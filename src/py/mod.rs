@@ -1,2 +1,2 @@
 pub mod api;
-//pub mod run_generator;
+pub mod run_generator;

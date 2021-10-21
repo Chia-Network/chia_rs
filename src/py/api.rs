@@ -4,9 +4,12 @@ use pyo3::{wrap_pyfunction, PyResult, Python};
 
 use clvm_rs::py::lazy_node::LazyNode;
 
+use crate::py::run_generator::__pyo3_get_function_run_generator;
+
 #[pymodule]
 fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(a_test_function, m)?)?;
+    m.add_function(wrap_pyfunction!(run_generator, m)?)?;
     m.add_class::<LazyNode>()?;
 
     Ok(())
