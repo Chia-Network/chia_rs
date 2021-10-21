@@ -7,7 +7,7 @@ edition = "2018"
 
 [dependencies]
 serde = "1.0.129"
-clvm_rs = { path = "/Users/kiss/projects/chia/clvm_rs/4chia_rs", default-features = false }
+clvm_rs = { git = "https://github.com/richardkiss/clvm_rs", branch = "chia_rs", default-features = false }
 
 [lib]
 name = "chia_rs"
