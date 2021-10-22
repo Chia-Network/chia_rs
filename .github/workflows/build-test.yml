@@ -86,7 +86,7 @@ jobs:
             . ./activate && \
             pip install --upgrade pip && \
             pip install maturin && \
-            CC=gcc maturin build --no-sdist --release --manylinux 2010 \
+            CC=gcc maturin build --no-sdist --release --manylinux 2010 -i python \
           '
 
     - name: Build Windows with maturin on Python ${{ matrix.python }}
