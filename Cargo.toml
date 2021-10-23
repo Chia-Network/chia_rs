@@ -7,6 +7,11 @@ edition = "2018"
 
 [dependencies]
 serde = "1.0.129"
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+clvm_rs = { git = "https://github.com/richardkiss/clvm_rs", branch = "chia_rs" }
+
+[target.'cfg(target_os = "macos")'.dependencies]
 clvm_rs = { git = "https://github.com/richardkiss/clvm_rs", branch = "chia_rs", default-features = false }
 
 [lib]
