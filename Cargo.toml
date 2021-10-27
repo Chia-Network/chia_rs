@@ -22,4 +22,4 @@ crate-type = ["cdylib", "rlib"]
 lto = true
 
 [target.'cfg(not(target_family="wasm"))'.dependencies]
-pyo3 = "0.14.5"
+pyo3 = { version = "0.14.5", features = ["abi3-py37"] }
