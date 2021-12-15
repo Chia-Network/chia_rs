@@ -2,6 +2,8 @@ use crate::run_generator::__pyo3_get_function_run_generator;
 use chia::gen::flags::COND_ARGS_NIL;
 use chia::gen::flags::COND_CANON_INTS;
 use chia::gen::flags::NO_UNKNOWN_CONDS;
+use chia::streamable::coin::Coin;
+use chia::streamable::fullblock::Fullblock;
 use clvmr::chia_dialect::NO_NEG_DIV;
 use clvmr::chia_dialect::NO_UNKNOWN_OPS;
 use clvmr::py::lazy_node::LazyNode;
@@ -23,6 +25,8 @@ pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add("NO_UNKNOWN_OPS", NO_UNKNOWN_OPS)?;
     m.add("MEMPOOL_MODE", MEMPOOL_MODE)?;
     m.add_class::<LazyNode>()?;
+    m.add_class::<Coin>()?;
+    m.add_class::<Fullblock>()?;
 
     Ok(())
 }
