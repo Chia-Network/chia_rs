@@ -2,16 +2,16 @@ use super::coin_id::compute_coin_id;
 use super::condition_sanitizers::{
     parse_amount, parse_height, parse_seconds, sanitize_announce_msg, sanitize_hash,
 };
-use super::rangeset::RangeSet;
-use super::sanitize_int::sanitize_uint;
-use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
-use crate::gen::opcodes::{
+use super::opcodes::{
     parse_opcode, ConditionOpcode, AGG_SIG_COST, AGG_SIG_ME, AGG_SIG_UNSAFE,
     ASSERT_COIN_ANNOUNCEMENT, ASSERT_HEIGHT_ABSOLUTE, ASSERT_HEIGHT_RELATIVE, ASSERT_MY_AMOUNT,
     ASSERT_MY_COIN_ID, ASSERT_MY_PARENT_ID, ASSERT_MY_PUZZLEHASH, ASSERT_PUZZLE_ANNOUNCEMENT,
     ASSERT_SECONDS_ABSOLUTE, ASSERT_SECONDS_RELATIVE, CREATE_COIN, CREATE_COIN_ANNOUNCEMENT,
     CREATE_COIN_COST, CREATE_PUZZLE_ANNOUNCEMENT, RESERVE_FEE,
 };
+use super::rangeset::RangeSet;
+use super::sanitize_int::sanitize_uint;
+use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
 use clvm_rs::allocator::{Allocator, NodePtr, SExp};
 use clvm_rs::cost::Cost;
 use clvm_rs::op_utils::u64_from_bytes;
@@ -263,8 +263,9 @@ impl PartialEq for NewCoin {
     }
 }
 
+// These are all the conditions related directly to a specific spend.
 #[derive(Debug)]
-pub struct SpendConditionSummary {
+pub struct Spend {
     pub coin_id: Arc<[u8; 32]>,
     pub puzzle_hash: NodePtr,
     // conditions
@@ -272,17 +273,37 @@ pub struct SpendConditionSummary {
     // constraint". i.e. a 0 in these conditions are inherently satisified and
     // ignored. 0 (or negative values) are not passed up to the next layer
     // One exception is height_relative, where 0 *is* relevant.
+    // the highest height/time conditions (i.e. most strict)
+    pub height_relative: Option<u32>,
+    pub seconds_relative: u64,
+    // all coins created by this spend. Duplicates are consensus failures
+    pub create_coin: HashSet<NewCoin>,
+    // Agg Sig Me conditions
+    pub agg_sig_me: Vec<(NodePtr, NodePtr)>,
+}
+
+// these are all the conditions and properties of a complete spend bundle.
+// some conditions that are created by individual spends are aggregated at the
+// spend bundle level, like reserve_fee and absolute time locks. Other
+// conditions are per spend, like relative time-locks and create coins (because
+// they have an implied parent coin ID).
+#[derive(Debug)]
+pub struct SpendBundleConditions {
+    pub spends: Vec<Spend>,
+    // conditions
+    // all these integers are initialized to 0, which also means "no
+    // constraint". i.e. a 0 in these conditions are inherently satisified and
+    // ignored. 0 (or negative values) are not passed up to the next layer
     // The sum of all reserve fee conditions
     pub reserve_fee: u64,
     // the highest height/time conditions (i.e. most strict)
-    pub height_relative: Option<u32>,
     pub height_absolute: u32,
-    pub seconds_relative: u64,
     pub seconds_absolute: u64,
-    // all create coins. Duplicates are consensus failures
-    pub create_coin: HashSet<NewCoin>,
-    // Agg Sig conditions
-    pub agg_sigs: Vec<Condition>,
+    // Unsafe Agg Sig conditions (i.e. not tied to the spend generating it)
+    pub agg_sig_unsafe: Vec<(NodePtr, NodePtr)>,
+
+    // the total cost of the spend bundle
+    pub cost: u64,
 }
 
 struct ParseState {
@@ -320,12 +341,13 @@ impl ParseState {
 }
 
 fn parse_spend_conditions(
+    ret: &mut SpendBundleConditions,
     a: &Allocator,
     state: &mut ParseState,
     mut spend: NodePtr,
     flags: u32,
     max_cost: &mut Cost,
-) -> Result<SpendConditionSummary, ValidationErr> {
+) -> Result<(), ValidationErr> {
     let parent_id = sanitize_hash(a, first(a, spend)?, 32, ErrorCode::InvalidParentId)?;
     spend = rest(a, spend)?;
     let puzzle_hash = sanitize_hash(a, first(a, spend)?, 32, ErrorCode::InvalidPuzzleHash)?;
@@ -349,16 +371,13 @@ fn parse_spend_conditions(
         return Err(ValidationErr(spend, ErrorCode::DoubleSpend));
     }
 
-    let mut spend = SpendConditionSummary {
+    let mut spend = Spend {
         coin_id,
         puzzle_hash,
-        reserve_fee: 0,
         height_relative: None,
-        height_absolute: 0,
         seconds_relative: 0,
-        seconds_absolute: 0,
         create_coin: HashSet::new(),
-        agg_sigs: Vec::new(),
+        agg_sig_me: Vec::new(),
     };
 
     let mut iter = first(a, cond)?;
@@ -398,7 +417,7 @@ fn parse_spend_conditions(
         match cva {
             Condition::ReserveFee(limit) => {
                 // reserve fees are accumulated
-                spend.reserve_fee = spend
+                ret.reserve_fee = ret
                     .reserve_fee
                     .checked_add(limit)
                     .ok_or(ValidationErr(c, ErrorCode::ReserveFeeConditionFailed))?;
@@ -419,7 +438,7 @@ fn parse_spend_conditions(
             }
             Condition::AssertSecondsAbsolute(s) => {
                 // keep the most strict condition. i.e. the highest limit
-                spend.seconds_absolute = max(spend.seconds_absolute, s);
+                ret.seconds_absolute = max(ret.seconds_absolute, s);
             }
             Condition::AssertHeightRelative(h) => {
                 // keep the most strict condition. i.e. the highest limit
@@ -427,7 +446,7 @@ fn parse_spend_conditions(
             }
             Condition::AssertHeightAbsolute(h) => {
                 // keep the most strict condition. i.e. the highest limit
-                spend.height_absolute = max(spend.height_absolute, h);
+                ret.height_absolute = max(ret.height_absolute, h);
             }
             Condition::AssertMyCoinId(id) => {
                 if a.atom(id) != *spend.coin_id {
@@ -461,14 +480,18 @@ fn parse_spend_conditions(
             Condition::AssertPuzzleAnnouncement(msg) => {
                 state.assert_puzzle.insert(msg);
             }
-            Condition::AggSigMe(_, _) | Condition::AggSigUnsafe(_, _) => {
-                spend.agg_sigs.push(cva);
+            Condition::AggSigMe(pk, msg) => {
+                spend.agg_sig_me.push((pk, msg));
+            }
+            Condition::AggSigUnsafe(pk, msg) => {
+                ret.agg_sig_unsafe.push((pk, msg));
             }
             Condition::Skip => {}
         }
     }
 
-    Ok(spend)
+    ret.spends.push(spend);
+    Ok(())
 }
 
 // This function parses, and validates aspects of, the above structure and
@@ -477,26 +500,31 @@ fn parse_spend_conditions(
 pub fn parse_spends(
     a: &Allocator,
     spends: NodePtr,
-    mut max_cost: Cost,
+    max_cost: Cost,
     flags: u32,
-) -> Result<Vec<SpendConditionSummary>, ValidationErr> {
-    let mut ret = Vec::<SpendConditionSummary>::new();
+) -> Result<SpendBundleConditions, ValidationErr> {
+    let mut ret = SpendBundleConditions {
+        spends: Vec::new(),
+        reserve_fee: 0,
+        height_absolute: 0,
+        seconds_absolute: 0,
+        agg_sig_unsafe: Vec::new(),
+        cost: 0,
+    };
 
     let mut state = ParseState::new();
+
+    let mut cost_left = max_cost;
 
     let mut iter = first(a, spends)?;
     while let Some((spend, next)) = next(a, iter)? {
         iter = next;
-        // max_cost is passed in as a mutable reference and decremented by the
+        // cost_left is passed in as a mutable reference and decremented by the
         // cost of the condition (if it has a cost). This let us fail as early
         // as possible if cost is exceeded
-        ret.push(parse_spend_conditions(
-            a,
-            &mut state,
-            spend,
-            flags,
-            &mut max_cost,
-        )?);
+        // this function adds the spend to the passed-in ret
+        // as well as updates it with any conditions
+        parse_spend_conditions(&mut ret, a, &mut state, spend, flags, &mut cost_left)?;
     }
 
     // check all the assert announcements
@@ -541,17 +569,34 @@ pub fn parse_spends(
         }
     }
 
+    ret.cost = max_cost - cost_left;
+
     Ok(ret)
 }
 
 #[cfg(test)]
-use clvm_rs::int_to_bytes::u64_to_bytes;
+fn u64_to_bytes(n: u64) -> Vec<u8> {
+    let mut buf = Vec::<u8>::new();
+    buf.extend_from_slice(&n.to_be_bytes());
+    if (buf[0] & 0x80) != 0 {
+        buf.insert(0, 0);
+    } else {
+        while buf.len() > 1 && buf[0] == 0 && (buf[1] & 0x80) == 0 {
+            buf.remove(0);
+        }
+    }
+    buf
+}
 #[cfg(test)]
-use clvm_rs::node::Node;
+use crate::node::Node;
 #[cfg(test)]
-use clvm_rs::number::{ptr_from_number, Number};
+use crate::number::{ptr_from_number, Number};
 #[cfg(test)]
-use clvm_rs::serialize::node_to_bytes;
+use crate::serialize::node_to_bytes;
+#[cfg(test)]
+use hex::FromHex;
+#[cfg(test)]
+use num_traits::Num;
 #[cfg(test)]
 use std::collections::HashMap;
 
@@ -652,66 +697,43 @@ fn test_coin_id(parent_id: &[u8], puzzle_hash: &[u8], amount: u64) -> [u8; 32] {
 #[cfg(test)]
 fn parse_list_impl(
     a: &mut Allocator,
-    mut input: &str,
+    input: &str,
     callback: &Option<fn(&mut Allocator) -> NodePtr>,
     subs: &HashMap<&'static str, NodePtr>,
 ) -> (NodePtr, usize) {
-    let first = input.chars().nth(0).unwrap();
-
     // skip whitespace
-    if first == ' ' {
+    if input.starts_with(" ") {
         let (n, skip) = parse_list_impl(a, &input[1..], callback, subs);
         return (n, skip + 1);
     }
-    if first == ')' {
+
+    if input.starts_with(")") {
         (a.null(), 1)
-    } else if first == '(' {
+    } else if input.starts_with("(") {
         let (first, step1) = parse_list_impl(a, &input[1..], callback, subs);
         let (rest, step2) = parse_list_impl(a, &input[(1 + step1)..], callback, subs);
         (a.new_pair(first, rest).unwrap(), 1 + step1 + step2)
-    } else if first == '{' {
+    } else if input.starts_with("{") {
         // substitute '{X}' tokens with our test hashes and messages
         // this keeps the test cases a lot simpler
-        let var = &input[1..].split('}').next().unwrap();
+        let var = input[1..].split_once("}").unwrap().0;
 
         let ret = match var {
-            &"" => callback.unwrap()(a),
+            "" => callback.unwrap()(a),
             _ => *subs.get(var).unwrap(),
         };
         (ret, var.len() + 2)
-    } else if &input[0..2] == "0x" {
-        let mut num = Number::from_signed_bytes_be(&[0]);
-        let mut count = 2;
-        for c in input[2..].chars() {
-            if c == ' ' {
-                break;
-            }
-            num <<= 4;
-            num += c.to_digit(16).unwrap();
-            count += 1;
-        }
-        assert!(count > 0);
-        (ptr_from_number(a, &num).unwrap(), count + 1)
+    } else if input.starts_with("0x") {
+        let v = input.split_once(" ").unwrap().0;
+
+        let buf = Vec::from_hex(v.strip_prefix("0x").unwrap()).unwrap();
+        (a.new_atom(&buf).unwrap(), v.len() + 1)
+    } else if input.starts_with("-") || "0123456789".contains(input.get(0..1).unwrap()) {
+        let v = input.split_once(" ").unwrap().0;
+        let num = Number::from_str_radix(v, 10).unwrap();
+        (ptr_from_number(a, &num).unwrap(), v.len() + 1)
     } else {
-        let negative = if input.chars().next().unwrap() == '-' {
-            input = &input[1..];
-            -1
-        } else {
-            1
-        };
-        let mut num = Number::from_signed_bytes_be(&[0]);
-        let mut count = 0;
-        for c in input.chars() {
-            if c == ' ' {
-                break;
-            }
-            num *= 10;
-            num += c.to_digit(10).unwrap();
-            count += 1;
-        }
-        num *= negative;
-        assert!(count > 0);
-        (ptr_from_number(a, &num).unwrap(), count + 1)
+        panic!("atom not supported \"{}\"", input);
     }
 }
 
@@ -782,7 +804,7 @@ fn parse_list(
 fn cond_test_cb(
     input: &str,
     callback: Option<fn(&mut Allocator) -> NodePtr>,
-) -> Result<(Allocator, Vec<SpendConditionSummary>), ValidationErr> {
+) -> Result<(Allocator, SpendBundleConditions), ValidationErr> {
     let mut a = Allocator::new();
 
     println!("input: {}", input);
@@ -795,7 +817,7 @@ fn cond_test_cb(
     let flags: u32 = 0;
     match parse_spends(&a, n, 11000000000, flags) {
         Ok(list) => {
-            for n in &list {
+            for n in &list.spends {
                 println!("{:?}", n);
             }
             Ok((a, list))
@@ -805,7 +827,7 @@ fn cond_test_cb(
 }
 
 #[cfg(test)]
-fn cond_test(input: &str) -> Result<(Allocator, Vec<SpendConditionSummary>), ValidationErr> {
+fn cond_test(input: &str) -> Result<(Allocator, SpendBundleConditions), ValidationErr> {
     cond_test_cb(input, None)
 }
 
@@ -829,13 +851,25 @@ fn test_invalid_condition_list2() {
 fn test_invalid_condition_args_terminator() {
     // we only look at the condition arguments the condition expects, any
     // additional arguments are ignored, including the terminator
-    let (a, spend_list) = cond_test("((({h1} ({h2} (123 (((80 (50 8 ))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((80 (50 8 ))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
 
-    assert_eq!(spend_list[0].seconds_relative, 50);
+    assert_eq!(spend.seconds_relative, 50);
+}
+#[test]
+fn test_invalid_condition_list_terminator() {
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((80 (50 8 ))))").unwrap();
+
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
+
+    assert_eq!(spend.seconds_relative, 50);
 }
 
 #[test]
@@ -873,13 +907,14 @@ fn test_invalid_spend_list_terminator() {
 #[test]
 fn test_single_seconds_relative() {
     // ASSERT_SECONDS_RELATIVE
-    let (a, spend_list) = cond_test("((({h1} ({h2} (123 (((80 (101 )))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((80 (101 )))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
 
-    assert_eq!(spend_list[0].seconds_relative, 101);
+    assert_eq!(spend.seconds_relative, 101);
 }
 
 #[test]
@@ -896,27 +931,29 @@ fn test_seconds_relative_exceed_max() {
 #[test]
 fn test_multiple_seconds_relative() {
     // ASSERT_SECONDS_RELATIVE
-    let (a, spend_list) =
+    let (a, conds) =
         cond_test("((({h1} ({h2} (123 (((80 (100 ) ((80 (503 ) ((80 (90 )))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
 
     // we use the MAX value
-    assert_eq!(spend_list[0].seconds_relative, 503);
+    assert_eq!(spend.seconds_relative, 503);
 }
 
 #[test]
 fn test_single_seconds_absolute() {
     // ASSERT_SECONDS_ABSOLUTE
-    let (a, spend_list) = cond_test("((({h1} ({h2} (123 (((81 (104 )))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((81 (104 )))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
 
-    assert_eq!(spend_list[0].seconds_absolute, 104);
+    assert_eq!(conds.seconds_absolute, 104);
 }
 
 #[test]
@@ -933,39 +970,42 @@ fn test_seconds_absolute_exceed_max() {
 #[test]
 fn test_multiple_seconds_absolute() {
     // ASSERT_SECONDS_ABSOLUTE
-    let (a, spend_list) =
+    let (a, conds) =
         cond_test("((({h1} ({h2} (123 (((81 (100 ) ((81 (503 ) ((81 (90 )))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
 
     // we use the MAX value
-    assert_eq!(spend_list[0].seconds_absolute, 503);
+    assert_eq!(conds.seconds_absolute, 503);
 }
 
 #[test]
 fn test_single_height_relative() {
     // ASSERT_HEIGHT_RELATIVE
-    let (a, spend_list) = cond_test("((({h1} ({h2} (123 (((82 (101 )))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((82 (101 )))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
 
-    assert_eq!(spend_list[0].height_relative, Some(101));
+    assert_eq!(spend.height_relative, Some(101));
 }
 
 #[test]
 fn test_single_height_relative_zero() {
     // ASSERT_HEIGHT_RELATIVE
-    let (a, spend_list) = cond_test("((({h1} ({h2} (123 (((82 (0 )))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((82 (0 )))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
 
-    assert_eq!(spend_list[0].height_relative, Some(0));
+    assert_eq!(spend.height_relative, Some(0));
 }
 
 #[test]
@@ -982,27 +1022,29 @@ fn test_height_relative_exceed_max() {
 #[test]
 fn test_multiple_height_relative() {
     // ASSERT_HEIGHT_RELATIVE
-    let (a, spend_list) =
+    let (a, conds) =
         cond_test("((({h1} ({h2} (123 (((82 (100 ) ((82 (503 ) ((82 (90 )))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
 
     // we use the MAX value
-    assert_eq!(spend_list[0].height_relative, Some(503));
+    assert_eq!(spend.height_relative, Some(503));
 }
 
 #[test]
 fn test_single_height_absolute() {
     // ASSERT_HEIGHT_ABSOLUTE
-    let (a, spend_list) = cond_test("((({h1} ({h2} (123 (((83 (100 )))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((83 (100 )))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
 
-    assert_eq!(spend_list[0].height_absolute, 100);
+    assert_eq!(conds.height_absolute, 100);
 }
 
 #[test]
@@ -1019,27 +1061,29 @@ fn test_height_absolute_exceed_max() {
 #[test]
 fn test_multiple_height_absolute() {
     // ASSERT_HEIGHT_ABSOLUTE
-    let (a, spend_list) =
+    let (a, conds) =
         cond_test("((({h1} ({h2} (123 (((83 (100 ) ((83 (503 ) ((83 (90 )))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
 
     // we use the MAX value
-    assert_eq!(spend_list[0].height_absolute, 503);
+    assert_eq!(conds.height_absolute, 503);
 }
 
 #[test]
 fn test_single_reserve_fee() {
     // RESERVE_FEE
-    let (a, spend_list) = cond_test("((({h1} ({h2} (123 (((52 (100 )))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((52 (100 )))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
 
-    assert_eq!(spend_list[0].reserve_fee, 100);
+    assert_eq!(conds.reserve_fee, 100);
 }
 
 #[test]
@@ -1058,15 +1102,16 @@ fn test_reserve_fee_exceed_max() {
 #[test]
 fn test_multiple_reserve_fee() {
     // RESERVE_FEE
-    let (a, spend_list) =
+    let (a, conds) =
         cond_test("((({h1} ({h2} (123 (((52 (100 ) ((52 (25 ) ((52 (50 )))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
 
     // reserve fee conditions are accumulated 100 + 50 = 150
-    assert_eq!(spend_list[0].reserve_fee, 175);
+    assert_eq!(conds.reserve_fee, 175);
 }
 
 // TOOD: test announcement across coins
@@ -1075,27 +1120,27 @@ fn test_multiple_reserve_fee() {
 fn test_coin_announces_consume() {
     // CREATE_COIN_ANNOUNCEMENT
     // ASSERT_COIN_ANNOUNCEMENT
-    let (a, spend_list) =
-        cond_test("((({h1} ({h2} (123 (((60 ({msg1} ) ((61 ({c11} )))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((60 ({msg1} ) ((61 ({c11} )))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
 }
 
 #[test]
 fn test_cross_coin_announces_consume() {
     // CREATE_COIN_ANNOUNCEMENT
     // ASSERT_COIN_ANNOUNCEMENT
-    let (a, spend_list) =
+    let (a, conds) =
         cond_test("((({h1} ({h2} (123 (((60 ({msg1} ))) (({h2} ({h2} (123 (((61 ({c11} )))))")
             .unwrap();
 
-    assert_eq!(spend_list.len(), 2);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
-    assert_eq!(*spend_list[1].coin_id, test_coin_id(H2, H2, 123));
-    assert_eq!(a.atom(spend_list[1].puzzle_hash), H2);
+    assert_eq!(conds.spends.len(), 2);
+    assert_eq!(*conds.spends[0].coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(conds.spends[0].puzzle_hash), H2);
+    assert_eq!(*conds.spends[1].coin_id, test_coin_id(H2, H2, 123));
+    assert_eq!(a.atom(conds.spends[1].puzzle_hash), H2);
 }
 
 #[test]
@@ -1137,27 +1182,27 @@ fn test_coin_announce_mismatch() {
 fn test_puzzle_announces_consume() {
     // CREATE_PUZZLE_ANNOUNCEMENT
     // ASSERT_PUZZLE_ANNOUNCEMENT
-    let (a, spend_list) =
-        cond_test("((({h1} ({h2} (123 (((62 ({msg1} ) ((63 ({p21} )))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((62 ({msg1} ) ((63 ({p21} )))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
 }
 
 #[test]
 fn test_cross_coin_puzzle_announces_consume() {
     // CREATE_PUZZLE_ANNOUNCEMENT
     // ASSERT_PUZZLE_ANNOUNCEMENT
-    let (a, spend_list) =
+    let (a, conds) =
         cond_test("((({h1} ({h2} (123 (((62 ({msg1} ))) (({h2} ({h2} (123 (((63 ({p21} )))))")
             .unwrap();
 
-    assert_eq!(spend_list.len(), 2);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
-    assert_eq!(*spend_list[1].coin_id, test_coin_id(H2, H2, 123));
-    assert_eq!(a.atom(spend_list[1].puzzle_hash), H2);
+    assert_eq!(conds.spends.len(), 2);
+    assert_eq!(*conds.spends[0].coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(conds.spends[0].puzzle_hash), H2);
+    assert_eq!(*conds.spends[1].coin_id, test_coin_id(H2, H2, 123));
+    assert_eq!(a.atom(conds.spends[1].puzzle_hash), H2);
 }
 
 #[test]
@@ -1198,11 +1243,12 @@ fn test_puzzle_announce_mismatch() {
 #[test]
 fn test_single_assert_my_amount() {
     // ASSERT_MY_AMOUNT
-    let (a, spend_list) = cond_test("((({h1} ({h2} (123 (((73 (123 )))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((73 (123 )))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
 }
 
 #[test]
@@ -1220,21 +1266,23 @@ fn test_single_assert_my_amount_exceed_max() {
 fn test_single_assert_my_amount_overlong() {
     // ASSERT_MY_AMOUNT
     // leading zeroes are ignored
-    let (a, spend_list) = cond_test("((({h1} ({h2} (123 (((73 (0x0000007b )))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((73 (0x0000007b )))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
 }
 
 #[test]
 fn test_multiple_assert_my_amount() {
     // ASSERT_MY_AMOUNT
-    let (a, spend_list) = cond_test("((({h1} ({h2} (123 (((73 (123 ) ((73 (123 ) ))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((73 (123 ) ((73 (123 ) ))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
 }
 
 #[test]
@@ -1262,33 +1310,36 @@ fn test_single_failing_assert_my_amount() {
 #[test]
 fn test_single_assert_my_coin_id() {
     // ASSERT_MY_COIN_ID
-    let (a, spend_list) = cond_test("((({h1} ({h2} (123 (((70 ({coin12} )))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((70 ({coin12} )))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
 }
 
 #[test]
 fn test_single_assert_my_coin_id_overlong() {
     // ASSERT_MY_COIN_ID
     // leading zeros in the coin amount are ignored when computing the coin ID
-    let (a, spend_list) = cond_test("((({h1} ({h2} (0x0000007b (((70 ({coin12} )))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (0x0000007b (((70 ({coin12} )))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
 }
 
 #[test]
 fn test_multiple_assert_my_coin_id() {
     // ASSERT_MY_COIN_ID
-    let (a, spend_list) =
+    let (a, conds) =
         cond_test("((({h1} ({h2} (123 (((70 ({coin12} ) ((70 ({coin12} ) ))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
 }
 
 #[test]
@@ -1318,21 +1369,23 @@ fn test_multiple_assert_my_coin_id_mismatch() {
 #[test]
 fn test_single_assert_my_parent_coin_id() {
     // ASSERT_MY_PARENT_ID
-    let (a, spend_list) = cond_test("((({h1} ({h2} (123 (((71 ({h1} )))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((71 ({h1} )))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
 }
 
 #[test]
 fn test_multiple_assert_my_parent_coin_id() {
     // ASSERT_MY_PARENT_ID
-    let (a, spend_list) = cond_test("((({h1} ({h2} (123 (((71 ({h1} ) ((71 ({h1} ) ))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((71 ({h1} ) ((71 ({h1} ) ))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
 }
 
 #[test]
@@ -1361,21 +1414,23 @@ fn test_single_invalid_assert_my_parent_coin_id() {
 #[test]
 fn test_single_assert_my_puzzle_hash() {
     // ASSERT_MY_PUZZLEHASH
-    let (a, spend_list) = cond_test("((({h1} ({h2} (123 (((72 ({h2} )))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((72 ({h2} )))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
 }
 
 #[test]
 fn test_multiple_assert_my_puzzle_hash() {
     // ASSERT_MY_PUZZLEHASH
-    let (a, spend_list) = cond_test("((({h1} ({h2} (123 (((72 ({h2} ) ((72 ({h2} ) ))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((72 ({h2} ) ((72 ({h2} ) ))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
 }
 
 #[test]
@@ -1404,13 +1459,14 @@ fn test_single_invalid_assert_my_puzzle_hash() {
 #[test]
 fn test_single_create_coin() {
     // CREATE_COIN
-    let (a, spend_list) = cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 )))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 )))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
-    assert_eq!(spend_list[0].create_coin.len(), 1);
-    for c in &spend_list[0].create_coin {
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.create_coin.len(), 1);
+    for c in &spend.create_coin {
         assert_eq!(c.puzzle_hash, H2.to_vec());
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.null());
@@ -1420,14 +1476,15 @@ fn test_single_create_coin() {
 #[test]
 fn test_create_coin_max_amount() {
     // CREATE_COIN
-    let (a, spend_list) =
+    let (a, conds) =
         cond_test("((({h1} ({h2} (123 (((51 ({h2} (0x00ffffffffffffffff )))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
-    assert_eq!(spend_list[0].create_coin.len(), 1);
-    for c in &spend_list[0].create_coin {
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.create_coin.len(), 1);
+    for c in &spend.create_coin {
         assert_eq!(c.puzzle_hash, H2.to_vec());
         assert_eq!(c.amount, 0xffffffffffffffff_u64);
         assert_eq!(c.hint, a.null());
@@ -1470,13 +1527,14 @@ fn test_create_coin_invalid_puzzlehash() {
 #[test]
 fn test_create_coin_with_hint() {
     // CREATE_COIN
-    let (a, spend_list) = cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 (({h1}) )))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 (({h1}) )))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
-    assert_eq!(spend_list[0].create_coin.len(), 1);
-    for c in &spend_list[0].create_coin {
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.create_coin.len(), 1);
+    for c in &spend.create_coin {
         assert!(c.puzzle_hash == H2.to_vec());
         assert!(c.amount == 42_u64);
         assert!(a.atom(c.hint) == H1.to_vec());
@@ -1486,14 +1544,14 @@ fn test_create_coin_with_hint() {
 #[test]
 fn test_create_coin_with_multiple_hints() {
     // CREATE_COIN
-    let (a, spend_list) =
-        cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 (({h1} ({h2}) )))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 (({h1} ({h2}) )))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
-    assert_eq!(spend_list[0].create_coin.len(), 1);
-    for c in &spend_list[0].create_coin {
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.create_coin.len(), 1);
+    for c in &spend.create_coin {
         assert!(c.puzzle_hash == H2.to_vec());
         assert!(c.amount == 42_u64);
         assert!(a.atom(c.hint) == H1.to_vec());
@@ -1504,13 +1562,14 @@ fn test_create_coin_with_multiple_hints() {
 fn test_create_coin_with_hint_as_atom() {
     // CREATE_COIN
     // the hint is supposed to be a list
-    let (a, spend_list) = cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 ({h1} )))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 ({h1} )))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
-    assert_eq!(spend_list[0].create_coin.len(), 1);
-    for c in &spend_list[0].create_coin {
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.create_coin.len(), 1);
+    for c in &spend.create_coin {
         assert_eq!(c.puzzle_hash, H2.to_vec());
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.null());
@@ -1520,13 +1579,14 @@ fn test_create_coin_with_hint_as_atom() {
 #[test]
 fn test_create_coin_with_invalid_hint_as_terminator() {
     // CREATE_COIN
-    let (a, spend_list) = cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 {h1}))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 {h1}))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
-    assert_eq!(spend_list[0].create_coin.len(), 1);
-    for c in &spend_list[0].create_coin {
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.create_coin.len(), 1);
+    for c in &spend.create_coin {
         assert_eq!(c.puzzle_hash, H2.to_vec());
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.null());
@@ -1536,13 +1596,15 @@ fn test_create_coin_with_invalid_hint_as_terminator() {
 #[test]
 fn test_create_coin_with_short_hint() {
     // CREATE_COIN
-    let (a, spend_list) = cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 (({msg1}))))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 (({msg1}))))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
-    assert_eq!(spend_list[0].create_coin.len(), 1);
-    for c in &spend_list[0].create_coin {
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.create_coin.len(), 1);
+
+    for c in &spend.create_coin {
         assert!(c.puzzle_hash == H2.to_vec());
         assert!(c.amount == 42_u64);
         assert!(a.atom(c.hint) == MSG1.to_vec());
@@ -1552,13 +1614,15 @@ fn test_create_coin_with_short_hint() {
 #[test]
 fn test_create_coin_with_long_hint() {
     // CREATE_COIN
-    let (a, spend_list) = cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 ({long})))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 ({long})))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
-    assert_eq!(spend_list[0].create_coin.len(), 1);
-    for c in &spend_list[0].create_coin {
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.create_coin.len(), 1);
+
+    for c in &spend.create_coin {
         assert_eq!(c.puzzle_hash, H2.to_vec());
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.null());
@@ -1569,14 +1633,15 @@ fn test_create_coin_with_long_hint() {
 fn test_create_coin_with_pair_hint() {
     // CREATE_COIN
     // we only pick out the first element
-    let (a, spend_list) =
-        cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 (({h1} {h2} )))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 (({h1} {h2} )))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
-    assert_eq!(spend_list[0].create_coin.len(), 1);
-    for c in &spend_list[0].create_coin {
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.create_coin.len(), 1);
+
+    for c in &spend.create_coin {
         assert_eq!(c.puzzle_hash, H2.to_vec());
         assert_eq!(c.amount, 42_u64);
         assert_eq!(a.atom(c.hint), H1.to_vec());
@@ -1587,14 +1652,14 @@ fn test_create_coin_with_pair_hint() {
 fn test_create_coin_with_cons_hint() {
     // CREATE_COIN
     // if the first element is a cons-box, it's not a valid hint
-    let (a, spend_list) =
-        cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 ((({h1} {h2}) )))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 ((({h1} {h2}) )))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
-    assert_eq!(spend_list[0].create_coin.len(), 1);
-    for c in &spend_list[0].create_coin {
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.create_coin.len(), 1);
+    for c in &spend.create_coin {
         assert_eq!(c.puzzle_hash, H2.to_vec());
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.null());
@@ -1604,19 +1669,21 @@ fn test_create_coin_with_cons_hint() {
 #[test]
 fn test_multiple_create_coin() {
     // CREATE_COIN
-    let (a, spend_list) =
+    let (a, conds) =
         cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 ) ((51 ({h2} (43 ) ))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
-    assert_eq!(spend_list[0].create_coin.len(), 2);
-    assert!(spend_list[0].create_coin.contains(&NewCoin {
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.create_coin.len(), 2);
+
+    assert!(spend.create_coin.contains(&NewCoin {
         puzzle_hash: H2.to_vec(),
         amount: 42_u64,
         hint: a.null()
     }));
-    assert!(spend_list[0].create_coin.contains(&NewCoin {
+    assert!(spend.create_coin.contains(&NewCoin {
         puzzle_hash: H2.to_vec(),
         amount: 43_u64,
         hint: a.null()
@@ -1670,22 +1737,16 @@ fn test_duplicate_create_coin() {
 #[test]
 fn test_single_agg_sig_me() {
     // AGG_SIG_ME
-    let (a, spend_list) = cond_test("((({h1} ({h2} (123 (((50 ({pubkey} ({msg1} )))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((50 ({pubkey} ({msg1} )))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
-    assert_eq!(spend_list[0].agg_sigs.len(), 1);
-    for c in &spend_list[0].agg_sigs {
-        match c {
-            Condition::AggSigMe(pubkey, msg) => {
-                assert_eq!(a.atom(*pubkey), PUBKEY);
-                assert_eq!(a.atom(*msg), MSG1);
-            }
-            _ => {
-                panic!("unexpected value");
-            }
-        }
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.agg_sig_me.len(), 1);
+    for c in &spend.agg_sig_me {
+        assert_eq!(a.atom(c.0), PUBKEY);
+        assert_eq!(a.atom(c.1), MSG1);
     }
 }
 
@@ -1694,24 +1755,18 @@ fn test_duplicate_agg_sig_me() {
     // AGG_SIG_ME
     // we cannot deduplicate AGG_SIG conditions. Their signatures will be
     // aggregated, and so must all copies of the public keys
-    let (a, spend_list) =
+    let (a, conds) =
         cond_test("((({h1} ({h2} (123 (((50 ({pubkey} ({msg1} ) ((50 ({pubkey} ({msg1} ) ))))")
             .unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
-    assert_eq!(spend_list[0].agg_sigs.len(), 2);
-    for c in &spend_list[0].agg_sigs {
-        match c {
-            Condition::AggSigMe(pubkey, msg) => {
-                assert_eq!(a.atom(*pubkey), PUBKEY);
-                assert_eq!(a.atom(*msg), MSG1);
-            }
-            _ => {
-                panic!("unexpected value");
-            }
-        }
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.agg_sig_me.len(), 2);
+    for c in &spend.agg_sig_me {
+        assert_eq!(a.atom(c.0), PUBKEY);
+        assert_eq!(a.atom(c.1), MSG1);
     }
 }
 
@@ -1773,22 +1828,16 @@ fn test_agg_sig_me_exceed_cost() {
 #[test]
 fn test_single_agg_sig_unsafe() {
     // AGG_SIG_UNSAFE
-    let (a, spend_list) = cond_test("((({h1} ({h2} (123 (((49 ({pubkey} ({msg1} )))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((49 ({pubkey} ({msg1} )))))").unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
-    assert_eq!(spend_list[0].agg_sigs.len(), 1);
-    for c in &spend_list[0].agg_sigs {
-        match c {
-            Condition::AggSigUnsafe(pubkey, msg) => {
-                assert_eq!(a.atom(*pubkey), PUBKEY);
-                assert_eq!(a.atom(*msg), MSG1);
-            }
-            _ => {
-                panic!("unexpected value");
-            }
-        }
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(conds.agg_sig_unsafe.len(), 1);
+    for (pk, msg) in &conds.agg_sig_unsafe {
+        assert_eq!(a.atom(*pk), PUBKEY);
+        assert_eq!(a.atom(*msg), MSG1);
     }
 }
 
@@ -1818,24 +1867,18 @@ fn test_agg_sig_me_extra_arg() {
 fn test_duplicate_agg_sig_unsafe() {
     // AGG_SIG_UNSAFE
     // these conditions may not be deduplicated
-    let (a, spend_list) =
+    let (a, conds) =
         cond_test("((({h1} ({h2} (123 (((49 ({pubkey} ({msg1} ) ((49 ({pubkey} ({msg1} ) ))))")
             .unwrap();
 
-    assert_eq!(spend_list.len(), 1);
-    assert_eq!(*spend_list[0].coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend_list[0].puzzle_hash), H2);
-    assert_eq!(spend_list[0].agg_sigs.len(), 2);
-    for c in &spend_list[0].agg_sigs {
-        match c {
-            Condition::AggSigUnsafe(pubkey, msg) => {
-                assert_eq!(a.atom(*pubkey), PUBKEY);
-                assert_eq!(a.atom(*msg), MSG1);
-            }
-            _ => {
-                panic!("unexpected value");
-            }
-        }
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(conds.agg_sig_unsafe.len(), 2);
+    for (pk, msg) in &conds.agg_sig_unsafe {
+        assert_eq!(a.atom(*pk), PUBKEY);
+        assert_eq!(a.atom(*msg), MSG1);
     }
 }
 

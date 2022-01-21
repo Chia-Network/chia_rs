@@ -12,7 +12,7 @@ serde = "1.0.129"
 clvm_rs = { git = "https://github.com/richardkiss/clvm_rs", branch = "chia_rs" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-clvm_rs = { git = "https://github.com/richardkiss/clvm_rs", branch = "chia_rs", default-features = false }
+clvm_rs = { git = "https://github.com/richardkiss/clvm_rs", branch = "chia_rs", default-features = false, features= ["py-api", "gen"]}
 
 [lib]
 name = "chia_rs"
@@ -22,4 +22,4 @@ crate-type = ["cdylib", "rlib"]
 lto = true
 
 [target.'cfg(not(target_family="wasm"))'.dependencies]
-pyo3 = { version = "0.14.5", features = ["abi3-py37"] }
+pyo3 = { version = "0.15.1", features = ["abi3-py37"] }

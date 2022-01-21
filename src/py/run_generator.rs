@@ -1,175 +1,106 @@
-use crate::gen::conditions::{parse_spends, Condition, SpendConditionSummary};
-use crate::gen::opcodes::{
-    ConditionOpcode, AGG_SIG_ME, AGG_SIG_UNSAFE, ASSERT_HEIGHT_ABSOLUTE, ASSERT_HEIGHT_RELATIVE,
-    ASSERT_SECONDS_ABSOLUTE, ASSERT_SECONDS_RELATIVE, CREATE_COIN, RESERVE_FEE,
-};
+use crate::gen::conditions::{parse_spends, Spend, SpendBundleConditions};
 use crate::gen::validation_error::{ErrorCode, ValidationErr};
 use clvm_rs::allocator::{Allocator, NodePtr};
-use clvm_rs::chia_dialect::chia_dialect;
+use clvm_rs::chia_dialect::ChiaDialect;
 use clvm_rs::cost::Cost;
-use clvm_rs::int_to_bytes::u64_to_bytes;
+use clvm_rs::py::adapt_response::eval_err_to_pyresult;
 use clvm_rs::reduction::{EvalErr, Reduction};
-use clvm_rs::run_program::STRICT_MODE;
+use clvm_rs::run_program::{run_program, STRICT_MODE};
 use clvm_rs::serialize::node_from_bytes;
 
-use clvm_rs::py::lazy_node::LazyNode;
-
-use std::collections::HashMap;
-use std::rc::Rc;
-
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict};
+use pyo3::types::PyBytes;
+
+#[pyclass(subclass, unsendable)]
+#[derive(Clone)]
+pub struct PySpend {
+    #[pyo3(get)]
+    pub coin_id: PyObject,
+    #[pyo3(get)]
+    pub puzzle_hash: PyObject,
+    #[pyo3(get)]
+    pub height_relative: Option<u32>,
+    #[pyo3(get)]
+    pub seconds_relative: u64,
+    #[pyo3(get)]
+    pub create_coin: Vec<(PyObject, u64, PyObject)>,
+    #[pyo3(get)]
+    pub agg_sig_me: Vec<(PyObject, PyObject)>,
+}
+
+#[pyclass(subclass, unsendable)]
+#[derive(Clone)]
+pub struct PySpendBundleConditions {
+    #[pyo3(get)]
+    pub spends: Vec<PySpend>,
+    #[pyo3(get)]
+    pub reserve_fee: u64,
+    #[pyo3(get)]
+    // the highest height/time conditions (i.e. most strict)
+    pub height_absolute: u32,
+    #[pyo3(get)]
+    pub seconds_absolute: u64,
+    // Unsafe Agg Sig conditions (i.e. not tied to the spend generating it)
+    #[pyo3(get)]
+    pub agg_sig_unsafe: Vec<(PyObject, PyObject)>,
+    #[pyo3(get)]
+    pub cost: u64,
+}
 
 fn node_to_pybytes(py: Python, a: &Allocator, n: NodePtr) -> PyObject {
     PyBytes::new(py, a.atom(n)).into()
 }
 
-fn int_to_pybytes(py: Python, n: u64) -> PyObject {
-    let buf = u64_to_bytes(n);
-    PyBytes::new(py, &buf).into()
+fn convert_spend(py: Python, a: &Allocator, spend: Spend) -> PySpend {
+    let mut agg_sigs = Vec::<(PyObject, PyObject)>::new();
+    for (pk, msg) in spend.agg_sig_me {
+        agg_sigs.push((node_to_pybytes(py, a, pk), node_to_pybytes(py, a, msg)));
+    }
+    let mut create_coin = Vec::<(PyObject, u64, PyObject)>::new();
+    for c in spend.create_coin {
+        create_coin.push((
+            PyBytes::new(py, &c.puzzle_hash).into(),
+            c.amount,
+            node_to_pybytes(py, a, c.hint),
+        ));
+    }
+
+    PySpend {
+        coin_id: PyBytes::new(py, &*spend.coin_id).into(),
+        puzzle_hash: node_to_pybytes(py, a, spend.puzzle_hash),
+        height_relative: spend.height_relative,
+        seconds_relative: spend.seconds_relative,
+        create_coin,
+        agg_sig_me: agg_sigs,
+    }
 }
 
-#[pyclass(subclass, unsendable)]
-#[derive(Clone)]
-pub struct PyConditionWithArgs {
-    #[pyo3(get)]
-    pub opcode: ConditionOpcode,
-    #[pyo3(get)]
-    pub vars: Vec<PyObject>,
-}
-
-#[pyclass(subclass, unsendable)]
-pub struct PySpendConditionSummary {
-    #[pyo3(get)]
-    pub coin_name: PyObject,
-    #[pyo3(get)]
-    pub puzzle_hash: PyObject,
-    #[pyo3(get)]
-    pub conditions: Vec<(ConditionOpcode, Vec<PyConditionWithArgs>)>,
-}
-
-fn convert_condition(py: Python, a: &Allocator, c: Condition) -> PyConditionWithArgs {
-    let (vars, opcode) = match c {
-        Condition::AggSigUnsafe(pubkey, msg) => (
-            vec![node_to_pybytes(py, a, pubkey), node_to_pybytes(py, a, msg)],
-            AGG_SIG_UNSAFE,
-        ),
-        Condition::AggSigMe(pubkey, msg) => (
-            vec![node_to_pybytes(py, a, pubkey), node_to_pybytes(py, a, msg)],
-            AGG_SIG_ME,
-        ),
-        _ => {
-            panic!("unexpected condition");
-        }
-    };
-    PyConditionWithArgs { opcode, vars }
-}
-
-fn make_condition(py: Python, op: ConditionOpcode, val: u64) -> Vec<PyConditionWithArgs> {
-    vec![PyConditionWithArgs {
-        opcode: op,
-        vars: vec![int_to_pybytes(py, val)],
-    }]
-}
-
-fn convert_spend(
+fn convert_spend_bundle_conds(
     py: Python,
     a: &Allocator,
-    spend_cond: SpendConditionSummary,
-) -> PySpendConditionSummary {
-    let mut ordered = HashMap::<ConditionOpcode, Vec<PyConditionWithArgs>>::new();
-    for c in spend_cond.agg_sigs {
-        let op = match c {
-            Condition::AggSigUnsafe(_, _) => AGG_SIG_UNSAFE,
-            Condition::AggSigMe(_, _) => AGG_SIG_ME,
-            _ => {
-                panic!("unexpected condition");
-            }
-        };
-        match ordered.get_mut(&op) {
-            Some(set) => {
-                set.push(convert_condition(py, a, c));
-            }
-            None => {
-                ordered.insert(op, vec![convert_condition(py, a, c)]);
-            }
-        };
+    sb: SpendBundleConditions,
+) -> PySpendBundleConditions {
+    let mut spends = Vec::<PySpend>::new();
+    for s in sb.spends {
+        spends.push(convert_spend(py, a, s));
     }
 
-    let mut new_coins = Vec::<PyConditionWithArgs>::new();
-    for new_coin in spend_cond.create_coin {
-        new_coins.push(PyConditionWithArgs {
-            opcode: CREATE_COIN,
-            vars: vec![
-                PyBytes::new(py, &new_coin.puzzle_hash).into(),
-                int_to_pybytes(py, new_coin.amount),
-                node_to_pybytes(py, a, new_coin.hint),
-            ],
-        });
-    }
-    if !new_coins.is_empty() {
-        ordered.insert(CREATE_COIN, new_coins);
+    let mut agg_sigs = Vec::<(PyObject, PyObject)>::new();
+    for (pk, msg) in sb.agg_sig_unsafe {
+        agg_sigs.push((node_to_pybytes(py, a, pk), node_to_pybytes(py, a, msg)));
     }
 
-    if spend_cond.reserve_fee > 0 {
-        ordered.insert(
-            RESERVE_FEE,
-            make_condition(py, RESERVE_FEE, spend_cond.reserve_fee),
-        );
-    }
-
-    if let Some(h) = spend_cond.height_relative {
-        ordered.insert(
-            ASSERT_HEIGHT_RELATIVE,
-            make_condition(py, ASSERT_HEIGHT_RELATIVE, h as u64),
-        );
-    }
-
-    if spend_cond.height_absolute > 0 {
-        ordered.insert(
-            ASSERT_HEIGHT_ABSOLUTE,
-            make_condition(
-                py,
-                ASSERT_HEIGHT_ABSOLUTE,
-                spend_cond.height_absolute as u64,
-            ),
-        );
-    }
-
-    if spend_cond.seconds_relative > 0 {
-        ordered.insert(
-            ASSERT_SECONDS_RELATIVE,
-            make_condition(
-                py,
-                ASSERT_SECONDS_RELATIVE,
-                spend_cond.seconds_relative as u64,
-            ),
-        );
-    }
-
-    if spend_cond.seconds_absolute > 0 {
-        ordered.insert(
-            ASSERT_SECONDS_ABSOLUTE,
-            make_condition(
-                py,
-                ASSERT_SECONDS_ABSOLUTE,
-                spend_cond.seconds_absolute as u64,
-            ),
-        );
-    }
-
-    let mut conditions = Vec::<(ConditionOpcode, Vec<PyConditionWithArgs>)>::new();
-    for (k, v) in ordered {
-        conditions.push((k, v));
-    }
-
-    PySpendConditionSummary {
-        coin_name: PyBytes::new(py, &*spend_cond.coin_id).into(),
-        puzzle_hash: node_to_pybytes(py, a, spend_cond.puzzle_hash),
-        conditions,
+    PySpendBundleConditions {
+        spends,
+        reserve_fee: sb.reserve_fee,
+        height_absolute: sb.height_absolute,
+        seconds_absolute: sb.seconds_absolute,
+        agg_sig_unsafe: agg_sigs,
+        cost: sb.cost,
     }
 }
 
+// from chia-blockchain/chia/util/errors.py
 impl IntoPy<PyObject> for ErrorCode {
     fn into_py(self, py: Python) -> PyObject {
         let ret = match self {
@@ -202,73 +133,56 @@ impl IntoPy<PyObject> for ErrorCode {
     }
 }
 
-// returns the cost of running the CLVM program along with the list of NPCs for
-// the generator/spend bundle. Each SpendConditionSummary is a coin spend along with its
-// conditions
-#[allow(clippy::too_many_arguments)]
+// returns the cost of running the CLVM program along with conditions and the list of
+// spends
 #[pyfunction]
-pub fn run_generator(
+pub fn run_generator2(
     py: Python,
     program: &[u8],
     args: &[u8],
-    _quote_kw: u8,
-    _apply_kw: u8,
-    _opcode_lookup_by_name: HashMap<String, Vec<u8>>,
     max_cost: Cost,
     flags: u32,
-) -> PyResult<(Option<ErrorCode>, Vec<PySpendConditionSummary>, Cost)> {
-    // `_quote_kw`, `_apply_kw`, `_opcode_lookup_by_name` are all deprecated
-    // and ignored. The standard chia dialect is always used.
-    // TODO: rev this API to drop these now deprecated parameters.
+) -> PyResult<(Option<ErrorCode>, Option<PySpendBundleConditions>)> {
     let mut allocator = Allocator::new();
     let strict: bool = (flags & STRICT_MODE) != 0;
     let program = node_from_bytes(&mut allocator, program)?;
     let args = node_from_bytes(&mut allocator, args)?;
-    let dialect = chia_dialect(strict);
+    let dialect = &ChiaDialect::new(strict);
 
     let r = py.allow_threads(
-        || -> Result<(Option<ErrorCode>, Cost, Vec<SpendConditionSummary>), EvalErr> {
+        || -> Result<(Option<ErrorCode>, Option<SpendBundleConditions>), EvalErr> {
             let Reduction(cost, node) =
-                dialect.run_program(&mut allocator, program, args, max_cost)?;
+                run_program(&mut allocator, dialect, program, args, max_cost, None)?;
             // we pass in what's left of max_cost here, to fail early in case the
             // cost of a condition brings us over the cost limit
             match parse_spends(&allocator, node, max_cost - cost, flags) {
-                Err(ValidationErr(_, c)) => {
-                    Ok((Some(c), 0_u64, Vec::<SpendConditionSummary>::new()))
+                Err(ValidationErr(_, c)) => Ok((Some(c), None)),
+                Ok(mut spend_bundle_conds) => {
+                    // the cost is only the cost of conditions, add the
+                    // cost of running the CLVM program here as well
+                    spend_bundle_conds.cost += cost;
+                    Ok((None, Some(spend_bundle_conds)))
                 }
-                Ok(spend_list) => Ok((None, cost, spend_list)),
             }
         },
     );
 
-    let mut ret = Vec::<PySpendConditionSummary>::new();
     match r {
-        Ok((None, cost, spend_list)) => {
+        Ok((None, Some(spend_bundle_conds))) => {
             // everything was successful
-            for spend_cond in spend_list {
-                ret.push(convert_spend(py, &allocator, spend_cond));
-            }
-            Ok((None, ret, cost))
+            Ok((
+                None,
+                Some(convert_spend_bundle_conds(
+                    py,
+                    &allocator,
+                    spend_bundle_conds,
+                )),
+            ))
         }
-        Ok((error_code, _, _)) => {
+        Ok((error_code, _)) => {
             // a validation error occurred
-            Ok((error_code, ret, 0))
+            Ok((error_code, None))
         }
-        Err(eval_err) => {
-            let node = LazyNode::new(Rc::new(allocator), eval_err.0);
-            let msg = eval_err.1;
-            let ctx: &PyDict = PyDict::new(py);
-            ctx.set_item("msg", msg)?;
-            ctx.set_item("node", node)?;
-            Err(py
-                .run(
-                    "
-from clvm.EvalError import EvalError
-raise EvalError(msg, node)",
-                    None,
-                    Some(ctx),
-                )
-                .unwrap_err())
-        }
+        Err(eval_err) => eval_err_to_pyresult(py, eval_err, allocator),
     }
 }
