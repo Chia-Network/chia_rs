@@ -12,10 +12,10 @@ use super::opcodes::{
 use super::rangeset::RangeSet;
 use super::sanitize_int::sanitize_uint;
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
+use crate::gen::flags::NO_UNKNOWN_CONDS;
 use clvm_rs::allocator::{Allocator, NodePtr, SExp};
 use clvm_rs::cost::Cost;
 use clvm_rs::op_utils::u64_from_bytes;
-use clvm_rs::run_program::STRICT_MODE;
 use clvm_rs::sha2::Sha256;
 use std::cmp::max;
 use std::collections::HashSet;
@@ -386,7 +386,7 @@ fn parse_spend_conditions(
         let op = match parse_opcode(a, first(a, c)?) {
             None => {
                 // in strict mode we don't allow unknown conditions
-                if (flags & STRICT_MODE) != 0 {
+                if (flags & NO_UNKNOWN_CONDS) != 0 {
                     return Err(ValidationErr(c, ErrorCode::InvalidConditionOpcode));
                 }
                 // in non-strict mode, we just ignore unknown conditions
