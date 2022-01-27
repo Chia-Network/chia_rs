@@ -588,11 +588,11 @@ fn u64_to_bytes(n: u64) -> Vec<u8> {
     buf
 }
 #[cfg(test)]
-use crate::node::Node;
+use clvm_rs::node::Node;
 #[cfg(test)]
-use crate::number::{ptr_from_number, Number};
+use clvm_rs::number::{ptr_from_number, Number};
 #[cfg(test)]
-use crate::serialize::node_to_bytes;
+use clvm_rs::serialize::node_to_bytes;
 #[cfg(test)]
 use hex::FromHex;
 #[cfg(test)]

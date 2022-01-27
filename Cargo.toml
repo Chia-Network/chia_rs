@@ -7,12 +7,11 @@ edition = "2018"
 
 [dependencies]
 serde = "1.0.129"
-
-[target.'cfg(not(target_os = "macos"))'.dependencies]
-clvm_rs = { git = "https://github.com/richardkiss/clvm_rs", branch = "chia_rs" }
+clvm = { git = "https://github.com/Chia-Network/clvm_rs", rev = "8ea5357ff54a2a07452feaf858e80e1c8015a30a" }
+hex = "=0.4.3"
+num-traits = "=0.2.14"
 
 [target.'cfg(target_os = "macos")'.dependencies]
-clvm_rs = { git = "https://github.com/richardkiss/clvm_rs", branch = "chia_rs", default-features = false, features= ["py-api", "gen"]}
 
 [lib]
 name = "chia_rs"
