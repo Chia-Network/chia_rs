@@ -16,7 +16,7 @@ clvm_rs = { git = "https://github.com/richardkiss/clvm_rs", branch = "chia_rs", 
 
 [lib]
 name = "chia_rs"
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib"]
 
 [profile.release]
 lto = true

@@ -5,7 +5,7 @@ use clvm_rs::chia_dialect::ChiaDialect;
 use clvm_rs::cost::Cost;
 use clvm_rs::py::adapt_response::eval_err_to_pyresult;
 use clvm_rs::reduction::{EvalErr, Reduction};
-use clvm_rs::run_program::{run_program, STRICT_MODE};
+use clvm_rs::run_program::run_program;
 use clvm_rs::serialize::node_from_bytes;
 
 use pyo3::prelude::*;
@@ -144,10 +144,9 @@ pub fn run_generator2(
     flags: u32,
 ) -> PyResult<(Option<ErrorCode>, Option<PySpendBundleConditions>)> {
     let mut allocator = Allocator::new();
-    let strict: bool = (flags & STRICT_MODE) != 0;
     let program = node_from_bytes(&mut allocator, program)?;
     let args = node_from_bytes(&mut allocator, args)?;
-    let dialect = &ChiaDialect::new(strict);
+    let dialect = &ChiaDialect::new(flags);
 
     let r = py.allow_threads(
         || -> Result<(Option<ErrorCode>, Option<SpendBundleConditions>), EvalErr> {
