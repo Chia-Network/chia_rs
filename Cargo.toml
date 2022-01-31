@@ -1,5 +1,8 @@
+[workspace]
+members = ["wheel"]
+
 [package]
-name = "chia_rs"
+name = "chia"
 version = "0.1.0"
 edition = "2018"
 
@@ -7,18 +10,14 @@ edition = "2018"
 
 [dependencies]
 serde = "1.0.129"
-clvm = { git = "https://github.com/Chia-Network/clvm_rs", rev = "8ea5357ff54a2a07452feaf858e80e1c8015a30a" }
+clvm = { git = "https://github.com/Chia-Network/clvm_rs", rev = "2dc27a2a57d29936742b772150040420fa657bb1" }
 hex = "=0.4.3"
 num-traits = "=0.2.14"
-
-[target.'cfg(target_os = "macos")'.dependencies]
+pyo3 = "=0.15.1"
 
 [lib]
-name = "chia_rs"
-crate-type = ["cdylib"]
+name = "chia"
+crate-type = ["rlib"]
 
 [profile.release]
 lto = true
-
-[target.'cfg(not(target_family="wasm"))'.dependencies]
-pyo3 = { version = "0.15.1", features = ["abi3-py37"] }
