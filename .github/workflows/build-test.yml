@@ -50,15 +50,7 @@ jobs:
         python -m venv venv
         ln -s venv/bin/activate
         . ./activate
-        maturin build --no-sdist -i python --release
-
-#    - name: Build Linux with maturin on Python ${{ matrix.python }}
-#      if: startsWith(matrix.os, 'ubuntu')
-#      run: |
-#        python -m venv venv
-#        ln -s venv/bin/activate
-#        . ./activate
-#        maturin build -i python --release --manylinux 2010
+        maturin build --no-sdist -i python --release -m wheel/Cargo.toml
 
     - name: Build Linux in manylinux2010 with maturin on Python ${{ matrix.python }}
       if: startsWith(matrix.os, 'ubuntu')
@@ -86,7 +78,7 @@ jobs:
             . ./activate && \
             pip install --upgrade pip && \
             pip install maturin && \
-            CC=gcc maturin build --no-sdist --release --manylinux 2010 -i python \
+            CC=gcc maturin build --no-sdist --release --manylinux 2010 -i python -m wheel/Cargo.toml \
           '
 
     - name: Build Windows with maturin on Python ${{ matrix.python }}
@@ -95,12 +87,12 @@ jobs:
         python -m venv venv
         . .\venv\Scripts\Activate.ps1
         ln -s venv\Scripts\Activate.ps1 activate
-        maturin build --no-sdist -i python --release
+        maturin build --no-sdist -i python --release -m wheel/Cargo.toml
         # this will install into the venv
         # it'd be better to use the wheel, but I can't figure out how to do that
         # TODO: figure this out
         # this does NOT work: pip install target/wheels/chia_rs-*.whl
-        maturin develop --release
+        maturin develop --release -m wheel/Cargo.toml
         # the line above also doesn't seem to work
 
     - name: Install chia_rs wheel
