@@ -1,5 +1,5 @@
 [workspace]
-members = ["wheel"]
+members = ["wasm", "wheel"]
 
 [package]
 name = "chia"
