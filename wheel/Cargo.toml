@@ -14,9 +14,6 @@ name = "chia_rs"
 crate-type = ["cdylib"]
 path = "src/lib.rs"
 
-[profile.release]
-lto = true
-
 [dependencies]
 chia = { path = ".." }
 pyo3 = { version = "=0.15.1", features = ["abi3-py37", "extension-module"] }
