@@ -10,7 +10,7 @@ edition = "2018"
 
 [dependencies]
 serde = "1.0.129"
-clvm = { git = "https://github.com/Chia-Network/clvm_rs", rev = "2dc27a2a57d29936742b772150040420fa657bb1" }
+clvmr = "=0.1.20"
 hex = "=0.4.3"
 num-traits = "=0.2.14"
 pyo3 = "=0.15.1"

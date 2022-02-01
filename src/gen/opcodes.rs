@@ -1,5 +1,5 @@
-use clvm_rs::allocator::{Allocator, NodePtr, SExp};
-use clvm_rs::cost::Cost;
+use clvmr::allocator::{Allocator, NodePtr, SExp};
+use clvmr::cost::Cost;
 
 pub type ConditionOpcode = u8;
 

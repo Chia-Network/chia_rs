@@ -13,10 +13,10 @@ use super::rangeset::RangeSet;
 use super::sanitize_int::sanitize_uint;
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
 use crate::gen::flags::NO_UNKNOWN_CONDS;
-use clvm_rs::allocator::{Allocator, NodePtr, SExp};
-use clvm_rs::cost::Cost;
-use clvm_rs::op_utils::u64_from_bytes;
-use clvm_rs::sha2::Sha256;
+use clvmr::allocator::{Allocator, NodePtr, SExp};
+use clvmr::cost::Cost;
+use clvmr::op_utils::u64_from_bytes;
+use clvmr::sha2::Sha256;
 use std::cmp::max;
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
@@ -588,11 +588,11 @@ fn u64_to_bytes(n: u64) -> Vec<u8> {
     buf
 }
 #[cfg(test)]
-use clvm_rs::node::Node;
+use clvmr::node::Node;
 #[cfg(test)]
-use clvm_rs::number::{ptr_from_number, Number};
+use clvmr::number::{ptr_from_number, Number};
 #[cfg(test)]
-use clvm_rs::serialize::node_to_bytes;
+use clvmr::serialize::node_to_bytes;
 #[cfg(test)]
 use hex::FromHex;
 #[cfg(test)]

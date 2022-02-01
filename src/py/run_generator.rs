@@ -1,12 +1,12 @@
 use crate::gen::conditions::{parse_spends, Spend, SpendBundleConditions};
 use crate::gen::validation_error::{ErrorCode, ValidationErr};
-use clvm_rs::allocator::{Allocator, NodePtr};
-use clvm_rs::chia_dialect::ChiaDialect;
-use clvm_rs::cost::Cost;
-use clvm_rs::py::adapt_response::eval_err_to_pyresult;
-use clvm_rs::reduction::{EvalErr, Reduction};
-use clvm_rs::run_program::run_program;
-use clvm_rs::serialize::node_from_bytes;
+use clvmr::allocator::{Allocator, NodePtr};
+use clvmr::chia_dialect::ChiaDialect;
+use clvmr::cost::Cost;
+use clvmr::py::adapt_response::eval_err_to_pyresult;
+use clvmr::reduction::{EvalErr, Reduction};
+use clvmr::run_program::run_program;
+use clvmr::serialize::node_from_bytes;
 
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;

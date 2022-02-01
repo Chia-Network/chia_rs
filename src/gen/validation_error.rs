@@ -1,4 +1,4 @@
-use clvm_rs::allocator::{Allocator, NodePtr, SExp};
+use clvmr::allocator::{Allocator, NodePtr, SExp};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ErrorCode {

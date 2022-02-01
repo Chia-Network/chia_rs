@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyModule;
 use pyo3::{wrap_pyfunction, PyResult, Python};
 
-use clvm_rs::py::lazy_node::LazyNode;
+use clvmr::py::lazy_node::LazyNode;
 
 use crate::py::run_generator::__pyo3_get_function_run_generator2;
 

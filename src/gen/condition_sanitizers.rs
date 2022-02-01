@@ -1,8 +1,8 @@
 use super::rangeset::RangeSet;
 use super::sanitize_int::sanitize_uint;
 use super::validation_error::{atom, ErrorCode, ValidationErr};
-use clvm_rs::allocator::{Allocator, NodePtr};
-use clvm_rs::op_utils::u64_from_bytes;
+use clvmr::allocator::{Allocator, NodePtr};
+use clvmr::op_utils::u64_from_bytes;
 
 pub fn sanitize_hash(
     a: &Allocator,

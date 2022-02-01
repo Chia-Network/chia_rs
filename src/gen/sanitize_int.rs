@@ -1,7 +1,7 @@
 use super::rangeset::RangeSet;
 use super::validation_error::{atom, ErrorCode, ValidationErr};
 use crate::gen::flags::COND_CANON_INTS;
-use clvm_rs::allocator::{Allocator, AtomBuf, NodePtr, SExp};
+use clvmr::allocator::{Allocator, AtomBuf, NodePtr, SExp};
 
 fn count_zeros_impl(buf: &[u8]) -> usize {
     let mut ret: usize = 0;
