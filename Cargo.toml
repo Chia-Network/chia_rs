@@ -5,8 +5,11 @@ members = ["wheel"]
 name = "chia"
 version = "0.1.0"
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license = "Apache-2.0"
+description = "Implementation of `clvm` for Chia Network's cryptocurrency"
+authors = ["Richard Kiss <him@richardkiss.com>"]
+homepage = "https://github.com/Chia-Network/chia_rs/"
+repository = "https://github.com/Chia-Network/chia_rs/"
 
 [dependencies]
 serde = "1.0.129"
