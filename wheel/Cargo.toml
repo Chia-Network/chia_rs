@@ -16,4 +16,5 @@ path = "src/lib.rs"
 
 [dependencies]
 chia = { path = ".." }
+clvmr = "=0.1.20"
 pyo3 = { version = "=0.15.1", features = ["abi3-py37", "extension-module"] }

@@ -1,7 +1,7 @@
-use crate::gen::flags::COND_ARGS_NIL;
-use crate::gen::flags::COND_CANON_INTS;
-use crate::gen::flags::NO_UNKNOWN_CONDS;
-use crate::py::run_generator::__pyo3_get_function_run_generator2;
+use crate::run_generator::__pyo3_get_function_run_generator2;
+use chia::gen::flags::COND_ARGS_NIL;
+use chia::gen::flags::COND_CANON_INTS;
+use chia::gen::flags::NO_UNKNOWN_CONDS;
 use clvmr::chia_dialect::NO_NEG_DIV;
 use clvmr::chia_dialect::NO_UNKNOWN_OPS;
 use clvmr::py::lazy_node::LazyNode;
@@ -12,7 +12,7 @@ use pyo3::{wrap_pyfunction, PyResult, Python};
 pub const MEMPOOL_MODE: u32 =
     NO_NEG_DIV | COND_CANON_INTS | NO_UNKNOWN_CONDS | NO_UNKNOWN_OPS | COND_ARGS_NIL;
 
-/// This module is a python module implemented in Rust.
+#[pymodule]
 pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(a_test_function, m)?)?;
     m.add_function(wrap_pyfunction!(run_generator2, m)?)?;
