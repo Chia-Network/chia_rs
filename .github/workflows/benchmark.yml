@@ -51,15 +51,7 @@ jobs:
         git clone https://github.com/Chia-Network/clvm_tools.git --branch=main --single-branch
         python -m pip install ./clvm_tools
         python -m pip install colorama
-        python -m pip install clvm_rs
         maturin develop --release -m wheel/Cargo.toml
-
-    - name: Run cost checks
-      run: |
-        . ./activate
-        cd tests
-        ./generate-programs.py
-        ./run-programs.py
 
     - name: test generators
       run: |
