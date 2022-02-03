@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from clvm_rs import run_generator2
+from chia_rs import run_generator
 from time import time
 from clvm_tools import binutils
 import sys
@@ -51,7 +51,7 @@ def run_gen(fn, flags=0):
     env_data = b"\xff" + env_data + b"\xff" + block_program_args  + b"\x80"
 
     try:
-        return run_generator2(
+        return run_generator(
             program_data,
             env_data,
             max_cost,
