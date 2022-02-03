@@ -1,22 +1,20 @@
 [package]
-name = "clvm_wasm"
-version = "0.1.19"
+name = "chia_wasm"
+version = "0.1.0"
 authors = ["Richard Kiss <him@richardkiss.com>"]
 edition = "2018"
 license = "Apache-2.0"
-description = "Implementation of `clvm` for Chia Network's cryptocurrency"
-homepage = "https://github.com/Chia-Network/clvm_rs/"
-repository = "https://github.com/Chia-Network/clvm_rs/"
+description = "Code useful for implementing chia consensus."
+homepage = "https://github.com/Chia-Network/chia_rs/"
+repository = "https://github.com/Chia-Network/chia_rs/"
 readme = "README.md"
 
 [lib]
-name = "clvm_wasm"
+name = "chia_wasm"
 crate-type = ["cdylib"]
 path = "src/lib.rs"
 
 [dependencies]
-# building `chia` is currently broken due to `pyo3` dependencies which need to move to `wheel`
-# TODO: refactor `pyo3` into `wheel`, then remove it from `chia`
-# chia = { path = ".." }
+chia = { path = ".." }
 wasm-bindgen = "=0.2.75"
 wasm-bindgen-test = "=0.3.25"
