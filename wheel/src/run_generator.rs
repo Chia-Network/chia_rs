@@ -103,7 +103,7 @@ fn convert_spend_bundle_conds(
 // returns the cost of running the CLVM program along with conditions and the list of
 // spends
 #[pyfunction]
-pub fn run_generator2(
+pub fn run_generator(
     py: Python,
     program: &[u8],
     args: &[u8],
