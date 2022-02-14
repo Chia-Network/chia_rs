@@ -1,78 +1,11 @@
+use super::bytes::{Bytes, Bytes100, Bytes32, Bytes48, Bytes96};
+use super::coin::Coin;
 use super::program::ProgramArray;
 use bincode::Options;
-use core::fmt::Formatter;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-
-#[derive(Serialize, Deserialize)]
-struct Bytes4([u8; 4]);
-
-impl Debug for Bytes4 {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        formatter.write_str(&hex::encode(self.0))
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-struct Bytes16([u8; 16]);
-
-impl Debug for Bytes16 {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        formatter.write_str(&hex::encode(self.0))
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-struct Bytes32([u8; 32]);
-
-impl Debug for Bytes32 {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        formatter.write_str(&hex::encode(self.0))
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-struct Bytes48(Bytes32, Bytes16);
-
-impl Debug for Bytes48 {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        self.0.fmt(formatter)?;
-        self.1.fmt(formatter)
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-struct Bytes96(Bytes32, Bytes32, Bytes32);
-
-impl Debug for Bytes96 {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        self.0.fmt(formatter)?;
-        self.1.fmt(formatter)?;
-        self.2.fmt(formatter)
-    }
-}
-
-// TODO: this is a hack to eliminate the need to serialize manually
-#[derive(Serialize, Deserialize)]
-struct Bytes100(Bytes96, Bytes4);
-
-impl Debug for Bytes100 {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        self.0.fmt(formatter)?;
-        self.1.fmt(formatter)
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-struct Bytes(Vec<u8>);
-
-impl Debug for Bytes {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        formatter.write_str(&hex::encode(&self.0))
-    }
-}
 
 #[pyclass(subclass, unsendable)]
 #[derive(Serialize, Deserialize, Debug)]
@@ -248,13 +181,6 @@ pub struct FoliageBlockData {
 pub struct PoolTarget {
     puzzle_hash: Bytes32,
     max_height: u32, //  # A max height of 0 means it is valid forever
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Coin {
-    parent_coin_info: Bytes32,
-    puzzle_hash: Bytes32,
-    amount: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
