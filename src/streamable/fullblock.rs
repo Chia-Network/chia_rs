@@ -35,6 +35,15 @@ impl Fullblock {
         chia.deserialize(blob).unwrap()
     }
 
+    fn __bytes__<'p>(&self, py: Python<'p>) -> &'p PyBytes {
+        let chia = bincode::DefaultOptions::new()
+            .with_chia_int_encoding()
+            .allow_trailing_bytes()
+            .with_big_endian();
+        let v = chia.serialize(self).unwrap();
+        PyBytes::new(py, &v)
+    }
+
     fn generator<'p>(&self, py: Python<'p>) -> Option<&'p PyBytes> {
         self.transactions_generator
             .as_ref()
