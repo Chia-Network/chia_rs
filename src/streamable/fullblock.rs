@@ -44,10 +44,8 @@ impl Fullblock {
         PyBytes::new(py, &v)
     }
 
-    fn generator<'p>(&self, py: Python<'p>) -> Option<&'p PyBytes> {
-        self.transactions_generator
-            .as_ref()
-            .map(|s| PyBytes::new(py, &s.0))
+    fn generator(&self) -> Option<&[u8]> {
+        self.transactions_generator.as_ref().map(|x| x.0.as_slice())
     }
 }
 
