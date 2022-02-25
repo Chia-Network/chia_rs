@@ -1,8 +1,9 @@
 Experimental Deserialization
 ----------------------------
 
-To enable experimental deserialization, apply this patch:
+To enable experimental deserialization, reverse this patch:
 
+```diff
 diff --git a/Cargo.toml b/Cargo.toml
 index dbecd26..89bc1e8 100644
 --- a/Cargo.toml
@@ -24,6 +25,7 @@ index 759f6d4..f4fa654 100644
  pub mod gen;
 -pub mod streamable;
 +// pub mod streamable;
+```
 
 [This is commented out because of the dependency on github.com, which isn't allowed in crates on crates.io.]
 
