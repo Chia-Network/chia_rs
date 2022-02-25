@@ -3,7 +3,7 @@ use super::condition_sanitizers::{
     parse_amount, parse_height, parse_seconds, sanitize_announce_msg, sanitize_hash,
 };
 use super::opcodes::{
-    parse_opcode, ConditionOpcode, AGG_SIG_COST, AGG_SIG_ME, AGG_SIG_UNSAFE,
+    parse_opcode, ConditionOpcode, AGG_SIG_COST, AGG_SIG_ME, AGG_SIG_UNSAFE, ALWAYS_TRUE,
     ASSERT_COIN_ANNOUNCEMENT, ASSERT_HEIGHT_ABSOLUTE, ASSERT_HEIGHT_RELATIVE, ASSERT_MY_AMOUNT,
     ASSERT_MY_COIN_ID, ASSERT_MY_PARENT_ID, ASSERT_MY_PUZZLEHASH, ASSERT_PUZZLE_ANNOUNCEMENT,
     ASSERT_SECONDS_ABSOLUTE, ASSERT_SECONDS_RELATIVE, CREATE_COIN, CREATE_COIN_ANNOUNCEMENT,
@@ -305,6 +305,10 @@ fn parse_args(
                 range_cache,
                 flags,
             )?))
+        }
+        ALWAYS_TRUE => {
+            // this condition is always true, we always ignore arguments
+            Ok(Condition::Skip)
         }
         _ => Err(ValidationErr(c, ErrorCode::InvalidConditionOpcode)),
     }
@@ -902,7 +906,7 @@ fn cond_test_cb(
 use crate::gen::flags::COND_CANON_INTS;
 
 #[cfg(test)]
-const MEMPOOL_MODE: u32 = COND_CANON_INTS | COND_ARGS_NIL | STRICT_ARGS_COUNT;
+const MEMPOOL_MODE: u32 = COND_CANON_INTS | COND_ARGS_NIL | STRICT_ARGS_COUNT | NO_UNKNOWN_CONDS;
 
 #[cfg(test)]
 fn cond_test(input: &str) -> Result<(Allocator, SpendBundleConditions), ValidationErr> {
@@ -2692,4 +2696,45 @@ fn test_double_spend() {
             .1,
         ErrorCode::DoubleSpend
     );
+}
+
+#[test]
+fn test_always_true() {
+    // ALWAYS_TRUE
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((0x00 )))))").unwrap();
+
+    // just make sure there are no constraints
+    assert_eq!(conds.agg_sig_unsafe.len(), 0);
+    assert_eq!(conds.reserve_fee, 0);
+    assert_eq!(conds.height_absolute, 0);
+    assert_eq!(conds.seconds_absolute, 0);
+    assert_eq!(conds.cost, 0);
+
+    // there is one spend
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.agg_sig_me.len(), 0);
+}
+
+#[test]
+fn test_always_true_with_arg() {
+    // ALWAYS_TRUE, but with one unknown argument
+    // unknown arguments are expected and always allowed
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((0x00 ( 42 )))))").unwrap();
+
+    // just make sure there are no constraints
+    assert_eq!(conds.agg_sig_unsafe.len(), 0);
+    assert_eq!(conds.reserve_fee, 0);
+    assert_eq!(conds.height_absolute, 0);
+    assert_eq!(conds.seconds_absolute, 0);
+    assert_eq!(conds.cost, 0);
+
+    // there is one spend
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.agg_sig_me.len(), 0);
 }
