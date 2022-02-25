@@ -1,0 +1,48 @@
+diff --git a/Cargo.toml b/Cargo.toml
+index dbecd26..89bc1e8 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -15,7 +15,7 @@ repository = "https://github.com/Chia-Network/chia_rs/"
+ serde = { version = "1.0.130", features = ["derive"] }
+ clvmr = "=0.1.20"
+ pyo3 = "0.15.1"
+-bincode = { git = "https://github.com/richardkiss/bincode", branch = "chia" }
++# bincode = { git = "https://github.com/richardkiss/bincode", branch = "chia" }
+ hex = "=0.4.3"
+ 
+ [dev-dependencies]
+diff --git a/src/lib.rs b/src/lib.rs
+index 759f6d4..f4fa654 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,2 +1,2 @@
+ pub mod gen;
+-pub mod streamable;
++// pub mod streamable;
+
+diff --git a/wheel/src/api.rs b/wheel/src/api.rs
+index 6e34218..a096e84 100644
+--- a/wheel/src/api.rs
++++ b/wheel/src/api.rs
+@@ -2,8 +2,8 @@ use crate::run_generator::__pyo3_get_function_run_generator;
+ use chia::gen::flags::COND_ARGS_NIL;
+ use chia::gen::flags::COND_CANON_INTS;
+ use chia::gen::flags::NO_UNKNOWN_CONDS;
+-use chia::streamable::coin::Coin;
+-use chia::streamable::fullblock::Fullblock;
++//use chia::streamable::coin::Coin;
++//use chia::streamable::fullblock::Fullblock;
+ use clvmr::chia_dialect::NO_NEG_DIV;
+ use clvmr::chia_dialect::NO_UNKNOWN_OPS;
+ use clvmr::py::lazy_node::LazyNode;
+@@ -25,8 +25,8 @@ pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
+     m.add("NO_UNKNOWN_OPS", NO_UNKNOWN_OPS)?;
+     m.add("MEMPOOL_MODE", MEMPOOL_MODE)?;
+     m.add_class::<LazyNode>()?;
+-    m.add_class::<Coin>()?;
+-    m.add_class::<Fullblock>()?;
++    //m.add_class::<Coin>()?;
++    //m.add_class::<Fullblock>()?;
+ 
+     Ok(())
+ }

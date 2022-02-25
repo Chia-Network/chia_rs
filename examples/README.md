@@ -1,33 +1,13 @@
 Experimental Deserialization
 ----------------------------
 
-To enable experimental deserialization, reverse this patch:
+To enable experimental deserialization, reverse a patch in the root directory with
 
-```diff
-diff --git a/Cargo.toml b/Cargo.toml
-index dbecd26..89bc1e8 100644
---- a/Cargo.toml
-+++ b/Cargo.toml
-@@ -15,7 +15,7 @@ repository = "https://github.com/Chia-Network/chia_rs/"
- serde = { version = "1.0.130", features = ["derive"] }
- clvmr = "=0.1.20"
- pyo3 = "0.15.1"
--bincode = { git = "https://github.com/richardkiss/bincode", branch = "chia" }
-+# bincode = { git = "https://github.com/richardkiss/bincode", branch = "chia" }
- hex = "=0.4.3"
- 
- [dev-dependencies]
-diff --git a/src/lib.rs b/src/lib.rs
-index 759f6d4..f4fa654 100644
---- a/src/lib.rs
-+++ b/src/lib.rs
-@@ -1,2 +1,2 @@
- pub mod gen;
--pub mod streamable;
-+// pub mod streamable;
+```sh
+patch -Rp1 < examples/streaming-patch.diff
 ```
 
-[This is commented out because of the dependency on github.com, which isn't allowed in crates on crates.io.]
+A bunch of stuff is currently commented out because of the dependency on github.com, which isn't allowed in crates on crates.io. This patch reverses that. The result can't be uploaded to crates.io though.
 
 
 Create a `venv`, then build the wheel and run `dump.py`.
