@@ -6,7 +6,7 @@ use chia::gen::flags::NO_UNKNOWN_CONDS;
 //use chia::streamable::fullblock::Fullblock;
 use clvmr::chia_dialect::NO_NEG_DIV;
 use clvmr::chia_dialect::NO_UNKNOWN_OPS;
-use clvmr::py::lazy_node::LazyNode;
+use clvm_rs::lazy_node::LazyNode;
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
 use pyo3::{wrap_pyfunction, PyResult, Python};
