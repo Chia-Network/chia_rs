@@ -1,4 +1,4 @@
-use crate::run_generator::__pyo3_get_function_run_generator;
+use crate::run_generator::{PySpend, PySpendBundleConditions, __pyo3_get_function_run_generator};
 use chia::gen::flags::COND_ARGS_NIL;
 use chia::gen::flags::COND_CANON_INTS;
 use chia::gen::flags::NO_UNKNOWN_CONDS;
@@ -17,6 +17,8 @@ pub const MEMPOOL_MODE: u32 =
 pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(a_test_function, m)?)?;
     m.add_function(wrap_pyfunction!(run_generator, m)?)?;
+    m.add_class::<PySpendBundleConditions>()?;
+    m.add_class::<PySpend>()?;
     m.add("NO_NEG_DIV", NO_NEG_DIV)?;
     m.add("COND_CANON_INTS", COND_CANON_INTS)?;
     m.add("COND_ARGS_NIL", COND_ARGS_NIL)?;
