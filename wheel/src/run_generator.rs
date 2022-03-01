@@ -1,9 +1,9 @@
+use super::adapt_response::eval_err_to_pyresult;
 use chia::gen::conditions::{parse_spends, Spend, SpendBundleConditions};
 use chia::gen::validation_error::{ErrorCode, ValidationErr};
 use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;
-use clvmr::py::adapt_response::eval_err_to_pyresult;
 use clvmr::reduction::{EvalErr, Reduction};
 use clvmr::run_program::run_program;
 use clvmr::serialize::node_from_bytes;
