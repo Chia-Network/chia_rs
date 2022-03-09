@@ -14,6 +14,7 @@ use super::sanitize_int::sanitize_uint;
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
 use crate::gen::flags::COND_ARGS_NIL;
 use crate::gen::flags::NO_UNKNOWN_CONDS;
+use crate::gen::flags::STRICT_ARGS_COUNT;
 use crate::gen::validation_error::check_nil;
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use clvmr::cost::Cost;
@@ -143,21 +144,29 @@ fn parse_args(
             // byte buffers (typically a 32 byte hash). We only pull out the
             // first element for now, but may support more in the future.
             // If we find anything else, that's still OK, since garbage is
-            // ignored.
-            if let Ok(c) = rest(a, c) {
-                // there was another item in the list
-                if let Ok(params) = first(a, c) {
-                    // the item was a cons-box, and params is the left-hand
-                    // side, the list element
-                    if let Ok(param) = first(a, params) {
-                        // pull out the first item (param)
-                        if let SExp::Atom(b) = a.sexp(param) {
-                            if a.buf(&b).len() <= 32 {
-                                return Ok(Condition::CreateCoin(puzzle_hash, amount, param));
-                            }
+            // ignored. (unless we're in mempool mode, and the STRICT_ARGS_COUNT
+            // flag is set)
+
+            // we always expect one more item, even if it's the zero-terminator
+            c = rest(a, c)?;
+
+            // there was another item in the list
+            if let Ok(params) = first(a, c) {
+                // the item was a cons-box, and params is the left-hand
+                // side, the list element
+                if (flags & STRICT_ARGS_COUNT) != 0 {
+                    check_nil(a, rest(a, c)?)?;
+                }
+                if let Ok(param) = first(a, params) {
+                    // pull out the first item (param)
+                    if let SExp::Atom(b) = a.sexp(param) {
+                        if a.buf(&b).len() <= 32 {
+                            return Ok(Condition::CreateCoin(puzzle_hash, amount, param));
                         }
                     }
                 }
+            } else if (flags & STRICT_ARGS_COUNT) != 0 {
+                check_nil(a, c)?;
             }
             Ok(Condition::CreateCoin(puzzle_hash, amount, a.null()))
         }
@@ -169,18 +178,30 @@ fn parse_args(
                 range_cache,
                 flags,
             )?;
+            if (flags & STRICT_ARGS_COUNT) != 0 {
+                check_nil(a, rest(a, c)?)?;
+            }
             Ok(Condition::ReserveFee(fee))
         }
         CREATE_COIN_ANNOUNCEMENT => {
             let msg = sanitize_announce_msg(a, first(a, c)?, ErrorCode::InvalidCoinAnnouncement)?;
+            if (flags & STRICT_ARGS_COUNT) != 0 {
+                check_nil(a, rest(a, c)?)?;
+            }
             Ok(Condition::CreateCoinAnnouncement(msg))
         }
         ASSERT_COIN_ANNOUNCEMENT => {
             let id = sanitize_hash(a, first(a, c)?, 32, ErrorCode::AssertCoinAnnouncementFailed)?;
+            if (flags & STRICT_ARGS_COUNT) != 0 {
+                check_nil(a, rest(a, c)?)?;
+            }
             Ok(Condition::AssertCoinAnnouncement(id))
         }
         CREATE_PUZZLE_ANNOUNCEMENT => {
             let msg = sanitize_announce_msg(a, first(a, c)?, ErrorCode::InvalidPuzzleAnnouncement)?;
+            if (flags & STRICT_ARGS_COUNT) != 0 {
+                check_nil(a, rest(a, c)?)?;
+            }
             Ok(Condition::CreatePuzzleAnnouncement(msg))
         }
         ASSERT_PUZZLE_ANNOUNCEMENT => {
@@ -190,18 +211,30 @@ fn parse_args(
                 32,
                 ErrorCode::AssertPuzzleAnnouncementFailed,
             )?;
+            if (flags & STRICT_ARGS_COUNT) != 0 {
+                check_nil(a, rest(a, c)?)?;
+            }
             Ok(Condition::AssertPuzzleAnnouncement(id))
         }
         ASSERT_MY_COIN_ID => {
             let id = sanitize_hash(a, first(a, c)?, 32, ErrorCode::AssertMyCoinIdFailed)?;
+            if (flags & STRICT_ARGS_COUNT) != 0 {
+                check_nil(a, rest(a, c)?)?;
+            }
             Ok(Condition::AssertMyCoinId(id))
         }
         ASSERT_MY_PARENT_ID => {
             let id = sanitize_hash(a, first(a, c)?, 32, ErrorCode::AssertMyParentIdFailed)?;
+            if (flags & STRICT_ARGS_COUNT) != 0 {
+                check_nil(a, rest(a, c)?)?;
+            }
             Ok(Condition::AssertMyParentId(id))
         }
         ASSERT_MY_PUZZLEHASH => {
             let id = sanitize_hash(a, first(a, c)?, 32, ErrorCode::AssertMyPuzzlehashFailed)?;
+            if (flags & STRICT_ARGS_COUNT) != 0 {
+                check_nil(a, rest(a, c)?)?;
+            }
             Ok(Condition::AssertMyPuzzlehash(id))
         }
         ASSERT_MY_AMOUNT => {
@@ -212,42 +245,65 @@ fn parse_args(
                 range_cache,
                 flags,
             )?;
+            if (flags & STRICT_ARGS_COUNT) != 0 {
+                check_nil(a, rest(a, c)?)?;
+            }
             Ok(Condition::AssertMyAmount(amount))
         }
-        ASSERT_SECONDS_RELATIVE => Ok(Condition::AssertSecondsRelative(parse_seconds(
-            a,
-            first(a, c)?,
-            ErrorCode::AssertSecondsRelative,
-            range_cache,
-            flags,
-        )?)),
-        ASSERT_SECONDS_ABSOLUTE => Ok(Condition::AssertSecondsAbsolute(parse_seconds(
-            a,
-            first(a, c)?,
-            ErrorCode::AssertSecondsAbsolute,
-            range_cache,
-            flags,
-        )?)),
-        ASSERT_HEIGHT_RELATIVE => match sanitize_uint(
-            a,
-            first(a, c)?,
-            4,
-            ErrorCode::AssertHeightRelative,
-            range_cache,
-            flags,
-        ) {
-            // Height is always positive, so a negative requirement is always true,
-            Err(ValidationErr(_, ErrorCode::NegativeAmount)) => Ok(Condition::Skip),
-            Err(r) => Err(r),
-            Ok(r) => Ok(Condition::AssertHeightRelative(u64_from_bytes(r) as u32)),
-        },
-        ASSERT_HEIGHT_ABSOLUTE => Ok(Condition::AssertHeightAbsolute(parse_height(
-            a,
-            first(a, c)?,
-            ErrorCode::AssertHeightAbsolute,
-            range_cache,
-            flags,
-        )?)),
+        ASSERT_SECONDS_RELATIVE => {
+            if (flags & STRICT_ARGS_COUNT) != 0 {
+                check_nil(a, rest(a, c)?)?;
+            }
+            Ok(Condition::AssertSecondsRelative(parse_seconds(
+                a,
+                first(a, c)?,
+                ErrorCode::AssertSecondsRelative,
+                range_cache,
+                flags,
+            )?))
+        }
+        ASSERT_SECONDS_ABSOLUTE => {
+            if (flags & STRICT_ARGS_COUNT) != 0 {
+                check_nil(a, rest(a, c)?)?;
+            }
+            Ok(Condition::AssertSecondsAbsolute(parse_seconds(
+                a,
+                first(a, c)?,
+                ErrorCode::AssertSecondsAbsolute,
+                range_cache,
+                flags,
+            )?))
+        }
+        ASSERT_HEIGHT_RELATIVE => {
+            if (flags & STRICT_ARGS_COUNT) != 0 {
+                check_nil(a, rest(a, c)?)?;
+            }
+            match sanitize_uint(
+                a,
+                first(a, c)?,
+                4,
+                ErrorCode::AssertHeightRelative,
+                range_cache,
+                flags,
+            ) {
+                // Height is always positive, so a negative requirement is always true,
+                Err(ValidationErr(_, ErrorCode::NegativeAmount)) => Ok(Condition::Skip),
+                Err(r) => Err(r),
+                Ok(r) => Ok(Condition::AssertHeightRelative(u64_from_bytes(r) as u32)),
+            }
+        }
+        ASSERT_HEIGHT_ABSOLUTE => {
+            if (flags & STRICT_ARGS_COUNT) != 0 {
+                check_nil(a, rest(a, c)?)?;
+            }
+            Ok(Condition::AssertHeightAbsolute(parse_height(
+                a,
+                first(a, c)?,
+                ErrorCode::AssertHeightAbsolute,
+                range_cache,
+                flags,
+            )?))
+        }
         _ => Err(ValidationErr(c, ErrorCode::InvalidConditionOpcode)),
     }
 }
@@ -844,7 +900,7 @@ fn cond_test_cb(
 use crate::gen::flags::COND_CANON_INTS;
 
 #[cfg(test)]
-const MEMPOOL_MODE: u32 = COND_CANON_INTS | COND_ARGS_NIL;
+const MEMPOOL_MODE: u32 = COND_CANON_INTS | COND_ARGS_NIL | STRICT_ARGS_COUNT;
 
 #[cfg(test)]
 fn cond_test(input: &str) -> Result<(Allocator, SpendBundleConditions), ValidationErr> {
@@ -893,6 +949,18 @@ fn test_invalid_condition_args_terminator() {
 }
 
 #[test]
+fn test_invalid_condition_args_terminator_mempool() {
+    // ASSERT_SECONDS_RELATIVE
+    // in mempool mode, the argument list must be properly terminated
+    assert_eq!(
+        cond_test("((({h1} ({h2} (123 (((80 (50 8 ))))")
+            .unwrap_err()
+            .1,
+        ErrorCode::InvalidCondition
+    );
+}
+
+#[test]
 fn test_invalid_condition_list_terminator() {
     // ASSERT_SECONDS_RELATIVE
     let (a, conds) = cond_test_flag("((({h1} ({h2} (123 (((80 (50 8 ))))", 0).unwrap();
@@ -904,6 +972,17 @@ fn test_invalid_condition_list_terminator() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
 
     assert_eq!(spend.seconds_relative, 50);
+}
+
+#[test]
+fn test_invalid_condition_list_terminator_mempool() {
+    // ASSERT_SECONDS_RELATIVE
+    assert_eq!(
+        cond_test("((({h1} ({h2} (123 (((80 (50 8 ))))")
+            .unwrap_err()
+            .1,
+        ErrorCode::InvalidCondition
+    );
 }
 
 #[test]
@@ -969,6 +1048,18 @@ fn test_single_seconds_relative_extra_arg() {
 }
 
 #[test]
+fn test_single_seconds_relative_extra_arg_mempool() {
+    // ASSERT_SECONDS_RELATIVE
+    // additional arguments are disallowed in mempool mode
+    assert_eq!(
+        cond_test("((({h1} ({h2} (123 (((80 (101 (1337 )))))")
+            .unwrap_err()
+            .1,
+        ErrorCode::InvalidCondition
+    );
+}
+
+#[test]
 fn test_seconds_relative_exceed_max() {
     // ASSERT_SECONDS_RELATIVE
     assert_eq!(
@@ -1025,6 +1116,21 @@ fn test_single_seconds_absolute_extra_arg() {
 }
 
 #[test]
+fn test_single_seconds_absolute_extra_arg_mempool() {
+    // ASSERT_SECONDS_ABSOLUTE
+    // extra args are disallowed in mempool mode
+    assert_eq!(
+        cond_test_flag(
+            "((({h1} ({h2} (123 (((81 (104 ( 1337 )))))",
+            STRICT_ARGS_COUNT
+        )
+        .unwrap_err()
+        .1,
+        ErrorCode::InvalidCondition
+    );
+}
+
+#[test]
 fn test_seconds_absolute_exceed_max() {
     // ASSERT_SECONDS_ABSOLUTE
     assert_eq!(
@@ -1078,6 +1184,21 @@ fn test_single_height_relative_extra_arg() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
 
     assert_eq!(spend.height_relative, Some(101));
+}
+
+#[test]
+fn test_single_height_relative_extra_arg_mempool() {
+    // ASSERT_HEIGHT_RELATIVE
+    // extra arguments are disallowed in mempool mode
+    assert_eq!(
+        cond_test_flag(
+            "((({h1} ({h2} (123 (((82 (101 (1337 )))))",
+            STRICT_ARGS_COUNT
+        )
+        .unwrap_err()
+        .1,
+        ErrorCode::InvalidCondition
+    );
 }
 
 #[test]
@@ -1151,6 +1272,21 @@ fn test_single_height_absolute_extra_arg() {
 }
 
 #[test]
+fn test_single_height_absolute_extra_arg_mempool() {
+    // ASSERT_HEIGHT_ABSOLUTE
+    // extra args are disallowed in mempool mode
+    assert_eq!(
+        cond_test_flag(
+            "((({h1} ({h2} (123 (((83 (100 (1337 )))))",
+            STRICT_ARGS_COUNT
+        )
+        .unwrap_err()
+        .1,
+        ErrorCode::InvalidCondition
+    );
+}
+
+#[test]
 fn test_height_absolute_exceed_max() {
     // ASSERT_HEIGHT_ABSOLUTE
     assert_eq!(
@@ -1204,6 +1340,21 @@ fn test_single_reserve_fee_extra_arg() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
 
     assert_eq!(conds.reserve_fee, 100);
+}
+
+#[test]
+fn test_single_reserve_fee_extra_arg_mempool() {
+    // RESERVE_FEE
+    // extra arguments are disallowed in mempool mode
+    assert_eq!(
+        cond_test_flag(
+            "((({h1} ({h2} (123 (((52 (100 (1337 )))))",
+            STRICT_ARGS_COUNT
+        )
+        .unwrap_err()
+        .1,
+        ErrorCode::InvalidCondition
+    );
 }
 
 #[test]
@@ -1269,6 +1420,22 @@ fn test_create_coin_announce_extra_arg() {
 }
 
 #[test]
+fn test_create_coin_announce_extra_arg_mempool() {
+    // CREATE_COIN_ANNOUNCEMENT
+    // ASSERT_COIN_ANNOUNCEMENT
+    // extra arguments are disallowed in mempool mode
+    assert_eq!(
+        cond_test_flag(
+            "((({h1} ({h2} (123 (((60 ({msg1} (1337 ) ((61 ({c11} )))))",
+            STRICT_ARGS_COUNT,
+        )
+        .unwrap_err()
+        .1,
+        ErrorCode::InvalidCondition
+    );
+}
+
+#[test]
 fn test_assert_coin_announce_extra_arg() {
     // CREATE_COIN_ANNOUNCEMENT
     // ASSERT_COIN_ANNOUNCEMENT
@@ -1284,6 +1451,22 @@ fn test_assert_coin_announce_extra_arg() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+}
+
+#[test]
+fn test_assert_coin_announce_extra_arg_mempool() {
+    // CREATE_COIN_ANNOUNCEMENT
+    // ASSERT_COIN_ANNOUNCEMENT
+    // extra arguments are disallowed in mempool mode
+    assert_eq!(
+        cond_test_flag(
+            "((({h1} ({h2} (123 (((60 ({msg1} ) ((61 ({c11} (1337 )))))",
+            STRICT_ARGS_COUNT,
+        )
+        .unwrap_err()
+        .1,
+        ErrorCode::InvalidCondition
+    );
 }
 
 #[test]
@@ -1369,6 +1552,22 @@ fn test_create_puzzle_announces_extra_arg() {
 }
 
 #[test]
+fn test_create_puzzle_announces_extra_arg_mempool() {
+    // CREATE_PUZZLE_ANNOUNCEMENT
+    // ASSERT_PUZZLE_ANNOUNCEMENT
+    // extra arguments are disallowed in mempool mode
+    assert_eq!(
+        cond_test_flag(
+            "((({h1} ({h2} (123 (((62 ({msg1} (1337 ) ((63 ({p21} )))))",
+            STRICT_ARGS_COUNT
+        )
+        .unwrap_err()
+        .1,
+        ErrorCode::InvalidCondition
+    );
+}
+
+#[test]
 fn test_assert_puzzle_announces_extra_arg() {
     // CREATE_PUZZLE_ANNOUNCEMENT
     // ASSERT_PUZZLE_ANNOUNCEMENT
@@ -1384,6 +1583,22 @@ fn test_assert_puzzle_announces_extra_arg() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+}
+
+#[test]
+fn test_assert_puzzle_announces_extra_arg_mempool() {
+    // CREATE_PUZZLE_ANNOUNCEMENT
+    // ASSERT_PUZZLE_ANNOUNCEMENT
+    // extra arguments are disallowed in mempool mode
+    assert_eq!(
+        cond_test_flag(
+            "((({h1} ({h2} (123 (((62 ({msg1} ) ((63 ({p21} (1337 )))))",
+            STRICT_ARGS_COUNT
+        )
+        .unwrap_err()
+        .1,
+        ErrorCode::InvalidCondition
+    );
 }
 
 #[test]
@@ -1460,6 +1675,21 @@ fn test_single_assert_my_amount_extra_arg() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+}
+
+#[test]
+fn test_single_assert_my_amount_extra_arg_mempool() {
+    // ASSERT_MY_AMOUNT
+    // extra args are disallowed in mempool mode
+    assert_eq!(
+        cond_test_flag(
+            "((({h1} ({h2} (123 (((73 (123 (1337 )))))",
+            STRICT_ARGS_COUNT
+        )
+        .unwrap_err()
+        .1,
+        ErrorCode::InvalidCondition
+    );
 }
 
 #[test]
@@ -1558,6 +1788,21 @@ fn test_single_assert_my_coin_id_extra_arg() {
 }
 
 #[test]
+fn test_single_assert_my_coin_id_extra_arg_mempool() {
+    // ASSERT_MY_COIN_ID
+    // extra args are disallowed in mempool mode
+    assert_eq!(
+        cond_test_flag(
+            "((({h1} ({h2} (123 (((70 ({coin12} (1337 )))))",
+            STRICT_ARGS_COUNT
+        )
+        .unwrap_err()
+        .1,
+        ErrorCode::InvalidCondition
+    );
+}
+
+#[test]
 fn test_single_assert_my_coin_id_overlong() {
     // ASSERT_MY_COIN_ID
     // leading zeros in the coin amount are ignored when computing the coin ID
@@ -1633,6 +1878,21 @@ fn test_single_assert_my_parent_coin_id_extra_arg() {
 }
 
 #[test]
+fn test_single_assert_my_parent_coin_id_extra_arg_mempool() {
+    // ASSERT_MY_PARENT_ID
+    // extra arguments are disallowed in mempool mode
+    assert_eq!(
+        cond_test_flag(
+            "((({h1} ({h2} (123 (((71 ({h1} (1337 )))))",
+            STRICT_ARGS_COUNT
+        )
+        .unwrap_err()
+        .1,
+        ErrorCode::InvalidCondition
+    );
+}
+
+#[test]
 fn test_multiple_assert_my_parent_coin_id() {
     // ASSERT_MY_PARENT_ID
     let (a, conds) = cond_test("((({h1} ({h2} (123 (((71 ({h1} ) ((71 ({h1} ) ))))").unwrap();
@@ -1690,6 +1950,21 @@ fn test_single_assert_my_puzzle_hash_extra_arg() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+}
+
+#[test]
+fn test_single_assert_my_puzzle_hash_extra_arg_mempool() {
+    // ASSERT_MY_PUZZLEHASH
+    // extra arguments are disallowed in mempool mode
+    assert_eq!(
+        cond_test_flag(
+            "((({h1} ({h2} (123 (((72 ({h2} (1337 )))))",
+            STRICT_ARGS_COUNT
+        )
+        .unwrap_err()
+        .1,
+        ErrorCode::InvalidCondition
+    );
 }
 
 #[test]
@@ -1836,6 +2111,21 @@ fn test_create_coin_extra_arg() {
 }
 
 #[test]
+fn test_create_coin_extra_arg_mempool() {
+    // CREATE_COIN
+    // extra args are disallowed in mempool mode
+    assert_eq!(
+        cond_test_flag(
+            "((({h1} ({h2} (123 (((51 ({h2} (42 (({h1}) (1337 )))))",
+            STRICT_ARGS_COUNT
+        )
+        .unwrap_err()
+        .1,
+        ErrorCode::InvalidCondition
+    );
+}
+
+#[test]
 fn test_create_coin_with_multiple_hints() {
     // CREATE_COIN
     let (a, conds) = cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 (({h1} ({h2}) )))))").unwrap();
@@ -1888,6 +2178,18 @@ fn test_create_coin_with_invalid_hint_as_terminator() {
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.null());
     }
+}
+
+#[test]
+fn test_create_coin_with_invalid_hint_as_terminator_mempool() {
+    // CREATE_COIN
+    // in mempool mode it's not OK to have an invalid terminator
+    assert_eq!(
+        cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 {h1}))))")
+            .unwrap_err()
+            .1,
+        ErrorCode::InvalidCondition
+    );
 }
 
 #[test]
@@ -2187,9 +2489,9 @@ fn test_agg_sig_me_extra_arg() {
 #[test]
 fn test_agg_sig_me_extra_arg_mempool() {
     // AGG_SIG_ME
-    // extra args are also disallowed in mempool mode
+    // extra arguments are not allowed in mempool_mode
     assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((50 ({pubkey} ({msg1} (456 )))))")
+        cond_test("((({h1} ({h2} (123 (((50 ({pubkey} ({msg1} (456 )))))",)
             .unwrap_err()
             .1,
         ErrorCode::InvalidCondition

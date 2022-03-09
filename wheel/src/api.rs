@@ -2,6 +2,7 @@ use crate::run_generator::{PySpend, PySpendBundleConditions, __pyo3_get_function
 use chia::gen::flags::COND_ARGS_NIL;
 use chia::gen::flags::COND_CANON_INTS;
 use chia::gen::flags::NO_UNKNOWN_CONDS;
+use chia::gen::flags::STRICT_ARGS_COUNT;
 //use chia::streamable::coin::Coin;
 //use chia::streamable::fullblock::Fullblock;
 use clvmr::chia_dialect::NO_NEG_DIV;
@@ -10,8 +11,12 @@ use pyo3::prelude::*;
 use pyo3::types::PyModule;
 use pyo3::{wrap_pyfunction, PyResult, Python};
 
-pub const MEMPOOL_MODE: u32 =
-    NO_NEG_DIV | COND_CANON_INTS | NO_UNKNOWN_CONDS | NO_UNKNOWN_OPS | COND_ARGS_NIL;
+pub const MEMPOOL_MODE: u32 = NO_NEG_DIV
+    | COND_CANON_INTS
+    | NO_UNKNOWN_CONDS
+    | NO_UNKNOWN_OPS
+    | COND_ARGS_NIL
+    | STRICT_ARGS_COUNT;
 
 #[pymodule]
 pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
@@ -24,6 +29,7 @@ pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add("COND_ARGS_NIL", COND_ARGS_NIL)?;
     m.add("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;
     m.add("NO_UNKNOWN_OPS", NO_UNKNOWN_OPS)?;
+    m.add("STRICT_ARGS_COUNT", STRICT_ARGS_COUNT)?;
     m.add("MEMPOOL_MODE", MEMPOOL_MODE)?;
     //m.add_class::<Coin>()?;
     //m.add_class::<Fullblock>()?;
