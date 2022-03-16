@@ -11,6 +11,10 @@ use pyo3::prelude::*;
 use pyo3::types::PyModule;
 use pyo3::{wrap_pyfunction, PyResult, Python};
 
+use crate::run_program::{
+    __pyo3_get_function_run_chia_program, __pyo3_get_function_serialized_length,
+};
+
 pub const MEMPOOL_MODE: u32 = NO_NEG_DIV
     | COND_CANON_INTS
     | NO_UNKNOWN_CONDS
@@ -20,24 +24,24 @@ pub const MEMPOOL_MODE: u32 = NO_NEG_DIV
 
 #[pymodule]
 pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(a_test_function, m)?)?;
     m.add_function(wrap_pyfunction!(run_generator, m)?)?;
     m.add_class::<PySpendBundleConditions>()?;
     m.add_class::<PySpend>()?;
-    m.add("NO_NEG_DIV", NO_NEG_DIV)?;
     m.add("COND_CANON_INTS", COND_CANON_INTS)?;
     m.add("COND_ARGS_NIL", COND_ARGS_NIL)?;
     m.add("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;
-    m.add("NO_UNKNOWN_OPS", NO_UNKNOWN_OPS)?;
     m.add("STRICT_ARGS_COUNT", STRICT_ARGS_COUNT)?;
     m.add("MEMPOOL_MODE", MEMPOOL_MODE)?;
     //m.add_class::<Coin>()?;
     //m.add_class::<Fullblock>()?;
 
-    Ok(())
-}
+    // facilities from clvm_rs
 
-#[pyfunction]
-pub fn a_test_function() -> u128 {
-    500
+    m.add_function(wrap_pyfunction!(run_chia_program, m)?)?;
+    m.add("NO_NEG_DIV", NO_NEG_DIV)?;
+    m.add("NO_UNKNOWN_OPS", NO_UNKNOWN_OPS)?;
+
+    m.add_function(wrap_pyfunction!(serialized_length, m)?)?;
+
+    Ok(())
 }
