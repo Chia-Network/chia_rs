@@ -15,7 +15,7 @@ repository = "https://github.com/Chia-Network/chia_rs/"
 py-bindings = ["dep:pyo3"]
 
 [dependencies]
-serde = { version = "1.0.130", features = ["derive"] }
+serde = { version = "1.0.130", features = ["derive", "rc"] }
 clvmr = "=0.1.20"
 # bincode = { git = "https://github.com/richardkiss/bincode", branch = "chia" }
 # the patched bincode is needed to enable serialization. However, a github dependency disqualifies

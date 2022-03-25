@@ -21,6 +21,7 @@ use clvmr::allocator::{Allocator, NodePtr, SExp};
 use clvmr::cost::Cost;
 use clvmr::op_utils::u64_from_bytes;
 use clvmr::sha2::Sha256;
+use serde::{Deserialize, Serialize};
 use std::cmp::max;
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
@@ -309,7 +310,7 @@ fn parse_args(
     }
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct NewCoin {
     pub puzzle_hash: Bytes32,
     pub amount: u64,
@@ -335,7 +336,7 @@ impl PartialEq for NewCoin {
 }
 
 // These are all the conditions related directly to a specific spend.
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Spend {
     pub coin_id: Arc<Bytes32>,
     pub puzzle_hash: NodePtr,
@@ -358,7 +359,7 @@ pub struct Spend {
 // spend bundle level, like reserve_fee and absolute time locks. Other
 // conditions are per spend, like relative time-locks and create coins (because
 // they have an implied parent coin ID).
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SpendBundleConditions {
     pub spends: Vec<Spend>,
     // conditions
