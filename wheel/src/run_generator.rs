@@ -1,4 +1,6 @@
 use super::adapt_response::eval_err_to_pyresult;
+use super::streamable::{py_from_bytes, py_parse_rust, py_to_bytes};
+
 use chia::gen::conditions::{parse_spends, Spend, SpendBundleConditions};
 use chia::gen::validation_error::{ErrorCode, ValidationErr};
 use chia::streamable::bytes::{Bytes, Bytes32, Bytes48};
@@ -8,11 +10,14 @@ use clvmr::cost::Cost;
 use clvmr::reduction::{EvalErr, Reduction};
 use clvmr::run_program::run_program;
 use clvmr::serialize::node_from_bytes;
+use serde::{Deserialize, Serialize};
 
+use pyo3::class::basic::{CompareOp, PyObjectProtocol};
 use pyo3::prelude::*;
+use pyo3::types::PyBytes;
 
-#[pyclass(subclass, unsendable)]
-#[derive(Clone)]
+#[pyclass(unsendable)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct PySpend {
     #[pyo3(get)]
     pub coin_id: Bytes32,
@@ -28,8 +33,50 @@ pub struct PySpend {
     pub agg_sig_me: Vec<(Bytes48, Bytes)>,
 }
 
-#[pyclass(subclass, unsendable)]
-#[derive(Clone)]
+#[pymethods]
+impl PySpend {
+    #[new]
+    fn new(
+        coin_id: Bytes32,
+        puzzle_hash: Bytes32,
+        height_relative: Option<u32>,
+        seconds_relative: u64,
+        create_coin: Vec<(Bytes32, u64, Option<Bytes>)>,
+        agg_sig_me: Vec<(Bytes48, Bytes)>,
+    ) -> PySpend {
+        PySpend {
+            coin_id,
+            puzzle_hash,
+            height_relative,
+            seconds_relative,
+            create_coin,
+            agg_sig_me,
+        }
+    }
+}
+
+#[pyproto]
+impl PyObjectProtocol for PySpend {
+    fn __str__(&self) -> PyResult<String> {
+        Ok(format!("{:?}", self))
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("{:?}", self))
+    }
+
+    fn __richcmp__(&self, other: PyRef<PySpend>, op: CompareOp) -> Py<PyAny> {
+        let py = other.py();
+        match op {
+            CompareOp::Eq => (self == &*other).into_py(py),
+            CompareOp::Ne => (self != &*other).into_py(py),
+            _ => py.NotImplemented(),
+        }
+    }
+}
+
+#[pyclass(unsendable)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct PySpendBundleConditions {
     #[pyo3(get)]
     pub spends: Vec<PySpend>,
@@ -47,15 +94,77 @@ pub struct PySpendBundleConditions {
     pub cost: u64,
 }
 
+#[pymethods]
+impl PySpendBundleConditions {
+    #[new]
+    fn new(
+        spends: Vec<PySpend>,
+        reserve_fee: u64,
+        height_absolute: u32,
+        seconds_absolute: u64,
+        agg_sig_unsafe: Vec<(Bytes48, Bytes)>,
+        cost: u64,
+    ) -> PySpendBundleConditions {
+        PySpendBundleConditions {
+            spends,
+            reserve_fee,
+            height_absolute,
+            seconds_absolute,
+            agg_sig_unsafe,
+            cost,
+        }
+    }
+
+    #[staticmethod]
+    pub fn from_bytes(blob: &[u8]) -> PyResult<Self> {
+        py_from_bytes::<Self>(blob)
+    }
+
+    // returns the type as well as the number of bytes read from the buffer
+    #[staticmethod]
+    pub fn parse_rust(blob: &[u8]) -> PyResult<(Self, u32)> {
+        py_parse_rust::<Self>(blob)
+    }
+
+    pub fn to_bytes(&self) -> PyResult<Vec<u8>> {
+        py_to_bytes(&self)
+    }
+
+    pub fn __bytes__<'p>(&self, py: Python<'p>) -> PyResult<&'p PyBytes> {
+        Ok(PyBytes::new(py, &self.to_bytes()?))
+    }
+}
+
+#[pyproto]
+impl PyObjectProtocol for PySpendBundleConditions {
+    fn __str__(&self) -> PyResult<String> {
+        Ok(format!("{:?}", self))
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("{:?}", self))
+    }
+
+    fn __richcmp__(&self, other: PyRef<PySpendBundleConditions>, op: CompareOp) -> Py<PyAny> {
+        let py = other.py();
+        match op {
+            CompareOp::Eq => (self == &*other).into_py(py),
+            CompareOp::Ne => (self != &*other).into_py(py),
+            _ => py.NotImplemented(),
+        }
+    }
+}
+
 fn convert_spend(a: &Allocator, spend: Spend) -> PySpend {
     let mut agg_sigs = Vec::<(Bytes48, Bytes)>::new();
     for (pk, msg) in spend.agg_sig_me {
         agg_sigs.push((a.atom(pk).into(), a.atom(msg).into()));
     }
-    let mut create_coin = Vec::<(Bytes32, u64, Option<Bytes>)>::new();
+    let mut create_coin =
+        Vec::<(Bytes32, u64, Option<Bytes>)>::with_capacity(spend.create_coin.len());
     for c in spend.create_coin {
         create_coin.push((
-            c.puzzle_hash,
+            c.puzzle_hash.into(),
             c.amount,
             if c.hint != a.null() {
                 Some(a.atom(c.hint).into())

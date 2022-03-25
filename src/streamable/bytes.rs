@@ -1,4 +1,7 @@
 use core::fmt::Formatter;
+use serde::ser::SerializeTuple;
+use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::fmt::Debug;
 
 #[cfg(feature = "py-bindings")]
@@ -8,7 +11,7 @@ use pyo3::types::PyBytes;
 #[cfg(feature = "py-bindings")]
 use std::convert::TryInto;
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct Bytes(Vec<u8>);
 
 impl From<&[u8]> for Bytes {
@@ -16,8 +19,46 @@ impl From<&[u8]> for Bytes {
         Bytes(v.to_vec())
     }
 }
+
+struct ByteVisitor<const N: usize>;
+
+impl<'de, const N: usize> serde::de::Visitor<'de> for ByteVisitor<N> {
+    type Value = BytesImpl<N>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("bytes")
+    }
+
+    fn visit_seq<S>(self, mut seq: S) -> Result<Self::Value, S::Error>
+    where
+        S: serde::de::SeqAccess<'de>,
+    {
+        let mut dest: [u8; N] = [0; N];
+        let mut counter = 0;
+        while let Some(value) = seq.next_element()? {
+            dest[counter] = value;
+            counter += 1;
+        }
+
+        Ok(dest.into())
+    }
+}
+
 #[derive(Hash, PartialEq, Eq, Copy, Clone)]
 pub struct BytesImpl<const N: usize>([u8; N]);
+
+impl<const N: usize> Serialize for BytesImpl<N> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut seq = serializer.serialize_tuple(N)?;
+        for elem in &self.0[..] {
+            seq.serialize_element(elem)?;
+        }
+        seq.end()
+    }
+}
 
 impl<const N: usize> From<[u8; N]> for BytesImpl<N> {
     fn from(v: [u8; N]) -> BytesImpl<N> {
@@ -73,6 +114,15 @@ impl<const N: usize> BytesImpl<N> {
 impl<const N: usize> Debug for BytesImpl<N> {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         formatter.write_str(&hex::encode(self.0))
+    }
+}
+
+impl<'de, const N: usize> Deserialize<'de> for BytesImpl<N> {
+    fn deserialize<D>(deserializer: D) -> Result<BytesImpl<N>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_tuple(N, ByteVisitor::<N>)
     }
 }
 
