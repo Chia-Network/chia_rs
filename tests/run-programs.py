@@ -54,7 +54,7 @@ for hexname in sorted(glob.glob('programs/*.hex')):
     output += proc.stdout.decode('UTF-8')
     end = time.perf_counter()
 
-    if 'FAIL: cost exceeded' not in output:
+    if 'FAIL: ' not in output or 'cost exceeded' not in output:
         ret += 1
         print(Fore.RED + '\nTEST FAILURE: expected cost to be exceeded\n' + Style.RESET_ALL)
         print(output)

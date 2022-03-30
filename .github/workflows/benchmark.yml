@@ -57,3 +57,10 @@ jobs:
         . ./activate
         cd tests
         ./test-generators.py
+
+    - name: Run cost checks
+      run: |
+        . ./activate
+        cd tests
+        ./generate-programs.py
+        ./run-programs.py
