@@ -63,7 +63,7 @@ fn radix_sort(range: &mut [[u8; 32]], depth: u8) -> ([u8; 32], NodeType) {
     let mut left: i32 = 0;
     let mut right = range.len() as i32 - 1;
 
-    // move 0 bits to the left, and 1 bits to the rigth
+    // move 0 bits to the left, and 1 bits to the right
     while left <= right {
         let left_bit = get_bit(&range[left as usize], depth);
         let right_bit = get_bit(&range[right as usize], depth);
@@ -136,10 +136,7 @@ fn radix_sort(range: &mut [[u8; 32]], depth: u8) -> ([u8; 32], NodeType) {
 pub fn compute_merkle_root(leafs: &mut [[u8; 32]]) -> [u8; 32] {
     // There's a special case for empty sets
     if leafs.is_empty() {
-        return [
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0,
-        ];
+        return BLANK;
     }
 
     match radix_sort(leafs, 0) {
