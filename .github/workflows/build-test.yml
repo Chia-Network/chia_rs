@@ -1,4 +1,4 @@
-name: Build Mac, Linux, and Windows wheels
+name: Build
 
 on:
   push:
@@ -172,7 +172,10 @@ jobs:
           args: --all-features
 
   unit_tests:
-    runs-on: ubuntu-20.04
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
     name: Unit tests
     steps:
       - uses: actions/checkout@v2
@@ -182,6 +185,5 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
             toolchain: stable
-            components: rustfmt, clippy
       - name: cargo test
         run: cargo test
