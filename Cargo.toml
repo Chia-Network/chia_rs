@@ -3,7 +3,7 @@ members = ["wasm", "wheel"]
 
 [package]
 name = "chia"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2018"
 license = "Apache-2.0"
 description = "Implementation of `clvm` for Chia Network's cryptocurrency"
