@@ -1,7 +1,8 @@
 use super::adapt_response::eval_err_to_pyresult;
 use chia::gen::conditions::{parse_spends, Spend, SpendBundleConditions};
 use chia::gen::validation_error::{ErrorCode, ValidationErr};
-use clvmr::allocator::{Allocator, NodePtr};
+use chia::streamable::bytes::{Bytes, Bytes32, Bytes48};
+use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;
 use clvmr::reduction::{EvalErr, Reduction};
@@ -9,23 +10,22 @@ use clvmr::run_program::run_program;
 use clvmr::serialize::node_from_bytes;
 
 use pyo3::prelude::*;
-use pyo3::types::PyBytes;
 
 #[pyclass(subclass, unsendable)]
 #[derive(Clone)]
 pub struct PySpend {
     #[pyo3(get)]
-    pub coin_id: PyObject,
+    pub coin_id: Bytes32,
     #[pyo3(get)]
-    pub puzzle_hash: PyObject,
+    pub puzzle_hash: Bytes32,
     #[pyo3(get)]
     pub height_relative: Option<u32>,
     #[pyo3(get)]
     pub seconds_relative: u64,
     #[pyo3(get)]
-    pub create_coin: Vec<(PyObject, u64, PyObject)>,
+    pub create_coin: Vec<(Bytes32, u64, Option<Bytes>)>,
     #[pyo3(get)]
-    pub agg_sig_me: Vec<(PyObject, PyObject)>,
+    pub agg_sig_me: Vec<(Bytes48, Bytes)>,
 }
 
 #[pyclass(subclass, unsendable)]
@@ -42,32 +42,32 @@ pub struct PySpendBundleConditions {
     pub seconds_absolute: u64,
     // Unsafe Agg Sig conditions (i.e. not tied to the spend generating it)
     #[pyo3(get)]
-    pub agg_sig_unsafe: Vec<(PyObject, PyObject)>,
+    pub agg_sig_unsafe: Vec<(Bytes48, Bytes)>,
     #[pyo3(get)]
     pub cost: u64,
 }
 
-fn node_to_pybytes(py: Python, a: &Allocator, n: NodePtr) -> PyObject {
-    PyBytes::new(py, a.atom(n)).into()
-}
-
-fn convert_spend(py: Python, a: &Allocator, spend: Spend) -> PySpend {
-    let mut agg_sigs = Vec::<(PyObject, PyObject)>::new();
+fn convert_spend(a: &Allocator, spend: Spend) -> PySpend {
+    let mut agg_sigs = Vec::<(Bytes48, Bytes)>::new();
     for (pk, msg) in spend.agg_sig_me {
-        agg_sigs.push((node_to_pybytes(py, a, pk), node_to_pybytes(py, a, msg)));
+        agg_sigs.push((a.atom(pk).into(), a.atom(msg).into()));
     }
-    let mut create_coin = Vec::<(PyObject, u64, PyObject)>::new();
+    let mut create_coin = Vec::<(Bytes32, u64, Option<Bytes>)>::new();
     for c in spend.create_coin {
         create_coin.push((
-            PyBytes::new(py, &c.puzzle_hash).into(),
+            c.puzzle_hash,
             c.amount,
-            node_to_pybytes(py, a, c.hint),
+            if c.hint != a.null() {
+                Some(a.atom(c.hint).into())
+            } else {
+                None
+            },
         ));
     }
 
     PySpend {
-        coin_id: PyBytes::new(py, &*spend.coin_id).into(),
-        puzzle_hash: node_to_pybytes(py, a, spend.puzzle_hash),
+        coin_id: *spend.coin_id,
+        puzzle_hash: a.atom(spend.puzzle_hash).into(),
         height_relative: spend.height_relative,
         seconds_relative: spend.seconds_relative,
         create_coin,
@@ -75,19 +75,15 @@ fn convert_spend(py: Python, a: &Allocator, spend: Spend) -> PySpend {
     }
 }
 
-fn convert_spend_bundle_conds(
-    py: Python,
-    a: &Allocator,
-    sb: SpendBundleConditions,
-) -> PySpendBundleConditions {
+fn convert_spend_bundle_conds(a: &Allocator, sb: SpendBundleConditions) -> PySpendBundleConditions {
     let mut spends = Vec::<PySpend>::new();
     for s in sb.spends {
-        spends.push(convert_spend(py, a, s));
+        spends.push(convert_spend(a, s));
     }
 
-    let mut agg_sigs = Vec::<(PyObject, PyObject)>::new();
+    let mut agg_sigs = Vec::<(Bytes48, Bytes)>::with_capacity(sb.agg_sig_unsafe.len());
     for (pk, msg) in sb.agg_sig_unsafe {
-        agg_sigs.push((node_to_pybytes(py, a, pk), node_to_pybytes(py, a, msg)));
+        agg_sigs.push((a.atom(pk).into(), a.atom(msg).into()));
     }
 
     PySpendBundleConditions {
@@ -138,11 +134,7 @@ pub fn run_generator(
             // everything was successful
             Ok((
                 None,
-                Some(convert_spend_bundle_conds(
-                    py,
-                    &allocator,
-                    spend_bundle_conds,
-                )),
+                Some(convert_spend_bundle_conds(&allocator, spend_bundle_conds)),
             ))
         }
         Ok((error_code, _)) => {
