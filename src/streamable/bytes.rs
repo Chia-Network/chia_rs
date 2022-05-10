@@ -1,9 +1,12 @@
 use core::fmt::Formatter;
-use std::convert::TryInto;
 use std::fmt::Debug;
 
+#[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
+#[cfg(feature = "py-bindings")]
 use pyo3::types::PyBytes;
+#[cfg(feature = "py-bindings")]
+use std::convert::TryInto;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Bytes(Vec<u8>);
@@ -78,18 +81,21 @@ pub type Bytes48 = BytesImpl<48>;
 pub type Bytes96 = BytesImpl<96>;
 pub type Bytes100 = BytesImpl<100>;
 
+#[cfg(feature = "py-bindings")]
 impl<const N: usize> ToPyObject for BytesImpl<N> {
     fn to_object(&self, py: Python) -> PyObject {
         PyBytes::new(py, &self.0).into()
     }
 }
 
+#[cfg(feature = "py-bindings")]
 impl<const N: usize> IntoPy<PyObject> for BytesImpl<N> {
     fn into_py(self, py: Python) -> PyObject {
         PyBytes::new(py, &self.0).into()
     }
 }
 
+#[cfg(feature = "py-bindings")]
 impl<'py, const N: usize> FromPyObject<'py> for BytesImpl<N> {
     fn extract(obj: &'py PyAny) -> PyResult<Self> {
         let b = <PyBytes as PyTryFrom>::try_from(obj)?;
@@ -99,18 +105,21 @@ impl<'py, const N: usize> FromPyObject<'py> for BytesImpl<N> {
     }
 }
 
+#[cfg(feature = "py-bindings")]
 impl ToPyObject for Bytes {
     fn to_object(&self, py: Python) -> PyObject {
         PyBytes::new(py, &self.0).into()
     }
 }
 
+#[cfg(feature = "py-bindings")]
 impl IntoPy<PyObject> for Bytes {
     fn into_py(self, py: Python) -> PyObject {
         PyBytes::new(py, &self.0).into()
     }
 }
 
+#[cfg(feature = "py-bindings")]
 impl<'py> FromPyObject<'py> for Bytes {
     fn extract(obj: &'py PyAny) -> PyResult<Self> {
         let b = <PyBytes as PyTryFrom>::try_from(obj)?;

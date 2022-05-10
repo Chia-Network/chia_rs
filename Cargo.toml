@@ -11,6 +11,9 @@ authors = ["Richard Kiss <him@richardkiss.com>"]
 homepage = "https://github.com/Chia-Network/chia_rs/"
 repository = "https://github.com/Chia-Network/chia_rs/"
 
+[features]
+py-bindings = ["dep:pyo3"]
+
 [dependencies]
 serde = { version = "1.0.130", features = ["derive"] }
 clvmr = "=0.1.20"
@@ -18,7 +21,7 @@ clvmr = "=0.1.20"
 # the patched bincode is needed to enable serialization. However, a github dependency disqualifies
 # any build crates from being uploaded to crates.io, so this is temporarily disabled.
 hex = "=0.4.3"
-pyo3 = { version = "=0.15.1", features = ["abi3-py37", "extension-module"] }
+pyo3 = { version = "=0.15.1", features = ["abi3-py37", "extension-module"], optional = true }
 
 [dev-dependencies]
 num-traits = "=0.2.14"
