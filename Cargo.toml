@@ -18,6 +18,7 @@ clvmr = "=0.1.20"
 # the patched bincode is needed to enable serialization. However, a github dependency disqualifies
 # any build crates from being uploaded to crates.io, so this is temporarily disabled.
 hex = "=0.4.3"
+pyo3 = { version = "=0.15.1", features = ["abi3-py37", "extension-module"] }
 
 [dev-dependencies]
 num-traits = "=0.2.14"

@@ -1,3 +1,4 @@
+use crate::streamable::bytes::Bytes32;
 use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::sha2::Sha256;
 
@@ -6,12 +7,12 @@ pub fn compute_coin_id(
     parent_id: NodePtr,
     puzzle_hash: NodePtr,
     amount: &[u8],
-) -> [u8; 32] {
+) -> Bytes32 {
     let mut hasher = Sha256::new();
     hasher.update(a.atom(parent_id));
     hasher.update(a.atom(puzzle_hash));
     hasher.update(amount);
-    hasher.finish()
+    hasher.finish().into()
 }
 
 // from chia.types.blockchain_format.coin import Coin
@@ -55,7 +56,7 @@ fn test_compute_coin_id() {
         0x64, 0x6e,
     ];
     assert_eq!(
-        &compute_coin_id(&a, parent_id1, puzzle_hash1, &[123]),
+        compute_coin_id(&a, parent_id1, puzzle_hash1, &[123]).slice(),
         coin_id
     );
 
@@ -65,7 +66,7 @@ fn test_compute_coin_id() {
         0x34, 0x68,
     ];
     assert_eq!(
-        &compute_coin_id(&a, parent_id1, puzzle_hash1, &[3]),
+        compute_coin_id(&a, parent_id1, puzzle_hash1, &[3]).slice(),
         coin_id
     );
 
@@ -75,7 +76,7 @@ fn test_compute_coin_id() {
         0xdf, 0x97,
     ];
     assert_eq!(
-        &compute_coin_id(&a, parent_id2, puzzle_hash1, &[3]),
+        compute_coin_id(&a, parent_id2, puzzle_hash1, &[3]).slice(),
         coin_id
     );
 }

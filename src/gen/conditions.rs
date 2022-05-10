@@ -16,6 +16,7 @@ use crate::gen::flags::COND_ARGS_NIL;
 use crate::gen::flags::NO_UNKNOWN_CONDS;
 use crate::gen::flags::STRICT_ARGS_COUNT;
 use crate::gen::validation_error::check_nil;
+use crate::streamable::bytes::Bytes32;
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use clvmr::cost::Cost;
 use clvmr::op_utils::u64_from_bytes;
@@ -310,7 +311,7 @@ fn parse_args(
 
 #[derive(Debug)]
 pub struct NewCoin {
-    pub puzzle_hash: Vec<u8>,
+    pub puzzle_hash: Bytes32,
     pub amount: u64,
     // the hint is optional. When not provided, this points to null (NodePtr
     // value -1). The hint is not part of the unique identity of a coin, it's not
@@ -336,7 +337,7 @@ impl PartialEq for NewCoin {
 // These are all the conditions related directly to a specific spend.
 #[derive(Debug)]
 pub struct Spend {
-    pub coin_id: Arc<[u8; 32]>,
+    pub coin_id: Arc<Bytes32>,
     pub puzzle_hash: NodePtr,
     // conditions
     // all these integers are initialized to 0, which also means "no
@@ -379,7 +380,7 @@ pub struct SpendBundleConditions {
 struct ParseState {
     // hashing of the announcements is deferred until parsing is complete. This
     // means less work up-front, in case parsing/validation fails
-    announce_coin: HashSet<(Arc<[u8; 32]>, NodePtr)>,
+    announce_coin: HashSet<(Arc<Bytes32>, NodePtr)>,
     announce_puzzle: HashSet<(NodePtr, NodePtr)>,
 
     // the assert announcements are checked once everything has been parsed and
@@ -390,7 +391,7 @@ struct ParseState {
     // all coin IDs that have been spent so far. When we parse a spend we also
     // compute the coin ID, and stick it in this set. It's reference counted
     // since it may also be referenced by announcements
-    spent_coins: HashSet<Arc<[u8; 32]>>,
+    spent_coins: HashSet<Arc<Bytes32>>,
 
     // this object tracks which ranges of the heap we've scanned for zeros, to
     // avoid scanning the same ranges multiple times.
@@ -494,7 +495,7 @@ fn parse_spend_conditions(
             }
             Condition::CreateCoin(ph, amount, hint) => {
                 let new_coin = NewCoin {
-                    puzzle_hash: a.atom(ph).to_vec(),
+                    puzzle_hash: a.atom(ph).into(),
                     amount,
                     hint,
                 };
@@ -519,7 +520,7 @@ fn parse_spend_conditions(
                 ret.height_absolute = max(ret.height_absolute, h);
             }
             Condition::AssertMyCoinId(id) => {
-                if a.atom(id) != *spend.coin_id {
+                if a.atom(id) != (*spend.coin_id).slice() {
                     return Err(ValidationErr(c, ErrorCode::AssertMyCoinIdFailed));
                 }
             }
@@ -600,17 +601,17 @@ pub fn parse_spends(
     // check all the assert announcements
     // if there are no asserts, there is no need to hash all the announcements
     if !state.assert_coin.is_empty() {
-        let mut announcements = HashSet::<[u8; 32]>::new();
+        let mut announcements = HashSet::<Bytes32>::new();
 
         for (coin_id, announce) in state.announce_coin {
             let mut hasher = Sha256::new();
-            hasher.update(&*coin_id);
+            hasher.update((*coin_id).slice());
             hasher.update(a.atom(announce));
-            announcements.insert(hasher.finish());
+            announcements.insert(hasher.finish().into());
         }
 
         for coin_assert in state.assert_coin {
-            if !announcements.contains(a.atom(coin_assert)) {
+            if !announcements.contains(&a.atom(coin_assert).into()) {
                 return Err(ValidationErr(
                     coin_assert,
                     ErrorCode::AssertCoinAnnouncementFailed,
@@ -620,17 +621,17 @@ pub fn parse_spends(
     }
 
     if !state.assert_puzzle.is_empty() {
-        let mut announcements = HashSet::<[u8; 32]>::new();
+        let mut announcements = HashSet::<Bytes32>::new();
 
         for (puzzle_hash, announce) in state.announce_puzzle {
             let mut hasher = Sha256::new();
             hasher.update(a.atom(puzzle_hash));
             hasher.update(a.atom(announce));
-            announcements.insert(hasher.finish());
+            announcements.insert(hasher.finish().into());
         }
 
         for puzzle_assert in state.assert_puzzle {
-            if !announcements.contains(a.atom(puzzle_assert)) {
+            if !announcements.contains(&a.atom(puzzle_assert).into()) {
                 return Err(ValidationErr(
                     puzzle_assert,
                     ErrorCode::AssertPuzzleAnnouncementFailed,
@@ -741,13 +742,13 @@ fn hash_buf(b1: &[u8], b2: &[u8]) -> Vec<u8> {
 }
 
 #[cfg(test)]
-fn test_coin_id(parent_id: &[u8], puzzle_hash: &[u8], amount: u64) -> [u8; 32] {
+fn test_coin_id(parent_id: &[u8; 32], puzzle_hash: &[u8; 32], amount: u64) -> Bytes32 {
     let mut hasher = Sha256::new();
     hasher.update(parent_id);
     hasher.update(puzzle_hash);
     let buf = u64_to_bytes(amount);
     hasher.update(&buf);
-    hasher.finish()
+    hasher.finish().into()
 }
 
 // this is a very simple parser. It does not handle errors, because it's only
@@ -831,29 +832,41 @@ fn parse_list(
     subs.insert("msg2", a.new_atom(MSG2).unwrap());
     subs.insert("longmsg", a.new_atom(LONGMSG).unwrap());
     // coin IDs
-    subs.insert("coin11", a.new_atom(&test_coin_id(H1, H1, 123)).unwrap());
-    subs.insert("coin12", a.new_atom(&test_coin_id(H1, H2, 123)).unwrap());
-    subs.insert("coin21", a.new_atom(&test_coin_id(H2, H1, 123)).unwrap());
-    subs.insert("coin22", a.new_atom(&test_coin_id(H2, H2, 123)).unwrap());
+    subs.insert(
+        "coin11",
+        a.new_atom(test_coin_id(H1, H1, 123).slice()).unwrap(),
+    );
+    subs.insert(
+        "coin12",
+        a.new_atom(test_coin_id(H1, H2, 123).slice()).unwrap(),
+    );
+    subs.insert(
+        "coin21",
+        a.new_atom(test_coin_id(H2, H1, 123).slice()).unwrap(),
+    );
+    subs.insert(
+        "coin22",
+        a.new_atom(test_coin_id(H2, H2, 123).slice()).unwrap(),
+    );
     // coin announcements
     subs.insert(
         "c11",
-        a.new_atom(&hash_buf(&test_coin_id(H1, H2, 123), MSG1))
+        a.new_atom(&hash_buf(test_coin_id(H1, H2, 123).slice(), MSG1))
             .unwrap(),
     );
     subs.insert(
         "c21",
-        a.new_atom(&hash_buf(&test_coin_id(H2, H2, 123), MSG1))
+        a.new_atom(&hash_buf(test_coin_id(H2, H2, 123).slice(), MSG1))
             .unwrap(),
     );
     subs.insert(
         "c12",
-        a.new_atom(&hash_buf(&test_coin_id(H1, H2, 123), MSG2))
+        a.new_atom(&hash_buf(test_coin_id(H1, H2, 123).slice(), MSG2))
             .unwrap(),
     );
     subs.insert(
         "c22",
-        a.new_atom(&hash_buf(&test_coin_id(H2, H2, 123), MSG2))
+        a.new_atom(&hash_buf(test_coin_id(H2, H2, 123).slice(), MSG2))
             .unwrap(),
     );
     // puzzle announcements
@@ -2014,7 +2027,7 @@ fn test_single_create_coin() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert_eq!(c.puzzle_hash, H2.to_vec());
+        assert_eq!(c.puzzle_hash, H2.into());
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.null());
     }
@@ -2033,7 +2046,7 @@ fn test_create_coin_max_amount() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert_eq!(c.puzzle_hash, H2.to_vec());
+        assert_eq!(c.puzzle_hash, H2.into());
         assert_eq!(c.amount, 0xffffffffffffffff_u64);
         assert_eq!(c.hint, a.null());
     }
@@ -2084,7 +2097,7 @@ fn test_create_coin_with_hint() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert!(c.puzzle_hash == H2.to_vec());
+        assert!(c.puzzle_hash == H2.into());
         assert!(c.amount == 42_u64);
         assert!(a.atom(c.hint) == H1.to_vec());
     }
@@ -2104,7 +2117,7 @@ fn test_create_coin_extra_arg() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert!(c.puzzle_hash == H2.to_vec());
+        assert!(c.puzzle_hash == H2.into());
         assert!(c.amount == 42_u64);
         assert!(a.atom(c.hint) == H1.to_vec());
     }
@@ -2137,7 +2150,7 @@ fn test_create_coin_with_multiple_hints() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert!(c.puzzle_hash == H2.to_vec());
+        assert!(c.puzzle_hash == H2.into());
         assert!(c.amount == 42_u64);
         assert!(a.atom(c.hint) == H1.to_vec());
     }
@@ -2156,7 +2169,7 @@ fn test_create_coin_with_hint_as_atom() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert_eq!(c.puzzle_hash, H2.to_vec());
+        assert_eq!(c.puzzle_hash, H2.into());
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.null());
     }
@@ -2174,7 +2187,7 @@ fn test_create_coin_with_invalid_hint_as_terminator() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert_eq!(c.puzzle_hash, H2.to_vec());
+        assert_eq!(c.puzzle_hash, H2.into());
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.null());
     }
@@ -2205,7 +2218,7 @@ fn test_create_coin_with_short_hint() {
     assert_eq!(spend.create_coin.len(), 1);
 
     for c in &spend.create_coin {
-        assert!(c.puzzle_hash == H2.to_vec());
+        assert!(c.puzzle_hash == H2.into());
         assert!(c.amount == 42_u64);
         assert!(a.atom(c.hint) == MSG1.to_vec());
     }
@@ -2224,7 +2237,7 @@ fn test_create_coin_with_long_hint() {
     assert_eq!(spend.create_coin.len(), 1);
 
     for c in &spend.create_coin {
-        assert_eq!(c.puzzle_hash, H2.to_vec());
+        assert_eq!(c.puzzle_hash, H2.into());
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.null());
     }
@@ -2244,7 +2257,7 @@ fn test_create_coin_with_pair_hint() {
     assert_eq!(spend.create_coin.len(), 1);
 
     for c in &spend.create_coin {
-        assert_eq!(c.puzzle_hash, H2.to_vec());
+        assert_eq!(c.puzzle_hash, H2.into());
         assert_eq!(c.amount, 42_u64);
         assert_eq!(a.atom(c.hint), H1.to_vec());
     }
@@ -2263,7 +2276,7 @@ fn test_create_coin_with_cons_hint() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert_eq!(c.puzzle_hash, H2.to_vec());
+        assert_eq!(c.puzzle_hash, H2.into());
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.null());
     }
@@ -2283,12 +2296,12 @@ fn test_multiple_create_coin() {
     assert_eq!(spend.create_coin.len(), 2);
 
     assert!(spend.create_coin.contains(&NewCoin {
-        puzzle_hash: H2.to_vec(),
+        puzzle_hash: H2.into(),
         amount: 42_u64,
         hint: a.null()
     }));
     assert!(spend.create_coin.contains(&NewCoin {
-        puzzle_hash: H2.to_vec(),
+        puzzle_hash: H2.into(),
         amount: 43_u64,
         hint: a.null()
     }));
