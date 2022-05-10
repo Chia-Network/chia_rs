@@ -15,6 +15,6 @@ crate-type = ["cdylib"]
 path = "src/lib.rs"
 
 [dependencies]
-chia = { path = ".." }
+chia = { path = "..", features = ["py-bindings"] }
 clvmr = "=0.1.20"
 pyo3 = { version = "=0.15.1", features = ["abi3-py37", "extension-module"] }
