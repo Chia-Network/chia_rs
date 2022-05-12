@@ -2,6 +2,6 @@ pub mod bytes;
 // pub mod coin;
 // pub mod fullblock;
 // pub mod program;
-pub mod deserialize;
+pub mod de;
 pub mod error;
-pub mod serialize;
+pub mod ser;
