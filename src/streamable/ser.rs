@@ -303,6 +303,13 @@ fn stream<T: serde::Serialize>(v: &T) -> Vec<u8> {
     buf
 }
 
+#[cfg(test)]
+fn stream_failure<T: serde::Serialize>(v: &T) -> Error {
+    let mut buf = Vec::<u8>::new();
+    let mut ser = ChiaSerializer::new(&mut buf);
+    serde::Serialize::serialize(&v, &mut ser).unwrap_err()
+}
+
 #[test]
 fn test_bytes() {
     let b: BytesImpl<32> = [
@@ -506,4 +513,85 @@ fn test_list_list() {
             0xff, 0xff
         ]
     );
+}
+
+#[cfg(test)]
+#[derive(Serialize)]
+struct NewTypeStruct(u8, i8);
+
+#[test]
+fn test_newtype_struct() {
+    let out = stream(&NewTypeStruct(10, -1));
+    assert_eq!(out, &[10, 0xff]);
+}
+
+#[test]
+fn test_float() {
+    assert_eq!(stream_failure(&3.14f32), Error::NotSupported);
+    assert_eq!(stream_failure(&3.14f64), Error::NotSupported);
+    assert_eq!(stream_failure(&(3.14f64, 10_u8)), Error::NotSupported);
+    assert_eq!(stream_failure(&[3.14f32, 1.2345f32]), Error::NotSupported);
+}
+
+#[test]
+fn test_char() {
+    let c = 'ä';
+    assert_eq!(stream_failure(&c), Error::NotSupported);
+}
+
+#[cfg(test)]
+use std::collections::HashMap;
+
+#[test]
+fn test_hash_map() {
+    let m = HashMap::from([("foo", 0), ("bar", 1)]);
+    assert_eq!(stream_failure(&m), Error::NotSupported);
+}
+
+#[cfg(test)]
+#[derive(Serialize)]
+enum TestVariant {
+    A(u8),
+    B,
+    C(String),
+}
+
+#[test]
+fn test_variant() {
+    assert_eq!(stream_failure(&TestVariant::A(5)), Error::NotSupported);
+    assert_eq!(stream_failure(&TestVariant::B), Error::NotSupported);
+    assert_eq!(
+        stream_failure(&TestVariant::C("foobar".to_string())),
+        Error::NotSupported
+    );
+}
+
+#[cfg(test)]
+#[derive(Serialize)]
+enum TestEnum {
+    A,
+    B,
+    C,
+}
+
+#[test]
+fn test_enum() {
+    assert_eq!(stream_failure(&TestEnum::A), Error::NotSupported);
+    assert_eq!(stream_failure(&TestEnum::B), Error::NotSupported);
+    assert_eq!(stream_failure(&TestEnum::C), Error::NotSupported);
+}
+
+#[cfg(test)]
+#[derive(Serialize)]
+struct UnitStruct;
+
+#[test]
+fn test_unit_struct() {
+    assert_eq!(stream_failure(&UnitStruct {}), Error::NotSupported);
+}
+
+#[test]
+fn test_unit() {
+    let a = ();
+    assert_eq!(stream_failure(&a), Error::NotSupported);
 }
