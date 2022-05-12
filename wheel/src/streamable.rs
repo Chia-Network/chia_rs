@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-use chia::streamable::deserialize::ChiaDeserializer;
-use chia::streamable::serialize::ChiaSerializer;
+use chia::streamable::de::ChiaDeserializer;
+use chia::streamable::ser::ChiaSerializer;
 
 use pyo3::prelude::*;
 
