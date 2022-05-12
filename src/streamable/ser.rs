@@ -53,6 +53,14 @@ macro_rules! serialize_primitive {
     };
 }
 
+macro_rules! serialize_not_supported {
+    ($name:ident, $ret:ty $(, $arg:ident : $t:ty)*) => {
+        fn $name(self $(, $arg : $t)*) -> Result<$ret> {
+            Err(Error::NotSupported)
+        }
+    };
+}
+
 impl<'a, W: io::Write> serde::Serializer for &'a mut ChiaSerializer<W> {
     type Ok = ();
     type Error = Error;
@@ -64,13 +72,35 @@ impl<'a, W: io::Write> serde::Serializer for &'a mut ChiaSerializer<W> {
     type SerializeStruct = Self;
     type SerializeStructVariant = Self;
 
-    fn serialize_unit(self) -> Result<()> {
-        Err(Error::NotSupported)
-    }
-
-    fn serialize_unit_struct(self, _: &'static str) -> Result<()> {
-        Err(Error::NotSupported)
-    }
+    serialize_not_supported!(serialize_unit, ());
+    serialize_not_supported!(serialize_unit_struct, (), _name: &'static str);
+    serialize_not_supported!(serialize_f32, (), _v: f32);
+    serialize_not_supported!(serialize_f64, (), _v: f64);
+    serialize_not_supported!(serialize_char, (), _c: char);
+    serialize_not_supported!(serialize_map, Self::SerializeMap, _len: Option<usize>);
+    serialize_not_supported!(
+        serialize_tuple_variant,
+        Self::SerializeTupleVariant,
+        _name: &'static str,
+        _index: u32,
+        _variant: &'static str,
+        _len: usize
+    );
+    serialize_not_supported!(
+        serialize_struct_variant,
+        Self::SerializeStructVariant,
+        _name: &'static str,
+        _index: u32,
+        _variant: &'static str,
+        _len: usize
+    );
+    serialize_not_supported!(
+        serialize_unit_variant,
+        (),
+        _name: &'static str,
+        _index: u32,
+        _variant: &'static str
+    );
 
     fn serialize_bool(self, v: bool) -> Result<()> {
         self.sink.write_all(&[v as u8])?;
@@ -86,13 +116,6 @@ impl<'a, W: io::Write> serde::Serializer for &'a mut ChiaSerializer<W> {
     serialize_primitive!(serialize_i64, i64);
     serialize_primitive!(serialize_u64, u64);
 
-    fn serialize_f32(self, _v: f32) -> Result<()> {
-        Err(Error::NotSupported)
-    }
-    fn serialize_f64(self, _v: f64) -> Result<()> {
-        Err(Error::NotSupported)
-    }
-
     fn serialize_str(self, v: &str) -> Result<()> {
         // bytes is the UTF-8 sequence
         let bytes = v.bytes();
@@ -102,10 +125,6 @@ impl<'a, W: io::Write> serde::Serializer for &'a mut ChiaSerializer<W> {
             self.serialize_u8(b)?;
         }
         Ok(())
-    }
-
-    fn serialize_char(self, _c: char) -> Result<()> {
-        Err(Error::NotSupported)
     }
 
     fn serialize_bytes(self, v: &[u8]) -> Result<()> {
@@ -149,32 +168,8 @@ impl<'a, W: io::Write> serde::Serializer for &'a mut ChiaSerializer<W> {
         Ok(self)
     }
 
-    fn serialize_tuple_variant(
-        self,
-        _name: &'static str,
-        _index: u32,
-        _variant: &'static str,
-        _len: usize,
-    ) -> Result<Self::SerializeTupleVariant> {
-        Err(Error::NotSupported)
-    }
-
-    fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap> {
-        Err(Error::NotSupported)
-    }
-
     fn serialize_struct(self, _name: &'static str, _len: usize) -> Result<Self::SerializeStruct> {
         Ok(self)
-    }
-
-    fn serialize_struct_variant(
-        self,
-        _name: &'static str,
-        _index: u32,
-        _variant: &'static str,
-        _len: usize,
-    ) -> Result<Self::SerializeStructVariant> {
-        Err(Error::NotSupported)
     }
 
     fn serialize_newtype_struct<T: ?Sized>(self, _name: &'static str, value: &T) -> Result<()>
@@ -194,15 +189,6 @@ impl<'a, W: io::Write> serde::Serializer for &'a mut ChiaSerializer<W> {
     where
         T: serde::ser::Serialize,
     {
-        Err(Error::NotSupported)
-    }
-
-    fn serialize_unit_variant(
-        self,
-        _name: &'static str,
-        _index: u32,
-        _variant: &'static str,
-    ) -> Result<()> {
         Err(Error::NotSupported)
     }
 
