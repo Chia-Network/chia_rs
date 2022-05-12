@@ -116,11 +116,11 @@ impl<'de, 'a> serde::Deserializer<'de> for &'a mut ChiaDeserializer<'de> {
         visitor.visit_i8(self.read_u8()? as i8)
     }
 
-    fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value>
+    fn deserialize_unit<V>(self, _visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
-        visitor.visit_unit()
+        Err(Error::NotSupported)
     }
 
     deserialize_not_supported!(deserialize_char);
@@ -249,11 +249,11 @@ impl<'de, 'a> serde::Deserializer<'de> for &'a mut ChiaDeserializer<'de> {
         visitor.visit_newtype_struct(self)
     }
 
-    fn deserialize_unit_struct<V>(self, _name: &'static str, visitor: V) -> Result<V::Value>
+    fn deserialize_unit_struct<V>(self, _name: &'static str, _visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
-        visitor.visit_unit()
+        Err(Error::NotSupported)
     }
 
     fn deserialize_tuple_struct<V>(
@@ -393,6 +393,12 @@ fn test_list_list_3() {
 }
 
 #[test]
+fn test_long_list() {
+    let buf: &[u8] = &[0xff, 0xff, 0xff, 0xff, 0, 0, 0];
+    from_bytes_fail::<Vec<u32>>(buf, Error::EndOfBuffer);
+}
+
+#[test]
 fn test_tuple() {
     let buf: &[u8] = &[0, 0, 0, 3, 42, 0xff];
     from_bytes::<(u32, u8, i8)>(buf, (3, 42, -1));
@@ -519,4 +525,63 @@ fn test_f32() {
 fn test_f64() {
     let buf: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0];
     from_bytes_fail::<f64>(buf, Error::NotSupported);
+}
+
+#[test]
+fn test_char() {
+    let buf: &[u8] = &[0, 0, 0, 0];
+    from_bytes_fail::<char>(buf, Error::NotSupported);
+}
+
+#[cfg(test)]
+use std::collections::HashMap;
+
+#[test]
+fn test_hash_map() {
+    let buf: &[u8] = &[0, 0, 0, 0];
+    from_bytes_fail::<HashMap<u8, u8>>(buf, Error::NotSupported);
+}
+
+#[cfg(test)]
+#[derive(Deserialize, std::fmt::Debug, std::cmp::PartialEq)]
+enum TestVariant {
+    A(u8),
+    B,
+    C(String),
+}
+
+#[test]
+fn test_variant() {
+    let buf: &[u8] = &[0, 0, 0, 0];
+    from_bytes_fail::<TestVariant>(buf, Error::NotSupported);
+}
+
+#[cfg(test)]
+#[derive(Deserialize, std::fmt::Debug, std::cmp::PartialEq)]
+enum TestEnum {
+    A,
+    B,
+    C,
+}
+
+#[test]
+fn test_enum() {
+    let buf: &[u8] = &[0, 0, 0, 0];
+    from_bytes_fail::<TestEnum>(buf, Error::NotSupported);
+}
+
+#[cfg(test)]
+#[derive(Deserialize, std::fmt::Debug, std::cmp::PartialEq)]
+struct UnitStruct;
+
+#[test]
+fn test_unit_struct() {
+    let buf: &[u8] = &[0, 0, 0, 0];
+    from_bytes_fail::<UnitStruct>(buf, Error::NotSupported);
+}
+
+#[test]
+fn test_unit() {
+    let buf: &[u8] = &[0, 0, 0, 0];
+    from_bytes_fail::<()>(buf, Error::NotSupported);
 }
