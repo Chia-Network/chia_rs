@@ -1,7 +1,39 @@
 use super::error::{Error, Result};
 use std::io;
 
-// A chia "Streamable" Serializer into a Writer.
+// A chia "Streamable" Serializer into a Writer. The Chia Streamable format is
+// similar to bincode, but simpler in some respects. Like bincode, types are not
+// encoded in the output stream, they are all expected to be known ahead of time
+// (compile time in our case). Types are serialized like this:
+
+// * fixed width primitive integer types are encoded as big endian.
+// * fixed sized byte buffers are stored verbatim. Their size is known ahead of
+//   time (e.g. Bytes32). BLS keys are also treated as fixed size buffers
+//   (Bytes48 and Bytes96)
+// * booleans are serialized as a single byte with value 0 or 1. Any other value
+//   for booleans are considered invalid when deserializing
+// * lists of variable length (but with all elements of the same type) are
+//   encoded with a 32 bit, big endian, length-prefix followed by that many
+//   elements.
+// * variable length byte buffers are encoded as a list of bytes (see point
+//   above).
+// * strings are encoded as a list of bytes. Those bytes are the UTF-8 encoding
+//   of the characters in the string. An invalid UTF-8 sequence is considered
+//   invalid. Note that the length prefix denotes the number of bytes, not
+//   characters.
+// * an optional value is encoded as a byte prefix of value 1 followed by the
+//   serialisation of the value, when the optional is engaged. A disengaged
+//   optional (None) is encoded as a single byte 0. Any value other than 0 or 1
+//   in the optional prefix is considered an error.
+// * tuples and structs/classes are encoded simply encoded as all their members
+
+// Some types are not supported by the Chia Streamable format. Notably:
+// * dictionaries
+// * floating point values
+// * characters (since they aren't necessarily fixed width)
+// * enums. They have to be converted to their underlying integer representation first
+// * variants
+
 pub struct ChiaSerializer<W: io::Write> {
     sink: W,
 }

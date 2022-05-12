@@ -1,6 +1,9 @@
 use super::error::{Error, Result};
 use std::convert::TryInto;
 
+// A Chia "Streamable" Deserializer.
+// This deserializer is similar to the bincode format. See ser.rs for a full
+// description of the Chia Streamable serialization format.
 pub struct ChiaDeserializer<'storage> {
     buf: &'storage [u8],
     pos: u32,
