@@ -245,11 +245,11 @@ serialize_impl!(
 );
 serialize_impl!(
     serde::ser::SerializeTupleVariant,
-    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<()>
+    fn serialize_field<T: ?Sized>(&mut self, _value: &T) -> Result<()>
     where
         T: serde::ser::Serialize,
     {
-        value.serialize(&mut **self)
+        panic!("should not get here");
     }
 );
 serialize_impl!(
@@ -263,27 +263,27 @@ serialize_impl!(
 );
 serialize_impl!(
     serde::ser::SerializeStructVariant,
-    fn serialize_field<T: ?Sized>(&mut self, _key: &'static str, value: &T) -> Result<()>
+    fn serialize_field<T: ?Sized>(&mut self, _key: &'static str, _value: &T) -> Result<()>
     where
         T: serde::ser::Serialize,
     {
-        value.serialize(&mut **self)
+        panic!("should not get here");
     }
 );
 #[rustfmt::skip]
 serialize_impl!(
     serde::ser::SerializeMap,
-    fn serialize_key<K: ?Sized>(&mut self, value: &K) -> Result<()>
+    fn serialize_key<K: ?Sized>(&mut self, _value: &K) -> Result<()>
     where
         K: serde::ser::Serialize,
     {
-        value.serialize(&mut **self)
+        panic!("should not get here");
     }
-    fn serialize_value<V: ?Sized>(&mut self, value: &V) -> Result<()>
+    fn serialize_value<V: ?Sized>(&mut self, _value: &V) -> Result<()>
     where
         V: serde::ser::Serialize,
     {
-        value.serialize(&mut **self)
+        panic!("should not get here");
     }
 );
 
