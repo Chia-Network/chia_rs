@@ -35,22 +35,32 @@ jobs:
       with:
         toolchain: stable
 
+    - name: setup venv
+      run: |
+        python -m venv venv
+        ln -s venv/bin/activate
+
     - name: Install dependencies
       run: |
+        . ./activate
         python -m pip install maturin
         rustup target add x86_64-unknown-linux-musl
+        python -m pip install pytest
 
     - name: Build
       env:
         CC: gcc
       run: |
-        python -m venv venv
-        ln -s venv/bin/activate
         . ./activate
         git clone https://github.com/Chia-Network/clvm_tools.git --branch=main --single-branch
         python -m pip install ./clvm_tools
         python -m pip install colorama
         maturin develop --release -m wheel/Cargo.toml
+
+    - name: python tests
+      run: |
+        . ./activate
+        pytest tests
 
     - name: test generators
       run: |

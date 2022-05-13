@@ -1,4 +1,5 @@
 use super::adapt_response::eval_err_to_pyresult;
+use super::to_json_dict::ToJsonDict;
 
 use chia::gen::conditions::{parse_spends, Spend, SpendBundleConditions};
 use chia::gen::validation_error::{ErrorCode, ValidationErr};
@@ -16,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 use pyo3::class::basic::{CompareOp, PyObjectProtocol};
 use pyo3::prelude::*;
-use pyo3::types::PyBytes;
+use pyo3::types::{PyBytes, PyDict};
 
 use py_streamable::Streamable;
 
