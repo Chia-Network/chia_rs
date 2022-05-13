@@ -20,6 +20,12 @@ impl From<&[u8]> for Bytes {
     }
 }
 
+impl fmt::Display for Bytes {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str(&hex::encode(&self.0))
+    }
+}
+
 struct ByteVisitor<const N: usize>;
 
 impl<'de, const N: usize> serde::de::Visitor<'de> for ByteVisitor<N> {
@@ -113,6 +119,11 @@ impl<const N: usize> BytesImpl<N> {
 
 impl<const N: usize> Debug for BytesImpl<N> {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        formatter.write_str(&hex::encode(self.0))
+    }
+}
+impl<const N: usize> fmt::Display for BytesImpl<N> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         formatter.write_str(&hex::encode(self.0))
     }
 }

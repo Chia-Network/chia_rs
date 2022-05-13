@@ -80,6 +80,18 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
                     pub fn __bytes__<'p>(&self, py: Python<'p>) -> PyResult<&'p PyBytes> {
                         Ok(PyBytes::new(py, &self.to_bytes()?))
                     }
+
+                    pub fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
+                        ToJsonDict::to_json_dict(self, py)
+                    }
+                }
+
+                impl ToJsonDict for #ident {
+                    fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
+                        let ret = PyDict::new(py);
+                        #(ret.set_item(stringify!(#fnames), self.#fnames.to_json_dict(py)?)?);*;
+                        Ok(ret.into())
+                    }
                 }
             }
         }
