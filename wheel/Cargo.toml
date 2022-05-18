@@ -18,6 +18,7 @@ path = "src/lib.rs"
 chia = { path = "..", features = ["py-bindings"] }
 clvmr = "=0.1.20"
 serde = { version = "1.0.130", features = ["derive", "rc"] }
-pyo3 = { version = "=0.15.1", features = ["abi3-py37", "extension-module"] }
+pyo3 = { version = "=0.15.1", features = ["abi3-py37", "extension-module", "multiple-pymethods"] }
 py_streamable = { path = "py_streamable" }
 hex = "=0.4.3"
+sha2 = "=0.9.5"
