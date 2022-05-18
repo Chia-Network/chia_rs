@@ -1,3 +1,4 @@
+use crate::coin::Coin;
 use crate::run_generator::{PySpend, PySpendBundleConditions, __pyo3_get_function_run_generator};
 use chia::gen::flags::COND_ARGS_NIL;
 use chia::gen::flags::COND_CANON_INTS;
@@ -5,7 +6,6 @@ use chia::gen::flags::NO_UNKNOWN_CONDS;
 use chia::gen::flags::STRICT_ARGS_COUNT;
 use chia::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use std::convert::TryInto;
-//use chia::streamable::coin::Coin;
 //use chia::streamable::fullblock::Fullblock;
 use clvmr::chia_dialect::NO_NEG_DIV;
 use clvmr::chia_dialect::NO_UNKNOWN_OPS;
@@ -47,7 +47,7 @@ pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;
     m.add("STRICT_ARGS_COUNT", STRICT_ARGS_COUNT)?;
     m.add("MEMPOOL_MODE", MEMPOOL_MODE)?;
-    //m.add_class::<Coin>()?;
+    m.add_class::<Coin>()?;
     //m.add_class::<Fullblock>()?;
 
     // facilities from clvm_rs

@@ -1,4 +1,4 @@
-from chia_rs import Spend, SpendBundleConditions
+from chia_rs import Spend, SpendBundleConditions, Coin
 import pytest
 import copy
 
@@ -184,3 +184,42 @@ def test_copy_spend_bundle_conditions() -> None:
     b = copy.deepcopy(a)
     assert a == b
     assert a is not b
+
+
+def coin_roundtrip(c: Coin) -> bool:
+    buf = c.to_bytes()
+    # make sure c.to_bytes() and bytes(c) are synonyms
+    assert buf == bytes(c)
+    c2 = Coin.from_bytes(buf)
+    return c == c2
+
+
+def test_coin_serialize() -> None:
+
+    c1 = Coin(coin, ph, 1000000)
+    assert c1.to_bytes() == coin + ph + (1000000).to_bytes(8, byteorder="big")
+    assert coin_roundtrip(c1)
+
+    c2 = Coin(coin, ph2, 0)
+    assert c2.to_bytes() == coin + ph2 + (0).to_bytes(8, byteorder="big")
+    assert coin_roundtrip(c2)
+
+    c3 = Coin(coin, ph2, 0xFFFFFFFFFFFFFFFF)
+    assert c3.to_bytes() == coin + ph2 + (0xFFFFFFFFFFFFFFFF).to_bytes(
+        8, byteorder="big"
+    )
+    assert coin_roundtrip(c3)
+
+
+def test_coin_parse_rust() -> None:
+
+    buffer = (
+        coin
+        + ph2
+        + (0xFFFFFFFFFFFFFFFF).to_bytes(8, byteorder="big")
+        + b"more bytes following, that should be ignored"
+    )
+
+    c1, consumed = Coin.parse_rust(buffer)
+    assert buffer[consumed:] == b"more bytes following, that should be ignored"
+    assert c1 == Coin(coin, ph2, 0xFFFFFFFFFFFFFFFF)
