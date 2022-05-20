@@ -1,4 +1,4 @@
-from chia_rs import PySpend, PySpendBundleConditions
+from chia_rs import Spend, SpendBundleConditions
 
 
 def test_json_spend() -> None:
@@ -7,7 +7,7 @@ def test_json_spend() -> None:
     ph = b"abababababababababababababababab"
     ph2 = b"cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
     sig = b"abababababababababababababababababababababababab"
-    a = PySpend(coin, ph, None, 0, [(ph2, 1000000, None)], [(sig, b"msg")])
+    a = Spend(coin, ph, None, 0, [(ph2, 1000000, None)], [(sig, b"msg")])
 
     assert a.to_json_dict() == {
         "coin_id": "0x" + coin.hex(),
@@ -22,7 +22,7 @@ def test_json_spend() -> None:
 def test_json_spend_bundle_conditions() -> None:
 
     sig = b"abababababababababababababababababababababababab"
-    a = PySpendBundleConditions([], 1000, 1337, 42, [(sig, b"msg")], 12345678)
+    a = SpendBundleConditions([], 1000, 1337, 42, [(sig, b"msg")], 12345678)
 
     assert a.to_json_dict() == {
         "spends": [],
