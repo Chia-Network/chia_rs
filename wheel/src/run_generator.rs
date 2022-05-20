@@ -21,7 +21,7 @@ use pyo3::types::{PyBytes, PyDict};
 
 use py_streamable::Streamable;
 
-#[pyclass(unsendable)]
+#[pyclass(unsendable, name = "Spend")]
 #[derive(Serialize, Deserialize, Streamable, Debug, Clone, Eq, PartialEq)]
 pub struct PySpend {
     #[pyo3(get)]
@@ -38,7 +38,7 @@ pub struct PySpend {
     pub agg_sig_me: Vec<(Bytes48, Bytes)>,
 }
 
-#[pyclass(unsendable)]
+#[pyclass(unsendable, name = "SpendBundleConditions")]
 #[derive(Serialize, Deserialize, Streamable, Debug, Clone, Eq, PartialEq)]
 pub struct PySpendBundleConditions {
     #[pyo3(get)]
