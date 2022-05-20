@@ -25,8 +25,8 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
                 let py = other.py();
                 match op {
                     CompareOp::Eq => (self == &*other).into_py(py),
-                        CompareOp::Ne => (self != &*other).into_py(py),
-                        _ => py.NotImplemented(),
+                    CompareOp::Ne => (self != &*other).into_py(py),
+                    _ => py.NotImplemented(),
                 }
             }
         }
