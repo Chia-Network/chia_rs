@@ -46,6 +46,7 @@ jobs:
         python -m pip install maturin
         rustup target add x86_64-unknown-linux-musl
         python -m pip install pytest
+        python -m pip install mypy
 
     - name: Build
       env:
@@ -56,6 +57,11 @@ jobs:
         python -m pip install ./clvm_tools
         python -m pip install colorama
         maturin develop --release -m wheel/Cargo.toml
+
+    - name: python mypy
+      run: |
+        . ./activate
+        mypy tests/test_*.py
 
     - name: python tests
       run: |
