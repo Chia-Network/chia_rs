@@ -1,5 +1,6 @@
 from chia_rs import Spend, SpendBundleConditions
 import pytest
+import copy
 
 
 coin = b"bcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc"
@@ -139,3 +140,27 @@ def test_from_json_spend_bundle_conditions() -> None:
     })
     assert a == b
 
+
+def test_copy_spend() -> None:
+
+    a = Spend(coin, ph, None, 0, [(ph2, 1000000, None)], [(sig, b"msg")])
+    b = copy.copy(a)
+
+    assert a == b
+    assert a is not b
+
+    b = copy.deepcopy(a)
+    assert a == b
+    assert a is not b
+
+def test_copy_spend_bundle_conditions() -> None:
+
+    a = SpendBundleConditions([], 1000, 1337, 42, [(sig, b"msg")], 12345678)
+    b = copy.copy(a)
+
+    assert a == b
+    assert a is not b
+
+    b = copy.deepcopy(a)
+    assert a == b
+    assert a is not b

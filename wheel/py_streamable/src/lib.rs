@@ -81,6 +81,14 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
                         self.to_bytes(py)
                     }
 
+                    pub fn __deepcopy__<'p>(&self, memo: &PyAny) -> PyResult<Self> {
+                        Ok(self.clone())
+                    }
+
+                    pub fn __copy__<'p>(&self) -> PyResult<Self> {
+                        Ok(self.clone())
+                    }
+
                     pub fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
                         ToJsonDict::to_json_dict(self, py)
                     }
