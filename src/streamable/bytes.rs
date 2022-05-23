@@ -20,6 +20,12 @@ impl From<&[u8]> for Bytes {
     }
 }
 
+impl From<Vec<u8>> for Bytes {
+    fn from(v: Vec<u8>) -> Bytes {
+        Bytes(v)
+    }
+}
+
 impl fmt::Display for Bytes {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         formatter.write_str(&hex::encode(&self.0))
