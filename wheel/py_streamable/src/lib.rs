@@ -70,15 +70,15 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
                             .map(|v| (v, de.pos()))
                     }
 
-                    pub fn to_bytes(&self) -> PyResult<Vec<u8>> {
+                    pub fn to_bytes<'p>(&self, py: Python<'p>) -> PyResult<&'p PyBytes> {
                         let mut writer = Vec::<u8>::new();
                         let mut ser = ChiaSerializer::new(&mut writer);
                         serde::Serialize::serialize(self, &mut ser)?;
-                        Ok(writer)
+                        Ok(PyBytes::new(py, &writer))
                     }
 
                     pub fn __bytes__<'p>(&self, py: Python<'p>) -> PyResult<&'p PyBytes> {
-                        Ok(PyBytes::new(py, &self.to_bytes()?))
+                        self.to_bytes(py)
                     }
 
                     pub fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
