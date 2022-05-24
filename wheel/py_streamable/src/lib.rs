@@ -29,6 +29,12 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
                     _ => py.NotImplemented(),
                 }
             }
+
+            fn __hash__(&self) -> PyResult<isize> {
+                let mut hasher = DefaultHasher::new();
+                std::hash::Hash::hash(self, &mut hasher);
+                Ok(hasher.finish() as isize)
+            }
         }
     };
     let constructor = match data {

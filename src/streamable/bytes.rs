@@ -11,7 +11,7 @@ use pyo3::types::PyBytes;
 #[cfg(feature = "py-bindings")]
 use std::convert::TryInto;
 
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Hash, Debug, Clone, Eq, PartialEq)]
 pub struct Bytes(Vec<u8>);
 
 impl From<&[u8]> for Bytes {
