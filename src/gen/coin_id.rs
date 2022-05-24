@@ -56,7 +56,7 @@ fn test_compute_coin_id() {
         0x64, 0x6e,
     ];
     assert_eq!(
-        compute_coin_id(&a, parent_id1, puzzle_hash1, &[123]).slice(),
+        compute_coin_id(&a, parent_id1, puzzle_hash1, &[123]).as_ref(),
         coin_id
     );
 
@@ -66,7 +66,7 @@ fn test_compute_coin_id() {
         0x34, 0x68,
     ];
     assert_eq!(
-        compute_coin_id(&a, parent_id1, puzzle_hash1, &[3]).slice(),
+        compute_coin_id(&a, parent_id1, puzzle_hash1, &[3]).as_ref(),
         coin_id
     );
 
@@ -76,7 +76,7 @@ fn test_compute_coin_id() {
         0xdf, 0x97,
     ];
     assert_eq!(
-        compute_coin_id(&a, parent_id2, puzzle_hash1, &[3]).slice(),
+        compute_coin_id(&a, parent_id2, puzzle_hash1, &[3]).as_ref(),
         coin_id
     );
 }

@@ -1,8 +1,10 @@
 use core::fmt::Formatter;
 use serde::ser::SerializeTuple;
 use serde::{Deserialize, Serialize};
+use std::convert::AsRef;
 use std::fmt;
 use std::fmt::Debug;
+use std::ops::Deref;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
@@ -115,14 +117,22 @@ impl<'a, const N: usize> From<&'a BytesImpl<N>> for &'a [u8] {
 }
 
 impl<const N: usize> BytesImpl<N> {
-    pub fn slice(&self) -> &[u8; N] {
-        &self.0
-    }
     pub fn to_vec(&self) -> Vec<u8> {
         self.0.to_vec()
     }
 }
 
+impl<const N: usize> AsRef<[u8]> for BytesImpl<N> {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+impl<const N: usize> Deref for BytesImpl<N> {
+    type Target = [u8];
+    fn deref(&self) -> &[u8] {
+        &self.0
+    }
+}
 impl<const N: usize> Debug for BytesImpl<N> {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         formatter.write_str(&hex::encode(self.0))
