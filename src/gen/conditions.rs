@@ -521,7 +521,7 @@ fn parse_spend_conditions(
                 ret.height_absolute = max(ret.height_absolute, h);
             }
             Condition::AssertMyCoinId(id) => {
-                if a.atom(id) != (*spend.coin_id).slice() {
+                if a.atom(id) != (*spend.coin_id).as_ref() {
                     return Err(ValidationErr(c, ErrorCode::AssertMyCoinIdFailed));
                 }
             }
@@ -606,7 +606,7 @@ pub fn parse_spends(
 
         for (coin_id, announce) in state.announce_coin {
             let mut hasher = Sha256::new();
-            hasher.update((*coin_id).slice());
+            hasher.update(&(*coin_id));
             hasher.update(a.atom(announce));
             announcements.insert(hasher.finish().into());
         }
@@ -833,41 +833,29 @@ fn parse_list(
     subs.insert("msg2", a.new_atom(MSG2).unwrap());
     subs.insert("longmsg", a.new_atom(LONGMSG).unwrap());
     // coin IDs
-    subs.insert(
-        "coin11",
-        a.new_atom(test_coin_id(H1, H1, 123).slice()).unwrap(),
-    );
-    subs.insert(
-        "coin12",
-        a.new_atom(test_coin_id(H1, H2, 123).slice()).unwrap(),
-    );
-    subs.insert(
-        "coin21",
-        a.new_atom(test_coin_id(H2, H1, 123).slice()).unwrap(),
-    );
-    subs.insert(
-        "coin22",
-        a.new_atom(test_coin_id(H2, H2, 123).slice()).unwrap(),
-    );
+    subs.insert("coin11", a.new_atom(&test_coin_id(H1, H1, 123)).unwrap());
+    subs.insert("coin12", a.new_atom(&test_coin_id(H1, H2, 123)).unwrap());
+    subs.insert("coin21", a.new_atom(&test_coin_id(H2, H1, 123)).unwrap());
+    subs.insert("coin22", a.new_atom(&test_coin_id(H2, H2, 123)).unwrap());
     // coin announcements
     subs.insert(
         "c11",
-        a.new_atom(&hash_buf(test_coin_id(H1, H2, 123).slice(), MSG1))
+        a.new_atom(&hash_buf(&test_coin_id(H1, H2, 123), MSG1))
             .unwrap(),
     );
     subs.insert(
         "c21",
-        a.new_atom(&hash_buf(test_coin_id(H2, H2, 123).slice(), MSG1))
+        a.new_atom(&hash_buf(&test_coin_id(H2, H2, 123), MSG1))
             .unwrap(),
     );
     subs.insert(
         "c12",
-        a.new_atom(&hash_buf(test_coin_id(H1, H2, 123).slice(), MSG2))
+        a.new_atom(&hash_buf(&test_coin_id(H1, H2, 123), MSG2))
             .unwrap(),
     );
     subs.insert(
         "c22",
-        a.new_atom(&hash_buf(test_coin_id(H2, H2, 123).slice(), MSG2))
+        a.new_atom(&hash_buf(&test_coin_id(H2, H2, 123), MSG2))
             .unwrap(),
     );
     // puzzle announcements

@@ -318,7 +318,7 @@ fn test_bytes() {
     ]
     .into();
     let buf = stream(&b);
-    assert_eq!(&buf[..], b.slice());
+    assert_eq!(&buf[..], b.as_ref());
 }
 
 #[test]
