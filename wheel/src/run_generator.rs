@@ -1,6 +1,8 @@
 use super::adapt_response::eval_err_to_pyresult;
 use super::from_json_dict::FromJsonDict;
 use super::to_json_dict::ToJsonDict;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::Hasher;
 
 use chia::gen::conditions::{parse_spends, Spend, SpendBundleConditions};
 use chia::gen::validation_error::{ErrorCode, ValidationErr};
@@ -24,7 +26,7 @@ use pyo3::PyAny;
 use py_streamable::Streamable;
 
 #[pyclass(unsendable, name = "Spend")]
-#[derive(Serialize, Deserialize, Streamable, Debug, Clone, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Streamable, Hash, Debug, Clone, Eq, PartialEq)]
 pub struct PySpend {
     #[pyo3(get)]
     pub coin_id: Bytes32,
@@ -41,7 +43,7 @@ pub struct PySpend {
 }
 
 #[pyclass(unsendable, name = "SpendBundleConditions")]
-#[derive(Serialize, Deserialize, Streamable, Debug, Clone, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Streamable, Hash, Debug, Clone, Eq, PartialEq)]
 pub struct PySpendBundleConditions {
     #[pyo3(get)]
     pub spends: Vec<PySpend>,

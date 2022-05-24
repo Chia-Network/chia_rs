@@ -7,6 +7,26 @@ ph = b"abababababababababababababababab"
 ph2 = b"cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
 sig = b"abababababababababababababababababababababababab"
 
+def test_hash_spend() -> None:
+
+    a1 = Spend(coin, ph, None, 0, [(ph2, 1000000, None)], [(sig, b"msg")])
+    a2 = Spend(coin, ph, None, 1, [(ph2, 1000000, None)], [(sig, b"msg")])
+    b = hash(a1)
+    c = hash(a2)
+    assert type(b) is int
+    assert type(c) is int
+    assert b != c
+
+def test_hash_spend_bundle_conditions() -> None:
+
+    a1 = SpendBundleConditions([], 1000, 1337, 42, [(sig, b"msg")], 12345678)
+    a2 = SpendBundleConditions([], 1001, 1337, 42, [(sig, b"msg")], 12345678)
+    b = hash(a1)
+    c = hash(a2)
+    assert type(b) is int
+    assert type(c) is int
+    assert b != c
+
 def test_json_spend() -> None:
 
     a = Spend(coin, ph, None, 0, [(ph2, 1000000, None)], [(sig, b"msg")])
