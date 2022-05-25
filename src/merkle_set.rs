@@ -9,7 +9,7 @@ fn get_bit(val: &[u8; 32], bit: u8) -> u8 {
 }
 
 #[repr(u8)]
-#[derive(PartialEq, Copy, Clone)]
+#[derive(PartialEq, Eq, Copy, Clone)]
 enum NodeType {
     Empty,
     Term,

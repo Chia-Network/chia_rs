@@ -1,6 +1,6 @@
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorCode {
     NegativeAmount,
     InvalidConditionOpcode,
@@ -28,7 +28,7 @@ pub enum ErrorCode {
     CostExceeded,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ValidationErr(pub NodePtr, pub ErrorCode);
 
 // helper functions that fail with ValidationErr
