@@ -34,7 +34,7 @@ pub const ASSERT_HEIGHT_RELATIVE: ConditionOpcode = 82;
 pub const ASSERT_HEIGHT_ABSOLUTE: ConditionOpcode = 83;
 
 // no-op condition
-pub const ALWAYS_TRUE: ConditionOpcode = 0;
+pub const ALWAYS_TRUE: ConditionOpcode = 1;
 
 pub const CREATE_COIN_COST: Cost = 1800000;
 pub const AGG_SIG_COST: Cost = 1200000;
@@ -137,7 +137,7 @@ fn test_parse_opcode() {
     // leading zeros are not allowed, it makes it a different value
     assert_eq!(opcode_tester(&mut a, &[ASSERT_HEIGHT_ABSOLUTE, 0]), None);
     assert_eq!(opcode_tester(&mut a, &[0, ASSERT_HEIGHT_ABSOLUTE]), None);
-    assert_eq!(opcode_tester(&mut a, &[1]), None);
+    assert_eq!(opcode_tester(&mut a, &[0]), None);
 
     // a pair is never a valid condition
     let v1 = a.new_atom(&[0]).unwrap();

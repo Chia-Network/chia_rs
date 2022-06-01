@@ -2701,7 +2701,7 @@ fn test_double_spend() {
 #[test]
 fn test_always_true() {
     // ALWAYS_TRUE
-    let (a, conds) = cond_test("((({h1} ({h2} (123 (((0x00 )))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((1 )))))").unwrap();
 
     // just make sure there are no constraints
     assert_eq!(conds.agg_sig_unsafe.len(), 0);
@@ -2722,7 +2722,7 @@ fn test_always_true() {
 fn test_always_true_with_arg() {
     // ALWAYS_TRUE, but with one unknown argument
     // unknown arguments are expected and always allowed
-    let (a, conds) = cond_test("((({h1} ({h2} (123 (((0x00 ( 42 )))))").unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((1 ( 42 )))))").unwrap();
 
     // just make sure there are no constraints
     assert_eq!(conds.agg_sig_unsafe.len(), 0);
