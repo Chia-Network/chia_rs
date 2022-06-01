@@ -16,6 +16,7 @@ def test_coin_name() -> None:
     c = Coin(parent_coin, puzzle_hash, 1)
     assert c.name() == sha256(parent_coin + puzzle_hash + bytes([1])).digest()
 
+    # 0xFF prefix
     c = Coin(parent_coin, puzzle_hash, 0xFF)
     assert c.name() == sha256(parent_coin + puzzle_hash + bytes([0, 0xFF])).digest()
 
@@ -74,6 +75,7 @@ def test_coin_name() -> None:
         ).digest()
     )
 
+    # 0x7F prefix
     c = Coin(parent_coin, puzzle_hash, 0x7F)
     assert c.name() == sha256(parent_coin + puzzle_hash + bytes([0x7F])).digest()
 
@@ -124,6 +126,65 @@ def test_coin_name() -> None:
             parent_coin
             + puzzle_hash
             + bytes([0x7F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
+        ).digest()
+    )
+
+    # 0x80 prefix
+    c = Coin(parent_coin, puzzle_hash, 0x80)
+    assert c.name() == sha256(parent_coin + puzzle_hash + bytes([0, 0x80])).digest()
+
+    c = Coin(parent_coin, puzzle_hash, 0x8000)
+    assert (
+        c.name() == sha256(parent_coin + puzzle_hash + bytes([0, 0x80, 0])).digest()
+    )
+
+    c = Coin(parent_coin, puzzle_hash, 0x800000)
+    assert (
+        c.name()
+        == sha256(parent_coin + puzzle_hash + bytes([0, 0x80, 0, 0])).digest()
+    )
+
+    c = Coin(parent_coin, puzzle_hash, 0x80000000)
+    assert (
+        c.name()
+        == sha256(
+            parent_coin + puzzle_hash + bytes([0, 0x80, 0, 0, 0])
+        ).digest()
+    )
+
+    c = Coin(parent_coin, puzzle_hash, 0x8000000000)
+    assert (
+        c.name()
+        == sha256(
+            parent_coin + puzzle_hash + bytes([0, 0x80, 0, 0, 0, 0])
+        ).digest()
+    )
+
+    c = Coin(parent_coin, puzzle_hash, 0x800000000000)
+    assert (
+        c.name()
+        == sha256(
+            parent_coin + puzzle_hash + bytes([0, 0x80, 0, 0, 0, 0, 0])
+        ).digest()
+    )
+
+    c = Coin(parent_coin, puzzle_hash, 0x80000000000000)
+    assert (
+        c.name()
+        == sha256(
+            parent_coin
+            + puzzle_hash
+            + bytes([0, 0x80, 0, 0, 0, 0, 0, 0])
+        ).digest()
+    )
+
+    c = Coin(parent_coin, puzzle_hash, 0x8000000000000000)
+    assert (
+        c.name()
+        == sha256(
+            parent_coin
+            + puzzle_hash
+            + bytes([0, 0x80, 0, 0, 0, 0, 0, 0, 0])
         ).digest()
     )
 
