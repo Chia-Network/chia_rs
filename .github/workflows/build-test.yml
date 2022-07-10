@@ -28,6 +28,11 @@ jobs:
             runs-on:
               arm: [macOS, ARM64]
               intel: [macos-latest]
+          - name: Ubuntu
+            matrix: ubuntu
+            runs-on:
+              arm: [Linux, ARM64]
+              intel: [ubuntu-latest]
             docker:
               arm:
                 docker-url: quay.io/pypa/manylinux2014_aarch64
@@ -39,11 +44,6 @@ jobs:
                 manylinux-version: 2010
                 no-sdist: ""
                 rustup-target: x86_64-unknown-linux-musl
-          - name: Ubuntu
-            matrix: ubuntu
-            runs-on:
-              arm: [Linux, ARM64]
-              intel: [ubuntu-latest]
           - name: Windows
             matrix: windows
             runs-on:
@@ -106,7 +106,7 @@ jobs:
         maturin build --no-sdist -i python --release -m wheel/Cargo.toml
 
     - name: Build Linux in manylinux2010 with maturin on Python ${{ matrix.python }}
-      if: matrix.os.matrix == 'linux'
+      if: matrix.os.matrix == 'ubuntu'
       run: |
         podman run --rm=true \
           -v ${{ github.workspace }}:/ws:rw --workdir=/ws \
