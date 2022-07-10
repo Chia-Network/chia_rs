@@ -205,7 +205,7 @@ jobs:
     needs:
       - build-wheels
 #      - build-sdist
-      - check
+#      - check
     strategy:
       fail-fast: false
       matrix:
