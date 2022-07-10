@@ -204,7 +204,7 @@ jobs:
     runs-on: ${{ matrix.os.runs-on[matrix.arch.matrix] }}
     needs:
       - build-wheels
-      - build-sdist
+#      - build-sdist
       - check
     strategy:
       fail-fast: false
