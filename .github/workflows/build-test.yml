@@ -140,10 +140,11 @@ jobs:
         maturin develop --release -m wheel/Cargo.toml
         # the line above also doesn't seem to work
 
+    - uses: chia-network/actions/activate-venv@main
+
     - name: Install chia_rs wheel
       if: ${{ !startsWith(matrix.os, 'windows') }}
       run: |
-        . ./activate
         ls target/wheels/
         # this mess puts the name of the `.whl` file into `$WHEEL_PATH`
         # remove the dot, use the `glob` lib to grab the file from the directory
