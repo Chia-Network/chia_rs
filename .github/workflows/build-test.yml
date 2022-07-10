@@ -37,12 +37,12 @@ jobs:
               arm:
                 docker-url: quay.io/pypa/manylinux2014_aarch64
                 manylinux-version: 2014
-                no-sdist: --no-sdist
+                sdist: ""
                 rustup-target: aarch64-unknown-linux-musl
               intel:
                 docker-url: quay.io/pypa/manylinux2010_x86_64
                 manylinux-version: 2010
-                no-sdist: ""
+                sdist: --sdist
                 rustup-target: x86_64-unknown-linux-musl
           - name: Windows
             matrix: windows
@@ -100,10 +100,9 @@ jobs:
     - name: Build MacOs with maturin on Python ${{ matrix.python }}
       if: matrix.os.matrix == 'macos'
       run: |
-        python -m venv venv
-        ln -s venv/bin/activate
-        . ./activate
-        maturin build --no-sdist -i python --release -m wheel/Cargo.toml
+        python${{ matrix.python.major-dot-minor }} -m venv venv
+        . venv/bin/activate
+        maturin build -i python --release -m wheel/Cargo.toml
 
     - name: Build Linux in manylinux2010 with maturin on Python ${{ matrix.python }}
       if: matrix.os.matrix == 'ubuntu'
@@ -121,7 +120,7 @@ jobs:
             . /venv/bin/activate && \
             pip install --upgrade pip && \
             pip install maturin && \
-            CC=gcc maturin build ${{ matrix.os.options[matrix.arch.matrix].no-sdist }} --release --manylinux ${{ matrix.os.options[matrix.arch.matrix].manylinux-version }} -m wheel/Cargo.toml \
+            CC=gcc maturin build ${{ matrix.os.options[matrix.arch.matrix].sdist }} --release --manylinux ${{ matrix.os.options[matrix.arch.matrix].manylinux-version }} -m wheel/Cargo.toml \
           '
           python -m venv venv
           ln -s venv/bin/activate
@@ -131,8 +130,7 @@ jobs:
       run: |
         py -${{ matrix.python.major-dot-minor }} -m venv venv
         . .\venv\Scripts\Activate.ps1
-        ln -s venv\Scripts\Activate.ps1 activate
-        maturin build --no-sdist -i python --release -m wheel/Cargo.toml
+        maturin build -i python --release -m wheel/Cargo.toml
         # this will install into the venv
         # it'd be better to use the wheel, but I can't figure out how to do that
         # TODO: figure this out
@@ -144,7 +142,6 @@ jobs:
 
     - name: Install chia_rs wheel
       run: |
-        ls -a target/wheels/
         pip install --find-links target/wheels/ chia_rs
 
     - name: Upload artifacts
