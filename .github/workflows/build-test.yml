@@ -189,7 +189,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: packages
-        path: ./dist
+        path: ./target/wheels/
 
   upload:
     name: Upload to PyPI - ${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }}
