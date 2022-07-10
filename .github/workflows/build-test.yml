@@ -37,12 +37,10 @@ jobs:
               arm:
                 docker-url: quay.io/pypa/manylinux2014_aarch64
                 manylinux-version: 2014
-                sdist: ""
                 rustup-target: aarch64-unknown-linux-musl
               intel:
                 docker-url: quay.io/pypa/manylinux2010_x86_64
                 manylinux-version: 2010
-                sdist: --sdist
                 rustup-target: x86_64-unknown-linux-musl
           - name: Windows
             matrix: windows
@@ -120,7 +118,7 @@ jobs:
             . /venv/bin/activate && \
             pip install --upgrade pip && \
             pip install maturin && \
-            CC=gcc maturin build ${{ matrix.os.options[matrix.arch.matrix].sdist }} --release --manylinux ${{ matrix.os.options[matrix.arch.matrix].manylinux-version }} -m wheel/Cargo.toml \
+            CC=gcc maturin build --release --manylinux ${{ matrix.os.options[matrix.arch.matrix].manylinux-version }} -m wheel/Cargo.toml \
           '
           python -m venv venv
           ln -s venv/bin/activate
@@ -150,54 +148,55 @@ jobs:
         name: packages
         path: ./target/wheels/
 
-#  build-sdist:
-#    name: sdist - ${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }}
-#    runs-on: ${{ matrix.os.runs-on[matrix.arch.matrix] }}
-#    strategy:
-#      fail-fast: false
-#      matrix:
-#        os:
-#          - name: Ubuntu
-#            matrix: ubuntu
-#            runs-on:
-#              arm: [Linux, ARM64]
-#              intel: [ubuntu-latest]
-#        python:
-#          - major-dot-minor: '3.9'
-#            matrix: '3.9'
-#        arch:
-#          - name: Intel
-#            matrix: intel
-#
-#    steps:
-#    - name: Clean workspace
-#      uses: Chia-Network/actions/clean-workspace@main
-#
-#    - name: Checkout code
-#      uses: actions/checkout@v3
-#      with:
-#        fetch-depth: 0
-#
-#    - uses: Chia-Network/actions/setup-python@main
-#      with:
-#        python-version: ${{ matrix.python.major-dot-minor }}
-#
-#    - name: Build source distribution
-#      run: |
-#        pip install build
-#        python -m build --sdist --outdir dist .
-#    - name: Upload artifacts
-#      uses: actions/upload-artifact@v3
-#      with:
-#        name: packages
-#        path: ./dist
+  build-sdist:
+    name: sdist - ${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }}
+    runs-on: ${{ matrix.os.runs-on[matrix.arch.matrix] }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - name: Ubuntu
+            matrix: ubuntu
+            runs-on:
+              arm: [Linux, ARM64]
+              intel: [ubuntu-latest]
+        python:
+          - major-dot-minor: '3.7'
+            matrix: '3.7'
+        arch:
+          - name: Intel
+            matrix: intel
+
+    steps:
+    - name: Clean workspace
+      uses: Chia-Network/actions/clean-workspace@main
+
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - uses: Chia-Network/actions/setup-python@main
+      with:
+        python-version: ${{ matrix.python.major-dot-minor }}
+
+    - name: Build source distribution
+      run: |
+        pip install maturin
+        maturin build --release --sdist -m wheel/Cargo.toml
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: packages
+        path: ./dist
 
   upload:
     name: Upload to PyPI - ${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }}
     runs-on: ${{ matrix.os.runs-on[matrix.arch.matrix] }}
     needs:
       - build-wheels
-#      - build-sdist
+      - build-sdist
 #      - check
     strategy:
       fail-fast: false
