@@ -191,13 +191,61 @@ jobs:
         name: packages
         path: ./target/wheels/
 
+  fmt:
+    runs-on: ubuntu-latest
+    name: cargo fmt
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+      - name: Install rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: nightly
+            components: rustfmt, clippy
+            override: true
+      - name: fmt
+        run: cargo fmt -- --files-with-diff --check
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          components: clippy
+          override: true
+      - uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-features
+
+  unit_tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    name: Unit tests
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+      - uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+      - name: cargo test
+        run: cargo test
+
   upload:
     name: Upload to PyPI - ${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }}
     runs-on: ${{ matrix.os.runs-on[matrix.arch.matrix] }}
     needs:
       - build-wheels
       - build-sdist
-#      - check
+      - fmt
+      - clippy
+      - unit_tests
     strategy:
       fail-fast: false
       matrix:
@@ -262,50 +310,3 @@ jobs:
         TWINE_NON_INTERACTIVE: 1
         TWINE_PASSWORD: ${{ secrets.test_pypi_password }}
       run: twine upload --non-interactive --skip-existing --verbose 'dist/*'
-
-  fmt:
-    runs-on: ubuntu-20.04
-    name: cargo fmt
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 1
-      - name: Install rust
-        uses: actions-rs/toolchain@v1
-        with:
-            toolchain: nightly
-            override: true
-            components: rustfmt, clippy
-      - name: fmt
-        run: cargo fmt -- --files-with-diff --check
-
-  clippy:
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v1
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          components: clippy
-          override: true
-      - uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-features
-
-  unit_tests:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
-    name: Unit tests
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 1
-      - name: Install rust
-        uses: actions-rs/toolchain@v1
-        with:
-            toolchain: stable
-      - name: cargo test
-        run: cargo test
