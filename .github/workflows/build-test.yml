@@ -98,7 +98,7 @@ jobs:
           python -m pip install maturin
 
     - name: Build MacOs with maturin on Python ${{ matrix.python }}
-      if: startsWith(matrix.os, 'macos')
+      if: matrix.os.matrix == 'macos'
       run: |
         python -m venv venv
         ln -s venv/bin/activate
@@ -106,7 +106,7 @@ jobs:
         maturin build --no-sdist -i python --release -m wheel/Cargo.toml
 
     - name: Build Linux in manylinux2010 with maturin on Python ${{ matrix.python }}
-      if: startsWith(matrix.os, 'ubuntu')
+      if: matrix.os.matrix == 'linux'
       run: |
         podman run --rm=true \
           -v ${{ github.workspace }}:/ws:rw --workdir=/ws \
@@ -127,7 +127,7 @@ jobs:
           ln -s venv/bin/activate
 
     - name: Build Windows with maturin on Python ${{ matrix.python }}
-      if: startsWith(matrix.os, 'windows')
+      if: matrix.os.matrix == 'windows'
       run: |
         py -${{ matrix.python.major-dot-minor }} -m venv venv
         . .\venv\Scripts\Activate.ps1
@@ -143,7 +143,7 @@ jobs:
     - uses: chia-network/actions/activate-venv@main
 
     - name: Install chia_rs wheel
-      if: ${{ !startsWith(matrix.os, 'windows') }}
+      if: matrix.os.matrix != 'windows'
       run: |
         ls target/wheels/
         # this mess puts the name of the `.whl` file into `$WHEEL_PATH`
