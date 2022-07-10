@@ -183,7 +183,7 @@ jobs:
     - name: Build source distribution
       run: |
         pip install maturin
-        maturin build --release --sdist -m wheel/Cargo.toml
+        maturin sdist -m wheel/Cargo.toml
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v3
