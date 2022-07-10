@@ -33,7 +33,7 @@ jobs:
             runs-on:
               arm: [Linux, ARM64]
               intel: [ubuntu-latest]
-            docker:
+            options:
               arm:
                 docker-url: quay.io/pypa/manylinux2014_aarch64
                 manylinux-version: 2014
