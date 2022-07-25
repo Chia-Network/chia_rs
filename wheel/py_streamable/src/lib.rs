@@ -69,8 +69,14 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
 
                     // returns the type as well as the number of bytes read from the buffer
                     #[staticmethod]
-                    pub fn parse_rust(blob: &[u8]) -> PyResult<(Self, u32)> {
-                        let mut de = ChiaDeserializer::from_slice(blob)?;
+                    pub fn parse_rust<'p>(blob: PyBuffer<u8>) -> PyResult<(Self, u32)> {
+                        if !blob.is_c_contiguous() {
+                            panic!("parse_rust() must be called with a contiguous buffer");
+                        }
+                        let slice = unsafe {
+                            std::slice::from_raw_parts(blob.buf_ptr() as *const u8, blob.len_bytes())
+                        };
+                        let mut de = ChiaDeserializer::from_slice(slice)?;
                         Self::deserialize(&mut de)
                             .map_err(|e| e.into())
                             .map(|v| (v, de.pos()))

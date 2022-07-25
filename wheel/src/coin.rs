@@ -10,6 +10,7 @@ use std::hash::Hash;
 use std::hash::Hasher;
 
 use chia::streamable::bytes::Bytes32;
+use pyo3::buffer::PyBuffer;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
 use sha2::{Digest, Sha256};
