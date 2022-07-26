@@ -17,6 +17,7 @@ jobs:
     strategy:
       matrix:
         os: [[ARM64, Linux]]
+        python: ["cp37-cp37m", "cp38-cp38", "cp39-cp39"]
 
     steps:
     - name: Checkout repository
@@ -34,6 +35,7 @@ jobs:
     - name: Build Python wheels
       run: |
         podman run --rm=true \
+          --env PYVER=${{ matrix.python }} \
           -v ${{ github.workspace }}:/ws:rw --workdir=/ws \
           quay.io/pypa/manylinux2014_aarch64 \
           bash -exc '\
@@ -44,12 +46,10 @@ jobs:
             source $HOME/.cargo/env && \
             rustup target add aarch64-unknown-linux-musl && \
             rm -rf venv && \
-            export PATH=/opt/python/cp39-cp39/bin/:$PATH && \
-            export PATH=/opt/python/cp38-cp38/bin/:$PATH && \
-            export PATH=/opt/python/cp37-cp37m/bin/:$PATH && \
-            /opt/python/cp38-cp38/bin/python -m venv venv && \
+            /opt/python/${PYVER}/bin/python -m venv venv && \
             if [ ! -f "activate" ]; then ln -s venv/bin/activate; fi && \
             . ./activate && \
+            python --version && \
             pip install maturin && \
             CC=gcc maturin build --release --manylinux 2014 -m wheel/Cargo.toml \
           '
