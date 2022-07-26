@@ -40,7 +40,7 @@ jobs:
         . ./venv/bin/activate
         export PATH=~/.cargo/bin:$PATH
         arch -arm64 pip install maturin
-        arch -arm64 maturin build --no-sdist -i python --release -m wheel/Cargo.toml
+        arch -arm64 maturin build -i python --release -m wheel/Cargo.toml
 
     - name: Install chia_rs wheel
       run: |
