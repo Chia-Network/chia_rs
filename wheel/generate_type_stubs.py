@@ -100,3 +100,15 @@ def serialized_length(program: bytes) -> int: ...
         "puzzle_hash: bytes32",
         "amount: int",
     ], "    def name(self) -> bytes32: ...")
+
+    print_class(f, "CoinState", [
+        "coin: Coin",
+        "spent_height: Optional[int]",
+        "created_height: Optional[int]",
+    ])
+
+    print_class(f, "RespondToPhUpdates", [
+        "puzzle_hashes: List[bytes32]",
+        "min_height: int",
+        "coin_states: List[CoinState]",
+    ])

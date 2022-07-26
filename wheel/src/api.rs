@@ -1,4 +1,6 @@
 use crate::coin::Coin;
+use crate::coin_state::CoinState;
+use crate::respond_to_ph_updates::RespondToPhUpdates;
 use crate::run_generator::{PySpend, PySpendBundleConditions, __pyo3_get_function_run_generator};
 use chia::gen::flags::COND_ARGS_NIL;
 use chia::gen::flags::NO_UNKNOWN_CONDS;
@@ -42,6 +44,8 @@ pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add("STRICT_ARGS_COUNT", STRICT_ARGS_COUNT)?;
     m.add("MEMPOOL_MODE", MEMPOOL_MODE)?;
     m.add_class::<Coin>()?;
+    m.add_class::<CoinState>()?;
+    m.add_class::<RespondToPhUpdates>()?;
     //m.add_class::<Fullblock>()?;
 
     // facilities from clvm_rs
