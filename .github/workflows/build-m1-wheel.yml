@@ -16,6 +16,8 @@ jobs:
     runs-on: [m1]
     strategy:
       fail-fast: false
+      matrix:
+        python: ["3.8", "3.9", "3.10"]
 
     steps:
     - name: Cancel previous runs on the same branch
@@ -23,6 +25,9 @@ jobs:
       uses: styfle/cancel-workflow-action@0.7.0
       with:
         access_token: ${{ github.token }}
+
+    - name: Install Python ${{ matrix.python }}
+      run: brew install python@${{ matrix.python }}
 
     - name: Checkout code
       uses: actions/checkout@v2
