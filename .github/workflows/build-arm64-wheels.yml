@@ -17,7 +17,7 @@ jobs:
     strategy:
       matrix:
         os: [[ARM64, Linux]]
-        python: ["cp37-cp37m", "cp38-cp38", "cp39-cp39"]
+        python: ["cp37-cp37m", "cp38-cp38", "cp39-cp39", "cp310-cp310"]
 
     steps:
     - name: Checkout repository
