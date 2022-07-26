@@ -75,7 +75,7 @@ jobs:
             . /venv/bin/activate && \
             pip install --upgrade pip && \
             pip install maturin && \
-            CC=gcc maturin build --release --manylinux 2010 -i python -m wheel/Cargo.toml \
+            CC=gcc maturin build --sdist --release --manylinux 2010 -i python -m wheel/Cargo.toml \
           '
           python -m venv venv
           ln -s venv/bin/activate
