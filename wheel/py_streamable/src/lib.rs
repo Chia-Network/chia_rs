@@ -63,8 +63,8 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
 
                     #[staticmethod]
                     pub fn from_bytes(blob: &[u8]) -> PyResult<Self> {
-                        let mut de = ChiaDeserializer::from_slice(blob)?;
-                        Self::deserialize(&mut de).map_err(|e| e.into())
+                        let mut input = std::io::Cursor::<&[u8]>::new(blob);
+                        Self::parse(&mut input).map_err(|e| <chia::chia_error::Error as Into<PyErr>>::into(e))
                     }
 
                     // returns the type as well as the number of bytes read from the buffer
@@ -76,16 +76,13 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
                         let slice = unsafe {
                             std::slice::from_raw_parts(blob.buf_ptr() as *const u8, blob.len_bytes())
                         };
-                        let mut de = ChiaDeserializer::from_slice(slice)?;
-                        Self::deserialize(&mut de)
-                            .map_err(|e| e.into())
-                            .map(|v| (v, de.pos()))
+                        let mut input = std::io::Cursor::<&[u8]>::new(slice);
+                        Self::parse(&mut input).map_err(|e| <chia::chia_error::Error as Into<PyErr>>::into(e)).map(|v| (v, input.position() as u32))
                     }
 
                     pub fn to_bytes<'p>(&self, py: Python<'p>) -> PyResult<&'p PyBytes> {
                         let mut writer = Vec::<u8>::new();
-                        let mut ser = ChiaSerializer::new(&mut writer);
-                        serde::Serialize::serialize(self, &mut ser)?;
+                        self.stream(&mut writer).map_err(|e| <chia::chia_error::Error as Into<PyErr>>::into(e))?;
                         Ok(PyBytes::new(py, &writer))
                     }
 
