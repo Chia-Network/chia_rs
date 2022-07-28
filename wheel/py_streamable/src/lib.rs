@@ -107,7 +107,7 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
 
                     #[staticmethod]
                     pub fn from_json_dict(o: &PyAny) -> PyResult<Self> {
-                        Ok(<Self as FromJsonDict>::from_json_dict(o)?)
+                        <Self as FromJsonDict>::from_json_dict(o)
                     }
                 }
 

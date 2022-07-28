@@ -71,7 +71,7 @@ fn convert_spend(a: &Allocator, spend: Spend) -> PySpend {
         Vec::<(Bytes32, u64, Option<Bytes>)>::with_capacity(spend.create_coin.len());
     for c in spend.create_coin {
         create_coin.push((
-            c.puzzle_hash.into(),
+            c.puzzle_hash,
             c.amount,
             if c.hint != a.null() {
                 Some(a.atom(c.hint).into())
