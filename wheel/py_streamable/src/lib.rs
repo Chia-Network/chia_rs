@@ -80,6 +80,11 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
                         Self::parse(&mut input).map_err(|e| <chia::chia_error::Error as Into<PyErr>>::into(e)).map(|v| (v, input.position() as u32))
                     }
 
+                    pub fn get_hash<'p>(&self, py: Python<'p>) -> PyResult<&'p PyBytes> {
+                        let mut ctx = Sha256::new();
+                        Streamable::update_digest(self, &mut ctx);
+                        Ok(PyBytes::new(py, &ctx.finish()))
+                    }
                     pub fn to_bytes<'p>(&self, py: Python<'p>) -> PyResult<&'p PyBytes> {
                         let mut writer = Vec::<u8>::new();
                         self.stream(&mut writer).map_err(|e| <chia::chia_error::Error as Into<PyErr>>::into(e))?;

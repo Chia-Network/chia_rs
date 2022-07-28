@@ -37,6 +37,9 @@ pub fn chia_streamable_macro(input: TokenStream) -> TokenStream {
 
     let ret = quote! {
         impl Streamable for #ident {
+            fn update_digest(&self, digest: &mut Sha256) {
+                #(self.#fnames.update_digest(digest);)*
+            }
             fn stream(&self, out: &mut Vec<u8>) -> chia_error::Result<()> {
                 #(self.#fnames.stream(out)?;)*
                 Ok(())

@@ -1,5 +1,6 @@
 use crate::chia_error;
 use crate::streamable::{read_bytes, Streamable};
+use clvmr::sha2::Sha256;
 use core::fmt::Formatter;
 use std::convert::AsRef;
 use std::convert::TryInto;
@@ -17,6 +18,10 @@ use pyo3::types::PyBytes;
 pub struct Bytes(Vec<u8>);
 
 impl Streamable for Bytes {
+    fn update_digest(&self, digest: &mut Sha256) {
+        (self.0.len() as u32).update_digest(digest);
+        digest.update(&self.0);
+    }
     fn stream(&self, out: &mut Vec<u8>) -> chia_error::Result<()> {
         if self.0.len() > u32::MAX as usize {
             Err(chia_error::Error::SequenceTooLarge)
@@ -55,6 +60,9 @@ impl fmt::Display for Bytes {
 pub struct BytesImpl<const N: usize>([u8; N]);
 
 impl<const N: usize> Streamable for BytesImpl<N> {
+    fn update_digest(&self, digest: &mut Sha256) {
+        digest.update(&self.0);
+    }
     fn stream(&self, out: &mut Vec<u8>) -> chia_error::Result<()> {
         out.extend_from_slice(&self.0);
         Ok(())

@@ -14,6 +14,7 @@ use clvmr::cost::Cost;
 use clvmr::reduction::{EvalErr, Reduction};
 use clvmr::run_program::run_program;
 use clvmr::serialize::node_from_bytes;
+use clvmr::sha2::Sha256;
 
 use pyo3::buffer::PyBuffer;
 use pyo3::class::basic::{CompareOp, PyObjectProtocol};
