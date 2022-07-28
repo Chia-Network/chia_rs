@@ -71,19 +71,19 @@ where
 
 impl FromJsonDict for u32 {
     fn from_json_dict(o: &PyAny) -> PyResult<Self> {
-        Ok(o.extract()?)
+        o.extract()
     }
 }
 
 impl FromJsonDict for u64 {
     fn from_json_dict(o: &PyAny) -> PyResult<Self> {
-        Ok(o.extract()?)
+        o.extract()
     }
 }
 
 impl FromJsonDict for String {
     fn from_json_dict(o: &PyAny) -> PyResult<Self> {
-        Ok(o.extract()?)
+        o.extract()
     }
 }
 
