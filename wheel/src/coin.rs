@@ -10,10 +10,10 @@ use std::hash::Hash;
 use std::hash::Hasher;
 
 use chia::bytes::Bytes32;
+use clvmr::sha2::Sha256;
 use pyo3::buffer::PyBuffer;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
-use sha2::{Digest, Sha256};
 
 #[pyclass(unsendable)]
 #[derive(Serialize, Deserialize, Streamable, Hash, Debug, Clone, Eq, PartialEq)]
@@ -51,7 +51,7 @@ impl Coin {
             hasher.update(&amount_bytes[start..]);
         }
 
-        hasher.finalize().into()
+        hasher.finish().into()
     }
 }
 
