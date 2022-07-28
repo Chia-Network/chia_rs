@@ -24,10 +24,10 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
 use pyo3::PyAny;
 
-use py_streamable::Streamable;
+use py_streamable::PyStreamable;
 
 #[pyclass(unsendable, name = "Spend")]
-#[derive(Serialize, Deserialize, Streamable, Hash, Debug, Clone, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, PyStreamable, Hash, Debug, Clone, Eq, PartialEq)]
 pub struct PySpend {
     #[pyo3(get)]
     pub coin_id: Bytes32,
@@ -44,7 +44,7 @@ pub struct PySpend {
 }
 
 #[pyclass(unsendable, name = "SpendBundleConditions")]
-#[derive(Serialize, Deserialize, Streamable, Hash, Debug, Clone, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, PyStreamable, Hash, Debug, Clone, Eq, PartialEq)]
 pub struct PySpendBundleConditions {
     #[pyo3(get)]
     pub spends: Vec<PySpend>,
