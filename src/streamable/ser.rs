@@ -290,7 +290,7 @@ serialize_impl!(
 // ===== TESTS ====
 
 #[cfg(test)]
-use crate::streamable::bytes::BytesImpl;
+use crate::bytes::BytesImpl;
 
 #[cfg(test)]
 use serde::Serialize;
@@ -478,7 +478,7 @@ fn test_struct() {
 }
 
 #[cfg(test)]
-use crate::streamable::bytes::Bytes32;
+use crate::bytes::Bytes32;
 
 #[test]
 fn test_bytes32() {
