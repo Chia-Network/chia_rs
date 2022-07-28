@@ -1,4 +1,4 @@
-use super::error::{Error, Result};
+use crate::error::{Error, Result};
 use std::convert::TryInto;
 
 // A Chia "Streamable" Deserializer.

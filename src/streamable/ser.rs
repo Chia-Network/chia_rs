@@ -1,4 +1,4 @@
-use super::error::{Error, Result};
+use crate::error::{Error, Result};
 use std::io;
 
 // A chia "Streamable" Serializer into a Writer. The Chia Streamable format is
