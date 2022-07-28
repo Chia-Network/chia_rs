@@ -1,4 +1,5 @@
 use crate::chia_error::{Error, Result};
+use clvmr::sha2::Sha256;
 use std::convert::TryInto;
 use std::io::Cursor;
 use std::mem::size_of;
@@ -27,6 +28,7 @@ fn test_read_bytes() {
 }
 
 pub trait Streamable {
+    fn update_digest(&self, digest: &mut Sha256);
     fn stream(&self, out: &mut Vec<u8>) -> Result<()>;
     fn parse(input: &mut Cursor<&[u8]>) -> Result<Self>
     where
@@ -36,6 +38,9 @@ pub trait Streamable {
 macro_rules! streamable_primitive {
     ($t:ty) => {
         impl Streamable for $t {
+            fn update_digest(&self, digest: &mut Sha256) {
+                digest.update(&self.to_be_bytes());
+            }
             fn stream(&self, out: &mut Vec<u8>) -> Result<()> {
                 Ok(out.extend_from_slice(&self.to_be_bytes()))
             }
@@ -59,6 +64,13 @@ streamable_primitive!(u64);
 streamable_primitive!(i64);
 
 impl<T: Streamable> Streamable for Vec<T> {
+    fn update_digest(&self, digest: &mut Sha256) {
+        (self.len() as u32).update_digest(digest);
+        for e in self {
+            e.update_digest(digest);
+        }
+    }
+
     fn stream(&self, out: &mut Vec<u8>) -> Result<()> {
         if self.len() > u32::MAX as usize {
             Err(Error::InputTooLarge)
@@ -85,6 +97,12 @@ impl<T: Streamable> Streamable for Vec<T> {
 }
 
 impl Streamable for String {
+    fn update_digest(&self, digest: &mut Sha256) {
+        let bytes = self.as_bytes();
+        (bytes.len() as u32).update_digest(digest);
+        digest.update(bytes);
+    }
+
     fn stream(&self, out: &mut Vec<u8>) -> Result<()> {
         // bytes is the UTF-8 sequence
         let bytes = self.bytes();
@@ -107,6 +125,10 @@ impl Streamable for String {
 }
 
 impl Streamable for bool {
+    fn update_digest(&self, digest: &mut Sha256) {
+        digest.update(if *self { &[1] } else { &[0] });
+    }
+
     fn stream(&self, out: &mut Vec<u8>) -> Result<()> {
         out.extend_from_slice(if *self { &[1] } else { &[0] });
         Ok(())
@@ -122,6 +144,18 @@ impl Streamable for bool {
 }
 
 impl<T: Streamable> Streamable for Option<T> {
+    fn update_digest(&self, digest: &mut Sha256) {
+        match self {
+            None => {
+                digest.update(&[0]);
+            }
+            Some(v) => {
+                digest.update(&[1]);
+                v.update_digest(digest);
+            }
+        }
+    }
+
     fn stream(&self, out: &mut Vec<u8>) -> Result<()> {
         match self {
             None => {
@@ -145,6 +179,10 @@ impl<T: Streamable> Streamable for Option<T> {
 }
 
 impl<T: Streamable, U: Streamable> Streamable for (T, U) {
+    fn update_digest(&self, digest: &mut Sha256) {
+        self.0.update_digest(digest);
+        self.1.update_digest(digest);
+    }
     fn stream(&self, out: &mut Vec<u8>) -> Result<()> {
         self.0.stream(out)?;
         self.1.stream(out)?;
@@ -156,6 +194,11 @@ impl<T: Streamable, U: Streamable> Streamable for (T, U) {
 }
 
 impl<T: Streamable, U: Streamable, V: Streamable> Streamable for (T, U, V) {
+    fn update_digest(&self, digest: &mut Sha256) {
+        self.0.update_digest(digest);
+        self.1.update_digest(digest);
+        self.2.update_digest(digest);
+    }
     fn stream(&self, out: &mut Vec<u8>) -> Result<()> {
         self.0.stream(out)?;
         self.1.stream(out)?;
@@ -168,6 +211,12 @@ impl<T: Streamable, U: Streamable, V: Streamable> Streamable for (T, U, V) {
 }
 
 impl<T: Streamable, U: Streamable, V: Streamable, W: Streamable> Streamable for (T, U, V, W) {
+    fn update_digest(&self, digest: &mut Sha256) {
+        self.0.update_digest(digest);
+        self.1.update_digest(digest);
+        self.2.update_digest(digest);
+        self.3.update_digest(digest);
+    }
     fn stream(&self, out: &mut Vec<u8>) -> Result<()> {
         self.0.stream(out)?;
         self.1.stream(out)?;
@@ -427,6 +476,11 @@ fn test_parse_struct() {
 fn stream<T: Streamable>(v: &T) -> Vec<u8> {
     let mut buf = Vec::<u8>::new();
     v.stream(&mut buf).unwrap();
+    let mut ctx1 = Sha256::new();
+    let mut ctx2 = Sha256::new();
+    v.update_digest(&mut ctx1);
+    ctx2.update(&buf);
+    assert_eq!(ctx1.finish(), ctx2.finish());
     buf
 }
 

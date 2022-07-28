@@ -18,7 +18,7 @@ py-bindings = ["dep:pyo3"]
 clvmr = "=0.1.22"
 hex = "=0.4.3"
 pyo3 = { version = "=0.15.1", features = ["extension-module"], optional = true }
-chia_streamable_macro = { version = "=0.1.0", path = "chia_streamable_macro" }
+chia_streamable_macro = { version = "=0.2.1", path = "chia_streamable_macro" }
 
 [dev-dependencies]
 num-traits = "=0.2.15"
