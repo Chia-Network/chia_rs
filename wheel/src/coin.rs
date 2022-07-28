@@ -2,7 +2,7 @@ use crate::from_json_dict::FromJsonDict;
 use crate::to_json_dict::ToJsonDict;
 use chia::streamable::de::ChiaDeserializer;
 use chia::streamable::ser::ChiaSerializer;
-use py_streamable::Streamable;
+use py_streamable::PyStreamable;
 use pyo3::class::basic::{CompareOp, PyObjectProtocol};
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
@@ -16,7 +16,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
 
 #[pyclass(unsendable)]
-#[derive(Serialize, Deserialize, Streamable, Hash, Debug, Clone, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, PyStreamable, Hash, Debug, Clone, Eq, PartialEq)]
 pub struct Coin {
     #[pyo3(get)]
     parent_coin_info: Bytes32,

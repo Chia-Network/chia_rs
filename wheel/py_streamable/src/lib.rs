@@ -6,7 +6,7 @@ use syn::{parse_macro_input, DeriveInput, FieldsNamed};
 
 use proc_macro::TokenStream;
 
-#[proc_macro_derive(Streamable)]
+#[proc_macro_derive(PyStreamable)]
 pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
     let DeriveInput { ident, data, .. } = parse_macro_input!(input);
 
@@ -49,7 +49,7 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
                     }
                 }
                 _ => {
-                    panic!("Streamable requires named fields");
+                    panic!("PyStreamable requires named fields");
                 }
             }
 
