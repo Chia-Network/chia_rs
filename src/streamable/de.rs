@@ -307,7 +307,7 @@ impl<'de> serde::de::VariantAccess<'de> for &'de mut ChiaDeserializer<'de> {
 // ===== TESTS ====
 
 #[cfg(test)]
-use crate::streamable::bytes::{Bytes32, Bytes48};
+use crate::bytes::{Bytes32, Bytes48};
 
 #[cfg(test)]
 fn from_bytes<'de, T: serde::de::Deserialize<'de> + std::fmt::Debug + std::cmp::PartialEq>(

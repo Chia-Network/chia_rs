@@ -9,7 +9,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::Hash;
 use std::hash::Hasher;
 
-use chia::streamable::bytes::Bytes32;
+use chia::bytes::Bytes32;
 use pyo3::buffer::PyBuffer;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};

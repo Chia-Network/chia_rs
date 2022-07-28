@@ -1,4 +1,4 @@
-use crate::streamable::bytes::Bytes32;
+use crate::bytes::Bytes32;
 use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::sha2::Sha256;
 

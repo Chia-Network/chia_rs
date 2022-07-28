@@ -4,9 +4,9 @@ use super::to_json_dict::ToJsonDict;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 
+use chia::bytes::{Bytes, Bytes32, Bytes48};
 use chia::gen::conditions::{parse_spends, Spend, SpendBundleConditions};
 use chia::gen::validation_error::{ErrorCode, ValidationErr};
-use chia::streamable::bytes::{Bytes, Bytes32, Bytes48};
 use chia::streamable::de::ChiaDeserializer;
 use chia::streamable::ser::ChiaSerializer;
 
