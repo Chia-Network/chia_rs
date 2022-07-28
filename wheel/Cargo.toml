@@ -21,4 +21,3 @@ serde = { version = "1.0.130", features = ["derive", "rc"] }
 pyo3 = { version = "=0.15.1", features = ["extension-module", "multiple-pymethods"] }
 py_streamable = { path = "py_streamable" }
 hex = "=0.4.3"
-sha2 = "=0.9.5"
