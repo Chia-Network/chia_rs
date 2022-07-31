@@ -9,6 +9,7 @@ import glob
 failed = 0
 
 def compare_output(output, expected, title):
+    global failed
     if expected != output:
         print(f"{title} output:")
         print(output)
@@ -73,4 +74,5 @@ for g in sorted(glob.glob('generators/*.clvm')):
             print("run-time exceeds limit!")
             failed = 1
 
+print(f"returning {failed}")
 sys.exit(failed)
