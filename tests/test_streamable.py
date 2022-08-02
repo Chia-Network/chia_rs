@@ -223,3 +223,20 @@ def test_coin_parse_rust() -> None:
     c1, consumed = Coin.parse_rust(buffer)
     assert buffer[consumed:] == b"more bytes following, that should be ignored"
     assert c1 == Coin(coin, ph2, 0xFFFFFFFFFFFFFFFF)
+
+def sha2(buf: bytes) -> bytes:
+    from hashlib import sha256
+    ctx = sha256()
+    ctx.update(buf)
+    return ctx.digest()
+
+def test_coin_get_hash() -> None:
+
+    c1 = Coin(coin, ph, 1000000)
+    assert sha2(c1.to_bytes()) == c1.get_hash()
+
+    c2 = Coin(coin, ph2, 0)
+    assert sha2(c2.to_bytes()) == c2.get_hash()
+
+    c3 = Coin(coin, ph2, 0xFFFFFFFFFFFFFFFF)
+    assert sha2(c3.to_bytes()) == c3.get_hash()
