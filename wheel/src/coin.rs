@@ -2,18 +2,13 @@ use crate::from_json_dict::FromJsonDict;
 use crate::to_json_dict::ToJsonDict;
 use chia_streamable_macro::Streamable;
 use py_streamable::PyStreamable;
-use pyo3::class::basic::{CompareOp, PyObjectProtocol};
-use std::collections::hash_map::DefaultHasher;
-use std::hash::Hash;
-use std::hash::Hasher;
 
 use chia::bytes::Bytes32;
 use chia::chia_error;
 use chia::streamable::Streamable;
 use clvmr::sha2::Sha256;
-use pyo3::buffer::PyBuffer;
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict};
+use pyo3::types::PyBytes;
 
 #[pyclass(unsendable)]
 #[derive(Streamable, PyStreamable, Hash, Debug, Clone, Eq, PartialEq)]
@@ -51,7 +46,7 @@ impl Coin {
             hasher.update(&amount_bytes[start..]);
         }
 
-        hasher.finish().into()
+        hasher.finish()
     }
 }
 

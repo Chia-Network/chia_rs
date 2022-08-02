@@ -12,7 +12,7 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
 
     let mut py_protocol = quote! {
         #[pyproto]
-        impl PyObjectProtocol for #ident {
+        impl pyo3::class::basic::PyObjectProtocol for #ident {
             fn __str__(&self) -> PyResult<String> {
                 Ok(format!("{:?}", self))
             }
@@ -21,7 +21,8 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
                 Ok(format!("{:?}", self))
             }
 
-            fn __richcmp__(&self, other: PyRef<#ident>, op: CompareOp) -> Py<PyAny> {
+            fn __richcmp__(&self, other: PyRef<#ident>, op: pyo3::class::basic::CompareOp) -> Py<pyo3::PyAny> {
+                use pyo3::class::basic::CompareOp;
                 let py = other.py();
                 match op {
                     CompareOp::Eq => (self == &*other).into_py(py),
@@ -31,9 +32,9 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
             }
 
             fn __hash__(&self) -> PyResult<isize> {
-                let mut hasher = DefaultHasher::new();
+                let mut hasher = std::collections::hash_map::DefaultHasher::new();
                 std::hash::Hash::hash(self, &mut hasher);
-                Ok(hasher.finish() as isize)
+                Ok(std::hash::Hasher::finish(&hasher) as isize)
             }
         }
     };
@@ -69,7 +70,7 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
 
                     // returns the type as well as the number of bytes read from the buffer
                     #[staticmethod]
-                    pub fn parse_rust<'p>(blob: PyBuffer<u8>) -> PyResult<(Self, u32)> {
+                    pub fn parse_rust<'p>(blob: pyo3::buffer::PyBuffer<u8>) -> PyResult<(Self, u32)> {
                         if !blob.is_c_contiguous() {
                             panic!("parse_rust() must be called with a contiguous buffer");
                         }
@@ -80,22 +81,22 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
                         Self::parse(&mut input).map_err(|e| <chia::chia_error::Error as Into<PyErr>>::into(e)).map(|v| (v, input.position() as u32))
                     }
 
-                    pub fn get_hash<'p>(&self, py: Python<'p>) -> PyResult<&'p PyBytes> {
-                        let mut ctx = Sha256::new();
+                    pub fn get_hash<'p>(&self, py: Python<'p>) -> PyResult<&'p pyo3::types::PyBytes> {
+                        let mut ctx = clvmr::sha2::Sha256::new();
                         Streamable::update_digest(self, &mut ctx);
-                        Ok(PyBytes::new(py, &ctx.finish()))
+                        Ok(pyo3::types::PyBytes::new(py, &ctx.finish()))
                     }
-                    pub fn to_bytes<'p>(&self, py: Python<'p>) -> PyResult<&'p PyBytes> {
+                    pub fn to_bytes<'p>(&self, py: Python<'p>) -> PyResult<&'p pyo3::types::PyBytes> {
                         let mut writer = Vec::<u8>::new();
                         self.stream(&mut writer).map_err(|e| <chia::chia_error::Error as Into<PyErr>>::into(e))?;
-                        Ok(PyBytes::new(py, &writer))
+                        Ok(pyo3::types::PyBytes::new(py, &writer))
                     }
 
-                    pub fn __bytes__<'p>(&self, py: Python<'p>) -> PyResult<&'p PyBytes> {
+                    pub fn __bytes__<'p>(&self, py: Python<'p>) -> PyResult<&'p pyo3::types::PyBytes> {
                         self.to_bytes(py)
                     }
 
-                    pub fn __deepcopy__<'p>(&self, memo: &PyAny) -> PyResult<Self> {
+                    pub fn __deepcopy__<'p>(&self, memo: &pyo3::PyAny) -> PyResult<Self> {
                         Ok(self.clone())
                     }
 
@@ -108,14 +109,14 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
                     }
 
                     #[staticmethod]
-                    pub fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+                    pub fn from_json_dict(o: &pyo3::PyAny) -> PyResult<Self> {
                         <Self as FromJsonDict>::from_json_dict(o)
                     }
                 }
 
                 impl ToJsonDict for #ident {
                     fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
-                        let ret = PyDict::new(py);
+                        let ret = pyo3::types::PyDict::new(py);
                         #(ret.set_item(stringify!(#fnames), self.#fnames.to_json_dict(py)?)?);*;
                         Ok(ret.into())
                     }
@@ -123,7 +124,7 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
 
 
                 impl FromJsonDict for #ident {
-                    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+                    fn from_json_dict(o: &pyo3::PyAny) -> PyResult<Self> {
                         Ok(Self{
                             #(#fnames: <#ftypes as FromJsonDict>::from_json_dict(o.get_item(stringify!(#fnames))?)?,)*
                         })

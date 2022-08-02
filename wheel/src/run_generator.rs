@@ -1,8 +1,6 @@
 use super::adapt_response::eval_err_to_pyresult;
 use super::from_json_dict::FromJsonDict;
 use super::to_json_dict::ToJsonDict;
-use std::collections::hash_map::DefaultHasher;
-use std::hash::Hasher;
 
 use chia::bytes::{Bytes, Bytes32, Bytes48};
 use chia::gen::conditions::{parse_spends, Spend, SpendBundleConditions};
@@ -14,13 +12,8 @@ use clvmr::cost::Cost;
 use clvmr::reduction::{EvalErr, Reduction};
 use clvmr::run_program::run_program;
 use clvmr::serialize::node_from_bytes;
-use clvmr::sha2::Sha256;
 
-use pyo3::buffer::PyBuffer;
-use pyo3::class::basic::{CompareOp, PyObjectProtocol};
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict};
-use pyo3::PyAny;
 
 use chia::chia_error;
 use chia::streamable::Streamable;
