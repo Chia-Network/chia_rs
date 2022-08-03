@@ -10,6 +10,7 @@ use std::convert::TryInto;
 //use chia::streamable::fullblock::Fullblock;
 use clvmr::chia_dialect::NO_NEG_DIV;
 use clvmr::chia_dialect::NO_UNKNOWN_OPS;
+use clvmr::serialize::tree_hash_from_stream;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use pyo3::types::PyModule;
@@ -34,6 +35,17 @@ pub fn compute_merkle_set_root<'p>(
     Ok(PyBytes::new(py, &compute_merkle_root_impl(&mut buffer)))
 }
 
+#[pyfunction]
+pub fn tree_hash<'p>(py: Python<'p>, blob: pyo3::buffer::PyBuffer<u8>) -> PyResult<&'p PyBytes> {
+    if !blob.is_c_contiguous() {
+        panic!("parse_rust() must be called with a contiguous buffer");
+    }
+    let slice =
+        unsafe { std::slice::from_raw_parts(blob.buf_ptr() as *const u8, blob.len_bytes()) };
+    let mut input = std::io::Cursor::<&[u8]>::new(slice);
+    Ok(PyBytes::new(py, &tree_hash_from_stream(&mut input)?))
+}
+
 #[pymodule]
 pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(run_generator, m)?)?;
@@ -56,6 +68,7 @@ pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
 
     m.add_function(wrap_pyfunction!(serialized_length, m)?)?;
     m.add_function(wrap_pyfunction!(compute_merkle_set_root, m)?)?;
+    m.add_function(wrap_pyfunction!(tree_hash, m)?)?;
 
     Ok(())
 }
