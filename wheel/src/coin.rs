@@ -6,9 +6,10 @@ use py_streamable::PyStreamable;
 use chia::bytes::Bytes32;
 use chia::chia_error;
 use chia::streamable::Streamable;
-use clvmr::sha2::Sha256;
+use clvmr::sha2::{Digest, Sha256};
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
+use std::convert::TryInto;
 
 #[pyclass(unsendable)]
 #[derive(Streamable, PyStreamable, Hash, Debug, Clone, Eq, PartialEq)]
@@ -46,7 +47,7 @@ impl Coin {
             hasher.update(&amount_bytes[start..]);
         }
 
-        hasher.finish()
+        hasher.finalize().as_slice().try_into().unwrap()
     }
 }
 

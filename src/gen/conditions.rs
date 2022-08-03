@@ -19,7 +19,7 @@ use crate::gen::validation_error::check_nil;
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use clvmr::cost::Cost;
 use clvmr::op_utils::u64_from_bytes;
-use clvmr::sha2::Sha256;
+use clvmr::sha2::{Digest, Sha256};
 use std::cmp::max;
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
@@ -563,9 +563,9 @@ pub fn parse_spends(
 
         for (coin_id, announce) in state.announce_coin {
             let mut hasher = Sha256::new();
-            hasher.update(&coin_id);
+            hasher.update(&*coin_id);
             hasher.update(a.atom(announce));
-            announcements.insert(hasher.finish().into());
+            announcements.insert(hasher.finalize().as_slice().into());
         }
 
         for coin_assert in state.assert_coin {
@@ -585,7 +585,7 @@ pub fn parse_spends(
             let mut hasher = Sha256::new();
             hasher.update(a.atom(puzzle_hash));
             hasher.update(a.atom(announce));
-            announcements.insert(hasher.finish().into());
+            announcements.insert(hasher.finalize().as_slice().into());
         }
 
         for puzzle_assert in state.assert_puzzle {
@@ -696,7 +696,7 @@ fn hash_buf(b1: &[u8], b2: &[u8]) -> Vec<u8> {
     let mut ctx = Sha256::new();
     ctx.update(b1);
     ctx.update(b2);
-    ctx.finish().to_vec()
+    ctx.finalize().to_vec()
 }
 
 #[cfg(test)]
@@ -706,7 +706,7 @@ fn test_coin_id(parent_id: &[u8; 32], puzzle_hash: &[u8; 32], amount: u64) -> By
     hasher.update(puzzle_hash);
     let buf = u64_to_bytes(amount);
     hasher.update(&buf);
-    hasher.finish().into()
+    hasher.finalize().as_slice().into()
 }
 
 // this is a very simple parser. It does not handle errors, because it's only

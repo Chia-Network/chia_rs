@@ -1,4 +1,4 @@
-use clvmr::sha2::Sha256;
+use clvmr::sha2::{Digest, Sha256};
 
 fn get_bit(val: &[u8; 32], bit: u8) -> u8 {
     if val[(bit / 8) as usize] & (0x80 >> (bit & 7)) == 0 {
@@ -38,7 +38,7 @@ fn hash(ltype: NodeType, rtype: NodeType, left: &[u8; 32], right: &[u8; 32]) -> 
     hasher.update(&[encode_type(ltype), encode_type(rtype)]);
     hasher.update(left);
     hasher.update(right);
-    hasher.finish()
+    hasher.finalize().into()
 }
 
 const BLANK: [u8; 32] = [
@@ -149,7 +149,7 @@ pub fn compute_merkle_set_root(leafs: &mut [[u8; 32]]) -> [u8; 32] {
             let mut hasher = Sha256::new();
             hasher.update(&[NodeType::Term as u8]);
             hasher.update(&hash);
-            hasher.finish()
+            hasher.finalize().into()
         }
         (hash, NodeType::Mid) => hash,
         (hash, NodeType::MidDbl) => hash,
@@ -249,7 +249,7 @@ fn h2(buf1: &[u8], buf2: &[u8]) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(buf1);
     hasher.update(buf2);
-    hasher.finish()
+    hasher.finalize().into()
 }
 
 #[cfg(test)]
@@ -262,7 +262,7 @@ fn hashdown(buf1: &[u8], buf2: &[u8], buf3: &[u8]) -> [u8; 32] {
     hasher.update(buf1);
     hasher.update(buf2);
     hasher.update(buf3);
-    hasher.finish()
+    hasher.finalize().into()
 }
 
 #[test]
