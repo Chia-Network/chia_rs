@@ -1,5 +1,5 @@
 use crate::chia_error::{Error, Result};
-use clvmr::sha2::Sha256;
+use clvmr::sha2::{Digest, Sha256};
 use std::convert::TryInto;
 use std::io::Cursor;
 use std::mem::size_of;
@@ -480,7 +480,7 @@ fn stream<T: Streamable>(v: &T) -> Vec<u8> {
     let mut ctx2 = Sha256::new();
     v.update_digest(&mut ctx1);
     ctx2.update(&buf);
-    assert_eq!(ctx1.finish(), ctx2.finish());
+    assert_eq!(&ctx1.finalize(), &ctx2.finalize());
     buf
 }
 

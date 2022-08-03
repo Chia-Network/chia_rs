@@ -82,9 +82,9 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
                     }
 
                     pub fn get_hash<'p>(&self, py: Python<'p>) -> PyResult<&'p pyo3::types::PyBytes> {
-                        let mut ctx = clvmr::sha2::Sha256::new();
+                        let mut ctx = <clvmr::sha2::Sha256 as clvmr::sha2::Digest>::new();
                         Streamable::update_digest(self, &mut ctx);
-                        Ok(pyo3::types::PyBytes::new(py, &ctx.finish()))
+                        Ok(pyo3::types::PyBytes::new(py, clvmr::sha2::Digest::finalize(ctx).as_slice()))
                     }
                     pub fn to_bytes<'p>(&self, py: Python<'p>) -> PyResult<&'p pyo3::types::PyBytes> {
                         let mut writer = Vec::<u8>::new();

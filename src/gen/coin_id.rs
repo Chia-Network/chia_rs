@@ -1,6 +1,6 @@
 use crate::bytes::Bytes32;
 use clvmr::allocator::{Allocator, NodePtr};
-use clvmr::sha2::Sha256;
+use clvmr::sha2::{Digest, Sha256};
 
 pub fn compute_coin_id(
     a: &Allocator,
@@ -12,7 +12,7 @@ pub fn compute_coin_id(
     hasher.update(a.atom(parent_id));
     hasher.update(a.atom(puzzle_hash));
     hasher.update(amount);
-    hasher.finish().into()
+    hasher.finalize().as_slice().into()
 }
 
 // from chia.types.blockchain_format.coin import Coin
