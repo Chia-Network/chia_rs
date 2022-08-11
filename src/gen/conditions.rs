@@ -9,19 +9,17 @@ use super::opcodes::{
     ASSERT_SECONDS_ABSOLUTE, ASSERT_SECONDS_RELATIVE, CREATE_COIN, CREATE_COIN_ANNOUNCEMENT,
     CREATE_COIN_COST, CREATE_PUZZLE_ANNOUNCEMENT, RESERVE_FEE,
 };
-use super::rangeset::RangeSet;
 use super::sanitize_int::sanitize_uint;
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
+use crate::bytes::Bytes32;
 use crate::gen::flags::COND_ARGS_NIL;
 use crate::gen::flags::NO_UNKNOWN_CONDS;
 use crate::gen::flags::STRICT_ARGS_COUNT;
 use crate::gen::validation_error::check_nil;
-use crate::streamable::bytes::Bytes32;
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use clvmr::cost::Cost;
 use clvmr::op_utils::u64_from_bytes;
-use clvmr::sha2::Sha256;
-use serde::{Deserialize, Serialize};
+use clvmr::sha2::{Digest, Sha256};
 use std::cmp::max;
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
@@ -92,7 +90,6 @@ fn parse_args(
     a: &Allocator,
     mut c: NodePtr,
     op: ConditionOpcode,
-    range_cache: &mut RangeSet,
     flags: u32,
 ) -> Result<Condition, ValidationErr> {
     match op {
@@ -135,13 +132,7 @@ fn parse_args(
         CREATE_COIN => {
             let puzzle_hash = sanitize_hash(a, first(a, c)?, 32, ErrorCode::InvalidPuzzleHash)?;
             c = rest(a, c)?;
-            let amount = parse_amount(
-                a,
-                first(a, c)?,
-                ErrorCode::InvalidCoinAmount,
-                range_cache,
-                flags,
-            )?;
+            let amount = parse_amount(a, first(a, c)?, ErrorCode::InvalidCoinAmount)?;
             // CREATE_COIN takes an optional 3rd parameter, which is a list of
             // byte buffers (typically a 32 byte hash). We only pull out the
             // first element for now, but may support more in the future.
@@ -173,13 +164,7 @@ fn parse_args(
             Ok(Condition::CreateCoin(puzzle_hash, amount, a.null()))
         }
         RESERVE_FEE => {
-            let fee = parse_amount(
-                a,
-                first(a, c)?,
-                ErrorCode::ReserveFeeConditionFailed,
-                range_cache,
-                flags,
-            )?;
+            let fee = parse_amount(a, first(a, c)?, ErrorCode::ReserveFeeConditionFailed)?;
             if (flags & STRICT_ARGS_COUNT) != 0 {
                 check_nil(a, rest(a, c)?)?;
             }
@@ -240,13 +225,7 @@ fn parse_args(
             Ok(Condition::AssertMyPuzzlehash(id))
         }
         ASSERT_MY_AMOUNT => {
-            let amount = parse_amount(
-                a,
-                first(a, c)?,
-                ErrorCode::AssertMyAmountFailed,
-                range_cache,
-                flags,
-            )?;
+            let amount = parse_amount(a, first(a, c)?, ErrorCode::AssertMyAmountFailed)?;
             if (flags & STRICT_ARGS_COUNT) != 0 {
                 check_nil(a, rest(a, c)?)?;
             }
@@ -260,8 +239,6 @@ fn parse_args(
                 a,
                 first(a, c)?,
                 ErrorCode::AssertSecondsRelative,
-                range_cache,
-                flags,
             )?))
         }
         ASSERT_SECONDS_ABSOLUTE => {
@@ -272,22 +249,13 @@ fn parse_args(
                 a,
                 first(a, c)?,
                 ErrorCode::AssertSecondsAbsolute,
-                range_cache,
-                flags,
             )?))
         }
         ASSERT_HEIGHT_RELATIVE => {
             if (flags & STRICT_ARGS_COUNT) != 0 {
                 check_nil(a, rest(a, c)?)?;
             }
-            match sanitize_uint(
-                a,
-                first(a, c)?,
-                4,
-                ErrorCode::AssertHeightRelative,
-                range_cache,
-                flags,
-            ) {
+            match sanitize_uint(a, first(a, c)?, 4, ErrorCode::AssertHeightRelative) {
                 // Height is always positive, so a negative requirement is always true,
                 Err(ValidationErr(_, ErrorCode::NegativeAmount)) => Ok(Condition::Skip),
                 Err(r) => Err(r),
@@ -302,8 +270,6 @@ fn parse_args(
                 a,
                 first(a, c)?,
                 ErrorCode::AssertHeightAbsolute,
-                range_cache,
-                flags,
             )?))
         }
         ALWAYS_TRUE => {
@@ -314,7 +280,7 @@ fn parse_args(
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug)]
 pub struct NewCoin {
     pub puzzle_hash: Bytes32,
     pub amount: u64,
@@ -340,7 +306,7 @@ impl PartialEq for NewCoin {
 }
 
 // These are all the conditions related directly to a specific spend.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug)]
 pub struct Spend {
     pub coin_id: Arc<Bytes32>,
     pub puzzle_hash: NodePtr,
@@ -363,7 +329,7 @@ pub struct Spend {
 // spend bundle level, like reserve_fee and absolute time locks. Other
 // conditions are per spend, like relative time-locks and create coins (because
 // they have an implied parent coin ID).
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug)]
 pub struct SpendBundleConditions {
     pub spends: Vec<Spend>,
     // conditions
@@ -397,10 +363,6 @@ struct ParseState {
     // compute the coin ID, and stick it in this set. It's reference counted
     // since it may also be referenced by announcements
     spent_coins: HashSet<Arc<Bytes32>>,
-
-    // this object tracks which ranges of the heap we've scanned for zeros, to
-    // avoid scanning the same ranges multiple times.
-    range_cache: RangeSet,
 }
 
 impl ParseState {
@@ -411,7 +373,6 @@ impl ParseState {
             assert_coin: HashSet::new(),
             assert_puzzle: HashSet::new(),
             spent_coins: HashSet::new(),
-            range_cache: RangeSet::new(),
         }
     }
 }
@@ -428,15 +389,7 @@ fn parse_spend_conditions(
     spend = rest(a, spend)?;
     let puzzle_hash = sanitize_hash(a, first(a, spend)?, 32, ErrorCode::InvalidPuzzleHash)?;
     spend = rest(a, spend)?;
-    let amount_buf = sanitize_uint(
-        a,
-        first(a, spend)?,
-        8,
-        ErrorCode::InvalidCoinAmount,
-        &mut state.range_cache,
-        flags,
-    )?
-    .to_vec();
+    let amount_buf = sanitize_uint(a, first(a, spend)?, 8, ErrorCode::InvalidCoinAmount)?.to_vec();
     let my_amount = u64_from_bytes(&amount_buf);
     let cond = rest(a, spend)?;
     let coin_id = Arc::new(compute_coin_id(a, parent_id, puzzle_hash, &amount_buf));
@@ -489,7 +442,7 @@ fn parse_spend_conditions(
             _ => (),
         }
         c = rest(a, c)?;
-        let cva = parse_args(a, c, op, &mut state.range_cache, flags)?;
+        let cva = parse_args(a, c, op, flags)?;
         match cva {
             Condition::ReserveFee(limit) => {
                 // reserve fees are accumulated
@@ -610,9 +563,9 @@ pub fn parse_spends(
 
         for (coin_id, announce) in state.announce_coin {
             let mut hasher = Sha256::new();
-            hasher.update(&(*coin_id));
+            hasher.update(&*coin_id);
             hasher.update(a.atom(announce));
-            announcements.insert(hasher.finish().into());
+            announcements.insert(hasher.finalize().as_slice().into());
         }
 
         for coin_assert in state.assert_coin {
@@ -632,7 +585,7 @@ pub fn parse_spends(
             let mut hasher = Sha256::new();
             hasher.update(a.atom(puzzle_hash));
             hasher.update(a.atom(announce));
-            announcements.insert(hasher.finish().into());
+            announcements.insert(hasher.finalize().as_slice().into());
         }
 
         for puzzle_assert in state.assert_puzzle {
@@ -743,7 +696,7 @@ fn hash_buf(b1: &[u8], b2: &[u8]) -> Vec<u8> {
     let mut ctx = Sha256::new();
     ctx.update(b1);
     ctx.update(b2);
-    ctx.finish().to_vec()
+    ctx.finalize().to_vec()
 }
 
 #[cfg(test)]
@@ -753,7 +706,7 @@ fn test_coin_id(parent_id: &[u8; 32], puzzle_hash: &[u8; 32], amount: u64) -> By
     hasher.update(puzzle_hash);
     let buf = u64_to_bytes(amount);
     hasher.update(&buf);
-    hasher.finish().into()
+    hasher.finalize().as_slice().into()
 }
 
 // this is a very simple parser. It does not handle errors, because it's only
@@ -903,10 +856,7 @@ fn cond_test_cb(
 }
 
 #[cfg(test)]
-use crate::gen::flags::COND_CANON_INTS;
-
-#[cfg(test)]
-const MEMPOOL_MODE: u32 = COND_CANON_INTS | COND_ARGS_NIL | STRICT_ARGS_COUNT | NO_UNKNOWN_CONDS;
+const MEMPOOL_MODE: u32 = COND_ARGS_NIL | STRICT_ARGS_COUNT | NO_UNKNOWN_CONDS;
 
 #[cfg(test)]
 fn cond_test(input: &str) -> Result<(Allocator, SpendBundleConditions), ValidationErr> {
@@ -1712,14 +1662,13 @@ fn test_single_assert_my_amount_exceed_max() {
 #[test]
 fn test_single_assert_my_amount_overlong() {
     // ASSERT_MY_AMOUNT
-    // leading zeroes are ignored
-    let (a, conds) = cond_test_flag("((({h1} ({h2} (123 (((73 (0x0000007b )))))", 0).unwrap();
-
-    assert_eq!(conds.cost, 0);
-    assert_eq!(conds.spends.len(), 1);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash), H2);
+    // leading zeroes are disallowed
+    assert_eq!(
+        cond_test_flag("((({h1} ({h2} (123 (((73 (0x0000007b )))))", 0)
+            .unwrap_err()
+            .1,
+        ErrorCode::AssertMyAmountFailed
+    );
 }
 
 #[test]
@@ -1811,14 +1760,13 @@ fn test_single_assert_my_coin_id_extra_arg_mempool() {
 #[test]
 fn test_single_assert_my_coin_id_overlong() {
     // ASSERT_MY_COIN_ID
-    // leading zeros in the coin amount are ignored when computing the coin ID
-    let (a, conds) = cond_test_flag("((({h1} ({h2} (0x0000007b (((70 ({coin12} )))))", 0).unwrap();
-
-    assert_eq!(conds.cost, 0);
-    assert_eq!(conds.spends.len(), 1);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash), H2);
+    // leading zeros in the coin amount invalid
+    assert_eq!(
+        cond_test_flag("((({h1} ({h2} (0x0000007b (((70 ({coin12} )))))", 0)
+            .unwrap_err()
+            .1,
+        ErrorCode::InvalidCoinAmount
+    );
 }
 
 #[test]

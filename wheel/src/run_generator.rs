@@ -1,14 +1,10 @@
 use super::adapt_response::eval_err_to_pyresult;
 use super::from_json_dict::FromJsonDict;
 use super::to_json_dict::ToJsonDict;
-use std::collections::hash_map::DefaultHasher;
-use std::hash::Hasher;
 
+use chia::bytes::{Bytes, Bytes32, Bytes48};
 use chia::gen::conditions::{parse_spends, Spend, SpendBundleConditions};
 use chia::gen::validation_error::{ErrorCode, ValidationErr};
-use chia::streamable::bytes::{Bytes, Bytes32, Bytes48};
-use chia::streamable::de::ChiaDeserializer;
-use chia::streamable::ser::ChiaSerializer;
 
 use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
@@ -16,18 +12,16 @@ use clvmr::cost::Cost;
 use clvmr::reduction::{EvalErr, Reduction};
 use clvmr::run_program::run_program;
 use clvmr::serialize::node_from_bytes;
-use serde::{Deserialize, Serialize};
 
-use pyo3::buffer::PyBuffer;
-use pyo3::class::basic::{CompareOp, PyObjectProtocol};
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict};
-use pyo3::PyAny;
 
-use py_streamable::Streamable;
+use chia::chia_error;
+use chia::streamable::Streamable;
+use chia_streamable_macro::Streamable;
+use py_streamable::PyStreamable;
 
 #[pyclass(unsendable, name = "Spend")]
-#[derive(Serialize, Deserialize, Streamable, Hash, Debug, Clone, Eq, PartialEq)]
+#[derive(Streamable, PyStreamable, Hash, Debug, Clone, Eq, PartialEq)]
 pub struct PySpend {
     #[pyo3(get)]
     pub coin_id: Bytes32,
@@ -44,7 +38,7 @@ pub struct PySpend {
 }
 
 #[pyclass(unsendable, name = "SpendBundleConditions")]
-#[derive(Serialize, Deserialize, Streamable, Hash, Debug, Clone, Eq, PartialEq)]
+#[derive(Streamable, PyStreamable, Hash, Debug, Clone, Eq, PartialEq)]
 pub struct PySpendBundleConditions {
     #[pyo3(get)]
     pub spends: Vec<PySpend>,
@@ -71,7 +65,7 @@ fn convert_spend(a: &Allocator, spend: Spend) -> PySpend {
         Vec::<(Bytes32, u64, Option<Bytes>)>::with_capacity(spend.create_coin.len());
     for c in spend.create_coin {
         create_coin.push((
-            c.puzzle_hash.into(),
+            c.puzzle_hash,
             c.amount,
             if c.hint != a.null() {
                 Some(a.atom(c.hint).into())

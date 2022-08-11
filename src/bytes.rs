@@ -1,20 +1,42 @@
+use crate::chia_error;
+use crate::streamable::{read_bytes, Streamable};
+use clvmr::sha2::{Digest, Sha256};
 use core::fmt::Formatter;
-use serde::ser::SerializeTuple;
-use serde::{Deserialize, Serialize};
 use std::convert::AsRef;
+use std::convert::TryInto;
 use std::fmt;
 use std::fmt::Debug;
+use std::io::Cursor;
 use std::ops::Deref;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
 #[cfg(feature = "py-bindings")]
 use pyo3::types::PyBytes;
-#[cfg(feature = "py-bindings")]
-use std::convert::TryInto;
 
-#[derive(Serialize, Deserialize, Hash, Debug, Clone, Eq, PartialEq)]
+#[derive(Hash, Debug, Clone, Eq, PartialEq)]
 pub struct Bytes(Vec<u8>);
+
+impl Streamable for Bytes {
+    fn update_digest(&self, digest: &mut Sha256) {
+        (self.0.len() as u32).update_digest(digest);
+        digest.update(&self.0);
+    }
+    fn stream(&self, out: &mut Vec<u8>) -> chia_error::Result<()> {
+        if self.0.len() > u32::MAX as usize {
+            Err(chia_error::Error::SequenceTooLarge)
+        } else {
+            (self.0.len() as u32).stream(out)?;
+            out.extend_from_slice(&self.0);
+            Ok(())
+        }
+    }
+
+    fn parse(input: &mut Cursor<&[u8]>) -> chia_error::Result<Self> {
+        let len = u32::parse(input)?;
+        Ok(Bytes(read_bytes(input, len as usize)?.to_vec()))
+    }
+}
 
 impl From<&[u8]> for Bytes {
     fn from(v: &[u8]) -> Bytes {
@@ -34,43 +56,20 @@ impl fmt::Display for Bytes {
     }
 }
 
-struct ByteVisitor<const N: usize>;
-
-impl<'de, const N: usize> serde::de::Visitor<'de> for ByteVisitor<N> {
-    type Value = BytesImpl<N>;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("bytes")
-    }
-
-    fn visit_seq<S>(self, mut seq: S) -> Result<Self::Value, S::Error>
-    where
-        S: serde::de::SeqAccess<'de>,
-    {
-        let mut dest: [u8; N] = [0; N];
-        let mut counter = 0;
-        while let Some(value) = seq.next_element()? {
-            dest[counter] = value;
-            counter += 1;
-        }
-
-        Ok(dest.into())
-    }
-}
-
 #[derive(Hash, PartialEq, Eq, Copy, Clone)]
 pub struct BytesImpl<const N: usize>([u8; N]);
 
-impl<const N: usize> Serialize for BytesImpl<N> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let mut seq = serializer.serialize_tuple(N)?;
-        for elem in &self.0[..] {
-            seq.serialize_element(elem)?;
-        }
-        seq.end()
+impl<const N: usize> Streamable for BytesImpl<N> {
+    fn update_digest(&self, digest: &mut Sha256) {
+        digest.update(&self.0);
+    }
+    fn stream(&self, out: &mut Vec<u8>) -> chia_error::Result<()> {
+        out.extend_from_slice(&self.0);
+        Ok(())
+    }
+
+    fn parse(input: &mut Cursor<&[u8]>) -> chia_error::Result<Self> {
+        Ok(BytesImpl(read_bytes(input, N)?.try_into().unwrap()))
     }
 }
 
@@ -134,22 +133,13 @@ impl<const N: usize> Deref for BytesImpl<N> {
     }
 }
 impl<const N: usize> Debug for BytesImpl<N> {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         formatter.write_str(&hex::encode(self.0))
     }
 }
 impl<const N: usize> fmt::Display for BytesImpl<N> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         formatter.write_str(&hex::encode(self.0))
-    }
-}
-
-impl<'de, const N: usize> Deserialize<'de> for BytesImpl<N> {
-    fn deserialize<D>(deserializer: D) -> Result<BytesImpl<N>, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        deserializer.deserialize_tuple(N, ByteVisitor::<N>)
     }
 }
 
