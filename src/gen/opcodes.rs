@@ -33,6 +33,9 @@ pub const ASSERT_SECONDS_ABSOLUTE: ConditionOpcode = 81;
 pub const ASSERT_HEIGHT_RELATIVE: ConditionOpcode = 82;
 pub const ASSERT_HEIGHT_ABSOLUTE: ConditionOpcode = 83;
 
+// no-op condition
+pub const ALWAYS_TRUE: ConditionOpcode = 1;
+
 pub const CREATE_COIN_COST: Cost = 1800000;
 pub const AGG_SIG_COST: Cost = 1200000;
 
@@ -60,7 +63,8 @@ pub fn parse_opcode(a: &Allocator, op: NodePtr) -> Option<ConditionOpcode> {
         | ASSERT_SECONDS_RELATIVE
         | ASSERT_SECONDS_ABSOLUTE
         | ASSERT_HEIGHT_RELATIVE
-        | ASSERT_HEIGHT_ABSOLUTE => Some(buf[0]),
+        | ASSERT_HEIGHT_ABSOLUTE
+        | ALWAYS_TRUE => Some(buf[0]),
         _ => None,
     }
 }
@@ -129,6 +133,7 @@ fn test_parse_opcode() {
         opcode_tester(&mut a, &[ASSERT_HEIGHT_ABSOLUTE]),
         Some(ASSERT_HEIGHT_ABSOLUTE)
     );
+    assert_eq!(opcode_tester(&mut a, &[ALWAYS_TRUE]), Some(ALWAYS_TRUE));
     // leading zeros are not allowed, it makes it a different value
     assert_eq!(opcode_tester(&mut a, &[ASSERT_HEIGHT_ABSOLUTE, 0]), None);
     assert_eq!(opcode_tester(&mut a, &[0, ASSERT_HEIGHT_ABSOLUTE]), None);

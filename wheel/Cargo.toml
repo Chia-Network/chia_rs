@@ -1,6 +1,6 @@
 [package]
 name = "chia_rs"
-version = "0.1.2"
+version = "0.1.5"
 authors = ["Richard Kiss <him@richardkiss.com>"]
 edition = "2018"
 license = "Apache-2.0"
@@ -16,5 +16,8 @@ path = "src/lib.rs"
 
 [dependencies]
 chia = { path = "..", features = ["py-bindings"] }
-clvmr = "=0.1.20"
-pyo3 = { version = "=0.15.1", features = ["abi3-py37", "extension-module"] }
+clvmr = "=0.1.23"
+pyo3 = { version = "=0.15.1", features = ["extension-module", "multiple-pymethods"] }
+py_streamable = { path = "py_streamable" }
+chia_streamable_macro = { version = "0.2.2", path = "../chia_streamable_macro" }
+hex = "=0.4.3"

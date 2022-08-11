@@ -1,34 +1,121 @@
-name: Build
+name: build - check - upload
 
 on:
   push:
     branches:
-      - main
+    - main
     tags:
-        - '**'
+    - '**'
   pull_request:
     branches:
-      - '**'
+    - '**'
+
+concurrency:
+  # SHA is added to the end if on `main` to let all main workflows run
+  group: ${{ github.ref }}-${{ github.workflow }}-${{ github.event_name }}-${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/long_lived/')) && github.sha || '' }}
+  cancel-in-progress: true
 
 jobs:
-  build_wheels:
-    name: Wheel on ${{ matrix.os }} py-${{ matrix.python }}
-    runs-on: ${{ matrix.os }}
+  build-wheels:
+    name: Wheel - ${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }}
+    runs-on: ${{ matrix.os.runs-on[matrix.arch.matrix] }}
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
-        python: [3.7]
+        os:
+          - name: macOS
+            matrix: macos
+            runs-on:
+              arm: [macOS, ARM64]
+              intel: [macos-latest]
+          - name: Ubuntu
+            matrix: ubuntu
+            runs-on:
+              arm: [Linux, ARM64]
+              intel: [ubuntu-latest]
+            options:
+              arm:
+                docker-url: quay.io/pypa/manylinux2014_aarch64
+                manylinux-version: 2014
+                rustup-target: aarch64-unknown-linux-musl
+              intel:
+                docker-url: quay.io/pypa/manylinux2010_x86_64
+                manylinux-version: 2010
+                rustup-target: x86_64-unknown-linux-musl
+          - name: Windows
+            matrix: windows
+            runs-on:
+              intel: [windows-latest]
+        python:
+          - major-dot-minor: '3.7'
+            cibw-build: 'cp37-*'
+            matrix: '3.7'
+          - major-dot-minor: '3.8'
+            cibw-build: 'cp38-*'
+            matrix: '3.8'
+          - major-dot-minor: '3.9'
+            cibw-build: 'cp39-*'
+            matrix: '3.9'
+          - major-dot-minor: '3.10'
+            cibw-build: 'cp310-*'
+            matrix: '3.10'
+        arch:
+          - name: ARM
+            matrix: arm
+          - name: Intel
+            matrix: intel
+        exclude:
+          # Only partial entries are required here by GitHub Actions so generally I
+          # only specify the `matrix:` entry.  The super linter complains so for now
+          # all entries are included to avoid that.  Reported at
+          # https://github.com/github/super-linter/issues/3016
+          - os:
+              name: Windows
+              matrix: windows
+              runs-on:
+                intel: [windows-latest]
+            arch:
+              name: ARM
+              matrix: arm
+          - os:
+              name: macOS
+              matrix: macos
+              runs-on:
+                arm: [macOS, ARM64]
+                intel: [macos-latest]
+            python:
+              major-dot-minor: '3.7'
+              cibw-build: 'cp37-*'
+              matrix: '3.7'
+            arch:
+              name: ARM
+              matrix: arm
+          - os:
+              name: macOS
+              matrix: macos
+              runs-on:
+                arm: [macOS, ARM64]
+                intel: [macos-latest]
+            python:
+              major-dot-minor: '3.8'
+              cibw-build: 'cp38-*'
+              matrix: '3.8'
+            arch:
+              name: ARM
+              matrix: arm
 
     steps:
-    - uses: actions/checkout@v2
+    - name: Clean workspace
+      uses: Chia-Network/actions/clean-workspace@main
+
+    - name: Checkout code
+      uses: actions/checkout@v3
       with:
         fetch-depth: 0
 
-    - uses: actions/setup-python@v2
-      name: Install Python ${{ matrix.python }}
+    - uses: Chia-Network/actions/setup-python@main
       with:
-        python-version: ${{ matrix.python }}
+        python-version: ${{ matrix.python.major-dot-minor }}
 
     - name: Update pip
       run: |
@@ -44,49 +131,39 @@ jobs:
           python -m pip install maturin
 
     - name: Build MacOs with maturin on Python ${{ matrix.python }}
-      if: startsWith(matrix.os, 'macos')
+      if: matrix.os.matrix == 'macos'
       run: |
-        python -m venv venv
-        ln -s venv/bin/activate
-        . ./activate
-        maturin build --no-sdist -i python --release -m wheel/Cargo.toml
+        python${{ matrix.python.major-dot-minor }} -m venv venv
+        . venv/bin/activate
+        maturin build -i python --release -m wheel/Cargo.toml
 
     - name: Build Linux in manylinux2010 with maturin on Python ${{ matrix.python }}
-      if: startsWith(matrix.os, 'ubuntu')
+      if: matrix.os.matrix == 'ubuntu'
       run: |
         podman run --rm=true \
           -v ${{ github.workspace }}:/ws:rw --workdir=/ws \
-          quay.io/pypa/manylinux2010_x86_64 \
+          ${{ matrix.os.options[matrix.arch.matrix].docker-url }} \
           bash -exc '\
             curl -L https://sh.rustup.rs > rustup-init.sh && \
             sh rustup-init.sh -y && \
             yum -y install openssl-devel && \
             source $HOME/.cargo/env && \
-            rustup target add x86_64-unknown-linux-musl && \
-            PY_VERSION=${{ matrix.python }}
-            PY_VERSION=${PY_VERSION/.} && \
-            echo "Python version with dot removed is $PY_VERSION" && \
-            if [ "$PY_VERSION" = "37" ]; \
-            then export SCND_VERSION="${PY_VERSION}m"; \
-            else export SCND_VERSION="$PY_VERSION"; fi && \
-            echo "Exporting path /opt/python/cp$PY_VERSION-cp$SCND_VERSION/bin" && \
-            export PATH=/opt/python/cp$PY_VERSION-cp$SCND_VERSION/bin/:$PATH && \
-            /opt/python/cp$PY_VERSION-cp$SCND_VERSION/bin/python -m venv /venv && \
+            rustup target add ${{ matrix.os.options[matrix.arch.matrix].rustup-target }} && \
+            python${{ matrix.python.major-dot-minor }} -m venv /venv && \
             . /venv/bin/activate && \
             pip install --upgrade pip && \
             pip install maturin && \
-            CC=gcc maturin build --release --manylinux 2010 -i python -m wheel/Cargo.toml \
+            CC=gcc maturin build --release --manylinux ${{ matrix.os.options[matrix.arch.matrix].manylinux-version }} -m wheel/Cargo.toml \
           '
           python -m venv venv
           ln -s venv/bin/activate
 
     - name: Build Windows with maturin on Python ${{ matrix.python }}
-      if: startsWith(matrix.os, 'windows')
+      if: matrix.os.matrix == 'windows'
       run: |
-        python -m venv venv
+        py -${{ matrix.python.major-dot-minor }} -m venv venv
         . .\venv\Scripts\Activate.ps1
-        ln -s venv\Scripts\Activate.ps1 activate
-        maturin build --no-sdist -i python --release -m wheel/Cargo.toml
+        maturin build -i python --release -m wheel/Cargo.toml
         # this will install into the venv
         # it'd be better to use the wheel, but I can't figure out how to do that
         # TODO: figure this out
@@ -94,73 +171,81 @@ jobs:
         maturin develop --release -m wheel/Cargo.toml
         # the line above also doesn't seem to work
 
+    - uses: chia-network/actions/activate-venv@main
+
     - name: Install chia_rs wheel
-      if: ${{ !startsWith(matrix.os, 'windows') }}
       run: |
-        . ./activate
-        ls target/wheels/
-        # this mess puts the name of the `.whl` file into `$WHEEL_PATH`
-        # remove the dot, use the `glob` lib to grab the file from the directory
-        WHEEL_PATH=$(echo ${{ matrix.python }} | python -c 'DOTLESS=input().replace(".", ""); import glob; print(" ".join(glob.glob("target/wheels/chia_rs-*-cp%s-abi*.whl" % DOTLESS)))' )
-        echo ${WHEEL_PATH}
-        pip install ${WHEEL_PATH}
+        pip install --find-links target/wheels/ chia_rs
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
-        name: wheels
+        name: packages
         path: ./target/wheels/
 
-    - name: Install Twine
-      run: pip install twine
+  build-sdist:
+    name: sdist - ${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }}
+    runs-on: ${{ matrix.os.runs-on[matrix.arch.matrix] }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - name: Ubuntu
+            matrix: ubuntu
+            runs-on:
+              arm: [Linux, ARM64]
+              intel: [ubuntu-latest]
+        python:
+          - major-dot-minor: '3.7'
+            matrix: '3.7'
+        arch:
+          - name: Intel
+            matrix: intel
 
-    - name: Test for secrets access
-      id: check_secrets
-      shell: bash
+    steps:
+    - name: Clean workspace
+      uses: Chia-Network/actions/clean-workspace@main
+
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - uses: Chia-Network/actions/setup-python@main
+      with:
+        python-version: ${{ matrix.python.major-dot-minor }}
+
+    - name: Build source distribution
       run: |
-        unset HAS_SECRET
-        if [ -n "$SECRET" ]; then HAS_SECRET='true' ; fi
-        echo ::set-output name=HAS_SECRET::${HAS_SECRET}
-      env:
-        SECRET: "${{ secrets.test_pypi_password }}"
+        pip install maturin
+        maturin sdist -m wheel/Cargo.toml
 
-    - name: publish (PyPi)
-      if: startsWith(github.event.ref, 'refs/tags') && steps.check_secrets.outputs.HAS_SECRET
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_NON_INTERACTIVE: 1
-        TWINE_PASSWORD: ${{ secrets.pypi_password }}
-      run: twine upload --non-interactive --skip-existing --verbose 'target/wheels/*'
-
-    - name: publish (Test PyPi)
-      if: steps.check_secrets.outputs.HAS_SECRET
-      env:
-        TWINE_REPOSITORY_URL: https://test.pypi.org/legacy/
-        TWINE_USERNAME: __token__
-        TWINE_NON_INTERACTIVE: 1
-        TWINE_PASSWORD: ${{ secrets.test_pypi_password }}
-      run: twine upload --non-interactive --skip-existing --verbose 'target/wheels/*'
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: packages
+        path: ./target/wheels/
 
   fmt:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     name: cargo fmt
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 1
       - name: Install rust
         uses: actions-rs/toolchain@v1
         with:
             toolchain: nightly
-            override: true
             components: rustfmt, clippy
+            override: true
       - name: fmt
         run: cargo fmt -- --files-with-diff --check
 
   clippy:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
@@ -178,12 +263,85 @@ jobs:
         os: [macos-latest, ubuntu-latest, windows-latest]
     name: Unit tests
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 1
-      - name: Install rust
-        uses: actions-rs/toolchain@v1
+      - uses: actions-rs/toolchain@v1
         with:
             toolchain: stable
       - name: cargo test
         run: cargo test
+
+  upload:
+    name: Upload to PyPI - ${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }}
+    runs-on: ${{ matrix.os.runs-on[matrix.arch.matrix] }}
+    needs:
+      - build-wheels
+      - build-sdist
+      - fmt
+      - clippy
+      - unit_tests
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - name: Ubuntu
+            matrix: ubuntu
+            runs-on:
+              arm: [Linux, ARM64]
+              intel: [ubuntu-latest]
+        python:
+          - major-dot-minor: '3.9'
+            matrix: '3.9'
+        arch:
+          - name: Intel
+            matrix: intel
+
+    steps:
+    - name: Clean workspace
+      uses: Chia-Network/actions/clean-workspace@main
+
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - uses: Chia-Network/actions/setup-python@main
+      with:
+        python-version: ${{ matrix.python.major-dot-minor }}
+
+    - name: Download artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: packages
+        path: ./dist
+
+    - name: Test for secrets access
+      id: check_secrets
+      shell: bash
+      run: |
+        unset HAS_SECRET
+        if [ -n "$SECRET" ]; then HAS_SECRET='true' ; fi
+        echo ::set-output name=HAS_SECRET::${HAS_SECRET}
+      env:
+        SECRET: "${{ secrets.test_pypi_password }}"
+
+    - name: Install twine
+      run: pip install twine
+
+    - name: Publish distribution to PyPI
+      if: startsWith(github.event.ref, 'refs/tags') && steps.check_secrets.outputs.HAS_SECRET
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_NON_INTERACTIVE: 1
+        TWINE_PASSWORD: ${{ secrets.pypi_password }}
+      run: twine upload --non-interactive --skip-existing --verbose 'dist/*'
+
+    - name: Publish distribution to Test PyPI
+      if: steps.check_secrets.outputs.HAS_SECRET
+      env:
+        TWINE_REPOSITORY_URL: https://test.pypi.org/legacy/
+        TWINE_USERNAME: __token__
+        TWINE_NON_INTERACTIVE: 1
+        TWINE_PASSWORD: ${{ secrets.test_pypi_password }}
+      run: twine upload --non-interactive --skip-existing --verbose 'dist/*'

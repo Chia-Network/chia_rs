@@ -1,9 +1,9 @@
 [workspace]
-members = ["wasm", "wheel"]
+members = ["wasm", "wheel", "chia_streamable_macro"]
 
 [package]
 name = "chia"
-version = "0.1.2"
+version = "0.1.5"
 edition = "2018"
 license = "Apache-2.0"
 description = "Implementation of `clvm` for Chia Network's cryptocurrency"
@@ -15,16 +15,13 @@ repository = "https://github.com/Chia-Network/chia_rs/"
 py-bindings = ["dep:pyo3"]
 
 [dependencies]
-serde = { version = "1.0.130", features = ["derive"] }
-clvmr = "=0.1.20"
-# bincode = { git = "https://github.com/richardkiss/bincode", branch = "chia" }
-# the patched bincode is needed to enable serialization. However, a github dependency disqualifies
-# any build crates from being uploaded to crates.io, so this is temporarily disabled.
+clvmr = "=0.1.23"
 hex = "=0.4.3"
-pyo3 = { version = "=0.15.1", features = ["abi3-py37", "extension-module"], optional = true }
+pyo3 = { version = "=0.15.1", features = ["extension-module"], optional = true }
+chia_streamable_macro = { version = "=0.2.2", path = "chia_streamable_macro" }
 
 [dev-dependencies]
-num-traits = "=0.2.14"
+num-traits = "=0.2.15"
 
 [lib]
 name = "chia"

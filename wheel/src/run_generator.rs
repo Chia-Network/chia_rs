@@ -1,7 +1,11 @@
 use super::adapt_response::eval_err_to_pyresult;
+use super::from_json_dict::FromJsonDict;
+use super::to_json_dict::ToJsonDict;
+
+use chia::bytes::{Bytes, Bytes32, Bytes48};
 use chia::gen::conditions::{parse_spends, Spend, SpendBundleConditions};
 use chia::gen::validation_error::{ErrorCode, ValidationErr};
-use chia::streamable::bytes::{Bytes, Bytes32, Bytes48};
+
 use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;
@@ -11,8 +15,13 @@ use clvmr::serialize::node_from_bytes;
 
 use pyo3::prelude::*;
 
-#[pyclass(subclass, unsendable)]
-#[derive(Clone)]
+use chia::chia_error;
+use chia::streamable::Streamable;
+use chia_streamable_macro::Streamable;
+use py_streamable::PyStreamable;
+
+#[pyclass(unsendable, name = "Spend")]
+#[derive(Streamable, PyStreamable, Hash, Debug, Clone, Eq, PartialEq)]
 pub struct PySpend {
     #[pyo3(get)]
     pub coin_id: Bytes32,
@@ -28,8 +37,8 @@ pub struct PySpend {
     pub agg_sig_me: Vec<(Bytes48, Bytes)>,
 }
 
-#[pyclass(subclass, unsendable)]
-#[derive(Clone)]
+#[pyclass(unsendable, name = "SpendBundleConditions")]
+#[derive(Streamable, PyStreamable, Hash, Debug, Clone, Eq, PartialEq)]
 pub struct PySpendBundleConditions {
     #[pyo3(get)]
     pub spends: Vec<PySpend>,
@@ -52,7 +61,8 @@ fn convert_spend(a: &Allocator, spend: Spend) -> PySpend {
     for (pk, msg) in spend.agg_sig_me {
         agg_sigs.push((a.atom(pk).into(), a.atom(msg).into()));
     }
-    let mut create_coin = Vec::<(Bytes32, u64, Option<Bytes>)>::new();
+    let mut create_coin =
+        Vec::<(Bytes32, u64, Option<Bytes>)>::with_capacity(spend.create_coin.len());
     for c in spend.create_coin {
         create_coin.push((
             c.puzzle_hash,
