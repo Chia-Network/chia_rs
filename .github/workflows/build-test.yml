@@ -50,6 +50,15 @@ jobs:
           - major-dot-minor: '3.7'
             cibw-build: 'cp37-*'
             matrix: '3.7'
+          - major-dot-minor: '3.8'
+            cibw-build: 'cp38-*'
+            matrix: '3.8'
+          - major-dot-minor: '3.9'
+            cibw-build: 'cp39-*'
+            matrix: '3.9'
+          - major-dot-minor: '3.10'
+            cibw-build: 'cp310-*'
+            matrix: '3.10'
         arch:
           - name: ARM
             matrix: arm
@@ -65,6 +74,32 @@ jobs:
               matrix: windows
               runs-on:
                 intel: [windows-latest]
+            arch:
+              name: ARM
+              matrix: arm
+          - os:
+              name: macOS
+              matrix: macos
+              runs-on:
+                arm: [macOS, ARM64]
+                intel: [macos-latest]
+            python:
+              major-dot-minor: '3.7'
+              cibw-build: 'cp37-*'
+              matrix: '3.7'
+            arch:
+              name: ARM
+              matrix: arm
+          - os:
+              name: macOS
+              matrix: macos
+              runs-on:
+                arm: [macOS, ARM64]
+                intel: [macos-latest]
+            python:
+              major-dot-minor: '3.8'
+              cibw-build: 'cp38-*'
+              matrix: '3.8'
             arch:
               name: ARM
               matrix: arm
