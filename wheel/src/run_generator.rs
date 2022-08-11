@@ -18,6 +18,7 @@ use clvmr::run_program::run_program;
 use clvmr::serialize::node_from_bytes;
 use serde::{Deserialize, Serialize};
 
+use pyo3::buffer::PyBuffer;
 use pyo3::class::basic::{CompareOp, PyObjectProtocol};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
