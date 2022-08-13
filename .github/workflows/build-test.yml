@@ -183,6 +183,23 @@ jobs:
         name: packages
         path: ./target/wheels/
 
+  check-typestubs:
+    name: Check chia_rs.pyi
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - uses: Chia-Network/actions/setup-python@main
+
+    - name: check generated chia_rs.pyi
+      run: |
+        python wheel/generate_type_stubs.py
+        git diff --exit-code
+
   build-sdist:
     name: sdist - ${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }}
     runs-on: ${{ matrix.os.runs-on[matrix.arch.matrix] }}
