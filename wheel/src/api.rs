@@ -20,6 +20,20 @@ use crate::run_program::{
     __pyo3_get_function_run_chia_program, __pyo3_get_function_serialized_length,
 };
 
+use crate::adapt_response::eval_err_to_pyresult;
+use chia::bytes::Bytes32;
+use chia::gen::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
+use chia::gen::validation_error::ValidationErr;
+use clvmr::allocator::Allocator;
+use clvmr::chia_dialect::ChiaDialect;
+use clvmr::cost::Cost;
+use clvmr::node::Node;
+use clvmr::reduction::EvalErr;
+use clvmr::reduction::Reduction;
+use clvmr::run_program::run_program;
+use clvmr::serialize::node_from_bytes;
+use clvmr::serialize::node_to_bytes;
+
 pub const MEMPOOL_MODE: u32 =
     NO_NEG_DIV | NO_UNKNOWN_CONDS | NO_UNKNOWN_OPS | COND_ARGS_NIL | STRICT_ARGS_COUNT;
 
@@ -38,12 +52,45 @@ pub fn compute_merkle_set_root<'p>(
 #[pyfunction]
 pub fn tree_hash<'p>(py: Python<'p>, blob: pyo3::buffer::PyBuffer<u8>) -> PyResult<&'p PyBytes> {
     if !blob.is_c_contiguous() {
-        panic!("parse_rust() must be called with a contiguous buffer");
+        panic!("tree_hash() must be called with a contiguous buffer");
     }
     let slice =
         unsafe { std::slice::from_raw_parts(blob.buf_ptr() as *const u8, blob.len_bytes()) };
     let mut input = std::io::Cursor::<&[u8]>::new(slice);
     Ok(PyBytes::new(py, &tree_hash_from_stream(&mut input)?))
+}
+
+#[pyfunction]
+pub fn get_puzzle_and_solution_for_coin<'py>(
+    py: Python<'py>,
+    program: &[u8],
+    args: &[u8],
+    max_cost: Cost,
+    find_parent: Bytes32,
+    find_amount: u64,
+    find_ph: Bytes32,
+) -> PyResult<(&'py PyBytes, &'py PyBytes)> {
+    let mut allocator = Allocator::new();
+    let program = node_from_bytes(&mut allocator, program)?;
+    let args = node_from_bytes(&mut allocator, args)?;
+    let dialect = &ChiaDialect::new(NO_NEG_DIV);
+
+    let r = py.allow_threads(|| -> Result<(Vec<u8>, Vec<u8>), EvalErr> {
+        let Reduction(_cost, result) =
+            run_program(&mut allocator, dialect, program, args, max_cost, None)?;
+        match parse_puzzle_solution(&allocator, result, find_parent, find_amount, find_ph) {
+            Err(ValidationErr(n, _)) => Err(EvalErr(n, "coin not found".to_string())),
+            Ok((puzzle, solution)) => Ok((
+                node_to_bytes(&Node::new(&allocator, puzzle)).unwrap(),
+                node_to_bytes(&Node::new(&allocator, solution)).unwrap(),
+            )),
+        }
+    });
+
+    match r {
+        Err(eval_err) => eval_err_to_pyresult(py, eval_err, allocator),
+        Ok((puzzle, solution)) => Ok((PyBytes::new(py, &puzzle), PyBytes::new(py, &solution))),
+    }
 }
 
 #[pymodule]
@@ -69,6 +116,7 @@ pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(serialized_length, m)?)?;
     m.add_function(wrap_pyfunction!(compute_merkle_set_root, m)?)?;
     m.add_function(wrap_pyfunction!(tree_hash, m)?)?;
+    m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin, m)?)?;
 
     Ok(())
 }
