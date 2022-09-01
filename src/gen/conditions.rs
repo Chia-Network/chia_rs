@@ -86,7 +86,7 @@ pub enum Condition {
     Skip,
 }
 
-fn parse_args(
+pub fn parse_args(
     a: &Allocator,
     mut c: NodePtr,
     op: ConditionOpcode,
