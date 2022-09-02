@@ -26,7 +26,7 @@ fn tree_hash(a: &Allocator, node: NodePtr) -> [u8; 32] {
 }
 
 // returns parent-coin ID, amount, puzzle-reveal and solution
-fn parse_coin_spend(
+pub fn parse_coin_spend(
     a: &Allocator,
     coin_spend: NodePtr,
 ) -> Result<(&[u8], u64, NodePtr, NodePtr), ValidationErr> {

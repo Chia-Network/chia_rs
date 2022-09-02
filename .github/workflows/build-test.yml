@@ -273,6 +273,18 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: --all-features
 
+  fuzz_targets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+            toolchain: nightly
+      - name: cargo-fuzz
+        run: cargo +nightly install cargo-fuzz
+      - name: cargo fuzz
+        run: cargo +nightly fuzz build
+
   unit_tests:
     runs-on: ${{ matrix.os }}
     strategy:
