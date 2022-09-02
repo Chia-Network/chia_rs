@@ -563,7 +563,7 @@ pub fn parse_spends(
 
         for (coin_id, announce) in state.announce_coin {
             let mut hasher = Sha256::new();
-            hasher.update(&*coin_id);
+            hasher.update(*coin_id);
             hasher.update(a.atom(announce));
             announcements.insert(hasher.finalize().as_slice().into());
         }

@@ -32,10 +32,10 @@ fn encode_type(t: NodeType) -> u8 {
 
 fn hash(ltype: NodeType, rtype: NodeType, left: &[u8; 32], right: &[u8; 32]) -> [u8; 32] {
     let mut hasher = Sha256::new();
-    hasher.update(&[
+    hasher.update([
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     ]);
-    hasher.update(&[encode_type(ltype), encode_type(rtype)]);
+    hasher.update([encode_type(ltype), encode_type(rtype)]);
     hasher.update(left);
     hasher.update(right);
     hasher.finalize().into()
@@ -147,8 +147,8 @@ pub fn compute_merkle_set_root(leafs: &mut [[u8; 32]]) -> [u8; 32] {
             // may contain duplicates and boil down to a single node
             // (effectively), which is a case we need to support
             let mut hasher = Sha256::new();
-            hasher.update(&[NodeType::Term as u8]);
-            hasher.update(&hash);
+            hasher.update([NodeType::Term as u8]);
+            hasher.update(hash);
             hasher.finalize().into()
         }
         (hash, NodeType::Mid) => hash,
