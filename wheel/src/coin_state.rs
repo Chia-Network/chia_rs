@@ -8,7 +8,7 @@ use py_streamable::PyStreamable;
 
 use pyo3::prelude::*;
 
-#[pyclass(unsendable)]
+#[pyclass]
 #[derive(Streamable, PyStreamable, Hash, Debug, Clone, Eq, PartialEq)]
 pub struct CoinState {
     #[pyo3(get)]
