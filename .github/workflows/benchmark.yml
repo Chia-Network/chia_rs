@@ -15,6 +15,7 @@ jobs:
   max-cost-checks:
     name: Cost checks
     runs-on: ${{ matrix.os }}
+    fail-fast: false
     strategy:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
