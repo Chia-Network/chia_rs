@@ -20,7 +20,7 @@ use chia::streamable::Streamable;
 use chia_streamable_macro::Streamable;
 use py_streamable::PyStreamable;
 
-#[pyclass(unsendable, name = "Spend")]
+#[pyclass(name = "Spend")]
 #[derive(Streamable, PyStreamable, Hash, Debug, Clone, Eq, PartialEq)]
 pub struct PySpend {
     #[pyo3(get)]
@@ -37,7 +37,7 @@ pub struct PySpend {
     pub agg_sig_me: Vec<(Bytes48, Bytes)>,
 }
 
-#[pyclass(unsendable, name = "SpendBundleConditions")]
+#[pyclass(name = "SpendBundleConditions")]
 #[derive(Streamable, PyStreamable, Hash, Debug, Clone, Eq, PartialEq)]
 pub struct PySpendBundleConditions {
     #[pyo3(get)]

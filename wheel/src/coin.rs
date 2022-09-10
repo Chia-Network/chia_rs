@@ -11,7 +11,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use std::convert::TryInto;
 
-#[pyclass(unsendable)]
+#[pyclass]
 #[derive(Streamable, PyStreamable, Hash, Debug, Clone, Eq, PartialEq)]
 pub struct Coin {
     #[pyo3(get)]

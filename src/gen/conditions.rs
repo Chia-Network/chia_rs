@@ -86,7 +86,7 @@ pub enum Condition {
     Skip,
 }
 
-fn parse_args(
+pub fn parse_args(
     a: &Allocator,
     mut c: NodePtr,
     op: ConditionOpcode,
@@ -563,7 +563,7 @@ pub fn parse_spends(
 
         for (coin_id, announce) in state.announce_coin {
             let mut hasher = Sha256::new();
-            hasher.update(&*coin_id);
+            hasher.update(*coin_id);
             hasher.update(a.atom(announce));
             announcements.insert(hasher.finalize().as_slice().into());
         }

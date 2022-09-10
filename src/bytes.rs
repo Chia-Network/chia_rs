@@ -61,7 +61,7 @@ pub struct BytesImpl<const N: usize>([u8; N]);
 
 impl<const N: usize> Streamable for BytesImpl<N> {
     fn update_digest(&self, digest: &mut Sha256) {
-        digest.update(&self.0);
+        digest.update(self.0);
     }
     fn stream(&self, out: &mut Vec<u8>) -> chia_error::Result<()> {
         out.extend_from_slice(&self.0);

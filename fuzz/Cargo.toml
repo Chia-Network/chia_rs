@@ -1,0 +1,50 @@
+[package]
+name = "chia-fuzz"
+version = "0.0.0"
+authors = ["Automatically generated"]
+publish = false
+edition = "2018"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+clvmr = "=0.1.23"
+
+[dependencies.chia]
+path = ".."
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "puzzle-coin-solution"
+path = "fuzz_targets/puzzle-coin-solution.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "parse-spend"
+path = "fuzz_targets/parse-spend.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "parse-cond-args"
+path = "fuzz_targets/parse-cond-args.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "parse-conditions"
+path = "fuzz_targets/parse-conditions.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "tree-hash"
+path = "fuzz_targets/tree-hash.rs"
+test = false
+doc = false

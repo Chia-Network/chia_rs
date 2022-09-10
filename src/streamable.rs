@@ -126,7 +126,7 @@ impl Streamable for String {
 
 impl Streamable for bool {
     fn update_digest(&self, digest: &mut Sha256) {
-        digest.update(if *self { &[1] } else { &[0] });
+        digest.update(if *self { [1] } else { [0] });
     }
 
     fn stream(&self, out: &mut Vec<u8>) -> Result<()> {
@@ -147,10 +147,10 @@ impl<T: Streamable> Streamable for Option<T> {
     fn update_digest(&self, digest: &mut Sha256) {
         match self {
             None => {
-                digest.update(&[0]);
+                digest.update([0]);
             }
             Some(v) => {
-                digest.update(&[1]);
+                digest.update([1]);
                 v.update_digest(digest);
             }
         }
