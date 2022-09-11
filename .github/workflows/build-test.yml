@@ -36,11 +36,9 @@ jobs:
             options:
               arm:
                 docker-url: quay.io/pypa/manylinux2014_aarch64
-                manylinux-version: 2014
                 rustup-target: aarch64-unknown-linux-musl
               intel:
                 docker-url: quay.io/pypa/manylinux2010_x86_64
-                manylinux-version: 2010
                 rustup-target: x86_64-unknown-linux-musl
           - name: Windows
             matrix: windows
@@ -49,18 +47,33 @@ jobs:
         python:
           - major-dot-minor: '3.7'
             cibw-build: 'cp37-*'
+            manylinux:
+              arch: manylinux2014
+              intel: manylinux2010
             matrix: '3.7'
           - major-dot-minor: '3.8'
             cibw-build: 'cp38-*'
+            manylinux:
+              arch: manylinux2014
+              intel: manylinux2010
             matrix: '3.8'
           - major-dot-minor: '3.9'
             cibw-build: 'cp39-*'
+            manylinux:
+              arch: manylinux2014
+              intel: manylinux2010
             matrix: '3.9'
           - major-dot-minor: '3.10'
             cibw-build: 'cp310-*'
+            manylinux:
+              arch: manylinux2014
+              intel: manylinux2010
             matrix: '3.10'
           - major-dot-minor: '3.11'
             cibw-build: 'cp311-*'
+            manylinux:
+              arch: manylinux2014
+              intel: manylinux2014
             matrix: '3.11'
         arch:
           - name: ARM
@@ -156,7 +169,7 @@ jobs:
             . /venv/bin/activate && \
             pip install --upgrade pip && \
             pip install maturin && \
-            CC=gcc maturin build --release --manylinux ${{ matrix.os.options[matrix.arch.matrix].manylinux-version }} -m wheel/Cargo.toml \
+            CC=gcc maturin build --release --manylinux ${{ matrix.python.manylinux[matrix.arch.matrix] }} -m wheel/Cargo.toml \
           '
           python -m venv venv
           ln -s venv/bin/activate
