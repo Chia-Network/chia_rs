@@ -64,7 +64,7 @@ jobs:
 
     - name: python mypy
       run: |
-        mypy tests/test_*.py
+        mypy tests
 
     - name: python tests
       run: |
