@@ -49,9 +49,9 @@ for hexname in sorted(glob.glob('programs/*.hex')):
 
     print(' '.join(command))
     start = time.perf_counter()
-    proc = subprocess.run(command, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-    output = proc.stderr.decode('UTF-8')
-    output += proc.stdout.decode('UTF-8')
+    completed_process = subprocess.run(command, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+    output = completed_process.stderr.decode('UTF-8')
+    output += completed_process.stdout.decode('UTF-8')
     end = time.perf_counter()
 
     if 'FAIL: ' not in output or 'cost exceeded' not in output:
@@ -77,8 +77,8 @@ for hexname in sorted(glob.glob('programs/*.hex')):
             if 'maxresident)k' not in l:
                 continue
             size = int(l.split('maxresident)k')[0].split(' ')[-1]) / 1024
-    if size != None:
-        print(Fore.YELLOW + ('  Resident Size: %d MiB' % size) + Style.RESET_ALL)
+    if size is not None:
+        print(Fore.YELLOW + f'  Resident Size: {size:.0f} MiB' + Style.RESET_ALL)
 
         if size > 2300:
             ret += 1
