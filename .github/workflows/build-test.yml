@@ -40,8 +40,8 @@ jobs:
         python:
           - major-dot-minor: '3.7'
             cibw-build: 'cp37-*'
-            by_arch:
-              arch: 
+            by-arch:
+              arm:
                 manylinux-version: 2014
                 docker-url: quay.io/pypa/manylinux2014_aarch64
                 rustup-target: aarch64-unknown-linux-musl
@@ -52,8 +52,8 @@ jobs:
             matrix: '3.7'
           - major-dot-minor: '3.8'
             cibw-build: 'cp38-*'
-            by_arch:
-              arch: 
+            by-arch:
+              arm:
                 manylinux-version: 2014
                 docker-url: quay.io/pypa/manylinux2014_aarch64
                 rustup-target: aarch64-unknown-linux-musl
@@ -64,8 +64,8 @@ jobs:
             matrix: '3.8'
           - major-dot-minor: '3.9'
             cibw-build: 'cp39-*'
-            by_arch:
-              arch: 
+            by-arch:
+              arm:
                 manylinux-version: 2014
                 docker-url: quay.io/pypa/manylinux2014_aarch64
                 rustup-target: aarch64-unknown-linux-musl
@@ -76,8 +76,8 @@ jobs:
             matrix: '3.9'
           - major-dot-minor: '3.10'
             cibw-build: 'cp310-*'
-            by_arch:
-              arch: 
+            by-arch:
+              arm:
                 manylinux-version: 2014
                 docker-url: quay.io/pypa/manylinux2014_aarch64
                 rustup-target: aarch64-unknown-linux-musl
@@ -88,8 +88,8 @@ jobs:
             matrix: '3.10'
           - major-dot-minor: '3.11'
             cibw-build: 'cp311-*'
-            by_arch:
-              arch: 
+            by-arch:
+              arm:
                 manylinux-version: 2014
                 docker-url: quay.io/pypa/manylinux2014_aarch64
                 rustup-target: aarch64-unknown-linux-musl
@@ -181,18 +181,18 @@ jobs:
       run: |
         podman run --rm=true \
           -v ${{ github.workspace }}:/ws:rw --workdir=/ws \
-          ${{ matrix.python.by_arch[matrix.arch.matrix].docker-url }} \
+          ${{ matrix.python.by-arch[matrix.arch.matrix].docker-url }} \
           bash -exc '\
             curl -L https://sh.rustup.rs > rustup-init.sh && \
             sh rustup-init.sh -y && \
             yum -y install openssl-devel && \
             source $HOME/.cargo/env && \
-            rustup target add ${{ matrix.python.by_arch[matrix.arch.matrix].rustup-target }} && \
+            rustup target add ${{ matrix.python.by-arch[matrix.arch.matrix].rustup-target }} && \
             python${{ matrix.python.major-dot-minor }} -m venv /venv && \
             . /venv/bin/activate && \
             pip install --upgrade pip && \
             pip install maturin && \
-            CC=gcc maturin build --release --manylinux ${{ matrix.python.by_arch[matrix.arch.matrix].manylinux-version }} -m wheel/Cargo.toml \
+            CC=gcc maturin build --release --manylinux ${{ matrix.python.by-arch[matrix.arch.matrix].manylinux-version }} -m wheel/Cargo.toml \
           '
           python -m venv venv
           ln -s venv/bin/activate
