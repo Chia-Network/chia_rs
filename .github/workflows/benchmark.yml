@@ -43,11 +43,11 @@ jobs:
     - name: setup venv
       run: |
         python -m venv venv
-        ln -s venv/bin/activate
+
+    - uses: chia-network/actions/activate-venv@main
 
     - name: Install dependencies
       run: |
-        . ./activate
         python -m pip install maturin
         rustup target add x86_64-unknown-linux-musl
         python -m pip install pytest
@@ -57,7 +57,6 @@ jobs:
       env:
         CC: gcc
       run: |
-        . ./activate
         git clone https://github.com/Chia-Network/clvm_tools.git --branch=main --single-branch
         python -m pip install ./clvm_tools
         python -m pip install colorama
@@ -65,23 +64,19 @@ jobs:
 
     - name: python mypy
       run: |
-        . ./activate
         mypy tests/test_*.py
 
     - name: python tests
       run: |
-        . ./activate
         pytest tests
 
     - name: test generators
       run: |
-        . ./activate
         cd tests
         ./test-generators.py
 
     - name: Run cost checks
       run: |
-        . ./activate
         cd tests
         ./generate-programs.py
         ./run-programs.py
