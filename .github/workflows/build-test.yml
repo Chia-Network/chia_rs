@@ -296,7 +296,7 @@ jobs:
             components: rustfmt, clippy
             override: true
       - name: fmt
-        run: cargo fmt -- --files-with-diff --check
+        run: cargo fmt --all -- --files-with-diff --check
 
   clippy:
     runs-on: ubuntu-latest
@@ -310,7 +310,7 @@ jobs:
       - uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-features
+          args: --all-features --all
 
   fuzz_targets:
     runs-on: ubuntu-latest

@@ -109,6 +109,7 @@ fn convert_spend_bundle_conds(a: &Allocator, sb: SpendBundleConditions) -> PySpe
 // returns the cost of running the CLVM program along with conditions and the list of
 // spends
 #[pyfunction]
+#[allow(clippy::borrow_deref_ref)]
 pub fn run_generator(
     py: Python,
     program: &[u8],
