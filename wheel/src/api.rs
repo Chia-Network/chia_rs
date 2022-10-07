@@ -50,7 +50,7 @@ pub fn compute_merkle_set_root<'p>(
 }
 
 #[pyfunction]
-pub fn tree_hash<'p>(py: Python<'p>, blob: pyo3::buffer::PyBuffer<u8>) -> PyResult<&'p PyBytes> {
+pub fn tree_hash(py: Python, blob: pyo3::buffer::PyBuffer<u8>) -> PyResult<&PyBytes> {
     if !blob.is_c_contiguous() {
         panic!("tree_hash() must be called with a contiguous buffer");
     }

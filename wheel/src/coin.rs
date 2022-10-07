@@ -25,13 +25,13 @@ pub struct Coin {
 impl Coin {
     fn coin_id(&self) -> [u8; 32] {
         let mut hasher = Sha256::new();
-        hasher.update(&self.parent_coin_info);
-        hasher.update(&self.puzzle_hash);
+        hasher.update(self.parent_coin_info);
+        hasher.update(self.puzzle_hash);
 
         let amount_bytes = self.amount.to_be_bytes();
         if self.amount >= 0x8000000000000000_u64 {
-            hasher.update(&[0_u8]);
-            hasher.update(&amount_bytes);
+            hasher.update([0_u8]);
+            hasher.update(amount_bytes);
         } else {
             let start = match self.amount {
                 n if n >= 0x80000000000000_u64 => 0,

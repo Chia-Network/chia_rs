@@ -57,11 +57,13 @@ impl LazyNode {
     }
 }
 
+#[allow(clippy::borrow_deref_ref)]
 #[pyfunction]
 pub fn serialized_length(program: &[u8]) -> PyResult<u64> {
     Ok(serialized_length_from_bytes(program)?)
 }
 
+#[allow(clippy::borrow_deref_ref)]
 #[pyfunction]
 pub fn run_chia_program(
     py: Python,
