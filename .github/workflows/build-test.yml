@@ -32,7 +32,7 @@ jobs:
             matrix: ubuntu
             runs-on:
               arm: [Linux, ARM64]
-              intel: [ubuntu-latest]
+              intel: [ubuntu-20.04]
           - name: Windows
             matrix: windows
             runs-on:
