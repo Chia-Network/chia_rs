@@ -71,7 +71,7 @@ for g in sorted(glob.glob('generators/*.clvm')):
             limit = 6
 
         if run_time > limit or run_time2 > limit:
-            print("run-time exceeds limit!")
+            print(f"run-time exceeds limit ({limit})!")
             failed = 1
 
 print(f"returning {failed}")
