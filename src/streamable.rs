@@ -62,6 +62,8 @@ streamable_primitive!(u32);
 streamable_primitive!(i32);
 streamable_primitive!(u64);
 streamable_primitive!(i64);
+streamable_primitive!(u128);
+streamable_primitive!(i128);
 
 impl<T: Streamable> Streamable for Vec<T> {
     fn update_digest(&self, digest: &mut Sha256) {
@@ -277,6 +279,37 @@ fn test_parse_u64() {
 }
 
 #[test]
+fn test_parse_u128() {
+    from_bytes::<u128>(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 0);
+    from_bytes::<u128>(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], 1);
+    from_bytes::<u128>(
+        &[0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        0x80000000000000000000000000000000,
+    );
+    from_bytes::<u128>(
+        &[
+            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+            0xff, 0xff,
+        ],
+        0xffffffffffffffffffffffffffffffff,
+    );
+
+    // truncated
+    from_bytes_fail::<u128>(
+        &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        Error::EndOfBuffer,
+    );
+    from_bytes_fail::<u128>(
+        &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        Error::EndOfBuffer,
+    );
+    from_bytes_fail::<u128>(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], Error::EndOfBuffer);
+    from_bytes_fail::<u128>(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], Error::EndOfBuffer);
+    from_bytes_fail::<u128>(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], Error::EndOfBuffer);
+    from_bytes_fail::<u128>(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0], Error::EndOfBuffer);
+}
+
+#[test]
 fn test_parse_bytes32() {
     let buf: &[u8] = &[
         1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
@@ -473,6 +506,16 @@ fn test_parse_struct() {
 }
 
 #[cfg(test)]
+#[derive(Streamable, PartialEq, Debug)]
+struct TestTuple(String, u32);
+
+#[test]
+fn test_parse_custom_tuple() {
+    let buf: &[u8] = &[0, 0, 0, 3, b'b', b'a', b'z', 0, 0, 0, 42];
+    from_bytes::<TestTuple>(buf, TestTuple("baz".to_string(), 42));
+}
+
+#[cfg(test)]
 fn stream<T: Streamable>(v: &T) -> Vec<u8> {
     let mut buf = Vec::<u8>::new();
     v.stream(&mut buf).unwrap();
@@ -633,6 +676,13 @@ fn test_stream_struct() {
 }
 
 #[test]
+fn test_stream_custom_tuple() {
+    let b = TestTuple("abc".to_string(), 1337);
+    let buf = stream(&b);
+    assert_eq!(&buf[..], [0, 0, 0, 3, b'a', b'b', b'c', 0, 0, 0x05, 0x39]);
+}
+
+#[test]
 fn test_stream_bytes32() {
     let buf: &[u8] = &[
         1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
@@ -676,6 +726,18 @@ fn test_stream_list_list() {
         &[
             0, 0, 0, 3, 0, 0, 0, 1, 1, 3, 3, 7, 0, 0, 0, 1, 0, 0, 0, 42, 0, 0, 0, 1, 0xff, 0xff,
             0xff, 0xff
+        ]
+    );
+}
+
+#[test]
+fn test_stream_u128() {
+    let out = stream(&(1337_u128, -1337_i128));
+    assert_eq!(
+        &out,
+        &[
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x05, 0x39, 0xff, 0xff, 0xff, 0xff, 0xff,
+            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfa, 0xc7
         ]
     );
 }
