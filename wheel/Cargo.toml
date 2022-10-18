@@ -21,3 +21,4 @@ pyo3 = { version = "=0.15.1", features = ["extension-module", "multiple-pymethod
 py_streamable = { path = "py_streamable" }
 chia_streamable_macro = { version = "0.2.3", path = "../chia_streamable_macro" }
 hex = "=0.4.3"
+ctor = "=0.1.23"
