@@ -1,0 +1,7 @@
+(q ((0x0101010101010101010101010101010101010101010101010101010101010101 (a (q 2 2 (c 2 (c 5 ()))) (c (q 2 (i (> 5 (q . 5557550)) (q 1 (52 1)) (q 2 2 (c 2 (c (+ 5 (q . 1)) ())))) 1) (q ()))) 123 (() (q . ())))))
+RESERVE_FEE: 1
+SPENDS:
+- coin id: f5c262977788d399e5ca7628c8d76d066e6ce0b4cc911cfd773b33d6e127569d ph: 44dca9c1190b625bedde1872ea6cd8dd9201c4fe875c51f4343b23e2749ef83b
+cost (clvm + conditions): 10998057107
+STRICT:
+FAILED: 117
