@@ -8,6 +8,7 @@ use chia::gen::validation_error::{ErrorCode, ValidationErr};
 
 use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
+use clvmr::chia_dialect::LIMIT_HEAP;
 use clvmr::cost::Cost;
 use clvmr::reduction::{EvalErr, Reduction};
 use clvmr::run_program::run_program;
@@ -117,7 +118,11 @@ pub fn run_generator(
     max_cost: Cost,
     flags: u32,
 ) -> PyResult<(Option<u32>, Option<PySpendBundleConditions>)> {
-    let mut allocator = Allocator::new();
+    let mut allocator = if flags & LIMIT_HEAP != 0 {
+        Allocator::new_limited(500000000, 62500000, 62500000)
+    } else {
+        Allocator::new()
+    };
     let program = node_from_bytes(&mut allocator, program)?;
     let args = node_from_bytes(&mut allocator, args)?;
     let dialect = &ChiaDialect::new(flags);

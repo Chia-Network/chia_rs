@@ -8,6 +8,7 @@ use chia::gen::flags::STRICT_ARGS_COUNT;
 use chia::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use std::convert::TryInto;
 //use chia::streamable::fullblock::Fullblock;
+use clvmr::chia_dialect::LIMIT_HEAP;
 use clvmr::chia_dialect::NO_NEG_DIV;
 use clvmr::chia_dialect::NO_UNKNOWN_OPS;
 use clvmr::serialize::tree_hash_from_stream;
@@ -35,7 +36,7 @@ use clvmr::serialize::node_from_bytes;
 use clvmr::serialize::node_to_bytes;
 
 pub const MEMPOOL_MODE: u32 =
-    NO_NEG_DIV | NO_UNKNOWN_CONDS | NO_UNKNOWN_OPS | COND_ARGS_NIL | STRICT_ARGS_COUNT;
+    NO_NEG_DIV | NO_UNKNOWN_CONDS | NO_UNKNOWN_OPS | COND_ARGS_NIL | STRICT_ARGS_COUNT | LIMIT_HEAP;
 
 #[pyfunction]
 pub fn compute_merkle_set_root<'p>(
@@ -112,6 +113,7 @@ pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(run_chia_program, m)?)?;
     m.add("NO_NEG_DIV", NO_NEG_DIV)?;
     m.add("NO_UNKNOWN_OPS", NO_UNKNOWN_OPS)?;
+    m.add("LIMIT_HEAP", LIMIT_HEAP)?;
 
     m.add_function(wrap_pyfunction!(serialized_length, m)?)?;
     m.add_function(wrap_pyfunction!(compute_merkle_set_root, m)?)?;
