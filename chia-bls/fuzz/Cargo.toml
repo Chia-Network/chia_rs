@@ -10,6 +10,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
+pyo3 = { version = ">=0.17.2", features = ["auto-initialize"]}
 
 [dependencies.chia-bls]
 path = ".."
@@ -21,5 +22,11 @@ members = ["."]
 [[bin]]
 name = "derive"
 path = "fuzz_targets/derive.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "blspy-fidelity"
+path = "fuzz_targets/blspy-fidelity.rs"
 test = false
 doc = false
