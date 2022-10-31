@@ -21,7 +21,7 @@ use clvmr::cost::Cost;
 use clvmr::op_utils::u64_from_bytes;
 use clvmr::sha2::{Digest, Sha256};
 use std::cmp::max;
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
@@ -280,7 +280,7 @@ pub fn parse_args(
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Ord, PartialOrd)]
 pub struct NewCoin {
     pub puzzle_hash: Bytes32,
     pub amount: u64,
@@ -319,7 +319,7 @@ pub struct Spend {
     pub height_relative: Option<u32>,
     pub seconds_relative: u64,
     // all coins created by this spend. Duplicates are consensus failures
-    pub create_coin: HashSet<NewCoin>,
+    pub create_coin: BTreeSet<NewCoin>,
     // Agg Sig Me conditions
     pub agg_sig_me: Vec<(NodePtr, NodePtr)>,
 }
@@ -405,7 +405,7 @@ fn parse_spend_conditions(
         puzzle_hash,
         height_relative: None,
         seconds_relative: 0,
-        create_coin: HashSet::new(),
+        create_coin: BTreeSet::new(),
         agg_sig_me: Vec::new(),
     };
 

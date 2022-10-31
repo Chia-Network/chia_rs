@@ -56,7 +56,7 @@ impl fmt::Display for Bytes {
     }
 }
 
-#[derive(Hash, PartialEq, Eq, Copy, Clone)]
+#[derive(Hash, PartialEq, Eq, PartialOrd, Ord, Copy, Clone)]
 pub struct BytesImpl<const N: usize>([u8; N]);
 
 impl<const N: usize> Streamable for BytesImpl<N> {
