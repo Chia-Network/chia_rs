@@ -6,6 +6,12 @@ pub trait ToJsonDict {
     fn to_json_dict(&self, py: Python) -> PyResult<PyObject>;
 }
 
+impl ToJsonDict for bool {
+    fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
+        Ok(self.to_object(py))
+    }
+}
+
 impl ToJsonDict for u32 {
     fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
         Ok(self.to_object(py))

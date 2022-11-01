@@ -86,6 +86,7 @@ def get_puzzle_and_solution_for_coin(program: bytes, args: bytes, max_cost: int,
         "seconds_relative: int",
         "create_coin: List[Tuple[bytes, int, Optional[bytes]]]",
         "agg_sig_me: List[Tuple[bytes, bytes]]",
+        "eligible_for_dedup: bool",
     ])
 
     print_class(f, "SpendBundleConditions", [

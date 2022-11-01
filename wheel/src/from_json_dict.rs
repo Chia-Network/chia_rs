@@ -69,6 +69,12 @@ where
     }
 }
 
+impl FromJsonDict for bool {
+    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+        o.extract()
+    }
+}
+
 impl FromJsonDict for u32 {
     fn from_json_dict(o: &PyAny) -> PyResult<Self> {
         o.extract()
