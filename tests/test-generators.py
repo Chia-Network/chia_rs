@@ -70,6 +70,9 @@ for g in sorted(glob.glob('generators/*.clvm')):
         elif "block-834768" in g:
             limit = 6
 
+        if sys.version_info[:2] == (3, 11):
+            limit *= 1.3
+
         if run_time > limit or run_time2 > limit:
             print(f"run-time exceeds limit ({limit})!")
             failed = 1
