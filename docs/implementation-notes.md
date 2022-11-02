@@ -107,3 +107,18 @@ Additional arguments are allowed to conditions, and ignored. This is to leave
 room for future expansion. One exception is the `AGG_SIG_UNSAFE` and
 `AGG_SIG_ME` conditions. They both require exactly 2 arguments. Anything else is
 a condition failure.
+
+5. Deduplicating identical spends
+---------------------------------
+
+The feature that deduplicates identical spends, in the mempool, can only work
+with spends that do not have any `AGG_SIG_ME` nor `AGG_SIG_UNSAFE` conditions.
+Because the signature cannot be subtracted from the aggregated siggnature in the
+general case. This feature is only active when these conditions are met:
+
+* The spend does not output an `AGG_SIG_ME` nor an `AGG_SIG_UNSAFE` condition.
+* The spend uses the exact same solution.
+
+Spends that are eligible for deduplication are marked with a bool in the `Spend`
+object when running the generator.
+
