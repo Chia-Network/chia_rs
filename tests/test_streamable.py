@@ -10,8 +10,8 @@ sig = b"abababababababababababababababababababababababab"
 
 def test_hash_spend() -> None:
 
-    a1 = Spend(coin, ph, None, 0, [(ph2, 1000000, None)], [(sig, b"msg")])
-    a2 = Spend(coin, ph, None, 1, [(ph2, 1000000, None)], [(sig, b"msg")])
+    a1 = Spend(coin, ph, None, 0, [(ph2, 1000000, None)], [(sig, b"msg")], False)
+    a2 = Spend(coin, ph, None, 1, [(ph2, 1000000, None)], [(sig, b"msg")], False)
     b = hash(a1)
     c = hash(a2)
     assert type(b) is int
@@ -30,7 +30,7 @@ def test_hash_spend_bundle_conditions() -> None:
 
 def test_json_spend() -> None:
 
-    a = Spend(coin, ph, None, 0, [(ph2, 1000000, None)], [(sig, b"msg")])
+    a = Spend(coin, ph, None, 0, [(ph2, 1000000, None)], [(sig, b"msg")], False)
 
     assert a.to_json_dict() == {
         "coin_id": "0x" + coin.hex(),
@@ -39,11 +39,12 @@ def test_json_spend() -> None:
         "seconds_relative": 0,
         "create_coin": [["0x" + ph2.hex(), 1000000, None]],
         "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
+        "eligible_for_dedup": False,
     }
 
 def test_from_json_spend() -> None:
 
-    a = Spend(coin, ph, None, 0, [(ph2, 1000000, None)], [(sig, b"msg")])
+    a = Spend(coin, ph, None, 0, [(ph2, 1000000, None)], [(sig, b"msg")], False)
 
     b = Spend.from_json_dict({
         "coin_id": "0x" + coin.hex(),
@@ -52,12 +53,13 @@ def test_from_json_spend() -> None:
         "seconds_relative": 0,
         "create_coin": [["0x" + ph2.hex(), 1000000, None]],
         "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
+        "eligible_for_dedup": False,
     })
     assert a == b
 
 def test_from_json_spend_set_optional() -> None:
 
-    a = Spend(coin, ph, 1337, 0, [(ph2, 1000000, None)], [(sig, b"msg")])
+    a = Spend(coin, ph, 1337, 0, [(ph2, 1000000, None)], [(sig, b"msg")], False)
 
     b = Spend.from_json_dict({
         "coin_id": "0x" + coin.hex(),
@@ -66,6 +68,7 @@ def test_from_json_spend_set_optional() -> None:
         "seconds_relative": 0,
         "create_coin": [["0x" + ph2.hex(), 1000000, None]],
         "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
+        "eligible_for_dedup": False,
     })
     assert a == b
 
@@ -80,6 +83,7 @@ def test_invalid_hex_prefix() -> None:
             "seconds_relative": 0,
             "create_coin": [["0x" + ph2.hex(), 1000000, None]],
             "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
+            "eligible_for_dedup": False,
         })
 
 def test_invalid_hex_prefix_bytes() -> None:
@@ -93,6 +97,7 @@ def test_invalid_hex_prefix_bytes() -> None:
             "create_coin": [["0x" + ph2.hex(), 1000000, None]],
             # the message field is missing the 0x prefix and is variable length bytes
             "agg_sig_me": [["0x" + sig.hex(), "6d7367"]],
+            "eligible_for_dedup": False,
         })
 
 def test_invalid_hex_digit() -> None:
@@ -106,6 +111,7 @@ def test_invalid_hex_digit() -> None:
             "seconds_relative": 0,
             "create_coin": [["0x" + ph2.hex(), 1000000, None]],
             "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
+            "eligible_for_dedup": False,
         })
 
 def test_invalid_hex_length() -> None:
@@ -119,6 +125,7 @@ def test_invalid_hex_length() -> None:
             "seconds_relative": 0,
             "create_coin": [["0x" + ph2.hex(), 1000000, None]],
             "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
+            "eligible_for_dedup": False,
         })
 
 def test_missing_field() -> None:
@@ -131,6 +138,7 @@ def test_missing_field() -> None:
             "seconds_relative": 0,
             "create_coin": [["0x" + ph2.hex(), 1000000, None]],
             "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
+            "eligible_for_dedup": False,
         })
 
 
@@ -163,7 +171,7 @@ def test_from_json_spend_bundle_conditions() -> None:
 
 def test_copy_spend() -> None:
 
-    a = Spend(coin, ph, None, 0, [(ph2, 1000000, None)], [(sig, b"msg")])
+    a = Spend(coin, ph, None, 0, [(ph2, 1000000, None)], [(sig, b"msg")], False)
     b = copy.copy(a)
 
     assert a == b

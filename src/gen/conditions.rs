@@ -322,6 +322,9 @@ pub struct Spend {
     pub create_coin: HashSet<NewCoin>,
     // Agg Sig Me conditions
     pub agg_sig_me: Vec<(NodePtr, NodePtr)>,
+    // a spend is eligible for deduplication if it does not have any AGG_SIG_ME
+    // nor AGG_SIG_UNSAFE
+    pub eligible_for_dedup: bool,
 }
 
 // these are all the conditions and properties of a complete spend bundle.
@@ -407,6 +410,8 @@ fn parse_spend_conditions(
         seconds_relative: 0,
         create_coin: HashSet::new(),
         agg_sig_me: Vec::new(),
+        // assume it's eligible until we see an agg-sig condition
+        eligible_for_dedup: true,
     };
 
     let mut iter = first(a, cond)?;
@@ -511,9 +516,11 @@ fn parse_spend_conditions(
             }
             Condition::AggSigMe(pk, msg) => {
                 spend.agg_sig_me.push((pk, msg));
+                spend.eligible_for_dedup = false;
             }
             Condition::AggSigUnsafe(pk, msg) => {
                 ret.agg_sig_unsafe.push((pk, msg));
+                spend.eligible_for_dedup = false;
             }
             Condition::Skip => {}
         }
@@ -900,6 +907,7 @@ fn test_invalid_condition_args_terminator() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 
     assert_eq!(spend.seconds_relative, 50);
 }
@@ -926,6 +934,7 @@ fn test_invalid_condition_list_terminator() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 
     assert_eq!(spend.seconds_relative, 50);
 }
@@ -984,6 +993,7 @@ fn test_single_seconds_relative() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 
     assert_eq!(spend.seconds_relative, 101);
 }
@@ -999,6 +1009,7 @@ fn test_single_seconds_relative_extra_arg() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 
     assert_eq!(spend.seconds_relative, 101);
 }
@@ -1037,6 +1048,7 @@ fn test_multiple_seconds_relative() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 
     // we use the MAX value
     assert_eq!(spend.seconds_relative, 503);
@@ -1052,6 +1064,7 @@ fn test_single_seconds_absolute() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 
     assert_eq!(conds.seconds_absolute, 104);
 }
@@ -1067,6 +1080,7 @@ fn test_single_seconds_absolute_extra_arg() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 
     assert_eq!(conds.seconds_absolute, 104);
 }
@@ -1108,6 +1122,7 @@ fn test_multiple_seconds_absolute() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 
     // we use the MAX value
     assert_eq!(conds.seconds_absolute, 503);
@@ -1123,6 +1138,7 @@ fn test_single_height_relative() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 
     assert_eq!(spend.height_relative, Some(101));
 }
@@ -1138,6 +1154,7 @@ fn test_single_height_relative_extra_arg() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 
     assert_eq!(spend.height_relative, Some(101));
 }
@@ -1167,6 +1184,7 @@ fn test_single_height_relative_zero() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 
     assert_eq!(spend.height_relative, Some(0));
 }
@@ -1193,6 +1211,7 @@ fn test_multiple_height_relative() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 
     // we use the MAX value
     assert_eq!(spend.height_relative, Some(503));
@@ -1208,6 +1227,7 @@ fn test_single_height_absolute() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 
     assert_eq!(conds.height_absolute, 100);
 }
@@ -1223,6 +1243,7 @@ fn test_single_height_absolute_extra_arg() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 
     assert_eq!(conds.height_absolute, 100);
 }
@@ -1264,6 +1285,7 @@ fn test_multiple_height_absolute() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 
     // we use the MAX value
     assert_eq!(conds.height_absolute, 503);
@@ -1279,6 +1301,7 @@ fn test_single_reserve_fee() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 
     assert_eq!(conds.reserve_fee, 100);
 }
@@ -1294,6 +1317,7 @@ fn test_single_reserve_fee_extra_arg() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 
     assert_eq!(conds.reserve_fee, 100);
 }
@@ -1337,6 +1361,7 @@ fn test_multiple_reserve_fee() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 
     // reserve fee conditions are accumulated 100 + 50 = 150
     assert_eq!(conds.reserve_fee, 175);
@@ -1355,6 +1380,7 @@ fn test_coin_announces_consume() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -1373,6 +1399,7 @@ fn test_create_coin_announce_extra_arg() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -1407,6 +1434,7 @@ fn test_assert_coin_announce_extra_arg() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -1487,6 +1515,7 @@ fn test_puzzle_announces_consume() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -1505,6 +1534,7 @@ fn test_create_puzzle_announces_extra_arg() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -1539,6 +1569,7 @@ fn test_assert_puzzle_announces_extra_arg() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -1618,6 +1649,7 @@ fn test_single_assert_my_amount() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -1631,6 +1663,7 @@ fn test_single_assert_my_amount_extra_arg() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -1693,6 +1726,7 @@ fn test_multiple_assert_my_amount() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -1727,6 +1761,7 @@ fn test_single_assert_my_coin_id() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -1740,6 +1775,7 @@ fn test_single_assert_my_coin_id_extra_arg() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -1780,6 +1816,7 @@ fn test_multiple_assert_my_coin_id() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -1816,6 +1853,7 @@ fn test_single_assert_my_parent_coin_id() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -1829,6 +1867,7 @@ fn test_single_assert_my_parent_coin_id_extra_arg() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -1856,6 +1895,7 @@ fn test_multiple_assert_my_parent_coin_id() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -1891,6 +1931,7 @@ fn test_single_assert_my_puzzle_hash() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -1904,6 +1945,7 @@ fn test_single_assert_my_puzzle_hash_extra_arg() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -1931,6 +1973,7 @@ fn test_multiple_assert_my_puzzle_hash() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -1972,6 +2015,7 @@ fn test_single_create_coin() {
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.null());
     }
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -1991,6 +2035,7 @@ fn test_create_coin_max_amount() {
         assert_eq!(c.amount, 0xffffffffffffffff_u64);
         assert_eq!(c.hint, a.null());
     }
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -2042,6 +2087,7 @@ fn test_create_coin_with_hint() {
         assert!(c.amount == 42_u64);
         assert!(a.atom(c.hint) == H1.to_vec());
     }
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -2062,6 +2108,7 @@ fn test_create_coin_extra_arg() {
         assert!(c.amount == 42_u64);
         assert!(a.atom(c.hint) == H1.to_vec());
     }
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -2095,6 +2142,7 @@ fn test_create_coin_with_multiple_hints() {
         assert!(c.amount == 42_u64);
         assert!(a.atom(c.hint) == H1.to_vec());
     }
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -2114,6 +2162,7 @@ fn test_create_coin_with_hint_as_atom() {
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.null());
     }
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -2132,6 +2181,7 @@ fn test_create_coin_with_invalid_hint_as_terminator() {
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.null());
     }
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -2163,6 +2213,7 @@ fn test_create_coin_with_short_hint() {
         assert!(c.amount == 42_u64);
         assert!(a.atom(c.hint) == MSG1.to_vec());
     }
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -2182,6 +2233,7 @@ fn test_create_coin_with_long_hint() {
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.null());
     }
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -2202,6 +2254,7 @@ fn test_create_coin_with_pair_hint() {
         assert_eq!(c.amount, 42_u64);
         assert_eq!(a.atom(c.hint), H1.to_vec());
     }
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -2221,6 +2274,7 @@ fn test_create_coin_with_cons_hint() {
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.null());
     }
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -2246,6 +2300,7 @@ fn test_multiple_create_coin() {
         amount: 43_u64,
         hint: a.null()
     }));
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -2308,6 +2363,7 @@ fn test_single_agg_sig_me() {
         assert_eq!(a.atom(c.0), PUBKEY);
         assert_eq!(a.atom(c.1), MSG1);
     }
+    assert_eq!(spend.eligible_for_dedup, false);
 }
 
 #[test]
@@ -2329,6 +2385,7 @@ fn test_duplicate_agg_sig_me() {
         assert_eq!(a.atom(c.0), PUBKEY);
         assert_eq!(a.atom(c.1), MSG1);
     }
+    assert_eq!(spend.eligible_for_dedup, false);
 }
 
 #[test]
@@ -2402,6 +2459,7 @@ fn test_single_agg_sig_unsafe() {
         assert_eq!(a.atom(*pk), PUBKEY);
         assert_eq!(a.atom(*msg), MSG1);
     }
+    assert_eq!(spend.eligible_for_dedup, false);
 }
 
 #[test]
@@ -2469,6 +2527,7 @@ fn test_agg_sig_unsafe_invalid_terminator() {
         assert_eq!(a.atom(*pk), PUBKEY);
         assert_eq!(a.atom(*msg), MSG1);
     }
+    assert_eq!(spend.eligible_for_dedup, false);
 }
 
 #[test]
@@ -2503,6 +2562,7 @@ fn test_agg_sig_me_invalid_terminator() {
         assert_eq!(a.atom(*pk), PUBKEY);
         assert_eq!(a.atom(*msg), MSG1);
     }
+    assert_eq!(spend.eligible_for_dedup, false);
 }
 
 #[test]
@@ -2539,6 +2599,7 @@ fn test_duplicate_agg_sig_unsafe() {
         assert_eq!(a.atom(*pk), PUBKEY);
         assert_eq!(a.atom(*msg), MSG1);
     }
+    assert_eq!(spend.eligible_for_dedup, false);
 }
 
 #[test]
@@ -2664,6 +2725,7 @@ fn test_always_true() {
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.agg_sig_me.len(), 0);
+    assert_eq!(spend.eligible_for_dedup, true);
 }
 
 #[test]
@@ -2685,4 +2747,5 @@ fn test_always_true_with_arg() {
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.agg_sig_me.len(), 0);
+    assert_eq!(spend.eligible_for_dedup, true);
 }

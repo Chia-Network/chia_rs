@@ -41,6 +41,7 @@ class Spend:
     seconds_relative: int
     create_coin: List[Tuple[bytes, int, Optional[bytes]]]
     agg_sig_me: List[Tuple[bytes, bytes]]
+    eligible_for_dedup: bool
     def __init__(
         self,
         coin_id: bytes,
@@ -48,7 +49,8 @@ class Spend:
         height_relative: Optional[int],
         seconds_relative: int,
         create_coin: Sequence[Tuple[bytes, int, Optional[bytes]]],
-        agg_sig_me: Sequence[Tuple[bytes, bytes]]
+        agg_sig_me: Sequence[Tuple[bytes, bytes]],
+        eligible_for_dedup: bool
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __str__(self) -> str: ...
