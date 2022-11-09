@@ -1,0 +1,15 @@
+[package]
+name = "clvm-utils"
+version = "0.1.14"
+edition = "2021"
+license = "Apache-2.0"
+description = "Utility functions for processing clvm programs and structures"
+authors = ["Arvid Norberg <arvid@chia.net>"]
+homepage = "https://github.com/Chia-Network/chia_rs/"
+repository = "https://github.com/Chia-Network/chia_rs/clvm-utils"
+
+[dependencies]
+clvmr = "=0.1.24"
+
+[profile.release]
+lto = true

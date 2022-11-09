@@ -321,8 +321,16 @@ jobs:
             toolchain: nightly
       - name: cargo-fuzz
         run: cargo +nightly install cargo-fuzz
-      - name: cargo fuzz
+      - name: cargo fuzz (chia_rs)
         run: cargo +nightly fuzz build
+      - name: cargo fuzz (chia-bls)
+        run: |
+          cd chia-bls
+          cargo +nightly fuzz build
+      - name: cargo fuzz (clvm-utils)
+        run: |
+          cd clvm-utils
+          cargo +nightly fuzz build
 
   unit_tests:
     runs-on: ${{ matrix.os }}

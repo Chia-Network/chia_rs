@@ -42,9 +42,3 @@ name = "parse-conditions"
 path = "fuzz_targets/parse-conditions.rs"
 test = false
 doc = false
-
-[[bin]]
-name = "tree-hash"
-path = "fuzz_targets/tree-hash.rs"
-test = false
-doc = false
