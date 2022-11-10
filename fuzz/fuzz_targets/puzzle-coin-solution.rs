@@ -9,7 +9,7 @@ const HASH: [u8;32] = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 
 fuzz_target!(|data: &[u8]| {
     let mut a = Allocator::new();
-    let input = make_tree(&mut a, &mut BitCursor::new(data));
+    let input = make_tree(&mut a, &mut BitCursor::new(data), false);
 
     let _ret = get_puzzle_and_solution_for_coin(&a, input, HASH.into(), 1337, HASH.into());
 });
