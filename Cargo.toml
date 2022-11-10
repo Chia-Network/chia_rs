@@ -1,5 +1,8 @@
+# the "wheel" crate is excluded from the workspace because pyo3 has problems with
+# "cargo test" and "cargo bench"
 [workspace]
-members = ["wasm", "wheel", "chia_streamable_macro"]
+members = ["wasm", "chia_streamable_macro", "chia-bls"]
+exclude = ["wheel"]
 
 [package]
 name = "chia"

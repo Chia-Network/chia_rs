@@ -1,0 +1,32 @@
+[package]
+name = "chia-bls-fuzz"
+version = "0.0.0"
+authors = ["Automatically generated"]
+publish = false
+edition = "2018"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+pyo3 = { version = ">=0.17.2", features = ["auto-initialize"]}
+
+[dependencies.chia-bls]
+path = ".."
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "derive"
+path = "fuzz_targets/derive.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "blspy-fidelity"
+path = "fuzz_targets/blspy-fidelity.rs"
+test = false
+doc = false
