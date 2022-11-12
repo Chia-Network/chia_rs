@@ -23,6 +23,9 @@ hex = "^0.4.3"
 rand = "^0.8.5"
 criterion = "^0.4"
 
+[lib]
+crate-type = ["rlib"]
+
 [[bench]]
 name = "derive_key"
 harness = false

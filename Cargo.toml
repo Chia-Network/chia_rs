@@ -1,7 +1,7 @@
 # the "wheel" crate is excluded from the workspace because pyo3 has problems with
 # "cargo test" and "cargo bench"
 [workspace]
-members = ["wasm", "chia_streamable_macro", "chia-bls", "clvm-utils"]
+members = ["wasm", "chia_streamable_macro", "chia-bls", "clvm-utils", "chia-protocol"]
 exclude = ["wheel"]
 
 [package]
@@ -21,8 +21,8 @@ py-bindings = ["dep:pyo3"]
 clvmr = "=0.1.24"
 hex = "=0.4.3"
 pyo3 = { version = "=0.15.1", features = ["extension-module"], optional = true }
-chia_streamable_macro = { version = "=0.2.3", path = "chia_streamable_macro" }
 clvm-utils = { version = "=0.1.14", path = "clvm-utils" }
+chia-protocol = { version = "=0.1.14", path = "chia-protocol" }
 
 [dev-dependencies]
 num-traits = "=0.2.15"

@@ -1,4 +1,4 @@
-use chia::bytes::{Bytes, BytesImpl};
+use chia_protocol::bytes::{Bytes, BytesImpl};
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 

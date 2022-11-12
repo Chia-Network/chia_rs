@@ -11,11 +11,11 @@ use super::opcodes::{
 };
 use super::sanitize_int::sanitize_uint;
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
-use crate::bytes::Bytes32;
 use crate::gen::flags::COND_ARGS_NIL;
 use crate::gen::flags::NO_UNKNOWN_CONDS;
 use crate::gen::flags::STRICT_ARGS_COUNT;
 use crate::gen::validation_error::check_nil;
+use chia_protocol::bytes::Bytes32;
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use clvmr::cost::Cost;
 use clvmr::op_utils::u64_from_bytes;

@@ -1,4 +1,4 @@
-use crate::bytes::Bytes32;
+use chia_protocol::bytes::Bytes32;
 use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::sha2::{Digest, Sha256};
 
