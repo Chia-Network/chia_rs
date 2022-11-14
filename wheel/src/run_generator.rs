@@ -2,7 +2,7 @@ use super::adapt_response::eval_err_to_pyresult;
 use super::from_json_dict::FromJsonDict;
 use super::to_json_dict::ToJsonDict;
 
-use chia::bytes::{Bytes, Bytes32, Bytes48};
+use chia_protocol::bytes::{Bytes, Bytes32, Bytes48};
 use chia::gen::conditions::{parse_spends, Spend, SpendBundleConditions};
 use chia::gen::validation_error::{ErrorCode, ValidationErr};
 
@@ -16,8 +16,8 @@ use clvmr::serialize::node_from_bytes;
 
 use pyo3::prelude::*;
 
-use chia::chia_error;
-use chia::streamable::Streamable;
+use chia_protocol::chia_error;
+use chia_protocol::streamable::Streamable;
 use chia_streamable_macro::Streamable;
 use py_streamable::PyStreamable;
 

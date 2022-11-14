@@ -3,9 +3,9 @@ use crate::to_json_dict::ToJsonDict;
 use chia_streamable_macro::Streamable;
 use py_streamable::PyStreamable;
 
-use chia::bytes::Bytes32;
-use chia::chia_error;
-use chia::streamable::Streamable;
+use chia_protocol::bytes::Bytes32;
+use chia_protocol::chia_error;
+use chia_protocol::streamable::Streamable;
 use clvmr::sha2::{Digest, Sha256};
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;

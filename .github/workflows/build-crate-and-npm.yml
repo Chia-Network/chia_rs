@@ -42,10 +42,15 @@ jobs:
       run: cargo test && cargo test --release
     - name: build
       run: cargo build --release
-    - name: dry-run of `cargo publish`
+    - name: dry-run of `cargo publish` (chia_rs)
+      run: cargo publish --dry-run
+    - name: dry-run of `cargo publish` (clvm-utils)
       run: |
-        cargo publish --dry-run
         cd clvm-utils
+        cargo publish --dry-run
+    - name: dry-run of `cargo publish` (chia-protocol)
+      run: |
+        cd chia-protocol
         cargo publish --dry-run
 
     - name: Upload crate artifacts
@@ -74,6 +79,8 @@ jobs:
       run: |
         cargo publish
         cd clvm-utils
+        cargo publish
+        cd ../chia-protocol
         cargo publish
 
     # this has not been tested, so probably needs to be debugged next time a tag is created

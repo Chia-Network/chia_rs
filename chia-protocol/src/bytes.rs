@@ -1,7 +1,7 @@
 use crate::chia_error;
 use crate::streamable::{read_bytes, Streamable};
-use clvmr::sha2::{Digest, Sha256};
 use core::fmt::Formatter;
+use sha2::{Digest, Sha256};
 use std::convert::AsRef;
 use std::convert::TryInto;
 use std::fmt;

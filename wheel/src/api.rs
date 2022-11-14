@@ -22,7 +22,7 @@ use crate::run_program::{
 };
 
 use crate::adapt_response::eval_err_to_pyresult;
-use chia::bytes::Bytes32;
+use chia_protocol::bytes::Bytes32;
 use chia::gen::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
 use chia::gen::validation_error::ValidationErr;
 use clvmr::allocator::Allocator;
