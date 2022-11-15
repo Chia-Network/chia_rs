@@ -1,6 +1,6 @@
 use super::adapt_response::eval_err_to_pyresult;
-use super::from_json_dict::FromJsonDict;
-use super::to_json_dict::ToJsonDict;
+use chia_protocol::from_json_dict::FromJsonDict;
+use chia_protocol::to_json_dict::ToJsonDict;
 
 use chia_protocol::bytes::{Bytes, Bytes32, Bytes48};
 use chia::gen::conditions::{parse_spends, Spend, SpendBundleConditions};
@@ -19,7 +19,7 @@ use pyo3::prelude::*;
 use chia_protocol::chia_error;
 use chia_protocol::streamable::Streamable;
 use chia_streamable_macro::Streamable;
-use py_streamable::PyStreamable;
+use chia_py_streamable_macro::PyStreamable;
 
 #[pyclass(name = "Spend")]
 #[derive(Streamable, PyStreamable, Hash, Debug, Clone, Eq, PartialEq)]
