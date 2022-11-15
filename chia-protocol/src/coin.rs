@@ -1,29 +1,34 @@
+#[cfg(feature = "py-bindings")]
 use crate::from_json_dict::FromJsonDict;
+#[cfg(feature = "py-bindings")]
 use crate::to_json_dict::ToJsonDict;
+#[cfg(feature = "py-bindings")]
+use chia_py_streamable_macro::PyStreamable;
 use chia_streamable_macro::Streamable;
-use py_streamable::PyStreamable;
 
-use chia_protocol::bytes::Bytes32;
-use chia_protocol::chia_error;
-use chia_protocol::streamable::Streamable;
-use clvmr::sha2::{Digest, Sha256};
+use crate::bytes::Bytes32;
+use crate::chia_error;
+use crate::streamable::Streamable;
+#[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
+#[cfg(feature = "py-bindings")]
 use pyo3::types::PyBytes;
+use sha2::{Digest, Sha256};
 use std::convert::TryInto;
 
-#[pyclass]
-#[derive(Streamable, PyStreamable, Hash, Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "py-bindings", pyclass, derive(PyStreamable))]
+#[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
 pub struct Coin {
-    #[pyo3(get)]
+    #[cfg_attr(features = "py-bindings", pyo3(get))]
     parent_coin_info: Bytes32,
-    #[pyo3(get)]
+    #[cfg_attr(features = "py-bindings", pyo3(get))]
     puzzle_hash: Bytes32,
-    #[pyo3(get)]
+    #[cfg_attr(features = "py-bindings", pyo3(get))]
     amount: u64,
 }
 
 impl Coin {
-    fn coin_id(&self) -> [u8; 32] {
+    pub fn coin_id(&self) -> [u8; 32] {
         let mut hasher = Sha256::new();
         hasher.update(self.parent_coin_info);
         hasher.update(self.puzzle_hash);
@@ -51,7 +56,8 @@ impl Coin {
     }
 }
 
-#[pymethods]
+#[cfg(feature = "py-bindings")]
+#[cfg_attr(feature = "py-bindings", pymethods)]
 impl Coin {
     fn name<'p>(&self, py: Python<'p>) -> PyResult<&'p PyBytes> {
         Ok(PyBytes::new(py, &self.coin_id()))

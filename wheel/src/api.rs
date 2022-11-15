@@ -1,6 +1,6 @@
-use crate::coin::Coin;
-use crate::coin_state::CoinState;
-use crate::respond_to_ph_updates::RespondToPhUpdates;
+use chia_protocol::coin::Coin;
+use chia_protocol::coin_state::CoinState;
+use chia_protocol::respond_to_ph_updates::RespondToPhUpdates;
 use crate::run_generator::{PySpend, PySpendBundleConditions, __pyo3_get_function_run_generator};
 use chia::gen::flags::COND_ARGS_NIL;
 use chia::gen::flags::NO_UNKNOWN_CONDS;

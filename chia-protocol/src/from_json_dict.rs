@@ -2,7 +2,7 @@ use pyo3::exceptions::PyValueError;
 use pyo3::PyAny;
 use pyo3::PyResult;
 
-use chia_protocol::bytes::{Bytes, BytesImpl};
+use crate::bytes::{Bytes, BytesImpl};
 use hex::FromHex;
 use std::convert::TryInto;
 

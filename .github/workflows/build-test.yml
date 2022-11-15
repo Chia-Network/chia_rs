@@ -333,7 +333,7 @@ jobs:
         with:
             toolchain: stable
       - name: cargo test
-        run: cargo test --workspace --all-features
+        run: cargo test --workspace
 
   upload:
     name: Upload to PyPI - ${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }}
