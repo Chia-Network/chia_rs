@@ -47,6 +47,20 @@ class {name}:
     )
 
 
+def rust_type_to_python(t: str) -> str:
+    return (
+        t.replace("<", "[")
+        .replace(">", "]")
+        .replace("Vec", "List")
+        .replace("Option", "Optional")
+        .replace("Bytes", "bytes")
+        .replace("u32", "int")
+        .replace("u64", "int")
+        .replace("u128", "int")
+        .strip()
+    )
+
+
 def parse_rust_source(filename: str) -> List[Tuple[str, List[str]]]:
     ret: List[Tuple[str], List[str]] = []
     in_struct: Optional[str] = None
@@ -56,6 +70,15 @@ def parse_rust_source(filename: str) -> List[Tuple[str, List[str]]]:
             if not in_struct:
                 if line.startswith("pub struct ") and "{" in line:
                     in_struct = line.split("pub struct ")[1].split("{")[0].strip()
+                elif line.startswith("pub struct ") and "(" in line and ");" in line:
+                    name = line.split("pub struct ")[1].split("(")[0].strip()
+                    rust_args = line.split("(")[1].split(");")[0]
+                    args = []
+                    for idx, rust_type in enumerate(rust_args.split(",")):
+                        py_type = rust_type_to_python(rust_type)
+                        args.append(f"a{idx}: {py_type}")
+                    ret.append((name, args))
+                    continue
                 else:
                     continue
 
@@ -69,23 +92,14 @@ def parse_rust_source(filename: str) -> List[Tuple[str, List[str]]]:
                 ret.append((in_struct, members))
                 members = []
                 in_struct = None
+                continue
 
             # a field
             if ":" in line:
-                name, rust_type = line.strip().split(":")
+                name, rust_type = line.split("//")[0].strip().split(":")
                 # members are separated by , in rust. Strip that off
                 rust_type = rust_type.split(",")[0]
-                py_type = (
-                    rust_type.replace("<", "[")
-                    .replace(">", "]")
-                    .replace("Vec", "List")
-                    .replace("Option", "Optional")
-                    .replace("Bytes", "bytes")
-                    .replace("u32", "int")
-                    .replace("u64", "int")
-                    .replace("u128", "int")
-                    .strip()
-                )
+                py_type = rust_type_to_python(rust_type)
                 members.append(f"{name}: {py_type}")
 
     assert in_struct is None
@@ -98,6 +112,7 @@ classes = []
 classes.extend(parse_rust_source("coin"))
 classes.extend(parse_rust_source("coin_state"))
 classes.extend(parse_rust_source("respond_to_ph_updates"))
+classes.extend(parse_rust_source("bls"))
 
 with open(output_file, "w") as f:
     f.write(
