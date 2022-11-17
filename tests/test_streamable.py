@@ -1,4 +1,4 @@
-from chia_rs import Spend, SpendBundleConditions, Coin
+from chia_rs import Spend, SpendBundleConditions, Coin, G1Element, G2Element
 import pytest
 import copy
 
@@ -248,3 +248,29 @@ def test_coin_get_hash() -> None:
 
     c3 = Coin(coin, ph2, 0xFFFFFFFFFFFFFFFF)
     assert sha2(c3.to_bytes()) == c3.get_hash()
+
+def test_g1_element() -> None:
+
+    a = G1Element(b"abcdefghijklmnopqrstuvwxabcdefghijklmnopqrstuvwx")
+    b = bytes(a)
+    assert b == b"abcdefghijklmnopqrstuvwxabcdefghijklmnopqrstuvwx"
+    c = G1Element.from_bytes(b)
+    assert a == c
+
+    assert a.to_json_dict() == "0x6162636465666768696a6b6c6d6e6f7071727374757677786162636465666768696a6b6c6d6e6f707172737475767778"
+
+    d = G1Element.from_json_dict("0x6162636465666768696a6b6c6d6e6f7071727374757677786162636465666768696a6b6c6d6e6f707172737475767778")
+    assert d == a
+
+def test_g2_element() -> None:
+
+    a = G2Element(b"abcdefghijklmnopqrstuvwxabcdefghijklmnopqrstuvwxabcdefghijklmnopqrstuvwxabcdefghijklmnopqrstuvwx")
+    b = bytes(a)
+    assert b == b"abcdefghijklmnopqrstuvwxabcdefghijklmnopqrstuvwxabcdefghijklmnopqrstuvwxabcdefghijklmnopqrstuvwx"
+    c = G2Element.from_bytes(b)
+    assert a == c
+
+    assert a.to_json_dict() == "0x6162636465666768696a6b6c6d6e6f7071727374757677786162636465666768696a6b6c6d6e6f7071727374757677786162636465666768696a6b6c6d6e6f7071727374757677786162636465666768696a6b6c6d6e6f707172737475767778"
+
+    d = G2Element.from_json_dict("0x6162636465666768696a6b6c6d6e6f7071727374757677786162636465666768696a6b6c6d6e6f7071727374757677786162636465666768696a6b6c6d6e6f7071727374757677786162636465666768696a6b6c6d6e6f707172737475767778")
+    assert a == d
