@@ -52,6 +52,10 @@ jobs:
       run: |
         cd chia-protocol
         cargo publish --dry-run
+    - name: dry-run of `cargo publish` (chia_py_streamable_macro)
+      run: |
+        cd chia_py_streamable_macro
+        cargo publish --dry-run
 
     - name: Upload crate artifacts
       uses: actions/upload-artifact@v2
@@ -81,6 +85,8 @@ jobs:
         cd clvm-utils
         cargo publish
         cd ../chia-protocol
+        cargo publish
+        cd ../chia_py_streamable_macro
         cargo publish
 
     # this has not been tested, so probably needs to be debugged next time a tag is created
