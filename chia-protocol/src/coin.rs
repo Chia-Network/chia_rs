@@ -19,11 +19,8 @@ use std::convert::TryInto;
 #[cfg_attr(feature = "py-bindings", pyclass, derive(PyStreamable))]
 #[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
 pub struct Coin {
-    #[cfg_attr(features = "py-bindings", pyo3(get))]
     parent_coin_info: Bytes32,
-    #[cfg_attr(features = "py-bindings", pyo3(get))]
     puzzle_hash: Bytes32,
-    #[cfg_attr(features = "py-bindings", pyo3(get))]
     amount: u64,
 }
 

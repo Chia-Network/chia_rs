@@ -71,6 +71,12 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
                     pub fn from_json_dict(o: &pyo3::PyAny) -> PyResult<Self> {
                         <Self as FromJsonDict>::from_json_dict(o)
                     }
+
+                    #(#[getter]
+                        fn #fnames(&self, py: Python) -> PyResult<#ftypes> {
+                            Ok(self.#fnames.clone())
+                        }
+                    )*
                 }
 
                 impl ToJsonDict for #ident {

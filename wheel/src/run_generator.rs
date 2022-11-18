@@ -24,38 +24,25 @@ use chia_py_streamable_macro::PyStreamable;
 #[pyclass(name = "Spend")]
 #[derive(Streamable, PyStreamable, Hash, Debug, Clone, Eq, PartialEq)]
 pub struct PySpend {
-    #[pyo3(get)]
     pub coin_id: Bytes32,
-    #[pyo3(get)]
     pub puzzle_hash: Bytes32,
-    #[pyo3(get)]
     pub height_relative: Option<u32>,
-    #[pyo3(get)]
     pub seconds_relative: u64,
-    #[pyo3(get)]
     pub create_coin: Vec<(Bytes32, u64, Option<Bytes>)>,
-    #[pyo3(get)]
     pub agg_sig_me: Vec<(Bytes48, Bytes)>,
-    #[pyo3(get)]
     pub eligible_for_dedup: bool,
 }
 
 #[pyclass(name = "SpendBundleConditions")]
 #[derive(Streamable, PyStreamable, Hash, Debug, Clone, Eq, PartialEq)]
 pub struct PySpendBundleConditions {
-    #[pyo3(get)]
     pub spends: Vec<PySpend>,
-    #[pyo3(get)]
     pub reserve_fee: u64,
-    #[pyo3(get)]
     // the highest height/time conditions (i.e. most strict)
     pub height_absolute: u32,
-    #[pyo3(get)]
     pub seconds_absolute: u64,
     // Unsafe Agg Sig conditions (i.e. not tied to the spend generating it)
-    #[pyo3(get)]
     pub agg_sig_unsafe: Vec<(Bytes48, Bytes)>,
-    #[pyo3(get)]
     pub cost: u64,
 }
 
