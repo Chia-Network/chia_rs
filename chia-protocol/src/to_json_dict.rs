@@ -6,23 +6,28 @@ pub trait ToJsonDict {
     fn to_json_dict(&self, py: Python) -> PyResult<PyObject>;
 }
 
-impl ToJsonDict for bool {
-    fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
-        Ok(self.to_object(py))
-    }
+macro_rules! to_json_primitive {
+    ($t:ty) => {
+        impl ToJsonDict for $t {
+            fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
+                Ok(self.to_object(py))
+            }
+        }
+    };
 }
 
-impl ToJsonDict for u32 {
-    fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
-        Ok(self.to_object(py))
-    }
-}
-
-impl ToJsonDict for u64 {
-    fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
-        Ok(self.to_object(py))
-    }
-}
+to_json_primitive!(bool);
+to_json_primitive!(u8);
+to_json_primitive!(i8);
+to_json_primitive!(u16);
+to_json_primitive!(i16);
+to_json_primitive!(u32);
+to_json_primitive!(i32);
+to_json_primitive!(u64);
+to_json_primitive!(i64);
+to_json_primitive!(u128);
+to_json_primitive!(i128);
+to_json_primitive!(String);
 
 impl<const N: usize> ToJsonDict for BytesImpl<N> {
     fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {

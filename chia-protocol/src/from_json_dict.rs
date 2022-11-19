@@ -69,29 +69,28 @@ where
     }
 }
 
-impl FromJsonDict for bool {
-    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
-        o.extract()
-    }
+macro_rules! from_json_primitive {
+    ($t:ty) => {
+        impl FromJsonDict for $t {
+            fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+                o.extract()
+            }
+        }
+    };
 }
 
-impl FromJsonDict for u32 {
-    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
-        o.extract()
-    }
-}
-
-impl FromJsonDict for u64 {
-    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
-        o.extract()
-    }
-}
-
-impl FromJsonDict for String {
-    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
-        o.extract()
-    }
-}
+from_json_primitive!(bool);
+from_json_primitive!(u8);
+from_json_primitive!(i8);
+from_json_primitive!(u16);
+from_json_primitive!(i16);
+from_json_primitive!(u32);
+from_json_primitive!(i32);
+from_json_primitive!(u64);
+from_json_primitive!(i64);
+from_json_primitive!(u128);
+from_json_primitive!(i128);
+from_json_primitive!(String);
 
 impl<T> FromJsonDict for Vec<T>
 where
