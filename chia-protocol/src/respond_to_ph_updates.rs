@@ -16,10 +16,7 @@ use pyo3::prelude::*;
 #[cfg_attr(feature = "py-bindings", pyclass(unsendable), derive(PyStreamable))]
 #[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
 pub struct RespondToPhUpdates {
-    #[cfg_attr(features = "py-bindings", pyo3(get))]
     puzzle_hashes: Vec<Bytes32>,
-    #[cfg_attr(features = "py-bindings", pyo3(get))]
     min_height: u32,
-    #[cfg_attr(features = "py-bindings", pyo3(get))]
     coin_states: Vec<CoinState>,
 }

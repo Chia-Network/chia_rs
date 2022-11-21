@@ -15,10 +15,7 @@ use pyo3::prelude::*;
 #[cfg_attr(feature = "py-bindings", pyclass, derive(PyStreamable))]
 #[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
 pub struct CoinState {
-    #[cfg_attr(features = "py-bindings", pyo3(get))]
     coin: Coin,
-    #[cfg_attr(features = "py-bindings", pyo3(get))]
     spent_height: Option<u32>,
-    #[cfg_attr(features = "py-bindings", pyo3(get))]
     created_height: Option<u32>,
 }

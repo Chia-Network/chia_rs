@@ -389,3 +389,10 @@ def test_coin_hash() -> None:
 
     assert hash(c1) == hash(c4)
     assert type(hash(c1)) is int
+
+def test_coin_fields() -> None:
+
+    c1 = Coin(parent_coin, puzzle_hash, 1000000)
+    assert c1.parent_coin_info == parent_coin
+    assert c1.puzzle_hash == puzzle_hash
+    assert c1.amount == 1000000
