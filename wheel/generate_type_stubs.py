@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Any, List, Optional, Tuple
+from glob import glob
 
 output_file = Path(__file__).parent.resolve() / "chia_rs.pyi"
 input_dir = Path(__file__).parent.parent.resolve() / "chia-protocol" / "src"
@@ -65,7 +66,7 @@ def parse_rust_source(filename: str) -> List[Tuple[str, List[str]]]:
     ret: List[Tuple[str], List[str]] = []
     in_struct: Optional[str] = None
     members: List[str] = []
-    with open(input_dir / f"{filename}.rs") as f:
+    with open(filename) as f:
         for line in f:
             if not in_struct:
                 if line.startswith("pub struct ") and "{" in line:
@@ -109,10 +110,10 @@ def parse_rust_source(filename: str) -> List[Tuple[str, List[str]]]:
 extra_members = {"Coin": "    def name(self) -> bytes32: ..."}
 
 classes = []
-classes.extend(parse_rust_source("coin"))
-classes.extend(parse_rust_source("coin_state"))
-classes.extend(parse_rust_source("respond_to_ph_updates"))
-classes.extend(parse_rust_source("bls"))
+for f in sorted(glob(str(input_dir / "*.rs"))):
+    if f.endswith("bytes.rs"):
+        continue
+    classes.extend(parse_rust_source(f))
 
 with open(output_file, "w") as f:
     f.write(
