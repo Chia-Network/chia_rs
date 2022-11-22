@@ -98,13 +98,19 @@ pub fn get_puzzle_and_solution_for_coin<'py>(
 
 #[pymodule]
 pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
+    // generator functions
     m.add_function(wrap_pyfunction!(run_generator, m)?)?;
     m.add_class::<PySpendBundleConditions>()?;
+    m.add("ELIGIBLE_FOR_DEDUP", chia::gen::conditions::ELIGIBLE_FOR_DEDUP)?;
     m.add_class::<PySpend>()?;
+
+    // clvm functions
     m.add("COND_ARGS_NIL", COND_ARGS_NIL)?;
     m.add("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;
     m.add("STRICT_ARGS_COUNT", STRICT_ARGS_COUNT)?;
     m.add("MEMPOOL_MODE", MEMPOOL_MODE)?;
+
+    // Chia classes
     m.add_class::<Coin>()?;
     m.add_class::<CoinState>()?;
     m.add_class::<RespondToPhUpdates>()?;

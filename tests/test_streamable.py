@@ -39,7 +39,7 @@ def test_json_spend() -> None:
         "seconds_relative": 0,
         "create_coin": [["0x" + ph2.hex(), 1000000, None]],
         "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
-        "eligible_for_dedup": False,
+        "flags": 0,
     }
 
 def test_from_json_spend() -> None:
@@ -53,7 +53,7 @@ def test_from_json_spend() -> None:
         "seconds_relative": 0,
         "create_coin": [["0x" + ph2.hex(), 1000000, None]],
         "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
-        "eligible_for_dedup": False,
+        "flags": 0,
     })
     assert a == b
 
@@ -68,7 +68,7 @@ def test_from_json_spend_set_optional() -> None:
         "seconds_relative": 0,
         "create_coin": [["0x" + ph2.hex(), 1000000, None]],
         "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
-        "eligible_for_dedup": False,
+        "flags": 0,
     })
     assert a == b
 
@@ -83,7 +83,7 @@ def test_invalid_hex_prefix() -> None:
             "seconds_relative": 0,
             "create_coin": [["0x" + ph2.hex(), 1000000, None]],
             "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
-            "eligible_for_dedup": False,
+            "flags": 0,
         })
 
 def test_invalid_hex_prefix_bytes() -> None:
@@ -97,7 +97,7 @@ def test_invalid_hex_prefix_bytes() -> None:
             "create_coin": [["0x" + ph2.hex(), 1000000, None]],
             # the message field is missing the 0x prefix and is variable length bytes
             "agg_sig_me": [["0x" + sig.hex(), "6d7367"]],
-            "eligible_for_dedup": False,
+            "flags": 0,
         })
 
 def test_invalid_hex_digit() -> None:
@@ -111,7 +111,7 @@ def test_invalid_hex_digit() -> None:
             "seconds_relative": 0,
             "create_coin": [["0x" + ph2.hex(), 1000000, None]],
             "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
-            "eligible_for_dedup": False,
+            "flags": 0,
         })
 
 def test_invalid_hex_length() -> None:
@@ -125,7 +125,7 @@ def test_invalid_hex_length() -> None:
             "seconds_relative": 0,
             "create_coin": [["0x" + ph2.hex(), 1000000, None]],
             "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
-            "eligible_for_dedup": False,
+            "flags": 0,
         })
 
 def test_missing_field() -> None:
@@ -138,7 +138,7 @@ def test_missing_field() -> None:
             "seconds_relative": 0,
             "create_coin": [["0x" + ph2.hex(), 1000000, None]],
             "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
-            "eligible_for_dedup": False,
+            "flags": 0,
         })
 
 
