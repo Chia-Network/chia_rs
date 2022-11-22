@@ -30,7 +30,7 @@ pub struct PySpend {
     pub seconds_relative: u64,
     pub create_coin: Vec<(Bytes32, u64, Option<Bytes>)>,
     pub agg_sig_me: Vec<(Bytes48, Bytes)>,
-    pub eligible_for_dedup: bool,
+    pub flags: u32,
 }
 
 #[pyclass(name = "SpendBundleConditions")]
@@ -72,7 +72,7 @@ fn convert_spend(a: &Allocator, spend: Spend) -> PySpend {
         seconds_relative: spend.seconds_relative,
         create_coin,
         agg_sig_me: agg_sigs,
-        eligible_for_dedup: spend.eligible_for_dedup,
+        flags: spend.flags,
     }
 }
 
