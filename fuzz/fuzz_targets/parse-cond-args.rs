@@ -17,7 +17,7 @@ use chia::gen::opcodes::{
 
 fuzz_target!(|data: &[u8]| {
     let mut a = Allocator::new();
-    let input = make_tree(&mut a, &mut BitCursor::new(data));
+    let input = make_tree(&mut a, &mut BitCursor::new(data), false);
     for flags in &[0, COND_ARGS_NIL, STRICT_ARGS_COUNT] {
         for op in &[AGG_SIG_ME, AGG_SIG_UNSAFE, ALWAYS_TRUE,
     ASSERT_COIN_ANNOUNCEMENT, ASSERT_HEIGHT_ABSOLUTE, ASSERT_HEIGHT_RELATIVE, ASSERT_MY_AMOUNT,

@@ -54,17 +54,26 @@ const BUFFER: [u8; 63] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 ];
 
-pub fn make_tree(a: &mut Allocator, cursor: &mut BitCursor) -> NodePtr {
+pub fn make_tree(a: &mut Allocator, cursor: &mut BitCursor, short_atoms: bool) -> NodePtr {
     match cursor.read_bits(1) {
         None => a.null(),
         Some(0) => {
-            let first = make_tree(a, cursor);
-            let second = make_tree(a, cursor);
+            let first = make_tree(a, cursor, short_atoms);
+            let second = make_tree(a, cursor, short_atoms);
             a.new_pair(first, second).unwrap()
         }
-        Some(_) => match cursor.read_bits(6) {
-            None => a.null(),
-            Some(len) => a.new_atom(&BUFFER[..len as usize]).unwrap(),
-        },
+        Some(_) => {
+            if short_atoms {
+                match cursor.read_bits(8) {
+                    None => a.null(),
+                    Some(val) => a.new_atom(&[val]).unwrap(),
+                }
+            } else {
+                match cursor.read_bits(6) {
+                    None => a.null(),
+                    Some(len) => a.new_atom(&BUFFER[..len as usize]).unwrap(),
+                }
+            }
+        }
     }
 }

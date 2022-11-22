@@ -27,3 +27,9 @@ name = "tree-hash"
 path = "fuzz_targets/tree-hash.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "uncurry"
+path = "fuzz_targets/uncurry.rs"
+test = false
+doc = false
