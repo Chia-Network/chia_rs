@@ -6,7 +6,7 @@ exclude = ["wheel"]
 
 [package]
 name = "chia"
-version = "0.1.14"
+version = "0.1.15"
 edition = "2021"
 license = "Apache-2.0"
 description = "Utility functions and types used by the Chia blockchain full node"
@@ -21,8 +21,8 @@ py-bindings = ["dep:pyo3"]
 clvmr = "=0.1.24"
 hex = "=0.4.3"
 pyo3 = { version = "=0.15.1", features = ["extension-module"], optional = true }
-clvm-utils = { version = "=0.1.14", path = "clvm-utils" }
-chia-protocol = { version = "=0.1.14", path = "chia-protocol" }
+clvm-utils = { version = "=0.1.15", path = "clvm-utils" }
+chia-protocol = { version = "=0.1.15", path = "chia-protocol" }
 
 [dev-dependencies]
 num-traits = "=0.2.15"
