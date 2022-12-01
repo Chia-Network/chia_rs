@@ -203,7 +203,7 @@ jobs:
 
     - name: Install chia_rs wheel
       run: |
-        pip install --find-links target/wheels/ chia_rs
+        pip install wheel/target/wheels/chia_rs-*.whl
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v3
