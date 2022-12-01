@@ -183,8 +183,6 @@ jobs:
             pip install maturin && \
             CC=gcc maturin build --release --manylinux ${{ matrix.python.by-arch[matrix.arch.matrix].manylinux-version }} -m wheel/Cargo.toml \
           '
-          python -m venv venv
-          ln -s venv/bin/activate
 
     - name: Build Windows with maturin on Python ${{ matrix.python }}
       if: matrix.os.matrix == 'windows'
@@ -192,18 +190,17 @@ jobs:
         py -${{ matrix.python.major-dot-minor }} -m venv venv
         . .\venv\Scripts\Activate.ps1
         maturin build -i python --release -m wheel/Cargo.toml
-        # this will install into the venv
-        # it'd be better to use the wheel, but I can't figure out how to do that
-        # TODO: figure this out
-        # this does NOT work: pip install target/wheels/chia_rs-*.whl
-        maturin develop --release -m wheel/Cargo.toml
-        # the line above also doesn't seem to work
 
-    - uses: chia-network/actions/activate-venv@main
+    - uses: Chia-Network/actions/create-venv@main
+      id: create-venv
+
+    - uses: Chia-Network/actions/activate-venv@main
+      with:
+        directories: ${{ steps.create-venv.outputs.activate-venv-directories }}
 
     - name: Install chia_rs wheel
       run: |
-        pip install --find-links target/wheels/ chia_rs
+        pip install --no-index --find-links wheel/target/wheels/ chia_rs
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v3
