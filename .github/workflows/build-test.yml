@@ -158,6 +158,8 @@ jobs:
 
     - name: Build MacOs with maturin on Python ${{ matrix.python }}
       if: matrix.os.matrix == 'macos'
+      env:
+        MACOSX_DEPLOYMENT_TARGET: 10.14
       run: |
         python${{ matrix.python.major-dot-minor }} -m venv venv
         . venv/bin/activate
