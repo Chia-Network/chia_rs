@@ -6,6 +6,7 @@ pub fn sanitize_uint(
     n: NodePtr,
     max_size: usize,
     code: ErrorCode,
+    code_if_max_exceeded: ErrorCode,
 ) -> Result<&[u8], ValidationErr> {
     assert!(max_size <= 8);
 
@@ -32,7 +33,7 @@ pub fn sanitize_uint(
 
     // if there are too many bytes left in the value, it's too big
     if buf.len() > size_limit {
-        return Err(ValidationErr(n, code));
+        return Err(ValidationErr(n, code_if_max_exceeded));
     }
 
     Ok(buf)
@@ -60,31 +61,41 @@ fn test_sanitize_uint() {
     let e = ErrorCode::InvalidCoinAmount;
     let no_leading_zero = a.new_substr(atom, 0, 8).unwrap();
     // this is a negative number, not allowed
-    assert!(sanitize_uint(&a, no_leading_zero, 8, e).is_err());
+    assert!(sanitize_uint(&a, no_leading_zero, 8, e, e).is_err());
 
     let just_zeros = a.new_substr(atom, 10, 70).unwrap();
     // a zero value must be represented by an empty atom
     assert_eq!(
-        sanitize_uint(&a, just_zeros, 8, e).unwrap_err().1,
+        sanitize_uint(&a, just_zeros, 8, e, e).unwrap_err().1,
         ErrorCode::InvalidCoinAmount
     );
 
     let a1 = a.new_substr(atom, 1, 101).unwrap();
     assert_eq!(
-        sanitize_uint(&a, a1, 8, e).unwrap_err().1,
+        sanitize_uint(&a, a1, 8, e, e).unwrap_err().1,
         ErrorCode::InvalidCoinAmount
     );
 
     let a1 = a.new_substr(atom, 1, 101).unwrap();
     assert_eq!(
-        sanitize_uint(&a, a1, 8, e).unwrap_err().1,
+        sanitize_uint(&a, a1, 8, e, e).unwrap_err().1,
         ErrorCode::InvalidCoinAmount
     );
 
     // a new all-zeros range
     let a1 = a.new_substr(atom, 1000, 1024).unwrap();
     assert_eq!(
-        sanitize_uint(&a, a1, 8, e).unwrap_err().1,
+        sanitize_uint(&a, a1, 8, e, e).unwrap_err().1,
         ErrorCode::InvalidCoinAmount
+    );
+
+    // Too big value
+    let e_if_max_exceeded = ErrorCode::AmountExceedsMaximum;
+    let a1 = a.new_atom(&[0x1, 0, 0, 0, 0, 0, 0, 0, 0]).unwrap();
+    assert_eq!(
+        sanitize_uint(&a, a1, 8, e, e_if_max_exceeded)
+            .unwrap_err()
+            .1,
+        e_if_max_exceeded
     );
 }

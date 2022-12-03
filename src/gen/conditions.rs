@@ -164,11 +164,16 @@ pub fn parse_args(
             Ok(Condition::CreateCoin(puzzle_hash, amount, a.null()))
         }
         RESERVE_FEE => {
-            let fee = parse_amount(a, first(a, c)?, ErrorCode::ReserveFeeConditionFailed)?;
             if (flags & STRICT_ARGS_COUNT) != 0 {
                 check_nil(a, rest(a, c)?)?;
             }
-            Ok(Condition::ReserveFee(fee))
+            match parse_amount(a, first(a, c)?, ErrorCode::ReserveFeeConditionFailed) {
+                Err(ValidationErr(n, ErrorCode::NegativeAmount)) => {
+                    Err(ValidationErr(n, ErrorCode::ReserveFeeConditionFailed))
+                }
+                Err(r) => Err(r),
+                Ok(fee) => Ok(Condition::ReserveFee(fee)),
+            }
         }
         CREATE_COIN_ANNOUNCEMENT => {
             let msg = sanitize_announce_msg(a, first(a, c)?, ErrorCode::InvalidCoinAnnouncement)?;
@@ -225,11 +230,19 @@ pub fn parse_args(
             Ok(Condition::AssertMyPuzzlehash(id))
         }
         ASSERT_MY_AMOUNT => {
-            let amount = parse_amount(a, first(a, c)?, ErrorCode::AssertMyAmountFailed)?;
             if (flags & STRICT_ARGS_COUNT) != 0 {
                 check_nil(a, rest(a, c)?)?;
             }
-            Ok(Condition::AssertMyAmount(amount))
+            match sanitize_uint(
+                a,
+                first(a, c)?,
+                8,
+                ErrorCode::AssertMyAmountFailed,
+                ErrorCode::AssertMyAmountFailed,
+            ) {
+                Err(r) => Err(r),
+                Ok(r) => Ok(Condition::AssertMyAmount(u64_from_bytes(r))),
+            }
         }
         ASSERT_SECONDS_RELATIVE => {
             if (flags & STRICT_ARGS_COUNT) != 0 {
@@ -255,7 +268,13 @@ pub fn parse_args(
             if (flags & STRICT_ARGS_COUNT) != 0 {
                 check_nil(a, rest(a, c)?)?;
             }
-            match sanitize_uint(a, first(a, c)?, 4, ErrorCode::AssertHeightRelative) {
+            match sanitize_uint(
+                a,
+                first(a, c)?,
+                4,
+                ErrorCode::AssertHeightRelative,
+                ErrorCode::AssertHeightRelative,
+            ) {
                 // Height is always positive, so a negative requirement is always true,
                 Err(ValidationErr(_, ErrorCode::NegativeAmount)) => Ok(Condition::Skip),
                 Err(r) => Err(r),
@@ -397,7 +416,14 @@ fn parse_spend_conditions(
     spend = rest(a, spend)?;
     let puzzle_hash = sanitize_hash(a, first(a, spend)?, 32, ErrorCode::InvalidPuzzleHash)?;
     spend = rest(a, spend)?;
-    let amount_buf = sanitize_uint(a, first(a, spend)?, 8, ErrorCode::InvalidCoinAmount)?.to_vec();
+    let amount_buf = sanitize_uint(
+        a,
+        first(a, spend)?,
+        8,
+        ErrorCode::InvalidCoinAmount,
+        ErrorCode::InvalidCoinAmount,
+    )?
+    .to_vec();
     let my_amount = u64_from_bytes(&amount_buf);
     let cond = rest(a, spend)?;
     let coin_id = Arc::new(compute_coin_id(a, parent_id, puzzle_hash, &amount_buf));
@@ -2050,7 +2076,7 @@ fn test_create_coin_amount_exceeds_max() {
         cond_test("((({h1} ({h2} (123 (((51 ({h2} (0x010000000000000000 )))))")
             .unwrap_err()
             .1,
-        ErrorCode::InvalidCoinAmount
+        ErrorCode::AmountExceedsMaximum
     );
 }
 
@@ -2061,7 +2087,7 @@ fn test_create_coin_negative_amount() {
         cond_test("((({h1} ({h2} (123 (((51 ({h2} (-1 )))))")
             .unwrap_err()
             .1,
-        ErrorCode::InvalidCoinAmount
+        ErrorCode::NegativeAmount
     );
 }
 

@@ -20,8 +20,7 @@ pub fn sanitize_hash(
 
 pub fn parse_amount(a: &Allocator, n: NodePtr, code: ErrorCode) -> Result<u64, ValidationErr> {
     // amounts are not allowed to exceed 2^64. i.e. 8 bytes
-    match sanitize_uint(a, n, 8, code) {
-        Err(ValidationErr(n, ErrorCode::NegativeAmount)) => Err(ValidationErr(n, code)),
+    match sanitize_uint(a, n, 8, code, ErrorCode::AmountExceedsMaximum) {
         Err(r) => Err(r),
         Ok(r) => Ok(u64_from_bytes(r)),
     }
@@ -31,7 +30,7 @@ pub fn parse_amount(a: &Allocator, n: NodePtr, code: ErrorCode) -> Result<u64, V
 // condition can be ignored and this functon returns 0
 pub fn parse_height(a: &Allocator, n: NodePtr, code: ErrorCode) -> Result<u32, ValidationErr> {
     // heights are not allowed to exceed 2^32. i.e. 4 bytes
-    match sanitize_uint(a, n, 4, code) {
+    match sanitize_uint(a, n, 4, code, code) {
         // Height is always positive, so a negative requirement is always true,
         // just like 0.
         Err(ValidationErr(_, ErrorCode::NegativeAmount)) => Ok(0),
@@ -43,7 +42,7 @@ pub fn parse_height(a: &Allocator, n: NodePtr, code: ErrorCode) -> Result<u32, V
 // negative seconds are always valid conditions, and will return 0
 pub fn parse_seconds(a: &Allocator, n: NodePtr, code: ErrorCode) -> Result<u64, ValidationErr> {
     // seconds are not allowed to exceed 2^64. i.e. 8 bytes
-    match sanitize_uint(a, n, 8, code) {
+    match sanitize_uint(a, n, 8, code, code) {
         // seconds is always positive, so a negative requirement is always true,
         // we don't need to include this condition
         Err(ValidationErr(_, ErrorCode::NegativeAmount)) => Ok(0),
@@ -143,15 +142,15 @@ fn test_sanitize_amount() {
     // regardless of flags
     assert_eq!(
         amount_tester(&[0x80]).unwrap_err().1,
-        ErrorCode::InvalidCoinAmount
+        ErrorCode::NegativeAmount
     );
     assert_eq!(
         amount_tester(&[0xff]).unwrap_err().1,
-        ErrorCode::InvalidCoinAmount
+        ErrorCode::NegativeAmount
     );
     assert_eq!(
         amount_tester(&[0xff, 0]).unwrap_err().1,
-        ErrorCode::InvalidCoinAmount
+        ErrorCode::NegativeAmount
     );
 
     // leading zeros are somtimes necessary to make values positive
@@ -179,7 +178,7 @@ fn test_sanitize_amount() {
         amount_tester(&[0x7f, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
             .unwrap_err()
             .1,
-        ErrorCode::InvalidCoinAmount
+        ErrorCode::AmountExceedsMaximum
     );
 
     // this is small enough though

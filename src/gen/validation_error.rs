@@ -3,6 +3,7 @@ use clvmr::allocator::{Allocator, NodePtr, SExp};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorCode {
     NegativeAmount,
+    AmountExceedsMaximum,
     InvalidConditionOpcode,
     InvalidParentId,
     InvalidPuzzleHash,
@@ -44,6 +45,7 @@ impl From<ErrorCode> for u32 {
     fn from(err: ErrorCode) -> u32 {
         match err {
             ErrorCode::NegativeAmount => 124,
+            ErrorCode::AmountExceedsMaximum => 16,
             ErrorCode::InvalidPuzzleHash => 10,
             ErrorCode::InvalidPubkey => 10,
             ErrorCode::InvalidMessage => 10,
