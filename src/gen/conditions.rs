@@ -629,7 +629,7 @@ use clvmr::node::Node;
 #[cfg(test)]
 use clvmr::number::{ptr_from_number, Number};
 #[cfg(test)]
-use clvmr::serialize::node_to_bytes;
+use clvmr::serde::node_to_bytes;
 #[cfg(test)]
 use hex::FromHex;
 #[cfg(test)]
