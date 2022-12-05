@@ -22,9 +22,16 @@ pub fn parse_amount(a: &Allocator, n: NodePtr, code: ErrorCode) -> Result<u64, V
     // amounts are not allowed to exceed 2^64. i.e. 8 bytes
     match sanitize_uint(a, n, 8, code) {
         Err(ValidationErr(n, ErrorCode::NegativeAmount)) => Err(ValidationErr(n, code)),
+        Err(ValidationErr(n, ErrorCode::AmountExceedsMaximum)) => Err(ValidationErr(n, code)),
         Err(r) => Err(r),
         Ok(r) => Ok(u64_from_bytes(r)),
     }
+}
+
+pub fn parse_create_coin_amount(a: &Allocator, n: NodePtr) -> Result<u64, ValidationErr> {
+    // amounts are not allowed to exceed 2^64. i.e. 8 bytes
+    let buf = sanitize_uint(a, n, 8, ErrorCode::InvalidCoinAmount)?;
+    Ok(u64_from_bytes(buf))
 }
 
 // a negative height is always true. In this case the
@@ -35,6 +42,7 @@ pub fn parse_height(a: &Allocator, n: NodePtr, code: ErrorCode) -> Result<u32, V
         // Height is always positive, so a negative requirement is always true,
         // just like 0.
         Err(ValidationErr(_, ErrorCode::NegativeAmount)) => Ok(0),
+        Err(ValidationErr(n, ErrorCode::AmountExceedsMaximum)) => Err(ValidationErr(n, code)),
         Err(r) => Err(r),
         Ok(r) => Ok(u64_from_bytes(r) as u32),
     }
@@ -47,6 +55,7 @@ pub fn parse_seconds(a: &Allocator, n: NodePtr, code: ErrorCode) -> Result<u64, 
         // seconds is always positive, so a negative requirement is always true,
         // we don't need to include this condition
         Err(ValidationErr(_, ErrorCode::NegativeAmount)) => Ok(0),
+        Err(ValidationErr(n, ErrorCode::AmountExceedsMaximum)) => Err(ValidationErr(n, code)),
         Err(r) => Err(r),
         Ok(r) => Ok(u64_from_bytes(r)),
     }
@@ -140,7 +149,6 @@ fn amount_tester(buf: &[u8]) -> Result<u64, ValidationErr> {
 #[test]
 fn test_sanitize_amount() {
     // negative amounts are not allowed
-    // regardless of flags
     assert_eq!(
         amount_tester(&[0x80]).unwrap_err().1,
         ErrorCode::InvalidCoinAmount
@@ -156,7 +164,7 @@ fn test_sanitize_amount() {
 
     // leading zeros are somtimes necessary to make values positive
     assert_eq!(amount_tester(&[0, 0xff]), Ok(0xff));
-    // but are stripped when they are redundant
+    // but are disallowed when they are redundant
     assert_eq!(
         amount_tester(&[0, 0, 0, 0xff]).unwrap_err().1,
         ErrorCode::InvalidCoinAmount
@@ -185,6 +193,35 @@ fn test_sanitize_amount() {
     // this is small enough though
     assert_eq!(
         amount_tester(&[0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]),
+        Ok(0xffffffffffffffff)
+    );
+}
+
+#[cfg(test)]
+fn create_amount_tester(buf: &[u8]) -> Result<u64, ValidationErr> {
+    let mut a = Allocator::new();
+    let n = a.new_atom(buf).unwrap();
+
+    parse_create_coin_amount(&mut a, n)
+}
+
+#[test]
+fn test_sanitize_create_coin_amount() {
+    // negative coin amounts are not allowed
+    assert_eq!(
+        create_amount_tester(&[0xff]).unwrap_err().1,
+        ErrorCode::NegativeAmount
+    );
+    // amounts aren't allowed to be too big
+    let large_buf = [0x7f, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    assert_eq!(
+        create_amount_tester(&large_buf).unwrap_err().1,
+        ErrorCode::AmountExceedsMaximum
+    );
+
+    // this is small enough though
+    assert_eq!(
+        create_amount_tester(&[0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]),
         Ok(0xffffffffffffffff)
     );
 }

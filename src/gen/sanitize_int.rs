@@ -32,7 +32,7 @@ pub fn sanitize_uint(
 
     // if there are too many bytes left in the value, it's too big
     if buf.len() > size_limit {
-        return Err(ValidationErr(n, code));
+        return Err(ValidationErr(n, ErrorCode::AmountExceedsMaximum));
     }
 
     Ok(buf)
@@ -86,5 +86,11 @@ fn test_sanitize_uint() {
     assert_eq!(
         sanitize_uint(&a, a1, 8, e).unwrap_err().1,
         ErrorCode::InvalidCoinAmount
+    );
+
+    let exceed_maximum = a.new_substr(atom, 100, 110).unwrap();
+    assert_eq!(
+        sanitize_uint(&a, exceed_maximum, 8, e).unwrap_err().1,
+        ErrorCode::AmountExceedsMaximum
     );
 }

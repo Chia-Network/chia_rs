@@ -1,6 +1,7 @@
 use super::coin_id::compute_coin_id;
 use super::condition_sanitizers::{
-    parse_amount, parse_height, parse_seconds, sanitize_announce_msg, sanitize_hash,
+    parse_amount, parse_create_coin_amount, parse_height, parse_seconds, sanitize_announce_msg,
+    sanitize_hash,
 };
 use super::opcodes::{
     parse_opcode, ConditionOpcode, AGG_SIG_COST, AGG_SIG_ME, AGG_SIG_UNSAFE, ALWAYS_TRUE,
@@ -132,7 +133,7 @@ pub fn parse_args(
         CREATE_COIN => {
             let puzzle_hash = sanitize_hash(a, first(a, c)?, 32, ErrorCode::InvalidPuzzleHash)?;
             c = rest(a, c)?;
-            let amount = parse_amount(a, first(a, c)?, ErrorCode::InvalidCoinAmount)?;
+            let amount = parse_create_coin_amount(a, first(a, c)?)?;
             // CREATE_COIN takes an optional 3rd parameter, which is a list of
             // byte buffers (typically a 32 byte hash). We only pull out the
             // first element for now, but may support more in the future.
@@ -235,29 +236,27 @@ pub fn parse_args(
             if (flags & STRICT_ARGS_COUNT) != 0 {
                 check_nil(a, rest(a, c)?)?;
             }
-            Ok(Condition::AssertSecondsRelative(parse_seconds(
-                a,
-                first(a, c)?,
-                ErrorCode::AssertSecondsRelative,
-            )?))
+            let seconds = parse_seconds(a, first(a, c)?, ErrorCode::AssertSecondsRelative)?;
+            Ok(Condition::AssertSecondsRelative(seconds))
         }
         ASSERT_SECONDS_ABSOLUTE => {
             if (flags & STRICT_ARGS_COUNT) != 0 {
                 check_nil(a, rest(a, c)?)?;
             }
-            Ok(Condition::AssertSecondsAbsolute(parse_seconds(
-                a,
-                first(a, c)?,
-                ErrorCode::AssertSecondsAbsolute,
-            )?))
+            let seconds = parse_seconds(a, first(a, c)?, ErrorCode::AssertSecondsAbsolute)?;
+            Ok(Condition::AssertSecondsAbsolute(seconds))
         }
         ASSERT_HEIGHT_RELATIVE => {
             if (flags & STRICT_ARGS_COUNT) != 0 {
                 check_nil(a, rest(a, c)?)?;
             }
-            match sanitize_uint(a, first(a, c)?, 4, ErrorCode::AssertHeightRelative) {
+            let code = ErrorCode::AssertHeightRelative;
+            match sanitize_uint(a, first(a, c)?, 4, code) {
                 // Height is always positive, so a negative requirement is always true,
                 Err(ValidationErr(_, ErrorCode::NegativeAmount)) => Ok(Condition::Skip),
+                Err(ValidationErr(n, ErrorCode::AmountExceedsMaximum)) => {
+                    Err(ValidationErr(n, code))
+                }
                 Err(r) => Err(r),
                 Ok(r) => Ok(Condition::AssertHeightRelative(u64_from_bytes(r) as u32)),
             }
@@ -266,11 +265,8 @@ pub fn parse_args(
             if (flags & STRICT_ARGS_COUNT) != 0 {
                 check_nil(a, rest(a, c)?)?;
             }
-            Ok(Condition::AssertHeightAbsolute(parse_height(
-                a,
-                first(a, c)?,
-                ErrorCode::AssertHeightAbsolute,
-            )?))
+            let height = parse_height(a, first(a, c)?, ErrorCode::AssertHeightAbsolute)?;
+            Ok(Condition::AssertHeightAbsolute(height))
         }
         ALWAYS_TRUE => {
             // this condition is always true, we always ignore arguments
@@ -397,10 +393,10 @@ fn parse_spend_conditions(
     spend = rest(a, spend)?;
     let puzzle_hash = sanitize_hash(a, first(a, spend)?, 32, ErrorCode::InvalidPuzzleHash)?;
     spend = rest(a, spend)?;
-    let amount_buf = sanitize_uint(a, first(a, spend)?, 8, ErrorCode::InvalidCoinAmount)?.to_vec();
-    let my_amount = u64_from_bytes(&amount_buf);
+    let my_amount = parse_amount(a, first(a, spend)?, ErrorCode::InvalidCoinAmount)?;
     let cond = rest(a, spend)?;
-    let coin_id = Arc::new(compute_coin_id(a, parent_id, puzzle_hash, &amount_buf));
+    let amount_buf = a.atom(first(a, spend)?);
+    let coin_id = Arc::new(compute_coin_id(a, parent_id, puzzle_hash, amount_buf));
 
     if !state.spent_coins.insert(coin_id.clone()) {
         // if this coin ID has already been added to this set, it's a double
@@ -2050,7 +2046,7 @@ fn test_create_coin_amount_exceeds_max() {
         cond_test("((({h1} ({h2} (123 (((51 ({h2} (0x010000000000000000 )))))")
             .unwrap_err()
             .1,
-        ErrorCode::InvalidCoinAmount
+        ErrorCode::AmountExceedsMaximum
     );
 }
 
@@ -2061,7 +2057,7 @@ fn test_create_coin_negative_amount() {
         cond_test("((({h1} ({h2} (123 (((51 ({h2} (-1 )))))")
             .unwrap_err()
             .1,
-        ErrorCode::InvalidCoinAmount
+        ErrorCode::NegativeAmount
     );
 }
 
@@ -2679,7 +2675,7 @@ fn test_single_spend_negative_amount() {
     // the coin we're trying to spend has a negative amount (i.e. it's invalid)
     assert_eq!(
         cond_test("((({h1} ({h2} (-123 ())))").unwrap_err().1,
-        ErrorCode::NegativeAmount
+        ErrorCode::InvalidCoinAmount
     );
 }
 
