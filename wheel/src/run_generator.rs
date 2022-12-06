@@ -12,7 +12,7 @@ use clvmr::chia_dialect::LIMIT_HEAP;
 use clvmr::cost::Cost;
 use clvmr::reduction::{EvalErr, Reduction};
 use clvmr::run_program::run_program;
-use clvmr::serialize::node_from_bytes;
+use clvmr::serde::node_from_bytes;
 
 use pyo3::prelude::*;
 

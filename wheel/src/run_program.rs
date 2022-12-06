@@ -4,7 +4,7 @@ use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;
 use clvmr::reduction::Response;
 use clvmr::run_program::run_program;
-use clvmr::serialize::{node_from_bytes, serialized_length_from_bytes};
+use clvmr::serde::{node_from_bytes, serialized_length_from_bytes};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyTuple};
 use std::rc::Rc;

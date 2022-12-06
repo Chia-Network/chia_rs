@@ -13,7 +13,7 @@ use std::convert::TryInto;
 use clvmr::chia_dialect::LIMIT_HEAP;
 use clvmr::chia_dialect::NO_NEG_DIV;
 use clvmr::chia_dialect::NO_UNKNOWN_OPS;
-use clvmr::serialize::tree_hash_from_stream;
+use clvmr::serde::tree_hash_from_stream;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use pyo3::types::PyModule;
@@ -34,8 +34,8 @@ use clvmr::node::Node;
 use clvmr::reduction::EvalErr;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
-use clvmr::serialize::node_from_bytes;
-use clvmr::serialize::node_to_bytes;
+use clvmr::serde::node_from_bytes;
+use clvmr::serde::node_to_bytes;
 
 pub const MEMPOOL_MODE: u32 =
     NO_NEG_DIV | NO_UNKNOWN_CONDS | NO_UNKNOWN_OPS | COND_ARGS_NIL | STRICT_ARGS_COUNT | LIMIT_HEAP;
