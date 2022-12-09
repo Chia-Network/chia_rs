@@ -26,11 +26,14 @@ def parse_output(result, error_code) -> str:
 
 for g in sorted(glob.glob('generators/*.clvm')):
     print(f"{g}")
+    sys.stdout.write("running generator...\r")
     start_time = perf_counter()
     error_code, result = run_gen(g, 0, "generators/block-834752.hex")
     run_time = perf_counter() - start_time
     output = parse_output(result, error_code)
 
+    sys.stdout.write("running generator (mempool mode) ...\r")
+    sys.stdout.flush()
     start_time = perf_counter()
     error_code2, result2 = run_gen(g, MEMPOOL_MODE, "generators/block-834752.hex")
     run_time2 = perf_counter() - start_time
@@ -46,6 +49,9 @@ for g in sorted(glob.glob('generators/*.clvm')):
         else:
             expected, expected2 = expected.split("STRICT:\n", 1)
 
+        sys.stdout.write("\x1b[K")
+        sys.stdout.flush()
+
         if run_time != 0:
             compare_output(output, expected, "")
             print(f"  run-time: {run_time:.2f}s")
@@ -53,18 +59,19 @@ for g in sorted(glob.glob('generators/*.clvm')):
         compare_output(output2, expected2, "STRICT")
         print(f"  run-time: {run_time2:.2f}s")
 
+        # this is the ambition with future optimizations
         limit = 1.5
         strict_limit = 1.5
 
         # temporary higher limits until this is optimized
         if "duplicate-coin-announce.clvm" in g:
-            limit = 9
-            strict_limit = 3
+            limit = 10
+            strict_limit = 5
         elif "negative-reserve-fee.clvm" in g:
             limit = 4
         elif "block-834752" in g:
-            limit = 2
-            strict_limit = 2
+            limit = 3
+            strict_limit = 3
         elif "block-834760" in g:
             limit = 10
             strict_limit = 10
@@ -75,12 +82,13 @@ for g in sorted(glob.glob('generators/*.clvm')):
             limit = 6
             strict_limit = 6
         elif "block-834768" in g:
-            limit = 6
-            strict_limit = 6
+            limit = 7
+            strict_limit = 7
         elif "infinite-recursion" in g:
-            limit = 8
+            limit = 12
+            strict_limit = 2
         elif "deep-recursion-plus" in g:
-            limit = 6
+            limit = 8
             strict_limit = 6
 
         if sys.version_info[:2] == (3, 11):
