@@ -1,3 +1,4 @@
+pub mod compression;
 pub mod gen;
 pub mod merkle_set;
 

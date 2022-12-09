@@ -1,3 +1,4 @@
+use crate::compression;
 use crate::run_generator::{PySpend, PySpendBundleConditions, __pyo3_get_function_run_generator};
 use chia::gen::flags::COND_ARGS_NIL;
 use chia::gen::flags::NO_UNKNOWN_CONDS;
@@ -108,7 +109,7 @@ pub fn get_puzzle_and_solution_for_coin<'py>(
 }
 
 #[pymodule]
-pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     // generator functions
     m.add_function(wrap_pyfunction!(run_generator, m)?)?;
     m.add_class::<PySpendBundleConditions>()?;
@@ -198,6 +199,8 @@ pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(compute_merkle_set_root, m)?)?;
     m.add_function(wrap_pyfunction!(tree_hash, m)?)?;
     m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin, m)?)?;
+
+    compression::add_submodule(py, m)?;
 
     Ok(())
 }
