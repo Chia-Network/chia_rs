@@ -31,13 +31,13 @@ to_json_primitive!(String);
 
 impl<const N: usize> ToJsonDict for BytesImpl<N> {
     fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
-        Ok(format!("0x{}", self).to_object(py))
+        Ok(format!("0x{self}").to_object(py))
     }
 }
 
 impl ToJsonDict for Bytes {
     fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
-        Ok(format!("0x{}", self).to_object(py))
+        Ok(format!("0x{self}").to_object(py))
     }
 }
 

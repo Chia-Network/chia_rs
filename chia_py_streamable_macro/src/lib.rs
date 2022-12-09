@@ -102,7 +102,7 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
             let mut ftypes = Vec::<syn::Type>::new();
             for (index, f) in unnamed.iter().enumerate() {
                 ftypes.push(f.ty.clone());
-                fnames.push(syn::Ident::new(&format!("a{}", index), Span::call_site()));
+                fnames.push(syn::Ident::new(&format!("a{index}"), Span::call_site()));
             }
 
             py_protocol.extend(quote! {
