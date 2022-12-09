@@ -11,6 +11,7 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 clvmr = "=0.2.2"
+clvm-utils = { version = "=0.1.16", path = "../clvm-utils" }
 
 [dependencies.chia]
 path = ".."
@@ -40,5 +41,11 @@ doc = false
 [[bin]]
 name = "parse-conditions"
 path = "fuzz_targets/parse-conditions.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "self-extractor"
+path = "fuzz_targets/self-extractor.rs"
 test = false
 doc = false

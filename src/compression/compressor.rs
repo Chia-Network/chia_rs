@@ -1,10 +1,10 @@
 use clvmr::allocator::{Allocator, NodePtr};
-use clvmr::chia_dialect::ChiaDialect;
 use clvmr::node::Node;
-use clvmr::run_program::run_program;
-use clvmr::serde::{node_from_bytes, node_to_bytes, node_to_bytes_backrefs};
+use clvmr::serde::{
+    node_from_bytes, node_from_bytes_backrefs, node_to_bytes, node_to_bytes_backrefs,
+};
 
-fn wrap_atom_with_decompression_program(
+pub fn wrap_atom_with_decompression_program(
     allocator: &mut Allocator,
     node_ptr: NodePtr,
 ) -> Result<NodePtr, std::io::Error> {
@@ -25,19 +25,7 @@ fn wrap_atom_with_decompression_program(
 }
 
 pub fn decompress(allocator: &mut Allocator, blob: &[u8]) -> Result<NodePtr, std::io::Error> {
-    let max_cost = u64::MAX;
-    let node_ptr = allocator.new_atom(blob)?;
-    let program = wrap_atom_with_decompression_program(allocator, node_ptr)?;
-    let dialect = ChiaDialect::new(0);
-    let reduction = run_program(
-        allocator,
-        &dialect,
-        program,
-        allocator.null(),
-        max_cost,
-        None,
-    )?;
-    Ok(reduction.1)
+    node_from_bytes_backrefs(allocator, blob)
 }
 
 pub fn create_autoextracting_clvm_program(input_program: &[u8]) -> std::io::Result<Vec<u8>> {
