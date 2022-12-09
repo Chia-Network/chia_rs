@@ -99,7 +99,7 @@ def parse_rust_source(filename: str) -> List[Tuple[str, List[str]]]:
             if ":" in line:
                 name, rust_type = line.split("//")[0].strip().split(":")
                 # members are separated by , in rust. Strip that off
-                rust_type = rust_type.split(",")[0]
+                rust_type = rust_type.rsplit(",",1)[0]
                 py_type = rust_type_to_python(rust_type)
                 members.append(f"{name}: {py_type}")
 
