@@ -1,0 +1,29 @@
+[package]
+name = "chia_connection"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Functions to establish a connection to a chia full node"
+authors = ["Arvid Norberg <arvid@chia.net>"]
+homepage = "https://github.com/Chia-Network/chia_rs/chia-connection"
+repository = "https://github.com/Chia-Network/chia_rs/chia-connection"
+
+[dependencies]
+chia-protocol = { path = "../chia-protocol" }
+tokio = { version = "1.23.0", features = ["full"] }
+futures-util = "*"
+futures-channel = "*"
+tokio-tungstenite = { version = "0.18.0", features = ["native-tls"]}
+url = "=2.3.1"
+native-tls = "=0.2.11"
+hex = "^0.4.3"
+
+#[lib]
+#name = "chia_connection"
+#crate-type = ["rlib"]
+
+[[bin]]
+name = "connect_to_node"
+
+[profile.release]
+lto = true
