@@ -58,6 +58,7 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
             py_protocol.extend( quote! {
                 #[pymethods]
                 impl #ident {
+                    #[allow(too_many_arguments)]
                     #[new]
                     fn new ( #(#fnames : #ftypes),* ) -> #ident {
                         #ident { #(#fnames),* }
