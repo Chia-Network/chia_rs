@@ -114,7 +114,7 @@ pub enum ProtocolMessageTypes {
     // More wallet protocol
     CoinStateUpdate = 69,
     RegisterForPhUpdates = 70,
-    RespondToPhUpdate = 71,
+    RespondToPhUpdates = 71,
     RegisterForCoinUpdates = 72,
     RespondToCoinUpdates = 73,
     RequestChildren = 74,

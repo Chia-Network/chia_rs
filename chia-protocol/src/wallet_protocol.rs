@@ -145,7 +145,11 @@ message_struct! (RegisterForPhUpdates {
     min_height: u32,
 });
 
-// struct RespondToPhUpdates
+message_struct! (RespondToPhUpdates {
+    puzzle_hashes: Vec<Bytes32>,
+    min_height: u32,
+    coin_states: Vec<CoinState>,
+});
 
 message_struct! (RegisterForCoinUpdates {
     coin_ids: Vec<Bytes32>,
