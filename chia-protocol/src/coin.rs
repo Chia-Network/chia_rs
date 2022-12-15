@@ -1,28 +1,27 @@
+use crate::bytes::Bytes32;
+use crate::chia_error;
+use crate::streamable::Streamable;
+use crate::streamable_struct;
+use chia_streamable_macro::Streamable;
+use sha2::{Digest, Sha256};
+use std::convert::TryInto;
+
 #[cfg(feature = "py-bindings")]
 use crate::from_json_dict::FromJsonDict;
 #[cfg(feature = "py-bindings")]
 use crate::to_json_dict::ToJsonDict;
 #[cfg(feature = "py-bindings")]
 use chia_py_streamable_macro::PyStreamable;
-use chia_streamable_macro::Streamable;
-
-use crate::bytes::Bytes32;
-use crate::chia_error;
-use crate::streamable::Streamable;
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
 #[cfg(feature = "py-bindings")]
 use pyo3::types::PyBytes;
-use sha2::{Digest, Sha256};
-use std::convert::TryInto;
 
-#[cfg_attr(feature = "py-bindings", pyclass, derive(PyStreamable))]
-#[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
-pub struct Coin {
+streamable_struct!(Coin {
     parent_coin_info: Bytes32,
     puzzle_hash: Bytes32,
     amount: u64,
-}
+});
 
 impl Coin {
     pub fn coin_id(&self) -> [u8; 32] {

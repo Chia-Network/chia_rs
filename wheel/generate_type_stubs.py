@@ -78,6 +78,8 @@ def parse_rust_source(filename: str) -> List[Tuple[str, List[str]]]:
             if not in_struct:
                 if line.startswith("pub struct ") and "{" in line:
                     in_struct = line.split("pub struct ")[1].split("{")[0].strip()
+                elif line.startswith("streamable_struct! (") and "{" in line:
+                    in_struct = line.split("streamable_struct! (")[1].split("{")[0].strip()
                 elif line.startswith("pub struct ") and "(" in line and ");" in line:
                     name = line.split("pub struct ")[1].split("(")[0].strip()
                     rust_args = line.split("(")[1].split(");")[0]
