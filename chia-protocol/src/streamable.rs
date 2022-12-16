@@ -741,3 +741,28 @@ fn test_stream_u128() {
         ]
     );
 }
+
+#[cfg(test)]
+#[derive(Streamable, Hash, Copy, Debug, Clone, Eq, PartialEq)]
+enum TestEnum {
+    A = 0,
+    B = 1,
+    C = 255,
+}
+
+#[test]
+fn test_parse_enum() {
+    from_bytes::<TestEnum>(&[0], TestEnum::A);
+    from_bytes::<TestEnum>(&[1], TestEnum::B);
+    from_bytes::<TestEnum>(&[255], TestEnum::C);
+    from_bytes_fail::<TestEnum>(&[3], Error::InvalidEnum);
+    from_bytes_fail::<TestEnum>(&[254], Error::InvalidEnum);
+    from_bytes_fail::<TestEnum>(&[128], Error::InvalidEnum);
+}
+
+#[test]
+fn test_stream_enum() {
+    assert_eq!(stream::<TestEnum>(&TestEnum::A), &[0_u8]);
+    assert_eq!(stream::<TestEnum>(&TestEnum::B), &[1_u8]);
+    assert_eq!(stream::<TestEnum>(&TestEnum::C), &[255_u8]);
+}

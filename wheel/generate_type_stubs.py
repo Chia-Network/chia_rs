@@ -5,6 +5,8 @@ from glob import glob
 output_file = Path(__file__).parent.resolve() / "chia_rs.pyi"
 input_dir = Path(__file__).parent.parent.resolve() / "chia-protocol" / "src"
 
+# enums are exposed to python as int
+enums = set(["NodeType", "ProtocolMessageType"])
 
 def transform_type(m: str) -> str:
     n, t = m.split(":")
@@ -12,6 +14,8 @@ def transform_type(m: str) -> str:
         t = t.replace("List[", "Sequence[")
     elif "bytes32" == t.strip():
         t = " bytes"
+    elif t.strip() in enums:
+        t = " int"
     return f"{n}:{t}"
 
 

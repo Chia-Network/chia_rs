@@ -13,6 +13,7 @@ pub enum Error {
     InvalidString,
     InputTooLarge,
     SequenceTooLarge,
+    InvalidEnum,
     Custom(String),
 }
 
@@ -27,6 +28,7 @@ impl fmt::Display for Error {
             Error::EndOfBuffer => write!(fmt, "unexpected end of buffer"),
             Error::InputTooLarge => write!(fmt, "input buffer too large"),
             Error::SequenceTooLarge => write!(fmt, "sequence too large"),
+            Error::InvalidEnum => write!(fmt, "invalid enum value"),
             Error::Custom(ref s) => s.fmt(fmt),
         }
     }
