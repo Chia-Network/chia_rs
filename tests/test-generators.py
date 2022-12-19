@@ -90,6 +90,9 @@ for g in sorted(glob.glob('generators/*.clvm')):
         elif "deep-recursion-plus" in g:
             limit = 8
             strict_limit = 6
+        elif "generators/recursion-pairs.clvm" in g:
+            limit = 14
+            strict_limit = 4
 
         if sys.version_info[:2] == (3, 11):
             limit *= 1.3
