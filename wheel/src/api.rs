@@ -1,5 +1,5 @@
 use crate::compression;
-use crate::run_generator::{PySpend, PySpendBundleConditions, __pyo3_get_function_run_generator};
+use crate::run_generator::{PySpend, PySpendBundleConditions, __pyo3_get_function_run_generator, __pyo3_get_function_run_block_generator};
 use chia::gen::flags::COND_ARGS_NIL;
 use chia::gen::flags::NO_UNKNOWN_CONDS;
 use chia::gen::flags::STRICT_ARGS_COUNT;
@@ -112,6 +112,7 @@ pub fn get_puzzle_and_solution_for_coin<'py>(
 pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     // generator functions
     m.add_function(wrap_pyfunction!(run_generator, m)?)?;
+    m.add_function(wrap_pyfunction!(run_block_generator, m)?)?;
     m.add_class::<PySpendBundleConditions>()?;
     m.add("ELIGIBLE_FOR_DEDUP", chia::gen::conditions::ELIGIBLE_FOR_DEDUP)?;
     m.add_class::<PySpend>()?;

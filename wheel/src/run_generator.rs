@@ -4,6 +4,7 @@ use chia_protocol::to_json_dict::ToJsonDict;
 
 use chia::gen::conditions::{parse_spends, Spend, SpendBundleConditions};
 use chia::gen::validation_error::{ErrorCode, ValidationErr};
+use chia::gen::run_block_generator::run_block_generator as native_run_block_generator;
 use chia_protocol::bytes::{Bytes, Bytes32, Bytes48};
 
 use clvmr::allocator::Allocator;
@@ -15,6 +16,7 @@ use clvmr::run_program::run_program;
 use clvmr::serde::node_from_bytes;
 
 use pyo3::prelude::*;
+use pyo3::types::PyList;
 
 use chia_protocol::chia_error;
 use chia_protocol::streamable::Streamable;
@@ -100,7 +102,6 @@ fn convert_spend_bundle_conds(a: &Allocator, sb: SpendBundleConditions) -> PySpe
 // returns the cost of running the CLVM program along with conditions and the list of
 // spends
 #[pyfunction]
-#[allow(clippy::borrow_deref_ref)]
 pub fn run_generator(
     py: Python,
     program: &[u8],
@@ -142,11 +143,45 @@ pub fn run_generator(
                 None,
                 Some(convert_spend_bundle_conds(&allocator, spend_bundle_conds)),
             ))
-        }
+        },
         Ok((error_code, _)) => {
             // a validation error occurred
             Ok((error_code.map(|x| x.into()), None))
         }
         Err(eval_err) => eval_err_to_pyresult(py, eval_err, allocator),
+    }
+}
+
+#[pyfunction]
+pub fn run_block_generator(
+    _py: Python,
+    program: &[u8],
+    block_refs: &PyList,
+    max_cost: Cost,
+    flags: u32,
+) -> PyResult<(Option<u32>, Option<PySpendBundleConditions>)> {
+    let mut allocator = if flags & LIMIT_HEAP != 0 {
+        Allocator::new_limited(500000000, 62500000, 62500000)
+    } else {
+        Allocator::new()
+    };
+
+    let mut refs = Vec::<Vec<u8>>::new();
+    for g in block_refs {
+        refs.push(g.extract::<Vec<u8>>()?);
+    }
+
+    match native_run_block_generator(&mut allocator, program, &refs, max_cost, flags) {
+        Ok(spend_bundle_conds) => {
+            // everything was successful
+            Ok((
+                None,
+                Some(convert_spend_bundle_conds(&allocator, spend_bundle_conds)),
+            ))
+        },
+        Err(ValidationErr(_, error_code)) => {
+            // a validation error occurred
+            Ok((Some(error_code.into()), None))
+        }
     }
 }
