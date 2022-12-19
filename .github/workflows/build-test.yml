@@ -225,6 +225,23 @@ jobs:
         python wheel/generate_type_stubs.py
         git diff --exit-code
 
+  build-tools:
+    name: build chia-tools
+    runs-on: ubuntu-latest
+    steps:
+    - name: Clean workspace
+      uses: Chia-Network/actions/clean-workspace@main
+
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: cargo build
+      run: |
+        cd chia-tools
+        cargo build
+
   build-sdist:
     name: sdist - ${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }}
     runs-on: ${{ matrix.os.runs-on[matrix.arch.matrix] }}
