@@ -1,0 +1,2 @@
+(a (q 2 2 (c 2 (c 5 (c 11 ())))) (c (q 11 (substr 11 (q . 1)) (substr 11 (q . 2)) (substr 11 (q . 3)) (substr 11 (q . 5)) (a 2 (c 2 (c 5 ())))) 1))
+FAILED: 117
