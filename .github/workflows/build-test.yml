@@ -308,19 +308,26 @@ jobs:
       - name: cargo-fuzz
         run: cargo +nightly install cargo-fuzz
       - name: cargo fuzz (chia_rs)
-        run: cargo +nightly fuzz build
+        run: cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=30 || exit 255"
       - name: cargo fuzz (chia-bls)
+        env:
+          # we disable leak reports here because blspy appears to be allocating
+          # memory that's not freed. It might be a false positive since python is
+          # not unloaded before exiting
+          LSAN_OPTIONS: detect_leaks=0
         run: |
           cd chia-bls
-          cargo +nightly fuzz build
+          python -m pip install blspy
+          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=3 || exit 255"
       - name: cargo fuzz (clvm-utils)
         run: |
           cd clvm-utils
-          cargo +nightly fuzz build
+          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=30 || exit 255"
       - name: cargo fuzz (chia-protocol)
         run: |
           cd chia-protocol
           cargo +nightly fuzz build
+          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=30 || exit 255"
 
   unit_tests:
     runs-on: ${{ matrix.os }}
