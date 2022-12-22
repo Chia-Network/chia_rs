@@ -6,7 +6,7 @@ output_file = Path(__file__).parent.resolve() / "chia_rs.pyi"
 input_dir = Path(__file__).parent.parent.resolve() / "chia-protocol" / "src"
 
 # enums are exposed to python as int
-enums = set(["NodeType", "ProtocolMessageType"])
+enums = set(["NodeType", "ProtocolMessageTypes"])
 
 def transform_type(m: str) -> str:
     n, t = m.split(":")
@@ -53,7 +53,7 @@ class {name}:
 
 
 def rust_type_to_python(t: str) -> str:
-    return (
+    ret = (
         t.replace("<", "[")
         .replace(">", "]")
         .replace("Vec", "List")
@@ -71,6 +71,9 @@ def rust_type_to_python(t: str) -> str:
         .replace("i128", "int")
         .strip()
     )
+    if ret in enums:
+        ret = "int"
+    return ret
 
 
 def parse_rust_source(filename: str) -> List[Tuple[str, List[str]]]:

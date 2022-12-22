@@ -150,12 +150,12 @@ class G2Element:
     def from_json_dict(o: Dict[str, Any]) -> G2Element: ...
 
 class Message:
-    msg_type: ProtocolMessageTypes
+    msg_type: int
     id: Optional[int]
     data: bytes
     def __init__(
         self,
-        msg_type: ProtocolMessageTypes,
+        msg_type: int,
         id: Optional[int],
         data: bytes
     ) -> None: ...
@@ -181,7 +181,7 @@ class Handshake:
     protocol_version: String
     software_version: String
     server_port: int
-    node_type: NodeType
+    node_type: int
     capabilities: List[(int, String)]
     def __init__(
         self,
