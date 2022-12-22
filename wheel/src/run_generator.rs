@@ -120,7 +120,7 @@ pub fn run_generator(
     let r = py.allow_threads(
         || -> Result<(Option<ErrorCode>, Option<SpendBundleConditions>), EvalErr> {
             let Reduction(cost, node) =
-                run_program(&mut allocator, dialect, program, args, max_cost, None)?;
+                run_program(&mut allocator, dialect, program, args, max_cost)?;
             // we pass in what's left of max_cost here, to fail early in case the
             // cost of a condition brings us over the cost limit
             match parse_spends(&allocator, node, max_cost - cost, flags) {
