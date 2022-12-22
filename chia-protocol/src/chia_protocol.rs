@@ -14,8 +14,12 @@ use crate::to_json_dict::ToJsonDict;
 use chia_py_streamable_macro::PyStreamable;
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
+#[cfg(feature = "py-bindings")]
+use std::io::Cursor;
 
 #[repr(u8)]
+#[cfg_attr(feature = "py-bindings", derive(PyStreamable))]
+#[derive(Streamable, Hash, Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ProtocolMessageTypes {
     // Shared protocol (all services)
     Handshake = 1,
@@ -133,6 +137,8 @@ pub trait ChiaProtocolMessage {
 }
 
 #[repr(u8)]
+#[cfg_attr(feature = "py-bindings", derive(PyStreamable))]
+#[derive(Streamable, Hash, Debug, Copy, Clone, Eq, PartialEq)]
 pub enum NodeType {
     FullNode = 1,
     Harvester = 2,
@@ -144,7 +150,7 @@ pub enum NodeType {
 }
 
 streamable_struct! (Message {
-    msg_type: u8,
+    msg_type: ProtocolMessageTypes,
     id: Option<u16>,
     data: Bytes,
 });
@@ -159,7 +165,7 @@ message_struct! (Handshake {
     // Which port the server is listening on
     server_port: u16,
     // NodeType (full node, wallet, farmer, etc.)
-    node_type: u8,
+    node_type: NodeType,
     // Key value dict to signal support for additional capabilities/features
     capabilities: Vec<(u16, String)>,
 });

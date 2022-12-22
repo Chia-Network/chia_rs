@@ -11,6 +11,49 @@ use quote::__private::Span;
 pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
     let DeriveInput { ident, data, .. } = parse_macro_input!(input);
 
+    let fields = match data {
+        syn::Data::Struct(s) => s.fields,
+        syn::Data::Enum(_) => {
+            return quote! {
+                impl ToJsonDict for #ident {
+                    fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
+                        <u8 as ToJsonDict>::to_json_dict(&(*self as u8), py)
+                    }
+                }
+
+                impl FromJsonDict for #ident {
+                    fn from_json_dict(o: &pyo3::PyAny) -> PyResult<Self> {
+                        let v = <u8 as FromJsonDict>::from_json_dict(o)?;
+                        #ident::parse(&mut Cursor::<&[u8]>::new(&[v])).map_err(|e| e.into())
+                    }
+                }
+
+                impl<'a> pyo3::conversion::FromPyObject<'a> for #ident {
+                    fn extract(ob: &'a PyAny) -> PyResult<Self> {
+                        let v: u8 = ob.extract()?;
+                        Self::parse(&mut Cursor::<&[u8]>::new(&[v])).map_err(|e| e.into())
+                    }
+                }
+
+                impl pyo3::conversion::ToPyObject for #ident {
+                    fn to_object(&self, py: Python<'_>) -> PyObject {
+                        (*self as u8).to_object(py)
+                    }
+                }
+
+                impl pyo3::conversion::IntoPy<PyObject> for #ident {
+                    fn into_py(self, py: Python<'_>) -> PyObject {
+                        (self as u8).to_object(py)
+                    }
+                }
+            }
+            .into();
+        }
+        _ => {
+            panic!("Streamable only support struct");
+        }
+    };
+
     let mut py_protocol = quote! {
         #[pyproto]
         impl pyo3::class::basic::PyObjectProtocol for #ident {
@@ -37,12 +80,6 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
                 std::hash::Hash::hash(self, &mut hasher);
                 Ok(std::hash::Hasher::finish(&hasher) as isize)
             }
-        }
-    };
-    let fields = match data {
-        syn::Data::Struct(s) => s.fields,
-        _ => {
-            panic!("Streamable only support struct");
         }
     };
 
