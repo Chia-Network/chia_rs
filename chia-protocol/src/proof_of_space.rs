@@ -1,7 +1,8 @@
-use crate::bytes::Bytes32;
+use crate::bls::G1Element;
+use crate::bytes::{Bytes, Bytes32};
 use crate::chia_error;
-use crate::coin_state::CoinState;
 use crate::streamable::Streamable;
+use crate::streamable_struct;
 use chia_streamable_macro::Streamable;
 
 #[cfg(feature = "py-bindings")]
@@ -13,10 +14,11 @@ use chia_py_streamable_macro::PyStreamable;
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
 
-#[cfg_attr(feature = "py-bindings", pyclass(unsendable), derive(PyStreamable))]
-#[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
-pub struct RespondToPhUpdates {
-    puzzle_hashes: Vec<Bytes32>,
-    min_height: u32,
-    coin_states: Vec<CoinState>,
-}
+streamable_struct! (ProofOfSpace {
+    challenge: Bytes32,
+    pool_public_key: Option<G1Element>,
+    pool_contract_puzzle_hash: Option<Bytes32>,
+    plot_public_key: G1Element,
+    size: u8,
+    proof: Bytes,
+});

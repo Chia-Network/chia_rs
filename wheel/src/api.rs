@@ -1,15 +1,28 @@
-use chia_protocol::coin::Coin;
-use chia_protocol::coin_state::CoinState;
-use chia_protocol::respond_to_ph_updates::RespondToPhUpdates;
-use chia_protocol::bls::G1Element;
-use chia_protocol::bls::G2Element;
 use crate::run_generator::{PySpend, PySpendBundleConditions, __pyo3_get_function_run_generator};
 use chia::gen::flags::COND_ARGS_NIL;
 use chia::gen::flags::NO_UNKNOWN_CONDS;
 use chia::gen::flags::STRICT_ARGS_COUNT;
 use chia::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
+use chia_protocol::Bytes32;
+use chia_protocol::G1Element;
+use chia_protocol::G2Element;
+use chia_protocol::FullBlock;
+use chia_protocol::{
+    ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin, CoinSpend, CoinState,
+    CoinStateUpdate, EndOfSubSlotBundle, Foliage, FoliageTransactionBlock,
+    InfusedChallengeChainSubSlot, NewPeakWallet, PoolTarget, Program, ProofOfSpace,
+    PuzzleSolutionResponse, RegisterForCoinUpdates, RegisterForPhUpdates, RejectAdditionsRequest,
+    RejectBlockHeaders, RejectHeaderBlocks, RejectHeaderRequest, RejectPuzzleSolution,
+    RejectRemovalsRequest, RequestAdditions, RequestBlockHeader, RequestBlockHeaders,
+    RequestChildren, RequestFeeEstimates, RequestHeaderBlocks, RequestPuzzleSolution,
+    RequestRemovals, RequestSesInfo, RespondAdditions, RespondBlockHeader, RespondBlockHeaders,
+    RespondChildren, RespondFeeEstimates, RespondHeaderBlocks, RespondPuzzleSolution,
+    RespondRemovals, RespondSesInfo, RespondToCoinUpdates, RespondToPhUpdates, RewardChainBlock,
+    RewardChainBlockUnfinished, RewardChainSubSlot, SendTransaction, SpendBundle,
+    SubEpochChallengeSegment, SubEpochSegments, SubSlotData, SubSlotProofs, TransactionAck,
+    TransactionsInfo, VDFInfo, VDFProof
+};
 use std::convert::TryInto;
-//use chia::streamable::fullblock::Fullblock;
 use clvmr::chia_dialect::LIMIT_HEAP;
 use clvmr::chia_dialect::NO_NEG_DIV;
 use clvmr::chia_dialect::NO_UNKNOWN_OPS;
@@ -24,7 +37,6 @@ use crate::run_program::{
 };
 
 use crate::adapt_response::eval_err_to_pyresult;
-use chia_protocol::bytes::Bytes32;
 use chia::gen::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
 use chia::gen::validation_error::ValidationErr;
 use clvmr::allocator::Allocator;
@@ -112,11 +124,68 @@ pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
 
     // Chia classes
     m.add_class::<Coin>()?;
-    m.add_class::<CoinState>()?;
-    m.add_class::<RespondToPhUpdates>()?;
     m.add_class::<G1Element>()?;
     m.add_class::<G2Element>()?;
-    //m.add_class::<Fullblock>()?;
+    m.add_class::<PoolTarget>()?;
+    m.add_class::<ClassgroupElement>()?;
+    m.add_class::<EndOfSubSlotBundle>()?;
+    m.add_class::<TransactionsInfo>()?;
+    m.add_class::<FoliageTransactionBlock>()?;
+    m.add_class::<Foliage>()?;
+    m.add_class::<ProofOfSpace>()?;
+    m.add_class::<RewardChainBlockUnfinished>()?;
+    m.add_class::<RewardChainBlock>()?;
+    m.add_class::<ChallengeBlockInfo>()?;
+    m.add_class::<ChallengeChainSubSlot>()?;
+    m.add_class::<InfusedChallengeChainSubSlot>()?;
+    m.add_class::<RewardChainSubSlot>()?;
+    m.add_class::<SubSlotProofs>()?;
+    m.add_class::<SpendBundle>()?;
+    m.add_class::<Program>()?;
+    m.add_class::<CoinSpend>()?;
+    m.add_class::<VDFInfo>()?;
+    m.add_class::<VDFProof>()?;
+    m.add_class::<SubSlotData>()?;
+    m.add_class::<SubEpochChallengeSegment>()?;
+    m.add_class::<SubEpochSegments>()?;
+
+    // wallet protocol
+    m.add_class::<RequestPuzzleSolution>()?;
+    m.add_class::<PuzzleSolutionResponse>()?;
+    m.add_class::<RespondPuzzleSolution>()?;
+    m.add_class::<RejectPuzzleSolution>()?;
+    m.add_class::<SendTransaction>()?;
+    m.add_class::<TransactionAck>()?;
+    m.add_class::<NewPeakWallet>()?;
+    m.add_class::<RequestBlockHeader>()?;
+    m.add_class::<RespondBlockHeader>()?;
+    m.add_class::<RejectHeaderRequest>()?;
+    m.add_class::<RequestRemovals>()?;
+    m.add_class::<RespondRemovals>()?;
+    m.add_class::<RejectRemovalsRequest>()?;
+    m.add_class::<RequestAdditions>()?;
+    m.add_class::<RespondAdditions>()?;
+    m.add_class::<RejectAdditionsRequest>()?;
+    m.add_class::<RespondBlockHeaders>()?;
+    m.add_class::<RejectBlockHeaders>()?;
+    m.add_class::<RequestBlockHeaders>()?;
+    m.add_class::<RequestHeaderBlocks>()?;
+    m.add_class::<RejectHeaderBlocks>()?;
+    m.add_class::<RespondHeaderBlocks>()?;
+    m.add_class::<CoinState>()?;
+    m.add_class::<RegisterForPhUpdates>()?;
+    m.add_class::<RespondToPhUpdates>()?;
+    m.add_class::<RegisterForCoinUpdates>()?;
+    m.add_class::<RespondToCoinUpdates>()?;
+    m.add_class::<CoinStateUpdate>()?;
+    m.add_class::<RequestChildren>()?;
+    m.add_class::<RespondChildren>()?;
+    m.add_class::<RequestSesInfo>()?;
+    m.add_class::<RespondSesInfo>()?;
+    m.add_class::<RequestFeeEstimates>()?;
+    m.add_class::<RespondFeeEstimates>()?;
+
+    m.add_class::<FullBlock>()?;
 
     // facilities from clvm_rs
 

@@ -55,9 +55,16 @@ def rust_type_to_python(t: str) -> str:
         .replace("Vec", "List")
         .replace("Option", "Optional")
         .replace("Bytes", "bytes")
+        .replace("u8", "int")
+        .replace("u16", "int")
         .replace("u32", "int")
         .replace("u64", "int")
         .replace("u128", "int")
+        .replace("i8", "int")
+        .replace("i16", "int")
+        .replace("i32", "int")
+        .replace("i64", "int")
+        .replace("i128", "int")
         .strip()
     )
 
@@ -71,6 +78,12 @@ def parse_rust_source(filename: str) -> List[Tuple[str, List[str]]]:
             if not in_struct:
                 if line.startswith("pub struct ") and "{" in line:
                     in_struct = line.split("pub struct ")[1].split("{")[0].strip()
+                elif line.startswith("streamable_struct!") and "{" in line:
+                    in_struct, line = line.split("(")[1].split("{")
+                    in_struct = in_struct.strip()
+                elif line.startswith("message_struct!") and "{" in line:
+                    in_struct, line = line.split("(")[1].split("{")
+                    in_struct = in_struct.strip()
                 elif line.startswith("pub struct ") and "(" in line and ");" in line:
                     name = line.split("pub struct ")[1].split("(")[0].strip()
                     rust_args = line.split("(")[1].split(");")[0]
@@ -88,20 +101,25 @@ def parse_rust_source(filename: str) -> List[Tuple[str, List[str]]]:
             if line.strip().startswith("#"):
                 continue
 
+            # a field
+            if ":" in line:
+                name, rust_type = line.split("//")[0].strip().split(":")
+                # members are separated by , in rust. Strip that off
+                try:
+                    rust_type, line = rust_type.rsplit(",",1)
+                except:
+                    rust_type, line = rust_type.rsplit("}",1)
+                    line = "}" + line
+                py_type = rust_type_to_python(rust_type)
+                members.append(f"{name}: {py_type}")
+
             # did we reach the end?
-            if line.strip().startswith("}"):
+            if "}" in line:
                 ret.append((in_struct, members))
                 members = []
                 in_struct = None
                 continue
 
-            # a field
-            if ":" in line:
-                name, rust_type = line.split("//")[0].strip().split(":")
-                # members are separated by , in rust. Strip that off
-                rust_type = rust_type.split(",")[0]
-                py_type = rust_type_to_python(rust_type)
-                members.append(f"{name}: {py_type}")
 
     assert in_struct is None
     return ret

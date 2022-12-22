@@ -317,6 +317,10 @@ jobs:
         run: |
           cd clvm-utils
           cargo +nightly fuzz build
+      - name: cargo fuzz (chia-protocol)
+        run: |
+          cd chia-protocol
+          cargo +nightly fuzz build
 
   unit_tests:
     runs-on: ${{ matrix.os }}
