@@ -2,6 +2,7 @@ use crate::run_generator::{PySpend, PySpendBundleConditions, __pyo3_get_function
 use chia::gen::flags::COND_ARGS_NIL;
 use chia::gen::flags::NO_UNKNOWN_CONDS;
 use chia::gen::flags::STRICT_ARGS_COUNT;
+use chia::gen::flags::MEMPOOL_MODE;
 use chia::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_protocol::Bytes32;
 use chia_protocol::G1Element;
@@ -23,9 +24,10 @@ use chia_protocol::{
     TransactionsInfo, VDFInfo, VDFProof
 };
 use std::convert::TryInto;
-use clvmr::chia_dialect::LIMIT_HEAP;
-use clvmr::chia_dialect::NO_NEG_DIV;
-use clvmr::chia_dialect::NO_UNKNOWN_OPS;
+use clvmr::LIMIT_HEAP;
+use clvmr::LIMIT_STACK;
+use clvmr::NO_NEG_DIV;
+use clvmr::NO_UNKNOWN_OPS;
 use clvmr::serde::tree_hash_from_stream;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
@@ -39,18 +41,15 @@ use crate::run_program::{
 use crate::adapt_response::eval_err_to_pyresult;
 use chia::gen::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
 use chia::gen::validation_error::ValidationErr;
-use clvmr::allocator::Allocator;
-use clvmr::chia_dialect::ChiaDialect;
+use clvmr::Allocator;
+use clvmr::ChiaDialect;
 use clvmr::cost::Cost;
 use clvmr::node::Node;
 use clvmr::reduction::EvalErr;
 use clvmr::reduction::Reduction;
-use clvmr::run_program::run_program;
+use clvmr::run_program;
 use clvmr::serde::node_from_bytes;
 use clvmr::serde::node_to_bytes;
-
-pub const MEMPOOL_MODE: u32 =
-    NO_NEG_DIV | NO_UNKNOWN_CONDS | NO_UNKNOWN_OPS | COND_ARGS_NIL | STRICT_ARGS_COUNT | LIMIT_HEAP;
 
 #[pyfunction]
 pub fn compute_merkle_set_root<'p>(
@@ -92,7 +91,7 @@ pub fn get_puzzle_and_solution_for_coin<'py>(
 
     let r = py.allow_threads(|| -> Result<(Vec<u8>, Vec<u8>), EvalErr> {
         let Reduction(_cost, result) =
-            run_program(&mut allocator, dialect, program, args, max_cost, None)?;
+            run_program(&mut allocator, dialect, program, args, max_cost)?;
         match parse_puzzle_solution(&allocator, result, find_parent, find_amount, find_ph) {
             Err(ValidationErr(n, _)) => Err(EvalErr(n, "coin not found".to_string())),
             Ok((puzzle, solution)) => Ok((
@@ -193,6 +192,7 @@ pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add("NO_NEG_DIV", NO_NEG_DIV)?;
     m.add("NO_UNKNOWN_OPS", NO_UNKNOWN_OPS)?;
     m.add("LIMIT_HEAP", LIMIT_HEAP)?;
+    m.add("LIMIT_STACK", LIMIT_STACK)?;
 
     m.add_function(wrap_pyfunction!(serialized_length, m)?)?;
     m.add_function(wrap_pyfunction!(compute_merkle_set_root, m)?)?;

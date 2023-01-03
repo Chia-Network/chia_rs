@@ -17,7 +17,7 @@ path = "src/lib.rs"
 [dependencies]
 chia = { path = "..", features = ["py-bindings"] }
 chia-protocol = { path = "../chia-protocol", features = ["py-bindings"]  }
-clvmr = "=0.2.1"
+clvmr = "=0.2.2"
 pyo3 = { version = "=0.15.1", features = ["extension-module", "multiple-pymethods"] }
 chia_py_streamable_macro = { version= "0.1.2", path = "../chia_py_streamable_macro" }
 chia_streamable_macro = { version = "0.2.3", path = "../chia_streamable_macro" }

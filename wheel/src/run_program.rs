@@ -80,7 +80,7 @@ pub fn run_chia_program(
         let dialect = ChiaDialect::new(flags);
 
         Ok(py
-            .allow_threads(|| run_program(&mut allocator, &dialect, program, args, max_cost, None)))
+            .allow_threads(|| run_program(&mut allocator, &dialect, program, args, max_cost)))
     })()?;
     match r {
         Ok(reduction) => {

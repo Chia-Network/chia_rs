@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from run_gen import run_gen, print_spend_bundle_conditions
-from chia_rs import MEMPOOL_MODE
+from chia_rs import MEMPOOL_MODE, LIMIT_STACK
 from time import perf_counter
 import sys
 import glob
@@ -28,7 +28,7 @@ for g in sorted(glob.glob('generators/*.clvm')):
     print(f"{g}")
     sys.stdout.write("running generator...\r")
     start_time = perf_counter()
-    error_code, result = run_gen(g, 0, "generators/block-834752.hex")
+    error_code, result = run_gen(g, LIMIT_STACK, "generators/block-834752.hex")
     run_time = perf_counter() - start_time
     output = parse_output(result, error_code)
 
@@ -84,9 +84,15 @@ for g in sorted(glob.glob('generators/*.clvm')):
         elif "block-834768" in g:
             limit = 7
             strict_limit = 7
-        elif "infinite-recursion" in g:
-            limit = 12
-            strict_limit = 2
+        elif "infinite-recursion1" in g:
+            limit = 4
+            strict_limit = 4
+        elif "infinite-recursion2" in g:
+            limit = 4
+            strict_limit = 4
+        elif "infinite-recursion4" in g:
+            limit = 2.5
+            strict_limit = 2.5
         elif "deep-recursion-plus" in g:
             limit = 8
             strict_limit = 6
