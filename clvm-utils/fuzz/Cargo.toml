@@ -10,7 +10,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-clvmr = "=0.2.1"
+clvmr = "=0.2.2"
 
 [dependencies.clvm-utils]
 path = ".."
