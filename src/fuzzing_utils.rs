@@ -54,26 +54,47 @@ const BUFFER: [u8; 63] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 ];
 
+enum MakeTreeOp {
+    Pair,
+    Tree,
+}
+
 pub fn make_tree(a: &mut Allocator, cursor: &mut BitCursor, short_atoms: bool) -> NodePtr {
-    match cursor.read_bits(1) {
-        None => a.null(),
-        Some(0) => {
-            let first = make_tree(a, cursor, short_atoms);
-            let second = make_tree(a, cursor, short_atoms);
-            a.new_pair(first, second).unwrap()
-        }
-        Some(_) => {
-            if short_atoms {
-                match cursor.read_bits(8) {
-                    None => a.null(),
-                    Some(val) => a.new_atom(&[val]).unwrap(),
-                }
-            } else {
-                match cursor.read_bits(6) {
-                    None => a.null(),
-                    Some(len) => a.new_atom(&BUFFER[..len as usize]).unwrap(),
-                }
+    let mut value_stack = Vec::<NodePtr>::new();
+    let mut op_stack = vec![MakeTreeOp::Tree];
+
+    while !op_stack.is_empty() {
+        match op_stack.pop().unwrap() {
+            MakeTreeOp::Pair => {
+                let second = value_stack.pop().unwrap();
+                let first = value_stack.pop().unwrap();
+                value_stack.push(a.new_pair(first, second).unwrap());
             }
+            MakeTreeOp::Tree => match cursor.read_bits(1) {
+                None => value_stack.push(a.null()),
+                Some(0) => {
+                    op_stack.push(MakeTreeOp::Pair);
+                    op_stack.push(MakeTreeOp::Tree);
+                    op_stack.push(MakeTreeOp::Tree);
+                }
+                Some(_) => {
+                    let atom = if short_atoms {
+                        match cursor.read_bits(8) {
+                            None => a.null(),
+                            Some(val) => a.new_atom(&[val]).unwrap(),
+                        }
+                    } else {
+                        match cursor.read_bits(6) {
+                            None => a.null(),
+                            Some(len) => a.new_atom(&BUFFER[..len as usize]).unwrap(),
+                        }
+                    };
+                    value_stack.push(atom);
+                }
+            },
         }
     }
+
+    assert!(value_stack.len() == 1);
+    value_stack.pop().unwrap()
 }
