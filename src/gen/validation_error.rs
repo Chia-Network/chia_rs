@@ -27,6 +27,7 @@ pub enum ErrorCode {
     DuplicateOutput,
     DoubleSpend,
     CostExceeded,
+    MintingCoin,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,6 +70,7 @@ impl From<ErrorCode> for u32 {
             ErrorCode::DuplicateOutput => 4,
             ErrorCode::DoubleSpend => 5,
             ErrorCode::CostExceeded => 23,
+            ErrorCode::MintingCoin => 20,
         }
     }
 }
