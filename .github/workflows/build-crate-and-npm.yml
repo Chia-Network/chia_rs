@@ -59,7 +59,7 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: npm-pkg
-        path: ./pkg/*-*.tgz
+        path: ./wasm/pkg/*-*.tgz
 
     # this has not been tested, so probably needs to be debugged next time a tag is created
     - name: publish to crates.io if tagged (chia_py_streamable_macro)
@@ -103,4 +103,4 @@ jobs:
       uses: JS-DevTools/npm-publish@v1
       with:
         token: ${{ secrets.node_auth_token }}
-        package: pkg/package.json
+        package: wasm/pkg/package.json
