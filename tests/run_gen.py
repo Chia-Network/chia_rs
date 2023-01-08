@@ -44,26 +44,6 @@ def run_gen(fn: str, flags: int = 0, args: Optional[str] = None):
         "ff02ffff04ff0dff8080808080ffff01ff0bffff0101ff058080ff0180ff0180"
         "80")
 
-    # this is the deserializer that's passed in to all blocks, from:
-    # https://github.com/Chia-Network/chia-blockchain/blob/main/chia/wallet/puzzles/chialisp_deserialisation.clvm.hex
-    deserializer = bytes.fromhex(
-        "ff02ffff01ff05ffff02ff3effff04ff02ffff04ff05ff8080808080ffff04ff"
-        "ff01ffffff81ff7fff81df81bfffffff02ffff03ffff09ff0bffff01818080ff"
-        "ff01ff04ff80ffff04ff05ff808080ffff01ff02ffff03ffff0aff0bff1880ff"
-        "ff01ff02ff1affff04ff02ffff04ffff02ffff03ffff0aff0bff1c80ffff01ff"
-        "02ffff03ffff0aff0bff1480ffff01ff0880ffff01ff04ffff0effff18ffff01"
-        "1fff0b80ffff0cff05ff80ffff01018080ffff04ffff0cff05ffff010180ff80"
-        "808080ff0180ffff01ff04ffff18ffff013fff0b80ffff04ff05ff80808080ff"
-        "0180ff80808080ffff01ff04ff0bffff04ff05ff80808080ff018080ff0180ff"
-        "04ffff0cff15ff80ff0980ffff04ffff0cff15ff0980ff808080ffff04ffff04"
-        "ff05ff1380ffff04ff2bff808080ffff02ff16ffff04ff02ffff04ff09ffff04"
-        "ffff02ff3effff04ff02ffff04ff15ff80808080ff8080808080ff02ffff03ff"
-        "ff09ffff0cff05ff80ffff010180ff1080ffff01ff02ff2effff04ff02ffff04"
-        "ffff02ff3effff04ff02ffff04ffff0cff05ffff010180ff80808080ff808080"
-        "80ffff01ff02ff12ffff04ff02ffff04ffff0cff05ffff010180ffff04ffff0c"
-        "ff05ff80ffff010180ff808080808080ff0180ff018080"
-    )
-
     # constants from the main chia blockchain:
     # https://github.com/Chia-Network/chia-blockchain/blob/main/chia/consensus/default_constants.py
     max_cost = 11000000000
@@ -76,13 +56,12 @@ def run_gen(fn: str, flags: int = 0, args: Optional[str] = None):
     max_cost -= len(env_data) * cost_per_byte
 
     # add the block program arguments
+    block_program_args = b"\x80"
     if args and args != "":
         with open(args, "r") as f:
             block_ref = bytes.fromhex(f.read())
-        block_program_args = b"\xff" + deserializer + b"\xff" + serialize_atom(block_ref) + b"\x80"
-    else:
-        block_program_args = b"\xff" + deserializer + b"\x80"
-    env_data = b"\xff" + env_data + b"\xff" + block_program_args  + b"\x80"
+        block_program_args = b"\xff" + serialize_atom(block_ref) + block_program_args
+    env_data = b"\xff" + env_data + b"\xff\xff" + block_program_args  + b"\x80\x80"
 
     try:
         return run_generator(
