@@ -14,8 +14,18 @@ use pyo3::prelude::*;
 #[cfg(feature = "py-bindings")]
 use pyo3::types::PyBytes;
 
-#[derive(Hash, Debug, Clone, Eq, PartialEq)]
+#[derive(Hash, Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Bytes(Vec<u8>);
+
+impl Bytes {
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
 
 impl Streamable for Bytes {
     fn update_digest(&self, digest: &mut Sha256) {
@@ -62,7 +72,7 @@ impl fmt::Display for Bytes {
     }
 }
 
-#[derive(Hash, PartialEq, Eq, Copy, Clone)]
+#[derive(Hash, PartialEq, Eq, Copy, Clone, PartialOrd, Ord)]
 pub struct BytesImpl<const N: usize>([u8; N]);
 
 impl<const N: usize> Streamable for BytesImpl<N> {
