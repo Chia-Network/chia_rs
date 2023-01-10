@@ -20,6 +20,16 @@ use pyo3::prelude::*;
 #[derive(Hash, Debug, Clone, Eq, PartialEq)]
 pub struct Program(Bytes);
 
+impl Program {
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
 impl Streamable for Program {
     fn update_digest(&self, digest: &mut Sha256) {
         digest.update(&self.0);
@@ -40,5 +50,11 @@ impl Streamable for Program {
         let program = buf[..len as usize].to_vec();
         input.set_position(pos + len);
         Ok(Program(program.into()))
+    }
+}
+
+impl AsRef<[u8]> for Program {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_ref()
     }
 }
