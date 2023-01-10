@@ -367,6 +367,12 @@ struct ParseState {
     // compute the coin ID, and stick it in this set. It's reference counted
     // since it may also be referenced by announcements
     spent_coins: HashSet<Arc<Bytes32>>,
+
+    // the sum of all values of all spent coins
+    removal_amount: u128,
+
+    // the sum of all amounts of CREATE_COIN conditions
+    addition_amount: u128,
 }
 
 impl ParseState {
@@ -377,6 +383,8 @@ impl ParseState {
             assert_coin: HashSet::new(),
             assert_puzzle: HashSet::new(),
             spent_coins: HashSet::new(),
+            removal_amount: 0,
+            addition_amount: 0,
         }
     }
 }
@@ -403,6 +411,8 @@ fn parse_spend_conditions(
         // spend
         return Err(ValidationErr(spend, ErrorCode::DoubleSpend));
     }
+
+    state.removal_amount += my_amount as u128;
 
     let mut spend = Spend {
         coin_id,
@@ -466,6 +476,7 @@ fn parse_spend_conditions(
                 if !spend.create_coin.insert(new_coin) {
                     return Err(ValidationErr(c, ErrorCode::DuplicateOutput));
                 }
+                state.addition_amount += amount as u128;
             }
             Condition::AssertSecondsRelative(s) => {
                 // keep the most strict condition. i.e. the highest limit
@@ -562,6 +573,17 @@ pub fn parse_spends(
         // this function adds the spend to the passed-in ret
         // as well as updates it with any conditions
         parse_spend_conditions(&mut ret, a, &mut state, spend, flags, &mut cost_left)?;
+    }
+
+    if state.removal_amount < state.addition_amount {
+        // The sum of removal amounts must not be less than the sum of addition
+        // amounts
+        return Err(ValidationErr(spends, ErrorCode::MintingCoin));
+    }
+
+    if state.removal_amount - state.addition_amount < ret.reserve_fee as u128 {
+        // the actual fee is lower than the reserved fee
+        return Err(ValidationErr(spends, ErrorCode::ReserveFeeConditionFailed));
     }
 
     // check all the assert announcements
@@ -1342,9 +1364,36 @@ fn test_single_reserve_fee_extra_arg_mempool() {
 fn test_reserve_fee_exceed_max() {
     // RESERVE_FEE
     // 0xfffffffffffffff0 + 0x10 just exceeds u64::MAX, which is higher than
-    // allowed
+    // allowed. Note that we need two coins to provide the removals to cover the
+    // reserve fee
+    // "((({h1} ({h2} (123 (((60 ({msg1} ))) (({h2} ({h2} (123 (((61 ({c11} )))))")
     assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((52 (0x00fffffffffffffff0 ) ((52 (0x10 ) ))))")
+        cond_test("((({h1} ({h2} (0x00ffffffffffffffff (((52 (0x00fffffffffffffff0 ))) (({h2} ({h1} (0x00ffffff (((52 (0x10 )))))")
+            .unwrap_err()
+            .1,
+        ErrorCode::ReserveFeeConditionFailed
+    );
+}
+
+#[test]
+fn test_reserve_fee_insufficient_spends() {
+    // RESERVE_FEE
+    // We spend a coin with amount 123 but reserve fee 124
+    assert_eq!(
+        cond_test("((({h1} ({h2} (123 (((52 (124 ) ))))")
+            .unwrap_err()
+            .1,
+        ErrorCode::ReserveFeeConditionFailed
+    );
+}
+
+#[test]
+fn test_reserve_fee_insufficient_fee() {
+    // RESERVE_FEE
+    // We spend a coin with amount 123 and create a coin worth 24 and reserve fee
+    // of 100 (which adds up to 124, i.e. not enough fee)
+    assert_eq!(
+        cond_test("((({h1} ({h2} (123 (((52 (100 ) ((51 ({h2} (24 )) )))")
             .unwrap_err()
             .1,
         ErrorCode::ReserveFeeConditionFailed
@@ -1355,12 +1404,12 @@ fn test_reserve_fee_exceed_max() {
 fn test_multiple_reserve_fee() {
     // RESERVE_FEE
     let (a, conds) =
-        cond_test("((({h1} ({h2} (123 (((52 (100 ) ((52 (25 ) ((52 (50 )))))").unwrap();
+        cond_test("((({h1} ({h2} (175 (((52 (100 ) ((52 (25 ) ((52 (50 )))))").unwrap();
 
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 175));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
 
@@ -2023,12 +2072,13 @@ fn test_single_create_coin() {
 fn test_create_coin_max_amount() {
     // CREATE_COIN
     let (a, conds) =
-        cond_test("((({h1} ({h2} (123 (((51 ({h2} (0x00ffffffffffffffff )))))").unwrap();
+        cond_test("((({h1} ({h2} (0x00ffffffffffffffff (((51 ({h2} (0x00ffffffffffffffff )))))")
+            .unwrap();
 
     assert_eq!(conds.cost, CREATE_COIN_COST);
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 0xffffffffffffffff));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
@@ -2037,6 +2087,18 @@ fn test_create_coin_max_amount() {
         assert_eq!(c.hint, a.null());
     }
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+}
+
+#[test]
+fn test_minting_coin() {
+    // CREATE_COIN
+    // we spend a coin with value 123 but create a coin with value 124
+    assert_eq!(
+        cond_test("((({h1} ({h2} (123 (((51 ({h2} (124 )))))")
+            .unwrap_err()
+            .1,
+        ErrorCode::MintingCoin
+    );
 }
 
 #[test]
