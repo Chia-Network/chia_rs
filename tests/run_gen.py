@@ -64,18 +64,20 @@ def run_gen(fn: str, flags: int = 0, args: Optional[str] = None):
     env_data = b"\xff" + env_data + b"\xff\xff" + block_program_args  + b"\x80\x80"
 
     try:
-        return run_generator(
+        err, result = run_generator(
             program_data,
             env_data,
             max_cost,
             flags,
         )
+        cost = 0 if result is None else result.cost + len(env_data) * cost_per_byte
+        return (err, result, cost)
     except Exception as e:
         # GENERATOR_RUNTIME_ERROR
-        return (117, None)
+        return (117, None, 0)
 
 
-def print_spend_bundle_conditions(result) -> str:
+def print_spend_bundle_conditions(result, cost: int) -> str:
     ret = ""
     if result.reserve_fee > 0:
         ret += f"RESERVE_FEE: {result.reserve_fee}\n"
@@ -100,14 +102,14 @@ def print_spend_bundle_conditions(result) -> str:
                 ret += f"  CREATE_COIN: ph: {a[0].hex()} amount: {a[1]}\n"
         for a in sorted(s.agg_sig_me):
             ret += f"  AGG_SIG_ME pk: {a[0].hex()} msg: {a[1].hex()}\n"
-    ret += f"cost (clvm + conditions): {result.cost}\n"
+    ret += f"cost: {cost}\n"
     return ret
 
 
 if __name__ == "__main__":
     try:
         start_time = time()
-        error_code, result = run_gen(sys.argv[1],
+        error_code, result, cost = run_gen(sys.argv[1],
             0 if len(sys.argv) < 3 else int(sys.argv[2]),
             None if len(sys.argv) < 4 else sys.argv[3])
         run_time = time() - start_time
@@ -117,7 +119,7 @@ if __name__ == "__main__":
             sys.exit(1)
         start_time = time()
         print("Spend bundle:")
-        print(print_spend_bundle_conditions(result))
+        print(print_spend_bundle_conditions(result, cost))
         print_time = time() - start_time
         print(f"run-time: {run_time:.2f}s")
         print(f"print-time: {print_time:.2f}s")

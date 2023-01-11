@@ -18,26 +18,26 @@ def compare_output(output, expected, title):
         failed = 1
 
 
-def parse_output(result, error_code) -> str:
+def parse_output(result, error_code, cost) -> str:
     if error_code:
         return f"FAILED: {error_code}\n"
     else:
-        return print_spend_bundle_conditions(result)
+        return print_spend_bundle_conditions(result, cost)
 
 for g in sorted(glob.glob('generators/*.clvm')):
     print(f"{g}")
     sys.stdout.write("running generator...\r")
     start_time = perf_counter()
-    error_code, result = run_gen(g, LIMIT_STACK, "generators/block-834752.hex")
+    error_code, result, cost = run_gen(g, LIMIT_STACK, "generators/block-834752.hex")
     run_time = perf_counter() - start_time
-    output = parse_output(result, error_code)
+    output = parse_output(result, error_code, cost)
 
     sys.stdout.write("running generator (mempool mode) ...\r")
     sys.stdout.flush()
     start_time = perf_counter()
-    error_code2, result2 = run_gen(g, MEMPOOL_MODE, "generators/block-834752.hex")
+    error_code2, result2, cost = run_gen(g, MEMPOOL_MODE, "generators/block-834752.hex")
     run_time2 = perf_counter() - start_time
-    output2 = parse_output(result2, error_code2)
+    output2 = parse_output(result2, error_code2, cost)
 
     with open(g) as f:
         expected = f.read().split('\n', 1)[1]
