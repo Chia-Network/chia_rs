@@ -96,7 +96,7 @@ pub fn get_puzzle_and_solution_for_coin<'py>(
             run_program(&mut allocator, dialect, program, args, max_cost)?;
         match parse_puzzle_solution(&allocator, result, find_parent, find_amount, find_ph) {
             Err(ValidationErr(n, _)) => Err(EvalErr(n, "coin not found".to_string())),
-            Ok((puzzle, solution)) => Ok((puzzle, solution)),
+            Ok(pair) => Ok(pair),
         }
     });
 
