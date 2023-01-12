@@ -51,6 +51,8 @@ def run_gen(fn: str, flags: int = 0, args: Optional[str] = None):
 
     env_data = binutils.assemble(open(fn, "r").read()).as_bin()
 
+    byte_cost = len(env_data) * cost_per_byte
+
     # we don't charge for the size of the generator ROM. However, we do charge
     # cost for the operations it executes
     max_cost -= len(env_data) * cost_per_byte
@@ -70,7 +72,7 @@ def run_gen(fn: str, flags: int = 0, args: Optional[str] = None):
             max_cost,
             flags,
         )
-        cost = 0 if result is None else result.cost + len(env_data) * cost_per_byte
+        cost = 0 if result is None else result.cost + byte_cost
         return (err, result, cost)
     except Exception as e:
         # GENERATOR_RUNTIME_ERROR
