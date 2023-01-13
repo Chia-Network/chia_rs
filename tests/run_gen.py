@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from chia_rs import run_generator
+from chia_rs import run_block_generator
 from time import time
 from clvm_tools import binutils
 from clvm.serialize import atom_to_byte_iterator
@@ -16,70 +16,27 @@ def serialize_atom(blob: bytes) -> bytes:
 
 def run_gen(fn: str, flags: int = 0, args: Optional[str] = None):
 
-    # the generator ROM from:
-    # https://github.com/Chia-Network/chia-blockchain/blob/main/chia/wallet/puzzles/rom_bootstrap_generator.clvm.hex
-    program_data = bytes.fromhex(
-        "ff02ffff01ff02ff0cffff04ff02ffff04ffff02ff05ffff04ff08ffff04ff13"
-        "ff80808080ff80808080ffff04ffff01ffffff02ffff01ff05ffff02ff3effff"
-        "04ff02ffff04ff05ff8080808080ffff04ffff01ffffff81ff7fff81df81bfff"
-        "ffff02ffff03ffff09ff0bffff01818080ffff01ff04ff80ffff04ff05ff8080"
-        "80ffff01ff02ffff03ffff0aff0bff1880ffff01ff02ff1affff04ff02ffff04"
-        "ffff02ffff03ffff0aff0bff1c80ffff01ff02ffff03ffff0aff0bff1480ffff"
-        "01ff0880ffff01ff04ffff0effff18ffff011fff0b80ffff0cff05ff80ffff01"
-        "018080ffff04ffff0cff05ffff010180ff80808080ff0180ffff01ff04ffff18"
-        "ffff013fff0b80ffff04ff05ff80808080ff0180ff80808080ffff01ff04ff0b"
-        "ffff04ff05ff80808080ff018080ff0180ff04ffff0cff15ff80ff0980ffff04"
-        "ffff0cff15ff0980ff808080ffff04ffff04ff05ff1380ffff04ff2bff808080"
-        "ffff02ff16ffff04ff02ffff04ff09ffff04ffff02ff3effff04ff02ffff04ff"
-        "15ff80808080ff8080808080ff02ffff03ffff09ffff0cff05ff80ffff010180"
-        "ff1080ffff01ff02ff2effff04ff02ffff04ffff02ff3effff04ff02ffff04ff"
-        "ff0cff05ffff010180ff80808080ff80808080ffff01ff02ff12ffff04ff02ff"
-        "ff04ffff0cff05ffff010180ffff04ffff0cff05ff80ffff010180ff80808080"
-        "8080ff0180ff018080ff04ffff02ff16ffff04ff02ffff04ff09ff80808080ff"
-        "0d80ffff04ff09ffff04ffff02ff1effff04ff02ffff04ff15ff80808080ffff"
-        "04ff2dffff04ffff02ff15ff5d80ff7d80808080ffff02ffff03ff05ffff01ff"
-        "04ffff02ff0affff04ff02ffff04ff09ff80808080ffff02ff16ffff04ff02ff"
-        "ff04ff0dff8080808080ff8080ff0180ff02ffff03ffff07ff0580ffff01ff0b"
-        "ffff0102ffff02ff1effff04ff02ffff04ff09ff80808080ffff02ff1effff04"
-        "ff02ffff04ff0dff8080808080ffff01ff0bffff0101ff058080ff0180ff0180"
-        "80")
-
     # constants from the main chia blockchain:
     # https://github.com/Chia-Network/chia-blockchain/blob/main/chia/consensus/default_constants.py
     max_cost = 11000000000
     cost_per_byte = 12000
 
-    env_data = binutils.assemble(open(fn, "r").read()).as_bin()
-
-    byte_cost = len(env_data) * cost_per_byte
-
-    # we don't charge for the size of the generator ROM. However, we do charge
-    # cost for the operations it executes
-    max_cost -= len(env_data) * cost_per_byte
+    generator = binutils.assemble(open(fn, "r").read()).as_bin()
 
     # add the block program arguments
-    block_program_args = b"\x80"
+    block_refs = []
     if args and args != "":
         with open(args, "r") as f:
-            block_ref = bytes.fromhex(f.read())
-        block_program_args = b"\xff" + serialize_atom(block_ref) + block_program_args
-    env_data = b"\xff" + env_data + b"\xff\xff" + block_program_args  + b"\x80\x80"
+            block_refs = [bytes.fromhex(f.read())]
 
     try:
-        err, result = run_generator(
-            program_data,
-            env_data,
-            max_cost,
-            flags,
-        )
-        cost = 0 if result is None else result.cost + byte_cost
-        return (err, result, cost)
+        return run_block_generator(generator, block_refs, max_cost, flags)
     except Exception as e:
         # GENERATOR_RUNTIME_ERROR
-        return (117, None, 0)
+        return (117, None)
 
 
-def print_spend_bundle_conditions(result, cost: int) -> str:
+def print_spend_bundle_conditions(result) -> str:
     ret = ""
     if result.reserve_fee > 0:
         ret += f"RESERVE_FEE: {result.reserve_fee}\n"
@@ -104,14 +61,14 @@ def print_spend_bundle_conditions(result, cost: int) -> str:
                 ret += f"  CREATE_COIN: ph: {a[0].hex()} amount: {a[1]}\n"
         for a in sorted(s.agg_sig_me):
             ret += f"  AGG_SIG_ME pk: {a[0].hex()} msg: {a[1].hex()}\n"
-    ret += f"cost: {cost}\n"
+    ret += f"cost: {result.cost}\n"
     return ret
 
 
 if __name__ == "__main__":
     try:
         start_time = time()
-        error_code, result, cost = run_gen(sys.argv[1],
+        error_code, result = run_gen(sys.argv[1],
             0 if len(sys.argv) < 3 else int(sys.argv[2]),
             None if len(sys.argv) < 4 else sys.argv[3])
         run_time = time() - start_time
@@ -121,7 +78,7 @@ if __name__ == "__main__":
             sys.exit(1)
         start_time = time()
         print("Spend bundle:")
-        print(print_spend_bundle_conditions(result, cost))
+        print(print_spend_bundle_conditions(result))
         print_time = time() - start_time
         print(f"run-time: {run_time:.2f}s")
         print(f"print-time: {print_time:.2f}s")

@@ -1,7 +1,9 @@
 use clvmr::allocator::{Allocator, NodePtr, SExp};
+use clvmr::reduction::EvalErr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorCode {
+    GeneratorRuntimeError,
     NegativeAmount,
     AmountExceedsMaximum,
     InvalidConditionOpcode,
@@ -33,6 +35,18 @@ pub enum ErrorCode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ValidationErr(pub NodePtr, pub ErrorCode);
 
+impl From<EvalErr> for ValidationErr {
+    fn from(v: EvalErr) -> Self {
+        ValidationErr(v.0, ErrorCode::GeneratorRuntimeError)
+    }
+}
+
+impl From<std::io::Error> for ValidationErr {
+    fn from(_: std::io::Error) -> Self {
+        ValidationErr(-1, ErrorCode::GeneratorRuntimeError)
+    }
+}
+
 // helper functions that fail with ValidationErr
 pub fn first(a: &Allocator, n: NodePtr) -> Result<NodePtr, ValidationErr> {
     match a.sexp(n) {
@@ -45,6 +59,7 @@ pub fn first(a: &Allocator, n: NodePtr) -> Result<NodePtr, ValidationErr> {
 impl From<ErrorCode> for u32 {
     fn from(err: ErrorCode) -> u32 {
         match err {
+            ErrorCode::GeneratorRuntimeError => 117,
             ErrorCode::NegativeAmount => 124,
             ErrorCode::AmountExceedsMaximum => 16,
             ErrorCode::InvalidPuzzleHash => 10,

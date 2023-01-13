@@ -348,7 +348,10 @@ pub struct SpendBundleConditions {
     // Unsafe Agg Sig conditions (i.e. not tied to the spend generating it)
     pub agg_sig_unsafe: Vec<(NodePtr, NodePtr)>,
 
-    // the total cost of the spend bundle
+    // the cost of conditions (when returned by parse_spends())
+    // run_generator() will include the CLVM cost
+    // run_block_generator() will include CLVM cost and byte cost (making this
+    // the total cost)
     pub cost: u64,
 }
 
