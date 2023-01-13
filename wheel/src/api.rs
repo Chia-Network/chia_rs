@@ -43,6 +43,7 @@ use crate::adapt_response::eval_err_to_pyresult;
 use chia::gen::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
 use chia::gen::validation_error::ValidationErr;
 use clvmr::Allocator;
+use clvmr::allocator::NodePtr;
 use clvmr::ChiaDialect;
 use clvmr::cost::Cost;
 use clvmr::node::Node;
@@ -90,21 +91,23 @@ pub fn get_puzzle_and_solution_for_coin<'py>(
     let args = node_from_bytes(&mut allocator, args)?;
     let dialect = &ChiaDialect::new(NO_NEG_DIV);
 
-    let r = py.allow_threads(|| -> Result<(Vec<u8>, Vec<u8>), EvalErr> {
+    let r = py.allow_threads(|| -> Result<(NodePtr, NodePtr), EvalErr> {
         let Reduction(_cost, result) =
             run_program(&mut allocator, dialect, program, args, max_cost)?;
         match parse_puzzle_solution(&allocator, result, find_parent, find_amount, find_ph) {
             Err(ValidationErr(n, _)) => Err(EvalErr(n, "coin not found".to_string())),
-            Ok((puzzle, solution)) => Ok((
-                node_to_bytes(&Node::new(&allocator, puzzle)).unwrap(),
-                node_to_bytes(&Node::new(&allocator, solution)).unwrap(),
-            )),
+            Ok(pair) => Ok(pair),
         }
     });
 
     match r {
         Err(eval_err) => eval_err_to_pyresult(py, eval_err, allocator),
-        Ok((puzzle, solution)) => Ok((PyBytes::new(py, &puzzle), PyBytes::new(py, &solution))),
+        Ok((puzzle, solution)) => {
+            Ok((
+                PyBytes::new(py, &node_to_bytes(&Node::new(&allocator, puzzle))?),
+                PyBytes::new(py, &node_to_bytes(&Node::new(&allocator, solution))?)
+            ))
+        },
     }
 }
 
