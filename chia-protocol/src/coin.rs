@@ -16,6 +16,8 @@ use chia_py_streamable_macro::PyStreamable;
 use pyo3::prelude::*;
 #[cfg(feature = "py-bindings")]
 use pyo3::types::PyBytes;
+#[cfg(feature = "serde")]
+use serde::Serialize;
 
 streamable_struct!(Coin {
     parent_coin_info: Bytes32,

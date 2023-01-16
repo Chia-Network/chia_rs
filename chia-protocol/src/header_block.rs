@@ -17,6 +17,8 @@ use crate::to_json_dict::ToJsonDict;
 use chia_py_streamable_macro::PyStreamable;
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
+#[cfg(feature = "serde")]
+use serde::Serialize;
 
 streamable_struct! (HeaderBlock {
     // If first sb

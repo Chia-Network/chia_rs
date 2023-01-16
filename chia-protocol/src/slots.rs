@@ -17,6 +17,8 @@ use crate::to_json_dict::ToJsonDict;
 use chia_py_streamable_macro::PyStreamable;
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
+#[cfg(feature = "serde")]
+use serde::Serialize;
 
 // The hash of this is used as the challenge_hash for the ICC VDF
 streamable_struct! (ChallengeBlockInfo {
