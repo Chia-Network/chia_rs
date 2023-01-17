@@ -1,0 +1,22 @@
+[package]
+name = "chia-tools"
+version = "0.1.16"
+edition = "2021"
+license = "Apache-2.0"
+description = "Utility functions and types used by the Chia blockchain full node"
+authors = ["Arvid Norberg <arvid@chia.net>"]
+homepage = "https://github.com/Chia-Network/chia_rs/chia-tools"
+repository = "https://github.com/Chia-Network/chia_rs/chia-tools"
+
+[dependencies]
+chia-protocol = { version = ">=0.2.0", path = "../chia-protocol" }
+clvmr = { version = ">=0.2.2", features = ["counters"] }
+chia = { path = "..", version = ">=0.2.0" }
+sqlite = "=0.30.3"
+clap = { version = "=4.0.29", features = ["derive"] }
+zstd = "=0.12.1"
+
+[[bin]]
+name = "analyze-chain"
+test = false
+bench = false
