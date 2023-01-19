@@ -18,7 +18,7 @@ jobs:
       fail-fast: false
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         fetch-depth: 0
 
@@ -44,7 +44,7 @@ jobs:
       run: cargo build --release
 
     - name: Upload crate artifacts
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: crate
         path: ./target/package/*-*.crate
@@ -56,7 +56,7 @@ jobs:
       run: cd wasm && wasm-pack build && wasm-pack pack
 
     - name: Upload npm pkg artifacts
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: npm-pkg
         path: ./wasm/pkg/*-*.tgz
