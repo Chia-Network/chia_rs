@@ -1,3 +1,4 @@
+use std::error;
 use std::fmt;
 
 #[cfg(feature = "py-bindings")]
@@ -31,6 +32,12 @@ impl fmt::Display for Error {
             Error::InvalidEnum => write!(fmt, "invalid enum value"),
             Error::Custom(ref s) => s.fmt(fmt),
         }
+    }
+}
+
+impl error::Error for Error {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        None
     }
 }
 
