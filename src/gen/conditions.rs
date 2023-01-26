@@ -643,6 +643,8 @@ use hex::FromHex;
 #[cfg(test)]
 use num_traits::Num;
 #[cfg(test)]
+use rstest::rstest;
+#[cfg(test)]
 use std::collections::HashMap;
 
 #[cfg(test)]
@@ -992,6 +994,40 @@ fn test_invalid_spend_list_terminator() {
     );
 }
 
+#[cfg(test)]
+#[rstest]
+#[case(ASSERT_SECONDS_ABSOLUTE, "104")]
+#[case(ASSERT_SECONDS_RELATIVE, "101")]
+#[case(ASSERT_HEIGHT_RELATIVE, "101")]
+#[case(ASSERT_HEIGHT_ABSOLUTE, "100")]
+#[case(RESERVE_FEE, "100")]
+#[case(CREATE_COIN_ANNOUNCEMENT, "{msg1}")]
+#[case(ASSERT_COIN_ANNOUNCEMENT, "{c11}")]
+#[case(CREATE_PUZZLE_ANNOUNCEMENT, "{msg1}")]
+#[case(ASSERT_PUZZLE_ANNOUNCEMENT, "{p21}")]
+#[case(ASSERT_MY_AMOUNT, "123")]
+#[case(ASSERT_MY_COIN_ID, "{coin12}")]
+#[case(ASSERT_MY_PARENT_ID, "{h1}")]
+#[case(ASSERT_MY_PUZZLEHASH, "{h2}")]
+#[case(CREATE_COIN, "{h2} (42 (({h1})")]
+#[case(AGG_SIG_UNSAFE, "{pubkey} ({msg1}")]
+#[case(AGG_SIG_ME, "{pubkey} ({msg1}")]
+fn test_extra_arg_mempool(#[case] condition: ConditionOpcode, #[case] arg: &str) {
+    // extra args are disallowed in mempool mode
+    assert_eq!(
+        cond_test_flag(
+            &format!(
+                "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 )))))",
+                condition as u8, arg
+            ),
+            STRICT_ARGS_COUNT
+        )
+        .unwrap_err()
+        .1,
+        ErrorCode::InvalidCondition
+    );
+}
+
 #[test]
 fn test_single_seconds_relative() {
     // ASSERT_SECONDS_RELATIVE
@@ -1021,18 +1057,6 @@ fn test_single_seconds_relative_extra_arg() {
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
 
     assert_eq!(spend.seconds_relative, 101);
-}
-
-#[test]
-fn test_single_seconds_relative_extra_arg_mempool() {
-    // ASSERT_SECONDS_RELATIVE
-    // additional arguments are disallowed in mempool mode
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((80 (101 (1337 )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::InvalidCondition
-    );
 }
 
 #[test]
@@ -1095,21 +1119,6 @@ fn test_single_seconds_absolute_extra_arg() {
 }
 
 #[test]
-fn test_single_seconds_absolute_extra_arg_mempool() {
-    // ASSERT_SECONDS_ABSOLUTE
-    // extra args are disallowed in mempool mode
-    assert_eq!(
-        cond_test_flag(
-            "((({h1} ({h2} (123 (((81 (104 ( 1337 )))))",
-            STRICT_ARGS_COUNT
-        )
-        .unwrap_err()
-        .1,
-        ErrorCode::InvalidCondition
-    );
-}
-
-#[test]
 fn test_seconds_absolute_exceed_max() {
     // ASSERT_SECONDS_ABSOLUTE
     assert_eq!(
@@ -1166,21 +1175,6 @@ fn test_single_height_relative_extra_arg() {
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
 
     assert_eq!(spend.height_relative, Some(101));
-}
-
-#[test]
-fn test_single_height_relative_extra_arg_mempool() {
-    // ASSERT_HEIGHT_RELATIVE
-    // extra arguments are disallowed in mempool mode
-    assert_eq!(
-        cond_test_flag(
-            "((({h1} ({h2} (123 (((82 (101 (1337 )))))",
-            STRICT_ARGS_COUNT
-        )
-        .unwrap_err()
-        .1,
-        ErrorCode::InvalidCondition
-    );
 }
 
 #[test]
@@ -1258,21 +1252,6 @@ fn test_single_height_absolute_extra_arg() {
 }
 
 #[test]
-fn test_single_height_absolute_extra_arg_mempool() {
-    // ASSERT_HEIGHT_ABSOLUTE
-    // extra args are disallowed in mempool mode
-    assert_eq!(
-        cond_test_flag(
-            "((({h1} ({h2} (123 (((83 (100 (1337 )))))",
-            STRICT_ARGS_COUNT
-        )
-        .unwrap_err()
-        .1,
-        ErrorCode::InvalidCondition
-    );
-}
-
-#[test]
 fn test_height_absolute_exceed_max() {
     // ASSERT_HEIGHT_ABSOLUTE
     assert_eq!(
@@ -1329,21 +1308,6 @@ fn test_single_reserve_fee_extra_arg() {
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
 
     assert_eq!(conds.reserve_fee, 100);
-}
-
-#[test]
-fn test_single_reserve_fee_extra_arg_mempool() {
-    // RESERVE_FEE
-    // extra arguments are disallowed in mempool mode
-    assert_eq!(
-        cond_test_flag(
-            "((({h1} ({h2} (123 (((52 (100 (1337 )))))",
-            STRICT_ARGS_COUNT
-        )
-        .unwrap_err()
-        .1,
-        ErrorCode::InvalidCondition
-    );
 }
 
 #[test]
@@ -1439,24 +1403,7 @@ fn test_create_coin_announce_extra_arg() {
 }
 
 #[test]
-fn test_create_coin_announce_extra_arg_mempool() {
-    // CREATE_COIN_ANNOUNCEMENT
-    // ASSERT_COIN_ANNOUNCEMENT
-    // extra arguments are disallowed in mempool mode
-    assert_eq!(
-        cond_test_flag(
-            "((({h1} ({h2} (123 (((60 ({msg1} (1337 ) ((61 ({c11} )))))",
-            STRICT_ARGS_COUNT,
-        )
-        .unwrap_err()
-        .1,
-        ErrorCode::InvalidCondition
-    );
-}
-
-#[test]
 fn test_assert_coin_announce_extra_arg() {
-    // CREATE_COIN_ANNOUNCEMENT
     // ASSERT_COIN_ANNOUNCEMENT
     // extra arguments are allowed in non-mempool mode
     let (a, conds) = cond_test_flag(
@@ -1471,22 +1418,6 @@ fn test_assert_coin_announce_extra_arg() {
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-}
-
-#[test]
-fn test_assert_coin_announce_extra_arg_mempool() {
-    // CREATE_COIN_ANNOUNCEMENT
-    // ASSERT_COIN_ANNOUNCEMENT
-    // extra arguments are disallowed in mempool mode
-    assert_eq!(
-        cond_test_flag(
-            "((({h1} ({h2} (123 (((60 ({msg1} ) ((61 ({c11} (1337 )))))",
-            STRICT_ARGS_COUNT,
-        )
-        .unwrap_err()
-        .1,
-        ErrorCode::InvalidCondition
-    );
 }
 
 #[test]
@@ -1574,24 +1505,7 @@ fn test_create_puzzle_announces_extra_arg() {
 }
 
 #[test]
-fn test_create_puzzle_announces_extra_arg_mempool() {
-    // CREATE_PUZZLE_ANNOUNCEMENT
-    // ASSERT_PUZZLE_ANNOUNCEMENT
-    // extra arguments are disallowed in mempool mode
-    assert_eq!(
-        cond_test_flag(
-            "((({h1} ({h2} (123 (((62 ({msg1} (1337 ) ((63 ({p21} )))))",
-            STRICT_ARGS_COUNT
-        )
-        .unwrap_err()
-        .1,
-        ErrorCode::InvalidCondition
-    );
-}
-
-#[test]
 fn test_assert_puzzle_announces_extra_arg() {
-    // CREATE_PUZZLE_ANNOUNCEMENT
     // ASSERT_PUZZLE_ANNOUNCEMENT
     // extra arguments are allowed in non-mempool mode
     let (a, conds) = cond_test_flag(
@@ -1606,22 +1520,6 @@ fn test_assert_puzzle_announces_extra_arg() {
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-}
-
-#[test]
-fn test_assert_puzzle_announces_extra_arg_mempool() {
-    // CREATE_PUZZLE_ANNOUNCEMENT
-    // ASSERT_PUZZLE_ANNOUNCEMENT
-    // extra arguments are disallowed in mempool mode
-    assert_eq!(
-        cond_test_flag(
-            "((({h1} ({h2} (123 (((62 ({msg1} ) ((63 ({p21} (1337 )))))",
-            STRICT_ARGS_COUNT
-        )
-        .unwrap_err()
-        .1,
-        ErrorCode::InvalidCondition
-    );
 }
 
 #[test]
@@ -1700,21 +1598,6 @@ fn test_single_assert_my_amount_extra_arg() {
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-}
-
-#[test]
-fn test_single_assert_my_amount_extra_arg_mempool() {
-    // ASSERT_MY_AMOUNT
-    // extra args are disallowed in mempool mode
-    assert_eq!(
-        cond_test_flag(
-            "((({h1} ({h2} (123 (((73 (123 (1337 )))))",
-            STRICT_ARGS_COUNT
-        )
-        .unwrap_err()
-        .1,
-        ErrorCode::InvalidCondition
-    );
 }
 
 #[test]
@@ -1815,21 +1698,6 @@ fn test_single_assert_my_coin_id_extra_arg() {
 }
 
 #[test]
-fn test_single_assert_my_coin_id_extra_arg_mempool() {
-    // ASSERT_MY_COIN_ID
-    // extra args are disallowed in mempool mode
-    assert_eq!(
-        cond_test_flag(
-            "((({h1} ({h2} (123 (((70 ({coin12} (1337 )))))",
-            STRICT_ARGS_COUNT
-        )
-        .unwrap_err()
-        .1,
-        ErrorCode::InvalidCondition
-    );
-}
-
-#[test]
 fn test_single_assert_my_coin_id_overlong() {
     // ASSERT_MY_COIN_ID
     // leading zeros in the coin amount invalid
@@ -1907,21 +1775,6 @@ fn test_single_assert_my_parent_coin_id_extra_arg() {
 }
 
 #[test]
-fn test_single_assert_my_parent_coin_id_extra_arg_mempool() {
-    // ASSERT_MY_PARENT_ID
-    // extra arguments are disallowed in mempool mode
-    assert_eq!(
-        cond_test_flag(
-            "((({h1} ({h2} (123 (((71 ({h1} (1337 )))))",
-            STRICT_ARGS_COUNT
-        )
-        .unwrap_err()
-        .1,
-        ErrorCode::InvalidCondition
-    );
-}
-
-#[test]
 fn test_multiple_assert_my_parent_coin_id() {
     // ASSERT_MY_PARENT_ID
     let (a, conds) = cond_test("((({h1} ({h2} (123 (((71 ({h1} ) ((71 ({h1} ) ))))").unwrap();
@@ -1982,21 +1835,6 @@ fn test_single_assert_my_puzzle_hash_extra_arg() {
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-}
-
-#[test]
-fn test_single_assert_my_puzzle_hash_extra_arg_mempool() {
-    // ASSERT_MY_PUZZLEHASH
-    // extra arguments are disallowed in mempool mode
-    assert_eq!(
-        cond_test_flag(
-            "((({h1} ({h2} (123 (((72 ({h2} (1337 )))))",
-            STRICT_ARGS_COUNT
-        )
-        .unwrap_err()
-        .1,
-        ErrorCode::InvalidCondition
-    );
 }
 
 #[test]
@@ -2158,21 +1996,6 @@ fn test_create_coin_extra_arg() {
         assert!(a.atom(c.hint) == H1.to_vec());
     }
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-}
-
-#[test]
-fn test_create_coin_extra_arg_mempool() {
-    // CREATE_COIN
-    // extra args are disallowed in mempool mode
-    assert_eq!(
-        cond_test_flag(
-            "((({h1} ({h2} (123 (((51 ({h2} (42 (({h1}) (1337 )))))",
-            STRICT_ARGS_COUNT
-        )
-        .unwrap_err()
-        .1,
-        ErrorCode::InvalidCondition
-    );
 }
 
 #[test]
@@ -2524,35 +2347,11 @@ fn test_agg_sig_unsafe_extra_arg() {
 }
 
 #[test]
-fn test_agg_sig_unsafe_extra_arg_mempool() {
-    // AGG_SIG_UNSAFE
-    // extra args are also disallowed in mempool mode
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((49 ({pubkey} ({msg1} (456 )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::InvalidCondition
-    );
-}
-
-#[test]
 fn test_agg_sig_me_extra_arg() {
     // AGG_SIG_ME
     // extra args are disallowed in non-mempool mode
     assert_eq!(
         cond_test_flag("((({h1} ({h2} (123 (((50 ({pubkey} ({msg1} (456 )))))", 0)
-            .unwrap_err()
-            .1,
-        ErrorCode::InvalidCondition
-    );
-}
-
-#[test]
-fn test_agg_sig_me_extra_arg_mempool() {
-    // AGG_SIG_ME
-    // extra arguments are not allowed in mempool_mode
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((50 ({pubkey} ({msg1} (456 )))))",)
             .unwrap_err()
             .1,
         ErrorCode::InvalidCondition
