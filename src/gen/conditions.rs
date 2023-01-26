@@ -1086,6 +1086,22 @@ fn test_seconds_exceed_max(#[case] condition: ConditionOpcode, #[case] expected_
     );
 }
 
+#[cfg(test)]
+#[rstest]
+#[case(ASSERT_HEIGHT_ABSOLUTE, ErrorCode::AssertHeightAbsolute)]
+#[case(ASSERT_HEIGHT_RELATIVE, ErrorCode::AssertHeightRelative)]
+fn test_height_exceed_max(#[case] condition: ConditionOpcode, #[case] expected_error: ErrorCode) {
+    assert_eq!(
+        cond_test(&format!(
+            "((({{h1}} ({{h2}} (123 ((({} (0x0100000000 )))))",
+            condition as u8
+        ))
+        .unwrap_err()
+        .1,
+        expected_error
+    );
+}
+
 #[test]
 fn test_single_seconds_relative() {
     // ASSERT_SECONDS_RELATIVE
@@ -1181,17 +1197,6 @@ fn test_single_height_relative_zero() {
 }
 
 #[test]
-fn test_height_relative_exceed_max() {
-    // ASSERT_HEIGHT_RELATIVE
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((82 (0x0100000000 )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::AssertHeightRelative
-    );
-}
-
-#[test]
 fn test_multiple_height_relative() {
     // ASSERT_HEIGHT_RELATIVE
     let (a, conds) =
@@ -1221,17 +1226,6 @@ fn test_single_height_absolute() {
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
 
     assert_eq!(conds.height_absolute, 100);
-}
-
-#[test]
-fn test_height_absolute_exceed_max() {
-    // ASSERT_HEIGHT_ABSOLUTE
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((83 (0x0100000000 )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::AssertHeightAbsolute
-    );
 }
 
 #[test]
