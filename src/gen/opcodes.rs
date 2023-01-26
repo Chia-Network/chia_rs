@@ -1,3 +1,4 @@
+use crate::gen::flags::ENABLE_ASSERT_BEFORE;
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use clvmr::cost::Cost;
 
@@ -33,13 +34,21 @@ pub const ASSERT_SECONDS_ABSOLUTE: ConditionOpcode = 81;
 pub const ASSERT_HEIGHT_RELATIVE: ConditionOpcode = 82;
 pub const ASSERT_HEIGHT_ABSOLUTE: ConditionOpcode = 83;
 
+// spend is not valid if block timestamp exceeds the specified one
+pub const ASSERT_BEFORE_SECONDS_RELATIVE: ConditionOpcode = 84;
+pub const ASSERT_BEFORE_SECONDS_ABSOLUTE: ConditionOpcode = 85;
+
+// spend is not valid if block height exceeds the specified height
+pub const ASSERT_BEFORE_HEIGHT_RELATIVE: ConditionOpcode = 86;
+pub const ASSERT_BEFORE_HEIGHT_ABSOLUTE: ConditionOpcode = 87;
+
 // no-op condition
 pub const ALWAYS_TRUE: ConditionOpcode = 1;
 
 pub const CREATE_COIN_COST: Cost = 1800000;
 pub const AGG_SIG_COST: Cost = 1200000;
 
-pub fn parse_opcode(a: &Allocator, op: NodePtr) -> Option<ConditionOpcode> {
+pub fn parse_opcode(a: &Allocator, op: NodePtr, flags: u32) -> Option<ConditionOpcode> {
     let buf = match a.sexp(op) {
         SExp::Atom(_) => a.atom(op),
         _ => return None,
@@ -47,6 +56,7 @@ pub fn parse_opcode(a: &Allocator, op: NodePtr) -> Option<ConditionOpcode> {
     if buf.len() != 1 {
         return None;
     }
+
     match buf[0] {
         AGG_SIG_UNSAFE
         | AGG_SIG_ME
@@ -65,14 +75,32 @@ pub fn parse_opcode(a: &Allocator, op: NodePtr) -> Option<ConditionOpcode> {
         | ASSERT_HEIGHT_RELATIVE
         | ASSERT_HEIGHT_ABSOLUTE
         | ALWAYS_TRUE => Some(buf[0]),
-        _ => None,
+        _ => {
+            if (flags & ENABLE_ASSERT_BEFORE) != 0 {
+                match buf[0] {
+                    ASSERT_BEFORE_SECONDS_RELATIVE
+                    | ASSERT_BEFORE_SECONDS_ABSOLUTE
+                    | ASSERT_BEFORE_HEIGHT_RELATIVE
+                    | ASSERT_BEFORE_HEIGHT_ABSOLUTE => Some(buf[0]),
+                    _ => None,
+                }
+            } else {
+                None
+            }
+        }
     }
 }
 
 #[cfg(test)]
 fn opcode_tester(a: &mut Allocator, val: &[u8]) -> Option<ConditionOpcode> {
     let v = a.new_atom(val).unwrap();
-    parse_opcode(&a, v)
+    parse_opcode(&a, v, 0)
+}
+
+#[cfg(test)]
+fn opcode_tester_with_assert_before(a: &mut Allocator, val: &[u8]) -> Option<ConditionOpcode> {
+    let v = a.new_atom(val).unwrap();
+    parse_opcode(&a, v, ENABLE_ASSERT_BEFORE)
 }
 
 #[test]
@@ -133,15 +161,131 @@ fn test_parse_opcode() {
         opcode_tester(&mut a, &[ASSERT_HEIGHT_ABSOLUTE]),
         Some(ASSERT_HEIGHT_ABSOLUTE)
     );
+    assert_eq!(
+        opcode_tester(&mut a, &[ASSERT_BEFORE_SECONDS_RELATIVE]),
+        None
+    );
+    assert_eq!(
+        opcode_tester(&mut a, &[ASSERT_BEFORE_SECONDS_ABSOLUTE]),
+        None
+    );
+    assert_eq!(
+        opcode_tester(&mut a, &[ASSERT_BEFORE_HEIGHT_RELATIVE]),
+        None
+    );
+    assert_eq!(
+        opcode_tester(&mut a, &[ASSERT_BEFORE_HEIGHT_ABSOLUTE]),
+        None
+    );
+
     assert_eq!(opcode_tester(&mut a, &[ALWAYS_TRUE]), Some(ALWAYS_TRUE));
     // leading zeros are not allowed, it makes it a different value
     assert_eq!(opcode_tester(&mut a, &[ASSERT_HEIGHT_ABSOLUTE, 0]), None);
     assert_eq!(opcode_tester(&mut a, &[0, ASSERT_HEIGHT_ABSOLUTE]), None);
     assert_eq!(opcode_tester(&mut a, &[0]), None);
 
+    // test with the ENABLE_ASSERT_BEFORE flag as well
+
+    assert_eq!(
+        opcode_tester_with_assert_before(&mut a, &[AGG_SIG_UNSAFE]),
+        Some(AGG_SIG_UNSAFE)
+    );
+    assert_eq!(
+        opcode_tester_with_assert_before(&mut a, &[AGG_SIG_ME]),
+        Some(AGG_SIG_ME)
+    );
+    assert_eq!(
+        opcode_tester_with_assert_before(&mut a, &[CREATE_COIN]),
+        Some(CREATE_COIN)
+    );
+    assert_eq!(
+        opcode_tester_with_assert_before(&mut a, &[RESERVE_FEE]),
+        Some(RESERVE_FEE)
+    );
+    assert_eq!(
+        opcode_tester_with_assert_before(&mut a, &[CREATE_COIN_ANNOUNCEMENT]),
+        Some(CREATE_COIN_ANNOUNCEMENT)
+    );
+    assert_eq!(
+        opcode_tester_with_assert_before(&mut a, &[ASSERT_COIN_ANNOUNCEMENT]),
+        Some(ASSERT_COIN_ANNOUNCEMENT)
+    );
+    assert_eq!(
+        opcode_tester_with_assert_before(&mut a, &[CREATE_PUZZLE_ANNOUNCEMENT]),
+        Some(CREATE_PUZZLE_ANNOUNCEMENT)
+    );
+    assert_eq!(
+        opcode_tester_with_assert_before(&mut a, &[ASSERT_PUZZLE_ANNOUNCEMENT]),
+        Some(ASSERT_PUZZLE_ANNOUNCEMENT)
+    );
+    assert_eq!(
+        opcode_tester_with_assert_before(&mut a, &[ASSERT_MY_COIN_ID]),
+        Some(ASSERT_MY_COIN_ID)
+    );
+    assert_eq!(
+        opcode_tester_with_assert_before(&mut a, &[ASSERT_MY_PARENT_ID]),
+        Some(ASSERT_MY_PARENT_ID)
+    );
+    assert_eq!(
+        opcode_tester_with_assert_before(&mut a, &[ASSERT_MY_PUZZLEHASH]),
+        Some(ASSERT_MY_PUZZLEHASH)
+    );
+    assert_eq!(
+        opcode_tester_with_assert_before(&mut a, &[ASSERT_MY_AMOUNT]),
+        Some(ASSERT_MY_AMOUNT)
+    );
+    assert_eq!(
+        opcode_tester_with_assert_before(&mut a, &[ASSERT_SECONDS_RELATIVE]),
+        Some(ASSERT_SECONDS_RELATIVE)
+    );
+    assert_eq!(
+        opcode_tester_with_assert_before(&mut a, &[ASSERT_SECONDS_ABSOLUTE]),
+        Some(ASSERT_SECONDS_ABSOLUTE)
+    );
+    assert_eq!(
+        opcode_tester_with_assert_before(&mut a, &[ASSERT_HEIGHT_RELATIVE]),
+        Some(ASSERT_HEIGHT_RELATIVE)
+    );
+    assert_eq!(
+        opcode_tester_with_assert_before(&mut a, &[ASSERT_HEIGHT_ABSOLUTE]),
+        Some(ASSERT_HEIGHT_ABSOLUTE)
+    );
+    assert_eq!(
+        opcode_tester_with_assert_before(&mut a, &[ASSERT_BEFORE_SECONDS_RELATIVE]),
+        Some(ASSERT_BEFORE_SECONDS_RELATIVE)
+    );
+    assert_eq!(
+        opcode_tester_with_assert_before(&mut a, &[ASSERT_BEFORE_SECONDS_ABSOLUTE]),
+        Some(ASSERT_BEFORE_SECONDS_ABSOLUTE)
+    );
+    assert_eq!(
+        opcode_tester_with_assert_before(&mut a, &[ASSERT_BEFORE_HEIGHT_RELATIVE]),
+        Some(ASSERT_BEFORE_HEIGHT_RELATIVE)
+    );
+    assert_eq!(
+        opcode_tester_with_assert_before(&mut a, &[ASSERT_BEFORE_HEIGHT_ABSOLUTE]),
+        Some(ASSERT_BEFORE_HEIGHT_ABSOLUTE)
+    );
+
+    assert_eq!(
+        opcode_tester_with_assert_before(&mut a, &[ALWAYS_TRUE]),
+        Some(ALWAYS_TRUE)
+    );
+    // leading zeros are not allowed, it makes it a different value
+    assert_eq!(
+        opcode_tester_with_assert_before(&mut a, &[ASSERT_HEIGHT_ABSOLUTE, 0]),
+        None
+    );
+    assert_eq!(
+        opcode_tester_with_assert_before(&mut a, &[0, ASSERT_HEIGHT_ABSOLUTE]),
+        None
+    );
+    assert_eq!(opcode_tester_with_assert_before(&mut a, &[0]), None);
+
     // a pair is never a valid condition
     let v1 = a.new_atom(&[0]).unwrap();
     let v2 = a.new_atom(&[0]).unwrap();
     let p = a.new_pair(v1, v2).unwrap();
-    assert_eq!(parse_opcode(&a, p), None);
+    assert_eq!(parse_opcode(&a, p, 0), None);
+    assert_eq!(parse_opcode(&a, p, ENABLE_ASSERT_BEFORE), None);
 }

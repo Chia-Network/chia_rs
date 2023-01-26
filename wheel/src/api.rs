@@ -4,6 +4,7 @@ use chia::gen::flags::COND_ARGS_NIL;
 use chia::gen::flags::NO_UNKNOWN_CONDS;
 use chia::gen::flags::STRICT_ARGS_COUNT;
 use chia::gen::flags::MEMPOOL_MODE;
+use chia::gen::flags::ENABLE_ASSERT_BEFORE;
 use chia::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_protocol::Bytes32;
 use chia_protocol::G1Element;
@@ -124,6 +125,7 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     m.add("COND_ARGS_NIL", COND_ARGS_NIL)?;
     m.add("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;
     m.add("STRICT_ARGS_COUNT", STRICT_ARGS_COUNT)?;
+    m.add("ENABLE_ASSERT_BEFORE", ENABLE_ASSERT_BEFORE)?;
     m.add("MEMPOOL_MODE", MEMPOOL_MODE)?;
 
     // Chia classes

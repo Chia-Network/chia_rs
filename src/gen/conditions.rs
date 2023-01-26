@@ -5,10 +5,12 @@ use super::condition_sanitizers::{
 };
 use super::opcodes::{
     parse_opcode, ConditionOpcode, AGG_SIG_COST, AGG_SIG_ME, AGG_SIG_UNSAFE, ALWAYS_TRUE,
-    ASSERT_COIN_ANNOUNCEMENT, ASSERT_HEIGHT_ABSOLUTE, ASSERT_HEIGHT_RELATIVE, ASSERT_MY_AMOUNT,
-    ASSERT_MY_COIN_ID, ASSERT_MY_PARENT_ID, ASSERT_MY_PUZZLEHASH, ASSERT_PUZZLE_ANNOUNCEMENT,
-    ASSERT_SECONDS_ABSOLUTE, ASSERT_SECONDS_RELATIVE, CREATE_COIN, CREATE_COIN_ANNOUNCEMENT,
-    CREATE_COIN_COST, CREATE_PUZZLE_ANNOUNCEMENT, RESERVE_FEE,
+    ASSERT_BEFORE_HEIGHT_ABSOLUTE, ASSERT_BEFORE_HEIGHT_RELATIVE, ASSERT_BEFORE_SECONDS_ABSOLUTE,
+    ASSERT_BEFORE_SECONDS_RELATIVE, ASSERT_COIN_ANNOUNCEMENT, ASSERT_HEIGHT_ABSOLUTE,
+    ASSERT_HEIGHT_RELATIVE, ASSERT_MY_AMOUNT, ASSERT_MY_COIN_ID, ASSERT_MY_PARENT_ID,
+    ASSERT_MY_PUZZLEHASH, ASSERT_PUZZLE_ANNOUNCEMENT, ASSERT_SECONDS_ABSOLUTE,
+    ASSERT_SECONDS_RELATIVE, CREATE_COIN, CREATE_COIN_ANNOUNCEMENT, CREATE_COIN_COST,
+    CREATE_PUZZLE_ANNOUNCEMENT, RESERVE_FEE,
 };
 use super::sanitize_int::sanitize_uint;
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
@@ -21,7 +23,7 @@ use clvmr::allocator::{Allocator, NodePtr, SExp};
 use clvmr::cost::Cost;
 use clvmr::op_utils::u64_from_bytes;
 use clvmr::sha2::{Digest, Sha256};
-use std::cmp::max;
+use std::cmp::{max, min};
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
@@ -82,6 +84,12 @@ pub enum Condition {
     // block height
     AssertHeightRelative(u32),
     AssertHeightAbsolute(u32),
+    // seconds
+    AssertBeforeSecondsRelative(u64),
+    AssertBeforeSecondsAbsolute(u64),
+    // block height
+    AssertBeforeHeightRelative(u32),
+    AssertBeforeHeightAbsolute(u32),
 
     // this means the condition is unconditionally true and can be skipped
     Skip,
@@ -251,6 +259,26 @@ pub fn parse_args(
             let height = parse_height(a, first(a, c)?, ErrorCode::AssertHeightAbsolute)?;
             Ok(Condition::AssertHeightAbsolute(height))
         }
+        ASSERT_BEFORE_SECONDS_RELATIVE => {
+            maybe_check_args_terminator(a, c, flags)?;
+            let seconds = parse_seconds(a, first(a, c)?, ErrorCode::AssertBeforeSecondsRelative)?;
+            Ok(Condition::AssertBeforeSecondsRelative(seconds))
+        }
+        ASSERT_BEFORE_SECONDS_ABSOLUTE => {
+            maybe_check_args_terminator(a, c, flags)?;
+            let seconds = parse_seconds(a, first(a, c)?, ErrorCode::AssertBeforeSecondsAbsolute)?;
+            Ok(Condition::AssertBeforeSecondsAbsolute(seconds))
+        }
+        ASSERT_BEFORE_HEIGHT_RELATIVE => {
+            maybe_check_args_terminator(a, c, flags)?;
+            let height = parse_height(a, first(a, c)?, ErrorCode::AssertBeforeHeightRelative)?;
+            Ok(Condition::AssertBeforeHeightRelative(height))
+        }
+        ASSERT_BEFORE_HEIGHT_ABSOLUTE => {
+            maybe_check_args_terminator(a, c, flags)?;
+            let height = parse_height(a, first(a, c)?, ErrorCode::AssertBeforeHeightAbsolute)?;
+            Ok(Condition::AssertBeforeHeightAbsolute(height))
+        }
         ALWAYS_TRUE => {
             // this condition is always true, we always ignore arguments
             Ok(Condition::Skip)
@@ -303,6 +331,13 @@ pub struct Spend {
     // the highest height/time conditions (i.e. most strict)
     pub height_relative: Option<u32>,
     pub seconds_relative: u64,
+    // the most restrictive ASSERT_BEFORE_HEIGHT_RELATIVE condition (if any)
+    // returned by this puzzle. It doesn't make much sense for a puzzle to
+    // return multiple of these, but if they do, we only need to care about the
+    // lowest one (the most restrictive).
+    pub before_height_relative: Option<u32>,
+    // the most restrictive ASSERT_BEFORE_SECOND_RELATIVE condition (if any)
+    pub before_seconds_relative: Option<u64>,
     // all coins created by this spend. Duplicates are consensus failures
     pub create_coin: HashSet<NewCoin>,
     // Agg Sig Me conditions
@@ -330,6 +365,11 @@ pub struct SpendBundleConditions {
     pub seconds_absolute: u64,
     // Unsafe Agg Sig conditions (i.e. not tied to the spend generating it)
     pub agg_sig_unsafe: Vec<(NodePtr, NodePtr)>,
+    // when set, this is the lowest (i.e. most restrictive) of all
+    // ASSERT_BEFORE_HEIGHT_ABSOLUTE conditions
+    pub before_height_absolute: Option<u32>,
+    // ASSERT_BEFORE_SECONDS_ABSOLUTE conditions
+    pub before_seconds_absolute: Option<u64>,
 
     // the cost of conditions (when returned by parse_spends())
     // run_generator() will include the CLVM cost
@@ -405,6 +445,8 @@ fn parse_spend_conditions(
         puzzle_hash,
         height_relative: None,
         seconds_relative: 0,
+        before_height_relative: None,
+        before_seconds_relative: None,
         create_coin: HashSet::new(),
         agg_sig_me: Vec::new(),
         // assume it's eligible until we see an agg-sig condition
@@ -414,7 +456,7 @@ fn parse_spend_conditions(
     let mut iter = first(a, cond)?;
     while let Some((mut c, next)) = next(a, iter)? {
         iter = next;
-        let op = match parse_opcode(a, first(a, c)?) {
+        let op = match parse_opcode(a, first(a, c)?, flags) {
             None => {
                 // in strict mode we don't allow unknown conditions
                 if (flags & NO_UNKNOWN_CONDS) != 0 {
@@ -480,6 +522,38 @@ fn parse_spend_conditions(
                 // keep the most strict condition. i.e. the highest limit
                 ret.height_absolute = max(ret.height_absolute, h);
             }
+            Condition::AssertBeforeSecondsRelative(s) => {
+                // keep the most strict condition. i.e. the lowest limit
+                if let Some(existing) = spend.before_seconds_relative {
+                    spend.before_seconds_relative = Some(min(existing, s));
+                } else {
+                    spend.before_seconds_relative = Some(s);
+                }
+            }
+            Condition::AssertBeforeSecondsAbsolute(s) => {
+                // keep the most strict condition. i.e. the lowest limit
+                if let Some(existing) = ret.before_seconds_absolute {
+                    ret.before_seconds_absolute = Some(min(existing, s));
+                } else {
+                    ret.before_seconds_absolute = Some(s);
+                }
+            }
+            Condition::AssertBeforeHeightRelative(h) => {
+                // keep the most strict condition. i.e. the lowest limit
+                if let Some(existing) = spend.before_height_relative {
+                    spend.before_height_relative = Some(min(existing, h));
+                } else {
+                    spend.before_height_relative = Some(h);
+                }
+            }
+            Condition::AssertBeforeHeightAbsolute(h) => {
+                // keep the most strict condition. i.e. the lowest limit
+                if let Some(existing) = ret.before_height_absolute {
+                    ret.before_height_absolute = Some(min(existing, h));
+                } else {
+                    ret.before_height_absolute = Some(h);
+                }
+            }
             Condition::AssertMyCoinId(id) => {
                 if a.atom(id) != (*spend.coin_id).as_ref() {
                     return Err(ValidationErr(c, ErrorCode::AssertMyCoinIdFailed));
@@ -542,6 +616,8 @@ pub fn parse_spends(
         reserve_fee: 0,
         height_absolute: 0,
         seconds_absolute: 0,
+        before_height_absolute: None,
+        before_seconds_absolute: None,
         agg_sig_unsafe: Vec::new(),
         cost: 0,
     };
@@ -632,6 +708,8 @@ fn u64_to_bytes(n: u64) -> Vec<u8> {
     }
     buf
 }
+#[cfg(test)]
+use crate::gen::flags::ENABLE_ASSERT_BEFORE;
 #[cfg(test)]
 use clvmr::node::Node;
 #[cfg(test)]
@@ -874,7 +952,8 @@ fn cond_test_cb(
 }
 
 #[cfg(test)]
-const MEMPOOL_MODE: u32 = COND_ARGS_NIL | STRICT_ARGS_COUNT | NO_UNKNOWN_CONDS;
+const MEMPOOL_MODE: u32 =
+    COND_ARGS_NIL | STRICT_ARGS_COUNT | NO_UNKNOWN_CONDS | ENABLE_ASSERT_BEFORE;
 
 #[cfg(test)]
 fn cond_test(input: &str) -> Result<(Allocator, SpendBundleConditions), ValidationErr> {
@@ -1000,6 +1079,10 @@ fn test_invalid_spend_list_terminator() {
 #[case(ASSERT_SECONDS_RELATIVE, "101")]
 #[case(ASSERT_HEIGHT_RELATIVE, "101")]
 #[case(ASSERT_HEIGHT_ABSOLUTE, "100")]
+#[case(ASSERT_BEFORE_SECONDS_ABSOLUTE, "104")]
+#[case(ASSERT_BEFORE_SECONDS_RELATIVE, "101")]
+#[case(ASSERT_BEFORE_HEIGHT_RELATIVE, "101")]
+#[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, "100")]
 #[case(RESERVE_FEE, "100")]
 #[case(CREATE_COIN_ANNOUNCEMENT, "{msg1}")]
 #[case(ASSERT_COIN_ANNOUNCEMENT, "{c11}")]
@@ -1020,7 +1103,7 @@ fn test_extra_arg_mempool(#[case] condition: ConditionOpcode, #[case] arg: &str)
                 "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 )))))",
                 condition as u8, arg
             ),
-            STRICT_ARGS_COUNT
+            STRICT_ARGS_COUNT | ENABLE_ASSERT_BEFORE
         )
         .unwrap_err()
         .1,
@@ -1034,6 +1117,10 @@ fn test_extra_arg_mempool(#[case] condition: ConditionOpcode, #[case] arg: &str)
 #[case(ASSERT_SECONDS_RELATIVE, "101", "", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.seconds_relative, 101))]
 #[case(ASSERT_HEIGHT_RELATIVE, "101", "", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.height_relative, Some(101)))]
 #[case(ASSERT_HEIGHT_ABSOLUTE, "100", "", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.height_absolute, 100))]
+#[case(ASSERT_BEFORE_SECONDS_ABSOLUTE, "104", "", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.before_seconds_absolute, Some(104)))]
+#[case(ASSERT_BEFORE_SECONDS_RELATIVE, "101", "", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.before_seconds_relative, Some(101)))]
+#[case(ASSERT_BEFORE_HEIGHT_RELATIVE, "101", "", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.before_height_relative, Some(101)))]
+#[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, "100", "", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.before_height_absolute, Some(100)))]
 #[case(RESERVE_FEE, "100", "", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.reserve_fee, 100))]
 #[case(CREATE_COIN_ANNOUNCEMENT, "{msg1}", "((61 ({c11} )", |_: &SpendBundleConditions, _: &Spend| {})]
 #[case(ASSERT_COIN_ANNOUNCEMENT, "{c11}", "((60 ({msg1} )", |_: &SpendBundleConditions, _: &Spend| {})]
@@ -1055,7 +1142,7 @@ fn test_extra_arg(
             "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 ) {} ))))",
             condition as u8, arg, extra_cond
         ),
-        0,
+        ENABLE_ASSERT_BEFORE,
     )
     .unwrap();
 
@@ -1073,6 +1160,8 @@ fn test_extra_arg(
 #[rstest]
 #[case(ASSERT_SECONDS_ABSOLUTE, ErrorCode::AssertSecondsAbsolute)]
 #[case(ASSERT_SECONDS_RELATIVE, ErrorCode::AssertSecondsRelative)]
+#[case(ASSERT_BEFORE_SECONDS_ABSOLUTE, ErrorCode::AssertBeforeSecondsAbsolute)]
+#[case(ASSERT_BEFORE_SECONDS_RELATIVE, ErrorCode::AssertBeforeSecondsRelative)]
 fn test_seconds_exceed_max(#[case] condition: ConditionOpcode, #[case] expected_error: ErrorCode) {
     // ASSERT_SECONDS_RELATIVE
     assert_eq!(
@@ -1090,6 +1179,8 @@ fn test_seconds_exceed_max(#[case] condition: ConditionOpcode, #[case] expected_
 #[rstest]
 #[case(ASSERT_HEIGHT_ABSOLUTE, ErrorCode::AssertHeightAbsolute)]
 #[case(ASSERT_HEIGHT_RELATIVE, ErrorCode::AssertHeightRelative)]
+#[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, ErrorCode::AssertBeforeHeightAbsolute)]
+#[case(ASSERT_BEFORE_HEIGHT_RELATIVE, ErrorCode::AssertBeforeHeightRelative)]
 fn test_height_exceed_max(#[case] condition: ConditionOpcode, #[case] expected_error: ErrorCode) {
     assert_eq!(
         cond_test(&format!(
@@ -1108,6 +1199,10 @@ fn test_height_exceed_max(#[case] condition: ConditionOpcode, #[case] expected_e
 #[case(ASSERT_SECONDS_RELATIVE, "101", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.seconds_relative, 101))]
 #[case(ASSERT_HEIGHT_RELATIVE, "101", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.height_relative, Some(101)))]
 #[case(ASSERT_HEIGHT_ABSOLUTE, "100", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.height_absolute, 100))]
+#[case(ASSERT_BEFORE_SECONDS_ABSOLUTE, "104", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.before_seconds_absolute, Some(104)))]
+#[case(ASSERT_BEFORE_SECONDS_RELATIVE, "101", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.before_seconds_relative, Some(101)))]
+#[case(ASSERT_BEFORE_HEIGHT_RELATIVE, "101", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.before_height_relative, Some(101)))]
+#[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, "100", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.before_height_absolute, Some(100)))]
 #[case(RESERVE_FEE, "100", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.reserve_fee, 100))]
 #[case(ASSERT_MY_AMOUNT, "123", |_: &SpendBundleConditions, _: &Spend| {})]
 #[case(ASSERT_MY_COIN_ID, "{coin12}", |_: &SpendBundleConditions, _: &Spend| {})]
@@ -1134,6 +1229,65 @@ fn test_single_condition(
     test(&conds, &spend);
 }
 
+// this test ensures that the ASSERT_BEFORE_ condition codes are not available
+// unless the ENABLE_ASSERT_BEFORE flag is set
+#[cfg(test)]
+#[rstest]
+#[case(ASSERT_SECONDS_ABSOLUTE, "104", None)]
+#[case(ASSERT_SECONDS_RELATIVE, "101", None)]
+#[case(ASSERT_HEIGHT_RELATIVE, "101", None)]
+#[case(ASSERT_HEIGHT_ABSOLUTE, "100", None)]
+#[case(
+    ASSERT_BEFORE_SECONDS_ABSOLUTE,
+    "104",
+    Some(ErrorCode::InvalidConditionOpcode)
+)]
+#[case(
+    ASSERT_BEFORE_SECONDS_RELATIVE,
+    "101",
+    Some(ErrorCode::InvalidConditionOpcode)
+)]
+#[case(
+    ASSERT_BEFORE_HEIGHT_RELATIVE,
+    "101",
+    Some(ErrorCode::InvalidConditionOpcode)
+)]
+#[case(
+    ASSERT_BEFORE_HEIGHT_ABSOLUTE,
+    "100",
+    Some(ErrorCode::InvalidConditionOpcode)
+)]
+#[case(RESERVE_FEE, "100", None)]
+#[case(ASSERT_MY_AMOUNT, "123", None)]
+#[case(ASSERT_MY_COIN_ID, "{coin12}", None)]
+#[case(ASSERT_MY_PARENT_ID, "{h1}", None)]
+#[case(ASSERT_MY_PUZZLEHASH, "{h2}", None)]
+fn test_disable_assert_before(
+    #[case] condition: ConditionOpcode,
+    #[case] arg: &str,
+    #[case] expected_error: Option<ErrorCode>,
+) {
+    // The flag we pass in does not have the ENABLE_ASSERT_BEFORE flag set.
+    // Setting the NO_UNKNOWN_CONDS will make those opcodes fail
+    let ret = cond_test_flag(
+        &format!(
+            "((({{h1}} ({{h2}} (123 ((({} ({} )))))",
+            condition as u8, arg
+        ),
+        NO_UNKNOWN_CONDS,
+    );
+
+    if let Some(err) = expected_error {
+        assert_eq!(ret.unwrap_err().1, err);
+    } else {
+        let (_, conds) = ret.unwrap();
+        assert_eq!(conds.cost, 0);
+        assert_eq!(conds.spends.len(), 1);
+        let spend = &conds.spends[0];
+        assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    }
+}
+
 // this test includes multiple instances of the same condition, to ensure we
 // aggregate the resulting condition correctly. The values we pass are:
 // 100, 503, 90
@@ -1146,6 +1300,11 @@ fn test_single_condition(
 #[case(ASSERT_HEIGHT_ABSOLUTE, |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.height_absolute, 503))]
 // we use the SUM of the values
 #[case(RESERVE_FEE, |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.reserve_fee, 693))]
+// we use the MIN value
+#[case(ASSERT_BEFORE_SECONDS_ABSOLUTE, |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.before_seconds_absolute, Some(90)))]
+#[case(ASSERT_BEFORE_SECONDS_RELATIVE, |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.before_seconds_relative, Some(90)))]
+#[case(ASSERT_BEFORE_HEIGHT_RELATIVE, |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.before_height_relative, Some(90)))]
+#[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.before_height_absolute, Some(90)))]
 fn test_multiple_conditions(
     #[case] condition: ConditionOpcode,
     #[case] test: impl Fn(&SpendBundleConditions, &Spend),
@@ -1190,7 +1349,7 @@ fn test_missing_arg(#[case] condition: ConditionOpcode) {
     assert_eq!(
         cond_test_flag(
             &format!("((({{h1}} ({{h2}} (123 ((({} )))))", condition as u8),
-            0
+            ENABLE_ASSERT_BEFORE
         )
         .unwrap_err()
         .1,

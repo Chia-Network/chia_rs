@@ -10,8 +10,8 @@ sig = b"abababababababababababababababababababababababab"
 
 def test_hash_spend() -> None:
 
-    a1 = Spend(coin, ph, None, 0, [(ph2, 1000000, None)], [(sig, b"msg")], False)
-    a2 = Spend(coin, ph, None, 1, [(ph2, 1000000, None)], [(sig, b"msg")], False)
+    a1 = Spend(coin, ph, None, 0, None, None, [(ph2, 1000000, None)], [(sig, b"msg")], False)
+    a2 = Spend(coin, ph, None, 1, None, None, [(ph2, 1000000, None)], [(sig, b"msg")], False)
     b = hash(a1)
     c = hash(a2)
     assert type(b) is int
@@ -20,8 +20,8 @@ def test_hash_spend() -> None:
 
 def test_hash_spend_bundle_conditions() -> None:
 
-    a1 = SpendBundleConditions([], 1000, 1337, 42, [(sig, b"msg")], 12345678)
-    a2 = SpendBundleConditions([], 1001, 1337, 42, [(sig, b"msg")], 12345678)
+    a1 = SpendBundleConditions([], 1000, 1337, 42, None, None, [(sig, b"msg")], 12345678)
+    a2 = SpendBundleConditions([], 1001, 1337, 42, None, None, [(sig, b"msg")], 12345678)
     b = hash(a1)
     c = hash(a2)
     assert type(b) is int
@@ -30,13 +30,15 @@ def test_hash_spend_bundle_conditions() -> None:
 
 def test_json_spend() -> None:
 
-    a = Spend(coin, ph, None, 0, [(ph2, 1000000, None)], [(sig, b"msg")], False)
+    a = Spend(coin, ph, None, 0, None, None, [(ph2, 1000000, None)], [(sig, b"msg")], False)
 
     assert a.to_json_dict() == {
         "coin_id": "0x" + coin.hex(),
         "puzzle_hash": "0x" + ph.hex(),
         "height_relative": None,
         "seconds_relative": 0,
+        "before_height_relative": None,
+        "before_seconds_relative": None,
         "create_coin": [["0x" + ph2.hex(), 1000000, None]],
         "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
         "flags": 0,
@@ -44,13 +46,15 @@ def test_json_spend() -> None:
 
 def test_from_json_spend() -> None:
 
-    a = Spend(coin, ph, None, 0, [(ph2, 1000000, None)], [(sig, b"msg")], False)
+    a = Spend(coin, ph, None, 0, None, None, [(ph2, 1000000, None)], [(sig, b"msg")], False)
 
     b = Spend.from_json_dict({
         "coin_id": "0x" + coin.hex(),
         "puzzle_hash": "0x" + ph.hex(),
         "height_relative": None,
         "seconds_relative": 0,
+        "before_height_relative": None,
+        "before_seconds_relative": None,
         "create_coin": [["0x" + ph2.hex(), 1000000, None]],
         "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
         "flags": 0,
@@ -59,13 +63,15 @@ def test_from_json_spend() -> None:
 
 def test_from_json_spend_set_optional() -> None:
 
-    a = Spend(coin, ph, 1337, 0, [(ph2, 1000000, None)], [(sig, b"msg")], False)
+    a = Spend(coin, ph, 1337, 0, None, None, [(ph2, 1000000, None)], [(sig, b"msg")], False)
 
     b = Spend.from_json_dict({
         "coin_id": "0x" + coin.hex(),
         "puzzle_hash": "0x" + ph.hex(),
         "height_relative": 1337,
         "seconds_relative": 0,
+        "before_height_relative": None,
+        "before_seconds_relative": None,
         "create_coin": [["0x" + ph2.hex(), 1000000, None]],
         "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
         "flags": 0,
@@ -81,6 +87,8 @@ def test_invalid_hex_prefix() -> None:
             "puzzle_hash": "0x" + ph.hex(),
             "height_relative": None,
             "seconds_relative": 0,
+            "before_height_relative": None,
+            "before_seconds_relative": None,
             "create_coin": [["0x" + ph2.hex(), 1000000, None]],
             "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
             "flags": 0,
@@ -94,6 +102,8 @@ def test_invalid_hex_prefix_bytes() -> None:
             "puzzle_hash": "0x" + ph.hex(),
             "height_relative": None,
             "seconds_relative": 0,
+            "before_height_relative": None,
+            "before_seconds_relative": None,
             "create_coin": [["0x" + ph2.hex(), 1000000, None]],
             # the message field is missing the 0x prefix and is variable length bytes
             "agg_sig_me": [["0x" + sig.hex(), "6d7367"]],
@@ -109,6 +119,8 @@ def test_invalid_hex_digit() -> None:
             "puzzle_hash": "0x" + ph.hex(),
             "height_relative": None,
             "seconds_relative": 0,
+            "before_height_relative": None,
+            "before_seconds_relative": None,
             "create_coin": [["0x" + ph2.hex(), 1000000, None]],
             "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
             "flags": 0,
@@ -123,6 +135,8 @@ def test_invalid_hex_length() -> None:
             "puzzle_hash": "0x" + ph.hex(),
             "height_relative": None,
             "seconds_relative": 0,
+            "before_height_relative": None,
+            "before_seconds_relative": None,
             "create_coin": [["0x" + ph2.hex(), 1000000, None]],
             "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
             "flags": 0,
@@ -136,6 +150,8 @@ def test_missing_field() -> None:
             "puzzle_hash": "0x" + ph.hex(),
             "height_relative": None,
             "seconds_relative": 0,
+            "before_height_relative": None,
+            "before_seconds_relative": None,
             "create_coin": [["0x" + ph2.hex(), 1000000, None]],
             "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
             "flags": 0,
@@ -144,25 +160,29 @@ def test_missing_field() -> None:
 
 def test_json_spend_bundle_conditions() -> None:
 
-    a = SpendBundleConditions([], 1000, 1337, 42, [(sig, b"msg")], 12345678)
+    a = SpendBundleConditions([], 1000, 1337, 42, None, None, [(sig, b"msg")], 12345678)
 
     assert a.to_json_dict() == {
         "spends": [],
         "reserve_fee": 1000,
         "height_absolute": 1337,
         "seconds_absolute": 42,
+        "before_height_absolute": None,
+        "before_seconds_absolute": None,
         "agg_sig_unsafe": [["0x" + sig.hex(), "0x6d7367"]],
         "cost": 12345678,
     }
 
 def test_from_json_spend_bundle_conditions() -> None:
 
-    a = SpendBundleConditions([], 1000, 1337, 42, [(sig, b"msg")], 12345678)
+    a = SpendBundleConditions([], 1000, 1337, 42, None, None, [(sig, b"msg")], 12345678)
     b = SpendBundleConditions.from_json_dict({
         "spends": [],
         "reserve_fee": 1000,
         "height_absolute": 1337,
         "seconds_absolute": 42,
+        "before_height_absolute": None,
+        "before_seconds_absolute": None,
         "agg_sig_unsafe": [["0x" + sig.hex(), "0x6d7367"]],
         "cost": 12345678,
     })
@@ -171,7 +191,7 @@ def test_from_json_spend_bundle_conditions() -> None:
 
 def test_copy_spend() -> None:
 
-    a = Spend(coin, ph, None, 0, [(ph2, 1000000, None)], [(sig, b"msg")], False)
+    a = Spend(coin, ph, None, 0, None, None, [(ph2, 1000000, None)], [(sig, b"msg")], False)
     b = copy.copy(a)
 
     assert a == b
@@ -183,7 +203,7 @@ def test_copy_spend() -> None:
 
 def test_copy_spend_bundle_conditions() -> None:
 
-    a = SpendBundleConditions([], 1000, 1337, 42, [(sig, b"msg")], 12345678)
+    a = SpendBundleConditions([], 1000, 1337, 42, None, None, [(sig, b"msg")], 12345678)
     b = copy.copy(a)
 
     assert a == b

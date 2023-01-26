@@ -14,5 +14,8 @@ pub const COND_ARGS_NIL: u32 = 0x40000;
 // currently supported for those conditions. This is meant for mempool-mode
 pub const STRICT_ARGS_COUNT: u32 = 0x80000;
 
+// When set, support the new ASSERT_BEFORE_* conditions
+pub const ENABLE_ASSERT_BEFORE: u32 = 0x100000;
+
 pub const MEMPOOL_MODE: u32 =
-    CLVM_MEMPOOL_MODE | NO_UNKNOWN_CONDS | COND_ARGS_NIL | STRICT_ARGS_COUNT;
+    CLVM_MEMPOOL_MODE | NO_UNKNOWN_CONDS | COND_ARGS_NIL | STRICT_ARGS_COUNT | ENABLE_ASSERT_BEFORE;
