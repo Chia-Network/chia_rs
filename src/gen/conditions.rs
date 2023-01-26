@@ -87,6 +87,17 @@ pub enum Condition {
     Skip,
 }
 
+fn maybe_check_args_terminator(
+    a: &Allocator,
+    arg: NodePtr,
+    flags: u32,
+) -> Result<(), ValidationErr> {
+    if (flags & STRICT_ARGS_COUNT) != 0 {
+        check_nil(a, rest(a, arg)?)?;
+    }
+    Ok(())
+}
+
 pub fn parse_args(
     a: &Allocator,
     mut c: NodePtr,
@@ -148,9 +159,7 @@ pub fn parse_args(
             if let Ok(params) = first(a, c) {
                 // the item was a cons-box, and params is the left-hand
                 // side, the list element
-                if (flags & STRICT_ARGS_COUNT) != 0 {
-                    check_nil(a, rest(a, c)?)?;
-                }
+                maybe_check_args_terminator(a, c, flags)?;
                 if let Ok(param) = first(a, params) {
                     // pull out the first item (param)
                     if let SExp::Atom(b) = a.sexp(param) {
@@ -165,91 +174,67 @@ pub fn parse_args(
             Ok(Condition::CreateCoin(puzzle_hash, amount, a.null()))
         }
         RESERVE_FEE => {
+            maybe_check_args_terminator(a, c, flags)?;
             let fee = parse_amount(a, first(a, c)?, ErrorCode::ReserveFeeConditionFailed)?;
-            if (flags & STRICT_ARGS_COUNT) != 0 {
-                check_nil(a, rest(a, c)?)?;
-            }
             Ok(Condition::ReserveFee(fee))
         }
         CREATE_COIN_ANNOUNCEMENT => {
+            maybe_check_args_terminator(a, c, flags)?;
             let msg = sanitize_announce_msg(a, first(a, c)?, ErrorCode::InvalidCoinAnnouncement)?;
-            if (flags & STRICT_ARGS_COUNT) != 0 {
-                check_nil(a, rest(a, c)?)?;
-            }
             Ok(Condition::CreateCoinAnnouncement(msg))
         }
         ASSERT_COIN_ANNOUNCEMENT => {
+            maybe_check_args_terminator(a, c, flags)?;
             let id = sanitize_hash(a, first(a, c)?, 32, ErrorCode::AssertCoinAnnouncementFailed)?;
-            if (flags & STRICT_ARGS_COUNT) != 0 {
-                check_nil(a, rest(a, c)?)?;
-            }
             Ok(Condition::AssertCoinAnnouncement(id))
         }
         CREATE_PUZZLE_ANNOUNCEMENT => {
+            maybe_check_args_terminator(a, c, flags)?;
             let msg = sanitize_announce_msg(a, first(a, c)?, ErrorCode::InvalidPuzzleAnnouncement)?;
-            if (flags & STRICT_ARGS_COUNT) != 0 {
-                check_nil(a, rest(a, c)?)?;
-            }
             Ok(Condition::CreatePuzzleAnnouncement(msg))
         }
         ASSERT_PUZZLE_ANNOUNCEMENT => {
+            maybe_check_args_terminator(a, c, flags)?;
             let id = sanitize_hash(
                 a,
                 first(a, c)?,
                 32,
                 ErrorCode::AssertPuzzleAnnouncementFailed,
             )?;
-            if (flags & STRICT_ARGS_COUNT) != 0 {
-                check_nil(a, rest(a, c)?)?;
-            }
             Ok(Condition::AssertPuzzleAnnouncement(id))
         }
         ASSERT_MY_COIN_ID => {
+            maybe_check_args_terminator(a, c, flags)?;
             let id = sanitize_hash(a, first(a, c)?, 32, ErrorCode::AssertMyCoinIdFailed)?;
-            if (flags & STRICT_ARGS_COUNT) != 0 {
-                check_nil(a, rest(a, c)?)?;
-            }
             Ok(Condition::AssertMyCoinId(id))
         }
         ASSERT_MY_PARENT_ID => {
+            maybe_check_args_terminator(a, c, flags)?;
             let id = sanitize_hash(a, first(a, c)?, 32, ErrorCode::AssertMyParentIdFailed)?;
-            if (flags & STRICT_ARGS_COUNT) != 0 {
-                check_nil(a, rest(a, c)?)?;
-            }
             Ok(Condition::AssertMyParentId(id))
         }
         ASSERT_MY_PUZZLEHASH => {
+            maybe_check_args_terminator(a, c, flags)?;
             let id = sanitize_hash(a, first(a, c)?, 32, ErrorCode::AssertMyPuzzlehashFailed)?;
-            if (flags & STRICT_ARGS_COUNT) != 0 {
-                check_nil(a, rest(a, c)?)?;
-            }
             Ok(Condition::AssertMyPuzzlehash(id))
         }
         ASSERT_MY_AMOUNT => {
+            maybe_check_args_terminator(a, c, flags)?;
             let amount = parse_amount(a, first(a, c)?, ErrorCode::AssertMyAmountFailed)?;
-            if (flags & STRICT_ARGS_COUNT) != 0 {
-                check_nil(a, rest(a, c)?)?;
-            }
             Ok(Condition::AssertMyAmount(amount))
         }
         ASSERT_SECONDS_RELATIVE => {
-            if (flags & STRICT_ARGS_COUNT) != 0 {
-                check_nil(a, rest(a, c)?)?;
-            }
+            maybe_check_args_terminator(a, c, flags)?;
             let seconds = parse_seconds(a, first(a, c)?, ErrorCode::AssertSecondsRelative)?;
             Ok(Condition::AssertSecondsRelative(seconds))
         }
         ASSERT_SECONDS_ABSOLUTE => {
-            if (flags & STRICT_ARGS_COUNT) != 0 {
-                check_nil(a, rest(a, c)?)?;
-            }
+            maybe_check_args_terminator(a, c, flags)?;
             let seconds = parse_seconds(a, first(a, c)?, ErrorCode::AssertSecondsAbsolute)?;
             Ok(Condition::AssertSecondsAbsolute(seconds))
         }
         ASSERT_HEIGHT_RELATIVE => {
-            if (flags & STRICT_ARGS_COUNT) != 0 {
-                check_nil(a, rest(a, c)?)?;
-            }
+            maybe_check_args_terminator(a, c, flags)?;
             let code = ErrorCode::AssertHeightRelative;
             match sanitize_uint(a, first(a, c)?, 4, code) {
                 // Height is always positive, so a negative requirement is always true,
@@ -262,9 +247,7 @@ pub fn parse_args(
             }
         }
         ASSERT_HEIGHT_ABSOLUTE => {
-            if (flags & STRICT_ARGS_COUNT) != 0 {
-                check_nil(a, rest(a, c)?)?;
-            }
+            maybe_check_args_terminator(a, c, flags)?;
             let height = parse_height(a, first(a, c)?, ErrorCode::AssertHeightAbsolute)?;
             Ok(Condition::AssertHeightAbsolute(height))
         }
