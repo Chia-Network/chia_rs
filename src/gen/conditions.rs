@@ -1028,10 +1028,36 @@ fn test_extra_arg_mempool(#[case] condition: ConditionOpcode, #[case] arg: &str)
     );
 }
 
-#[test]
-fn test_single_seconds_relative() {
-    // ASSERT_SECONDS_RELATIVE
-    let (a, conds) = cond_test("((({h1} ({h2} (123 (((80 (101 )))))").unwrap();
+#[cfg(test)]
+#[rstest]
+#[case(ASSERT_SECONDS_ABSOLUTE, "104", "", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.seconds_absolute, 104))]
+#[case(ASSERT_SECONDS_RELATIVE, "101", "", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.seconds_relative, 101))]
+#[case(ASSERT_HEIGHT_RELATIVE, "101", "", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.height_relative, Some(101)))]
+#[case(ASSERT_HEIGHT_ABSOLUTE, "100", "", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.height_absolute, 100))]
+#[case(RESERVE_FEE, "100", "", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.reserve_fee, 100))]
+#[case(CREATE_COIN_ANNOUNCEMENT, "{msg1}", "((61 ({c11} )", |_: &SpendBundleConditions, _: &Spend| {})]
+#[case(ASSERT_COIN_ANNOUNCEMENT, "{c11}", "((60 ({msg1} )", |_: &SpendBundleConditions, _: &Spend| {})]
+#[case(CREATE_PUZZLE_ANNOUNCEMENT, "{msg1}", "((63 ({p21} )", |_: &SpendBundleConditions, _: &Spend| {})]
+#[case(ASSERT_PUZZLE_ANNOUNCEMENT, "{p21}", "((62 ({msg1} )", |_: &SpendBundleConditions, _: &Spend| {})]
+#[case(ASSERT_MY_AMOUNT, "123", "", |_: &SpendBundleConditions, _: &Spend| {})]
+#[case(ASSERT_MY_COIN_ID, "{coin12}", "", |_: &SpendBundleConditions, _: &Spend| {})]
+#[case(ASSERT_MY_PARENT_ID, "{h1}", "", |_: &SpendBundleConditions, _: &Spend| {})]
+#[case(ASSERT_MY_PUZZLEHASH, "{h2}", "", |_: &SpendBundleConditions, _: &Spend| {})]
+fn test_extra_arg(
+    #[case] condition: ConditionOpcode,
+    #[case] arg: &str,
+    #[case] extra_cond: &str,
+    #[case] test: impl Fn(&SpendBundleConditions, &Spend),
+) {
+    // extra args are ignored
+    let (a, conds) = cond_test_flag(
+        &format!(
+            "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 ) {} ))))",
+            condition as u8, arg, extra_cond
+        ),
+        0,
+    )
+    .unwrap();
 
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
@@ -1040,14 +1066,13 @@ fn test_single_seconds_relative() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
 
-    assert_eq!(spend.seconds_relative, 101);
+    test(&conds, &spend);
 }
 
 #[test]
-fn test_single_seconds_relative_extra_arg() {
+fn test_single_seconds_relative() {
     // ASSERT_SECONDS_RELATIVE
-    // additional arguments are ignored
-    let (a, conds) = cond_test_flag("((({h1} ({h2} (123 (((80 (101 (1337 )))))", 0).unwrap();
+    let (a, conds) = cond_test("((({h1} ({h2} (123 (((80 (101 )))))").unwrap();
 
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
@@ -1103,22 +1128,6 @@ fn test_single_seconds_absolute() {
 }
 
 #[test]
-fn test_single_seconds_absolute_extra_arg() {
-    // ASSERT_SECONDS_ABSOLUTE
-    // extra args are allowed in non-mempool mode
-    let (a, conds) = cond_test_flag("((({h1} ({h2} (123 (((81 (104 ( 1337 )))))", 0).unwrap();
-
-    assert_eq!(conds.cost, 0);
-    assert_eq!(conds.spends.len(), 1);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-
-    assert_eq!(conds.seconds_absolute, 104);
-}
-
-#[test]
 fn test_seconds_absolute_exceed_max() {
     // ASSERT_SECONDS_ABSOLUTE
     assert_eq!(
@@ -1150,22 +1159,6 @@ fn test_multiple_seconds_absolute() {
 fn test_single_height_relative() {
     // ASSERT_HEIGHT_RELATIVE
     let (a, conds) = cond_test("((({h1} ({h2} (123 (((82 (101 )))))").unwrap();
-
-    assert_eq!(conds.cost, 0);
-    assert_eq!(conds.spends.len(), 1);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-
-    assert_eq!(spend.height_relative, Some(101));
-}
-
-#[test]
-fn test_single_height_relative_extra_arg() {
-    // ASSERT_HEIGHT_RELATIVE
-    // extra arguments are allowed in non-mempool mode
-    let (a, conds) = cond_test_flag("((({h1} ({h2} (123 (((82 (101 (1337 )))))", 0).unwrap();
 
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
@@ -1236,22 +1229,6 @@ fn test_single_height_absolute() {
 }
 
 #[test]
-fn test_single_height_absolute_extra_arg() {
-    // ASSERT_HEIGHT_ABSOLUTE
-    // extra args are allowed in non-mempool mode
-    let (a, conds) = cond_test_flag("((({h1} ({h2} (123 (((83 (100 (1337 )))))", 0).unwrap();
-
-    assert_eq!(conds.cost, 0);
-    assert_eq!(conds.spends.len(), 1);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-
-    assert_eq!(conds.height_absolute, 100);
-}
-
-#[test]
 fn test_height_absolute_exceed_max() {
     // ASSERT_HEIGHT_ABSOLUTE
     assert_eq!(
@@ -1283,22 +1260,6 @@ fn test_multiple_height_absolute() {
 fn test_single_reserve_fee() {
     // RESERVE_FEE
     let (a, conds) = cond_test("((({h1} ({h2} (123 (((52 (100 )))))").unwrap();
-
-    assert_eq!(conds.cost, 0);
-    assert_eq!(conds.spends.len(), 1);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-
-    assert_eq!(conds.reserve_fee, 100);
-}
-
-#[test]
-fn test_single_reserve_fee_extra_arg() {
-    // RESERVE_FEE
-    // extra arguments are allowed in non-mempool mode
-    let (a, conds) = cond_test_flag("((({h1} ({h2} (123 (((52 (100 (1337 )))))", 0).unwrap();
 
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
@@ -1384,43 +1345,6 @@ fn test_coin_announces_consume() {
 }
 
 #[test]
-fn test_create_coin_announce_extra_arg() {
-    // CREATE_COIN_ANNOUNCEMENT
-    // ASSERT_COIN_ANNOUNCEMENT
-    // extra arguments are allowed in non-mempool mode
-    let (a, conds) = cond_test_flag(
-        "((({h1} ({h2} (123 (((60 ({msg1} (1337 ) ((61 ({c11} )))))",
-        0,
-    )
-    .unwrap();
-
-    assert_eq!(conds.cost, 0);
-    assert_eq!(conds.spends.len(), 1);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-}
-
-#[test]
-fn test_assert_coin_announce_extra_arg() {
-    // ASSERT_COIN_ANNOUNCEMENT
-    // extra arguments are allowed in non-mempool mode
-    let (a, conds) = cond_test_flag(
-        "((({h1} ({h2} (123 (((60 ({msg1} ) ((61 ({c11} (1337 )))))",
-        0,
-    )
-    .unwrap();
-
-    assert_eq!(conds.cost, 0);
-    assert_eq!(conds.spends.len(), 1);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-}
-
-#[test]
 fn test_cross_coin_announces_consume() {
     // CREATE_COIN_ANNOUNCEMENT
     // ASSERT_COIN_ANNOUNCEMENT
@@ -1486,43 +1410,6 @@ fn test_puzzle_announces_consume() {
 }
 
 #[test]
-fn test_create_puzzle_announces_extra_arg() {
-    // CREATE_PUZZLE_ANNOUNCEMENT
-    // ASSERT_PUZZLE_ANNOUNCEMENT
-    // extra arguments are allowed in non-mempool mode
-    let (a, conds) = cond_test_flag(
-        "((({h1} ({h2} (123 (((62 ({msg1} (1337 ) ((63 ({p21} )))))",
-        0,
-    )
-    .unwrap();
-
-    assert_eq!(conds.cost, 0);
-    assert_eq!(conds.spends.len(), 1);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-}
-
-#[test]
-fn test_assert_puzzle_announces_extra_arg() {
-    // ASSERT_PUZZLE_ANNOUNCEMENT
-    // extra arguments are allowed in non-mempool mode
-    let (a, conds) = cond_test_flag(
-        "((({h1} ({h2} (123 (((62 ({msg1} ) ((63 ({p21} (1337 )))))",
-        0,
-    )
-    .unwrap();
-
-    assert_eq!(conds.cost, 0);
-    assert_eq!(conds.spends.len(), 1);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-}
-
-#[test]
 fn test_cross_coin_puzzle_announces_consume() {
     // CREATE_PUZZLE_ANNOUNCEMENT
     // ASSERT_PUZZLE_ANNOUNCEMENT
@@ -1577,20 +1464,6 @@ fn test_puzzle_announce_mismatch() {
 fn test_single_assert_my_amount() {
     // ASSERT_MY_AMOUNT
     let (a, conds) = cond_test("((({h1} ({h2} (123 (((73 (123 )))))").unwrap();
-
-    assert_eq!(conds.cost, 0);
-    assert_eq!(conds.spends.len(), 1);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-}
-
-#[test]
-fn test_single_assert_my_amount_extra_arg() {
-    // ASSERT_MY_AMOUNT
-    // extra args are allowed in non-mempool mode
-    let (a, conds) = cond_test_flag("((({h1} ({h2} (123 (((73 (123 (1337 )))))", 0).unwrap();
 
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
@@ -1684,20 +1557,6 @@ fn test_single_assert_my_coin_id() {
 }
 
 #[test]
-fn test_single_assert_my_coin_id_extra_arg() {
-    // ASSERT_MY_COIN_ID
-    // extra args are allowed in non-mempool mode
-    let (a, conds) = cond_test_flag("((({h1} ({h2} (123 (((70 ({coin12} (1337 )))))", 0).unwrap();
-
-    assert_eq!(conds.cost, 0);
-    assert_eq!(conds.spends.len(), 1);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-}
-
-#[test]
 fn test_single_assert_my_coin_id_overlong() {
     // ASSERT_MY_COIN_ID
     // leading zeros in the coin amount invalid
@@ -1761,20 +1620,6 @@ fn test_single_assert_my_parent_coin_id() {
 }
 
 #[test]
-fn test_single_assert_my_parent_coin_id_extra_arg() {
-    // ASSERT_MY_PARENT_ID
-    // extra arguments are allowed in non-mempool mode
-    let (a, conds) = cond_test_flag("((({h1} ({h2} (123 (((71 ({h1} (1337 )))))", 0).unwrap();
-
-    assert_eq!(conds.cost, 0);
-    assert_eq!(conds.spends.len(), 1);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-}
-
-#[test]
 fn test_multiple_assert_my_parent_coin_id() {
     // ASSERT_MY_PARENT_ID
     let (a, conds) = cond_test("((({h1} ({h2} (123 (((71 ({h1} ) ((71 ({h1} ) ))))").unwrap();
@@ -1814,20 +1659,6 @@ fn test_single_invalid_assert_my_parent_coin_id() {
 fn test_single_assert_my_puzzle_hash() {
     // ASSERT_MY_PUZZLEHASH
     let (a, conds) = cond_test("((({h1} ({h2} (123 (((72 ({h2} )))))").unwrap();
-
-    assert_eq!(conds.cost, 0);
-    assert_eq!(conds.spends.len(), 1);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-}
-
-#[test]
-fn test_single_assert_my_puzzle_hash_extra_arg() {
-    // ASSERT_MY_PUZZLEHASH
-    // extra arguments are allowed in non-mempool mode
-    let (a, conds) = cond_test_flag("((({h1} ({h2} (123 (((72 ({h2} (1337 )))))", 0).unwrap();
 
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
