@@ -1102,10 +1102,27 @@ fn test_height_exceed_max(#[case] condition: ConditionOpcode, #[case] expected_e
     );
 }
 
-#[test]
-fn test_single_seconds_relative() {
-    // ASSERT_SECONDS_RELATIVE
-    let (a, conds) = cond_test("((({h1} ({h2} (123 (((80 (101 )))))").unwrap();
+#[cfg(test)]
+#[rstest]
+#[case(ASSERT_SECONDS_ABSOLUTE, "104", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.seconds_absolute, 104))]
+#[case(ASSERT_SECONDS_RELATIVE, "101", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.seconds_relative, 101))]
+#[case(ASSERT_HEIGHT_RELATIVE, "101", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.height_relative, Some(101)))]
+#[case(ASSERT_HEIGHT_ABSOLUTE, "100", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.height_absolute, 100))]
+#[case(RESERVE_FEE, "100", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.reserve_fee, 100))]
+#[case(ASSERT_MY_AMOUNT, "123", |_: &SpendBundleConditions, _: &Spend| {})]
+#[case(ASSERT_MY_COIN_ID, "{coin12}", |_: &SpendBundleConditions, _: &Spend| {})]
+#[case(ASSERT_MY_PARENT_ID, "{h1}", |_: &SpendBundleConditions, _: &Spend| {})]
+#[case(ASSERT_MY_PUZZLEHASH, "{h2}", |_: &SpendBundleConditions, _: &Spend| {})]
+fn test_single_condition(
+    #[case] condition: ConditionOpcode,
+    #[case] arg: &str,
+    #[case] test: impl Fn(&SpendBundleConditions, &Spend),
+) {
+    let (a, conds) = cond_test(&format!(
+        "((({{h1}} ({{h2}} (123 ((({} ({} )))))",
+        condition as u8, arg
+    ))
+    .unwrap();
 
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
@@ -1114,7 +1131,7 @@ fn test_single_seconds_relative() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
 
-    assert_eq!(spend.seconds_relative, 101);
+    test(&conds, &spend);
 }
 
 #[test]
@@ -1135,21 +1152,6 @@ fn test_multiple_seconds_relative() {
 }
 
 #[test]
-fn test_single_seconds_absolute() {
-    // ASSERT_SECONDS_ABSOLUTE
-    let (a, conds) = cond_test("((({h1} ({h2} (123 (((81 (104 )))))").unwrap();
-
-    assert_eq!(conds.cost, 0);
-    assert_eq!(conds.spends.len(), 1);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-
-    assert_eq!(conds.seconds_absolute, 104);
-}
-
-#[test]
 fn test_multiple_seconds_absolute() {
     // ASSERT_SECONDS_ABSOLUTE
     let (a, conds) =
@@ -1164,21 +1166,6 @@ fn test_multiple_seconds_absolute() {
 
     // we use the MAX value
     assert_eq!(conds.seconds_absolute, 503);
-}
-
-#[test]
-fn test_single_height_relative() {
-    // ASSERT_HEIGHT_RELATIVE
-    let (a, conds) = cond_test("((({h1} ({h2} (123 (((82 (101 )))))").unwrap();
-
-    assert_eq!(conds.cost, 0);
-    assert_eq!(conds.spends.len(), 1);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-
-    assert_eq!(spend.height_relative, Some(101));
 }
 
 #[test]
@@ -1214,21 +1201,6 @@ fn test_multiple_height_relative() {
 }
 
 #[test]
-fn test_single_height_absolute() {
-    // ASSERT_HEIGHT_ABSOLUTE
-    let (a, conds) = cond_test("((({h1} ({h2} (123 (((83 (100 )))))").unwrap();
-
-    assert_eq!(conds.cost, 0);
-    assert_eq!(conds.spends.len(), 1);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-
-    assert_eq!(conds.height_absolute, 100);
-}
-
-#[test]
 fn test_multiple_height_absolute() {
     // ASSERT_HEIGHT_ABSOLUTE
     let (a, conds) =
@@ -1243,21 +1215,6 @@ fn test_multiple_height_absolute() {
 
     // we use the MAX value
     assert_eq!(conds.height_absolute, 503);
-}
-
-#[test]
-fn test_single_reserve_fee() {
-    // RESERVE_FEE
-    let (a, conds) = cond_test("((({h1} ({h2} (123 (((52 (100 )))))").unwrap();
-
-    assert_eq!(conds.cost, 0);
-    assert_eq!(conds.spends.len(), 1);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-
-    assert_eq!(conds.reserve_fee, 100);
 }
 
 #[test]
@@ -1450,19 +1407,6 @@ fn test_puzzle_announce_mismatch() {
 }
 
 #[test]
-fn test_single_assert_my_amount() {
-    // ASSERT_MY_AMOUNT
-    let (a, conds) = cond_test("((({h1} ({h2} (123 (((73 (123 )))))").unwrap();
-
-    assert_eq!(conds.cost, 0);
-    assert_eq!(conds.spends.len(), 1);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-}
-
-#[test]
 fn test_single_assert_my_amount_exceed_max() {
     // ASSERT_MY_AMOUNT
     assert_eq!(
@@ -1533,19 +1477,6 @@ fn test_single_failing_assert_my_amount() {
 }
 
 #[test]
-fn test_single_assert_my_coin_id() {
-    // ASSERT_MY_COIN_ID
-    let (a, conds) = cond_test("((({h1} ({h2} (123 (((70 ({coin12} )))))").unwrap();
-
-    assert_eq!(conds.cost, 0);
-    assert_eq!(conds.spends.len(), 1);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-}
-
-#[test]
 fn test_single_assert_my_coin_id_overlong() {
     // ASSERT_MY_COIN_ID
     // leading zeros in the coin amount invalid
@@ -1596,19 +1527,6 @@ fn test_multiple_assert_my_coin_id_mismatch() {
 }
 
 #[test]
-fn test_single_assert_my_parent_coin_id() {
-    // ASSERT_MY_PARENT_ID
-    let (a, conds) = cond_test("((({h1} ({h2} (123 (((71 ({h1} )))))").unwrap();
-
-    assert_eq!(conds.cost, 0);
-    assert_eq!(conds.spends.len(), 1);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-}
-
-#[test]
 fn test_multiple_assert_my_parent_coin_id() {
     // ASSERT_MY_PARENT_ID
     let (a, conds) = cond_test("((({h1} ({h2} (123 (((71 ({h1} ) ((71 ({h1} ) ))))").unwrap();
@@ -1642,19 +1560,6 @@ fn test_single_invalid_assert_my_parent_coin_id() {
             .1,
         ErrorCode::AssertMyParentIdFailed
     );
-}
-
-#[test]
-fn test_single_assert_my_puzzle_hash() {
-    // ASSERT_MY_PUZZLEHASH
-    let (a, conds) = cond_test("((({h1} ({h2} (123 (((72 ({h2} )))))").unwrap();
-
-    assert_eq!(conds.cost, 0);
-    assert_eq!(conds.spends.len(), 1);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
 }
 
 #[test]
