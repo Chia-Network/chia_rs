@@ -1166,6 +1166,38 @@ fn test_multiple_conditions(
     test(&conds, &spend);
 }
 
+// parse all conditions without an argument. They should all fail
+#[cfg(test)]
+#[rstest]
+#[case(ASSERT_SECONDS_ABSOLUTE)]
+#[case(ASSERT_SECONDS_RELATIVE)]
+#[case(ASSERT_HEIGHT_RELATIVE)]
+#[case(ASSERT_HEIGHT_ABSOLUTE)]
+#[case(RESERVE_FEE)]
+#[case(CREATE_COIN_ANNOUNCEMENT)]
+#[case(ASSERT_COIN_ANNOUNCEMENT)]
+#[case(CREATE_PUZZLE_ANNOUNCEMENT)]
+#[case(ASSERT_PUZZLE_ANNOUNCEMENT)]
+#[case(ASSERT_MY_AMOUNT)]
+#[case(ASSERT_MY_COIN_ID)]
+#[case(ASSERT_MY_PARENT_ID)]
+#[case(ASSERT_MY_PUZZLEHASH)]
+#[case(CREATE_COIN)]
+#[case(AGG_SIG_UNSAFE)]
+#[case(AGG_SIG_ME)]
+fn test_missing_arg(#[case] condition: ConditionOpcode) {
+    // extra args are disallowed in mempool mode
+    assert_eq!(
+        cond_test_flag(
+            &format!("((({{h1}} ({{h2}} (123 ((({} )))))", condition as u8),
+            0
+        )
+        .unwrap_err()
+        .1,
+        ErrorCode::InvalidCondition
+    );
+}
+
 #[test]
 fn test_single_height_relative_zero() {
     // ASSERT_HEIGHT_RELATIVE
@@ -1254,18 +1286,6 @@ fn test_cross_coin_announces_consume() {
 }
 
 #[test]
-fn test_coin_announce_missing_arg() {
-    // CREATE_COIN_ANNOUNCEMENT
-    // ASSERT_COIN_ANNOUNCEMENT
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((60 ) ((61 ({p21} )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::InvalidCondition
-    );
-}
-
-#[test]
 fn test_failing_coin_consume() {
     // ASSERT_COIN_ANNOUNCEMENT
     assert_eq!(
@@ -1316,18 +1336,6 @@ fn test_cross_coin_puzzle_announces_consume() {
     assert_eq!(a.atom(conds.spends[0].puzzle_hash), H2);
     assert_eq!(*conds.spends[1].coin_id, test_coin_id(H2, H2, 123));
     assert_eq!(a.atom(conds.spends[1].puzzle_hash), H2);
-}
-
-#[test]
-fn test_puzzle_announce_missing_arg() {
-    // CREATE_PUZZLE_ANNOUNCEMENT
-    // ASSERT_PUZZLE_ANNOUNCEMENT
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((62 ) ((63 ({p21} )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::InvalidCondition
-    );
 }
 
 #[test]
