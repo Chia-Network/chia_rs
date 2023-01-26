@@ -1069,6 +1069,23 @@ fn test_extra_arg(
     test(&conds, &spend);
 }
 
+#[cfg(test)]
+#[rstest]
+#[case(ASSERT_SECONDS_ABSOLUTE, ErrorCode::AssertSecondsAbsolute)]
+#[case(ASSERT_SECONDS_RELATIVE, ErrorCode::AssertSecondsRelative)]
+fn test_seconds_exceed_max(#[case] condition: ConditionOpcode, #[case] expected_error: ErrorCode) {
+    // ASSERT_SECONDS_RELATIVE
+    assert_eq!(
+        cond_test(&format!(
+            "((({{h1}} ({{h2}} (123 ((({} (0x010000000000000000 )))))",
+            condition as u8
+        ))
+        .unwrap_err()
+        .1,
+        expected_error
+    );
+}
+
 #[test]
 fn test_single_seconds_relative() {
     // ASSERT_SECONDS_RELATIVE
@@ -1082,17 +1099,6 @@ fn test_single_seconds_relative() {
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
 
     assert_eq!(spend.seconds_relative, 101);
-}
-
-#[test]
-fn test_seconds_relative_exceed_max() {
-    // ASSERT_SECONDS_RELATIVE
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((80 (0x010000000000000000 )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::AssertSecondsRelative
-    );
 }
 
 #[test]
@@ -1125,17 +1131,6 @@ fn test_single_seconds_absolute() {
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
 
     assert_eq!(conds.seconds_absolute, 104);
-}
-
-#[test]
-fn test_seconds_absolute_exceed_max() {
-    // ASSERT_SECONDS_ABSOLUTE
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((81 (0x010000000000000000 )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::AssertSecondsAbsolute
-    );
 }
 
 #[test]
