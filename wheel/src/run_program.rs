@@ -1,4 +1,5 @@
 use super::adapt_response::eval_err_to_pyresult;
+use chia::allocator::make_allocator;
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;
@@ -72,7 +73,7 @@ pub fn run_chia_program(
     max_cost: Cost,
     flags: u32,
 ) -> PyResult<(Cost, LazyNode)> {
-    let mut allocator = Allocator::new();
+    let mut allocator = make_allocator(flags);
 
     let r: Response = (|| -> PyResult<Response> {
         let program = node_from_bytes(&mut allocator, program)?;

@@ -6,10 +6,10 @@ use chia::gen::conditions::{parse_spends, Spend, SpendBundleConditions};
 use chia::gen::validation_error::{ErrorCode, ValidationErr};
 use chia::gen::run_block_generator::run_block_generator as native_run_block_generator;
 use chia_protocol::bytes::{Bytes, Bytes32, Bytes48};
+use chia::allocator::make_allocator;
 
 use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
-use clvmr::chia_dialect::LIMIT_HEAP;
 use clvmr::cost::Cost;
 use clvmr::reduction::{EvalErr, Reduction};
 use clvmr::run_program::run_program;
@@ -109,11 +109,7 @@ pub fn run_generator(
     max_cost: Cost,
     flags: u32,
 ) -> PyResult<(Option<u32>, Option<PySpendBundleConditions>)> {
-    let mut allocator = if flags & LIMIT_HEAP != 0 {
-        Allocator::new_limited(500000000, 62500000, 62500000)
-    } else {
-        Allocator::new()
-    };
+	let mut allocator = make_allocator(flags);
     let program = node_from_bytes(&mut allocator, program)?;
     let args = node_from_bytes(&mut allocator, args)?;
     let dialect = &ChiaDialect::new(flags);
@@ -160,11 +156,7 @@ pub fn run_block_generator(
     max_cost: Cost,
     flags: u32,
 ) -> PyResult<(Option<u32>, Option<PySpendBundleConditions>)> {
-    let mut allocator = if flags & LIMIT_HEAP != 0 {
-        Allocator::new_limited(500000000, 62500000, 62500000)
-    } else {
-        Allocator::new()
-    };
+	let mut allocator = make_allocator(flags);
 
     let mut refs = Vec::<Vec<u8>>::new();
     for g in block_refs {
