@@ -1134,38 +1134,68 @@ fn test_single_condition(
     test(&conds, &spend);
 }
 
-#[test]
-fn test_multiple_seconds_relative() {
-    // ASSERT_SECONDS_RELATIVE
-    let (a, conds) =
-        cond_test("((({h1} ({h2} (123 (((80 (100 ) ((80 (503 ) ((80 (90 )))))").unwrap();
+// this test includes multiple instances of the same condition, to ensure we
+// aggregate the resulting condition correctly. The values we pass are:
+// 100, 503, 90
+#[cfg(test)]
+#[rstest]
+// we use the MAX value
+#[case(ASSERT_SECONDS_ABSOLUTE, |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.seconds_absolute, 503))]
+#[case(ASSERT_SECONDS_RELATIVE, |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.seconds_relative, 503))]
+#[case(ASSERT_HEIGHT_RELATIVE, |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.height_relative, Some(503)))]
+#[case(ASSERT_HEIGHT_ABSOLUTE, |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.height_absolute, 503))]
+// we use the SUM of the values
+#[case(RESERVE_FEE, |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.reserve_fee, 693))]
+fn test_multiple_conditions(
+    #[case] condition: ConditionOpcode,
+    #[case] test: impl Fn(&SpendBundleConditions, &Spend),
+) {
+    let val = condition as u8;
+    let (a, conds) = cond_test(&format!(
+        "((({{h1}} ({{h2}} (1234 ((({val} (100 ) (({val} (503 ) (({val} (90 )))))"
+    ))
+    .unwrap();
 
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 1234));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
 
-    // we use the MAX value
-    assert_eq!(spend.seconds_relative, 503);
+    test(&conds, &spend);
 }
 
-#[test]
-fn test_multiple_seconds_absolute() {
-    // ASSERT_SECONDS_ABSOLUTE
-    let (a, conds) =
-        cond_test("((({h1} ({h2} (123 (((81 (100 ) ((81 (503 ) ((81 (90 )))))").unwrap();
-
-    assert_eq!(conds.cost, 0);
-    assert_eq!(conds.spends.len(), 1);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-
-    // we use the MAX value
-    assert_eq!(conds.seconds_absolute, 503);
+// parse all conditions without an argument. They should all fail
+#[cfg(test)]
+#[rstest]
+#[case(ASSERT_SECONDS_ABSOLUTE)]
+#[case(ASSERT_SECONDS_RELATIVE)]
+#[case(ASSERT_HEIGHT_RELATIVE)]
+#[case(ASSERT_HEIGHT_ABSOLUTE)]
+#[case(RESERVE_FEE)]
+#[case(CREATE_COIN_ANNOUNCEMENT)]
+#[case(ASSERT_COIN_ANNOUNCEMENT)]
+#[case(CREATE_PUZZLE_ANNOUNCEMENT)]
+#[case(ASSERT_PUZZLE_ANNOUNCEMENT)]
+#[case(ASSERT_MY_AMOUNT)]
+#[case(ASSERT_MY_COIN_ID)]
+#[case(ASSERT_MY_PARENT_ID)]
+#[case(ASSERT_MY_PUZZLEHASH)]
+#[case(CREATE_COIN)]
+#[case(AGG_SIG_UNSAFE)]
+#[case(AGG_SIG_ME)]
+fn test_missing_arg(#[case] condition: ConditionOpcode) {
+    // extra args are disallowed in mempool mode
+    assert_eq!(
+        cond_test_flag(
+            &format!("((({{h1}} ({{h2}} (123 ((({} )))))", condition as u8),
+            0
+        )
+        .unwrap_err()
+        .1,
+        ErrorCode::InvalidCondition
+    );
 }
 
 #[test]
@@ -1181,40 +1211,6 @@ fn test_single_height_relative_zero() {
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
 
     assert_eq!(spend.height_relative, Some(0));
-}
-
-#[test]
-fn test_multiple_height_relative() {
-    // ASSERT_HEIGHT_RELATIVE
-    let (a, conds) =
-        cond_test("((({h1} ({h2} (123 (((82 (100 ) ((82 (503 ) ((82 (90 )))))").unwrap();
-
-    assert_eq!(conds.cost, 0);
-    assert_eq!(conds.spends.len(), 1);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-
-    // we use the MAX value
-    assert_eq!(spend.height_relative, Some(503));
-}
-
-#[test]
-fn test_multiple_height_absolute() {
-    // ASSERT_HEIGHT_ABSOLUTE
-    let (a, conds) =
-        cond_test("((({h1} ({h2} (123 (((83 (100 ) ((83 (503 ) ((83 (90 )))))").unwrap();
-
-    assert_eq!(conds.cost, 0);
-    assert_eq!(conds.spends.len(), 1);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-
-    // we use the MAX value
-    assert_eq!(conds.height_absolute, 503);
 }
 
 #[test]
@@ -1257,23 +1253,6 @@ fn test_reserve_fee_insufficient_fee() {
     );
 }
 
-#[test]
-fn test_multiple_reserve_fee() {
-    // RESERVE_FEE
-    let (a, conds) =
-        cond_test("((({h1} ({h2} (175 (((52 (100 ) ((52 (25 ) ((52 (50 )))))").unwrap();
-
-    assert_eq!(conds.cost, 0);
-    assert_eq!(conds.spends.len(), 1);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 175));
-    assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-
-    // reserve fee conditions are accumulated 100 + 50 = 150
-    assert_eq!(conds.reserve_fee, 175);
-}
-
 // TOOD: test announcement across coins
 
 #[test]
@@ -1304,18 +1283,6 @@ fn test_cross_coin_announces_consume() {
     assert_eq!(a.atom(conds.spends[0].puzzle_hash), H2);
     assert_eq!(*conds.spends[1].coin_id, test_coin_id(H2, H2, 123));
     assert_eq!(a.atom(conds.spends[1].puzzle_hash), H2);
-}
-
-#[test]
-fn test_coin_announce_missing_arg() {
-    // CREATE_COIN_ANNOUNCEMENT
-    // ASSERT_COIN_ANNOUNCEMENT
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((60 ) ((61 ({p21} )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::InvalidCondition
-    );
 }
 
 #[test]
@@ -1369,18 +1336,6 @@ fn test_cross_coin_puzzle_announces_consume() {
     assert_eq!(a.atom(conds.spends[0].puzzle_hash), H2);
     assert_eq!(*conds.spends[1].coin_id, test_coin_id(H2, H2, 123));
     assert_eq!(a.atom(conds.spends[1].puzzle_hash), H2);
-}
-
-#[test]
-fn test_puzzle_announce_missing_arg() {
-    // CREATE_PUZZLE_ANNOUNCEMENT
-    // ASSERT_PUZZLE_ANNOUNCEMENT
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((62 ) ((63 ({p21} )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::InvalidCondition
-    );
 }
 
 #[test]
