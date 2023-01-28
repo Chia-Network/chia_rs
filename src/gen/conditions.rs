@@ -6,9 +6,9 @@ use super::condition_sanitizers::{
 use super::opcodes::{
     parse_opcode, ConditionOpcode, AGG_SIG_COST, AGG_SIG_ME, AGG_SIG_UNSAFE, ALWAYS_TRUE,
     ASSERT_BEFORE_HEIGHT_ABSOLUTE, ASSERT_BEFORE_HEIGHT_RELATIVE, ASSERT_BEFORE_SECONDS_ABSOLUTE,
-    ASSERT_BEFORE_SECONDS_RELATIVE, ASSERT_COIN_ANNOUNCEMENT, ASSERT_HEIGHT_ABSOLUTE,
-    ASSERT_HEIGHT_RELATIVE, ASSERT_MY_AMOUNT, ASSERT_MY_COIN_ID, ASSERT_MY_PARENT_ID,
-    ASSERT_MY_PUZZLEHASH, ASSERT_PUZZLE_ANNOUNCEMENT, ASSERT_SECONDS_ABSOLUTE,
+    ASSERT_BEFORE_SECONDS_RELATIVE, ASSERT_COIN_ANNOUNCEMENT, ASSERT_CONCURRENT_SPEND,
+    ASSERT_HEIGHT_ABSOLUTE, ASSERT_HEIGHT_RELATIVE, ASSERT_MY_AMOUNT, ASSERT_MY_COIN_ID,
+    ASSERT_MY_PARENT_ID, ASSERT_MY_PUZZLEHASH, ASSERT_PUZZLE_ANNOUNCEMENT, ASSERT_SECONDS_ABSOLUTE,
     ASSERT_SECONDS_RELATIVE, CREATE_COIN, CREATE_COIN_ANNOUNCEMENT, CREATE_COIN_COST,
     CREATE_PUZZLE_ANNOUNCEMENT, RESERVE_FEE,
 };
@@ -72,6 +72,8 @@ pub enum Condition {
     // announce ID (hash, 32 bytes)
     AssertCoinAnnouncement(NodePtr),
     AssertPuzzleAnnouncement(NodePtr),
+    // ensure the specified coin ID is also being spent (hash, 32 bytes)
+    AssertConcurrentSpend(NodePtr),
     // ID (hash, 32 bytes)
     AssertMyCoinId(NodePtr),
     AssertMyParentId(NodePtr),
@@ -210,6 +212,11 @@ pub fn parse_args(
                 ErrorCode::AssertPuzzleAnnouncementFailed,
             )?;
             Ok(Condition::AssertPuzzleAnnouncement(id))
+        }
+        ASSERT_CONCURRENT_SPEND => {
+            maybe_check_args_terminator(a, c, flags)?;
+            let id = sanitize_hash(a, first(a, c)?, 32, ErrorCode::AssertConcurrentSpendFailed)?;
+            Ok(Condition::AssertConcurrentSpend(id))
         }
         ASSERT_MY_COIN_ID => {
             maybe_check_args_terminator(a, c, flags)?;
@@ -389,6 +396,10 @@ struct ParseState {
     assert_coin: HashSet<NodePtr>,
     assert_puzzle: HashSet<NodePtr>,
 
+    // the assert concurrent spend coin IDs are inserted into this set and
+    // checked once everything has been parsed.
+    assert_concurrent_spend: HashSet<NodePtr>,
+
     // all coin IDs that have been spent so far. When we parse a spend we also
     // compute the coin ID, and stick it in this set. It's reference counted
     // since it may also be referenced by announcements
@@ -408,6 +419,7 @@ impl ParseState {
             announce_puzzle: HashSet::new(),
             assert_coin: HashSet::new(),
             assert_puzzle: HashSet::new(),
+            assert_concurrent_spend: HashSet::new(),
             spent_coins: HashSet::new(),
             removal_amount: 0,
             addition_amount: 0,
@@ -586,6 +598,9 @@ fn parse_spend_conditions(
             Condition::AssertPuzzleAnnouncement(msg) => {
                 state.assert_puzzle.insert(msg);
             }
+            Condition::AssertConcurrentSpend(id) => {
+                state.assert_concurrent_spend.insert(id);
+            }
             Condition::AggSigMe(pk, msg) => {
                 spend.agg_sig_me.push((pk, msg));
                 spend.flags &= !ELIGIBLE_FOR_DEDUP;
@@ -646,6 +661,16 @@ pub fn parse_spends(
     if state.removal_amount - state.addition_amount < ret.reserve_fee as u128 {
         // the actual fee is lower than the reserved fee
         return Err(ValidationErr(spends, ErrorCode::ReserveFeeConditionFailed));
+    }
+
+    // check concurrent spent assertions
+    for coin_id in state.assert_concurrent_spend {
+        if !state.spent_coins.contains(&Bytes32::from(a.atom(coin_id))) {
+            return Err(ValidationErr(
+                coin_id,
+                ErrorCode::AssertConcurrentSpendFailed,
+            ));
+        }
     }
 
     // check all the assert announcements
@@ -890,6 +915,15 @@ fn parse_list(
     subs.insert("coin12", a.new_atom(&test_coin_id(H1, H2, 123)).unwrap());
     subs.insert("coin21", a.new_atom(&test_coin_id(H2, H1, 123)).unwrap());
     subs.insert("coin22", a.new_atom(&test_coin_id(H2, H2, 123)).unwrap());
+    subs.insert(
+        "coin12_h2_42",
+        a.new_atom(&test_coin_id(
+            &test_coin_id(H1, H2, 123).as_ref().try_into().unwrap(),
+            H2,
+            42,
+        ))
+        .unwrap(),
+    );
     // coin announcements
     subs.insert(
         "c11",
@@ -1095,6 +1129,7 @@ fn test_invalid_spend_list_terminator() {
 #[case(CREATE_COIN, "{h2} (42 (({h1})")]
 #[case(AGG_SIG_UNSAFE, "{pubkey} ({msg1}")]
 #[case(AGG_SIG_ME, "{pubkey} ({msg1}")]
+#[case(ASSERT_CONCURRENT_SPEND, "{coin12}")]
 fn test_extra_arg_mempool(#[case] condition: ConditionOpcode, #[case] arg: &str) {
     // extra args are disallowed in mempool mode
     assert_eq!(
@@ -1130,6 +1165,7 @@ fn test_extra_arg_mempool(#[case] condition: ConditionOpcode, #[case] arg: &str)
 #[case(ASSERT_MY_COIN_ID, "{coin12}", "", |_: &SpendBundleConditions, _: &Spend| {})]
 #[case(ASSERT_MY_PARENT_ID, "{h1}", "", |_: &SpendBundleConditions, _: &Spend| {})]
 #[case(ASSERT_MY_PUZZLEHASH, "{h2}", "", |_: &SpendBundleConditions, _: &Spend| {})]
+#[case(ASSERT_CONCURRENT_SPEND, "{coin12}", "", |_: &SpendBundleConditions, _: &Spend| {})]
 fn test_extra_arg(
     #[case] condition: ConditionOpcode,
     #[case] arg: &str,
@@ -1208,6 +1244,7 @@ fn test_height_exceed_max(#[case] condition: ConditionOpcode, #[case] expected_e
 #[case(ASSERT_MY_COIN_ID, "{coin12}", |_: &SpendBundleConditions, _: &Spend| {})]
 #[case(ASSERT_MY_PARENT_ID, "{h1}", |_: &SpendBundleConditions, _: &Spend| {})]
 #[case(ASSERT_MY_PUZZLEHASH, "{h2}", |_: &SpendBundleConditions, _: &Spend| {})]
+#[case(ASSERT_CONCURRENT_SPEND, "{coin12}", |_: &SpendBundleConditions, _: &Spend| {})]
 fn test_single_condition(
     #[case] condition: ConditionOpcode,
     #[case] arg: &str,
@@ -1262,6 +1299,11 @@ fn test_single_condition(
 #[case(ASSERT_MY_COIN_ID, "{coin12}", None)]
 #[case(ASSERT_MY_PARENT_ID, "{h1}", None)]
 #[case(ASSERT_MY_PUZZLEHASH, "{h2}", None)]
+#[case(
+    ASSERT_CONCURRENT_SPEND,
+    "{coin12}",
+    Some(ErrorCode::InvalidConditionOpcode)
+)]
 fn test_disable_assert_before(
     #[case] condition: ConditionOpcode,
     #[case] arg: &str,
@@ -1344,6 +1386,7 @@ fn test_multiple_conditions(
 #[case(CREATE_COIN)]
 #[case(AGG_SIG_UNSAFE)]
 #[case(AGG_SIG_ME)]
+#[case(ASSERT_CONCURRENT_SPEND)]
 fn test_missing_arg(#[case] condition: ConditionOpcode) {
     // extra args are disallowed in mempool mode
     assert_eq!(
@@ -2429,6 +2472,129 @@ fn test_always_true_with_arg() {
     assert_eq!(conds.cost, 0);
 
     // there is one spend
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.agg_sig_me.len(), 0);
+    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+}
+
+#[test]
+fn test_concurrent_spend() {
+    // ASSERT_CONCURRENT_SPEND
+    // this spends the coin (h1, h2, 123)
+    // and (h2, h2, 123).
+
+    // three cases are tested:
+    // 1. the first spend asserts that the second happens
+    // 2. the second asserts that the first happens.
+    // 3. the second asserts its own coin ID
+    // the result is the same in all cases, and all are expected to pass
+
+    let test_cases = [
+        "(\
+            (({h1} ({h2} (123 (((64 ({coin22} )))\
+            (({h2} ({h2} (123 ())\
+            ))",
+        "(\
+            (({h1} ({h2} (123 ())\
+            (({h2} ({h2} (123 (((64 ({coin12} )))\
+            ))",
+        "(\
+            (({h1} ({h2} (123 ())\
+            (({h2} ({h2} (123 (((64 ({coin22} )))\
+            ))",
+    ];
+
+    for test in test_cases {
+        let (a, conds) = cond_test(test).unwrap();
+
+        // just make sure there are no constraints
+        assert_eq!(conds.agg_sig_unsafe.len(), 0);
+        assert_eq!(conds.reserve_fee, 0);
+        assert_eq!(conds.height_absolute, 0);
+        assert_eq!(conds.seconds_absolute, 0);
+        assert_eq!(conds.cost, 0);
+
+        // there are two spends
+        assert_eq!(conds.spends.len(), 2);
+        let spend = &conds.spends[0];
+        assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+        assert_eq!(a.atom(spend.puzzle_hash), H2);
+        assert_eq!(spend.agg_sig_me.len(), 0);
+        assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+
+        let spend = &conds.spends[1];
+        assert_eq!(*spend.coin_id, test_coin_id(H2, H2, 123));
+        assert_eq!(a.atom(spend.puzzle_hash), H2);
+        assert_eq!(spend.agg_sig_me.len(), 0);
+        assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    }
+}
+
+#[test]
+fn test_concurrent_spend_fail() {
+    // ASSERT_CONCURRENT_SPEND
+    // this spends the coin (h1, h2, 123)
+    // and (h2, h2, 123).
+
+    // this test ensures that asserting a coin ID that's not being spent causes
+    // a failure. There are two cases, where each of the two spends make the
+    // invalid assertion
+
+    let test_cases = [
+        "(\
+            (({h1} ({h2} (123 (((64 ({coin21} )))\
+            (({h2} ({h2} (123 ())\
+            ))",
+        "(\
+            (({h1} ({h2} (123 ())\
+            (({h2} ({h2} (123 (((64 ({coin21} )))\
+            ))",
+        // msg1 has an invalid length for a sha256 hash
+        "(\
+            (({h1} ({h2} (123 ())\
+            (({h2} ({h2} (123 (((64 ({msg1} )))\
+            ))",
+        // in this case we *create* coin ((coin12 h2 42))
+        // and we assert it being spent (which should fail)
+        // i.e. make sure we don't "cross the beams" on created coins and spent
+        // coins
+        "(\
+            (({h1} ({h2} (123 (((51 ({h2} (42 )))\
+            (({h2} ({h2} (123 (((64 ({coin12_h2_42} )))\
+            ))",
+    ];
+
+    for test in test_cases {
+        assert_eq!(
+            cond_test(test).unwrap_err().1,
+            ErrorCode::AssertConcurrentSpendFailed
+        );
+    }
+}
+
+#[test]
+fn test_assert_concurrent_spend_self() {
+    // ASSERT_CONCURRENT_SPEND
+    // asserting ones own coin ID is always true
+
+    let (a, conds) = cond_test(
+        "(\
+        (({h1} ({h2} (123 (((64 ({coin12} )))\
+        ))",
+    )
+    .unwrap();
+
+    // just make sure there are no constraints
+    assert_eq!(conds.agg_sig_unsafe.len(), 0);
+    assert_eq!(conds.reserve_fee, 0);
+    assert_eq!(conds.height_absolute, 0);
+    assert_eq!(conds.seconds_absolute, 0);
+    assert_eq!(conds.cost, 0);
+
+    // there are two spends
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
