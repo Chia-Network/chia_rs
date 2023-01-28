@@ -5,6 +5,7 @@ use chia::gen::flags::NO_UNKNOWN_CONDS;
 use chia::gen::flags::STRICT_ARGS_COUNT;
 use chia::gen::flags::MEMPOOL_MODE;
 use chia::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
+use chia::allocator::make_allocator;
 use chia_protocol::Bytes32;
 use chia_protocol::G1Element;
 use chia_protocol::G2Element;
@@ -42,7 +43,6 @@ use crate::run_program::{
 use crate::adapt_response::eval_err_to_pyresult;
 use chia::gen::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
 use chia::gen::validation_error::ValidationErr;
-use clvmr::Allocator;
 use clvmr::allocator::NodePtr;
 use clvmr::ChiaDialect;
 use clvmr::cost::Cost;
@@ -86,10 +86,10 @@ pub fn get_puzzle_and_solution_for_coin<'py>(
     find_amount: u64,
     find_ph: Bytes32,
 ) -> PyResult<(&'py PyBytes, &'py PyBytes)> {
-    let mut allocator = Allocator::new();
+    let mut allocator = make_allocator(LIMIT_HEAP);
     let program = node_from_bytes(&mut allocator, program)?;
     let args = node_from_bytes(&mut allocator, args)?;
-    let dialect = &ChiaDialect::new(NO_NEG_DIV);
+    let dialect = &ChiaDialect::new(NO_NEG_DIV | LIMIT_STACK);
 
     let r = py.allow_threads(|| -> Result<(NodePtr, NodePtr), EvalErr> {
         let Reduction(_cost, result) =
