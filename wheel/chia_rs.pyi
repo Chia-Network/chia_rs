@@ -23,6 +23,7 @@ NO_UNKNOWN_CONDS: int = ...
 STRICT_ARGS_COUNT: int = ...
 LIMIT_HEAP: int = ...
 LIMIT_STACK: int = ...
+ENABLE_ASSERT_BEFORE: int = ...
 MEMPOOL_MODE: int = ...
 ELIGIBLE_FOR_DEDUP: int = ...
 
@@ -46,6 +47,8 @@ class Spend:
     puzzle_hash: bytes
     height_relative: Optional[int]
     seconds_relative: int
+    before_height_relative: Optional[int]
+    before_seconds_relative: Optional[int]
     create_coin: List[Tuple[bytes, int, Optional[bytes]]]
     agg_sig_me: List[Tuple[bytes, bytes]]
     flags: int
@@ -55,6 +58,8 @@ class Spend:
         puzzle_hash: bytes,
         height_relative: Optional[int],
         seconds_relative: int,
+        before_height_relative: Optional[int],
+        before_seconds_relative: Optional[int],
         create_coin: Sequence[Tuple[bytes, int, Optional[bytes]]],
         agg_sig_me: Sequence[Tuple[bytes, bytes]],
         flags: int
@@ -81,6 +86,8 @@ class SpendBundleConditions:
     reserve_fee: int
     height_absolute: int
     seconds_absolute: int
+    before_height_absolute: Optional[int]
+    before_seconds_absolute: Optional[int]
     agg_sig_unsafe: List[Tuple[bytes, bytes]]
     cost: int
     def __init__(
@@ -89,6 +96,8 @@ class SpendBundleConditions:
         reserve_fee: int,
         height_absolute: int,
         seconds_absolute: int,
+        before_height_absolute: Optional[int],
+        before_seconds_absolute: Optional[int],
         agg_sig_unsafe: Sequence[Tuple[bytes, bytes]],
         cost: int
     ) -> None: ...

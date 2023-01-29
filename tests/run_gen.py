@@ -44,6 +44,10 @@ def print_spend_bundle_conditions(result) -> str:
         ret += f"ASSERT_HEIGHT_ABSOLUTE {result.height_absolute}\n"
     if result.seconds_absolute > 0:
         ret += f"ASSERT_SECONDS_ABSOLUTE {result.seconds_absolute}\n"
+    if result.before_seconds_absolute is not None:
+        ret += f"ASSERT_BEFORE_SECONDS_ABSOLUTE {result.before_seconds_absolute}\n"
+    if result.before_height_absolute is not None:
+        ret += f"ASSERT_BEFORE_HEIGHT_ABSOLUTE {result.before_height_absolute}\n"
     for a in sorted(result.agg_sig_unsafe):
         ret += f"AGG_SIG_UNSAFE pk: {a[0].hex()} msg: {a[1].hex()}\n"
     ret += "SPENDS:\n"
@@ -54,6 +58,10 @@ def print_spend_bundle_conditions(result) -> str:
             ret += f"  ASSERT_HEIGHT_RELATIVE {s.height_relative}\n"
         if s.seconds_relative > 0:
             ret += f"  ASSERT_SECONDS_RELATIVE {s.seconds_relative}\n"
+        if s.before_height_relative is not None:
+            ret += f"  ASSERT_BEFORE_HEIGHT_RELATIVE {s.before_height_relative}\n"
+        if s.before_seconds_relative is not None:
+            ret += f"  ASSERT_BEFORE_SECONDS_RELATIVE {s.before_seconds_relative}\n"
         for a in sorted(s.create_coin):
             if a[2] is not None and len(a[2]) > 0:
                 ret += f"  CREATE_COIN: ph: {a[0].hex()} amount: {a[1]} hint: {a[2].hex()}\n"

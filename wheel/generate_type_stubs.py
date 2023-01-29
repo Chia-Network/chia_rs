@@ -167,6 +167,7 @@ NO_UNKNOWN_CONDS: int = ...
 STRICT_ARGS_COUNT: int = ...
 LIMIT_HEAP: int = ...
 LIMIT_STACK: int = ...
+ENABLE_ASSERT_BEFORE: int = ...
 MEMPOOL_MODE: int = ...
 ELIGIBLE_FOR_DEDUP: int = ...
 
@@ -193,6 +194,8 @@ def get_puzzle_and_solution_for_coin(program: bytes, args: bytes, max_cost: int,
             "puzzle_hash: bytes",
             "height_relative: Optional[int]",
             "seconds_relative: int",
+            "before_height_relative: Optional[int]",
+            "before_seconds_relative: Optional[int]",
             "create_coin: List[Tuple[bytes, int, Optional[bytes]]]",
             "agg_sig_me: List[Tuple[bytes, bytes]]",
             "flags: int",
@@ -205,6 +208,8 @@ def get_puzzle_and_solution_for_coin(program: bytes, args: bytes, max_cost: int,
             "reserve_fee: int",
             "height_absolute: int",
             "seconds_absolute: int",
+            "before_height_absolute: Optional[int]",
+            "before_seconds_absolute: Optional[int]",
             "agg_sig_unsafe: List[Tuple[bytes, bytes]]",
             "cost: int",
         ],
