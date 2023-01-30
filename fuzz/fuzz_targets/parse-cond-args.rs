@@ -5,7 +5,7 @@ use clvmr::allocator::Allocator;
 use chia::fuzzing_utils::{BitCursor, make_tree};
 use chia::gen::conditions::parse_args;
 
-use chia::gen::flags::{COND_ARGS_NIL, STRICT_ARGS_COUNT};
+use chia::gen::flags::{COND_ARGS_NIL, STRICT_ARGS_COUNT, ENABLE_ASSERT_BEFORE};
 
 use chia::gen::opcodes::{
     AGG_SIG_ME, AGG_SIG_UNSAFE, ALWAYS_TRUE,
@@ -18,7 +18,7 @@ use chia::gen::opcodes::{
 fuzz_target!(|data: &[u8]| {
     let mut a = Allocator::new();
     let input = make_tree(&mut a, &mut BitCursor::new(data), false);
-    for flags in &[0, COND_ARGS_NIL, STRICT_ARGS_COUNT] {
+    for flags in &[0, ENABLE_ASSERT_BEFORE | COND_ARGS_NIL, ENABLE_ASSERT_BEFORE | STRICT_ARGS_COUNT] {
         for op in &[AGG_SIG_ME, AGG_SIG_UNSAFE, ALWAYS_TRUE,
     ASSERT_COIN_ANNOUNCEMENT, ASSERT_HEIGHT_ABSOLUTE, ASSERT_HEIGHT_RELATIVE, ASSERT_MY_AMOUNT,
     ASSERT_MY_COIN_ID, ASSERT_MY_PARENT_ID, ASSERT_MY_PUZZLEHASH, ASSERT_PUZZLE_ANNOUNCEMENT,

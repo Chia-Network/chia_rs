@@ -6,11 +6,11 @@ use super::condition_sanitizers::{
 use super::opcodes::{
     parse_opcode, ConditionOpcode, AGG_SIG_COST, AGG_SIG_ME, AGG_SIG_UNSAFE, ALWAYS_TRUE,
     ASSERT_BEFORE_HEIGHT_ABSOLUTE, ASSERT_BEFORE_HEIGHT_RELATIVE, ASSERT_BEFORE_SECONDS_ABSOLUTE,
-    ASSERT_BEFORE_SECONDS_RELATIVE, ASSERT_COIN_ANNOUNCEMENT, ASSERT_CONCURRENT_SPEND,
-    ASSERT_HEIGHT_ABSOLUTE, ASSERT_HEIGHT_RELATIVE, ASSERT_MY_AMOUNT, ASSERT_MY_COIN_ID,
-    ASSERT_MY_PARENT_ID, ASSERT_MY_PUZZLEHASH, ASSERT_PUZZLE_ANNOUNCEMENT, ASSERT_SECONDS_ABSOLUTE,
-    ASSERT_SECONDS_RELATIVE, CREATE_COIN, CREATE_COIN_ANNOUNCEMENT, CREATE_COIN_COST,
-    CREATE_PUZZLE_ANNOUNCEMENT, RESERVE_FEE,
+    ASSERT_BEFORE_SECONDS_RELATIVE, ASSERT_COIN_ANNOUNCEMENT, ASSERT_CONCURRENT_PUZZLE,
+    ASSERT_CONCURRENT_SPEND, ASSERT_HEIGHT_ABSOLUTE, ASSERT_HEIGHT_RELATIVE, ASSERT_MY_AMOUNT,
+    ASSERT_MY_COIN_ID, ASSERT_MY_PARENT_ID, ASSERT_MY_PUZZLEHASH, ASSERT_PUZZLE_ANNOUNCEMENT,
+    ASSERT_SECONDS_ABSOLUTE, ASSERT_SECONDS_RELATIVE, CREATE_COIN, CREATE_COIN_ANNOUNCEMENT,
+    CREATE_COIN_COST, CREATE_PUZZLE_ANNOUNCEMENT, RESERVE_FEE,
 };
 use super::sanitize_int::sanitize_uint;
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
@@ -74,6 +74,9 @@ pub enum Condition {
     AssertPuzzleAnnouncement(NodePtr),
     // ensure the specified coin ID is also being spent (hash, 32 bytes)
     AssertConcurrentSpend(NodePtr),
+    // ensure that the specified puzzle hash is used by at least one spend
+    // (hash, 32 bytes)
+    AssertConcurrentPuzzle(NodePtr),
     // ID (hash, 32 bytes)
     AssertMyCoinId(NodePtr),
     AssertMyParentId(NodePtr),
@@ -217,6 +220,11 @@ pub fn parse_args(
             maybe_check_args_terminator(a, c, flags)?;
             let id = sanitize_hash(a, first(a, c)?, 32, ErrorCode::AssertConcurrentSpendFailed)?;
             Ok(Condition::AssertConcurrentSpend(id))
+        }
+        ASSERT_CONCURRENT_PUZZLE => {
+            maybe_check_args_terminator(a, c, flags)?;
+            let id = sanitize_hash(a, first(a, c)?, 32, ErrorCode::AssertConcurrentPuzzleFailed)?;
+            Ok(Condition::AssertConcurrentPuzzle(id))
         }
         ASSERT_MY_COIN_ID => {
             maybe_check_args_terminator(a, c, flags)?;
@@ -400,10 +408,20 @@ struct ParseState {
     // checked once everything has been parsed.
     assert_concurrent_spend: HashSet<NodePtr>,
 
+    // the assert concurrent puzzle hashes are inserted into this set and
+    // checked once everything has been parsed.
+    assert_concurrent_puzzle: HashSet<NodePtr>,
+
     // all coin IDs that have been spent so far. When we parse a spend we also
     // compute the coin ID, and stick it in this set. It's reference counted
     // since it may also be referenced by announcements
     spent_coins: HashSet<Arc<Bytes32>>,
+
+    // for every coin spent, we also store all the puzzle hashes that were
+    // spent. Note that these are just the node pointers into the allocator, so
+    // there may still be duplicates here. We defer creating a hash set of the
+    // actual hashes until the end, and only if there are any puzzle assertions
+    spent_puzzles: HashSet<NodePtr>,
 
     // the sum of all values of all spent coins
     removal_amount: u128,
@@ -420,7 +438,9 @@ impl ParseState {
             assert_coin: HashSet::new(),
             assert_puzzle: HashSet::new(),
             assert_concurrent_spend: HashSet::new(),
+            assert_concurrent_puzzle: HashSet::new(),
             spent_coins: HashSet::new(),
+            spent_puzzles: HashSet::new(),
             removal_amount: 0,
             addition_amount: 0,
         }
@@ -449,6 +469,8 @@ fn parse_spend_conditions(
         // spend
         return Err(ValidationErr(spend, ErrorCode::DoubleSpend));
     }
+
+    state.spent_puzzles.insert(puzzle_hash);
 
     state.removal_amount += my_amount as u128;
 
@@ -601,6 +623,9 @@ fn parse_spend_conditions(
             Condition::AssertConcurrentSpend(id) => {
                 state.assert_concurrent_spend.insert(id);
             }
+            Condition::AssertConcurrentPuzzle(id) => {
+                state.assert_concurrent_puzzle.insert(id);
+            }
             Condition::AggSigMe(pk, msg) => {
                 spend.agg_sig_me.push((pk, msg));
                 spend.flags &= !ELIGIBLE_FOR_DEDUP;
@@ -670,6 +695,25 @@ pub fn parse_spends(
                 coin_id,
                 ErrorCode::AssertConcurrentSpendFailed,
             ));
+        }
+    }
+
+    if !state.assert_concurrent_puzzle.is_empty() {
+        let mut spent_phs = HashSet::<Bytes32>::new();
+
+        // expand all the spent puzzle hashes into a set, to allow
+        // fast lookups of all assertions
+        for ph in state.spent_puzzles {
+            spent_phs.insert(a.atom(ph).into());
+        }
+
+        for puzzle_assert in state.assert_concurrent_puzzle {
+            if !spent_phs.contains(&a.atom(puzzle_assert).into()) {
+                return Err(ValidationErr(
+                    puzzle_assert,
+                    ErrorCode::AssertConcurrentPuzzleFailed,
+                ));
+            }
         }
     }
 
@@ -1130,6 +1174,7 @@ fn test_invalid_spend_list_terminator() {
 #[case(AGG_SIG_UNSAFE, "{pubkey} ({msg1}")]
 #[case(AGG_SIG_ME, "{pubkey} ({msg1}")]
 #[case(ASSERT_CONCURRENT_SPEND, "{coin12}")]
+#[case(ASSERT_CONCURRENT_PUZZLE, "{h2}")]
 fn test_extra_arg_mempool(#[case] condition: ConditionOpcode, #[case] arg: &str) {
     // extra args are disallowed in mempool mode
     assert_eq!(
@@ -1166,6 +1211,7 @@ fn test_extra_arg_mempool(#[case] condition: ConditionOpcode, #[case] arg: &str)
 #[case(ASSERT_MY_PARENT_ID, "{h1}", "", |_: &SpendBundleConditions, _: &Spend| {})]
 #[case(ASSERT_MY_PUZZLEHASH, "{h2}", "", |_: &SpendBundleConditions, _: &Spend| {})]
 #[case(ASSERT_CONCURRENT_SPEND, "{coin12}", "", |_: &SpendBundleConditions, _: &Spend| {})]
+#[case(ASSERT_CONCURRENT_PUZZLE, "{h2}", "", |_: &SpendBundleConditions, _: &Spend| {})]
 fn test_extra_arg(
     #[case] condition: ConditionOpcode,
     #[case] arg: &str,
@@ -1245,6 +1291,7 @@ fn test_height_exceed_max(#[case] condition: ConditionOpcode, #[case] expected_e
 #[case(ASSERT_MY_PARENT_ID, "{h1}", |_: &SpendBundleConditions, _: &Spend| {})]
 #[case(ASSERT_MY_PUZZLEHASH, "{h2}", |_: &SpendBundleConditions, _: &Spend| {})]
 #[case(ASSERT_CONCURRENT_SPEND, "{coin12}", |_: &SpendBundleConditions, _: &Spend| {})]
+#[case(ASSERT_CONCURRENT_PUZZLE, "{h2}", |_: &SpendBundleConditions, _: &Spend| {})]
 fn test_single_condition(
     #[case] condition: ConditionOpcode,
     #[case] arg: &str,
@@ -1301,6 +1348,11 @@ fn test_single_condition(
 #[case(ASSERT_MY_PUZZLEHASH, "{h2}", None)]
 #[case(
     ASSERT_CONCURRENT_SPEND,
+    "{coin12}",
+    Some(ErrorCode::InvalidConditionOpcode)
+)]
+#[case(
+    ASSERT_CONCURRENT_PUZZLE,
     "{coin12}",
     Some(ErrorCode::InvalidConditionOpcode)
 )]
@@ -1387,6 +1439,7 @@ fn test_multiple_conditions(
 #[case(AGG_SIG_UNSAFE)]
 #[case(AGG_SIG_ME)]
 #[case(ASSERT_CONCURRENT_SPEND)]
+#[case(ASSERT_CONCURRENT_PUZZLE)]
 fn test_missing_arg(#[case] condition: ConditionOpcode) {
     // extra args are disallowed in mempool mode
     assert_eq!(
@@ -2583,6 +2636,128 @@ fn test_assert_concurrent_spend_self() {
     let (a, conds) = cond_test(
         "(\
         (({h1} ({h2} (123 (((64 ({coin12} )))\
+        ))",
+    )
+    .unwrap();
+
+    // just make sure there are no constraints
+    assert_eq!(conds.agg_sig_unsafe.len(), 0);
+    assert_eq!(conds.reserve_fee, 0);
+    assert_eq!(conds.height_absolute, 0);
+    assert_eq!(conds.seconds_absolute, 0);
+    assert_eq!(conds.cost, 0);
+
+    // there are two spends
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.agg_sig_me.len(), 0);
+    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+}
+
+#[test]
+fn test_concurrent_puzzle() {
+    // ASSERT_CONCURRENT_PUZZLE
+    // this spends the coin (h1, h2, 123)
+    // and (h2, h2, 123).
+
+    // three cases are tested:
+    // 1. the first spend asserts second's puzzle hash
+    // 2. the second asserts the first's puzzle hash
+    // 3. the second asserts its own puzzle hash
+    // the result is the same in all cases, and all are expected to pass
+
+    let test_cases = [
+        "(\
+            (({h1} ({h1} (123 (((65 ({h2} )))\
+            (({h2} ({h2} (123 ())\
+            ))",
+        "(\
+            (({h1} ({h1} (123 ())\
+            (({h2} ({h2} (123 (((65 ({h1} )))\
+            ))",
+        "(\
+            (({h1} ({h1} (123 ())\
+            (({h2} ({h2} (123 (((65 ({h2} )))\
+            ))",
+    ];
+
+    for test in test_cases {
+        let (a, conds) = cond_test(test).unwrap();
+
+        // just make sure there are no constraints
+        assert_eq!(conds.agg_sig_unsafe.len(), 0);
+        assert_eq!(conds.reserve_fee, 0);
+        assert_eq!(conds.height_absolute, 0);
+        assert_eq!(conds.seconds_absolute, 0);
+        assert_eq!(conds.cost, 0);
+
+        // there are two spends
+        assert_eq!(conds.spends.len(), 2);
+        let spend = &conds.spends[0];
+        assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
+        assert_eq!(a.atom(spend.puzzle_hash), H1);
+        assert_eq!(spend.agg_sig_me.len(), 0);
+        assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+
+        let spend = &conds.spends[1];
+        assert_eq!(*spend.coin_id, test_coin_id(H2, H2, 123));
+        assert_eq!(a.atom(spend.puzzle_hash), H2);
+        assert_eq!(spend.agg_sig_me.len(), 0);
+        assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    }
+}
+
+#[test]
+fn test_concurrent_puzzle_fail() {
+    // ASSERT_CONCURRENT_PUZZLE
+    // this spends the coin (h1, h2, 123)
+    // and (h2, h2, 123).
+
+    // this test ensures that asserting a puzzle hash that's not being spent
+    // causes a failure.
+
+    let test_cases = [
+        "(\
+            (({h1} ({h2} (123 (((65 ({h1} )))\
+            (({h2} ({h2} (123 ())\
+            ))",
+        "(\
+            (({h1} ({h2} (123 ())\
+            (({h2} ({h2} (123 (((65 ({h1} )))\
+            ))",
+        // msg1 has an invalid length for a sha256 hash
+        "(\
+            (({h1} ({h2} (123 ())\
+            (({h2} ({h2} (123 (((65 ({msg1} )))\
+            ))",
+        // in this case we *create* coin ((coin12 h2 42))
+        // i.e. paid to puzzle hash h2. And we assert the puzzle hash h2 is
+        // being spent. This should not pass, i.e. make sure we don't "cross the
+        // beams" on created coins and spent puzzles
+        "(\
+            (({h1} ({h1} (123 (((51 ({h2} (42 )))\
+            (({h2} ({h1} (123 (((65 ({h2} )))\
+            ))",
+    ];
+
+    for test in test_cases {
+        assert_eq!(
+            cond_test(test).unwrap_err().1,
+            ErrorCode::AssertConcurrentPuzzleFailed
+        );
+    }
+}
+
+#[test]
+fn test_assert_concurrent_puzzle_self() {
+    // ASSERT_CONCURRENT_PUZZLE
+    // asserting ones own puzzle hash is always true
+
+    let (a, conds) = cond_test(
+        "(\
+        (({h1} ({h2} (123 (((65 ({h2} )))\
         ))",
     )
     .unwrap();
