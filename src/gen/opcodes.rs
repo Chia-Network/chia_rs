@@ -19,6 +19,7 @@ pub const ASSERT_COIN_ANNOUNCEMENT: ConditionOpcode = 61;
 pub const CREATE_PUZZLE_ANNOUNCEMENT: ConditionOpcode = 62;
 pub const ASSERT_PUZZLE_ANNOUNCEMENT: ConditionOpcode = 63;
 pub const ASSERT_CONCURRENT_SPEND: ConditionOpcode = 64;
+pub const ASSERT_CONCURRENT_PUZZLE: ConditionOpcode = 65;
 
 // the conditions below let coins inquire about themselves
 pub const ASSERT_MY_COIN_ID: ConditionOpcode = 70;
@@ -83,7 +84,8 @@ pub fn parse_opcode(a: &Allocator, op: NodePtr, flags: u32) -> Option<ConditionO
                     | ASSERT_BEFORE_SECONDS_ABSOLUTE
                     | ASSERT_BEFORE_HEIGHT_RELATIVE
                     | ASSERT_BEFORE_HEIGHT_ABSOLUTE
-                    | ASSERT_CONCURRENT_SPEND => Some(buf[0]),
+                    | ASSERT_CONCURRENT_SPEND
+                    | ASSERT_CONCURRENT_PUZZLE => Some(buf[0]),
                     _ => None,
                 }
             } else {
@@ -180,6 +182,7 @@ fn test_parse_opcode() {
         None
     );
     assert_eq!(opcode_tester(&mut a, &[ASSERT_CONCURRENT_SPEND]), None);
+    assert_eq!(opcode_tester(&mut a, &[ASSERT_CONCURRENT_PUZZLE]), None);
 
     assert_eq!(opcode_tester(&mut a, &[ALWAYS_TRUE]), Some(ALWAYS_TRUE));
     // leading zeros are not allowed, it makes it a different value
@@ -272,6 +275,10 @@ fn test_parse_opcode() {
     assert_eq!(
         opcode_tester_with_assert_before(&mut a, &[ASSERT_CONCURRENT_SPEND]),
         Some(ASSERT_CONCURRENT_SPEND)
+    );
+    assert_eq!(
+        opcode_tester_with_assert_before(&mut a, &[ASSERT_CONCURRENT_PUZZLE]),
+        Some(ASSERT_CONCURRENT_PUZZLE)
     );
 
     assert_eq!(
