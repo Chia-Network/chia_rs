@@ -543,6 +543,17 @@ fn parse_spend_conditions(
             Condition::AssertSecondsRelative(s) => {
                 // keep the most strict condition. i.e. the highest limit
                 spend.seconds_relative = max(spend.seconds_relative, s);
+                if let Some(bs) = spend.before_seconds_relative {
+                    if bs <= spend.seconds_relative {
+                        // this spend bundle requres to be spent *before* a
+                        // timestamp and also *after* a timestamp that's the
+                        // same or later. that's impossible.
+                        return Err(ValidationErr(
+                            c,
+                            ErrorCode::ImpossibleSecondsRelativeConstraints,
+                        ));
+                    }
+                }
             }
             Condition::AssertSecondsAbsolute(s) => {
                 // keep the most strict condition. i.e. the highest limit
@@ -551,6 +562,17 @@ fn parse_spend_conditions(
             Condition::AssertHeightRelative(h) => {
                 // keep the most strict condition. i.e. the highest limit
                 spend.height_relative = Some(max(spend.height_relative.unwrap_or(0), h));
+                if let Some(bs) = spend.before_height_relative {
+                    if bs <= h {
+                        // this spend bundle requres to be spent *before* a
+                        // height and also *after* a height that's the
+                        // same or later. that's impossible.
+                        return Err(ValidationErr(
+                            c,
+                            ErrorCode::ImpossibleHeightRelativeConstraints,
+                        ));
+                    }
+                }
             }
             Condition::AssertHeightAbsolute(h) => {
                 // keep the most strict condition. i.e. the highest limit
@@ -562,6 +584,15 @@ fn parse_spend_conditions(
                     spend.before_seconds_relative = Some(min(existing, s));
                 } else {
                     spend.before_seconds_relative = Some(s);
+                }
+                if s <= spend.seconds_relative {
+                    // this spend bundle requres to be spent *before* a
+                    // timestamp and also *after* a timestamp that's the
+                    // same or later. that's impossible.
+                    return Err(ValidationErr(
+                        c,
+                        ErrorCode::ImpossibleSecondsRelativeConstraints,
+                    ));
                 }
             }
             Condition::AssertBeforeSecondsAbsolute(s) => {
@@ -578,6 +609,17 @@ fn parse_spend_conditions(
                     spend.before_height_relative = Some(min(existing, h));
                 } else {
                     spend.before_height_relative = Some(h);
+                }
+                if let Some(hr) = spend.height_relative {
+                    if h <= hr {
+                        // this spend bundle requres to be spent *before* a
+                        // height and also *after* a height that's the
+                        // same or later. that's impossible.
+                        return Err(ValidationErr(
+                            c,
+                            ErrorCode::ImpossibleHeightRelativeConstraints,
+                        ));
+                    }
                 }
             }
             Condition::AssertBeforeHeightAbsolute(h) => {
@@ -686,6 +728,30 @@ pub fn parse_spends(
     if state.removal_amount - state.addition_amount < ret.reserve_fee as u128 {
         // the actual fee is lower than the reserved fee
         return Err(ValidationErr(spends, ErrorCode::ReserveFeeConditionFailed));
+    }
+
+    if let Some(bh) = ret.before_height_absolute {
+        if bh <= ret.height_absolute {
+            // this spend bundle requres to be spent *before* a
+            // height and also *after* a height that's the
+            // same or later. that's impossible.
+            return Err(ValidationErr(
+                spends,
+                ErrorCode::ImpossibleHeightAbsoluteConstraints,
+            ));
+        }
+    }
+
+    if let Some(bs) = ret.before_seconds_absolute {
+        if bs <= ret.seconds_absolute {
+            // this spend bundle requres to be spent *before* a
+            // timestamp and also *after* a timestamp that's the
+            // same or later. that's impossible.
+            return Err(ValidationErr(
+                spends,
+                ErrorCode::ImpossibleSecondsAbsoluteConstraints,
+            ));
+        }
     }
 
     // check concurrent spent assertions
@@ -2776,4 +2842,210 @@ fn test_assert_concurrent_puzzle_self() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.agg_sig_me.len(), 0);
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+}
+
+// the relative constraints clash because they are on the same coin spend
+#[cfg(test)]
+#[rstest]
+#[case(
+    ASSERT_SECONDS_ABSOLUTE,
+    100,
+    ASSERT_BEFORE_SECONDS_ABSOLUTE,
+    100,
+    Some(ErrorCode::ImpossibleSecondsAbsoluteConstraints)
+)]
+#[case(ASSERT_SECONDS_ABSOLUTE, 99, ASSERT_BEFORE_SECONDS_ABSOLUTE, 100, None)]
+#[case(
+    ASSERT_HEIGHT_ABSOLUTE,
+    100,
+    ASSERT_BEFORE_HEIGHT_ABSOLUTE,
+    100,
+    Some(ErrorCode::ImpossibleHeightAbsoluteConstraints)
+)]
+#[case(ASSERT_HEIGHT_ABSOLUTE, 99, ASSERT_BEFORE_HEIGHT_ABSOLUTE, 100, None)]
+#[case(
+    ASSERT_SECONDS_RELATIVE,
+    100,
+    ASSERT_BEFORE_SECONDS_RELATIVE,
+    100,
+    Some(ErrorCode::ImpossibleSecondsRelativeConstraints)
+)]
+#[case(ASSERT_SECONDS_RELATIVE, 99, ASSERT_BEFORE_SECONDS_RELATIVE, 100, None)]
+#[case(
+    ASSERT_HEIGHT_RELATIVE,
+    100,
+    ASSERT_BEFORE_HEIGHT_RELATIVE,
+    100,
+    Some(ErrorCode::ImpossibleHeightRelativeConstraints)
+)]
+#[case(ASSERT_HEIGHT_RELATIVE, 99, ASSERT_BEFORE_HEIGHT_RELATIVE, 100, None)]
+// order shouldn't matter
+#[case(
+    ASSERT_BEFORE_SECONDS_ABSOLUTE,
+    100,
+    ASSERT_SECONDS_ABSOLUTE,
+    100,
+    Some(ErrorCode::ImpossibleSecondsAbsoluteConstraints)
+)]
+#[case(ASSERT_BEFORE_SECONDS_ABSOLUTE, 100, ASSERT_SECONDS_ABSOLUTE, 99, None)]
+#[case(
+    ASSERT_BEFORE_HEIGHT_ABSOLUTE,
+    100,
+    ASSERT_HEIGHT_ABSOLUTE,
+    100,
+    Some(ErrorCode::ImpossibleHeightAbsoluteConstraints)
+)]
+#[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, 100, ASSERT_HEIGHT_ABSOLUTE, 99, None)]
+#[case(
+    ASSERT_BEFORE_SECONDS_RELATIVE,
+    100,
+    ASSERT_SECONDS_RELATIVE,
+    100,
+    Some(ErrorCode::ImpossibleSecondsRelativeConstraints)
+)]
+#[case(ASSERT_BEFORE_SECONDS_RELATIVE, 100, ASSERT_SECONDS_RELATIVE, 99, None)]
+#[case(
+    ASSERT_BEFORE_HEIGHT_RELATIVE,
+    100,
+    ASSERT_HEIGHT_RELATIVE,
+    100,
+    Some(ErrorCode::ImpossibleHeightRelativeConstraints)
+)]
+#[case(ASSERT_BEFORE_HEIGHT_RELATIVE, 100, ASSERT_HEIGHT_RELATIVE, 99, None)]
+fn test_impossible_constraints_single_spend(
+    #[case] cond1: ConditionOpcode,
+    #[case] value1: u64,
+    #[case] cond2: ConditionOpcode,
+    #[case] value2: u64,
+    #[case] expected_err: Option<ErrorCode>,
+) {
+    let test: &str = &format!(
+        "(\
+       (({{h1}} ({{h1}} (123 (\
+           (({} ({} ) \
+           (({} ({} ) \
+           ))\
+       ))",
+        cond1 as u8, value1, cond2 as u8, value2
+    );
+    if let Some(e) = expected_err {
+        assert_eq!(cond_test(test).unwrap_err().1, e);
+    } else {
+        // we don't expect any error
+        let (a, conds) = cond_test(test).unwrap();
+
+        // just make sure there are no constraints
+        assert_eq!(conds.agg_sig_unsafe.len(), 0);
+        assert_eq!(conds.reserve_fee, 0);
+        assert_eq!(conds.cost, 0);
+
+        assert_eq!(conds.spends.len(), 1);
+        let spend = &conds.spends[0];
+        assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
+        assert_eq!(a.atom(spend.puzzle_hash), H1);
+        assert_eq!(spend.agg_sig_me.len(), 0);
+        assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    }
+}
+
+// the relative constraints do not clash because they are on separate coin
+// spends. We don't know those coins' confirm block height nor timestamps,
+// so we can't infer any conflicts
+#[cfg(test)]
+#[rstest]
+#[case(
+    ASSERT_SECONDS_ABSOLUTE,
+    100,
+    ASSERT_BEFORE_SECONDS_ABSOLUTE,
+    100,
+    Some(ErrorCode::ImpossibleSecondsAbsoluteConstraints)
+)]
+#[case(ASSERT_SECONDS_ABSOLUTE, 99, ASSERT_BEFORE_SECONDS_ABSOLUTE, 100, None)]
+#[case(
+    ASSERT_HEIGHT_ABSOLUTE,
+    100,
+    ASSERT_BEFORE_HEIGHT_ABSOLUTE,
+    100,
+    Some(ErrorCode::ImpossibleHeightAbsoluteConstraints)
+)]
+#[case(ASSERT_HEIGHT_ABSOLUTE, 99, ASSERT_BEFORE_HEIGHT_ABSOLUTE, 100, None)]
+#[case(
+    ASSERT_SECONDS_RELATIVE,
+    100,
+    ASSERT_BEFORE_SECONDS_RELATIVE,
+    100,
+    None
+)]
+#[case(ASSERT_SECONDS_RELATIVE, 99, ASSERT_BEFORE_SECONDS_RELATIVE, 100, None)]
+#[case(ASSERT_HEIGHT_RELATIVE, 100, ASSERT_BEFORE_HEIGHT_RELATIVE, 100, None)]
+#[case(ASSERT_HEIGHT_RELATIVE, 99, ASSERT_BEFORE_HEIGHT_RELATIVE, 100, None)]
+// order shouldn't matter
+#[case(
+    ASSERT_BEFORE_SECONDS_ABSOLUTE,
+    100,
+    ASSERT_SECONDS_ABSOLUTE,
+    100,
+    Some(ErrorCode::ImpossibleSecondsAbsoluteConstraints)
+)]
+#[case(ASSERT_BEFORE_SECONDS_ABSOLUTE, 100, ASSERT_SECONDS_ABSOLUTE, 99, None)]
+#[case(
+    ASSERT_BEFORE_HEIGHT_ABSOLUTE,
+    100,
+    ASSERT_HEIGHT_ABSOLUTE,
+    100,
+    Some(ErrorCode::ImpossibleHeightAbsoluteConstraints)
+)]
+#[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, 100, ASSERT_HEIGHT_ABSOLUTE, 99, None)]
+#[case(
+    ASSERT_BEFORE_SECONDS_RELATIVE,
+    100,
+    ASSERT_SECONDS_RELATIVE,
+    100,
+    None
+)]
+#[case(ASSERT_BEFORE_SECONDS_RELATIVE, 100, ASSERT_SECONDS_RELATIVE, 99, None)]
+#[case(ASSERT_BEFORE_HEIGHT_RELATIVE, 100, ASSERT_HEIGHT_RELATIVE, 100, None)]
+#[case(ASSERT_BEFORE_HEIGHT_RELATIVE, 100, ASSERT_HEIGHT_RELATIVE, 99, None)]
+fn test_impossible_constraints_separate_spends(
+    #[case] cond1: ConditionOpcode,
+    #[case] value1: u64,
+    #[case] cond2: ConditionOpcode,
+    #[case] value2: u64,
+    #[case] expected_err: Option<ErrorCode>,
+) {
+    let test: &str = &format!(
+        "(\
+       (({{h1}} ({{h1}} (123 (\
+           (({} ({} ) \
+           ))\
+       (({{h1}} ({{h2}} (123 (\
+           (({} ({} ) \
+           ))\
+       ))",
+        cond1 as u8, value1, cond2 as u8, value2
+    );
+    if let Some(e) = expected_err {
+        assert_eq!(cond_test(test).unwrap_err().1, e);
+    } else {
+        // we don't expect any error
+        let (a, conds) = cond_test(test).unwrap();
+
+        // just make sure there are no constraints
+        assert_eq!(conds.agg_sig_unsafe.len(), 0);
+        assert_eq!(conds.reserve_fee, 0);
+        assert_eq!(conds.cost, 0);
+
+        assert_eq!(conds.spends.len(), 2);
+        let spend = &conds.spends[0];
+        assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
+        assert_eq!(a.atom(spend.puzzle_hash), H1);
+        assert_eq!(spend.agg_sig_me.len(), 0);
+        assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+
+        let spend = &conds.spends[1];
+        assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+        assert_eq!(a.atom(spend.puzzle_hash), H2);
+        assert_eq!(spend.agg_sig_me.len(), 0);
+        assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    }
 }
