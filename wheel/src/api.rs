@@ -29,7 +29,6 @@ use chia_protocol::{
 use std::convert::TryInto;
 use clvmr::LIMIT_HEAP;
 use clvmr::LIMIT_STACK;
-use clvmr::NO_NEG_DIV;
 use clvmr::NO_UNKNOWN_OPS;
 use clvmr::serde::tree_hash_from_stream;
 use pyo3::prelude::*;
@@ -90,7 +89,7 @@ pub fn get_puzzle_and_solution_for_coin<'py>(
     let mut allocator = make_allocator(LIMIT_HEAP);
     let program = node_from_bytes(&mut allocator, program)?;
     let args = node_from_bytes(&mut allocator, args)?;
-    let dialect = &ChiaDialect::new(NO_NEG_DIV | LIMIT_STACK);
+    let dialect = &ChiaDialect::new(LIMIT_STACK);
 
     let r = py.allow_threads(|| -> Result<(NodePtr, NodePtr), EvalErr> {
         let Reduction(_cost, result) =
@@ -196,7 +195,6 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     // facilities from clvm_rs
 
     m.add_function(wrap_pyfunction!(run_chia_program, m)?)?;
-    m.add("NO_NEG_DIV", NO_NEG_DIV)?;
     m.add("NO_UNKNOWN_OPS", NO_UNKNOWN_OPS)?;
     m.add("LIMIT_HEAP", LIMIT_HEAP)?;
     m.add("LIMIT_STACK", LIMIT_STACK)?;
