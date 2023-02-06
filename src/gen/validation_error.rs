@@ -36,6 +36,10 @@ pub enum ErrorCode {
     DoubleSpend,
     CostExceeded,
     MintingCoin,
+    ImpossibleSecondsRelativeConstraints,
+    ImpossibleSecondsAbsoluteConstraints,
+    ImpossibleHeightRelativeConstraints,
+    ImpossibleHeightAbsoluteConstraints,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -98,6 +102,10 @@ impl From<ErrorCode> for u32 {
             ErrorCode::DoubleSpend => 5,
             ErrorCode::CostExceeded => 23,
             ErrorCode::MintingCoin => 20,
+            ErrorCode::ImpossibleSecondsRelativeConstraints => 134,
+            ErrorCode::ImpossibleSecondsAbsoluteConstraints => 135,
+            ErrorCode::ImpossibleHeightRelativeConstraints => 136,
+            ErrorCode::ImpossibleHeightAbsoluteConstraints => 136,
         }
     }
 }
