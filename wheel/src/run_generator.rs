@@ -87,7 +87,7 @@ fn convert_spend(a: &Allocator, spend: Spend) -> PySpend {
     }
 }
 
-fn convert_spend_bundle_conds(a: &Allocator, sb: SpendBundleConditions) -> PySpendBundleConditions {
+pub fn convert_spend_bundle_conds(a: &Allocator, sb: SpendBundleConditions) -> PySpendBundleConditions {
     let mut spends = Vec::<PySpend>::new();
     for s in sb.spends {
         spends.push(convert_spend(a, s));

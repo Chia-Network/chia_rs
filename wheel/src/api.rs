@@ -1,5 +1,6 @@
 use crate::compression;
-use crate::run_generator::{PySpend, PySpendBundleConditions, __pyo3_get_function_run_generator, __pyo3_get_function_run_block_generator};
+use crate::run_generator::{PySpend, PySpendBundleConditions, convert_spend_bundle_conds, __pyo3_get_function_run_generator, __pyo3_get_function_run_block_generator};
+use chia::gen::run_puzzle::run_puzzle as native_run_puzzle;
 use chia::gen::flags::COND_ARGS_NIL;
 use chia::gen::flags::NO_UNKNOWN_CONDS;
 use chia::gen::flags::STRICT_ARGS_COUNT;
@@ -111,11 +112,26 @@ pub fn get_puzzle_and_solution_for_coin<'py>(
     }
 }
 
+#[pyfunction]
+fn run_puzzle(
+    puzzle: &[u8],
+    solution: &[u8],
+    parent_id: &[u8],
+    amount: u64,
+    max_cost: Cost,
+    flags: u32,
+) -> PyResult<PySpendBundleConditions> {
+    let mut a = make_allocator(LIMIT_HEAP);
+    let conds = native_run_puzzle(&mut a, puzzle, solution, parent_id, amount, max_cost, flags)?;
+    Ok(convert_spend_bundle_conds(&mut a, conds))
+}
+
 #[pymodule]
 pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     // generator functions
     m.add_function(wrap_pyfunction!(run_generator, m)?)?;
     m.add_function(wrap_pyfunction!(run_block_generator, m)?)?;
+    m.add_function(wrap_pyfunction!(run_puzzle, m)?)?;
     m.add_class::<PySpendBundleConditions>()?;
     m.add("ELIGIBLE_FOR_DEDUP", chia::gen::conditions::ELIGIBLE_FOR_DEDUP)?;
     m.add_class::<PySpend>()?;
