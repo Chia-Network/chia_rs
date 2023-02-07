@@ -5,7 +5,10 @@ use std::fmt;
 use pyo3::exceptions;
 #[cfg(feature = "py-bindings")]
 use pyo3::PyErr;
+#[cfg(feature = "serde")]
+use serde::Serialize;
 
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, PartialEq, Eq)]
 pub enum Error {
     InvalidBool,

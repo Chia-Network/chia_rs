@@ -15,8 +15,11 @@ use crate::to_json_dict::ToJsonDict;
 use chia_py_streamable_macro::PyStreamable;
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
+#[cfg(feature = "serde")]
+use serde::Serialize;
 
 #[cfg_attr(feature = "py-bindings", pyclass, derive(PyStreamable))]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Hash, Debug, Clone, Eq, PartialEq)]
 pub struct Program(Bytes);
 

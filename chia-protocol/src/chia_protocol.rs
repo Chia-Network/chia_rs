@@ -14,11 +14,14 @@ use crate::to_json_dict::ToJsonDict;
 use chia_py_streamable_macro::PyStreamable;
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
+#[cfg(feature = "serde")]
+use serde::Serialize;
 #[cfg(feature = "py-bindings")]
 use std::io::Cursor;
 
 #[repr(u8)]
 #[cfg_attr(feature = "py-bindings", derive(PyStreamable))]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Streamable, Hash, Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ProtocolMessageTypes {
     // Shared protocol (all services)
@@ -138,6 +141,7 @@ pub trait ChiaProtocolMessage {
 
 #[repr(u8)]
 #[cfg_attr(feature = "py-bindings", derive(PyStreamable))]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Streamable, Hash, Debug, Copy, Clone, Eq, PartialEq)]
 pub enum NodeType {
     FullNode = 1,
