@@ -5,7 +5,6 @@ use chia::fuzzing_utils;
 
 use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
-use clvmr::chia_dialect::NO_NEG_DIV;
 use clvmr::node::Node;
 use clvmr::run_program::run_program;
 //use clvmr::serde::node_from_bytes_backrefs;
@@ -27,7 +26,7 @@ fn do_fuzz(data: &[u8], short_atoms: bool) {
     let self_extracting_program =
         wrap_atom_with_decompression_program(&mut allocator, serialized_program_atom).unwrap();
 
-    let dialect = &ChiaDialect::new(NO_NEG_DIV);
+    let dialect = &ChiaDialect::new(0);
 
     let args = allocator.null();
 
