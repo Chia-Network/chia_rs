@@ -105,7 +105,7 @@ impl From<ErrorCode> for u32 {
             ErrorCode::ImpossibleSecondsRelativeConstraints => 134,
             ErrorCode::ImpossibleSecondsAbsoluteConstraints => 135,
             ErrorCode::ImpossibleHeightRelativeConstraints => 136,
-            ErrorCode::ImpossibleHeightAbsoluteConstraints => 136,
+            ErrorCode::ImpossibleHeightAbsoluteConstraints => 137,
         }
     }
 }
