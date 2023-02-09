@@ -336,8 +336,15 @@ pub const ELIGIBLE_FOR_DEDUP: u32 = 1;
 // These are all the conditions related directly to a specific spend.
 #[derive(Debug)]
 pub struct Spend {
-    pub coin_id: Arc<Bytes32>,
+    // the parent coin ID of the coin being spent
+    pub parent_id: NodePtr,
+    // the amount of the coin that's being spent
+    pub coin_amount: u64,
+    // the puzzle hash of the p
     pub puzzle_hash: NodePtr,
+    // the coin ID of the coin being spent. This is computed from parent_id,
+    // coin_amount and puzzle_hash
+    pub coin_id: Arc<Bytes32>,
     // conditions
     // all these integers are initialized to 0, which also means "no
     // constraint". i.e. a 0 in these conditions are inherently satisified and
@@ -393,7 +400,7 @@ pub struct SpendBundleConditions {
     pub cost: u64,
 }
 
-struct ParseState {
+pub struct ParseState {
     // hashing of the announcements is deferred until parsing is complete. This
     // means less work up-front, in case parsing/validation fails
     announce_coin: HashSet<(Arc<Bytes32>, NodePtr)>,
@@ -431,7 +438,7 @@ struct ParseState {
 }
 
 impl ParseState {
-    fn new() -> ParseState {
+    pub fn new() -> ParseState {
         ParseState {
             announce_coin: HashSet::new(),
             announce_puzzle: HashSet::new(),
@@ -447,7 +454,7 @@ impl ParseState {
     }
 }
 
-fn parse_spend_conditions(
+pub(crate) fn parse_single_spend(
     ret: &mut SpendBundleConditions,
     a: &Allocator,
     state: &mut ParseState,
@@ -474,9 +481,11 @@ fn parse_spend_conditions(
 
     state.removal_amount += my_amount as u128;
 
-    let mut spend = Spend {
-        coin_id,
+    let coin_spend = Spend {
+        parent_id,
+        coin_amount: my_amount,
         puzzle_hash,
+        coin_id,
         height_relative: None,
         seconds_relative: 0,
         before_height_relative: None,
@@ -487,7 +496,19 @@ fn parse_spend_conditions(
         flags: ELIGIBLE_FOR_DEDUP,
     };
 
-    let mut iter = first(a, cond)?;
+    let iter = first(a, cond)?;
+    parse_conditions(a, ret, state, coin_spend, iter, flags, max_cost)
+}
+
+pub fn parse_conditions(
+    a: &Allocator,
+    ret: &mut SpendBundleConditions,
+    state: &mut ParseState,
+    mut spend: Spend,
+    mut iter: NodePtr,
+    flags: u32,
+    max_cost: &mut Cost,
+) -> Result<(), ValidationErr> {
     while let Some((mut c, next)) = next(a, iter)? {
         iter = next;
         let op = match parse_opcode(a, first(a, c)?, flags) {
@@ -636,17 +657,17 @@ fn parse_spend_conditions(
                 }
             }
             Condition::AssertMyAmount(amount) => {
-                if amount != my_amount {
+                if amount != spend.coin_amount {
                     return Err(ValidationErr(c, ErrorCode::AssertMyAmountFailed));
                 }
             }
             Condition::AssertMyParentId(id) => {
-                if a.atom(id) != a.atom(parent_id) {
+                if a.atom(id) != a.atom(spend.parent_id) {
                     return Err(ValidationErr(c, ErrorCode::AssertMyParentIdFailed));
                 }
             }
             Condition::AssertMyPuzzlehash(hash) => {
-                if a.atom(hash) != a.atom(puzzle_hash) {
+                if a.atom(hash) != a.atom(spend.puzzle_hash) {
                     return Err(ValidationErr(c, ErrorCode::AssertMyPuzzlehashFailed));
                 }
             }
@@ -716,7 +737,7 @@ pub fn parse_spends(
         // as possible if cost is exceeded
         // this function adds the spend to the passed-in ret
         // as well as updates it with any conditions
-        parse_spend_conditions(&mut ret, a, &mut state, spend, flags, &mut cost_left)?;
+        parse_single_spend(&mut ret, a, &mut state, spend, flags, &mut cost_left)?;
     }
 
     if state.removal_amount < state.addition_amount {

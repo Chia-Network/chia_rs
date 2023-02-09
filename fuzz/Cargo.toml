@@ -12,6 +12,7 @@ cargo-fuzz = true
 libfuzzer-sys = "0.4"
 clvmr = "=0.2.3"
 clvm-utils = { version = "=0.2.1", path = "../clvm-utils" }
+chia-protocol = { version = "=0.2.1", path = "../chia-protocol" }
 
 [dependencies.chia]
 path = ".."
@@ -47,5 +48,11 @@ doc = false
 [[bin]]
 name = "self-extractor"
 path = "fuzz_targets/self-extractor.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "parse-spends"
+path = "fuzz_targets/parse-spends.rs"
 test = false
 doc = false
