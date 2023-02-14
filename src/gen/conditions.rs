@@ -1,7 +1,7 @@
 use super::coin_id::compute_coin_id;
 use super::condition_sanitizers::{
-    parse_amount, parse_create_coin_amount, parse_height, parse_seconds, sanitize_announce_msg,
-    sanitize_hash,
+    parse_amount, parse_create_coin_amount, parse_height, parse_positive_height,
+    parse_positive_seconds, parse_seconds, sanitize_announce_msg, sanitize_hash,
 };
 use super::opcodes::{
     parse_opcode, ConditionOpcode, AGG_SIG_COST, AGG_SIG_ME, AGG_SIG_UNSAFE, ALWAYS_TRUE,
@@ -276,23 +276,31 @@ pub fn parse_args(
         }
         ASSERT_BEFORE_SECONDS_RELATIVE => {
             maybe_check_args_terminator(a, c, flags)?;
-            let seconds = parse_seconds(a, first(a, c)?, ErrorCode::AssertBeforeSecondsRelative)?;
-            Ok(Condition::AssertBeforeSecondsRelative(seconds))
+            match parse_positive_seconds(a, first(a, c)?, ErrorCode::AssertBeforeSecondsRelative)? {
+                None => Ok(Condition::Skip),
+                Some(seconds) => Ok(Condition::AssertBeforeSecondsRelative(seconds)),
+            }
         }
         ASSERT_BEFORE_SECONDS_ABSOLUTE => {
             maybe_check_args_terminator(a, c, flags)?;
-            let seconds = parse_seconds(a, first(a, c)?, ErrorCode::AssertBeforeSecondsAbsolute)?;
-            Ok(Condition::AssertBeforeSecondsAbsolute(seconds))
+            match parse_positive_seconds(a, first(a, c)?, ErrorCode::AssertBeforeSecondsAbsolute)? {
+                None => Ok(Condition::Skip),
+                Some(seconds) => Ok(Condition::AssertBeforeSecondsAbsolute(seconds)),
+            }
         }
         ASSERT_BEFORE_HEIGHT_RELATIVE => {
             maybe_check_args_terminator(a, c, flags)?;
-            let height = parse_height(a, first(a, c)?, ErrorCode::AssertBeforeHeightRelative)?;
-            Ok(Condition::AssertBeforeHeightRelative(height))
+            match parse_positive_height(a, first(a, c)?, ErrorCode::AssertBeforeHeightRelative)? {
+                None => Ok(Condition::Skip),
+                Some(height) => Ok(Condition::AssertBeforeHeightRelative(height)),
+            }
         }
         ASSERT_BEFORE_HEIGHT_ABSOLUTE => {
             maybe_check_args_terminator(a, c, flags)?;
-            let height = parse_height(a, first(a, c)?, ErrorCode::AssertBeforeHeightAbsolute)?;
-            Ok(Condition::AssertBeforeHeightAbsolute(height))
+            match parse_positive_height(a, first(a, c)?, ErrorCode::AssertBeforeHeightAbsolute)? {
+                None => Ok(Condition::Skip),
+                Some(height) => Ok(Condition::AssertBeforeHeightAbsolute(height)),
+            }
         }
         ALWAYS_TRUE => {
             // this condition is always true, we always ignore arguments
@@ -1327,50 +1335,18 @@ fn test_extra_arg(
 
 #[cfg(test)]
 #[rstest]
-#[case(ASSERT_SECONDS_ABSOLUTE, ErrorCode::AssertSecondsAbsolute)]
-#[case(ASSERT_SECONDS_RELATIVE, ErrorCode::AssertSecondsRelative)]
-#[case(ASSERT_BEFORE_SECONDS_ABSOLUTE, ErrorCode::AssertBeforeSecondsAbsolute)]
-#[case(ASSERT_BEFORE_SECONDS_RELATIVE, ErrorCode::AssertBeforeSecondsRelative)]
-fn test_seconds_exceed_max(#[case] condition: ConditionOpcode, #[case] expected_error: ErrorCode) {
-    // ASSERT_SECONDS_RELATIVE
-    assert_eq!(
-        cond_test(&format!(
-            "((({{h1}} ({{h2}} (123 ((({} (0x010000000000000000 )))))",
-            condition as u8
-        ))
-        .unwrap_err()
-        .1,
-        expected_error
-    );
-}
-
-#[cfg(test)]
-#[rstest]
-#[case(ASSERT_HEIGHT_ABSOLUTE, ErrorCode::AssertHeightAbsolute)]
-#[case(ASSERT_HEIGHT_RELATIVE, ErrorCode::AssertHeightRelative)]
-#[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, ErrorCode::AssertBeforeHeightAbsolute)]
-#[case(ASSERT_BEFORE_HEIGHT_RELATIVE, ErrorCode::AssertBeforeHeightRelative)]
-fn test_height_exceed_max(#[case] condition: ConditionOpcode, #[case] expected_error: ErrorCode) {
-    assert_eq!(
-        cond_test(&format!(
-            "((({{h1}} ({{h2}} (123 ((({} (0x0100000000 )))))",
-            condition as u8
-        ))
-        .unwrap_err()
-        .1,
-        expected_error
-    );
-}
-
-#[cfg(test)]
-#[rstest]
 #[case(ASSERT_SECONDS_ABSOLUTE, "104", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.seconds_absolute, 104))]
+#[case(ASSERT_SECONDS_ABSOLUTE, "-1", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.seconds_absolute, 0))]
 #[case(ASSERT_SECONDS_RELATIVE, "101", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.seconds_relative, 101))]
+#[case(ASSERT_SECONDS_RELATIVE, "-1", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.seconds_relative, 0))]
 #[case(ASSERT_HEIGHT_RELATIVE, "101", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.height_relative, Some(101)))]
+#[case(ASSERT_HEIGHT_RELATIVE, "-1", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.height_relative, None))]
 #[case(ASSERT_HEIGHT_ABSOLUTE, "100", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.height_absolute, 100))]
+#[case(ASSERT_HEIGHT_ABSOLUTE, "-1", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.height_absolute, 0))]
 #[case(ASSERT_BEFORE_SECONDS_ABSOLUTE, "104", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.before_seconds_absolute, Some(104)))]
 #[case(ASSERT_BEFORE_SECONDS_RELATIVE, "101", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.before_seconds_relative, Some(101)))]
 #[case(ASSERT_BEFORE_HEIGHT_RELATIVE, "101", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.before_height_relative, Some(101)))]
+#[case(ASSERT_BEFORE_HEIGHT_RELATIVE, "0", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.before_height_relative, Some(0)))]
 #[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, "100", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.before_height_absolute, Some(100)))]
 #[case(RESERVE_FEE, "100", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.reserve_fee, 100))]
 #[case(ASSERT_MY_AMOUNT, "123", |_: &SpendBundleConditions, _: &Spend| {})]
@@ -1398,6 +1374,106 @@ fn test_single_condition(
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
 
     test(&conds, &spend);
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(ASSERT_BEFORE_SECONDS_ABSOLUTE, "0x010000000000000000")]
+#[case(ASSERT_BEFORE_SECONDS_RELATIVE, "0x010000000000000000")]
+#[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, "0x0100000000")]
+#[case(ASSERT_BEFORE_HEIGHT_RELATIVE, "0x0100000000")]
+#[case(ASSERT_SECONDS_ABSOLUTE, "-1")]
+#[case(ASSERT_SECONDS_RELATIVE, "-1")]
+#[case(ASSERT_HEIGHT_ABSOLUTE, "-1")]
+#[case(ASSERT_HEIGHT_RELATIVE, "-1")]
+fn test_single_condition_no_op(#[case] condition: ConditionOpcode, #[case] value: &str) {
+    let (_, conds) = cond_test(&format!(
+        "((({{h1}} ({{h2}} (123 ((({} ({} )))))",
+        condition as u8, value
+    ))
+    .unwrap();
+
+    assert_eq!(conds.height_absolute, 0);
+    assert_eq!(conds.seconds_absolute, 0);
+    assert_eq!(conds.before_height_absolute, None);
+    assert_eq!(conds.before_seconds_absolute, None);
+    let spend = &conds.spends[0];
+    assert_eq!(spend.before_height_relative, None);
+    assert_eq!(spend.before_seconds_relative, None);
+    assert_eq!(spend.height_relative, None);
+    assert_eq!(spend.seconds_relative, 0);
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(
+    ASSERT_SECONDS_ABSOLUTE,
+    "0x010000000000000000",
+    ErrorCode::AssertSecondsAbsolute
+)]
+#[case(
+    ASSERT_SECONDS_RELATIVE,
+    "0x010000000000000000",
+    ErrorCode::AssertSecondsRelative
+)]
+#[case(
+    ASSERT_HEIGHT_ABSOLUTE,
+    "0x0100000000",
+    ErrorCode::AssertHeightAbsolute
+)]
+#[case(
+    ASSERT_HEIGHT_RELATIVE,
+    "0x0100000000",
+    ErrorCode::AssertHeightRelative
+)]
+#[case(
+    ASSERT_BEFORE_SECONDS_ABSOLUTE,
+    "-1",
+    ErrorCode::AssertBeforeSecondsAbsolute
+)]
+#[case(
+    ASSERT_BEFORE_SECONDS_ABSOLUTE,
+    "0",
+    ErrorCode::ImpossibleSecondsAbsoluteConstraints
+)]
+#[case(
+    ASSERT_BEFORE_SECONDS_RELATIVE,
+    "-1",
+    ErrorCode::AssertBeforeSecondsRelative
+)]
+#[case(
+    ASSERT_BEFORE_SECONDS_RELATIVE,
+    "0",
+    ErrorCode::ImpossibleSecondsRelativeConstraints
+)]
+#[case(
+    ASSERT_BEFORE_HEIGHT_ABSOLUTE,
+    "-1",
+    ErrorCode::AssertBeforeHeightAbsolute
+)]
+#[case(
+    ASSERT_BEFORE_HEIGHT_ABSOLUTE,
+    "0",
+    ErrorCode::ImpossibleHeightAbsoluteConstraints
+)]
+#[case(
+    ASSERT_BEFORE_HEIGHT_RELATIVE,
+    "-1",
+    ErrorCode::AssertBeforeHeightRelative
+)]
+fn test_single_condition_failure(
+    #[case] condition: ConditionOpcode,
+    #[case] arg: &str,
+    #[case] expected_error: ErrorCode,
+) {
+    let err = cond_test(&format!(
+        "((({{h1}} ({{h2}} (123 ((({} ({} )))))",
+        condition as u8, arg
+    ))
+    .unwrap_err()
+    .1;
+
+    assert_eq!(err, expected_error);
 }
 
 // this test ensures that the ASSERT_BEFORE_ condition codes are not available
