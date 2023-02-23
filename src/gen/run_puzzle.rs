@@ -29,16 +29,10 @@ pub fn run_puzzle(
     let Reduction(clvm_cost, conditions) = run_program(a, &dialect, puzzle, solution, max_cost)?;
 
     let mut ret = SpendBundleConditions {
-        spends: Vec::new(),
-        reserve_fee: 0,
-        height_absolute: 0,
-        seconds_absolute: 0,
-        before_height_absolute: None,
-        before_seconds_absolute: None,
-        agg_sig_unsafe: Vec::new(),
-        cost: 0,
+        removal_amount: amount as u128,
+        ..Default::default()
     };
-    let mut state = ParseState::new();
+    let mut state = ParseState::default();
 
     let puzzle_hash = tree_hash(a, puzzle);
     let coin_id = Arc::<Bytes32>::new(

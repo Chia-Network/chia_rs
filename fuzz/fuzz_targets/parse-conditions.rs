@@ -16,16 +16,7 @@ fuzz_target!(|data: &[u8]| {
     let mut a = Allocator::new();
     let input = make_tree(&mut a, &mut BitCursor::new(data), false);
 
-    let mut ret = SpendBundleConditions {
-        spends: Vec::new(),
-        reserve_fee: 0,
-        height_absolute: 0,
-        seconds_absolute: 0,
-        before_height_absolute: None,
-        before_seconds_absolute: None,
-        agg_sig_unsafe: Vec::new(),
-        cost: 0,
-    };
+    let mut ret = SpendBundleConditions::default();
 
     let amount = 1337_u64;
     let parent_id: Bytes32 = b"12345678901234567890123456789012".into();
@@ -40,7 +31,7 @@ fuzz_target!(|data: &[u8]| {
         .into(),
     );
 
-    let mut state = ParseState::new();
+    let mut state = ParseState::default();
 
     for flags in &[0, ENABLE_ASSERT_BEFORE | COND_ARGS_NIL, ENABLE_ASSERT_BEFORE | STRICT_ARGS_COUNT, NO_UNKNOWN_CONDS] {
 

@@ -6,3 +6,5 @@ SPENDS:
   ASSERT_HEIGHT_RELATIVE 100
   ASSERT_SECONDS_RELATIVE 22
 cost: 1561592
+removal_amount: 123
+addition_amount: 0

@@ -2,5 +2,7 @@
 SPENDS:
 - coin id: 8bdc2ac9ec247e66ee9722169d4e4f617369baf28fe277aac20f566d82cc749b ph: ef802af59c2cb937fcd0669330f4d8e14f39af61390ad356691109aeb29567ce
 cost: 7500952738
+removal_amount: 123
+addition_amount: 0
 STRICT:
 FAILED: 117

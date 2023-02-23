@@ -215,6 +215,8 @@ def get_puzzle_and_solution_for_coin(program: bytes, args: bytes, max_cost: int,
             "before_seconds_absolute: Optional[int]",
             "agg_sig_unsafe: List[Tuple[bytes, bytes]]",
             "cost: int",
+            "removal_amount: int",
+            "addition_amount: int",
         ],
     )
 
