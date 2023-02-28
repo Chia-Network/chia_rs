@@ -53,6 +53,10 @@ pub struct PySpendBundleConditions {
     // Unsafe Agg Sig conditions (i.e. not tied to the spend generating it)
     pub agg_sig_unsafe: Vec<(Bytes48, Bytes)>,
     pub cost: u64,
+    // the sum of all values of all spent coins
+    pub removal_amount: u128,
+    // the sum of all amounts of CREATE_COIN conditions
+    pub addition_amount: u128,
 }
 
 fn convert_spend(a: &Allocator, spend: Spend) -> PySpend {
@@ -107,6 +111,8 @@ pub fn convert_spend_bundle_conds(a: &Allocator, sb: SpendBundleConditions) -> P
         before_seconds_absolute: sb.before_seconds_absolute,
         agg_sig_unsafe: agg_sigs,
         cost: sb.cost,
+        removal_amount: sb.removal_amount,
+        addition_amount: sb.addition_amount,
     }
 }
 

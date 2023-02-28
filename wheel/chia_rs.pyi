@@ -93,6 +93,8 @@ class SpendBundleConditions:
     before_seconds_absolute: Optional[int]
     agg_sig_unsafe: List[Tuple[bytes, bytes]]
     cost: int
+    removal_amount: int
+    addition_amount: int
     def __init__(
         self,
         spends: Sequence[Spend],
@@ -102,7 +104,9 @@ class SpendBundleConditions:
         before_height_absolute: Optional[int],
         before_seconds_absolute: Optional[int],
         agg_sig_unsafe: Sequence[Tuple[bytes, bytes]],
-        cost: int
+        cost: int,
+        removal_amount: int,
+        addition_amount: int
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __str__(self) -> str: ...

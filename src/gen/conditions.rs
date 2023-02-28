@@ -381,7 +381,7 @@ pub struct Spend {
 // spend bundle level, like reserve_fee and absolute time locks. Other
 // conditions are per spend, like relative time-locks and create coins (because
 // they have an implied parent coin ID).
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct SpendBundleConditions {
     pub spends: Vec<Spend>,
     // conditions
@@ -406,8 +406,15 @@ pub struct SpendBundleConditions {
     // run_block_generator() will include CLVM cost and byte cost (making this
     // the total cost)
     pub cost: u64,
+
+    // the sum of all values of all spent coins
+    pub removal_amount: u128,
+
+    // the sum of all amounts of CREATE_COIN conditions
+    pub addition_amount: u128,
 }
 
+#[derive(Default)]
 pub struct ParseState {
     // hashing of the announcements is deferred until parsing is complete. This
     // means less work up-front, in case parsing/validation fails
@@ -437,29 +444,6 @@ pub struct ParseState {
     // there may still be duplicates here. We defer creating a hash set of the
     // actual hashes until the end, and only if there are any puzzle assertions
     spent_puzzles: HashSet<NodePtr>,
-
-    // the sum of all values of all spent coins
-    removal_amount: u128,
-
-    // the sum of all amounts of CREATE_COIN conditions
-    addition_amount: u128,
-}
-
-impl ParseState {
-    pub fn new() -> ParseState {
-        ParseState {
-            announce_coin: HashSet::new(),
-            announce_puzzle: HashSet::new(),
-            assert_coin: HashSet::new(),
-            assert_puzzle: HashSet::new(),
-            assert_concurrent_spend: HashSet::new(),
-            assert_concurrent_puzzle: HashSet::new(),
-            spent_coins: HashSet::new(),
-            spent_puzzles: HashSet::new(),
-            removal_amount: 0,
-            addition_amount: 0,
-        }
-    }
 }
 
 pub(crate) fn parse_single_spend(
@@ -487,7 +471,7 @@ pub(crate) fn parse_single_spend(
 
     state.spent_puzzles.insert(puzzle_hash);
 
-    state.removal_amount += my_amount as u128;
+    ret.removal_amount += my_amount as u128;
 
     let coin_spend = Spend {
         parent_id,
@@ -567,7 +551,7 @@ pub fn parse_conditions(
                 if !spend.create_coin.insert(new_coin) {
                     return Err(ValidationErr(c, ErrorCode::DuplicateOutput));
                 }
-                state.addition_amount += amount as u128;
+                ret.addition_amount += amount as u128;
             }
             Condition::AssertSecondsRelative(s) => {
                 // keep the most strict condition. i.e. the highest limit
@@ -722,18 +706,8 @@ pub fn parse_spends(
     max_cost: Cost,
     flags: u32,
 ) -> Result<SpendBundleConditions, ValidationErr> {
-    let mut ret = SpendBundleConditions {
-        spends: Vec::new(),
-        reserve_fee: 0,
-        height_absolute: 0,
-        seconds_absolute: 0,
-        before_height_absolute: None,
-        before_seconds_absolute: None,
-        agg_sig_unsafe: Vec::new(),
-        cost: 0,
-    };
-
-    let mut state = ParseState::new();
+    let mut ret = SpendBundleConditions::default();
+    let mut state = ParseState::default();
 
     let mut cost_left = max_cost;
 
@@ -748,13 +722,13 @@ pub fn parse_spends(
         parse_single_spend(&mut ret, a, &mut state, spend, flags, &mut cost_left)?;
     }
 
-    if state.removal_amount < state.addition_amount {
+    if ret.removal_amount < ret.addition_amount {
         // The sum of removal amounts must not be less than the sum of addition
         // amounts
         return Err(ValidationErr(spends, ErrorCode::MintingCoin));
     }
 
-    if state.removal_amount - state.addition_amount < ret.reserve_fee as u128 {
+    if ret.removal_amount - ret.addition_amount < ret.reserve_fee as u128 {
         // the actual fee is lower than the reserved fee
         return Err(ValidationErr(spends, ErrorCode::ReserveFeeConditionFailed));
     }
@@ -1942,6 +1916,8 @@ fn test_multiple_assert_my_puzzle_hash() {
 
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
+    assert_eq!(conds.removal_amount, 123);
+    assert_eq!(conds.addition_amount, 0);
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
@@ -1978,6 +1954,8 @@ fn test_single_create_coin() {
 
     assert_eq!(conds.cost, CREATE_COIN_COST);
     assert_eq!(conds.spends.len(), 1);
+    assert_eq!(conds.removal_amount, 123);
+    assert_eq!(conds.addition_amount, 42);
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
@@ -1999,6 +1977,8 @@ fn test_create_coin_max_amount() {
 
     assert_eq!(conds.cost, CREATE_COIN_COST);
     assert_eq!(conds.spends.len(), 1);
+    assert_eq!(conds.removal_amount, 0xffffffffffffffff);
+    assert_eq!(conds.addition_amount, 0xffffffffffffffff);
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 0xffffffffffffffff));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
@@ -2063,6 +2043,8 @@ fn test_create_coin_with_hint() {
 
     assert_eq!(conds.cost, CREATE_COIN_COST);
     assert_eq!(conds.spends.len(), 1);
+    assert_eq!(conds.removal_amount, 123);
+    assert_eq!(conds.addition_amount, 42);
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
@@ -2084,6 +2066,8 @@ fn test_create_coin_extra_arg() {
 
     assert_eq!(conds.cost, CREATE_COIN_COST);
     assert_eq!(conds.spends.len(), 1);
+    assert_eq!(conds.removal_amount, 123);
+    assert_eq!(conds.addition_amount, 42);
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
@@ -2103,6 +2087,8 @@ fn test_create_coin_with_multiple_hints() {
 
     assert_eq!(conds.cost, CREATE_COIN_COST);
     assert_eq!(conds.spends.len(), 1);
+    assert_eq!(conds.removal_amount, 123);
+    assert_eq!(conds.addition_amount, 42);
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
@@ -2123,6 +2109,8 @@ fn test_create_coin_with_hint_as_atom() {
 
     assert_eq!(conds.cost, CREATE_COIN_COST);
     assert_eq!(conds.spends.len(), 1);
+    assert_eq!(conds.removal_amount, 123);
+    assert_eq!(conds.addition_amount, 42);
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
@@ -2142,6 +2130,8 @@ fn test_create_coin_with_invalid_hint_as_terminator() {
 
     assert_eq!(conds.cost, CREATE_COIN_COST);
     assert_eq!(conds.spends.len(), 1);
+    assert_eq!(conds.removal_amount, 123);
+    assert_eq!(conds.addition_amount, 42);
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
@@ -2173,6 +2163,8 @@ fn test_create_coin_with_short_hint() {
 
     assert_eq!(conds.cost, CREATE_COIN_COST);
     assert_eq!(conds.spends.len(), 1);
+    assert_eq!(conds.removal_amount, 123);
+    assert_eq!(conds.addition_amount, 42);
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
@@ -2193,6 +2185,8 @@ fn test_create_coin_with_long_hint() {
 
     assert_eq!(conds.cost, CREATE_COIN_COST);
     assert_eq!(conds.spends.len(), 1);
+    assert_eq!(conds.removal_amount, 123);
+    assert_eq!(conds.addition_amount, 42);
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
@@ -2214,6 +2208,8 @@ fn test_create_coin_with_pair_hint() {
 
     assert_eq!(conds.cost, CREATE_COIN_COST);
     assert_eq!(conds.spends.len(), 1);
+    assert_eq!(conds.removal_amount, 123);
+    assert_eq!(conds.addition_amount, 42);
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
@@ -2235,6 +2231,8 @@ fn test_create_coin_with_cons_hint() {
 
     assert_eq!(conds.cost, CREATE_COIN_COST);
     assert_eq!(conds.spends.len(), 1);
+    assert_eq!(conds.removal_amount, 123);
+    assert_eq!(conds.addition_amount, 42);
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
@@ -2255,6 +2253,8 @@ fn test_multiple_create_coin() {
 
     assert_eq!(conds.cost, CREATE_COIN_COST * 2);
     assert_eq!(conds.spends.len(), 1);
+    assert_eq!(conds.removal_amount, 123);
+    assert_eq!(conds.addition_amount, 42 + 43);
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
@@ -2325,6 +2325,8 @@ fn test_single_agg_sig_me() {
 
     assert_eq!(conds.cost, AGG_SIG_COST);
     assert_eq!(conds.spends.len(), 1);
+    assert_eq!(conds.removal_amount, 123);
+    assert_eq!(conds.addition_amount, 0);
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
@@ -2347,6 +2349,8 @@ fn test_duplicate_agg_sig_me() {
 
     assert_eq!(conds.cost, AGG_SIG_COST * 2);
     assert_eq!(conds.spends.len(), 1);
+    assert_eq!(conds.removal_amount, 123);
+    assert_eq!(conds.addition_amount, 0);
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
@@ -2421,6 +2425,8 @@ fn test_single_agg_sig_unsafe() {
 
     assert_eq!(conds.cost, AGG_SIG_COST);
     assert_eq!(conds.spends.len(), 1);
+    assert_eq!(conds.removal_amount, 123);
+    assert_eq!(conds.addition_amount, 0);
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
@@ -2465,6 +2471,8 @@ fn test_agg_sig_unsafe_invalid_terminator() {
 
     assert_eq!(conds.cost, AGG_SIG_COST);
     assert_eq!(conds.spends.len(), 1);
+    assert_eq!(conds.removal_amount, 123);
+    assert_eq!(conds.addition_amount, 0);
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
@@ -2500,6 +2508,8 @@ fn test_agg_sig_me_invalid_terminator() {
 
     assert_eq!(conds.cost, AGG_SIG_COST);
     assert_eq!(conds.spends.len(), 1);
+    assert_eq!(conds.removal_amount, 123);
+    assert_eq!(conds.addition_amount, 0);
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
@@ -2537,6 +2547,8 @@ fn test_duplicate_agg_sig_unsafe() {
 
     assert_eq!(conds.cost, AGG_SIG_COST * 2);
     assert_eq!(conds.spends.len(), 1);
+    assert_eq!(conds.removal_amount, 123);
+    assert_eq!(conds.addition_amount, 0);
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
@@ -2664,6 +2676,8 @@ fn test_always_true() {
     assert_eq!(conds.height_absolute, 0);
     assert_eq!(conds.seconds_absolute, 0);
     assert_eq!(conds.cost, 0);
+    assert_eq!(conds.removal_amount, 123);
+    assert_eq!(conds.addition_amount, 0);
 
     // there is one spend
     assert_eq!(conds.spends.len(), 1);
@@ -2686,6 +2700,8 @@ fn test_always_true_with_arg() {
     assert_eq!(conds.height_absolute, 0);
     assert_eq!(conds.seconds_absolute, 0);
     assert_eq!(conds.cost, 0);
+    assert_eq!(conds.removal_amount, 123);
+    assert_eq!(conds.addition_amount, 0);
 
     // there is one spend
     assert_eq!(conds.spends.len(), 1);
@@ -2732,6 +2748,8 @@ fn test_concurrent_spend() {
         assert_eq!(conds.height_absolute, 0);
         assert_eq!(conds.seconds_absolute, 0);
         assert_eq!(conds.cost, 0);
+        assert_eq!(conds.removal_amount, 246);
+        assert_eq!(conds.addition_amount, 0);
 
         // there are two spends
         assert_eq!(conds.spends.len(), 2);
@@ -2809,6 +2827,8 @@ fn test_assert_concurrent_spend_self() {
     assert_eq!(conds.height_absolute, 0);
     assert_eq!(conds.seconds_absolute, 0);
     assert_eq!(conds.cost, 0);
+    assert_eq!(conds.removal_amount, 123);
+    assert_eq!(conds.addition_amount, 0);
 
     // there are two spends
     assert_eq!(conds.spends.len(), 1);
@@ -2855,6 +2875,8 @@ fn test_concurrent_puzzle() {
         assert_eq!(conds.height_absolute, 0);
         assert_eq!(conds.seconds_absolute, 0);
         assert_eq!(conds.cost, 0);
+        assert_eq!(conds.removal_amount, 246);
+        assert_eq!(conds.addition_amount, 0);
 
         // there are two spends
         assert_eq!(conds.spends.len(), 2);
@@ -2931,6 +2953,8 @@ fn test_assert_concurrent_puzzle_self() {
     assert_eq!(conds.height_absolute, 0);
     assert_eq!(conds.seconds_absolute, 0);
     assert_eq!(conds.cost, 0);
+    assert_eq!(conds.removal_amount, 123);
+    assert_eq!(conds.addition_amount, 0);
 
     // there are two spends
     assert_eq!(conds.spends.len(), 1);
@@ -3035,6 +3059,8 @@ fn test_impossible_constraints_single_spend(
         assert_eq!(conds.agg_sig_unsafe.len(), 0);
         assert_eq!(conds.reserve_fee, 0);
         assert_eq!(conds.cost, 0);
+        assert_eq!(conds.removal_amount, 123);
+        assert_eq!(conds.addition_amount, 0);
 
         assert_eq!(conds.spends.len(), 1);
         let spend = &conds.spends[0];
@@ -3131,6 +3157,8 @@ fn test_impossible_constraints_separate_spends(
         assert_eq!(conds.agg_sig_unsafe.len(), 0);
         assert_eq!(conds.reserve_fee, 0);
         assert_eq!(conds.cost, 0);
+        assert_eq!(conds.removal_amount, 246);
+        assert_eq!(conds.addition_amount, 0);
 
         assert_eq!(conds.spends.len(), 2);
         let spend = &conds.spends[0];

@@ -20,8 +20,8 @@ def test_hash_spend() -> None:
 
 def test_hash_spend_bundle_conditions() -> None:
 
-    a1 = SpendBundleConditions([], 1000, 1337, 42, None, None, [(sig, b"msg")], 12345678)
-    a2 = SpendBundleConditions([], 1001, 1337, 42, None, None, [(sig, b"msg")], 12345678)
+    a1 = SpendBundleConditions([], 1000, 1337, 42, None, None, [(sig, b"msg")], 12345678, 123, 456)
+    a2 = SpendBundleConditions([], 1001, 1337, 42, None, None, [(sig, b"msg")], 12345678, 123, 456)
     b = hash(a1)
     c = hash(a2)
     assert type(b) is int
@@ -160,7 +160,7 @@ def test_missing_field() -> None:
 
 def test_json_spend_bundle_conditions() -> None:
 
-    a = SpendBundleConditions([], 1000, 1337, 42, None, None, [(sig, b"msg")], 12345678)
+    a = SpendBundleConditions([], 1000, 1337, 42, None, None, [(sig, b"msg")], 12345678, 123, 456)
 
     assert a.to_json_dict() == {
         "spends": [],
@@ -171,11 +171,13 @@ def test_json_spend_bundle_conditions() -> None:
         "before_seconds_absolute": None,
         "agg_sig_unsafe": [["0x" + sig.hex(), "0x6d7367"]],
         "cost": 12345678,
+        "removal_amount": 123,
+        "addition_amount": 456,
     }
 
 def test_from_json_spend_bundle_conditions() -> None:
 
-    a = SpendBundleConditions([], 1000, 1337, 42, None, None, [(sig, b"msg")], 12345678)
+    a = SpendBundleConditions([], 1000, 1337, 42, None, None, [(sig, b"msg")], 12345678, 123, 456)
     b = SpendBundleConditions.from_json_dict({
         "spends": [],
         "reserve_fee": 1000,
@@ -185,6 +187,8 @@ def test_from_json_spend_bundle_conditions() -> None:
         "before_seconds_absolute": None,
         "agg_sig_unsafe": [["0x" + sig.hex(), "0x6d7367"]],
         "cost": 12345678,
+        "removal_amount": 123,
+        "addition_amount": 456,
     })
     assert a == b
 
@@ -203,7 +207,7 @@ def test_copy_spend() -> None:
 
 def test_copy_spend_bundle_conditions() -> None:
 
-    a = SpendBundleConditions([], 1000, 1337, 42, None, None, [(sig, b"msg")], 12345678)
+    a = SpendBundleConditions([], 1000, 1337, 42, None, None, [(sig, b"msg")], 12345678, 123, 456)
     b = copy.copy(a)
 
     assert a == b

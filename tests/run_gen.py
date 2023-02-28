@@ -70,6 +70,8 @@ def print_spend_bundle_conditions(result) -> str:
         for a in sorted(s.agg_sig_me):
             ret += f"  AGG_SIG_ME pk: {a[0].hex()} msg: {a[1].hex()}\n"
     ret += f"cost: {result.cost}\n"
+    ret += f"removal_amount: {result.removal_amount}\n"
+    ret += f"addition_amount: {result.addition_amount}\n"
     return ret
 
 
