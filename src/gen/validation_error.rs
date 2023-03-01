@@ -29,6 +29,8 @@ pub enum ErrorCode {
     AssertSecondsAbsolute,
     AssertSecondsRelative,
     AssertMyAmountFailed,
+    AssertMyBirthSecondsFailed,
+    AssertMyBirthHeightFailed,
     AssertMyPuzzlehashFailed,
     AssertMyParentIdFailed,
     AssertMyCoinIdFailed,
@@ -118,6 +120,8 @@ impl From<ErrorCode> for u32 {
             ErrorCode::ImpossibleSecondsAbsoluteConstraints => 135,
             ErrorCode::ImpossibleHeightRelativeConstraints => 136,
             ErrorCode::ImpossibleHeightAbsoluteConstraints => 137,
+            ErrorCode::AssertMyBirthSecondsFailed => 138,
+            ErrorCode::AssertMyBirthHeightFailed => 139,
         }
     }
 }

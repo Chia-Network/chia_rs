@@ -26,6 +26,8 @@ pub const ASSERT_MY_COIN_ID: ConditionOpcode = 70;
 pub const ASSERT_MY_PARENT_ID: ConditionOpcode = 71;
 pub const ASSERT_MY_PUZZLEHASH: ConditionOpcode = 72;
 pub const ASSERT_MY_AMOUNT: ConditionOpcode = 73;
+pub const ASSERT_MY_BIRTH_SECONDS: ConditionOpcode = 74;
+pub const ASSERT_MY_BIRTH_HEIGHT: ConditionOpcode = 75;
 
 // the conditions below ensure that we're "far enough" in the future
 // wall-clock time
@@ -85,7 +87,9 @@ pub fn parse_opcode(a: &Allocator, op: NodePtr, flags: u32) -> Option<ConditionO
                     | ASSERT_BEFORE_HEIGHT_RELATIVE
                     | ASSERT_BEFORE_HEIGHT_ABSOLUTE
                     | ASSERT_CONCURRENT_SPEND
-                    | ASSERT_CONCURRENT_PUZZLE => Some(buf[0]),
+                    | ASSERT_CONCURRENT_PUZZLE
+                    | ASSERT_MY_BIRTH_SECONDS
+                    | ASSERT_MY_BIRTH_HEIGHT => Some(buf[0]),
                     _ => None,
                 }
             } else {
@@ -131,6 +135,8 @@ use rstest::rstest;
 #[case(&[ASSERT_MY_PARENT_ID], Some(ASSERT_MY_PARENT_ID), Some(ASSERT_MY_PARENT_ID))]
 #[case(&[ASSERT_MY_PUZZLEHASH], Some(ASSERT_MY_PUZZLEHASH), Some(ASSERT_MY_PUZZLEHASH))]
 #[case(&[ASSERT_MY_AMOUNT], Some(ASSERT_MY_AMOUNT), Some(ASSERT_MY_AMOUNT))]
+#[case(&[ASSERT_MY_BIRTH_SECONDS], None, Some(ASSERT_MY_BIRTH_SECONDS))]
+#[case(&[ASSERT_MY_BIRTH_HEIGHT], None, Some(ASSERT_MY_BIRTH_HEIGHT))]
 #[case(&[ASSERT_SECONDS_RELATIVE],Some(ASSERT_SECONDS_RELATIVE) , Some(ASSERT_SECONDS_RELATIVE))]
 #[case(&[ASSERT_SECONDS_ABSOLUTE],Some(ASSERT_SECONDS_ABSOLUTE) , Some(ASSERT_SECONDS_ABSOLUTE))]
 #[case(&[ASSERT_HEIGHT_RELATIVE], Some(ASSERT_HEIGHT_RELATIVE), Some(ASSERT_HEIGHT_RELATIVE))]

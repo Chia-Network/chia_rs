@@ -44,6 +44,8 @@ fuzz_target!(|data: &[u8]| {
             seconds_relative: 0,
             before_height_relative: None,
             before_seconds_relative: None,
+            birth_height: None,
+            birth_seconds: None,
             create_coin: HashSet::new(),
             agg_sig_me: Vec::new(),
             flags: 0_u32,

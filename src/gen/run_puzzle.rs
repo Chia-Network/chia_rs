@@ -54,6 +54,8 @@ pub fn run_puzzle(
         seconds_relative: 0,
         before_height_relative: None,
         before_seconds_relative: None,
+        birth_height: None,
+        birth_seconds: None,
         create_coin: HashSet::new(),
         agg_sig_me: Vec::new(),
         // assume it's eligible until we see an agg-sig condition
