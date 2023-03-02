@@ -52,6 +52,8 @@ class Spend:
     seconds_relative: int
     before_height_relative: Optional[int]
     before_seconds_relative: Optional[int]
+    birth_height: Optional[int]
+    birth_seconds: Optional[int]
     create_coin: List[Tuple[bytes, int, Optional[bytes]]]
     agg_sig_me: List[Tuple[bytes, bytes]]
     flags: int
@@ -63,6 +65,8 @@ class Spend:
         seconds_relative: int,
         before_height_relative: Optional[int],
         before_seconds_relative: Optional[int],
+        birth_height: Optional[int],
+        birth_seconds: Optional[int],
         create_coin: Sequence[Tuple[bytes, int, Optional[bytes]]],
         agg_sig_me: Sequence[Tuple[bytes, bytes]],
         flags: int

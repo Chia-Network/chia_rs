@@ -8,9 +8,10 @@ use super::opcodes::{
     ASSERT_BEFORE_HEIGHT_ABSOLUTE, ASSERT_BEFORE_HEIGHT_RELATIVE, ASSERT_BEFORE_SECONDS_ABSOLUTE,
     ASSERT_BEFORE_SECONDS_RELATIVE, ASSERT_COIN_ANNOUNCEMENT, ASSERT_CONCURRENT_PUZZLE,
     ASSERT_CONCURRENT_SPEND, ASSERT_HEIGHT_ABSOLUTE, ASSERT_HEIGHT_RELATIVE, ASSERT_MY_AMOUNT,
-    ASSERT_MY_COIN_ID, ASSERT_MY_PARENT_ID, ASSERT_MY_PUZZLEHASH, ASSERT_PUZZLE_ANNOUNCEMENT,
-    ASSERT_SECONDS_ABSOLUTE, ASSERT_SECONDS_RELATIVE, CREATE_COIN, CREATE_COIN_ANNOUNCEMENT,
-    CREATE_COIN_COST, CREATE_PUZZLE_ANNOUNCEMENT, RESERVE_FEE,
+    ASSERT_MY_BIRTH_HEIGHT, ASSERT_MY_BIRTH_SECONDS, ASSERT_MY_COIN_ID, ASSERT_MY_PARENT_ID,
+    ASSERT_MY_PUZZLEHASH, ASSERT_PUZZLE_ANNOUNCEMENT, ASSERT_SECONDS_ABSOLUTE,
+    ASSERT_SECONDS_RELATIVE, CREATE_COIN, CREATE_COIN_ANNOUNCEMENT, CREATE_COIN_COST,
+    CREATE_PUZZLE_ANNOUNCEMENT, RESERVE_FEE,
 };
 use super::sanitize_int::sanitize_uint;
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
@@ -83,6 +84,10 @@ pub enum Condition {
     AssertMyPuzzlehash(NodePtr),
     // amount
     AssertMyAmount(u64),
+    // seconds
+    AssertMyBirthSeconds(u64),
+    // block height
+    AssertMyBirthHeight(u32),
     // seconds
     AssertSecondsRelative(u64),
     AssertSecondsAbsolute(u64),
@@ -246,6 +251,35 @@ pub fn parse_args(
             let amount = parse_amount(a, first(a, c)?, ErrorCode::AssertMyAmountFailed)?;
             Ok(Condition::AssertMyAmount(amount))
         }
+        ASSERT_MY_BIRTH_SECONDS => {
+            maybe_check_args_terminator(a, c, flags)?;
+            let code = ErrorCode::AssertMyBirthSecondsFailed;
+            // both negative values and values exceeding the max are invalid
+            let s = match sanitize_uint(a, first(a, c)?, 8, code) {
+                Err(ValidationErr(n, ErrorCode::NegativeAmount)) => Err(ValidationErr(n, code)),
+                Err(ValidationErr(n, ErrorCode::AmountExceedsMaximum)) => {
+                    Err(ValidationErr(n, code))
+                }
+                Err(r) => Err(r),
+                Ok(r) => Ok(u64_from_bytes(r)),
+            }?;
+
+            Ok(Condition::AssertMyBirthSeconds(s))
+        }
+        ASSERT_MY_BIRTH_HEIGHT => {
+            maybe_check_args_terminator(a, c, flags)?;
+            let code = ErrorCode::AssertMyBirthHeightFailed;
+            // both negative values and values exceeding the max are invalid
+            let h = match sanitize_uint(a, first(a, c)?, 4, code) {
+                Err(ValidationErr(n, ErrorCode::NegativeAmount)) => Err(ValidationErr(n, code)),
+                Err(ValidationErr(n, ErrorCode::AmountExceedsMaximum)) => {
+                    Err(ValidationErr(n, code))
+                }
+                Err(r) => Err(r),
+                Ok(r) => Ok(u64_from_bytes(r) as u32),
+            }?;
+            Ok(Condition::AssertMyBirthHeight(h))
+        }
         ASSERT_SECONDS_RELATIVE => {
             maybe_check_args_terminator(a, c, flags)?;
             let seconds = parse_seconds(a, first(a, c)?, ErrorCode::AssertSecondsRelative)?;
@@ -369,6 +403,9 @@ pub struct Spend {
     // the most restrictive ASSERT_BEFORE_SECOND_RELATIVE condition (if any)
     pub before_seconds_relative: Option<u64>,
     // all coins created by this spend. Duplicates are consensus failures
+    // if the coin is asserting its birth height or timestamp, these are set
+    pub birth_height: Option<u32>,
+    pub birth_seconds: Option<u64>,
     pub create_coin: HashSet<NewCoin>,
     // Agg Sig Me conditions
     pub agg_sig_me: Vec<(NodePtr, NodePtr)>,
@@ -482,6 +519,8 @@ pub(crate) fn parse_single_spend(
         seconds_relative: 0,
         before_height_relative: None,
         before_seconds_relative: None,
+        birth_height: None,
+        birth_seconds: None,
         create_coin: HashSet::new(),
         agg_sig_me: Vec::new(),
         // assume it's eligible until we see an agg-sig condition
@@ -652,6 +691,24 @@ pub fn parse_conditions(
                 if amount != spend.coin_amount {
                     return Err(ValidationErr(c, ErrorCode::AssertMyAmountFailed));
                 }
+            }
+            Condition::AssertMyBirthSeconds(s) => {
+                // if this spend already has a birth_seconds assertion, it's an
+                // error if it's different from the new birth assertion. One of
+                // them must be false
+                if spend.birth_seconds.map(|v| v == s) == Some(false) {
+                    return Err(ValidationErr(c, ErrorCode::AssertMyBirthSecondsFailed));
+                }
+                spend.birth_seconds = Some(s);
+            }
+            Condition::AssertMyBirthHeight(h) => {
+                // if this spend already has a birth_height assertion, it's an
+                // error if it's different from the new birth assertion. One of
+                // them must be false
+                if spend.birth_height.map(|v| v == h) == Some(false) {
+                    return Err(ValidationErr(c, ErrorCode::AssertMyBirthHeightFailed));
+                }
+                spend.birth_height = Some(h);
             }
             Condition::AssertMyParentId(id) => {
                 if a.atom(id) != a.atom(spend.parent_id) {
@@ -827,6 +884,10 @@ pub fn parse_spends(
             }
         }
     }
+
+    // TODO: there may be more failures that can be detected early here, for
+    // example an assert-my-birth-height that's incompatible assert-height or
+    // assert-before-height. Same thing for the seconds counterpart
 
     ret.cost = max_cost - cost_left;
 
@@ -1236,6 +1297,8 @@ fn test_invalid_spend_list_terminator() {
 #[case(CREATE_PUZZLE_ANNOUNCEMENT, "{msg1}")]
 #[case(ASSERT_PUZZLE_ANNOUNCEMENT, "{p21}")]
 #[case(ASSERT_MY_AMOUNT, "123")]
+#[case(ASSERT_MY_BIRTH_SECONDS, "123")]
+#[case(ASSERT_MY_BIRTH_HEIGHT, "123")]
 #[case(ASSERT_MY_COIN_ID, "{coin12}")]
 #[case(ASSERT_MY_PARENT_ID, "{h1}")]
 #[case(ASSERT_MY_PUZZLEHASH, "{h2}")]
@@ -1276,6 +1339,8 @@ fn test_extra_arg_mempool(#[case] condition: ConditionOpcode, #[case] arg: &str)
 #[case(CREATE_PUZZLE_ANNOUNCEMENT, "{msg1}", "((63 ({p21} )", |_: &SpendBundleConditions, _: &Spend| {})]
 #[case(ASSERT_PUZZLE_ANNOUNCEMENT, "{p21}", "((62 ({msg1} )", |_: &SpendBundleConditions, _: &Spend| {})]
 #[case(ASSERT_MY_AMOUNT, "123", "", |_: &SpendBundleConditions, _: &Spend| {})]
+#[case(ASSERT_MY_BIRTH_SECONDS, "123", "", |_: &SpendBundleConditions, s: &Spend| { assert_eq!(s.birth_seconds, Some(123)); })]
+#[case(ASSERT_MY_BIRTH_HEIGHT, "123", "", |_: &SpendBundleConditions, s: &Spend| { assert_eq!(s.birth_height, Some(123)); })]
 #[case(ASSERT_MY_COIN_ID, "{coin12}", "", |_: &SpendBundleConditions, _: &Spend| {})]
 #[case(ASSERT_MY_PARENT_ID, "{h1}", "", |_: &SpendBundleConditions, _: &Spend| {})]
 #[case(ASSERT_MY_PUZZLEHASH, "{h2}", "", |_: &SpendBundleConditions, _: &Spend| {})]
@@ -1324,6 +1389,8 @@ fn test_extra_arg(
 #[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, "100", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.before_height_absolute, Some(100)))]
 #[case(RESERVE_FEE, "100", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.reserve_fee, 100))]
 #[case(ASSERT_MY_AMOUNT, "123", |_: &SpendBundleConditions, _: &Spend| {})]
+#[case(ASSERT_MY_BIRTH_SECONDS, "123", |_: &SpendBundleConditions, s: &Spend| { assert_eq!(s.birth_seconds, Some(123)); })]
+#[case(ASSERT_MY_BIRTH_HEIGHT, "123", |_: &SpendBundleConditions, s: &Spend| { assert_eq!(s.birth_height, Some(123)); })]
 #[case(ASSERT_MY_COIN_ID, "{coin12}", |_: &SpendBundleConditions, _: &Spend| {})]
 #[case(ASSERT_MY_PARENT_ID, "{h1}", |_: &SpendBundleConditions, _: &Spend| {})]
 #[case(ASSERT_MY_PUZZLEHASH, "{h2}", |_: &SpendBundleConditions, _: &Spend| {})]
@@ -1435,6 +1502,18 @@ fn test_single_condition_no_op(#[case] condition: ConditionOpcode, #[case] value
     "-1",
     ErrorCode::AssertBeforeHeightRelative
 )]
+#[case(ASSERT_MY_BIRTH_HEIGHT, "-1", ErrorCode::AssertMyBirthHeightFailed)]
+#[case(
+    ASSERT_MY_BIRTH_HEIGHT,
+    "0x0100000000",
+    ErrorCode::AssertMyBirthHeightFailed
+)]
+#[case(ASSERT_MY_BIRTH_SECONDS, "-1", ErrorCode::AssertMyBirthSecondsFailed)]
+#[case(
+    ASSERT_MY_BIRTH_SECONDS,
+    "0x010000000000000000",
+    ErrorCode::AssertMyBirthSecondsFailed
+)]
 fn test_single_condition_failure(
     #[case] condition: ConditionOpcode,
     #[case] arg: &str,
@@ -1480,6 +1559,12 @@ fn test_single_condition_failure(
 )]
 #[case(RESERVE_FEE, "100", None)]
 #[case(ASSERT_MY_AMOUNT, "123", None)]
+#[case(
+    ASSERT_MY_BIRTH_SECONDS,
+    "123",
+    Some(ErrorCode::InvalidConditionOpcode)
+)]
+#[case(ASSERT_MY_BIRTH_HEIGHT, "123", Some(ErrorCode::InvalidConditionOpcode))]
 #[case(ASSERT_MY_COIN_ID, "{coin12}", None)]
 #[case(ASSERT_MY_PARENT_ID, "{h1}", None)]
 #[case(ASSERT_MY_PUZZLEHASH, "{h2}", None)]
@@ -1569,6 +1654,8 @@ fn test_multiple_conditions(
 #[case(CREATE_PUZZLE_ANNOUNCEMENT)]
 #[case(ASSERT_PUZZLE_ANNOUNCEMENT)]
 #[case(ASSERT_MY_AMOUNT)]
+#[case(ASSERT_MY_BIRTH_SECONDS)]
+#[case(ASSERT_MY_BIRTH_HEIGHT)]
 #[case(ASSERT_MY_COIN_ID)]
 #[case(ASSERT_MY_PARENT_ID)]
 #[case(ASSERT_MY_PUZZLEHASH)]
@@ -3173,4 +3260,47 @@ fn test_impossible_constraints_separate_spends(
         assert_eq!(spend.agg_sig_me.len(), 0);
         assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
     }
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(ASSERT_MY_BIRTH_HEIGHT, ErrorCode::AssertMyBirthHeightFailed)]
+#[case(ASSERT_MY_BIRTH_SECONDS, ErrorCode::AssertMyBirthSecondsFailed)]
+fn test_conflicting_my_birth_assertions(
+    #[case] condition: ConditionOpcode,
+    #[case] expected: ErrorCode,
+) {
+    let val = condition as u8;
+    assert_eq!(
+        cond_test(&format!(
+            "((({{h1}} ({{h2}} (1234 ((({val} (100 ) (({val} (503 ) (({val} (90 )))))"
+        ))
+        .unwrap_err()
+        .1,
+        expected
+    );
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(ASSERT_MY_BIRTH_HEIGHT, |s: &Spend| assert_eq!(s.birth_height, Some(100)))]
+#[case(ASSERT_MY_BIRTH_SECONDS, |s: &Spend| assert_eq!(s.birth_seconds, Some(100)))]
+fn test_multiple_my_birth_assertions(
+    #[case] condition: ConditionOpcode,
+    #[case] test: impl Fn(&Spend),
+) {
+    let val = condition as u8;
+    let (a, conds) = cond_test(&format!(
+        "((({{h1}} ({{h2}} (1234 ((({val} (100 ) (({val} (100 ) (({val} (100 )))))"
+    ))
+    .unwrap();
+
+    assert_eq!(conds.cost, 0);
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 1234));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+
+    test(spend);
 }
