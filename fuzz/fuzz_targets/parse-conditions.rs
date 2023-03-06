@@ -41,7 +41,7 @@ fuzz_target!(|data: &[u8]| {
             puzzle_hash: a.new_atom(&puzzle_hash).expect("atom failed"),
             coin_id: coin_id.clone(),
             height_relative: None,
-            seconds_relative: 0,
+            seconds_relative: None,
             before_height_relative: None,
             before_seconds_relative: None,
             birth_height: None,

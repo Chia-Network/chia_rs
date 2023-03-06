@@ -29,7 +29,7 @@ pub struct PySpend {
     pub coin_id: Bytes32,
     pub puzzle_hash: Bytes32,
     pub height_relative: Option<u32>,
-    pub seconds_relative: u64,
+    pub seconds_relative: Option<u64>,
     pub before_height_relative: Option<u32>,
     pub before_seconds_relative: Option<u64>,
     pub birth_height: Option<u32>,
