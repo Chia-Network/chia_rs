@@ -30,11 +30,13 @@ pub const ASSERT_MY_BIRTH_SECONDS: ConditionOpcode = 74;
 pub const ASSERT_MY_BIRTH_HEIGHT: ConditionOpcode = 75;
 
 // the conditions below ensure that we're "far enough" in the future
+// ASSERT_SECONDS_X means ASSERT_AFTER_SECONDS_X >= xxx
 // wall-clock time
 pub const ASSERT_SECONDS_RELATIVE: ConditionOpcode = 80;
 pub const ASSERT_SECONDS_ABSOLUTE: ConditionOpcode = 81;
 
 // block index
+// ASSERT_HEIGHT_X means ASSERT_HEIGHT_SECONDS_X xxx >=
 pub const ASSERT_HEIGHT_RELATIVE: ConditionOpcode = 82;
 pub const ASSERT_HEIGHT_ABSOLUTE: ConditionOpcode = 83;
 

@@ -49,11 +49,20 @@ pub fn parse_height(a: &Allocator, n: NodePtr, code: ErrorCode) -> Result<u32, V
 }
 
 // negative seconds are always valid conditions, and will return 0
+// xxx TODO: guard with condition types?
 pub fn parse_seconds(a: &Allocator, n: NodePtr, code: ErrorCode) -> Result<u64, ValidationErr> {
     // seconds are not allowed to exceed 2^64. i.e. 8 bytes
     match sanitize_uint(a, n, 8, code) {
         // seconds is always positive, so a negative requirement is always true,
         // we don't need to include this condition
+        // (ASSERT_SECONDS_RELATIVE seconds_passed) requires AT LEAST seconds_passed
+        // to have passed. Therefore, seconds_passed <= 0 is okay
+        // (ASSERT_SECONDS_RELATIVE 0) is a no-op. We don't need to pass the condition on
+        // Same for (ASSERT_SECONDS_ABSOLUTE 0) or (ASSERT_SECONDS_ABSOLUTE -1)
+        
+        //Err(ValidationErr(_, ErrorCode::NegativeAmount)) => Ok(None),
+        //Ok(0) => Ok(None),
+
         Err(ValidationErr(_, ErrorCode::NegativeAmount)) => Ok(0),
         Err(ValidationErr(n, ErrorCode::AmountExceedsMaximum)) => Err(ValidationErr(n, code)),
         Err(r) => Err(r),

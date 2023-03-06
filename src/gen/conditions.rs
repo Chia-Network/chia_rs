@@ -283,12 +283,27 @@ pub fn parse_args(
         ASSERT_SECONDS_RELATIVE => {
             maybe_check_args_terminator(a, c, flags)?;
             let seconds = parse_seconds(a, first(a, c)?, ErrorCode::AssertSecondsRelative)?;
-            Ok(Condition::AssertSecondsRelative(seconds))
+            match seconds {
+                // (ASSERT_SECONDS_RELATIVE seconds_passed) requires AT LEAST seconds_passed
+                // to have passed. Therefore, seconds_passed <= 0 is okay
+                // (ASSERT_SECONDSRELATIVE 0) is a no-op. We don't need to pass the condition on
+                0 => Ok(Condition::Skip),
+                _ => Ok(Condition::AssertSecondsRelative(seconds))
+            }
         }
         ASSERT_SECONDS_ABSOLUTE => {
             maybe_check_args_terminator(a, c, flags)?;
             let seconds = parse_seconds(a, first(a, c)?, ErrorCode::AssertSecondsAbsolute)?;
             Ok(Condition::AssertSecondsAbsolute(seconds))
+            /*
+            match seconds {
+                // (ASSERT_SECONDS_ABSOLUTE seconds_passed) requires AT LEAST seconds_passed
+                // to have passed. Therefore, seconds_passed <= 0 is okay
+                // (ASSERT_SECONDS_ABSOLUTE 0) is a no-op. We don't need to pass the condition on
+                0 => Ok(Condition::Skip),
+                _ => Ok(Condition::AssertSecondsAbsolute(seconds))
+            }
+            */
         }
         ASSERT_HEIGHT_RELATIVE => {
             maybe_check_args_terminator(a, c, flags)?;
@@ -388,13 +403,17 @@ pub struct Spend {
     // coin_amount and puzzle_hash
     pub coin_id: Arc<Bytes32>,
     // conditions
-    // all these integers are initialized to 0, which also means "no
-    // constraint". i.e. a 0 in these conditions are inherently satisified and
-    // ignored. 0 (or negative values) are not passed up to the next layer
+    // A condition argument initialized to nil in the rust code means "no constraint".
+    // xxx TODO: add tests that use CLVM nil as condition arguments
+    // nil, 0, or negative values are not passed up to the next layer
     // One exception is height_relative, where 0 *is* relevant.
-    // the highest height/time conditions (i.e. most strict)
+    // Only the most restrictive condition of each type is passed to the layer above.
+    // height_relative: the highest HEIGHT_RELATIVE found for this spend
     pub height_relative: Option<u32>,
-    pub seconds_relative: u64,
+    // The largest SECONDS_RELATIVE condition found. Note that negative 
+    // SECONDS_RELATIVE values will pass validation, and no SECONDS_RELATIVE
+    // condition will be passed up.
+    pub seconds_relative: Option<u64>,
     // the most restrictive ASSERT_BEFORE_HEIGHT_RELATIVE condition (if any)
     // returned by this puzzle. It doesn't make much sense for a puzzle to
     // return multiple of these, but if they do, we only need to care about the
@@ -516,7 +535,7 @@ pub(crate) fn parse_single_spend(
         puzzle_hash,
         coin_id,
         height_relative: None,
-        seconds_relative: 0,
+        seconds_relative: None,
         before_height_relative: None,
         before_seconds_relative: None,
         birth_height: None,
@@ -594,16 +613,19 @@ pub fn parse_conditions(
             }
             Condition::AssertSecondsRelative(s) => {
                 // keep the most strict condition. i.e. the highest limit
-                spend.seconds_relative = max(spend.seconds_relative, s);
+                spend.seconds_relative = max(spend.seconds_relative, Some(s));
                 if let Some(bs) = spend.before_seconds_relative {
-                    if bs <= spend.seconds_relative {
-                        // this spend bundle requres to be spent *before* a
-                        // timestamp and also *after* a timestamp that's the
-                        // same or later. that's impossible.
-                        return Err(ValidationErr(
-                            c,
-                            ErrorCode::ImpossibleSecondsRelativeConstraints,
-                        ));
+                    if let Some(s) = spend.seconds_relative {
+                        if bs <= s {
+                            // this spend bundle requres to be spent *before* a
+                            // timestamp and also *after* a timestamp that's the
+                            // same or later. that's impossible.
+                            // TODO: Check semantics of (ASSERT_SECONDS_RELATIVE 0) and (ASSERT_BEFORE_SECONDS_RELATIVE 0)
+                            return Err(ValidationErr(
+                                c,
+                                ErrorCode::ImpossibleSecondsRelativeConstraints,
+                            ));
+                        }
                     }
                 }
             }
@@ -637,7 +659,7 @@ pub fn parse_conditions(
                 } else {
                     spend.before_seconds_relative = Some(s);
                 }
-                if s <= spend.seconds_relative {
+                if Some(s) <= spend.seconds_relative {
                     // this spend bundle requres to be spent *before* a
                     // timestamp and also *after* a timestamp that's the
                     // same or later. that's impossible.
@@ -1207,7 +1229,7 @@ fn test_invalid_condition_args_terminator() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
 
-    assert_eq!(spend.seconds_relative, 50);
+    assert_eq!(spend.seconds_relative, Some(50));
 }
 
 #[test]
@@ -1234,7 +1256,7 @@ fn test_invalid_condition_list_terminator() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
 
-    assert_eq!(spend.seconds_relative, 50);
+    assert_eq!(spend.seconds_relative, Some(50));
 }
 
 #[test]
@@ -1326,7 +1348,7 @@ fn test_extra_arg_mempool(#[case] condition: ConditionOpcode, #[case] arg: &str)
 #[cfg(test)]
 #[rstest]
 #[case(ASSERT_SECONDS_ABSOLUTE, "104", "", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.seconds_absolute, 104))]
-#[case(ASSERT_SECONDS_RELATIVE, "101", "", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.seconds_relative, 101))]
+#[case(ASSERT_SECONDS_RELATIVE, "101", "", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.seconds_relative, Some(101)))]
 #[case(ASSERT_HEIGHT_RELATIVE, "101", "", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.height_relative, Some(101)))]
 #[case(ASSERT_HEIGHT_ABSOLUTE, "100", "", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.height_absolute, 100))]
 #[case(ASSERT_BEFORE_SECONDS_ABSOLUTE, "104", "", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.before_seconds_absolute, Some(104)))]
@@ -1376,8 +1398,8 @@ fn test_extra_arg(
 #[rstest]
 #[case(ASSERT_SECONDS_ABSOLUTE, "104", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.seconds_absolute, 104))]
 #[case(ASSERT_SECONDS_ABSOLUTE, "-1", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.seconds_absolute, 0))]
-#[case(ASSERT_SECONDS_RELATIVE, "101", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.seconds_relative, 101))]
-#[case(ASSERT_SECONDS_RELATIVE, "-1", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.seconds_relative, 0))]
+#[case(ASSERT_SECONDS_RELATIVE, "101", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.seconds_relative, Some(101)))]
+#[case(ASSERT_SECONDS_RELATIVE, "-1", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.seconds_relative, None))]
 #[case(ASSERT_HEIGHT_RELATIVE, "101", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.height_relative, Some(101)))]
 #[case(ASSERT_HEIGHT_RELATIVE, "-1", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.height_relative, None))]
 #[case(ASSERT_HEIGHT_ABSOLUTE, "100", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.height_absolute, 100))]
@@ -1424,9 +1446,13 @@ fn test_single_condition(
 #[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, "0x0100000000")]
 #[case(ASSERT_BEFORE_HEIGHT_RELATIVE, "0x0100000000")]
 #[case(ASSERT_SECONDS_ABSOLUTE, "-1")]
-#[case(ASSERT_SECONDS_RELATIVE, "-1")]
+//#[case(ASSERT_SECONDS_ABSOLUTE, "0")]
+#[case(ASSERT_SECONDS_RELATIVE, "-1")] //xxx
+//#[case(ASSERT_SECONDS_RELATIVE, "0")] //xxx
 #[case(ASSERT_HEIGHT_ABSOLUTE, "-1")]
+//#[case(ASSERT_HEIGHT_ABSOLUTE, "0")]
 #[case(ASSERT_HEIGHT_RELATIVE, "-1")]
+//#[case(ASSERT_HEIGHT_RELATIVE, "-0")] // xxx TODO: Check if clvm vas negative zero
 fn test_single_condition_no_op(#[case] condition: ConditionOpcode, #[case] value: &str) {
     let (_, conds) = cond_test(&format!(
         "((({{h1}} ({{h2}} (123 ((({} ({} )))))",
@@ -1442,7 +1468,7 @@ fn test_single_condition_no_op(#[case] condition: ConditionOpcode, #[case] value
     assert_eq!(spend.before_height_relative, None);
     assert_eq!(spend.before_seconds_relative, None);
     assert_eq!(spend.height_relative, None);
-    assert_eq!(spend.seconds_relative, 0);
+    assert_eq!(spend.seconds_relative, None); //xxx if this is None OR Some(0), it is equivalent to no condition.
 }
 
 #[cfg(test)]
@@ -1455,7 +1481,7 @@ fn test_single_condition_no_op(#[case] condition: ConditionOpcode, #[case] value
 #[case(
     ASSERT_SECONDS_RELATIVE,
     "0x010000000000000000",
-    ErrorCode::AssertSecondsRelative
+    ErrorCode::AssertSecondsRelative// xxx Is this the only failure case?
 )]
 #[case(
     ASSERT_HEIGHT_ABSOLUTE,
@@ -1483,7 +1509,7 @@ fn test_single_condition_no_op(#[case] condition: ConditionOpcode, #[case] value
     ErrorCode::AssertBeforeSecondsRelative
 )]
 #[case(
-    ASSERT_BEFORE_SECONDS_RELATIVE,
+    ASSERT_BEFORE_SECONDS_RELATIVE,//xxx
     "0",
     ErrorCode::ImpossibleSecondsRelativeConstraints
 )]
@@ -1611,7 +1637,7 @@ fn test_disable_assert_before(
 #[rstest]
 // we use the MAX value
 #[case(ASSERT_SECONDS_ABSOLUTE, |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.seconds_absolute, 503))]
-#[case(ASSERT_SECONDS_RELATIVE, |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.seconds_relative, 503))]
+#[case(ASSERT_SECONDS_RELATIVE, |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.seconds_relative, Some(503)))]
 #[case(ASSERT_HEIGHT_RELATIVE, |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.height_relative, Some(503)))]
 #[case(ASSERT_HEIGHT_ABSOLUTE, |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.height_absolute, 503))]
 // we use the SUM of the values
@@ -3053,6 +3079,16 @@ fn test_assert_concurrent_puzzle_self() {
 }
 
 // the relative constraints clash because they are on the same coin spend
+// xxx add this?
+/*
+#[case(
+    ASSERT_HEIGHT_RELATIVE,
+    0,
+    ASSERT_BEFORE_HEIGHT_RELATIVE,
+    0,
+    Some(ErrorCode::ImpossibleHeightRelativeConstraints)
+)]
+*/
 #[cfg(test)]
 #[rstest]
 #[case(
