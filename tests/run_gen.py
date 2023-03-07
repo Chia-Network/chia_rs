@@ -54,9 +54,9 @@ def print_spend_bundle_conditions(result) -> str:
     for s in sorted(result.spends, key=lambda x: x.coin_id):
         ret += f"- coin id: {s.coin_id.hex()} ph: {s.puzzle_hash.hex()}\n"
 
-        if s.height_relative:
+        if s.height_relative is not None:
             ret += f"  ASSERT_HEIGHT_RELATIVE {s.height_relative}\n"
-        if s.seconds_relative > 0:
+        if s.seconds_relative is not None:
             ret += f"  ASSERT_SECONDS_RELATIVE {s.seconds_relative}\n"
         if s.before_height_relative is not None:
             ret += f"  ASSERT_BEFORE_HEIGHT_RELATIVE {s.before_height_relative}\n"

@@ -49,7 +49,7 @@ class Spend:
     coin_id: bytes
     puzzle_hash: bytes
     height_relative: Optional[int]
-    seconds_relative: int
+    seconds_relative: Optional[int]
     before_height_relative: Optional[int]
     before_seconds_relative: Optional[int]
     birth_height: Optional[int]
@@ -62,7 +62,7 @@ class Spend:
         coin_id: bytes,
         puzzle_hash: bytes,
         height_relative: Optional[int],
-        seconds_relative: int,
+        seconds_relative: Optional[int],
         before_height_relative: Optional[int],
         before_seconds_relative: Optional[int],
         birth_height: Optional[int],
