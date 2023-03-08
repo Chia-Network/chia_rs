@@ -600,7 +600,11 @@ pub fn parse_conditions(
             }
             Condition::AssertSecondsRelative(s) => {
                 // keep the most strict condition. i.e. the highest limit
-                spend.seconds_relative = Some(max(spend.seconds_relative.unwrap_or(0), s));
+                if let Some(existing) = spend.seconds_relative {
+                    spend.seconds_relative = Some(max(existing, s));
+                } else {
+                    spend.seconds_relative = Some(s);
+                }
                 if let Some(bs) = spend.before_seconds_relative {
                     if bs <= s {
                         // this spend bundle requres to be spent *before* a
@@ -619,7 +623,11 @@ pub fn parse_conditions(
             }
             Condition::AssertHeightRelative(h) => {
                 // keep the most strict condition. i.e. the highest limit
-                spend.height_relative = Some(max(spend.height_relative.unwrap_or(0), h));
+                if let Some(existing) = spend.height_relative {
+                    spend.height_relative = Some(max(existing, h));
+                } else {
+                    spend.height_relative = Some(h);
+                }
                 if let Some(bs) = spend.before_height_relative {
                     if bs <= h {
                         // this spend bundle requres to be spent *before* a
