@@ -56,3 +56,9 @@ name = "parse-spends"
 path = "fuzz_targets/parse-spends.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "sanitize-uint"
+path = "fuzz_targets/sanitize-uint.rs"
+test = false
+doc = false
