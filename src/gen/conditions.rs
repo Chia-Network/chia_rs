@@ -2462,6 +2462,17 @@ fn test_duplicate_create_coin() {
 }
 
 #[test]
+fn test_duplicate_create_coin_with_hint() {
+    // CREATE_COIN
+    assert_eq!(
+        cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 (({h1})) ((51 ({h2} (42 ) ))))")
+            .unwrap_err()
+            .1,
+        ErrorCode::DuplicateOutput
+    );
+}
+
+#[test]
 fn test_single_agg_sig_me() {
     // AGG_SIG_ME
     let (a, conds) = cond_test("((({h1} ({h2} (123 (((50 ({pubkey} ({msg1} )))))").unwrap();
