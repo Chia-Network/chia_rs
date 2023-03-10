@@ -3371,3 +3371,119 @@ fn test_multiple_my_birth_assertions(
 
     test(spend);
 }
+
+#[test]
+fn test_assert_ephemeral() {
+    // ASSERT_EPHEMERAL
+    // the coin11 value is the coinID computed from (H1, H1, 123).
+    // coin11 is the first coin we spend in this case.
+    // 51 is CREATE_COIN, 76 is ASSERT_EPHEMERAL
+    let test = "(\
+       (({h1} ({h1} (123 (\
+           ((51 ({h2} (123 ) \
+           ))\
+       (({coin11} ({h2} (123 (\
+           ((76 ) \
+           ))\
+       ))";
+    // we don't expect any error
+    let (a, conds) = cond_test(test).unwrap();
+
+    // our spends don't add any additional constraints
+    assert_eq!(conds.agg_sig_unsafe.len(), 0);
+    assert_eq!(conds.reserve_fee, 0);
+    assert_eq!(conds.cost, CREATE_COIN_COST);
+    // we spend a coin worth 123, into a new coin worth 123
+    // then we spend that coin burning the value. i.e. we spend 123 * 2 and only
+    // add 123. the net is a removal of 123
+    assert_eq!(conds.removal_amount, 246);
+    assert_eq!(conds.addition_amount, 123);
+
+    assert_eq!(conds.spends.len(), 2);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(&H1, &H1, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H1);
+    assert_eq!(spend.agg_sig_me.len(), 0);
+    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+
+    let spend = &conds.spends[1];
+    assert_eq!(
+        *spend.coin_id,
+        test_coin_id((&(*conds.spends[0].coin_id)).into(), H2, 123)
+    );
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.agg_sig_me.len(), 0);
+    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+}
+
+#[test]
+fn test_assert_ephemeral_wrong_ph() {
+    // ASSERT_EPHEMERAL
+    // the coin11 value is the coinID computed from (H1, H1, 123). The first
+    // coin we spend in this case
+    // 51 is CREATE_COIN, 76 is ASSERT_EPHEMERAL
+    // in this case the puzzle hash doesn't match the coin the parent paid to,
+    // so it's not a valid spend
+    let test = "(\
+       (({h1} ({h1} (123 (\
+           ((51 ({h2} (123 ) \
+           ))\
+       (({coin11} ({h1} (123 (\
+           ((76 ) \
+           ))\
+       ))";
+
+    // this is an invalid ASSERT_EPHEMERAL
+    assert_eq!(
+        cond_test(test).unwrap_err().1,
+        ErrorCode::AssertEphemeralFailed
+    );
+}
+
+#[test]
+fn test_assert_ephemeral_wrong_amount() {
+    // ASSERT_EPHEMERAL
+    // the coin11 value is the coinID computed from (H1, H1, 123). The first
+    // coin we spend in this case
+    // 51 is CREATE_COIN, 76 is ASSERT_EPHEMERAL
+    // in this case the amount doesn't match the coin the parent paid to,
+    // so it's not a valid spend
+    let test = "(\
+       (({h1} ({h1} (123 (\
+           ((51 ({h2} (123 ) \
+           ))\
+       (({coin11} ({h2} (122 (\
+           ((76 ) \
+           ))\
+       ))";
+
+    // this is an invalid ASSERT_EPHEMERAL
+    assert_eq!(
+        cond_test(test).unwrap_err().1,
+        ErrorCode::AssertEphemeralFailed
+    );
+}
+
+#[test]
+fn test_assert_ephemeral_wrong_parent() {
+    // ASSERT_EPHEMERAL
+    // the coin12 value is the coinID computed from (H1, H2, 123). This is *not*
+    // the coin we spend first
+    // 51 is CREATE_COIN, 76 is ASSERT_EPHEMERAL
+    // in this case the amount doesn't match the coin the parent paid to,
+    // so it's not a valid spend
+    let test = "(\
+       (({h1} ({h1} (123 (\
+           ((51 ({h2} (123 ) \
+           ))\
+       (({coin12} ({h2} (123 (\
+           ((76 ) \
+           ))\
+       ))";
+
+    // this is an invalid ASSERT_EPHEMERAL
+    assert_eq!(
+        cond_test(test).unwrap_err().1,
+        ErrorCode::AssertEphemeralFailed
+    );
+}
