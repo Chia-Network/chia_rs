@@ -100,6 +100,7 @@ pub enum Condition {
 
     // this means the condition is unconditionally true and can be skipped
     Skip,
+    SkipRelativeCondition,
 }
 
 fn maybe_check_args_terminator(
@@ -290,7 +291,7 @@ pub fn parse_args(
             let code = ErrorCode::AssertSecondsRelative;
             match sanitize_uint(a, node, 8, code)? {
                 SanitizedUint::PositiveOverflow => Err(ValidationErr(node, code)),
-                SanitizedUint::NegativeOverflow => Ok(Condition::Skip),
+                SanitizedUint::NegativeOverflow => Ok(Condition::SkipRelativeCondition),
                 SanitizedUint::Ok(r) => Ok(Condition::AssertSecondsRelative(r)),
             }
         }
@@ -310,7 +311,7 @@ pub fn parse_args(
             let code = ErrorCode::AssertHeightRelative;
             match sanitize_uint(a, node, 4, code)? {
                 SanitizedUint::PositiveOverflow => Err(ValidationErr(node, code)),
-                SanitizedUint::NegativeOverflow => Ok(Condition::Skip),
+                SanitizedUint::NegativeOverflow => Ok(Condition::SkipRelativeCondition),
                 SanitizedUint::Ok(r) => Ok(Condition::AssertHeightRelative(r as u32)),
             }
         }
@@ -329,7 +330,7 @@ pub fn parse_args(
             let node = first(a, c)?;
             let code = ErrorCode::AssertBeforeSecondsRelative;
             match sanitize_uint(a, node, 8, code)? {
-                SanitizedUint::PositiveOverflow => Ok(Condition::Skip),
+                SanitizedUint::PositiveOverflow => Ok(Condition::SkipRelativeCondition),
                 SanitizedUint::NegativeOverflow => Err(ValidationErr(node, code)),
                 SanitizedUint::Ok(r) => Ok(Condition::AssertBeforeSecondsRelative(r)),
             }
@@ -350,7 +351,7 @@ pub fn parse_args(
             let node = first(a, c)?;
             let code = ErrorCode::AssertBeforeHeightRelative;
             match sanitize_uint(a, node, 4, code)? {
-                SanitizedUint::PositiveOverflow => Ok(Condition::Skip),
+                SanitizedUint::PositiveOverflow => Ok(Condition::SkipRelativeCondition),
                 SanitizedUint::NegativeOverflow => Err(ValidationErr(node, code)),
                 SanitizedUint::Ok(r) => Ok(Condition::AssertBeforeHeightRelative(r as u32)),
             }
@@ -403,6 +404,9 @@ impl PartialEq for NewCoin {
 // a spend is eligible for deduplication if it does not have any AGG_SIG_ME
 // nor AGG_SIG_UNSAFE
 pub const ELIGIBLE_FOR_DEDUP: u32 = 1;
+
+// If the spend bundle contained *any* relative seconds or height condition, this flag is set
+pub const HAS_RELATIVE_CONDITION: u32 = 2;
 
 // These are all the conditions related directly to a specific spend.
 #[derive(Debug)]
@@ -649,6 +653,7 @@ pub fn parse_conditions(
                         ));
                     }
                 }
+                spend.flags |= HAS_RELATIVE_CONDITION;
             }
             Condition::AssertSecondsAbsolute(s) => {
                 // keep the most strict condition. i.e. the highest limit
@@ -672,6 +677,7 @@ pub fn parse_conditions(
                         ));
                     }
                 }
+                spend.flags |= HAS_RELATIVE_CONDITION;
             }
             Condition::AssertHeightAbsolute(h) => {
                 // keep the most strict condition. i.e. the highest limit
@@ -695,6 +701,7 @@ pub fn parse_conditions(
                         ));
                     }
                 }
+                spend.flags |= HAS_RELATIVE_CONDITION;
             }
             Condition::AssertBeforeSecondsAbsolute(s) => {
                 // keep the most strict condition. i.e. the lowest limit
@@ -722,6 +729,7 @@ pub fn parse_conditions(
                         ));
                     }
                 }
+                spend.flags |= HAS_RELATIVE_CONDITION;
             }
             Condition::AssertBeforeHeightAbsolute(h) => {
                 // keep the most strict condition. i.e. the lowest limit
@@ -749,6 +757,7 @@ pub fn parse_conditions(
                     return Err(ValidationErr(c, ErrorCode::AssertMyBirthSecondsFailed));
                 }
                 spend.birth_seconds = Some(s);
+                spend.flags |= HAS_RELATIVE_CONDITION;
             }
             Condition::AssertMyBirthHeight(h) => {
                 // if this spend already has a birth_height assertion, it's an
@@ -758,6 +767,7 @@ pub fn parse_conditions(
                     return Err(ValidationErr(c, ErrorCode::AssertMyBirthHeightFailed));
                 }
                 spend.birth_height = Some(h);
+                spend.flags |= HAS_RELATIVE_CONDITION;
             }
             Condition::AssertEphemeral => {
                 state.assert_ephemeral.insert(ret.spends.len());
@@ -797,6 +807,9 @@ pub fn parse_conditions(
             Condition::AggSigUnsafe(pk, msg) => {
                 ret.agg_sig_unsafe.push((pk, msg));
                 spend.flags &= !ELIGIBLE_FOR_DEDUP;
+            }
+            Condition::SkipRelativeCondition => {
+                spend.flags |= HAS_RELATIVE_CONDITION;
             }
             Condition::Skip => {}
         }
@@ -1292,7 +1305,7 @@ fn test_invalid_condition_args_terminator() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP | HAS_RELATIVE_CONDITION);
 
     assert_eq!(spend.seconds_relative, Some(50));
 }
@@ -1319,7 +1332,7 @@ fn test_invalid_condition_list_terminator() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP | HAS_RELATIVE_CONDITION);
 
     assert_eq!(spend.seconds_relative, Some(50));
 }
@@ -1454,7 +1467,7 @@ fn test_extra_arg(
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
 
     test(&conds, &spend);
 }
@@ -1503,7 +1516,7 @@ fn test_single_condition(
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
 
     test(&conds, &spend);
 }
@@ -1722,7 +1735,7 @@ fn test_multiple_conditions(
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 1234));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
 
     test(&conds, &spend);
 }
@@ -1773,7 +1786,7 @@ fn test_single_height_relative_zero() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP | HAS_RELATIVE_CONDITION);
 
     assert_eq!(spend.height_relative, Some(0));
 }
@@ -3251,7 +3264,7 @@ fn test_impossible_constraints_single_spend(
         assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
         assert_eq!(a.atom(spend.puzzle_hash), H1);
         assert_eq!(spend.agg_sig_me.len(), 0);
-        assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+        assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
     }
 }
 
@@ -3349,13 +3362,13 @@ fn test_impossible_constraints_separate_spends(
         assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
         assert_eq!(a.atom(spend.puzzle_hash), H1);
         assert_eq!(spend.agg_sig_me.len(), 0);
-        assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+        assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
 
         let spend = &conds.spends[1];
         assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
         assert_eq!(a.atom(spend.puzzle_hash), H2);
         assert_eq!(spend.agg_sig_me.len(), 0);
-        assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+        assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
     }
 }
 
@@ -3397,7 +3410,7 @@ fn test_multiple_my_birth_assertions(
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 1234));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
 
     test(spend);
 }
