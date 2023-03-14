@@ -6,6 +6,7 @@ use chia::gen::flags::NO_UNKNOWN_CONDS;
 use chia::gen::flags::STRICT_ARGS_COUNT;
 use chia::gen::flags::MEMPOOL_MODE;
 use chia::gen::flags::ENABLE_ASSERT_BEFORE;
+use chia::gen::flags::NO_RELATIVE_CONDITIONS_ON_EPHEMERAL;
 use chia::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia::allocator::make_allocator;
 use chia_protocol::Bytes32;
@@ -141,6 +142,7 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     m.add("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;
     m.add("STRICT_ARGS_COUNT", STRICT_ARGS_COUNT)?;
     m.add("ENABLE_ASSERT_BEFORE", ENABLE_ASSERT_BEFORE)?;
+    m.add("NO_RELATIVE_CONDITIONS_ON_EPHEMERAL", NO_RELATIVE_CONDITIONS_ON_EPHEMERAL)?;
     m.add("MEMPOOL_MODE", MEMPOOL_MODE)?;
 
     // Chia classes
