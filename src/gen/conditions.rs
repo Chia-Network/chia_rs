@@ -514,8 +514,8 @@ pub struct ParseState {
     // we record all coins that assert that they are ephemeral in here. Once
     // we've processed all spends, we ensure that all of these coins were
     // created in this same block
-    // each item is parent-coin-id, puzzle-hash, amount.
-    assert_ephemeral: HashSet<(NodePtr, NodePtr, u64)>,
+    // each item is the index into the SpendBundleConditions::spends vector
+    assert_ephemeral: HashSet<usize>,
 }
 
 pub(crate) fn parse_single_spend(
@@ -760,11 +760,7 @@ pub fn parse_conditions(
                 spend.birth_height = Some(h);
             }
             Condition::AssertEphemeral => {
-                state.assert_ephemeral.insert((
-                    spend.parent_id,
-                    spend.puzzle_hash,
-                    spend.coin_amount,
-                ));
+                state.assert_ephemeral.insert(ret.spends.len());
             }
             Condition::AssertMyParentId(id) => {
                 if a.atom(id) != a.atom(spend.parent_id) {
@@ -808,6 +804,30 @@ pub fn parse_conditions(
 
     ret.spends.push(spend);
     Ok(())
+}
+
+fn is_ephemeral(
+    a: &Allocator,
+    spend_idx: usize,
+    spent_ids: &HashMap<Arc<Bytes32>, usize>,
+    spends: &[Spend],
+) -> bool {
+    let spend = &spends[spend_idx];
+    let idx = match spent_ids.get(&Bytes32::from(a.atom(spend.parent_id))) {
+        None => {
+            return false;
+        }
+        Some(idx) => *idx,
+    };
+
+    // then lookup the coin (puzzle hash, amount) in its set of created
+    // coins. Note that hint is not relevant for this lookup
+    let parent_spend = &spends[idx];
+    parent_spend.create_coin.contains(&NewCoin {
+        puzzle_hash: Bytes32::from(a.atom(spend.puzzle_hash)),
+        amount: spend.coin_amount,
+        hint: -1,
+    })
 }
 
 // This function parses, and validates aspects of, the above structure and
@@ -924,25 +944,13 @@ pub fn parse_spends(
         }
     }
 
-    for (parent, puzzle_hash, amount) in state.assert_ephemeral {
-        // make sure this coin was created in this block, and find the
-        // corresponding Spend object
-        let idx = match state.spent_coins.get(&Bytes32::from(a.atom(parent))) {
-            None => {
-                return Err(ValidationErr(parent, ErrorCode::AssertEphemeralFailed));
-            }
-            Some(idx) => *idx,
-        };
-
-        // then lookup the coin (puzzle hash, amount) in its set of created
-        // coins. Note that hint is not relevant for this lookup
-        let parent_spend = &ret.spends[idx];
-        if !parent_spend.create_coin.contains(&NewCoin {
-            puzzle_hash: Bytes32::from(a.atom(puzzle_hash)),
-            amount,
-            hint: a.null(),
-        }) {
-            return Err(ValidationErr(parent, ErrorCode::AssertEphemeralFailed));
+    for spend_idx in state.assert_ephemeral {
+        // make sure this coin was created in this block
+        if !is_ephemeral(a, spend_idx, &state.spent_coins, &ret.spends) {
+            return Err(ValidationErr(
+                ret.spends[spend_idx].parent_id,
+                ErrorCode::AssertEphemeralFailed,
+            ));
         }
     }
 
