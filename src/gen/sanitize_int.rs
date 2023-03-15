@@ -1,23 +1,32 @@
 use super::validation_error::{atom, ErrorCode, ValidationErr};
 use clvmr::allocator::{Allocator, NodePtr};
 
+use clvmr::op_utils::u64_from_bytes;
+
+#[derive(PartialEq, Debug)]
+pub enum SanitizedUint {
+    Ok(u64),
+    PositiveOverflow,
+    NegativeOverflow,
+}
+
 pub fn sanitize_uint(
     a: &Allocator,
     n: NodePtr,
     max_size: usize,
     code: ErrorCode,
-) -> Result<&[u8], ValidationErr> {
+) -> Result<SanitizedUint, ValidationErr> {
     assert!(max_size <= 8);
 
     let buf = atom(a, n, code)?;
 
     if buf.is_empty() {
-        return Ok(&[]);
+        return Ok(SanitizedUint::Ok(0));
     }
 
     // if the top bit is set, it's a negative number
     if (buf[0] & 0x80) != 0 {
-        return Err(ValidationErr(n, ErrorCode::NegativeAmount));
+        return Ok(SanitizedUint::NegativeOverflow);
     }
 
     // we only allow a leading zero if it's used to prevent a value to otherwise
@@ -32,10 +41,10 @@ pub fn sanitize_uint(
 
     // if there are too many bytes left in the value, it's too big
     if buf.len() > size_limit {
-        return Err(ValidationErr(n, ErrorCode::AmountExceedsMaximum));
+        return Ok(SanitizedUint::PositiveOverflow);
     }
 
-    Ok(buf)
+    Ok(SanitizedUint::Ok(u64_from_bytes(buf)))
 }
 
 #[test]
@@ -60,7 +69,7 @@ fn test_sanitize_uint() {
     let e = ErrorCode::InvalidCoinAmount;
     let no_leading_zero = a.new_substr(atom, 0, 8).unwrap();
     // this is a negative number, not allowed
-    assert!(sanitize_uint(&a, no_leading_zero, 8, e).is_err());
+    assert!(sanitize_uint(&a, no_leading_zero, 8, e) == Ok(SanitizedUint::NegativeOverflow));
 
     let just_zeros = a.new_substr(atom, 10, 70).unwrap();
     // a zero value must be represented by an empty atom
@@ -90,7 +99,7 @@ fn test_sanitize_uint() {
 
     let exceed_maximum = a.new_substr(atom, 100, 110).unwrap();
     assert_eq!(
-        sanitize_uint(&a, exceed_maximum, 8, e).unwrap_err().1,
-        ErrorCode::AmountExceedsMaximum
+        sanitize_uint(&a, exceed_maximum, 8, e),
+        Ok(SanitizedUint::PositiveOverflow)
     );
 }
