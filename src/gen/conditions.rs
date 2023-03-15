@@ -7,9 +7,9 @@ use super::opcodes::{
     parse_opcode, ConditionOpcode, AGG_SIG_COST, AGG_SIG_ME, AGG_SIG_UNSAFE, ALWAYS_TRUE,
     ASSERT_BEFORE_HEIGHT_ABSOLUTE, ASSERT_BEFORE_HEIGHT_RELATIVE, ASSERT_BEFORE_SECONDS_ABSOLUTE,
     ASSERT_BEFORE_SECONDS_RELATIVE, ASSERT_COIN_ANNOUNCEMENT, ASSERT_CONCURRENT_PUZZLE,
-    ASSERT_CONCURRENT_SPEND, ASSERT_HEIGHT_ABSOLUTE, ASSERT_HEIGHT_RELATIVE, ASSERT_MY_AMOUNT,
-    ASSERT_MY_BIRTH_HEIGHT, ASSERT_MY_BIRTH_SECONDS, ASSERT_MY_COIN_ID, ASSERT_MY_PARENT_ID,
-    ASSERT_MY_PUZZLEHASH, ASSERT_PUZZLE_ANNOUNCEMENT, ASSERT_SECONDS_ABSOLUTE,
+    ASSERT_CONCURRENT_SPEND, ASSERT_EPHEMERAL, ASSERT_HEIGHT_ABSOLUTE, ASSERT_HEIGHT_RELATIVE,
+    ASSERT_MY_AMOUNT, ASSERT_MY_BIRTH_HEIGHT, ASSERT_MY_BIRTH_SECONDS, ASSERT_MY_COIN_ID,
+    ASSERT_MY_PARENT_ID, ASSERT_MY_PUZZLEHASH, ASSERT_PUZZLE_ANNOUNCEMENT, ASSERT_SECONDS_ABSOLUTE,
     ASSERT_SECONDS_RELATIVE, CREATE_COIN, CREATE_COIN_ANNOUNCEMENT, CREATE_COIN_COST,
     CREATE_PUZZLE_ANNOUNCEMENT, RESERVE_FEE,
 };
@@ -25,7 +25,7 @@ use clvmr::cost::Cost;
 use clvmr::op_utils::u64_from_bytes;
 use clvmr::sha2::{Digest, Sha256};
 use std::cmp::{max, min};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
@@ -100,6 +100,7 @@ pub enum Condition {
     // block height
     AssertBeforeHeightRelative(u32),
     AssertBeforeHeightAbsolute(u32),
+    AssertEphemeral,
 
     // this means the condition is unconditionally true and can be skipped
     Skip,
@@ -279,6 +280,13 @@ pub fn parse_args(
                 Ok(r) => Ok(u64_from_bytes(r) as u32),
             }?;
             Ok(Condition::AssertMyBirthHeight(h))
+        }
+        ASSERT_EPHEMERAL => {
+            // this condition does not take any parameters
+            if (flags & STRICT_ARGS_COUNT) != 0 {
+                check_nil(a, c)?;
+            }
+            Ok(Condition::AssertEphemeral)
         }
         ASSERT_SECONDS_RELATIVE => {
             maybe_check_args_terminator(a, c, flags)?;
@@ -478,15 +486,22 @@ pub struct ParseState {
     assert_concurrent_puzzle: HashSet<NodePtr>,
 
     // all coin IDs that have been spent so far. When we parse a spend we also
-    // compute the coin ID, and stick it in this set. It's reference counted
-    // since it may also be referenced by announcements
-    spent_coins: HashSet<Arc<Bytes32>>,
+    // compute the coin ID, and stick it in this map. It's reference counted
+    // since it may also be referenced by announcements. The value mapped to is
+    // the index of the spend in SpendBundleConditions::spends
+    spent_coins: HashMap<Arc<Bytes32>, usize>,
 
     // for every coin spent, we also store all the puzzle hashes that were
     // spent. Note that these are just the node pointers into the allocator, so
     // there may still be duplicates here. We defer creating a hash set of the
     // actual hashes until the end, and only if there are any puzzle assertions
     spent_puzzles: HashSet<NodePtr>,
+
+    // we record all coins that assert that they are ephemeral in here. Once
+    // we've processed all spends, we ensure that all of these coins were
+    // created in this same block
+    // each item is parent-coin-id, puzzle-hash, amount.
+    assert_ephemeral: HashSet<(NodePtr, NodePtr, u64)>,
 }
 
 pub(crate) fn parse_single_spend(
@@ -506,7 +521,11 @@ pub(crate) fn parse_single_spend(
     let amount_buf = a.atom(first(a, spend)?);
     let coin_id = Arc::new(compute_coin_id(a, parent_id, puzzle_hash, amount_buf));
 
-    if !state.spent_coins.insert(coin_id.clone()) {
+    if state
+        .spent_coins
+        .insert(coin_id.clone(), ret.spends.len())
+        .is_some()
+    {
         // if this coin ID has already been added to this set, it's a double
         // spend
         return Err(ValidationErr(spend, ErrorCode::DoubleSpend));
@@ -718,6 +737,13 @@ pub fn parse_conditions(
                 }
                 spend.birth_height = Some(h);
             }
+            Condition::AssertEphemeral => {
+                state.assert_ephemeral.insert((
+                    spend.parent_id,
+                    spend.puzzle_hash,
+                    spend.coin_amount,
+                ));
+            }
             Condition::AssertMyParentId(id) => {
                 if a.atom(id) != a.atom(spend.parent_id) {
                     return Err(ValidationErr(c, ErrorCode::AssertMyParentIdFailed));
@@ -824,7 +850,10 @@ pub fn parse_spends(
 
     // check concurrent spent assertions
     for coin_id in state.assert_concurrent_spend {
-        if !state.spent_coins.contains(&Bytes32::from(a.atom(coin_id))) {
+        if !state
+            .spent_coins
+            .contains_key(&Bytes32::from(a.atom(coin_id)))
+        {
             return Err(ValidationErr(
                 coin_id,
                 ErrorCode::AssertConcurrentSpendFailed,
@@ -870,6 +899,28 @@ pub fn parse_spends(
                     ErrorCode::AssertCoinAnnouncementFailed,
                 ));
             }
+        }
+    }
+
+    for (parent, puzzle_hash, amount) in state.assert_ephemeral {
+        // make sure this coin was created in this block, and find the
+        // corresponding Spend object
+        let idx = match state.spent_coins.get(&Bytes32::from(a.atom(parent))) {
+            None => {
+                return Err(ValidationErr(parent, ErrorCode::AssertEphemeralFailed));
+            }
+            Some(idx) => *idx,
+        };
+
+        // then lookup the coin (puzzle hash, amount) in its set of created
+        // coins. Note that hint is not relevant for this lookup
+        let parent_spend = &ret.spends[idx];
+        if !parent_spend.create_coin.contains(&NewCoin {
+            puzzle_hash: Bytes32::from(a.atom(puzzle_hash)),
+            amount,
+            hint: a.null(),
+        }) {
+            return Err(ValidationErr(parent, ErrorCode::AssertEphemeralFailed));
         }
     }
 
@@ -929,8 +980,6 @@ use hex::FromHex;
 use num_traits::Num;
 #[cfg(test)]
 use rstest::rstest;
-#[cfg(test)]
-use std::collections::HashMap;
 
 #[cfg(test)]
 const H1: &[u8; 32] = &[
@@ -2413,6 +2462,17 @@ fn test_duplicate_create_coin() {
 }
 
 #[test]
+fn test_duplicate_create_coin_with_hint() {
+    // CREATE_COIN
+    assert_eq!(
+        cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 (({h1})) ((51 ({h2} (42 ) ))))")
+            .unwrap_err()
+            .1,
+        ErrorCode::DuplicateOutput
+    );
+}
+
+#[test]
 fn test_single_agg_sig_me() {
     // AGG_SIG_ME
     let (a, conds) = cond_test("((({h1} ({h2} (123 (((50 ({pubkey} ({msg1} )))))").unwrap();
@@ -3310,4 +3370,120 @@ fn test_multiple_my_birth_assertions(
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
 
     test(spend);
+}
+
+#[test]
+fn test_assert_ephemeral() {
+    // ASSERT_EPHEMERAL
+    // the coin11 value is the coinID computed from (H1, H1, 123).
+    // coin11 is the first coin we spend in this case.
+    // 51 is CREATE_COIN, 76 is ASSERT_EPHEMERAL
+    let test = "(\
+       (({h1} ({h1} (123 (\
+           ((51 ({h2} (123 ) \
+           ))\
+       (({coin11} ({h2} (123 (\
+           ((76 ) \
+           ))\
+       ))";
+    // we don't expect any error
+    let (a, conds) = cond_test(test).unwrap();
+
+    // our spends don't add any additional constraints
+    assert_eq!(conds.agg_sig_unsafe.len(), 0);
+    assert_eq!(conds.reserve_fee, 0);
+    assert_eq!(conds.cost, CREATE_COIN_COST);
+    // we spend a coin worth 123, into a new coin worth 123
+    // then we spend that coin burning the value. i.e. we spend 123 * 2 and only
+    // add 123. the net is a removal of 123
+    assert_eq!(conds.removal_amount, 246);
+    assert_eq!(conds.addition_amount, 123);
+
+    assert_eq!(conds.spends.len(), 2);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(&H1, &H1, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H1);
+    assert_eq!(spend.agg_sig_me.len(), 0);
+    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+
+    let spend = &conds.spends[1];
+    assert_eq!(
+        *spend.coin_id,
+        test_coin_id((&(*conds.spends[0].coin_id)).into(), H2, 123)
+    );
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.agg_sig_me.len(), 0);
+    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+}
+
+#[test]
+fn test_assert_ephemeral_wrong_ph() {
+    // ASSERT_EPHEMERAL
+    // the coin11 value is the coinID computed from (H1, H1, 123). The first
+    // coin we spend in this case
+    // 51 is CREATE_COIN, 76 is ASSERT_EPHEMERAL
+    // in this case the puzzle hash doesn't match the coin the parent paid to,
+    // so it's not a valid spend
+    let test = "(\
+       (({h1} ({h1} (123 (\
+           ((51 ({h2} (123 ) \
+           ))\
+       (({coin11} ({h1} (123 (\
+           ((76 ) \
+           ))\
+       ))";
+
+    // this is an invalid ASSERT_EPHEMERAL
+    assert_eq!(
+        cond_test(test).unwrap_err().1,
+        ErrorCode::AssertEphemeralFailed
+    );
+}
+
+#[test]
+fn test_assert_ephemeral_wrong_amount() {
+    // ASSERT_EPHEMERAL
+    // the coin11 value is the coinID computed from (H1, H1, 123). The first
+    // coin we spend in this case
+    // 51 is CREATE_COIN, 76 is ASSERT_EPHEMERAL
+    // in this case the amount doesn't match the coin the parent paid to,
+    // so it's not a valid spend
+    let test = "(\
+       (({h1} ({h1} (123 (\
+           ((51 ({h2} (123 ) \
+           ))\
+       (({coin11} ({h2} (122 (\
+           ((76 ) \
+           ))\
+       ))";
+
+    // this is an invalid ASSERT_EPHEMERAL
+    assert_eq!(
+        cond_test(test).unwrap_err().1,
+        ErrorCode::AssertEphemeralFailed
+    );
+}
+
+#[test]
+fn test_assert_ephemeral_wrong_parent() {
+    // ASSERT_EPHEMERAL
+    // the coin12 value is the coinID computed from (H1, H2, 123). This is *not*
+    // the coin we spend first
+    // 51 is CREATE_COIN, 76 is ASSERT_EPHEMERAL
+    // in this case the amount doesn't match the coin the parent paid to,
+    // so it's not a valid spend
+    let test = "(\
+       (({h1} ({h1} (123 (\
+           ((51 ({h2} (123 ) \
+           ))\
+       (({coin12} ({h2} (123 (\
+           ((76 ) \
+           ))\
+       ))";
+
+    // this is an invalid ASSERT_EPHEMERAL
+    assert_eq!(
+        cond_test(test).unwrap_err().1,
+        ErrorCode::AssertEphemeralFailed
+    );
 }
