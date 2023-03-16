@@ -13,6 +13,7 @@ use super::opcodes::{
 use super::sanitize_int::{sanitize_uint, SanitizedUint};
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
 use crate::gen::flags::COND_ARGS_NIL;
+use crate::gen::flags::NO_RELATIVE_CONDITIONS_ON_EPHEMERAL;
 use crate::gen::flags::NO_UNKNOWN_CONDS;
 use crate::gen::flags::STRICT_ARGS_COUNT;
 use crate::gen::validation_error::check_nil;
@@ -100,6 +101,7 @@ pub enum Condition {
 
     // this means the condition is unconditionally true and can be skipped
     Skip,
+    SkipRelativeCondition,
 }
 
 fn maybe_check_args_terminator(
@@ -290,7 +292,7 @@ pub fn parse_args(
             let code = ErrorCode::AssertSecondsRelative;
             match sanitize_uint(a, node, 8, code)? {
                 SanitizedUint::PositiveOverflow => Err(ValidationErr(node, code)),
-                SanitizedUint::NegativeOverflow => Ok(Condition::Skip),
+                SanitizedUint::NegativeOverflow => Ok(Condition::SkipRelativeCondition),
                 SanitizedUint::Ok(r) => Ok(Condition::AssertSecondsRelative(r)),
             }
         }
@@ -310,7 +312,7 @@ pub fn parse_args(
             let code = ErrorCode::AssertHeightRelative;
             match sanitize_uint(a, node, 4, code)? {
                 SanitizedUint::PositiveOverflow => Err(ValidationErr(node, code)),
-                SanitizedUint::NegativeOverflow => Ok(Condition::Skip),
+                SanitizedUint::NegativeOverflow => Ok(Condition::SkipRelativeCondition),
                 SanitizedUint::Ok(r) => Ok(Condition::AssertHeightRelative(r as u32)),
             }
         }
@@ -329,7 +331,7 @@ pub fn parse_args(
             let node = first(a, c)?;
             let code = ErrorCode::AssertBeforeSecondsRelative;
             match sanitize_uint(a, node, 8, code)? {
-                SanitizedUint::PositiveOverflow => Ok(Condition::Skip),
+                SanitizedUint::PositiveOverflow => Ok(Condition::SkipRelativeCondition),
                 SanitizedUint::NegativeOverflow => Err(ValidationErr(node, code)),
                 SanitizedUint::Ok(r) => Ok(Condition::AssertBeforeSecondsRelative(r)),
             }
@@ -350,7 +352,7 @@ pub fn parse_args(
             let node = first(a, c)?;
             let code = ErrorCode::AssertBeforeHeightRelative;
             match sanitize_uint(a, node, 4, code)? {
-                SanitizedUint::PositiveOverflow => Ok(Condition::Skip),
+                SanitizedUint::PositiveOverflow => Ok(Condition::SkipRelativeCondition),
                 SanitizedUint::NegativeOverflow => Err(ValidationErr(node, code)),
                 SanitizedUint::Ok(r) => Ok(Condition::AssertBeforeHeightRelative(r as u32)),
             }
@@ -403,6 +405,9 @@ impl PartialEq for NewCoin {
 // a spend is eligible for deduplication if it does not have any AGG_SIG_ME
 // nor AGG_SIG_UNSAFE
 pub const ELIGIBLE_FOR_DEDUP: u32 = 1;
+
+// If the spend bundle contained *any* relative seconds or height condition, this flag is set
+pub const HAS_RELATIVE_CONDITION: u32 = 2;
 
 // These are all the conditions related directly to a specific spend.
 #[derive(Debug)]
@@ -514,8 +519,20 @@ pub struct ParseState {
     // we record all coins that assert that they are ephemeral in here. Once
     // we've processed all spends, we ensure that all of these coins were
     // created in this same block
-    // each item is parent-coin-id, puzzle-hash, amount.
-    assert_ephemeral: HashSet<(NodePtr, NodePtr, u64)>,
+    // each item is the index into the SpendBundleConditions::spends vector
+    assert_ephemeral: HashSet<usize>,
+
+    // spends that use relative height- or time conditions are disallowed on
+    // ephemeral coins. They are recorded in this set to be be checked once all
+    // spends have been parsed. These conditions are:
+    // ASSERT_HEIGHT_RELATIVE
+    // ASSERT_SECONDS_RELATIVE
+    // ASSERT_BEFORE_HEIGHT_RELATIVE
+    // ASSERT_BEFORE_SECONDS_RELATIVE
+    // ASSERT_MY_BIRTH_SECONDS
+    // ASSERT_MY_BIRTH_HEIGHT
+    // each item is the index into the SpendBundleConditions::spends vector
+    assert_not_ephemeral: HashSet<usize>,
 }
 
 pub(crate) fn parse_single_spend(
@@ -568,6 +585,15 @@ pub(crate) fn parse_single_spend(
 
     let iter = first(a, cond)?;
     parse_conditions(a, ret, state, coin_spend, iter, flags, max_cost)
+}
+
+fn assert_not_ephemeral(spend_flags: &mut u32, state: &mut ParseState, idx: usize) {
+    if (*spend_flags & HAS_RELATIVE_CONDITION) != 0 {
+        return;
+    }
+
+    state.assert_not_ephemeral.insert(idx);
+    *spend_flags |= HAS_RELATIVE_CONDITION;
 }
 
 pub fn parse_conditions(
@@ -649,6 +675,7 @@ pub fn parse_conditions(
                         ));
                     }
                 }
+                assert_not_ephemeral(&mut spend.flags, state, ret.spends.len());
             }
             Condition::AssertSecondsAbsolute(s) => {
                 // keep the most strict condition. i.e. the highest limit
@@ -672,6 +699,7 @@ pub fn parse_conditions(
                         ));
                     }
                 }
+                assert_not_ephemeral(&mut spend.flags, state, ret.spends.len());
             }
             Condition::AssertHeightAbsolute(h) => {
                 // keep the most strict condition. i.e. the highest limit
@@ -695,6 +723,7 @@ pub fn parse_conditions(
                         ));
                     }
                 }
+                assert_not_ephemeral(&mut spend.flags, state, ret.spends.len());
             }
             Condition::AssertBeforeSecondsAbsolute(s) => {
                 // keep the most strict condition. i.e. the lowest limit
@@ -722,6 +751,7 @@ pub fn parse_conditions(
                         ));
                     }
                 }
+                assert_not_ephemeral(&mut spend.flags, state, ret.spends.len());
             }
             Condition::AssertBeforeHeightAbsolute(h) => {
                 // keep the most strict condition. i.e. the lowest limit
@@ -749,6 +779,7 @@ pub fn parse_conditions(
                     return Err(ValidationErr(c, ErrorCode::AssertMyBirthSecondsFailed));
                 }
                 spend.birth_seconds = Some(s);
+                assert_not_ephemeral(&mut spend.flags, state, ret.spends.len());
             }
             Condition::AssertMyBirthHeight(h) => {
                 // if this spend already has a birth_height assertion, it's an
@@ -758,13 +789,10 @@ pub fn parse_conditions(
                     return Err(ValidationErr(c, ErrorCode::AssertMyBirthHeightFailed));
                 }
                 spend.birth_height = Some(h);
+                assert_not_ephemeral(&mut spend.flags, state, ret.spends.len());
             }
             Condition::AssertEphemeral => {
-                state.assert_ephemeral.insert((
-                    spend.parent_id,
-                    spend.puzzle_hash,
-                    spend.coin_amount,
-                ));
+                state.assert_ephemeral.insert(ret.spends.len());
             }
             Condition::AssertMyParentId(id) => {
                 if a.atom(id) != a.atom(spend.parent_id) {
@@ -802,12 +830,39 @@ pub fn parse_conditions(
                 ret.agg_sig_unsafe.push((pk, msg));
                 spend.flags &= !ELIGIBLE_FOR_DEDUP;
             }
+            Condition::SkipRelativeCondition => {
+                assert_not_ephemeral(&mut spend.flags, state, ret.spends.len());
+            }
             Condition::Skip => {}
         }
     }
 
     ret.spends.push(spend);
     Ok(())
+}
+
+fn is_ephemeral(
+    a: &Allocator,
+    spend_idx: usize,
+    spent_ids: &HashMap<Arc<Bytes32>, usize>,
+    spends: &[Spend],
+) -> bool {
+    let spend = &spends[spend_idx];
+    let idx = match spent_ids.get(&Bytes32::from(a.atom(spend.parent_id))) {
+        None => {
+            return false;
+        }
+        Some(idx) => *idx,
+    };
+
+    // then lookup the coin (puzzle hash, amount) in its set of created
+    // coins. Note that hint is not relevant for this lookup
+    let parent_spend = &spends[idx];
+    parent_spend.create_coin.contains(&NewCoin {
+        puzzle_hash: Bytes32::from(a.atom(spend.puzzle_hash)),
+        amount: spend.coin_amount,
+        hint: -1,
+    })
 }
 
 // This function parses, and validates aspects of, the above structure and
@@ -924,25 +979,25 @@ pub fn parse_spends(
         }
     }
 
-    for (parent, puzzle_hash, amount) in state.assert_ephemeral {
-        // make sure this coin was created in this block, and find the
-        // corresponding Spend object
-        let idx = match state.spent_coins.get(&Bytes32::from(a.atom(parent))) {
-            None => {
-                return Err(ValidationErr(parent, ErrorCode::AssertEphemeralFailed));
-            }
-            Some(idx) => *idx,
-        };
+    for spend_idx in state.assert_ephemeral {
+        // make sure this coin was created in this block
+        if !is_ephemeral(a, spend_idx, &state.spent_coins, &ret.spends) {
+            return Err(ValidationErr(
+                ret.spends[spend_idx].parent_id,
+                ErrorCode::AssertEphemeralFailed,
+            ));
+        }
+    }
 
-        // then lookup the coin (puzzle hash, amount) in its set of created
-        // coins. Note that hint is not relevant for this lookup
-        let parent_spend = &ret.spends[idx];
-        if !parent_spend.create_coin.contains(&NewCoin {
-            puzzle_hash: Bytes32::from(a.atom(puzzle_hash)),
-            amount,
-            hint: a.null(),
-        }) {
-            return Err(ValidationErr(parent, ErrorCode::AssertEphemeralFailed));
+    if (flags & NO_RELATIVE_CONDITIONS_ON_EPHEMERAL) != 0 {
+        for spend_idx in state.assert_not_ephemeral {
+            // make sure this coin was NOT created in this block
+            if is_ephemeral(a, spend_idx, &state.spent_coins, &ret.spends) {
+                return Err(ValidationErr(
+                    ret.spends[spend_idx].parent_id,
+                    ErrorCode::EphemeralRelativeCondition,
+                ));
+            }
         }
     }
 
@@ -1284,7 +1339,7 @@ fn test_invalid_condition_args_terminator() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP | HAS_RELATIVE_CONDITION);
 
     assert_eq!(spend.seconds_relative, Some(50));
 }
@@ -1311,7 +1366,7 @@ fn test_invalid_condition_list_terminator() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP | HAS_RELATIVE_CONDITION);
 
     assert_eq!(spend.seconds_relative, Some(50));
 }
@@ -1446,7 +1501,7 @@ fn test_extra_arg(
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
 
     test(&conds, &spend);
 }
@@ -1495,7 +1550,7 @@ fn test_single_condition(
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
 
     test(&conds, &spend);
 }
@@ -1714,7 +1769,7 @@ fn test_multiple_conditions(
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 1234));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
 
     test(&conds, &spend);
 }
@@ -1765,7 +1820,7 @@ fn test_single_height_relative_zero() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP | HAS_RELATIVE_CONDITION);
 
     assert_eq!(spend.height_relative, Some(0));
 }
@@ -3243,7 +3298,7 @@ fn test_impossible_constraints_single_spend(
         assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
         assert_eq!(a.atom(spend.puzzle_hash), H1);
         assert_eq!(spend.agg_sig_me.len(), 0);
-        assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+        assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
     }
 }
 
@@ -3341,13 +3396,13 @@ fn test_impossible_constraints_separate_spends(
         assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
         assert_eq!(a.atom(spend.puzzle_hash), H1);
         assert_eq!(spend.agg_sig_me.len(), 0);
-        assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+        assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
 
         let spend = &conds.spends[1];
         assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
         assert_eq!(a.atom(spend.puzzle_hash), H2);
         assert_eq!(spend.agg_sig_me.len(), 0);
-        assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+        assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
     }
 }
 
@@ -3389,7 +3444,7 @@ fn test_multiple_my_birth_assertions(
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 1234));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
 
     test(spend);
 }
@@ -3508,4 +3563,105 @@ fn test_assert_ephemeral_wrong_parent() {
         cond_test(test).unwrap_err().1,
         ErrorCode::AssertEphemeralFailed
     );
+}
+
+#[cfg(test)]
+#[rstest]
+// the default expected errors are post soft-fork, when both new rules are
+// activated
+#[case(ASSERT_HEIGHT_ABSOLUTE, None)]
+#[case(ASSERT_HEIGHT_RELATIVE, Some(ErrorCode::EphemeralRelativeCondition))]
+#[case(ASSERT_SECONDS_ABSOLUTE, None)]
+#[case(ASSERT_SECONDS_RELATIVE, Some(ErrorCode::EphemeralRelativeCondition))]
+#[case(ASSERT_MY_BIRTH_HEIGHT, Some(ErrorCode::EphemeralRelativeCondition))]
+#[case(ASSERT_MY_BIRTH_SECONDS, Some(ErrorCode::EphemeralRelativeCondition))]
+#[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, None)]
+#[case(
+    ASSERT_BEFORE_HEIGHT_RELATIVE,
+    Some(ErrorCode::EphemeralRelativeCondition)
+)]
+#[case(ASSERT_BEFORE_SECONDS_ABSOLUTE, None)]
+#[case(
+    ASSERT_BEFORE_SECONDS_RELATIVE,
+    Some(ErrorCode::EphemeralRelativeCondition)
+)]
+fn test_relative_condition_on_ephemeral(
+    #[case] condition: ConditionOpcode,
+    #[case] mut expect_error: Option<ErrorCode>,
+    #[values(0, ENABLE_ASSERT_BEFORE)] enable_assert_before: u32,
+    #[values(0, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL)] no_rel_conds_on_ephemeral: u32,
+) {
+    // this test ensures that we disallow relative conditions (including
+    // assert-my-birth conditions) on ephemeral coin spends.
+    // We run these test cases for every combination of enabling/disabling
+    // assert-before conditions as well as disallowing relative conditions on
+    // ephemeral coins
+
+    let cond = condition as u8;
+
+    if no_rel_conds_on_ephemeral == 0 {
+        // if we allow relative conditions, all cases should pass
+        expect_error = None;
+    }
+
+    if enable_assert_before == 0
+        && [
+            ASSERT_MY_BIRTH_HEIGHT,
+            ASSERT_MY_BIRTH_SECONDS,
+            ASSERT_BEFORE_HEIGHT_ABSOLUTE,
+            ASSERT_BEFORE_HEIGHT_RELATIVE,
+            ASSERT_BEFORE_SECONDS_ABSOLUTE,
+            ASSERT_BEFORE_SECONDS_RELATIVE,
+        ]
+        .contains(&condition)
+    {
+        // if new conditions aren't enabled, they are just ignored
+        expect_error = None;
+    }
+
+    // the coin11 value is the coinID computed from (H1, H1, 123).
+    // coin11 is the first coin we spend in this case.
+    // 51 is CREATE_COIN
+    let test = format!(
+        "(\
+       (({{h1}} ({{h1}} (123 (\
+           ((51 ({{h2}} (123 ) \
+           ))\
+       (({{coin11}} ({{h2}} (123 (\
+           (({} (1000 ) \
+           ))\
+       ))",
+        cond
+    );
+
+    let flags = enable_assert_before | no_rel_conds_on_ephemeral;
+
+    match expect_error {
+        Some(err) => {
+            assert_eq!(cond_test_flag(&test, flags).unwrap_err().1, err);
+        }
+        None => {
+            // we don't expect any error
+            let (a, conds) = cond_test_flag(&test, flags).unwrap();
+
+            assert_eq!(conds.reserve_fee, 0);
+            assert_eq!(conds.cost, CREATE_COIN_COST);
+
+            assert_eq!(conds.spends.len(), 2);
+            let spend = &conds.spends[0];
+            assert_eq!(*spend.coin_id, test_coin_id(&H1, &H1, 123));
+            assert_eq!(a.atom(spend.puzzle_hash), H1);
+            assert_eq!(spend.agg_sig_me.len(), 0);
+            assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+
+            let spend = &conds.spends[1];
+            assert_eq!(
+                *spend.coin_id,
+                test_coin_id((&(*conds.spends[0].coin_id)).into(), H2, 123)
+            );
+            assert_eq!(a.atom(spend.puzzle_hash), H2);
+            assert_eq!(spend.agg_sig_me.len(), 0);
+            assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
+        }
+    }
 }

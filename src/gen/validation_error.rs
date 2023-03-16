@@ -48,6 +48,7 @@ pub enum ErrorCode {
     ImpossibleHeightRelativeConstraints,
     ImpossibleHeightAbsoluteConstraints,
     AssertEphemeralFailed,
+    EphemeralRelativeCondition,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -124,6 +125,7 @@ impl From<ErrorCode> for u32 {
             ErrorCode::AssertMyBirthSecondsFailed => 138,
             ErrorCode::AssertMyBirthHeightFailed => 139,
             ErrorCode::AssertEphemeralFailed => 140,
+            ErrorCode::EphemeralRelativeCondition => 141,
         }
     }
 }
