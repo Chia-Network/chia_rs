@@ -72,6 +72,8 @@ fn main() {
         node_from_bytes(&mut a, &GENERATOR_ROM).expect("failed to parse generator ROM");
     let allocator_checkpoint = a.checkpoint();
 
+    let mut prev_timestamp = 0;
+
     while let Ok(State::Row) = statement.next() {
         let height: u32 = statement
             .read::<i64, _>(0)
@@ -93,6 +95,19 @@ fn main() {
                 continue;
             }
         };
+
+        let ftb = match block.foliage_transaction_block {
+            Some(ftb) => ftb,
+            None => {
+                continue;
+            }
+        };
+
+        if prev_timestamp == 0 {
+            prev_timestamp = ftb.timestamp;
+        }
+        let time_delta = ftb.timestamp - prev_timestamp;
+        prev_timestamp = ftb.timestamp;
 
         if let Some(program) = block.transactions_generator {
             a.restore_checkpoint(&allocator_checkpoint);
@@ -180,7 +195,6 @@ fn main() {
                 .expect("failed to get system time");
 
             assert!(clvm_cost + byte_cost + conds.cost == ti.cost);
-
             output
                 .write_fmt(format_args!(
                     "{} val_stack: {} \
@@ -196,6 +210,8 @@ fn main() {
                 ref_lookup_time: {} \
                 execute_time: {} \
                 conditions_time: {} \
+                timestamp: {} \
+                time_delta: {} \
                 \n",
                     height,
                     counters.val_stack_usage,
@@ -211,6 +227,8 @@ fn main() {
                     ref_lookup_timing.as_micros(),
                     execute_timing.as_micros(),
                     conditions_timing.as_micros(),
+                    ftb.timestamp,
+                    time_delta,
                 ))
                 .expect("failed to write to output file");
         }

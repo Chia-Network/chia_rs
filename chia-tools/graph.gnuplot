@@ -28,6 +28,11 @@ plot "chain-resource-usage.dat" using 1:11 with dots title "block decompress + p
 "chain-resource-usage.dat" using 1:12 with dots title "block reference lookup", \
 "chain-resource-usage.dat" using 1:14 with dots title "conditions`
 
+set output "block-wall-clock-delta.png"
+set title "transaction block timestamp delta"
+set xlabel "s"
+plot "chain-resource-usage.dat" using 1:16 with dots title "block timestamp delta", \
+
 set output "block-cost-vs-time.png"
 set title "block CLVM execution time versus CLVM cost"
 set xlabel "CLVM cost (millions)"
@@ -67,3 +72,15 @@ set xrange [0:2000]
 plot "chain-resource-usage-cdf.dat" using 11:1 with lines title "block decompress + parse", \
 "chain-resource-usage-cdf.dat" using 12:1 with lines title "block reference lookup", \
 "chain-resource-usage-cdf.dat" using 14:1 with lines title "conditions"
+
+set output "block-wall-clock-delta-cdf.png"
+set title "transaction block timestamp delta"
+set xrange [0:200]
+set xlabel "s"
+
+plot "chain-resource-usage-cdf.dat" using 16:1 with lines title "block time delta (wall-clock)"
+
+set output "block-wall-clock-delta-cdf-zoom.png"
+set xrange [0:20]
+
+replot

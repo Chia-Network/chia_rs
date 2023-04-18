@@ -15,6 +15,8 @@ keys = ["val_stack:",
      "ref_lookup_time:",
      "execute_time:",
      "conditions_time:",
+     "timestamp:",
+     "time_delta:",
 ]
 
 def to_int(value: str) -> int:
