@@ -1,5 +1,5 @@
 use crate::gen::conditions::{parse_spends, SpendBundleConditions};
-use crate::gen::validation_error::ValidationErr;
+use crate::gen::validation_error::{ErrorCode, ValidationErr};
 use crate::generator_rom::{COST_PER_BYTE, GENERATOR_ROM};
 use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
@@ -30,6 +30,10 @@ pub fn run_block_generator<GenBuf: AsRef<[u8]>>(
 ) -> Result<SpendBundleConditions, ValidationErr> {
     let byte_cost = program.len() as u64 * COST_PER_BYTE;
 
+    if byte_cost >= max_cost {
+        return Err(ValidationErr(a.null(), ErrorCode::CostExceeded));
+    }
+
     let generator_rom = node_from_bytes(a, &GENERATOR_ROM)?;
     let program = node_from_bytes(a, program)?;
 
@@ -48,6 +52,8 @@ pub fn run_block_generator<GenBuf: AsRef<[u8]>>(
     let dialect = ChiaDialect::new(flags);
     let Reduction(clvm_cost, generator_output) =
         run_program(a, &dialect, generator_rom, args, max_cost - byte_cost)?;
+
+    assert!(clvm_cost <= max_cost - byte_cost);
 
     // we pass in what's left of max_cost here, to fail early in case the
     // cost of a condition brings us over the cost limit
