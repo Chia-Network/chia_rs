@@ -8,7 +8,7 @@ use std::time::SystemTime;
 use sqlite::State;
 
 use chia::gen::conditions::parse_spends;
-use chia::gen::flags::MEMPOOL_MODE;
+use chia::gen::flags::{HARD_FORK, MEMPOOL_MODE};
 use chia::gen::validation_error::ValidationErr;
 use chia::generator_rom::{COST_PER_BYTE, GENERATOR_ROM};
 use clvmr::reduction::Reduction;
@@ -26,8 +26,12 @@ struct Args {
     file: String,
 
     /// Specifies whether to run the blocks in the stricter mempool mode or not
-    #[arg(short, long, default_value_t = false)]
+    #[arg(long, default_value_t = false)]
     mempool_mode: bool,
+
+    /// Specifies whether to run the blocks with the hard-fork generator or not
+    #[arg(long, default_value_t = false)]
+    hard_fork: bool,
 
     /// Start at this block height
     #[arg(short, long, default_value_t = 225694)]
@@ -61,6 +65,14 @@ fn main() {
     let mut block_ref_lookup = connection
         .prepare("SELECT block FROM full_blocks WHERE height=? and in_main_chain=1")
         .expect("failed to prepare SQL statement looking up ref-blocks");
+
+    let mut flags: u32 = 0;
+    if args.mempool_mode {
+        flags |= MEMPOOL_MODE;
+    }
+    if args.hard_fork {
+        flags |= HARD_FORK;
+    }
 
     let mut output =
         std::fs::File::create("chain-resource-usage.log").expect("failed to open output file");
@@ -183,8 +195,7 @@ fn main() {
             let start_conditions = SystemTime::now();
             // we pass in what's left of max_cost here, to fail early in case the
             // cost of a condition brings us over the cost limit
-            let conds = match parse_spends(&a, generator_output, ti.cost - clvm_cost, MEMPOOL_MODE)
-            {
+            let conds = match parse_spends(&a, generator_output, ti.cost - clvm_cost, flags) {
                 Err(ValidationErr(_, _)) => {
                     panic!("failed to parse conditions in block {height}");
                 }

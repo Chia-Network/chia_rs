@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from run_gen import run_gen, print_spend_bundle_conditions
-from chia_rs import MEMPOOL_MODE, LIMIT_STACK
+from chia_rs import MEMPOOL_MODE, LIMIT_STACK, HARD_FORK
 from time import perf_counter
 import sys
 import glob
@@ -31,6 +31,17 @@ for g in sorted(glob.glob('generators/*.clvm')):
     error_code, result = run_gen(g, LIMIT_STACK, "generators/block-834752.hex")
     run_time = perf_counter() - start_time
     output = parse_output(result, error_code)
+
+    sys.stdout.write("running generator (hard-fork mode) ...\r")
+    start_time = perf_counter()
+    error_code3, result3 = run_gen(g, LIMIT_STACK | HARD_FORK, "generators/block-834752.hex")
+    run_time3 = perf_counter() - start_time
+    output3 = parse_output(result3, error_code3)
+    if output != output:
+        print("output differs with hard fork!")
+        failed = 1
+        print(output)
+        print(output3)
 
     sys.stdout.write("running generator (mempool mode) ...\r")
     sys.stdout.flush()

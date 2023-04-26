@@ -1,6 +1,7 @@
 use crate::gen::conditions::{parse_spends, SpendBundleConditions};
+use crate::gen::flags::HARD_FORK;
 use crate::gen::validation_error::{ErrorCode, ValidationErr};
-use crate::generator_rom::{COST_PER_BYTE, GENERATOR_ROM};
+use crate::generator_rom::{COST_PER_BYTE, GENERATOR2_ROM, GENERATOR_ROM};
 use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::reduction::Reduction;
@@ -34,7 +35,14 @@ pub fn run_block_generator<GenBuf: AsRef<[u8]>>(
         return Err(ValidationErr(a.null(), ErrorCode::CostExceeded));
     }
 
-    let generator_rom = node_from_bytes(a, &GENERATOR_ROM)?;
+    let generator_rom = node_from_bytes(
+        a,
+        if (flags & HARD_FORK) == 0 {
+            &GENERATOR_ROM
+        } else {
+            &GENERATOR2_ROM
+        },
+    )?;
     let program = node_from_bytes(a, program)?;
 
     // iterate in reverse order since we're building a linked list from
