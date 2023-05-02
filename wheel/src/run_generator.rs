@@ -2,11 +2,11 @@ use super::adapt_response::eval_err_to_pyresult;
 use chia_protocol::from_json_dict::FromJsonDict;
 use chia_protocol::to_json_dict::ToJsonDict;
 
-use chia::gen::conditions::{parse_spends, Spend, SpendBundleConditions};
-use chia::gen::validation_error::{ErrorCode, ValidationErr};
-use chia::gen::run_block_generator::run_block_generator as native_run_block_generator;
-use chia_protocol::bytes::{Bytes, Bytes32, Bytes48};
 use chia::allocator::make_allocator;
+use chia::gen::conditions::{parse_spends, Spend, SpendBundleConditions};
+use chia::gen::run_block_generator::run_block_generator as native_run_block_generator;
+use chia::gen::validation_error::{ErrorCode, ValidationErr};
+use chia_protocol::bytes::{Bytes, Bytes32, Bytes48};
 
 use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
@@ -95,7 +95,10 @@ fn convert_spend(a: &Allocator, spend: Spend) -> PySpend {
     }
 }
 
-pub fn convert_spend_bundle_conds(a: &Allocator, sb: SpendBundleConditions) -> PySpendBundleConditions {
+pub fn convert_spend_bundle_conds(
+    a: &Allocator,
+    sb: SpendBundleConditions,
+) -> PySpendBundleConditions {
     let mut spends = Vec::<PySpend>::new();
     for s in sb.spends {
         spends.push(convert_spend(a, s));
@@ -130,7 +133,7 @@ pub fn run_generator(
     max_cost: Cost,
     flags: u32,
 ) -> PyResult<(Option<u32>, Option<PySpendBundleConditions>)> {
-	let mut allocator = make_allocator(flags);
+    let mut allocator = make_allocator(flags);
     let program = node_from_bytes(&mut allocator, program)?;
     let args = node_from_bytes(&mut allocator, args)?;
     let dialect = &ChiaDialect::new(flags);
@@ -160,7 +163,7 @@ pub fn run_generator(
                 None,
                 Some(convert_spend_bundle_conds(&allocator, spend_bundle_conds)),
             ))
-        },
+        }
         Ok((error_code, _)) => {
             // a validation error occurred
             Ok((error_code.map(|x| x.into()), None))
@@ -177,7 +180,7 @@ pub fn run_block_generator(
     max_cost: Cost,
     flags: u32,
 ) -> PyResult<(Option<u32>, Option<PySpendBundleConditions>)> {
-	let mut allocator = make_allocator(flags);
+    let mut allocator = make_allocator(flags);
 
     let mut refs = Vec::<Vec<u8>>::new();
     for g in block_refs {
@@ -191,7 +194,7 @@ pub fn run_block_generator(
                 None,
                 Some(convert_spend_bundle_conds(&allocator, spend_bundle_conds)),
             ))
-        },
+        }
         Err(ValidationErr(_, error_code)) => {
             // a validation error occurred
             Ok((Some(error_code.into()), None))

@@ -1,18 +1,21 @@
 use crate::compression;
-use crate::run_generator::{PySpend, PySpendBundleConditions, convert_spend_bundle_conds, __pyo3_get_function_run_generator, __pyo3_get_function_run_block_generator};
-use chia::gen::run_puzzle::run_puzzle as native_run_puzzle;
+use crate::run_generator::{
+    convert_spend_bundle_conds, PySpend, PySpendBundleConditions,
+    __pyo3_get_function_run_block_generator, __pyo3_get_function_run_generator,
+};
+use chia::allocator::make_allocator;
 use chia::gen::flags::COND_ARGS_NIL;
+use chia::gen::flags::ENABLE_ASSERT_BEFORE;
+use chia::gen::flags::MEMPOOL_MODE;
+use chia::gen::flags::NO_RELATIVE_CONDITIONS_ON_EPHEMERAL;
 use chia::gen::flags::NO_UNKNOWN_CONDS;
 use chia::gen::flags::STRICT_ARGS_COUNT;
-use chia::gen::flags::MEMPOOL_MODE;
-use chia::gen::flags::ENABLE_ASSERT_BEFORE;
-use chia::gen::flags::NO_RELATIVE_CONDITIONS_ON_EPHEMERAL;
+use chia::gen::run_puzzle::run_puzzle as native_run_puzzle;
 use chia::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
-use chia::allocator::make_allocator;
 use chia_protocol::Bytes32;
+use chia_protocol::FullBlock;
 use chia_protocol::G1Element;
 use chia_protocol::G2Element;
-use chia_protocol::FullBlock;
 use chia_protocol::{
     ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin, CoinSpend, CoinState,
     CoinStateUpdate, EndOfSubSlotBundle, Foliage, FoliageTransactionBlock,
@@ -26,17 +29,17 @@ use chia_protocol::{
     RespondRemovals, RespondSesInfo, RespondToCoinUpdates, RespondToPhUpdates, RewardChainBlock,
     RewardChainBlockUnfinished, RewardChainSubSlot, SendTransaction, SpendBundle,
     SubEpochChallengeSegment, SubEpochSegments, SubSlotData, SubSlotProofs, TransactionAck,
-    TransactionsInfo, VDFInfo, VDFProof
+    TransactionsInfo, VDFInfo, VDFProof,
 };
-use std::convert::TryInto;
+use clvmr::serde::tree_hash_from_stream;
 use clvmr::LIMIT_HEAP;
 use clvmr::LIMIT_STACK;
 use clvmr::NO_UNKNOWN_OPS;
-use clvmr::serde::tree_hash_from_stream;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use pyo3::types::PyModule;
 use pyo3::{wrap_pyfunction, PyResult, Python};
+use std::convert::TryInto;
 
 use crate::run_program::{
     __pyo3_get_function_run_chia_program, __pyo3_get_function_serialized_length,
@@ -46,7 +49,6 @@ use crate::adapt_response::eval_err_to_pyresult;
 use chia::gen::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
 use chia::gen::validation_error::ValidationErr;
 use clvmr::allocator::NodePtr;
-use clvmr::ChiaDialect;
 use clvmr::cost::Cost;
 use clvmr::node::Node;
 use clvmr::reduction::EvalErr;
@@ -54,6 +56,7 @@ use clvmr::reduction::Reduction;
 use clvmr::run_program;
 use clvmr::serde::node_from_bytes;
 use clvmr::serde::node_to_bytes;
+use clvmr::ChiaDialect;
 
 #[pyfunction]
 pub fn compute_merkle_set_root<'p>(
@@ -104,12 +107,10 @@ pub fn get_puzzle_and_solution_for_coin<'py>(
 
     match r {
         Err(eval_err) => eval_err_to_pyresult(py, eval_err, allocator),
-        Ok((puzzle, solution)) => {
-            Ok((
-                PyBytes::new(py, &node_to_bytes(&Node::new(&allocator, puzzle))?),
-                PyBytes::new(py, &node_to_bytes(&Node::new(&allocator, solution))?)
-            ))
-        },
+        Ok((puzzle, solution)) => Ok((
+            PyBytes::new(py, &node_to_bytes(&Node::new(&allocator, puzzle))?),
+            PyBytes::new(py, &node_to_bytes(&Node::new(&allocator, solution))?),
+        )),
     }
 }
 
@@ -134,7 +135,10 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(run_block_generator, m)?)?;
     m.add_function(wrap_pyfunction!(run_puzzle, m)?)?;
     m.add_class::<PySpendBundleConditions>()?;
-    m.add("ELIGIBLE_FOR_DEDUP", chia::gen::conditions::ELIGIBLE_FOR_DEDUP)?;
+    m.add(
+        "ELIGIBLE_FOR_DEDUP",
+        chia::gen::conditions::ELIGIBLE_FOR_DEDUP,
+    )?;
     m.add_class::<PySpend>()?;
 
     // clvm functions
@@ -142,7 +146,10 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     m.add("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;
     m.add("STRICT_ARGS_COUNT", STRICT_ARGS_COUNT)?;
     m.add("ENABLE_ASSERT_BEFORE", ENABLE_ASSERT_BEFORE)?;
-    m.add("NO_RELATIVE_CONDITIONS_ON_EPHEMERAL", NO_RELATIVE_CONDITIONS_ON_EPHEMERAL)?;
+    m.add(
+        "NO_RELATIVE_CONDITIONS_ON_EPHEMERAL",
+        NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
+    )?;
     m.add("MEMPOOL_MODE", MEMPOOL_MODE)?;
 
     // Chia classes
