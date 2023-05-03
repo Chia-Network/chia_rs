@@ -15,8 +15,14 @@ chia = { path = "..", version = ">=0.2.0" }
 sqlite = "=0.30.3"
 clap = { version = "=4.0.29", features = ["derive"] }
 zstd = "=0.12.1"
+threadpool = "=1.8.1"
 
 [[bin]]
 name = "analyze-chain"
+test = false
+bench = false
+
+[[bin]]
+name = "test-block-generators"
 test = false
 bench = false
