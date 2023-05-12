@@ -378,10 +378,12 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
             toolchain: nightly
-      - name: Install tarpaulin
-        run: cargo +nightly install cargo-tarpaulin
-      - name: Run tarpaulin
-        run: cargo tarpaulin --no-dead-code --engine llvm --all-features --ignore-panics --out Lcov
+      - name: Run for coverage
+        run: |
+          rustup default nightly
+          cargo install grcov
+          CARGO_INCREMENTAL=0 RUSTFLAGS="-Zprofile -Ccodegen-units=1 -Copt-level=0 -Clink-dead-code -Coverflow-checks=off" cargo test --workspace
+          grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o lcov.info
       - name: Upload to Coveralls
         uses: coverallsapp/github-action@v2
         if: always()
