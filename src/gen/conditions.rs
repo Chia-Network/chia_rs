@@ -1,14 +1,14 @@
 use super::coin_id::compute_coin_id;
 use super::condition_sanitizers::{parse_amount, sanitize_announce_msg, sanitize_hash};
 use super::opcodes::{
-    parse_opcode, ConditionOpcode, AGG_SIG_COST, AGG_SIG_ME, AGG_SIG_UNSAFE, ALWAYS_TRUE,
+    parse_opcode, ConditionOpcode, AGG_SIG_COST, AGG_SIG_ME, AGG_SIG_UNSAFE,
     ASSERT_BEFORE_HEIGHT_ABSOLUTE, ASSERT_BEFORE_HEIGHT_RELATIVE, ASSERT_BEFORE_SECONDS_ABSOLUTE,
     ASSERT_BEFORE_SECONDS_RELATIVE, ASSERT_COIN_ANNOUNCEMENT, ASSERT_CONCURRENT_PUZZLE,
     ASSERT_CONCURRENT_SPEND, ASSERT_EPHEMERAL, ASSERT_HEIGHT_ABSOLUTE, ASSERT_HEIGHT_RELATIVE,
     ASSERT_MY_AMOUNT, ASSERT_MY_BIRTH_HEIGHT, ASSERT_MY_BIRTH_SECONDS, ASSERT_MY_COIN_ID,
     ASSERT_MY_PARENT_ID, ASSERT_MY_PUZZLEHASH, ASSERT_PUZZLE_ANNOUNCEMENT, ASSERT_SECONDS_ABSOLUTE,
     ASSERT_SECONDS_RELATIVE, CREATE_COIN, CREATE_COIN_ANNOUNCEMENT, CREATE_COIN_COST,
-    CREATE_PUZZLE_ANNOUNCEMENT, RESERVE_FEE,
+    CREATE_PUZZLE_ANNOUNCEMENT, REMARK, RESERVE_FEE,
 };
 use super::sanitize_int::{sanitize_uint, SanitizedUint};
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
@@ -367,7 +367,7 @@ pub fn parse_args(
                 SanitizedUint::Ok(r) => Ok(Condition::AssertBeforeHeightAbsolute(r as u32)),
             }
         }
-        ALWAYS_TRUE => {
+        REMARK => {
             // this condition is always true, we always ignore arguments
             Ok(Condition::Skip)
         }
@@ -2897,8 +2897,8 @@ fn test_double_spend() {
 }
 
 #[test]
-fn test_always_true() {
-    // ALWAYS_TRUE
+fn test_remark() {
+    // REMARK
     let (a, conds) = cond_test("((({h1} ({h2} (123 (((1 )))))").unwrap();
 
     // just make sure there are no constraints
@@ -2920,8 +2920,8 @@ fn test_always_true() {
 }
 
 #[test]
-fn test_always_true_with_arg() {
-    // ALWAYS_TRUE, but with one unknown argument
+fn test_remark_with_arg() {
+    // REMARK, but with one unknown argument
     // unknown arguments are expected and always allowed
     let (a, conds) = cond_test("((({h1} ({h2} (123 (((1 ( 42 )))))").unwrap();
 

@@ -48,7 +48,7 @@ pub const ASSERT_BEFORE_HEIGHT_RELATIVE: ConditionOpcode = 86;
 pub const ASSERT_BEFORE_HEIGHT_ABSOLUTE: ConditionOpcode = 87;
 
 // no-op condition
-pub const ALWAYS_TRUE: ConditionOpcode = 1;
+pub const REMARK: ConditionOpcode = 1;
 
 pub const CREATE_COIN_COST: Cost = 1800000;
 pub const AGG_SIG_COST: Cost = 1200000;
@@ -79,7 +79,7 @@ pub fn parse_opcode(a: &Allocator, op: NodePtr, flags: u32) -> Option<ConditionO
         | ASSERT_SECONDS_ABSOLUTE
         | ASSERT_HEIGHT_RELATIVE
         | ASSERT_HEIGHT_ABSOLUTE
-        | ALWAYS_TRUE => Some(buf[0]),
+        | REMARK => Some(buf[0]),
         _ => {
             if (flags & ENABLE_ASSERT_BEFORE) != 0 {
                 match buf[0] {
@@ -148,7 +148,7 @@ use rstest::rstest;
 #[case(&[ASSERT_BEFORE_SECONDS_ABSOLUTE], None, Some(ASSERT_BEFORE_SECONDS_ABSOLUTE))]
 #[case(&[ASSERT_BEFORE_HEIGHT_RELATIVE], None, Some(ASSERT_BEFORE_HEIGHT_RELATIVE))]
 #[case(&[ASSERT_BEFORE_HEIGHT_ABSOLUTE], None, Some(ASSERT_BEFORE_HEIGHT_ABSOLUTE))]
-#[case(&[ALWAYS_TRUE], Some(ALWAYS_TRUE), Some(ALWAYS_TRUE))]
+#[case(&[REMARK], Some(REMARK), Some(REMARK))]
 
 fn test_parse_opcode(
     #[case] input: &[u8],
