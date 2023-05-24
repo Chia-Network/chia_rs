@@ -1,11 +1,13 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
-use clvmr::allocator::Allocator;
-use chia::fuzzing_utils::{BitCursor, make_tree};
+use chia::fuzzing_utils::{make_tree, BitCursor};
 use chia::gen::get_puzzle_and_solution::get_puzzle_and_solution_for_coin;
+use clvmr::allocator::Allocator;
 
-const HASH: [u8;32] = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+const HASH: [u8; 32] = [
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+];
 
 fuzz_target!(|data: &[u8]| {
     let mut a = Allocator::new();
