@@ -10,7 +10,10 @@ use clvmr::allocator::Allocator;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use chia::gen::flags::{COND_ARGS_NIL, ENABLE_ASSERT_BEFORE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
+use chia::gen::flags::{
+    COND_ARGS_NIL, ENABLE_ASSERT_BEFORE, ENABLE_SOFTFORK_CONDITION, NO_UNKNOWN_CONDS,
+    STRICT_ARGS_COUNT,
+};
 
 fuzz_target!(|data: &[u8]| {
     let mut a = Allocator::new();
@@ -38,6 +41,7 @@ fuzz_target!(|data: &[u8]| {
         ENABLE_ASSERT_BEFORE | COND_ARGS_NIL,
         ENABLE_ASSERT_BEFORE | STRICT_ARGS_COUNT,
         NO_UNKNOWN_CONDS,
+        ENABLE_SOFTFORK_CONDITION,
     ] {
         let coin_spend = Spend {
             parent_id: a.new_atom(&parent_id).expect("atom failed"),

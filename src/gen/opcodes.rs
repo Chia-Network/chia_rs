@@ -1,4 +1,5 @@
 use crate::gen::flags::ENABLE_ASSERT_BEFORE;
+use crate::gen::flags::ENABLE_SOFTFORK_CONDITION;
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use clvmr::cost::Cost;
 
@@ -50,6 +51,12 @@ pub const ASSERT_BEFORE_HEIGHT_ABSOLUTE: ConditionOpcode = 87;
 // no-op condition
 pub const REMARK: ConditionOpcode = 1;
 
+// takes its cost as the first parameter, followed by future extensions
+// the cost is specified in increments of 10000, to keep the values smaller
+// This is a hard fork and is therefore only available when enabled by the
+// ENABLE_SOFTFORK_CONDITION flag
+pub const SOFTFORK: ConditionOpcode = 90;
+
 pub const CREATE_COIN_COST: Cost = 1800000;
 pub const AGG_SIG_COST: Cost = 1200000;
 
@@ -81,7 +88,9 @@ pub fn parse_opcode(a: &Allocator, op: NodePtr, flags: u32) -> Option<ConditionO
         | ASSERT_HEIGHT_ABSOLUTE
         | REMARK => Some(buf[0]),
         _ => {
-            if (flags & ENABLE_ASSERT_BEFORE) != 0 {
+            if (flags & ENABLE_SOFTFORK_CONDITION) != 0 && buf[0] == SOFTFORK {
+                Some(buf[0])
+            } else if (flags & ENABLE_ASSERT_BEFORE) != 0 {
                 match buf[0] {
                     ASSERT_BEFORE_SECONDS_RELATIVE
                     | ASSERT_BEFORE_SECONDS_ABSOLUTE
@@ -102,15 +111,9 @@ pub fn parse_opcode(a: &Allocator, op: NodePtr, flags: u32) -> Option<ConditionO
 }
 
 #[cfg(test)]
-fn opcode_tester(a: &mut Allocator, val: &[u8]) -> Option<ConditionOpcode> {
+fn opcode_tester(a: &mut Allocator, val: &[u8], flags: u32) -> Option<ConditionOpcode> {
     let v = a.new_atom(val).unwrap();
-    parse_opcode(&a, v, 0)
-}
-
-#[cfg(test)]
-fn opcode_tester_with_assert_before(a: &mut Allocator, val: &[u8]) -> Option<ConditionOpcode> {
-    let v = a.new_atom(val).unwrap();
-    parse_opcode(&a, v, ENABLE_ASSERT_BEFORE)
+    parse_opcode(&a, v, flags)
 }
 
 #[cfg(test)]
@@ -149,15 +152,51 @@ use rstest::rstest;
 #[case(&[ASSERT_BEFORE_HEIGHT_RELATIVE], None, Some(ASSERT_BEFORE_HEIGHT_RELATIVE))]
 #[case(&[ASSERT_BEFORE_HEIGHT_ABSOLUTE], None, Some(ASSERT_BEFORE_HEIGHT_ABSOLUTE))]
 #[case(&[REMARK], Some(REMARK), Some(REMARK))]
-
 fn test_parse_opcode(
     #[case] input: &[u8],
     #[case] expected: Option<ConditionOpcode>,
     #[case] expected2: Option<ConditionOpcode>,
 ) {
     let mut a = Allocator::new();
-    assert_eq!(opcode_tester(&mut a, input), expected);
-    assert_eq!(opcode_tester_with_assert_before(&mut a, input), expected2);
+    assert_eq!(opcode_tester(&mut a, input, 0), expected);
+    assert_eq!(
+        opcode_tester(&mut a, input, ENABLE_ASSERT_BEFORE),
+        expected2
+    );
+    assert_eq!(
+        opcode_tester(&mut a, input, ENABLE_SOFTFORK_CONDITION),
+        expected
+    );
+    assert_eq!(
+        opcode_tester(
+            &mut a,
+            input,
+            ENABLE_ASSERT_BEFORE | ENABLE_SOFTFORK_CONDITION
+        ),
+        expected2
+    );
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(&[AGG_SIG_UNSAFE], Some(AGG_SIG_UNSAFE), Some(AGG_SIG_UNSAFE))]
+#[case(&[AGG_SIG_ME], Some(AGG_SIG_ME), Some(AGG_SIG_ME))]
+#[case(&[CREATE_COIN], Some(CREATE_COIN), Some(CREATE_COIN))]
+// the SOFTOFORK condition is only recognized when the flag is set
+#[case(&[SOFTFORK], None, Some(SOFTFORK))]
+#[case(&[ASSERT_EPHEMERAL], None, None)]
+#[case(&[ASSERT_BEFORE_SECONDS_RELATIVE], None, None)]
+fn test_parse_opcode_softfork(
+    #[case] input: &[u8],
+    #[case] expected: Option<ConditionOpcode>,
+    #[case] expected2: Option<ConditionOpcode>,
+) {
+    let mut a = Allocator::new();
+    assert_eq!(opcode_tester(&mut a, input, 0), expected);
+    assert_eq!(
+        opcode_tester(&mut a, input, ENABLE_SOFTFORK_CONDITION),
+        expected2
+    );
 }
 
 #[test]
