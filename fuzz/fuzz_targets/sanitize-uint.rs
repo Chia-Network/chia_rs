@@ -1,9 +1,9 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
-use clvmr::allocator::Allocator;
 use chia::gen::sanitize_int::{sanitize_uint, SanitizedUint};
 use chia::gen::validation_error::{ErrorCode, ValidationErr};
+use clvmr::allocator::Allocator;
 
 fuzz_target!(|data: &[u8]| {
     let mut a = Allocator::new();
@@ -14,13 +14,13 @@ fuzz_target!(|data: &[u8]| {
             if data.len() == 9 {
                 assert!(data[0] == 0);
             }
-        },
+        }
         Ok(SanitizedUint::NegativeOverflow) => {
-            assert!(data.len() > 0 && (data[0] & 0x80) != 0);
-        },
+            assert!(!data.is_empty() && (data[0] & 0x80) != 0);
+        }
         Ok(SanitizedUint::PositiveOverflow) => {
             assert!(data.len() > 8);
-        },
+        }
         Err(ValidationErr(n, c)) => {
             assert!(n == atom);
             assert!(c == ErrorCode::InvalidCoinAmount);
@@ -33,13 +33,13 @@ fuzz_target!(|data: &[u8]| {
             if data.len() == 5 {
                 assert!(data[0] == 0);
             }
-        },
+        }
         Ok(SanitizedUint::NegativeOverflow) => {
-            assert!(data.len() > 0 && (data[0] & 0x80) != 0);
-        },
+            assert!(!data.is_empty() && (data[0] & 0x80) != 0);
+        }
         Ok(SanitizedUint::PositiveOverflow) => {
             assert!(data.len() > 4);
-        },
+        }
         Err(ValidationErr(n, c)) => {
             assert!(n == atom);
             assert!(c == ErrorCode::InvalidCoinAmount);

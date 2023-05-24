@@ -1,16 +1,16 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
-use std::sync::Arc;
-use std::collections::HashSet;
-use clvmr::allocator::Allocator;
-use chia::fuzzing_utils::{BitCursor, make_tree};
+use chia::fuzzing_utils::{make_tree, BitCursor};
 use chia::gen::conditions::{parse_conditions, ParseState, Spend, SpendBundleConditions};
-use clvm_utils::tree_hash::tree_hash;
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
+use clvm_utils::tree_hash::tree_hash;
+use clvmr::allocator::Allocator;
+use std::collections::HashSet;
+use std::sync::Arc;
 
-use chia::gen::flags::{COND_ARGS_NIL, STRICT_ARGS_COUNT, ENABLE_ASSERT_BEFORE, NO_UNKNOWN_CONDS};
+use chia::gen::flags::{COND_ARGS_NIL, ENABLE_ASSERT_BEFORE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
 
 fuzz_target!(|data: &[u8]| {
     let mut a = Allocator::new();
@@ -33,8 +33,12 @@ fuzz_target!(|data: &[u8]| {
 
     let mut state = ParseState::default();
 
-    for flags in &[0, ENABLE_ASSERT_BEFORE | COND_ARGS_NIL, ENABLE_ASSERT_BEFORE | STRICT_ARGS_COUNT, NO_UNKNOWN_CONDS] {
-
+    for flags in &[
+        0,
+        ENABLE_ASSERT_BEFORE | COND_ARGS_NIL,
+        ENABLE_ASSERT_BEFORE | STRICT_ARGS_COUNT,
+        NO_UNKNOWN_CONDS,
+    ] {
         let coin_spend = Spend {
             parent_id: a.new_atom(&parent_id).expect("atom failed"),
             coin_amount: amount,
@@ -51,7 +55,14 @@ fuzz_target!(|data: &[u8]| {
             flags: 0_u32,
         };
         let mut max_cost: u64 = 3300000000;
-        let _ret = parse_conditions(&a, &mut ret, &mut state, coin_spend, input, *flags, &mut max_cost);
+        let _ret = parse_conditions(
+            &a,
+            &mut ret,
+            &mut state,
+            coin_spend,
+            input,
+            *flags,
+            &mut max_cost,
+        );
     }
 });
-

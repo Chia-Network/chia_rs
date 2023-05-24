@@ -303,6 +303,8 @@ jobs:
             cargo fmt --all -- --files-with-diff --check
             cd wheel
             cargo fmt -- --files-with-diff --check
+            cd ../fuzz
+            cargo fmt -- --files-with-diff --check
 
   clippy:
     runs-on: ubuntu-latest
@@ -317,6 +319,10 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: --all-features --workspace
+      - name: wheel
+        run: |
+            cd wheel
+            cargo clippy
 
   fuzz_targets:
     runs-on: ubuntu-latest
