@@ -16,7 +16,7 @@ fuzz_target!(|data: &[u8]| {
             }
         }
         Ok(SanitizedUint::NegativeOverflow) => {
-            assert!(data.len() > 0 && (data[0] & 0x80) != 0);
+            assert!(!data.is_empty() && (data[0] & 0x80) != 0);
         }
         Ok(SanitizedUint::PositiveOverflow) => {
             assert!(data.len() > 8);
@@ -35,7 +35,7 @@ fuzz_target!(|data: &[u8]| {
             }
         }
         Ok(SanitizedUint::NegativeOverflow) => {
-            assert!(data.len() > 0 && (data[0] & 0x80) != 0);
+            assert!(!data.is_empty() && (data[0] & 0x80) != 0);
         }
         Ok(SanitizedUint::PositiveOverflow) => {
             assert!(data.len() > 4);

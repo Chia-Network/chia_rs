@@ -319,6 +319,10 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: --all-features --workspace
+      - name: wheel
+        run: |
+            cd wheel
+            cargo clippy
 
   fuzz_targets:
     runs-on: ubuntu-latest

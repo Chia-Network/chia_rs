@@ -125,7 +125,7 @@ fn run_puzzle(
 ) -> PyResult<PySpendBundleConditions> {
     let mut a = make_allocator(LIMIT_HEAP);
     let conds = native_run_puzzle(&mut a, puzzle, solution, parent_id, amount, max_cost, flags)?;
-    Ok(convert_spend_bundle_conds(&mut a, conds))
+    Ok(convert_spend_bundle_conds(&a, conds))
 }
 
 #[pymodule]
