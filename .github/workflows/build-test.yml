@@ -368,28 +368,21 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
             toolchain: stable
+      - name: Prepare for coverage
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          cargo install grcov
+          echo "RUSTFLAGS=-Cinstrument-coverage" >> "$GITHUB_ENV"
+          echo "LLVM_PROFILE_FILE=$(pwd)/target/chia_rs-%p-%m.profraw" >> "$GITHUB_ENV"
+          echo "CARGO_TARGET_DIR=$(pwd)/target" >> "$GITHUB_ENV"
       - name: cargo test
         run: cargo test --workspace
-
-  coverage:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-            toolchain: stable
-      - name: Run for coverage
+      - name: Continue with coverage
+        if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install lcov -y
           rustup component add llvm-tools-preview
-          export CARGOFLAGS="-j $(nproc)"
-          cargo install grcov
-          export RUSTFLAGS="-Cinstrument-coverage"
-          export LLVM_PROFILE_FILE=$(pwd)/target/chia_rs-%p-%m.profraw
-          export CARGO_TARGET_DIR=$(pwd)/target
-          export RUST_TEST_THREADS=$(nproc)
-          cargo test --workspace
           python -m venv venv
           source venv/bin/activate
           git clone https://github.com/Chia-Network/clvm_tools.git --branch=main --single-branch
@@ -405,7 +398,7 @@ jobs:
           python -c 'with open("rust_cov.info") as f: lines = [l for l in f if not (l.startswith("DA:") and int(l.split(",")[1].strip()) >= 2**63)]; open("lcov.info", "w").writelines(lines)'
       - name: Upload to Coveralls
         uses: coverallsapp/github-action@v2
-        if: always()
+        if: matrix.os == 'ubuntu-latest'
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         with:
