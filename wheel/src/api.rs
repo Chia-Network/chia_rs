@@ -31,6 +31,8 @@ use chia_protocol::{
     SubEpochChallengeSegment, SubEpochSegments, SubSlotData, SubSlotProofs, TransactionAck,
     TransactionsInfo, VDFInfo, VDFProof,
 };
+use clvmr::chia_dialect::ENABLE_BLS_OPS;
+use clvmr::chia_dialect::ENABLE_BLS_OPS_OUTSIDE_GUARD;
 use clvmr::serde::tree_hash_from_stream;
 use clvmr::LIMIT_HEAP;
 use clvmr::LIMIT_STACK;
@@ -146,6 +148,8 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     m.add("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;
     m.add("STRICT_ARGS_COUNT", STRICT_ARGS_COUNT)?;
     m.add("ENABLE_ASSERT_BEFORE", ENABLE_ASSERT_BEFORE)?;
+    m.add("ENABLE_BLS_OPS", ENABLE_BLS_OPS)?;
+    m.add("ENABLE_BLS_OPS_OUTSIDE_GUARD", ENABLE_BLS_OPS_OUTSIDE_GUARD)?;
     m.add(
         "NO_RELATIVE_CONDITIONS_ON_EPHEMERAL",
         NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,

@@ -1048,7 +1048,7 @@ use crate::gen::flags::ENABLE_ASSERT_BEFORE;
 #[cfg(test)]
 use clvmr::node::Node;
 #[cfg(test)]
-use clvmr::number::{ptr_from_number, Number};
+use clvmr::number::Number;
 #[cfg(test)]
 use clvmr::serde::node_to_bytes;
 #[cfg(test)]
@@ -1189,7 +1189,7 @@ fn parse_list_impl(
     } else if input.starts_with("-") || "0123456789".contains(input.get(0..1).unwrap()) {
         let v = input.split_once(" ").unwrap().0;
         let num = Number::from_str_radix(v, 10).unwrap();
-        (ptr_from_number(a, &num).unwrap(), v.len() + 1)
+        (a.new_number(num).unwrap(), v.len() + 1)
     } else {
         panic!("atom not supported \"{}\"", input);
     }

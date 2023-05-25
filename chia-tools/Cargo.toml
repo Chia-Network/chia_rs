@@ -10,7 +10,7 @@ repository = "https://github.com/Chia-Network/chia_rs/chia-tools"
 
 [dependencies]
 chia-protocol = { version = ">=0.2.0", path = "../chia-protocol" }
-clvmr = { version = ">=0.2.4", features = ["counters"] }
+clvmr = { version = ">=0.2.5", features = ["counters"] }
 chia = { path = "..", version = ">=0.2.0" }
 sqlite = "=0.30.3"
 clap = { version = "=4.0.29", features = ["derive"] }
