@@ -13,11 +13,11 @@ py-bindings = ["dep:pyo3", "dep:chia_py_streamable_macro"]
 
 [dependencies]
 pyo3 = { version = "=0.15.1", features = ["extension-module", "multiple-pymethods"], optional = true }
-sha2 = "=0.10.2"
+sha2 = "=0.9.9"
 hex = "=0.4.3"
 chia_streamable_macro = { version = "=0.2.4", path = "../chia_streamable_macro" }
 chia_py_streamable_macro = { path = "../chia_py_streamable_macro", version = "=0.1.3", optional = true }
-clvmr = "=0.2.4"
+clvmr = "=0.2.5"
 
 [lib]
 crate-type = ["rlib"]
