@@ -368,23 +368,37 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
             toolchain: stable
+      - name: Prepare for coverage
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          cargo install grcov
+          echo "RUSTFLAGS=-Cinstrument-coverage" >> "$GITHUB_ENV"
+          echo "LLVM_PROFILE_FILE=$(pwd)/target/chia_rs-%p-%m.profraw" >> "$GITHUB_ENV"
+          echo "CARGO_TARGET_DIR=$(pwd)/target" >> "$GITHUB_ENV"
       - name: cargo test
         run: cargo test --workspace
-
-  coverage:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-            toolchain: nightly
-      - name: Install tarpaulin
-        run: cargo +nightly install cargo-tarpaulin
-      - name: Run tarpaulin
-        run: cargo tarpaulin --no-dead-code --engine llvm --all-features --ignore-panics --out Lcov
+      - name: Continue with coverage
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install lcov -y
+          rustup component add llvm-tools-preview
+          python -m venv venv
+          source venv/bin/activate
+          git clone https://github.com/Chia-Network/clvm_tools.git --branch=main --single-branch
+          pip install ./clvm_tools
+          pip install colorama maturin pytest
+          maturin develop -m wheel/Cargo.toml
+          cd tests
+          python generate-programs.py
+          python run-programs.py || true
+          cd ..
+          pytest tests
+          grcov . --binary-path target -s . --branch --ignore-not-existing --ignore='*/.cargo/*' --ignore='tests/*' --ignore='venv/*' -o rust_cov.info
+          python -c 'with open("rust_cov.info") as f: lines = [l for l in f if not (l.startswith("DA:") and int(l.split(",")[1].strip()) >= 2**63)]; open("lcov.info", "w").writelines(lines)'
       - name: Upload to Coveralls
         uses: coverallsapp/github-action@v2
-        if: always()
+        if: matrix.os == 'ubuntu-latest'
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         with:
