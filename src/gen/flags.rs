@@ -20,6 +20,9 @@ pub const ENABLE_ASSERT_BEFORE: u32 = 0x100000;
 // disallow relative height- and time conditions on ephemeral spends
 pub const NO_RELATIVE_CONDITIONS_ON_EPHEMERAL: u32 = 0x200000;
 
+// enable softfork condition
+pub const ENABLE_SOFTFORK_CONDITION: u32 = 0x400000;
+
 pub const MEMPOOL_MODE: u32 = CLVM_MEMPOOL_MODE
     | NO_UNKNOWN_CONDS
     | COND_ARGS_NIL

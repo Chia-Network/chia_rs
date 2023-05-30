@@ -8,7 +8,7 @@ use super::opcodes::{
     ASSERT_MY_AMOUNT, ASSERT_MY_BIRTH_HEIGHT, ASSERT_MY_BIRTH_SECONDS, ASSERT_MY_COIN_ID,
     ASSERT_MY_PARENT_ID, ASSERT_MY_PUZZLEHASH, ASSERT_PUZZLE_ANNOUNCEMENT, ASSERT_SECONDS_ABSOLUTE,
     ASSERT_SECONDS_RELATIVE, CREATE_COIN, CREATE_COIN_ANNOUNCEMENT, CREATE_COIN_COST,
-    CREATE_PUZZLE_ANNOUNCEMENT, REMARK, RESERVE_FEE,
+    CREATE_PUZZLE_ANNOUNCEMENT, REMARK, RESERVE_FEE, SOFTFORK,
 };
 use super::sanitize_int::{sanitize_uint, SanitizedUint};
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
@@ -98,6 +98,10 @@ pub enum Condition {
     AssertBeforeHeightRelative(u32),
     AssertBeforeHeightAbsolute(u32),
     AssertEphemeral,
+
+    // The softfork condition is one that we don't understand, it just applies
+    // the specified cost
+    Softfork(Cost),
 
     // this means the condition is unconditionally true and can be skipped
     Skip,
@@ -198,6 +202,20 @@ pub fn parse_args(
                 check_nil(a, c)?;
             }
             Ok(Condition::CreateCoin(puzzle_hash, amount, a.null()))
+        }
+        SOFTFORK => {
+            if (flags & NO_UNKNOWN_CONDS) != 0 {
+                // We don't know of any new softforked-in conditions, so they
+                // are all unknown
+                Err(ValidationErr(c, ErrorCode::InvalidConditionOpcode))
+            } else {
+                match sanitize_uint(a, first(a, c)?, 4, ErrorCode::InvalidSoftforkCost)? {
+                    // the first argument represents the cost of the condition.
+                    // We scale it by 10000 to make the argument be a bit smaller
+                    SanitizedUint::Ok(cost) => Ok(Condition::Softfork(cost * 10000)),
+                    _ => Err(ValidationErr(c, ErrorCode::InvalidSoftforkCost)),
+                }
+            }
         }
         RESERVE_FEE => {
             maybe_check_args_terminator(a, c, flags)?;
@@ -830,6 +848,12 @@ pub fn parse_conditions(
                 ret.agg_sig_unsafe.push((pk, msg));
                 spend.flags &= !ELIGIBLE_FOR_DEDUP;
             }
+            Condition::Softfork(cost) => {
+                if *max_cost < cost {
+                    return Err(ValidationErr(c, ErrorCode::CostExceeded));
+                }
+                *max_cost -= cost;
+            }
             Condition::SkipRelativeCondition => {
                 assert_not_ephemeral(&mut spend.flags, state, ret.spends.len());
             }
@@ -1045,6 +1069,8 @@ fn u64_to_bytes(n: u64) -> Vec<u8> {
 }
 #[cfg(test)]
 use crate::gen::flags::ENABLE_ASSERT_BEFORE;
+#[cfg(test)]
+use crate::gen::flags::ENABLE_SOFTFORK_CONDITION;
 #[cfg(test)]
 use clvmr::node::Node;
 #[cfg(test)]
@@ -3664,4 +3690,80 @@ fn test_relative_condition_on_ephemeral(
             assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
         }
     }
+}
+
+#[cfg(test)]
+#[rstest]
+// the scale factor is 10000
+#[case("((90 (1 )", 10000)]
+// 0 is OK (but does it make sense?)
+#[case("((90 (0 )", 0)]
+// the cost accumulates
+#[case("((90 (1 ) ((90 (2 ) ((90 (3 )", (1 + 2 + 3) * 10000)]
+// the cost can be large
+#[case("((90 (10000 )", 100000000)]
+// the upper cost limit in the test is 11000000000
+#[case("((90 (1100000 )", 11000000000)]
+// additional arguments are ignored
+#[case("((90 (1 ( 42 ( 1337 )", 10000)]
+fn test_softfork_condition(#[case] conditions: &str, #[case] expected_cost: Cost) {
+    // SOFTFORK (90)
+    let (_, spends) = cond_test_flag(
+        &format!("((({{h1}} ({{h2}} (1234 ({}))))", conditions),
+        ENABLE_SOFTFORK_CONDITION,
+    )
+    .unwrap();
+    assert_eq!(spends.cost, expected_cost);
+
+    // when NO_UNKNOWN_CONDS is enabled, any SOFTFORK condition is an error
+    // (because we don't know of any yet)
+    assert_eq!(
+        cond_test_flag(
+            &format!("((({{h1}} ({{h2}} (1234 ({}))))", conditions),
+            ENABLE_SOFTFORK_CONDITION | NO_UNKNOWN_CONDS
+        )
+        .unwrap_err()
+        .1,
+        ErrorCode::InvalidConditionOpcode
+    );
+
+    // if softfork conditions aren't enabled, they are just plain unknown
+    // conditions (that don't incur a cost
+    let (_, spends) =
+        cond_test_flag(&format!("((({{h1}} ({{h2}} (1234 ({}))))", conditions), 0).unwrap();
+    assert_eq!(spends.cost, 0);
+
+    // if softfork conditions aren't enabled, but we don't allow unknown
+    // conditions (mempool mode) they fail
+    assert_eq!(
+        cond_test_flag(
+            &format!("((({{h1}} ({{h2}} (1234 ({}))))", conditions),
+            NO_UNKNOWN_CONDS
+        )
+        .unwrap_err()
+        .1,
+        ErrorCode::InvalidConditionOpcode
+    );
+}
+
+#[cfg(test)]
+#[rstest]
+// the cost argument must be positive
+#[case("((90 (-1 )", ErrorCode::InvalidSoftforkCost)]
+// the cost argument may not exceed 2^32-1
+#[case("((90 (0x0100000000 )", ErrorCode::InvalidSoftforkCost)]
+// the test has a cost limit of 11000000000
+#[case("((90 (0x00ffffffff )", ErrorCode::CostExceeded)]
+#[case("((90 )", ErrorCode::InvalidCondition)]
+fn test_softfork_condition_failures(#[case] conditions: &str, #[case] expected_err: ErrorCode) {
+    // SOFTFORK (90)
+    assert_eq!(
+        cond_test_flag(
+            &format!("((({{h1}} ({{h2}} (1234 ({}))))", conditions),
+            ENABLE_SOFTFORK_CONDITION
+        )
+        .unwrap_err()
+        .1,
+        expected_err
+    );
 }

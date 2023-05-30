@@ -6,6 +6,7 @@ use crate::run_generator::{
 use chia::allocator::make_allocator;
 use chia::gen::flags::COND_ARGS_NIL;
 use chia::gen::flags::ENABLE_ASSERT_BEFORE;
+use chia::gen::flags::ENABLE_SOFTFORK_CONDITION;
 use chia::gen::flags::MEMPOOL_MODE;
 use chia::gen::flags::NO_RELATIVE_CONDITIONS_ON_EPHEMERAL;
 use chia::gen::flags::NO_UNKNOWN_CONDS;
@@ -148,6 +149,7 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     m.add("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;
     m.add("STRICT_ARGS_COUNT", STRICT_ARGS_COUNT)?;
     m.add("ENABLE_ASSERT_BEFORE", ENABLE_ASSERT_BEFORE)?;
+    m.add("ENABLE_SOFTFORK_CONDITION", ENABLE_SOFTFORK_CONDITION)?;
     m.add("ENABLE_BLS_OPS", ENABLE_BLS_OPS)?;
     m.add("ENABLE_BLS_OPS_OUTSIDE_GUARD", ENABLE_BLS_OPS_OUTSIDE_GUARD)?;
     m.add(
