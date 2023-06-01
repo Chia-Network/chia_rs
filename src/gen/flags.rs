@@ -2,6 +2,12 @@ use clvmr::MEMPOOL_MODE as CLVM_MEMPOOL_MODE;
 
 // flags controlling to condition parsing
 
+// When set, limit the number of atoms allowed to be allocated to 62'500'000
+// Also limit the number of pairs allowed to be allocated to the same limit
+// This is similar to LIMIT_HEAP, except this flag only limits the total number
+// of pairs and atoms we allow to be allocated, not the total heap size
+pub const LIMIT_OBJECTS: u32 = 0x10000;
+
 // unknown condition codes are disallowed
 pub const NO_UNKNOWN_CONDS: u32 = 0x20000;
 
