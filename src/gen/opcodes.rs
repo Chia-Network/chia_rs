@@ -3,7 +3,7 @@ use crate::gen::flags::ENABLE_SOFTFORK_CONDITION;
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use clvmr::cost::Cost;
 
-pub type ConditionOpcode = u8;
+pub type ConditionOpcode = u16;
 
 // AGG_SIG is ascii "1"
 pub const AGG_SIG_UNSAFE: ConditionOpcode = 49;
@@ -60,53 +60,74 @@ pub const SOFTFORK: ConditionOpcode = 90;
 pub const CREATE_COIN_COST: Cost = 1800000;
 pub const AGG_SIG_COST: Cost = 1200000;
 
+// when ENABLE_SOFTFORK_CONDITION is enabled
+// 2-byte condition opcodes whose first byte is 1 have costs, despite being unknown:
+
+// cost = 1000000 + (byte[1] & 0x7) * 200000
+
+pub fn compute_unknown_condition_cost(op: ConditionOpcode) -> Cost {
+    match op {
+        256..=511 => 1000000 + ((op & 0x7) as Cost) * 200000,
+        _ => 0,
+    }
+}
+
 pub fn parse_opcode(a: &Allocator, op: NodePtr, flags: u32) -> Option<ConditionOpcode> {
     let buf = match a.sexp(op) {
         SExp::Atom(_) => a.atom(op),
         _ => return None,
     };
-    if buf.len() != 1 {
-        return None;
-    }
-
-    match buf[0] {
-        AGG_SIG_UNSAFE
-        | AGG_SIG_ME
-        | CREATE_COIN
-        | RESERVE_FEE
-        | CREATE_COIN_ANNOUNCEMENT
-        | ASSERT_COIN_ANNOUNCEMENT
-        | CREATE_PUZZLE_ANNOUNCEMENT
-        | ASSERT_PUZZLE_ANNOUNCEMENT
-        | ASSERT_MY_COIN_ID
-        | ASSERT_MY_PARENT_ID
-        | ASSERT_MY_PUZZLEHASH
-        | ASSERT_MY_AMOUNT
-        | ASSERT_SECONDS_RELATIVE
-        | ASSERT_SECONDS_ABSOLUTE
-        | ASSERT_HEIGHT_RELATIVE
-        | ASSERT_HEIGHT_ABSOLUTE
-        | REMARK => Some(buf[0]),
-        _ => {
-            if (flags & ENABLE_SOFTFORK_CONDITION) != 0 && buf[0] == SOFTFORK {
-                Some(buf[0])
-            } else if (flags & ENABLE_ASSERT_BEFORE) != 0 {
-                match buf[0] {
-                    ASSERT_BEFORE_SECONDS_RELATIVE
-                    | ASSERT_BEFORE_SECONDS_ABSOLUTE
-                    | ASSERT_BEFORE_HEIGHT_RELATIVE
-                    | ASSERT_BEFORE_HEIGHT_ABSOLUTE
-                    | ASSERT_CONCURRENT_SPEND
-                    | ASSERT_CONCURRENT_PUZZLE
-                    | ASSERT_MY_BIRTH_SECONDS
-                    | ASSERT_MY_BIRTH_HEIGHT
-                    | ASSERT_EPHEMERAL => Some(buf[0]),
-                    _ => None,
+    if buf.len() == 2 && (flags & ENABLE_SOFTFORK_CONDITION) != 0 {
+        let b0 = buf[0];
+        if b0 != 1 {
+            None
+        } else {
+            // These are 2-byte condition codes whose first byte is 1
+            Some(ConditionOpcode::from_be_bytes(buf.try_into().unwrap()))
+        }
+    } else if buf.len() == 1 {
+        let b0 = buf[0] as ConditionOpcode;
+        match b0 {
+            AGG_SIG_UNSAFE
+            | AGG_SIG_ME
+            | CREATE_COIN
+            | RESERVE_FEE
+            | CREATE_COIN_ANNOUNCEMENT
+            | ASSERT_COIN_ANNOUNCEMENT
+            | CREATE_PUZZLE_ANNOUNCEMENT
+            | ASSERT_PUZZLE_ANNOUNCEMENT
+            | ASSERT_MY_COIN_ID
+            | ASSERT_MY_PARENT_ID
+            | ASSERT_MY_PUZZLEHASH
+            | ASSERT_MY_AMOUNT
+            | ASSERT_SECONDS_RELATIVE
+            | ASSERT_SECONDS_ABSOLUTE
+            | ASSERT_HEIGHT_RELATIVE
+            | ASSERT_HEIGHT_ABSOLUTE
+            | REMARK => Some(b0),
+            _ => {
+                if (flags & ENABLE_SOFTFORK_CONDITION) != 0 && b0 == SOFTFORK {
+                    Some(b0)
+                } else if (flags & ENABLE_ASSERT_BEFORE) != 0 {
+                    match b0 {
+                        ASSERT_BEFORE_SECONDS_RELATIVE
+                        | ASSERT_BEFORE_SECONDS_ABSOLUTE
+                        | ASSERT_BEFORE_HEIGHT_RELATIVE
+                        | ASSERT_BEFORE_HEIGHT_ABSOLUTE
+                        | ASSERT_CONCURRENT_SPEND
+                        | ASSERT_CONCURRENT_PUZZLE
+                        | ASSERT_MY_BIRTH_SECONDS
+                        | ASSERT_MY_BIRTH_HEIGHT
+                        | ASSERT_EPHEMERAL => Some(b0),
+                        _ => None,
+                    }
+                } else {
+                    None
                 }
-            } else {
-                None
             }
         }
+    } else {
+        None
     }
 }
 
@@ -122,36 +143,36 @@ use rstest::rstest;
 #[cfg(test)]
 #[rstest]
 // leading zeros are not allowed, it makes it a different value
-#[case(&[ASSERT_HEIGHT_ABSOLUTE, 0], None, None)]
-#[case(&[0, ASSERT_HEIGHT_ABSOLUTE], None, None)]
+#[case(&[ASSERT_HEIGHT_ABSOLUTE as u8, 0], None, None)]
+#[case(&[0, ASSERT_HEIGHT_ABSOLUTE as u8], None, None)]
 #[case(&[0], None, None)]
 // all condition codes
-#[case(&[AGG_SIG_UNSAFE], Some(AGG_SIG_UNSAFE), Some(AGG_SIG_UNSAFE))]
-#[case(&[AGG_SIG_ME], Some(AGG_SIG_ME), Some(AGG_SIG_ME))]
-#[case(&[CREATE_COIN], Some(CREATE_COIN), Some(CREATE_COIN))]
-#[case(&[RESERVE_FEE], Some(RESERVE_FEE), Some(RESERVE_FEE))]
-#[case(&[CREATE_COIN_ANNOUNCEMENT], Some(CREATE_COIN_ANNOUNCEMENT), Some(CREATE_COIN_ANNOUNCEMENT))]
-#[case(&[ASSERT_COIN_ANNOUNCEMENT], Some(ASSERT_COIN_ANNOUNCEMENT), Some(ASSERT_COIN_ANNOUNCEMENT))]
-#[case(&[CREATE_PUZZLE_ANNOUNCEMENT], Some(CREATE_PUZZLE_ANNOUNCEMENT), Some(CREATE_PUZZLE_ANNOUNCEMENT))]
-#[case(&[ASSERT_PUZZLE_ANNOUNCEMENT], Some(ASSERT_PUZZLE_ANNOUNCEMENT), Some(ASSERT_PUZZLE_ANNOUNCEMENT))]
-#[case(&[ASSERT_CONCURRENT_SPEND], None, Some(ASSERT_CONCURRENT_SPEND))]
-#[case(&[ASSERT_CONCURRENT_PUZZLE], None, Some(ASSERT_CONCURRENT_PUZZLE))]
-#[case(&[ASSERT_MY_COIN_ID], Some(ASSERT_MY_COIN_ID), Some(ASSERT_MY_COIN_ID))]
-#[case(&[ASSERT_MY_PARENT_ID], Some(ASSERT_MY_PARENT_ID), Some(ASSERT_MY_PARENT_ID))]
-#[case(&[ASSERT_MY_PUZZLEHASH], Some(ASSERT_MY_PUZZLEHASH), Some(ASSERT_MY_PUZZLEHASH))]
-#[case(&[ASSERT_MY_AMOUNT], Some(ASSERT_MY_AMOUNT), Some(ASSERT_MY_AMOUNT))]
-#[case(&[ASSERT_MY_BIRTH_SECONDS], None, Some(ASSERT_MY_BIRTH_SECONDS))]
-#[case(&[ASSERT_MY_BIRTH_HEIGHT], None, Some(ASSERT_MY_BIRTH_HEIGHT))]
-#[case(&[ASSERT_EPHEMERAL], None, Some(ASSERT_EPHEMERAL))]
-#[case(&[ASSERT_SECONDS_RELATIVE],Some(ASSERT_SECONDS_RELATIVE) , Some(ASSERT_SECONDS_RELATIVE))]
-#[case(&[ASSERT_SECONDS_ABSOLUTE],Some(ASSERT_SECONDS_ABSOLUTE) , Some(ASSERT_SECONDS_ABSOLUTE))]
-#[case(&[ASSERT_HEIGHT_RELATIVE], Some(ASSERT_HEIGHT_RELATIVE), Some(ASSERT_HEIGHT_RELATIVE))]
-#[case(&[ASSERT_HEIGHT_ABSOLUTE], Some(ASSERT_HEIGHT_ABSOLUTE), Some(ASSERT_HEIGHT_ABSOLUTE))]
-#[case(&[ASSERT_BEFORE_SECONDS_RELATIVE], None, Some(ASSERT_BEFORE_SECONDS_RELATIVE))]
-#[case(&[ASSERT_BEFORE_SECONDS_ABSOLUTE], None, Some(ASSERT_BEFORE_SECONDS_ABSOLUTE))]
-#[case(&[ASSERT_BEFORE_HEIGHT_RELATIVE], None, Some(ASSERT_BEFORE_HEIGHT_RELATIVE))]
-#[case(&[ASSERT_BEFORE_HEIGHT_ABSOLUTE], None, Some(ASSERT_BEFORE_HEIGHT_ABSOLUTE))]
-#[case(&[REMARK], Some(REMARK), Some(REMARK))]
+#[case(&[AGG_SIG_UNSAFE as u8], Some(AGG_SIG_UNSAFE), Some(AGG_SIG_UNSAFE))]
+#[case(&[AGG_SIG_ME as u8], Some(AGG_SIG_ME), Some(AGG_SIG_ME))]
+#[case(&[CREATE_COIN as u8], Some(CREATE_COIN), Some(CREATE_COIN))]
+#[case(&[RESERVE_FEE as u8], Some(RESERVE_FEE), Some(RESERVE_FEE))]
+#[case(&[CREATE_COIN_ANNOUNCEMENT as u8], Some(CREATE_COIN_ANNOUNCEMENT), Some(CREATE_COIN_ANNOUNCEMENT))]
+#[case(&[ASSERT_COIN_ANNOUNCEMENT as u8], Some(ASSERT_COIN_ANNOUNCEMENT), Some(ASSERT_COIN_ANNOUNCEMENT))]
+#[case(&[CREATE_PUZZLE_ANNOUNCEMENT as u8], Some(CREATE_PUZZLE_ANNOUNCEMENT), Some(CREATE_PUZZLE_ANNOUNCEMENT))]
+#[case(&[ASSERT_PUZZLE_ANNOUNCEMENT as u8], Some(ASSERT_PUZZLE_ANNOUNCEMENT), Some(ASSERT_PUZZLE_ANNOUNCEMENT))]
+#[case(&[ASSERT_CONCURRENT_SPEND as u8], None, Some(ASSERT_CONCURRENT_SPEND))]
+#[case(&[ASSERT_CONCURRENT_PUZZLE as u8], None, Some(ASSERT_CONCURRENT_PUZZLE))]
+#[case(&[ASSERT_MY_COIN_ID as u8], Some(ASSERT_MY_COIN_ID), Some(ASSERT_MY_COIN_ID))]
+#[case(&[ASSERT_MY_PARENT_ID as u8], Some(ASSERT_MY_PARENT_ID), Some(ASSERT_MY_PARENT_ID))]
+#[case(&[ASSERT_MY_PUZZLEHASH as u8], Some(ASSERT_MY_PUZZLEHASH), Some(ASSERT_MY_PUZZLEHASH))]
+#[case(&[ASSERT_MY_AMOUNT as u8], Some(ASSERT_MY_AMOUNT), Some(ASSERT_MY_AMOUNT))]
+#[case(&[ASSERT_MY_BIRTH_SECONDS as u8], None, Some(ASSERT_MY_BIRTH_SECONDS))]
+#[case(&[ASSERT_MY_BIRTH_HEIGHT as u8], None, Some(ASSERT_MY_BIRTH_HEIGHT))]
+#[case(&[ASSERT_EPHEMERAL as u8], None, Some(ASSERT_EPHEMERAL))]
+#[case(&[ASSERT_SECONDS_RELATIVE as u8],Some(ASSERT_SECONDS_RELATIVE) , Some(ASSERT_SECONDS_RELATIVE))]
+#[case(&[ASSERT_SECONDS_ABSOLUTE as u8],Some(ASSERT_SECONDS_ABSOLUTE) , Some(ASSERT_SECONDS_ABSOLUTE))]
+#[case(&[ASSERT_HEIGHT_RELATIVE as u8], Some(ASSERT_HEIGHT_RELATIVE), Some(ASSERT_HEIGHT_RELATIVE))]
+#[case(&[ASSERT_HEIGHT_ABSOLUTE as u8], Some(ASSERT_HEIGHT_ABSOLUTE), Some(ASSERT_HEIGHT_ABSOLUTE))]
+#[case(&[ASSERT_BEFORE_SECONDS_RELATIVE as u8], None, Some(ASSERT_BEFORE_SECONDS_RELATIVE))]
+#[case(&[ASSERT_BEFORE_SECONDS_ABSOLUTE as u8], None, Some(ASSERT_BEFORE_SECONDS_ABSOLUTE))]
+#[case(&[ASSERT_BEFORE_HEIGHT_RELATIVE as u8], None, Some(ASSERT_BEFORE_HEIGHT_RELATIVE))]
+#[case(&[ASSERT_BEFORE_HEIGHT_ABSOLUTE as u8], None, Some(ASSERT_BEFORE_HEIGHT_ABSOLUTE))]
+#[case(&[REMARK as u8], Some(REMARK), Some(REMARK))]
 fn test_parse_opcode(
     #[case] input: &[u8],
     #[case] expected: Option<ConditionOpcode>,
@@ -179,13 +200,13 @@ fn test_parse_opcode(
 
 #[cfg(test)]
 #[rstest]
-#[case(&[AGG_SIG_UNSAFE], Some(AGG_SIG_UNSAFE), Some(AGG_SIG_UNSAFE))]
-#[case(&[AGG_SIG_ME], Some(AGG_SIG_ME), Some(AGG_SIG_ME))]
-#[case(&[CREATE_COIN], Some(CREATE_COIN), Some(CREATE_COIN))]
+#[case(&[AGG_SIG_UNSAFE as u8], Some(AGG_SIG_UNSAFE), Some(AGG_SIG_UNSAFE))]
+#[case(&[AGG_SIG_ME as u8], Some(AGG_SIG_ME), Some(AGG_SIG_ME))]
+#[case(&[CREATE_COIN as u8], Some(CREATE_COIN), Some(CREATE_COIN))]
 // the SOFTOFORK condition is only recognized when the flag is set
-#[case(&[SOFTFORK], None, Some(SOFTFORK))]
-#[case(&[ASSERT_EPHEMERAL], None, None)]
-#[case(&[ASSERT_BEFORE_SECONDS_RELATIVE], None, None)]
+#[case(&[SOFTFORK as u8], None, Some(SOFTFORK))]
+#[case(&[ASSERT_EPHEMERAL as u8], None, None)]
+#[case(&[ASSERT_BEFORE_SECONDS_RELATIVE as u8], None, None)]
 fn test_parse_opcode_softfork(
     #[case] input: &[u8],
     #[case] expected: Option<ConditionOpcode>,

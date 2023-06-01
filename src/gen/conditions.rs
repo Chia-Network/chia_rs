@@ -1,14 +1,14 @@
 use super::coin_id::compute_coin_id;
 use super::condition_sanitizers::{parse_amount, sanitize_announce_msg, sanitize_hash};
 use super::opcodes::{
-    parse_opcode, ConditionOpcode, AGG_SIG_COST, AGG_SIG_ME, AGG_SIG_UNSAFE,
-    ASSERT_BEFORE_HEIGHT_ABSOLUTE, ASSERT_BEFORE_HEIGHT_RELATIVE, ASSERT_BEFORE_SECONDS_ABSOLUTE,
-    ASSERT_BEFORE_SECONDS_RELATIVE, ASSERT_COIN_ANNOUNCEMENT, ASSERT_CONCURRENT_PUZZLE,
-    ASSERT_CONCURRENT_SPEND, ASSERT_EPHEMERAL, ASSERT_HEIGHT_ABSOLUTE, ASSERT_HEIGHT_RELATIVE,
-    ASSERT_MY_AMOUNT, ASSERT_MY_BIRTH_HEIGHT, ASSERT_MY_BIRTH_SECONDS, ASSERT_MY_COIN_ID,
-    ASSERT_MY_PARENT_ID, ASSERT_MY_PUZZLEHASH, ASSERT_PUZZLE_ANNOUNCEMENT, ASSERT_SECONDS_ABSOLUTE,
-    ASSERT_SECONDS_RELATIVE, CREATE_COIN, CREATE_COIN_ANNOUNCEMENT, CREATE_COIN_COST,
-    CREATE_PUZZLE_ANNOUNCEMENT, REMARK, RESERVE_FEE, SOFTFORK,
+    compute_unknown_condition_cost, parse_opcode, ConditionOpcode, AGG_SIG_COST, AGG_SIG_ME,
+    AGG_SIG_UNSAFE, ASSERT_BEFORE_HEIGHT_ABSOLUTE, ASSERT_BEFORE_HEIGHT_RELATIVE,
+    ASSERT_BEFORE_SECONDS_ABSOLUTE, ASSERT_BEFORE_SECONDS_RELATIVE, ASSERT_COIN_ANNOUNCEMENT,
+    ASSERT_CONCURRENT_PUZZLE, ASSERT_CONCURRENT_SPEND, ASSERT_EPHEMERAL, ASSERT_HEIGHT_ABSOLUTE,
+    ASSERT_HEIGHT_RELATIVE, ASSERT_MY_AMOUNT, ASSERT_MY_BIRTH_HEIGHT, ASSERT_MY_BIRTH_SECONDS,
+    ASSERT_MY_COIN_ID, ASSERT_MY_PARENT_ID, ASSERT_MY_PUZZLEHASH, ASSERT_PUZZLE_ANNOUNCEMENT,
+    ASSERT_SECONDS_ABSOLUTE, ASSERT_SECONDS_RELATIVE, CREATE_COIN, CREATE_COIN_ANNOUNCEMENT,
+    CREATE_COIN_COST, CREATE_PUZZLE_ANNOUNCEMENT, REMARK, RESERVE_FEE, SOFTFORK,
 };
 use super::sanitize_int::{sanitize_uint, SanitizedUint};
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
@@ -215,6 +215,15 @@ pub fn parse_args(
                     SanitizedUint::Ok(cost) => Ok(Condition::Softfork(cost * 10000)),
                     _ => Err(ValidationErr(c, ErrorCode::InvalidSoftforkCost)),
                 }
+            }
+        }
+        256..=511 => {
+            // All of these conditions are unknown
+            // but they have costs (when ENABLE_SOFTFORK_CONDITION is enabled)
+            if (flags & NO_UNKNOWN_CONDS) != 0 {
+                Err(ValidationErr(c, ErrorCode::InvalidConditionOpcode))
+            } else {
+                Ok(Condition::Softfork(compute_unknown_condition_cost(op)))
             }
         }
         RESERVE_FEE => {
@@ -3706,6 +3715,26 @@ fn test_relative_condition_on_ephemeral(
 #[case("((90 (1100000 )", 11000000000)]
 // additional arguments are ignored
 #[case("((90 (1 ( 42 ( 1337 )", 10000)]
+// reserved opcodes with fixed cost
+#[case("((256 )", 1000000)]
+#[case("((257 )", 1200000)]
+#[case("((258 )", 1400000)]
+#[case("((259 )", 1600000)]
+#[case("((260 )", 1800000)]
+#[case("((261 )", 2000000)]
+#[case("((262 )", 2200000)]
+#[case("((263 )", 2400000)]
+#[case("((264 )", 1000000)]
+#[case("((265 )", 1200000)]
+#[case("((266 )", 1400000)]
+#[case("((504 )", 1000000)]
+#[case("((505 )", 1200000)]
+#[case("((506 )", 1400000)]
+#[case("((507 )", 1600000)]
+#[case("((508 )", 1800000)]
+#[case("((509 )", 2000000)]
+#[case("((510 )", 2200000)]
+#[case("((511 )", 2400000)]
 fn test_softfork_condition(#[case] conditions: &str, #[case] expected_cost: Cost) {
     // SOFTFORK (90)
     let (_, spends) = cond_test_flag(
