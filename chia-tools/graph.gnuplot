@@ -59,6 +59,19 @@ plot "chain-resource-usage-cdf.dat" using ($5)*8/1000000:1 with lines title "Ato
 "chain-resource-usage-cdf.dat" using ($6)*8/1000000:1 with lines title "Pair size", \
 "chain-resource-usage-cdf.dat" using ($7)/1000000:1 with lines title "Heap size"
 
+set output "blockchain-object-usage-cdf.png"
+
+set title "block object usage"
+set xlabel "count (million)"
+set xrange [0:*]
+
+plot "chain-resource-usage-cdf.dat" using ($5)/1000000:1 with lines title "Allocated atoms", \
+"chain-resource-usage-cdf.dat" using ($6)/1000000:1 with lines title "Allocated pairs"
+
+set output "blockchain-object-usage-cdf2.png"
+set xrange [0:3]
+replot
+
 set output "block-execution-time-cdf.png"
 set title "block validation time"
 set xlabel "microseconds"

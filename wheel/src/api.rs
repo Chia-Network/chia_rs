@@ -7,6 +7,7 @@ use chia::allocator::make_allocator;
 use chia::gen::flags::COND_ARGS_NIL;
 use chia::gen::flags::ENABLE_ASSERT_BEFORE;
 use chia::gen::flags::ENABLE_SOFTFORK_CONDITION;
+use chia::gen::flags::LIMIT_OBJECTS;
 use chia::gen::flags::MEMPOOL_MODE;
 use chia::gen::flags::NO_RELATIVE_CONDITIONS_ON_EPHEMERAL;
 use chia::gen::flags::NO_UNKNOWN_CONDS;
@@ -157,6 +158,7 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
         NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
     )?;
     m.add("MEMPOOL_MODE", MEMPOOL_MODE)?;
+    m.add("LIMIT_OBJECTS", LIMIT_OBJECTS)?;
 
     // Chia classes
     m.add_class::<Coin>()?;
