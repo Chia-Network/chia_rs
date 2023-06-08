@@ -1,38 +1,67 @@
-use clvmr::allocator::{Allocator, NodePtr};
-use clvmr::node::Node;
+use clvmr::allocator::{Allocator, NodePtr, SExp};
 
-fn unwrap3(node: Node) -> Option<(Node, Node, Node)> {
-    let mut i = node;
-    let n1 = i.next()?;
-    let n2 = i.next()?;
-    let n3 = i.next()?;
-    if i.next().is_some() {
-        return None;
+fn next(a: &Allocator, n: NodePtr) -> Option<(NodePtr, NodePtr)> {
+    match a.sexp(n) {
+        SExp::Pair(first, second) => Some((first, second)),
+        _ => None,
     }
-    Some((n1, n2, n3))
 }
 
-fn check(n: &Node, atom: &[u8]) -> Option<()> {
-    if n.atom()? == atom {
-        Some(())
-    } else {
+fn nullp(a: &Allocator, n: NodePtr) -> bool {
+    match a.sexp(n) {
+        SExp::Atom(_) => a.atom(n).is_empty(),
+        _ => false,
+    }
+}
+
+fn destructure<const N: usize>(a: &Allocator, mut node: NodePtr) -> Option<[NodePtr; N]> {
+    let mut counter = 0;
+    let mut ret: [NodePtr; N] = [0; N];
+    while let Some((first, rest)) = next(a, node) {
+        node = rest;
+        if counter == N {
+            return None;
+        }
+        ret[counter] = first;
+        counter += 1;
+    }
+    if counter != N {
         None
+    } else {
+        Some(ret)
     }
 }
 
-fn unwrap_quote(node: Node) -> Option<Node> {
-    let p = node.pair()?;
-    check(&p.0, &[1_u8])?;
-    Some(p.1)
+fn check(a: &Allocator, n: NodePtr, atom: &[u8]) -> Option<()> {
+    match a.sexp(n) {
+        SExp::Atom(_) => {
+            if a.atom(n) == atom {
+                Some(())
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+fn unwrap_quote(a: &Allocator, n: NodePtr) -> Option<NodePtr> {
+    match a.sexp(n) {
+        SExp::Pair(first, rest) => {
+            check(a, first, &[1_u8])?;
+            Some(rest)
+        }
+        _ => None,
+    }
 }
 
 // matches
 // (2 (1 . self) rest)
 // returning (self, rest)
-fn match_wrapper(node: Node) -> Option<(Node, Node)> {
-    let (ev, quoted_inner, args_list) = unwrap3(node)?;
-    check(&ev, &[2_u8])?;
-    let inner = unwrap_quote(quoted_inner)?;
+fn match_wrapper(a: &Allocator, node: NodePtr) -> Option<(NodePtr, NodePtr)> {
+    let [ev, quoted_inner, args_list] = destructure::<3>(a, node)?;
+    check(a, ev, &[2_u8])?;
+    let inner = unwrap_quote(a, quoted_inner)?;
     Some((inner, args_list))
 }
 
@@ -41,20 +70,18 @@ fn match_wrapper(node: Node) -> Option<(Node, Node)> {
 pub fn uncurry(a: &Allocator, node: NodePtr) -> Option<(NodePtr, Vec<NodePtr>)> {
     let mut ret_args = Vec::<NodePtr>::new();
 
-    let n = Node::new(a, node);
-    let (inner, args) = match_wrapper(n)?;
+    let (inner, mut args) = match_wrapper(a, node)?;
 
-    let mut rest = args;
-    while rest.pair().is_some() {
+    while !nullp(a, args) {
         // match
         // (4 (1 . <arg>) <rest>)
-        let (cons, quoted_arg, r) = unwrap3(rest.clone())?;
-        rest = r;
-        let arg = unwrap_quote(quoted_arg)?;
-        check(&cons, &[4_u8])?;
-        ret_args.push(arg.node);
+        let [cons, quoted_arg, r] = destructure::<3>(a, args)?;
+        args = r;
+        let arg = unwrap_quote(a, quoted_arg)?;
+        check(a, cons, &[4_u8])?;
+        ret_args.push(arg);
     }
-    Some((inner.node, ret_args))
+    Some((inner, ret_args))
 }
 
 // ==== tests ===
@@ -104,21 +131,16 @@ fn test_unwrap_quote() {
     let invalid_quote = a.new_pair(a.null(), foobar).unwrap();
 
     // positive tests
+    assert_eq!(unwrap_quote(&a, quoted_foobar).unwrap(), foobar);
     assert_eq!(
-        unwrap_quote(Node::new(&a, quoted_foobar)).unwrap().node,
-        foobar
-    );
-    assert_eq!(
-        unwrap_quote(Node::new(&a, double_quoted_foobar))
-            .unwrap()
-            .node,
+        unwrap_quote(&a, double_quoted_foobar).unwrap(),
         quoted_foobar
     );
 
     // negative tests
-    assert!(unwrap_quote(Node::new(&a, foobar)).is_none());
-    assert!(unwrap_quote(Node::new(&a, invalid_quote)).is_none());
-    assert!(unwrap_quote(Node::new(&a, a.null())).is_none());
+    assert!(unwrap_quote(&a, foobar).is_none());
+    assert!(unwrap_quote(&a, invalid_quote).is_none());
+    assert!(unwrap_quote(&a, a.null()).is_none());
 }
 
 #[test]
@@ -128,20 +150,20 @@ fn test_check() {
     let foobar = a.new_atom(b"foobar").unwrap();
     let quoted_foobar = a.new_pair(quote, foobar).unwrap();
 
-    assert!(check(&Node::new(&a, quote), &[1_u8]).is_some());
-    assert!(check(&Node::new(&a, foobar), b"foobar").is_some());
+    assert!(check(&a, quote, &[1_u8]).is_some());
+    assert!(check(&a, foobar, b"foobar").is_some());
 
     // the wrong atom value
-    assert!(check(&Node::new(&a, foobar), &[1_u8]).is_none());
-    assert!(check(&Node::new(&a, quote), b"foobar").is_none());
+    assert!(check(&a, foobar, &[1_u8]).is_none());
+    assert!(check(&a, quote, b"foobar").is_none());
 
     // pairs alwaus fail
-    assert!(check(&Node::new(&a, quoted_foobar), b"foobar").is_none());
-    assert!(check(&Node::new(&a, quoted_foobar), &[1_u8]).is_none());
+    assert!(check(&a, quoted_foobar, b"foobar").is_none());
+    assert!(check(&a, quoted_foobar, &[1_u8]).is_none());
 }
 
 #[test]
-fn test_unwrap3() {
+fn test_destructure() {
     let mut a = Allocator::new();
     let foobar = a.new_atom(b"foobar").unwrap();
     let list1 = a.new_pair(foobar, a.null()).unwrap();
@@ -150,16 +172,16 @@ fn test_unwrap3() {
     let list4 = a.new_pair(foobar, list3).unwrap();
 
     // negative tests
-    assert!(unwrap3(Node::new(&a, foobar)).is_none());
-    assert!(unwrap3(Node::new(&a, list1)).is_none());
-    assert!(unwrap3(Node::new(&a, list2)).is_none());
-    assert!(unwrap3(Node::new(&a, list4)).is_none());
+    assert!(destructure::<3>(&a, foobar).is_none());
+    assert!(destructure::<3>(&a, list1).is_none());
+    assert!(destructure::<3>(&a, list2).is_none());
+    assert!(destructure::<3>(&a, list4).is_none());
 
     // positive test
-    let foobar_tuple = unwrap3(Node::new(&a, list3)).unwrap();
-    assert!(foobar_tuple.0.node == foobar);
-    assert!(foobar_tuple.1.node == foobar);
-    assert!(foobar_tuple.2.node == foobar);
+    let foobar_array = destructure::<3>(&a, list3).unwrap();
+    assert!(foobar_array[0] == foobar);
+    assert!(foobar_array[1] == foobar);
+    assert!(foobar_array[2] == foobar);
 }
 
 #[test]
@@ -178,17 +200,17 @@ fn test_match_wrapper() {
 
     // input: (2 (1 . self) rest)
     // returns: (self, rest)
-    let matched = match_wrapper(Node::new(&a, input)).unwrap();
-    assert!(matched.0.node == inner);
-    assert!(matched.1.node == rest);
+    let matched = match_wrapper(&a, input).unwrap();
+    assert!(matched.0 == inner);
+    assert!(matched.1 == rest);
 
     // negative tests
-    assert!(match_wrapper(Node::new(&a, long_input)).is_none());
-    assert!(match_wrapper(Node::new(&a, invalid_input)).is_none());
-    assert!(match_wrapper(Node::new(&a, quoted_inner)).is_none());
-    assert!(match_wrapper(Node::new(&a, apply)).is_none());
-    assert!(match_wrapper(Node::new(&a, rest)).is_none());
-    assert!(match_wrapper(Node::new(&a, inner)).is_none());
-    assert!(match_wrapper(Node::new(&a, input2)).is_none());
-    assert!(match_wrapper(Node::new(&a, input1)).is_none());
+    assert!(match_wrapper(&a, long_input).is_none());
+    assert!(match_wrapper(&a, invalid_input).is_none());
+    assert!(match_wrapper(&a, quoted_inner).is_none());
+    assert!(match_wrapper(&a, apply).is_none());
+    assert!(match_wrapper(&a, rest).is_none());
+    assert!(match_wrapper(&a, inner).is_none());
+    assert!(match_wrapper(&a, input2).is_none());
+    assert!(match_wrapper(&a, input1).is_none());
 }
