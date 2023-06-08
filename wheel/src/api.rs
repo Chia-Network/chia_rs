@@ -5,8 +5,9 @@ use crate::run_generator::{
 };
 use chia::allocator::make_allocator;
 use chia::gen::flags::{
-    AGG_SIG_ARGS, COND_ARGS_NIL, ENABLE_ASSERT_BEFORE, ENABLE_SOFTFORK_CONDITION, LIMIT_OBJECTS,
-    MEMPOOL_MODE, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
+    AGG_SIG_ARGS, COND_ARGS_NIL, ENABLE_ASSERT_BEFORE, ENABLE_SOFTFORK_CONDITION, LIMIT_ANNOUNCES,
+    LIMIT_OBJECTS, MEMPOOL_MODE, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL, NO_UNKNOWN_CONDS,
+    STRICT_ARGS_COUNT,
 };
 use chia::gen::run_puzzle::run_puzzle as native_run_puzzle;
 use chia::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
@@ -29,11 +30,11 @@ use chia_protocol::{
     SubEpochChallengeSegment, SubEpochSegments, SubSlotData, SubSlotProofs, TransactionAck,
     TransactionsInfo, VDFInfo, VDFProof,
 };
-use clvmr::chia_dialect::{ENABLE_BLS_OPS, ENABLE_BLS_OPS_OUTSIDE_GUARD};
 use clvmr::serde::tree_hash_from_stream;
-use clvmr::LIMIT_HEAP;
-use clvmr::LIMIT_STACK;
-use clvmr::NO_UNKNOWN_OPS;
+use clvmr::{
+    ENABLE_BLS_OPS, ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV, ENABLE_SECP_OPS, LIMIT_HEAP,
+    NO_UNKNOWN_OPS,
+};
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use pyo3::types::PyModule;
@@ -49,7 +50,6 @@ use chia::gen::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as pars
 use chia::gen::validation_error::ValidationErr;
 use clvmr::allocator::NodePtr;
 use clvmr::cost::Cost;
-use clvmr::node::Node;
 use clvmr::reduction::EvalErr;
 use clvmr::reduction::Reduction;
 use clvmr::run_program;
@@ -93,7 +93,7 @@ pub fn get_puzzle_and_solution_for_coin<'py>(
     let mut allocator = make_allocator(LIMIT_HEAP);
     let program = node_from_bytes(&mut allocator, program)?;
     let args = node_from_bytes(&mut allocator, args)?;
-    let dialect = &ChiaDialect::new(LIMIT_STACK);
+    let dialect = &ChiaDialect::new(0);
 
     let r = py.allow_threads(|| -> Result<(NodePtr, NodePtr), EvalErr> {
         let Reduction(_cost, result) =
@@ -107,8 +107,8 @@ pub fn get_puzzle_and_solution_for_coin<'py>(
     match r {
         Err(eval_err) => eval_err_to_pyresult(py, eval_err, allocator),
         Ok((puzzle, solution)) => Ok((
-            PyBytes::new(py, &node_to_bytes(&Node::new(&allocator, puzzle))?),
-            PyBytes::new(py, &node_to_bytes(&Node::new(&allocator, solution))?),
+            PyBytes::new(py, &node_to_bytes(&allocator, puzzle)?),
+            PyBytes::new(py, &node_to_bytes(&allocator, solution)?),
         )),
     }
 }
@@ -144,17 +144,16 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     m.add("COND_ARGS_NIL", COND_ARGS_NIL)?;
     m.add("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;
     m.add("STRICT_ARGS_COUNT", STRICT_ARGS_COUNT)?;
+    m.add("LIMIT_ANNOUNCES", LIMIT_ANNOUNCES)?;
     m.add("AGG_SIG_ARGS", AGG_SIG_ARGS)?;
     m.add("ENABLE_ASSERT_BEFORE", ENABLE_ASSERT_BEFORE)?;
+    m.add("ENABLE_FIXED_DIV", ENABLE_FIXED_DIV)?;
     m.add("ENABLE_SOFTFORK_CONDITION", ENABLE_SOFTFORK_CONDITION)?;
-    m.add("ENABLE_BLS_OPS", ENABLE_BLS_OPS)?;
-    m.add("ENABLE_BLS_OPS_OUTSIDE_GUARD", ENABLE_BLS_OPS_OUTSIDE_GUARD)?;
     m.add(
         "NO_RELATIVE_CONDITIONS_ON_EPHEMERAL",
         NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
     )?;
     m.add("MEMPOOL_MODE", MEMPOOL_MODE)?;
-    m.add("LIMIT_OBJECTS", LIMIT_OBJECTS)?;
 
     // Chia classes
     m.add_class::<Coin>()?;
@@ -226,7 +225,10 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(run_chia_program, m)?)?;
     m.add("NO_UNKNOWN_OPS", NO_UNKNOWN_OPS)?;
     m.add("LIMIT_HEAP", LIMIT_HEAP)?;
-    m.add("LIMIT_STACK", LIMIT_STACK)?;
+    m.add("ENABLE_BLS_OPS", ENABLE_BLS_OPS)?;
+    m.add("ENABLE_SECP_OPS", ENABLE_SECP_OPS)?;
+    m.add("ENABLE_BLS_OPS_OUTSIDE_GUARD", ENABLE_BLS_OPS_OUTSIDE_GUARD)?;
+    m.add("LIMIT_OBJECTS", LIMIT_OBJECTS)?;
 
     m.add_function(wrap_pyfunction!(serialized_length, m)?)?;
     m.add_function(wrap_pyfunction!(compute_merkle_set_root, m)?)?;

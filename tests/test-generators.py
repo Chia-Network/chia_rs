@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from run_gen import run_gen, print_spend_bundle_conditions
-from chia_rs import MEMPOOL_MODE, LIMIT_STACK
+from chia_rs import MEMPOOL_MODE
 from time import perf_counter
 import sys
 import glob
@@ -28,7 +28,7 @@ for g in sorted(glob.glob('../generator-tests/*.txt')):
     print(f"{g}")
     sys.stdout.write("running generator...\r")
     start_time = perf_counter()
-    error_code, result = run_gen(g, LIMIT_STACK) #, "generators/block-834752.hex")
+    error_code, result = run_gen(g, 0) #, "generators/block-834752.hex")
     run_time = perf_counter() - start_time
     output = parse_output(result, error_code)
 

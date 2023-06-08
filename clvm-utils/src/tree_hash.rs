@@ -13,10 +13,10 @@ pub fn tree_hash(a: &Allocator, node: NodePtr) -> [u8; 32] {
     while !ops.is_empty() {
         match ops.pop().unwrap() {
             TreeOp::SExp(node) => match a.sexp(node) {
-                SExp::Atom(atom) => {
+                SExp::Atom() => {
                     let mut sha256 = Sha256::new();
                     sha256.update([1_u8]);
-                    sha256.update(a.buf(&atom));
+                    sha256.update(a.atom(node));
                     hashes.push(sha256.finalize().into())
                 }
                 SExp::Pair(left, right) => {
