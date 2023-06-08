@@ -4,14 +4,10 @@ use crate::run_generator::{
     __pyo3_get_function_run_block_generator, __pyo3_get_function_run_generator,
 };
 use chia::allocator::make_allocator;
-use chia::gen::flags::COND_ARGS_NIL;
-use chia::gen::flags::ENABLE_ASSERT_BEFORE;
-use chia::gen::flags::ENABLE_SOFTFORK_CONDITION;
-use chia::gen::flags::LIMIT_OBJECTS;
-use chia::gen::flags::MEMPOOL_MODE;
-use chia::gen::flags::NO_RELATIVE_CONDITIONS_ON_EPHEMERAL;
-use chia::gen::flags::NO_UNKNOWN_CONDS;
-use chia::gen::flags::STRICT_ARGS_COUNT;
+use chia::gen::flags::{
+    AGG_SIG_ARGS, COND_ARGS_NIL, ENABLE_ASSERT_BEFORE, ENABLE_SOFTFORK_CONDITION, LIMIT_OBJECTS,
+    MEMPOOL_MODE, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
+};
 use chia::gen::run_puzzle::run_puzzle as native_run_puzzle;
 use chia::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_protocol::Bytes32;
@@ -33,8 +29,7 @@ use chia_protocol::{
     SubEpochChallengeSegment, SubEpochSegments, SubSlotData, SubSlotProofs, TransactionAck,
     TransactionsInfo, VDFInfo, VDFProof,
 };
-use clvmr::chia_dialect::ENABLE_BLS_OPS;
-use clvmr::chia_dialect::ENABLE_BLS_OPS_OUTSIDE_GUARD;
+use clvmr::chia_dialect::{ENABLE_BLS_OPS, ENABLE_BLS_OPS_OUTSIDE_GUARD};
 use clvmr::serde::tree_hash_from_stream;
 use clvmr::LIMIT_HEAP;
 use clvmr::LIMIT_STACK;
@@ -149,6 +144,7 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     m.add("COND_ARGS_NIL", COND_ARGS_NIL)?;
     m.add("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;
     m.add("STRICT_ARGS_COUNT", STRICT_ARGS_COUNT)?;
+    m.add("AGG_SIG_ARGS", AGG_SIG_ARGS)?;
     m.add("ENABLE_ASSERT_BEFORE", ENABLE_ASSERT_BEFORE)?;
     m.add("ENABLE_SOFTFORK_CONDITION", ENABLE_SOFTFORK_CONDITION)?;
     m.add("ENABLE_BLS_OPS", ENABLE_BLS_OPS)?;

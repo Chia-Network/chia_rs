@@ -26,8 +26,13 @@ pub const ENABLE_ASSERT_BEFORE: u32 = 0x100000;
 // disallow relative height- and time conditions on ephemeral spends
 pub const NO_RELATIVE_CONDITIONS_ON_EPHEMERAL: u32 = 0x200000;
 
-// enable softfork condition
+// enable softfork condition. Enabling this flag is a hard fork
 pub const ENABLE_SOFTFORK_CONDITION: u32 = 0x400000;
+
+// this lifts the restriction that AGG_SIG_ME and AGG_SIG_UNSAFE are only
+// allowed to have two arguments. This makes the AGG_SIG_* conditions behave
+// normal, just like all other conditions. Setting this flag is a hard fork
+pub const AGG_SIG_ARGS: u32 = 0x800000;
 
 pub const MEMPOOL_MODE: u32 = CLVM_MEMPOOL_MODE
     | NO_UNKNOWN_CONDS
