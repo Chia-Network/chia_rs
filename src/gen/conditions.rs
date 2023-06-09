@@ -12,10 +12,10 @@ use super::opcodes::{
 };
 use super::sanitize_int::{sanitize_uint, SanitizedUint};
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
-use crate::gen::flags::COND_ARGS_NIL;
-use crate::gen::flags::NO_RELATIVE_CONDITIONS_ON_EPHEMERAL;
-use crate::gen::flags::NO_UNKNOWN_CONDS;
-use crate::gen::flags::STRICT_ARGS_COUNT;
+use crate::gen::flags::{
+    AGG_SIG_ARGS, COND_ARGS_NIL, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL, NO_UNKNOWN_CONDS,
+    STRICT_ARGS_COUNT,
+};
 use crate::gen::validation_error::check_nil;
 use chia_protocol::bytes::Bytes32;
 use clvmr::allocator::{Allocator, NodePtr, SExp};
@@ -135,13 +135,15 @@ pub fn parse_args(
                 // make sure there aren't more than two
                 check_nil(a, rest(a, c)?)?;
                 Ok(Condition::AggSigUnsafe(pubkey, message))
-            } else {
+            } else if (flags & AGG_SIG_ARGS) == 0 {
                 // but the argument list still doesn't need to be terminated by NIL,
                 // just any atom will do
                 match a.sexp(rest(a, c)?) {
                     SExp::Pair(_, _) => Err(ValidationErr(c, ErrorCode::InvalidCondition)),
                     _ => Ok(Condition::AggSigUnsafe(pubkey, message)),
                 }
+            } else {
+                Ok(Condition::AggSigUnsafe(pubkey, message))
             }
         }
         AGG_SIG_ME => {
@@ -153,13 +155,15 @@ pub fn parse_args(
                 // make sure there aren't more than two
                 check_nil(a, rest(a, c)?)?;
                 Ok(Condition::AggSigMe(pubkey, message))
-            } else {
+            } else if (flags & AGG_SIG_ARGS) == 0 {
                 // but the argument list still doesn't need to be terminated by NIL,
                 // just any atom will do
                 match a.sexp(rest(a, c)?) {
                     SExp::Pair(_, _) => Err(ValidationErr(c, ErrorCode::InvalidCondition)),
                     _ => Ok(Condition::AggSigMe(pubkey, message)),
                 }
+            } else {
+                Ok(Condition::AggSigMe(pubkey, message))
             }
         }
         CREATE_COIN => {
@@ -2726,6 +2730,56 @@ fn test_agg_sig_me_extra_arg() {
             .1,
         ErrorCode::InvalidCondition
     );
+}
+
+#[test]
+fn test_agg_sig_unsafe_extra_arg_allowed() {
+    // AGG_SIG_UNSAFE
+    // extra args are allowed when the AGG_SIG_ARGS flag is set
+    let (a, conds) = cond_test_flag(
+        "((({h1} ({h2} (123 (((49 ({pubkey} ({msg1} (456 )))))",
+        AGG_SIG_ARGS,
+    )
+    .unwrap();
+
+    assert_eq!(conds.cost, AGG_SIG_COST);
+    assert_eq!(conds.spends.len(), 1);
+    assert_eq!(conds.removal_amount, 123);
+    assert_eq!(conds.addition_amount, 0);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(conds.agg_sig_unsafe.len(), 1);
+    for (pk, msg) in &conds.agg_sig_unsafe {
+        assert_eq!(a.atom(*pk), PUBKEY);
+        assert_eq!(a.atom(*msg), MSG1);
+    }
+    assert_eq!(spend.flags, 0);
+}
+
+#[test]
+fn test_agg_sig_me_extra_arg_allowed() {
+    // AGG_SIG_ME
+    // extra args are allowed when the AGG_SIG_ARGS flag is set
+    let (a, conds) = cond_test_flag(
+        "((({h1} ({h2} (123 (((50 ({pubkey} ({msg1} (456 )))))",
+        AGG_SIG_ARGS,
+    )
+    .unwrap();
+
+    assert_eq!(conds.cost, AGG_SIG_COST);
+    assert_eq!(conds.spends.len(), 1);
+    assert_eq!(conds.removal_amount, 123);
+    assert_eq!(conds.addition_amount, 0);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert_eq!(spend.agg_sig_me.len(), 1);
+    for c in &spend.agg_sig_me {
+        assert_eq!(a.atom(c.0), PUBKEY);
+        assert_eq!(a.atom(c.1), MSG1);
+    }
+    assert_eq!(spend.flags, 0);
 }
 
 #[test]
