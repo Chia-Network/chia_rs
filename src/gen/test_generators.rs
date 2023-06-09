@@ -1,7 +1,7 @@
 use super::conditions::{NewCoin, Spend, SpendBundleConditions};
-use super::run_block_generator::run_block_generator;
+use super::run_block_generator::{run_block_generator, run_block_generator2};
 use crate::allocator::make_allocator;
-use crate::gen::flags::MEMPOOL_MODE;
+use crate::gen::flags::{ALLOW_BACKREFS, MEMPOOL_MODE};
 use chia_protocol::{Bytes, Bytes48};
 use clvmr::Allocator;
 use std::iter::zip;
@@ -147,6 +147,7 @@ fn print_diff(output: &str, expected: &str) {
 #[case("block-225758")]
 #[case("assert-puzzle-announce-fail")]
 #[case("block-834752")]
+#[case("block-834752-compressed")]
 #[case("block-834760")]
 #[case("block-834761")]
 #[case("block-834765")]
@@ -206,16 +207,38 @@ fn run_generator(#[case] name: &str) {
         block_refs.push(hex::decode(env_hex).expect("hex decode env-file"));
     }
 
-    for (flags, expected) in zip(&[0, MEMPOOL_MODE], expected) {
+    for (flags, expected) in zip(&[ALLOW_BACKREFS, ALLOW_BACKREFS | MEMPOOL_MODE], expected) {
         println!("flags: {:x}", flags);
         let mut a = make_allocator(*flags);
-        let output = match run_block_generator(&mut a, &generator, &block_refs, 11000000000, *flags)
-        {
-            Ok(conditions) => print_conditions(&a, &conditions),
-            Err(code) => {
-                format!("FAILED: {}\n", u32::from(code.1))
-            }
-        };
+        let (expected_cost, output) =
+            match run_block_generator(&mut a, &generator, &block_refs, 11000000000, *flags) {
+                Ok(conditions) => (conditions.cost, print_conditions(&a, &conditions)),
+                Err(code) => (0, format!("FAILED: {}\n", u32::from(code.1))),
+            };
+
+        let output_hard_fork =
+            match run_block_generator2(&mut a, &generator, &block_refs, 11000000000, *flags) {
+                Ok(mut conditions) => {
+                    // in the hard fork, the cost of running the genrator +
+                    // puzzles should never be higher than before the hard-fork
+                    // but it's likely less.
+                    assert!(conditions.cost <= expected_cost);
+                    assert!(conditions.cost > 0);
+                    // update the cost we print here, just to be compatible with
+                    // the test cases we have. We've already ensured the cost is
+                    // lower
+                    conditions.cost = expected_cost;
+                    print_conditions(&a, &conditions)
+                }
+                Err(code) => {
+                    format!("FAILED: {}\n", u32::from(code.1))
+                }
+            };
+
+        if output != output_hard_fork {
+            print_diff(&output, &output_hard_fork);
+            panic!("run_block_generator2 produced a different result!");
+        }
 
         if output != expected {
             print_diff(&output, &expected);

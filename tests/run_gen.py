@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
-from chia_rs import run_block_generator, SpendBundleConditions
+from chia_rs import run_block_generator, SpendBundleConditions, run_block_generator2
 from time import time
 import sys
 from time import perf_counter
 from typing import Optional, Tuple
 
-def run_gen(fn: str, flags: int = 0, args: Optional[str] = None) -> Tuple[Optional[int], Optional[SpendBundleConditions], float]:
+def run_gen(fn: str, flags: int = 0, args: Optional[str] = None, version: int = 1) -> Tuple[Optional[int], Optional[SpendBundleConditions], float]:
 
     # constants from the main chia blockchain:
     # https://github.com/Chia-Network/chia-blockchain/blob/main/chia/consensus/default_constants.py
@@ -25,9 +25,11 @@ def run_gen(fn: str, flags: int = 0, args: Optional[str] = None) -> Tuple[Option
         except OSError as e:
             pass
 
+    block_runner = run_block_generator if version == 1 else run_block_generator2
+
     start_time = perf_counter()
     try:
-        ret = run_block_generator(generator, block_refs, max_cost, flags)
+        ret = block_runner(generator, block_refs, max_cost, flags)
         run_time = perf_counter() - start_time
         return ret + (run_time, )
     except Exception as e:
