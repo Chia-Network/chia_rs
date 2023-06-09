@@ -60,3 +60,9 @@ name = "sanitize-uint"
 path = "fuzz_targets/sanitize-uint.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "process-spend"
+path = "fuzz_targets/process-spend.rs"
+test = false
+doc = false

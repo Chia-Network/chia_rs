@@ -566,21 +566,39 @@ pub struct ParseState {
     assert_not_ephemeral: HashSet<usize>,
 }
 
+// returns (parent-id, puzzle-hash, amount, condition-list)
 pub(crate) fn parse_single_spend(
-    ret: &mut SpendBundleConditions,
     a: &Allocator,
-    state: &mut ParseState,
     mut spend: NodePtr,
+) -> Result<(NodePtr, NodePtr, NodePtr, NodePtr), ValidationErr> {
+    let parent_id = first(a, spend)?;
+    spend = rest(a, spend)?;
+    let puzzle_hash = first(a, spend)?;
+    spend = rest(a, spend)?;
+    let amount = first(a, spend)?;
+    spend = rest(a, spend)?;
+    let cond = first(a, spend)?;
+    // the rest() here is spend_level_extr. Typically nil
+    Ok((parent_id, puzzle_hash, amount, cond))
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn process_single_spend(
+    a: &Allocator,
+    ret: &mut SpendBundleConditions,
+    state: &mut ParseState,
+    parent_id: NodePtr,
+    puzzle_hash: NodePtr,
+    amount: NodePtr,
+    conditions: NodePtr,
     flags: u32,
     max_cost: &mut Cost,
 ) -> Result<(), ValidationErr> {
-    let parent_id = sanitize_hash(a, first(a, spend)?, 32, ErrorCode::InvalidParentId)?;
-    spend = rest(a, spend)?;
-    let puzzle_hash = sanitize_hash(a, first(a, spend)?, 32, ErrorCode::InvalidPuzzleHash)?;
-    spend = rest(a, spend)?;
-    let my_amount = parse_amount(a, first(a, spend)?, ErrorCode::InvalidCoinAmount)?;
-    let cond = rest(a, spend)?;
-    let amount_buf = a.atom(first(a, spend)?);
+    let parent_id = sanitize_hash(a, parent_id, 32, ErrorCode::InvalidParentId)?;
+    let puzzle_hash = sanitize_hash(a, puzzle_hash, 32, ErrorCode::InvalidPuzzleHash)?;
+    let my_amount = parse_amount(a, amount, ErrorCode::InvalidCoinAmount)?;
+    let amount_buf = a.atom(amount);
+
     let coin_id = Arc::new(compute_coin_id(a, parent_id, puzzle_hash, amount_buf));
 
     if state
@@ -590,7 +608,7 @@ pub(crate) fn parse_single_spend(
     {
         // if this coin ID has already been added to this set, it's a double
         // spend
-        return Err(ValidationErr(spend, ErrorCode::DoubleSpend));
+        return Err(ValidationErr(parent_id, ErrorCode::DoubleSpend));
     }
 
     state.spent_puzzles.insert(puzzle_hash);
@@ -614,8 +632,7 @@ pub(crate) fn parse_single_spend(
         flags: ELIGIBLE_FOR_DEDUP,
     };
 
-    let iter = first(a, cond)?;
-    parse_conditions(a, ret, state, coin_spend, iter, flags, max_cost)
+    parse_conditions(a, ret, state, coin_spend, conditions, flags, max_cost)
 }
 
 fn assert_not_ephemeral(spend_flags: &mut u32, state: &mut ParseState, idx: usize) {
@@ -924,9 +941,34 @@ pub fn parse_spends(
         // as possible if cost is exceeded
         // this function adds the spend to the passed-in ret
         // as well as updates it with any conditions
-        parse_single_spend(&mut ret, a, &mut state, spend, flags, &mut cost_left)?;
+        let (parent_id, puzzle_hash, amount, conds) = parse_single_spend(a, spend)?;
+
+        process_single_spend(
+            a,
+            &mut ret,
+            &mut state,
+            parent_id,
+            puzzle_hash,
+            amount,
+            conds,
+            flags,
+            &mut cost_left,
+        )?;
     }
 
+    validate_conditions(a, &ret, state, spends, flags)?;
+    ret.cost = max_cost - cost_left;
+
+    Ok(ret)
+}
+
+pub fn validate_conditions(
+    a: &Allocator,
+    ret: &SpendBundleConditions,
+    state: ParseState,
+    spends: NodePtr,
+    flags: u32,
+) -> Result<(), ValidationErr> {
     if ret.removal_amount < ret.addition_amount {
         // The sum of removal amounts must not be less than the sum of addition
         // amounts
@@ -1062,9 +1104,7 @@ pub fn parse_spends(
     // example an assert-my-birth-height that's incompatible assert-height or
     // assert-before-height. Same thing for the seconds counterpart
 
-    ret.cost = max_cost - cost_left;
-
-    Ok(ret)
+    Ok(())
 }
 
 #[cfg(test)]
