@@ -1,5 +1,5 @@
 use crate::compression;
-use crate::run_generator::run_block_generator;
+use crate::run_generator::{run_block_generator, run_block_generator2};
 use chia::allocator::make_allocator;
 use chia::gen::conditions::{NewCoin, Spend, SpendBundleConditions};
 use chia::gen::flags::{
@@ -152,6 +152,7 @@ fn run_puzzle(
 pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     // generator functions
     m.add_function(wrap_pyfunction!(run_block_generator, m)?)?;
+    m.add_function(wrap_pyfunction!(run_block_generator2, m)?)?;
     m.add_function(wrap_pyfunction!(run_puzzle, m)?)?;
     m.add_class::<SpendBundleConditions>()?;
     m.add_class::<Spend>()?;

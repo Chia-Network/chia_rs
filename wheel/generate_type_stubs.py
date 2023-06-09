@@ -158,6 +158,10 @@ def run_block_generator(
     program: ReadableBuffer, args: List[ReadableBuffer], max_cost: int, flags: int
 ) -> Tuple[Optional[int], Optional[SpendBundleConditions]]: ...
 
+def run_block_generator2(
+    program: ReadableBuffer, args: List[ReadableBuffer], max_cost: int, flags: int
+) -> Tuple[Optional[int], Optional[SpendBundleConditions]]: ...
+
 def run_puzzle(
     puzzle: bytes, solution: bytes, parent_id: bytes32, amount: int, max_cost: int, flags: int
 ) -> SpendBundleConditions: ...
