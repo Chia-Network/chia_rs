@@ -406,7 +406,7 @@ pub fn parse_args(
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NewCoin {
     pub puzzle_hash: Bytes32,
     pub amount: u64,
@@ -441,7 +441,7 @@ pub const ELIGIBLE_FOR_DEDUP: u32 = 1;
 pub const HAS_RELATIVE_CONDITION: u32 = 2;
 
 // These are all the conditions related directly to a specific spend.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Spend {
     // the parent coin ID of the coin being spent
     pub parent_id: NodePtr,

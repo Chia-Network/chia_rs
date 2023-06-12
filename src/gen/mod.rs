@@ -8,3 +8,6 @@ pub mod run_block_generator;
 pub mod run_puzzle;
 pub mod sanitize_int;
 pub mod validation_error;
+
+#[cfg(test)]
+mod test_generators;
