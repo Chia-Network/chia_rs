@@ -51,6 +51,7 @@ pub enum ErrorCode {
     EphemeralRelativeCondition,
     InvalidSoftforkCondition,
     InvalidSoftforkCost,
+    TooManyAnnouncements,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -130,6 +131,7 @@ impl From<ErrorCode> for u32 {
             ErrorCode::EphemeralRelativeCondition => 141,
             ErrorCode::InvalidSoftforkCondition => 142,
             ErrorCode::InvalidSoftforkCost => 143,
+            ErrorCode::TooManyAnnouncements => 144,
         }
     }
 }

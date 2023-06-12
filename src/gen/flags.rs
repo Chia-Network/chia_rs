@@ -34,8 +34,19 @@ pub const ENABLE_SOFTFORK_CONDITION: u32 = 0x400000;
 // normal, just like all other conditions. Setting this flag is a hard fork
 pub const AGG_SIG_ARGS: u32 = 0x800000;
 
+// When enabled, each spend is limited in the number of announcements it is
+// allowed to create and assert, to no more than 1000. This includes:
+// CREATE_COIN_ANNOUNCEMENT
+// CREATE_PUZZLE_ANNOUNCEMENT
+// ASSERT_COIN_ANNOUNCEMENT
+// ASSERT_PUZZLE_ANNOUNCEMENT
+// ASSERT_CONCURRENT_SPEND
+// ASSERT_CONCURRENT_PUZZLE
+pub const LIMIT_ANNOUNCES: u32 = 0x1000000;
+
 pub const MEMPOOL_MODE: u32 = CLVM_MEMPOOL_MODE
     | NO_UNKNOWN_CONDS
     | COND_ARGS_NIL
     | STRICT_ARGS_COUNT
-    | NO_RELATIVE_CONDITIONS_ON_EPHEMERAL;
+    | NO_RELATIVE_CONDITIONS_ON_EPHEMERAL
+    | LIMIT_ANNOUNCES;

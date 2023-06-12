@@ -13,8 +13,8 @@ use super::opcodes::{
 use super::sanitize_int::{sanitize_uint, SanitizedUint};
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
 use crate::gen::flags::{
-    AGG_SIG_ARGS, COND_ARGS_NIL, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL, NO_UNKNOWN_CONDS,
-    STRICT_ARGS_COUNT,
+    AGG_SIG_ARGS, COND_ARGS_NIL, LIMIT_ANNOUNCES, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
+    NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
 };
 use crate::gen::validation_error::check_nil;
 use chia_protocol::bytes::Bytes32;
@@ -644,6 +644,15 @@ fn assert_not_ephemeral(spend_flags: &mut u32, state: &mut ParseState, idx: usiz
     *spend_flags |= HAS_RELATIVE_CONDITION;
 }
 
+fn decrement(cnt: &mut u32, n: NodePtr) -> Result<(), ValidationErr> {
+    if *cnt == 0 {
+        Err(ValidationErr(n, ErrorCode::TooManyAnnouncements))
+    } else {
+        *cnt -= 1;
+        Ok(())
+    }
+}
+
 pub fn parse_conditions(
     a: &Allocator,
     ret: &mut SpendBundleConditions,
@@ -653,6 +662,12 @@ pub fn parse_conditions(
     flags: u32,
     max_cost: &mut Cost,
 ) -> Result<(), ValidationErr> {
+    let mut announce_countdown: u32 = if (flags & LIMIT_ANNOUNCES) != 0 {
+        1000
+    } else {
+        u32::MAX
+    };
+
     while let Some((mut c, next)) = next(a, iter)? {
         iter = next;
         let op = match parse_opcode(a, first(a, c)?, flags) {
@@ -853,21 +868,27 @@ pub fn parse_conditions(
                 }
             }
             Condition::CreateCoinAnnouncement(msg) => {
+                decrement(&mut announce_countdown, msg)?;
                 state.announce_coin.insert((spend.coin_id.clone(), msg));
             }
             Condition::CreatePuzzleAnnouncement(msg) => {
+                decrement(&mut announce_countdown, msg)?;
                 state.announce_puzzle.insert((spend.puzzle_hash, msg));
             }
             Condition::AssertCoinAnnouncement(msg) => {
+                decrement(&mut announce_countdown, msg)?;
                 state.assert_coin.insert(msg);
             }
             Condition::AssertPuzzleAnnouncement(msg) => {
+                decrement(&mut announce_countdown, msg)?;
                 state.assert_puzzle.insert(msg);
             }
             Condition::AssertConcurrentSpend(id) => {
+                decrement(&mut announce_countdown, id)?;
                 state.assert_concurrent_spend.insert(id);
             }
             Condition::AssertConcurrentPuzzle(id) => {
+                decrement(&mut announce_countdown, id)?;
                 state.assert_concurrent_puzzle.insert(id);
             }
             Condition::AggSigMe(pk, msg) => {
@@ -1235,7 +1256,7 @@ fn test_coin_id(parent_id: &[u8; 32], puzzle_hash: &[u8; 32], amount: u64) -> By
 fn parse_list_impl(
     a: &mut Allocator,
     input: &str,
-    callback: &Option<fn(&mut Allocator) -> NodePtr>,
+    callback: &Option<Box<dyn Fn(&mut Allocator) -> NodePtr>>,
     subs: &HashMap<&'static str, NodePtr>,
 ) -> (NodePtr, usize) {
     // skip whitespace
@@ -1256,7 +1277,7 @@ fn parse_list_impl(
         let var = input[1..].split_once("}").unwrap().0;
 
         let ret = match var {
-            "" => callback.unwrap()(a),
+            "" => callback.as_ref().unwrap()(a),
             _ => *subs.get(var).unwrap(),
         };
         (ret, var.len() + 2)
@@ -1278,7 +1299,7 @@ fn parse_list_impl(
 fn parse_list(
     a: &mut Allocator,
     input: &str,
-    callback: &Option<fn(&mut Allocator) -> NodePtr>,
+    callback: &Option<Box<dyn Fn(&mut Allocator) -> NodePtr>>,
 ) -> NodePtr {
     // all substitutions are allocated up-front in order to have them all use
     // the same atom in the CLVM structure. This is to cover cases where
@@ -1350,7 +1371,7 @@ fn parse_list(
 fn cond_test_cb(
     input: &str,
     flags: u32,
-    callback: Option<fn(&mut Allocator) -> NodePtr>,
+    callback: Option<Box<dyn Fn(&mut Allocator) -> NodePtr>>,
 ) -> Result<(Allocator, SpendBundleConditions), ValidationErr> {
     let mut a = Allocator::new();
 
@@ -2580,7 +2601,7 @@ fn test_create_coin_exceed_cost() {
         cond_test_cb(
             "((({h1} ({h2} (123 ({} )))",
             0,
-            Some(|a: &mut Allocator| -> NodePtr {
+            Some(Box::new(|a: &mut Allocator| -> NodePtr {
                 let mut rest: NodePtr = a.null();
 
                 for i in 0..6500 {
@@ -2598,7 +2619,7 @@ fn test_create_coin_exceed_cost() {
                     rest = a.new_pair(coin, rest).unwrap();
                 }
                 rest
-            })
+            }))
         )
         .unwrap_err()
         .1,
@@ -2702,7 +2723,7 @@ fn test_agg_sig_me_exceed_cost() {
         cond_test_cb(
             "((({h1} ({h2} (123 ({} )))",
             0,
-            Some(|a: &mut Allocator| -> NodePtr {
+            Some(Box::new(|a: &mut Allocator| -> NodePtr {
                 let mut rest: NodePtr = a.null();
 
                 for _i in 0..9167 {
@@ -2720,7 +2741,7 @@ fn test_agg_sig_me_exceed_cost() {
                     rest = a.new_pair(aggsig, rest).unwrap();
                 }
                 rest
-            })
+            }))
         )
         .unwrap_err()
         .1,
@@ -2950,7 +2971,7 @@ fn test_agg_sig_unsafe_exceed_cost() {
         cond_test_cb(
             "((({h1} ({h2} (123 ({} )))",
             0,
-            Some(|a: &mut Allocator| -> NodePtr {
+            Some(Box::new(|a: &mut Allocator| -> NodePtr {
                 let mut rest: NodePtr = a.null();
 
                 for _i in 0..9167 {
@@ -2968,7 +2989,7 @@ fn test_agg_sig_unsafe_exceed_cost() {
                     rest = a.new_pair(aggsig, rest).unwrap();
                 }
                 rest
-            })
+            }))
         )
         .unwrap_err()
         .1,
@@ -3889,4 +3910,110 @@ fn test_softfork_condition_failures(#[case] conditions: &str, #[case] expected_e
         .1,
         expected_err
     );
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(CREATE_PUZZLE_ANNOUNCEMENT, 1000, LIMIT_ANNOUNCES, None)]
+#[case(
+    CREATE_PUZZLE_ANNOUNCEMENT,
+    1001,
+    LIMIT_ANNOUNCES,
+    Some(ErrorCode::TooManyAnnouncements)
+)]
+#[case(
+    ASSERT_PUZZLE_ANNOUNCEMENT,
+    1000,
+    LIMIT_ANNOUNCES,
+    Some(ErrorCode::AssertPuzzleAnnouncementFailed)
+)]
+#[case(
+    ASSERT_PUZZLE_ANNOUNCEMENT,
+    1001,
+    LIMIT_ANNOUNCES,
+    Some(ErrorCode::TooManyAnnouncements)
+)]
+#[case(CREATE_COIN_ANNOUNCEMENT, 1000, LIMIT_ANNOUNCES, None)]
+#[case(
+    CREATE_COIN_ANNOUNCEMENT,
+    1001,
+    LIMIT_ANNOUNCES,
+    Some(ErrorCode::TooManyAnnouncements)
+)]
+#[case(
+    ASSERT_COIN_ANNOUNCEMENT,
+    1000,
+    LIMIT_ANNOUNCES,
+    Some(ErrorCode::AssertCoinAnnouncementFailed)
+)]
+#[case(
+    ASSERT_COIN_ANNOUNCEMENT,
+    1001,
+    LIMIT_ANNOUNCES,
+    Some(ErrorCode::TooManyAnnouncements)
+)]
+#[case(ASSERT_CONCURRENT_SPEND, 1000, ENABLE_ASSERT_BEFORE | LIMIT_ANNOUNCES, Some(ErrorCode::AssertConcurrentSpendFailed))]
+#[case(ASSERT_CONCURRENT_SPEND, 1001, ENABLE_ASSERT_BEFORE | LIMIT_ANNOUNCES, Some(ErrorCode::TooManyAnnouncements))]
+#[case(ASSERT_CONCURRENT_PUZZLE, 1000, ENABLE_ASSERT_BEFORE | LIMIT_ANNOUNCES, Some(ErrorCode::AssertConcurrentPuzzleFailed))]
+#[case(ASSERT_CONCURRENT_PUZZLE, 1001, ENABLE_ASSERT_BEFORE | LIMIT_ANNOUNCES, Some(ErrorCode::TooManyAnnouncements))]
+#[case(CREATE_PUZZLE_ANNOUNCEMENT, 1001, 0, None)]
+#[case(
+    ASSERT_PUZZLE_ANNOUNCEMENT,
+    1001,
+    0,
+    Some(ErrorCode::AssertPuzzleAnnouncementFailed)
+)]
+#[case(CREATE_COIN_ANNOUNCEMENT, 1001, 0, None)]
+#[case(
+    ASSERT_COIN_ANNOUNCEMENT,
+    1001,
+    0,
+    Some(ErrorCode::AssertCoinAnnouncementFailed)
+)]
+#[case(
+    ASSERT_CONCURRENT_SPEND,
+    1001,
+    ENABLE_ASSERT_BEFORE,
+    Some(ErrorCode::AssertConcurrentSpendFailed)
+)]
+#[case(
+    ASSERT_CONCURRENT_PUZZLE,
+    1001,
+    ENABLE_ASSERT_BEFORE,
+    Some(ErrorCode::AssertConcurrentPuzzleFailed)
+)]
+fn test_limit_announcements(
+    #[case] cond: ConditionOpcode,
+    #[case] count: i32,
+    #[case] flags: u32,
+    #[case] expect_err: Option<ErrorCode>,
+) {
+    let r = cond_test_cb(
+        "((({h1} ({h1} (123 ({} )))",
+        flags,
+        Some(Box::new(move |a: &mut Allocator| -> NodePtr {
+            let mut rest: NodePtr = a.null();
+
+            // generate a lot of announcements
+            for _ in 0..count {
+                // this builds one condition
+                // borrow-rules prevent this from being succint
+                let ann = a.null();
+                let val = a.new_atom(H2).unwrap();
+                let ann = a.new_pair(val, ann).unwrap();
+                let val = a.new_atom(&u64_to_bytes(cond as u64)).unwrap();
+                let ann = a.new_pair(val, ann).unwrap();
+
+                // add the condition to the list
+                rest = a.new_pair(ann, rest).unwrap();
+            }
+            rest
+        })),
+    );
+
+    if expect_err.is_some() {
+        assert_eq!(r.unwrap_err().1, expect_err.unwrap());
+    } else {
+        r.unwrap();
+    }
 }
