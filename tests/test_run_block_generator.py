@@ -1,11 +1,10 @@
-from clvm_tools import binutils
 from chia_rs import run_block_generator
 from chia_rs import MEMPOOL_MODE, LIMIT_STACK
 import pytest
 
 def test_run_block_generator_cost() -> None:
 
-    generator = binutils.assemble(open("tests/generators/block-834768.clvm", "r").read()).as_bin()
+    generator = bytes.fromhex(open("generator-tests/block-834768.txt", "r").read().split("\n")[0])
     # the total cost of this generator is 635805370
     err, conds = run_block_generator(generator, [], 635805370, LIMIT_STACK)
     assert err is None

@@ -8,7 +8,7 @@ from clvm_tools import binutils
 import os
 
 def test_block_834752() -> None:
-    block = bytes.fromhex(open(f"{os.path.dirname(__file__)}/generators/block-834752.hex").read())
+    block = bytes.fromhex(open("generator-tests/block-834752.txt", "r").read().split("\n")[0])
     cost, ret = run_chia_program(block, b"\xff\x80\x80", 11000000000, 0)
     ret = ret.pair[0]
     puzzles = []
