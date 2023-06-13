@@ -394,7 +394,7 @@ jobs:
           git clone https://github.com/Chia-Network/clvm_tools.git --branch=main --single-branch
           pip install ./clvm_tools
           pip install colorama maturin pytest
-          maturin develop -m wheel/Cargo.toml
+          maturin develop --release -m wheel/Cargo.toml
           cd tests
           python generate-programs.py
           python run-programs.py || true
