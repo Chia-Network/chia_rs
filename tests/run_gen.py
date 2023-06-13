@@ -2,17 +2,8 @@
 
 from chia_rs import run_block_generator
 from time import time
-from clvm_tools import binutils
-from clvm.serialize import atom_to_byte_iterator
 import sys
 from typing import Optional
-
-def serialize_atom(blob: bytes) -> bytes:
-    ret = bytearray()
-    for b in atom_to_byte_iterator(blob):
-        ret += b
-    return bytes(ret)
-
 
 def run_gen(fn: str, flags: int = 0, args: Optional[str] = None):
 
@@ -21,7 +12,7 @@ def run_gen(fn: str, flags: int = 0, args: Optional[str] = None):
     max_cost = 11000000000
     cost_per_byte = 12000
 
-    generator = binutils.assemble(open(fn, "r").read()).as_bin()
+    generator = bytes.fromhex(open(fn, "r").read().split('\n')[0])
 
     # add the block program arguments
     block_refs = []

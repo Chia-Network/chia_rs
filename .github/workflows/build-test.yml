@@ -362,6 +362,12 @@ jobs:
         os: [macos-latest, ubuntu-latest, windows-latest]
     name: Unit tests
     steps:
+      # the test files are read verbatim, making it problematic if git is
+      # allowed to insert \r when checking out files
+      - name: disable git autocrlf
+        run: |
+          git config --global core.autocrlf false
+
       - uses: actions/checkout@v3
         with:
           fetch-depth: 1
