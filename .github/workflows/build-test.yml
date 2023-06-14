@@ -168,8 +168,8 @@ jobs:
     - name: Build Linux with maturin on Python ${{ matrix.python }}
       if: matrix.os.matrix == 'ubuntu'
       run: |
-        podman run --rm=true \
-          -v ${{ github.workspace }}:/ws:rw --workdir=/ws \
+        docker run --rm \
+          -v ${{ github.workspace }}:/ws --workdir=/ws \
           ${{ matrix.python.by-arch[matrix.arch.matrix].docker-url }} \
           bash -exc '\
             curl -L https://sh.rustup.rs > rustup-init.sh && \
