@@ -7,7 +7,8 @@ use clvmr::Allocator;
 use clvmr::LIMIT_STACK;
 use std::iter::zip;
 use std::string::String;
-use text_diff::print_diff;
+use text_diff::diff;
+use text_diff::Difference;
 
 use rstest::rstest;
 
@@ -158,8 +159,6 @@ fn run_generator(#[case] filename: &str) {
         None => [expected, expected],
     };
 
-    println!("expected: {:?}", expected);
-
     for (flags, expected) in zip(&[LIMIT_STACK, MEMPOOL_MODE], expected) {
         println!("flags: {:x}", flags);
         let mut a = make_allocator(*flags);
@@ -172,7 +171,42 @@ fn run_generator(#[case] filename: &str) {
             };
 
         if output != expected {
-            print_diff(expected, &output, "\n");
+            println!("\x1b[102m \x1b[0m - output from test");
+            println!("\x1b[101m \x1b[0m - expected output");
+            for diff in diff(expected, &output, "\n").1 {
+                match diff {
+                    Difference::Same(s) => {
+                        let lines: Vec<&str> = s.split("\n").collect();
+                        if lines.len() <= 6 {
+                            for l in &lines {
+                                println!(" {l}");
+                            }
+                        } else {
+                            for l in &lines[0..3] {
+                                println!(" {l}");
+                            }
+                            println!(" ...");
+                            for l in &lines[lines.len() - 3..] {
+                                println!(" {l}");
+                            }
+                        }
+                    }
+                    Difference::Rem(s) => {
+                        println!("\x1b[91m");
+                        for l in s.split("\n") {
+                            println!("-{l}");
+                        }
+                        println!("\x1b[0m");
+                    }
+                    Difference::Add(s) => {
+                        println!("\x1b[92m");
+                        for l in s.split("\n") {
+                            println!("+{l}");
+                        }
+                        println!("\x1b[0m");
+                    }
+                }
+            }
             panic!("mismatching generator output");
         }
     }
