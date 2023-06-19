@@ -1,11 +1,12 @@
 use crate::gen::conditions::{parse_spends, SpendBundleConditions};
+use crate::gen::flags::ALLOW_BACKREFS;
 use crate::gen::validation_error::{ErrorCode, ValidationErr};
 use crate::generator_rom::{COST_PER_BYTE, GENERATOR_ROM};
 use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
-use clvmr::serde::node_from_bytes;
+use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs};
 
 // Runs the generator ROM and passes in the program (transactions generator).
 // The program is expected to return a list of spends. Each item being:
@@ -35,7 +36,11 @@ pub fn run_block_generator<GenBuf: AsRef<[u8]>>(
     }
 
     let generator_rom = node_from_bytes(a, &GENERATOR_ROM)?;
-    let program = node_from_bytes(a, program)?;
+    let program = if (flags & ALLOW_BACKREFS) != 0 {
+        node_from_bytes_backrefs(a, program)?
+    } else {
+        node_from_bytes(a, program)?
+    };
 
     // iterate in reverse order since we're building a linked list from
     // the tail

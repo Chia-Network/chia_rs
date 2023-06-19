@@ -1,4 +1,4 @@
-from chia_rs import run_puzzle, run_chia_program
+from chia_rs import run_puzzle, run_chia_program, ALLOW_BACKREFS
 from hashlib import sha256
 import pytest
 from run_gen import print_spend_bundle_conditions
@@ -7,9 +7,18 @@ from clvm.casts import int_from_bytes
 from clvm_tools import binutils
 import os
 
-def test_block_834752() -> None:
-    block = bytes.fromhex(open("generator-tests/block-834752.txt", "r").read().split("\n")[0])
-    cost, ret = run_chia_program(block, b"\xff\x80\x80", 11000000000, 0)
+@pytest.mark.parametrize("flags", [0, ALLOW_BACKREFS])
+@pytest.mark.parametrize("input_file", ["generator-tests/block-834752.txt", "generator-tests/block-834752-compressed.txt"])
+def test_block_834752(flags: int, input_file: str) -> None:
+    block = bytes.fromhex(open(input_file, "r").read().split("\n")[0])
+
+    if (flags & ALLOW_BACKREFS) == 0 and "compressed" in input_file:
+        with pytest.raises(OSError, match="bad encoding"):
+            cost, ret = run_chia_program(block, b"\xff\x80\x80", 11000000000, flags)
+        return
+    else:
+        cost, ret = run_chia_program(block, b"\xff\x80\x80", 11000000000, flags)
+
     ret = ret.pair[0]
     puzzles = []
 
@@ -32,7 +41,7 @@ def test_block_834752() -> None:
 
     output = ""
     for parent, amount, puzzle, solution in puzzles:
-        conds = run_puzzle(puzzle, solution, parent, amount, 11000000000, 0)
+        conds = run_puzzle(puzzle, solution, parent, amount, 11000000000, flags)
         output += print_spend_bundle_conditions(conds)
 
     assert output == """\
@@ -83,7 +92,8 @@ removal_amount: 1
 addition_amount: 1
 """
 
-def test_failure() -> None:
+@pytest.mark.parametrize("flags", [0, ALLOW_BACKREFS])
+def test_failure(flags: int) -> None:
 
     output = ""
     parent = b"1" * 32
@@ -94,7 +104,7 @@ def test_failure() -> None:
     solution2 = binutils.assemble("(2)").as_bin()
 
     # the puzzle expects (1)
-    conds = run_puzzle(puzzle, solution1, parent, amount, 11000000000, 0)
+    conds = run_puzzle(puzzle, solution1, parent, amount, 11000000000, flags)
     output += print_spend_bundle_conditions(conds)
     print(output)
     assert output == """\
@@ -107,4 +117,4 @@ addition_amount: 0
 
     with pytest.raises(ValueError, match="ValidationError"):
         # the puzzle does not expect (2)
-        run_puzzle(puzzle, solution2, parent, amount, 11000000000, 0)
+        run_puzzle(puzzle, solution2, parent, amount, 11000000000, flags)

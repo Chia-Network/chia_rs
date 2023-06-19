@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from run_gen import run_gen, print_spend_bundle_conditions
-from chia_rs import MEMPOOL_MODE
+from chia_rs import MEMPOOL_MODE, ALLOW_BACKREFS
 from time import perf_counter
 import sys
 import glob
@@ -28,14 +28,14 @@ for g in sorted(glob.glob('../generator-tests/*.txt')):
     print(f"{g}")
     sys.stdout.write("running generator...\r")
     start_time = perf_counter()
-    error_code, result = run_gen(g, 0) #, "generators/block-834752.hex")
+    error_code, result = run_gen(g, ALLOW_BACKREFS) #, "generators/block-834752.hex")
     run_time = perf_counter() - start_time
     output = parse_output(result, error_code)
 
     sys.stdout.write("running generator (mempool mode) ...\r")
     sys.stdout.flush()
     start_time = perf_counter()
-    error_code2, result2 = run_gen(g, MEMPOOL_MODE) #, "generators/block-834752.hex")
+    error_code2, result2 = run_gen(g, ALLOW_BACKREFS | MEMPOOL_MODE) #, "generators/block-834752.hex")
     run_time2 = perf_counter() - start_time
     output2 = parse_output(result2, error_code2)
 

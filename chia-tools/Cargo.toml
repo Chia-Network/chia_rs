@@ -16,6 +16,7 @@ sqlite = "=0.30.3"
 clap = { version = "=4.0.29", features = ["derive"] }
 zstd = "=0.12.1"
 threadpool = "=1.8.1"
+hex = "=0.4.3"
 
 [[bin]]
 name = "analyze-chain"
@@ -24,5 +25,10 @@ bench = false
 
 [[bin]]
 name = "test-block-generators"
+test = false
+bench = false
+
+[[bin]]
+name = "compress-clvm"
 test = false
 bench = false
