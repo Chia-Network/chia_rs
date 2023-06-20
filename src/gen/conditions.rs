@@ -221,7 +221,7 @@ pub fn parse_args(
                 }
             }
         }
-        256..=511 => {
+        256..=65535 => {
             // All of these conditions are unknown
             // but they have costs (when ENABLE_SOFTFORK_CONDITION is enabled)
             if (flags & NO_UNKNOWN_CONDS) != 0 {
@@ -3831,25 +3831,29 @@ fn test_relative_condition_on_ephemeral(
 // additional arguments are ignored
 #[case("((90 (1 ( 42 ( 1337 )", 10000)]
 // reserved opcodes with fixed cost
-#[case("((256 )", 1000000)]
-#[case("((257 )", 1200000)]
-#[case("((258 )", 1400000)]
-#[case("((259 )", 1600000)]
-#[case("((260 )", 1800000)]
-#[case("((261 )", 2000000)]
-#[case("((262 )", 2200000)]
-#[case("((263 )", 2400000)]
-#[case("((264 )", 1000000)]
-#[case("((265 )", 1200000)]
-#[case("((266 )", 1400000)]
-#[case("((504 )", 1000000)]
-#[case("((505 )", 1200000)]
-#[case("((506 )", 1400000)]
-#[case("((507 )", 1600000)]
-#[case("((508 )", 1800000)]
-#[case("((509 )", 2000000)]
-#[case("((510 )", 2200000)]
-#[case("((511 )", 2400000)]
+#[case("((256 )", 100)]
+#[case("((257 )", 106)]
+#[case("((258 )", 112)]
+#[case("((259 )", 119)]
+#[case("((260 )", 127)]
+#[case("((261 )", 135)]
+#[case("((262 )", 143)]
+#[case("((263 )", 152)]
+#[case("((264 )", 162)]
+#[case("((265 )", 172)]
+#[case("((266 )", 183)]
+#[case("((504 )", 338000000)]
+#[case("((505 )", 359000000)]
+#[case("((506 )", 382000000)]
+#[case("((507 )", 406000000)]
+#[case("((508 )", 431000000)]
+#[case("((509 )", 458000000)]
+#[case("((510 )", 487000000)]
+#[case("((511 )", 517000000)]
+#[case("((512 )", 100)]
+#[case("((513 )", 106)]
+#[case("((0xff00 )", 100)]
+#[case("((0xff01 )", 106)]
 fn test_softfork_condition(#[case] conditions: &str, #[case] expected_cost: Cost) {
     // SOFTFORK (90)
     let (_, spends) = cond_test_flag(
