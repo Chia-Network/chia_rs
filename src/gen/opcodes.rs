@@ -63,6 +63,7 @@ pub const AGG_SIG_COST: Cost = 1200000;
 // when ENABLE_SOFTFORK_CONDITION is enabled
 // 2-byte condition opcodes have costs according to this table:
 
+// the values `100 * (17 ** idx)/(16 ** idx)` rounded to three significant decimal figures
 const COSTS: [Cost; 256] = [
     100, 106, 112, 119, 127, 135, 143, 152, 162, 172, 183, 194, 206, 219, 233, 248, 263, 280, 297,
     316, 336, 357, 379, 403, 428, 455, 483, 513, 546, 580, 616, 654, 695, 739, 785, 834, 886, 942,
