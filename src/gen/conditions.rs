@@ -663,7 +663,7 @@ pub fn parse_conditions(
     max_cost: &mut Cost,
 ) -> Result<(), ValidationErr> {
     let mut announce_countdown: u32 = if (flags & LIMIT_ANNOUNCES) != 0 {
-        1000
+        1024
     } else {
         u32::MAX
     };
@@ -3919,68 +3919,68 @@ fn test_softfork_condition_failures(#[case] conditions: &str, #[case] expected_e
 #[case(CREATE_PUZZLE_ANNOUNCEMENT, 1000, LIMIT_ANNOUNCES, None)]
 #[case(
     CREATE_PUZZLE_ANNOUNCEMENT,
-    1001,
+    1025,
     LIMIT_ANNOUNCES,
     Some(ErrorCode::TooManyAnnouncements)
 )]
 #[case(
     ASSERT_PUZZLE_ANNOUNCEMENT,
-    1000,
+    1024,
     LIMIT_ANNOUNCES,
     Some(ErrorCode::AssertPuzzleAnnouncementFailed)
 )]
 #[case(
     ASSERT_PUZZLE_ANNOUNCEMENT,
-    1001,
+    1025,
     LIMIT_ANNOUNCES,
     Some(ErrorCode::TooManyAnnouncements)
 )]
 #[case(CREATE_COIN_ANNOUNCEMENT, 1000, LIMIT_ANNOUNCES, None)]
 #[case(
     CREATE_COIN_ANNOUNCEMENT,
-    1001,
+    1025,
     LIMIT_ANNOUNCES,
     Some(ErrorCode::TooManyAnnouncements)
 )]
 #[case(
     ASSERT_COIN_ANNOUNCEMENT,
-    1000,
+    1024,
     LIMIT_ANNOUNCES,
     Some(ErrorCode::AssertCoinAnnouncementFailed)
 )]
 #[case(
     ASSERT_COIN_ANNOUNCEMENT,
-    1001,
+    1025,
     LIMIT_ANNOUNCES,
     Some(ErrorCode::TooManyAnnouncements)
 )]
-#[case(ASSERT_CONCURRENT_SPEND, 1000, ENABLE_ASSERT_BEFORE | LIMIT_ANNOUNCES, Some(ErrorCode::AssertConcurrentSpendFailed))]
-#[case(ASSERT_CONCURRENT_SPEND, 1001, ENABLE_ASSERT_BEFORE | LIMIT_ANNOUNCES, Some(ErrorCode::TooManyAnnouncements))]
-#[case(ASSERT_CONCURRENT_PUZZLE, 1000, ENABLE_ASSERT_BEFORE | LIMIT_ANNOUNCES, Some(ErrorCode::AssertConcurrentPuzzleFailed))]
-#[case(ASSERT_CONCURRENT_PUZZLE, 1001, ENABLE_ASSERT_BEFORE | LIMIT_ANNOUNCES, Some(ErrorCode::TooManyAnnouncements))]
-#[case(CREATE_PUZZLE_ANNOUNCEMENT, 1001, 0, None)]
+#[case(ASSERT_CONCURRENT_SPEND, 1024, ENABLE_ASSERT_BEFORE | LIMIT_ANNOUNCES, Some(ErrorCode::AssertConcurrentSpendFailed))]
+#[case(ASSERT_CONCURRENT_SPEND, 1025, ENABLE_ASSERT_BEFORE | LIMIT_ANNOUNCES, Some(ErrorCode::TooManyAnnouncements))]
+#[case(ASSERT_CONCURRENT_PUZZLE, 1024, ENABLE_ASSERT_BEFORE | LIMIT_ANNOUNCES, Some(ErrorCode::AssertConcurrentPuzzleFailed))]
+#[case(ASSERT_CONCURRENT_PUZZLE, 1025, ENABLE_ASSERT_BEFORE | LIMIT_ANNOUNCES, Some(ErrorCode::TooManyAnnouncements))]
+#[case(CREATE_PUZZLE_ANNOUNCEMENT, 1025, 0, None)]
 #[case(
     ASSERT_PUZZLE_ANNOUNCEMENT,
-    1001,
+    1025,
     0,
     Some(ErrorCode::AssertPuzzleAnnouncementFailed)
 )]
-#[case(CREATE_COIN_ANNOUNCEMENT, 1001, 0, None)]
+#[case(CREATE_COIN_ANNOUNCEMENT, 1025, 0, None)]
 #[case(
     ASSERT_COIN_ANNOUNCEMENT,
-    1001,
+    1025,
     0,
     Some(ErrorCode::AssertCoinAnnouncementFailed)
 )]
 #[case(
     ASSERT_CONCURRENT_SPEND,
-    1001,
+    1025,
     ENABLE_ASSERT_BEFORE,
     Some(ErrorCode::AssertConcurrentSpendFailed)
 )]
 #[case(
     ASSERT_CONCURRENT_PUZZLE,
-    1001,
+    1025,
     ENABLE_ASSERT_BEFORE,
     Some(ErrorCode::AssertConcurrentPuzzleFailed)
 )]
