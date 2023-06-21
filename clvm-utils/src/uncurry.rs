@@ -1,23 +1,10 @@
 use clvmr::allocator::{Allocator, NodePtr, SExp};
-
-fn next(a: &Allocator, n: NodePtr) -> Option<(NodePtr, NodePtr)> {
-    match a.sexp(n) {
-        SExp::Pair(first, second) => Some((first, second)),
-        _ => None,
-    }
-}
-
-fn nullp(a: &Allocator, n: NodePtr) -> bool {
-    match a.sexp(n) {
-        SExp::Atom(_) => a.atom(n).is_empty(),
-        _ => false,
-    }
-}
+use clvmr::op_utils::nullp;
 
 fn destructure<const N: usize>(a: &Allocator, mut node: NodePtr) -> Option<[NodePtr; N]> {
     let mut counter = 0;
     let mut ret: [NodePtr; N] = [0; N];
-    while let Some((first, rest)) = next(a, node) {
+    while let Some((first, rest)) = a.next(node) {
         node = rest;
         if counter == N {
             return None;
@@ -34,7 +21,7 @@ fn destructure<const N: usize>(a: &Allocator, mut node: NodePtr) -> Option<[Node
 
 fn check(a: &Allocator, n: NodePtr, atom: &[u8]) -> Option<()> {
     match a.sexp(n) {
-        SExp::Atom(_) => {
+        SExp::Atom() => {
             if a.atom(n) == atom {
                 Some(())
             } else {
@@ -131,6 +118,7 @@ fn test_unwrap_quote() {
     let invalid_quote = a.new_pair(a.null(), foobar).unwrap();
 
     // positive tests
+    assert_eq!(unwrap_quote(&a, quoted_foobar).unwrap(), foobar);
     assert_eq!(unwrap_quote(&a, quoted_foobar).unwrap(), foobar);
     assert_eq!(
         unwrap_quote(&a, double_quoted_foobar).unwrap(),

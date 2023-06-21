@@ -4,7 +4,6 @@ use crate::allocator::make_allocator;
 use crate::gen::flags::MEMPOOL_MODE;
 use chia_protocol::{Bytes, Bytes48};
 use clvmr::Allocator;
-use clvmr::LIMIT_STACK;
 use std::iter::zip;
 use std::string::String;
 use text_diff::diff;
@@ -159,7 +158,7 @@ fn run_generator(#[case] filename: &str) {
         None => [expected, expected],
     };
 
-    for (flags, expected) in zip(&[LIMIT_STACK, MEMPOOL_MODE], expected) {
+    for (flags, expected) in zip(&[0, MEMPOOL_MODE], expected) {
         println!("flags: {:x}", flags);
         let mut a = make_allocator(*flags);
         let output =

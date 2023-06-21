@@ -12,7 +12,6 @@ use chia::gen::flags::MEMPOOL_MODE;
 use chia::gen::run_block_generator::run_block_generator;
 use clvmr::allocator::NodePtr;
 use clvmr::Allocator;
-use clvmr::LIMIT_STACK;
 use std::collections::HashSet;
 use std::thread::available_parallelism;
 use threadpool::ThreadPool;
@@ -174,18 +173,12 @@ fn main() {
         pool.execute(move || {
             let mut a = Allocator::new_limited(500000000, 62500000, 62500000);
 
-            let consensus =
-                run_block_generator(&mut a, prg.as_ref(), &block_refs, ti.cost, LIMIT_STACK)
-                    .expect("failed to run block generator");
+            let consensus = run_block_generator(&mut a, prg.as_ref(), &block_refs, ti.cost, 0)
+                .expect("failed to run block generator");
 
-            let mempool = run_block_generator(
-                &mut a,
-                prg.as_ref(),
-                &block_refs,
-                ti.cost,
-                LIMIT_STACK | MEMPOOL_MODE,
-            )
-            .expect("failed to run block generator");
+            let mempool =
+                run_block_generator(&mut a, prg.as_ref(), &block_refs, ti.cost, MEMPOOL_MODE)
+                    .expect("failed to run block generator");
 
             println!("height: {height}");
             assert_eq!(consensus.cost, ti.cost);

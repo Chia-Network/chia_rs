@@ -196,8 +196,8 @@ pub fn parse_args(
                 maybe_check_args_terminator(a, c, flags)?;
                 if let Ok(param) = first(a, params) {
                     // pull out the first item (param)
-                    if let SExp::Atom(b) = a.sexp(param) {
-                        if a.buf(&b).len() <= 32 {
+                    if let SExp::Atom() = a.sexp(param) {
+                        if a.atom_len(param) <= 32 {
                             return Ok(Condition::CreateCoin(puzzle_hash, amount, param));
                         }
                     }
@@ -1146,8 +1146,6 @@ use crate::gen::flags::ENABLE_ASSERT_BEFORE;
 #[cfg(test)]
 use crate::gen::flags::ENABLE_SOFTFORK_CONDITION;
 #[cfg(test)]
-use clvmr::node::Node;
-#[cfg(test)]
 use clvmr::number::Number;
 #[cfg(test)]
 use clvmr::serde::node_to_bytes;
@@ -1378,7 +1376,7 @@ fn cond_test_cb(
     println!("input: {}", input);
 
     let n = parse_list(&mut a, &input, &callback);
-    for c in node_to_bytes(&Node::new(&a, n)).unwrap() {
+    for c in node_to_bytes(&a, n).unwrap() {
         print!("{:02x}", c);
     }
     println!();

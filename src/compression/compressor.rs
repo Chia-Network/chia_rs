@@ -1,5 +1,4 @@
 use clvmr::allocator::{Allocator, NodePtr};
-use clvmr::node::Node;
 use clvmr::serde::{
     node_from_bytes, node_from_bytes_backrefs, node_to_bytes, node_to_bytes_backrefs,
 };
@@ -31,13 +30,9 @@ pub fn decompress(allocator: &mut Allocator, blob: &[u8]) -> Result<NodePtr, std
 pub fn create_autoextracting_clvm_program(input_program: &[u8]) -> std::io::Result<Vec<u8>> {
     let mut allocator = Allocator::new();
     let node_ptr = decompress(&mut allocator, input_program)?;
-    let node = Node {
-        allocator: &allocator,
-        node: node_ptr,
-    };
-    let compressed_block = node_to_bytes_backrefs(&node).expect("can't compress");
+    let compressed_block = node_to_bytes_backrefs(&allocator, node_ptr).expect("can't compress");
     let compressed_block_as_atom = allocator.new_atom(&compressed_block)?;
     let decompression_program_ptr =
         wrap_atom_with_decompression_program(&mut allocator, compressed_block_as_atom)?;
-    node_to_bytes(&Node::new(&allocator, decompression_program_ptr))
+    node_to_bytes(&allocator, decompression_program_ptr)
 }

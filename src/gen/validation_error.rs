@@ -146,9 +146,9 @@ pub fn rest(a: &Allocator, n: NodePtr) -> Result<NodePtr, ValidationErr> {
 pub fn next(a: &Allocator, n: NodePtr) -> Result<Option<(NodePtr, NodePtr)>, ValidationErr> {
     match a.sexp(n) {
         SExp::Pair(left, right) => Ok(Some((left, right))),
-        SExp::Atom(v) => {
+        SExp::Atom() => {
             // this is expected to be a valid list terminator
-            if v.is_empty() {
+            if a.atom_len(n) == 0 {
                 Ok(None)
             } else {
                 Err(ValidationErr(n, ErrorCode::InvalidCondition))
@@ -159,7 +159,7 @@ pub fn next(a: &Allocator, n: NodePtr) -> Result<Option<(NodePtr, NodePtr)>, Val
 
 pub fn atom(a: &Allocator, n: NodePtr, code: ErrorCode) -> Result<&[u8], ValidationErr> {
     match a.sexp(n) {
-        SExp::Atom(_) => Ok(a.atom(n)),
+        SExp::Atom() => Ok(a.atom(n)),
         _ => Err(ValidationErr(n, code)),
     }
 }

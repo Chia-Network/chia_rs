@@ -3,12 +3,10 @@
 use chia::compression::compressor::wrap_atom_with_decompression_program;
 use chia::fuzzing_utils;
 
+use clvm_utils::tree_hash::tree_hash;
 use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
-use clvmr::node::Node;
 use clvmr::run_program::run_program;
-//use clvmr::serde::node_from_bytes_backrefs;
-use clvm_utils::tree_hash::tree_hash;
 use clvmr::serde::node_to_bytes_backrefs;
 use libfuzzer_sys::fuzz_target;
 
@@ -20,7 +18,7 @@ fn do_fuzz(data: &[u8], short_atoms: bool) {
 
     let original_hash = tree_hash(&allocator, program);
 
-    let serialized_program_bytes = node_to_bytes_backrefs(&Node::new(&allocator, program)).unwrap();
+    let serialized_program_bytes = node_to_bytes_backrefs(&allocator, program).unwrap();
     let serialized_program_atom = allocator.new_atom(&serialized_program_bytes).unwrap();
 
     let self_extracting_program =
