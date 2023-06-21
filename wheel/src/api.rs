@@ -5,9 +5,9 @@ use crate::run_generator::{
 };
 use chia::allocator::make_allocator;
 use chia::gen::flags::{
-    AGG_SIG_ARGS, COND_ARGS_NIL, ENABLE_ASSERT_BEFORE, ENABLE_SOFTFORK_CONDITION, LIMIT_ANNOUNCES,
-    LIMIT_OBJECTS, MEMPOOL_MODE, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL, NO_UNKNOWN_CONDS,
-    STRICT_ARGS_COUNT,
+    AGG_SIG_ARGS, ALLOW_BACKREFS, COND_ARGS_NIL, ENABLE_ASSERT_BEFORE, ENABLE_SOFTFORK_CONDITION,
+    LIMIT_ANNOUNCES, LIMIT_OBJECTS, MEMPOOL_MODE, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
+    NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
 };
 use chia::gen::run_puzzle::run_puzzle as native_run_puzzle;
 use chia::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
@@ -53,8 +53,8 @@ use clvmr::cost::Cost;
 use clvmr::reduction::EvalErr;
 use clvmr::reduction::Reduction;
 use clvmr::run_program;
-use clvmr::serde::node_from_bytes;
 use clvmr::serde::node_to_bytes;
+use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs, node_to_bytes_backrefs};
 use clvmr::ChiaDialect;
 
 #[pyfunction]
@@ -89,11 +89,18 @@ pub fn get_puzzle_and_solution_for_coin<'py>(
     find_parent: Bytes32,
     find_amount: u64,
     find_ph: Bytes32,
+    flags: u32,
 ) -> PyResult<(&'py PyBytes, &'py PyBytes)> {
     let mut allocator = make_allocator(LIMIT_HEAP);
-    let program = node_from_bytes(&mut allocator, program)?;
-    let args = node_from_bytes(&mut allocator, args)?;
-    let dialect = &ChiaDialect::new(0);
+
+    let deserialize = if (flags & ALLOW_BACKREFS) != 0 {
+        node_from_bytes_backrefs
+    } else {
+        node_from_bytes
+    };
+    let program = deserialize(&mut allocator, program)?;
+    let args = deserialize(&mut allocator, args)?;
+    let dialect = &ChiaDialect::new(flags);
 
     let r = py.allow_threads(|| -> Result<(NodePtr, NodePtr), EvalErr> {
         let Reduction(_cost, result) =
@@ -104,11 +111,16 @@ pub fn get_puzzle_and_solution_for_coin<'py>(
         }
     });
 
+    let serialize = if (flags & ALLOW_BACKREFS) != 0 {
+        node_to_bytes_backrefs
+    } else {
+        node_to_bytes
+    };
     match r {
         Err(eval_err) => eval_err_to_pyresult(py, eval_err, allocator),
         Ok((puzzle, solution)) => Ok((
-            PyBytes::new(py, &node_to_bytes(&allocator, puzzle)?),
-            PyBytes::new(py, &node_to_bytes(&allocator, solution)?),
+            PyBytes::new(py, &serialize(&allocator, puzzle)?),
+            PyBytes::new(py, &serialize(&allocator, solution)?),
         )),
     }
 }
@@ -154,6 +166,8 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
         NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
     )?;
     m.add("MEMPOOL_MODE", MEMPOOL_MODE)?;
+    m.add("LIMIT_OBJECTS", LIMIT_OBJECTS)?;
+    m.add("ALLOW_BACKREFS", ALLOW_BACKREFS)?;
 
     // Chia classes
     m.add_class::<Coin>()?;

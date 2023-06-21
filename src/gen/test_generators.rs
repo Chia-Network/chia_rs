@@ -1,7 +1,7 @@
 use super::conditions::{NewCoin, Spend, SpendBundleConditions};
 use super::run_block_generator::run_block_generator;
 use crate::allocator::make_allocator;
-use crate::gen::flags::MEMPOOL_MODE;
+use crate::gen::flags::{ALLOW_BACKREFS, MEMPOOL_MODE};
 use chia_protocol::{Bytes, Bytes48};
 use clvmr::Allocator;
 use std::iter::zip;
@@ -158,7 +158,7 @@ fn run_generator(#[case] filename: &str) {
         None => [expected, expected],
     };
 
-    for (flags, expected) in zip(&[0, MEMPOOL_MODE], expected) {
+    for (flags, expected) in zip(&[0, MEMPOOL_MODE, ALLOW_BACKREFS], expected) {
         println!("flags: {:x}", flags);
         let mut a = make_allocator(*flags);
         let output =

@@ -1,11 +1,12 @@
 use super::adapt_response::eval_err_to_pyresult;
 use chia::allocator::make_allocator;
+use chia::gen::flags::ALLOW_BACKREFS;
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;
 use clvmr::reduction::Response;
 use clvmr::run_program::run_program;
-use clvmr::serde::{node_from_bytes, serialized_length_from_bytes};
+use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs, serialized_length_from_bytes};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyTuple};
 use std::rc::Rc;
@@ -76,8 +77,13 @@ pub fn run_chia_program(
     let mut allocator = make_allocator(flags);
 
     let r: Response = (|| -> PyResult<Response> {
-        let program = node_from_bytes(&mut allocator, program)?;
-        let args = node_from_bytes(&mut allocator, args)?;
+        let deserialize = if (flags & ALLOW_BACKREFS) != 0 {
+            node_from_bytes_backrefs
+        } else {
+            node_from_bytes
+        };
+        let program = deserialize(&mut allocator, program)?;
+        let args = deserialize(&mut allocator, args)?;
         let dialect = ChiaDialect::new(flags);
 
         Ok(py.allow_threads(|| run_program(&mut allocator, &dialect, program, args, max_cost)))

@@ -44,6 +44,10 @@ pub const AGG_SIG_ARGS: u32 = 0x800000;
 // ASSERT_CONCURRENT_PUZZLE
 pub const LIMIT_ANNOUNCES: u32 = 0x1000000;
 
+// when this flag is set, the block generator serialization is allowed to
+// contain back-references
+pub const ALLOW_BACKREFS: u32 = 0x2000000;
+
 pub const MEMPOOL_MODE: u32 = CLVM_MEMPOOL_MODE
     | NO_UNKNOWN_CONDS
     | COND_ARGS_NIL
