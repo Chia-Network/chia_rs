@@ -4,9 +4,19 @@ use crate::gen::validation_error::{ErrorCode, ValidationErr};
 use crate::generator_rom::{COST_PER_BYTE, GENERATOR_ROM};
 use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
+use clvmr::cost::Cost;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
 use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs};
+
+fn subtract_cost(a: &Allocator, cost_left: &mut Cost, subtract: Cost) -> Result<(), ValidationErr> {
+    if subtract > *cost_left {
+        Err(ValidationErr(a.null(), ErrorCode::CostExceeded))
+    } else {
+        *cost_left -= subtract;
+        Ok(())
+    }
+}
 
 // Runs the generator ROM and passes in the program (transactions generator).
 // The program is expected to return a list of spends. Each item being:
@@ -29,11 +39,10 @@ pub fn run_block_generator<GenBuf: AsRef<[u8]>>(
     max_cost: u64,
     flags: u32,
 ) -> Result<SpendBundleConditions, ValidationErr> {
+    let mut cost_left = max_cost;
     let byte_cost = program.len() as u64 * COST_PER_BYTE;
 
-    if byte_cost >= max_cost {
-        return Err(ValidationErr(a.null(), ErrorCode::CostExceeded));
-    }
+    subtract_cost(a, &mut cost_left, byte_cost)?;
 
     let generator_rom = node_from_bytes(a, &GENERATOR_ROM)?;
     let program = if (flags & ALLOW_BACKREFS) != 0 {
@@ -56,13 +65,13 @@ pub fn run_block_generator<GenBuf: AsRef<[u8]>>(
 
     let dialect = ChiaDialect::new(flags);
     let Reduction(clvm_cost, generator_output) =
-        run_program(a, &dialect, generator_rom, args, max_cost - byte_cost)?;
+        run_program(a, &dialect, generator_rom, args, cost_left)?;
 
-    assert!(clvm_cost <= max_cost - byte_cost);
+    subtract_cost(a, &mut cost_left, clvm_cost)?;
 
     // we pass in what's left of max_cost here, to fail early in case the
     // cost of a condition brings us over the cost limit
-    let mut result = parse_spends(a, generator_output, max_cost - clvm_cost - byte_cost, flags)?;
-    result.cost += clvm_cost + byte_cost;
+    let mut result = parse_spends(a, generator_output, cost_left, flags)?;
+    result.cost += max_cost - cost_left;
     Ok(result)
 }
