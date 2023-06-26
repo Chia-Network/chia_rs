@@ -17,8 +17,12 @@ def run_gen(fn: str, flags: int = 0, args: Optional[str] = None):
     # add the block program arguments
     block_refs = []
     if args and args != "":
-        with open(args, "r") as f:
-            block_refs = [bytes.fromhex(f.read())]
+        try:
+            with open(args, "r") as f:
+                block_refs = [bytes.fromhex(f.read())]
+            print("using ", args)
+        except OSError as e:
+            pass
 
     try:
         return run_block_generator(generator, block_refs, max_cost, flags)

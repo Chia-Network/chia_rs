@@ -10,14 +10,14 @@ pub fn tree_hash(a: &Allocator, node: NodePtr) -> [u8; 32] {
     let mut hashes: Vec<[u8; 32]> = vec![];
     let mut ops = vec![TreeOp::SExp(node)];
 
-    while !ops.is_empty() {
-        match ops.pop().unwrap() {
+    while let Some(op) = ops.pop() {
+        match op {
             TreeOp::SExp(node) => match a.sexp(node) {
                 SExp::Atom() => {
                     let mut sha256 = Sha256::new();
                     sha256.update([1_u8]);
                     sha256.update(a.atom(node));
-                    hashes.push(sha256.finalize().into())
+                    hashes.push(sha256.finalize().into());
                 }
                 SExp::Pair(left, right) => {
                     ops.push(TreeOp::Cons);

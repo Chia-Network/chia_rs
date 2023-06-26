@@ -1,7 +1,7 @@
 use super::conditions::{NewCoin, Spend, SpendBundleConditions};
 use super::run_block_generator::run_block_generator;
 use crate::allocator::make_allocator;
-use crate::gen::flags::{ALLOW_BACKREFS, MEMPOOL_MODE};
+use crate::gen::flags::MEMPOOL_MODE;
 use chia_protocol::{Bytes, Bytes48};
 use clvmr::Allocator;
 use std::iter::zip;
@@ -105,6 +105,7 @@ fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
 
 #[cfg(test)]
 #[rstest]
+#[case("block-225758")]
 #[case("assert-puzzle-announce-fail")]
 #[case("block-834752")]
 #[case("block-834760")]
@@ -144,10 +145,10 @@ fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
 #[case("negative-reserve-fee")]
 #[case("recursion-pairs")]
 #[case("unknown-condition")]
-fn run_generator(#[case] filename: &str) {
+fn run_generator(#[case] name: &str) {
     use std::fs::read_to_string;
 
-    let filename = format!("generator-tests/{filename}.txt");
+    let filename = format!("generator-tests/{name}.txt");
     println!("file: {filename}");
     let test_file = read_to_string(filename).expect("test file not found");
     let (generator, expected) = test_file.split_once("\n").expect("invalid test file");
@@ -158,16 +159,24 @@ fn run_generator(#[case] filename: &str) {
         None => [expected, expected],
     };
 
-    for (flags, expected) in zip(&[0, MEMPOOL_MODE, ALLOW_BACKREFS], expected) {
+    let mut block_refs = Vec::<Vec<u8>>::new();
+
+    let filename = format!("generator-tests/{name}.env");
+    if let Ok(env_hex) = std::fs::read_to_string(&filename) {
+        println!("block-ref file: {filename}");
+        block_refs.push(hex::decode(env_hex).expect("hex decode env-file"));
+    }
+
+    for (flags, expected) in zip(&[0, MEMPOOL_MODE], expected) {
         println!("flags: {:x}", flags);
         let mut a = make_allocator(*flags);
-        let output =
-            match run_block_generator(&mut a, &generator, &[] as &[&[u8]], 11000000000, *flags) {
-                Ok(conditions) => print_conditions(&mut a, &conditions),
-                Err(code) => {
-                    format!("FAILED: {}\n", u32::from(code.1))
-                }
-            };
+        let output = match run_block_generator(&mut a, &generator, &block_refs, 11000000000, *flags)
+        {
+            Ok(conditions) => print_conditions(&a, &conditions),
+            Err(code) => {
+                format!("FAILED: {}\n", u32::from(code.1))
+            }
+        };
 
         if output != expected {
             println!("\x1b[102m \x1b[0m - output from test");
