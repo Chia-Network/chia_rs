@@ -2279,7 +2279,7 @@ fn test_single_create_coin() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert_eq!(c.puzzle_hash, H2.into());
+        assert_eq!(c.puzzle_hash, H2);
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.null());
     }
@@ -2302,7 +2302,7 @@ fn test_create_coin_max_amount() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert_eq!(c.puzzle_hash, H2.into());
+        assert_eq!(c.puzzle_hash, H2);
         assert_eq!(c.amount, 0xffffffffffffffff_u64);
         assert_eq!(c.hint, a.null());
     }
@@ -2368,7 +2368,7 @@ fn test_create_coin_with_hint() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert!(c.puzzle_hash == H2.into());
+        assert!(c.puzzle_hash == H2);
         assert!(c.amount == 42_u64);
         assert!(a.atom(c.hint) == H1.to_vec());
     }
@@ -2391,7 +2391,7 @@ fn test_create_coin_extra_arg() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert!(c.puzzle_hash == H2.into());
+        assert!(c.puzzle_hash == H2);
         assert!(c.amount == 42_u64);
         assert!(a.atom(c.hint) == H1.to_vec());
     }
@@ -2412,7 +2412,7 @@ fn test_create_coin_with_multiple_hints() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert!(c.puzzle_hash == H2.into());
+        assert!(c.puzzle_hash == H2);
         assert!(c.amount == 42_u64);
         assert!(a.atom(c.hint) == H1.to_vec());
     }
@@ -2434,7 +2434,7 @@ fn test_create_coin_with_hint_as_atom() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert_eq!(c.puzzle_hash, H2.into());
+        assert_eq!(c.puzzle_hash, H2);
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.null());
     }
@@ -2455,7 +2455,7 @@ fn test_create_coin_with_invalid_hint_as_terminator() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert_eq!(c.puzzle_hash, H2.into());
+        assert_eq!(c.puzzle_hash, H2);
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.null());
     }
@@ -2489,7 +2489,7 @@ fn test_create_coin_with_short_hint() {
     assert_eq!(spend.create_coin.len(), 1);
 
     for c in &spend.create_coin {
-        assert!(c.puzzle_hash == H2.into());
+        assert!(c.puzzle_hash == H2);
         assert!(c.amount == 42_u64);
         assert!(a.atom(c.hint) == MSG1.to_vec());
     }
@@ -2511,7 +2511,7 @@ fn test_create_coin_with_long_hint() {
     assert_eq!(spend.create_coin.len(), 1);
 
     for c in &spend.create_coin {
-        assert_eq!(c.puzzle_hash, H2.into());
+        assert_eq!(c.puzzle_hash, H2);
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.null());
     }
@@ -2534,7 +2534,7 @@ fn test_create_coin_with_pair_hint() {
     assert_eq!(spend.create_coin.len(), 1);
 
     for c in &spend.create_coin {
-        assert_eq!(c.puzzle_hash, H2.into());
+        assert_eq!(c.puzzle_hash, H2);
         assert_eq!(c.amount, 42_u64);
         assert_eq!(a.atom(c.hint), H1.to_vec());
     }
@@ -2556,7 +2556,7 @@ fn test_create_coin_with_cons_hint() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert_eq!(c.puzzle_hash, H2.into());
+        assert_eq!(c.puzzle_hash, H2);
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.null());
     }
