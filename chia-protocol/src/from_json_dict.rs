@@ -34,7 +34,7 @@ impl<const N: usize> FromJsonDict for BytesImpl<N> {
                 N
             )));
         }
-        Ok(buf.try_into()?)
+        Ok((&buf).try_into()?)
     }
 }
 
