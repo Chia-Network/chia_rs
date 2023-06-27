@@ -1,7 +1,7 @@
 use crate::compression;
 use crate::run_generator::{
-    convert_spend_bundle_conds, PySpend, PySpendBundleConditions,
-    __pyo3_get_function_run_block_generator, __pyo3_get_function_run_generator,
+    convert_spend_bundle_conds, run_block_generator, run_generator, PySpend,
+    PySpendBundleConditions,
 };
 use chia::allocator::make_allocator;
 use chia::gen::flags::{
@@ -41,9 +41,7 @@ use pyo3::types::PyModule;
 use pyo3::{wrap_pyfunction, PyResult, Python};
 use std::convert::TryInto;
 
-use crate::run_program::{
-    __pyo3_get_function_run_chia_program, __pyo3_get_function_serialized_length,
-};
+use crate::run_program::{run_chia_program, serialized_length};
 
 use crate::adapt_response::eval_err_to_pyresult;
 use chia::gen::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;

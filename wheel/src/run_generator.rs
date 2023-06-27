@@ -23,7 +23,7 @@ use chia_protocol::streamable::Streamable;
 use chia_py_streamable_macro::PyStreamable;
 use chia_streamable_macro::Streamable;
 
-#[pyclass(name = "Spend")]
+#[pyclass(name = "Spend", get_all, frozen)]
 #[derive(Streamable, PyStreamable, Hash, Debug, Clone, Eq, PartialEq)]
 pub struct PySpend {
     pub coin_id: Bytes32,
@@ -39,7 +39,7 @@ pub struct PySpend {
     pub flags: u32,
 }
 
-#[pyclass(name = "SpendBundleConditions")]
+#[pyclass(name = "SpendBundleConditions", get_all, frozen)]
 #[derive(Streamable, PyStreamable, Hash, Debug, Clone, Eq, PartialEq)]
 pub struct PySpendBundleConditions {
     pub spends: Vec<PySpend>,

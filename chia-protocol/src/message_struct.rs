@@ -1,7 +1,7 @@
 #[macro_export]
 macro_rules! message_struct {
     ($name:ident {$($field:ident: $t:ty $(,)? )*}) => {
-        #[cfg_attr(feature = "py-bindings", pyclass, derive(PyStreamable))]
+        #[cfg_attr(feature = "py-bindings", pyclass(get_all, frozen), derive(PyStreamable))]
         #[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
         pub struct $name {
             $(pub $field: $t),*
@@ -18,7 +18,7 @@ macro_rules! message_struct {
 #[macro_export]
 macro_rules! streamable_struct {
     ($name:ident {$($field:ident: $t:ty $(,)? )*}) => {
-        #[cfg_attr(feature = "py-bindings", pyclass, derive(PyStreamable))]
+        #[cfg_attr(feature = "py-bindings", pyclass(get_all, frozen), derive(PyStreamable))]
         #[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
         pub struct $name {
             $(pub $field: $t),*
