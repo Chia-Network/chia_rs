@@ -52,6 +52,8 @@ def tree_hash(program: ReadableBuffer) -> bytes32: ...
 def get_puzzle_and_solution_for_coin(program: ReadableBuffer, args: ReadableBuffer, max_cost: int, find_parent: bytes32, find_amount: int, find_ph: bytes32, flags: int) -> Tuple[bytes, bytes]: ...
 
 class Spend:
+    parent_id: bytes
+    coin_amount: int
     coin_id: bytes
     puzzle_hash: bytes
     height_relative: Optional[int]
@@ -60,11 +62,13 @@ class Spend:
     before_seconds_relative: Optional[int]
     birth_height: Optional[int]
     birth_seconds: Optional[int]
-    create_coin: List[Tuple[bytes, int, Optional[bytes]]]
+    create_coin: Set[NewCoin]
     agg_sig_me: List[Tuple[bytes, bytes]]
     flags: int
     def __init__(
         self,
+        parent_id: bytes,
+        coin_amount: int,
         coin_id: bytes,
         puzzle_hash: bytes,
         height_relative: Optional[int],
@@ -73,7 +77,7 @@ class Spend:
         before_seconds_relative: Optional[int],
         birth_height: Optional[int],
         birth_seconds: Optional[int],
-        create_coin: Sequence[Tuple[bytes, int, Optional[bytes]]],
+        create_coin: Set[NewCoin],
         agg_sig_me: Sequence[Tuple[bytes, bytes]],
         flags: int
     ) -> None: ...
@@ -93,6 +97,33 @@ class Spend:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(o: Dict[str, Any]) -> Spend: ...
+
+class NewCoin:
+    puzzle_hash: bytes
+    amount: int
+    hint: Option[bytes]
+    def __init__(
+        self,
+        puzzle_hash: bytes,
+        amount: int,
+        hint: Option[bytes]
+    ) -> None: ...
+    def __hash__(self) -> int: ...
+    def __str__(self) -> str: ...
+    def __repr__(self) -> str: ...
+    def __richcmp__(self) -> Any: ...
+    def __deepcopy__(self) -> NewCoin: ...
+    def __copy__(self) -> NewCoin: ...
+    @staticmethod
+    def from_bytes(bytes) -> NewCoin: ...
+    @staticmethod
+    def parse_rust(ReadableBuffer) -> Tuple[NewCoin, int]: ...
+    def to_bytes(self) -> bytes: ...
+    def __bytes__(self) -> bytes: ...
+    def get_hash(self) -> bytes32: ...
+    def to_json_dict(self) -> Dict[str, Any]: ...
+    @staticmethod
+    def from_json_dict(o: Dict[str, Any]) -> NewCoin: ...
 
 class SpendBundleConditions:
     spends: List[Spend]

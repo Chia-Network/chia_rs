@@ -58,10 +58,10 @@ def print_spend_bundle_conditions(result) -> str:
         if s.before_seconds_relative is not None:
             ret += f"  ASSERT_BEFORE_SECONDS_RELATIVE {s.before_seconds_relative}\n"
         for a in sorted(s.create_coin):
-            if a[2] is not None and len(a[2]) > 0:
-                ret += f"  CREATE_COIN: ph: {a[0].hex()} amount: {a[1]} hint: {a[2].hex()}\n"
+            if a.hint is not None and len(a.hint) > 0:
+                ret += f"  CREATE_COIN: ph: {a.puzzle_hash.hex()} amount: {a.amount} hint: {a.hint.hex()}\n"
             else:
-                ret += f"  CREATE_COIN: ph: {a[0].hex()} amount: {a[1]}\n"
+                ret += f"  CREATE_COIN: ph: {a.puzzle_hash.hex()} amount: {a.amount}\n"
         for a in sorted(s.agg_sig_me):
             ret += f"  AGG_SIG_ME pk: {a[0].hex()} msg: {a[1].hex()}\n"
     ret += f"cost: {result.cost}\n"

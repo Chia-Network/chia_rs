@@ -39,11 +39,11 @@ fn print_conditions(c: &SpendBundleConditions) -> String {
     ret += "SPENDS:\n";
 
     let mut spends: Vec<&Spend> = (&c.spends).into_iter().collect();
-    spends.sort_by_key(|s| *s.coin_id);
+    spends.sort_by_key(|s| s.coin_id);
     for s in spends {
         ret += &format!(
             "- coin id: {} ph: {}\n",
-            hex::encode(*s.coin_id),
+            hex::encode(s.coin_id),
             hex::encode(s.puzzle_hash)
         );
 

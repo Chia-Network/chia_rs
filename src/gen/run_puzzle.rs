@@ -12,7 +12,6 @@ use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
 use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs};
 use std::collections::HashSet;
-use std::sync::Arc;
 
 pub fn run_puzzle(
     a: &mut Allocator,
@@ -41,15 +40,13 @@ pub fn run_puzzle(
     let mut state = ParseState::default();
 
     let puzzle_hash = tree_hash(a, puzzle);
-    let coin_id = Arc::<Bytes32>::new(
-        Coin {
-            parent_coin_info: parent_id.into(),
-            puzzle_hash: puzzle_hash.into(),
-            amount,
-        }
-        .coin_id()
-        .into(),
-    );
+    let coin_id = Coin {
+        parent_coin_info: parent_id.into(),
+        puzzle_hash: puzzle_hash.into(),
+        amount,
+    }
+    .coin_id()
+    .into();
 
     let spend = Spend {
         parent_id: Bytes32::from(parent_id),

@@ -199,6 +199,8 @@ def get_puzzle_and_solution_for_coin(program: ReadableBuffer, args: ReadableBuff
 
     print_class(f, "Spend",
         [
+            "parent_id: bytes",
+            "coin_amount: int",
             "coin_id: bytes",
             "puzzle_hash: bytes",
             "height_relative: Optional[int]",
@@ -207,9 +209,17 @@ def get_puzzle_and_solution_for_coin(program: ReadableBuffer, args: ReadableBuff
             "before_seconds_relative: Optional[int]",
             "birth_height: Optional[int]",
             "birth_seconds: Optional[int]",
-            "create_coin: List[Tuple[bytes, int, Optional[bytes]]]",
+            "create_coin: Set[NewCoin]",
             "agg_sig_me: List[Tuple[bytes, bytes]]",
             "flags: int",
+        ],
+    )
+
+    print_class(f, "NewCoin",
+        [
+            "puzzle_hash: bytes",
+            "amount: int",
+            "hint: Option[bytes]",
         ],
     )
 

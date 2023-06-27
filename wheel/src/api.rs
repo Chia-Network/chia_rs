@@ -1,8 +1,7 @@
 use crate::compression;
-use crate::run_generator::{
-    convert_spend_bundle_conds, run_block_generator, PySpend, PySpendBundleConditions,
-};
+use crate::run_generator::run_block_generator;
 use chia::allocator::make_allocator;
+use chia::gen::conditions::{NewCoin, Spend, SpendBundleConditions};
 use chia::gen::flags::{
     AGG_SIG_ARGS, ALLOW_BACKREFS, COND_ARGS_NIL, ENABLE_ASSERT_BEFORE, ENABLE_SOFTFORK_CONDITION,
     LIMIT_ANNOUNCES, LIMIT_OBJECTS, MEMPOOL_MODE, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
@@ -143,10 +142,10 @@ fn run_puzzle(
     amount: u64,
     max_cost: Cost,
     flags: u32,
-) -> PyResult<PySpendBundleConditions> {
+) -> PyResult<SpendBundleConditions> {
     let mut a = make_allocator(LIMIT_HEAP);
     let conds = native_run_puzzle(&mut a, puzzle, solution, parent_id, amount, max_cost, flags)?;
-    Ok(convert_spend_bundle_conds(conds))
+    Ok(conds)
 }
 
 #[pymodule]
@@ -154,12 +153,13 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     // generator functions
     m.add_function(wrap_pyfunction!(run_block_generator, m)?)?;
     m.add_function(wrap_pyfunction!(run_puzzle, m)?)?;
-    m.add_class::<PySpendBundleConditions>()?;
+    m.add_class::<SpendBundleConditions>()?;
+    m.add_class::<Spend>()?;
+    m.add_class::<NewCoin>()?;
     m.add(
         "ELIGIBLE_FOR_DEDUP",
         chia::gen::conditions::ELIGIBLE_FOR_DEDUP,
     )?;
-    m.add_class::<PySpend>()?;
 
     // clvm functions
     m.add("COND_ARGS_NIL", COND_ARGS_NIL)?;

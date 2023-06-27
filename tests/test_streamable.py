@@ -1,4 +1,4 @@
-from chia_rs import Spend, SpendBundleConditions, Coin, G1Element, G2Element
+from chia_rs import Spend, SpendBundleConditions, Coin, G1Element, G2Element, NewCoin
 import pytest
 import copy
 
@@ -8,31 +8,13 @@ ph = b"abababababababababababababababab"
 ph2 = b"cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
 sig = b"abababababababababababababababababababababababab"
 
-def test_hash_spend() -> None:
-
-    a1 = Spend(coin, ph, None, 0, None, None, None, None, [(ph2, 1000000, None)], [(sig, b"msg")], False)
-    a2 = Spend(coin, ph, None, 1, None, None, None, None, [(ph2, 1000000, None)], [(sig, b"msg")], False)
-    b = hash(a1)
-    c = hash(a2)
-    assert type(b) is int
-    assert type(c) is int
-    assert b != c
-
-def test_hash_spend_bundle_conditions() -> None:
-
-    a1 = SpendBundleConditions([], 1000, 1337, 42, None, None, [(sig, b"msg")], 12345678, 123, 456)
-    a2 = SpendBundleConditions([], 1001, 1337, 42, None, None, [(sig, b"msg")], 12345678, 123, 456)
-    b = hash(a1)
-    c = hash(a2)
-    assert type(b) is int
-    assert type(c) is int
-    assert b != c
-
 def test_json_spend() -> None:
 
-    a = Spend(coin, ph, None, 0, None, None, None, None, [(ph2, 1000000, None)], [(sig, b"msg")], False)
+    a = Spend(ph2, 123, coin, ph, None, 0, None, None, None, None, {NewCoin(ph2, 1000000, None)}, [(sig, b"msg")], False)
 
     assert a.to_json_dict() == {
+        "parent_id": "0x" + ph2.hex(),
+        "coin_amount": 123,
         "coin_id": "0x" + coin.hex(),
         "puzzle_hash": "0x" + ph.hex(),
         "height_relative": None,
@@ -41,16 +23,18 @@ def test_json_spend() -> None:
         "before_seconds_relative": None,
         "birth_height": None,
         "birth_seconds": None,
-        "create_coin": [["0x" + ph2.hex(), 1000000, None]],
+        "create_coin": [{"puzzle_hash": "0x" + ph2.hex(), "amount": 1000000, "hint": None}],
         "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
         "flags": 0,
     }
 
 def test_from_json_spend() -> None:
 
-    a = Spend(coin, ph, None, 0, None, None, None, None, [(ph2, 1000000, None)], [(sig, b"msg")], False)
+    a = Spend(ph2, 123, coin, ph, None, 0, None, None, None, None, {NewCoin(ph2, 1000000, None)}, [(sig, b"msg")], False)
 
     b = Spend.from_json_dict({
+        "parent_id": "0x" + ph2.hex(),
+        "coin_amount": 123,
         "coin_id": "0x" + coin.hex(),
         "puzzle_hash": "0x" + ph.hex(),
         "height_relative": None,
@@ -59,7 +43,7 @@ def test_from_json_spend() -> None:
         "before_seconds_relative": None,
         "birth_height": None,
         "birth_seconds": None,
-        "create_coin": [["0x" + ph2.hex(), 1000000, None]],
+        "create_coin": [{"puzzle_hash": "0x" + ph2.hex(), "amount": 1000000, "hint": None}],
         "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
         "flags": 0,
     })
@@ -67,9 +51,11 @@ def test_from_json_spend() -> None:
 
 def test_from_json_spend_set_optional() -> None:
 
-    a = Spend(coin, ph, 1337, 0, None, None, None, None, [(ph2, 1000000, None)], [(sig, b"msg")], False)
+    a = Spend(ph2, 123, coin, ph, 1337, 0, None, None, None, None, {NewCoin(ph2, 1000000, None)}, [(sig, b"msg")], False)
 
     b = Spend.from_json_dict({
+        "parent_id": "0x" + ph2.hex(),
+        "coin_amount": 123,
         "coin_id": "0x" + coin.hex(),
         "puzzle_hash": "0x" + ph.hex(),
         "height_relative": 1337,
@@ -78,7 +64,7 @@ def test_from_json_spend_set_optional() -> None:
         "before_seconds_relative": None,
         "birth_height": None,
         "birth_seconds": None,
-        "create_coin": [["0x" + ph2.hex(), 1000000, None]],
+        "create_coin": [{"puzzle_hash": "0x" + ph2.hex(), "amount": 1000000, "hint": None}],
         "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
         "flags": 0,
     })
@@ -88,6 +74,8 @@ def test_invalid_hex_prefix() -> None:
 
     with pytest.raises(ValueError, match="bytes object is expected to start with 0x"):
         a = Spend.from_json_dict({
+            "parent_id": "0x" + ph.hex(),
+            "coin_amount": 123,
             # this field is missing the 0x prefix
             "coin_id": coin.hex(),
             "puzzle_hash": "0x" + ph.hex(),
@@ -97,7 +85,7 @@ def test_invalid_hex_prefix() -> None:
             "before_seconds_relative": None,
             "birth_height": None,
             "birth_seconds": None,
-            "create_coin": [["0x" + ph2.hex(), 1000000, None]],
+            "create_coin": [{"puzzle_hash": "0x" + ph2.hex(), "amount": 1000000, "hint": None}],
             "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
             "flags": 0,
         })
@@ -106,6 +94,8 @@ def test_invalid_hex_prefix_bytes() -> None:
 
     with pytest.raises(ValueError, match="bytes object is expected to start with 0x"):
         a = Spend.from_json_dict({
+            "parent_id": "0x" + ph.hex(),
+            "coin_amount": 123,
             "coin_id": "0x" + coin.hex(),
             "puzzle_hash": "0x" + ph.hex(),
             "height_relative": None,
@@ -114,7 +104,7 @@ def test_invalid_hex_prefix_bytes() -> None:
             "before_seconds_relative": None,
             "birth_height": None,
             "birth_seconds": None,
-            "create_coin": [["0x" + ph2.hex(), 1000000, None]],
+            "create_coin": [{"puzzle_hash": "0x" + ph2.hex(), "amount": 1000000, "hint": None}],
             # the message field is missing the 0x prefix and is variable length bytes
             "agg_sig_me": [["0x" + sig.hex(), "6d7367"]],
             "flags": 0,
@@ -124,6 +114,8 @@ def test_invalid_hex_digit() -> None:
 
     with pytest.raises(ValueError, match="invalid hex"):
         a = Spend.from_json_dict({
+            "parent_id": "0x" + ph.hex(),
+            "coin_amount": 123,
             # this field is has an invalid hex digit (the last one)
             "coin_id": "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeg",
             "puzzle_hash": "0x" + ph.hex(),
@@ -133,7 +125,7 @@ def test_invalid_hex_digit() -> None:
             "before_seconds_relative": None,
             "birth_height": None,
             "birth_seconds": None,
-            "create_coin": [["0x" + ph2.hex(), 1000000, None]],
+            "create_coin": [{"puzzle_hash": "0x" + ph2.hex(), "amount": 1000000, "hint": None}],
             "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
             "flags": 0,
         })
@@ -142,6 +134,8 @@ def test_invalid_hex_length() -> None:
 
     with pytest.raises(ValueError, match="invalid length 33 expected 32"):
         a = Spend.from_json_dict({
+            "parent_id": "0x" + ph.hex(),
+            "coin_amount": 123,
             # this field is has invalid length
             "coin_id": "0x" + coin.hex() + "ff",
             "puzzle_hash": "0x" + ph.hex(),
@@ -151,7 +145,7 @@ def test_invalid_hex_length() -> None:
             "before_seconds_relative": None,
             "birth_height": None,
             "birth_seconds": None,
-            "create_coin": [["0x" + ph2.hex(), 1000000, None]],
+            "create_coin": [{"puzzle_hash": "0x" + ph2.hex(), "amount": 1000000, "hint": None}],
             "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
             "flags": 0,
         })
@@ -160,6 +154,8 @@ def test_missing_field() -> None:
 
     with pytest.raises(KeyError, match="coin_id"):
         a = Spend.from_json_dict({
+            "parent_id": "0x" + ph.hex(),
+            "coin_amount": 123,
             # coin_id is missing
             "puzzle_hash": "0x" + ph.hex(),
             "height_relative": None,
@@ -168,7 +164,7 @@ def test_missing_field() -> None:
             "before_seconds_relative": None,
             "birth_height": None,
             "birth_seconds": None,
-            "create_coin": [["0x" + ph2.hex(), 1000000, None]],
+            "create_coin": [{"puzzle_hash": "0x" + ph2.hex(), "amount": 1000000, "hint": None}],
             "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
             "flags": 0,
         })
@@ -211,7 +207,7 @@ def test_from_json_spend_bundle_conditions() -> None:
 
 def test_copy_spend() -> None:
 
-    a = Spend(coin, ph, None, 0, None, None, None, None, [(ph2, 1000000, None)], [(sig, b"msg")], False)
+    a = Spend(ph2, 123, coin, ph, None, 0, None, None, None, None, {NewCoin(ph2, 1000000, None)}, [(sig, b"msg")], False)
     b = copy.copy(a)
 
     assert a == b

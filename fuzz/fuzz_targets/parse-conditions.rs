@@ -8,7 +8,6 @@ use chia_protocol::Coin;
 use clvm_utils::tree_hash::tree_hash;
 use clvmr::allocator::Allocator;
 use std::collections::HashSet;
-use std::sync::Arc;
 
 use chia::gen::flags::{
     COND_ARGS_NIL, ENABLE_ASSERT_BEFORE, ENABLE_SOFTFORK_CONDITION, NO_UNKNOWN_CONDS,
@@ -24,15 +23,13 @@ fuzz_target!(|data: &[u8]| {
     let amount = 1337_u64;
     let parent_id: Bytes32 = b"12345678901234567890123456789012".into();
     let puzzle_hash = tree_hash(&a, input);
-    let coin_id = Arc::<Bytes32>::new(
-        Coin {
-            parent_coin_info: parent_id.into(),
-            puzzle_hash: puzzle_hash.into(),
-            amount,
-        }
-        .coin_id()
-        .into(),
-    );
+    let coin_id = Coin {
+        parent_coin_info: parent_id.into(),
+        puzzle_hash: puzzle_hash.into(),
+        amount,
+    }
+    .coin_id()
+    .into();
 
     let mut state = ParseState::default();
 
@@ -47,7 +44,7 @@ fuzz_target!(|data: &[u8]| {
             parent_id,
             coin_amount: amount,
             puzzle_hash: puzzle_hash.into(),
-            coin_id: coin_id.clone(),
+            coin_id,
             height_relative: None,
             seconds_relative: None,
             before_height_relative: None,

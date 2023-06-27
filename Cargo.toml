@@ -15,7 +15,7 @@ homepage = "https://github.com/Chia-Network/chia_rs/"
 repository = "https://github.com/Chia-Network/chia_rs/"
 
 [features]
-py-bindings = ["dep:pyo3"]
+py-bindings = ["dep:pyo3", "dep:chia_streamable_macro", "dep:chia_py_streamable_macro"]
 
 [dependencies]
 clvmr = "=0.2.6"
@@ -24,6 +24,8 @@ pyo3 = { version = ">=0.19.0", features = ["extension-module"], optional = true 
 clvm-utils = { version = "=0.2.7", path = "clvm-utils" }
 chia-protocol = { version = "=0.2.7", path = "chia-protocol" }
 hex-literal = "=0.4.1"
+chia_streamable_macro = { version = "=0.2.4", path = "chia_streamable_macro", optional = true }
+chia_py_streamable_macro = { path = "chia_py_streamable_macro", version = "=0.1.3", optional = true }
 
 [dev-dependencies]
 num-traits = "=0.2.15"
