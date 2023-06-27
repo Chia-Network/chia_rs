@@ -1,6 +1,8 @@
 use crate::bytes::{Bytes, BytesImpl};
 use pyo3::prelude::*;
 use pyo3::types::PyList;
+use std::collections::HashSet;
+use std::sync::Arc;
 
 pub trait ToJsonDict {
     fn to_json_dict(&self, py: Python) -> PyResult<PyObject>;
@@ -51,12 +53,28 @@ impl<T: ToJsonDict> ToJsonDict for Vec<T> {
     }
 }
 
+impl<T: ToJsonDict> ToJsonDict for HashSet<T> {
+    fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
+        let list = PyList::empty(py);
+        for v in self {
+            list.append(v.to_json_dict(py)?)?;
+        }
+        Ok(list.into())
+    }
+}
+
 impl<T: ToJsonDict> ToJsonDict for Option<T> {
     fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
         match self {
             None => Ok(py.None()),
             Some(v) => Ok(v.to_json_dict(py)?),
         }
+    }
+}
+
+impl<T: ToJsonDict> ToJsonDict for Arc<T> {
+    fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
+        Ok((**self).to_json_dict(py)?)
     }
 }
 

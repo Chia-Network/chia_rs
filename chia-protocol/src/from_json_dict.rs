@@ -4,7 +4,10 @@ use pyo3::PyResult;
 
 use crate::bytes::{Bytes, BytesImpl};
 use hex::FromHex;
+use std::collections::HashSet;
 use std::convert::TryInto;
+use std::hash::Hash;
+use std::sync::Arc;
 
 pub trait FromJsonDict {
     fn from_json_dict(o: &PyAny) -> PyResult<Self>
@@ -69,6 +72,15 @@ where
     }
 }
 
+impl<T> FromJsonDict for Arc<T>
+where
+    T: FromJsonDict,
+{
+    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+        Ok(Arc::new(<T as FromJsonDict>::from_json_dict(o)?))
+    }
+}
+
 macro_rules! from_json_primitive {
     ($t:ty) => {
         impl FromJsonDict for $t {
@@ -100,6 +112,19 @@ where
         let mut ret = Vec::<T>::new();
         for v in o.iter()? {
             ret.push(<T as FromJsonDict>::from_json_dict(v?)?);
+        }
+        Ok(ret)
+    }
+}
+
+impl<T> FromJsonDict for HashSet<T>
+where
+    T: FromJsonDict + PartialEq + Eq + Hash,
+{
+    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+        let mut ret = HashSet::<T>::new();
+        for v in o.iter()? {
+            ret.insert(<T as FromJsonDict>::from_json_dict(v?)?);
         }
         Ok(ret)
     }

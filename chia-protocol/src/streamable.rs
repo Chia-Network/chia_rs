@@ -1,8 +1,11 @@
 use crate::chia_error::{Error, Result};
 use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 use std::convert::TryInto;
+use std::hash::Hash;
 use std::io::Cursor;
 use std::mem::size_of;
+use std::sync::Arc;
 
 pub fn read_bytes<'a>(input: &'a mut Cursor<&[u8]>, len: usize) -> Result<&'a [u8]> {
     let pos = input.position();
@@ -177,6 +180,49 @@ impl<T: Streamable> Streamable for Option<T> {
             1 => Ok(Some(T::parse(input)?)),
             _ => Err(Error::InvalidOptional),
         }
+    }
+}
+
+impl<T: Streamable> Streamable for Arc<T> {
+    fn update_digest(&self, digest: &mut Sha256) {
+        (**self).update_digest(digest);
+    }
+
+    fn stream(&self, out: &mut Vec<u8>) -> Result<()> {
+        (**self).stream(out)
+    }
+    fn parse(input: &mut Cursor<&[u8]>) -> Result<Self> {
+        Ok(Arc::new(T::parse(input)?))
+    }
+}
+
+impl<T: Streamable + PartialEq + Eq + Hash> Streamable for HashSet<T> {
+    fn update_digest(&self, _digest: &mut Sha256) {
+        panic!("hash set does not serialize deterministically");
+    }
+
+    fn stream(&self, out: &mut Vec<u8>) -> Result<()> {
+        if self.len() > u32::MAX as usize {
+            Err(Error::InputTooLarge)
+        } else {
+            (self.len() as u32).stream(out)?;
+            for e in self {
+                e.stream(out)?;
+            }
+            Ok(())
+        }
+    }
+
+    fn parse(input: &mut Cursor<&[u8]>) -> Result<Self> {
+        let len = u32::parse(input)?;
+
+        // TODO: pre-allocate capacity, but we'd need safe-guards for overflow
+        // attacks
+        let mut ret = HashSet::<T>::new();
+        for _ in 0..len {
+            ret.insert(T::parse(input)?);
+        }
+        Ok(ret)
     }
 }
 
