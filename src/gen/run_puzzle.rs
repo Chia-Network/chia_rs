@@ -52,9 +52,9 @@ pub fn run_puzzle(
     );
 
     let spend = Spend {
-        parent_id: a.new_atom(parent_id)?,
+        parent_id: Bytes32::from(parent_id),
         coin_amount: amount,
-        puzzle_hash: a.new_atom(&puzzle_hash)?,
+        puzzle_hash: Bytes32::from(&puzzle_hash),
         coin_id,
         height_relative: None,
         seconds_relative: None,

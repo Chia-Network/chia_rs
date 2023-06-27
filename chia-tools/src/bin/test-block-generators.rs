@@ -5,14 +5,9 @@ use chia_protocol::Streamable;
 
 use sqlite::State;
 
-use chia::gen::conditions::NewCoin;
-use chia::gen::conditions::Spend;
-use chia::gen::conditions::SpendBundleConditions;
 use chia::gen::flags::MEMPOOL_MODE;
 use chia::gen::run_block_generator::run_block_generator;
-use clvmr::allocator::NodePtr;
 use clvmr::Allocator;
-use std::collections::HashSet;
 use std::thread::available_parallelism;
 use threadpool::ThreadPool;
 
@@ -27,66 +22,6 @@ struct Args {
     /// The number of paralell thread to run block generators in
     #[arg(short, long)]
     num_jobs: Option<usize>,
-}
-
-fn compare_new_coin(a: &Allocator, lhs: &NewCoin, rhs: &NewCoin) {
-    assert_eq!(lhs.puzzle_hash, rhs.puzzle_hash);
-    assert_eq!(lhs.amount, rhs.amount);
-    assert_eq!(a.atom(lhs.hint), a.atom(rhs.hint));
-}
-
-fn compare_new_coins(a: &Allocator, lhs: &HashSet<NewCoin>, rhs: &HashSet<NewCoin>) {
-    assert_eq!(lhs.len(), rhs.len());
-
-    for c in lhs {
-        compare_new_coin(a, c, rhs.get(c).unwrap());
-    }
-}
-
-fn compare_agg_sig(a: &Allocator, lhs: &Vec<(NodePtr, NodePtr)>, rhs: &Vec<(NodePtr, NodePtr)>) {
-    assert_eq!(lhs.len(), rhs.len());
-
-    for (l, r) in std::iter::zip(lhs, rhs) {
-        assert_eq!(a.atom(l.0), a.atom(r.0));
-        assert_eq!(a.atom(l.1), a.atom(r.1));
-    }
-}
-
-fn compare_spend(a: &Allocator, lhs: &Spend, rhs: &Spend) {
-    assert_eq!(a.atom(lhs.parent_id), a.atom(rhs.parent_id));
-    assert_eq!(lhs.coin_amount, rhs.coin_amount);
-    assert_eq!(*lhs.coin_id, *rhs.coin_id);
-    assert_eq!(lhs.height_relative, rhs.height_relative);
-    assert_eq!(lhs.seconds_relative, rhs.seconds_relative);
-    assert_eq!(lhs.before_height_relative, rhs.before_height_relative);
-    assert_eq!(lhs.before_seconds_relative, rhs.before_seconds_relative);
-    assert_eq!(lhs.birth_height, rhs.birth_height);
-    assert_eq!(lhs.birth_seconds, rhs.birth_seconds);
-    compare_new_coins(a, &lhs.create_coin, &rhs.create_coin);
-    compare_agg_sig(a, &lhs.agg_sig_me, &rhs.agg_sig_me);
-    assert_eq!(lhs.flags, rhs.flags);
-    assert_eq!(a.atom(lhs.puzzle_hash), a.atom(rhs.puzzle_hash));
-}
-
-fn compare_spends(a: &Allocator, lhs: &Vec<Spend>, rhs: &Vec<Spend>) {
-    assert_eq!(lhs.len(), rhs.len());
-
-    for (l, r) in std::iter::zip(lhs, rhs) {
-        compare_spend(a, l, r);
-    }
-}
-
-fn compare(a: &Allocator, lhs: &SpendBundleConditions, rhs: &SpendBundleConditions) {
-    compare_spends(a, &lhs.spends, &rhs.spends);
-    assert_eq!(lhs.reserve_fee, rhs.reserve_fee);
-    assert_eq!(lhs.height_absolute, rhs.height_absolute);
-    assert_eq!(lhs.seconds_absolute, rhs.seconds_absolute);
-    compare_agg_sig(a, &lhs.agg_sig_unsafe, &rhs.agg_sig_unsafe);
-    assert_eq!(lhs.before_height_absolute, rhs.before_height_absolute);
-    assert_eq!(lhs.before_seconds_absolute, rhs.before_seconds_absolute);
-    assert_eq!(lhs.cost, rhs.cost);
-    assert_eq!(lhs.removal_amount, rhs.removal_amount);
-    assert_eq!(lhs.addition_amount, rhs.addition_amount);
 }
 
 fn main() {
@@ -185,7 +120,7 @@ fn main() {
             assert_eq!(mempool.cost, ti.cost);
 
             // now ensure the outputs are the same
-            compare(&a, &consensus, &mempool);
+            assert_eq!(&consensus, &mempool);
         });
 
         assert_eq!(pool.panic_count(), 0);

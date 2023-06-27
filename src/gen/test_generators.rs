@@ -2,8 +2,6 @@ use super::conditions::{NewCoin, Spend, SpendBundleConditions};
 use super::run_block_generator::run_block_generator;
 use crate::allocator::make_allocator;
 use crate::gen::flags::MEMPOOL_MODE;
-use chia_protocol::{Bytes, Bytes48};
-use clvmr::Allocator;
 use std::iter::zip;
 use std::string::String;
 use text_diff::diff;
@@ -11,7 +9,7 @@ use text_diff::Difference;
 
 use rstest::rstest;
 
-fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
+fn print_conditions(c: &SpendBundleConditions) -> String {
     let mut ret = String::new();
     if c.reserve_fee > 0 {
         ret += &format!("RESERVE_FEE: {}\n", c.reserve_fee);
@@ -29,10 +27,7 @@ fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
     if let Some(val) = c.before_height_absolute {
         ret += &format!("ASSERT_BEFORE_HEIGHT_ABSOLUTE {val}\n");
     }
-    let mut agg_sigs = Vec::<(Bytes48, Bytes)>::new();
-    for (pk, msg) in &c.agg_sig_unsafe {
-        agg_sigs.push((a.atom(*pk).into(), a.atom(*msg).into()));
-    }
+    let mut agg_sigs = c.agg_sig_unsafe.clone();
     agg_sigs.sort();
     for (pk, msg) in agg_sigs {
         ret += &format!(
@@ -43,13 +38,13 @@ fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
     }
     ret += "SPENDS:\n";
 
-    let mut spends: Vec<Spend> = c.spends.clone();
+    let mut spends: Vec<&Spend> = (&c.spends).into_iter().collect();
     spends.sort_by_key(|s| *s.coin_id);
     for s in spends {
         ret += &format!(
             "- coin id: {} ph: {}\n",
             hex::encode(*s.coin_id),
-            hex::encode(a.atom(s.puzzle_hash))
+            hex::encode(s.puzzle_hash)
         );
 
         if let Some(val) = s.height_relative {
@@ -67,12 +62,12 @@ fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
         let mut create_coin: Vec<&NewCoin> = s.create_coin.iter().collect();
         create_coin.sort_by_key(|cc| (cc.puzzle_hash, cc.amount));
         for cc in create_coin {
-            if cc.hint != -1 {
+            if let Some(hint) = &cc.hint {
                 ret += &format!(
                     "  CREATE_COIN: ph: {} amount: {} hint: {}\n",
                     hex::encode(cc.puzzle_hash),
                     cc.amount,
-                    hex::encode(a.atom(cc.hint))
+                    hex::encode(hint)
                 );
             } else {
                 ret += &format!(
@@ -83,10 +78,7 @@ fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
             }
         }
 
-        let mut agg_sigs = Vec::<(Bytes48, Bytes)>::new();
-        for (pk, msg) in s.agg_sig_me {
-            agg_sigs.push((a.atom(pk).into(), a.atom(msg).into()));
-        }
+        let mut agg_sigs = s.agg_sig_me.clone();
         agg_sigs.sort();
         for (pk, msg) in agg_sigs {
             ret += &format!(
@@ -211,7 +203,7 @@ fn run_generator(#[case] name: &str) {
         let mut a = make_allocator(*flags);
         let output = match run_block_generator(&mut a, &generator, &block_refs, 11000000000, *flags)
         {
-            Ok(conditions) => print_conditions(&a, &conditions),
+            Ok(conditions) => print_conditions(&conditions),
             Err(code) => {
                 format!("FAILED: {}\n", u32::from(code.1))
             }

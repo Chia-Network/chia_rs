@@ -44,9 +44,9 @@ fuzz_target!(|data: &[u8]| {
         ENABLE_SOFTFORK_CONDITION,
     ] {
         let coin_spend = Spend {
-            parent_id: a.new_atom(&parent_id).expect("atom failed"),
+            parent_id,
             coin_amount: amount,
-            puzzle_hash: a.new_atom(&puzzle_hash).expect("atom failed"),
+            puzzle_hash: puzzle_hash.into(),
             coin_id: coin_id.clone(),
             height_relative: None,
             seconds_relative: None,

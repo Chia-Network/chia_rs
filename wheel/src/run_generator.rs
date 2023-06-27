@@ -7,7 +7,6 @@ use chia::gen::run_block_generator::run_block_generator as native_run_block_gene
 use chia::gen::validation_error::ValidationErr;
 use chia_protocol::bytes::{Bytes, Bytes32, Bytes48};
 
-use clvmr::allocator::Allocator;
 use clvmr::cost::Cost;
 
 use pyo3::buffer::PyBuffer;
@@ -57,28 +56,17 @@ pub struct PySpendBundleConditions {
     pub addition_amount: u128,
 }
 
-fn convert_spend(a: &Allocator, spend: Spend) -> PySpend {
-    let mut agg_sigs = Vec::<(Bytes48, Bytes)>::new();
-    for (pk, msg) in spend.agg_sig_me {
-        agg_sigs.push((a.atom(pk).into(), a.atom(msg).into()));
-    }
+fn convert_spend(spend: Spend) -> PySpend {
     let mut create_coin =
         Vec::<(Bytes32, u64, Option<Bytes>)>::with_capacity(spend.create_coin.len());
     for c in spend.create_coin {
-        create_coin.push((
-            c.puzzle_hash,
-            c.amount,
-            if c.hint != a.null() {
-                Some(a.atom(c.hint).into())
-            } else {
-                None
-            },
-        ));
+        create_coin.push((c.puzzle_hash, c.amount, c.hint));
     }
+    create_coin.sort();
 
     PySpend {
         coin_id: *spend.coin_id,
-        puzzle_hash: a.atom(spend.puzzle_hash).into(),
+        puzzle_hash: spend.puzzle_hash,
         height_relative: spend.height_relative,
         seconds_relative: spend.seconds_relative,
         before_height_relative: spend.before_height_relative,
@@ -86,23 +74,15 @@ fn convert_spend(a: &Allocator, spend: Spend) -> PySpend {
         birth_height: spend.birth_height,
         birth_seconds: spend.birth_seconds,
         create_coin,
-        agg_sig_me: agg_sigs,
+        agg_sig_me: spend.agg_sig_me,
         flags: spend.flags,
     }
 }
 
-pub fn convert_spend_bundle_conds(
-    a: &Allocator,
-    sb: SpendBundleConditions,
-) -> PySpendBundleConditions {
-    let mut spends = Vec::<PySpend>::new();
+pub fn convert_spend_bundle_conds(sb: SpendBundleConditions) -> PySpendBundleConditions {
+    let mut spends = Vec::<PySpend>::with_capacity(sb.spends.len());
     for s in sb.spends {
-        spends.push(convert_spend(a, s));
-    }
-
-    let mut agg_sigs = Vec::<(Bytes48, Bytes)>::with_capacity(sb.agg_sig_unsafe.len());
-    for (pk, msg) in sb.agg_sig_unsafe {
-        agg_sigs.push((a.atom(pk).into(), a.atom(msg).into()));
+        spends.push(convert_spend(s));
     }
 
     PySpendBundleConditions {
@@ -112,7 +92,7 @@ pub fn convert_spend_bundle_conds(
         seconds_absolute: sb.seconds_absolute,
         before_height_absolute: sb.before_height_absolute,
         before_seconds_absolute: sb.before_seconds_absolute,
-        agg_sig_unsafe: agg_sigs,
+        agg_sig_unsafe: sb.agg_sig_unsafe.clone(),
         cost: sb.cost,
         removal_amount: sb.removal_amount,
         addition_amount: sb.addition_amount,
@@ -150,10 +130,7 @@ pub fn run_block_generator(
     match native_run_block_generator(&mut allocator, program, &refs, max_cost, flags) {
         Ok(spend_bundle_conds) => {
             // everything was successful
-            Ok((
-                None,
-                Some(convert_spend_bundle_conds(&allocator, spend_bundle_conds)),
-            ))
+            Ok((None, Some(convert_spend_bundle_conds(spend_bundle_conds))))
         }
         Err(ValidationErr(_, error_code)) => {
             // a validation error occurred

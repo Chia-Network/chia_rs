@@ -78,6 +78,7 @@ pub fn tree_hash(py: Python, blob: PyBuffer<u8>) -> PyResult<&PyBytes> {
     Ok(PyBytes::new(py, &tree_hash_from_stream(&mut input)?))
 }
 
+#[allow(clippy::too_many_arguments)]
 #[pyfunction]
 pub fn get_puzzle_and_solution_for_coin<'py>(
     py: Python<'py>,
@@ -145,7 +146,7 @@ fn run_puzzle(
 ) -> PyResult<PySpendBundleConditions> {
     let mut a = make_allocator(LIMIT_HEAP);
     let conds = native_run_puzzle(&mut a, puzzle, solution, parent_id, amount, max_cost, flags)?;
-    Ok(convert_spend_bundle_conds(&a, conds))
+    Ok(convert_spend_bundle_conds(conds))
 }
 
 #[pymodule]
