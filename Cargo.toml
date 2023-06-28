@@ -3,6 +3,7 @@
 [workspace]
 members = [
     "chia-protocol",
+    "chia-client",
     "chia-bls",
     "chia-ssl",
     "chia-tools",
