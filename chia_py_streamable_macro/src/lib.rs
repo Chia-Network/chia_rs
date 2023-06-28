@@ -9,6 +9,15 @@ use quote::__private::Span;
 
 #[proc_macro_derive(PyStreamable)]
 pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
+    py_streamable_macro_impl(input, true)
+}
+
+#[proc_macro_derive(PyStreamableNoHash)]
+pub fn py_streamable_macro_no_hash(input: TokenStream) -> TokenStream {
+    py_streamable_macro_impl(input, false)
+}
+
+fn py_streamable_macro_impl(input: TokenStream, with_hash: bool) -> TokenStream {
     let DeriveInput { ident, data, .. } = parse_macro_input!(input);
 
     let fields = match data {
@@ -54,6 +63,18 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
         }
     };
 
+    let hash_impl = if with_hash {
+        quote! {
+            fn __hash__(&self) -> PyResult<isize> {
+                let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                std::hash::Hash::hash(self, &mut hasher);
+                Ok(std::hash::Hasher::finish(&hasher) as isize)
+            }
+        }
+    } else {
+        quote! {}
+    };
+
     let mut py_protocol = quote! {
         #[pymethods]
         impl #ident {
@@ -74,12 +95,7 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
                     _ => py.NotImplemented(),
                 }
             }
-
-            fn __hash__(&self) -> PyResult<isize> {
-                let mut hasher = std::collections::hash_map::DefaultHasher::new();
-                std::hash::Hash::hash(self, &mut hasher);
-                Ok(std::hash::Hasher::finish(&hasher) as isize)
-            }
+            #hash_impl
         }
     };
 
