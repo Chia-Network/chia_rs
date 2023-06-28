@@ -1,19 +1,14 @@
-use super::adapt_response::eval_err_to_pyresult;
 use chia_protocol::from_json_dict::FromJsonDict;
 use chia_protocol::to_json_dict::ToJsonDict;
 
 use chia::allocator::make_allocator;
-use chia::gen::conditions::{parse_spends, Spend, SpendBundleConditions};
+use chia::gen::conditions::{Spend, SpendBundleConditions};
 use chia::gen::run_block_generator::run_block_generator as native_run_block_generator;
-use chia::gen::validation_error::{ErrorCode, ValidationErr};
+use chia::gen::validation_error::ValidationErr;
 use chia_protocol::bytes::{Bytes, Bytes32, Bytes48};
 
 use clvmr::allocator::Allocator;
-use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;
-use clvmr::reduction::{EvalErr, Reduction};
-use clvmr::run_program::run_program;
-use clvmr::serde::node_from_bytes;
 
 use pyo3::buffer::PyBuffer;
 use pyo3::prelude::*;
@@ -121,55 +116,6 @@ pub fn convert_spend_bundle_conds(
         cost: sb.cost,
         removal_amount: sb.removal_amount,
         addition_amount: sb.addition_amount,
-    }
-}
-
-// returns the cost of running the CLVM program along with conditions and the list of
-// spends
-#[pyfunction]
-pub fn run_generator(
-    py: Python,
-    program: &[u8],
-    args: &[u8],
-    max_cost: Cost,
-    flags: u32,
-) -> PyResult<(Option<u32>, Option<PySpendBundleConditions>)> {
-    let mut allocator = make_allocator(flags);
-    let program = node_from_bytes(&mut allocator, program)?;
-    let args = node_from_bytes(&mut allocator, args)?;
-    let dialect = &ChiaDialect::new(flags);
-
-    let r = py.allow_threads(
-        || -> Result<(Option<ErrorCode>, Option<SpendBundleConditions>), EvalErr> {
-            let Reduction(cost, node) =
-                run_program(&mut allocator, dialect, program, args, max_cost)?;
-            // we pass in what's left of max_cost here, to fail early in case the
-            // cost of a condition brings us over the cost limit
-            match parse_spends(&allocator, node, max_cost - cost, flags) {
-                Err(ValidationErr(_, c)) => Ok((Some(c), None)),
-                Ok(mut spend_bundle_conds) => {
-                    // the cost is only the cost of conditions, add the
-                    // cost of running the CLVM program here as well
-                    spend_bundle_conds.cost += cost;
-                    Ok((None, Some(spend_bundle_conds)))
-                }
-            }
-        },
-    );
-
-    match r {
-        Ok((None, Some(spend_bundle_conds))) => {
-            // everything was successful
-            Ok((
-                None,
-                Some(convert_spend_bundle_conds(&allocator, spend_bundle_conds)),
-            ))
-        }
-        Ok((error_code, _)) => {
-            // a validation error occurred
-            Ok((error_code.map(|x| x.into()), None))
-        }
-        Err(eval_err) => eval_err_to_pyresult(py, eval_err, allocator),
     }
 }
 
