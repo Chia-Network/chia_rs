@@ -9,15 +9,24 @@ use quote::__private::Span;
 
 #[proc_macro_derive(PyStreamable)]
 pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
-    py_streamable_macro_impl(input, true)
+    py_streamable_macro_impl(input, true, false)
 }
 
 #[proc_macro_derive(PyStreamableNoHash)]
 pub fn py_streamable_macro_no_hash(input: TokenStream) -> TokenStream {
-    py_streamable_macro_impl(input, false)
+    py_streamable_macro_impl(input, false, false)
 }
 
-fn py_streamable_macro_impl(input: TokenStream, with_hash: bool) -> TokenStream {
+#[proc_macro_derive(PyStreamableOrdered)]
+pub fn py_streamable_macro_ordered(input: TokenStream) -> TokenStream {
+    py_streamable_macro_impl(input, true, true)
+}
+
+fn py_streamable_macro_impl(
+    input: TokenStream,
+    with_hash: bool,
+    with_ordering: bool,
+) -> TokenStream {
     let DeriveInput { ident, data, .. } = parse_macro_input!(input);
 
     let fields = match data {
@@ -75,6 +84,19 @@ fn py_streamable_macro_impl(input: TokenStream, with_hash: bool) -> TokenStream 
         quote! {}
     };
 
+    let ordering_impl = if with_ordering {
+        quote! {
+            CompareOp::Lt => (self < &*other).into_py(py),
+            CompareOp::Le => (self <= &*other).into_py(py),
+            CompareOp::Gt => (self > &*other).into_py(py),
+            CompareOp::Ge => (self >= &*other).into_py(py),
+        }
+    } else {
+        quote! {
+            _ => py.NotImplemented(),
+        }
+    };
+
     let mut py_protocol = quote! {
         #[pymethods]
         impl #ident {
@@ -92,7 +114,7 @@ fn py_streamable_macro_impl(input: TokenStream, with_hash: bool) -> TokenStream 
                 match op {
                     CompareOp::Eq => (self == &*other).into_py(py),
                     CompareOp::Ne => (self != &*other).into_py(py),
-                    _ => py.NotImplemented(),
+                    #ordering_impl
                 }
             }
             #hash_impl
