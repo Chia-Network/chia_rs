@@ -35,6 +35,7 @@ use clvmr::{
     ENABLE_BLS_OPS, ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV, ENABLE_SECP_OPS, LIMIT_HEAP,
     NO_UNKNOWN_OPS,
 };
+use pyo3::buffer::PyBuffer;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use pyo3::types::PyModule;
@@ -68,7 +69,7 @@ pub fn compute_merkle_set_root<'p>(
 }
 
 #[pyfunction]
-pub fn tree_hash(py: Python, blob: pyo3::buffer::PyBuffer<u8>) -> PyResult<&PyBytes> {
+pub fn tree_hash(py: Python, blob: PyBuffer<u8>) -> PyResult<&PyBytes> {
     if !blob.is_c_contiguous() {
         panic!("tree_hash() must be called with a contiguous buffer");
     }
@@ -81,8 +82,8 @@ pub fn tree_hash(py: Python, blob: pyo3::buffer::PyBuffer<u8>) -> PyResult<&PyBy
 #[pyfunction]
 pub fn get_puzzle_and_solution_for_coin<'py>(
     py: Python<'py>,
-    program: &[u8],
-    args: &[u8],
+    program: PyBuffer<u8>,
+    args: PyBuffer<u8>,
     max_cost: Cost,
     find_parent: Bytes32,
     find_amount: u64,
@@ -90,6 +91,17 @@ pub fn get_puzzle_and_solution_for_coin<'py>(
     flags: u32,
 ) -> PyResult<(&'py PyBytes, &'py PyBytes)> {
     let mut allocator = make_allocator(LIMIT_HEAP);
+
+    if !program.is_c_contiguous() {
+        panic!("program must be contiguous");
+    }
+    let program =
+        unsafe { std::slice::from_raw_parts(program.buf_ptr() as *const u8, program.len_bytes()) };
+
+    if !args.is_c_contiguous() {
+        panic!("args must be contiguous");
+    }
+    let args = unsafe { std::slice::from_raw_parts(args.buf_ptr() as *const u8, args.len_bytes()) };
 
     let deserialize = if (flags & ALLOW_BACKREFS) != 0 {
         node_from_bytes_backrefs
