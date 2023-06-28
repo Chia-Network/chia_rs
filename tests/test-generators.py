@@ -2,7 +2,6 @@
 
 from run_gen import run_gen, print_spend_bundle_conditions
 from chia_rs import MEMPOOL_MODE, ALLOW_BACKREFS
-from time import perf_counter
 import sys
 import glob
 
@@ -27,16 +26,12 @@ def parse_output(result, error_code) -> str:
 for g in sorted(glob.glob('../generator-tests/*.txt')):
     print(f"{g}")
     sys.stdout.write("running generator...\r")
-    start_time = perf_counter()
-    error_code, result = run_gen(g, ALLOW_BACKREFS, g.replace(".txt", ".env"))
-    run_time = perf_counter() - start_time
+    error_code, result, run_time = run_gen(g, ALLOW_BACKREFS, g.replace(".txt", ".env"))
     output = parse_output(result, error_code)
 
     sys.stdout.write("running generator (mempool mode) ...\r")
     sys.stdout.flush()
-    start_time = perf_counter()
-    error_code2, result2 = run_gen(g, ALLOW_BACKREFS | MEMPOOL_MODE, g.replace(".txt", ".env"))
-    run_time2 = perf_counter() - start_time
+    error_code2, result2, run_time2 = run_gen(g, ALLOW_BACKREFS | MEMPOOL_MODE, g.replace(".txt", ".env"))
     output2 = parse_output(result2, error_code2)
 
     with open(g) as f:
