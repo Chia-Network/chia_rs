@@ -503,7 +503,6 @@ pub struct SpendBundleConditions {
     pub before_seconds_absolute: Option<u64>,
 
     // the cost of conditions (when returned by parse_spends())
-    // run_generator() will include the CLVM cost
     // run_block_generator() will include CLVM cost and byte cost (making this
     // the total cost)
     pub cost: u64,

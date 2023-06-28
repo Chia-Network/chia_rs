@@ -10,10 +10,6 @@ ReadableBuffer = Union[bytes, bytearray, memoryview]
 
 def compute_merkle_set_root(items: Sequence[bytes]) -> bytes: ...
 
-def run_generator(
-    program: bytes, args: bytes, max_cost: int, flags: int
-) -> Tuple[Optional[int], Optional[SpendBundleConditions]]: ...
-
 def run_block_generator(
     program: ReadableBuffer, args: List[ReadableBuffer], max_cost: int, flags: int
 ) -> Tuple[Optional[int], Optional[SpendBundleConditions]]: ...
