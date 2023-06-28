@@ -6,7 +6,7 @@ use chia_protocol::Streamable;
 use sqlite::State;
 
 use chia::gen::flags::MEMPOOL_MODE;
-use chia::gen::run_block_generator::run_block_generator;
+use chia::gen::run_block_generator::{run_block_generator, run_block_generator2};
 use clvmr::Allocator;
 use std::thread::available_parallelism;
 use threadpool::ThreadPool;
@@ -22,6 +22,22 @@ struct Args {
     /// The number of paralell thread to run block generators in
     #[arg(short, long)]
     num_jobs: Option<usize>,
+
+    /// Run all block generators in mempool mode
+    #[arg(short, long, default_value_t = false)]
+    mempool: bool,
+
+    /// Compare the output from the default ROM running in consensus mode.
+    #[arg(short, long, default_value_t = false)]
+    validate: bool,
+
+    /// stop running block generators when reaching this height
+    #[arg(short, long)]
+    max_height: Option<u32>,
+
+    /// when enabled, run the rust port of the ROM generator
+    #[arg(short, long, default_value_t = false)]
+    rust_generator: bool,
 }
 
 fn main() {
@@ -47,12 +63,30 @@ fn main() {
             .unwrap_or(available_parallelism().unwrap().into()),
     );
 
+    if args.validate && !(args.mempool || args.rust_generator) {
+        panic!("it doesn't make sense to validate the output against identical runs. Specify --mempool or --rust-generator");
+    }
+
+    let flags = if args.mempool { MEMPOOL_MODE } else { 0 };
+
+    let block_runner = if args.rust_generator {
+        run_block_generator2
+    } else {
+        run_block_generator
+    };
+
     while let Ok(State::Row) = statement.next() {
         let height: u32 = statement
             .read::<i64, _>(0)
             .expect("missing height")
             .try_into()
             .expect("invalid height in block record");
+        if let Some(h) = args.max_height {
+            if height > h {
+                break;
+            }
+        }
+
         let block_buffer = statement.read::<Vec<u8>, _>(1).expect("invalid block blob");
 
         let block_buffer =
@@ -108,19 +142,32 @@ fn main() {
         pool.execute(move || {
             let mut a = Allocator::new_limited(500000000, 62500000, 62500000);
 
-            let consensus = run_block_generator(&mut a, prg.as_ref(), &block_refs, ti.cost, 0)
-                .expect("failed to run block generator");
+            let mut conditions = block_runner(&mut a, prg.as_ref(), &block_refs, ti.cost, flags)
+                .expect("failed to run block generator2");
+            if args.rust_generator {
+                assert!(conditions.cost <= ti.cost);
+                assert!(conditions.cost > 0);
 
-            let mempool =
-                run_block_generator(&mut a, prg.as_ref(), &block_refs, ti.cost, MEMPOOL_MODE)
-                    .expect("failed to run block generator");
+                // in order for the comparison below the hold, we need to
+                // patch up the cost of the rust generator to look like the
+                // baseline
+                conditions.cost = ti.cost;
+            } else {
+                assert_eq!(conditions.cost, ti.cost);
+            }
 
-            println!("height: {height}");
-            assert_eq!(consensus.cost, ti.cost);
-            assert_eq!(mempool.cost, ti.cost);
+            if args.validate {
+                let mut baseline =
+                    run_block_generator(&mut a, prg.as_ref(), &block_refs, ti.cost, 0)
+                        .expect("failed to run block generator");
+                assert_eq!(baseline.cost, ti.cost);
 
-            // now ensure the outputs are the same
-            assert_eq!(&consensus, &mempool);
+                baseline.spends.sort();
+                conditions.spends.sort();
+
+                // now ensure the outputs are the same
+                assert_eq!(&baseline, &conditions);
+            }
         });
 
         assert_eq!(pool.panic_count(), 0);
