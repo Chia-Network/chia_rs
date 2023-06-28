@@ -103,6 +103,45 @@ fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
     ret
 }
 
+fn print_diff(output: &str, expected: &str) {
+    println!("\x1b[102m \x1b[0m - output from test");
+    println!("\x1b[101m \x1b[0m - expected output");
+    for diff in diff(expected, &output, "\n").1 {
+        match diff {
+            Difference::Same(s) => {
+                let lines: Vec<&str> = s.split("\n").collect();
+                if lines.len() <= 6 {
+                    for l in &lines {
+                        println!(" {l}");
+                    }
+                } else {
+                    for l in &lines[0..3] {
+                        println!(" {l}");
+                    }
+                    println!(" ...");
+                    for l in &lines[lines.len() - 3..] {
+                        println!(" {l}");
+                    }
+                }
+            }
+            Difference::Rem(s) => {
+                println!("\x1b[91m");
+                for l in s.split("\n") {
+                    println!("-{l}");
+                }
+                println!("\x1b[0m");
+            }
+            Difference::Add(s) => {
+                println!("\x1b[92m");
+                for l in s.split("\n") {
+                    println!("+{l}");
+                }
+                println!("\x1b[0m");
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 #[rstest]
 #[case("block-225758")]
@@ -179,42 +218,7 @@ fn run_generator(#[case] name: &str) {
         };
 
         if output != expected {
-            println!("\x1b[102m \x1b[0m - output from test");
-            println!("\x1b[101m \x1b[0m - expected output");
-            for diff in diff(expected, &output, "\n").1 {
-                match diff {
-                    Difference::Same(s) => {
-                        let lines: Vec<&str> = s.split("\n").collect();
-                        if lines.len() <= 6 {
-                            for l in &lines {
-                                println!(" {l}");
-                            }
-                        } else {
-                            for l in &lines[0..3] {
-                                println!(" {l}");
-                            }
-                            println!(" ...");
-                            for l in &lines[lines.len() - 3..] {
-                                println!(" {l}");
-                            }
-                        }
-                    }
-                    Difference::Rem(s) => {
-                        println!("\x1b[91m");
-                        for l in s.split("\n") {
-                            println!("-{l}");
-                        }
-                        println!("\x1b[0m");
-                    }
-                    Difference::Add(s) => {
-                        println!("\x1b[92m");
-                        for l in s.split("\n") {
-                            println!("+{l}");
-                        }
-                        println!("\x1b[0m");
-                    }
-                }
-            }
+            print_diff(&output, &expected);
             panic!("mismatching generator output");
         }
     }
