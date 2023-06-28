@@ -20,7 +20,7 @@ py-bindings = ["dep:pyo3"]
 [dependencies]
 clvmr = "=0.2.6"
 hex = "=0.4.3"
-pyo3 = { version = "=0.15.1", features = ["extension-module"], optional = true }
+pyo3 = { version = ">=0.19.0", features = ["extension-module"], optional = true }
 clvm-utils = { version = "=0.2.7", path = "clvm-utils" }
 chia-protocol = { version = "=0.2.7", path = "chia-protocol" }
 hex-literal = "=0.4.1"

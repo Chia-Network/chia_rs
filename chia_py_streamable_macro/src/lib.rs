@@ -55,8 +55,8 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
     };
 
     let mut py_protocol = quote! {
-        #[pyproto]
-        impl pyo3::class::basic::PyObjectProtocol for #ident {
+        #[pymethods]
+        impl #ident {
             fn __str__(&self) -> PyResult<String> {
                 Ok(format!("{:?}", self))
             }
@@ -97,6 +97,7 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
                 impl #ident {
                     #[allow(too_many_arguments)]
                     #[new]
+                    #[pyo3(signature = (#(#fnames),*))]
                     fn new ( #(#fnames : #ftypes),* ) -> #ident {
                         #ident { #(#fnames),* }
                     }
@@ -109,12 +110,6 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
                     pub fn from_json_dict(o: &pyo3::PyAny) -> PyResult<Self> {
                         <Self as FromJsonDict>::from_json_dict(o)
                     }
-
-                    #(#[getter]
-                        fn #fnames(&self, py: Python) -> PyResult<#ftypes> {
-                            Ok(self.#fnames.clone())
-                        }
-                    )*
                 }
 
                 impl ToJsonDict for #ident {

@@ -11,7 +11,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyTuple};
 use std::rc::Rc;
 
-#[pyclass(subclass, unsendable)]
+#[pyclass(subclass, unsendable, frozen)]
 #[derive(Clone)]
 pub struct LazyNode {
     allocator: Rc<Allocator>,
