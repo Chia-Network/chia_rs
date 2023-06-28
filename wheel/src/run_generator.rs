@@ -15,6 +15,7 @@ use clvmr::reduction::{EvalErr, Reduction};
 use clvmr::run_program::run_program;
 use clvmr::serde::node_from_bytes;
 
+use pyo3::buffer::PyBuffer;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 
@@ -175,17 +176,30 @@ pub fn run_generator(
 #[pyfunction]
 pub fn run_block_generator(
     _py: Python,
-    program: &[u8],
+    program: PyBuffer<u8>,
     block_refs: &PyList,
     max_cost: Cost,
     flags: u32,
 ) -> PyResult<(Option<u32>, Option<PySpendBundleConditions>)> {
     let mut allocator = make_allocator(flags);
 
-    let mut refs = Vec::<Vec<u8>>::new();
+    let mut refs = Vec::<&[u8]>::new();
     for g in block_refs {
-        refs.push(g.extract::<Vec<u8>>()?);
+        let buf = g.extract::<PyBuffer<u8>>()?;
+
+        if !buf.is_c_contiguous() {
+            panic!("block_refs buffers must be contiguous");
+        }
+        let slice =
+            unsafe { std::slice::from_raw_parts(buf.buf_ptr() as *const u8, buf.len_bytes()) };
+        refs.push(slice);
     }
+
+    if !program.is_c_contiguous() {
+        panic!("program buffer must be contiguous");
+    }
+    let program =
+        unsafe { std::slice::from_raw_parts(program.buf_ptr() as *const u8, program.len_bytes()) };
 
     match native_run_block_generator(&mut allocator, program, &refs, max_cost, flags) {
         Ok(spend_bundle_conds) => {
