@@ -1236,6 +1236,9 @@ fn test_coin_id(parent_id: &[u8; 32], puzzle_hash: &[u8; 32], amount: u64) -> By
     hasher.finalize().as_slice().into()
 }
 
+#[cfg(test)]
+type CallbackFn = dyn Fn(&mut Allocator) -> NodePtr;
+
 // this is a very simple parser. It does not handle errors, because it's only
 // meant for tests
 // * redundant white space is not supported.
@@ -1254,25 +1257,25 @@ fn test_coin_id(parent_id: &[u8; 32], puzzle_hash: &[u8; 32], amount: u64) -> By
 fn parse_list_impl(
     a: &mut Allocator,
     input: &str,
-    callback: &Option<Box<dyn Fn(&mut Allocator) -> NodePtr>>,
+    callback: &Option<Box<CallbackFn>>,
     subs: &HashMap<&'static str, NodePtr>,
 ) -> (NodePtr, usize) {
     // skip whitespace
-    if input.starts_with(" ") {
-        let (n, skip) = parse_list_impl(a, &input[1..], callback, subs);
+    if let Some(substr) = input.strip_prefix(' ') {
+        let (n, skip) = parse_list_impl(a, substr, callback, subs);
         return (n, skip + 1);
     }
 
-    if input.starts_with(")") {
+    if input.starts_with(')') {
         (a.null(), 1)
-    } else if input.starts_with("(") {
-        let (first, step1) = parse_list_impl(a, &input[1..], callback, subs);
-        let (rest, step2) = parse_list_impl(a, &input[(1 + step1)..], callback, subs);
+    } else if let Some(substr) = input.strip_prefix('(') {
+        let (first, step1) = parse_list_impl(a, substr, callback, subs);
+        let (rest, step2) = parse_list_impl(a, &substr[step1..], callback, subs);
         (a.new_pair(first, rest).unwrap(), 1 + step1 + step2)
-    } else if input.starts_with("{") {
+    } else if let Some(substr) = input.strip_prefix('{') {
         // substitute '{X}' tokens with our test hashes and messages
         // this keeps the test cases a lot simpler
-        let var = input[1..].split_once("}").unwrap().0;
+        let var = substr.split_once('}').unwrap().0;
 
         let ret = match var {
             "" => callback.as_ref().unwrap()(a),
@@ -1280,12 +1283,12 @@ fn parse_list_impl(
         };
         (ret, var.len() + 2)
     } else if input.starts_with("0x") {
-        let v = input.split_once(" ").unwrap().0;
+        let v = input.split_once(' ').unwrap().0;
 
         let buf = Vec::from_hex(v.strip_prefix("0x").unwrap()).unwrap();
         (a.new_atom(&buf).unwrap(), v.len() + 1)
-    } else if input.starts_with("-") || "0123456789".contains(input.get(0..1).unwrap()) {
-        let v = input.split_once(" ").unwrap().0;
+    } else if input.starts_with('-') || "0123456789".contains(input.get(0..1).unwrap()) {
+        let v = input.split_once(' ').unwrap().0;
         let num = Number::from_str_radix(v, 10).unwrap();
         (a.new_number(num).unwrap(), v.len() + 1)
     } else {
@@ -1294,11 +1297,7 @@ fn parse_list_impl(
 }
 
 #[cfg(test)]
-fn parse_list(
-    a: &mut Allocator,
-    input: &str,
-    callback: &Option<Box<dyn Fn(&mut Allocator) -> NodePtr>>,
-) -> NodePtr {
+fn parse_list(a: &mut Allocator, input: &str, callback: &Option<Box<CallbackFn>>) -> NodePtr {
     // all substitutions are allocated up-front in order to have them all use
     // the same atom in the CLVM structure. This is to cover cases where
     // conditions may be deduplicated based on the NodePtr value, when they
@@ -1369,13 +1368,13 @@ fn parse_list(
 fn cond_test_cb(
     input: &str,
     flags: u32,
-    callback: Option<Box<dyn Fn(&mut Allocator) -> NodePtr>>,
+    callback: Option<Box<CallbackFn>>,
 ) -> Result<(Allocator, SpendBundleConditions), ValidationErr> {
     let mut a = Allocator::new();
 
     println!("input: {}", input);
 
-    let n = parse_list(&mut a, &input, &callback);
+    let n = parse_list(&mut a, input, &callback);
     for c in node_to_bytes(&a, n).unwrap() {
         print!("{:02x}", c);
     }
@@ -1601,7 +1600,7 @@ fn test_extra_arg(
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
 
-    test(&conds, &spend);
+    test(&conds, spend);
 }
 
 #[cfg(test)]
@@ -1650,7 +1649,7 @@ fn test_single_condition(
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
 
-    test(&conds, &spend);
+    test(&conds, spend);
 }
 
 #[cfg(test)]
@@ -1869,7 +1868,7 @@ fn test_multiple_conditions(
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
 
-    test(&conds, &spend);
+    test(&conds, spend);
 }
 
 // parse all conditions without an argument. They should all fail
@@ -3626,7 +3625,7 @@ fn test_assert_ephemeral() {
 
     assert_eq!(conds.spends.len(), 2);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(&H1, &H1, 123));
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H1);
     assert_eq!(spend.agg_sig_me.len(), 0);
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
@@ -3797,7 +3796,7 @@ fn test_relative_condition_on_ephemeral(
 
             assert_eq!(conds.spends.len(), 2);
             let spend = &conds.spends[0];
-            assert_eq!(*spend.coin_id, test_coin_id(&H1, &H1, 123));
+            assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
             assert_eq!(a.atom(spend.puzzle_hash), H1);
             assert_eq!(spend.agg_sig_me.len(), 0);
             assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);

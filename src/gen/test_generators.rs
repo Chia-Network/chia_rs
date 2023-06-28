@@ -151,7 +151,7 @@ fn run_generator(#[case] name: &str) {
     let filename = format!("generator-tests/{name}.txt");
     println!("file: {filename}");
     let test_file = read_to_string(filename).expect("test file not found");
-    let (generator, expected) = test_file.split_once("\n").expect("invalid test file");
+    let (generator, expected) = test_file.split_once('\n').expect("invalid test file");
     let generator = hex::decode(generator).expect("invalid hex encoded generator");
 
     let expected = match expected.split_once("STRICT:\n") {
@@ -184,7 +184,7 @@ fn run_generator(#[case] name: &str) {
             for diff in diff(expected, &output, "\n").1 {
                 match diff {
                     Difference::Same(s) => {
-                        let lines: Vec<&str> = s.split("\n").collect();
+                        let lines: Vec<&str> = s.split('\n').collect();
                         if lines.len() <= 6 {
                             for l in &lines {
                                 println!(" {l}");
@@ -201,14 +201,14 @@ fn run_generator(#[case] name: &str) {
                     }
                     Difference::Rem(s) => {
                         println!("\x1b[91m");
-                        for l in s.split("\n") {
+                        for l in s.split('\n') {
                             println!("-{l}");
                         }
                         println!("\x1b[0m");
                     }
                     Difference::Add(s) => {
                         println!("\x1b[92m");
-                        for l in s.split("\n") {
+                        for l in s.split('\n') {
                             println!("+{l}");
                         }
                         println!("\x1b[0m");

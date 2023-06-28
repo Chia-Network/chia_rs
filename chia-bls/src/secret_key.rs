@@ -194,12 +194,9 @@ fn test_derive_unhardened() {
     ];
     let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
 
-    for idx in 0..4_usize {
+    for (idx, hex) in derived_hex.iter().enumerate() {
         let derived = sk.derive_unhardened(idx as u32);
-        assert_eq!(
-            derived.to_bytes(),
-            <[u8; 32]>::from_hex(derived_hex[idx]).unwrap()
-        )
+        assert_eq!(derived.to_bytes(), <[u8; 32]>::from_hex(hex).unwrap())
     }
 }
 
@@ -262,12 +259,9 @@ fn test_derive_hardened() {
     ];
     let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
 
-    for idx in 0..derived_hex.len() {
+    for (idx, hex) in derived_hex.iter().enumerate() {
         let derived = sk.derive_hardened(idx as u32);
-        assert_eq!(
-            derived.to_bytes(),
-            <[u8; 32]>::from_hex(derived_hex[idx]).unwrap()
-        )
+        assert_eq!(derived.to_bytes(), <[u8; 32]>::from_hex(hex).unwrap())
     }
 }
 

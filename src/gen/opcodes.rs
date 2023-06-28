@@ -162,7 +162,7 @@ pub fn parse_opcode(a: &Allocator, op: NodePtr, flags: u32) -> Option<ConditionO
 #[cfg(test)]
 fn opcode_tester(a: &mut Allocator, val: &[u8], flags: u32) -> Option<ConditionOpcode> {
     let v = a.new_atom(val).unwrap();
-    parse_opcode(&a, v, flags)
+    parse_opcode(a, v, flags)
 }
 
 #[cfg(test)]
