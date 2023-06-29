@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
-from chia_rs import run_block_generator
+from chia_rs import run_block_generator, SpendBundleConditions
 from time import time
 import sys
-from typing import Optional
+from time import perf_counter
+from typing import Optional, Tuple
 
-def run_gen(fn: str, flags: int = 0, args: Optional[str] = None):
+def run_gen(fn: str, flags: int = 0, args: Optional[str] = None) -> Tuple[Optional[int], Optional[SpendBundleConditions], float]:
 
     # constants from the main chia blockchain:
     # https://github.com/Chia-Network/chia-blockchain/blob/main/chia/consensus/default_constants.py
@@ -24,11 +25,15 @@ def run_gen(fn: str, flags: int = 0, args: Optional[str] = None):
         except OSError as e:
             pass
 
+    start_time = perf_counter()
     try:
-        return run_block_generator(generator, block_refs, max_cost, flags)
+        ret = run_block_generator(generator, block_refs, max_cost, flags)
+        run_time = perf_counter() - start_time
+        return ret + (run_time, )
     except Exception as e:
         # GENERATOR_RUNTIME_ERROR
-        return (117, None)
+        run_time = perf_counter() - start_time
+        return (117, None, run_time)
 
 
 def print_spend_bundle_conditions(result) -> str:
@@ -72,11 +77,9 @@ def print_spend_bundle_conditions(result) -> str:
 
 if __name__ == "__main__":
     try:
-        start_time = time()
-        error_code, result = run_gen(sys.argv[1],
+        error_code, result, run_time = run_gen(sys.argv[1],
             0 if len(sys.argv) < 3 else int(sys.argv[2]),
             None if len(sys.argv) < 4 else sys.argv[3])
-        run_time = time() - start_time
         if error_code is not None:
             print(f"Validation Error: {error_code}")
             print(f"run-time: {run_time:.2f}s")
