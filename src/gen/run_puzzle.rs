@@ -5,7 +5,7 @@ use crate::gen::flags::ALLOW_BACKREFS;
 use crate::gen::validation_error::ValidationErr;
 use chia_protocol::bytes::Bytes32;
 use chia_protocol::coin::Coin;
-use clvm_utils::tree_hash::tree_hash;
+use clvm_utils::tree_hash;
 use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::reduction::Reduction;

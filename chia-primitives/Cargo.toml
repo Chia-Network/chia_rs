@@ -1,0 +1,13 @@
+[package]
+name = "chia-primitives"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Chia primitive implementations"
+authors = ["Brandon Haggstrom <b.haggstrom@chia.net>"]
+homepage = "https://github.com/Chia-Network/chia_rs/chia-primitives/"
+repository = "https://github.com/Chia-Network/chia_rs/chia-primitives/"
+
+[dependencies]
+hex-literal = "0.4.1"
+chia-bls = { version = "0.2.7", path = "../chia-bls" }

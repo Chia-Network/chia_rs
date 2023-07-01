@@ -4,6 +4,7 @@
 members = [
     "chia-protocol",
     "chia-client",
+    "chia-primitives",
     "chia-bls",
     "chia-ssl",
     "chia-tools",

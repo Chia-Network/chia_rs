@@ -17,6 +17,7 @@ bls12_381_plus = "0.7.0"
 num-bigint = "0.4.3"
 hkdf = "0.11.0"
 group = "0.12.0"
+blst = "0.3.10"
 
 [dev-dependencies]
 hex = "0.4.3"
