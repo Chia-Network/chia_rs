@@ -7,6 +7,14 @@ macro_rules! message_struct {
             $(pub $field: $t),*
         }
 
+        #[cfg(not(feature = "py-bindings"))]
+        #[allow(clippy::too_many_arguments)]
+        impl $name {
+            pub fn new ( $($field: $t),* ) -> $name {
+                $name { $($field),* }
+            }
+        }
+
         impl ChiaProtocolMessage for $name {
             fn msg_type() -> ProtocolMessageTypes {
                 ProtocolMessageTypes::$name
@@ -22,6 +30,14 @@ macro_rules! streamable_struct {
         #[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
         pub struct $name {
             $(pub $field: $t),*
+        }
+
+        #[cfg(not(feature = "py-bindings"))]
+        #[allow(clippy::too_many_arguments)]
+        impl $name {
+            pub fn new ( $($field: $t),* ) -> $name {
+                $name { $($field),* }
+            }
         }
     }
 }
