@@ -66,3 +66,9 @@ name = "process-spend"
 path = "fuzz_targets/process-spend.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "run-generator"
+path = "fuzz_targets/run-generator.rs"
+test = false
+doc = false
