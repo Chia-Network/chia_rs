@@ -25,10 +25,6 @@ impl Wallet {
         }
     }
 
-    pub fn subscribe(&self) -> broadcast::Receiver<WalletEvent> {
-        self.event_sender.subscribe()
-    }
-
     async fn peer_handler(mut peer_receiver: broadcast::Receiver<PeerEvent>) {
         loop {
             match peer_receiver.recv().await {
@@ -41,6 +37,10 @@ impl Wallet {
                 _ => {}
             }
         }
+    }
+
+    pub fn subscribe(&self) -> broadcast::Receiver<WalletEvent> {
+        self.event_sender.subscribe()
     }
 }
 

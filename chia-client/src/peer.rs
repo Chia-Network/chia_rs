@@ -78,18 +78,14 @@ impl Peer {
         mut stream: SplitStream<PeerSocket>,
     ) {
         while let Some(next) = stream.next().await {
-            match next {
-                Ok(ws_message) => match Message::parse(&mut Cursor::new(&ws_message.into_data())) {
-                    Ok(message) => {
-                        if let Some(id) = message.id {
-                            if let Some(request) = requests.lock().await.remove(&id) {
-                                request.send(message).ok();
-                            }
+            if let Ok(message) = next {
+                if let Ok(message) = Message::parse(&mut Cursor::new(&message.into_data())) {
+                    if let Some(id) = message.id {
+                        if let Some(request) = requests.lock().await.remove(&id) {
+                            request.send(message).ok();
                         }
                     }
-                    Err(_error) => {} // TODO: Handle protocol errors
-                },
-                Err(_error) => {} // TODO: Handle protocol errors
+                }
             }
         }
     }
