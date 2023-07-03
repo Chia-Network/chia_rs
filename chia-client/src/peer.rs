@@ -12,7 +12,15 @@ use tokio::{
 };
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 
-use crate::{PeerEvent, PeerMessage, RequestError, SendError};
+mod peer_event;
+mod peer_message;
+mod request_error;
+mod send_error;
+
+pub use peer_event::*;
+pub use peer_message::*;
+pub use request_error::*;
+pub use send_error::*;
 
 type PeerSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
