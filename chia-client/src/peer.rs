@@ -1,9 +1,6 @@
 use std::{collections::HashMap, io::Cursor, sync::Arc};
 
-use chia_protocol::{
-    Handshake, Message, NodeType, ProtocolMessageTypes, RegisterForPhUpdates, RespondToPhUpdates,
-    Streamable,
-};
+use chia_protocol::{ChiaProtocolMessage, Handshake, Message, NodeType, Streamable};
 use futures_util::{
     stream::{SplitSink, SplitStream},
     SinkExt, StreamExt,
@@ -106,24 +103,12 @@ impl Peer {
                 (3, "1".to_string()),
             ],
         };
-        self.send(ProtocolMessageTypes::Handshake, handshake).await
+        self.send(handshake).await
     }
 
-    pub async fn register_puzzle_hashes(
-        &self,
-        body: RegisterForPhUpdates,
-    ) -> Result<RespondToPhUpdates, RequestError> {
-        self.request(
-            ProtocolMessageTypes::RegisterForPhUpdates,
-            ProtocolMessageTypes::RespondToPhUpdates,
-            body,
-        )
-        .await
-    }
-
-    async fn send<T>(&self, request_type: ProtocolMessageTypes, body: T) -> Result<(), SendError>
+    pub async fn send<T>(&self, body: T) -> Result<(), SendError>
     where
-        T: Streamable,
+        T: Streamable + ChiaProtocolMessage,
     {
         let mut body_bytes = Vec::new();
 
@@ -133,7 +118,7 @@ impl Peer {
             })?;
 
         let message = Message {
-            msg_type: request_type,
+            msg_type: T::msg_type(),
             id: None,
             data: body_bytes.into(),
         };
@@ -148,15 +133,10 @@ impl Peer {
         Ok(())
     }
 
-    async fn request<T, R>(
-        &self,
-        request_type: ProtocolMessageTypes,
-        response_type: ProtocolMessageTypes,
-        body: T,
-    ) -> Result<R, RequestError>
+    pub async fn request<T, R>(&self, body: T) -> Result<R, RequestError>
     where
-        T: Streamable,
-        R: Streamable,
+        T: Streamable + ChiaProtocolMessage,
+        R: Streamable + ChiaProtocolMessage,
     {
         let mut body_bytes = Vec::new();
 
@@ -168,7 +148,7 @@ impl Peer {
         let id = *self.request_nonce.read().await;
 
         let message = Message {
-            msg_type: request_type,
+            msg_type: T::msg_type(),
             id: Some(id),
             data: body_bytes.into(),
         };
@@ -196,7 +176,7 @@ impl Peer {
                 })
             }
             Ok(message) => {
-                if message.msg_type != response_type {
+                if message.msg_type != R::msg_type() {
                     return Err(RequestError::ResponseError {
                         message: Some(message),
                         reason: "invalid response message type".to_string(),
