@@ -1,6 +1,9 @@
 use std::{collections::HashMap, io::Cursor, sync::Arc};
 
-use chia_protocol::{Handshake, Message, NodeType, ProtocolMessageTypes, Streamable};
+use chia_protocol::{
+    Handshake, Message, NodeType, ProtocolMessageTypes, RegisterForPhUpdates, RespondToPhUpdates,
+    Streamable,
+};
 use futures_util::{
     stream::{SplitSink, SplitStream},
     SinkExt, StreamExt,
@@ -106,6 +109,18 @@ impl Peer {
         self.send(ProtocolMessageTypes::Handshake, handshake).await
     }
 
+    pub async fn register_puzzle_hashes(
+        &self,
+        body: RegisterForPhUpdates,
+    ) -> Result<RespondToPhUpdates, RequestError> {
+        self.request(
+            ProtocolMessageTypes::RegisterForPhUpdates,
+            ProtocolMessageTypes::RespondToPhUpdates,
+            body,
+        )
+        .await
+    }
+
     async fn send<T>(&self, request_type: ProtocolMessageTypes, body: T) -> Result<(), SendError>
     where
         T: Streamable,
@@ -133,7 +148,7 @@ impl Peer {
         Ok(())
     }
 
-    pub async fn request<T, R>(
+    async fn request<T, R>(
         &self,
         request_type: ProtocolMessageTypes,
         response_type: ProtocolMessageTypes,
