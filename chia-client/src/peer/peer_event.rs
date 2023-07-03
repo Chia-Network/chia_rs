@@ -1,2 +1,6 @@
+use chia_protocol::Message;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PeerEvent {}
+pub enum PeerEvent {
+    Protocol(Message),
+}

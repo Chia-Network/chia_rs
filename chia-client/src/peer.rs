@@ -41,7 +41,11 @@ impl Peer {
         let requests = Arc::new(Mutex::new(HashMap::<u16, oneshot::Sender<Message>>::new()));
 
         let outbound_handler = tokio::spawn(Self::outbound_handler(message_receiver, sink));
-        let inbound_handler = tokio::spawn(Self::inbound_handler(Arc::clone(&requests), stream));
+        let inbound_handler = tokio::spawn(Self::inbound_handler(
+            event_sender.clone(),
+            Arc::clone(&requests),
+            stream,
+        ));
 
         Self {
             event_sender,
@@ -74,6 +78,7 @@ impl Peer {
     }
 
     async fn inbound_handler(
+        _event_sender: broadcast::Sender<PeerEvent>,
         requests: Arc<Mutex<HashMap<u16, oneshot::Sender<Message>>>>,
         mut stream: SplitStream<PeerSocket>,
     ) {
@@ -82,7 +87,7 @@ impl Peer {
                 if let Ok(message) = Message::parse(&mut Cursor::new(&message.into_data())) {
                     if let Some(id) = message.id {
                         if let Some(request) = requests.lock().await.remove(&id) {
-                            request.send(message).ok();
+                            request.send(message.clone()).ok();
                         }
                     }
                 }
