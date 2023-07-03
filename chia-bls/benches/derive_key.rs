@@ -1,5 +1,4 @@
-use chia_bls::derivable_key::DerivableKey;
-use chia_bls::secret_key::SecretKey;
+use chia_bls::{DerivableKey, SecretKey};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
@@ -11,7 +10,7 @@ fn key_derivation_benchmark(c: &mut Criterion) {
     rng.fill(data.as_mut_slice());
 
     let sk = SecretKey::from_seed(&data);
-    let pk = sk.public_key();
+    let pk = sk.to_public_key();
 
     c.bench_function("secret key, unhardened", |b| {
         b.iter_custom(|iters| {

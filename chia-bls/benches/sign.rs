@@ -1,5 +1,4 @@
-use chia_bls::secret_key::SecretKey;
-use chia_bls::signature::sign;
+use chia_bls::SecretKey;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
@@ -15,12 +14,12 @@ fn sign_benchmark(c: &mut Criterion) {
 
     c.bench_function("sign, small msg", |b| {
         b.iter(|| {
-            sign(&sk, black_box(&small_msg));
+            sk.sign(black_box(small_msg));
         });
     });
     c.bench_function("sign, 4kiB msg", |b| {
         b.iter(|| {
-            sign(&sk, black_box(&large_msg));
+            sk.sign(black_box(&large_msg));
         });
     });
 }
