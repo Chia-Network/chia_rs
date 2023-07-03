@@ -40,7 +40,6 @@ mod tests {
         // Secret key round trip
         assert_eq!(
             SecretKey::from_bytes(&secret_key_bytes)
-                .unwrap()
                 .to_bytes()
                 .encode_hex::<String>(),
             secret_key_hex

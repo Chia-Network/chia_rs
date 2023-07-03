@@ -1,7 +1,7 @@
 use blst::{
     blst_core_verify_pk_in_g1, blst_p1 as P1, blst_p1_add_affine, blst_p1_affine as P1Affine,
-    blst_p1_affine_compress, blst_p1_affine_in_g1, blst_p1_affine_is_inf, blst_p1_from_affine,
-    blst_p1_to_affine, blst_p1_uncompress, BLST_ERROR,
+    blst_p1_affine_compress, blst_p1_affine_generator, blst_p1_affine_in_g1, blst_p1_affine_is_inf,
+    blst_p1_from_affine, blst_p1_mult, blst_p1_to_affine, blst_p1_uncompress, BLST_ERROR,
 };
 use sha2::{digest::FixedOutput, Digest, Sha256};
 
@@ -69,6 +69,29 @@ impl PublicKey {
         Self(p1_affine)
     }
 
+    pub fn mul(&self, secret_key: &SecretKey) -> Self {
+        let mut p1 = P1::default();
+        unsafe {
+            blst_p1_from_affine(&mut p1, &self.0);
+        }
+
+        let mut output_p1 = P1::default();
+        unsafe {
+            blst_p1_mult(
+                &mut output_p1,
+                &p1,
+                secret_key.0.b.as_ptr(),
+                secret_key.0.b.len() * 8,
+            );
+        }
+
+        let mut p1_affine = P1Affine::default();
+        unsafe {
+            blst_p1_to_affine(&mut p1_affine, &output_p1);
+        }
+        Self(p1_affine)
+    }
+
     pub fn verify(&self, message: &[u8], signature: &Signature) -> bool {
         if !self.is_valid() || !signature.is_valid(false) {
             return false;
@@ -92,6 +115,12 @@ impl PublicKey {
     }
 }
 
+impl Default for PublicKey {
+    fn default() -> Self {
+        Self(unsafe { *blst_p1_affine_generator() })
+    }
+}
+
 impl DerivableKey for PublicKey {
     fn derive_unhardened(&self, index: u32) -> Self {
         let mut hasher = Sha256::new();
@@ -99,7 +128,7 @@ impl DerivableKey for PublicKey {
         hasher.update(index.to_be_bytes());
         let digest: [u8; 32] = hasher.finalize_fixed().into();
 
-        let new_sk = SecretKey::from_bytes(&digest).unwrap();
+        let new_sk = SecretKey::from_bytes(&digest);
         self.add(&new_sk.to_public_key())
     }
 }
@@ -117,7 +146,7 @@ mod tests {
     #[test]
     fn test_derive_unhardened() {
         let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
-        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap());
         let pk = sk.to_public_key();
 
         // make sure deriving the secret keys produce the same public keys as

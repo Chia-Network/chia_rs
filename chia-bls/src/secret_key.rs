@@ -32,17 +32,12 @@ impl SecretKey {
         Self(scalar)
     }
 
-    pub fn from_bytes(b: &[u8; 32]) -> Option<Self> {
+    pub fn from_bytes(bytes: &[u8; 32]) -> Self {
         let mut scalar = Scalar::default();
         unsafe {
-            let result = blst_scalar_from_be_bytes(&mut scalar, b.as_ptr(), b.len());
-
-            if result && blst_sk_check(&scalar) {
-                Some(Self(scalar))
-            } else {
-                None
-            }
+            blst_scalar_from_be_bytes(&mut scalar, bytes.as_ptr(), bytes.len());
         }
+        Self(scalar)
     }
 
     pub fn to_bytes(&self) -> [u8; 32] {
@@ -51,6 +46,10 @@ impl SecretKey {
             blst_bendian_from_scalar(bytes.as_mut_ptr(), &self.0);
         }
         bytes
+    }
+
+    pub fn is_valid(&self) -> bool {
+        unsafe { blst_sk_check(&self.0) }
     }
 
     pub fn to_public_key(&self) -> PublicKey {
@@ -64,7 +63,7 @@ impl SecretKey {
     pub fn add(&self, secret_key: &Self) -> Self {
         let mut scalar = Scalar::default();
         unsafe {
-            assert!(blst_sk_add_n_check(&mut scalar, &self.0, &secret_key.0));
+            blst_sk_add_n_check(&mut scalar, &self.0, &secret_key.0);
         }
         Self(scalar)
     }
@@ -101,7 +100,7 @@ impl DerivableKey for SecretKey {
         hasher.update(index.to_be_bytes());
         let digest: [u8; 32] = hasher.finalize_fixed().into();
 
-        let new_sk = Self::from_bytes(&digest).unwrap();
+        let new_sk = Self::from_bytes(&digest);
         self.add(&new_sk)
     }
 }
@@ -146,7 +145,7 @@ mod tests {
             "52e7e9f2fb51f2c5705aea8e11ac82737b95e664ae578f015af22031d956f92b",
         ];
 
-        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap());
 
         for (index, hex) in derived_hex.iter().enumerate() {
             let derived = sk.derive_unhardened(index as u32);
@@ -170,7 +169,7 @@ mod tests {
         ];
 
         for (sk_hex, pk_hex) in test_cases {
-            let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+            let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap());
             let pk = sk.to_public_key();
             assert_eq!(
                 pk,
@@ -189,7 +188,7 @@ mod tests {
             "3ea55db88d9a6bf5f1d9c9de072e3c9a56b13f4156d72fca7880cd39b4bd4fdc",
         ];
 
-        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap());
 
         for (index, hex) in derived_hex.iter().enumerate() {
             let derived = sk.derive_hardened(index as u32);
@@ -206,7 +205,7 @@ mod tests {
             // make the bytes exceed q
             data[0] |= 0x80;
             // just any random bytes are not a valid key and should fail
-            assert_eq!(SecretKey::from_bytes(&data), None);
+            assert!(!SecretKey::from_bytes(&data).is_valid());
         }
     }
 
@@ -218,7 +217,7 @@ mod tests {
             rng.fill(data.as_mut_slice());
             let sk = SecretKey::from_seed(&data);
             let bytes = sk.to_bytes();
-            let sk2 = SecretKey::from_bytes(&bytes).unwrap();
+            let sk2 = SecretKey::from_bytes(&bytes);
             assert_eq!(sk, sk2);
             assert_eq!(sk.to_public_key(), sk2.to_public_key());
         }
