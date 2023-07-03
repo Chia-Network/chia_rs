@@ -1,6 +1,6 @@
 use crate::compression;
 use crate::run_generator::{
-    convert_spend_bundle_conds, run_block_generator, run_generator, PySpend,
+    convert_spend_bundle_conds, run_block_generator, run_block_generator2, PySpend,
     PySpendBundleConditions,
 };
 use chia::allocator::make_allocator;
@@ -152,8 +152,8 @@ fn run_puzzle(
 #[pymodule]
 pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     // generator functions
-    m.add_function(wrap_pyfunction!(run_generator, m)?)?;
     m.add_function(wrap_pyfunction!(run_block_generator, m)?)?;
+    m.add_function(wrap_pyfunction!(run_block_generator2, m)?)?;
     m.add_function(wrap_pyfunction!(run_puzzle, m)?)?;
     m.add_class::<PySpendBundleConditions>()?;
     m.add(

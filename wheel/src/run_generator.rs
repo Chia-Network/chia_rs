@@ -1,19 +1,15 @@
-use super::adapt_response::eval_err_to_pyresult;
 use chia_protocol::from_json_dict::FromJsonDict;
 use chia_protocol::to_json_dict::ToJsonDict;
 
 use chia::allocator::make_allocator;
-use chia::gen::conditions::{parse_spends, Spend, SpendBundleConditions};
+use chia::gen::conditions::{Spend, SpendBundleConditions};
 use chia::gen::run_block_generator::run_block_generator as native_run_block_generator;
-use chia::gen::validation_error::{ErrorCode, ValidationErr};
+use chia::gen::run_block_generator::run_block_generator2 as native_run_block_generator2;
+use chia::gen::validation_error::ValidationErr;
 use chia_protocol::bytes::{Bytes, Bytes32, Bytes48};
 
 use clvmr::allocator::Allocator;
-use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;
-use clvmr::reduction::{EvalErr, Reduction};
-use clvmr::run_program::run_program;
-use clvmr::serde::node_from_bytes;
 
 use pyo3::buffer::PyBuffer;
 use pyo3::prelude::*;
@@ -124,55 +120,6 @@ pub fn convert_spend_bundle_conds(
     }
 }
 
-// returns the cost of running the CLVM program along with conditions and the list of
-// spends
-#[pyfunction]
-pub fn run_generator(
-    py: Python,
-    program: &[u8],
-    args: &[u8],
-    max_cost: Cost,
-    flags: u32,
-) -> PyResult<(Option<u32>, Option<PySpendBundleConditions>)> {
-    let mut allocator = make_allocator(flags);
-    let program = node_from_bytes(&mut allocator, program)?;
-    let args = node_from_bytes(&mut allocator, args)?;
-    let dialect = &ChiaDialect::new(flags);
-
-    let r = py.allow_threads(
-        || -> Result<(Option<ErrorCode>, Option<SpendBundleConditions>), EvalErr> {
-            let Reduction(cost, node) =
-                run_program(&mut allocator, dialect, program, args, max_cost)?;
-            // we pass in what's left of max_cost here, to fail early in case the
-            // cost of a condition brings us over the cost limit
-            match parse_spends(&allocator, node, max_cost - cost, flags) {
-                Err(ValidationErr(_, c)) => Ok((Some(c), None)),
-                Ok(mut spend_bundle_conds) => {
-                    // the cost is only the cost of conditions, add the
-                    // cost of running the CLVM program here as well
-                    spend_bundle_conds.cost += cost;
-                    Ok((None, Some(spend_bundle_conds)))
-                }
-            }
-        },
-    );
-
-    match r {
-        Ok((None, Some(spend_bundle_conds))) => {
-            // everything was successful
-            Ok((
-                None,
-                Some(convert_spend_bundle_conds(&allocator, spend_bundle_conds)),
-            ))
-        }
-        Ok((error_code, _)) => {
-            // a validation error occurred
-            Ok((error_code.map(|x| x.into()), None))
-        }
-        Err(eval_err) => eval_err_to_pyresult(py, eval_err, allocator),
-    }
-}
-
 #[pyfunction]
 pub fn run_block_generator(
     _py: Python,
@@ -202,6 +149,49 @@ pub fn run_block_generator(
         unsafe { std::slice::from_raw_parts(program.buf_ptr() as *const u8, program.len_bytes()) };
 
     match native_run_block_generator(&mut allocator, program, &refs, max_cost, flags) {
+        Ok(spend_bundle_conds) => {
+            // everything was successful
+            Ok((
+                None,
+                Some(convert_spend_bundle_conds(&allocator, spend_bundle_conds)),
+            ))
+        }
+        Err(ValidationErr(_, error_code)) => {
+            // a validation error occurred
+            Ok((Some(error_code.into()), None))
+        }
+    }
+}
+
+#[pyfunction]
+pub fn run_block_generator2(
+    _py: Python,
+    program: PyBuffer<u8>,
+    block_refs: &PyList,
+    max_cost: Cost,
+    flags: u32,
+) -> PyResult<(Option<u32>, Option<PySpendBundleConditions>)> {
+    let mut allocator = make_allocator(flags);
+
+    let mut refs = Vec::<&[u8]>::new();
+    for g in block_refs {
+        let buf = g.extract::<PyBuffer<u8>>()?;
+
+        if !buf.is_c_contiguous() {
+            panic!("block_refs buffers must be contiguous");
+        }
+        let slice =
+            unsafe { std::slice::from_raw_parts(buf.buf_ptr() as *const u8, buf.len_bytes()) };
+        refs.push(slice);
+    }
+
+    if !program.is_c_contiguous() {
+        panic!("program buffer must be contiguous");
+    }
+    let program =
+        unsafe { std::slice::from_raw_parts(program.buf_ptr() as *const u8, program.len_bytes()) };
+
+    match native_run_block_generator2(&mut allocator, program, &refs, max_cost, flags) {
         Ok(spend_bundle_conds) => {
             // everything was successful
             Ok((
