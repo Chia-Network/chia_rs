@@ -10,3 +10,4 @@ repository = "https://github.com/Chia-Network/chia_rs/chia-wallet/"
 
 [dependencies]
 chia-client = { version = "0.1.0", path = "../chia-client" }
+tokio = { version = "1", features = ["sync"] }

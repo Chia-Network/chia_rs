@@ -7,33 +7,41 @@ use futures_util::{
 };
 use tokio::{
     net::TcpStream,
-    sync::{mpsc, oneshot, Mutex},
+    sync::{broadcast, mpsc, oneshot, Mutex, RwLock},
+    task::JoinHandle,
 };
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 
-use crate::{PeerMessage, RequestError, SendError};
+use crate::{PeerEvent, PeerMessage, RequestError, SendError};
 
 type PeerSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 pub struct Peer {
-    sender: mpsc::Sender<PeerMessage>,
+    event_sender: broadcast::Sender<PeerEvent>,
+    message_sender: mpsc::Sender<PeerMessage>,
     requests: Arc<Mutex<HashMap<u16, oneshot::Sender<Message>>>>,
-    request_nonce: u16,
+    request_nonce: RwLock<u16>,
+    outbound_handler: JoinHandle<()>,
+    inbound_handler: JoinHandle<()>,
 }
 
 impl Peer {
     pub async fn new(ws: PeerSocket) -> Self {
         let (sink, stream) = ws.split();
-        let (sender, receiver) = mpsc::channel(32);
+        let (event_sender, _) = broadcast::channel(32);
+        let (message_sender, message_receiver) = mpsc::channel(32);
         let requests = Arc::new(Mutex::new(HashMap::<u16, oneshot::Sender<Message>>::new()));
 
-        tokio::spawn(Self::outbound_handler(receiver, sink));
-        tokio::spawn(Self::inbound_handler(Arc::clone(&requests), stream));
+        let outbound_handler = tokio::spawn(Self::outbound_handler(message_receiver, sink));
+        let inbound_handler = tokio::spawn(Self::inbound_handler(Arc::clone(&requests), stream));
 
         Self {
-            sender,
+            event_sender,
+            message_sender,
             requests,
-            request_nonce: 0,
+            request_nonce: RwLock::new(0),
+            outbound_handler,
+            inbound_handler,
         }
     }
 
@@ -78,7 +86,11 @@ impl Peer {
         }
     }
 
-    pub async fn perform_handshake(&mut self, network_id: String) -> Result<(), SendError> {
+    pub fn subscribe(&self) -> broadcast::Receiver<PeerEvent> {
+        self.event_sender.subscribe()
+    }
+
+    pub async fn perform_handshake(&self, network_id: String) -> Result<(), SendError> {
         let handshake = Handshake {
             network_id,
             protocol_version: "0.0.34".to_string(),
@@ -111,7 +123,7 @@ impl Peer {
             data: body_bytes.into(),
         };
 
-        self.sender
+        self.message_sender
             .send(PeerMessage::Protocol(message))
             .await
             .map_err(|error| SendError::SocketError {
@@ -122,7 +134,7 @@ impl Peer {
     }
 
     pub async fn request<T, R>(
-        &mut self,
+        &self,
         request_type: ProtocolMessageTypes,
         response_type: ProtocolMessageTypes,
         body: T,
@@ -138,7 +150,7 @@ impl Peer {
                 reason: error.to_string(),
             })?;
 
-        let id = self.request_nonce;
+        let id = *self.request_nonce.read().await;
 
         let message = Message {
             msg_type: request_type,
@@ -146,9 +158,9 @@ impl Peer {
             data: body_bytes.into(),
         };
 
-        self.request_nonce += 1;
+        *self.request_nonce.write().await += 1;
 
-        self.sender
+        self.message_sender
             .send(PeerMessage::Protocol(message))
             .await
             .map_err(|error| RequestError::SocketError {
@@ -187,6 +199,13 @@ impl Peer {
     }
 
     pub async fn close(&self) -> Result<(), mpsc::error::SendError<PeerMessage>> {
-        self.sender.send(PeerMessage::Close).await
+        self.message_sender.send(PeerMessage::Close).await
+    }
+}
+
+impl Drop for Peer {
+    fn drop(&mut self) {
+        self.outbound_handler.abort();
+        self.inbound_handler.abort();
     }
 }
