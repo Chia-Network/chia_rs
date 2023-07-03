@@ -1,0 +1,12 @@
+[package]
+name = "chia-wallet"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Chia light wallet implementation"
+authors = ["Brandon Haggstrom <b.haggstrom@chia.net>"]
+homepage = "https://github.com/Chia-Network/chia_rs/chia-wallet/"
+repository = "https://github.com/Chia-Network/chia_rs/chia-wallet/"
+
+[dependencies]
+chia-client = { version = "0.1.0", path = "../chia-client" }
