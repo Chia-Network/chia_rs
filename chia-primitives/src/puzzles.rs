@@ -13,6 +13,12 @@ pub const P2_DELEGATED_OR_HIDDEN: [u8; 227] = hex!(
     "
 );
 
+pub const P2_DELEGATED_OR_HIDDEN_HASH: [u8; 32] = hex!(
+    "
+    e9aaa49f45bad5c889b86ee3341550c155cfdd10c3a6757de618d20612fffd52
+    "
+);
+
 pub const DEFAULT_HIDDEN_PUZZLE: [u8; 3] = hex!("ff0980");
 
 pub const DEFAULT_HIDDEN_PUZZLE_HASH: [u8; 32] = hex!(

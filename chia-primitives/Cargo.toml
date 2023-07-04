@@ -11,9 +11,8 @@ repository = "https://github.com/Chia-Network/chia_rs/chia-primitives/"
 [dependencies]
 hex-literal = "0.4.1"
 chia-bls = { version = "0.2.7", path = "../chia-bls" }
+clvm-utils = { version = "0.2.7", path = "../clvm-utils" }
 sha2 = "0.9.9"
-num-bigint = "0.4.3"
-num-traits = "0.2.15"
 
 [dev-dependencies]
 hex = "0.4.3"
