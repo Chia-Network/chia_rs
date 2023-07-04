@@ -1,20 +1,28 @@
 use chia_bls::{PublicKey, SecretKey};
 use sha2::{digest::FixedOutput, Digest, Sha256};
 
-pub trait SyntheticKeyExt {
+pub trait DeriveSynthetic {
     fn derive_synthetic(&self, hidden_puzzle_hash: &[u8; 32]) -> Self;
 }
 
-impl SyntheticKeyExt for PublicKey {
+impl DeriveSynthetic for PublicKey {
     fn derive_synthetic(&self, hidden_puzzle_hash: &[u8; 32]) -> Self {
-        let mut hasher = Sha256::new();
-        hasher.update(self.to_bytes());
-        hasher.update(hidden_puzzle_hash);
-        let bytes: [u8; 32] = hasher.finalize_fixed().into();
-        let sk = SecretKey::from_signed_bytes(&bytes);
-        let pk = sk.to_public_key();
-        self.add(&pk)
+        self.add(&synthetic_offset(self, hidden_puzzle_hash).to_public_key())
     }
+}
+
+impl DeriveSynthetic for SecretKey {
+    fn derive_synthetic(&self, hidden_puzzle_hash: &[u8; 32]) -> Self {
+        self.add(&synthetic_offset(&self.to_public_key(), hidden_puzzle_hash))
+    }
+}
+
+fn synthetic_offset(public_key: &PublicKey, hidden_puzzle_hash: &[u8; 32]) -> SecretKey {
+    let mut hasher = Sha256::new();
+    hasher.update(public_key.to_bytes());
+    hasher.update(hidden_puzzle_hash);
+    let bytes: [u8; 32] = hasher.finalize_fixed().into();
+    SecretKey::from_signed_bytes(&bytes)
 }
 
 #[cfg(test)]
@@ -28,7 +36,7 @@ mod tests {
     use hex_literal::hex;
 
     #[test]
-    fn test_synthetic_keys() {
+    fn test_synthetic_public_keys() {
         let hex_keys = [
             "b0c8cf08fdbe7fdb7bb1795740153b944c32364b100c372a05833554cb97794563b096cb5f57bfa09f38d7aebb48704e",
             "8b1b92da63fdf8c4b53349da2fdd84685303587653f1a75826a56a97ea50b86ca8a0fbf6a5d6605c70b6be324bc59c85",
@@ -53,6 +61,40 @@ mod tests {
         ));
         let pk = sk.to_public_key();
         let intermediate = master_to_wallet_unhardened_intermediate(&pk);
+
+        for (index, hex) in hex_keys.iter().enumerate() {
+            let key = intermediate
+                .derive_unhardened(index as u32)
+                .derive_synthetic(&DEFAULT_HIDDEN_PUZZLE_HASH);
+            assert_eq!(key.to_bytes().encode_hex::<String>(), *hex);
+        }
+    }
+
+    #[test]
+    fn test_synthetic_secret_keys() {
+        let hex_keys = [
+            "64c91fe4534fc21c36096be012e0e14de484180a1a510783367bcd5ccecaad0c",
+            "13a0f95de0dd347c769ee79e9828a698bfe53429233375e891f05b4e0eaa8219",
+            "4399fcc4435e014f24fa31f8acf419367e0fbac70c9d6df53a7cc31623a10eac",
+            "5ef7d10f546d45ae919277568d2142f9e907933d4393111c54b13425c20abce1",
+            "0c39c6c5d70ee05cbd3da44ae918af21469f235dc0bea0116566a4379d33f1f5",
+            "39fbf8ed5b0b7071ba155d7a0180af13ea88aec08d74afaa86ea11ad61cb06ec",
+            "31c03611b14be9c811beb435162e2c6e773efc77a4a5a5b2aca87e27687f6a12",
+            "222b62feb12390110122c63c176c2216cf85ad17bdbfd6240663eeeeab47abc0",
+            "18012a00d6ab3aec680960cc21beec41b78c731be1720f0c30f09e32892e918f",
+            "31e8f4a82182f072cb9035acdb45ae3e4c5d631b4538dd89afa71294792a774f",
+            "196f72aaa1403dc0e3334a3b7a1910fbe61dfabd3aba178ed7e1ba7c80dccce2",
+            "27bf40f3a6fa7b2b47f48402e423ee2c5a441e6ba716fc6fef02c3dd5285df20",
+            "0bccd277dbeb9742e816b0696b298277985ec7008ba61a585af63b4a4b6d7108",
+            "3d77df05a9bbda18cc23de6ac1b9744f0a07622df925ae253b3418c41709dcc8",
+            "465a7d9a106522d4111e5f35ca5ca4fb6889b884f15eba024e3826b8191cf784",
+            "68fe97fadd389f4051b6bd0c320f17d08ba7b4951b33d525b1f23d38226e5d0a",
+        ];
+
+        let sk = SecretKey::from_bytes(&hex!(
+            "6bb19282e27bc6e7e397fb19efc2627a412410fdfd13bf14f4ce5bfdce084c71"
+        ));
+        let intermediate = master_to_wallet_unhardened_intermediate(&sk);
 
         for (index, hex) in hex_keys.iter().enumerate() {
             let key = intermediate

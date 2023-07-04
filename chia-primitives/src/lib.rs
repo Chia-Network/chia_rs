@@ -1,5 +1,5 @@
 pub mod puzzles;
 
-mod synthetic_keys;
+mod derive_synthetic;
 
-pub use synthetic_keys::*;
+pub use derive_synthetic::*;
