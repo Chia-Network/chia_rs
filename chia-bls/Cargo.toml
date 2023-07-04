@@ -10,6 +10,8 @@ repository = "https://github.com/Chia-Network/chia_rs/chia-bls/"
 
 [dependencies]
 blst = "0.3.10"
+num-bigint = "0.4.3"
+num-traits = "0.2.15"
 sha2 = "0.9.9"
 
 [dev-dependencies]

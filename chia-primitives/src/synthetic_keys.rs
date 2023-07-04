@@ -1,6 +1,4 @@
 use chia_bls::{PublicKey, SecretKey};
-use num_bigint::BigInt;
-use num_traits::Num;
 use sha2::{digest::FixedOutput, Digest, Sha256};
 
 pub trait SyntheticKeyExt {
@@ -13,22 +11,7 @@ impl SyntheticKeyExt for PublicKey {
         hasher.update(self.to_bytes());
         hasher.update(hidden_puzzle_hash);
         let bytes: [u8; 32] = hasher.finalize_fixed().into();
-
-        let value = BigInt::from_signed_bytes_be(&bytes);
-
-        let group_order = BigInt::from_str_radix(
-            "73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001",
-            16,
-        )
-        .unwrap();
-        let modulo = ((&value % &group_order) + &group_order) % &group_order;
-        let mut byte_vec = modulo.to_bytes_be().1;
-        if byte_vec.len() < 32 {
-            let pad = vec![0; 32 - byte_vec.len()];
-            byte_vec.splice(0..0, pad);
-        }
-
-        let sk = SecretKey::from_bytes(&byte_vec.try_into().unwrap());
+        let sk = SecretKey::from_signed_bytes(&bytes);
         let pk = sk.to_public_key();
         self.add(&pk)
     }

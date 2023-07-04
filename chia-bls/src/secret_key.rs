@@ -4,6 +4,8 @@ use blst::{
     blst_sk_add_n_check, blst_sk_check, blst_sk_to_pk2_in_g1,
 };
 use blst::{blst_p2_to_affine, blst_sign_pk_in_g1};
+use num_bigint::BigInt;
+use num_traits::Num;
 use sha2::digest::FixedOutput;
 use sha2::{Digest, Sha256};
 
@@ -30,6 +32,23 @@ impl SecretKey {
             );
         }
         Self(scalar)
+    }
+
+    pub fn from_signed_bytes(bytes: &[u8; 32]) -> Self {
+        // Code should be improved.
+        let value = BigInt::from_signed_bytes_be(bytes.as_slice());
+        let group_order = BigInt::from_str_radix(
+            "73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001",
+            16,
+        )
+        .unwrap();
+        let modulo = ((&value % &group_order) + &group_order) % &group_order;
+        let mut byte_vec = modulo.to_bytes_be().1;
+        if byte_vec.len() < 32 {
+            let pad = vec![0; 32 - byte_vec.len()];
+            byte_vec.splice(0..0, pad);
+        }
+        Self::from_bytes(&byte_vec.try_into().unwrap())
     }
 
     pub fn from_bytes(bytes: &[u8; 32]) -> Self {
