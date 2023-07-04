@@ -1,6 +1,7 @@
 mod aug_scheme;
 mod derivable_key;
 mod derive_keys;
+mod pairing;
 mod public_key;
 mod secret_key;
 mod signature;

@@ -3,16 +3,17 @@ use std::sync::Arc;
 use chia_client::{Peer, PeerEvent};
 use tokio::{sync::broadcast, task::JoinHandle};
 
-use crate::WalletEvent;
+use crate::{KeyStore, WalletEvent};
 
 pub struct Wallet {
     peer: Arc<Peer>,
+    key_store: KeyStore,
     event_sender: broadcast::Sender<WalletEvent>,
     peer_handler: JoinHandle<()>,
 }
 
 impl Wallet {
-    pub fn new(peer: Arc<Peer>) -> Self {
+    pub fn new(peer: Arc<Peer>, key_store: KeyStore) -> Self {
         let (event_sender, _) = broadcast::channel(32);
         let peer_receiver = peer.subscribe();
 
@@ -20,6 +21,7 @@ impl Wallet {
 
         Self {
             peer,
+            key_store,
             event_sender,
             peer_handler,
         }

@@ -1,12 +1,23 @@
 use blst::{
-    blst_p2_affine as P2Affine, blst_p2_affine_compress, blst_p2_affine_in_g2,
-    blst_p2_affine_is_inf, blst_p2_uncompress, BLST_ERROR,
+    blst_p2 as P2, blst_p2_add_affine, blst_p2_affine as P2Affine, blst_p2_affine_compress,
+    blst_p2_affine_generator, blst_p2_affine_in_g2, blst_p2_affine_is_inf, blst_p2_from_affine,
+    blst_p2_to_affine, blst_p2_uncompress, BLST_ERROR,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Signature(pub(crate) P2Affine);
 
 impl Signature {
+    pub fn validate(bytes: &[u8; 96]) -> Option<Self> {
+        let result = Self::from_bytes(bytes)?;
+
+        if result.is_valid(true) {
+            Some(result)
+        } else {
+            None
+        }
+    }
+
     pub fn from_bytes(bytes: &[u8; 96]) -> Option<Self> {
         if (bytes[0] & 0x80) == 0 {
             let mut p2_affine = P2Affine::default();
@@ -35,11 +46,35 @@ impl Signature {
             (!check_infinity || !blst_p2_affine_is_inf(&self.0)) && blst_p2_affine_in_g2(&self.0)
         }
     }
+
+    pub fn add(&self, public_key: &Self) -> Self {
+        let mut p2 = P2::default();
+        unsafe {
+            blst_p2_from_affine(&mut p2, &self.0);
+        }
+
+        let mut output_p2 = P2::default();
+        unsafe {
+            blst_p2_add_affine(&mut output_p2, &p2, &public_key.0);
+        }
+
+        let mut p2_affine = P2Affine::default();
+        unsafe {
+            blst_p2_to_affine(&mut p2_affine, &output_p2);
+        }
+        Self(p2_affine)
+    }
+}
+
+impl Default for Signature {
+    fn default() -> Self {
+        Self(unsafe { *blst_p2_affine_generator() })
+    }
 }
 
 // #[cfg(test)]
 // mod tests {
-//     use crate::secret_key::SecretKey;
+//     use crate::{PublicKey, SecretKey};
 
 //     use super::*;
 
@@ -83,13 +118,13 @@ impl Signature {
 //         for _i in 0..20 {
 //             rng.fill(data.as_mut_slice());
 //             let sk = SecretKey::from_seed(&data);
-//             let pk = sk.public_key();
-//             let sig = sign(&sk, &msg);
-//             assert!(verify(&sig, &pk, msg));
+//             let pk = sk.to_public_key();
+//             let sig = sk.sign(&msg);
+//             assert!(pk.verify(&msg, &sig));
 
 //             let bytes = sig.to_bytes();
 //             let sig2 = Signature::from_bytes(&bytes).unwrap();
-//             assert!(verify(&sig2, &pk, msg));
+//             assert!(pk.verify(&msg, &sig2));
 //         }
 //     }
 
@@ -107,49 +142,35 @@ impl Signature {
 //                 "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb",
 //             )
 //             .unwrap(),
-//         )
-//         .unwrap();
+//         );
 
-//         let sig = sign(&sk, &msg);
-//         assert!(verify(&sig, &sk.public_key(), msg));
+//         let sig = sk.sign(msg);
+//         let pk = sk.to_public_key();
+//         assert!(pk.verify(msg, &sig));
 
 //         assert_eq!(sig.to_bytes(), <[u8; 96]>::from_hex("b45825c0ee7759945c0189b4c38b7e54231ebadc83a851bec3bb7cf954a124ae0cc8e8e5146558332ea152f63bf8846e04826185ef60e817f271f8d500126561319203f9acb95809ed20c193757233454be1562a5870570941a84605bd2c9c9a").unwrap());
 //     }
 
 //     #[test]
 //     fn test_aggregate_signature() {
-//         // from blspy import PrivateKey
-//         // from blspy import AugSchemeMPL
-//         // sk = PrivateKey.from_bytes(bytes.fromhex("52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb"))
-//         // data = b"foobar"
-//         // sk0 = AugSchemeMPL.derive_child_sk(sk, 0)
-//         // sk1 = AugSchemeMPL.derive_child_sk(sk, 1)
-//         // sk2 = AugSchemeMPL.derive_child_sk(sk, 2)
-//         // sk3 = AugSchemeMPL.derive_child_sk(sk, 3)
-
-//         // sig0 = AugSchemeMPL.sign(sk0, data)
-//         // sig1 = AugSchemeMPL.sign(sk1, data)
-//         // sig2 = AugSchemeMPL.sign(sk2, data)
-//         // sig3 = AugSchemeMPL.sign(sk3, data)
-
-//         // agg = AugSchemeMPL.aggregate([sig0, sig1, sig2, sig3])
-
-//         // 87bce2c588f4257e2792d929834548c7d3af679272cb4f8e1d24cf4bf584dd287aa1d9f5e53a86f288190db45e1d100d0a5e936079a66a709b5f35394cf7d52f49dd963284cb5241055d54f8cf48f61bc1037d21cae6c025a7ea5e9f4d289a18
-
 //         let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
-//         let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+//         let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap());
 //         let msg = b"foobar";
 //         let mut agg = Signature::default();
-//         let mut data = Vec::<(PublicKey, &[u8])>::new();
+//         let mut public_keys = Vec::new();
+//         let mut messages = Vec::new();
+
 //         for idx in 0..4 {
 //             let derived = sk.derive_hardened(idx as u32);
-//             data.push((derived.public_key(), msg));
-//             agg.aggregate(&sign(&derived, msg));
+//             public_keys.push(&derived.to_public_key());
+//             messages.push(msg.as_slice());
+//             agg = agg.add(&derived.sign(msg));
 //         }
+
 //         assert_eq!(agg.to_bytes(), <[u8; 96]>::from_hex("87bce2c588f4257e2792d929834548c7d3af679272cb4f8e1d24cf4bf584dd287aa1d9f5e53a86f288190db45e1d100d0a5e936079a66a709b5f35394cf7d52f49dd963284cb5241055d54f8cf48f61bc1037d21cae6c025a7ea5e9f4d289a18").unwrap());
 
 //         // ensure the aggregate signature verifies OK
-//         assert!(aggregate_verify(&agg, data));
+//         assert!(agg.aggregate_verify(&public_keys, &messages, true));
 //     }
 
 //     fn random_sk<R: Rng>(rng: &mut R) -> SecretKey {
@@ -162,41 +183,38 @@ impl Signature {
 //     fn test_aggregate_signature_separate_msg() {
 //         let mut rng = StdRng::seed_from_u64(1337);
 //         let sk = [random_sk(&mut rng), random_sk(&mut rng)];
-//         let pk = [sk[0].public_key(), sk[1].public_key()];
-//         let msg: [&'static [u8]; 2] = [b"foo", b"foobar"];
-//         let sig = [sign(&sk[0], msg[0]), sign(&sk[1], msg[1])];
-//         let mut agg = Signature::default();
-//         agg.aggregate(&sig[0]);
-//         agg.aggregate(&sig[1]);
+//         let mut pk = [&sk[0].to_public_key(), &sk[1].to_public_key()];
+//         let mut msg: [&[u8]; 2] = [b"foo", b"foobar"];
+//         let sig = [sk[0].sign(msg[0]), sk[1].sign(msg[1])];
+//         let agg = sig[0].add(&sig[1]);
 
-//         assert!(aggregate_verify(&agg, pk.iter().zip(msg)));
+//         assert!(agg.aggregate_verify(&pk, &msg, true));
 //         // order does not matter
-//         assert!(aggregate_verify(&agg, pk.iter().zip(msg).rev()));
+//         pk.reverse();
+//         msg.reverse();
+//         assert!(agg.aggregate_verify(&pk, &msg, true));
 //     }
 
 //     #[test]
 //     fn test_aggregate_signature_identity() {
 //         // when verifying 0 messages, an identity signature is considered valid
-//         let empty = Vec::<(PublicKey, &[u8])>::new();
-//         assert!(aggregate_verify(&Signature::default(), empty));
+//         assert!(Signature::default().aggregate_verify(&[], &[], true));
 //     }
 
 //     #[test]
 //     fn test_invalid_aggregate_signature() {
 //         let mut rng = StdRng::seed_from_u64(1337);
 //         let sk = [random_sk(&mut rng), random_sk(&mut rng)];
-//         let pk = [sk[0].public_key(), sk[1].public_key()];
-//         let msg: [&'static [u8]; 2] = [b"foo", b"foobar"];
-//         let sig = [sign(&sk[0], msg[0]), sign(&sk[1], msg[1])];
-//         let mut agg = Signature::default();
-//         agg.aggregate(&sig[0]);
-//         agg.aggregate(&sig[1]);
+//         let pk = [sk[0].to_public_key(), sk[1].to_public_key()];
+//         let msg: [&[u8]; 2] = [b"foo", b"foobar"];
+//         let sig = [sk[0].sign(msg[0]), sk[1].sign(msg[1])];
+//         let agg = sig[0].add(&sig[1]);
 
-//         assert!(aggregate_verify(&agg, [(&pk[0], msg[0])]) == false);
-//         assert!(aggregate_verify(&agg, [(&pk[1], msg[1])]) == false);
+//         assert!(!agg.aggregate_verify(&[&pk[0]], &[&msg[0]], true));
+//         assert!(!agg.aggregate_verify(&[&pk[1]], &[&msg[1]], true));
 //         // public keys mixed with the wrong message
-//         assert!(aggregate_verify(&agg, [(&pk[0], msg[1]), (&pk[1], msg[0])]) == false);
-//         assert!(aggregate_verify(&agg, [(&pk[1], msg[0]), (&pk[0], msg[1])]) == false);
+//         assert!(!agg.aggregate_verify(&[&pk[0], &pk[1]], &[&msg[1], &msg[0]], true));
+//         assert!(!agg.aggregate_verify(&[&pk[1], &pk[0]], &[&msg[0], &msg[1]], true));
 //     }
 
 //     #[test]
@@ -211,30 +229,24 @@ impl Signature {
 //         let sk1 = SecretKey::from_seed(&[2_u8; 32]);
 //         let sk2 = SecretKey::from_seed(&[3_u8; 32]);
 
-//         let pk1 = sk1.public_key();
-//         let pk2 = sk2.public_key();
+//         let pk1 = sk1.to_public_key();
+//         let pk2 = sk2.to_public_key();
 
-//         let sig1 = sign(&sk1, &message1);
-//         let sig2 = sign(&sk2, &message2);
-//         let sig3 = sign(&sk2, &message1);
-//         let sig4 = sign(&sk1, &message3);
-//         let sig5 = sign(&sk1, &message1);
-//         let sig6 = sign(&sk1, &message4);
+//         let sig1 = sk1.sign(&message1);
+//         let sig2 = sk2.sign(&message2);
+//         let sig3 = sk2.sign(&message1);
+//         let sig4 = sk1.sign(&message3);
+//         let sig5 = sk1.sign(&message1);
+//         let sig6 = sk1.sign(&message4);
 
-//         let agg_sig_l = aggregate(&[sig1, sig2]);
-//         let agg_sig_r = aggregate(&[sig3, sig4, sig5]);
-//         let aggsig = aggregate(&[agg_sig_l, agg_sig_r, sig6]);
+//         let agg_sig_l = sig1.add(&sig2);
+//         let agg_sig_r = sig3.add(&sig4).add(&sig5);
+//         let aggsig = agg_sig_l.add(&agg_sig_r).add(&sig6);
 
-//         assert!(aggregate_verify(
-//             &aggsig,
-//             [
-//                 (&pk1, &message1 as &[u8]),
-//                 (&pk2, &message2),
-//                 (&pk2, &message1),
-//                 (&pk1, &message3),
-//                 (&pk1, &message1),
-//                 (&pk1, &message4)
-//             ]
+//         assert!(aggsig.aggregate_verify(
+//             &[&pk1, &pk2, &pk2, &pk1, &pk1, &pk1],
+//             &[&message1, &message2, &message1, &message3, &message1, &message4],
+//             true
 //         ));
 
 //         assert_eq!(
@@ -252,8 +264,8 @@ impl Signature {
 //     fn test_signature_zero_key() {
 //         // test case from: bls-signatures/src/test.cpp
 //         // "Should sign with the zero key"
-//         let sk = SecretKey::from_bytes(&[0; 32]).unwrap();
-//         assert_eq!(sign(&sk, &[1_u8, 2, 3]), Signature::default());
+//         let sk = SecretKey::from_bytes(&[0; 32]);
+//         assert_eq!(sk.sign(&[1_u8, 2, 3]), Signature::default());
 //     }
 
 //     #[test]
@@ -263,20 +275,22 @@ impl Signature {
 
 //         let mut rng = StdRng::seed_from_u64(1337);
 
-//         let mut pairs = Vec::<(PublicKey, Vec<u8>)>::new();
+//         let mut public_keys = Vec::new();
+//         let mut messages = Vec::new();
 //         let mut sigs = Vec::<Signature>::new();
 
 //         for i in 0..80 {
 //             let message = vec![0_u8, 100, 2, 45, 64, 12, 12, 63, i];
 //             let sk = random_sk(&mut rng);
-//             let sig = sign(&sk, &message);
-//             pairs.push((sk.public_key(), message));
+//             let sig = sk.sign(&message);
+//             public_keys.push(&sk.to_public_key());
+//             messages.push(message.as_slice());
 //             sigs.push(sig);
 //         }
 
-//         let aggsig = aggregate(sigs);
+//         let aggsig = sigs.into_iter().reduce(|a, b| a.add(&b)).unwrap();
 
-//         assert!(aggregate_verify(&aggsig, pairs));
+//         assert!(aggsig.aggregate_verify(&public_keys, &messages, true));
 //     }
 
 //     #[test]
@@ -284,11 +298,8 @@ impl Signature {
 //         // test case from: bls-signatures/src/test.cpp
 //         // "Aggregate Verification of zero items with infinity should pass"
 //         let sig = Signature::default();
-//         let aggsig = aggregate([&sig]);
-//         assert_eq!(aggsig, sig);
-//         assert_eq!(aggsig, Signature::default());
-
-//         assert!(aggregate_verify(&aggsig, [] as [(&PublicKey, &[u8]); 0]));
+//         assert_eq!(sig, Signature::default());
+//         assert!(sig.aggregate_verify(&[], &[], true));
 //     }
 
 //     #[test]
@@ -300,18 +311,22 @@ impl Signature {
 
 //         let message1 = [100_u8, 2, 254, 88, 90, 45, 23];
 //         let sk1 = random_sk(&mut rng);
-//         let pk1 = sk1.public_key();
-//         let mut agg_sig = sign(&sk1, &message1);
-//         let mut pairs: Vec<(PublicKey, &[u8])> = vec![(pk1, &message1)];
+//         let pk1 = sk1.to_public_key();
+//         let mut agg_sig = sk1.sign(&message1);
+
+//         let mut public_keys = vec![pk1];
+//         let mut messages = vec![message1.as_slice()];
 
 //         for _i in 0..10 {
 //             let sk = random_sk(&mut rng);
-//             let pk = sk.public_key();
-//             pairs.push((pk, &message1));
-//             let sig = sign(&sk, &message1);
-//             agg_sig.aggregate(&sig);
+//             let pk = sk.to_public_key();
+//             public_keys.push(pk);
+//             messages.push(&message1);
+//             let sig = sk.sign(&message1);
+//             agg_sig = agg_sig.add(&sig);
 //         }
-//         assert!(aggregate_verify(&agg_sig, pairs));
+
+//         assert!(agg_sig.aggregate_verify(public_keys.as_ref(), &messages, true));
 //     }
 
 //     #[test]
@@ -329,25 +344,23 @@ impl Signature {
 //         let sk1 = random_sk(&mut rng);
 //         let sk2 = random_sk(&mut rng);
 
-//         let pk1 = sk1.public_key();
-//         let pk2 = sk2.public_key();
+//         let pk1 = sk1.to_public_key();
+//         let pk2 = sk2.to_public_key();
 
-//         let sig1 = sign(&sk1, &message1);
-//         let sig2 = sign(&sk2, &message2);
-//         let sig3 = sign(&sk2, &message3);
-//         let sig4 = sign(&sk1, &message4);
+//         let sig1 = sk1.sign(&message1);
+//         let sig2 = sk2.sign(&message2);
+//         let sig3 = sk2.sign(&message3);
+//         let sig4 = sk1.sign(&message4);
 
-//         let agg_sig_l = aggregate([sig1, sig2]);
-//         let agg_sig_r = aggregate([sig3, sig4]);
-//         let agg_sig = aggregate([agg_sig_l, agg_sig_r]);
+//         let agg_sig_l = sig1.add(&sig2);
+//         let agg_sig_r = sig3.add(&sig4);
+//         let agg_sig = agg_sig_l.add(&agg_sig_r);
 
-//         let all_pairs: [(&PublicKey, &[u8]); 4] = [
-//             (&pk1, &message1),
-//             (&pk2, &message2),
-//             (&pk2, &message3),
-//             (&pk1, &message4),
-//         ];
-//         assert!(aggregate_verify(&agg_sig, all_pairs));
+//         assert!(agg_sig.aggregate_verify(
+//             &[&pk1, &pk2, &pk2, &pk1],
+//             &[&message1, &message2, &message3, &message4],
+//             true
+//         ));
 //     }
 
 //     #[test]
@@ -359,60 +372,50 @@ impl Signature {
 //         let msg2 = [10_u8, 11, 12];
 
 //         let sk1 = SecretKey::from_seed(&[4_u8; 32]);
-//         let pk1 = sk1.public_key();
+//         let pk1 = sk1.to_public_key();
 //         let pk1v = pk1.to_bytes();
-//         let sig1 = sign(&sk1, &msg1);
+//         let sig1 = sk1.sign(&msg1);
 //         let sig1v = sig1.to_bytes();
 
-//         assert!(verify(&sig1, &pk1, &msg1));
-//         assert!(verify(
-//             &Signature::from_bytes(&sig1v).unwrap(),
-//             &PublicKey::from_bytes(&pk1v).unwrap(),
-//             &msg1
-//         ));
+//         assert!(pk1.verify(&msg1, &sig1));
+//         assert!(PublicKey::from_bytes(&pk1v)
+//             .unwrap()
+//             .verify(&msg1, &Signature::from_bytes(&sig1v).unwrap(),));
 
 //         let sk2 = SecretKey::from_seed(&[5_u8; 32]);
-//         let pk2 = sk2.public_key();
+//         let pk2 = sk2.to_public_key();
 //         let pk2v = pk2.to_bytes();
-//         let sig2 = sign(&sk2, &msg2);
+//         let sig2 = sk2.sign(&msg2);
 //         let sig2v = sig2.to_bytes();
 
-//         assert!(verify(&sig2, &pk2, &msg2));
-//         assert!(verify(
-//             &Signature::from_bytes(&sig2v).unwrap(),
-//             &PublicKey::from_bytes(&pk2v).unwrap(),
-//             &msg2
-//         ));
+//         assert!(pk2.verify(&msg2, &sig2));
+//         assert!(PublicKey::from_bytes(&pk2v)
+//             .unwrap()
+//             .verify(&msg2, &Signature::from_bytes(&sig2v).unwrap(),));
 
 //         // Wrong G2Element
-//         assert!(!verify(&sig2, &pk1, &msg1));
-//         assert!(!verify(
-//             &Signature::from_bytes(&sig2v).unwrap(),
-//             &PublicKey::from_bytes(&pk1v).unwrap(),
-//             &msg1
-//         ));
+//         assert!(!pk1.verify(&msg1, &sig2));
+//         assert!(!PublicKey::from_bytes(&pk1v)
+//             .unwrap()
+//             .verify(&msg1, &Signature::from_bytes(&sig2v).unwrap(),));
 //         // Wrong msg
-//         assert!(!verify(&sig1, &pk1, &msg2));
-//         assert!(!verify(
-//             &Signature::from_bytes(&sig1v).unwrap(),
-//             &PublicKey::from_bytes(&pk1v).unwrap(),
-//             &msg2
-//         ));
+//         assert!(!pk1.verify(&msg2, &sig1));
+//         assert!(!PublicKey::from_bytes(&pk1v)
+//             .unwrap()
+//             .verify(&msg2, &Signature::from_bytes(&sig1v).unwrap(),));
 //         // Wrong pk
-//         assert!(!verify(&sig1, &pk2, &msg1));
-//         assert!(!verify(
-//             &Signature::from_bytes(&sig1v).unwrap(),
-//             &PublicKey::from_bytes(&pk2v).unwrap(),
-//             &msg1
-//         ));
+//         assert!(!pk2.verify(&msg1, &sig1));
+//         assert!(!PublicKey::from_bytes(&pk2v)
+//             .unwrap()
+//             .verify(&msg1, &Signature::from_bytes(&sig1v).unwrap(),));
 
-//         let aggsig = aggregate([sig1, sig2]);
+//         let aggsig = sig1.add(&sig2);
 //         let aggsigv = aggsig.to_bytes();
-//         let pairs: [(&PublicKey, &[u8]); 2] = [(&pk1, &msg1), (&pk2, &msg2)];
-//         assert!(aggregate_verify(&aggsig, pairs));
-//         assert!(aggregate_verify(
-//             &Signature::from_bytes(&aggsigv).unwrap(),
-//             pairs
+//         assert!(aggsig.aggregate_verify(&[&pk1, &pk2], &[&msg1, &msg2], true));
+//         assert!(&Signature::from_bytes(&aggsigv).unwrap().aggregate_verify(
+//             &[&pk1, &pk2],
+//             &[&msg1, &msg2],
+//             true
 //         ));
 //     }
 // }
