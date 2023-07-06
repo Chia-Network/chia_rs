@@ -8,9 +8,10 @@ use sqlite::State;
 use chia::gen::conditions::NewCoin;
 use chia::gen::conditions::Spend;
 use chia::gen::conditions::SpendBundleConditions;
-use chia::gen::flags::MEMPOOL_MODE;
+use chia::gen::flags::{ALLOW_BACKREFS, MEMPOOL_MODE};
 use chia::gen::run_block_generator::{run_block_generator, run_block_generator2};
 use clvmr::allocator::NodePtr;
+use clvmr::serde::{node_from_bytes, node_to_bytes_backrefs};
 use clvmr::Allocator;
 use std::collections::HashSet;
 use std::thread::available_parallelism;
@@ -25,12 +26,17 @@ struct Args {
     file: String,
 
     /// The number of paralell thread to run block generators in
-    #[arg(short, long)]
+    #[arg(short = 'j', long)]
     num_jobs: Option<usize>,
 
     /// Run all block generators in mempool mode
-    #[arg(short, long, default_value_t = false)]
+    #[arg(long, default_value_t = false)]
     mempool: bool,
+
+    /// re-serialize each generator using backrefs and ensure it still produces
+    /// the same output
+    #[arg(long, default_value_t = false)]
+    test_backrefs: bool,
 
     /// Compare the output from the default ROM running in consensus mode.
     #[arg(short, long, default_value_t = false)]
@@ -40,8 +46,12 @@ struct Args {
     #[arg(short, long)]
     max_height: Option<u32>,
 
+    /// start running block generators at this height
+    #[arg(long, default_value_t = 0)]
+    start_height: u32,
+
     /// when enabled, run the rust port of the ROM generator
-    #[arg(short, long, default_value_t = false)]
+    #[arg(long, default_value_t = false)]
     rust_generator: bool,
 }
 
@@ -114,25 +124,33 @@ fn main() {
         .prepare(
             "SELECT height, block \
         FROM full_blocks \
-        WHERE in_main_chain=1 \
+        WHERE in_main_chain=1 AND height >= ?\
         ORDER BY height",
         )
         .expect("failed to prepare SQL statement enumerating blocks");
+    statement
+        .bind((1, args.start_height as i64))
+        .expect("failed to bind start-height to SQL statement");
 
     let mut block_ref_lookup = connection
         .prepare("SELECT block FROM full_blocks WHERE height=? and in_main_chain=1")
         .expect("failed to prepare SQL statement looking up ref-blocks");
+
+    if args.validate && !(args.mempool || args.rust_generator || args.test_backrefs) {
+        panic!("it doesn't make sense to validate the output against identical runs. Specify --mempool, --rust-generator or --test-backrefs");
+    }
 
     let pool = ThreadPool::new(
         args.num_jobs
             .unwrap_or(available_parallelism().unwrap().into()),
     );
 
-    if args.validate && !(args.mempool || args.rust_generator) {
-        panic!("it doesn't make sense to validate the output against identical runs. Specify --mempool or --rust-generator");
-    }
-
-    let flags = if args.mempool { MEMPOOL_MODE } else { 0 };
+    let flags = if args.mempool { MEMPOOL_MODE } else { 0 }
+        | if args.test_backrefs {
+            ALLOW_BACKREFS
+        } else {
+            0
+        };
 
     let block_runner = if args.rust_generator {
         run_block_generator2
@@ -207,9 +225,20 @@ fn main() {
         pool.execute(move || {
             let mut a = Allocator::new_limited(500000000, 62500000, 62500000);
 
-            let mut conditions = block_runner(&mut a, prg.as_ref(), &block_refs, ti.cost, flags)
+            let storage: Vec<u8>;
+            let generator = if args.test_backrefs {
+                // re-serialize the generator with back-references
+                let gen = node_from_bytes(&mut a, prg.as_ref()).expect("node_from_bytes");
+                storage = node_to_bytes_backrefs(&a, gen).expect("node_to_bytes_backrefs");
+                &storage[..]
+            } else {
+                prg.as_ref()
+            };
+
+            let mut conditions = block_runner(&mut a, generator, &block_refs, ti.cost, flags)
                 .expect("failed to run block generator");
-            if args.rust_generator {
+
+            if args.rust_generator || args.test_backrefs {
                 assert!(conditions.cost <= ti.cost);
                 assert!(conditions.cost > 0);
 
