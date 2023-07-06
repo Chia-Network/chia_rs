@@ -1,6 +1,9 @@
 use std::{collections::HashMap, io::Cursor, sync::Arc};
 
-use chia_protocol::{ChiaProtocolMessage, Handshake, Message, NodeType, Streamable};
+use chia_protocol::{
+    chia_error::Error as ChiaError, ChiaProtocolMessage, CoinStateUpdate, Handshake, Message,
+    NewPeakWallet, NodeType, ProtocolMessageTypes, Streamable,
+};
 use futures_util::{
     stream::{SplitSink, SplitStream},
     SinkExt, StreamExt,
@@ -30,7 +33,7 @@ pub struct Peer {
     requests: Arc<Mutex<HashMap<u16, oneshot::Sender<Message>>>>,
     request_nonce: RwLock<u16>,
     outbound_handler: JoinHandle<()>,
-    inbound_handler: JoinHandle<()>,
+    inbound_handler: JoinHandle<Result<(), ChiaError>>,
 }
 
 impl Peer {
@@ -197,19 +200,31 @@ async fn handle_outbound_messages(
 }
 
 async fn handle_inbound_messages(
-    _event_sender: broadcast::Sender<PeerEvent>,
+    event_sender: broadcast::Sender<PeerEvent>,
     requests: Arc<Mutex<HashMap<u16, oneshot::Sender<Message>>>>,
     mut stream: SplitStream<PeerSocket>,
-) {
+) -> Result<(), ChiaError> {
     while let Some(next) = stream.next().await {
         if let Ok(message) = next {
-            if let Ok(message) = Message::parse(&mut Cursor::new(&message.into_data())) {
-                if let Some(id) = message.id {
-                    if let Some(request) = requests.lock().await.remove(&id) {
-                        request.send(message.clone()).ok();
+            let message = Message::parse(&mut Cursor::new(&message.into_data()))?;
+            if let Some(id) = message.id {
+                if let Some(request) = requests.lock().await.remove(&id) {
+                    request.send(message).ok();
+                }
+            } else {
+                match message.msg_type {
+                    ProtocolMessageTypes::CoinStateUpdate => {
+                        let body = CoinStateUpdate::parse(&mut Cursor::new(message.data.as_ref()))?;
+                        event_sender.send(PeerEvent::CoinStateUpdate(body)).ok();
                     }
+                    ProtocolMessageTypes::NewPeakWallet => {
+                        let body = NewPeakWallet::parse(&mut Cursor::new(message.data.as_ref()))?;
+                        event_sender.send(PeerEvent::NewPeakWallet(body)).ok();
+                    }
+                    _ => {}
                 }
             }
         }
     }
+    Ok(())
 }
