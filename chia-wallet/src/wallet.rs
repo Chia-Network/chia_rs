@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use chia_client::{Peer, PeerEvent};
-use chia_protocol::{Coin, CoinState, CoinStateUpdate};
+use chia_protocol::{Coin, CoinState};
 use tokio::{
     sync::{broadcast, RwLock},
     task::JoinHandle,
