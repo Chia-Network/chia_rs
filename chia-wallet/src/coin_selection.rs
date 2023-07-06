@@ -1,6 +1,6 @@
 use chia_protocol::Coin;
 
-pub fn select_coins(mut coins: Vec<&Coin>, amount: u64) -> Vec<&Coin> {
+pub fn select_coins(mut coins: Vec<Coin>, amount: u64) -> Vec<Coin> {
     coins.sort_by(|a, b| a.amount.cmp(&b.amount));
 
     let mut selected = Vec::new();
@@ -10,8 +10,8 @@ pub fn select_coins(mut coins: Vec<&Coin>, amount: u64) -> Vec<&Coin> {
         if selected_amount >= amount {
             break;
         }
-        selected.push(coin);
         selected_amount += coin.amount;
+        selected.push(coin);
     }
 
     if selected_amount < amount {
