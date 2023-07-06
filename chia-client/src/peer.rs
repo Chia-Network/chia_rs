@@ -40,8 +40,8 @@ impl Peer {
         let (message_sender, message_receiver) = mpsc::channel(32);
         let requests = Arc::new(Mutex::new(HashMap::<u16, oneshot::Sender<Message>>::new()));
 
-        let outbound_handler = tokio::spawn(Self::outbound_handler(message_receiver, sink));
-        let inbound_handler = tokio::spawn(Self::inbound_handler(
+        let outbound_handler = tokio::spawn(handle_outbound_messages(message_receiver, sink));
+        let inbound_handler = tokio::spawn(handle_inbound_messages(
             event_sender.clone(),
             Arc::clone(&requests),
             stream,
@@ -54,44 +54,6 @@ impl Peer {
             request_nonce: RwLock::new(0),
             outbound_handler,
             inbound_handler,
-        }
-    }
-
-    async fn outbound_handler(
-        mut receiver: mpsc::Receiver<PeerMessage>,
-        mut sink: SplitSink<PeerSocket, tungstenite::Message>,
-    ) {
-        while let Some(message) = receiver.recv().await {
-            match message {
-                PeerMessage::Protocol(message) => {
-                    let mut bytes = Vec::new();
-                    if message.stream(&mut bytes).is_ok() {
-                        sink.send(bytes.into()).await.ok();
-                    }
-                }
-                PeerMessage::Close => {
-                    sink.close().await.ok();
-                    break;
-                }
-            }
-        }
-    }
-
-    async fn inbound_handler(
-        _event_sender: broadcast::Sender<PeerEvent>,
-        requests: Arc<Mutex<HashMap<u16, oneshot::Sender<Message>>>>,
-        mut stream: SplitStream<PeerSocket>,
-    ) {
-        while let Some(next) = stream.next().await {
-            if let Ok(message) = next {
-                if let Ok(message) = Message::parse(&mut Cursor::new(&message.into_data())) {
-                    if let Some(id) = message.id {
-                        if let Some(request) = requests.lock().await.remove(&id) {
-                            request.send(message.clone()).ok();
-                        }
-                    }
-                }
-            }
         }
     }
 
@@ -211,5 +173,43 @@ impl Drop for Peer {
     fn drop(&mut self) {
         self.outbound_handler.abort();
         self.inbound_handler.abort();
+    }
+}
+
+async fn handle_outbound_messages(
+    mut receiver: mpsc::Receiver<PeerMessage>,
+    mut sink: SplitSink<PeerSocket, tungstenite::Message>,
+) {
+    while let Some(message) = receiver.recv().await {
+        match message {
+            PeerMessage::Protocol(message) => {
+                let mut bytes = Vec::new();
+                if message.stream(&mut bytes).is_ok() {
+                    sink.send(bytes.into()).await.ok();
+                }
+            }
+            PeerMessage::Close => {
+                sink.close().await.ok();
+                break;
+            }
+        }
+    }
+}
+
+async fn handle_inbound_messages(
+    _event_sender: broadcast::Sender<PeerEvent>,
+    requests: Arc<Mutex<HashMap<u16, oneshot::Sender<Message>>>>,
+    mut stream: SplitStream<PeerSocket>,
+) {
+    while let Some(next) = stream.next().await {
+        if let Ok(message) = next {
+            if let Ok(message) = Message::parse(&mut Cursor::new(&message.into_data())) {
+                if let Some(id) = message.id {
+                    if let Some(request) = requests.lock().await.remove(&id) {
+                        request.send(message.clone()).ok();
+                    }
+                }
+            }
+        }
     }
 }
