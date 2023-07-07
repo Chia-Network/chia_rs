@@ -142,7 +142,7 @@ fn main() {
 
     let pool = ThreadPool::new(
         args.num_jobs
-            .unwrap_or(available_parallelism().unwrap().into()),
+            .unwrap_or_else(|| available_parallelism().unwrap().into()),
     );
 
     let flags = if args.mempool { MEMPOOL_MODE } else { 0 }

@@ -27,7 +27,7 @@ impl<'a> BitCursor<'a> {
             Some((self.data[0] & mask(self.bit_offset)) >> (8 - num - self.bit_offset))
         } else if self.data.len() < 2 {
             num = 8 - self.bit_offset;
-            Some(&self.data[0] & mask(self.bit_offset))
+            Some(self.data[0] & mask(self.bit_offset))
         } else {
             let first_byte = 8 - self.bit_offset;
             let second_byte = num - first_byte;

@@ -11,25 +11,20 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 clvmr = "=0.2.6"
-
-[dependencies.clvm-utils]
-path = ".."
-
-[dependencies.chia]
-path = "../.."
-
-# Prevent this from interfering with workspaces
-[workspace]
-members = ["."]
+chia-fuzz = { path = "../../fuzz" }
+clvm-utils = { path = ".." }
+chia = { path = "../.." }
 
 [[bin]]
 name = "tree-hash"
 path = "fuzz_targets/tree-hash.rs"
 test = false
 doc = false
+bench = false
 
 [[bin]]
 name = "uncurry"
 path = "fuzz_targets/uncurry.rs"
 test = false
 doc = false
+bench = false

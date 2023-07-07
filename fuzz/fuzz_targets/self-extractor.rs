@@ -1,7 +1,6 @@
 #![no_main]
 
 use chia::compression::compressor::wrap_atom_with_decompression_program;
-use chia::fuzzing_utils;
 
 use clvm_utils::tree_hash::tree_hash;
 use clvmr::allocator::Allocator;

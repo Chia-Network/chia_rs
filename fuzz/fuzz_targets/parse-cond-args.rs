@@ -1,9 +1,9 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
-use chia::fuzzing_utils::{make_tree, BitCursor};
 use chia::gen::conditions::parse_args;
 use clvmr::allocator::Allocator;
+use fuzzing_utils::{make_tree, BitCursor};
 
 use chia::gen::flags::{COND_ARGS_NIL, ENABLE_ASSERT_BEFORE, STRICT_ARGS_COUNT};
 
