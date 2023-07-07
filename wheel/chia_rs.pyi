@@ -8,6 +8,9 @@ from chia.types.blockchain_format.sized_bytes import bytes32
 
 ReadableBuffer = Union[bytes, bytearray, memoryview]
 
+def solution_generator(spends: Sequence[Tuple[Coin, bytes, bytes]]) -> bytes: ...
+def solution_generator_backrefs(spends: Sequence[Tuple[Coin, bytes, bytes]]) -> bytes: ...
+
 def compute_merkle_set_root(items: Sequence[bytes]) -> bytes: ...
 
 def run_block_generator(
