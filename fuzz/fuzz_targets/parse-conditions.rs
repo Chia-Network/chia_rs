@@ -1,12 +1,12 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
-use chia::fuzzing_utils::{make_tree, BitCursor};
 use chia::gen::conditions::{parse_conditions, ParseState, Spend, SpendBundleConditions};
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
 use clvm_utils::tree_hash::tree_hash;
 use clvmr::allocator::Allocator;
+use fuzzing_utils::{make_tree, BitCursor};
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -26,7 +26,7 @@ fuzz_target!(|data: &[u8]| {
     let puzzle_hash = tree_hash(&a, input);
     let coin_id = Arc::<Bytes32>::new(
         Coin {
-            parent_coin_info: parent_id.into(),
+            parent_coin_info: parent_id,
             puzzle_hash: puzzle_hash.into(),
             amount,
         }

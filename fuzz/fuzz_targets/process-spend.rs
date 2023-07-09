@@ -1,8 +1,8 @@
 #![no_main]
-use chia::fuzzing_utils::{make_tree, BitCursor};
 use chia::gen::conditions::{process_single_spend, ParseState, SpendBundleConditions};
 use chia::gen::flags::{COND_ARGS_NIL, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
 use clvmr::allocator::Allocator;
+use fuzzing_utils::{make_tree, BitCursor};
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
@@ -19,7 +19,7 @@ fuzz_target!(|data: &[u8]| {
     for flags in &[0, COND_ARGS_NIL, STRICT_ARGS_COUNT, NO_UNKNOWN_CONDS] {
         let mut cost_left = 11000000;
         let _ = process_single_spend(
-            &mut a,
+            &a,
             &mut ret,
             &mut state,
             parent_id,
