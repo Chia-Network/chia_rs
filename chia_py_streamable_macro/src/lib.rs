@@ -98,7 +98,7 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
                     #[allow(too_many_arguments)]
                     #[new]
                     #[pyo3(signature = (#(#fnames),*))]
-                    pub fn new ( #(#fnames : #ftypes),* ) -> #ident {
+                    fn new ( #(#fnames : #ftypes),* ) -> #ident {
                         #ident { #(#fnames),* }
                     }
 
@@ -142,7 +142,7 @@ pub fn py_streamable_macro(input: TokenStream) -> TokenStream {
                 #[pymethods]
                 impl #ident {
                     #[new]
-                    pub fn new ( #(#fnames: #ftypes),* ) -> #ident {
+                    fn new ( #(#fnames: #ftypes),* ) -> #ident {
                         #ident ( #(#fnames),* )
                     }
                 }
