@@ -2,7 +2,7 @@ use chia_protocol::CoinState;
 
 #[derive(Default)]
 pub struct CoinStore {
-    coin_state: Vec<CoinState>,
+    pub coin_state: Vec<CoinState>,
 }
 
 impl CoinStore {
