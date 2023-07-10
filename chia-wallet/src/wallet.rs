@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use chia_client::{Peer, PeerEvent};
-use chia_protocol::{Coin, CoinState};
+use chia_protocol::{Coin, CoinState, RegisterForPhUpdates, RespondToPhUpdates};
 use tokio::{
     sync::{broadcast, RwLock},
     task::JoinHandle,
@@ -24,8 +24,12 @@ impl Wallet {
 
         let coin_state = Arc::new(RwLock::new(Vec::new()));
 
-        let peer_event_handler =
-            tokio::spawn(handle_peer_events(peer_receiver, Arc::clone(&coin_state)));
+        let peer_event_handler = tokio::spawn(handle_peer_events(
+            Arc::clone(&peer),
+            peer_receiver,
+            Arc::clone(&coin_state),
+            key_store,
+        ));
 
         Self {
             peer,
@@ -68,23 +72,24 @@ impl Drop for Wallet {
 }
 
 async fn handle_peer_events(
+    peer: Arc<Peer>,
     mut peer_receiver: broadcast::Receiver<PeerEvent>,
     coin_state: Arc<RwLock<Vec<CoinState>>>,
+    mut key_store: KeyStore,
 ) {
+    let first = key_store.add_next();
+    let response = peer
+        .request::<_, RespondToPhUpdates>(RegisterForPhUpdates::new(vec![first.into()], 0))
+        .await
+        .unwrap();
+
+    handle_coin_state_update(Arc::clone(&coin_state), response.coin_states).await;
+
     loop {
         match peer_receiver.recv().await {
             Ok(event) => match event {
                 PeerEvent::CoinStateUpdate(update) => {
-                    for updated_item in update.items {
-                        let mut coin_state_lock = coin_state.write().await;
-                        match coin_state_lock
-                            .iter_mut()
-                            .find(|item| item.coin == updated_item.coin)
-                        {
-                            Some(existing) => *existing = updated_item,
-                            None => coin_state_lock.push(updated_item),
-                        }
-                    }
+                    handle_coin_state_update(Arc::clone(&coin_state), update.items).await;
                 }
                 PeerEvent::NewPeakWallet(_) => {}
             },
@@ -92,6 +97,22 @@ async fn handle_peer_events(
                 break;
             }
             _ => {}
+        }
+    }
+}
+
+async fn handle_coin_state_update(
+    coin_state: Arc<RwLock<Vec<CoinState>>>,
+    update_items: Vec<CoinState>,
+) {
+    for updated_item in update_items {
+        let mut coin_state_lock = coin_state.write().await;
+        match coin_state_lock
+            .iter_mut()
+            .find(|item| item.coin == updated_item.coin)
+        {
+            Some(existing) => *existing = updated_item,
+            None => coin_state_lock.push(updated_item),
         }
     }
 }

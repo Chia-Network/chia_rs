@@ -38,6 +38,7 @@ impl KeyStore {
         let public_key = secret_key.to_public_key();
 
         let mut hasher = Sha256::new();
+        hasher.update([1]);
         hasher.update(public_key.to_bytes());
         let synthetic_pk_hash: [u8; 32] = hasher.finalize_fixed().into();
 
