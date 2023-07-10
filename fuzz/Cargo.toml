@@ -15,60 +15,69 @@ clvm-utils = { path = "../clvm-utils" }
 chia-protocol = { path = "../chia-protocol" }
 chia = { path = ".." }
 
-# Prevent this from interfering with workspaces
-[workspace]
-members = ["."]
+[lib]
+name = "fuzzing_utils"
+crate-type = ["rlib"]
 
 [[bin]]
 name = "puzzle-coin-solution"
 path = "fuzz_targets/puzzle-coin-solution.rs"
 test = false
 doc = false
+bench = false
 
 [[bin]]
 name = "parse-spend"
 path = "fuzz_targets/parse-spend.rs"
 test = false
 doc = false
+bench = false
 
 [[bin]]
 name = "parse-cond-args"
 path = "fuzz_targets/parse-cond-args.rs"
 test = false
 doc = false
+bench = false
 
 [[bin]]
 name = "parse-conditions"
 path = "fuzz_targets/parse-conditions.rs"
 test = false
 doc = false
+bench = false
 
 [[bin]]
 name = "self-extractor"
 path = "fuzz_targets/self-extractor.rs"
 test = false
 doc = false
+bench = false
 
 [[bin]]
 name = "parse-spends"
 path = "fuzz_targets/parse-spends.rs"
 test = false
 doc = false
+bench = false
 
 [[bin]]
 name = "sanitize-uint"
 path = "fuzz_targets/sanitize-uint.rs"
 test = false
 doc = false
+bench = false
 
 [[bin]]
 name = "process-spend"
 path = "fuzz_targets/process-spend.rs"
 test = false
 doc = false
+bench = false
 
 [[bin]]
 name = "run-generator"
 path = "fuzz_targets/run-generator.rs"
 test = false
 doc = false
+bench = false

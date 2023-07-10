@@ -10,6 +10,8 @@ use chia::gen::flags::{
     NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
 };
 use chia::gen::run_puzzle::run_puzzle as native_run_puzzle;
+use chia::gen::solution_generator::solution_generator as native_solution_generator;
+use chia::gen::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
 use chia::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_protocol::Bytes32;
 use chia_protocol::FullBlock;
@@ -37,8 +39,10 @@ use clvmr::{
 };
 use pyo3::buffer::PyBuffer;
 use pyo3::prelude::*;
+use pyo3::types::PyAny;
 use pyo3::types::PyBytes;
 use pyo3::types::PyModule;
+use pyo3::types::PyTuple;
 use pyo3::{wrap_pyfunction, PyResult, Python};
 use std::convert::TryInto;
 
@@ -149,12 +153,41 @@ fn run_puzzle(
     Ok(convert_spend_bundle_conds(&a, conds))
 }
 
+fn convert_list_of_tuples(spends: &PyAny) -> PyResult<Vec<(Coin, &[u8], &[u8])>> {
+    let mut native_spends = Vec::<(Coin, &[u8], &[u8])>::new();
+    for s in spends.iter()? {
+        let tuple = s?.downcast::<PyTuple>()?;
+        let coin = tuple.get_item(0)?.extract::<Coin>()?;
+        let puzzle = tuple.get_item(1)?.extract::<&[u8]>()?;
+        let solution = tuple.get_item(2)?.extract::<&[u8]>()?;
+        native_spends.push((coin, puzzle, solution));
+    }
+    Ok(native_spends)
+}
+
+#[pyfunction]
+fn solution_generator<'p>(py: Python<'p>, spends: &PyAny) -> PyResult<&'p PyBytes> {
+    let spends = convert_list_of_tuples(spends)?;
+    Ok(PyBytes::new(py, &native_solution_generator(spends)?))
+}
+
+#[pyfunction]
+fn solution_generator_backrefs<'p>(py: Python<'p>, spends: &PyAny) -> PyResult<&'p PyBytes> {
+    let spends = convert_list_of_tuples(spends)?;
+    Ok(PyBytes::new(
+        py,
+        &native_solution_generator_backrefs(spends)?,
+    ))
+}
+
 #[pymodule]
 pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     // generator functions
     m.add_function(wrap_pyfunction!(run_block_generator, m)?)?;
     m.add_function(wrap_pyfunction!(run_block_generator2, m)?)?;
     m.add_function(wrap_pyfunction!(run_puzzle, m)?)?;
+    m.add_function(wrap_pyfunction!(solution_generator, m)?)?;
+    m.add_function(wrap_pyfunction!(solution_generator_backrefs, m)?)?;
     m.add_class::<PySpendBundleConditions>()?;
     m.add(
         "ELIGIBLE_FOR_DEDUP",

@@ -10,8 +10,10 @@ members = [
     "chia-ssl",
     "chia-tools",
     "clvm-utils",
+    "clvm-utils/fuzz",
     "chia_streamable_macro",
     "chia_py_streamable_macro",
+    "fuzz",
     "wasm"
 ]
 exclude = ["wheel"]

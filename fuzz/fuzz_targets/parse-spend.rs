@@ -1,9 +1,9 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
-use chia::fuzzing_utils::{make_tree, BitCursor};
 use chia::gen::get_puzzle_and_solution::parse_coin_spend;
 use clvmr::allocator::Allocator;
+use fuzzing_utils::{make_tree, BitCursor};
 
 fuzz_target!(|data: &[u8]| {
     let mut a = Allocator::new();
