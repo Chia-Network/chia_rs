@@ -1,40 +1,25 @@
-use sha2::{digest::FixedOutput, Digest, Sha256};
-
-fn hash_pair(first: &[u8; 32], rest: &[u8; 32]) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    hasher.update([2]);
-    hasher.update(first);
-    hasher.update(rest);
-    hasher.finalize_fixed().into()
-}
-
-fn hash_atom(value: &[u8]) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    hasher.update([1]);
-    hasher.update(value);
-    hasher.finalize_fixed().into()
-}
+use crate::{tree_hash_atom, tree_hash_pair};
 
 pub fn curry_tree_hash(program_hash: &[u8; 32], arg_hashes: &[&[u8; 32]]) -> [u8; 32] {
-    let nil = hash_atom(&[]);
-    let one = hash_atom(&[1]);
+    let nil = tree_hash_atom(&[]);
+    let one = tree_hash_atom(&[1]);
     let op_q = one;
-    let op_a = hash_atom(&[2]);
-    let op_c = hash_atom(&[4]);
+    let op_a = tree_hash_atom(&[2]);
+    let op_c = tree_hash_atom(&[4]);
 
-    let quoted_program = hash_pair(&op_q, program_hash);
-    let mut quoted_args = hash_atom(&[1]);
+    let quoted_program = tree_hash_pair(&op_q, program_hash);
+    let mut quoted_args = tree_hash_atom(&[1]);
 
     for arg_hash in arg_hashes.iter().rev() {
-        let quoted_arg = hash_pair(&op_q, arg_hash);
-        let terminated_args = hash_pair(&quoted_args, &nil);
-        let terminated_args = hash_pair(&quoted_arg, &terminated_args);
-        quoted_args = hash_pair(&op_c, &terminated_args);
+        let quoted_arg = tree_hash_pair(&op_q, arg_hash);
+        let terminated_args = tree_hash_pair(&quoted_args, &nil);
+        let terminated_args = tree_hash_pair(&quoted_arg, &terminated_args);
+        quoted_args = tree_hash_pair(&op_c, &terminated_args);
     }
 
-    let terminated_args = hash_pair(&quoted_args, &nil);
-    let program_and_args = hash_pair(&quoted_program, &terminated_args);
-    hash_pair(&op_a, &program_and_args)
+    let terminated_args = tree_hash_pair(&quoted_args, &nil);
+    let program_and_args = tree_hash_pair(&quoted_program, &terminated_args);
+    tree_hash_pair(&op_a, &program_and_args)
 }
 
 #[cfg(test)]

@@ -8,7 +8,7 @@ use sha2::{digest::FixedOutput, Digest, Sha256};
 
 pub struct KeyStore {
     intermediate_key: SecretKey,
-    derivations: Vec<Derivation>,
+    pub derivations: Vec<Derivation>,
 }
 
 pub struct Derivation {

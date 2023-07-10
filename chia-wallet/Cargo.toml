@@ -16,3 +16,6 @@ chia-bls = { version = "0.2.7", path = "../chia-bls" }
 clvm-utils = { version = "0.2.7", path = "../clvm-utils" }
 tokio = { version = "1", features = ["sync"] }
 sha2 = "0.9.9"
+clvmr = "0.2.6"
+hex-literal = "0.4.1"
+hex = "0.4.3"

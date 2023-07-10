@@ -1,5 +1,5 @@
 use clvmr::allocator::{Allocator, NodePtr, SExp};
-use clvmr::sha2::{Digest, Sha256};
+use sha2::{digest::FixedOutput, Digest, Sha256};
 
 enum TreeOp {
     SExp(NodePtr),
@@ -14,10 +14,7 @@ pub fn tree_hash(a: &Allocator, node: NodePtr) -> [u8; 32] {
         match op {
             TreeOp::SExp(node) => match a.sexp(node) {
                 SExp::Atom() => {
-                    let mut sha256 = Sha256::new();
-                    sha256.update([1_u8]);
-                    sha256.update(a.atom(node));
-                    hashes.push(sha256.finalize().into());
+                    hashes.push(tree_hash_atom(a.atom(node)));
                 }
                 SExp::Pair(left, right) => {
                     ops.push(TreeOp::Cons);
@@ -26,17 +23,30 @@ pub fn tree_hash(a: &Allocator, node: NodePtr) -> [u8; 32] {
                 }
             },
             TreeOp::Cons => {
-                let mut sha256 = Sha256::new();
-                sha256.update([2_u8]);
-                sha256.update(hashes.pop().unwrap());
-                sha256.update(hashes.pop().unwrap());
-                hashes.push(sha256.finalize().into());
+                let first = hashes.pop().unwrap();
+                let rest = hashes.pop().unwrap();
+                hashes.push(tree_hash_pair(&first, &rest));
             }
         }
     }
 
     assert!(hashes.len() == 1);
     hashes[0]
+}
+
+pub fn tree_hash_pair(first: &[u8; 32], rest: &[u8; 32]) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update([2]);
+    hasher.update(first);
+    hasher.update(rest);
+    hasher.finalize_fixed().into()
+}
+
+pub fn tree_hash_atom(value: &[u8]) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update([1]);
+    hasher.update(value);
+    hasher.finalize_fixed().into()
 }
 
 #[test]

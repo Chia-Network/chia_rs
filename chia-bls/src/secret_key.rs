@@ -1,9 +1,8 @@
 use blst::{
-    blst_bendian_from_scalar, blst_keygen_v3, blst_p1_affine as P1Affine, blst_p2 as P2,
+    blst_bendian_from_scalar, blst_keygen_v3, blst_p1_affine as P1Affine,
     blst_p2_affine as P2Affine, blst_scalar as Scalar, blst_scalar_from_be_bytes,
-    blst_sk_add_n_check, blst_sk_check, blst_sk_to_pk2_in_g1,
+    blst_sign_pk2_in_g1, blst_sk_add_n_check, blst_sk_check, blst_sk_to_pk2_in_g1,
 };
-use blst::{blst_p2_to_affine, blst_sign_pk_in_g1};
 use num_bigint::BigInt;
 use num_traits::Num;
 use sha2::digest::FixedOutput;
@@ -96,14 +95,9 @@ impl SecretKey {
         let message = prepend_message(&self.to_public_key(), message);
         let p2 = hash_to_g2(&message);
 
-        let mut signature_p2 = P2::default();
-        unsafe {
-            blst_sign_pk_in_g1(&mut signature_p2, &p2, &self.0);
-        }
-
         let mut signature_p2_affine = P2Affine::default();
         unsafe {
-            blst_p2_to_affine(&mut signature_p2_affine, &signature_p2);
+            blst_sign_pk2_in_g1(std::ptr::null_mut(), &mut signature_p2_affine, &p2, &self.0);
         }
 
         Signature(signature_p2_affine)

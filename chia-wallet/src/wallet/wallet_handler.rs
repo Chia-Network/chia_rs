@@ -8,7 +8,7 @@ use crate::{CoinStore, KeyStore, WalletEvent};
 
 pub struct WalletHandler {
     pub(super) peer: Arc<Peer>,
-    pub(super) key_store: KeyStore,
+    pub(super) key_store: Arc<RwLock<KeyStore>>,
     pub(super) coin_store: Arc<RwLock<CoinStore>>,
     pub(super) peer_receiver: broadcast::Receiver<PeerEvent>,
     pub(super) event_sender: broadcast::Sender<WalletEvent>,
@@ -16,7 +16,7 @@ pub struct WalletHandler {
 
 impl WalletHandler {
     pub async fn run(mut self) {
-        let first = self.key_store.add_next();
+        let first = self.key_store.write().await.add_next();
         let response = self
             .peer
             .request::<_, RespondToPhUpdates>(RegisterForPhUpdates::new(vec![first.into()], 0))
