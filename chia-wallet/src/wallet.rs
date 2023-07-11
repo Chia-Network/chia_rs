@@ -1,11 +1,14 @@
 use std::{io::Cursor, sync::Arc};
 
 use chia_client::Peer;
-use chia_primitives::{conditions::create_coin, puzzles::P2_DELEGATED_OR_HIDDEN};
+use chia_primitives::{
+    conditions::create_coin, puzzles::P2_DELEGATED_OR_HIDDEN,
+    standard_puzzle::spend_standard_puzzle,
+};
 use chia_protocol::{
     Bytes96, CoinSpend, Program, SendTransaction, SpendBundle, Streamable, TransactionAck,
 };
-use clvm_utils::{curry, new_list, tree_hash};
+use clvm_utils::curry;
 use clvmr::{
     serde::{node_from_bytes, node_to_bytes},
     Allocator,
@@ -92,6 +95,7 @@ impl Wallet {
             let secret_key = key_store
                 .derivation((&record.coin.puzzle_hash).into())
                 .unwrap();
+
             let mut conditions = Vec::new();
 
             if i == 0 {
@@ -106,11 +110,15 @@ impl Wallet {
                 }
             }
 
-            let condition_list = new_list(&mut a, &conditions).unwrap();
-            let delegated_puzzle = a.new_pair(a.one(), condition_list).unwrap();
+            let (solution, signature) = spend_standard_puzzle(
+                &mut a,
+                &record.coin.coin_id(),
+                &secret_key,
+                &self.peer.network.agg_sig_me_extra_data,
+                &conditions,
+            )
+            .unwrap();
 
-            let nil = a.null();
-            let solution = new_list(&mut a, &[nil, delegated_puzzle, nil]).unwrap();
             let pk = a.new_atom(&secret_key.to_public_key().to_bytes()).unwrap();
             let puzzle_reveal = curry(&mut a, p2, &[pk]).unwrap();
 
@@ -120,17 +128,7 @@ impl Wallet {
             let solution_bytes = node_to_bytes(&a, solution).unwrap();
             let solution_program = Program::parse(&mut Cursor::new(&solution_bytes)).unwrap();
 
-            let coin_id = record.coin.coin_id();
             let coin_spend = CoinSpend::new(record.coin.clone(), puzzle_program, solution_program);
-
-            let raw_message = tree_hash(&a, delegated_puzzle);
-
-            let mut message = Vec::with_capacity(96);
-            message.extend(raw_message);
-            message.extend(coin_id);
-            message.extend(self.peer.network.agg_sig_me_extra_data);
-
-            let signature = secret_key.sign(&message);
 
             coin_spends.push(coin_spend);
             signatures.push(signature);
