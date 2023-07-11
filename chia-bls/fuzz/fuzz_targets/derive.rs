@@ -1,10 +1,10 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
-use chia_bls::secret_key::SecretKey;
-use chia_bls::public_key::PublicKey;
-use chia_bls::signature::{sign, verify};
 use chia_bls::derivable_key::DerivableKey;
+use chia_bls::public_key::PublicKey;
+use chia_bls::secret_key::SecretKey;
+use chia_bls::signature::{sign, verify};
 
 fuzz_target!(|data: &[u8]| {
     if data.len() < 32 {
@@ -28,5 +28,4 @@ fuzz_target!(|data: &[u8]| {
 
     let sig = sign(&sk1, b"foobar");
     assert!(verify(&sig, &pk1, b"foobar"));
-
 });

@@ -198,13 +198,13 @@ jobs:
 
     - name: Install chia_rs wheel
       run: |
-        pip install --no-index --find-links wheel/target/wheels/ chia_rs
+        pip install --no-index --find-links target/wheels/ chia_rs
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v3
       with:
         name: packages
-        path: ./wheel/target/wheels/
+        path: ./target/wheels/
 
   check-typestubs:
     name: Check chia_rs.pyi
@@ -281,7 +281,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: packages
-        path: ./wheel/target/wheels/
+        path: ./target/wheels/
 
   fmt:
     runs-on: ubuntu-latest
@@ -378,7 +378,8 @@ jobs:
           echo "LLVM_PROFILE_FILE=$(pwd)/target/chia_rs-%p-%m.profraw" >> "$GITHUB_ENV"
           echo "CARGO_TARGET_DIR=$(pwd)/target" >> "$GITHUB_ENV"
       - name: cargo test
-        run: cargo test --workspace
+        # Exclude wheel to prevent py-bindings feature from being activated.
+        run: cargo test --workspace --exclude chia_rs
       - name: Continue with coverage
         if: matrix.os == 'ubuntu-latest'
         run: |
