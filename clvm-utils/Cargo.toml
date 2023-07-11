@@ -9,7 +9,7 @@ homepage = "https://github.com/Chia-Network/chia_rs/"
 repository = "https://github.com/Chia-Network/chia_rs/clvm-utils"
 
 [dependencies]
-clvmr = "0.2.6"
+clvmr = "0.2.7"
 sha2 = "0.9.9"
 
 [dev-dependencies]
