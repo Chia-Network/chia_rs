@@ -2,17 +2,14 @@ use std::{io::Cursor, sync::Arc};
 
 use chia_client::Peer;
 use chia_primitives::{
-    conditions::create_coin, puzzles::P2_DELEGATED_OR_HIDDEN,
-    standard_puzzle::spend_standard_puzzle,
+    conditions::create_coin,
+    standard_puzzle::{alloc_standard_puzzle, spend_standard_puzzle},
 };
 use chia_protocol::{
     Bytes96, CoinSpend, Program, SendTransaction, SpendBundle, Streamable, TransactionAck,
 };
 use clvm_utils::curry;
-use clvmr::{
-    serde::{node_from_bytes, node_to_bytes},
-    Allocator,
-};
+use clvmr::{serde::node_to_bytes, Allocator};
 use tokio::{
     sync::{broadcast, RwLock},
     task::JoinHandle,
@@ -89,7 +86,7 @@ impl Wallet {
 
         let mut a = Allocator::new();
 
-        let p2 = node_from_bytes(&mut a, &P2_DELEGATED_OR_HIDDEN).unwrap();
+        let p2 = alloc_standard_puzzle(&mut a).unwrap();
 
         for (i, record) in selected.into_iter().enumerate() {
             let secret_key = key_store
@@ -113,9 +110,9 @@ impl Wallet {
             let (solution, signature) = spend_standard_puzzle(
                 &mut a,
                 &record.coin.coin_id(),
+                &conditions,
                 &secret_key,
                 &self.peer.network.agg_sig_me_extra_data,
-                &conditions,
             )
             .unwrap();
 
