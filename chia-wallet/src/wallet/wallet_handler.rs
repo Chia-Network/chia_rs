@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use chia_client::{Peer, PeerEvent};
-use chia_protocol::{RegisterForPhUpdates, RespondToPhUpdates};
+use chia_protocol::{CoinState, RegisterForPhUpdates, RespondToPhUpdates};
 use tokio::sync::{broadcast, RwLock};
 
 use crate::{CoinStore, KeyStore, WalletEvent};
@@ -16,14 +16,14 @@ pub struct WalletHandler {
 
 impl WalletHandler {
     pub async fn run(mut self) {
-        let first = self.key_store.write().await.add_next();
+        let first = self.key_store.write().await.derive_next();
         let response = self
             .peer
             .request::<_, RespondToPhUpdates>(RegisterForPhUpdates::new(vec![first.into()], 0))
             .await
             .unwrap();
-
-        self.coin_store.write().await.update(response.coin_states);
+        let updates = self.filter_coin_state(response.coin_states).await;
+        self.coin_store.write().await.update(updates);
 
         self.event_sender
             .send(WalletEvent::SyncStatusUpdate {
@@ -36,7 +36,8 @@ impl WalletHandler {
             match self.peer_receiver.recv().await {
                 Ok(event) => match event {
                     PeerEvent::CoinStateUpdate(update) => {
-                        self.coin_store.write().await.update(update.items);
+                        let updates = self.filter_coin_state(update.items).await;
+                        self.coin_store.write().await.update(updates);
                     }
                     PeerEvent::NewPeakWallet(_) => {}
                 },
@@ -46,5 +47,19 @@ impl WalletHandler {
                 _ => {}
             }
         }
+    }
+
+    pub async fn filter_coin_state(&mut self, coin_states: Vec<CoinState>) -> Vec<CoinState> {
+        let key_store = self.key_store.read().await;
+        coin_states
+            .into_iter()
+            .filter_map(|state| {
+                if key_store.contains((&state.coin.puzzle_hash).into()) {
+                    Some(state)
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 }

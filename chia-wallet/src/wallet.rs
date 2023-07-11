@@ -3,7 +3,7 @@ use std::{io::Cursor, sync::Arc};
 use chia_client::Peer;
 use chia_primitives::puzzles::P2_DELEGATED_OR_HIDDEN;
 use chia_protocol::{
-    Bytes96, Coin, CoinSpend, Program, SendTransaction, SpendBundle, Streamable, TransactionAck,
+    Bytes96, CoinSpend, Program, SendTransaction, SpendBundle, Streamable, TransactionAck,
 };
 use clvm_utils::{curry, new_list, tree_hash};
 use clvmr::{
@@ -12,7 +12,6 @@ use clvmr::{
 };
 use hex::ToHex;
 use hex_literal::hex;
-use sha2::{digest::FixedOutput, Digest, Sha256};
 use tokio::{
     sync::{broadcast, RwLock},
     task::JoinHandle,
@@ -58,49 +57,31 @@ impl Wallet {
         }
     }
 
-    pub async fn next_puzzle_hash(&self) -> [u8; 32] {
-        self.key_store
-            .read()
-            .await
-            .derivations
-            .first()
-            .unwrap()
-            .puzzle_hash
+    pub async fn next_puzzle_hash(&self) -> Option<[u8; 32]> {
+        let key_store = self.key_store.read().await;
+        let coin_store = self.coin_store.read().await;
+        for puzzle_hash in key_store.puzzle_hashes() {
+            if coin_store.is_used(&puzzle_hash) {
+                return Some(puzzle_hash);
+            }
+        }
+        None
     }
 
-    pub async fn balance(&self) -> u64 {
-        self.spendable_coins()
-            .await
-            .iter()
-            .fold(0, |amount, coin| amount + coin.amount)
-    }
-
-    pub async fn send(&mut self, puzzle_hash: &[u8; 32], amount: u64, fee: u64) -> bool {
+    pub async fn send(&self, puzzle_hash: &[u8; 32], amount: u64, fee: u64) -> bool {
         let key_store = self.key_store.read().await;
 
-        let puzzle_hashes: Vec<_> = key_store
-            .derivations
-            .iter()
-            .map(|derivation| derivation.puzzle_hash)
-            .collect();
-
-        let spendable_coins: Vec<_> = self
-            .spendable_coins()
-            .await
-            .into_iter()
-            .filter(|coin| puzzle_hashes.contains((&coin.puzzle_hash).into()))
-            .collect();
-
+        let spendable = self.coin_store.read().await.unspent();
         let total_amount = amount + fee;
 
-        let selected_coins = select_coins(spendable_coins, total_amount);
-        if selected_coins.is_empty() {
+        let selected = select_coins(spendable, total_amount);
+        if selected.is_empty() {
             return false;
         }
 
-        let selected_amount = selected_coins
+        let selected_amount = selected
             .iter()
-            .fold(0, |amount, coin| amount + coin.amount);
+            .fold(0, |amount, record| amount + record.coin.amount);
 
         let mut coin_spends = Vec::new();
         let mut signatures = Vec::new();
@@ -109,8 +90,10 @@ impl Wallet {
 
         let p2 = node_from_bytes(&mut a, &P2_DELEGATED_OR_HIDDEN).unwrap();
 
-        for (i, coin) in selected_coins.into_iter().enumerate() {
-            let derivation = key_store.derivation((&coin.puzzle_hash).into()).unwrap();
+        for (i, record) in selected.into_iter().enumerate() {
+            let secret_key = key_store
+                .derivation((&record.coin.puzzle_hash).into())
+                .unwrap();
             let mut conditions = Vec::new();
 
             if i == 0 {
@@ -121,7 +104,7 @@ impl Wallet {
 
                 if selected_amount > total_amount {
                     let change_amount = selected_amount - total_amount;
-                    let change_ph = self.next_puzzle_hash().await;
+                    let change_ph = self.next_puzzle_hash().await.unwrap();
 
                     let ph_ptr = a.new_atom(&change_ph).unwrap();
                     let amount_ptr = a.new_number(change_amount.into()).unwrap();
@@ -134,7 +117,7 @@ impl Wallet {
 
             let nil = a.null();
             let solution = new_list(&mut a, &[nil, delegated_puzzle, nil]).unwrap();
-            let pk = a.new_atom(&derivation.public_key.to_bytes()).unwrap();
+            let pk = a.new_atom(&secret_key.to_public_key().to_bytes()).unwrap();
             let puzzle_reveal = curry(&mut a, p2, &[pk]).unwrap();
 
             let puzzle_bytes = node_to_bytes(&a, puzzle_reveal).unwrap();
@@ -143,29 +126,19 @@ impl Wallet {
             let solution_bytes = node_to_bytes(&a, solution).unwrap();
             let solution_program = Program::parse(&mut Cursor::new(&solution_bytes)).unwrap();
 
-            dbg!(puzzle_bytes.encode_hex::<String>());
-            dbg!(solution_bytes.encode_hex::<String>());
-
-            let coin_id = coin.coin_id();
-            let coin_spend = CoinSpend::new(coin, puzzle_program, solution_program);
-
-            let delegated_puzzle_bytes = node_to_bytes(&a, delegated_puzzle).unwrap();
-            dbg!(delegated_puzzle_bytes.encode_hex::<String>());
+            let coin_id = record.coin.coin_id();
+            let coin_spend = CoinSpend::new(record.coin.clone(), puzzle_program, solution_program);
 
             let raw_message = tree_hash(&a, delegated_puzzle);
             let agg_sig_me_extra_data =
                 hex!("ae83525ba8d1dd3f09b277de18ca3e43fc0af20d20c4b3e92ef2a48bd291ccb2");
-
-            dbg!(raw_message.encode_hex::<String>());
-            dbg!(coin_id.encode_hex::<String>());
-            dbg!(agg_sig_me_extra_data.encode_hex::<String>());
 
             let mut message = Vec::with_capacity(96);
             message.extend(raw_message);
             message.extend(coin_id);
             message.extend(agg_sig_me_extra_data);
 
-            let signature = derivation.secret_key.sign(&message);
+            let signature = secret_key.sign(&message);
 
             coin_spends.push(coin_spend);
             signatures.push(signature);
@@ -192,32 +165,6 @@ impl Wallet {
 
         true
     }
-
-    pub async fn spendable_coins(&self) -> Vec<Coin> {
-        self.coin_store
-            .read()
-            .await
-            .coin_state
-            .iter()
-            .filter_map(|state| {
-                if state.spent_height.is_none() {
-                    Some(state.coin.clone())
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
-    // pub async fn balance(&self) -> u64 {
-    //     self.coin_store
-    //         .read()
-    //         .await
-    //         .coin_state
-    //         .iter()
-    //         .filter(|state| state.spent_height.is_none())
-    //         .fold(0, |amount, state| amount + state.coin.amount)
-    // }
 
     pub fn subscribe(&self) -> broadcast::Receiver<WalletEvent> {
         self.event_sender.subscribe()

@@ -1,17 +1,19 @@
-use chia_protocol::Coin;
+use std::sync::Arc;
 
-pub fn select_coins(mut coins: Vec<Coin>, amount: u64) -> Vec<Coin> {
-    coins.sort_by(|a, b| a.amount.cmp(&b.amount));
+use chia_protocol::CoinState;
+
+pub fn select_coins(mut coin_state: Vec<Arc<CoinState>>, amount: u64) -> Vec<Arc<CoinState>> {
+    coin_state.sort_by(|a, b| a.coin.amount.cmp(&b.coin.amount));
 
     let mut selected = Vec::new();
     let mut selected_amount = 0;
 
-    for coin in coins {
+    for state in coin_state {
         if selected_amount >= amount {
             break;
         }
-        selected_amount += coin.amount;
-        selected.push(coin);
+        selected_amount += state.coin.amount;
+        selected.push(state);
     }
 
     if selected_amount < amount {
