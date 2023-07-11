@@ -261,6 +261,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "chia-protocol-fuzz"
+version = "0.0.0"
+dependencies = [
+ "chia-protocol",
+ "libfuzzer-sys",
+]
+
+[[package]]
 name = "chia-tools"
 version = "0.1.16"
 dependencies = [
