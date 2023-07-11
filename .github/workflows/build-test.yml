@@ -378,6 +378,7 @@ jobs:
           echo "LLVM_PROFILE_FILE=$(pwd)/target/chia_rs-%p-%m.profraw" >> "$GITHUB_ENV"
           echo "CARGO_TARGET_DIR=$(pwd)/target" >> "$GITHUB_ENV"
       - name: cargo test
+        # Exclude wheel to prevent py-bindings feature from being activated
         run: cargo test --workspace --exclude chia_rs
       - name: Continue with coverage
         if: matrix.os == 'ubuntu-latest'
