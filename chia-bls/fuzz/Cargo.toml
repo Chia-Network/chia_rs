@@ -20,9 +20,11 @@ name = "derive"
 path = "fuzz_targets/derive.rs"
 test = false
 doc = false
+bench = false
 
 [[bin]]
 name = "blspy-fidelity"
 path = "fuzz_targets/blspy-fidelity.rs"
 test = false
 doc = false
+bench = false
