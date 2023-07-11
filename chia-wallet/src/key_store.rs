@@ -25,11 +25,12 @@ impl KeyStore {
         self.derivations.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.derivations.is_empty()
+    }
+
     pub fn puzzle_hashes(&self) -> Vec<[u8; 32]> {
-        self.derivations
-            .keys()
-            .map(|puzzle_hash| *puzzle_hash)
-            .collect()
+        self.derivations.keys().copied().collect()
     }
 
     pub fn contains(&self, puzzle_hash: &[u8; 32]) -> bool {

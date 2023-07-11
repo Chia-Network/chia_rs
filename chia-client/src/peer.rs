@@ -25,9 +25,12 @@ pub use peer_message::*;
 pub use request_error::*;
 pub use send_error::*;
 
+use crate::Network;
+
 type PeerSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 pub struct Peer {
+    pub network: Arc<Network>,
     event_sender: broadcast::Sender<PeerEvent>,
     message_sender: mpsc::Sender<PeerMessage>,
     requests: Arc<Mutex<HashMap<u16, oneshot::Sender<Message>>>>,
@@ -37,7 +40,7 @@ pub struct Peer {
 }
 
 impl Peer {
-    pub async fn new(ws: PeerSocket) -> Self {
+    pub async fn new(ws: PeerSocket, network: Arc<Network>) -> Self {
         let (sink, stream) = ws.split();
         let (event_sender, _) = broadcast::channel(32);
         let (message_sender, message_receiver) = mpsc::channel(32);
@@ -51,6 +54,7 @@ impl Peer {
         ));
 
         Self {
+            network,
             event_sender,
             message_sender,
             requests,
@@ -64,9 +68,9 @@ impl Peer {
         self.event_sender.subscribe()
     }
 
-    pub async fn perform_handshake(&self, network_id: String) -> Result<(), SendError> {
+    pub async fn perform_handshake(&self) -> Result<(), SendError> {
         let handshake = Handshake {
-            network_id,
+            network_id: self.network.network_id.clone(),
             protocol_version: "0.0.34".to_string(),
             software_version: "0.0.0".to_string(),
             server_port: 0,

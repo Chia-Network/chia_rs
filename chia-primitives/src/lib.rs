@@ -1,3 +1,4 @@
+pub mod conditions;
 pub mod puzzles;
 
 mod derive_synthetic;

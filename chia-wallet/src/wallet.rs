@@ -1,7 +1,7 @@
 use std::{io::Cursor, sync::Arc};
 
 use chia_client::Peer;
-use chia_primitives::puzzles::P2_DELEGATED_OR_HIDDEN;
+use chia_primitives::{conditions::create_coin, puzzles::P2_DELEGATED_OR_HIDDEN};
 use chia_protocol::{
     Bytes96, CoinSpend, Program, SendTransaction, SpendBundle, Streamable, TransactionAck,
 };
@@ -10,8 +10,6 @@ use clvmr::{
     serde::{node_from_bytes, node_to_bytes},
     Allocator,
 };
-use hex::ToHex;
-use hex_literal::hex;
 use tokio::{
     sync::{broadcast, RwLock},
     task::JoinHandle,
@@ -97,18 +95,14 @@ impl Wallet {
             let mut conditions = Vec::new();
 
             if i == 0 {
-                let code_ptr = a.new_number(51.into()).unwrap();
-                let ph_ptr = a.new_atom(puzzle_hash).unwrap();
-                let amount_ptr = a.new_number(amount.into()).unwrap();
-                conditions.push(new_list(&mut a, &[code_ptr, ph_ptr, amount_ptr]).unwrap());
+                conditions.push(create_coin(&mut a, puzzle_hash, amount).unwrap());
 
                 if selected_amount > total_amount {
+                    let change_puzzle_hash = self.next_puzzle_hash().await.unwrap();
                     let change_amount = selected_amount - total_amount;
-                    let change_ph = self.next_puzzle_hash().await.unwrap();
 
-                    let ph_ptr = a.new_atom(&change_ph).unwrap();
-                    let amount_ptr = a.new_number(change_amount.into()).unwrap();
-                    conditions.push(new_list(&mut a, &[code_ptr, ph_ptr, amount_ptr]).unwrap());
+                    conditions
+                        .push(create_coin(&mut a, &change_puzzle_hash, change_amount).unwrap());
                 }
             }
 
@@ -130,13 +124,11 @@ impl Wallet {
             let coin_spend = CoinSpend::new(record.coin.clone(), puzzle_program, solution_program);
 
             let raw_message = tree_hash(&a, delegated_puzzle);
-            let agg_sig_me_extra_data =
-                hex!("ae83525ba8d1dd3f09b277de18ca3e43fc0af20d20c4b3e92ef2a48bd291ccb2");
 
             let mut message = Vec::with_capacity(96);
             message.extend(raw_message);
             message.extend(coin_id);
-            message.extend(agg_sig_me_extra_data);
+            message.extend(self.peer.network.agg_sig_me_extra_data);
 
             let signature = secret_key.sign(&message);
 

@@ -37,7 +37,6 @@ impl CoinStore {
     pub fn is_used(&self, puzzle_hash: &[u8; 32]) -> bool {
         self.coin_records
             .iter()
-            .find(|record| record.coin.puzzle_hash == puzzle_hash)
-            .is_some()
+            .any(|record| record.coin.puzzle_hash == puzzle_hash)
     }
 }
