@@ -140,4 +140,4 @@ jobs:
 
     - name: cargo bench
       run: |
-        cargo bench --all
+        cargo bench --workspace

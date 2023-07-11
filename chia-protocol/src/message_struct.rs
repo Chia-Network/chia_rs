@@ -7,7 +7,6 @@ macro_rules! message_struct {
             $(pub $field: $t),*
         }
 
-        #[cfg(not(feature = "py-bindings"))]
         #[allow(clippy::too_many_arguments)]
         impl $name {
             pub fn new ( $($field: $t),* ) -> $name {
@@ -32,7 +31,6 @@ macro_rules! streamable_struct {
             $(pub $field: $t),*
         }
 
-        #[cfg(not(feature = "py-bindings"))]
         #[allow(clippy::too_many_arguments)]
         impl $name {
             pub fn new ( $($field: $t),* ) -> $name {
