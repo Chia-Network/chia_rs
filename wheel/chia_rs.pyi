@@ -69,6 +69,12 @@ class Spend:
     birth_seconds: Optional[int]
     create_coin: List[Tuple[bytes, int, Optional[bytes]]]
     agg_sig_me: List[Tuple[bytes, bytes]]
+    agg_sig_parent: List[Tuple[bytes, bytes]]
+    agg_sig_puzzle: List[Tuple[bytes, bytes]]
+    agg_sig_amount: List[Tuple[bytes, bytes]]
+    agg_sig_puzzle_amount: List[Tuple[bytes, bytes]]
+    agg_sig_parent_amount: List[Tuple[bytes, bytes]]
+    agg_sig_parent_puzzle: List[Tuple[bytes, bytes]]
     flags: int
     def __init__(
         self,
@@ -82,6 +88,12 @@ class Spend:
         birth_seconds: Optional[int],
         create_coin: Sequence[Tuple[bytes, int, Optional[bytes]]],
         agg_sig_me: Sequence[Tuple[bytes, bytes]],
+        agg_sig_parent: Sequence[Tuple[bytes, bytes]],
+        agg_sig_puzzle: Sequence[Tuple[bytes, bytes]],
+        agg_sig_amount: Sequence[Tuple[bytes, bytes]],
+        agg_sig_puzzle_amount: Sequence[Tuple[bytes, bytes]],
+        agg_sig_parent_amount: Sequence[Tuple[bytes, bytes]],
+        agg_sig_parent_puzzle: Sequence[Tuple[bytes, bytes]],
         flags: int
     ) -> None: ...
     def __hash__(self) -> int: ...

@@ -90,6 +90,12 @@ fn compare_spend(a: &Allocator, lhs: &Spend, rhs: &Spend) {
     assert_eq!(lhs.birth_seconds, rhs.birth_seconds);
     compare_new_coins(a, &lhs.create_coin, &rhs.create_coin);
     compare_agg_sig(a, &lhs.agg_sig_me, &rhs.agg_sig_me);
+    compare_agg_sig(a, &lhs.agg_sig_parent, &rhs.agg_sig_parent);
+    compare_agg_sig(a, &lhs.agg_sig_puzzle, &rhs.agg_sig_puzzle);
+    compare_agg_sig(a, &lhs.agg_sig_amount, &rhs.agg_sig_amount);
+    compare_agg_sig(a, &lhs.agg_sig_puzzle_amount, &rhs.agg_sig_puzzle_amount);
+    compare_agg_sig(a, &lhs.agg_sig_parent_amount, &rhs.agg_sig_parent_amount);
+    compare_agg_sig(a, &lhs.agg_sig_parent_puzzle, &rhs.agg_sig_parent_puzzle);
     assert_eq!(lhs.flags, rhs.flags);
     assert_eq!(a.atom(lhs.puzzle_hash), a.atom(rhs.puzzle_hash));
 }

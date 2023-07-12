@@ -216,6 +216,12 @@ def get_puzzle_and_solution_for_coin(program: ReadableBuffer, args: ReadableBuff
             "birth_seconds: Optional[int]",
             "create_coin: List[Tuple[bytes, int, Optional[bytes]]]",
             "agg_sig_me: List[Tuple[bytes, bytes]]",
+            "agg_sig_parent: List[Tuple[bytes, bytes]]",
+            "agg_sig_puzzle: List[Tuple[bytes, bytes]]",
+            "agg_sig_amount: List[Tuple[bytes, bytes]]",
+            "agg_sig_puzzle_amount: List[Tuple[bytes, bytes]]",
+            "agg_sig_parent_amount: List[Tuple[bytes, bytes]]",
+            "agg_sig_parent_puzzle: List[Tuple[bytes, bytes]]",
             "flags: int",
         ],
     )

@@ -64,6 +64,12 @@ pub fn run_puzzle(
         birth_seconds: None,
         create_coin: HashSet::new(),
         agg_sig_me: Vec::new(),
+        agg_sig_parent: Vec::new(),
+        agg_sig_puzzle: Vec::new(),
+        agg_sig_amount: Vec::new(),
+        agg_sig_puzzle_amount: Vec::new(),
+        agg_sig_parent_amount: Vec::new(),
+        agg_sig_parent_puzzle: Vec::new(),
         // assume it's eligible until we see an agg-sig condition
         flags: ELIGIBLE_FOR_DEDUP,
     };

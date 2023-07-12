@@ -6,6 +6,12 @@ use clvmr::cost::Cost;
 pub type ConditionOpcode = u16;
 
 // AGG_SIG is ascii "1"
+pub const AGG_SIG_PARENT: ConditionOpcode = 43;
+pub const AGG_SIG_PUZZLE: ConditionOpcode = 44;
+pub const AGG_SIG_AMOUNT: ConditionOpcode = 45;
+pub const AGG_SIG_PUZZLE_AMOUNT: ConditionOpcode = 46;
+pub const AGG_SIG_PARENT_AMOUNT: ConditionOpcode = 47;
+pub const AGG_SIG_PARENT_PUZZLE: ConditionOpcode = 48;
 pub const AGG_SIG_UNSAFE: ConditionOpcode = 49;
 pub const AGG_SIG_ME: ConditionOpcode = 50;
 
@@ -134,7 +140,18 @@ pub fn parse_opcode(a: &Allocator, op: NodePtr, flags: u32) -> Option<ConditionO
             | ASSERT_HEIGHT_ABSOLUTE
             | REMARK => Some(b0),
             _ => {
-                if (flags & ENABLE_SOFTFORK_CONDITION) != 0 && b0 == SOFTFORK {
+                if (flags & ENABLE_SOFTFORK_CONDITION) != 0
+                    && [
+                        SOFTFORK,
+                        AGG_SIG_PARENT,
+                        AGG_SIG_PUZZLE,
+                        AGG_SIG_AMOUNT,
+                        AGG_SIG_PUZZLE_AMOUNT,
+                        AGG_SIG_PARENT_AMOUNT,
+                        AGG_SIG_PARENT_PUZZLE,
+                    ]
+                    .contains(&b0)
+                {
                     Some(b0)
                 } else if (flags & ENABLE_ASSERT_BEFORE) != 0 {
                     match b0 {
@@ -231,8 +248,14 @@ fn test_parse_opcode(
 #[case(&[AGG_SIG_UNSAFE as u8], Some(AGG_SIG_UNSAFE), Some(AGG_SIG_UNSAFE))]
 #[case(&[AGG_SIG_ME as u8], Some(AGG_SIG_ME), Some(AGG_SIG_ME))]
 #[case(&[CREATE_COIN as u8], Some(CREATE_COIN), Some(CREATE_COIN))]
-// the SOFTOFORK condition is only recognized when the flag is set
+// the SOFTOFORK and new AGG_SIG_* condition is only recognized when the flag is set
 #[case(&[SOFTFORK as u8], None, Some(SOFTFORK))]
+#[case(&[AGG_SIG_PARENT as u8], None, Some(AGG_SIG_PARENT))]
+#[case(&[AGG_SIG_PUZZLE as u8], None, Some(AGG_SIG_PUZZLE))]
+#[case(&[AGG_SIG_AMOUNT as u8], None, Some(AGG_SIG_AMOUNT))]
+#[case(&[AGG_SIG_PUZZLE_AMOUNT as u8], None, Some(AGG_SIG_PUZZLE_AMOUNT))]
+#[case(&[AGG_SIG_PARENT_AMOUNT as u8], None, Some(AGG_SIG_PARENT_AMOUNT))]
+#[case(&[AGG_SIG_PARENT_PUZZLE as u8], None, Some(AGG_SIG_PARENT_PUZZLE))]
 #[case(&[ASSERT_EPHEMERAL as u8], None, None)]
 #[case(&[ASSERT_BEFORE_SECONDS_RELATIVE as u8], None, None)]
 fn test_parse_opcode_softfork(
