@@ -60,7 +60,9 @@ def get_puzzle_and_solution_for_coin(program: ReadableBuffer, args: ReadableBuff
 
 class Spend:
     coin_id: bytes
+    parent_id: bytes
     puzzle_hash: bytes
+    coin_amount: int
     height_relative: Optional[int]
     seconds_relative: Optional[int]
     before_height_relative: Optional[int]
@@ -69,11 +71,19 @@ class Spend:
     birth_seconds: Optional[int]
     create_coin: List[Tuple[bytes, int, Optional[bytes]]]
     agg_sig_me: List[Tuple[bytes, bytes]]
+    agg_sig_parent: List[Tuple[bytes, bytes]]
+    agg_sig_puzzle: List[Tuple[bytes, bytes]]
+    agg_sig_amount: List[Tuple[bytes, bytes]]
+    agg_sig_puzzle_amount: List[Tuple[bytes, bytes]]
+    agg_sig_parent_amount: List[Tuple[bytes, bytes]]
+    agg_sig_parent_puzzle: List[Tuple[bytes, bytes]]
     flags: int
     def __init__(
         self,
         coin_id: bytes,
+        parent_id: bytes,
         puzzle_hash: bytes,
+        coin_amount: int,
         height_relative: Optional[int],
         seconds_relative: Optional[int],
         before_height_relative: Optional[int],
@@ -82,6 +92,12 @@ class Spend:
         birth_seconds: Optional[int],
         create_coin: Sequence[Tuple[bytes, int, Optional[bytes]]],
         agg_sig_me: Sequence[Tuple[bytes, bytes]],
+        agg_sig_parent: Sequence[Tuple[bytes, bytes]],
+        agg_sig_puzzle: Sequence[Tuple[bytes, bytes]],
+        agg_sig_amount: Sequence[Tuple[bytes, bytes]],
+        agg_sig_puzzle_amount: Sequence[Tuple[bytes, bytes]],
+        agg_sig_parent_amount: Sequence[Tuple[bytes, bytes]],
+        agg_sig_parent_puzzle: Sequence[Tuple[bytes, bytes]],
         flags: int
     ) -> None: ...
     def __hash__(self) -> int: ...
