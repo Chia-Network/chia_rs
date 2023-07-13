@@ -60,7 +60,9 @@ def get_puzzle_and_solution_for_coin(program: ReadableBuffer, args: ReadableBuff
 
 class Spend:
     coin_id: bytes
+    parent_id: bytes
     puzzle_hash: bytes
+    coin_amount: int
     height_relative: Optional[int]
     seconds_relative: Optional[int]
     before_height_relative: Optional[int]
@@ -79,7 +81,9 @@ class Spend:
     def __init__(
         self,
         coin_id: bytes,
+        parent_id: bytes,
         puzzle_hash: bytes,
+        coin_amount: int,
         height_relative: Optional[int],
         seconds_relative: Optional[int],
         before_height_relative: Optional[int],

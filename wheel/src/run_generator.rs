@@ -24,7 +24,9 @@ use chia_streamable_macro::Streamable;
 #[derive(Streamable, PyStreamable, Hash, Debug, Clone, Eq, PartialEq)]
 pub struct PySpend {
     pub coin_id: Bytes32,
+    pub parent_id: Bytes32,
     pub puzzle_hash: Bytes32,
+    pub coin_amount: u64,
     pub height_relative: Option<u32>,
     pub seconds_relative: Option<u64>,
     pub before_height_relative: Option<u32>,
@@ -89,7 +91,9 @@ fn convert_spend(a: &Allocator, spend: Spend) -> PySpend {
 
     PySpend {
         coin_id: *spend.coin_id,
+        parent_id: a.atom(spend.parent_id).into(),
         puzzle_hash: a.atom(spend.puzzle_hash).into(),
+        coin_amount: spend.coin_amount,
         height_relative: spend.height_relative,
         seconds_relative: spend.seconds_relative,
         before_height_relative: spend.before_height_relative,
