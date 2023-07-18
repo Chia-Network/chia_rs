@@ -1,5 +1,4 @@
 use clvmr::allocator::{Allocator, NodePtr, SExp};
-use clvmr::op_utils::nullp;
 
 fn destructure<const N: usize>(a: &Allocator, mut node: NodePtr) -> Option<[NodePtr; N]> {
     let mut counter = 0;
@@ -59,7 +58,7 @@ pub fn uncurry(a: &Allocator, node: NodePtr) -> Option<(NodePtr, Vec<NodePtr>)> 
 
     let (inner, mut args) = match_wrapper(a, node)?;
 
-    while !nullp(a, args) {
+    while check(a, args, &[1]).is_none() {
         // match
         // (4 (1 . <arg>) <rest>)
         let [cons, quoted_arg, r] = destructure::<3>(a, args)?;

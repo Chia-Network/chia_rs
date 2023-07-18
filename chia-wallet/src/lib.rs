@@ -3,6 +3,7 @@ mod coin_store;
 mod key_store;
 mod wallet;
 mod wallet_event;
+mod wallet_handler;
 
 pub use coin_selection::*;
 pub use coin_store::*;

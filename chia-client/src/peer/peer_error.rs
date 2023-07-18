@@ -3,7 +3,7 @@ use std::fmt;
 use chia_protocol::Message;
 
 #[derive(Debug)]
-pub enum RequestError {
+pub enum PeerError {
     StreamError {
         reason: String,
     },
@@ -20,7 +20,7 @@ pub enum RequestError {
     },
 }
 
-impl fmt::Display for RequestError {
+impl fmt::Display for PeerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::StreamError { reason } | Self::SocketError { reason } => write!(f, "{reason}"),
@@ -35,4 +35,4 @@ impl fmt::Display for RequestError {
     }
 }
 
-impl std::error::Error for RequestError {}
+impl std::error::Error for PeerError {}

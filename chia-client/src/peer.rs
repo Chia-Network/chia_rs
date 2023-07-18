@@ -15,15 +15,13 @@ use tokio::{
 };
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 
+mod peer_error;
 mod peer_event;
 mod peer_message;
-mod request_error;
-mod send_error;
 
+pub use peer_error::*;
 pub use peer_event::*;
 pub use peer_message::*;
-pub use request_error::*;
-pub use send_error::*;
 
 use crate::Network;
 
@@ -68,7 +66,7 @@ impl Peer {
         self.event_sender.subscribe()
     }
 
-    pub async fn perform_handshake(&self) -> Result<(), SendError> {
+    pub async fn perform_handshake(&self) -> Result<(), PeerError> {
         let handshake = Handshake {
             network_id: self.network.network_id.clone(),
             protocol_version: "0.0.34".to_string(),
@@ -84,14 +82,14 @@ impl Peer {
         self.send(handshake).await
     }
 
-    pub async fn send<T>(&self, body: T) -> Result<(), SendError>
+    pub async fn send<T>(&self, body: T) -> Result<(), PeerError>
     where
         T: Streamable + ChiaProtocolMessage,
     {
         let mut body_bytes = Vec::new();
 
         body.stream(&mut body_bytes)
-            .map_err(|error| SendError::StreamError {
+            .map_err(|error| PeerError::StreamError {
                 reason: error.to_string(),
             })?;
 
@@ -104,14 +102,14 @@ impl Peer {
         self.message_sender
             .send(PeerMessage::Protocol(message))
             .await
-            .map_err(|error| SendError::SocketError {
+            .map_err(|error| PeerError::SocketError {
                 reason: error.to_string(),
             })?;
 
         Ok(())
     }
 
-    pub async fn request<T, R>(&self, body: T) -> Result<R, RequestError>
+    pub async fn request<T, R>(&self, body: T) -> Result<R, PeerError>
     where
         T: Streamable + ChiaProtocolMessage,
         R: Streamable + ChiaProtocolMessage,
@@ -119,7 +117,7 @@ impl Peer {
         let mut body_bytes = Vec::new();
 
         body.stream(&mut body_bytes)
-            .map_err(|error| RequestError::StreamError {
+            .map_err(|error| PeerError::StreamError {
                 reason: error.to_string(),
             })?;
 
@@ -136,7 +134,7 @@ impl Peer {
         self.message_sender
             .send(PeerMessage::Protocol(message))
             .await
-            .map_err(|error| RequestError::SocketError {
+            .map_err(|error| PeerError::SocketError {
                 reason: error.to_string(),
             })?;
 
@@ -148,21 +146,21 @@ impl Peer {
             Err(error) => {
                 self.requests.lock().await.remove(&id);
 
-                Err(RequestError::ResponseError {
+                Err(PeerError::ResponseError {
                     message: None,
                     reason: error.to_string(),
                 })
             }
             Ok(message) => {
                 if message.msg_type != R::msg_type() {
-                    return Err(RequestError::ResponseError {
+                    return Err(PeerError::ResponseError {
                         message: Some(message),
                         reason: "invalid response message type".to_string(),
                     });
                 }
 
                 R::parse(&mut Cursor::new(message.data.as_ref())).map_err(|error| {
-                    RequestError::ParseError {
+                    PeerError::ParseError {
                         message,
                         reason: error.to_string(),
                     }

@@ -6,11 +6,22 @@ pub fn create_coin(
     a: &mut Allocator,
     puzzle_hash: &[u8; 32],
     amount: u64,
+    memos: &[&[u8; 32]],
 ) -> Result<NodePtr, EvalErr> {
     let code = a.new_number(51.into())?;
     let puzzle_hash = a.new_atom(puzzle_hash)?;
     let amount = a.new_number(amount.into())?;
-    new_list(a, &[code, puzzle_hash, amount])
+
+    if memos.is_empty() {
+        new_list(a, &[code, puzzle_hash, amount])
+    } else {
+        let mut memo_ptrs = Vec::with_capacity(memos.len());
+        for &memo in memos {
+            memo_ptrs.push(a.new_atom(memo)?);
+        }
+        let memo_list = new_list(a, &memo_ptrs)?;
+        new_list(a, &[code, puzzle_hash, amount, memo_list])
+    }
 }
 
 pub fn sign_agg_sig_me(

@@ -9,8 +9,8 @@ homepage = "https://github.com/Chia-Network/chia_rs/"
 repository = "https://github.com/Chia-Network/chia_rs/clvm-utils"
 
 [dependencies]
+chia-protocol = { version = "0.2.7", path = "../chia-protocol" }
+chia-bls = { version = "0.2.7", path = "../chia-bls" }
 clvmr = "0.2.7"
-sha2 = "0.9.9"
-
-[dev-dependencies]
 hex = "0.4.3"
+sha2 = "0.9.9"

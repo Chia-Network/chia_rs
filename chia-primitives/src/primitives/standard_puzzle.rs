@@ -1,8 +1,35 @@
-use chia_bls::{PublicKey, SecretKey, Signature};
-use clvm_utils::{curry, curry_tree_hash, new_list, tree_hash, tree_hash_atom};
+use chia_bls::PublicKey;
+use chia_protocol::Program;
+use clvm_utils::{curry, curry_tree_hash, new_list, tree_hash_atom, uncurry, Allocate};
 use clvmr::{allocator::NodePtr, reduction::EvalErr, serde::node_from_bytes, Allocator};
 
 use crate::puzzles::{P2_DELEGATED_OR_HIDDEN, P2_DELEGATED_OR_HIDDEN_HASH};
+
+#[derive(Debug, Clone)]
+pub struct StandardPuzzle {
+    synthetic_key: PublicKey,
+}
+
+impl Allocate for StandardPuzzle {
+    fn from_clvm(a: &Allocator, node: NodePtr) -> Option<Self> {
+        let (program, args) = uncurry(a, node)?;
+        let program = Program::from_clvm(a, program)?;
+        if program.as_ref() != P2_DELEGATED_OR_HIDDEN || args.len() != 1 {
+            return None;
+        }
+        Some(Self {
+            synthetic_key: Allocate::from_clvm(a, args[0])?,
+        })
+    }
+    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr, EvalErr> {
+        let node = node_from_bytes(a, &P2_DELEGATED_OR_HIDDEN)
+            .map_err(|error| EvalErr(a.null(), error.to_string()))?;
+
+        let synthetic_key = self.synthetic_key.to_clvm(a)?;
+
+        curry(a, node, &[synthetic_key])
+    }
+}
 
 pub fn alloc_standard_puzzle(a: &mut Allocator) -> std::io::Result<NodePtr> {
     node_from_bytes(a, &P2_DELEGATED_OR_HIDDEN)
@@ -22,24 +49,12 @@ pub fn curry_standard_puzzle(
     curry(a, node, &[synthetic_key])
 }
 
-pub fn spend_standard_puzzle(
+pub fn solve_standard_puzzle(
     a: &mut Allocator,
-    coin_id: &[u8; 32],
     conditions: &[NodePtr],
-    secret_key: &SecretKey,
-    agg_sig_me_extra_data: &[u8; 32],
-) -> Result<(NodePtr, Signature), EvalErr> {
+) -> Result<NodePtr, EvalErr> {
     let condition_list = new_list(a, conditions)?;
     let delegated_puzzle = a.new_pair(a.one(), condition_list)?;
     let nil = a.null();
-    let solution = new_list(a, &[nil, delegated_puzzle, nil])?;
-
-    let raw_message = tree_hash(a, delegated_puzzle);
-    let mut message = Vec::with_capacity(96);
-    message.extend(raw_message);
-    message.extend(coin_id);
-    message.extend(agg_sig_me_extra_data);
-    let signature = secret_key.sign(&message);
-
-    Ok((solution, signature))
+    new_list(a, &[nil, delegated_puzzle, nil])
 }

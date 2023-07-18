@@ -15,11 +15,7 @@ use tokio::{
     task::JoinHandle,
 };
 
-use crate::{select_coins, CoinStore, KeyStore, WalletEvent};
-
-mod wallet_handler;
-
-use wallet_handler::WalletHandler;
+use crate::{select_coins, wallet_handler::WalletHandler, CoinStore, KeyStore, WalletEvent};
 
 pub struct Wallet {
     peer: Arc<Peer>,

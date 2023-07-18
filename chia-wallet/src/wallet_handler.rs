@@ -7,11 +7,11 @@ use tokio::sync::{broadcast, RwLock};
 use crate::{CoinStore, KeyStore, WalletEvent};
 
 pub struct WalletHandler {
-    pub(super) peer: Arc<Peer>,
-    pub(super) key_store: Arc<RwLock<KeyStore>>,
-    pub(super) coin_store: Arc<RwLock<CoinStore>>,
-    pub(super) peer_receiver: broadcast::Receiver<PeerEvent>,
-    pub(super) event_sender: broadcast::Sender<WalletEvent>,
+    pub(crate) peer: Arc<Peer>,
+    pub(crate) key_store: Arc<RwLock<KeyStore>>,
+    pub(crate) coin_store: Arc<RwLock<CoinStore>>,
+    pub(crate) peer_receiver: broadcast::Receiver<PeerEvent>,
+    pub(crate) event_sender: broadcast::Sender<WalletEvent>,
 }
 
 impl WalletHandler {
@@ -51,6 +51,7 @@ impl WalletHandler {
 
     pub async fn filter_coin_state(&mut self, coin_states: Vec<CoinState>) -> Vec<CoinState> {
         let key_store = self.key_store.read().await;
+
         coin_states
             .into_iter()
             .filter_map(|state| {
