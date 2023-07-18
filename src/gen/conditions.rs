@@ -15,8 +15,8 @@ use super::opcodes::{
 use super::sanitize_int::{sanitize_uint, SanitizedUint};
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
 use crate::gen::flags::{
-    AGG_SIG_ARGS, COND_ARGS_NIL, LIMIT_ANNOUNCES, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
-    NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
+    AGG_SIG_ARGS, COND_ARGS_NIL, ENABLE_SOFTFORK_CONDITION, LIMIT_ANNOUNCES,
+    NO_RELATIVE_CONDITIONS_ON_EPHEMERAL, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
 };
 use crate::gen::validation_error::check_nil;
 use chia_protocol::bytes::Bytes32;
@@ -716,6 +716,14 @@ pub fn parse_conditions(
 
     while let Some((mut c, next)) = next(a, iter)? {
         iter = next;
+        if let SExp::Atom() = a.sexp(c) {
+            // after hard fork, skip null conditions in condition list
+            if flags & ENABLE_SOFTFORK_CONDITION != 0 {
+                if a.atom_len(c) == 0 {
+                    continue;
+                }
+            }
+        }
         let op = match parse_opcode(a, first(a, c)?, flags) {
             None => {
                 // in strict mode we don't allow unknown conditions
@@ -1221,8 +1229,6 @@ fn u64_to_bytes(n: u64) -> Vec<u8> {
 #[cfg(test)]
 use crate::gen::flags::ENABLE_ASSERT_BEFORE;
 #[cfg(test)]
-use crate::gen::flags::ENABLE_SOFTFORK_CONDITION;
-#[cfg(test)]
 use clvmr::number::Number;
 #[cfg(test)]
 use clvmr::serde::node_to_bytes;
@@ -1321,7 +1327,7 @@ fn test_coin_id(parent_id: &[u8; 32], puzzle_hash: &[u8; 32], amount: u64) -> By
 //   the second atom.
 // * ) means nil
 // * substitutions for test values can be done with {name} in the input string.
-// * arbitrary substitutions can be made with a callback and {} in the intput
+// * arbitrary substitutions can be made with a callback and {} in the input
 //   string
 // Example:
 // (1 (2 (3 ) means: (1 . (2 . (3 . ())))
@@ -1466,6 +1472,22 @@ fn cond_test_cb(
         }
         Err(e) => Err(e),
     }
+}
+
+#[test]
+fn test_null_condition() {
+    assert_eq!(
+        cond_test_flag("((({h1} ({h2} (123 ((0 ))))", MEMPOOL_MODE)
+            .unwrap_err()
+            .1,
+        ErrorCode::InvalidCondition
+    );
+
+    cond_test_flag(
+        "((({h1} ({h2} (123 ((0 ))))",
+        MEMPOOL_MODE | ENABLE_SOFTFORK_CONDITION,
+    )
+    .unwrap();
 }
 
 #[cfg(test)]
