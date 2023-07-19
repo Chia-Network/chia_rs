@@ -718,10 +718,8 @@ pub fn parse_conditions(
         iter = next;
         if let SExp::Atom() = a.sexp(c) {
             // after hard fork, skip null conditions in condition list
-            if flags & ENABLE_SOFTFORK_CONDITION != 0 {
-                if a.atom_len(c) == 0 {
-                    continue;
-                }
+            if flags & ENABLE_SOFTFORK_CONDITION != 0 && a.atom_len(c) == 0 {
+                continue;
             }
         }
         let op = match parse_opcode(a, first(a, c)?, flags) {
