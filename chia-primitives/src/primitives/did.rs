@@ -61,7 +61,7 @@ where
     }
 }
 
-pub fn solve_did(a: &mut Allocator, inner_solution: NodePtr) -> Result<NodePtr, EvalErr> {
+pub fn did_solution(a: &mut Allocator, inner_solution: NodePtr) -> Result<NodePtr, EvalErr> {
     let mode = a.one();
     new_list(a, &[mode, inner_solution])
 }

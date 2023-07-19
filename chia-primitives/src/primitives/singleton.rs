@@ -1,11 +1,8 @@
 use chia_protocol::Program;
 use clvm_utils::{curry, new_list, uncurry, Allocate, Error};
-use clvmr::{allocator::NodePtr, reduction::EvalErr, serde::node_from_bytes, Allocator};
+use clvmr::{allocator::NodePtr, serde::node_from_bytes, Allocator};
 
-use crate::{
-    puzzles::{SINGLETON_LAUNCHER_HASH, SINGLETON_TOP_LAYER, SINGLETON_TOP_LAYER_HASH},
-    Proof,
-};
+use crate::{puzzles::SINGLETON_TOP_LAYER, Proof};
 
 #[derive(Debug, Clone)]
 pub struct Singleton<T = Program>
@@ -65,34 +62,13 @@ impl Allocate for SingletonStruct {
     }
 }
 
-pub fn alloc_singleton(a: &mut Allocator) -> std::io::Result<NodePtr> {
-    node_from_bytes(a, &SINGLETON_TOP_LAYER)
-}
-
-pub fn curry_singleton(
+pub fn singleton_solution(
     a: &mut Allocator,
-    node: NodePtr,
-    launcher_id: &[u8; 32],
-    inner_puzzle: NodePtr,
-) -> Result<NodePtr, EvalErr> {
-    let singleton_hash = a.new_atom(&SINGLETON_TOP_LAYER_HASH)?;
-    let launcher_id = a.new_atom(launcher_id)?;
-    let launcher_hash = a.new_atom(&SINGLETON_LAUNCHER_HASH)?;
-
-    let singleton_struct = a.new_pair(launcher_id, launcher_hash)?;
-    let singleton_struct = a.new_pair(singleton_hash, singleton_struct)?;
-
-    curry(a, node, &[singleton_struct, inner_puzzle])
-}
-
-pub fn solve_singleton(
-    a: &mut Allocator,
-    lineage_proof: &Proof,
+    proof: &Proof,
     amount: u64,
     inner_solution: NodePtr,
 ) -> Result<NodePtr, Error> {
-    let lineage_proof_ptr = lineage_proof.to_clvm(a)?;
+    let lineage_proof_ptr = proof.to_clvm(a)?;
     let amount_ptr = a.new_number(amount.into()).map_err(Error::Eval)?;
-
     new_list(a, &[lineage_proof_ptr, amount_ptr, inner_solution]).map_err(Error::Eval)
 }
