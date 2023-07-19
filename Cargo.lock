@@ -513,6 +513,7 @@ dependencies = [
  "clvmr",
  "hex",
  "sha2 0.9.9",
+ "thiserror",
 ]
 
 [[package]]

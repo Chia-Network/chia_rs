@@ -14,3 +14,4 @@ chia-bls = { version = "0.2.7", path = "../chia-bls" }
 clvmr = "0.2.7"
 hex = "0.4.3"
 sha2 = "0.9.9"
+thiserror = "1.0.43"

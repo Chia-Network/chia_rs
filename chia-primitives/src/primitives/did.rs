@@ -1,5 +1,5 @@
 use chia_protocol::Program;
-use clvm_utils::{curry, new_list, uncurry, Allocate};
+use clvm_utils::{curry, new_list, uncurry, Allocate, Error};
 use clvmr::{allocator::NodePtr, reduction::EvalErr, serde::node_from_bytes, Allocator};
 
 use crate::{puzzles::DID, singleton::SingletonStruct};
@@ -10,11 +10,11 @@ where
     T: Allocate,
     M: Allocate,
 {
-    inner_puzzle: T,
-    recovery_did_list_hash: [u8; 32],
-    num_verifications_required: u64,
-    singleton_struct: SingletonStruct,
-    metadata: M,
+    pub inner_puzzle: T,
+    pub recovery_did_list_hash: [u8; 32],
+    pub num_verifications_required: u64,
+    pub singleton_struct: SingletonStruct,
+    pub metadata: M,
 }
 
 impl<T, M> Allocate for Did<T, M>
@@ -22,13 +22,14 @@ where
     T: Allocate,
     M: Allocate,
 {
-    fn from_clvm(a: &Allocator, node: NodePtr) -> Option<Self> {
-        let (program, args) = uncurry(a, node)?;
+    fn from_clvm(a: &Allocator, node: NodePtr) -> clvm_utils::Result<Self> {
+        let (program, args) = uncurry(a, node)
+            .ok_or_else(|| Error::Reason("could not uncurry program".to_string()))?;
         let program = Program::from_clvm(a, program)?;
         if program.as_ref() != DID || args.len() != 5 {
-            return None;
+            return Err(Error::Reason("uncurried program is not did".to_string()));
         }
-        Some(Self {
+        Ok(Self {
             inner_puzzle: Allocate::from_clvm(a, args[0])?,
             recovery_did_list_hash: Allocate::from_clvm(a, args[1])?,
             num_verifications_required: Allocate::from_clvm(a, args[2])?,
@@ -36,9 +37,8 @@ where
             metadata: Allocate::from_clvm(a, args[4])?,
         })
     }
-    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr, EvalErr> {
-        let node =
-            node_from_bytes(a, &DID).map_err(|error| EvalErr(a.null(), error.to_string()))?;
+    fn to_clvm(&self, a: &mut Allocator) -> clvm_utils::Result<NodePtr> {
+        let node = node_from_bytes(a, &DID)?;
 
         let inner_puzzle = self.inner_puzzle.to_clvm(a)?;
         let recovery_did_list_hash = self.recovery_did_list_hash.to_clvm(a)?;
@@ -57,10 +57,9 @@ where
                 metadata,
             ],
         )
+        .map_err(Error::Eval)
     }
 }
-
-// pub fn curry_did(a: &mut Allocator, node: NodePtr, inner_puzzle: NodePtr, recovery)
 
 pub fn solve_did(a: &mut Allocator, inner_solution: NodePtr) -> Result<NodePtr, EvalErr> {
     let mode = a.one();
