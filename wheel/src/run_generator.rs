@@ -8,7 +8,7 @@ use chia::gen::run_block_generator::run_block_generator2 as native_run_block_gen
 use chia::gen::validation_error::ValidationErr;
 use chia_protocol::bytes::{Bytes, Bytes32, Bytes48};
 
-use clvmr::allocator::Allocator;
+use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::cost::Cost;
 
 use pyo3::buffer::PyBuffer;
@@ -24,7 +24,9 @@ use chia_streamable_macro::Streamable;
 #[derive(Streamable, PyStreamable, Hash, Debug, Clone, Eq, PartialEq)]
 pub struct PySpend {
     pub coin_id: Bytes32,
+    pub parent_id: Bytes32,
     pub puzzle_hash: Bytes32,
+    pub coin_amount: u64,
     pub height_relative: Option<u32>,
     pub seconds_relative: Option<u64>,
     pub before_height_relative: Option<u32>,
@@ -33,6 +35,12 @@ pub struct PySpend {
     pub birth_seconds: Option<u64>,
     pub create_coin: Vec<(Bytes32, u64, Option<Bytes>)>,
     pub agg_sig_me: Vec<(Bytes48, Bytes)>,
+    pub agg_sig_parent: Vec<(Bytes48, Bytes)>,
+    pub agg_sig_puzzle: Vec<(Bytes48, Bytes)>,
+    pub agg_sig_amount: Vec<(Bytes48, Bytes)>,
+    pub agg_sig_puzzle_amount: Vec<(Bytes48, Bytes)>,
+    pub agg_sig_parent_amount: Vec<(Bytes48, Bytes)>,
+    pub agg_sig_parent_puzzle: Vec<(Bytes48, Bytes)>,
     pub flags: u32,
 }
 
@@ -58,11 +66,15 @@ pub struct PySpendBundleConditions {
     pub addition_amount: u128,
 }
 
-fn convert_spend(a: &Allocator, spend: Spend) -> PySpend {
-    let mut agg_sigs = Vec::<(Bytes48, Bytes)>::new();
-    for (pk, msg) in spend.agg_sig_me {
-        agg_sigs.push((a.atom(pk).into(), a.atom(msg).into()));
+fn convert_agg_sigs(a: &Allocator, agg_sigs: &[(NodePtr, NodePtr)]) -> Vec<(Bytes48, Bytes)> {
+    let mut ret = Vec::<(Bytes48, Bytes)>::new();
+    for (pk, msg) in agg_sigs {
+        ret.push((a.atom(*pk).into(), a.atom(*msg).into()));
     }
+    ret
+}
+
+fn convert_spend(a: &Allocator, spend: Spend) -> PySpend {
     let mut create_coin =
         Vec::<(Bytes32, u64, Option<Bytes>)>::with_capacity(spend.create_coin.len());
     for c in spend.create_coin {
@@ -79,7 +91,9 @@ fn convert_spend(a: &Allocator, spend: Spend) -> PySpend {
 
     PySpend {
         coin_id: *spend.coin_id,
+        parent_id: a.atom(spend.parent_id).into(),
         puzzle_hash: a.atom(spend.puzzle_hash).into(),
+        coin_amount: spend.coin_amount,
         height_relative: spend.height_relative,
         seconds_relative: spend.seconds_relative,
         before_height_relative: spend.before_height_relative,
@@ -87,7 +101,13 @@ fn convert_spend(a: &Allocator, spend: Spend) -> PySpend {
         birth_height: spend.birth_height,
         birth_seconds: spend.birth_seconds,
         create_coin,
-        agg_sig_me: agg_sigs,
+        agg_sig_me: convert_agg_sigs(a, &spend.agg_sig_me),
+        agg_sig_parent: convert_agg_sigs(a, &spend.agg_sig_parent),
+        agg_sig_puzzle: convert_agg_sigs(a, &spend.agg_sig_puzzle),
+        agg_sig_amount: convert_agg_sigs(a, &spend.agg_sig_amount),
+        agg_sig_puzzle_amount: convert_agg_sigs(a, &spend.agg_sig_puzzle_amount),
+        agg_sig_parent_amount: convert_agg_sigs(a, &spend.agg_sig_parent_amount),
+        agg_sig_parent_puzzle: convert_agg_sigs(a, &spend.agg_sig_parent_puzzle),
         flags: spend.flags,
     }
 }

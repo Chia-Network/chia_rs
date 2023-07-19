@@ -56,6 +56,12 @@ fuzz_target!(|data: &[u8]| {
             birth_seconds: None,
             create_coin: HashSet::new(),
             agg_sig_me: Vec::new(),
+            agg_sig_parent: Vec::new(),
+            agg_sig_puzzle: Vec::new(),
+            agg_sig_amount: Vec::new(),
+            agg_sig_puzzle_amount: Vec::new(),
+            agg_sig_parent_amount: Vec::new(),
+            agg_sig_parent_puzzle: Vec::new(),
             flags: 0_u32,
         };
         let mut max_cost: u64 = 3300000000;

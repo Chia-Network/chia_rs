@@ -1,14 +1,16 @@
 use super::coin_id::compute_coin_id;
 use super::condition_sanitizers::{parse_amount, sanitize_announce_msg, sanitize_hash};
 use super::opcodes::{
-    compute_unknown_condition_cost, parse_opcode, ConditionOpcode, AGG_SIG_COST, AGG_SIG_ME,
-    AGG_SIG_UNSAFE, ASSERT_BEFORE_HEIGHT_ABSOLUTE, ASSERT_BEFORE_HEIGHT_RELATIVE,
-    ASSERT_BEFORE_SECONDS_ABSOLUTE, ASSERT_BEFORE_SECONDS_RELATIVE, ASSERT_COIN_ANNOUNCEMENT,
-    ASSERT_CONCURRENT_PUZZLE, ASSERT_CONCURRENT_SPEND, ASSERT_EPHEMERAL, ASSERT_HEIGHT_ABSOLUTE,
-    ASSERT_HEIGHT_RELATIVE, ASSERT_MY_AMOUNT, ASSERT_MY_BIRTH_HEIGHT, ASSERT_MY_BIRTH_SECONDS,
-    ASSERT_MY_COIN_ID, ASSERT_MY_PARENT_ID, ASSERT_MY_PUZZLEHASH, ASSERT_PUZZLE_ANNOUNCEMENT,
-    ASSERT_SECONDS_ABSOLUTE, ASSERT_SECONDS_RELATIVE, CREATE_COIN, CREATE_COIN_ANNOUNCEMENT,
-    CREATE_COIN_COST, CREATE_PUZZLE_ANNOUNCEMENT, REMARK, RESERVE_FEE, SOFTFORK,
+    compute_unknown_condition_cost, parse_opcode, ConditionOpcode, AGG_SIG_AMOUNT, AGG_SIG_COST,
+    AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT, AGG_SIG_PARENT_PUZZLE, AGG_SIG_PUZZLE,
+    AGG_SIG_PUZZLE_AMOUNT, AGG_SIG_UNSAFE, ASSERT_BEFORE_HEIGHT_ABSOLUTE,
+    ASSERT_BEFORE_HEIGHT_RELATIVE, ASSERT_BEFORE_SECONDS_ABSOLUTE, ASSERT_BEFORE_SECONDS_RELATIVE,
+    ASSERT_COIN_ANNOUNCEMENT, ASSERT_CONCURRENT_PUZZLE, ASSERT_CONCURRENT_SPEND, ASSERT_EPHEMERAL,
+    ASSERT_HEIGHT_ABSOLUTE, ASSERT_HEIGHT_RELATIVE, ASSERT_MY_AMOUNT, ASSERT_MY_BIRTH_HEIGHT,
+    ASSERT_MY_BIRTH_SECONDS, ASSERT_MY_COIN_ID, ASSERT_MY_PARENT_ID, ASSERT_MY_PUZZLEHASH,
+    ASSERT_PUZZLE_ANNOUNCEMENT, ASSERT_SECONDS_ABSOLUTE, ASSERT_SECONDS_RELATIVE, CREATE_COIN,
+    CREATE_COIN_ANNOUNCEMENT, CREATE_COIN_COST, CREATE_PUZZLE_ANNOUNCEMENT, REMARK, RESERVE_FEE,
+    SOFTFORK,
 };
 use super::sanitize_int::{sanitize_uint, SanitizedUint};
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
@@ -59,6 +61,12 @@ pub enum Condition {
     // pubkey (48 bytes) and message (<= 1024 bytes)
     AggSigUnsafe(NodePtr, NodePtr),
     AggSigMe(NodePtr, NodePtr),
+    AggSigParent(NodePtr, NodePtr),
+    AggSigPuzzle(NodePtr, NodePtr),
+    AggSigAmount(NodePtr, NodePtr),
+    AggSigPuzzleAmount(NodePtr, NodePtr),
+    AggSigParentAmount(NodePtr, NodePtr),
+    AggSigParentPuzzle(NodePtr, NodePtr),
     // puzzle hash (32 bytes), amount-node, amount integer, hint is an optional
     // hash (32 bytes), may be left as null
     CreateCoin(NodePtr, u64, NodePtr),
@@ -164,6 +172,32 @@ pub fn parse_args(
                 }
             } else {
                 Ok(Condition::AggSigMe(pubkey, message))
+            }
+        }
+        AGG_SIG_PUZZLE
+        | AGG_SIG_PUZZLE_AMOUNT
+        | AGG_SIG_PARENT
+        | AGG_SIG_AMOUNT
+        | AGG_SIG_PARENT_PUZZLE
+        | AGG_SIG_PARENT_AMOUNT => {
+            let pubkey = sanitize_hash(a, first(a, c)?, 48, ErrorCode::InvalidPubkey)?;
+            c = rest(a, c)?;
+            let message = sanitize_announce_msg(a, first(a, c)?, ErrorCode::InvalidMessage)?;
+            // AGG_SIG_* take two parameters
+
+            if (flags & STRICT_ARGS_COUNT) != 0 {
+                check_nil(a, c)?;
+            }
+            match op {
+                AGG_SIG_PARENT => Ok(Condition::AggSigParent(pubkey, message)),
+                AGG_SIG_PUZZLE => Ok(Condition::AggSigPuzzle(pubkey, message)),
+                AGG_SIG_AMOUNT => Ok(Condition::AggSigAmount(pubkey, message)),
+                AGG_SIG_PUZZLE_AMOUNT => Ok(Condition::AggSigPuzzleAmount(pubkey, message)),
+                AGG_SIG_PARENT_AMOUNT => Ok(Condition::AggSigParentAmount(pubkey, message)),
+                AGG_SIG_PARENT_PUZZLE => Ok(Condition::AggSigParentPuzzle(pubkey, message)),
+                _ => {
+                    panic!("unexpected");
+                }
             }
         }
         CREATE_COIN => {
@@ -472,7 +506,14 @@ pub struct Spend {
     pub birth_seconds: Option<u64>,
     pub create_coin: HashSet<NewCoin>,
     // Agg Sig Me conditions
+    // Maybe this should be an array of vectors
     pub agg_sig_me: Vec<(NodePtr, NodePtr)>,
+    pub agg_sig_parent: Vec<(NodePtr, NodePtr)>,
+    pub agg_sig_puzzle: Vec<(NodePtr, NodePtr)>,
+    pub agg_sig_amount: Vec<(NodePtr, NodePtr)>,
+    pub agg_sig_puzzle_amount: Vec<(NodePtr, NodePtr)>,
+    pub agg_sig_parent_amount: Vec<(NodePtr, NodePtr)>,
+    pub agg_sig_parent_puzzle: Vec<(NodePtr, NodePtr)>,
     // Flags describing properties of this spend. See flags above
     pub flags: u32,
 }
@@ -627,6 +668,12 @@ pub fn process_single_spend(
         birth_seconds: None,
         create_coin: HashSet::new(),
         agg_sig_me: Vec::new(),
+        agg_sig_parent: Vec::new(),
+        agg_sig_puzzle: Vec::new(),
+        agg_sig_amount: Vec::new(),
+        agg_sig_puzzle_amount: Vec::new(),
+        agg_sig_parent_amount: Vec::new(),
+        agg_sig_parent_puzzle: Vec::new(),
         // assume it's eligible until we see an agg-sig condition
         flags: ELIGIBLE_FOR_DEDUP,
     };
@@ -690,7 +737,14 @@ pub fn parse_conditions(
                 }
                 *max_cost -= CREATE_COIN_COST;
             }
-            AGG_SIG_UNSAFE | AGG_SIG_ME => {
+            AGG_SIG_UNSAFE
+            | AGG_SIG_ME
+            | AGG_SIG_PUZZLE
+            | AGG_SIG_PUZZLE_AMOUNT
+            | AGG_SIG_PARENT
+            | AGG_SIG_AMOUNT
+            | AGG_SIG_PARENT_PUZZLE
+            | AGG_SIG_PARENT_AMOUNT => {
                 if *max_cost < AGG_SIG_COST {
                     return Err(ValidationErr(c, ErrorCode::CostExceeded));
                 }
@@ -892,6 +946,30 @@ pub fn parse_conditions(
             }
             Condition::AggSigMe(pk, msg) => {
                 spend.agg_sig_me.push((pk, msg));
+                spend.flags &= !ELIGIBLE_FOR_DEDUP;
+            }
+            Condition::AggSigParent(pk, msg) => {
+                spend.agg_sig_parent.push((pk, msg));
+                spend.flags &= !ELIGIBLE_FOR_DEDUP;
+            }
+            Condition::AggSigPuzzle(pk, msg) => {
+                spend.agg_sig_puzzle.push((pk, msg));
+                spend.flags &= !ELIGIBLE_FOR_DEDUP;
+            }
+            Condition::AggSigAmount(pk, msg) => {
+                spend.agg_sig_amount.push((pk, msg));
+                spend.flags &= !ELIGIBLE_FOR_DEDUP;
+            }
+            Condition::AggSigPuzzleAmount(pk, msg) => {
+                spend.agg_sig_puzzle_amount.push((pk, msg));
+                spend.flags &= !ELIGIBLE_FOR_DEDUP;
+            }
+            Condition::AggSigParentAmount(pk, msg) => {
+                spend.agg_sig_parent_amount.push((pk, msg));
+                spend.flags &= !ELIGIBLE_FOR_DEDUP;
+            }
+            Condition::AggSigParentPuzzle(pk, msg) => {
+                spend.agg_sig_parent_puzzle.push((pk, msg));
                 spend.flags &= !ELIGIBLE_FOR_DEDUP;
             }
             Condition::AggSigUnsafe(pk, msg) => {
@@ -1536,6 +1614,12 @@ fn test_invalid_spend_list_terminator() {
 #[case(CREATE_COIN, "{h2} (42 (({h1})")]
 #[case(AGG_SIG_UNSAFE, "{pubkey} ({msg1}")]
 #[case(AGG_SIG_ME, "{pubkey} ({msg1}")]
+#[case(AGG_SIG_PARENT, "{pubkey} ({msg1}")]
+#[case(AGG_SIG_PUZZLE, "{pubkey} ({msg1}")]
+#[case(AGG_SIG_AMOUNT, "{pubkey} ({msg1}")]
+#[case(AGG_SIG_PUZZLE_AMOUNT, "{pubkey} ({msg1}")]
+#[case(AGG_SIG_PARENT_PUZZLE, "{pubkey} ({msg1}")]
+#[case(AGG_SIG_PARENT_AMOUNT, "{pubkey} ({msg1}")]
 #[case(ASSERT_CONCURRENT_SPEND, "{coin12}")]
 #[case(ASSERT_CONCURRENT_PUZZLE, "{h2}")]
 fn test_extra_arg_mempool(#[case] condition: ConditionOpcode, #[case] arg: &str) {
@@ -1546,7 +1630,7 @@ fn test_extra_arg_mempool(#[case] condition: ConditionOpcode, #[case] arg: &str)
                 "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 )))))",
                 condition as u8, arg
             ),
-            STRICT_ARGS_COUNT | ENABLE_ASSERT_BEFORE
+            STRICT_ARGS_COUNT | ENABLE_ASSERT_BEFORE | ENABLE_SOFTFORK_CONDITION
         )
         .unwrap_err()
         .1,
@@ -1892,6 +1976,12 @@ fn test_multiple_conditions(
 #[case(CREATE_COIN)]
 #[case(AGG_SIG_UNSAFE)]
 #[case(AGG_SIG_ME)]
+#[case(AGG_SIG_PARENT)]
+#[case(AGG_SIG_PUZZLE)]
+#[case(AGG_SIG_AMOUNT)]
+#[case(AGG_SIG_PUZZLE_AMOUNT)]
+#[case(AGG_SIG_PARENT_PUZZLE)]
+#[case(AGG_SIG_PARENT_AMOUNT)]
 #[case(ASSERT_CONCURRENT_SPEND)]
 #[case(ASSERT_CONCURRENT_PUZZLE)]
 fn test_missing_arg(#[case] condition: ConditionOpcode) {
@@ -1899,7 +1989,7 @@ fn test_missing_arg(#[case] condition: ConditionOpcode) {
     assert_eq!(
         cond_test_flag(
             &format!("((({{h1}} ({{h2}} (123 ((({} )))))", condition as u8),
-            ENABLE_ASSERT_BEFORE
+            ENABLE_ASSERT_BEFORE | ENABLE_SOFTFORK_CONDITION
         )
         .unwrap_err()
         .1,
@@ -2646,10 +2736,40 @@ fn test_duplicate_create_coin_with_hint() {
     );
 }
 
-#[test]
-fn test_single_agg_sig_me() {
-    // AGG_SIG_ME
-    let (a, conds) = cond_test("((({h1} ({h2} (123 (((50 ({pubkey} ({msg1} )))))").unwrap();
+#[cfg(test)]
+fn agg_sig_vec(c: ConditionOpcode, s: &Spend) -> &[(NodePtr, NodePtr)] {
+    match c {
+        AGG_SIG_ME => &s.agg_sig_me,
+        AGG_SIG_PARENT => &s.agg_sig_parent,
+        AGG_SIG_PUZZLE => &s.agg_sig_puzzle,
+        AGG_SIG_AMOUNT => &s.agg_sig_amount,
+        AGG_SIG_PUZZLE_AMOUNT => &s.agg_sig_puzzle_amount,
+        AGG_SIG_PARENT_AMOUNT => &s.agg_sig_parent_amount,
+        AGG_SIG_PARENT_PUZZLE => &s.agg_sig_parent_puzzle,
+        _ => {
+            panic!("unexpected");
+        }
+    }
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(AGG_SIG_ME)]
+#[case(AGG_SIG_PARENT)]
+#[case(AGG_SIG_PUZZLE)]
+#[case(AGG_SIG_AMOUNT)]
+#[case(AGG_SIG_PUZZLE_AMOUNT)]
+#[case(AGG_SIG_PARENT_PUZZLE)]
+#[case(AGG_SIG_PARENT_AMOUNT)]
+fn test_single_agg_sig_me(#[case] condition: ConditionOpcode) {
+    let (a, conds) = cond_test_flag(
+        &format!(
+            "((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{msg1}} )))))",
+            condition
+        ),
+        ENABLE_SOFTFORK_CONDITION,
+    )
+    .unwrap();
 
     assert_eq!(conds.cost, AGG_SIG_COST);
     assert_eq!(conds.spends.len(), 1);
@@ -2658,21 +2778,31 @@ fn test_single_agg_sig_me() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.agg_sig_me.len(), 1);
-    for c in &spend.agg_sig_me {
+
+    let agg_sigs = agg_sig_vec(condition, &spend);
+    assert_eq!(agg_sigs.len(), 1);
+    for c in agg_sigs {
         assert_eq!(a.atom(c.0), PUBKEY);
         assert_eq!(a.atom(c.1), MSG1);
     }
     assert_eq!(spend.flags, 0);
 }
 
-#[test]
-fn test_duplicate_agg_sig_me() {
-    // AGG_SIG_ME
+#[cfg(test)]
+#[rstest]
+#[case(AGG_SIG_ME)]
+#[case(AGG_SIG_PARENT)]
+#[case(AGG_SIG_PUZZLE)]
+#[case(AGG_SIG_AMOUNT)]
+#[case(AGG_SIG_PUZZLE_AMOUNT)]
+#[case(AGG_SIG_PARENT_PUZZLE)]
+#[case(AGG_SIG_PARENT_AMOUNT)]
+fn test_duplicate_agg_sig(#[case] condition: ConditionOpcode) {
     // we cannot deduplicate AGG_SIG conditions. Their signatures will be
     // aggregated, and so must all copies of the public keys
     let (a, conds) =
-        cond_test("((({h1} ({h2} (123 (((50 ({pubkey} ({msg1} ) ((50 ({pubkey} ({msg1} ) ))))")
+        cond_test_flag(&format!("((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{msg1}} ) (({} ({{pubkey}} ({{msg1}} ) ))))", condition as u8, condition as u8),
+            ENABLE_SOFTFORK_CONDITION)
             .unwrap();
 
     assert_eq!(conds.cost, AGG_SIG_COST * 2);
@@ -2682,59 +2812,94 @@ fn test_duplicate_agg_sig_me() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert_eq!(spend.agg_sig_me.len(), 2);
-    for c in &spend.agg_sig_me {
+
+    let agg_sigs = agg_sig_vec(condition, &spend);
+    assert_eq!(agg_sigs.len(), 2);
+    for c in agg_sigs {
         assert_eq!(a.atom(c.0), PUBKEY);
         assert_eq!(a.atom(c.1), MSG1);
     }
     assert_eq!(spend.flags, 0);
 }
 
-#[test]
-fn test_agg_sig_me_invalid_pubkey() {
-    // AGG_SIG_ME
+#[cfg(test)]
+#[rstest]
+#[case(AGG_SIG_ME)]
+#[case(AGG_SIG_PARENT)]
+#[case(AGG_SIG_PUZZLE)]
+#[case(AGG_SIG_AMOUNT)]
+#[case(AGG_SIG_PUZZLE_AMOUNT)]
+#[case(AGG_SIG_PARENT_PUZZLE)]
+#[case(AGG_SIG_PARENT_AMOUNT)]
+fn test_agg_sig_invalid_pubkey(#[case] condition: ConditionOpcode) {
     assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((50 ({h2} ({msg1} )))))")
-            .unwrap_err()
-            .1,
+        cond_test_flag(
+            &format!(
+                "((({{h1}} ({{h2}} (123 ((({} ({{h2}} ({{msg1}} )))))",
+                condition as u8
+            ),
+            ENABLE_SOFTFORK_CONDITION
+        )
+        .unwrap_err()
+        .1,
         ErrorCode::InvalidPubkey
     );
 }
 
-#[test]
-fn test_agg_sig_me_invalid_msg() {
-    // AGG_SIG_ME
+#[cfg(test)]
+#[rstest]
+#[case(AGG_SIG_ME)]
+#[case(AGG_SIG_PARENT)]
+#[case(AGG_SIG_PUZZLE)]
+#[case(AGG_SIG_AMOUNT)]
+#[case(AGG_SIG_PUZZLE_AMOUNT)]
+#[case(AGG_SIG_PARENT_PUZZLE)]
+#[case(AGG_SIG_PARENT_AMOUNT)]
+fn test_agg_sig_invalid_msg(#[case] condition: ConditionOpcode) {
     assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((50 ({pubkey} ({longmsg} )))))")
-            .unwrap_err()
-            .1,
+        cond_test_flag(
+            &format!(
+                "((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{longmsg}} )))))",
+                condition as u8
+            ),
+            ENABLE_SOFTFORK_CONDITION
+        )
+        .unwrap_err()
+        .1,
         ErrorCode::InvalidMessage
     );
 }
 
-#[test]
-fn test_agg_sig_me_exceed_cost() {
-    // AGG_SIG_ME
+#[cfg(test)]
+#[rstest]
+#[case(AGG_SIG_ME)]
+#[case(AGG_SIG_PARENT)]
+#[case(AGG_SIG_PUZZLE)]
+#[case(AGG_SIG_AMOUNT)]
+#[case(AGG_SIG_PUZZLE_AMOUNT)]
+#[case(AGG_SIG_PARENT_PUZZLE)]
+#[case(AGG_SIG_PARENT_AMOUNT)]
+fn test_agg_sig_exceed_cost(#[case] condition: ConditionOpcode) {
     // ensure that we terminate parsing conditions once they exceed the max cost
     assert_eq!(
         cond_test_cb(
             "((({h1} ({h2} (123 ({} )))",
-            0,
-            Some(Box::new(|a: &mut Allocator| -> NodePtr {
+            ENABLE_SOFTFORK_CONDITION,
+            Some(Box::new(move |a: &mut Allocator| -> NodePtr {
                 let mut rest: NodePtr = a.null();
 
                 for _i in 0..9167 {
-                    // this builds one AGG_SIG_ME condition
+                    // this builds one AGG_SIG_* condition
                     // borrow-rules prevent this from being succint
                     let aggsig = a.null();
                     let val = a.new_atom(MSG1).unwrap();
                     let aggsig = a.new_pair(val, aggsig).unwrap();
                     let val = a.new_atom(PUBKEY).unwrap();
                     let aggsig = a.new_pair(val, aggsig).unwrap();
-                    let val = a.new_atom(&u64_to_bytes(AGG_SIG_ME as u64)).unwrap();
+                    let val = a.new_atom(&u64_to_bytes(condition as u64)).unwrap();
                     let aggsig = a.new_pair(val, aggsig).unwrap();
 
-                    // add the AGG_SIG_ME condition to the list (called rest)
+                    // add the condition to the list (called rest)
                     rest = a.new_pair(aggsig, rest).unwrap();
                 }
                 rest
@@ -2774,6 +2939,50 @@ fn test_agg_sig_unsafe_extra_arg() {
         cond_test_flag("((({h1} ({h2} (123 (((49 ({pubkey} ({msg1} (456 )))))", 0)
             .unwrap_err()
             .1,
+        ErrorCode::InvalidCondition
+    );
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(AGG_SIG_PARENT)]
+#[case(AGG_SIG_PUZZLE)]
+#[case(AGG_SIG_AMOUNT)]
+#[case(AGG_SIG_PUZZLE_AMOUNT)]
+#[case(AGG_SIG_PARENT_PUZZLE)]
+#[case(AGG_SIG_PARENT_AMOUNT)]
+fn test_agg_sig_extra_arg(#[case] condition: ConditionOpcode) {
+    // extra args are ignored in consensus mode
+    let (a, conds) = cond_test_flag(
+        &format!(
+            "((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{msg1}} ( 1337 ) ))))",
+            condition as u8
+        ),
+        ENABLE_SOFTFORK_CONDITION,
+    )
+    .unwrap();
+
+    assert_eq!(conds.cost, 1200000);
+    assert_eq!(conds.spends.len(), 1);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(a.atom(spend.puzzle_hash), H2);
+    assert!((spend.flags & ELIGIBLE_FOR_DEDUP) == 0);
+
+    let agg_sigs = agg_sig_vec(condition, &spend);
+    assert_eq!(agg_sigs.len(), 1);
+
+    // but not in mempool mode
+    assert_eq!(
+        cond_test_flag(
+            &format!(
+                "((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{msg1}} ( 1337 ) ))))",
+                condition as u8
+            ),
+            MEMPOOL_MODE | ENABLE_SOFTFORK_CONDITION,
+        )
+        .unwrap_err()
+        .1,
         ErrorCode::InvalidCondition
     );
 }
