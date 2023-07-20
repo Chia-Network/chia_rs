@@ -1,13 +1,10 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{Data, DataStruct, DeriveInput, Fields};
+use syn::{parse_quote, Data, DataStruct, DeriveInput, Fields};
 
-use crate::{
-    crate_ident::crate_ident,
-    parse_args::{parse_args, Repr},
-};
+use crate::helpers::{add_trait_bounds, crate_ident, parse_args, Repr};
 
-pub fn impl_to_clvm(ast: DeriveInput) -> TokenStream {
+pub fn impl_to_clvm(mut ast: DeriveInput) -> TokenStream {
     let args = parse_args(&ast.attrs);
     let crate_name = crate_ident();
 
@@ -28,8 +25,12 @@ pub fn impl_to_clvm(ast: DeriveInput) -> TokenStream {
         Repr::CurriedArgs => quote!( #crate_name::clvm_curried_args ),
     };
 
+    add_trait_bounds(&mut ast.generics, parse_quote!(#crate_name::ToClvm));
+    let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
+
     quote! {
-        impl #crate_name::ToClvm for #struct_name {
+        #[automatically_derived]
+        impl #impl_generics #crate_name::ToClvm for #struct_name #ty_generics #where_clause {
             fn to_clvm(&self, a: &mut clvmr::Allocator) -> #crate_name::Result<clvmr::allocator::NodePtr> {
                 let value = #list_macro!( #( self.#field_name ),* );
                 #crate_name::ToClvm::to_clvm(&value, a)

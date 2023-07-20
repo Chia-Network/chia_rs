@@ -1,9 +1,8 @@
 extern crate proc_macro;
 
-mod crate_ident;
+mod helpers;
 mod impl_from_clvm;
 mod impl_to_clvm;
-mod parse_args;
 
 use impl_from_clvm::impl_from_clvm;
 use impl_to_clvm::impl_to_clvm;

@@ -1,5 +1,7 @@
-use proc_macro2::Ident;
-use syn::{punctuated::Punctuated, Attribute, Token};
+use proc_macro2::{Ident, Span, TokenStream};
+use proc_macro_crate::{crate_name, FoundCrate};
+use quote::quote;
+use syn::{punctuated::Punctuated, Attribute, GenericParam, Generics, Token, TypeParamBound};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Repr {
@@ -61,5 +63,25 @@ pub fn parse_args(attrs: &[Attribute]) -> ClvmDeriveArgs {
 
     ClvmDeriveArgs {
         repr: repr.unwrap_or(Repr::Tuple),
+    }
+}
+
+pub fn crate_ident() -> TokenStream {
+    let found_crate = crate_name("clvm-utils").expect("`clvm-utils` not found in `Cargo.toml`");
+
+    match found_crate {
+        FoundCrate::Itself => quote!(crate),
+        FoundCrate::Name(name) => {
+            let ident = Ident::new(&name, Span::call_site());
+            quote!(#ident)
+        }
+    }
+}
+
+pub fn add_trait_bounds(generics: &mut Generics, bound: TypeParamBound) {
+    for param in &mut generics.params {
+        if let GenericParam::Type(ref mut type_param) = *param {
+            type_param.bounds.push(bound.clone());
+        }
     }
 }
