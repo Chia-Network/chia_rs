@@ -17,25 +17,19 @@ pub fn impl_to_clvm(ast: DeriveInput) -> TokenStream {
     };
 
     let struct_name = &ast.ident;
+    let field_name = fields.iter().map(|field| &field.ident);
 
-    let mut tuple_value = quote! { () };
-
-    for (i, field) in fields.iter().enumerate().rev() {
-        let field_name = &field.ident;
-
-        if i == fields.len() - 1 && !args.proper_list {
-            tuple_value = quote! { self.#field_name };
-        } else {
-            tuple_value = quote! {
-                ( self.#field_name, #tuple_value )
-            };
-        }
-    }
+    let list_macro = if args.proper_list {
+        quote!( #crate_name::clvm_list )
+    } else {
+        quote!( #crate_name::clvm_tuple )
+    };
 
     quote! {
         impl #crate_name::ToClvm for #struct_name {
             fn to_clvm(&self, a: &mut clvmr::Allocator) -> #crate_name::Result<clvmr::allocator::NodePtr> {
-                #crate_name::ToClvm::to_clvm(&#tuple_value, a)
+                let value = #list_macro!( #( self.#field_name ),* );
+                #crate_name::ToClvm::to_clvm(&value, a)
             }
         }
     }

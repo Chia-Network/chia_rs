@@ -17,6 +17,36 @@ pub trait FromClvm: Sized {
     fn from_clvm(a: &Allocator, node: NodePtr) -> Result<Self>;
 }
 
+#[macro_export]
+macro_rules! clvm_list {
+    () => {
+        ()
+    };
+    ( $first:expr $( , $item:expr )* $(,)? ) => {
+        ($first, clvm_list!( $( $item ),* ))
+    };
+}
+
+#[macro_export]
+macro_rules! clvm_tuple {
+    ( $first:expr $(,)? ) => {
+        $first
+    };
+    ( $first:expr $( , $item:expr )* $(,)? ) => {
+        ($first, clvm_tuple!( $( $item ),* ))
+    };
+}
+
+#[macro_export]
+macro_rules! clvm_curried_args {
+    () => {
+        1
+    };
+    ( $first:expr $( , $item:expr )* $(,)? ) => {
+        ((1, $first), clvm_curried_args!( $( $item ),* ))
+    };
+}
+
 macro_rules! clvm_primitive {
     ($t:ty) => {
         impl ToClvm for $t {
