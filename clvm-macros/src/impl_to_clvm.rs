@@ -32,7 +32,7 @@ pub fn impl_to_clvm(mut ast: DeriveInput) -> TokenStream {
         #[automatically_derived]
         impl #impl_generics #crate_name::ToClvm for #struct_name #ty_generics #where_clause {
             fn to_clvm(&self, a: &mut clvmr::Allocator) -> #crate_name::Result<clvmr::allocator::NodePtr> {
-                let value = #list_macro!( #( self.#field_name ),* );
+                let value = #list_macro!( #( &self.#field_name ),* );
                 #crate_name::ToClvm::to_clvm(&value, a)
             }
         }

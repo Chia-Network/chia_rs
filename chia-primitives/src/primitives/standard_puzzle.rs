@@ -4,7 +4,7 @@ use clvmr::{allocator::NodePtr, Allocator};
 
 use crate::{condition::Condition, puzzles::P2_DELEGATED_OR_HIDDEN_HASH};
 
-#[derive(Debug, Clone, ToClvm, FromClvm)]
+#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curried_args)]
 pub struct StandardPuzzle {
     pub synthetic_key: PublicKey,

@@ -77,3 +77,46 @@ macro_rules! match_curried_args {
         )
     };
 }
+
+#[macro_export]
+macro_rules! destructure_list {
+    () => {
+        $crate::MatchByte::<0>
+    };
+    ( $first:ident $( , $rest:ident )* $(,)? ) => {
+        ($first, $crate::destructure_list!( $( $rest ),* ))
+    };
+}
+
+#[macro_export]
+macro_rules! destructure_tuple {
+    ( $first:ident $(,)? ) => {
+        $first
+    };
+    ( $first:ident $( , $rest:ident )* $(,)? ) => {
+        ($first, $crate::destructure_tuple!( $( $rest ),* ))
+    };
+}
+
+#[macro_export]
+macro_rules! destructure_quote {
+    ( $name:ident ) => {
+        ($crate::MatchByte::<1>, $name)
+    };
+}
+
+#[macro_export]
+macro_rules! destructure_curried_args {
+    () => {
+        $crate::MatchByte::<1>
+    };
+    ( $first:ident $( , $rest:ident )* $(,)? ) => {
+        (
+            $crate::MatchByte::<4>,
+            (
+                $crate::destructure_quote!($first),
+                ($crate::destructure_curried_args!( $( $rest ),* ), ()),
+            ),
+        )
+    };
+}

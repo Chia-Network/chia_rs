@@ -1,4 +1,10 @@
 use chia_bls::{SecretKey, Signature};
+use clvm_utils::{clvm_list, match_list, match_tuple, Error, FromClvm, LazyNode, Result, ToClvm};
+use clvmr::{
+    allocator::{NodePtr, SExp},
+    op_utils::nullp,
+    Allocator,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Condition {
@@ -7,6 +13,55 @@ pub enum Condition {
         amount: u64,
         memos: Vec<[u8; 32]>,
     },
+}
+
+impl FromClvm for Condition {
+    fn from_clvm(a: &Allocator, node: NodePtr) -> Result<Self> {
+        let (code, LazyNode(args)) = <match_tuple!(u8, LazyNode)>::from_clvm(a, node)?;
+
+        match code {
+            51 => {
+                let value = <match_tuple!([u8; 32], u64, LazyNode)>::from_clvm(a, args)?;
+                let memo_node = value.1 .1 .0;
+                Ok(Condition::CreateCoin {
+                    puzzle_hash: value.0,
+                    amount: value.1 .0,
+                    memos: match a.sexp(memo_node) {
+                        SExp::Atom() => {
+                            if nullp(a, memo_node) {
+                                Vec::new()
+                            } else {
+                                return Err(Error::ExpectedNil(memo_node));
+                            }
+                        }
+                        SExp::Pair(..) => {
+                            let memo_value = <match_list!(Vec<[u8; 32]>)>::from_clvm(a, memo_node)?;
+                            memo_value.0
+                        }
+                    },
+                })
+            }
+            _ => Err(Error::Reason(format!("unknown condition code {}", code))),
+        }
+    }
+}
+
+impl ToClvm for Condition {
+    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
+        match self {
+            Self::CreateCoin {
+                puzzle_hash,
+                amount,
+                memos,
+            } => {
+                if memos.is_empty() {
+                    clvm_list!(51, puzzle_hash, amount).to_clvm(a)
+                } else {
+                    clvm_list!(51, puzzle_hash, amount, memos).to_clvm(a)
+                }
+            }
+        }
+    }
 }
 
 pub fn sign_agg_sig_me(

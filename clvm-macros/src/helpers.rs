@@ -62,7 +62,9 @@ pub fn parse_args(attrs: &[Attribute]) -> ClvmDeriveArgs {
     }
 
     ClvmDeriveArgs {
-        repr: repr.unwrap_or(Repr::Tuple),
+        repr: repr.expect(
+            "expected clvm attribute parameter of either `tuple`, `proper_list`, or `curried_args`",
+        ),
     }
 }
 

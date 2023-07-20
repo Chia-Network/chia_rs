@@ -23,6 +23,7 @@ mod tests {
     use super::*;
 
     #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
+    #[clvm(tuple)]
     struct TupleStruct {
         a: u64,
         b: i32,

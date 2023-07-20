@@ -16,40 +16,24 @@ pub fn impl_from_clvm(mut ast: DeriveInput) -> TokenStream {
         _ => panic!("expected a struct with named fields"),
     };
 
-    let mut field_list = Vec::new();
-
-    for (i, field) in fields.iter().enumerate() {
-        let field_name = &field.ident;
-
-        let mut tuple_prop = Vec::new();
-
-        for _ in 0..field_list.len() {
-            match args.repr {
-                Repr::Tuple | Repr::ProperList => tuple_prop.push(quote! { .1 }),
-                Repr::CurriedArgs => tuple_prop.push(quote! { .1 .1 .0 }),
-            }
-        }
-
-        let is_last_arg = i == fields.len() - 1;
-
-        match (is_last_arg, args.repr) {
-            (true, Repr::Tuple) => (),
-            (false, Repr::Tuple) | (_, Repr::ProperList) => tuple_prop.push(quote! { .0 }),
-            (_, Repr::CurriedArgs) => tuple_prop.push(quote! { .1 .0 .1 }),
-        }
-
-        field_list.push(quote! {
-            #field_name: values #( #tuple_prop )*
-        });
-    }
-
     let struct_name = &ast.ident;
     let field_type = fields.iter().map(|field| &field.ty);
+    let field_names = fields.iter().map(|field| &field.ident);
+    let destructure_names = field_names.clone();
 
-    let match_macro = match args.repr {
-        Repr::ProperList => quote!( #crate_name::match_list ),
-        Repr::Tuple => quote!( #crate_name::match_tuple ),
-        Repr::CurriedArgs => quote!( #crate_name::match_curried_args ),
+    let (match_macro, destructure_macro) = match args.repr {
+        Repr::ProperList => (
+            quote!( #crate_name::match_list ),
+            quote!( #crate_name::destructure_list ),
+        ),
+        Repr::Tuple => (
+            quote!( #crate_name::match_tuple ),
+            quote!( #crate_name::destructure_tuple ),
+        ),
+        Repr::CurriedArgs => (
+            quote!( #crate_name::match_curried_args ),
+            quote!( #crate_name::destructure_curried_args ),
+        ),
     };
 
     add_trait_bounds(&mut ast.generics, parse_quote!(#crate_name::FromClvm));
@@ -59,8 +43,8 @@ pub fn impl_from_clvm(mut ast: DeriveInput) -> TokenStream {
         #[automatically_derived]
         impl #impl_generics #crate_name::FromClvm for #struct_name #ty_generics #where_clause {
             fn from_clvm(a: &clvmr::Allocator, node: clvmr::allocator::NodePtr) -> #crate_name::Result<Self> {
-                let values = <#match_macro!( #( #field_type ),* ) as #crate_name::FromClvm>::from_clvm(a, node)?;
-                Ok(Self { #( #field_list, )* })
+                let #destructure_macro!( #( #destructure_names, )* ) = <#match_macro!( #( #field_type ),* ) as #crate_name::FromClvm>::from_clvm(a, node)?;
+                Ok(Self { #( #field_names, )* })
             }
         }
     }

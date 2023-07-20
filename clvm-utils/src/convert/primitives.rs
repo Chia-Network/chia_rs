@@ -92,3 +92,53 @@ impl FromClvm for () {
         }
     }
 }
+
+impl<const N: usize> FromClvm for [u8; N] {
+    fn from_clvm(a: &Allocator, node: NodePtr) -> Result<Self> {
+        if let SExp::Atom() = a.sexp(node) {
+            a.atom(node)
+                .try_into()
+                .map_err(|error: TryFromSliceError| Error::Reason(error.to_string()))
+        } else {
+            Err(Error::ExpectedAtom(node))
+        }
+    }
+}
+
+impl<const N: usize> ToClvm for [u8; N] {
+    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
+        a.new_atom(self).map_err(Error::Allocator)
+    }
+}
+
+impl<T: FromClvm> FromClvm for Vec<T> {
+    fn from_clvm(a: &Allocator, mut node: NodePtr) -> Result<Self> {
+        let mut items = Vec::new();
+        loop {
+            match a.sexp(node) {
+                SExp::Atom() => {
+                    if nullp(a, node) {
+                        return Ok(items);
+                    } else {
+                        return Err(Error::Reason("unterminated list".to_string()));
+                    }
+                }
+                SExp::Pair(first, rest) => {
+                    items.push(T::from_clvm(a, first)?);
+                    node = rest;
+                }
+            }
+        }
+    }
+}
+
+impl<T: ToClvm> ToClvm for Vec<T> {
+    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
+        let mut result = a.null();
+        for item in self.iter().rev() {
+            let value = item.to_clvm(a)?;
+            result = a.new_pair(value, result).map_err(Error::Allocator)?;
+        }
+        Ok(result)
+    }
+}
