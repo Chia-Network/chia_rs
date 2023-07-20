@@ -2,7 +2,7 @@ use std::{io::Cursor, sync::Arc};
 
 use chia_client::Peer;
 use chia_primitives::{
-    conditions::create_coin,
+    condition::create_coin,
     standard_puzzle::{alloc_standard_puzzle, spend_standard_puzzle},
 };
 use chia_protocol::{

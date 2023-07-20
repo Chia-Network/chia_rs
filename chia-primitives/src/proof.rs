@@ -36,7 +36,7 @@ pub struct EveProof {
 
 impl Allocate for LineageProof {
     fn from_clvm(a: &Allocator, node: NodePtr) -> clvm_utils::Result<Self> {
-        let value = <([u8; 32], ([u8; 32], (u64, [u8; 0])))>::from_clvm(a, node)?;
+        let value = <([u8; 32], ([u8; 32], (u64, ())))>::from_clvm(a, node)?;
         Ok(Self {
             parent_coin_info: value.0,
             inner_puzzle_hash: value.1 .0,
@@ -54,7 +54,7 @@ impl Allocate for LineageProof {
 
 impl Allocate for EveProof {
     fn from_clvm(a: &Allocator, node: NodePtr) -> clvm_utils::Result<Self> {
-        let value = <([u8; 32], (u64, [u8; 0]))>::from_clvm(a, node)?;
+        let value = <([u8; 32], (u64, ()))>::from_clvm(a, node)?;
         Ok(Self {
             parent_coin_info: value.0,
             amount: value.1 .0,
