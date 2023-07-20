@@ -5,7 +5,7 @@ use clvmr::{
     op_utils::nullp,
     Allocator,
 };
-use num_bigint::Sign;
+use num_bigint::{BigInt, Sign};
 
 use crate::{Error, Result};
 
@@ -22,8 +22,8 @@ macro_rules! clvm_list {
     () => {
         ()
     };
-    ( $first:expr $( , $item:expr )* $(,)? ) => {
-        ($first, clvm_list!( $( $item ),* ))
+    ( $first:expr $( , $rest:expr )* $(,)? ) => {
+        ($first, $crate::clvm_list!( $( $rest ),* ))
     };
 }
 
@@ -32,47 +32,90 @@ macro_rules! clvm_tuple {
     ( $first:expr $(,)? ) => {
         $first
     };
-    ( $first:expr $( , $item:expr )* $(,)? ) => {
-        ($first, clvm_tuple!( $( $item ),* ))
+    ( $first:expr $( , $rest:expr )* $(,)? ) => {
+        ($first, $crate::clvm_tuple!( $( $rest ),* ))
     };
 }
 
 #[macro_export]
 macro_rules! clvm_quote {
     ( $value:expr ) => {
-        (1, $value)
+        (1u8, $value)
     };
 }
 
 #[macro_export]
 macro_rules! clvm_curried_args {
     () => {
-        1
+        1u8
     };
-    ( $first:expr $( , $item:expr )* $(,)? ) => {
-        (4, ($crate::clvm_quote!($first), (clvm_curried_args!( $( $item ),* ), 0)))
+    ( $first:expr $( , $rest:expr )* $(,)? ) => {
+        (4u8, ($crate::clvm_quote!($first), ($crate::clvm_curried_args!( $( $rest ),* ), ())))
+    };
+}
+
+#[macro_export]
+macro_rules! match_list {
+    () => {
+        $crate::MatchByte::<0>
+    };
+    ( $first:ty $( , $rest:ty )* $(,)? ) => {
+        ($first, $crate::match_list!( $( $rest ),* ))
+    };
+}
+
+#[macro_export]
+macro_rules! match_tuple {
+    ( $first:ty $(,)? ) => {
+        $first
+    };
+    ( $first:ty $( , $rest:ty )* $(,)? ) => {
+        ($first, $crate::match_tuple!( $( $rest ),* ))
+    };
+}
+
+#[macro_export]
+macro_rules! match_quote {
+    ( $type:ty ) => {
+        ($crate::MatchByte::<1>, $type)
+    };
+}
+
+#[macro_export]
+macro_rules! match_curried_args {
+    () => {
+        $crate::MatchByte::<1>
+    };
+    ( $first:ty $( , $rest:ty )* $(,)? ) => {
+        (
+            $crate::MatchByte::<4>,
+            (
+                $crate::match_quote!($first),
+                ($crate::match_curried_args!( $( $rest ),* ), ()),
+            ),
+        )
     };
 }
 
 macro_rules! clvm_primitive {
-    ($t:ty) => {
-        impl ToClvm for $t {
+    ($primitive:ty) => {
+        impl ToClvm for $primitive {
             fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
                 a.new_number((*self).into()).map_err(Error::Allocator)
             }
         }
 
-        impl FromClvm for $t {
+        impl FromClvm for $primitive {
             fn from_clvm(a: &Allocator, node: NodePtr) -> Result<Self> {
                 if let SExp::Atom() = a.sexp(node) {
                     let (sign, mut vec) = a.number(node).to_bytes_be();
-                    if vec.len() < std::mem::size_of::<$t>() {
-                        let mut zeros = vec![0; std::mem::size_of::<$t>() - vec.len()];
+                    if vec.len() < std::mem::size_of::<$primitive>() {
+                        let mut zeros = vec![0; std::mem::size_of::<$primitive>() - vec.len()];
                         zeros.extend(vec);
                         vec = zeros;
                     }
                     let value =
-                        <$t>::from_be_bytes(vec.as_slice().try_into().map_err(
+                        <$primitive>::from_be_bytes(vec.as_slice().try_into().map_err(
                             |error: TryFromSliceError| Error::Reason(error.to_string()),
                         )?);
                     Ok(if sign == Sign::Minus {
@@ -136,6 +179,35 @@ impl FromClvm for () {
             Err(Error::ExpectedNil(node))
         } else {
             Ok(())
+        }
+    }
+}
+
+pub struct MatchByte<const BYTE: u8>;
+
+impl<const BYTE: u8> ToClvm for MatchByte<BYTE> {
+    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
+        a.new_number(BYTE.into()).map_err(Error::Allocator)
+    }
+}
+
+impl<const BYTE: u8> FromClvm for MatchByte<BYTE> {
+    fn from_clvm(a: &Allocator, node: NodePtr) -> Result<Self> {
+        if let SExp::Atom() = a.sexp(node) {
+            let value: u8 =
+                a.number(node)
+                    .try_into()
+                    .map_err(|error: <u8 as TryFrom<BigInt>>::Error| {
+                        Error::Reason(error.to_string())
+                    })?;
+
+            if value == BYTE {
+                Ok(Self)
+            } else {
+                Err(Error::Reason(format!("expected {}", BYTE)))
+            }
+        } else {
+            Err(Error::ExpectedAtom(node))
         }
     }
 }
