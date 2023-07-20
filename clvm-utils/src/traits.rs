@@ -3,34 +3,11 @@ use std::array::TryFromSliceError;
 use clvmr::{
     allocator::{NodePtr, SExp},
     op_utils::nullp,
-    reduction::EvalErr,
     Allocator,
 };
 use num_bigint::Sign;
-use thiserror::Error;
 
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("{0}")]
-    Reason(String),
-
-    #[error("allocator error {0:?}")]
-    Allocator(EvalErr),
-
-    #[error("expected atom")]
-    ExpectedAtom(NodePtr),
-
-    #[error("expected cons")]
-    ExpectedCons(NodePtr),
-
-    #[error("expected nil")]
-    ExpectedNil(NodePtr),
-
-    #[error("validation failed")]
-    Validation(NodePtr),
-}
-
-pub type Result<T> = std::result::Result<T, Error>;
+use crate::{Error, Result};
 
 pub trait ToClvm: Sized {
     fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr>;

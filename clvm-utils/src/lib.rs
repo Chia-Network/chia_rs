@@ -2,6 +2,7 @@ pub use clvm_macros::*;
 
 mod curry;
 mod curry_tree_hash;
+mod error;
 mod new_list;
 mod traits;
 mod tree_hash;
@@ -9,6 +10,7 @@ mod uncurry;
 
 pub use curry::*;
 pub use curry_tree_hash::*;
+pub use error::*;
 pub use new_list::*;
 pub use traits::*;
 pub use tree_hash::*;
