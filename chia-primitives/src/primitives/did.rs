@@ -5,31 +5,33 @@ use crate::singleton::SingletonStruct;
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curried_args)]
-pub struct Did<T, M> {
-    pub inner_puzzle: T,
+pub struct Did {
+    pub inner_puzzle: LazyNode,
     pub recovery_did_list_hash: [u8; 32],
     pub num_verifications_required: u64,
     pub singleton_struct: SingletonStruct,
-    pub metadata: M,
+    pub metadata: LazyNode,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum DidSolution<T> {
-    InnerSpend(T),
+pub enum DidSolution {
+    InnerSpend(LazyNode),
 }
 
-impl<T: FromClvm> FromClvm for DidSolution<T> {
+impl FromClvm for DidSolution {
     fn from_clvm(a: &Allocator, node: NodePtr) -> Result<Self> {
         let (mode, LazyNode(args)) = <match_tuple!(u8, LazyNode)>::from_clvm(a, node)?;
 
         match mode {
-            1 => Ok(Self::InnerSpend(<match_list!(T)>::from_clvm(a, args)?.0)),
+            1 => Ok(Self::InnerSpend(
+                <match_list!(LazyNode)>::from_clvm(a, args)?.0,
+            )),
             _ => Err(Error::Reason(format!("unexpected did spend mode {}", mode))),
         }
     }
 }
 
-impl<T: ToClvm> ToClvm for DidSolution<T> {
+impl ToClvm for DidSolution {
     fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
         match self {
             Self::InnerSpend(solution) => clvm_list!(1, solution).to_clvm(a),
