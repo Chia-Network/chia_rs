@@ -2,7 +2,10 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Data, DataStruct, DeriveInput, Fields};
 
-use crate::{args::parse_args, crate_ident::crate_ident};
+use crate::{
+    crate_ident::crate_ident,
+    parse_args::{parse_args, Repr},
+};
 
 pub fn impl_from_clvm(ast: DeriveInput) -> TokenStream {
     let args = parse_args(&ast.attrs);
@@ -22,7 +25,7 @@ pub fn impl_from_clvm(ast: DeriveInput) -> TokenStream {
     for (i, field) in fields.iter().enumerate().rev() {
         let field_type = &field.ty;
 
-        if i == fields.len() - 1 && !args.proper_list {
+        if i == fields.len() - 1 && args.repr != Repr::ProperList {
             tuple_type = quote! { #field_type };
         } else {
             tuple_type = quote! {
@@ -42,7 +45,7 @@ pub fn impl_from_clvm(ast: DeriveInput) -> TokenStream {
             tuple_prop.push(quote! { .1 });
         }
 
-        if i != fields.len() - 1 || args.proper_list {
+        if i != fields.len() - 1 || args.repr == Repr::ProperList {
             tuple_prop.push(quote! { .0 });
         }
 
