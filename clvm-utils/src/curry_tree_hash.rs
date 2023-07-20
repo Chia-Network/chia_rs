@@ -27,7 +27,7 @@ mod tests {
     use clvmr::Allocator;
     use hex::ToHex;
 
-    use crate::{curry, tree_hash};
+    use crate::{clvm_curried_args, curry, tree_hash, ToClvm};
 
     use super::*;
 
@@ -38,7 +38,8 @@ mod tests {
         let program = a.new_number(2.into()).unwrap();
         let arg1 = a.new_number(5.into()).unwrap();
         let arg2 = a.new_number(8.into()).unwrap();
-        let curried = curry(&mut a, program, &[arg1, arg2]).unwrap();
+        let args = clvm_curried_args!(5, 8).to_clvm(&mut a).unwrap();
+        let curried = curry(&mut a, program, args).unwrap();
 
         let tree_hash_result = tree_hash(&a, curried);
 

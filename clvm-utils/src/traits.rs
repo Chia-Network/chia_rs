@@ -38,12 +38,19 @@ macro_rules! clvm_tuple {
 }
 
 #[macro_export]
+macro_rules! clvm_quote {
+    ( $value:expr ) => {
+        (1, $value)
+    };
+}
+
+#[macro_export]
 macro_rules! clvm_curried_args {
     () => {
         1
     };
     ( $first:expr $( , $item:expr )* $(,)? ) => {
-        ((1, $first), clvm_curried_args!( $( $item ),* ))
+        (4, ($crate::clvm_quote!($first), (clvm_curried_args!( $( $item ),* ), 0)))
     };
 }
 
