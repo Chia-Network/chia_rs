@@ -6,8 +6,13 @@ mod bls;
 mod macros;
 mod matchers;
 mod primitives;
+mod protocol;
 
+pub use bls::*;
+pub use macros::*;
 pub use matchers::*;
+pub use primitives::*;
+pub use protocol::*;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct LazyNode(pub NodePtr);

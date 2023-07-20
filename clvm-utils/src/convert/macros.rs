@@ -21,17 +21,17 @@ macro_rules! clvm_tuple {
 #[macro_export]
 macro_rules! clvm_quote {
     ( $value:expr ) => {
-        (1u8, $value)
+        ($crate::MatchByte::<1>, $value)
     };
 }
 
 #[macro_export]
 macro_rules! clvm_curried_args {
     () => {
-        1u8
+        $crate::MatchByte::<1>
     };
     ( $first:expr $( , $rest:expr )* $(,)? ) => {
-        (4u8, ($crate::clvm_quote!($first), ($crate::clvm_curried_args!( $( $rest ),* ), ())))
+        ($crate::MatchByte::<4>, ($crate::clvm_quote!($first), ($crate::clvm_curried_args!( $( $rest ),* ), ())))
     };
 }
 

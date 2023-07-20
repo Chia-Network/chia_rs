@@ -1,8 +1,5 @@
-use clvm_utils::{clvm_list, match_list, Error, FromClvm, Result, ToClvm};
-use clvmr::{
-    allocator::{NodePtr, SExp},
-    Allocator,
-};
+use clvm_utils::{clvm_list, match_list, match_tuple, Error, FromClvm, LazyNode, Result, ToClvm};
+use clvmr::{allocator::NodePtr, Allocator};
 
 use crate::singleton::SingletonStruct;
 
@@ -23,11 +20,11 @@ pub enum DidSolution<T> {
 
 impl<T: FromClvm> FromClvm for DidSolution<T> {
     fn from_clvm(a: &Allocator, node: NodePtr) -> Result<Self> {
-        match a.sexp(node) {
-            SExp::Atom() => Err(Error::ExpectedCons(node)),
-            SExp::Pair(first, rest) => match first {
-                1 => Ok(Self::InnerSpend(<match_list!(T)>::from_clvm(a, rest)?.0)),
-            },
+        let (mode, LazyNode(args)) = <match_tuple!(u8, LazyNode)>::from_clvm(a, node)?;
+
+        match mode {
+            1 => Ok(Self::InnerSpend(<match_list!(T)>::from_clvm(a, args)?.0)),
+            _ => Err(Error::Reason(format!("unexpected did spend mode {}", mode))),
         }
     }
 }
