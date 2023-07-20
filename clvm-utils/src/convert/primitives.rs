@@ -142,3 +142,22 @@ impl<T: ToClvm> ToClvm for Vec<T> {
         Ok(result)
     }
 }
+
+impl<T: ToClvm> ToClvm for Option<T> {
+    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
+        match self {
+            Some(value) => value.to_clvm(a),
+            None => Ok(a.null()),
+        }
+    }
+}
+
+impl<T: FromClvm> FromClvm for Option<T> {
+    fn from_clvm(a: &Allocator, node: NodePtr) -> Result<Self> {
+        if nullp(a, node) {
+            Ok(None)
+        } else {
+            Ok(Some(T::from_clvm(a, node)?))
+        }
+    }
+}
