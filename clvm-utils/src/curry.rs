@@ -1,19 +1,9 @@
-use clvmr::{allocator::NodePtr, reduction::EvalErr, Allocator};
+use clvmr::{allocator::NodePtr, Allocator};
 
-pub fn curry(
-    a: &mut Allocator,
-    program: NodePtr,
-    curried_args: NodePtr,
-) -> Result<NodePtr, EvalErr> {
-    let nil = a.null();
-    let op_q = a.one();
-    let op_a = a.new_number(2.into())?;
+use crate::{clvm_list, clvm_quote, Result, ToClvm};
 
-    let quoted_program = a.new_pair(op_q, program)?;
-    let terminated_args = a.new_pair(curried_args, nil)?;
-    let program_and_args = a.new_pair(quoted_program, terminated_args)?;
-    let result = a.new_pair(op_a, program_and_args)?;
-    Ok(result)
+pub fn curry(a: &mut Allocator, program: NodePtr, args: NodePtr) -> Result<NodePtr> {
+    clvm_list!(2, clvm_quote!(program), args).to_clvm(a)
 }
 
 #[cfg(test)]
