@@ -179,3 +179,13 @@ impl ToClvm for String {
         self.as_str().to_clvm(a)
     }
 }
+
+impl FromClvm for String {
+    fn from_clvm(a: &Allocator, node: NodePtr) -> Result<Self> {
+        if let SExp::Atom() = a.sexp(node) {
+            Self::from_utf8(a.atom(node).to_vec()).map_err(|error| Error::Reason(error.to_string()))
+        } else {
+            Err(Error::ExpectedAtom(node))
+        }
+    }
+}
