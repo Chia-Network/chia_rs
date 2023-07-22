@@ -2,7 +2,7 @@ use chia_bls::PublicKey;
 use clvm_utils::{curry_tree_hash, tree_hash_atom, FromClvm, LazyNode, ToClvm};
 use clvmr::{allocator::NodePtr, Allocator};
 
-use crate::puzzles::P2_DELEGATED_OR_HIDDEN_HASH;
+use crate::puzzles::STANDARD_PUZZLE_HASH;
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curried_args)]
@@ -30,5 +30,5 @@ impl StandardSolution {
 
 pub fn standard_puzzle_hash(synthetic_key: &PublicKey) -> [u8; 32] {
     let synthetic_key = tree_hash_atom(&synthetic_key.to_bytes());
-    curry_tree_hash(&P2_DELEGATED_OR_HIDDEN_HASH, &[&synthetic_key])
+    curry_tree_hash(&STANDARD_PUZZLE_HASH, &[&synthetic_key])
 }

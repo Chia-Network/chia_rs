@@ -13,6 +13,18 @@ pub enum Condition {
         amount: u64,
         memos: Vec<[u8; 32]>,
     },
+    CreateCoinAnnouncement {
+        message: [u8; 32],
+    },
+    AssertCoinAnnouncement {
+        announcement_id: [u8; 32],
+    },
+    CreatePuzzleAnnouncement {
+        message: [u8; 32],
+    },
+    AssertPuzzleAnnouncement {
+        announcement_id: [u8; 32],
+    },
 }
 
 impl FromClvm for Condition {
@@ -41,6 +53,26 @@ impl FromClvm for Condition {
                     },
                 })
             }
+            60 => {
+                let value = <match_list!([u8; 32])>::from_clvm(a, args)?;
+                Ok(Condition::CreateCoinAnnouncement { message: value.0 })
+            }
+            61 => {
+                let value = <match_list!([u8; 32])>::from_clvm(a, args)?;
+                Ok(Condition::AssertCoinAnnouncement {
+                    announcement_id: value.0,
+                })
+            }
+            62 => {
+                let value = <match_list!([u8; 32])>::from_clvm(a, args)?;
+                Ok(Condition::CreatePuzzleAnnouncement { message: value.0 })
+            }
+            63 => {
+                let value = <match_list!([u8; 32])>::from_clvm(a, args)?;
+                Ok(Condition::AssertPuzzleAnnouncement {
+                    announcement_id: value.0,
+                })
+            }
             _ => Err(Error::Reason(format!("unknown condition code {}", code))),
         }
     }
@@ -59,6 +91,14 @@ impl ToClvm for Condition {
                 } else {
                     clvm_list!(51, puzzle_hash, amount, memos).to_clvm(a)
                 }
+            }
+            Self::CreateCoinAnnouncement { message } => clvm_list!(60, message).to_clvm(a),
+            Self::AssertCoinAnnouncement { announcement_id } => {
+                clvm_list!(61, announcement_id).to_clvm(a)
+            }
+            Self::CreatePuzzleAnnouncement { message } => clvm_list!(62, message).to_clvm(a),
+            Self::AssertPuzzleAnnouncement { announcement_id } => {
+                clvm_list!(63, announcement_id).to_clvm(a)
             }
         }
     }

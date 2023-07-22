@@ -167,3 +167,15 @@ impl<T: FromClvm> FromClvm for Option<T> {
         }
     }
 }
+
+impl ToClvm for &str {
+    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
+        a.new_atom(self.as_bytes()).map_err(Error::Allocator)
+    }
+}
+
+impl ToClvm for String {
+    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
+        self.as_str().to_clvm(a)
+    }
+}
