@@ -1,6 +1,9 @@
 use clvm_utils::{FromClvm, LazyNode, ToClvm};
 
-use crate::Proof;
+use crate::{
+    puzzles::{SINGLETON_LAUNCHER_HASH, SINGLETON_TOP_LAYER_HASH},
+    Proof,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curried_args)]
@@ -23,4 +26,14 @@ pub struct SingletonSolution {
     pub proof: Proof,
     pub amount: u64,
     pub inner_solution: LazyNode,
+}
+
+impl SingletonStruct {
+    pub fn from_launcher_id(launcher_id: [u8; 32]) -> Self {
+        Self {
+            mod_hash: SINGLETON_TOP_LAYER_HASH,
+            launcher_id,
+            launcher_puzzle_hash: SINGLETON_LAUNCHER_HASH,
+        }
+    }
 }

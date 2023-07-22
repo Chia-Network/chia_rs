@@ -180,3 +180,9 @@ pub const DID: [u8; 1012] = hex!(
     ffff01ff0bffff0101ff058080ff0180ff018080
     "
 );
+
+pub const DID_HASH: [u8; 32] = hex!(
+    "
+    33143d2bef64f14036742673afd158126b94284b4530a28c354fac202b0c910e
+    "
+);

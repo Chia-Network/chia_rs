@@ -134,6 +134,12 @@ impl<T: FromClvm> FromClvm for Vec<T> {
 
 impl<T: ToClvm> ToClvm for Vec<T> {
     fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
+        self.as_slice().to_clvm(a)
+    }
+}
+
+impl<T: ToClvm> ToClvm for &[T] {
+    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
         let mut result = a.null();
         for item in self.iter().rev() {
             let value = item.to_clvm(a)?;

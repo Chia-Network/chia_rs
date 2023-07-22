@@ -1,9 +1,9 @@
 use clvmr::{allocator::NodePtr, Allocator};
 
-use crate::{clvm_list, clvm_quote, Result, ToClvm};
+use crate::{clvm_list, clvm_quote, LazyNode, Result, ToClvm};
 
 pub fn curry(a: &mut Allocator, program: NodePtr, args: NodePtr) -> Result<NodePtr> {
-    clvm_list!(2, clvm_quote!(program), args).to_clvm(a)
+    clvm_list!(2, clvm_quote!(LazyNode(program)), LazyNode(args)).to_clvm(a)
 }
 
 #[cfg(test)]

@@ -3,6 +3,7 @@ use crate::chia_error::{Error, Result};
 use crate::streamable::Streamable;
 use clvmr::serde::serialized_length_from_bytes;
 use sha2::{Digest, Sha256};
+use std::fmt;
 use std::io::Cursor;
 
 #[cfg(feature = "py-bindings")]
@@ -56,5 +57,11 @@ impl Streamable for Program {
 impl AsRef<[u8]> for Program {
     fn as_ref(&self) -> &[u8] {
         self.0.as_ref()
+    }
+}
+
+impl fmt::Display for Program {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str(&hex::encode(&self.0))
     }
 }
