@@ -91,6 +91,13 @@ pub const CAT_PUZZLE_HASH: [u8; 32] = hex!(
     "
 );
 
+pub const EVERYTHING_WITH_SIGNATURE_TAIL_PUZZLE: [u8; 41] = hex!(
+    "
+    ff02ffff01ff04ffff04ff02ffff04ff05ffff04ff5fff80808080ff8080ffff
+    04ffff0132ff018080
+    "
+);
+
 pub const LAUNCHER_PUZZLE: [u8; 175] = hex!(
     "
     ff02ffff01ff04ffff04ff04ffff04ff05ffff04ff0bff80808080ffff04ffff

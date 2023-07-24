@@ -10,7 +10,7 @@ use clvmr::{
 pub enum Condition {
     CreateCoin {
         puzzle_hash: [u8; 32],
-        amount: u64,
+        amount: i64,
         memos: Vec<[u8; 32]>,
     },
     CreateCoinAnnouncement {
@@ -33,7 +33,7 @@ impl FromClvm for Condition {
 
         match code {
             51 => {
-                let value = <match_tuple!([u8; 32], u64, LazyNode)>::from_clvm(a, args)?;
+                let value = <match_tuple!([u8; 32], i64, LazyNode)>::from_clvm(a, args)?;
                 let memo_node = value.1 .1 .0;
                 Ok(Condition::CreateCoin {
                     puzzle_hash: value.0,
