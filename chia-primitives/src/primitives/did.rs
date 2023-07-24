@@ -5,7 +5,7 @@ use crate::singleton::SingletonStruct;
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curried_args)]
-pub struct Did {
+pub struct DidArgs {
     pub inner_puzzle: LazyNode,
     pub recovery_did_list_hash: [u8; 32],
     pub num_verifications_required: u64,

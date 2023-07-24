@@ -6,7 +6,7 @@ use crate::puzzles::STANDARD_PUZZLE_HASH;
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curried_args)]
-pub struct StandardPuzzle {
+pub struct StandardArgs {
     pub synthetic_key: PublicKey,
 }
 

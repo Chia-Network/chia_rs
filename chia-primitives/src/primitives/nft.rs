@@ -5,7 +5,7 @@ use crate::singleton::SingletonStruct;
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curried_args)]
-pub struct NftIntermediateLauncher {
+pub struct NftIntermediateLauncherArgs {
     pub launcher_puzzle_hash: [u8; 32],
     pub mint_number: usize,
     pub mint_total: usize,
@@ -13,7 +13,7 @@ pub struct NftIntermediateLauncher {
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curried_args)]
-pub struct NftState {
+pub struct NftStateLayerArgs {
     pub mod_hash: [u8; 32],
     pub metadata: LazyNode,
     pub metadata_updater_puzzle_hash: [u8; 32],
@@ -22,13 +22,13 @@ pub struct NftState {
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(proper_list)]
-pub struct NftStateSolution {
+pub struct NftStateLayerSolution {
     pub inner_solution: LazyNode,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curried_args)]
-pub struct NftOwnership {
+pub struct NftOwnershipLayerArgs {
     pub mod_hash: [u8; 32],
     pub current_owner: Option<[u8; 32]>,
     pub transfer_program: LazyNode,
@@ -37,13 +37,13 @@ pub struct NftOwnership {
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(proper_list)]
-pub struct NftOwnershipSolution {
+pub struct NftOwnershipLayerSolution {
     pub inner_solution: LazyNode,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curried_args)]
-pub struct RoyaltyTransferProgram {
+pub struct NftRoyaltyTransferPuzzleArgs {
     pub singleton_struct: SingletonStruct,
     pub royalty_puzzle_hash: [u8; 32],
     pub trade_price_percentage: u16,

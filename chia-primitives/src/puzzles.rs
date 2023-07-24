@@ -193,7 +193,7 @@ pub const DID_INNER_PUZZLE_HASH: [u8; 32] = hex!(
     "
 );
 
-pub const NFT_STATE_PUZZLE: [u8; 827] = hex!(
+pub const NFT_STATE_LAYER_PUZZLE: [u8; 827] = hex!(
     "
     ff02ffff01ff02ff3effff04ff02ffff04ff05ffff04ffff02ff2fff5f80ffff
     04ff80ffff04ffff04ffff04ff0bffff04ff17ff808080ffff01ff808080ffff
@@ -224,13 +224,13 @@ pub const NFT_STATE_PUZZLE: [u8; 827] = hex!(
     "
 );
 
-pub const NFT_STATE_PUZZLE_HASH: [u8; 32] = hex!(
+pub const NFT_STATE_LAYER_PUZZLE_HASH: [u8; 32] = hex!(
     "
     a04d9f57764f54a43e4030befb4d80026e870519aaa66334aef8304f5d0393c2
     "
 );
 
-pub const NFT_OWNERSHIP_PUZZLE: [u8; 1226] = hex!(
+pub const NFT_OWNERSHIP_LAYER_PUZZLE: [u8; 1226] = hex!(
     "
     ff02ffff01ff02ff26ffff04ff02ffff04ff05ffff04ff17ffff04ff0bffff04
     ffff02ff2fff5f80ff80808080808080ffff04ffff01ffffff82ad4cff0233ff
@@ -274,13 +274,13 @@ pub const NFT_OWNERSHIP_PUZZLE: [u8; 1226] = hex!(
     "
 );
 
-pub const NFT_OWNERSHIP_PUZZLE_HASH: [u8; 32] = hex!(
+pub const NFT_OWNERSHIP_LAYER_PUZZLE_HASH: [u8; 32] = hex!(
     "
     c5abea79afaa001b5427dfa0c8cf42ca6f38f5841b78f9b3c252733eb2de2726
     "
 );
 
-pub const ROYALTY_TRANSFER_PROGRAM: [u8; 687] = hex!(
+pub const ROYALTY_TRANSFER_PUZZLE: [u8; 687] = hex!(
     "
     ff02ffff01ff02ffff03ff81bfffff01ff04ff82013fffff04ff80ffff04ffff
     02ffff03ffff22ff82013fffff20ffff09ff82013fff2f808080ffff01ff04ff
@@ -307,13 +307,13 @@ pub const ROYALTY_TRANSFER_PROGRAM: [u8; 687] = hex!(
     "
 );
 
-pub const ROYALTY_TRANSFER_PROGRAM_HASH: [u8; 32] = hex!(
+pub const ROYALTY_TRANSFER_PUZZLE_HASH: [u8; 32] = hex!(
     "
     025dee0fb1e9fa110302a7e9bfb6e381ca09618e2778b0184fa5c6b275cfce1f
     "
 );
 
-pub const NFT_METADATA_UPDATER: [u8; 241] = hex!(
+pub const NFT_METADATA_UPDATER_PUZZLE: [u8; 241] = hex!(
     "
     ff02ffff01ff04ffff04ffff02ffff03ffff22ff27ff3780ffff01ff02ffff03
     ffff21ffff09ff27ffff01826d7580ffff09ff27ffff01826c7580ffff09ff27
@@ -326,7 +326,7 @@ pub const NFT_METADATA_UPDATER: [u8; 241] = hex!(
     "
 );
 
-pub const NFT_METADATA_UPDATER_HASH: [u8; 32] = hex!(
+pub const NFT_METADATA_UPDATER_PUZZLE_HASH: [u8; 32] = hex!(
     "
     fe8a4b4e27a2e29a4d3fc7ce9d527adbcaccbab6ada3903ccf3ba9a769d2d78b
     "

@@ -7,7 +7,7 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curried_args)]
-pub struct Singleton {
+pub struct SingletonArgs {
     pub singleton_struct: SingletonStruct,
     pub inner_puzzle: LazyNode,
 }
