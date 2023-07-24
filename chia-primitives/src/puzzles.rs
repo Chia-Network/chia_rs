@@ -280,7 +280,7 @@ pub const NFT_OWNERSHIP_LAYER_PUZZLE_HASH: [u8; 32] = hex!(
     "
 );
 
-pub const ROYALTY_TRANSFER_PUZZLE: [u8; 687] = hex!(
+pub const NFT_ROYALTY_TRANSFER_PUZZLE: [u8; 687] = hex!(
     "
     ff02ffff01ff02ffff03ff81bfffff01ff04ff82013fffff04ff80ffff04ffff
     02ffff03ffff22ff82013fffff20ffff09ff82013fff2f808080ffff01ff04ff
@@ -307,7 +307,7 @@ pub const ROYALTY_TRANSFER_PUZZLE: [u8; 687] = hex!(
     "
 );
 
-pub const ROYALTY_TRANSFER_PUZZLE_HASH: [u8; 32] = hex!(
+pub const NFT_ROYALTY_TRANSFER_PUZZLE_HASH: [u8; 32] = hex!(
     "
     025dee0fb1e9fa110302a7e9bfb6e381ca09618e2778b0184fa5c6b275cfce1f
     "

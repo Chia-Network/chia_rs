@@ -1,7 +1,7 @@
 use clvm_utils::{clvm_list, match_list, match_tuple, Error, FromClvm, LazyNode, Result, ToClvm};
 use clvmr::{allocator::NodePtr, Allocator};
 
-use crate::singleton::SingletonStruct;
+use crate::SingletonStruct;
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curried_args)]
