@@ -1,3 +1,4 @@
+pub mod cat;
 pub mod did;
 pub mod nft;
 pub mod singleton;

@@ -5,6 +5,14 @@ use crate::singleton::SingletonStruct;
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curried_args)]
+pub struct NftIntermediateLauncher {
+    pub launcher_puzzle_hash: [u8; 32],
+    pub mint_number: usize,
+    pub mint_total: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[clvm(curried_args)]
 pub struct NftState {
     pub mod_hash: [u8; 32],
     pub metadata: LazyNode,

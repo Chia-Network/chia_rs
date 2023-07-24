@@ -85,6 +85,12 @@ pub const CAT_PUZZLE: [u8; 1672] = hex!(
     "
 );
 
+pub const CAT_PUZZLE_HASH: [u8; 32] = hex!(
+    "
+    37bef360ee858133b69d595a906dc45d01af50379dad515eb9518abb7c1d2a7a
+    "
+);
+
 pub const LAUNCHER_PUZZLE: [u8; 175] = hex!(
     "
     ff02ffff01ff04ffff04ff04ffff04ff05ffff04ff0bff80808080ffff04ffff
@@ -323,5 +329,19 @@ pub const NFT_METADATA_UPDATER: [u8; 241] = hex!(
 pub const NFT_METADATA_UPDATER_HASH: [u8; 32] = hex!(
     "
     fe8a4b4e27a2e29a4d3fc7ce9d527adbcaccbab6ada3903ccf3ba9a769d2d78b
+    "
+);
+
+pub const NFT_INTERMEDIATE_LAUNCHER_PUZZLE: [u8; 65] = hex!(
+    "
+    ff02ffff01ff04ffff04ff04ffff04ff05ffff01ff01808080ffff04ffff04ff
+    06ffff04ffff0bff0bff1780ff808080ff808080ffff04ffff01ff333cff0180
+    80
+    "
+);
+
+pub const NFT_INTERMEDIATE_LAUNCHER_PUZZLE_HASH: [u8; 32] = hex!(
+    "
+    7a32d2d9571d3436791c0ad3d7fcfdb9c43ace2b0f0ff13f98d29f0cc093f445
     "
 );

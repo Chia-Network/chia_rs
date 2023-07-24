@@ -51,6 +51,8 @@ clvm_primitive!(u64);
 clvm_primitive!(i64);
 clvm_primitive!(u128);
 clvm_primitive!(i128);
+clvm_primitive!(usize);
+clvm_primitive!(isize);
 
 impl<A, B> ToClvm for (A, B)
 where
