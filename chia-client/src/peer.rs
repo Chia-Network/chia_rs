@@ -38,7 +38,7 @@ pub struct Peer {
 }
 
 impl Peer {
-    pub async fn new(ws: PeerSocket, network: Arc<Network>) -> Self {
+    pub fn new(ws: PeerSocket, network: Arc<Network>) -> Self {
         let (sink, stream) = ws.split();
         let (event_sender, _) = broadcast::channel(32);
         let (message_sender, message_receiver) = mpsc::channel(32);
