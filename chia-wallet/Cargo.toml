@@ -9,12 +9,21 @@ homepage = "https://github.com/Chia-Network/chia_rs/chia-wallet/"
 repository = "https://github.com/Chia-Network/chia_rs/chia-wallet/"
 
 [dependencies]
-chia-client = { version = "0.1.0", path = "../chia-client" }
-chia-primitives = { version = "0.1.0", path = "../chia-primitives" }
-chia-protocol = { version = "0.2.7", path = "../chia-protocol" }
-chia-bls = { version = "0.2.7", path = "../chia-bls" }
-clvm-utils = { version = "0.2.7", path = "../clvm-utils" }
-tokio = { version = "1", features = ["sync"] }
-sha2 = "0.9.9"
+chia-bls = { path = "../chia-bls" }
+chia-primitives = { path = "../chia-primitives" }
+chia-protocol = { path = "../chia-protocol" }
+chia-client = { path = "../chia-client" }
+clvm-utils = { path = "../clvm-utils" }
+tokio = { version = "1", features = ["full"] }
+tokio-tungstenite = "0.19.0"
+dotenvy = "0.15.7"
+bip39 = "2.0.0"
+anyhow = "1.0.71"
+hex = "0.4.3"
 clvmr = "0.2.6"
+sha2 = "0.9.9"
+hex-literal = "0.4.1"
 indexmap = "2.0.0"
+num-bigint = "0.4.3"
+thiserror = "1.0.44"
+flate2 = { git = "https://github.com/PierreV23/flate2-rs", features = ["zlib"] }

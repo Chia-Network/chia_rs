@@ -352,3 +352,88 @@ pub const NFT_INTERMEDIATE_LAUNCHER_PUZZLE_HASH: [u8; 32] = hex!(
     7a32d2d9571d3436791c0ad3d7fcfdb9c43ace2b0f0ff13f98d29f0cc093f445
     "
 );
+
+pub const SETTLEMENT_PAYMENTS_PUZZLE: [u8; 293] = hex!(
+    "
+    ff02ffff01ff02ff0affff04ff02ffff04ff03ff80808080ffff04ffff01ffff
+    333effff02ffff03ff05ffff01ff04ffff04ff0cffff04ffff02ff1effff04ff
+    02ffff04ff09ff80808080ff808080ffff02ff16ffff04ff02ffff04ff19ffff
+    04ffff02ff0affff04ff02ffff04ff0dff80808080ff808080808080ff8080ff
+    0180ffff02ffff03ff05ffff01ff02ffff03ffff15ff29ff8080ffff01ff04ff
+    ff04ff08ff0980ffff02ff16ffff04ff02ffff04ff0dffff04ff0bff80808080
+    8080ffff01ff088080ff0180ffff010b80ff0180ff02ffff03ffff07ff0580ff
+    ff01ff0bffff0102ffff02ff1effff04ff02ffff04ff09ff80808080ffff02ff
+    1effff04ff02ffff04ff0dff8080808080ffff01ff0bffff0101ff058080ff01
+    80ff018080
+    "
+);
+
+pub const SETTLEMENT_PAYMENTS_PUZZLE_HASH: [u8; 32] = hex!(
+    "
+    cfbfdeed5c4ca2de3d0bf520b9cb4bb7743a359bd2e6a188d19ce7dffc21d3e7
+    "
+);
+
+pub const CAT_PUZZLE_V1: [u8; 1420] = hex!(
+    "
+    ff02ffff01ff02ff5effff04ff02ffff04ffff04ff05ffff04ffff0bff2cff05
+    80ffff04ff0bff80808080ffff04ffff02ff17ff2f80ffff04ff5fffff04ffff
+    02ff2effff04ff02ffff04ff17ff80808080ffff04ffff0bff82027fff82057f
+    ff820b7f80ffff04ff81bfffff04ff82017fffff04ff8202ffffff04ff8205ff
+    ffff04ff820bffff80808080808080808080808080ffff04ffff01ffffffff81
+    ca3dff46ff0233ffff3c04ff01ff0181cbffffff02ff02ffff03ff05ffff01ff
+    02ff32ffff04ff02ffff04ff0dffff04ffff0bff22ffff0bff2cff3480ffff0b
+    ff22ffff0bff22ffff0bff2cff5c80ff0980ffff0bff22ff0bffff0bff2cff80
+    80808080ff8080808080ffff010b80ff0180ffff02ffff03ff0bffff01ff02ff
+    ff03ffff09ffff02ff2effff04ff02ffff04ff13ff80808080ff820b9f80ffff
+    01ff02ff26ffff04ff02ffff04ffff02ff13ffff04ff5fffff04ff17ffff04ff
+    2fffff04ff81bfffff04ff82017fffff04ff1bff8080808080808080ffff04ff
+    82017fff8080808080ffff01ff088080ff0180ffff01ff02ffff03ff17ffff01
+    ff02ffff03ffff20ff81bf80ffff0182017fffff01ff088080ff0180ffff01ff
+    088080ff018080ff0180ffff04ffff04ff05ff2780ffff04ffff10ff0bff5780
+    ff778080ff02ffff03ff05ffff01ff02ffff03ffff09ffff02ffff03ffff09ff
+    11ff7880ffff0159ff8080ff0180ffff01818f80ffff01ff02ff7affff04ff02
+    ffff04ff0dffff04ff0bffff04ffff04ff81b9ff82017980ff808080808080ff
+    ff01ff02ff5affff04ff02ffff04ffff02ffff03ffff09ff11ff7880ffff01ff
+    04ff78ffff04ffff02ff36ffff04ff02ffff04ff13ffff04ff29ffff04ffff0b
+    ff2cff5b80ffff04ff2bff80808080808080ff398080ffff01ff02ffff03ffff
+    09ff11ff2480ffff01ff04ff24ffff04ffff0bff20ff2980ff398080ffff0109
+    80ff018080ff0180ffff04ffff02ffff03ffff09ff11ff7880ffff0159ff8080
+    ff0180ffff04ffff02ff7affff04ff02ffff04ff0dffff04ff0bffff04ff17ff
+    808080808080ff80808080808080ff0180ffff01ff04ff80ffff04ff80ff1780
+    8080ff0180ffffff02ffff03ff05ffff01ff04ff09ffff02ff26ffff04ff02ff
+    ff04ff0dffff04ff0bff808080808080ffff010b80ff0180ff0bff22ffff0bff
+    2cff5880ffff0bff22ffff0bff22ffff0bff2cff5c80ff0580ffff0bff22ffff
+    02ff32ffff04ff02ffff04ff07ffff04ffff0bff2cff2c80ff8080808080ffff
+    0bff2cff8080808080ffff02ffff03ffff07ff0580ffff01ff0bffff0102ffff
+    02ff2effff04ff02ffff04ff09ff80808080ffff02ff2effff04ff02ffff04ff
+    0dff8080808080ffff01ff0bff2cff058080ff0180ffff04ffff04ff28ffff04
+    ff5fff808080ffff02ff7effff04ff02ffff04ffff04ffff04ff2fff0580ffff
+    04ff5fff82017f8080ffff04ffff02ff7affff04ff02ffff04ff0bffff04ff05
+    ffff01ff808080808080ffff04ff17ffff04ff81bfffff04ff82017fffff04ff
+    ff0bff8204ffffff02ff36ffff04ff02ffff04ff09ffff04ff820affffff04ff
+    ff0bff2cff2d80ffff04ff15ff80808080808080ff8216ff80ffff04ff8205ff
+    ffff04ff820bffff808080808080808080808080ff02ff2affff04ff02ffff04
+    ff5fffff04ff3bffff04ffff02ffff03ff17ffff01ff09ff2dffff0bff27ffff
+    02ff36ffff04ff02ffff04ff29ffff04ff57ffff04ffff0bff2cff81b980ffff
+    04ff59ff80808080808080ff81b78080ff8080ff0180ffff04ff17ffff04ff05
+    ffff04ff8202ffffff04ffff04ffff04ff24ffff04ffff0bff7cff2fff82017f
+    80ff808080ffff04ffff04ff30ffff04ffff0bff81bfffff0bff7cff15ffff10
+    ff82017fffff11ff8202dfff2b80ff8202ff808080ff808080ff138080ff8080
+    8080808080808080ff018080
+    "
+);
+
+pub const SETTLEMENT_PAYMENTS_PUZZLE_V1: [u8; 267] = hex!(
+    "
+    ff02ffff01ff02ff0affff04ff02ffff04ff03ff80808080ffff04ffff01ffff
+    333effff02ffff03ff05ffff01ff04ffff04ff0cffff04ffff02ff1effff04ff
+    02ffff04ff09ff80808080ff808080ffff02ff16ffff04ff02ffff04ff19ffff
+    04ffff02ff0affff04ff02ffff04ff0dff80808080ff808080808080ff8080ff
+    0180ffff02ffff03ff05ffff01ff04ffff04ff08ff0980ffff02ff16ffff04ff
+    02ffff04ff0dffff04ff0bff808080808080ffff010b80ff0180ff02ffff03ff
+    ff07ff0580ffff01ff0bffff0102ffff02ff1effff04ff02ffff04ff09ff8080
+    8080ffff02ff1effff04ff02ffff04ff0dff8080808080ffff01ff0bffff0101
+    ff058080ff0180ff018080
+    "
+);
