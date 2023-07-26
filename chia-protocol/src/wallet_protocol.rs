@@ -45,7 +45,7 @@ message_struct!(RejectPuzzleSolution {
 });
 
 message_struct!(SendTransaction {
-    ransaction: SpendBundle,
+    transaction: SpendBundle,
 });
 
 message_struct! (TransactionAck {
@@ -137,8 +137,6 @@ message_struct! (RespondHeaderBlocks {
     end_height: u32,
     header_blocks: Vec<HeaderBlock>,
 });
-
-// struct CoinState
 
 message_struct! (RegisterForPhUpdates {
     puzzle_hashes: Vec<Bytes32>,
