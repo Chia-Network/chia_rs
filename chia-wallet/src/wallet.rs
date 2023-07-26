@@ -232,11 +232,6 @@ impl Wallet {
 
         coin_spends.push(requested_coin_spend);
 
-        // Add royalty spend. ????
-        if royalty_amount > 0 {
-            let inner_royalty_solution = clvm_list!((nft_info.launcher_id, vec![royalty_payment]));
-        }
-
         // Construct spend bundle.
         let spend_bundle = SpendBundle::new(
             coin_spends,

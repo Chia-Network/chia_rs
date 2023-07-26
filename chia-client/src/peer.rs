@@ -207,24 +207,33 @@ async fn handle_inbound_messages(
     mut stream: SplitStream<PeerSocket>,
 ) -> Result<(), ChiaError> {
     while let Some(next) = stream.next().await {
-        if let Ok(message) = next {
-            let message = Message::parse(&mut Cursor::new(&message.into_data()))?;
-            if let Some(id) = message.id {
-                if let Some(request) = requests.lock().await.remove(&id) {
-                    request.send(message).ok();
-                }
-            } else {
-                match message.msg_type {
-                    ProtocolMessageTypes::CoinStateUpdate => {
-                        let body = CoinStateUpdate::parse(&mut Cursor::new(message.data.as_ref()))?;
-                        event_sender.send(PeerEvent::CoinStateUpdate(body)).ok();
+        match next {
+            Ok(message) => {
+                let bytes = &message.into_data();
+                let message = Message::parse(&mut Cursor::new(bytes))?;
+
+                if let Some(id) = message.id {
+                    if let Some(request) = requests.lock().await.remove(&id) {
+                        request.send(message).ok();
                     }
-                    ProtocolMessageTypes::NewPeakWallet => {
-                        let body = NewPeakWallet::parse(&mut Cursor::new(message.data.as_ref()))?;
-                        event_sender.send(PeerEvent::NewPeakWallet(body)).ok();
+                } else {
+                    match message.msg_type {
+                        ProtocolMessageTypes::CoinStateUpdate => {
+                            let body =
+                                CoinStateUpdate::parse(&mut Cursor::new(message.data.as_ref()))?;
+                            event_sender.send(PeerEvent::CoinStateUpdate(body)).ok();
+                        }
+                        ProtocolMessageTypes::NewPeakWallet => {
+                            let body =
+                                NewPeakWallet::parse(&mut Cursor::new(message.data.as_ref()))?;
+                            event_sender.send(PeerEvent::NewPeakWallet(body)).ok();
+                        }
+                        _ => {}
                     }
-                    _ => {}
                 }
+            }
+            Err(error) => {
+                dbg!(error);
             }
         }
     }
