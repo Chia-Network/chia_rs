@@ -52,7 +52,7 @@ use crate::utils::int_to_bytes;
 pub struct Wallet {
     peer: Arc<Peer>,
     event_receiver: Receiver<WalletEvent>,
-    state: Arc<RwLock<WalletState>>,
+    pub state: Arc<RwLock<WalletState>>,
     runner_handle: Option<JoinHandle<()>>,
 }
 
