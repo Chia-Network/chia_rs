@@ -17,18 +17,18 @@ pub fn select_coins(mut coins: Vec<&Coin>, amount: u64) -> Vec<&Coin> {
     coins.sort_by(|a, b| a.amount.cmp(&b.amount));
 
     let mut result = Vec::new();
-    let mut selected = 0;
+    let mut selected = 0u128;
 
     for coin in coins {
-        if selected >= amount {
+        if selected >= amount as u128 {
             break;
         }
 
-        selected += coin.amount;
+        selected += coin.amount as u128;
         result.push(coin);
     }
 
-    if selected >= amount {
+    if selected >= amount as u128 {
         result
     } else {
         Vec::new()
