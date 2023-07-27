@@ -1,11 +1,14 @@
 use blst::{
-    blst_p1 as P1, blst_p1_add_affine, blst_p1_affine as P1Affine, blst_p1_affine_compress,
-    blst_p1_affine_generator, blst_p1_affine_in_g1, blst_p1_affine_is_inf, blst_p1_from_affine,
-    blst_p1_mult, blst_p1_to_affine, blst_p1_uncompress, BLST_ERROR,
+    blst_core_verify_pk_in_g1, blst_p1 as P1, blst_p1_add_affine, blst_p1_affine as P1Affine,
+    blst_p1_affine_compress, blst_p1_affine_generator, blst_p1_affine_in_g1, blst_p1_affine_is_inf,
+    blst_p1_from_affine, blst_p1_mult, blst_p1_to_affine, blst_p1_uncompress, BLST_ERROR,
 };
 use sha2::{digest::FixedOutput, Digest, Sha256};
 
-use crate::{DerivableKey, SecretKey};
+use crate::{
+    aug_scheme::{prepend_message, DST},
+    DerivableKey, SecretKey, Signature,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PublicKey(pub(crate) P1Affine);
@@ -87,6 +90,34 @@ impl PublicKey {
             blst_p1_to_affine(&mut p1_affine, &output_p1);
         }
         Self(p1_affine)
+    }
+
+    pub fn verify(&self, message: &[u8], signature: &Signature) -> bool {
+        let message = prepend_message(self, message);
+
+        if !signature.is_valid(false) {
+            return false;
+        }
+
+        if !self.is_valid() {
+            return false;
+        }
+
+        unsafe {
+            let result = blst_core_verify_pk_in_g1(
+                &self.0,
+                &signature.0,
+                true,
+                message.as_ptr(),
+                message.len(),
+                DST.as_ptr(),
+                DST.len(),
+                [].as_ptr(),
+                0,
+            );
+
+            result == BLST_ERROR::BLST_SUCCESS
+        }
     }
 }
 
