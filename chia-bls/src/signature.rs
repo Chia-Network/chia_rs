@@ -19,7 +19,7 @@ impl Signature {
     }
 
     pub fn from_bytes(bytes: &[u8; 96]) -> Option<Self> {
-        if (bytes[0] & 0x80) == 0 {
+        if (bytes[0] & 0x80) != 0 {
             let mut p2_affine = P2Affine::default();
             if unsafe { blst_p2_uncompress(&mut p2_affine, bytes.as_ptr()) }
                 == BLST_ERROR::BLST_SUCCESS
@@ -74,7 +74,7 @@ impl Default for Signature {
 
 #[cfg(test)]
 mod tests {
-    use crate::SecretKey;
+    use crate::{SecretKey, Signature};
 
     use bip39::Mnemonic;
 
@@ -96,5 +96,10 @@ mod tests {
         assert!(public_key.verify(message_2, &signature_2));
         assert!(!public_key.verify(message_2, &signature_1));
         assert!(!public_key.verify(message_1, &signature_2));
+
+        assert_eq!(
+            Signature::from_bytes(&signature_1.to_bytes()).unwrap(),
+            signature_1
+        );
     }
 }
