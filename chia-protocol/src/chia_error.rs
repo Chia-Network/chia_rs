@@ -1,11 +1,6 @@
 use std::error;
 use std::fmt;
 
-#[cfg(feature = "py-bindings")]
-use pyo3::exceptions;
-#[cfg(feature = "py-bindings")]
-use pyo3::PyErr;
-
 #[derive(Debug, PartialEq, Eq)]
 pub enum Error {
     InvalidBool,
@@ -42,8 +37,8 @@ impl error::Error for Error {
 }
 
 #[cfg(feature = "py-bindings")]
-impl std::convert::From<Error> for PyErr {
-    fn from(err: Error) -> PyErr {
-        exceptions::PyValueError::new_err(err.to_string())
+impl std::convert::From<Error> for pyo3::PyErr {
+    fn from(err: Error) -> pyo3::PyErr {
+        pyo3::exceptions::PyValueError::new_err(err.to_string())
     }
 }
