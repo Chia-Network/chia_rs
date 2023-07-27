@@ -1,6 +1,5 @@
 use chia_streamable_macro::Streamable;
 
-use crate::chia_error;
 use crate::message_struct;
 use crate::streamable_struct;
 use crate::ChiaProtocolMessage;
@@ -9,19 +8,8 @@ use crate::CoinState;
 use crate::FeeEstimateGroup;
 use crate::HeaderBlock;
 use crate::Program;
-use crate::ProtocolMessageTypes;
 use crate::SpendBundle;
-use crate::Streamable;
 use crate::{Bytes, Bytes32};
-
-#[cfg(feature = "py-bindings")]
-use crate::from_json_dict::FromJsonDict;
-#[cfg(feature = "py-bindings")]
-use crate::to_json_dict::ToJsonDict;
-#[cfg(feature = "py-bindings")]
-use chia_py_streamable_macro::PyStreamable;
-#[cfg(feature = "py-bindings")]
-use pyo3::prelude::*;
 
 message_struct!(RequestPuzzleSolution {
     coin_name: Bytes32,
