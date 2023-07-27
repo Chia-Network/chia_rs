@@ -14,7 +14,7 @@ clvmr = { version = "=0.2.7", features = ["counters"] }
 chia = { version = "=0.2.9", path = ".." }
 sqlite = "=0.31.0"
 clap = { version = "=4.3.9", features = ["derive"] }
-zstd = "=0.12.3+zstd.1.5.2"
+zstd = "=0.12.3"
 threadpool = "=1.8.1"
 hex = "=0.4.3"
 
