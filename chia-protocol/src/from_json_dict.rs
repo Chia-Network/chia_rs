@@ -71,8 +71,8 @@ where
 
 macro_rules! from_json_primitive {
     ($t:ty) => {
-        impl FromJsonDict for $t {
-            fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+        impl $crate::from_json_dict::FromJsonDict for $t {
+            fn from_json_dict(o: &pyo3::PyAny) -> pyo3::PyResult<Self> {
                 o.extract()
             }
         }

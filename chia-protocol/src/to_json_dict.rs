@@ -8,8 +8,8 @@ pub trait ToJsonDict {
 
 macro_rules! to_json_primitive {
     ($t:ty) => {
-        impl ToJsonDict for $t {
-            fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
+        impl $crate::to_json_dict::ToJsonDict for $t {
+            fn to_json_dict(&self, py: Python) -> pyo3::PyResult<PyObject> {
                 Ok(self.to_object(py))
             }
         }

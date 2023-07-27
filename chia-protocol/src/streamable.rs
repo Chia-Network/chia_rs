@@ -479,9 +479,6 @@ fn test_parse_truncated_str() {
 use chia_streamable_macro::Streamable;
 
 #[cfg(test)]
-use crate::chia_error;
-
-#[cfg(test)]
 #[derive(Streamable, PartialEq, Debug)]
 struct TestStruct {
     a: Vec<i8>,
