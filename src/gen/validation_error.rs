@@ -1,6 +1,9 @@
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use clvmr::reduction::EvalErr;
 
+#[cfg(feature = "py-bindings")]
+use pyo3::PyErr;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorCode {
     GeneratorRuntimeError,
