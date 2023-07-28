@@ -591,7 +591,7 @@ impl Wallet {
         start_index: usize,
         total_nft_count: usize,
         fee: u64,
-    ) -> anyhow::Result<(Vec<CoinSpend>, Signature)> {
+    ) -> anyhow::Result<(Vec<CoinSpend>, Signature, Vec<[u8; 32]>)> {
         // Get DID info.
         let did_info = self
             .state
@@ -642,6 +642,7 @@ impl Wallet {
         let mut coin_spends = Vec::new();
         let mut did_condition_list = Vec::new();
         let mut signatures = Vec::new();
+        let mut nft_ids = Vec::new();
 
         // Prepare NFT mint spends.
         for (raw_index, nft_mint) in nft_mints.iter().enumerate() {
@@ -702,6 +703,8 @@ impl Wallet {
                 nft_amount,
             );
             let launcher_id = launcher_coin.coin_id();
+
+            nft_ids.push(launcher_id);
 
             did_condition_list.push(Condition::CreatePuzzleAnnouncement {
                 message: launcher_id,
@@ -962,6 +965,7 @@ impl Wallet {
                 .into_iter()
                 .reduce(|aggregate, signature| aggregate.add(&signature))
                 .unwrap(),
+            nft_ids,
         ))
     }
 
