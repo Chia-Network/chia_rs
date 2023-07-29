@@ -1,5 +1,5 @@
-use crate::chia_error;
-use crate::streamable::{read_bytes, Streamable};
+use chia_traits::chia_error;
+use chia_traits::{read_bytes, Streamable};
 use core::fmt::Formatter;
 use sha2::{Digest, Sha256};
 use std::convert::AsRef;
@@ -9,6 +9,12 @@ use std::fmt::Debug;
 use std::io::Cursor;
 use std::ops::Deref;
 
+#[cfg(feature = "py-bindings")]
+use chia_traits::{FromJsonDict, ToJsonDict};
+#[cfg(feature = "py-bindings")]
+use hex::FromHex;
+#[cfg(feature = "py-bindings")]
+use pyo3::exceptions::PyValueError;
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
 #[cfg(feature = "py-bindings")]
@@ -45,6 +51,33 @@ impl Streamable for Bytes {
     fn parse(input: &mut Cursor<&[u8]>) -> chia_error::Result<Self> {
         let len = u32::parse(input)?;
         Ok(Bytes(read_bytes(input, len as usize)?.to_vec()))
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+impl ToJsonDict for Bytes {
+    fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
+        Ok(format!("0x{self}").to_object(py))
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+impl FromJsonDict for Bytes {
+    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+        let s: String = o.extract()?;
+        if !s.starts_with("0x") {
+            return Err(PyValueError::new_err(
+                "bytes object is expected to start with 0x",
+            ));
+        }
+        let s = &s[2..];
+        let buf = match Vec::from_hex(s) {
+            Err(_) => {
+                return Err(PyValueError::new_err("invalid hex"));
+            }
+            Ok(v) => v,
+        };
+        Ok(buf.into())
     }
 }
 
@@ -243,6 +276,40 @@ impl<const N: usize> PartialEq<BytesImpl<N>> for [u8; N] {
     }
 }
 
+#[cfg(feature = "py-bindings")]
+impl<const N: usize> ToJsonDict for BytesImpl<N> {
+    fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
+        Ok(format!("0x{self}").to_object(py))
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+impl<const N: usize> FromJsonDict for BytesImpl<N> {
+    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+        let s: String = o.extract()?;
+        if !s.starts_with("0x") {
+            return Err(PyValueError::new_err(
+                "bytes object is expected to start with 0x",
+            ));
+        }
+        let s = &s[2..];
+        let buf = match Vec::from_hex(s) {
+            Err(_) => {
+                return Err(PyValueError::new_err("invalid hex"));
+            }
+            Ok(v) => v,
+        };
+        if buf.len() != N {
+            return Err(PyValueError::new_err(format!(
+                "invalid length {} expected {}",
+                buf.len(),
+                N
+            )));
+        }
+        Ok((&buf).try_into()?)
+    }
+}
+
 pub type Bytes32 = BytesImpl<32>;
 pub type Bytes48 = BytesImpl<48>;
 pub type Bytes96 = BytesImpl<96>;
@@ -434,4 +501,101 @@ fn test_bytes_comparisons(#[case] lhs: &str, #[case] rhs: &str, #[case] expect_e
             assert!(rhs_vec != lhs);
         }
     }
+}
+
+#[cfg(test)]
+fn from_bytes<'de, T: Streamable + std::fmt::Debug + std::cmp::PartialEq>(
+    buf: &'de [u8],
+    expected: T,
+) {
+    let mut input = Cursor::<&[u8]>::new(buf);
+    assert_eq!(T::parse(&mut input).unwrap(), expected);
+}
+
+#[cfg(test)]
+fn from_bytes_fail<'de, T: Streamable + std::fmt::Debug + std::cmp::PartialEq>(
+    buf: &'de [u8],
+    expected: chia_error::Error,
+) {
+    let mut input = Cursor::<&[u8]>::new(buf);
+    assert_eq!(T::parse(&mut input).unwrap_err(), expected);
+}
+
+#[cfg(test)]
+fn stream<T: Streamable>(v: &T) -> Vec<u8> {
+    let mut buf = Vec::<u8>::new();
+    v.stream(&mut buf).unwrap();
+    let mut ctx1 = Sha256::new();
+    let mut ctx2 = Sha256::new();
+    v.update_digest(&mut ctx1);
+    ctx2.update(&buf);
+    assert_eq!(&ctx1.finalize(), &ctx2.finalize());
+    buf
+}
+
+#[test]
+fn test_stream_bytes32() {
+    let buf: &[u8] = &[
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+        26, 27, 28, 29, 30, 31, 32,
+    ];
+    let out = stream(&Bytes32::from(buf));
+    assert_eq!(&buf, &out);
+}
+
+#[test]
+fn test_stream_bytes() {
+    let val: Bytes = vec![
+        1_u8, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+        25, 26, 27, 28, 29, 30, 31, 32,
+    ]
+    .into();
+    println!("{:?}", val);
+    let buf = stream(&val);
+    println!("buf: {:?}", buf);
+    from_bytes(&buf, val);
+}
+
+#[test]
+fn test_parse_bytes_empty() {
+    let buf: &[u8] = &[0, 0, 0, 0];
+    from_bytes::<Bytes>(buf, [].to_vec().into());
+}
+
+#[test]
+fn test_parse_bytes() {
+    let buf: &[u8] = &[0, 0, 0, 3, 1, 2, 3];
+    from_bytes::<Bytes>(buf, [1_u8, 2, 3].to_vec().into());
+}
+
+#[test]
+fn test_parse_truncated_len() {
+    let buf: &[u8] = &[0, 0, 1];
+    from_bytes_fail::<Bytes>(buf, chia_error::Error::EndOfBuffer);
+}
+
+#[test]
+fn test_parse_truncated() {
+    let buf: &[u8] = &[0, 0, 0, 4, 1, 2, 3];
+    from_bytes_fail::<Bytes>(buf, chia_error::Error::EndOfBuffer);
+}
+
+#[test]
+fn test_parse_bytes32() {
+    let buf: &[u8] = &[
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+        26, 27, 28, 29, 30, 31, 32,
+    ];
+    from_bytes::<Bytes32>(buf, Bytes32::from(buf));
+    from_bytes_fail::<Bytes32>(&buf[0..30], chia_error::Error::EndOfBuffer);
+}
+
+#[test]
+fn test_parse_bytes48() {
+    let buf: &[u8] = &[
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+        26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48,
+    ];
+    from_bytes::<Bytes48>(buf, Bytes48::from(buf));
+    from_bytes_fail::<Bytes48>(&buf[0..47], chia_error::Error::EndOfBuffer);
 }

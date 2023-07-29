@@ -1,6 +1,3 @@
-use chia_protocol::from_json_dict::FromJsonDict;
-use chia_protocol::to_json_dict::ToJsonDict;
-
 use chia::allocator::make_allocator;
 use chia::gen::conditions::{Spend, SpendBundleConditions};
 use chia::gen::run_block_generator::run_block_generator as native_run_block_generator;
@@ -15,10 +12,11 @@ use pyo3::buffer::PyBuffer;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 
-use chia_protocol::chia_error;
-use chia_protocol::streamable::Streamable;
 use chia_py_streamable_macro::PyStreamable;
 use chia_streamable_macro::Streamable;
+
+#[cfg(feature = "py-bindings")]
+use chia_traits::{FromJsonDict, ToJsonDict};
 
 #[pyclass(name = "Spend", get_all, frozen)]
 #[derive(Streamable, PyStreamable, Hash, Debug, Clone, Eq, PartialEq)]

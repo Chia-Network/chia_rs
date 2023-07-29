@@ -1,4 +1,3 @@
-use crate::bytes::{Bytes, BytesImpl};
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 
@@ -28,18 +27,6 @@ to_json_primitive!(i64);
 to_json_primitive!(u128);
 to_json_primitive!(i128);
 to_json_primitive!(String);
-
-impl<const N: usize> ToJsonDict for BytesImpl<N> {
-    fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
-        Ok(format!("0x{self}").to_object(py))
-    }
-}
-
-impl ToJsonDict for Bytes {
-    fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
-        Ok(format!("0x{self}").to_object(py))
-    }
-}
 
 impl<T: ToJsonDict> ToJsonDict for Vec<T> {
     fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {

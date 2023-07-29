@@ -10,8 +10,7 @@ use syn::{
 
 #[proc_macro_derive(Streamable)]
 pub fn chia_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let found_crate =
-        crate_name("chia-protocol").expect("chia-protocol is present in `Cargo.toml`");
+    let found_crate = crate_name("chia-traits").expect("chia-traits is present in `Cargo.toml`");
 
     let crate_name = match found_crate {
         FoundCrate::Itself => quote!(crate),
