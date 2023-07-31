@@ -38,18 +38,6 @@ jobs:
             runs-on:
               intel: [windows-latest]
         python:
-          - major-dot-minor: '3.7'
-            cibw-build: 'cp37-*'
-            by-arch:
-              arm:
-                manylinux-version: 2014
-                docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-aarch64
-                rustup-target: aarch64-unknown-linux-musl
-              intel:
-                manylinux-version: 2014
-                docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-x86_64
-                rustup-target: x86_64-unknown-linux-musl
-            matrix: '3.7'
           - major-dot-minor: '3.8'
             cibw-build: 'cp38-*'
             by-arch:
@@ -253,8 +241,8 @@ jobs:
               arm: [Linux, ARM64]
               intel: [ubuntu-latest]
         python:
-          - major-dot-minor: '3.7'
-            matrix: '3.7'
+          - major-dot-minor: '3.8'
+            matrix: '3.8'
         arch:
           - name: Intel
             matrix: intel
