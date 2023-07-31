@@ -436,37 +436,69 @@ impl Wallet {
         ))
     }
 
-    pub async fn send_cat_no_fee(
+    pub async fn send_cat(
         &self,
         asset_id: &[u8; 32],
         target_puzzle_hash: [u8; 32],
-        amount: u64,
+        send_amount: u64,
+        fee: u64,
     ) -> anyhow::Result<(Vec<CoinSpend>, Signature)> {
-        let cat_coins = self.state.read().await.select_cat_coins(asset_id, amount);
+        let total_amount = send_amount + fee;
 
-        if cat_coins.is_empty() {
+        let selected_coins = self
+            .state
+            .read()
+            .await
+            .select_cat_coins(asset_id, total_amount);
+
+        let selected_amount = selected_coins.iter().fold(0, |amount, cat_coin| {
+            amount + cat_coin.coin_state.coin.amount
+        });
+
+        let change_amount = selected_amount - total_amount;
+        let change_puzzle_hash = self.unused_puzzle_hash().await?;
+
+        if selected_coins.is_empty() {
             return Err(anyhow::Error::msg("insufficient token balance"));
         }
 
-        self.spend_cat(
+        self.spend_cats(
             asset_id,
-            &cat_coins,
-            &[Condition::CreateCoin {
-                puzzle_hash: target_puzzle_hash,
-                amount: amount as i64,
-                memos: vec![target_puzzle_hash],
-            }],
-            0,
+            &selected_coins
+                .into_iter()
+                .enumerate()
+                .map(|(i, cat_coin)| CatSpend {
+                    cat_coin,
+                    conditions: if i == 0 {
+                        let mut conditions = vec![Condition::CreateCoin {
+                            puzzle_hash: target_puzzle_hash,
+                            amount: total_amount as i64,
+                            memos: vec![target_puzzle_hash],
+                        }];
+
+                        if change_amount > 0 {
+                            conditions.push(Condition::CreateCoin {
+                                puzzle_hash: change_puzzle_hash,
+                                amount: change_amount as i64,
+                                memos: vec![change_puzzle_hash],
+                            });
+                        }
+
+                        conditions
+                    } else {
+                        vec![]
+                    },
+                    extra_delta: 0,
+                })
+                .collect::<Vec<_>>(),
         )
         .await
     }
 
-    async fn spend_cat(
+    async fn spend_cats(
         &self,
         asset_id: &[u8; 32],
-        cat_coins: &[CatCoin],
-        condition_list: &[Condition],
-        extra_delta: i64,
+        cat_spends: &[CatSpend],
     ) -> anyhow::Result<(Vec<CoinSpend>, Signature)> {
         let mut coin_spends = Vec::new();
         let mut signatures = Vec::new();
@@ -480,30 +512,28 @@ impl Wallet {
         // Create the CAT coin spends.
         let mut total_delta = 0;
 
-        for (index, cat_coin) in cat_coins.iter().enumerate() {
+        for (index, cat_spend) in cat_spends.iter().enumerate() {
             // Calculate the delta and add it to the subtotal.
-            let delta = if index == 0 {
-                condition_list
+            let delta =
+                cat_spend
+                    .conditions
                     .iter()
-                    .fold(-extra_delta, |delta, condition| {
+                    .fold(-cat_spend.extra_delta, |delta, condition| {
                         if let Condition::CreateCoin { amount, .. } = condition {
                             if *amount != -113 {
                                 return delta + amount;
                             }
                         }
                         delta
-                    })
-            } else {
-                0
-            };
+                    });
 
             let prev_subtotal = total_delta;
 
             total_delta += delta;
 
             // Find information of neighboring coins on the ring.
-            let prev_cat_coin = &cat_coins[index.wrapping_sub(1) % cat_coins.len()];
-            let next_cat_coin = &cat_coins[index.wrapping_add(1) % cat_coins.len()];
+            let prev_cat_coin = &cat_spends[index.wrapping_sub(1) % cat_spends.len()].cat_coin;
+            let next_cat_coin = &cat_spends[index.wrapping_add(1) % cat_spends.len()].cat_coin;
 
             // Construct the p2 puzzle.
             let secret_key = self
@@ -511,7 +541,7 @@ impl Wallet {
                 .read()
                 .await
                 .key_store
-                .secret_key_of(&cat_coin.p2_puzzle_hash)
+                .secret_key_of(&cat_spend.cat_coin.p2_puzzle_hash)
                 .ok_or(anyhow::Error::msg("missing secret key for p2 spend"))?
                 .clone();
 
@@ -533,8 +563,7 @@ impl Wallet {
             let cat = curry(&mut a, cat_mod, cat_args)?;
 
             // Construct the p2 solution.
-            let conditions =
-                clvm_quote!(if index == 0 { condition_list } else { &[] }).to_clvm(&mut a)?;
+            let conditions = clvm_quote!(&cat_spend.conditions).to_clvm(&mut a)?;
             let conditions_tree_hash = tree_hash(&a, conditions);
             let p2_solution =
                 StandardSolution::with_conditions(&mut a, conditions).to_clvm(&mut a)?;
@@ -542,7 +571,7 @@ impl Wallet {
             let signature = sign_agg_sig_me(
                 &secret_key,
                 &conditions_tree_hash,
-                &cat_coin.coin_state.coin.coin_id(),
+                &cat_spend.cat_coin.coin_state.coin.coin_id(),
                 &self.peer.network.agg_sig_me_extra_data,
             );
 
@@ -558,18 +587,18 @@ impl Wallet {
 
             let cat_solution = CatSolution {
                 inner_puzzle_solution: LazyNode(p2_solution),
-                lineage_proof: Some(cat_coin.lineage_proof.clone()),
+                lineage_proof: Some(cat_spend.cat_coin.lineage_proof.clone()),
                 prev_coin_id: prev_cat_coin.coin_state.coin.coin_id(),
-                this_coin_info: cat_coin.coin_state.coin.clone(),
+                this_coin_info: cat_spend.cat_coin.coin_state.coin.clone(),
                 next_coin_proof,
                 prev_subtotal,
-                extra_delta,
+                extra_delta: cat_spend.extra_delta,
             }
             .to_clvm(&mut a)?;
 
             // Add the spend info.
             let coin_spend = CoinSpend::new(
-                cat_coin.coin_state.coin.clone(),
+                cat_spend.cat_coin.coin_state.coin.clone(),
                 Program::from_clvm(&a, cat)?,
                 Program::from_clvm(&a, cat_solution)?,
             );
