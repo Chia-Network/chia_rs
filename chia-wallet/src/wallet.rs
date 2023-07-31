@@ -443,56 +443,143 @@ impl Wallet {
         send_amount: u64,
         fee: u64,
     ) -> anyhow::Result<(Vec<CoinSpend>, Signature)> {
-        let total_amount = send_amount + fee;
+        let mut coin_spends = Vec::new();
+        let mut signatures = Vec::new();
 
-        let selected_coins = self
+        // Initialize the allocator and puzzles.
+        let mut a = Allocator::new();
+
+        let p2_mod = node_from_bytes(&mut a, &STANDARD_PUZZLE)?;
+
+        // Fee
+        let selected_fee_coins = self.state.read().await.select_standard_coins(fee);
+
+        if selected_fee_coins.is_empty() {
+            return Err(anyhow::Error::msg("insufficient fee balance"));
+        }
+
+        let selected_fee_amount = selected_fee_coins
+            .iter()
+            .fold(0, |amount, coin| amount + coin.amount);
+
+        let fee_change_amount = selected_fee_amount - fee;
+
+        // CAT
+        let selected_cat_coins = self
             .state
             .read()
             .await
-            .select_cat_coins(asset_id, total_amount);
+            .select_cat_coins(asset_id, send_amount);
 
-        let selected_amount = selected_coins.iter().fold(0, |amount, cat_coin| {
+        if selected_cat_coins.is_empty() {
+            return Err(anyhow::Error::msg("insufficient CAT balance"));
+        }
+
+        let selected_cat_amount = selected_cat_coins.iter().fold(0, |amount, cat_coin| {
             amount + cat_coin.coin_state.coin.amount
         });
 
-        let change_amount = selected_amount - total_amount;
+        let change_amount = selected_cat_amount - send_amount;
         let change_puzzle_hash = self.unused_puzzle_hash().await?;
 
-        if selected_coins.is_empty() {
-            return Err(anyhow::Error::msg("insufficient token balance"));
+        // Fee spends
+        for fee_coin in selected_fee_coins {
+            // Construct the p2 puzzle.
+            let secret_key = self
+                .state
+                .read()
+                .await
+                .key_store
+                .secret_key_of((&fee_coin.puzzle_hash).into())
+                .ok_or(anyhow::Error::msg("missing secret key for p2 spend"))?
+                .clone();
+
+            let p2_args = StandardArgs {
+                synthetic_key: secret_key.to_public_key(),
+            }
+            .to_clvm(&mut a)?;
+
+            let p2 = curry(&mut a, p2_mod, p2_args)?;
+
+            // Create the conditions.
+            let mut conditions = Vec::new();
+
+            if fee_change_amount > 0 {
+                conditions.push(Condition::CreateCoin {
+                    puzzle_hash: change_puzzle_hash,
+                    amount: fee_change_amount as i64,
+                    memos: vec![],
+                });
+            }
+
+            // Construct the p2 solution.
+            let conditions = clvm_quote!(conditions).to_clvm(&mut a)?;
+            let conditions_tree_hash = tree_hash(&a, conditions);
+            let p2_solution =
+                StandardSolution::with_conditions(&mut a, conditions).to_clvm(&mut a)?;
+
+            let signature = sign_agg_sig_me(
+                &secret_key,
+                &conditions_tree_hash,
+                &fee_coin.coin_id(),
+                &self.peer.network.agg_sig_me_extra_data,
+            );
+
+            // Create coin spend
+            let coin_spend = CoinSpend::new(
+                fee_coin,
+                Program::from_clvm(&a, p2)?,
+                Program::from_clvm(&a, p2_solution)?,
+            );
+
+            coin_spends.push(coin_spend);
+            signatures.push(signature);
         }
 
-        self.spend_cats(
-            asset_id,
-            &selected_coins
+        // CAT spends
+        let (cat_spends, cat_signature) = self
+            .spend_cats(
+                asset_id,
+                &selected_cat_coins
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, cat_coin)| CatSpend {
+                        cat_coin,
+                        conditions: if i == 0 {
+                            let mut conditions = vec![Condition::CreateCoin {
+                                puzzle_hash: target_puzzle_hash,
+                                amount: send_amount as i64,
+                                memos: vec![target_puzzle_hash],
+                            }];
+
+                            if change_amount > 0 {
+                                conditions.push(Condition::CreateCoin {
+                                    puzzle_hash: change_puzzle_hash,
+                                    amount: change_amount as i64,
+                                    memos: vec![change_puzzle_hash],
+                                });
+                            }
+
+                            conditions
+                        } else {
+                            vec![]
+                        },
+                        extra_delta: 0,
+                    })
+                    .collect::<Vec<_>>(),
+            )
+            .await?;
+
+        coin_spends.extend(cat_spends);
+        signatures.push(cat_signature);
+
+        Ok((
+            coin_spends,
+            signatures
                 .into_iter()
-                .enumerate()
-                .map(|(i, cat_coin)| CatSpend {
-                    cat_coin,
-                    conditions: if i == 0 {
-                        let mut conditions = vec![Condition::CreateCoin {
-                            puzzle_hash: target_puzzle_hash,
-                            amount: total_amount as i64,
-                            memos: vec![target_puzzle_hash],
-                        }];
-
-                        if change_amount > 0 {
-                            conditions.push(Condition::CreateCoin {
-                                puzzle_hash: change_puzzle_hash,
-                                amount: change_amount as i64,
-                                memos: vec![change_puzzle_hash],
-                            });
-                        }
-
-                        conditions
-                    } else {
-                        vec![]
-                    },
-                    extra_delta: 0,
-                })
-                .collect::<Vec<_>>(),
-        )
-        .await
+                .reduce(|aggregate, signature| aggregate.add(&signature))
+                .unwrap(),
+        ))
     }
 
     async fn spend_cats(
