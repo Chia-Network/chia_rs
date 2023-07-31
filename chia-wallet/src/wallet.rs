@@ -481,9 +481,9 @@ impl Wallet {
         let mut total_delta = 0;
 
         for (index, cat_coin) in cat_coins.iter().enumerate() {
-            if index == 0 {
-                // Calculate the delta and add it to the subtotal.
-                let delta = condition_list
+            // Calculate the delta and add it to the subtotal.
+            let delta = if index == 0 {
+                condition_list
                     .iter()
                     .fold(-extra_delta, |delta, condition| {
                         if let Condition::CreateCoin { amount, .. } = condition {
@@ -492,87 +492,90 @@ impl Wallet {
                             }
                         }
                         delta
-                    });
+                    })
+            } else {
+                0
+            };
 
-                let prev_subtotal = total_delta;
+            let prev_subtotal = total_delta;
 
-                total_delta += delta;
+            total_delta += delta;
 
-                // Find information of neighboring coins on the ring.
-                let prev_cat_coin = &cat_coins[index.wrapping_sub(1) % cat_coins.len()];
-                let next_cat_coin = &cat_coins[index.wrapping_add(1) % cat_coins.len()];
+            // Find information of neighboring coins on the ring.
+            let prev_cat_coin = &cat_coins[index.wrapping_sub(1) % cat_coins.len()];
+            let next_cat_coin = &cat_coins[index.wrapping_add(1) % cat_coins.len()];
 
-                // Construct the p2 puzzle.
-                let secret_key = self
-                    .state
-                    .read()
-                    .await
-                    .key_store
-                    .secret_key_of(&cat_coin.p2_puzzle_hash)
-                    .ok_or(anyhow::Error::msg("missing secret key for p2 spend"))?
-                    .clone();
+            // Construct the p2 puzzle.
+            let secret_key = self
+                .state
+                .read()
+                .await
+                .key_store
+                .secret_key_of(&cat_coin.p2_puzzle_hash)
+                .ok_or(anyhow::Error::msg("missing secret key for p2 spend"))?
+                .clone();
 
-                let p2_args = StandardArgs {
-                    synthetic_key: secret_key.to_public_key(),
-                }
-                .to_clvm(&mut a)?;
-
-                let p2 = curry(&mut a, p2_mod, p2_args)?;
-
-                // Construct the CAT puzzle.
-                let cat_args = CatArgs {
-                    mod_hash: CAT_PUZZLE_HASH,
-                    tail_program_hash: *asset_id,
-                    inner_puzzle: LazyNode(p2),
-                }
-                .to_clvm(&mut a)?;
-
-                let cat = curry(&mut a, cat_mod, cat_args)?;
-
-                // Construct the p2 solution.
-                let conditions = clvm_quote!(condition_list).to_clvm(&mut a)?;
-                let conditions_tree_hash = tree_hash(&a, conditions);
-                let p2_solution =
-                    StandardSolution::with_conditions(&mut a, conditions).to_clvm(&mut a)?;
-
-                let signature = sign_agg_sig_me(
-                    &secret_key,
-                    &conditions_tree_hash,
-                    &cat_coin.coin_state.coin.coin_id(),
-                    &self.peer.network.agg_sig_me_extra_data,
-                );
-
-                // Construct the CAT solution.
-                let next_parent_coin_info: &[u8; 32] =
-                    (&next_cat_coin.coin_state.coin.parent_coin_info).into();
-
-                let next_coin_proof = CoinProof {
-                    parent_coin_info: *next_parent_coin_info,
-                    inner_puzzle_hash: next_cat_coin.p2_puzzle_hash,
-                    amount: next_cat_coin.coin_state.coin.amount,
-                };
-
-                let cat_solution = CatSolution {
-                    inner_puzzle_solution: LazyNode(p2_solution),
-                    lineage_proof: Some(cat_coin.lineage_proof.clone()),
-                    prev_coin_id: prev_cat_coin.coin_state.coin.coin_id(),
-                    this_coin_info: cat_coin.coin_state.coin.clone(),
-                    next_coin_proof,
-                    prev_subtotal,
-                    extra_delta,
-                }
-                .to_clvm(&mut a)?;
-
-                // Add the spend info.
-                let coin_spend = CoinSpend::new(
-                    cat_coin.coin_state.coin.clone(),
-                    Program::from_clvm(&a, cat)?,
-                    Program::from_clvm(&a, cat_solution)?,
-                );
-
-                coin_spends.push(coin_spend);
-                signatures.push(signature);
+            let p2_args = StandardArgs {
+                synthetic_key: secret_key.to_public_key(),
             }
+            .to_clvm(&mut a)?;
+
+            let p2 = curry(&mut a, p2_mod, p2_args)?;
+
+            // Construct the CAT puzzle.
+            let cat_args = CatArgs {
+                mod_hash: CAT_PUZZLE_HASH,
+                tail_program_hash: *asset_id,
+                inner_puzzle: LazyNode(p2),
+            }
+            .to_clvm(&mut a)?;
+
+            let cat = curry(&mut a, cat_mod, cat_args)?;
+
+            // Construct the p2 solution.
+            let conditions =
+                clvm_quote!(if index == 0 { condition_list } else { &[] }).to_clvm(&mut a)?;
+            let conditions_tree_hash = tree_hash(&a, conditions);
+            let p2_solution =
+                StandardSolution::with_conditions(&mut a, conditions).to_clvm(&mut a)?;
+
+            let signature = sign_agg_sig_me(
+                &secret_key,
+                &conditions_tree_hash,
+                &cat_coin.coin_state.coin.coin_id(),
+                &self.peer.network.agg_sig_me_extra_data,
+            );
+
+            // Construct the CAT solution.
+            let next_parent_coin_info: &[u8; 32] =
+                (&next_cat_coin.coin_state.coin.parent_coin_info).into();
+
+            let next_coin_proof = CoinProof {
+                parent_coin_info: *next_parent_coin_info,
+                inner_puzzle_hash: next_cat_coin.p2_puzzle_hash,
+                amount: next_cat_coin.coin_state.coin.amount,
+            };
+
+            let cat_solution = CatSolution {
+                inner_puzzle_solution: LazyNode(p2_solution),
+                lineage_proof: Some(cat_coin.lineage_proof.clone()),
+                prev_coin_id: prev_cat_coin.coin_state.coin.coin_id(),
+                this_coin_info: cat_coin.coin_state.coin.clone(),
+                next_coin_proof,
+                prev_subtotal,
+                extra_delta,
+            }
+            .to_clvm(&mut a)?;
+
+            // Add the spend info.
+            let coin_spend = CoinSpend::new(
+                cat_coin.coin_state.coin.clone(),
+                Program::from_clvm(&a, cat)?,
+                Program::from_clvm(&a, cat_solution)?,
+            );
+
+            coin_spends.push(coin_spend);
+            signatures.push(signature);
         }
 
         Ok((
