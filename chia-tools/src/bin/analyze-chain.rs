@@ -1,7 +1,7 @@
 use clap::Parser;
 
 use chia_protocol::FullBlock;
-use chia_protocol::Streamable;
+use chia_traits::Streamable;
 use std::io::Write;
 use std::time::SystemTime;
 

@@ -257,6 +257,7 @@ dependencies = [
 name = "chia-protocol"
 version = "0.2.7"
 dependencies = [
+ "chia-traits",
  "chia_py_streamable_macro",
  "chia_streamable_macro",
  "clvmr",
@@ -272,12 +273,25 @@ version = "0.1.16"
 dependencies = [
  "chia",
  "chia-protocol",
+ "chia-traits",
  "clap",
  "clvmr",
  "hex",
  "sqlite",
  "threadpool",
  "zstd",
+]
+
+[[package]]
+name = "chia-traits"
+version = "0.1.0"
+dependencies = [
+ "chia_py_streamable_macro",
+ "chia_streamable_macro",
+ "clvmr",
+ "hex",
+ "pyo3",
+ "sha2 0.9.9",
 ]
 
 [[package]]
