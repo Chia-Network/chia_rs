@@ -17,7 +17,7 @@ use chia_primitives::{
     SingletonStruct, StandardArgs, StandardSolution,
 };
 use chia_protocol::{Coin, CoinSpend, CoinState, Program, SpendBundle, Streamable};
-use clvm_utils::{clvm_list, clvm_quote, curry, tree_hash, uncurry, FromClvm, LazyNode, ToClvm};
+use clvm_utils::{clvm_list, clvm_quote, curry, tree_hash, FromClvm, LazyNode, ToClvm};
 use clvmr::{allocator::NodePtr, serde::node_from_bytes, Allocator};
 use sha2::{digest::FixedOutput, Digest, Sha256};
 use tokio::{
@@ -117,27 +117,6 @@ impl Wallet {
         let offer_mod = node_from_bytes(&mut a, &SETTLEMENT_PAYMENTS_PUZZLE)?;
         let cat_mod = node_from_bytes(&mut a, &CAT_PUZZLE)?;
 
-        // Parse NFT information and calculate royalty amount.
-        let puzzle = nft_info.puzzle_reveal.to_clvm(&mut a)?;
-
-        let (_, singleton_args) = uncurry(&a, puzzle)?;
-        let singleton_args = SingletonArgs::from_clvm(&a, singleton_args)?;
-
-        let (_, state_layer_args) = uncurry(&a, singleton_args.inner_puzzle.0)?;
-        let state_layer_args = NftStateLayerArgs::from_clvm(&a, state_layer_args)?;
-
-        let (_, ownership_layer_args) = uncurry(&a, state_layer_args.inner_puzzle.0)?;
-        let ownership_layer_args = NftOwnershipLayerArgs::from_clvm(&a, ownership_layer_args)?;
-
-        let (_, transfer_args) = uncurry(&a, ownership_layer_args.transfer_program.0)?;
-        let royalty_transfer_args = NftRoyaltyTransferPuzzleArgs::from_clvm(&a, transfer_args)?;
-
-        let royalty_percent = royalty_transfer_args.trade_price_percentage;
-        let royalty_puzzle_hash = royalty_transfer_args.royalty_puzzle_hash;
-
-        let royalty_amount =
-            (requested_amount as f64 * royalty_percent as f64 / 10000f64).abs() as u64;
-
         // Calculate requested payment.
         let puzzle_hash = self.unused_puzzle_hash().await?;
 
@@ -165,40 +144,6 @@ impl Wallet {
         // Collect announcements.
         let mut announcements_to_assert = Vec::new();
 
-        // Calculate puzzle announcement.
-        let payment_message = (nonce, vec![requested_payment.clone()]).to_clvm(&mut a)?;
-        let payment_message_hash = tree_hash(&a, payment_message);
-
-        let mut hasher = Sha256::new();
-        hasher.update(settlement_puzzle_hash);
-        hasher.update(payment_message_hash);
-        let payment_announcement_id: [u8; 32] = hasher.finalize_fixed().into();
-
-        announcements_to_assert.push(Condition::AssertPuzzleAnnouncement {
-            announcement_id: payment_announcement_id,
-        });
-
-        // Calculate royalty notarized payment.
-        let royalty_payment = Condition::CreateCoin {
-            puzzle_hash: royalty_puzzle_hash,
-            amount: royalty_amount as i64,
-            memos: vec![royalty_puzzle_hash],
-        }
-        .to_clvm(&mut a)?;
-
-        // Calculate royalty puzzle announcement.
-        let royalty_message = (nft_info.launcher_id, vec![royalty_payment]).to_clvm(&mut a)?;
-        let royalty_message_hash = tree_hash(&a, royalty_message);
-
-        let mut hasher = Sha256::new();
-        hasher.update(settlement_puzzle_hash);
-        hasher.update(royalty_message_hash);
-        let royalty_announcement_id: [u8; 32] = hasher.finalize_fixed().into();
-
-        announcements_to_assert.push(Condition::AssertPuzzleAnnouncement {
-            announcement_id: royalty_announcement_id,
-        });
-
         // Create spends.
         let mut coin_spends: Vec<CoinSpend> = Vec::new();
         let mut signatures: Vec<Signature> = Vec::new();
@@ -216,6 +161,19 @@ impl Wallet {
         );
 
         coin_spends.push(requested_coin_spend);
+
+        // Calculate puzzle announcement.
+        let payment_message = (nonce, vec![requested_payment_args.1]).to_clvm(&mut a)?;
+        let payment_message_hash = tree_hash(&a, payment_message);
+
+        let mut hasher = Sha256::new();
+        hasher.update(settlement_puzzle_hash);
+        hasher.update(payment_message_hash);
+        let payment_announcement_id: [u8; 32] = hasher.finalize_fixed().into();
+
+        announcements_to_assert.push(Condition::AssertPuzzleAnnouncement {
+            announcement_id: payment_announcement_id,
+        });
 
         // Spend NFT.
         let mut nft_condition_list = vec![Condition::CreateCoin {
