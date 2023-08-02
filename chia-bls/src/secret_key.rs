@@ -26,6 +26,28 @@ fn ikm_to_lamport_sk(ikm: &[u8; 32], salt: &[u8; 4]) -> [u8; 255 * 32] {
     output
 }
 
+pub fn to_lamport_pk(ikm: [u8; 32], idx: u32) -> [u8; 32] {
+    let not_ikm = flip_bits(ikm);
+    let salt = idx.to_be_bytes();
+
+    let mut lamport0 = ikm_to_lamport_sk(&ikm, &salt);
+    let mut lamport1 = ikm_to_lamport_sk(&not_ikm, &salt);
+
+    for i in (0..32 * 255).step_by(32) {
+        let hash = sha256(&lamport0[i..i + 32]);
+        lamport0[i..i + 32].copy_from_slice(&hash);
+    }
+    for i in (0..32 * 255).step_by(32) {
+        let hash = sha256(&lamport1[i..i + 32]);
+        lamport1[i..i + 32].copy_from_slice(&hash);
+    }
+
+    let mut hasher = Sha256::new();
+    hasher.update(lamport0);
+    hasher.update(lamport1);
+    hasher.finalize().try_into().unwrap()
+}
+
 fn sha256(bytes: &[u8]) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(bytes);
@@ -70,33 +92,10 @@ impl SecretKey {
         PublicKey(G1Projective::generator() * self.0)
     }
 
-    fn to_lamport_pk(&self, idx: u32) -> [u8; 32] {
-        let ikm = self.to_bytes();
-        let not_ikm = flip_bits(ikm);
-        let salt = idx.to_be_bytes();
-
-        let mut lamport0 = ikm_to_lamport_sk(&ikm, &salt);
-        let mut lamport1 = ikm_to_lamport_sk(&not_ikm, &salt);
-
-        for i in (0..32 * 255).step_by(32) {
-            let hash = sha256(&lamport0[i..i + 32]);
-            lamport0[i..i + 32].copy_from_slice(&hash);
-        }
-        for i in (0..32 * 255).step_by(32) {
-            let hash = sha256(&lamport1[i..i + 32]);
-            lamport1[i..i + 32].copy_from_slice(&hash);
-        }
-
-        let mut hasher = Sha256::new();
-        hasher.update(lamport0);
-        hasher.update(lamport1);
-        hasher.finalize().try_into().unwrap()
-    }
-
     pub fn derive_hardened(&self, idx: u32) -> SecretKey {
         // described here:
         // https://eips.ethereum.org/EIPS/eip-2333#derive_child_sk
-        SecretKey::from_seed(&self.to_lamport_pk(idx))
+        SecretKey::from_seed(to_lamport_pk(self.to_bytes(), idx).as_slice())
     }
 }
 
