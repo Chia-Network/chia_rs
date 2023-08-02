@@ -302,7 +302,7 @@ impl WalletState {
 
         let lineage_proof = LineageProof {
             parent_coin_info: *lineage_parent,
-            inner_puzzle_hash: inner_puzzle_hash,
+            inner_puzzle_hash,
             amount: parent_coin_state.coin.amount,
         };
 
