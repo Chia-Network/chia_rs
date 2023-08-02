@@ -162,7 +162,7 @@ impl<T: ToClvm> ToClvm for Option<T> {
 
 impl<T: FromClvm> FromClvm for Result<T> {
     fn from_clvm(a: &Allocator, node: NodePtr) -> Result<Self> {
-        T::from_clvm(a, node).map(Ok)
+        Ok(T::from_clvm(a, node))
     }
 }
 
