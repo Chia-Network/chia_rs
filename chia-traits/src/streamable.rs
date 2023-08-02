@@ -239,9 +239,6 @@ impl<T: Streamable, U: Streamable, V: Streamable, W: Streamable> Streamable for 
 // ===== TESTS ====
 
 #[cfg(test)]
-use crate::bytes::{Bytes, Bytes32, Bytes48};
-
-#[cfg(test)]
 fn from_bytes<'de, T: Streamable + std::fmt::Debug + std::cmp::PartialEq>(
     buf: &'de [u8],
     expected: T,
@@ -307,50 +304,6 @@ fn test_parse_u128() {
     from_bytes_fail::<u128>(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], Error::EndOfBuffer);
     from_bytes_fail::<u128>(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], Error::EndOfBuffer);
     from_bytes_fail::<u128>(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0], Error::EndOfBuffer);
-}
-
-#[test]
-fn test_parse_bytes32() {
-    let buf: &[u8] = &[
-        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
-        26, 27, 28, 29, 30, 31, 32,
-    ];
-    from_bytes::<Bytes32>(buf, Bytes32::from(buf));
-    from_bytes_fail::<Bytes32>(&buf[0..30], Error::EndOfBuffer);
-}
-
-#[test]
-fn test_parse_bytes48() {
-    let buf: &[u8] = &[
-        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
-        26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48,
-    ];
-    from_bytes::<Bytes48>(buf, Bytes48::from(buf));
-    from_bytes_fail::<Bytes48>(&buf[0..47], Error::EndOfBuffer);
-}
-
-#[test]
-fn test_parse_bytes_empty() {
-    let buf: &[u8] = &[0, 0, 0, 0];
-    from_bytes::<Bytes>(buf, [].to_vec().into());
-}
-
-#[test]
-fn test_parse_bytes() {
-    let buf: &[u8] = &[0, 0, 0, 3, 1, 2, 3];
-    from_bytes::<Bytes>(buf, [1_u8, 2, 3].to_vec().into());
-}
-
-#[test]
-fn test_parse_truncated_len() {
-    let buf: &[u8] = &[0, 0, 1];
-    from_bytes_fail::<Bytes>(buf, Error::EndOfBuffer);
-}
-
-#[test]
-fn test_parse_truncated() {
-    let buf: &[u8] = &[0, 0, 0, 4, 1, 2, 3];
-    from_bytes_fail::<Bytes>(buf, Error::EndOfBuffer);
 }
 
 #[test]
@@ -677,29 +630,6 @@ fn test_stream_custom_tuple() {
     let b = TestTuple("abc".to_string(), 1337);
     let buf = stream(&b);
     assert_eq!(&buf[..], [0, 0, 0, 3, b'a', b'b', b'c', 0, 0, 0x05, 0x39]);
-}
-
-#[test]
-fn test_stream_bytes32() {
-    let buf: &[u8] = &[
-        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
-        26, 27, 28, 29, 30, 31, 32,
-    ];
-    let out = stream(&Bytes32::from(buf));
-    assert_eq!(&buf, &out);
-}
-
-#[test]
-fn test_stream_bytes() {
-    let val: Bytes = vec![
-        1_u8, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
-        25, 26, 27, 28, 29, 30, 31, 32,
-    ]
-    .into();
-    println!("{:?}", val);
-    let buf = stream(&val);
-    println!("buf: {:?}", buf);
-    from_bytes(&buf, val);
 }
 
 #[test]

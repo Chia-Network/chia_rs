@@ -2,59 +2,10 @@ use pyo3::exceptions::PyValueError;
 use pyo3::PyAny;
 use pyo3::PyResult;
 
-use crate::bytes::{Bytes, BytesImpl};
-use hex::FromHex;
-use std::convert::TryInto;
-
 pub trait FromJsonDict {
     fn from_json_dict(o: &PyAny) -> PyResult<Self>
     where
         Self: Sized;
-}
-
-impl<const N: usize> FromJsonDict for BytesImpl<N> {
-    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
-        let s: String = o.extract()?;
-        if !s.starts_with("0x") {
-            return Err(PyValueError::new_err(
-                "bytes object is expected to start with 0x",
-            ));
-        }
-        let s = &s[2..];
-        let buf = match Vec::from_hex(s) {
-            Err(_) => {
-                return Err(PyValueError::new_err("invalid hex"));
-            }
-            Ok(v) => v,
-        };
-        if buf.len() != N {
-            return Err(PyValueError::new_err(format!(
-                "invalid length {} expected {}",
-                buf.len(),
-                N
-            )));
-        }
-        Ok((&buf).try_into()?)
-    }
-}
-
-impl FromJsonDict for Bytes {
-    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
-        let s: String = o.extract()?;
-        if !s.starts_with("0x") {
-            return Err(PyValueError::new_err(
-                "bytes object is expected to start with 0x",
-            ));
-        }
-        let s = &s[2..];
-        let buf = match Vec::from_hex(s) {
-            Err(_) => {
-                return Err(PyValueError::new_err("invalid hex"));
-            }
-            Ok(v) => v,
-        };
-        Ok(buf.into())
-    }
 }
 
 impl<T> FromJsonDict for Option<T>

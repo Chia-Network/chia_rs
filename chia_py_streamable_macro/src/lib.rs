@@ -7,8 +7,7 @@ use syn::{parse_macro_input, DeriveInput, FieldsNamed, FieldsUnnamed};
 
 #[proc_macro_derive(PyStreamable)]
 pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let found_crate =
-        crate_name("chia-protocol").expect("chia-protocol is present in `Cargo.toml`");
+    let found_crate = crate_name("chia-traits").expect("chia-traits is present in `Cargo.toml`");
 
     let crate_name = match found_crate {
         FoundCrate::Itself => quote!(crate),

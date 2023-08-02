@@ -9,6 +9,7 @@ members = [
     "chia-bls",
     "chia-ssl",
     "chia-tools",
+    "chia-traits",
     "clvm-macros",
     "clvm-utils",
     "clvm-utils/fuzz",

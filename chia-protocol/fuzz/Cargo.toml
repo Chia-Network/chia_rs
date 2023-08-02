@@ -10,6 +10,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
+chia-traits = { path = "../../chia-traits" }
 
 [dependencies.chia-protocol]
 path = ".."

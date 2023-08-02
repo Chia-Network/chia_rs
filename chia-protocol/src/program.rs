@@ -1,6 +1,6 @@
 use crate::bytes::Bytes;
-use crate::chia_error::{Error, Result};
-use crate::streamable::Streamable;
+use chia_traits::chia_error::{Error, Result};
+use chia_traits::Streamable;
 use clvmr::serde::serialized_length_from_bytes;
 use sha2::{Digest, Sha256};
 use std::fmt;
