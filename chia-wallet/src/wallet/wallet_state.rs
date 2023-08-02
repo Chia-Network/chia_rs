@@ -4,17 +4,22 @@ use chia_client::Peer;
 use chia_primitives::{
     puzzles::{
         CAT_PUZZLE_HASH, DID_INNER_PUZZLE_HASH, NFT_OWNERSHIP_LAYER_PUZZLE_HASH,
-        NFT_STATE_LAYER_PUZZLE_HASH, SINGLETON_PUZZLE_HASH,
+        NFT_STATE_LAYER_PUZZLE, NFT_STATE_LAYER_PUZZLE_HASH, SINGLETON_PUZZLE,
+        SINGLETON_PUZZLE_HASH, STANDARD_PUZZLE,
     },
-    CatArgs, Condition, DidArgs, LineageProof, NftOwnershipLayerArgs, NftStateLayerArgs, Proof,
-    SingletonArgs,
+    CatArgs, Condition, DidArgs, LineageProof, NftMetadata, NftOwnershipLayerArgs,
+    NftOwnershipLayerSolution, NftStateLayerArgs, NftStateLayerSolution, Proof, SingletonArgs,
+    SingletonSolution, SingletonStruct, StandardArgs,
 };
 use chia_protocol::{
     Coin, CoinState, Program, RegisterForCoinUpdates, RegisterForPhUpdates, RequestPuzzleSolution,
     RespondPuzzleSolution, RespondToCoinUpdates, RespondToPhUpdates,
 };
-use clvm_utils::{tree_hash, uncurry, FromClvm, ToClvm};
-use clvmr::{allocator::NodePtr, run_program, Allocator, ChiaDialect};
+use clvm_utils::{
+    curry, match_list, match_tuple, tree_hash, uncurry, FromClvm, LazyNode, MatchByte, ToClvm,
+};
+use clvmr::{allocator::NodePtr, run_program, serde::node_from_bytes, Allocator, ChiaDialect};
+use hex::ToHex;
 use tokio::sync::broadcast::Sender;
 
 use crate::utils::{select_coins, update_state};
@@ -282,24 +287,121 @@ impl WalletState {
 
     fn discover_nft(
         &mut self,
-        a: &Allocator,
+        a: &mut Allocator,
+        dialect: &ChiaDialect,
         parent_coin_state: CoinState,
         coin_state: CoinState,
-        parent_puzzle: Program,
+        parent_solution: NodePtr,
         launcher_id: [u8; 32],
         inner_puzzle_hash: [u8; 32],
         state_layer_args: NftStateLayerArgs,
     ) -> anyhow::Result<()> {
-        let (ownership_mod, ownership_args) = uncurry(a, state_layer_args.inner_puzzle.0)?;
+        let singleton_solution = SingletonSolution::from_clvm(a, parent_solution)?;
+        let state_solution =
+            NftStateLayerSolution::from_clvm(a, singleton_solution.inner_solution.0)?;
+        let ownership_solution =
+            NftOwnershipLayerSolution::from_clvm(a, state_solution.inner_solution.0)?;
 
-        if tree_hash(a, ownership_mod) != NFT_OWNERSHIP_LAYER_PUZZLE_HASH {
-            return Ok(());
+        let (ownership_layer_mod, ownership_layer_args) =
+            uncurry(a, state_layer_args.inner_puzzle.0)?;
+
+        if tree_hash(a, ownership_layer_mod) != NFT_OWNERSHIP_LAYER_PUZZLE_HASH {
+            return Err(anyhow::Error::msg("invalid NFT1 ownership puzzle"));
         }
 
-        let ownership_args = NftOwnershipLayerArgs::from_clvm(a, ownership_args)?;
+        let ownership_layer_args = NftOwnershipLayerArgs::from_clvm(a, ownership_layer_args)?;
+
+        let conditions = run_program(
+            a,
+            dialect,
+            ownership_layer_args.inner_puzzle.0,
+            ownership_solution.inner_solution.0,
+            u64::MAX,
+        )
+        .map_err(clvm_utils::Error::Allocator)?;
+
+        let mut metadata = NftMetadata::from_clvm(a, state_layer_args.metadata.0)?;
+        let mut p2_puzzle_hash = None;
+        let mut current_owner = ownership_layer_args.current_owner;
+
+        for LazyNode(condition) in Vec::from_clvm(a, conditions.1)? {
+            if let Ok(Condition::CreateCoin {
+                amount: 1, memos, ..
+            }) = Condition::from_clvm(a, condition)
+            {
+                if p2_puzzle_hash == None && !memos.is_empty() {
+                    p2_puzzle_hash = Some(*memos.first().unwrap());
+                }
+            } else if let Ok(result) =
+                <match_list!(MatchByte<235>, LazyNode, (String, String))>::from_clvm(a, condition)
+            {
+                let (key, uri) = result.1 .1 .0;
+
+                match key.as_str() {
+                    "u" => metadata.data_uris.insert(0, uri),
+                    "mu" => metadata.metadata_uris.insert(0, uri),
+                    "lu" => metadata.license_uris.insert(0, uri),
+                    _ => {}
+                }
+            } else if let Ok(result) =
+                <match_tuple!(MatchByte<246>, Option<[u8; 32]>, LazyNode)>::from_clvm(a, condition)
+            {
+                current_owner = result.1 .0;
+            }
+        }
+
+        let metadata = metadata.to_clvm(a)?;
+
+        let p2_puzzle_hash = p2_puzzle_hash.ok_or(anyhow::Error::msg("missing hint"))?;
+
+        let public_key = self
+            .key_store
+            .secret_key_of(&p2_puzzle_hash)
+            .ok_or(anyhow::Error::msg(
+                "inner p2 puzzle doesn't belong to wallet",
+            ))?
+            .to_public_key();
+
+        let p2_mod = node_from_bytes(a, &STANDARD_PUZZLE)?;
+        let state_layer_mod = node_from_bytes(a, &NFT_STATE_LAYER_PUZZLE)?;
+        let singleton_mod = node_from_bytes(a, &SINGLETON_PUZZLE)?;
+
+        let p2_args = StandardArgs {
+            synthetic_key: public_key,
+        }
+        .to_clvm(a)?;
+
+        let p2 = curry(a, p2_mod, p2_args)?;
+
+        let new_ownership_args = NftOwnershipLayerArgs {
+            mod_hash: NFT_OWNERSHIP_LAYER_PUZZLE_HASH,
+            current_owner,
+            transfer_program: ownership_layer_args.transfer_program,
+            inner_puzzle: LazyNode(p2),
+        }
+        .to_clvm(a)?;
+
+        let new_ownership = curry(a, ownership_layer_mod, new_ownership_args)?;
+
+        let new_state_args = NftStateLayerArgs {
+            mod_hash: NFT_STATE_LAYER_PUZZLE_HASH,
+            metadata: LazyNode(metadata),
+            metadata_updater_puzzle_hash: state_layer_args.metadata_updater_puzzle_hash,
+            inner_puzzle: LazyNode(new_ownership),
+        }
+        .to_clvm(a)?;
+
+        let new_state = curry(a, state_layer_mod, new_state_args)?;
+
+        let singleton_args = SingletonArgs {
+            singleton_struct: SingletonStruct::from_launcher_id(launcher_id),
+            inner_puzzle: LazyNode(new_state),
+        }
+        .to_clvm(a)?;
+
+        let singleton = curry(a, singleton_mod, singleton_args)?;
 
         let lineage_parent: &[u8; 32] = (&parent_coin_state.coin.parent_coin_info).into();
-
         let lineage_proof = LineageProof {
             parent_coin_info: *lineage_parent,
             inner_puzzle_hash,
@@ -309,8 +411,8 @@ impl WalletState {
         self.update_nft(NftInfo {
             launcher_id,
             coin_state,
-            puzzle_reveal: parent_puzzle,
-            p2_puzzle_hash: tree_hash(&a, ownership_args.inner_puzzle.0),
+            puzzle_reveal: Program::from_clvm(a, singleton)?,
+            p2_puzzle_hash,
             proof: Proof::Lineage(lineage_proof),
         })?;
 
@@ -438,10 +540,11 @@ impl WalletState {
                         let state_layer_args = NftStateLayerArgs::from_clvm(&a, inner_args)?;
 
                         self.discover_nft(
-                            &a,
+                            &mut a,
+                            &dialect,
                             parent_coin_state,
                             coin_state,
-                            parent_spend.puzzle,
+                            parent_solution,
                             launcher_id,
                             inner_puzzle_hash,
                             state_layer_args,
