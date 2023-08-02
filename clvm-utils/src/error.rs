@@ -1,7 +1,7 @@
 use clvmr::{allocator::NodePtr, reduction::EvalErr};
 use thiserror::Error;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum Error {
     #[error("{0}")]
     Reason(String),

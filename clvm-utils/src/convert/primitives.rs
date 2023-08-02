@@ -160,6 +160,21 @@ impl<T: ToClvm> ToClvm for Option<T> {
     }
 }
 
+impl<T: FromClvm> FromClvm for Result<T> {
+    fn from_clvm(a: &Allocator, node: NodePtr) -> Result<Self> {
+        T::from_clvm(a, node).map(Ok)
+    }
+}
+
+impl<T: ToClvm> ToClvm for Result<T> {
+    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
+        match self {
+            Ok(value) => value.to_clvm(a),
+            Err(error) => Err(error.clone()),
+        }
+    }
+}
+
 impl<T: FromClvm> FromClvm for Option<T> {
     fn from_clvm(a: &Allocator, node: NodePtr) -> Result<Self> {
         if nullp(a, node) {

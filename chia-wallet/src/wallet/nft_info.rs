@@ -9,3 +9,12 @@ pub struct NftInfo {
     pub p2_puzzle_hash: [u8; 32],
     pub proof: Proof,
 }
+
+pub enum NewOwner {
+    Reset,
+    Retain,
+    DidInfo {
+        did_id: [u8; 32],
+        did_inner_puzzle_hash: [u8; 32],
+    },
+}

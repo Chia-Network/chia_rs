@@ -7,14 +7,15 @@ use chia_primitives::{
         CAT_PUZZLE_HASH, DID_INNER_PUZZLE_HASH, NFT_OWNERSHIP_LAYER_PUZZLE_HASH,
         NFT_STATE_LAYER_PUZZLE_HASH, SINGLETON_PUZZLE_HASH,
     },
-    CatArgs, DidArgs, LineageProof, NftOwnershipLayerArgs, NftStateLayerArgs, Proof, SingletonArgs,
+    CatArgs, Condition, DidArgs, LineageProof, NftOwnershipLayerArgs, NftStateLayerArgs, Proof,
+    SingletonArgs,
 };
 use chia_protocol::{
-    Coin, CoinState, RegisterForCoinUpdates, RegisterForPhUpdates, RequestPuzzleSolution,
+    Coin, CoinState, Program, RegisterForCoinUpdates, RegisterForPhUpdates, RequestPuzzleSolution,
     RespondPuzzleSolution, RespondToCoinUpdates, RespondToPhUpdates,
 };
 use clvm_utils::{match_list, tree_hash, uncurry, FromClvm, LazyNode, MatchByte, ToClvm};
-use clvmr::{run_program, Allocator, ChiaDialect};
+use clvmr::{allocator::NodePtr, run_program, Allocator, ChiaDialect};
 use tokio::sync::broadcast::Sender;
 
 use crate::utils::{select_coins, update_state};
@@ -250,33 +251,154 @@ impl WalletState {
         Ok(())
     }
 
+    fn discover_did(
+        &mut self,
+        a: &Allocator,
+        parent_coin_state: CoinState,
+        coin_state: CoinState,
+        parent_puzzle: Program,
+        launcher_id: [u8; 32],
+        inner_puzzle_hash: [u8; 32],
+        did_args: DidArgs,
+    ) -> anyhow::Result<()> {
+        let lineage_parent: &[u8; 32] = (&parent_coin_state.coin.parent_coin_info).into();
+
+        let lineage_proof = LineageProof {
+            parent_coin_info: *lineage_parent,
+            inner_puzzle_hash,
+            amount: parent_coin_state.coin.amount,
+        };
+
+        self.update_did(DidInfo {
+            launcher_id,
+            coin_state,
+            puzzle_reveal: parent_puzzle,
+            inner_puzzle_hash,
+            p2_puzzle_hash: tree_hash(a, did_args.inner_puzzle.0),
+            proof: Proof::Lineage(lineage_proof),
+        })?;
+
+        Ok(())
+    }
+
+    fn discover_nft(
+        &mut self,
+        a: &Allocator,
+        parent_coin_state: CoinState,
+        coin_state: CoinState,
+        parent_puzzle: Program,
+        launcher_id: [u8; 32],
+        inner_puzzle_hash: [u8; 32],
+        state_layer_args: NftStateLayerArgs,
+    ) -> anyhow::Result<()> {
+        let (ownership_mod, ownership_args) = uncurry(a, state_layer_args.inner_puzzle.0)?;
+
+        if tree_hash(a, ownership_mod) != NFT_OWNERSHIP_LAYER_PUZZLE_HASH {
+            return Ok(());
+        }
+
+        let ownership_args = NftOwnershipLayerArgs::from_clvm(a, ownership_args)?;
+
+        let lineage_parent: &[u8; 32] = (&parent_coin_state.coin.parent_coin_info).into();
+
+        let lineage_proof = LineageProof {
+            parent_coin_info: *lineage_parent,
+            inner_puzzle_hash: inner_puzzle_hash,
+            amount: parent_coin_state.coin.amount,
+        };
+
+        self.update_nft(NftInfo {
+            launcher_id,
+            coin_state,
+            puzzle_reveal: parent_puzzle,
+            p2_puzzle_hash: tree_hash(&a, ownership_args.inner_puzzle.0),
+            proof: Proof::Lineage(lineage_proof),
+        })?;
+
+        Ok(())
+    }
+
+    fn discover_cat(
+        &mut self,
+        a: &mut Allocator,
+        dialect: &ChiaDialect,
+        parent_coin_state: CoinState,
+        coin_state: CoinState,
+        parent_puzzle: NodePtr,
+        parent_solution: NodePtr,
+        cat_args: CatArgs,
+    ) -> anyhow::Result<()> {
+        let conditions = run_program(a, dialect, parent_puzzle, parent_solution, u64::MAX)
+            .map_err(clvm_utils::Error::Allocator)?;
+
+        let conditions = Vec::<clvm_utils::Result<Condition>>::from_clvm(a, conditions.1)?;
+
+        let p2_puzzle_hash = conditions
+            .iter()
+            .find_map(|condition| {
+                if let Ok(Condition::CreateCoin {
+                    puzzle_hash, memos, ..
+                }) = condition
+                {
+                    if puzzle_hash == coin_state.coin.puzzle_hash && !memos.is_empty() {
+                        Some(*memos.first().unwrap())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .ok_or(anyhow::Error::msg("missing hint"))?;
+
+        let lineage_parent: &[u8; 32] = (&parent_coin_state.coin.parent_coin_info).into();
+
+        let lineage_proof = LineageProof {
+            parent_coin_info: *lineage_parent,
+            inner_puzzle_hash: tree_hash(a, cat_args.inner_puzzle.0),
+            amount: parent_coin_state.coin.amount,
+        };
+
+        self.update_cat(
+            cat_args.tail_program_hash,
+            CatCoin {
+                coin_state,
+                lineage_proof,
+                p2_puzzle_hash,
+            },
+        )?;
+
+        Ok(())
+    }
+
     /// Handles hinted coin discovery.
-    async fn handle_hinted_coin(&mut self, update: CoinState) -> anyhow::Result<()> {
+    async fn handle_hinted_coin(&mut self, coin_state: CoinState) -> anyhow::Result<()> {
         // Ignore spent coins.
-        if update.spent_height.is_some() {
+        if coin_state.spent_height.is_some() {
             return Ok(());
         }
 
         // Request parent coin state.
-        let response: RespondToCoinUpdates = self
+        let mut response: RespondToCoinUpdates = self
             .peer
             .request(RegisterForCoinUpdates::new(
-                vec![update.coin.parent_coin_info],
+                vec![coin_state.coin.parent_coin_info],
                 0,
             ))
             .await?;
 
-        let parent_coin_state = response
-            .coin_states
-            .first()
-            .ok_or(Error::msg("no parent coin state"))?;
+        if response.coin_states.is_empty() {
+            return Ok(());
+        }
+
+        let parent_coin_state = response.coin_states.remove(0);
 
         // Request parent coin spend.
         let response: RespondPuzzleSolution = self
             .peer
             .request(RequestPuzzleSolution::new(
-                update.coin.parent_coin_info,
-                update.created_height.unwrap_or_default(),
+                coin_state.coin.parent_coin_info,
+                coin_state.created_height.unwrap_or_default(),
             ))
             .await?;
 
@@ -284,114 +406,62 @@ impl WalletState {
 
         // Initialize the allocator.
         let mut a = Allocator::new();
+        let dialect = ChiaDialect::new(0);
 
-        let puzzle = parent_spend.puzzle.to_clvm(&mut a)?;
-        let (uncurried, args) = uncurry(&a, puzzle)?;
+        let parent_puzzle = parent_spend.puzzle.to_clvm(&mut a)?;
+        let parent_solution = parent_spend.solution.to_clvm(&mut a)?;
 
-        match tree_hash(&a, uncurried) {
+        let (uncurried_parent, parent_args) = uncurry(&a, parent_puzzle)?;
+
+        match tree_hash(&a, uncurried_parent) {
             SINGLETON_PUZZLE_HASH => {
-                let singleton_args = SingletonArgs::from_clvm(&a, args)?;
+                let singleton_args = SingletonArgs::from_clvm(&a, parent_args)?;
                 let (uncurried_inner, inner_args) = uncurry(&a, singleton_args.inner_puzzle.0)?;
-                let singleton_inner_hash = tree_hash(&a, singleton_args.inner_puzzle.0);
-                let singleton_launcher_id = singleton_args.singleton_struct.launcher_id;
+
+                let launcher_id = singleton_args.singleton_struct.launcher_id;
+                let inner_puzzle_hash = tree_hash(&a, singleton_args.inner_puzzle.0);
 
                 match tree_hash(&a, uncurried_inner) {
                     DID_INNER_PUZZLE_HASH => {
                         let did_args = DidArgs::from_clvm(&a, inner_args)?;
 
-                        let lineage_parent: &[u8; 32] =
-                            (&parent_coin_state.coin.parent_coin_info).into();
-
-                        let lineage_proof = LineageProof {
-                            parent_coin_info: *lineage_parent,
-                            inner_puzzle_hash: singleton_inner_hash,
-                            amount: parent_coin_state.coin.amount,
-                        };
-
-                        self.update_did(DidInfo {
-                            launcher_id: singleton_launcher_id,
-                            coin_state: update,
-                            puzzle_reveal: parent_spend.puzzle,
-                            inner_puzzle_hash: singleton_inner_hash,
-                            p2_puzzle_hash: tree_hash(&a, did_args.inner_puzzle.0),
-                            proof: Proof::Lineage(lineage_proof),
-                        })?;
+                        self.discover_did(
+                            &a,
+                            parent_coin_state,
+                            coin_state,
+                            parent_spend.puzzle,
+                            launcher_id,
+                            inner_puzzle_hash,
+                            did_args,
+                        )?;
                     }
                     NFT_STATE_LAYER_PUZZLE_HASH => {
-                        let state_args = NftStateLayerArgs::from_clvm(&a, inner_args)?;
-                        let (ownership, ownership_args) = uncurry(&a, state_args.inner_puzzle.0)?;
-                        if tree_hash(&a, ownership) != NFT_OWNERSHIP_LAYER_PUZZLE_HASH {
-                            return Ok(());
-                        }
-                        let ownership_args = NftOwnershipLayerArgs::from_clvm(&a, ownership_args)?;
+                        let state_layer_args = NftStateLayerArgs::from_clvm(&a, inner_args)?;
 
-                        let lineage_parent: &[u8; 32] =
-                            (&parent_coin_state.coin.parent_coin_info).into();
-
-                        let lineage_proof = LineageProof {
-                            parent_coin_info: *lineage_parent,
-                            inner_puzzle_hash: singleton_inner_hash,
-                            amount: parent_coin_state.coin.amount,
-                        };
-
-                        self.update_nft(NftInfo {
-                            launcher_id: singleton_launcher_id,
-                            coin_state: update,
-                            puzzle_reveal: parent_spend.puzzle,
-                            p2_puzzle_hash: tree_hash(&a, ownership_args.inner_puzzle.0),
-                            proof: Proof::Lineage(lineage_proof),
-                        })?;
+                        self.discover_nft(
+                            &a,
+                            parent_coin_state,
+                            coin_state,
+                            parent_spend.puzzle,
+                            launcher_id,
+                            inner_puzzle_hash,
+                            state_layer_args,
+                        )?;
                     }
                     _ => {}
                 }
             }
             CAT_PUZZLE_HASH => {
-                let cat_args = CatArgs::from_clvm(&a, args)?;
-                let cat_inner_hash = tree_hash(&a, cat_args.inner_puzzle.0);
+                let cat_args = CatArgs::from_clvm(&a, parent_args)?;
 
-                let solution = parent_spend.solution.to_clvm(&mut a)?;
-                let dialect = ChiaDialect::new(0);
-                let output = run_program(&mut a, &dialect, puzzle, solution, 1_000_000_000_000_000)
-                    .map_err(clvm_utils::Error::Allocator)?;
-
-                let items = Vec::<LazyNode>::from_clvm(&a, output.1)?;
-                let mut p2_puzzle_hash = None;
-
-                for item in items {
-                    let matched =
-                        <match_list!(MatchByte<51>, [u8; 32], u64, Vec<[u8; 32]>)>::from_clvm(
-                            &a, item.0,
-                        );
-                    if let Ok(info) = matched {
-                        let puzzle_hash = info.1 .0;
-                        let memos = info.1 .1 .1 .0;
-
-                        if puzzle_hash == update.coin.puzzle_hash {
-                            p2_puzzle_hash =
-                                Some(*memos.first().ok_or(anyhow::Error::msg("missing hint"))?);
-                        }
-                    }
-                }
-
-                let Some(p2_puzzle_hash) = p2_puzzle_hash else {
-                    return Err(anyhow::Error::msg("missing hint"));
-                };
-
-                let lineage_parent: &[u8; 32] = (&parent_coin_state.coin.parent_coin_info).into();
-
-                let lineage_proof = LineageProof {
-                    parent_coin_info: *lineage_parent,
-                    inner_puzzle_hash: cat_inner_hash,
-                    amount: parent_coin_state.coin.amount,
-                };
-
-                self.update_cat(
-                    cat_args.tail_program_hash,
-                    CatCoin {
-                        coin_state: update,
-                        lineage_proof,
-                        p2_puzzle_hash,
-                    },
+                self.discover_cat(
+                    &mut a,
+                    &dialect,
+                    parent_coin_state,
+                    coin_state,
+                    parent_puzzle,
+                    parent_solution,
+                    cat_args,
                 )?;
             }
             _ => {}

@@ -203,21 +203,6 @@ impl Wallet {
         let mut coin_spends: Vec<CoinSpend> = Vec::new();
         let mut signatures: Vec<Signature> = Vec::new();
 
-        // Spend NFT.
-        let mut nft_condition_list = vec![Condition::CreateCoin {
-            puzzle_hash: SETTLEMENT_PAYMENTS_PUZZLE_HASH,
-            amount: nft_info.coin_state.coin.amount as i64,
-            memos: vec![],
-        }];
-
-        nft_condition_list.extend(announcements_to_assert);
-
-        let (nft_coin_spend, nft_signature, _) =
-            self.spend_nft(nft_id, None, nft_condition_list).await?;
-
-        coin_spends.push(nft_coin_spend);
-        signatures.push(nft_signature);
-
         // Add requested CAT.
         let requested_payment_ptr = requested_payment.to_clvm(&mut a)?;
         let requested_payment_args = <(LazyNode, LazyNode)>::from_clvm(&a, requested_payment_ptr)?;
@@ -231,6 +216,22 @@ impl Wallet {
         );
 
         coin_spends.push(requested_coin_spend);
+
+        // Spend NFT.
+        let mut nft_condition_list = vec![Condition::CreateCoin {
+            puzzle_hash: SETTLEMENT_PAYMENTS_PUZZLE_HASH,
+            amount: nft_info.coin_state.coin.amount as i64,
+            memos: vec![SETTLEMENT_PAYMENTS_PUZZLE_HASH],
+        }];
+
+        nft_condition_list.extend(announcements_to_assert);
+
+        let (nft_coin_spend, nft_signature, _) = self
+            .spend_nft(nft_id, NewOwner::Reset, nft_condition_list)
+            .await?;
+
+        coin_spends.push(nft_coin_spend);
+        signatures.push(nft_signature);
 
         // Construct spend bundle.
         let spend_bundle = SpendBundle::new(
@@ -933,7 +934,10 @@ impl Wallet {
             let (eve_coin_spend, signature, announcement_message) = self
                 .spend_nft(
                     &launcher_id,
-                    Some((did_info.launcher_id, did_info.inner_puzzle_hash)),
+                    NewOwner::DidInfo {
+                        did_id: did_info.launcher_id,
+                        did_inner_puzzle_hash: did_info.inner_puzzle_hash,
+                    },
                     eve_spend_conditions,
                 )
                 .await?;
@@ -944,7 +948,7 @@ impl Wallet {
             // Assert eve puzzle announcement in funding spend.
             let mut hasher = Sha256::new();
             hasher.update(eve_puzzle_hash);
-            hasher.update(announcement_message);
+            hasher.update(announcement_message.unwrap());
             let announcement_id: [u8; 32] = hasher.finalize_fixed().into();
 
             did_condition_list.push(Condition::AssertPuzzleAnnouncement { announcement_id });
@@ -1091,9 +1095,9 @@ impl Wallet {
     pub async fn spend_nft(
         &self,
         nft_id: &[u8; 32],
-        new_did_id_and_did_inner_puzzle_hash: Option<([u8; 32], [u8; 32])>,
+        new_owner: NewOwner,
         condition_list: Vec<Condition>,
-    ) -> anyhow::Result<(CoinSpend, Signature, Vec<u8>)> {
+    ) -> anyhow::Result<(CoinSpend, Signature, Option<Vec<u8>>)> {
         // Get NFT info.
         let nft_info = self
             .state
@@ -1107,22 +1111,34 @@ impl Wallet {
 
         // Construct the p2 solution.
         let conditions: NodePtr;
-        let mut announcement_message = Vec::new();
+        let mut announcement_message = None;
 
-        if let Some((new_did_id, new_did_inner_puzzle_hash)) = new_did_id_and_did_inner_puzzle_hash
-        {
-            let new_owner_condition_args =
-                clvm_list!(new_did_id, (), new_did_inner_puzzle_hash).to_clvm(&mut a)?;
-            let magic_condition = (-10, LazyNode(new_owner_condition_args)).to_clvm(&mut a)?;
-            conditions =
-                clvm_quote!((LazyNode(magic_condition), condition_list)).to_clvm(&mut a)?;
+        match new_owner {
+            NewOwner::DidInfo {
+                did_id,
+                did_inner_puzzle_hash,
+            } => {
+                let new_owner_condition_args =
+                    clvm_list!(did_id, (), did_inner_puzzle_hash).to_clvm(&mut a)?;
+                let magic_condition = (-10, LazyNode(new_owner_condition_args)).to_clvm(&mut a)?;
+                conditions =
+                    clvm_quote!((LazyNode(magic_condition), condition_list)).to_clvm(&mut a)?;
 
-            let raw_announcement_message = tree_hash(&a, new_owner_condition_args);
-            announcement_message.push(0xad);
-            announcement_message.push(0x4c);
-            announcement_message.extend(raw_announcement_message);
-        } else {
-            conditions = clvm_quote!(condition_list).to_clvm(&mut a)?;
+                let mut message = vec![0xad, 0x4c];
+                message.extend(tree_hash(&a, new_owner_condition_args));
+                announcement_message = Some(message);
+            }
+            NewOwner::Reset => {
+                let new_owner_condition_args = clvm_list!((), (), ()).to_clvm(&mut a)?;
+                let magic_condition = (-10, LazyNode(new_owner_condition_args)).to_clvm(&mut a)?;
+                conditions =
+                    clvm_quote!((LazyNode(magic_condition), condition_list)).to_clvm(&mut a)?;
+
+                let mut message = vec![0xad, 0x4c];
+                message.extend(tree_hash(&a, new_owner_condition_args));
+                announcement_message = Some(message);
+            }
+            NewOwner::Retain => conditions = clvm_quote!(condition_list).to_clvm(&mut a)?,
         }
 
         let conditions_tree_hash = tree_hash(&a, conditions);
