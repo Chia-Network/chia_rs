@@ -1,7 +1,7 @@
 #[macro_export]
 macro_rules! message_struct {
     ($name:ident {$($field:ident: $t:ty $(,)? )*}) => {
-        #[cfg_attr(feature = "py-bindings", pyo3::pyclass(get_all, frozen), derive(chia_py_streamable_macro::PyStreamable))]
+        #[cfg_attr(feature = "py-bindings", pyo3::pyclass(get_all, frozen), derive(chia_py_streamable_macro::PyJsonDict, chia_py_streamable_macro::PyStreamable))]
         #[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
         pub struct $name {
             $(pub $field: $t),*
@@ -26,7 +26,7 @@ macro_rules! message_struct {
 #[macro_export]
 macro_rules! streamable_struct {
     ($name:ident {$($field:ident: $t:ty $(,)? )*}) => {
-        #[cfg_attr(feature = "py-bindings", pyo3::pyclass(get_all, frozen), derive(chia_py_streamable_macro::PyStreamable))]
+        #[cfg_attr(feature = "py-bindings", pyo3::pyclass(get_all, frozen), derive(chia_py_streamable_macro::PyJsonDict, chia_py_streamable_macro::PyStreamable))]
         #[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
         pub struct $name {
             $(pub $field: $t),*
