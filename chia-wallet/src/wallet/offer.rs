@@ -140,7 +140,7 @@ mod tests {
 
     #[test]
     fn test_decompression() {
-        for version in MIN_VERSION..=MAX_VERSION {
+        for _ in MIN_VERSION..=MAX_VERSION {
             let output = decompress_object_with_puzzles(&COMPRESSED_OFFER_HEX).unwrap();
 
             assert_eq!(

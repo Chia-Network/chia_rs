@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use anyhow::Error;
 use chia_client::Peer;
 use chia_primitives::{
     puzzles::{
@@ -14,7 +13,7 @@ use chia_protocol::{
     Coin, CoinState, Program, RegisterForCoinUpdates, RegisterForPhUpdates, RequestPuzzleSolution,
     RespondPuzzleSolution, RespondToCoinUpdates, RespondToPhUpdates,
 };
-use clvm_utils::{match_list, tree_hash, uncurry, FromClvm, LazyNode, MatchByte, ToClvm};
+use clvm_utils::{tree_hash, uncurry, FromClvm, ToClvm};
 use clvmr::{allocator::NodePtr, run_program, Allocator, ChiaDialect};
 use tokio::sync::broadcast::Sender;
 
