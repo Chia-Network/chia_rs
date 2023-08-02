@@ -16,7 +16,8 @@ use chia_primitives::{
     NftStateLayerArgs, NftStateLayerSolution, Proof, SingletonArgs, SingletonSolution,
     SingletonStruct, StandardArgs, StandardSolution,
 };
-use chia_protocol::{Coin, CoinSpend, CoinState, Program, SpendBundle, Streamable};
+use chia_protocol::{Coin, CoinSpend, CoinState, Program, SpendBundle};
+use chia_traits::Streamable;
 use clvm_utils::{clvm_list, clvm_quote, curry, tree_hash, FromClvm, LazyNode, ToClvm};
 use clvmr::{allocator::NodePtr, serde::node_from_bytes, Allocator};
 use sha2::{digest::FixedOutput, Digest, Sha256};

@@ -1,6 +1,7 @@
 use std::io::Cursor;
 
-use chia_protocol::{BytesImpl, Coin, Program, Streamable};
+use chia_protocol::{BytesImpl, Coin, Program};
+use chia_traits::Streamable;
 use clvmr::{
     allocator::{NodePtr, SExp},
     serde::{node_from_bytes, node_to_bytes},

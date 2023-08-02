@@ -11,6 +11,7 @@ repository = "https://github.com/Chia-Network/chia_rs/clvm-utils"
 [dependencies]
 chia-protocol = { version = "0.2.7", path = "../chia-protocol" }
 chia-bls = { version = "0.2.7", path = "../chia-bls" }
+chia-traits = { version = "0.1.0", path = "../chia-traits" }
 clvm-macros = { version = "0.1.0", path = "../clvm-macros" }
 clvmr = "0.2.7"
 hex = "0.4.3"

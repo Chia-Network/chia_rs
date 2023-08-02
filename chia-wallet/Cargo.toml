@@ -12,6 +12,7 @@ repository = "https://github.com/Chia-Network/chia_rs/chia-wallet/"
 chia-bls = { path = "../chia-bls" }
 chia-primitives = { path = "../chia-primitives" }
 chia-protocol = { path = "../chia-protocol" }
+chia-traits = { path = "../chia-traits" }
 chia-client = { path = "../chia-client" }
 clvm-utils = { path = "../clvm-utils" }
 tokio = { version = "1", features = ["full"] }

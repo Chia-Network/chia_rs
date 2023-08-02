@@ -1,9 +1,10 @@
 use std::{collections::HashMap, io::Cursor, sync::Arc};
 
 use chia_protocol::{
-    chia_error::Error as ChiaError, ChiaProtocolMessage, CoinStateUpdate, Handshake, Message,
-    NewPeakWallet, NodeType, ProtocolMessageTypes, Streamable,
+    ChiaProtocolMessage, CoinStateUpdate, Handshake, Message, NewPeakWallet, NodeType,
+    ProtocolMessageTypes,
 };
+use chia_traits::{chia_error::Error as ChiaError, Streamable};
 use futures_util::{
     stream::{SplitSink, SplitStream},
     SinkExt, StreamExt,
