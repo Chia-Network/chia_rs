@@ -120,7 +120,8 @@ pub fn compress_object_with_puzzles(bytes: &[u8], version: u16) -> io::Result<Ve
 mod tests {
     use std::io::Cursor;
 
-    use chia_protocol::{SpendBundle, Streamable};
+    use chia_protocol::SpendBundle;
+    use chia_traits::Streamable;
     use hex::ToHex;
     use hex_literal::hex;
 
