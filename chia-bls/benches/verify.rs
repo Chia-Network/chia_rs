@@ -14,8 +14,8 @@ fn verify_benchmark(c: &mut Criterion) {
     let pk = sk.public_key();
     let msg_small = b"The quick brown fox jumps over the lazy dog";
     let msg_large = [42_u8; 4096];
-    let sig_small = sign(&sk, &msg_small);
-    let sig_large = sign(&sk, &msg_large);
+    let sig_small = sign(&sk, msg_small);
+    let sig_large = sign(&sk, msg_large);
 
     c.bench_function("verify, small msg", |b| {
         b.iter(|| {

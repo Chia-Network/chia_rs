@@ -170,7 +170,7 @@ fn test_random_verify() {
         rng.fill(data.as_mut_slice());
         let sk = SecretKey::from_seed(&data);
         let pk = sk.public_key();
-        let sig = sign(&sk, &msg);
+        let sig = sign(&sk, msg);
         assert!(verify(&sig, &pk, msg));
 
         let bytes = sig.to_bytes();
@@ -197,7 +197,7 @@ fn test_verify() {
     )
     .unwrap();
 
-    let sig = sign(&sk, &msg);
+    let sig = sign(&sk, msg);
     assert!(verify(&sig, &sk.public_key(), msg));
 
     assert_eq!(sig.to_bytes(), <[u8; 96]>::from_hex("b45825c0ee7759945c0189b4c38b7e54231ebadc83a851bec3bb7cf954a124ae0cc8e8e5146558332ea152f63bf8846e04826185ef60e817f271f8d500126561319203f9acb95809ed20c193757233454be1562a5870570941a84605bd2c9c9a").unwrap());
@@ -280,11 +280,17 @@ fn test_invalid_aggregate_signature() {
     agg.aggregate(&sig[0]);
     agg.aggregate(&sig[1]);
 
-    assert!(aggregate_verify(&agg, [(&pk[0], msg[0])]) == false);
-    assert!(aggregate_verify(&agg, [(&pk[1], msg[1])]) == false);
+    assert!(!aggregate_verify(&agg, [(&pk[0], msg[0])]));
+    assert!(!aggregate_verify(&agg, [(&pk[1], msg[1])]));
     // public keys mixed with the wrong message
-    assert!(aggregate_verify(&agg, [(&pk[0], msg[1]), (&pk[1], msg[0])]) == false);
-    assert!(aggregate_verify(&agg, [(&pk[1], msg[0]), (&pk[0], msg[1])]) == false);
+    assert!(!aggregate_verify(
+        &agg,
+        [(&pk[0], msg[1]), (&pk[1], msg[0])]
+    ));
+    assert!(!aggregate_verify(
+        &agg,
+        [(&pk[1], msg[0]), (&pk[0], msg[1])]
+    ));
 }
 
 #[test]
@@ -302,16 +308,16 @@ fn test_vector_2_aggregate_of_aggregates() {
     let pk1 = sk1.public_key();
     let pk2 = sk2.public_key();
 
-    let sig1 = sign(&sk1, &message1);
-    let sig2 = sign(&sk2, &message2);
-    let sig3 = sign(&sk2, &message1);
-    let sig4 = sign(&sk1, &message3);
-    let sig5 = sign(&sk1, &message1);
-    let sig6 = sign(&sk1, &message4);
+    let sig1 = sign(&sk1, message1);
+    let sig2 = sign(&sk2, message2);
+    let sig3 = sign(&sk2, message1);
+    let sig4 = sign(&sk1, message3);
+    let sig5 = sign(&sk1, message1);
+    let sig6 = sign(&sk1, message4);
 
-    let agg_sig_l = aggregate(&[sig1, sig2]);
-    let agg_sig_r = aggregate(&[sig3, sig4, sig5]);
-    let aggsig = aggregate(&[agg_sig_l, agg_sig_r, sig6]);
+    let agg_sig_l = aggregate([sig1, sig2]);
+    let agg_sig_r = aggregate([sig3, sig4, sig5]);
+    let aggsig = aggregate([agg_sig_l, agg_sig_r, sig6]);
 
     assert!(aggregate_verify(
         &aggsig,
@@ -341,7 +347,7 @@ fn test_signature_zero_key() {
     // test case from: bls-signatures/src/test.cpp
     // "Should sign with the zero key"
     let sk = SecretKey::from_bytes(&[0; 32]).unwrap();
-    assert_eq!(sign(&sk, &[1_u8, 2, 3]), Signature::default());
+    assert_eq!(sign(&sk, [1_u8, 2, 3]), Signature::default());
 }
 
 #[test]
@@ -389,14 +395,14 @@ fn test_aggregate_multiple_levels_degenerate() {
     let message1 = [100_u8, 2, 254, 88, 90, 45, 23];
     let sk1 = random_sk(&mut rng);
     let pk1 = sk1.public_key();
-    let mut agg_sig = sign(&sk1, &message1);
+    let mut agg_sig = sign(&sk1, message1);
     let mut pairs: Vec<(PublicKey, &[u8])> = vec![(pk1, &message1)];
 
     for _i in 0..10 {
         let sk = random_sk(&mut rng);
         let pk = sk.public_key();
         pairs.push((pk, &message1));
-        let sig = sign(&sk, &message1);
+        let sig = sign(&sk, message1);
         agg_sig.aggregate(&sig);
     }
     assert!(aggregate_verify(&agg_sig, pairs));
@@ -420,10 +426,10 @@ fn test_aggregate_multiple_levels_different_messages() {
     let pk1 = sk1.public_key();
     let pk2 = sk2.public_key();
 
-    let sig1 = sign(&sk1, &message1);
-    let sig2 = sign(&sk2, &message2);
-    let sig3 = sign(&sk2, &message3);
-    let sig4 = sign(&sk1, &message4);
+    let sig1 = sign(&sk1, message1);
+    let sig2 = sign(&sk2, message2);
+    let sig3 = sign(&sk2, message3);
+    let sig4 = sign(&sk1, message4);
 
     let agg_sig_l = aggregate([sig1, sig2]);
     let agg_sig_r = aggregate([sig3, sig4]);
@@ -449,49 +455,49 @@ fn test_aug_scheme() {
     let sk1 = SecretKey::from_seed(&[4_u8; 32]);
     let pk1 = sk1.public_key();
     let pk1v = pk1.to_bytes();
-    let sig1 = sign(&sk1, &msg1);
+    let sig1 = sign(&sk1, msg1);
     let sig1v = sig1.to_bytes();
 
-    assert!(verify(&sig1, &pk1, &msg1));
+    assert!(verify(&sig1, &pk1, msg1));
     assert!(verify(
         &Signature::from_bytes(&sig1v).unwrap(),
         &PublicKey::from_bytes(&pk1v).unwrap(),
-        &msg1
+        msg1
     ));
 
     let sk2 = SecretKey::from_seed(&[5_u8; 32]);
     let pk2 = sk2.public_key();
     let pk2v = pk2.to_bytes();
-    let sig2 = sign(&sk2, &msg2);
+    let sig2 = sign(&sk2, msg2);
     let sig2v = sig2.to_bytes();
 
-    assert!(verify(&sig2, &pk2, &msg2));
+    assert!(verify(&sig2, &pk2, msg2));
     assert!(verify(
         &Signature::from_bytes(&sig2v).unwrap(),
         &PublicKey::from_bytes(&pk2v).unwrap(),
-        &msg2
+        msg2
     ));
 
     // Wrong G2Element
-    assert!(!verify(&sig2, &pk1, &msg1));
+    assert!(!verify(&sig2, &pk1, msg1));
     assert!(!verify(
         &Signature::from_bytes(&sig2v).unwrap(),
         &PublicKey::from_bytes(&pk1v).unwrap(),
-        &msg1
+        msg1
     ));
     // Wrong msg
-    assert!(!verify(&sig1, &pk1, &msg2));
+    assert!(!verify(&sig1, &pk1, msg2));
     assert!(!verify(
         &Signature::from_bytes(&sig1v).unwrap(),
         &PublicKey::from_bytes(&pk1v).unwrap(),
-        &msg2
+        msg2
     ));
     // Wrong pk
-    assert!(!verify(&sig1, &pk2, &msg1));
+    assert!(!verify(&sig1, &pk2, msg1));
     assert!(!verify(
         &Signature::from_bytes(&sig1v).unwrap(),
         &PublicKey::from_bytes(&pk2v).unwrap(),
-        &msg1
+        msg1
     ));
 
     let aggsig = aggregate([sig1, sig2]);

@@ -46,7 +46,7 @@ where
     I: IntoIterator<Item = (Coin, BufRef, BufRef)>,
 {
     let mut a = Allocator::new();
-    let generator = build_generator(&mut a, spends.into_iter())?;
+    let generator = build_generator(&mut a, spends)?;
     node_to_bytes(&a, generator)
 }
 
@@ -100,7 +100,7 @@ mod tests {
     fn run_generator(program: &[u8]) -> Vec<u8> {
         let dialect = ChiaDialect::new(0);
         let mut a = Allocator::new();
-        let program = node_from_bytes_backrefs(&mut a, &program).expect("node_from_bytes");
+        let program = node_from_bytes_backrefs(&mut a, program).expect("node_from_bytes");
         let env = a.null();
         let generator_output = run_program(&mut a, &dialect, program, env, 11000000000)
             .expect("run_program")
