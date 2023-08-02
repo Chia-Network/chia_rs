@@ -19,7 +19,6 @@ use clvm_utils::{
     curry, match_list, match_tuple, tree_hash, uncurry, FromClvm, LazyNode, MatchByte, ToClvm,
 };
 use clvmr::{allocator::NodePtr, run_program, serde::node_from_bytes, Allocator, ChiaDialect};
-use hex::ToHex;
 use tokio::sync::broadcast::Sender;
 
 use crate::utils::{select_coins, update_state};
