@@ -561,18 +561,17 @@ impl Wallet {
 
         for (index, cat_spend) in cat_spends.iter().enumerate() {
             // Calculate the delta and add it to the subtotal.
-            let delta =
-                cat_spend
-                    .conditions
-                    .iter()
-                    .fold(-cat_spend.extra_delta, |delta, condition| {
-                        if let Condition::CreateCoin { amount, .. } = condition {
-                            if *amount != -113 {
-                                return delta + amount;
-                            }
+            let delta = cat_spend.conditions.iter().fold(
+                cat_spend.cat_coin.coin_state.coin.amount as i64 - cat_spend.extra_delta,
+                |delta, condition| {
+                    if let Condition::CreateCoin { amount, .. } = condition {
+                        if *amount != -113 {
+                            return delta - amount;
                         }
-                        delta
-                    });
+                    }
+                    delta
+                },
+            );
 
             let prev_subtotal = total_delta;
 
