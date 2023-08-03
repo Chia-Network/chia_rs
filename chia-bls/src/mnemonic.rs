@@ -23,8 +23,6 @@ pub fn entropy_to_seed(entropy: &[u8; 32]) -> [u8; 64] {
 }
 
 #[cfg(test)]
-use hex::encode;
-#[cfg(test)]
 use hex::FromHex;
 
 #[test]
@@ -52,7 +50,7 @@ fn test_parse_mnemonic() {
     for (phrase, entropy, seed) in test_cases {
         println!("{}", phrase);
         assert_eq!(
-            encode(mnemonic_to_entropy(phrase).unwrap()),
+            hex::encode(mnemonic_to_entropy(phrase).unwrap()),
             entropy.to_string()
         );
         assert_eq!(
@@ -60,7 +58,7 @@ fn test_parse_mnemonic() {
             *phrase
         );
         assert_eq!(
-            encode(entropy_to_seed(&<[u8; 32]>::from_hex(entropy).unwrap())),
+            hex::encode(entropy_to_seed(&<[u8; 32]>::from_hex(entropy).unwrap())),
             seed.to_string()
         )
     }
