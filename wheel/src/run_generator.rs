@@ -12,14 +12,14 @@ use pyo3::buffer::PyBuffer;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 
-use chia_py_streamable_macro::PyStreamable;
+use chia_py_streamable_macro::{PyJsonDict, PyStreamable};
 use chia_streamable_macro::Streamable;
 
 #[cfg(feature = "py-bindings")]
 use chia_traits::{FromJsonDict, ToJsonDict};
 
 #[pyclass(name = "Spend", get_all, frozen)]
-#[derive(Streamable, PyStreamable, Hash, Debug, Clone, Eq, PartialEq)]
+#[derive(Streamable, PyJsonDict, PyStreamable, Hash, Debug, Clone, Eq, PartialEq)]
 pub struct PySpend {
     pub coin_id: Bytes32,
     pub parent_id: Bytes32,
@@ -43,7 +43,7 @@ pub struct PySpend {
 }
 
 #[pyclass(name = "SpendBundleConditions", get_all, frozen)]
-#[derive(Streamable, PyStreamable, Hash, Debug, Clone, Eq, PartialEq)]
+#[derive(Streamable, PyJsonDict, PyStreamable, Hash, Debug, Clone, Eq, PartialEq)]
 pub struct PySpendBundleConditions {
     pub spends: Vec<PySpend>,
     pub reserve_fee: u64,

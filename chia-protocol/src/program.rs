@@ -7,6 +7,9 @@ use std::fmt;
 use std::io::Cursor;
 
 #[cfg(feature = "py-bindings")]
+use chia_traits::{FromJsonDict, ToJsonDict};
+
+#[cfg(feature = "py-bindings")]
 use chia_py_streamable_macro::PyStreamable;
 
 #[cfg(feature = "py-bindings")]
@@ -46,6 +49,20 @@ impl Streamable for Program {
         let program = buf[..len as usize].to_vec();
         input.set_position(pos + len);
         Ok(Program(program.into()))
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+impl ToJsonDict for Program {
+    fn to_json_dict(&self, py: Python) -> pyo3::PyResult<PyObject> {
+        self.0.to_json_dict(py)
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+impl FromJsonDict for Program {
+    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+        Ok(Self(Bytes::from_json_dict(o)?))
     }
 }
 

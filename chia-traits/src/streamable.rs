@@ -239,17 +239,14 @@ impl<T: Streamable, U: Streamable, V: Streamable, W: Streamable> Streamable for 
 // ===== TESTS ====
 
 #[cfg(test)]
-fn from_bytes<'de, T: Streamable + std::fmt::Debug + std::cmp::PartialEq>(
-    buf: &'de [u8],
-    expected: T,
-) {
+fn from_bytes<T: Streamable + std::fmt::Debug + std::cmp::PartialEq>(buf: &[u8], expected: T) {
     let mut input = Cursor::<&[u8]>::new(buf);
     assert_eq!(T::parse(&mut input).unwrap(), expected);
 }
 
 #[cfg(test)]
-fn from_bytes_fail<'de, T: Streamable + std::fmt::Debug + std::cmp::PartialEq>(
-    buf: &'de [u8],
+fn from_bytes_fail<T: Streamable + std::fmt::Debug + std::cmp::PartialEq>(
+    buf: &[u8],
     expected: Error,
 ) {
     let mut input = Cursor::<&[u8]>::new(buf);

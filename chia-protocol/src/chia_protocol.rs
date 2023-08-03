@@ -5,10 +5,10 @@ use crate::streamable_struct;
 use crate::Bytes;
 
 #[cfg(feature = "py-bindings")]
-use chia_py_streamable_macro::PyStreamable;
+use chia_py_streamable_macro::{PyJsonDict, PyStreamable};
 
 #[repr(u8)]
-#[cfg_attr(feature = "py-bindings", derive(PyStreamable))]
+#[cfg_attr(feature = "py-bindings", derive(PyJsonDict, PyStreamable))]
 #[derive(Streamable, Hash, Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ProtocolMessageTypes {
     // Shared protocol (all services)
@@ -127,7 +127,7 @@ pub trait ChiaProtocolMessage {
 }
 
 #[repr(u8)]
-#[cfg_attr(feature = "py-bindings", derive(PyStreamable))]
+#[cfg_attr(feature = "py-bindings", derive(PyJsonDict, PyStreamable))]
 #[derive(Streamable, Hash, Debug, Copy, Clone, Eq, PartialEq)]
 pub enum NodeType {
     FullNode = 1,

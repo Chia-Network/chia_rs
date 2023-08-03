@@ -59,8 +59,8 @@ fn test_tree_hash() {
     // test atom1 hash
     let atom1_hash = {
         let mut sha256 = Sha256::new();
-        sha256.update(&[1_u8]);
-        sha256.update(&[1, 2, 3]);
+        sha256.update([1_u8]);
+        sha256.update([1, 2, 3]);
         let atom1_hash = sha256.finalize();
 
         assert_eq!(tree_hash(&a, atom1), atom1_hash.as_slice());
@@ -70,8 +70,8 @@ fn test_tree_hash() {
     // test atom2 hash
     let atom2_hash = {
         let mut sha256 = Sha256::new();
-        sha256.update(&[1_u8]);
-        sha256.update(&[4, 5, 6]);
+        sha256.update([1_u8]);
+        sha256.update([4, 5, 6]);
         let atom2_hash = sha256.finalize();
 
         assert_eq!(tree_hash(&a, atom2), atom2_hash.as_slice());
@@ -81,7 +81,7 @@ fn test_tree_hash() {
     // test tree hash
     let root_hash = {
         let mut sha256 = Sha256::new();
-        sha256.update(&[2_u8]);
+        sha256.update([2_u8]);
         sha256.update(atom1_hash.as_slice());
         sha256.update(atom2_hash.as_slice());
         let root_hash = sha256.finalize();
@@ -95,15 +95,15 @@ fn test_tree_hash() {
 
     let atom3_hash = {
         let mut sha256 = Sha256::new();
-        sha256.update(&[1_u8]);
-        sha256.update(&[7, 8, 9]);
+        sha256.update([1_u8]);
+        sha256.update([7, 8, 9]);
         sha256.finalize()
     };
 
     // test deeper tree hash
     {
         let mut sha256 = Sha256::new();
-        sha256.update(&[2_u8]);
+        sha256.update([2_u8]);
         sha256.update(root_hash.as_slice());
         sha256.update(atom3_hash.as_slice());
 
