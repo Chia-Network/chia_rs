@@ -250,7 +250,7 @@ fn test_get_bit_mixed() {
 #[test]
 fn test_compute_merkle_root_0() {
     assert_eq!(
-        compute_merkle_set_root(&mut vec![]),
+        compute_merkle_set_root(&mut []),
         [
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0
@@ -286,7 +286,7 @@ fn test_compute_merkle_root_duplicate_1() {
         0, 0, 0,
     ];
 
-    assert_eq!(compute_merkle_set_root(&mut vec![a, a]), h2(&[1_u8], &a));
+    assert_eq!(compute_merkle_set_root(&mut [a, a]), h2(&[1_u8], &a));
 }
 
 #[test]
@@ -296,10 +296,7 @@ fn test_compute_merkle_root_duplicates_1() {
         0, 0, 0,
     ];
 
-    assert_eq!(
-        compute_merkle_set_root(&mut vec![a, a, a, a]),
-        h2(&[1_u8], &a)
-    );
+    assert_eq!(compute_merkle_set_root(&mut [a, a, a, a]), h2(&[1_u8], &a));
 }
 
 #[test]
@@ -328,22 +325,22 @@ fn test_compute_merkle_root_duplicate_4() {
     );
 
     // rotations
-    assert_eq!(compute_merkle_set_root(&mut vec![a, b, c, d, a]), expected);
-    assert_eq!(compute_merkle_set_root(&mut vec![b, c, d, a, a]), expected);
-    assert_eq!(compute_merkle_set_root(&mut vec![c, d, a, b, a]), expected);
-    assert_eq!(compute_merkle_set_root(&mut vec![d, a, b, c, a]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [a, b, c, d, a]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [b, c, d, a, a]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [c, d, a, b, a]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [d, a, b, c, a]), expected);
 
     // reverse rotations
-    assert_eq!(compute_merkle_set_root(&mut vec![d, c, b, a, a]), expected);
-    assert_eq!(compute_merkle_set_root(&mut vec![c, b, a, d, a]), expected);
-    assert_eq!(compute_merkle_set_root(&mut vec![b, a, d, c, a]), expected);
-    assert_eq!(compute_merkle_set_root(&mut vec![a, d, c, b, a]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [d, c, b, a, a]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [c, b, a, d, a]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [b, a, d, c, a]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [a, d, c, b, a]), expected);
 
     // shuffled
-    assert_eq!(compute_merkle_set_root(&mut vec![c, a, d, b, a]), expected);
-    assert_eq!(compute_merkle_set_root(&mut vec![d, c, b, a, a]), expected);
-    assert_eq!(compute_merkle_set_root(&mut vec![c, d, a, b, a]), expected);
-    assert_eq!(compute_merkle_set_root(&mut vec![a, b, c, d, a]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [c, a, d, b, a]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [d, c, b, a, a]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [c, d, a, b, a]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [a, b, c, d, a]), expected);
 }
 
 #[test]
@@ -366,10 +363,10 @@ fn test_compute_merkle_root_1() {
     ];
 
     // singles
-    assert_eq!(compute_merkle_set_root(&mut vec![a]), h2(&[1_u8], &a));
-    assert_eq!(compute_merkle_set_root(&mut vec![b]), h2(&[1_u8], &b));
-    assert_eq!(compute_merkle_set_root(&mut vec![c]), h2(&[1_u8], &c));
-    assert_eq!(compute_merkle_set_root(&mut vec![d]), h2(&[1_u8], &d));
+    assert_eq!(compute_merkle_set_root(&mut [a]), h2(&[1_u8], &a));
+    assert_eq!(compute_merkle_set_root(&mut [b]), h2(&[1_u8], &b));
+    assert_eq!(compute_merkle_set_root(&mut [c]), h2(&[1_u8], &c));
+    assert_eq!(compute_merkle_set_root(&mut [d]), h2(&[1_u8], &d));
 }
 
 #[test]
@@ -393,51 +390,51 @@ fn test_compute_merkle_root_2() {
 
     // pairs
     assert_eq!(
-        compute_merkle_set_root(&mut vec![a, b]),
+        compute_merkle_set_root(&mut [a, b]),
         hashdown(&[1_u8, 1], &a, &b)
     );
     assert_eq!(
-        compute_merkle_set_root(&mut vec![b, a]),
+        compute_merkle_set_root(&mut [b, a]),
         hashdown(&[1_u8, 1], &a, &b)
     );
     assert_eq!(
-        compute_merkle_set_root(&mut vec![a, c]),
+        compute_merkle_set_root(&mut [a, c]),
         hashdown(&[1_u8, 1], &a, &c)
     );
     assert_eq!(
-        compute_merkle_set_root(&mut vec![c, a]),
+        compute_merkle_set_root(&mut [c, a]),
         hashdown(&[1_u8, 1], &a, &c)
     );
     assert_eq!(
-        compute_merkle_set_root(&mut vec![a, d]),
+        compute_merkle_set_root(&mut [a, d]),
         hashdown(&[1_u8, 1], &a, &d)
     );
     assert_eq!(
-        compute_merkle_set_root(&mut vec![d, a]),
+        compute_merkle_set_root(&mut [d, a]),
         hashdown(&[1_u8, 1], &a, &d)
     );
     assert_eq!(
-        compute_merkle_set_root(&mut vec![b, c]),
+        compute_merkle_set_root(&mut [b, c]),
         hashdown(&[1_u8, 1], &b, &c)
     );
     assert_eq!(
-        compute_merkle_set_root(&mut vec![c, b]),
+        compute_merkle_set_root(&mut [c, b]),
         hashdown(&[1_u8, 1], &b, &c)
     );
     assert_eq!(
-        compute_merkle_set_root(&mut vec![b, d]),
+        compute_merkle_set_root(&mut [b, d]),
         hashdown(&[1_u8, 1], &b, &d)
     );
     assert_eq!(
-        compute_merkle_set_root(&mut vec![d, b]),
+        compute_merkle_set_root(&mut [d, b]),
         hashdown(&[1_u8, 1], &b, &d)
     );
     assert_eq!(
-        compute_merkle_set_root(&mut vec![c, d]),
+        compute_merkle_set_root(&mut [c, d]),
         hashdown(&[1_u8, 1], &c, &d)
     );
     assert_eq!(
-        compute_merkle_set_root(&mut vec![d, c]),
+        compute_merkle_set_root(&mut [d, c]),
         hashdown(&[1_u8, 1], &c, &d)
     );
 }
@@ -460,12 +457,12 @@ fn test_compute_merkle_root_3() {
     let expected = hashdown(&[2_u8, 1], &hashdown(&[1_u8, 1], &a, &b), &c);
 
     // all permutations
-    assert_eq!(compute_merkle_set_root(&mut vec![a, b, c]), expected);
-    assert_eq!(compute_merkle_set_root(&mut vec![a, c, b]), expected);
-    assert_eq!(compute_merkle_set_root(&mut vec![b, a, c]), expected);
-    assert_eq!(compute_merkle_set_root(&mut vec![b, c, a]), expected);
-    assert_eq!(compute_merkle_set_root(&mut vec![c, a, b]), expected);
-    assert_eq!(compute_merkle_set_root(&mut vec![c, b, a]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [a, b, c]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [a, c, b]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [b, a, c]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [b, c, a]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [c, a, b]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [c, b, a]), expected);
 }
 
 #[test]
@@ -494,22 +491,22 @@ fn test_compute_merkle_root_4() {
     );
 
     // rotations
-    assert_eq!(compute_merkle_set_root(&mut vec![a, b, c, d]), expected);
-    assert_eq!(compute_merkle_set_root(&mut vec![b, c, d, a]), expected);
-    assert_eq!(compute_merkle_set_root(&mut vec![c, d, a, b]), expected);
-    assert_eq!(compute_merkle_set_root(&mut vec![d, a, b, c]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [a, b, c, d]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [b, c, d, a]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [c, d, a, b]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [d, a, b, c]), expected);
 
     // reverse rotations
-    assert_eq!(compute_merkle_set_root(&mut vec![d, c, b, a]), expected);
-    assert_eq!(compute_merkle_set_root(&mut vec![c, b, a, d]), expected);
-    assert_eq!(compute_merkle_set_root(&mut vec![b, a, d, c]), expected);
-    assert_eq!(compute_merkle_set_root(&mut vec![a, d, c, b]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [d, c, b, a]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [c, b, a, d]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [b, a, d, c]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [a, d, c, b]), expected);
 
     // shuffled
-    assert_eq!(compute_merkle_set_root(&mut vec![c, a, d, b]), expected);
-    assert_eq!(compute_merkle_set_root(&mut vec![d, c, b, a]), expected);
-    assert_eq!(compute_merkle_set_root(&mut vec![c, d, a, b]), expected);
-    assert_eq!(compute_merkle_set_root(&mut vec![a, b, c, d]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [c, a, d, b]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [d, c, b, a]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [c, d, a, b]), expected);
+    assert_eq!(compute_merkle_set_root(&mut [a, b, c, d]), expected);
 }
 
 #[test]
