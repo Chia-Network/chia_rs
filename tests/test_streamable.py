@@ -356,7 +356,7 @@ def test_coin_get_hash() -> None:
 
 def test_g1_element() -> None:
 
-    a = G1Element(b"abcdefghijklmnopqrstuvwxabcdefghijklmnopqrstuvwx")
+    a = G1Element.from_bytes(b"abcdefghijklmnopqrstuvwxabcdefghijklmnopqrstuvwx")
     b = bytes(a)
     assert b == b"abcdefghijklmnopqrstuvwxabcdefghijklmnopqrstuvwx"
     c = G1Element.from_bytes(b)
@@ -369,7 +369,7 @@ def test_g1_element() -> None:
 
 def test_g2_element() -> None:
 
-    a = G2Element(b"abcdefghijklmnopqrstuvwxabcdefghijklmnopqrstuvwxabcdefghijklmnopqrstuvwxabcdefghijklmnopqrstuvwx")
+    a = G2Element.from_bytes(b"abcdefghijklmnopqrstuvwxabcdefghijklmnopqrstuvwxabcdefghijklmnopqrstuvwxabcdefghijklmnopqrstuvwx")
     b = bytes(a)
     assert b == b"abcdefghijklmnopqrstuvwxabcdefghijklmnopqrstuvwxabcdefghijklmnopqrstuvwxabcdefghijklmnopqrstuvwx"
     c = G2Element.from_bytes(b)
