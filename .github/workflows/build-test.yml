@@ -111,9 +111,9 @@ jobs:
                 arm: [macOS, ARM64]
                 intel: [macos-latest]
             python:
-              major-dot-minor: '3.7'
-              cibw-build: 'cp37-*'
-              matrix: '3.7'
+              major-dot-minor: '3.8'
+              cibw-build: 'cp38-*'
+              matrix: '3.8'
             arch:
               name: ARM
               matrix: arm
