@@ -4,8 +4,12 @@
 //! as well as many other values in the standard library that would be common to encode.
 //!
 //! As well as the built-in implementations, this library exposes two derive macros
-//! for implementing the `ToClvm` and `FromClvm` traits on structs. They can be encoded
-//! as either `tuple`, `proper_list`, or `curried_args`, depending on the `clvm` value set.
+//! for implementing the `ToClvm` and `FromClvm` traits on structs. They be marked
+//! with one of the following encodings:
+//!
+//! * `#[clvm(tuple)]` for unterminated lists such as `(A . (B . C))`.
+//! * `#[clvm(proper_list)]` for proper lists such as `(A B C)`, or in other words `(A . (B . (C . ())))`.
+//! * `#[clvm(curried_args)]` for curried arguments such as `(c (q . A) (c (q . B) (c (q . C) 1)))`.
 
 #![cfg_attr(
     feature = "derive",
