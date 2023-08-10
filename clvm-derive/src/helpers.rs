@@ -1,6 +1,4 @@
-use proc_macro2::{Ident, Span, TokenStream};
-use proc_macro_crate::{crate_name, FoundCrate};
-use quote::quote;
+use proc_macro2::Ident;
 use syn::{punctuated::Punctuated, Attribute, GenericParam, Generics, Token, TypeParamBound};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -65,18 +63,6 @@ pub fn parse_args(attrs: &[Attribute]) -> ClvmDeriveArgs {
         repr: repr.expect(
             "expected clvm attribute parameter of either `tuple`, `proper_list`, or `curried_args`",
         ),
-    }
-}
-
-pub fn crate_ident() -> TokenStream {
-    let found_crate = crate_name("clvm-traits").expect("`clvm-traits` not found in `Cargo.toml`");
-
-    match found_crate {
-        FoundCrate::Itself => quote!(crate),
-        FoundCrate::Name(name) => {
-            let ident = Ident::new(&name, Span::call_site());
-            quote!(#ident)
-        }
     }
 }
 

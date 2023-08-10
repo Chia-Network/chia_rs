@@ -8,6 +8,9 @@ authors = ["Brandon Haggstrom <b.haggstrom@chia.net>"]
 homepage = "https://github.com/Chia-Network/chia_rs/clvm-traits/"
 repository = "https://github.com/Chia-Network/chia_rs/clvm-traits/"
 
+[package.metadata.docs.rs]
+features = ["derive"]
+
 [features]
 derive = ["dep:clvm-derive"]
 

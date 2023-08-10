@@ -1,3 +1,38 @@
+//! # CLVM Traits
+//! This is a library for encoding and decoding Rust values using a CLVM allocator.
+//! It provides implementations for every fixed-width signed and unsigned integer type,
+//! as well as many other values in the standard library that would be common to encode.
+//!
+//! As well as the built-in implementations, this library exposes two derive macros
+//! for implementing the `ToClvm` and `FromClvm` traits on structs. They can be encoded
+//! as either `tuple`, `proper_list`, or `curried_args`, depending on the `clvm` value set.
+
+#![cfg_attr(
+    feature = "derive",
+    doc = r#"
+## Derive Example
+
+```rust
+use clvmr::Allocator;
+use clvm_traits::{ToClvm, FromClvm};
+
+#[derive(Debug, PartialEq, Eq, ToClvm, FromClvm)]
+#[clvm(tuple)]
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+let a = &mut Allocator::new();
+
+let point = Point { x: 5, y: 2 };
+let ptr = point.to_clvm(a).unwrap();
+
+assert_eq!(Point::from_clvm(a, ptr).unwrap(), point);
+```
+"#
+)]
+
 #[cfg(feature = "derive")]
 pub use clvm_derive::*;
 
@@ -16,6 +51,8 @@ pub use to_clvm::*;
 #[cfg(test)]
 #[cfg(feature = "derive")]
 mod tests {
+    extern crate self as clvm_traits;
+
     use clvmr::Allocator;
 
     use super::*;

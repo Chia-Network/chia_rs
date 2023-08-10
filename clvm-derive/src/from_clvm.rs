@@ -2,11 +2,11 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{parse_quote, Data, DataStruct, DeriveInput, Fields};
 
-use crate::helpers::{add_trait_bounds, crate_ident, parse_args, Repr};
+use crate::helpers::{add_trait_bounds, parse_args, Repr};
 
 pub fn from_clvm(mut ast: DeriveInput) -> TokenStream {
     let args = parse_args(&ast.attrs);
-    let crate_name = crate_ident();
+    let crate_name = quote!(clvm_traits);
 
     let fields = match &ast.data {
         Data::Struct(DataStruct {
