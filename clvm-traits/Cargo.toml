@@ -1,0 +1,21 @@
+[package]
+name = "clvm-traits"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Traits for encoding and decoding CLVM objects."
+authors = ["Brandon Haggstrom <b.haggstrom@chia.net>"]
+homepage = "https://github.com/Chia-Network/chia_rs/clvm-traits/"
+repository = "https://github.com/Chia-Network/chia_rs/clvm-traits/"
+
+[features]
+derive = ["dep:clvm-derive"]
+
+[dependencies]
+clvm-derive = { version = "0.1.0", path = "../clvm-derive", optional = true }
+clvmr = "0.2.7"
+num-bigint = "0.4.3"
+thiserror = "1.0.44"
+
+[dev-dependencies]
+hex = "0.4.3"
