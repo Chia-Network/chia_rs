@@ -10,7 +10,11 @@ pub struct MatchByte<const BYTE: u8>;
 
 impl<const BYTE: u8> ToClvm for MatchByte<BYTE> {
     fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
-        a.new_number(BYTE.into()).map_err(Error::Allocator)
+        match BYTE {
+            0 => Ok(a.null()),
+            1 => Ok(a.one()),
+            _ => Ok(a.new_number(BYTE.into())?),
+        }
     }
 }
 
