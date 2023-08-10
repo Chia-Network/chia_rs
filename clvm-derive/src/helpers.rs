@@ -15,7 +15,7 @@ impl ToString for Repr {
         match self {
             Self::Tuple => "tuple".to_string(),
             Self::ProperList => "proper_list".to_string(),
-            Self::CurriedArgs => "curried_list".to_string(),
+            Self::CurriedArgs => "curried_args".to_string(),
         }
     }
 }
