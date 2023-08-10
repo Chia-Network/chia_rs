@@ -19,7 +19,7 @@ impl<const BYTE: u8> FromClvm for MatchByte<BYTE> {
         if let SExp::Atom() = a.sexp(node) {
             match a.atom(node) {
                 [] if BYTE == 0 => Ok(Self),
-                [byte] if *byte == BYTE => Ok(Self),
+                [byte] if *byte == BYTE && BYTE > 0 => Ok(Self),
                 _ => Err(Error::Custom(format!(
                     "expected an atom with a value of {}",
                     BYTE
