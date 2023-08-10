@@ -2,7 +2,6 @@ use clvmr::{
     allocator::{NodePtr, SExp},
     Allocator,
 };
-use num_bigint::{BigInt, Sign};
 
 use crate::{Error, FromClvm, Result, ToClvm};
 
@@ -18,28 +17,16 @@ impl<const BYTE: u8> ToClvm for MatchByte<BYTE> {
 impl<const BYTE: u8> FromClvm for MatchByte<BYTE> {
     fn from_clvm(a: &Allocator, node: NodePtr) -> Result<Self> {
         if let SExp::Atom() = a.sexp(node) {
-            let value: u8 = to_unsigned(a.number(node)).try_into().map_err(
-                |error: <u8 as TryFrom<BigInt>>::Error| Error::Custom(error.to_string()),
-            )?;
-
-            if value == BYTE {
-                Ok(Self)
-            } else {
-                Err(Error::Custom(format!(
+            match a.atom(node) {
+                [] if BYTE == 0 => Ok(Self),
+                [byte] if *byte == BYTE => Ok(Self),
+                _ => Err(Error::Custom(format!(
                     "expected an atom with a value of {}",
                     BYTE
-                )))
+                ))),
             }
         } else {
             Err(Error::ExpectedAtom(node))
         }
-    }
-}
-
-fn to_unsigned(value: BigInt) -> BigInt {
-    if value.sign() == Sign::Minus {
-        value + 256
-    } else {
-        value
     }
 }
