@@ -21,24 +21,24 @@ macro_rules! clvm_tuple {
 #[macro_export]
 macro_rules! clvm_quote {
     ( $value:expr ) => {
-        ($crate::MatchByte::<1>, $value)
+        (1, $value)
     };
 }
 
 #[macro_export]
 macro_rules! clvm_curried_args {
     () => {
-        $crate::MatchByte::<1>
+        1
     };
     ( $first:expr $( , $rest:expr )* $(,)? ) => {
-        ($crate::MatchByte::<4>, ($crate::clvm_quote!($first), ($crate::clvm_curried_args!( $( $rest ),* ), ())))
+        (4, ($crate::clvm_quote!($first), ($crate::clvm_curried_args!( $( $rest ),* ), ())))
     };
 }
 
 #[macro_export]
 macro_rules! match_list {
     () => {
-        $crate::MatchByte::<0>
+        ()
     };
     ( $first:ty $( , $rest:ty )* $(,)? ) => {
         ($first, $crate::match_list!( $( $rest ),* ))
@@ -81,7 +81,7 @@ macro_rules! match_curried_args {
 #[macro_export]
 macro_rules! destructure_list {
     () => {
-        $crate::MatchByte::<0>
+        _
     };
     ( $first:ident $( , $rest:ident )* $(,)? ) => {
         ($first, $crate::destructure_list!( $( $rest ),* ))
@@ -101,18 +101,18 @@ macro_rules! destructure_tuple {
 #[macro_export]
 macro_rules! destructure_quote {
     ( $name:ident ) => {
-        ($crate::MatchByte::<1>, $name)
+        (_, $name)
     };
 }
 
 #[macro_export]
 macro_rules! destructure_curried_args {
     () => {
-        $crate::MatchByte::<1>
+        _
     };
     ( $first:ident $( , $rest:ident )* $(,)? ) => {
         (
-            $crate::MatchByte::<4>,
+            _,
             (
                 $crate::destructure_quote!($first),
                 ($crate::destructure_curried_args!( $( $rest ),* ), ()),
