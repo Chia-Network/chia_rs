@@ -21,6 +21,8 @@ pub fn from_clvm(mut ast: DeriveInput) -> TokenStream {
     let field_names = fields.iter().map(|field| &field.ident);
     let destructure_names = field_names.clone();
 
+    // `match_macro` decodes a nested tuple containing each of the struct field types within.
+    // `destructure_macro` destructures the values into the field names, to be stored in the struct.
     let (match_macro, destructure_macro) = match args.repr {
         Repr::ProperList => (
             quote!( #crate_name::match_list ),

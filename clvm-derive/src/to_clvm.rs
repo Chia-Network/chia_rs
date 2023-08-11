@@ -19,6 +19,7 @@ pub fn to_clvm(mut ast: DeriveInput) -> TokenStream {
     let struct_name = &ast.ident;
     let field_name = fields.iter().map(|field| &field.ident);
 
+    // `list_macro` encodes a nested tuple containing each of the struct field values within.
     let list_macro = match args.repr {
         Repr::ProperList => quote!( #crate_name::clvm_list ),
         Repr::Tuple => quote!( #crate_name::clvm_tuple ),
