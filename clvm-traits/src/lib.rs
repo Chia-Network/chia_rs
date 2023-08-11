@@ -57,7 +57,9 @@ pub use to_clvm::*;
 mod tests {
     extern crate self as clvm_traits;
 
-    use clvmr::Allocator;
+    use std::fmt;
+
+    use clvmr::{serde::node_to_bytes, Allocator};
 
     use super::*;
 
@@ -82,30 +84,36 @@ mod tests {
         b: i32,
     }
 
-    #[test]
-    fn test_round_trip_tuple() {
-        let mut a = Allocator::new();
-        let value = TupleStruct { a: 52, b: -32 };
-        let node = value.to_clvm(&mut a).unwrap();
-        let round_trip = TupleStruct::from_clvm(&a, node).unwrap();
+    fn check<T>(value: T, expected: &str)
+    where
+        T: fmt::Debug + PartialEq + ToClvm + FromClvm,
+    {
+        let a = &mut Allocator::new();
+
+        let ptr = value.to_clvm(a).unwrap();
+        let round_trip = T::from_clvm(a, ptr).unwrap();
         assert_eq!(value, round_trip);
+
+        let bytes = node_to_bytes(a, ptr).unwrap();
+        let actual = hex::encode(bytes);
+        assert_eq!(expected, actual);
     }
 
     #[test]
-    fn test_round_trip_proper_list() {
-        let mut a = Allocator::new();
-        let value = ProperListStruct { a: 52, b: -32 };
-        let node = value.to_clvm(&mut a).unwrap();
-        let round_trip = ProperListStruct::from_clvm(&a, node).unwrap();
-        assert_eq!(value, round_trip);
+    fn test_tuple() {
+        check(TupleStruct { a: 52, b: -32 }, "ff3481e0");
     }
 
     #[test]
-    fn test_round_trip_curried_args() {
-        let mut a = Allocator::new();
-        let value = CurriedArgsStruct { a: 52, b: -32 };
-        let node = value.to_clvm(&mut a).unwrap();
-        let round_trip = CurriedArgsStruct::from_clvm(&a, node).unwrap();
-        assert_eq!(value, round_trip);
+    fn test_proper_list() {
+        check(ProperListStruct { a: 52, b: -32 }, "ff34ff81e080");
+    }
+
+    #[test]
+    fn test_curried_args() {
+        check(
+            CurriedArgsStruct { a: 52, b: -32 },
+            "ff04ffff0134ffff04ffff0181e0ff018080",
+        );
     }
 }
