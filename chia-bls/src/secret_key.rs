@@ -1,15 +1,15 @@
-use crate::derivable_key::DerivableKey;
-use crate::public_key::PublicKey;
-use bls12_381_plus::{G1Projective, Scalar};
+use crate::{DerivableKey, PublicKey};
+use blst::*;
 use chia_traits::chia_error::{Error, Result};
 use chia_traits::{read_bytes, Streamable};
 use hkdf::HkdfExtract;
-use num_bigint::BigUint;
 use sha2::{Digest, Sha256};
+use std::hash::{Hash, Hasher};
 use std::io::Cursor;
+use std::mem::MaybeUninit;
 
-#[derive(PartialEq, Eq, Debug)]
-pub struct SecretKey(pub(crate) Scalar);
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct SecretKey(pub(crate) blst_scalar);
 
 fn flip_bits(input: [u8; 32]) -> [u8; 32] {
     let mut ret = [0; 32];
@@ -29,7 +29,7 @@ fn ikm_to_lamport_sk(ikm: &[u8; 32], salt: &[u8; 4]) -> [u8; 255 * 32] {
     output
 }
 
-pub fn to_lamport_pk(ikm: [u8; 32], idx: u32) -> [u8; 32] {
+fn to_lamport_pk(ikm: [u8; 32], idx: u32) -> [u8; 32] {
     let not_ikm = flip_bits(ikm);
     let salt = idx.to_be_bytes();
 
@@ -66,51 +66,63 @@ pub fn is_all_zero(buf: &[u8]) -> bool {
 }
 
 impl SecretKey {
-    pub fn from_seed(seed: &[u8]) -> SecretKey {
+    pub fn from_seed(seed: &[u8]) -> Self {
         // described here:
         // https://eips.ethereum.org/EIPS/eip-2333#derive_master_sk
         assert!(seed.len() >= 32);
 
-        const SALT: &[u8] = b"BLS-SIG-KEYGEN-SALT-";
-        let mut extracter = HkdfExtract::<sha2::Sha256>::new(Some(SALT));
-        extracter.input_ikm(seed);
-        extracter.input_ikm(&[0_u8]);
-        let h = extracter.finalize().1;
-
-        // TODO: = uninitialized
-        let mut sk = [0_u8; 48];
-        h.expand(&[0_u8, 48], &mut sk)
-            .expect("failed to generate secret key");
-        SecretKey(Scalar::from_okm(&sk))
+        let bytes = unsafe {
+            let mut scalar = MaybeUninit::<blst_scalar>::uninit();
+            blst_keygen_v3(
+                scalar.as_mut_ptr(),
+                seed.as_ptr(),
+                seed.len(),
+                std::ptr::null(),
+                0,
+            );
+            let mut bytes = MaybeUninit::<[u8; 32]>::uninit();
+            blst_bendian_from_scalar(bytes.as_mut_ptr() as *mut u8, &scalar.assume_init());
+            bytes.assume_init()
+        };
+        Self::from_bytes(&bytes).expect("from_seed")
     }
 
-    pub fn from_bytes(b: &[u8; 32]) -> Result<Self> {
-        if is_all_zero(b) {
+    pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self> {
+        let pk = unsafe {
+            let mut pk = MaybeUninit::<blst_scalar>::uninit();
+            blst_scalar_from_bendian(pk.as_mut_ptr(), bytes.as_ptr());
+            pk.assume_init()
+        };
+
+        if is_all_zero(bytes) {
             // don't check anything else, we allow zero private key
-            return Ok(Self(Scalar::from_bytes(b).unwrap()));
+            return Ok(Self(pk));
         }
 
-        let t = [
-            b[31], b[30], b[29], b[28], b[27], b[26], b[25], b[24], b[23], b[22], b[21], b[20],
-            b[19], b[18], b[17], b[16], b[15], b[14], b[13], b[12], b[11], b[10], b[9], b[8], b[7],
-            b[6], b[5], b[4], b[3], b[2], b[1], b[0],
-        ];
-        match Scalar::from_bytes(&t).into() {
-            Some(s) => Ok(SecretKey(s)),
-            None => Err(Error::Custom(
+        if unsafe { !blst_sk_check(&pk) } {
+            return Err(Error::Custom(
                 "SecretKey byte data must be less than the group order".to_string(),
-            )),
+            ));
         }
+
+        Ok(Self(pk))
     }
 
     pub fn to_bytes(&self) -> [u8; 32] {
-        let mut bytes = self.0.to_bytes();
-        bytes.reverse();
-        bytes
+        unsafe {
+            let mut bytes = MaybeUninit::<[u8; 32]>::uninit();
+            blst_bendian_from_scalar(bytes.as_mut_ptr() as *mut u8, &self.0);
+            bytes.assume_init()
+        }
     }
 
     pub fn public_key(&self) -> PublicKey {
-        PublicKey(G1Projective::generator() * self.0)
+        let p1 = unsafe {
+            let mut p1 = MaybeUninit::<blst_p1>::uninit();
+            blst_sk_to_pk_in_g1(p1.as_mut_ptr(), &self.0);
+            p1.assume_init()
+        };
+        PublicKey(p1)
     }
 
     pub fn derive_hardened(&self, idx: u32) -> SecretKey {
@@ -135,6 +147,12 @@ impl Streamable for SecretKey {
     }
 }
 
+impl Hash for SecretKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write(&self.to_bytes())
+    }
+}
+
 impl DerivableKey for SecretKey {
     fn derive_unhardened(&self, idx: u32) -> Self {
         let pk = self.public_key();
@@ -144,35 +162,16 @@ impl DerivableKey for SecretKey {
         hasher.update(idx.to_be_bytes());
         let digest = hasher.finalize();
 
-        // in an ideal world, we would not need to reach for the sledge-hammer of
-        // num-bigint here. This would most likely be faster if implemented in
-        // Scalar directly.
-
-        // interpret the hash as an unsigned big-endian number
-        let mut scalar = BigUint::from_bytes_be(digest.as_slice());
-
-        let q = BigUint::from_bytes_be(&[
-            0x73, 0xed, 0xa7, 0x53, 0x29, 0x9d, 0x7d, 0x48, 0x33, 0x39, 0xd8, 0x08, 0x09, 0xa1,
-            0xd8, 0x05, 0x53, 0xbd, 0xa4, 0x02, 0xff, 0xfe, 0x5b, 0xfe, 0xff, 0xff, 0xff, 0xff,
-            0x00, 0x00, 0x00, 0x01,
-        ]);
-
-        // mod by G1 Order
-        scalar %= q;
-
-        // Now, convert BigUint -> Scalar, that we can use to create the new secret key with
-        let mut raw_limbs = [0_u64; 4];
-        for (it, limb) in raw_limbs.iter_mut().zip(scalar.to_u64_digits()) {
-            *it = limb;
-        }
-
-        let mut new_sk = Scalar::from_raw(raw_limbs);
-
-        // aggregate the new secret with the existing secret
-        // The Scalar type uses modulus arithmetic in the Q order, so the modulus Q
-        // is implied in these addition operations
-        new_sk += self.0;
-        SecretKey(new_sk)
+        let scalar = unsafe {
+            let mut scalar = MaybeUninit::<blst_scalar>::uninit();
+            let success =
+                blst_scalar_from_be_bytes(scalar.as_mut_ptr(), digest.as_ptr(), digest.len());
+            assert!(success);
+            let success = blst_sk_add_n_check(scalar.as_mut_ptr(), scalar.as_ptr(), &self.0);
+            assert!(success);
+            scalar.assume_init()
+        };
+        Self(scalar)
     }
 }
 
