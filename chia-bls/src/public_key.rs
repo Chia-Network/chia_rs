@@ -344,3 +344,11 @@ fn test_hash() {
     assert!(hash(pk2) != hash(pk3));
     assert!(hash(pk1.derive_unhardened(42)) == hash(pk1.derive_unhardened(42)));
 }
+
+#[test]
+fn test_debug() {
+    let mut data = [0u8; 48];
+    data[0] = 0xc0;
+    let pk = PublicKey::from_bytes(&data).unwrap();
+    assert_eq!(format!("{:?}", pk), hex::encode(data));
+}

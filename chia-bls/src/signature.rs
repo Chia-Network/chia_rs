@@ -746,3 +746,11 @@ fn test_hash() {
     assert!(hash(sig1) != hash(sig2));
     assert_eq!(hash(sign(&sk, &[0, 1, 2])), hash(sign(&sk, &[0, 1, 2])));
 }
+
+#[test]
+fn test_debug() {
+    let mut data = [0u8; 96];
+    data[0] = 0xc0;
+    let sig = Signature::from_bytes(&data).unwrap();
+    assert_eq!(format!("{:?}", sig), hex::encode(data));
+}
