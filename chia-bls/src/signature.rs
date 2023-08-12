@@ -5,13 +5,14 @@ use chia_traits::{read_bytes, Streamable};
 use sha2::{Digest, Sha256};
 use std::borrow::Borrow;
 use std::convert::AsRef;
+use std::fmt;
 use std::io::Cursor;
 use std::mem::MaybeUninit;
 
 // we use the augmented scheme
 pub const DST: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_AUG_";
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Signature(pub(crate) blst_p2);
 
 impl Signature {
@@ -86,6 +87,12 @@ impl PartialEq for Signature {
     }
 }
 impl Eq for Signature {}
+
+impl fmt::Debug for Signature {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str(&hex::encode(self.to_bytes()))
+    }
+}
 
 pub fn hash_to_g2(msg: &[u8]) -> Signature {
     let p2 = unsafe {

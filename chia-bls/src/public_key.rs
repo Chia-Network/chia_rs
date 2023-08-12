@@ -4,10 +4,11 @@ use blst::*;
 use chia_traits::chia_error::{Error, Result};
 use chia_traits::{read_bytes, Streamable};
 use sha2::{digest::FixedOutput, Digest, Sha256};
+use std::fmt;
 use std::io::Cursor;
 use std::mem::MaybeUninit;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct PublicKey(pub(crate) blst_p1);
 
 impl PublicKey {
@@ -107,6 +108,12 @@ impl Default for PublicKey {
             let p1 = MaybeUninit::<blst_p1>::zeroed();
             Self(p1.assume_init())
         }
+    }
+}
+
+impl fmt::Debug for PublicKey {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str(&hex::encode(self.to_bytes()))
     }
 }
 
