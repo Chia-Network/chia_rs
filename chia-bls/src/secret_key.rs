@@ -326,6 +326,29 @@ fn test_debug() {
 }
 
 #[test]
+fn test_hash() {
+    fn hash<T: std::hash::Hash>(v: &T) -> u64 {
+        use std::collections::hash_map::DefaultHasher;
+        let mut h = DefaultHasher::new();
+        v.hash(&mut h);
+        h.finish()
+    }
+
+    let mut rng = StdRng::seed_from_u64(1337);
+    let mut data = [0u8; 32];
+    rng.fill(data.as_mut_slice());
+
+    let sk1 = SecretKey::from_seed(&data);
+    let sk2 = SecretKey::from_seed(&data);
+
+    rng.fill(data.as_mut_slice());
+    let sk3 = SecretKey::from_seed(&data);
+
+    assert!(hash(&sk1) == hash(&sk2));
+    assert!(hash(&sk1) != hash(&sk3));
+}
+
+#[test]
 fn test_from_bytes() {
     let mut rng = StdRng::seed_from_u64(1337);
     let mut data = [0u8; 32];
