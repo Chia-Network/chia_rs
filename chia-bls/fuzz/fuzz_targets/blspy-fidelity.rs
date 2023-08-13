@@ -26,7 +26,12 @@ fuzz_target!(|data: &[u8]| {
     }
 
     Python::with_gil(|py| {
-
+/*
+        py.run(r#"
+import sys
+print(sys.executable)
+"#, None, None).unwrap();
+*/
         let blspy = py.import("blspy").unwrap();
         let aug = blspy.getattr("AugSchemeMPL").unwrap();
 
