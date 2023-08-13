@@ -3,8 +3,8 @@ use chia_streamable_macro::Streamable;
 use crate::streamable_struct;
 use crate::Bytes32;
 use crate::Coin;
-use crate::G2Element;
 use crate::PoolTarget;
+use chia_bls::G2Element;
 
 streamable_struct! (TransactionsInfo {
     // Information that goes along with each transaction block

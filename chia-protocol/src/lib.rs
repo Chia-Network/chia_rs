@@ -1,4 +1,3 @@
-pub mod bls;
 pub mod bytes;
 pub mod chia_protocol;
 pub mod classgroup;
@@ -22,7 +21,6 @@ pub mod wallet_protocol;
 pub mod weight_proof;
 
 // export shorter names
-pub use crate::bls::*;
 pub use crate::bytes::*;
 pub use crate::chia_protocol::*;
 pub use crate::classgroup::*;
