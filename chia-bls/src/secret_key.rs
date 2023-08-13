@@ -8,6 +8,15 @@ use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::mem::MaybeUninit;
 
+#[cfg(feature = "py-bindings")]
+use crate::public_key::parse_hex_string;
+#[cfg(feature = "py-bindings")]
+use chia_traits::from_json_dict::FromJsonDict;
+#[cfg(feature = "py-bindings")]
+use chia_traits::to_json_dict::ToJsonDict;
+#[cfg(feature = "py-bindings")]
+use pyo3::{IntoPy, PyAny, PyObject, PyResult, Python};
+
 #[derive(PartialEq, Eq, Clone)]
 pub struct SecretKey(pub(crate) blst_scalar);
 
@@ -156,6 +165,26 @@ impl Hash for SecretKey {
 impl fmt::Debug for SecretKey {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         formatter.write_str(&hex::encode(self.to_bytes()))
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+impl ToJsonDict for SecretKey {
+    fn to_json_dict(&self, py: Python) -> pyo3::PyResult<PyObject> {
+        let bytes = self.to_bytes();
+        Ok(("0x".to_string() + &hex::encode(bytes)).into_py(py))
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+impl FromJsonDict for SecretKey {
+    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+        Ok(Self::from_bytes(
+            parse_hex_string(o, 32, "PrivateKey")?
+                .as_slice()
+                .try_into()
+                .unwrap(),
+        )?)
     }
 }
 
@@ -380,5 +409,64 @@ fn test_roundtrip() {
         let sk2 = SecretKey::from_bytes(&bytes).unwrap();
         assert_eq!(sk, sk2);
         assert_eq!(sk.public_key(), sk2.public_key());
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "py-bindings")]
+mod pytests {
+
+    use super::*;
+    use rstest::rstest;
+
+    #[test]
+    fn test_json_dict_roundtrip() {
+        pyo3::prepare_freethreaded_python();
+        let mut rng = StdRng::seed_from_u64(1337);
+        let mut data = [0u8; 32];
+        for _i in 0..50 {
+            rng.fill(data.as_mut_slice());
+            let sk = SecretKey::from_seed(&data);
+            let ret = Python::with_gil(|py| -> PyResult<()> {
+                let string = sk.to_json_dict(py)?;
+                let sk2 = SecretKey::from_json_dict(string.as_ref(py)).unwrap();
+                assert_eq!(sk, sk2);
+                assert_eq!(sk.public_key(), sk2.public_key());
+                Ok(())
+            });
+            assert!(ret.is_ok())
+        }
+    }
+
+    #[rstest]
+    #[case(
+        "0x000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e",
+        "PrivateKey, invalid length 31 expected 32"
+    )]
+    #[case(
+        "0x000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f00",
+        "PrivateKey, invalid length 33 expected 32"
+    )]
+    #[case(
+        "000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f00",
+        "PrivateKey, invalid length 33 expected 32"
+    )]
+    #[case(
+        "000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e",
+        "PrivateKey, invalid length 31 expected 32"
+    )]
+    #[case(
+        "0r0102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f",
+        "invalid hex"
+    )]
+    fn test_json_dict(#[case] input: &str, #[case] msg: &str) {
+        pyo3::prepare_freethreaded_python();
+        let ret = Python::with_gil(|py| -> PyResult<()> {
+            let err =
+                SecretKey::from_json_dict(input.to_string().into_py(py).as_ref(py)).unwrap_err();
+            assert_eq!(err.value(py).to_string(), msg.to_string());
+            Ok(())
+        });
+        assert!(ret.is_ok())
     }
 }

@@ -10,6 +10,15 @@ use std::io::Cursor;
 use std::mem::MaybeUninit;
 use std::ops::{Add, AddAssign};
 
+#[cfg(feature = "py-bindings")]
+use crate::public_key::parse_hex_string;
+#[cfg(feature = "py-bindings")]
+use chia_traits::from_json_dict::FromJsonDict;
+#[cfg(feature = "py-bindings")]
+use chia_traits::to_json_dict::ToJsonDict;
+#[cfg(feature = "py-bindings")]
+use pyo3::{IntoPy, PyAny, PyObject, PyResult, Python};
+
 // we use the augmented scheme
 pub const DST: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_AUG_";
 
@@ -129,6 +138,26 @@ impl Add<&Signature> for &Signature {
             ret.assume_init()
         };
         Signature(p1)
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+impl ToJsonDict for Signature {
+    fn to_json_dict(&self, py: Python) -> pyo3::PyResult<PyObject> {
+        let bytes = self.to_bytes();
+        Ok(("0x".to_string() + &hex::encode(bytes)).into_py(py))
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+impl FromJsonDict for Signature {
+    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+        Ok(Self::from_bytes(
+            parse_hex_string(o, 96, "Signature")?
+                .as_slice()
+                .try_into()
+                .unwrap(),
+        )?)
     }
 }
 
@@ -764,4 +793,50 @@ fn test_debug() {
     data[0] = 0xc0;
     let sig = Signature::from_bytes(&data).unwrap();
     assert_eq!(format!("{:?}", sig), hex::encode(data));
+}
+
+#[cfg(test)]
+#[cfg(feature = "py-bindings")]
+mod pytests {
+
+    use super::*;
+    use rstest::rstest;
+
+    #[test]
+    fn test_json_dict_roundtrip() {
+        pyo3::prepare_freethreaded_python();
+        let mut rng = StdRng::seed_from_u64(1337);
+        let mut data = [0u8; 32];
+        let mut msg = [0u8; 10];
+        for _i in 0..50 {
+            rng.fill(data.as_mut_slice());
+            rng.fill(msg.as_mut_slice());
+            let sk = SecretKey::from_seed(&data);
+            let sig = sign(&sk, msg);
+            let ret = Python::with_gil(|py| -> PyResult<()> {
+                let string = sig.to_json_dict(py)?;
+                let sig2 = Signature::from_json_dict(string.as_ref(py)).unwrap();
+                assert_eq!(sig, sig2);
+                Ok(())
+            });
+            assert!(ret.is_ok())
+        }
+    }
+
+    #[rstest]
+    #[case("0x000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0ff000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e", "Signature, invalid length 95 expected 96")]
+    #[case("0x000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0ff000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f00", "Signature, invalid length 97 expected 96")]
+    #[case("000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0ff000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e", "Signature, invalid length 95 expected 96")]
+    #[case("000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0ff000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f00", "Signature, invalid length 97 expected 96")]
+    #[case("00r102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0ff000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f", "invalid hex")]
+    fn test_json_dict(#[case] input: &str, #[case] msg: &str) {
+        pyo3::prepare_freethreaded_python();
+        let ret = Python::with_gil(|py| -> PyResult<()> {
+            let err =
+                Signature::from_json_dict(input.to_string().into_py(py).as_ref(py)).unwrap_err();
+            assert_eq!(err.value(py).to_string(), msg.to_string());
+            Ok(())
+        });
+        assert!(ret.is_ok())
+    }
 }

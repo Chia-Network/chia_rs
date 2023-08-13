@@ -9,6 +9,13 @@ use std::io::Cursor;
 use std::mem::MaybeUninit;
 use std::ops::{Add, AddAssign};
 
+#[cfg(feature = "py-bindings")]
+use chia_traits::from_json_dict::FromJsonDict;
+#[cfg(feature = "py-bindings")]
+use chia_traits::to_json_dict::ToJsonDict;
+#[cfg(feature = "py-bindings")]
+use pyo3::{IntoPy, PyAny, PyObject, PyResult, Python};
+
 #[derive(Clone)]
 pub struct PublicKey(pub(crate) blst_p1);
 
@@ -146,6 +153,49 @@ impl Add<&PublicKey> for PublicKey {
 impl fmt::Debug for PublicKey {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         formatter.write_str(&hex::encode(self.to_bytes()))
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+impl ToJsonDict for PublicKey {
+    fn to_json_dict(&self, py: Python) -> pyo3::PyResult<PyObject> {
+        let bytes = self.to_bytes();
+        Ok(("0x".to_string() + &hex::encode(bytes)).into_py(py))
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+pub fn parse_hex_string(o: &PyAny, len: usize, name: &str) -> PyResult<Vec<u8>> {
+    use pyo3::exceptions::PyValueError;
+    let s: String = o.extract()?;
+    let s = if s.starts_with("0x") { &s[2..] } else { &s[..] };
+    let buf = match hex::decode(s) {
+        Err(_) => {
+            return Err(PyValueError::new_err("invalid hex"));
+        }
+        Ok(v) => v,
+    };
+    if buf.len() != len {
+        Err(PyValueError::new_err(format!(
+            "{}, invalid length {} expected {}",
+            name,
+            buf.len(),
+            len
+        )))
+    } else {
+        Ok(buf)
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+impl FromJsonDict for PublicKey {
+    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+        Ok(Self::from_bytes(
+            parse_hex_string(o, 48, "PublicKey")?
+                .as_slice()
+                .try_into()
+                .unwrap(),
+        )?)
     }
 }
 
@@ -353,4 +403,48 @@ fn test_debug() {
     data[0] = 0xc0;
     let pk = PublicKey::from_bytes(&data).unwrap();
     assert_eq!(format!("{:?}", pk), hex::encode(data));
+}
+
+#[cfg(test)]
+#[cfg(feature = "py-bindings")]
+mod pytests {
+
+    use super::*;
+    use rstest::rstest;
+
+    #[test]
+    fn test_json_dict_roundtrip() {
+        pyo3::prepare_freethreaded_python();
+        let mut rng = StdRng::seed_from_u64(1337);
+        let mut data = [0u8; 32];
+        for _i in 0..50 {
+            rng.fill(data.as_mut_slice());
+            let sk = SecretKey::from_seed(&data);
+            let pk = sk.public_key();
+            let ret = Python::with_gil(|py| -> PyResult<()> {
+                let string = pk.to_json_dict(py)?;
+                let pk2 = PublicKey::from_json_dict(string.as_ref(py)).unwrap();
+                assert_eq!(pk, pk2);
+                Ok(())
+            });
+            assert!(ret.is_ok())
+        }
+    }
+
+    #[rstest]
+    #[case("0x000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e", "PublicKey, invalid length 47 expected 48")]
+    #[case("0x000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f00", "PublicKey, invalid length 49 expected 48")]
+    #[case("000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e", "PublicKey, invalid length 47 expected 48")]
+    #[case("000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f00", "PublicKey, invalid length 49 expected 48")]
+    #[case("0x00r102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f", "invalid hex")]
+    fn test_json_dict(#[case] input: &str, #[case] msg: &str) {
+        pyo3::prepare_freethreaded_python();
+        let ret = Python::with_gil(|py| -> PyResult<()> {
+            let err =
+                PublicKey::from_json_dict(input.to_string().into_py(py).as_ref(py)).unwrap_err();
+            assert_eq!(err.value(py).to_string(), msg.to_string());
+            Ok(())
+        });
+        assert!(ret.is_ok())
+    }
 }
