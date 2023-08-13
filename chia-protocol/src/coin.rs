@@ -1,6 +1,9 @@
-use crate::bytes::Bytes32;
 use crate::streamable_struct;
+use crate::{bytes::Bytes32, BytesImpl};
 use chia_streamable_macro::Streamable;
+use clvm_traits::{clvm_list, destructure_list, match_list, FromClvm, ToClvm};
+use clvmr::allocator::NodePtr;
+use clvmr::Allocator;
 use sha2::{Digest, Sha256};
 use std::convert::TryInto;
 
@@ -47,6 +50,27 @@ impl Coin {
 impl Coin {
     fn name<'p>(&self, py: pyo3::Python<'p>) -> pyo3::PyResult<&'p pyo3::types::PyBytes> {
         Ok(pyo3::types::PyBytes::new(py, &self.coin_id()))
+    }
+}
+
+impl ToClvm for Coin {
+    fn to_clvm(&self, a: &mut Allocator) -> clvm_traits::Result<NodePtr> {
+        clvm_list!(self.parent_coin_info, self.puzzle_hash, self.amount).to_clvm(a)
+    }
+}
+
+impl FromClvm for Coin {
+    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self>
+    where
+        Self: Sized,
+    {
+        let destructure_list!(parent_coin_info, puzzle_hash, amount) =
+            <match_list!(BytesImpl<32>, BytesImpl<32>, u64)>::from_clvm(a, ptr)?;
+        Ok(Coin {
+            parent_coin_info,
+            puzzle_hash,
+            amount,
+        })
     }
 }
 

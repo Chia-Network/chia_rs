@@ -1,5 +1,6 @@
 use crate::bytes::{Bytes48, Bytes96};
 use chia_streamable_macro::Streamable;
+use clvm_traits::{FromClvm, ToClvm};
 
 #[cfg(feature = "py-bindings")]
 use chia_py_streamable_macro::PyStreamable;
@@ -10,7 +11,8 @@ use chia_traits::{FromJsonDict, ToJsonDict};
 use pyo3::prelude::*;
 
 #[cfg_attr(feature = "py-bindings", pyclass(frozen), derive(PyStreamable))]
-#[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
+#[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq, FromClvm, ToClvm)]
+#[clvm(tuple)]
 pub struct G1Element(Bytes48);
 
 #[cfg(feature = "py-bindings")]
@@ -27,7 +29,8 @@ impl FromJsonDict for G1Element {
     }
 }
 #[cfg_attr(feature = "py-bindings", pyclass(frozen), derive(PyStreamable))]
-#[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
+#[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq, FromClvm, ToClvm)]
+#[clvm(tuple)]
 pub struct G2Element(Bytes96);
 
 #[cfg(feature = "py-bindings")]

@@ -1,5 +1,8 @@
 use chia_traits::chia_error;
 use chia_traits::{read_bytes, Streamable};
+use clvm_traits::{FromClvm, ToClvm};
+use clvmr::allocator::{NodePtr, SExp};
+use clvmr::Allocator;
 use core::fmt::Formatter;
 use sha2::{Digest, Sha256};
 use std::convert::AsRef;
@@ -78,6 +81,25 @@ impl FromJsonDict for Bytes {
             Ok(v) => v,
         };
         Ok(buf.into())
+    }
+}
+
+impl ToClvm for Bytes {
+    fn to_clvm(&self, a: &mut Allocator) -> clvm_traits::Result<NodePtr> {
+        Ok(a.new_atom(self.0.as_slice())?)
+    }
+}
+
+impl FromClvm for Bytes {
+    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self>
+    where
+        Self: Sized,
+    {
+        if let SExp::Atom() = a.sexp(ptr) {
+            Ok(Self(a.atom(ptr).to_vec()))
+        } else {
+            Err(clvm_traits::Error::ExpectedAtom(ptr))
+        }
     }
 }
 
@@ -167,6 +189,28 @@ impl<const N: usize> Streamable for BytesImpl<N> {
 
     fn parse(input: &mut Cursor<&[u8]>) -> chia_error::Result<Self> {
         Ok(BytesImpl(read_bytes(input, N)?.try_into().unwrap()))
+    }
+}
+
+impl<const N: usize> ToClvm for BytesImpl<N> {
+    fn to_clvm(&self, a: &mut Allocator) -> clvm_traits::Result<NodePtr> {
+        Ok(a.new_atom(self.0.as_slice())?)
+    }
+}
+
+impl<const N: usize> FromClvm for BytesImpl<N> {
+    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self>
+    where
+        Self: Sized,
+    {
+        if let SExp::Atom() = a.sexp(ptr) {
+            return match a.atom(ptr).try_into() {
+                Ok(value) => Ok(value),
+                Err(_) => Err(clvm_traits::Error::ExpectedCons(ptr)),
+            };
+        } else {
+            Err(clvm_traits::Error::ExpectedAtom(ptr))
+        }
     }
 }
 

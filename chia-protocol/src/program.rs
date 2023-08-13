@@ -1,7 +1,10 @@
 use crate::bytes::Bytes;
 use chia_traits::chia_error::{Error, Result};
 use chia_traits::Streamable;
-use clvmr::serde::serialized_length_from_bytes;
+use clvm_traits::{FromClvm, ToClvm};
+use clvmr::allocator::NodePtr;
+use clvmr::serde::{node_from_bytes, node_to_bytes, serialized_length_from_bytes};
+use clvmr::Allocator;
 use sha2::{Digest, Sha256};
 use std::io::Cursor;
 
@@ -62,6 +65,26 @@ impl ToJsonDict for Program {
 impl FromJsonDict for Program {
     fn from_json_dict(o: &PyAny) -> PyResult<Self> {
         Ok(Self(Bytes::from_json_dict(o)?))
+    }
+}
+
+impl FromClvm for Program {
+    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self>
+    where
+        Self: Sized,
+    {
+        Ok(Self(
+            node_to_bytes(a, ptr)
+                .map_err(|error| clvm_traits::Error::Custom(error.to_string()))?
+                .into(),
+        ))
+    }
+}
+
+impl ToClvm for Program {
+    fn to_clvm(&self, a: &mut Allocator) -> clvm_traits::Result<NodePtr> {
+        Ok(node_from_bytes(a, self.0.as_ref())
+            .map_err(|error| clvm_traits::Error::Custom(error.to_string()))?)
     }
 }
 
