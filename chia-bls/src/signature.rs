@@ -6,6 +6,7 @@ use sha2::{Digest, Sha256};
 use std::borrow::Borrow;
 use std::convert::AsRef;
 use std::fmt;
+use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::mem::MaybeUninit;
 use std::ops::{Add, AddAssign};
@@ -88,6 +89,12 @@ impl PartialEq for Signature {
     }
 }
 impl Eq for Signature {}
+
+impl Hash for Signature {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write(&self.to_bytes())
+    }
+}
 
 impl fmt::Debug for Signature {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -718,4 +725,24 @@ fn test_aug_scheme() {
         &Signature::from_bytes(&aggsigv).unwrap(),
         pairs
     ));
+}
+
+#[test]
+fn test_hash() {
+    fn hash<T: std::hash::Hash>(v: T) -> u64 {
+        use std::collections::hash_map::DefaultHasher;
+        let mut h = DefaultHasher::new();
+        v.hash(&mut h);
+        h.finish()
+    }
+
+    let mut rng = StdRng::seed_from_u64(1337);
+    let mut data = [0u8; 32];
+    rng.fill(data.as_mut_slice());
+    let sk = SecretKey::from_seed(&data);
+    let sig1 = sign(&sk, &[0, 1, 2]);
+    let sig2 = sign(&sk, &[0, 1, 2, 3]);
+
+    assert!(hash(sig1) != hash(sig2));
+    assert_eq!(hash(sign(&sk, &[0, 1, 2])), hash(sign(&sk, &[0, 1, 2])));
 }

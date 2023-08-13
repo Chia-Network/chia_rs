@@ -5,6 +5,7 @@ use chia_traits::chia_error::{Error, Result};
 use chia_traits::{read_bytes, Streamable};
 use sha2::{digest::FixedOutput, Digest, Sha256};
 use std::fmt;
+use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::mem::MaybeUninit;
 use std::ops::{Add, AddAssign};
@@ -100,6 +101,12 @@ impl Streamable for PublicKey {
 
     fn parse(input: &mut Cursor<&[u8]>) -> Result<Self> {
         Self::from_bytes(read_bytes(input, 48)?.try_into().unwrap())
+    }
+}
+
+impl Hash for PublicKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write(&self.to_bytes())
     }
 }
 
@@ -314,4 +321,26 @@ fn test_is_valid() {
         let pk = sk.public_key();
         assert!(pk.is_valid());
     }
+}
+
+#[test]
+fn test_hash() {
+    fn hash<T: std::hash::Hash>(v: T) -> u64 {
+        use std::collections::hash_map::DefaultHasher;
+        let mut h = DefaultHasher::new();
+        v.hash(&mut h);
+        h.finish()
+    }
+
+    let mut rng = StdRng::seed_from_u64(1337);
+    let mut data = [0u8; 32];
+    rng.fill(data.as_mut_slice());
+
+    let sk = SecretKey::from_seed(&data);
+    let pk1 = sk.public_key();
+    let pk2 = pk1.derive_unhardened(1);
+    let pk3 = pk1.derive_unhardened(2);
+
+    assert!(hash(pk2) != hash(pk3));
+    assert!(hash(pk1.derive_unhardened(42)) == hash(pk1.derive_unhardened(42)));
 }
