@@ -11,3 +11,6 @@ pub use error::{Error, Result};
 pub use public_key::PublicKey;
 pub use secret_key::SecretKey;
 pub use signature::Signature;
+
+pub type G1Element = PublicKey;
+pub type G2Element = Signature;

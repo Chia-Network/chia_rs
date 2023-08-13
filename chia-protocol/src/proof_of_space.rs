@@ -1,6 +1,6 @@
-use crate::bls::G1Element;
 use crate::bytes::{Bytes, Bytes32};
 use crate::streamable_struct;
+use chia_bls::G1Element;
 use chia_streamable_macro::Streamable;
 
 streamable_struct! (ProofOfSpace {

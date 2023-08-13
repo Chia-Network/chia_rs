@@ -15,8 +15,6 @@ use chia::gen::solution_generator::solution_generator_backrefs as native_solutio
 use chia::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_protocol::Bytes32;
 use chia_protocol::FullBlock;
-use chia_protocol::G1Element;
-use chia_protocol::G2Element;
 use chia_protocol::{
     ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin, CoinSpend, CoinState,
     CoinStateUpdate, EndOfSubSlotBundle, Foliage, FoliageTransactionBlock,
@@ -59,6 +57,8 @@ use clvmr::run_program;
 use clvmr::serde::node_to_bytes;
 use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs, node_to_bytes_backrefs};
 use clvmr::ChiaDialect;
+
+use chia_bls::{G1Element, G2Element};
 
 #[pyfunction]
 pub fn compute_merkle_set_root<'p>(
