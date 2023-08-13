@@ -93,7 +93,7 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                     #[allow(too_many_arguments)]
                     #[new]
                     #[pyo3(signature = (#(#fnames),*))]
-                    fn new ( #(#fnames : #ftypes),* ) -> Self {
+                    pub fn new ( #(#fnames : #ftypes),* ) -> Self {
                         Self { #(#fnames),* }
                     }
                 }
