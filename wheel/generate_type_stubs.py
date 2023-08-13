@@ -19,15 +19,19 @@ def transform_type(m: str) -> str:
     return f"{n}:{t}"
 
 
-def print_class(f: Any, name: str, members: List[str], extra: Optional[str] = None):
+def print_class(f: Any, name: str, members: List[str], extra: Optional[List[str]] = None):
 
     # f-strings don't allow backslashes, which makes it a bit tricky to
     # manipulate strings with newlines
     nl = "\n"
+    extra_members = None
+    if extra is not None:
+        extra_members = ''.join(map(lambda x: '\n    ' + x, extra));
+
     f.write(
         f"""
 class {name}:
-    {(nl + '    ').join(members)}{nl + extra if extra else ''}
+    {(nl + '    ').join(members)}{extra_members if extra else ''}
     def __init__(
         self,
         {(',' + nl + '        ').join(map(transform_type, members))}
@@ -132,7 +136,7 @@ def parse_rust_source(filename: str) -> List[Tuple[str, List[str]]]:
     return ret
 
 
-extra_members = {"Coin": "    def name(self) -> bytes32: ..."}
+extra_members = {"Coin": ["def name(self) -> bytes32: ..."]}
 
 classes = []
 for f in sorted(glob(str(input_dir / "*.rs"))):
