@@ -10,6 +10,7 @@ pub fn from_clvm(mut ast: DeriveInput) -> TokenStream {
 
     let field_types: Vec<Type>;
     let field_names: Vec<Ident>;
+    let initializer: TokenStream;
 
     match &ast.data {
         Data::Struct(data_struct) => match &data_struct.fields {
@@ -20,6 +21,7 @@ pub fn from_clvm(mut ast: DeriveInput) -> TokenStream {
                     .iter()
                     .map(|field| field.ident.clone().unwrap())
                     .collect();
+                initializer = quote!(Self { #( #field_names, )* });
             }
             Fields::Unnamed(fields) => {
                 let fields = &fields.unnamed;
@@ -29,6 +31,7 @@ pub fn from_clvm(mut ast: DeriveInput) -> TokenStream {
                     .enumerate()
                     .map(|(i, field)| Ident::new(&format!("field_{i}"), field.span()))
                     .collect();
+                initializer = quote!(Self( #( #field_names, )* ));
             }
             Fields::Unit => panic!("unit structs are not supported"),
         },
@@ -36,7 +39,6 @@ pub fn from_clvm(mut ast: DeriveInput) -> TokenStream {
     };
 
     let struct_name = &ast.ident;
-    let destructure_names = field_names.clone();
 
     // `match_macro` decodes a nested tuple containing each of the struct field types within.
     // `destructure_macro` destructures the values into the field names, to be stored in the struct.
@@ -62,8 +64,8 @@ pub fn from_clvm(mut ast: DeriveInput) -> TokenStream {
         #[automatically_derived]
         impl #impl_generics #crate_name::FromClvm for #struct_name #ty_generics #where_clause {
             fn from_clvm(a: &clvmr::Allocator, node: clvmr::allocator::NodePtr) -> #crate_name::Result<Self> {
-                let #destructure_macro!( #( #destructure_names, )* ) = <#match_macro!( #( #field_types ),* ) as #crate_name::FromClvm>::from_clvm(a, node)?;
-                Ok(Self { #( #field_names, )* })
+                let #destructure_macro!( #( #field_names, )* ) = <#match_macro!( #( #field_types ),* ) as #crate_name::FromClvm>::from_clvm(a, node)?;
+                Ok(#initializer)
             }
         }
     }

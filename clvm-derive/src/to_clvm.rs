@@ -1,6 +1,6 @@
-use proc_macro2::{Ident, TokenStream};
+use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{parse_quote, spanned::Spanned, Data, DeriveInput, Fields};
+use syn::{parse_quote, Data, DeriveInput, Fields, Index};
 
 use crate::helpers::{add_trait_bounds, parse_args, Repr};
 
@@ -8,7 +8,7 @@ pub fn to_clvm(mut ast: DeriveInput) -> TokenStream {
     let args = parse_args(&ast.attrs);
     let crate_name = quote!(clvm_traits);
 
-    let field_names: Vec<Ident>;
+    let field_names: Vec<TokenStream>;
 
     match &ast.data {
         Data::Struct(data_struct) => match &data_struct.fields {
@@ -16,7 +16,10 @@ pub fn to_clvm(mut ast: DeriveInput) -> TokenStream {
                 let fields = &fields.named;
                 field_names = fields
                     .iter()
-                    .map(|field| field.ident.clone().unwrap())
+                    .map(|field| {
+                        let ident = field.ident.clone().unwrap();
+                        quote!(#ident)
+                    })
                     .collect();
             }
             Fields::Unnamed(fields) => {
@@ -24,7 +27,10 @@ pub fn to_clvm(mut ast: DeriveInput) -> TokenStream {
                 field_names = fields
                     .iter()
                     .enumerate()
-                    .map(|(i, field)| Ident::new(&format!("field_{i}"), field.span()))
+                    .map(|(i, _)| {
+                        let index = Index::from(i);
+                        quote!(#index)
+                    })
                     .collect();
             }
             Fields::Unit => panic!("unit structs are not supported"),

@@ -116,4 +116,22 @@ mod tests {
             "ff04ffff0134ffff04ffff0181e0ff018080",
         );
     }
+
+    #[test]
+    fn test_unnamed() {
+        #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
+        #[clvm(tuple)]
+        struct UnnamedStruct(String, String);
+
+        check(UnnamedStruct("A".to_string(), "B".to_string()), "ff4142");
+    }
+
+    #[test]
+    fn test_newtype() {
+        #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
+        #[clvm(tuple)]
+        struct NewTypeStruct(String);
+
+        check(NewTypeStruct("XYZ".to_string()), "8358595a");
+    }
 }
