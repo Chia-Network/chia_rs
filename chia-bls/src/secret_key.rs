@@ -9,6 +9,19 @@ use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::mem::MaybeUninit;
 
+#[cfg(feature = "py-bindings")]
+use crate::public_key::parse_hex_string;
+#[cfg(feature = "py-bindings")]
+use crate::Signature;
+#[cfg(feature = "py-bindings")]
+use chia_py_streamable_macro::PyStreamable;
+#[cfg(feature = "py-bindings")]
+use chia_traits::from_json_dict::FromJsonDict;
+#[cfg(feature = "py-bindings")]
+use chia_traits::to_json_dict::ToJsonDict;
+#[cfg(feature = "py-bindings")]
+use pyo3::{pyclass, pymethods, IntoPy, PyAny, PyObject, PyResult, Python};
+
 #[derive(PartialEq, Eq, Clone)]
 pub struct SecretKey(pub(crate) blst_scalar);
 
@@ -157,6 +170,23 @@ impl Hash for SecretKey {
 impl fmt::Debug for SecretKey {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         formatter.write_str(&hex::encode(self.to_bytes()))
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+impl ToJsonDict for SecretKey {
+    fn to_json_dict(&self, py: Python) -> pyo3::PyResult<PyObject> {
+        let bytes = self.to_bytes();
+        Ok(("0x".to_string() + &hex::encode(bytes)).into_py(py))
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+impl FromJsonDict for SecretKey {
+    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+        Ok(Self::from_bytes(
+            parse_hex_string(o, 32)?.as_slice().try_into().unwrap(),
+        )?)
     }
 }
 

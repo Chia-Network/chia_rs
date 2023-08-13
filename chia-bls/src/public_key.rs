@@ -10,6 +10,15 @@ use std::io::Cursor;
 use std::mem::MaybeUninit;
 use std::ops::{Add, AddAssign};
 
+#[cfg(feature = "py-bindings")]
+use chia_traits::from_json_dict::FromJsonDict;
+#[cfg(feature = "py-bindings")]
+use chia_traits::to_json_dict::ToJsonDict;
+#[cfg(feature = "py-bindings")]
+use pyo3::exceptions::PyValueError;
+#[cfg(feature = "py-bindings")]
+use pyo3::{IntoPy, PyAny, PyObject, PyResult, Python};
+
 #[derive(Clone)]
 pub struct PublicKey(pub(crate) blst_p1);
 
@@ -152,6 +161,44 @@ impl Add<&PublicKey> for PublicKey {
 impl fmt::Debug for PublicKey {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         formatter.write_str(&hex::encode(self.to_bytes()))
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+impl ToJsonDict for PublicKey {
+    fn to_json_dict(&self, py: Python) -> pyo3::PyResult<PyObject> {
+        let bytes = self.to_bytes();
+        Ok(("0x".to_string() + &hex::encode(bytes)).into_py(py))
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+pub fn parse_hex_string(o: &PyAny, len: usize) -> PyResult<Vec<u8>> {
+    let s: String = o.extract()?;
+    let s = if s.starts_with("0x") { &s[2..] } else { &s[..] };
+    let buf = match hex::decode(s) {
+        Err(_) => {
+            return Err(PyValueError::new_err("invalid hex"));
+        }
+        Ok(v) => v,
+    };
+    if buf.len() != len {
+        Err(PyValueError::new_err(format!(
+            "PublicKey, invalid length {} expected {}",
+            buf.len(),
+            len
+        )))
+    } else {
+        Ok(buf)
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+impl FromJsonDict for PublicKey {
+    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+        Ok(Self::from_bytes(
+            parse_hex_string(o, 48)?.as_slice().try_into().unwrap(),
+        )?)
     }
 }
 

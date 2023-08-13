@@ -11,6 +11,17 @@ use std::io::Cursor;
 use std::mem::MaybeUninit;
 use std::ops::{Add, AddAssign};
 
+#[cfg(feature = "py-bindings")]
+use crate::public_key::parse_hex_string;
+#[cfg(feature = "py-bindings")]
+use chia_py_streamable_macro::PyStreamable;
+#[cfg(feature = "py-bindings")]
+use chia_traits::from_json_dict::FromJsonDict;
+#[cfg(feature = "py-bindings")]
+use chia_traits::to_json_dict::ToJsonDict;
+#[cfg(feature = "py-bindings")]
+use pyo3::{pyclass, pymethods, IntoPy, PyAny, PyObject, PyResult, Python};
+
 // we use the augmented scheme
 pub const DST: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_AUG_";
 
@@ -129,6 +140,23 @@ impl Add<&Signature> for &Signature {
             ret.assume_init()
         };
         Signature(p1)
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+impl ToJsonDict for Signature {
+    fn to_json_dict(&self, py: Python) -> pyo3::PyResult<PyObject> {
+        let bytes = self.to_bytes();
+        Ok(("0x".to_string() + &hex::encode(bytes)).into_py(py))
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+impl FromJsonDict for Signature {
+    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+        Ok(Self::from_bytes(
+            parse_hex_string(o, 96)?.as_slice().try_into().unwrap(),
+        )?)
     }
 }
 
