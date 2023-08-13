@@ -123,7 +123,8 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
         #[pyo3::pymethods]
         impl #ident {
             #[staticmethod]
-            pub fn from_bytes(blob: &[u8]) -> pyo3::PyResult<Self> {
+            #[pyo3(name = "from_bytes")]
+            pub fn py_from_bytes(blob: &[u8]) -> pyo3::PyResult<Self> {
                 let mut input = std::io::Cursor::<&[u8]>::new(blob);
                 <Self as #crate_name::Streamable>::parse(&mut input).map_err(|e| <#crate_name::chia_error::Error as Into<pyo3::PyErr>>::into(e))
             }
@@ -146,14 +147,15 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 #crate_name::Streamable::update_digest(self, &mut ctx);
                 Ok(pyo3::types::PyBytes::new(py, clvmr::sha2::Digest::finalize(ctx).as_slice()))
             }
-            pub fn to_bytes<'p>(&self, py: pyo3::Python<'p>) -> pyo3::PyResult<&'p pyo3::types::PyBytes> {
+            #[pyo3(name = "to_bytes")]
+            pub fn py_to_bytes<'p>(&self, py: pyo3::Python<'p>) -> pyo3::PyResult<&'p pyo3::types::PyBytes> {
                 let mut writer = Vec::<u8>::new();
                 #crate_name::Streamable::stream(self, &mut writer).map_err(|e| <#crate_name::chia_error::Error as Into<pyo3::PyErr>>::into(e))?;
                 Ok(pyo3::types::PyBytes::new(py, &writer))
             }
 
             pub fn __bytes__<'p>(&self, py: pyo3::Python<'p>) -> pyo3::PyResult<&'p pyo3::types::PyBytes> {
-                self.to_bytes(py)
+                self.py_to_bytes(py)
             }
 
             pub fn __deepcopy__<'p>(&self, memo: &pyo3::PyAny) -> pyo3::PyResult<Self> {
