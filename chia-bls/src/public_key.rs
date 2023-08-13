@@ -7,6 +7,7 @@ use sha2::{digest::FixedOutput, Digest, Sha256};
 use std::fmt;
 use std::io::Cursor;
 use std::mem::MaybeUninit;
+use std::ops::{Add, AddAssign};
 
 #[derive(Clone)]
 pub struct PublicKey(pub(crate) blst_p1);
@@ -107,6 +108,36 @@ impl Default for PublicKey {
         unsafe {
             let p1 = MaybeUninit::<blst_p1>::zeroed();
             Self(p1.assume_init())
+        }
+    }
+}
+
+impl AddAssign<&PublicKey> for PublicKey {
+    fn add_assign(&mut self, rhs: &PublicKey) {
+        unsafe {
+            blst_p1_add_or_double(&mut self.0, &self.0, &rhs.0);
+        }
+    }
+}
+
+impl Add<&PublicKey> for &PublicKey {
+    type Output = PublicKey;
+    fn add(self, rhs: &PublicKey) -> PublicKey {
+        let p1 = unsafe {
+            let mut ret = MaybeUninit::<blst_p1>::uninit();
+            blst_p1_add_or_double(ret.as_mut_ptr(), &self.0, &rhs.0);
+            ret.assume_init()
+        };
+        PublicKey(p1)
+    }
+}
+
+impl Add<&PublicKey> for PublicKey {
+    type Output = PublicKey;
+    fn add(mut self, rhs: &PublicKey) -> PublicKey {
+        unsafe {
+            blst_p1_add_or_double(&mut self.0, &self.0, &rhs.0);
+            self
         }
     }
 }
@@ -222,6 +253,27 @@ fn test_get_fingerprint() {
         .unwrap();
     let pk = PublicKey::from_bytes(&bytes).unwrap();
     assert_eq!(pk.get_fingerprint(), 651010559);
+}
+
+#[test]
+fn test_aggregate_pubkey() {
+    // from blspy import PrivateKey
+    // from blspy import AugSchemeMPL
+    // sk = PrivateKey.from_bytes(bytes.fromhex("52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb"))
+    // pk = sk.get_g1()
+    // pk + pk
+    // <G1Element b1b8033286299e7f238aede0d3fea48d133a1e233139085f72c102c2e6cc1f8a4ea64ed2838c10bbd2ef8f78ef271bf3>
+    // pk + pk + pk
+    // <G1Element a8bc2047d90c04a12e8c38050ec0feb4417b4d5689165cd2cea8a7903aad1778e36548a46d427b5ec571364515e456d6>
+
+    let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
+    let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+    let pk = sk.public_key();
+    let pk2 = &pk + &pk;
+    let pk3 = &pk + &pk + &pk;
+
+    assert_eq!(pk2, PublicKey::from_bytes(&<[u8; 48]>::from_hex("b1b8033286299e7f238aede0d3fea48d133a1e233139085f72c102c2e6cc1f8a4ea64ed2838c10bbd2ef8f78ef271bf3").unwrap()).unwrap());
+    assert_eq!(pk3, PublicKey::from_bytes(&<[u8; 48]>::from_hex("a8bc2047d90c04a12e8c38050ec0feb4417b4d5689165cd2cea8a7903aad1778e36548a46d427b5ec571364515e456d6").unwrap()).unwrap());
 }
 
 #[test]
