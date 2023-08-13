@@ -232,6 +232,7 @@ version = "0.2.7"
 dependencies = [
  "anyhow",
  "bls12_381_plus",
+ "chia-traits",
  "criterion",
  "group 0.12.1",
  "hex",

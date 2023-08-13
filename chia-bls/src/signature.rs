@@ -3,19 +3,24 @@ use crate::secret_key::SecretKey;
 use bls12_381_plus::{
     multi_miller_loop, ExpandMsgXmd, G1Affine, G2Affine, G2Prepared, G2Projective,
 };
+use chia_traits::chia_error::{Error, Result};
+use chia_traits::{read_bytes, Streamable};
 use group::{Curve, Group};
+use sha2::{Digest, Sha256};
 use std::borrow::Borrow;
 use std::convert::AsRef;
+use std::io::Cursor;
 use std::ops::Neg;
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct Signature(pub(crate) G2Projective);
 
 impl Signature {
-    pub fn from_bytes(buf: &[u8; 96]) -> Option<Signature> {
-        G2Affine::from_compressed(buf)
-            .map(|p| Self(G2Projective::from(&p)))
-            .into()
+    pub fn from_bytes(buf: &[u8; 96]) -> Result<Self> {
+        match G2Affine::from_compressed(buf).into() {
+            Some(p) => Ok(Self(G2Projective::from(&p))),
+            None => Err(Error::Custom("Signature is invalid".to_string())),
+        }
     }
 
     pub fn to_bytes(&self) -> [u8; 96] {
@@ -34,6 +39,21 @@ impl Signature {
 impl Default for Signature {
     fn default() -> Self {
         Signature(G2Projective::identity())
+    }
+}
+
+impl Streamable for Signature {
+    fn update_digest(&self, digest: &mut Sha256) {
+        digest.update(self.to_bytes());
+    }
+
+    fn stream(&self, out: &mut Vec<u8>) -> Result<()> {
+        out.extend_from_slice(&self.to_bytes());
+        Ok(())
+    }
+
+    fn parse(input: &mut Cursor<&[u8]>) -> Result<Self> {
+        Self::from_bytes(read_bytes(input, 96)?.try_into().unwrap())
     }
 }
 
@@ -140,7 +160,10 @@ fn test_from_bytes() {
     for _i in 0..50 {
         rng.fill(data.as_mut_slice());
         // just any random bytes are not a valid signature and should fail
-        assert_eq!(Signature::from_bytes(&data), None);
+        assert_eq!(
+            Signature::from_bytes(&data).unwrap_err(),
+            Error::Custom("Signature is invalid".to_string())
+        );
     }
 }
 
