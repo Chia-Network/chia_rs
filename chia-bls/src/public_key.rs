@@ -1,17 +1,21 @@
 use crate::derivable_key::DerivableKey;
 use bls12_381_plus::{G1Affine, G1Projective, Scalar};
+use chia_traits::chia_error::{Error, Result};
+use chia_traits::{read_bytes, Streamable};
 use group::Curve;
 use num_bigint::BigUint;
 use sha2::{Digest, Sha256};
+use std::io::Cursor;
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct PublicKey(pub G1Projective);
 
 impl PublicKey {
-    pub fn from_bytes(bytes: &[u8; 48]) -> Option<PublicKey> {
-        G1Affine::from_compressed(bytes)
-            .map(|p| Self(G1Projective::from(&p)))
-            .into()
+    pub fn from_bytes(bytes: &[u8; 48]) -> Result<Self> {
+        match G1Affine::from_compressed(bytes).into() {
+            Some(p) => Ok(Self(G1Projective::from(&p))),
+            None => Err(Error::Custom("PublicKey is invalid".to_string())),
+        }
     }
 
     pub fn to_bytes(&self) -> [u8; 48] {
@@ -20,6 +24,21 @@ impl PublicKey {
 
     pub fn is_valid(&self) -> bool {
         self.0.is_identity().unwrap_u8() == 0 && self.0.is_on_curve().unwrap_u8() == 1
+    }
+}
+
+impl Streamable for PublicKey {
+    fn update_digest(&self, digest: &mut Sha256) {
+        digest.update(self.to_bytes());
+    }
+
+    fn stream(&self, out: &mut Vec<u8>) -> Result<()> {
+        out.extend_from_slice(&self.to_bytes());
+        Ok(())
+    }
+
+    fn parse(input: &mut Cursor<&[u8]>) -> Result<Self> {
+        Self::from_bytes(read_bytes(input, 48)?.try_into().unwrap())
     }
 }
 
@@ -91,7 +110,10 @@ fn test_from_bytes() {
     for _i in 0..50 {
         rng.fill(data.as_mut_slice());
         // just any random bytes are not a valid key and should fail
-        assert_eq!(PublicKey::from_bytes(&data), None);
+        assert_eq!(
+            PublicKey::from_bytes(&data).unwrap_err(),
+            Error::Custom("PublicKey is invalid".to_string())
+        );
     }
 }
 

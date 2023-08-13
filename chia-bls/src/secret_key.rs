@@ -1,9 +1,12 @@
 use crate::derivable_key::DerivableKey;
 use crate::public_key::PublicKey;
 use bls12_381_plus::{G1Projective, Scalar};
+use chia_traits::chia_error::{Error, Result};
+use chia_traits::{read_bytes, Streamable};
 use hkdf::HkdfExtract;
 use num_bigint::BigUint;
 use sha2::{Digest, Sha256};
+use std::io::Cursor;
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct SecretKey(pub(crate) Scalar);
@@ -73,13 +76,18 @@ impl SecretKey {
         SecretKey(Scalar::from_okm(&sk))
     }
 
-    pub fn from_bytes(b: &[u8; 32]) -> Option<SecretKey> {
+    pub fn from_bytes(b: &[u8; 32]) -> Result<Self> {
         let t = [
             b[31], b[30], b[29], b[28], b[27], b[26], b[25], b[24], b[23], b[22], b[21], b[20],
             b[19], b[18], b[17], b[16], b[15], b[14], b[13], b[12], b[11], b[10], b[9], b[8], b[7],
             b[6], b[5], b[4], b[3], b[2], b[1], b[0],
         ];
-        Scalar::from_bytes(&t).map(SecretKey).into()
+        match Scalar::from_bytes(&t).into() {
+            Some(s) => Ok(SecretKey(s)),
+            None => Err(Error::Custom(
+                "SecretKey byte data must be less than the group order".to_string(),
+            )),
+        }
     }
 
     pub fn to_bytes(&self) -> [u8; 32] {
@@ -96,6 +104,21 @@ impl SecretKey {
         // described here:
         // https://eips.ethereum.org/EIPS/eip-2333#derive_child_sk
         SecretKey::from_seed(to_lamport_pk(self.to_bytes(), idx).as_slice())
+    }
+}
+
+impl Streamable for SecretKey {
+    fn update_digest(&self, digest: &mut Sha256) {
+        digest.update(self.to_bytes());
+    }
+
+    fn stream(&self, out: &mut Vec<u8>) -> Result<()> {
+        out.extend_from_slice(&self.to_bytes());
+        Ok(())
+    }
+
+    fn parse(input: &mut Cursor<&[u8]>) -> Result<Self> {
+        Self::from_bytes(read_bytes(input, 32)?.try_into().unwrap())
     }
 }
 
@@ -285,7 +308,10 @@ fn test_from_bytes() {
         // make the bytes exceed q
         data[0] |= 0x80;
         // just any random bytes are not a valid key and should fail
-        assert_eq!(SecretKey::from_bytes(&data), None);
+        assert_eq!(
+            SecretKey::from_bytes(&data).unwrap_err(),
+            Error::Custom("SecretKey byte data must be less than the group order".to_string())
+        );
     }
 }
 
