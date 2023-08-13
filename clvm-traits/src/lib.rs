@@ -63,27 +63,6 @@ mod tests {
 
     use super::*;
 
-    #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
-    #[clvm(tuple)]
-    struct TupleStruct {
-        a: u64,
-        b: i32,
-    }
-
-    #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
-    #[clvm(proper_list)]
-    struct ProperListStruct {
-        a: u64,
-        b: i32,
-    }
-
-    #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
-    #[clvm(curried_args)]
-    struct CurriedArgsStruct {
-        a: u64,
-        b: i32,
-    }
-
     fn check<T>(value: T, expected: &str)
     where
         T: fmt::Debug + PartialEq + ToClvm + FromClvm,
@@ -101,16 +80,37 @@ mod tests {
 
     #[test]
     fn test_tuple() {
+        #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
+        #[clvm(tuple)]
+        struct TupleStruct {
+            a: u64,
+            b: i32,
+        }
+
         check(TupleStruct { a: 52, b: -32 }, "ff3481e0");
     }
 
     #[test]
     fn test_proper_list() {
+        #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
+        #[clvm(proper_list)]
+        struct ProperListStruct {
+            a: u64,
+            b: i32,
+        }
+
         check(ProperListStruct { a: 52, b: -32 }, "ff34ff81e080");
     }
 
     #[test]
     fn test_curried_args() {
+        #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
+        #[clvm(curried_args)]
+        struct CurriedArgsStruct {
+            a: u64,
+            b: i32,
+        }
+
         check(
             CurriedArgsStruct { a: 52, b: -32 },
             "ff04ffff0134ffff04ffff0181e0ff018080",
