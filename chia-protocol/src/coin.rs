@@ -60,10 +60,7 @@ impl ToClvm for Coin {
 }
 
 impl FromClvm for Coin {
-    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self>
-    where
-        Self: Sized,
-    {
+    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self> {
         let destructure_list!(parent_coin_info, puzzle_hash, amount) =
             <match_list!(BytesImpl<32>, BytesImpl<32>, u64)>::from_clvm(a, ptr)?;
         Ok(Coin {

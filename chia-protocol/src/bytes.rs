@@ -91,10 +91,7 @@ impl ToClvm for Bytes {
 }
 
 impl FromClvm for Bytes {
-    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self>
-    where
-        Self: Sized,
-    {
+    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self> {
         if let SExp::Atom() = a.sexp(ptr) {
             Ok(Self(a.atom(ptr).to_vec()))
         } else {
@@ -199,10 +196,7 @@ impl<const N: usize> ToClvm for BytesImpl<N> {
 }
 
 impl<const N: usize> FromClvm for BytesImpl<N> {
-    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self>
-    where
-        Self: Sized,
-    {
+    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self> {
         if let SExp::Atom() = a.sexp(ptr) {
             return match a.atom(ptr).try_into() {
                 Ok(value) => Ok(value),
