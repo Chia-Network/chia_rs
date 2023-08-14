@@ -19,7 +19,7 @@ macro_rules! clvm_primitive {
     ($primitive:ty) => {
         impl FromClvm for $primitive {
             fn from_clvm(a: &Allocator, ptr: NodePtr) -> Result<Self> {
-                if let SExp::Atom() = a.sexp(ptr) {
+                if let SExp::Atom = a.sexp(ptr) {
                     let (sign, mut vec) = a.number(ptr).to_bytes_be();
                     if vec.len() < std::mem::size_of::<$primitive>() {
                         let mut zeros = vec![0; std::mem::size_of::<$primitive>() - vec.len()];
@@ -67,7 +67,7 @@ where
     {
         match a.sexp(ptr) {
             SExp::Pair(first, rest) => Ok((A::from_clvm(a, first)?, B::from_clvm(a, rest)?)),
-            SExp::Atom() => Err(Error::ExpectedCons(ptr)),
+            SExp::Atom => Err(Error::ExpectedCons(ptr)),
         }
     }
 }
@@ -93,7 +93,7 @@ where
         let mut items = Vec::with_capacity(N);
         loop {
             match a.sexp(ptr) {
-                SExp::Atom() => {
+                SExp::Atom => {
                     if nullp(a, ptr) {
                         return match items.try_into() {
                             Ok(value) => Ok(value),
@@ -127,7 +127,7 @@ where
         let mut items = Vec::new();
         loop {
             match a.sexp(ptr) {
-                SExp::Atom() => {
+                SExp::Atom => {
                     if nullp(a, ptr) {
                         return Ok(items);
                     } else {
@@ -155,7 +155,7 @@ impl<T: FromClvm> FromClvm for Option<T> {
 
 impl FromClvm for String {
     fn from_clvm(a: &Allocator, ptr: NodePtr) -> Result<Self> {
-        if let SExp::Atom() = a.sexp(ptr) {
+        if let SExp::Atom = a.sexp(ptr) {
             Self::from_utf8(a.atom(ptr).to_vec()).map_err(|error| Error::Custom(error.to_string()))
         } else {
             Err(Error::ExpectedAtom(ptr))

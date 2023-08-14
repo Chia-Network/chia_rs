@@ -108,7 +108,7 @@ pub fn compute_unknown_condition_cost(op: ConditionOpcode) -> Cost {
 
 pub fn parse_opcode(a: &Allocator, op: NodePtr, flags: u32) -> Option<ConditionOpcode> {
     let buf = match a.sexp(op) {
-        SExp::Atom() => a.atom(op),
+        SExp::Atom => a.atom(op),
         _ => return None,
     };
     if buf.len() == 2 && (flags & ENABLE_SOFTFORK_CONDITION) != 0 {

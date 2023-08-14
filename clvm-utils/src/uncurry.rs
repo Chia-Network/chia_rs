@@ -3,7 +3,7 @@ use clvmr::op_utils::nullp;
 
 fn destructure<const N: usize>(a: &Allocator, mut node: NodePtr) -> Option<[NodePtr; N]> {
     let mut counter = 0;
-    let mut ret: [NodePtr; N] = [0; N];
+    let mut ret: [NodePtr; N] = [NodePtr(0); N];
     while let Some((first, rest)) = a.next(node) {
         node = rest;
         if counter == N {
@@ -21,7 +21,7 @@ fn destructure<const N: usize>(a: &Allocator, mut node: NodePtr) -> Option<[Node
 
 fn check(a: &Allocator, n: NodePtr, atom: &[u8]) -> Option<()> {
     match a.sexp(n) {
-        SExp::Atom() => {
+        SExp::Atom => {
             if a.atom(n) == atom {
                 Some(())
             } else {

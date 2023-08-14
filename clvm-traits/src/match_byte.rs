@@ -20,7 +20,7 @@ impl<const BYTE: u8> ToClvm for MatchByte<BYTE> {
 
 impl<const BYTE: u8> FromClvm for MatchByte<BYTE> {
     fn from_clvm(a: &Allocator, node: NodePtr) -> Result<Self> {
-        if let SExp::Atom() = a.sexp(node) {
+        if let SExp::Atom = a.sexp(node) {
             match a.atom(node) {
                 [] if BYTE == 0 => Ok(Self),
                 [byte] if *byte == BYTE && BYTE > 0 => Ok(Self),

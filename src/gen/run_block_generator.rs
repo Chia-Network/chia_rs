@@ -84,7 +84,7 @@ fn extract_n<const N: usize>(
     mut n: NodePtr,
     e: ErrorCode,
 ) -> Result<[NodePtr; N], ValidationErr> {
-    let mut ret: [NodePtr; N] = [0; N];
+    let mut ret: [NodePtr; N] = [NodePtr(0); N];
     let mut counter = 0;
     assert!(N > 0);
     while let Some((item, rest)) = a.next(n) {

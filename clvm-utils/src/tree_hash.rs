@@ -13,7 +13,7 @@ pub fn tree_hash(a: &Allocator, node: NodePtr) -> [u8; 32] {
     while let Some(op) = ops.pop() {
         match op {
             TreeOp::SExp(node) => match a.sexp(node) {
-                SExp::Atom() => {
+                SExp::Atom => {
                     let mut sha256 = Sha256::new();
                     sha256.update([1_u8]);
                     sha256.update(a.atom(node));
