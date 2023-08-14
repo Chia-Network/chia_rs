@@ -4,7 +4,7 @@ use chia_traits::chia_error::{Error, Result};
 use chia_traits::{read_bytes, Streamable};
 use group::Curve;
 use num_bigint::BigUint;
-use sha2::{Digest, Sha256};
+use sha2::{digest::FixedOutput, Digest, Sha256};
 use std::io::Cursor;
 
 #[derive(PartialEq, Eq, Debug)]
@@ -24,6 +24,13 @@ impl PublicKey {
 
     pub fn is_valid(&self) -> bool {
         self.0.is_identity().unwrap_u8() == 0 && self.0.is_on_curve().unwrap_u8() == 1
+    }
+
+    pub fn get_fingerprint(&self) -> u32 {
+        let mut hasher = Sha256::new();
+        hasher.update(self.to_bytes());
+        let hash: [u8; 32] = hasher.finalize_fixed().into();
+        u32::from_be_bytes(hash[0..4].try_into().unwrap())
     }
 }
 
@@ -47,7 +54,7 @@ impl DerivableKey for PublicKey {
         let mut hasher = Sha256::new();
         hasher.update(self.to_bytes());
         hasher.update(idx.to_be_bytes());
-        let digest = hasher.finalize();
+        let digest: [u8; 32] = hasher.finalize_fixed().into();
 
         // in an ideal world, we would not need to reach for the sledge-hammer of
         // num-bigint here. This would most likely be faster if implemented in
@@ -115,6 +122,17 @@ fn test_from_bytes() {
             Error::Custom("PublicKey is invalid".to_string())
         );
     }
+}
+
+#[test]
+fn test_get_fingerprint() {
+    let bytes: [u8; 48] = hex::decode("997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2")
+        .unwrap()
+        .as_slice()
+        .try_into()
+        .unwrap();
+    let pk = PublicKey::from_bytes(&bytes).unwrap();
+    assert_eq!(pk.get_fingerprint(), 651010559);
 }
 
 #[test]
