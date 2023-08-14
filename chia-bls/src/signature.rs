@@ -168,6 +168,33 @@ fn test_from_bytes() {
 }
 
 #[test]
+fn test_default_is_valid() {
+    let sig = Signature::default();
+    assert!(sig.is_valid());
+}
+
+#[test]
+fn test_infinity_is_valid() {
+    let mut data = [0u8; 96];
+    data[0] = 0xc0;
+    let sig = Signature::from_bytes(&data).unwrap();
+    assert!(sig.is_valid());
+}
+
+#[test]
+fn test_is_valid() {
+    let mut rng = StdRng::seed_from_u64(1337);
+    let mut data = [0u8; 32];
+    let msg = [0u8; 32];
+    for _i in 0..50 {
+        rng.fill(data.as_mut_slice());
+        let sk = SecretKey::from_seed(&data);
+        let sig = sign(&sk, msg);
+        assert!(sig.is_valid());
+    }
+}
+
+#[test]
 fn test_roundtrip() {
     let mut rng = StdRng::seed_from_u64(1337);
     let mut data = [0u8; 32];
