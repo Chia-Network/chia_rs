@@ -239,6 +239,7 @@ dependencies = [
  "hkdf",
  "num-bigint",
  "rand",
+ "rstest 0.17.0",
  "sha2 0.9.9",
  "tiny-bip39",
 ]
