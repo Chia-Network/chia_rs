@@ -1,4 +1,5 @@
 use crate::derivable_key::DerivableKey;
+use crate::secret_key::is_all_zero;
 use bls12_381_plus::{G1Affine, G1Projective, Scalar};
 use chia_traits::chia_error::{Error, Result};
 use chia_traits::{read_bytes, Streamable};
@@ -12,6 +13,32 @@ pub struct PublicKey(pub G1Projective);
 
 impl PublicKey {
     pub fn from_bytes(bytes: &[u8; 48]) -> Result<Self> {
+        // check if the element is canonical
+        // the first 3 bits have special meaning
+        let zeros_only = is_all_zero(&bytes[1..]);
+
+        if (bytes[0] & 0xc0) == 0xc0 {
+            // enforce that infinity must be 0xc0000..00
+            if bytes[0] != 0xc0 || !zeros_only {
+                return Err(Error::Custom(
+                    "Given G1 infinity element must be canonical".to_string(),
+                ));
+            }
+            // return infinity element (point all zero)
+            return Ok(Self(G1Projective::identity()));
+        } else {
+            if (bytes[0] & 0xc0) != 0x80 {
+                return Err(Error::Custom(
+                    "Given G1 non-infinity element must start with 0b10".to_string(),
+                ));
+            }
+            if zeros_only {
+                return Err(Error::Custom(
+                    "G1 non-infinity element can't have only zeros".to_string(),
+                ));
+            }
+        }
+
         match G1Affine::from_compressed(bytes).into() {
             Some(p) => Ok(Self(G1Projective::from(&p))),
             None => Err(Error::Custom("PublicKey is invalid".to_string())),
@@ -110,18 +137,47 @@ use rand::{Rng, SeedableRng};
 #[cfg(test)]
 use rand::rngs::StdRng;
 
+#[cfg(test)]
+use rstest::rstest;
+
 #[test]
 fn test_from_bytes() {
     let mut rng = StdRng::seed_from_u64(1337);
     let mut data = [0u8; 48];
     for _i in 0..50 {
         rng.fill(data.as_mut_slice());
+        // clear the bits that mean infinity
+        data[0] = 0x80;
         // just any random bytes are not a valid key and should fail
         assert_eq!(
             PublicKey::from_bytes(&data).unwrap_err(),
             Error::Custom("PublicKey is invalid".to_string())
         );
     }
+}
+
+#[cfg(test)]
+#[rstest]
+#[case("c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001", "Given G1 infinity element must be canonical")]
+#[case("c08000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "Given G1 infinity element must be canonical")]
+#[case("c80000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "Given G1 infinity element must be canonical")]
+#[case("e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "Given G1 infinity element must be canonical")]
+#[case("d00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "Given G1 infinity element must be canonical")]
+#[case("800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "G1 non-infinity element can't have only zeros")]
+#[case("400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "Given G1 non-infinity element must start with 0b10")]
+fn test_from_bytes_failures(#[case] input: &str, #[case()] error: &str) {
+    let bytes: [u8; 48] = hex::decode(input).unwrap().try_into().unwrap();
+    assert_eq!(
+        PublicKey::from_bytes(&bytes).unwrap_err(),
+        Error::Custom(error.to_string())
+    );
+}
+
+#[test]
+fn test_from_bytes_infinity() {
+    let bytes: [u8; 48] = hex::decode("c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000").unwrap().try_into().unwrap();
+    let pk = PublicKey::from_bytes(&bytes).unwrap();
+    assert!(pk.0.is_identity().unwrap_u8() != 0);
 }
 
 #[test]

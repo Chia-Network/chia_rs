@@ -57,6 +57,14 @@ fn sha256(bytes: &[u8]) -> [u8; 32] {
     hasher.finalize().try_into().unwrap()
 }
 
+pub fn is_all_zero(buf: &[u8]) -> bool {
+    let (prefix, aligned, suffix) = unsafe { buf.align_to::<u128>() };
+
+    prefix.iter().all(|&x| x == 0)
+        && suffix.iter().all(|&x| x == 0)
+        && aligned.iter().all(|&x| x == 0)
+}
+
 impl SecretKey {
     pub fn from_seed(seed: &[u8]) -> SecretKey {
         // described here:
@@ -77,6 +85,11 @@ impl SecretKey {
     }
 
     pub fn from_bytes(b: &[u8; 32]) -> Result<Self> {
+        if is_all_zero(b) {
+            // don't check anything else, we allow zero private key
+            return Ok(Self(Scalar::from_bytes(b).unwrap()));
+        }
+
         let t = [
             b[31], b[30], b[29], b[28], b[27], b[26], b[25], b[24], b[23], b[22], b[21], b[20],
             b[19], b[18], b[17], b[16], b[15], b[14], b[13], b[12], b[11], b[10], b[9], b[8], b[7],
@@ -313,6 +326,12 @@ fn test_from_bytes() {
             Error::Custom("SecretKey byte data must be less than the group order".to_string())
         );
     }
+}
+
+#[test]
+fn test_from_bytes_zero() {
+    let data = [0u8; 32];
+    let _sk = SecretKey::from_bytes(&data).unwrap();
 }
 
 #[test]
