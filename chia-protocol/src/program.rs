@@ -69,10 +69,7 @@ impl FromJsonDict for Program {
 }
 
 impl FromClvm for Program {
-    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self>
-    where
-        Self: Sized,
-    {
+    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self> {
         Ok(Self(
             node_to_bytes(a, ptr)
                 .map_err(|error| clvm_traits::Error::Custom(error.to_string()))?
