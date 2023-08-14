@@ -1,7 +1,10 @@
 use crate::bytes::Bytes;
 use chia_traits::chia_error::{Error, Result};
 use chia_traits::Streamable;
-use clvmr::serde::serialized_length_from_bytes;
+use clvm_traits::{FromClvm, ToClvm};
+use clvmr::allocator::NodePtr;
+use clvmr::serde::{node_from_bytes, node_to_bytes, serialized_length_from_bytes};
+use clvmr::Allocator;
 use sha2::{Digest, Sha256};
 use std::io::Cursor;
 
@@ -65,8 +68,43 @@ impl FromJsonDict for Program {
     }
 }
 
+impl FromClvm for Program {
+    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self> {
+        Ok(Self(
+            node_to_bytes(a, ptr)
+                .map_err(|error| clvm_traits::Error::Custom(error.to_string()))?
+                .into(),
+        ))
+    }
+}
+
+impl ToClvm for Program {
+    fn to_clvm(&self, a: &mut Allocator) -> clvm_traits::Result<NodePtr> {
+        Ok(node_from_bytes(a, self.0.as_ref())
+            .map_err(|error| clvm_traits::Error::Custom(error.to_string()))?)
+    }
+}
+
 impl AsRef<[u8]> for Program {
     fn as_ref(&self) -> &[u8] {
         self.0.as_ref()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn program_roundtrip() {
+        let a = &mut Allocator::new();
+        let expected = "ff01ff02ff62ff0480";
+        let expected_bytes = hex::decode(expected).unwrap();
+
+        let ptr = node_from_bytes(a, &expected_bytes).unwrap();
+        let program = Program::from_clvm(a, ptr).unwrap();
+
+        let round_trip = program.to_clvm(a).unwrap();
+        assert_eq!(expected, hex::encode(node_to_bytes(a, round_trip).unwrap()));
     }
 }
