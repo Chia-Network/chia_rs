@@ -14,6 +14,8 @@ use std::mem::MaybeUninit;
 use std::ops::{Add, AddAssign};
 
 #[cfg(feature = "py-bindings")]
+use crate::{GTElement, Signature};
+#[cfg(feature = "py-bindings")]
 use chia_py_streamable_macro::PyStreamable;
 #[cfg(feature = "py-bindings")]
 use chia_traits::from_json_dict::FromJsonDict;
@@ -22,14 +24,18 @@ use chia_traits::to_json_dict::ToJsonDict;
 #[cfg(feature = "py-bindings")]
 use pyo3::exceptions::PyValueError;
 #[cfg(feature = "py-bindings")]
-use pyo3::{pyclass, IntoPy, PyAny, PyObject, PyResult, Python};
+use pyo3::{pyclass, pymethods, IntoPy, PyAny, PyObject, PyResult, Python};
 
-#[cfg_attr(feature = "py-bindings", pyclass(frozen), derive(PyStreamable))]
+#[cfg_attr(
+    feature = "py-bindings",
+    pyclass(name = "G1Element"),
+    derive(PyStreamable)
+)]
 #[derive(Clone)]
 pub struct PublicKey(pub(crate) blst_p1);
 
 impl PublicKey {
-    pub fn from_bytes(bytes: &[u8; 48]) -> Result<Self> {
+    pub fn from_bytes_unchecked(bytes: &[u8; 48]) -> Result<Self> {
         // check if the element is canonical
         // the first 3 bits have special meaning
         let zeros_only = is_all_zero(&bytes[1..]);
@@ -67,7 +73,11 @@ impl PublicKey {
             blst_p1_from_affine(p1.as_mut_ptr(), &p1_affine.assume_init());
             p1.assume_init()
         };
-        let ret = Self(p1);
+        Ok(Self(p1))
+    }
+
+    pub fn from_bytes(bytes: &[u8; 48]) -> Result<Self> {
+        let ret = Self::from_bytes_unchecked(bytes)?;
         if !ret.is_valid() {
             Err(Error::Custom("PublicKey is invalid".to_string()))
         } else {
@@ -94,6 +104,51 @@ impl PublicKey {
         hasher.update(self.to_bytes());
         let hash: [u8; 32] = hasher.finalize_fixed().into();
         u32::from_be_bytes(hash[0..4].try_into().unwrap())
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+#[cfg_attr(feature = "py-bindings", pymethods)]
+impl PublicKey {
+    #[classattr]
+    const SIZE: usize = 48;
+
+    #[new]
+    pub fn init() -> Self {
+        Self::default()
+    }
+
+    #[staticmethod]
+    #[pyo3(name = "from_bytes_unchecked")]
+    fn py_from_bytes_unchecked(bytes: [u8; Self::SIZE]) -> Result<Self> {
+        Self::from_bytes_unchecked(&bytes)
+    }
+
+    #[staticmethod]
+    pub fn generator() -> Self {
+        unsafe { Self(*blst_p1_generator()) }
+    }
+
+    pub fn pair(&self, other: &Signature) -> GTElement {
+        other.pair(self)
+    }
+
+    #[pyo3(name = "get_fingerprint")]
+    pub fn py_get_fingerprint(&self) -> u32 {
+        self.get_fingerprint()
+    }
+
+    pub fn __repr__(&self) -> String {
+        let bytes = self.to_bytes();
+        format!("<G1Element {}>", &hex::encode(bytes))
+    }
+
+    pub fn __add__(&self, rhs: &Self) -> Self {
+        self + rhs
+    }
+
+    pub fn __iadd__(&mut self, rhs: &Self) {
+        *self += rhs;
     }
 }
 

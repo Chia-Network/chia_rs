@@ -1,4 +1,4 @@
-use crate::{PublicKey, SecretKey};
+use crate::{GTElement, PublicKey, SecretKey};
 use blst::*;
 use chia_traits::chia_error::{Error, Result};
 use chia_traits::{read_bytes, Streamable};
@@ -28,12 +28,16 @@ use pyo3::{pyclass, pymethods, IntoPy, PyAny, PyObject, PyResult, Python};
 // we use the augmented scheme
 pub const DST: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_AUG_";
 
-#[cfg_attr(feature = "py-bindings", pyclass(frozen), derive(PyStreamable))]
+#[cfg_attr(
+    feature = "py-bindings",
+    pyclass(name = "G2Element"),
+    derive(PyStreamable)
+)]
 #[derive(Clone)]
 pub struct Signature(pub(crate) blst_p2);
 
 impl Signature {
-    pub fn from_bytes(buf: &[u8; 96]) -> Result<Self> {
+    pub fn from_bytes_unchecked(buf: &[u8; 96]) -> Result<Self> {
         let p2 = unsafe {
             let mut p2_affine = MaybeUninit::<blst_p2_affine>::uninit();
             if blst_p2_uncompress(p2_affine.as_mut_ptr(), buf as *const u8)
@@ -45,7 +49,11 @@ impl Signature {
             blst_p2_from_affine(p2.as_mut_ptr(), &p2_affine.assume_init());
             p2.assume_init()
         };
-        let ret = Self(p2);
+        Ok(Self(p2))
+    }
+
+    pub fn from_bytes(buf: &[u8; 96]) -> Result<Self> {
+        let ret = Self::from_bytes_unchecked(buf)?;
         if !ret.is_valid() {
             Err(Error::Custom("Signature is invalid".to_string()))
         } else {
@@ -71,6 +79,22 @@ impl Signature {
         // Infinity was considered a valid G2Element in older Relic versions
         // For historical compatibililty this behavior is maintained.
         unsafe { blst_p2_is_inf(&self.0) || blst_p2_in_g2(&self.0) }
+    }
+
+    pub fn pair(&self, other: &PublicKey) -> GTElement {
+        let ans = unsafe {
+            let mut ans = MaybeUninit::<blst_fp12>::uninit();
+            let mut aff1 = MaybeUninit::<blst_p1_affine>::uninit();
+            let mut aff2 = MaybeUninit::<blst_p2_affine>::uninit();
+
+            blst_p1_to_affine(aff1.as_mut_ptr(), &other.0);
+            blst_p2_to_affine(aff2.as_mut_ptr(), &self.0);
+
+            blst_miller_loop(ans.as_mut_ptr(), &aff2.assume_init(), &aff1.assume_init());
+            blst_final_exp(ans.as_mut_ptr(), ans.as_ptr());
+            ans.assume_init()
+        };
+        GTElement(ans)
     }
 }
 
@@ -180,6 +204,47 @@ impl ToClvm for Signature {
     fn to_clvm(&self, a: &mut Allocator) -> clvm_traits::Result<NodePtr> {
         node_from_bytes(a, &self.to_bytes())
             .map_err(|error| clvm_traits::Error::Custom(error.to_string()))
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+#[cfg_attr(feature = "py-bindings", pymethods)]
+impl Signature {
+    #[classattr]
+    const SIZE: usize = 96;
+
+    #[new]
+    pub fn init() -> Self {
+        Self::default()
+    }
+
+    #[staticmethod]
+    #[pyo3(name = "from_bytes_unchecked")]
+    pub fn py_from_bytes_unchecked(bytes: [u8; Self::SIZE]) -> Result<Signature> {
+        Self::from_bytes_unchecked(&bytes)
+    }
+
+    #[pyo3(name = "pair")]
+    pub fn py_pair(&self, other: &PublicKey) -> GTElement {
+        self.pair(other)
+    }
+
+    #[staticmethod]
+    pub fn generator() -> Self {
+        unsafe { Self(*blst_p2_generator()) }
+    }
+
+    pub fn __repr__(&self) -> String {
+        let bytes = self.to_bytes();
+        format!("<G2Element {}>", &hex::encode(bytes))
+    }
+
+    pub fn __add__(&self, rhs: &Self) -> Self {
+        self + rhs
+    }
+
+    pub fn __iadd__(&mut self, rhs: &Self) {
+        *self += rhs;
     }
 }
 
@@ -314,15 +379,16 @@ where
     }
 }
 
-pub fn sign<Msg: AsRef<[u8]>>(sk: &SecretKey, msg: Msg) -> Signature {
-    let mut aug_msg = sk.public_key().to_bytes().to_vec();
-    aug_msg.extend_from_slice(msg.as_ref());
+// Signs msg using sk without augmenting the message with the public key. This
+// function is used when the caller augments the message with some other public
+// key
+pub fn sign_raw<Msg: AsRef<[u8]>>(sk: &SecretKey, msg: Msg) -> Signature {
     let p2 = unsafe {
         let mut p2 = MaybeUninit::<blst_p2>::uninit();
         blst_hash_to_g2(
             p2.as_mut_ptr(),
-            aug_msg.as_ptr(),
-            aug_msg.len(),
+            msg.as_ref().as_ptr(),
+            msg.as_ref().len(),
             DST.as_ptr(),
             DST.len(),
             std::ptr::null(),
@@ -332,6 +398,12 @@ pub fn sign<Msg: AsRef<[u8]>>(sk: &SecretKey, msg: Msg) -> Signature {
         p2.assume_init()
     };
     Signature(p2)
+}
+
+pub fn sign<Msg: AsRef<[u8]>>(sk: &SecretKey, msg: Msg) -> Signature {
+    let mut aug_msg = sk.public_key().to_bytes().to_vec();
+    aug_msg.extend_from_slice(msg.as_ref());
+    sign_raw(sk, aug_msg)
 }
 
 #[cfg(test)]
