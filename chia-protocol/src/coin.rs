@@ -74,6 +74,7 @@ impl FromClvm for Coin {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use clvmr::serde::{node_from_bytes, node_to_bytes};
     use rstest::rstest;
 
     #[rstest]
@@ -107,5 +108,18 @@ mod tests {
         sha256.update(puzzle_hash);
         sha256.update(bytes);
         assert_eq!(c.coin_id(), &sha256.finalize() as &[u8]);
+    }
+
+    #[test]
+    fn coin_roundtrip() {
+        let a = &mut Allocator::new();
+        let expected = "ffa09e144397decd2b831551f9710c17ae776d9c5a3ae5283c5f9747263fd1255381ffa0eff07522495060c066f66f32acc2a77e3a3e737aca8baea4d1a64ea4cdc13da9ff0180";
+        let expected_bytes = hex::decode(expected).unwrap();
+
+        let ptr = node_from_bytes(a, &expected_bytes).unwrap();
+        let coin = Coin::from_clvm(a, ptr).unwrap();
+
+        let round_trip = coin.to_clvm(a).unwrap();
+        assert_eq!(expected, hex::encode(node_to_bytes(a, round_trip).unwrap()));
     }
 }

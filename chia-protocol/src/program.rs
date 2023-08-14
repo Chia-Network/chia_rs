@@ -90,3 +90,21 @@ impl AsRef<[u8]> for Program {
         self.0.as_ref()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn program_roundtrip() {
+        let a = &mut Allocator::new();
+        let expected = "ff01ff02ff62ff0480";
+        let expected_bytes = hex::decode(expected).unwrap();
+
+        let ptr = node_from_bytes(a, &expected_bytes).unwrap();
+        let program = Program::from_clvm(a, ptr).unwrap();
+
+        let round_trip = program.to_clvm(a).unwrap();
+        assert_eq!(expected, hex::encode(node_to_bytes(a, round_trip).unwrap()));
+    }
+}
