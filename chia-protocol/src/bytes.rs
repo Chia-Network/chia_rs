@@ -403,6 +403,7 @@ impl<'py> FromPyObject<'py> for Bytes {
 mod tests {
     use super::*;
 
+    use clvmr::serde::{node_from_bytes, node_to_bytes};
     use rstest::rstest;
 
     #[rstest]
@@ -633,5 +634,31 @@ mod tests {
         ];
         from_bytes::<Bytes48>(buf, Bytes48::from(buf));
         from_bytes_fail::<Bytes48>(&buf[0..47], chia_error::Error::EndOfBuffer);
+    }
+
+    #[test]
+    fn bytes_roundtrip() {
+        let a = &mut Allocator::new();
+        let expected = "84facef00d";
+        let expected_bytes = hex::decode(expected).unwrap();
+
+        let ptr = node_from_bytes(a, &expected_bytes).unwrap();
+        let bytes = Bytes::from_clvm(a, ptr).unwrap();
+
+        let round_trip = bytes.to_clvm(a).unwrap();
+        assert_eq!(expected, hex::encode(node_to_bytes(a, round_trip).unwrap()));
+    }
+
+    #[test]
+    fn bytes32_roundtrip() {
+        let a = &mut Allocator::new();
+        let expected = "a0eff07522495060c066f66f32acc2a77e3a3e737aca8baea4d1a64ea4cdc13da9";
+        let expected_bytes = hex::decode(expected).unwrap();
+
+        let ptr = node_from_bytes(a, &expected_bytes).unwrap();
+        let bytes32 = Bytes32::from_clvm(a, ptr).unwrap();
+
+        let round_trip = bytes32.to_clvm(a).unwrap();
+        assert_eq!(expected, hex::encode(node_to_bytes(a, round_trip).unwrap()));
     }
 }
