@@ -205,4 +205,28 @@ fn test_roundtrip() {
     }
 }
 
-// ERROR test is_valid
+#[test]
+fn test_default_is_valid() {
+    let pk = PublicKey(G1Projective::identity());
+    assert!(!pk.is_valid());
+}
+
+#[test]
+fn test_infinity_is_valid() {
+    let mut data = [0u8; 48];
+    data[0] = 0xc0;
+    let pk = PublicKey::from_bytes(&data).unwrap();
+    assert!(!pk.is_valid());
+}
+
+#[test]
+fn test_is_valid() {
+    let mut rng = StdRng::seed_from_u64(1337);
+    let mut data = [0u8; 32];
+    for _i in 0..50 {
+        rng.fill(data.as_mut_slice());
+        let sk = SecretKey::from_seed(&data);
+        let pk = sk.public_key();
+        assert!(pk.is_valid());
+    }
+}
