@@ -31,6 +31,6 @@ use pyo3::PyErr;
 #[cfg(feature = "py-bindings")]
 impl std::convert::From<Error> for PyErr {
     fn from(err: Error) -> PyErr {
-        pyo3::exceptions::PyValueError::new_err(format!("BLS Error {0:?}", err))
+        pyo3::exceptions::PyValueError::new_err(format!("BLS Error {:?}", err))
     }
 }

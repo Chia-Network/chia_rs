@@ -11,15 +11,21 @@ use std::mem::MaybeUninit;
 #[cfg(feature = "py-bindings")]
 use crate::public_key::parse_hex_string;
 #[cfg(feature = "py-bindings")]
+use crate::Signature;
+#[cfg(feature = "py-bindings")]
 use chia_py_streamable_macro::PyStreamable;
 #[cfg(feature = "py-bindings")]
 use chia_traits::from_json_dict::FromJsonDict;
 #[cfg(feature = "py-bindings")]
 use chia_traits::to_json_dict::ToJsonDict;
 #[cfg(feature = "py-bindings")]
-use pyo3::{pyclass, IntoPy, PyAny, PyObject, PyResult, Python};
+use pyo3::{pyclass, pymethods, IntoPy, PyAny, PyObject, PyResult, Python};
 
-#[cfg_attr(feature = "py-bindings", pyclass(frozen), derive(PyStreamable))]
+#[cfg_attr(
+    feature = "py-bindings",
+    pyclass(frozen, name = "PrivateKey"),
+    derive(PyStreamable)
+)]
 #[derive(PartialEq, Eq, Clone)]
 pub struct SecretKey(pub(crate) blst_scalar);
 
@@ -210,6 +216,26 @@ impl DerivableKey for SecretKey {
             scalar.assume_init()
         };
         Self(scalar)
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+#[cfg_attr(feature = "py-bindings", pymethods)]
+impl SecretKey {
+    #[classattr]
+    const PRIVATE_KEY_SIZE: usize = 32;
+
+    pub fn sign_g2(&self, msg: &[u8]) -> Signature {
+        crate::sign(self, msg)
+    }
+
+    pub fn get_g1(&self) -> PublicKey {
+        self.public_key()
+    }
+
+    pub fn __repr__(&self) -> String {
+        let bytes = self.to_bytes();
+        format!("<PrivateKey {}>", &hex::encode(bytes))
     }
 }
 
