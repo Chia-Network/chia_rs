@@ -66,7 +66,9 @@ impl PublicKey {
     }
 
     pub fn is_valid(&self) -> bool {
-        unsafe { !blst_p1_is_inf(&self.0) && blst_p1_in_g1(&self.0) }
+        // Infinity was considered a valid G1Element in older Relic versions
+        // For historical compatibililty this behavior is maintained.
+        unsafe { blst_p1_is_inf(&self.0) || blst_p1_in_g1(&self.0) }
     }
 
     pub fn get_fingerprint(&self) -> u32 {
@@ -232,7 +234,7 @@ fn test_roundtrip() {
 #[test]
 fn test_default_is_valid() {
     let pk = PublicKey::default();
-    assert!(!pk.is_valid());
+    assert!(pk.is_valid());
 }
 
 #[test]
@@ -240,7 +242,7 @@ fn test_infinity_is_valid() {
     let mut data = [0u8; 48];
     data[0] = 0xc0;
     let pk = PublicKey::from_bytes(&data).unwrap();
-    assert!(!pk.is_valid());
+    assert!(pk.is_valid());
 }
 
 #[test]
