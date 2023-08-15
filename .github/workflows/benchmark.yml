@@ -55,12 +55,12 @@ jobs:
 
     - name: Build
       run: |
-        python -m pip install clvm_tools colorama
+        python -m pip install clvm_tools colorama blspy
         maturin develop --release -m wheel/Cargo.toml
 
     - name: python mypy
       run: |
-        mypy tests
+        mypy --ignore-missing-imports tests
 
     - name: python tests
       run: |
