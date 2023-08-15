@@ -6,6 +6,12 @@ pub trait ToClvm {
     fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr>;
 }
 
+impl ToClvm for NodePtr {
+    fn to_clvm(&self, _a: &mut Allocator) -> Result<NodePtr> {
+        Ok(*self)
+    }
+}
+
 macro_rules! clvm_primitive {
     ($primitive:ty) => {
         impl ToClvm for $primitive {
@@ -126,6 +132,13 @@ mod tests {
         let actual = value.to_clvm(a).unwrap();
         let actual_bytes = node_to_bytes(a, actual).unwrap();
         Ok(actual_bytes.encode_hex())
+    }
+
+    #[test]
+    fn test_nodeptr() {
+        let a = &mut Allocator::new();
+        let ptr = a.one();
+        assert_eq!(ptr.to_clvm(a).unwrap(), ptr);
     }
 
     #[test]
