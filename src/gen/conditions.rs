@@ -230,7 +230,7 @@ pub fn parse_args(
                 maybe_check_args_terminator(a, c, flags)?;
                 if let Ok(param) = first(a, params) {
                     // pull out the first item (param)
-                    if let SExp::Atom() = a.sexp(param) {
+                    if let SExp::Atom = a.sexp(param) {
                         if a.atom_len(param) <= 32 {
                             return Ok(Condition::CreateCoin(puzzle_hash, amount, param));
                         }
@@ -1013,7 +1013,7 @@ fn is_ephemeral(
     parent_spend.create_coin.contains(&NewCoin {
         puzzle_hash: Bytes32::from(a.atom(spend.puzzle_hash)),
         amount: spend.coin_amount,
-        hint: -1,
+        hint: NodePtr(-1),
     })
 }
 

@@ -63,7 +63,7 @@ impl From<EvalErr> for ValidationErr {
 
 impl From<std::io::Error> for ValidationErr {
     fn from(_: std::io::Error) -> Self {
-        ValidationErr(-1, ErrorCode::GeneratorRuntimeError)
+        ValidationErr(NodePtr(-1), ErrorCode::GeneratorRuntimeError)
     }
 }
 
@@ -144,7 +144,7 @@ pub fn rest(a: &Allocator, n: NodePtr) -> Result<NodePtr, ValidationErr> {
 pub fn next(a: &Allocator, n: NodePtr) -> Result<Option<(NodePtr, NodePtr)>, ValidationErr> {
     match a.sexp(n) {
         SExp::Pair(left, right) => Ok(Some((left, right))),
-        SExp::Atom() => {
+        SExp::Atom => {
             // this is expected to be a valid list terminator
             if a.atom_len(n) == 0 {
                 Ok(None)
@@ -157,7 +157,7 @@ pub fn next(a: &Allocator, n: NodePtr) -> Result<Option<(NodePtr, NodePtr)>, Val
 
 pub fn atom(a: &Allocator, n: NodePtr, code: ErrorCode) -> Result<&[u8], ValidationErr> {
     match a.sexp(n) {
-        SExp::Atom() => Ok(a.atom(n)),
+        SExp::Atom => Ok(a.atom(n)),
         _ => Err(ValidationErr(n, code)),
     }
 }
