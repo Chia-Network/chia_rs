@@ -9,10 +9,8 @@ use num_bigint::Sign;
 
 use crate::{Error, Result};
 
-pub trait FromClvm {
-    fn from_clvm(a: &Allocator, ptr: NodePtr) -> Result<Self>
-    where
-        Self: Sized;
+pub trait FromClvm: Sized {
+    fn from_clvm(a: &Allocator, ptr: NodePtr) -> Result<Self>;
 }
 
 macro_rules! clvm_primitive {
@@ -61,10 +59,7 @@ where
     A: FromClvm,
     B: FromClvm,
 {
-    fn from_clvm(a: &Allocator, ptr: NodePtr) -> Result<Self>
-    where
-        Self: Sized,
-    {
+    fn from_clvm(a: &Allocator, ptr: NodePtr) -> Result<Self> {
         match a.sexp(ptr) {
             SExp::Pair(first, rest) => Ok((A::from_clvm(a, first)?, B::from_clvm(a, rest)?)),
             SExp::Atom => Err(Error::ExpectedCons(ptr)),
@@ -73,10 +68,7 @@ where
 }
 
 impl FromClvm for () {
-    fn from_clvm(a: &Allocator, ptr: NodePtr) -> Result<Self>
-    where
-        Self: Sized,
-    {
+    fn from_clvm(a: &Allocator, ptr: NodePtr) -> Result<Self> {
         if nullp(a, ptr) {
             Ok(())
         } else {
@@ -120,10 +112,7 @@ impl<T> FromClvm for Vec<T>
 where
     T: FromClvm,
 {
-    fn from_clvm(a: &Allocator, mut ptr: NodePtr) -> Result<Self>
-    where
-        Self: Sized,
-    {
+    fn from_clvm(a: &Allocator, mut ptr: NodePtr) -> Result<Self> {
         let mut items = Vec::new();
         loop {
             match a.sexp(ptr) {
