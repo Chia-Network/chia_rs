@@ -6,6 +6,12 @@ pub trait ToClvm {
     fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr>;
 }
 
+impl ToClvm for NodePtr {
+    fn to_clvm(&self, _a: &mut Allocator) -> Result<NodePtr> {
+        Ok(*self)
+    }
+}
+
 macro_rules! clvm_primitive {
     ($primitive:ty) => {
         impl ToClvm for $primitive {

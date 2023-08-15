@@ -13,6 +13,12 @@ pub trait FromClvm: Sized {
     fn from_clvm(a: &Allocator, ptr: NodePtr) -> Result<Self>;
 }
 
+impl FromClvm for NodePtr {
+    fn from_clvm(_a: &Allocator, ptr: NodePtr) -> Result<Self> {
+        Ok(ptr)
+    }
+}
+
 macro_rules! clvm_primitive {
     ($primitive:ty) => {
         impl FromClvm for $primitive {
