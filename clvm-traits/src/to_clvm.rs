@@ -135,6 +135,13 @@ mod tests {
     }
 
     #[test]
+    fn test_nodeptr() {
+        let a = &mut Allocator::new();
+        let ptr = a.one();
+        assert_eq!(ptr.to_clvm(a).unwrap(), ptr);
+    }
+
+    #[test]
     fn test_primitives() {
         let a = &mut Allocator::new();
         assert_eq!(encode(a, 0u8), Ok("80".to_owned()));
