@@ -4,7 +4,7 @@ use crate::gen::conditions::{
 use crate::gen::flags::ALLOW_BACKREFS;
 use crate::gen::validation_error::{first, ErrorCode, ValidationErr};
 use crate::generator_rom::{CLVM_DESERIALIZER, COST_PER_BYTE, GENERATOR_ROM};
-use clvm_utils::tree_hash::tree_hash;
+use clvm_utils::tree_hash;
 use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;

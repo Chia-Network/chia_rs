@@ -1,7 +1,7 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
-use clvm_utils::tree_hash::tree_hash;
+use clvm_utils::tree_hash;
 use clvmr::allocator::Allocator;
 use fuzzing_utils::{make_tree, BitCursor};
 

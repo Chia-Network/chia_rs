@@ -1,6 +1,6 @@
 use crate::gen::validation_error::{atom, check_nil, first, next, rest, ErrorCode, ValidationErr};
 use ::chia_protocol::bytes::Bytes32;
-use clvm_utils::tree_hash::tree_hash;
+use clvm_utils::tree_hash;
 use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::op_utils::u64_from_bytes;
 use std::convert::AsRef;
