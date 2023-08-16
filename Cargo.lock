@@ -420,7 +420,9 @@ dependencies = [
 name = "clvm-utils"
 version = "0.2.7"
 dependencies = [
+ "clvm-traits",
  "clvmr",
+ "hex",
 ]
 
 [[package]]
@@ -429,6 +431,7 @@ version = "0.0.0"
 dependencies = [
  "chia",
  "chia-fuzz",
+ "clvm-traits",
  "clvm-utils",
  "clvmr",
  "libfuzzer-sys",

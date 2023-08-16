@@ -15,6 +15,9 @@ pub enum Error {
     #[error("expected nil")]
     ExpectedNil(NodePtr),
 
+    #[error("expected one")]
+    ExpectedOne(NodePtr),
+
     #[error("validation failed")]
     Validation(NodePtr),
 
