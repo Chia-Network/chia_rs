@@ -6,18 +6,30 @@ enum TreeOp {
     Cons,
 }
 
+pub fn tree_hash_atom(bytes: &[u8]) -> [u8; 32] {
+    let mut sha256 = Sha256::new();
+    sha256.update([1]);
+    sha256.update(bytes);
+    sha256.finalize().into()
+}
+
+pub fn tree_hash_pair(first: [u8; 32], rest: [u8; 32]) -> [u8; 32] {
+    let mut sha256 = Sha256::new();
+    sha256.update([2]);
+    sha256.update(first);
+    sha256.update(rest);
+    sha256.finalize().into()
+}
+
 pub fn tree_hash(a: &Allocator, node: NodePtr) -> [u8; 32] {
-    let mut hashes: Vec<[u8; 32]> = vec![];
+    let mut hashes = Vec::new();
     let mut ops = vec![TreeOp::SExp(node)];
 
     while let Some(op) = ops.pop() {
         match op {
             TreeOp::SExp(node) => match a.sexp(node) {
                 SExp::Atom => {
-                    let mut sha256 = Sha256::new();
-                    sha256.update([1_u8]);
-                    sha256.update(a.atom(node));
-                    hashes.push(sha256.finalize().into());
+                    hashes.push(tree_hash_atom(a.atom(node)));
                 }
                 SExp::Pair(left, right) => {
                     ops.push(TreeOp::Cons);
@@ -26,11 +38,9 @@ pub fn tree_hash(a: &Allocator, node: NodePtr) -> [u8; 32] {
                 }
             },
             TreeOp::Cons => {
-                let mut sha256 = Sha256::new();
-                sha256.update([2_u8]);
-                sha256.update(hashes.pop().unwrap());
-                sha256.update(hashes.pop().unwrap());
-                hashes.push(sha256.finalize().into());
+                let first = hashes.pop().unwrap();
+                let rest = hashes.pop().unwrap();
+                hashes.push(tree_hash_pair(first, rest));
             }
         }
     }
