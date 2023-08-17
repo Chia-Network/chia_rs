@@ -14,10 +14,8 @@ tiny-bip39 = "1.0.0"
 anyhow = "1.0.71"
 # the newer sha2 crate doesn't implement the digest traits required by hkdf
 sha2 = "0.9.9"
-bls12_381_plus = "0.7.0"
-num-bigint = "0.4.3"
 hkdf = "0.11.0"
-group = "0.12.0"
+blst = "0.3.10"
 
 [dev-dependencies]
 hex = "0.4.3"

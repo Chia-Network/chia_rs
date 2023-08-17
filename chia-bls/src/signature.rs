@@ -1,44 +1,67 @@
-use crate::public_key::PublicKey;
-use crate::secret_key::SecretKey;
-use bls12_381_plus::{
-    multi_miller_loop, ExpandMsgXmd, G1Affine, G2Affine, G2Prepared, G2Projective,
-};
+use crate::{PublicKey, SecretKey};
+use blst::*;
 use chia_traits::chia_error::{Error, Result};
 use chia_traits::{read_bytes, Streamable};
-use group::{Curve, Group};
 use sha2::{Digest, Sha256};
 use std::borrow::Borrow;
 use std::convert::AsRef;
 use std::io::Cursor;
-use std::ops::Neg;
+use std::mem::MaybeUninit;
 
-#[derive(PartialEq, Eq, Debug)]
-pub struct Signature(pub(crate) G2Projective);
+// we use the augmented scheme
+pub const DST: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_AUG_";
+
+#[derive(Debug, Clone)]
+pub struct Signature(pub(crate) blst_p2);
 
 impl Signature {
     pub fn from_bytes(buf: &[u8; 96]) -> Result<Self> {
-        match G2Affine::from_compressed(buf).into() {
-            Some(p) => Ok(Self(G2Projective::from(&p))),
-            None => Err(Error::Custom("Signature is invalid".to_string())),
+        let p2 = unsafe {
+            let mut p2_affine = MaybeUninit::<blst_p2_affine>::uninit();
+            if blst_p2_uncompress(p2_affine.as_mut_ptr(), buf as *const u8)
+                != BLST_ERROR::BLST_SUCCESS
+            {
+                return Err(Error::Custom("Signature is invalid".to_string()));
+            }
+            let mut p2 = MaybeUninit::<blst_p2>::uninit();
+            blst_p2_from_affine(p2.as_mut_ptr(), &p2_affine.assume_init());
+            p2.assume_init()
+        };
+        let ret = Self(p2);
+        if !ret.is_valid() {
+            Err(Error::Custom("Signature is invalid".to_string()))
+        } else {
+            Ok(ret)
         }
     }
 
     pub fn to_bytes(&self) -> [u8; 96] {
-        self.0.to_affine().to_compressed()
+        unsafe {
+            let mut bytes = MaybeUninit::<[u8; 96]>::uninit();
+            blst_p2_compress(bytes.as_mut_ptr() as *mut u8, &self.0);
+            bytes.assume_init()
+        }
     }
 
     pub fn aggregate(&mut self, sig: &Signature) {
-        self.0 += sig.0;
+        unsafe {
+            blst_p2_add_or_double(&mut self.0, &self.0, &sig.0);
+        }
     }
 
     pub fn is_valid(&self) -> bool {
-        self.0.is_on_curve().unwrap_u8() == 1
+        // Infinity was considered a valid G2Element in older Relic versions
+        // For historical compatibililty this behavior is maintained.
+        unsafe { blst_p2_is_inf(&self.0) || blst_p2_in_g2(&self.0) }
     }
 }
 
 impl Default for Signature {
     fn default() -> Self {
-        Signature(G2Projective::identity())
+        unsafe {
+            let p2 = MaybeUninit::<blst_p2>::zeroed();
+            Self(p2.assume_init())
+        }
     }
 }
 
@@ -57,12 +80,28 @@ impl Streamable for Signature {
     }
 }
 
-fn hash_msg<Msg: AsRef<[u8]>>(pk: &PublicKey, msg: Msg) -> G2Projective {
-    let mut prepended_msg = pk.to_bytes().to_vec();
-    prepended_msg.extend_from_slice(msg.as_ref());
-    // domain separation tag
-    const CIPHER_SUITE: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_AUG_";
-    G2Projective::hash::<ExpandMsgXmd<sha2::Sha256>>(&prepended_msg, CIPHER_SUITE)
+impl PartialEq for Signature {
+    fn eq(&self, other: &Self) -> bool {
+        unsafe { blst_p2_is_equal(&self.0, &other.0) }
+    }
+}
+impl Eq for Signature {}
+
+pub fn hash_to_g2(msg: &[u8]) -> Signature {
+    let p2 = unsafe {
+        let mut p2 = MaybeUninit::<blst_p2>::uninit();
+        blst_hash_to_g2(
+            p2.as_mut_ptr(),
+            msg.as_ptr(),
+            msg.len(),
+            DST.as_ptr(),
+            DST.len(),
+            std::ptr::null(),
+            0,
+        );
+        p2.assume_init()
+    };
+    Signature(p2)
 }
 
 pub fn aggregate<Sig: Borrow<Signature>, I>(sigs: I) -> Signature
@@ -78,19 +117,30 @@ where
 }
 
 pub fn verify<Msg: AsRef<[u8]>>(sig: &Signature, key: &PublicKey, msg: Msg) -> bool {
-    if !key.is_valid() || !sig.is_valid() {
-        return false;
-    }
-    let a = hash_msg(key, msg);
-    let g1 = G1Affine::generator().neg();
+    unsafe {
+        let mut pubkey_affine = MaybeUninit::<blst_p1_affine>::uninit();
+        let mut sig_affine = MaybeUninit::<blst_p2_affine>::uninit();
 
-    multi_miller_loop(&[
-        (&key.0.to_affine(), &G2Prepared::from(a.to_affine())),
-        (&g1, &G2Prepared::from(sig.0.to_affine())),
-    ])
-    .final_exponentiation()
-    .is_identity()
-    .into()
+        blst_p1_to_affine(pubkey_affine.as_mut_ptr(), &key.0);
+        blst_p2_to_affine(sig_affine.as_mut_ptr(), &sig.0);
+
+        let mut augmented_msg = key.to_bytes().to_vec();
+        augmented_msg.extend_from_slice(msg.as_ref());
+
+        let err = blst_core_verify_pk_in_g1(
+            &pubkey_affine.assume_init(),
+            &sig_affine.assume_init(),
+            true, // hash
+            augmented_msg.as_ptr(),
+            augmented_msg.len(),
+            DST.as_ptr(),
+            DST.len(),
+            std::ptr::null(),
+            0,
+        );
+
+        err == BLST_ERROR::BLST_SUCCESS
+    }
 }
 
 pub fn aggregate_verify<Pk: Borrow<PublicKey>, Msg: Borrow<[u8]>, I>(
@@ -103,48 +153,89 @@ where
     if !sig.is_valid() {
         return false;
     }
-    let mut store = Vec::<(G1Affine, G2Prepared)>::new();
 
-    for (key, msg) in data.into_iter() {
-        let key = key.borrow();
-        if !key.is_valid() {
+    let mut data = data.into_iter().peekable();
+    if data.peek().is_none() {
+        return *sig == Signature::default();
+    }
+
+    let sig_gt = unsafe {
+        let mut sig_affine = MaybeUninit::<blst_p2_affine>::uninit();
+        let mut sig_gt = MaybeUninit::<blst_fp12>::uninit();
+        blst_p2_to_affine(sig_affine.as_mut_ptr(), &sig.0);
+        blst_aggregated_in_g2(sig_gt.as_mut_ptr(), sig_affine.as_ptr());
+        sig_gt.assume_init()
+    };
+
+    let mut v: Vec<u64> = vec![0; unsafe { blst_pairing_sizeof() } / 8];
+    let ctx = unsafe {
+        let ctx = v.as_mut_slice().as_mut_ptr() as *mut blst_pairing;
+        blst_pairing_init(
+            ctx,
+            true, // hash
+            DST.as_ptr(),
+            DST.len(),
+        );
+        ctx
+    };
+
+    let mut aug_msg = Vec::<u8>::new();
+    for (pk, msg) in data {
+        if !pk.borrow().is_valid() {
             return false;
         }
-        store.push((
-            key.0.to_affine(),
-            G2Prepared::from(hash_msg(key, msg.borrow()).to_affine()),
-        ));
+
+        let pk_affine = unsafe {
+            let mut pk_affine = MaybeUninit::<blst_p1_affine>::uninit();
+            blst_p1_to_affine(pk_affine.as_mut_ptr(), &pk.borrow().0);
+            pk_affine.assume_init()
+        };
+
+        aug_msg.clear();
+        aug_msg.extend_from_slice(&pk.borrow().to_bytes());
+        aug_msg.extend_from_slice(msg.borrow());
+
+        let err = unsafe {
+            blst_pairing_aggregate_pk_in_g1(
+                ctx,
+                &pk_affine,
+                std::ptr::null(),
+                aug_msg.as_ptr(),
+                aug_msg.len(),
+                std::ptr::null(),
+                0,
+            )
+        };
+
+        if err != BLST_ERROR::BLST_SUCCESS {
+            return false;
+        }
     }
 
-    if store.is_empty() {
-        // if we have exactly zero messages to verify, the only correct
-        // signature is the identity
-        // This is an optimization for the edge case of having 0 messages
-        return sig == &Signature::default();
+    unsafe {
+        blst_pairing_commit(ctx);
+        blst_pairing_finalverify(ctx, &sig_gt)
     }
-
-    store.push((
-        G1Affine::generator().neg(),
-        G2Prepared::from(sig.0.to_affine()),
-    ));
-
-    let mut terms = Vec::<(&G1Affine, &G2Prepared)>::new();
-    for (g1, g2) in &store {
-        terms.push((g1, g2));
-    }
-
-    // multi_miller_loop takes a slice of *references*, which means we need to build
-    // both a vector owning the elements (G1Affine and G2Prepared) in addition to a
-    // vector holding references into it.
-    multi_miller_loop(terms.as_slice())
-        .final_exponentiation()
-        .is_identity()
-        .into()
 }
 
 pub fn sign<Msg: AsRef<[u8]>>(sk: &SecretKey, msg: Msg) -> Signature {
-    let g2 = hash_msg(&sk.public_key(), msg);
-    Signature(g2 * sk.0)
+    let mut aug_msg = sk.public_key().to_bytes().to_vec();
+    aug_msg.extend_from_slice(msg.as_ref());
+    let p2 = unsafe {
+        let mut p2 = MaybeUninit::<blst_p2>::uninit();
+        blst_hash_to_g2(
+            p2.as_mut_ptr(),
+            aug_msg.as_ptr(),
+            aug_msg.len(),
+            DST.as_ptr(),
+            DST.len(),
+            std::ptr::null(),
+            0,
+        );
+        blst_sign_pk_in_g1(p2.as_mut_ptr(), p2.as_ptr(), &sk.0);
+        p2.assume_init()
+    };
+    Signature(p2)
 }
 
 #[cfg(test)]
@@ -286,6 +377,23 @@ fn test_aggregate_signature() {
     assert_eq!(agg.to_bytes(), <[u8; 96]>::from_hex("87bce2c588f4257e2792d929834548c7d3af679272cb4f8e1d24cf4bf584dd287aa1d9f5e53a86f288190db45e1d100d0a5e936079a66a709b5f35394cf7d52f49dd963284cb5241055d54f8cf48f61bc1037d21cae6c025a7ea5e9f4d289a18").unwrap());
 
     // ensure the aggregate signature verifies OK
+    assert!(aggregate_verify(&agg, data));
+}
+
+#[test]
+fn test_aggregate_duplicate_signature() {
+    let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
+    let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+    let msg = b"foobar";
+    let mut agg = Signature::default();
+    let mut data = Vec::<(PublicKey, &[u8])>::new();
+    for _idx in 0..2 {
+        data.push((sk.public_key(), msg));
+        agg.aggregate(&sign(&sk, msg));
+    }
+
+    assert_eq!(agg.to_bytes(), <[u8; 96]>::from_hex("a1cca6540a4a06d096cb5b5fc76af5fd099476e70b623b8c6e4cf02ffde94fc0f75f4e17c67a9e350940893306798a3519368b02dc3464b7270ea4ca233cfa85a38da9e25c9314e81270b54d1e773a2ec5c3e14c62dac7abdebe52f4688310d3").unwrap());
+
     assert!(aggregate_verify(&agg, data));
 }
 
