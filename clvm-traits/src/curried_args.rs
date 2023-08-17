@@ -68,19 +68,38 @@ mod tests {
     }
 
     #[test]
-    fn curried_args() {
+    fn curry_multiple_args() {
         let a = &mut Allocator::new();
-
         let args = CurriedArgs(vec![
             "a".to_clvm(a).unwrap(),
             "b".to_clvm(a).unwrap(),
             "c".to_clvm(a).unwrap(),
         ]);
-
         check(
             a,
             args,
             "ff04ffff0161ffff04ffff0162ffff04ffff0163ff01808080",
         );
+    }
+
+    #[test]
+    fn curry_single_arg() {
+        let a = &mut Allocator::new();
+        let args = CurriedArgs(vec![42.to_clvm(a).unwrap()]);
+        check(a, args, "ff04ffff012aff0180");
+    }
+
+    #[test]
+    fn curry_nothing() {
+        let a = &mut Allocator::new();
+        let args = CurriedArgs(vec![]);
+        check(a, args, "01");
+    }
+
+    #[test]
+    fn uncurry_invalid() {
+        let a = &mut Allocator::new();
+        let ptr = vec![42, 123].to_clvm(a).unwrap();
+        CurriedArgs::from_clvm(a, ptr).unwrap_err();
     }
 }
