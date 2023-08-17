@@ -45,7 +45,7 @@ impl Signature {
 
     pub fn aggregate(&mut self, sig: &Signature) {
         unsafe {
-            blst_p2_add(&mut self.0, &self.0, &sig.0);
+            blst_p2_add_or_double(&mut self.0, &self.0, &sig.0);
         }
     }
 
@@ -377,6 +377,23 @@ fn test_aggregate_signature() {
     assert_eq!(agg.to_bytes(), <[u8; 96]>::from_hex("87bce2c588f4257e2792d929834548c7d3af679272cb4f8e1d24cf4bf584dd287aa1d9f5e53a86f288190db45e1d100d0a5e936079a66a709b5f35394cf7d52f49dd963284cb5241055d54f8cf48f61bc1037d21cae6c025a7ea5e9f4d289a18").unwrap());
 
     // ensure the aggregate signature verifies OK
+    assert!(aggregate_verify(&agg, data));
+}
+
+#[test]
+fn test_aggregate_duplicate_signature() {
+    let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
+    let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+    let msg = b"foobar";
+    let mut agg = Signature::default();
+    let mut data = Vec::<(PublicKey, &[u8])>::new();
+    for _idx in 0..2 {
+        data.push((sk.public_key(), msg));
+        agg.aggregate(&sign(&sk, msg));
+    }
+
+    assert_eq!(agg.to_bytes(), <[u8; 96]>::from_hex("a1cca6540a4a06d096cb5b5fc76af5fd099476e70b623b8c6e4cf02ffde94fc0f75f4e17c67a9e350940893306798a3519368b02dc3464b7270ea4ca233cfa85a38da9e25c9314e81270b54d1e773a2ec5c3e14c62dac7abdebe52f4688310d3").unwrap());
+
     assert!(aggregate_verify(&agg, data));
 }
 
