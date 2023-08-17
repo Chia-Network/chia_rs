@@ -5,16 +5,13 @@ use chia_traits::{read_bytes, Streamable};
 use sha2::{Digest, Sha256};
 use std::borrow::Borrow;
 use std::convert::AsRef;
-use std::fmt;
-use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::mem::MaybeUninit;
-use std::ops::{Add, AddAssign};
 
 // we use the augmented scheme
 pub const DST: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_AUG_";
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Signature(pub(crate) blst_p2);
 
 impl Signature {
@@ -89,48 +86,6 @@ impl PartialEq for Signature {
     }
 }
 impl Eq for Signature {}
-
-impl Hash for Signature {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write(&self.to_bytes())
-    }
-}
-
-impl fmt::Debug for Signature {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str(&hex::encode(self.to_bytes()))
-    }
-}
-
-impl AddAssign<&Signature> for Signature {
-    fn add_assign(&mut self, rhs: &Signature) {
-        unsafe {
-            blst_p2_add_or_double(&mut self.0, &self.0, &rhs.0);
-        }
-    }
-}
-
-impl Add<&Signature> for Signature {
-    type Output = Signature;
-    fn add(mut self, rhs: &Signature) -> Signature {
-        unsafe {
-            blst_p2_add_or_double(&mut self.0, &self.0, &rhs.0);
-            self
-        }
-    }
-}
-
-impl Add<&Signature> for &Signature {
-    type Output = Signature;
-    fn add(self, rhs: &Signature) -> Signature {
-        let p1 = unsafe {
-            let mut ret = MaybeUninit::<blst_p2>::uninit();
-            blst_p2_add_or_double(ret.as_mut_ptr(), &self.0, &rhs.0);
-            ret.assume_init()
-        };
-        Signature(p1)
-    }
-}
 
 pub fn hash_to_g2(msg: &[u8]) -> Signature {
     let p2 = unsafe {
@@ -412,31 +367,17 @@ fn test_aggregate_signature() {
     let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
     let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
     let msg = b"foobar";
-    let mut agg1 = Signature::default();
-    let mut agg2 = Signature::default();
-    let mut sigs = Vec::<Signature>::new();
+    let mut agg = Signature::default();
     let mut data = Vec::<(PublicKey, &[u8])>::new();
     for idx in 0..4 {
         let derived = sk.derive_hardened(idx as u32);
         data.push((derived.public_key(), msg));
-        let sig = sign(&derived, msg);
-        agg1.aggregate(&sig);
-        agg2 += &sig;
-        sigs.push(sig);
+        agg.aggregate(&sign(&derived, msg));
     }
-    let agg3 = aggregate(&sigs);
-    let agg4 = &sigs[0] + &sigs[1] + &sigs[2] + &sigs[3];
-
-    assert_eq!(agg1.to_bytes(), <[u8; 96]>::from_hex("87bce2c588f4257e2792d929834548c7d3af679272cb4f8e1d24cf4bf584dd287aa1d9f5e53a86f288190db45e1d100d0a5e936079a66a709b5f35394cf7d52f49dd963284cb5241055d54f8cf48f61bc1037d21cae6c025a7ea5e9f4d289a18").unwrap());
-    assert_eq!(agg1, agg2);
-    assert_eq!(agg1, agg3);
-    assert_eq!(agg1, agg4);
+    assert_eq!(agg.to_bytes(), <[u8; 96]>::from_hex("87bce2c588f4257e2792d929834548c7d3af679272cb4f8e1d24cf4bf584dd287aa1d9f5e53a86f288190db45e1d100d0a5e936079a66a709b5f35394cf7d52f49dd963284cb5241055d54f8cf48f61bc1037d21cae6c025a7ea5e9f4d289a18").unwrap());
 
     // ensure the aggregate signature verifies OK
-    assert!(aggregate_verify(&agg1, data.clone()));
-    assert!(aggregate_verify(&agg2, data.clone()));
-    assert!(aggregate_verify(&agg3, data.clone()));
-    assert!(aggregate_verify(&agg4, data.clone()));
+    assert!(aggregate_verify(&agg, data));
 }
 
 #[test]
@@ -725,24 +666,4 @@ fn test_aug_scheme() {
         &Signature::from_bytes(&aggsigv).unwrap(),
         pairs
     ));
-}
-
-#[test]
-fn test_hash() {
-    fn hash<T: std::hash::Hash>(v: T) -> u64 {
-        use std::collections::hash_map::DefaultHasher;
-        let mut h = DefaultHasher::new();
-        v.hash(&mut h);
-        h.finish()
-    }
-
-    let mut rng = StdRng::seed_from_u64(1337);
-    let mut data = [0u8; 32];
-    rng.fill(data.as_mut_slice());
-    let sk = SecretKey::from_seed(&data);
-    let sig1 = sign(&sk, &[0, 1, 2]);
-    let sig2 = sign(&sk, &[0, 1, 2, 3]);
-
-    assert!(hash(sig1) != hash(sig2));
-    assert_eq!(hash(sign(&sk, &[0, 1, 2])), hash(sign(&sk, &[0, 1, 2])));
 }

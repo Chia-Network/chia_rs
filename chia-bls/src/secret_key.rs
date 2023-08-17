@@ -4,12 +4,11 @@ use chia_traits::chia_error::{Error, Result};
 use chia_traits::{read_bytes, Streamable};
 use hkdf::HkdfExtract;
 use sha2::{Digest, Sha256};
-use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::mem::MaybeUninit;
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct SecretKey(pub(crate) blst_scalar);
 
 fn flip_bits(input: [u8; 32]) -> [u8; 32] {
@@ -151,12 +150,6 @@ impl Streamable for SecretKey {
 impl Hash for SecretKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         state.write(&self.to_bytes())
-    }
-}
-
-impl fmt::Debug for SecretKey {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str(&hex::encode(self.to_bytes()))
     }
 }
 
