@@ -5,9 +5,9 @@ use clvm_traits::{
 use clvmr::{allocator::NodePtr, Allocator};
 
 #[derive(Debug, Clone)]
-pub struct Curry<T>(NodePtr, T);
+pub struct CurriedProgram<T>(NodePtr, T);
 
-impl<T> FromClvm for Curry<T>
+impl<T> FromClvm for CurriedProgram<T>
 where
     T: FromClvm,
 {
@@ -19,7 +19,7 @@ where
     }
 }
 
-impl<T> ToClvm for Curry<T>
+impl<T> ToClvm for CurriedProgram<T>
 where
     T: ToClvm,
 {
@@ -44,16 +44,16 @@ mod tests {
     {
         let a = &mut Allocator::new();
 
-        let curry = Curry(program.to_clvm(a).unwrap(), args.clone())
+        let curry = CurriedProgram(program.to_clvm(a).unwrap(), args.clone())
             .to_clvm(a)
             .unwrap();
         let actual = node_to_bytes(a, curry).unwrap();
         assert_eq!(hex::encode(actual), expected);
 
-        let Curry(ptr, round_args) = Curry::<A>::from_clvm(a, curry).unwrap();
-        let round_program = T::from_clvm(a, ptr).unwrap();
+        let curried = CurriedProgram::<A>::from_clvm(a, curry).unwrap();
+        let round_program = T::from_clvm(a, curried.0).unwrap();
         assert_eq!(round_program, program);
-        assert_eq!(round_args, args);
+        assert_eq!(curried.1, args);
     }
 
     #[test]
