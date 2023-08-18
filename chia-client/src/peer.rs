@@ -19,7 +19,6 @@ type Requests = Arc<Mutex<HashMap<u16, oneshot::Sender<Message>>>>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PeerEvent {
-    Handshake(Handshake),
     CoinStateUpdate(CoinStateUpdate),
     NewPeakWallet(NewPeakWallet),
 }
