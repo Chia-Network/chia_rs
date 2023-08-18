@@ -260,6 +260,12 @@ impl<'a, const N: usize> From<&'a BytesImpl<N>> for &'a [u8; N] {
     }
 }
 
+impl<const N: usize> From<&BytesImpl<N>> for [u8; N] {
+    fn from(v: &BytesImpl<N>) -> [u8; N] {
+        v.0
+    }
+}
+
 impl<'a, const N: usize> From<&'a BytesImpl<N>> for &'a [u8] {
     fn from(v: &'a BytesImpl<N>) -> &'a [u8] {
         &v.0

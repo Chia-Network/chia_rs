@@ -241,6 +241,10 @@ name = "chia"
 version = "0.2.9"
 dependencies = [
  "chia-protocol",
+ "chia-traits",
+ "chia-wallet",
+ "clvm-derive",
+ "clvm-traits",
  "clvm-utils",
  "clvmr",
  "hex",
