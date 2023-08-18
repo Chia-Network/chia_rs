@@ -19,7 +19,6 @@ type Requests = Arc<Mutex<HashMap<u16, oneshot::Sender<Message>>>>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PeerEvent {
-    FatalError,
     Handshake(Handshake),
     CoinStateUpdate(CoinStateUpdate),
     NewPeakWallet(NewPeakWallet),
@@ -49,42 +48,31 @@ impl Peer {
 
                     // Parse the message.
                     let Ok(message) = Message::parse(cursor) else {
-                        event_sender.send(PeerEvent::FatalError).ok();
-                        break;
+                        continue;
                     };
 
                     if let Some(id) = message.id {
                         // Send response through oneshot channel if present.
                         if let Some(request) = requests_clone.lock().await.remove(&id) {
                             request.send(message).ok();
-                        } else {
-                            event_sender.send(PeerEvent::FatalError).ok();
-                            break;
                         }
                     } else {
                         match message.msg_type {
                             ProtocolMessageTypes::CoinStateUpdate => {
                                 let cursor = &mut Cursor::new(message.data.as_ref());
-                                let Ok(body) = CoinStateUpdate::parse(cursor) else {
-                                    event_sender.send(PeerEvent::FatalError).ok();
-                                    break;
-                                };
-                                event_sender.send(PeerEvent::CoinStateUpdate(body)).ok();
+                                if let Ok(body) = CoinStateUpdate::parse(cursor) {
+                                    event_sender.send(PeerEvent::CoinStateUpdate(body)).ok();
+                                }
                             }
                             ProtocolMessageTypes::NewPeakWallet => {
                                 let cursor = &mut Cursor::new(message.data.as_ref());
-                                let Ok(body) = NewPeakWallet::parse(cursor) else {
-                                    event_sender.send(PeerEvent::FatalError).ok();
-                                    break;
-                                };
-                                event_sender.send(PeerEvent::NewPeakWallet(body)).ok();
+                                if let Ok(body) = NewPeakWallet::parse(cursor) {
+                                    event_sender.send(PeerEvent::NewPeakWallet(body)).ok();
+                                }
                             }
                             _ => {}
                         }
                     }
-                } else {
-                    event_sender.send(PeerEvent::FatalError).ok();
-                    break;
                 }
             }
         });
