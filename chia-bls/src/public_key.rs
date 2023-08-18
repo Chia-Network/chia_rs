@@ -1,15 +1,17 @@
-use crate::derivable_key::DerivableKey;
 use crate::secret_key::is_all_zero;
-use bls12_381_plus::{G1Affine, G1Projective, Scalar};
+use crate::DerivableKey;
+use blst::*;
 use chia_traits::chia_error::{Error, Result};
 use chia_traits::{read_bytes, Streamable};
-use group::Curve;
-use num_bigint::BigUint;
 use sha2::{digest::FixedOutput, Digest, Sha256};
+use std::fmt;
+use std::hash::{Hash, Hasher};
 use std::io::Cursor;
+use std::mem::MaybeUninit;
+use std::ops::{Add, AddAssign};
 
-#[derive(PartialEq, Eq, Debug)]
-pub struct PublicKey(pub G1Projective);
+#[derive(Clone)]
+pub struct PublicKey(pub(crate) blst_p1);
 
 impl PublicKey {
     pub fn from_bytes(bytes: &[u8; 48]) -> Result<Self> {
@@ -25,7 +27,7 @@ impl PublicKey {
                 ));
             }
             // return infinity element (point all zero)
-            return Ok(Self(G1Projective::identity()));
+            return Ok(Self::default());
         } else {
             if (bytes[0] & 0xc0) != 0x80 {
                 return Err(Error::Custom(
@@ -39,18 +41,37 @@ impl PublicKey {
             }
         }
 
-        match G1Affine::from_compressed(bytes).into() {
-            Some(p) => Ok(Self(G1Projective::from(&p))),
-            None => Err(Error::Custom("PublicKey is invalid".to_string())),
+        let p1 = unsafe {
+            let mut p1_affine = MaybeUninit::<blst_p1_affine>::uninit();
+            if blst_p1_uncompress(p1_affine.as_mut_ptr(), bytes as *const u8)
+                != BLST_ERROR::BLST_SUCCESS
+            {
+                return Err(Error::Custom("PublicKey is invalid".to_string()));
+            }
+            let mut p1 = MaybeUninit::<blst_p1>::uninit();
+            blst_p1_from_affine(p1.as_mut_ptr(), &p1_affine.assume_init());
+            p1.assume_init()
+        };
+        let ret = Self(p1);
+        if !ret.is_valid() {
+            Err(Error::Custom("PublicKey is invalid".to_string()))
+        } else {
+            Ok(ret)
         }
     }
 
     pub fn to_bytes(&self) -> [u8; 48] {
-        self.0.to_affine().to_compressed()
+        unsafe {
+            let mut bytes = MaybeUninit::<[u8; 48]>::uninit();
+            blst_p1_compress(bytes.as_mut_ptr() as *mut u8, &self.0);
+            bytes.assume_init()
+        }
     }
 
     pub fn is_valid(&self) -> bool {
-        self.0.is_identity().unwrap_u8() == 0 && self.0.is_on_curve().unwrap_u8() == 1
+        // Infinity was considered a valid G1Element in older Relic versions
+        // For historical compatibililty this behavior is maintained.
+        unsafe { blst_p1_is_inf(&self.0) || blst_p1_in_g1(&self.0) }
     }
 
     pub fn get_fingerprint(&self) -> u32 {
@@ -60,6 +81,13 @@ impl PublicKey {
         u32::from_be_bytes(hash[0..4].try_into().unwrap())
     }
 }
+
+impl PartialEq for PublicKey {
+    fn eq(&self, other: &Self) -> bool {
+        unsafe { blst_p1_is_equal(&self.0, &other.0) }
+    }
+}
+impl Eq for PublicKey {}
 
 impl Streamable for PublicKey {
     fn update_digest(&self, digest: &mut Sha256) {
@@ -76,6 +104,57 @@ impl Streamable for PublicKey {
     }
 }
 
+impl Hash for PublicKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write(&self.to_bytes())
+    }
+}
+
+impl Default for PublicKey {
+    fn default() -> Self {
+        unsafe {
+            let p1 = MaybeUninit::<blst_p1>::zeroed();
+            Self(p1.assume_init())
+        }
+    }
+}
+
+impl AddAssign<&PublicKey> for PublicKey {
+    fn add_assign(&mut self, rhs: &PublicKey) {
+        unsafe {
+            blst_p1_add_or_double(&mut self.0, &self.0, &rhs.0);
+        }
+    }
+}
+
+impl Add<&PublicKey> for &PublicKey {
+    type Output = PublicKey;
+    fn add(self, rhs: &PublicKey) -> PublicKey {
+        let p1 = unsafe {
+            let mut ret = MaybeUninit::<blst_p1>::uninit();
+            blst_p1_add_or_double(ret.as_mut_ptr(), &self.0, &rhs.0);
+            ret.assume_init()
+        };
+        PublicKey(p1)
+    }
+}
+
+impl Add<&PublicKey> for PublicKey {
+    type Output = PublicKey;
+    fn add(mut self, rhs: &PublicKey) -> PublicKey {
+        unsafe {
+            blst_p1_add_or_double(&mut self.0, &self.0, &rhs.0);
+            self
+        }
+    }
+}
+
+impl fmt::Debug for PublicKey {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str(&hex::encode(self.to_bytes()))
+    }
+}
+
 impl DerivableKey for PublicKey {
     fn derive_unhardened(&self, idx: u32) -> Self {
         let mut hasher = Sha256::new();
@@ -83,30 +162,22 @@ impl DerivableKey for PublicKey {
         hasher.update(idx.to_be_bytes());
         let digest: [u8; 32] = hasher.finalize_fixed().into();
 
-        // in an ideal world, we would not need to reach for the sledge-hammer of
-        // num-bigint here. This would most likely be faster if implemented in
-        // Scalar directly.
-
-        // interpret the hash as an unsigned big-endian number
-        let mut nounce = BigUint::from_bytes_be(digest.as_slice());
-
-        let q = BigUint::from_bytes_be(&[
-            0x73, 0xed, 0xa7, 0x53, 0x29, 0x9d, 0x7d, 0x48, 0x33, 0x39, 0xd8, 0x08, 0x09, 0xa1,
-            0xd8, 0x05, 0x53, 0xbd, 0xa4, 0x02, 0xff, 0xfe, 0x5b, 0xfe, 0xff, 0xff, 0xff, 0xff,
-            0x00, 0x00, 0x00, 0x01,
-        ]);
-
-        // mod by G1 Order
-        nounce %= q;
-
-        let raw_bytes = nounce.to_bytes_be();
-        let mut bytes = [0_u8; 32];
-        bytes[32 - raw_bytes.len()..].copy_from_slice(&raw_bytes);
-        bytes.reverse();
-
-        let nounce = Scalar::from_bytes(&bytes).unwrap();
-
-        PublicKey(self.0 + G1Projective::generator() * nounce)
+        let p1 = unsafe {
+            let mut nonce = MaybeUninit::<blst_scalar>::uninit();
+            blst_scalar_from_lendian(nonce.as_mut_ptr(), digest.as_ptr());
+            let mut bte = MaybeUninit::<[u8; 48]>::uninit();
+            blst_bendian_from_scalar(bte.as_mut_ptr() as *mut u8, nonce.as_ptr());
+            let mut p1 = MaybeUninit::<blst_p1>::uninit();
+            blst_p1_mult(
+                p1.as_mut_ptr(),
+                blst_p1_generator(),
+                bte.as_ptr() as *const u8,
+                256,
+            );
+            blst_p1_add(p1.as_mut_ptr(), p1.as_mut_ptr(), &self.0);
+            p1.assume_init()
+        };
+        PublicKey(p1)
     }
 }
 
@@ -114,7 +185,7 @@ impl DerivableKey for PublicKey {
 use hex::FromHex;
 
 #[cfg(test)]
-use crate::secret_key::SecretKey;
+use crate::SecretKey;
 
 #[test]
 fn test_derive_unhardened() {
@@ -177,7 +248,7 @@ fn test_from_bytes_failures(#[case] input: &str, #[case()] error: &str) {
 fn test_from_bytes_infinity() {
     let bytes: [u8; 48] = hex::decode("c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000").unwrap().try_into().unwrap();
     let pk = PublicKey::from_bytes(&bytes).unwrap();
-    assert!(pk.0.is_identity().unwrap_u8() != 0);
+    assert_eq!(pk, PublicKey::default());
 }
 
 #[test]
@@ -189,6 +260,27 @@ fn test_get_fingerprint() {
         .unwrap();
     let pk = PublicKey::from_bytes(&bytes).unwrap();
     assert_eq!(pk.get_fingerprint(), 651010559);
+}
+
+#[test]
+fn test_aggregate_pubkey() {
+    // from blspy import PrivateKey
+    // from blspy import AugSchemeMPL
+    // sk = PrivateKey.from_bytes(bytes.fromhex("52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb"))
+    // pk = sk.get_g1()
+    // pk + pk
+    // <G1Element b1b8033286299e7f238aede0d3fea48d133a1e233139085f72c102c2e6cc1f8a4ea64ed2838c10bbd2ef8f78ef271bf3>
+    // pk + pk + pk
+    // <G1Element a8bc2047d90c04a12e8c38050ec0feb4417b4d5689165cd2cea8a7903aad1778e36548a46d427b5ec571364515e456d6>
+
+    let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
+    let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+    let pk = sk.public_key();
+    let pk2 = &pk + &pk;
+    let pk3 = &pk + &pk + &pk;
+
+    assert_eq!(pk2, PublicKey::from_bytes(&<[u8; 48]>::from_hex("b1b8033286299e7f238aede0d3fea48d133a1e233139085f72c102c2e6cc1f8a4ea64ed2838c10bbd2ef8f78ef271bf3").unwrap()).unwrap());
+    assert_eq!(pk3, PublicKey::from_bytes(&<[u8; 48]>::from_hex("a8bc2047d90c04a12e8c38050ec0feb4417b4d5689165cd2cea8a7903aad1778e36548a46d427b5ec571364515e456d6").unwrap()).unwrap());
 }
 
 #[test]
@@ -207,8 +299,8 @@ fn test_roundtrip() {
 
 #[test]
 fn test_default_is_valid() {
-    let pk = PublicKey(G1Projective::identity());
-    assert!(!pk.is_valid());
+    let pk = PublicKey::default();
+    assert!(pk.is_valid());
 }
 
 #[test]
@@ -216,7 +308,7 @@ fn test_infinity_is_valid() {
     let mut data = [0u8; 48];
     data[0] = 0xc0;
     let pk = PublicKey::from_bytes(&data).unwrap();
-    assert!(!pk.is_valid());
+    assert!(pk.is_valid());
 }
 
 #[test]
@@ -229,4 +321,26 @@ fn test_is_valid() {
         let pk = sk.public_key();
         assert!(pk.is_valid());
     }
+}
+
+#[test]
+fn test_hash() {
+    fn hash<T: std::hash::Hash>(v: T) -> u64 {
+        use std::collections::hash_map::DefaultHasher;
+        let mut h = DefaultHasher::new();
+        v.hash(&mut h);
+        h.finish()
+    }
+
+    let mut rng = StdRng::seed_from_u64(1337);
+    let mut data = [0u8; 32];
+    rng.fill(data.as_mut_slice());
+
+    let sk = SecretKey::from_seed(&data);
+    let pk1 = sk.public_key();
+    let pk2 = pk1.derive_unhardened(1);
+    let pk3 = pk1.derive_unhardened(2);
+
+    assert!(hash(pk2) != hash(pk3));
+    assert!(hash(pk1.derive_unhardened(42)) == hash(pk1.derive_unhardened(42)));
 }

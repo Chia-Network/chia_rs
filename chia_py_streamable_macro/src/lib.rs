@@ -56,10 +56,6 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 Ok(format!("{:?}", self))
             }
 
-            fn __repr__(&self) -> pyo3::PyResult<String> {
-                Ok(format!("{:?}", self))
-            }
-
             fn __richcmp__(&self, other: pyo3::PyRef<Self>, op: pyo3::class::basic::CompareOp) -> pyo3::Py<pyo3::PyAny> {
                 use pyo3::class::basic::CompareOp;
                 let py = other.py();
