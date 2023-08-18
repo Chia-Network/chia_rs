@@ -180,18 +180,15 @@ impl Peer {
                 let found_type = message.msg_type;
 
                 if found_type != expected_type {
-                    return Err(Error::Fatal(format!(
-                        "Expected {:?} message, found {:?}",
-                        expected_type, found_type
-                    )));
+                    return Err(Error::InvalidResponse(Some(message)));
                 }
 
                 match R::parse(&mut Cursor::new(message.data.as_ref())) {
                     Ok(response) => Ok(response),
-                    Err(error) => Err(Error::Fatal(error.to_string())),
+                    _ => Err(Error::InvalidResponse(Some(message))),
                 }
             }
-            _ => Err(Error::Fatal("Response channel closed".to_string())),
+            _ => Err(Error::InvalidResponse(None)),
         }
     }
 

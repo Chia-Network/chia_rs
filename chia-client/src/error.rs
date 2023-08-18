@@ -1,3 +1,4 @@
+use chia_protocol::Message;
 use chia_traits::chia_error;
 use thiserror::Error;
 
@@ -11,6 +12,6 @@ pub enum Error {
     #[error("{0}")]
     WebSocket(#[from] tungstenite::Error),
 
-    #[error("Fatal error {0}")]
-    Fatal(String),
+    #[error("{0:?}")]
+    InvalidResponse(Option<Message>),
 }
