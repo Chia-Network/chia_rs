@@ -54,12 +54,8 @@ jobs:
         python -m pip install mypy
 
     - name: Build
-      env:
-        CC: gcc
       run: |
-        git clone https://github.com/Chia-Network/clvm_tools.git --branch=main --single-branch
-        python -m pip install ./clvm_tools
-        python -m pip install colorama
+        python -m pip install clvm_tools colorama
         maturin develop --release -m wheel/Cargo.toml
 
     - name: python mypy
