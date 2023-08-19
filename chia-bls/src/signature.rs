@@ -15,15 +15,18 @@ use std::ops::{Add, AddAssign};
 #[cfg(feature = "py-bindings")]
 use crate::public_key::parse_hex_string;
 #[cfg(feature = "py-bindings")]
+use chia_py_streamable_macro::PyStreamable;
+#[cfg(feature = "py-bindings")]
 use chia_traits::from_json_dict::FromJsonDict;
 #[cfg(feature = "py-bindings")]
 use chia_traits::to_json_dict::ToJsonDict;
 #[cfg(feature = "py-bindings")]
-use pyo3::{IntoPy, PyAny, PyObject, PyResult, Python};
+use pyo3::{pyclass, IntoPy, PyAny, PyObject, PyResult, Python};
 
 // we use the augmented scheme
 pub const DST: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_AUG_";
 
+#[cfg_attr(feature = "py-bindings", pyclass(frozen), derive(PyStreamable))]
 #[derive(Clone)]
 pub struct Signature(pub(crate) blst_p2);
 

@@ -11,12 +11,15 @@ use std::mem::MaybeUninit;
 #[cfg(feature = "py-bindings")]
 use crate::public_key::parse_hex_string;
 #[cfg(feature = "py-bindings")]
+use chia_py_streamable_macro::PyStreamable;
+#[cfg(feature = "py-bindings")]
 use chia_traits::from_json_dict::FromJsonDict;
 #[cfg(feature = "py-bindings")]
 use chia_traits::to_json_dict::ToJsonDict;
 #[cfg(feature = "py-bindings")]
-use pyo3::{IntoPy, PyAny, PyObject, PyResult, Python};
+use pyo3::{pyclass, IntoPy, PyAny, PyObject, PyResult, Python};
 
+#[cfg_attr(feature = "py-bindings", pyclass(frozen), derive(PyStreamable))]
 #[derive(PartialEq, Eq, Clone)]
 pub struct SecretKey(pub(crate) blst_scalar);
 
