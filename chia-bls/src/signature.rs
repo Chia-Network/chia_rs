@@ -1,6 +1,8 @@
 use crate::{Error, PublicKey, Result, SecretKey};
 use blst::*;
 use chia_traits::{read_bytes, Streamable};
+use clvm_traits::{FromClvm, ToClvm};
+use clvmr::allocator::{Allocator, NodePtr, SExp};
 use sha2::{Digest, Sha256};
 use std::borrow::Borrow;
 use std::convert::AsRef;
@@ -158,6 +160,28 @@ impl FromJsonDict for Signature {
                 .try_into()
                 .unwrap(),
         )?)
+    }
+}
+
+impl FromClvm for Signature {
+    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self> {
+        let blob = match a.sexp(ptr) {
+            SExp::Atom => a.atom(ptr),
+            _ => {
+                return Err(clvm_traits::Error::ExpectedAtom(ptr));
+            }
+        };
+        Self::from_bytes(
+            blob.try_into()
+                .map_err(|_error| clvm_traits::Error::Custom("invalid size".to_string()))?,
+        )
+        .map_err(|error| clvm_traits::Error::Custom(error.to_string()))
+    }
+}
+
+impl ToClvm for Signature {
+    fn to_clvm(&self, a: &mut Allocator) -> clvm_traits::Result<NodePtr> {
+        Ok(a.new_atom(&self.to_bytes())?)
     }
 }
 
@@ -793,6 +817,29 @@ fn test_debug() {
     data[0] = 0xc0;
     let sig = Signature::from_bytes(&data).unwrap();
     assert_eq!(format!("{:?}", sig), hex::encode(data));
+}
+
+#[test]
+fn test_to_from_clvm() {
+    let mut a = Allocator::new();
+    let bytes = hex::decode("b45825c0ee7759945c0189b4c38b7e54231ebadc83a851bec3bb7cf954a124ae0cc8e8e5146558332ea152f63bf8846e04826185ef60e817f271f8d500126561319203f9acb95809ed20c193757233454be1562a5870570941a84605bd2c9c9a").expect("hex::decode()");
+    let ptr = a.new_atom(&bytes).expect("new_atom");
+
+    let sig = Signature::from_clvm(&a, ptr).expect("from_clvm");
+    assert_eq!(&sig.to_bytes()[..], &bytes[..]);
+
+    let sig_ptr = sig.to_clvm(&mut a).expect("to_clvm");
+    assert!(a.atom_eq(sig_ptr, ptr));
+}
+
+#[test]
+fn test_from_clvm_failure() {
+    let mut a = Allocator::new();
+    let ptr = a.new_pair(a.one(), a.one()).expect("new_pair");
+    assert_eq!(
+        Signature::from_clvm(&a, ptr).unwrap_err(),
+        clvm_traits::Error::ExpectedAtom(ptr)
+    );
 }
 
 #[cfg(test)]

@@ -2,6 +2,8 @@ use crate::secret_key::is_all_zero;
 use crate::{DerivableKey, Error, Result};
 use blst::*;
 use chia_traits::{read_bytes, Streamable};
+use clvm_traits::{FromClvm, ToClvm};
+use clvmr::allocator::{Allocator, NodePtr, SExp};
 use sha2::{digest::FixedOutput, Digest, Sha256};
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -225,6 +227,28 @@ impl DerivableKey for PublicKey {
     }
 }
 
+impl FromClvm for PublicKey {
+    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self> {
+        let blob = match a.sexp(ptr) {
+            SExp::Atom => a.atom(ptr),
+            _ => {
+                return Err(clvm_traits::Error::ExpectedAtom(ptr));
+            }
+        };
+        Self::from_bytes(
+            blob.try_into()
+                .map_err(|_error| clvm_traits::Error::Custom("invalid size".to_string()))?,
+        )
+        .map_err(|error| clvm_traits::Error::Custom(error.to_string()))
+    }
+}
+
+impl ToClvm for PublicKey {
+    fn to_clvm(&self, a: &mut Allocator) -> clvm_traits::Result<NodePtr> {
+        Ok(a.new_atom(&self.to_bytes())?)
+    }
+}
+
 #[cfg(test)]
 use hex::FromHex;
 
@@ -403,6 +427,29 @@ fn test_debug() {
     data[0] = 0xc0;
     let pk = PublicKey::from_bytes(&data).unwrap();
     assert_eq!(format!("{:?}", pk), hex::encode(data));
+}
+
+#[test]
+fn test_to_from_clvm() {
+    let mut a = Allocator::new();
+    let bytes = hex::decode("997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2").expect("hex::decode()");
+    let ptr = a.new_atom(&bytes).expect("new_atom");
+
+    let pk = PublicKey::from_clvm(&a, ptr).expect("from_clvm");
+    assert_eq!(&pk.to_bytes()[..], &bytes[..]);
+
+    let pk_ptr = pk.to_clvm(&mut a).expect("to_clvm");
+    assert!(a.atom_eq(pk_ptr, ptr));
+}
+
+#[test]
+fn test_from_clvm_failure() {
+    let mut a = Allocator::new();
+    let ptr = a.new_pair(a.one(), a.one()).expect("new_pair");
+    assert_eq!(
+        PublicKey::from_clvm(&a, ptr).unwrap_err(),
+        clvm_traits::Error::ExpectedAtom(ptr)
+    );
 }
 
 #[cfg(test)]
