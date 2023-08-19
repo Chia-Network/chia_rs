@@ -3,6 +3,9 @@ use crate::DerivableKey;
 use blst::*;
 use chia_traits::chia_error::{Error, Result};
 use chia_traits::{read_bytes, Streamable};
+use clvm_traits::{FromClvm, ToClvm};
+use clvmr::allocator::{Allocator, NodePtr};
+use clvmr::serde::{node_from_bytes, node_to_bytes};
 use sha2::{digest::FixedOutput, Digest, Sha256};
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -225,6 +228,25 @@ impl DerivableKey for PublicKey {
             p1.assume_init()
         };
         PublicKey(p1)
+    }
+}
+
+impl FromClvm for PublicKey {
+    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self> {
+        Self::from_bytes(
+            &node_to_bytes(a, ptr)
+                .map_err(|error| clvm_traits::Error::Custom(error.to_string()))?
+                .try_into()
+                .map_err(|_error| clvm_traits::Error::Custom("invalid size".to_string()))?,
+        )
+        .map_err(|error| clvm_traits::Error::Custom(error.to_string()))
+    }
+}
+
+impl ToClvm for PublicKey {
+    fn to_clvm(&self, a: &mut Allocator) -> clvm_traits::Result<NodePtr> {
+        node_from_bytes(a, &self.to_bytes())
+            .map_err(|error| clvm_traits::Error::Custom(error.to_string()))
     }
 }
 
