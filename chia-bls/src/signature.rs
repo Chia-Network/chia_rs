@@ -28,6 +28,7 @@ use pyo3::{pyclass, pymethods, IntoPy, PyAny, PyObject, PyResult, Python};
 // we use the augmented scheme
 pub const DST: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_AUG_";
 
+#[cfg_attr(feature = "py-bindings", pyclass(frozen), derive(PyStreamable))]
 #[derive(Clone)]
 pub struct Signature(pub(crate) blst_p2);
 

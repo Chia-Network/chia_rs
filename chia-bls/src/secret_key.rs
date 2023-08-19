@@ -22,6 +22,7 @@ use chia_traits::to_json_dict::ToJsonDict;
 #[cfg(feature = "py-bindings")]
 use pyo3::{pyclass, pymethods, IntoPy, PyAny, PyObject, PyResult, Python};
 
+#[cfg_attr(feature = "py-bindings", pyclass(frozen), derive(PyStreamable))]
 #[derive(PartialEq, Eq, Clone)]
 pub struct SecretKey(pub(crate) blst_scalar);
 
