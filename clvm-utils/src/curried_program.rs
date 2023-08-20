@@ -5,7 +5,7 @@ use clvm_traits::{
 use clvmr::{allocator::NodePtr, Allocator};
 
 #[derive(Debug, Clone)]
-pub struct CurriedProgram<T>(NodePtr, T);
+pub struct CurriedProgram<T>(pub NodePtr, pub T);
 
 impl<T> FromClvm for CurriedProgram<T>
 where
