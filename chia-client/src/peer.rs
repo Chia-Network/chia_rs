@@ -12,6 +12,7 @@ use tokio::sync::{broadcast, oneshot, Mutex};
 use tokio::{net::TcpStream, task::JoinHandle};
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 
+use crate::utils::stream;
 use crate::{Error, Result};
 
 type WebSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
@@ -109,20 +110,12 @@ impl Peer {
         let message = Message {
             msg_type: T::msg_type(),
             id: None,
-            data: {
-                let mut body_bytes = Vec::new();
-                body.stream(&mut body_bytes)?;
-                body_bytes.into()
-            },
+            data: stream(&body)?.into(),
         };
-
-        // Convert message to bytes.
-        let mut bytes = Vec::new();
-        message.stream(&mut bytes)?;
 
         // Send the message through the websocket.
         let mut sink = self.sink.lock().await;
-        sink.send(bytes.into()).await?;
+        sink.send(stream(&message)?.into()).await?;
 
         Ok(())
     }
@@ -144,23 +137,15 @@ impl Peer {
         let message = Message {
             msg_type: T::msg_type(),
             id: Some(message_id),
-            data: {
-                let mut body_bytes = Vec::new();
-                body.stream(&mut body_bytes)?;
-                body_bytes.into()
-            },
+            data: stream(&body)?.into(),
         };
-
-        // Convert message to bytes.
-        let mut bytes = Vec::new();
-        message.stream(&mut bytes)?;
 
         // Create a saved oneshot channel to receive the response.
         let (sender, receiver) = oneshot::channel::<Message>();
         self.requests.lock().await.insert(message_id, sender);
 
         // Send the message.
-        if let Err(error) = self.sink.lock().await.send(bytes.into()).await {
+        if let Err(error) = self.sink.lock().await.send(stream(&message)?.into()).await {
             // Prevent memory leak.
             self.requests.lock().await.remove(&message_id);
 
