@@ -132,9 +132,13 @@ impl Peer {
         T: Streamable + ChiaProtocolMessage,
         R: Streamable + ChiaProtocolMessage,
     {
-        // Get the current nonce.
-        let mut nonce = self.nonce.lock().await;
-        let message_id = *nonce;
+        // Get the current nonce and increment.
+        let message_id = {
+            let mut nonce = self.nonce.lock().await;
+            let id = *nonce;
+            *nonce += 1;
+            id
+        };
 
         // Create the message.
         let message = Message {
@@ -162,10 +166,6 @@ impl Peer {
 
             return Err(error.into());
         }
-
-        // Increment the nonce and drop its lock.
-        *nonce += 1;
-        drop(nonce);
 
         // Wait for the response.
         let response = receiver.await;
