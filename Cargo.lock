@@ -204,6 +204,7 @@ dependencies = [
  "pyo3",
  "rstest 0.16.0",
  "text-diff",
+ "thiserror",
 ]
 
 [[package]]
