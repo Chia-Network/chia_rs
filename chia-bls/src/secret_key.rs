@@ -1,6 +1,5 @@
-use crate::{DerivableKey, PublicKey};
+use crate::{DerivableKey, Error, PublicKey, Result};
 use blst::*;
-use chia_traits::chia_error::{Error, Result};
 use chia_traits::{read_bytes, Streamable};
 use hkdf::HkdfExtract;
 use sha2::{Digest, Sha256};
@@ -101,9 +100,7 @@ impl SecretKey {
         }
 
         if unsafe { !blst_sk_check(&pk) } {
-            return Err(Error::Custom(
-                "SecretKey byte data must be less than the group order".to_string(),
-            ));
+            return Err(Error::SecretKeyGroupOrder);
         }
 
         Ok(Self(pk))
@@ -138,13 +135,15 @@ impl Streamable for SecretKey {
         digest.update(self.to_bytes());
     }
 
-    fn stream(&self, out: &mut Vec<u8>) -> Result<()> {
+    fn stream(&self, out: &mut Vec<u8>) -> chia_traits::chia_error::Result<()> {
         out.extend_from_slice(&self.to_bytes());
         Ok(())
     }
 
-    fn parse(input: &mut Cursor<&[u8]>) -> Result<Self> {
-        Self::from_bytes(read_bytes(input, 32)?.try_into().unwrap())
+    fn parse(input: &mut Cursor<&[u8]>) -> chia_traits::chia_error::Result<Self> {
+        Ok(Self::from_bytes(
+            read_bytes(input, 32)?.try_into().unwrap(),
+        )?)
     }
 }
 
@@ -359,7 +358,7 @@ fn test_from_bytes() {
         // just any random bytes are not a valid key and should fail
         assert_eq!(
             SecretKey::from_bytes(&data).unwrap_err(),
-            Error::Custom("SecretKey byte data must be less than the group order".to_string())
+            Error::SecretKeyGroupOrder
         );
     }
 }

@@ -220,6 +220,7 @@ dependencies = [
  "rand",
  "rstest 0.17.0",
  "sha2 0.9.9",
+ "thiserror",
  "tiny-bip39",
 ]
 
