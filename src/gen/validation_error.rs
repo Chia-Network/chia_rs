@@ -1,5 +1,6 @@
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use clvmr::reduction::EvalErr;
+use thiserror::Error;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::PyErr;
@@ -52,7 +53,8 @@ pub enum ErrorCode {
     TooManyAnnouncements,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+#[error("validation error: {1:?}")]
 pub struct ValidationErr(pub NodePtr, pub ErrorCode);
 
 impl From<EvalErr> for ValidationErr {

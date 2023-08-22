@@ -1,6 +1,5 @@
-use crate::{PublicKey, SecretKey};
+use crate::{Error, PublicKey, Result, SecretKey};
 use blst::*;
-use chia_traits::chia_error::{Error, Result};
 use chia_traits::{read_bytes, Streamable};
 use sha2::{Digest, Sha256};
 use std::borrow::Borrow;
@@ -21,10 +20,9 @@ impl Signature {
     pub fn from_bytes(buf: &[u8; 96]) -> Result<Self> {
         let p2 = unsafe {
             let mut p2_affine = MaybeUninit::<blst_p2_affine>::uninit();
-            if blst_p2_uncompress(p2_affine.as_mut_ptr(), buf as *const u8)
-                != BLST_ERROR::BLST_SUCCESS
-            {
-                return Err(Error::Custom("Signature is invalid".to_string()));
+            let ret = blst_p2_uncompress(p2_affine.as_mut_ptr(), buf as *const u8);
+            if ret != BLST_ERROR::BLST_SUCCESS {
+                return Err(Error::InvalidSignature(ret));
             }
             let mut p2 = MaybeUninit::<blst_p2>::uninit();
             blst_p2_from_affine(p2.as_mut_ptr(), &p2_affine.assume_init());
@@ -32,7 +30,7 @@ impl Signature {
         };
         let ret = Self(p2);
         if !ret.is_valid() {
-            Err(Error::Custom("Signature is invalid".to_string()))
+            Err(Error::InvalidSignature(BLST_ERROR::BLST_POINT_NOT_ON_CURVE))
         } else {
             Ok(ret)
         }
@@ -73,13 +71,15 @@ impl Streamable for Signature {
         digest.update(self.to_bytes());
     }
 
-    fn stream(&self, out: &mut Vec<u8>) -> Result<()> {
+    fn stream(&self, out: &mut Vec<u8>) -> chia_traits::chia_error::Result<()> {
         out.extend_from_slice(&self.to_bytes());
         Ok(())
     }
 
-    fn parse(input: &mut Cursor<&[u8]>) -> Result<Self> {
-        Self::from_bytes(read_bytes(input, 96)?.try_into().unwrap())
+    fn parse(input: &mut Cursor<&[u8]>) -> chia_traits::chia_error::Result<Self> {
+        Ok(Self::from_bytes(
+            read_bytes(input, 96)?.try_into().unwrap(),
+        )?)
     }
 }
 
@@ -296,10 +296,21 @@ fn test_from_bytes() {
     for _i in 0..50 {
         rng.fill(data.as_mut_slice());
         // just any random bytes are not a valid signature and should fail
-        assert_eq!(
-            Signature::from_bytes(&data).unwrap_err(),
-            Error::Custom("Signature is invalid".to_string())
-        );
+        match Signature::from_bytes(&data) {
+            Err(Error::InvalidSignature(err)) => {
+                assert!([
+                    BLST_ERROR::BLST_BAD_ENCODING,
+                    BLST_ERROR::BLST_POINT_NOT_ON_CURVE
+                ]
+                .contains(&err));
+            }
+            Err(e) => {
+                panic!("unexpected error from_bytes(): {e}");
+            }
+            Ok(v) => {
+                panic!("unexpected value from_bytes(): {v:?}");
+            }
+        }
     }
 }
 

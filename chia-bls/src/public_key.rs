@@ -1,7 +1,6 @@
 use crate::secret_key::is_all_zero;
-use crate::DerivableKey;
+use crate::{DerivableKey, Error, Result};
 use blst::*;
-use chia_traits::chia_error::{Error, Result};
 use chia_traits::{read_bytes, Streamable};
 use sha2::{digest::FixedOutput, Digest, Sha256};
 use std::fmt;
@@ -22,31 +21,24 @@ impl PublicKey {
         if (bytes[0] & 0xc0) == 0xc0 {
             // enforce that infinity must be 0xc0000..00
             if bytes[0] != 0xc0 || !zeros_only {
-                return Err(Error::Custom(
-                    "Given G1 infinity element must be canonical".to_string(),
-                ));
+                return Err(Error::G1NotCanonical);
             }
             // return infinity element (point all zero)
             return Ok(Self::default());
         } else {
             if (bytes[0] & 0xc0) != 0x80 {
-                return Err(Error::Custom(
-                    "Given G1 non-infinity element must start with 0b10".to_string(),
-                ));
+                return Err(Error::G1InfinityInvalidBits);
             }
             if zeros_only {
-                return Err(Error::Custom(
-                    "G1 non-infinity element can't have only zeros".to_string(),
-                ));
+                return Err(Error::G1InfinityNotZero);
             }
         }
 
         let p1 = unsafe {
             let mut p1_affine = MaybeUninit::<blst_p1_affine>::uninit();
-            if blst_p1_uncompress(p1_affine.as_mut_ptr(), bytes as *const u8)
-                != BLST_ERROR::BLST_SUCCESS
-            {
-                return Err(Error::Custom("PublicKey is invalid".to_string()));
+            let ret = blst_p1_uncompress(p1_affine.as_mut_ptr(), bytes as *const u8);
+            if ret != BLST_ERROR::BLST_SUCCESS {
+                return Err(Error::InvalidPublicKey(ret));
             }
             let mut p1 = MaybeUninit::<blst_p1>::uninit();
             blst_p1_from_affine(p1.as_mut_ptr(), &p1_affine.assume_init());
@@ -54,7 +46,7 @@ impl PublicKey {
         };
         let ret = Self(p1);
         if !ret.is_valid() {
-            Err(Error::Custom("PublicKey is invalid".to_string()))
+            Err(Error::InvalidPublicKey(BLST_ERROR::BLST_POINT_NOT_ON_CURVE))
         } else {
             Ok(ret)
         }
@@ -94,13 +86,15 @@ impl Streamable for PublicKey {
         digest.update(self.to_bytes());
     }
 
-    fn stream(&self, out: &mut Vec<u8>) -> Result<()> {
+    fn stream(&self, out: &mut Vec<u8>) -> chia_traits::Result<()> {
         out.extend_from_slice(&self.to_bytes());
         Ok(())
     }
 
-    fn parse(input: &mut Cursor<&[u8]>) -> Result<Self> {
-        Self::from_bytes(read_bytes(input, 48)?.try_into().unwrap())
+    fn parse(input: &mut Cursor<&[u8]>) -> chia_traits::Result<Self> {
+        Ok(Self::from_bytes(
+            read_bytes(input, 48)?.try_into().unwrap(),
+        )?)
     }
 }
 
@@ -220,28 +214,36 @@ fn test_from_bytes() {
         // clear the bits that mean infinity
         data[0] = 0x80;
         // just any random bytes are not a valid key and should fail
-        assert_eq!(
-            PublicKey::from_bytes(&data).unwrap_err(),
-            Error::Custom("PublicKey is invalid".to_string())
-        );
+        match PublicKey::from_bytes(&data) {
+            Err(Error::InvalidPublicKey(err)) => {
+                assert!([
+                    BLST_ERROR::BLST_BAD_ENCODING,
+                    BLST_ERROR::BLST_POINT_NOT_ON_CURVE
+                ]
+                .contains(&err));
+            }
+            Err(e) => {
+                panic!("unexpected error from_bytes(): {e}");
+            }
+            Ok(v) => {
+                panic!("unexpected value from_bytes(): {v:?}");
+            }
+        }
     }
 }
 
 #[cfg(test)]
 #[rstest]
-#[case("c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001", "Given G1 infinity element must be canonical")]
-#[case("c08000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "Given G1 infinity element must be canonical")]
-#[case("c80000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "Given G1 infinity element must be canonical")]
-#[case("e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "Given G1 infinity element must be canonical")]
-#[case("d00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "Given G1 infinity element must be canonical")]
-#[case("800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "G1 non-infinity element can't have only zeros")]
-#[case("400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "Given G1 non-infinity element must start with 0b10")]
-fn test_from_bytes_failures(#[case] input: &str, #[case()] error: &str) {
+#[case("c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001", Error::G1NotCanonical)]
+#[case("c08000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", Error::G1NotCanonical)]
+#[case("c80000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", Error::G1NotCanonical)]
+#[case("e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", Error::G1NotCanonical)]
+#[case("d00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", Error::G1NotCanonical)]
+#[case("800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", Error::G1InfinityNotZero)]
+#[case("400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", Error::G1InfinityInvalidBits)]
+fn test_from_bytes_failures(#[case] input: &str, #[case()] error: Error) {
     let bytes: [u8; 48] = hex::decode(input).unwrap().try_into().unwrap();
-    assert_eq!(
-        PublicKey::from_bytes(&bytes).unwrap_err(),
-        Error::Custom(error.to_string())
-    );
+    assert_eq!(PublicKey::from_bytes(&bytes).unwrap_err(), error);
 }
 
 #[test]

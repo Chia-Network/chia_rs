@@ -10,4 +10,5 @@ pub mod to_json_dict;
 #[cfg(feature = "py-bindings")]
 pub use crate::to_json_dict::*;
 
+pub use crate::chia_error::{Error, Result};
 pub use crate::streamable::*;

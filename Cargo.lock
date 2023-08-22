@@ -204,6 +204,7 @@ dependencies = [
  "pyo3",
  "rstest 0.16.0",
  "text-diff",
+ "thiserror",
 ]
 
 [[package]]
@@ -219,6 +220,7 @@ dependencies = [
  "rand",
  "rstest 0.17.0",
  "sha2 0.9.9",
+ "thiserror",
  "tiny-bip39",
 ]
 
@@ -273,6 +275,7 @@ dependencies = [
  "hex",
  "pyo3",
  "sha2 0.9.9",
+ "thiserror",
 ]
 
 [[package]]
