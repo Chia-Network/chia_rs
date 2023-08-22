@@ -1,40 +1,26 @@
-use std::error;
-use std::fmt;
+use thiserror::Error;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Error)]
 pub enum Error {
+    #[error("invalid bool encoding")]
     InvalidBool,
+    #[error("invalid optional encoding")]
     InvalidOptional,
+    #[error("unexpected end of buffer")]
     EndOfBuffer,
+    #[error("invalid string encoding")]
     InvalidString,
+    #[error("input buffer too large")]
     InputTooLarge,
+    #[error("sequence too large")]
     SequenceTooLarge,
+    #[error("invalid enum value")]
     InvalidEnum,
+    #[error("{0}")]
     Custom(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
-
-impl fmt::Display for Error {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            Error::InvalidBool => write!(fmt, "invalid bool encoding"),
-            Error::InvalidOptional => write!(fmt, "invalid optional encoding"),
-            Error::InvalidString => write!(fmt, "invalid string encoding"),
-            Error::EndOfBuffer => write!(fmt, "unexpected end of buffer"),
-            Error::InputTooLarge => write!(fmt, "input buffer too large"),
-            Error::SequenceTooLarge => write!(fmt, "sequence too large"),
-            Error::InvalidEnum => write!(fmt, "invalid enum value"),
-            Error::Custom(ref s) => s.fmt(fmt),
-        }
-    }
-}
-
-impl error::Error for Error {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        None
-    }
-}
 
 #[cfg(feature = "py-bindings")]
 impl std::convert::From<Error> for pyo3::PyErr {

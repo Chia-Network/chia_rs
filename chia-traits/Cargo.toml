@@ -13,3 +13,4 @@ chia_streamable_macro = { version = "0.2.4", path = "../chia_streamable_macro" }
 clvmr = "0.3.0"
 sha2 = "0.9.9"
 hex = "=0.4.3"
+thiserror = "1.0.44"

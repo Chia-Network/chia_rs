@@ -273,6 +273,7 @@ dependencies = [
  "hex",
  "pyo3",
  "sha2 0.9.9",
+ "thiserror",
 ]
 
 [[package]]
