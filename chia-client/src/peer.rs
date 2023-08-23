@@ -32,40 +32,6 @@ pub struct Peer {
     nonce: Mutex<u16>,
 }
 
-struct ResponseHandler {
-    requests: Requests,
-    message_id: u16,
-}
-
-impl ResponseHandler {
-    async fn new(
-        requests: Requests,
-        message_id: u16,
-    ) -> (ResponseHandler, oneshot::Receiver<Message>) {
-        let (sender, receiver) = oneshot::channel::<Message>();
-        requests.lock().await.insert(message_id, sender);
-
-        (
-            Self {
-                requests,
-                message_id,
-            },
-            receiver,
-        )
-    }
-}
-
-impl Drop for ResponseHandler {
-    fn drop(&mut self) {
-        let requests = Arc::clone(&self.requests);
-        let message_id = self.message_id;
-
-        tokio::spawn(async move {
-            requests.lock().await.remove(&message_id);
-        });
-    }
-}
-
 impl Peer {
     pub fn new(ws: WebSocket) -> Self {
         let (sink, mut stream) = ws.split();
@@ -175,17 +141,31 @@ impl Peer {
         };
 
         // Create a saved oneshot channel to receive the response.
-        let handler = ResponseHandler::new(Arc::clone(&self.requests), message_id).await;
+        let (sender, receiver) = oneshot::channel::<Message>();
+        self.requests.lock().await.insert(message_id, sender);
 
         // Send the message.
-        self.sink
-            .lock()
-            .await
-            .send(stream(&message)?.into())
-            .await?;
+        let bytes = match stream(&message) {
+            Ok(bytes) => bytes.into(),
+            Err(error) => {
+                self.requests.lock().await.remove(&message_id);
+                return Err(error.into());
+            }
+        };
+        let send_result = self.sink.lock().await.send(bytes).await;
+
+        if let Err(error) = send_result {
+            self.requests.lock().await.remove(&message_id);
+            return Err(error.into());
+        }
 
         // Wait for the response.
-        match handler.1.await {
+        let response = receiver.await;
+
+        // Remove the one shot channel.
+        self.requests.lock().await.remove(&message_id);
+
+        match response {
             Ok(message) => {
                 let expected_type = R::msg_type();
                 let found_type = message.msg_type;
