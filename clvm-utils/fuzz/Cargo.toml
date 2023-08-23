@@ -13,6 +13,7 @@ libfuzzer-sys = "0.4"
 clvmr = "=0.3.0"
 chia-fuzz = { path = "../../fuzz" }
 clvm-utils = { path = ".." }
+clvm-traits = { path = "../../clvm-traits" }
 chia = { path = "../.." }
 
 [[bin]]
@@ -23,8 +24,8 @@ doc = false
 bench = false
 
 [[bin]]
-name = "uncurry"
-path = "fuzz_targets/uncurry.rs"
+name = "curry"
+path = "fuzz_targets/curry.rs"
 test = false
 doc = false
 bench = false

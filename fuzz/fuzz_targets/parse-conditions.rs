@@ -4,7 +4,7 @@ use libfuzzer_sys::fuzz_target;
 use chia::gen::conditions::{parse_conditions, ParseState, Spend, SpendBundleConditions};
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
-use clvm_utils::tree_hash::tree_hash;
+use clvm_utils::tree_hash;
 use clvmr::allocator::Allocator;
 use fuzzing_utils::{make_tree, BitCursor};
 use std::collections::HashSet;

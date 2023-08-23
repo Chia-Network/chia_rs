@@ -2,7 +2,7 @@
 
 use chia::compression::compressor::wrap_atom_with_decompression_program;
 
-use clvm_utils::tree_hash::tree_hash;
+use clvm_utils::tree_hash;
 use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::run_program::run_program;

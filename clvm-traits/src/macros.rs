@@ -83,24 +83,24 @@ macro_rules! destructure_list {
     () => {
         _
     };
-    ( $first:ident $( , $rest:ident )* $(,)? ) => {
+    ( $first:pat $( , $rest:pat )* $(,)? ) => {
         ($first, $crate::destructure_list!( $( $rest ),* ))
     };
 }
 
 #[macro_export]
 macro_rules! destructure_tuple {
-    ( $first:ident $(,)? ) => {
+    ( $first:pat $(,)? ) => {
         $first
     };
-    ( $first:ident $( , $rest:ident )* $(,)? ) => {
+    ( $first:pat $( , $rest:pat )* $(,)? ) => {
         ($first, $crate::destructure_tuple!( $( $rest ),* ))
     };
 }
 
 #[macro_export]
 macro_rules! destructure_quote {
-    ( $name:ident ) => {
+    ( $name:pat ) => {
         (_, $name)
     };
 }
@@ -110,7 +110,7 @@ macro_rules! destructure_curried_args {
     () => {
         _
     };
-    ( $first:ident $( , $rest:ident )* $(,)? ) => {
+    ( $first:pat $( , $rest:pat )* $(,)? ) => {
         (
             _,
             (
