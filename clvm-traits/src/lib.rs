@@ -40,14 +40,12 @@ assert_eq!(Point::from_clvm(a, ptr).unwrap(), point);
 #[cfg(feature = "derive")]
 pub use clvm_derive::*;
 
-mod curried_args;
 mod error;
 mod from_clvm;
 mod macros;
 mod match_byte;
 mod to_clvm;
 
-pub use curried_args::*;
 pub use error::*;
 pub use from_clvm::*;
 pub use macros::*;

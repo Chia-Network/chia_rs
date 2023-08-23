@@ -5,18 +5,16 @@
 //!
 //! ```rust
 //! use clvm_utils::CurriedProgram;
-//! use clvm_traits::{ToClvm, CurriedArgs};
+//! use clvm_traits::{ToClvm, clvm_curried_args};
 //! use clvmr::{Allocator, serde::node_to_bytes};
 //!
 //! let a = &mut Allocator::new();
 //!
 //! let program = a.one();
-//! let x = 42.to_clvm(a).unwrap();
-//! let y = 75.to_clvm(a).unwrap();
 //!
 //! let ptr = CurriedProgram {
 //!     program,
-//!     args: CurriedArgs(vec![x, y]),
+//!     args: clvm_curried_args!(42, 75),
 //! }
 //! .to_clvm(a)
 //! .unwrap();
