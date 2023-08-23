@@ -194,10 +194,8 @@ impl Peer {
                     return Err(Error::InvalidResponse(Some(message)));
                 }
 
-                match R::parse(&mut Cursor::new(message.data.as_ref())) {
-                    Ok(response) => Ok(response),
-                    _ => Err(Error::InvalidResponse(Some(message))),
-                }
+                R::parse(&mut Cursor::new(message.data.as_ref()))
+                    .map_err(|_| Error::InvalidResponse(Some(message)))
             }
             _ => Err(Error::InvalidResponse(None)),
         }
