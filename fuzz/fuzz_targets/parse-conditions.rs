@@ -11,8 +11,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use chia::gen::flags::{
-    COND_ARGS_NIL, ENABLE_ASSERT_BEFORE, ENABLE_SOFTFORK_CONDITION, NO_UNKNOWN_CONDS,
-    STRICT_ARGS_COUNT,
+    COND_ARGS_NIL, ENABLE_SOFTFORK_CONDITION, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
 };
 
 fuzz_target!(|data: &[u8]| {
@@ -38,8 +37,8 @@ fuzz_target!(|data: &[u8]| {
 
     for flags in &[
         0,
-        ENABLE_ASSERT_BEFORE | COND_ARGS_NIL,
-        ENABLE_ASSERT_BEFORE | STRICT_ARGS_COUNT,
+        COND_ARGS_NIL,
+        STRICT_ARGS_COUNT,
         NO_UNKNOWN_CONDS,
         ENABLE_SOFTFORK_CONDITION,
     ] {
