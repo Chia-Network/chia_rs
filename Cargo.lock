@@ -334,6 +334,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "chia-wallet"
+version = "0.1.0"
+
+[[package]]
 name = "chia_py_streamable_macro"
 version = "0.1.4"
 dependencies = [
