@@ -192,17 +192,13 @@ impl FromJsonDict for Signature {
 
 impl FromClvm for Signature {
     fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self> {
-        let blob = match a.sexp(ptr) {
-            SExp::Atom => a.atom(ptr),
-            _ => {
-                return Err(clvm_traits::Error::ExpectedAtom(ptr));
-            }
+        let blob = if let SExp::Atom = a.sexp(ptr) {
+            a.atom(ptr)
+        } else {
+            return Err(anyhow::Error::msg("expected atom"));
         };
-        Self::from_bytes(
-            blob.try_into()
-                .map_err(|_error| clvm_traits::Error::Custom("invalid size".to_string()))?,
-        )
-        .map_err(|error| clvm_traits::Error::Custom(error.to_string()))
+
+        Ok(Self::from_bytes(blob.try_into()?)?)
     }
 }
 
@@ -920,10 +916,7 @@ fn test_to_from_clvm() {
 fn test_from_clvm_failure() {
     let mut a = Allocator::new();
     let ptr = a.new_pair(a.one(), a.one()).expect("new_pair");
-    assert_eq!(
-        Signature::from_clvm(&a, ptr).unwrap_err(),
-        clvm_traits::Error::ExpectedAtom(ptr)
-    );
+    assert!(Signature::from_clvm(&a, ptr).is_err());
 }
 
 #[cfg(test)]

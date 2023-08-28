@@ -1,5 +1,3 @@
-use std::array::TryFromSliceError;
-
 use clvmr::{
     allocator::{NodePtr, SExp},
     op_utils::nullp,
@@ -30,17 +28,14 @@ macro_rules! clvm_primitive {
                         zeros.extend(vec);
                         vec = zeros;
                     }
-                    let value =
-                        <$primitive>::from_be_bytes(vec.as_slice().try_into().map_err(
-                            |error: TryFromSliceError| Error::Custom(error.to_string()),
-                        )?);
+                    let value = <$primitive>::from_be_bytes(vec.as_slice().try_into()?);
                     Ok(if sign == Sign::Minus {
                         value.wrapping_neg()
                     } else {
                         value
                     })
                 } else {
-                    Err(Error::ExpectedAtom(ptr))
+                    Err(Error::msg("expected atom"))
                 }
             }
         }
@@ -68,7 +63,7 @@ where
     fn from_clvm(a: &Allocator, ptr: NodePtr) -> Result<Self> {
         match a.sexp(ptr) {
             SExp::Pair(first, rest) => Ok((A::from_clvm(a, first)?, B::from_clvm(a, rest)?)),
-            SExp::Atom => Err(Error::ExpectedCons(ptr)),
+            SExp::Atom => Err(Error::msg("expected atom")),
         }
     }
 }
@@ -78,7 +73,7 @@ impl FromClvm for () {
         if nullp(a, ptr) {
             Ok(())
         } else {
-            Err(Error::ExpectedNil(ptr))
+            Err(Error::msg("expected nil"))
         }
     }
 }
@@ -95,15 +90,15 @@ where
                     if nullp(a, ptr) {
                         return match items.try_into() {
                             Ok(value) => Ok(value),
-                            Err(_) => Err(Error::ExpectedCons(ptr)),
+                            Err(_) => Err(Error::msg("expected cons")),
                         };
                     } else {
-                        return Err(Error::ExpectedNil(ptr));
+                        return Err(Error::msg("expected nil"));
                     }
                 }
                 SExp::Pair(first, rest) => {
                     if items.len() >= N {
-                        return Err(Error::ExpectedAtom(ptr));
+                        return Err(Error::msg("expected atom"));
                     } else {
                         items.push(T::from_clvm(a, first)?);
                         ptr = rest;
@@ -126,7 +121,7 @@ where
                     if nullp(a, ptr) {
                         return Ok(items);
                     } else {
-                        return Err(Error::ExpectedNil(ptr));
+                        return Err(Error::msg("expected nil"));
                     }
                 }
                 SExp::Pair(first, rest) => {
@@ -151,9 +146,9 @@ impl<T: FromClvm> FromClvm for Option<T> {
 impl FromClvm for String {
     fn from_clvm(a: &Allocator, ptr: NodePtr) -> Result<Self> {
         if let SExp::Atom = a.sexp(ptr) {
-            Self::from_utf8(a.atom(ptr).to_vec()).map_err(|error| Error::Custom(error.to_string()))
+            Ok(Self::from_utf8(a.atom(ptr).to_vec())?)
         } else {
-            Err(Error::ExpectedAtom(ptr))
+            Err(Error::msg("expected atom"))
         }
     }
 }
@@ -173,6 +168,14 @@ mod tests {
         T::from_clvm(a, actual)
     }
 
+    fn check<T>(a: &mut Allocator, hex: &str, value: T)
+    where
+        T: FromClvm + PartialEq + std::fmt::Debug,
+    {
+        let result = decode::<T>(a, hex).unwrap();
+        assert_eq!(result, value);
+    }
+
     #[test]
     fn test_nodeptr() {
         let a = &mut Allocator::new();
@@ -183,62 +186,62 @@ mod tests {
     #[test]
     fn test_primitives() {
         let a = &mut Allocator::new();
-        assert_eq!(decode(a, "80"), Ok(0u8));
-        assert_eq!(decode(a, "80"), Ok(0i8));
-        assert_eq!(decode(a, "05"), Ok(5u8));
-        assert_eq!(decode(a, "05"), Ok(5u32));
-        assert_eq!(decode(a, "05"), Ok(5i32));
-        assert_eq!(decode(a, "81e5"), Ok(-27i32));
-        assert_eq!(decode(a, "80"), Ok(-0));
-        assert_eq!(decode(a, "8180"), Ok(-128i8));
+        check(a, "80", 0u8);
+        check(a, "80", 0i8);
+        check(a, "05", 5u8);
+        check(a, "05", 5u32);
+        check(a, "05", 5i32);
+        check(a, "81e5", -27i32);
+        check(a, "80", -0i32);
+        check(a, "8180", -128i8);
     }
 
     #[test]
     fn test_pair() {
         let a = &mut Allocator::new();
-        assert_eq!(decode(a, "ff0502"), Ok((5, 2)));
-        assert_eq!(decode(a, "ff81b8ff8301600980"), Ok((-72, (90121, ()))));
-        assert_eq!(
-            decode(a, "ffff80ff80ff80ffff80ff80ff80808080"),
-            Ok((((), ((), ((), (((), ((), ((), ()))), ())))), ()))
+        check(a, "ff0502", (5, 2));
+        check(a, "ff81b8ff8301600980", (-72, (90121, ())));
+        check(
+            a,
+            "ffff80ff80ff80ffff80ff80ff80808080",
+            (((), ((), ((), (((), ((), ((), ()))), ())))), ()),
         );
     }
 
     #[test]
     fn test_nil() {
         let a = &mut Allocator::new();
-        assert_eq!(decode(a, "80"), Ok(()));
+        check(a, "80", ());
     }
 
     #[test]
     fn test_array() {
         let a = &mut Allocator::new();
-        assert_eq!(decode(a, "ff01ff02ff03ff0480"), Ok([1, 2, 3, 4]));
-        assert_eq!(decode(a, "80"), Ok([] as [i32; 0]));
+        check(a, "ff01ff02ff03ff0480", [1, 2, 3, 4]);
+        check::<[i32; 0]>(a, "80", []);
     }
 
     #[test]
     fn test_vec() {
         let a = &mut Allocator::new();
-        assert_eq!(decode(a, "ff01ff02ff03ff0480"), Ok(vec![1, 2, 3, 4]));
-        assert_eq!(decode(a, "80"), Ok(Vec::<i32>::new()));
+        check(a, "ff01ff02ff03ff0480", vec![1, 2, 3, 4]);
+        check(a, "80", Vec::<i32>::new());
     }
 
     #[test]
     fn test_option() {
         let a = &mut Allocator::new();
-        assert_eq!(decode(a, "8568656c6c6f"), Ok(Some("hello".to_string())));
-        assert_eq!(decode(a, "80"), Ok(None::<String>));
+        check(a, "8568656c6c6f", Some("hello".to_string()));
 
         // Empty strings get decoded as None instead, since both values are represented by nil bytes.
         // This could be considered either intended behavior or not, depending on the way it's used.
-        assert_ne!(decode(a, "80"), Ok(Some("".to_string())));
+        check(a, "80", None::<String>);
     }
 
     #[test]
     fn test_string() {
         let a = &mut Allocator::new();
-        assert_eq!(decode(a, "8568656c6c6f"), Ok("hello".to_string()));
-        assert_eq!(decode(a, "80"), Ok("".to_string()));
+        check(a, "8568656c6c6f", "hello".to_string());
+        check(a, "80", "".to_string());
     }
 }

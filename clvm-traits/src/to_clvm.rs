@@ -1,6 +1,6 @@
 use clvmr::{allocator::NodePtr, Allocator};
 
-use crate::{Error, Result};
+use crate::Result;
 
 pub trait ToClvm {
     fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr>;
@@ -16,7 +16,7 @@ macro_rules! clvm_primitive {
     ($primitive:ty) => {
         impl ToClvm for $primitive {
             fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
-                a.new_number((*self).into()).map_err(Error::Allocator)
+                Ok(a.new_number((*self).into())?)
             }
         }
     };
@@ -134,6 +134,14 @@ mod tests {
         Ok(actual_bytes.encode_hex())
     }
 
+    fn check<T>(a: &mut Allocator, value: T, hex: &str)
+    where
+        T: ToClvm,
+    {
+        let result = encode(a, value).unwrap();
+        assert_eq!(result, hex);
+    }
+
     #[test]
     fn test_nodeptr() {
         let a = &mut Allocator::new();
@@ -144,94 +152,83 @@ mod tests {
     #[test]
     fn test_primitives() {
         let a = &mut Allocator::new();
-        assert_eq!(encode(a, 0u8), Ok("80".to_owned()));
-        assert_eq!(encode(a, 0i8), Ok("80".to_owned()));
-        assert_eq!(encode(a, 5u8), Ok("05".to_owned()));
-        assert_eq!(encode(a, 5u32), Ok("05".to_owned()));
-        assert_eq!(encode(a, 5i32), Ok("05".to_owned()));
-        assert_eq!(encode(a, -27i32), Ok("81e5".to_owned()));
-        assert_eq!(encode(a, -0), Ok("80".to_owned()));
-        assert_eq!(encode(a, -128i8), Ok("8180".to_owned()));
+        check(a, 0u8, "80");
+        check(a, 0i8, "80");
+        check(a, 5u8, "05");
+        check(a, 5u32, "05");
+        check(a, 5i32, "05");
+        check(a, -27i32, "81e5");
+        check(a, -0, "80");
+        check(a, -128i8, "8180");
     }
 
     #[test]
     fn test_reference() {
         let a = &mut Allocator::new();
-        assert_eq!(encode(a, &[1, 2, 3]), encode(a, [1, 2, 3]));
-        assert_eq!(encode(a, &Some(42)), encode(a, Some(42)));
-        assert_eq!(encode(a, &Some(&42)), encode(a, Some(42)));
-        assert_eq!(encode(a, Some(&42)), encode(a, Some(42)));
+        check(a, &[1, 2, 3], "ff01ff02ff0380");
+        check(a, &Some(42), "2a");
+        check(a, &Some(&42), "2a");
+        check(a, Some(&42), "2a");
     }
 
     #[test]
     fn test_pair() {
         let a = &mut Allocator::new();
-        assert_eq!(encode(a, (5, 2)), Ok("ff0502".to_owned()));
-        assert_eq!(
-            encode(a, (-72, (90121, ()))),
-            Ok("ff81b8ff8301600980".to_owned())
-        );
-        assert_eq!(
-            encode(a, (((), ((), ((), (((), ((), ((), ()))), ())))), ())),
-            Ok("ffff80ff80ff80ffff80ff80ff80808080".to_owned())
+        check(a, (5, 2), "ff0502");
+        check(a, (-72, (90121, ())), "ff81b8ff8301600980");
+        check(
+            a,
+            (((), ((), ((), (((), ((), ((), ()))), ())))), ()),
+            "ffff80ff80ff80ffff80ff80ff80808080",
         );
     }
 
     #[test]
     fn test_nil() {
         let a = &mut Allocator::new();
-        assert_eq!(encode(a, ()), Ok("80".to_owned()));
+        check(a, (), "80");
     }
 
     #[test]
     fn test_slice() {
         let a = &mut Allocator::new();
-        assert_eq!(
-            encode(a, [1, 2, 3, 4].as_slice()),
-            Ok("ff01ff02ff03ff0480".to_owned())
-        );
-        assert_eq!(encode(a, [0; 0].as_slice()), Ok("80".to_owned()));
+        check(a, [1, 2, 3, 4].as_slice(), "ff01ff02ff03ff0480");
+        check(a, [0; 0].as_slice(), "80");
     }
 
     #[test]
     fn test_array() {
         let a = &mut Allocator::new();
-        assert_eq!(encode(a, [1, 2, 3, 4]), Ok("ff01ff02ff03ff0480".to_owned()));
-        assert_eq!(encode(a, [0; 0]), Ok("80".to_owned()));
+        check(a, [1, 2, 3, 4], "ff01ff02ff03ff0480");
+        check(a, [0; 0], "80");
     }
 
     #[test]
     fn test_vec() {
         let a = &mut Allocator::new();
-        assert_eq!(
-            encode(a, vec![1, 2, 3, 4]),
-            Ok("ff01ff02ff03ff0480".to_owned())
-        );
-        assert_eq!(encode(a, vec![0; 0]), Ok("80".to_owned()));
+        check(a, vec![1, 2, 3, 4], "ff01ff02ff03ff0480");
+        check(a, vec![0; 0], "80");
     }
 
     #[test]
     fn test_option() {
         let a = &mut Allocator::new();
-        assert_eq!(encode(a, Some("hello")), Ok("8568656c6c6f".to_owned()));
-        assert_eq!(encode(a, None::<&str>), Ok("80".to_owned()));
-        assert_eq!(encode(a, Some("")), Ok("80".to_owned()));
+        check(a, Some("hello"), "8568656c6c6f");
+        check(a, None::<&str>, "80");
+        check(a, Some(""), "80");
     }
 
     #[test]
     fn test_str() {
         let a = &mut Allocator::new();
-        assert_eq!(encode(a, "hello"), Ok("8568656c6c6f".to_owned()));
-        assert_eq!(encode(a, ""), Ok("80".to_owned()));
+        check(a, "hello", "8568656c6c6f");
+        check(a, "", "80");
     }
 
     #[test]
     fn test_string() {
         let a = &mut Allocator::new();
-        assert_eq!(
-            encode(a, "hello".to_string()),
-            Ok("8568656c6c6f".to_owned())
-        );
-        assert_eq!(encode(a, "".to_string()), Ok("80".to_owned()));
+        check(a, "hello".to_string(), "8568656c6c6f");
+        check(a, "".to_string(), "80");
     }
 }

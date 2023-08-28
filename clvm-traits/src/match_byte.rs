@@ -24,13 +24,13 @@ impl<const BYTE: u8> FromClvm for MatchByte<BYTE> {
             match a.atom(node) {
                 [] if BYTE == 0 => Ok(Self),
                 [byte] if *byte == BYTE && BYTE > 0 => Ok(Self),
-                _ => Err(Error::Custom(format!(
+                _ => Err(Error::msg(format!(
                     "expected an atom with a value of {}",
                     BYTE
                 ))),
             }
         } else {
-            Err(Error::ExpectedAtom(node))
+            Err(Error::msg("expected atom"))
         }
     }
 }

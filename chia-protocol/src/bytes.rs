@@ -95,7 +95,7 @@ impl FromClvm for Bytes {
         if let SExp::Atom = a.sexp(ptr) {
             Ok(Self(a.atom(ptr).to_vec()))
         } else {
-            Err(clvm_traits::Error::ExpectedAtom(ptr))
+            Err(clvm_traits::Error::msg("expected atom"))
         }
     }
 }
@@ -200,10 +200,10 @@ impl<const N: usize> FromClvm for BytesImpl<N> {
         if let SExp::Atom = a.sexp(ptr) {
             return match a.atom(ptr).try_into() {
                 Ok(value) => Ok(value),
-                Err(_) => Err(clvm_traits::Error::ExpectedCons(ptr)),
+                Err(_) => Err(clvm_traits::Error::msg("expected cons")),
             };
         } else {
-            Err(clvm_traits::Error::ExpectedAtom(ptr))
+            Err(clvm_traits::Error::msg("expected atom"))
         }
     }
 }

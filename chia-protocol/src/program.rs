@@ -70,18 +70,13 @@ impl FromJsonDict for Program {
 
 impl FromClvm for Program {
     fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self> {
-        Ok(Self(
-            node_to_bytes(a, ptr)
-                .map_err(|error| clvm_traits::Error::Custom(error.to_string()))?
-                .into(),
-        ))
+        Ok(Self(node_to_bytes(a, ptr)?.into()))
     }
 }
 
 impl ToClvm for Program {
     fn to_clvm(&self, a: &mut Allocator) -> clvm_traits::Result<NodePtr> {
-        Ok(node_from_bytes(a, self.0.as_ref())
-            .map_err(|error| clvm_traits::Error::Custom(error.to_string()))?)
+        Ok(node_from_bytes(a, self.0.as_ref())?)
     }
 }
 

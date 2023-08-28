@@ -15,6 +15,7 @@ features = ["derive"]
 derive = ["dep:clvm-derive"]
 
 [dependencies]
+anyhow = "1.0.75"
 clvm-derive = { version = "0.1.0", path = "../clvm-derive", optional = true }
 clvmr = "0.3.0"
 num-bigint = "0.4.3"
