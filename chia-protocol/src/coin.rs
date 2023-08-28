@@ -1,11 +1,14 @@
 use crate::streamable_struct;
 use crate::{bytes::Bytes32, BytesImpl};
 use chia_streamable_macro::Streamable;
-use clvm_traits::{clvm_list, destructure_list, match_list, FromClvm, ToClvm};
+use clvm_traits::{clvm_list, destructure_list, match_list, ClvmTree, FromClvm, Value};
 use clvmr::allocator::NodePtr;
 use clvmr::Allocator;
 use sha2::{Digest, Sha256};
 use std::convert::TryInto;
+
+#[cfg(test)]
+use clvm_traits::ToClvm;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
@@ -53,9 +56,12 @@ impl Coin {
     }
 }
 
-impl ToClvm for Coin {
-    fn to_clvm(&self, a: &mut Allocator) -> clvm_traits::Result<NodePtr> {
-        clvm_list!(self.parent_coin_info, self.puzzle_hash, self.amount).to_clvm(a)
+impl<N> ClvmTree<N> for Coin {
+    fn collect_tree(
+        &self,
+        f: &mut impl FnMut(Value<N>) -> clvm_traits::Result<N>,
+    ) -> clvm_traits::Result<N> {
+        clvm_list!(self.parent_coin_info, self.puzzle_hash, self.amount).collect_tree(f)
     }
 }
 

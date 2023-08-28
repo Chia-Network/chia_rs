@@ -3,18 +3,14 @@ use clvmr::{
     Allocator,
 };
 
-use crate::{Error, FromClvm, Result, ToClvm};
+use crate::{ClvmTree, Error, FromClvm, Result, Value};
 
 #[derive(Debug, Copy, Clone)]
 pub struct MatchByte<const BYTE: u8>;
 
-impl<const BYTE: u8> ToClvm for MatchByte<BYTE> {
-    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
-        match BYTE {
-            0 => Ok(a.null()),
-            1 => Ok(a.one()),
-            _ => Ok(a.new_number(BYTE.into())?),
-        }
+impl<N, const BYTE: u8> ClvmTree<N> for MatchByte<BYTE> {
+    fn collect_tree(&self, f: &mut impl FnMut(Value<N>) -> Result<N>) -> Result<N> {
+        BYTE.collect_tree(f)
     }
 }
 

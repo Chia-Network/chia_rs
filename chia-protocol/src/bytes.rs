@@ -1,6 +1,6 @@
 use chia_traits::chia_error;
 use chia_traits::{read_bytes, Streamable};
-use clvm_traits::{FromClvm, ToClvm};
+use clvm_traits::{ClvmTree, FromClvm, Value};
 use clvmr::allocator::{NodePtr, SExp};
 use clvmr::Allocator;
 use core::fmt::Formatter;
@@ -11,6 +11,9 @@ use std::fmt;
 use std::fmt::Debug;
 use std::io::Cursor;
 use std::ops::Deref;
+
+#[cfg(test)]
+use clvm_traits::ToClvm;
 
 #[cfg(feature = "py-bindings")]
 use chia_traits::{FromJsonDict, ToJsonDict};
@@ -84,9 +87,12 @@ impl FromJsonDict for Bytes {
     }
 }
 
-impl ToClvm for Bytes {
-    fn to_clvm(&self, a: &mut Allocator) -> clvm_traits::Result<NodePtr> {
-        Ok(a.new_atom(self.0.as_slice())?)
+impl<N> ClvmTree<N> for Bytes {
+    fn collect_tree(
+        &self,
+        f: &mut impl FnMut(Value<N>) -> clvm_traits::Result<N>,
+    ) -> clvm_traits::Result<N> {
+        f(Value::Atom(self.0.as_slice()))
     }
 }
 
@@ -189,9 +195,12 @@ impl<const N: usize> Streamable for BytesImpl<N> {
     }
 }
 
-impl<const N: usize> ToClvm for BytesImpl<N> {
-    fn to_clvm(&self, a: &mut Allocator) -> clvm_traits::Result<NodePtr> {
-        Ok(a.new_atom(self.0.as_slice())?)
+impl<N, const LEN: usize> ClvmTree<N> for BytesImpl<LEN> {
+    fn collect_tree(
+        &self,
+        f: &mut impl FnMut(Value<N>) -> clvm_traits::Result<N>,
+    ) -> clvm_traits::Result<N> {
+        f(Value::Atom(self.0.as_slice()))
     }
 }
 

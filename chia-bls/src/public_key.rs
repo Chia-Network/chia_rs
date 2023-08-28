@@ -2,7 +2,7 @@ use crate::secret_key::is_all_zero;
 use crate::{DerivableKey, Error, Result};
 use blst::*;
 use chia_traits::{read_bytes, Streamable};
-use clvm_traits::{FromClvm, ToClvm};
+use clvm_traits::{ClvmTree, FromClvm, Value};
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use sha2::{digest::FixedOutput, Digest, Sha256};
 use std::fmt;
@@ -10,6 +10,9 @@ use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::mem::MaybeUninit;
 use std::ops::{Add, AddAssign};
+
+#[cfg(test)]
+use clvm_traits::ToClvm;
 
 #[cfg(feature = "py-bindings")]
 use crate::{GTElement, Signature};
@@ -297,9 +300,9 @@ impl FromClvm for PublicKey {
     }
 }
 
-impl ToClvm for PublicKey {
-    fn to_clvm(&self, a: &mut Allocator) -> clvm_traits::Result<NodePtr> {
-        Ok(a.new_atom(&self.to_bytes())?)
+impl<N> ClvmTree<N> for PublicKey {
+    fn collect_tree(&self, f: &mut impl FnMut(Value<N>) -> anyhow::Result<N>) -> anyhow::Result<N> {
+        f(Value::Atom(&self.to_bytes()))
     }
 }
 

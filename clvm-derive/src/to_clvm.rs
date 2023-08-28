@@ -1,4 +1,4 @@
-use proc_macro2::TokenStream;
+use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
 use syn::{parse_quote, Data, DeriveInput, Fields, Index};
 
@@ -48,14 +48,29 @@ pub fn to_clvm(mut ast: DeriveInput) -> TokenStream {
     };
 
     add_trait_bounds(&mut ast.generics, parse_quote!(#crate_name::ToClvm));
+
+    let generic_name = Ident::new("__N", Span::call_site());
+
     let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
+    let mut tokens = quote!(#impl_generics).into_iter().collect::<Vec<_>>();
+    if tokens.len() >= 2 {
+        tokens.remove(0);
+        tokens.remove(tokens.len() - 1);
+    }
+    let mut impl_generics = TokenStream::new();
+    impl_generics.extend(tokens.into_iter());
 
     quote! {
         #[automatically_derived]
-        impl #impl_generics #crate_name::ToClvm for #struct_name #ty_generics #where_clause {
-            fn to_clvm(&self, a: &mut clvmr::Allocator) -> #crate_name::Result<clvmr::allocator::NodePtr> {
+        impl<#generic_name, #impl_generics> #crate_name::ClvmTree<#generic_name>
+        for #struct_name #ty_generics #where_clause {
+            fn collect_tree(
+                &self,
+                f: &mut impl FnMut(#crate_name::Value<#generic_name>)
+                    -> #crate_name::Result<#generic_name>
+            ) -> #crate_name::Result<#generic_name> {
                 let value = #list_macro!( #( &self.#field_names ),* );
-                #crate_name::ToClvm::to_clvm(&value, a)
+                #crate_name::ClvmTree::collect_tree(&value, f)
             }
         }
     }

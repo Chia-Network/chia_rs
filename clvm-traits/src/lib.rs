@@ -44,12 +44,14 @@ mod from_clvm;
 mod macros;
 mod match_byte;
 mod to_clvm;
+mod value;
 
 pub use anyhow::{Error, Result};
 pub use from_clvm::*;
 pub use macros::*;
 pub use match_byte::*;
 pub use to_clvm::*;
+pub use value::*;
 
 #[cfg(test)]
 #[cfg(feature = "derive")]
@@ -58,13 +60,13 @@ mod tests {
 
     use std::fmt;
 
-    use clvmr::{serde::node_to_bytes, Allocator};
+    use clvmr::{allocator::NodePtr, serde::node_to_bytes, Allocator};
 
     use super::*;
 
     fn check<T>(value: T, expected: &str)
     where
-        T: fmt::Debug + PartialEq + ToClvm + FromClvm,
+        T: fmt::Debug + PartialEq + ClvmTree<NodePtr> + FromClvm,
     {
         let a = &mut Allocator::new();
 

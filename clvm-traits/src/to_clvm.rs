@@ -1,22 +1,53 @@
 use clvmr::{allocator::NodePtr, Allocator};
+use num_bigint::BigInt;
 
-use crate::Result;
+use crate::{Result, Value};
+
+pub trait ClvmTree<N> {
+    fn collect_tree(&self, f: &mut impl FnMut(Value<N>) -> Result<N>) -> Result<N>;
+}
 
 pub trait ToClvm {
     fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr>;
 }
 
-impl ToClvm for NodePtr {
-    fn to_clvm(&self, _a: &mut Allocator) -> Result<NodePtr> {
+impl<T> ToClvm for T
+where
+    T: ClvmTree<NodePtr>,
+{
+    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
+        self.collect_tree(&mut |value| {
+            Ok(match value {
+                Value::Atom(atom) => match atom {
+                    [] => a.null(),
+                    [1] => a.one(),
+                    _ => a.new_atom(atom)?,
+                },
+                Value::Pair(first, rest) => a.new_pair(first, rest)?,
+            })
+        })
+    }
+}
+
+impl ClvmTree<NodePtr> for NodePtr {
+    fn collect_tree(
+        &self,
+        _f: &mut impl FnMut(Value<NodePtr>) -> Result<NodePtr>,
+    ) -> Result<NodePtr> {
         Ok(*self)
     }
 }
 
 macro_rules! clvm_primitive {
     ($primitive:ty) => {
-        impl ToClvm for $primitive {
-            fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
-                Ok(a.new_number((*self).into())?)
+        impl<N> ClvmTree<N> for $primitive {
+            fn collect_tree(&self, f: &mut impl FnMut(Value<N>) -> Result<N>) -> Result<N> {
+                if *self == 0 {
+                    f(Value::Atom(&[]))
+                } else {
+                    let value: BigInt = (*self).into();
+                    f(Value::Atom(&value.to_signed_bytes_be()))
+                }
             }
         }
     };
@@ -35,99 +66,99 @@ clvm_primitive!(i128);
 clvm_primitive!(usize);
 clvm_primitive!(isize);
 
-impl<T> ToClvm for &T
+impl<N, T> ClvmTree<N> for &T
 where
-    T: ToClvm,
+    T: ClvmTree<N>,
 {
-    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
-        T::to_clvm(*self, a)
+    fn collect_tree(&self, f: &mut impl FnMut(Value<N>) -> Result<N>) -> Result<N> {
+        T::collect_tree(*self, f)
     }
 }
 
-impl<A, B> ToClvm for (A, B)
+impl<N, A, B> ClvmTree<N> for (A, B)
 where
-    A: ToClvm,
-    B: ToClvm,
+    A: ClvmTree<N>,
+    B: ClvmTree<N>,
 {
-    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
-        let first = self.0.to_clvm(a)?;
-        let rest = self.1.to_clvm(a)?;
-        Ok(a.new_pair(first, rest)?)
+    fn collect_tree(&self, f: &mut impl FnMut(Value<N>) -> Result<N>) -> Result<N> {
+        let first = self.0.collect_tree(f)?;
+        let rest = self.1.collect_tree(f)?;
+        f(Value::Pair(first, rest))
     }
 }
 
-impl ToClvm for () {
-    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
-        Ok(a.null())
+impl<N> ClvmTree<N> for () {
+    fn collect_tree(&self, f: &mut impl FnMut(Value<N>) -> Result<N>) -> Result<N> {
+        f(Value::Atom(&[]))
     }
 }
 
-impl<T> ToClvm for &[T]
+impl<N, T> ClvmTree<N> for &[T]
 where
-    T: ToClvm,
+    T: ClvmTree<N>,
 {
-    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
-        let mut result = a.null();
+    fn collect_tree(&self, f: &mut impl FnMut(Value<N>) -> Result<N>) -> Result<N> {
+        let mut result = ().collect_tree(f)?;
         for item in self.iter().rev() {
-            let value = item.to_clvm(a)?;
-            result = a.new_pair(value, result)?;
+            let value = item.collect_tree(f)?;
+            result = f(Value::Pair(value, result))?;
         }
         Ok(result)
     }
 }
 
-impl<T, const N: usize> ToClvm for [T; N]
+impl<N, T, const LEN: usize> ClvmTree<N> for [T; LEN]
 where
-    T: ToClvm,
+    T: ClvmTree<N>,
 {
-    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
-        self.as_slice().to_clvm(a)
+    fn collect_tree(&self, f: &mut impl FnMut(Value<N>) -> Result<N>) -> Result<N> {
+        self.as_slice().collect_tree(f)
     }
 }
 
-impl<T> ToClvm for Vec<T>
+impl<N, T> ClvmTree<N> for Vec<T>
 where
-    T: ToClvm,
+    T: ClvmTree<N>,
 {
-    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
-        self.as_slice().to_clvm(a)
+    fn collect_tree(&self, f: &mut impl FnMut(Value<N>) -> Result<N>) -> Result<N> {
+        self.as_slice().collect_tree(f)
     }
 }
 
-impl<T> ToClvm for Option<T>
+impl<N, T> ClvmTree<N> for Option<T>
 where
-    T: ToClvm,
+    T: ClvmTree<N>,
 {
-    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
+    fn collect_tree(&self, f: &mut impl FnMut(Value<N>) -> Result<N>) -> Result<N> {
         match self {
-            Some(value) => value.to_clvm(a),
-            None => Ok(a.null()),
+            Some(value) => value.collect_tree(f),
+            None => ().collect_tree(f),
         }
     }
 }
 
-impl ToClvm for &str {
-    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
-        Ok(a.new_atom(self.as_bytes())?)
+impl<N> ClvmTree<N> for &str {
+    fn collect_tree(&self, f: &mut impl FnMut(Value<N>) -> Result<N>) -> Result<N> {
+        f(Value::Atom(self.as_bytes()))
     }
 }
 
-impl ToClvm for String {
-    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
-        self.as_str().to_clvm(a)
+impl<N> ClvmTree<N> for String {
+    fn collect_tree(&self, f: &mut impl FnMut(Value<N>) -> Result<N>) -> Result<N> {
+        self.as_str().collect_tree(f)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use clvmr::serde::node_to_bytes;
+    use clvmr::{serde::node_to_bytes, Allocator};
     use hex::ToHex;
 
     use super::*;
 
     fn encode<T>(a: &mut Allocator, value: T) -> Result<String>
     where
-        T: ToClvm,
+        T: ClvmTree<NodePtr>,
     {
         let actual = value.to_clvm(a).unwrap();
         let actual_bytes = node_to_bytes(a, actual).unwrap();
@@ -136,7 +167,7 @@ mod tests {
 
     fn check<T>(a: &mut Allocator, value: T, hex: &str)
     where
-        T: ToClvm,
+        T: ClvmTree<NodePtr>,
     {
         let result = encode(a, value).unwrap();
         assert_eq!(result, hex);

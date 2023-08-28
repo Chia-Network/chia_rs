@@ -1,16 +1,16 @@
 use clvm_traits::{
-    clvm_list, clvm_quote, destructure_list, destructure_quote, match_list, match_quote, FromClvm,
-    MatchByte, Result, ToClvm,
+    clvm_list, clvm_quote, destructure_list, destructure_quote, match_list, match_quote, ClvmTree,
+    FromClvm, MatchByte, Result, Value,
 };
 use clvmr::{allocator::NodePtr, Allocator};
 
 #[derive(Debug, Clone)]
-pub struct CurriedProgram<T> {
-    pub program: NodePtr,
+pub struct CurriedProgram<N, T> {
+    pub program: N,
     pub args: T,
 }
 
-impl<T> FromClvm for CurriedProgram<T>
+impl<T> FromClvm for CurriedProgram<NodePtr, T>
 where
     T: FromClvm,
 {
@@ -22,12 +22,13 @@ where
     }
 }
 
-impl<T> ToClvm for CurriedProgram<T>
+impl<N, T> ClvmTree<N> for CurriedProgram<N, T>
 where
-    T: ToClvm,
+    N: ClvmTree<N>,
+    T: ClvmTree<N>,
 {
-    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
-        clvm_list!(2, clvm_quote!(self.program), self.args.to_clvm(a)?).to_clvm(a)
+    fn collect_tree(&self, f: &mut impl FnMut(Value<N>) -> Result<N>) -> Result<N> {
+        clvm_list!(2, clvm_quote!(&self.program), self.args.collect_tree(f)?).collect_tree(f)
     }
 }
 
@@ -35,28 +36,30 @@ where
 mod tests {
     use std::fmt::Debug;
 
-    use clvm_traits::clvm_curried_args;
+    use clvm_traits::{clvm_curried_args, ToClvm};
     use clvmr::serde::node_to_bytes;
 
     use super::*;
 
     fn check<T, A>(program: T, args: A, expected: &str)
     where
-        T: Debug + ToClvm + PartialEq + FromClvm,
-        A: Debug + Clone + PartialEq + ToClvm + FromClvm,
+        T: Debug + ClvmTree<NodePtr> + PartialEq + FromClvm,
+        A: Debug + PartialEq + ClvmTree<NodePtr> + FromClvm,
     {
         let a = &mut Allocator::new();
 
+        let program_ptr = program.to_clvm(a).unwrap();
+
         let curry = CurriedProgram {
-            program: program.to_clvm(a).unwrap(),
-            args: args.clone(),
+            program: program_ptr,
+            args: &args,
         }
         .to_clvm(a)
         .unwrap();
         let actual = node_to_bytes(a, curry).unwrap();
         assert_eq!(hex::encode(actual), expected);
 
-        let curried = CurriedProgram::<A>::from_clvm(a, curry).unwrap();
+        let curried = CurriedProgram::<_, A>::from_clvm(a, curry).unwrap();
         let round_program = T::from_clvm(a, curried.program).unwrap();
         assert_eq!(round_program, program);
         assert_eq!(curried.args, args);

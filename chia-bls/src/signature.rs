@@ -1,7 +1,7 @@
 use crate::{Error, GTElement, PublicKey, Result, SecretKey};
 use blst::*;
 use chia_traits::{read_bytes, Streamable};
-use clvm_traits::{FromClvm, ToClvm};
+use clvm_traits::{ClvmTree, FromClvm, Value};
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use sha2::{Digest, Sha256};
 use std::borrow::Borrow;
@@ -11,6 +11,9 @@ use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::mem::MaybeUninit;
 use std::ops::{Add, AddAssign};
+
+#[cfg(test)]
+use clvm_traits::ToClvm;
 
 #[cfg(feature = "py-bindings")]
 use crate::public_key::parse_hex_string;
@@ -202,9 +205,9 @@ impl FromClvm for Signature {
     }
 }
 
-impl ToClvm for Signature {
-    fn to_clvm(&self, a: &mut Allocator) -> clvm_traits::Result<NodePtr> {
-        Ok(a.new_atom(&self.to_bytes())?)
+impl<N> ClvmTree<N> for Signature {
+    fn collect_tree(&self, f: &mut impl FnMut(Value<N>) -> anyhow::Result<N>) -> anyhow::Result<N> {
+        f(Value::Atom(&self.to_bytes()))
     }
 }
 
