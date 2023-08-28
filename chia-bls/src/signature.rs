@@ -1,6 +1,8 @@
-use crate::{Error, PublicKey, Result, SecretKey};
+use crate::{Error, GTElement, PublicKey, Result, SecretKey};
 use blst::*;
 use chia_traits::{read_bytes, Streamable};
+use clvm_traits::{FromClvm, ToClvm};
+use clvmr::allocator::{Allocator, NodePtr, SExp};
 use sha2::{Digest, Sha256};
 use std::borrow::Borrow;
 use std::convert::AsRef;
@@ -10,14 +12,30 @@ use std::io::Cursor;
 use std::mem::MaybeUninit;
 use std::ops::{Add, AddAssign};
 
+#[cfg(feature = "py-bindings")]
+use crate::public_key::parse_hex_string;
+#[cfg(feature = "py-bindings")]
+use chia_py_streamable_macro::PyStreamable;
+#[cfg(feature = "py-bindings")]
+use chia_traits::from_json_dict::FromJsonDict;
+#[cfg(feature = "py-bindings")]
+use chia_traits::to_json_dict::ToJsonDict;
+#[cfg(feature = "py-bindings")]
+use pyo3::{pyclass, pymethods, IntoPy, PyAny, PyObject, PyResult, Python};
+
 // we use the augmented scheme
 pub const DST: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_AUG_";
 
+#[cfg_attr(
+    feature = "py-bindings",
+    pyclass(name = "G2Element"),
+    derive(PyStreamable)
+)]
 #[derive(Clone)]
 pub struct Signature(pub(crate) blst_p2);
 
 impl Signature {
-    pub fn from_bytes(buf: &[u8; 96]) -> Result<Self> {
+    pub fn from_bytes_unchecked(buf: &[u8; 96]) -> Result<Self> {
         let p2 = unsafe {
             let mut p2_affine = MaybeUninit::<blst_p2_affine>::uninit();
             let ret = blst_p2_uncompress(p2_affine.as_mut_ptr(), buf as *const u8);
@@ -28,7 +46,11 @@ impl Signature {
             blst_p2_from_affine(p2.as_mut_ptr(), &p2_affine.assume_init());
             p2.assume_init()
         };
-        let ret = Self(p2);
+        Ok(Self(p2))
+    }
+
+    pub fn from_bytes(buf: &[u8; 96]) -> Result<Self> {
+        let ret = Self::from_bytes_unchecked(buf)?;
         if !ret.is_valid() {
             Err(Error::InvalidSignature(BLST_ERROR::BLST_POINT_NOT_ON_CURVE))
         } else {
@@ -54,6 +76,22 @@ impl Signature {
         // Infinity was considered a valid G2Element in older Relic versions
         // For historical compatibililty this behavior is maintained.
         unsafe { blst_p2_is_inf(&self.0) || blst_p2_in_g2(&self.0) }
+    }
+
+    pub fn pair(&self, other: &PublicKey) -> GTElement {
+        let ans = unsafe {
+            let mut ans = MaybeUninit::<blst_fp12>::uninit();
+            let mut aff1 = MaybeUninit::<blst_p1_affine>::uninit();
+            let mut aff2 = MaybeUninit::<blst_p2_affine>::uninit();
+
+            blst_p1_to_affine(aff1.as_mut_ptr(), &other.0);
+            blst_p2_to_affine(aff2.as_mut_ptr(), &self.0);
+
+            blst_miller_loop(ans.as_mut_ptr(), &aff2.assume_init(), &aff1.assume_init());
+            blst_final_exp(ans.as_mut_ptr(), ans.as_ptr());
+            ans.assume_init()
+        };
+        GTElement(ans)
     }
 }
 
@@ -129,6 +167,89 @@ impl Add<&Signature> for &Signature {
             ret.assume_init()
         };
         Signature(p1)
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+impl ToJsonDict for Signature {
+    fn to_json_dict(&self, py: Python) -> pyo3::PyResult<PyObject> {
+        let bytes = self.to_bytes();
+        Ok(("0x".to_string() + &hex::encode(bytes)).into_py(py))
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+impl FromJsonDict for Signature {
+    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+        Ok(Self::from_bytes(
+            parse_hex_string(o, 96, "Signature")?
+                .as_slice()
+                .try_into()
+                .unwrap(),
+        )?)
+    }
+}
+
+impl FromClvm for Signature {
+    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self> {
+        let blob = match a.sexp(ptr) {
+            SExp::Atom => a.atom(ptr),
+            _ => {
+                return Err(clvm_traits::Error::ExpectedAtom(ptr));
+            }
+        };
+        Self::from_bytes(
+            blob.try_into()
+                .map_err(|_error| clvm_traits::Error::Custom("invalid size".to_string()))?,
+        )
+        .map_err(|error| clvm_traits::Error::Custom(error.to_string()))
+    }
+}
+
+impl ToClvm for Signature {
+    fn to_clvm(&self, a: &mut Allocator) -> clvm_traits::Result<NodePtr> {
+        Ok(a.new_atom(&self.to_bytes())?)
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+#[cfg_attr(feature = "py-bindings", pymethods)]
+impl Signature {
+    #[classattr]
+    const SIZE: usize = 96;
+
+    #[new]
+    pub fn init() -> Self {
+        Self::default()
+    }
+
+    #[staticmethod]
+    #[pyo3(name = "from_bytes_unchecked")]
+    pub fn py_from_bytes_unchecked(bytes: [u8; Self::SIZE]) -> Result<Signature> {
+        Self::from_bytes_unchecked(&bytes)
+    }
+
+    #[pyo3(name = "pair")]
+    pub fn py_pair(&self, other: &PublicKey) -> GTElement {
+        self.pair(other)
+    }
+
+    #[staticmethod]
+    pub fn generator() -> Self {
+        unsafe { Self(*blst_p2_generator()) }
+    }
+
+    pub fn __repr__(&self) -> String {
+        let bytes = self.to_bytes();
+        format!("<G2Element {}>", &hex::encode(bytes))
+    }
+
+    pub fn __add__(&self, rhs: &Self) -> Self {
+        self + rhs
+    }
+
+    pub fn __iadd__(&mut self, rhs: &Self) {
+        *self += rhs;
     }
 }
 
@@ -263,15 +384,16 @@ where
     }
 }
 
-pub fn sign<Msg: AsRef<[u8]>>(sk: &SecretKey, msg: Msg) -> Signature {
-    let mut aug_msg = sk.public_key().to_bytes().to_vec();
-    aug_msg.extend_from_slice(msg.as_ref());
+// Signs msg using sk without augmenting the message with the public key. This
+// function is used when the caller augments the message with some other public
+// key
+pub fn sign_raw<Msg: AsRef<[u8]>>(sk: &SecretKey, msg: Msg) -> Signature {
     let p2 = unsafe {
         let mut p2 = MaybeUninit::<blst_p2>::uninit();
         blst_hash_to_g2(
             p2.as_mut_ptr(),
-            aug_msg.as_ptr(),
-            aug_msg.len(),
+            msg.as_ref().as_ptr(),
+            msg.as_ref().len(),
             DST.as_ptr(),
             DST.len(),
             std::ptr::null(),
@@ -283,11 +405,26 @@ pub fn sign<Msg: AsRef<[u8]>>(sk: &SecretKey, msg: Msg) -> Signature {
     Signature(p2)
 }
 
+pub fn sign<Msg: AsRef<[u8]>>(sk: &SecretKey, msg: Msg) -> Signature {
+    let mut aug_msg = sk.public_key().to_bytes().to_vec();
+    aug_msg.extend_from_slice(msg.as_ref());
+    sign_raw(sk, aug_msg)
+}
+
 #[cfg(test)]
 use rand::{Rng, SeedableRng};
 
 #[cfg(test)]
 use rand::rngs::StdRng;
+
+#[test]
+#[cfg(feature = "py-bindings")]
+fn test_generator() {
+    assert_eq!(
+        hex::encode(&Signature::generator().to_bytes()),
+        "93e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb8"
+    );
+}
 
 #[test]
 fn test_from_bytes() {
@@ -764,4 +901,73 @@ fn test_debug() {
     data[0] = 0xc0;
     let sig = Signature::from_bytes(&data).unwrap();
     assert_eq!(format!("{:?}", sig), hex::encode(data));
+}
+
+#[test]
+fn test_to_from_clvm() {
+    let mut a = Allocator::new();
+    let bytes = hex::decode("b45825c0ee7759945c0189b4c38b7e54231ebadc83a851bec3bb7cf954a124ae0cc8e8e5146558332ea152f63bf8846e04826185ef60e817f271f8d500126561319203f9acb95809ed20c193757233454be1562a5870570941a84605bd2c9c9a").expect("hex::decode()");
+    let ptr = a.new_atom(&bytes).expect("new_atom");
+
+    let sig = Signature::from_clvm(&a, ptr).expect("from_clvm");
+    assert_eq!(&sig.to_bytes()[..], &bytes[..]);
+
+    let sig_ptr = sig.to_clvm(&mut a).expect("to_clvm");
+    assert!(a.atom_eq(sig_ptr, ptr));
+}
+
+#[test]
+fn test_from_clvm_failure() {
+    let mut a = Allocator::new();
+    let ptr = a.new_pair(a.one(), a.one()).expect("new_pair");
+    assert_eq!(
+        Signature::from_clvm(&a, ptr).unwrap_err(),
+        clvm_traits::Error::ExpectedAtom(ptr)
+    );
+}
+
+#[cfg(test)]
+#[cfg(feature = "py-bindings")]
+mod pytests {
+
+    use super::*;
+    use rstest::rstest;
+
+    #[test]
+    fn test_json_dict_roundtrip() {
+        pyo3::prepare_freethreaded_python();
+        let mut rng = StdRng::seed_from_u64(1337);
+        let mut data = [0u8; 32];
+        let mut msg = [0u8; 10];
+        for _i in 0..50 {
+            rng.fill(data.as_mut_slice());
+            rng.fill(msg.as_mut_slice());
+            let sk = SecretKey::from_seed(&data);
+            let sig = sign(&sk, msg);
+            let ret = Python::with_gil(|py| -> PyResult<()> {
+                let string = sig.to_json_dict(py)?;
+                let sig2 = Signature::from_json_dict(string.as_ref(py)).unwrap();
+                assert_eq!(sig, sig2);
+                Ok(())
+            });
+            assert!(ret.is_ok())
+        }
+    }
+
+    #[rstest]
+    #[case("0x000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0ff000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e", "Signature, invalid length 95 expected 96")]
+    #[case("0x000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0ff000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f00", "Signature, invalid length 97 expected 96")]
+    #[case("000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0ff000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e", "Signature, invalid length 95 expected 96")]
+    #[case("000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0ff000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f00", "Signature, invalid length 97 expected 96")]
+    #[case("00r102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0ff000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f", "invalid hex")]
+    fn test_json_dict(#[case] input: &str, #[case] msg: &str) {
+        pyo3::prepare_freethreaded_python();
+        let ret = Python::with_gil(|py| -> PyResult<()> {
+            let err =
+                Signature::from_json_dict(input.to_string().into_py(py).as_ref(py)).unwrap_err();
+            assert_eq!(err.value(py).to_string(), msg.to_string());
+            Ok(())
+        });
+        assert!(ret.is_ok())
+    }
 }

@@ -24,17 +24,20 @@ def print_class(f: Any, name: str, members: List[str], extra: Optional[List[str]
     # f-strings don't allow backslashes, which makes it a bit tricky to
     # manipulate strings with newlines
     nl = "\n"
-    extra_members = None
+    def add_indent(x):
+        return '\n    ' + x
+
+    init_args = ''.join([(',\n        ' + transform_type(x)) for x in members])
+
     if extra is not None:
-        extra_members = ''.join(map(lambda x: '\n    ' + x, extra));
+        members.extend(extra)
+    members = ''.join(map(add_indent, members));
 
     f.write(
         f"""
-class {name}:
-    {(nl + '    ').join(members)}{extra_members if extra else ''}
+class {name}:{members}
     def __init__(
-        self,
-        {(',' + nl + '        ').join(map(transform_type, members))}
+        self{init_args}
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __str__(self) -> str: ...
@@ -205,8 +208,64 @@ class LazyNode:
 def serialized_length(program: ReadableBuffer) -> int: ...
 def tree_hash(program: ReadableBuffer) -> bytes32: ...
 def get_puzzle_and_solution_for_coin(program: ReadableBuffer, args: ReadableBuffer, max_cost: int, find_parent: bytes32, find_amount: int, find_ph: bytes32, flags: int) -> Tuple[bytes, bytes]: ...
+
+class AugSchemeMPL:
+    @staticmethod
+    def sign(pk: PrivateKey, msg: bytes, prepend_pk: G1Element = None) -> G2Element: ...
+    @staticmethod
+    def aggregate(sigs: Sequence[G2Element]) -> G2Element: ...
+    @staticmethod
+    def verify(pk: G1Element, msg: bytes, sig: G2Element) -> bool: ...
+    @staticmethod
+    def aggregate_verify(pks: Sequence[G1Element], msgs: Sequence[bytes], sig: G2Element) -> bool: ...
+    @staticmethod
+    def key_gen(seed: bytes) -> PrivateKey: ...
+    @staticmethod
+    def g2_from_message(msg: bytes) -> G2Element: ...
+    @staticmethod
+    def derive_child_sk(pk: PrivateKey, index: int) -> PrivateKey: ...
+    @staticmethod
+    def derive_child_sk_unhardened(pk: PrivateKey, index: int) -> PrivateKey: ...
+    @staticmethod
+    def derive_child_pk_unhardened(pk: PublicKey, index: int) -> PublicKey: ...
 """
     )
+
+    print_class(f, "G1Element", [], [
+        "SIZE: ClassVar[int] = ...",
+        "def __new__(cls) -> G1Element: ...",
+        "def get_fingerprint(self) -> int: ...",
+        "def pair(self, other: G2Element) -> GTElement: ...",
+        "@staticmethod",
+        "def from_bytes_unchecked(b: bytes) -> G1Element: ...",
+        "@staticmethod",
+        "def generator() -> G1Element: ...",
+        "def __add__(self, other: G1Element) -> G1Element: ...",
+        "def __iadd__(self, other: G1Element) -> G1Element: ...",
+    ])
+    print_class(f, "G2Element", [], [
+        "SIZE: ClassVar[int] = ...",
+        "def __new__(cls) -> G2Element: ...",
+        "@staticmethod",
+        "def from_bytes_unchecked(b: bytes) -> G2Element: ...",
+        "def pair(self, other: G1Element) -> GTElement: ...",
+        "@staticmethod",
+        "def generator() -> G2Element: ...",
+        "def __add__(self, other: G2Element) -> G2Element: ...",
+        "def __iadd__(self, other: G2Element) -> G2Element: ...",
+        ])
+    print_class(f, "GTElement", [], [
+        "SIZE: ClassVar[int] = ...",
+        "@staticmethod",
+        "def from_bytes_unchecked(b: bytes) -> GTElement: ...",
+        "def __mul__(self, rhs: GTElement) -> GTElement: ...",
+        "def __imul__(self, rhs: GTElement) -> GTElement : ...",
+        ])
+    print_class(f, "PrivateKey", [], [
+        "PRIVATE_KEY_SIZE: ClassVar[int] = ...",
+        "def sign_g2(self, msg: bytes, dst: bytes) -> G2Element: ...",
+        "def get_g1(self) -> G1Element: ...",
+        ])
 
     print_class(f, "Spend",
         [
