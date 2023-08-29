@@ -31,7 +31,7 @@ pub const DST: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_AUG_";
     pyclass(name = "G2Element"),
     derive(PyStreamable)
 )]
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Signature(pub(crate) blst_p2);
 
 impl Signature {
@@ -92,15 +92,6 @@ impl Signature {
             ans.assume_init()
         };
         GTElement(ans)
-    }
-}
-
-impl Default for Signature {
-    fn default() -> Self {
-        unsafe {
-            let p2 = MaybeUninit::<blst_p2>::zeroed();
-            Self(p2.assume_init())
-        }
     }
 }
 

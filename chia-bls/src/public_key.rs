@@ -27,7 +27,7 @@ use pyo3::{pyclass, pymethods, IntoPy, PyAny, PyObject, PyResult, Python};
     pyclass(name = "G1Element"),
     derive(PyStreamable)
 )]
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct PublicKey(pub(crate) blst_p1);
 
 impl PublicKey {
@@ -168,15 +168,6 @@ impl Streamable for PublicKey {
 impl Hash for PublicKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         state.write(&self.to_bytes())
-    }
-}
-
-impl Default for PublicKey {
-    fn default() -> Self {
-        unsafe {
-            let p1 = MaybeUninit::<blst_p1>::zeroed();
-            Self(p1.assume_init())
-        }
     }
 }
 
