@@ -356,26 +356,26 @@ def test_coin_get_hash() -> None:
 
 def test_g1_element() -> None:
 
-    a = G1Element.from_bytes(b"abcdefghijklmnopqrstuvwxabcdefghijklmnopqrstuvwx")
+    a = G1Element.from_bytes(bytes.fromhex("a24d88ce995cea579675377728938eeb3956d5da608414efc9064774dc9653764edeb4823fc8da22c810917bf389c127"))
     b = bytes(a)
-    assert b == b"abcdefghijklmnopqrstuvwxabcdefghijklmnopqrstuvwx"
+    assert b == bytes.fromhex("a24d88ce995cea579675377728938eeb3956d5da608414efc9064774dc9653764edeb4823fc8da22c810917bf389c127")
     c = G1Element.from_bytes(b)
     assert a == c
 
-    assert a.to_json_dict() == "0x6162636465666768696a6b6c6d6e6f7071727374757677786162636465666768696a6b6c6d6e6f707172737475767778"
+    assert a.to_json_dict() == "0xa24d88ce995cea579675377728938eeb3956d5da608414efc9064774dc9653764edeb4823fc8da22c810917bf389c127"
 
-    d = G1Element.from_json_dict("0x6162636465666768696a6b6c6d6e6f7071727374757677786162636465666768696a6b6c6d6e6f707172737475767778")
+    d = G1Element.from_json_dict("0xa24d88ce995cea579675377728938eeb3956d5da608414efc9064774dc9653764edeb4823fc8da22c810917bf389c127")
     assert d == a
 
 def test_g2_element() -> None:
 
-    a = G2Element.from_bytes(b"abcdefghijklmnopqrstuvwxabcdefghijklmnopqrstuvwxabcdefghijklmnopqrstuvwxabcdefghijklmnopqrstuvwx")
+    a = G2Element.from_bytes(bytes.fromhex("a566b4d972db20765c668ce7fdcd76a4a5a8201dc2d5b1e747e2993fcdd99c8c96c1ca0503ade72809ae6d19c5e8400e10900a24ae56b7c9c84231ed5b7dd4c0790dd1aef56e0820e86994aa02c33bd409d3f17ace74c7fa40b00fe5022cc6d6"))
     b = bytes(a)
-    assert b == b"abcdefghijklmnopqrstuvwxabcdefghijklmnopqrstuvwxabcdefghijklmnopqrstuvwxabcdefghijklmnopqrstuvwx"
+    assert b == bytes.fromhex("a566b4d972db20765c668ce7fdcd76a4a5a8201dc2d5b1e747e2993fcdd99c8c96c1ca0503ade72809ae6d19c5e8400e10900a24ae56b7c9c84231ed5b7dd4c0790dd1aef56e0820e86994aa02c33bd409d3f17ace74c7fa40b00fe5022cc6d6")
     c = G2Element.from_bytes(b)
     assert a == c
 
-    assert a.to_json_dict() == "0x6162636465666768696a6b6c6d6e6f7071727374757677786162636465666768696a6b6c6d6e6f7071727374757677786162636465666768696a6b6c6d6e6f7071727374757677786162636465666768696a6b6c6d6e6f707172737475767778"
+    assert a.to_json_dict() == "0xa566b4d972db20765c668ce7fdcd76a4a5a8201dc2d5b1e747e2993fcdd99c8c96c1ca0503ade72809ae6d19c5e8400e10900a24ae56b7c9c84231ed5b7dd4c0790dd1aef56e0820e86994aa02c33bd409d3f17ace74c7fa40b00fe5022cc6d6"
 
-    d = G2Element.from_json_dict("0x6162636465666768696a6b6c6d6e6f7071727374757677786162636465666768696a6b6c6d6e6f7071727374757677786162636465666768696a6b6c6d6e6f7071727374757677786162636465666768696a6b6c6d6e6f707172737475767778")
+    d = G2Element.from_json_dict("0xa566b4d972db20765c668ce7fdcd76a4a5a8201dc2d5b1e747e2993fcdd99c8c96c1ca0503ade72809ae6d19c5e8400e10900a24ae56b7c9c84231ed5b7dd4c0790dd1aef56e0820e86994aa02c33bd409d3f17ace74c7fa40b00fe5022cc6d6")
     assert a == d

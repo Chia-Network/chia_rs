@@ -256,9 +256,13 @@ dependencies = [
  "anyhow",
  "blst",
  "chia-traits",
+ "chia_py_streamable_macro",
+ "clvm-traits",
+ "clvmr",
  "criterion",
  "hex",
  "hkdf",
+ "pyo3",
  "rand",
  "rstest 0.17.0",
  "sha2 0.9.9",
@@ -294,6 +298,7 @@ dependencies = [
 name = "chia-protocol"
 version = "0.2.7"
 dependencies = [
+ "chia-bls",
  "chia-traits",
  "chia_py_streamable_macro",
  "chia_streamable_macro",

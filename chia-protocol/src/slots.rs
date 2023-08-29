@@ -2,10 +2,10 @@ use crate::streamable_struct;
 use chia_streamable_macro::Streamable;
 
 use crate::Bytes32;
-use crate::G2Element;
 use crate::ProofOfSpace;
 use crate::VDFInfo;
 use crate::VDFProof;
+use chia_bls::G2Element;
 
 // The hash of this is used as the challenge_hash for the ICC VDF
 streamable_struct! (ChallengeBlockInfo {

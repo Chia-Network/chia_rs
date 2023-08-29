@@ -2,6 +2,8 @@ use crate::secret_key::is_all_zero;
 use crate::{DerivableKey, Error, Result};
 use blst::*;
 use chia_traits::{read_bytes, Streamable};
+use clvm_traits::{FromClvm, ToClvm};
+use clvmr::allocator::{Allocator, NodePtr, SExp};
 use sha2::{digest::FixedOutput, Digest, Sha256};
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -9,11 +11,27 @@ use std::io::Cursor;
 use std::mem::MaybeUninit;
 use std::ops::{Add, AddAssign};
 
+#[cfg(feature = "py-bindings")]
+use crate::{GTElement, Signature};
+#[cfg(feature = "py-bindings")]
+use chia_py_streamable_macro::PyStreamable;
+#[cfg(feature = "py-bindings")]
+use chia_traits::from_json_dict::FromJsonDict;
+#[cfg(feature = "py-bindings")]
+use chia_traits::to_json_dict::ToJsonDict;
+#[cfg(feature = "py-bindings")]
+use pyo3::{pyclass, pymethods, IntoPy, PyAny, PyObject, PyResult, Python};
+
+#[cfg_attr(
+    feature = "py-bindings",
+    pyclass(name = "G1Element"),
+    derive(PyStreamable)
+)]
 #[derive(Clone)]
 pub struct PublicKey(pub(crate) blst_p1);
 
 impl PublicKey {
-    pub fn from_bytes(bytes: &[u8; 48]) -> Result<Self> {
+    pub fn from_bytes_unchecked(bytes: &[u8; 48]) -> Result<Self> {
         // check if the element is canonical
         // the first 3 bits have special meaning
         let zeros_only = is_all_zero(&bytes[1..]);
@@ -44,7 +62,11 @@ impl PublicKey {
             blst_p1_from_affine(p1.as_mut_ptr(), &p1_affine.assume_init());
             p1.assume_init()
         };
-        let ret = Self(p1);
+        Ok(Self(p1))
+    }
+
+    pub fn from_bytes(bytes: &[u8; 48]) -> Result<Self> {
+        let ret = Self::from_bytes_unchecked(bytes)?;
         if !ret.is_valid() {
             Err(Error::InvalidPublicKey(BLST_ERROR::BLST_POINT_NOT_ON_CURVE))
         } else {
@@ -71,6 +93,51 @@ impl PublicKey {
         hasher.update(self.to_bytes());
         let hash: [u8; 32] = hasher.finalize_fixed().into();
         u32::from_be_bytes(hash[0..4].try_into().unwrap())
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+#[cfg_attr(feature = "py-bindings", pymethods)]
+impl PublicKey {
+    #[classattr]
+    const SIZE: usize = 48;
+
+    #[new]
+    pub fn init() -> Self {
+        Self::default()
+    }
+
+    #[staticmethod]
+    #[pyo3(name = "from_bytes_unchecked")]
+    fn py_from_bytes_unchecked(bytes: [u8; Self::SIZE]) -> Result<Self> {
+        Self::from_bytes_unchecked(&bytes)
+    }
+
+    #[staticmethod]
+    pub fn generator() -> Self {
+        unsafe { Self(*blst_p1_generator()) }
+    }
+
+    pub fn pair(&self, other: &Signature) -> GTElement {
+        other.pair(self)
+    }
+
+    #[pyo3(name = "get_fingerprint")]
+    pub fn py_get_fingerprint(&self) -> u32 {
+        self.get_fingerprint()
+    }
+
+    pub fn __repr__(&self) -> String {
+        let bytes = self.to_bytes();
+        format!("<G1Element {}>", &hex::encode(bytes))
+    }
+
+    pub fn __add__(&self, rhs: &Self) -> Self {
+        self + rhs
+    }
+
+    pub fn __iadd__(&mut self, rhs: &Self) {
+        *self += rhs;
     }
 }
 
@@ -149,6 +216,49 @@ impl fmt::Debug for PublicKey {
     }
 }
 
+#[cfg(feature = "py-bindings")]
+impl ToJsonDict for PublicKey {
+    fn to_json_dict(&self, py: Python) -> pyo3::PyResult<PyObject> {
+        let bytes = self.to_bytes();
+        Ok(("0x".to_string() + &hex::encode(bytes)).into_py(py))
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+pub fn parse_hex_string(o: &PyAny, len: usize, name: &str) -> PyResult<Vec<u8>> {
+    use pyo3::exceptions::PyValueError;
+    let s: String = o.extract()?;
+    let s = if s.starts_with("0x") { &s[2..] } else { &s[..] };
+    let buf = match hex::decode(s) {
+        Err(_) => {
+            return Err(PyValueError::new_err("invalid hex"));
+        }
+        Ok(v) => v,
+    };
+    if buf.len() != len {
+        Err(PyValueError::new_err(format!(
+            "{}, invalid length {} expected {}",
+            name,
+            buf.len(),
+            len
+        )))
+    } else {
+        Ok(buf)
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+impl FromJsonDict for PublicKey {
+    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+        Ok(Self::from_bytes(
+            parse_hex_string(o, 48, "PublicKey")?
+                .as_slice()
+                .try_into()
+                .unwrap(),
+        )?)
+    }
+}
+
 impl DerivableKey for PublicKey {
     fn derive_unhardened(&self, idx: u32) -> Self {
         let mut hasher = Sha256::new();
@@ -175,6 +285,28 @@ impl DerivableKey for PublicKey {
     }
 }
 
+impl FromClvm for PublicKey {
+    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self> {
+        let blob = match a.sexp(ptr) {
+            SExp::Atom => a.atom(ptr),
+            _ => {
+                return Err(clvm_traits::Error::ExpectedAtom(ptr));
+            }
+        };
+        Self::from_bytes(
+            blob.try_into()
+                .map_err(|_error| clvm_traits::Error::Custom("invalid size".to_string()))?,
+        )
+        .map_err(|error| clvm_traits::Error::Custom(error.to_string()))
+    }
+}
+
+impl ToClvm for PublicKey {
+    fn to_clvm(&self, a: &mut Allocator) -> clvm_traits::Result<NodePtr> {
+        Ok(a.new_atom(&self.to_bytes())?)
+    }
+}
+
 #[cfg(test)]
 use hex::FromHex;
 
@@ -194,6 +326,15 @@ fn test_derive_unhardened() {
         let derived_pk = pk.derive_unhardened(idx as u32);
         assert_eq!(derived_pk.to_bytes(), derived_sk.public_key().to_bytes());
     }
+}
+
+#[test]
+#[cfg(feature = "py-bindings")]
+fn test_generator() {
+    assert_eq!(
+        hex::encode(&PublicKey::generator().to_bytes()),
+        "97f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb"
+    );
 }
 
 #[cfg(test)]
@@ -353,4 +494,71 @@ fn test_debug() {
     data[0] = 0xc0;
     let pk = PublicKey::from_bytes(&data).unwrap();
     assert_eq!(format!("{:?}", pk), hex::encode(data));
+}
+
+#[test]
+fn test_to_from_clvm() {
+    let mut a = Allocator::new();
+    let bytes = hex::decode("997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2").expect("hex::decode()");
+    let ptr = a.new_atom(&bytes).expect("new_atom");
+
+    let pk = PublicKey::from_clvm(&a, ptr).expect("from_clvm");
+    assert_eq!(&pk.to_bytes()[..], &bytes[..]);
+
+    let pk_ptr = pk.to_clvm(&mut a).expect("to_clvm");
+    assert!(a.atom_eq(pk_ptr, ptr));
+}
+
+#[test]
+fn test_from_clvm_failure() {
+    let mut a = Allocator::new();
+    let ptr = a.new_pair(a.one(), a.one()).expect("new_pair");
+    assert_eq!(
+        PublicKey::from_clvm(&a, ptr).unwrap_err(),
+        clvm_traits::Error::ExpectedAtom(ptr)
+    );
+}
+
+#[cfg(test)]
+#[cfg(feature = "py-bindings")]
+mod pytests {
+
+    use super::*;
+    use rstest::rstest;
+
+    #[test]
+    fn test_json_dict_roundtrip() {
+        pyo3::prepare_freethreaded_python();
+        let mut rng = StdRng::seed_from_u64(1337);
+        let mut data = [0u8; 32];
+        for _i in 0..50 {
+            rng.fill(data.as_mut_slice());
+            let sk = SecretKey::from_seed(&data);
+            let pk = sk.public_key();
+            let ret = Python::with_gil(|py| -> PyResult<()> {
+                let string = pk.to_json_dict(py)?;
+                let pk2 = PublicKey::from_json_dict(string.as_ref(py)).unwrap();
+                assert_eq!(pk, pk2);
+                Ok(())
+            });
+            assert!(ret.is_ok())
+        }
+    }
+
+    #[rstest]
+    #[case("0x000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e", "PublicKey, invalid length 47 expected 48")]
+    #[case("0x000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f00", "PublicKey, invalid length 49 expected 48")]
+    #[case("000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e", "PublicKey, invalid length 47 expected 48")]
+    #[case("000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f00", "PublicKey, invalid length 49 expected 48")]
+    #[case("0x00r102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f", "invalid hex")]
+    fn test_json_dict(#[case] input: &str, #[case] msg: &str) {
+        pyo3::prepare_freethreaded_python();
+        let ret = Python::with_gil(|py| -> PyResult<()> {
+            let err =
+                PublicKey::from_json_dict(input.to_string().into_py(py).as_ref(py)).unwrap_err();
+            assert_eq!(err.value(py).to_string(), msg.to_string());
+            Ok(())
+        });
+        assert!(ret.is_ok())
+    }
 }
