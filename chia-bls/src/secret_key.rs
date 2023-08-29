@@ -240,16 +240,20 @@ impl SecretKey {
 }
 
 #[cfg(test)]
-use hex::FromHex;
+mod tests {
+    use super::*;
+    use hex::FromHex;
+    use rand::rngs::StdRng;
+    use rand::{Rng, SeedableRng};
 
-#[test]
-fn test_make_key() {
-    // test vectors from:
-    // from chia.util.keychain import KeyDataSecrets
-    // print(KeyDataSecrets.from_mnemonic(phrase)["privatekey"])
+    #[test]
+    fn test_make_key() {
+        // test vectors from:
+        // from chia.util.keychain import KeyDataSecrets
+        // print(KeyDataSecrets.from_mnemonic(phrase)["privatekey"])
 
-    // (seed, secret-key)
-    let test_cases = &[
+        // (seed, secret-key)
+        let test_cases = &[
         ("fc795be0c3f18c50dddb34e72179dc597d64055497ecc1e69e2e56a5409651bc139aae8070d4df0ea14d8d2a518a9a00bb1cc6e92e053fe34051f6821df9164c",
             "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb"),
         ("b873212f885ccffbf4692afcb84bc2e55886de2dfa07d90f5c3c239abc31c0a6ce047e30fd8bf6a281e71389aa82d73df74c7bbfb3b06b4639a5cee775cccd3c",
@@ -258,62 +262,62 @@ fn test_make_key() {
             "59095c391107936599b7ee6f09067979b321932bd62e23c7f53ed5fb19f851f6")
     ];
 
-    for (seed, sk) in test_cases {
-        assert_eq!(
-            SecretKey::from_seed(&<[u8; 64]>::from_hex(seed).unwrap())
-                .to_bytes()
-                .to_vec(),
-            Vec::<u8>::from_hex(sk).unwrap()
-        );
+        for (seed, sk) in test_cases {
+            assert_eq!(
+                SecretKey::from_seed(&<[u8; 64]>::from_hex(seed).unwrap())
+                    .to_bytes()
+                    .to_vec(),
+                Vec::<u8>::from_hex(sk).unwrap()
+            );
+        }
     }
-}
 
-#[test]
-fn test_derive_unhardened() {
-    // test vectors from:
-    // from blspy import AugSchemeMPL
-    // from blspy import PrivateKey
-    // sk = PrivateKey.from_bytes(bytes.fromhex("52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb"))
-    // AugSchemeMPL.derive_child_sk_unhardened(sk, 0)
-    // AugSchemeMPL.derive_child_sk_unhardened(sk, 1)
-    // AugSchemeMPL.derive_child_sk_unhardened(sk, 2)
-    // AugSchemeMPL.derive_child_sk_unhardened(sk, 3)
-    // <PrivateKey 399638f99d446500f3c3a363f24c2b0634ad7caf646f503455093f35f29290bd>
-    // <PrivateKey 3dcb4098ad925d8940e2f516d2d5a4dbab393db928a8c6cb06b93066a09a843a>
-    // <PrivateKey 13115c8fb68a3d667938dac2ffc6b867a4a0f216bbb228aa43d6bdde14245575>
-    // <PrivateKey 52e7e9f2fb51f2c5705aea8e11ac82737b95e664ae578f015af22031d956f92b>
+    #[test]
+    fn test_derive_unhardened() {
+        // test vectors from:
+        // from blspy import AugSchemeMPL
+        // from blspy import PrivateKey
+        // sk = PrivateKey.from_bytes(bytes.fromhex("52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb"))
+        // AugSchemeMPL.derive_child_sk_unhardened(sk, 0)
+        // AugSchemeMPL.derive_child_sk_unhardened(sk, 1)
+        // AugSchemeMPL.derive_child_sk_unhardened(sk, 2)
+        // AugSchemeMPL.derive_child_sk_unhardened(sk, 3)
+        // <PrivateKey 399638f99d446500f3c3a363f24c2b0634ad7caf646f503455093f35f29290bd>
+        // <PrivateKey 3dcb4098ad925d8940e2f516d2d5a4dbab393db928a8c6cb06b93066a09a843a>
+        // <PrivateKey 13115c8fb68a3d667938dac2ffc6b867a4a0f216bbb228aa43d6bdde14245575>
+        // <PrivateKey 52e7e9f2fb51f2c5705aea8e11ac82737b95e664ae578f015af22031d956f92b>
 
-    let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
-    let derived_hex = [
-        "399638f99d446500f3c3a363f24c2b0634ad7caf646f503455093f35f29290bd",
-        "3dcb4098ad925d8940e2f516d2d5a4dbab393db928a8c6cb06b93066a09a843a",
-        "13115c8fb68a3d667938dac2ffc6b867a4a0f216bbb228aa43d6bdde14245575",
-        "52e7e9f2fb51f2c5705aea8e11ac82737b95e664ae578f015af22031d956f92b",
-    ];
-    let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+        let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
+        let derived_hex = [
+            "399638f99d446500f3c3a363f24c2b0634ad7caf646f503455093f35f29290bd",
+            "3dcb4098ad925d8940e2f516d2d5a4dbab393db928a8c6cb06b93066a09a843a",
+            "13115c8fb68a3d667938dac2ffc6b867a4a0f216bbb228aa43d6bdde14245575",
+            "52e7e9f2fb51f2c5705aea8e11ac82737b95e664ae578f015af22031d956f92b",
+        ];
+        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
 
-    for idx in 0..4_usize {
-        let derived = sk.derive_unhardened(idx as u32);
-        assert_eq!(
-            derived.to_bytes(),
-            <[u8; 32]>::from_hex(derived_hex[idx]).unwrap()
-        )
+        for idx in 0..4_usize {
+            let derived = sk.derive_unhardened(idx as u32);
+            assert_eq!(
+                derived.to_bytes(),
+                <[u8; 32]>::from_hex(derived_hex[idx]).unwrap()
+            )
+        }
     }
-}
 
-#[test]
-fn test_public_key() {
-    // test vectors from:
-    // from blspy import PrivateKey
-    // from blspy import AugSchemeMPL
-    // sk = PrivateKey.from_bytes(bytes.fromhex("52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb"))
-    // for i in [100, 52312, 352350, 316]:
-    //         sk0 = AugSchemeMPL.derive_child_sk_unhardened(sk, i)
-    //         print(bytes(sk0).hex())
-    //         print(bytes(sk0.get_g1()).hex())
+    #[test]
+    fn test_public_key() {
+        // test vectors from:
+        // from blspy import PrivateKey
+        // from blspy import AugSchemeMPL
+        // sk = PrivateKey.from_bytes(bytes.fromhex("52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb"))
+        // for i in [100, 52312, 352350, 316]:
+        //         sk0 = AugSchemeMPL.derive_child_sk_unhardened(sk, i)
+        //         print(bytes(sk0).hex())
+        //         print(bytes(sk0.get_g1()).hex())
 
-    // secret key, public key
-    let test_cases = [
+        // secret key, public key
+        let test_cases = [
         ("5aac8405befe4cb3748a67177c56df26355f1f98d979afdb0b2f97858d2f71c3",
         "b9de000821a610ef644d160c810e35113742ff498002c2deccd8f1a349e423047e9b3fc17ebfc733dbee8fd902ba2961"),
         ("23f1fb291d3bd7434282578b842d5ea4785994bb89bd2c94896d1b4be6c70ba2",
@@ -326,126 +330,122 @@ fn test_public_key() {
         "928ea102b5a3e3efe4f4c240d3458a568dfeb505e02901a85ed70a384944b0c08c703a35245322709921b8f2b7f5e54a"),
         ];
 
-    for (sk_hex, pk_hex) in test_cases {
+        for (sk_hex, pk_hex) in test_cases {
+            let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+            let pk = sk.public_key();
+            assert_eq!(
+                pk,
+                PublicKey::from_bytes(&<[u8; 48]>::from_hex(pk_hex).unwrap()).unwrap()
+            );
+        }
+    }
+
+    #[test]
+    fn test_derive_hardened() {
+        // test vectors from:
+        // from blspy import AugSchemeMPL
+        // from blspy import PrivateKey
+        // sk = PrivateKey.from_bytes(bytes.fromhex("52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb"))
+        // AugSchemeMPL.derive_child_sk(sk, 0)
+        // AugSchemeMPL.derive_child_sk(sk, 1)
+        // AugSchemeMPL.derive_child_sk(sk, 2)
+        // AugSchemeMPL.derive_child_sk(sk, 3)
+        // <PrivateKey 05eccb2d70e814f51a30d8b9965505605c677afa97228fa2419db583a8121db9>
+        // <PrivateKey 612ae96bdce2e9bc01693ac579918fbb559e04ec365cce9b66bb80e328f62c46>
+        // <PrivateKey 5df14a0a34fd6c30a80136d4103f0a93422ce82d5c537bebbecbc56e19fee5b9>
+        // <PrivateKey 3ea55db88d9a6bf5f1d9c9de072e3c9a56b13f4156d72fca7880cd39b4bd4fdc>
+
+        let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
+        let derived_hex = [
+            "05eccb2d70e814f51a30d8b9965505605c677afa97228fa2419db583a8121db9",
+            "612ae96bdce2e9bc01693ac579918fbb559e04ec365cce9b66bb80e328f62c46",
+            "5df14a0a34fd6c30a80136d4103f0a93422ce82d5c537bebbecbc56e19fee5b9",
+            "3ea55db88d9a6bf5f1d9c9de072e3c9a56b13f4156d72fca7880cd39b4bd4fdc",
+        ];
         let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
-        let pk = sk.public_key();
-        assert_eq!(
-            pk,
-            PublicKey::from_bytes(&<[u8; 48]>::from_hex(pk_hex).unwrap()).unwrap()
-        );
-    }
-}
 
-#[test]
-fn test_derive_hardened() {
-    // test vectors from:
-    // from blspy import AugSchemeMPL
-    // from blspy import PrivateKey
-    // sk = PrivateKey.from_bytes(bytes.fromhex("52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb"))
-    // AugSchemeMPL.derive_child_sk(sk, 0)
-    // AugSchemeMPL.derive_child_sk(sk, 1)
-    // AugSchemeMPL.derive_child_sk(sk, 2)
-    // AugSchemeMPL.derive_child_sk(sk, 3)
-    // <PrivateKey 05eccb2d70e814f51a30d8b9965505605c677afa97228fa2419db583a8121db9>
-    // <PrivateKey 612ae96bdce2e9bc01693ac579918fbb559e04ec365cce9b66bb80e328f62c46>
-    // <PrivateKey 5df14a0a34fd6c30a80136d4103f0a93422ce82d5c537bebbecbc56e19fee5b9>
-    // <PrivateKey 3ea55db88d9a6bf5f1d9c9de072e3c9a56b13f4156d72fca7880cd39b4bd4fdc>
-
-    let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
-    let derived_hex = [
-        "05eccb2d70e814f51a30d8b9965505605c677afa97228fa2419db583a8121db9",
-        "612ae96bdce2e9bc01693ac579918fbb559e04ec365cce9b66bb80e328f62c46",
-        "5df14a0a34fd6c30a80136d4103f0a93422ce82d5c537bebbecbc56e19fee5b9",
-        "3ea55db88d9a6bf5f1d9c9de072e3c9a56b13f4156d72fca7880cd39b4bd4fdc",
-    ];
-    let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
-
-    for idx in 0..derived_hex.len() {
-        let derived = sk.derive_hardened(idx as u32);
-        assert_eq!(
-            derived.to_bytes(),
-            <[u8; 32]>::from_hex(derived_hex[idx]).unwrap()
-        )
-    }
-}
-
-#[cfg(test)]
-use rand::{Rng, SeedableRng};
-
-#[cfg(test)]
-use rand::rngs::StdRng;
-
-#[test]
-fn test_debug() {
-    let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
-    let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
-    assert_eq!(format!("{:?}", sk), sk_hex);
-}
-
-#[test]
-fn test_hash() {
-    fn hash<T: std::hash::Hash>(v: &T) -> u64 {
-        use std::collections::hash_map::DefaultHasher;
-        let mut h = DefaultHasher::new();
-        v.hash(&mut h);
-        h.finish()
+        for idx in 0..derived_hex.len() {
+            let derived = sk.derive_hardened(idx as u32);
+            assert_eq!(
+                derived.to_bytes(),
+                <[u8; 32]>::from_hex(derived_hex[idx]).unwrap()
+            )
+        }
     }
 
-    let mut rng = StdRng::seed_from_u64(1337);
-    let mut data = [0u8; 32];
-    rng.fill(data.as_mut_slice());
+    #[test]
+    fn test_debug() {
+        let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
+        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+        assert_eq!(format!("{:?}", sk), sk_hex);
+    }
 
-    let sk1 = SecretKey::from_seed(&data);
-    let sk2 = SecretKey::from_seed(&data);
+    #[test]
+    fn test_hash() {
+        fn hash<T: std::hash::Hash>(v: &T) -> u64 {
+            use std::collections::hash_map::DefaultHasher;
+            let mut h = DefaultHasher::new();
+            v.hash(&mut h);
+            h.finish()
+        }
 
-    rng.fill(data.as_mut_slice());
-    let sk3 = SecretKey::from_seed(&data);
-
-    assert!(hash(&sk1) == hash(&sk2));
-    assert!(hash(&sk1) != hash(&sk3));
-}
-
-#[test]
-fn test_from_bytes() {
-    let mut rng = StdRng::seed_from_u64(1337);
-    let mut data = [0u8; 32];
-    for _i in 0..50 {
+        let mut rng = StdRng::seed_from_u64(1337);
+        let mut data = [0u8; 32];
         rng.fill(data.as_mut_slice());
-        // make the bytes exceed q
-        data[0] |= 0x80;
-        // just any random bytes are not a valid key and should fail
-        assert_eq!(
-            SecretKey::from_bytes(&data).unwrap_err(),
-            Error::SecretKeyGroupOrder
-        );
-    }
-}
 
-#[test]
-fn test_from_bytes_zero() {
-    let data = [0u8; 32];
-    let _sk = SecretKey::from_bytes(&data).unwrap();
-}
+        let sk1 = SecretKey::from_seed(&data);
+        let sk2 = SecretKey::from_seed(&data);
 
-#[test]
-fn test_roundtrip() {
-    let mut rng = StdRng::seed_from_u64(1337);
-    let mut data = [0u8; 32];
-    for _i in 0..50 {
         rng.fill(data.as_mut_slice());
-        let sk = SecretKey::from_seed(&data);
-        let bytes = sk.to_bytes();
-        let sk2 = SecretKey::from_bytes(&bytes).unwrap();
-        assert_eq!(sk, sk2);
-        assert_eq!(sk.public_key(), sk2.public_key());
+        let sk3 = SecretKey::from_seed(&data);
+
+        assert!(hash(&sk1) == hash(&sk2));
+        assert!(hash(&sk1) != hash(&sk3));
+    }
+
+    #[test]
+    fn test_from_bytes() {
+        let mut rng = StdRng::seed_from_u64(1337);
+        let mut data = [0u8; 32];
+        for _i in 0..50 {
+            rng.fill(data.as_mut_slice());
+            // make the bytes exceed q
+            data[0] |= 0x80;
+            // just any random bytes are not a valid key and should fail
+            assert_eq!(
+                SecretKey::from_bytes(&data).unwrap_err(),
+                Error::SecretKeyGroupOrder
+            );
+        }
+    }
+
+    #[test]
+    fn test_from_bytes_zero() {
+        let data = [0u8; 32];
+        let _sk = SecretKey::from_bytes(&data).unwrap();
+    }
+
+    #[test]
+    fn test_roundtrip() {
+        let mut rng = StdRng::seed_from_u64(1337);
+        let mut data = [0u8; 32];
+        for _i in 0..50 {
+            rng.fill(data.as_mut_slice());
+            let sk = SecretKey::from_seed(&data);
+            let bytes = sk.to_bytes();
+            let sk2 = SecretKey::from_bytes(&bytes).unwrap();
+            assert_eq!(sk, sk2);
+            assert_eq!(sk.public_key(), sk2.public_key());
+        }
     }
 }
 
 #[cfg(test)]
 #[cfg(feature = "py-bindings")]
 mod pytests {
-
     use super::*;
+    use rand::rngs::StdRng;
+    use rand::{Rng, SeedableRng};
     use rstest::rstest;
 
     #[test]
