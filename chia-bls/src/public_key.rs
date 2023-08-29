@@ -503,7 +503,7 @@ fn test_to_from_clvm() {
     let ptr = a.new_atom(&bytes).expect("new_atom");
 
     let pk = PublicKey::from_clvm(&a, ptr).expect("from_clvm");
-    assert_eq!(&pk.to_bytes()[..], &bytes[..]);
+    assert_eq!(pk.to_bytes(), &bytes[..]);
 
     let pk_ptr = pk.to_clvm(&mut a).expect("to_clvm");
     assert!(a.atom_eq(pk_ptr, ptr));
@@ -535,13 +535,11 @@ mod pytests {
             rng.fill(data.as_mut_slice());
             let sk = SecretKey::from_seed(&data);
             let pk = sk.public_key();
-            let ret = Python::with_gil(|py| -> PyResult<()> {
-                let string = pk.to_json_dict(py)?;
+            Python::with_gil(|py| {
+                let string = pk.to_json_dict(py).expect("to_json_dict");
                 let pk2 = PublicKey::from_json_dict(string.as_ref(py)).unwrap();
                 assert_eq!(pk, pk2);
-                Ok(())
             });
-            assert!(ret.is_ok())
         }
     }
 
@@ -553,12 +551,10 @@ mod pytests {
     #[case("0x00r102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f", "invalid hex")]
     fn test_json_dict(#[case] input: &str, #[case] msg: &str) {
         pyo3::prepare_freethreaded_python();
-        let ret = Python::with_gil(|py| -> PyResult<()> {
+        Python::with_gil(|py| {
             let err =
                 PublicKey::from_json_dict(input.to_string().into_py(py).as_ref(py)).unwrap_err();
             assert_eq!(err.value(py).to_string(), msg.to_string());
-            Ok(())
         });
-        assert!(ret.is_ok())
     }
 }

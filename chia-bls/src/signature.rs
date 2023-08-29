@@ -944,13 +944,11 @@ mod pytests {
             rng.fill(msg.as_mut_slice());
             let sk = SecretKey::from_seed(&data);
             let sig = sign(&sk, msg);
-            let ret = Python::with_gil(|py| -> PyResult<()> {
-                let string = sig.to_json_dict(py)?;
+            Python::with_gil(|py| {
+                let string = sig.to_json_dict(py).expect("to_json_dict");
                 let sig2 = Signature::from_json_dict(string.as_ref(py)).unwrap();
                 assert_eq!(sig, sig2);
-                Ok(())
             });
-            assert!(ret.is_ok())
         }
     }
 
@@ -962,12 +960,10 @@ mod pytests {
     #[case("00r102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0ff000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f", "invalid hex")]
     fn test_json_dict(#[case] input: &str, #[case] msg: &str) {
         pyo3::prepare_freethreaded_python();
-        let ret = Python::with_gil(|py| -> PyResult<()> {
+        Python::with_gil(|py| {
             let err =
                 Signature::from_json_dict(input.to_string().into_py(py).as_ref(py)).unwrap_err();
             assert_eq!(err.value(py).to_string(), msg.to_string());
-            Ok(())
         });
-        assert!(ret.is_ok())
     }
 }

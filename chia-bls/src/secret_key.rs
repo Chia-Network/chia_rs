@@ -456,14 +456,12 @@ mod pytests {
         for _i in 0..50 {
             rng.fill(data.as_mut_slice());
             let sk = SecretKey::from_seed(&data);
-            let ret = Python::with_gil(|py| -> PyResult<()> {
-                let string = sk.to_json_dict(py)?;
+            Python::with_gil(|py| {
+                let string = sk.to_json_dict(py).expect("to_json_dict");
                 let sk2 = SecretKey::from_json_dict(string.as_ref(py)).unwrap();
                 assert_eq!(sk, sk2);
                 assert_eq!(sk.public_key(), sk2.public_key());
-                Ok(())
             });
-            assert!(ret.is_ok())
         }
     }
 
@@ -490,12 +488,10 @@ mod pytests {
     )]
     fn test_json_dict(#[case] input: &str, #[case] msg: &str) {
         pyo3::prepare_freethreaded_python();
-        let ret = Python::with_gil(|py| -> PyResult<()> {
+        Python::with_gil(|py| {
             let err =
                 SecretKey::from_json_dict(input.to_string().into_py(py).as_ref(py)).unwrap_err();
             assert_eq!(err.value(py).to_string(), msg.to_string());
-            Ok(())
         });
-        assert!(ret.is_ok())
     }
 }
