@@ -1219,8 +1219,6 @@ fn u64_to_bytes(n: u64) -> Vec<u8> {
     buf
 }
 #[cfg(test)]
-use crate::gen::flags::ENABLE_ASSERT_BEFORE;
-#[cfg(test)]
 use crate::gen::flags::ENABLE_SOFTFORK_CONDITION;
 #[cfg(test)]
 use clvmr::number::Number;
@@ -1469,8 +1467,7 @@ fn cond_test_cb(
 }
 
 #[cfg(test)]
-const MEMPOOL_MODE: u32 =
-    COND_ARGS_NIL | STRICT_ARGS_COUNT | NO_UNKNOWN_CONDS | ENABLE_ASSERT_BEFORE;
+const MEMPOOL_MODE: u32 = COND_ARGS_NIL | STRICT_ARGS_COUNT | NO_UNKNOWN_CONDS;
 
 #[cfg(test)]
 fn cond_test(input: &str) -> Result<(Allocator, SpendBundleConditions), ValidationErr> {
@@ -1630,7 +1627,7 @@ fn test_extra_arg_mempool(#[case] condition: ConditionOpcode, #[case] arg: &str)
                 "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 )))))",
                 condition as u8, arg
             ),
-            STRICT_ARGS_COUNT | ENABLE_ASSERT_BEFORE | ENABLE_SOFTFORK_CONDITION
+            STRICT_ARGS_COUNT | ENABLE_SOFTFORK_CONDITION
         )
         .unwrap_err()
         .1,
@@ -1673,7 +1670,7 @@ fn test_extra_arg(
             "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 ) {} ))))",
             condition as u8, arg, extra_cond
         ),
-        ENABLE_ASSERT_BEFORE,
+        0,
     )
     .unwrap();
 
@@ -1843,81 +1840,6 @@ fn test_single_condition_failure(
     assert_eq!(err, expected_error);
 }
 
-// this test ensures that the ASSERT_BEFORE_ condition codes are not available
-// unless the ENABLE_ASSERT_BEFORE flag is set
-#[cfg(test)]
-#[rstest]
-#[case(ASSERT_SECONDS_ABSOLUTE, "104", None)]
-#[case(ASSERT_SECONDS_RELATIVE, "101", None)]
-#[case(ASSERT_HEIGHT_RELATIVE, "101", None)]
-#[case(ASSERT_HEIGHT_ABSOLUTE, "100", None)]
-#[case(
-    ASSERT_BEFORE_SECONDS_ABSOLUTE,
-    "104",
-    Some(ErrorCode::InvalidConditionOpcode)
-)]
-#[case(
-    ASSERT_BEFORE_SECONDS_RELATIVE,
-    "101",
-    Some(ErrorCode::InvalidConditionOpcode)
-)]
-#[case(
-    ASSERT_BEFORE_HEIGHT_RELATIVE,
-    "101",
-    Some(ErrorCode::InvalidConditionOpcode)
-)]
-#[case(
-    ASSERT_BEFORE_HEIGHT_ABSOLUTE,
-    "100",
-    Some(ErrorCode::InvalidConditionOpcode)
-)]
-#[case(RESERVE_FEE, "100", None)]
-#[case(ASSERT_MY_AMOUNT, "123", None)]
-#[case(
-    ASSERT_MY_BIRTH_SECONDS,
-    "123",
-    Some(ErrorCode::InvalidConditionOpcode)
-)]
-#[case(ASSERT_MY_BIRTH_HEIGHT, "123", Some(ErrorCode::InvalidConditionOpcode))]
-#[case(ASSERT_MY_COIN_ID, "{coin12}", None)]
-#[case(ASSERT_MY_PARENT_ID, "{h1}", None)]
-#[case(ASSERT_MY_PUZZLEHASH, "{h2}", None)]
-#[case(
-    ASSERT_CONCURRENT_SPEND,
-    "{coin12}",
-    Some(ErrorCode::InvalidConditionOpcode)
-)]
-#[case(
-    ASSERT_CONCURRENT_PUZZLE,
-    "{coin12}",
-    Some(ErrorCode::InvalidConditionOpcode)
-)]
-fn test_disable_assert_before(
-    #[case] condition: ConditionOpcode,
-    #[case] arg: &str,
-    #[case] expected_error: Option<ErrorCode>,
-) {
-    // The flag we pass in does not have the ENABLE_ASSERT_BEFORE flag set.
-    // Setting the NO_UNKNOWN_CONDS will make those opcodes fail
-    let ret = cond_test_flag(
-        &format!(
-            "((({{h1}} ({{h2}} (123 ((({} ({} )))))",
-            condition as u8, arg
-        ),
-        NO_UNKNOWN_CONDS,
-    );
-
-    if let Some(err) = expected_error {
-        assert_eq!(ret.unwrap_err().1, err);
-    } else {
-        let (_, conds) = ret.unwrap();
-        assert_eq!(conds.cost, 0);
-        assert_eq!(conds.spends.len(), 1);
-        let spend = &conds.spends[0];
-        assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    }
-}
-
 // this test includes multiple instances of the same condition, to ensure we
 // aggregate the resulting condition correctly. The values we pass are:
 // 100, 503, 90
@@ -1989,7 +1911,7 @@ fn test_missing_arg(#[case] condition: ConditionOpcode) {
     assert_eq!(
         cond_test_flag(
             &format!("((({{h1}} ({{h2}} (123 ((({} )))))", condition as u8),
-            ENABLE_ASSERT_BEFORE | ENABLE_SOFTFORK_CONDITION
+            ENABLE_SOFTFORK_CONDITION
         )
         .unwrap_err()
         .1,
@@ -3944,7 +3866,6 @@ fn test_assert_ephemeral_wrong_parent() {
 fn test_relative_condition_on_ephemeral(
     #[case] condition: ConditionOpcode,
     #[case] mut expect_error: Option<ErrorCode>,
-    #[values(0, ENABLE_ASSERT_BEFORE)] enable_assert_before: u32,
     #[values(0, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL)] no_rel_conds_on_ephemeral: u32,
 ) {
     // this test ensures that we disallow relative conditions (including
@@ -3957,21 +3878,6 @@ fn test_relative_condition_on_ephemeral(
 
     if no_rel_conds_on_ephemeral == 0 {
         // if we allow relative conditions, all cases should pass
-        expect_error = None;
-    }
-
-    if enable_assert_before == 0
-        && [
-            ASSERT_MY_BIRTH_HEIGHT,
-            ASSERT_MY_BIRTH_SECONDS,
-            ASSERT_BEFORE_HEIGHT_ABSOLUTE,
-            ASSERT_BEFORE_HEIGHT_RELATIVE,
-            ASSERT_BEFORE_SECONDS_ABSOLUTE,
-            ASSERT_BEFORE_SECONDS_RELATIVE,
-        ]
-        .contains(&condition)
-    {
-        // if new conditions aren't enabled, they are just ignored
         expect_error = None;
     }
 
@@ -3990,7 +3896,7 @@ fn test_relative_condition_on_ephemeral(
         cond
     );
 
-    let flags = enable_assert_before | no_rel_conds_on_ephemeral;
+    let flags = no_rel_conds_on_ephemeral;
 
     match expect_error {
         Some(err) => {
@@ -4162,10 +4068,30 @@ fn test_softfork_condition_failures(#[case] conditions: &str, #[case] expected_e
     LIMIT_ANNOUNCES,
     Some(ErrorCode::TooManyAnnouncements)
 )]
-#[case(ASSERT_CONCURRENT_SPEND, 1024, ENABLE_ASSERT_BEFORE | LIMIT_ANNOUNCES, Some(ErrorCode::AssertConcurrentSpendFailed))]
-#[case(ASSERT_CONCURRENT_SPEND, 1025, ENABLE_ASSERT_BEFORE | LIMIT_ANNOUNCES, Some(ErrorCode::TooManyAnnouncements))]
-#[case(ASSERT_CONCURRENT_PUZZLE, 1024, ENABLE_ASSERT_BEFORE | LIMIT_ANNOUNCES, Some(ErrorCode::AssertConcurrentPuzzleFailed))]
-#[case(ASSERT_CONCURRENT_PUZZLE, 1025, ENABLE_ASSERT_BEFORE | LIMIT_ANNOUNCES, Some(ErrorCode::TooManyAnnouncements))]
+#[case(
+    ASSERT_CONCURRENT_SPEND,
+    1024,
+    LIMIT_ANNOUNCES,
+    Some(ErrorCode::AssertConcurrentSpendFailed)
+)]
+#[case(
+    ASSERT_CONCURRENT_SPEND,
+    1025,
+    LIMIT_ANNOUNCES,
+    Some(ErrorCode::TooManyAnnouncements)
+)]
+#[case(
+    ASSERT_CONCURRENT_PUZZLE,
+    1024,
+    LIMIT_ANNOUNCES,
+    Some(ErrorCode::AssertConcurrentPuzzleFailed)
+)]
+#[case(
+    ASSERT_CONCURRENT_PUZZLE,
+    1025,
+    LIMIT_ANNOUNCES,
+    Some(ErrorCode::TooManyAnnouncements)
+)]
 #[case(CREATE_PUZZLE_ANNOUNCEMENT, 1025, 0, None)]
 #[case(
     ASSERT_PUZZLE_ANNOUNCEMENT,
@@ -4183,13 +4109,13 @@ fn test_softfork_condition_failures(#[case] conditions: &str, #[case] expected_e
 #[case(
     ASSERT_CONCURRENT_SPEND,
     1025,
-    ENABLE_ASSERT_BEFORE,
+    0,
     Some(ErrorCode::AssertConcurrentSpendFailed)
 )]
 #[case(
     ASSERT_CONCURRENT_PUZZLE,
     1025,
-    ENABLE_ASSERT_BEFORE,
+    0,
     Some(ErrorCode::AssertConcurrentPuzzleFailed)
 )]
 fn test_limit_announcements(
