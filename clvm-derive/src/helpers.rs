@@ -4,16 +4,16 @@ use syn::{punctuated::Punctuated, Attribute, Generics, Token, TypeParamBound};
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Repr {
     Tuple,
-    ProperList,
-    CurriedArgs,
+    List,
+    Curry,
 }
 
 impl ToString for Repr {
     fn to_string(&self) -> String {
         match self {
             Self::Tuple => "tuple".to_string(),
-            Self::ProperList => "proper_list".to_string(),
-            Self::CurriedArgs => "curried_args".to_string(),
+            Self::List => "list".to_string(),
+            Self::Curry => "curry".to_string(),
         }
     }
 }
@@ -40,17 +40,17 @@ pub fn parse_args(attrs: &[Attribute]) -> ClvmDeriveArgs {
                             }
                             repr = Some(Repr::Tuple);
                         }
-                        "proper_list" => {
+                        "list" => {
                             if let Some(existing) = repr {
-                                panic!("`proper_list` conflicts with `{}`", existing.to_string());
+                                panic!("`list` conflicts with `{}`", existing.to_string());
                             }
-                            repr = Some(Repr::ProperList);
+                            repr = Some(Repr::List);
                         }
-                        "curried_args" => {
+                        "curry" => {
                             if let Some(existing) = repr {
-                                panic!("`curried_args` conflicts with `{}`", existing.to_string());
+                                panic!("`curry` conflicts with `{}`", existing.to_string());
                             }
-                            repr = Some(Repr::CurriedArgs);
+                            repr = Some(Repr::Curry);
                         }
                         ident => panic!("unknown argument `{}`", ident),
                     }
@@ -60,9 +60,8 @@ pub fn parse_args(attrs: &[Attribute]) -> ClvmDeriveArgs {
     }
 
     ClvmDeriveArgs {
-        repr: repr.expect(
-            "expected clvm attribute parameter of either `tuple`, `proper_list`, or `curried_args`",
-        ),
+        repr: repr
+            .expect("expected clvm attribute parameter of either `tuple`, `list`, or `curry`"),
     }
 }
 
