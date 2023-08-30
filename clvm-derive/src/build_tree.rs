@@ -4,7 +4,7 @@ use syn::{parse_quote, Data, DeriveInput, Fields, Index};
 
 use crate::helpers::{add_trait_bounds, parse_args, Repr};
 
-pub fn to_clvm(mut ast: DeriveInput) -> TokenStream {
+pub fn build_tree(mut ast: DeriveInput) -> TokenStream {
     let args = parse_args(&ast.attrs);
     let crate_name = quote!(clvm_traits);
 
@@ -62,15 +62,15 @@ pub fn to_clvm(mut ast: DeriveInput) -> TokenStream {
 
     quote! {
         #[automatically_derived]
-        impl<#generic_name, #impl_generics> #crate_name::ClvmTree<#generic_name>
+        impl<#generic_name, #impl_generics> #crate_name::BuildTree<#generic_name>
         for #struct_name #ty_generics #where_clause {
-            fn collect_tree(
+            fn build_tree(
                 &self,
                 f: &mut impl FnMut(#crate_name::Value<#generic_name>)
                     -> #crate_name::Result<#generic_name>
             ) -> #crate_name::Result<#generic_name> {
                 let value = #list_macro!( #( &self.#field_names ),* );
-                #crate_name::ClvmTree::collect_tree(&value, f)
+                #crate_name::BuildTree::build_tree(&value, f)
             }
         }
     }

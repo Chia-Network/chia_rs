@@ -18,9 +18,9 @@
 
 ```rust
 use clvmr::Allocator;
-use clvm_traits::{ToClvm, FromClvm};
+use clvm_traits::{BuildTree, ToClvm, FromClvm};
 
-#[derive(Debug, PartialEq, Eq, ToClvm, FromClvm)]
+#[derive(Debug, PartialEq, Eq, BuildTree, FromClvm)]
 #[clvm(tuple)]
 struct Point {
     x: i32,
@@ -40,6 +40,7 @@ assert_eq!(Point::from_clvm(a, ptr).unwrap(), point);
 #[cfg(feature = "derive")]
 pub use clvm_derive::*;
 
+mod build_tree;
 mod from_clvm;
 mod macros;
 mod match_byte;
@@ -47,6 +48,7 @@ mod to_clvm;
 mod value;
 
 pub use anyhow::{Error, Result};
+pub use build_tree::*;
 pub use from_clvm::*;
 pub use macros::*;
 pub use match_byte::*;
@@ -66,7 +68,7 @@ mod tests {
 
     fn check<T>(value: T, expected: &str)
     where
-        T: fmt::Debug + PartialEq + ClvmTree<NodePtr> + FromClvm,
+        T: fmt::Debug + PartialEq + BuildTree<NodePtr> + FromClvm,
     {
         let a = &mut Allocator::new();
 
@@ -81,7 +83,7 @@ mod tests {
 
     #[test]
     fn test_tuple() {
-        #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
+        #[derive(Debug, BuildTree, FromClvm, PartialEq, Eq)]
         #[clvm(tuple)]
         struct TupleStruct {
             a: u64,
@@ -93,7 +95,7 @@ mod tests {
 
     #[test]
     fn test_proper_list() {
-        #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
+        #[derive(Debug, BuildTree, FromClvm, PartialEq, Eq)]
         #[clvm(proper_list)]
         struct ProperListStruct {
             a: u64,
@@ -105,7 +107,7 @@ mod tests {
 
     #[test]
     fn test_curried_args() {
-        #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
+        #[derive(Debug, BuildTree, FromClvm, PartialEq, Eq)]
         #[clvm(curried_args)]
         struct CurriedArgsStruct {
             a: u64,
@@ -120,7 +122,7 @@ mod tests {
 
     #[test]
     fn test_unnamed() {
-        #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
+        #[derive(Debug, BuildTree, FromClvm, PartialEq, Eq)]
         #[clvm(tuple)]
         struct UnnamedStruct(String, String);
 
@@ -129,7 +131,7 @@ mod tests {
 
     #[test]
     fn test_newtype() {
-        #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
+        #[derive(Debug, BuildTree, FromClvm, PartialEq, Eq)]
         #[clvm(tuple)]
         struct NewTypeStruct(String);
 

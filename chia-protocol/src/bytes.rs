@@ -1,6 +1,6 @@
 use chia_traits::chia_error;
 use chia_traits::{read_bytes, Streamable};
-use clvm_traits::{ClvmTree, FromClvm, Value};
+use clvm_traits::{BuildTree, FromClvm, Value};
 use clvmr::allocator::{NodePtr, SExp};
 use clvmr::Allocator;
 use core::fmt::Formatter;
@@ -87,8 +87,8 @@ impl FromJsonDict for Bytes {
     }
 }
 
-impl<N> ClvmTree<N> for Bytes {
-    fn collect_tree(
+impl<N> BuildTree<N> for Bytes {
+    fn build_tree(
         &self,
         f: &mut impl FnMut(Value<N>) -> clvm_traits::Result<N>,
     ) -> clvm_traits::Result<N> {
@@ -195,8 +195,8 @@ impl<const N: usize> Streamable for BytesImpl<N> {
     }
 }
 
-impl<N, const LEN: usize> ClvmTree<N> for BytesImpl<LEN> {
-    fn collect_tree(
+impl<N, const LEN: usize> BuildTree<N> for BytesImpl<LEN> {
+    fn build_tree(
         &self,
         f: &mut impl FnMut(Value<N>) -> clvm_traits::Result<N>,
     ) -> clvm_traits::Result<N> {

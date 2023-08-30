@@ -2,7 +2,7 @@ use crate::secret_key::is_all_zero;
 use crate::{DerivableKey, Error, Result};
 use blst::*;
 use chia_traits::{read_bytes, Streamable};
-use clvm_traits::{ClvmTree, FromClvm, Value};
+use clvm_traits::{BuildTree, FromClvm, Value};
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use sha2::{digest::FixedOutput, Digest, Sha256};
 use std::fmt;
@@ -300,8 +300,8 @@ impl FromClvm for PublicKey {
     }
 }
 
-impl<N> ClvmTree<N> for PublicKey {
-    fn collect_tree(&self, f: &mut impl FnMut(Value<N>) -> anyhow::Result<N>) -> anyhow::Result<N> {
+impl<N> BuildTree<N> for PublicKey {
+    fn build_tree(&self, f: &mut impl FnMut(Value<N>) -> anyhow::Result<N>) -> anyhow::Result<N> {
         f(Value::Atom(&self.to_bytes()))
     }
 }

@@ -1,7 +1,7 @@
 use crate::{Error, GTElement, PublicKey, Result, SecretKey};
 use blst::*;
 use chia_traits::{read_bytes, Streamable};
-use clvm_traits::{ClvmTree, FromClvm, Value};
+use clvm_traits::{BuildTree, FromClvm, Value};
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use sha2::{Digest, Sha256};
 use std::borrow::Borrow;
@@ -205,8 +205,8 @@ impl FromClvm for Signature {
     }
 }
 
-impl<N> ClvmTree<N> for Signature {
-    fn collect_tree(&self, f: &mut impl FnMut(Value<N>) -> anyhow::Result<N>) -> anyhow::Result<N> {
+impl<N> BuildTree<N> for Signature {
+    fn build_tree(&self, f: &mut impl FnMut(Value<N>) -> anyhow::Result<N>) -> anyhow::Result<N> {
         f(Value::Atom(&self.to_bytes()))
     }
 }

@@ -1,5 +1,5 @@
 use clvm_traits::{
-    clvm_list, clvm_quote, destructure_list, destructure_quote, match_list, match_quote, ClvmTree,
+    clvm_list, clvm_quote, destructure_list, destructure_quote, match_list, match_quote, BuildTree,
     FromClvm, MatchByte, Result, Value,
 };
 use clvmr::{allocator::NodePtr, Allocator};
@@ -22,13 +22,13 @@ where
     }
 }
 
-impl<N, T> ClvmTree<N> for CurriedProgram<N, T>
+impl<N, T> BuildTree<N> for CurriedProgram<N, T>
 where
-    N: ClvmTree<N>,
-    T: ClvmTree<N>,
+    N: BuildTree<N>,
+    T: BuildTree<N>,
 {
-    fn collect_tree(&self, f: &mut impl FnMut(Value<N>) -> Result<N>) -> Result<N> {
-        clvm_list!(2, clvm_quote!(&self.program), self.args.collect_tree(f)?).collect_tree(f)
+    fn build_tree(&self, f: &mut impl FnMut(Value<N>) -> Result<N>) -> Result<N> {
+        clvm_list!(2, clvm_quote!(&self.program), self.args.build_tree(f)?).build_tree(f)
     }
 }
 
@@ -43,8 +43,8 @@ mod tests {
 
     fn check<T, A>(program: T, args: A, expected: &str)
     where
-        T: Debug + ClvmTree<NodePtr> + PartialEq + FromClvm,
-        A: Debug + PartialEq + ClvmTree<NodePtr> + FromClvm,
+        T: Debug + BuildTree<NodePtr> + PartialEq + FromClvm,
+        A: Debug + PartialEq + BuildTree<NodePtr> + FromClvm,
     {
         let a = &mut Allocator::new();
 

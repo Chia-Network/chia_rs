@@ -1,7 +1,7 @@
 use crate::streamable_struct;
 use crate::{bytes::Bytes32, BytesImpl};
 use chia_streamable_macro::Streamable;
-use clvm_traits::{clvm_list, destructure_list, match_list, ClvmTree, FromClvm, Value};
+use clvm_traits::{clvm_list, destructure_list, match_list, BuildTree, FromClvm, Value};
 use clvmr::allocator::NodePtr;
 use clvmr::Allocator;
 use sha2::{Digest, Sha256};
@@ -56,8 +56,8 @@ impl Coin {
     }
 }
 
-impl<N> ClvmTree<N> for Coin {
-    fn collect_tree(
+impl<N> BuildTree<N> for Coin {
+    fn build_tree(
         &self,
         f: &mut impl FnMut(Value<N>) -> clvm_traits::Result<N>,
     ) -> clvm_traits::Result<N> {
