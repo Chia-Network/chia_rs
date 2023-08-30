@@ -10,9 +10,6 @@ use std::fmt::Debug;
 use std::io::Cursor;
 use std::ops::Deref;
 
-#[cfg(test)]
-use clvm_traits::ToClvm;
-
 #[cfg(feature = "py-bindings")]
 use chia_traits::{FromJsonDict, ToJsonDict};
 #[cfg(feature = "py-bindings")]
@@ -406,7 +403,7 @@ impl<'py> FromPyObject<'py> for Bytes {
 mod tests {
     use super::*;
 
-    use clvm_traits::FromClvm;
+    use clvm_traits::{FromClvm, ToClvm};
     use clvmr::{
         serde::{node_from_bytes, node_to_bytes},
         Allocator,
