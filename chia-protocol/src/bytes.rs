@@ -668,4 +668,22 @@ mod tests {
         let round_trip = bytes32.to_clvm(a).unwrap();
         assert_eq!(expected, hex::encode(node_to_bytes(a, round_trip).unwrap()));
     }
+
+    #[test]
+    fn bytes32_failure() {
+        let a = &mut Allocator::new();
+        let bytes =
+            hex::decode("f07522495060c066f66f32acc2a77e3a3e737aca8baea4d1a64ea4cdc13da9").unwrap();
+        let ptr = a.new_atom(&bytes).unwrap();
+        assert_eq!(
+            Bytes32::from_clvm(a, ptr).unwrap_err(),
+            clvm_traits::Error::Custom("invalid size".to_string())
+        );
+
+        let ptr = a.new_pair(a.one(), a.one()).unwrap();
+        assert_eq!(
+            Bytes32::from_clvm(a, ptr).unwrap_err(),
+            clvm_traits::Error::ExpectedAtom(ptr)
+        );
+    }
 }
