@@ -14,7 +14,7 @@ where
     N: ParseTree<N>,
     T: ParseTree<N>,
 {
-    fn parse_tree<'a>(f: &impl Fn(&N) -> Value<'a, N>, ptr: N) -> Result<Self> {
+    fn parse_tree<'a>(f: &impl Fn(N) -> Value<'a, N>, ptr: N) -> Result<Self> {
         let destructure_list!(_, destructure_quote!(program), args) =
             <match_list!(MatchByte<2>, match_quote!(N), T)>::parse_tree(f, ptr)?;
 

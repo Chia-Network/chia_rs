@@ -1,8 +1,7 @@
 use crate::{Error, GTElement, PublicKey, Result, SecretKey};
 use blst::*;
 use chia_traits::{read_bytes, Streamable};
-use clvm_traits::{BuildTree, FromClvm, Value};
-use clvmr::allocator::{Allocator, NodePtr, SExp};
+use clvm_traits::{BuildTree, ParseTree, Value};
 use sha2::{Digest, Sha256};
 use std::borrow::Borrow;
 use std::convert::AsRef;
@@ -13,7 +12,10 @@ use std::mem::MaybeUninit;
 use std::ops::{Add, AddAssign};
 
 #[cfg(test)]
-use clvm_traits::ToClvm;
+use clvm_traits::{FromClvm, ToClvm};
+
+#[cfg(test)]
+use clvmr::Allocator;
 
 #[cfg(feature = "py-bindings")]
 use crate::public_key::parse_hex_string;
@@ -193,10 +195,10 @@ impl FromJsonDict for Signature {
     }
 }
 
-impl FromClvm for Signature {
-    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self> {
-        let blob = if let SExp::Atom = a.sexp(ptr) {
-            a.atom(ptr)
+impl<N> ParseTree<N> for Signature {
+    fn parse_tree<'a>(f: &impl Fn(N) -> Value<'a, N>, ptr: N) -> anyhow::Result<Self> {
+        let blob = if let Value::Atom(atom) = f(ptr) {
+            atom
         } else {
             return Err(anyhow::Error::msg("expected atom"));
         };

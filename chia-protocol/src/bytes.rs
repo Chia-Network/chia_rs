@@ -1,8 +1,6 @@
 use chia_traits::chia_error;
 use chia_traits::{read_bytes, Streamable};
-use clvm_traits::{BuildTree, FromClvm, Value};
-use clvmr::allocator::{NodePtr, SExp};
-use clvmr::Allocator;
+use clvm_traits::{BuildTree, ParseTree, Value};
 use core::fmt::Formatter;
 use sha2::{Digest, Sha256};
 use std::convert::AsRef;
@@ -96,10 +94,10 @@ impl<N> BuildTree<N> for Bytes {
     }
 }
 
-impl FromClvm for Bytes {
-    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self> {
-        if let SExp::Atom = a.sexp(ptr) {
-            Ok(Self(a.atom(ptr).to_vec()))
+impl<N> ParseTree<N> for Bytes {
+    fn parse_tree<'a>(f: &impl Fn(N) -> Value<'a, N>, ptr: N) -> clvm_traits::Result<Self> {
+        if let Value::Atom(atom) = f(ptr) {
+            Ok(Self(atom.to_vec()))
         } else {
             Err(clvm_traits::Error::msg("expected atom"))
         }
@@ -204,15 +202,11 @@ impl<N, const LEN: usize> BuildTree<N> for BytesImpl<LEN> {
     }
 }
 
-impl<const N: usize> FromClvm for BytesImpl<N> {
-    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self> {
-        if let SExp::Atom = a.sexp(ptr) {
-            return match a.atom(ptr).try_into() {
-                Ok(value) => Ok(value),
-                Err(_) => Err(clvm_traits::Error::msg("expected cons")),
-            };
-        } else {
-            Err(clvm_traits::Error::msg("expected atom"))
+impl<N, const LEN: usize> ParseTree<N> for BytesImpl<LEN> {
+    fn parse_tree<'a>(f: &impl Fn(N) -> Value<'a, N>, ptr: N) -> clvm_traits::Result<Self> {
+        match f(ptr) {
+            Value::Atom(atom) => Ok(atom.try_into()?),
+            _ => Err(clvm_traits::Error::msg("expected atom")),
         }
     }
 }
@@ -412,7 +406,11 @@ impl<'py> FromPyObject<'py> for Bytes {
 mod tests {
     use super::*;
 
-    use clvmr::serde::{node_from_bytes, node_to_bytes};
+    use clvm_traits::FromClvm;
+    use clvmr::{
+        serde::{node_from_bytes, node_to_bytes},
+        Allocator,
+    };
     use rstest::rstest;
 
     #[rstest]

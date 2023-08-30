@@ -123,6 +123,7 @@ where
 
 impl<N, T> ParseTree<N> for Option<T>
 where
+    N: Copy,
     T: ParseTree<N>,
 {
     fn parse_tree<'a>(f: &impl Fn(N) -> Value<'a, N>, ptr: N) -> Result<Self> {

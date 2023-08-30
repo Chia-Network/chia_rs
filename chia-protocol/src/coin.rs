@@ -1,14 +1,9 @@
 use crate::streamable_struct;
 use crate::{bytes::Bytes32, BytesImpl};
 use chia_streamable_macro::Streamable;
-use clvm_traits::{clvm_list, destructure_list, match_list, BuildTree, FromClvm, Value};
-use clvmr::allocator::NodePtr;
-use clvmr::Allocator;
+use clvm_traits::{clvm_list, destructure_list, match_list, BuildTree, ParseTree, Value};
 use sha2::{Digest, Sha256};
 use std::convert::TryInto;
-
-#[cfg(test)]
-use clvm_traits::ToClvm;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
@@ -61,14 +56,14 @@ impl<N> BuildTree<N> for Coin {
         &self,
         f: &mut impl FnMut(Value<N>) -> clvm_traits::Result<N>,
     ) -> clvm_traits::Result<N> {
-        clvm_list!(self.parent_coin_info, self.puzzle_hash, self.amount).collect_tree(f)
+        clvm_list!(self.parent_coin_info, self.puzzle_hash, self.amount).build_tree(f)
     }
 }
 
-impl FromClvm for Coin {
-    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self> {
+impl<N> ParseTree<N> for Coin {
+    fn parse_tree<'a>(f: &impl Fn(N) -> Value<'a, N>, ptr: N) -> clvm_traits::Result<Self> {
         let destructure_list!(parent_coin_info, puzzle_hash, amount) =
-            <match_list!(BytesImpl<32>, BytesImpl<32>, u64)>::from_clvm(a, ptr)?;
+            <match_list!(BytesImpl<32>, BytesImpl<32>, u64)>::parse_tree(f, ptr)?;
         Ok(Coin {
             parent_coin_info,
             puzzle_hash,
@@ -80,7 +75,11 @@ impl FromClvm for Coin {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use clvmr::serde::{node_from_bytes, node_to_bytes};
+    use clvm_traits::{FromClvm, ToClvm};
+    use clvmr::{
+        serde::{node_from_bytes, node_to_bytes},
+        Allocator,
+    };
     use rstest::rstest;
 
     #[rstest]
