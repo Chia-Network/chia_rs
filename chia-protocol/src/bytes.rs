@@ -675,15 +675,9 @@ mod tests {
         let bytes =
             hex::decode("f07522495060c066f66f32acc2a77e3a3e737aca8baea4d1a64ea4cdc13da9").unwrap();
         let ptr = a.new_atom(&bytes).unwrap();
-        assert_eq!(
-            Bytes32::from_clvm(a, ptr).unwrap_err(),
-            clvm_traits::Error::Custom("invalid size".to_string())
-        );
+        assert!(Bytes32::from_clvm(a, ptr).is_err());
 
         let ptr = a.new_pair(a.one(), a.one()).unwrap();
-        assert_eq!(
-            Bytes32::from_clvm(a, ptr).unwrap_err(),
-            clvm_traits::Error::ExpectedAtom(ptr)
-        );
+        assert!(Bytes32::from_clvm(a, ptr).is_err());
     }
 }

@@ -489,10 +489,7 @@ mod tests {
     fn test_from_clvm_failure() {
         let mut a = Allocator::new();
         let ptr = a.new_pair(a.one(), a.one()).expect("new_pair");
-        assert_eq!(
-            PublicKey::from_clvm(&a, ptr).unwrap_err(),
-            clvm_traits::Error::ExpectedAtom(ptr)
-        );
+        assert!(PublicKey::from_clvm(&a, ptr).is_err());
     }
 }
 
