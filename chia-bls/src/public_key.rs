@@ -10,12 +10,6 @@ use std::io::Cursor;
 use std::mem::MaybeUninit;
 use std::ops::{Add, AddAssign};
 
-#[cfg(test)]
-use clvm_traits::{FromClvm, ToClvm};
-
-#[cfg(test)]
-use clvmr::Allocator;
-
 #[cfg(feature = "py-bindings")]
 use crate::{GTElement, Signature};
 #[cfg(feature = "py-bindings")]
@@ -303,6 +297,8 @@ impl<N> BuildTree<N> for PublicKey {
 mod tests {
     use super::*;
     use crate::SecretKey;
+    use clvm_traits::{FromClvm, ToClvm};
+    use clvmr::Allocator;
     use hex::FromHex;
     use rand::rngs::StdRng;
     use rand::{Rng, SeedableRng};

@@ -11,12 +11,6 @@ use std::io::Cursor;
 use std::mem::MaybeUninit;
 use std::ops::{Add, AddAssign};
 
-#[cfg(test)]
-use clvm_traits::{FromClvm, ToClvm};
-
-#[cfg(test)]
-use clvmr::Allocator;
-
 #[cfg(feature = "py-bindings")]
 use crate::public_key::parse_hex_string;
 #[cfg(feature = "py-bindings")]
@@ -406,6 +400,8 @@ pub fn sign<Msg: AsRef<[u8]>>(sk: &SecretKey, msg: Msg) -> Signature {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use clvm_traits::{FromClvm, ToClvm};
+    use clvmr::Allocator;
     use hex::FromHex;
     use rand::rngs::StdRng;
     use rand::{Rng, SeedableRng};
