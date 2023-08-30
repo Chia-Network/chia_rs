@@ -1,10 +1,10 @@
-use proc_macro2::{Ident, TokenStream};
+use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
-use syn::{parse_quote, spanned::Spanned, Data, DeriveInput, Fields, Type};
+use syn::{parse_quote, spanned::Spanned, Data, DeriveInput, Fields, Lifetime, Type};
 
 use crate::helpers::{add_trait_bounds, parse_args, Repr};
 
-pub fn from_clvm(mut ast: DeriveInput) -> TokenStream {
+pub fn parse_tree(mut ast: DeriveInput) -> TokenStream {
     let args = parse_args(&ast.attrs);
     let crate_name = quote!(clvm_traits);
 
@@ -57,14 +57,33 @@ pub fn from_clvm(mut ast: DeriveInput) -> TokenStream {
         ),
     };
 
-    add_trait_bounds(&mut ast.generics, parse_quote!(#crate_name::FromClvm));
+    let generic_name = Ident::new("__N", Span::call_site());
+    let lifetime_name = Lifetime::new("'a", Span::call_site());
+
+    add_trait_bounds(
+        &mut ast.generics,
+        parse_quote!(#crate_name::ParseTree<#generic_name>),
+    );
+
     let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
+    let mut tokens = quote!(#impl_generics).into_iter().collect::<Vec<_>>();
+    if tokens.len() >= 2 {
+        tokens.remove(0);
+        tokens.remove(tokens.len() - 1);
+    }
+    let mut impl_generics = TokenStream::new();
+    impl_generics.extend(tokens.into_iter());
 
     quote! {
         #[automatically_derived]
-        impl #impl_generics #crate_name::FromClvm for #struct_name #ty_generics #where_clause {
-            fn from_clvm(a: &clvmr::Allocator, node: clvmr::allocator::NodePtr) -> #crate_name::Result<Self> {
-                let #destructure_macro!( #( #field_names, )* ) = <#match_macro!( #( #field_types ),* ) as #crate_name::FromClvm>::from_clvm(a, node)?;
+        impl<#generic_name, #impl_generics> #crate_name::ParseTree<#generic_name>
+        for #struct_name #ty_generics #where_clause {
+            fn parse_tree<#lifetime_name>(
+                f: &impl Fn(#generic_name) -> #crate_name::Value<#lifetime_name, #generic_name>,
+                ptr: #generic_name
+            ) -> #crate_name::Result<Self> {
+                let #destructure_macro!( #( #field_names, )* ) =
+                    <#match_macro!( #( #field_types ),* ) as #crate_name::ParseTree<#generic_name>>::parse_tree(f, ptr)?;
                 Ok(#initializer)
             }
         }

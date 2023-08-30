@@ -3,7 +3,7 @@ use clvmr::{allocator::NodePtr, Allocator};
 
 use crate::{BuildTree, Value};
 
-pub trait ToClvm {
+pub trait ToClvm: BuildTree<NodePtr> {
     fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr>;
 }
 

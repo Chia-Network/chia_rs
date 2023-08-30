@@ -1,9 +1,4 @@
-use clvmr::{
-    allocator::{NodePtr, SExp},
-    Allocator,
-};
-
-use crate::{BuildTree, Error, FromClvm, Result, Value};
+use crate::{BuildTree, Error, ParseTree, Result, Value};
 
 #[derive(Debug, Copy, Clone)]
 pub struct MatchByte<const BYTE: u8>;
@@ -14,19 +9,16 @@ impl<N, const BYTE: u8> BuildTree<N> for MatchByte<BYTE> {
     }
 }
 
-impl<const BYTE: u8> FromClvm for MatchByte<BYTE> {
-    fn from_clvm(a: &Allocator, node: NodePtr) -> Result<Self> {
-        if let SExp::Atom = a.sexp(node) {
-            match a.atom(node) {
-                [] if BYTE == 0 => Ok(Self),
-                [byte] if *byte == BYTE && BYTE > 0 => Ok(Self),
-                _ => Err(Error::msg(format!(
-                    "expected an atom with a value of {}",
-                    BYTE
-                ))),
-            }
-        } else {
-            Err(Error::msg("expected atom"))
+impl<N, const BYTE: u8> ParseTree<N> for MatchByte<BYTE> {
+    fn parse_tree<'a>(f: &impl Fn(N) -> Value<'a, N>, ptr: N) -> Result<Self> {
+        match f(ptr) {
+            Value::Atom(&[]) if BYTE == 0 => Ok(Self),
+            Value::Atom(&[byte]) if byte == BYTE && BYTE > 0 => Ok(Self),
+            Value::Atom(_) => Err(Error::msg(format!(
+                "expected an atom with a value of {}",
+                BYTE
+            ))),
+            _ => Err(Error::msg("expected atom")),
         }
     }
 }

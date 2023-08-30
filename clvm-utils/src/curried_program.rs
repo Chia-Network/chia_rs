@@ -1,8 +1,7 @@
 use clvm_traits::{
     clvm_list, clvm_quote, destructure_list, destructure_quote, match_list, match_quote, BuildTree,
-    FromClvm, MatchByte, Result, Value,
+    MatchByte, ParseTree, Result, Value,
 };
-use clvmr::{allocator::NodePtr, Allocator};
 
 #[derive(Debug, Clone)]
 pub struct CurriedProgram<N, T> {
@@ -10,13 +9,14 @@ pub struct CurriedProgram<N, T> {
     pub args: T,
 }
 
-impl<T> FromClvm for CurriedProgram<NodePtr, T>
+impl<N, T> ParseTree<N> for CurriedProgram<N, T>
 where
-    T: FromClvm,
+    N: ParseTree<N>,
+    T: ParseTree<N>,
 {
-    fn from_clvm(a: &Allocator, ptr: NodePtr) -> Result<Self> {
+    fn parse_tree<'a>(f: &impl Fn(&N) -> Value<'a, N>, ptr: N) -> Result<Self> {
         let destructure_list!(_, destructure_quote!(program), args) =
-            <match_list!(MatchByte<2>, match_quote!(NodePtr), T)>::from_clvm(a, ptr)?;
+            <match_list!(MatchByte<2>, match_quote!(N), T)>::parse_tree(f, ptr)?;
 
         Ok(Self { program, args })
     }
@@ -36,15 +36,15 @@ where
 mod tests {
     use std::fmt::Debug;
 
-    use clvm_traits::{clvm_curried_args, ToClvm};
-    use clvmr::serde::node_to_bytes;
+    use clvm_traits::{clvm_curried_args, FromClvm, ToClvm};
+    use clvmr::{serde::node_to_bytes, Allocator};
 
     use super::*;
 
     fn check<T, A>(program: T, args: A, expected: &str)
     where
-        T: Debug + BuildTree<NodePtr> + PartialEq + FromClvm,
-        A: Debug + PartialEq + BuildTree<NodePtr> + FromClvm,
+        T: Debug + PartialEq + ToClvm + FromClvm,
+        A: Debug + PartialEq + ToClvm + FromClvm,
     {
         let a = &mut Allocator::new();
 

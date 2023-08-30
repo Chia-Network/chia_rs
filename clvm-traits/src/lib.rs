@@ -44,6 +44,7 @@ mod build_tree;
 mod from_clvm;
 mod macros;
 mod match_byte;
+mod parse_tree;
 mod to_clvm;
 mod value;
 
@@ -52,6 +53,7 @@ pub use build_tree::*;
 pub use from_clvm::*;
 pub use macros::*;
 pub use match_byte::*;
+pub use parse_tree::*;
 pub use to_clvm::*;
 pub use value::*;
 
@@ -83,7 +85,7 @@ mod tests {
 
     #[test]
     fn test_tuple() {
-        #[derive(Debug, BuildTree, FromClvm, PartialEq, Eq)]
+        #[derive(Debug, BuildTree, ParseTree, PartialEq, Eq)]
         #[clvm(tuple)]
         struct TupleStruct {
             a: u64,
@@ -95,7 +97,7 @@ mod tests {
 
     #[test]
     fn test_proper_list() {
-        #[derive(Debug, BuildTree, FromClvm, PartialEq, Eq)]
+        #[derive(Debug, BuildTree, ParseTree, PartialEq, Eq)]
         #[clvm(proper_list)]
         struct ProperListStruct {
             a: u64,
@@ -107,7 +109,7 @@ mod tests {
 
     #[test]
     fn test_curried_args() {
-        #[derive(Debug, BuildTree, FromClvm, PartialEq, Eq)]
+        #[derive(Debug, BuildTree, ParseTree, PartialEq, Eq)]
         #[clvm(curried_args)]
         struct CurriedArgsStruct {
             a: u64,
@@ -122,7 +124,7 @@ mod tests {
 
     #[test]
     fn test_unnamed() {
-        #[derive(Debug, BuildTree, FromClvm, PartialEq, Eq)]
+        #[derive(Debug, BuildTree, ParseTree, PartialEq, Eq)]
         #[clvm(tuple)]
         struct UnnamedStruct(String, String);
 
@@ -131,7 +133,7 @@ mod tests {
 
     #[test]
     fn test_newtype() {
-        #[derive(Debug, BuildTree, FromClvm, PartialEq, Eq)]
+        #[derive(Debug, BuildTree, ParseTree, PartialEq, Eq)]
         #[clvm(tuple)]
         struct NewTypeStruct(String);
 

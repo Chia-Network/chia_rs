@@ -47,9 +47,12 @@ pub fn build_tree(mut ast: DeriveInput) -> TokenStream {
         Repr::CurriedArgs => quote!( #crate_name::clvm_curried_args ),
     };
 
-    add_trait_bounds(&mut ast.generics, parse_quote!(#crate_name::ToClvm));
-
     let generic_name = Ident::new("__N", Span::call_site());
+
+    add_trait_bounds(
+        &mut ast.generics,
+        parse_quote!(#crate_name::BuildTree<#generic_name>),
+    );
 
     let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
     let mut tokens = quote!(#impl_generics).into_iter().collect::<Vec<_>>();

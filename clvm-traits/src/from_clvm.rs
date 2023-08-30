@@ -1,155 +1,27 @@
+use anyhow::Result;
 use clvmr::{
     allocator::{NodePtr, SExp},
-    op_utils::nullp,
     Allocator,
 };
-use num_bigint::Sign;
 
-use crate::{Error, Result};
+use crate::{ParseTree, Value};
 
-pub trait FromClvm: Sized {
+pub trait FromClvm: ParseTree<NodePtr> {
     fn from_clvm(a: &Allocator, ptr: NodePtr) -> Result<Self>;
 }
 
-impl FromClvm for NodePtr {
-    fn from_clvm(_a: &Allocator, ptr: NodePtr) -> Result<Self> {
-        Ok(ptr)
-    }
-}
-
-macro_rules! clvm_primitive {
-    ($primitive:ty) => {
-        impl FromClvm for $primitive {
-            fn from_clvm(a: &Allocator, ptr: NodePtr) -> Result<Self> {
-                if let SExp::Atom = a.sexp(ptr) {
-                    let (sign, mut vec) = a.number(ptr).to_bytes_be();
-                    if vec.len() < std::mem::size_of::<$primitive>() {
-                        let mut zeros = vec![0; std::mem::size_of::<$primitive>() - vec.len()];
-                        zeros.extend(vec);
-                        vec = zeros;
-                    }
-                    let value = <$primitive>::from_be_bytes(vec.as_slice().try_into()?);
-                    Ok(if sign == Sign::Minus {
-                        value.wrapping_neg()
-                    } else {
-                        value
-                    })
-                } else {
-                    Err(Error::msg("expected atom"))
-                }
-            }
-        }
-    };
-}
-
-clvm_primitive!(u8);
-clvm_primitive!(i8);
-clvm_primitive!(u16);
-clvm_primitive!(i16);
-clvm_primitive!(u32);
-clvm_primitive!(i32);
-clvm_primitive!(u64);
-clvm_primitive!(i64);
-clvm_primitive!(u128);
-clvm_primitive!(i128);
-clvm_primitive!(usize);
-clvm_primitive!(isize);
-
-impl<A, B> FromClvm for (A, B)
+impl<T> FromClvm for T
 where
-    A: FromClvm,
-    B: FromClvm,
+    T: ParseTree<NodePtr>,
 {
     fn from_clvm(a: &Allocator, ptr: NodePtr) -> Result<Self> {
-        match a.sexp(ptr) {
-            SExp::Pair(first, rest) => Ok((A::from_clvm(a, first)?, B::from_clvm(a, rest)?)),
-            SExp::Atom => Err(Error::msg("expected atom")),
-        }
-    }
-}
-
-impl FromClvm for () {
-    fn from_clvm(a: &Allocator, ptr: NodePtr) -> Result<Self> {
-        if nullp(a, ptr) {
-            Ok(())
-        } else {
-            Err(Error::msg("expected nil"))
-        }
-    }
-}
-
-impl<T, const N: usize> FromClvm for [T; N]
-where
-    T: FromClvm,
-{
-    fn from_clvm(a: &Allocator, mut ptr: NodePtr) -> Result<Self> {
-        let mut items = Vec::with_capacity(N);
-        loop {
-            match a.sexp(ptr) {
-                SExp::Atom => {
-                    if nullp(a, ptr) {
-                        return match items.try_into() {
-                            Ok(value) => Ok(value),
-                            Err(_) => Err(Error::msg("expected cons")),
-                        };
-                    } else {
-                        return Err(Error::msg("expected nil"));
-                    }
-                }
-                SExp::Pair(first, rest) => {
-                    if items.len() >= N {
-                        return Err(Error::msg("expected atom"));
-                    } else {
-                        items.push(T::from_clvm(a, first)?);
-                        ptr = rest;
-                    }
-                }
-            }
-        }
-    }
-}
-
-impl<T> FromClvm for Vec<T>
-where
-    T: FromClvm,
-{
-    fn from_clvm(a: &Allocator, mut ptr: NodePtr) -> Result<Self> {
-        let mut items = Vec::new();
-        loop {
-            match a.sexp(ptr) {
-                SExp::Atom => {
-                    if nullp(a, ptr) {
-                        return Ok(items);
-                    } else {
-                        return Err(Error::msg("expected nil"));
-                    }
-                }
-                SExp::Pair(first, rest) => {
-                    items.push(T::from_clvm(a, first)?);
-                    ptr = rest;
-                }
-            }
-        }
-    }
-}
-
-impl<T: FromClvm> FromClvm for Option<T> {
-    fn from_clvm(a: &Allocator, ptr: NodePtr) -> Result<Self> {
-        if nullp(a, ptr) {
-            Ok(None)
-        } else {
-            Ok(Some(T::from_clvm(a, ptr)?))
-        }
-    }
-}
-
-impl FromClvm for String {
-    fn from_clvm(a: &Allocator, ptr: NodePtr) -> Result<Self> {
-        if let SExp::Atom = a.sexp(ptr) {
-            Ok(Self::from_utf8(a.atom(ptr).to_vec())?)
-        } else {
-            Err(Error::msg("expected atom"))
-        }
+        T::parse_tree(
+            &|ptr| match a.sexp(ptr) {
+                SExp::Atom => Value::Atom(a.atom(ptr)),
+                SExp::Pair(first, rest) => Value::Pair(first, rest),
+            },
+            ptr,
+        )
     }
 }
 
