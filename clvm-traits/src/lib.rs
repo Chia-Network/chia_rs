@@ -18,9 +18,9 @@
 
 ```rust
 use clvmr::Allocator;
-use clvm_traits::{BuildTree, ToClvm, FromClvm};
+use clvm_traits::{BuildTree, ParseTree, ToClvm, FromClvm};
 
-#[derive(Debug, PartialEq, Eq, BuildTree, FromClvm)]
+#[derive(Debug, PartialEq, Eq, BuildTree, ParseTree)]
 #[clvm(tuple)]
 struct Point {
     x: i32,
