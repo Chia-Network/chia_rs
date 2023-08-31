@@ -15,6 +15,7 @@ chia-fuzz = { path = "../../fuzz" }
 clvm-utils = { path = ".." }
 clvm-traits = { path = "../../clvm-traits" }
 chia = { path = "../.." }
+hex = "0.4.3"
 
 [[bin]]
 name = "tree-hash"
@@ -29,3 +30,9 @@ path = "fuzz_targets/curry.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "tree-hash-with-cost"
+path = "fuzz_targets/tree-hash-with-cost.rs"
+test = false
+doc = false

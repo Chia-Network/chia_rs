@@ -128,7 +128,7 @@ pub fn tree_hash_with_cost(
     Some(hashes[0])
 }
 
-#[cfg(test)]
+#[cfg(any(test, fuzzing))]
 pub fn cmp_hash(a: &mut Allocator, root: NodePtr) {
     use clvmr::chia_dialect::ChiaDialect;
     use clvmr::reduction::Reduction;

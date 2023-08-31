@@ -475,6 +475,7 @@ dependencies = [
  "clvm-traits",
  "clvm-utils",
  "clvmr",
+ "hex",
  "libfuzzer-sys",
 ]
 
