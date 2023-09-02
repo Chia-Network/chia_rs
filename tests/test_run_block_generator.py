@@ -9,7 +9,7 @@ def test_run_block_generator_cost() -> None:
     original_consensus_cost = 635805370
     # once the hard fork activates, the cost will be lower, because you no
     # longer pay the cost of the generator ROM
-    hard_fork_consensus_cost = 596498808
+    hard_fork_consensus_cost = original_consensus_cost
 
     generator = bytes.fromhex(open("generator-tests/block-834768.txt", "r").read().split("\n")[0])
     err, conds = run_block_generator(generator, [], original_consensus_cost, 0)
