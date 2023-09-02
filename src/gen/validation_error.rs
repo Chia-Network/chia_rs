@@ -59,7 +59,11 @@ pub struct ValidationErr(pub NodePtr, pub ErrorCode);
 
 impl From<EvalErr> for ValidationErr {
     fn from(v: EvalErr) -> Self {
-        ValidationErr(v.0, ErrorCode::GeneratorRuntimeError)
+        if v.1 == "cost exceeded" {
+            ValidationErr(v.0, ErrorCode::CostExceeded)
+        } else {
+            ValidationErr(v.0, ErrorCode::GeneratorRuntimeError)
+        }
     }
 }
 

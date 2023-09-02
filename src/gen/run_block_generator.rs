@@ -180,6 +180,9 @@ pub fn run_block_generator2<GenBuf: AsRef<[u8]>>(
             &mut cost_left,
         )?;
     }
+    if a.atom_len(all_spends) != 0 {
+        return Err(ValidationErr(all_spends, ErrorCode::GeneratorRuntimeError));
+    }
 
     validate_conditions(a, &ret, state, a.null(), flags)?;
 
