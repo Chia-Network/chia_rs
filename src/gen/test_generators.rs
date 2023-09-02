@@ -217,18 +217,10 @@ fn run_generator(#[case] name: &str) {
                 Err(code) => (0, format!("FAILED: {}\n", u32::from(code.1))),
             };
 
-        let output_hard_fork =
+        let output2 =
             match run_block_generator2(&mut a, &generator, &block_refs, 11000000000, *flags) {
-                Ok(mut conditions) => {
-                    // in the hard fork, the cost of running the genrator +
-                    // puzzles should never be higher than before the hard-fork
-                    // but it's likely less.
-                    assert!(conditions.cost <= expected_cost);
-                    assert!(conditions.cost > 0);
-                    // update the cost we print here, just to be compatible with
-                    // the test cases we have. We've already ensured the cost is
-                    // lower
-                    conditions.cost = expected_cost;
+                Ok(conditions) => {
+                    assert_eq!(conditions.cost, expected_cost);
                     print_conditions(&a, &conditions)
                 }
                 Err(code) => {
@@ -236,8 +228,8 @@ fn run_generator(#[case] name: &str) {
                 }
             };
 
-        if output != output_hard_fork {
-            print_diff(&output, &output_hard_fork);
+        if output != output2 {
+            print_diff(&output, &output2);
             panic!("run_block_generator2 produced a different result!");
         }
 
