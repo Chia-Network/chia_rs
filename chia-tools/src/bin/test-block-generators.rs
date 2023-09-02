@@ -244,17 +244,7 @@ fn main() {
             let mut conditions = block_runner(&mut a, generator, &block_refs, ti.cost, flags)
                 .expect("failed to run block generator");
 
-            if args.rust_generator || args.test_backrefs {
-                assert!(conditions.cost <= ti.cost);
-                assert!(conditions.cost > 0);
-
-                // in order for the comparison below the hold, we need to
-                // patch up the cost of the rust generator to look like the
-                // baseline
-                conditions.cost = ti.cost;
-            } else {
-                assert_eq!(conditions.cost, ti.cost);
-            }
+            assert_eq!(conditions.cost, ti.cost);
 
             if args.validate {
                 let mut baseline =
