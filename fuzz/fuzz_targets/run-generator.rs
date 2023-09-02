@@ -2,7 +2,6 @@
 use chia::allocator::make_allocator;
 use chia::gen::flags::{ALLOW_BACKREFS, LIMIT_OBJECTS};
 use chia::gen::run_block_generator::{run_block_generator, run_block_generator2};
-use chia::gen::validation_error::{ErrorCode, ValidationErr};
 use clvmr::chia_dialect::LIMIT_HEAP;
 use libfuzzer_sys::fuzz_target;
 
@@ -16,18 +15,13 @@ fuzz_target!(|data: &[u8]| {
     drop(a2);
 
     match (r1, r2) {
-        (Err(ValidationErr(_, ErrorCode::CostExceeded)), Ok(_)) => {
-            // Since run_block_generator2 cost less, it's not a problem if the
-            // original generator runs our of cost while the rust implementation
-            // succeeds. This is part of its features.
-        }
         (Err(_), Err(_)) => {
             // The specific error may not match, because
             // run_block_generator2() parses conditions after each spend
             // instead of after running all spends
         }
         (Ok(a), Ok(b)) => {
-            assert!(a.cost >= b.cost);
+            assert_eq!(a.cost, b.cost);
             assert_eq!(a.reserve_fee, b.reserve_fee);
             assert_eq!(a.removal_amount, b.removal_amount);
             assert_eq!(a.addition_amount, b.addition_amount);
