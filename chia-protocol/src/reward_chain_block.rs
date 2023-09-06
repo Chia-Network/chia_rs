@@ -2,9 +2,9 @@ use crate::streamable_struct;
 use chia_streamable_macro::Streamable;
 
 use crate::Bytes32;
-use crate::G2Element;
 use crate::ProofOfSpace;
 use crate::VDFInfo;
+use chia_bls::G2Element;
 
 streamable_struct! (RewardChainBlockUnfinished {
     total_iters: u128,

@@ -80,8 +80,8 @@ impl FromClvm for Program {
 
 impl ToClvm for Program {
     fn to_clvm(&self, a: &mut Allocator) -> clvm_traits::Result<NodePtr> {
-        Ok(node_from_bytes(a, self.0.as_ref())
-            .map_err(|error| clvm_traits::Error::Custom(error.to_string()))?)
+        node_from_bytes(a, self.0.as_ref())
+            .map_err(|error| clvm_traits::Error::Custom(error.to_string()))
     }
 }
 

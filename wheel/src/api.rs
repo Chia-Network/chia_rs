@@ -5,9 +5,9 @@ use crate::run_generator::{
 };
 use chia::allocator::make_allocator;
 use chia::gen::flags::{
-    AGG_SIG_ARGS, ALLOW_BACKREFS, COND_ARGS_NIL, ENABLE_ASSERT_BEFORE, ENABLE_SOFTFORK_CONDITION,
-    LIMIT_ANNOUNCES, LIMIT_OBJECTS, MEMPOOL_MODE, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
-    NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
+    AGG_SIG_ARGS, ALLOW_BACKREFS, COND_ARGS_NIL, ENABLE_SOFTFORK_CONDITION, LIMIT_ANNOUNCES,
+    LIMIT_OBJECTS, MEMPOOL_MODE, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL, NO_UNKNOWN_CONDS,
+    STRICT_ARGS_COUNT,
 };
 use chia::gen::run_puzzle::run_puzzle as native_run_puzzle;
 use chia::gen::solution_generator::solution_generator as native_solution_generator;
@@ -15,8 +15,6 @@ use chia::gen::solution_generator::solution_generator_backrefs as native_solutio
 use chia::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_protocol::Bytes32;
 use chia_protocol::FullBlock;
-use chia_protocol::G1Element;
-use chia_protocol::G2Element;
 use chia_protocol::{
     ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin, CoinSpend, CoinState,
     CoinStateUpdate, EndOfSubSlotBundle, Foliage, FoliageTransactionBlock,
@@ -38,13 +36,16 @@ use clvmr::{
     NO_UNKNOWN_OPS,
 };
 use pyo3::buffer::PyBuffer;
+use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
 use pyo3::types::PyBytes;
+use pyo3::types::PyList;
 use pyo3::types::PyModule;
 use pyo3::types::PyTuple;
 use pyo3::{wrap_pyfunction, PyResult, Python};
 use std::convert::TryInto;
+use std::iter::zip;
 
 use crate::run_program::{run_chia_program, serialized_length};
 
@@ -59,6 +60,10 @@ use clvmr::run_program;
 use clvmr::serde::node_to_bytes;
 use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs, node_to_bytes_backrefs};
 use clvmr::ChiaDialect;
+
+use chia_bls::{
+    hash_to_g2 as native_hash_to_g2, DerivableKey, GTElement, PublicKey, SecretKey, Signature,
+};
 
 #[pyfunction]
 pub fn compute_merkle_set_root<'p>(
@@ -180,6 +185,86 @@ fn solution_generator_backrefs<'p>(py: Python<'p>, spends: &PyAny) -> PyResult<&
     ))
 }
 
+#[pyclass]
+struct AugSchemeMPL {}
+
+#[pymethods]
+impl AugSchemeMPL {
+    #[staticmethod]
+    #[pyo3(signature = (pk,msg,prepend_pk=None))]
+    pub fn sign(pk: &SecretKey, msg: &[u8], prepend_pk: Option<&PublicKey>) -> Signature {
+        match prepend_pk {
+            Some(prefix) => {
+                let mut aug_msg = prefix.to_bytes().to_vec();
+                aug_msg.extend_from_slice(msg);
+                chia_bls::sign_raw(pk, aug_msg)
+            }
+            None => chia_bls::sign(pk, msg),
+        }
+    }
+
+    #[staticmethod]
+    pub fn aggregate(sigs: &PyList) -> PyResult<Signature> {
+        let mut ret = Signature::default();
+        for p2 in sigs {
+            ret += &p2.extract::<Signature>()?;
+        }
+        Ok(ret)
+    }
+
+    #[staticmethod]
+    pub fn verify(pk: &PublicKey, msg: &[u8], sig: &Signature) -> bool {
+        chia_bls::verify(sig, pk, msg)
+    }
+
+    #[staticmethod]
+    pub fn aggregate_verify(pks: &PyList, msgs: &PyList, sig: &Signature) -> PyResult<bool> {
+        let mut data = Vec::<(PublicKey, Vec<u8>)>::new();
+        if pks.len() != msgs.len() {
+            return Err(PyRuntimeError::new_err(
+                "aggregate_verify expects the same number of public keys as messages",
+            ));
+        }
+        for (pk, msg) in zip(pks, msgs) {
+            let pk = pk.extract::<PublicKey>()?;
+            let msg = msg.extract::<Vec<u8>>()?;
+            data.push((pk, msg));
+        }
+
+        Ok(chia_bls::aggregate_verify(sig, data))
+    }
+
+    #[staticmethod]
+    pub fn g2_from_message(msg: &[u8]) -> Signature {
+        native_hash_to_g2(msg)
+    }
+
+    #[staticmethod]
+    pub fn derive_child_sk(sk: &SecretKey, index: u32) -> SecretKey {
+        sk.derive_hardened(index)
+    }
+
+    #[staticmethod]
+    pub fn derive_child_sk_unhardened(sk: &SecretKey, index: u32) -> SecretKey {
+        sk.derive_unhardened(index)
+    }
+
+    #[staticmethod]
+    pub fn derive_child_pk_unhardened(pk: &PublicKey, index: u32) -> PublicKey {
+        pk.derive_unhardened(index)
+    }
+
+    #[staticmethod]
+    pub fn key_gen(seed: &[u8]) -> PyResult<SecretKey> {
+        if seed.len() < 32 {
+            return Err(PyRuntimeError::new_err(
+                "Seed size must be at leat 32 bytes",
+            ));
+        }
+        Ok(SecretKey::from_seed(seed))
+    }
+}
+
 #[pymodule]
 pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     // generator functions
@@ -201,7 +286,6 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     m.add("STRICT_ARGS_COUNT", STRICT_ARGS_COUNT)?;
     m.add("LIMIT_ANNOUNCES", LIMIT_ANNOUNCES)?;
     m.add("AGG_SIG_ARGS", AGG_SIG_ARGS)?;
-    m.add("ENABLE_ASSERT_BEFORE", ENABLE_ASSERT_BEFORE)?;
     m.add("ENABLE_FIXED_DIV", ENABLE_FIXED_DIV)?;
     m.add("ENABLE_SOFTFORK_CONDITION", ENABLE_SOFTFORK_CONDITION)?;
     m.add(
@@ -214,8 +298,6 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
 
     // Chia classes
     m.add_class::<Coin>()?;
-    m.add_class::<G1Element>()?;
-    m.add_class::<G2Element>()?;
     m.add_class::<PoolTarget>()?;
     m.add_class::<ClassgroupElement>()?;
     m.add_class::<EndOfSubSlotBundle>()?;
@@ -291,6 +373,14 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(compute_merkle_set_root, m)?)?;
     m.add_function(wrap_pyfunction!(tree_hash, m)?)?;
     m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin, m)?)?;
+
+    // facilities from chia-bls
+
+    m.add_class::<PublicKey>()?;
+    m.add_class::<Signature>()?;
+    m.add_class::<GTElement>()?;
+    m.add_class::<SecretKey>()?;
+    m.add_class::<AugSchemeMPL>()?;
 
     compression::add_submodule(py, m)?;
 
