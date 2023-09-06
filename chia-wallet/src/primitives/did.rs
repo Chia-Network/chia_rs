@@ -44,3 +44,19 @@ pub static DID_INNER_PUZZLE_HASH: [u8; 32] = hex!(
     33143d2bef64f14036742673afd158126b94284b4530a28c354fac202b0c910e
     "
 );
+
+#[cfg(test)]
+mod tests {
+    use clvm_utils::tree_hash;
+    use clvmr::{serde::node_from_bytes, Allocator};
+
+    use super::*;
+
+    #[test]
+    fn did() {
+        let mut a = Allocator::new();
+        let ptr = node_from_bytes(&mut a, &DID_INNER_PUZZLE).unwrap();
+        let hash = tree_hash(&mut a, ptr);
+        assert_eq!(DID_INNER_PUZZLE_HASH, hash);
+    }
+}

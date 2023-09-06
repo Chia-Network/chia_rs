@@ -30,3 +30,27 @@ pub static DEFAULT_HIDDEN_PUZZLE_HASH: [u8; 32] = hex!(
     711d6c4e32c92e53179b199484cf8c897542bc57f2b22582799f9d657eec4699
     "
 );
+
+#[cfg(test)]
+mod tests {
+    use clvm_utils::tree_hash;
+    use clvmr::{serde::node_from_bytes, Allocator};
+
+    use super::*;
+
+    #[test]
+    fn standard() {
+        let mut a = Allocator::new();
+        let ptr = node_from_bytes(&mut a, &STANDARD_PUZZLE).unwrap();
+        let hash = tree_hash(&mut a, ptr);
+        assert_eq!(STANDARD_PUZZLE_HASH, hash);
+    }
+
+    #[test]
+    fn default_hidden() {
+        let mut a = Allocator::new();
+        let ptr = node_from_bytes(&mut a, &DEFAULT_HIDDEN_PUZZLE).unwrap();
+        let hash = tree_hash(&mut a, ptr);
+        assert_eq!(DEFAULT_HIDDEN_PUZZLE_HASH, hash);
+    }
+}

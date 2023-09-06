@@ -62,3 +62,27 @@ pub static SINGLETON_TOP_LAYER_PUZZLE_HASH: [u8; 32] = hex!(
     7faa3253bfddd1e0decb0906b2dc6247bbc4cf608f58345d173adb63e8b47c9f
     "
 );
+
+#[cfg(test)]
+mod tests {
+    use clvm_utils::tree_hash;
+    use clvmr::{serde::node_from_bytes, Allocator};
+
+    use super::*;
+
+    #[test]
+    fn singleton_launcher() {
+        let mut a = Allocator::new();
+        let ptr = node_from_bytes(&mut a, &SINGLETON_LAUNCHER_PUZZLE).unwrap();
+        let hash = tree_hash(&mut a, ptr);
+        assert_eq!(SINGLETON_LAUNCHER_PUZZLE_HASH, hash);
+    }
+
+    #[test]
+    fn singleton_top_layer() {
+        let mut a = Allocator::new();
+        let ptr = node_from_bytes(&mut a, &SINGLETON_TOP_LAYER_PUZZLE).unwrap();
+        let hash = tree_hash(&mut a, ptr);
+        assert_eq!(SINGLETON_TOP_LAYER_PUZZLE_HASH, hash);
+    }
+}

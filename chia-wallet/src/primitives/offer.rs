@@ -40,3 +40,37 @@ pub static SETTLEMENT_PAYMENTS_PUZZLE_V1: [u8; 267] = hex!(
     ff058080ff0180ff018080
     "
 );
+
+/// This is the puzzle hash of the old [offer settlement payments](https://chialisp.com/offers) puzzle.
+///
+/// **Warning:**
+/// It is recommended not to use settlement payments v1 for anything other than backwards compatibility (e.g. offer compression).
+pub static SETTLEMENT_PAYMENTS_PUZZLE_HASH_V1: [u8; 32] = hex!(
+    "
+    bae24162efbd568f89bc7a340798a6118df0189eb9e3f8697bcea27af99f8f79
+    "
+);
+
+#[cfg(test)]
+mod tests {
+    use clvm_utils::tree_hash;
+    use clvmr::{serde::node_from_bytes, Allocator};
+
+    use super::*;
+
+    #[test]
+    fn settlement_payments() {
+        let mut a = Allocator::new();
+        let ptr = node_from_bytes(&mut a, &SETTLEMENT_PAYMENTS_PUZZLE).unwrap();
+        let hash = tree_hash(&mut a, ptr);
+        assert_eq!(SETTLEMENT_PAYMENTS_PUZZLE_HASH, hash);
+    }
+
+    #[test]
+    fn settlement_payments_v1() {
+        let mut a = Allocator::new();
+        let ptr = node_from_bytes(&mut a, &SETTLEMENT_PAYMENTS_PUZZLE_V1).unwrap();
+        let hash = tree_hash(&mut a, ptr);
+        assert_eq!(SETTLEMENT_PAYMENTS_PUZZLE_HASH_V1, hash);
+    }
+}

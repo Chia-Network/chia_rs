@@ -129,3 +129,39 @@ pub static CAT_PUZZLE_V1: [u8; 1420] = hex!(
     8080808080808080ff018080
     "
 );
+
+/// This is the puzzle hash of the old [CAT1 standard](https://chialisp.com/cats) puzzle.
+///
+/// **Warning:**
+/// It is recommended not to use CAT1 for anything other than backwards compatibility (e.g. offer compression),
+/// due to security issues uncovered in an audit. You can read more about the vulnerability that prompted the creation
+/// of CAT2 in the [CATbleed Post Mortem](https://github.com/Chia-Network/post-mortem/blob/main/2022-08/2022-08-19-CATbleed.md).
+pub static CAT_PUZZLE_HASH_V1: [u8; 32] = hex!(
+    "
+    72dec062874cd4d3aab892a0906688a1ae412b0109982e1797a170add88bdcdc
+    "
+);
+
+#[cfg(test)]
+mod tests {
+    use clvm_utils::tree_hash;
+    use clvmr::{serde::node_from_bytes, Allocator};
+
+    use super::*;
+
+    #[test]
+    fn cat() {
+        let mut a = Allocator::new();
+        let ptr = node_from_bytes(&mut a, &CAT_PUZZLE).unwrap();
+        let hash = tree_hash(&mut a, ptr);
+        assert_eq!(CAT_PUZZLE_HASH, hash);
+    }
+
+    #[test]
+    fn cat_v1() {
+        let mut a = Allocator::new();
+        let ptr = node_from_bytes(&mut a, &CAT_PUZZLE_V1).unwrap();
+        let hash = tree_hash(&mut a, ptr);
+        assert_eq!(CAT_PUZZLE_HASH_V1, hash);
+    }
+}
