@@ -7,3 +7,6 @@ description = "Chia primitives needed for building wallets."
 authors = ["Brandon Haggstrom <b.haggstrom@chia.net>"]
 homepage = "https://github.com/Chia-Network/chia_rs/chia-wallet/"
 repository = "https://github.com/Chia-Network/chia_rs/chia-wallet/"
+
+[dependencies]
+hex-literal = "0.4.1"
