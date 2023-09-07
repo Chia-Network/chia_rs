@@ -43,9 +43,10 @@ jobs:
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
           source $HOME/.cargo/env && \
           python3 -m venv venv && \
-          ./venv/bin/pip install --upgrade pip && \
-          ./venv/bin/pip install maturin && \
-          ./venv/bin/maturin build -i python --release -m wheel/Cargo.toml \
+          source ./venv/bin/activate && \
+          pip install --upgrade pip && \
+          pip install maturin && \
+          maturin build -i python --release -m wheel/Cargo.toml \
           '
 
     - name: Upload artifacts
