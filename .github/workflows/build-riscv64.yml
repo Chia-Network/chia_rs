@@ -26,7 +26,6 @@ jobs:
         fetch-depth: 1
 
     - name: Set up QEMU on x86_64
-      if: startsWith(matrix.os, 'ubuntu-latest')
       id: qemu
       uses: docker/setup-qemu-action@v2
       with:
@@ -42,10 +41,12 @@ jobs:
           apt-get install -y build-essential git python3-full python3-dev python3-pip libssl-dev curl && \
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
           source $HOME/.cargo/env && \
+          cargo build --release && \
+          cargo test && cargo test --release && \
           python3 -m venv venv && \
           source ./venv/bin/activate && \
           pip install --upgrade pip && \
-          pip install maturin && \
+          pip install --extra-index-url https://pypi.chia.net/simple/ maturin==1.2.3 && \
           maturin build -i python --release -m wheel/Cargo.toml \
           '
 
