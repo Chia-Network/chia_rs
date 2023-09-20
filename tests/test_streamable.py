@@ -1,4 +1,4 @@
-from chia_rs import Spend, SpendBundleConditions, Coin, G1Element, G2Element
+from chia_rs import Spend, SpendBundleConditions, Coin, G1Element, G2Element, Program
 import pytest
 import copy
 
@@ -379,3 +379,29 @@ def test_g2_element() -> None:
 
     d = G2Element.from_json_dict("0xa566b4d972db20765c668ce7fdcd76a4a5a8201dc2d5b1e747e2993fcdd99c8c96c1ca0503ade72809ae6d19c5e8400e10900a24ae56b7c9c84231ed5b7dd4c0790dd1aef56e0820e86994aa02c33bd409d3f17ace74c7fa40b00fe5022cc6d6")
     assert a == d
+
+def test_program() -> None:
+    p = Program.from_json_dict("0xff8080")
+    assert str(p) == "Program(ff8080)"
+    assert p.to_bytes() == bytes.fromhex("ff8080")
+
+    p = Program.from_bytes(bytes.fromhex("ff8080"))
+    assert str(p) == "Program(ff8080)"
+    assert p.to_bytes() == bytes.fromhex("ff8080")
+
+    # truncated serialization
+    with pytest.raises(ValueError, match="unexpected end of buffer"):
+        Program.from_bytes(bytes.fromhex("ff80"))
+
+    # garbage at the end of the serialization
+    # Streamable is OK with more data after the object, it's how we serialize
+    # a stream of members and items
+    Program.from_bytes(bytes.fromhex("ff808080"))
+
+    # truncated serialization
+    with pytest.raises(ValueError, match="unexpected end of buffer"):
+        Program.from_json_dict("0xff80")
+
+    # garbage at the end of the serialization
+    with pytest.raises(ValueError, match="invalid CLVM serialization"):
+        Program.from_json_dict("0xff808080")

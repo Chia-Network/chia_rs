@@ -16,6 +16,8 @@ pub enum Error {
     SequenceTooLarge,
     #[error("invalid enum value")]
     InvalidEnum,
+    #[error("invalid CLVM serialization")]
+    InvalidClvm,
     #[error("{0}")]
     Custom(String),
 }
