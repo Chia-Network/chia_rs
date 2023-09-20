@@ -56,7 +56,7 @@ impl Streamable for Program {
 
 #[cfg(feature = "py-bindings")]
 impl ToJsonDict for Program {
-    fn to_json_dict(&self, py: Python) -> pyo3::PyResult<PyObject> {
+    fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
         self.0.to_json_dict(py)
     }
 }
@@ -64,7 +64,16 @@ impl ToJsonDict for Program {
 #[cfg(feature = "py-bindings")]
 impl FromJsonDict for Program {
     fn from_json_dict(o: &PyAny) -> PyResult<Self> {
-        Ok(Self(Bytes::from_json_dict(o)?))
+        let bytes = Bytes::from_json_dict(o)?;
+        let len =
+            serialized_length_from_bytes(bytes.as_slice()).map_err(|_e| Error::EndOfBuffer)?;
+        if len as usize != bytes.len() {
+            // If the bytes in the JSON string is not a valid CLVM
+            // serialization, or if it has garbage at the end of the string,
+            // reject it
+            return Err(Error::InvalidClvm)?;
+        }
+        Ok(Self(bytes))
     }
 }
 

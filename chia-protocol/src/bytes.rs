@@ -23,7 +23,7 @@ use pyo3::prelude::*;
 #[cfg(feature = "py-bindings")]
 use pyo3::types::PyBytes;
 
-#[derive(Hash, Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Hash, Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Bytes(Vec<u8>);
 
 impl Bytes {
@@ -33,6 +33,10 @@ impl Bytes {
 
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+
+    pub fn as_slice(&self) -> &[u8] {
+        self.0.as_slice()
     }
 }
 
@@ -54,6 +58,12 @@ impl Streamable for Bytes {
     fn parse(input: &mut Cursor<&[u8]>) -> chia_error::Result<Self> {
         let len = u32::parse(input)?;
         Ok(Bytes(read_bytes(input, len as usize)?.to_vec()))
+    }
+}
+
+impl Debug for Bytes {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+        formatter.write_str(&hex::encode(&self.0))
     }
 }
 
