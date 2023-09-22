@@ -58,7 +58,7 @@ use clvmr::reduction::EvalErr;
 use clvmr::reduction::Reduction;
 use clvmr::run_program;
 use clvmr::serde::node_to_bytes;
-use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs, node_to_bytes_backrefs};
+use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs};
 use clvmr::ChiaDialect;
 
 use chia_bls::{
@@ -130,11 +130,15 @@ pub fn get_puzzle_and_solution_for_coin<'py>(
         }
     });
 
-    let serialize = if (flags & ALLOW_BACKREFS) != 0 {
-        node_to_bytes_backrefs
-    } else {
-        node_to_bytes
-    };
+    // keep serializing normally, until wallets support backrefs
+    let serialize = node_to_bytes;
+    /*
+        let serialize = if (flags & ALLOW_BACKREFS) != 0 {
+            node_to_bytes_backrefs
+        } else {
+            node_to_bytes
+        };
+    */
     match r {
         Err(eval_err) => eval_err_to_pyresult(py, eval_err, allocator),
         Ok((puzzle, solution)) => Ok((
