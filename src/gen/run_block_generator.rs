@@ -79,7 +79,7 @@ pub fn run_block_generator<GenBuf: AsRef<[u8]>>(
     Ok(result)
 }
 
-fn extract_n<const N: usize>(
+pub fn extract_n<const N: usize>(
     a: &Allocator,
     mut n: NodePtr,
     e: ErrorCode,

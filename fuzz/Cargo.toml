@@ -13,6 +13,7 @@ libfuzzer-sys = "0.4"
 clvmr = "=0.3.0"
 clvm-utils = { path = "../clvm-utils" }
 chia-protocol = { path = "../chia-protocol" }
+chia-traits = { path = "../chia-traits" }
 chia = { path = ".." }
 
 [lib]
@@ -78,6 +79,13 @@ bench = false
 [[bin]]
 name = "run-generator"
 path = "fuzz_targets/run-generator.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "run-puzzle"
+path = "fuzz_targets/run-puzzle.rs"
 test = false
 doc = false
 bench = false

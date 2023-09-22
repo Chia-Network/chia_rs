@@ -29,6 +29,10 @@ impl Program {
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
+
+    pub fn as_slice(&self) -> &[u8] {
+        self.0.as_slice()
+    }
 }
 
 impl Streamable for Program {
