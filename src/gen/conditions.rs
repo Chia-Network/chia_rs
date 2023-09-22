@@ -186,7 +186,7 @@ pub fn parse_args(
             // AGG_SIG_* take two parameters
 
             if (flags & STRICT_ARGS_COUNT) != 0 {
-                check_nil(a, c)?;
+                check_nil(a, rest(a, c)?)?;
             }
             match op {
                 AGG_SIG_PARENT => Ok(Condition::AggSigParent(pubkey, message)),
@@ -1622,7 +1622,11 @@ fn test_invalid_spend_list_terminator() {
 #[case(AGG_SIG_PARENT_AMOUNT, "{pubkey} ({msg1}")]
 #[case(ASSERT_CONCURRENT_SPEND, "{coin12}")]
 #[case(ASSERT_CONCURRENT_PUZZLE, "{h2}")]
-fn test_extra_arg_mempool(#[case] condition: ConditionOpcode, #[case] arg: &str) {
+fn test_extra_arg_mempool(
+    #[case] condition: ConditionOpcode,
+    #[case] arg: &str,
+    #[values(MEMPOOL_MODE, 0)] mempool: u32,
+) {
     // extra args are disallowed in mempool mode
     assert_eq!(
         cond_test_flag(
@@ -1630,7 +1634,7 @@ fn test_extra_arg_mempool(#[case] condition: ConditionOpcode, #[case] arg: &str)
                 "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 )))))",
                 condition as u8, arg
             ),
-            STRICT_ARGS_COUNT | ENABLE_ASSERT_BEFORE | ENABLE_SOFTFORK_CONDITION
+            STRICT_ARGS_COUNT | ENABLE_ASSERT_BEFORE | ENABLE_SOFTFORK_CONDITION | mempool
         )
         .unwrap_err()
         .1,
@@ -1661,28 +1665,62 @@ fn test_extra_arg_mempool(#[case] condition: ConditionOpcode, #[case] arg: &str)
 #[case(ASSERT_MY_PUZZLEHASH, "{h2}", "", |_: &SpendBundleConditions, _: &Spend| {})]
 #[case(ASSERT_CONCURRENT_SPEND, "{coin12}", "", |_: &SpendBundleConditions, _: &Spend| {})]
 #[case(ASSERT_CONCURRENT_PUZZLE, "{h2}", "", |_: &SpendBundleConditions, _: &Spend| {})]
+#[case(AGG_SIG_PARENT, "{pubkey} ({msg1}", "", |_: &SpendBundleConditions, _: &Spend| {})]
+#[case(AGG_SIG_PUZZLE, "{pubkey} ({msg1}", "", |_: &SpendBundleConditions, _: &Spend| {})]
+#[case(AGG_SIG_AMOUNT, "{pubkey} ({msg1}", "", |_: &SpendBundleConditions, _: &Spend| {})]
+#[case(AGG_SIG_PUZZLE_AMOUNT, "{pubkey} ({msg1}", "", |_: &SpendBundleConditions, _: &Spend| {})]
+#[case(AGG_SIG_PARENT_PUZZLE, "{pubkey} ({msg1}", "", |_: &SpendBundleConditions, _: &Spend| {})]
+#[case(AGG_SIG_PARENT_AMOUNT, "{pubkey} ({msg1}", "", |_: &SpendBundleConditions, _: &Spend| {})]
 fn test_extra_arg(
     #[case] condition: ConditionOpcode,
     #[case] arg: &str,
     #[case] extra_cond: &str,
     #[case] test: impl Fn(&SpendBundleConditions, &Spend),
 ) {
-    // extra args are ignored
+    // extra args are ignored in consensus mode
+    // and a failure in mempool mode
+    assert_eq!(
+        cond_test_flag(
+            &format!(
+                "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 ) {} ))))",
+                condition as u8, arg, extra_cond
+            ),
+            ENABLE_ASSERT_BEFORE | ENABLE_SOFTFORK_CONDITION | MEMPOOL_MODE,
+        )
+        .unwrap_err()
+        .1,
+        ErrorCode::InvalidCondition
+    );
+
     let (a, conds) = cond_test_flag(
         &format!(
             "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 ) {} ))))",
             condition as u8, arg, extra_cond
         ),
-        ENABLE_ASSERT_BEFORE,
+        ENABLE_ASSERT_BEFORE | ENABLE_SOFTFORK_CONDITION,
     )
     .unwrap();
 
-    assert_eq!(conds.cost, 0);
+    let has_agg_sig = [
+        AGG_SIG_PARENT,
+        AGG_SIG_PUZZLE,
+        AGG_SIG_AMOUNT,
+        AGG_SIG_PUZZLE_AMOUNT,
+        AGG_SIG_PARENT_PUZZLE,
+        AGG_SIG_PARENT_AMOUNT,
+    ]
+    .contains(&condition);
+
+    let expected_cost = if has_agg_sig { 1200000 } else { 0 };
+
+    let expected_flags = if has_agg_sig { 0 } else { ELIGIBLE_FOR_DEDUP };
+
+    assert_eq!(conds.cost, expected_cost);
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash), H2);
-    assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
+    assert_eq!((spend.flags & ELIGIBLE_FOR_DEDUP), expected_flags);
 
     test(&conds, &spend);
 }
@@ -2761,13 +2799,16 @@ fn agg_sig_vec(c: ConditionOpcode, s: &Spend) -> &[(NodePtr, NodePtr)] {
 #[case(AGG_SIG_PUZZLE_AMOUNT)]
 #[case(AGG_SIG_PARENT_PUZZLE)]
 #[case(AGG_SIG_PARENT_AMOUNT)]
-fn test_single_agg_sig_me(#[case] condition: ConditionOpcode) {
+fn test_single_agg_sig_me(
+    #[case] condition: ConditionOpcode,
+    #[values(MEMPOOL_MODE, 0)] mempool: u32,
+) {
     let (a, conds) = cond_test_flag(
         &format!(
             "((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{msg1}} )))))",
             condition
         ),
-        ENABLE_SOFTFORK_CONDITION,
+        ENABLE_SOFTFORK_CONDITION | mempool,
     )
     .unwrap();
 
@@ -2797,12 +2838,15 @@ fn test_single_agg_sig_me(#[case] condition: ConditionOpcode) {
 #[case(AGG_SIG_PUZZLE_AMOUNT)]
 #[case(AGG_SIG_PARENT_PUZZLE)]
 #[case(AGG_SIG_PARENT_AMOUNT)]
-fn test_duplicate_agg_sig(#[case] condition: ConditionOpcode) {
+fn test_duplicate_agg_sig(
+    #[case] condition: ConditionOpcode,
+    #[values(MEMPOOL_MODE, 0)] mempool: u32,
+) {
     // we cannot deduplicate AGG_SIG conditions. Their signatures will be
     // aggregated, and so must all copies of the public keys
     let (a, conds) =
         cond_test_flag(&format!("((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{msg1}} ) (({} ({{pubkey}} ({{msg1}} ) ))))", condition as u8, condition as u8),
-            ENABLE_SOFTFORK_CONDITION)
+            ENABLE_SOFTFORK_CONDITION | mempool)
             .unwrap();
 
     assert_eq!(conds.cost, AGG_SIG_COST * 2);
@@ -2831,14 +2875,17 @@ fn test_duplicate_agg_sig(#[case] condition: ConditionOpcode) {
 #[case(AGG_SIG_PUZZLE_AMOUNT)]
 #[case(AGG_SIG_PARENT_PUZZLE)]
 #[case(AGG_SIG_PARENT_AMOUNT)]
-fn test_agg_sig_invalid_pubkey(#[case] condition: ConditionOpcode) {
+fn test_agg_sig_invalid_pubkey(
+    #[case] condition: ConditionOpcode,
+    #[values(MEMPOOL_MODE, 0)] mempool: u32,
+) {
     assert_eq!(
         cond_test_flag(
             &format!(
                 "((({{h1}} ({{h2}} (123 ((({} ({{h2}} ({{msg1}} )))))",
                 condition as u8
             ),
-            ENABLE_SOFTFORK_CONDITION
+            ENABLE_SOFTFORK_CONDITION | mempool
         )
         .unwrap_err()
         .1,
@@ -2855,14 +2902,17 @@ fn test_agg_sig_invalid_pubkey(#[case] condition: ConditionOpcode) {
 #[case(AGG_SIG_PUZZLE_AMOUNT)]
 #[case(AGG_SIG_PARENT_PUZZLE)]
 #[case(AGG_SIG_PARENT_AMOUNT)]
-fn test_agg_sig_invalid_msg(#[case] condition: ConditionOpcode) {
+fn test_agg_sig_invalid_msg(
+    #[case] condition: ConditionOpcode,
+    #[values(MEMPOOL_MODE, 0)] mempool: u32,
+) {
     assert_eq!(
         cond_test_flag(
             &format!(
                 "((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{longmsg}} )))))",
                 condition as u8
             ),
-            ENABLE_SOFTFORK_CONDITION
+            ENABLE_SOFTFORK_CONDITION | mempool
         )
         .unwrap_err()
         .1,
