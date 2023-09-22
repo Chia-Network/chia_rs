@@ -11,6 +11,8 @@ repository = "https://github.com/Chia-Network/chia_rs/chia-tools"
 [dependencies]
 chia-protocol = { version = "=0.2.7", path = "../chia-protocol" }
 chia-traits = { path = "../chia-traits" }
+clvm-utils = { path = "../clvm-utils" }
+clvm-traits = { path = "../clvm-traits" }
 clvmr = { version = "=0.3.0", features = ["counters"] }
 chia = { version = "=0.2.9", path = ".." }
 sqlite = "=0.31.0"
@@ -18,6 +20,10 @@ clap = { version = "=4.3.9", features = ["derive"] }
 zstd = "=0.12.3"
 threadpool = "=1.8.1"
 hex = "=0.4.3"
+
+[lib]
+name = "chia_tools"
+crate-type = ["rlib"]
 
 [[bin]]
 name = "analyze-chain"
@@ -31,5 +37,10 @@ bench = false
 
 [[bin]]
 name = "compress-clvm"
+test = false
+bench = false
+
+[[bin]]
+name = "gen-corpus"
 test = false
 bench = false
