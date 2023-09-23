@@ -2,6 +2,7 @@ use crate::gen::conditions::{
     parse_spends, process_single_spend, validate_conditions, ParseState, SpendBundleConditions,
 };
 use crate::gen::flags::ALLOW_BACKREFS;
+use crate::gen::policy::ConditionPolicy;
 use crate::gen::validation_error::{first, ErrorCode, ValidationErr};
 use crate::generator_rom::{CLVM_DESERIALIZER, COST_PER_BYTE, GENERATOR_ROM};
 use clvm_utils::tree_hash;
@@ -35,12 +36,13 @@ fn subtract_cost(a: &Allocator, cost_left: &mut Cost, subtract: Cost) -> Result<
 // the only reason we need to pass in the allocator is because the returned
 // SpendBundleConditions contains NodePtr fields. If that's changed, we could
 // create the allocator inside this functions as well.
-pub fn run_block_generator<GenBuf: AsRef<[u8]>>(
+pub fn run_block_generator<GenBuf: AsRef<[u8]>, T: ConditionPolicy>(
     a: &mut Allocator,
     program: &[u8],
     block_refs: &[GenBuf],
     max_cost: u64,
     flags: u32,
+    policy: &mut T,
 ) -> Result<SpendBundleConditions, ValidationErr> {
     let mut cost_left = max_cost;
     let byte_cost = program.len() as u64 * COST_PER_BYTE;
@@ -74,7 +76,7 @@ pub fn run_block_generator<GenBuf: AsRef<[u8]>>(
 
     // we pass in what's left of max_cost here, to fail early in case the
     // cost of a condition brings us over the cost limit
-    let mut result = parse_spends(a, generator_output, cost_left, flags)?;
+    let mut result = parse_spends(a, generator_output, cost_left, flags, policy)?;
     result.cost += max_cost - cost_left;
     Ok(result)
 }
@@ -108,12 +110,13 @@ pub fn extract_n<const N: usize>(
 // you only pay cost for the generator, the puzzles and the conditions).
 // it also does not apply the stack depth or object allocation limits the same,
 // as each puzzle run in its own environment.
-pub fn run_block_generator2<GenBuf: AsRef<[u8]>>(
+pub fn run_block_generator2<GenBuf: AsRef<[u8]>, T: ConditionPolicy>(
     a: &mut Allocator,
     program: &[u8],
     block_refs: &[GenBuf],
     max_cost: u64,
     flags: u32,
+    policy: &mut T,
 ) -> Result<SpendBundleConditions, ValidationErr> {
     let byte_cost = program.len() as u64 * COST_PER_BYTE;
 
@@ -178,6 +181,7 @@ pub fn run_block_generator2<GenBuf: AsRef<[u8]>>(
             conditions,
             flags,
             &mut cost_left,
+            policy,
         )?;
     }
     if a.atom_len(all_spends) != 0 {

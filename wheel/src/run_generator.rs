@@ -1,5 +1,6 @@
 use chia::allocator::make_allocator;
-use chia::gen::conditions::{Spend, SpendBundleConditions};
+use chia::gen::conditions::{MempoolPolicy, NonePolicy, Spend, SpendBundleConditions};
+use chia::gen::flags::ANALYZE_SPENDS;
 use chia::gen::run_block_generator::run_block_generator as native_run_block_generator;
 use chia::gen::run_block_generator::run_block_generator2 as native_run_block_generator2;
 use chia::gen::validation_error::ValidationErr;
@@ -166,7 +167,27 @@ pub fn run_block_generator(
     let program =
         unsafe { std::slice::from_raw_parts(program.buf_ptr() as *const u8, program.len_bytes()) };
 
-    match native_run_block_generator(&mut allocator, program, &refs, max_cost, flags) {
+    let r = if (flags & ANALYZE_SPENDS) == 0 {
+        native_run_block_generator(
+            &mut allocator,
+            program,
+            &refs,
+            max_cost,
+            flags,
+            &mut NonePolicy::default(),
+        )
+    } else {
+        native_run_block_generator(
+            &mut allocator,
+            program,
+            &refs,
+            max_cost,
+            flags,
+            &mut MempoolPolicy::default(),
+        )
+    };
+
+    match r {
         Ok(spend_bundle_conds) => {
             // everything was successful
             Ok((
@@ -209,7 +230,27 @@ pub fn run_block_generator2(
     let program =
         unsafe { std::slice::from_raw_parts(program.buf_ptr() as *const u8, program.len_bytes()) };
 
-    match native_run_block_generator2(&mut allocator, program, &refs, max_cost, flags) {
+    let r = if (flags & ANALYZE_SPENDS) == 0 {
+        native_run_block_generator2(
+            &mut allocator,
+            program,
+            &refs,
+            max_cost,
+            flags,
+            &mut NonePolicy::default(),
+        )
+    } else {
+        native_run_block_generator2(
+            &mut allocator,
+            program,
+            &refs,
+            max_cost,
+            flags,
+            &mut MempoolPolicy::default(),
+        )
+    };
+
+    match r {
         Ok(spend_bundle_conds) => {
             // everything was successful
             Ok((

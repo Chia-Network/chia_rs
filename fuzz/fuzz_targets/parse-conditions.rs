@@ -1,7 +1,9 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
-use chia::gen::conditions::{parse_conditions, ParseState, Spend, SpendBundleConditions};
+use chia::gen::conditions::{
+    parse_conditions, MempoolPolicy, ParseState, Spend, SpendBundleConditions,
+};
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
 use clvm_utils::tree_hash;
@@ -72,6 +74,7 @@ fuzz_target!(|data: &[u8]| {
             input,
             *flags,
             &mut max_cost,
+            &mut MempoolPolicy::default(),
         );
     }
 });

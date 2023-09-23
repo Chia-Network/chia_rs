@@ -182,6 +182,7 @@ pub fn fast_forward_singleton(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::gen::conditions::MempoolPolicy;
     use crate::gen::run_puzzle::run_puzzle;
     use chia_protocol::CoinSpend;
     use chia_traits::streamable::Streamable;
@@ -249,6 +250,7 @@ mod tests {
             spend.coin.amount,
             11000000000,
             0,
+            &mut MempoolPolicy::default(),
         )
         .expect("run_puzzle");
 
@@ -261,6 +263,7 @@ mod tests {
             new_coin.amount,
             11000000000,
             0,
+            &mut MempoolPolicy::default(),
         )
         .expect("run_puzzle");
 

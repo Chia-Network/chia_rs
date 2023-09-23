@@ -7,7 +7,7 @@ use std::time::SystemTime;
 
 use sqlite::State;
 
-use chia::gen::conditions::parse_spends;
+use chia::gen::conditions::{parse_spends, MempoolPolicy};
 use chia::gen::flags::MEMPOOL_MODE;
 use chia::gen::validation_error::ValidationErr;
 use chia::generator_rom::{COST_PER_BYTE, GENERATOR_ROM};
@@ -183,8 +183,13 @@ fn main() {
             let start_conditions = SystemTime::now();
             // we pass in what's left of max_cost here, to fail early in case the
             // cost of a condition brings us over the cost limit
-            let conds = match parse_spends(&a, generator_output, ti.cost - clvm_cost, MEMPOOL_MODE)
-            {
+            let conds = match parse_spends(
+                &a,
+                generator_output,
+                ti.cost - clvm_cost,
+                MEMPOOL_MODE,
+                &mut MempoolPolicy::default(),
+            ) {
                 Err(ValidationErr(_, _)) => {
                     panic!("failed to parse conditions in block {height}");
                 }

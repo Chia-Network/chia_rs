@@ -45,9 +45,14 @@ pub const LIMIT_ANNOUNCES: u32 = 0x1000000;
 // contain back-references
 pub const ALLOW_BACKREFS: u32 = 0x2000000;
 
+// When set, the "flags" field of the Spend objects will be set depending on
+// what features are detected of the spends
+pub const ANALYZE_SPENDS: u32 = 0x4000000;
+
 pub const MEMPOOL_MODE: u32 = CLVM_MEMPOOL_MODE
     | NO_UNKNOWN_CONDS
     | COND_ARGS_NIL
     | STRICT_ARGS_COUNT
     | NO_RELATIVE_CONDITIONS_ON_EPHEMERAL
-    | LIMIT_ANNOUNCES;
+    | LIMIT_ANNOUNCES
+    | ANALYZE_SPENDS;

@@ -1,5 +1,6 @@
 #![no_main]
 use chia::allocator::make_allocator;
+use chia::gen::conditions::MempoolPolicy;
 use chia::gen::flags::{ALLOW_BACKREFS, LIMIT_OBJECTS};
 use chia::gen::run_block_generator::{run_block_generator, run_block_generator2};
 use chia::gen::validation_error::{ErrorCode, ValidationErr};
@@ -8,11 +9,25 @@ use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
     let mut a1 = make_allocator(LIMIT_HEAP | LIMIT_OBJECTS);
-    let r1 = run_block_generator::<&[u8]>(&mut a1, data, &[], 110000000, ALLOW_BACKREFS);
+    let r1 = run_block_generator::<&[u8], MempoolPolicy>(
+        &mut a1,
+        data,
+        &[],
+        110000000,
+        ALLOW_BACKREFS,
+        &mut MempoolPolicy::default(),
+    );
     drop(a1);
 
     let mut a2 = make_allocator(LIMIT_HEAP | LIMIT_OBJECTS);
-    let r2 = run_block_generator2::<&[u8]>(&mut a2, data, &[], 110000000, ALLOW_BACKREFS);
+    let r2 = run_block_generator2::<&[u8], MempoolPolicy>(
+        &mut a2,
+        data,
+        &[],
+        110000000,
+        ALLOW_BACKREFS,
+        &mut MempoolPolicy::default(),
+    );
     drop(a2);
 
     match (r1, r2) {

@@ -1,5 +1,7 @@
 #![no_main]
-use chia::gen::conditions::{process_single_spend, ParseState, SpendBundleConditions};
+use chia::gen::conditions::{
+    process_single_spend, MempoolPolicy, ParseState, SpendBundleConditions,
+};
 use chia::gen::flags::{COND_ARGS_NIL, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
 use clvmr::allocator::Allocator;
 use fuzzing_utils::{make_tree, BitCursor};
@@ -28,6 +30,7 @@ fuzz_target!(|data: &[u8]| {
             conds,
             *flags,
             &mut cost_left,
+            &mut MempoolPolicy::default(),
         );
     }
 });

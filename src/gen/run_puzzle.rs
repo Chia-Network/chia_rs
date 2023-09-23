@@ -1,5 +1,6 @@
 use crate::gen::conditions::{parse_conditions, ParseState, Spend, SpendBundleConditions};
 use crate::gen::flags::ALLOW_BACKREFS;
+use crate::gen::policy::ConditionPolicy;
 use crate::gen::validation_error::ValidationErr;
 use chia_protocol::bytes::Bytes32;
 use chia_protocol::coin::Coin;
@@ -11,7 +12,8 @@ use clvmr::run_program::run_program;
 use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs};
 use std::sync::Arc;
 
-pub fn run_puzzle(
+#[allow(clippy::too_many_arguments)]
+pub fn run_puzzle<T: ConditionPolicy>(
     a: &mut Allocator,
     puzzle: &[u8],
     solution: &[u8],
@@ -19,6 +21,7 @@ pub fn run_puzzle(
     amount: u64,
     max_cost: u64,
     flags: u32,
+    policy: &mut T,
 ) -> Result<SpendBundleConditions, ValidationErr> {
     let deserialize = if (flags & ALLOW_BACKREFS) != 0 {
         node_from_bytes_backrefs
@@ -48,12 +51,14 @@ pub fn run_puzzle(
         .into(),
     );
 
-    let spend = Spend::new(
+    let mut spend = Spend::new(
         a.new_atom(parent_id)?,
         amount,
         a.new_atom(&puzzle_hash)?,
         coin_id,
     );
+
+    policy.new_spend(&mut spend);
 
     let mut cost_left = max_cost - clvm_cost;
 
@@ -65,6 +70,7 @@ pub fn run_puzzle(
         conditions,
         flags,
         &mut cost_left,
+        policy,
     )?;
     ret.cost = max_cost - cost_left;
     Ok(ret)
