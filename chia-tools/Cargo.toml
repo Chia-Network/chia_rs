@@ -46,3 +46,13 @@ bench = false
 name = "gen-corpus"
 test = false
 bench = false
+
+[[bin]]
+name = "run-spend"
+test = false
+bench = false
+
+[[bin]]
+name = "fast-forward-spend"
+test = false
+bench = false
