@@ -50,6 +50,7 @@ use std::iter::zip;
 use crate::run_program::{run_chia_program, serialized_length};
 
 use crate::adapt_response::eval_err_to_pyresult;
+use chia::fast_forward::fast_forward_singleton as native_ff;
 use chia::gen::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
 use chia::gen::validation_error::ValidationErr;
 use clvmr::allocator::NodePtr;
@@ -274,6 +275,57 @@ impl AugSchemeMPL {
     }
 }
 
+#[pyfunction]
+fn supports_fast_forward(spend: &CoinSpend) -> bool {
+    // the test function just attempts the rebase onto a dummy parent coin
+    let new_parent = Coin {
+        parent_coin_info: [0_u8; 32].into(),
+        puzzle_hash: spend.coin.puzzle_hash,
+        amount: spend.coin.amount,
+    };
+    let new_coin = Coin {
+        parent_coin_info: new_parent.coin_id().into(),
+        puzzle_hash: spend.coin.puzzle_hash,
+        amount: spend.coin.amount,
+    };
+
+    let mut a = make_allocator(LIMIT_HEAP);
+    let Ok(puzzle) = node_from_bytes(&mut a, spend.puzzle_reveal.as_slice()) else {
+        return false;
+    };
+    let Ok(solution) = node_from_bytes(&mut a, spend.solution.as_slice()) else {
+        return false;
+    };
+
+    native_ff(
+        &mut a,
+        puzzle,
+        solution,
+        &spend.coin,
+        &new_coin,
+        &new_parent,
+    )
+    .is_ok()
+}
+
+#[pyfunction]
+fn fast_forward_singleton<'p>(
+    py: Python<'p>,
+    spend: &CoinSpend,
+    new_coin: &Coin,
+    new_parent: &Coin,
+) -> PyResult<&'p PyBytes> {
+    let mut a = make_allocator(LIMIT_HEAP);
+    let puzzle = node_from_bytes(&mut a, spend.puzzle_reveal.as_slice())?;
+    let solution = node_from_bytes(&mut a, spend.solution.as_slice())?;
+
+    let new_solution = native_ff(&mut a, puzzle, solution, &spend.coin, new_coin, new_parent)?;
+    Ok(PyBytes::new(
+        py,
+        node_to_bytes(&a, new_solution)?.as_slice(),
+    ))
+}
+
 #[pymodule]
 pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     // generator functions
@@ -282,6 +334,8 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(run_puzzle, m)?)?;
     m.add_function(wrap_pyfunction!(solution_generator, m)?)?;
     m.add_function(wrap_pyfunction!(solution_generator_backrefs, m)?)?;
+    m.add_function(wrap_pyfunction!(supports_fast_forward, m)?)?;
+    m.add_function(wrap_pyfunction!(fast_forward_singleton, m)?)?;
     m.add_class::<PySpendBundleConditions>()?;
     m.add(
         "ELIGIBLE_FOR_DEDUP",

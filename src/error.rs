@@ -2,6 +2,9 @@ use crate::gen::validation_error::ValidationErr;
 use clvmr::reduction::EvalErr;
 use thiserror::Error;
 
+#[cfg(feature = "py-bindings")]
+use pyo3::PyErr;
+
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum Error {
     #[error("CLVM {0}")]
@@ -36,6 +39,13 @@ pub enum Error {
 
     #[error("{0}")]
     Custom(String),
+}
+
+#[cfg(feature = "py-bindings")]
+impl std::convert::From<Error> for PyErr {
+    fn from(err: Error) -> PyErr {
+        pyo3::exceptions::PyValueError::new_err(err.to_string())
+    }
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
