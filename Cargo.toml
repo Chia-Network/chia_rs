@@ -9,6 +9,7 @@ members = [
     "chia_streamable_macro",
     "chia-tools",
     "chia-traits",
+    "chia-wallet",
     "clvm-derive",
     "clvm-traits",
     "clvm-utils",
