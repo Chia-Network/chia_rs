@@ -143,7 +143,6 @@ fn print_diff(output: &str, expected: &str) {
     }
 }
 
-#[cfg(test)]
 #[rstest]
 #[case("block-225758")]
 #[case("assert-puzzle-announce-fail")]
