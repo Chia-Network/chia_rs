@@ -165,48 +165,16 @@ pub static NFT_INTERMEDIATE_LAUNCHER_PUZZLE_HASH: [u8; 32] = hex!(
 
 #[cfg(test)]
 mod tests {
-    use clvm_utils::tree_hash;
-    use clvmr::{serde::node_from_bytes, Allocator};
-
     use super::*;
 
-    #[test]
-    fn nft_state_layer() {
-        let mut a = Allocator::new();
-        let ptr = node_from_bytes(&mut a, &NFT_STATE_LAYER_PUZZLE).unwrap();
-        let hash = tree_hash(&mut a, ptr);
-        assert_eq!(NFT_STATE_LAYER_PUZZLE_HASH, hash);
-    }
+    use crate::assert_puzzle_hash;
 
     #[test]
-    fn nft_ownership_layer() {
-        let mut a = Allocator::new();
-        let ptr = node_from_bytes(&mut a, &NFT_OWNERSHIP_LAYER_PUZZLE).unwrap();
-        let hash = tree_hash(&mut a, ptr);
-        assert_eq!(NFT_OWNERSHIP_LAYER_PUZZLE_HASH, hash);
-    }
-
-    #[test]
-    fn nft_royalty_transfer() {
-        let mut a = Allocator::new();
-        let ptr = node_from_bytes(&mut a, &NFT_ROYALTY_TRANSFER_PUZZLE).unwrap();
-        let hash = tree_hash(&mut a, ptr);
-        assert_eq!(NFT_ROYALTY_TRANSFER_PUZZLE_HASH, hash);
-    }
-
-    #[test]
-    fn nft_metadata_updater() {
-        let mut a = Allocator::new();
-        let ptr = node_from_bytes(&mut a, &NFT_METADATA_UPDATER_PUZZLE).unwrap();
-        let hash = tree_hash(&mut a, ptr);
-        assert_eq!(NFT_METADATA_UPDATER_PUZZLE_HASH, hash);
-    }
-
-    #[test]
-    fn nft_intermediate_launcher() {
-        let mut a = Allocator::new();
-        let ptr = node_from_bytes(&mut a, &NFT_INTERMEDIATE_LAUNCHER_PUZZLE).unwrap();
-        let hash = tree_hash(&mut a, ptr);
-        assert_eq!(NFT_INTERMEDIATE_LAUNCHER_PUZZLE_HASH, hash);
+    fn puzzle_hashes() {
+        assert_puzzle_hash!(NFT_STATE_LAYER_PUZZLE => NFT_STATE_LAYER_PUZZLE_HASH);
+        assert_puzzle_hash!(NFT_OWNERSHIP_LAYER_PUZZLE => NFT_OWNERSHIP_LAYER_PUZZLE_HASH);
+        assert_puzzle_hash!(NFT_ROYALTY_TRANSFER_PUZZLE => NFT_ROYALTY_TRANSFER_PUZZLE_HASH);
+        assert_puzzle_hash!(NFT_METADATA_UPDATER_PUZZLE => NFT_METADATA_UPDATER_PUZZLE_HASH);
+        assert_puzzle_hash!(NFT_INTERMEDIATE_LAUNCHER_PUZZLE => NFT_INTERMEDIATE_LAUNCHER_PUZZLE_HASH);
     }
 }

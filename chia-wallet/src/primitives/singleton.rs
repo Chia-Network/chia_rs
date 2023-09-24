@@ -65,24 +65,13 @@ pub static SINGLETON_TOP_LAYER_PUZZLE_HASH: [u8; 32] = hex!(
 
 #[cfg(test)]
 mod tests {
-    use clvm_utils::tree_hash;
-    use clvmr::{serde::node_from_bytes, Allocator};
-
     use super::*;
 
-    #[test]
-    fn singleton_launcher() {
-        let mut a = Allocator::new();
-        let ptr = node_from_bytes(&mut a, &SINGLETON_LAUNCHER_PUZZLE).unwrap();
-        let hash = tree_hash(&mut a, ptr);
-        assert_eq!(SINGLETON_LAUNCHER_PUZZLE_HASH, hash);
-    }
+    use crate::assert_puzzle_hash;
 
     #[test]
-    fn singleton_top_layer() {
-        let mut a = Allocator::new();
-        let ptr = node_from_bytes(&mut a, &SINGLETON_TOP_LAYER_PUZZLE).unwrap();
-        let hash = tree_hash(&mut a, ptr);
-        assert_eq!(SINGLETON_TOP_LAYER_PUZZLE_HASH, hash);
+    fn puzzle_hashes() {
+        assert_puzzle_hash!(SINGLETON_LAUNCHER_PUZZLE => SINGLETON_LAUNCHER_PUZZLE_HASH);
+        assert_puzzle_hash!(SINGLETON_TOP_LAYER_PUZZLE => SINGLETON_TOP_LAYER_PUZZLE_HASH);
     }
 }

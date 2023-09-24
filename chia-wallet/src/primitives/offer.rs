@@ -53,24 +53,13 @@ pub static SETTLEMENT_PAYMENTS_PUZZLE_HASH_V1: [u8; 32] = hex!(
 
 #[cfg(test)]
 mod tests {
-    use clvm_utils::tree_hash;
-    use clvmr::{serde::node_from_bytes, Allocator};
-
     use super::*;
 
-    #[test]
-    fn settlement_payments() {
-        let mut a = Allocator::new();
-        let ptr = node_from_bytes(&mut a, &SETTLEMENT_PAYMENTS_PUZZLE).unwrap();
-        let hash = tree_hash(&mut a, ptr);
-        assert_eq!(SETTLEMENT_PAYMENTS_PUZZLE_HASH, hash);
-    }
+    use crate::assert_puzzle_hash;
 
     #[test]
-    fn settlement_payments_v1() {
-        let mut a = Allocator::new();
-        let ptr = node_from_bytes(&mut a, &SETTLEMENT_PAYMENTS_PUZZLE_V1).unwrap();
-        let hash = tree_hash(&mut a, ptr);
-        assert_eq!(SETTLEMENT_PAYMENTS_PUZZLE_HASH_V1, hash);
+    fn puzzle_hashes() {
+        assert_puzzle_hash!(SETTLEMENT_PAYMENTS_PUZZLE => SETTLEMENT_PAYMENTS_PUZZLE_HASH);
+        assert_puzzle_hash!(SETTLEMENT_PAYMENTS_PUZZLE_V1 => SETTLEMENT_PAYMENTS_PUZZLE_HASH_V1);
     }
 }

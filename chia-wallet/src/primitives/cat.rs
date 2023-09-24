@@ -144,24 +144,13 @@ pub static CAT_PUZZLE_HASH_V1: [u8; 32] = hex!(
 
 #[cfg(test)]
 mod tests {
-    use clvm_utils::tree_hash;
-    use clvmr::{serde::node_from_bytes, Allocator};
-
     use super::*;
 
-    #[test]
-    fn cat() {
-        let mut a = Allocator::new();
-        let ptr = node_from_bytes(&mut a, &CAT_PUZZLE).unwrap();
-        let hash = tree_hash(&mut a, ptr);
-        assert_eq!(CAT_PUZZLE_HASH, hash);
-    }
+    use crate::assert_puzzle_hash;
 
     #[test]
-    fn cat_v1() {
-        let mut a = Allocator::new();
-        let ptr = node_from_bytes(&mut a, &CAT_PUZZLE_V1).unwrap();
-        let hash = tree_hash(&mut a, ptr);
-        assert_eq!(CAT_PUZZLE_HASH_V1, hash);
+    fn puzzle_hashes() {
+        assert_puzzle_hash!(CAT_PUZZLE => CAT_PUZZLE_HASH);
+        assert_puzzle_hash!(CAT_PUZZLE_V1 => CAT_PUZZLE_HASH_V1);
     }
 }
