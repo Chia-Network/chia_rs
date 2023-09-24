@@ -9,7 +9,7 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::mem::MaybeUninit;
-use std::ops::{Add, AddAssign, SubAssign};
+use std::ops::{Add, AddAssign, Neg, SubAssign};
 
 #[cfg(feature = "py-bindings")]
 use crate::{GTElement, Signature};
@@ -221,6 +221,23 @@ impl Streamable for PublicKey {
 impl Hash for PublicKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         state.write(&self.to_bytes())
+    }
+}
+
+impl Neg for PublicKey {
+    type Output = PublicKey;
+    fn neg(mut self) -> Self::Output {
+        self.negate();
+        self
+    }
+}
+
+impl Neg for &PublicKey {
+    type Output = PublicKey;
+    fn neg(self) -> Self::Output {
+        let mut ret = self.clone();
+        ret.negate();
+        ret
     }
 }
 

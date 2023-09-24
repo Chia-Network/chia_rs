@@ -10,7 +10,7 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::mem::MaybeUninit;
-use std::ops::{Add, AddAssign, SubAssign};
+use std::ops::{Add, AddAssign, Neg, SubAssign};
 
 #[cfg(feature = "py-bindings")]
 use crate::public_key::parse_hex_string;
@@ -168,6 +168,23 @@ impl AddAssign<&Signature> for Signature {
         unsafe {
             blst_p2_add_or_double(&mut self.0, &self.0, &rhs.0);
         }
+    }
+}
+
+impl Neg for Signature {
+    type Output = Signature;
+    fn neg(mut self) -> Self::Output {
+        self.negate();
+        self
+    }
+}
+
+impl Neg for &Signature {
+    type Output = Signature;
+    fn neg(self) -> Self::Output {
+        let mut ret = self.clone();
+        ret.negate();
+        ret
     }
 }
 
@@ -619,6 +636,12 @@ mod tests {
         assert_eq!(sig.to_bytes(), <[u8; 96]>::from_hex("b45825c0ee7759945c0189b4c38b7e54231ebadc83a851bec3bb7cf954a124ae0cc8e8e5146558332ea152f63bf8846e04826185ef60e817f271f8d500126561319203f9acb95809ed20c193757233454be1562a5870570941a84605bd2c9c9a").unwrap());
     }
 
+    fn aug_msg_to_g2(pk: &PublicKey, msg: &[u8]) -> Signature {
+        let mut augmented = pk.to_bytes().to_vec();
+        augmented.extend_from_slice(msg);
+        hash_to_g2(augmented.as_slice())
+    }
+
     #[test]
     fn test_aggregate_signature() {
         // from blspy import PrivateKey
@@ -646,13 +669,16 @@ mod tests {
         let mut agg2 = Signature::default();
         let mut sigs = Vec::<Signature>::new();
         let mut data = Vec::<(PublicKey, &[u8])>::new();
+        let mut pairs = Vec::<(PublicKey, Signature)>::new();
         for idx in 0..4 {
             let derived = sk.derive_hardened(idx as u32);
-            data.push((derived.public_key(), msg));
+            let pk = derived.public_key();
+            data.push((pk.clone(), msg));
             let sig = sign(&derived, msg);
             agg1.aggregate(&sig);
             agg2 += &sig;
             sigs.push(sig);
+            pairs.push((pk.clone(), aug_msg_to_g2(&pk, msg)));
         }
         let agg3 = aggregate(&sigs);
         let agg4 = &sigs[0] + &sigs[1] + &sigs[2] + &sigs[3];
@@ -667,6 +693,11 @@ mod tests {
         assert!(aggregate_verify(&agg2, data.clone()));
         assert!(aggregate_verify(&agg3, data.clone()));
         assert!(aggregate_verify(&agg4, data.clone()));
+
+        pairs.push((-PublicKey::generator(), agg1));
+        assert!(aggregate_pairing(pairs.clone()));
+        // order does not matter
+        assert!(aggregate_pairing(pairs.into_iter().rev()));
     }
 
     #[test]
@@ -676,14 +707,23 @@ mod tests {
         let msg = b"foobar";
         let mut agg = Signature::default();
         let mut data = Vec::<(PublicKey, &[u8])>::new();
+        let mut pairs = Vec::<(PublicKey, Signature)>::new();
         for _idx in 0..2 {
-            data.push((sk.public_key(), msg));
-            agg.aggregate(&sign(&sk, msg));
+            let pk = sk.public_key();
+            data.push((pk.clone(), msg));
+            agg.aggregate(&sign(&sk, msg.clone()));
+
+            pairs.push((pk.clone(), aug_msg_to_g2(&pk, msg)));
         }
 
         assert_eq!(agg.to_bytes(), <[u8; 96]>::from_hex("a1cca6540a4a06d096cb5b5fc76af5fd099476e70b623b8c6e4cf02ffde94fc0f75f4e17c67a9e350940893306798a3519368b02dc3464b7270ea4ca233cfa85a38da9e25c9314e81270b54d1e773a2ec5c3e14c62dac7abdebe52f4688310d3").unwrap());
 
         assert!(aggregate_verify(&agg, data));
+
+        pairs.push((-PublicKey::generator(), agg));
+        assert!(aggregate_pairing(pairs.clone()));
+        // order does not matter
+        assert!(aggregate_pairing(pairs.into_iter().rev()));
     }
 
     #[cfg(test)]
@@ -714,6 +754,9 @@ mod tests {
         // when verifying 0 messages, an identity signature is considered valid
         let empty = Vec::<(PublicKey, &[u8])>::new();
         assert!(aggregate_verify(&Signature::default(), empty));
+
+        let pairs = vec![(-PublicKey::generator(), Signature::default())];
+        assert!(aggregate_pairing(pairs));
     }
 
     #[test]
@@ -723,6 +766,7 @@ mod tests {
         let pk = [sk[0].public_key(), sk[1].public_key()];
         let msg: [&'static [u8]; 2] = [b"foo", b"foobar"];
         let sig = [sign(&sk[0], msg[0]), sign(&sk[1], msg[1])];
+        let g2s = [aug_msg_to_g2(&pk[0], msg[0]), aug_msg_to_g2(&pk[1], msg[1])];
         let mut agg = Signature::default();
         agg.aggregate(&sig[0]);
         agg.aggregate(&sig[1]);
@@ -738,6 +782,27 @@ mod tests {
             &agg,
             [(&pk[1], msg[0]), (&pk[0], msg[1])]
         ));
+
+        let gen_sig = (&-PublicKey::generator(), agg);
+        assert!(!aggregate_pairing([
+            (&pk[0], g2s[0].clone()),
+            gen_sig.clone()
+        ]));
+        assert!(!aggregate_pairing([
+            (&pk[1], g2s[1].clone()),
+            gen_sig.clone()
+        ]));
+        // public keys mixed with the wrong message
+        assert!(!aggregate_pairing([
+            (&pk[0], g2s[1].clone()),
+            (&pk[1], g2s[0].clone()),
+            gen_sig.clone()
+        ]));
+        assert!(!aggregate_pairing([
+            (&pk[1], g2s[0].clone()),
+            (&pk[0], g2s[1].clone()),
+            gen_sig.clone()
+        ]));
     }
 
     #[test]
