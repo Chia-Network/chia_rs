@@ -305,11 +305,11 @@ jobs:
           override: true
       - name: workspace
         run: |
-            cargo clippy --workspace --all-features
+            cargo clippy --workspace --all-features -- -Dwarnings
       - name: wheel
         run: |
             cd wheel
-            cargo clippy
+            cargo clippy --all-features -- -Dwarnings
 
   fuzz_targets:
     runs-on: ubuntu-latest
