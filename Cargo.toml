@@ -50,4 +50,4 @@ name = "chia"
 crate-type = ["rlib"]
 
 [profile.release]
-lto = true
+lto = "thin"
