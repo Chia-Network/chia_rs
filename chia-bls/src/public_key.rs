@@ -9,7 +9,7 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::mem::MaybeUninit;
-use std::ops::{Add, AddAssign};
+use std::ops::{Add, AddAssign, Neg, SubAssign};
 
 #[cfg(feature = "py-bindings")]
 use crate::{GTElement, Signature};
@@ -65,6 +65,30 @@ impl PublicKey {
         Ok(Self(p1))
     }
 
+    pub fn generator() -> Self {
+        let p1 = unsafe { *blst_p1_generator() };
+        Self(p1)
+    }
+
+    // Creates a G1 point by multiplying the generator by the specified scalar.
+    // This is the same as creating a private key from the scalar, and then get
+    // the corresponding public key
+    pub fn from_integer(int_bytes: &[u8]) -> Self {
+        let p1 = unsafe {
+            let mut scalar = MaybeUninit::<blst_scalar>::uninit();
+            blst_scalar_from_be_bytes(scalar.as_mut_ptr(), int_bytes.as_ptr(), int_bytes.len());
+            let mut p1 = MaybeUninit::<blst_p1>::uninit();
+            blst_p1_mult(
+                p1.as_mut_ptr(),
+                blst_p1_generator(),
+                scalar.as_ptr() as *const u8,
+                256,
+            );
+            p1.assume_init()
+        };
+        Self(p1)
+    }
+
     pub fn from_bytes(bytes: &[u8; 48]) -> Result<Self> {
         let ret = Self::from_bytes_unchecked(bytes)?;
         if !ret.is_valid() {
@@ -72,6 +96,20 @@ impl PublicKey {
         } else {
             Ok(ret)
         }
+    }
+
+    pub fn from_uncompressed(buf: &[u8; 96]) -> Result<Self> {
+        let p1 = unsafe {
+            let mut p1_affine = MaybeUninit::<blst_p1_affine>::uninit();
+            let ret = blst_p1_deserialize(p1_affine.as_mut_ptr(), buf as *const u8);
+            if ret != BLST_ERROR::BLST_SUCCESS {
+                return Err(Error::InvalidSignature(ret));
+            }
+            let mut p1 = MaybeUninit::<blst_p1>::uninit();
+            blst_p1_from_affine(p1.as_mut_ptr(), &p1_affine.assume_init());
+            p1.assume_init()
+        };
+        Ok(Self(p1))
     }
 
     pub fn to_bytes(&self) -> [u8; 48] {
@@ -86,6 +124,20 @@ impl PublicKey {
         // Infinity was considered a valid G1Element in older Relic versions
         // For historical compatibililty this behavior is maintained.
         unsafe { blst_p1_is_inf(&self.0) || blst_p1_in_g1(&self.0) }
+    }
+
+    pub fn negate(&mut self) {
+        unsafe {
+            blst_p1_cneg(&mut self.0, true);
+        }
+    }
+
+    pub fn scalar_multiply(&mut self, int_bytes: &[u8]) {
+        unsafe {
+            let mut scalar = MaybeUninit::<blst_scalar>::uninit();
+            blst_scalar_from_be_bytes(scalar.as_mut_ptr(), int_bytes.as_ptr(), int_bytes.len());
+            blst_p1_mult(&mut self.0, &self.0, scalar.as_ptr() as *const u8, 256);
+        }
     }
 
     pub fn get_fingerprint(&self) -> u32 {
@@ -114,8 +166,9 @@ impl PublicKey {
     }
 
     #[staticmethod]
-    pub fn generator() -> Self {
-        unsafe { Self(*blst_p1_generator()) }
+    #[pyo3(name = "generator")]
+    pub fn py_generator() -> Self {
+        Self::generator()
     }
 
     pub fn pair(&self, other: &Signature) -> GTElement {
@@ -171,10 +224,37 @@ impl Hash for PublicKey {
     }
 }
 
+impl Neg for PublicKey {
+    type Output = PublicKey;
+    fn neg(mut self) -> Self::Output {
+        self.negate();
+        self
+    }
+}
+
+impl Neg for &PublicKey {
+    type Output = PublicKey;
+    fn neg(self) -> Self::Output {
+        let mut ret = self.clone();
+        ret.negate();
+        ret
+    }
+}
+
 impl AddAssign<&PublicKey> for PublicKey {
     fn add_assign(&mut self, rhs: &PublicKey) {
         unsafe {
             blst_p1_add_or_double(&mut self.0, &self.0, &rhs.0);
+        }
+    }
+}
+
+impl SubAssign<&PublicKey> for PublicKey {
+    fn sub_assign(&mut self, rhs: &PublicKey) {
+        unsafe {
+            let mut neg = rhs.clone();
+            blst_p1_cneg(&mut neg.0, true);
+            blst_p1_add_or_double(&mut self.0, &self.0, &neg.0);
         }
     }
 }
@@ -300,6 +380,29 @@ impl ToClvm for PublicKey {
     fn to_clvm(&self, a: &mut Allocator) -> clvm_traits::Result<NodePtr> {
         Ok(a.new_atom(&self.to_bytes())?)
     }
+}
+
+pub const DST: &[u8] = b"BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_AUG_";
+
+pub fn hash_to_g1(msg: &[u8]) -> PublicKey {
+    hash_to_g1_with_dst(msg, DST)
+}
+
+pub fn hash_to_g1_with_dst(msg: &[u8], dst: &[u8]) -> PublicKey {
+    let p1 = unsafe {
+        let mut p1 = MaybeUninit::<blst_p1>::uninit();
+        blst_hash_to_g1(
+            p1.as_mut_ptr(),
+            msg.as_ptr(),
+            msg.len(),
+            dst.as_ptr(),
+            dst.len(),
+            std::ptr::null(),
+            0,
+        );
+        p1.assume_init()
+    };
+    PublicKey(p1)
 }
 
 #[cfg(test)]
@@ -497,6 +600,145 @@ mod tests {
             clvm_traits::Error::ExpectedAtom(ptr)
         );
     }
+
+    #[test]
+    fn test_generator() {
+        assert_eq!(
+            hex::encode(&PublicKey::generator().to_bytes()),
+            "97f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb"
+        );
+    }
+
+    #[test]
+    fn test_from_integer() {
+        let mut rng = StdRng::seed_from_u64(1337);
+        let mut data = [0u8; 32];
+        for _i in 0..50 {
+            // this integer may not exceed the group order, so leave the top
+            // byte as 0
+            rng.fill(&mut data[1..]);
+
+            let g1 = PublicKey::from_integer(&data);
+            let expected_g1 = SecretKey::from_bytes(&data)
+                .expect("invalid public key")
+                .public_key();
+            assert_eq!(g1, expected_g1);
+        }
+    }
+
+    // test cases from zksnark test in chia_rs
+    #[rstest]
+    #[case("06f6ba2972ab1c83718d747b2d55cca96d08729b1ea5a3ab3479b8efe2d455885abf65f58d1507d7f260cd2a4687db821171c9d8dc5c0f5c3c4fd64b26cf93ff28b2e683c409fb374c4e26cc548c6f7cef891e60b55e6115bb38bbe97822e4d4", "a6f6ba2972ab1c83718d747b2d55cca96d08729b1ea5a3ab3479b8efe2d455885abf65f58d1507d7f260cd2a4687db82")]
+    #[case("127271e81a1cb5c08a68694fcd5bd52f475d545edd4fbd49b9f6ec402ee1973f9f4102bf3bfccdcbf1b2f862af89a1340d40795c1c09d1e10b1acfa0f3a97a71bf29c11665743fa8d30e57e450b8762959571d6f6d253b236931b93cf634e7cf", "b27271e81a1cb5c08a68694fcd5bd52f475d545edd4fbd49b9f6ec402ee1973f9f4102bf3bfccdcbf1b2f862af89a134")]
+    #[case("0fe94ac2d68d39d9207ea0cae4bb2177f7352bd754173ed27bd13b4c156f77f8885458886ee9fbd212719f27a96397c110fa7b4f898b1c45c2e82c5d46b52bdad95cae8299d4fd4556ae02baf20a5ec989fc62f28c8b6b3df6dc696f2afb6e20", "afe94ac2d68d39d9207ea0cae4bb2177f7352bd754173ed27bd13b4c156f77f8885458886ee9fbd212719f27a96397c1")]
+    #[case("13aedc305adfdbc854aa105c41085618484858e6baa276b176fd89415021f7a0c75ff4f9ec39f482f142f1b54c11144815e519df6f71b1db46c83b1d2bdf381fc974059f3ccd87ed5259221dc37c50c3be407b58990d14b6d5bb79dad9ab8c42", "b3aedc305adfdbc854aa105c41085618484858e6baa276b176fd89415021f7a0c75ff4f9ec39f482f142f1b54c111448")]
+    fn test_from_uncompressed(#[case] input: &str, #[case] expect: &str) {
+        let input = hex::decode(input).unwrap();
+        let g1 = PublicKey::from_uncompressed(input.as_slice().try_into().unwrap()).unwrap();
+        let compressed = g1.to_bytes();
+        assert_eq!(hex::encode(compressed), expect);
+    }
+
+    #[test]
+    fn test_negate_roundtrip() {
+        let mut rng = StdRng::seed_from_u64(1337);
+        let mut data = [0u8; 32];
+        for _i in 0..50 {
+            // this integer may not exceed the group order, so leave the top
+            // byte as 0
+            rng.fill(&mut data[1..]);
+
+            let g1 = PublicKey::from_integer(&data);
+            let mut g1_neg = g1.clone();
+            g1_neg.negate();
+            assert!(g1_neg != g1);
+
+            g1_neg.negate();
+            assert!(g1_neg == g1);
+        }
+    }
+
+    #[test]
+    fn test_negate_infinity() {
+        let g1 = PublicKey::default();
+        let mut g1_neg = g1.clone();
+        // negate on infinity is a no-op
+        g1_neg.negate();
+        assert!(g1_neg == g1);
+    }
+
+    #[test]
+    fn test_negate() {
+        let mut rng = StdRng::seed_from_u64(1337);
+        let mut data = [0u8; 32];
+        for _i in 0..50 {
+            // this integer may not exceed the group order, so leave the top
+            // byte as 0
+            rng.fill(&mut data[1..]);
+
+            let g1 = PublicKey::from_integer(&data);
+            let mut g1_neg = g1.clone();
+            g1_neg.negate();
+
+            let mut g1_double = g1.clone();
+            // adding the negative undoes adding the positive
+            g1_double += &g1;
+            assert!(g1_double != g1);
+            g1_double += &g1_neg;
+            assert!(g1_double == g1);
+        }
+    }
+
+    #[test]
+    fn test_scalar_multiply() {
+        let mut rng = StdRng::seed_from_u64(1337);
+        let mut data = [0u8; 32];
+        for _i in 0..50 {
+            // this integer may not exceed the group order, so leave the top
+            // byte as 0
+            rng.fill(&mut data[1..]);
+
+            let mut g1 = PublicKey::from_integer(&data);
+            let mut g1_double = g1.clone();
+            g1_double += &g1;
+            assert!(g1_double != g1);
+            // scalar multiply by 2 is the same as adding oneself
+            g1.scalar_multiply(&[2]);
+            assert!(g1_double == g1);
+        }
+    }
+
+    #[test]
+    fn test_hash_to_g1_different_dst() {
+        const DEFAULT_DST: &[u8] = b"BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_AUG_";
+        const CUSTOM_DST: &[u8] = b"foobar";
+
+        let mut rng = StdRng::seed_from_u64(1337);
+        let mut msg = [0u8; 32];
+        for _i in 0..50 {
+            rng.fill(&mut msg);
+            let default_hash = hash_to_g1(&msg);
+            assert_eq!(default_hash, hash_to_g1_with_dst(&msg, DEFAULT_DST));
+            assert!(default_hash != hash_to_g1_with_dst(&msg, CUSTOM_DST));
+        }
+    }
+
+    // test cases from clvm_rs
+    #[rstest]
+    #[case("abcdef0123456789", "88e7302bf1fa8fcdecfb96f6b81475c3564d3bcaf552ccb338b1c48b9ba18ab7195c5067fe94fb216478188c0a3bef4a")]
+    fn test_hash_to_g1(#[case] input: &str, #[case] expect: &str) {
+        let g1 = hash_to_g1(input.as_bytes());
+        assert_eq!(hex::encode(g1.to_bytes()), expect);
+    }
+
+    // test cases from clvm_rs
+    #[rstest]
+    #[case("abcdef0123456789", "BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_", "8dd8e3a9197ddefdc25dde980d219004d6aa130d1af9b1808f8b2b004ae94484ac62a08a739ec7843388019a79c437b0")]
+    #[case("abcdef0123456789", "BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_AUG_", "88e7302bf1fa8fcdecfb96f6b81475c3564d3bcaf552ccb338b1c48b9ba18ab7195c5067fe94fb216478188c0a3bef4a")]
+    fn test_hash_to_g1_with_dst(#[case] input: &str, #[case] dst: &str, #[case] expect: &str) {
+        let g1 = hash_to_g1_with_dst(input.as_bytes(), dst.as_bytes());
+        assert_eq!(hex::encode(g1.to_bytes()), expect);
+    }
 }
 
 #[cfg(test)]
@@ -507,14 +749,6 @@ mod pytests {
     use rand::rngs::StdRng;
     use rand::{Rng, SeedableRng};
     use rstest::rstest;
-
-    #[test]
-    fn test_generator() {
-        assert_eq!(
-            hex::encode(&PublicKey::generator().to_bytes()),
-            "97f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb"
-        );
-    }
 
     #[test]
     fn test_json_dict_roundtrip() {
