@@ -88,9 +88,10 @@ pub fn tree_hash(py: Python, blob: PyBuffer<u8>) -> PyResult<&PyBytes> {
     Ok(PyBytes::new(py, &tree_hash_from_stream(&mut input)?))
 }
 
+#[allow(clippy::too_many_arguments)]
 #[pyfunction]
-pub fn get_puzzle_and_solution_for_coin<'py>(
-    py: Python<'py>,
+pub fn get_puzzle_and_solution_for_coin(
+    py: Python<'_>,
     program: PyBuffer<u8>,
     args: PyBuffer<u8>,
     max_cost: Cost,
@@ -98,7 +99,7 @@ pub fn get_puzzle_and_solution_for_coin<'py>(
     find_amount: u64,
     find_ph: Bytes32,
     flags: u32,
-) -> PyResult<(&'py PyBytes, &'py PyBytes)> {
+) -> PyResult<(&PyBytes, &PyBytes)> {
     let mut allocator = make_allocator(LIMIT_HEAP);
 
     if !program.is_c_contiguous() {
@@ -158,8 +159,12 @@ fn run_puzzle(
     Ok(convert_spend_bundle_conds(&a, conds))
 }
 
-fn convert_list_of_tuples(spends: &PyAny) -> PyResult<Vec<(Coin, &[u8], &[u8])>> {
-    let mut native_spends = Vec::<(Coin, &[u8], &[u8])>::new();
+// this is like a CoinSpend but with references to the puzzle and solution,
+// rather than owning them
+type CoinSpendRef<'a> = (Coin, &'a [u8], &'a [u8]);
+
+fn convert_list_of_tuples(spends: &PyAny) -> PyResult<Vec<CoinSpendRef>> {
+    let mut native_spends = Vec::<CoinSpendRef>::new();
     for s in spends.iter()? {
         let tuple = s?.downcast::<PyTuple>()?;
         let coin = tuple.get_item(0)?.extract::<Coin>()?;
