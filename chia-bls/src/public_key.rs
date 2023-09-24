@@ -219,7 +219,11 @@ impl ToJsonDict for PublicKey {
 pub fn parse_hex_string(o: &PyAny, len: usize, name: &str) -> PyResult<Vec<u8>> {
     use pyo3::exceptions::PyValueError;
     let s: String = o.extract()?;
-    let s = if s.starts_with("0x") { &s[2..] } else { &s[..] };
+    let s = if let Some(st) = s.strip_prefix("0x") {
+        st
+    } else {
+        &s[..]
+    };
     let buf = match hex::decode(s) {
         Err(_) => {
             return Err(PyValueError::new_err("invalid hex"));
