@@ -1,4 +1,4 @@
-name: Build and test riscv64 on ubuntu-latest
+name: QEMU Build and test riscv64 crate
 
 on:
   push:
@@ -41,7 +41,7 @@ jobs:
           '
 
   build_wheels:
-    name: QEMU riscv64 via Debian on ubuntu-latest
+    name: QEMU riscv64 wheel
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
