@@ -41,8 +41,7 @@ jobs:
           apt-get install -y git curl build-essential && \
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
           source $HOME/.cargo/env && \
-          cargo build --release && \
-          cargo test && cargo test --release
+          cargo test --release
           '
 
   build_wheels:
