@@ -711,7 +711,7 @@ mod tests {
         for _idx in 0..2 {
             let pk = sk.public_key();
             data.push((pk.clone(), msg));
-            agg.aggregate(&sign(&sk, msg.clone()));
+            agg.aggregate(&sign(&sk, *msg));
 
             pairs.push((pk.clone(), aug_msg_to_g2(&pk, msg)));
         }
@@ -1035,11 +1035,11 @@ mod tests {
         let mut data = [0u8; 32];
         rng.fill(data.as_mut_slice());
         let sk = SecretKey::from_seed(&data);
-        let sig1 = sign(&sk, &[0, 1, 2]);
-        let sig2 = sign(&sk, &[0, 1, 2, 3]);
+        let sig1 = sign(&sk, [0, 1, 2]);
+        let sig2 = sign(&sk, [0, 1, 2, 3]);
 
         assert!(hash(sig1) != hash(sig2));
-        assert_eq!(hash(sign(&sk, &[0, 1, 2])), hash(sign(&sk, &[0, 1, 2])));
+        assert_eq!(hash(sign(&sk, [0, 1, 2])), hash(sign(&sk, [0, 1, 2])));
     }
 
     #[test]
@@ -1076,7 +1076,7 @@ mod tests {
     #[test]
     fn test_generator() {
         assert_eq!(
-        hex::encode(&Signature::generator().to_bytes()),
+        hex::encode(Signature::generator().to_bytes()),
         "93e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb8"
         );
     }
