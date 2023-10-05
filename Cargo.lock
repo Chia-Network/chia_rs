@@ -271,6 +271,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "chia-bls-fuzz"
+version = "0.0.0"
+dependencies = [
+ "chia-bls",
+ "libfuzzer-sys",
+ "pyo3",
+]
+
+[[package]]
 name = "chia-client"
 version = "0.1.0"
 dependencies = [
@@ -309,6 +318,15 @@ dependencies = [
  "pyo3",
  "rstest 0.17.0",
  "sha2 0.9.9",
+]
+
+[[package]]
+name = "chia-protocol-fuzz"
+version = "0.0.0"
+dependencies = [
+ "chia-protocol",
+ "chia-traits",
+ "libfuzzer-sys",
 ]
 
 [[package]]

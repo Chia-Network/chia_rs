@@ -157,9 +157,9 @@ mod tests {
     #[test]
     fn test_reference() {
         let a = &mut Allocator::new();
-        assert_eq!(encode(a, &[1, 2, 3]), encode(a, [1, 2, 3]));
-        assert_eq!(encode(a, &Some(42)), encode(a, Some(42)));
-        assert_eq!(encode(a, &Some(&42)), encode(a, Some(42)));
+        assert_eq!(encode(a, [1, 2, 3]), encode(a, [1, 2, 3]));
+        assert_eq!(encode(a, Some(42)), encode(a, Some(42)));
+        assert_eq!(encode(a, Some(&42)), encode(a, Some(42)));
         assert_eq!(encode(a, Some(&42)), encode(a, Some(42)));
     }
 

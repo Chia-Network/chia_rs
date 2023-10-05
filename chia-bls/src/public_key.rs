@@ -604,7 +604,7 @@ mod tests {
     #[test]
     fn test_generator() {
         assert_eq!(
-            hex::encode(&PublicKey::generator().to_bytes()),
+            hex::encode(PublicKey::generator().to_bytes()),
             "97f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb"
         );
     }
