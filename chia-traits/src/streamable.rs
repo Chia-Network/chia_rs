@@ -33,6 +33,27 @@ pub trait Streamable {
     fn parse(input: &mut Cursor<&[u8]>) -> Result<Self>
     where
         Self: Sized;
+
+    // convenience functions for the top-level Streamable object
+    // these are meant to be used by *users* of streamable objects
+    // whereas the above functions are meant to be implemented by *implementers*
+    // of streamable types
+    fn to_bytes(&self) -> Result<Vec<u8>> {
+        let mut ret = Vec::<u8>::new();
+        self.stream(&mut ret)?;
+        Ok(ret)
+    }
+    fn from_bytes(bytes: &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        Self::parse(&mut Cursor::new(bytes))
+    }
+    fn hash(&self) -> [u8; 32] {
+        let mut ctx = Sha256::new();
+        self.update_digest(&mut ctx);
+        ctx.finalize().into()
+    }
 }
 
 macro_rules! streamable_primitive {

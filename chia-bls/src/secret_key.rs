@@ -29,6 +29,15 @@ use pyo3::{pyclass, pymethods, IntoPy, PyAny, PyObject, PyResult, Python};
 #[derive(PartialEq, Eq, Clone)]
 pub struct SecretKey(pub(crate) blst_scalar);
 
+#[cfg(fuzzing)]
+impl<'a> arbitrary::Arbitrary<'a> for SecretKey {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let mut seed = [0_u8; 32];
+        let _ = u.fill_buffer(seed.as_mut_slice());
+        Ok(Self::from_seed(&seed))
+    }
+}
+
 fn flip_bits(input: [u8; 32]) -> [u8; 32] {
     let mut ret = [0; 32];
     for i in 0..32 {

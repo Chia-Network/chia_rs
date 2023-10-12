@@ -30,6 +30,14 @@ use pyo3::{pyclass, pymethods, IntoPy, PyAny, PyObject, PyResult, Python};
 #[derive(Clone, Default)]
 pub struct PublicKey(pub(crate) blst_p1);
 
+#[cfg(fuzzing)]
+impl<'a> arbitrary::Arbitrary<'a> for PublicKey {
+    fn arbitrary(_u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        // placeholder
+        Ok(Self::default())
+    }
+}
+
 impl PublicKey {
     pub fn from_bytes_unchecked(bytes: &[u8; 48]) -> Result<Self> {
         // check if the element is canonical

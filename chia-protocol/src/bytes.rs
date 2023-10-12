@@ -24,6 +24,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 
 #[derive(Hash, Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[cfg_attr(fuzzing, derive(arbitrary::Arbitrary))]
 pub struct Bytes(Vec<u8>);
 
 impl Bytes {
@@ -183,6 +184,7 @@ impl fmt::Display for Bytes {
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, PartialOrd, Ord)]
+#[cfg_attr(fuzzing, derive(arbitrary::Arbitrary))]
 pub struct BytesImpl<const N: usize>([u8; N]);
 
 impl<const N: usize> Streamable for BytesImpl<N> {
