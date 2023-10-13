@@ -21,6 +21,30 @@ use pyo3::prelude::*;
 #[derive(Hash, Debug, Clone, Eq, PartialEq)]
 pub struct Program(Bytes);
 
+#[cfg(fuzzing)]
+impl<'a> arbitrary::Arbitrary<'a> for Program {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        // generate an arbitrary CLVM structure. Not likely a valid program.
+        let mut items_left = 1;
+        let mut total_items = 0;
+        let mut buf = Vec::<u8>::with_capacity(200);
+
+        while items_left > 0 {
+            if total_items < 100 && u.ratio(1, 4).unwrap() {
+                // make a pair
+                buf.push(0xff);
+                items_left += 2;
+            } else {
+                // make an atom. just single bytes for now
+                buf.push(u.int_in_range(0..=0x80).unwrap());
+            }
+            total_items += 1;
+            items_left -= 1;
+        }
+        Ok(Self(buf.into()))
+    }
+}
+
 impl Program {
     pub fn len(&self) -> usize {
         self.0.len()

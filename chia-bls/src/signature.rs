@@ -34,6 +34,14 @@ pub const DST: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_AUG_";
 #[derive(Clone, Default)]
 pub struct Signature(pub(crate) blst_p2);
 
+#[cfg(fuzzing)]
+impl<'a> arbitrary::Arbitrary<'a> for Signature {
+    fn arbitrary(_u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        // placeholder
+        Ok(Self::default())
+    }
+}
+
 impl Signature {
     pub fn from_bytes_unchecked(buf: &[u8; 96]) -> Result<Self> {
         let p2 = unsafe {

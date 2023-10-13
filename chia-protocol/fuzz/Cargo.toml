@@ -11,6 +11,9 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 chia-traits = { path = "../../chia-traits" }
+arbitrary = { version = "=1.3.0" }
+sha2 = "0.9.9"
+hex = "0.4.3"
 
 [dependencies.chia-protocol]
 path = ".."
@@ -46,6 +49,13 @@ bench = false
 [[bin]]
 name = "parse-program"
 path = "fuzz_targets/parse-program.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "streamable"
+path = "fuzz_targets/streamable.rs"
 test = false
 doc = false
 bench = false

@@ -21,6 +21,7 @@ clvmr = "0.3.0"
 chia-traits = { version = "0.1.0", path = "../chia-traits" }
 clvm-traits = { version = "0.1.0", path = "../clvm-traits", features = ["derive"] }
 chia-bls = { version = "0.2.7", path = "../chia-bls" }
+arbitrary = { version = "=1.3.0", features = ["derive"] }
 
 [dev-dependencies]
 rstest = "0.17.0"
