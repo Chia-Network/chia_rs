@@ -305,28 +305,45 @@ impl ToJsonDict for PublicKey {
 
 #[cfg(feature = "py-bindings")]
 pub fn parse_hex_string(o: &PyAny, len: usize, name: &str) -> PyResult<Vec<u8>> {
-    use pyo3::exceptions::PyValueError;
-    let s: String = o.extract()?;
-    let s = if let Some(st) = s.strip_prefix("0x") {
-        st
-    } else {
-        &s[..]
-    };
-    let buf = match hex::decode(s) {
-        Err(_) => {
-            return Err(PyValueError::new_err("invalid hex"));
+    use pyo3::exceptions::{PyTypeError, PyValueError};
+    if let Ok(s) = o.extract::<String>() {
+        let s = if let Some(st) = s.strip_prefix("0x") {
+            st
+        } else {
+            &s[..]
+        };
+        let buf = match hex::decode(s) {
+            Err(_) => {
+                return Err(PyValueError::new_err("invalid hex"));
+            }
+            Ok(v) => v,
+        };
+        if buf.len() != len {
+            Err(PyValueError::new_err(format!(
+                "{}, invalid length {} expected {}",
+                name,
+                buf.len(),
+                len
+            )))
+        } else {
+            Ok(buf)
         }
-        Ok(v) => v,
-    };
-    if buf.len() != len {
-        Err(PyValueError::new_err(format!(
-            "{}, invalid length {} expected {}",
-            name,
-            buf.len(),
-            len
-        )))
+    } else if let Ok(buf) = o.extract::<Vec<u8>>() {
+        if buf.len() != len {
+            Err(PyValueError::new_err(format!(
+                "{}, invalid length {} expected {}",
+                name,
+                buf.len(),
+                len
+            )))
+        } else {
+            Ok(buf)
+        }
     } else {
-        Ok(buf)
+        Err(PyTypeError::new_err(format!(
+            "invalid input type for {}",
+            name
+        )))
     }
 }
 
