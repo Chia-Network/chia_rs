@@ -63,7 +63,7 @@ jobs:
       run: |
         docker run --rm --platform linux/riscv64 \
           -v ${{ github.workspace }}:/ws --workdir=/ws \
-          chianetwork/ubuntu-22.04-risc-builder:latest \
+          chianetwork/ubuntu-22.04-risc-builder:sha-3045b8707792f63998cde1131e75b3440a624aa1 \
           bash -exc '\
           pyenv global 3.10
           python -m venv venv && \
