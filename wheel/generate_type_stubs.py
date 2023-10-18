@@ -143,7 +143,7 @@ extra_members = {"Coin": ["def name(self) -> bytes32: ..."]}
 
 classes = []
 for f in sorted(glob(str(input_dir / "*.rs"))):
-    if f.endswith("bytes.rs"):
+    if f.endswith("bytes.rs") or f.endswith("lazy_node.rs"):
         continue
     classes.extend(parse_rust_source(f))
 
