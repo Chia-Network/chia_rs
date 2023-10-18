@@ -139,7 +139,15 @@ def parse_rust_source(filename: str) -> List[Tuple[str, List[str]]]:
     return ret
 
 
-extra_members = {"Coin": ["def name(self) -> bytes32: ..."]}
+extra_members = {
+    "Coin": [
+        "def name(self) -> bytes32: ...",
+    ],
+    "ClassgroupElement": [
+        "@staticmethod\n    def get_default_element() -> ClassgroupElement: ...",
+        "@staticmethod\n    def get_size() -> int: ...",
+    ],
+}
 
 classes = []
 for f in sorted(glob(str(input_dir / "*.rs"))):
