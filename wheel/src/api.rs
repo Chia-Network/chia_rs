@@ -27,8 +27,8 @@ use chia_protocol::{
     RespondChildren, RespondFeeEstimates, RespondHeaderBlocks, RespondPuzzleSolution,
     RespondRemovals, RespondSesInfo, RespondToCoinUpdates, RespondToPhUpdates, RewardChainBlock,
     RewardChainBlockUnfinished, RewardChainSubSlot, SendTransaction, SpendBundle,
-    SubEpochChallengeSegment, SubEpochSegments, SubSlotData, SubSlotProofs, TransactionAck,
-    TransactionsInfo, VDFInfo, VDFProof,
+    SubEpochChallengeSegment, SubEpochSegments, SubEpochSummary, SubSlotData, SubSlotProofs,
+    TransactionAck, TransactionsInfo, UnfinishedBlock, VDFInfo, VDFProof,
 };
 use clvmr::serde::tree_hash_from_stream;
 use clvmr::{
@@ -329,6 +329,8 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<SubSlotData>()?;
     m.add_class::<SubEpochChallengeSegment>()?;
     m.add_class::<SubEpochSegments>()?;
+    m.add_class::<SubEpochSummary>()?;
+    m.add_class::<UnfinishedBlock>()?;
 
     // wallet protocol
     m.add_class::<RequestPuzzleSolution>()?;
