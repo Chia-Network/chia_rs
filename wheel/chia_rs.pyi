@@ -350,6 +350,10 @@ class Handshake:
 
 class ClassgroupElement:
     data: bytes100
+    @staticmethod
+    def get_default_element() -> ClassgroupElement: ...
+    @staticmethod
+    def get_size() -> int: ...
     def __init__(
         self,
         data: bytes100
