@@ -144,8 +144,25 @@ extra_members = {
         "def name(self) -> bytes32: ...",
     ],
     "ClassgroupElement": [
+        "@staticmethod\n    def create(bytes) -> ClassgroupElement: ...",
         "@staticmethod\n    def get_default_element() -> ClassgroupElement: ...",
         "@staticmethod\n    def get_size() -> int: ...",
+    ],
+    "UnfinishedBlock": [
+        "prev_header_hash: bytes32",
+        "partial_hash: bytes32",
+        "def is_transaction_block(self) -> bool: ...",
+        "total_iters: int",
+    ],
+    "FullBlock": [
+        "prev_header_hash: bytes32",
+        "header_hash: bytes32",
+        "def is_transaction_block(self) -> bool: ...",
+        "total_iters: int",
+        "height: int",
+        "weight: int",
+        "def get_included_reward_coins(self) -> List[Coin]: ...",
+        "def is_fully_compactified(self) -> bool: ...",
     ],
 }
 

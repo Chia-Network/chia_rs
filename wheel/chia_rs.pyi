@@ -351,6 +351,8 @@ class Handshake:
 class ClassgroupElement:
     data: bytes100
     @staticmethod
+    def create(bytes) -> ClassgroupElement: ...
+    @staticmethod
     def get_default_element() -> ClassgroupElement: ...
     @staticmethod
     def get_size() -> int: ...
@@ -704,6 +706,14 @@ class FullBlock:
     transactions_info: Optional[TransactionsInfo]
     transactions_generator: Optional[Program]
     transactions_generator_ref_list: List[int]
+    prev_header_hash: bytes32
+    header_hash: bytes32
+    def is_transaction_block(self) -> bool: ...
+    total_iters: int
+    height: int
+    weight: int
+    def get_included_reward_coins(self) -> List[Coin]: ...
+    def is_fully_compactified(self) -> bool: ...
     def __init__(
         self,
         finished_sub_slots: Sequence[EndOfSubSlotBundle],
@@ -1151,6 +1161,10 @@ class UnfinishedBlock:
     transactions_info: Optional[TransactionsInfo]
     transactions_generator: Optional[Program]
     transactions_generator_ref_list: List[int]
+    prev_header_hash: bytes32
+    partial_hash: bytes32
+    def is_transaction_block(self) -> bool: ...
+    total_iters: int
     def __init__(
         self,
         finished_sub_slots: Sequence[EndOfSubSlotBundle],
