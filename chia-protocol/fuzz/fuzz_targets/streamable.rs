@@ -53,6 +53,7 @@ fuzz_target!(|data: &[u8]| {
     test::<FoliageBlockData>(data);
     test::<Foliage>(data);
     test::<FullBlock>(data);
+    test::<UnfinishedBlock>(data);
     test::<HeaderBlock>(data);
     test::<PoolTarget>(data);
     test::<ProofOfSpace>(data);
@@ -70,6 +71,7 @@ fuzz_target!(|data: &[u8]| {
     test::<SubSlotData>(data);
     test::<SubEpochChallengeSegment>(data);
     test::<SubEpochSegments>(data);
+    test::<SubEpochSummary>(data);
 
     test::<Handshake>(data);
 
