@@ -922,6 +922,7 @@ class RewardChainBlock:
     reward_chain_ip_vdf: VDFInfo
     infused_challenge_chain_ip_vdf: Optional[VDFInfo]
     is_transaction_block: bool
+    def get_unfinished(self) -> RewardChainBlockUnfinished: ...
     def __init__(
         self,
         weight: int,

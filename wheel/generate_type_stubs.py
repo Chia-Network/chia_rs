@@ -164,6 +164,9 @@ extra_members = {
         "def get_included_reward_coins(self) -> List[Coin]: ...",
         "def is_fully_compactified(self) -> bool: ...",
     ],
+    "RewardChainBlock": [
+        "def get_unfinished(self) -> RewardChainBlockUnfinished: ...",
+    ],
 }
 
 classes = []
