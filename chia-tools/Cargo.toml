@@ -13,6 +13,7 @@ chia-protocol = { version = "0.2.7", path = "../chia-protocol" }
 chia-traits = { path = "../chia-traits" }
 clvm-utils = { path = "../clvm-utils" }
 clvm-traits = { path = "../clvm-traits" }
+chia-wallet = { version = "=0.1.0", path = "../chia-wallet" }
 clvmr = { version = "=0.3.0", features = ["counters"] }
 chia = { version = "0.2.9", path = ".." }
 sqlite = "=0.31.0"
@@ -20,6 +21,7 @@ clap = { version = "=4.3.9", features = ["derive"] }
 zstd = "=0.12.3"
 threadpool = "=1.8.1"
 hex = "=0.4.3"
+hex-literal = "=0.4.1"
 
 [lib]
 name = "chia_tools"
@@ -42,5 +44,15 @@ bench = false
 
 [[bin]]
 name = "gen-corpus"
+test = false
+bench = false
+
+[[bin]]
+name = "run-spend"
+test = false
+bench = false
+
+[[bin]]
+name = "fast-forward-spend"
 test = false
 bench = false

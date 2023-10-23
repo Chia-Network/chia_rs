@@ -10,6 +10,7 @@ use chia_traits::streamable::Streamable;
 
 use chia_protocol::bytes::Bytes32;
 use chia_protocol::{coin::Coin, coin_spend::CoinSpend, program::Program};
+use chia_wallet::singleton::SINGLETON_TOP_LAYER_PUZZLE_HASH;
 use clvm_traits::FromClvm;
 use clvm_utils::{tree_hash, CurriedProgram};
 use clvmr::allocator::NodePtr;
@@ -48,6 +49,7 @@ fn main() {
     use std::collections::HashSet;
     use std::sync::{Arc, Mutex};
     let seen_puzzles = Arc::new(Mutex::new(HashSet::<Bytes32>::new()));
+    let seen_singletons = Arc::new(Mutex::new(HashSet::<Bytes32>::new()));
 
     iterate_tx_blocks(
         &args.file,
@@ -59,6 +61,7 @@ fn main() {
             let prg = block.transactions_generator.unwrap();
 
             let seen_puzzles = seen_puzzles.clone();
+            let seen_singletons = seen_singletons.clone();
             pool.execute(move || {
                 let mut a = Allocator::new_limited(500000000, 62500000, 62500000);
 
@@ -76,10 +79,13 @@ fn main() {
                             _ => puzzle_hash,
                         };
 
-                        if !seen_puzzles.lock().unwrap().insert(mod_hash) {
+                        let run_puzzle = seen_puzzles.lock().unwrap().insert(mod_hash);
+                        let fast_forward = (mod_hash == SINGLETON_TOP_LAYER_PUZZLE_HASH)
+                            && seen_singletons.lock().unwrap().insert(puzzle_hash);
+
+                        if !run_puzzle && !fast_forward {
                             return;
                         }
-
                         use std::fs::write;
 
                         let puzzle_reveal = Program::from_clvm(a, puzzle).expect("puzzle reveal");
@@ -97,10 +103,20 @@ fn main() {
 
                         let mut bytes = Vec::<u8>::new();
                         spend.stream(&mut bytes).expect("stream CoinSpend");
-                        let directory = "../fuzz/corpus/run-puzzle";
-                        let _ = std::fs::create_dir_all(directory);
-                        write(format!("{directory}/{mod_hash}.spend"), bytes).expect("write");
-                        println!("{height}: {mod_hash}");
+                        if run_puzzle {
+                            let directory = "../fuzz/corpus/run-puzzle";
+                            let _ = std::fs::create_dir_all(directory);
+                            write(format!("{directory}/{mod_hash}.spend"), &bytes).expect("write");
+                            println!("{height}: {mod_hash}");
+                        }
+
+                        if fast_forward {
+                            let directory = "../fuzz/corpus/fast-forward";
+                            let _ = std::fs::create_dir_all(directory);
+                            write(format!("{directory}/{puzzle_hash}.spend"), bytes)
+                                .expect("write");
+                            println!("{height}: {puzzle_hash}");
+                        }
                     },
                 )
                 .expect("failed to run block generator");

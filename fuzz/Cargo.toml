@@ -12,9 +12,11 @@ cargo-fuzz = true
 libfuzzer-sys = "0.4"
 clvmr = "=0.3.0"
 clvm-utils = { path = "../clvm-utils" }
+clvm-traits = { path = "../clvm-traits" }
 chia-protocol = { path = "../chia-protocol" }
 chia-traits = { path = "../chia-traits" }
 chia = { path = ".." }
+hex-literal = "=0.4.1"
 
 [lib]
 name = "fuzzing_utils"
@@ -86,6 +88,13 @@ bench = false
 [[bin]]
 name = "run-puzzle"
 path = "fuzz_targets/run-puzzle.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fast-forward"
+path = "fuzz_targets/fast-forward.rs"
 test = false
 doc = false
 bench = false
