@@ -2106,6 +2106,8 @@ class SubSlotData:
     cc_ip_vdf_info: Optional[VDFInfo]
     icc_ip_vdf_info: Optional[VDFInfo]
     total_iters: Optional[int]
+    def is_end_of_slot(self) -> bool: ...
+    def is_challenge(self) -> bool: ...
     def __init__(
         self,
         proof_of_space: Optional[ProofOfSpace],

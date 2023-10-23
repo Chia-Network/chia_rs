@@ -20,6 +20,20 @@ streamable_struct! (SubSlotData {
     total_iters: Option<u128>,
 });
 
+#[cfg(feature = "py-bindings")]
+use pyo3::prelude::*;
+
+#[cfg_attr(feature = "py-bindings", pymethods)]
+impl SubSlotData {
+    pub fn is_end_of_slot(&self) -> bool {
+        self.cc_slot_end_info.is_some()
+    }
+
+    pub fn is_challenge(&self) -> bool {
+        self.proof_of_space.is_some()
+    }
+}
+
 streamable_struct! (SubEpochChallengeSegment {
     sub_epoch_n: u32,
     sub_slots: Vec<SubSlotData>,

@@ -167,6 +167,10 @@ extra_members = {
     "RewardChainBlock": [
         "def get_unfinished(self) -> RewardChainBlockUnfinished: ...",
     ],
+    "SubSlotData": [
+        "def is_end_of_slot(self) -> bool: ...",
+        "def is_challenge(self) -> bool: ...",
+    ],
 }
 
 classes = []
