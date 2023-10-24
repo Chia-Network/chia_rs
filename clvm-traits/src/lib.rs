@@ -48,7 +48,6 @@ mod to_clvm;
 
 pub use error::*;
 pub use from_clvm::*;
-pub use macros::*;
 pub use match_byte::*;
 pub use to_clvm::*;
 
