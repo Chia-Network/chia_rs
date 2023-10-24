@@ -518,6 +518,38 @@ pub struct Spend {
     pub flags: u32,
 }
 
+impl Spend {
+    pub fn new(
+        parent_id: NodePtr,
+        coin_amount: u64,
+        puzzle_hash: NodePtr,
+        coin_id: Arc<Bytes32>,
+    ) -> Spend {
+        Spend {
+            parent_id,
+            coin_amount,
+            puzzle_hash,
+            coin_id,
+            height_relative: None,
+            seconds_relative: None,
+            before_height_relative: None,
+            before_seconds_relative: None,
+            birth_height: None,
+            birth_seconds: None,
+            create_coin: HashSet::new(),
+            agg_sig_me: Vec::new(),
+            agg_sig_parent: Vec::new(),
+            agg_sig_puzzle: Vec::new(),
+            agg_sig_amount: Vec::new(),
+            agg_sig_puzzle_amount: Vec::new(),
+            agg_sig_parent_amount: Vec::new(),
+            agg_sig_parent_puzzle: Vec::new(),
+            // assume it's eligible until we see an agg-sig condition
+            flags: ELIGIBLE_FOR_DEDUP,
+        }
+    }
+}
+
 // these are all the conditions and properties of a complete spend bundle.
 // some conditions that are created by individual spends are aggregated at the
 // spend bundle level, like reserve_fee and absolute time locks. Other
@@ -655,28 +687,7 @@ pub fn process_single_spend(
 
     ret.removal_amount += my_amount as u128;
 
-    let coin_spend = Spend {
-        parent_id,
-        coin_amount: my_amount,
-        puzzle_hash,
-        coin_id,
-        height_relative: None,
-        seconds_relative: None,
-        before_height_relative: None,
-        before_seconds_relative: None,
-        birth_height: None,
-        birth_seconds: None,
-        create_coin: HashSet::new(),
-        agg_sig_me: Vec::new(),
-        agg_sig_parent: Vec::new(),
-        agg_sig_puzzle: Vec::new(),
-        agg_sig_amount: Vec::new(),
-        agg_sig_puzzle_amount: Vec::new(),
-        agg_sig_parent_amount: Vec::new(),
-        agg_sig_parent_puzzle: Vec::new(),
-        // assume it's eligible until we see an agg-sig condition
-        flags: ELIGIBLE_FOR_DEDUP,
-    };
+    let coin_spend = Spend::new(parent_id, my_amount, puzzle_hash, coin_id);
 
     parse_conditions(a, ret, state, coin_spend, conditions, flags, max_cost)
 }

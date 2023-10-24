@@ -1,6 +1,4 @@
-use crate::gen::conditions::{
-    parse_conditions, ParseState, Spend, SpendBundleConditions, ELIGIBLE_FOR_DEDUP,
-};
+use crate::gen::conditions::{parse_conditions, ParseState, Spend, SpendBundleConditions};
 use crate::gen::flags::ALLOW_BACKREFS;
 use crate::gen::validation_error::ValidationErr;
 use chia_protocol::bytes::Bytes32;
@@ -11,7 +9,6 @@ use clvmr::chia_dialect::ChiaDialect;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
 use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs};
-use std::collections::HashSet;
 use std::sync::Arc;
 
 pub fn run_puzzle(
@@ -51,28 +48,12 @@ pub fn run_puzzle(
         .into(),
     );
 
-    let spend = Spend {
-        parent_id: a.new_atom(parent_id)?,
-        coin_amount: amount,
-        puzzle_hash: a.new_atom(&puzzle_hash)?,
+    let spend = Spend::new(
+        a.new_atom(parent_id)?,
+        amount,
+        a.new_atom(&puzzle_hash)?,
         coin_id,
-        height_relative: None,
-        seconds_relative: None,
-        before_height_relative: None,
-        before_seconds_relative: None,
-        birth_height: None,
-        birth_seconds: None,
-        create_coin: HashSet::new(),
-        agg_sig_me: Vec::new(),
-        agg_sig_parent: Vec::new(),
-        agg_sig_puzzle: Vec::new(),
-        agg_sig_amount: Vec::new(),
-        agg_sig_puzzle_amount: Vec::new(),
-        agg_sig_parent_amount: Vec::new(),
-        agg_sig_parent_puzzle: Vec::new(),
-        // assume it's eligible until we see an agg-sig condition
-        flags: ELIGIBLE_FOR_DEDUP,
-    };
+    );
 
     let mut cost_left = max_cost - clvm_cost;
 
