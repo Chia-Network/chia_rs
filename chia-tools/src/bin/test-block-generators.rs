@@ -5,7 +5,7 @@ use chia_traits::Streamable;
 
 use sqlite::State;
 
-use chia::gen::conditions::{NewCoin, NonePolicy, Spend, SpendBundleConditions};
+use chia::gen::conditions::{EmptyVisitor, NewCoin, Spend, SpendBundleConditions};
 use chia::gen::flags::{ALLOW_BACKREFS, MEMPOOL_MODE};
 use chia::gen::run_block_generator::{run_block_generator, run_block_generator2};
 use clvmr::allocator::NodePtr;
@@ -157,9 +157,9 @@ fn main() {
         };
 
     let block_runner = if args.rust_generator {
-        run_block_generator2::<_, NonePolicy>
+        run_block_generator2::<_, EmptyVisitor>
     } else {
-        run_block_generator::<_, NonePolicy>
+        run_block_generator::<_, EmptyVisitor>
     };
 
     while let Ok(State::Row) = statement.next() {
@@ -239,15 +239,8 @@ fn main() {
                 prg.as_ref()
             };
 
-            let mut conditions = block_runner(
-                &mut a,
-                generator,
-                &block_refs,
-                ti.cost,
-                flags,
-                &mut NonePolicy::default(),
-            )
-            .expect("failed to run block generator");
+            let mut conditions = block_runner(&mut a, generator, &block_refs, ti.cost, flags)
+                .expect("failed to run block generator");
 
             if args.rust_generator || args.test_backrefs {
                 assert!(conditions.cost <= ti.cost);
@@ -262,13 +255,12 @@ fn main() {
             }
 
             if args.validate {
-                let mut baseline = run_block_generator(
+                let mut baseline = run_block_generator::<_, EmptyVisitor>(
                     &mut a,
                     prg.as_ref(),
                     &block_refs,
                     ti.cost,
                     0,
-                    &mut NonePolicy::default(),
                 )
                 .expect("failed to run block generator");
                 assert_eq!(baseline.cost, ti.cost);

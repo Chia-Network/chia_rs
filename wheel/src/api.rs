@@ -4,7 +4,7 @@ use crate::run_generator::{
     PySpendBundleConditions,
 };
 use chia::allocator::make_allocator;
-use chia::gen::conditions::MempoolPolicy;
+use chia::gen::conditions::MempoolVisitor;
 use chia::gen::flags::{
     AGG_SIG_ARGS, ALLOW_BACKREFS, ANALYZE_SPENDS, COND_ARGS_NIL, ENABLE_SOFTFORK_CONDITION,
     LIMIT_ANNOUNCES, LIMIT_OBJECTS, MEMPOOL_MODE, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
@@ -161,15 +161,8 @@ fn run_puzzle(
     flags: u32,
 ) -> PyResult<PySpendBundleConditions> {
     let mut a = make_allocator(LIMIT_HEAP);
-    let conds = native_run_puzzle(
-        &mut a,
-        puzzle,
-        solution,
-        parent_id,
-        amount,
-        max_cost,
-        flags,
-        &mut MempoolPolicy::default(),
+    let conds = native_run_puzzle::<MempoolVisitor>(
+        &mut a, puzzle, solution, parent_id, amount, max_cost, flags,
     )?;
     Ok(convert_spend_bundle_conds(&a, conds))
 }

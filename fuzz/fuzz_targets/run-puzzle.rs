@@ -1,5 +1,5 @@
 #![no_main]
-use chia::gen::conditions::MempoolPolicy;
+use chia::gen::conditions::MempoolVisitor;
 use chia::gen::flags::ALLOW_BACKREFS;
 use chia::gen::run_puzzle::run_puzzle;
 use chia_protocol::CoinSpend;
@@ -14,7 +14,7 @@ fuzz_target!(|data: &[u8]| {
     let Ok(spend) = CoinSpend::parse(&mut Cursor::new(data)) else {
         return;
     };
-    let _ = run_puzzle(
+    let _ = run_puzzle::<MempoolVisitor>(
         &mut a,
         spend.puzzle_reveal.as_slice(),
         spend.solution.as_slice(),
@@ -22,6 +22,5 @@ fuzz_target!(|data: &[u8]| {
         spend.coin.amount,
         11000000000,
         ALLOW_BACKREFS,
-        &mut MempoolPolicy::default(),
     );
 });

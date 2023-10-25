@@ -1,6 +1,6 @@
 #![no_main]
 use chia::fast_forward::fast_forward_singleton;
-use chia::gen::conditions::MempoolPolicy;
+use chia::gen::conditions::MempoolVisitor;
 use chia::gen::run_puzzle::run_puzzle;
 use chia::gen::validation_error::ValidationErr;
 use chia_protocol::Bytes32;
@@ -57,7 +57,7 @@ fuzz_target!(|data: &[u8]| {
     let new_solution = node_to_bytes(&a, new_solution).expect("serialize new solution");
 
     // run original spend
-    let conditions1 = run_puzzle(
+    let conditions1 = run_puzzle::<MempoolVisitor>(
         &mut a,
         spend.puzzle_reveal.as_slice(),
         spend.solution.as_slice(),
@@ -65,11 +65,10 @@ fuzz_target!(|data: &[u8]| {
         spend.coin.amount,
         11000000000,
         0,
-        &mut MempoolPolicy::default(),
     );
 
     // run new spend
-    let conditions2 = run_puzzle(
+    let conditions2 = run_puzzle::<MempoolVisitor>(
         &mut a,
         spend.puzzle_reveal.as_slice(),
         new_solution.as_slice(),
@@ -77,7 +76,6 @@ fuzz_target!(|data: &[u8]| {
         new_coin.amount,
         11000000000,
         0,
-        &mut MempoolPolicy::default(),
     );
 
     match (conditions1, conditions2) {

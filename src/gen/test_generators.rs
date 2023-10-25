@@ -1,4 +1,4 @@
-use super::conditions::{MempoolPolicy, NewCoin, Spend, SpendBundleConditions};
+use super::conditions::{MempoolVisitor, NewCoin, Spend, SpendBundleConditions};
 use super::run_block_generator::{run_block_generator, run_block_generator2};
 use crate::allocator::make_allocator;
 use crate::gen::flags::{ALLOW_BACKREFS, MEMPOOL_MODE};
@@ -210,26 +210,27 @@ fn run_generator(#[case] name: &str) {
     for (flags, expected) in zip(&[ALLOW_BACKREFS, ALLOW_BACKREFS | MEMPOOL_MODE], expected) {
         println!("flags: {:x}", flags);
         let mut a = make_allocator(*flags);
-        let (expected_cost, output) = match run_block_generator(
+        let conds = run_block_generator::<_, MempoolVisitor>(
             &mut a,
             &generator,
             &block_refs,
             11000000000,
             *flags,
-            &mut MempoolPolicy::default(),
-        ) {
+        );
+
+        let (expected_cost, output) = match conds {
             Ok(conditions) => (conditions.cost, print_conditions(&a, &conditions)),
             Err(code) => (0, format!("FAILED: {}\n", u32::from(code.1))),
         };
 
-        let output_hard_fork = match run_block_generator2(
+        let conds = run_block_generator2::<_, MempoolVisitor>(
             &mut a,
             &generator,
             &block_refs,
             11000000000,
             *flags,
-            &mut MempoolPolicy::default(),
-        ) {
+        );
+        let output_hard_fork = match conds {
             Ok(mut conditions) => {
                 // in the hard fork, the cost of running the genrator +
                 // puzzles should never be higher than before the hard-fork

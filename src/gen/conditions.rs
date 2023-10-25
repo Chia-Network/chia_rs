@@ -18,7 +18,7 @@ use crate::gen::flags::{
     AGG_SIG_ARGS, COND_ARGS_NIL, LIMIT_ANNOUNCES, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
     NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
 };
-use crate::gen::policy::ConditionPolicy;
+use crate::gen::spend_visitor::SpendVisitor;
 use crate::gen::validation_error::check_nil;
 use chia_protocol::bytes::Bytes32;
 use clvmr::allocator::{Allocator, NodePtr, SExp};
@@ -47,22 +47,22 @@ pub const HAS_RELATIVE_CONDITION: u32 = 2;
 // 4. it has an output coin with the same puzzle hash and amount as the spend itself
 pub const ELIGIBLE_FOR_FF: u32 = 4;
 
-#[derive(Default)]
-pub struct NonePolicy {}
+pub struct EmptyVisitor {}
 
-impl ConditionPolicy for NonePolicy {
-    fn new_spend(&mut self, _spend: &mut Spend) {}
+impl SpendVisitor for EmptyVisitor {
+    fn new_spend(_spend: &mut Spend) -> Self {
+        Self {}
+    }
     fn condition(&mut self, _spend: &mut Spend, _c: &Condition) {}
     fn post_spend(&mut self, _a: &Allocator, _spend: &mut Spend) {}
 }
 
-#[derive(Default)]
-pub struct MempoolPolicy {
+pub struct MempoolVisitor {
     condition_counter: i32,
 }
 
-impl ConditionPolicy for MempoolPolicy {
-    fn new_spend(&mut self, spend: &mut Spend) {
+impl SpendVisitor for MempoolVisitor {
+    fn new_spend(spend: &mut Spend) -> Self {
         // assume it's eligibe. We'll clear this flag if it isn't
         let mut spend_flags = ELIGIBLE_FOR_DEDUP;
 
@@ -71,7 +71,10 @@ impl ConditionPolicy for MempoolPolicy {
             spend_flags |= ELIGIBLE_FOR_FF;
         }
         spend.flags |= spend_flags;
-        self.condition_counter = 0;
+
+        Self {
+            condition_counter: 0,
+        }
     }
 
     fn condition(&mut self, spend: &mut Spend, c: &Condition) {
@@ -754,7 +757,7 @@ pub(crate) fn parse_single_spend(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn process_single_spend<T: ConditionPolicy>(
+pub fn process_single_spend<V: SpendVisitor>(
     a: &Allocator,
     ret: &mut SpendBundleConditions,
     state: &mut ParseState,
@@ -764,7 +767,6 @@ pub fn process_single_spend<T: ConditionPolicy>(
     conditions: NodePtr,
     flags: u32,
     max_cost: &mut Cost,
-    policy: &mut T,
 ) -> Result<(), ValidationErr> {
     let parent_id = sanitize_hash(a, parent_id, 32, ErrorCode::InvalidParentId)?;
     let puzzle_hash = sanitize_hash(a, puzzle_hash, 32, ErrorCode::InvalidPuzzleHash)?;
@@ -789,9 +791,18 @@ pub fn process_single_spend<T: ConditionPolicy>(
 
     let mut spend = Spend::new(parent_id, my_amount, puzzle_hash, coin_id);
 
-    policy.new_spend(&mut spend);
+    let mut visitor = V::new_spend(&mut spend);
 
-    parse_conditions(a, ret, state, spend, conditions, flags, max_cost, policy)
+    parse_conditions(
+        a,
+        ret,
+        state,
+        spend,
+        conditions,
+        flags,
+        max_cost,
+        &mut visitor,
+    )
 }
 
 fn assert_not_ephemeral(spend_flags: &mut u32, state: &mut ParseState, idx: usize) {
@@ -813,7 +824,7 @@ fn decrement(cnt: &mut u32, n: NodePtr) -> Result<(), ValidationErr> {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn parse_conditions<T: ConditionPolicy>(
+pub fn parse_conditions<V: SpendVisitor>(
     a: &Allocator,
     ret: &mut SpendBundleConditions,
     state: &mut ParseState,
@@ -821,7 +832,7 @@ pub fn parse_conditions<T: ConditionPolicy>(
     mut iter: NodePtr,
     flags: u32,
     max_cost: &mut Cost,
-    policy: &mut T,
+    visitor: &mut V,
 ) -> Result<(), ValidationErr> {
     let mut announce_countdown: u32 = if (flags & LIMIT_ANNOUNCES) != 0 {
         1024
@@ -869,7 +880,7 @@ pub fn parse_conditions<T: ConditionPolicy>(
         }
         c = rest(a, c)?;
         let cva = parse_args(a, c, op, flags)?;
-        policy.condition(&mut spend, &cva);
+        visitor.condition(&mut spend, &cva);
         match cva {
             Condition::ReserveFee(limit) => {
                 // reserve fees are accumulated
@@ -1097,7 +1108,7 @@ pub fn parse_conditions<T: ConditionPolicy>(
         }
     }
 
-    policy.post_spend(a, &mut spend);
+    visitor.post_spend(a, &mut spend);
 
     ret.spends.push(spend);
     Ok(())
@@ -1130,12 +1141,11 @@ fn is_ephemeral(
 // This function parses, and validates aspects of, the above structure and
 // returns a list of all spends, along with all conditions, organized by
 // condition op-code
-pub fn parse_spends<T: ConditionPolicy>(
+pub fn parse_spends<V: SpendVisitor>(
     a: &Allocator,
     spends: NodePtr,
     max_cost: Cost,
     flags: u32,
-    policy: &mut T,
 ) -> Result<SpendBundleConditions, ValidationErr> {
     let mut ret = SpendBundleConditions::default();
     let mut state = ParseState::default();
@@ -1152,7 +1162,7 @@ pub fn parse_spends<T: ConditionPolicy>(
         // as well as updates it with any conditions
         let (parent_id, puzzle_hash, amount, conds) = parse_single_spend(a, spend)?;
 
-        process_single_spend(
+        process_single_spend::<V>(
             a,
             &mut ret,
             &mut state,
@@ -1162,7 +1172,6 @@ pub fn parse_spends<T: ConditionPolicy>(
             conds,
             flags,
             &mut cost_left,
-            policy,
         )?;
     }
 
@@ -1567,7 +1576,7 @@ fn cond_test_cb(
         print!("{:02x}", c);
     }
     println!();
-    match parse_spends(&a, n, 11000000000, flags, &mut MempoolPolicy::default()) {
+    match parse_spends::<MempoolVisitor>(&a, n, 11000000000, flags) {
         Ok(list) => {
             for n in &list.spends {
                 println!("{:?}", n);
