@@ -1,4 +1,5 @@
 from chia_rs import run_puzzle, run_chia_program, ALLOW_BACKREFS
+from chia.types.blockchain_format.sized_bytes import bytes32
 from hashlib import sha256
 import pytest
 from run_gen import print_spend_bundle_conditions
@@ -96,7 +97,7 @@ addition_amount: 1
 def test_failure(flags: int) -> None:
 
     output = ""
-    parent = b"1" * 32
+    parent = bytes32(b"1" * 32)
     amount = 1337
     # (mod (solution) (if (= solution (q . 1)) () (x solution)))
     puzzle = binutils.assemble("(a (i (= 2 (q . 1)) () (q 8 2)) 1)").as_bin()

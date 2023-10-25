@@ -369,6 +369,7 @@ dependencies = [
  "chia_py_streamable_macro",
  "chia_streamable_macro",
  "clvm-traits",
+ "clvm-utils",
  "clvmr",
  "hex",
  "pyo3",
@@ -575,6 +576,7 @@ dependencies = [
  "clvmr",
  "hex",
  "num-bigint",
+ "pyo3",
  "thiserror",
 ]
 
@@ -1660,6 +1662,7 @@ dependencies = [
  "inventory",
  "libc",
  "memoffset",
+ "num-bigint",
  "parking_lot",
  "pyo3-build-config",
  "pyo3-ffi",

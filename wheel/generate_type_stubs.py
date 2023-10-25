@@ -183,6 +183,18 @@ extra_members = {
         "def is_end_of_slot(self) -> bool: ...",
         "def is_challenge(self) -> bool: ...",
     ],
+    "Program": [
+        "def get_tree_hash(self) -> bytes32: ...",
+        "@staticmethod\n    def default() -> Program: ...",
+        "@staticmethod\n    def fromhex(hex) -> Program: ...",
+        "def run_mempool_with_cost(self, max_cost: int, args: object) -> Tuple[int, ChiaProgram]: ...",
+        "def run_with_cost(self, max_cost: int, args: object) -> Tuple[int, ChiaProgram]: ...",
+        "def _run(self, max_cost: int, flags: int, args: object) -> Tuple[int, ChiaProgram]: ...",
+        "@staticmethod\n    def to(o: object) -> Program: ...",
+        "@staticmethod\n    def from_program(p: ChiaProgram) -> Program: ...",
+        "def to_program(self) -> ChiaProgram: ...",
+        "def uncurry(self) -> Tuple[ChiaProgram, ChiaProgram]: ...",
+    ],
 }
 
 classes = []
@@ -200,6 +212,7 @@ with open(output_file, "w") as f:
 
 from typing import List, Optional, Sequence, Tuple
 from chia.types.blockchain_format.sized_bytes import bytes32
+from chia.types.blockchain_format.program import Program as ChiaProgram
 
 ReadableBuffer = Union[bytes, bytearray, memoryview]
 
