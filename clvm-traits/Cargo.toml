@@ -1,6 +1,6 @@
 [package]
 name = "clvm-traits"
-version = "0.1.0"
+version = "0.2.12"
 edition = "2021"
 license = "Apache-2.0"
 description = "Traits for encoding and decoding CLVM objects."
@@ -15,7 +15,7 @@ features = ["derive"]
 derive = ["dep:clvm-derive"]
 
 [dependencies]
-clvm-derive = { version = "0.1.0", path = "../clvm-derive", optional = true }
+clvm-derive = { version = "0.2.12", path = "../clvm-derive", optional = true }
 clvmr = "0.3.0"
 num-bigint = "0.4.3"
 thiserror = "1.0.44"
