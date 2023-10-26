@@ -18,6 +18,7 @@ use crate::gen::flags::{
     AGG_SIG_ARGS, COND_ARGS_NIL, LIMIT_ANNOUNCES, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
     NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
 };
+use crate::gen::spend_visitor::SpendVisitor;
 use crate::gen::validation_error::check_nil;
 use chia_protocol::bytes::Bytes32;
 use clvmr::allocator::{Allocator, NodePtr, SExp};
@@ -27,6 +28,117 @@ use std::cmp::{max, min};
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
+
+// spend flags
+
+// a spend is eligible for deduplication if it does not have any AGG_SIG_ME
+// nor AGG_SIG_UNSAFE
+pub const ELIGIBLE_FOR_DEDUP: u32 = 1;
+
+// If the spend bundle contained *any* relative seconds or height condition, this flag is set
+pub const HAS_RELATIVE_CONDITION: u32 = 2;
+
+// If the CoinSpend is eligible for fast-forward, this flag is set. A spend is
+// eligible if:
+// 1. the input coin amount is odd
+// 2. There are no AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_* conditions
+// 3. No ASSERT_MY_COIN_ID condition, no more than one ASSERT_MY_PARENT_ID condition
+//    (as the second condition)
+// 4. it has an output coin with the same puzzle hash and amount as the spend itself
+pub const ELIGIBLE_FOR_FF: u32 = 4;
+
+pub struct EmptyVisitor {}
+
+impl SpendVisitor for EmptyVisitor {
+    fn new_spend(_spend: &mut Spend) -> Self {
+        Self {}
+    }
+    fn condition(&mut self, _spend: &mut Spend, _c: &Condition) {}
+    fn post_spend(&mut self, _a: &Allocator, _spend: &mut Spend) {}
+}
+
+pub struct MempoolVisitor {
+    condition_counter: i32,
+}
+
+impl SpendVisitor for MempoolVisitor {
+    fn new_spend(spend: &mut Spend) -> Self {
+        // assume it's eligibe. We'll clear this flag if it isn't
+        let mut spend_flags = ELIGIBLE_FOR_DEDUP;
+
+        // spend eligible for fast-forward must be singletons, which use odd amounts
+        if (spend.coin_amount & 1) == 1 {
+            spend_flags |= ELIGIBLE_FOR_FF;
+        }
+        spend.flags |= spend_flags;
+
+        Self {
+            condition_counter: 0,
+        }
+    }
+
+    fn condition(&mut self, spend: &mut Spend, c: &Condition) {
+        match c {
+            Condition::AssertMyCoinId(_) => {
+                spend.flags &= !ELIGIBLE_FOR_FF;
+            }
+            Condition::AssertMyParentId(_) => {
+                // the singleton_top_layer_v1_1.clsp will only emit two
+                // conditions, ASSERT_MY_AMOUNT and ASSERT_MY_PARENT_ID (in that
+                // order). So we expect this conditon as the second in the list.
+                // Any other conditions of this kind have to have been produced
+                // by the inner puzzle, which we don't have control over. So in
+                // that case this spend is not eligible for fast-forward.
+                if self.condition_counter != 1 {
+                    spend.flags &= !ELIGIBLE_FOR_FF;
+                }
+            }
+            Condition::AggSigMe(_, _) => {
+                spend.flags &= !ELIGIBLE_FOR_DEDUP;
+                spend.flags &= !ELIGIBLE_FOR_FF;
+            }
+            Condition::AggSigParent(_, _) => {
+                spend.flags &= !ELIGIBLE_FOR_DEDUP;
+                spend.flags &= !ELIGIBLE_FOR_FF;
+            }
+            Condition::AggSigPuzzle(_, _) => {
+                spend.flags &= !ELIGIBLE_FOR_DEDUP;
+            }
+            Condition::AggSigAmount(_, _) => {
+                spend.flags &= !ELIGIBLE_FOR_DEDUP;
+            }
+            Condition::AggSigPuzzleAmount(_, _) => {
+                spend.flags &= !ELIGIBLE_FOR_DEDUP;
+            }
+            Condition::AggSigParentAmount(_, _) => {
+                spend.flags &= !ELIGIBLE_FOR_DEDUP;
+                spend.flags &= !ELIGIBLE_FOR_FF;
+            }
+            Condition::AggSigParentPuzzle(_, _) => {
+                spend.flags &= !ELIGIBLE_FOR_DEDUP;
+                spend.flags &= !ELIGIBLE_FOR_FF;
+            }
+            Condition::AggSigUnsafe(_, _) => {
+                spend.flags &= !ELIGIBLE_FOR_DEDUP;
+            }
+            _ => {}
+        }
+        self.condition_counter += 1;
+    }
+
+    fn post_spend(&mut self, a: &Allocator, spend: &mut Spend) {
+        // if this still looks like it might be a singleton, check the output coins
+        // to look for something that looks like a singleton output, with the same
+        // puzzle hash as our input coin
+        if (spend.flags & ELIGIBLE_FOR_FF) != 0
+            && !spend.create_coin.iter().any(|c| {
+                c.amount == spend.coin_amount && a.atom(spend.puzzle_hash) == c.puzzle_hash
+            })
+        {
+            spend.flags &= !ELIGIBLE_FOR_FF;
+        }
+    }
+}
 
 // The structure of conditions, returned from a generator program, is a list,
 // where the first element is used, and any additional elements are left unused,
@@ -465,15 +577,6 @@ impl PartialEq for NewCoin {
     }
 }
 
-// spend flags
-
-// a spend is eligible for deduplication if it does not have any AGG_SIG_ME
-// nor AGG_SIG_UNSAFE
-pub const ELIGIBLE_FOR_DEDUP: u32 = 1;
-
-// If the spend bundle contained *any* relative seconds or height condition, this flag is set
-pub const HAS_RELATIVE_CONDITION: u32 = 2;
-
 // These are all the conditions related directly to a specific spend.
 #[derive(Debug, Clone)]
 pub struct Spend {
@@ -544,8 +647,7 @@ impl Spend {
             agg_sig_puzzle_amount: Vec::new(),
             agg_sig_parent_amount: Vec::new(),
             agg_sig_parent_puzzle: Vec::new(),
-            // assume it's eligible until we see an agg-sig condition
-            flags: ELIGIBLE_FOR_DEDUP,
+            flags: 0,
         }
     }
 }
@@ -655,7 +757,7 @@ pub(crate) fn parse_single_spend(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn process_single_spend(
+pub fn process_single_spend<V: SpendVisitor>(
     a: &Allocator,
     ret: &mut SpendBundleConditions,
     state: &mut ParseState,
@@ -687,9 +789,20 @@ pub fn process_single_spend(
 
     ret.removal_amount += my_amount as u128;
 
-    let coin_spend = Spend::new(parent_id, my_amount, puzzle_hash, coin_id);
+    let mut spend = Spend::new(parent_id, my_amount, puzzle_hash, coin_id);
 
-    parse_conditions(a, ret, state, coin_spend, conditions, flags, max_cost)
+    let mut visitor = V::new_spend(&mut spend);
+
+    parse_conditions(
+        a,
+        ret,
+        state,
+        spend,
+        conditions,
+        flags,
+        max_cost,
+        &mut visitor,
+    )
 }
 
 fn assert_not_ephemeral(spend_flags: &mut u32, state: &mut ParseState, idx: usize) {
@@ -710,7 +823,8 @@ fn decrement(cnt: &mut u32, n: NodePtr) -> Result<(), ValidationErr> {
     }
 }
 
-pub fn parse_conditions(
+#[allow(clippy::too_many_arguments)]
+pub fn parse_conditions<V: SpendVisitor>(
     a: &Allocator,
     ret: &mut SpendBundleConditions,
     state: &mut ParseState,
@@ -718,6 +832,7 @@ pub fn parse_conditions(
     mut iter: NodePtr,
     flags: u32,
     max_cost: &mut Cost,
+    visitor: &mut V,
 ) -> Result<(), ValidationErr> {
     let mut announce_countdown: u32 = if (flags & LIMIT_ANNOUNCES) != 0 {
         1024
@@ -765,6 +880,7 @@ pub fn parse_conditions(
         }
         c = rest(a, c)?;
         let cva = parse_args(a, c, op, flags)?;
+        visitor.condition(&mut spend, &cva);
         match cva {
             Condition::ReserveFee(limit) => {
                 // reserve fees are accumulated
@@ -957,35 +1073,27 @@ pub fn parse_conditions(
             }
             Condition::AggSigMe(pk, msg) => {
                 spend.agg_sig_me.push((pk, msg));
-                spend.flags &= !ELIGIBLE_FOR_DEDUP;
             }
             Condition::AggSigParent(pk, msg) => {
                 spend.agg_sig_parent.push((pk, msg));
-                spend.flags &= !ELIGIBLE_FOR_DEDUP;
             }
             Condition::AggSigPuzzle(pk, msg) => {
                 spend.agg_sig_puzzle.push((pk, msg));
-                spend.flags &= !ELIGIBLE_FOR_DEDUP;
             }
             Condition::AggSigAmount(pk, msg) => {
                 spend.agg_sig_amount.push((pk, msg));
-                spend.flags &= !ELIGIBLE_FOR_DEDUP;
             }
             Condition::AggSigPuzzleAmount(pk, msg) => {
                 spend.agg_sig_puzzle_amount.push((pk, msg));
-                spend.flags &= !ELIGIBLE_FOR_DEDUP;
             }
             Condition::AggSigParentAmount(pk, msg) => {
                 spend.agg_sig_parent_amount.push((pk, msg));
-                spend.flags &= !ELIGIBLE_FOR_DEDUP;
             }
             Condition::AggSigParentPuzzle(pk, msg) => {
                 spend.agg_sig_parent_puzzle.push((pk, msg));
-                spend.flags &= !ELIGIBLE_FOR_DEDUP;
             }
             Condition::AggSigUnsafe(pk, msg) => {
                 ret.agg_sig_unsafe.push((pk, msg));
-                spend.flags &= !ELIGIBLE_FOR_DEDUP;
             }
             Condition::Softfork(cost) => {
                 if *max_cost < cost {
@@ -999,6 +1107,8 @@ pub fn parse_conditions(
             Condition::Skip => {}
         }
     }
+
+    visitor.post_spend(a, &mut spend);
 
     ret.spends.push(spend);
     Ok(())
@@ -1031,7 +1141,7 @@ fn is_ephemeral(
 // This function parses, and validates aspects of, the above structure and
 // returns a list of all spends, along with all conditions, organized by
 // condition op-code
-pub fn parse_spends(
+pub fn parse_spends<V: SpendVisitor>(
     a: &Allocator,
     spends: NodePtr,
     max_cost: Cost,
@@ -1052,7 +1162,7 @@ pub fn parse_spends(
         // as well as updates it with any conditions
         let (parent_id, puzzle_hash, amount, conds) = parse_single_spend(a, spend)?;
 
-        process_single_spend(
+        process_single_spend::<V>(
             a,
             &mut ret,
             &mut state,
@@ -1466,7 +1576,7 @@ fn cond_test_cb(
         print!("{:02x}", c);
     }
     println!();
-    match parse_spends(&a, n, 11000000000, flags) {
+    match parse_spends::<MempoolVisitor>(&a, n, 11000000000, flags) {
         Ok(list) => {
             for n in &list.spends {
                 println!("{:?}", n);
@@ -2366,7 +2476,7 @@ fn test_create_coin_max_amount() {
         assert_eq!(c.amount, 0xffffffffffffffff_u64);
         assert_eq!(c.hint, a.null());
     }
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP | ELIGIBLE_FOR_FF);
 }
 
 #[test]
@@ -4212,5 +4322,142 @@ fn test_limit_announcements(
         assert_eq!(r.unwrap_err().1, expect_err.unwrap());
     } else {
         r.unwrap();
+    }
+}
+
+#[test]
+fn test_eligible_for_ff_assert_parent() {
+    // this is a model example of a spend that's eligible for FF
+    // it mimics the output of singleton_top_layer_v1_1
+    // the ASSERT_MY_PARENT_ID is only allowed as the second condition
+    // 73=ASSERT_MY_AMOUNT
+    // 71=ASSERT_MY_PARENT_ID
+    // 51=CREATE_COIN
+    let test: &str = &format!(
+        "(\
+       (({{h1}} ({{h2}} (123 (\
+           ((73 (123 ) \
+           ((71 ({{h1}} ) \
+           ((51 ({{h2}} (123 ) \
+           ))\
+       ))"
+    );
+
+    let (_a, cond) = cond_test(test).expect("cond_test");
+    assert!(cond.spends.len() == 1);
+    assert!((cond.spends[0].flags & ELIGIBLE_FOR_FF) != 0);
+}
+
+#[test]
+fn test_eligible_for_ff_even_amount() {
+    // coins with even amounts cannot be singletons, even if all other
+    // conditions are met
+    // 73=ASSERT_MY_AMOUNT
+    // 71=ASSERT_MY_PARENT_ID
+    // 51=CREATE_COIN
+    let test: &str = &format!(
+        "(\
+       (({{h1}} ({{h2}} (122 (\
+           ((73 (122 ) \
+           ((71 ({{h1}} ) \
+           ((51 ({{h2}} (122 ) \
+           ))\
+       ))"
+    );
+
+    let (_a, cond) = cond_test(test).expect("cond_test");
+    assert!(cond.spends.len() == 1);
+    assert!((cond.spends[0].flags & ELIGIBLE_FOR_FF) == 0);
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(123, "{h2}", true)]
+#[case(122, "{h1}", false)]
+#[case(1, "{h1}", false)]
+#[case(123, "{h1}", false)]
+fn test_eligible_for_ff_output_coin(#[case] amount: u64, #[case] ph: &str, #[case] eligible: bool) {
+    // in order to be elgibible for fast forward, there needs to be an output
+    // coin with the same amount and same puzzle hash
+    // 51=CREATE_COIN
+    let test: &str = &format!(
+        "(\
+       (({{h1}} ({{h2}} (123 (\
+           ((51 ({} ({} ) \
+           ))\
+       ))",
+        ph, amount
+    );
+
+    let (_a, cond) = cond_test(test).expect("cond_test");
+    assert!(cond.spends.len() == 1);
+    let flags = cond.spends[0].flags;
+    if eligible {
+        assert!((flags & ELIGIBLE_FOR_FF) != 0);
+    } else {
+        assert!((flags & ELIGIBLE_FOR_FF) == 0);
+    }
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(ASSERT_MY_PARENT_ID, "{h1}")]
+#[case(ASSERT_MY_COIN_ID, "{coin12}")]
+fn test_eligible_for_ff_invalid_assert_parent(
+    #[case] condition: ConditionOpcode,
+    #[case] arg: &str,
+) {
+    // the ASSERT_MY_PARENT_ID is only allowed as the second condition
+    // and ASSERT_MY_COIN_ID is disallowed
+    // 73=ASSERT_MY_AMOUNT
+    // 51=CREATE_COIN
+    let test: &str = &format!(
+        "(\
+       (({{h1}} ({{h2}} (123 (\
+           (({} ({} ) \
+           ((73 (123 ) \
+           ((51 ({{h2}} (123 ) \
+           ))\
+       ))",
+        condition, arg
+    );
+
+    let (_a, cond) = cond_test(test).expect("cond_test");
+    assert!(cond.spends.len() == 1);
+    assert!((cond.spends[0].flags & ELIGIBLE_FOR_FF) == 0);
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(AGG_SIG_ME, false)]
+#[case(AGG_SIG_PARENT, false)]
+#[case(AGG_SIG_PARENT_AMOUNT, false)]
+#[case(AGG_SIG_PARENT_PUZZLE, false)]
+#[case(AGG_SIG_UNSAFE, true)]
+#[case(AGG_SIG_PUZZLE, true)]
+#[case(AGG_SIG_AMOUNT, true)]
+#[case(AGG_SIG_PUZZLE_AMOUNT, true)]
+fn test_eligible_for_ff_invalid_agg_sig_me(
+    #[case] condition: ConditionOpcode,
+    #[case] eligible: bool,
+) {
+    // 51=CREATE_COIN
+    let test: &str = &format!(
+        "(\
+       (({{h1}} ({{h2}} (1 (\
+           (({} ({{pubkey}} ({{msg1}} ) \
+           ((51 ({{h2}} (1 ) \
+           ))\
+       ))",
+        condition
+    );
+
+    let (_a, cond) = cond_test_flag(test, ENABLE_SOFTFORK_CONDITION).expect("cond_test");
+    assert!(cond.spends.len() == 1);
+    let flags = cond.spends[0].flags;
+    if eligible {
+        assert!((flags & ELIGIBLE_FOR_FF) != 0);
+    } else {
+        assert!((flags & ELIGIBLE_FOR_FF) == 0);
     }
 }

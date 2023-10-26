@@ -1,7 +1,10 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
-use chia::gen::conditions::{parse_conditions, ParseState, Spend, SpendBundleConditions};
+use chia::gen::conditions::{
+    parse_conditions, MempoolVisitor, ParseState, Spend, SpendBundleConditions,
+};
+use chia::gen::spend_visitor::SpendVisitor;
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
 use clvm_utils::tree_hash;
@@ -42,7 +45,7 @@ fuzz_target!(|data: &[u8]| {
         NO_UNKNOWN_CONDS,
         ENABLE_SOFTFORK_CONDITION,
     ] {
-        let coin_spend = Spend {
+        let mut coin_spend = Spend {
             parent_id: a.new_atom(&parent_id).expect("atom failed"),
             coin_amount: amount,
             puzzle_hash: a.new_atom(&puzzle_hash).expect("atom failed"),
@@ -63,6 +66,7 @@ fuzz_target!(|data: &[u8]| {
             agg_sig_parent_puzzle: Vec::new(),
             flags: 0_u32,
         };
+        let mut visitor = MempoolVisitor::new_spend(&mut coin_spend);
         let mut max_cost: u64 = 3300000000;
         let _ret = parse_conditions(
             &a,
@@ -72,6 +76,7 @@ fuzz_target!(|data: &[u8]| {
             input,
             *flags,
             &mut max_cost,
+            &mut visitor,
         );
     }
 });

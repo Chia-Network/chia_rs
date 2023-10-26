@@ -1,4 +1,4 @@
-use super::conditions::{NewCoin, Spend, SpendBundleConditions};
+use super::conditions::{MempoolVisitor, NewCoin, Spend, SpendBundleConditions};
 use super::run_block_generator::{run_block_generator, run_block_generator2};
 use crate::allocator::make_allocator;
 use crate::gen::flags::{ALLOW_BACKREFS, MEMPOOL_MODE};
@@ -210,30 +210,43 @@ fn run_generator(#[case] name: &str) {
     for (flags, expected) in zip(&[ALLOW_BACKREFS, ALLOW_BACKREFS | MEMPOOL_MODE], expected) {
         println!("flags: {:x}", flags);
         let mut a = make_allocator(*flags);
-        let (expected_cost, output) =
-            match run_block_generator(&mut a, &generator, &block_refs, 11000000000, *flags) {
-                Ok(conditions) => (conditions.cost, print_conditions(&a, &conditions)),
-                Err(code) => (0, format!("FAILED: {}\n", u32::from(code.1))),
-            };
+        let conds = run_block_generator::<_, MempoolVisitor>(
+            &mut a,
+            &generator,
+            &block_refs,
+            11000000000,
+            *flags,
+        );
 
-        let output_hard_fork =
-            match run_block_generator2(&mut a, &generator, &block_refs, 11000000000, *flags) {
-                Ok(mut conditions) => {
-                    // in the hard fork, the cost of running the genrator +
-                    // puzzles should never be higher than before the hard-fork
-                    // but it's likely less.
-                    assert!(conditions.cost <= expected_cost);
-                    assert!(conditions.cost > 0);
-                    // update the cost we print here, just to be compatible with
-                    // the test cases we have. We've already ensured the cost is
-                    // lower
-                    conditions.cost = expected_cost;
-                    print_conditions(&a, &conditions)
-                }
-                Err(code) => {
-                    format!("FAILED: {}\n", u32::from(code.1))
-                }
-            };
+        let (expected_cost, output) = match conds {
+            Ok(conditions) => (conditions.cost, print_conditions(&a, &conditions)),
+            Err(code) => (0, format!("FAILED: {}\n", u32::from(code.1))),
+        };
+
+        let conds = run_block_generator2::<_, MempoolVisitor>(
+            &mut a,
+            &generator,
+            &block_refs,
+            11000000000,
+            *flags,
+        );
+        let output_hard_fork = match conds {
+            Ok(mut conditions) => {
+                // in the hard fork, the cost of running the genrator +
+                // puzzles should never be higher than before the hard-fork
+                // but it's likely less.
+                assert!(conditions.cost <= expected_cost);
+                assert!(conditions.cost > 0);
+                // update the cost we print here, just to be compatible with
+                // the test cases we have. We've already ensured the cost is
+                // lower
+                conditions.cost = expected_cost;
+                print_conditions(&a, &conditions)
+            }
+            Err(code) => {
+                format!("FAILED: {}\n", u32::from(code.1))
+            }
+        };
 
         if output != output_hard_fork {
             print_diff(&output, &output_hard_fork);

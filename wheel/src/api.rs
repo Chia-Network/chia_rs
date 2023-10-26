@@ -4,10 +4,11 @@ use crate::run_generator::{
     PySpendBundleConditions,
 };
 use chia::allocator::make_allocator;
+use chia::gen::conditions::MempoolVisitor;
 use chia::gen::flags::{
-    AGG_SIG_ARGS, ALLOW_BACKREFS, COND_ARGS_NIL, ENABLE_SOFTFORK_CONDITION, LIMIT_ANNOUNCES,
-    LIMIT_OBJECTS, MEMPOOL_MODE, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL, NO_UNKNOWN_CONDS,
-    STRICT_ARGS_COUNT,
+    AGG_SIG_ARGS, ALLOW_BACKREFS, ANALYZE_SPENDS, COND_ARGS_NIL, ENABLE_SOFTFORK_CONDITION,
+    LIMIT_ANNOUNCES, LIMIT_OBJECTS, MEMPOOL_MODE, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
+    NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
 };
 use chia::gen::run_puzzle::run_puzzle as native_run_puzzle;
 use chia::gen::solution_generator::solution_generator as native_solution_generator;
@@ -160,7 +161,9 @@ fn run_puzzle(
     flags: u32,
 ) -> PyResult<PySpendBundleConditions> {
     let mut a = make_allocator(LIMIT_HEAP);
-    let conds = native_run_puzzle(&mut a, puzzle, solution, parent_id, amount, max_cost, flags)?;
+    let conds = native_run_puzzle::<MempoolVisitor>(
+        &mut a, puzzle, solution, parent_id, amount, max_cost, flags,
+    )?;
     Ok(convert_spend_bundle_conds(&a, conds))
 }
 
@@ -341,6 +344,7 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
         "ELIGIBLE_FOR_DEDUP",
         chia::gen::conditions::ELIGIBLE_FOR_DEDUP,
     )?;
+    m.add("ELIGIBLE_FOR_FF", chia::gen::conditions::ELIGIBLE_FOR_FF)?;
     m.add_class::<PySpend>()?;
 
     // clvm functions
@@ -358,6 +362,7 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     m.add("MEMPOOL_MODE", MEMPOOL_MODE)?;
     m.add("LIMIT_OBJECTS", LIMIT_OBJECTS)?;
     m.add("ALLOW_BACKREFS", ALLOW_BACKREFS)?;
+    m.add("ANALYZE_SPENDS", ANALYZE_SPENDS)?;
 
     // Chia classes
     m.add_class::<Coin>()?;

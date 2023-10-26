@@ -5,9 +5,7 @@ use chia_traits::Streamable;
 
 use sqlite::State;
 
-use chia::gen::conditions::NewCoin;
-use chia::gen::conditions::Spend;
-use chia::gen::conditions::SpendBundleConditions;
+use chia::gen::conditions::{EmptyVisitor, NewCoin, Spend, SpendBundleConditions};
 use chia::gen::flags::{ALLOW_BACKREFS, MEMPOOL_MODE};
 use chia::gen::run_block_generator::{run_block_generator, run_block_generator2};
 use clvmr::allocator::NodePtr;
@@ -159,9 +157,9 @@ fn main() {
         };
 
     let block_runner = if args.rust_generator {
-        run_block_generator2
+        run_block_generator2::<_, EmptyVisitor>
     } else {
-        run_block_generator
+        run_block_generator::<_, EmptyVisitor>
     };
 
     while let Ok(State::Row) = statement.next() {
@@ -257,9 +255,14 @@ fn main() {
             }
 
             if args.validate {
-                let mut baseline =
-                    run_block_generator(&mut a, prg.as_ref(), &block_refs, ti.cost, 0)
-                        .expect("failed to run block generator");
+                let mut baseline = run_block_generator::<_, EmptyVisitor>(
+                    &mut a,
+                    prg.as_ref(),
+                    &block_refs,
+                    ti.cost,
+                    0,
+                )
+                .expect("failed to run block generator");
                 assert_eq!(baseline.cost, ti.cost);
 
                 baseline.spends.sort_by_key(|s| *s.coin_id);

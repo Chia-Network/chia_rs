@@ -1,5 +1,6 @@
 use chia::allocator::make_allocator;
-use chia::gen::conditions::{Spend, SpendBundleConditions};
+use chia::gen::conditions::{EmptyVisitor, MempoolVisitor, Spend, SpendBundleConditions};
+use chia::gen::flags::ANALYZE_SPENDS;
 use chia::gen::run_block_generator::run_block_generator as native_run_block_generator;
 use chia::gen::run_block_generator::run_block_generator2 as native_run_block_generator2;
 use chia::gen::validation_error::ValidationErr;
@@ -166,19 +167,27 @@ pub fn run_block_generator(
     let program =
         unsafe { std::slice::from_raw_parts(program.buf_ptr() as *const u8, program.len_bytes()) };
 
-    match native_run_block_generator(&mut allocator, program, &refs, max_cost, flags) {
-        Ok(spend_bundle_conds) => {
-            // everything was successful
-            Ok((
-                None,
-                Some(convert_spend_bundle_conds(&allocator, spend_bundle_conds)),
-            ))
-        }
-        Err(ValidationErr(_, error_code)) => {
-            // a validation error occurred
-            Ok((Some(error_code.into()), None))
-        }
-    }
+    let run_block = if (flags & ANALYZE_SPENDS) == 0 {
+        native_run_block_generator::<_, EmptyVisitor>
+    } else {
+        native_run_block_generator::<_, MempoolVisitor>
+    };
+
+    Ok(
+        match run_block(&mut allocator, program, &refs, max_cost, flags) {
+            Ok(spend_bundle_conds) => {
+                // everything was successful
+                (
+                    None,
+                    Some(convert_spend_bundle_conds(&allocator, spend_bundle_conds)),
+                )
+            }
+            Err(ValidationErr(_, error_code)) => {
+                // a validation error occurred
+                (Some(error_code.into()), None)
+            }
+        },
+    )
 }
 
 #[pyfunction]
@@ -209,17 +218,25 @@ pub fn run_block_generator2(
     let program =
         unsafe { std::slice::from_raw_parts(program.buf_ptr() as *const u8, program.len_bytes()) };
 
-    match native_run_block_generator2(&mut allocator, program, &refs, max_cost, flags) {
-        Ok(spend_bundle_conds) => {
-            // everything was successful
-            Ok((
-                None,
-                Some(convert_spend_bundle_conds(&allocator, spend_bundle_conds)),
-            ))
-        }
-        Err(ValidationErr(_, error_code)) => {
-            // a validation error occurred
-            Ok((Some(error_code.into()), None))
-        }
-    }
+    let run_block = if (flags & ANALYZE_SPENDS) == 0 {
+        native_run_block_generator2::<_, EmptyVisitor>
+    } else {
+        native_run_block_generator2::<_, MempoolVisitor>
+    };
+
+    Ok(
+        match run_block(&mut allocator, program, &refs, max_cost, flags) {
+            Ok(spend_bundle_conds) => {
+                // everything was successful
+                (
+                    None,
+                    Some(convert_spend_bundle_conds(&allocator, spend_bundle_conds)),
+                )
+            }
+            Err(ValidationErr(_, error_code)) => {
+                // a validation error occurred
+                (Some(error_code.into()), None)
+            }
+        },
+    )
 }

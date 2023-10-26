@@ -182,6 +182,7 @@ pub fn fast_forward_singleton(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::gen::conditions::MempoolVisitor;
     use crate::gen::run_puzzle::run_puzzle;
     use chia_protocol::CoinSpend;
     use chia_traits::streamable::Streamable;
@@ -241,7 +242,7 @@ mod tests {
         let new_solution = node_to_bytes(&a, new_solution).expect("serialize new solution");
 
         // run original spend
-        let conditions1 = run_puzzle(
+        let conditions1 = run_puzzle::<MempoolVisitor>(
             &mut a,
             spend.puzzle_reveal.as_slice(),
             spend.solution.as_slice(),
@@ -253,7 +254,7 @@ mod tests {
         .expect("run_puzzle");
 
         // run new spend
-        let conditions2 = run_puzzle(
+        let conditions2 = run_puzzle::<MempoolVisitor>(
             &mut a,
             spend.puzzle_reveal.as_slice(),
             new_solution.as_slice(),

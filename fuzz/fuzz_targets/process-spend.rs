@@ -1,5 +1,7 @@
 #![no_main]
-use chia::gen::conditions::{process_single_spend, ParseState, SpendBundleConditions};
+use chia::gen::conditions::{
+    process_single_spend, MempoolVisitor, ParseState, SpendBundleConditions,
+};
 use chia::gen::flags::{COND_ARGS_NIL, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
 use clvmr::allocator::Allocator;
 use fuzzing_utils::{make_tree, BitCursor};
@@ -18,7 +20,7 @@ fuzz_target!(|data: &[u8]| {
 
     for flags in &[0, COND_ARGS_NIL, STRICT_ARGS_COUNT, NO_UNKNOWN_CONDS] {
         let mut cost_left = 11000000;
-        let _ = process_single_spend(
+        let _ = process_single_spend::<MempoolVisitor>(
             &a,
             &mut ret,
             &mut state,
