@@ -1,4 +1,3 @@
-use std::io::Cursor;
 use std::{collections::HashMap, sync::Arc};
 
 use chia_protocol::{
@@ -65,11 +64,8 @@ impl Peer {
         requests: &Requests,
         event_sender: &broadcast::Sender<PeerEvent>,
     ) -> Result<()> {
-        let bytes = message.into_data();
-        let cursor = &mut Cursor::new(bytes.as_slice());
-
         // Parse the message.
-        let message = Message::parse(cursor)?;
+        let message = Message::from_bytes(message.into_data().as_ref())?;
 
         if let Some(id) = message.id {
             // Send response through oneshot channel if present.
@@ -79,14 +75,12 @@ impl Peer {
             return Ok(());
         }
 
-        let cursor = &mut Cursor::new(message.data.as_ref());
-
         macro_rules! events {
             ( $( $event:ident ),+ $(,)? ) => {
                 match message.msg_type {
                     $( ProtocolMessageTypes::$event => {
                         event_sender
-                            .send(PeerEvent::$event($event::parse(cursor)?))
+                            .send(PeerEvent::$event($event::from_bytes(message.data.as_ref())?))
                             .ok();
                     } )+
                     _ => {}
@@ -188,8 +182,7 @@ impl Peer {
                     return Err(Error::InvalidResponse(message));
                 }
 
-                R::parse(&mut Cursor::new(message.data.as_ref()))
-                    .or(Err(Error::InvalidResponse(message)))
+                R::from_bytes(message.data.as_ref()).or(Err(Error::InvalidResponse(message)))
             })
             .unwrap_or(Err(Error::MissingResponse))
     }
