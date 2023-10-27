@@ -1,6 +1,6 @@
 [package]
 name = "chia-wallet"
-version = "0.1.0"
+version = "0.2.12"
 edition = "2021"
 license = "Apache-2.0"
 description = "Chia primitives needed for building wallets."
@@ -11,4 +11,4 @@ repository = "https://github.com/Chia-Network/chia_rs/chia-wallet/"
 [dependencies]
 clvmr = "0.3.0"
 hex-literal = "0.4.1"
-clvm-utils = { version = "0.2.7", path = "../clvm-utils" }
+clvm-utils = { version = "0.2.12", path = "../clvm-utils" }

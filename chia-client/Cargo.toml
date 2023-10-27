@@ -1,6 +1,6 @@
 [package]
 name = "chia-client"
-version = "0.1.0"
+version = "0.2.12"
 edition = "2021"
 license = "Apache-2.0"
 description = "Chia light client and async peer connections."
@@ -9,8 +9,8 @@ homepage = "https://github.com/Chia-Network/chia_rs/chia-client/"
 repository = "https://github.com/Chia-Network/chia_rs/chia-client/"
 
 [dependencies]
-chia-protocol = { version = "0.2.7", path = "../chia-protocol" }
-chia-traits = { version = "0.1.0", path = "../chia-traits" }
+chia-protocol = { version = "0.2.12", path = "../chia-protocol" }
+chia-traits = { version = "0.2.12", path = "../chia-traits" }
 tokio = { version = "1.32.0", features = ["rt", "sync"] }
 tokio-tungstenite = "0.20.0"
 futures-util = "0.3.28"
