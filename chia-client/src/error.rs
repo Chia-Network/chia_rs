@@ -13,5 +13,8 @@ pub enum Error {
     WebSocket(#[from] tungstenite::Error),
 
     #[error("{0:?}")]
-    InvalidResponse(Option<Message>),
+    InvalidResponse(Message),
+
+    #[error("missing response")]
+    MissingResponse,
 }

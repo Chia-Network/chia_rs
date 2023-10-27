@@ -238,7 +238,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chia"
-version = "0.2.9"
+version = "0.2.12"
 dependencies = [
  "chia-protocol",
  "chia-traits",
@@ -258,7 +258,7 @@ dependencies = [
 
 [[package]]
 name = "chia-bls"
-version = "0.2.7"
+version = "0.2.12"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -289,7 +289,7 @@ dependencies = [
 
 [[package]]
 name = "chia-client"
-version = "0.1.0"
+version = "0.2.12"
 dependencies = [
  "chia-protocol",
  "chia-traits",
@@ -316,7 +316,7 @@ dependencies = [
 
 [[package]]
 name = "chia-protocol"
-version = "0.2.7"
+version = "0.2.12"
 dependencies = [
  "arbitrary",
  "chia-bls",
@@ -345,7 +345,7 @@ dependencies = [
 
 [[package]]
 name = "chia-tools"
-version = "0.1.16"
+version = "0.2.12"
 dependencies = [
  "chia",
  "chia-protocol",
@@ -364,7 +364,7 @@ dependencies = [
 
 [[package]]
 name = "chia-traits"
-version = "0.1.0"
+version = "0.2.12"
 dependencies = [
  "chia_py_streamable_macro",
  "chia_streamable_macro",
@@ -377,7 +377,7 @@ dependencies = [
 
 [[package]]
 name = "chia-wallet"
-version = "0.1.0"
+version = "0.2.12"
 dependencies = [
  "clvm-utils",
  "clvmr",
@@ -386,7 +386,7 @@ dependencies = [
 
 [[package]]
 name = "chia_py_streamable_macro"
-version = "0.1.4"
+version = "0.2.12"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -396,7 +396,7 @@ dependencies = [
 
 [[package]]
 name = "chia_streamable_macro"
-version = "0.2.4"
+version = "0.2.12"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -485,7 +485,7 @@ checksum = "2da6da31387c7e4ef160ffab6d5e7f00c42626fe39aea70a7b0f1773f7dd6c1b"
 
 [[package]]
 name = "clvm-derive"
-version = "0.1.0"
+version = "0.2.12"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -494,7 +494,7 @@ dependencies = [
 
 [[package]]
 name = "clvm-traits"
-version = "0.1.0"
+version = "0.2.12"
 dependencies = [
  "clvm-derive",
  "clvmr",
@@ -505,7 +505,7 @@ dependencies = [
 
 [[package]]
 name = "clvm-utils"
-version = "0.2.7"
+version = "0.2.12"
 dependencies = [
  "clvm-traits",
  "clvmr",
