@@ -31,6 +31,9 @@ def crates_with_changes() -> Set[str]:
         diff = os.popen(f"git diff {tag} -- {c}").read().strip()
         if len(diff) > 0:
             ret.add(c)
+    # the python wheel is the top-level build target, we always want to bump its
+    # version
+    ret.add("wheel")
     return ret
 
 def update_cargo(name: str, crates: Set[str]) -> None:
