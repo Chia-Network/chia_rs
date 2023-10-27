@@ -2,6 +2,9 @@
 name = "chia-traits"
 version = "0.2.12"
 edition = "2021"
+license = "Apache-2.0"
+description = "Chia traits for Streamable types (chia's serialization format)"
+authors = ["Arvid Norberg <arvid@chia.net>"]
 
 [features]
 py-bindings = ["dep:pyo3", "dep:chia_py_streamable_macro"]
