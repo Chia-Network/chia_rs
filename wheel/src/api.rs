@@ -19,7 +19,7 @@ use chia_protocol::FullBlock;
 use chia_protocol::{
     ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin, CoinSpend, CoinState,
     CoinStateUpdate, EndOfSubSlotBundle, Foliage, FoliageBlockData, FoliageTransactionBlock,
-    InfusedChallengeChainSubSlot, NewPeakWallet, PoolTarget, Program, ProofOfSpace,
+    HeaderBlock, InfusedChallengeChainSubSlot, NewPeakWallet, PoolTarget, Program, ProofOfSpace,
     PuzzleSolutionResponse, RegisterForCoinUpdates, RegisterForPhUpdates, RejectAdditionsRequest,
     RejectBlockHeaders, RejectHeaderBlocks, RejectHeaderRequest, RejectPuzzleSolution,
     RejectRemovalsRequest, RequestAdditions, RequestBlockHeader, RequestBlockHeaders,
@@ -415,6 +415,7 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<RequestHeaderBlocks>()?;
     m.add_class::<RejectHeaderBlocks>()?;
     m.add_class::<RespondHeaderBlocks>()?;
+    m.add_class::<HeaderBlock>()?;
     m.add_class::<CoinState>()?;
     m.add_class::<RegisterForPhUpdates>()?;
     m.add_class::<RespondToPhUpdates>()?;

@@ -762,6 +762,15 @@ class HeaderBlock:
     foliage_transaction_block: Optional[FoliageTransactionBlock]
     transactions_filter: bytes
     transactions_info: Optional[TransactionsInfo]
+    prev_header_hash: bytes32
+    header_hash: bytes32
+    height: int
+    weight: int
+    header_hash: bytes32
+    total_iters: int
+    log_string: str
+    is_transaction_block: bool
+    first_in_sub_slots: bool
     def __init__(
         self,
         finished_sub_slots: Sequence[EndOfSubSlotBundle],
