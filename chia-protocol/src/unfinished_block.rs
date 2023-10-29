@@ -53,7 +53,7 @@ impl UnfinishedBlock {
     }
 
     #[getter]
-    #[pyo3(name = "prev_header_hash")]
+    #[pyo3(name = "partial_hash")]
     fn py_partial_hash(&self) -> Bytes32 {
         self.partial_hash()
     }
