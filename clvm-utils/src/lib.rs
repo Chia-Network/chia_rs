@@ -25,20 +25,9 @@
 //! assert_eq!(hex, "ff02ffff0101ffff04ffff012affff04ffff014bff01808080");
 
 mod curried_program;
+mod curry_tree_hash;
 mod tree_hash;
 
 pub use curried_program::*;
+pub use curry_tree_hash::*;
 pub use tree_hash::*;
-/*
-    let curry = CurriedProgram {
-        program: program.to_clvm(a).unwrap(),
-        args: args.clone(),
-    }
-    .to_clvm(a)
-    .unwrap();
-    let actual = node_to_bytes(a, curry).unwrap();
-    assert_eq!(hex::encode(actual), expected);
-
-    let curried = CurriedProgram::<A>::from_clvm(a, curry).unwrap();
-    let round_program = T::from_clvm(a, curried.program).unwrap();
-*/
