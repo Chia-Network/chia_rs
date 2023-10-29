@@ -379,6 +379,9 @@ dependencies = [
 name = "chia-wallet"
 version = "0.2.12"
 dependencies = [
+ "chia-bls",
+ "chia-protocol",
+ "clvm-traits",
  "clvm-utils",
  "clvmr",
  "hex-literal",
