@@ -108,7 +108,7 @@ fn amount_tester(buf: &[u8]) -> Result<u64, ValidationErr> {
     let mut a = Allocator::new();
     let n = a.new_atom(buf).unwrap();
 
-    parse_amount(&mut a, n, ErrorCode::InvalidCoinAmount)
+    parse_amount(&a, n, ErrorCode::InvalidCoinAmount)
 }
 
 #[test]
