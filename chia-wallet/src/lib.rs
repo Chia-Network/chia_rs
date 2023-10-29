@@ -1,3 +1,3 @@
-mod primitives;
+mod puzzles;
 
-pub use primitives::*;
+pub use puzzles::*;
