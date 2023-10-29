@@ -272,7 +272,7 @@ mod tests {
         mutate: fn(&mut Allocator, &mut Coin, &mut Coin, &mut Coin, &mut Vec<u8>, &mut Vec<u8>),
         expected_err: Error,
     ) {
-        let spend_bytes = fs::read(format!("ff-tests/e3c0.spend")).expect("read file");
+        let spend_bytes = fs::read("ff-tests/e3c0.spend").expect("read file");
         let mut spend =
             CoinSpend::parse(&mut Cursor::new(spend_bytes.as_slice())).expect("parse CoinSpend");
         let new_parents_parent: &[u8] =
@@ -373,12 +373,12 @@ mod tests {
 
     fn parse_solution(a: &mut Allocator, solution: &[u8]) -> SingletonSolution {
         let new_solution = node_from_bytes(a, solution).expect("parse solution");
-        SingletonSolution::from_clvm(&a, new_solution).expect("parse solution")
+        SingletonSolution::from_clvm(a, new_solution).expect("parse solution")
     }
 
     fn serialize_solution(a: &mut Allocator, solution: &SingletonSolution) -> Vec<u8> {
         let new_solution = solution.to_clvm(a).expect("to_clvm");
-        node_to_bytes(&a, new_solution).expect("serialize solution")
+        node_to_bytes(a, new_solution).expect("serialize solution")
     }
 
     fn parse_singleton(a: &mut Allocator, puzzle: &[u8]) -> CurriedProgram<SingletonArgs> {
@@ -398,7 +398,7 @@ mod tests {
     fn test_invalid_lineage_proof_parent() {
         run_ff_test(
             |a, _coin, _new_coin, _new_parent, _puzzle, solution| {
-                let mut new_solution = parse_solution(a, &solution);
+                let mut new_solution = parse_solution(a, solution);
 
                 // corrupt the lineage proof
                 new_solution.lineage_proof.parent_parent_coin_id = Bytes32::from(hex!(
@@ -415,7 +415,7 @@ mod tests {
     fn test_invalid_lineage_proof_parent_amount() {
         run_ff_test(
             |a, _coin, _new_coin, _new_parent, _puzzle, solution| {
-                let mut new_solution = parse_solution(a, &solution);
+                let mut new_solution = parse_solution(a, solution);
 
                 // corrupt the lineage proof
                 new_solution.lineage_proof.parent_amount = 11;
@@ -430,7 +430,7 @@ mod tests {
     fn test_invalid_lineage_proof_parent_inner_ph() {
         run_ff_test(
             |a, _coin, _new_coin, _new_parent, _puzzle, solution| {
-                let mut new_solution = parse_solution(a, &solution);
+                let mut new_solution = parse_solution(a, solution);
 
                 // corrupt the lineage proof
                 new_solution.lineage_proof.parent_inner_puzzle_hash = Bytes32::from(hex!(
@@ -447,7 +447,7 @@ mod tests {
     fn test_invalid_lineage_proof_parent_inner_ph_with_coin() {
         run_ff_test(
             |a, coin, new_coin, new_parent, puzzle, solution| {
-                let mut new_solution = parse_solution(a, &solution);
+                let mut new_solution = parse_solution(a, solution);
                 let singleton = parse_singleton(a, puzzle);
 
                 // corrupt the lineage proof
@@ -469,7 +469,7 @@ mod tests {
                     amount: new_solution.lineage_proof.parent_amount,
                 };
 
-                new_coin.puzzle_hash = parent_puzzle_hash.into();
+                new_coin.puzzle_hash = parent_puzzle_hash;
 
                 coin.parent_coin_info = new_parent.coin_id().into();
                 coin.puzzle_hash = parent_puzzle_hash;

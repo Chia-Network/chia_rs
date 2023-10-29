@@ -1447,28 +1447,31 @@ fn test_coin_id(parent_id: &[u8; 32], puzzle_hash: &[u8; 32], amount: u64) -> By
 // and:
 
 #[cfg(test)]
+type Callback = Option<Box<dyn Fn(&mut Allocator) -> NodePtr>>;
+
+#[cfg(test)]
 fn parse_list_impl(
     a: &mut Allocator,
     input: &str,
-    callback: &Option<Box<dyn Fn(&mut Allocator) -> NodePtr>>,
+    callback: &Callback,
     subs: &HashMap<&'static str, NodePtr>,
 ) -> (NodePtr, usize) {
     // skip whitespace
-    if input.starts_with(' ') {
-        let (n, skip) = parse_list_impl(a, &input[1..], callback, subs);
+    if let Some(rest) = input.strip_prefix(' ') {
+        let (n, skip) = parse_list_impl(a, rest, callback, subs);
         return (n, skip + 1);
     }
 
     if input.starts_with(')') {
         (a.null(), 1)
-    } else if input.starts_with('(') {
-        let (first, step1) = parse_list_impl(a, &input[1..], callback, subs);
+    } else if let Some(rest) = input.strip_prefix('(') {
+        let (first, step1) = parse_list_impl(a, rest, callback, subs);
         let (rest, step2) = parse_list_impl(a, &input[(1 + step1)..], callback, subs);
         (a.new_pair(first, rest).unwrap(), 1 + step1 + step2)
-    } else if input.starts_with('{') {
+    } else if let Some(rest) = input.strip_prefix('{') {
         // substitute '{X}' tokens with our test hashes and messages
         // this keeps the test cases a lot simpler
-        let var = input[1..].split_once('}').unwrap().0;
+        let var = rest.split_once('}').unwrap().0;
 
         let ret = match var {
             "" => callback.as_ref().unwrap()(a),
@@ -1490,11 +1493,7 @@ fn parse_list_impl(
 }
 
 #[cfg(test)]
-fn parse_list(
-    a: &mut Allocator,
-    input: &str,
-    callback: &Option<Box<dyn Fn(&mut Allocator) -> NodePtr>>,
-) -> NodePtr {
+fn parse_list(a: &mut Allocator, input: &str, callback: &Callback) -> NodePtr {
     // all substitutions are allocated up-front in order to have them all use
     // the same atom in the CLVM structure. This is to cover cases where
     // conditions may be deduplicated based on the NodePtr value, when they
@@ -1565,7 +1564,7 @@ fn parse_list(
 fn cond_test_cb(
     input: &str,
     flags: u32,
-    callback: Option<Box<dyn Fn(&mut Allocator) -> NodePtr>>,
+    callback: Callback,
 ) -> Result<(Allocator, SpendBundleConditions), ValidationErr> {
     let mut a = Allocator::new();
 
@@ -4333,15 +4332,13 @@ fn test_eligible_for_ff_assert_parent() {
     // 73=ASSERT_MY_AMOUNT
     // 71=ASSERT_MY_PARENT_ID
     // 51=CREATE_COIN
-    let test: &str = &format!(
-        "(\
-       (({{h1}} ({{h2}} (123 (\
+    let test = "(\
+       (({h1} ({h2} (123 (\
            ((73 (123 ) \
-           ((71 ({{h1}} ) \
-           ((51 ({{h2}} (123 ) \
+           ((71 ({h1} ) \
+           ((51 ({h2} (123 ) \
            ))\
-       ))"
-    );
+       ))";
 
     let (_a, cond) = cond_test(test).expect("cond_test");
     assert!(cond.spends.len() == 1);
@@ -4355,15 +4352,13 @@ fn test_eligible_for_ff_even_amount() {
     // 73=ASSERT_MY_AMOUNT
     // 71=ASSERT_MY_PARENT_ID
     // 51=CREATE_COIN
-    let test: &str = &format!(
-        "(\
-       (({{h1}} ({{h2}} (122 (\
+    let test = "(\
+       (({h1} ({h2} (122 (\
            ((73 (122 ) \
-           ((71 ({{h1}} ) \
-           ((51 ({{h2}} (122 ) \
+           ((71 ({h1} ) \
+           ((51 ({h2} (122 ) \
            ))\
-       ))"
-    );
+       ))";
 
     let (_a, cond) = cond_test(test).expect("cond_test");
     assert!(cond.spends.len() == 1);
