@@ -134,6 +134,15 @@ jobs:
         cd chia-protocol
         cargo publish
 
+    - name: publish to crates.io if tagged (chia-wallet)
+      continue-on-error: true
+      if: startsWith(github.event.ref, 'refs/tags')
+      env:
+        CARGO_REGISTRY_TOKEN: ${{ secrets.cargo_registry_token }}
+      run: |
+        cd chia-wallet
+        cargo publish
+
     - name: publish to crates.io if tagged (chia_rs)
       continue-on-error: true
       if: startsWith(github.event.ref, 'refs/tags')
