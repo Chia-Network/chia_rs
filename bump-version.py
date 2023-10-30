@@ -22,7 +22,8 @@ our_crates = [
     "clvm-utils",
     "clvm-derive",
     "chia-wallet",
-    "chia-client"
+    "chia-client",
+    "chia-ssl",
 ]
 
 def crates_with_changes() -> Set[str]:
@@ -48,7 +49,7 @@ def update_cargo(name: str, crates: Set[str]) -> None:
             if split[0] == "version" and name in crates:
                 line = f'version = "{v}"\n'
             elif split[0] in crates:
-                line = re.sub('version = "(>?=?)\d\.\d\.\d"', f'version = "\\g<1>{v}"', line)
+                line = re.sub('version = "(>?=?)\d+\.\d+\.\d+"', f'version = "\\g<1>{v}"', line)
             subst += line
 
     with open(f"{name}/Cargo.toml", "w") as f:
