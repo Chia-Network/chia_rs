@@ -164,6 +164,17 @@ extra_members = {
         "def get_included_reward_coins(self) -> List[Coin]: ...",
         "def is_fully_compactified(self) -> bool: ...",
     ],
+    "HeaderBlock": [
+        "prev_header_hash: bytes32",
+        "header_hash: bytes32",
+        "height: int",
+        "weight: int",
+        "header_hash: bytes32",
+        "total_iters: int",
+        "log_string: str",
+        "is_transaction_block: bool",
+        "first_in_sub_slots: bool",
+    ],
     "RewardChainBlock": [
         "def get_unfinished(self) -> RewardChainBlockUnfinished: ...",
     ],
