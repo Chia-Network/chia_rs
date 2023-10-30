@@ -403,10 +403,19 @@ def test_program() -> None:
     with pytest.raises(ValueError, match="unexpected end of buffer"):
         Program.from_bytes(bytes.fromhex("ff80"))
 
+    with pytest.raises(ValueError, match="unexpected end of buffer"):
+        Program.parse_rust(bytes.fromhex("ff80"))
+
     # garbage at the end of the serialization
-    # Streamable is OK with more data after the object, it's how we serialize
-    # a stream of members and items
-    Program.from_bytes(bytes.fromhex("ff808080"))
+    # from_bytes() requires all input to be consumed
+    with pytest.raises(ValueError, match="input buffer too large"):
+        Program.from_bytes(bytes.fromhex("ff808080"))
+
+    # But the (lower level) parse() function doesn't, because it's meant to
+    # consume only its part of the stream.
+    p, consumed = Program.parse_rust(bytes.fromhex("ff808080"))
+    assert str(p) == "Program(ff8080)"
+    assert consumed == 3
 
     # truncated serialization
     with pytest.raises(ValueError, match="unexpected end of buffer"):
