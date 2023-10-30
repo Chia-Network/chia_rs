@@ -94,6 +94,29 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                     }
                 }
             });
+
+            py_protocol.extend(quote! {
+                #[pyo3::pymethods]
+                impl #ident {
+                    #[pyo3(signature = (**kwargs))]
+                    fn replace(&self, kwargs: Option<&pyo3::types::PyDict>) -> pyo3::PyResult<Self> {
+                        let mut ret = self.clone();
+                        if let Some(kwargs) = kwargs {
+                            let iter: pyo3::types::iter::PyDictIterator = kwargs.iter();
+                            for (field, value) in iter {
+                                let field = field.extract::<String>()?;
+                                match field.as_str() {
+                                    #(stringify!(#fnames) => {
+                                        ret.#fnames = value.extract()?;
+                                    }),*
+                                    _ => { return Err(pyo3::exceptions::PyKeyError::new_err(format!("unknown field {field}"))); }
+                                }
+                            }
+                        }
+                        Ok(ret)
+                    }
+                }
+            });
         }
         syn::Fields::Unnamed(FieldsUnnamed { .. }) => {}
         syn::Fields::Unit => {
