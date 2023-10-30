@@ -2,8 +2,7 @@ use crate::{tree_hash_atom, tree_hash_pair};
 
 pub fn curry_tree_hash(program_hash: [u8; 32], arg_hashes: &[[u8; 32]]) -> [u8; 32] {
     let nil = tree_hash_atom(&[]);
-    let one = tree_hash_atom(&[1]);
-    let op_q = one;
+    let op_q = tree_hash_atom(&[1]);
     let op_a = tree_hash_atom(&[2]);
     let op_c = tree_hash_atom(&[4]);
 
