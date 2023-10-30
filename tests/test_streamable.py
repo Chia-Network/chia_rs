@@ -395,6 +395,10 @@ def test_program() -> None:
     assert str(p) == "Program(ff8080)"
     assert p.to_bytes() == bytes.fromhex("ff8080")
 
+    # make sure we can pass in a slice/memoryview
+    p = Program.from_bytes(bytes.fromhex("00ff8080")[1:])
+    assert str(p) == "Program(ff8080)"
+
     # truncated serialization
     with pytest.raises(ValueError, match="unexpected end of buffer"):
         Program.from_bytes(bytes.fromhex("ff80"))

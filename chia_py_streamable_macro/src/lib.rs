@@ -120,8 +120,14 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
         impl #ident {
             #[staticmethod]
             #[pyo3(name = "from_bytes")]
-            pub fn py_from_bytes(blob: &[u8]) -> pyo3::PyResult<Self> {
-                let mut input = std::io::Cursor::<&[u8]>::new(blob);
+            pub fn py_from_bytes(blob: pyo3::buffer::PyBuffer<u8>) -> pyo3::PyResult<Self> {
+                if !blob.is_c_contiguous() {
+                    panic!("from_bytes() must be called with a contiguous buffer");
+                }
+                let slice = unsafe {
+                    std::slice::from_raw_parts(blob.buf_ptr() as *const u8, blob.len_bytes())
+                };
+                let mut input = std::io::Cursor::<&[u8]>::new(slice);
                 <Self as #crate_name::Streamable>::parse(&mut input).map_err(|e| <#crate_name::chia_error::Error as Into<pyo3::PyErr>>::into(e))
             }
 
