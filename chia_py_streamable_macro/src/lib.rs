@@ -178,6 +178,10 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 Ok(pyo3::types::PyBytes::new(py, &writer))
             }
 
+            pub fn stream_to_bytes<'p>(&self, py: pyo3::Python<'p>) -> pyo3::PyResult<&'p pyo3::types::PyBytes> {
+                self.py_to_bytes(py)
+            }
+
             pub fn __bytes__<'p>(&self, py: pyo3::Python<'p>) -> pyo3::PyResult<&'p pyo3::types::PyBytes> {
                 self.py_to_bytes(py)
             }
