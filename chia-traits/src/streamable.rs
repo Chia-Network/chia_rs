@@ -47,7 +47,13 @@ pub trait Streamable {
     where
         Self: Sized,
     {
-        Self::parse(&mut Cursor::new(bytes))
+        let mut cursor = Cursor::new(bytes);
+        let ret = Self::parse(&mut cursor)?;
+        if cursor.position() != bytes.len() as u64 {
+            Err(Error::InputTooLarge)
+        } else {
+            Ok(ret)
+        }
     }
     fn hash(&self) -> [u8; 32] {
         let mut ctx = Sha256::new();
