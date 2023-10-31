@@ -24,3 +24,4 @@ chia-protocol = { version = "=0.2.13", path = "../chia-protocol", features = ["p
 chia-traits = { version = "=0.2.13", path = "../chia-traits", features = ["py-bindings"]  }
 chia_py_streamable_macro = { version = "=0.2.13", path = "../chia_py_streamable_macro" }
 chia_streamable_macro = { version = "=0.2.12", path = "../chia_streamable_macro" }
+sha2 = "0.9.9"
