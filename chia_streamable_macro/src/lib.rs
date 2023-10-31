@@ -58,7 +58,7 @@ pub fn chia_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::Toke
             }
             let ret = quote! {
                 impl #crate_name::Streamable for #ident {
-                    fn update_digest(&self, digest: &mut clvmr::sha2::Sha256) {
+                    fn update_digest(&self, digest: &mut sha2::Sha256) {
                         <u8 as #crate_name::Streamable>::update_digest(&(*self as u8), digest);
                     }
                     fn stream(&self, out: &mut Vec<u8>) -> #crate_name::chia_error::Result<()> {
@@ -100,7 +100,7 @@ pub fn chia_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::Toke
     if !fnames.is_empty() {
         let ret = quote! {
             impl #crate_name::Streamable for #ident {
-                fn update_digest(&self, digest: &mut clvmr::sha2::Sha256) {
+                fn update_digest(&self, digest: &mut sha2::Sha256) {
                     #(self.#fnames.update_digest(digest);)*
                 }
                 fn stream(&self, out: &mut Vec<u8>) -> #crate_name::chia_error::Result<()> {
@@ -116,7 +116,7 @@ pub fn chia_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::Toke
     } else if !findices.is_empty() {
         let ret = quote! {
             impl #crate_name::Streamable for #ident {
-                fn update_digest(&self, digest: &mut clvmr::sha2::Sha256) {
+                fn update_digest(&self, digest: &mut sha2::Sha256) {
                     #(self.#findices.update_digest(digest);)*
                 }
                 fn stream(&self, out: &mut Vec<u8>) -> #crate_name::chia_error::Result<()> {

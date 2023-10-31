@@ -167,9 +167,9 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
             }
 
             pub fn get_hash<'p>(&self, py: pyo3::Python<'p>) -> pyo3::PyResult<&'p pyo3::types::PyBytes> {
-                let mut ctx = <clvmr::sha2::Sha256 as clvmr::sha2::Digest>::new();
+                let mut ctx = <sha2::Sha256 as sha2::Digest>::new();
                 #crate_name::Streamable::update_digest(self, &mut ctx);
-                Ok(pyo3::types::PyBytes::new(py, clvmr::sha2::Digest::finalize(ctx).as_slice()))
+                Ok(pyo3::types::PyBytes::new(py, sha2::Digest::finalize(ctx).as_slice()))
             }
             #[pyo3(name = "to_bytes")]
             pub fn py_to_bytes<'p>(&self, py: pyo3::Python<'p>) -> pyo3::PyResult<&'p pyo3::types::PyBytes> {

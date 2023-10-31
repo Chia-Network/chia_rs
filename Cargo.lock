@@ -283,7 +283,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chia"
-version = "0.2.12"
+version = "0.2.13"
 dependencies = [
  "chia-protocol",
  "chia-traits",
@@ -303,7 +303,7 @@ dependencies = [
 
 [[package]]
 name = "chia-bls"
-version = "0.2.12"
+version = "0.2.13"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -334,7 +334,7 @@ dependencies = [
 
 [[package]]
 name = "chia-client"
-version = "0.2.12"
+version = "0.2.13"
 dependencies = [
  "chia-protocol",
  "chia-traits",
@@ -361,7 +361,7 @@ dependencies = [
 
 [[package]]
 name = "chia-protocol"
-version = "0.2.12"
+version = "0.2.13"
 dependencies = [
  "arbitrary",
  "chia-bls",
@@ -390,7 +390,7 @@ dependencies = [
 
 [[package]]
 name = "chia-ssl"
-version = "0.2.12"
+version = "0.2.13"
 dependencies = [
  "lazy_static",
  "rand",
@@ -422,11 +422,10 @@ dependencies = [
 
 [[package]]
 name = "chia-traits"
-version = "0.2.12"
+version = "0.2.13"
 dependencies = [
  "chia_py_streamable_macro",
  "chia_streamable_macro",
- "clvmr",
  "hex",
  "pyo3",
  "sha2 0.9.9",
@@ -444,7 +443,7 @@ dependencies = [
 
 [[package]]
 name = "chia_py_streamable_macro"
-version = "0.2.12"
+version = "0.2.13"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
