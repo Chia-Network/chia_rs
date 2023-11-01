@@ -379,6 +379,7 @@ dependencies = [
 name = "chia-wallet"
 version = "0.2.12"
 dependencies = [
+ "arbitrary",
  "chia-bls",
  "chia-protocol",
  "clvm-traits",
@@ -388,6 +389,18 @@ dependencies = [
  "hex-literal",
  "num-bigint",
  "sha2 0.9.9",
+]
+
+[[package]]
+name = "chia-wallet-fuzz"
+version = "0.0.0"
+dependencies = [
+ "arbitrary",
+ "chia-wallet",
+ "clvm-traits",
+ "clvmr",
+ "libfuzzer-sys",
+ "pyo3",
 ]
 
 [[package]]
