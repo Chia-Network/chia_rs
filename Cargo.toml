@@ -37,7 +37,7 @@ py-bindings = ["dep:pyo3"]
 
 [dependencies]
 clvmr = "=0.3.0"
-hex = "=0.4.3"
+hex = "0.4.3"
 pyo3 = { version = ">=0.19.0", optional = true }
 clvm-utils = { version = "=0.2.12", path = "clvm-utils" }
 chia-traits = { version = "=0.2.13", path = "chia-traits" }
@@ -45,7 +45,7 @@ clvm-traits = { version = "=0.2.12", path = "clvm-traits" }
 clvm-derive = { version = "=0.2.12", path = "clvm-derive" }
 chia-protocol = { version = "=0.2.13", path = "chia-protocol" }
 chia-wallet = { version = "=0.2.12", path = "chia-wallet" }
-hex-literal = "=0.4.1"
+hex-literal = "0.4.1"
 thiserror = "1.0.44"
 
 [dev-dependencies]
