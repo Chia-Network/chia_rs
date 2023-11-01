@@ -303,6 +303,8 @@ def coin_roundtrip(c: Coin) -> bool:
     buf = c.to_bytes()
     # make sure c.to_bytes() and bytes(c) are synonyms
     assert buf == bytes(c)
+    buf = c.stream_to_bytes()
+    assert buf == bytes(c)
     c2 = Coin.from_bytes(buf)
     return c == c2
 
@@ -390,10 +392,12 @@ def test_program() -> None:
     p = Program.from_json_dict("0xff8080")
     assert str(p) == "Program(ff8080)"
     assert p.to_bytes() == bytes.fromhex("ff8080")
+    assert p.stream_to_bytes() == bytes.fromhex("ff8080")
 
     p = Program.from_bytes(bytes.fromhex("ff8080"))
     assert str(p) == "Program(ff8080)"
     assert p.to_bytes() == bytes.fromhex("ff8080")
+    assert p.stream_to_bytes() == bytes.fromhex("ff8080")
 
     # make sure we can pass in a slice/memoryview
     p = Program.from_bytes(bytes.fromhex("00ff8080")[1:])
