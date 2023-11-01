@@ -10,8 +10,13 @@ repository = "https://github.com/Chia-Network/chia_rs/chia-wallet/"
 
 [dependencies]
 clvmr = "0.3.0"
+sha2 = "0.9.9"
+num-bigint = "0.4.3"
 hex-literal = "0.4.1"
 clvm-utils = { version = "0.2.12", path = "../clvm-utils" }
 clvm-traits = { version = "0.2.12", path = "../clvm-traits" }
 chia-bls = { version = "0.2.12", path = "../chia-bls" }
 chia-protocol = { version = "0.2.12", path = "../chia-protocol" }
+
+[dev-dependencies]
+hex = "0.4.3"

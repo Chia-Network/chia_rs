@@ -384,7 +384,10 @@ dependencies = [
  "clvm-traits",
  "clvm-utils",
  "clvmr",
+ "hex",
  "hex-literal",
+ "num-bigint",
+ "sha2 0.9.9",
 ]
 
 [[package]]
