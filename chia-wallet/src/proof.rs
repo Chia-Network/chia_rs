@@ -1,3 +1,4 @@
+use arbitrary::{Arbitrary, Unstructured};
 use clvm_traits::{FromClvm, Result, ToClvm};
 use clvmr::{allocator::NodePtr, Allocator};
 
@@ -20,6 +21,24 @@ impl ToClvm for Proof {
         match self {
             Self::Lineage(lineage_proof) => lineage_proof.to_clvm(a),
             Self::Eve(eve_proof) => eve_proof.to_clvm(a),
+        }
+    }
+}
+
+impl<'a> Arbitrary<'a> for Proof {
+    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+        let is_eve = u.ratio(3, 10)?;
+        if is_eve {
+            Ok(Self::Eve(EveProof {
+                parent_coin_info: u.arbitrary()?,
+                amount: u.arbitrary()?,
+            }))
+        } else {
+            Ok(Self::Lineage(LineageProof {
+                parent_coin_info: u.arbitrary()?,
+                inner_puzzle_hash: u.arbitrary()?,
+                amount: u.arbitrary()?,
+            }))
         }
     }
 }

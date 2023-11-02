@@ -1,7 +1,7 @@
 #![no_main]
 use std::fmt;
 
-use chia_wallet::nft::NftMetadata;
+use chia_wallet::{nft::NftMetadata, Proof};
 use clvm_traits::{FromClvm, ToClvm};
 use clvmr::Allocator;
 use libfuzzer_sys::{
@@ -12,6 +12,7 @@ use libfuzzer_sys::{
 fuzz_target!(|data: &[u8]| {
     let mut u = Unstructured::new(data);
     roundtrip::<NftMetadata>(&mut u);
+    roundtrip::<Proof>(&mut u);
 });
 
 fn roundtrip<'a, T>(u: &mut Unstructured<'a>)
