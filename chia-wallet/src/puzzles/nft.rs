@@ -1,3 +1,4 @@
+use arbitrary::Arbitrary;
 use clvm_traits::{FromClvm, Result, ToClvm};
 use clvmr::{allocator::NodePtr, Allocator};
 use hex_literal::hex;
@@ -50,8 +51,7 @@ pub struct NftRoyaltyTransferPuzzleArgs {
     pub trade_price_percentage: u16,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(fuzzing, derive(arbitrary::Arbitrary))]
+#[derive(Debug, Clone, PartialEq, Eq, Arbitrary)]
 pub struct NftMetadata {
     pub edition_number: u64,
     pub edition_total: u64,

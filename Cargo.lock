@@ -395,7 +395,6 @@ dependencies = [
 name = "chia-wallet-fuzz"
 version = "0.0.0"
 dependencies = [
- "arbitrary",
  "chia-wallet",
  "clvm-traits",
  "clvmr",
