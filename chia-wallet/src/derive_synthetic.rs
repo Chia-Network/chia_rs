@@ -25,7 +25,7 @@ impl DeriveSynthetic for SecretKey {
 pub fn mod_by_group_order(bytes: [u8; 32]) -> [u8; 32] {
     let value = BigInt::from_signed_bytes_be(bytes.as_slice());
     let group_order = BigInt::from_signed_bytes_be(&GROUP_ORDER_BYTES);
-    let modulo = ((&value % &group_order) + &group_order) % &group_order;
+    let modulo = ((value % &group_order) + &group_order) % &group_order;
     let mut byte_vec = modulo.to_bytes_be().1;
     if byte_vec.len() < 32 {
         let pad = vec![0; 32 - byte_vec.len()];
