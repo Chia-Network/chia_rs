@@ -1,6 +1,10 @@
 use chia_bls::{PublicKey, SecretKey};
+use hex_literal::hex;
 use num_bigint::BigInt;
 use sha2::{digest::FixedOutput, Digest, Sha256};
+
+const GROUP_ORDER_BYTES: [u8; 32] =
+    hex!("73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001");
 
 pub trait DeriveSynthetic {
     fn derive_synthetic(&self, hidden_puzzle_hash: &[u8; 32]) -> Self;
@@ -18,20 +22,16 @@ impl DeriveSynthetic for SecretKey {
     }
 }
 
-pub fn hash_to_secret_key(bytes: [u8; 32]) -> SecretKey {
+pub fn mod_by_group_order(bytes: [u8; 32]) -> [u8; 32] {
     let value = BigInt::from_signed_bytes_be(bytes.as_slice());
-    let group_order = BigInt::parse_bytes(
-        b"73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001",
-        16,
-    )
-    .unwrap();
+    let group_order = BigInt::from_signed_bytes_be(&GROUP_ORDER_BYTES);
     let modulo = ((&value % &group_order) + &group_order) % &group_order;
     let mut byte_vec = modulo.to_bytes_be().1;
     if byte_vec.len() < 32 {
         let pad = vec![0; 32 - byte_vec.len()];
         byte_vec.splice(0..0, pad);
     }
-    SecretKey::from_bytes(&byte_vec.try_into().unwrap()).unwrap()
+    byte_vec.try_into().unwrap()
 }
 
 fn synthetic_offset(public_key: &PublicKey, hidden_puzzle_hash: &[u8; 32]) -> SecretKey {
@@ -39,7 +39,7 @@ fn synthetic_offset(public_key: &PublicKey, hidden_puzzle_hash: &[u8; 32]) -> Se
     hasher.update(public_key.to_bytes());
     hasher.update(hidden_puzzle_hash);
     let bytes: [u8; 32] = hasher.finalize_fixed().into();
-    hash_to_secret_key(bytes)
+    SecretKey::from_bytes(&mod_by_group_order(bytes)).unwrap()
 }
 
 #[cfg(test)]
