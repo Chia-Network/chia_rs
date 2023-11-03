@@ -13,6 +13,7 @@ members = [
     "chia-tools",
     "chia-traits",
     "chia-wallet",
+    "chia-wallet/fuzz",
     "clvm-derive",
     "clvm-traits",
     "clvm-utils",

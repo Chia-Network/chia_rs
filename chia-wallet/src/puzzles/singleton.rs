@@ -1,4 +1,49 @@
+use clvm_traits::{FromClvm, ToClvm};
+use clvmr::allocator::NodePtr;
 use hex_literal::hex;
+
+use crate::Proof;
+
+#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[clvm(curried_args)]
+pub struct SingletonArgs {
+    pub singleton_struct: SingletonStruct,
+    pub inner_puzzle: NodePtr,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[clvm(tuple)]
+pub struct SingletonStruct {
+    pub mod_hash: [u8; 32],
+    pub launcher_id: [u8; 32],
+    pub launcher_puzzle_hash: [u8; 32],
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[clvm(proper_list)]
+pub struct SingletonSolution {
+    pub proof: Proof,
+    pub amount: u64,
+    pub inner_solution: NodePtr,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[clvm(proper_list)]
+pub struct LauncherSolution {
+    pub singleton_puzzle_hash: [u8; 32],
+    pub amount: u64,
+    pub key_value_list: NodePtr,
+}
+
+impl SingletonStruct {
+    pub fn new(launcher_id: [u8; 32]) -> Self {
+        Self {
+            mod_hash: SINGLETON_TOP_LAYER_PUZZLE_HASH,
+            launcher_id,
+            launcher_puzzle_hash: SINGLETON_LAUNCHER_PUZZLE_HASH,
+        }
+    }
+}
 
 /// This is the puzzle reveal of the [singleton launcher](https://chialisp.com/singletons#launcher) puzzle.
 pub static SINGLETON_LAUNCHER_PUZZLE: [u8; 175] = hex!(

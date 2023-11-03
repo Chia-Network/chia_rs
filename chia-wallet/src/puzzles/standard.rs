@@ -1,4 +1,27 @@
+use chia_bls::PublicKey;
+use clvm_traits::{FromClvm, ToClvm};
+use clvm_utils::{curry_tree_hash, tree_hash_atom};
+use clvmr::allocator::NodePtr;
 use hex_literal::hex;
+
+#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[clvm(curried_args)]
+pub struct StandardArgs {
+    pub synthetic_key: PublicKey,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[clvm(proper_list)]
+pub struct StandardSolution {
+    pub original_public_key: Option<PublicKey>,
+    pub delegated_puzzle: NodePtr,
+    pub solution: NodePtr,
+}
+
+pub fn standard_puzzle_hash(synthetic_key: &PublicKey) -> [u8; 32] {
+    let sk_tree_hash = tree_hash_atom(&synthetic_key.to_bytes());
+    curry_tree_hash(STANDARD_PUZZLE_HASH, &[sk_tree_hash])
+}
 
 /// This is the puzzle reveal of the [standard transaction](https://chialisp.com/standard-transactions) puzzle.
 pub static STANDARD_PUZZLE: [u8; 227] = hex!(

@@ -7,6 +7,7 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::mem::MaybeUninit;
+use std::ops::{Add, AddAssign};
 
 #[cfg(feature = "py-bindings")]
 use crate::public_key::parse_hex_string;
@@ -177,6 +178,36 @@ impl Streamable for SecretKey {
 impl Hash for SecretKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         state.write(&self.to_bytes())
+    }
+}
+
+impl Add<&SecretKey> for &SecretKey {
+    type Output = SecretKey;
+    fn add(self, rhs: &SecretKey) -> SecretKey {
+        let scalar = unsafe {
+            let mut ret = MaybeUninit::<blst_scalar>::uninit();
+            blst_sk_add_n_check(ret.as_mut_ptr(), &self.0, &rhs.0);
+            ret.assume_init()
+        };
+        SecretKey(scalar)
+    }
+}
+
+impl Add<&SecretKey> for SecretKey {
+    type Output = SecretKey;
+    fn add(mut self, rhs: &SecretKey) -> SecretKey {
+        unsafe {
+            blst_sk_add_n_check(&mut self.0, &self.0, &rhs.0);
+            self
+        }
+    }
+}
+
+impl AddAssign<&SecretKey> for SecretKey {
+    fn add_assign(&mut self, rhs: &SecretKey) {
+        unsafe {
+            blst_sk_add_n_check(&mut self.0, &self.0, &rhs.0);
+        }
     }
 }
 
@@ -426,6 +457,36 @@ mod tests {
     fn test_from_bytes_zero() {
         let data = [0u8; 32];
         let _sk = SecretKey::from_bytes(&data).unwrap();
+    }
+
+    #[test]
+    fn test_aggregate_secret_key() {
+        let sk_hex = "5aac8405befe4cb3748a67177c56df26355f1f98d979afdb0b2f97858d2f71c3";
+        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+        let sk2 = &sk + &sk;
+        let sk3 = &sk + &sk + &sk;
+
+        assert_eq!(
+            sk2,
+            SecretKey::from_bytes(
+                &<[u8; 32]>::from_hex(
+                    "416b60b8545f1c1eb5daf626ef0be64717009b2eb2f503b7165f2f0c1a5ee385"
+                )
+                .unwrap()
+            )
+            .unwrap()
+        );
+
+        assert_eq!(
+            sk3,
+            SecretKey::from_bytes(
+                &<[u8; 32]>::from_hex(
+                    "282a3d6ae9bfeb89f72b853661c0ed67f8a216c48c705793218ec692a78e5547"
+                )
+                .unwrap()
+            )
+            .unwrap()
+        );
     }
 
     #[test]
