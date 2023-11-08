@@ -1,8 +1,29 @@
 use crate::streamable_struct;
 use chia_streamable_macro::Streamable;
 
+use crate::Bytes32;
+use crate::EndOfSubSlotBundle;
+use crate::HeaderBlock;
 use crate::ProofOfSpace;
+use crate::RewardChainBlock;
 use crate::{VDFInfo, VDFProof};
+
+streamable_struct! (SubEpochData {
+    reward_chain_hash: Bytes32,
+    num_blocks_overflow: u8,
+    new_sub_slot_iters: Option<u64>,
+    new_difficulty: Option<u64>,
+});
+
+// number of challenge blocks
+// Average iters for challenge blocks
+// |--A-R----R-------R--------R------R----R----------R-----R--R---|       Honest difficulty 1000
+//           0.16
+
+//  compute total reward chain blocks
+// |----------------------------A---------------------------------|       Attackers chain 1000
+//                            0.48
+// total number of challenge blocks == total number of reward chain blocks
 
 streamable_struct! (SubSlotData {
     proof_of_space: Option<ProofOfSpace>,
@@ -42,4 +63,20 @@ streamable_struct! (SubEpochChallengeSegment {
 
 streamable_struct! (SubEpochSegments {
     challenge_segments: Vec<SubEpochChallengeSegment>,
+});
+
+// this is used only for serialization to database
+streamable_struct! (RecentChainData {
+    recent_chain_data: Vec<HeaderBlock>,
+});
+
+streamable_struct! (ProofBlockHeader {
+    finished_sub_slots: Vec<EndOfSubSlotBundle>,
+    reward_chain_block: RewardChainBlock,
+});
+
+streamable_struct! (WeightProof {
+    sub_epochs: Vec<SubEpochData>,
+    sub_epoch_segments: Vec<SubEpochChallengeSegment>,  // sampled sub epoch
+    recent_chain_data: Vec<HeaderBlock>,
 });
