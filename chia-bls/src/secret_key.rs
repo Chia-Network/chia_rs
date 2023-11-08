@@ -76,13 +76,13 @@ fn to_lamport_pk(ikm: [u8; 32], idx: u32) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(lamport0);
     hasher.update(lamport1);
-    hasher.finalize().try_into().unwrap()
+    hasher.finalize().into()
 }
 
 fn sha256(bytes: &[u8]) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(bytes);
-    hasher.finalize().try_into().unwrap()
+    hasher.finalize().into()
 }
 
 pub fn is_all_zero(buf: &[u8]) -> bool {
