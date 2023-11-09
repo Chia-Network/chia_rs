@@ -85,9 +85,7 @@ pub fn chia_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::Toke
                     ftypes.push(f.ty.clone());
                 }
             }
-            Fields::Unit => {
-                panic!("Streamable does not support the unit type");
-            }
+            Fields::Unit => {}
             Fields::Named(FieldsNamed { named, .. }) => {
                 for f in named.iter() {
                     fnames.push(f.ident.as_ref().unwrap().clone());
@@ -130,6 +128,18 @@ pub fn chia_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::Toke
         };
         ret.into()
     } else {
-        panic!("unknown error");
+        // this is an empty type (Unit)
+        let ret = quote! {
+            impl #crate_name::Streamable for #ident {
+                fn update_digest(&self, _digest: &mut sha2::Sha256) {}
+                fn stream(&self, _out: &mut Vec<u8>) -> #crate_name::chia_error::Result<()> {
+                    Ok(())
+                }
+                fn parse(_input: &mut std::io::Cursor<&[u8]>) -> #crate_name::chia_error::Result<Self> {
+                    Ok(Self{})
+                }
+            }
+        };
+        ret.into()
     }
 }
