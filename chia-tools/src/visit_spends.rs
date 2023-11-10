@@ -89,12 +89,15 @@ pub fn iterate_tx_blocks(
     }
 }
 
-pub fn visit_spends<GenBuf: AsRef<[u8]>, F: Fn(&mut Allocator, Bytes32, u64, NodePtr, NodePtr)>(
+pub fn visit_spends<
+    GenBuf: AsRef<[u8]>,
+    F: FnMut(&mut Allocator, Bytes32, u64, NodePtr, NodePtr),
+>(
     a: &mut Allocator,
     program: &[u8],
     block_refs: &[GenBuf],
     max_cost: u64,
-    callback: F,
+    mut callback: F,
 ) -> Result<(), ValidationErr> {
     let clvm_deserializer = node_from_bytes(a, &CLVM_DESERIALIZER)?;
     let program = node_from_bytes_backrefs(a, program)?;
