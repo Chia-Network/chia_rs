@@ -1,8 +1,6 @@
 use chia_traits::chia_error;
 use chia_traits::{read_bytes, Streamable};
-use clvm_traits::{FromClvm, ToClvm};
-use clvmr::allocator::{NodePtr, SExp};
-use clvmr::Allocator;
+use clvm_traits::{from_clvm, to_clvm, ClvmValue, FromClvm, FromClvmError, ToClvm};
 use core::fmt::Formatter;
 use sha2::{Digest, Sha256};
 use std::convert::AsRef;
@@ -95,20 +93,18 @@ impl FromJsonDict for Bytes {
     }
 }
 
-impl ToClvm for Bytes {
-    fn to_clvm(&self, a: &mut Allocator) -> clvm_traits::Result<NodePtr> {
-        Ok(a.new_atom(self.0.as_slice())?)
-    }
+impl<Node> ToClvm<Node> for Bytes {
+    to_clvm!(Node, self, f, { f(ClvmValue::Atom(self.0.as_slice())) });
 }
 
-impl FromClvm for Bytes {
-    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self> {
-        if let SExp::Atom = a.sexp(ptr) {
-            Ok(Self(a.atom(ptr).to_vec()))
+impl<Node> FromClvm<Node> for Bytes {
+    from_clvm!(Node, f, ptr, {
+        if let ClvmValue::Atom(bytes) = f(ptr) {
+            Ok(Self(bytes.to_vec()))
         } else {
-            Err(clvm_traits::Error::ExpectedAtom(ptr))
+            Err(FromClvmError::ExpectedAtom)
         }
-    }
+    });
 }
 
 impl PartialEq<Bytes> for Vec<u8> {
@@ -201,27 +197,25 @@ impl<const N: usize> Streamable for BytesImpl<N> {
     }
 }
 
-impl<const N: usize> ToClvm for BytesImpl<N> {
-    fn to_clvm(&self, a: &mut Allocator) -> clvm_traits::Result<NodePtr> {
-        Ok(a.new_atom(self.0.as_slice())?)
-    }
+impl<Node, const N: usize> ToClvm<Node> for BytesImpl<N> {
+    to_clvm!(Node, self, f, { f(ClvmValue::Atom(self.0.as_slice())) });
 }
 
-impl<const N: usize> FromClvm for BytesImpl<N> {
-    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self> {
-        let blob = match a.sexp(ptr) {
-            SExp::Atom => {
-                if a.atom_len(ptr) != N {
-                    return Err(clvm_traits::Error::Custom("invalid size".to_string()));
-                }
-                a.atom(ptr)
-            }
-            _ => {
-                return Err(clvm_traits::Error::ExpectedAtom(ptr));
-            }
+impl<Node, const N: usize> FromClvm<Node> for BytesImpl<N> {
+    from_clvm!(Node, f, ptr, {
+        let ClvmValue::Atom(bytes) = f(ptr) else {
+            return Err(FromClvmError::ExpectedAtom);
         };
-        Ok(Self::from(blob))
-    }
+
+        if bytes.len() != N {
+            return Err(FromClvmError::Invalid(format!(
+                "expected {N} bytes, found {}",
+                bytes.len()
+            )));
+        }
+
+        Ok(Self::from(bytes))
+    });
 }
 
 impl<const N: usize> From<[u8; N]> for BytesImpl<N> {
@@ -425,7 +419,11 @@ impl<'py> FromPyObject<'py> for Bytes {
 mod tests {
     use super::*;
 
-    use clvmr::serde::{node_from_bytes, node_to_bytes};
+    use clvm_traits::AllocatorExt;
+    use clvmr::{
+        serde::{node_from_bytes, node_to_bytes},
+        Allocator,
+    };
     use rstest::rstest;
 
     #[rstest]
@@ -665,9 +663,9 @@ mod tests {
         let expected_bytes = hex::decode(expected).unwrap();
 
         let ptr = node_from_bytes(a, &expected_bytes).unwrap();
-        let bytes = Bytes::from_clvm(a, ptr).unwrap();
+        let bytes = a.value_from_ptr::<Bytes>(ptr).unwrap();
 
-        let round_trip = bytes.to_clvm(a).unwrap();
+        let round_trip = a.value_to_ptr(bytes).unwrap();
         assert_eq!(expected, hex::encode(node_to_bytes(a, round_trip).unwrap()));
     }
 
@@ -678,9 +676,9 @@ mod tests {
         let expected_bytes = hex::decode(expected).unwrap();
 
         let ptr = node_from_bytes(a, &expected_bytes).unwrap();
-        let bytes32 = Bytes32::from_clvm(a, ptr).unwrap();
+        let bytes32 = a.value_from_ptr::<Bytes32>(ptr).unwrap();
 
-        let round_trip = bytes32.to_clvm(a).unwrap();
+        let round_trip = a.value_to_ptr(bytes32).unwrap();
         assert_eq!(expected, hex::encode(node_to_bytes(a, round_trip).unwrap()));
     }
 
@@ -690,15 +688,12 @@ mod tests {
         let bytes =
             hex::decode("f07522495060c066f66f32acc2a77e3a3e737aca8baea4d1a64ea4cdc13da9").unwrap();
         let ptr = a.new_atom(&bytes).unwrap();
-        assert_eq!(
-            Bytes32::from_clvm(a, ptr).unwrap_err(),
-            clvm_traits::Error::Custom("invalid size".to_string())
-        );
+        assert!(a.value_from_ptr::<Bytes32>(ptr).is_err());
 
         let ptr = a.new_pair(a.one(), a.one()).unwrap();
         assert_eq!(
-            Bytes32::from_clvm(a, ptr).unwrap_err(),
-            clvm_traits::Error::ExpectedAtom(ptr)
+            a.value_from_ptr::<Bytes32>(ptr).unwrap_err(),
+            FromClvmError::ExpectedAtom
         );
     }
 }

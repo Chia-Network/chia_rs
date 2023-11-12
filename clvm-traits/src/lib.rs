@@ -18,7 +18,7 @@
 
 ```rust
 use clvmr::Allocator;
-use clvm_traits::{ToClvm, FromClvm};
+use clvm_traits::{ToClvm, FromClvm, AllocatorExt};
 
 #[derive(Debug, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(tuple)]
@@ -30,9 +30,9 @@ struct Point {
 let a = &mut Allocator::new();
 
 let point = Point { x: 5, y: 2 };
-let ptr = point.to_clvm(a).unwrap();
+let ptr = a.value_to_ptr(&point).unwrap();
 
-assert_eq!(Point::from_clvm(a, ptr).unwrap(), point);
+assert_eq!(a.value_from_ptr::<Point>(ptr).unwrap(), point);
 ```
 "#
 )]
@@ -40,12 +40,16 @@ assert_eq!(Point::from_clvm(a, ptr).unwrap(), point);
 #[cfg(feature = "derive")]
 pub use clvm_derive::*;
 
+mod allocator_ext;
+mod clvm_value;
 mod error;
 mod from_clvm;
 mod macros;
 mod match_byte;
 mod to_clvm;
 
+pub use allocator_ext::*;
+pub use clvm_value::*;
 pub use error::*;
 pub use from_clvm::*;
 pub use match_byte::*;
@@ -58,18 +62,18 @@ mod tests {
 
     use std::fmt;
 
-    use clvmr::{serde::node_to_bytes, Allocator};
+    use clvmr::{allocator::NodePtr, serde::node_to_bytes, Allocator};
 
     use super::*;
 
     fn check<T>(value: T, expected: &str)
     where
-        T: fmt::Debug + PartialEq + ToClvm + FromClvm,
+        T: fmt::Debug + PartialEq + ToClvm<NodePtr> + FromClvm<NodePtr>,
     {
         let a = &mut Allocator::new();
 
-        let ptr = value.to_clvm(a).unwrap();
-        let round_trip = T::from_clvm(a, ptr).unwrap();
+        let ptr = a.value_to_ptr(&value).unwrap();
+        let round_trip = a.value_from_ptr(ptr).unwrap();
         assert_eq!(value, round_trip);
 
         let bytes = node_to_bytes(a, ptr).unwrap();

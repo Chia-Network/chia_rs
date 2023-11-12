@@ -1,6 +1,5 @@
 use arbitrary::Arbitrary;
-use clvm_traits::{FromClvm, Result, ToClvm};
-use clvmr::{allocator::NodePtr, Allocator};
+use clvm_traits::{from_clvm, to_clvm, FromClvm, ToClvm};
 use hex_literal::hex;
 
 use crate::singleton::SingletonStruct;
@@ -15,32 +14,32 @@ pub struct NftIntermediateLauncherArgs {
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curried_args)]
-pub struct NftStateLayerArgs {
+pub struct NftStateLayerArgs<I, M> {
     pub mod_hash: [u8; 32],
-    pub metadata: NodePtr,
+    pub metadata: M,
     pub metadata_updater_puzzle_hash: [u8; 32],
-    pub inner_puzzle: NodePtr,
+    pub inner_puzzle: I,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(proper_list)]
-pub struct NftStateLayerSolution {
-    pub inner_solution: NodePtr,
+pub struct NftStateLayerSolution<I> {
+    pub inner_solution: I,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curried_args)]
-pub struct NftOwnershipLayerArgs {
+pub struct NftOwnershipLayerArgs<I, P> {
     pub mod_hash: [u8; 32],
     pub current_owner: Option<[u8; 32]>,
-    pub transfer_program: NodePtr,
-    pub inner_puzzle: NodePtr,
+    pub transfer_program: P,
+    pub inner_puzzle: I,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(proper_list)]
-pub struct NftOwnershipLayerSolution {
-    pub inner_solution: NodePtr,
+pub struct NftOwnershipLayerSolution<I> {
+    pub inner_solution: I,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
@@ -78,64 +77,70 @@ impl Default for NftMetadata {
     }
 }
 
-impl FromClvm for NftMetadata {
-    fn from_clvm(a: &Allocator, node: NodePtr) -> Result<Self> {
-        let items: Vec<(String, NodePtr)> = FromClvm::from_clvm(a, node)?;
+impl<Node> FromClvm<Node> for NftMetadata
+where
+    Node: FromClvm<Node>,
+{
+    from_clvm!(Node, f, ptr, {
+        let items = Vec::<(String, Node)>::from_clvm(f, ptr)?;
         let mut metadata = Self::default();
 
-        for (key, value_ptr) in items {
+        for (key, ref ptr) in items {
             match key.as_str() {
-                "sn" => metadata.edition_number = FromClvm::from_clvm(a, value_ptr)?,
-                "st" => metadata.edition_total = FromClvm::from_clvm(a, value_ptr)?,
-                "u" => metadata.data_uris = FromClvm::from_clvm(a, value_ptr)?,
-                "h" => metadata.data_hash = FromClvm::from_clvm(a, value_ptr)?,
-                "mu" => metadata.metadata_uris = FromClvm::from_clvm(a, value_ptr)?,
-                "mh" => metadata.metadata_hash = FromClvm::from_clvm(a, value_ptr)?,
-                "lu" => metadata.license_uris = FromClvm::from_clvm(a, value_ptr)?,
-                "lh" => metadata.license_hash = FromClvm::from_clvm(a, value_ptr)?,
+                "sn" => metadata.edition_number = FromClvm::from_clvm(f, ptr)?,
+                "st" => metadata.edition_total = FromClvm::from_clvm(f, ptr)?,
+                "u" => metadata.data_uris = FromClvm::from_clvm(f, ptr)?,
+                "h" => metadata.data_hash = FromClvm::from_clvm(f, ptr)?,
+                "mu" => metadata.metadata_uris = FromClvm::from_clvm(f, ptr)?,
+                "mh" => metadata.metadata_hash = FromClvm::from_clvm(f, ptr)?,
+                "lu" => metadata.license_uris = FromClvm::from_clvm(f, ptr)?,
+                "lh" => metadata.license_hash = FromClvm::from_clvm(f, ptr)?,
                 _ => (),
             }
         }
 
         Ok(metadata)
-    }
+    });
 }
 
-impl ToClvm for NftMetadata {
-    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
-        let mut items: Vec<(&str, NodePtr)> = Vec::new();
+impl<Node> ToClvm<Node> for NftMetadata
+where
+    Node: ToClvm<Node>,
+{
+    to_clvm!(Node, self, f, {
+        let mut items: Vec<(&str, Node)> = Vec::new();
 
         if !self.data_uris.is_empty() {
-            items.push(("u", self.data_uris.to_clvm(a)?));
+            items.push(("u", self.data_uris.to_clvm(f)?));
         }
 
         if let Some(hash) = self.data_hash {
-            items.push(("h", hash.to_clvm(a)?));
+            items.push(("h", hash.to_clvm(f)?));
         }
 
         if !self.metadata_uris.is_empty() {
-            items.push(("mu", self.metadata_uris.to_clvm(a)?));
+            items.push(("mu", self.metadata_uris.to_clvm(f)?));
         }
 
         if let Some(hash) = self.metadata_hash {
-            items.push(("mh", hash.to_clvm(a)?));
+            items.push(("mh", hash.to_clvm(f)?));
         }
 
         if !self.license_uris.is_empty() {
-            items.push(("lu", self.license_uris.to_clvm(a)?));
+            items.push(("lu", self.license_uris.to_clvm(f)?));
         }
 
         if let Some(hash) = self.license_hash {
-            items.push(("lh", hash.to_clvm(a)?));
+            items.push(("lh", hash.to_clvm(f)?));
         }
 
         items.extend(vec![
-            ("sn", self.edition_number.to_clvm(a)?),
-            ("st", self.edition_total.to_clvm(a)?),
+            ("sn", self.edition_number.to_clvm(f)?),
+            ("st", self.edition_total.to_clvm(f)?),
         ]);
 
-        items.to_clvm(a)
-    }
+        items.to_clvm(f)
+    });
 }
 
 /// This is the puzzle reveal of the [NFT1 state layer](https://chialisp.com/nfts) puzzle.

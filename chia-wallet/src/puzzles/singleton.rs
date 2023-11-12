@@ -1,14 +1,13 @@
 use clvm_traits::{FromClvm, ToClvm};
-use clvmr::allocator::NodePtr;
 use hex_literal::hex;
 
 use crate::Proof;
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curried_args)]
-pub struct SingletonArgs {
+pub struct SingletonArgs<I> {
     pub singleton_struct: SingletonStruct,
-    pub inner_puzzle: NodePtr,
+    pub inner_puzzle: I,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
@@ -21,18 +20,18 @@ pub struct SingletonStruct {
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(proper_list)]
-pub struct SingletonSolution {
+pub struct SingletonSolution<I> {
     pub proof: Proof,
     pub amount: u64,
-    pub inner_solution: NodePtr,
+    pub inner_solution: I,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(proper_list)]
-pub struct LauncherSolution {
+pub struct LauncherSolution<T> {
     pub singleton_puzzle_hash: [u8; 32],
     pub amount: u64,
-    pub key_value_list: NodePtr,
+    pub key_value_list: T,
 }
 
 impl SingletonStruct {

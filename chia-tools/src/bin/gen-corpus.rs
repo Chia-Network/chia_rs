@@ -3,6 +3,7 @@
 // coin). It was used to pull out real-life examples of spends that would
 // satisfy the requirements on the fast-foward feature.
 
+use chia_protocol::Bytes;
 use clap::Parser;
 
 use chia_tools::{iterate_tx_blocks, visit_spends};
@@ -11,9 +12,10 @@ use chia_traits::streamable::Streamable;
 use chia_protocol::bytes::Bytes32;
 use chia_protocol::{coin::Coin, coin_spend::CoinSpend, program::Program};
 use chia_wallet::singleton::SINGLETON_TOP_LAYER_PUZZLE_HASH;
-use clvm_traits::FromClvm;
+use clvm_traits::AllocatorExt;
 use clvm_utils::{tree_hash, CurriedProgram};
 use clvmr::allocator::NodePtr;
+use clvmr::serde::node_to_bytes;
 use clvmr::Allocator;
 use std::thread::available_parallelism;
 use threadpool::ThreadPool;
@@ -74,10 +76,11 @@ fn main() {
                     max_cost,
                     |a, parent_coin_info, amount, puzzle, solution| {
                         let puzzle_hash = Bytes32::from(tree_hash(a, puzzle));
-                        let mod_hash = match CurriedProgram::<NodePtr>::from_clvm(a, puzzle) {
-                            Ok(uncurried) => Bytes32::from(tree_hash(a, uncurried.program)),
-                            _ => puzzle_hash,
-                        };
+                        let mod_hash =
+                            match a.value_from_ptr::<CurriedProgram<NodePtr, NodePtr>>(puzzle) {
+                                Ok(uncurried) => Bytes32::from(tree_hash(a, uncurried.program)),
+                                _ => puzzle_hash,
+                            };
 
                         let run_puzzle = seen_puzzles.lock().unwrap().insert(mod_hash);
                         let fast_forward = (mod_hash == SINGLETON_TOP_LAYER_PUZZLE_HASH)
@@ -88,8 +91,12 @@ fn main() {
                         }
                         use std::fs::write;
 
-                        let puzzle_reveal = Program::from_clvm(a, puzzle).expect("puzzle reveal");
-                        let solution = Program::from_clvm(a, solution).expect("solution");
+                        let puzzle_bytes = node_to_bytes(a, puzzle).expect("puzzle reveal");
+                        let puzzle_reveal = Program::new(Bytes::from(puzzle_bytes));
+
+                        let solution_bytes = node_to_bytes(a, solution).expect("solution");
+                        let solution = Program::new(Bytes::from(solution_bytes));
+
                         let coin = Coin {
                             parent_coin_info,
                             puzzle_hash,

@@ -1,187 +1,198 @@
-use std::array::TryFromSliceError;
+use clvmr::allocator::NodePtr;
 
-use clvmr::{
-    allocator::{NodePtr, SExp},
-    op_utils::nullp,
-    Allocator,
-};
-use num_bigint::Sign;
+use crate::{ClvmValue, FromClvmError};
 
-use crate::{Error, Result};
-
-pub trait FromClvm: Sized {
-    fn from_clvm(a: &Allocator, ptr: NodePtr) -> Result<Self>;
+pub trait FromClvm<Node>: Sized {
+    fn from_clvm<'a>(
+        f: &mut impl FnMut(&Node) -> ClvmValue<'a, Node>,
+        ptr: &Node,
+    ) -> Result<Self, FromClvmError>;
 }
 
-impl FromClvm for NodePtr {
-    fn from_clvm(_a: &Allocator, ptr: NodePtr) -> Result<Self> {
-        Ok(ptr)
-    }
-}
-
-macro_rules! clvm_primitive {
-    ($primitive:ty) => {
-        impl FromClvm for $primitive {
-            fn from_clvm(a: &Allocator, ptr: NodePtr) -> Result<Self> {
-                if let SExp::Atom = a.sexp(ptr) {
-                    let (sign, mut vec) = a.number(ptr).to_bytes_be();
-                    if vec.len() < std::mem::size_of::<$primitive>() {
-                        let mut zeros = vec![0; std::mem::size_of::<$primitive>() - vec.len()];
-                        zeros.extend(vec);
-                        vec = zeros;
-                    }
-                    let value =
-                        <$primitive>::from_be_bytes(vec.as_slice().try_into().map_err(
-                            |error: TryFromSliceError| Error::Custom(error.to_string()),
-                        )?);
-                    Ok(if sign == Sign::Minus {
-                        value.wrapping_neg()
-                    } else {
-                        value
-                    })
-                } else {
-                    Err(Error::ExpectedAtom(ptr))
-                }
-            }
+#[macro_export]
+macro_rules! from_clvm {
+    ($node:ty, $f:ident, $ptr:ident, { $( $block:tt )* }) => {
+        #[allow(unused_mut)]
+        fn from_clvm<'a>(
+            mut $f: &mut impl FnMut(&$node) -> $crate::ClvmValue<'a, $node>,
+            $ptr: &$node,
+        ) -> ::std::result::Result<Self, $crate::FromClvmError> {
+            $( $block )*
         }
     };
 }
 
-clvm_primitive!(u8);
-clvm_primitive!(i8);
-clvm_primitive!(u16);
-clvm_primitive!(i16);
-clvm_primitive!(u32);
-clvm_primitive!(i32);
-clvm_primitive!(u64);
-clvm_primitive!(i64);
-clvm_primitive!(u128);
-clvm_primitive!(i128);
-clvm_primitive!(usize);
-clvm_primitive!(isize);
+macro_rules! clvm_ints {
+    ($int:ty) => {
+        impl<Node> FromClvm<Node> for $int {
+            from_clvm!(Node, f, ptr, {
+                if let ClvmValue::Atom(bytes) = f(ptr) {
+                    const LEN: usize = std::mem::size_of::<$int>();
+                    if bytes.len() > LEN {
+                        return Err(FromClvmError::ValueTooLarge);
+                    }
 
-impl<A, B> FromClvm for (A, B)
-where
-    A: FromClvm,
-    B: FromClvm,
-{
-    fn from_clvm(a: &Allocator, ptr: NodePtr) -> Result<Self> {
-        match a.sexp(ptr) {
-            SExp::Pair(first, rest) => Ok((A::from_clvm(a, first)?, B::from_clvm(a, rest)?)),
-            SExp::Atom => Err(Error::ExpectedCons(ptr)),
+                    let is_negative = !bytes.is_empty() && (bytes[0] & 0x80) != 0;
+                    let fill_byte = if is_negative { 0xFF } else { 0x00 };
+
+                    let mut buf = [fill_byte; LEN];
+                    let start = LEN - bytes.len();
+                    buf[start..].copy_from_slice(bytes);
+
+                    Ok(<$int>::from_be_bytes(buf))
+                } else {
+                    Err(FromClvmError::ExpectedAtom)
+                }
+            });
         }
-    }
+    };
 }
 
-impl FromClvm for () {
-    fn from_clvm(a: &Allocator, ptr: NodePtr) -> Result<Self> {
-        if nullp(a, ptr) {
+clvm_ints!(u8);
+clvm_ints!(i8);
+clvm_ints!(u16);
+clvm_ints!(i16);
+clvm_ints!(u32);
+clvm_ints!(i32);
+clvm_ints!(u64);
+clvm_ints!(i64);
+clvm_ints!(u128);
+clvm_ints!(i128);
+clvm_ints!(usize);
+clvm_ints!(isize);
+
+impl FromClvm<NodePtr> for NodePtr {
+    from_clvm!(NodePtr, _f, ptr, { Ok(*ptr) });
+}
+
+impl<Node, A, B> FromClvm<Node> for (A, B)
+where
+    A: FromClvm<Node>,
+    B: FromClvm<Node>,
+{
+    from_clvm!(Node, f, ptr, {
+        if let ClvmValue::Pair(first, rest) = f(ptr) {
+            let first = A::from_clvm(f, &first)?;
+            let rest = B::from_clvm(f, &rest)?;
+            Ok((first, rest))
+        } else {
+            Err(FromClvmError::ExpectedPair)
+        }
+    });
+}
+
+impl<Node> FromClvm<Node> for () {
+    from_clvm!(Node, f, ptr, {
+        if let ClvmValue::Atom(&[]) = f(ptr) {
             Ok(())
         } else {
-            Err(Error::ExpectedNil(ptr))
+            Err(FromClvmError::ExpectedNil)
         }
-    }
+    });
 }
 
-impl<T, const N: usize> FromClvm for [T; N]
+impl<Node, T, const N: usize> FromClvm<Node> for [T; N]
 where
-    T: FromClvm,
+    T: FromClvm<Node>,
 {
-    fn from_clvm(a: &Allocator, mut ptr: NodePtr) -> Result<Self> {
+    from_clvm!(Node, f, ptr, {
+        let mut next = None;
         let mut items = Vec::with_capacity(N);
         loop {
-            match a.sexp(ptr) {
-                SExp::Atom => {
-                    if nullp(a, ptr) {
-                        return match items.try_into() {
-                            Ok(value) => Ok(value),
-                            Err(_) => Err(Error::ExpectedCons(ptr)),
-                        };
-                    } else {
-                        return Err(Error::ExpectedNil(ptr));
-                    }
+            match f(next.as_ref().unwrap_or(ptr)) {
+                ClvmValue::Atom(&[]) => {
+                    return items.try_into().map_err(|_| FromClvmError::ExpectedPair);
                 }
-                SExp::Pair(first, rest) => {
-                    if items.len() >= N {
-                        return Err(Error::ExpectedAtom(ptr));
+                ClvmValue::Atom(_) => {
+                    return Err(FromClvmError::ExpectedNil);
+                }
+                ClvmValue::Pair(first, rest) => {
+                    if items.len() == N {
+                        return Err(FromClvmError::ExpectedAtom);
                     } else {
-                        items.push(T::from_clvm(a, first)?);
-                        ptr = rest;
+                        items.push(T::from_clvm(f, &first)?);
+                        next = Some(rest);
                     }
                 }
             }
         }
-    }
+    });
 }
 
-impl<T> FromClvm for Vec<T>
+impl<Node, T> FromClvm<Node> for Vec<T>
 where
-    T: FromClvm,
+    T: FromClvm<Node>,
 {
-    fn from_clvm(a: &Allocator, mut ptr: NodePtr) -> Result<Self> {
+    from_clvm!(Node, f, ptr, {
+        let mut next = None;
         let mut items = Vec::new();
         loop {
-            match a.sexp(ptr) {
-                SExp::Atom => {
-                    if nullp(a, ptr) {
-                        return Ok(items);
-                    } else {
-                        return Err(Error::ExpectedNil(ptr));
-                    }
+            match f(next.as_ref().unwrap_or(ptr)) {
+                ClvmValue::Atom(&[]) => {
+                    return Ok(items);
                 }
-                SExp::Pair(first, rest) => {
-                    items.push(T::from_clvm(a, first)?);
-                    ptr = rest;
+                ClvmValue::Atom(_) => {
+                    return Err(FromClvmError::ExpectedNil);
+                }
+                ClvmValue::Pair(first, rest) => {
+                    items.push(T::from_clvm(f, &first)?);
+                    next = Some(rest);
                 }
             }
         }
-    }
+    });
 }
 
-impl<T: FromClvm> FromClvm for Option<T> {
-    fn from_clvm(a: &Allocator, ptr: NodePtr) -> Result<Self> {
-        if nullp(a, ptr) {
+impl<Node, T> FromClvm<Node> for Option<T>
+where
+    T: FromClvm<Node>,
+{
+    from_clvm!(Node, f, ptr, {
+        if let ClvmValue::Atom(&[]) = f(ptr) {
             Ok(None)
         } else {
-            Ok(Some(T::from_clvm(a, ptr)?))
+            Ok(Some(T::from_clvm(f, ptr)?))
         }
-    }
+    });
 }
 
-impl FromClvm for String {
-    fn from_clvm(a: &Allocator, ptr: NodePtr) -> Result<Self> {
-        if let SExp::Atom = a.sexp(ptr) {
-            Self::from_utf8(a.atom(ptr).to_vec()).map_err(|error| Error::Custom(error.to_string()))
+impl<Node> FromClvm<Node> for String {
+    from_clvm!(Node, f, ptr, {
+        if let ClvmValue::Atom(bytes) = f(ptr) {
+            Ok(Self::from_utf8(bytes.to_vec())?)
         } else {
-            Err(Error::ExpectedAtom(ptr))
+            Err(FromClvmError::ExpectedAtom)
         }
-    }
+    });
 }
 
 #[cfg(test)]
 mod tests {
-    use clvmr::serde::node_from_bytes;
+    use clvmr::{serde::node_from_bytes, Allocator};
+
+    use crate::AllocatorExt;
 
     use super::*;
 
-    fn decode<T>(a: &mut Allocator, hex: &str) -> Result<T>
+    fn decode<T>(a: &mut Allocator, hex: &str) -> Result<T, FromClvmError>
     where
-        T: FromClvm,
+        T: FromClvm<NodePtr>,
     {
         let bytes = hex::decode(hex).unwrap();
         let actual = node_from_bytes(a, &bytes).unwrap();
-        T::from_clvm(a, actual)
+        a.value_from_ptr(actual)
     }
 
     #[test]
     fn test_nodeptr() {
         let a = &mut Allocator::new();
         let ptr = a.one();
-        assert_eq!(NodePtr::from_clvm(a, ptr).unwrap(), ptr);
+        let value: NodePtr = a.value_from_ptr(ptr).unwrap();
+        assert_eq!(value, ptr);
     }
 
     #[test]
-    fn test_primitives() {
+    fn test_ints() {
         let a = &mut Allocator::new();
         assert_eq!(decode(a, "80"), Ok(0u8));
         assert_eq!(decode(a, "80"), Ok(0i8));

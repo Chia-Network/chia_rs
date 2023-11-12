@@ -1,34 +1,30 @@
-use clvmr::{allocator::NodePtr, reduction::EvalErr};
+use std::string::FromUtf8Error;
+
 use thiserror::Error;
 
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
-pub enum Error {
-    #[error("allocator error {0:?}")]
-    Allocator(EvalErr),
-
-    #[error("expected atom")]
-    ExpectedAtom(NodePtr),
-
-    #[error("expected cons")]
-    ExpectedCons(NodePtr),
-
-    #[error("expected nil")]
-    ExpectedNil(NodePtr),
-
-    #[error("expected one")]
-    ExpectedOne(NodePtr),
-
-    #[error("validation failed")]
-    Validation(NodePtr),
-
-    #[error("{0}")]
-    Custom(String),
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
+pub enum ToClvmError {
+    #[error("limit reached")]
+    LimitReached,
 }
 
-pub type Result<T> = std::result::Result<T, Error>;
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
+pub enum FromClvmError {
+    #[error("invalid utf8")]
+    InvalidUtf8(#[from] FromUtf8Error),
 
-impl From<EvalErr> for Error {
-    fn from(value: EvalErr) -> Self {
-        Self::Allocator(value)
-    }
+    #[error("value too large")]
+    ValueTooLarge,
+
+    #[error("validation error: {0}")]
+    Invalid(String),
+
+    #[error("expected atom")]
+    ExpectedAtom,
+
+    #[error("expected pair")]
+    ExpectedPair,
+
+    #[error("expected nil")]
+    ExpectedNil,
 }

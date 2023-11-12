@@ -1,4 +1,6 @@
+use chia_protocol::Bytes;
 use clap::Parser;
+use clvmr::serde::{node_from_bytes, node_to_bytes};
 use std::fs;
 use std::io::Cursor;
 
@@ -6,7 +8,6 @@ use chia::fast_forward::fast_forward_singleton;
 use chia_protocol::bytes::Bytes32;
 use chia_protocol::{coin::Coin, coin_spend::CoinSpend, program::Program};
 use chia_traits::streamable::Streamable;
-use clvm_traits::{FromClvm, ToClvm};
 use clvm_utils::tree_hash;
 use clvmr::allocator::Allocator;
 
@@ -40,8 +41,8 @@ fn main() {
         .expect("parent_id");
 
     let mut a = Allocator::new_limited(500000000, 62500000, 62500000);
-    let puzzle = spend.puzzle_reveal.to_clvm(&mut a).expect("to_clvm");
-    let solution = spend.solution.to_clvm(&mut a).expect("to_clvm");
+    let puzzle = node_from_bytes(&mut a, spend.puzzle_reveal.as_slice()).expect("to_clvm");
+    let solution = node_from_bytes(&mut a, spend.solution.as_slice()).expect("to_clvm");
     let puzzle_hash = Bytes32::from(tree_hash(&a, puzzle));
 
     let new_parent_coin = Coin {
@@ -66,10 +67,13 @@ fn main() {
     )
     .expect("fast-forward");
 
+    let solution_bytes = node_to_bytes(&a, new_solution).expect("new solution");
+    let new_solution_program = Program::new(Bytes::from(solution_bytes));
+
     let new_spend = CoinSpend {
         coin: new_parent_coin,
         puzzle_reveal: spend.puzzle_reveal,
-        solution: Program::from_clvm(&a, new_solution).expect("new solution"),
+        solution: new_solution_program,
     };
     let mut bytes = Vec::<u8>::new();
     new_spend.stream(&mut bytes).expect("stream CoinSpend");

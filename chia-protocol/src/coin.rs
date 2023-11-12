@@ -1,9 +1,7 @@
 use crate::streamable_struct;
 use crate::{bytes::Bytes32, BytesImpl};
 use chia_streamable_macro::Streamable;
-use clvm_traits::{clvm_list, destructure_list, match_list, FromClvm, ToClvm};
-use clvmr::allocator::NodePtr;
-use clvmr::Allocator;
+use clvm_traits::{clvm_list, destructure_list, from_clvm, match_list, to_clvm, FromClvm, ToClvm};
 use sha2::{Digest, Sha256};
 use std::convert::TryInto;
 
@@ -53,28 +51,32 @@ impl Coin {
     }
 }
 
-impl ToClvm for Coin {
-    fn to_clvm(&self, a: &mut Allocator) -> clvm_traits::Result<NodePtr> {
-        clvm_list!(self.parent_coin_info, self.puzzle_hash, self.amount).to_clvm(a)
-    }
+impl<Node> ToClvm<Node> for Coin {
+    to_clvm!(Node, self, f, {
+        clvm_list!(self.parent_coin_info, self.puzzle_hash, self.amount).to_clvm(f)
+    });
 }
 
-impl FromClvm for Coin {
-    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self> {
+impl<Node> FromClvm<Node> for Coin {
+    from_clvm!(Node, f, ptr, {
         let destructure_list!(parent_coin_info, puzzle_hash, amount) =
-            <match_list!(BytesImpl<32>, BytesImpl<32>, u64)>::from_clvm(a, ptr)?;
+            <match_list!(BytesImpl<32>, BytesImpl<32>, u64)>::from_clvm(f, ptr)?;
         Ok(Coin {
             parent_coin_info,
             puzzle_hash,
             amount,
         })
-    }
+    });
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use clvmr::serde::{node_from_bytes, node_to_bytes};
+    use clvm_traits::AllocatorExt;
+    use clvmr::{
+        serde::{node_from_bytes, node_to_bytes},
+        Allocator,
+    };
     use rstest::rstest;
 
     #[rstest]
@@ -117,9 +119,9 @@ mod tests {
         let expected_bytes = hex::decode(expected).unwrap();
 
         let ptr = node_from_bytes(a, &expected_bytes).unwrap();
-        let coin = Coin::from_clvm(a, ptr).unwrap();
+        let coin = a.value_from_ptr::<Coin>(ptr).unwrap();
 
-        let round_trip = coin.to_clvm(a).unwrap();
+        let round_trip = a.value_to_ptr(coin).unwrap();
         assert_eq!(expected, hex::encode(node_to_bytes(a, round_trip).unwrap()));
     }
 }

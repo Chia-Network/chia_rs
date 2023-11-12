@@ -2,8 +2,8 @@
 use std::fmt;
 
 use chia_wallet::{nft::NftMetadata, Proof};
-use clvm_traits::{FromClvm, ToClvm};
-use clvmr::Allocator;
+use clvm_traits::{AllocatorExt, FromClvm, ToClvm};
+use clvmr::{allocator::NodePtr, Allocator};
 use libfuzzer_sys::{
     arbitrary::{Arbitrary, Unstructured},
     fuzz_target,
@@ -17,11 +17,11 @@ fuzz_target!(|data: &[u8]| {
 
 fn roundtrip<'a, T>(u: &mut Unstructured<'a>)
 where
-    T: Arbitrary<'a> + ToClvm + FromClvm + PartialEq + fmt::Debug,
+    T: Arbitrary<'a> + ToClvm<NodePtr> + FromClvm<NodePtr> + PartialEq + fmt::Debug,
 {
     let obj = T::arbitrary(u).unwrap();
     let mut a = Allocator::new();
-    let ptr = obj.to_clvm(&mut a).unwrap();
-    let obj2 = T::from_clvm(&a, ptr).unwrap();
+    let ptr = a.value_to_ptr(&obj).unwrap();
+    let obj2 = a.value_from_ptr::<T>(ptr).unwrap();
     assert_eq!(obj, obj2);
 }

@@ -47,13 +47,6 @@ doc = false
 bench = false
 
 [[bin]]
-name = "parse-program"
-path = "fuzz_targets/parse-program.rs"
-test = false
-doc = false
-bench = false
-
-[[bin]]
 name = "streamable"
 path = "fuzz_targets/streamable.rs"
 test = false

@@ -1,8 +1,7 @@
 use crate::{Error, GTElement, PublicKey, Result, SecretKey};
 use blst::*;
 use chia_traits::{read_bytes, Streamable};
-use clvm_traits::{FromClvm, ToClvm};
-use clvmr::allocator::{Allocator, NodePtr, SExp};
+use clvm_traits::{from_clvm, to_clvm, ClvmValue, FromClvm, FromClvmError, ToClvm};
 use sha2::{Digest, Sha256};
 use std::borrow::Borrow;
 use std::convert::AsRef;
@@ -248,26 +247,22 @@ impl FromJsonDict for Signature {
     }
 }
 
-impl FromClvm for Signature {
-    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self> {
-        let blob = match a.sexp(ptr) {
-            SExp::Atom => a.atom(ptr),
-            _ => {
-                return Err(clvm_traits::Error::ExpectedAtom(ptr));
-            }
+impl<Node> FromClvm<Node> for Signature {
+    from_clvm!(Node, f, ptr, {
+        let ClvmValue::Atom(bytes) = f(ptr) else {
+            return Err(FromClvmError::ExpectedAtom);
         };
-        Self::from_bytes(
-            blob.try_into()
-                .map_err(|_error| clvm_traits::Error::Custom("invalid size".to_string()))?,
-        )
-        .map_err(|error| clvm_traits::Error::Custom(error.to_string()))
-    }
+
+        let Ok(bytes) = bytes.try_into() else {
+            return Err(FromClvmError::Invalid("expected signature".to_string()));
+        };
+
+        Self::from_bytes(bytes).or(Err(FromClvmError::Invalid("invalid signature".to_string())))
+    });
 }
 
-impl ToClvm for Signature {
-    fn to_clvm(&self, a: &mut Allocator) -> clvm_traits::Result<NodePtr> {
-        Ok(a.new_atom(&self.to_bytes())?)
-    }
+impl<Node> ToClvm<Node> for Signature {
+    to_clvm!(Node, self, f, { f(ClvmValue::Atom(&self.to_bytes())) });
 }
 
 #[cfg(feature = "py-bindings")]
@@ -529,6 +524,8 @@ pub fn sign<Msg: AsRef<[u8]>>(sk: &SecretKey, msg: Msg) -> Signature {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use clvm_traits::AllocatorExt;
+    use clvmr::Allocator;
     use hex::FromHex;
     use rand::rngs::StdRng;
     use rand::{Rng, SeedableRng};
@@ -1064,10 +1061,10 @@ mod tests {
         let bytes = hex::decode("b45825c0ee7759945c0189b4c38b7e54231ebadc83a851bec3bb7cf954a124ae0cc8e8e5146558332ea152f63bf8846e04826185ef60e817f271f8d500126561319203f9acb95809ed20c193757233454be1562a5870570941a84605bd2c9c9a").expect("hex::decode()");
         let ptr = a.new_atom(&bytes).expect("new_atom");
 
-        let sig = Signature::from_clvm(&a, ptr).expect("from_clvm");
+        let sig = a.value_from_ptr::<Signature>(ptr).expect("from_clvm");
         assert_eq!(&sig.to_bytes()[..], &bytes[..]);
 
-        let sig_ptr = sig.to_clvm(&mut a).expect("to_clvm");
+        let sig_ptr = a.value_to_ptr(sig).expect("to_clvm");
         assert!(a.atom_eq(sig_ptr, ptr));
     }
 
@@ -1076,8 +1073,8 @@ mod tests {
         let mut a = Allocator::new();
         let ptr = a.new_pair(a.one(), a.one()).expect("new_pair");
         assert_eq!(
-            Signature::from_clvm(&a, ptr).unwrap_err(),
-            clvm_traits::Error::ExpectedAtom(ptr)
+            a.value_from_ptr::<Signature>(ptr).unwrap_err(),
+            FromClvmError::ExpectedAtom
         );
     }
 

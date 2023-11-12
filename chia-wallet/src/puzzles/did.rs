@@ -1,43 +1,49 @@
-use clvm_traits::{clvm_list, match_list, match_tuple, Error, FromClvm, Result, ToClvm};
-use clvmr::{allocator::NodePtr, Allocator};
+use clvm_traits::{clvm_tuple, from_clvm, match_tuple, to_clvm, FromClvm, FromClvmError, ToClvm};
 use hex_literal::hex;
 
 use crate::singleton::SingletonStruct;
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curried_args)]
-pub struct DidArgs {
-    pub inner_puzzle: NodePtr,
+pub struct DidArgs<I, M> {
+    pub inner_puzzle: I,
     pub recovery_did_list_hash: [u8; 32],
     pub num_verifications_required: u64,
     pub singleton_struct: SingletonStruct,
-    pub metadata: NodePtr,
+    pub metadata: M,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum DidSolution {
-    InnerSpend(NodePtr),
+pub enum DidSolution<T> {
+    InnerSpend(T),
 }
 
-impl FromClvm for DidSolution {
-    fn from_clvm(a: &Allocator, node: NodePtr) -> Result<Self> {
-        let (mode, args) = <match_tuple!(u8, NodePtr)>::from_clvm(a, node)?;
+impl<Node, T> FromClvm<Node> for DidSolution<T>
+where
+    T: FromClvm<Node>,
+{
+    from_clvm!(Node, f, ptr, {
+        let (mode, args) = <match_tuple!(u8, T)>::from_clvm(f, ptr)?;
 
         match mode {
-            1 => Ok(Self::InnerSpend(
-                <match_list!(NodePtr)>::from_clvm(a, args)?.0,
-            )),
-            _ => Err(Error::Custom(format!("unexpected did spend mode {}", mode))),
+            1 => Ok(Self::InnerSpend(args)),
+            _ => Err(FromClvmError::Invalid(format!(
+                "unexpected did spend mode {}",
+                mode
+            ))),
         }
-    }
+    });
 }
 
-impl ToClvm for DidSolution {
-    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
+impl<Node, T> ToClvm<Node> for DidSolution<T>
+where
+    T: ToClvm<Node>,
+{
+    to_clvm!(Node, self, f, {
         match self {
-            Self::InnerSpend(solution) => clvm_list!(1, solution).to_clvm(a),
+            Self::InnerSpend(solution) => clvm_tuple!(1, solution).to_clvm(f),
         }
-    }
+    });
 }
 
 /// This is the puzzle reveal of the [DID1 standard](https://chialisp.com/dids) puzzle.
@@ -87,6 +93,9 @@ pub static DID_INNER_PUZZLE_HASH: [u8; 32] = hex!(
 
 #[cfg(test)]
 mod tests {
+    use clvm_traits::AllocatorExt;
+    use clvmr::Allocator;
+
     use super::*;
 
     use crate::assert_puzzle_hash;
@@ -99,9 +108,9 @@ mod tests {
     #[test]
     fn did_solution() {
         let a = &mut Allocator::new();
-        let did_solution = DidSolution::InnerSpend(a.null());
-        let ptr = did_solution.to_clvm(a).unwrap();
-        let roundtrip = DidSolution::from_clvm(a, ptr).unwrap();
+        let did_solution = DidSolution::InnerSpend(());
+        let ptr = a.value_to_ptr(&did_solution).unwrap();
+        let roundtrip = a.value_from_ptr::<DidSolution<()>>(ptr).unwrap();
         assert_eq!(did_solution, roundtrip);
     }
 }

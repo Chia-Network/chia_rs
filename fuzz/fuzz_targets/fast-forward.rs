@@ -7,8 +7,8 @@ use chia_protocol::Bytes32;
 use chia_protocol::Coin;
 use chia_protocol::CoinSpend;
 use chia_traits::streamable::Streamable;
-use clvm_traits::ToClvm;
 use clvm_utils::tree_hash;
+use clvmr::serde::node_from_bytes;
 use clvmr::serde::node_to_bytes;
 use clvmr::Allocator;
 use hex_literal::hex;
@@ -23,10 +23,10 @@ fuzz_target!(|data: &[u8]| {
         hex!("abababababababababababababababababababababababababababababababab");
 
     let mut a = Allocator::new_limited(500000000, 62500000, 62500000);
-    let Ok(puzzle) = spend.puzzle_reveal.to_clvm(&mut a) else {
+    let Ok(puzzle) = node_from_bytes(&mut a, spend.puzzle_reveal.as_slice()) else {
         return;
     };
-    let Ok(solution) = spend.solution.to_clvm(&mut a) else {
+    let Ok(solution) = node_from_bytes(&mut a, spend.solution.as_slice()) else {
         return;
     };
     let puzzle_hash = Bytes32::from(tree_hash(&a, puzzle));

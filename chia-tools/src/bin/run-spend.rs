@@ -2,9 +2,11 @@ use chia::gen::conditions::Condition;
 use chia_protocol::Bytes32;
 use chia_traits::Streamable;
 use clap::Parser;
+use clvm_traits::AllocatorExt;
 use clvm_traits::{FromClvm, ToClvm};
 use clvm_utils::tree_hash;
 use clvm_utils::CurriedProgram;
+use clvmr::serde::node_from_bytes;
 use clvmr::{allocator::NodePtr, Allocator};
 use hex_literal::hex;
 use std::io::Cursor;
@@ -131,9 +133,9 @@ pub struct SingletonStruct {
 
 #[derive(FromClvm, ToClvm, Debug)]
 #[clvm(curried_args)]
-pub struct SingletonArgs {
+pub struct SingletonArgs<I> {
     pub singleton_struct: SingletonStruct,
-    pub inner_puzzle: NodePtr,
+    pub inner_puzzle: I,
 }
 
 #[derive(FromClvm, ToClvm, Debug)]
@@ -153,24 +155,24 @@ pub struct EveProof {
 
 #[derive(FromClvm, ToClvm, Debug)]
 #[clvm(proper_list)]
-pub struct SingletonSolution {
+pub struct SingletonSolution<I> {
     pub lineage_proof: LineageProof,
     pub amount: u64,
-    pub inner_solution: NodePtr,
+    pub inner_solution: I,
 }
 
 #[derive(FromClvm, ToClvm, Debug)]
 #[clvm(proper_list)]
-pub struct EveSingletonSolution {
+pub struct EveSingletonSolution<I> {
     pub lineage_proof: EveProof,
     pub amount: u64,
-    pub inner_solution: NodePtr,
+    pub inner_solution: I,
 }
 
 fn print_puzzle_info(a: &Allocator, puzzle: NodePtr, solution: NodePtr) {
     println!("Puzzle: {}", hex::encode(tree_hash(a, puzzle)));
     // exit if this puzzle is not curried
-    let Ok(uncurried) = CurriedProgram::<NodePtr>::from_clvm(a, puzzle) else {
+    let Ok(uncurried) = a.value_from_ptr::<CurriedProgram<NodePtr, NodePtr>>(puzzle) else {
         println!("   puzzle has no curried parameters");
         return;
     };
@@ -178,7 +180,9 @@ fn print_puzzle_info(a: &Allocator, puzzle: NodePtr, solution: NodePtr) {
     match tree_hash(a, uncurried.program) {
         SINGLETON_MOD_HASH => {
             println!("singleton_top_layer_1_1.clsp");
-            let Ok(uncurried) = CurriedProgram::<SingletonArgs>::from_clvm(a, puzzle) else {
+            let Ok(uncurried) =
+                a.value_from_ptr::<CurriedProgram<NodePtr, SingletonArgs<NodePtr>>>(puzzle)
+            else {
                 println!("failed to uncurry singleton");
                 return;
             };
@@ -196,12 +200,14 @@ fn print_puzzle_info(a: &Allocator, puzzle: NodePtr, solution: NodePtr) {
                 uncurried.args.singleton_struct.launcher_puzzle_hash
             );
 
-            let inner_solution = if let Ok(sol) = SingletonSolution::from_clvm(a, solution) {
+            let inner_solution = if let Ok(sol) =
+                a.value_from_ptr::<SingletonSolution<NodePtr>>(solution)
+            {
                 println!("  solution");
                 println!("    lineage-proof: {:?}", sol.lineage_proof);
                 println!("    amount: {}", sol.amount);
                 sol.inner_solution
-            } else if let Ok(sol) = EveSingletonSolution::from_clvm(a, solution) {
+            } else if let Ok(sol) = a.value_from_ptr::<EveSingletonSolution<NodePtr>>(solution) {
                 println!("  eve-solution:");
                 println!("    lineage-proof:: {:?}", sol.lineage_proof);
                 println!("    amount: {}", sol.amount);
@@ -237,14 +243,10 @@ fn main() {
     let spend = read(args.spend).expect("spend file not found");
     let spend = CoinSpend::parse(&mut Cursor::new(spend.as_slice())).expect("parse CoinSpend");
 
-    let puzzle = spend
-        .puzzle_reveal
-        .to_clvm(&mut a)
-        .expect("deserialize puzzle");
-    let solution = spend
-        .solution
-        .to_clvm(&mut a)
-        .expect("deserialize solution");
+    let puzzle =
+        node_from_bytes(&mut a, spend.puzzle_reveal.as_slice()).expect("deserialize puzzle");
+    let solution =
+        node_from_bytes(&mut a, spend.solution.as_slice()).expect("deserialize solution");
 
     println!("Spending {:?}", &spend.coin);
     println!("   coin-id: {}\n", hex::encode(spend.coin.coin_id()));

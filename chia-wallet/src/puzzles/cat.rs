@@ -1,17 +1,16 @@
 use chia_bls::PublicKey;
 use chia_protocol::Coin;
 use clvm_traits::{FromClvm, ToClvm};
-use clvmr::allocator::NodePtr;
 use hex_literal::hex;
 
 use crate::LineageProof;
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curried_args)]
-pub struct CatArgs {
+pub struct CatArgs<I> {
     pub mod_hash: [u8; 32],
     pub tail_program_hash: [u8; 32],
-    pub inner_puzzle: NodePtr,
+    pub inner_puzzle: I,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
@@ -22,8 +21,8 @@ pub struct EverythingWithSignatureTailArgs {
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(proper_list)]
-pub struct CatSolution {
-    pub inner_puzzle_solution: NodePtr,
+pub struct CatSolution<I> {
+    pub inner_puzzle_solution: I,
     pub lineage_proof: Option<LineageProof>,
     pub prev_coin_id: [u8; 32],
     pub this_coin_info: Coin,
