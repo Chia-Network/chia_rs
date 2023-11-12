@@ -4,16 +4,16 @@ use syn::{punctuated::Punctuated, Attribute, GenericParam, Generics, Token, Type
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Repr {
     Tuple,
-    ProperList,
-    CurriedArgs,
+    List,
+    Curry,
 }
 
 impl ToString for Repr {
     fn to_string(&self) -> String {
         match self {
             Self::Tuple => "tuple".to_string(),
-            Self::ProperList => "proper_list".to_string(),
-            Self::CurriedArgs => "curried_args".to_string(),
+            Self::List => "list".to_string(),
+            Self::Curry => "curry".to_string(),
         }
     }
 }
@@ -33,36 +33,24 @@ pub fn parse_args(attrs: &[Attribute]) -> ClvmDeriveArgs {
                     .unwrap();
 
                 for arg in args {
-                    match arg.to_string().as_str() {
-                        "tuple" => {
-                            if let Some(existing) = repr {
-                                panic!("`tuple` conflicts with `{}`", existing.to_string());
-                            }
-                            repr = Some(Repr::Tuple);
-                        }
-                        "proper_list" => {
-                            if let Some(existing) = repr {
-                                panic!("`proper_list` conflicts with `{}`", existing.to_string());
-                            }
-                            repr = Some(Repr::ProperList);
-                        }
-                        "curried_args" => {
-                            if let Some(existing) = repr {
-                                panic!("`curried_args` conflicts with `{}`", existing.to_string());
-                            }
-                            repr = Some(Repr::CurriedArgs);
-                        }
-                        ident => panic!("unknown argument `{}`", ident),
+                    if let Some(existing) = repr {
+                        panic!("`{arg}` conflicts with `{}`", existing.to_string());
                     }
+
+                    repr = Some(match arg.to_string().as_str() {
+                        "tuple" => Repr::Tuple,
+                        "list" => Repr::List,
+                        "curry" => Repr::Curry,
+                        ident => panic!("unknown argument `{}`", ident),
+                    });
                 }
             }
         }
     }
 
     ClvmDeriveArgs {
-        repr: repr.expect(
-            "expected clvm attribute parameter of either `tuple`, `proper_list`, or `curried_args`",
-        ),
+        repr: repr
+            .expect("expected clvm attribute parameter of either `tuple`, `list`, or `curry`"),
     }
 }
 

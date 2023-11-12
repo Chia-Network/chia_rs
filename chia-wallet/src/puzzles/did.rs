@@ -4,7 +4,7 @@ use hex_literal::hex;
 use crate::singleton::SingletonStruct;
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
-#[clvm(curried_args)]
+#[clvm(curry)]
 pub struct DidArgs<I, M> {
     pub inner_puzzle: I,
     pub recovery_did_list_hash: [u8; 32],

@@ -42,9 +42,9 @@ pub fn to_clvm(mut ast: DeriveInput) -> TokenStream {
 
     // `list_macro` encodes a nested tuple containing each of the struct field values within.
     let list_macro = match args.repr {
-        Repr::ProperList => quote!( #crate_name::clvm_list ),
+        Repr::List => quote!( #crate_name::clvm_list ),
         Repr::Tuple => quote!( #crate_name::clvm_tuple ),
-        Repr::CurriedArgs => quote!( #crate_name::clvm_curried_args ),
+        Repr::Curry => quote!( #crate_name::clvm_curried_args ),
     };
 
     let node_type = Ident::new("Node", Span::mixed_site());

@@ -4,13 +4,13 @@ use clvm_utils::{curry_tree_hash, tree_hash_atom};
 use hex_literal::hex;
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
-#[clvm(curried_args)]
+#[clvm(curry)]
 pub struct StandardArgs {
     pub synthetic_key: PublicKey,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
-#[clvm(proper_list)]
+#[clvm(list)]
 pub struct StandardSolution<P, S> {
     pub original_public_key: Option<PublicKey>,
     pub delegated_puzzle: P,

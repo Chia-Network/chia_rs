@@ -43,7 +43,7 @@ impl<'a> Arbitrary<'a> for Proof {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
-#[clvm(proper_list)]
+#[clvm(list)]
 pub struct LineageProof {
     pub parent_coin_info: [u8; 32],
     pub inner_puzzle_hash: [u8; 32],
@@ -51,7 +51,7 @@ pub struct LineageProof {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
-#[clvm(proper_list)]
+#[clvm(list)]
 pub struct EveProof {
     pub parent_coin_info: [u8; 32],
     pub amount: u64,
