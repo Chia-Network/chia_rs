@@ -1,5 +1,9 @@
 use crate::{from_clvm, to_clvm, FromClvm, ToClvm};
 
+/// A wrapper for an intermediate CLVM value. This is required to
+/// implement `ToClvm` and `FromClvm` for `Node`, since the compiler
+/// cannot guarantee that the generic `Node` type doesn't already
+/// implement these traits.
 pub struct Raw<T>(pub T);
 
 impl<Node> FromClvm<Node> for Raw<Node>

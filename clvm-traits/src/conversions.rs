@@ -5,7 +5,9 @@ use clvmr::{
 
 use crate::{ClvmValue, FromClvm, FromClvmError, ToClvm, ToClvmError};
 
+/// A wrapper trait for `ToClvm<NodePtr>` that implements conversion to a `NodePtr`.
 pub trait ToPtr: ToClvm<NodePtr> {
+    /// Allocates the value on a given CLVM allocator, returning the corresponding `NodePtr`.
     fn to_ptr(&self, a: &mut Allocator) -> Result<NodePtr, ToClvmError>;
 }
 
@@ -27,10 +29,12 @@ where
     }
 }
 
+/// A wrapper trait for `FromClvm<NodePtr>` that implements conversion from a `NodePtr`.
 pub trait FromPtr: FromClvm<NodePtr>
 where
     Self: Sized,
 {
+    /// Reconstructs a value from a given CLVM allocator and `NodePtr`.
     fn from_ptr(a: &Allocator, ptr: NodePtr) -> Result<Self, FromClvmError>;
 }
 

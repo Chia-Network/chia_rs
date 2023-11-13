@@ -2,12 +2,14 @@ use std::string::FromUtf8Error;
 
 use thiserror::Error;
 
+/// Any errors that may occur while converting a Rust value to a CLVM value.
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum ToClvmError {
     #[error("limit reached")]
     LimitReached,
 }
 
+/// Any errors that may occur while converting a CLVM value to a Rust value.
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum FromClvmError {
     #[error("invalid utf8")]

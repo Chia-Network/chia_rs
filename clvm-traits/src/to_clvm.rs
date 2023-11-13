@@ -2,6 +2,7 @@ use clvmr::allocator::NodePtr;
 
 use crate::{ClvmValue, ToClvmError};
 
+/// A trait for converting a Rust value to a CLVM value.
 pub trait ToClvm<Node>
 where
     Node: Clone,
