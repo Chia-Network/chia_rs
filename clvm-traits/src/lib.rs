@@ -154,4 +154,33 @@ mod tests {
         check(Enum::B { x: -72 }, "ff0181b8");
         check(Enum::C, "ff0280");
     }
+
+    #[test]
+    fn test_raw_enum() {
+        #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
+        #[clvm(tuple, raw)]
+        enum Enum {
+            A(i32),
+
+            #[clvm(list)]
+            B {
+                x: i32,
+                y: i32,
+            },
+
+            #[clvm(curry)]
+            C {
+                curried_value: String,
+            },
+        }
+
+        check(Enum::A(32), "20");
+        check(Enum::B { x: -72, y: 94 }, "ff81b8ff5e80");
+        check(
+            Enum::C {
+                curried_value: "Hello".to_string(),
+            },
+            "ff04ffff018548656c6c6fff0180",
+        );
+    }
 }

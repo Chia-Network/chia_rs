@@ -6,7 +6,7 @@ use syn::{
 };
 
 use crate::{
-    helpers::{add_trait_bounds, parse_args, Repr},
+    helpers::{add_trait_bounds, expect_repr, parse_args, parse_repr, Repr},
     macros::{repr_macros, Macros},
 };
 
@@ -21,21 +21,26 @@ struct VariantInfo {
     name: Ident,
     value: Expr,
     field_info: FieldInfo,
+    macros: Macros,
 }
 
 pub fn to_clvm(ast: DeriveInput) -> TokenStream {
     let args = parse_args(&ast.attrs);
     let crate_name = quote!(clvm_traits);
-    let macros = repr_macros(&crate_name, args.repr);
 
     match &ast.data {
         Data::Struct(data_struct) => {
+            if args.raw_enum {
+                panic!("cannot use `raw` on a struct");
+            }
+
+            let macros = repr_macros(&crate_name, expect_repr(args.repr));
             let field_info = fields(&data_struct.fields);
             impl_for_struct(&crate_name, &ast, &macros, &field_info)
         }
         Data::Enum(data_enum) => {
-            if args.repr == Repr::Curry {
-                panic!("cannot use `#[clvm(curry)]` on an enum");
+            if !args.raw_enum && args.repr == Some(Repr::Curry) {
+                panic!("cannot use `curry` on an non-raw enum");
             }
 
             let mut next_value: Expr = parse_quote!(0);
@@ -43,12 +48,26 @@ pub fn to_clvm(ast: DeriveInput) -> TokenStream {
 
             for variant in data_enum.variants.iter() {
                 let field_info = fields(&variant.fields);
+                let (repr, raw_enum) = parse_repr(&variant.attrs);
+                if raw_enum {
+                    panic!("cannot use `raw` on an enum variant");
+                }
+                let repr = repr.or(args.repr);
+                if !args.raw_enum && repr == Some(Repr::Curry) {
+                    panic!("cannot use `curry` on an non-raw enum");
+                }
+
+                let macros = repr_macros(&crate_name, expect_repr(repr));
                 let variant_info = VariantInfo {
                     name: variant.ident.clone(),
                     value: variant
                         .discriminant
                         .as_ref()
                         .map(|(_, value)| {
+                            if args.raw_enum {
+                                panic!("cannot use `raw` on an enum variant with explicit discriminant");
+                            }
+
                             next_value = parse_quote!(#value + 1);
                             value.clone()
                         })
@@ -58,11 +77,12 @@ pub fn to_clvm(ast: DeriveInput) -> TokenStream {
                             value
                         }),
                     field_info,
+                    macros,
                 };
                 variants.push(variant_info);
             }
 
-            impl_for_enum(&crate_name, &ast, &macros, &variants)
+            impl_for_enum(&crate_name, &ast, args.raw_enum, &variants)
         }
         _ => panic!("expected an enum or struct"),
     }
@@ -137,7 +157,7 @@ fn impl_for_struct(
 fn impl_for_enum(
     crate_name: &TokenStream,
     ast: &DeriveInput,
-    Macros { clvm_macro, .. }: &Macros,
+    raw_enum: bool,
     variants: &[VariantInfo],
 ) -> TokenStream {
     let node_name = Ident::new("Node", Span::mixed_site());
@@ -152,6 +172,7 @@ fn impl_for_enum(
                 name,
                 value,
                 field_info,
+                macros,
             } = variant_info;
 
             let FieldInfo {
@@ -160,7 +181,15 @@ fn impl_for_enum(
                 ..
             } = field_info;
 
-            if has_initializers {
+            let Macros { clvm_macro, .. } = macros;
+
+            if raw_enum {
+                quote! {
+                    Self::#name #initializer => {
+                        #clvm_macro!( #( #field_names ),* ).to_clvm(f)
+                    }
+                }
+            } else if has_initializers {
                 quote! {
                     Self::#name #initializer => {
                         (#value, #clvm_macro!( #( #field_names ),* )).to_clvm(f)
