@@ -11,6 +11,7 @@ pub struct CurriedProgram<P, A> {
 
 impl<Node, P, A> FromClvm<Node> for CurriedProgram<P, A>
 where
+    Node: Clone,
     P: FromClvm<Node>,
     A: FromClvm<Node>,
 {
@@ -24,6 +25,7 @@ where
 
 impl<Node, P, A> ToClvm<Node> for CurriedProgram<P, A>
 where
+    Node: Clone,
     P: ToClvm<Node>,
     A: ToClvm<Node>,
 {

@@ -47,6 +47,7 @@ mod from_clvm;
 mod macros;
 mod match_byte;
 mod to_clvm;
+mod wrappers;
 
 pub use allocator_ext::*;
 pub use clvm_value::*;
@@ -54,6 +55,7 @@ pub use error::*;
 pub use from_clvm::*;
 pub use match_byte::*;
 pub use to_clvm::*;
+pub use wrappers::*;
 
 #[cfg(test)]
 #[cfg(feature = "derive")]
@@ -94,7 +96,7 @@ mod tests {
     }
 
     #[test]
-    fn test_proper_list() {
+    fn test_list() {
         #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
         #[clvm(list)]
         struct ProperListStruct {
@@ -106,7 +108,7 @@ mod tests {
     }
 
     #[test]
-    fn test_curried_args() {
+    fn test_curry() {
         #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
         #[clvm(curry)]
         struct CurriedArgsStruct {
@@ -136,5 +138,20 @@ mod tests {
         struct NewTypeStruct(String);
 
         check(NewTypeStruct("XYZ".to_string()), "8358595a");
+    }
+
+    #[test]
+    fn test_enum() {
+        #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
+        #[clvm(tuple)]
+        enum Enum {
+            A(i32),
+            B { x: i32 },
+            C,
+        }
+
+        check(Enum::A(32), "ff8020");
+        check(Enum::B { x: -72 }, "ff0181b8");
+        check(Enum::C, "ff0280");
     }
 }

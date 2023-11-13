@@ -1,70 +1,223 @@
 use proc_macro2::{Ident, Span, TokenStream};
-use quote::quote;
-use syn::{parse_quote, Data, DeriveInput, Fields, GenericParam, Index};
+use quote::{quote, ToTokens};
+use syn::{
+    parse_quote, punctuated::Punctuated, spanned::Spanned, Data, DeriveInput, Expr, Fields,
+    FieldsNamed, FieldsUnnamed, GenericParam, Index, TypeParam, TypeParamBound,
+};
 
-use crate::helpers::{add_trait_bounds, parse_args, Repr};
+use crate::{
+    helpers::{add_trait_bounds, parse_args, Repr},
+    macros::{repr_macros, Macros},
+};
 
-pub fn to_clvm(mut ast: DeriveInput) -> TokenStream {
+#[derive(Default)]
+struct FieldInfo {
+    field_names: Vec<Ident>,
+    field_accessors: Vec<TokenStream>,
+    initializer: TokenStream,
+}
+
+struct VariantInfo {
+    name: Ident,
+    value: Expr,
+    field_info: FieldInfo,
+}
+
+pub fn to_clvm(ast: DeriveInput) -> TokenStream {
     let args = parse_args(&ast.attrs);
     let crate_name = quote!(clvm_traits);
-
-    let field_names: Vec<TokenStream>;
+    let macros = repr_macros(&crate_name, args.repr);
 
     match &ast.data {
-        Data::Struct(data_struct) => match &data_struct.fields {
-            Fields::Named(fields) => {
-                let fields = &fields.named;
-                field_names = fields
-                    .iter()
-                    .map(|field| {
-                        let ident = field.ident.clone().unwrap();
-                        quote!(#ident)
-                    })
-                    .collect();
+        Data::Struct(data_struct) => {
+            let field_info = fields(&data_struct.fields);
+            impl_for_struct(&crate_name, &ast, &macros, &field_info)
+        }
+        Data::Enum(data_enum) => {
+            if args.repr == Repr::Curry {
+                panic!("cannot use `#[clvm(curry)]` on an enum");
             }
-            Fields::Unnamed(fields) => {
-                let fields = &fields.unnamed;
-                field_names = fields
-                    .iter()
-                    .enumerate()
-                    .map(|(i, _)| {
-                        let index = Index::from(i);
-                        quote!(#index)
-                    })
-                    .collect();
+
+            let mut next_value: Expr = parse_quote!(0);
+            let mut variants = Vec::new();
+
+            for variant in data_enum.variants.iter() {
+                let field_info = fields(&variant.fields);
+                let variant_info = VariantInfo {
+                    name: variant.ident.clone(),
+                    value: variant
+                        .discriminant
+                        .as_ref()
+                        .map(|(_, value)| {
+                            next_value = parse_quote!(#value + 1);
+                            value.clone()
+                        })
+                        .unwrap_or_else(|| {
+                            let value = next_value.clone();
+                            next_value = parse_quote!(#next_value + 1);
+                            value
+                        }),
+                    field_info,
+                };
+                variants.push(variant_info);
             }
-            Fields::Unit => panic!("unit structs are not supported"),
-        },
-        _ => panic!("expected struct with named or unnamed fields"),
+
+            impl_for_enum(&crate_name, &ast, &macros, &variants)
+        }
+        _ => panic!("expected an enum or struct"),
+    }
+}
+
+fn fields(fields: &Fields) -> FieldInfo {
+    match fields {
+        Fields::Named(fields) => named_fields(fields),
+        Fields::Unnamed(fields) => unnamed_fields(fields),
+        Fields::Unit => FieldInfo::default(),
+    }
+}
+
+fn named_fields(fields: &FieldsNamed) -> FieldInfo {
+    let field_names: Vec<Ident> = fields
+        .named
+        .iter()
+        .map(|field| field.ident.clone().unwrap())
+        .collect();
+    let field_accessors = field_names
+        .iter()
+        .map(|field_name| field_name.clone().to_token_stream())
+        .collect();
+    let initializer = quote!({ #( #field_names, )* });
+
+    FieldInfo {
+        field_names,
+        field_accessors,
+        initializer,
+    }
+}
+
+fn unnamed_fields(fields: &FieldsUnnamed) -> FieldInfo {
+    let field_names: Vec<Ident> = fields
+        .unnamed
+        .iter()
+        .enumerate()
+        .map(|(i, field)| Ident::new(&format!("field_{i}"), field.span()))
+        .collect();
+    let field_accessors = field_names
+        .iter()
+        .enumerate()
+        .map(|(i, _)| Index::from(i).to_token_stream())
+        .collect();
+    let initializer = quote!(( #( #field_names, )* ));
+
+    FieldInfo {
+        field_names,
+        field_accessors,
+        initializer,
+    }
+}
+
+fn impl_for_struct(
+    crate_name: &TokenStream,
+    ast: &DeriveInput,
+    Macros { clvm_macro, .. }: &Macros,
+    FieldInfo {
+        field_accessors, ..
+    }: &FieldInfo,
+) -> TokenStream {
+    let node_name = Ident::new("Node", Span::mixed_site());
+
+    let body = quote! {
+        let value = #clvm_macro!( #( &self.#field_accessors ),* );
+        #crate_name::ToClvm::to_clvm(&value, f)
     };
 
-    let struct_name = &ast.ident;
+    generate_from_clvm(crate_name, ast, &node_name, &body)
+}
 
-    // `list_macro` encodes a nested tuple containing each of the struct field values within.
-    let list_macro = match args.repr {
-        Repr::List => quote!( #crate_name::clvm_list ),
-        Repr::Tuple => quote!( #crate_name::clvm_tuple ),
-        Repr::Curry => quote!( #crate_name::clvm_curried_args ),
+fn impl_for_enum(
+    crate_name: &TokenStream,
+    ast: &DeriveInput,
+    Macros { clvm_macro, .. }: &Macros,
+    variants: &[VariantInfo],
+) -> TokenStream {
+    let node_name = Ident::new("Node", Span::mixed_site());
+    let has_initializers = variants
+        .iter()
+        .any(|variant| !variant.field_info.initializer.is_empty());
+
+    let variant_bodies = variants
+        .iter()
+        .map(|variant_info| {
+            let VariantInfo {
+                name,
+                value,
+                field_info,
+            } = variant_info;
+
+            let FieldInfo {
+                field_names,
+                initializer,
+                ..
+            } = field_info;
+
+            if has_initializers {
+                quote! {
+                    Self::#name #initializer => {
+                        (#value, #clvm_macro!( #( #field_names ),* )).to_clvm(f)
+                    }
+                }
+            } else {
+                quote! {
+                    Self::#name => {
+                        (#value).to_clvm(f)
+                    }
+                }
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let body = quote! {
+
+        match self {
+            #( #variant_bodies )*
+        }
     };
 
-    let node_type = Ident::new("Node", Span::mixed_site());
+    generate_from_clvm(crate_name, ast, &node_name, &body)
+}
+
+fn generate_from_clvm(
+    crate_name: &TokenStream,
+    ast: &DeriveInput,
+    node_name: &Ident,
+    body: &TokenStream,
+) -> TokenStream {
+    let mut ast = ast.clone();
+    let item_name = ast.ident;
+
     add_trait_bounds(
         &mut ast.generics,
-        parse_quote!(#crate_name::ToClvm<#node_type>),
+        parse_quote!(#crate_name::ToClvm<#node_name>),
     );
+
     let generics_clone = ast.generics.clone();
     let (_, ty_generics, where_clause) = generics_clone.split_for_impl();
-    ast.generics
-        .params
-        .push(GenericParam::Type(node_type.clone().into()));
+
+    ast.generics.params.push(GenericParam::Type(TypeParam {
+        ident: node_name.clone(),
+        attrs: Vec::new(),
+        colon_token: None,
+        bounds: Punctuated::from_iter([TypeParamBound::Trait(parse_quote!(::std::clone::Clone))]),
+        eq_token: None,
+        default: None,
+    }));
     let (impl_generics, _, _) = ast.generics.split_for_impl();
 
     quote! {
         #[automatically_derived]
-        impl #impl_generics #crate_name::ToClvm<#node_type> for #struct_name #ty_generics #where_clause {
+        impl #impl_generics #crate_name::ToClvm<#node_name> for #item_name #ty_generics #where_clause {
             #crate_name::to_clvm!(Node, self, f, {
-                let value = #list_macro!( #( &self.#field_names ),* );
-                #crate_name::ToClvm::to_clvm(&value, f)
+                #body
             });
         }
     }

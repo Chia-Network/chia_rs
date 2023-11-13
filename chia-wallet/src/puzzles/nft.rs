@@ -1,5 +1,5 @@
 use arbitrary::Arbitrary;
-use clvm_traits::{from_clvm, to_clvm, FromClvm, ToClvm};
+use clvm_traits::{from_clvm, to_clvm, FromClvm, Raw, ToClvm};
 use hex_literal::hex;
 
 use crate::singleton::SingletonStruct;
@@ -79,13 +79,13 @@ impl Default for NftMetadata {
 
 impl<Node> FromClvm<Node> for NftMetadata
 where
-    Node: FromClvm<Node>,
+    Node: Clone,
 {
     from_clvm!(Node, f, ptr, {
-        let items = Vec::<(String, Node)>::from_clvm(f, ptr)?;
+        let items = Vec::<(String, Raw<Node>)>::from_clvm(f, ptr)?;
         let mut metadata = Self::default();
 
-        for (key, ref ptr) in items {
+        for (key, Raw(ptr)) in items {
             match key.as_str() {
                 "sn" => metadata.edition_number = FromClvm::from_clvm(f, ptr)?,
                 "st" => metadata.edition_total = FromClvm::from_clvm(f, ptr)?,
@@ -105,38 +105,38 @@ where
 
 impl<Node> ToClvm<Node> for NftMetadata
 where
-    Node: ToClvm<Node>,
+    Node: Clone,
 {
     to_clvm!(Node, self, f, {
-        let mut items: Vec<(&str, Node)> = Vec::new();
+        let mut items: Vec<(&str, Raw<Node>)> = Vec::new();
 
         if !self.data_uris.is_empty() {
-            items.push(("u", self.data_uris.to_clvm(f)?));
+            items.push(("u", Raw(self.data_uris.to_clvm(f)?)));
         }
 
         if let Some(hash) = self.data_hash {
-            items.push(("h", hash.to_clvm(f)?));
+            items.push(("h", Raw(hash.to_clvm(f)?)));
         }
 
         if !self.metadata_uris.is_empty() {
-            items.push(("mu", self.metadata_uris.to_clvm(f)?));
+            items.push(("mu", Raw(self.metadata_uris.to_clvm(f)?)));
         }
 
         if let Some(hash) = self.metadata_hash {
-            items.push(("mh", hash.to_clvm(f)?));
+            items.push(("mh", Raw(hash.to_clvm(f)?)));
         }
 
         if !self.license_uris.is_empty() {
-            items.push(("lu", self.license_uris.to_clvm(f)?));
+            items.push(("lu", Raw(self.license_uris.to_clvm(f)?)));
         }
 
         if let Some(hash) = self.license_hash {
-            items.push(("lh", hash.to_clvm(f)?));
+            items.push(("lh", Raw(hash.to_clvm(f)?)));
         }
 
         items.extend(vec![
-            ("sn", self.edition_number.to_clvm(f)?),
-            ("st", self.edition_total.to_clvm(f)?),
+            ("sn", Raw(self.edition_number.to_clvm(f)?)),
+            ("st", Raw(self.edition_total.to_clvm(f)?)),
         ]);
 
         items.to_clvm(f)

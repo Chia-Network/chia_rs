@@ -10,6 +10,9 @@ macro_rules! clvm_list {
 
 #[macro_export]
 macro_rules! clvm_tuple {
+    () => {
+        ()
+    };
     ( $first:expr $(,)? ) => {
         $first
     };
@@ -47,6 +50,9 @@ macro_rules! match_list {
 
 #[macro_export]
 macro_rules! match_tuple {
+    () => {
+        ()
+    };
     ( $first:ty $(,)? ) => {
         $first
     };
@@ -90,6 +96,9 @@ macro_rules! destructure_list {
 
 #[macro_export]
 macro_rules! destructure_tuple {
+    () => {
+        _
+    };
     ( $first:pat $(,)? ) => {
         $first
     };

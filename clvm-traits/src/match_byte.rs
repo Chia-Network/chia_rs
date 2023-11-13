@@ -3,7 +3,10 @@ use crate::{from_clvm, simplify_int_bytes, to_clvm, ClvmValue, FromClvm, FromClv
 #[derive(Debug, Copy, Clone)]
 pub struct MatchByte<const BYTE: u8>;
 
-impl<Node, const BYTE: u8> ToClvm<Node> for MatchByte<BYTE> {
+impl<Node, const BYTE: u8> ToClvm<Node> for MatchByte<BYTE>
+where
+    Node: Clone,
+{
     to_clvm!(Node, self, f, {
         let bytes = BYTE.to_be_bytes();
         let slice = simplify_int_bytes(&bytes);
@@ -11,9 +14,12 @@ impl<Node, const BYTE: u8> ToClvm<Node> for MatchByte<BYTE> {
     });
 }
 
-impl<Node, const BYTE: u8> FromClvm<Node> for MatchByte<BYTE> {
+impl<Node, const BYTE: u8> FromClvm<Node> for MatchByte<BYTE>
+where
+    Node: Clone,
+{
     from_clvm!(Node, f, ptr, {
-        match f(ptr) {
+        match f(&ptr) {
             ClvmValue::Atom(&[]) if BYTE == 0 => Ok(Self),
             ClvmValue::Atom(&[byte]) if byte == BYTE && BYTE > 0 => Ok(Self),
             ClvmValue::Atom(..) => Err(FromClvmError::Invalid(format!("expected {BYTE}"))),

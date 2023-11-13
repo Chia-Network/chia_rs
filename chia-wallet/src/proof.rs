@@ -7,15 +7,21 @@ pub enum Proof {
     Eve(EveProof),
 }
 
-impl<Node> FromClvm<Node> for Proof {
+impl<Node> FromClvm<Node> for Proof
+where
+    Node: Clone,
+{
     from_clvm!(Node, f, ptr, {
-        LineageProof::from_clvm(f, ptr)
+        LineageProof::from_clvm(f, ptr.clone())
             .map(Self::Lineage)
             .or_else(|_| EveProof::from_clvm(f, ptr).map(Self::Eve))
     });
 }
 
-impl<Node> ToClvm<Node> for Proof {
+impl<Node> ToClvm<Node> for Proof
+where
+    Node: Clone,
+{
     to_clvm!(Node, self, f, {
         match self {
             Self::Lineage(lineage_proof) => lineage_proof.to_clvm(f),

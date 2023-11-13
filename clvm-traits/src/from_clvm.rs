@@ -2,10 +2,13 @@ use clvmr::allocator::NodePtr;
 
 use crate::{ClvmValue, FromClvmError};
 
-pub trait FromClvm<Node>: Sized {
+pub trait FromClvm<Node>: Sized
+where
+    Node: Clone,
+{
     fn from_clvm<'a>(
         f: &mut impl FnMut(&Node) -> ClvmValue<'a, Node>,
-        ptr: &Node,
+        ptr: Node,
     ) -> Result<Self, FromClvmError>;
 }
 
@@ -15,7 +18,7 @@ macro_rules! from_clvm {
         #[allow(unused_mut)]
         fn from_clvm<'a>(
             mut $f: &mut impl FnMut(&$node) -> $crate::ClvmValue<'a, $node>,
-            $ptr: &$node,
+            mut $ptr: $node,
         ) -> ::std::result::Result<Self, $crate::FromClvmError> {
             $( $block )*
         }
@@ -24,9 +27,12 @@ macro_rules! from_clvm {
 
 macro_rules! clvm_ints {
     ($int:ty) => {
-        impl<Node> FromClvm<Node> for $int {
+        impl<Node> FromClvm<Node> for $int
+        where
+            Node: Clone,
+        {
             from_clvm!(Node, f, ptr, {
-                if let ClvmValue::Atom(bytes) = f(ptr) {
+                if let ClvmValue::Atom(bytes) = f(&ptr) {
                     const LEN: usize = std::mem::size_of::<$int>();
                     if bytes.len() > LEN {
                         return Err(FromClvmError::ValueTooLarge);
@@ -62,18 +68,19 @@ clvm_ints!(usize);
 clvm_ints!(isize);
 
 impl FromClvm<NodePtr> for NodePtr {
-    from_clvm!(NodePtr, _f, ptr, { Ok(*ptr) });
+    from_clvm!(NodePtr, _f, ptr, { Ok(ptr) });
 }
 
 impl<Node, A, B> FromClvm<Node> for (A, B)
 where
+    Node: Clone,
     A: FromClvm<Node>,
     B: FromClvm<Node>,
 {
     from_clvm!(Node, f, ptr, {
-        if let ClvmValue::Pair(first, rest) = f(ptr) {
-            let first = A::from_clvm(f, &first)?;
-            let rest = B::from_clvm(f, &rest)?;
+        if let ClvmValue::Pair(first, rest) = f(&ptr) {
+            let first = A::from_clvm(f, first)?;
+            let rest = B::from_clvm(f, rest)?;
             Ok((first, rest))
         } else {
             Err(FromClvmError::ExpectedPair)
@@ -81,9 +88,12 @@ where
     });
 }
 
-impl<Node> FromClvm<Node> for () {
+impl<Node> FromClvm<Node> for ()
+where
+    Node: Clone,
+{
     from_clvm!(Node, f, ptr, {
-        if let ClvmValue::Atom(&[]) = f(ptr) {
+        if let ClvmValue::Atom(&[]) = f(&ptr) {
             Ok(())
         } else {
             Err(FromClvmError::ExpectedNil)
@@ -93,13 +103,13 @@ impl<Node> FromClvm<Node> for () {
 
 impl<Node, T, const N: usize> FromClvm<Node> for [T; N]
 where
+    Node: Clone,
     T: FromClvm<Node>,
 {
     from_clvm!(Node, f, ptr, {
-        let mut next = None;
         let mut items = Vec::with_capacity(N);
         loop {
-            match f(next.as_ref().unwrap_or(ptr)) {
+            match f(&ptr) {
                 ClvmValue::Atom(&[]) => {
                     return items.try_into().map_err(|_| FromClvmError::ExpectedPair);
                 }
@@ -110,8 +120,8 @@ where
                     if items.len() == N {
                         return Err(FromClvmError::ExpectedAtom);
                     } else {
-                        items.push(T::from_clvm(f, &first)?);
-                        next = Some(rest);
+                        items.push(T::from_clvm(f, first)?);
+                        ptr = rest;
                     }
                 }
             }
@@ -121,13 +131,13 @@ where
 
 impl<Node, T> FromClvm<Node> for Vec<T>
 where
+    Node: Clone,
     T: FromClvm<Node>,
 {
     from_clvm!(Node, f, ptr, {
-        let mut next = None;
         let mut items = Vec::new();
         loop {
-            match f(next.as_ref().unwrap_or(ptr)) {
+            match f(&ptr) {
                 ClvmValue::Atom(&[]) => {
                     return Ok(items);
                 }
@@ -135,8 +145,8 @@ where
                     return Err(FromClvmError::ExpectedNil);
                 }
                 ClvmValue::Pair(first, rest) => {
-                    items.push(T::from_clvm(f, &first)?);
-                    next = Some(rest);
+                    items.push(T::from_clvm(f, first)?);
+                    ptr = rest;
                 }
             }
         }
@@ -145,10 +155,11 @@ where
 
 impl<Node, T> FromClvm<Node> for Option<T>
 where
+    Node: Clone,
     T: FromClvm<Node>,
 {
     from_clvm!(Node, f, ptr, {
-        if let ClvmValue::Atom(&[]) = f(ptr) {
+        if let ClvmValue::Atom(&[]) = f(&ptr) {
             Ok(None)
         } else {
             Ok(Some(T::from_clvm(f, ptr)?))
@@ -156,9 +167,12 @@ where
     });
 }
 
-impl<Node> FromClvm<Node> for String {
+impl<Node> FromClvm<Node> for String
+where
+    Node: Clone,
+{
     from_clvm!(Node, f, ptr, {
-        if let ClvmValue::Atom(bytes) = f(ptr) {
+        if let ClvmValue::Atom(bytes) = f(&ptr) {
             Ok(Self::from_utf8(bytes.to_vec())?)
         } else {
             Err(FromClvmError::ExpectedAtom)

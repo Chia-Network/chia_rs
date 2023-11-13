@@ -51,13 +51,19 @@ impl Coin {
     }
 }
 
-impl<Node> ToClvm<Node> for Coin {
+impl<Node> ToClvm<Node> for Coin
+where
+    Node: Clone,
+{
     to_clvm!(Node, self, f, {
         clvm_list!(self.parent_coin_info, self.puzzle_hash, self.amount).to_clvm(f)
     });
 }
 
-impl<Node> FromClvm<Node> for Coin {
+impl<Node> FromClvm<Node> for Coin
+where
+    Node: Clone,
+{
     from_clvm!(Node, f, ptr, {
         let destructure_list!(parent_coin_info, puzzle_hash, amount) =
             <match_list!(BytesImpl<32>, BytesImpl<32>, u64)>::from_clvm(f, ptr)?;

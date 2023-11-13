@@ -35,7 +35,7 @@ impl AllocatorExt for Allocator {
                 SExp::Atom => ClvmValue::Atom(self.atom(*ptr)),
                 SExp::Pair(first, rest) => ClvmValue::Pair(first, rest),
             },
-            &ptr,
+            ptr,
         )
     }
 }

@@ -2,7 +2,10 @@ use clvmr::allocator::NodePtr;
 
 use crate::{ClvmValue, ToClvmError};
 
-pub trait ToClvm<Node> {
+pub trait ToClvm<Node>
+where
+    Node: Clone,
+{
     fn to_clvm(
         &self,
         f: &mut impl FnMut(ClvmValue<Node>) -> Result<Node, ToClvmError>,
@@ -45,7 +48,10 @@ pub fn simplify_int_bytes(bytes: &[u8]) -> &[u8] {
 
 macro_rules! clvm_ints {
     ($int:ty) => {
-        impl<Node> ToClvm<Node> for $int {
+        impl<Node> ToClvm<Node> for $int
+        where
+            Node: Clone,
+        {
             to_clvm!(Node, self, f, {
                 let bytes = self.to_be_bytes();
                 let slice = simplify_int_bytes(&bytes);
@@ -74,6 +80,7 @@ impl ToClvm<NodePtr> for NodePtr {
 
 impl<Node, T> ToClvm<Node> for &T
 where
+    Node: Clone,
     T: ToClvm<Node>,
 {
     to_clvm!(Node, self, f, { (*self).to_clvm(f) });
@@ -81,6 +88,7 @@ where
 
 impl<Node, A, B> ToClvm<Node> for (A, B)
 where
+    Node: Clone,
     A: ToClvm<Node>,
     B: ToClvm<Node>,
 {
@@ -91,12 +99,16 @@ where
     });
 }
 
-impl<Node> ToClvm<Node> for () {
+impl<Node> ToClvm<Node> for ()
+where
+    Node: Clone,
+{
     to_clvm!(Node, self, f, { f(ClvmValue::Atom(&[])) });
 }
 
 impl<Node, T> ToClvm<Node> for &[T]
 where
+    Node: Clone,
     T: ToClvm<Node>,
 {
     to_clvm!(Node, self, f, {
@@ -111,6 +123,7 @@ where
 
 impl<Node, T, const N: usize> ToClvm<Node> for [T; N]
 where
+    Node: Clone,
     T: ToClvm<Node>,
 {
     to_clvm!(Node, self, f, { self.as_slice().to_clvm(f) });
@@ -118,6 +131,7 @@ where
 
 impl<Node, T> ToClvm<Node> for Vec<T>
 where
+    Node: Clone,
     T: ToClvm<Node>,
 {
     to_clvm!(Node, self, f, { self.as_slice().to_clvm(f) });
@@ -125,6 +139,7 @@ where
 
 impl<Node, T> ToClvm<Node> for Option<T>
 where
+    Node: Clone,
     T: ToClvm<Node>,
 {
     to_clvm!(Node, self, f, {
@@ -135,11 +150,17 @@ where
     });
 }
 
-impl<Node> ToClvm<Node> for &str {
+impl<Node> ToClvm<Node> for &str
+where
+    Node: Clone,
+{
     to_clvm!(Node, self, f, { f(ClvmValue::Atom(self.as_bytes())) });
 }
 
-impl<Node> ToClvm<Node> for String {
+impl<Node> ToClvm<Node> for String
+where
+    Node: Clone,
+{
     to_clvm!(Node, self, f, { self.as_str().to_clvm(f) });
 }
 

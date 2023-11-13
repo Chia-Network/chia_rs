@@ -20,6 +20,7 @@ pub enum DidSolution<T> {
 
 impl<Node, T> FromClvm<Node> for DidSolution<T>
 where
+    Node: Clone,
     T: FromClvm<Node>,
 {
     from_clvm!(Node, f, ptr, {
@@ -37,6 +38,7 @@ where
 
 impl<Node, T> ToClvm<Node> for DidSolution<T>
 where
+    Node: Clone,
     T: ToClvm<Node>,
 {
     to_clvm!(Node, self, f, {

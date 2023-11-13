@@ -384,9 +384,12 @@ impl DerivableKey for PublicKey {
     }
 }
 
-impl<Node> FromClvm<Node> for PublicKey {
+impl<Node> FromClvm<Node> for PublicKey
+where
+    Node: Clone,
+{
     from_clvm!(Node, f, ptr, {
-        let ClvmValue::Atom(bytes) = f(ptr) else {
+        let ClvmValue::Atom(bytes) = f(&ptr) else {
             return Err(FromClvmError::ExpectedAtom);
         };
 
@@ -400,7 +403,10 @@ impl<Node> FromClvm<Node> for PublicKey {
     });
 }
 
-impl<Node> ToClvm<Node> for PublicKey {
+impl<Node> ToClvm<Node> for PublicKey
+where
+    Node: Clone,
+{
     to_clvm!(Node, self, f, { f(ClvmValue::Atom(&self.to_bytes())) });
 }
 

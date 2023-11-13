@@ -1,5 +1,7 @@
-use proc_macro2::Ident;
-use syn::{punctuated::Punctuated, Attribute, GenericParam, Generics, Token, TypeParamBound};
+use proc_macro2::{Ident, Span};
+use syn::{
+    ext::IdentExt, punctuated::Punctuated, Attribute, GenericParam, Generics, Token, TypeParamBound,
+};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Repr {
@@ -20,30 +22,38 @@ impl ToString for Repr {
 
 pub struct ClvmDeriveArgs {
     pub repr: Repr,
+    pub int_repr: Ident,
 }
 
 pub fn parse_args(attrs: &[Attribute]) -> ClvmDeriveArgs {
     let mut repr: Option<Repr> = None;
+    let mut int_repr: Option<Ident> = None;
 
     for attr in attrs {
         if let Some(ident) = attr.path().get_ident() {
-            if ident == "clvm" {
-                let args = attr
-                    .parse_args_with(Punctuated::<Ident, Token![,]>::parse_terminated)
-                    .unwrap();
+            match ident.to_string().as_str() {
+                "clvm" => {
+                    let args = attr
+                        .parse_args_with(Punctuated::<Ident, Token![,]>::parse_terminated)
+                        .unwrap();
 
-                for arg in args {
-                    if let Some(existing) = repr {
-                        panic!("`{arg}` conflicts with `{}`", existing.to_string());
+                    for arg in args {
+                        if let Some(existing) = repr {
+                            panic!("`{arg}` conflicts with `{}`", existing.to_string());
+                        }
+
+                        repr = Some(match arg.to_string().as_str() {
+                            "tuple" => Repr::Tuple,
+                            "list" => Repr::List,
+                            "curry" => Repr::Curry,
+                            ident => panic!("unknown argument `{}`", ident),
+                        });
                     }
-
-                    repr = Some(match arg.to_string().as_str() {
-                        "tuple" => Repr::Tuple,
-                        "list" => Repr::List,
-                        "curry" => Repr::Curry,
-                        ident => panic!("unknown argument `{}`", ident),
-                    });
                 }
+                "repr" => {
+                    int_repr = Some(attr.parse_args_with(Ident::parse_any).unwrap());
+                }
+                _ => {}
             }
         }
     }
@@ -51,6 +61,7 @@ pub fn parse_args(attrs: &[Attribute]) -> ClvmDeriveArgs {
     ClvmDeriveArgs {
         repr: repr
             .expect("expected clvm attribute parameter of either `tuple`, `list`, or `curry`"),
+        int_repr: int_repr.unwrap_or(Ident::new("isize", Span::call_site())),
     }
 }
 

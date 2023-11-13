@@ -93,13 +93,19 @@ impl FromJsonDict for Bytes {
     }
 }
 
-impl<Node> ToClvm<Node> for Bytes {
+impl<Node> ToClvm<Node> for Bytes
+where
+    Node: Clone,
+{
     to_clvm!(Node, self, f, { f(ClvmValue::Atom(self.0.as_slice())) });
 }
 
-impl<Node> FromClvm<Node> for Bytes {
+impl<Node> FromClvm<Node> for Bytes
+where
+    Node: Clone,
+{
     from_clvm!(Node, f, ptr, {
-        if let ClvmValue::Atom(bytes) = f(ptr) {
+        if let ClvmValue::Atom(bytes) = f(&ptr) {
             Ok(Self(bytes.to_vec()))
         } else {
             Err(FromClvmError::ExpectedAtom)
@@ -197,13 +203,19 @@ impl<const N: usize> Streamable for BytesImpl<N> {
     }
 }
 
-impl<Node, const N: usize> ToClvm<Node> for BytesImpl<N> {
+impl<Node, const N: usize> ToClvm<Node> for BytesImpl<N>
+where
+    Node: Clone,
+{
     to_clvm!(Node, self, f, { f(ClvmValue::Atom(self.0.as_slice())) });
 }
 
-impl<Node, const N: usize> FromClvm<Node> for BytesImpl<N> {
+impl<Node, const N: usize> FromClvm<Node> for BytesImpl<N>
+where
+    Node: Clone,
+{
     from_clvm!(Node, f, ptr, {
-        let ClvmValue::Atom(bytes) = f(ptr) else {
+        let ClvmValue::Atom(bytes) = f(&ptr) else {
             return Err(FromClvmError::ExpectedAtom);
         };
 
