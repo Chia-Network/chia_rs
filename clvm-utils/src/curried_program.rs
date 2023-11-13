@@ -38,28 +38,28 @@ where
 mod tests {
     use std::fmt::Debug;
 
-    use clvm_traits::{clvm_curried_args, AllocatorExt};
-    use clvmr::{allocator::NodePtr, serde::node_to_bytes, Allocator};
+    use clvm_traits::{clvm_curried_args, FromPtr, ToPtr};
+    use clvmr::{serde::node_to_bytes, Allocator};
 
     use super::*;
 
     fn check<P, A>(program: P, args: A, expected: &str)
     where
-        P: Debug + Clone + PartialEq + ToClvm<NodePtr> + FromClvm<NodePtr>,
-        A: Debug + Clone + PartialEq + ToClvm<NodePtr> + FromClvm<NodePtr>,
+        P: Debug + Clone + PartialEq + ToPtr + FromPtr,
+        A: Debug + Clone + PartialEq + ToPtr + FromPtr,
     {
         let a = &mut Allocator::new();
 
-        let curry = a
-            .value_to_ptr(CurriedProgram {
-                program: program.clone(),
-                args: args.clone(),
-            })
-            .unwrap();
+        let curry = CurriedProgram {
+            program: program.clone(),
+            args: args.clone(),
+        }
+        .to_ptr(a)
+        .unwrap();
         let actual = node_to_bytes(a, curry).unwrap();
         assert_eq!(hex::encode(actual), expected);
 
-        let curried: CurriedProgram<P, A> = a.value_from_ptr(curry).unwrap();
+        let curried: CurriedProgram<P, A> = FromPtr::from_ptr(a, curry).unwrap();
         assert_eq!(curried.program, program);
         assert_eq!(curried.args, args);
     }

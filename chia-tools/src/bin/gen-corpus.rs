@@ -6,13 +6,12 @@
 use chia_protocol::Bytes;
 use clap::Parser;
 
-use chia_tools::{iterate_tx_blocks, visit_spends};
-use chia_traits::streamable::Streamable;
-
 use chia_protocol::bytes::Bytes32;
 use chia_protocol::{coin::Coin, coin_spend::CoinSpend, program::Program};
+use chia_tools::{iterate_tx_blocks, visit_spends};
+use chia_traits::streamable::Streamable;
 use chia_wallet::singleton::SINGLETON_TOP_LAYER_PUZZLE_HASH;
-use clvm_traits::AllocatorExt;
+use clvm_traits::FromPtr;
 use clvm_utils::{tree_hash, CurriedProgram};
 use clvmr::allocator::NodePtr;
 use clvmr::serde::node_to_bytes;
@@ -76,11 +75,11 @@ fn main() {
                     max_cost,
                     |a, parent_coin_info, amount, puzzle, solution| {
                         let puzzle_hash = Bytes32::from(tree_hash(a, puzzle));
-                        let mod_hash =
-                            match a.value_from_ptr::<CurriedProgram<NodePtr, NodePtr>>(puzzle) {
-                                Ok(uncurried) => Bytes32::from(tree_hash(a, uncurried.program)),
-                                _ => puzzle_hash,
-                            };
+                        let mod_hash = match <CurriedProgram<NodePtr, NodePtr>>::from_ptr(a, puzzle)
+                        {
+                            Ok(uncurried) => Bytes32::from(tree_hash(a, uncurried.program)),
+                            _ => puzzle_hash,
+                        };
 
                         let run_puzzle = seen_puzzles.lock().unwrap().insert(mod_hash);
                         let fast_forward = (mod_hash == SINGLETON_TOP_LAYER_PUZZLE_HASH)

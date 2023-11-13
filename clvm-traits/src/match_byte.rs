@@ -32,28 +32,28 @@ where
 mod tests {
     use clvmr::Allocator;
 
-    use crate::AllocatorExt;
+    use crate::{FromPtr, ToPtr};
 
     use super::*;
 
     #[test]
     fn test_zero() {
         let a = &mut Allocator::new();
-        let atom = a.value_to_ptr(MatchByte::<0>).unwrap();
-        a.value_from_ptr::<MatchByte<0>>(atom).unwrap();
+        let atom = MatchByte::<0>.to_ptr(a).unwrap();
+        <MatchByte<0>>::from_ptr(a, atom).unwrap();
     }
 
     #[test]
     fn test_one() {
         let a = &mut Allocator::new();
-        let atom = a.value_to_ptr(MatchByte::<1>).unwrap();
-        a.value_from_ptr::<MatchByte<1>>(atom).unwrap();
+        let atom = MatchByte::<1>.to_ptr(a).unwrap();
+        <MatchByte<1>>::from_ptr(a, atom).unwrap();
     }
 
     #[test]
     fn test_max() {
         let a = &mut Allocator::new();
-        let atom = a.value_to_ptr(MatchByte::<255>).unwrap();
-        a.value_from_ptr::<MatchByte<255>>(atom).unwrap();
+        let atom = MatchByte::<255>.to_ptr(a).unwrap();
+        <MatchByte<255>>::from_ptr(a, atom).unwrap();
     }
 }

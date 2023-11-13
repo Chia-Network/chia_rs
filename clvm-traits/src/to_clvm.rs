@@ -169,15 +169,15 @@ mod tests {
     use clvmr::{serde::node_to_bytes, Allocator};
     use hex::ToHex;
 
-    use crate::AllocatorExt;
+    use crate::ToPtr;
 
     use super::*;
 
     fn encode<T>(a: &mut Allocator, value: T) -> Result<String, ToClvmError>
     where
-        T: ToClvm<NodePtr>,
+        T: ToPtr,
     {
-        let actual = a.value_to_ptr(value).unwrap();
+        let actual = value.to_ptr(a).unwrap();
         let actual_bytes = node_to_bytes(a, actual).unwrap();
         Ok(actual_bytes.encode_hex())
     }
@@ -186,7 +186,7 @@ mod tests {
     fn test_nodeptr() {
         let a = &mut Allocator::new();
         let ptr = a.one();
-        assert_eq!(a.value_to_ptr(ptr).unwrap(), ptr);
+        assert_eq!(ptr.to_ptr(a).unwrap(), ptr);
     }
 
     #[test]

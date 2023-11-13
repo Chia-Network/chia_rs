@@ -431,7 +431,7 @@ impl<'py> FromPyObject<'py> for Bytes {
 mod tests {
     use super::*;
 
-    use clvm_traits::AllocatorExt;
+    use clvm_traits::{FromPtr, ToPtr};
     use clvmr::{
         serde::{node_from_bytes, node_to_bytes},
         Allocator,
@@ -675,9 +675,9 @@ mod tests {
         let expected_bytes = hex::decode(expected).unwrap();
 
         let ptr = node_from_bytes(a, &expected_bytes).unwrap();
-        let bytes = a.value_from_ptr::<Bytes>(ptr).unwrap();
+        let bytes = Bytes::from_ptr(a, ptr).unwrap();
 
-        let round_trip = a.value_to_ptr(bytes).unwrap();
+        let round_trip = bytes.to_ptr(a).unwrap();
         assert_eq!(expected, hex::encode(node_to_bytes(a, round_trip).unwrap()));
     }
 
@@ -688,9 +688,9 @@ mod tests {
         let expected_bytes = hex::decode(expected).unwrap();
 
         let ptr = node_from_bytes(a, &expected_bytes).unwrap();
-        let bytes32 = a.value_from_ptr::<Bytes32>(ptr).unwrap();
+        let bytes32 = Bytes32::from_ptr(a, ptr).unwrap();
 
-        let round_trip = a.value_to_ptr(bytes32).unwrap();
+        let round_trip = bytes32.to_ptr(a).unwrap();
         assert_eq!(expected, hex::encode(node_to_bytes(a, round_trip).unwrap()));
     }
 
@@ -700,11 +700,11 @@ mod tests {
         let bytes =
             hex::decode("f07522495060c066f66f32acc2a77e3a3e737aca8baea4d1a64ea4cdc13da9").unwrap();
         let ptr = a.new_atom(&bytes).unwrap();
-        assert!(a.value_from_ptr::<Bytes32>(ptr).is_err());
+        assert!(Bytes32::from_ptr(a, ptr).is_err());
 
         let ptr = a.new_pair(a.one(), a.one()).unwrap();
         assert_eq!(
-            a.value_from_ptr::<Bytes32>(ptr).unwrap_err(),
+            Bytes32::from_ptr(a, ptr).unwrap_err(),
             FromClvmError::ExpectedAtom
         );
     }

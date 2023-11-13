@@ -437,7 +437,7 @@ pub fn hash_to_g1_with_dst(msg: &[u8], dst: &[u8]) -> PublicKey {
 mod tests {
     use super::*;
     use crate::SecretKey;
-    use clvm_traits::AllocatorExt;
+    use clvm_traits::{FromPtr, ToPtr};
     use clvmr::Allocator;
     use hex::FromHex;
     use rand::rngs::StdRng;
@@ -614,10 +614,10 @@ mod tests {
         let bytes = hex::decode("997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2").expect("hex::decode()");
         let ptr = a.new_atom(&bytes).expect("new_atom");
 
-        let pk = a.value_from_ptr::<PublicKey>(ptr).expect("from_clvm");
+        let pk = PublicKey::from_ptr(&a, ptr).expect("from_clvm");
         assert_eq!(pk.to_bytes(), &bytes[..]);
 
-        let pk_ptr = a.value_to_ptr(pk).expect("to_clvm");
+        let pk_ptr = pk.to_ptr(&mut a).expect("to_clvm");
         assert!(a.atom_eq(pk_ptr, ptr));
     }
 
@@ -626,7 +626,7 @@ mod tests {
         let mut a = Allocator::new();
         let ptr = a.new_pair(a.one(), a.one()).expect("new_pair");
         assert_eq!(
-            a.value_from_ptr::<PublicKey>(ptr).unwrap_err(),
+            PublicKey::from_ptr(&a, ptr).unwrap_err(),
             FromClvmError::ExpectedAtom
         );
     }

@@ -5,17 +5,18 @@
 //!
 //! ```rust
 //! use clvm_utils::CurriedProgram;
-//! use clvm_traits::{AllocatorExt, ToClvm, clvm_curried_args};
+//! use clvm_traits::{ToClvm, ToPtr, clvm_curried_args};
 //! use clvmr::{Allocator, serde::node_to_bytes};
 //!
 //! let a = &mut Allocator::new();
 //!
 //! let program = a.one();
 //!
-//! let ptr = a.value_to_ptr(CurriedProgram {
+//! let ptr = CurriedProgram {
 //!     program,
 //!     args: clvm_curried_args!(42, 75),
-//! })
+//! }
+//! .to_ptr(a)
 //! .unwrap();
 //!
 //! let hex = hex::encode(node_to_bytes(a, ptr).unwrap());

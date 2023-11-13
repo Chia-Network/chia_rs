@@ -184,24 +184,24 @@ where
 mod tests {
     use clvmr::{serde::node_from_bytes, Allocator};
 
-    use crate::AllocatorExt;
+    use crate::FromPtr;
 
     use super::*;
 
     fn decode<T>(a: &mut Allocator, hex: &str) -> Result<T, FromClvmError>
     where
-        T: FromClvm<NodePtr>,
+        T: FromPtr,
     {
         let bytes = hex::decode(hex).unwrap();
         let actual = node_from_bytes(a, &bytes).unwrap();
-        a.value_from_ptr(actual)
+        T::from_ptr(a, actual)
     }
 
     #[test]
     fn test_nodeptr() {
         let a = &mut Allocator::new();
         let ptr = a.one();
-        let value: NodePtr = a.value_from_ptr(ptr).unwrap();
+        let value = NodePtr::from_ptr(a, ptr).unwrap();
         assert_eq!(value, ptr);
     }
 

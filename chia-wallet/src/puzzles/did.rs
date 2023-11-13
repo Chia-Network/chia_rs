@@ -95,7 +95,7 @@ pub static DID_INNER_PUZZLE_HASH: [u8; 32] = hex!(
 
 #[cfg(test)]
 mod tests {
-    use clvm_traits::AllocatorExt;
+    use clvm_traits::{FromPtr, ToPtr};
     use clvmr::Allocator;
 
     use super::*;
@@ -111,8 +111,8 @@ mod tests {
     fn did_solution() {
         let a = &mut Allocator::new();
         let did_solution = DidSolution::InnerSpend(());
-        let ptr = a.value_to_ptr(&did_solution).unwrap();
-        let roundtrip = a.value_from_ptr::<DidSolution<()>>(ptr).unwrap();
+        let ptr = did_solution.to_ptr(a).unwrap();
+        let roundtrip: DidSolution<()> = FromPtr::from_ptr(a, ptr).unwrap();
         assert_eq!(did_solution, roundtrip);
     }
 }

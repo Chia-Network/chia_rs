@@ -2,7 +2,8 @@ use crate::error::{Error, Result};
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
 use chia_wallet::singleton::SINGLETON_TOP_LAYER_PUZZLE_HASH;
-use clvm_traits::AllocatorExt;
+use clvm_traits::FromPtr;
+use clvm_traits::ToPtr;
 use clvm_traits::{FromClvm, ToClvm};
 use clvm_utils::CurriedProgram;
 use clvm_utils::{tree_hash, tree_hash_atom, tree_hash_pair};
@@ -111,8 +112,8 @@ pub fn fast_forward_singleton(
         return Err(Error::PuzzleHashMismatch);
     }
 
-    let singleton = a.value_from_ptr::<CurriedProgram<NodePtr, SingletonArgs<NodePtr>>>(puzzle)?;
-    let mut new_solution = a.value_from_ptr::<SingletonSolution<NodePtr>>(solution)?;
+    let singleton: CurriedProgram<NodePtr, SingletonArgs<NodePtr>> = FromPtr::from_ptr(a, puzzle)?;
+    let mut new_solution: SingletonSolution<NodePtr> = FromPtr::from_ptr(a, solution)?;
 
     // this is the tree hash of the singleton top layer puzzle
     // the tree hash of singleton_top_layer_v1_1.clsp
@@ -177,7 +178,7 @@ pub fn fast_forward_singleton(
         return Err(Error::CoinMismatch);
     }
 
-    Ok(a.value_to_ptr(new_solution)?)
+    Ok(new_solution.to_ptr(a)?)
 }
 
 #[cfg(test)]
@@ -374,11 +375,11 @@ mod tests {
 
     fn parse_solution(a: &mut Allocator, solution: &[u8]) -> SingletonSolution<NodePtr> {
         let new_solution = node_from_bytes(a, solution).expect("parse solution");
-        a.value_from_ptr(new_solution).expect("parse solution")
+        FromPtr::from_ptr(a, new_solution).expect("parse solution")
     }
 
     fn serialize_solution(a: &mut Allocator, solution: &SingletonSolution<NodePtr>) -> Vec<u8> {
-        let new_solution = a.value_to_ptr(solution).expect("to_clvm");
+        let new_solution = solution.to_ptr(a).expect("to_clvm");
         node_to_bytes(a, new_solution).expect("serialize solution")
     }
 
@@ -387,14 +388,14 @@ mod tests {
         puzzle: &[u8],
     ) -> CurriedProgram<NodePtr, SingletonArgs<NodePtr>> {
         let puzzle = node_from_bytes(a, puzzle).expect("parse puzzle");
-        a.value_from_ptr(puzzle).expect("uncurry")
+        FromPtr::from_ptr(a, puzzle).expect("uncurry")
     }
 
     fn serialize_singleton(
         a: &mut Allocator,
         singleton: &CurriedProgram<NodePtr, SingletonArgs<NodePtr>>,
     ) -> Vec<u8> {
-        let puzzle = a.value_to_ptr(singleton).expect("to_clvm");
+        let puzzle = singleton.to_ptr(a).expect("to_clvm");
         node_to_bytes(a, puzzle).expect("serialize puzzle")
     }
 

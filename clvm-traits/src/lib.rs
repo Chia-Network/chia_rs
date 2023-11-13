@@ -18,7 +18,7 @@
 
 ```rust
 use clvmr::Allocator;
-use clvm_traits::{ToClvm, FromClvm, AllocatorExt};
+use clvm_traits::{ToClvm, FromClvm, ToPtr, FromPtr};
 
 #[derive(Debug, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(tuple)]
@@ -30,9 +30,9 @@ struct Point {
 let a = &mut Allocator::new();
 
 let point = Point { x: 5, y: 2 };
-let ptr = a.value_to_ptr(&point).unwrap();
+let ptr = point.to_ptr(a).unwrap();
 
-assert_eq!(a.value_from_ptr::<Point>(ptr).unwrap(), point);
+assert_eq!(Point::from_ptr(a, ptr).unwrap(), point);
 ```
 "#
 )]
@@ -40,8 +40,8 @@ assert_eq!(a.value_from_ptr::<Point>(ptr).unwrap(), point);
 #[cfg(feature = "derive")]
 pub use clvm_derive::*;
 
-mod allocator_ext;
 mod clvm_value;
+mod conversions;
 mod error;
 mod from_clvm;
 mod macros;
@@ -49,8 +49,8 @@ mod match_byte;
 mod to_clvm;
 mod wrappers;
 
-pub use allocator_ext::*;
 pub use clvm_value::*;
+pub use conversions::*;
 pub use error::*;
 pub use from_clvm::*;
 pub use match_byte::*;
@@ -74,8 +74,8 @@ mod tests {
     {
         let a = &mut Allocator::new();
 
-        let ptr = a.value_to_ptr(&value).unwrap();
-        let round_trip = a.value_from_ptr(ptr).unwrap();
+        let ptr = value.to_ptr(a).unwrap();
+        let round_trip = T::from_ptr(a, ptr).unwrap();
         assert_eq!(value, round_trip);
 
         let bytes = node_to_bytes(a, ptr).unwrap();

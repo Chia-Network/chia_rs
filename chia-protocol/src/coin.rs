@@ -78,7 +78,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use clvm_traits::AllocatorExt;
+    use clvm_traits::{FromPtr, ToPtr};
     use clvmr::{
         serde::{node_from_bytes, node_to_bytes},
         Allocator,
@@ -125,9 +125,9 @@ mod tests {
         let expected_bytes = hex::decode(expected).unwrap();
 
         let ptr = node_from_bytes(a, &expected_bytes).unwrap();
-        let coin = a.value_from_ptr::<Coin>(ptr).unwrap();
+        let coin = Coin::from_ptr(a, ptr).unwrap();
 
-        let round_trip = a.value_to_ptr(coin).unwrap();
+        let round_trip = coin.to_ptr(a).unwrap();
         assert_eq!(expected, hex::encode(node_to_bytes(a, round_trip).unwrap()));
     }
 }

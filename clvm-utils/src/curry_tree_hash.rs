@@ -23,7 +23,7 @@ pub fn curry_tree_hash(program_hash: [u8; 32], arg_hashes: &[[u8; 32]]) -> [u8; 
 
 #[cfg(test)]
 mod tests {
-    use clvm_traits::{clvm_curried_args, AllocatorExt};
+    use clvm_traits::{clvm_curried_args, ToPtr};
     use clvmr::Allocator;
     use hex::ToHex;
 
@@ -39,7 +39,7 @@ mod tests {
         let arg1 = a.new_number(5.into()).unwrap();
         let arg2 = a.new_number(8.into()).unwrap();
         let args = clvm_curried_args!(5, 8);
-        let curried = a.value_to_ptr(CurriedProgram { program, args }).unwrap();
+        let curried = CurriedProgram { program, args }.to_ptr(&mut a).unwrap();
 
         let tree_hash_result = tree_hash(&a, curried);
 

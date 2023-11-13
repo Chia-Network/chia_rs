@@ -530,7 +530,7 @@ pub fn sign<Msg: AsRef<[u8]>>(sk: &SecretKey, msg: Msg) -> Signature {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use clvm_traits::AllocatorExt;
+    use clvm_traits::{FromPtr, ToPtr};
     use clvmr::Allocator;
     use hex::FromHex;
     use rand::rngs::StdRng;
@@ -1067,10 +1067,10 @@ mod tests {
         let bytes = hex::decode("b45825c0ee7759945c0189b4c38b7e54231ebadc83a851bec3bb7cf954a124ae0cc8e8e5146558332ea152f63bf8846e04826185ef60e817f271f8d500126561319203f9acb95809ed20c193757233454be1562a5870570941a84605bd2c9c9a").expect("hex::decode()");
         let ptr = a.new_atom(&bytes).expect("new_atom");
 
-        let sig = a.value_from_ptr::<Signature>(ptr).expect("from_clvm");
+        let sig = Signature::from_ptr(&a, ptr).expect("from_clvm");
         assert_eq!(&sig.to_bytes()[..], &bytes[..]);
 
-        let sig_ptr = a.value_to_ptr(sig).expect("to_clvm");
+        let sig_ptr = sig.to_ptr(&mut a).expect("to_clvm");
         assert!(a.atom_eq(sig_ptr, ptr));
     }
 
@@ -1079,7 +1079,7 @@ mod tests {
         let mut a = Allocator::new();
         let ptr = a.new_pair(a.one(), a.one()).expect("new_pair");
         assert_eq!(
-            a.value_from_ptr::<Signature>(ptr).unwrap_err(),
+            Signature::from_ptr(&a, ptr).unwrap_err(),
             FromClvmError::ExpectedAtom
         );
     }
