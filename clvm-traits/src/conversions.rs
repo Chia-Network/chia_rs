@@ -1,5 +1,6 @@
 use clvmr::{
     allocator::{NodePtr, SExp},
+    sha2::{Digest, Sha256},
     Allocator,
 };
 
@@ -50,5 +51,54 @@ where
             },
             ptr,
         )
+    }
+}
+
+/// A wrapper around a `[u8; 32]` value, which represents the tree hash of a program.
+/// This is used since `[T; N]` is serialized as a list of `T` values, rather than bytes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TreeHash(pub [u8; 32]);
+
+/// A wrapper trait for `ToClvm<TreeHash>` that implements conversion to a `TreeHash`.
+pub trait ToTreeHash: ToClvm<TreeHash> {
+    /// Computes the tree hash of the value.
+    fn tree_hash(&self) -> Result<TreeHash, ToClvmError>;
+}
+
+impl<T> ToTreeHash for T
+where
+    T: ToClvm<TreeHash>,
+{
+    fn tree_hash(&self) -> Result<TreeHash, ToClvmError> {
+        self.to_clvm(&mut |value| match value {
+            ClvmValue::Atom(bytes) => {
+                let mut sha256 = Sha256::new();
+                sha256.update([1]);
+                sha256.update(bytes);
+                Ok(TreeHash(sha256.finalize().try_into().unwrap()))
+            }
+            ClvmValue::Pair(first, rest) => {
+                let mut sha256 = Sha256::new();
+                sha256.update([2]);
+                sha256.update(first.0);
+                sha256.update(rest.0);
+                Ok(TreeHash(sha256.finalize().try_into().unwrap()))
+            }
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tree_hash() {
+        let value = (42, ([1, 2, 3], "Hello, world!"));
+        let ptr = value.tree_hash().unwrap().0;
+        assert_eq!(
+            hex::encode(ptr),
+            "7c3670f319e07cff6d433e4c22e0895f1f0a10bad5bbcd23c32e3bc5589c23cb"
+        );
     }
 }
