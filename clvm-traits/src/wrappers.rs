@@ -4,7 +4,9 @@ use crate::{from_clvm, to_clvm, FromClvm, ToClvm};
 /// implement `ToClvm` and `FromClvm` for `Node`, since the compiler
 /// cannot guarantee that the generic `Node` type doesn't already
 /// implement these traits.
-pub struct Raw<T>(pub T);
+pub struct Raw<Node>(pub Node)
+where
+    Node: Clone;
 
 impl<Node> FromClvm<Node> for Raw<Node>
 where
