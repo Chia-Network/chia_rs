@@ -2,7 +2,7 @@ use crate::{from_clvm, simplify_int_bytes, to_clvm, ClvmValue, FromClvm, FromClv
 
 /// A simple type for performing validation on an atom,
 /// ensuring that it matches a given byte value.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct MatchByte<const BYTE: u8>;
 
 impl<Node, const BYTE: u8> ToClvm<Node> for MatchByte<BYTE>
