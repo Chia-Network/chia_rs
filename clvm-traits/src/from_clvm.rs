@@ -217,6 +217,7 @@ mod tests {
         assert_eq!(decode(a, "81e5"), Ok(-27i32));
         assert_eq!(decode(a, "80"), Ok(-0));
         assert_eq!(decode(a, "8180"), Ok(-128i8));
+        assert_eq!(decode(a, "8600e8d4a51000"), Ok(1000000000000u64));
     }
 
     #[test]

@@ -1,4 +1,5 @@
 use clvmr::allocator::NodePtr;
+use num_bigint::BigInt;
 
 use crate::{ClvmValue, ToClvmError};
 
@@ -26,24 +27,13 @@ macro_rules! to_clvm {
     };
 }
 
-pub fn simplify_int_bytes(bytes: &[u8]) -> &[u8] {
-    let mut slice = bytes;
-
-    // Check if the number is negative
-    let is_negative = !bytes.is_empty() && (bytes[0] & 0x80) != 0;
-
-    if is_negative {
-        // Remove leading 0xFF for negative numbers
-        while slice.len() > 1 && slice[0] == 0xFF && (slice[1] & 0x80) == 0x80 {
-            slice = &slice[1..];
+pub fn simplify_int_bytes(mut slice: &[u8]) -> &[u8] {
+    while (!slice.is_empty()) && (slice[0] == 0) {
+        if slice.len() > 1 && (slice[1] & 0x80 == 0x80) {
+            break;
         }
-    } else {
-        // Remove leading zeros for positive numbers
-        while !slice.is_empty() && slice[0] == 0 {
-            slice = &slice[1..];
-        }
+        slice = &slice[1..];
     }
-
     slice
 }
 
@@ -54,9 +44,10 @@ macro_rules! clvm_ints {
             Node: Clone,
         {
             to_clvm!(Node, self, f, {
-                let bytes = self.to_be_bytes();
-                let slice = simplify_int_bytes(&bytes);
-                f(ClvmValue::Atom(slice))
+                let bytes = BigInt::from(*self);
+                f(ClvmValue::Atom(simplify_int_bytes(
+                    &bytes.to_signed_bytes_be(),
+                )))
             });
         }
     };
@@ -201,6 +192,7 @@ mod tests {
         assert_eq!(encode(a, -27i32), Ok("81e5".to_owned()));
         assert_eq!(encode(a, -0), Ok("80".to_owned()));
         assert_eq!(encode(a, -128i8), Ok("8180".to_owned()));
+        assert_eq!(encode(a, 1000000000000u64), Ok("8600e8d4a51000".to_owned()));
     }
 
     #[test]
