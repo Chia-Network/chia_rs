@@ -1,3 +1,4 @@
+use chia_protocol::Bytes32;
 use clvm_traits::{FromClvm, ToClvm};
 use hex_literal::hex;
 
@@ -13,9 +14,9 @@ pub struct SingletonArgs<I> {
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(tuple)]
 pub struct SingletonStruct {
-    pub mod_hash: [u8; 32],
-    pub launcher_id: [u8; 32],
-    pub launcher_puzzle_hash: [u8; 32],
+    pub mod_hash: Bytes32,
+    pub launcher_id: Bytes32,
+    pub launcher_puzzle_hash: Bytes32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
@@ -29,17 +30,17 @@ pub struct SingletonSolution<I> {
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(list)]
 pub struct LauncherSolution<T> {
-    pub singleton_puzzle_hash: [u8; 32],
+    pub singleton_puzzle_hash: Bytes32,
     pub amount: u64,
     pub key_value_list: T,
 }
 
 impl SingletonStruct {
-    pub fn new(launcher_id: [u8; 32]) -> Self {
+    pub fn new(launcher_id: Bytes32) -> Self {
         Self {
-            mod_hash: SINGLETON_TOP_LAYER_PUZZLE_HASH,
+            mod_hash: SINGLETON_TOP_LAYER_PUZZLE_HASH.into(),
             launcher_id,
-            launcher_puzzle_hash: SINGLETON_LAUNCHER_PUZZLE_HASH,
+            launcher_puzzle_hash: SINGLETON_LAUNCHER_PUZZLE_HASH.into(),
         }
     }
 }

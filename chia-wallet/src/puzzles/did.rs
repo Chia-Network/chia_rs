@@ -1,3 +1,4 @@
+use chia_protocol::Bytes32;
 use clvm_traits::{clvm_tuple, from_clvm, match_tuple, to_clvm, FromClvm, FromClvmError, ToClvm};
 use hex_literal::hex;
 
@@ -7,7 +8,7 @@ use crate::singleton::SingletonStruct;
 #[clvm(curry)]
 pub struct DidArgs<I, M> {
     pub inner_puzzle: I,
-    pub recovery_did_list_hash: [u8; 32],
+    pub recovery_did_list_hash: Bytes32,
     pub num_verifications_required: u64,
     pub singleton_struct: SingletonStruct,
     pub metadata: M,

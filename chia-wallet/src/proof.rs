@@ -1,4 +1,5 @@
 use arbitrary::{Arbitrary, Unstructured};
+use chia_protocol::Bytes32;
 use clvm_traits::{from_clvm, to_clvm, FromClvm, ToClvm};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,13 +36,13 @@ impl<'a> Arbitrary<'a> for Proof {
         let is_eve = u.ratio(3, 10)?;
         if is_eve {
             Ok(Self::Eve(EveProof {
-                parent_coin_info: u.arbitrary()?,
+                parent_coin_info: u.arbitrary::<[u8; 32]>()?.into(),
                 amount: u.arbitrary()?,
             }))
         } else {
             Ok(Self::Lineage(LineageProof {
-                parent_coin_info: u.arbitrary()?,
-                inner_puzzle_hash: u.arbitrary()?,
+                parent_coin_info: u.arbitrary::<[u8; 32]>()?.into(),
+                inner_puzzle_hash: u.arbitrary::<[u8; 32]>()?.into(),
                 amount: u.arbitrary()?,
             }))
         }
@@ -51,14 +52,14 @@ impl<'a> Arbitrary<'a> for Proof {
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(list)]
 pub struct LineageProof {
-    pub parent_coin_info: [u8; 32],
-    pub inner_puzzle_hash: [u8; 32],
+    pub parent_coin_info: Bytes32,
+    pub inner_puzzle_hash: Bytes32,
     pub amount: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(list)]
 pub struct EveProof {
-    pub parent_coin_info: [u8; 32],
+    pub parent_coin_info: Bytes32,
     pub amount: u64,
 }

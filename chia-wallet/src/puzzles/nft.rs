@@ -1,4 +1,4 @@
-use arbitrary::Arbitrary;
+use chia_protocol::Bytes32;
 use clvm_traits::{from_clvm, to_clvm, FromClvm, Raw, ToClvm};
 use hex_literal::hex;
 
@@ -7,7 +7,7 @@ use crate::singleton::SingletonStruct;
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curry)]
 pub struct NftIntermediateLauncherArgs {
-    pub launcher_puzzle_hash: [u8; 32],
+    pub launcher_puzzle_hash: Bytes32,
     pub mint_number: usize,
     pub mint_total: usize,
 }
@@ -15,9 +15,9 @@ pub struct NftIntermediateLauncherArgs {
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curry)]
 pub struct NftStateLayerArgs<I, M> {
-    pub mod_hash: [u8; 32],
+    pub mod_hash: Bytes32,
     pub metadata: M,
-    pub metadata_updater_puzzle_hash: [u8; 32],
+    pub metadata_updater_puzzle_hash: Bytes32,
     pub inner_puzzle: I,
 }
 
@@ -30,8 +30,8 @@ pub struct NftStateLayerSolution<I> {
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curry)]
 pub struct NftOwnershipLayerArgs<I, P> {
-    pub mod_hash: [u8; 32],
-    pub current_owner: Option<[u8; 32]>,
+    pub mod_hash: Bytes32,
+    pub current_owner: Option<Bytes32>,
     pub transfer_program: P,
     pub inner_puzzle: I,
 }
@@ -46,20 +46,21 @@ pub struct NftOwnershipLayerSolution<I> {
 #[clvm(curry)]
 pub struct NftRoyaltyTransferPuzzleArgs {
     pub singleton_struct: SingletonStruct,
-    pub royalty_puzzle_hash: [u8; 32],
+    pub royalty_puzzle_hash: Bytes32,
     pub trade_price_percentage: u16,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Arbitrary)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(fuzzing, derive(arbitrary::Arbitrary))]
 pub struct NftMetadata {
     pub edition_number: u64,
     pub edition_total: u64,
     pub data_uris: Vec<String>,
-    pub data_hash: Option<[u8; 32]>,
+    pub data_hash: Option<Bytes32>,
     pub metadata_uris: Vec<String>,
-    pub metadata_hash: Option<[u8; 32]>,
+    pub metadata_hash: Option<Bytes32>,
     pub license_uris: Vec<String>,
-    pub license_hash: Option<[u8; 32]>,
+    pub license_hash: Option<Bytes32>,
 }
 
 impl Default for NftMetadata {
