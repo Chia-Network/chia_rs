@@ -1,5 +1,7 @@
 use chia_protocol::Bytes32;
-use clvm_traits::{clvm_tuple, from_clvm, match_tuple, to_clvm, FromClvm, FromClvmError, ToClvm};
+use clvm_traits::{
+    clvm_tuple, match_tuple, ClvmValue, FromClvm, FromClvmError, ToClvm, ToClvmError,
+};
 use hex_literal::hex;
 
 use crate::singleton::SingletonStruct;
@@ -24,7 +26,10 @@ where
     Node: Clone,
     T: FromClvm<Node>,
 {
-    from_clvm!(Node, f, ptr, {
+    fn from_clvm<'a>(
+        f: &mut impl FnMut(&Node) -> ClvmValue<'a, Node>,
+        ptr: Node,
+    ) -> Result<Self, FromClvmError> {
         let (mode, args) = <match_tuple!(u8, T)>::from_clvm(f, ptr)?;
 
         match mode {
@@ -34,7 +39,7 @@ where
                 mode
             ))),
         }
-    });
+    }
 }
 
 impl<Node, T> ToClvm<Node> for DidSolution<T>
@@ -42,11 +47,14 @@ where
     Node: Clone,
     T: ToClvm<Node>,
 {
-    to_clvm!(Node, self, f, {
+    fn to_clvm(
+        &self,
+        f: &mut impl FnMut(ClvmValue<Node>) -> Result<Node, ToClvmError>,
+    ) -> Result<Node, ToClvmError> {
         match self {
             Self::InnerSpend(solution) => clvm_tuple!(1, solution).to_clvm(f),
         }
-    });
+    }
 }
 
 /// This is the puzzle reveal of the [DID1 standard](https://chialisp.com/dids) puzzle.

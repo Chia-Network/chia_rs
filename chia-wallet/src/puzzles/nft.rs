@@ -1,5 +1,5 @@
 use chia_protocol::Bytes32;
-use clvm_traits::{from_clvm, to_clvm, FromClvm, Raw, ToClvm};
+use clvm_traits::{ClvmValue, FromClvm, FromClvmError, Raw, ToClvm, ToClvmError};
 use hex_literal::hex;
 
 use crate::singleton::SingletonStruct;
@@ -82,7 +82,10 @@ impl<Node> FromClvm<Node> for NftMetadata
 where
     Node: Clone,
 {
-    from_clvm!(Node, f, ptr, {
+    fn from_clvm<'a>(
+        f: &mut impl FnMut(&Node) -> ClvmValue<'a, Node>,
+        ptr: Node,
+    ) -> Result<Self, FromClvmError> {
         let items = Vec::<(String, Raw<Node>)>::from_clvm(f, ptr)?;
         let mut metadata = Self::default();
 
@@ -101,14 +104,17 @@ where
         }
 
         Ok(metadata)
-    });
+    }
 }
 
 impl<Node> ToClvm<Node> for NftMetadata
 where
     Node: Clone,
 {
-    to_clvm!(Node, self, f, {
+    fn to_clvm(
+        &self,
+        f: &mut impl FnMut(ClvmValue<Node>) -> Result<Node, ToClvmError>,
+    ) -> Result<Node, ToClvmError> {
         let mut items: Vec<(&str, Raw<Node>)> = Vec::new();
 
         if !self.data_uris.is_empty() {
@@ -141,7 +147,7 @@ where
         ]);
 
         items.to_clvm(f)
-    });
+    }
 }
 
 /// This is the puzzle reveal of the [NFT1 state layer](https://chialisp.com/nfts) puzzle.

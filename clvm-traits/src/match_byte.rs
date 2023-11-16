@@ -1,4 +1,4 @@
-use crate::{from_clvm, simplify_int_bytes, to_clvm, ClvmValue, FromClvm, FromClvmError, ToClvm};
+use crate::{simplify_int_bytes, ClvmValue, FromClvm, FromClvmError, ToClvm, ToClvmError};
 
 /// A simple type for performing validation on an atom,
 /// ensuring that it matches a given byte value.
@@ -9,25 +9,31 @@ impl<Node, const BYTE: u8> ToClvm<Node> for MatchByte<BYTE>
 where
     Node: Clone,
 {
-    to_clvm!(Node, self, f, {
+    fn to_clvm(
+        &self,
+        f: &mut impl FnMut(ClvmValue<Node>) -> Result<Node, ToClvmError>,
+    ) -> Result<Node, ToClvmError> {
         let bytes = BYTE.to_be_bytes();
         let slice = simplify_int_bytes(&bytes);
         f(ClvmValue::Atom(slice))
-    });
+    }
 }
 
 impl<Node, const BYTE: u8> FromClvm<Node> for MatchByte<BYTE>
 where
     Node: Clone,
 {
-    from_clvm!(Node, f, ptr, {
+    fn from_clvm<'a>(
+        f: &mut impl FnMut(&Node) -> ClvmValue<'a, Node>,
+        ptr: Node,
+    ) -> Result<Self, FromClvmError> {
         match f(&ptr) {
             ClvmValue::Atom(&[]) if BYTE == 0 => Ok(Self),
             ClvmValue::Atom(&[byte]) if byte == BYTE && BYTE > 0 => Ok(Self),
             ClvmValue::Atom(..) => Err(FromClvmError::Invalid(format!("expected {BYTE}"))),
             ClvmValue::Pair(..) => Err(FromClvmError::ExpectedAtom),
         }
-    });
+    }
 }
 
 #[cfg(test)]

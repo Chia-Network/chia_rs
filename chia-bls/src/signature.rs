@@ -1,7 +1,7 @@
 use crate::{Error, GTElement, PublicKey, Result, SecretKey};
 use blst::*;
 use chia_traits::{read_bytes, Streamable};
-use clvm_traits::{from_clvm, to_clvm, ClvmValue, FromClvm, FromClvmError, ToClvm};
+use clvm_traits::{ClvmValue, FromClvm, FromClvmError, ToClvm, ToClvmError};
 use sha2::{Digest, Sha256};
 use std::borrow::Borrow;
 use std::convert::AsRef;
@@ -251,7 +251,10 @@ impl<Node> FromClvm<Node> for Signature
 where
     Node: Clone,
 {
-    from_clvm!(Node, f, ptr, {
+    fn from_clvm<'a>(
+        f: &mut impl FnMut(&Node) -> ClvmValue<'a, Node>,
+        ptr: Node,
+    ) -> std::result::Result<Self, FromClvmError> {
         let ClvmValue::Atom(bytes) = f(&ptr) else {
             return Err(FromClvmError::ExpectedAtom);
         };
@@ -261,14 +264,19 @@ where
         };
 
         Self::from_bytes(bytes).or(Err(FromClvmError::Invalid("invalid signature".to_string())))
-    });
+    }
 }
 
 impl<Node> ToClvm<Node> for Signature
 where
     Node: Clone,
 {
-    to_clvm!(Node, self, f, { f(ClvmValue::Atom(&self.to_bytes())) });
+    fn to_clvm(
+        &self,
+        f: &mut impl FnMut(ClvmValue<Node>) -> std::result::Result<Node, ToClvmError>,
+    ) -> std::result::Result<Node, ToClvmError> {
+        f(ClvmValue::Atom(&self.to_bytes()))
+    }
 }
 
 #[cfg(feature = "py-bindings")]

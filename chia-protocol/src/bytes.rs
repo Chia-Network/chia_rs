@@ -1,6 +1,6 @@
 use chia_traits::chia_error;
 use chia_traits::{read_bytes, Streamable};
-use clvm_traits::{from_clvm, to_clvm, ClvmValue, FromClvm, FromClvmError, ToClvm};
+use clvm_traits::{ClvmValue, FromClvm, FromClvmError, ToClvm, ToClvmError};
 use core::fmt::Formatter;
 use sha2::{Digest, Sha256};
 use std::convert::AsRef;
@@ -97,20 +97,28 @@ impl<Node> ToClvm<Node> for Bytes
 where
     Node: Clone,
 {
-    to_clvm!(Node, self, f, { f(ClvmValue::Atom(self.0.as_slice())) });
+    fn to_clvm(
+        &self,
+        f: &mut impl FnMut(ClvmValue<Node>) -> Result<Node, ToClvmError>,
+    ) -> Result<Node, ToClvmError> {
+        f(ClvmValue::Atom(self.0.as_slice()))
+    }
 }
 
 impl<Node> FromClvm<Node> for Bytes
 where
     Node: Clone,
 {
-    from_clvm!(Node, f, ptr, {
+    fn from_clvm<'a>(
+        f: &mut impl FnMut(&Node) -> ClvmValue<'a, Node>,
+        ptr: Node,
+    ) -> Result<Self, FromClvmError> {
         if let ClvmValue::Atom(bytes) = f(&ptr) {
             Ok(Self(bytes.to_vec()))
         } else {
             Err(FromClvmError::ExpectedAtom)
         }
-    });
+    }
 }
 
 impl PartialEq<Bytes> for Vec<u8> {
@@ -207,14 +215,22 @@ impl<Node, const N: usize> ToClvm<Node> for BytesImpl<N>
 where
     Node: Clone,
 {
-    to_clvm!(Node, self, f, { f(ClvmValue::Atom(self.0.as_slice())) });
+    fn to_clvm(
+        &self,
+        f: &mut impl FnMut(ClvmValue<Node>) -> Result<Node, ToClvmError>,
+    ) -> Result<Node, ToClvmError> {
+        f(ClvmValue::Atom(self.0.as_slice()))
+    }
 }
 
 impl<Node, const N: usize> FromClvm<Node> for BytesImpl<N>
 where
     Node: Clone,
 {
-    from_clvm!(Node, f, ptr, {
+    fn from_clvm<'a>(
+        f: &mut impl FnMut(&Node) -> ClvmValue<'a, Node>,
+        ptr: Node,
+    ) -> Result<Self, FromClvmError> {
         let ClvmValue::Atom(bytes) = f(&ptr) else {
             return Err(FromClvmError::ExpectedAtom);
         };
@@ -227,7 +243,7 @@ where
         }
 
         Ok(Self::from(bytes))
-    });
+    }
 }
 
 impl<const N: usize> From<[u8; N]> for BytesImpl<N> {

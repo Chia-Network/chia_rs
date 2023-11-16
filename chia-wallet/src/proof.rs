@@ -1,6 +1,6 @@
 use arbitrary::{Arbitrary, Unstructured};
 use chia_protocol::Bytes32;
-use clvm_traits::{from_clvm, to_clvm, FromClvm, ToClvm};
+use clvm_traits::{ClvmValue, FromClvm, FromClvmError, ToClvm, ToClvmError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Proof {
@@ -12,23 +12,29 @@ impl<Node> FromClvm<Node> for Proof
 where
     Node: Clone,
 {
-    from_clvm!(Node, f, ptr, {
+    fn from_clvm<'a>(
+        f: &mut impl FnMut(&Node) -> ClvmValue<'a, Node>,
+        ptr: Node,
+    ) -> Result<Self, FromClvmError> {
         LineageProof::from_clvm(f, ptr.clone())
             .map(Self::Lineage)
             .or_else(|_| EveProof::from_clvm(f, ptr).map(Self::Eve))
-    });
+    }
 }
 
 impl<Node> ToClvm<Node> for Proof
 where
     Node: Clone,
 {
-    to_clvm!(Node, self, f, {
+    fn to_clvm(
+        &self,
+        f: &mut impl FnMut(ClvmValue<Node>) -> Result<Node, ToClvmError>,
+    ) -> Result<Node, ToClvmError> {
         match self {
             Self::Lineage(lineage_proof) => lineage_proof.to_clvm(f),
             Self::Eve(eve_proof) => eve_proof.to_clvm(f),
         }
-    });
+    }
 }
 
 impl<'a> Arbitrary<'a> for Proof {

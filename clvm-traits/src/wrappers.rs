@@ -1,4 +1,4 @@
-use crate::{from_clvm, to_clvm, FromClvm, ToClvm};
+use crate::{ClvmValue, FromClvm, FromClvmError, ToClvm, ToClvmError};
 
 /// A wrapper for an intermediate CLVM value. This is required to
 /// implement `ToClvm` and `FromClvm` for `Node`, since the compiler
@@ -12,12 +12,22 @@ impl<Node> FromClvm<Node> for Raw<Node>
 where
     Node: Clone,
 {
-    from_clvm!(Node, _f, ptr, { Ok(Self(ptr)) });
+    fn from_clvm<'a>(
+        _f: &mut impl FnMut(&Node) -> ClvmValue<'a, Node>,
+        ptr: Node,
+    ) -> Result<Self, FromClvmError> {
+        Ok(Self(ptr))
+    }
 }
 
 impl<Node> ToClvm<Node> for Raw<Node>
 where
     Node: Clone,
 {
-    to_clvm!(Node, self, _f, { Ok(self.0.clone()) });
+    fn to_clvm(
+        &self,
+        _f: &mut impl FnMut(ClvmValue<Node>) -> Result<Node, ToClvmError>,
+    ) -> Result<Node, ToClvmError> {
+        Ok(self.0.clone())
+    }
 }

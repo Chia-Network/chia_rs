@@ -2,7 +2,7 @@ use crate::secret_key::is_all_zero;
 use crate::{DerivableKey, Error, Result};
 use blst::*;
 use chia_traits::{read_bytes, Streamable};
-use clvm_traits::{from_clvm, to_clvm, ClvmValue, FromClvm, FromClvmError, ToClvm};
+use clvm_traits::{ClvmValue, FromClvm, FromClvmError, ToClvm, ToClvmError};
 use sha2::{digest::FixedOutput, Digest, Sha256};
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -388,7 +388,10 @@ impl<Node> FromClvm<Node> for PublicKey
 where
     Node: Clone,
 {
-    from_clvm!(Node, f, ptr, {
+    fn from_clvm<'a>(
+        f: &mut impl FnMut(&Node) -> ClvmValue<'a, Node>,
+        ptr: Node,
+    ) -> std::result::Result<Self, FromClvmError> {
         let ClvmValue::Atom(bytes) = f(&ptr) else {
             return Err(FromClvmError::ExpectedAtom);
         };
@@ -400,14 +403,19 @@ where
         Self::from_bytes(bytes).or(Err(FromClvmError::Invalid(
             "invalid public key".to_string(),
         )))
-    });
+    }
 }
 
 impl<Node> ToClvm<Node> for PublicKey
 where
     Node: Clone,
 {
-    to_clvm!(Node, self, f, { f(ClvmValue::Atom(&self.to_bytes())) });
+    fn to_clvm(
+        &self,
+        f: &mut impl FnMut(ClvmValue<Node>) -> std::result::Result<Node, ToClvmError>,
+    ) -> std::result::Result<Node, ToClvmError> {
+        f(ClvmValue::Atom(&self.to_bytes()))
+    }
 }
 
 pub const DST: &[u8] = b"BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_AUG_";

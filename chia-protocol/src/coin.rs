@@ -1,7 +1,10 @@
 use crate::streamable_struct;
 use crate::{bytes::Bytes32, BytesImpl};
 use chia_streamable_macro::Streamable;
-use clvm_traits::{clvm_list, destructure_list, from_clvm, match_list, to_clvm, FromClvm, ToClvm};
+use clvm_traits::{
+    clvm_list, destructure_list, match_list, ClvmValue, FromClvm, FromClvmError, ToClvm,
+    ToClvmError,
+};
 use sha2::{Digest, Sha256};
 use std::convert::TryInto;
 
@@ -55,16 +58,22 @@ impl<Node> ToClvm<Node> for Coin
 where
     Node: Clone,
 {
-    to_clvm!(Node, self, f, {
+    fn to_clvm(
+        &self,
+        f: &mut impl FnMut(ClvmValue<Node>) -> Result<Node, ToClvmError>,
+    ) -> Result<Node, ToClvmError> {
         clvm_list!(self.parent_coin_info, self.puzzle_hash, self.amount).to_clvm(f)
-    });
+    }
 }
 
 impl<Node> FromClvm<Node> for Coin
 where
     Node: Clone,
 {
-    from_clvm!(Node, f, ptr, {
+    fn from_clvm<'a>(
+        f: &mut impl FnMut(&Node) -> ClvmValue<'a, Node>,
+        ptr: Node,
+    ) -> Result<Self, FromClvmError> {
         let destructure_list!(parent_coin_info, puzzle_hash, amount) =
             <match_list!(BytesImpl<32>, BytesImpl<32>, u64)>::from_clvm(f, ptr)?;
         Ok(Coin {
@@ -72,7 +81,7 @@ where
             puzzle_hash,
             amount,
         })
-    });
+    }
 }
 
 #[cfg(test)]

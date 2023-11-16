@@ -1,6 +1,6 @@
 use clvm_traits::{
-    clvm_list, clvm_quote, destructure_list, destructure_quote, from_clvm, match_list, match_quote,
-    to_clvm, FromClvm, MatchByte, ToClvm,
+    clvm_list, clvm_quote, destructure_list, destructure_quote, match_list, match_quote, ClvmValue,
+    FromClvm, FromClvmError, MatchByte, ToClvm, ToClvmError,
 };
 
 #[derive(Debug, Clone)]
@@ -15,12 +15,15 @@ where
     P: FromClvm<Node>,
     A: FromClvm<Node>,
 {
-    from_clvm!(Node, f, ptr, {
+    fn from_clvm<'a>(
+        f: &mut impl FnMut(&Node) -> ClvmValue<'a, Node>,
+        ptr: Node,
+    ) -> Result<Self, FromClvmError> {
         let destructure_list!(_, destructure_quote!(program), args) =
             <match_list!(MatchByte<2>, match_quote!(P), A)>::from_clvm(f, ptr)?;
 
         Ok(Self { program, args })
-    });
+    }
 }
 
 impl<Node, P, A> ToClvm<Node> for CurriedProgram<P, A>
@@ -29,9 +32,12 @@ where
     P: ToClvm<Node>,
     A: ToClvm<Node>,
 {
-    to_clvm!(Node, self, f, {
+    fn to_clvm(
+        &self,
+        f: &mut impl FnMut(ClvmValue<Node>) -> Result<Node, ToClvmError>,
+    ) -> Result<Node, ToClvmError> {
         clvm_list!(2, clvm_quote!(&self.program), &self.args).to_clvm(f)
-    });
+    }
 }
 
 #[cfg(test)]

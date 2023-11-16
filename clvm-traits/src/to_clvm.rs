@@ -14,19 +14,6 @@ where
     ) -> Result<Node, ToClvmError>;
 }
 
-#[macro_export]
-macro_rules! to_clvm {
-    ( $node:ty, $self:ident, $f:ident, { $( $block:tt )* } ) => {
-        #[allow(unused_mut)]
-        fn to_clvm(
-            &$self,
-            mut $f: &mut impl FnMut($crate::ClvmValue<$node>) -> ::std::result::Result<$node, $crate::ToClvmError>,
-        ) -> ::std::result::Result<$node, $crate::ToClvmError> {
-            $( $block )*
-        }
-    };
-}
-
 pub fn simplify_int_bytes(mut slice: &[u8]) -> &[u8] {
     while (!slice.is_empty()) && (slice[0] == 0) {
         if slice.len() > 1 && (slice[1] & 0x80 == 0x80) {
@@ -43,12 +30,15 @@ macro_rules! clvm_ints {
         where
             Node: Clone,
         {
-            to_clvm!(Node, self, f, {
+            fn to_clvm(
+                &self,
+                f: &mut impl FnMut(ClvmValue<Node>) -> Result<Node, ToClvmError>,
+            ) -> Result<Node, ToClvmError> {
                 let bytes = BigInt::from(*self);
                 f(ClvmValue::Atom(simplify_int_bytes(
                     &bytes.to_signed_bytes_be(),
                 )))
-            });
+            }
         }
     };
 }
@@ -67,7 +57,12 @@ clvm_ints!(usize);
 clvm_ints!(isize);
 
 impl ToClvm<NodePtr> for NodePtr {
-    to_clvm!(NodePtr, self, _f, { Ok(*self) });
+    fn to_clvm(
+        &self,
+        _f: &mut impl FnMut(ClvmValue<NodePtr>) -> Result<NodePtr, ToClvmError>,
+    ) -> Result<NodePtr, ToClvmError> {
+        Ok(*self)
+    }
 }
 
 impl<Node, T> ToClvm<Node> for &T
@@ -75,7 +70,12 @@ where
     Node: Clone,
     T: ToClvm<Node>,
 {
-    to_clvm!(Node, self, f, { (*self).to_clvm(f) });
+    fn to_clvm(
+        &self,
+        f: &mut impl FnMut(ClvmValue<Node>) -> Result<Node, ToClvmError>,
+    ) -> Result<Node, ToClvmError> {
+        (*self).to_clvm(f)
+    }
 }
 
 impl<Node, A, B> ToClvm<Node> for (A, B)
@@ -84,18 +84,26 @@ where
     A: ToClvm<Node>,
     B: ToClvm<Node>,
 {
-    to_clvm!(Node, self, f, {
+    fn to_clvm(
+        &self,
+        f: &mut impl FnMut(ClvmValue<Node>) -> Result<Node, ToClvmError>,
+    ) -> Result<Node, ToClvmError> {
         let first = self.0.to_clvm(f)?;
         let rest = self.1.to_clvm(f)?;
         f(ClvmValue::Pair(first, rest))
-    });
+    }
 }
 
 impl<Node> ToClvm<Node> for ()
 where
     Node: Clone,
 {
-    to_clvm!(Node, self, f, { f(ClvmValue::Atom(&[])) });
+    fn to_clvm(
+        &self,
+        f: &mut impl FnMut(ClvmValue<Node>) -> Result<Node, ToClvmError>,
+    ) -> Result<Node, ToClvmError> {
+        f(ClvmValue::Atom(&[]))
+    }
 }
 
 impl<Node, T> ToClvm<Node> for &[T]
@@ -103,14 +111,17 @@ where
     Node: Clone,
     T: ToClvm<Node>,
 {
-    to_clvm!(Node, self, f, {
+    fn to_clvm(
+        &self,
+        f: &mut impl FnMut(ClvmValue<Node>) -> Result<Node, ToClvmError>,
+    ) -> Result<Node, ToClvmError> {
         let mut result = f(ClvmValue::Atom(&[]))?;
         for item in self.iter().rev() {
             let value = item.to_clvm(f)?;
             result = f(ClvmValue::Pair(value, result))?;
         }
         Ok(result)
-    });
+    }
 }
 
 impl<Node, T, const N: usize> ToClvm<Node> for [T; N]
@@ -118,7 +129,12 @@ where
     Node: Clone,
     T: ToClvm<Node>,
 {
-    to_clvm!(Node, self, f, { self.as_slice().to_clvm(f) });
+    fn to_clvm(
+        &self,
+        f: &mut impl FnMut(ClvmValue<Node>) -> Result<Node, ToClvmError>,
+    ) -> Result<Node, ToClvmError> {
+        self.as_slice().to_clvm(f)
+    }
 }
 
 impl<Node, T> ToClvm<Node> for Vec<T>
@@ -126,7 +142,12 @@ where
     Node: Clone,
     T: ToClvm<Node>,
 {
-    to_clvm!(Node, self, f, { self.as_slice().to_clvm(f) });
+    fn to_clvm(
+        &self,
+        f: &mut impl FnMut(ClvmValue<Node>) -> Result<Node, ToClvmError>,
+    ) -> Result<Node, ToClvmError> {
+        self.as_slice().to_clvm(f)
+    }
 }
 
 impl<Node, T> ToClvm<Node> for Option<T>
@@ -134,26 +155,39 @@ where
     Node: Clone,
     T: ToClvm<Node>,
 {
-    to_clvm!(Node, self, f, {
+    fn to_clvm(
+        &self,
+        f: &mut impl FnMut(ClvmValue<Node>) -> Result<Node, ToClvmError>,
+    ) -> Result<Node, ToClvmError> {
         match self {
             Some(value) => value.to_clvm(f),
             None => f(ClvmValue::Atom(&[])),
         }
-    });
+    }
 }
 
 impl<Node> ToClvm<Node> for &str
 where
     Node: Clone,
 {
-    to_clvm!(Node, self, f, { f(ClvmValue::Atom(self.as_bytes())) });
+    fn to_clvm(
+        &self,
+        f: &mut impl FnMut(ClvmValue<Node>) -> Result<Node, ToClvmError>,
+    ) -> Result<Node, ToClvmError> {
+        f(ClvmValue::Atom(self.as_bytes()))
+    }
 }
 
 impl<Node> ToClvm<Node> for String
 where
     Node: Clone,
 {
-    to_clvm!(Node, self, f, { self.as_str().to_clvm(f) });
+    fn to_clvm(
+        &self,
+        f: &mut impl FnMut(ClvmValue<Node>) -> Result<Node, ToClvmError>,
+    ) -> Result<Node, ToClvmError> {
+        self.as_str().to_clvm(f)
+    }
 }
 
 #[cfg(test)]

@@ -13,26 +13,16 @@ where
     ) -> Result<Self, FromClvmError>;
 }
 
-#[macro_export]
-macro_rules! from_clvm {
-    ($node:ty, $f:ident, $ptr:ident, { $( $block:tt )* }) => {
-        #[allow(unused_mut)]
-        fn from_clvm<'a>(
-            mut $f: &mut impl FnMut(&$node) -> $crate::ClvmValue<'a, $node>,
-            mut $ptr: $node,
-        ) -> ::std::result::Result<Self, $crate::FromClvmError> {
-            $( $block )*
-        }
-    };
-}
-
 macro_rules! clvm_ints {
     ($int:ty) => {
         impl<Node> FromClvm<Node> for $int
         where
             Node: Clone,
         {
-            from_clvm!(Node, f, ptr, {
+            fn from_clvm<'a>(
+                f: &mut impl FnMut(&Node) -> ClvmValue<'a, Node>,
+                ptr: Node,
+            ) -> Result<Self, FromClvmError> {
                 if let ClvmValue::Atom(bytes) = f(&ptr) {
                     const LEN: usize = std::mem::size_of::<$int>();
                     if bytes.len() > LEN {
@@ -50,7 +40,7 @@ macro_rules! clvm_ints {
                 } else {
                     Err(FromClvmError::ExpectedAtom)
                 }
-            });
+            }
         }
     };
 }
@@ -69,7 +59,12 @@ clvm_ints!(usize);
 clvm_ints!(isize);
 
 impl FromClvm<NodePtr> for NodePtr {
-    from_clvm!(NodePtr, _f, ptr, { Ok(ptr) });
+    fn from_clvm<'a>(
+        _f: &mut impl FnMut(&NodePtr) -> ClvmValue<'a, NodePtr>,
+        ptr: NodePtr,
+    ) -> Result<Self, FromClvmError> {
+        Ok(ptr)
+    }
 }
 
 impl<Node, A, B> FromClvm<Node> for (A, B)
@@ -78,7 +73,10 @@ where
     A: FromClvm<Node>,
     B: FromClvm<Node>,
 {
-    from_clvm!(Node, f, ptr, {
+    fn from_clvm<'a>(
+        f: &mut impl FnMut(&Node) -> ClvmValue<'a, Node>,
+        ptr: Node,
+    ) -> Result<Self, FromClvmError> {
         if let ClvmValue::Pair(first, rest) = f(&ptr) {
             let first = A::from_clvm(f, first)?;
             let rest = B::from_clvm(f, rest)?;
@@ -86,20 +84,23 @@ where
         } else {
             Err(FromClvmError::ExpectedPair)
         }
-    });
+    }
 }
 
 impl<Node> FromClvm<Node> for ()
 where
     Node: Clone,
 {
-    from_clvm!(Node, f, ptr, {
+    fn from_clvm<'a>(
+        f: &mut impl FnMut(&Node) -> ClvmValue<'a, Node>,
+        ptr: Node,
+    ) -> Result<Self, FromClvmError> {
         if let ClvmValue::Atom(&[]) = f(&ptr) {
             Ok(())
         } else {
             Err(FromClvmError::ExpectedNil)
         }
-    });
+    }
 }
 
 impl<Node, T, const N: usize> FromClvm<Node> for [T; N]
@@ -107,7 +108,10 @@ where
     Node: Clone,
     T: FromClvm<Node>,
 {
-    from_clvm!(Node, f, ptr, {
+    fn from_clvm<'a>(
+        f: &mut impl FnMut(&Node) -> ClvmValue<'a, Node>,
+        mut ptr: Node,
+    ) -> Result<Self, FromClvmError> {
         let mut items = Vec::with_capacity(N);
         loop {
             match f(&ptr) {
@@ -127,7 +131,7 @@ where
                 }
             }
         }
-    });
+    }
 }
 
 impl<Node, T> FromClvm<Node> for Vec<T>
@@ -135,7 +139,10 @@ where
     Node: Clone,
     T: FromClvm<Node>,
 {
-    from_clvm!(Node, f, ptr, {
+    fn from_clvm<'a>(
+        f: &mut impl FnMut(&Node) -> ClvmValue<'a, Node>,
+        mut ptr: Node,
+    ) -> Result<Self, FromClvmError> {
         let mut items = Vec::new();
         loop {
             match f(&ptr) {
@@ -151,7 +158,7 @@ where
                 }
             }
         }
-    });
+    }
 }
 
 impl<Node, T> FromClvm<Node> for Option<T>
@@ -159,26 +166,32 @@ where
     Node: Clone,
     T: FromClvm<Node>,
 {
-    from_clvm!(Node, f, ptr, {
+    fn from_clvm<'a>(
+        f: &mut impl FnMut(&Node) -> ClvmValue<'a, Node>,
+        ptr: Node,
+    ) -> Result<Self, FromClvmError> {
         if let ClvmValue::Atom(&[]) = f(&ptr) {
             Ok(None)
         } else {
             Ok(Some(T::from_clvm(f, ptr)?))
         }
-    });
+    }
 }
 
 impl<Node> FromClvm<Node> for String
 where
     Node: Clone,
 {
-    from_clvm!(Node, f, ptr, {
+    fn from_clvm<'a>(
+        f: &mut impl FnMut(&Node) -> ClvmValue<'a, Node>,
+        ptr: Node,
+    ) -> Result<Self, FromClvmError> {
         if let ClvmValue::Atom(bytes) = f(&ptr) {
             Ok(Self::from_utf8(bytes.to_vec())?)
         } else {
             Err(FromClvmError::ExpectedAtom)
         }
-    });
+    }
 }
 
 #[cfg(test)]

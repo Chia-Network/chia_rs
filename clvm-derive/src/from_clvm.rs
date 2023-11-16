@@ -324,9 +324,12 @@ fn generate_from_clvm(
     quote! {
         #[automatically_derived]
         impl #impl_generics #crate_name::FromClvm<#node_name> for #item_name #ty_generics #where_clause {
-            #crate_name::from_clvm!(Node, f, ptr, {
+            fn from_clvm<'a>(
+                f: &mut impl FnMut(&#node_name) -> #crate_name::ClvmValue<'a, #node_name>,
+                ptr: #node_name,
+            ) -> ::std::result::Result<Self, #crate_name::FromClvmError> {
                 #body
-            });
+            }
         }
     }
 }
