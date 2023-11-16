@@ -44,12 +44,12 @@ pub fn parse_repr(attrs: &[Attribute]) -> Option<Repr> {
                 for arg in args {
                     let existing = repr;
 
-                    match arg.to_string().as_str() {
-                        "tuple" => repr = Some(Repr::Tuple),
-                        "list" => repr = Some(Repr::List),
-                        "curry" => repr = Some(Repr::Curry),
+                    repr = Some(match arg.to_string().as_str() {
+                        "tuple" => Repr::Tuple,
+                        "list" => Repr::List,
+                        "curry" => Repr::Curry,
                         ident => panic!("unknown argument `{ident}`"),
-                    }
+                    });
 
                     if let Some(existing) = existing {
                         panic!("`{arg}` conflicts with `{existing}`");
