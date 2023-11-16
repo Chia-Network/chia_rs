@@ -93,25 +93,25 @@ mod tests {
     fn test_proper_list() {
         #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
         #[clvm(list)]
-        struct ProperListStruct {
+        struct ListStruct {
             a: u64,
             b: i32,
         }
 
-        check(ProperListStruct { a: 52, b: -32 }, "ff34ff81e080");
+        check(ListStruct { a: 52, b: -32 }, "ff34ff81e080");
     }
 
     #[test]
     fn test_curried_args() {
         #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
         #[clvm(curry)]
-        struct CurriedArgsStruct {
+        struct CurryStruct {
             a: u64,
             b: i32,
         }
 
         check(
-            CurriedArgsStruct { a: 52, b: -32 },
+            CurryStruct { a: 52, b: -32 },
             "ff04ffff0134ffff04ffff0181e0ff018080",
         );
     }
