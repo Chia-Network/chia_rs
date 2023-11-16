@@ -90,7 +90,7 @@ mod tests {
     }
 
     #[test]
-    fn test_proper_list() {
+    fn test_list() {
         #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
         #[clvm(list)]
         struct ListStruct {
@@ -102,7 +102,7 @@ mod tests {
     }
 
     #[test]
-    fn test_curried_args() {
+    fn test_curry() {
         #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
         #[clvm(curry)]
         struct CurryStruct {
