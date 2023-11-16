@@ -8,8 +8,8 @@
 //! with one of the following encodings:
 //!
 //! * `#[clvm(tuple)]` for unterminated lists such as `(A . (B . C))`.
-//! * `#[clvm(proper_list)]` for proper lists such as `(A B C)`, or in other words `(A . (B . (C . ())))`.
-//! * `#[clvm(curried_args)]` for curried arguments such as `(c (q . A) (c (q . B) (c (q . C) 1)))`.
+//! * `#[clvm(list)]` for proper lists such as `(A B C)`, or in other words `(A . (B . (C . ())))`.
+//! * `#[clvm(curry)]` for curried arguments such as `(c (q . A) (c (q . B) (c (q . C) 1)))`.
 
 #![cfg_attr(
     feature = "derive",
@@ -92,7 +92,7 @@ mod tests {
     #[test]
     fn test_proper_list() {
         #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
-        #[clvm(proper_list)]
+        #[clvm(list)]
         struct ProperListStruct {
             a: u64,
             b: i32,
@@ -104,7 +104,7 @@ mod tests {
     #[test]
     fn test_curried_args() {
         #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
-        #[clvm(curried_args)]
+        #[clvm(curry)]
         struct CurriedArgsStruct {
             a: u64,
             b: i32,

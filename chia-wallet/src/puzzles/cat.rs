@@ -7,7 +7,7 @@ use hex_literal::hex;
 use crate::LineageProof;
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
-#[clvm(curried_args)]
+#[clvm(curry)]
 pub struct CatArgs {
     pub mod_hash: [u8; 32],
     pub tail_program_hash: [u8; 32],
@@ -15,13 +15,13 @@ pub struct CatArgs {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
-#[clvm(curried_args)]
+#[clvm(curry)]
 pub struct EverythingWithSignatureTailArgs {
     pub public_key: PublicKey,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
-#[clvm(proper_list)]
+#[clvm(list)]
 pub struct CatSolution {
     pub inner_puzzle_solution: NodePtr,
     pub lineage_proof: Option<LineageProof>,
@@ -33,7 +33,7 @@ pub struct CatSolution {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
-#[clvm(proper_list)]
+#[clvm(list)]
 pub struct CoinProof {
     pub parent_coin_info: [u8; 32],
     pub inner_puzzle_hash: [u8; 32],

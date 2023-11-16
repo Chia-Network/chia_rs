@@ -5,13 +5,13 @@ use clvmr::allocator::NodePtr;
 use hex_literal::hex;
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
-#[clvm(curried_args)]
+#[clvm(curry)]
 pub struct StandardArgs {
     pub synthetic_key: PublicKey,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
-#[clvm(proper_list)]
+#[clvm(list)]
 pub struct StandardSolution {
     pub original_public_key: Option<PublicKey>,
     pub delegated_puzzle: NodePtr,

@@ -16,14 +16,14 @@ pub struct SingletonStruct {
 }
 
 #[derive(FromClvm, ToClvm, Debug)]
-#[clvm(curried_args)]
+#[clvm(curry)]
 pub struct SingletonArgs {
     pub singleton_struct: SingletonStruct,
     pub inner_puzzle: NodePtr,
 }
 
 #[derive(FromClvm, ToClvm, Debug)]
-#[clvm(proper_list)]
+#[clvm(list)]
 pub struct LineageProof {
     pub parent_parent_coin_id: Bytes32,
     pub parent_inner_puzzle_hash: Bytes32,
@@ -31,7 +31,7 @@ pub struct LineageProof {
 }
 
 #[derive(FromClvm, ToClvm, Debug)]
-#[clvm(proper_list)]
+#[clvm(list)]
 pub struct SingletonSolution {
     pub lineage_proof: LineageProof,
     pub amount: u64,
