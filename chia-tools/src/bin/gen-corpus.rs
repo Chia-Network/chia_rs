@@ -11,7 +11,7 @@ use chia_traits::streamable::Streamable;
 use chia_protocol::bytes::Bytes32;
 use chia_protocol::{coin::Coin, coin_spend::CoinSpend, program::Program};
 use chia_wallet::singleton::SINGLETON_TOP_LAYER_PUZZLE_HASH;
-use clvm_traits::FromClvm;
+use clvm_traits::{FromClvm, FromNodePtr};
 use clvm_utils::{tree_hash, CurriedProgram};
 use clvmr::allocator::NodePtr;
 use clvmr::Allocator;
@@ -74,10 +74,11 @@ fn main() {
                     max_cost,
                     |a, parent_coin_info, amount, puzzle, solution| {
                         let puzzle_hash = Bytes32::from(tree_hash(a, puzzle));
-                        let mod_hash = match CurriedProgram::<NodePtr>::from_clvm(a, puzzle) {
-                            Ok(uncurried) => Bytes32::from(tree_hash(a, uncurried.program)),
-                            _ => puzzle_hash,
-                        };
+                        let mod_hash =
+                            match CurriedProgram::<NodePtr, NodePtr>::from_clvm(a, puzzle) {
+                                Ok(uncurried) => Bytes32::from(tree_hash(a, uncurried.program)),
+                                _ => puzzle_hash,
+                            };
 
                         let run_puzzle = seen_puzzles.lock().unwrap().insert(mod_hash);
                         let fast_forward = (mod_hash == SINGLETON_TOP_LAYER_PUZZLE_HASH)
@@ -88,8 +89,9 @@ fn main() {
                         }
                         use std::fs::write;
 
-                        let puzzle_reveal = Program::from_clvm(a, puzzle).expect("puzzle reveal");
-                        let solution = Program::from_clvm(a, solution).expect("solution");
+                        let puzzle_reveal =
+                            Program::from_node_ptr(a, puzzle).expect("puzzle reveal");
+                        let solution = Program::from_node_ptr(a, solution).expect("solution");
                         let coin = Coin {
                             parent_coin_info,
                             puzzle_hash,
