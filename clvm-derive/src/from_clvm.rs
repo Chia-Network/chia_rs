@@ -43,7 +43,7 @@ pub fn from_clvm(mut ast: DeriveInput) -> TokenStream {
     // `match_macro` decodes a nested tuple containing each of the struct field types within.
     // `destructure_macro` destructures the values into the field names, to be stored in the struct.
     let (match_macro, destructure_macro) = match args.repr {
-        Repr::ProperList => (
+        Repr::List => (
             quote!( #crate_name::match_list ),
             quote!( #crate_name::destructure_list ),
         ),
@@ -51,7 +51,7 @@ pub fn from_clvm(mut ast: DeriveInput) -> TokenStream {
             quote!( #crate_name::match_tuple ),
             quote!( #crate_name::destructure_tuple ),
         ),
-        Repr::CurriedArgs => (
+        Repr::Curry => (
             quote!( #crate_name::match_curried_args ),
             quote!( #crate_name::destructure_curried_args ),
         ),

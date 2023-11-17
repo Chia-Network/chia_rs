@@ -1,20 +1,22 @@
+use std::fmt;
+
 use proc_macro2::Ident;
 use syn::{punctuated::Punctuated, Attribute, GenericParam, Generics, Token, TypeParamBound};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Repr {
     Tuple,
-    ProperList,
-    CurriedArgs,
+    List,
+    Curry,
 }
 
-impl ToString for Repr {
-    fn to_string(&self) -> String {
-        match self {
-            Self::Tuple => "tuple".to_string(),
-            Self::ProperList => "proper_list".to_string(),
-            Self::CurriedArgs => "curried_args".to_string(),
-        }
+impl fmt::Display for Repr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Tuple => "tuple",
+            Self::List => "list",
+            Self::Curry => "curry",
+        })
     }
 }
 
@@ -23,8 +25,15 @@ pub struct ClvmDeriveArgs {
 }
 
 pub fn parse_args(attrs: &[Attribute]) -> ClvmDeriveArgs {
-    let mut repr: Option<Repr> = None;
+    let repr = parse_repr(attrs);
+    ClvmDeriveArgs {
+        repr: repr
+            .expect("expected clvm attribute parameter of either `tuple`, `list`, or `curry`"),
+    }
+}
 
+pub fn parse_repr(attrs: &[Attribute]) -> Option<Repr> {
+    let mut repr: Option<Repr> = None;
     for attr in attrs {
         if let Some(ident) = attr.path().get_ident() {
             if ident == "clvm" {
@@ -33,37 +42,23 @@ pub fn parse_args(attrs: &[Attribute]) -> ClvmDeriveArgs {
                     .unwrap();
 
                 for arg in args {
-                    match arg.to_string().as_str() {
-                        "tuple" => {
-                            if let Some(existing) = repr {
-                                panic!("`tuple` conflicts with `{}`", existing.to_string());
-                            }
-                            repr = Some(Repr::Tuple);
-                        }
-                        "proper_list" => {
-                            if let Some(existing) = repr {
-                                panic!("`proper_list` conflicts with `{}`", existing.to_string());
-                            }
-                            repr = Some(Repr::ProperList);
-                        }
-                        "curried_args" => {
-                            if let Some(existing) = repr {
-                                panic!("`curried_args` conflicts with `{}`", existing.to_string());
-                            }
-                            repr = Some(Repr::CurriedArgs);
-                        }
-                        ident => panic!("unknown argument `{}`", ident),
+                    let existing = repr;
+
+                    repr = Some(match arg.to_string().as_str() {
+                        "tuple" => Repr::Tuple,
+                        "list" => Repr::List,
+                        "curry" => Repr::Curry,
+                        ident => panic!("unknown argument `{ident}`"),
+                    });
+
+                    if let Some(existing) = existing {
+                        panic!("`{arg}` conflicts with `{existing}`");
                     }
                 }
             }
         }
     }
-
-    ClvmDeriveArgs {
-        repr: repr.expect(
-            "expected clvm attribute parameter of either `tuple`, `proper_list`, or `curried_args`",
-        ),
-    }
+    repr
 }
 
 pub fn add_trait_bounds(generics: &mut Generics, bound: TypeParamBound) {

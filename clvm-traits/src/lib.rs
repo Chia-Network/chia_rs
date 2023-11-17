@@ -8,8 +8,8 @@
 //! with one of the following encodings:
 //!
 //! * `#[clvm(tuple)]` for unterminated lists such as `(A . (B . C))`.
-//! * `#[clvm(proper_list)]` for proper lists such as `(A B C)`, or in other words `(A . (B . (C . ())))`.
-//! * `#[clvm(curried_args)]` for curried arguments such as `(c (q . A) (c (q . B) (c (q . C) 1)))`.
+//! * `#[clvm(list)]` for proper lists such as `(A B C)`, or in other words `(A . (B . (C . ())))`.
+//! * `#[clvm(curry)]` for curried arguments such as `(c (q . A) (c (q . B) (c (q . C) 1)))`.
 
 #![cfg_attr(
     feature = "derive",
@@ -90,28 +90,28 @@ mod tests {
     }
 
     #[test]
-    fn test_proper_list() {
+    fn test_list() {
         #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
-        #[clvm(proper_list)]
-        struct ProperListStruct {
+        #[clvm(list)]
+        struct ListStruct {
             a: u64,
             b: i32,
         }
 
-        check(ProperListStruct { a: 52, b: -32 }, "ff34ff81e080");
+        check(ListStruct { a: 52, b: -32 }, "ff34ff81e080");
     }
 
     #[test]
-    fn test_curried_args() {
+    fn test_curry() {
         #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
-        #[clvm(curried_args)]
-        struct CurriedArgsStruct {
+        #[clvm(curry)]
+        struct CurryStruct {
             a: u64,
             b: i32,
         }
 
         check(
-            CurriedArgsStruct { a: 52, b: -32 },
+            CurryStruct { a: 52, b: -32 },
             "ff04ffff0134ffff04ffff0181e0ff018080",
         );
     }

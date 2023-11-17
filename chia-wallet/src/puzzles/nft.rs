@@ -6,7 +6,7 @@ use hex_literal::hex;
 use crate::singleton::SingletonStruct;
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
-#[clvm(curried_args)]
+#[clvm(curry)]
 pub struct NftIntermediateLauncherArgs {
     pub launcher_puzzle_hash: [u8; 32],
     pub mint_number: usize,
@@ -14,7 +14,7 @@ pub struct NftIntermediateLauncherArgs {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
-#[clvm(curried_args)]
+#[clvm(curry)]
 pub struct NftStateLayerArgs {
     pub mod_hash: [u8; 32],
     pub metadata: NodePtr,
@@ -23,13 +23,13 @@ pub struct NftStateLayerArgs {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
-#[clvm(proper_list)]
+#[clvm(list)]
 pub struct NftStateLayerSolution {
     pub inner_solution: NodePtr,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
-#[clvm(curried_args)]
+#[clvm(curry)]
 pub struct NftOwnershipLayerArgs {
     pub mod_hash: [u8; 32],
     pub current_owner: Option<[u8; 32]>,
@@ -38,13 +38,13 @@ pub struct NftOwnershipLayerArgs {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
-#[clvm(proper_list)]
+#[clvm(list)]
 pub struct NftOwnershipLayerSolution {
     pub inner_solution: NodePtr,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
-#[clvm(curried_args)]
+#[clvm(curry)]
 pub struct NftRoyaltyTransferPuzzleArgs {
     pub singleton_struct: SingletonStruct,
     pub royalty_puzzle_hash: [u8; 32],
