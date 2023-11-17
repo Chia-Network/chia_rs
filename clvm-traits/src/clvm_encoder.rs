@@ -12,6 +12,9 @@ pub trait ClvmEncoder {
         rest: Self::Node,
     ) -> Result<Self::Node, ToClvmError>;
 
+    /// This is a helper function that just calls `clone` on the node.
+    /// It's required only because the compiler can't infer that `N` is `Clone`,
+    /// since there's no `Clone` bound on the `ToClvm` trait.
     fn clone_node(&self, node: &Self::Node) -> Self::Node {
         node.clone()
     }
