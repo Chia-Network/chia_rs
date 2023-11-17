@@ -17,9 +17,9 @@ pub struct SingletonStruct {
 
 #[derive(FromClvm, ToClvm, Debug)]
 #[clvm(curry)]
-pub struct SingletonArgs {
+pub struct SingletonArgs<I> {
     pub singleton_struct: SingletonStruct,
-    pub inner_puzzle: NodePtr,
+    pub inner_puzzle: I,
 }
 
 #[derive(FromClvm, ToClvm, Debug)]
@@ -32,10 +32,10 @@ pub struct LineageProof {
 
 #[derive(FromClvm, ToClvm, Debug)]
 #[clvm(list)]
-pub struct SingletonSolution {
+pub struct SingletonSolution<I> {
     pub lineage_proof: LineageProof,
     pub amount: u64,
-    pub inner_solution: NodePtr,
+    pub inner_solution: I,
 }
 
 // TODO: replace this with a generic function to compute the hash of curried
@@ -110,8 +110,8 @@ pub fn fast_forward_singleton(
         return Err(Error::PuzzleHashMismatch);
     }
 
-    let singleton = CurriedProgram::<SingletonArgs>::from_clvm(a, puzzle)?;
-    let mut new_solution = SingletonSolution::from_clvm(a, solution)?;
+    let singleton = CurriedProgram::<NodePtr, SingletonArgs<NodePtr>>::from_clvm(a, puzzle)?;
+    let mut new_solution = SingletonSolution::<NodePtr>::from_clvm(a, solution)?;
 
     // this is the tree hash of the singleton top layer puzzle
     // the tree hash of singleton_top_layer_v1_1.clsp
@@ -186,6 +186,7 @@ mod tests {
     use crate::gen::run_puzzle::run_puzzle;
     use chia_protocol::CoinSpend;
     use chia_traits::streamable::Streamable;
+    use clvm_traits::ToNodePtr;
     use clvmr::serde::{node_from_bytes, node_to_bytes};
     use hex_literal::hex;
     use rstest::rstest;
@@ -213,8 +214,8 @@ mod tests {
         let new_parents_parent = hex::decode(new_parents_parent).unwrap();
 
         let mut a = Allocator::new_limited(500000000, 62500000, 62500000);
-        let puzzle = spend.puzzle_reveal.to_clvm(&mut a).expect("to_clvm");
-        let solution = spend.solution.to_clvm(&mut a).expect("to_clvm");
+        let puzzle = spend.puzzle_reveal.to_node_ptr(&mut a).expect("to_clvm");
+        let solution = spend.solution.to_node_ptr(&mut a).expect("to_clvm");
         let puzzle_hash = Bytes32::from(tree_hash(&a, puzzle));
 
         let new_parent_coin = Coin {
@@ -279,7 +280,7 @@ mod tests {
             &hex!("abababababababababababababababababababababababababababababababab");
 
         let mut a = Allocator::new_limited(500000000, 62500000, 62500000);
-        let puzzle = spend.puzzle_reveal.to_clvm(&mut a).expect("to_clvm");
+        let puzzle = spend.puzzle_reveal.to_node_ptr(&mut a).expect("to_clvm");
         let puzzle_hash = Bytes32::from(tree_hash(&a, puzzle));
 
         let mut new_parent_coin = Coin {
@@ -371,24 +372,27 @@ mod tests {
         );
     }
 
-    fn parse_solution(a: &mut Allocator, solution: &[u8]) -> SingletonSolution {
+    fn parse_solution(a: &mut Allocator, solution: &[u8]) -> SingletonSolution<NodePtr> {
         let new_solution = node_from_bytes(a, solution).expect("parse solution");
         SingletonSolution::from_clvm(a, new_solution).expect("parse solution")
     }
 
-    fn serialize_solution(a: &mut Allocator, solution: &SingletonSolution) -> Vec<u8> {
+    fn serialize_solution(a: &mut Allocator, solution: &SingletonSolution<NodePtr>) -> Vec<u8> {
         let new_solution = solution.to_clvm(a).expect("to_clvm");
         node_to_bytes(a, new_solution).expect("serialize solution")
     }
 
-    fn parse_singleton(a: &mut Allocator, puzzle: &[u8]) -> CurriedProgram<SingletonArgs> {
+    fn parse_singleton(
+        a: &mut Allocator,
+        puzzle: &[u8],
+    ) -> CurriedProgram<NodePtr, SingletonArgs<NodePtr>> {
         let puzzle = node_from_bytes(a, puzzle).expect("parse puzzle");
-        CurriedProgram::<SingletonArgs>::from_clvm(a, puzzle).expect("uncurry")
+        CurriedProgram::<NodePtr, SingletonArgs<NodePtr>>::from_clvm(a, puzzle).expect("uncurry")
     }
 
     fn serialize_singleton(
         a: &mut Allocator,
-        singleton: &CurriedProgram<SingletonArgs>,
+        singleton: &CurriedProgram<NodePtr, SingletonArgs<NodePtr>>,
     ) -> Vec<u8> {
         let puzzle = singleton.to_clvm(a).expect("to_clvm");
         node_to_bytes(a, puzzle).expect("serialize puzzle")

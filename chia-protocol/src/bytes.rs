@@ -1,8 +1,6 @@
 use chia_traits::chia_error;
 use chia_traits::{read_bytes, Streamable};
-use clvm_traits::{FromClvm, ToClvm};
-use clvmr::allocator::{NodePtr, SExp};
-use clvmr::Allocator;
+use clvm_traits::{ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError, ToClvm, ToClvmError};
 use core::fmt::Formatter;
 use sha2::{Digest, Sha256};
 use std::convert::AsRef;
@@ -95,19 +93,16 @@ impl FromJsonDict for Bytes {
     }
 }
 
-impl ToClvm for Bytes {
-    fn to_clvm(&self, a: &mut Allocator) -> clvm_traits::Result<NodePtr> {
-        Ok(a.new_atom(self.0.as_slice())?)
+impl<N> ToClvm<N> for Bytes {
+    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+        encoder.encode_atom(self.0.as_slice())
     }
 }
 
-impl FromClvm for Bytes {
-    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self> {
-        if let SExp::Atom = a.sexp(ptr) {
-            Ok(Self(a.atom(ptr).to_vec()))
-        } else {
-            Err(clvm_traits::Error::ExpectedAtom(ptr))
-        }
+impl<N> FromClvm<N> for Bytes {
+    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+        let bytes = decoder.decode_atom(&node)?;
+        Ok(Self(bytes.to_vec()))
     }
 }
 
@@ -201,26 +196,22 @@ impl<const N: usize> Streamable for BytesImpl<N> {
     }
 }
 
-impl<const N: usize> ToClvm for BytesImpl<N> {
-    fn to_clvm(&self, a: &mut Allocator) -> clvm_traits::Result<NodePtr> {
-        Ok(a.new_atom(self.0.as_slice())?)
+impl<N, const LEN: usize> ToClvm<N> for BytesImpl<LEN> {
+    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+        encoder.encode_atom(self.0.as_slice())
     }
 }
 
-impl<const N: usize> FromClvm for BytesImpl<N> {
-    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self> {
-        let blob = match a.sexp(ptr) {
-            SExp::Atom => {
-                if a.atom_len(ptr) != N {
-                    return Err(clvm_traits::Error::Custom("invalid size".to_string()));
-                }
-                a.atom(ptr)
-            }
-            _ => {
-                return Err(clvm_traits::Error::ExpectedAtom(ptr));
-            }
-        };
-        Ok(Self::from(blob))
+impl<N, const LEN: usize> FromClvm<N> for BytesImpl<LEN> {
+    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+        let bytes = decoder.decode_atom(&node)?;
+        if bytes.len() != LEN {
+            return Err(FromClvmError::WrongAtomLength {
+                expected: LEN,
+                found: bytes.len(),
+            });
+        }
+        Ok(Self::from(bytes))
     }
 }
 
@@ -425,7 +416,10 @@ impl<'py> FromPyObject<'py> for Bytes {
 mod tests {
     use super::*;
 
-    use clvmr::serde::{node_from_bytes, node_to_bytes};
+    use clvmr::{
+        serde::{node_from_bytes, node_to_bytes},
+        Allocator,
+    };
     use rstest::rstest;
 
     #[rstest]
@@ -690,15 +684,12 @@ mod tests {
         let bytes =
             hex::decode("f07522495060c066f66f32acc2a77e3a3e737aca8baea4d1a64ea4cdc13da9").unwrap();
         let ptr = a.new_atom(&bytes).unwrap();
-        assert_eq!(
-            Bytes32::from_clvm(a, ptr).unwrap_err(),
-            clvm_traits::Error::Custom("invalid size".to_string())
-        );
+        assert!(Bytes32::from_clvm(a, ptr).is_err());
 
         let ptr = a.new_pair(a.one(), a.one()).unwrap();
         assert_eq!(
             Bytes32::from_clvm(a, ptr).unwrap_err(),
-            clvm_traits::Error::ExpectedAtom(ptr)
+            FromClvmError::ExpectedAtom
         );
     }
 }

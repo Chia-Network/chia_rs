@@ -1,7 +1,7 @@
 use crate::bytes::Bytes;
 use chia_traits::chia_error::{Error, Result};
 use chia_traits::Streamable;
-use clvm_traits::{FromClvm, ToClvm};
+use clvm_traits::{FromClvmError, FromNodePtr, ToClvmError, ToNodePtr};
 use clvmr::allocator::NodePtr;
 use clvmr::serde::{node_from_bytes, node_to_bytes, serialized_length_from_bytes};
 use clvmr::Allocator;
@@ -105,20 +105,19 @@ impl FromJsonDict for Program {
     }
 }
 
-impl FromClvm for Program {
-    fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self> {
+impl FromNodePtr for Program {
+    fn from_node_ptr(a: &Allocator, node: NodePtr) -> std::result::Result<Self, FromClvmError> {
         Ok(Self(
-            node_to_bytes(a, ptr)
-                .map_err(|error| clvm_traits::Error::Custom(error.to_string()))?
+            node_to_bytes(a, node)
+                .map_err(|error| FromClvmError::Custom(error.to_string()))?
                 .into(),
         ))
     }
 }
 
-impl ToClvm for Program {
-    fn to_clvm(&self, a: &mut Allocator) -> clvm_traits::Result<NodePtr> {
-        node_from_bytes(a, self.0.as_ref())
-            .map_err(|error| clvm_traits::Error::Custom(error.to_string()))
+impl ToNodePtr for Program {
+    fn to_node_ptr(&self, a: &mut Allocator) -> std::result::Result<NodePtr, ToClvmError> {
+        node_from_bytes(a, self.0.as_ref()).map_err(|error| ToClvmError::Custom(error.to_string()))
     }
 }
 
@@ -139,9 +138,9 @@ mod tests {
         let expected_bytes = hex::decode(expected).unwrap();
 
         let ptr = node_from_bytes(a, &expected_bytes).unwrap();
-        let program = Program::from_clvm(a, ptr).unwrap();
+        let program = Program::from_node_ptr(a, ptr).unwrap();
 
-        let round_trip = program.to_clvm(a).unwrap();
+        let round_trip = program.to_node_ptr(a).unwrap();
         assert_eq!(expected, hex::encode(node_to_bytes(a, round_trip).unwrap()));
     }
 }

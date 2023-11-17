@@ -1,7 +1,6 @@
 use chia_bls::PublicKey;
 use clvm_traits::{FromClvm, ToClvm};
 use clvm_utils::{curry_tree_hash, tree_hash_atom};
-use clvmr::allocator::NodePtr;
 use hex_literal::hex;
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
@@ -12,10 +11,10 @@ pub struct StandardArgs {
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(list)]
-pub struct StandardSolution {
+pub struct StandardSolution<P, S> {
     pub original_public_key: Option<PublicKey>,
-    pub delegated_puzzle: NodePtr,
-    pub solution: NodePtr,
+    pub delegated_puzzle: P,
+    pub solution: S,
 }
 
 pub fn standard_puzzle_hash(synthetic_key: &PublicKey) -> [u8; 32] {
