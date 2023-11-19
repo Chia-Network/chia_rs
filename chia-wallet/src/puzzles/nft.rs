@@ -53,7 +53,7 @@ pub struct NftRoyaltyTransferPuzzleArgs {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(derive, fuzzing)]
+#[cfg_attr(fuzzing, derive(Arbitrary))]
 pub struct NftMetadata {
     pub edition_number: u64,
     pub edition_total: u64,
