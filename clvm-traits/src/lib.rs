@@ -53,7 +53,6 @@ pub use clvm_decoder::*;
 pub use clvm_encoder::*;
 pub use error::*;
 pub use from_clvm::*;
-pub use macros::*;
 pub use match_byte::*;
 pub use to_clvm::*;
 pub use wrappers::*;
