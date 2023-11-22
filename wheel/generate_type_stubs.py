@@ -163,7 +163,7 @@ extra_members = {
         "total_iters: int",
         "height: int",
         "weight: int",
-        "def get_included_reward_coins(self) -> Set[Coin]: ...",
+        "def get_included_reward_coins(self) -> List[Coin]: ...",
         "def is_fully_compactified(self) -> bool: ...",
     ],
     "HeaderBlock": [
