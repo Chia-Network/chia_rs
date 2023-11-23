@@ -43,3 +43,25 @@ macro_rules! streamable_struct {
         }
     }
 }
+
+#[macro_export]
+macro_rules! streamable_struct2 {
+    ($name:ident {$($field:ident: $t:ty $(,)? )*}) => {
+        #[wasm_bindgen]
+        #[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
+        pub struct $name {
+            $(
+                #[wasm_bindgen]
+                pub $field: $t
+            ),*
+        }
+
+        #[cfg(not(feature = "py-bindings"))]
+        #[allow(clippy::too_many_arguments)]
+        impl $name {
+            pub fn new ( $($field: $t),* ) -> $name {
+                $name { $($field),* }
+            }
+        }
+    }
+}
