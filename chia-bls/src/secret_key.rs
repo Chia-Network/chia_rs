@@ -213,7 +213,10 @@ impl AddAssign<&SecretKey> for SecretKey {
 
 impl fmt::Debug for SecretKey {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str(&hex::encode(self.to_bytes()))
+        formatter.write_fmt(format_args!(
+            "<PrivateKey {}>",
+            &hex::encode(self.to_bytes())
+        ))
     }
 }
 
@@ -260,7 +263,7 @@ impl DerivableKey for SecretKey {
 }
 
 #[cfg(feature = "py-bindings")]
-#[cfg_attr(feature = "py-bindings", pymethods)]
+#[pymethods]
 impl SecretKey {
     #[classattr]
     const PRIVATE_KEY_SIZE: usize = 32;
@@ -273,9 +276,8 @@ impl SecretKey {
         self.public_key()
     }
 
-    pub fn __repr__(&self) -> String {
-        let bytes = self.to_bytes();
-        format!("<PrivateKey {}>", &hex::encode(bytes))
+    fn __str__(&self) -> pyo3::PyResult<String> {
+        Ok(hex::encode(self.to_bytes()))
     }
 }
 
@@ -411,7 +413,7 @@ mod tests {
     fn test_debug() {
         let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
         let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
-        assert_eq!(format!("{:?}", sk), sk_hex);
+        assert_eq!(format!("{:?}", sk), format!("<PrivateKey {}>", sk_hex));
     }
 
     #[test]

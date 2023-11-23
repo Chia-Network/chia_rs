@@ -51,7 +51,7 @@ impl GTElement {
     }
 }
 #[cfg(feature = "py-bindings")]
-#[cfg_attr(feature = "py-bindings", pymethods)]
+#[pymethods]
 impl GTElement {
     #[classattr]
     #[pyo3(name = "SIZE")]
@@ -63,9 +63,8 @@ impl GTElement {
         Ok(Self::from_bytes(&bytes))
     }
 
-    pub fn __repr__(&self) -> String {
-        let bytes = self.to_bytes();
-        format!("<GTElement {}>", &hex::encode(bytes))
+    fn __str__(&self) -> pyo3::PyResult<String> {
+        Ok(hex::encode(self.to_bytes()))
     }
 
     pub fn __mul__(&self, rhs: &Self) -> Self {
@@ -137,7 +136,10 @@ impl FromJsonDict for GTElement {
 
 impl fmt::Debug for GTElement {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str(&hex::encode(self.to_bytes()))
+        formatter.write_fmt(format_args!(
+            "<GTElement {}>",
+            &hex::encode(self.to_bytes())
+        ))
     }
 }
 

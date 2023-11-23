@@ -157,7 +157,7 @@ impl PublicKey {
 }
 
 #[cfg(feature = "py-bindings")]
-#[cfg_attr(feature = "py-bindings", pymethods)]
+#[pymethods]
 impl PublicKey {
     #[classattr]
     const SIZE: usize = 48;
@@ -188,9 +188,8 @@ impl PublicKey {
         self.get_fingerprint()
     }
 
-    pub fn __repr__(&self) -> String {
-        let bytes = self.to_bytes();
-        format!("<G1Element {}>", &hex::encode(bytes))
+    fn __str__(&self) -> pyo3::PyResult<String> {
+        Ok(hex::encode(self.to_bytes()))
     }
 
     pub fn __add__(&self, rhs: &Self) -> Self {
@@ -291,7 +290,10 @@ impl Add<&PublicKey> for PublicKey {
 
 impl fmt::Debug for PublicKey {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str(&hex::encode(self.to_bytes()))
+        formatter.write_fmt(format_args!(
+            "<G1Element {}>",
+            &hex::encode(self.to_bytes())
+        ))
     }
 }
 
@@ -600,7 +602,10 @@ mod tests {
         let mut data = [0u8; 48];
         data[0] = 0xc0;
         let pk = PublicKey::from_bytes(&data).unwrap();
-        assert_eq!(format!("{:?}", pk), hex::encode(data));
+        assert_eq!(
+            format!("{:?}", pk),
+            format!("<G1Element {}>", hex::encode(data))
+        );
     }
 
     #[test]
