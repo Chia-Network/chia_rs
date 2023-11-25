@@ -190,7 +190,6 @@ mod tests {
     use hex_literal::hex;
     use rstest::rstest;
     use std::fs;
-    use std::io::Cursor;
 
     // this test loads CoinSpends from file (Coin, puzzle, solution)-triples
     // and "fast-forwards" the spend onto a few different parent-parent coins
@@ -208,8 +207,7 @@ mod tests {
         new_parents_parent: &str,
     ) {
         let spend_bytes = fs::read(format!("ff-tests/{spend_file}.spend")).expect("read file");
-        let spend =
-            CoinSpend::parse(&mut Cursor::new(spend_bytes.as_slice())).expect("parse CoinSpend");
+        let spend = CoinSpend::from_bytes(&spend_bytes).expect("parse CoinSpend");
         let new_parents_parent = hex::decode(new_parents_parent).unwrap();
 
         let mut a = Allocator::new_limited(500000000, 62500000, 62500000);
@@ -273,8 +271,7 @@ mod tests {
         expected_err: Error,
     ) {
         let spend_bytes = fs::read("ff-tests/e3c0.spend").expect("read file");
-        let mut spend =
-            CoinSpend::parse(&mut Cursor::new(spend_bytes.as_slice())).expect("parse CoinSpend");
+        let mut spend = CoinSpend::from_bytes(&spend_bytes).expect("parse CoinSpend");
         let new_parents_parent: &[u8] =
             &hex!("abababababababababababababababababababababababababababababababab");
 

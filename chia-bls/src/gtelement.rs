@@ -1,6 +1,6 @@
 use blst::*;
 use chia_traits::chia_error::Result;
-use chia_traits::{read_bytes, Streamable};
+use chia_traits::{read_bytes, Streamable, Validation};
 use sha2::{Digest, Sha256};
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -56,12 +56,6 @@ impl GTElement {
     #[classattr]
     #[pyo3(name = "SIZE")]
     const PY_SIZE: usize = Self::SIZE;
-
-    #[staticmethod]
-    #[pyo3(name = "from_bytes_unchecked")]
-    fn py_from_bytes_unchecked(bytes: [u8; Self::SIZE]) -> Result<GTElement> {
-        Ok(Self::from_bytes(&bytes))
-    }
 
     pub fn __repr__(&self) -> String {
         let bytes = self.to_bytes();
@@ -151,7 +145,7 @@ impl Streamable for GTElement {
         Ok(())
     }
 
-    fn parse(input: &mut Cursor<&[u8]>) -> Result<Self> {
+    fn parse(input: &mut Cursor<&[u8]>, _checked: Validation) -> Result<Self> {
         Ok(GTElement::from_bytes(
             read_bytes(input, Self::SIZE)?.try_into().unwrap(),
         ))

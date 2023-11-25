@@ -64,8 +64,8 @@ pub fn chia_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::Toke
                     fn stream(&self, out: &mut Vec<u8>) -> #crate_name::chia_error::Result<()> {
                         <u8 as #crate_name::Streamable>::stream(&(*self as u8), out)
                     }
-                    fn parse(input: &mut std::io::Cursor<&[u8]>) -> #crate_name::chia_error::Result<Self> {
-                        let v = <u8 as #crate_name::Streamable>::parse(input)?;
+                    fn parse(input: &mut std::io::Cursor<&[u8]>, checked: #crate_name::Validation) -> #crate_name::chia_error::Result<Self> {
+                        let v = <u8 as #crate_name::Streamable>::parse(input, checked)?;
                         match &v {
                             #(#values => Ok(Self::#names),)*
                             _ => Err(#crate_name::chia_error::Error::InvalidEnum),
@@ -107,8 +107,8 @@ pub fn chia_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::Toke
                     #(self.#fnames.stream(out)?;)*
                     Ok(())
                 }
-                fn parse(input: &mut std::io::Cursor<&[u8]>) -> #crate_name::chia_error::Result<Self> {
-                    Ok(Self { #( #fnames: <#ftypes as #crate_name::Streamable>::parse(input)?, )* })
+                fn parse(input: &mut std::io::Cursor<&[u8]>, checked: #crate_name::Validation) -> #crate_name::chia_error::Result<Self> {
+                    Ok(Self { #( #fnames: <#ftypes as #crate_name::Streamable>::parse(input, checked)?, )* })
                 }
             }
         };
@@ -123,8 +123,8 @@ pub fn chia_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::Toke
                     #(self.#findices.stream(out)?;)*
                     Ok(())
                 }
-                fn parse(input: &mut std::io::Cursor<&[u8]>) -> #crate_name::chia_error::Result<Self> {
-                    Ok(Self( #( <#ftypes as #crate_name::Streamable>::parse(input)?, )* ))
+                fn parse(input: &mut std::io::Cursor<&[u8]>, checked: #crate_name::Validation) -> #crate_name::chia_error::Result<Self> {
+                    Ok(Self( #( <#ftypes as #crate_name::Streamable>::parse(input, checked)?, )* ))
                 }
             }
         };

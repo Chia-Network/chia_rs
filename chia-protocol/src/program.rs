@@ -1,6 +1,6 @@
 use crate::bytes::Bytes;
 use chia_traits::chia_error::{Error, Result};
-use chia_traits::Streamable;
+use chia_traits::{Streamable, Validation};
 use clvm_traits::{FromClvm, ToClvm};
 use clvmr::allocator::NodePtr;
 use clvmr::serde::{node_from_bytes, node_to_bytes, serialized_length_from_bytes};
@@ -69,7 +69,7 @@ impl Streamable for Program {
         Ok(())
     }
 
-    fn parse(input: &mut Cursor<&[u8]>) -> Result<Self> {
+    fn parse(input: &mut Cursor<&[u8]>, _checked: Validation) -> Result<Self> {
         let pos = input.position();
         let buf: &[u8] = &input.get_ref()[pos as usize..];
         let len = serialized_length_from_bytes(buf).map_err(|_e| Error::EndOfBuffer)?;

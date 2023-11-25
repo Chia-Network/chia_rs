@@ -1,6 +1,6 @@
 use crate::{Error, GTElement, PublicKey, Result, SecretKey};
 use blst::*;
-use chia_traits::{read_bytes, Streamable};
+use chia_traits::{read_bytes, Streamable, Validation};
 use clvm_traits::{FromClvm, ToClvm};
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use sha2::{Digest, Sha256};
@@ -145,10 +145,16 @@ impl Streamable for Signature {
         Ok(())
     }
 
-    fn parse(input: &mut Cursor<&[u8]>) -> chia_traits::chia_error::Result<Self> {
-        Ok(Self::from_bytes(
-            read_bytes(input, 96)?.try_into().unwrap(),
-        )?)
+    fn parse(
+        input: &mut Cursor<&[u8]>,
+        checked: Validation,
+    ) -> chia_traits::chia_error::Result<Self> {
+        let input = read_bytes(input, 96)?.try_into().unwrap();
+        if checked == Validation::On {
+            Ok(Self::from_bytes(input)?)
+        } else {
+            Ok(Self::from_bytes_unchecked(input)?)
+        }
     }
 }
 
@@ -279,12 +285,6 @@ impl Signature {
     #[new]
     pub fn init() -> Self {
         Self::default()
-    }
-
-    #[staticmethod]
-    #[pyo3(name = "from_bytes_unchecked")]
-    pub fn py_from_bytes_unchecked(bytes: [u8; Self::SIZE]) -> Result<Signature> {
-        Self::from_bytes_unchecked(&bytes)
     }
 
     #[pyo3(name = "pair")]

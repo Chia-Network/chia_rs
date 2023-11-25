@@ -6,7 +6,7 @@ use chia::gen::validation_error::ValidationErr;
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
 use chia_protocol::CoinSpend;
-use chia_traits::streamable::Streamable;
+use chia_traits::streamable::{Streamable, Validation};
 use clvm_traits::ToClvm;
 use clvm_utils::tree_hash;
 use clvmr::serde::node_to_bytes;
@@ -16,7 +16,7 @@ use libfuzzer_sys::fuzz_target;
 use std::io::Cursor;
 
 fuzz_target!(|data: &[u8]| {
-    let Ok(spend) = CoinSpend::parse(&mut Cursor::new(data)) else {
+    let Ok(spend) = CoinSpend::parse(&mut Cursor::new(data), Validation::On) else {
         return;
     };
     let new_parents_parent =

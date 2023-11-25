@@ -1,6 +1,6 @@
 use crate::{DerivableKey, Error, PublicKey, Result};
 use blst::*;
-use chia_traits::{read_bytes, Streamable};
+use chia_traits::{read_bytes, Streamable, Validation};
 use hkdf::HkdfExtract;
 use sha2::{Digest, Sha256};
 use std::fmt;
@@ -168,7 +168,10 @@ impl Streamable for SecretKey {
         Ok(())
     }
 
-    fn parse(input: &mut Cursor<&[u8]>) -> chia_traits::chia_error::Result<Self> {
+    fn parse(
+        input: &mut Cursor<&[u8]>,
+        _checked: Validation,
+    ) -> chia_traits::chia_error::Result<Self> {
         Ok(Self::from_bytes(
             read_bytes(input, 32)?.try_into().unwrap(),
         )?)

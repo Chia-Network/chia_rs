@@ -21,6 +21,9 @@ pub fn test_streamable<T: Streamable + std::fmt::Debug + PartialEq>(obj: &T) {
     };
     assert_eq!(obj, &obj2);
 
+    let obj3 = T::from_bytes_unchecked(&bytes).unwrap();
+    assert_eq!(obj, &obj3);
+
     let mut ctx = Sha256::new();
     ctx.update(&bytes);
     let expect_hash: [u8; 32] = ctx.finalize().into();

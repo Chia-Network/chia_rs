@@ -1,7 +1,7 @@
 use crate::secret_key::is_all_zero;
 use crate::{DerivableKey, Error, Result};
 use blst::*;
-use chia_traits::{read_bytes, Streamable};
+use chia_traits::{read_bytes, Streamable, Validation};
 use clvm_traits::{FromClvm, ToClvm};
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use sha2::{digest::FixedOutput, Digest, Sha256};
@@ -168,12 +168,6 @@ impl PublicKey {
     }
 
     #[staticmethod]
-    #[pyo3(name = "from_bytes_unchecked")]
-    fn py_from_bytes_unchecked(bytes: [u8; Self::SIZE]) -> Result<Self> {
-        Self::from_bytes_unchecked(&bytes)
-    }
-
-    #[staticmethod]
     #[pyo3(name = "generator")]
     pub fn py_generator() -> Self {
         Self::generator()
@@ -219,10 +213,13 @@ impl Streamable for PublicKey {
         Ok(())
     }
 
-    fn parse(input: &mut Cursor<&[u8]>) -> chia_traits::Result<Self> {
-        Ok(Self::from_bytes(
-            read_bytes(input, 48)?.try_into().unwrap(),
-        )?)
+    fn parse(input: &mut Cursor<&[u8]>, checked: Validation) -> chia_traits::Result<Self> {
+        let input = read_bytes(input, 48)?.try_into().unwrap();
+        if checked == Validation::On {
+            Ok(Self::from_bytes(input)?)
+        } else {
+            Ok(Self::from_bytes_unchecked(input)?)
+        }
     }
 }
 

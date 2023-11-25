@@ -1,6 +1,5 @@
 use clap::Parser;
 use std::fs;
-use std::io::Cursor;
 
 use chia::fast_forward::fast_forward_singleton;
 use chia_protocol::bytes::Bytes32;
@@ -31,7 +30,7 @@ fn main() {
     let args = Args::parse();
 
     let spend_bytes = fs::read(args.spend).expect("read file");
-    let spend = CoinSpend::parse(&mut Cursor::new(&spend_bytes)).expect("parse CoinSpend");
+    let spend = CoinSpend::from_bytes(&spend_bytes).expect("parse CoinSpend");
 
     let new_parents_parent: Bytes32 = hex::decode(args.new_parents_parent)
         .expect("invalid hex")

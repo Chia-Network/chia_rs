@@ -3,7 +3,7 @@ use chia::gen::conditions::MempoolVisitor;
 use chia::gen::flags::ALLOW_BACKREFS;
 use chia::gen::run_puzzle::run_puzzle;
 use chia_protocol::CoinSpend;
-use chia_traits::streamable::Streamable;
+use chia_traits::streamable::{Streamable, Validation};
 use clvmr::Allocator;
 use libfuzzer_sys::fuzz_target;
 use std::io::Cursor;
@@ -11,7 +11,7 @@ use std::io::Cursor;
 fuzz_target!(|data: &[u8]| {
     let mut a = Allocator::new();
 
-    let Ok(spend) = CoinSpend::parse(&mut Cursor::new(data)) else {
+    let Ok(spend) = CoinSpend::parse(&mut Cursor::new(data), Validation::On) else {
         return;
     };
     let _ = run_puzzle::<MempoolVisitor>(
