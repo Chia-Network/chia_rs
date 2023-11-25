@@ -324,7 +324,7 @@ impl Streamable for Program {
         Ok(())
     }
 
-    fn parse(input: &mut Cursor<&[u8]>) -> Result<Self> {
+    fn parse<const TRUSTED: bool>(input: &mut Cursor<&[u8]>) -> Result<Self> {
         let pos = input.position();
         let buf: &[u8] = &input.get_ref()[pos as usize..];
         let len = serialized_length_from_bytes(buf).map_err(|_e| Error::EndOfBuffer)?;

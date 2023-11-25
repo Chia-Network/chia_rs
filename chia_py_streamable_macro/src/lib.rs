@@ -26,7 +26,7 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 impl<'a> pyo3::conversion::FromPyObject<'a> for #ident {
                     fn extract(ob: &'a pyo3::PyAny) -> pyo3::PyResult<Self> {
                         let v: u8 = ob.extract()?;
-                        <Self as #crate_name::Streamable>::parse(&mut std::io::Cursor::<&[u8]>::new(&[v])).map_err(|e| e.into())
+                        <Self as #crate_name::Streamable>::parse::<false>(&mut std::io::Cursor::<&[u8]>::new(&[v])).map_err(|e| e.into())
                     }
                 }
 
@@ -154,9 +154,22 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 <Self as #crate_name::Streamable>::from_bytes(slice).map_err(|e| <#crate_name::chia_error::Error as Into<pyo3::PyErr>>::into(e))
             }
 
+            #[staticmethod]
+            #[pyo3(name = "from_bytes_unchecked")]
+            pub fn py_from_bytes_unchecked(blob: pyo3::buffer::PyBuffer<u8>) -> pyo3::PyResult<Self> {
+                if !blob.is_c_contiguous() {
+                    panic!("from_bytes_unchecked() must be called with a contiguous buffer");
+                }
+                let slice = unsafe {
+                    std::slice::from_raw_parts(blob.buf_ptr() as *const u8, blob.len_bytes())
+                };
+                <Self as #crate_name::Streamable>::from_bytes_unchecked(slice).map_err(|e| <#crate_name::chia_error::Error as Into<pyo3::PyErr>>::into(e))
+            }
+
             // returns the type as well as the number of bytes read from the buffer
             #[staticmethod]
-            pub fn parse_rust<'p>(blob: pyo3::buffer::PyBuffer<u8>) -> pyo3::PyResult<(Self, u32)> {
+            #[pyo3(signature= (blob, trusted=false))]
+            pub fn parse_rust<'p>(blob: pyo3::buffer::PyBuffer<u8>, trusted: bool) -> pyo3::PyResult<(Self, u32)> {
                 if !blob.is_c_contiguous() {
                     panic!("parse_rust() must be called with a contiguous buffer");
                 }
@@ -164,7 +177,11 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                     std::slice::from_raw_parts(blob.buf_ptr() as *const u8, blob.len_bytes())
                 };
                 let mut input = std::io::Cursor::<&[u8]>::new(slice);
-                <Self as #crate_name::Streamable>::parse(&mut input).map_err(|e| <#crate_name::chia_error::Error as Into<pyo3::PyErr>>::into(e)).map(|v| (v, input.position() as u32))
+                if trusted {
+                    <Self as #crate_name::Streamable>::parse::<true>(&mut input).map_err(|e| <#crate_name::chia_error::Error as Into<pyo3::PyErr>>::into(e)).map(|v| (v, input.position() as u32))
+                } else {
+                    <Self as #crate_name::Streamable>::parse::<false>(&mut input).map_err(|e| <#crate_name::chia_error::Error as Into<pyo3::PyErr>>::into(e)).map(|v| (v, input.position() as u32))
+                }
             }
 
             pub fn get_hash<'p>(&self, py: pyo3::Python<'p>) -> pyo3::PyResult<&'p pyo3::types::PyBytes> {
@@ -227,7 +244,7 @@ pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenSt
                 impl #crate_name::from_json_dict::FromJsonDict for #ident {
                     fn from_json_dict(o: &pyo3::PyAny) -> pyo3::PyResult<Self> {
                         let v = <u8 as #crate_name::from_json_dict::FromJsonDict>::from_json_dict(o)?;
-                        <Self as #crate_name::Streamable>::parse(&mut std::io::Cursor::<&[u8]>::new(&[v])).map_err(|e| e.into())
+                        <Self as #crate_name::Streamable>::parse::<false>(&mut std::io::Cursor::<&[u8]>::new(&[v])).map_err(|e| e.into())
                     }
                 }
             }

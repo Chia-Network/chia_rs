@@ -168,7 +168,9 @@ impl Streamable for SecretKey {
         Ok(())
     }
 
-    fn parse(input: &mut Cursor<&[u8]>) -> chia_traits::chia_error::Result<Self> {
+    fn parse<const TRUSTED: bool>(
+        input: &mut Cursor<&[u8]>,
+    ) -> chia_traits::chia_error::Result<Self> {
         Ok(Self::from_bytes(
             read_bytes(input, 32)?.try_into().unwrap(),
         )?)

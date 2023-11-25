@@ -16,7 +16,7 @@ use libfuzzer_sys::fuzz_target;
 use std::io::Cursor;
 
 fuzz_target!(|data: &[u8]| {
-    let Ok(spend) = CoinSpend::parse(&mut Cursor::new(data)) else {
+    let Ok(spend) = CoinSpend::parse::<false>(&mut Cursor::new(data)) else {
         return;
     };
     let new_parents_parent =

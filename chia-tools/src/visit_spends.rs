@@ -53,8 +53,8 @@ pub fn iterate_tx_blocks(
         let block_buffer =
             zstd::stream::decode_all(&mut std::io::Cursor::<Vec<u8>>::new(block_buffer))
                 .expect("failed to decompress block");
-        let block = FullBlock::parse(&mut std::io::Cursor::<&[u8]>::new(&block_buffer))
-            .expect("failed to parse FullBlock");
+        let block =
+            FullBlock::from_bytes_unchecked(&block_buffer).expect("failed to parse FullBlock");
 
         if block.transactions_info.is_none() {
             continue;
@@ -83,8 +83,8 @@ pub fn iterate_tx_blocks(
                 zstd::stream::decode_all(&mut std::io::Cursor::<Vec<u8>>::new(ref_block))
                     .expect("failed to decompress block");
 
-            let ref_block = FullBlock::parse(&mut std::io::Cursor::<&[u8]>::new(&ref_block))
-                .expect("failed to parse ref-block");
+            let ref_block =
+                FullBlock::from_bytes_unchecked(&ref_block).expect("failed to parse ref-block");
             let ref_gen = ref_block
                 .transactions_generator
                 .expect("block ref has no generator");

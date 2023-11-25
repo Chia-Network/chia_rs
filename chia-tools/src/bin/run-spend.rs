@@ -8,7 +8,6 @@ use clvm_utils::tree_hash;
 use clvm_utils::CurriedProgram;
 use clvmr::{allocator::NodePtr, Allocator};
 use hex_literal::hex;
-use std::io::Cursor;
 
 /// Run a puzzle given a solution and print the resulting conditions
 #[derive(Parser, Debug)]
@@ -238,7 +237,7 @@ fn main() {
 
     let mut a = Allocator::new();
     let spend = read(args.spend).expect("spend file not found");
-    let spend = CoinSpend::parse(&mut Cursor::new(spend.as_slice())).expect("parse CoinSpend");
+    let spend = CoinSpend::from_bytes(&spend).expect("parse CoinSpend");
 
     let puzzle = spend
         .puzzle_reveal

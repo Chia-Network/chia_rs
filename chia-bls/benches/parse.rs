@@ -1,7 +1,7 @@
 use chia_bls::secret_key::SecretKey;
 use chia_bls::signature::sign;
-use chia_bls::Signature;
 use chia_bls::PublicKey;
+use chia_bls::Signature;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
@@ -16,8 +16,8 @@ fn parse_benchmark(c: &mut Criterion) {
     let msg = b"The quick brown fox jumps over the lazy dog";
     let sig = sign(&sk, msg);
 
-	let sig_bytes = sig.to_bytes();
-	let pk_bytes = pk.to_bytes();
+    let sig_bytes = sig.to_bytes();
+    let pk_bytes = pk.to_bytes();
 
     c.bench_function("parse Signature", |b| {
         b.iter(|| {
@@ -46,4 +46,3 @@ fn parse_benchmark(c: &mut Criterion) {
 
 criterion_group!(parse, parse_benchmark);
 criterion_main!(parse);
-
