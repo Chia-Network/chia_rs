@@ -128,8 +128,9 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
         #[pyo3::pymethods]
         impl #ident {
             #[staticmethod]
-            pub fn from_json_dict(o: &pyo3::PyAny) -> pyo3::PyResult<Self> {
-                <Self as #crate_name::from_json_dict::FromJsonDict>::from_json_dict(o)
+            #[pyo3(signature=(json_dict))]
+            pub fn from_json_dict(json_dict: &pyo3::PyAny) -> pyo3::PyResult<Self> {
+                <Self as #crate_name::from_json_dict::FromJsonDict>::from_json_dict(json_dict)
             }
 
             pub fn to_json_dict(&self, py: pyo3::Python) -> pyo3::PyResult<pyo3::PyObject> {
