@@ -194,7 +194,7 @@ from chia_rs import (
     PrivateKey,
 )
 
-def test_schemes():
+def test_schemes() -> None:
     # fmt: off
     seed = bytes([
         0, 50, 6, 244, 24, 199, 1, 25, 52, 88, 192, 19, 18, 12, 89, 6,
@@ -272,7 +272,7 @@ def test_schemes():
         assert Scheme.verify(childUPk, msg, sigU_child)
 
 
-def test_vectors_invalid():
+def test_vectors_invalid() -> None:
     # Invalid inputs from https://github.com/algorand/bls_sigs_ref/blob/master/python-impl/serdesZ.py
     invalid_inputs_1 = [
         # infinity points: too short
@@ -314,7 +314,7 @@ def test_vectors_invalid():
     for s in invalid_inputs_1:
         bytes_ = binascii.unhexlify(s)
         try:
-            g1 = G1Element(bytes_)
+            g1 = G1Element.from_bytes(bytes_)
             assert False, "Failed to disallow creation of G1 element."
         except Exception as e:
             pass
@@ -322,13 +322,13 @@ def test_vectors_invalid():
     for s in invalid_inputs_2:
         bytes_ = binascii.unhexlify(s)
         try:
-            g2 = G2Element(bytes_)
+            g2 = G2Element.from_bytes(bytes_)
             assert False, "Failed to disallow creation of G2 element."
         except Exception as e:
             pass
 
 
-def test_vectors_valid():
+def test_vectors_valid() -> None:
     # The following code was used to generate these vectors
     """
     from py_ecc.bls import (
@@ -391,7 +391,7 @@ def test_vectors_valid():
     # assert bytes(sigAPop) == ref_sigAPop
 
 
-def test_readme():
+def test_readme() -> None:
     seed: bytes = bytes(
         [
             0,
@@ -518,11 +518,11 @@ def test_readme():
     assert ok
 
 
-def test_aggregate_verify_zero_items():
+def test_aggregate_verify_zero_items() -> None:
     assert AugSchemeMPL.aggregate_verify([], [], G2Element())
 
 
-def test_invalid_points():
+def test_invalid_points() -> None:
     sk1 = AugSchemeMPL.key_gen(b"1" *32)
     good_point = sk1.get_g1()
     good_point_bytes = bytes(good_point)
