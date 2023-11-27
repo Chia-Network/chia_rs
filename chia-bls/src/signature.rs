@@ -166,7 +166,10 @@ impl Hash for Signature {
 
 impl fmt::Debug for Signature {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str(&hex::encode(self.to_bytes()))
+        formatter.write_fmt(format_args!(
+            "<G2Element {}>",
+            &hex::encode(self.to_bytes())
+        ))
     }
 }
 
@@ -272,7 +275,7 @@ impl<N> ToClvm<N> for Signature {
 }
 
 #[cfg(feature = "py-bindings")]
-#[cfg_attr(feature = "py-bindings", pymethods)]
+#[pymethods]
 impl Signature {
     #[classattr]
     const SIZE: usize = 96;
@@ -299,9 +302,8 @@ impl Signature {
         Self::generator()
     }
 
-    pub fn __repr__(&self) -> String {
-        let bytes = self.to_bytes();
-        format!("<G2Element {}>", &hex::encode(bytes))
+    fn __str__(&self) -> pyo3::PyResult<String> {
+        Ok(hex::encode(self.to_bytes()))
     }
 
     pub fn __add__(&self, rhs: &Self) -> Self {
@@ -1057,7 +1059,10 @@ mod tests {
         let mut data = [0u8; 96];
         data[0] = 0xc0;
         let sig = Signature::from_bytes(&data).unwrap();
-        assert_eq!(format!("{:?}", sig), hex::encode(data));
+        assert_eq!(
+            format!("{:?}", sig),
+            format!("<G2Element {}>", hex::encode(data))
+        );
     }
 
     #[test]

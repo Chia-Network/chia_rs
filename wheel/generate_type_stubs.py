@@ -40,7 +40,6 @@ class {name}:{members}
         self{init_args}
     ) -> None: ...
     def __hash__(self) -> int: ...
-    def __str__(self) -> str: ...
     def __repr__(self) -> str: ...
     def __richcmp__(self) -> Any: ...
     def __deepcopy__(self) -> {name}: ...
@@ -288,6 +287,8 @@ class AugSchemeMPL:
         "def from_bytes_unchecked(b: bytes) -> G1Element: ...",
         "@staticmethod",
         "def generator() -> G1Element: ...",
+        "def __str__(self) -> str: ...",
+        "def __repr__(self) -> str: ...",
         "def __add__(self, other: G1Element) -> G1Element: ...",
         "def __iadd__(self, other: G1Element) -> G1Element: ...",
     ])
@@ -299,6 +300,8 @@ class AugSchemeMPL:
         "def pair(self, other: G1Element) -> GTElement: ...",
         "@staticmethod",
         "def generator() -> G2Element: ...",
+        "def __str__(self) -> str: ...",
+        "def __repr__(self) -> str: ...",
         "def __add__(self, other: G2Element) -> G2Element: ...",
         "def __iadd__(self, other: G2Element) -> G2Element: ...",
         ])
@@ -306,6 +309,8 @@ class AugSchemeMPL:
         "SIZE: ClassVar[int] = ...",
         "@staticmethod",
         "def from_bytes_unchecked(b: bytes) -> GTElement: ...",
+        "def __str__(self) -> str: ...",
+        "def __repr__(self) -> str: ...",
         "def __mul__(self, rhs: GTElement) -> GTElement: ...",
         "def __imul__(self, rhs: GTElement) -> GTElement : ...",
         ])
@@ -313,6 +318,8 @@ class AugSchemeMPL:
         "PRIVATE_KEY_SIZE: ClassVar[int] = ...",
         "def sign_g2(self, msg: bytes, dst: bytes) -> G2Element: ...",
         "def get_g1(self) -> G1Element: ...",
+        "def __str__(self) -> str: ...",
+        "def __repr__(self) -> str: ...",
         ])
 
     print_class(f, "Spend",
