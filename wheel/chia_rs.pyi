@@ -812,7 +812,7 @@ class HeaderBlock:
     total_iters: int
     log_string: str
     is_transaction_block: bool
-    first_in_sub_slots: bool
+    first_in_sub_slot: bool
     def __init__(
         self,
         finished_sub_slots: Sequence[EndOfSubSlotBundle],

@@ -175,7 +175,7 @@ extra_members = {
         "total_iters: int",
         "log_string: str",
         "is_transaction_block: bool",
-        "first_in_sub_slots: bool",
+        "first_in_sub_slot: bool",
     ],
     "RewardChainBlock": [
         "def get_unfinished(self) -> RewardChainBlockUnfinished: ...",
