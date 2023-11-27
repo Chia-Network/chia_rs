@@ -1,6 +1,7 @@
+#[cfg(fuzzing)]
 use arbitrary::Arbitrary;
-use clvm_traits::{FromClvm, Result, ToClvm};
-use clvmr::{allocator::NodePtr, Allocator};
+use chia_protocol::Bytes32;
+use clvm_traits::{ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError, Raw, ToClvm, ToClvmError};
 use hex_literal::hex;
 
 use crate::singleton::SingletonStruct;
@@ -8,59 +9,60 @@ use crate::singleton::SingletonStruct;
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curry)]
 pub struct NftIntermediateLauncherArgs {
-    pub launcher_puzzle_hash: [u8; 32],
+    pub launcher_puzzle_hash: Bytes32,
     pub mint_number: usize,
     pub mint_total: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curry)]
-pub struct NftStateLayerArgs {
-    pub mod_hash: [u8; 32],
-    pub metadata: NodePtr,
-    pub metadata_updater_puzzle_hash: [u8; 32],
-    pub inner_puzzle: NodePtr,
+pub struct NftStateLayerArgs<I, M> {
+    pub mod_hash: Bytes32,
+    pub metadata: M,
+    pub metadata_updater_puzzle_hash: Bytes32,
+    pub inner_puzzle: I,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(list)]
-pub struct NftStateLayerSolution {
-    pub inner_solution: NodePtr,
+pub struct NftStateLayerSolution<I> {
+    pub inner_solution: I,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curry)]
-pub struct NftOwnershipLayerArgs {
-    pub mod_hash: [u8; 32],
-    pub current_owner: Option<[u8; 32]>,
-    pub transfer_program: NodePtr,
-    pub inner_puzzle: NodePtr,
+pub struct NftOwnershipLayerArgs<I, P> {
+    pub mod_hash: Bytes32,
+    pub current_owner: Option<Bytes32>,
+    pub transfer_program: P,
+    pub inner_puzzle: I,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(list)]
-pub struct NftOwnershipLayerSolution {
-    pub inner_solution: NodePtr,
+pub struct NftOwnershipLayerSolution<I> {
+    pub inner_solution: I,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curry)]
 pub struct NftRoyaltyTransferPuzzleArgs {
     pub singleton_struct: SingletonStruct,
-    pub royalty_puzzle_hash: [u8; 32],
+    pub royalty_puzzle_hash: Bytes32,
     pub trade_price_percentage: u16,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Arbitrary)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(fuzzing, derive(Arbitrary))]
 pub struct NftMetadata {
     pub edition_number: u64,
     pub edition_total: u64,
     pub data_uris: Vec<String>,
-    pub data_hash: Option<[u8; 32]>,
+    pub data_hash: Option<Bytes32>,
     pub metadata_uris: Vec<String>,
-    pub metadata_hash: Option<[u8; 32]>,
+    pub metadata_hash: Option<Bytes32>,
     pub license_uris: Vec<String>,
-    pub license_hash: Option<[u8; 32]>,
+    pub license_hash: Option<Bytes32>,
 }
 
 impl Default for NftMetadata {
@@ -78,21 +80,21 @@ impl Default for NftMetadata {
     }
 }
 
-impl FromClvm for NftMetadata {
-    fn from_clvm(a: &Allocator, node: NodePtr) -> Result<Self> {
-        let items: Vec<(String, NodePtr)> = FromClvm::from_clvm(a, node)?;
+impl<N> FromClvm<N> for NftMetadata {
+    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+        let items: Vec<(String, Raw<N>)> = FromClvm::from_clvm(decoder, node)?;
         let mut metadata = Self::default();
 
         for (key, value_ptr) in items {
             match key.as_str() {
-                "sn" => metadata.edition_number = FromClvm::from_clvm(a, value_ptr)?,
-                "st" => metadata.edition_total = FromClvm::from_clvm(a, value_ptr)?,
-                "u" => metadata.data_uris = FromClvm::from_clvm(a, value_ptr)?,
-                "h" => metadata.data_hash = FromClvm::from_clvm(a, value_ptr)?,
-                "mu" => metadata.metadata_uris = FromClvm::from_clvm(a, value_ptr)?,
-                "mh" => metadata.metadata_hash = FromClvm::from_clvm(a, value_ptr)?,
-                "lu" => metadata.license_uris = FromClvm::from_clvm(a, value_ptr)?,
-                "lh" => metadata.license_hash = FromClvm::from_clvm(a, value_ptr)?,
+                "sn" => metadata.edition_number = FromClvm::from_clvm(decoder, value_ptr.0)?,
+                "st" => metadata.edition_total = FromClvm::from_clvm(decoder, value_ptr.0)?,
+                "u" => metadata.data_uris = FromClvm::from_clvm(decoder, value_ptr.0)?,
+                "h" => metadata.data_hash = FromClvm::from_clvm(decoder, value_ptr.0)?,
+                "mu" => metadata.metadata_uris = FromClvm::from_clvm(decoder, value_ptr.0)?,
+                "mh" => metadata.metadata_hash = FromClvm::from_clvm(decoder, value_ptr.0)?,
+                "lu" => metadata.license_uris = FromClvm::from_clvm(decoder, value_ptr.0)?,
+                "lh" => metadata.license_hash = FromClvm::from_clvm(decoder, value_ptr.0)?,
                 _ => (),
             }
         }
@@ -101,40 +103,40 @@ impl FromClvm for NftMetadata {
     }
 }
 
-impl ToClvm for NftMetadata {
-    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
-        let mut items: Vec<(&str, NodePtr)> = Vec::new();
+impl<N> ToClvm<N> for NftMetadata {
+    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+        let mut items: Vec<(&str, Raw<N>)> = Vec::new();
 
         if !self.data_uris.is_empty() {
-            items.push(("u", self.data_uris.to_clvm(a)?));
+            items.push(("u", Raw(self.data_uris.to_clvm(encoder)?)));
         }
 
         if let Some(hash) = self.data_hash {
-            items.push(("h", hash.to_clvm(a)?));
+            items.push(("h", Raw(hash.to_clvm(encoder)?)));
         }
 
         if !self.metadata_uris.is_empty() {
-            items.push(("mu", self.metadata_uris.to_clvm(a)?));
+            items.push(("mu", Raw(self.metadata_uris.to_clvm(encoder)?)));
         }
 
         if let Some(hash) = self.metadata_hash {
-            items.push(("mh", hash.to_clvm(a)?));
+            items.push(("mh", Raw(hash.to_clvm(encoder)?)));
         }
 
         if !self.license_uris.is_empty() {
-            items.push(("lu", self.license_uris.to_clvm(a)?));
+            items.push(("lu", Raw(self.license_uris.to_clvm(encoder)?)));
         }
 
         if let Some(hash) = self.license_hash {
-            items.push(("lh", hash.to_clvm(a)?));
+            items.push(("lh", Raw(hash.to_clvm(encoder)?)));
         }
 
         items.extend(vec![
-            ("sn", self.edition_number.to_clvm(a)?),
-            ("st", self.edition_total.to_clvm(a)?),
+            ("sn", Raw(self.edition_number.to_clvm(encoder)?)),
+            ("st", Raw(self.edition_total.to_clvm(encoder)?)),
         ]);
 
-        items.to_clvm(a)
+        items.to_clvm(encoder)
     }
 }
 

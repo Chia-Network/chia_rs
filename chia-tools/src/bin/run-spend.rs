@@ -2,6 +2,7 @@ use chia::gen::conditions::Condition;
 use chia_protocol::Bytes32;
 use chia_traits::Streamable;
 use clap::Parser;
+use clvm_traits::ToNodePtr;
 use clvm_traits::{FromClvm, ToClvm};
 use clvm_utils::tree_hash;
 use clvm_utils::CurriedProgram;
@@ -131,9 +132,9 @@ pub struct SingletonStruct {
 
 #[derive(FromClvm, ToClvm, Debug)]
 #[clvm(curry)]
-pub struct SingletonArgs {
+pub struct SingletonArgs<I> {
     pub singleton_struct: SingletonStruct,
-    pub inner_puzzle: NodePtr,
+    pub inner_puzzle: I,
 }
 
 #[derive(FromClvm, ToClvm, Debug)]
@@ -153,24 +154,24 @@ pub struct EveProof {
 
 #[derive(FromClvm, ToClvm, Debug)]
 #[clvm(list)]
-pub struct SingletonSolution {
+pub struct SingletonSolution<I> {
     pub lineage_proof: LineageProof,
     pub amount: u64,
-    pub inner_solution: NodePtr,
+    pub inner_solution: I,
 }
 
 #[derive(FromClvm, ToClvm, Debug)]
 #[clvm(list)]
-pub struct EveSingletonSolution {
+pub struct EveSingletonSolution<I> {
     pub lineage_proof: EveProof,
     pub amount: u64,
-    pub inner_solution: NodePtr,
+    pub inner_solution: I,
 }
 
 fn print_puzzle_info(a: &Allocator, puzzle: NodePtr, solution: NodePtr) {
     println!("Puzzle: {}", hex::encode(tree_hash(a, puzzle)));
     // exit if this puzzle is not curried
-    let Ok(uncurried) = CurriedProgram::<NodePtr>::from_clvm(a, puzzle) else {
+    let Ok(uncurried) = CurriedProgram::<NodePtr, NodePtr>::from_clvm(a, puzzle) else {
         println!("   puzzle has no curried parameters");
         return;
     };
@@ -178,7 +179,9 @@ fn print_puzzle_info(a: &Allocator, puzzle: NodePtr, solution: NodePtr) {
     match tree_hash(a, uncurried.program) {
         SINGLETON_MOD_HASH => {
             println!("singleton_top_layer_1_1.clsp");
-            let Ok(uncurried) = CurriedProgram::<SingletonArgs>::from_clvm(a, puzzle) else {
+            let Ok(uncurried) =
+                CurriedProgram::<NodePtr, SingletonArgs<NodePtr>>::from_clvm(a, puzzle)
+            else {
                 println!("failed to uncurry singleton");
                 return;
             };
@@ -239,11 +242,11 @@ fn main() {
 
     let puzzle = spend
         .puzzle_reveal
-        .to_clvm(&mut a)
+        .to_node_ptr(&mut a)
         .expect("deserialize puzzle");
     let solution = spend
         .solution
-        .to_clvm(&mut a)
+        .to_node_ptr(&mut a)
         .expect("deserialize solution");
 
     println!("Spending {:?}", &spend.coin);

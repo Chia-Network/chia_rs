@@ -1,6 +1,8 @@
-use proc_macro2::{Ident, TokenStream};
+use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
-use syn::{parse_quote, spanned::Spanned, Data, DeriveInput, Fields, Type};
+use syn::{
+    parse_quote, spanned::Spanned, Data, DeriveInput, Fields, GenericParam, Type, TypeParam,
+};
 
 use crate::helpers::{add_trait_bounds, parse_args, Repr};
 
@@ -57,14 +59,29 @@ pub fn from_clvm(mut ast: DeriveInput) -> TokenStream {
         ),
     };
 
-    add_trait_bounds(&mut ast.generics, parse_quote!(#crate_name::FromClvm));
-    let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
+    let node_name = Ident::new("Node", Span::mixed_site());
+
+    add_trait_bounds(
+        &mut ast.generics,
+        parse_quote!(#crate_name::FromClvm<#node_name>),
+    );
+
+    let generics_clone = ast.generics.clone();
+    let (_, ty_generics, where_clause) = generics_clone.split_for_impl();
+
+    ast.generics
+        .params
+        .push(GenericParam::Type(TypeParam::from(node_name.clone())));
+    let (impl_generics, _, _) = ast.generics.split_for_impl();
 
     quote! {
         #[automatically_derived]
-        impl #impl_generics #crate_name::FromClvm for #struct_name #ty_generics #where_clause {
-            fn from_clvm(a: &clvmr::Allocator, node: clvmr::allocator::NodePtr) -> #crate_name::Result<Self> {
-                let #destructure_macro!( #( #field_names, )* ) = <#match_macro!( #( #field_types ),* ) as #crate_name::FromClvm>::from_clvm(a, node)?;
+        impl #impl_generics #crate_name::FromClvm<#node_name> for #struct_name #ty_generics #where_clause {
+            fn from_clvm(
+                decoder: &impl #crate_name::ClvmDecoder<Node = #node_name>,
+                node: #node_name,
+            ) -> ::std::result::Result<Self, #crate_name::FromClvmError> {
+                let #destructure_macro!( #( #field_names, )* ) = <#match_macro!( #( #field_types ),* ) as #crate_name::FromClvm<#node_name>>::from_clvm(decoder, node)?;
                 Ok(#initializer)
             }
         }

@@ -1,17 +1,16 @@
 use chia_bls::PublicKey;
-use chia_protocol::Coin;
+use chia_protocol::{Bytes32, Coin};
 use clvm_traits::{FromClvm, ToClvm};
-use clvmr::allocator::NodePtr;
 use hex_literal::hex;
 
 use crate::LineageProof;
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curry)]
-pub struct CatArgs {
-    pub mod_hash: [u8; 32],
-    pub tail_program_hash: [u8; 32],
-    pub inner_puzzle: NodePtr,
+pub struct CatArgs<I> {
+    pub mod_hash: Bytes32,
+    pub tail_program_hash: Bytes32,
+    pub inner_puzzle: I,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
@@ -22,10 +21,10 @@ pub struct EverythingWithSignatureTailArgs {
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(list)]
-pub struct CatSolution {
-    pub inner_puzzle_solution: NodePtr,
+pub struct CatSolution<I> {
+    pub inner_puzzle_solution: I,
     pub lineage_proof: Option<LineageProof>,
-    pub prev_coin_id: [u8; 32],
+    pub prev_coin_id: Bytes32,
     pub this_coin_info: Coin,
     pub next_coin_proof: CoinProof,
     pub prev_subtotal: i64,
@@ -35,8 +34,8 @@ pub struct CatSolution {
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(list)]
 pub struct CoinProof {
-    pub parent_coin_info: [u8; 32],
-    pub inner_puzzle_hash: [u8; 32],
+    pub parent_coin_info: Bytes32,
+    pub inner_puzzle_hash: Bytes32,
     pub amount: u64,
 }
 

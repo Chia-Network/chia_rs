@@ -1,6 +1,5 @@
 use arbitrary::{Arbitrary, Unstructured};
-use clvm_traits::{FromClvm, Result, ToClvm};
-use clvmr::{allocator::NodePtr, Allocator};
+use clvm_traits::{ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError, ToClvm, ToClvmError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Proof {
@@ -8,19 +7,19 @@ pub enum Proof {
     Eve(EveProof),
 }
 
-impl FromClvm for Proof {
-    fn from_clvm(a: &Allocator, node: NodePtr) -> Result<Self> {
-        LineageProof::from_clvm(a, node)
+impl<N> FromClvm<N> for Proof {
+    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+        LineageProof::from_clvm(decoder, decoder.clone_node(&node))
             .map(Self::Lineage)
-            .or_else(|_| EveProof::from_clvm(a, node).map(Self::Eve))
+            .or_else(|_| EveProof::from_clvm(decoder, node).map(Self::Eve))
     }
 }
 
-impl ToClvm for Proof {
-    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
+impl<N> ToClvm<N> for Proof {
+    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
         match self {
-            Self::Lineage(lineage_proof) => lineage_proof.to_clvm(a),
-            Self::Eve(eve_proof) => eve_proof.to_clvm(a),
+            Self::Lineage(lineage_proof) => lineage_proof.to_clvm(encoder),
+            Self::Eve(eve_proof) => eve_proof.to_clvm(encoder),
         }
     }
 }

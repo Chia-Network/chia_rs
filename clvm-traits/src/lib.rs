@@ -40,16 +40,22 @@ assert_eq!(Point::from_clvm(a, ptr).unwrap(), point);
 #[cfg(feature = "derive")]
 pub use clvm_derive::*;
 
+mod clvm_decoder;
+mod clvm_encoder;
 mod error;
 mod from_clvm;
 mod macros;
 mod match_byte;
 mod to_clvm;
+mod wrappers;
 
+pub use clvm_decoder::*;
+pub use clvm_encoder::*;
 pub use error::*;
 pub use from_clvm::*;
 pub use match_byte::*;
 pub use to_clvm::*;
+pub use wrappers::*;
 
 #[cfg(test)]
 #[cfg(feature = "derive")]
@@ -58,13 +64,13 @@ mod tests {
 
     use std::fmt;
 
-    use clvmr::{serde::node_to_bytes, Allocator};
+    use clvmr::{allocator::NodePtr, serde::node_to_bytes, Allocator};
 
     use super::*;
 
     fn check<T>(value: T, expected: &str)
     where
-        T: fmt::Debug + PartialEq + ToClvm + FromClvm,
+        T: fmt::Debug + PartialEq + ToClvm<NodePtr> + FromClvm<NodePtr>,
     {
         let a = &mut Allocator::new();
 

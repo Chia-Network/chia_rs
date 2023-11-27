@@ -1,22 +1,50 @@
 use clvmr::{allocator::NodePtr, Allocator};
+use num_bigint::BigInt;
 
-use crate::{Error, Result};
+use crate::{ClvmEncoder, ToClvmError};
 
-pub trait ToClvm {
-    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr>;
+pub trait ToClvm<N> {
+    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError>;
 }
 
-impl ToClvm for NodePtr {
-    fn to_clvm(&self, _a: &mut Allocator) -> Result<NodePtr> {
+pub trait ToNodePtr {
+    fn to_node_ptr(&self, a: &mut Allocator) -> Result<NodePtr, ToClvmError>;
+}
+
+impl<T> ToNodePtr for T
+where
+    T: ToClvm<NodePtr>,
+{
+    fn to_node_ptr(&self, a: &mut Allocator) -> Result<NodePtr, ToClvmError> {
+        self.to_clvm(a)
+    }
+}
+
+impl ToClvm<NodePtr> for NodePtr {
+    fn to_clvm(
+        &self,
+        _encoder: &mut impl ClvmEncoder<Node = NodePtr>,
+    ) -> Result<NodePtr, ToClvmError> {
         Ok(*self)
     }
 }
 
+pub fn simplify_int_bytes(mut slice: &[u8]) -> &[u8] {
+    while (!slice.is_empty()) && (slice[0] == 0) {
+        if slice.len() > 1 && (slice[1] & 0x80 == 0x80) {
+            break;
+        }
+        slice = &slice[1..];
+    }
+    slice
+}
+
 macro_rules! clvm_primitive {
     ($primitive:ty) => {
-        impl ToClvm for $primitive {
-            fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
-                a.new_number((*self).into()).map_err(Error::Allocator)
+        impl<N> ToClvm<N> for $primitive {
+            fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+                let number = BigInt::from(*self);
+                encoder.encode_atom(simplify_int_bytes(&number.to_signed_bytes_be()))
             }
         }
     };
@@ -35,99 +63,99 @@ clvm_primitive!(i128);
 clvm_primitive!(usize);
 clvm_primitive!(isize);
 
-impl<T> ToClvm for &T
+impl<N, T> ToClvm<N> for &T
 where
-    T: ToClvm,
+    T: ToClvm<N>,
 {
-    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
-        T::to_clvm(*self, a)
+    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+        T::to_clvm(*self, encoder)
     }
 }
 
-impl<A, B> ToClvm for (A, B)
+impl<N, A, B> ToClvm<N> for (A, B)
 where
-    A: ToClvm,
-    B: ToClvm,
+    A: ToClvm<N>,
+    B: ToClvm<N>,
 {
-    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
-        let first = self.0.to_clvm(a)?;
-        let rest = self.1.to_clvm(a)?;
-        Ok(a.new_pair(first, rest)?)
+    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+        let first = self.0.to_clvm(encoder)?;
+        let rest = self.1.to_clvm(encoder)?;
+        encoder.encode_pair(first, rest)
     }
 }
 
-impl ToClvm for () {
-    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
-        Ok(a.null())
+impl<N> ToClvm<N> for () {
+    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+        encoder.encode_atom(&[])
     }
 }
 
-impl<T> ToClvm for &[T]
+impl<N, T> ToClvm<N> for &[T]
 where
-    T: ToClvm,
+    T: ToClvm<N>,
 {
-    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
-        let mut result = a.null();
+    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+        let mut result = encoder.encode_atom(&[])?;
         for item in self.iter().rev() {
-            let value = item.to_clvm(a)?;
-            result = a.new_pair(value, result)?;
+            let value = item.to_clvm(encoder)?;
+            result = encoder.encode_pair(value, result)?;
         }
         Ok(result)
     }
 }
 
-impl<T, const N: usize> ToClvm for [T; N]
+impl<N, T, const LEN: usize> ToClvm<N> for [T; LEN]
 where
-    T: ToClvm,
+    T: ToClvm<N>,
 {
-    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
-        self.as_slice().to_clvm(a)
+    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+        self.as_slice().to_clvm(encoder)
     }
 }
 
-impl<T> ToClvm for Vec<T>
+impl<N, T> ToClvm<N> for Vec<T>
 where
-    T: ToClvm,
+    T: ToClvm<N>,
 {
-    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
-        self.as_slice().to_clvm(a)
+    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+        self.as_slice().to_clvm(encoder)
     }
 }
 
-impl<T> ToClvm for Option<T>
+impl<N, T> ToClvm<N> for Option<T>
 where
-    T: ToClvm,
+    T: ToClvm<N>,
 {
-    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
+    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
         match self {
-            Some(value) => value.to_clvm(a),
-            None => Ok(a.null()),
+            Some(value) => value.to_clvm(encoder),
+            None => encoder.encode_atom(&[]),
         }
     }
 }
 
-impl ToClvm for &str {
-    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
-        Ok(a.new_atom(self.as_bytes())?)
+impl<N> ToClvm<N> for &str {
+    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+        encoder.encode_atom(self.as_bytes())
     }
 }
 
-impl ToClvm for String {
-    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
-        self.as_str().to_clvm(a)
+impl<N> ToClvm<N> for String {
+    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+        self.as_str().to_clvm(encoder)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use clvmr::serde::node_to_bytes;
+    use clvmr::{serde::node_to_bytes, Allocator};
     use hex::ToHex;
 
     use super::*;
 
-    fn encode<T>(a: &mut Allocator, value: T) -> Result<String>
+    fn encode<T>(a: &mut Allocator, value: T) -> Result<String, ToClvmError>
     where
-        T: ToClvm,
+        T: ToClvm<NodePtr>,
     {
         let actual = value.to_clvm(a).unwrap();
         let actual_bytes = node_to_bytes(a, actual).unwrap();

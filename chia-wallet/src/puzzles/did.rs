@@ -1,41 +1,52 @@
-use clvm_traits::{clvm_list, match_list, match_tuple, Error, FromClvm, Result, ToClvm};
-use clvmr::{allocator::NodePtr, Allocator};
+use chia_protocol::Bytes32;
+use clvm_traits::{
+    clvm_list, match_list, match_tuple, ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError, Raw,
+    ToClvm, ToClvmError,
+};
 use hex_literal::hex;
 
 use crate::singleton::SingletonStruct;
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curry)]
-pub struct DidArgs {
-    pub inner_puzzle: NodePtr,
-    pub recovery_did_list_hash: [u8; 32],
+pub struct DidArgs<I, M> {
+    pub inner_puzzle: I,
+    pub recovery_did_list_hash: Bytes32,
     pub num_verifications_required: u64,
     pub singleton_struct: SingletonStruct,
-    pub metadata: NodePtr,
+    pub metadata: M,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum DidSolution {
-    InnerSpend(NodePtr),
+pub enum DidSolution<I> {
+    InnerSpend(I),
 }
 
-impl FromClvm for DidSolution {
-    fn from_clvm(a: &Allocator, node: NodePtr) -> Result<Self> {
-        let (mode, args) = <match_tuple!(u8, NodePtr)>::from_clvm(a, node)?;
-
+impl<N, I> FromClvm<N> for DidSolution<I>
+where
+    I: FromClvm<N>,
+{
+    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+        let (mode, args) = <match_tuple!(u8, Raw<N>)>::from_clvm(decoder, node)?;
         match mode {
             1 => Ok(Self::InnerSpend(
-                <match_list!(NodePtr)>::from_clvm(a, args)?.0,
+                <match_list!(I)>::from_clvm(decoder, args.0)?.0,
             )),
-            _ => Err(Error::Custom(format!("unexpected did spend mode {}", mode))),
+            _ => Err(FromClvmError::Custom(format!(
+                "unexpected did spend mode {}",
+                mode
+            ))),
         }
     }
 }
 
-impl ToClvm for DidSolution {
-    fn to_clvm(&self, a: &mut Allocator) -> Result<NodePtr> {
+impl<N, I> ToClvm<N> for DidSolution<I>
+where
+    I: ToClvm<N>,
+{
+    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
         match self {
-            Self::InnerSpend(solution) => clvm_list!(1, solution).to_clvm(a),
+            Self::InnerSpend(solution) => clvm_list!(1, solution).to_clvm(encoder),
         }
     }
 }
@@ -87,6 +98,8 @@ pub static DID_INNER_PUZZLE_HASH: [u8; 32] = hex!(
 
 #[cfg(test)]
 mod tests {
+    use clvmr::Allocator;
+
     use super::*;
 
     use crate::assert_puzzle_hash;

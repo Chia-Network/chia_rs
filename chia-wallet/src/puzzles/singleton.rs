@@ -1,46 +1,46 @@
+use chia_protocol::Bytes32;
 use clvm_traits::{FromClvm, ToClvm};
-use clvmr::allocator::NodePtr;
 use hex_literal::hex;
 
 use crate::Proof;
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curry)]
-pub struct SingletonArgs {
+pub struct SingletonArgs<I> {
     pub singleton_struct: SingletonStruct,
-    pub inner_puzzle: NodePtr,
+    pub inner_puzzle: I,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(tuple)]
 pub struct SingletonStruct {
-    pub mod_hash: [u8; 32],
-    pub launcher_id: [u8; 32],
-    pub launcher_puzzle_hash: [u8; 32],
+    pub mod_hash: Bytes32,
+    pub launcher_id: Bytes32,
+    pub launcher_puzzle_hash: Bytes32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(list)]
-pub struct SingletonSolution {
+pub struct SingletonSolution<I> {
     pub proof: Proof,
     pub amount: u64,
-    pub inner_solution: NodePtr,
+    pub inner_solution: I,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(list)]
-pub struct LauncherSolution {
-    pub singleton_puzzle_hash: [u8; 32],
+pub struct LauncherSolution<T> {
+    pub singleton_puzzle_hash: Bytes32,
     pub amount: u64,
-    pub key_value_list: NodePtr,
+    pub key_value_list: T,
 }
 
 impl SingletonStruct {
-    pub fn new(launcher_id: [u8; 32]) -> Self {
+    pub fn new(launcher_id: Bytes32) -> Self {
         Self {
-            mod_hash: SINGLETON_TOP_LAYER_PUZZLE_HASH,
+            mod_hash: SINGLETON_TOP_LAYER_PUZZLE_HASH.into(),
             launcher_id,
-            launcher_puzzle_hash: SINGLETON_LAUNCHER_PUZZLE_HASH,
+            launcher_puzzle_hash: SINGLETON_LAUNCHER_PUZZLE_HASH.into(),
         }
     }
 }
