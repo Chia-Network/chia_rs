@@ -56,3 +56,8 @@ bench = false
 name = "fast-forward-spend"
 test = false
 bench = false
+
+[[bin]]
+name = "analyze-orphans"
+test = false
+bench = false
