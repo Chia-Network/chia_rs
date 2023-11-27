@@ -12,8 +12,6 @@ use chia_traits::Streamable;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
-#[cfg(feature = "py-bindings")]
-use std::collections::HashSet;
 
 streamable_struct! (FullBlock {
     finished_sub_slots: Vec<EndOfSubSlotBundle>,
@@ -129,8 +127,8 @@ impl FullBlock {
     }
 
     #[pyo3(name = "get_included_reward_coins")]
-    fn py_get_included_reward_coins(&self) -> HashSet<Coin> {
-        HashSet::from_iter(self.get_included_reward_coins())
+    fn py_get_included_reward_coins(&self) -> Vec<Coin> {
+        self.get_included_reward_coins()
     }
 
     #[pyo3(name = "is_fully_compactified")]
