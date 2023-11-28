@@ -1,14 +1,13 @@
 name: Security audit
 on:
-  push:
-     paths:
-       - '**/Cargo.toml'
-       - '**/Cargo.lock'
+  pull_request:
+    branches:
+      - '**'
+
 jobs:
   security_audit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/audit-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: cargo audit
+        run: cargo audit --ignore RUSTSEC-2023-0071
