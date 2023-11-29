@@ -156,6 +156,22 @@ mod tests {
     }
 
     #[test]
+    fn test_explicit_enum() {
+        #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
+        #[clvm(tuple)]
+        #[repr(u8)]
+        enum Enum {
+            A(i32) = 42,
+            B { x: i32 } = 34,
+            C = 11,
+        }
+
+        check(Enum::A(32), "ff2a20");
+        check(Enum::B { x: -72 }, "ff2281b8");
+        check(Enum::C, "ff0b80");
+    }
+
+    #[test]
     fn test_untagged_enum() {
         #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
         #[clvm(tuple, untagged)]
