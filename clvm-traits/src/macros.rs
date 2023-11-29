@@ -1,3 +1,4 @@
+/// Converts a list of CLVM values into a series of nested pairs.
 #[macro_export]
 macro_rules! clvm_list {
     () => {
@@ -8,8 +9,12 @@ macro_rules! clvm_list {
     };
 }
 
+/// Converts a tuple of CLVM values into a series of nested pairs.
 #[macro_export]
 macro_rules! clvm_tuple {
+    () => {
+        ()
+    };
     ( $first:expr $(,)? ) => {
         $first
     };
@@ -18,6 +23,7 @@ macro_rules! clvm_tuple {
     };
 }
 
+/// Quotes a CLVM value.
 #[macro_export]
 macro_rules! clvm_quote {
     ( $value:expr ) => {
@@ -25,6 +31,7 @@ macro_rules! clvm_quote {
     };
 }
 
+/// Constructs a sequence of nested pairs that represents a set of curried arguments.
 #[macro_export]
 macro_rules! clvm_curried_args {
     () => {
@@ -35,6 +42,7 @@ macro_rules! clvm_curried_args {
     };
 }
 
+/// Creates the type needed to represent a list of CLVM types.
 #[macro_export]
 macro_rules! match_list {
     () => {
@@ -45,8 +53,12 @@ macro_rules! match_list {
     };
 }
 
+/// Creates the type needed to represent a tuple of CLVM types.
 #[macro_export]
 macro_rules! match_tuple {
+    () => {
+        ()
+    };
     ( $first:ty $(,)? ) => {
         $first
     };
@@ -55,6 +67,7 @@ macro_rules! match_tuple {
     };
 }
 
+/// Creates the type needed to represent a quoted CLVM type.
 #[macro_export]
 macro_rules! match_quote {
     ( $type:ty ) => {
@@ -62,6 +75,7 @@ macro_rules! match_quote {
     };
 }
 
+/// Creates the type needed to represent a set of curried arguments.
 #[macro_export]
 macro_rules! match_curried_args {
     () => {
@@ -78,6 +92,7 @@ macro_rules! match_curried_args {
     };
 }
 
+/// Deconstructs a CLVM list that has been matched.
 #[macro_export]
 macro_rules! destructure_list {
     () => {
@@ -88,8 +103,12 @@ macro_rules! destructure_list {
     };
 }
 
+/// Deconstructs a CLVM tuple that has been matched.
 #[macro_export]
 macro_rules! destructure_tuple {
+    () => {
+        _
+    };
     ( $first:pat $(,)? ) => {
         $first
     };
@@ -98,6 +117,7 @@ macro_rules! destructure_tuple {
     };
 }
 
+/// Deconstructs a quoted CLVM value that has been matched.
 #[macro_export]
 macro_rules! destructure_quote {
     ( $name:pat ) => {
@@ -105,6 +125,7 @@ macro_rules! destructure_quote {
     };
 }
 
+/// Deconstructs a set of curried arguments that has been matched.
 #[macro_export]
 macro_rules! destructure_curried_args {
     () => {

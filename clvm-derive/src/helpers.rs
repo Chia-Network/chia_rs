@@ -1,6 +1,6 @@
 use std::fmt;
 
-use proc_macro2::Ident;
+use proc_macro2::{Ident, Span};
 use syn::{
     ext::IdentExt, punctuated::Punctuated, Attribute, GenericParam, Generics, Token, TypeParamBound,
 };
@@ -72,7 +72,7 @@ pub fn parse_clvm_attr(attrs: &[Attribute]) -> ClvmAttr {
     result
 }
 
-fn parse_int_repr(attrs: &[Attribute]) -> Option<Ident> {
+pub fn parse_int_repr(attrs: &[Attribute]) -> Ident {
     let mut int_repr: Option<Ident> = None;
     for attr in attrs {
         if let Some(ident) = attr.path().get_ident() {
@@ -81,7 +81,7 @@ fn parse_int_repr(attrs: &[Attribute]) -> Option<Ident> {
             }
         }
     }
-    int_repr
+    int_repr.unwrap_or(Ident::new("isize", Span::call_site()))
 }
 
 pub fn add_trait_bounds(generics: &mut Generics, bound: TypeParamBound) {

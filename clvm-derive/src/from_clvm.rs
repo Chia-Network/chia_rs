@@ -1,12 +1,12 @@
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
 use syn::{
-    parse_quote, spanned::Spanned, Data, DeriveInput, Fields, FieldsNamed, FieldsUnnamed,
+    parse_quote, spanned::Spanned, Data, DeriveInput, Expr, Fields, FieldsNamed, FieldsUnnamed,
     GenericParam, Type,
 };
 
 use crate::{
-    helpers::{add_trait_bounds, parse_clvm_attr},
+    helpers::{add_trait_bounds, parse_clvm_attr, parse_int_repr, Repr},
     macros::{repr_macros, Macros},
 };
 
@@ -15,6 +15,13 @@ struct FieldInfo {
     field_types: Vec<Type>,
     field_names: Vec<Ident>,
     initializer: TokenStream,
+}
+
+struct VariantInfo {
+    name: Ident,
+    value: Expr,
+    field_info: FieldInfo,
+    macros: Macros,
 }
 
 pub fn from_clvm(ast: DeriveInput) -> TokenStream {
@@ -29,6 +36,61 @@ pub fn from_clvm(ast: DeriveInput) -> TokenStream {
             let macros = repr_macros(&crate_name, clvm_attr.expect_repr());
             let field_info = fields(&data_struct.fields);
             impl_for_struct(&crate_name, &ast, &macros, &field_info)
+        }
+        Data::Enum(data_enum) => {
+            if !clvm_attr.untagged && clvm_attr.repr == Some(Repr::Curry) {
+                panic!("cannot use `curry` on a tagged enum");
+            }
+
+            let mut next_value: Expr = parse_quote!(0);
+            let mut variants = Vec::new();
+
+            for variant in data_enum.variants.iter() {
+                let field_info = fields(&variant.fields);
+                let variant_clvm_attr = parse_clvm_attr(&variant.attrs);
+
+                if variant_clvm_attr.untagged {
+                    panic!("cannot use `untagged` on an enum variant");
+                }
+
+                let repr = variant_clvm_attr
+                    .repr
+                    .unwrap_or_else(|| clvm_attr.expect_repr());
+                if !clvm_attr.untagged && repr == Repr::Curry {
+                    panic!("cannot use `curry` on a tagged enum variant");
+                }
+
+                let macros = repr_macros(&crate_name, repr);
+                let variant_info = VariantInfo {
+                    name: variant.ident.clone(),
+                    value: variant
+                        .discriminant
+                        .as_ref()
+                        .map(|(_, value)| {
+                            if clvm_attr.untagged {
+                                panic!("cannot use `untagged` on an enum with discriminants");
+                            }
+
+                            next_value = parse_quote!(#value + 1);
+                            value.clone()
+                        })
+                        .unwrap_or_else(|| {
+                            let value = next_value.clone();
+                            next_value = parse_quote!(#next_value + 1);
+                            value
+                        }),
+                    field_info,
+                    macros,
+                };
+                variants.push(variant_info);
+            }
+
+            if clvm_attr.untagged {
+                impl_for_untagged_enum(&crate_name, &ast, &variants)
+            } else {
+                let int_repr = parse_int_repr(&ast.attrs);
+                impl_for_enum(&crate_name, &ast, &int_repr, &variants)
+            }
         }
         _ => panic!("expected struct with named or unnamed fields"),
     }
@@ -96,6 +158,142 @@ fn impl_for_struct(
             <#match_macro!( #( #field_types ),* )
             as #crate_name::FromClvm<#node_name>>::from_clvm(decoder, node)?;
         Ok(Self #initializer)
+    };
+
+    generate_from_clvm(crate_name, ast, &node_name, &body)
+}
+
+fn impl_for_enum(
+    crate_name: &TokenStream,
+    ast: &DeriveInput,
+    int_repr: &Ident,
+    variants: &[VariantInfo],
+) -> TokenStream {
+    let node_name = Ident::new("Node", Span::mixed_site());
+
+    let mut value_definitions = Vec::new();
+    let mut has_initializers = false;
+
+    let variant_bodies = variants
+        .iter()
+        .enumerate()
+        .map(|(i, variant_info)| {
+            let VariantInfo {
+                name,
+                value,
+                field_info,
+                macros,
+            } = variant_info;
+
+            let FieldInfo {
+                field_types,
+                field_names,
+                initializer,
+            } = field_info;
+
+            let Macros {
+                match_macro,
+                destructure_macro,
+                ..
+            } = macros;
+
+            let value_ident = Ident::new(&format!("VALUE_{}", i), Span::mixed_site());
+            value_definitions.push(quote! {
+                const #value_ident: #int_repr = #value;
+            });
+
+            if initializer.is_empty() {
+                quote! {
+                    #value_ident => {
+                        Ok(Self::#name)
+                    }
+                }
+            } else {
+                has_initializers = true;
+                quote! {
+                    #value_ident => {
+                        let #destructure_macro!( #( #field_names ),* ) =
+                            <#match_macro!( #( #field_types ),* )
+                            as #crate_name::FromClvm<#node_name>>::from_clvm(decoder, args.0)?;
+                        Ok(Self::#name #initializer)
+                    }
+                }
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let parse_value = if has_initializers {
+        quote! {
+            let (value, args) = <(#int_repr, #crate_name::Raw<#node_name>)>::from_clvm(decoder, node)?;
+        }
+    } else {
+        quote! {
+            let value = #int_repr::from_clvm(decoder, node)?;
+        }
+    };
+
+    let body = quote! {
+        #parse_value
+
+        #( #value_definitions )*
+
+        match value {
+            #( #variant_bodies )*
+            _ => Err(#crate_name::FromClvmError::Custom(
+                format!("unexpected enum variant {value}")
+            ))
+        }
+    };
+
+    generate_from_clvm(crate_name, ast, &node_name, &body)
+}
+
+fn impl_for_untagged_enum(
+    crate_name: &TokenStream,
+    ast: &DeriveInput,
+    variants: &[VariantInfo],
+) -> TokenStream {
+    let node_name = Ident::new("Node", Span::mixed_site());
+
+    let variant_bodies = variants
+        .iter()
+        .map(|variant_info| {
+            let VariantInfo {
+                name,
+                field_info,
+                macros,
+                ..
+            } = variant_info;
+
+            let FieldInfo {
+                field_types,
+                field_names,
+                initializer,
+            } = field_info;
+
+            let Macros {
+                match_macro,
+                destructure_macro,
+                ..
+            } = macros;
+
+            quote! {
+                if let Ok(#destructure_macro!( #( #field_names ),* )) =
+                    <#match_macro!( #( #field_types ),* )
+                    as #crate_name::FromClvm<#node_name>>::from_clvm(decoder, decoder.clone_node(&node))
+                {
+                    return Ok(Self::#name #initializer);
+                }
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let body = quote! {
+        #( #variant_bodies )*
+
+        Err(#crate_name::FromClvmError::Custom(
+            format!("unexpected enum variant")
+        ))
     };
 
     generate_from_clvm(crate_name, ast, &node_name, &body)
