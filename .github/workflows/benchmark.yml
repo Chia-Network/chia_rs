@@ -55,7 +55,7 @@ jobs:
 
     - name: Build
       run: |
-        python -m pip install clvm_tools colorama blspy
+        python -m pip install clvm_tools colorama blspy chia-blockchain==2.1.0
         maturin develop --release -m wheel/Cargo.toml
 
     - name: python mypy
