@@ -7,8 +7,8 @@ use chia::allocator::make_allocator;
 use chia::gen::conditions::MempoolVisitor;
 use chia::gen::flags::{
     AGG_SIG_ARGS, ALLOW_BACKREFS, ANALYZE_SPENDS, COND_ARGS_NIL, ENABLE_SOFTFORK_CONDITION,
-    LIMIT_ANNOUNCES, LIMIT_OBJECTS, MEMPOOL_MODE, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
-    NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
+    LIMIT_OBJECTS, MEMPOOL_MODE, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL, NO_UNKNOWN_CONDS,
+    STRICT_ARGS_COUNT,
 };
 use chia::gen::run_puzzle::run_puzzle as native_run_puzzle;
 use chia::gen::solution_generator::solution_generator as native_solution_generator;
@@ -351,7 +351,6 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     m.add("COND_ARGS_NIL", COND_ARGS_NIL)?;
     m.add("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;
     m.add("STRICT_ARGS_COUNT", STRICT_ARGS_COUNT)?;
-    m.add("LIMIT_ANNOUNCES", LIMIT_ANNOUNCES)?;
     m.add("AGG_SIG_ARGS", AGG_SIG_ARGS)?;
     m.add("ENABLE_FIXED_DIV", ENABLE_FIXED_DIV)?;
     m.add("ENABLE_SOFTFORK_CONDITION", ENABLE_SOFTFORK_CONDITION)?;

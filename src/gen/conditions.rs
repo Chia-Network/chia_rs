@@ -15,8 +15,8 @@ use super::opcodes::{
 use super::sanitize_int::{sanitize_uint, SanitizedUint};
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
 use crate::gen::flags::{
-    AGG_SIG_ARGS, COND_ARGS_NIL, LIMIT_ANNOUNCES, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
-    NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
+    AGG_SIG_ARGS, COND_ARGS_NIL, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL, NO_UNKNOWN_CONDS,
+    STRICT_ARGS_COUNT,
 };
 use crate::gen::spend_visitor::SpendVisitor;
 use crate::gen::validation_error::check_nil;
@@ -834,11 +834,7 @@ pub fn parse_conditions<V: SpendVisitor>(
     max_cost: &mut Cost,
     visitor: &mut V,
 ) -> Result<(), ValidationErr> {
-    let mut announce_countdown: u32 = if (flags & LIMIT_ANNOUNCES) != 0 {
-        1024
-    } else {
-        u32::MAX
-    };
+    let mut announce_countdown: u32 = 1024;
 
     while let Some((mut c, next)) = next(a, iter)? {
         iter = next;
@@ -4200,103 +4196,50 @@ fn test_softfork_condition_failures(#[case] conditions: &str, #[case] expected_e
 
 #[cfg(test)]
 #[rstest]
-#[case(CREATE_PUZZLE_ANNOUNCEMENT, 1000, LIMIT_ANNOUNCES, None)]
+#[case(CREATE_PUZZLE_ANNOUNCEMENT, 1000, None)]
 #[case(
     CREATE_PUZZLE_ANNOUNCEMENT,
     1025,
-    LIMIT_ANNOUNCES,
     Some(ErrorCode::TooManyAnnouncements)
 )]
 #[case(
     ASSERT_PUZZLE_ANNOUNCEMENT,
     1024,
-    LIMIT_ANNOUNCES,
     Some(ErrorCode::AssertPuzzleAnnouncementFailed)
 )]
 #[case(
     ASSERT_PUZZLE_ANNOUNCEMENT,
     1025,
-    LIMIT_ANNOUNCES,
     Some(ErrorCode::TooManyAnnouncements)
 )]
-#[case(CREATE_COIN_ANNOUNCEMENT, 1000, LIMIT_ANNOUNCES, None)]
-#[case(
-    CREATE_COIN_ANNOUNCEMENT,
-    1025,
-    LIMIT_ANNOUNCES,
-    Some(ErrorCode::TooManyAnnouncements)
-)]
+#[case(CREATE_COIN_ANNOUNCEMENT, 1000, None)]
+#[case(CREATE_COIN_ANNOUNCEMENT, 1025, Some(ErrorCode::TooManyAnnouncements))]
 #[case(
     ASSERT_COIN_ANNOUNCEMENT,
     1024,
-    LIMIT_ANNOUNCES,
     Some(ErrorCode::AssertCoinAnnouncementFailed)
 )]
-#[case(
-    ASSERT_COIN_ANNOUNCEMENT,
-    1025,
-    LIMIT_ANNOUNCES,
-    Some(ErrorCode::TooManyAnnouncements)
-)]
+#[case(ASSERT_COIN_ANNOUNCEMENT, 1025, Some(ErrorCode::TooManyAnnouncements))]
 #[case(
     ASSERT_CONCURRENT_SPEND,
     1024,
-    LIMIT_ANNOUNCES,
     Some(ErrorCode::AssertConcurrentSpendFailed)
 )]
-#[case(
-    ASSERT_CONCURRENT_SPEND,
-    1025,
-    LIMIT_ANNOUNCES,
-    Some(ErrorCode::TooManyAnnouncements)
-)]
+#[case(ASSERT_CONCURRENT_SPEND, 1025, Some(ErrorCode::TooManyAnnouncements))]
 #[case(
     ASSERT_CONCURRENT_PUZZLE,
     1024,
-    LIMIT_ANNOUNCES,
     Some(ErrorCode::AssertConcurrentPuzzleFailed)
 )]
-#[case(
-    ASSERT_CONCURRENT_PUZZLE,
-    1025,
-    LIMIT_ANNOUNCES,
-    Some(ErrorCode::TooManyAnnouncements)
-)]
-#[case(CREATE_PUZZLE_ANNOUNCEMENT, 1025, 0, None)]
-#[case(
-    ASSERT_PUZZLE_ANNOUNCEMENT,
-    1025,
-    0,
-    Some(ErrorCode::AssertPuzzleAnnouncementFailed)
-)]
-#[case(CREATE_COIN_ANNOUNCEMENT, 1025, 0, None)]
-#[case(
-    ASSERT_COIN_ANNOUNCEMENT,
-    1025,
-    0,
-    Some(ErrorCode::AssertCoinAnnouncementFailed)
-)]
-#[case(
-    ASSERT_CONCURRENT_SPEND,
-    1025,
-    0,
-    Some(ErrorCode::AssertConcurrentSpendFailed)
-)]
-#[case(
-    ASSERT_CONCURRENT_PUZZLE,
-    1025,
-    0,
-    Some(ErrorCode::AssertConcurrentPuzzleFailed)
-)]
+#[case(ASSERT_CONCURRENT_PUZZLE, 1025, Some(ErrorCode::TooManyAnnouncements))]
 fn test_limit_announcements(
     #[case] cond: ConditionOpcode,
     #[case] count: i32,
-    #[case] flags: u32,
     #[case] expect_err: Option<ErrorCode>,
 ) {
     let r = cond_test_cb(
         "((({h1} ({h1} (123 ({} )))",
-        flags,
+        0,
         Some(Box::new(move |a: &mut Allocator| -> NodePtr {
             let mut rest: NodePtr = a.null();
 
