@@ -20,6 +20,7 @@ members = [
     "clvm-utils/fuzz",
     "fuzz",
     "wasm",
+    "wasm-patch",
 ]
 exclude = ["wheel"]
 

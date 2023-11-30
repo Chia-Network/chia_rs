@@ -27,6 +27,7 @@ macro_rules! message_struct {
 #[macro_export]
 macro_rules! streamable_struct {
     ($name:ident {$($field:ident: $t:ty $(,)? )*}) => {
+        #[wasm_patch::with_wasm]
         #[cfg_attr(feature = "py-bindings", pyo3::pyclass(get_all, frozen), derive(chia_py_streamable_macro::PyJsonDict, chia_py_streamable_macro::PyStreamable))]
         #[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
         #[cfg_attr(fuzzing, derive(arbitrary::Arbitrary))]
@@ -34,28 +35,7 @@ macro_rules! streamable_struct {
             $(pub $field: $t),*
         }
 
-        #[cfg(not(feature = "py-bindings"))]
-        #[allow(clippy::too_many_arguments)]
-        impl $name {
-            pub fn new ( $($field: $t),* ) -> $name {
-                $name { $($field),* }
-            }
-        }
-    }
-}
-
-#[macro_export]
-macro_rules! streamable_struct2 {
-    ($name:ident {$($field:ident: $t:ty $(,)? )*}) => {
-        #[wasm_bindgen]
-        #[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
-        pub struct $name {
-            $(
-                #[wasm_bindgen]
-                pub $field: $t
-            ),*
-        }
-
+        #[wasm_patch::with_wasm]
         #[cfg(not(feature = "py-bindings"))]
         #[allow(clippy::too_many_arguments)]
         impl $name {

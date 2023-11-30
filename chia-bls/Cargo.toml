@@ -26,6 +26,10 @@ thiserror = "1.0.44"
 pyo3 = { version = "0.19.0", features = ["multiple-pymethods"], optional = true }
 arbitrary = { version = "1.3.0" }
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2.88"
+wasm-patch = { version = "0.1.0", path = "../wasm-patch" }
+
 [dev-dependencies]
 rand = "0.8.5"
 criterion = "0.5.1"

@@ -17,6 +17,7 @@ use chia_py_streamable_macro::PyStreamable;
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
 
+#[wasm_patch::with_wasm]
 #[cfg_attr(feature = "py-bindings", pyclass, derive(PyStreamable))]
 #[derive(Hash, Debug, Clone, Eq, PartialEq)]
 pub struct Program(Bytes);

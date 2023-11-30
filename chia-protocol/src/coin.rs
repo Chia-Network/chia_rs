@@ -1,5 +1,4 @@
-// use crate::streamable_struct2;
-use crate::{bytes::Bytes32};
+use crate::bytes::Bytes32;
 use chia_streamable_macro::Streamable;
 use clvm_traits::{clvm_list, destructure_list, match_list, FromClvm, ToClvm};
 use clvmr::allocator::NodePtr;
@@ -10,46 +9,12 @@ use std::convert::TryInto;
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
 
-use wasm_bindgen::prelude::*;
-
-/*
-streamable_struct2!(Coin {
+//*
+crate::streamable_struct!(Coin {
     parent_coin_info: Bytes32,
     puzzle_hash: Bytes32,
     amount: u64,
 });
-
-// */
-
-//*
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-#[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
-pub struct Coin {
-    #[wasm_bindgen]
-    pub parent_coin_info: Bytes32,
-    #[wasm_bindgen]
-    pub puzzle_hash: Bytes32,
-    #[wasm_bindgen]
-    pub amount: u64,
-}
-
-#[cfg(not(feature = "py-bindings"))]
-#[allow(clippy::too_many_arguments)]
-impl Coin {
-    pub fn new (
-        parent_coin_info: Bytes32,
-        puzzle_hash: Bytes32,
-        amount: u64,
-    ) -> Coin {
-        Coin {
-            parent_coin_info,
-            puzzle_hash,
-            amount,
-        }
-    }
-}
-// */
-
 
 impl Coin {
     pub fn coin_id(&self) -> [u8; 32] {
