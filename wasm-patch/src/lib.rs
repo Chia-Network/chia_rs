@@ -5,7 +5,7 @@ use syn::{Item, parse_macro_input};
 
 fn attach_wasm_bindgen(input: &TokenStream) -> TokenStream {
     let mut t = input.to_string();
-    t = format!("#[wasm_bindgen::prelude::wasm_bindgen] {}", t);
+    t = format!("#[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)] {}", t);
     t.parse().unwrap()
 }
 

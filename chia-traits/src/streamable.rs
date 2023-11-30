@@ -313,7 +313,7 @@ fn test_parse_u64() {
 }
 
 #[test]
-fn test_parse_u128() {
+fn test_parse_u64() {
     from_bytes::<u128>(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 0);
     from_bytes::<u128>(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], 1);
     from_bytes::<u128>(

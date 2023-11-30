@@ -10,7 +10,7 @@ use chia_bls::G2Element;
 use pyo3::prelude::*;
 
 streamable_struct! (RewardChainBlockUnfinished {
-    total_iters: u128,
+    total_iters: u64,
     signage_point_index: u8,
     pos_ss_cc_challenge_hash: Bytes32,
     proof_of_space: ProofOfSpace,
@@ -21,9 +21,9 @@ streamable_struct! (RewardChainBlockUnfinished {
 });
 
 streamable_struct! (RewardChainBlock {
-    weight: u128,
+    weight: u64,
     height: u32,
-    total_iters: u128,
+    total_iters: u64,
     signage_point_index: u8,
     pos_ss_cc_challenge_hash: Bytes32,
     proof_of_space: ProofOfSpace,

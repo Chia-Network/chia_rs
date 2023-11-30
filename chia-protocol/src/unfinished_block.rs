@@ -38,7 +38,7 @@ impl UnfinishedBlock {
         self.foliage.foliage_transaction_block_hash.is_some()
     }
 
-    pub fn total_iters(&self) -> u128 {
+    pub fn total_iters(&self) -> u64 {
         self.reward_chain_block.total_iters
     }
 }
@@ -65,7 +65,7 @@ impl UnfinishedBlock {
 
     #[getter]
     #[pyo3(name = "total_iters")]
-    fn py_total_iters(&self) -> u128 {
+    fn py_total_iters(&self) -> u64 {
         self.total_iters()
     }
 }

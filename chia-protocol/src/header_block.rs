@@ -45,7 +45,7 @@ impl HeaderBlock {
         self.reward_chain_block.height
     }
 
-    pub fn weight(&self) -> u128 {
+    pub fn weight(&self) -> u64 {
         self.reward_chain_block.weight
     }
 
@@ -53,7 +53,7 @@ impl HeaderBlock {
         self.foliage.hash().into()
     }
 
-    pub fn total_iters(&self) -> u128 {
+    pub fn total_iters(&self) -> u64 {
         self.reward_chain_block.total_iters
     }
 
@@ -100,7 +100,7 @@ impl HeaderBlock {
 
     #[getter]
     #[pyo3(name = "weight")]
-    fn py_weight(&self) -> u128 {
+    fn py_weight(&self) -> u64 {
         self.weight()
     }
 
@@ -112,7 +112,7 @@ impl HeaderBlock {
 
     #[getter]
     #[pyo3(name = "total_iters")]
-    fn py_total_iters(&self) -> u128 {
+    fn py_total_iters(&self) -> u64 {
         self.total_iters()
     }
 
