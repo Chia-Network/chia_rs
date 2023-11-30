@@ -4,12 +4,16 @@
 //! as well as many other values in the standard library that would be common to encode.
 //!
 //! As well as the built-in implementations, this library exposes two derive macros
-//! for implementing the `ToClvm` and `FromClvm` traits on structs. They be marked
-//! with one of the following encodings:
+//! for implementing the `ToClvm` and `FromClvm` traits on structs and enums. They be
+//! marked with the following representations:
 //!
 //! * `#[clvm(tuple)]` for unterminated lists such as `(A . (B . C))`.
 //! * `#[clvm(list)]` for proper lists such as `(A B C)`, or in other words `(A . (B . (C . ())))`.
 //! * `#[clvm(curry)]` for curried arguments such as `(c (q . A) (c (q . B) (c (q . C) 1)))`.
+//!
+//! Additionally, you can use `#[clvm(untagged)]` on enums which don't have a numeric discriminant value.
+//!
+//! The `#[repr(int_type)]` attribute can be used to specify the discriminant type for enums.
 
 #![cfg_attr(
     feature = "derive",
