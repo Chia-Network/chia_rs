@@ -39,7 +39,7 @@ pub fn to_clvm(ast: DeriveInput) -> TokenStream {
         }
         Data::Enum(data_enum) => {
             if !clvm_attr.untagged && clvm_attr.repr == Some(Repr::Curry) {
-                panic!("cannot use `curry` on a tagged enum");
+                panic!("cannot use `curry` on a tagged enum, since unlike other representations, each argument is wrapped");
             }
 
             let mut next_discriminant: Expr = parse_quote!(0);
@@ -57,7 +57,7 @@ pub fn to_clvm(ast: DeriveInput) -> TokenStream {
                     .repr
                     .unwrap_or_else(|| clvm_attr.expect_repr());
                 if !clvm_attr.untagged && repr == Repr::Curry {
-                    panic!("cannot use `curry` on a tagged enum variant");
+                    panic!("cannot use `curry` on a tagged enum variant, since unlike other representations, each argument is wrapped");
                 }
 
                 let macros = repr_macros(&crate_name, repr);
