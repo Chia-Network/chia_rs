@@ -19,7 +19,7 @@ struct FieldInfo {
 
 struct VariantInfo {
     name: Ident,
-    value: Expr,
+    discriminant: Expr,
     field_info: FieldInfo,
     macros: Macros,
 }
@@ -42,7 +42,7 @@ pub fn to_clvm(ast: DeriveInput) -> TokenStream {
                 panic!("cannot use `curry` on a tagged enum");
             }
 
-            let mut next_value: Expr = parse_quote!(0);
+            let mut next_discriminant: Expr = parse_quote!(0);
             let mut variants = Vec::new();
 
             for variant in data_enum.variants.iter() {
@@ -63,21 +63,17 @@ pub fn to_clvm(ast: DeriveInput) -> TokenStream {
                 let macros = repr_macros(&crate_name, repr);
                 let variant_info = VariantInfo {
                     name: variant.ident.clone(),
-                    value: variant
+                    discriminant: variant
                         .discriminant
                         .as_ref()
-                        .map(|(_, value)| {
-                            if clvm_attr.untagged {
-                                panic!("cannot use `untagged` on an enum with discriminants");
-                            }
-
-                            next_value = parse_quote!(#value + 1);
-                            value.clone()
+                        .map(|(_, discriminant)| {
+                            next_discriminant = parse_quote!(#discriminant + 1);
+                            discriminant.clone()
                         })
                         .unwrap_or_else(|| {
-                            let value = next_value.clone();
-                            next_value = parse_quote!(#next_value + 1);
-                            value
+                            let discriminant = next_discriminant.clone();
+                            next_discriminant = parse_quote!(#next_discriminant + 1);
+                            discriminant
                         }),
                     field_info,
                     macros,
@@ -173,7 +169,7 @@ fn impl_for_enum(
         .map(|variant_info| {
             let VariantInfo {
                 name,
-                value,
+                discriminant,
                 field_info,
                 macros,
             } = variant_info;
@@ -195,13 +191,13 @@ fn impl_for_enum(
             } else if has_initializers {
                 quote! {
                     Self::#name #initializer => {
-                        (#value, #clvm_macro!( #( #field_names ),* )).to_clvm(encoder)
+                        (#discriminant, #clvm_macro!( #( #field_names ),* )).to_clvm(encoder)
                     }
                 }
             } else {
                 quote! {
                     Self::#name => {
-                        (#value).to_clvm(encoder)
+                        (#discriminant).to_clvm(encoder)
                     }
                 }
             }
