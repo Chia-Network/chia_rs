@@ -220,7 +220,7 @@ fn generate_to_clvm(
     body: &TokenStream,
 ) -> TokenStream {
     let mut ast = ast.clone();
-    let item_name = ast.ident;
+    let type_name = ast.ident;
 
     add_trait_bounds(
         &mut ast.generics,
@@ -237,7 +237,7 @@ fn generate_to_clvm(
 
     quote! {
         #[automatically_derived]
-        impl #impl_generics #crate_name::ToClvm<#node_name> for #item_name #ty_generics #where_clause {
+        impl #impl_generics #crate_name::ToClvm<#node_name> for #type_name #ty_generics #where_clause {
             fn to_clvm(
                 &self,
                 encoder: &mut impl #crate_name::ClvmEncoder<Node = #node_name>
