@@ -88,7 +88,7 @@ pub fn from_clvm(ast: DeriveInput) -> TokenStream {
                 impl_for_enum(&crate_name, &ast, &int_repr, &variants)
             }
         }
-        _ => panic!("expected struct with named or unnamed fields"),
+        Data::Union(_union) => panic!("cannot derive `FromClvm` for a union"),
     }
 }
 

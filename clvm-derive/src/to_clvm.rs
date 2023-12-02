@@ -83,7 +83,7 @@ pub fn to_clvm(ast: DeriveInput) -> TokenStream {
 
             impl_for_enum(&crate_name, &ast, clvm_attr.untagged, &variants)
         }
-        _ => panic!("expected struct with named or unnamed fields"),
+        Data::Union(_union) => panic!("cannot derive `ToClvm` for a union"),
     }
 }
 
