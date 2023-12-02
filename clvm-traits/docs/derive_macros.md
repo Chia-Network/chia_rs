@@ -193,7 +193,7 @@ assert_eq!(SpendMode::from_clvm(a, ptr).unwrap(), mode);
 
 ### Untagged Enums
 
-Often, the discriminator isn't necessary to encode, and you'd prefer to match try variant in order until one matches.
+Often, the discriminator isn't necessary to encode, and you'd prefer to try to match each variant in order until one matches.
 This is what `#[clvm(untagged)]` allows you to do. However, due to current limitations, it's not possible to mix this with `#[clvm(curry)]`.
 
 Note that if there is any ambiguity, the first variant which matches a value will be the resulting value.
