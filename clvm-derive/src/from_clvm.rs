@@ -1,4 +1,4 @@
-use proc_macro2::{Ident, Span, TokenStream};
+use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::quote;
 use syn::{
     parse_quote, spanned::Spanned, Data, DeriveInput, Expr, Fields, FieldsNamed, FieldsUnnamed,
@@ -165,6 +165,7 @@ fn impl_for_enum(
     int_repr: &Ident,
     variants: &[VariantInfo],
 ) -> TokenStream {
+    let type_name = Literal::string(&ast.ident.to_string());
     let node_name = Ident::new("Node", Span::mixed_site());
 
     let mut discriminant_definitions = Vec::new();
@@ -236,7 +237,7 @@ fn impl_for_enum(
         match value {
             #( #variant_bodies )*
             _ => Err(#crate_name::FromClvmError::Custom(
-                format!("unexpected enum variant {value}")
+                format!("failed to match any enum variants of `{}`", #type_name)
             ))
         }
     };
@@ -249,6 +250,7 @@ fn impl_for_untagged_enum(
     ast: &DeriveInput,
     variants: &[VariantInfo],
 ) -> TokenStream {
+    let type_name = Literal::string(&ast.ident.to_string());
     let node_name = Ident::new("Node", Span::mixed_site());
 
     let variant_bodies = variants
@@ -288,7 +290,7 @@ fn impl_for_untagged_enum(
         #( #variant_bodies )*
 
         Err(#crate_name::FromClvmError::Custom(
-            format!("unexpected enum variant")
+            format!("failed to match any enum variants of `{}`", #type_name)
         ))
     };
 
