@@ -1,6 +1,6 @@
 [package]
 name = "chia-bls"
-version = "0.2.13"
+version = "0.2.14"
 edition = "2021"
 license = "Apache-2.0"
 description = "BLS signature, verification and aggregation funcions for the Chia blockchain"
@@ -12,9 +12,9 @@ repository = "https://github.com/Chia-Network/chia_rs/chia-bls/"
 py-bindings = ["dep:pyo3", "chia_py_streamable_macro", "chia-traits/py-bindings"]
 
 [dependencies]
-chia-traits = { version = "=0.2.13", path = "../chia-traits" }
-clvm-traits = { version = "=0.2.12", path = "../clvm-traits", features = ["derive"] }
-chia_py_streamable_macro = { version = "=0.2.13", path = "../chia_py_streamable_macro", optional = true }
+chia-traits = { version = "=0.2.14", path = "../chia-traits" }
+clvm-traits = { version = "=0.2.14", path = "../clvm-traits", features = ["derive"] }
+chia_py_streamable_macro = { version = "=0.2.14", path = "../chia_py_streamable_macro", optional = true }
 tiny-bip39 = "1.0.0"
 anyhow = "1.0.71"
 sha2 = "0.10.8"

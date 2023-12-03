@@ -1,6 +1,6 @@
 [package]
 name = "chia-tools"
-version = "0.2.12"
+version = "0.2.14"
 edition = "2021"
 license = "Apache-2.0"
 description = "Utility functions and types used by the Chia blockchain full node"
@@ -9,13 +9,13 @@ homepage = "https://github.com/Chia-Network/chia_rs/chia-tools"
 repository = "https://github.com/Chia-Network/chia_rs/chia-tools"
 
 [dependencies]
-chia-protocol = { version = "0.2.13", path = "../chia-protocol" }
+chia-protocol = { version = "0.2.14", path = "../chia-protocol" }
 chia-traits = { path = "../chia-traits" }
 clvm-utils = { path = "../clvm-utils" }
 clvm-traits = { path = "../clvm-traits" }
-chia-wallet = { version = "=0.2.12", path = "../chia-wallet" }
+chia-wallet = { version = "=0.2.14", path = "../chia-wallet" }
 clvmr = { version = "=0.3.0", features = ["counters"] }
-chia = { version = "0.2.13", path = ".." }
+chia = { version = "0.2.14", path = ".." }
 sqlite = "=0.31.0"
 clap = { version = "=4.3.9", features = ["derive"] }
 zstd = "=0.12.3"
