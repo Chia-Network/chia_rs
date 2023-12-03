@@ -12,7 +12,7 @@ cargo-fuzz = true
 libfuzzer-sys = "0.4"
 clvmr = "=0.3.0"
 clvm-utils = { path = "../clvm-utils" }
-clvm-traits = { path = "../clvm-traits" }
+clvm-traits = { version = "=0.2.14" }
 chia-protocol = { path = "../chia-protocol" }
 chia-traits = { path = "../chia-traits" }
 chia = { path = ".." }
