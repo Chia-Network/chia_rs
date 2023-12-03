@@ -2,6 +2,7 @@ extern crate proc_macro;
 
 mod from_clvm;
 mod helpers;
+mod macros;
 mod to_clvm;
 
 use from_clvm::from_clvm;
