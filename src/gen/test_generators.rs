@@ -223,6 +223,7 @@ fn run_generator(#[case] name: &str) {
             Err(code) => (0, format!("FAILED: {}\n", u32::from(code.1))),
         };
 
+        let mut a = make_allocator(*flags);
         let conds = run_block_generator2::<_, MempoolVisitor>(
             &mut a,
             &generator,
