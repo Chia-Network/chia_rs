@@ -1,13 +1,9 @@
 use clap::Parser;
 
-use chia_protocol::FullBlock;
-use chia_traits::Streamable;
-
-use sqlite::State;
-
 use chia::gen::conditions::{EmptyVisitor, NewCoin, Spend, SpendBundleConditions};
 use chia::gen::flags::{ALLOW_BACKREFS, MEMPOOL_MODE};
 use chia::gen::run_block_generator::{run_block_generator, run_block_generator2};
+use chia_tools::iterate_tx_blocks;
 use clvmr::allocator::NodePtr;
 use clvmr::serde::{node_from_bytes, node_to_bytes_backrefs};
 use clvmr::Allocator;
@@ -122,24 +118,6 @@ fn compare(a: &Allocator, lhs: &SpendBundleConditions, rhs: &SpendBundleConditio
 fn main() {
     let args = Args::parse();
 
-    let connection = sqlite::open(args.file).expect("failed to open database file");
-
-    let mut statement = connection
-        .prepare(
-            "SELECT height, block \
-        FROM full_blocks \
-        WHERE in_main_chain=1 AND height >= ?\
-        ORDER BY height",
-        )
-        .expect("failed to prepare SQL statement enumerating blocks");
-    statement
-        .bind((1, args.start_height as i64))
-        .expect("failed to bind start-height to SQL statement");
-
-    let mut block_ref_lookup = connection
-        .prepare("SELECT block FROM full_blocks WHERE height=? and in_main_chain=1")
-        .expect("failed to prepare SQL statement looking up ref-blocks");
-
     if args.validate && !(args.mempool || args.rust_generator || args.test_backrefs) {
         panic!("it doesn't make sense to validate the output against identical runs. Specify --mempool, --rust-generator or --test-backrefs");
     }
@@ -162,119 +140,67 @@ fn main() {
         run_block_generator::<_, EmptyVisitor>
     };
 
-    while let Ok(State::Row) = statement.next() {
-        let height: u32 = statement
-            .read::<i64, _>(0)
-            .expect("missing height")
-            .try_into()
-            .expect("invalid height in block record");
-        if let Some(h) = args.max_height {
-            if height > h {
-                break;
-            }
-        }
+    iterate_tx_blocks(
+        &args.file,
+        args.start_height,
+        args.max_height,
+        |_height, block, block_refs| {
+            pool.execute(move || {
+                let mut a = Allocator::new_limited(500000000, 62500000, 62500000);
 
-        let block_buffer = statement.read::<Vec<u8>, _>(1).expect("invalid block blob");
+                let ti = block.transactions_info.as_ref().expect("transactions_info");
+                let prg = block
+                    .transactions_generator
+                    .as_ref()
+                    .expect("transactions_generator");
 
-        let block_buffer =
-            zstd::stream::decode_all(&mut std::io::Cursor::<Vec<u8>>::new(block_buffer))
-                .expect("failed to decompress block");
-        let block =
-            FullBlock::from_bytes_unchecked(&block_buffer).expect("failed to parse FullBlock");
+                let storage: Vec<u8>;
+                let generator = if args.test_backrefs {
+                    // re-serialize the generator with back-references
+                    let gen = node_from_bytes(&mut a, prg.as_ref()).expect("node_from_bytes");
+                    storage = node_to_bytes_backrefs(&a, gen).expect("node_to_bytes_backrefs");
+                    &storage[..]
+                } else {
+                    prg.as_ref()
+                };
 
-        let ti = match block.transactions_info {
-            Some(ti) => ti,
-            None => {
-                continue;
-            }
-        };
+                let mut conditions = block_runner(&mut a, generator, &block_refs, ti.cost, flags)
+                    .expect("failed to run block generator");
 
-        let prg = match block.transactions_generator {
-            Some(prg) => prg,
-            None => {
-                continue;
-            }
-        };
+                if args.rust_generator || args.test_backrefs {
+                    assert!(conditions.cost <= ti.cost);
+                    assert!(conditions.cost > 0);
 
-        // iterate in reverse order since we're building a linked list from
-        // the tail
-        let mut block_refs = Vec::<Vec<u8>>::new();
-        for height in block.transactions_generator_ref_list {
-            block_ref_lookup
-                .reset()
-                .expect("sqlite reset statement failed");
-            block_ref_lookup
-                .bind((1, height as i64))
-                .expect("failed to look up ref-block");
+                    // in order for the comparison below the hold, we need to
+                    // patch up the cost of the rust generator to look like the
+                    // baseline
+                    conditions.cost = ti.cost;
+                } else {
+                    assert_eq!(conditions.cost, ti.cost);
+                }
 
-            block_ref_lookup
-                .next()
-                .expect("failed to fetch block-ref row");
-            let ref_block = block_ref_lookup
-                .read::<Vec<u8>, _>(0)
-                .expect("failed to lookup block reference");
+                if args.validate {
+                    let mut baseline = run_block_generator::<_, EmptyVisitor>(
+                        &mut a,
+                        prg.as_ref(),
+                        &block_refs,
+                        ti.cost,
+                        0,
+                    )
+                    .expect("failed to run block generator");
+                    assert_eq!(baseline.cost, ti.cost);
 
-            let ref_block =
-                zstd::stream::decode_all(&mut std::io::Cursor::<Vec<u8>>::new(ref_block))
-                    .expect("failed to decompress block");
+                    baseline.spends.sort_by_key(|s| *s.coin_id);
+                    conditions.spends.sort_by_key(|s| *s.coin_id);
 
-            let ref_block =
-                FullBlock::from_bytes_unchecked(&ref_block).expect("failed to parse ref-block");
-            let ref_gen = ref_block
-                .transactions_generator
-                .expect("block ref has no generator");
-            block_refs.push(ref_gen.as_ref().into());
-        }
+                    // now ensure the outputs are the same
+                    compare(&a, &baseline, &conditions);
+                }
+            });
 
-        pool.execute(move || {
-            let mut a = Allocator::new_limited(500000000, 62500000, 62500000);
-
-            let storage: Vec<u8>;
-            let generator = if args.test_backrefs {
-                // re-serialize the generator with back-references
-                let gen = node_from_bytes(&mut a, prg.as_ref()).expect("node_from_bytes");
-                storage = node_to_bytes_backrefs(&a, gen).expect("node_to_bytes_backrefs");
-                &storage[..]
-            } else {
-                prg.as_ref()
-            };
-
-            let mut conditions = block_runner(&mut a, generator, &block_refs, ti.cost, flags)
-                .expect("failed to run block generator");
-
-            if args.rust_generator || args.test_backrefs {
-                assert!(conditions.cost <= ti.cost);
-                assert!(conditions.cost > 0);
-
-                // in order for the comparison below the hold, we need to
-                // patch up the cost of the rust generator to look like the
-                // baseline
-                conditions.cost = ti.cost;
-            } else {
-                assert_eq!(conditions.cost, ti.cost);
-            }
-
-            if args.validate {
-                let mut baseline = run_block_generator::<_, EmptyVisitor>(
-                    &mut a,
-                    prg.as_ref(),
-                    &block_refs,
-                    ti.cost,
-                    0,
-                )
-                .expect("failed to run block generator");
-                assert_eq!(baseline.cost, ti.cost);
-
-                baseline.spends.sort_by_key(|s| *s.coin_id);
-                conditions.spends.sort_by_key(|s| *s.coin_id);
-
-                // now ensure the outputs are the same
-                compare(&a, &baseline, &conditions);
-            }
-        });
-
-        assert_eq!(pool.panic_count(), 0);
-    }
+            assert_eq!(pool.panic_count(), 0);
+        },
+    );
 
     pool.join();
 }
