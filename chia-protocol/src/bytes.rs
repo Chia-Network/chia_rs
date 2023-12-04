@@ -54,8 +54,8 @@ impl Streamable for Bytes {
         }
     }
 
-    fn parse(input: &mut Cursor<&[u8]>) -> chia_error::Result<Self> {
-        let len = u32::parse(input)?;
+    fn parse<const TRUSTED: bool>(input: &mut Cursor<&[u8]>) -> chia_error::Result<Self> {
+        let len = u32::parse::<TRUSTED>(input)?;
         Ok(Bytes(read_bytes(input, len as usize)?.to_vec()))
     }
 }
@@ -191,7 +191,7 @@ impl<const N: usize> Streamable for BytesImpl<N> {
         Ok(())
     }
 
-    fn parse(input: &mut Cursor<&[u8]>) -> chia_error::Result<Self> {
+    fn parse<const TRUSTED: bool>(input: &mut Cursor<&[u8]>) -> chia_error::Result<Self> {
         Ok(BytesImpl(read_bytes(input, N)?.try_into().unwrap()))
     }
 }
@@ -562,7 +562,7 @@ mod tests {
 
     fn from_bytes<T: Streamable + std::fmt::Debug + std::cmp::PartialEq>(buf: &[u8], expected: T) {
         let mut input = Cursor::<&[u8]>::new(buf);
-        assert_eq!(T::parse(&mut input).unwrap(), expected);
+        assert_eq!(T::parse::<false>(&mut input).unwrap(), expected);
     }
 
     fn from_bytes_fail<T: Streamable + std::fmt::Debug + std::cmp::PartialEq>(
@@ -570,7 +570,7 @@ mod tests {
         expected: chia_error::Error,
     ) {
         let mut input = Cursor::<&[u8]>::new(buf);
-        assert_eq!(T::parse(&mut input).unwrap_err(), expected);
+        assert_eq!(T::parse::<false>(&mut input).unwrap_err(), expected);
     }
 
     fn stream<T: Streamable>(v: &T) -> Vec<u8> {

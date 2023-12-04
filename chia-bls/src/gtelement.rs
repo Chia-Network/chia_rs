@@ -57,12 +57,6 @@ impl GTElement {
     #[pyo3(name = "SIZE")]
     const PY_SIZE: usize = Self::SIZE;
 
-    #[staticmethod]
-    #[pyo3(name = "from_bytes_unchecked")]
-    fn py_from_bytes_unchecked(bytes: [u8; Self::SIZE]) -> Result<GTElement> {
-        Ok(Self::from_bytes(&bytes))
-    }
-
     fn __str__(&self) -> pyo3::PyResult<String> {
         Ok(hex::encode(self.to_bytes()))
     }
@@ -153,7 +147,7 @@ impl Streamable for GTElement {
         Ok(())
     }
 
-    fn parse(input: &mut Cursor<&[u8]>) -> Result<Self> {
+    fn parse<const TRUSTED: bool>(input: &mut Cursor<&[u8]>) -> Result<Self> {
         Ok(GTElement::from_bytes(
             read_bytes(input, Self::SIZE)?.try_into().unwrap(),
         ))

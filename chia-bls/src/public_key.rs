@@ -167,12 +167,6 @@ impl PublicKey {
     }
 
     #[staticmethod]
-    #[pyo3(name = "from_bytes_unchecked")]
-    fn py_from_bytes_unchecked(bytes: [u8; Self::SIZE]) -> Result<Self> {
-        Self::from_bytes_unchecked(&bytes)
-    }
-
-    #[staticmethod]
     #[pyo3(name = "generator")]
     pub fn py_generator() -> Self {
         Self::generator()
@@ -217,10 +211,13 @@ impl Streamable for PublicKey {
         Ok(())
     }
 
-    fn parse(input: &mut Cursor<&[u8]>) -> chia_traits::Result<Self> {
-        Ok(Self::from_bytes(
-            read_bytes(input, 48)?.try_into().unwrap(),
-        )?)
+    fn parse<const TRUSTED: bool>(input: &mut Cursor<&[u8]>) -> chia_traits::Result<Self> {
+        let input = read_bytes(input, 48)?.try_into().unwrap();
+        if TRUSTED {
+            Ok(Self::from_bytes_unchecked(input)?)
+        } else {
+            Ok(Self::from_bytes(input)?)
+        }
     }
 }
 

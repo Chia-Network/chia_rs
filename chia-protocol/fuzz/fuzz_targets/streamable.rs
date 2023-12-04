@@ -21,6 +21,9 @@ pub fn test_streamable<T: Streamable + std::fmt::Debug + PartialEq>(obj: &T) {
     };
     assert_eq!(obj, &obj2);
 
+    let obj3 = T::from_bytes_unchecked(&bytes).unwrap();
+    assert_eq!(obj, &obj3);
+
     let mut ctx = Sha256::new();
     ctx.update(&bytes);
     let expect_hash: [u8; 32] = ctx.finalize().into();
@@ -29,12 +32,12 @@ pub fn test_streamable<T: Streamable + std::fmt::Debug + PartialEq>(obj: &T) {
     // make sure input too large is an error
     let mut corrupt_bytes = bytes.clone();
     corrupt_bytes.push(0);
-    assert!(T::from_bytes(&corrupt_bytes) == Err(chia_traits::Error::InputTooLarge));
+    assert!(T::from_bytes_unchecked(&corrupt_bytes) == Err(chia_traits::Error::InputTooLarge));
 
     if !bytes.is_empty() {
         // make sure input too short is an error
         corrupt_bytes.truncate(bytes.len() - 1);
-        assert!(T::from_bytes(&corrupt_bytes) == Err(chia_traits::Error::EndOfBuffer));
+        assert!(T::from_bytes_unchecked(&corrupt_bytes) == Err(chia_traits::Error::EndOfBuffer));
     }
 }
 #[cfg(fuzzing)]

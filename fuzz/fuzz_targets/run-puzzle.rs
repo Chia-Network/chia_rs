@@ -11,7 +11,7 @@ use std::io::Cursor;
 fuzz_target!(|data: &[u8]| {
     let mut a = Allocator::new();
 
-    let Ok(spend) = CoinSpend::parse(&mut Cursor::new(data)) else {
+    let Ok(spend) = CoinSpend::parse::<false>(&mut Cursor::new(data)) else {
         return;
     };
     let _ = run_puzzle::<MempoolVisitor>(
