@@ -1,33 +1,39 @@
 extern crate proc_macro;
 
+use syn::{visit_mut::VisitMut, parse_quote, Type};
 use proc_macro::{TokenStream};
-use syn::{Item, parse_macro_input};
 
-fn attach_wasm_bindgen(input: &TokenStream) -> TokenStream {
-    let mut t = input.to_string();
-    t = format!("#[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)] {}", t);
-    t.parse().unwrap()
+// See https://github.com/rustwasm/wasm-bindgen/issues/3707
+fn _patch_issue_3707(input: &TokenStream) -> TokenStream {
+    let mut s = input.to_string();
+    s = format!("#[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)] {}", s);
+    s.parse().unwrap()
+}
+
+struct TypeConverter;
+
+// As of Dec 2023, wasm-bindgen cannot handle u128 at all.
+// We convert u128 into u64 here.
+// u64 is then converted into bigint in JS which has no size limitation.
+// So this conversion does no harm unless a value greater than u64_max is
+// communicated between JS and Wasm Runtime.
+impl VisitMut for TypeConverter {
+    fn visit_type_mut(&mut self, i: &mut Type) {
+        if let Type::Path(type_path) = i {
+            if type_path.path.is_ident("u128") {
+                *i = parse_quote! { u64 };
+            }
+        }
+        syn::visit_mut::visit_type_mut(self, i);
+    }
 }
 
 #[proc_macro_attribute]
 pub fn with_wasm(_args: TokenStream, input: TokenStream) -> TokenStream {
-    let mut input_maybe_modified = input.clone();
+    let mut ast: syn::File = syn::parse(input.into()).unwrap();
+    let mut converter = TypeConverter;
+    converter.visit_file_mut(&mut ast);
 
-    let parsed_item = parse_macro_input!(input as Item);
-
-    match parsed_item {
-        Item::Struct(_) => {
-            let shrink_u128 = true;
-            if shrink_u128 {
-                let mut s = input_maybe_modified.to_string();
-                s = s.replace("u128", "u64");
-                input_maybe_modified = s.parse().unwrap();
-            }
-            // println!("{}", &input_maybe_modified);
-            attach_wasm_bindgen(&input_maybe_modified)
-        },
-        _ => {
-            attach_wasm_bindgen(&input_maybe_modified)
-        }
-    }
+    let input_maybe_modified = quote::quote!(#ast);
+    _patch_issue_3707(&input_maybe_modified.into())
 }
