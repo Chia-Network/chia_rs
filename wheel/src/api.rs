@@ -14,22 +14,27 @@ use chia::gen::run_puzzle::run_puzzle as native_run_puzzle;
 use chia::gen::solution_generator::solution_generator as native_solution_generator;
 use chia::gen::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
 use chia::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
-use chia_protocol::Bytes32;
-use chia_protocol::FullBlock;
 use chia_protocol::{
-    ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin, CoinSpend, CoinState,
-    CoinStateUpdate, EndOfSubSlotBundle, Foliage, FoliageBlockData, FoliageTransactionBlock,
-    HeaderBlock, InfusedChallengeChainSubSlot, NewPeakWallet, PoolTarget, Program, ProofOfSpace,
-    PuzzleSolutionResponse, RegisterForCoinUpdates, RegisterForPhUpdates, RejectAdditionsRequest,
-    RejectBlockHeaders, RejectHeaderBlocks, RejectHeaderRequest, RejectPuzzleSolution,
-    RejectRemovalsRequest, RequestAdditions, RequestBlockHeader, RequestBlockHeaders,
-    RequestChildren, RequestFeeEstimates, RequestHeaderBlocks, RequestPuzzleSolution,
-    RequestRemovals, RequestSesInfo, RespondAdditions, RespondBlockHeader, RespondBlockHeaders,
-    RespondChildren, RespondFeeEstimates, RespondHeaderBlocks, RespondPuzzleSolution,
-    RespondRemovals, RespondSesInfo, RespondToCoinUpdates, RespondToPhUpdates, RewardChainBlock,
-    RewardChainBlockUnfinished, RewardChainSubSlot, SendTransaction, SpendBundle,
-    SubEpochChallengeSegment, SubEpochSegments, SubEpochSummary, SubSlotData, SubSlotProofs,
-    TransactionAck, TransactionsInfo, UnfinishedBlock, VDFInfo, VDFProof,
+    Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin, CoinSpend,
+    CoinState, CoinStateUpdate, EndOfSubSlotBundle, Foliage, FoliageBlockData,
+    FoliageTransactionBlock, FullBlock, HeaderBlock, InfusedChallengeChainSubSlot, NewCompactVDF,
+    NewPeak, NewPeakWallet, NewSignagePointOrEndOfSubSlot, NewTransaction, NewUnfinishedBlock,
+    PoolTarget, Program, ProofBlockHeader, ProofOfSpace, PuzzleSolutionResponse, RecentChainData,
+    RegisterForCoinUpdates, RegisterForPhUpdates, RejectAdditionsRequest, RejectBlock,
+    RejectBlockHeaders, RejectBlocks, RejectHeaderBlocks, RejectHeaderRequest,
+    RejectPuzzleSolution, RejectRemovalsRequest, RequestAdditions, RequestBlock,
+    RequestBlockHeader, RequestBlockHeaders, RequestBlocks, RequestChildren, RequestCompactVDF,
+    RequestFeeEstimates, RequestHeaderBlocks, RequestMempoolTransactions, RequestPeers,
+    RequestProofOfWeight, RequestPuzzleSolution, RequestRemovals, RequestSesInfo,
+    RequestSignagePointOrEndOfSubSlot, RequestTransaction, RequestUnfinishedBlock,
+    RespondAdditions, RespondBlock, RespondBlockHeader, RespondBlockHeaders, RespondBlocks,
+    RespondChildren, RespondCompactVDF, RespondEndOfSubSlot, RespondFeeEstimates,
+    RespondHeaderBlocks, RespondPeers, RespondProofOfWeight, RespondPuzzleSolution,
+    RespondRemovals, RespondSesInfo, RespondSignagePoint, RespondToCoinUpdates, RespondToPhUpdates,
+    RespondTransaction, RespondUnfinishedBlock, RewardChainBlock, RewardChainBlockUnfinished,
+    RewardChainSubSlot, SendTransaction, SpendBundle, SubEpochChallengeSegment, SubEpochData,
+    SubEpochSegments, SubEpochSummary, SubSlotData, SubSlotProofs, TimestampedPeerInfo,
+    TransactionAck, TransactionsInfo, UnfinishedBlock, VDFInfo, VDFProof, WeightProof,
 };
 use clvmr::serde::tree_hash_from_stream;
 use clvmr::{
@@ -386,10 +391,16 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<VDFInfo>()?;
     m.add_class::<VDFProof>()?;
     m.add_class::<SubSlotData>()?;
+    m.add_class::<SubEpochData>()?;
     m.add_class::<SubEpochChallengeSegment>()?;
     m.add_class::<SubEpochSegments>()?;
     m.add_class::<SubEpochSummary>()?;
     m.add_class::<UnfinishedBlock>()?;
+    m.add_class::<FullBlock>()?;
+    m.add_class::<WeightProof>()?;
+    m.add_class::<RecentChainData>()?;
+    m.add_class::<ProofBlockHeader>()?;
+    m.add_class::<TimestampedPeerInfo>()?;
 
     // wallet protocol
     m.add_class::<RequestPuzzleSolution>()?;
@@ -428,7 +439,32 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<RequestFeeEstimates>()?;
     m.add_class::<RespondFeeEstimates>()?;
 
-    m.add_class::<FullBlock>()?;
+    // full node protocol
+    m.add_class::<NewPeak>()?;
+    m.add_class::<NewTransaction>()?;
+    m.add_class::<RequestTransaction>()?;
+    m.add_class::<RespondTransaction>()?;
+    m.add_class::<RequestProofOfWeight>()?;
+    m.add_class::<RespondProofOfWeight>()?;
+    m.add_class::<RequestBlock>()?;
+    m.add_class::<RejectBlock>()?;
+    m.add_class::<RequestBlocks>()?;
+    m.add_class::<RespondBlocks>()?;
+    m.add_class::<RejectBlocks>()?;
+    m.add_class::<RespondBlock>()?;
+    m.add_class::<NewUnfinishedBlock>()?;
+    m.add_class::<RequestUnfinishedBlock>()?;
+    m.add_class::<RespondUnfinishedBlock>()?;
+    m.add_class::<NewSignagePointOrEndOfSubSlot>()?;
+    m.add_class::<RequestSignagePointOrEndOfSubSlot>()?;
+    m.add_class::<RespondSignagePoint>()?;
+    m.add_class::<RespondEndOfSubSlot>()?;
+    m.add_class::<RequestMempoolTransactions>()?;
+    m.add_class::<NewCompactVDF>()?;
+    m.add_class::<RequestCompactVDF>()?;
+    m.add_class::<RespondCompactVDF>()?;
+    m.add_class::<RequestPeers>()?;
+    m.add_class::<RespondPeers>()?;
 
     // facilities from clvm_rs
 
