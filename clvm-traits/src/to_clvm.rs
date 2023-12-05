@@ -1,32 +1,9 @@
-use clvmr::{allocator::NodePtr, Allocator};
 use num_bigint::BigInt;
 
 use crate::{ClvmEncoder, ToClvmError};
 
 pub trait ToClvm<N> {
     fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError>;
-}
-
-pub trait ToNodePtr {
-    fn to_node_ptr(&self, a: &mut Allocator) -> Result<NodePtr, ToClvmError>;
-}
-
-impl<T> ToNodePtr for T
-where
-    T: ToClvm<NodePtr>,
-{
-    fn to_node_ptr(&self, a: &mut Allocator) -> Result<NodePtr, ToClvmError> {
-        self.to_clvm(a)
-    }
-}
-
-impl ToClvm<NodePtr> for NodePtr {
-    fn to_clvm(
-        &self,
-        _encoder: &mut impl ClvmEncoder<Node = NodePtr>,
-    ) -> Result<NodePtr, ToClvmError> {
-        Ok(*self)
-    }
 }
 
 pub fn simplify_int_bytes(mut slice: &[u8]) -> &[u8] {
@@ -148,118 +125,100 @@ impl<N> ToClvm<N> for String {
 
 #[cfg(test)]
 mod tests {
-    use clvmr::{serde::node_to_bytes, Allocator};
-    use hex::ToHex;
+    use crate::tests::{node_to_str, TestAllocator, TestNode};
 
     use super::*;
 
-    fn encode<T>(a: &mut Allocator, value: T) -> Result<String, ToClvmError>
+    fn encode<T>(value: T) -> Result<String, ToClvmError>
     where
-        T: ToClvm<NodePtr>,
+        T: ToClvm<TestNode>,
     {
-        let actual = value.to_clvm(a).unwrap();
-        let actual_bytes = node_to_bytes(a, actual).unwrap();
-        Ok(actual_bytes.encode_hex())
-    }
-
-    #[test]
-    fn test_nodeptr() {
-        let a = &mut Allocator::new();
-        let ptr = a.one();
-        assert_eq!(ptr.to_clvm(a).unwrap(), ptr);
+        let mut a = TestAllocator::new();
+        let node = value.to_clvm(&mut a).unwrap();
+        Ok(node_to_str(&a, &node))
     }
 
     #[test]
     fn test_primitives() {
-        let a = &mut Allocator::new();
-        assert_eq!(encode(a, 0u8), Ok("80".to_owned()));
-        assert_eq!(encode(a, 0i8), Ok("80".to_owned()));
-        assert_eq!(encode(a, 5u8), Ok("05".to_owned()));
-        assert_eq!(encode(a, 5u32), Ok("05".to_owned()));
-        assert_eq!(encode(a, 5i32), Ok("05".to_owned()));
-        assert_eq!(encode(a, -27i32), Ok("81e5".to_owned()));
-        assert_eq!(encode(a, -0), Ok("80".to_owned()));
-        assert_eq!(encode(a, -128i8), Ok("8180".to_owned()));
+        assert_eq!(encode(0u8), Ok("NIL".to_owned()));
+        assert_eq!(encode(0i8), Ok("NIL".to_owned()));
+        assert_eq!(encode(5u8), Ok("05".to_owned()));
+        assert_eq!(encode(5u32), Ok("05".to_owned()));
+        assert_eq!(encode(5i32), Ok("05".to_owned()));
+        assert_eq!(encode(-27i32), Ok("e5".to_owned()));
+        assert_eq!(encode(-0), Ok("NIL".to_owned()));
+        assert_eq!(encode(-128i8), Ok("80".to_owned()));
     }
 
     #[test]
     fn test_reference() {
-        let a = &mut Allocator::new();
-        assert_eq!(encode(a, [1, 2, 3]), encode(a, [1, 2, 3]));
-        assert_eq!(encode(a, Some(42)), encode(a, Some(42)));
-        assert_eq!(encode(a, Some(&42)), encode(a, Some(42)));
-        assert_eq!(encode(a, Some(&42)), encode(a, Some(42)));
+        assert_eq!(encode([1, 2, 3]), encode([1, 2, 3]));
+        assert_eq!(encode(Some(42)), encode(Some(42)));
+        assert_eq!(encode(Some(&42)), encode(Some(42)));
+        assert_eq!(encode(Some(&42)), encode(Some(42)));
     }
 
     #[test]
     fn test_pair() {
-        let a = &mut Allocator::new();
-        assert_eq!(encode(a, (5, 2)), Ok("ff0502".to_owned()));
+        assert_eq!(encode((5, 2)), Ok("( 05 02".to_owned()));
         assert_eq!(
-            encode(a, (-72, (90121, ()))),
-            Ok("ff81b8ff8301600980".to_owned())
+            encode((-72, (90121, ()))),
+            Ok("( b8 ( 016009 NIL".to_owned())
         );
         assert_eq!(
-            encode(a, (((), ((), ((), (((), ((), ((), ()))), ())))), ())),
-            Ok("ffff80ff80ff80ffff80ff80ff80808080".to_owned())
+            encode((((), ((), ((), (((), ((), ((), ()))), ())))), ())),
+            Ok("( ( NIL ( NIL ( NIL ( ( NIL ( NIL ( NIL NIL NIL NIL".to_owned())
         );
     }
 
     #[test]
     fn test_nil() {
-        let a = &mut Allocator::new();
-        assert_eq!(encode(a, ()), Ok("80".to_owned()));
+        assert_eq!(encode(()), Ok("NIL".to_owned()));
     }
 
     #[test]
     fn test_slice() {
-        let a = &mut Allocator::new();
         assert_eq!(
-            encode(a, [1, 2, 3, 4].as_slice()),
-            Ok("ff01ff02ff03ff0480".to_owned())
+            encode([1, 2, 3, 4].as_slice()),
+            Ok("( 01 ( 02 ( 03 ( 04 NIL".to_owned())
         );
-        assert_eq!(encode(a, [0; 0].as_slice()), Ok("80".to_owned()));
+        assert_eq!(encode([0; 0].as_slice()), Ok("NIL".to_owned()));
     }
 
     #[test]
     fn test_array() {
-        let a = &mut Allocator::new();
-        assert_eq!(encode(a, [1, 2, 3, 4]), Ok("ff01ff02ff03ff0480".to_owned()));
-        assert_eq!(encode(a, [0; 0]), Ok("80".to_owned()));
+        assert_eq!(
+            encode([1, 2, 3, 4]),
+            Ok("( 01 ( 02 ( 03 ( 04 NIL".to_owned())
+        );
+        assert_eq!(encode([0; 0]), Ok("NIL".to_owned()));
     }
 
     #[test]
     fn test_vec() {
-        let a = &mut Allocator::new();
         assert_eq!(
-            encode(a, vec![1, 2, 3, 4]),
-            Ok("ff01ff02ff03ff0480".to_owned())
+            encode(vec![1, 2, 3, 4]),
+            Ok("( 01 ( 02 ( 03 ( 04 NIL".to_owned())
         );
-        assert_eq!(encode(a, vec![0; 0]), Ok("80".to_owned()));
+        assert_eq!(encode(vec![0; 0]), Ok("NIL".to_owned()));
     }
 
     #[test]
     fn test_option() {
-        let a = &mut Allocator::new();
-        assert_eq!(encode(a, Some("hello")), Ok("8568656c6c6f".to_owned()));
-        assert_eq!(encode(a, None::<&str>), Ok("80".to_owned()));
-        assert_eq!(encode(a, Some("")), Ok("80".to_owned()));
+        assert_eq!(encode(Some("hello")), Ok("68656c6c6f".to_owned()));
+        assert_eq!(encode(None::<&str>), Ok("NIL".to_owned()));
+        assert_eq!(encode(Some("")), Ok("NIL".to_owned()));
     }
 
     #[test]
     fn test_str() {
-        let a = &mut Allocator::new();
-        assert_eq!(encode(a, "hello"), Ok("8568656c6c6f".to_owned()));
-        assert_eq!(encode(a, ""), Ok("80".to_owned()));
+        assert_eq!(encode("hello"), Ok("68656c6c6f".to_owned()));
+        assert_eq!(encode(""), Ok("NIL".to_owned()));
     }
 
     #[test]
     fn test_string() {
-        let a = &mut Allocator::new();
-        assert_eq!(
-            encode(a, "hello".to_string()),
-            Ok("8568656c6c6f".to_owned())
-        );
-        assert_eq!(encode(a, "".to_string()), Ok("80".to_owned()));
+        assert_eq!(encode("hello".to_string()), Ok("68656c6c6f".to_owned()));
+        assert_eq!(encode("".to_string()), Ok("NIL".to_owned()));
     }
 }
