@@ -45,7 +45,7 @@ pub mod tests {
 
     impl TestAllocator {
         pub fn new() -> Self {
-            TestAllocator { atoms: vec![] }
+            TestAllocator::default()
         }
 
         fn new_atom(&mut self, buf: &[u8]) -> TestNode {
