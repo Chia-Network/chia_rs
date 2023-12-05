@@ -7,8 +7,7 @@ use chia::allocator::make_allocator;
 use chia::gen::conditions::MempoolVisitor;
 use chia::gen::flags::{
     AGG_SIG_ARGS, ALLOW_BACKREFS, ANALYZE_SPENDS, COND_ARGS_NIL, ENABLE_SOFTFORK_CONDITION,
-    LIMIT_OBJECTS, MEMPOOL_MODE, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL, NO_UNKNOWN_CONDS,
-    STRICT_ARGS_COUNT,
+    MEMPOOL_MODE, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
 };
 use chia::gen::run_puzzle::run_puzzle as native_run_puzzle;
 use chia::gen::solution_generator::solution_generator as native_solution_generator;
@@ -364,7 +363,6 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
         NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
     )?;
     m.add("MEMPOOL_MODE", MEMPOOL_MODE)?;
-    m.add("LIMIT_OBJECTS", LIMIT_OBJECTS)?;
     m.add("ALLOW_BACKREFS", ALLOW_BACKREFS)?;
     m.add("ANALYZE_SPENDS", ANALYZE_SPENDS)?;
 
@@ -474,7 +472,6 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     m.add("ENABLE_BLS_OPS", ENABLE_BLS_OPS)?;
     m.add("ENABLE_SECP_OPS", ENABLE_SECP_OPS)?;
     m.add("ENABLE_BLS_OPS_OUTSIDE_GUARD", ENABLE_BLS_OPS_OUTSIDE_GUARD)?;
-    m.add("LIMIT_OBJECTS", LIMIT_OBJECTS)?;
 
     m.add_function(wrap_pyfunction!(serialized_length, m)?)?;
     m.add_function(wrap_pyfunction!(compute_merkle_set_root, m)?)?;
