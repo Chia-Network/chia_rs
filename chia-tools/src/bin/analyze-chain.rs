@@ -5,7 +5,7 @@ use chia_traits::Streamable;
 use std::io::Write;
 use std::time::SystemTime;
 
-use sqlite::State;
+use rusqlite::Connection;
 
 use chia::gen::conditions::{parse_spends, MempoolVisitor};
 use chia::gen::flags::MEMPOOL_MODE;
@@ -41,7 +41,7 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    let connection = sqlite::open(args.file).expect("failed to open database file");
+    let connection = Connection::open(args.file).expect("failed to open database file");
 
     let mut statement = connection
         .prepare(
@@ -51,12 +51,6 @@ fn main() {
         ORDER BY height",
         )
         .expect("failed to prepare SQL statement enumerating blocks");
-    statement
-        .bind((1, args.start as i64))
-        .expect("failed to bind start height to sql query");
-    statement
-        .bind((2, args.end as i64))
-        .expect("failed to bind start height to sql query");
 
     let mut block_ref_lookup = connection
         .prepare("SELECT block FROM full_blocks WHERE height=? and in_main_chain=1")
@@ -74,13 +68,12 @@ fn main() {
 
     let mut prev_timestamp = 0;
 
-    while let Ok(State::Row) = statement.next() {
-        let height: u32 = statement
-            .read::<i64, _>(0)
-            .expect("missing height")
-            .try_into()
-            .expect("invalid height in block record");
-        let block_buffer = statement.read::<Vec<u8>, _>(1).expect("invalid block blob");
+    let mut rows = statement
+        .query([args.start, args.end])
+        .expect("failed to query blocks");
+    while let Ok(Some(row)) = rows.next() {
+        let height: u32 = row.get::<_, u32>(0).expect("missing height");
+        let block_buffer: Vec<u8> = row.get(1).expect("invalid block blob");
 
         let start_parse = SystemTime::now();
         let block_buffer =
@@ -123,18 +116,16 @@ fn main() {
             // iterate in reverse order since we're building a linked list from
             // the tail
             for height in block.transactions_generator_ref_list.iter().rev() {
-                block_ref_lookup
-                    .reset()
-                    .expect("sqlite reset statement failed");
-                block_ref_lookup
-                    .bind((1, *height as i64))
+                let mut rows = block_ref_lookup
+                    .query(rusqlite::params![height])
                     .expect("failed to look up ref-block");
 
-                block_ref_lookup
+                let row = rows
                     .next()
-                    .expect("failed to fetch block-ref row");
-                let ref_block = block_ref_lookup
-                    .read::<Vec<u8>, _>(0)
+                    .expect("failed to fetch block-ref row")
+                    .expect("get None block-ref row");
+                let ref_block = row
+                    .get::<_, Vec<u8>>(0)
                     .expect("failed to lookup block reference");
 
                 let ref_block =

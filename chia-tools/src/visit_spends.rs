@@ -10,7 +10,7 @@ use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
 use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs};
 use clvmr::Allocator;
-use sqlite::State;
+use rusqlite::Connection;
 
 pub fn iterate_tx_blocks(
     db: &str,
@@ -18,7 +18,7 @@ pub fn iterate_tx_blocks(
     max_height: Option<u32>,
     callback: impl Fn(u32, FullBlock, Vec<Vec<u8>>),
 ) {
-    let connection = sqlite::open(db).expect("failed to open database file");
+    let connection = Connection::open(db).expect("failed to open database file");
 
     let mut statement = connection
         .prepare(
@@ -28,27 +28,23 @@ pub fn iterate_tx_blocks(
         ORDER BY height",
         )
         .expect("failed to prepare SQL statement enumerating blocks");
-    statement
-        .bind((1, start_height as i64))
-        .expect("failed to bind start-height to SQL statement");
 
     let mut block_ref_lookup = connection
         .prepare("SELECT block FROM full_blocks WHERE height=? and in_main_chain=1")
         .expect("failed to prepare SQL statement looking up ref-blocks");
 
-    while let Ok(State::Row) = statement.next() {
-        let height: u32 = statement
-            .read::<i64, _>(0)
-            .expect("missing height")
-            .try_into()
-            .expect("invalid height in block record");
+    let mut rows = statement
+        .query([start_height])
+        .expect("failed to query blocks");
+    while let Ok(Some(row)) = rows.next() {
+        let height = row.get::<_, u32>(0).expect("missing height");
         if let Some(h) = max_height {
             if height > h {
                 break;
             }
         }
 
-        let block_buffer = statement.read::<Vec<u8>, _>(1).expect("invalid block blob");
+        let block_buffer: Vec<u8> = row.get(1).expect("invalid block blob");
 
         let block_buffer =
             zstd::stream::decode_all(&mut std::io::Cursor::<Vec<u8>>::new(block_buffer))
@@ -65,18 +61,16 @@ pub fn iterate_tx_blocks(
 
         let mut block_refs = Vec::<Vec<u8>>::new();
         for height in &block.transactions_generator_ref_list {
-            block_ref_lookup
-                .reset()
-                .expect("sqlite reset statement failed");
-            block_ref_lookup
-                .bind((1, *height as i64))
+            let mut rows = block_ref_lookup
+                .query(rusqlite::params![height])
                 .expect("failed to look up ref-block");
 
-            block_ref_lookup
+            let row = rows
                 .next()
-                .expect("failed to fetch block-ref row");
-            let ref_block = block_ref_lookup
-                .read::<Vec<u8>, _>(0)
+                .expect("failed to fetch block-ref row")
+                .expect("get None block-ref row");
+            let ref_block = row
+                .get::<_, Vec<u8>>(0)
                 .expect("failed to lookup block reference");
 
             let ref_block =
