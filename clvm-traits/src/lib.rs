@@ -38,13 +38,14 @@ pub mod tests {
         Pair(Box<TestNode>, Box<TestNode>),
     }
 
+    #[derive(Default)]
     pub struct TestAllocator {
         atoms: Vec<Vec<u8>>,
     }
 
     impl TestAllocator {
         pub fn new() -> Self {
-            TestAllocator { atoms: vec![] }
+            TestAllocator::default()
         }
 
         fn new_atom(&mut self, buf: &[u8]) -> TestNode {
@@ -64,7 +65,7 @@ pub mod tests {
             (TestNode::Pair(l1, r1), TestNode::Pair(l2, r2)) => {
                 node_eq(a, l1, l2) && node_eq(a, r1, r2)
             }
-            (_, _) => false,
+            _ => false,
         }
     }
 
@@ -72,10 +73,10 @@ pub mod tests {
         match input {
             TestNode::Atom(v) => {
                 let atom = a.atom(*v);
-                if atom.len() == 0 {
+                if atom.is_empty() {
                     "NIL".to_owned()
                 } else {
-                    format!("{}", &hex::encode(&atom))
+                    hex::encode(atom)
                 }
             }
             TestNode::Pair(l, r) => format!("( {} {}", node_to_str(a, l), node_to_str(a, r)),
@@ -94,15 +95,13 @@ pub mod tests {
             let (rest, left) = str_to_node(a, rest);
             let (rest, right) = str_to_node(a, rest);
             (rest, TestNode::Pair(Box::new(left), Box::new(right)))
+        } else if first == "NIL" {
+            (rest, a.new_atom(&[]))
         } else {
-            if first == "NIL" {
-                (rest, a.new_atom(&[]))
-            } else {
-                (
-                    rest,
-                    a.new_atom(hex::decode(first).expect("invalid hex").as_slice()),
-                )
-            }
+            (
+                rest,
+                a.new_atom(hex::decode(first).expect("invalid hex").as_slice()),
+            )
         }
     }
 
