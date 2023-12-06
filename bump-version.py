@@ -24,6 +24,9 @@ our_crates = [
     "chia-wallet",
     "chia-client",
     "chia-ssl",
+    "fuzz",
+    "chia-wallet/fuzz",
+    "clvm-utils/fuzz",
 ]
 
 def crates_with_changes() -> Set[str]:
