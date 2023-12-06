@@ -123,8 +123,8 @@ pub enum ProtocolMessageTypes {
     RespondFeeEstimates = 90,
 
     // Extended wallet protocol
-    UnregisterForPhUpdates = 92,
-    UnregisterForCoinUpdates = 93,
+    UnregisterPhUpdates = 92,
+    UnregisterCoinUpdates = 93,
 }
 
 pub trait ChiaProtocolMessage {
