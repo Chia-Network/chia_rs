@@ -148,6 +148,14 @@ message_struct! (RespondToCoinUpdates {
     coin_states: Vec<CoinState>,
 });
 
+message_struct! (UnregisterForPhUpdates {
+    puzzle_hashes: Vec<Bytes32>,
+});
+
+message_struct! (UnregisterForCoinUpdates {
+    coin_ids: Vec<Bytes32>,
+});
+
 message_struct! (CoinStateUpdate {
     height: u32,
     fork_height: u32,
