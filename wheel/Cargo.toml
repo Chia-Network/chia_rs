@@ -1,6 +1,6 @@
 [package]
 name = "chia_rs"
-version = "0.2.14"
+version = "0.3.0"
 authors = ["Richard Kiss <him@richardkiss.com>"]
 edition = "2021"
 license = "Apache-2.0"
@@ -19,10 +19,10 @@ clvmr = "=0.3.0"
 hex = "0.4.3"
 sha2 = "0.10.8"
 pyo3 = { version = "=0.19.0", features = ["extension-module", "multiple-pymethods"] }
-chia = { version = "=0.2.14", path = "..", features = ["py-bindings"] }
-chia-bls = { version = "=0.2.14", path = "../chia-bls", features = ["py-bindings"]  }
-chia-protocol = { version = "=0.2.14", path = "../chia-protocol", features = ["py-bindings"]  }
-chia-traits = { version = "=0.2.14", path = "../chia-traits", features = ["py-bindings"]  }
+chia = { version = "=0.3.0", path = "..", features = ["py-bindings"] }
+chia-bls = { version = "=0.3.0", path = "../chia-bls", features = ["py-bindings"]  }
+chia-protocol = { version = "=0.3.0", path = "../chia-protocol", features = ["py-bindings"]  }
+chia-traits = { version = "=0.3.0", path = "../chia-traits", features = ["py-bindings"]  }
 clvm-traits = { version = "=0.2.14", features = ["derive", "py-bindings"] }
-chia_py_streamable_macro = { version = "=0.2.14", path = "../chia_py_streamable_macro" }
-chia_streamable_macro = { version = "=0.2.14", path = "../chia_streamable_macro" }
+chia_py_streamable_macro = { version = "=0.3.0", path = "../chia_py_streamable_macro" }
+chia_streamable_macro = { version = "=0.3.0", path = "../chia_streamable_macro" }

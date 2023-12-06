@@ -301,7 +301,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chia"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
  "chia-protocol",
  "chia-traits",
@@ -321,7 +321,7 @@ dependencies = [
 
 [[package]]
 name = "chia-bls"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -365,7 +365,7 @@ dependencies = [
 
 [[package]]
 name = "chia-fuzz"
-version = "0.0.0"
+version = "0.3.0"
 dependencies = [
  "chia",
  "chia-protocol",
@@ -379,7 +379,7 @@ dependencies = [
 
 [[package]]
 name = "chia-protocol"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
  "arbitrary",
  "chia-bls",
@@ -422,7 +422,7 @@ dependencies = [
 
 [[package]]
 name = "chia-tools"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
  "chia",
  "chia-protocol",
@@ -441,7 +441,7 @@ dependencies = [
 
 [[package]]
 name = "chia-traits"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
  "chia_py_streamable_macro",
  "chia_streamable_macro",
@@ -453,7 +453,7 @@ dependencies = [
 
 [[package]]
 name = "chia-wallet"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
  "arbitrary",
  "chia-bls",
@@ -469,7 +469,7 @@ dependencies = [
 
 [[package]]
 name = "chia-wallet-fuzz"
-version = "0.0.0"
+version = "0.3.0"
 dependencies = [
  "chia-wallet",
  "clvm-traits 0.2.14",
@@ -480,7 +480,7 @@ dependencies = [
 
 [[package]]
 name = "chia_py_streamable_macro"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -490,7 +490,7 @@ dependencies = [
 
 [[package]]
 name = "chia_streamable_macro"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -594,7 +594,7 @@ checksum = "9110e638f8a4d34922e0436282c7fe1a8149020aef3aacf699377dcd3f1553da"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.28",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -612,7 +612,7 @@ dependencies = [
 
 [[package]]
 name = "clvm-traits"
-version = "0.2.15"
+version = "0.3.0"
 dependencies = [
  "clvm-derive 0.2.14",
  "hex",
@@ -624,7 +624,7 @@ dependencies = [
 
 [[package]]
 name = "clvm-utils"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
  "clvm-traits 0.2.14",
  "clvmr",
@@ -633,7 +633,7 @@ dependencies = [
 
 [[package]]
 name = "clvm-utils-fuzz"
-version = "0.0.0"
+version = "0.3.0"
 dependencies = [
  "chia",
  "chia-fuzz",
