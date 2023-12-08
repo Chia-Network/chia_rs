@@ -306,8 +306,8 @@ dependencies = [
  "chia-protocol",
  "chia-traits",
  "chia-wallet",
- "clvm-derive 0.2.14",
- "clvm-traits 0.2.14",
+ "clvm-derive",
+ "clvm-traits",
  "clvm-utils",
  "clvmr",
  "hex",
@@ -328,7 +328,7 @@ dependencies = [
  "blst",
  "chia-traits",
  "chia_py_streamable_macro",
- "clvm-traits 0.2.14",
+ "clvm-traits",
  "clvmr",
  "criterion",
  "hex",
@@ -370,7 +370,7 @@ dependencies = [
  "chia",
  "chia-protocol",
  "chia-traits",
- "clvm-traits 0.2.14",
+ "clvm-traits",
  "clvm-utils",
  "clvmr",
  "hex-literal",
@@ -386,7 +386,7 @@ dependencies = [
  "chia-traits",
  "chia_py_streamable_macro",
  "chia_streamable_macro",
- "clvm-traits 0.2.14",
+ "clvm-traits",
  "clvm-utils",
  "clvmr",
  "hex",
@@ -429,7 +429,7 @@ dependencies = [
  "chia-traits",
  "chia-wallet",
  "clap",
- "clvm-traits 0.2.14",
+ "clvm-traits",
  "clvm-utils",
  "clvmr",
  "hex",
@@ -458,7 +458,7 @@ dependencies = [
  "arbitrary",
  "chia-bls",
  "chia-protocol",
- "clvm-traits 0.2.14",
+ "clvm-traits",
  "clvm-utils",
  "clvmr",
  "hex",
@@ -472,7 +472,7 @@ name = "chia-wallet-fuzz"
 version = "0.3.0"
 dependencies = [
  "chia-wallet",
- "clvm-traits 0.2.14",
+ "clvm-traits",
  "clvmr",
  "libfuzzer-sys",
  "pyo3",
@@ -587,34 +587,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "clvm-derive"
-version = "0.2.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9110e638f8a4d34922e0436282c7fe1a8149020aef3aacf699377dcd3f1553da"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.32",
-]
-
-[[package]]
-name = "clvm-traits"
-version = "0.2.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d64ffd2241dead56ca31fb0261b4d0f802ba0b98a1c1e6f4514bc06c6095a9a9"
-dependencies = [
- "clvm-derive 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)",
- "clvmr",
- "num-bigint",
- "pyo3",
- "thiserror",
-]
-
-[[package]]
 name = "clvm-traits"
 version = "0.3.0"
 dependencies = [
- "clvm-derive 0.2.14",
+ "clvm-derive",
  "hex",
  "hex-literal",
  "num-bigint",
@@ -626,7 +602,7 @@ dependencies = [
 name = "clvm-utils"
 version = "0.3.0"
 dependencies = [
- "clvm-traits 0.2.14",
+ "clvm-traits",
  "clvmr",
  "hex",
 ]
@@ -637,7 +613,7 @@ version = "0.3.0"
 dependencies = [
  "chia",
  "chia-fuzz",
- "clvm-traits 0.2.14",
+ "clvm-traits",
  "clvm-utils",
  "clvmr",
  "libfuzzer-sys",
