@@ -182,6 +182,12 @@ impl fmt::Display for Bytes {
 #[cfg_attr(fuzzing, derive(arbitrary::Arbitrary))]
 pub struct BytesImpl<const N: usize>([u8; N]);
 
+impl<const N: usize> BytesImpl<N> {
+    pub fn as_slice(&self) -> &[u8] {
+        &self.0
+    }
+}
+
 impl<const N: usize> Streamable for BytesImpl<N> {
     fn update_digest(&self, digest: &mut Sha256) {
         digest.update(self.0);
