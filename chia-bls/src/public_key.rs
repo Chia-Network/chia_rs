@@ -2,7 +2,6 @@ use crate::secret_key::is_all_zero;
 use crate::{DerivableKey, Error, Result};
 use blst::*;
 use chia_traits::{read_bytes, Streamable};
-use clvm_traits::{ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError, ToClvm, ToClvmError};
 use sha2::{digest::FixedOutput, Digest, Sha256};
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -383,30 +382,6 @@ impl DerivableKey for PublicKey {
     }
 }
 
-impl<N> FromClvm<N> for PublicKey {
-    fn from_clvm(
-        decoder: &impl ClvmDecoder<Node = N>,
-        node: N,
-    ) -> std::result::Result<Self, FromClvmError> {
-        let bytes = decoder.decode_atom(&node)?;
-        let error = Err(FromClvmError::WrongAtomLength {
-            expected: 48,
-            found: bytes.len(),
-        });
-        let bytes = bytes.try_into().or(error)?;
-        Self::from_bytes(bytes).map_err(|error| FromClvmError::Custom(error.to_string()))
-    }
-}
-
-impl<N> ToClvm<N> for PublicKey {
-    fn to_clvm(
-        &self,
-        encoder: &mut impl ClvmEncoder<Node = N>,
-    ) -> std::result::Result<N, ToClvmError> {
-        encoder.encode_atom(&self.to_bytes())
-    }
-}
-
 pub const DST: &[u8] = b"BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_AUG_";
 
 pub fn hash_to_g1(msg: &[u8]) -> PublicKey {
@@ -434,7 +409,6 @@ pub fn hash_to_g1_with_dst(msg: &[u8], dst: &[u8]) -> PublicKey {
 mod tests {
     use super::*;
     use crate::SecretKey;
-    use clvmr::Allocator;
     use hex::FromHex;
     use rand::rngs::StdRng;
     use rand::{Rng, SeedableRng};
@@ -604,29 +578,6 @@ mod tests {
         assert_eq!(
             format!("{:?}", pk),
             format!("<G1Element {}>", hex::encode(data))
-        );
-    }
-
-    #[test]
-    fn test_to_from_clvm() {
-        let mut a = Allocator::new();
-        let bytes = hex::decode("997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2").expect("hex::decode()");
-        let ptr = a.new_atom(&bytes).expect("new_atom");
-
-        let pk = PublicKey::from_clvm(&a, ptr).expect("from_clvm");
-        assert_eq!(pk.to_bytes(), &bytes[..]);
-
-        let pk_ptr = pk.to_clvm(&mut a).expect("to_clvm");
-        assert!(a.atom_eq(pk_ptr, ptr));
-    }
-
-    #[test]
-    fn test_from_clvm_failure() {
-        let mut a = Allocator::new();
-        let ptr = a.new_pair(a.one(), a.one()).expect("new_pair");
-        assert_eq!(
-            PublicKey::from_clvm(&a, ptr).unwrap_err(),
-            FromClvmError::ExpectedAtom
         );
     }
 

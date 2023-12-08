@@ -156,6 +156,32 @@ impl<N> FromClvm<N> for String {
     }
 }
 
+#[cfg(feature = "chia-bls")]
+impl<N> FromClvm<N> for chia_bls::PublicKey {
+    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+        let bytes = decoder.decode_atom(&node)?;
+        let error = Err(FromClvmError::WrongAtomLength {
+            expected: 48,
+            found: bytes.len(),
+        });
+        let bytes = bytes.try_into().or(error)?;
+        Self::from_bytes(bytes).map_err(|error| FromClvmError::Custom(error.to_string()))
+    }
+}
+
+#[cfg(feature = "chia-bls")]
+impl<N> FromClvm<N> for chia_bls::Signature {
+    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+        let bytes = decoder.decode_atom(&node)?;
+        let error = Err(FromClvmError::WrongAtomLength {
+            expected: 96,
+            found: bytes.len(),
+        });
+        let bytes = bytes.try_into().or(error)?;
+        Self::from_bytes(bytes).map_err(|error| FromClvmError::Custom(error.to_string()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::tests::{str_to_node, TestAllocator, TestNode};
@@ -226,5 +252,45 @@ mod tests {
     fn test_string() {
         assert_eq!(decode("68656c6c6f"), Ok("hello".to_string()));
         assert_eq!(decode("NIL"), Ok("".to_string()));
+    }
+
+    #[cfg(feature = "chia-bls")]
+    #[test]
+    fn test_public_key() {
+        use chia_bls::PublicKey;
+        use hex_literal::hex;
+
+        let valid_bytes = hex!("b8f7dd239557ff8c49d338f89ac1a258a863fa52cd0a502e3aaae4b6738ba39ac8d982215aa3fa16bc5f8cb7e44b954d");
+        assert_eq!(
+            decode(&hex::encode(valid_bytes)),
+            Ok(PublicKey::from_bytes(&valid_bytes).unwrap())
+        );
+        assert_eq!(
+            decode::<PublicKey>("68656c6c6f"),
+            Err(FromClvmError::WrongAtomLength {
+                expected: 48,
+                found: 5
+            })
+        );
+    }
+
+    #[cfg(feature = "chia-bls")]
+    #[test]
+    fn test_signature() {
+        use chia_bls::Signature;
+        use hex_literal::hex;
+
+        let valid_bytes = hex!("a3994dc9c0ef41a903d3335f0afe42ba16c88e7881706798492da4a1653cd10c69c841eeb56f44ae005e2bad27fb7ebb16ce8bbfbd708ea91dd4ff24f030497b50e694a8270eccd07dbc206b8ffe0c34a9ea81291785299fae8206a1e1bbc1d1");
+        assert_eq!(
+            decode(&hex::encode(valid_bytes)),
+            Ok(Signature::from_bytes(&valid_bytes).unwrap())
+        );
+        assert_eq!(
+            decode::<Signature>("68656c6c6f"),
+            Err(FromClvmError::WrongAtomLength {
+                expected: 96,
+                found: 5
+            })
+        );
     }
 }

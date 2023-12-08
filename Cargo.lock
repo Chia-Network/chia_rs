@@ -303,12 +303,12 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 name = "chia"
 version = "0.3.0"
 dependencies = [
- "chia-protocol",
- "chia-traits",
+ "chia-protocol 0.3.0",
+ "chia-traits 0.3.0",
  "chia-wallet",
  "clvm-derive 0.2.14",
  "clvm-traits 0.2.14",
- "clvm-utils",
+ "clvm-utils 0.3.0",
  "clvmr",
  "hex",
  "hex-literal",
@@ -326,10 +326,8 @@ dependencies = [
  "anyhow",
  "arbitrary",
  "blst",
- "chia-traits",
+ "chia-traits 0.3.0",
  "chia_py_streamable_macro",
- "clvm-traits 0.2.14",
- "clvmr",
  "criterion",
  "hex",
  "hkdf",
@@ -342,10 +340,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "chia-bls"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1f02b3316f347607f79668627cf1f01b5a62257089c08e92c7df3ad93c6c1aa"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "blst",
+ "chia-traits 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "clvm-traits 0.2.14",
+ "hex",
+ "hkdf",
+ "sha2 0.10.8",
+ "thiserror",
+ "tiny-bip39",
+]
+
+[[package]]
 name = "chia-bls-fuzz"
 version = "0.0.0"
 dependencies = [
- "chia-bls",
+ "chia-bls 0.3.0",
  "libfuzzer-sys",
  "pyo3",
 ]
@@ -354,8 +370,8 @@ dependencies = [
 name = "chia-client"
 version = "0.2.13"
 dependencies = [
- "chia-protocol",
- "chia-traits",
+ "chia-protocol 0.3.0",
+ "chia-traits 0.3.0",
  "futures-util",
  "thiserror",
  "tokio",
@@ -368,10 +384,10 @@ name = "chia-fuzz"
 version = "0.3.0"
 dependencies = [
  "chia",
- "chia-protocol",
- "chia-traits",
+ "chia-protocol 0.3.0",
+ "chia-traits 0.3.0",
  "clvm-traits 0.2.14",
- "clvm-utils",
+ "clvm-utils 0.3.0",
  "clvmr",
  "hex-literal",
  "libfuzzer-sys",
@@ -382,12 +398,12 @@ name = "chia-protocol"
 version = "0.3.0"
 dependencies = [
  "arbitrary",
- "chia-bls",
- "chia-traits",
+ "chia-bls 0.3.0",
+ "chia-traits 0.3.0",
  "chia_py_streamable_macro",
- "chia_streamable_macro",
+ "chia_streamable_macro 0.3.0",
  "clvm-traits 0.2.14",
- "clvm-utils",
+ "clvm-utils 0.3.0",
  "clvmr",
  "hex",
  "pyo3",
@@ -396,12 +412,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "chia-protocol"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5065871f83884a9a64d70f3f8390c328acb878e5dab0e575ab068f73aaf1e577"
+dependencies = [
+ "arbitrary",
+ "chia-bls 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "chia-traits 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "chia_streamable_macro 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "clvm-traits 0.2.14",
+ "clvm-utils 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "clvmr",
+ "hex",
+ "sha2 0.10.8",
+]
+
+[[package]]
 name = "chia-protocol-fuzz"
 version = "0.0.0"
 dependencies = [
  "arbitrary",
- "chia-protocol",
- "chia-traits",
+ "chia-protocol 0.3.0",
+ "chia-traits 0.3.0",
  "hex",
  "libfuzzer-sys",
  "sha2 0.10.8",
@@ -425,12 +458,12 @@ name = "chia-tools"
 version = "0.3.0"
 dependencies = [
  "chia",
- "chia-protocol",
- "chia-traits",
+ "chia-protocol 0.3.0",
+ "chia-traits 0.3.0",
  "chia-wallet",
  "clap",
  "clvm-traits 0.2.14",
- "clvm-utils",
+ "clvm-utils 0.3.0",
  "clvmr",
  "hex",
  "hex-literal",
@@ -444,9 +477,21 @@ name = "chia-traits"
 version = "0.3.0"
 dependencies = [
  "chia_py_streamable_macro",
- "chia_streamable_macro",
+ "chia_streamable_macro 0.3.0",
  "hex",
  "pyo3",
+ "sha2 0.10.8",
+ "thiserror",
+]
+
+[[package]]
+name = "chia-traits"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "636e832ece4dc14e2e866d1737fbfdc32d6dd616aa4fc3869cfb273881def303"
+dependencies = [
+ "chia_streamable_macro 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hex",
  "sha2 0.10.8",
  "thiserror",
 ]
@@ -456,10 +501,10 @@ name = "chia-wallet"
 version = "0.3.0"
 dependencies = [
  "arbitrary",
- "chia-bls",
- "chia-protocol",
+ "chia-bls 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "chia-protocol 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "clvm-traits 0.2.14",
- "clvm-utils",
+ "clvm-utils 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "clvmr",
  "hex",
  "hex-literal",
@@ -491,6 +536,18 @@ dependencies = [
 [[package]]
 name = "chia_streamable_macro"
 version = "0.3.0"
+dependencies = [
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.32",
+]
+
+[[package]]
+name = "chia_streamable_macro"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "342cdb29dd8c1214d60fac24100ab1567756270710e93336db910a531fe8a264"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -606,7 +663,6 @@ dependencies = [
  "clvm-derive 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "clvmr",
  "num-bigint",
- "pyo3",
  "thiserror",
 ]
 
@@ -614,6 +670,7 @@ dependencies = [
 name = "clvm-traits"
 version = "0.3.0"
 dependencies = [
+ "chia-bls 0.3.0",
  "clvm-derive 0.2.14",
  "hex",
  "hex-literal",
@@ -632,13 +689,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "clvm-utils"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0f2d0945fda2ed18f689f5f7faf50c3375594d94c5aba6f3da838ee29002f1f8"
+dependencies = [
+ "clvm-traits 0.2.14",
+ "clvmr",
+]
+
+[[package]]
 name = "clvm-utils-fuzz"
 version = "0.3.0"
 dependencies = [
  "chia",
  "chia-fuzz",
  "clvm-traits 0.2.14",
- "clvm-utils",
+ "clvm-utils 0.3.0",
  "clvmr",
  "libfuzzer-sys",
 ]

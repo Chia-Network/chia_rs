@@ -9,15 +9,17 @@ homepage = "https://github.com/Chia-Network/chia_rs/clvm-traits/"
 repository = "https://github.com/Chia-Network/chia_rs/clvm-traits/"
 
 [package.metadata.docs.rs]
-features = ["derive"]
+features = ["derive", "chia-bls"]
 
 [features]
 derive = ["dep:clvm-derive"]
+chia-bls = ["dep:chia-bls"]
 py-bindings = ["dep:pyo3"]
 
 [dependencies]
 pyo3 = { version = ">=0.19.0", optional = true }
 clvm-derive = { version = "0.2.14", path = "../clvm-derive", optional = true }
+chia-bls = { version = "0.3.0", path = "../chia-bls", optional = true }
 num-bigint = "0.4.3"
 thiserror = "1.0.44"
 
