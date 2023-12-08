@@ -301,9 +301,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chia"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
- "chia-protocol 0.3.0",
+ "chia-protocol 0.3.1",
  "chia-traits 0.3.0",
  "chia-wallet",
  "clvm-derive 0.2.14",
@@ -317,26 +317,6 @@ dependencies = [
  "rstest 0.16.0",
  "text-diff",
  "thiserror",
-]
-
-[[package]]
-name = "chia-bls"
-version = "0.3.0"
-dependencies = [
- "anyhow",
- "arbitrary",
- "blst",
- "chia-traits 0.3.0",
- "chia_py_streamable_macro",
- "criterion",
- "hex",
- "hkdf",
- "pyo3",
- "rand",
- "rstest 0.17.0",
- "sha2 0.10.8",
- "thiserror",
- "tiny-bip39",
 ]
 
 [[package]]
@@ -358,10 +338,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "chia-bls"
+version = "0.3.1"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "blst",
+ "chia-traits 0.3.0",
+ "chia_py_streamable_macro",
+ "criterion",
+ "hex",
+ "hkdf",
+ "pyo3",
+ "rand",
+ "rstest 0.17.0",
+ "sha2 0.10.8",
+ "thiserror",
+ "tiny-bip39",
+]
+
+[[package]]
 name = "chia-bls-fuzz"
 version = "0.0.0"
 dependencies = [
- "chia-bls 0.3.0",
+ "chia-bls 0.3.1",
  "libfuzzer-sys",
  "pyo3",
 ]
@@ -370,7 +370,7 @@ dependencies = [
 name = "chia-client"
 version = "0.2.13"
 dependencies = [
- "chia-protocol 0.3.0",
+ "chia-protocol 0.3.1",
  "chia-traits 0.3.0",
  "futures-util",
  "thiserror",
@@ -384,7 +384,7 @@ name = "chia-fuzz"
 version = "0.3.0"
 dependencies = [
  "chia",
- "chia-protocol 0.3.0",
+ "chia-protocol 0.3.1",
  "chia-traits 0.3.0",
  "clvm-traits 0.2.14",
  "clvm-utils 0.3.0",
@@ -396,9 +396,26 @@ dependencies = [
 [[package]]
 name = "chia-protocol"
 version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5065871f83884a9a64d70f3f8390c328acb878e5dab0e575ab068f73aaf1e577"
 dependencies = [
  "arbitrary",
  "chia-bls 0.3.0",
+ "chia-traits 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "chia_streamable_macro 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "clvm-traits 0.2.14",
+ "clvm-utils 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "clvmr",
+ "hex",
+ "sha2 0.10.8",
+]
+
+[[package]]
+name = "chia-protocol"
+version = "0.3.1"
+dependencies = [
+ "arbitrary",
+ "chia-bls 0.3.1",
  "chia-traits 0.3.0",
  "chia_py_streamable_macro",
  "chia_streamable_macro 0.3.0",
@@ -412,28 +429,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "chia-protocol"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5065871f83884a9a64d70f3f8390c328acb878e5dab0e575ab068f73aaf1e577"
-dependencies = [
- "arbitrary",
- "chia-bls 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "chia-traits 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "chia_streamable_macro 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "clvm-traits 0.2.14",
- "clvm-utils 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "clvmr",
- "hex",
- "sha2 0.10.8",
-]
-
-[[package]]
 name = "chia-protocol-fuzz"
 version = "0.0.0"
 dependencies = [
  "arbitrary",
- "chia-protocol 0.3.0",
+ "chia-protocol 0.3.1",
  "chia-traits 0.3.0",
  "hex",
  "libfuzzer-sys",
@@ -458,7 +458,7 @@ name = "chia-tools"
 version = "0.3.0"
 dependencies = [
  "chia",
- "chia-protocol 0.3.0",
+ "chia-protocol 0.3.1",
  "chia-traits 0.3.0",
  "chia-wallet",
  "clap",
@@ -498,11 +498,11 @@ dependencies = [
 
 [[package]]
 name = "chia-wallet"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "arbitrary",
- "chia-bls 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "chia-protocol 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "chia-bls 0.3.0",
+ "chia-protocol 0.3.0",
  "clvm-traits 0.2.14",
  "clvm-utils 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "clvmr",
@@ -668,9 +668,9 @@ dependencies = [
 
 [[package]]
 name = "clvm-traits"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
- "chia-bls 0.3.0",
+ "chia-bls 0.3.1",
  "clvm-derive 0.2.14",
  "hex",
  "hex-literal",
