@@ -12,9 +12,9 @@ repository = "https://github.com/Chia-Network/chia_rs/chia-tools"
 chia-protocol = { version = "0.3.0", path = "../chia-protocol" }
 chia-traits = { path = "../chia-traits" }
 clvm-utils = { path = "../clvm-utils" }
-clvm-traits = { version = "=0.2.14" }
+clvm-traits = { version = "=0.3.0", path = "../clvm-traits" }
 chia-wallet = { version = "=0.3.0", path = "../chia-wallet" }
-clvmr = { version = "=0.3.0", features = ["counters"] }
+clvmr = { version = "=0.3.1", features = ["counters"] }
 chia = { version = "0.3.0", path = ".." }
 rusqlite = { version = "=0.30.0", features = ["bundled"] }
 clap = { version = "=4.3.9", features = ["derive"] }

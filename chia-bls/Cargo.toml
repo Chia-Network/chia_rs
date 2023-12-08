@@ -13,7 +13,7 @@ py-bindings = ["dep:pyo3", "chia_py_streamable_macro", "chia-traits/py-bindings"
 
 [dependencies]
 chia-traits = { version = "=0.3.0", path = "../chia-traits" }
-clvm-traits = { version = "=0.2.14", features = ["derive"] }
+clvm-traits = { version = "=0.3.0", path = "../clvm-traits", features = ["derive"] }
 chia_py_streamable_macro = { version = "=0.3.0", path = "../chia_py_streamable_macro", optional = true }
 tiny-bip39 = "1.0.0"
 anyhow = "1.0.71"
@@ -29,7 +29,7 @@ arbitrary = { version = "1.3.0" }
 rand = "0.8.5"
 criterion = "0.5.1"
 rstest = "0.17.0"
-clvmr = "=0.3.0"
+clvmr = "=0.3.1"
 
 [lib]
 crate-type = ["rlib"]
