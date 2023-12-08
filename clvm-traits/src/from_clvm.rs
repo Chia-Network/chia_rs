@@ -156,6 +156,32 @@ impl<N> FromClvm<N> for String {
     }
 }
 
+#[cfg(feature = "chia-bls")]
+impl<N> FromClvm<N> for chia_bls::PublicKey {
+    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+        let bytes = decoder.decode_atom(&node)?;
+        let error = Err(FromClvmError::WrongAtomLength {
+            expected: 48,
+            found: bytes.len(),
+        });
+        let bytes = bytes.try_into().or(error)?;
+        Self::from_bytes(bytes).map_err(|error| FromClvmError::Custom(error.to_string()))
+    }
+}
+
+#[cfg(feature = "chia-bls")]
+impl<N> FromClvm<N> for chia_bls::Signature {
+    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+        let bytes = decoder.decode_atom(&node)?;
+        let error = Err(FromClvmError::WrongAtomLength {
+            expected: 96,
+            found: bytes.len(),
+        });
+        let bytes = bytes.try_into().or(error)?;
+        Self::from_bytes(bytes).map_err(|error| FromClvmError::Custom(error.to_string()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::tests::{str_to_node, TestAllocator, TestNode};
@@ -226,5 +252,37 @@ mod tests {
     fn test_string() {
         assert_eq!(decode("68656c6c6f"), Ok("hello".to_string()));
         assert_eq!(decode("NIL"), Ok("".to_string()));
+    }
+
+    #[cfg(feature = "chia-bls")]
+    #[test]
+    fn test_public_key() {
+        use chia_bls::PublicKey;
+
+        let valid_bytes = [255; 48];
+        assert_eq!(
+            decode(&hex::encode(valid_bytes)),
+            Ok(PublicKey::from_bytes(&valid_bytes).unwrap())
+        );
+        assert_eq!(
+            decode::<PublicKey>("68656c6c6f"),
+            Err(FromClvmError::ExpectedAtom)
+        );
+    }
+
+    #[cfg(feature = "chia-bls")]
+    #[test]
+    fn test_signature() {
+        use chia_bls::Signature;
+
+        let valid_bytes = [255; 96];
+        assert_eq!(
+            decode(&hex::encode(valid_bytes)),
+            Ok(Signature::from_bytes(&valid_bytes).unwrap())
+        );
+        assert_eq!(
+            decode::<Signature>("68656c6c6f"),
+            Err(FromClvmError::ExpectedAtom)
+        );
     }
 }

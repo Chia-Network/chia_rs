@@ -123,6 +123,20 @@ impl<N> ToClvm<N> for String {
     }
 }
 
+#[cfg(feature = "chia-bls")]
+impl<N> ToClvm<N> for chia_bls::PublicKey {
+    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+        encoder.encode_atom(&self.to_bytes())
+    }
+}
+
+#[cfg(feature = "chia-bls")]
+impl<N> ToClvm<N> for chia_bls::Signature {
+    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+        encoder.encode_atom(&self.to_bytes())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::tests::{node_to_str, TestAllocator, TestNode};
@@ -220,5 +234,17 @@ mod tests {
     fn test_string() {
         assert_eq!(encode("hello".to_string()), Ok("68656c6c6f".to_owned()));
         assert_eq!(encode("".to_string()), Ok("NIL".to_owned()));
+    }
+
+    #[cfg(feature = "chia-bls")]
+    #[test]
+    fn test_public_key() {
+        use chia_bls::PublicKey;
+
+        let valid_bytes = [255; 48];
+        assert_eq!(
+            encode(PublicKey::from_bytes(&valid_bytes).unwrap()),
+            Ok(hex::encode(valid_bytes))
+        );
     }
 }
