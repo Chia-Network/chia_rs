@@ -189,7 +189,8 @@ impl Program {
     fn py_to(args: &PyAny) -> PyResult<Program> {
         let mut a = Allocator::new_limited(500000000, 62500000, 62500000);
         let clvm = clvm_convert(&mut a, args)?;
-        Ok(Program::from_node_ptr(&a, clvm)?)
+        Ok(Program::from_node_ptr(&a, clvm)
+            .map_err(|error| PyErr::new::<PyTypeError, _>(error.to_string()))?)
     }
 
     fn get_tree_hash(&self) -> crate::Bytes32 {
@@ -299,7 +300,8 @@ impl Program {
                 <(
                     clvm_traits::MatchByte<4>,
                     (clvm_traits::match_quote!(NodePtr), (NodePtr, ())),
-                ) as clvm_traits::FromNodePtr>::from_node_ptr(&a, args)?;
+                ) as clvm_traits::FromNodePtr>::from_node_ptr(&a, args)
+                .map_err(|error| PyErr::new::<PyTypeError, _>(error.to_string()))?;
             curried_args.push(arg);
             args = rest;
         }
