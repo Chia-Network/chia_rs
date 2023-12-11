@@ -36,10 +36,7 @@ use chia_protocol::{
     TransactionAck, TransactionsInfo, UnfinishedBlock, VDFInfo, VDFProof, WeightProof,
 };
 use clvmr::serde::tree_hash_from_stream;
-use clvmr::{
-    ENABLE_BLS_OPS, ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV, ENABLE_SECP_OPS, LIMIT_HEAP,
-    NO_UNKNOWN_OPS,
-};
+use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV, LIMIT_HEAP, NO_UNKNOWN_OPS};
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
@@ -469,8 +466,6 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(run_chia_program, m)?)?;
     m.add("NO_UNKNOWN_OPS", NO_UNKNOWN_OPS)?;
     m.add("LIMIT_HEAP", LIMIT_HEAP)?;
-    m.add("ENABLE_BLS_OPS", ENABLE_BLS_OPS)?;
-    m.add("ENABLE_SECP_OPS", ENABLE_SECP_OPS)?;
     m.add("ENABLE_BLS_OPS_OUTSIDE_GUARD", ENABLE_BLS_OPS_OUTSIDE_GUARD)?;
 
     m.add_function(wrap_pyfunction!(serialized_length, m)?)?;
