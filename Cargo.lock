@@ -508,6 +508,7 @@ name = "chia_wasm"
 version = "0.2.7"
 dependencies = [
  "chia",
+ "getrandom",
  "js-sys",
  "wasm-bindgen",
  "wasm-bindgen-test",
@@ -1054,8 +1055,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fe9006bed769170c11f845cf00c7c1e9092aeb3f268e007c3e760ac68008070f"
 dependencies = [
  "cfg-if",
+ "js-sys",
  "libc",
  "wasi",
+ "wasm-bindgen",
 ]
 
 [[package]]
