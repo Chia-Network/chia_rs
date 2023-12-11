@@ -61,5 +61,12 @@ crate-type = ["rlib"]
 [profile.release]
 lto = "thin"
 
+# This is also necessary in `wheel/Cargo.toml` to make sure the `wheel` crate builds as well.
+# This overrides the crates.io version of `clvm-traits` with the local version.
+# This is because `clvmr` currently uses the latest published version of `clvm-traits`.
+# Because path dependencies are considered different from crates.io dependencies, they conflict.
+# All of the types are considered different by Cargo, and the below snippet is necessary to fix this.
+# When making breaking changes, this may be a complication.
+# Ideally this should be removed once a long term fix is found.
 [patch.crates-io]
 clvm-traits = { path = "clvm-traits" }
