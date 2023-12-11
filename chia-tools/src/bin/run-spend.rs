@@ -2,10 +2,10 @@ use chia::gen::conditions::Condition;
 use chia_protocol::Bytes32;
 use chia_traits::Streamable;
 use clap::Parser;
-use clvm_traits::ToNodePtr;
 use clvm_traits::{FromClvm, ToClvm};
 use clvm_utils::tree_hash;
 use clvm_utils::CurriedProgram;
+use clvmr::ToNodePtr;
 use clvmr::{allocator::NodePtr, Allocator};
 use hex_literal::hex;
 
