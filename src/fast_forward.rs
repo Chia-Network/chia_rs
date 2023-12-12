@@ -98,12 +98,6 @@ pub fn fast_forward_singleton(
         return Err(Error::CoinAmountEven);
     }
 
-    // in the case of fast-forwarding a spend, we require the amount to remain
-    // unchanged
-    if coin.amount != new_coin.amount || coin.amount != new_parent.amount {
-        return Err(Error::CoinAmountMismatch);
-    }
-
     // we can only fast-forward spends of singletons whose puzzle hash doesn't
     // change
     if coin.puzzle_hash != new_parent.puzzle_hash || coin.puzzle_hash != new_coin.puzzle_hash {
@@ -126,11 +120,9 @@ pub fn fast_forward_singleton(
         return Err(Error::NotSingletonModHash);
     }
 
-    // we can only fast-forward if the coin amount stay the same
-    // this is to minimize the risk of producing an invalid spend, after
-    // fast-forward. e.g. we might end up attempting to spend more that the
-    // amount of the coin
-    if coin.amount != new_solution.lineage_proof.parent_amount || coin.amount != new_parent.amount {
+    // if the current solution to the puzzle doesn't match the coin amount, it's
+    // an invalid spend. Don't try to fast-forward it
+    if coin.amount != new_solution.amount {
         return Err(Error::CoinAmountMismatch);
     }
 
@@ -169,6 +161,8 @@ pub fn fast_forward_singleton(
 
     // update the solution to use the new parent coin's information
     new_solution.lineage_proof.parent_parent_coin_id = new_parent.parent_coin_info;
+    new_solution.lineage_proof.parent_amount = new_parent.amount;
+    new_solution.amount = new_coin.amount;
 
     let expected_new_parent = new_parent.coin_id();
 
@@ -206,6 +200,8 @@ mod tests {
             "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
         )]
         new_parents_parent: &str,
+        #[values(0, 1, 3, 5)] new_amount: u64,
+        #[values(0, 1, 3, 5)] prev_amount: u64,
     ) {
         let spend_bytes = fs::read(format!("ff-tests/{spend_file}.spend")).expect("read file");
         let spend = CoinSpend::from_bytes(&spend_bytes).expect("parse CoinSpend");
@@ -219,13 +215,21 @@ mod tests {
         let new_parent_coin = Coin {
             parent_coin_info: new_parents_parent.as_slice().into(),
             puzzle_hash,
-            amount: spend.coin.amount,
+            amount: if prev_amount == 0 {
+                spend.coin.amount
+            } else {
+                prev_amount
+            },
         };
 
         let new_coin = Coin {
             parent_coin_info: new_parent_coin.coin_id().into(),
             puzzle_hash,
-            amount: spend.coin.amount,
+            amount: if new_amount == 0 {
+                spend.coin.amount
+            } else {
+                new_amount
+            },
         };
 
         // perform fast-forward
@@ -353,20 +357,6 @@ mod tests {
             },
             Error::CoinAmountMismatch,
         );
-
-        run_ff_test(
-            |_a, _coin, new_coin, _new_parent, _puzzle, _solution| {
-                new_coin.amount = 3;
-            },
-            Error::CoinAmountMismatch,
-        );
-
-        run_ff_test(
-            |_a, _coin, _new_coin, new_parent, _puzzle, _solution| {
-                new_parent.amount = 3;
-            },
-            Error::CoinAmountMismatch,
-        );
     }
 
     fn parse_solution(a: &mut Allocator, solution: &[u8]) -> SingletonSolution<NodePtr> {
@@ -423,7 +413,7 @@ mod tests {
 
                 *solution = serialize_solution(a, &new_solution);
             },
-            Error::CoinAmountMismatch,
+            Error::ParentCoinMismatch,
         );
     }
 
