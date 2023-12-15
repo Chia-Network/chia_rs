@@ -44,7 +44,7 @@ pub const HAS_RELATIVE_CONDITION: u32 = 2;
 // 2. There are no AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_* conditions
 // 3. No ASSERT_MY_COIN_ID condition, no more than one ASSERT_MY_PARENT_ID condition
 //    (as the second condition)
-// 4. it has an output coin with the same puzzle hash and amount as the spend itself
+// 4. it has an output coin with the same puzzle hash as the spend itself
 pub const ELIGIBLE_FOR_FF: u32 = 4;
 
 pub struct EmptyVisitor {}
@@ -131,9 +131,10 @@ impl SpendVisitor for MempoolVisitor {
         // to look for something that looks like a singleton output, with the same
         // puzzle hash as our input coin
         if (spend.flags & ELIGIBLE_FOR_FF) != 0
-            && !spend.create_coin.iter().any(|c| {
-                c.amount == spend.coin_amount && a.atom(spend.puzzle_hash) == c.puzzle_hash
-            })
+            && !spend
+                .create_coin
+                .iter()
+                .any(|c| (c.amount & 1) == 1 && a.atom(spend.puzzle_hash) == c.puzzle_hash)
         {
             spend.flags &= !ELIGIBLE_FOR_FF;
         }
@@ -2753,7 +2754,7 @@ fn test_multiple_create_coin() {
         amount: 43_u64,
         hint: a.null()
     }));
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP | ELIGIBLE_FOR_FF);
 }
 
 #[test]
@@ -4311,12 +4312,13 @@ fn test_eligible_for_ff_even_amount() {
 #[cfg(test)]
 #[rstest]
 #[case(123, "{h2}", true)]
+#[case(121, "{h2}", true)]
 #[case(122, "{h1}", false)]
 #[case(1, "{h1}", false)]
 #[case(123, "{h1}", false)]
 fn test_eligible_for_ff_output_coin(#[case] amount: u64, #[case] ph: &str, #[case] eligible: bool) {
     // in order to be elgibible for fast forward, there needs to be an output
-    // coin with the same amount and same puzzle hash
+    // coin with the same puzzle hash
     // 51=CREATE_COIN
     let test: &str = &format!(
         "(\
