@@ -90,9 +90,6 @@ fn clvm_convert(a: &mut Allocator, o: &PyAny) -> PyResult<NodePtr> {
     // None
     if o.is_none() {
         Ok(a.null())
-    // Program itself
-    } else if let Ok(prg) = o.extract::<Program>() {
-        Ok(node_from_bytes_backrefs(a, prg.0.as_slice())?)
     // bytes
     } else if let Ok(buffer) = o.extract::<&[u8]>() {
         a.new_atom(buffer)
@@ -148,6 +145,12 @@ fn clvm_convert(a: &mut Allocator, o: &PyAny) -> PyResult<NodePtr> {
             a.new_atom(atom.extract::<&[u8]>()?)
                 .map_err(|e| PyMemoryError::new_err(e.to_string()))
         }
+    // Program itself. This is interpreted as a program in serialized form, and
+    // just a buffer of that serialization. This is an optimization to finding
+    // __bytes__() and calling it
+    } else if let Ok(prg) = o.extract::<Program>() {
+        a.new_atom(prg.0.as_slice())
+            .map_err(|e| PyMemoryError::new_err(e.to_string()))
     // anything convertible to bytes
     } else if let Ok(fun) = o.getattr("__bytes__") {
         let bytes = fun.call0()?;

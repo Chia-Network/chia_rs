@@ -389,7 +389,7 @@ jobs:
           source venv/bin/activate
           git clone https://github.com/Chia-Network/clvm_tools.git --branch=main --single-branch
           pip install ./clvm_tools
-          pip install colorama maturin pytest chia-blockchain==2.1.0
+          pip install colorama maturin pytest chia-blockchain==2.1.2 clvm==0.9.8
           maturin develop --release -m wheel/Cargo.toml
           pytest tests
           grcov . --binary-path target -s . --branch --ignore-not-existing --ignore='*/.cargo/*' --ignore='tests/*' --ignore='venv/*' -o rust_cov.info
