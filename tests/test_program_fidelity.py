@@ -29,13 +29,16 @@ def rand_list(rnd: Random) -> List:
 def rand_program(rnd: Random) -> ChiaProgram:
     return ChiaProgram.from_bytes(b"\xff\x01\xff\x04\x01")
 
+def rand_rust_program(rnd: Random) -> chia_rs.Program:
+    return chia_rs.Program.from_bytes(b"\xff\x01\xff\x04\x01")
+
 def rand_optional(rnd: Random) -> Optional[object]:
     if rnd.randint(0, 1) == 0:
         return None
     return rand_object(rnd)
 
 def rand_object(rnd: Random) -> object:
-    types = [rand_optional, rand_int, rand_string, rand_bytes, rand_program, rand_list]
+    types = [rand_optional, rand_int, rand_string, rand_bytes, rand_program, rand_list, rand_rust_program]
     return rnd.sample(types, 1)[0](rnd)
 
 def test_run_program() -> None:
