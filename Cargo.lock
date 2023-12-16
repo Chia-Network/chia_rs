@@ -267,10 +267,10 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chia"
-version = "0.3.1"
+version = "0.3.3"
 dependencies = [
  "chia-protocol",
- "chia-traits 0.3.0",
+ "chia-traits 0.3.3",
  "chia-wallet",
  "clvm-derive",
  "clvm-traits",
@@ -288,11 +288,28 @@ dependencies = [
 [[package]]
 name = "chia-bls"
 version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a72987625a992469b793a7aba42b29be55f9b9b35f8d55bb5b87a314274733c0"
 dependencies = [
  "anyhow",
  "arbitrary",
  "blst",
  "chia-traits 0.3.0",
+ "hex",
+ "hkdf",
+ "sha2",
+ "thiserror",
+ "tiny-bip39",
+]
+
+[[package]]
+name = "chia-bls"
+version = "0.3.3"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "blst",
+ "chia-traits 0.3.3",
  "chia_py_streamable_macro",
  "criterion",
  "hex",
@@ -306,27 +323,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "chia-bls"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a72987625a992469b793a7aba42b29be55f9b9b35f8d55bb5b87a314274733c0"
-dependencies = [
- "anyhow",
- "arbitrary",
- "blst",
- "chia-traits 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "hex",
- "hkdf",
- "sha2",
- "thiserror",
- "tiny-bip39",
-]
-
-[[package]]
 name = "chia-bls-fuzz"
 version = "0.0.0"
 dependencies = [
- "chia-bls 0.3.1",
+ "chia-bls 0.3.3",
  "libfuzzer-sys",
  "pyo3",
 ]
@@ -336,7 +336,7 @@ name = "chia-client"
 version = "0.2.13"
 dependencies = [
  "chia-protocol",
- "chia-traits 0.3.0",
+ "chia-traits 0.3.3",
  "futures-util",
  "thiserror",
  "tokio",
@@ -346,11 +346,11 @@ dependencies = [
 
 [[package]]
 name = "chia-fuzz"
-version = "0.3.0"
+version = "0.3.3"
 dependencies = [
  "chia",
  "chia-protocol",
- "chia-traits 0.3.0",
+ "chia-traits 0.3.3",
  "clvm-traits",
  "clvm-utils",
  "clvmr",
@@ -360,11 +360,11 @@ dependencies = [
 
 [[package]]
 name = "chia-protocol"
-version = "0.3.1"
+version = "0.3.3"
 dependencies = [
  "arbitrary",
- "chia-bls 0.3.1",
- "chia-traits 0.3.0",
+ "chia-bls 0.3.3",
+ "chia-traits 0.3.3",
  "chia_py_streamable_macro",
  "chia_streamable_macro 0.3.0",
  "clvm-traits",
@@ -382,7 +382,7 @@ version = "0.0.0"
 dependencies = [
  "arbitrary",
  "chia-protocol",
- "chia-traits 0.3.0",
+ "chia-traits 0.3.3",
  "hex",
  "libfuzzer-sys",
  "sha2",
@@ -403,11 +403,11 @@ dependencies = [
 
 [[package]]
 name = "chia-tools"
-version = "0.3.0"
+version = "0.3.3"
 dependencies = [
  "chia",
  "chia-protocol",
- "chia-traits 0.3.0",
+ "chia-traits 0.3.3",
  "chia-wallet",
  "clap",
  "clvm-traits",
@@ -423,18 +423,6 @@ dependencies = [
 [[package]]
 name = "chia-traits"
 version = "0.3.0"
-dependencies = [
- "chia_py_streamable_macro",
- "chia_streamable_macro 0.3.0",
- "hex",
- "pyo3",
- "sha2",
- "thiserror",
-]
-
-[[package]]
-name = "chia-traits"
-version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "636e832ece4dc14e2e866d1737fbfdc32d6dd616aa4fc3869cfb273881def303"
 dependencies = [
@@ -445,11 +433,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "chia-traits"
+version = "0.3.3"
+dependencies = [
+ "chia_py_streamable_macro",
+ "chia_streamable_macro 0.3.0",
+ "hex",
+ "pyo3",
+ "sha2",
+ "thiserror",
+]
+
+[[package]]
 name = "chia-wallet"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "arbitrary",
- "chia-bls 0.3.1",
+ "chia-bls 0.3.3",
  "chia-protocol",
  "clvm-traits",
  "clvm-utils",
@@ -462,7 +462,7 @@ dependencies = [
 
 [[package]]
 name = "chia-wallet-fuzz"
-version = "0.3.0"
+version = "0.3.3"
 dependencies = [
  "chia-wallet",
  "clvm-traits",
@@ -594,9 +594,9 @@ dependencies = [
 
 [[package]]
 name = "clvm-traits"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
- "chia-bls 0.3.1",
+ "chia-bls 0.3.3",
  "clvm-derive",
  "hex",
  "hex-literal",
@@ -607,7 +607,7 @@ dependencies = [
 
 [[package]]
 name = "clvm-utils"
-version = "0.3.0"
+version = "0.3.3"
 dependencies = [
  "clvm-traits",
  "clvmr",
@@ -616,7 +616,7 @@ dependencies = [
 
 [[package]]
 name = "clvm-utils-fuzz"
-version = "0.3.0"
+version = "0.3.3"
 dependencies = [
  "chia",
  "chia-fuzz",
@@ -632,7 +632,7 @@ version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dede49a536ac5ad83753cf241f674d0c7b251a2a58ae681577457be9c5ea7bc3"
 dependencies = [
- "chia-bls 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "chia-bls 0.3.1",
  "clvm-traits",
  "hex",
  "k256",
