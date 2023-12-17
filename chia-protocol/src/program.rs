@@ -165,6 +165,52 @@ fn clvm_convert(a: &mut Allocator, o: &PyAny) -> PyResult<NodePtr> {
 }
 
 #[cfg(feature = "py-bindings")]
+fn clvm_serialize(a: &mut Allocator, o: &PyAny) -> PyResult<NodePtr> {
+    /*
+    When passing arguments to run(), there's some special treatment, before falling
+    back on the regular python -> CLVM conversion (implemented by clvm_convert
+    above). This function mimics the _serialize() function in python:
+
+       def _serialize(node: object) -> bytes:
+           if isinstance(node, list):
+               serialized_list = bytearray()
+               for a in node:
+                   serialized_list += b"\xff"
+                   serialized_list += _serialize(a)
+               serialized_list += b"\x80"
+               return bytes(serialized_list)
+           if type(node) is SerializedProgram:
+               return bytes(node)
+           if type(node) is Program:
+               return bytes(node)
+           else:
+               ret: bytes = SExp.to(node).as_bin()
+               return ret
+    */
+
+    // List
+    if let Ok(list) = o.downcast::<PyList>() {
+        let mut rev = Vec::<&PyAny>::new();
+        for py_item in list.iter() {
+            rev.push(py_item);
+        }
+        let mut ret = a.null();
+        for py_item in rev.into_iter().rev() {
+            let item = clvm_serialize(a, py_item)?;
+            ret = a
+                .new_pair(item, ret)
+                .map_err(|e| PyMemoryError::new_err(e.to_string()))?;
+        }
+        Ok(ret)
+    // Program itself
+    } else if let Ok(prg) = o.extract::<Program>() {
+        Ok(node_from_bytes_backrefs(a, prg.0.as_slice())?)
+    } else {
+        clvm_convert(a, o)
+    }
+}
+
+#[cfg(feature = "py-bindings")]
 fn to_program(py: Python<'_>, node: LazyNode) -> PyResult<&PyAny> {
     use pyo3::types::PyDict;
     let ctx: &PyDict = PyDict::new(py);
@@ -252,7 +298,16 @@ impl Program {
         use std::rc::Rc;
 
         let mut a = Allocator::new_limited(500000000, 62500000, 62500000);
-        let clvm_args = clvm_convert(&mut a, args)?;
+        // The python behavior here is a bit messy, and is best not emulated
+        // on the rust side. We must be able to pass a Program as an argument,
+        // and it being treated as the CLVM structure it represents. In python's
+        // SerializedProgram, we have a hack where we interpret the first
+        // "layer" of SerializedProgram, or lists of SerializedProgram this way.
+        // But if we encounter an Optional or tuple, we defer to the clvm
+        // wheel's conversion function to SExp. This level does not have any
+        // special treatment for SerializedProgram (as that would cause a
+        // circular dependency).
+        let clvm_args = clvm_serialize(&mut a, args)?;
 
         let r: Response = (|| -> PyResult<Response> {
             let program = node_from_bytes_backrefs(&mut a, self.0.as_ref())?;
