@@ -176,6 +176,8 @@ jobs:
 
     - name: Build Windows with maturin on Python ${{ matrix.python }}
       if: matrix.os.matrix == 'windows'
+      env:
+        CC: 'clang'
       run: |
         py -${{ matrix.python.major-dot-minor }} -m venv venv
         . .\venv\Scripts\Activate.ps1
