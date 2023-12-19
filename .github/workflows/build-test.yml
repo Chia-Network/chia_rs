@@ -178,10 +178,11 @@ jobs:
       if: matrix.os.matrix == 'windows'
       env:
         CC: 'clang'
+        CFLAGS: "-D__BLST_PORTABLE__"
       run: |
         py -${{ matrix.python.major-dot-minor }} -m venv venv
         . .\venv\Scripts\Activate.ps1
-        maturin build -i python --release -m wheel/Cargo.toml
+        maturin build -i python --features portable --release -m wheel/Cargo.toml
 
     - uses: Chia-Network/actions/create-venv@main
       id: create-venv
