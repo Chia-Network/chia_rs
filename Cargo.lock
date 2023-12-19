@@ -276,6 +276,7 @@ dependencies = [
  "clvm-traits",
  "clvm-utils",
  "clvmr",
+ "criterion",
  "hex",
  "hex-literal",
  "num-traits",

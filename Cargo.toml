@@ -53,6 +53,7 @@ thiserror = "1.0.44"
 num-traits = "0.2.15"
 rstest = "0.16.0"
 text-diff = "0.4.0"
+criterion = "0.5.1"
 
 [lib]
 name = "chia"
@@ -60,6 +61,10 @@ crate-type = ["rlib"]
 
 [profile.release]
 lto = "thin"
+
+[[bench]]
+name = "run-generator"
+harness = false
 
 # This is also necessary in `wheel/Cargo.toml` to make sure the `wheel` crate builds as well.
 # This overrides the crates.io version of `clvm-traits` with the local version.
