@@ -144,6 +144,7 @@ fn print_diff(output: &str, expected: &str) {
 }
 
 #[rstest]
+#[case("block-4671894")]
 #[case("block-225758")]
 #[case("assert-puzzle-announce-fail")]
 #[case("block-834752")]
