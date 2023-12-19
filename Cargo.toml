@@ -70,4 +70,6 @@ lto = "thin"
 # Ideally this should be removed once a long term fix is found.
 [patch.crates-io]
 clvm-traits = { path = "clvm-traits" }
+chia-bls = { version = "=0.3.3", path = "../chia-bls"  }
+
 # blst =  { git = "https://github.com/supranational/blst.git", rev = "0d46eefa45fc1e57aceb42bba0e84eab3a7a9725" }
