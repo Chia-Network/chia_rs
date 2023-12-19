@@ -36,9 +36,7 @@ jobs:
           python -m pip install --upgrade pip
 
     - name: Set up rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
+      uses: dtolnay/rust-toolchain@stable
 
     - name: setup venv
       run: |
@@ -85,9 +83,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
 
     - name: Set up rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
+      uses: dtolnay/rust-toolchain@stable
 
     - name: setup venv
       run: |
@@ -128,9 +124,7 @@ jobs:
         fetch-depth: 1
 
     - name: Set up rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
+      uses: dtolnay/rust-toolchain@stable
 
     - name: cargo bench
       run: |
