@@ -285,6 +285,8 @@ jobs:
         uses: dtolnay/rust-toolchain@nightly
         with:
             components: rustfmt, clippy
+      
+      - name: Set rustup override
         run: rustup override set nightly
 
       - name: fmt
@@ -300,6 +302,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: clippy
+        
+      - name: Set rustup override
         run: rustup override set nightly
 
       - name: workspace
