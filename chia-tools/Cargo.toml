@@ -14,7 +14,7 @@ chia-traits = { path = "../chia-traits" }
 clvm-utils = { path = "../clvm-utils" }
 clvm-traits = { version = "=0.3.3", path = "../clvm-traits" }
 chia-wallet = { version = "=0.3.3", path = "../chia-wallet" }
-clvmr = { version = "=0.3.2", features = ["counters"] }
+clvmr = { version = "0.3.3", features = ["counters"] }
 chia = { version = "0.3.3", path = ".." }
 rusqlite = { version = "=0.30.0", features = ["bundled"] }
 clap = { version = "=4.3.9", features = ["derive"] }
