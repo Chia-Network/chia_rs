@@ -384,6 +384,7 @@ dependencies = [
  "arbitrary",
  "chia-protocol",
  "chia-traits 0.3.3",
+ "clvmr",
  "hex",
  "libfuzzer-sys",
  "sha2",
@@ -629,9 +630,9 @@ dependencies = [
 
 [[package]]
 name = "clvmr"
-version = "0.3.2"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dede49a536ac5ad83753cf241f674d0c7b251a2a58ae681577457be9c5ea7bc3"
+checksum = "deabd4e4163efb64486937a7c80996e5bdfb88d21a6baa9c0f802e6b45906109"
 dependencies = [
  "chia-bls 0.3.1",
  "clvm-traits",

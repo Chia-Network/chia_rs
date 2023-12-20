@@ -3,7 +3,10 @@ use chia_traits::chia_error::{Error, Result};
 use chia_traits::Streamable;
 use clvm_traits::{FromClvmError, ToClvmError};
 use clvmr::allocator::NodePtr;
-use clvmr::serde::{node_from_bytes, node_to_bytes, serialized_length_from_bytes};
+use clvmr::serde::{
+    node_from_bytes, node_to_bytes, serialized_length_from_bytes,
+    serialized_length_from_bytes_trusted,
+};
 use clvmr::{Allocator, FromNodePtr, ToNodePtr};
 use sha2::{Digest, Sha256};
 use std::io::Cursor;
@@ -387,7 +390,11 @@ impl Streamable for Program {
     fn parse<const TRUSTED: bool>(input: &mut Cursor<&[u8]>) -> Result<Self> {
         let pos = input.position();
         let buf: &[u8] = &input.get_ref()[pos as usize..];
-        let len = serialized_length_from_bytes(buf).map_err(|_e| Error::EndOfBuffer)?;
+        let len = if TRUSTED {
+            serialized_length_from_bytes_trusted(buf).map_err(|_e| Error::EndOfBuffer)?
+        } else {
+            serialized_length_from_bytes(buf).map_err(|_e| Error::EndOfBuffer)?
+        };
         if buf.len() < len as usize {
             return Err(Error::EndOfBuffer);
         }
