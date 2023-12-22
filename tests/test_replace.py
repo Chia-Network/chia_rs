@@ -30,4 +30,4 @@ def test_coin_replace_ph_amount() -> None:
 def test_coin_replace_fail() -> None:
     c1 = Coin(coin, ph, 1000000)
     with pytest.raises(KeyError, match="unknown field foobar"):
-        c1.replace(amount=100, foobar=ph2)
+        c1.replace(amount=100, foobar=ph2)  # type: ignore[call-arg]
