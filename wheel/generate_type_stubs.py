@@ -179,6 +179,7 @@ extra_members = {
     ],
     "HeaderBlock": [
         "prev_header_hash: bytes32",
+        "prev_hash: bytes32",
         "header_hash: bytes32",
         "height: int",
         "weight: int",
