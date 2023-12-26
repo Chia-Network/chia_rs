@@ -14,8 +14,8 @@ use chia::gen::solution_generator::solution_generator as native_solution_generat
 use chia::gen::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
 use chia::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_protocol::{
-    Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin, CoinSpend,
-    CoinState, CoinStateUpdate, EndOfSubSlotBundle, Foliage, FoliageBlockData,
+    BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
+    CoinSpend, CoinState, CoinStateUpdate, EndOfSubSlotBundle, Foliage, FoliageBlockData,
     FoliageTransactionBlock, FullBlock, HeaderBlock, InfusedChallengeChainSubSlot, NewCompactVDF,
     NewPeak, NewPeakWallet, NewSignagePointOrEndOfSubSlot, NewTransaction, NewUnfinishedBlock,
     PoolTarget, Program, ProofBlockHeader, ProofOfSpace, PuzzleSolutionResponse, RecentChainData,
@@ -392,6 +392,7 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<SubEpochSummary>()?;
     m.add_class::<UnfinishedBlock>()?;
     m.add_class::<FullBlock>()?;
+    m.add_class::<BlockRecord>()?;
     m.add_class::<WeightProof>()?;
     m.add_class::<RecentChainData>()?;
     m.add_class::<ProofBlockHeader>()?;

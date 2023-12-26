@@ -6,6 +6,7 @@
 from typing import List, Optional, Sequence, Tuple
 from chia.types.blockchain_format.sized_bytes import bytes32
 from chia.types.blockchain_format.program import Program as ChiaProgram
+from chia.consensus.constants import ConsensusConstants
 
 ReadableBuffer = Union[bytes, bytearray, memoryview]
 
@@ -342,6 +343,112 @@ class SpendBundleConditions:
         cost: Union[ int, _Unspec] = _Unspec(),
         removal_amount: Union[ int, _Unspec] = _Unspec(),
         addition_amount: Union[ int, _Unspec] = _Unspec()) -> SpendBundleConditions: ...
+
+class BlockRecord:
+    header_hash: bytes32
+    prev_hash: bytes32
+    height: int
+    weight: int
+    total_iters: int
+    signage_point_index: int
+    challenge_vdf_output: ClassgroupElement
+    infused_challenge_vdf_output: Optional[ClassgroupElement]
+    reward_infusion_new_challenge: bytes32
+    challenge_block_info_hash: bytes32
+    sub_slot_iters: int
+    pool_puzzle_hash: bytes32
+    farmer_puzzle_hash: bytes32
+    required_iters: int
+    deficit: int
+    overflow: bool
+    prev_transaction_block_height: int
+    timestamp: Optional[int]
+    prev_transaction_block_hash: Optional[bytes32]
+    fees: Optional[int]
+    reward_claims_incorporated: Optional[List[Coin]]
+    finished_challenge_slot_hashes: Optional[List[bytes32]]
+    finished_infused_challenge_slot_hashes: Optional[List[bytes32]]
+    finished_reward_slot_hashes: Optional[List[bytes32]]
+    sub_epoch_summary_included: Optional[SubEpochSummary]
+    is_transaction_block: bool
+    first_in_sub_slot: bool
+    def is_challenge_block(self, constants: ConsensusConstants) -> bool: ...
+    def sp_sub_slot_total_iters(self, constants: ConsensusConstants) -> int: ...
+    def ip_sub_slot_total_iters(self, constants: ConsensusConstants) -> int: ...
+    def sp_iters(self, constants: ConsensusConstants) -> int: ...
+    def ip_iters(self, constants: ConsensusConstants) -> int: ...
+    def sp_total_iters(self, constants: ConsensusConstants) -> int: ...
+    def __init__(
+        self,
+        header_hash: bytes,
+        prev_hash: bytes,
+        height: int,
+        weight: int,
+        total_iters: int,
+        signage_point_index: int,
+        challenge_vdf_output: ClassgroupElement,
+        infused_challenge_vdf_output: Optional[ClassgroupElement],
+        reward_infusion_new_challenge: bytes,
+        challenge_block_info_hash: bytes,
+        sub_slot_iters: int,
+        pool_puzzle_hash: bytes,
+        farmer_puzzle_hash: bytes,
+        required_iters: int,
+        deficit: int,
+        overflow: bool,
+        prev_transaction_block_height: int,
+        timestamp: Optional[int],
+        prev_transaction_block_hash: Optional[bytes32],
+        fees: Optional[int],
+        reward_claims_incorporated: Optional[Sequence[Coin]],
+        finished_challenge_slot_hashes: Optional[Sequence[bytes32]],
+        finished_infused_challenge_slot_hashes: Optional[Sequence[bytes32]],
+        finished_reward_slot_hashes: Optional[Sequence[bytes32]],
+        sub_epoch_summary_included: Optional[SubEpochSummary]
+    ) -> None: ...
+    def __hash__(self) -> int: ...
+    def __repr__(self) -> str: ...
+    def __richcmp__(self) -> Any: ...
+    def __deepcopy__(self) -> BlockRecord: ...
+    def __copy__(self) -> BlockRecord: ...
+    @staticmethod
+    def from_bytes(bytes) -> BlockRecord: ...
+    @staticmethod
+    def from_bytes_unchecked(bytes) -> BlockRecord: ...
+    @staticmethod
+    def parse_rust(ReadableBuffer, bool = False) -> Tuple[BlockRecord, int]: ...
+    def to_bytes(self) -> bytes: ...
+    def __bytes__(self) -> bytes: ...
+    def stream_to_bytes(self) -> bytes: ...
+    def get_hash(self) -> bytes32: ...
+    def to_json_dict(self) -> Dict[str, Any]: ...
+    @staticmethod
+    def from_json_dict(json_dict: Dict[str, Any]) -> BlockRecord: ...
+    def replace(self, *, header_hash: Union[ bytes32, _Unspec] = _Unspec(),
+        prev_hash: Union[ bytes32, _Unspec] = _Unspec(),
+        height: Union[ int, _Unspec] = _Unspec(),
+        weight: Union[ int, _Unspec] = _Unspec(),
+        total_iters: Union[ int, _Unspec] = _Unspec(),
+        signage_point_index: Union[ int, _Unspec] = _Unspec(),
+        challenge_vdf_output: Union[ ClassgroupElement, _Unspec] = _Unspec(),
+        infused_challenge_vdf_output: Union[ Optional[ClassgroupElement], _Unspec] = _Unspec(),
+        reward_infusion_new_challenge: Union[ bytes32, _Unspec] = _Unspec(),
+        challenge_block_info_hash: Union[ bytes32, _Unspec] = _Unspec(),
+        sub_slot_iters: Union[ int, _Unspec] = _Unspec(),
+        pool_puzzle_hash: Union[ bytes32, _Unspec] = _Unspec(),
+        farmer_puzzle_hash: Union[ bytes32, _Unspec] = _Unspec(),
+        required_iters: Union[ int, _Unspec] = _Unspec(),
+        deficit: Union[ int, _Unspec] = _Unspec(),
+        overflow: Union[ bool, _Unspec] = _Unspec(),
+        prev_transaction_block_height: Union[ int, _Unspec] = _Unspec(),
+        timestamp: Union[ Optional[int], _Unspec] = _Unspec(),
+        prev_transaction_block_hash: Union[ Optional[bytes32], _Unspec] = _Unspec(),
+        fees: Union[ Optional[int], _Unspec] = _Unspec(),
+        reward_claims_incorporated: Union[ Optional[List[Coin]], _Unspec] = _Unspec(),
+        finished_challenge_slot_hashes: Union[ Optional[List[bytes32]], _Unspec] = _Unspec(),
+        finished_infused_challenge_slot_hashes: Union[ Optional[List[bytes32]], _Unspec] = _Unspec(),
+        finished_reward_slot_hashes: Union[ Optional[List[bytes32]], _Unspec] = _Unspec(),
+        sub_epoch_summary_included: Union[ Optional[SubEpochSummary], _Unspec] = _Unspec()) -> BlockRecord: ...
 
 class Message:
     msg_type: int

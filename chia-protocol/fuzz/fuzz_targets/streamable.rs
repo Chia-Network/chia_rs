@@ -67,6 +67,7 @@ fuzz_target!(|data: &[u8]| {
     test::<FoliageBlockData>(data);
     test::<Foliage>(data);
     test::<FullBlock>(data);
+    test::<BlockRecord>(data);
     test::<UnfinishedBlock>(data);
     test::<HeaderBlock>(data);
     test::<PoolTarget>(data);
