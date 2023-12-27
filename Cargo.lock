@@ -384,6 +384,7 @@ dependencies = [
  "arbitrary",
  "chia-protocol",
  "chia-traits 0.3.3",
+ "clvm-traits",
  "clvmr",
  "hex",
  "libfuzzer-sys",

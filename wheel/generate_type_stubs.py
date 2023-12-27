@@ -208,6 +208,13 @@ extra_members = {
         "def to_program(self) -> ChiaProgram: ...",
         "def uncurry(self) -> Tuple[ChiaProgram, ChiaProgram]: ...",
     ],
+    "SpendBundle": [
+        "@staticmethod\n    def aggregate(sbs: List[SpendBundle]) -> SpendBundle: ...",
+        "def name(self) -> bytes32: ...",
+        "def removals(self) -> List[Coin]: ...",
+        "def additions(self) -> List[Coin]: ...",
+        "def debug(self) -> None: ...",
+    ],
 }
 
 classes = []
