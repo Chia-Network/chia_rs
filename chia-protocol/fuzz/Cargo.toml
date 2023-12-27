@@ -61,3 +61,10 @@ path = "fuzz_targets/streamable.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "spend-bundle"
+path = "fuzz_targets/spend-bundle.rs"
+test = false
+doc = false
+bench = false
