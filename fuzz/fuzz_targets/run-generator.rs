@@ -26,7 +26,7 @@ fuzz_target!(|data: &[u8]| {
     match (r1, r2) {
         (Err(ValidationErr(_, ErrorCode::CostExceeded)), Ok(_)) => {
             // Since run_block_generator2 cost less, it's not a problem if the
-            // original generator runs our of cost while the rust implementation
+            // original generator runs out of cost while the rust implementation
             // succeeds. This is part of its features.
         }
         (Err(_), Err(_)) => {

@@ -3,11 +3,14 @@ use chia_traits::chia_error::{Error, Result};
 use chia_traits::Streamable;
 use clvm_traits::{FromClvmError, ToClvmError};
 use clvmr::allocator::NodePtr;
+use clvmr::cost::Cost;
+use clvmr::reduction::EvalErr;
+use clvmr::run_program;
 use clvmr::serde::{
-    node_from_bytes, node_to_bytes, serialized_length_from_bytes,
+    node_from_bytes, node_from_bytes_backrefs, node_to_bytes, serialized_length_from_bytes,
     serialized_length_from_bytes_trusted,
 };
-use clvmr::{Allocator, FromNodePtr, ToNodePtr};
+use clvmr::{Allocator, ChiaDialect, FromNodePtr, ToNodePtr};
 use sha2::{Digest, Sha256};
 use std::io::Cursor;
 
@@ -51,6 +54,31 @@ impl Program {
     pub fn as_slice(&self) -> &[u8] {
         self.0.as_slice()
     }
+
+    #[cfg(test)]
+    pub fn new(buf: Bytes) -> Program {
+        Program(buf)
+    }
+
+    pub fn run<A: ToNodePtr>(
+        &self,
+        a: &mut Allocator,
+        flags: u32,
+        max_cost: Cost,
+        arg: &A,
+    ) -> std::result::Result<(Cost, NodePtr), EvalErr> {
+        let arg = arg.to_node_ptr(a).map_err(|_| {
+            EvalErr(
+                a.null(),
+                "failed to convert argument to CLVM objects".to_string(),
+            )
+        })?;
+        let program =
+            node_from_bytes_backrefs(a, self.0.as_ref()).expect("invalid SerializedProgram");
+        let dialect = ChiaDialect::new(flags);
+        let reduction = run_program(a, &dialect, program, arg, max_cost)?;
+        Ok((reduction.0, reduction.1))
+    }
 }
 
 impl Default for Program {
@@ -73,9 +101,6 @@ use pyo3::prelude::*;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::types::{PyList, PyTuple};
-
-#[cfg(feature = "py-bindings")]
-use clvmr::serde::node_from_bytes_backrefs;
 
 #[cfg(feature = "py-bindings")]
 use clvmr::allocator::SExp;
@@ -296,8 +321,6 @@ impl Program {
         args: &PyAny,
     ) -> PyResult<(u64, &'a PyAny)> {
         use clvmr::reduction::Response;
-        use clvmr::run_program;
-        use clvmr::ChiaDialect;
         use std::rc::Rc;
 
         let mut a = Allocator::new_limited(500000000, 62500000, 62500000);
@@ -464,5 +487,17 @@ mod tests {
 
         let round_trip = program.to_node_ptr(a).unwrap();
         assert_eq!(expected, hex::encode(node_to_bytes(a, round_trip).unwrap()));
+    }
+
+    #[test]
+    fn program_run() {
+        let a = &mut Allocator::new();
+
+        // (+ 2 5)
+        let prg = Program::from_bytes(&hex::decode("ff10ff02ff0580").expect("hex::decode"))
+            .expect("from_bytes");
+        let (cost, result) = prg.run(a, 0, 1000, &[1300, 37]).expect("run");
+        assert_eq!(cost, 869);
+        assert_eq!(a.number(result), 1337.into());
     }
 }

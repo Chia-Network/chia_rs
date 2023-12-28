@@ -384,6 +384,7 @@ dependencies = [
  "arbitrary",
  "chia-protocol",
  "chia-traits 0.3.3",
+ "clvm-traits",
  "clvmr",
  "hex",
  "libfuzzer-sys",
@@ -408,6 +409,7 @@ name = "chia-tools"
 version = "0.3.3"
 dependencies = [
  "chia",
+ "chia-bls 0.3.3",
  "chia-protocol",
  "chia-traits 0.3.3",
  "chia-wallet",
