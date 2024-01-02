@@ -15,7 +15,7 @@ clvm-utils = { path = "../clvm-utils" }
 clvm-traits = { path = "../clvm-traits" }
 chia-wallet = { version = "=0.2.12", path = "../chia-wallet" }
 clvmr = { version = "=0.3.0", features = ["counters"] }
-chia = { version = "0.2.13", path = ".." }
+chia = { version = "0.2.15", path = ".." }
 sqlite = "=0.31.0"
 clap = { version = "=4.3.9", features = ["derive"] }
 zstd = "=0.12.3"
