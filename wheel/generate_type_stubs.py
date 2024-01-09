@@ -215,6 +215,16 @@ extra_members = {
         "def additions(self) -> List[Coin]: ...",
         "def debug(self) -> None: ...",
     ],
+    "BlockRecord": [
+        "is_transaction_block: bool",
+        "first_in_sub_slot: bool",
+        "def is_challenge_block(self, constants: ConsensusConstants) -> bool: ...",
+        "def sp_sub_slot_total_iters(self, constants: ConsensusConstants) -> int: ...",
+        "def ip_sub_slot_total_iters(self, constants: ConsensusConstants) -> int: ...",
+        "def sp_iters(self, constants: ConsensusConstants) -> int: ...",
+        "def ip_iters(self, constants: ConsensusConstants) -> int: ...",
+        "def sp_total_iters(self, constants: ConsensusConstants) -> int: ...",
+    ],
 }
 
 classes = []
@@ -233,6 +243,7 @@ with open(output_file, "w") as f:
 from typing import List, Optional, Sequence, Tuple
 from chia.types.blockchain_format.sized_bytes import bytes32
 from chia.types.blockchain_format.program import Program as ChiaProgram
+from chia.consensus.constants import ConsensusConstants
 
 ReadableBuffer = Union[bytes, bytearray, memoryview]
 
