@@ -22,7 +22,7 @@ fuzz_target!(|data: &[u8]| {
     let new_parents_parent =
         hex!("abababababababababababababababababababababababababababababababab");
 
-    let mut a = Allocator::new_limited(500000000, 62500000, 62500000);
+    let mut a = Allocator::new_limited(500000000);
     let Ok(puzzle) = spend.puzzle_reveal.to_node_ptr(&mut a) else {
         return;
     };

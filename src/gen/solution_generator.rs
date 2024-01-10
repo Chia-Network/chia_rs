@@ -13,9 +13,9 @@ where
     // Its format is as follows:
     // (q . ( ( ( parent-id puzzle-reveal amount solution ) ... ) ) )
 
-    let mut spend_list = a.null();
+    let mut spend_list = a.nil();
     for s in spends {
-        let item = a.null();
+        let item = a.nil();
         // solution
         let solution = node_from_bytes_backrefs(a, s.2.as_ref())?;
         let item = a.new_pair(solution, item)?;
@@ -33,7 +33,7 @@ where
     }
 
     // the list of spends is the first (and only) item in an outer list
-    spend_list = a.new_pair(spend_list, a.null())?;
+    spend_list = a.new_pair(spend_list, a.nil())?;
 
     let quote = a.new_pair(a.one(), spend_list)?;
     Ok(quote)
@@ -101,7 +101,7 @@ mod tests {
         let dialect = ChiaDialect::new(0);
         let mut a = Allocator::new();
         let program = node_from_bytes_backrefs(&mut a, program).expect("node_from_bytes");
-        let env = a.null();
+        let env = a.nil();
         let generator_output = run_program(&mut a, &dialect, program, env, 11000000000)
             .expect("run_program")
             .1;

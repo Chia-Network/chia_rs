@@ -181,7 +181,7 @@ pub enum Condition {
     AggSigParentAmount(NodePtr, NodePtr),
     AggSigParentPuzzle(NodePtr, NodePtr),
     // puzzle hash (32 bytes), amount-node, amount integer, hint is an optional
-    // hash (32 bytes), may be left as null
+    // hash (32 bytes), may be left as nil
     CreateCoin(NodePtr, u64, NodePtr),
     // amount
     ReserveFee(u64),
@@ -352,7 +352,7 @@ pub fn parse_args(
             } else if (flags & STRICT_ARGS_COUNT) != 0 {
                 check_nil(a, c)?;
             }
-            Ok(Condition::CreateCoin(puzzle_hash, amount, a.null()))
+            Ok(Condition::CreateCoin(puzzle_hash, amount, a.nil()))
         }
         SOFTFORK => {
             if (flags & NO_UNKNOWN_CONDS) != 0 {
@@ -557,7 +557,7 @@ pub fn parse_args(
 pub struct NewCoin {
     pub puzzle_hash: Bytes32,
     pub amount: u64,
-    // the hint is optional. When not provided, this points to null (NodePtr
+    // the hint is optional. When not provided, this points to nil (NodePtr
     // value -1). The hint is not part of the unique identity of a coin, it's not
     // hashed when computing the coin ID
     pub hint: NodePtr,
@@ -1131,7 +1131,7 @@ fn is_ephemeral(
     parent_spend.create_coin.contains(&NewCoin {
         puzzle_hash: Bytes32::from(a.atom(spend.puzzle_hash)),
         amount: spend.coin_amount,
-        hint: NodePtr(-1),
+        hint: a.nil(),
     })
 }
 
@@ -1460,7 +1460,7 @@ fn parse_list_impl(
     }
 
     if input.starts_with(')') {
-        (a.null(), 1)
+        (a.nil(), 1)
     } else if let Some(rest) = input.strip_prefix('(') {
         let (first, step1) = parse_list_impl(a, rest, callback, subs);
         let (rest, step2) = parse_list_impl(a, &input[(1 + step1)..], callback, subs);
@@ -2447,7 +2447,7 @@ fn test_single_create_coin() {
     for c in &spend.create_coin {
         assert_eq!(c.puzzle_hash, H2);
         assert_eq!(c.amount, 42_u64);
-        assert_eq!(c.hint, a.null());
+        assert_eq!(c.hint, a.nil());
     }
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
 }
@@ -2470,7 +2470,7 @@ fn test_create_coin_max_amount() {
     for c in &spend.create_coin {
         assert_eq!(c.puzzle_hash, H2);
         assert_eq!(c.amount, 0xffffffffffffffff_u64);
-        assert_eq!(c.hint, a.null());
+        assert_eq!(c.hint, a.nil());
     }
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP | ELIGIBLE_FOR_FF);
 }
@@ -2602,7 +2602,7 @@ fn test_create_coin_with_hint_as_atom() {
     for c in &spend.create_coin {
         assert_eq!(c.puzzle_hash, H2);
         assert_eq!(c.amount, 42_u64);
-        assert_eq!(c.hint, a.null());
+        assert_eq!(c.hint, a.nil());
     }
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
 }
@@ -2623,7 +2623,7 @@ fn test_create_coin_with_invalid_hint_as_terminator() {
     for c in &spend.create_coin {
         assert_eq!(c.puzzle_hash, H2);
         assert_eq!(c.amount, 42_u64);
-        assert_eq!(c.hint, a.null());
+        assert_eq!(c.hint, a.nil());
     }
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
 }
@@ -2679,7 +2679,7 @@ fn test_create_coin_with_long_hint() {
     for c in &spend.create_coin {
         assert_eq!(c.puzzle_hash, H2);
         assert_eq!(c.amount, 42_u64);
-        assert_eq!(c.hint, a.null());
+        assert_eq!(c.hint, a.nil());
     }
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
 }
@@ -2724,7 +2724,7 @@ fn test_create_coin_with_cons_hint() {
     for c in &spend.create_coin {
         assert_eq!(c.puzzle_hash, H2);
         assert_eq!(c.amount, 42_u64);
-        assert_eq!(c.hint, a.null());
+        assert_eq!(c.hint, a.nil());
     }
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
 }
@@ -2747,12 +2747,12 @@ fn test_multiple_create_coin() {
     assert!(spend.create_coin.contains(&NewCoin {
         puzzle_hash: H2.into(),
         amount: 42_u64,
-        hint: a.null()
+        hint: a.nil()
     }));
     assert!(spend.create_coin.contains(&NewCoin {
         puzzle_hash: H2.into(),
         amount: 43_u64,
-        hint: a.null()
+        hint: a.nil()
     }));
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP | ELIGIBLE_FOR_FF);
 }
@@ -2766,12 +2766,12 @@ fn test_create_coin_exceed_cost() {
             "((({h1} ({h2} (123 ({} )))",
             0,
             Some(Box::new(|a: &mut Allocator| -> NodePtr {
-                let mut rest: NodePtr = a.null();
+                let mut rest: NodePtr = a.nil();
 
                 for i in 0..6500 {
                     // this builds one CREATE_COIN condition
                     // borrow-rules prevent this from being succint
-                    let coin = a.null();
+                    let coin = a.nil();
                     let val = a.new_atom(&u64_to_bytes(i)).unwrap();
                     let coin = a.new_pair(val, coin).unwrap();
                     let val = a.new_atom(H2).unwrap();
@@ -2975,12 +2975,12 @@ fn test_agg_sig_exceed_cost(#[case] condition: ConditionOpcode) {
             "((({h1} ({h2} (123 ({} )))",
             ENABLE_SOFTFORK_CONDITION,
             Some(Box::new(move |a: &mut Allocator| -> NodePtr {
-                let mut rest: NodePtr = a.null();
+                let mut rest: NodePtr = a.nil();
 
                 for _i in 0..9167 {
                     // this builds one AGG_SIG_* condition
                     // borrow-rules prevent this from being succint
-                    let aggsig = a.null();
+                    let aggsig = a.nil();
                     let val = a.new_atom(MSG1).unwrap();
                     let aggsig = a.new_pair(val, aggsig).unwrap();
                     let val = a.new_atom(PUBKEY).unwrap();
@@ -3267,12 +3267,12 @@ fn test_agg_sig_unsafe_exceed_cost() {
             "((({h1} ({h2} (123 ({} )))",
             0,
             Some(Box::new(|a: &mut Allocator| -> NodePtr {
-                let mut rest: NodePtr = a.null();
+                let mut rest: NodePtr = a.nil();
 
                 for _i in 0..9167 {
                     // this builds one AGG_SIG_UNSAFE condition
                     // borrow-rules prevent this from being succint
-                    let aggsig = a.null();
+                    let aggsig = a.nil();
                     let val = a.new_atom(MSG1).unwrap();
                     let aggsig = a.new_pair(val, aggsig).unwrap();
                     let val = a.new_atom(PUBKEY).unwrap();
@@ -4242,13 +4242,13 @@ fn test_limit_announcements(
         "((({h1} ({h1} (123 ({} )))",
         0,
         Some(Box::new(move |a: &mut Allocator| -> NodePtr {
-            let mut rest: NodePtr = a.null();
+            let mut rest: NodePtr = a.nil();
 
             // generate a lot of announcements
             for _ in 0..count {
                 // this builds one condition
                 // borrow-rules prevent this from being succint
-                let ann = a.null();
+                let ann = a.nil();
                 let val = a.new_atom(H2).unwrap();
                 let ann = a.new_pair(val, ann).unwrap();
                 let val = a.new_atom(&u64_to_bytes(cond as u64)).unwrap();

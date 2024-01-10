@@ -146,7 +146,7 @@ fn main() {
         args.max_height,
         |_height, block, block_refs| {
             pool.execute(move || {
-                let mut a = Allocator::new_limited(500000000, 62500000, 62500000);
+                let mut a = Allocator::new_limited(500000000);
 
                 let ti = block.transactions_info.as_ref().expect("transactions_info");
                 let prg = block

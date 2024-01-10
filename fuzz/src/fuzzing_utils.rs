@@ -71,7 +71,7 @@ pub fn make_tree(a: &mut Allocator, cursor: &mut BitCursor, short_atoms: bool) -
                 value_stack.push(a.new_pair(first, second).unwrap());
             }
             MakeTreeOp::Tree => match cursor.read_bits(1) {
-                None => value_stack.push(a.null()),
+                None => value_stack.push(a.nil()),
                 Some(0) => {
                     op_stack.push(MakeTreeOp::Pair);
                     op_stack.push(MakeTreeOp::Tree);
@@ -80,12 +80,12 @@ pub fn make_tree(a: &mut Allocator, cursor: &mut BitCursor, short_atoms: bool) -
                 Some(_) => {
                     let atom = if short_atoms {
                         match cursor.read_bits(8) {
-                            None => a.null(),
+                            None => a.nil(),
                             Some(val) => a.new_atom(&[val]).unwrap(),
                         }
                     } else {
                         match cursor.read_bits(6) {
-                            None => a.null(),
+                            None => a.nil(),
                             Some(len) => a.new_atom(&BUFFER[..len as usize]).unwrap(),
                         }
                     };

@@ -207,7 +207,7 @@ mod tests {
         let spend = CoinSpend::from_bytes(&spend_bytes).expect("parse CoinSpend");
         let new_parents_parent = hex::decode(new_parents_parent).unwrap();
 
-        let mut a = Allocator::new_limited(500000000, 62500000, 62500000);
+        let mut a = Allocator::new_limited(500000000);
         let puzzle = spend.puzzle_reveal.to_node_ptr(&mut a).expect("to_clvm");
         let solution = spend.solution.to_node_ptr(&mut a).expect("to_clvm");
         let puzzle_hash = Bytes32::from(tree_hash(&a, puzzle));
@@ -280,7 +280,7 @@ mod tests {
         let new_parents_parent: &[u8] =
             &hex!("abababababababababababababababababababababababababababababababab");
 
-        let mut a = Allocator::new_limited(500000000, 62500000, 62500000);
+        let mut a = Allocator::new_limited(500000000);
         let puzzle = spend.puzzle_reveal.to_node_ptr(&mut a).expect("to_clvm");
         let puzzle_hash = Bytes32::from(tree_hash(&a, puzzle));
 
@@ -475,7 +475,7 @@ mod tests {
             |a, _coin, _new_coin, _new_parent, puzzle, _solution| {
                 let mut singleton = parse_singleton(a, puzzle);
 
-                singleton.program = a.null();
+                singleton.program = a.nil();
 
                 *puzzle = serialize_singleton(a, &singleton);
             },

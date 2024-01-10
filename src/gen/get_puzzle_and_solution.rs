@@ -101,7 +101,7 @@ fn make_coin_spend(
 ) -> NodePtr {
     let a1 = a.new_atom(&parent).unwrap();
     let a4 = a.new_atom(&u64_to_bytes(amount)).unwrap();
-    let a5 = a.new_pair(solution, a.null()).unwrap();
+    let a5 = a.new_pair(solution, a.nil()).unwrap();
     let a3 = a.new_pair(a4, a5).unwrap();
     let a2 = a.new_pair(puzzle, a3).unwrap();
     a.new_pair(a1, a2).unwrap()
@@ -115,7 +115,7 @@ fn make_invalid_coin_spend(
     puzzle: NodePtr,
     solution: NodePtr,
 ) -> NodePtr {
-    let a5 = a.new_pair(solution, a.null()).unwrap();
+    let a5 = a.new_pair(solution, a.nil()).unwrap();
     let a3 = a.new_pair(amount, a5).unwrap();
     let a2 = a.new_pair(puzzle, a3).unwrap();
     a.new_pair(parent, a2).unwrap()
@@ -129,8 +129,8 @@ fn test_find_single_coin() {
     let solution1 = make_dummy_puzzle(&mut a, 2);
 
     let spend1 = make_coin_spend(&mut a, parent, 1337, puzzle1, solution1);
-    let spends = a.new_pair(spend1, a.null()).unwrap();
-    let generator_output = a.new_pair(spends, a.null()).unwrap();
+    let spends = a.new_pair(spend1, a.nil()).unwrap();
+    let generator_output = a.new_pair(spends, a.nil()).unwrap();
 
     // find the coin
     assert_eq!(

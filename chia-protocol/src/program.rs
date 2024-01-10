@@ -69,7 +69,7 @@ impl Program {
     ) -> std::result::Result<(Cost, NodePtr), EvalErr> {
         let arg = arg.to_node_ptr(a).map_err(|_| {
             EvalErr(
-                a.null(),
+                a.nil(),
                 "failed to convert argument to CLVM objects".to_string(),
             )
         })?;
@@ -117,7 +117,7 @@ use pyo3::exceptions::*;
 fn clvm_convert(a: &mut Allocator, o: &PyAny) -> PyResult<NodePtr> {
     // None
     if o.is_none() {
-        Ok(a.null())
+        Ok(a.nil())
     // bytes
     } else if let Ok(buffer) = o.extract::<&[u8]>() {
         a.new_atom(buffer)
@@ -149,7 +149,7 @@ fn clvm_convert(a: &mut Allocator, o: &PyAny) -> PyResult<NodePtr> {
         for py_item in list.iter() {
             rev.push(py_item);
         }
-        let mut ret = a.null();
+        let mut ret = a.nil();
         for py_item in rev.into_iter().rev() {
             let item = clvm_convert(a, py_item)?;
             ret = a
@@ -222,7 +222,7 @@ fn clvm_serialize(a: &mut Allocator, o: &PyAny) -> PyResult<NodePtr> {
         for py_item in list.iter() {
             rev.push(py_item);
         }
-        let mut ret = a.null();
+        let mut ret = a.nil();
         for py_item in rev.into_iter().rev() {
             let item = clvm_serialize(a, py_item)?;
             ret = a
@@ -264,7 +264,7 @@ impl Program {
     #[staticmethod]
     #[pyo3(name = "to")]
     fn py_to(args: &PyAny) -> PyResult<Program> {
-        let mut a = Allocator::new_limited(500000000, 62500000, 62500000);
+        let mut a = Allocator::new_limited(500000000);
         let clvm = clvm_convert(&mut a, args)?;
         Program::from_node_ptr(&a, clvm)
             .map_err(|error| PyErr::new::<PyTypeError, _>(error.to_string()))
@@ -323,7 +323,7 @@ impl Program {
         use clvmr::reduction::Response;
         use std::rc::Rc;
 
-        let mut a = Allocator::new_limited(500000000, 62500000, 62500000);
+        let mut a = Allocator::new_limited(500000000);
         // The python behavior here is a bit messy, and is best not emulated
         // on the rust side. We must be able to pass a Program as an argument,
         // and it being treated as the CLVM structure it represents. In python's
@@ -352,7 +352,7 @@ impl Program {
 
     fn to_program<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
         use std::rc::Rc;
-        let mut a = Allocator::new_limited(500000000, 62500000, 62500000);
+        let mut a = Allocator::new_limited(500000000);
         let prg = node_from_bytes_backrefs(&mut a, self.0.as_ref())?;
         let prg = LazyNode::new(Rc::new(a), prg);
         to_program(py, prg)
@@ -362,12 +362,12 @@ impl Program {
         use clvm_utils::CurriedProgram;
         use std::rc::Rc;
 
-        let mut a = Allocator::new_limited(500000000, 62500000, 62500000);
+        let mut a = Allocator::new_limited(500000000);
         let prg = node_from_bytes_backrefs(&mut a, self.0.as_ref())?;
         let Ok(uncurried) = CurriedProgram::<NodePtr, NodePtr>::from_node_ptr(&a, prg) else {
             let a = Rc::new(a);
             let prg = LazyNode::new(a.clone(), prg);
-            let ret = a.null();
+            let ret = a.nil();
             let ret = LazyNode::new(a, ret);
             return Ok((to_program(py, prg)?, to_program(py, ret)?));
         };
@@ -389,7 +389,7 @@ impl Program {
             curried_args.push(arg);
             args = rest;
         }
-        let mut ret = a.null();
+        let mut ret = a.nil();
         for item in curried_args.into_iter().rev() {
             ret = a.new_pair(item, ret).map_err(|_e| Error::EndOfBuffer)?;
         }

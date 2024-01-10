@@ -104,7 +104,7 @@ pub fn visit_spends<
 
     // iterate in reverse order since we're building a linked list from
     // the tail
-    let mut blocks = a.null();
+    let mut blocks = a.nil();
     for g in block_refs.iter().rev() {
         let ref_gen = a.new_atom(g.as_ref())?;
         blocks = a.new_pair(ref_gen, blocks)?;
@@ -112,7 +112,7 @@ pub fn visit_spends<
 
     // the first argument to the generator is the serializer, followed by a list
     // of the blocks it requested.
-    let mut args = a.new_pair(blocks, a.null())?;
+    let mut args = a.new_pair(blocks, a.nil())?;
     args = a.new_pair(clvm_deserializer, args)?;
 
     let dialect = ChiaDialect::new(0);

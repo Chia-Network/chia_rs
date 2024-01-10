@@ -15,7 +15,7 @@ use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs};
 
 fn subtract_cost(a: &Allocator, cost_left: &mut Cost, subtract: Cost) -> Result<(), ValidationErr> {
     if subtract > *cost_left {
-        Err(ValidationErr(a.null(), ErrorCode::CostExceeded))
+        Err(ValidationErr(a.nil(), ErrorCode::CostExceeded))
     } else {
         *cost_left -= subtract;
         Ok(())
@@ -57,14 +57,14 @@ pub fn run_block_generator<GenBuf: AsRef<[u8]>, V: SpendVisitor>(
 
     // iterate in reverse order since we're building a linked list from
     // the tail
-    let mut args = a.null();
+    let mut args = a.nil();
     for g in block_refs.iter().rev() {
         let ref_gen = a.new_atom(g.as_ref())?;
         args = a.new_pair(ref_gen, args)?;
     }
 
-    args = a.new_pair(args, a.null())?;
-    let args = a.new_pair(args, a.null())?;
+    args = a.new_pair(args, a.nil())?;
+    let args = a.new_pair(args, a.nil())?;
     let args = a.new_pair(program, args)?;
 
     let dialect = ChiaDialect::new(flags);
@@ -85,7 +85,7 @@ pub fn extract_n<const N: usize>(
     mut n: NodePtr,
     e: ErrorCode,
 ) -> Result<[NodePtr; N], ValidationErr> {
-    let mut ret: [NodePtr; N] = [NodePtr(0); N];
+    let mut ret: [NodePtr; N] = [NodePtr::NIL; N];
     let mut counter = 0;
     assert!(N > 0);
     while let Some((item, rest)) = a.next(n) {
@@ -130,7 +130,7 @@ pub fn run_block_generator2<GenBuf: AsRef<[u8]>, V: SpendVisitor>(
 
     // iterate in reverse order since we're building a linked list from
     // the tail
-    let mut blocks = a.null();
+    let mut blocks = a.nil();
     for g in block_refs.iter().rev() {
         let ref_gen = a.new_atom(g.as_ref())?;
         blocks = a.new_pair(ref_gen, blocks)?;
@@ -138,7 +138,7 @@ pub fn run_block_generator2<GenBuf: AsRef<[u8]>, V: SpendVisitor>(
 
     // the first argument to the generator is the serializer, followed by a list
     // of the blocks it requested.
-    let mut args = a.new_pair(blocks, a.null())?;
+    let mut args = a.new_pair(blocks, a.nil())?;
     args = a.new_pair(clvm_deserializer, args)?;
 
     let dialect = ChiaDialect::new(flags);
@@ -185,7 +185,7 @@ pub fn run_block_generator2<GenBuf: AsRef<[u8]>, V: SpendVisitor>(
         return Err(ValidationErr(all_spends, ErrorCode::GeneratorRuntimeError));
     }
 
-    validate_conditions(a, &ret, state, a.null(), flags)?;
+    validate_conditions(a, &ret, state, a.nil(), flags)?;
 
     ret.cost = max_cost - cost_left;
     Ok(ret)

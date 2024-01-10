@@ -17,7 +17,7 @@ sha2 = "0.10.8"
 hex = "0.4.3"
 chia_streamable_macro = { version = "0.3.0", path = "../chia_streamable_macro" }
 chia_py_streamable_macro = { version = "0.3.0", path = "../chia_py_streamable_macro", optional = true }
-clvmr = "0.3.3"
+clvmr = "0.4.0"
 chia-traits = { version = "0.3.3", path = "../chia-traits" }
 clvm-traits = { version = "0.3.3", path = "../clvm-traits", features = ["derive"] }
 clvm-utils = { version = "0.3.3", path = "../clvm-utils" }

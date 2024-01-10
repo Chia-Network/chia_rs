@@ -55,7 +55,7 @@ impl SpendBundle {
                 cs.puzzle_reveal
                     .run(&mut a, ENABLE_FIXED_DIV, cost_left, &cs.solution)?;
             if cost > cost_left {
-                return Err(EvalErr(a.null(), "cost exceeded".to_string()));
+                return Err(EvalErr(a.nil(), "cost exceeded".to_string()));
             }
             cost_left -= cost;
             let parent_coin_info: Bytes32 = cs.coin.coin_id().into();
@@ -82,7 +82,7 @@ impl SpendBundle {
                         amount,
                     });
                     if CREATE_COIN_COST > cost_left {
-                        return Err(EvalErr(a.null(), "cost exceeded".to_string()));
+                        return Err(EvalErr(a.nil(), "cost exceeded".to_string()));
                     }
                     cost_left -= CREATE_COIN_COST;
                 }
