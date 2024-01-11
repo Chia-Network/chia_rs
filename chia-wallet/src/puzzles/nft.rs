@@ -1,5 +1,3 @@
-#[cfg(fuzzing)]
-use arbitrary::Arbitrary;
 use chia_protocol::Bytes32;
 use clvm_traits::{ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError, Raw, ToClvm, ToClvmError};
 use hex_literal::hex;
@@ -53,7 +51,7 @@ pub struct NftRoyaltyTransferPuzzleArgs {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(fuzzing, derive(Arbitrary))]
+#[cfg_attr(fuzzing, derive(arbitrary::Arbitrary))]
 pub struct NftMetadata {
     pub edition_number: u64,
     pub edition_total: u64,
