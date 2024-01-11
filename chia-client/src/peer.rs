@@ -11,7 +11,7 @@ use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 use tungstenite::Message as WsMessage;
 
 use crate::utils::stream;
-use crate::{Error, Result};
+use crate::Error;
 
 type WebSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 type Requests = Arc<Mutex<HashMap<u16, oneshot::Sender<Message>>>>;
@@ -57,7 +57,11 @@ impl Peer {
         }
     }
 
-    pub async fn send_handshake(&self, network_id: String, node_type: NodeType) -> Result<(), ()> {
+    pub async fn send_handshake(
+        &self,
+        network_id: String,
+        node_type: NodeType,
+    ) -> Result<(), Error<()>> {
         let body = Handshake {
             network_id,
             protocol_version: "0.0.34".to_string(),
@@ -77,7 +81,7 @@ impl Peer {
         &self,
         coin_id: Bytes32,
         height: u32,
-    ) -> Result<PuzzleSolutionResponse, RejectPuzzleSolution> {
+    ) -> Result<PuzzleSolutionResponse, Error<RejectPuzzleSolution>> {
         let body = RequestPuzzleSolution {
             coin_name: coin_id,
             height,
@@ -86,7 +90,10 @@ impl Peer {
         Ok(response.response)
     }
 
-    pub async fn send_transaction(&self, spend_bundle: SpendBundle) -> Result<TransactionAck, ()> {
+    pub async fn send_transaction(
+        &self,
+        spend_bundle: SpendBundle,
+    ) -> Result<TransactionAck, Error<()>> {
         let body = SendTransaction {
             transaction: spend_bundle,
         };
@@ -96,7 +103,7 @@ impl Peer {
     pub async fn request_block_header(
         &self,
         height: u32,
-    ) -> Result<HeaderBlock, RejectHeaderRequest> {
+    ) -> Result<HeaderBlock, Error<RejectHeaderRequest>> {
         let body = RequestBlockHeader { height };
         let response: RespondBlockHeader = self.request(body).await?;
         Ok(response.header_block)
@@ -107,7 +114,7 @@ impl Peer {
         start_height: u32,
         end_height: u32,
         return_filter: bool,
-    ) -> Result<Vec<HeaderBlock>, ()> {
+    ) -> Result<Vec<HeaderBlock>, Error<()>> {
         let body = RequestBlockHeaders {
             start_height,
             end_height,
@@ -131,7 +138,7 @@ impl Peer {
         height: u32,
         header_hash: Bytes32,
         coin_ids: Option<Vec<Bytes32>>,
-    ) -> Result<RespondRemovals, RejectRemovalsRequest> {
+    ) -> Result<RespondRemovals, Error<RejectRemovalsRequest>> {
         let body = RequestRemovals {
             height,
             header_hash,
@@ -145,7 +152,7 @@ impl Peer {
         height: u32,
         header_hash: Option<Bytes32>,
         puzzle_hashes: Option<Vec<Bytes32>>,
-    ) -> Result<RespondAdditions, RejectAdditionsRequest> {
+    ) -> Result<RespondAdditions, Error<RejectAdditionsRequest>> {
         let body = RequestAdditions {
             height,
             header_hash,
@@ -158,7 +165,7 @@ impl Peer {
         &self,
         puzzle_hashes: Vec<Bytes32>,
         min_height: u32,
-    ) -> Result<Vec<CoinState>, ()> {
+    ) -> Result<Vec<CoinState>, Error<()>> {
         let body = RegisterForPhUpdates {
             puzzle_hashes,
             min_height,
@@ -171,7 +178,7 @@ impl Peer {
         &self,
         coin_ids: Vec<Bytes32>,
         min_height: u32,
-    ) -> Result<Vec<CoinState>, ()> {
+    ) -> Result<Vec<CoinState>, Error<()>> {
         let body = RegisterForCoinUpdates {
             coin_ids,
             min_height,
@@ -180,7 +187,7 @@ impl Peer {
         Ok(response.coin_states)
     }
 
-    pub async fn request_children(&self, coin_id: Bytes32) -> Result<Vec<CoinState>, ()> {
+    pub async fn request_children(&self, coin_id: Bytes32) -> Result<Vec<CoinState>, Error<()>> {
         let body = RequestChildren { coin_name: coin_id };
         let response: RespondChildren = self.request_infallible(body).await?;
         Ok(response.coin_states)
@@ -190,7 +197,7 @@ impl Peer {
         &self,
         start_height: u32,
         end_height: u32,
-    ) -> Result<RespondSesInfo, ()> {
+    ) -> Result<RespondSesInfo, Error<()>> {
         let body = RequestSesInfo {
             start_height,
             end_height,
@@ -201,13 +208,13 @@ impl Peer {
     pub async fn request_fee_estimates(
         &self,
         time_targets: Vec<u64>,
-    ) -> Result<FeeEstimateGroup, ()> {
+    ) -> Result<FeeEstimateGroup, Error<()>> {
         let body = RequestFeeEstimates { time_targets };
         let response: RespondFeeEstimates = self.request_infallible(body).await?;
         Ok(response.estimates)
     }
 
-    pub async fn send<T>(&self, body: T) -> Result<(), ()>
+    pub async fn send<T>(&self, body: T) -> Result<(), Error<()>>
     where
         T: Streamable + ChiaProtocolMessage,
     {
@@ -225,26 +232,26 @@ impl Peer {
         Ok(())
     }
 
-    pub async fn request<Response, Rejection, T>(&self, body: T) -> Result<Response, Rejection>
+    pub async fn request<T, R, B>(&self, body: B) -> Result<T, Error<R>>
     where
-        Response: Streamable + ChiaProtocolMessage,
-        Rejection: Streamable + ChiaProtocolMessage,
         T: Streamable + ChiaProtocolMessage,
+        R: Streamable + ChiaProtocolMessage,
+        B: Streamable + ChiaProtocolMessage,
     {
         let message = self.request_raw(body).await?;
         let data = message.data.as_ref();
 
-        if message.msg_type == Response::msg_type() {
-            Response::from_bytes(data).or(Err(Error::InvalidResponse(message)))
-        } else if message.msg_type == Rejection::msg_type() {
-            let rejection = Rejection::from_bytes(data).or(Err(Error::InvalidResponse(message)))?;
+        if message.msg_type == T::msg_type() {
+            T::from_bytes(data).or(Err(Error::InvalidResponse(message)))
+        } else if message.msg_type == R::msg_type() {
+            let rejection = R::from_bytes(data).or(Err(Error::InvalidResponse(message)))?;
             Err(Error::Rejection(rejection))
         } else {
             Err(Error::InvalidResponse(message))
         }
     }
 
-    pub async fn request_infallible<Response, T>(&self, body: T) -> Result<Response, ()>
+    pub async fn request_infallible<Response, T>(&self, body: T) -> Result<Response, Error<()>>
     where
         Response: Streamable + ChiaProtocolMessage,
         T: Streamable + ChiaProtocolMessage,
@@ -259,7 +266,7 @@ impl Peer {
         }
     }
 
-    pub async fn request_raw<T, Rejection>(&self, body: T) -> Result<Message, Rejection>
+    pub async fn request_raw<T, R>(&self, body: T) -> Result<Message, Error<R>>
     where
         T: Streamable + ChiaProtocolMessage,
     {
@@ -314,7 +321,7 @@ impl Peer {
         message: WsMessage,
         requests: &Requests,
         event_sender: &broadcast::Sender<PeerEvent>,
-    ) -> Result<(), ()> {
+    ) -> Result<(), Error<()>> {
         // Parse the message.
         let message = Message::from_bytes(message.into_data().as_ref())?;
 
