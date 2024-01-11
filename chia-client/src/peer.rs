@@ -86,7 +86,7 @@ impl Peer {
             coin_name: coin_id,
             height,
         };
-        let response: RespondPuzzleSolution = self.request(body).await?;
+        let response: RespondPuzzleSolution = self.request_or_reject(body).await?;
         Ok(response.response)
     }
 
@@ -97,7 +97,7 @@ impl Peer {
         let body = SendTransaction {
             transaction: spend_bundle,
         };
-        self.request_infallible(body).await
+        self.request(body).await
     }
 
     pub async fn request_block_header(
@@ -105,7 +105,7 @@ impl Peer {
         height: u32,
     ) -> Result<HeaderBlock, Error<RejectHeaderRequest>> {
         let body = RequestBlockHeader { height };
-        let response: RespondBlockHeader = self.request(body).await?;
+        let response: RespondBlockHeader = self.request_or_reject(body).await?;
         Ok(response.header_block)
     }
 
@@ -121,7 +121,7 @@ impl Peer {
             return_filter,
         };
         let response: RespondBlockHeaders =
-            self.request(body)
+            self.request_or_reject(body)
                 .await
                 .map_err(|error: Error<RejectBlockHeaders>| match error {
                     Error::Rejection(_rejection) => Error::Rejection(()),
@@ -144,7 +144,7 @@ impl Peer {
             header_hash,
             coin_names: coin_ids,
         };
-        self.request(body).await
+        self.request_or_reject(body).await
     }
 
     pub async fn request_additions(
@@ -158,7 +158,7 @@ impl Peer {
             header_hash,
             puzzle_hashes,
         };
-        self.request(body).await
+        self.request_or_reject(body).await
     }
 
     pub async fn register_for_ph_updates(
@@ -170,7 +170,7 @@ impl Peer {
             puzzle_hashes,
             min_height,
         };
-        let response: RespondToPhUpdates = self.request_infallible(body).await?;
+        let response: RespondToPhUpdates = self.request(body).await?;
         Ok(response.coin_states)
     }
 
@@ -183,13 +183,13 @@ impl Peer {
             coin_ids,
             min_height,
         };
-        let response: RespondToCoinUpdates = self.request_infallible(body).await?;
+        let response: RespondToCoinUpdates = self.request(body).await?;
         Ok(response.coin_states)
     }
 
     pub async fn request_children(&self, coin_id: Bytes32) -> Result<Vec<CoinState>, Error<()>> {
         let body = RequestChildren { coin_name: coin_id };
-        let response: RespondChildren = self.request_infallible(body).await?;
+        let response: RespondChildren = self.request(body).await?;
         Ok(response.coin_states)
     }
 
@@ -202,7 +202,7 @@ impl Peer {
             start_height,
             end_height,
         };
-        self.request_infallible(body).await
+        self.request(body).await
     }
 
     pub async fn request_fee_estimates(
@@ -210,7 +210,7 @@ impl Peer {
         time_targets: Vec<u64>,
     ) -> Result<FeeEstimateGroup, Error<()>> {
         let body = RequestFeeEstimates { time_targets };
-        let response: RespondFeeEstimates = self.request_infallible(body).await?;
+        let response: RespondFeeEstimates = self.request(body).await?;
         Ok(response.estimates)
     }
 
@@ -232,7 +232,7 @@ impl Peer {
         Ok(())
     }
 
-    pub async fn request<T, R, B>(&self, body: B) -> Result<T, Error<R>>
+    pub async fn request_or_reject<T, R, B>(&self, body: B) -> Result<T, Error<R>>
     where
         T: Streamable + ChiaProtocolMessage,
         R: Streamable + ChiaProtocolMessage,
@@ -251,7 +251,7 @@ impl Peer {
         }
     }
 
-    pub async fn request_infallible<Response, T>(&self, body: T) -> Result<Response, Error<()>>
+    pub async fn request<Response, T>(&self, body: T) -> Result<Response, Error<()>>
     where
         Response: Streamable + ChiaProtocolMessage,
         T: Streamable + ChiaProtocolMessage,
