@@ -27,6 +27,9 @@ pub struct Peer {
     inbound_task: JoinHandle<()>,
     event_receiver: broadcast::Receiver<PeerEvent>,
     requests: Requests,
+
+    // TODO: This does not currently prevent multiple requests with the same id at the same time.
+    // If one of them is still running while all other ids are being iterated through.
     nonce: AtomicU16,
 }
 
@@ -346,6 +349,7 @@ impl Peer {
             };
         }
 
+        // TODO: Handle unexpected messages.
         events!(CoinStateUpdate, NewPeakWallet);
 
         Ok(())
