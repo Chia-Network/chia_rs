@@ -12,7 +12,7 @@ repository = "https://github.com/Chia-Network/chia_rs/chia-client/"
 chia-protocol = { version = "0.3.3", path = "../chia-protocol" }
 chia-traits = { version = "0.3.3", path = "../chia-traits" }
 tokio = { version = "1.32.0", features = ["rt", "sync"] }
-tokio-tungstenite = "0.20.0"
+tokio-tungstenite = "0.21.0"
 futures-util = "0.3.28"
-tungstenite = "0.20.1"
+tungstenite = "0.21.0"
 thiserror = "1.0.47"

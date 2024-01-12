@@ -2,10 +2,8 @@ use chia_protocol::Message;
 use chia_traits::chia_error;
 use thiserror::Error;
 
-pub type Result<T> = std::result::Result<T, Error>;
-
 #[derive(Debug, Error)]
-pub enum Error {
+pub enum Error<R> {
     #[error("{0:?}")]
     Chia(#[from] chia_error::Error),
 
@@ -17,4 +15,7 @@ pub enum Error {
 
     #[error("missing response")]
     MissingResponse,
+
+    #[error("rejection")]
+    Rejection(R),
 }
