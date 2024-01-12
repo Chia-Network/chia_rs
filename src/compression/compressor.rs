@@ -16,7 +16,7 @@ pub fn wrap_atom_with_decompression_program(
 
     let compressed_block = allocator.new_pair(quote_node, node_ptr)?;
     let program = allocator.new_pair(quote_node, program)?;
-    let list = allocator.null();
+    let list = allocator.nil();
     let list = allocator.new_pair(compressed_block, list)?;
     let list = allocator.new_pair(program, list)?;
     let list = allocator.new_pair(apply_node, list)?;

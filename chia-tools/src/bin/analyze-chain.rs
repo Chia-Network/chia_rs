@@ -61,7 +61,7 @@ fn main() {
 
     // We only create a single allocator, load it with the generator ROM and
     // then we keep reusing it
-    let mut a = Allocator::new_limited(500000000, 62500000, 62500000);
+    let mut a = Allocator::new_limited(500000000);
     let generator_rom =
         node_from_bytes(&mut a, &GENERATOR_ROM).expect("failed to parse generator ROM");
     let allocator_checkpoint = a.checkpoint();
@@ -110,7 +110,7 @@ fn main() {
 
             let parse_timing = start_parse.elapsed().expect("failed to get system time");
 
-            let mut args = a.null();
+            let mut args = a.nil();
 
             let start_ref_lookup = SystemTime::now();
             // iterate in reverse order since we're building a linked list from
@@ -152,8 +152,8 @@ fn main() {
 
             let byte_cost = program.len() as u64 * COST_PER_BYTE;
 
-            args = a.new_pair(args, a.null()).expect("failed to allocate pair");
-            let args = a.new_pair(args, a.null()).expect("failed to allocate pair");
+            args = a.new_pair(args, a.nil()).expect("failed to allocate pair");
+            let args = a.new_pair(args, a.nil()).expect("failed to allocate pair");
             let args = a
                 .new_pair(generator, args)
                 .expect("failed to allocate pair");

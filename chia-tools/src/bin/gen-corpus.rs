@@ -69,7 +69,7 @@ fn main() {
             let seen_puzzles = seen_puzzles.clone();
             let seen_singletons = seen_singletons.clone();
             pool.execute(move || {
-                let mut a = Allocator::new_limited(500000000, 62500000, 62500000);
+                let mut a = Allocator::new_limited(500000000);
 
                 let generator = prg.as_ref();
 

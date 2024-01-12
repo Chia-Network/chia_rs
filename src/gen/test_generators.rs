@@ -68,7 +68,7 @@ fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
         let mut create_coin: Vec<&NewCoin> = s.create_coin.iter().collect();
         create_coin.sort_by_key(|cc| (cc.puzzle_hash, cc.amount));
         for cc in create_coin {
-            if cc.hint != NodePtr(-1) {
+            if cc.hint != NodePtr::NIL {
                 ret += &format!(
                     "  CREATE_COIN: ph: {} amount: {} hint: {}\n",
                     hex::encode(cc.puzzle_hash),

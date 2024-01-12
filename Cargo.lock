@@ -287,23 +287,6 @@ dependencies = [
 
 [[package]]
 name = "chia-bls"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a72987625a992469b793a7aba42b29be55f9b9b35f8d55bb5b87a314274733c0"
-dependencies = [
- "anyhow",
- "arbitrary",
- "blst",
- "chia-traits 0.3.0",
- "hex",
- "hkdf",
- "sha2",
- "thiserror",
- "tiny-bip39",
-]
-
-[[package]]
-name = "chia-bls"
 version = "0.3.3"
 dependencies = [
  "anyhow",
@@ -317,6 +300,23 @@ dependencies = [
  "pyo3",
  "rand",
  "rstest 0.17.0",
+ "sha2",
+ "thiserror",
+ "tiny-bip39",
+]
+
+[[package]]
+name = "chia-bls"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba003303bda3019f2fe94e5478555a96addff1d6a1ea84bfe207b3f075cd8420"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "blst",
+ "chia-traits 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hex",
+ "hkdf",
  "sha2",
  "thiserror",
  "tiny-bip39",
@@ -425,12 +425,12 @@ dependencies = [
 
 [[package]]
 name = "chia-traits"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "636e832ece4dc14e2e866d1737fbfdc32d6dd616aa4fc3869cfb273881def303"
+version = "0.3.3"
 dependencies = [
- "chia_streamable_macro 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "chia_py_streamable_macro",
+ "chia_streamable_macro 0.3.0",
  "hex",
+ "pyo3",
  "sha2",
  "thiserror",
 ]
@@ -438,11 +438,11 @@ dependencies = [
 [[package]]
 name = "chia-traits"
 version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe532ed59df94db00cc1fb85edc3c4dd7287d0590eefb356d960671b93081334"
 dependencies = [
- "chia_py_streamable_macro",
- "chia_streamable_macro 0.3.0",
+ "chia_streamable_macro 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "hex",
- "pyo3",
  "sha2",
  "thiserror",
 ]
@@ -631,13 +631,12 @@ dependencies = [
 
 [[package]]
 name = "clvmr"
-version = "0.3.3"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "deabd4e4163efb64486937a7c80996e5bdfb88d21a6baa9c0f802e6b45906109"
+checksum = "797ae1b4229262bd4987523a8f75e49d4800338db5feb2b39612edbfa8934186"
 dependencies = [
- "chia-bls 0.3.1",
+ "chia-bls 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "clvm-traits",
- "hex",
  "k256",
  "lazy_static",
  "num-bigint",

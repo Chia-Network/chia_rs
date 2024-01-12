@@ -10,7 +10,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-clvmr = "0.3.3"
+clvmr = "0.4.0"
 pyo3 = { version = ">=0.19.0", features = ["auto-initialize"]}
 chia-wallet = { path = ".." }
 clvm-traits = { version = "=0.3.3", path = "../../clvm-traits" }
