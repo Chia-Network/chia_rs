@@ -121,6 +121,18 @@ pub enum ProtocolMessageTypes {
     RespondBlockHeaders = 88,
     RequestFeeEstimates = 89,
     RespondFeeEstimates = 90,
+
+    // New wallet sync protocol
+    RequestAddPuzzleSubscriptions = 92,
+    RespondAddPuzzleSubscriptions = 93,
+    RequestAddCoinSubscriptions = 94,
+    RespondAddCoinSubscriptions = 95,
+    RequestRemovePuzzleSubscriptions = 96,
+    RespondRemovePuzzleSubscriptions = 97,
+    RequestRemoveCoinSubscriptions = 98,
+    RespondRemoveCoinSubscriptions = 99,
+    RequestResetSubscriptions = 100,
+    RespondResetSubscriptions = 101,
 }
 
 #[cfg(feature = "py-bindings")]

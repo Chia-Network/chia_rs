@@ -217,6 +217,61 @@ impl Peer {
         Ok(response.estimates)
     }
 
+    pub async fn request_add_puzzle_subscriptions(
+        &self,
+        puzzle_hashes: Vec<Bytes32>,
+        min_height: u32,
+        header_hash: Option<Bytes32>,
+    ) -> Result<Vec<Bytes32>, Error<()>> {
+        let body = RequestAddPuzzleSubscriptions {
+            puzzle_hashes,
+            min_height,
+            header_hash,
+        };
+        let response: RespondAddPuzzleSubscriptions = self.request(body).await?;
+        Ok(response.puzzle_hashes)
+    }
+
+    pub async fn request_add_coin_subscriptions(
+        &self,
+        coin_ids: Vec<Bytes32>,
+        min_height: u32,
+        header_hash: Option<Bytes32>,
+    ) -> Result<Vec<Bytes32>, Error<()>> {
+        let body = RequestAddCoinSubscriptions {
+            coin_ids,
+            min_height,
+            header_hash,
+        };
+        let response: RespondAddCoinSubscriptions = self.request(body).await?;
+        Ok(response.coin_ids)
+    }
+
+    pub async fn request_remove_puzzle_subscriptions(
+        &self,
+        puzzle_hashes: Vec<Bytes32>,
+    ) -> Result<Vec<Bytes32>, Error<()>> {
+        let body = RequestRemovePuzzleSubscriptions { puzzle_hashes };
+        let response: RespondRemovePuzzleSubscriptions = self.request(body).await?;
+        Ok(response.puzzle_hashes)
+    }
+
+    pub async fn request_remove_coin_subscriptions(
+        &self,
+        coin_ids: Vec<Bytes32>,
+    ) -> Result<Vec<Bytes32>, Error<()>> {
+        let body = RequestRemoveCoinSubscriptions { coin_ids };
+        let response: RespondRemoveCoinSubscriptions = self.request(body).await?;
+        Ok(response.coin_ids)
+    }
+
+    pub async fn request_reset_subscriptions(
+        &self,
+    ) -> Result<RespondResetSubscriptions, Error<()>> {
+        let body = RequestResetSubscriptions {};
+        self.request(body).await
+    }
+
     pub async fn send<T>(&self, body: T) -> Result<(), Error<()>>
     where
         T: Streamable + ChiaProtocolMessage,

@@ -178,3 +178,46 @@ message_struct! (RequestFeeEstimates {
 message_struct!(RespondFeeEstimates {
     estimates: FeeEstimateGroup,
 });
+
+message_struct!(RequestAddPuzzleSubscriptions {
+    puzzle_hashes: Vec<Bytes32>,
+    min_height: u32,
+    header_hash: Option<Bytes32>,
+});
+
+message_struct!(RespondAddPuzzleSubscriptions {
+    puzzle_hashes: Vec<Bytes32>,
+});
+
+message_struct!(RequestAddCoinSubscriptions {
+    coin_ids: Vec<Bytes32>,
+    min_height: u32,
+    header_hash: Option<Bytes32>,
+});
+
+message_struct!(RespondAddCoinSubscriptions {
+    coin_ids: Vec<Bytes32>,
+});
+
+message_struct!(RequestRemovePuzzleSubscriptions {
+    puzzle_hashes: Vec<Bytes32>,
+});
+
+message_struct!(RespondRemovePuzzleSubscriptions {
+    puzzle_hashes: Vec<Bytes32>,
+});
+
+message_struct!(RequestRemoveCoinSubscriptions {
+    coin_ids: Vec<Bytes32>,
+});
+
+message_struct!(RespondRemoveCoinSubscriptions {
+    coin_ids: Vec<Bytes32>,
+});
+
+message_struct!(RequestResetSubscriptions {});
+
+message_struct!(RespondResetSubscriptions {
+    puzzle_hashes: Vec<Bytes32>,
+    coin_ids: Vec<Bytes32>,
+});
