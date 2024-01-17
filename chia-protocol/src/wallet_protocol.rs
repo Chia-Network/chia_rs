@@ -179,6 +179,12 @@ message_struct!(RespondFeeEstimates {
     estimates: FeeEstimateGroup,
 });
 
+streamable_struct!(CoinStateFilters {
+    include_spent: bool,
+    include_unspent: bool,
+    include_hinted: bool,
+});
+
 message_struct!(RequestAddPuzzleSubscriptions {
     puzzle_hashes: Vec<Bytes32>,
     min_height: u32,
@@ -220,4 +226,34 @@ message_struct!(RequestResetSubscriptions {});
 message_struct!(RespondResetSubscriptions {
     puzzle_hashes: Vec<Bytes32>,
     coin_ids: Vec<Bytes32>,
+});
+
+message_struct!(RequestPuzzleState {
+    puzzle_hashes: Vec<Bytes32>,
+    min_height: u32,
+    header_hash: Option<Bytes32>,
+    filters: CoinStateFilters,
+    subscribe_when_finished: bool,
+});
+
+message_struct!(RespondPuzzleState {
+    puzzle_hashes: Vec<Bytes32>,
+    next_height: u32,
+    next_header_hash: Bytes32,
+    is_finished: bool,
+    coin_states: Vec<CoinState>,
+});
+
+message_struct!(RejectPuzzleState {
+    header_hash: Option<Bytes32>,
+});
+
+message_struct!(RequestCoinState {
+    coin_ids: Vec<Bytes32>,
+    subscribe: bool,
+});
+
+message_struct!(RespondCoinState {
+    coin_ids: Vec<Bytes32>,
+    coin_states: Vec<CoinState>,
 });

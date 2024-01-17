@@ -272,6 +272,36 @@ impl Peer {
         self.request(body).await
     }
 
+    pub async fn request_puzzle_state(
+        &self,
+        puzzle_hashes: Vec<Bytes32>,
+        min_height: u32,
+        header_hash: Option<Bytes32>,
+        filters: CoinStateFilters,
+        subscribe_when_finished: bool,
+    ) -> Result<RespondPuzzleState, Error<RejectPuzzleState>> {
+        let body = RequestPuzzleState {
+            puzzle_hashes,
+            min_height,
+            header_hash,
+            filters,
+            subscribe_when_finished,
+        };
+        self.request_or_reject(body).await
+    }
+
+    pub async fn request_coin_state(
+        &self,
+        coin_ids: Vec<Bytes32>,
+        subscribe: bool,
+    ) -> Result<RespondCoinState, Error<()>> {
+        let body = RequestCoinState {
+            coin_ids,
+            subscribe,
+        };
+        self.request(body).await
+    }
+
     pub async fn send<T>(&self, body: T) -> Result<(), Error<()>>
     where
         T: Streamable + ChiaProtocolMessage,

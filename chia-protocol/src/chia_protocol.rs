@@ -133,6 +133,11 @@ pub enum ProtocolMessageTypes {
     RespondRemoveCoinSubscriptions = 99,
     RequestResetSubscriptions = 100,
     RespondResetSubscriptions = 101,
+    RequestPuzzleState = 102,
+    RespondPuzzleState = 103,
+    RejectPuzzleState = 104,
+    RequestCoinState = 105,
+    RespondCoinState = 106,
 }
 
 #[cfg(feature = "py-bindings")]
