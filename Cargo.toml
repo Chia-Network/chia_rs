@@ -31,9 +31,12 @@ license = "Apache-2.0"
 description = "Utility functions and types used by the Chia blockchain full node"
 authors = ["Richard Kiss <him@richardkiss.com>", "Arvid Norberg <arvid@chia.net>"]
 homepage = "https://github.com/Chia-Network/chia_rs/"
-repository = "https://github.com/Chia-Network/chia_rs/"
+repository ="https://github.com/Chia-Network/chia_rs/"
 
 [features]
+default = ["client", "ssl"]
+client = ["dep:chia-client"]
+ssl = ["dep:chia-ssl"]
 py-bindings = ["dep:pyo3"]
 
 [dependencies]
@@ -46,6 +49,9 @@ clvm-traits = { version = "0.3.3", path = "clvm-traits" }
 clvm-derive = { version = "0.2.14", path = "clvm-derive" }
 chia-protocol = { version = "0.4.0", path = "chia-protocol" }
 chia-wallet = { version = "0.4.0", path = "chia-wallet" }
+chia-bls = { version = "0.4.0", path = "chia-bls" }
+chia-client = { version = "0.4.0", path = "chia-client", optional = true }
+chia-ssl = { version = "0.2.14", path = "chia-ssl", optional = true }
 hex-literal = "0.4.1"
 thiserror = "1.0.44"
 
