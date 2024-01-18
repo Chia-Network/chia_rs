@@ -238,9 +238,8 @@ message_struct!(RequestPuzzleState {
 
 message_struct!(RespondPuzzleState {
     puzzle_hashes: Vec<Bytes32>,
-    next_height: u32,
-    next_header_hash: Bytes32,
-    is_finished: bool,
+    next_height: Option<u32>,
+    next_header_hash: Option<Bytes32>,
     coin_states: Vec<CoinState>,
 });
 
