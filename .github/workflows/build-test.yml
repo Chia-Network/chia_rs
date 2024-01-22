@@ -90,6 +90,19 @@ jobs:
                 docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-x86_64
                 rustup-target: x86_64-unknown-linux-musl
             matrix: '3.11'
+          - major-dot-minor: '3.12'
+            cibw-build: 'cp312-*'
+            by-arch:
+              arm:
+                manylinux-version: 2014
+                docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-aarch64
+                rustup-target: aarch64-unknown-linux-musl
+              intel:
+                manylinux-version: 2014
+                docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-x86_64
+                rustup-target: x86_64-unknown-linux-musl
+            matrix: '3.12'
+
         arch:
           - name: ARM
             matrix: arm
@@ -105,19 +118,6 @@ jobs:
               matrix: windows
               runs-on:
                 intel: [windows-latest]
-            arch:
-              name: ARM
-              matrix: arm
-          - os:
-              name: macOS
-              matrix: macos
-              runs-on:
-                arm: [macOS, ARM64]
-                intel: [macos-latest]
-            python:
-              major-dot-minor: '3.7'
-              cibw-build: 'cp37-*'
-              matrix: '3.7'
             arch:
               name: ARM
               matrix: arm
