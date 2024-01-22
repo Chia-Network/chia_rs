@@ -358,9 +358,7 @@ jobs:
     strategy:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
-        exclude:
-          - os: macos-latest
-    name: Fred
+    name: Unit tests
     steps:
       # the test files are read verbatim, making it problematic if git is
       # allowed to insert \r when checking out files
