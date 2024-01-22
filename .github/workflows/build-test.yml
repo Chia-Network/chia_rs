@@ -360,9 +360,7 @@ jobs:
         os: [macos-latest, ubuntu-latest, windows-latest]
         exclude:
           - os: macos-latest
-            python:
-              matrix: 3.12
-    name: Unit tests
+    name: Fred
     steps:
       # the test files are read verbatim, making it problematic if git is
       # allowed to insert \r when checking out files
