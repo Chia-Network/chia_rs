@@ -81,7 +81,8 @@ use clvmr::sha2::{Digest, Sha256};
 fn make_dummy_id(seed: u64) -> Bytes32 {
     let mut sha256 = Sha256::new();
     sha256.update(seed.to_be_bytes());
-    sha256.finalize().as_slice().into()
+    let id: [u8; 32] = sha256.finalize().into();
+    id.into()
 }
 
 #[cfg(test)]

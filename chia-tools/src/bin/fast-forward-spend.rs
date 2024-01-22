@@ -34,8 +34,8 @@ fn main() {
 
     let new_parents_parent: Bytes32 = hex::decode(args.new_parents_parent)
         .expect("invalid hex")
-        .as_slice()
-        .into();
+        .try_into()
+        .unwrap();
 
     let mut a = Allocator::new_limited(500000000);
     let puzzle = spend.puzzle_reveal.to_node_ptr(&mut a).expect("to_clvm");

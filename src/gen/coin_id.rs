@@ -12,7 +12,8 @@ pub fn compute_coin_id(
     hasher.update(a.atom(parent_id));
     hasher.update(a.atom(puzzle_hash));
     hasher.update(amount);
-    hasher.finalize().as_slice().into()
+    let coin_id: [u8; 32] = hasher.finalize().into();
+    coin_id.into()
 }
 
 // from chia.types.blockchain_format.coin import Coin

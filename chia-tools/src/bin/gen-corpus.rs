@@ -89,7 +89,7 @@ fn main() {
                             };
 
                         let run_puzzle = seen_puzzles.lock().unwrap().insert(mod_hash);
-                        let fast_forward = (mod_hash == SINGLETON_TOP_LAYER_PUZZLE_HASH)
+                        let fast_forward = (*mod_hash == SINGLETON_TOP_LAYER_PUZZLE_HASH)
                             && seen_singletons.lock().unwrap().insert(puzzle_hash);
 
                         if !run_puzzle && !fast_forward && !args.spend_bundles {
