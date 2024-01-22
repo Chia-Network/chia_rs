@@ -361,7 +361,7 @@ jobs:
         exclude:
           - os: macos-latest
             python:
-              matrix: '3.12'
+              matrix: 3.12
     name: Unit tests
     steps:
       # the test files are read verbatim, making it problematic if git is
