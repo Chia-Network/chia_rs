@@ -25,7 +25,9 @@ impl ClassgroupElement {
     #[staticmethod]
     pub fn create(bytes: &[u8]) -> ClassgroupElement {
         if bytes.len() == 100 {
-            ClassgroupElement { data: bytes.into() }
+            ClassgroupElement {
+                data: bytes.try_into().unwrap(),
+            }
         } else {
             assert!(bytes.len() < 100);
             let mut data = [0_u8; 100];

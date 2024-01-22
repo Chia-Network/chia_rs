@@ -177,12 +177,14 @@ mod tests {
     fn test_impl<F: Fn(Coin, SpendBundle)>(solution: &str, body: F) {
         let solution = hex::decode(solution).expect("hex::decode");
         let test_coin = Coin::new(
-            (&hex::decode("4444444444444444444444444444444444444444444444444444444444444444")
-                .unwrap())
-                .into(),
-            (&hex::decode("3333333333333333333333333333333333333333333333333333333333333333")
-                .unwrap())
-                .into(),
+            hex::decode("4444444444444444444444444444444444444444444444444444444444444444")
+                .unwrap()
+                .try_into()
+                .unwrap(),
+            hex::decode("3333333333333333333333333333333333333333333333333333333333333333")
+                .unwrap()
+                .try_into()
+                .unwrap(),
             1,
         );
         let spend = CoinSpend::new(
@@ -213,9 +215,10 @@ ff01\
 
             let new_coin = Coin::new(
                 test_coin.coin_id().into(),
-                (&hex::decode("2222222222222222222222222222222222222222222222222222222222222222")
-                    .unwrap())
-                    .into(),
+                hex::decode("2222222222222222222222222222222222222222222222222222222222222222")
+                    .unwrap()
+                    .try_into()
+                    .unwrap(),
                 1,
             );
             assert_eq!(additions, [new_coin]);
