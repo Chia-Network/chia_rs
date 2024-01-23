@@ -267,22 +267,14 @@ jobs:
 
     - name: Build source distribution
       run: |
-        pip install maturin
-        maturin sdist -m wheel/Cargo.toml
+        pip install build
+        python -m build wheel/
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v3
       with:
         name: packages
-        path: ./wheel/target/wheels/
-
-    - name: Verify wheel builds
-      run: |
-        # it would be great to actually use the sdist to build the real wheels
-        mkdir empty
-        cd empty
-        pip install build
-        python -m build --wheel ../wheel/target/wheels/chia_rs-*.tar.gz
+        path: ./wheel/target/wheels/*.tar.gz
 
   fmt:
     runs-on: ubuntu-latest
