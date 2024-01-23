@@ -276,6 +276,14 @@ jobs:
         name: packages
         path: ./wheel/target/wheels/
 
+    - name: Verify wheel builds
+      run: |
+        # it would be great to actually use the sdist to build the real wheels
+        mkdir empty
+        cd empty
+        pip install build
+        build ../wheel/target/wheels/chia_rs-*.tar.gz
+
   fmt:
     runs-on: ubuntu-latest
     name: cargo fmt
