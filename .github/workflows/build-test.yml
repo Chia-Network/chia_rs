@@ -282,7 +282,7 @@ jobs:
         mkdir empty
         cd empty
         pip install build
-        python -m build ../wheel/target/wheels/chia_rs-*.tar.gz
+        python -m build --wheel ../wheel/target/wheels/chia_rs-*.tar.gz
 
   fmt:
     runs-on: ubuntu-latest
