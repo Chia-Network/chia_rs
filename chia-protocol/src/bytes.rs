@@ -163,7 +163,7 @@ impl<const N: usize> BytesImpl<N> {
         &self.0
     }
 
-    pub fn into_inner(self) -> [u8; N] {
+    pub fn to_bytes(self) -> [u8; N] {
         self.0
     }
 

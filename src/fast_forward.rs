@@ -109,7 +109,7 @@ pub fn fast_forward_singleton(
 
     // this is the tree hash of the singleton top layer puzzle
     // the tree hash of singleton_top_layer_v1_1.clsp
-    if singleton.args.singleton_struct.mod_hash.into_inner() != SINGLETON_TOP_LAYER_PUZZLE_HASH {
+    if singleton.args.singleton_struct.mod_hash.as_ref() != SINGLETON_TOP_LAYER_PUZZLE_HASH {
         return Err(Error::NotSingletonModHash);
     }
 
