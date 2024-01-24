@@ -66,6 +66,10 @@ lto = "thin"
 name = "run-generator"
 harness = false
 
+[[bench]]
+name = "tree-hash"
+harness = false
+
 # This is also necessary in `wheel/Cargo.toml` to make sure the `wheel` crate builds as well.
 # This overrides the crates.io version of `clvm-traits` with the local version.
 # This is because `clvmr` currently uses the latest published version of `clvm-traits`.

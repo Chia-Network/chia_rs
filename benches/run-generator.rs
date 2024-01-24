@@ -1,6 +1,7 @@
 use chia::gen::conditions::MempoolVisitor;
 use chia::gen::flags::ALLOW_BACKREFS;
 use chia::gen::run_block_generator::{run_block_generator, run_block_generator2};
+use clvmr::serde::{node_from_bytes, node_to_bytes_backrefs};
 use clvmr::Allocator;
 use criterion::{criterion_group, criterion_main, Criterion, SamplingMode};
 use std::fs::read_to_string;
@@ -26,39 +27,47 @@ fn run(c: &mut Criterion) {
             block_refs.push(hex::decode(env_hex).expect("hex decode env-file"));
         }
 
-        group.bench_function(format!("run_block_generator {name}"), |b| {
-            b.iter(|| {
-                let mut a = Allocator::new();
-                let start = Instant::now();
+        let compressed_generator = {
+            let mut a = Allocator::new();
+            let input = node_from_bytes(&mut a, &generator).expect("failed to parse input file");
+            node_to_bytes_backrefs(&a, input).expect("failed to compress generator")
+        };
 
-                let conds = run_block_generator::<_, MempoolVisitor>(
-                    &mut a,
-                    &generator,
-                    &block_refs,
-                    11000000000,
-                    ALLOW_BACKREFS,
-                );
-                assert!(conds.is_ok());
-                start.elapsed()
-            })
-        });
+        for (gen, name_suffix) in &[(generator, ""), (compressed_generator, "-compressed")] {
+            group.bench_function(format!("run_block_generator {name}{name_suffix}"), |b| {
+                b.iter(|| {
+                    let mut a = Allocator::new();
+                    let start = Instant::now();
 
-        group.bench_function(format!("run_block_generator2 {name}"), |b| {
-            b.iter(|| {
-                let mut a = Allocator::new();
-                let start = Instant::now();
+                    let conds = run_block_generator::<_, MempoolVisitor>(
+                        &mut a,
+                        &gen,
+                        &block_refs,
+                        11000000000,
+                        ALLOW_BACKREFS,
+                    );
+                    assert!(conds.is_ok());
+                    start.elapsed()
+                })
+            });
 
-                let conds = run_block_generator2::<_, MempoolVisitor>(
-                    &mut a,
-                    &generator,
-                    &block_refs,
-                    11000000000,
-                    ALLOW_BACKREFS,
-                );
-                assert!(conds.is_ok());
-                start.elapsed()
-            })
-        });
+            group.bench_function(format!("run_block_generator2 {name}{name_suffix}"), |b| {
+                b.iter(|| {
+                    let mut a = Allocator::new();
+                    let start = Instant::now();
+
+                    let conds = run_block_generator2::<_, MempoolVisitor>(
+                        &mut a,
+                        &gen,
+                        &block_refs,
+                        11000000000,
+                        ALLOW_BACKREFS,
+                    );
+                    assert!(conds.is_ok());
+                    start.elapsed()
+                })
+            });
+        }
     }
 }
 
