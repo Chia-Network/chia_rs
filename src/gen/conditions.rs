@@ -131,10 +131,9 @@ impl SpendVisitor for MempoolVisitor {
         // to look for something that looks like a singleton output, with the same
         // puzzle hash as our input coin
         if (spend.flags & ELIGIBLE_FOR_FF) != 0
-            && !spend
-                .create_coin
-                .iter()
-                .any(|c| (c.amount & 1) == 1 && a.atom(spend.puzzle_hash) == c.puzzle_hash)
+            && !spend.create_coin.iter().any(|c| {
+                (c.amount & 1) == 1 && a.atom(spend.puzzle_hash) == c.puzzle_hash.as_slice()
+            })
         {
             spend.flags &= !ELIGIBLE_FOR_FF;
         }
@@ -888,7 +887,7 @@ pub fn parse_conditions<V: SpendVisitor>(
             }
             Condition::CreateCoin(ph, amount, hint) => {
                 let new_coin = NewCoin {
-                    puzzle_hash: a.atom(ph).into(),
+                    puzzle_hash: a.atom(ph).try_into().unwrap(),
                     amount,
                     hint,
                 };
@@ -1118,7 +1117,7 @@ fn is_ephemeral(
     spends: &[Spend],
 ) -> bool {
     let spend = &spends[spend_idx];
-    let idx = match spent_ids.get(&Bytes32::from(a.atom(spend.parent_id))) {
+    let idx = match spent_ids.get(&Bytes32::try_from(a.atom(spend.parent_id)).unwrap()) {
         None => {
             return false;
         }
@@ -1129,7 +1128,7 @@ fn is_ephemeral(
     // coins. Note that hint is not relevant for this lookup
     let parent_spend = &spends[idx];
     parent_spend.create_coin.contains(&NewCoin {
-        puzzle_hash: Bytes32::from(a.atom(spend.puzzle_hash)),
+        puzzle_hash: Bytes32::try_from(a.atom(spend.puzzle_hash)).unwrap(),
         amount: spend.coin_amount,
         hint: a.nil(),
     })
@@ -1224,7 +1223,7 @@ pub fn validate_conditions(
     for coin_id in state.assert_concurrent_spend {
         if !state
             .spent_coins
-            .contains_key(&Bytes32::from(a.atom(coin_id)))
+            .contains_key(&Bytes32::try_from(a.atom(coin_id)).unwrap())
         {
             return Err(ValidationErr(
                 coin_id,
@@ -1239,11 +1238,11 @@ pub fn validate_conditions(
         // expand all the spent puzzle hashes into a set, to allow
         // fast lookups of all assertions
         for ph in state.spent_puzzles {
-            spent_phs.insert(a.atom(ph).into());
+            spent_phs.insert(a.atom(ph).try_into().unwrap());
         }
 
         for puzzle_assert in state.assert_concurrent_puzzle {
-            if !spent_phs.contains(&a.atom(puzzle_assert).into()) {
+            if !spent_phs.contains(&a.atom(puzzle_assert).try_into().unwrap()) {
                 return Err(ValidationErr(
                     puzzle_assert,
                     ErrorCode::AssertConcurrentPuzzleFailed,
@@ -1261,11 +1260,12 @@ pub fn validate_conditions(
             let mut hasher = Sha256::new();
             hasher.update(*coin_id);
             hasher.update(a.atom(announce));
-            announcements.insert(hasher.finalize().as_slice().into());
+            let announcement_id: [u8; 32] = hasher.finalize().into();
+            announcements.insert(announcement_id.into());
         }
 
         for coin_assert in state.assert_coin {
-            if !announcements.contains(&a.atom(coin_assert).into()) {
+            if !announcements.contains(&a.atom(coin_assert).try_into().unwrap()) {
                 return Err(ValidationErr(
                     coin_assert,
                     ErrorCode::AssertCoinAnnouncementFailed,
@@ -1303,11 +1303,12 @@ pub fn validate_conditions(
             let mut hasher = Sha256::new();
             hasher.update(a.atom(puzzle_hash));
             hasher.update(a.atom(announce));
-            announcements.insert(hasher.finalize().as_slice().into());
+            let announcement_id: [u8; 32] = hasher.finalize().into();
+            announcements.insert(announcement_id.into());
         }
 
         for puzzle_assert in state.assert_puzzle {
-            if !announcements.contains(&a.atom(puzzle_assert).into()) {
+            if !announcements.contains(&a.atom(puzzle_assert).try_into().unwrap()) {
                 return Err(ValidationErr(
                     puzzle_assert,
                     ErrorCode::AssertPuzzleAnnouncementFailed,
@@ -1426,7 +1427,8 @@ fn test_coin_id(parent_id: &[u8; 32], puzzle_hash: &[u8; 32], amount: u64) -> By
     hasher.update(puzzle_hash);
     let buf = u64_to_bytes(amount);
     hasher.update(&buf);
-    hasher.finalize().as_slice().into()
+    let coin_id: [u8; 32] = hasher.finalize().into();
+    coin_id.into()
 }
 
 // this is a very simple parser. It does not handle errors, because it's only
@@ -2445,7 +2447,7 @@ fn test_single_create_coin() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert_eq!(c.puzzle_hash, H2);
+        assert_eq!(c.puzzle_hash.as_ref(), H2);
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.nil());
     }
@@ -2468,7 +2470,7 @@ fn test_create_coin_max_amount() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert_eq!(c.puzzle_hash, H2);
+        assert_eq!(c.puzzle_hash.as_ref(), H2);
         assert_eq!(c.amount, 0xffffffffffffffff_u64);
         assert_eq!(c.hint, a.nil());
     }
@@ -2534,7 +2536,7 @@ fn test_create_coin_with_hint() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert!(c.puzzle_hash == H2);
+        assert!(c.puzzle_hash.as_ref() == H2);
         assert!(c.amount == 42_u64);
         assert!(a.atom(c.hint) == H1.to_vec());
     }
@@ -2557,7 +2559,7 @@ fn test_create_coin_extra_arg() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert!(c.puzzle_hash == H2);
+        assert!(c.puzzle_hash.as_ref() == H2);
         assert!(c.amount == 42_u64);
         assert!(a.atom(c.hint) == H1.to_vec());
     }
@@ -2578,7 +2580,7 @@ fn test_create_coin_with_multiple_hints() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert!(c.puzzle_hash == H2);
+        assert!(c.puzzle_hash.as_ref() == H2);
         assert!(c.amount == 42_u64);
         assert!(a.atom(c.hint) == H1.to_vec());
     }
@@ -2600,7 +2602,7 @@ fn test_create_coin_with_hint_as_atom() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert_eq!(c.puzzle_hash, H2);
+        assert_eq!(c.puzzle_hash.as_ref(), H2);
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.nil());
     }
@@ -2621,7 +2623,7 @@ fn test_create_coin_with_invalid_hint_as_terminator() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert_eq!(c.puzzle_hash, H2);
+        assert_eq!(c.puzzle_hash.as_ref(), H2);
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.nil());
     }
@@ -2655,7 +2657,7 @@ fn test_create_coin_with_short_hint() {
     assert_eq!(spend.create_coin.len(), 1);
 
     for c in &spend.create_coin {
-        assert!(c.puzzle_hash == H2);
+        assert!(c.puzzle_hash.as_ref() == H2);
         assert!(c.amount == 42_u64);
         assert!(a.atom(c.hint) == MSG1.to_vec());
     }
@@ -2677,7 +2679,7 @@ fn test_create_coin_with_long_hint() {
     assert_eq!(spend.create_coin.len(), 1);
 
     for c in &spend.create_coin {
-        assert_eq!(c.puzzle_hash, H2);
+        assert_eq!(c.puzzle_hash.as_ref(), H2);
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.nil());
     }
@@ -2700,7 +2702,7 @@ fn test_create_coin_with_pair_hint() {
     assert_eq!(spend.create_coin.len(), 1);
 
     for c in &spend.create_coin {
-        assert_eq!(c.puzzle_hash, H2);
+        assert_eq!(c.puzzle_hash.as_ref(), H2);
         assert_eq!(c.amount, 42_u64);
         assert_eq!(a.atom(c.hint), H1.to_vec());
     }
@@ -2722,7 +2724,7 @@ fn test_create_coin_with_cons_hint() {
     assert_eq!(a.atom(spend.puzzle_hash), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert_eq!(c.puzzle_hash, H2);
+        assert_eq!(c.puzzle_hash.as_ref(), H2);
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.nil());
     }

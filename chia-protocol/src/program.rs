@@ -13,36 +13,23 @@ use clvmr::serde::{
 use clvmr::{Allocator, ChiaDialect, FromNodePtr, ToNodePtr};
 use sha2::{Digest, Sha256};
 use std::io::Cursor;
+use std::ops::Deref;
 
 #[cfg_attr(feature = "py-bindings", pyclass, derive(PyStreamable))]
-#[derive(Hash, Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Program(Bytes);
 
-#[cfg(fuzzing)]
-impl<'a> arbitrary::Arbitrary<'a> for Program {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        // generate an arbitrary CLVM structure. Not likely a valid program.
-        let mut items_left = 1;
-        let mut total_items = 0;
-        let mut buf = Vec::<u8>::with_capacity(200);
-
-        while items_left > 0 {
-            if total_items < 100 && u.ratio(1, 4).unwrap() {
-                // make a pair
-                buf.push(0xff);
-                items_left += 2;
-            } else {
-                // make an atom. just single bytes for now
-                buf.push(u.int_in_range(0..=0x80).unwrap());
-            }
-            total_items += 1;
-            items_left -= 1;
-        }
-        Ok(Self(buf.into()))
+impl Default for Program {
+    fn default() -> Self {
+        Self(vec![0x80].into())
     }
 }
 
 impl Program {
+    pub fn new(bytes: Bytes) -> Self {
+        Self(bytes)
+    }
+
     pub fn len(&self) -> usize {
         self.0.len()
     }
@@ -55,9 +42,16 @@ impl Program {
         self.0.as_slice()
     }
 
-    #[cfg(test)]
-    pub fn new(buf: Bytes) -> Program {
-        Program(buf)
+    pub fn to_vec(&self) -> Vec<u8> {
+        self.0.to_vec()
+    }
+
+    pub fn into_inner(self) -> Bytes {
+        self.0
+    }
+
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.0.into_inner()
     }
 
     pub fn run<A: ToNodePtr>(
@@ -81,9 +75,71 @@ impl Program {
     }
 }
 
-impl Default for Program {
-    fn default() -> Self {
-        Self(vec![0x80_u8].into())
+impl From<Bytes> for Program {
+    fn from(value: Bytes) -> Self {
+        Self(value)
+    }
+}
+
+impl From<Program> for Bytes {
+    fn from(value: Program) -> Self {
+        value.0
+    }
+}
+
+impl From<Vec<u8>> for Program {
+    fn from(value: Vec<u8>) -> Self {
+        Self(Bytes::new(value))
+    }
+}
+
+impl From<&[u8]> for Program {
+    fn from(value: &[u8]) -> Self {
+        Self(value.into())
+    }
+}
+
+impl From<Program> for Vec<u8> {
+    fn from(value: Program) -> Self {
+        value.0.into()
+    }
+}
+
+impl AsRef<[u8]> for Program {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_ref()
+    }
+}
+
+impl Deref for Program {
+    type Target = [u8];
+
+    fn deref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+#[cfg(fuzzing)]
+impl<'a> arbitrary::Arbitrary<'a> for Program {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        // generate an arbitrary CLVM structure. Not likely a valid program.
+        let mut items_left = 1;
+        let mut total_items = 0;
+        let mut buf = Vec::<u8>::with_capacity(200);
+
+        while items_left > 0 {
+            if total_items < 100 && u.ratio(1, 4).unwrap() {
+                // make a pair
+                buf.push(0xff);
+                items_left += 2;
+            } else {
+                // make an atom. just single bytes for now
+                buf.push(u.int_in_range(0..=0x80).unwrap());
+            }
+            total_items += 1;
+            items_left -= 1;
+        }
+        Ok(Self(buf.into()))
     }
 }
 
@@ -463,12 +519,6 @@ impl FromNodePtr for Program {
 impl ToNodePtr for Program {
     fn to_node_ptr(&self, a: &mut Allocator) -> std::result::Result<NodePtr, ToClvmError> {
         node_from_bytes(a, self.0.as_ref()).map_err(|error| ToClvmError::Custom(error.to_string()))
-    }
-}
-
-impl AsRef<[u8]> for Program {
-    fn as_ref(&self) -> &[u8] {
-        self.0.as_ref()
     }
 }
 

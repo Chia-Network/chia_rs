@@ -34,7 +34,7 @@ fuzz_target!(|data: &[u8]| {
     for new_amount in [0, 2, 3] {
         for new_parent_amount in [0, 2, 3] {
             let new_parent_coin = Coin {
-                parent_coin_info: new_parents_parent.as_slice().into(),
+                parent_coin_info: new_parents_parent.into(),
                 puzzle_hash,
                 amount: if new_parent_amount == 0 {
                     spend.coin.amount

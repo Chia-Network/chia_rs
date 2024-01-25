@@ -131,7 +131,7 @@ pub fn visit_spends<
         let [parent_id, puzzle, amount, solution, _spend_level_extra] =
             extract_n::<5>(a, spend, ErrorCode::InvalidCondition)?;
         let amount: u64 = a.number(amount).try_into().expect("invalid amount");
-        let parent_id = Bytes32::from(a.atom(parent_id));
+        let parent_id = Bytes32::try_from(a.atom(parent_id)).unwrap();
         callback(a, parent_id, amount, puzzle, solution);
     }
     Ok(())

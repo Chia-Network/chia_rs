@@ -68,7 +68,7 @@ pub struct PySpendBundleConditions {
 fn convert_agg_sigs(a: &Allocator, agg_sigs: &[(NodePtr, NodePtr)]) -> Vec<(Bytes48, Bytes)> {
     let mut ret = Vec::<(Bytes48, Bytes)>::new();
     for (pk, msg) in agg_sigs {
-        ret.push((a.atom(*pk).into(), a.atom(*msg).into()));
+        ret.push((a.atom(*pk).try_into().unwrap(), a.atom(*msg).into()));
     }
     ret
 }
@@ -90,8 +90,8 @@ fn convert_spend(a: &Allocator, spend: Spend) -> PySpend {
 
     PySpend {
         coin_id: *spend.coin_id,
-        parent_id: a.atom(spend.parent_id).into(),
-        puzzle_hash: a.atom(spend.puzzle_hash).into(),
+        parent_id: a.atom(spend.parent_id).try_into().unwrap(),
+        puzzle_hash: a.atom(spend.puzzle_hash).try_into().unwrap(),
         coin_amount: spend.coin_amount,
         height_relative: spend.height_relative,
         seconds_relative: spend.seconds_relative,
@@ -122,7 +122,7 @@ pub fn convert_spend_bundle_conds(
 
     let mut agg_sigs = Vec::<(Bytes48, Bytes)>::with_capacity(sb.agg_sig_unsafe.len());
     for (pk, msg) in sb.agg_sig_unsafe {
-        agg_sigs.push((a.atom(pk).into(), a.atom(msg).into()));
+        agg_sigs.push((a.atom(pk).try_into().unwrap(), a.atom(msg).into()));
     }
 
     PySpendBundleConditions {

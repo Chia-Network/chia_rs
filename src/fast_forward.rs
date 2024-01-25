@@ -109,7 +109,7 @@ pub fn fast_forward_singleton(
 
     // this is the tree hash of the singleton top layer puzzle
     // the tree hash of singleton_top_layer_v1_1.clsp
-    if singleton.args.singleton_struct.mod_hash != SINGLETON_TOP_LAYER_PUZZLE_HASH {
+    if singleton.args.singleton_struct.mod_hash.as_ref() != SINGLETON_TOP_LAYER_PUZZLE_HASH {
         return Err(Error::NotSingletonModHash);
     }
 
@@ -141,18 +141,18 @@ pub fn fast_forward_singleton(
         amount: new_solution.lineage_proof.parent_amount,
     };
 
-    if parent_coin.coin_id() != coin.parent_coin_info {
+    if parent_coin.coin_id() != *coin.parent_coin_info {
         return Err(Error::ParentCoinMismatch);
     }
 
     let inner_puzzle_hash = tree_hash(a, singleton.args.inner_puzzle);
-    if inner_puzzle_hash != new_solution.lineage_proof.parent_inner_puzzle_hash {
+    if inner_puzzle_hash != *new_solution.lineage_proof.parent_inner_puzzle_hash {
         return Err(Error::InnerPuzzleHashMismatch);
     }
 
     let puzzle_hash = tree_hash(a, puzzle);
 
-    if puzzle_hash != new_parent.puzzle_hash || puzzle_hash != coin.puzzle_hash {
+    if puzzle_hash != *new_parent.puzzle_hash || puzzle_hash != *coin.puzzle_hash {
         // we can only fast-forward if the puzzle hash match the new coin
         // the spend is assumed to be valied already, so we don't check it
         // against the original coin being spent
@@ -166,7 +166,7 @@ pub fn fast_forward_singleton(
 
     let expected_new_parent = new_parent.coin_id();
 
-    if new_coin.parent_coin_info != expected_new_parent {
+    if *new_coin.parent_coin_info != expected_new_parent {
         return Err(Error::CoinMismatch);
     }
 
@@ -213,7 +213,7 @@ mod tests {
         let puzzle_hash = Bytes32::from(tree_hash(&a, puzzle));
 
         let new_parent_coin = Coin {
-            parent_coin_info: new_parents_parent.as_slice().into(),
+            parent_coin_info: new_parents_parent.try_into().unwrap(),
             puzzle_hash,
             amount: if prev_amount == 0 {
                 spend.coin.amount
@@ -285,7 +285,7 @@ mod tests {
         let puzzle_hash = Bytes32::from(tree_hash(&a, puzzle));
 
         let mut new_parent_coin = Coin {
-            parent_coin_info: new_parents_parent.into(),
+            parent_coin_info: new_parents_parent.try_into().unwrap(),
             puzzle_hash,
             amount: spend.coin.amount,
         };

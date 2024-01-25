@@ -41,7 +41,7 @@ pub fn run_puzzle<V: SpendVisitor>(
     let puzzle_hash = tree_hash(a, puzzle);
     let coin_id = Arc::<Bytes32>::new(
         Coin {
-            parent_coin_info: parent_id.into(),
+            parent_coin_info: parent_id.try_into().unwrap(),
             puzzle_hash: puzzle_hash.into(),
             amount,
         }

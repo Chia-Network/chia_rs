@@ -1,12 +1,9 @@
-use chia_traits::chia_error;
-use chia_traits::{read_bytes, Streamable};
+use chia_traits::{chia_error, read_bytes, Streamable};
 use clvm_traits::{ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError, ToClvm, ToClvmError};
-use core::fmt::Formatter;
 use sha2::{Digest, Sha256};
-use std::convert::AsRef;
-use std::convert::TryInto;
+use std::array::TryFromSliceError;
+use std::convert::{AsRef, TryInto};
 use std::fmt;
-use std::fmt::Debug;
 use std::io::Cursor;
 use std::ops::Deref;
 
@@ -21,11 +18,15 @@ use pyo3::prelude::*;
 #[cfg(feature = "py-bindings")]
 use pyo3::types::PyBytes;
 
-#[derive(Hash, Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(fuzzing, derive(arbitrary::Arbitrary))]
 pub struct Bytes(Vec<u8>);
 
 impl Bytes {
+    pub fn new(bytes: Vec<u8>) -> Self {
+        Self(bytes)
+    }
+
     pub fn len(&self) -> usize {
         self.0.len()
     }
@@ -37,6 +38,22 @@ impl Bytes {
     pub fn as_slice(&self) -> &[u8] {
         self.0.as_slice()
     }
+
+    pub fn into_inner(self) -> Vec<u8> {
+        self.0
+    }
+}
+
+impl fmt::Debug for Bytes {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&hex::encode(self))
+    }
+}
+
+impl fmt::Display for Bytes {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str(&hex::encode(self))
+    }
 }
 
 impl Streamable for Bytes {
@@ -44,6 +61,7 @@ impl Streamable for Bytes {
         (self.0.len() as u32).update_digest(digest);
         digest.update(&self.0);
     }
+
     fn stream(&self, out: &mut Vec<u8>) -> chia_error::Result<()> {
         if self.0.len() > u32::MAX as usize {
             Err(chia_error::Error::SequenceTooLarge)
@@ -57,12 +75,6 @@ impl Streamable for Bytes {
     fn parse<const TRUSTED: bool>(input: &mut Cursor<&[u8]>) -> chia_error::Result<Self> {
         let len = u32::parse::<TRUSTED>(input)?;
         Ok(Bytes(read_bytes(input, len as usize)?.to_vec()))
-    }
-}
-
-impl Debug for Bytes {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        formatter.write_str(&hex::encode(&self.0))
     }
 }
 
@@ -106,63 +118,21 @@ impl<N> FromClvm<N> for Bytes {
     }
 }
 
-impl PartialEq<Bytes> for Vec<u8> {
-    fn eq(&self, lhs: &Bytes) -> bool {
-        *self == lhs.0
-    }
-}
-
-impl PartialEq<Vec<u8>> for Bytes {
-    fn eq(&self, lhs: &Vec<u8>) -> bool {
-        self.0 == *lhs
-    }
-}
-
-impl PartialEq<&[u8]> for Bytes {
-    fn eq(&self, lhs: &&[u8]) -> bool {
-        &self.0 == lhs
-    }
-}
-
-impl PartialEq<Bytes> for &[u8] {
-    fn eq(&self, lhs: &Bytes) -> bool {
-        self == &lhs.0
-    }
-}
-
-impl<const N: usize> PartialEq<[u8; N]> for Bytes {
-    fn eq(&self, lhs: &[u8; N]) -> bool {
-        self.0 == lhs
-    }
-}
-
-impl<const N: usize> PartialEq<&[u8; N]> for Bytes {
-    fn eq(&self, lhs: &&[u8; N]) -> bool {
-        self.0 == *lhs
-    }
-}
-
-impl<const N: usize> PartialEq<Bytes> for &[u8; N] {
-    fn eq(&self, lhs: &Bytes) -> bool {
-        lhs.0 == *self
-    }
-}
-
-impl<const N: usize> PartialEq<Bytes> for [u8; N] {
-    fn eq(&self, lhs: &Bytes) -> bool {
-        lhs.0 == self
-    }
-}
-
 impl From<&[u8]> for Bytes {
-    fn from(v: &[u8]) -> Bytes {
-        Bytes(v.to_vec())
+    fn from(value: &[u8]) -> Self {
+        Self(value.to_vec())
     }
 }
 
 impl From<Vec<u8>> for Bytes {
-    fn from(v: Vec<u8>) -> Bytes {
-        Bytes(v)
+    fn from(value: Vec<u8>) -> Self {
+        Self(value)
+    }
+}
+
+impl From<Bytes> for Vec<u8> {
+    fn from(value: Bytes) -> Self {
+        value.0
     }
 }
 
@@ -172,15 +142,53 @@ impl AsRef<[u8]> for Bytes {
     }
 }
 
-impl fmt::Display for Bytes {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str(&hex::encode(&self.0))
+impl Deref for Bytes {
+    type Target = [u8];
+
+    fn deref(&self) -> &[u8] {
+        &self.0
     }
 }
 
-#[derive(Hash, PartialEq, Eq, Copy, Clone, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(fuzzing, derive(arbitrary::Arbitrary))]
 pub struct BytesImpl<const N: usize>([u8; N]);
+
+impl<const N: usize> BytesImpl<N> {
+    pub fn new(bytes: [u8; N]) -> Self {
+        Self(bytes)
+    }
+
+    pub fn as_slice(&self) -> &[u8] {
+        &self.0
+    }
+
+    pub fn to_bytes(self) -> [u8; N] {
+        self.0
+    }
+
+    pub fn to_vec(&self) -> Vec<u8> {
+        self.0.to_vec()
+    }
+}
+
+impl<const N: usize> Default for BytesImpl<N> {
+    fn default() -> Self {
+        Self([0; N])
+    }
+}
+
+impl<const N: usize> fmt::Debug for BytesImpl<N> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        formatter.write_str(&hex::encode(self))
+    }
+}
+
+impl<const N: usize> fmt::Display for BytesImpl<N> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str(&hex::encode(self))
+    }
+}
 
 impl<const N: usize> Streamable for BytesImpl<N> {
     fn update_digest(&self, digest: &mut Sha256) {
@@ -193,137 +201,6 @@ impl<const N: usize> Streamable for BytesImpl<N> {
 
     fn parse<const TRUSTED: bool>(input: &mut Cursor<&[u8]>) -> chia_error::Result<Self> {
         Ok(BytesImpl(read_bytes(input, N)?.try_into().unwrap()))
-    }
-}
-
-impl<N, const LEN: usize> ToClvm<N> for BytesImpl<LEN> {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
-        encoder.encode_atom(self.0.as_slice())
-    }
-}
-
-impl<N, const LEN: usize> FromClvm<N> for BytesImpl<LEN> {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
-        let bytes = decoder.decode_atom(&node)?;
-        if bytes.len() != LEN {
-            return Err(FromClvmError::WrongAtomLength {
-                expected: LEN,
-                found: bytes.len(),
-            });
-        }
-        Ok(Self::from(bytes))
-    }
-}
-
-impl<const N: usize> From<[u8; N]> for BytesImpl<N> {
-    fn from(v: [u8; N]) -> BytesImpl<N> {
-        BytesImpl::<N>(v)
-    }
-}
-impl<const N: usize> From<&[u8; N]> for BytesImpl<N> {
-    fn from(v: &[u8; N]) -> BytesImpl<N> {
-        BytesImpl::<N>(*v)
-    }
-}
-impl<const N: usize> From<&[u8]> for BytesImpl<N> {
-    fn from(v: &[u8]) -> BytesImpl<N> {
-        if v.len() != N {
-            panic!("invalid atom, expected {} bytes (got {})", N, v.len());
-        }
-        let mut ret = BytesImpl::<N>([0; N]);
-        ret.0.copy_from_slice(v);
-        ret
-    }
-}
-impl<const N: usize> From<&Vec<u8>> for BytesImpl<N> {
-    fn from(v: &Vec<u8>) -> BytesImpl<N> {
-        if v.len() != N {
-            panic!("invalid atom, expected {} bytes (got {})", N, v.len());
-        }
-        let mut ret = BytesImpl::<N>([0; N]);
-        ret.0.copy_from_slice(v);
-        ret
-    }
-}
-impl<'a, const N: usize> From<&'a BytesImpl<N>> for &'a [u8; N] {
-    fn from(v: &'a BytesImpl<N>) -> &'a [u8; N] {
-        &v.0
-    }
-}
-
-impl<const N: usize> From<&BytesImpl<N>> for [u8; N] {
-    fn from(v: &BytesImpl<N>) -> [u8; N] {
-        v.0
-    }
-}
-
-impl<'a, const N: usize> From<&'a BytesImpl<N>> for &'a [u8] {
-    fn from(v: &'a BytesImpl<N>) -> &'a [u8] {
-        &v.0
-    }
-}
-
-impl<const N: usize> BytesImpl<N> {
-    pub fn to_vec(&self) -> Vec<u8> {
-        self.0.to_vec()
-    }
-}
-
-impl<const N: usize> AsRef<[u8]> for BytesImpl<N> {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
-    }
-}
-impl<const N: usize> Deref for BytesImpl<N> {
-    type Target = [u8];
-    fn deref(&self) -> &[u8] {
-        &self.0
-    }
-}
-impl<const N: usize> Debug for BytesImpl<N> {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        formatter.write_str(&hex::encode(self.0))
-    }
-}
-impl<const N: usize> fmt::Display for BytesImpl<N> {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str(&hex::encode(self.0))
-    }
-}
-
-impl<const N: usize> PartialEq<&[u8]> for BytesImpl<N> {
-    fn eq(&self, lhs: &&[u8]) -> bool {
-        self.0 == *lhs
-    }
-}
-
-impl<const N: usize> PartialEq<BytesImpl<N>> for &[u8] {
-    fn eq(&self, lhs: &BytesImpl<N>) -> bool {
-        self == &lhs.0
-    }
-}
-
-impl<const N: usize> PartialEq<&[u8; N]> for BytesImpl<N> {
-    fn eq(&self, lhs: &&[u8; N]) -> bool {
-        &self.0 == *lhs
-    }
-}
-
-impl<const N: usize> PartialEq<BytesImpl<N>> for &[u8; N] {
-    fn eq(&self, lhs: &BytesImpl<N>) -> bool {
-        *self == &lhs.0
-    }
-}
-
-impl<const N: usize> PartialEq<[u8; N]> for BytesImpl<N> {
-    fn eq(&self, lhs: &[u8; N]) -> bool {
-        &self.0 == lhs
-    }
-}
-
-impl<const N: usize> PartialEq<BytesImpl<N>> for [u8; N] {
-    fn eq(&self, lhs: &BytesImpl<N>) -> bool {
-        self == &lhs.0
     }
 }
 
@@ -357,7 +234,106 @@ impl<const N: usize> FromJsonDict for BytesImpl<N> {
                 N
             )));
         }
-        Ok((&buf).into())
+        Ok(buf.try_into().unwrap())
+    }
+}
+
+impl<N, const LEN: usize> ToClvm<N> for BytesImpl<LEN> {
+    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+        encoder.encode_atom(self.0.as_slice())
+    }
+}
+
+impl<N, const LEN: usize> FromClvm<N> for BytesImpl<LEN> {
+    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+        let bytes = decoder.decode_atom(&node)?;
+        if bytes.len() != LEN {
+            return Err(FromClvmError::WrongAtomLength {
+                expected: LEN,
+                found: bytes.len(),
+            });
+        }
+        Ok(Self::try_from(bytes).unwrap())
+    }
+}
+
+impl<const N: usize> TryFrom<&[u8]> for BytesImpl<N> {
+    type Error = TryFromSliceError;
+
+    fn try_from(value: &[u8]) -> Result<Self, TryFromSliceError> {
+        Ok(Self(value.try_into()?))
+    }
+}
+
+impl<const N: usize> TryFrom<Vec<u8>> for BytesImpl<N> {
+    type Error = TryFromSliceError;
+
+    fn try_from(value: Vec<u8>) -> Result<Self, TryFromSliceError> {
+        value.as_slice().try_into()
+    }
+}
+
+impl<const N: usize> TryFrom<&Vec<u8>> for BytesImpl<N> {
+    type Error = TryFromSliceError;
+
+    fn try_from(value: &Vec<u8>) -> Result<Self, TryFromSliceError> {
+        value.as_slice().try_into()
+    }
+}
+
+impl<const N: usize> From<BytesImpl<N>> for Vec<u8> {
+    fn from(value: BytesImpl<N>) -> Self {
+        value.to_vec()
+    }
+}
+
+impl<const N: usize> From<[u8; N]> for BytesImpl<N> {
+    fn from(value: [u8; N]) -> Self {
+        Self(value)
+    }
+}
+
+impl<const N: usize> From<&[u8; N]> for BytesImpl<N> {
+    fn from(value: &[u8; N]) -> Self {
+        Self(*value)
+    }
+}
+
+impl<const N: usize> From<BytesImpl<N>> for [u8; N] {
+    fn from(value: BytesImpl<N>) -> Self {
+        value.0
+    }
+}
+
+impl<'a, const N: usize> From<&'a BytesImpl<N>> for &'a [u8; N] {
+    fn from(value: &'a BytesImpl<N>) -> &'a [u8; N] {
+        &value.0
+    }
+}
+
+impl<const N: usize> From<&BytesImpl<N>> for [u8; N] {
+    fn from(value: &BytesImpl<N>) -> [u8; N] {
+        value.0
+    }
+}
+
+impl<'a, const N: usize> From<&'a BytesImpl<N>> for &'a [u8] {
+    fn from(value: &'a BytesImpl<N>) -> &'a [u8] {
+        &value.0
+    }
+}
+
+impl<const N: usize> AsRef<[u8]> for BytesImpl<N> {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl<const N: usize> Deref for BytesImpl<N> {
+    type Target = [u8];
+
+    fn deref(&self) -> &[u8] {
+        &self.0
     }
 }
 
@@ -449,11 +425,10 @@ mod tests {
     fn test_bytes_comparisons(#[case] lhs: &str, #[case] rhs: &str, #[case] expect_equal: bool) {
         let lhs_vec: Vec<u8> = hex::decode(lhs).expect("hex::decode");
         let rhs_vec: Vec<u8> = hex::decode(rhs).expect("hex::decode");
-        let lhs_slice = &lhs_vec[..];
-        let rhs_slice = &rhs_vec[..];
+
         if lhs_vec.len() == 32 && rhs_vec.len() == 32 {
-            let lhs = Bytes32::from(&lhs_vec);
-            let rhs = Bytes32::from(&rhs_vec);
+            let lhs = Bytes32::try_from(&lhs_vec).unwrap();
+            let rhs = Bytes32::try_from(&rhs_vec).unwrap();
 
             assert_eq!(lhs.len(), 32);
             assert_eq!(rhs.len(), 32);
@@ -461,49 +436,12 @@ mod tests {
             assert_eq!(lhs.is_empty(), lhs_vec.is_empty());
             assert_eq!(rhs.is_empty(), rhs_vec.is_empty());
 
-            // Bytes32 compare against arrays of the same size, not slices
-            let lhs_array: &[u8; 32] = lhs_slice.try_into().unwrap();
-            let rhs_array: &[u8; 32] = rhs_slice.try_into().unwrap();
             if expect_equal {
                 assert_eq!(lhs, rhs);
                 assert_eq!(rhs, lhs);
-
-                // array comparisons
-                assert_eq!(lhs, rhs_array);
-                assert_eq!(rhs, lhs_array);
-                assert_eq!(lhs_array, rhs);
-                assert_eq!(rhs_array, lhs);
-
-                assert_eq!(lhs, *rhs_array);
-                assert_eq!(rhs, *lhs_array);
-                assert_eq!(*lhs_array, rhs);
-                assert_eq!(*rhs_array, lhs);
-
-                // slice comparisona
-                assert_eq!(lhs, rhs_slice);
-                assert_eq!(rhs, lhs_slice);
-                assert_eq!(lhs_slice, rhs);
-                assert_eq!(rhs_slice, lhs);
             } else {
                 assert!(lhs != rhs);
                 assert!(rhs != lhs);
-
-                // array comparisons
-                assert!(lhs != rhs_array);
-                assert!(rhs != lhs_array);
-                assert!(lhs_array != rhs);
-                assert!(rhs_array != lhs);
-
-                assert!(lhs != *rhs_array);
-                assert!(rhs != *lhs_array);
-                assert!(*lhs_array != rhs);
-                assert!(*rhs_array != lhs);
-
-                // slice comparisons
-                assert!(lhs != rhs_slice);
-                assert!(rhs != lhs_slice);
-                assert!(lhs_slice != rhs);
-                assert!(rhs_slice != lhs);
             }
         } else {
             let lhs = Bytes::from(lhs_vec.clone());
@@ -515,47 +453,12 @@ mod tests {
             assert_eq!(lhs.is_empty(), lhs_vec.is_empty());
             assert_eq!(rhs.is_empty(), rhs_vec.is_empty());
 
-            // array comparisons
-            let array: &[u8; 3] = &[1, 2, 3];
-            assert!(lhs != array);
-            assert!(rhs != array);
-            assert!(array != lhs);
-            assert!(array != rhs);
-            assert!(lhs != *array);
-            assert!(rhs != *array);
-            assert!(*array != lhs);
-            assert!(*array != rhs);
-
             if expect_equal {
                 assert_eq!(lhs, rhs);
                 assert_eq!(rhs, lhs);
-
-                // slice comparisons
-                assert_eq!(lhs, rhs_slice);
-                assert_eq!(rhs, lhs_slice);
-                assert_eq!(lhs_slice, rhs);
-                assert_eq!(rhs_slice, lhs);
-
-                // vec comparisons
-                assert_eq!(lhs, rhs_vec);
-                assert_eq!(rhs, lhs_vec);
-                assert_eq!(lhs_vec, rhs);
-                assert_eq!(rhs_vec, lhs);
             } else {
                 assert!(lhs != rhs);
                 assert!(rhs != lhs);
-
-                // slice comparisons
-                assert!(lhs != rhs_slice);
-                assert!(rhs != lhs_slice);
-                assert!(lhs_slice != rhs);
-                assert!(rhs_slice != lhs);
-
-                // vec comparisons
-                assert!(lhs != rhs_vec);
-                assert!(rhs != lhs_vec);
-                assert!(lhs_vec != rhs);
-                assert!(rhs_vec != lhs);
             }
         }
     }
@@ -586,12 +489,12 @@ mod tests {
 
     #[test]
     fn test_stream_bytes32() {
-        let buf: &[u8] = &[
+        let buf = [
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
             25, 26, 27, 28, 29, 30, 31, 32,
         ];
         let out = stream(&Bytes32::from(buf));
-        assert_eq!(&buf, &out);
+        assert_eq!(buf.as_slice(), &out);
     }
 
     #[test]
@@ -633,22 +536,22 @@ mod tests {
 
     #[test]
     fn test_parse_bytes32() {
-        let buf: &[u8] = &[
+        let buf = [
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
             25, 26, 27, 28, 29, 30, 31, 32,
         ];
-        from_bytes::<Bytes32>(buf, Bytes32::from(buf));
+        from_bytes::<Bytes32>(&buf, Bytes32::from(buf));
         from_bytes_fail::<Bytes32>(&buf[0..30], chia_error::Error::EndOfBuffer);
     }
 
     #[test]
     fn test_parse_bytes48() {
-        let buf: &[u8] = &[
+        let buf = [
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
             25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46,
             47, 48,
         ];
-        from_bytes::<Bytes48>(buf, Bytes48::from(buf));
+        from_bytes::<Bytes48>(&buf, Bytes48::from(buf));
         from_bytes_fail::<Bytes48>(&buf[0..47], chia_error::Error::EndOfBuffer);
     }
 

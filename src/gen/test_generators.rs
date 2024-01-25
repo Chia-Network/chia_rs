@@ -32,7 +32,7 @@ fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
     }
     let mut agg_sigs = Vec::<(Bytes48, Bytes)>::new();
     for (pk, msg) in &c.agg_sig_unsafe {
-        agg_sigs.push((a.atom(*pk).into(), a.atom(*msg).into()));
+        agg_sigs.push((a.atom(*pk).try_into().unwrap(), a.atom(*msg).into()));
     }
     agg_sigs.sort();
     for (pk, msg) in agg_sigs {
@@ -86,7 +86,7 @@ fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
 
         let mut agg_sigs = Vec::<(Bytes48, Bytes)>::new();
         for (pk, msg) in s.agg_sig_me {
-            agg_sigs.push((a.atom(pk).into(), a.atom(msg).into()));
+            agg_sigs.push((a.atom(pk).try_into().unwrap(), a.atom(msg).into()));
         }
         agg_sigs.sort();
         for (pk, msg) in agg_sigs {
