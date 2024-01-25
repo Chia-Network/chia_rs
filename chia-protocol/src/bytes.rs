@@ -1,22 +1,12 @@
-use chia_traits::{chia_error, read_bytes, Streamable};
-use clvm_traits::{ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError, ToClvm, ToClvmError};
-use sha2::{Digest, Sha256};
 use std::array::TryFromSliceError;
 use std::convert::{AsRef, TryInto};
 use std::fmt;
 use std::io::Cursor;
 use std::ops::Deref;
 
-#[cfg(feature = "py-bindings")]
-use chia_traits::{FromJsonDict, ToJsonDict};
-#[cfg(feature = "py-bindings")]
-use hex::FromHex;
-#[cfg(feature = "py-bindings")]
-use pyo3::exceptions::PyValueError;
-#[cfg(feature = "py-bindings")]
-use pyo3::prelude::*;
-#[cfg(feature = "py-bindings")]
-use pyo3::types::PyBytes;
+use chia_traits::{chia_error, read_bytes, Streamable};
+use clvm_traits::{ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError, ToClvm, ToClvmError};
+use sha2::{Digest, Sha256};
 
 #[derive(Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(fuzzing, derive(arbitrary::Arbitrary))]
@@ -75,33 +65,6 @@ impl Streamable for Bytes {
     fn parse<const TRUSTED: bool>(input: &mut Cursor<&[u8]>) -> chia_error::Result<Self> {
         let len = u32::parse::<TRUSTED>(input)?;
         Ok(Bytes(read_bytes(input, len as usize)?.to_vec()))
-    }
-}
-
-#[cfg(feature = "py-bindings")]
-impl ToJsonDict for Bytes {
-    fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
-        Ok(format!("0x{self}").to_object(py))
-    }
-}
-
-#[cfg(feature = "py-bindings")]
-impl FromJsonDict for Bytes {
-    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
-        let s: String = o.extract()?;
-        if !s.starts_with("0x") {
-            return Err(PyValueError::new_err(
-                "bytes object is expected to start with 0x",
-            ));
-        }
-        let s = &s[2..];
-        let buf = match Vec::from_hex(s) {
-            Err(_) => {
-                return Err(PyValueError::new_err("invalid hex"));
-            }
-            Ok(v) => v,
-        };
-        Ok(buf.into())
     }
 }
 
@@ -201,40 +164,6 @@ impl<const N: usize> Streamable for BytesImpl<N> {
 
     fn parse<const TRUSTED: bool>(input: &mut Cursor<&[u8]>) -> chia_error::Result<Self> {
         Ok(BytesImpl(read_bytes(input, N)?.try_into().unwrap()))
-    }
-}
-
-#[cfg(feature = "py-bindings")]
-impl<const N: usize> ToJsonDict for BytesImpl<N> {
-    fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
-        Ok(format!("0x{self}").to_object(py))
-    }
-}
-
-#[cfg(feature = "py-bindings")]
-impl<const N: usize> FromJsonDict for BytesImpl<N> {
-    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
-        let s: String = o.extract()?;
-        if !s.starts_with("0x") {
-            return Err(PyValueError::new_err(
-                "bytes object is expected to start with 0x",
-            ));
-        }
-        let s = &s[2..];
-        let buf = match Vec::from_hex(s) {
-            Err(_) => {
-                return Err(PyValueError::new_err("invalid hex"));
-            }
-            Ok(v) => v,
-        };
-        if buf.len() != N {
-            return Err(PyValueError::new_err(format!(
-                "invalid length {} expected {}",
-                buf.len(),
-                N
-            )));
-        }
-        Ok(buf.try_into().unwrap())
     }
 }
 
@@ -343,48 +272,110 @@ pub type Bytes96 = BytesImpl<96>;
 pub type Bytes100 = BytesImpl<100>;
 
 #[cfg(feature = "py-bindings")]
-impl<const N: usize> ToPyObject for BytesImpl<N> {
-    fn to_object(&self, py: Python) -> PyObject {
-        PyBytes::new(py, &self.0).into()
-    }
-}
+mod py_bindings {
+    use super::*;
 
-#[cfg(feature = "py-bindings")]
-impl<const N: usize> IntoPy<PyObject> for BytesImpl<N> {
-    fn into_py(self, py: Python) -> PyObject {
-        PyBytes::new(py, &self.0).into()
-    }
-}
+    use chia_traits::{FromJsonDict, ToJsonDict};
+    use hex::FromHex;
+    use pyo3::exceptions::PyValueError;
+    use pyo3::prelude::*;
+    use pyo3::types::PyBytes;
 
-#[cfg(feature = "py-bindings")]
-impl<'py, const N: usize> FromPyObject<'py> for BytesImpl<N> {
-    fn extract(obj: &'py PyAny) -> PyResult<Self> {
-        let b = <PyBytes as PyTryFrom>::try_from(obj)?;
-        let slice: &[u8] = b.as_bytes();
-        let buf: [u8; N] = slice.try_into()?;
-        Ok(BytesImpl::<N>(buf))
+    impl ToJsonDict for Bytes {
+        fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
+            Ok(format!("0x{self}").to_object(py))
+        }
     }
-}
 
-#[cfg(feature = "py-bindings")]
-impl ToPyObject for Bytes {
-    fn to_object(&self, py: Python) -> PyObject {
-        PyBytes::new(py, &self.0).into()
+    impl FromJsonDict for Bytes {
+        fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+            let s: String = o.extract()?;
+            if !s.starts_with("0x") {
+                return Err(PyValueError::new_err(
+                    "bytes object is expected to start with 0x",
+                ));
+            }
+            let s = &s[2..];
+            let buf = match Vec::from_hex(s) {
+                Err(_) => {
+                    return Err(PyValueError::new_err("invalid hex"));
+                }
+                Ok(v) => v,
+            };
+            Ok(buf.into())
+        }
     }
-}
 
-#[cfg(feature = "py-bindings")]
-impl IntoPy<PyObject> for Bytes {
-    fn into_py(self, py: Python) -> PyObject {
-        PyBytes::new(py, &self.0).into()
+    impl<const N: usize> ToJsonDict for BytesImpl<N> {
+        fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
+            Ok(format!("0x{self}").to_object(py))
+        }
     }
-}
 
-#[cfg(feature = "py-bindings")]
-impl<'py> FromPyObject<'py> for Bytes {
-    fn extract(obj: &'py PyAny) -> PyResult<Self> {
-        let b = <PyBytes as PyTryFrom>::try_from(obj)?;
-        Ok(Bytes(b.as_bytes().to_vec()))
+    impl<const N: usize> FromJsonDict for BytesImpl<N> {
+        fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+            let s: String = o.extract()?;
+            if !s.starts_with("0x") {
+                return Err(PyValueError::new_err(
+                    "bytes object is expected to start with 0x",
+                ));
+            }
+            let s = &s[2..];
+            let buf = match Vec::from_hex(s) {
+                Err(_) => {
+                    return Err(PyValueError::new_err("invalid hex"));
+                }
+                Ok(v) => v,
+            };
+            if buf.len() != N {
+                return Err(PyValueError::new_err(format!(
+                    "invalid length {} expected {}",
+                    buf.len(),
+                    N
+                )));
+            }
+            Ok(buf.try_into().unwrap())
+        }
+    }
+
+    impl<const N: usize> ToPyObject for BytesImpl<N> {
+        fn to_object(&self, py: Python) -> PyObject {
+            PyBytes::new(py, &self.0).into()
+        }
+    }
+
+    impl<const N: usize> IntoPy<PyObject> for BytesImpl<N> {
+        fn into_py(self, py: Python) -> PyObject {
+            PyBytes::new(py, &self.0).into()
+        }
+    }
+
+    impl<'py, const N: usize> FromPyObject<'py> for BytesImpl<N> {
+        fn extract(obj: &'py PyAny) -> PyResult<Self> {
+            let b = <PyBytes as PyTryFrom>::try_from(obj)?;
+            let slice: &[u8] = b.as_bytes();
+            let buf: [u8; N] = slice.try_into()?;
+            Ok(BytesImpl::<N>(buf))
+        }
+    }
+
+    impl ToPyObject for Bytes {
+        fn to_object(&self, py: Python) -> PyObject {
+            PyBytes::new(py, &self.0).into()
+        }
+    }
+
+    impl IntoPy<PyObject> for Bytes {
+        fn into_py(self, py: Python) -> PyObject {
+            PyBytes::new(py, &self.0).into()
+        }
+    }
+
+    impl<'py> FromPyObject<'py> for Bytes {
+        fn extract(obj: &'py PyAny) -> PyResult<Self> {
+            let b = <PyBytes as PyTryFrom>::try_from(obj)?;
+            Ok(Bytes(b.as_bytes().to_vec()))
+        }
     }
 }
 

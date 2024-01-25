@@ -3,9 +3,6 @@ use chia_streamable_macro::Streamable;
 use crate::streamable_struct;
 use crate::{Bytes32, ClassgroupElement, Coin, SubEpochSummary};
 
-#[cfg(feature = "py-bindings")]
-use pyo3::prelude::*;
-
 // This class is not included or hashed into the blockchain, but it is kept in memory as a more
 // efficient way to maintain data about the blockchain. This allows us to validate future blocks,
 // difficulty adjustments, etc, without saving the whole header block in memory.
@@ -70,88 +67,90 @@ impl BlockRecord {
 }
 
 #[cfg(feature = "py-bindings")]
-use pyo3::types::PyDict;
+mod py_bindings {
+    use super::*;
 
-#[cfg(feature = "py-bindings")]
-use pyo3::exceptions::PyValueError;
+    use pyo3::exceptions::PyValueError;
+    use pyo3::prelude::*;
+    use pyo3::types::PyDict;
 
-#[cfg(feature = "py-bindings")]
-#[pymethods]
-impl BlockRecord {
-    #[getter]
-    #[pyo3(name = "is_transaction_block")]
-    fn py_is_transaction_block(&self) -> bool {
-        self.is_transaction_block()
-    }
-
-    #[getter]
-    #[pyo3(name = "first_in_sub_slot")]
-    fn py_first_in_sub_slot(&self) -> bool {
-        self.first_in_sub_slot()
-    }
-
-    #[pyo3(name = "is_challenge_block")]
-    fn py_is_challenge_block(&self, constants: &PyAny) -> PyResult<bool> {
-        Ok(self.is_challenge_block(
-            constants
-                .getattr("MIN_BLOCKS_PER_CHALLENGE_BLOCK")?
-                .extract::<u8>()?,
-        ))
-    }
-
-    // TODO: at some point it would be nice to port
-    // chia.consensus.pot_iterations to rust, and make this less hacky
-    fn sp_sub_slot_total_iters(&self, py: Python, constants: &PyAny) -> PyResult<u128> {
-        let ret = self
-            .total_iters
-            .checked_sub(self.ip_iters(py, constants)? as u128)
-            .ok_or(PyValueError::new_err("uint128 overflow"))?;
-        if self.overflow {
-            ret.checked_sub(self.sub_slot_iters as u128)
-                .ok_or(PyValueError::new_err("uint128 overflow"))
-        } else {
-            Ok(ret)
+    #[pymethods]
+    impl BlockRecord {
+        #[getter]
+        #[pyo3(name = "is_transaction_block")]
+        fn py_is_transaction_block(&self) -> bool {
+            self.is_transaction_block()
         }
-    }
 
-    fn ip_sub_slot_total_iters(&self, py: Python, constants: &PyAny) -> PyResult<u128> {
-        self.total_iters
-            .checked_sub(self.ip_iters(py, constants)? as u128)
-            .ok_or(PyValueError::new_err("uint128 overflow"))
-    }
+        #[getter]
+        #[pyo3(name = "first_in_sub_slot")]
+        fn py_first_in_sub_slot(&self) -> bool {
+            self.first_in_sub_slot()
+        }
 
-    fn sp_iters(&self, py: Python, constants: &PyAny) -> PyResult<u64> {
-        let ctx: &PyDict = PyDict::new(py);
-        ctx.set_item("sub_slot_iters", self.sub_slot_iters)?;
-        ctx.set_item("signage_point_index", self.signage_point_index)?;
-        ctx.set_item("constants", constants)?;
-        py.run(
+        #[pyo3(name = "is_challenge_block")]
+        fn py_is_challenge_block(&self, constants: &PyAny) -> PyResult<bool> {
+            Ok(self.is_challenge_block(
+                constants
+                    .getattr("MIN_BLOCKS_PER_CHALLENGE_BLOCK")?
+                    .extract::<u8>()?,
+            ))
+        }
+
+        // TODO: at some point it would be nice to port
+        // chia.consensus.pot_iterations to rust, and make this less hacky
+        fn sp_sub_slot_total_iters(&self, py: Python, constants: &PyAny) -> PyResult<u128> {
+            let ret = self
+                .total_iters
+                .checked_sub(self.ip_iters(py, constants)? as u128)
+                .ok_or(PyValueError::new_err("uint128 overflow"))?;
+            if self.overflow {
+                ret.checked_sub(self.sub_slot_iters as u128)
+                    .ok_or(PyValueError::new_err("uint128 overflow"))
+            } else {
+                Ok(ret)
+            }
+        }
+
+        fn ip_sub_slot_total_iters(&self, py: Python, constants: &PyAny) -> PyResult<u128> {
+            self.total_iters
+                .checked_sub(self.ip_iters(py, constants)? as u128)
+                .ok_or(PyValueError::new_err("uint128 overflow"))
+        }
+
+        fn sp_iters(&self, py: Python, constants: &PyAny) -> PyResult<u64> {
+            let ctx: &PyDict = PyDict::new(py);
+            ctx.set_item("sub_slot_iters", self.sub_slot_iters)?;
+            ctx.set_item("signage_point_index", self.signage_point_index)?;
+            ctx.set_item("constants", constants)?;
+            py.run(
             "from chia.consensus.pot_iterations import calculate_ip_iters, calculate_sp_iters\n\
             ret = calculate_sp_iters(constants, sub_slot_iters, signage_point_index)\n",
             None,
             Some(ctx),
         )?;
-        ctx.get_item("ret").unwrap().extract::<u64>()
-    }
+            ctx.get_item("ret").unwrap().extract::<u64>()
+        }
 
-    fn ip_iters(&self, py: Python, constants: &PyAny) -> PyResult<u64> {
-        let ctx: &PyDict = PyDict::new(py);
-        ctx.set_item("sub_slot_iters", self.sub_slot_iters)?;
-        ctx.set_item("signage_point_index", self.signage_point_index)?;
-        ctx.set_item("required_iters", self.required_iters)?;
-        ctx.set_item("constants", constants)?;
-        py.run(
+        fn ip_iters(&self, py: Python, constants: &PyAny) -> PyResult<u64> {
+            let ctx: &PyDict = PyDict::new(py);
+            ctx.set_item("sub_slot_iters", self.sub_slot_iters)?;
+            ctx.set_item("signage_point_index", self.signage_point_index)?;
+            ctx.set_item("required_iters", self.required_iters)?;
+            ctx.set_item("constants", constants)?;
+            py.run(
             "from chia.consensus.pot_iterations import calculate_ip_iters, calculate_sp_iters\n\
             ret = calculate_ip_iters(constants, sub_slot_iters, signage_point_index, required_iters)\n",
             None,
             Some(ctx),
             )?;
-        ctx.get_item("ret").unwrap().extract::<u64>()
-    }
+            ctx.get_item("ret").unwrap().extract::<u64>()
+        }
 
-    fn sp_total_iters(&self, py: Python, constants: &PyAny) -> PyResult<u128> {
-        self.sp_sub_slot_total_iters(py, constants)?
-            .checked_add(self.sp_iters(py, constants)? as u128)
-            .ok_or(PyValueError::new_err("uint128 overflow"))
+        fn sp_total_iters(&self, py: Python, constants: &PyAny) -> PyResult<u128> {
+            self.sp_sub_slot_total_iters(py, constants)?
+                .checked_add(self.sp_iters(py, constants)? as u128)
+                .ok_or(PyValueError::new_err("uint128 overflow"))
+        }
     }
 }

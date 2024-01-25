@@ -30,18 +30,20 @@ pub enum FromClvmError {
 }
 
 #[cfg(feature = "py-bindings")]
-use pyo3::PyErr;
+mod py_bindings {
+    use super::*;
 
-#[cfg(feature = "py-bindings")]
-impl std::convert::From<ToClvmError> for PyErr {
-    fn from(err: ToClvmError) -> PyErr {
-        pyo3::exceptions::PyValueError::new_err(err.to_string())
+    use pyo3::{exceptions::PyValueError, prelude::*};
+
+    impl From<ToClvmError> for PyErr {
+        fn from(err: ToClvmError) -> PyErr {
+            PyValueError::new_err(err.to_string())
+        }
     }
-}
 
-#[cfg(feature = "py-bindings")]
-impl std::convert::From<FromClvmError> for PyErr {
-    fn from(err: FromClvmError) -> PyErr {
-        pyo3::exceptions::PyValueError::new_err(err.to_string())
+    impl From<FromClvmError> for PyErr {
+        fn from(err: FromClvmError) -> PyErr {
+            PyValueError::new_err(err.to_string())
+        }
     }
 }

@@ -1,29 +1,20 @@
-use crate::secret_key::is_all_zero;
-use crate::{DerivableKey, Error, Result};
-use blst::*;
-use chia_traits::{read_bytes, Streamable};
-use sha2::{digest::FixedOutput, Digest, Sha256};
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::mem::MaybeUninit;
 use std::ops::{Add, AddAssign, Neg, SubAssign};
 
-#[cfg(feature = "py-bindings")]
-use crate::{GTElement, Signature};
-#[cfg(feature = "py-bindings")]
-use chia_py_streamable_macro::PyStreamable;
-#[cfg(feature = "py-bindings")]
-use chia_traits::from_json_dict::FromJsonDict;
-#[cfg(feature = "py-bindings")]
-use chia_traits::to_json_dict::ToJsonDict;
-#[cfg(feature = "py-bindings")]
-use pyo3::{pyclass, pymethods, IntoPy, PyAny, PyObject, PyResult, Python};
+use blst::*;
+use chia_traits::{read_bytes, Streamable};
+use sha2::{digest::FixedOutput, Digest, Sha256};
+
+use crate::secret_key::is_all_zero;
+use crate::{DerivableKey, Error, Result};
 
 #[cfg_attr(
     feature = "py-bindings",
-    pyclass(name = "G1Element"),
-    derive(PyStreamable)
+    pyo3::pyclass(name = "G1Element"),
+    derive(chia_py_streamable_macro::PyStreamable)
 )]
 #[derive(Clone, Default)]
 pub struct PublicKey(pub(crate) blst_p1);
@@ -154,45 +145,6 @@ impl PublicKey {
     }
 }
 
-#[cfg(feature = "py-bindings")]
-#[pymethods]
-impl PublicKey {
-    #[classattr]
-    const SIZE: usize = 48;
-
-    #[new]
-    pub fn init() -> Self {
-        Self::default()
-    }
-
-    #[staticmethod]
-    #[pyo3(name = "generator")]
-    pub fn py_generator() -> Self {
-        Self::generator()
-    }
-
-    pub fn pair(&self, other: &Signature) -> GTElement {
-        other.pair(self)
-    }
-
-    #[pyo3(name = "get_fingerprint")]
-    pub fn py_get_fingerprint(&self) -> u32 {
-        self.get_fingerprint()
-    }
-
-    fn __str__(&self) -> pyo3::PyResult<String> {
-        Ok(hex::encode(self.to_bytes()))
-    }
-
-    pub fn __add__(&self, rhs: &Self) -> Self {
-        self + rhs
-    }
-
-    pub fn __iadd__(&mut self, rhs: &Self) {
-        *self += rhs;
-    }
-}
-
 impl PartialEq for PublicKey {
     fn eq(&self, other: &Self) -> bool {
         unsafe { blst_p1_is_equal(&self.0, &other.0) }
@@ -292,70 +244,6 @@ impl fmt::Debug for PublicKey {
     }
 }
 
-#[cfg(feature = "py-bindings")]
-impl ToJsonDict for PublicKey {
-    fn to_json_dict(&self, py: Python) -> pyo3::PyResult<PyObject> {
-        let bytes = self.to_bytes();
-        Ok(("0x".to_string() + &hex::encode(bytes)).into_py(py))
-    }
-}
-
-#[cfg(feature = "py-bindings")]
-pub fn parse_hex_string(o: &PyAny, len: usize, name: &str) -> PyResult<Vec<u8>> {
-    use pyo3::exceptions::{PyTypeError, PyValueError};
-    if let Ok(s) = o.extract::<String>() {
-        let s = if let Some(st) = s.strip_prefix("0x") {
-            st
-        } else {
-            &s[..]
-        };
-        let buf = match hex::decode(s) {
-            Err(_) => {
-                return Err(PyValueError::new_err("invalid hex"));
-            }
-            Ok(v) => v,
-        };
-        if buf.len() != len {
-            Err(PyValueError::new_err(format!(
-                "{}, invalid length {} expected {}",
-                name,
-                buf.len(),
-                len
-            )))
-        } else {
-            Ok(buf)
-        }
-    } else if let Ok(buf) = o.extract::<Vec<u8>>() {
-        if buf.len() != len {
-            Err(PyValueError::new_err(format!(
-                "{}, invalid length {} expected {}",
-                name,
-                buf.len(),
-                len
-            )))
-        } else {
-            Ok(buf)
-        }
-    } else {
-        Err(PyTypeError::new_err(format!(
-            "invalid input type for {}",
-            name
-        )))
-    }
-}
-
-#[cfg(feature = "py-bindings")]
-impl FromJsonDict for PublicKey {
-    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
-        Ok(Self::from_bytes(
-            parse_hex_string(o, 48, "PublicKey")?
-                .as_slice()
-                .try_into()
-                .unwrap(),
-        )?)
-    }
-}
-
 impl DerivableKey for PublicKey {
     fn derive_unhardened(&self, idx: u32) -> Self {
         let mut hasher = Sha256::new();
@@ -403,6 +291,114 @@ pub fn hash_to_g1_with_dst(msg: &[u8], dst: &[u8]) -> PublicKey {
         p1.assume_init()
     };
     PublicKey(p1)
+}
+
+#[cfg(feature = "py-bindings")]
+pub(crate) mod py_bindings {
+    use super::*;
+
+    use crate::{GTElement, Signature};
+    use chia_traits::{from_json_dict::FromJsonDict, to_json_dict::ToJsonDict};
+    use pyo3::prelude::*;
+
+    #[pymethods]
+    impl PublicKey {
+        #[classattr]
+        const SIZE: usize = 48;
+
+        #[new]
+        pub fn init() -> Self {
+            Self::default()
+        }
+
+        #[staticmethod]
+        #[pyo3(name = "generator")]
+        pub fn py_generator() -> Self {
+            Self::generator()
+        }
+
+        pub fn pair(&self, other: &Signature) -> GTElement {
+            other.pair(self)
+        }
+
+        #[pyo3(name = "get_fingerprint")]
+        pub fn py_get_fingerprint(&self) -> u32 {
+            self.get_fingerprint()
+        }
+
+        fn __str__(&self) -> pyo3::PyResult<String> {
+            Ok(hex::encode(self.to_bytes()))
+        }
+
+        pub fn __add__(&self, rhs: &Self) -> Self {
+            self + rhs
+        }
+
+        pub fn __iadd__(&mut self, rhs: &Self) {
+            *self += rhs;
+        }
+    }
+
+    impl ToJsonDict for PublicKey {
+        fn to_json_dict(&self, py: Python) -> pyo3::PyResult<PyObject> {
+            let bytes = self.to_bytes();
+            Ok(("0x".to_string() + &hex::encode(bytes)).into_py(py))
+        }
+    }
+
+    pub fn parse_hex_string(o: &PyAny, len: usize, name: &str) -> PyResult<Vec<u8>> {
+        use pyo3::exceptions::{PyTypeError, PyValueError};
+        if let Ok(s) = o.extract::<String>() {
+            let s = if let Some(st) = s.strip_prefix("0x") {
+                st
+            } else {
+                &s[..]
+            };
+            let buf = match hex::decode(s) {
+                Err(_) => {
+                    return Err(PyValueError::new_err("invalid hex"));
+                }
+                Ok(v) => v,
+            };
+            if buf.len() != len {
+                Err(PyValueError::new_err(format!(
+                    "{}, invalid length {} expected {}",
+                    name,
+                    buf.len(),
+                    len
+                )))
+            } else {
+                Ok(buf)
+            }
+        } else if let Ok(buf) = o.extract::<Vec<u8>>() {
+            if buf.len() != len {
+                Err(PyValueError::new_err(format!(
+                    "{}, invalid length {} expected {}",
+                    name,
+                    buf.len(),
+                    len
+                )))
+            } else {
+                Ok(buf)
+            }
+        } else {
+            Err(PyTypeError::new_err(format!(
+                "invalid input type for {}",
+                name
+            )))
+        }
+    }
+
+    impl FromJsonDict for PublicKey {
+        fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+            Ok(Self::from_bytes(
+                parse_hex_string(o, 48, "PublicKey")?
+                    .as_slice()
+                    .try_into()
+                    .unwrap(),
+            )?)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -726,6 +722,8 @@ mod tests {
 mod pytests {
     use super::*;
     use crate::SecretKey;
+
+    use pyo3::prelude::*;
     use rand::rngs::StdRng;
     use rand::{Rng, SeedableRng};
     use rstest::rstest;

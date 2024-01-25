@@ -1,31 +1,20 @@
-use crate::{DerivableKey, Error, PublicKey, Result};
-use blst::*;
-use chia_traits::{read_bytes, Streamable};
-use hkdf::HkdfExtract;
-use sha2::{Digest, Sha256};
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::mem::MaybeUninit;
 use std::ops::{Add, AddAssign};
 
-#[cfg(feature = "py-bindings")]
-use crate::public_key::parse_hex_string;
-#[cfg(feature = "py-bindings")]
-use crate::Signature;
-#[cfg(feature = "py-bindings")]
-use chia_py_streamable_macro::PyStreamable;
-#[cfg(feature = "py-bindings")]
-use chia_traits::from_json_dict::FromJsonDict;
-#[cfg(feature = "py-bindings")]
-use chia_traits::to_json_dict::ToJsonDict;
-#[cfg(feature = "py-bindings")]
-use pyo3::{pyclass, pymethods, IntoPy, PyAny, PyObject, PyResult, Python};
+use blst::*;
+use chia_traits::{read_bytes, Streamable};
+use hkdf::HkdfExtract;
+use sha2::{Digest, Sha256};
+
+use crate::{DerivableKey, Error, PublicKey, Result};
 
 #[cfg_attr(
     feature = "py-bindings",
-    pyclass(frozen, name = "PrivateKey"),
-    derive(PyStreamable)
+    pyo3::pyclass(frozen, name = "PrivateKey"),
+    derive(chia_py_streamable_macro::PyStreamable)
 )]
 #[derive(PartialEq, Eq, Clone)]
 pub struct SecretKey(pub(crate) blst_scalar);
@@ -222,26 +211,6 @@ impl fmt::Debug for SecretKey {
     }
 }
 
-#[cfg(feature = "py-bindings")]
-impl ToJsonDict for SecretKey {
-    fn to_json_dict(&self, py: Python) -> pyo3::PyResult<PyObject> {
-        let bytes = self.to_bytes();
-        Ok(("0x".to_string() + &hex::encode(bytes)).into_py(py))
-    }
-}
-
-#[cfg(feature = "py-bindings")]
-impl FromJsonDict for SecretKey {
-    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
-        Ok(Self::from_bytes(
-            parse_hex_string(o, 32, "PrivateKey")?
-                .as_slice()
-                .try_into()
-                .unwrap(),
-        )?)
-    }
-}
-
 impl DerivableKey for SecretKey {
     fn derive_unhardened(&self, idx: u32) -> Self {
         let pk = self.public_key();
@@ -265,21 +234,50 @@ impl DerivableKey for SecretKey {
 }
 
 #[cfg(feature = "py-bindings")]
-#[pymethods]
-impl SecretKey {
-    #[classattr]
-    const PRIVATE_KEY_SIZE: usize = 32;
+mod py_bindings {
+    use crate::public_key::py_bindings::parse_hex_string;
+    use crate::Signature;
 
-    pub fn sign_g2(&self, msg: &[u8]) -> Signature {
-        crate::sign(self, msg)
+    use super::*;
+
+    use chia_traits::from_json_dict::FromJsonDict;
+    use chia_traits::to_json_dict::ToJsonDict;
+    use pyo3::prelude::*;
+
+    impl ToJsonDict for SecretKey {
+        fn to_json_dict(&self, py: Python) -> pyo3::PyResult<PyObject> {
+            let bytes = self.to_bytes();
+            Ok(("0x".to_string() + &hex::encode(bytes)).into_py(py))
+        }
     }
 
-    pub fn get_g1(&self) -> PublicKey {
-        self.public_key()
+    impl FromJsonDict for SecretKey {
+        fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+            Ok(Self::from_bytes(
+                parse_hex_string(o, 32, "PrivateKey")?
+                    .as_slice()
+                    .try_into()
+                    .unwrap(),
+            )?)
+        }
     }
 
-    fn __str__(&self) -> pyo3::PyResult<String> {
-        Ok(hex::encode(self.to_bytes()))
+    #[pymethods]
+    impl SecretKey {
+        #[classattr]
+        const PRIVATE_KEY_SIZE: usize = 32;
+
+        pub fn sign_g2(&self, msg: &[u8]) -> Signature {
+            crate::sign(self, msg)
+        }
+
+        pub fn get_g1(&self) -> PublicKey {
+            self.public_key()
+        }
+
+        fn __str__(&self) -> pyo3::PyResult<String> {
+            Ok(hex::encode(self.to_bytes()))
+        }
     }
 }
 
@@ -287,8 +285,7 @@ impl SecretKey {
 mod tests {
     use super::*;
     use hex::FromHex;
-    use rand::rngs::StdRng;
-    use rand::{Rng, SeedableRng};
+    use rand::{rngs::StdRng, Rng, SeedableRng};
 
     #[test]
     fn test_make_key() {
@@ -512,8 +509,9 @@ mod tests {
 #[cfg(feature = "py-bindings")]
 mod pytests {
     use super::*;
-    use rand::rngs::StdRng;
-    use rand::{Rng, SeedableRng};
+
+    use pyo3::prelude::*;
+    use rand::{rngs::StdRng, Rng, SeedableRng};
     use rstest::rstest;
 
     #[test]
