@@ -79,16 +79,16 @@ def rust_type_to_python(t: str) -> str:
         .replace("Vec", "List")
         .replace("Option", "Optional")
         .replace("Bytes", "bytes")
-        .replace("u8", "int")
-        .replace("u16", "int")
-        .replace("u32", "int")
-        .replace("u64", "int")
-        .replace("u128", "int")
-        .replace("i8", "int")
-        .replace("i16", "int")
-        .replace("i32", "int")
-        .replace("i64", "int")
-        .replace("i128", "int")
+        .replace("u8", "uint8")
+        .replace("u16", "uint16")
+        .replace("u32", "uint32")
+        .replace("u64", "uint64")
+        .replace("u128", "uint128")
+        .replace("i8", "int8")
+        .replace("i16", "int16")
+        .replace("i32", "int32")
+        .replace("i64", "int64")
+        .replace("i128", "int128")
         .strip()
     )
     if ret in enums:
@@ -165,15 +165,15 @@ extra_members = {
         "prev_header_hash: bytes32",
         "partial_hash: bytes32",
         "def is_transaction_block(self) -> bool: ...",
-        "total_iters: int",
+        "total_iters: uint128",
     ],
     "FullBlock": [
         "prev_header_hash: bytes32",
         "header_hash: bytes32",
         "def is_transaction_block(self) -> bool: ...",
-        "total_iters: int",
-        "height: int",
-        "weight: int",
+        "total_iters: uint128",
+        "height: uint32",
+        "weight: uint128",
         "def get_included_reward_coins(self) -> List[Coin]: ...",
         "def is_fully_compactified(self) -> bool: ...",
     ],
@@ -181,10 +181,10 @@ extra_members = {
         "prev_header_hash: bytes32",
         "prev_hash: bytes32",
         "header_hash: bytes32",
-        "height: int",
-        "weight: int",
+        "height: uint32",
+        "weight: uint128",
         "header_hash: bytes32",
-        "total_iters: int",
+        "total_iters: uint128",
         "log_string: str",
         "is_transaction_block: bool",
         "first_in_sub_slot: bool",
@@ -242,6 +242,7 @@ with open(output_file, "w") as f:
 
 from typing import List, Optional, Sequence, Tuple
 from chia.types.blockchain_format.sized_bytes import bytes32
+from chia.util.ints import uint8, uint16, uint32, uint64, uint128, int8, int16, int32, int64, int128
 from chia.types.blockchain_format.program import Program as ChiaProgram
 from chia.consensus.constants import ConsensusConstants
 

@@ -94,14 +94,14 @@ impl HeaderBlock {
 
     #[getter]
     #[pyo3(name = "height")]
-    fn py_height(&self) -> u32 {
-        self.height()
+    fn py_height<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
+        crate::int::py_int(py, "uint32", self.height())
     }
 
     #[getter]
     #[pyo3(name = "weight")]
-    fn py_weight(&self) -> u128 {
-        self.weight()
+    fn py_weight<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
+        crate::int::py_int(py, "uint128", self.weight())
     }
 
     #[getter]
@@ -112,8 +112,8 @@ impl HeaderBlock {
 
     #[getter]
     #[pyo3(name = "total_iters")]
-    fn py_total_iters(&self) -> u128 {
-        self.total_iters()
+    fn py_total_iters<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
+        crate::int::py_int(py, "uint128", self.total_iters())
     }
 
     #[getter]

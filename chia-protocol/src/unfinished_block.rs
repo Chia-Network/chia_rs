@@ -65,7 +65,7 @@ impl UnfinishedBlock {
 
     #[getter]
     #[pyo3(name = "total_iters")]
-    fn py_total_iters(&self) -> u128 {
-        self.total_iters()
+    fn py_total_iters<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
+        crate::int::py_int(py, "uint128", self.total_iters())
     }
 }

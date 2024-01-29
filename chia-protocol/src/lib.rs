@@ -26,6 +26,8 @@ pub mod wallet_protocol;
 pub mod weight_proof;
 
 #[cfg(feature = "py-bindings")]
+pub mod int;
+#[cfg(feature = "py-bindings")]
 pub mod lazy_node;
 
 // export shorter names
@@ -55,5 +57,7 @@ pub use crate::vdf::*;
 pub use crate::wallet_protocol::*;
 pub use crate::weight_proof::*;
 
+#[cfg(feature = "py-bindings")]
+pub use crate::int::*;
 #[cfg(feature = "py-bindings")]
 pub use crate::lazy_node::*;
