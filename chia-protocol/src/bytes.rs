@@ -8,7 +8,7 @@ use std::io::Cursor;
 use std::ops::Deref;
 
 #[cfg(feature = "py-bindings")]
-use chia_traits::{FromJsonDict, ToJsonDict};
+use chia_traits::{ChiaToPython, FromJsonDict, ToJsonDict};
 #[cfg(feature = "py-bindings")]
 use hex::FromHex;
 #[cfg(feature = "py-bindings")]
@@ -357,6 +357,13 @@ impl<const N: usize> IntoPy<PyObject> for BytesImpl<N> {
 }
 
 #[cfg(feature = "py-bindings")]
+impl<const N: usize> ChiaToPython for BytesImpl<N> {
+    fn to_python<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
+        Ok(PyBytes::new(py, &self.0).into())
+    }
+}
+
+#[cfg(feature = "py-bindings")]
 impl<'py, const N: usize> FromPyObject<'py> for BytesImpl<N> {
     fn extract(obj: &'py PyAny) -> PyResult<Self> {
         let b = <PyBytes as PyTryFrom>::try_from(obj)?;
@@ -377,6 +384,13 @@ impl ToPyObject for Bytes {
 impl IntoPy<PyObject> for Bytes {
     fn into_py(self, py: Python) -> PyObject {
         PyBytes::new(py, &self.0).into()
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+impl ChiaToPython for Bytes {
+    fn to_python<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
+        Ok(PyBytes::new(py, &self.0).into())
     }
 }
 

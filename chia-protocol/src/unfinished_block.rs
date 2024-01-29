@@ -9,9 +9,6 @@ use crate::VDFProof;
 use crate::{Foliage, FoliageTransactionBlock, TransactionsInfo};
 use chia_traits::Streamable;
 
-#[cfg(feature = "py-bindings")]
-use pyo3::prelude::*;
-
 streamable_struct! (UnfinishedBlock {
     // Full block, without the final VDFs
     finished_sub_slots: Vec<EndOfSubSlotBundle>,  // If first sb
@@ -44,6 +41,11 @@ impl UnfinishedBlock {
 }
 
 #[cfg(feature = "py-bindings")]
+use chia_traits::ChiaToPython;
+#[cfg(feature = "py-bindings")]
+use pyo3::prelude::*;
+
+#[cfg(feature = "py-bindings")]
 #[pymethods]
 impl UnfinishedBlock {
     #[getter]
@@ -65,7 +67,7 @@ impl UnfinishedBlock {
 
     #[getter]
     #[pyo3(name = "total_iters")]
-    fn py_total_iters(&self) -> u128 {
-        self.total_iters()
+    fn py_total_iters<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
+        ChiaToPython::to_python(&self.total_iters(), py)
     }
 }

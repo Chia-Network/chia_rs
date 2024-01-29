@@ -10,9 +10,6 @@ use crate::VDFProof;
 use crate::{Foliage, FoliageTransactionBlock, TransactionsInfo};
 use chia_traits::Streamable;
 
-#[cfg(feature = "py-bindings")]
-use pyo3::prelude::*;
-
 streamable_struct! (FullBlock {
     finished_sub_slots: Vec<EndOfSubSlotBundle>,
     reward_chain_block: RewardChainBlock,
@@ -89,6 +86,11 @@ impl FullBlock {
 }
 
 #[cfg(feature = "py-bindings")]
+use chia_traits::ChiaToPython;
+#[cfg(feature = "py-bindings")]
+use pyo3::prelude::*;
+
+#[cfg(feature = "py-bindings")]
 #[pymethods]
 impl FullBlock {
     #[getter]
@@ -110,20 +112,20 @@ impl FullBlock {
 
     #[getter]
     #[pyo3(name = "total_iters")]
-    fn py_total_iters(&self) -> u128 {
-        self.total_iters()
+    fn py_total_iters<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
+        ChiaToPython::to_python(&self.total_iters(), py)
     }
 
     #[getter]
     #[pyo3(name = "height")]
-    fn py_height(&self) -> u32 {
-        self.height()
+    fn py_height<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
+        ChiaToPython::to_python(&self.height(), py)
     }
 
     #[getter]
     #[pyo3(name = "weight")]
-    fn py_weight(&self) -> u128 {
-        self.weight()
+    fn py_weight<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
+        ChiaToPython::to_python(&self.weight(), py)
     }
 
     #[pyo3(name = "get_included_reward_coins")]

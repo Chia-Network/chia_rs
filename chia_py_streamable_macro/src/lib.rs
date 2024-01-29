@@ -72,6 +72,12 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 Ok(std::hash::Hasher::finish(&hasher) as isize)
             }
         }
+
+        impl #crate_name::ChiaToPython for #ident {
+            fn to_python<'a>(&self, py: pyo3::Python<'a>) -> pyo3::PyResult<&'a pyo3::PyAny> {
+                Ok(pyo3::IntoPy::into_py(self.clone(), py).into_ref(py))
+            }
+        }
     };
 
     match fields {
@@ -291,4 +297,48 @@ pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenSt
     }
 
     py_protocol.into()
+}
+
+#[proc_macro_derive(PyGetters)]
+pub fn py_getters_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let DeriveInput { ident, data, .. } = parse_macro_input!(input);
+
+    let syn::Data::Struct(s) = data else {
+        panic!("python binding only support struct");
+    };
+
+    let syn::Fields::Named(FieldsNamed { named, .. }) = s.fields else {
+        panic!("python binding only support struct");
+    };
+
+    let found_crate = crate_name("chia-traits").expect("chia-traits is present in `Cargo.toml`");
+
+    let crate_name = match found_crate {
+        FoundCrate::Itself => quote!(crate),
+        FoundCrate::Name(name) => {
+            let ident = Ident::new(&name, Span::call_site());
+            quote!(#ident)
+        }
+    };
+
+    let mut fnames = Vec::<syn::Ident>::new();
+    let mut ftypes = Vec::<syn::Type>::new();
+    for f in named.into_iter() {
+        fnames.push(f.ident.unwrap());
+        ftypes.push(f.ty);
+    }
+
+    let ret = quote! {
+        #[pyo3::pymethods]
+        impl #ident {
+            #(
+            #[getter]
+            fn #fnames<'a> (&self, py: pyo3::Python<'a>) -> pyo3::PyResult<&'a pyo3::PyAny> {
+                #crate_name::ChiaToPython::to_python(&self.#fnames, py)
+            }
+            )*
+        }
+    };
+
+    ret.into()
 }

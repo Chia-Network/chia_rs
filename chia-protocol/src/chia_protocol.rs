@@ -123,6 +123,13 @@ pub enum ProtocolMessageTypes {
     RespondFeeEstimates = 90,
 }
 
+#[cfg(feature = "py-bindings")]
+impl chia_traits::ChiaToPython for ProtocolMessageTypes {
+    fn to_python<'a>(&self, py: pyo3::Python<'a>) -> pyo3::PyResult<&'a pyo3::PyAny> {
+        Ok(pyo3::IntoPy::into_py(*self, py).into_ref(py))
+    }
+}
+
 pub trait ChiaProtocolMessage {
     fn msg_type() -> ProtocolMessageTypes;
 }
@@ -139,6 +146,13 @@ pub enum NodeType {
     Introducer = 5,
     Wallet = 6,
     DataLayer = 7,
+}
+
+#[cfg(feature = "py-bindings")]
+impl chia_traits::ChiaToPython for NodeType {
+    fn to_python<'a>(&self, py: pyo3::Python<'a>) -> pyo3::PyResult<&'a pyo3::PyAny> {
+        Ok(pyo3::IntoPy::into_py(*self, py).into_ref(py))
+    }
 }
 
 streamable_struct! (Message {

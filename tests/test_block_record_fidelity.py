@@ -76,7 +76,7 @@ def get_block_record(rng: Random) -> BlockRecord:
     deficit = get_u8(rng)
     overflow = get_bool(rng)
     prev_tx_height = get_u32(rng)
-    timestamp = 123456789
+    timestamp = uint64(123456789)
     prev_tx_hash = get_optional(rng, get_hash)
     fees = get_optional(rng, get_u64)
 
