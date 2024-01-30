@@ -1,3 +1,4 @@
+use crate::streamable_struct;
 use crate::bytes::Bytes32;
 use chia_streamable_macro::Streamable;
 use clvm_traits::{clvm_list, destructure_list, match_list, FromClvm, ToClvm};
@@ -9,8 +10,7 @@ use std::convert::TryInto;
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
 
-//*
-crate::streamable_struct!(Coin {
+streamable_struct!(Coin {
     parent_coin_info: Bytes32,
     puzzle_hash: Bytes32,
     amount: u64,
