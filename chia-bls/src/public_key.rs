@@ -22,7 +22,7 @@ use chia_traits::to_json_dict::ToJsonDict;
 #[cfg(feature = "py-bindings")]
 use pyo3::{pyclass, pymethods, IntoPy, PyAny, PyObject, PyResult, Python};
 
-#[wasm_patch::with_wasm]
+#[cfg_attr(target_arch = "wasm32", wasm_patch::with_wasm)]
 #[cfg_attr(
     feature = "py-bindings",
     pyclass(name = "G1Element"),

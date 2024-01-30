@@ -39,7 +39,7 @@ from_json_primitive!(u32);
 from_json_primitive!(i32);
 from_json_primitive!(u64);
 from_json_primitive!(i64);
-from_json_primitive!(u64);
+from_json_primitive!(u128);
 from_json_primitive!(i128);
 from_json_primitive!(String);
 

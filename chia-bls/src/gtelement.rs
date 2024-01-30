@@ -19,7 +19,7 @@ use pyo3::exceptions::PyValueError;
 #[cfg(feature = "py-bindings")]
 use pyo3::{pyclass, pymethods, IntoPy, PyAny, PyObject, PyResult, Python};
 
-#[wasm_patch::with_wasm]
+#[cfg_attr(target_arch = "wasm32", wasm_patch::with_wasm)]
 #[cfg_attr(feature = "py-bindings", pyclass, derive(PyStreamable, Clone))]
 pub struct GTElement(pub(crate) blst_fp12);
 

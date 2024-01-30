@@ -7,7 +7,7 @@ use crate::Bytes;
 #[cfg(feature = "py-bindings")]
 use chia_py_streamable_macro::{PyJsonDict, PyStreamable};
 
-#[wasm_patch::with_wasm]
+#[cfg_attr(target_arch = "wasm32", wasm_patch::with_wasm)]
 #[repr(u8)]
 #[cfg_attr(feature = "py-bindings", derive(PyJsonDict, PyStreamable))]
 #[cfg_attr(fuzzing, derive(arbitrary::Arbitrary))]
@@ -128,7 +128,7 @@ pub trait ChiaProtocolMessage {
     fn msg_type() -> ProtocolMessageTypes;
 }
 
-#[wasm_patch::with_wasm]
+#[cfg_attr(target_arch = "wasm32", wasm_patch::with_wasm)]
 #[repr(u8)]
 #[cfg_attr(feature = "py-bindings", derive(PyJsonDict, PyStreamable))]
 #[cfg_attr(fuzzing, derive(arbitrary::Arbitrary))]

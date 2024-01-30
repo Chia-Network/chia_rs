@@ -12,7 +12,9 @@ use std::fmt::Debug;
 use std::io::Cursor;
 use std::ops::Deref;
 
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
+#[cfg(target_arch = "wasm32")]
 use paste::paste;
 
 #[cfg(feature = "py-bindings")]
@@ -191,11 +193,11 @@ impl fmt::Display for Bytes {
 #[cfg_attr(fuzzing, derive(arbitrary::Arbitrary))]
 pub struct BytesImpl<const N: usize>([u8; N]);
 
+#[cfg(target_arch = "wasm32")]
 macro_rules! generate_bytes_n {
     ($($N:expr),+) => {
         paste! {
             $(
-                #[cfg(target_arch = "wasm32")]
                 #[wasm_bindgen]
                 #[derive(Hash, PartialEq, Eq, Copy, Clone, PartialOrd, Ord)]
                 #[cfg_attr(fuzzing, derive(arbitrary::Arbitrary))]
@@ -204,6 +206,7 @@ macro_rules! generate_bytes_n {
         }
     };
 }
+#[cfg(target_arch = "wasm32")]
 generate_bytes_n!(32, 48, 96, 100);
 
 impl<const N: usize> Streamable for BytesImpl<N> {
@@ -220,11 +223,11 @@ impl<const N: usize> Streamable for BytesImpl<N> {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 macro_rules! impl_streamable_for_bytes_n {
     ($($N:expr),+) => {
         paste! {
             $(
-                #[cfg(target_arch = "wasm32")]
                 impl Streamable for [<Bytes $N>] {
                     fn update_digest(&self, digest: &mut Sha256) {
                         digest.update(self.0);
@@ -242,6 +245,7 @@ macro_rules! impl_streamable_for_bytes_n {
         }
     };
 }
+#[cfg(target_arch = "wasm32")]
 impl_streamable_for_bytes_n!(32, 48, 96, 100);
 
 impl<const N: usize> ToClvm for BytesImpl<N> {
@@ -250,11 +254,11 @@ impl<const N: usize> ToClvm for BytesImpl<N> {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 macro_rules! impl_to_clvm_for_bytes_n {
     ($($N:expr),+) => {
         paste! {
             $(
-                #[cfg(target_arch = "wasm32")]
                 impl ToClvm for [<Bytes $N>] {
                     fn to_clvm(&self, a: &mut Allocator) -> clvm_traits::Result<NodePtr> {
                         Ok(a.new_atom(self.0.as_slice())?)
@@ -264,6 +268,7 @@ macro_rules! impl_to_clvm_for_bytes_n {
         }
     };
 }
+#[cfg(target_arch = "wasm32")]
 impl_to_clvm_for_bytes_n!(32, 48, 96, 100);
 
 impl<const N: usize> FromClvm for BytesImpl<N> {
@@ -283,11 +288,11 @@ impl<const N: usize> FromClvm for BytesImpl<N> {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 macro_rules! impl_from_clvm_for_bytes_n {
     ($($N:expr),+) => {
         paste! {
             $(
-                #[cfg(target_arch = "wasm32")]
                 impl FromClvm for [<Bytes $N>] {
                     fn from_clvm(a: &Allocator, ptr: NodePtr) -> clvm_traits::Result<Self> {
                         let blob = match a.sexp(ptr) {
@@ -308,6 +313,7 @@ macro_rules! impl_from_clvm_for_bytes_n {
         }
     };
 }
+#[cfg(target_arch = "wasm32")]
 impl_from_clvm_for_bytes_n!(32, 48, 96, 100);
 
 impl<const N: usize> From<[u8; N]> for BytesImpl<N> {
@@ -316,11 +322,11 @@ impl<const N: usize> From<[u8; N]> for BytesImpl<N> {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 macro_rules! impl_from_u8n_for_bytes_n {
     ($($N:expr),+) => {
         paste! {
             $(
-                #[cfg(target_arch = "wasm32")]
                 impl From<[u8; $N]> for [<Bytes $N>] {
                     fn from(v: [u8; $N]) -> [<Bytes $N>] {
                         [<Bytes $N>](v)
@@ -330,6 +336,7 @@ macro_rules! impl_from_u8n_for_bytes_n {
         }
     };
 }
+#[cfg(target_arch = "wasm32")]
 impl_from_u8n_for_bytes_n!(32, 48, 96, 100);
 
 impl<const N: usize> From<&[u8; N]> for BytesImpl<N> {
@@ -338,11 +345,11 @@ impl<const N: usize> From<&[u8; N]> for BytesImpl<N> {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 macro_rules! impl_from_ref_u8n_for_bytes_n {
     ($($N:expr),+) => {
         paste! {
             $(
-                #[cfg(target_arch = "wasm32")]
                 impl From<&[u8; $N]> for [<Bytes $N>] {
                     fn from(v: &[u8; $N]) -> [<Bytes $N>] {
                         [<Bytes $N>](*v)
@@ -352,6 +359,7 @@ macro_rules! impl_from_ref_u8n_for_bytes_n {
         }
     };
 }
+#[cfg(target_arch = "wasm32")]
 impl_from_ref_u8n_for_bytes_n!(32, 48, 96, 100);
 
 impl<const N: usize> From<&[u8]> for BytesImpl<N> {
@@ -365,11 +373,11 @@ impl<const N: usize> From<&[u8]> for BytesImpl<N> {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 macro_rules! impl_from_ref_u8_for_bytes_n {
     ($($N:expr),+) => {
         paste! {
             $(
-                #[cfg(target_arch = "wasm32")]
                 impl From<&[u8]> for [<Bytes $N>] {
                     fn from(v: &[u8]) -> [<Bytes $N>] {
                         if v.len() != $N {
@@ -384,6 +392,7 @@ macro_rules! impl_from_ref_u8_for_bytes_n {
         }
     };
 }
+#[cfg(target_arch = "wasm32")]
 impl_from_ref_u8_for_bytes_n!(32, 48, 96, 100);
 
 impl<const N: usize> From<&Vec<u8>> for BytesImpl<N> {
@@ -397,11 +406,11 @@ impl<const N: usize> From<&Vec<u8>> for BytesImpl<N> {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 macro_rules! impl_from_ref_vec_u8_for_bytes_n {
     ($($N:expr),+) => {
         paste! {
             $(
-                #[cfg(target_arch = "wasm32")]
                 impl From<&Vec<u8>> for [<Bytes $N>] {
                     fn from(v: &Vec<u8>) -> [<Bytes $N>] {
                         if v.len() != $N {
@@ -416,6 +425,7 @@ macro_rules! impl_from_ref_vec_u8_for_bytes_n {
         }
     };
 }
+#[cfg(target_arch = "wasm32")]
 impl_from_ref_vec_u8_for_bytes_n!(32, 48, 96, 100);
 
 impl<'a, const N: usize> From<&'a BytesImpl<N>> for &'a [u8; N] {
@@ -424,11 +434,11 @@ impl<'a, const N: usize> From<&'a BytesImpl<N>> for &'a [u8; N] {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 macro_rules! impl_from_a_bytes_u8_for_a_u8n {
     ($($N:expr),+) => {
         paste! {
             $(
-                #[cfg(target_arch = "wasm32")]
                 impl<'a> From<&'a [<Bytes $N>]> for &'a [u8; $N] {
                     fn from(v: &'a [<Bytes $N>]) -> &'a [u8; $N] {
                         &v.0
@@ -438,6 +448,7 @@ macro_rules! impl_from_a_bytes_u8_for_a_u8n {
         }
     };
 }
+#[cfg(target_arch = "wasm32")]
 impl_from_a_bytes_u8_for_a_u8n!(32, 48, 96, 100);
 
 impl<const N: usize> From<&BytesImpl<N>> for [u8; N] {
@@ -446,11 +457,11 @@ impl<const N: usize> From<&BytesImpl<N>> for [u8; N] {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 macro_rules! impl_from_ref_bytes_n_for_u8n {
     ($($N:expr),+) => {
         paste! {
             $(
-                #[cfg(target_arch = "wasm32")]
                 impl From<&[<Bytes $N>]> for [u8; $N] {
                     fn from(v: &[<Bytes $N>]) -> [u8; $N] {
                         v.0
@@ -460,6 +471,7 @@ macro_rules! impl_from_ref_bytes_n_for_u8n {
         }
     };
 }
+#[cfg(target_arch = "wasm32")]
 impl_from_ref_bytes_n_for_u8n!(32, 48, 96, 100);
 
 impl<'a, const N: usize> From<&'a BytesImpl<N>> for &'a [u8] {
@@ -467,11 +479,11 @@ impl<'a, const N: usize> From<&'a BytesImpl<N>> for &'a [u8] {
         &v.0
     }
 }
+#[cfg(target_arch = "wasm32")]
 macro_rules! impl_from_a_bytes_n_for_a_u8 {
     ($($N:expr),+) => {
         paste! {
             $(
-                #[cfg(target_arch = "wasm32")]
                 impl<'a> From<&'a [<Bytes $N>]> for &'a [u8] {
                     fn from(v: &'a [<Bytes $N>]) -> &'a [u8] {
                         &v.0
@@ -481,6 +493,7 @@ macro_rules! impl_from_a_bytes_n_for_a_u8 {
         }
     };
 }
+#[cfg(target_arch = "wasm32")]
 impl_from_a_bytes_n_for_a_u8!(32, 48, 96, 100);
 
 impl<const N: usize> BytesImpl<N> {
@@ -488,11 +501,11 @@ impl<const N: usize> BytesImpl<N> {
         self.0.to_vec()
     }
 }
+#[cfg(target_arch = "wasm32")]
 macro_rules! impl_bytes_n {
     ($($N:expr),+) => {
         paste! {
             $(
-                #[cfg(target_arch = "wasm32")]
                 impl [<Bytes $N>] {
                     pub fn to_vec(&self) -> Vec<u8> {
                         self.0.to_vec()
@@ -502,6 +515,7 @@ macro_rules! impl_bytes_n {
         }
     };
 }
+#[cfg(target_arch = "wasm32")]
 impl_bytes_n!(32, 48, 96, 100);
 
 impl<const N: usize> AsRef<[u8]> for BytesImpl<N> {
@@ -510,11 +524,11 @@ impl<const N: usize> AsRef<[u8]> for BytesImpl<N> {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 macro_rules! impl_as_ref_for_bytes_n {
     ($($N:expr),+) => {
         paste! {
             $(
-                #[cfg(target_arch = "wasm32")]
                 impl AsRef<[u8]> for [<Bytes $N>] {
                     fn as_ref(&self) -> &[u8] { &self.0 }
                 }
@@ -522,6 +536,7 @@ macro_rules! impl_as_ref_for_bytes_n {
         }
     };
 }
+#[cfg(target_arch = "wasm32")]
 impl_as_ref_for_bytes_n!(32, 48, 96, 100);
 
 impl<const N: usize> Deref for BytesImpl<N> {
@@ -531,11 +546,11 @@ impl<const N: usize> Deref for BytesImpl<N> {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 macro_rules! impl_deref_for_bytes_n {
     ($($N:expr),+) => {
         paste! {
             $(
-                #[cfg(target_arch = "wasm32")]
                 impl Deref for [<Bytes $N>] {
                     type Target = [u8];
                     fn deref(&self) -> &[u8] { &self.0 }
@@ -544,6 +559,7 @@ macro_rules! impl_deref_for_bytes_n {
         }
     };
 }
+#[cfg(target_arch = "wasm32")]
 impl_deref_for_bytes_n!(32, 48, 96, 100);
 
 impl<const N: usize> Debug for BytesImpl<N> {
@@ -552,11 +568,11 @@ impl<const N: usize> Debug for BytesImpl<N> {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 macro_rules! impl_debug_for_bytes_n {
     ($($N:expr),+) => {
         paste! {
             $(
-                #[cfg(target_arch = "wasm32")]
                 impl Debug for [<Bytes $N>] {
                     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
                         formatter.write_str(&hex::encode(self.0))
@@ -566,6 +582,7 @@ macro_rules! impl_debug_for_bytes_n {
         }
     };
 }
+#[cfg(target_arch = "wasm32")]
 impl_debug_for_bytes_n!(32, 48, 96, 100);
 
 impl<const N: usize> fmt::Display for BytesImpl<N> {
@@ -574,11 +591,11 @@ impl<const N: usize> fmt::Display for BytesImpl<N> {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 macro_rules! impl_display_for_bytes_n {
     ($($N:expr),+) => {
         paste! {
             $(
-                #[cfg(target_arch = "wasm32")]
                 impl fmt::Display for [<Bytes $N>] {
                     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                         formatter.write_str(&hex::encode(self.0))
@@ -588,6 +605,7 @@ macro_rules! impl_display_for_bytes_n {
         }
     };
 }
+#[cfg(target_arch = "wasm32")]
 impl_display_for_bytes_n!(32, 48, 96, 100);
 
 impl<const N: usize> PartialEq<&[u8]> for BytesImpl<N> {
@@ -596,11 +614,11 @@ impl<const N: usize> PartialEq<&[u8]> for BytesImpl<N> {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 macro_rules! impl_partial_eq_for_ref_bytes_n {
     ($($N:expr),+) => {
         paste! {
             $(
-                #[cfg(target_arch = "wasm32")]
                 impl PartialEq<&[u8]> for [<Bytes $N>] {
                     fn eq(&self, lhs: &&[u8]) -> bool { self.0 == *lhs }
                 }
@@ -608,6 +626,7 @@ macro_rules! impl_partial_eq_for_ref_bytes_n {
         }
     };
 }
+#[cfg(target_arch = "wasm32")]
 impl_partial_eq_for_ref_bytes_n!(32, 48, 96, 100);
 
 impl<const N: usize> PartialEq<BytesImpl<N>> for &[u8] {
@@ -616,11 +635,11 @@ impl<const N: usize> PartialEq<BytesImpl<N>> for &[u8] {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 macro_rules! impl_partial_eq_for_ref_u8 {
     ($($N:expr),+) => {
         paste! {
             $(
-                #[cfg(target_arch = "wasm32")]
                 impl PartialEq<[<Bytes $N>]> for &[u8] {
                     fn eq(&self, lhs: &[<Bytes $N>]) -> bool { self == &lhs.0 }
                 }
@@ -628,6 +647,7 @@ macro_rules! impl_partial_eq_for_ref_u8 {
         }
     };
 }
+#[cfg(target_arch = "wasm32")]
 impl_partial_eq_for_ref_u8!(32, 48, 96, 100);
 
 impl<const N: usize> PartialEq<&[u8; N]> for BytesImpl<N> {
@@ -636,11 +656,11 @@ impl<const N: usize> PartialEq<&[u8; N]> for BytesImpl<N> {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 macro_rules! impl_partial_eq_ref_u8n_for_bytes_n {
     ($($N:expr),+) => {
         paste! {
             $(
-                #[cfg(target_arch = "wasm32")]
                 impl PartialEq<&[u8; $N]> for [<Bytes $N>] {
                     fn eq(&self, lhs: &&[u8; $N]) -> bool { &self.0 == *lhs }
                 }
@@ -648,6 +668,7 @@ macro_rules! impl_partial_eq_ref_u8n_for_bytes_n {
         }
     };
 }
+#[cfg(target_arch = "wasm32")]
 impl_partial_eq_ref_u8n_for_bytes_n!(32, 48, 96, 100);
 
 impl<const N: usize> PartialEq<BytesImpl<N>> for &[u8; N] {
@@ -656,11 +677,11 @@ impl<const N: usize> PartialEq<BytesImpl<N>> for &[u8; N] {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 macro_rules! impl_partial_eq_bytes_n_for_ref_u8n {
     ($($N:expr),+) => {
         paste! {
             $(
-                #[cfg(target_arch = "wasm32")]
                 impl PartialEq<[<Bytes $N>]> for &[u8; $N] {
                     fn eq(&self, lhs: &[<Bytes $N>]) -> bool { *self == &lhs.0 }
                 }
@@ -668,6 +689,7 @@ macro_rules! impl_partial_eq_bytes_n_for_ref_u8n {
         }
     };
 }
+#[cfg(target_arch = "wasm32")]
 impl_partial_eq_bytes_n_for_ref_u8n!(32, 48, 96, 100);
 
 impl<const N: usize> PartialEq<[u8; N]> for BytesImpl<N> {
@@ -676,11 +698,11 @@ impl<const N: usize> PartialEq<[u8; N]> for BytesImpl<N> {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 macro_rules! impl_partial_eq_u8n_for_bytes_n {
     ($($N:expr),+) => {
         paste! {
             $(
-                #[cfg(target_arch = "wasm32")]
                 impl PartialEq<[u8; $N]> for [<Bytes $N>] {
                     fn eq(&self, lhs: &[u8; $N]) -> bool {
                         &self.0 == lhs
@@ -690,6 +712,7 @@ macro_rules! impl_partial_eq_u8n_for_bytes_n {
         }
     };
 }
+#[cfg(target_arch = "wasm32")]
 impl_partial_eq_u8n_for_bytes_n!(32, 48, 96, 100);
 
 
@@ -699,11 +722,11 @@ impl<const N: usize> PartialEq<BytesImpl<N>> for [u8; N] {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 macro_rules! impl_partial_eq_bytes_n_for_u8n {
     ($($N:expr),+) => {
         paste! {
             $(
-                #[cfg(target_arch = "wasm32")]
                 impl PartialEq<[<Bytes $N>]> for [u8; $N] {
                     fn eq(&self, lhs: &[<Bytes $N>]) -> bool { self == &lhs.0 }
                 }
@@ -711,6 +734,7 @@ macro_rules! impl_partial_eq_bytes_n_for_u8n {
         }
     };
 }
+#[cfg(target_arch = "wasm32")]
 impl_partial_eq_bytes_n_for_u8n!(32, 48, 96, 100);
 
 #[cfg(feature = "py-bindings")]

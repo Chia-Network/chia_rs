@@ -37,3 +37,12 @@ pub fn with_wasm(_args: TokenStream, input: TokenStream) -> TokenStream {
     let input_maybe_modified = quote::quote!(#ast);
     _patch_issue_3707(&input_maybe_modified.into())
 }
+
+#[proc_macro_attribute]
+pub fn conv_u128_to_u64_for_wasm(_args: TokenStream, input: TokenStream) -> TokenStream {
+    let mut ast: syn::ImplItemFn = syn::parse(input.into()).unwrap();
+    let mut converter = TypeConverter;
+    converter.visit_impl_item_fn_mut(&mut ast);
+
+    quote::quote!(#ast).into()
+}

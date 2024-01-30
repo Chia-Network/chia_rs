@@ -33,7 +33,7 @@ pub fn run_puzzle<V: SpendVisitor>(
     let Reduction(clvm_cost, conditions) = run_program(a, &dialect, puzzle, solution, max_cost)?;
 
     let mut ret = SpendBundleConditions {
-        removal_amount: amount as u64,
+        removal_amount: amount as u128,
         ..Default::default()
     };
     let mut state = ParseState::default();

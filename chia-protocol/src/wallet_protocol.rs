@@ -45,7 +45,7 @@ message_struct! (TransactionAck {
 message_struct!(NewPeakWallet {
     header_hash: Bytes32,
     height: u32,
-    weight: u64,
+    weight: u128,
     fork_point_with_previous_peak: u32,
 });
 

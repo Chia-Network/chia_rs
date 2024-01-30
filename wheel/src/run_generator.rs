@@ -60,9 +60,9 @@ pub struct PySpendBundleConditions {
     pub agg_sig_unsafe: Vec<(Bytes48, Bytes)>,
     pub cost: u64,
     // the sum of all values of all spent coins
-    pub removal_amount: u64,
+    pub removal_amount: u128,
     // the sum of all amounts of CREATE_COIN conditions
-    pub addition_amount: u64,
+    pub addition_amount: u128,
 }
 
 fn convert_agg_sigs(a: &Allocator, agg_sigs: &[(NodePtr, NodePtr)]) -> Vec<(Bytes48, Bytes)> {

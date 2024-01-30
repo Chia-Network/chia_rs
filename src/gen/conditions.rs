@@ -683,10 +683,10 @@ pub struct SpendBundleConditions {
     pub cost: u64,
 
     // the sum of all values of all spent coins
-    pub removal_amount: u64,
+    pub removal_amount: u128,
 
     // the sum of all amounts of CREATE_COIN conditions
-    pub addition_amount: u64,
+    pub addition_amount: u128,
 }
 
 #[derive(Default)]
@@ -787,7 +787,7 @@ pub fn process_single_spend<V: SpendVisitor>(
 
     state.spent_puzzles.insert(puzzle_hash);
 
-    ret.removal_amount += my_amount as u64;
+    ret.removal_amount += my_amount as u128;
 
     let mut spend = Spend::new(parent_id, my_amount, puzzle_hash, coin_id);
 
@@ -898,7 +898,7 @@ pub fn parse_conditions<V: SpendVisitor>(
                 if !spend.create_coin.insert(new_coin) {
                     return Err(ValidationErr(c, ErrorCode::DuplicateOutput));
                 }
-                ret.addition_amount += amount as u64;
+                ret.addition_amount += amount as u128;
             }
             Condition::AssertSecondsRelative(s) => {
                 // keep the most strict condition. i.e. the highest limit
@@ -1194,7 +1194,7 @@ pub fn validate_conditions(
         return Err(ValidationErr(spends, ErrorCode::MintingCoin));
     }
 
-    if ret.removal_amount - ret.addition_amount < ret.reserve_fee as u64 {
+    if ret.removal_amount - ret.addition_amount < ret.reserve_fee as u128 {
         // the actual fee is lower than the reserved fee
         return Err(ValidationErr(spends, ErrorCode::ReserveFeeConditionFailed));
     }

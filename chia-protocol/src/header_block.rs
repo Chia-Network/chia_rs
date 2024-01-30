@@ -45,7 +45,8 @@ impl HeaderBlock {
         self.reward_chain_block.height
     }
 
-    pub fn weight(&self) -> u64 {
+    #[cfg_attr(target_arch = "wasm32", wasm_patch::conv_u128_to_u64_for_wasm)]
+    pub fn weight(&self) -> u128 {
         self.reward_chain_block.weight
     }
 
@@ -53,7 +54,8 @@ impl HeaderBlock {
         self.foliage.hash().into()
     }
 
-    pub fn total_iters(&self) -> u64 {
+    #[cfg_attr(target_arch = "wasm32", wasm_patch::conv_u128_to_u64_for_wasm)]
+    pub fn total_iters(&self) -> u128 {
         self.reward_chain_block.total_iters
     }
 
@@ -100,7 +102,7 @@ impl HeaderBlock {
 
     #[getter]
     #[pyo3(name = "weight")]
-    fn py_weight(&self) -> u64 {
+    fn py_weight(&self) -> u128 {
         self.weight()
     }
 
@@ -112,7 +114,7 @@ impl HeaderBlock {
 
     #[getter]
     #[pyo3(name = "total_iters")]
-    fn py_total_iters(&self) -> u64 {
+    fn py_total_iters(&self) -> u128 {
         self.total_iters()
     }
 

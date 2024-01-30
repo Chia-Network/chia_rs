@@ -6,7 +6,7 @@ use crate::{Bytes, Bytes32};
 
 streamable_struct!(VDFInfo {
     challenge: Bytes32,
-    number_of_iterations: u128,
+    number_of_iterations: u64,
     output: ClassgroupElement,
 });
 

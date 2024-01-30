@@ -38,7 +38,8 @@ impl UnfinishedBlock {
         self.foliage.foliage_transaction_block_hash.is_some()
     }
 
-    pub fn total_iters(&self) -> u64 {
+    #[cfg_attr(target_arch = "wasm32", wasm_patch::conv_u128_to_u64_for_wasm)]
+    pub fn total_iters(&self) -> u128 {
         self.reward_chain_block.total_iters
     }
 }
@@ -65,7 +66,7 @@ impl UnfinishedBlock {
 
     #[getter]
     #[pyo3(name = "total_iters")]
-    fn py_total_iters(&self) -> u64 {
+    fn py_total_iters(&self) -> u128 {
         self.total_iters()
     }
 }

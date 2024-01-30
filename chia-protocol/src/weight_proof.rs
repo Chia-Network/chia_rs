@@ -17,7 +17,7 @@ streamable_struct! (SubSlotData {
     icc_slot_end_info: Option<VDFInfo>,
     cc_ip_vdf_info: Option<VDFInfo>,
     icc_ip_vdf_info: Option<VDFInfo>,
-    total_iters: Option<u64>,
+    total_iters: Option<u128>,
 });
 
 #[cfg(feature = "py-bindings")]
