@@ -1,4 +1,5 @@
 from chia_rs import Spend, SpendBundleConditions, Coin, G1Element, G2Element, Program
+from chia.util.ints import uint64
 import pytest
 import copy
 
@@ -311,15 +312,15 @@ def coin_roundtrip(c: Coin) -> bool:
 
 def test_coin_serialize() -> None:
 
-    c1 = Coin(coin, ph, 1000000)
+    c1 = Coin(coin, ph, uint64(1000000))
     assert c1.to_bytes() == coin + ph + (1000000).to_bytes(8, byteorder="big")
     assert coin_roundtrip(c1)
 
-    c2 = Coin(coin, ph2, 0)
+    c2 = Coin(coin, ph2, uint64(0))
     assert c2.to_bytes() == coin + ph2 + (0).to_bytes(8, byteorder="big")
     assert coin_roundtrip(c2)
 
-    c3 = Coin(coin, ph2, 0xFFFFFFFFFFFFFFFF)
+    c3 = Coin(coin, ph2, uint64(0xFFFFFFFFFFFFFFFF))
     assert c3.to_bytes() == coin + ph2 + (0xFFFFFFFFFFFFFFFF).to_bytes(
         8, byteorder="big"
     )
@@ -337,7 +338,7 @@ def test_coin_parse_rust() -> None:
 
     c1, consumed = Coin.parse_rust(buffer)
     assert buffer[consumed:] == b"more bytes following, that should be ignored"
-    assert c1 == Coin(coin, ph2, 0xFFFFFFFFFFFFFFFF)
+    assert c1 == Coin(coin, ph2, uint64(0xFFFFFFFFFFFFFFFF))
 
 def sha2(buf: bytes) -> bytes:
     from hashlib import sha256
@@ -347,13 +348,13 @@ def sha2(buf: bytes) -> bytes:
 
 def test_coin_get_hash() -> None:
 
-    c1 = Coin(coin, ph, 1000000)
+    c1 = Coin(coin, ph, uint64(1000000))
     assert sha2(c1.to_bytes()) == c1.get_hash()
 
-    c2 = Coin(coin, ph2, 0)
+    c2 = Coin(coin, ph2, uint64(0))
     assert sha2(c2.to_bytes()) == c2.get_hash()
 
-    c3 = Coin(coin, ph2, 0xFFFFFFFFFFFFFFFF)
+    c3 = Coin(coin, ph2, uint64(0xFFFFFFFFFFFFFFFF))
     assert sha2(c3.to_bytes()) == c3.get_hash()
 
 def test_g1_element() -> None:

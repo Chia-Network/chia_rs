@@ -5,6 +5,7 @@
 
 from typing import List, Optional, Sequence, Tuple
 from chia.types.blockchain_format.sized_bytes import bytes32
+from chia.util.ints import uint8, uint16, uint32, uint64, uint128, int8, int16, int32, int64, int128
 from chia.types.blockchain_format.program import Program as ChiaProgram
 from chia.consensus.constants import ConsensusConstants
 
@@ -347,24 +348,24 @@ class SpendBundleConditions:
 class BlockRecord:
     header_hash: bytes32
     prev_hash: bytes32
-    height: int
-    weight: int
-    total_iters: int
-    signage_point_index: int
+    height: uint32
+    weight: uint128
+    total_iters: uint128
+    signage_point_index: uint8
     challenge_vdf_output: ClassgroupElement
     infused_challenge_vdf_output: Optional[ClassgroupElement]
     reward_infusion_new_challenge: bytes32
     challenge_block_info_hash: bytes32
-    sub_slot_iters: int
+    sub_slot_iters: uint64
     pool_puzzle_hash: bytes32
     farmer_puzzle_hash: bytes32
-    required_iters: int
-    deficit: int
+    required_iters: uint64
+    deficit: uint8
     overflow: bool
-    prev_transaction_block_height: int
-    timestamp: Optional[int]
+    prev_transaction_block_height: uint32
+    timestamp: Optional[uint64]
     prev_transaction_block_hash: Optional[bytes32]
-    fees: Optional[int]
+    fees: Optional[uint64]
     reward_claims_incorporated: Optional[List[Coin]]
     finished_challenge_slot_hashes: Optional[List[bytes32]]
     finished_infused_challenge_slot_hashes: Optional[List[bytes32]]
@@ -373,33 +374,33 @@ class BlockRecord:
     is_transaction_block: bool
     first_in_sub_slot: bool
     def is_challenge_block(self, constants: ConsensusConstants) -> bool: ...
-    def sp_sub_slot_total_iters(self, constants: ConsensusConstants) -> int: ...
-    def ip_sub_slot_total_iters(self, constants: ConsensusConstants) -> int: ...
-    def sp_iters(self, constants: ConsensusConstants) -> int: ...
-    def ip_iters(self, constants: ConsensusConstants) -> int: ...
-    def sp_total_iters(self, constants: ConsensusConstants) -> int: ...
+    def sp_sub_slot_total_iters(self, constants: ConsensusConstants) -> uint128: ...
+    def ip_sub_slot_total_iters(self, constants: ConsensusConstants) -> uint128: ...
+    def sp_iters(self, constants: ConsensusConstants) -> uint64: ...
+    def ip_iters(self, constants: ConsensusConstants) -> uint64: ...
+    def sp_total_iters(self, constants: ConsensusConstants) -> uint128: ...
     def __init__(
         self,
         header_hash: bytes,
         prev_hash: bytes,
-        height: int,
-        weight: int,
-        total_iters: int,
-        signage_point_index: int,
+        height: uint32,
+        weight: uint128,
+        total_iters: uint128,
+        signage_point_index: uint8,
         challenge_vdf_output: ClassgroupElement,
         infused_challenge_vdf_output: Optional[ClassgroupElement],
         reward_infusion_new_challenge: bytes,
         challenge_block_info_hash: bytes,
-        sub_slot_iters: int,
+        sub_slot_iters: uint64,
         pool_puzzle_hash: bytes,
         farmer_puzzle_hash: bytes,
-        required_iters: int,
-        deficit: int,
+        required_iters: uint64,
+        deficit: uint8,
         overflow: bool,
-        prev_transaction_block_height: int,
-        timestamp: Optional[int],
+        prev_transaction_block_height: uint32,
+        timestamp: Optional[uint64],
         prev_transaction_block_hash: Optional[bytes32],
-        fees: Optional[int],
+        fees: Optional[uint64],
         reward_claims_incorporated: Optional[Sequence[Coin]],
         finished_challenge_slot_hashes: Optional[Sequence[bytes32]],
         finished_infused_challenge_slot_hashes: Optional[Sequence[bytes32]],
@@ -426,24 +427,24 @@ class BlockRecord:
     def from_json_dict(json_dict: Dict[str, Any]) -> BlockRecord: ...
     def replace(self, *, header_hash: Union[ bytes32, _Unspec] = _Unspec(),
         prev_hash: Union[ bytes32, _Unspec] = _Unspec(),
-        height: Union[ int, _Unspec] = _Unspec(),
-        weight: Union[ int, _Unspec] = _Unspec(),
-        total_iters: Union[ int, _Unspec] = _Unspec(),
-        signage_point_index: Union[ int, _Unspec] = _Unspec(),
+        height: Union[ uint32, _Unspec] = _Unspec(),
+        weight: Union[ uint128, _Unspec] = _Unspec(),
+        total_iters: Union[ uint128, _Unspec] = _Unspec(),
+        signage_point_index: Union[ uint8, _Unspec] = _Unspec(),
         challenge_vdf_output: Union[ ClassgroupElement, _Unspec] = _Unspec(),
         infused_challenge_vdf_output: Union[ Optional[ClassgroupElement], _Unspec] = _Unspec(),
         reward_infusion_new_challenge: Union[ bytes32, _Unspec] = _Unspec(),
         challenge_block_info_hash: Union[ bytes32, _Unspec] = _Unspec(),
-        sub_slot_iters: Union[ int, _Unspec] = _Unspec(),
+        sub_slot_iters: Union[ uint64, _Unspec] = _Unspec(),
         pool_puzzle_hash: Union[ bytes32, _Unspec] = _Unspec(),
         farmer_puzzle_hash: Union[ bytes32, _Unspec] = _Unspec(),
-        required_iters: Union[ int, _Unspec] = _Unspec(),
-        deficit: Union[ int, _Unspec] = _Unspec(),
+        required_iters: Union[ uint64, _Unspec] = _Unspec(),
+        deficit: Union[ uint8, _Unspec] = _Unspec(),
         overflow: Union[ bool, _Unspec] = _Unspec(),
-        prev_transaction_block_height: Union[ int, _Unspec] = _Unspec(),
-        timestamp: Union[ Optional[int], _Unspec] = _Unspec(),
+        prev_transaction_block_height: Union[ uint32, _Unspec] = _Unspec(),
+        timestamp: Union[ Optional[uint64], _Unspec] = _Unspec(),
         prev_transaction_block_hash: Union[ Optional[bytes32], _Unspec] = _Unspec(),
-        fees: Union[ Optional[int], _Unspec] = _Unspec(),
+        fees: Union[ Optional[uint64], _Unspec] = _Unspec(),
         reward_claims_incorporated: Union[ Optional[List[Coin]], _Unspec] = _Unspec(),
         finished_challenge_slot_hashes: Union[ Optional[List[bytes32]], _Unspec] = _Unspec(),
         finished_infused_challenge_slot_hashes: Union[ Optional[List[bytes32]], _Unspec] = _Unspec(),
@@ -452,12 +453,12 @@ class BlockRecord:
 
 class Message:
     msg_type: int
-    id: Optional[int]
+    id: Optional[uint16]
     data: bytes
     def __init__(
         self,
         msg_type: int,
-        id: Optional[int],
+        id: Optional[uint16],
         data: bytes
     ) -> None: ...
     def __hash__(self) -> int: ...
@@ -479,24 +480,24 @@ class Message:
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> Message: ...
     def replace(self, *, msg_type: Union[ int, _Unspec] = _Unspec(),
-        id: Union[ Optional[int], _Unspec] = _Unspec(),
+        id: Union[ Optional[uint16], _Unspec] = _Unspec(),
         data: Union[ bytes, _Unspec] = _Unspec()) -> Message: ...
 
 class Handshake:
     network_id: String
     protocol_version: String
     software_version: String
-    server_port: int
+    server_port: uint16
     node_type: int
-    capabilities: List[(int, String)]
+    capabilities: List[(uint16, String)]
     def __init__(
         self,
         network_id: String,
         protocol_version: String,
         software_version: String,
-        server_port: int,
+        server_port: uint16,
         node_type: int,
-        capabilities: Sequence[(int, String)]
+        capabilities: Sequence[(uint16, String)]
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -519,9 +520,9 @@ class Handshake:
     def replace(self, *, network_id: Union[ String, _Unspec] = _Unspec(),
         protocol_version: Union[ String, _Unspec] = _Unspec(),
         software_version: Union[ String, _Unspec] = _Unspec(),
-        server_port: Union[ int, _Unspec] = _Unspec(),
+        server_port: Union[ uint16, _Unspec] = _Unspec(),
         node_type: Union[ int, _Unspec] = _Unspec(),
-        capabilities: Union[ List[(int, String)], _Unspec] = _Unspec()) -> Handshake: ...
+        capabilities: Union[ List[(uint16, String)], _Unspec] = _Unspec()) -> Handshake: ...
 
 class ClassgroupElement:
     data: bytes100
@@ -558,13 +559,13 @@ class ClassgroupElement:
 class Coin:
     parent_coin_info: bytes32
     puzzle_hash: bytes32
-    amount: int
+    amount: uint64
     def name(self) -> bytes32: ...
     def __init__(
         self,
         parent_coin_info: bytes,
         puzzle_hash: bytes,
-        amount: int
+        amount: uint64
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -586,7 +587,7 @@ class Coin:
     def from_json_dict(json_dict: Dict[str, Any]) -> Coin: ...
     def replace(self, *, parent_coin_info: Union[ bytes32, _Unspec] = _Unspec(),
         puzzle_hash: Union[ bytes32, _Unspec] = _Unspec(),
-        amount: Union[ int, _Unspec] = _Unspec()) -> Coin: ...
+        amount: Union[ uint64, _Unspec] = _Unspec()) -> Coin: ...
 
 class CoinSpend:
     coin: Coin
@@ -622,13 +623,13 @@ class CoinSpend:
 
 class CoinState:
     coin: Coin
-    spent_height: Optional[int]
-    created_height: Optional[int]
+    spent_height: Optional[uint32]
+    created_height: Optional[uint32]
     def __init__(
         self,
         coin: Coin,
-        spent_height: Optional[int],
-        created_height: Optional[int]
+        spent_height: Optional[uint32],
+        created_height: Optional[uint32]
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -649,8 +650,8 @@ class CoinState:
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> CoinState: ...
     def replace(self, *, coin: Union[ Coin, _Unspec] = _Unspec(),
-        spent_height: Union[ Optional[int], _Unspec] = _Unspec(),
-        created_height: Union[ Optional[int], _Unspec] = _Unspec()) -> CoinState: ...
+        spent_height: Union[ Optional[uint32], _Unspec] = _Unspec(),
+        created_height: Union[ Optional[uint32], _Unspec] = _Unspec()) -> CoinState: ...
 
 class EndOfSubSlotBundle:
     challenge_chain: ChallengeChainSubSlot
@@ -688,10 +689,10 @@ class EndOfSubSlotBundle:
         proofs: Union[ SubSlotProofs, _Unspec] = _Unspec()) -> EndOfSubSlotBundle: ...
 
 class FeeRate:
-    mojos_per_clvm_cost: int
+    mojos_per_clvm_cost: uint64
     def __init__(
         self,
-        mojos_per_clvm_cost: int
+        mojos_per_clvm_cost: uint64
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -711,16 +712,16 @@ class FeeRate:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> FeeRate: ...
-    def replace(self, *, mojos_per_clvm_cost: Union[ int, _Unspec] = _Unspec()) -> FeeRate: ...
+    def replace(self, *, mojos_per_clvm_cost: Union[ uint64, _Unspec] = _Unspec()) -> FeeRate: ...
 
 class FeeEstimate:
     error: Optional[String]
-    time_target: int
+    time_target: uint64
     estimated_fee_rate: FeeRate
     def __init__(
         self,
         error: Optional[String],
-        time_target: int,
+        time_target: uint64,
         estimated_fee_rate: FeeRate
     ) -> None: ...
     def __hash__(self) -> int: ...
@@ -742,7 +743,7 @@ class FeeEstimate:
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> FeeEstimate: ...
     def replace(self, *, error: Union[ Optional[String], _Unspec] = _Unspec(),
-        time_target: Union[ int, _Unspec] = _Unspec(),
+        time_target: Union[ uint64, _Unspec] = _Unspec(),
         estimated_fee_rate: Union[ FeeRate, _Unspec] = _Unspec()) -> FeeEstimate: ...
 
 class FeeEstimateGroup:
@@ -778,16 +779,16 @@ class TransactionsInfo:
     generator_root: bytes32
     generator_refs_root: bytes32
     aggregated_signature: G2Element
-    fees: int
-    cost: int
+    fees: uint64
+    cost: uint64
     reward_claims_incorporated: List[Coin]
     def __init__(
         self,
         generator_root: bytes,
         generator_refs_root: bytes,
         aggregated_signature: G2Element,
-        fees: int,
-        cost: int,
+        fees: uint64,
+        cost: uint64,
         reward_claims_incorporated: Sequence[Coin]
     ) -> None: ...
     def __hash__(self) -> int: ...
@@ -811,13 +812,13 @@ class TransactionsInfo:
     def replace(self, *, generator_root: Union[ bytes32, _Unspec] = _Unspec(),
         generator_refs_root: Union[ bytes32, _Unspec] = _Unspec(),
         aggregated_signature: Union[ G2Element, _Unspec] = _Unspec(),
-        fees: Union[ int, _Unspec] = _Unspec(),
-        cost: Union[ int, _Unspec] = _Unspec(),
+        fees: Union[ uint64, _Unspec] = _Unspec(),
+        cost: Union[ uint64, _Unspec] = _Unspec(),
         reward_claims_incorporated: Union[ List[Coin], _Unspec] = _Unspec()) -> TransactionsInfo: ...
 
 class FoliageTransactionBlock:
     prev_transaction_block_hash: bytes32
-    timestamp: int
+    timestamp: uint64
     filter_hash: bytes32
     additions_root: bytes32
     removals_root: bytes32
@@ -825,7 +826,7 @@ class FoliageTransactionBlock:
     def __init__(
         self,
         prev_transaction_block_hash: bytes,
-        timestamp: int,
+        timestamp: uint64,
         filter_hash: bytes,
         additions_root: bytes,
         removals_root: bytes,
@@ -850,7 +851,7 @@ class FoliageTransactionBlock:
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> FoliageTransactionBlock: ...
     def replace(self, *, prev_transaction_block_hash: Union[ bytes32, _Unspec] = _Unspec(),
-        timestamp: Union[ int, _Unspec] = _Unspec(),
+        timestamp: Union[ uint64, _Unspec] = _Unspec(),
         filter_hash: Union[ bytes32, _Unspec] = _Unspec(),
         additions_root: Union[ bytes32, _Unspec] = _Unspec(),
         removals_root: Union[ bytes32, _Unspec] = _Unspec(),
@@ -937,16 +938,16 @@ class Foliage:
 
 class NewPeak:
     header_hash: bytes32
-    height: int
-    weight: int
-    fork_point_with_previous_peak: int
+    height: uint32
+    weight: uint128
+    fork_point_with_previous_peak: uint32
     unfinished_reward_block_hash: bytes32
     def __init__(
         self,
         header_hash: bytes,
-        height: int,
-        weight: int,
-        fork_point_with_previous_peak: int,
+        height: uint32,
+        weight: uint128,
+        fork_point_with_previous_peak: uint32,
         unfinished_reward_block_hash: bytes
     ) -> None: ...
     def __hash__(self) -> int: ...
@@ -968,20 +969,20 @@ class NewPeak:
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> NewPeak: ...
     def replace(self, *, header_hash: Union[ bytes32, _Unspec] = _Unspec(),
-        height: Union[ int, _Unspec] = _Unspec(),
-        weight: Union[ int, _Unspec] = _Unspec(),
-        fork_point_with_previous_peak: Union[ int, _Unspec] = _Unspec(),
+        height: Union[ uint32, _Unspec] = _Unspec(),
+        weight: Union[ uint128, _Unspec] = _Unspec(),
+        fork_point_with_previous_peak: Union[ uint32, _Unspec] = _Unspec(),
         unfinished_reward_block_hash: Union[ bytes32, _Unspec] = _Unspec()) -> NewPeak: ...
 
 class NewTransaction:
     transaction_id: bytes32
-    cost: int
-    fees: int
+    cost: uint64
+    fees: uint64
     def __init__(
         self,
         transaction_id: bytes,
-        cost: int,
-        fees: int
+        cost: uint64,
+        fees: uint64
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -1002,8 +1003,8 @@ class NewTransaction:
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> NewTransaction: ...
     def replace(self, *, transaction_id: Union[ bytes32, _Unspec] = _Unspec(),
-        cost: Union[ int, _Unspec] = _Unspec(),
-        fees: Union[ int, _Unspec] = _Unspec()) -> NewTransaction: ...
+        cost: Union[ uint64, _Unspec] = _Unspec(),
+        fees: Union[ uint64, _Unspec] = _Unspec()) -> NewTransaction: ...
 
 class RequestTransaction:
     transaction_id: bytes32
@@ -1058,11 +1059,11 @@ class RespondTransaction:
     def replace(self, *, transaction: Union[ SpendBundle, _Unspec] = _Unspec()) -> RespondTransaction: ...
 
 class RequestProofOfWeight:
-    total_number_of_blocks: int
+    total_number_of_blocks: uint32
     tip: bytes32
     def __init__(
         self,
-        total_number_of_blocks: int,
+        total_number_of_blocks: uint32,
         tip: bytes
     ) -> None: ...
     def __hash__(self) -> int: ...
@@ -1083,7 +1084,7 @@ class RequestProofOfWeight:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RequestProofOfWeight: ...
-    def replace(self, *, total_number_of_blocks: Union[ int, _Unspec] = _Unspec(),
+    def replace(self, *, total_number_of_blocks: Union[ uint32, _Unspec] = _Unspec(),
         tip: Union[ bytes32, _Unspec] = _Unspec()) -> RequestProofOfWeight: ...
 
 class RespondProofOfWeight:
@@ -1116,11 +1117,11 @@ class RespondProofOfWeight:
         tip: Union[ bytes32, _Unspec] = _Unspec()) -> RespondProofOfWeight: ...
 
 class RequestBlock:
-    height: int
+    height: uint32
     include_transaction_block: bool
     def __init__(
         self,
-        height: int,
+        height: uint32,
         include_transaction_block: bool
     ) -> None: ...
     def __hash__(self) -> int: ...
@@ -1141,14 +1142,14 @@ class RequestBlock:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RequestBlock: ...
-    def replace(self, *, height: Union[ int, _Unspec] = _Unspec(),
+    def replace(self, *, height: Union[ uint32, _Unspec] = _Unspec(),
         include_transaction_block: Union[ bool, _Unspec] = _Unspec()) -> RequestBlock: ...
 
 class RejectBlock:
-    height: int
+    height: uint32
     def __init__(
         self,
-        height: int
+        height: uint32
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -1168,16 +1169,16 @@ class RejectBlock:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RejectBlock: ...
-    def replace(self, *, height: Union[ int, _Unspec] = _Unspec()) -> RejectBlock: ...
+    def replace(self, *, height: Union[ uint32, _Unspec] = _Unspec()) -> RejectBlock: ...
 
 class RequestBlocks:
-    start_height: int
-    end_height: int
+    start_height: uint32
+    end_height: uint32
     include_transaction_block: bool
     def __init__(
         self,
-        start_height: int,
-        end_height: int,
+        start_height: uint32,
+        end_height: uint32,
         include_transaction_block: bool
     ) -> None: ...
     def __hash__(self) -> int: ...
@@ -1198,18 +1199,18 @@ class RequestBlocks:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RequestBlocks: ...
-    def replace(self, *, start_height: Union[ int, _Unspec] = _Unspec(),
-        end_height: Union[ int, _Unspec] = _Unspec(),
+    def replace(self, *, start_height: Union[ uint32, _Unspec] = _Unspec(),
+        end_height: Union[ uint32, _Unspec] = _Unspec(),
         include_transaction_block: Union[ bool, _Unspec] = _Unspec()) -> RequestBlocks: ...
 
 class RespondBlocks:
-    start_height: int
-    end_height: int
+    start_height: uint32
+    end_height: uint32
     blocks: List[FullBlock]
     def __init__(
         self,
-        start_height: int,
-        end_height: int,
+        start_height: uint32,
+        end_height: uint32,
         blocks: Sequence[FullBlock]
     ) -> None: ...
     def __hash__(self) -> int: ...
@@ -1230,17 +1231,17 @@ class RespondBlocks:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RespondBlocks: ...
-    def replace(self, *, start_height: Union[ int, _Unspec] = _Unspec(),
-        end_height: Union[ int, _Unspec] = _Unspec(),
+    def replace(self, *, start_height: Union[ uint32, _Unspec] = _Unspec(),
+        end_height: Union[ uint32, _Unspec] = _Unspec(),
         blocks: Union[ List[FullBlock], _Unspec] = _Unspec()) -> RespondBlocks: ...
 
 class RejectBlocks:
-    start_height: int
-    end_height: int
+    start_height: uint32
+    end_height: uint32
     def __init__(
         self,
-        start_height: int,
-        end_height: int
+        start_height: uint32,
+        end_height: uint32
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -1260,8 +1261,8 @@ class RejectBlocks:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RejectBlocks: ...
-    def replace(self, *, start_height: Union[ int, _Unspec] = _Unspec(),
-        end_height: Union[ int, _Unspec] = _Unspec()) -> RejectBlocks: ...
+    def replace(self, *, start_height: Union[ uint32, _Unspec] = _Unspec(),
+        end_height: Union[ uint32, _Unspec] = _Unspec()) -> RejectBlocks: ...
 
 class RespondBlock:
     block: FullBlock
@@ -1370,13 +1371,13 @@ class RespondUnfinishedBlock:
 class NewSignagePointOrEndOfSubSlot:
     prev_challenge_hash: Optional[bytes32]
     challenge_hash: bytes32
-    index_from_challenge: int
+    index_from_challenge: uint8
     last_rc_infusion: bytes32
     def __init__(
         self,
         prev_challenge_hash: Optional[bytes32],
         challenge_hash: bytes,
-        index_from_challenge: int,
+        index_from_challenge: uint8,
         last_rc_infusion: bytes
     ) -> None: ...
     def __hash__(self) -> int: ...
@@ -1399,17 +1400,17 @@ class NewSignagePointOrEndOfSubSlot:
     def from_json_dict(json_dict: Dict[str, Any]) -> NewSignagePointOrEndOfSubSlot: ...
     def replace(self, *, prev_challenge_hash: Union[ Optional[bytes32], _Unspec] = _Unspec(),
         challenge_hash: Union[ bytes32, _Unspec] = _Unspec(),
-        index_from_challenge: Union[ int, _Unspec] = _Unspec(),
+        index_from_challenge: Union[ uint8, _Unspec] = _Unspec(),
         last_rc_infusion: Union[ bytes32, _Unspec] = _Unspec()) -> NewSignagePointOrEndOfSubSlot: ...
 
 class RequestSignagePointOrEndOfSubSlot:
     challenge_hash: bytes32
-    index_from_challenge: int
+    index_from_challenge: uint8
     last_rc_infusion: bytes32
     def __init__(
         self,
         challenge_hash: bytes,
-        index_from_challenge: int,
+        index_from_challenge: uint8,
         last_rc_infusion: bytes
     ) -> None: ...
     def __hash__(self) -> int: ...
@@ -1431,18 +1432,18 @@ class RequestSignagePointOrEndOfSubSlot:
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RequestSignagePointOrEndOfSubSlot: ...
     def replace(self, *, challenge_hash: Union[ bytes32, _Unspec] = _Unspec(),
-        index_from_challenge: Union[ int, _Unspec] = _Unspec(),
+        index_from_challenge: Union[ uint8, _Unspec] = _Unspec(),
         last_rc_infusion: Union[ bytes32, _Unspec] = _Unspec()) -> RequestSignagePointOrEndOfSubSlot: ...
 
 class RespondSignagePoint:
-    index_from_challenge: int
+    index_from_challenge: uint8
     challenge_chain_vdf: VDFInfo
     challenge_chain_proof: VDFProof
     reward_chain_vdf: VDFInfo
     reward_chain_proof: VDFProof
     def __init__(
         self,
-        index_from_challenge: int,
+        index_from_challenge: uint8,
         challenge_chain_vdf: VDFInfo,
         challenge_chain_proof: VDFProof,
         reward_chain_vdf: VDFInfo,
@@ -1466,7 +1467,7 @@ class RespondSignagePoint:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RespondSignagePoint: ...
-    def replace(self, *, index_from_challenge: Union[ int, _Unspec] = _Unspec(),
+    def replace(self, *, index_from_challenge: Union[ uint8, _Unspec] = _Unspec(),
         challenge_chain_vdf: Union[ VDFInfo, _Unspec] = _Unspec(),
         challenge_chain_proof: Union[ VDFProof, _Unspec] = _Unspec(),
         reward_chain_vdf: Union[ VDFInfo, _Unspec] = _Unspec(),
@@ -1525,15 +1526,15 @@ class RequestMempoolTransactions:
     def replace(self, *, filter: Union[ bytes, _Unspec] = _Unspec()) -> RequestMempoolTransactions: ...
 
 class NewCompactVDF:
-    height: int
+    height: uint32
     header_hash: bytes32
-    field_vdf: int
+    field_vdf: uint8
     vdf_info: VDFInfo
     def __init__(
         self,
-        height: int,
+        height: uint32,
         header_hash: bytes,
-        field_vdf: int,
+        field_vdf: uint8,
         vdf_info: VDFInfo
     ) -> None: ...
     def __hash__(self) -> int: ...
@@ -1554,21 +1555,21 @@ class NewCompactVDF:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> NewCompactVDF: ...
-    def replace(self, *, height: Union[ int, _Unspec] = _Unspec(),
+    def replace(self, *, height: Union[ uint32, _Unspec] = _Unspec(),
         header_hash: Union[ bytes32, _Unspec] = _Unspec(),
-        field_vdf: Union[ int, _Unspec] = _Unspec(),
+        field_vdf: Union[ uint8, _Unspec] = _Unspec(),
         vdf_info: Union[ VDFInfo, _Unspec] = _Unspec()) -> NewCompactVDF: ...
 
 class RequestCompactVDF:
-    height: int
+    height: uint32
     header_hash: bytes32
-    field_vdf: int
+    field_vdf: uint8
     vdf_info: VDFInfo
     def __init__(
         self,
-        height: int,
+        height: uint32,
         header_hash: bytes,
-        field_vdf: int,
+        field_vdf: uint8,
         vdf_info: VDFInfo
     ) -> None: ...
     def __hash__(self) -> int: ...
@@ -1589,22 +1590,22 @@ class RequestCompactVDF:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RequestCompactVDF: ...
-    def replace(self, *, height: Union[ int, _Unspec] = _Unspec(),
+    def replace(self, *, height: Union[ uint32, _Unspec] = _Unspec(),
         header_hash: Union[ bytes32, _Unspec] = _Unspec(),
-        field_vdf: Union[ int, _Unspec] = _Unspec(),
+        field_vdf: Union[ uint8, _Unspec] = _Unspec(),
         vdf_info: Union[ VDFInfo, _Unspec] = _Unspec()) -> RequestCompactVDF: ...
 
 class RespondCompactVDF:
-    height: int
+    height: uint32
     header_hash: bytes32
-    field_vdf: int
+    field_vdf: uint8
     vdf_info: VDFInfo
     vdf_proof: VDFProof
     def __init__(
         self,
-        height: int,
+        height: uint32,
         header_hash: bytes,
-        field_vdf: int,
+        field_vdf: uint8,
         vdf_info: VDFInfo,
         vdf_proof: VDFProof
     ) -> None: ...
@@ -1626,9 +1627,9 @@ class RespondCompactVDF:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RespondCompactVDF: ...
-    def replace(self, *, height: Union[ int, _Unspec] = _Unspec(),
+    def replace(self, *, height: Union[ uint32, _Unspec] = _Unspec(),
         header_hash: Union[ bytes32, _Unspec] = _Unspec(),
-        field_vdf: Union[ int, _Unspec] = _Unspec(),
+        field_vdf: Union[ uint8, _Unspec] = _Unspec(),
         vdf_info: Union[ VDFInfo, _Unspec] = _Unspec(),
         vdf_proof: Union[ VDFProof, _Unspec] = _Unspec()) -> RespondCompactVDF: ...
 
@@ -1693,13 +1694,13 @@ class FullBlock:
     foliage_transaction_block: Optional[FoliageTransactionBlock]
     transactions_info: Optional[TransactionsInfo]
     transactions_generator: Optional[Program]
-    transactions_generator_ref_list: List[int]
+    transactions_generator_ref_list: List[uint32]
     prev_header_hash: bytes32
     header_hash: bytes32
     def is_transaction_block(self) -> bool: ...
-    total_iters: int
-    height: int
-    weight: int
+    total_iters: uint128
+    height: uint32
+    weight: uint128
     def get_included_reward_coins(self) -> List[Coin]: ...
     def is_fully_compactified(self) -> bool: ...
     def __init__(
@@ -1715,7 +1716,7 @@ class FullBlock:
         foliage_transaction_block: Optional[FoliageTransactionBlock],
         transactions_info: Optional[TransactionsInfo],
         transactions_generator: Optional[Program],
-        transactions_generator_ref_list: Sequence[int]
+        transactions_generator_ref_list: Sequence[uint32]
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -1746,7 +1747,7 @@ class FullBlock:
         foliage_transaction_block: Union[ Optional[FoliageTransactionBlock], _Unspec] = _Unspec(),
         transactions_info: Union[ Optional[TransactionsInfo], _Unspec] = _Unspec(),
         transactions_generator: Union[ Optional[Program], _Unspec] = _Unspec(),
-        transactions_generator_ref_list: Union[ List[int], _Unspec] = _Unspec()) -> FullBlock: ...
+        transactions_generator_ref_list: Union[ List[uint32], _Unspec] = _Unspec()) -> FullBlock: ...
 
 class HeaderBlock:
     finished_sub_slots: List[EndOfSubSlotBundle]
@@ -1763,10 +1764,10 @@ class HeaderBlock:
     prev_header_hash: bytes32
     prev_hash: bytes32
     header_hash: bytes32
-    height: int
-    weight: int
+    height: uint32
+    weight: uint128
     header_hash: bytes32
-    total_iters: int
+    total_iters: uint128
     log_string: str
     is_transaction_block: bool
     first_in_sub_slot: bool
@@ -1816,13 +1817,13 @@ class HeaderBlock:
 
 class TimestampedPeerInfo:
     host: String
-    port: int
-    timestamp: int
+    port: uint16
+    timestamp: uint64
     def __init__(
         self,
         host: String,
-        port: int,
-        timestamp: int
+        port: uint16,
+        timestamp: uint64
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -1843,16 +1844,16 @@ class TimestampedPeerInfo:
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> TimestampedPeerInfo: ...
     def replace(self, *, host: Union[ String, _Unspec] = _Unspec(),
-        port: Union[ int, _Unspec] = _Unspec(),
-        timestamp: Union[ int, _Unspec] = _Unspec()) -> TimestampedPeerInfo: ...
+        port: Union[ uint16, _Unspec] = _Unspec(),
+        timestamp: Union[ uint64, _Unspec] = _Unspec()) -> TimestampedPeerInfo: ...
 
 class PoolTarget:
     puzzle_hash: bytes32
-    max_height: int
+    max_height: uint32
     def __init__(
         self,
         puzzle_hash: bytes,
-        max_height: int
+        max_height: uint32
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -1873,7 +1874,7 @@ class PoolTarget:
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> PoolTarget: ...
     def replace(self, *, puzzle_hash: Union[ bytes32, _Unspec] = _Unspec(),
-        max_height: Union[ int, _Unspec] = _Unspec()) -> PoolTarget: ...
+        max_height: Union[ uint32, _Unspec] = _Unspec()) -> PoolTarget: ...
 
 class Program:
     a0: bytes
@@ -1920,7 +1921,7 @@ class ProofOfSpace:
     pool_public_key: Optional[G1Element]
     pool_contract_puzzle_hash: Optional[bytes32]
     plot_public_key: G1Element
-    size: int
+    size: uint8
     proof: bytes
     def __init__(
         self,
@@ -1928,7 +1929,7 @@ class ProofOfSpace:
         pool_public_key: Optional[G1Element],
         pool_contract_puzzle_hash: Optional[bytes32],
         plot_public_key: G1Element,
-        size: int,
+        size: uint8,
         proof: bytes
     ) -> None: ...
     def __hash__(self) -> int: ...
@@ -1953,12 +1954,12 @@ class ProofOfSpace:
         pool_public_key: Union[ Optional[G1Element], _Unspec] = _Unspec(),
         pool_contract_puzzle_hash: Union[ Optional[bytes32], _Unspec] = _Unspec(),
         plot_public_key: Union[ G1Element, _Unspec] = _Unspec(),
-        size: Union[ int, _Unspec] = _Unspec(),
+        size: Union[ uint8, _Unspec] = _Unspec(),
         proof: Union[ bytes, _Unspec] = _Unspec()) -> ProofOfSpace: ...
 
 class RewardChainBlockUnfinished:
-    total_iters: int
-    signage_point_index: int
+    total_iters: uint128
+    signage_point_index: uint8
     pos_ss_cc_challenge_hash: bytes32
     proof_of_space: ProofOfSpace
     challenge_chain_sp_vdf: Optional[VDFInfo]
@@ -1967,8 +1968,8 @@ class RewardChainBlockUnfinished:
     reward_chain_sp_signature: G2Element
     def __init__(
         self,
-        total_iters: int,
-        signage_point_index: int,
+        total_iters: uint128,
+        signage_point_index: uint8,
         pos_ss_cc_challenge_hash: bytes,
         proof_of_space: ProofOfSpace,
         challenge_chain_sp_vdf: Optional[VDFInfo],
@@ -1994,8 +1995,8 @@ class RewardChainBlockUnfinished:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RewardChainBlockUnfinished: ...
-    def replace(self, *, total_iters: Union[ int, _Unspec] = _Unspec(),
-        signage_point_index: Union[ int, _Unspec] = _Unspec(),
+    def replace(self, *, total_iters: Union[ uint128, _Unspec] = _Unspec(),
+        signage_point_index: Union[ uint8, _Unspec] = _Unspec(),
         pos_ss_cc_challenge_hash: Union[ bytes32, _Unspec] = _Unspec(),
         proof_of_space: Union[ ProofOfSpace, _Unspec] = _Unspec(),
         challenge_chain_sp_vdf: Union[ Optional[VDFInfo], _Unspec] = _Unspec(),
@@ -2004,10 +2005,10 @@ class RewardChainBlockUnfinished:
         reward_chain_sp_signature: Union[ G2Element, _Unspec] = _Unspec()) -> RewardChainBlockUnfinished: ...
 
 class RewardChainBlock:
-    weight: int
-    height: int
-    total_iters: int
-    signage_point_index: int
+    weight: uint128
+    height: uint32
+    total_iters: uint128
+    signage_point_index: uint8
     pos_ss_cc_challenge_hash: bytes32
     proof_of_space: ProofOfSpace
     challenge_chain_sp_vdf: Optional[VDFInfo]
@@ -2021,10 +2022,10 @@ class RewardChainBlock:
     def get_unfinished(self) -> RewardChainBlockUnfinished: ...
     def __init__(
         self,
-        weight: int,
-        height: int,
-        total_iters: int,
-        signage_point_index: int,
+        weight: uint128,
+        height: uint32,
+        total_iters: uint128,
+        signage_point_index: uint8,
         pos_ss_cc_challenge_hash: bytes,
         proof_of_space: ProofOfSpace,
         challenge_chain_sp_vdf: Optional[VDFInfo],
@@ -2054,10 +2055,10 @@ class RewardChainBlock:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RewardChainBlock: ...
-    def replace(self, *, weight: Union[ int, _Unspec] = _Unspec(),
-        height: Union[ int, _Unspec] = _Unspec(),
-        total_iters: Union[ int, _Unspec] = _Unspec(),
-        signage_point_index: Union[ int, _Unspec] = _Unspec(),
+    def replace(self, *, weight: Union[ uint128, _Unspec] = _Unspec(),
+        height: Union[ uint32, _Unspec] = _Unspec(),
+        total_iters: Union[ uint128, _Unspec] = _Unspec(),
+        signage_point_index: Union[ uint8, _Unspec] = _Unspec(),
         pos_ss_cc_challenge_hash: Union[ bytes32, _Unspec] = _Unspec(),
         proof_of_space: Union[ ProofOfSpace, _Unspec] = _Unspec(),
         challenge_chain_sp_vdf: Union[ Optional[VDFInfo], _Unspec] = _Unspec(),
@@ -2108,15 +2109,15 @@ class ChallengeChainSubSlot:
     challenge_chain_end_of_slot_vdf: VDFInfo
     infused_challenge_chain_sub_slot_hash: Optional[bytes32]
     subepoch_summary_hash: Optional[bytes32]
-    new_sub_slot_iters: Optional[int]
-    new_difficulty: Optional[int]
+    new_sub_slot_iters: Optional[uint64]
+    new_difficulty: Optional[uint64]
     def __init__(
         self,
         challenge_chain_end_of_slot_vdf: VDFInfo,
         infused_challenge_chain_sub_slot_hash: Optional[bytes32],
         subepoch_summary_hash: Optional[bytes32],
-        new_sub_slot_iters: Optional[int],
-        new_difficulty: Optional[int]
+        new_sub_slot_iters: Optional[uint64],
+        new_difficulty: Optional[uint64]
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -2139,8 +2140,8 @@ class ChallengeChainSubSlot:
     def replace(self, *, challenge_chain_end_of_slot_vdf: Union[ VDFInfo, _Unspec] = _Unspec(),
         infused_challenge_chain_sub_slot_hash: Union[ Optional[bytes32], _Unspec] = _Unspec(),
         subepoch_summary_hash: Union[ Optional[bytes32], _Unspec] = _Unspec(),
-        new_sub_slot_iters: Union[ Optional[int], _Unspec] = _Unspec(),
-        new_difficulty: Union[ Optional[int], _Unspec] = _Unspec()) -> ChallengeChainSubSlot: ...
+        new_sub_slot_iters: Union[ Optional[uint64], _Unspec] = _Unspec(),
+        new_difficulty: Union[ Optional[uint64], _Unspec] = _Unspec()) -> ChallengeChainSubSlot: ...
 
 class InfusedChallengeChainSubSlot:
     infused_challenge_chain_end_of_slot_vdf: VDFInfo
@@ -2172,13 +2173,13 @@ class RewardChainSubSlot:
     end_of_slot_vdf: VDFInfo
     challenge_chain_sub_slot_hash: bytes32
     infused_challenge_chain_sub_slot_hash: Optional[bytes32]
-    deficit: int
+    deficit: uint8
     def __init__(
         self,
         end_of_slot_vdf: VDFInfo,
         challenge_chain_sub_slot_hash: bytes,
         infused_challenge_chain_sub_slot_hash: Optional[bytes32],
-        deficit: int
+        deficit: uint8
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -2201,7 +2202,7 @@ class RewardChainSubSlot:
     def replace(self, *, end_of_slot_vdf: Union[ VDFInfo, _Unspec] = _Unspec(),
         challenge_chain_sub_slot_hash: Union[ bytes32, _Unspec] = _Unspec(),
         infused_challenge_chain_sub_slot_hash: Union[ Optional[bytes32], _Unspec] = _Unspec(),
-        deficit: Union[ int, _Unspec] = _Unspec()) -> RewardChainSubSlot: ...
+        deficit: Union[ uint8, _Unspec] = _Unspec()) -> RewardChainSubSlot: ...
 
 class SubSlotProofs:
     challenge_chain_slot_proof: VDFProof
@@ -2273,16 +2274,16 @@ class SpendBundle:
 class SubEpochSummary:
     prev_subepoch_summary_hash: bytes32
     reward_chain_hash: bytes32
-    num_blocks_overflow: int
-    new_difficulty: Optional[int]
-    new_sub_slot_iters: Optional[int]
+    num_blocks_overflow: uint8
+    new_difficulty: Optional[uint64]
+    new_sub_slot_iters: Optional[uint64]
     def __init__(
         self,
         prev_subepoch_summary_hash: bytes,
         reward_chain_hash: bytes,
-        num_blocks_overflow: int,
-        new_difficulty: Optional[int],
-        new_sub_slot_iters: Optional[int]
+        num_blocks_overflow: uint8,
+        new_difficulty: Optional[uint64],
+        new_sub_slot_iters: Optional[uint64]
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -2304,9 +2305,9 @@ class SubEpochSummary:
     def from_json_dict(json_dict: Dict[str, Any]) -> SubEpochSummary: ...
     def replace(self, *, prev_subepoch_summary_hash: Union[ bytes32, _Unspec] = _Unspec(),
         reward_chain_hash: Union[ bytes32, _Unspec] = _Unspec(),
-        num_blocks_overflow: Union[ int, _Unspec] = _Unspec(),
-        new_difficulty: Union[ Optional[int], _Unspec] = _Unspec(),
-        new_sub_slot_iters: Union[ Optional[int], _Unspec] = _Unspec()) -> SubEpochSummary: ...
+        num_blocks_overflow: Union[ uint8, _Unspec] = _Unspec(),
+        new_difficulty: Union[ Optional[uint64], _Unspec] = _Unspec(),
+        new_sub_slot_iters: Union[ Optional[uint64], _Unspec] = _Unspec()) -> SubEpochSummary: ...
 
 class UnfinishedBlock:
     finished_sub_slots: List[EndOfSubSlotBundle]
@@ -2317,11 +2318,11 @@ class UnfinishedBlock:
     foliage_transaction_block: Optional[FoliageTransactionBlock]
     transactions_info: Optional[TransactionsInfo]
     transactions_generator: Optional[Program]
-    transactions_generator_ref_list: List[int]
+    transactions_generator_ref_list: List[uint32]
     prev_header_hash: bytes32
     partial_hash: bytes32
     def is_transaction_block(self) -> bool: ...
-    total_iters: int
+    total_iters: uint128
     def __init__(
         self,
         finished_sub_slots: Sequence[EndOfSubSlotBundle],
@@ -2332,7 +2333,7 @@ class UnfinishedBlock:
         foliage_transaction_block: Optional[FoliageTransactionBlock],
         transactions_info: Optional[TransactionsInfo],
         transactions_generator: Optional[Program],
-        transactions_generator_ref_list: Sequence[int]
+        transactions_generator_ref_list: Sequence[uint32]
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -2360,16 +2361,16 @@ class UnfinishedBlock:
         foliage_transaction_block: Union[ Optional[FoliageTransactionBlock], _Unspec] = _Unspec(),
         transactions_info: Union[ Optional[TransactionsInfo], _Unspec] = _Unspec(),
         transactions_generator: Union[ Optional[Program], _Unspec] = _Unspec(),
-        transactions_generator_ref_list: Union[ List[int], _Unspec] = _Unspec()) -> UnfinishedBlock: ...
+        transactions_generator_ref_list: Union[ List[uint32], _Unspec] = _Unspec()) -> UnfinishedBlock: ...
 
 class VDFInfo:
     challenge: bytes32
-    number_of_iterations: int
+    number_of_iterations: uint64
     output: ClassgroupElement
     def __init__(
         self,
         challenge: bytes,
-        number_of_iterations: int,
+        number_of_iterations: uint64,
         output: ClassgroupElement
     ) -> None: ...
     def __hash__(self) -> int: ...
@@ -2391,16 +2392,16 @@ class VDFInfo:
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> VDFInfo: ...
     def replace(self, *, challenge: Union[ bytes32, _Unspec] = _Unspec(),
-        number_of_iterations: Union[ int, _Unspec] = _Unspec(),
+        number_of_iterations: Union[ uint64, _Unspec] = _Unspec(),
         output: Union[ ClassgroupElement, _Unspec] = _Unspec()) -> VDFInfo: ...
 
 class VDFProof:
-    witness_type: int
+    witness_type: uint8
     witness: bytes
     normalized_to_identity: bool
     def __init__(
         self,
-        witness_type: int,
+        witness_type: uint8,
         witness: bytes,
         normalized_to_identity: bool
     ) -> None: ...
@@ -2422,17 +2423,17 @@ class VDFProof:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> VDFProof: ...
-    def replace(self, *, witness_type: Union[ int, _Unspec] = _Unspec(),
+    def replace(self, *, witness_type: Union[ uint8, _Unspec] = _Unspec(),
         witness: Union[ bytes, _Unspec] = _Unspec(),
         normalized_to_identity: Union[ bool, _Unspec] = _Unspec()) -> VDFProof: ...
 
 class RequestPuzzleSolution:
     coin_name: bytes32
-    height: int
+    height: uint32
     def __init__(
         self,
         coin_name: bytes,
-        height: int
+        height: uint32
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -2453,17 +2454,17 @@ class RequestPuzzleSolution:
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RequestPuzzleSolution: ...
     def replace(self, *, coin_name: Union[ bytes32, _Unspec] = _Unspec(),
-        height: Union[ int, _Unspec] = _Unspec()) -> RequestPuzzleSolution: ...
+        height: Union[ uint32, _Unspec] = _Unspec()) -> RequestPuzzleSolution: ...
 
 class PuzzleSolutionResponse:
     coin_name: bytes32
-    height: int
+    height: uint32
     puzzle: Program
     solution: Program
     def __init__(
         self,
         coin_name: bytes,
-        height: int,
+        height: uint32,
         puzzle: Program,
         solution: Program
     ) -> None: ...
@@ -2486,7 +2487,7 @@ class PuzzleSolutionResponse:
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> PuzzleSolutionResponse: ...
     def replace(self, *, coin_name: Union[ bytes32, _Unspec] = _Unspec(),
-        height: Union[ int, _Unspec] = _Unspec(),
+        height: Union[ uint32, _Unspec] = _Unspec(),
         puzzle: Union[ Program, _Unspec] = _Unspec(),
         solution: Union[ Program, _Unspec] = _Unspec()) -> PuzzleSolutionResponse: ...
 
@@ -2518,11 +2519,11 @@ class RespondPuzzleSolution:
 
 class RejectPuzzleSolution:
     coin_name: bytes32
-    height: int
+    height: uint32
     def __init__(
         self,
         coin_name: bytes,
-        height: int
+        height: uint32
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -2543,7 +2544,7 @@ class RejectPuzzleSolution:
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RejectPuzzleSolution: ...
     def replace(self, *, coin_name: Union[ bytes32, _Unspec] = _Unspec(),
-        height: Union[ int, _Unspec] = _Unspec()) -> RejectPuzzleSolution: ...
+        height: Union[ uint32, _Unspec] = _Unspec()) -> RejectPuzzleSolution: ...
 
 class SendTransaction:
     transaction: SpendBundle
@@ -2573,12 +2574,12 @@ class SendTransaction:
 
 class TransactionAck:
     txid: bytes32
-    status: int
+    status: uint8
     error: Optional[String]
     def __init__(
         self,
         txid: bytes,
-        status: int,
+        status: uint8,
         error: Optional[String]
     ) -> None: ...
     def __hash__(self) -> int: ...
@@ -2600,20 +2601,20 @@ class TransactionAck:
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> TransactionAck: ...
     def replace(self, *, txid: Union[ bytes32, _Unspec] = _Unspec(),
-        status: Union[ int, _Unspec] = _Unspec(),
+        status: Union[ uint8, _Unspec] = _Unspec(),
         error: Union[ Optional[String], _Unspec] = _Unspec()) -> TransactionAck: ...
 
 class NewPeakWallet:
     header_hash: bytes32
-    height: int
-    weight: int
-    fork_point_with_previous_peak: int
+    height: uint32
+    weight: uint128
+    fork_point_with_previous_peak: uint32
     def __init__(
         self,
         header_hash: bytes,
-        height: int,
-        weight: int,
-        fork_point_with_previous_peak: int
+        height: uint32,
+        weight: uint128,
+        fork_point_with_previous_peak: uint32
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -2634,15 +2635,15 @@ class NewPeakWallet:
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> NewPeakWallet: ...
     def replace(self, *, header_hash: Union[ bytes32, _Unspec] = _Unspec(),
-        height: Union[ int, _Unspec] = _Unspec(),
-        weight: Union[ int, _Unspec] = _Unspec(),
-        fork_point_with_previous_peak: Union[ int, _Unspec] = _Unspec()) -> NewPeakWallet: ...
+        height: Union[ uint32, _Unspec] = _Unspec(),
+        weight: Union[ uint128, _Unspec] = _Unspec(),
+        fork_point_with_previous_peak: Union[ uint32, _Unspec] = _Unspec()) -> NewPeakWallet: ...
 
 class RequestBlockHeader:
-    height: int
+    height: uint32
     def __init__(
         self,
-        height: int
+        height: uint32
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -2662,7 +2663,7 @@ class RequestBlockHeader:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RequestBlockHeader: ...
-    def replace(self, *, height: Union[ int, _Unspec] = _Unspec()) -> RequestBlockHeader: ...
+    def replace(self, *, height: Union[ uint32, _Unspec] = _Unspec()) -> RequestBlockHeader: ...
 
 class RespondBlockHeader:
     header_block: HeaderBlock
@@ -2691,10 +2692,10 @@ class RespondBlockHeader:
     def replace(self, *, header_block: Union[ HeaderBlock, _Unspec] = _Unspec()) -> RespondBlockHeader: ...
 
 class RejectHeaderRequest:
-    height: int
+    height: uint32
     def __init__(
         self,
-        height: int
+        height: uint32
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -2714,15 +2715,15 @@ class RejectHeaderRequest:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RejectHeaderRequest: ...
-    def replace(self, *, height: Union[ int, _Unspec] = _Unspec()) -> RejectHeaderRequest: ...
+    def replace(self, *, height: Union[ uint32, _Unspec] = _Unspec()) -> RejectHeaderRequest: ...
 
 class RequestRemovals:
-    height: int
+    height: uint32
     header_hash: bytes32
     coin_names: Optional[List[bytes32]]
     def __init__(
         self,
-        height: int,
+        height: uint32,
         header_hash: bytes,
         coin_names: Optional[Sequence[bytes32]]
     ) -> None: ...
@@ -2744,18 +2745,18 @@ class RequestRemovals:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RequestRemovals: ...
-    def replace(self, *, height: Union[ int, _Unspec] = _Unspec(),
+    def replace(self, *, height: Union[ uint32, _Unspec] = _Unspec(),
         header_hash: Union[ bytes32, _Unspec] = _Unspec(),
         coin_names: Union[ Optional[List[bytes32]], _Unspec] = _Unspec()) -> RequestRemovals: ...
 
 class RespondRemovals:
-    height: int
+    height: uint32
     header_hash: bytes32
     coins: List[(bytes32, Optional[Coin])]
     proofs: Optional[List[(bytes32, bytes)]]
     def __init__(
         self,
-        height: int,
+        height: uint32,
         header_hash: bytes,
         coins: Sequence[(bytes32, Optional[Coin])],
         proofs: Optional[Sequence[(bytes32, bytes)]]
@@ -2778,17 +2779,17 @@ class RespondRemovals:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RespondRemovals: ...
-    def replace(self, *, height: Union[ int, _Unspec] = _Unspec(),
+    def replace(self, *, height: Union[ uint32, _Unspec] = _Unspec(),
         header_hash: Union[ bytes32, _Unspec] = _Unspec(),
         coins: Union[ List[(bytes32, Optional[Coin])], _Unspec] = _Unspec(),
         proofs: Union[ Optional[List[(bytes32, bytes)]], _Unspec] = _Unspec()) -> RespondRemovals: ...
 
 class RejectRemovalsRequest:
-    height: int
+    height: uint32
     header_hash: bytes32
     def __init__(
         self,
-        height: int,
+        height: uint32,
         header_hash: bytes
     ) -> None: ...
     def __hash__(self) -> int: ...
@@ -2809,16 +2810,16 @@ class RejectRemovalsRequest:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RejectRemovalsRequest: ...
-    def replace(self, *, height: Union[ int, _Unspec] = _Unspec(),
+    def replace(self, *, height: Union[ uint32, _Unspec] = _Unspec(),
         header_hash: Union[ bytes32, _Unspec] = _Unspec()) -> RejectRemovalsRequest: ...
 
 class RequestAdditions:
-    height: int
+    height: uint32
     header_hash: Optional[bytes32]
     puzzle_hashes: Optional[List[bytes32]]
     def __init__(
         self,
-        height: int,
+        height: uint32,
         header_hash: Optional[bytes32],
         puzzle_hashes: Optional[Sequence[bytes32]]
     ) -> None: ...
@@ -2840,18 +2841,18 @@ class RequestAdditions:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RequestAdditions: ...
-    def replace(self, *, height: Union[ int, _Unspec] = _Unspec(),
+    def replace(self, *, height: Union[ uint32, _Unspec] = _Unspec(),
         header_hash: Union[ Optional[bytes32], _Unspec] = _Unspec(),
         puzzle_hashes: Union[ Optional[List[bytes32]], _Unspec] = _Unspec()) -> RequestAdditions: ...
 
 class RespondAdditions:
-    height: int
+    height: uint32
     header_hash: bytes32
     coins: List[(bytes32, List[Coin])]
     proofs: Optional[List[(bytes32, bytes, Optional[bytes])]]
     def __init__(
         self,
-        height: int,
+        height: uint32,
         header_hash: bytes,
         coins: Sequence[(bytes32, Sequence[Coin])],
         proofs: Optional[Sequence[(bytes32, bytes, Optional[bytes])]]
@@ -2874,17 +2875,17 @@ class RespondAdditions:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RespondAdditions: ...
-    def replace(self, *, height: Union[ int, _Unspec] = _Unspec(),
+    def replace(self, *, height: Union[ uint32, _Unspec] = _Unspec(),
         header_hash: Union[ bytes32, _Unspec] = _Unspec(),
         coins: Union[ List[(bytes32, List[Coin])], _Unspec] = _Unspec(),
         proofs: Union[ Optional[List[(bytes32, bytes, Optional[bytes])]], _Unspec] = _Unspec()) -> RespondAdditions: ...
 
 class RejectAdditionsRequest:
-    height: int
+    height: uint32
     header_hash: bytes32
     def __init__(
         self,
-        height: int,
+        height: uint32,
         header_hash: bytes
     ) -> None: ...
     def __hash__(self) -> int: ...
@@ -2905,17 +2906,17 @@ class RejectAdditionsRequest:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RejectAdditionsRequest: ...
-    def replace(self, *, height: Union[ int, _Unspec] = _Unspec(),
+    def replace(self, *, height: Union[ uint32, _Unspec] = _Unspec(),
         header_hash: Union[ bytes32, _Unspec] = _Unspec()) -> RejectAdditionsRequest: ...
 
 class RespondBlockHeaders:
-    start_height: int
-    end_height: int
+    start_height: uint32
+    end_height: uint32
     header_blocks: List[HeaderBlock]
     def __init__(
         self,
-        start_height: int,
-        end_height: int,
+        start_height: uint32,
+        end_height: uint32,
         header_blocks: Sequence[HeaderBlock]
     ) -> None: ...
     def __hash__(self) -> int: ...
@@ -2936,17 +2937,17 @@ class RespondBlockHeaders:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RespondBlockHeaders: ...
-    def replace(self, *, start_height: Union[ int, _Unspec] = _Unspec(),
-        end_height: Union[ int, _Unspec] = _Unspec(),
+    def replace(self, *, start_height: Union[ uint32, _Unspec] = _Unspec(),
+        end_height: Union[ uint32, _Unspec] = _Unspec(),
         header_blocks: Union[ List[HeaderBlock], _Unspec] = _Unspec()) -> RespondBlockHeaders: ...
 
 class RejectBlockHeaders:
-    start_height: int
-    end_height: int
+    start_height: uint32
+    end_height: uint32
     def __init__(
         self,
-        start_height: int,
-        end_height: int
+        start_height: uint32,
+        end_height: uint32
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -2966,17 +2967,17 @@ class RejectBlockHeaders:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RejectBlockHeaders: ...
-    def replace(self, *, start_height: Union[ int, _Unspec] = _Unspec(),
-        end_height: Union[ int, _Unspec] = _Unspec()) -> RejectBlockHeaders: ...
+    def replace(self, *, start_height: Union[ uint32, _Unspec] = _Unspec(),
+        end_height: Union[ uint32, _Unspec] = _Unspec()) -> RejectBlockHeaders: ...
 
 class RequestBlockHeaders:
-    start_height: int
-    end_height: int
+    start_height: uint32
+    end_height: uint32
     return_filter: bool
     def __init__(
         self,
-        start_height: int,
-        end_height: int,
+        start_height: uint32,
+        end_height: uint32,
         return_filter: bool
     ) -> None: ...
     def __hash__(self) -> int: ...
@@ -2997,17 +2998,17 @@ class RequestBlockHeaders:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RequestBlockHeaders: ...
-    def replace(self, *, start_height: Union[ int, _Unspec] = _Unspec(),
-        end_height: Union[ int, _Unspec] = _Unspec(),
+    def replace(self, *, start_height: Union[ uint32, _Unspec] = _Unspec(),
+        end_height: Union[ uint32, _Unspec] = _Unspec(),
         return_filter: Union[ bool, _Unspec] = _Unspec()) -> RequestBlockHeaders: ...
 
 class RequestHeaderBlocks:
-    start_height: int
-    end_height: int
+    start_height: uint32
+    end_height: uint32
     def __init__(
         self,
-        start_height: int,
-        end_height: int
+        start_height: uint32,
+        end_height: uint32
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -3027,16 +3028,16 @@ class RequestHeaderBlocks:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RequestHeaderBlocks: ...
-    def replace(self, *, start_height: Union[ int, _Unspec] = _Unspec(),
-        end_height: Union[ int, _Unspec] = _Unspec()) -> RequestHeaderBlocks: ...
+    def replace(self, *, start_height: Union[ uint32, _Unspec] = _Unspec(),
+        end_height: Union[ uint32, _Unspec] = _Unspec()) -> RequestHeaderBlocks: ...
 
 class RejectHeaderBlocks:
-    start_height: int
-    end_height: int
+    start_height: uint32
+    end_height: uint32
     def __init__(
         self,
-        start_height: int,
-        end_height: int
+        start_height: uint32,
+        end_height: uint32
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -3056,17 +3057,17 @@ class RejectHeaderBlocks:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RejectHeaderBlocks: ...
-    def replace(self, *, start_height: Union[ int, _Unspec] = _Unspec(),
-        end_height: Union[ int, _Unspec] = _Unspec()) -> RejectHeaderBlocks: ...
+    def replace(self, *, start_height: Union[ uint32, _Unspec] = _Unspec(),
+        end_height: Union[ uint32, _Unspec] = _Unspec()) -> RejectHeaderBlocks: ...
 
 class RespondHeaderBlocks:
-    start_height: int
-    end_height: int
+    start_height: uint32
+    end_height: uint32
     header_blocks: List[HeaderBlock]
     def __init__(
         self,
-        start_height: int,
-        end_height: int,
+        start_height: uint32,
+        end_height: uint32,
         header_blocks: Sequence[HeaderBlock]
     ) -> None: ...
     def __hash__(self) -> int: ...
@@ -3087,17 +3088,17 @@ class RespondHeaderBlocks:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RespondHeaderBlocks: ...
-    def replace(self, *, start_height: Union[ int, _Unspec] = _Unspec(),
-        end_height: Union[ int, _Unspec] = _Unspec(),
+    def replace(self, *, start_height: Union[ uint32, _Unspec] = _Unspec(),
+        end_height: Union[ uint32, _Unspec] = _Unspec(),
         header_blocks: Union[ List[HeaderBlock], _Unspec] = _Unspec()) -> RespondHeaderBlocks: ...
 
 class RegisterForPhUpdates:
     puzzle_hashes: List[bytes32]
-    min_height: int
+    min_height: uint32
     def __init__(
         self,
         puzzle_hashes: Sequence[bytes32],
-        min_height: int
+        min_height: uint32
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -3118,16 +3119,16 @@ class RegisterForPhUpdates:
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RegisterForPhUpdates: ...
     def replace(self, *, puzzle_hashes: Union[ List[bytes32], _Unspec] = _Unspec(),
-        min_height: Union[ int, _Unspec] = _Unspec()) -> RegisterForPhUpdates: ...
+        min_height: Union[ uint32, _Unspec] = _Unspec()) -> RegisterForPhUpdates: ...
 
 class RespondToPhUpdates:
     puzzle_hashes: List[bytes32]
-    min_height: int
+    min_height: uint32
     coin_states: List[CoinState]
     def __init__(
         self,
         puzzle_hashes: Sequence[bytes32],
-        min_height: int,
+        min_height: uint32,
         coin_states: Sequence[CoinState]
     ) -> None: ...
     def __hash__(self) -> int: ...
@@ -3149,16 +3150,16 @@ class RespondToPhUpdates:
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RespondToPhUpdates: ...
     def replace(self, *, puzzle_hashes: Union[ List[bytes32], _Unspec] = _Unspec(),
-        min_height: Union[ int, _Unspec] = _Unspec(),
+        min_height: Union[ uint32, _Unspec] = _Unspec(),
         coin_states: Union[ List[CoinState], _Unspec] = _Unspec()) -> RespondToPhUpdates: ...
 
 class RegisterForCoinUpdates:
     coin_ids: List[bytes32]
-    min_height: int
+    min_height: uint32
     def __init__(
         self,
         coin_ids: Sequence[bytes32],
-        min_height: int
+        min_height: uint32
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -3179,16 +3180,16 @@ class RegisterForCoinUpdates:
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RegisterForCoinUpdates: ...
     def replace(self, *, coin_ids: Union[ List[bytes32], _Unspec] = _Unspec(),
-        min_height: Union[ int, _Unspec] = _Unspec()) -> RegisterForCoinUpdates: ...
+        min_height: Union[ uint32, _Unspec] = _Unspec()) -> RegisterForCoinUpdates: ...
 
 class RespondToCoinUpdates:
     coin_ids: List[bytes32]
-    min_height: int
+    min_height: uint32
     coin_states: List[CoinState]
     def __init__(
         self,
         coin_ids: Sequence[bytes32],
-        min_height: int,
+        min_height: uint32,
         coin_states: Sequence[CoinState]
     ) -> None: ...
     def __hash__(self) -> int: ...
@@ -3210,18 +3211,18 @@ class RespondToCoinUpdates:
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RespondToCoinUpdates: ...
     def replace(self, *, coin_ids: Union[ List[bytes32], _Unspec] = _Unspec(),
-        min_height: Union[ int, _Unspec] = _Unspec(),
+        min_height: Union[ uint32, _Unspec] = _Unspec(),
         coin_states: Union[ List[CoinState], _Unspec] = _Unspec()) -> RespondToCoinUpdates: ...
 
 class CoinStateUpdate:
-    height: int
-    fork_height: int
+    height: uint32
+    fork_height: uint32
     peak_hash: bytes32
     items: List[CoinState]
     def __init__(
         self,
-        height: int,
-        fork_height: int,
+        height: uint32,
+        fork_height: uint32,
         peak_hash: bytes,
         items: Sequence[CoinState]
     ) -> None: ...
@@ -3243,8 +3244,8 @@ class CoinStateUpdate:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> CoinStateUpdate: ...
-    def replace(self, *, height: Union[ int, _Unspec] = _Unspec(),
-        fork_height: Union[ int, _Unspec] = _Unspec(),
+    def replace(self, *, height: Union[ uint32, _Unspec] = _Unspec(),
+        fork_height: Union[ uint32, _Unspec] = _Unspec(),
         peak_hash: Union[ bytes32, _Unspec] = _Unspec(),
         items: Union[ List[CoinState], _Unspec] = _Unspec()) -> CoinStateUpdate: ...
 
@@ -3301,12 +3302,12 @@ class RespondChildren:
     def replace(self, *, coin_states: Union[ List[CoinState], _Unspec] = _Unspec()) -> RespondChildren: ...
 
 class RequestSesInfo:
-    start_height: int
-    end_height: int
+    start_height: uint32
+    end_height: uint32
     def __init__(
         self,
-        start_height: int,
-        end_height: int
+        start_height: uint32,
+        end_height: uint32
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -3326,16 +3327,16 @@ class RequestSesInfo:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RequestSesInfo: ...
-    def replace(self, *, start_height: Union[ int, _Unspec] = _Unspec(),
-        end_height: Union[ int, _Unspec] = _Unspec()) -> RequestSesInfo: ...
+    def replace(self, *, start_height: Union[ uint32, _Unspec] = _Unspec(),
+        end_height: Union[ uint32, _Unspec] = _Unspec()) -> RequestSesInfo: ...
 
 class RespondSesInfo:
     reward_chain_hash: List[bytes32]
-    heights: List[List[int]]
+    heights: List[List[uint32]]
     def __init__(
         self,
         reward_chain_hash: Sequence[bytes32],
-        heights: Sequence[Sequence[int]]
+        heights: Sequence[Sequence[uint32]]
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -3356,13 +3357,13 @@ class RespondSesInfo:
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RespondSesInfo: ...
     def replace(self, *, reward_chain_hash: Union[ List[bytes32], _Unspec] = _Unspec(),
-        heights: Union[ List[List[int]], _Unspec] = _Unspec()) -> RespondSesInfo: ...
+        heights: Union[ List[List[uint32]], _Unspec] = _Unspec()) -> RespondSesInfo: ...
 
 class RequestFeeEstimates:
-    time_targets: List[int]
+    time_targets: List[uint64]
     def __init__(
         self,
-        time_targets: Sequence[int]
+        time_targets: Sequence[uint64]
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -3382,7 +3383,7 @@ class RequestFeeEstimates:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> RequestFeeEstimates: ...
-    def replace(self, *, time_targets: Union[ List[int], _Unspec] = _Unspec()) -> RequestFeeEstimates: ...
+    def replace(self, *, time_targets: Union[ List[uint64], _Unspec] = _Unspec()) -> RequestFeeEstimates: ...
 
 class RespondFeeEstimates:
     estimates: FeeEstimateGroup
@@ -3412,15 +3413,15 @@ class RespondFeeEstimates:
 
 class SubEpochData:
     reward_chain_hash: bytes32
-    num_blocks_overflow: int
-    new_sub_slot_iters: Optional[int]
-    new_difficulty: Optional[int]
+    num_blocks_overflow: uint8
+    new_sub_slot_iters: Optional[uint64]
+    new_difficulty: Optional[uint64]
     def __init__(
         self,
         reward_chain_hash: bytes,
-        num_blocks_overflow: int,
-        new_sub_slot_iters: Optional[int],
-        new_difficulty: Optional[int]
+        num_blocks_overflow: uint8,
+        new_sub_slot_iters: Optional[uint64],
+        new_difficulty: Optional[uint64]
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -3441,9 +3442,9 @@ class SubEpochData:
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> SubEpochData: ...
     def replace(self, *, reward_chain_hash: Union[ bytes32, _Unspec] = _Unspec(),
-        num_blocks_overflow: Union[ int, _Unspec] = _Unspec(),
-        new_sub_slot_iters: Union[ Optional[int], _Unspec] = _Unspec(),
-        new_difficulty: Union[ Optional[int], _Unspec] = _Unspec()) -> SubEpochData: ...
+        num_blocks_overflow: Union[ uint8, _Unspec] = _Unspec(),
+        new_sub_slot_iters: Union[ Optional[uint64], _Unspec] = _Unspec(),
+        new_difficulty: Union[ Optional[uint64], _Unspec] = _Unspec()) -> SubEpochData: ...
 
 class SubSlotData:
     proof_of_space: Optional[ProofOfSpace]
@@ -3451,14 +3452,14 @@ class SubSlotData:
     cc_infusion_point: Optional[VDFProof]
     icc_infusion_point: Optional[VDFProof]
     cc_sp_vdf_info: Optional[VDFInfo]
-    signage_point_index: Optional[int]
+    signage_point_index: Optional[uint8]
     cc_slot_end: Optional[VDFProof]
     icc_slot_end: Optional[VDFProof]
     cc_slot_end_info: Optional[VDFInfo]
     icc_slot_end_info: Optional[VDFInfo]
     cc_ip_vdf_info: Optional[VDFInfo]
     icc_ip_vdf_info: Optional[VDFInfo]
-    total_iters: Optional[int]
+    total_iters: Optional[uint128]
     def is_end_of_slot(self) -> bool: ...
     def is_challenge(self) -> bool: ...
     def __init__(
@@ -3468,14 +3469,14 @@ class SubSlotData:
         cc_infusion_point: Optional[VDFProof],
         icc_infusion_point: Optional[VDFProof],
         cc_sp_vdf_info: Optional[VDFInfo],
-        signage_point_index: Optional[int],
+        signage_point_index: Optional[uint8],
         cc_slot_end: Optional[VDFProof],
         icc_slot_end: Optional[VDFProof],
         cc_slot_end_info: Optional[VDFInfo],
         icc_slot_end_info: Optional[VDFInfo],
         cc_ip_vdf_info: Optional[VDFInfo],
         icc_ip_vdf_info: Optional[VDFInfo],
-        total_iters: Optional[int]
+        total_iters: Optional[uint128]
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -3500,22 +3501,22 @@ class SubSlotData:
         cc_infusion_point: Union[ Optional[VDFProof], _Unspec] = _Unspec(),
         icc_infusion_point: Union[ Optional[VDFProof], _Unspec] = _Unspec(),
         cc_sp_vdf_info: Union[ Optional[VDFInfo], _Unspec] = _Unspec(),
-        signage_point_index: Union[ Optional[int], _Unspec] = _Unspec(),
+        signage_point_index: Union[ Optional[uint8], _Unspec] = _Unspec(),
         cc_slot_end: Union[ Optional[VDFProof], _Unspec] = _Unspec(),
         icc_slot_end: Union[ Optional[VDFProof], _Unspec] = _Unspec(),
         cc_slot_end_info: Union[ Optional[VDFInfo], _Unspec] = _Unspec(),
         icc_slot_end_info: Union[ Optional[VDFInfo], _Unspec] = _Unspec(),
         cc_ip_vdf_info: Union[ Optional[VDFInfo], _Unspec] = _Unspec(),
         icc_ip_vdf_info: Union[ Optional[VDFInfo], _Unspec] = _Unspec(),
-        total_iters: Union[ Optional[int], _Unspec] = _Unspec()) -> SubSlotData: ...
+        total_iters: Union[ Optional[uint128], _Unspec] = _Unspec()) -> SubSlotData: ...
 
 class SubEpochChallengeSegment:
-    sub_epoch_n: int
+    sub_epoch_n: uint32
     sub_slots: List[SubSlotData]
     rc_slot_end_info: Optional[VDFInfo]
     def __init__(
         self,
-        sub_epoch_n: int,
+        sub_epoch_n: uint32,
         sub_slots: Sequence[SubSlotData],
         rc_slot_end_info: Optional[VDFInfo]
     ) -> None: ...
@@ -3537,7 +3538,7 @@ class SubEpochChallengeSegment:
     def to_json_dict(self) -> Dict[str, Any]: ...
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> SubEpochChallengeSegment: ...
-    def replace(self, *, sub_epoch_n: Union[ int, _Unspec] = _Unspec(),
+    def replace(self, *, sub_epoch_n: Union[ uint32, _Unspec] = _Unspec(),
         sub_slots: Union[ List[SubSlotData], _Unspec] = _Unspec(),
         rc_slot_end_info: Union[ Optional[VDFInfo], _Unspec] = _Unspec()) -> SubEpochChallengeSegment: ...
 
