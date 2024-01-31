@@ -57,3 +57,8 @@ bench = false
 name = "fast-forward-spend"
 test = false
 bench = false
+
+[[bin]]
+name = "optimize-db"
+test = false
+bench = false
