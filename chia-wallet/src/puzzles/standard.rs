@@ -55,6 +55,9 @@ pub static DEFAULT_HIDDEN_PUZZLE_HASH: [u8; 32] = hex!(
 
 #[cfg(test)]
 mod tests {
+    use clvm_utils::{tree_hash, CurriedProgram};
+    use clvmr::{serde::node_from_bytes, Allocator, ToNodePtr};
+
     use super::*;
 
     use crate::assert_puzzle_hash;
@@ -63,5 +66,26 @@ mod tests {
     fn puzzle_hashes() {
         assert_puzzle_hash!(STANDARD_PUZZLE => STANDARD_PUZZLE_HASH);
         assert_puzzle_hash!(DEFAULT_HIDDEN_PUZZLE => DEFAULT_HIDDEN_PUZZLE_HASH);
+    }
+
+    #[test]
+    fn curry_tree_hash() {
+        let args = StandardArgs {
+            synthetic_key: PublicKey::default(),
+        };
+
+        let mut a = Allocator::new();
+        let mod_ptr = node_from_bytes(&mut a, &STANDARD_PUZZLE).unwrap();
+        let curried_ptr = CurriedProgram {
+            program: mod_ptr,
+            args: &args,
+        }
+        .to_node_ptr(&mut a)
+        .unwrap();
+
+        let expected_tree_hash = hex::encode(tree_hash(&a, curried_ptr));
+        let actual_tree_hash = hex::encode(standard_puzzle_hash(&args.synthetic_key));
+
+        assert_eq!(expected_tree_hash, actual_tree_hash);
     }
 }

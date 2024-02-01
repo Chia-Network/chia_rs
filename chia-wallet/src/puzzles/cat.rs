@@ -193,13 +193,52 @@ pub static CAT_PUZZLE_HASH_V1: [u8; 32] = hex!(
 
 #[cfg(test)]
 mod tests {
+    use clvm_utils::{tree_hash, CurriedProgram};
+    use clvmr::{serde::node_from_bytes, Allocator, ToNodePtr};
+
     use super::*;
 
-    use crate::assert_puzzle_hash;
+    use crate::{
+        assert_puzzle_hash,
+        standard::{standard_puzzle_hash, StandardArgs, STANDARD_PUZZLE},
+    };
 
     #[test]
     fn puzzle_hashes() {
         assert_puzzle_hash!(CAT_PUZZLE => CAT_PUZZLE_HASH);
         assert_puzzle_hash!(CAT_PUZZLE_V1 => CAT_PUZZLE_HASH_V1);
+    }
+
+    #[test]
+    fn curry_tree_hash() {
+        let inner_args = StandardArgs {
+            synthetic_key: PublicKey::default(),
+        };
+        let asset_id = [120; 32];
+
+        let mut a = Allocator::new();
+        let mod_ptr = node_from_bytes(&mut a, &CAT_PUZZLE).unwrap();
+        let inner_mod_ptr = node_from_bytes(&mut a, &STANDARD_PUZZLE).unwrap();
+        let curried_ptr = CurriedProgram {
+            program: mod_ptr,
+            args: CatArgs {
+                mod_hash: CAT_PUZZLE_HASH.into(),
+                inner_puzzle: CurriedProgram {
+                    program: inner_mod_ptr,
+                    args: &inner_args,
+                },
+                tail_program_hash: asset_id.into(),
+            },
+        }
+        .to_node_ptr(&mut a)
+        .unwrap();
+
+        let expected_tree_hash = hex::encode(tree_hash(&a, curried_ptr));
+        let actual_tree_hash = hex::encode(cat_puzzle_hash(
+            asset_id,
+            standard_puzzle_hash(&inner_args.synthetic_key),
+        ));
+
+        assert_eq!(expected_tree_hash, actual_tree_hash);
     }
 }
