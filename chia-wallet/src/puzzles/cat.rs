@@ -1,6 +1,7 @@
 use chia_bls::PublicKey;
 use chia_protocol::{Bytes32, Coin};
 use clvm_traits::{FromClvm, ToClvm};
+use clvm_utils::{curry_tree_hash, tree_hash_atom};
 use hex_literal::hex;
 
 use crate::LineageProof;
@@ -37,6 +38,15 @@ pub struct CoinProof {
     pub parent_coin_info: Bytes32,
     pub inner_puzzle_hash: Bytes32,
     pub amount: u64,
+}
+
+pub fn cat_puzzle_hash(asset_id: [u8; 32], inner_puzzle_hash: [u8; 32]) -> [u8; 32] {
+    let mod_hash = tree_hash_atom(&CAT_PUZZLE_HASH);
+    let asset_id_hash = tree_hash_atom(&asset_id);
+    curry_tree_hash(
+        CAT_PUZZLE_HASH,
+        &[mod_hash, asset_id_hash, inner_puzzle_hash],
+    )
 }
 
 /// This is the puzzle reveal of the [CAT2 standard](https://chialisp.com/cats) puzzle.
