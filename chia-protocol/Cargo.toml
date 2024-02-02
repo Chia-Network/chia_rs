@@ -1,6 +1,6 @@
 [package]
 name = "chia-protocol"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 license = "Apache-2.0"
 description = "Chia network protocol message types"
@@ -16,9 +16,9 @@ pyo3 = { version = "0.19.0", features = ["multiple-pymethods", "num-bigint"], op
 sha2 = "0.10.8"
 hex = "0.4.3"
 chia_streamable_macro = { version = "0.3.0", path = "../chia_streamable_macro" }
-chia_py_streamable_macro = { version = "0.3.0", path = "../chia_py_streamable_macro", optional = true }
+chia_py_streamable_macro = { version = "0.5.0", path = "../chia_py_streamable_macro", optional = true }
 clvmr = "0.4.0"
-chia-traits = { version = "0.3.3", path = "../chia-traits" }
+chia-traits = { version = "0.5.0", path = "../chia-traits" }
 clvm-traits = { version = "0.3.3", path = "../clvm-traits", features = ["derive"] }
 clvm-utils = { version = "0.4.0", path = "../clvm-utils" }
 chia-bls = { version = "0.4.0", path = "../chia-bls" }
