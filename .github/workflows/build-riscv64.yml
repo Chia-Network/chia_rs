@@ -4,9 +4,8 @@ on:
   push:
     branches:
       - main
-      - dev
-    tags:
-      - "**"
+  release:
+    types: [published]
   pull_request:
     branches:
       - "**"
@@ -122,7 +121,7 @@ jobs:
         if: env.RELEASE == 'true'
         shell: sh
         run: |
-          aws s3 ls s3://download.chia.net/simple/chiavdf/ > existing_wheel_list_raw
+          aws s3 ls s3://download.chia.net/simple/chia-rs/ > existing_wheel_list_raw
           cat existing_wheel_list_raw
           cat existing_wheel_list_raw | tr -s ' ' | cut -d ' ' -f 4 > existing_wheel_list
 
