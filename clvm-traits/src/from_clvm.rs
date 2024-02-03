@@ -184,74 +184,79 @@ impl<N> FromClvm<N> for chia_bls::Signature {
 
 #[cfg(test)]
 mod tests {
-    use crate::tests::{str_to_node, TestAllocator, TestNode};
+    use clvmr::{serde::node_from_bytes, Allocator, NodePtr};
 
-    use super::FromClvm;
     use super::*;
 
-    fn decode<T>(hex: &str) -> Result<T, FromClvmError>
+    fn decode<T>(a: &mut Allocator, hex: &str) -> Result<T, FromClvmError>
     where
-        T: FromClvm<TestNode>,
+        T: FromClvm<NodePtr>,
     {
-        let mut a = TestAllocator::new();
-        let (rest, actual) = str_to_node(&mut a, hex);
-        assert_eq!(rest, "");
-        T::from_clvm(&a, actual)
+        let bytes = hex::decode(hex).unwrap();
+        let actual = node_from_bytes(a, &bytes).unwrap();
+        T::from_clvm(a, actual)
     }
 
     #[test]
     fn test_primitives() {
-        assert_eq!(decode("NIL"), Ok(0u8));
-        assert_eq!(decode("NIL"), Ok(0i8));
-        assert_eq!(decode("05"), Ok(5u8));
-        assert_eq!(decode("05"), Ok(5u32));
-        assert_eq!(decode("05"), Ok(5i32));
-        assert_eq!(decode("e5"), Ok(-27i32));
-        assert_eq!(decode("NIL"), Ok(-0));
-        assert_eq!(decode("80"), Ok(-128i8));
+        let a = &mut Allocator::new();
+        assert_eq!(decode(a, "80"), Ok(0u8));
+        assert_eq!(decode(a, "80"), Ok(0i8));
+        assert_eq!(decode(a, "05"), Ok(5u8));
+        assert_eq!(decode(a, "05"), Ok(5u32));
+        assert_eq!(decode(a, "05"), Ok(5i32));
+        assert_eq!(decode(a, "81e5"), Ok(-27i32));
+        assert_eq!(decode(a, "80"), Ok(-0));
+        assert_eq!(decode(a, "8180"), Ok(-128i8));
     }
 
     #[test]
     fn test_pair() {
-        assert_eq!(decode("( 05 02"), Ok((5, 2)));
-        assert_eq!(decode("( b8 ( 016009 NIL"), Ok((-72, (90121, ()))));
+        let a = &mut Allocator::new();
+        assert_eq!(decode(a, "ff0502"), Ok((5, 2)));
+        assert_eq!(decode(a, "ff81b8ff8301600980"), Ok((-72, (90121, ()))));
         assert_eq!(
-            decode("( ( NIL ( NIL ( NIL ( ( NIL ( NIL ( NIL NIL NIL NIL"),
+            decode(a, "ffff80ff80ff80ffff80ff80ff80808080"),
             Ok((((), ((), ((), (((), ((), ((), ()))), ())))), ()))
         );
     }
 
     #[test]
     fn test_nil() {
-        assert_eq!(decode("NIL"), Ok(()));
+        let a = &mut Allocator::new();
+        assert_eq!(decode(a, "80"), Ok(()));
     }
 
     #[test]
     fn test_array() {
-        assert_eq!(decode("( 01 ( 02 ( 03 ( 04 NIL"), Ok([1, 2, 3, 4]));
-        assert_eq!(decode("NIL"), Ok([] as [i32; 0]));
+        let a = &mut Allocator::new();
+        assert_eq!(decode(a, "ff01ff02ff03ff0480"), Ok([1, 2, 3, 4]));
+        assert_eq!(decode(a, "80"), Ok([] as [i32; 0]));
     }
 
     #[test]
     fn test_vec() {
-        assert_eq!(decode("( 01 ( 02 ( 03 ( 04 NIL"), Ok(vec![1, 2, 3, 4]));
-        assert_eq!(decode("NIL"), Ok(Vec::<i32>::new()));
+        let a = &mut Allocator::new();
+        assert_eq!(decode(a, "ff01ff02ff03ff0480"), Ok(vec![1, 2, 3, 4]));
+        assert_eq!(decode(a, "80"), Ok(Vec::<i32>::new()));
     }
 
     #[test]
     fn test_option() {
-        assert_eq!(decode("68656c6c6f"), Ok(Some("hello".to_string())));
-        assert_eq!(decode("NIL"), Ok(None::<String>));
+        let a = &mut Allocator::new();
+        assert_eq!(decode(a, "8568656c6c6f"), Ok(Some("hello".to_string())));
+        assert_eq!(decode(a, "80"), Ok(None::<String>));
 
         // Empty strings get decoded as None instead, since both values are represented by nil bytes.
         // This could be considered either intended behavior or not, depending on the way it's used.
-        assert_ne!(decode("NIL"), Ok(Some("".to_string())));
+        assert_ne!(decode(a, "80"), Ok(Some("".to_string())));
     }
 
     #[test]
     fn test_string() {
-        assert_eq!(decode("68656c6c6f"), Ok("hello".to_string()));
-        assert_eq!(decode("NIL"), Ok("".to_string()));
+        let a = &mut Allocator::new();
+        assert_eq!(decode(a, "8568656c6c6f"), Ok("hello".to_string()));
+        assert_eq!(decode(a, "80"), Ok("".to_string()));
     }
 
     #[cfg(feature = "chia-bls")]
@@ -260,13 +265,21 @@ mod tests {
         use chia_bls::PublicKey;
         use hex_literal::hex;
 
-        let valid_bytes = hex!("b8f7dd239557ff8c49d338f89ac1a258a863fa52cd0a502e3aaae4b6738ba39ac8d982215aa3fa16bc5f8cb7e44b954d");
+        let a = &mut Allocator::new();
+
+        let bytes = hex!(
+            "
+            b8f7dd239557ff8c49d338f89ac1a258a863fa52cd0a502e
+            3aaae4b6738ba39ac8d982215aa3fa16bc5f8cb7e44b954d
+            "
+        );
+
         assert_eq!(
-            decode(&hex::encode(valid_bytes)),
-            Ok(PublicKey::from_bytes(&valid_bytes).unwrap())
+            decode(a, "b0b8f7dd239557ff8c49d338f89ac1a258a863fa52cd0a502e3aaae4b6738ba39ac8d982215aa3fa16bc5f8cb7e44b954d"),
+            Ok(PublicKey::from_bytes(&bytes).unwrap())
         );
         assert_eq!(
-            decode::<PublicKey>("68656c6c6f"),
+            decode::<PublicKey>(a, "8568656c6c6f"),
             Err(FromClvmError::WrongAtomLength {
                 expected: 48,
                 found: 5
@@ -280,13 +293,21 @@ mod tests {
         use chia_bls::Signature;
         use hex_literal::hex;
 
-        let valid_bytes = hex!("a3994dc9c0ef41a903d3335f0afe42ba16c88e7881706798492da4a1653cd10c69c841eeb56f44ae005e2bad27fb7ebb16ce8bbfbd708ea91dd4ff24f030497b50e694a8270eccd07dbc206b8ffe0c34a9ea81291785299fae8206a1e1bbc1d1");
-        assert_eq!(
-            decode(&hex::encode(valid_bytes)),
-            Ok(Signature::from_bytes(&valid_bytes).unwrap())
+        let a = &mut Allocator::new();
+
+        let bytes = hex!(
+            "
+            a3994dc9c0ef41a903d3335f0afe42ba16c88e7881706798492da4a1653cd10c
+            69c841eeb56f44ae005e2bad27fb7ebb16ce8bbfbd708ea91dd4ff24f030497b
+            50e694a8270eccd07dbc206b8ffe0c34a9ea81291785299fae8206a1e1bbc1d1
+            "
         );
         assert_eq!(
-            decode::<Signature>("68656c6c6f"),
+            decode(a, "c060a3994dc9c0ef41a903d3335f0afe42ba16c88e7881706798492da4a1653cd10c69c841eeb56f44ae005e2bad27fb7ebb16ce8bbfbd708ea91dd4ff24f030497b50e694a8270eccd07dbc206b8ffe0c34a9ea81291785299fae8206a1e1bbc1d1"),
+            Ok(Signature::from_bytes(&bytes).unwrap())
+        );
+        assert_eq!(
+            decode::<Signature>(a, "8568656c6c6f"),
             Err(FromClvmError::WrongAtomLength {
                 expected: 96,
                 found: 5

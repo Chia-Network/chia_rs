@@ -27,145 +27,26 @@ pub use to_clvm::*;
 pub use wrappers::*;
 
 #[cfg(test)]
-pub mod tests {
-    extern crate self as clvm_traits;
-
-    use super::*;
-
-    #[derive(Clone)]
-    pub enum TestNode {
-        Atom(usize),
-        Pair(Box<TestNode>, Box<TestNode>),
-    }
-
-    #[derive(Default)]
-    pub struct TestAllocator {
-        atoms: Vec<Vec<u8>>,
-    }
-
-    impl TestAllocator {
-        pub fn new() -> Self {
-            TestAllocator::default()
-        }
-
-        fn new_atom(&mut self, buf: &[u8]) -> TestNode {
-            let idx = self.atoms.len();
-            self.atoms.push(buf.to_vec());
-            TestNode::Atom(idx)
-        }
-
-        fn atom(&self, idx: usize) -> &[u8] {
-            self.atoms[idx].as_slice()
-        }
-    }
-
-    pub fn node_eq(a: &TestAllocator, left: &TestNode, right: &TestNode) -> bool {
-        match (left, right) {
-            (TestNode::Atom(l), TestNode::Atom(r)) => a.atom(*l) == a.atom(*r),
-            (TestNode::Pair(l1, r1), TestNode::Pair(l2, r2)) => {
-                node_eq(a, l1, l2) && node_eq(a, r1, r2)
-            }
-            _ => false,
-        }
-    }
-
-    pub fn node_to_str(a: &TestAllocator, input: &TestNode) -> String {
-        match input {
-            TestNode::Atom(v) => {
-                let atom = a.atom(*v);
-                if atom.is_empty() {
-                    "NIL".to_owned()
-                } else {
-                    hex::encode(atom)
-                }
-            }
-            TestNode::Pair(l, r) => format!("( {} {}", node_to_str(a, l), node_to_str(a, r)),
-        }
-    }
-
-    pub fn str_to_node<'a>(a: &mut TestAllocator, input: &'a str) -> (&'a str, TestNode) {
-        let (first, rest) = if let Some((f, r)) = input.split_once(' ') {
-            (f, r)
-        } else {
-            (input, "")
-        };
-
-        println!("\"{first}\" | \"{rest}\"");
-        if first == "(" {
-            let (rest, left) = str_to_node(a, rest);
-            let (rest, right) = str_to_node(a, rest);
-            (rest, TestNode::Pair(Box::new(left), Box::new(right)))
-        } else if first == "NIL" {
-            (rest, a.new_atom(&[]))
-        } else {
-            (
-                rest,
-                a.new_atom(hex::decode(first).expect("invalid hex").as_slice()),
-            )
-        }
-    }
-
-    impl ClvmDecoder for TestAllocator {
-        type Node = TestNode;
-
-        fn decode_atom(&self, node: &Self::Node) -> Result<&[u8], FromClvmError> {
-            match &node {
-                TestNode::Atom(v) => Ok(self.atom(*v)),
-                _ => Err(FromClvmError::ExpectedAtom),
-            }
-        }
-
-        fn decode_pair(
-            &self,
-            node: &Self::Node,
-        ) -> Result<(Self::Node, Self::Node), FromClvmError> {
-            match &node {
-                TestNode::Pair(l, r) => Ok((*l.clone(), *r.clone())),
-                _ => Err(FromClvmError::ExpectedPair),
-            }
-        }
-
-        fn clone_node(&self, node: &Self::Node) -> Self::Node {
-            node.clone()
-        }
-    }
-
-    impl ClvmEncoder for TestAllocator {
-        type Node = TestNode;
-
-        fn encode_atom(&mut self, bytes: &[u8]) -> Result<Self::Node, ToClvmError> {
-            Ok(self.new_atom(bytes))
-        }
-
-        fn encode_pair(
-            &mut self,
-            first: Self::Node,
-            rest: Self::Node,
-        ) -> Result<Self::Node, ToClvmError> {
-            Ok(TestNode::Pair(Box::new(first), Box::new(rest)))
-        }
-    }
-}
-
-#[cfg(test)]
 #[cfg(feature = "derive")]
 mod derive_tests {
     extern crate self as clvm_traits;
 
     use super::*;
-    use crate::tests::*;
+
     use std::fmt::Debug;
+
+    use clvmr::{serde::node_to_bytes, Allocator, NodePtr};
 
     fn check<T>(value: T, expected: &str)
     where
-        T: Debug + PartialEq + ToClvm<TestNode> + FromClvm<TestNode>,
+        T: Debug + PartialEq + ToClvm<NodePtr> + FromClvm<NodePtr>,
     {
-        let a = &mut TestAllocator::new();
+        let a = &mut Allocator::new();
 
         let ptr = value.to_clvm(a).unwrap();
 
-        let actual = node_to_str(a, &ptr);
-        assert_eq!(expected, actual);
+        let actual = node_to_bytes(a, ptr).unwrap();
+        assert_eq!(expected, hex::encode(actual));
 
         let round_trip = T::from_clvm(a, ptr).unwrap();
         assert_eq!(value, round_trip);
@@ -173,10 +54,10 @@ mod derive_tests {
 
     fn coerce_into<A, B>(value: A) -> B
     where
-        A: ToClvm<TestNode>,
-        B: FromClvm<TestNode>,
+        A: ToClvm<NodePtr>,
+        B: FromClvm<NodePtr>,
     {
-        let a = &mut TestAllocator::new();
+        let a = &mut Allocator::new();
         let ptr = value.to_clvm(a).unwrap();
         B::from_clvm(a, ptr).unwrap()
     }
@@ -190,7 +71,7 @@ mod derive_tests {
             b: i32,
         }
 
-        check(TupleStruct { a: 52, b: -32 }, "( 34 e0");
+        check(TupleStruct { a: 52, b: -32 }, "ff3481e0");
     }
 
     #[test]
@@ -202,7 +83,7 @@ mod derive_tests {
             b: i32,
         }
 
-        check(ListStruct { a: 52, b: -32 }, "( 34 ( e0 NIL");
+        check(ListStruct { a: 52, b: -32 }, "ff34ff81e080");
     }
 
     #[test]
@@ -216,7 +97,7 @@ mod derive_tests {
 
         check(
             CurryStruct { a: 52, b: -32 },
-            "( 04 ( ( 01 34 ( ( 04 ( ( 01 e0 ( 01 NIL NIL",
+            "ff04ffff0134ffff04ffff0181e0ff018080",
         );
     }
 
@@ -226,7 +107,7 @@ mod derive_tests {
         #[clvm(tuple)]
         struct UnnamedStruct(String, String);
 
-        check(UnnamedStruct("A".to_string(), "B".to_string()), "( 41 42");
+        check(UnnamedStruct("A".to_string(), "B".to_string()), "ff4142");
     }
 
     #[test]
@@ -235,7 +116,7 @@ mod derive_tests {
         #[clvm(tuple)]
         struct NewTypeStruct(String);
 
-        check(NewTypeStruct("XYZ".to_string()), "58595a");
+        check(NewTypeStruct("XYZ".to_string()), "8358595a");
     }
 
     #[test]
@@ -248,9 +129,9 @@ mod derive_tests {
             C,
         }
 
-        check(Enum::A(32), "( NIL 20");
-        check(Enum::B { x: -72 }, "( 01 b8");
-        check(Enum::C, "( 02 NIL");
+        check(Enum::A(32), "ff8020");
+        check(Enum::B { x: -72 }, "ff0181b8");
+        check(Enum::C, "ff0280");
     }
 
     #[test]
@@ -264,9 +145,9 @@ mod derive_tests {
             C = 11,
         }
 
-        check(Enum::A(32), "( 2a 20");
-        check(Enum::B { x: -72 }, "( 22 b8");
-        check(Enum::C, "( 0b NIL");
+        check(Enum::A(32), "ff2a20");
+        check(Enum::B { x: -72 }, "ff2281b8");
+        check(Enum::C, "ff0b80");
     }
 
     #[test]
@@ -289,12 +170,12 @@ mod derive_tests {
         }
 
         check(Enum::A(32), "20");
-        check(Enum::B { x: -72, y: 94 }, "( b8 ( 5e NIL");
+        check(Enum::B { x: -72, y: 94 }, "ff81b8ff5e80");
         check(
             Enum::C {
                 curried_value: "Hello".to_string(),
             },
-            "( 04 ( ( 01 48656c6c6f ( 01 NIL",
+            "ff04ffff018548656c6c6fff0180",
         );
     }
 
