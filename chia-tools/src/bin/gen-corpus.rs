@@ -10,10 +10,10 @@ use chia_traits::streamable::Streamable;
 
 use chia_protocol::{Bytes32, Coin, CoinSpend, Program, SpendBundle};
 use chia_wallet::singleton::SINGLETON_TOP_LAYER_PUZZLE_HASH;
-use clvm_traits::FromClvm;
+use clvm_traits::{FromClvm, FromNodePtr};
 use clvm_utils::{tree_hash, CurriedProgram};
 use clvmr::allocator::NodePtr;
-use clvmr::{Allocator, FromNodePtr};
+use clvmr::Allocator;
 use std::thread::available_parallelism;
 use threadpool::ThreadPool;
 
