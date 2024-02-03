@@ -9,7 +9,6 @@ use rusqlite::Connection;
 
 use chia::gen::conditions::{parse_spends, MempoolVisitor};
 use chia::gen::flags::MEMPOOL_MODE;
-use chia::gen::validation_error::ValidationErr;
 use chia::generator_rom::{COST_PER_BYTE, GENERATOR_ROM};
 use clvmr::reduction::Reduction;
 use clvmr::run_program_with_counters;
@@ -82,18 +81,11 @@ fn main() {
         let block =
             FullBlock::from_bytes_unchecked(&block_buffer).expect("failed to parse FullBlock");
 
-        let ti = match block.transactions_info {
-            Some(ti) => ti,
-            None => {
-                continue;
-            }
+        let Some(ti) = block.transactions_info else {
+            continue;
         };
-
-        let ftb = match block.foliage_transaction_block {
-            Some(ftb) => ftb,
-            None => {
-                continue;
-            }
+        let Some(ftb) = block.foliage_transaction_block else {
+            continue;
         };
 
         if prev_timestamp == 0 {
@@ -102,130 +94,118 @@ fn main() {
         let time_delta = ftb.timestamp - prev_timestamp;
         prev_timestamp = ftb.timestamp;
 
-        if let Some(program) = block.transactions_generator {
-            a.restore_checkpoint(&allocator_checkpoint);
+        let Some(program) = block.transactions_generator else {
+            continue;
+        };
 
-            let generator =
-                node_from_bytes(&mut a, program.as_ref()).expect("failed to parse block generator");
+        a.restore_checkpoint(&allocator_checkpoint);
 
-            let parse_timing = start_parse.elapsed().expect("failed to get system time");
+        let generator =
+            node_from_bytes(&mut a, program.as_ref()).expect("failed to parse block generator");
 
-            let mut args = a.nil();
+        let parse_timing = start_parse.elapsed().expect("failed to get system time");
 
-            let start_ref_lookup = SystemTime::now();
-            // iterate in reverse order since we're building a linked list from
-            // the tail
-            for height in block.transactions_generator_ref_list.iter().rev() {
-                let mut rows = block_ref_lookup
-                    .query(rusqlite::params![height])
-                    .expect("failed to look up ref-block");
+        let mut args = a.nil();
 
-                let row = rows
-                    .next()
-                    .expect("failed to fetch block-ref row")
-                    .expect("get None block-ref row");
-                let ref_block = row
-                    .get::<_, Vec<u8>>(0)
-                    .expect("failed to lookup block reference");
+        let start_ref_lookup = SystemTime::now();
+        // iterate in reverse order since we're building a linked list from
+        // the tail
+        for height in block.transactions_generator_ref_list.iter().rev() {
+            let mut rows = block_ref_lookup
+                .query(rusqlite::params![height])
+                .expect("failed to look up ref-block");
 
-                let ref_block =
-                    zstd::stream::decode_all(&mut std::io::Cursor::<Vec<u8>>::new(ref_block))
-                        .expect("failed to decompress block");
+            let row = rows
+                .next()
+                .expect("failed to fetch block-ref row")
+                .expect("get None block-ref row");
+            let ref_block = row
+                .get::<_, Vec<u8>>(0)
+                .expect("failed to lookup block reference");
 
-                let ref_block =
-                    FullBlock::from_bytes_unchecked(&ref_block).expect("failed to parse ref-block");
-                let ref_gen = match ref_block.transactions_generator {
-                    None => {
-                        panic!("block ref has no generator");
-                    }
-                    Some(g) => g,
-                };
+            let ref_block =
+                zstd::stream::decode_all(&mut std::io::Cursor::<Vec<u8>>::new(ref_block))
+                    .expect("failed to decompress block");
 
-                let ref_gen = a
-                    .new_atom(ref_gen.as_ref())
-                    .expect("failed to allocate atom for ref_block");
-                args = a.new_pair(ref_gen, args).expect("failed to allocate pair");
-            }
-            let ref_lookup_timing = start_ref_lookup
-                .elapsed()
-                .expect("failed to get system time");
+            let ref_block =
+                FullBlock::from_bytes_unchecked(&ref_block).expect("failed to parse ref-block");
+            let ref_gen = ref_block
+                .transactions_generator
+                .expect("block ref has no generator");
 
-            let byte_cost = program.len() as u64 * COST_PER_BYTE;
-
-            args = a.new_pair(args, a.nil()).expect("failed to allocate pair");
-            let args = a.new_pair(args, a.nil()).expect("failed to allocate pair");
-            let args = a
-                .new_pair(generator, args)
-                .expect("failed to allocate pair");
-
-            let start_execute = SystemTime::now();
-            let dialect = ChiaDialect::new(0);
-            let (counters, result) = run_program_with_counters(
-                &mut a,
-                &dialect,
-                generator_rom,
-                args,
-                ti.cost - byte_cost,
-            );
-            let execute_timing = start_execute.elapsed().expect("failed to get system time");
-
-            let Reduction(clvm_cost, generator_output) = result.expect("block generator failed");
-
-            let start_conditions = SystemTime::now();
-            // we pass in what's left of max_cost here, to fail early in case the
-            // cost of a condition brings us over the cost limit
-            let conds = match parse_spends::<MempoolVisitor>(
-                &a,
-                generator_output,
-                ti.cost - clvm_cost,
-                MEMPOOL_MODE,
-            ) {
-                Err(ValidationErr(_, _)) => {
-                    panic!("failed to parse conditions in block {height}");
-                }
-                Ok(c) => c,
-            };
-            let conditions_timing = start_conditions
-                .elapsed()
-                .expect("failed to get system time");
-
-            assert!(clvm_cost + byte_cost + conds.cost == ti.cost);
-            output
-                .write_fmt(format_args!(
-                    "{} val_stack: {} \
-                env_stack: {} \
-                op_stack: {} \
-                atoms: {} \
-                pairs: {} \
-                heap: {} \
-                block_cost: {} \
-                clvm_cost: {} \
-                cond_cost: {} \
-                parse_time: {} \
-                ref_lookup_time: {} \
-                execute_time: {} \
-                conditions_time: {} \
-                timestamp: {} \
-                time_delta: {} \
-                \n",
-                    height,
-                    counters.val_stack_usage,
-                    counters.env_stack_usage,
-                    counters.op_stack_usage,
-                    counters.atom_count,
-                    counters.pair_count,
-                    counters.heap_size,
-                    ti.cost,
-                    clvm_cost,
-                    conds.cost,
-                    parse_timing.as_micros(),
-                    ref_lookup_timing.as_micros(),
-                    execute_timing.as_micros(),
-                    conditions_timing.as_micros(),
-                    ftb.timestamp,
-                    time_delta,
-                ))
-                .expect("failed to write to output file");
+            let ref_gen = a
+                .new_atom(ref_gen.as_ref())
+                .expect("failed to allocate atom for ref_block");
+            args = a.new_pair(ref_gen, args).expect("failed to allocate pair");
         }
+        let ref_lookup_timing = start_ref_lookup
+            .elapsed()
+            .expect("failed to get system time");
+
+        let byte_cost = program.len() as u64 * COST_PER_BYTE;
+
+        args = a.new_pair(args, a.nil()).expect("failed to allocate pair");
+        let args = a.new_pair(args, a.nil()).expect("failed to allocate pair");
+        let args = a
+            .new_pair(generator, args)
+            .expect("failed to allocate pair");
+
+        let start_execute = SystemTime::now();
+        let dialect = ChiaDialect::new(0);
+        let (counters, result) =
+            run_program_with_counters(&mut a, &dialect, generator_rom, args, ti.cost - byte_cost);
+        let execute_timing = start_execute.elapsed().expect("failed to get system time");
+
+        let Reduction(clvm_cost, generator_output) = result.expect("block generator failed");
+
+        let start_conditions = SystemTime::now();
+        // we pass in what's left of max_cost here, to fail early in case the
+        // cost of a condition brings us over the cost limit
+        let Ok(conds) =
+            parse_spends::<MempoolVisitor>(&a, generator_output, ti.cost - clvm_cost, MEMPOOL_MODE)
+        else {
+            panic!("failed to parse conditions in block {height}");
+        };
+        let conditions_timing = start_conditions
+            .elapsed()
+            .expect("failed to get system time");
+
+        assert!(clvm_cost + byte_cost + conds.cost == ti.cost);
+        output
+            .write_fmt(format_args!(
+                "{} val_stack: {} \
+            env_stack: {} \
+            op_stack: {} \
+            atoms: {} \
+            pairs: {} \
+            heap: {} \
+            block_cost: {} \
+            clvm_cost: {} \
+            cond_cost: {} \
+            parse_time: {} \
+            ref_lookup_time: {} \
+            execute_time: {} \
+            conditions_time: {} \
+            timestamp: {} \
+            time_delta: {} \
+            \n",
+                height,
+                counters.val_stack_usage,
+                counters.env_stack_usage,
+                counters.op_stack_usage,
+                counters.atom_count,
+                counters.pair_count,
+                counters.heap_size,
+                ti.cost,
+                clvm_cost,
+                conds.cost,
+                parse_timing.as_micros(),
+                ref_lookup_timing.as_micros(),
+                execute_timing.as_micros(),
+                conditions_timing.as_micros(),
+                ftb.timestamp,
+                time_delta,
+            ))
+            .expect("failed to write to output file");
     }
 }
