@@ -1,7 +1,7 @@
 use crate::bytes::Bytes;
 use chia_traits::chia_error::{Error, Result};
 use chia_traits::Streamable;
-use clvm_traits::{FromClvmError, ToClvmError};
+use clvm_traits::{FromClvmError, FromNodePtr, ToClvmError, ToNodePtr};
 use clvmr::allocator::NodePtr;
 use clvmr::cost::Cost;
 use clvmr::reduction::EvalErr;
@@ -10,7 +10,7 @@ use clvmr::serde::{
     node_from_bytes, node_from_bytes_backrefs, node_to_bytes, serialized_length_from_bytes,
     serialized_length_from_bytes_trusted,
 };
-use clvmr::{Allocator, ChiaDialect, FromNodePtr, ToNodePtr};
+use clvmr::{Allocator, ChiaDialect};
 use sha2::{Digest, Sha256};
 use std::io::Cursor;
 use std::ops::Deref;
@@ -440,7 +440,7 @@ impl Program {
                 <(
                     clvm_traits::MatchByte<4>,
                     (clvm_traits::match_quote!(NodePtr), (NodePtr, ())),
-                ) as clvmr::FromNodePtr>::from_node_ptr(&a, args)
+                ) as clvm_traits::FromNodePtr>::from_node_ptr(&a, args)
                 .map_err(|error| PyErr::new::<PyTypeError, _>(error.to_string()))?;
             curried_args.push(arg);
             args = rest;

@@ -1,6 +1,6 @@
 [package]
 name = "clvm-utils"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 license = "Apache-2.0"
 description = "Utility functions for processing clvm programs and structures"
@@ -9,8 +9,8 @@ homepage = "https://github.com/Chia-Network/chia_rs/"
 repository = "https://github.com/Chia-Network/chia_rs/clvm-utils"
 
 [dependencies]
-clvmr = "0.4.0"
-clvm-traits = { version = "0.3.3", path = "../clvm-traits" }
+clvmr = "0.5.0"
+clvm-traits = { version = "0.5.0", path = "../clvm-traits" }
 
 [dev-dependencies]
 hex = "0.4.3"

@@ -287,9 +287,9 @@ dependencies = [
 
 [[package]]
 name = "chia-bls"
-version = "0.3.3"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba003303bda3019f2fe94e5478555a96addff1d6a1ea84bfe207b3f075cd8420"
+checksum = "1cbbce0107fa3911890f1a204a147c6d07116687658a6af95690e64fc21ff782"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -304,7 +304,7 @@ dependencies = [
 
 [[package]]
 name = "chia-bls"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -326,14 +326,14 @@ dependencies = [
 name = "chia-bls-fuzz"
 version = "0.0.0"
 dependencies = [
- "chia-bls 0.4.0",
+ "chia-bls 0.5.0",
  "libfuzzer-sys",
  "pyo3",
 ]
 
 [[package]]
 name = "chia-client"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "chia-protocol",
  "chia-traits 0.5.0",
@@ -363,7 +363,7 @@ name = "chia-protocol"
 version = "0.5.0"
 dependencies = [
  "arbitrary",
- "chia-bls 0.4.0",
+ "chia-bls 0.5.0",
  "chia-traits 0.5.0",
  "chia_py_streamable_macro",
  "chia_streamable_macro 0.3.0",
@@ -408,7 +408,7 @@ name = "chia-tools"
 version = "0.5.0"
 dependencies = [
  "chia",
- "chia-bls 0.4.0",
+ "chia-bls 0.5.0",
  "chia-protocol",
  "chia-traits 0.5.0",
  "chia-wallet",
@@ -452,7 +452,7 @@ name = "chia-wallet"
 version = "0.5.0"
 dependencies = [
  "arbitrary",
- "chia-bls 0.4.0",
+ "chia-bls 0.5.0",
  "chia-protocol",
  "clvm-traits",
  "clvm-utils",
@@ -465,7 +465,7 @@ dependencies = [
 
 [[package]]
 name = "chia-wallet-fuzz"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "chia-wallet",
  "clvm-traits",
@@ -597,10 +597,11 @@ dependencies = [
 
 [[package]]
 name = "clvm-traits"
-version = "0.3.3"
+version = "0.5.0"
 dependencies = [
- "chia-bls 0.4.0",
+ "chia-bls 0.5.0",
  "clvm-derive",
+ "clvmr",
  "hex",
  "hex-literal",
  "num-bigint",
@@ -610,7 +611,7 @@ dependencies = [
 
 [[package]]
 name = "clvm-utils"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "clvm-traits",
  "clvmr",
@@ -631,12 +632,11 @@ dependencies = [
 
 [[package]]
 name = "clvmr"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "797ae1b4229262bd4987523a8f75e49d4800338db5feb2b39612edbfa8934186"
+checksum = "9703ae71967bce4aa064bcdcb4103b065b2e40ae710729f42697e94bff43553f"
 dependencies = [
- "chia-bls 0.3.3",
- "clvm-traits",
+ "chia-bls 0.4.0",
  "k256",
  "lazy_static",
  "num-bigint",

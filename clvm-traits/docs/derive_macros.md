@@ -24,7 +24,7 @@ For example:
 - `(A, B, C)` is encoded as `(A . (B . C))`, since every cons-pair must contain two values.
 - `(A, B, C, D)` is encoded as `(A . (B . (C . D)))` for the same reason as above.
 
-```rust compile_fail
+```rust
 use clvmr::Allocator;
 use clvm_traits::{ToClvm, FromClvm};
 
@@ -59,7 +59,7 @@ For example:
 Note that the following code is for example purposes only and is not indicative of how to create a secure program.
 Using a password like shown in this example is an insecure method of locking coins, but it's effective for learning.
 
-```rust compile_fail
+```rust
 use clvmr::Allocator;
 use clvm_traits::{ToClvm, FromClvm};
 
@@ -91,7 +91,7 @@ You can read more about currying on the [Chia blockchain documentation](https://
 Note that the following code is for example purposes only and is not indicative of how to create a secure program.
 Using a password like shown in this example is an insecure method of locking coins, but it's effective for learning.
 
-```rust compile_fail
+```rust
 use clvmr::Allocator;
 use clvm_traits::{ToClvm, FromClvm};
 
@@ -121,7 +121,7 @@ For convenience, this is the behavior when deriving `ToClvm` and `FromClvm` for 
 In this example, since the `tuple` representation is used and the only values are the discriminants, the variants will be encoded as an atom.
 Discriminants default to the `isize` type and the first value is `0`. Subsequent values are incremented by `1` by default.
 
-```rust compile_fail
+```rust
 use clvmr::Allocator;
 use clvm_traits::{ToClvm, FromClvm};
 
@@ -145,7 +145,7 @@ It's possible to override both the type of the discriminator, and the value.
 The `#[repr(...)]` attribute is used by the Rust compiler to allow overriding the discriminator type.
 As such, this attribute is also used to change the underlying type used to serialize and deserialize discriminator values.
 
-```rust compile_fail
+```rust
 use clvmr::Allocator;
 use clvm_traits::{ToClvm, FromClvm};
 
@@ -169,7 +169,7 @@ assert_eq!(Status::from_clvm(a, ptr).unwrap(), status);
 Of course, you can also include fields on enum variants, and they will be serialized after the discriminator accordingly.
 It's also possible to override the representation of an individual variant, as if it were a standalone struct.
 
-```rust compile_fail
+```rust
 use clvmr::Allocator;
 use clvm_traits::{ToClvm, FromClvm};
 
@@ -199,7 +199,7 @@ This is what `#[clvm(untagged)]` allows you to do. However, due to current limit
 Note that if there is any ambiguity, the first variant which matches a value will be the resulting value.
 For example, if both `A` and `B` are in that order and are the same type, if you serialize a value of `B`, it will be deserialized as `A`.
 
-```rust compile_fail
+```rust
 use clvmr::Allocator;
 use clvm_traits::{ToClvm, FromClvm};
 

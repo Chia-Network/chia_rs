@@ -180,8 +180,8 @@ mod tests {
     use crate::gen::run_puzzle::run_puzzle;
     use chia_protocol::CoinSpend;
     use chia_traits::streamable::Streamable;
+    use clvm_traits::ToNodePtr;
     use clvmr::serde::{node_from_bytes, node_to_bytes};
-    use clvmr::ToNodePtr;
     use hex_literal::hex;
     use rstest::rstest;
     use std::fs;

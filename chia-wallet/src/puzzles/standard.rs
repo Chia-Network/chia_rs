@@ -55,8 +55,9 @@ pub static DEFAULT_HIDDEN_PUZZLE_HASH: [u8; 32] = hex!(
 
 #[cfg(test)]
 mod tests {
+    use clvm_traits::ToNodePtr;
     use clvm_utils::{tree_hash, CurriedProgram};
-    use clvmr::{serde::node_from_bytes, Allocator, ToNodePtr};
+    use clvmr::{serde::node_from_bytes, Allocator};
 
     use super::*;
 

@@ -193,8 +193,9 @@ pub static CAT_PUZZLE_HASH_V1: [u8; 32] = hex!(
 
 #[cfg(test)]
 mod tests {
+    use clvm_traits::ToNodePtr;
     use clvm_utils::{tree_hash, CurriedProgram};
-    use clvmr::{serde::node_from_bytes, Allocator, ToNodePtr};
+    use clvmr::{serde::node_from_bytes, Allocator};
 
     use super::*;
 
