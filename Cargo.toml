@@ -58,6 +58,7 @@ criterion = "0.5.1"
 [lib]
 name = "chia"
 crate-type = ["rlib"]
+bench = false
 
 [profile.release]
 lto = "thin"
