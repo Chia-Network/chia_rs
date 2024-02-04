@@ -62,3 +62,8 @@ bench = false
 name = "optimize-db"
 test = false
 bench = false
+
+[[bin]]
+name = "get-generator"
+test = false
+bench = false
