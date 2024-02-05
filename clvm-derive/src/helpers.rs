@@ -38,34 +38,38 @@ impl ClvmAttr {
 pub fn parse_clvm_attr(attrs: &[Attribute]) -> ClvmAttr {
     let mut result = ClvmAttr::default();
     for attr in attrs {
-        if let Some(ident) = attr.path().get_ident() {
-            if ident == "clvm" {
-                let args = attr
-                    .parse_args_with(Punctuated::<Ident, Token![,]>::parse_terminated)
-                    .unwrap();
+        let Some(ident) = attr.path().get_ident() else {
+            continue;
+        };
 
-                for arg in args {
-                    let existing = result.repr;
+        if ident != "clvm" {
+            continue;
+        }
 
-                    result.repr = Some(match arg.to_string().as_str() {
-                        "tuple" => Repr::Tuple,
-                        "list" => Repr::List,
-                        "curry" => Repr::Curry,
-                        "untagged" => {
-                            if result.untagged {
-                                panic!("`untagged` specified twice");
-                            } else {
-                                result.untagged = true;
-                            }
-                            continue;
-                        }
-                        ident => panic!("unknown argument `{ident}`"),
-                    });
+        let args = attr
+            .parse_args_with(Punctuated::<Ident, Token![,]>::parse_terminated)
+            .unwrap();
 
-                    if let Some(existing) = existing {
-                        panic!("`{arg}` conflicts with `{existing}`");
+        for arg in args {
+            let existing = result.repr;
+
+            result.repr = Some(match arg.to_string().as_str() {
+                "tuple" => Repr::Tuple,
+                "list" => Repr::List,
+                "curry" => Repr::Curry,
+                "untagged" => {
+                    if result.untagged {
+                        panic!("`untagged` specified twice");
+                    } else {
+                        result.untagged = true;
                     }
+                    continue;
                 }
+                ident => panic!("unknown argument `{ident}`"),
+            });
+
+            if let Some(existing) = existing {
+                panic!("`{arg}` conflicts with `{existing}`");
             }
         }
     }
@@ -75,10 +79,11 @@ pub fn parse_clvm_attr(attrs: &[Attribute]) -> ClvmAttr {
 pub fn parse_int_repr(attrs: &[Attribute]) -> Ident {
     let mut int_repr: Option<Ident> = None;
     for attr in attrs {
-        if let Some(ident) = attr.path().get_ident() {
-            if ident == "repr" {
-                int_repr = Some(attr.parse_args_with(Ident::parse_any).unwrap());
-            }
+        let Some(ident) = attr.path().get_ident() else {
+            continue;
+        };
+        if ident == "repr" {
+            int_repr = Some(attr.parse_args_with(Ident::parse_any).unwrap());
         }
     }
     int_repr.unwrap_or(Ident::new("isize", Span::call_site()))
