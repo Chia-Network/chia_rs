@@ -1,25 +1,6 @@
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyBool, PyDict, PyList, PyString, PyTuple};
+use pyo3::types::{PyAny, PyBool, PyList, PyString, PyTuple};
 use pyo3::PyResult;
-
-pub fn py_int<'a, T: pyo3::ToPyObject + std::fmt::Debug>(
-    py: pyo3::Python<'a>,
-    py_type: &str,
-    val: T,
-) -> PyResult<&'a PyAny> {
-    let ctx: &'a PyDict = PyDict::new(py);
-    ctx.set_item("value", val.to_object(py))?;
-    py.run(
-        format!(
-            "from chia.util.ints import {py_type}\n\
-        ret = {py_type}(value)\n"
-        )
-        .as_str(),
-        None,
-        Some(ctx),
-    )?;
-    Ok(ctx.get_item("ret").unwrap())
-}
 
 /// A custom to-python conversion trait that turns primitive integer types into
 /// the chia-blockchain fixed-width integer types (uint8, int8, etc.)
@@ -31,7 +12,9 @@ macro_rules! primitive_int {
     ($t:ty, $name:expr) => {
         impl ChiaToPython for $t {
             fn to_python<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
-                py_int(py, $name, &self)
+                let int_module = PyModule::import(py, "chia.util.ints")?;
+                let ty = int_module.getattr($name)?;
+                ty.call1((self.into_py(py),))
             }
         }
     };
