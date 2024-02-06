@@ -266,10 +266,10 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chia"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "chia-protocol",
- "chia-traits 0.5.1",
+ "chia-traits 0.5.2",
  "chia-wallet",
  "clvm-derive",
  "clvm-traits",
@@ -309,7 +309,7 @@ dependencies = [
  "anyhow",
  "arbitrary",
  "blst",
- "chia-traits 0.5.1",
+ "chia-traits 0.5.2",
  "chia_py_streamable_macro",
  "criterion",
  "hex",
@@ -333,10 +333,10 @@ dependencies = [
 
 [[package]]
 name = "chia-client"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "chia-protocol",
- "chia-traits 0.5.1",
+ "chia-traits 0.5.2",
  "futures-util",
  "thiserror",
  "tokio",
@@ -350,7 +350,7 @@ version = "0.5.1"
 dependencies = [
  "chia",
  "chia-protocol",
- "chia-traits 0.5.1",
+ "chia-traits 0.5.2",
  "clvm-traits",
  "clvm-utils",
  "clvmr",
@@ -364,7 +364,7 @@ version = "0.5.1"
 dependencies = [
  "arbitrary",
  "chia-bls 0.5.1",
- "chia-traits 0.5.1",
+ "chia-traits 0.5.2",
  "chia_py_streamable_macro",
  "chia_streamable_macro 0.3.0",
  "clvm-traits",
@@ -382,7 +382,7 @@ version = "0.0.0"
 dependencies = [
  "arbitrary",
  "chia-protocol",
- "chia-traits 0.5.1",
+ "chia-traits 0.5.2",
  "clvm-traits",
  "clvmr",
  "hex",
@@ -405,12 +405,12 @@ dependencies = [
 
 [[package]]
 name = "chia-tools"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "chia",
  "chia-bls 0.5.1",
  "chia-protocol",
- "chia-traits 0.5.1",
+ "chia-traits 0.5.2",
  "chia-wallet",
  "clap",
  "clvm-traits",
@@ -437,7 +437,7 @@ dependencies = [
 
 [[package]]
 name = "chia-traits"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "chia_py_streamable_macro",
  "chia_streamable_macro 0.3.0",
@@ -465,7 +465,7 @@ dependencies = [
 
 [[package]]
 name = "chia-wallet-fuzz"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "chia-wallet",
  "clvm-traits",
@@ -588,7 +588,7 @@ checksum = "cd7cc57abe963c6d3b9d8be5b06ba7c8957a930305ca90304f24ef040aa6f961"
 
 [[package]]
 name = "clvm-derive"
-version = "0.2.14"
+version = "0.5.2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -597,7 +597,7 @@ dependencies = [
 
 [[package]]
 name = "clvm-traits"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "chia-bls 0.5.1",
  "clvm-derive",
