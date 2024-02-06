@@ -128,4 +128,4 @@ jobs:
 
     - name: cargo bench
       run: |
-        cargo bench --all
+        cargo bench --workspace --exclude chia_rs
