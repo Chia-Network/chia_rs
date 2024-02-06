@@ -13,6 +13,7 @@ readme = "README.md"
 name = "chia_rs"
 crate-type = ["cdylib"]
 path = "src/lib.rs"
+bench = false
 
 [dependencies]
 clvmr = "0.5.0"
@@ -26,7 +27,3 @@ chia-traits = { version = "=0.5.2", path = "../chia-traits", features = ["py-bin
 clvm-traits = { version = "=0.5.2", path = "../clvm-traits", features = ["derive", "py-bindings"] }
 chia_py_streamable_macro = { version = "=0.5.1", path = "../chia_py_streamable_macro" }
 chia_streamable_macro = { version = "=0.3.0", path = "../chia_streamable_macro" }
-
-# See `../Cargo.toml` for more information on why this is necessary.
-[patch.crates-io]
-blst = { git = "https://github.com/supranational/blst.git", rev = "0d46eefa45fc1e57aceb42bba0e84eab3a7a9725" }
