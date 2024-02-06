@@ -267,14 +267,14 @@ jobs:
 
     - name: Build source distribution
       run: |
-        pip install maturin
-        maturin sdist -m wheel/Cargo.toml
+        pip install build
+        python -m build wheel/
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v3
       with:
         name: packages
-        path: ./wheel/target/wheels/
+        path: ./wheel/target/wheels/*.tar.gz
 
   fmt:
     runs-on: ubuntu-latest
