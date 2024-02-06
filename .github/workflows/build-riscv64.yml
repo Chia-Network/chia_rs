@@ -89,7 +89,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: packages
-          path: ./wheel/target/wheels/
+          path: ./target/wheels
           if-no-files-found: error
   upload:
     name: Upload to Chia PyPI
@@ -112,7 +112,7 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: packages
-          path: ./wheel/target/wheels/
+          path: ./target/wheels
 
       - name: Configure AWS credentials
         if: env.RELEASE == 'true'
@@ -133,8 +133,8 @@ jobs:
         if: env.RELEASE == 'true'
         shell: sh
         run: |
-          (cd wheel/target/wheels/; ls chia_rs-*.whl) > new_wheel_list
-          cat new_wheel_list | xargs -I % sh -c 'ls -l wheel/target/wheels/%'
+          (cd target/wheels/; ls chia_rs-*.whl) > new_wheel_list
+          cat new_wheel_list | xargs -I % sh -c 'ls -l target/wheels/%'
 
       - name: Choose wheels to upload
         if: env.RELEASE == 'true'
@@ -147,4 +147,4 @@ jobs:
         if: env.RELEASE == 'true'
         shell: sh
         run: |
-          cat upload_wheel_list | xargs -I % sh -c 'aws s3 cp wheel/target/wheels/% s3://download.chia.net/simple/chia-rs/'
+          cat upload_wheel_list | xargs -I % sh -c 'aws s3 cp target/wheels/% s3://download.chia.net/simple/chia-rs/'
