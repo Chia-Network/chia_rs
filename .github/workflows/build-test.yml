@@ -197,7 +197,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: packages
-        path: ./wheel/target/wheels/
+        path: ./target/wheels/
 
   check-typestubs:
     name: Check chia_rs.pyi
@@ -274,7 +274,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: packages
-        path: ./wheel/target/wheels/
+        path: ./target/wheels/
 
   fmt:
     runs-on: ubuntu-latest
