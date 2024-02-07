@@ -1,5 +1,3 @@
-# the "wheel" crate is excluded from the workspace because pyo3 has problems with
-# "cargo test" and "cargo bench"
 [workspace]
 members = [
     "chia-bls",
@@ -20,8 +18,8 @@ members = [
     "clvm-utils/fuzz",
     "fuzz",
     "wasm",
+    "wheel",
 ]
-exclude = ["wheel"]
 
 [package]
 name = "chia"
