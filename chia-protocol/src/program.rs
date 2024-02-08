@@ -296,16 +296,9 @@ fn clvm_serialize(a: &mut Allocator, o: &PyAny) -> PyResult<NodePtr> {
 
 #[cfg(feature = "py-bindings")]
 fn to_program(py: Python<'_>, node: LazyNode) -> PyResult<&PyAny> {
-    use pyo3::types::PyDict;
-    let ctx: &PyDict = PyDict::new(py);
-    ctx.set_item("node", node)?;
-    py.run(
-        "from chia.types.blockchain_format.program import Program\n\
-        ret = Program(node)\n",
-        None,
-        Some(ctx),
-    )?;
-    Ok(ctx.get_item("ret").unwrap())
+    let int_module = PyModule::import(py, "chia.types.blockchain_format.program")?;
+    let ty = int_module.getattr("Program")?;
+    ty.call1((node.into_py(py),))
 }
 
 #[cfg(feature = "py-bindings")]
