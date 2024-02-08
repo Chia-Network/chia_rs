@@ -486,7 +486,7 @@ dependencies = [
 
 [[package]]
 name = "chia_rs"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "chia",
  "chia-bls 0.5.1",
