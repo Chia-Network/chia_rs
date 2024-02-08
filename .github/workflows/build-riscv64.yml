@@ -8,7 +8,7 @@ on:
     types: [published]
   pull_request:
     branches:
-      - "**"
+      - '**'
 
 permissions:
   id-token: write
@@ -50,14 +50,14 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         python:
-          - major-dot-minor: "3.8"
-            matrix: "3.8"
-          - major-dot-minor: "3.9"
-            matrix: "3.9"
-          - major-dot-minor: "3.10"
-            matrix: "3.10"
-          - major-dot-minor: "3.11"
-            matrix: "3.11"
+          - major-dot-minor: '3.8'
+            matrix: '3.8'
+          - major-dot-minor: '3.9'
+            matrix: '3.9'
+          - major-dot-minor: '3.10'
+            matrix: '3.10'
+          - major-dot-minor: '3.11'
+            matrix: '3.11'
 
     steps:
       - name: Checkout repository

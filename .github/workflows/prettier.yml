@@ -1,0 +1,20 @@
+name: Prettier formatter
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '**'
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  prettier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: npm install
+        run: npm install
+      - name: prettier check
+        run: npx prettier . --check
