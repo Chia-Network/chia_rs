@@ -1,5 +1,7 @@
 use clvmr::allocator::{Allocator, NodePtr, SExp};
+use clvmr::serde::node_from_bytes_backrefs;
 use clvmr::sha2::{Digest, Sha256};
+use std::io;
 
 enum TreeOp {
     SExp(NodePtr),
@@ -47,6 +49,12 @@ pub fn tree_hash(a: &Allocator, node: NodePtr) -> [u8; 32] {
 
     assert!(hashes.len() == 1);
     hashes[0]
+}
+
+pub fn tree_hash_from_bytes(buf: &[u8]) -> io::Result<[u8; 32]> {
+    let mut a = Allocator::new();
+    let node = node_from_bytes_backrefs(&mut a, buf)?;
+    Ok(tree_hash(&a, node))
 }
 
 #[test]
@@ -109,4 +117,32 @@ fn test_tree_hash() {
 
         assert_eq!(tree_hash(&a, root2), sha256.finalize().as_slice());
     }
+}
+
+#[test]
+fn test_tree_hash_from_bytes() {
+    use clvmr::serde::{node_to_bytes, node_to_bytes_backrefs};
+
+    let mut a = Allocator::new();
+    let atom1 = a.new_atom(&[1, 2, 3]).unwrap();
+    let atom2 = a.new_atom(&[4, 5, 6]).unwrap();
+    let node1 = a.new_pair(atom1, atom2).unwrap();
+    let node2 = a.new_pair(atom2, atom1).unwrap();
+
+    let node1 = a.new_pair(node1, node1).unwrap();
+    let node2 = a.new_pair(node2, node2).unwrap();
+
+    let root = a.new_pair(node1, node2).unwrap();
+
+    let serialized_clvm = node_to_bytes(&a, root).expect("node_to_bytes");
+    let serialized_clvm_backrefs =
+        node_to_bytes_backrefs(&a, root).expect("node_to_bytes_backrefs");
+
+    let hash1 = tree_hash_from_bytes(&serialized_clvm).expect("tree_hash_from_bytes");
+    let hash2 = tree_hash_from_bytes(&serialized_clvm_backrefs).expect("tree_hash_from_bytes");
+    let hash3 = tree_hash(&a, root);
+
+    assert!(serialized_clvm.len() > serialized_clvm_backrefs.len());
+    assert_eq!(hash1, hash2);
+    assert_eq!(hash1, hash3);
 }

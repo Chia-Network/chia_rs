@@ -35,7 +35,7 @@ use chia_protocol::{
     SubEpochSegments, SubEpochSummary, SubSlotData, SubSlotProofs, TimestampedPeerInfo,
     TransactionAck, TransactionsInfo, UnfinishedBlock, VDFInfo, VDFProof, WeightProof,
 };
-use clvmr::serde::tree_hash_from_stream;
+use clvm_utils::tree_hash_from_bytes;
 use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV, LIMIT_HEAP, NO_UNKNOWN_OPS};
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::PyRuntimeError;
@@ -87,8 +87,7 @@ pub fn tree_hash(py: Python, blob: PyBuffer<u8>) -> PyResult<&PyBytes> {
     }
     let slice =
         unsafe { std::slice::from_raw_parts(blob.buf_ptr() as *const u8, blob.len_bytes()) };
-    let mut input = std::io::Cursor::<&[u8]>::new(slice);
-    Ok(PyBytes::new(py, &tree_hash_from_stream(&mut input)?))
+    Ok(PyBytes::new(py, &tree_hash_from_bytes(slice)?))
 }
 
 #[allow(clippy::too_many_arguments)]

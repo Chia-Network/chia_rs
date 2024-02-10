@@ -495,6 +495,7 @@ dependencies = [
  "chia_py_streamable_macro",
  "chia_streamable_macro 0.3.0",
  "clvm-traits",
+ "clvm-utils",
  "clvmr",
  "hex",
  "pyo3",
