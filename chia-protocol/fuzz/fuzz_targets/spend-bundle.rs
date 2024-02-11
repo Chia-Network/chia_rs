@@ -39,10 +39,10 @@ fuzz_target!(|data: &[u8]| {
             let op = first(&a, c).expect("first");
             let c = rest(&a, c).expect("rest");
             let buf = a.atom(op);
-            if buf.len() != 1 {
+            if buf.as_ref().len() != 1 {
                 continue;
             }
-            if buf[0] == 51 {
+            if buf.as_ref()[0] == 51 {
                 let (puzzle_hash, (amount, _)) =
                     <(Bytes32, (u64, NodePtr))>::from_clvm(&a, c).expect("parse spend");
                 expected.insert(Coin {

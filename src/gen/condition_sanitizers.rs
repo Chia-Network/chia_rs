@@ -10,7 +10,7 @@ pub fn sanitize_hash(
 ) -> Result<NodePtr, ValidationErr> {
     let buf = atom(a, n, code)?;
 
-    if buf.len() != size {
+    if buf.as_ref().len() != size {
         Err(ValidationErr(n, code))
     } else {
         Ok(n)
@@ -33,7 +33,7 @@ pub fn sanitize_announce_msg(
 ) -> Result<NodePtr, ValidationErr> {
     let buf = atom(a, n, code)?;
 
-    if buf.len() > 1024 {
+    if buf.as_ref().len() > 1024 {
         Err(ValidationErr(n, code))
     } else {
         Ok(n)

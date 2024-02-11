@@ -1,7 +1,7 @@
 use crate::gen::validation_error::{atom, check_nil, first, next, rest, ErrorCode, ValidationErr};
 use ::chia_protocol::bytes::Bytes32;
 use clvm_utils::tree_hash;
-use clvmr::allocator::{Allocator, NodePtr};
+use clvmr::allocator::{Allocator, Atom, NodePtr};
 use clvmr::op_utils::u64_from_bytes;
 use std::convert::AsRef;
 
@@ -9,16 +9,13 @@ use std::convert::AsRef;
 pub fn parse_coin_spend(
     a: &Allocator,
     coin_spend: NodePtr,
-) -> Result<(&[u8], u64, NodePtr, NodePtr), ValidationErr> {
+) -> Result<(Atom, u64, NodePtr, NodePtr), ValidationErr> {
     let parent = atom(a, first(a, coin_spend)?, ErrorCode::InvalidParentId)?;
     let coin_spend = rest(a, coin_spend)?;
     let puzzle = first(a, coin_spend)?;
     let coin_spend = rest(a, coin_spend)?;
-    let amount = u64_from_bytes(atom(
-        a,
-        first(a, coin_spend)?,
-        ErrorCode::InvalidCoinAmount,
-    )?);
+    let amount =
+        u64_from_bytes(atom(a, first(a, coin_spend)?, ErrorCode::InvalidCoinAmount)?.as_ref());
     let coin_spend = rest(a, coin_spend)?;
     let solution = first(a, coin_spend)?;
     check_nil(a, rest(a, coin_spend)?)?;
@@ -45,7 +42,7 @@ pub fn get_puzzle_and_solution_for_coin(
 
         // we want to avoid having to compute the puzzle hash if we don't have to
         // so check parent and amount first
-        if parent != find_parent.as_ref() || amount != find_amount {
+        if parent.as_ref() != find_parent.as_ref() || amount != find_amount {
             continue;
         }
 
@@ -196,7 +193,7 @@ fn test_parse_coin_spend() {
     let spend1 = make_coin_spend(&mut a, parent, 1337, puzzle1, solution1);
     assert_eq!(
         parse_coin_spend(&a, spend1).unwrap(),
-        (parent.as_ref(), 1337, puzzle1, solution1)
+        (Atom::Borrowed(&parent), 1337, puzzle1, solution1)
     );
 
     // this is a spend where the parent is not an atom

@@ -110,6 +110,7 @@ pub fn parse_opcode(a: &Allocator, op: NodePtr, flags: u32) -> Option<ConditionO
         SExp::Atom => a.atom(op),
         _ => return None,
     };
+    let buf = buf.as_ref();
     if buf.len() == 2 && (flags & ENABLE_SOFTFORK_CONDITION) != 0 {
         if buf[0] == 0 {
             // no redundant leading zeroes

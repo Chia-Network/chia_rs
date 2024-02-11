@@ -70,6 +70,7 @@ impl SpendBundle {
                         return Err(EvalErr(op, "invalid condition".to_string()));
                     }
                 };
+                let buf = buf.as_ref();
                 if buf.len() != 1 {
                     continue;
                 }

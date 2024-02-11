@@ -1,11 +1,11 @@
-use clvmr::{allocator::SExp, Allocator, NodePtr};
+use clvmr::{allocator::SExp, Allocator, Atom, NodePtr};
 
 use crate::{FromClvm, FromClvmError};
 
 pub trait ClvmDecoder {
     type Node: Clone;
 
-    fn decode_atom(&self, node: &Self::Node) -> Result<&[u8], FromClvmError>;
+    fn decode_atom(&self, node: &Self::Node) -> Result<Atom, FromClvmError>;
     fn decode_pair(&self, node: &Self::Node) -> Result<(Self::Node, Self::Node), FromClvmError>;
 
     /// This is a helper function that just calls `clone` on the node.
@@ -19,7 +19,7 @@ pub trait ClvmDecoder {
 impl ClvmDecoder for Allocator {
     type Node = NodePtr;
 
-    fn decode_atom(&self, node: &Self::Node) -> Result<&[u8], FromClvmError> {
+    fn decode_atom(&self, node: &Self::Node) -> Result<Atom, FromClvmError> {
         if let SExp::Atom = self.sexp(*node) {
             Ok(self.atom(*node))
         } else {
