@@ -1,11 +1,13 @@
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use clvmr::serde::node_from_bytes_backrefs;
 use clvmr::sha2::{Digest, Sha256};
+use std::collections::{HashMap, HashSet};
 use std::io;
 
 enum TreeOp {
     SExp(NodePtr),
     Cons,
+    ConsAddCache(NodePtr),
 }
 
 pub fn tree_hash_atom(bytes: &[u8]) -> [u8; 32] {
@@ -43,6 +45,59 @@ pub fn tree_hash(a: &Allocator, node: NodePtr) -> [u8; 32] {
                 let first = hashes.pop().unwrap();
                 let rest = hashes.pop().unwrap();
                 hashes.push(tree_hash_pair(first, rest));
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    assert!(hashes.len() == 1);
+    hashes[0]
+}
+
+pub fn tree_hash_cached(
+    a: &Allocator,
+    node: NodePtr,
+    backrefs: &HashSet<NodePtr>,
+    cache: &mut HashMap<NodePtr, [u8; 32]>,
+) -> [u8; 32] {
+    let mut hashes = Vec::new();
+    let mut ops = vec![TreeOp::SExp(node)];
+
+    while let Some(op) = ops.pop() {
+        match op {
+            TreeOp::SExp(node) => match a.sexp(node) {
+                SExp::Atom => {
+                    let hash = tree_hash_atom(a.atom(node).as_ref());
+                    if backrefs.contains(&node) {
+                        cache.insert(node, hash);
+                    }
+                    hashes.push(hash);
+                }
+                SExp::Pair(left, right) => {
+                    if let Some(hash) = cache.get(&node) {
+                        hashes.push(*hash);
+                    } else {
+                        if backrefs.contains(&node) {
+                            ops.push(TreeOp::ConsAddCache(node));
+                        } else {
+                            ops.push(TreeOp::Cons);
+                        }
+                        ops.push(TreeOp::SExp(left));
+                        ops.push(TreeOp::SExp(right));
+                    }
+                }
+            },
+            TreeOp::Cons => {
+                let first = hashes.pop().unwrap();
+                let rest = hashes.pop().unwrap();
+                hashes.push(tree_hash_pair(first, rest));
+            }
+            TreeOp::ConsAddCache(original_node) => {
+                let first = hashes.pop().unwrap();
+                let rest = hashes.pop().unwrap();
+                let hash = tree_hash_pair(first, rest);
+                hashes.push(hash);
+                cache.insert(original_node, hash);
             }
         }
     }
@@ -145,4 +200,57 @@ fn test_tree_hash_from_bytes() {
     assert!(serialized_clvm.len() > serialized_clvm_backrefs.len());
     assert_eq!(hash1, hash2);
     assert_eq!(hash1, hash3);
+}
+
+#[cfg(test)]
+use rstest::rstest;
+
+#[cfg(test)]
+#[rstest]
+#[case("block-1ee588dc")]
+#[case("block-6fe59b24")]
+#[case("block-b45268ac")]
+#[case("block-c2a8df0d")]
+#[case("block-e5002df2")]
+#[case("block-4671894")]
+#[case("block-225758")]
+#[case("block-834752")]
+#[case("block-834752-compressed")]
+#[case("block-834760")]
+#[case("block-834761")]
+#[case("block-834765")]
+#[case("block-834766")]
+#[case("block-834768")]
+fn test_tree_hash_cached(#[case] name: &str, #[values(true, false)] compressed: bool) {
+    use clvmr::serde::{
+        node_from_bytes_backrefs, node_from_bytes_backrefs_record, node_to_bytes_backrefs,
+    };
+    use std::fs::read_to_string;
+
+    let filename = format!("../generator-tests/{name}.txt");
+    println!("file: {filename}",);
+    let test_file = read_to_string(filename).expect("test file not found");
+    let (generator, _) = test_file.split_once('\n').expect("invalid test file");
+    let generator = hex::decode(generator).expect("invalid hex encoded generator");
+
+    let generator = if compressed {
+        let mut a = Allocator::new();
+        let node = node_from_bytes_backrefs(&mut a, &generator).expect("node_from_bytes_backrefs");
+        node_to_bytes_backrefs(&a, node).expect("node_to_bytes_backrefs")
+    } else {
+        generator
+    };
+
+    let mut a = Allocator::new();
+    let mut cache = HashMap::<NodePtr, [u8; 32]>::new();
+    let (node, backrefs) = node_from_bytes_backrefs_record(&mut a, &generator)
+        .expect("node_from_bytes_backrefs_records");
+
+    let hash1 = tree_hash(&a, node);
+    let hash2 = tree_hash_cached(&a, node, &backrefs, &mut cache);
+    // for (key, value) in cache.iter() {
+    //     println!("  {key:?}: {}", hex::encode(value));
+    // }
+    assert_eq!(hash1, hash2);
+    assert!(!compressed || !backrefs.is_empty());
 }
