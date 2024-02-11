@@ -6,7 +6,10 @@ use clvm_utils::tree_hash;
 use clvm_utils::CurriedProgram;
 use clvmr::{allocator::NodePtr, Allocator};
 
+use chia_wallet::cat::{CatArgs, CatSolution, CAT_PUZZLE_HASH};
+use chia_wallet::did::{DidArgs, DidSolution, DID_INNER_PUZZLE_HASH};
 use chia_wallet::singleton::{SingletonArgs, SingletonSolution, SINGLETON_TOP_LAYER_PUZZLE_HASH};
+use chia_wallet::standard::{StandardArgs, StandardSolution, STANDARD_PUZZLE_HASH};
 use chia_wallet::Proof;
 
 /// Run a puzzle given a solution and print the resulting conditions
@@ -127,12 +130,87 @@ fn print_puzzle_info(a: &Allocator, puzzle: NodePtr, solution: NodePtr) {
     };
 
     match tree_hash(a, uncurried.program) {
+        STANDARD_PUZZLE_HASH => {
+            println!("p2_delegated_puzzle_or_hidden_puzzle.clsp");
+            let Ok(uncurried) = CurriedProgram::<NodePtr, StandardArgs>::from_clvm(a, puzzle)
+            else {
+                println!("-- failed to uncurry standard transaction");
+                return;
+            };
+            println!("    synthetic-key: {:?}", uncurried.args.synthetic_key);
+            let Ok(sol) = StandardSolution::<NodePtr, NodePtr>::from_clvm(a, solution) else {
+                println!("-- failed to parse solution");
+                return;
+            };
+            println!("  solution");
+            println!("    original-public-key: {:?}", sol.original_public_key);
+            println!("\nDelegated Puzzle\n");
+            print_puzzle_info(a, sol.delegated_puzzle, sol.solution);
+        }
+        CAT_PUZZLE_HASH => {
+            println!("cat_v2.clsp");
+            let Ok(uncurried) = CurriedProgram::<NodePtr, CatArgs<NodePtr>>::from_clvm(a, puzzle)
+            else {
+                println!("-- failed to uncurry CAT transaction");
+                return;
+            };
+            println!("    mod-hash: {:?}", uncurried.args.mod_hash);
+            println!(
+                "    tail-program-hash: {:?}",
+                uncurried.args.tail_program_hash
+            );
+            let Ok(sol) = CatSolution::<NodePtr>::from_clvm(a, solution) else {
+                println!("-- failed to parse solution");
+                return;
+            };
+
+            println!("  solution");
+            println!("    lineage-proof: {:?}", sol.lineage_proof);
+            println!("    prev-coin-id: {:?}", sol.prev_coin_id);
+            println!("    this-coin-info: {:?}", sol.this_coin_info);
+            println!("    next-coin-proof: {:?}", sol.next_coin_proof);
+            println!("    prev-subtotal: {:?}", sol.prev_subtotal);
+            println!("    extra-delta: {:?}", sol.extra_delta);
+
+            println!("\nInner Puzzle\n");
+            print_puzzle_info(a, uncurried.args.inner_puzzle, sol.inner_puzzle_solution);
+        }
+        DID_INNER_PUZZLE_HASH => {
+            println!("did_innerpuz.clsp");
+            let Ok(uncurried) =
+                CurriedProgram::<NodePtr, DidArgs<NodePtr, NodePtr>>::from_clvm(a, puzzle)
+            else {
+                println!("-- failed to uncurry DID transaction");
+                return;
+            };
+            println!(
+                "    recovery_did_list_hash: {:?}",
+                uncurried.args.recovery_did_list_hash
+            );
+            println!(
+                "    num_verifications_required: {:?}",
+                uncurried.args.num_verifications_required
+            );
+            println!(
+                "    singleton_struct: {:?}",
+                uncurried.args.singleton_struct
+            );
+            println!("    metadata: {:?}", uncurried.args.metadata);
+            let Ok(sol) = DidSolution::<NodePtr>::from_clvm(a, solution) else {
+                println!("-- failed to parse solution");
+                return;
+            };
+
+            println!("\nInner Puzzle\n");
+            let DidSolution::InnerSpend(inner_sol) = sol;
+            print_puzzle_info(a, uncurried.args.inner_puzzle, inner_sol);
+        }
         SINGLETON_TOP_LAYER_PUZZLE_HASH => {
             println!("singleton_top_layer_1_1.clsp");
             let Ok(uncurried) =
                 CurriedProgram::<NodePtr, SingletonArgs<NodePtr>>::from_clvm(a, puzzle)
             else {
-                println!("failed to uncurry singleton");
+                println!("-- failed to uncurry singleton");
                 return;
             };
             println!("  singleton-struct:");
@@ -150,7 +228,7 @@ fn print_puzzle_info(a: &Allocator, puzzle: NodePtr, solution: NodePtr) {
             );
 
             let Ok(sol) = SingletonSolution::<NodePtr>::from_clvm(a, solution) else {
-                println!("-- failed to parse singleton solution");
+                println!("-- failed to parse solution");
                 return;
             };
             println!("  solution");
@@ -167,6 +245,7 @@ fn print_puzzle_info(a: &Allocator, puzzle: NodePtr, solution: NodePtr) {
             println!("\nInner Puzzle:\n");
             print_puzzle_info(a, uncurried.args.inner_puzzle, sol.inner_solution);
         }
+        // TODO: NFT puzzles
 
         // Unknown puzzle
         n => {
