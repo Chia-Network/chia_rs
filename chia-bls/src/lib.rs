@@ -6,7 +6,13 @@ pub mod mnemonic;
 pub mod public_key;
 pub mod secret_key;
 pub mod signature;
+pub mod lru_cache;
+pub mod cached_bls;
 
+pub use lru_cache::LRUCache;
+pub use cached_bls::BLSCache;
+pub use lru_cache::Bytes32;
+pub use lru_cache::Bytes48;
 pub use derivable_key::DerivableKey;
 pub use error::{Error, Result};
 pub use gtelement::GTElement;
