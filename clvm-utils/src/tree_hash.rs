@@ -1,5 +1,5 @@
 use clvmr::allocator::{Allocator, NodePtr, SExp};
-use clvmr::serde::node_from_bytes_backrefs;
+use clvmr::serde::node_from_bytes_backrefs_record;
 use clvmr::sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::io;
@@ -108,8 +108,9 @@ pub fn tree_hash_cached(
 
 pub fn tree_hash_from_bytes(buf: &[u8]) -> io::Result<[u8; 32]> {
     let mut a = Allocator::new();
-    let node = node_from_bytes_backrefs(&mut a, buf)?;
-    Ok(tree_hash(&a, node))
+    let (node, backrefs) = node_from_bytes_backrefs_record(&mut a, buf)?;
+    let mut cache = HashMap::<NodePtr, [u8; 32]>::new();
+    Ok(tree_hash_cached(&a, node, &backrefs, &mut cache))
 }
 
 #[test]
