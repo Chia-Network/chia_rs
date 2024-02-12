@@ -24,5 +24,6 @@ chia-bls = { version = "=0.5.1", path = "../chia-bls", features = ["py-bindings"
 chia-protocol = { version = "=0.5.1", path = "../chia-protocol", features = ["py-bindings"]  }
 chia-traits = { version = "=0.5.2", path = "../chia-traits", features = ["py-bindings"]  }
 clvm-traits = { version = "=0.5.2", path = "../clvm-traits", features = ["derive", "py-bindings"] }
+clvm-utils = { version = "=0.5.1", path = "../clvm-utils" }
 chia_py_streamable_macro = { version = "=0.5.1", path = "../chia_py_streamable_macro" }
 chia_streamable_macro = { version = "=0.3.0", path = "../chia_streamable_macro" }

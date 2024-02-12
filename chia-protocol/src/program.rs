@@ -320,8 +320,7 @@ impl Program {
     }
 
     fn get_tree_hash(&self) -> crate::Bytes32 {
-        let mut cursor = Cursor::new(self.0.as_ref());
-        clvmr::serde::tree_hash_from_stream(&mut cursor)
+        clvm_utils::tree_hash_from_bytes(self.0.as_ref())
             .unwrap()
             .into()
     }
