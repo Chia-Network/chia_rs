@@ -23,7 +23,7 @@ pub fn standard_puzzle_hash(synthetic_key: &PublicKey) -> [u8; 32] {
 }
 
 /// This is the puzzle reveal of the [standard transaction](https://chialisp.com/standard-transactions) puzzle.
-pub static STANDARD_PUZZLE: [u8; 227] = hex!(
+pub const STANDARD_PUZZLE: [u8; 227] = hex!(
     "
     ff02ffff01ff02ffff03ff0bffff01ff02ffff03ffff09ff05ffff1dff0bffff
     1effff0bff0bffff02ff06ffff04ff02ffff04ff17ff8080808080808080ffff
@@ -37,17 +37,17 @@ pub static STANDARD_PUZZLE: [u8; 227] = hex!(
 );
 
 /// This is the puzzle hash of the [standard transaction](https://chialisp.com/standard-transactions) puzzle.
-pub static STANDARD_PUZZLE_HASH: [u8; 32] = hex!(
+pub const STANDARD_PUZZLE_HASH: [u8; 32] = hex!(
     "
     e9aaa49f45bad5c889b86ee3341550c155cfdd10c3a6757de618d20612fffd52
     "
 );
 
 /// This is the puzzle reveal of the [default hidden puzzle](https://chialisp.com/standard-transactions#default-hidden-puzzle).
-pub static DEFAULT_HIDDEN_PUZZLE: [u8; 3] = hex!("ff0980");
+pub const DEFAULT_HIDDEN_PUZZLE: [u8; 3] = hex!("ff0980");
 
 /// This is the puzzle hash of the [default hidden puzzle](https://chialisp.com/standard-transactions#default-hidden-puzzle).
-pub static DEFAULT_HIDDEN_PUZZLE_HASH: [u8; 32] = hex!(
+pub const DEFAULT_HIDDEN_PUZZLE_HASH: [u8; 32] = hex!(
     "
     711d6c4e32c92e53179b199484cf8c897542bc57f2b22582799f9d657eec4699
     "
