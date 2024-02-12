@@ -1,21 +1,30 @@
-use crate::lru_cache::LRUCache;
+use crate::LRUCache;
+use crate::Bytes32;
+use crate::Bytes48;
 // use crate::public_key::PublicKey;
-use crate::signture::Signature;
+use crate::Signature;
 use crate::gtelement::GTElement;
 use crate::PublicKey;
+use std::collections::HashMap;
 
-type Bytes32 = [u8; 32];
-type Bytes48 = [u8; 48];
+
+
 
 pub struct BLSCache {
-    pub cache: LRUCache<Bytes32, GTElement>,
+    cache: LRUCache<Bytes32, GTElement>,
 }
 
 impl BLSCache {
     
     pub fn generator(cache_size: Option<u128>) -> Self {
-        let cache: LRUCache = LRUCache.new(cache_size.unwrap_or(50000));
-        Self(cache)
+        let cache: LRUCache<Bytes32, GTElement> = LRUCache::new(cache_size.unwrap_or(50000));
+        Self{cache}
+    }
+
+    fn set_cache_size(self, cache_size: u128) {
+        let mut cache_copy = self.cache;
+        let cache_copy: LRUCache<Bytes32, GTElement> = LRUCache{cache_copy.cache, cache_copy.order, cache_size};
+        self.cache = cache_copy;
     }
     
     // Define a function to get pairings
@@ -58,7 +67,7 @@ impl BLSCache {
             } else {
                 let mut aug_msg = pks[i].to_vec();
                 aug_msg.extend_from_slice(&msgs[i]);
-                let aug_hash = G2Element::from_message(&aug_msg);
+                let aug_hash = Signature::hash_to_g2(&aug_msg);
 
                 let pk_parsed = pk_bytes_to_g1.entry(pks[i]).or_insert_with(|| {
                     PublicKey::from_bytes(&pks[i])
@@ -75,15 +84,16 @@ impl BLSCache {
     }
 
     fn aggregate_verify(
+        self,
         pks: &[Bytes48],
         msgs: &[u8],
         sig: &Signature,
         force_cache: bool, 
     ) {
-        let pairings: [GTElement] = get_pairings(&self.cache, &pks, &msgs, force_cache);
+        let pairings: [GTElement] = self.get_pairings(&self.cache, &pks, &msgs, force_cache);
         if pairings.is_empty() {
             let mut data = Vec::<(PublicKey, Vec<u8>)>::new();
-            for (pks, msg) in zip(pks, msgs) {
+            for (pk, msg) in pks.iter().zip(msgs.iter()) {
                 let pk = PublicKey.from_bytes_unchecked(pk);
                 let msg = msg.extract::<Vec<u8>>()?;
                 data.push((pk, msg));
@@ -93,6 +103,16 @@ impl BLSCache {
         }
         let pairings_prod = pairings.iter().fold(GTElement, |acc, &p| acc.mul_assign(p));
         pairings_prod == sig.pair(PublicKey::generator())
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+
+    #[test]
+    pub fn test_instantiation() {
+        let bls_cache: BLSCache = BLSCache::generator(None);
     }
 }
 
