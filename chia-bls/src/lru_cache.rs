@@ -8,11 +8,11 @@ pub type Bytes48 = [u8; 48];
 pub struct LRUCache<K, V>{
     cache: HashMap<K, V>,
     order: Vec<K>,
-    capacity: u128,
+    capacity: usize,
 }
 
 impl<K: Eq + std::hash::Hash + Clone, V> LRUCache<K, V> {
-    pub fn new(capacity: u128) -> LRUCache<K, V> {
+    pub fn new(capacity: usize) -> LRUCache<K, V> {
         LRUCache {
             cache: HashMap::new(),
             order: Vec::new(),
@@ -43,7 +43,7 @@ impl<K: Eq + std::hash::Hash + Clone, V> LRUCache<K, V> {
         } else {
             self.cache.insert(key.clone(), value);
             self.order.push(key.clone());
-            if self.cache.len() as u128 > self.capacity {
+            if self.cache.len() > self.capacity {
                 let oldest = self.order.remove(0);
                 self.cache.remove(&oldest);
             }
@@ -51,9 +51,17 @@ impl<K: Eq + std::hash::Hash + Clone, V> LRUCache<K, V> {
     }
 
     pub fn remove(&mut self, key: &K) {
-        self.cache.remove(key);
         let Some(index) = self.order.iter().position(|&x| x == *key);
-        // Move the element to the back
+        self.cache.remove(key);
         self.order.remove(index);
+    }
+
+    pub fn set_capacity(&mut self, new_size: usize) {
+        if new_size < self.capacity && self.order.len() > new_size {
+            let len = self.order.len();
+            let new_len = len.saturating_sub(self.capacity - new_size);
+            self.order.truncate(new_len);
+        }
+        self.capacity = new_size;
     }
 }

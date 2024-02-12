@@ -16,15 +16,13 @@ pub struct BLSCache {
 
 impl BLSCache {
     
-    pub fn generator(cache_size: Option<u128>) -> Self {
+    pub fn generator(cache_size: Option<usize>) -> Self {
         let cache: LRUCache<Bytes32, GTElement> = LRUCache::new(cache_size.unwrap_or(50000));
         Self{cache}
     }
 
-    fn set_cache_size(self, cache_size: u128) {
-        let mut cache_copy = self.cache;
-        let cache_copy: LRUCache<Bytes32, GTElement> = LRUCache{cache_copy.cache, cache_copy.order, cache_size};
-        self.cache = cache_copy;
+    fn set_cache_size(&mut self, cache_size: usize) {
+        self.cache.set_capacity(cache_size)
     }
     
     // Define a function to get pairings
