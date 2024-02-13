@@ -1,58 +1,62 @@
-use crate::LRUCache;
-use crate::Bytes32;
-use crate::Bytes48;
+extern crate lru;
+use lru::LruCache;
+use std::num::NonZeroUsize;
 // use crate::public_key::PublicKey;
 use crate::Signature;
 use crate::gtelement::GTElement;
 use crate::PublicKey;
 use std::collections::HashMap;
+use sha2::{Digest, Sha256};
 
-
-
+pub type Bytes32 = [u8; 32];
+pub type Bytes48 = [u8; 48];
 
 pub struct BLSCache {
-    cache: LRUCache<Bytes32, GTElement>,
+    cache: LruCache<Bytes32, GTElement>,
 }
 
 impl BLSCache {
     
     pub fn generator(cache_size: Option<usize>) -> Self {
-        let cache: LRUCache<Bytes32, GTElement> = LRUCache::new(cache_size.unwrap_or(50000));
+        let cache: LruCache<Bytes32, GTElement> = LruCache::new(NonZeroUsize::new(cache_size.unwrap_or(50000)).unwrap());
         Self{cache}
-    }
-
-    fn set_cache_size(&mut self, cache_size: usize) {
-        self.cache.set_capacity(cache_size)
     }
     
     // Define a function to get pairings
     fn get_pairings(
-        cache: &mut LRUCache<Bytes32, GTElement>,
+        cache: &mut LruCache<Bytes32, GTElement>,
         pks: &[Bytes48],
         msgs: &[Bytes32],
         force_cache: bool,
     ) -> Vec<GTElement> {
         let mut pairings: Vec<Option<GTElement>> = vec![];
         let mut missing_count: usize = 0;
-
+        
         for (pk, msg) in pks.iter().zip(msgs.iter()) {
             let mut aug_msg = pk.to_vec();
-            aug_msg.extend_from_slice(msg);
-            let h = std_hash(&aug_msg);
-
-            if let Some(pairing) = cache.get(&h) {
-                if !force_cache && pairing.is_none() {
-                    // Heuristic to avoid more expensive sig validation with pairing
-                    // cache when it's empty and cached pairings won't be useful later
-                    // (e.g. while syncing)
-                    missing_count += 1;
-                    if missing_count > pks.len() / 2 {
-                        return vec![];
+            aug_msg.extend_from_slice(msg); // pk + msg
+            let mut hasher = Sha256::new();
+            hasher.update(aug_msg);
+            let h: Bytes32 = hasher.finalize().into();
+            let pairing: Option<&GTElement> = cache.get(&h);
+            match pairing {
+                Some(pairing) => {
+                    if !force_cache {
+                        // Heuristic to avoid more expensive sig validation with pairing
+                        // cache when it's empty and cached pairings won't be useful later
+                        // (e.g. while syncing)
+                        missing_count += 1;
+                        if missing_count > pks.len() / 2 {
+                            return vec![];
+                        }
                     }
-                }
+                    pairings.push(Some(*pairing));
+                },
+                _ => {
+                    pairings.push(None);
+                },
             }
-
-            pairings.push(cache.get(&h).cloned());
+            
         }
 
         // G1Element.from_bytes can be expensive due to subgroup check, so we avoid recomputing it with this cache
@@ -61,7 +65,7 @@ impl BLSCache {
 
         for (i, pairing) in pairings.iter_mut().enumerate() {
             if let Some(pairing) = pairing {
-                ret.push(pairing.clone());
+                ret.push(*pairing.clone());
             } else {
                 let mut aug_msg = pks[i].to_vec();
                 aug_msg.extend_from_slice(&msgs[i]);
