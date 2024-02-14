@@ -266,7 +266,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chia"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "chia-protocol",
  "chia-traits 0.3.3",
@@ -333,7 +333,7 @@ dependencies = [
 
 [[package]]
 name = "chia-client"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "chia-protocol",
  "chia-traits 0.3.3",
@@ -360,7 +360,7 @@ dependencies = [
 
 [[package]]
 name = "chia-protocol"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "arbitrary",
  "chia-bls 0.4.0",
@@ -405,7 +405,7 @@ dependencies = [
 
 [[package]]
 name = "chia-tools"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "chia",
  "chia-bls 0.4.0",
@@ -449,7 +449,7 @@ dependencies = [
 
 [[package]]
 name = "chia-wallet"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "arbitrary",
  "chia-bls 0.4.0",
