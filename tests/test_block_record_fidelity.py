@@ -109,6 +109,14 @@ def get_block_record(rng: Random) -> BlockRecord:
     )
 
 
+def test_bytes32():
+    rng = Random()
+    rng.seed(1337)
+    br = get_block_record(rng)
+    assert isinstance(br.header_hash, bytes32)
+    assert f"{br.header_hash}" == "e433713dd932b2314eab219aa5504f71b9fe9f2d8e2f5cadfa892d8dc6a7ba53"
+    assert br.header_hash.__str__() == "e433713dd932b2314eab219aa5504f71b9fe9f2d8e2f5cadfa892d8dc6a7ba53"
+
 def wrap_call(expr: str, br: Any) -> str:
     try:
         ret = eval(expr, None, {"br": br})
