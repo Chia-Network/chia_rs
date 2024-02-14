@@ -1,8 +1,9 @@
 extern crate lru;
 use lru::LruCache;
 use std::num::NonZeroUsize;
-// use crate::public_key::PublicKey;
 use crate::Signature;
+use crate::hash_to_g2;
+use crate::aggregate_verify as agg_ver;
 use crate::gtelement::GTElement;
 use crate::PublicKey;
 use std::collections::HashMap;
@@ -24,9 +25,9 @@ impl BLSCache {
     
     // Define a function to get pairings
     fn get_pairings(
-        cache: &mut LruCache<Bytes32, GTElement>,
+        &mut self,
         pks: &[Bytes48],
-        msgs: &[Bytes32],
+        msgs: &[Vec<u8>],
         force_cache: bool,
     ) -> Vec<GTElement> {
         let mut pairings: Vec<Option<GTElement>> = vec![];
@@ -38,7 +39,7 @@ impl BLSCache {
             let mut hasher = Sha256::new();
             hasher.update(aug_msg);
             let h: Bytes32 = hasher.finalize().into();
-            let pairing: Option<&GTElement> = cache.get(&h);
+            let pairing: Option<&GTElement> = self.cache.get(&h);
             match pairing {
                 Some(pairing) => {
                     if !force_cache {
@@ -65,19 +66,21 @@ impl BLSCache {
 
         for (i, pairing) in pairings.iter_mut().enumerate() {
             if let Some(pairing) = pairing {
-                ret.push(*pairing.clone());
+                ret.push(*pairing);
             } else {
                 let mut aug_msg = pks[i].to_vec();
-                aug_msg.extend_from_slice(&msgs[i]);
-                let aug_hash = Signature::hash_to_g2(&aug_msg);
+                aug_msg.extend_from_slice(&msgs[i]);  // pk + msg
+                let aug_hash = hash_to_g2(&aug_msg);
 
                 let pk_parsed = pk_bytes_to_g1.entry(pks[i]).or_insert_with(|| {
-                    PublicKey::from_bytes(&pks[i])
+                    PublicKey::from_bytes(&pks[i]).unwrap()
                 });
 
                 let pairing = aug_hash.pair(pk_parsed);
-                let h = std_hash(&aug_msg);
-                cache.put(h, pairing.clone());
+                let mut hasher = Sha256::new();
+                hasher.update(&aug_msg);
+                let h: Bytes32 = hasher.finalize().into();
+                self.cache.put(h, pairing.clone());
                 ret.push(pairing);
             }
         }
@@ -86,25 +89,28 @@ impl BLSCache {
     }
 
     fn aggregate_verify(
-        self,
+        &mut self,
         pks: &[Bytes48],
-        msgs: &[u8],
+        msgs: &[Vec<u8>],
         sig: &Signature,
         force_cache: bool, 
-    ) {
-        let pairings: [GTElement] = self.get_pairings(&self.cache, &pks, &msgs, force_cache);
+    ) -> bool {
+        let pairings: Vec<GTElement> = self.get_pairings(&pks, &msgs, force_cache);
         if pairings.is_empty() {
-            let mut data = Vec::<(PublicKey, Vec<u8>)>::new();
+            let mut data = Vec::<(&PublicKey, &[u8])>::new();
             for (pk, msg) in pks.iter().zip(msgs.iter()) {
-                let pk = PublicKey.from_bytes_unchecked(pk);
-                let msg = msg.extract::<Vec<u8>>()?;
-                data.push((pk, msg));
+                let pk = PublicKey::from_bytes_unchecked(pk).unwrap();
+                data.push((&pk, msg));
             }
-            let res: bool = Signature.aggregate_verify(sig, data);
+            let res: bool = agg_ver(sig, data);
             return res
         }
-        let pairings_prod = pairings.iter().fold(GTElement, |acc, &p| acc.mul_assign(p));
-        pairings_prod == sig.pair(PublicKey::generator())
+        let mut pairings_prod = pairings[0]; // start with the first pairing
+        for &p in pairings.iter().skip(1) {  // loop through rest of list
+            pairings_prod *= &p;
+        }
+        // let pairings_prod: GTElement = pairings.iter().fold(GTElement, |acc, &p| acc.mul_assign(p))();
+        pairings_prod == sig.pair(&PublicKey::generator())
     }
 }
 
