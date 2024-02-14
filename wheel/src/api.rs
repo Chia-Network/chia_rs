@@ -144,7 +144,7 @@ pub fn get_puzzle_and_solution_for_coin(
         };
     */
     match r {
-        Err(eval_err) => eval_err_to_pyresult(py, eval_err, allocator),
+        Err(eval_err) => eval_err_to_pyresult(eval_err, allocator),
         Ok((puzzle, solution)) => Ok((
             PyBytes::new(py, &serialize(&allocator, puzzle)?),
             PyBytes::new(py, &serialize(&allocator, solution)?),
