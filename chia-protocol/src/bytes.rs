@@ -359,7 +359,13 @@ impl<const N: usize> IntoPy<PyObject> for BytesImpl<N> {
 #[cfg(feature = "py-bindings")]
 impl<const N: usize> ChiaToPython for BytesImpl<N> {
     fn to_python<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
-        Ok(PyBytes::new(py, &self.0).into())
+        if N == 32 {
+            let bytes_module = PyModule::import(py, "chia.types.blockchain_format.sized_bytes")?;
+            let ty = bytes_module.getattr("bytes32")?;
+            ty.call1((self.0.into_py(py),))
+        } else {
+            Ok(PyBytes::new(py, &self.0).into())
+        }
     }
 }
 
