@@ -50,6 +50,6 @@ pub fn run_chia_program(
             let val = LazyNode::new(Rc::new(allocator), reduction.1);
             Ok((reduction.0, val))
         }
-        Err(eval_err) => eval_err_to_pyresult(py, eval_err, allocator),
+        Err(eval_err) => eval_err_to_pyresult(eval_err, allocator),
     }
 }

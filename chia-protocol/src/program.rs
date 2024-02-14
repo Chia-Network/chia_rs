@@ -346,7 +346,10 @@ impl Program {
                 let val = LazyNode::new(Rc::new(a), reduction.1);
                 Ok((reduction.0, to_program(py, val)?))
             }
-            Err(eval_err) => Err(PyValueError::new_err(eval_err.to_string())),
+            Err(eval_err) => {
+                let blob = node_to_bytes(&a, eval_err.0).ok().map(hex::encode);
+                Err(PyValueError::new_err((eval_err.1, blob)))
+            }
         }
     }
 
