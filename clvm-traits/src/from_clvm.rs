@@ -16,7 +16,7 @@ macro_rules! clvm_primitive {
                 const LEN: usize = std::mem::size_of::<$primitive>();
 
                 let bytes = decoder.decode_atom(&node)?;
-                let number = BigInt::from_signed_bytes_be(bytes);
+                let number = BigInt::from_signed_bytes_be(bytes.as_ref());
                 let (sign, mut vec) = number.to_bytes_be();
 
                 if vec.len() < std::mem::size_of::<$primitive>() {
@@ -28,7 +28,7 @@ macro_rules! clvm_primitive {
                 let value = <$primitive>::from_be_bytes(vec.as_slice().try_into().or(Err(
                     FromClvmError::WrongAtomLength {
                         expected: LEN,
-                        found: bytes.len(),
+                        found: bytes.as_ref().len(),
                     },
                 ))?);
 
@@ -71,12 +71,12 @@ where
 impl<N> FromClvm<N> for () {
     fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
         let bytes = decoder.decode_atom(&node)?;
-        if bytes.is_empty() {
+        if bytes.as_ref().is_empty() {
             Ok(())
         } else {
             Err(FromClvmError::WrongAtomLength {
                 expected: 0,
-                found: bytes.len(),
+                found: bytes.as_ref().len(),
             })
         }
     }
@@ -98,12 +98,12 @@ where
                 }
             } else {
                 let bytes = decoder.decode_atom(&node)?;
-                if bytes.is_empty() {
+                if bytes.as_ref().is_empty() {
                     return items.try_into().or(Err(FromClvmError::ExpectedPair));
                 } else {
                     return Err(FromClvmError::WrongAtomLength {
                         expected: 0,
-                        found: bytes.len(),
+                        found: bytes.as_ref().len(),
                     });
                 }
             }
@@ -123,12 +123,12 @@ where
                 node = rest;
             } else {
                 let bytes = decoder.decode_atom(&node)?;
-                if bytes.is_empty() {
+                if bytes.as_ref().is_empty() {
                     return Ok(items);
                 } else {
                     return Err(FromClvmError::WrongAtomLength {
                         expected: 0,
-                        found: bytes.len(),
+                        found: bytes.as_ref().len(),
                     });
                 }
             }
@@ -141,18 +141,19 @@ where
     T: FromClvm<N>,
 {
     fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
-        if let Ok(&[]) = decoder.decode_atom(&node) {
-            Ok(None)
-        } else {
-            Ok(Some(T::from_clvm(decoder, node)?))
+        if let Ok(atom) = decoder.decode_atom(&node) {
+            if atom.as_ref().is_empty() {
+                return Ok(None);
+            }
         }
+        Ok(Some(T::from_clvm(decoder, node)?))
     }
 }
 
 impl<N> FromClvm<N> for String {
     fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
         let bytes = decoder.decode_atom(&node)?;
-        Ok(Self::from_utf8(bytes.to_vec())?)
+        Ok(Self::from_utf8(bytes.as_ref().to_vec())?)
     }
 }
 
@@ -162,10 +163,10 @@ impl<N> FromClvm<N> for chia_bls::PublicKey {
         let bytes = decoder.decode_atom(&node)?;
         let error = Err(FromClvmError::WrongAtomLength {
             expected: 48,
-            found: bytes.len(),
+            found: bytes.as_ref().len(),
         });
-        let bytes = bytes.try_into().or(error)?;
-        Self::from_bytes(bytes).map_err(|error| FromClvmError::Custom(error.to_string()))
+        let bytes: [u8; 48] = bytes.as_ref().try_into().or(error)?;
+        Self::from_bytes(&bytes).map_err(|error| FromClvmError::Custom(error.to_string()))
     }
 }
 
@@ -175,10 +176,10 @@ impl<N> FromClvm<N> for chia_bls::Signature {
         let bytes = decoder.decode_atom(&node)?;
         let error = Err(FromClvmError::WrongAtomLength {
             expected: 96,
-            found: bytes.len(),
+            found: bytes.as_ref().len(),
         });
-        let bytes = bytes.try_into().or(error)?;
-        Self::from_bytes(bytes).map_err(|error| FromClvmError::Custom(error.to_string()))
+        let bytes: [u8; 96] = bytes.as_ref().try_into().or(error)?;
+        Self::from_bytes(&bytes).map_err(|error| FromClvmError::Custom(error.to_string()))
     }
 }
 

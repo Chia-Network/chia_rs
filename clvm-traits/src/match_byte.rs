@@ -18,7 +18,7 @@ impl<N, const BYTE: u8> ToClvm<N> for MatchByte<BYTE> {
 
 impl<N, const BYTE: u8> FromClvm<N> for MatchByte<BYTE> {
     fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
-        match decoder.decode_atom(&node)? {
+        match decoder.decode_atom(&node)?.as_ref() {
             [] if BYTE == 0 => Ok(Self),
             [byte] if *byte == BYTE && BYTE > 0 => Ok(Self),
             _ => Err(FromClvmError::Custom(format!(

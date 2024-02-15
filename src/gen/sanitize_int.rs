@@ -19,6 +19,7 @@ pub fn sanitize_uint(
     assert!(max_size <= 8);
 
     let buf = atom(a, n, code)?;
+    let buf = buf.as_ref();
 
     if buf.is_empty() {
         return Ok(SanitizedUint::Ok(0));

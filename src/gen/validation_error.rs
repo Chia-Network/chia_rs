@@ -1,4 +1,4 @@
-use clvmr::allocator::{Allocator, NodePtr, SExp};
+use clvmr::allocator::{Allocator, Atom, NodePtr, SExp};
 use clvmr::reduction::EvalErr;
 use thiserror::Error;
 
@@ -161,7 +161,7 @@ pub fn next(a: &Allocator, n: NodePtr) -> Result<Option<(NodePtr, NodePtr)>, Val
     }
 }
 
-pub fn atom(a: &Allocator, n: NodePtr, code: ErrorCode) -> Result<&[u8], ValidationErr> {
+pub fn atom(a: &Allocator, n: NodePtr, code: ErrorCode) -> Result<Atom, ValidationErr> {
     match a.sexp(n) {
         SExp::Atom => Ok(a.atom(n)),
         _ => Err(ValidationErr(n, code)),
@@ -169,7 +169,7 @@ pub fn atom(a: &Allocator, n: NodePtr, code: ErrorCode) -> Result<&[u8], Validat
 }
 
 pub fn check_nil(a: &Allocator, n: NodePtr) -> Result<(), ValidationErr> {
-    if atom(a, n, ErrorCode::InvalidCondition)?.is_empty() {
+    if atom(a, n, ErrorCode::InvalidCondition)?.as_ref().is_empty() {
         Ok(())
     } else {
         Err(ValidationErr(n, ErrorCode::InvalidCondition))

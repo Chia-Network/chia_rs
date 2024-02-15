@@ -114,7 +114,7 @@ impl<N> ToClvm<N> for Bytes {
 impl<N> FromClvm<N> for Bytes {
     fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
         let bytes = decoder.decode_atom(&node)?;
-        Ok(Self(bytes.to_vec()))
+        Ok(Self(bytes.as_ref().to_vec()))
     }
 }
 
@@ -247,13 +247,13 @@ impl<N, const LEN: usize> ToClvm<N> for BytesImpl<LEN> {
 impl<N, const LEN: usize> FromClvm<N> for BytesImpl<LEN> {
     fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
         let bytes = decoder.decode_atom(&node)?;
-        if bytes.len() != LEN {
+        if bytes.as_ref().len() != LEN {
             return Err(FromClvmError::WrongAtomLength {
                 expected: LEN,
-                found: bytes.len(),
+                found: bytes.as_ref().len(),
             });
         }
-        Ok(Self::try_from(bytes).unwrap())
+        Ok(Self::try_from(bytes.as_ref()).unwrap())
     }
 }
 

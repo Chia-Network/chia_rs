@@ -9,7 +9,7 @@ homepage = "https://github.com/Chia-Network/chia_rs/chia-wallet/"
 repository = "https://github.com/Chia-Network/chia_rs/chia-wallet/"
 
 [dependencies]
-clvmr = "0.5.0"
+clvmr = "0.6.0"
 sha2 = "0.10.8"
 num-bigint = "0.4.3"
 hex-literal = "0.4.1"

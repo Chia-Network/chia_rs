@@ -31,7 +31,7 @@ pub fn tree_hash(a: &Allocator, node: NodePtr) -> [u8; 32] {
         match op {
             TreeOp::SExp(node) => match a.sexp(node) {
                 SExp::Atom => {
-                    hashes.push(tree_hash_atom(a.atom(node)));
+                    hashes.push(tree_hash_atom(a.atom(node).as_ref()));
                 }
                 SExp::Pair(left, right) => {
                     ops.push(TreeOp::Cons);
