@@ -5,13 +5,14 @@ use crate::gen::flags::ALLOW_BACKREFS;
 use crate::gen::spend_visitor::SpendVisitor;
 use crate::gen::validation_error::{first, ErrorCode, ValidationErr};
 use crate::generator_rom::{CLVM_DESERIALIZER, COST_PER_BYTE, GENERATOR_ROM};
-use clvm_utils::tree_hash;
+use clvm_utils::tree_hash_cached;
 use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
-use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs};
+use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs, node_from_bytes_backrefs_record};
+use std::collections::{HashMap, HashSet};
 
 fn subtract_cost(a: &Allocator, cost_left: &mut Cost, subtract: Cost) -> Result<(), ValidationErr> {
     if subtract > *cost_left {
@@ -122,10 +123,10 @@ pub fn run_block_generator2<GenBuf: AsRef<[u8]>, V: SpendVisitor>(
     subtract_cost(a, &mut cost_left, byte_cost)?;
 
     let clvm_deserializer = node_from_bytes(a, &CLVM_DESERIALIZER)?;
-    let program = if (flags & ALLOW_BACKREFS) != 0 {
-        node_from_bytes_backrefs(a, program)?
+    let (program, backrefs) = if (flags & ALLOW_BACKREFS) != 0 {
+        node_from_bytes_backrefs_record(a, program)?
     } else {
-        node_from_bytes(a, program)?
+        (node_from_bytes(a, program)?, HashSet::<NodePtr>::new())
     };
 
     // iterate in reverse order since we're building a linked list from
@@ -154,6 +155,7 @@ pub fn run_block_generator2<GenBuf: AsRef<[u8]>, V: SpendVisitor>(
 
     let mut ret = SpendBundleConditions::default();
     let mut state = ParseState::default();
+    let mut cache = HashMap::<NodePtr, [u8; 32]>::new();
 
     while let Some((spend, rest)) = a.next(all_spends) {
         all_spends = rest;
@@ -166,7 +168,7 @@ pub fn run_block_generator2<GenBuf: AsRef<[u8]>, V: SpendVisitor>(
 
         subtract_cost(a, &mut cost_left, clvm_cost)?;
 
-        let buf = tree_hash(a, puzzle);
+        let buf = tree_hash_cached(a, puzzle, &backrefs, &mut cache);
         let puzzle_hash = a.new_atom(&buf)?;
 
         process_single_spend::<V>(

@@ -634,6 +634,7 @@ dependencies = [
  "clvm-traits",
  "clvmr",
  "hex",
+ "rstest 0.16.0",
 ]
 
 [[package]]

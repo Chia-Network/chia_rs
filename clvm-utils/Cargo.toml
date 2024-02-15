@@ -14,3 +14,4 @@ clvm-traits = { version = "0.5.1", path = "../clvm-traits" }
 
 [dev-dependencies]
 hex = "0.4.3"
+rstest = "0.16.0"
