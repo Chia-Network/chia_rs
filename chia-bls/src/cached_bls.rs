@@ -125,6 +125,7 @@ impl BLSCache {
 pub mod tests {
     use crate::SecretKey;
     use crate::sign;
+    use crate::aggregate;
     use super::*;
 
     #[test]
@@ -158,6 +159,47 @@ pub mod tests {
         let msg_list: Vec<Vec<u8>> = [msg].to_vec();
         assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig, true));
         assert_eq!(bls_cache.cache.len(), 1);
+        // try again with (pk, msg) cached
+        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig, true));
+        assert_eq!(bls_cache.cache.len(), 1);
+    }
+
+    #[test]
+    pub fn test_cache() {
+        let mut bls_cache: BLSCache = BLSCache::generator(None);
+        assert_eq!(bls_cache.cache.len(), 0);
+        let byte_array: [u8; 32] = [0; 32];
+        let sk: SecretKey = SecretKey::from_seed(&byte_array);
+        let pk: PublicKey = sk.public_key();
+        let msg: Vec<u8> = [106; 32].to_vec();
+        let sig: Signature = sign(&sk, &msg);
+        let mut pk_list: Vec<[u8; 48]> = [pk.to_bytes()].to_vec();
+        let mut msg_list: Vec<Vec<u8>> = [msg].to_vec();
+        // add first to cache
+        // try one cached, one not cached
+        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig, false));
+        assert_eq!(bls_cache.cache.len(), 1);
+        let byte_array: [u8; 32] = [1; 32];
+        let sk: SecretKey = SecretKey::from_seed(&byte_array);
+        let pk: PublicKey = sk.public_key();
+        let msg: Vec<u8> = [107; 32].to_vec();
+        let sig = aggregate([sig, sign(&sk, &msg)]);
+        pk_list.push(pk.to_bytes());
+        msg_list.push(msg);
+        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig, false));
+        assert_eq!(bls_cache.cache.len(), 2);
+        // try reusing a pubkey
+        let pk: PublicKey = sk.public_key();
+        let msg: Vec<u8> = [108; 32].to_vec();
+        let sig = aggregate([sig, sign(&sk, &msg)]);
+        pk_list.push(pk.to_bytes());
+        msg_list.push(msg);
+        // try with force_cache disabled
+        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig, false));
+        assert_eq!(bls_cache.cache.len(), 2);
+        // now force it to save the pairing
+        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig, true));
+        assert_eq!(bls_cache.cache.len(), 3);
     }
 }
 
