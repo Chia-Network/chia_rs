@@ -65,7 +65,7 @@ impl BLSCache {
         let mut ret: Vec<GTElement> = vec![];
 
         for (i, pairing) in pairings.iter_mut().enumerate() {
-            if let Some(pairing) = pairing {
+            if let Some(pairing) = pairing {  // equivalent to `if pairing is not None`
                 ret.push(pairing.clone());
             } else {
                 let mut aug_msg = pks[i].to_vec();
@@ -123,11 +123,26 @@ impl BLSCache {
 
 #[cfg(test)]
 pub mod tests {
+    use crate::SecretKey;
     use super::*;
 
     #[test]
     pub fn test_instantiation() {
-        let bls_cache: BLSCache = BLSCache::generator(None);
+        let mut bls_cache: BLSCache = BLSCache::generator(None);
+        let byte_array: [u8; 32] = [0; 32];
+        let sk: SecretKey = SecretKey::from_seed(&byte_array);
+        let pk:PublicKey = sk.public_key();
+        let msg: [u8; 32] = [106; 32];
+        let mut aug_msg: Vec<u8> = pk.clone().to_bytes().to_vec();
+        aug_msg.extend_from_slice(&msg);  // pk + msg
+        let aug_hash = hash_to_g2(&aug_msg);
+
+        let pairing = aug_hash.pair(&pk);
+        let mut hasher = Sha256::new();
+        hasher.update(&aug_msg);
+        let h: Bytes32 = hasher.finalize().into();
+        bls_cache.cache.put(h, pairing.clone());
+        assert_eq!(*bls_cache.cache.get(&h).unwrap(), pairing);
     }
 }
 
