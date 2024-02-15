@@ -24,7 +24,7 @@ impl BLSCache {
     }
     
     // Define a function to get pairings
-    fn get_pairings(
+    pub fn get_pairings(
         &mut self,
         pks: &[Bytes48],
         msgs: &[Vec<u8>],
@@ -88,10 +88,10 @@ impl BLSCache {
         ret
     }
 
-    fn aggregate_verify(
+    pub fn aggregate_verify(
         &mut self,
-        pks: &[Bytes48],
-        msgs: &[Vec<u8>],
+        pks: &Vec<Bytes48>,
+        msgs: &Vec<Vec<u8>>,
         sig: &Signature,
         force_cache: bool, 
     ) -> bool {
@@ -124,6 +124,7 @@ impl BLSCache {
 #[cfg(test)]
 pub mod tests {
     use crate::SecretKey;
+    use crate::sign;
     use super::*;
 
     #[test]
@@ -136,13 +137,27 @@ pub mod tests {
         let mut aug_msg: Vec<u8> = pk.clone().to_bytes().to_vec();
         aug_msg.extend_from_slice(&msg);  // pk + msg
         let aug_hash = hash_to_g2(&aug_msg);
-
         let pairing = aug_hash.pair(&pk);
         let mut hasher = Sha256::new();
         hasher.update(&aug_msg);
         let h: Bytes32 = hasher.finalize().into();
         bls_cache.cache.put(h, pairing.clone());
         assert_eq!(*bls_cache.cache.get(&h).unwrap(), pairing);
+    }
+
+    #[test]
+    pub fn test_aggregate_verify() {
+        let mut bls_cache: BLSCache = BLSCache::generator(None);
+        assert_eq!(bls_cache.cache.len(), 0);
+        let byte_array: [u8; 32] = [0; 32];
+        let sk: SecretKey = SecretKey::from_seed(&byte_array);
+        let pk: PublicKey = sk.public_key();
+        let msg: Vec<u8> = [106; 32].to_vec();
+        let sig: Signature = sign(&sk, &msg);
+        let pk_list: Vec<[u8; 48]> = [pk.to_bytes()].to_vec();
+        let msg_list: Vec<Vec<u8>> = [msg].to_vec();
+        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig, true));
+        assert_eq!(bls_cache.cache.len(), 1);
     }
 }
 
