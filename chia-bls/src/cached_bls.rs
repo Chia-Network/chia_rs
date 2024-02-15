@@ -51,7 +51,7 @@ impl BLSCache {
                             return vec![];
                         }
                     }
-                    pairings.push(Some(*pairing));
+                    pairings.push(Some(pairing.clone()));
                 },
                 _ => {
                     pairings.push(None);
@@ -66,7 +66,7 @@ impl BLSCache {
 
         for (i, pairing) in pairings.iter_mut().enumerate() {
             if let Some(pairing) = pairing {
-                ret.push(*pairing);
+                ret.push(pairing.clone());
             } else {
                 let mut aug_msg = pks[i].to_vec();
                 aug_msg.extend_from_slice(&msgs[i]);  // pk + msg
@@ -95,22 +95,29 @@ impl BLSCache {
         sig: &Signature,
         force_cache: bool, 
     ) -> bool {
-        let pairings: Vec<GTElement> = self.get_pairings(&pks, &msgs, force_cache);
+        let mut pairings: Vec<GTElement> = self.get_pairings(&pks, &msgs, force_cache);
         if pairings.is_empty() {
-            let mut data = Vec::<(&PublicKey, &[u8])>::new();
+            let mut data = Vec::<(PublicKey, Vec<u8>)>::new();
             for (pk, msg) in pks.iter().zip(msgs.iter()) {
                 let pk = PublicKey::from_bytes_unchecked(pk).unwrap();
-                data.push((&pk, msg));
+                data.push((pk.clone(), msg.clone()));
             }
             let res: bool = agg_ver(sig, data);
             return res
         }
-        let mut pairings_prod = pairings[0]; // start with the first pairing
-        for &p in pairings.iter().skip(1) {  // loop through rest of list
-            pairings_prod *= &p;
+        let pairings_prod = pairings.pop(); // start with the first pairing
+        match pairings_prod {
+            Some(mut prod) => {
+                for p in pairings.iter() {  // loop through rest of list
+                    prod *= &p;
+                }
+                prod == sig.pair(&PublicKey::generator())
+            },
+            _ => {
+                pairings.len() == 0
+            },
         }
-        // let pairings_prod: GTElement = pairings.iter().fold(GTElement, |acc, &p| acc.mul_assign(p))();
-        pairings_prod == sig.pair(&PublicKey::generator())
+        
     }
 }
 
