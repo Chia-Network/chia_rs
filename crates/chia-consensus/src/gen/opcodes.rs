@@ -1,4 +1,4 @@
-use crate::gen::flags::ENABLE_SOFTFORK_CONDITION;
+use crate::gen::flags::{ENABLE_MESSAGE_CONDITIONS, ENABLE_SOFTFORK_CONDITION};
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use clvmr::cost::Cost;
 
@@ -26,6 +26,9 @@ pub const CREATE_PUZZLE_ANNOUNCEMENT: ConditionOpcode = 62;
 pub const ASSERT_PUZZLE_ANNOUNCEMENT: ConditionOpcode = 63;
 pub const ASSERT_CONCURRENT_SPEND: ConditionOpcode = 64;
 pub const ASSERT_CONCURRENT_PUZZLE: ConditionOpcode = 65;
+
+pub const SEND_MESSAGE: ConditionOpcode = 66;
+pub const RECEIVE_MESSAGE: ConditionOpcode = 67;
 
 // the conditions below let coins inquire about themselves
 pub const ASSERT_MY_COIN_ID: ConditionOpcode = 70;
@@ -149,7 +152,7 @@ pub fn parse_opcode(a: &Allocator, op: NodePtr, flags: u32) -> Option<ConditionO
             | ASSERT_MY_BIRTH_HEIGHT
             | ASSERT_EPHEMERAL => Some(b0),
             _ => {
-                if (flags & ENABLE_SOFTFORK_CONDITION) != 0
+                if ((flags & ENABLE_SOFTFORK_CONDITION) != 0
                     && [
                         SOFTFORK,
                         AGG_SIG_PARENT,
@@ -159,7 +162,9 @@ pub fn parse_opcode(a: &Allocator, op: NodePtr, flags: u32) -> Option<ConditionO
                         AGG_SIG_PARENT_AMOUNT,
                         AGG_SIG_PARENT_PUZZLE,
                     ]
-                    .contains(&b0)
+                    .contains(&b0))
+                    || ((flags & ENABLE_MESSAGE_CONDITIONS) != 0
+                        && [SEND_MESSAGE, RECEIVE_MESSAGE].contains(&b0))
                 {
                     Some(b0)
                 } else {
@@ -218,7 +223,11 @@ fn test_parse_opcode(#[case] input: &[u8], #[case] expected: Option<ConditionOpc
     let mut a = Allocator::new();
     assert_eq!(opcode_tester(&mut a, input, 0), expected);
     assert_eq!(
-        opcode_tester(&mut a, input, ENABLE_SOFTFORK_CONDITION),
+        opcode_tester(
+            &mut a,
+            input,
+            ENABLE_SOFTFORK_CONDITION | ENABLE_MESSAGE_CONDITIONS
+        ),
         expected
     );
 }
@@ -238,6 +247,8 @@ fn test_parse_opcode(#[case] input: &[u8], #[case] expected: Option<ConditionOpc
 #[case(&[AGG_SIG_PARENT_PUZZLE as u8], None, Some(AGG_SIG_PARENT_PUZZLE))]
 #[case(&[ASSERT_EPHEMERAL as u8], Some(ASSERT_EPHEMERAL), Some(ASSERT_EPHEMERAL))]
 #[case(&[ASSERT_BEFORE_SECONDS_RELATIVE as u8], Some(ASSERT_BEFORE_SECONDS_RELATIVE), Some(ASSERT_BEFORE_SECONDS_RELATIVE))]
+#[case(&[SEND_MESSAGE as u8], None, None)]
+#[case(&[RECEIVE_MESSAGE as u8], None, None)]
 fn test_parse_opcode_softfork(
     #[case] input: &[u8],
     #[case] expected: Option<ConditionOpcode>,
@@ -247,6 +258,36 @@ fn test_parse_opcode_softfork(
     assert_eq!(opcode_tester(&mut a, input, 0), expected);
     assert_eq!(
         opcode_tester(&mut a, input, ENABLE_SOFTFORK_CONDITION),
+        expected2
+    );
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(&[AGG_SIG_UNSAFE as u8], Some(AGG_SIG_UNSAFE), Some(AGG_SIG_UNSAFE))]
+#[case(&[AGG_SIG_ME as u8], Some(AGG_SIG_ME), Some(AGG_SIG_ME))]
+#[case(&[CREATE_COIN as u8], Some(CREATE_COIN), Some(CREATE_COIN))]
+// the SOFTOFORK and new AGG_SIG_* condition is only recognized when the flag is set
+#[case(&[SOFTFORK as u8], None, None)]
+#[case(&[AGG_SIG_PARENT as u8], None, None)]
+#[case(&[AGG_SIG_PUZZLE as u8], None, None)]
+#[case(&[AGG_SIG_AMOUNT as u8], None, None)]
+#[case(&[AGG_SIG_PUZZLE_AMOUNT as u8], None, None)]
+#[case(&[AGG_SIG_PARENT_AMOUNT as u8], None, None)]
+#[case(&[AGG_SIG_PARENT_PUZZLE as u8], None, None)]
+#[case(&[ASSERT_EPHEMERAL as u8], Some(ASSERT_EPHEMERAL), Some(ASSERT_EPHEMERAL))]
+#[case(&[ASSERT_BEFORE_SECONDS_RELATIVE as u8], Some(ASSERT_BEFORE_SECONDS_RELATIVE), Some(ASSERT_BEFORE_SECONDS_RELATIVE))]
+#[case(&[SEND_MESSAGE as u8], None, Some(SEND_MESSAGE))]
+#[case(&[RECEIVE_MESSAGE as u8], None, Some(RECEIVE_MESSAGE))]
+fn test_parse_opcode_message(
+    #[case] input: &[u8],
+    #[case] expected: Option<ConditionOpcode>,
+    #[case] expected2: Option<ConditionOpcode>,
+) {
+    let mut a = Allocator::new();
+    assert_eq!(opcode_tester(&mut a, input, 0), expected);
+    assert_eq!(
+        opcode_tester(&mut a, input, ENABLE_MESSAGE_CONDITIONS),
         expected2
     );
 }

@@ -33,6 +33,9 @@ pub const ALLOW_BACKREFS: u32 = 0x2000000;
 // what features are detected of the spends
 pub const ANALYZE_SPENDS: u32 = 0x4000000;
 
+// This enables support for the new SEND_MESSAGE and RECEIVE_MESSAGE conditions
+pub const ENABLE_MESSAGE_CONDITIONS: u32 = 0x8000000;
+
 pub const MEMPOOL_MODE: u32 = CLVM_MEMPOOL_MODE
     | NO_UNKNOWN_CONDS
     | COND_ARGS_NIL
