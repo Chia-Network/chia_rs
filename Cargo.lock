@@ -214,6 +214,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "blocking-threadpool"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c4ba4d6edfe07b0a4940ab5c05a7114155ffbe9d0c64df7a2e39cb002f879869"
+dependencies = [
+ "crossbeam-channel",
+ "num_cpus",
+]
+
+[[package]]
 name = "blst"
 version = "0.3.11"
 source = "git+https://github.com/supranational/blst.git?rev=0d46eefa45fc1e57aceb42bba0e84eab3a7a9725#0d46eefa45fc1e57aceb42bba0e84eab3a7a9725"
@@ -407,6 +417,7 @@ dependencies = [
 name = "chia-tools"
 version = "0.5.2"
 dependencies = [
+ "blocking-threadpool",
  "chia",
  "chia-bls 0.5.1",
  "chia-protocol",
@@ -419,7 +430,6 @@ dependencies = [
  "hex",
  "hex-literal",
  "rusqlite",
- "threadpool",
  "zstd",
 ]
 
@@ -733,6 +743,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "crossbeam-channel"
+version = "0.5.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "176dc175b78f56c0f321911d9c8eb2b77a78a4860b9c19db83835fea1a46649b"
+dependencies = [
+ "crossbeam-utils",
+]
+
+[[package]]
 name = "crossbeam-deque"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -758,12 +777,9 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-utils"
-version = "0.8.16"
+version = "0.8.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a22b2d63d4d1dc0b7f1b6b2747dd0088008a9be28b6ddf0b1e7d335e3037294"
-dependencies = [
- "cfg-if",
-]
+checksum = "248e3bacc7dc6baa3b21e405ee045c3047101a49145e7e9eca583ab4c2ca5345"
 
 [[package]]
 name = "crypto-bigint"

@@ -15,7 +15,7 @@ use clvm_utils::{tree_hash, CurriedProgram};
 use clvmr::allocator::NodePtr;
 use clvmr::Allocator;
 use std::thread::available_parallelism;
-use threadpool::ThreadPool;
+use std::time::{Duration, Instant};
 
 /// Analyze the spends in a chia blockchain database
 #[derive(Parser, Debug)]
@@ -44,10 +44,13 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    let pool = ThreadPool::new(
-        args.num_jobs
-            .unwrap_or_else(|| available_parallelism().unwrap().into()),
-    );
+    let num_cores = args
+        .num_jobs
+        .unwrap_or_else(|| available_parallelism().unwrap().into());
+    let pool = blocking_threadpool::Builder::new()
+        .num_threads(num_cores)
+        .queue_len(num_cores + 5)
+        .build();
 
     use chia_bls::G2Element;
     use std::collections::HashSet;
@@ -57,6 +60,8 @@ fn main() {
     let seen_puzzles = Arc::new(Mutex::new(HashSet::<Bytes32>::new()));
     let seen_singletons = Arc::new(Mutex::new(HashSet::<Bytes32>::new()));
 
+    let mut last_height = 0;
+    let mut last_time = Instant::now();
     iterate_tx_blocks(
         &args.file,
         args.start_height,
@@ -143,6 +148,14 @@ fn main() {
                     write(format!("{directory}/{height}.bundle"), bytes).expect("write");
                 }
             });
+            if last_time.elapsed() > Duration::new(4, 0) {
+                let rate = (height - last_height) as f64 / last_time.elapsed().as_secs_f64();
+                use std::io::Write;
+                print!("\rheight: {height} ({rate:0.1} blocks/s)   ");
+                let _ = std::io::stdout().flush();
+                last_height = height;
+                last_time = Instant::now();
+            }
         },
     );
 
