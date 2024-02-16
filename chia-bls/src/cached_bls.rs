@@ -71,13 +71,13 @@ impl BLSCache {
             } else {
                 let mut aug_msg = pks.borrow()[i].to_vec();
                 aug_msg.extend_from_slice(&msgs.borrow()[i]);  // pk + msg
-                let aug_hash = hash_to_g2(&aug_msg);
+                let aug_hash: Signature = hash_to_g2(&aug_msg);
 
-                let pk_parsed = pk_bytes_to_g1.entry(pks.borrow()[i]).or_insert_with(|| {
+                let pk_parsed: &mut PublicKey = pk_bytes_to_g1.entry(pks.borrow()[i]).or_insert_with(|| {
                     PublicKey::from_bytes(&pks.borrow()[i]).unwrap()
                 });
 
-                let pairing = aug_hash.pair(pk_parsed);
+                let pairing: GTElement = aug_hash.pair(pk_parsed);
                 let mut hasher = Sha256::new();
                 hasher.update(&aug_msg);
                 let h: Bytes32 = hasher.finalize().into();
