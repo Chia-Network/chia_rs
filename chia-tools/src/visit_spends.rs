@@ -16,7 +16,7 @@ pub fn iterate_tx_blocks(
     db: &str,
     start_height: u32,
     max_height: Option<u32>,
-    callback: impl Fn(u32, FullBlock, Vec<Vec<u8>>),
+    mut callback: impl FnMut(u32, FullBlock, Vec<Vec<u8>>),
 ) {
     let connection = Connection::open(db).expect("failed to open database file");
 

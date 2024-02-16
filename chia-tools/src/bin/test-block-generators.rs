@@ -9,7 +9,7 @@ use clvmr::serde::{node_from_bytes, node_to_bytes_backrefs};
 use clvmr::Allocator;
 use std::collections::HashSet;
 use std::thread::available_parallelism;
-use threadpool::ThreadPool;
+use std::time::{Duration, Instant};
 
 /// Analyze the blocks in a chia blockchain database
 #[derive(Parser, Debug)]
@@ -122,10 +122,14 @@ fn main() {
         panic!("it doesn't make sense to validate the output against identical runs. Specify --mempool, --rust-generator or --test-backrefs");
     }
 
-    let pool = ThreadPool::new(
-        args.num_jobs
-            .unwrap_or_else(|| available_parallelism().unwrap().into()),
-    );
+    let num_cores = args
+        .num_jobs
+        .unwrap_or_else(|| available_parallelism().unwrap().into());
+
+    let pool = blocking_threadpool::Builder::new()
+        .num_threads(num_cores)
+        .queue_len(num_cores + 5)
+        .build();
 
     let flags = if args.mempool { MEMPOOL_MODE } else { 0 }
         | if args.test_backrefs {
@@ -140,11 +144,13 @@ fn main() {
         run_block_generator::<_, EmptyVisitor>
     };
 
+    let mut last_height = 0;
+    let mut last_time = Instant::now();
     iterate_tx_blocks(
         &args.file,
         args.start_height,
         args.max_height,
-        |_height, block, block_refs| {
+        |height, block, block_refs| {
             pool.execute(move || {
                 let mut a = Allocator::new_limited(500000000);
 
@@ -199,8 +205,17 @@ fn main() {
             });
 
             assert_eq!(pool.panic_count(), 0);
+            if last_time.elapsed() > Duration::new(4, 0) {
+                let rate = (height - last_height) as f64 / last_time.elapsed().as_secs_f64();
+                use std::io::Write;
+                print!("\rheight: {height} ({rate:0.1} blocks/s)   ");
+                let _ = std::io::stdout().flush();
+                last_height = height;
+                last_time = Instant::now();
+            }
         },
     );
+    assert_eq!(pool.panic_count(), 0);
 
     pool.join();
 }
