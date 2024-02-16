@@ -1,6 +1,7 @@
 extern crate lru;
 use lru::LruCache;
 use std::num::NonZeroUsize;
+use std::borrow::Borrow;
 use crate::Signature;
 use crate::hash_to_g2;
 use crate::aggregate_verify as agg_ver;
@@ -24,18 +25,18 @@ impl BLSCache {
     }
     
     // Define a function to get pairings
-    pub fn get_pairings(
+    pub fn get_pairings<P: Borrow<[Bytes48]>, M: Borrow<[Vec<u8>]>> (
         &mut self,
-        pks: &[Bytes48],
-        msgs: &[Vec<u8>],
+        pks: &P,
+        msgs: &M,
         force_cache: bool,
     ) -> Vec<GTElement> {
         let mut pairings: Vec<Option<GTElement>> = vec![];
         let mut missing_count: usize = 0;
         
-        for (pk, msg) in pks.iter().zip(msgs.iter()) {
+        for (pk, msg) in pks.borrow().iter().zip(msgs.borrow().iter()) {
             let mut aug_msg = pk.to_vec();
-            aug_msg.extend_from_slice(msg); // pk + msg
+            aug_msg.extend_from_slice(msg.borrow()); // pk + msg
             let mut hasher = Sha256::new();
             hasher.update(aug_msg);
             let h: Bytes32 = hasher.finalize().into();
@@ -47,7 +48,7 @@ impl BLSCache {
                         // cache when it's empty and cached pairings won't be useful later
                         // (e.g. while syncing)
                         missing_count += 1;
-                        if missing_count > pks.len() / 2 {
+                        if missing_count > pks.borrow().len() / 2 {
                             return vec![];
                         }
                     }
@@ -68,12 +69,12 @@ impl BLSCache {
             if let Some(pairing) = pairing {  // equivalent to `if pairing is not None`
                 ret.push(pairing.clone());
             } else {
-                let mut aug_msg = pks[i].to_vec();
-                aug_msg.extend_from_slice(&msgs[i]);  // pk + msg
+                let mut aug_msg = pks.borrow()[i].to_vec();
+                aug_msg.extend_from_slice(&msgs.borrow()[i]);  // pk + msg
                 let aug_hash = hash_to_g2(&aug_msg);
 
-                let pk_parsed = pk_bytes_to_g1.entry(pks[i]).or_insert_with(|| {
-                    PublicKey::from_bytes(&pks[i]).unwrap()
+                let pk_parsed = pk_bytes_to_g1.entry(pks.borrow()[i]).or_insert_with(|| {
+                    PublicKey::from_bytes(&pks.borrow()[i]).unwrap()
                 });
 
                 let pairing = aug_hash.pair(pk_parsed);
@@ -95,7 +96,7 @@ impl BLSCache {
         sig: &Signature,
         force_cache: bool, 
     ) -> bool {
-        let mut pairings: Vec<GTElement> = self.get_pairings(&pks, &msgs, force_cache);
+        let mut pairings: Vec<GTElement> = self.get_pairings(pks, msgs, force_cache);
         if pairings.is_empty() {
             let mut data = Vec::<(PublicKey, Vec<u8>)>::new();
             for (pk, msg) in pks.iter().zip(msgs.iter()) {
