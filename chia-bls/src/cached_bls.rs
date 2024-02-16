@@ -202,5 +202,36 @@ pub mod tests {
         assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig, true));
         assert_eq!(bls_cache.cache.len(), 3);
     }
+
+    #[test]
+    pub fn test_cache_limit() {
+        // set cache size to 3
+        let mut bls_cache: BLSCache = BLSCache::generator(Some(3));
+        assert_eq!(bls_cache.cache.len(), 0);
+        // create 5 pk/msg combos
+        for i in 1..=5 {
+            let byte_array: [u8; 32] = [i as u8; 32];
+            let sk: SecretKey = SecretKey::from_seed(&byte_array);
+            let pk: PublicKey = sk.public_key();
+            let msg: Vec<u8> = [106; 32].to_vec();
+            let sig: Signature = sign(&sk, &msg);
+            let pk_list: Vec<[u8; 48]> = [pk.to_bytes()].to_vec();
+            let msg_list: Vec<Vec<u8>> = [msg].to_vec();
+            assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig, true));
+        }
+        assert_eq!(bls_cache.cache.len(), 3);
+        // recreate first key
+        let byte_array: [u8; 32] = [1; 32];
+        let sk: SecretKey = SecretKey::from_seed(&byte_array);
+        let pk: PublicKey = sk.public_key();
+        let msg: Vec<u8> = [106; 32].to_vec();
+        let mut aug_msg = pk.to_bytes().to_vec();
+        aug_msg.extend_from_slice(&msg); // pk + msg
+        let mut hasher = Sha256::new();
+        hasher.update(aug_msg);
+        let h: Bytes32 = hasher.finalize().into();
+        // assert first key has been removed
+        assert!(bls_cache.cache.get(&h).is_none());
+    }
 }
 
