@@ -1,4 +1,3 @@
-chia_rs @ file:///var/folders/w1/q9rlcnps12l0vj4l4ch0krwc0000gn/T/.tmpjfJVCH/chia_rs-0.5.2-cp312-cp312-macosx_11_0_arm64.whl#sha256=87f12f2b5ab21018a01cd416a415e0310994411b0780292c76ead83f8f50feb4
 iniconfig==2.0.0
 maturin==1.4.0
 chia-blockchain==2.1.4

@@ -4,7 +4,7 @@ To run the tests:
 ```
 cd wheel
 python3 -m venv venv
-pip install -r requirements
+pip install -r requirements.txt
 maturin develop
 cd ..
 pytest tests

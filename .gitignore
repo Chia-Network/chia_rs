@@ -1,2 +1,5 @@
 target/
 .idea/
+__pycache__
+venv
+Cargo.lock
