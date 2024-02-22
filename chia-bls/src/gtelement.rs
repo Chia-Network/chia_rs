@@ -19,7 +19,8 @@ use pyo3::exceptions::PyValueError;
 #[cfg(feature = "py-bindings")]
 use pyo3::{pyclass, pymethods, IntoPy, PyAny, PyObject, PyResult, Python};
 
-#[cfg_attr(feature = "py-bindings", pyclass, derive(PyStreamable, Clone))]
+#[cfg_attr(feature = "py-bindings", pyclass, derive(PyStreamable))]
+#[derive(Clone)]
 pub struct GTElement(pub(crate) blst_fp12);
 
 impl GTElement {
