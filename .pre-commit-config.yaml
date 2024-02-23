@@ -47,6 +47,6 @@ repos:
         name: build wheel
         description: run maturin develop on the wheel
         stages: [pre-push]
-        entry: cd wheel && maturin develop
+        entry: sh -c "cd wheel && maturin develop"
         language: system
         pass_filenames: false
