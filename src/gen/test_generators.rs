@@ -6,7 +6,6 @@ use chia_protocol::{Bytes, Bytes48};
 use clvmr::allocator::NodePtr;
 use clvmr::Allocator;
 use std::iter::zip;
-use std::string::String;
 use text_diff::diff;
 use text_diff::Difference;
 
