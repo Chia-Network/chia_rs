@@ -9,7 +9,6 @@ use clvmr::ENABLE_FIXED_DIV;
 use clvmr::{Allocator, NodePtr};
 use libfuzzer_sys::fuzz_target;
 use std::collections::HashSet;
-use std::iter::FromIterator;
 
 fuzz_target!(|data: &[u8]| {
     let Ok(bundle) = SpendBundle::from_bytes(data) else {

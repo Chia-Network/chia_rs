@@ -11,7 +11,6 @@ use clvmr::cost::Cost;
 use clvmr::op_utils::{first, rest};
 use clvmr::reduction::EvalErr;
 use clvmr::Allocator;
-use std::result::Result;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;

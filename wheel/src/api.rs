@@ -40,13 +40,10 @@ use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV, LIMIT_HEAP, NO_UNKNO
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
-use pyo3::types::PyAny;
 use pyo3::types::PyBytes;
 use pyo3::types::PyList;
-use pyo3::types::PyModule;
 use pyo3::types::PyTuple;
-use pyo3::{wrap_pyfunction, PyResult, Python};
-use std::convert::TryInto;
+use pyo3::wrap_pyfunction;
 use std::iter::zip;
 
 use crate::run_program::{run_chia_program, serialized_length};

@@ -63,7 +63,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chia_protocol::Coin;
     use clvmr::{run_program, ChiaDialect};
     use hex_literal::hex;
 
