@@ -208,21 +208,67 @@ use rstest::rstest;
 
 #[cfg(test)]
 #[rstest]
-#[case("block-1ee588dc")]
-#[case("block-6fe59b24")]
-#[case("block-b45268ac")]
-#[case("block-c2a8df0d")]
-#[case("block-e5002df2")]
-#[case("block-4671894")]
-#[case("block-225758")]
-#[case("block-834752")]
-#[case("block-834752-compressed")]
-#[case("block-834760")]
-#[case("block-834761")]
-#[case("block-834765")]
-#[case("block-834766")]
-#[case("block-834768")]
-fn test_tree_hash_cached(#[case] name: &str, #[values(true, false)] compressed: bool) {
+#[case(
+    "block-1ee588dc",
+    "1cba0b22b84b597d265d77fbabb57fada01d963f75dc3956a6166a2385997ef2"
+)]
+#[case(
+    "block-6fe59b24",
+    "540c5afac7c26728ed6b7891d8ce2f5b26009c4b0090d7035403c2425dc54e1d"
+)]
+#[case(
+    "block-b45268ac",
+    "7cc321f5554126c9f430afbc7dd9c804f5d34a248e3192f275f5d585ecf8e873"
+)]
+#[case(
+    "block-c2a8df0d",
+    "2e25efa524e420111006fee77f50fb8fbd725920a5312d5480af239d81ab5e7e"
+)]
+#[case(
+    "block-e5002df2",
+    "c179ece232dceef984ba000f7e5b67ee3092582668bf6178969df10845eb8b18"
+)]
+#[case(
+    "block-4671894",
+    "3750f0e1bde9fcb407135f974aa276a4580e1e76a47e6d8d9bb2911d0fe91db1"
+)]
+#[case(
+    "block-225758",
+    "880df94c3c9e0f7c26c42ae99723e683a4cd37e73f74c6322d1dfabaa1d64d93"
+)]
+#[case(
+    "block-834752",
+    "be755b8ef03d917b8bd37ae152792a7daa7de81bbb0eaa21c530571c2105c130"
+)]
+#[case(
+    "block-834752-compressed",
+    "be755b8ef03d917b8bd37ae152792a7daa7de81bbb0eaa21c530571c2105c130"
+)]
+#[case(
+    "block-834760",
+    "77558768f74c5f863b36232a1390843a63a397fc22da1321fea3a05eab67be2c"
+)]
+#[case(
+    "block-834761",
+    "4bac8b299c6545a37a825883c863b79ce850e7f6c8f1d2abeec2865f5450f1c5"
+)]
+#[case(
+    "block-834765",
+    "b915ec5f9f8ea723e0a99b035df206673369b802766dd76b6c8f4c15ab7bca2c"
+)]
+#[case(
+    "block-834766",
+    "409559c3395fb18a6c3390ccccd55e82162b1e68b867490a90ccbddf78147c9d"
+)]
+#[case(
+    "block-834768",
+    "905441945a9a56558337c8b7a536a6b9606ad63e11a265a938f301747ccfb7af"
+)]
+fn test_tree_hash_cached(
+    #[case] name: &str,
+    #[case] expect: &str,
+    #[values(true, false)] compressed: bool,
+) {
     use clvmr::serde::{
         node_from_bytes_backrefs, node_from_bytes_backrefs_record, node_to_bytes_backrefs,
     };
@@ -253,5 +299,35 @@ fn test_tree_hash_cached(#[case] name: &str, #[values(true, false)] compressed: 
     //     println!("  {key:?}: {}", hex::encode(value));
     // }
     assert_eq!(hash1, hash2);
+    assert_eq!(hash1, hex::decode(expect).unwrap().as_slice());
     assert!(!compressed || !backrefs.is_empty());
+}
+
+#[cfg(test)]
+fn test_sha256_atom(buf: &[u8]) {
+    let hash = tree_hash_atom(buf);
+
+    let mut hasher = Sha256::new();
+    hasher.update([1_u8]);
+    if !buf.is_empty() {
+        hasher.update(buf);
+    }
+
+    assert_eq!(hash, hasher.finalize().as_slice());
+}
+
+#[test]
+fn test_tree_hash_atom() {
+    test_sha256_atom(&[]);
+    for val in 0..255 {
+        test_sha256_atom(&[val]);
+    }
+
+    for val in 0..255 {
+        test_sha256_atom(&[0, val]);
+    }
+
+    for val in 0..255 {
+        test_sha256_atom(&[0xff, val]);
+    }
 }
