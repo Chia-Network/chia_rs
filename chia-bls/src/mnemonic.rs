@@ -1,7 +1,6 @@
 use anyhow::Error;
 use bip39::{Language, Mnemonic, Seed};
 use std::array::TryFromSliceError;
-use std::result::Result;
 
 pub fn entropy_to_mnemonic(entropy: &[u8; 32]) -> String {
     Mnemonic::from_entropy(entropy, Language::English)

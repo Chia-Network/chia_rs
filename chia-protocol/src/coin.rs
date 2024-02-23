@@ -6,7 +6,6 @@ use clvm_traits::{
     ToClvm, ToClvmError,
 };
 use sha2::{Digest, Sha256};
-use std::convert::TryInto;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;

@@ -3,7 +3,6 @@ use ::chia_protocol::bytes::Bytes32;
 use clvm_utils::tree_hash;
 use clvmr::allocator::{Allocator, Atom, NodePtr};
 use clvmr::op_utils::u64_from_bytes;
-use std::convert::AsRef;
 
 // returns parent-coin ID, amount, puzzle-reveal and solution
 pub fn parse_coin_spend(

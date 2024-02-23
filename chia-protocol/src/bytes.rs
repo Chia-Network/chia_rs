@@ -2,7 +2,6 @@ use chia_traits::{chia_error, read_bytes, Streamable};
 use clvm_traits::{ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError, ToClvm, ToClvmError};
 use sha2::{Digest, Sha256};
 use std::array::TryFromSliceError;
-use std::convert::{AsRef, TryInto};
 use std::fmt;
 use std::io::Cursor;
 use std::ops::Deref;

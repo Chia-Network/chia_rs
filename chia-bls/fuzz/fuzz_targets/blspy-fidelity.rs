@@ -9,7 +9,6 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 use pyo3::prelude::*;
-use std::convert::TryFrom;
 
 use chia_bls::derivable_key::DerivableKey;
 use chia_bls::secret_key::SecretKey;
