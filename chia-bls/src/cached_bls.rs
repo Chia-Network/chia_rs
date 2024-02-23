@@ -13,7 +13,7 @@ use sha2::{Digest, Sha256};
 #[cfg(feature = "py-bindings")]
 use pyo3::{pyclass, pymethods, PyResult};
 #[cfg(feature = "py-bindings")]
-use pyo3::types::{PyList, PyBool};
+use pyo3::types::{PyList, PyBool, PyInt};
 
 pub type Bytes32 = [u8; 32];
 pub type Bytes48 = [u8; 48];
@@ -141,8 +141,14 @@ impl BLSCache {
 
     #[staticmethod]
     #[pyo3(name = "generator")]
-    pub fn py_generator() -> Self {
-        Self::generator(None)
+    pub fn py_generator(size: Option<&PyInt>) -> Self {
+        match size {
+            Some(s) => {
+                let usize_value: usize = s.extract::<usize>().unwrap();
+                Self::generator(Some(usize_value))
+            },
+            None => Self::generator(None)
+        }
     }
 
     #[pyo3(name = "aggregate_verify")]
@@ -157,6 +163,11 @@ impl BLSCache {
         let msgs_r: Vec<Vec<u8>> = msgs.iter().map(|item| item.extract::<Vec<u8>>()).collect::<PyResult<_>>()?;
         let force_cache_bool = force_cache.extract::<bool>()?;
         Ok(self.aggregate_verify(&pks_r, &msgs_r, sig, force_cache_bool))
+    }
+
+    #[pyo3(name = "len")]
+    pub fn py_len(&self) -> PyResult<usize> {
+        Ok(self.cache.len())
     }
 }
 
