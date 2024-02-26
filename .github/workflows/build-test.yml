@@ -288,7 +288,7 @@ jobs:
         uses: dtolnay/rust-toolchain
         with:
             components: rustfmt, clippy
-      
+
       - name: fmt
         run: |
             cargo fmt --all -- --files-with-diff --check
@@ -302,7 +302,7 @@ jobs:
       - uses: dtolnay/rust-toolchain
         with:
           components: clippy
-        
+
       - name: workspace
         run: |
             cargo clippy --workspace --all-features -- -Dwarnings
