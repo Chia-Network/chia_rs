@@ -285,13 +285,10 @@ jobs:
           fetch-depth: 1
 
       - name: Install rust
-        uses: dtolnay/rust-toolchain@nightly
+        uses: dtolnay/rust-toolchain
         with:
             components: rustfmt, clippy
       
-      - name: Set rustup override
-        run: rustup override set nightly
-
       - name: fmt
         run: |
             cargo fmt --all -- --files-with-diff --check
@@ -302,13 +299,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain
         with:
           components: clippy
         
-      - name: Set rustup override
-        run: rustup override set nightly
-
       - name: workspace
         run: |
             cargo clippy --workspace --all-features -- -Dwarnings
