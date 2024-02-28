@@ -20,14 +20,15 @@ enum NodeType {
 }
 
 // the ArrayType is used to create a more lasting MerkleTree representation in the MerkleTreeData struct
-enum ArrayTypes {
+#[derive(PartialEq, Debug, Copy, Clone)]
+pub enum ArrayTypes {
     Leaf {data: u32 }, // indexes for the data_hash array
     Middle {children: (u32, u32)}, // indexes for a Vec of ArrayTypes
     Empty,
 }
 
 // represents a MerkleTree by putting all the nodes in a vec. Root is the last entry.
-struct MerkleTreeData {
+pub struct MerkleTreeData {
     nodes_vec: Vec<ArrayTypes>,
     leaf_vec: Vec<[u8; 32]>,
 }
@@ -328,8 +329,12 @@ fn test_compute_merkle_root_duplicate_1() {
         0x70, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0,
     ];
-
-    assert_eq!(compute_merkle_set_root(&mut [a, a]).0, h2(&[1_u8], &a));
+    let (root, tree) = compute_merkle_set_root(&mut [a, a]);
+    assert_eq!(root, h2(&[1_u8], &a));
+    // assert_eq!(tree.nodes_vec.len(), 1);
+    assert_eq!(tree.leaf_vec.len(), 1);
+    assert_eq!(tree.leaf_vec[0], a);
+    assert_eq!(tree.nodes_vec[0], ArrayTypes::Leaf { data: 0 });
 }
 
 #[test]
@@ -339,7 +344,12 @@ fn test_compute_merkle_root_duplicates_1() {
         0, 0, 0,
     ];
 
-    assert_eq!(compute_merkle_set_root(&mut [a, a, a, a]).0, h2(&[1_u8], &a));
+    let (root, tree) = compute_merkle_set_root(&mut [a, a]);
+    assert_eq!(root, h2(&[1_u8], &a));
+    // assert_eq!(tree.nodes_vec.len(), 1);
+    assert_eq!(tree.leaf_vec.len(), 1);
+    assert_eq!(tree.leaf_vec[0], a);
+    assert_eq!(tree.nodes_vec[0], ArrayTypes::Leaf { data: 0 });
 }
 
 #[test]
@@ -368,6 +378,7 @@ fn test_compute_merkle_root_duplicate_4() {
     );
 
     // rotations
+    
     assert_eq!(compute_merkle_set_root(&mut [a, b, c, d, a]).0, expected);
     assert_eq!(compute_merkle_set_root(&mut [b, c, d, a, a]).0, expected);
     assert_eq!(compute_merkle_set_root(&mut [c, d, a, b, a]).0, expected);
