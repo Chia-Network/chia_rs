@@ -22,8 +22,8 @@ enum NodeType {
 // the ArrayType is used to create a more lasting MerkleTree representation in the MerkleTreeData struct
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum ArrayTypes {
-    Leaf {data: u32 }, // indexes for the data_hash array
-    Middle {children: (u32, u32)}, // indexes for a Vec of ArrayTypes
+    Leaf {data: usize }, // indexes for the data_hash array
+    Middle {children: (usize, usize)}, // indexes for a Vec of ArrayTypes
     Empty,
 }
 
@@ -70,8 +70,8 @@ fn radix_sort(range: &mut [[u8; 32]], depth: u8, merkle_tree: &mut MerkleTreeDat
     if range.len() == 1 {
         // we've reached a leaf node
         // nothing below us so return empty vecs
+        merkle_tree.nodes_vec.push(ArrayTypes::Leaf {data: merkle_tree.leaf_vec.len()});
         merkle_tree.leaf_vec.push(range[0]);
-        merkle_tree.nodes_vec.push(ArrayTypes::Leaf {data: merkle_tree.leaf_vec.len() as u32});
         return (range[0], NodeType::Term);
     }
 
@@ -117,7 +117,7 @@ fn radix_sort(range: &mut [[u8; 32]], depth: u8, merkle_tree: &mut MerkleTreeDat
             // so just return one of the duplicates as if there was only one
             debug_assert!(range.len() > 1);
             debug_assert!(range[0] == range[1]);
-            merkle_tree.nodes_vec.push(ArrayTypes::Leaf{data: merkle_tree.leaf_vec.len() as u32});
+            merkle_tree.nodes_vec.push(ArrayTypes::Leaf{data: merkle_tree.leaf_vec.len()});
             merkle_tree.leaf_vec.push(range[0].clone());
             (range[0], NodeType::Term)
         } else {
@@ -126,20 +126,20 @@ fn radix_sort(range: &mut [[u8; 32]], depth: u8, merkle_tree: &mut MerkleTreeDat
             let (child_hash, child_type) = radix_sort(range, depth + 1, merkle_tree);
             
             merkle_tree.nodes_vec.push(ArrayTypes::Empty);
-            let node_length: u32 =  merkle_tree.nodes_vec.len() as u32;
+            let node_length: usize =  merkle_tree.nodes_vec.len();
             // most recent nodes are our children
             
             // in this case we may need to insert an Empty node (prefix 0 and a
             // blank hash)
             if child_type == NodeType::Mid {
                 if left_empty {
-                    merkle_tree.nodes_vec.push(ArrayTypes::Middle { children: (node_length, node_length - 1) });
+                    merkle_tree.nodes_vec.push(ArrayTypes::Middle { children: (node_length - 1, node_length - 2) });
                     (
                         hash(NodeType::Empty, child_type, &BLANK, &child_hash),
                         NodeType::Mid,
                     )
                 } else {
-                    merkle_tree.nodes_vec.push(ArrayTypes::Middle { children: (node_length - 1, node_length) });
+                    merkle_tree.nodes_vec.push(ArrayTypes::Middle { children: (node_length - 2, node_length - 1) });
                     (
                         hash(child_type, NodeType::Empty, &child_hash, &BLANK),
                         NodeType::Mid,
@@ -156,10 +156,15 @@ fn radix_sort(range: &mut [[u8; 32]], depth: u8, merkle_tree: &mut MerkleTreeDat
         // overflow
         debug_assert!(range.len() > 1);
         debug_assert!(left < range.len() as i32);
-        merkle_tree.nodes_vec.push(ArrayTypes::Empty);
-        merkle_tree.nodes_vec.push(ArrayTypes::Empty);
-        let nodes_len = merkle_tree.nodes_vec.len() as u32;
-        merkle_tree.nodes_vec.push(ArrayTypes::Middle { children: (nodes_len - 1, nodes_len) });
+
+        merkle_tree.nodes_vec.push(ArrayTypes::Leaf {data: merkle_tree.leaf_vec.len()});
+        merkle_tree.leaf_vec.push(range[0].clone());
+
+        merkle_tree.nodes_vec.push(ArrayTypes::Leaf { data: merkle_tree.leaf_vec.len() });
+        merkle_tree.leaf_vec.push(range[left as usize].clone());
+
+        let nodes_len = merkle_tree.nodes_vec.len();
+        merkle_tree.nodes_vec.push(ArrayTypes::Middle { children: (nodes_len - 2, nodes_len - 1) });
         (
             hash(
                 NodeType::Term,
@@ -174,12 +179,18 @@ fn radix_sort(range: &mut [[u8; 32]], depth: u8, merkle_tree: &mut MerkleTreeDat
         // recursively sort and hash our left and right children and return the resultant hash upwards
         let (left_hash, left_type) = radix_sort(&mut range[..left as usize], depth + 1, merkle_tree);
         // make a note of where the left child node is
-        let left_child_index = merkle_tree.nodes_vec.len() as u32;
+        let left_child_index: usize = merkle_tree.nodes_vec.len() - 1;
         let (right_hash, right_type) = radix_sort(&mut range[left as usize..], depth + 1, merkle_tree);
-        merkle_tree.nodes_vec.push(ArrayTypes::Middle { children: (left_child_index, merkle_tree.nodes_vec.len() as u32) });
+       
         let node_type: NodeType = if left_type == NodeType::Term && right_type == NodeType::Term {
+            // Prune the two empties beneath us and push ourselves as empty
+            // merkle_tree.nodes_vec.remove(usize::try_from(left_child_index).unwrap());
+            // merkle_tree.nodes_vec.remove(merkle_tree.nodes_vec.len() - 1);
+            // merkle_tree.nodes_vec.push(ArrayTypes::Empty);
+            merkle_tree.nodes_vec.push(ArrayTypes::Middle { children: (left_child_index, merkle_tree.nodes_vec.len() - 1) });
             NodeType::MidDbl
         } else {
+            merkle_tree.nodes_vec.push(ArrayTypes::Middle { children: (left_child_index, merkle_tree.nodes_vec.len() - 1) });
             NodeType::Mid
         };
         (
@@ -332,7 +343,7 @@ fn test_compute_merkle_root_duplicate_1() {
     ];
     let (root, tree) = compute_merkle_set_root(&mut [a, a]);
     assert_eq!(root, h2(&[1_u8], &a));
-    // assert_eq!(tree.nodes_vec.len(), 1);
+    // assert_eq!(tree.nodes_vec.len(), 3);
     assert_eq!(tree.leaf_vec.len(), 1);
     assert_eq!(tree.leaf_vec[0], a);
     assert_eq!(tree.nodes_vec[0], ArrayTypes::Leaf { data: 0 });
@@ -494,55 +505,78 @@ fn test_compute_merkle_root_2() {
         0, 0, 0,
     ];
 
-    // pairs
-    assert_eq!(
-        compute_merkle_set_root(&mut [a, b]).0,
-        hashdown(&[1_u8, 1], &a, &b)
-    );
-    assert_eq!(
-        compute_merkle_set_root(&mut [b, a]).0,
-        hashdown(&[1_u8, 1], &a, &b)
-    );
-    assert_eq!(
-        compute_merkle_set_root(&mut [a, c]).0,
-        hashdown(&[1_u8, 1], &a, &c)
-    );
-    assert_eq!(
-        compute_merkle_set_root(&mut [c, a]).0,
-        hashdown(&[1_u8, 1], &a, &c)
-    );
-    assert_eq!(
-        compute_merkle_set_root(&mut [a, d]).0,
-        hashdown(&[1_u8, 1], &a, &d)
-    );
-    assert_eq!(
-        compute_merkle_set_root(&mut [d, a]).0,
-        hashdown(&[1_u8, 1], &a, &d)
-    );
-    assert_eq!(
-        compute_merkle_set_root(&mut [b, c]).0,
-        hashdown(&[1_u8, 1], &b, &c)
-    );
-    assert_eq!(
-        compute_merkle_set_root(&mut [c, b]).0,
-        hashdown(&[1_u8, 1], &b, &c)
-    );
-    assert_eq!(
-        compute_merkle_set_root(&mut [b, d]).0,
-        hashdown(&[1_u8, 1], &b, &d)
-    );
-    assert_eq!(
-        compute_merkle_set_root(&mut [d, b]).0,
-        hashdown(&[1_u8, 1], &b, &d)
-    );
-    assert_eq!(
-        compute_merkle_set_root(&mut [c, d]).0,
-        hashdown(&[1_u8, 1], &c, &d)
-    );
-    assert_eq!(
-        compute_merkle_set_root(&mut [d, c]).0,
-        hashdown(&[1_u8, 1], &c, &d)
-    );
+    // pairs a, b
+    let (root, tree) = compute_merkle_set_root(&mut [a, b]);
+    assert_eq!(root, hashdown(&[1_u8, 1], &a, &b));
+    assert_eq!(tree.leaf_vec.len(), 2);
+    assert_eq!(tree.leaf_vec[0], a);
+    assert_eq!(tree.leaf_vec[1], b);
+
+    let (root, tree) = compute_merkle_set_root(&mut [b, a]);
+    assert_eq!(root, hashdown(&[1_u8, 1], &a, &b));
+    assert_eq!(tree.leaf_vec.len(), 2);
+    assert_eq!(tree.leaf_vec[0], a);
+    assert_eq!(tree.leaf_vec[1], b);
+
+    // pairs a, c
+    let (root, tree) = compute_merkle_set_root(&mut [a, c]);
+    assert_eq!(root, hashdown(&[1_u8, 1], &a, &c));
+    assert_eq!(tree.leaf_vec.len(), 2);
+    assert_eq!(tree.leaf_vec[0], a);
+    assert_eq!(tree.leaf_vec[1], c);
+    let (root, tree) = compute_merkle_set_root(&mut [c, a]);
+    assert_eq!(root, hashdown(&[1_u8, 1], &a, &c));
+    assert_eq!(tree.leaf_vec.len(), 2);
+    assert_eq!(tree.leaf_vec[0], a);
+    assert_eq!(tree.leaf_vec[1], c);
+
+    // pairs a, d
+    let (root, tree) = compute_merkle_set_root(&mut [a, d]);
+    assert_eq!(root, hashdown(&[1_u8, 1], &a, &d));
+    assert_eq!(tree.leaf_vec.len(), 2);
+    assert_eq!(tree.leaf_vec[0], a);
+    assert_eq!(tree.leaf_vec[1], d);
+    let (root, tree) = compute_merkle_set_root(&mut [d, a]);
+    assert_eq!(root, hashdown(&[1_u8, 1], &a, &d));
+    assert_eq!(tree.leaf_vec.len(), 2);
+    assert_eq!(tree.leaf_vec[0], a);
+    assert_eq!(tree.leaf_vec[1], d);
+   
+    // pairs b, c
+    let (root, tree) = compute_merkle_set_root(&mut [b, c]);
+    assert_eq!(root, hashdown(&[1_u8, 1], &b, &c));
+    assert_eq!(tree.leaf_vec.len(), 2);
+    assert_eq!(tree.leaf_vec[0], b);
+    assert_eq!(tree.leaf_vec[1], c);
+    let (root, tree) = compute_merkle_set_root(&mut [c, b]);
+    assert_eq!(root, hashdown(&[1_u8, 1], &b, &c));
+    assert_eq!(tree.leaf_vec.len(), 2);
+    assert_eq!(tree.leaf_vec[0], b);
+    assert_eq!(tree.leaf_vec[1], c);
+   
+    // pairs b, d
+    let (root, tree) = compute_merkle_set_root(&mut [b, d]);
+    assert_eq!(root, hashdown(&[1_u8, 1], &b, &d));
+    assert_eq!(tree.leaf_vec.len(), 2);
+    assert_eq!(tree.leaf_vec[0], b);
+    assert_eq!(tree.leaf_vec[1], d);
+    let (root, tree) = compute_merkle_set_root(&mut [d, b]);
+    assert_eq!(root, hashdown(&[1_u8, 1], &b, &d));
+    assert_eq!(tree.leaf_vec.len(), 2);
+    assert_eq!(tree.leaf_vec[0], b);
+    assert_eq!(tree.leaf_vec[1], d);
+
+    // pairs c, d
+    let (root, tree) = compute_merkle_set_root(&mut [c, d]);
+    assert_eq!(root, hashdown(&[1_u8, 1], &c, &d));
+    assert_eq!(tree.leaf_vec.len(), 2);
+    assert_eq!(tree.leaf_vec[0], c);
+    assert_eq!(tree.leaf_vec[1], d);
+    let (root, tree) = compute_merkle_set_root(&mut [d, c]);
+    assert_eq!(root, hashdown(&[1_u8, 1], &c, &d));
+    assert_eq!(tree.leaf_vec.len(), 2);
+    assert_eq!(tree.leaf_vec[0], c);
+    assert_eq!(tree.leaf_vec[1], d);
 }
 
 #[test]
@@ -648,7 +682,9 @@ fn test_compute_merkle_root_5() {
     let expected = hashdown(&[2, 1], &expected, &a);
     let expected = hashdown(&[2, 1], &expected, &d);
 
-    assert_eq!(compute_merkle_set_root(&mut [a, b, c, d, e]).0, expected)
+    let (root, tree) = compute_merkle_set_root(&mut [a, b, c, d, e]);
+    assert_eq!(root, expected);
+    assert_eq!(tree.leaf_vec.len(), 5);
     // this tree looks like this:
     //
     //             o
@@ -668,6 +704,16 @@ fn test_compute_merkle_root_5() {
     //   o   b
     //  / \
     // e   c
+    assert_eq!(tree.nodes_vec.len(), 17);
+    if let ArrayTypes::Middle {children} = tree.nodes_vec[tree.nodes_vec.len() - 1] {
+        if let ArrayTypes::Leaf {data} = tree.nodes_vec[children.1 as usize] {
+            assert_eq!(tree.leaf_vec[data as usize], d);
+        } else {
+            assert!(false) // node should be a leaf
+        }
+    } else {
+        assert!(false) // root node should be a Middle
+    }
 }
 
 #[test]
