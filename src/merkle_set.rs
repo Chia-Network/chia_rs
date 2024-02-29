@@ -28,6 +28,7 @@ pub enum ArrayTypes {
 }
 
 // represents a MerkleTree by putting all the nodes in a vec. Root is the last entry.
+#[derive(PartialEq, Debug, Clone)]
 pub struct MerkleTreeData {
     nodes_vec: Vec<ArrayTypes>,
     leaf_vec: Vec<[u8; 32]>,
@@ -378,23 +379,59 @@ fn test_compute_merkle_root_duplicate_4() {
     );
 
     // rotations
+    let (root, tree) = compute_merkle_set_root(&mut [a, b, c, d, a]);
+    assert_eq!(root, expected);
+    assert_eq!(tree.leaf_vec.len(), 4);
+    let node_len = tree.nodes_vec.len();
+    assert!(matches!(tree.nodes_vec[node_len - 1], ArrayTypes::Middle { .. }));  // check root node is a middle
+
+    // check variations have same root and tree
+    let (root, tree_2) = compute_merkle_set_root(&mut [b, c, d, a, a]);
+    assert_eq!(root, expected);
+    assert_eq!(tree, tree_2);
     
-    assert_eq!(compute_merkle_set_root(&mut [a, b, c, d, a]).0, expected);
-    assert_eq!(compute_merkle_set_root(&mut [b, c, d, a, a]).0, expected);
-    assert_eq!(compute_merkle_set_root(&mut [c, d, a, b, a]).0, expected);
-    assert_eq!(compute_merkle_set_root(&mut [d, a, b, c, a]).0, expected);
+    let (root, tree_2) = compute_merkle_set_root(&mut [c, d, a, b, a]);
+    assert_eq!(root, expected);
+    assert_eq!(tree, tree_2);
+    
+    let (root, tree_2) = compute_merkle_set_root(&mut  [d, a, b, c, a]);
+    assert_eq!(root, expected);
+    assert_eq!(tree, tree_2);
 
     // reverse rotations
-    assert_eq!(compute_merkle_set_root(&mut [d, c, b, a, a]).0, expected);
-    assert_eq!(compute_merkle_set_root(&mut [c, b, a, d, a]).0, expected);
-    assert_eq!(compute_merkle_set_root(&mut [b, a, d, c, a]).0, expected);
-    assert_eq!(compute_merkle_set_root(&mut [a, d, c, b, a]).0, expected);
+    let (root, tree_2) = compute_merkle_set_root(&mut  [d, c, b, a, a]);
+    assert_eq!(root, expected);
+    assert_eq!(tree, tree_2);
+    
+    let (root, tree_2) = compute_merkle_set_root(&mut  [c, b, a, d, a]);
+    assert_eq!(root, expected);
+    assert_eq!(tree, tree_2);
+    
+    let (root, tree_2) = compute_merkle_set_root(&mut  [b, a, d, c, a]);
+    assert_eq!(root, expected);
+    assert_eq!(tree, tree_2);
+    
+    let (root, tree_2) = compute_merkle_set_root(&mut  [a, d, c, b, a]);
+    assert_eq!(root, expected);
+    assert_eq!(tree, tree_2);
 
     // shuffled
-    assert_eq!(compute_merkle_set_root(&mut [c, a, d, b, a]).0, expected);
-    assert_eq!(compute_merkle_set_root(&mut [d, c, b, a, a]).0, expected);
-    assert_eq!(compute_merkle_set_root(&mut [c, d, a, b, a]).0, expected);
-    assert_eq!(compute_merkle_set_root(&mut [a, b, c, d, a]).0, expected);
+    let (root, tree_2) = compute_merkle_set_root(&mut  [c, a, d, b, a]);
+    assert_eq!(root, expected);
+    assert_eq!(tree, tree_2);
+
+    let (root, tree_2) = compute_merkle_set_root(&mut  [d, c, b, a, a]);
+    assert_eq!(root, expected);
+    assert_eq!(tree, tree_2);
+
+    let (root, tree_2) = compute_merkle_set_root(&mut  [c, d, a, b, a]);
+    assert_eq!(root, expected);
+    assert_eq!(tree, tree_2);
+
+    let (root, tree_2) = compute_merkle_set_root(&mut  [a, b, c, d, a]);
+    assert_eq!(root, expected);
+    assert_eq!(tree, tree_2);
+
 }
 
 #[test]
@@ -417,10 +454,25 @@ fn test_compute_merkle_root_1() {
     ];
 
     // singles
-    assert_eq!(compute_merkle_set_root(&mut [a]).0, h2(&[1_u8], &a));
-    assert_eq!(compute_merkle_set_root(&mut [b]).0, h2(&[1_u8], &b));
-    assert_eq!(compute_merkle_set_root(&mut [c]).0, h2(&[1_u8], &c));
-    assert_eq!(compute_merkle_set_root(&mut [d]).0, h2(&[1_u8], &d));
+    let (root, tree) = compute_merkle_set_root(&mut [a]);
+    assert_eq!(root, h2(&[1_u8], &a));
+    assert_eq!(tree.leaf_vec.len(), 1);
+    assert_eq!(tree.leaf_vec[0], a);
+    
+    let (root, tree) = compute_merkle_set_root(&mut [b]);
+    assert_eq!(root, h2(&[1_u8], &b));
+    assert_eq!(tree.leaf_vec.len(), 1);
+    assert_eq!(tree.leaf_vec[0], b);
+
+    let (root, tree) = compute_merkle_set_root(&mut [c]);
+    assert_eq!(root, h2(&[1_u8], &c));
+    assert_eq!(tree.leaf_vec.len(), 1);
+    assert_eq!(tree.leaf_vec[0], c);
+    
+    let (root, tree) = compute_merkle_set_root(&mut [d]);
+    assert_eq!(root, h2(&[1_u8], &d));
+    assert_eq!(tree.leaf_vec.len(), 1);
+    assert_eq!(tree.leaf_vec[0], d);
 }
 
 #[test]
