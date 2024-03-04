@@ -1,5 +1,25 @@
 [workspace]
-members = ["crates/*", "crates/*/fuzz", "fuzz", "wasm", "wheel"]
+members = [
+    "crates/chia-bls",
+    "crates/chia-bls/fuzz",
+    "crates/chia-client",
+    "crates/chia-protocol",
+    "crates/chia-protocol/fuzz",
+    "crates/chia_py_streamable_macro",
+    "crates/chia_streamable_macro",
+    "crates/chia-ssl",
+    "crates/chia-tools",
+    "crates/chia-traits",
+    "crates/chia-wallet",
+    "crates/chia-wallet/fuzz",
+    "crates/clvm-derive",
+    "crates/clvm-traits",
+    "crates/clvm-utils",
+    "crates/clvm-utils/fuzz",
+    "fuzz",
+    "wasm",
+    "wheel",
+]
 
 [package]
 name = "chia"
