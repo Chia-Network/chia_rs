@@ -1,25 +1,5 @@
 [workspace]
-members = [
-    "chia-bls",
-    "chia-bls/fuzz",
-    "chia-client",
-    "chia-protocol",
-    "chia-protocol/fuzz",
-    "chia_py_streamable_macro",
-    "chia_streamable_macro",
-    "chia-ssl",
-    "chia-tools",
-    "chia-traits",
-    "chia-wallet",
-    "chia-wallet/fuzz",
-    "clvm-derive",
-    "clvm-traits",
-    "clvm-utils",
-    "clvm-utils/fuzz",
-    "fuzz",
-    "wasm",
-    "wheel",
-]
+members = ["crates/*", "crates/*/fuzz", "fuzz", "wasm", "wheel"]
 
 [package]
 name = "chia"
@@ -38,12 +18,12 @@ py-bindings = ["dep:pyo3"]
 clvmr = "0.6.0"
 hex = "0.4.3"
 pyo3 = { version = ">=0.19.0", optional = true }
-clvm-utils = { version = "0.5.1", path = "clvm-utils" }
-chia-traits = { version = "0.5.2", path = "chia-traits" }
-clvm-traits = { version = "0.5.2", path = "clvm-traits" }
-clvm-derive = { version = "0.5.2", path = "clvm-derive" }
-chia-protocol = { version = "0.5.1", path = "chia-protocol" }
-chia-wallet = { version = "0.5.1", path = "chia-wallet" }
+clvm-utils = { version = "0.5.1", path = "crates/clvm-utils" }
+chia-traits = { version = "0.5.2", path = "crates/chia-traits" }
+clvm-traits = { version = "0.5.2", path = "crates/clvm-traits" }
+clvm-derive = { version = "0.5.2", path = "crates/clvm-derive" }
+chia-protocol = { version = "0.5.1", path = "crates/chia-protocol" }
+chia-wallet = { version = "0.5.1", path = "crates/chia-wallet" }
 hex-literal = "0.4.1"
 thiserror = "1.0.44"
 

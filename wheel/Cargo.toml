@@ -20,10 +20,10 @@ hex = "0.4.3"
 sha2 = "0.10.8"
 pyo3 = { version = "=0.19.0", features = ["multiple-pymethods"] }
 chia = { version = "=0.5.2", path = "..", features = ["py-bindings"] }
-chia-bls = { version = "=0.5.1", path = "../chia-bls", features = ["py-bindings"]  }
-chia-protocol = { version = "=0.5.1", path = "../chia-protocol", features = ["py-bindings"]  }
-chia-traits = { version = "=0.5.2", path = "../chia-traits", features = ["py-bindings"]  }
-clvm-traits = { version = "=0.5.2", path = "../clvm-traits", features = ["derive", "py-bindings"] }
-clvm-utils = { version = "=0.5.1", path = "../clvm-utils" }
-chia_py_streamable_macro = { version = "=0.5.1", path = "../chia_py_streamable_macro" }
-chia_streamable_macro = { version = "=0.3.0", path = "../chia_streamable_macro" }
+chia-bls = { version = "=0.5.1", path = "../crates/chia-bls", features = ["py-bindings"]  }
+chia-protocol = { version = "=0.5.1", path = "../crates/chia-protocol", features = ["py-bindings"]  }
+chia-traits = { version = "=0.5.2", path = "../crates/chia-traits", features = ["py-bindings"]  }
+clvm-traits = { version = "=0.5.2", path = "../crates/clvm-traits", features = ["derive", "py-bindings"] }
+clvm-utils = { version = "=0.5.1", path = "../crates/clvm-utils" }
+chia_py_streamable_macro = { version = "=0.5.1", path = "../crates/chia_py_streamable_macro" }
+chia_streamable_macro = { version = "=0.3.0", path = "../crates/chia_streamable_macro" }
