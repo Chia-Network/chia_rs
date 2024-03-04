@@ -5,8 +5,8 @@ edition = "2021"
 license = "Apache-2.0"
 description = "Derive macro to create python bindings for Chia types"
 authors = ["Arvid Norberg <arvid@libtorrent.org>"]
-homepage = "https://github.com/Chia-Network/chia_rs/chia_py_streamable_macro/"
-repository = "https://github.com/Chia-Network/chia_rs/chia_py_streamable_macro/"
+homepage = "https://github.com/Chia-Network/chia_rs"
+repository = "https://github.com/Chia-Network/chia_rs"
 
 [lib]
 proc-macro = true

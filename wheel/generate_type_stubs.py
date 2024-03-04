@@ -3,7 +3,7 @@ from typing import Any, List, Optional, Tuple
 from glob import glob
 
 output_file = Path(__file__).parent.resolve() / "chia_rs.pyi"
-input_dir = Path(__file__).parent.parent.resolve() / "chia-protocol" / "src"
+input_dir = Path(__file__).parent.parent.resolve() / "crates" / "chia-protocol" / "src"
 
 # enums are exposed to python as int
 enums = set(["NodeType", "ProtocolMessageTypes"])

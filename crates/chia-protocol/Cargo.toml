@@ -5,8 +5,8 @@ edition = "2021"
 license = "Apache-2.0"
 description = "Chia network protocol message types"
 authors = ["Arvid Norberg <arvid@chia.net>"]
-homepage = "https://github.com/Chia-Network/chia_rs/chia-protocol/"
-repository = "https://github.com/Chia-Network/chia_rs/chia-protocol/"
+homepage = "https://github.com/Chia-Network/chia_rs"
+repository = "https://github.com/Chia-Network/chia_rs"
 
 [features]
 py-bindings = ["dep:pyo3", "dep:chia_py_streamable_macro", "chia-traits/py-bindings"]

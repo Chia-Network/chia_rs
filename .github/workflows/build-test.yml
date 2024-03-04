@@ -230,7 +230,7 @@ jobs:
 
     - name: cargo build
       run: |
-        cd chia-tools
+        cd crates/chia-tools
         cargo build
 
   build-sdist:
@@ -329,21 +329,21 @@ jobs:
           # not unloaded before exiting
           LSAN_OPTIONS: detect_leaks=0
         run: |
-          cd chia-bls
+          cd crates/chia-bls
           python -m pip install blspy
           cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=10 || exit 255"
       - name: cargo fuzz (clvm-utils)
         run: |
-          cd clvm-utils
+          cd crates/clvm-utils
           cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=20 || exit 255"
       - name: cargo fuzz (chia-protocol)
         run: |
-          cd chia-protocol
+          cd crates/chia-protocol
           cargo +nightly fuzz build
           cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=20 || exit 255"
       - name: cargo fuzz (chia-wallet)
         run: |
-          cd chia-wallet
+          cd crates/chia-wallet
           cargo +nightly fuzz build
           cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=20 || exit 255"
 

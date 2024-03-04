@@ -12,21 +12,21 @@ v = sys.argv[1]
 tag = sys.argv[2]
 
 our_crates = [
-    "chia-bls",
-    "clvm-traits",
-    "chia-traits",
-    "chia_py_streamable_macro",
-    "chia_streamable_macro",
-    "chia-protocol",
-    "chia-tools",
-    "clvm-utils",
-    "clvm-derive",
-    "chia-wallet",
-    "chia-client",
-    "chia-ssl",
-    "fuzz",
-    "chia-wallet/fuzz",
-    "clvm-utils/fuzz",
+    "crates/chia-bls",
+    "crates/clvm-traits",
+    "crates/chia-traits",
+    "crates/chia_py_streamable_macro",
+    "crates/chia_streamable_macro",
+    "crates/chia-protocol",
+    "crates/chia-tools",
+    "crates/clvm-utils",
+    "crates/clvm-derive",
+    "crates/chia-wallet",
+    "crates/chia-client",
+    "crates/chia-ssl",
+    "crates/fuzz",
+    "crates/chia-wallet/fuzz",
+    "crates/clvm-utils/fuzz",
 ]
 
 def crates_with_changes() -> Set[str]:
