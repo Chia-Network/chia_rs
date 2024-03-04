@@ -1,9 +1,9 @@
 #![no_main]
-use chia::allocator::make_allocator;
-use chia::gen::conditions::MempoolVisitor;
-use chia::gen::flags::ALLOW_BACKREFS;
-use chia::gen::run_block_generator::{run_block_generator, run_block_generator2};
-use chia::gen::validation_error::{ErrorCode, ValidationErr};
+use chia_consensus::allocator::make_allocator;
+use chia_consensus::gen::conditions::MempoolVisitor;
+use chia_consensus::gen::flags::ALLOW_BACKREFS;
+use chia_consensus::gen::run_block_generator::{run_block_generator, run_block_generator2};
+use chia_consensus::gen::validation_error::{ErrorCode, ValidationErr};
 use clvmr::chia_dialect::LIMIT_HEAP;
 use libfuzzer_sys::fuzz_target;
 

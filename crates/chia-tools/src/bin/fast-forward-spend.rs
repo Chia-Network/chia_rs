@@ -1,7 +1,7 @@
 use clap::Parser;
 use std::fs;
 
-use chia::fast_forward::fast_forward_singleton;
+use chia_consensus::fast_forward::fast_forward_singleton;
 use chia_protocol::bytes::Bytes32;
 use chia_protocol::{coin::Coin, coin_spend::CoinSpend, program::Program};
 use chia_traits::streamable::Streamable;

@@ -278,21 +278,18 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 name = "chia"
 version = "0.5.2"
 dependencies = [
+ "chia-bls 0.5.1",
+ "chia-client",
+ "chia-consensus",
  "chia-protocol",
+ "chia-ssl",
  "chia-traits 0.5.2",
  "chia-wallet",
- "clvm-derive",
  "clvm-traits",
  "clvm-utils",
  "clvmr",
  "criterion",
  "hex",
- "hex-literal",
- "num-traits",
- "pyo3",
- "rstest 0.16.0",
- "text-diff",
- "thiserror",
 ]
 
 [[package]]
@@ -357,12 +354,28 @@ dependencies = [
 [[package]]
 name = "chia-consensus"
 version = "0.5.2"
+dependencies = [
+ "chia-protocol",
+ "chia-traits 0.5.2",
+ "chia-wallet",
+ "clvm-derive",
+ "clvm-traits",
+ "clvm-utils",
+ "clvmr",
+ "hex",
+ "hex-literal",
+ "num-traits",
+ "pyo3",
+ "rstest 0.16.0",
+ "text-diff",
+ "thiserror",
+]
 
 [[package]]
 name = "chia-fuzz"
 version = "0.5.1"
 dependencies = [
- "chia",
+ "chia-consensus",
  "chia-protocol",
  "chia-traits 0.5.2",
  "clvm-traits",
@@ -422,8 +435,8 @@ name = "chia-tools"
 version = "0.5.2"
 dependencies = [
  "blocking-threadpool",
- "chia",
  "chia-bls 0.5.1",
+ "chia-consensus",
  "chia-protocol",
  "chia-traits 0.5.2",
  "chia-wallet",
@@ -502,8 +515,8 @@ dependencies = [
 name = "chia_rs"
 version = "0.5.2"
 dependencies = [
- "chia",
  "chia-bls 0.5.1",
+ "chia-consensus",
  "chia-protocol",
  "chia-traits 0.5.2",
  "chia_py_streamable_macro",
@@ -542,7 +555,7 @@ dependencies = [
 name = "chia_wasm"
 version = "0.2.7"
 dependencies = [
- "chia",
+ "chia-consensus",
  "getrandom",
  "js-sys",
  "wasm-bindgen",
@@ -655,7 +668,7 @@ dependencies = [
 name = "clvm-utils-fuzz"
 version = "0.4.0"
 dependencies = [
- "chia",
+ "chia-consensus",
  "chia-fuzz",
  "clvm-traits",
  "clvm-utils",

@@ -14,7 +14,7 @@ clvmr = "=0.6.0"
 chia-fuzz = { path = "../../../fuzz" }
 clvm-utils = { path = ".." }
 clvm-traits = { path = "../../../crates/clvm-traits" }
-chia = { path = "../../.." }
+chia-consensus = { path = "../../../crates/chia-consensus" }
 
 [[bin]]
 name = "tree-hash"

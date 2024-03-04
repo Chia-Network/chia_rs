@@ -1,9 +1,9 @@
-use chia::allocator::make_allocator;
-use chia::gen::conditions::{EmptyVisitor, MempoolVisitor, Spend, SpendBundleConditions};
-use chia::gen::flags::ANALYZE_SPENDS;
-use chia::gen::run_block_generator::run_block_generator as native_run_block_generator;
-use chia::gen::run_block_generator::run_block_generator2 as native_run_block_generator2;
-use chia::gen::validation_error::ValidationErr;
+use chia_consensus::allocator::make_allocator;
+use chia_consensus::gen::conditions::{EmptyVisitor, MempoolVisitor, Spend, SpendBundleConditions};
+use chia_consensus::gen::flags::ANALYZE_SPENDS;
+use chia_consensus::gen::run_block_generator::run_block_generator as native_run_block_generator;
+use chia_consensus::gen::run_block_generator::run_block_generator2 as native_run_block_generator2;
+use chia_consensus::gen::validation_error::ValidationErr;
 use chia_protocol::bytes::{Bytes, Bytes32, Bytes48};
 
 use clvmr::allocator::{Allocator, NodePtr};

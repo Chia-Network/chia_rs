@@ -1,8 +1,8 @@
 #![no_main]
-use chia::fast_forward::fast_forward_singleton;
-use chia::gen::conditions::{MempoolVisitor, ELIGIBLE_FOR_FF};
-use chia::gen::run_puzzle::run_puzzle;
-use chia::gen::validation_error::{ErrorCode, ValidationErr};
+use chia_consensus::fast_forward::fast_forward_singleton;
+use chia_consensus::gen::conditions::{MempoolVisitor, ELIGIBLE_FOR_FF};
+use chia_consensus::gen::run_puzzle::run_puzzle;
+use chia_consensus::gen::validation_error::{ErrorCode, ValidationErr};
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
 use chia_protocol::CoinSpend;
