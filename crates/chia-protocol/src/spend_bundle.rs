@@ -156,7 +156,8 @@ mod tests {
         #[case] expect_parent: &str,
         #[case] expect_ph: &str,
     ) {
-        let spend_bytes = fs::read(format!("../ff-tests/{spend_file}.spend")).expect("read file");
+        let spend_bytes =
+            fs::read(format!("../../ff-tests/{spend_file}.spend")).expect("read file");
         let spend = CoinSpend::from_bytes(&spend_bytes).expect("parse CoinSpend");
         let bundle = SpendBundle::new(vec![spend], G2Element::default());
 

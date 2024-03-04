@@ -5,8 +5,8 @@ edition = "2021"
 license = "Apache-2.0"
 description = "Chia primitives needed for building wallets."
 authors = ["Brandon Haggstrom <b.haggstrom@chia.net>"]
-homepage = "https://github.com/Chia-Network/chia_rs/chia-wallet/"
-repository = "https://github.com/Chia-Network/chia_rs/chia-wallet/"
+homepage = "https://github.com/Chia-Network/chia_rs"
+repository = "https://github.com/Chia-Network/chia_rs"
 
 [dependencies]
 clvmr = "0.6.0"

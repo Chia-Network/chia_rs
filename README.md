@@ -78,7 +78,7 @@ crates. There is a tool to generate a fuzzing corpus from a blockchain database.
 It's run like this:
 
 ```
-cd chia-tools
+cd crates/chia-tools
 cargo run --release --bin gen-corpus -- --help
 ```
 

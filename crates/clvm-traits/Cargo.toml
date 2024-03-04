@@ -5,8 +5,8 @@ edition = "2021"
 license = "Apache-2.0"
 description = "Traits for encoding and decoding CLVM objects."
 authors = ["Brandon Haggstrom <b.haggstrom@chia.net>"]
-homepage = "https://github.com/Chia-Network/chia_rs/clvm-traits/"
-repository = "https://github.com/Chia-Network/chia_rs/clvm-traits/"
+homepage = "https://github.com/Chia-Network/chia_rs"
+repository = "https://github.com/Chia-Network/chia_rs"
 
 [package.metadata.docs.rs]
 features = ["derive", "chia-bls"]

@@ -11,10 +11,10 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 clvmr = "=0.6.0"
-chia-fuzz = { path = "../../fuzz" }
+chia-fuzz = { path = "../../../fuzz" }
 clvm-utils = { path = ".." }
-clvm-traits = { path = "../../clvm-traits" }
-chia = { path = "../.." }
+clvm-traits = { path = "../../../crates/clvm-traits" }
+chia = { path = "../../.." }
 
 [[bin]]
 name = "tree-hash"

@@ -5,8 +5,8 @@ edition = "2021"
 license = "Apache-2.0"
 description = "BLS signature, verification and aggregation funcions for the Chia blockchain"
 authors = ["Arvid Norberg <arvid@chia.net>"]
-homepage = "https://github.com/Chia-Network/chia_rs/chia-bls/"
-repository = "https://github.com/Chia-Network/chia_rs/chia-bls/"
+homepage = "https://github.com/Chia-Network/chia_rs"
+repository = "https://github.com/Chia-Network/chia_rs"
 
 [features]
 py-bindings = ["dep:pyo3", "chia_py_streamable_macro", "chia-traits/py-bindings"]
