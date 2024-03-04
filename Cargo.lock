@@ -287,9 +287,6 @@ dependencies = [
  "chia-wallet",
  "clvm-traits",
  "clvm-utils",
- "clvmr",
- "criterion",
- "hex",
 ]
 
 [[package]]
@@ -362,6 +359,7 @@ dependencies = [
  "clvm-traits",
  "clvm-utils",
  "clvmr",
+ "criterion",
  "hex",
  "hex-literal",
  "num-traits",

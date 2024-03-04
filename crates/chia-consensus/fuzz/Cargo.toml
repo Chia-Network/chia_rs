@@ -11,11 +11,11 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 clvmr = "0.6.0"
-clvm-utils = { path = "../crates/clvm-utils" }
-clvm-traits = { path = "../crates/clvm-traits" }
-chia-protocol = { path = "../crates/chia-protocol" }
-chia-traits = { path = "../crates/chia-traits" }
-chia-consensus = { path = "../crates/chia-consensus" }
+clvm-utils = { path = "../../clvm-utils" }
+clvm-traits = { path = "../../clvm-traits" }
+chia-protocol = { path = "../../chia-protocol" }
+chia-traits = { path = "../../chia-traits" }
+chia-consensus = { path = "../../chia-consensus" }
 hex-literal = "=0.4.1"
 
 [lib]

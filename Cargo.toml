@@ -4,6 +4,7 @@ members = [
     "crates/chia-bls/fuzz",
     "crates/chia-client",
     "crates/chia-consensus",
+    "crates/chia-consensus/fuzz",
     "crates/chia-protocol",
     "crates/chia-protocol/fuzz",
     "crates/chia_py_streamable_macro",
@@ -17,7 +18,6 @@ members = [
     "crates/clvm-traits",
     "crates/clvm-utils",
     "crates/clvm-utils/fuzz",
-    "fuzz",
     "wasm",
     "wheel",
 ]
@@ -36,32 +36,42 @@ authors = [
 homepage = "https://github.com/Chia-Network/chia_rs"
 repository = "https://github.com/Chia-Network/chia_rs"
 
-[dependencies]
-chia-bls = { path = "./crates/chia-bls" }
-chia-client = { path = "./crates/chia-client" }
-chia-consensus = { path = "./crates/chia-consensus" }
-chia-protocol = { path = "./crates/chia-protocol" }
-chia-ssl = { path = "./crates/chia-ssl" }
-chia-traits = { path = "./crates/chia-traits" }
-chia-wallet = { path = "./crates/chia-wallet" }
-clvm-traits = { path = "./crates/clvm-traits" }
-clvm-utils = { path = "./crates/clvm-utils" }
-clvmr = "0.6.0"
+[features]
+default = [
+    "bls",
+    "client",
+    "consensus",
+    "protocol",
+    "ssl",
+    "traits",
+    "wallet",
+    "clvm-traits",
+    "clvm-utils"
+]
 
-[dev-dependencies]
-criterion = "0.5.1"
-hex = "0.4.3"
+bls = ["dep:chia-bls"]
+client = ["dep:chia-client"]
+consensus = ["dep:chia-consensus"]
+protocol = ["dep:chia-protocol"]
+ssl = ["dep:chia-ssl"]
+traits = ["dep:chia-traits"]
+wallet = ["dep:chia-wallet"]
+clvm-traits = ["dep:clvm-traits"]
+clvm-utils = ["dep:clvm-utils"]
+
+[dependencies]
+chia-bls = { path = "./crates/chia-bls", optional = true }
+chia-client = { path = "./crates/chia-client", optional = true }
+chia-consensus = { path = "./crates/chia-consensus", optional = true }
+chia-protocol = { path = "./crates/chia-protocol", optional = true }
+chia-ssl = { path = "./crates/chia-ssl", optional = true }
+chia-traits = { path = "./crates/chia-traits", optional = true }
+chia-wallet = { path = "./crates/chia-wallet", optional = true }
+clvm-traits = { path = "./crates/clvm-traits", optional = true }
+clvm-utils = { path = "./crates/clvm-utils", optional = true }
 
 [profile.release]
 lto = "thin"
-
-[[bench]]
-name = "run-generator"
-harness = false
-
-[[bench]]
-name = "tree-hash"
-harness = false
 
 # This is also necessary in `wheel/Cargo.toml` to make sure the `wheel` crate builds as well.
 # Pin the `blst` dependency to the correct revision, since the fix has not been properly released yet.
