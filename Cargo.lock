@@ -355,6 +355,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "chia-consensus"
+version = "0.5.2"
+
+[[package]]
 name = "chia-fuzz"
 version = "0.5.1"
 dependencies = [

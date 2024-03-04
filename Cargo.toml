@@ -3,6 +3,7 @@ members = [
     "crates/chia-bls",
     "crates/chia-bls/fuzz",
     "crates/chia-client",
+    "crates/chia-consensus",
     "crates/chia-protocol",
     "crates/chia-protocol/fuzz",
     "crates/chia_py_streamable_macro",
@@ -18,7 +19,7 @@ members = [
     "crates/clvm-utils/fuzz",
     "fuzz",
     "wasm",
-    "wheel",
+    "wheel", "crates/chia-consensus",
 ]
 
 [package]
