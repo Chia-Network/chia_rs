@@ -24,7 +24,7 @@ fn run(c: &mut Criterion) {
         "block-e5002df2",
         "recursion-pairs",
     ] {
-        let filename = format!("generator-tests/{name}.txt");
+        let filename = format!("../../generator-tests/{name}.txt");
         println!("file: {filename}");
         let test_file = read_to_string(filename).expect("test file not found");
         let generator = test_file.split_once('\n').expect("invalid test file").0;
@@ -32,7 +32,7 @@ fn run(c: &mut Criterion) {
 
         let mut block_refs = Vec::<Vec<u8>>::new();
 
-        let filename = format!("generator-tests/{name}.env");
+        let filename = format!("../../generator-tests/{name}.env");
         if let Ok(env_hex) = std::fs::read_to_string(&filename) {
             println!("block-ref file: {filename}");
             block_refs.push(hex::decode(env_hex).expect("hex decode env-file"));
