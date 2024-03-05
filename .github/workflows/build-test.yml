@@ -320,8 +320,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
       - name: cargo-fuzz
         run: cargo +nightly install cargo-fuzz
-      - name: cargo fuzz (chia_rs)
-        run: cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=20 || exit 255"
+      - name: cargo fuzz (chia-consensus)
+        run: |
+          cd crates/chia-consensus
+          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=20 || exit 255"
       - name: cargo fuzz (chia-bls)
         env:
           # we disable leak reports here because blspy appears to be allocating
