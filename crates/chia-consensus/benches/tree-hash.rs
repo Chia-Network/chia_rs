@@ -16,7 +16,7 @@ fn run(c: &mut Criterion) {
         "block-6fe59b24",
         "block-b45268ac",
     ] {
-        let filename = format!("generator-tests/{name}.txt");
+        let filename = format!("../../generator-tests/{name}.txt");
         println!("file: {filename}");
         let test_file = read_to_string(filename).expect("test file not found");
         let generator = test_file.split_once('\n').expect("invalid test file").0;
