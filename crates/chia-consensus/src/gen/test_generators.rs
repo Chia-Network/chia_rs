@@ -199,7 +199,7 @@ fn print_diff(output: &str, expected: &str) {
 fn run_generator(#[case] name: &str) {
     use std::fs::read_to_string;
 
-    let filename = format!("generator-tests/{name}.txt");
+    let filename = format!("../../generator-tests/{name}.txt");
     println!("file: {filename}");
     let test_file = read_to_string(filename).expect("test file not found");
     let (generator, expected) = test_file.split_once('\n').expect("invalid test file");
@@ -212,7 +212,7 @@ fn run_generator(#[case] name: &str) {
 
     let mut block_refs = Vec::<Vec<u8>>::new();
 
-    let filename = format!("generator-tests/{name}.env");
+    let filename = format!("../../generator-tests/{name}.env");
     if let Ok(env_hex) = std::fs::read_to_string(&filename) {
         println!("block-ref file: {filename}");
         block_refs.push(hex::decode(env_hex).expect("hex decode env-file"));
