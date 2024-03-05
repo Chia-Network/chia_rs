@@ -203,7 +203,8 @@ mod tests {
         #[values(0, 1, 3, 5)] new_amount: u64,
         #[values(0, 1, 3, 5)] prev_amount: u64,
     ) {
-        let spend_bytes = fs::read(format!("ff-tests/{spend_file}.spend")).expect("read file");
+        let spend_bytes =
+            fs::read(format!("../../ff-tests/{spend_file}.spend")).expect("read file");
         let spend = CoinSpend::from_bytes(&spend_bytes).expect("parse CoinSpend");
         let new_parents_parent = hex::decode(new_parents_parent).unwrap();
 
@@ -275,7 +276,7 @@ mod tests {
         mutate: fn(&mut Allocator, &mut Coin, &mut Coin, &mut Coin, &mut Vec<u8>, &mut Vec<u8>),
         expected_err: Error,
     ) {
-        let spend_bytes = fs::read("ff-tests/e3c0.spend").expect("read file");
+        let spend_bytes = fs::read("../../ff-tests/e3c0.spend").expect("read file");
         let mut spend = CoinSpend::from_bytes(&spend_bytes).expect("parse CoinSpend");
         let new_parents_parent: &[u8] =
             &hex!("abababababababababababababababababababababababababababababababab");
