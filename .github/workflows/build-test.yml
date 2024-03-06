@@ -362,6 +362,14 @@ jobs:
         run: |
           git config --global core.autocrlf false
 
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.3
+
+      - name: Set sccache env vars
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
+          echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
+
       - uses: actions/checkout@v3
         with:
           fetch-depth: 1
