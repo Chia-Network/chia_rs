@@ -30,7 +30,7 @@ fn run(c: &mut Criterion) {
 
         for (gen, name_suffix) in &[(&generator, ""), (&compressed_generator, "-compressed")] {
             let mut a = Allocator::new();
-            let gen = node_from_bytes_backrefs(&mut a, &gen).expect("parse generator");
+            let gen = node_from_bytes_backrefs(&mut a, gen).expect("parse generator");
 
             group.bench_function(format!("tree-hash {name}{name_suffix}"), |b| {
                 b.iter(|| {

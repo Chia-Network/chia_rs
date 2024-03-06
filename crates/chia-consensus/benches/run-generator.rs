@@ -52,7 +52,7 @@ fn run(c: &mut Criterion) {
 
                     let conds = run_block_generator::<_, MempoolVisitor>(
                         &mut a,
-                        &gen,
+                        gen,
                         &block_refs,
                         11000000000,
                         ALLOW_BACKREFS,
@@ -69,7 +69,7 @@ fn run(c: &mut Criterion) {
 
                     let conds = run_block_generator2::<_, MempoolVisitor>(
                         &mut a,
-                        &gen,
+                        gen,
                         &block_refs,
                         11000000000,
                         ALLOW_BACKREFS,
