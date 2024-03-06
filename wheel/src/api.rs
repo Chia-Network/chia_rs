@@ -1,4 +1,3 @@
-use crate::compression;
 use crate::run_generator::{
     convert_spend_bundle_conds, run_block_generator, run_block_generator2, PySpend,
     PySpendBundleConditions,
@@ -327,7 +326,7 @@ fn fast_forward_singleton<'p>(
 }
 
 #[pymodule]
-pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
+pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
     // generator functions
     m.add_function(wrap_pyfunction!(run_block_generator, m)?)?;
     m.add_function(wrap_pyfunction!(run_block_generator2, m)?)?;
@@ -480,8 +479,6 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<GTElement>()?;
     m.add_class::<SecretKey>()?;
     m.add_class::<AugSchemeMPL>()?;
-
-    compression::add_submodule(py, m)?;
 
     Ok(())
 }

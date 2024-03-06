@@ -1,7 +1,6 @@
 #![doc = include_str!("../README.md")]
 
 pub mod allocator;
-pub mod compression;
 pub mod error;
 pub mod fast_forward;
 pub mod gen;
