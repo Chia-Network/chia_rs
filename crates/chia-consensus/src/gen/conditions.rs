@@ -844,16 +844,13 @@ pub fn parse_conditions<V: SpendVisitor>(
 
     while let Some((mut c, next)) = next(a, iter)? {
         iter = next;
-        let op = match parse_opcode(a, first(a, c)?, flags) {
-            None => {
-                // in strict mode we don't allow unknown conditions
-                if (flags & NO_UNKNOWN_CONDS) != 0 {
-                    return Err(ValidationErr(c, ErrorCode::InvalidConditionOpcode));
-                }
-                // in non-strict mode, we just ignore unknown conditions
-                continue;
+        let Some(op) = parse_opcode(a, first(a, c)?, flags) else {
+            // in strict mode we don't allow unknown conditions
+            if (flags & NO_UNKNOWN_CONDS) != 0 {
+                return Err(ValidationErr(c, ErrorCode::InvalidConditionOpcode));
             }
-            Some(v) => v,
+            // in non-strict mode, we just ignore unknown conditions
+            continue;
         };
 
         // subtract the max_cost based on the current condition
