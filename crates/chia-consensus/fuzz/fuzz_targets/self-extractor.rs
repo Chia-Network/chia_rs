@@ -1,6 +1,6 @@
 #![no_main]
 
-use chia::compression::compressor::wrap_atom_with_decompression_program;
+use chia_consensus::compression::compressor::wrap_atom_with_decompression_program;
 
 use clvm_utils::tree_hash;
 use clvmr::allocator::Allocator;

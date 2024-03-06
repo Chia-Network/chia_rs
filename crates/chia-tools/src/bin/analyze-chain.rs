@@ -7,9 +7,9 @@ use std::time::SystemTime;
 
 use rusqlite::Connection;
 
-use chia::gen::conditions::{parse_spends, MempoolVisitor};
-use chia::gen::flags::MEMPOOL_MODE;
-use chia::generator_rom::{COST_PER_BYTE, GENERATOR_ROM};
+use chia_consensus::gen::conditions::{parse_spends, MempoolVisitor};
+use chia_consensus::gen::flags::MEMPOOL_MODE;
+use chia_consensus::generator_rom::{COST_PER_BYTE, GENERATOR_ROM};
 use clvmr::reduction::Reduction;
 use clvmr::run_program_with_counters;
 use clvmr::serde::node_from_bytes;

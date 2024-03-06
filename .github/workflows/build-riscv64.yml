@@ -40,7 +40,7 @@ jobs:
             -v ${{ github.workspace }}:/ws --workdir=/ws \
             chianetwork/ubuntu-22.04-risc-builder:latest \
             bash -exc '\
-            cargo test --release
+            cargo test --release -p chia-consensus
             '
 
   build_wheels:

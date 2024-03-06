@@ -3,16 +3,16 @@ use crate::run_generator::{
     convert_spend_bundle_conds, run_block_generator, run_block_generator2, PySpend,
     PySpendBundleConditions,
 };
-use chia::allocator::make_allocator;
-use chia::gen::conditions::MempoolVisitor;
-use chia::gen::flags::{
+use chia_consensus::allocator::make_allocator;
+use chia_consensus::gen::conditions::MempoolVisitor;
+use chia_consensus::gen::flags::{
     AGG_SIG_ARGS, ALLOW_BACKREFS, ANALYZE_SPENDS, COND_ARGS_NIL, ENABLE_SOFTFORK_CONDITION,
     MEMPOOL_MODE, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
 };
-use chia::gen::run_puzzle::run_puzzle as native_run_puzzle;
-use chia::gen::solution_generator::solution_generator as native_solution_generator;
-use chia::gen::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
-use chia::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
+use chia_consensus::gen::run_puzzle::run_puzzle as native_run_puzzle;
+use chia_consensus::gen::solution_generator::solution_generator as native_solution_generator;
+use chia_consensus::gen::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
+use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
     CoinSpend, CoinState, CoinStateUpdate, EndOfSubSlotBundle, Foliage, FoliageBlockData,
@@ -49,9 +49,9 @@ use std::iter::zip;
 use crate::run_program::{run_chia_program, serialized_length};
 
 use crate::adapt_response::eval_err_to_pyresult;
-use chia::fast_forward::fast_forward_singleton as native_ff;
-use chia::gen::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
-use chia::gen::validation_error::ValidationErr;
+use chia_consensus::fast_forward::fast_forward_singleton as native_ff;
+use chia_consensus::gen::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
+use chia_consensus::gen::validation_error::ValidationErr;
 use clvmr::allocator::NodePtr;
 use clvmr::cost::Cost;
 use clvmr::reduction::EvalErr;
@@ -339,9 +339,12 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PySpendBundleConditions>()?;
     m.add(
         "ELIGIBLE_FOR_DEDUP",
-        chia::gen::conditions::ELIGIBLE_FOR_DEDUP,
+        chia_consensus::gen::conditions::ELIGIBLE_FOR_DEDUP,
     )?;
-    m.add("ELIGIBLE_FOR_FF", chia::gen::conditions::ELIGIBLE_FOR_FF)?;
+    m.add(
+        "ELIGIBLE_FOR_FF",
+        chia_consensus::gen::conditions::ELIGIBLE_FOR_FF,
+    )?;
     m.add_class::<PySpend>()?;
 
     // clvm functions

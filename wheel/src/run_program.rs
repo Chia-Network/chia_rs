@@ -1,6 +1,6 @@
 use super::adapt_response::eval_err_to_pyresult;
-use chia::allocator::make_allocator;
-use chia::gen::flags::ALLOW_BACKREFS;
+use chia_consensus::allocator::make_allocator;
+use chia_consensus::gen::flags::ALLOW_BACKREFS;
 use chia_protocol::LazyNode;
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;

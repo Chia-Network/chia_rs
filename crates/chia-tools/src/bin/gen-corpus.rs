@@ -124,14 +124,14 @@ fn main() {
                         let mut bytes = Vec::<u8>::new();
                         spend.stream(&mut bytes).expect("stream CoinSpend");
                         if run_puzzle {
-                            let directory = "../fuzz/corpus/run-puzzle";
+                            let directory = "../chia-consensus/fuzz/corpus/run-puzzle";
                             let _ = std::fs::create_dir_all(directory);
                             write(format!("{directory}/{mod_hash}.spend"), &bytes).expect("write");
                             println!("{height}: {mod_hash}");
                         }
 
                         if fast_forward {
-                            let directory = "../fuzz/corpus/fast-forward";
+                            let directory = "../chia-consensus/fuzz/corpus/fast-forward";
                             let _ = std::fs::create_dir_all(directory);
                             write(format!("{directory}/{puzzle_hash}.spend"), bytes)
                                 .expect("write");

@@ -1,13 +1,13 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
-use chia::gen::conditions::parse_args;
+use chia_consensus::gen::conditions::parse_args;
 use clvmr::allocator::Allocator;
 use fuzzing_utils::{make_tree, BitCursor};
 
-use chia::gen::flags::{COND_ARGS_NIL, STRICT_ARGS_COUNT};
+use chia_consensus::gen::flags::{COND_ARGS_NIL, STRICT_ARGS_COUNT};
 
-use chia::gen::opcodes::{
+use chia_consensus::gen::opcodes::{
     AGG_SIG_ME, AGG_SIG_UNSAFE, ASSERT_COIN_ANNOUNCEMENT, ASSERT_HEIGHT_ABSOLUTE,
     ASSERT_HEIGHT_RELATIVE, ASSERT_MY_AMOUNT, ASSERT_MY_COIN_ID, ASSERT_MY_PARENT_ID,
     ASSERT_MY_PUZZLEHASH, ASSERT_PUZZLE_ANNOUNCEMENT, ASSERT_SECONDS_ABSOLUTE,

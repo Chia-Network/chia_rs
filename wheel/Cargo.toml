@@ -19,7 +19,7 @@ clvmr = "0.6.0"
 hex = "0.4.3"
 sha2 = "0.10.8"
 pyo3 = { version = "=0.19.0", features = ["multiple-pymethods"] }
-chia = { version = "=0.5.2", path = "..", features = ["py-bindings"] }
+chia-consensus = { version = "=0.5.2", path = "../crates/chia-consensus", features = ["py-bindings"] }
 chia-bls = { version = "=0.5.1", path = "../crates/chia-bls", features = ["py-bindings"]  }
 chia-protocol = { version = "=0.5.1", path = "../crates/chia-protocol", features = ["py-bindings"]  }
 chia-traits = { version = "=0.5.2", path = "../crates/chia-traits", features = ["py-bindings"]  }

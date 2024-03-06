@@ -1,7 +1,7 @@
 #![no_main]
-use chia::gen::conditions::MempoolVisitor;
-use chia::gen::flags::ALLOW_BACKREFS;
-use chia::gen::run_puzzle::run_puzzle;
+use chia_consensus::gen::conditions::MempoolVisitor;
+use chia_consensus::gen::flags::ALLOW_BACKREFS;
+use chia_consensus::gen::run_puzzle::run_puzzle;
 use chia_protocol::CoinSpend;
 use chia_traits::streamable::Streamable;
 use clvmr::Allocator;

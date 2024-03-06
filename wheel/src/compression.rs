@@ -1,4 +1,4 @@
-use chia::compression::compressor::create_autoextracting_clvm_program;
+use chia_consensus::compression::compressor::create_autoextracting_clvm_program;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 

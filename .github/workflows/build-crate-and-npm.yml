@@ -153,8 +153,17 @@ jobs:
       run: |
         cd crates/chia-ssl
         cargo publish
+    
+    - name: publish to crates.io if tagged (chia-consensus)
+      continue-on-error: true
+      if: startsWith(github.event.ref, 'refs/tags')
+      env:
+        CARGO_REGISTRY_TOKEN: ${{ secrets.cargo_registry_token }}
+      run: |
+        cd crates/chia-consensus
+        cargo publish
 
-    - name: publish to crates.io if tagged (chia_rs)
+    - name: publish to crates.io if tagged (chia)
       continue-on-error: true
       if: startsWith(github.event.ref, 'refs/tags')
       env:

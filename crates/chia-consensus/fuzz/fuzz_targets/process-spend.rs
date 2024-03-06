@@ -1,8 +1,8 @@
 #![no_main]
-use chia::gen::conditions::{
+use chia_consensus::gen::conditions::{
     process_single_spend, MempoolVisitor, ParseState, SpendBundleConditions,
 };
-use chia::gen::flags::{COND_ARGS_NIL, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
+use chia_consensus::gen::flags::{COND_ARGS_NIL, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
 use clvmr::allocator::Allocator;
 use fuzzing_utils::{make_tree, BitCursor};
 use libfuzzer_sys::fuzz_target;

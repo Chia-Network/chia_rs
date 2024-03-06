@@ -1,4 +1,4 @@
-use chia::gen::conditions::Condition;
+use chia_consensus::gen::conditions::Condition;
 use chia_traits::Streamable;
 use clap::Parser;
 use clvm_traits::{FromClvm, ToNodePtr};
@@ -254,10 +254,10 @@ fn print_puzzle_info(a: &Allocator, puzzle: NodePtr, solution: NodePtr) {
     }
 }
 fn main() {
-    use chia::gen::conditions::parse_args;
-    use chia::gen::flags::ENABLE_SOFTFORK_CONDITION;
-    use chia::gen::opcodes::parse_opcode;
-    use chia::gen::validation_error::{first, rest};
+    use chia_consensus::gen::conditions::parse_args;
+    use chia_consensus::gen::flags::ENABLE_SOFTFORK_CONDITION;
+    use chia_consensus::gen::opcodes::parse_opcode;
+    use chia_consensus::gen::validation_error::{first, rest};
     use chia_protocol::coin_spend::CoinSpend;
     use clvmr::reduction::{EvalErr, Reduction};
     use clvmr::{run_program, ChiaDialect};

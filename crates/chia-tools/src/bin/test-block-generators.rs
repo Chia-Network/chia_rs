@@ -1,8 +1,8 @@
 use clap::Parser;
 
-use chia::gen::conditions::{EmptyVisitor, NewCoin, Spend, SpendBundleConditions};
-use chia::gen::flags::{ALLOW_BACKREFS, MEMPOOL_MODE};
-use chia::gen::run_block_generator::{run_block_generator, run_block_generator2};
+use chia_consensus::gen::conditions::{EmptyVisitor, NewCoin, Spend, SpendBundleConditions};
+use chia_consensus::gen::flags::{ALLOW_BACKREFS, MEMPOOL_MODE};
+use chia_consensus::gen::run_block_generator::{run_block_generator, run_block_generator2};
 use chia_tools::iterate_tx_blocks;
 use clvmr::allocator::NodePtr;
 use clvmr::serde::{node_from_bytes, node_to_bytes_backrefs};
