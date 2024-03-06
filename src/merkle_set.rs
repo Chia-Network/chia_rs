@@ -41,9 +41,9 @@ const TERMINAL: u8 = 1;
 const TRUNCATED: u8 = 2;
 const MIDDLE: u8 = 3;
 #[derive(Debug)]
-struct SetError;
+pub struct SetError;
 
-fn deserialize_proof(proof: &[u8]) -> Result<MerkleTreeData, SetError> {
+pub fn deserialize_proof(proof: &[u8]) -> Result<MerkleTreeData, SetError> {
     let mut merkle_tree: MerkleTreeData = MerkleTreeData{ nodes_vec: Vec::new(), leaf_vec: Vec::new(), hash_cache: Vec::new()};
     let pos = _deserialize(proof, 0, &[], &mut merkle_tree)?;
     if pos != proof.len() {
@@ -53,7 +53,7 @@ fn deserialize_proof(proof: &[u8]) -> Result<MerkleTreeData, SetError> {
     }
 }
 
-fn _deserialize(proof: &[u8], mut pos: usize, bits: &[u8], merkle_tree: &mut MerkleTreeData) -> Result<usize, SetError> {
+fn _deserialize(proof: &[u8], pos: usize, bits: &[u8], merkle_tree: &mut MerkleTreeData) -> Result<usize, SetError> {
     if let Some(&t) = proof.get(pos) {
         match t {
             EMPTY => {
@@ -63,6 +63,11 @@ fn _deserialize(proof: &[u8], mut pos: usize, bits: &[u8], merkle_tree: &mut Mer
             },
             TERMINAL => {
                 let hash: [u8; 32] = proof[pos + 1..pos + 33].try_into().map_err(|_| SetError)?;
+                let mut bit_position = 0;
+                for bit in bits {
+                    assert_eq!(bit, &hash[bit_position]);
+                    bit_position += 1;
+                }
                 merkle_tree.leaf_vec.push(hash.clone());
                 merkle_tree.nodes_vec.push(ArrayTypes::Leaf{ data: merkle_tree.leaf_vec.len() - 2});
                 merkle_tree.hash_cache.push(hash);
@@ -94,9 +99,72 @@ impl MerkleTreeData {
         self.hash_cache[self.hash_cache.len() - 1]
     }
 
-    // pub fn generate_proof(leaf: [u8; 32]) {
+    pub fn generate_proof(&self, to_check: [u8; 32]) -> Result<(bool, Vec<u8>), SetError> {
+        let mut proof = Vec::new();
+        let r = self.is_included(self.nodes_vec.len() - 1, to_check, &mut proof, 0)?;
+        return Ok((r, proof))
 
-    // }
+    }
+
+    pub fn is_included(&self, current_node_index: usize, to_check: [u8; 32], proof: &mut Vec<u8>, depth: usize) -> Result<bool, SetError> {
+        match self.nodes_vec[current_node_index] {
+            ArrayTypes::Empty => {
+                proof.push(EMPTY);
+                Ok(false)
+            },
+            ArrayTypes::Leaf { .. } => {
+                proof.push(TERMINAL);
+                for bit in self.hash_cache[current_node_index] {
+                    proof.push(bit);
+                }
+                return Ok(self.hash_cache[current_node_index] == to_check)
+            },
+            ArrayTypes::Middle { children } => {
+                proof.push(MIDDLE);
+                if to_check[depth] == 0 {
+                    let r: bool = self.is_included(children.0, to_check, proof, depth + 1)?;
+                    self.other_included(children.1, to_check, proof, depth + 1, matches!(self.nodes_vec[children.0], ArrayTypes::Empty))?;
+                    return Ok(r)
+                } else {
+                    self.other_included(children.0, to_check, proof, depth + 1, matches!(self.nodes_vec[children.1], ArrayTypes::Empty))?;
+                    return self.is_included(children.1, to_check, proof, depth + 1)
+
+                }
+            },
+            ArrayTypes::Truncated {} => {
+                Err(SetError)
+            },
+        }
+    }
+
+    fn other_included(&self, current_node_index: usize, to_check: [u8; 32], proof: &mut Vec<u8>, depth: usize, collapse: bool) -> Result<(), SetError> {
+        if collapse || !self.is_double(current_node_index)? {
+            proof.push(TRUNCATED);
+            for bit in self.hash_cache[current_node_index] {
+                proof.push(bit);
+            }
+            Ok(())
+        }
+        else {
+            self.is_included(current_node_index, to_check, proof, depth)?;
+            Ok(())
+        }
+    }
+
+    // check if a node_index contains more than one leaf node as its children
+    fn is_double(&self, node_index: usize) -> Result<bool, SetError> {
+        if let ArrayTypes::Middle { children } = self.nodes_vec[node_index] {
+            if matches!(self.nodes_vec[children.0], ArrayTypes::Empty) {
+                return self.is_double(children.1)
+            } else if matches!(self.nodes_vec[children.1], ArrayTypes::Empty) {
+                return self.is_double(children.0)
+            } else {
+                return Ok(matches!(self.nodes_vec[children.0], ArrayTypes::Leaf { .. }) && matches!(self.nodes_vec[children.1], ArrayTypes::Leaf { .. }))
+            }
+        } else {
+            Err(SetError)
+        }
+    }
 
     fn _confirm() {
 
