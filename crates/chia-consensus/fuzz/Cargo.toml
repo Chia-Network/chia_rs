@@ -15,7 +15,7 @@ clvm-utils = { path = "../../clvm-utils" }
 clvm-traits = { path = "../../clvm-traits" }
 chia-protocol = { path = "../../chia-protocol" }
 chia-traits = { path = "../../chia-traits" }
-chia-consensus = { path = "../../chia-consensus" }
+chia-consensus = { path = ".." }
 hex-literal = "=0.4.1"
 
 [lib]
