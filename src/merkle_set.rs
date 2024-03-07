@@ -111,6 +111,8 @@ impl MerkleTreeData {
 
     pub fn is_included(&self, current_node_index: usize, to_check: [u8; 32], proof: &mut Vec<u8>, depth: u8) -> Result<bool, SetError> {
         println!("Entering node index: {:?}", current_node_index);
+        println!("Depth: {:?}", depth);
+        
         match self.nodes_vec[current_node_index] {
             ArrayTypes::Empty => {
                 proof.push(EMPTY);
@@ -118,8 +120,8 @@ impl MerkleTreeData {
             },
             ArrayTypes::Leaf { data } => {
                 proof.push(TERMINAL);
-                for bit in self.leaf_vec[data] {
-                    proof.push(bit);
+                for byte in self.leaf_vec[data] {
+                    proof.push(byte);
                 }
                 // println!("Leaf vec: {:?}", self.leaf_vec[data]);
                 // println!("to_check output: {:?}", to_check);
@@ -129,6 +131,31 @@ impl MerkleTreeData {
             },
             ArrayTypes::Middle { children } => {
                 proof.push(MIDDLE);
+                if depth == 255 {
+                    if matches!(self.nodes_vec[children.0], ArrayTypes::Leaf { .. }) && matches!(self.nodes_vec[children.1], ArrayTypes::Leaf { .. }) {
+                        if let ArrayTypes::Leaf { data: child_0_data } = self.nodes_vec[children.0]{
+                            if let ArrayTypes::Leaf { data: child_1_data } = self.nodes_vec[children.1] {
+                                proof.push(TERMINAL);
+                                for byte in self.leaf_vec[child_0_data] {
+                                    proof.push(byte);
+                                }
+                                proof.push(TERMINAL);
+                                for byte in self.leaf_vec[child_1_data] {
+                                    proof.push(byte);
+                                }
+                                if get_bit(&to_check, depth) == 0{
+                                    return Ok(self.leaf_vec[child_0_data] == to_check)
+                                } else {
+                                    return Ok(self.leaf_vec[child_1_data] == to_check)
+                                }
+                            }
+                        }
+                        
+                    }
+                    else {
+                        return Err(SetError)
+                    }
+                 }
                 if get_bit(&to_check, depth) == 0 {
                     let r: bool = self.is_included(children.0, to_check, proof, depth + 1)?;
                     self.other_included(children.1, to_check, proof, depth + 1, matches!(self.nodes_vec[children.0], ArrayTypes::Empty))?;
@@ -140,7 +167,6 @@ impl MerkleTreeData {
                 }
             },
             ArrayTypes::Truncated {} => {
-                panic!("140");
                 Err(SetError)
             },
         }
@@ -156,8 +182,8 @@ impl MerkleTreeData {
             ArrayTypes::Middle { .. } => {
                 if collapse || !self.is_double(current_node_index)? {
                     proof.push(TRUNCATED);
-                    for bit in self.hash_cache[current_node_index] {
-                        proof.push(bit);
+                    for byte in self.hash_cache[current_node_index] {
+                        proof.push(byte);
                     }
                     Ok(())
                 }
@@ -168,15 +194,15 @@ impl MerkleTreeData {
             },
             ArrayTypes::Truncated => {
                 proof.push(TRUNCATED);
-                for bit in self.hash_cache[current_node_index] {
-                    proof.push(bit);
+                for byte in self.hash_cache[current_node_index] {
+                    proof.push(byte);
                 }
                 Ok(())
             },
             ArrayTypes::Leaf { data } => {
                 proof.push(TERMINAL);
-                for bit in self.leaf_vec[data] {
-                    proof.push(bit);
+                for byte in self.leaf_vec[data] {
+                    proof.push(byte);
                 }
                 Ok(())
             }
@@ -1237,8 +1263,10 @@ fn test_merkle_left_edge() {
     }
 
     expected = hashdown(&[2, 1], &expected, &a);
-
-    assert_eq!(generate_merkle_tree(&mut [a, b, c, d]).0, expected);
+    let (root, tree) = generate_merkle_tree(&mut [a, b, c, d]);
+    assert_eq!(root, expected);
+    assert_eq!(root, compute_merkle_set_root(&mut [a, b, c, d]));
+    assert_eq!(tree.leaf_vec.len(), 4);
     // this tree looks like this:
     //           o
     //          / \
@@ -1255,6 +1283,22 @@ fn test_merkle_left_edge() {
     // b   o
     //    / \
     //   c   d
+    assert_eq!(tree.nodes_vec.len(), 513);
+    if let ArrayTypes::Middle {children} = tree.nodes_vec[tree.nodes_vec.len() - 1] {
+        if let ArrayTypes::Leaf {data} = tree.nodes_vec[children.1] {
+            assert_eq!(tree.leaf_vec[data], a);
+        } else {
+            assert!(false) // node should be a leaf
+        }
+    } else {
+        assert!(false) // root node should be a Middle
+    }
+    // generate proof of incluseion for e
+    let (included, proof) = tree.generate_proof(d).unwrap();
+    assert!(included);
+    assert_eq!(tree.hash_cache.len(), tree.nodes_vec.len());
+    let rebuilt = deserialize_proof(&proof).unwrap();
+    assert_eq!(rebuilt.hash_cache[rebuilt.hash_cache.len() - 1], tree.hash_cache[tree.hash_cache.len() - 1]);
 }
 
 #[test]
