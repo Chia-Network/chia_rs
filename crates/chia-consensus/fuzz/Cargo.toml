@@ -51,13 +51,6 @@ doc = false
 bench = false
 
 [[bin]]
-name = "self-extractor"
-path = "fuzz_targets/self-extractor.rs"
-test = false
-doc = false
-bench = false
-
-[[bin]]
 name = "parse-spends"
 path = "fuzz_targets/parse-spends.rs"
 test = false

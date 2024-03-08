@@ -2,6 +2,5 @@
 
 mod adapt_response;
 mod api;
-mod compression;
 mod run_generator;
 mod run_program;
