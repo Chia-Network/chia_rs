@@ -1,39 +1,36 @@
 extern crate lru;
-use lru::LruCache;
-use std::num::NonZeroUsize;
-use std::borrow::Borrow;
-use crate::Signature;
-use crate::hash_to_g2;
 use crate::aggregate_verify as agg_ver;
 use crate::gtelement::GTElement;
+use crate::hash_to_g2;
 use crate::PublicKey;
-use std::collections::HashMap;
+use crate::Signature;
+use lru::LruCache;
 use sha2::{Digest, Sha256};
+use std::borrow::Borrow;
+use std::collections::HashMap;
+use std::num::NonZeroUsize;
 
 #[cfg(feature = "py-bindings")]
-use pyo3::{pyclass, pymethods, PyResult};
+use pyo3::types::{PyBool, PyInt, PyList};
 #[cfg(feature = "py-bindings")]
-use pyo3::types::{PyList, PyBool, PyInt};
+use pyo3::{pyclass, pymethods, PyResult};
 
 pub type Bytes32 = [u8; 32];
 pub type Bytes48 = [u8; 48];
 
-#[cfg_attr(
-    feature = "py-bindings",
-    pyclass(name = "BLSCache"),
-)]
+#[cfg_attr(feature = "py-bindings", pyclass(name = "BLSCache"))]
 pub struct BLSCache {
     cache: LruCache<Bytes32, GTElement>,
 }
 
 impl BLSCache {
-    
     pub fn generator(cache_size: Option<usize>) -> Self {
-        let cache: LruCache<Bytes32, GTElement> = LruCache::new(NonZeroUsize::new(cache_size.unwrap_or(50000)).unwrap());
-        Self{cache}
+        let cache: LruCache<Bytes32, GTElement> =
+            LruCache::new(NonZeroUsize::new(cache_size.unwrap_or(50000)).unwrap());
+        Self { cache }
     }
-    
-    pub fn get_pairings<P: Borrow<[Bytes48]>, M: Borrow<[Vec<u8>]>> (
+
+    pub fn get_pairings<P: Borrow<[Bytes48]>, M: Borrow<[Vec<u8>]>>(
         &mut self,
         pks: &P,
         msgs: &M,
@@ -41,7 +38,7 @@ impl BLSCache {
     ) -> Vec<GTElement> {
         let mut pairings: Vec<Option<GTElement>> = vec![];
         let mut missing_count: usize = 0;
-        
+
         for (pk, msg) in pks.borrow().iter().zip(msgs.borrow().iter()) {
             let mut aug_msg = pk.to_vec();
             aug_msg.extend_from_slice(msg.borrow()); // pk + msg
@@ -61,12 +58,11 @@ impl BLSCache {
                         }
                     }
                     pairings.push(Some(pairing.clone()));
-                },
+                }
                 _ => {
                     pairings.push(None);
-                },
+                }
             }
-            
         }
 
         // G1Element.from_bytes can be expensive due to subgroup check, so we avoid recomputing it with this cache
@@ -74,16 +70,17 @@ impl BLSCache {
         let mut ret: Vec<GTElement> = vec![];
 
         for (i, pairing) in pairings.iter_mut().enumerate() {
-            if let Some(pairing) = pairing {  // equivalent to `if pairing is not None`
+            if let Some(pairing) = pairing {
+                // equivalent to `if pairing is not None`
                 ret.push(pairing.clone());
             } else {
                 let mut aug_msg = pks.borrow()[i].to_vec();
-                aug_msg.extend_from_slice(&msgs.borrow()[i]);  // pk + msg
+                aug_msg.extend_from_slice(&msgs.borrow()[i]); // pk + msg
                 let aug_hash: Signature = hash_to_g2(&aug_msg);
 
-                let pk_parsed: &mut PublicKey = pk_bytes_to_g1.entry(pks.borrow()[i]).or_insert_with(|| {
-                    PublicKey::from_bytes(&pks.borrow()[i]).unwrap()
-                });
+                let pk_parsed: &mut PublicKey = pk_bytes_to_g1
+                    .entry(pks.borrow()[i])
+                    .or_insert_with(|| PublicKey::from_bytes(&pks.borrow()[i]).unwrap());
 
                 let pairing: GTElement = aug_hash.pair(pk_parsed);
                 let mut hasher = Sha256::new();
@@ -102,7 +99,7 @@ impl BLSCache {
         pks: &Vec<Bytes48>,
         msgs: &Vec<Vec<u8>>,
         sig: &Signature,
-        force_cache: bool, 
+        force_cache: bool,
     ) -> bool {
         let mut pairings: Vec<GTElement> = self.get_pairings(pks, msgs, force_cache);
         if pairings.is_empty() {
@@ -112,19 +109,18 @@ impl BLSCache {
                 data.push((pk.clone(), msg.clone()));
             }
             let res: bool = agg_ver(sig, data);
-            return res
+            return res;
         }
         let pairings_prod = pairings.pop(); // start with the first pairing
         match pairings_prod {
             Some(mut prod) => {
-                for p in pairings.iter() {  // loop through rest of list
+                for p in pairings.iter() {
+                    // loop through rest of list
                     prod *= &p;
                 }
                 prod == sig.pair(&PublicKey::generator())
-            },
-            _ => {
-                pairings.len() == 0
-            },
+            }
+            _ => pairings.len() == 0,
         }
     }
 }
@@ -133,7 +129,6 @@ impl BLSCache {
 #[cfg(feature = "py-bindings")]
 #[pymethods]
 impl BLSCache {
-
     #[new]
     pub fn init() -> Self {
         Self::generator(None)
@@ -146,21 +141,27 @@ impl BLSCache {
             Some(s) => {
                 let usize_value: usize = s.extract::<usize>().unwrap();
                 Self::generator(Some(usize_value))
-            },
-            None => Self::generator(None)
+            }
+            None => Self::generator(None),
         }
     }
 
     #[pyo3(name = "aggregate_verify")]
     pub fn py_aggregate_verify(
         &mut self,
-        pks: &PyList, 
-        msgs: &PyList, 
+        pks: &PyList,
+        msgs: &PyList,
         sig: &Signature,
         force_cache: &PyBool,
     ) -> PyResult<bool> {
-        let pks_r: Vec<Bytes48> = pks.iter().map(|item| item.extract::<Bytes48>()).collect::<PyResult<_>>()?;
-        let msgs_r: Vec<Vec<u8>> = msgs.iter().map(|item| item.extract::<Vec<u8>>()).collect::<PyResult<_>>()?;
+        let pks_r: Vec<Bytes48> = pks
+            .iter()
+            .map(|item| item.extract::<Bytes48>())
+            .collect::<PyResult<_>>()?;
+        let msgs_r: Vec<Vec<u8>> = msgs
+            .iter()
+            .map(|item| item.extract::<Vec<u8>>())
+            .collect::<PyResult<_>>()?;
         let force_cache_bool = force_cache.extract::<bool>()?;
         Ok(self.aggregate_verify(&pks_r, &msgs_r, sig, force_cache_bool))
     }
@@ -173,20 +174,20 @@ impl BLSCache {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::SecretKey;
-    use crate::sign;
-    use crate::aggregate;
     use super::*;
+    use crate::aggregate;
+    use crate::sign;
+    use crate::SecretKey;
 
     #[test]
     pub fn test_instantiation() {
         let mut bls_cache: BLSCache = BLSCache::generator(None);
         let byte_array: [u8; 32] = [0; 32];
         let sk: SecretKey = SecretKey::from_seed(&byte_array);
-        let pk:PublicKey = sk.public_key();
+        let pk: PublicKey = sk.public_key();
         let msg: [u8; 32] = [106; 32];
         let mut aug_msg: Vec<u8> = pk.clone().to_bytes().to_vec();
-        aug_msg.extend_from_slice(&msg);  // pk + msg
+        aug_msg.extend_from_slice(&msg); // pk + msg
         let aug_hash = hash_to_g2(&aug_msg);
         let pairing = aug_hash.pair(&pk);
         let mut hasher = Sha256::new();
@@ -283,4 +284,3 @@ pub mod tests {
         assert!(bls_cache.cache.get(&h).is_none());
     }
 }
-

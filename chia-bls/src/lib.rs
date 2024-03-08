@@ -1,3 +1,4 @@
+pub mod cached_bls;
 pub mod derivable_key;
 pub mod derive_keys;
 pub mod error;
@@ -6,8 +7,6 @@ pub mod mnemonic;
 pub mod public_key;
 pub mod secret_key;
 pub mod signature;
-pub mod cached_bls;
-
 
 pub use cached_bls::BLSCache;
 pub use cached_bls::Bytes32;
