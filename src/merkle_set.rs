@@ -263,7 +263,6 @@ impl MerkleTreeData {
         } else if matches!(self.nodes_vec[node_index], ArrayTypes::Truncated) {
             Ok(false)
         } else {
-            // panic!("is_double call on node_index: {:?}", node_index);
             Err(SetError)
         }
     }
@@ -1278,7 +1277,7 @@ fn test_compute_merkle_root_5() {
     } else {
         assert!(false) // root node should be a Middle
     }
-    // generate proof of incluseion for e
+    // generate proof of inclusion for e
     let (included, proof) = tree.generate_proof(e).unwrap();
     assert!(included);
     assert_eq!(tree.hash_cache.len(), tree.nodes_vec.len());
@@ -1346,7 +1345,7 @@ fn test_merkle_left_edge() {
     } else {
         assert!(false) // root node should be a Middle
     }
-    // generate proof of incluseion for e
+    // generate proof of inclusion for e
     let (included, proof) = tree.generate_proof(d).unwrap();
     assert!(included);
     assert_eq!(tree.hash_cache.len(), tree.nodes_vec.len());
@@ -1420,7 +1419,7 @@ fn test_merkle_left_edge_duplicates() {
     } else {
         assert!(false) // root node should be a Middle
     }
-    // generate proof of incluseion for e
+    // generate proof of inclusion for e
     let (included, proof) = tree.generate_proof(d).unwrap();
     assert!(included);
     assert_eq!(tree.hash_cache.len(), tree.nodes_vec.len());
@@ -1462,7 +1461,11 @@ fn test_merkle_right_edge() {
 
     expected = hashdown(&[1, 2], &a, &expected);
 
-    assert_eq!(compute_merkle_set_root(&mut [a, b, c, d]), expected)
+    assert_eq!(compute_merkle_set_root(&mut [a, b, c, d]), expected);
+    let (root, tree) = generate_merkle_tree(&mut [a, b, c, d]);
+    assert_eq!(root, expected);
+    assert_eq!(root, compute_merkle_set_root(&mut [a, b, c, d]));
+    assert_eq!(tree.leaf_vec.len(), 4);
     // this tree looks like this:
     //           o
     //          / \
@@ -1479,4 +1482,27 @@ fn test_merkle_right_edge() {
     //               d   o
     //                  / \
     //                 c   b
+    assert_eq!(tree.nodes_vec.len(), 513);
+    if let ArrayTypes::Middle { children } = tree.nodes_vec[tree.nodes_vec.len() - 1] {
+        if let ArrayTypes::Leaf { data } = tree.nodes_vec[children.0] {
+            assert_eq!(tree.leaf_vec[data], a);
+        } else {
+            assert!(false) // node should be a leaf
+        }
+    } else {
+        assert!(false) // root node should be a Middle
+    }
+    // generate proof of inclusion for every node
+    let (included, _proof) = tree.generate_proof(d).unwrap();
+    assert!(included);
+    let (included, _proof) = tree.generate_proof(a).unwrap();
+    assert!(included);
+    let (included, proof) = tree.generate_proof(c).unwrap();
+    assert!(included);
+    assert_eq!(tree.hash_cache.len(), tree.nodes_vec.len());
+    let rebuilt = deserialize_proof(&proof).unwrap();
+    assert_eq!(
+        rebuilt.hash_cache[rebuilt.hash_cache.len() - 1],
+        tree.hash_cache[tree.hash_cache.len() - 1]
+    );
 }
