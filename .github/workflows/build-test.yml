@@ -150,7 +150,7 @@ jobs:
         python${{ matrix.python.major-dot-minor }} -m venv venv
         . venv/bin/activate
         pip install build
-        python -m build ./wheel
+        python -m build --wheel ./wheel
 
     - name: Build Linux on Python ${{ matrix.python }}
       if: matrix.os.matrix == 'ubuntu'
@@ -166,7 +166,7 @@ jobs:
             python${{ matrix.python.major-dot-minor }} -m venv /venv && \
             . /venv/bin/activate && \
             pip install --upgrade pip build && \
-            python -m build ./wheel \
+            python -m build --wheel ./wheel \
           '
 
     - name: Build Windows on Python ${{ matrix.python }}
@@ -177,8 +177,8 @@ jobs:
       run: |
         py -${{ matrix.python.major-dot-minor }} -m venv venv
         . .\venv\Scripts\Activate.ps1
-        pip install build
-        python -m build ./wheel
+        pip install --upgrade pip build
+        python -m build --wheel ./wheel
 
     - uses: Chia-Network/actions/create-venv@main
       id: create-venv
