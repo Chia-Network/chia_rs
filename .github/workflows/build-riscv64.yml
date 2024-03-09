@@ -89,7 +89,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: packages
-          path: dist/
+          path: wheel/dist/
           if-no-files-found: error
   upload:
     name: Upload to Chia PyPI
@@ -112,7 +112,7 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: packages
-          path: ./dist
+          path: wheel/dist/
 
       - name: Configure AWS credentials
         if: env.RELEASE == 'true'

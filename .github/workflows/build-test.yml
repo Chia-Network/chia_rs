@@ -189,13 +189,13 @@ jobs:
 
     - name: Install chia_rs wheel
       run: |
-        pip install --no-index --find-links dist/ chia_rs
+        pip install --no-index --find-links wheel/dist/ chia_rs
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v3
       with:
         name: packages
-        path: dist/
+        path: wheel/dist/
 
   check-typestubs:
     name: Check chia_rs.pyi
@@ -272,7 +272,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: packages
-        path: dist/
+        path: wheel/dist/
 
   fmt:
     runs-on: ubuntu-latest
