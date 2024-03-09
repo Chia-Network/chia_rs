@@ -157,6 +157,7 @@ jobs:
       run: |
         docker run --rm \
           -v ${{ github.workspace }}:/ws --workdir=/ws \
+          -e MATURIN_PEP517_ARGS='--manylinux ${{ matrix.python.by-arch[matrix.arch.matrix].manylinux-version }}'
           ${{ matrix.python.by-arch[matrix.arch.matrix].docker-url }} \
           bash -exc '\
             yum -y install openssl-devel && \
@@ -165,7 +166,7 @@ jobs:
             python${{ matrix.python.major-dot-minor }} -m venv /venv && \
             . /venv/bin/activate && \
             pip install --upgrade pip build && \
-            MATURIN_PEP517_ARGS='--manylinux ${{ matrix.python.by-arch[matrix.arch.matrix].manylinux-version }}' python -m build ./wheel \
+            python -m build ./wheel \
           '
 
     - name: Build Windows on Python ${{ matrix.python }}
