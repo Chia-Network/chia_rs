@@ -5,6 +5,3 @@ build-backend = "maturin"
 [tool.maturin]
 bindings = "pyo3"
 features = ["extension-module"]
-
-[project]
-name = "chia_rs"
