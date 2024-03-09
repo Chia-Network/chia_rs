@@ -384,7 +384,8 @@ jobs:
           source venv/bin/activate
           git clone https://github.com/Chia-Network/clvm_tools.git --branch=main --single-branch
           pip install ./clvm_tools
-          pip install ./wheel colorama pytest chia-blockchain==2.1.2 clvm==0.9.8
+          pip install colorama pytest chia-blockchain==2.1.2 clvm==0.9.8
+          pip install ./wheel
           pytest tests
           grcov . --binary-path target -s . --branch --ignore-not-existing --ignore='*/.cargo/*' --ignore='tests/*' --ignore='venv/*' -o rust_cov.info
           python -c 'with open("rust_cov.info") as f: lines = [l for l in f if not (l.startswith("DA:") and int(l.split(",")[1].strip()) >= 2**63)]; open("lcov.info", "w").writelines(lines)'
