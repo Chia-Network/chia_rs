@@ -142,20 +142,17 @@ jobs:
     - name: Set up rust
       uses: dtolnay/rust-toolchain@stable
 
-    - name: Install dependencies
-      run: |
-          python -m pip install maturin
-
-    - name: Build MacOs with maturin on Python ${{ matrix.python }}
+    - name: Build macOS on Python ${{ matrix.python }}
       if: matrix.os.matrix == 'macos'
       env:
         MACOSX_DEPLOYMENT_TARGET: '11.0'
       run: |
         python${{ matrix.python.major-dot-minor }} -m venv venv
         . venv/bin/activate
-        maturin build -i python --release -m wheel/Cargo.toml
+        pip install build
+        python -m build ./wheel
 
-    - name: Build Linux with maturin on Python ${{ matrix.python }}
+    - name: Build Linux on Python ${{ matrix.python }}
       if: matrix.os.matrix == 'ubuntu'
       run: |
         docker run --rm \
@@ -167,12 +164,11 @@ jobs:
             rustup target add ${{ matrix.python.by-arch[matrix.arch.matrix].rustup-target }} && \
             python${{ matrix.python.major-dot-minor }} -m venv /venv && \
             . /venv/bin/activate && \
-            pip install --upgrade pip && \
-            pip install maturin && \
-            CC=gcc maturin build --release --manylinux ${{ matrix.python.by-arch[matrix.arch.matrix].manylinux-version }} -m wheel/Cargo.toml \
+            pip install --upgrade pip build && \
+            MATURIN_PEP517_ARGS='--manylinux ${{ matrix.python.by-arch[matrix.arch.matrix].manylinux-version }}' python -m build ./wheel \
           '
 
-    - name: Build Windows with maturin on Python ${{ matrix.python }}
+    - name: Build Windows on Python ${{ matrix.python }}
       if: matrix.os.matrix == 'windows'
       env:
         CC: 'clang'
@@ -180,7 +176,8 @@ jobs:
       run: |
         py -${{ matrix.python.major-dot-minor }} -m venv venv
         . .\venv\Scripts\Activate.ps1
-        maturin build -i python --release -m wheel/Cargo.toml
+        pip install build
+        python -m build ./wheel
 
     - uses: Chia-Network/actions/create-venv@main
       id: create-venv
@@ -267,8 +264,8 @@ jobs:
 
     - name: Build source distribution
       run: |
-        pip install maturin
-        maturin sdist -m wheel/Cargo.toml
+        pip install build
+        python -m build --sdist ./wheel
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v3
@@ -387,8 +384,7 @@ jobs:
           source venv/bin/activate
           git clone https://github.com/Chia-Network/clvm_tools.git --branch=main --single-branch
           pip install ./clvm_tools
-          pip install colorama maturin pytest chia-blockchain==2.1.2 clvm==0.9.8
-          maturin develop --release -m wheel/Cargo.toml
+          pip install ./wheel colorama pytest chia-blockchain==2.1.2 clvm==0.9.8
           pytest tests
           grcov . --binary-path target -s . --branch --ignore-not-existing --ignore='*/.cargo/*' --ignore='tests/*' --ignore='venv/*' -o rust_cov.info
           python -c 'with open("rust_cov.info") as f: lines = [l for l in f if not (l.startswith("DA:") and int(l.split(",")[1].strip()) >= 2**63)]; open("lcov.info", "w").writelines(lines)'
