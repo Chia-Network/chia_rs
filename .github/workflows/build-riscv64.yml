@@ -75,7 +75,7 @@ jobs:
         run: |
           docker run --rm --platform linux/riscv64 \
             -v ${{ github.workspace }}:/ws --workdir=/ws \
-            -e PIP_EXTRA_INDEX_URL='https://pypi.chia.net/simple/
+            -e PIP_EXTRA_INDEX_URL='https://pypi.chia.net/simple/ \
             chianetwork/ubuntu-22.04-risc-builder:latest \
             bash -exc '\
             pyenv global ${{ matrix.python.matrix }}
