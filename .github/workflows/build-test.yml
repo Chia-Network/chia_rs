@@ -165,6 +165,7 @@ jobs:
             rustup target add ${{ matrix.python.by-arch[matrix.arch.matrix].rustup-target }} && \
             python${{ matrix.python.major-dot-minor }} -m venv /venv && \
             . /venv/bin/activate && \
+            source ./llp.sh && \
             pip install --upgrade pip build && \
             python -m build --wheel ./wheel \
           '
