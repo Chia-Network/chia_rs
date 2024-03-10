@@ -31,16 +31,13 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Update pip
-      run: |
-          python -m pip install --upgrade pip
-
     - name: Set up rust
       uses: dtolnay/rust-toolchain@stable
 
     - name: setup venv
       run: |
         python -m venv venv
+        python -m pip install --upgrade pip
 
     - uses: chia-network/actions/activate-venv@main
 
