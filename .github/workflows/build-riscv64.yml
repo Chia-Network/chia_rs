@@ -83,7 +83,7 @@ jobs:
             pyenv global ${{ matrix.python.matrix }}
             python -m venv venv && \
             source ./venv/bin/activate && \
-            pip install --upgrade build && \
+            pip install --upgrade pip build && \
             python -m build --wheel ./wheel \
             '
 
