@@ -8,8 +8,8 @@ use chia_consensus::gen::spend_visitor::SpendVisitor;
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
 use clvm_utils::tree_hash;
-use clvmr::allocator::Allocator;
-use fuzzing_utils::{make_tree, BitCursor};
+use clvmr::{Allocator, NodePtr};
+use fuzzing_utils::{make_list, BitCursor};
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -19,7 +19,9 @@ use chia_consensus::gen::flags::{
 
 fuzz_target!(|data: &[u8]| {
     let mut a = Allocator::new();
-    let input = make_tree(&mut a, &mut BitCursor::new(data), false);
+    let input = make_list(&mut a, &mut BitCursor::new(data));
+    // conditions are a list of lists
+    let input = a.new_pair(input, NodePtr::NIL).unwrap();
 
     let mut ret = SpendBundleConditions::default();
 
@@ -35,6 +37,8 @@ fuzz_target!(|data: &[u8]| {
         .coin_id()
         .into(),
     );
+    let parent_id = a.new_atom(&parent_id).expect("atom failed");
+    let puzzle_hash = a.new_atom(&puzzle_hash).expect("atom failed");
 
     let mut state = ParseState::default();
 
@@ -46,9 +50,9 @@ fuzz_target!(|data: &[u8]| {
         ENABLE_SOFTFORK_CONDITION,
     ] {
         let mut coin_spend = Spend {
-            parent_id: a.new_atom(&parent_id).expect("atom failed"),
+            parent_id,
             coin_amount: amount,
-            puzzle_hash: a.new_atom(&puzzle_hash).expect("atom failed"),
+            puzzle_hash,
             coin_id: coin_id.clone(),
             height_relative: None,
             seconds_relative: None,

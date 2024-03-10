@@ -1,6 +1,7 @@
 use clvmr::allocator::Allocator;
 use clvmr::allocator::NodePtr;
 
+// TODO: use the arbitrary crate instead
 pub struct BitCursor<'a> {
     data: &'a [u8],
     bit_offset: u8,
@@ -50,8 +51,9 @@ impl<'a> BitCursor<'a> {
 }
 
 const BUFFER: [u8; 63] = [
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0xff, 0x80, 0, 1, 0x55, 0, 0x55, 0, 0x80, 0, 0xff, 0, 2, 0, 0xcc, 0, 0, 0, 0x7f, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x77,
+    0xee, 0, 0xcc, 0x0f, 0xff, 0x80, 0x7e, 1,
 ];
 
 enum MakeTreeOp {
@@ -97,4 +99,46 @@ pub fn make_tree(a: &mut Allocator, cursor: &mut BitCursor, short_atoms: bool) -
 
     assert!(value_stack.len() == 1);
     value_stack.pop().unwrap()
+}
+
+pub fn make_list(a: &mut Allocator, cursor: &mut BitCursor) -> NodePtr {
+    let mut ret = NodePtr::NIL;
+
+    let mut length = cursor.read_bits(5).unwrap_or(0);
+    let mut nil_terminated = cursor.read_bits(3).unwrap_or(0) != 0;
+
+    while length > 0 {
+        let atom_kind = cursor.read_bits(3).unwrap_or(0);
+        let value = match atom_kind {
+            0 => a
+                .new_number(cursor.read_bits(7).unwrap_or(0).into())
+                .unwrap(),
+            1..=3 => {
+                let offset = cursor.read_bits(3).unwrap_or(0);
+                a.new_atom(&BUFFER[offset as usize..(offset + 32) as usize])
+                    .unwrap()
+            }
+            4 | 5 => {
+                let mut num: i64 = ((cursor.read_bits(8).unwrap_or(0) as i64) << 8)
+                    | (cursor.read_bits(8).unwrap_or(0) as i64);
+                if atom_kind == 4 {
+                    num = -num;
+                }
+                a.new_number(num.into()).unwrap()
+            }
+            6 => a.new_pair(NodePtr::NIL, NodePtr::NIL).unwrap(),
+            _ => {
+                let len = cursor.read_bits(6).unwrap_or(0);
+                a.new_atom(&BUFFER[..len as usize]).unwrap()
+            }
+        };
+        if !nil_terminated {
+            ret = value;
+            nil_terminated = true;
+        } else {
+            ret = a.new_pair(value, ret).unwrap();
+        }
+        length -= 1;
+    }
+    ret
 }
