@@ -19,6 +19,7 @@ jobs:
     name: Build riscv64 crate and run tests
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest]
 
@@ -47,6 +48,7 @@ jobs:
     name: ${{ matrix.os }} 📦 Build Wheel ${{ matrix.python.major-dot-minor }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest]
         python:
