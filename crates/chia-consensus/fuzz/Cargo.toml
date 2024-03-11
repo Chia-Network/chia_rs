@@ -91,3 +91,10 @@ path = "fuzz_targets/fast-forward.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "parse-spend-id"
+path = "fuzz_targets/parse-spend-id.rs"
+test = false
+doc = false
+bench = false
