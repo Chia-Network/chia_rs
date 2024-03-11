@@ -9,7 +9,7 @@ homepage = "https://github.com/Chia-Network/chia_rs"
 repository = "https://github.com/Chia-Network/chia_rs"
 
 [features]
-py-bindings = ["dep:pyo3", "dep:chia_py_streamable_macro", "chia-traits/py-bindings"]
+py-bindings = ["dep:pyo3", "dep:chia_py_streamable_macro", "chia-traits/py-bindings", "chia-bls/py-bindings"]
 
 [dependencies]
 pyo3 = { version = "0.19.0", features = ["multiple-pymethods", "num-bigint"], optional = true }

@@ -1,6 +1,6 @@
+use chia_streamable_macro::streamable;
 use chia_streamable_macro::Streamable;
 
-use crate::streamable_struct;
 use crate::Bytes;
 use crate::Bytes32;
 use crate::EndOfSubSlotBundle;
@@ -9,7 +9,8 @@ use crate::VDFProof;
 use crate::{Foliage, FoliageTransactionBlock, TransactionsInfo};
 use chia_traits::Streamable;
 
-streamable_struct! (HeaderBlock {
+#[streamable]
+pub struct HeaderBlock {
     // If first sb
     finished_sub_slots: Vec<EndOfSubSlotBundle>,
     // Reward chain trunk data
@@ -30,7 +31,7 @@ streamable_struct! (HeaderBlock {
     transactions_filter: Bytes,
     // Reward chain foliage data (tx block additional)
     transactions_info: Option<TransactionsInfo>,
-});
+}
 
 impl HeaderBlock {
     pub fn prev_header_hash(&self) -> Bytes32 {

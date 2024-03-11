@@ -1,15 +1,127 @@
 extern crate proc_macro;
 
+use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use proc_macro_crate::{crate_name, FoundCrate};
 use quote::quote;
+use syn::token::Pub;
 use syn::Lit::Int;
 use syn::{
     parse_macro_input, Data, DeriveInput, Expr, Fields, FieldsNamed, FieldsUnnamed, Index, Type,
+    Visibility,
 };
 
+#[proc_macro_attribute]
+pub fn streamable(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let found_crate =
+        crate_name("chia-protocol").expect("chia-protocol is present in `Cargo.toml`");
+
+    let chia_protocol = match found_crate {
+        FoundCrate::Itself => quote!(crate),
+        FoundCrate::Name(name) => {
+            let ident = Ident::new(&name, Span::call_site());
+            quote!(#ident)
+        }
+    };
+
+    let is_message = &attr.to_string() == "message";
+
+    let my_name = std::env::var("CARGO_PKG_NAME").unwrap();
+    let is_protocol = &my_name == "chia-protocol";
+
+    let mut input: DeriveInput = parse_macro_input!(item);
+    let name = input.ident.clone();
+    let name_ref = &name;
+
+    let mut extra_impls = Vec::new();
+
+    if let Data::Struct(data) = &mut input.data {
+        let mut field_names = Vec::new();
+        let mut field_types = Vec::new();
+
+        for (i, field) in data.fields.iter_mut().enumerate() {
+            field.vis = Visibility::Public(Pub::default());
+            field_names.push(Ident::new(
+                &field
+                    .ident
+                    .as_ref()
+                    .map(|ident| ident.to_string())
+                    .unwrap_or(format!("field_{i}")),
+                Span::mixed_site(),
+            ));
+            field_types.push(field.ty.clone());
+        }
+
+        let init_names = field_names.clone();
+
+        let initializer = match &data.fields {
+            Fields::Named(..) => quote!( Self { #( #init_names ),* } ),
+            Fields::Unnamed(..) => quote!( Self( #( #init_names ),* ) ),
+            Fields::Unit => quote!(Self),
+        };
+
+        if field_names.is_empty() {
+            extra_impls.push(quote! {
+                impl Default for #name_ref {
+                    fn default() -> Self {
+                        Self::new()
+                    }
+                }
+            });
+        }
+
+        extra_impls.push(quote! {
+            impl #name_ref {
+                #[allow(clippy::too_many_arguments)]
+                pub fn new( #( #field_names: #field_types ),* ) -> #name_ref {
+                    #initializer
+                }
+            }
+        });
+
+        if is_message {
+            extra_impls.push(quote! {
+                impl #chia_protocol::ChiaProtocolMessage for #name_ref {
+                    fn msg_type() -> #chia_protocol::ProtocolMessageTypes {
+                        #chia_protocol::ProtocolMessageTypes::#name_ref
+                    }
+                }
+            });
+        }
+    } else {
+        panic!("only structs are supported");
+    }
+
+    let main_derives = quote! {
+        #[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
+    };
+
+    let attrs = if is_protocol {
+        quote! {
+            #[cfg_attr(
+                feature = "py-bindings", pyo3::pyclass(frozen), derive(
+                    chia_py_streamable_macro::PyJsonDict,
+                    chia_py_streamable_macro::PyStreamable,
+                    chia_py_streamable_macro::PyGetters
+                )
+            )]
+            #main_derives
+            #[cfg_attr(fuzzing, derive(arbitrary::Arbitrary))]
+        }
+    } else {
+        main_derives
+    };
+
+    quote! {
+        #attrs
+        #input
+        #( #extra_impls )*
+    }
+    .into()
+}
+
 #[proc_macro_derive(Streamable)]
-pub fn chia_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn chia_streamable_macro(input: TokenStream) -> TokenStream {
     let found_crate = crate_name("chia-traits").expect("chia-traits is present in `Cargo.toml`");
 
     let crate_name = match found_crate {

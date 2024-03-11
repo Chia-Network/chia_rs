@@ -1,7 +1,5 @@
-use chia_streamable_macro::Streamable;
+use chia_streamable_macro::{streamable, Streamable};
 
-use crate::message_struct;
-use crate::streamable_struct;
 use crate::Bytes;
 
 #[cfg(feature = "py-bindings")]
@@ -155,13 +153,15 @@ impl chia_traits::ChiaToPython for NodeType {
     }
 }
 
-streamable_struct! (Message {
+#[streamable]
+pub struct Message {
     msg_type: ProtocolMessageTypes,
     id: Option<u16>,
     data: Bytes,
-});
+}
 
-message_struct! (Handshake {
+#[streamable(message)]
+pub struct Handshake {
     // Network id, usually the genesis challenge of the blockchain
     network_id: String,
     // Protocol version to determine which messages the peer supports
@@ -174,4 +174,4 @@ message_struct! (Handshake {
     node_type: NodeType,
     // Key value dict to signal support for additional capabilities/features
     capabilities: Vec<(u16, String)>,
-});
+}

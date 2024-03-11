@@ -1,6 +1,5 @@
-use chia_streamable_macro::Streamable;
+use chia_streamable_macro::{streamable, Streamable};
 
-use crate::streamable_struct;
 use crate::{Bytes32, ClassgroupElement, Coin, SubEpochSummary};
 
 #[cfg(feature = "py-bindings")]
@@ -9,7 +8,8 @@ use pyo3::prelude::*;
 // This class is not included or hashed into the blockchain, but it is kept in memory as a more
 // efficient way to maintain data about the blockchain. This allows us to validate future blocks,
 // difficulty adjustments, etc, without saving the whole header block in memory.
-streamable_struct! (BlockRecord {
+#[streamable]
+pub struct BlockRecord {
     header_hash: Bytes32,
     // Header hash of the previous block
     prev_hash: Bytes32,
@@ -53,7 +53,7 @@ streamable_struct! (BlockRecord {
 
     // Sub-epoch (present iff this is the first SB after sub-epoch)
     sub_epoch_summary_included: Option<SubEpochSummary>,
-});
+}
 
 impl BlockRecord {
     pub fn is_transaction_block(&self) -> bool {
