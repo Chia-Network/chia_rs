@@ -16,18 +16,15 @@ pub fn streamable(attr: TokenStream, item: TokenStream) -> TokenStream {
     let found_crate =
         crate_name("chia-protocol").expect("chia-protocol is present in `Cargo.toml`");
 
-    let chia_protocol = match found_crate {
+    let chia_protocol = match &found_crate {
         FoundCrate::Itself => quote!(crate),
         FoundCrate::Name(name) => {
-            let ident = Ident::new(&name, Span::call_site());
+            let ident = Ident::new(name, Span::call_site());
             quote!(#ident)
         }
     };
 
     let is_message = &attr.to_string() == "message";
-
-    let my_name = std::env::var("CARGO_PKG_NAME").unwrap();
-    let is_protocol = &my_name == "chia-protocol";
 
     let mut input: DeriveInput = parse_macro_input!(item);
     let name = input.ident.clone();
@@ -96,7 +93,10 @@ pub fn streamable(attr: TokenStream, item: TokenStream) -> TokenStream {
         #[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
     };
 
-    let attrs = if is_protocol {
+    // If you're calling the macro from `chia-protocol`, enable Python bindings and fuzzing conditionally.
+    // Otherwise, you're calling it from an external crate which doesn't have this infrastructure setup.
+    // In that case, the caller can add these macros manually if they want to.
+    let attrs = if matches!(found_crate, FoundCrate::Itself) {
         quote! {
             #[cfg_attr(
                 feature = "py-bindings", pyo3::pyclass(frozen), derive(
