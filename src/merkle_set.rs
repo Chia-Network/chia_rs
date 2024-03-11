@@ -72,11 +72,11 @@ fn _deserialize(
             }
             TERMINAL => {
                 let hash: [u8; 32] = proof[pos + 1..pos + 33].try_into().map_err(|_| SetError)?;
-                // for (pos, &v) in bits.iter().enumerate() {
-                //     if get_bit(&hash, pos as u8) != v {
-                //         return Err(SetError)
-                //     }
-                // }
+                for (pos, &v) in bits.iter().enumerate() {
+                    if get_bit(&hash, pos as u8) != v {
+                        return Err(SetError)
+                    }
+                }
                 merkle_tree.leaf_vec.push(hash.clone());
                 merkle_tree.nodes_vec.push(ArrayTypes::Leaf {
                     data: merkle_tree.leaf_vec.len() - 1,
@@ -95,8 +95,9 @@ fn _deserialize(
                 left_bits.push(0);
                 let new_pos = _deserialize(proof, pos + 1, &mut left_bits, merkle_tree)?;
                 let left_pointer = merkle_tree.nodes_vec.len() - 1;
-                bits.clone().push(1);
-                let final_pos = _deserialize(proof, new_pos, bits, merkle_tree)?;
+                let mut right_bits = bits.clone();
+                right_bits.push(1);
+                let final_pos = _deserialize(proof, new_pos, &mut right_bits, merkle_tree)?;
                 let right_pointer = merkle_tree.nodes_vec.len() - 1;
                 merkle_tree.nodes_vec.push(ArrayTypes::Middle {
                     children: (left_pointer, right_pointer),
