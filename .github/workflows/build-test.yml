@@ -142,7 +142,7 @@ jobs:
     - name: Set up rust
       uses: dtolnay/rust-toolchain@stable
 
-    - name: Build macOS on Python ${{ matrix.python }}
+    - name: Build macOS on Python ${{ matrix.python.major-dot-minor }}
       if: matrix.os.matrix == 'macos'
       env:
         MACOSX_DEPLOYMENT_TARGET: '11.0'
@@ -152,7 +152,7 @@ jobs:
         pip install build
         python -m build --wheel ./wheel
 
-    - name: Build Linux on Python ${{ matrix.python }}
+    - name: Build Linux on Python ${{ matrix.python.major-dot-minor }}
       if: matrix.os.matrix == 'ubuntu'
       run: |
         docker run --rm \
@@ -170,7 +170,7 @@ jobs:
             python -m build --wheel ./wheel \
           '
 
-    - name: Build Windows on Python ${{ matrix.python }}
+    - name: Build Windows on Python ${{ matrix.python.major-dot-minor }}
       if: matrix.os.matrix == 'windows'
       env:
         CC: 'clang'
