@@ -157,7 +157,7 @@ jobs:
       run: |
         docker run --rm \
           -v ${{ github.workspace }}:/ws --workdir=/ws \
-          -e MATURIN_PEP517_ARGS='--manylinux ${{ matrix.python.by-arch[matrix.arch.matrix].manylinux-version }}' \
+          -e MATURIN_PEP517_ARGS='--compatibility ${{ matrix.python.by-arch[matrix.arch.matrix].manylinux-version }}' \
           ${{ matrix.python.by-arch[matrix.arch.matrix].docker-url }} \
           bash -exc '\
             yum -y install openssl-devel && \
