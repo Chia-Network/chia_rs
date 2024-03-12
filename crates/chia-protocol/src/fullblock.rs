@@ -1,6 +1,6 @@
+use chia_streamable_macro::streamable;
 use chia_streamable_macro::Streamable;
 
-use crate::streamable_struct;
 use crate::Bytes32;
 use crate::Coin;
 use crate::EndOfSubSlotBundle;
@@ -10,7 +10,8 @@ use crate::VDFProof;
 use crate::{Foliage, FoliageTransactionBlock, TransactionsInfo};
 use chia_traits::Streamable;
 
-streamable_struct! (FullBlock {
+#[streamable]
+pub struct FullBlock {
     finished_sub_slots: Vec<EndOfSubSlotBundle>,
     reward_chain_block: RewardChainBlock,
     challenge_chain_sp_proof: Option<VDFProof>, // # If not first sp in sub-slot
@@ -23,7 +24,7 @@ streamable_struct! (FullBlock {
     transactions_info: Option<TransactionsInfo>, // Reward chain foliage data (tx block additional)
     transactions_generator: Option<Program>,     // Program that generates transactions
     transactions_generator_ref_list: Vec<u32>, // List of block heights of previous generators referenced in this block
-});
+}
 
 impl FullBlock {
     pub fn prev_header_hash(&self) -> Bytes32 {

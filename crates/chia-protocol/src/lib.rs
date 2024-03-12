@@ -11,7 +11,6 @@ pub mod foliage;
 pub mod full_node_protocol;
 pub mod fullblock;
 pub mod header_block;
-pub mod message_struct;
 pub mod peer_info;
 pub mod pool_target;
 pub mod program;

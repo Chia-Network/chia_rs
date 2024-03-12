@@ -1,9 +1,8 @@
-use chia_streamable_macro::Streamable;
+use chia_streamable_macro::{streamable, Streamable};
 
-use crate::streamable_struct;
-
-streamable_struct!(TimestampedPeerInfo {
+#[streamable]
+pub struct TimestampedPeerInfo {
     host: String,
     port: u16,
     timestamp: u64,
-});
+}

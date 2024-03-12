@@ -1,11 +1,13 @@
-use crate::streamable_struct;
 use crate::Bytes100;
-use chia_streamable_macro::Streamable;
+use chia_streamable_macro::{streamable, Streamable};
 
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
 
-streamable_struct!(ClassgroupElement { data: Bytes100 });
+#[streamable]
+pub struct ClassgroupElement {
+    data: Bytes100,
+}
 
 impl ClassgroupElement {
     pub fn get_default_element() -> ClassgroupElement {

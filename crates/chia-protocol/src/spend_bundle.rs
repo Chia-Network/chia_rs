@@ -1,8 +1,8 @@
 use crate::coin_spend::CoinSpend;
-use crate::streamable_struct;
 use crate::Bytes32;
 use crate::Coin;
 use chia_bls::G2Element;
+use chia_streamable_macro::streamable;
 use chia_streamable_macro::Streamable;
 use chia_traits::Streamable;
 use clvm_traits::FromClvm;
@@ -15,10 +15,11 @@ use clvmr::Allocator;
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
 
-streamable_struct! (SpendBundle {
+#[streamable]
+pub struct SpendBundle {
     coin_spends: Vec<CoinSpend>,
     aggregated_signature: G2Element,
-});
+}
 
 impl SpendBundle {
     pub fn aggregate(spend_bundles: &[SpendBundle]) -> SpendBundle {

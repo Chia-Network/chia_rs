@@ -1,6 +1,5 @@
-use crate::streamable_struct;
 use crate::{bytes::Bytes32, BytesImpl};
-use chia_streamable_macro::Streamable;
+use chia_streamable_macro::{streamable, Streamable};
 use clvm_traits::{
     clvm_list, destructure_list, match_list, ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError,
     ToClvm, ToClvmError,
@@ -10,11 +9,12 @@ use sha2::{Digest, Sha256};
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
 
-streamable_struct!(Coin {
+#[streamable]
+pub struct Coin {
     parent_coin_info: Bytes32,
     puzzle_hash: Bytes32,
     amount: u64,
-});
+}
 
 impl Coin {
     pub fn coin_id(&self) -> [u8; 32] {
