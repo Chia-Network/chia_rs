@@ -1763,7 +1763,6 @@ class HeaderBlock:
     transactions_info: Optional[TransactionsInfo]
     prev_header_hash: bytes32
     prev_hash: bytes32
-    header_hash: bytes32
     height: uint32
     weight: uint128
     header_hash: bytes32
