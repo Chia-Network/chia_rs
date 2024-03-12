@@ -1,6 +1,6 @@
 [package]
 name = "chia-wallet-fuzz"
-version = "0.5.2"
+version = "0.6.0-alpha.1"
 authors = ["Automatically generated"]
 publish = false
 edition = "2021"
@@ -13,7 +13,7 @@ libfuzzer-sys = "0.4"
 clvmr = "0.6.0"
 pyo3 = { version = ">=0.19.0", features = ["auto-initialize"]}
 chia-wallet = { path = ".." }
-clvm-traits = { version = "0.5.2", path = "../../clvm-traits" }
+clvm-traits = { version = "0.6.0-alpha.1", path = "../../clvm-traits" }
 
 [[bin]]
 name = "roundtrip"
