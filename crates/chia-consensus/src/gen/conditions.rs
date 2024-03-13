@@ -252,7 +252,7 @@ pub fn parse_args(
             c = rest(a, c)?;
             let message = sanitize_announce_msg(a, first(a, c)?, ErrorCode::InvalidMessage)?;
             // AGG_SIG_UNSAFE takes exactly two parameters
-            if (flags & COND_ARGS_NIL) != 0 {
+            if (flags & COND_ARGS_NIL) != 0 || (flags & STRICT_ARGS_COUNT) != 0 {
                 // make sure there aren't more than two
                 check_nil(a, rest(a, c)?)?;
                 Ok(Condition::AggSigUnsafe(pubkey, message))
@@ -272,7 +272,7 @@ pub fn parse_args(
             c = rest(a, c)?;
             let message = sanitize_announce_msg(a, first(a, c)?, ErrorCode::InvalidMessage)?;
             // AGG_SIG_ME takes exactly two parameters
-            if (flags & COND_ARGS_NIL) != 0 {
+            if (flags & COND_ARGS_NIL) != 0 || (flags & STRICT_ARGS_COUNT) != 0 {
                 // make sure there aren't more than two
                 check_nil(a, rest(a, c)?)?;
                 Ok(Condition::AggSigMe(pubkey, message))
@@ -1741,24 +1741,34 @@ fn test_invalid_spend_list_terminator() {
 #[case(AGG_SIG_PARENT_AMOUNT, "{pubkey} ({msg1}")]
 #[case(ASSERT_CONCURRENT_SPEND, "{coin12}")]
 #[case(ASSERT_CONCURRENT_PUZZLE, "{h2}")]
-fn test_extra_arg_mempool(
+fn test_strict_args_count(
     #[case] condition: ConditionOpcode,
     #[case] arg: &str,
-    #[values(MEMPOOL_MODE, 0)] mempool: u32,
+    #[values(STRICT_ARGS_COUNT, 0)] flags: u32,
 ) {
-    // extra args are disallowed in mempool mode
-    assert_eq!(
-        cond_test_flag(
-            &format!(
-                "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 )))))",
-                condition as u8, arg
-            ),
-            STRICT_ARGS_COUNT | ENABLE_SOFTFORK_CONDITION | mempool
-        )
-        .unwrap_err()
-        .1,
-        ErrorCode::InvalidCondition
+    // extra args are disallowed when STRICT_ARGS_COUNT is set
+    let ret = cond_test_flag(
+        &format!(
+            "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 )))))",
+            condition as u8, arg
+        ),
+        flags | ENABLE_SOFTFORK_CONDITION | AGG_SIG_ARGS,
     );
+    if flags == 0 {
+        // two of the cases won't pass, even when garbage at the end is allowed.
+        if condition == ASSERT_COIN_ANNOUNCEMENT {
+            assert_eq!(ret.unwrap_err().1, ErrorCode::AssertCoinAnnouncementFailed,);
+        } else if condition == ASSERT_PUZZLE_ANNOUNCEMENT {
+            assert_eq!(
+                ret.unwrap_err().1,
+                ErrorCode::AssertPuzzleAnnouncementFailed,
+            );
+        } else {
+            assert!(ret.is_ok());
+        }
+    } else {
+        assert_eq!(ret.unwrap_err().1, ErrorCode::InvalidCondition);
+    }
 }
 
 #[cfg(test)]
