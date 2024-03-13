@@ -676,11 +676,12 @@ dependencies = [
 
 [[package]]
 name = "clvmr"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2a325317df74c08409b8080cbea9c8c8a9d46184d5b2d89e941c5a958fe87eb"
+checksum = "deb235bb5ce94e1e64e54cede97ca5a4766590d3584dea1b4285499d8e7f56f6"
 dependencies = [
  "chia-bls 0.4.0",
+ "hex-literal",
  "k256",
  "lazy_static",
  "num-bigint",
