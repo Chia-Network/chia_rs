@@ -1511,12 +1511,12 @@ fn test_merkle_right_edge() {
 
 #[test]
 fn test_random_bytes() {
-    for _i in [1..10000] {
+    for _i in [1..1000000] {
         // Create a random number generator
         let mut small_rng = SmallRng::from_entropy();
 
         // Generate a random length for the Vec
-        let vec_length: usize = small_rng.gen_range(0..=100); // Adjust the range as needed
+        let vec_length: usize = small_rng.gen_range(0..=500); 
 
         // Generate a Vec of random [u8; 32] arrays
         let mut random_data: Vec<[u8; 32]> = Vec::with_capacity(vec_length);
@@ -1530,11 +1530,9 @@ fn test_random_bytes() {
         assert_eq!(tree.hash_cache.len(), tree.nodes_vec.len());
         assert_eq!(root, tree.hash_cache[tree.nodes_vec.len() - 1]);
         assert_eq!(root, compute_merkle_set_root(&mut random_data));  // interestingly the old way has this bug too
-        let (included, proof) = tree.generate_proof(random_data[0]).unwrap();
-        if !included {
-            println!("random_data[0]: {:?}", random_data[0]);
-             println!("tree: {:?}", tree);
-        }
+        let mut rng = rand::thread_rng();
+        let index = rng.gen_range(0..random_data.len());
+        let (included, proof) = tree.generate_proof(random_data[index]).unwrap();
         assert!(included);
         let rebuilt = deserialize_proof(&proof).unwrap();
         assert_eq!(
