@@ -46,6 +46,8 @@ chia-protocol = { version = "0.5.1", path = "chia-protocol" }
 chia-wallet = { version = "0.5.1", path = "chia-wallet" }
 hex-literal = "0.4.1"
 thiserror = "1.0.44"
+rand = { version = "0.8.5", features = [ "small_rng" ] }
+libfuzzer-sys = "0.4.7"
 
 [dev-dependencies]
 num-traits = "0.2.15"
