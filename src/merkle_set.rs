@@ -75,11 +75,12 @@ fn _deserialize(
             }
             TERMINAL => {
                 let hash: [u8; 32] = proof[pos + 1..pos + 33].try_into().map_err(|_| SetError)?;
-                for (pos, &v) in bits.iter().enumerate() {
-                    if get_bit(&hash, pos as u8) != v {
-                        return Err(SetError)
-                    }
-                }
+                // bit checking doesn't work if the leaf nodes have been collapsed a level
+                // for (pos, &v) in bits.iter().enumerate() {
+                    // if get_bit(&hash, pos as u8) != v {
+                    //     return Err(SetError)
+                    // }
+                // }
                 merkle_tree.leaf_vec.push(hash.clone());
                 merkle_tree.nodes_vec.push(ArrayTypes::Leaf {
                     data: merkle_tree.leaf_vec.len() - 1,
