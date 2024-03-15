@@ -1,7 +1,8 @@
+#[cfg(feature = "small_rng")]
+pub use self::small::SmallRng;
 use clvmr::sha2::{Digest, Sha256};
-#[cfg(feature = "small_rng")] pub use self::small::SmallRng;
-use rand::{Rng, SeedableRng};
 use rand::rngs::SmallRng;
+use rand::{Rng, SeedableRng};
 
 fn get_bit(val: &[u8; 32], bit: u8) -> u8 {
     ((val[(bit / 8) as usize] & (0x80 >> (bit & 7))) != 0).into()
@@ -77,9 +78,9 @@ fn _deserialize(
                 let hash: [u8; 32] = proof[pos + 1..pos + 33].try_into().map_err(|_| SetError)?;
                 // bit checking doesn't work if the leaf nodes have been collapsed a level
                 // for (pos, &v) in bits.iter().enumerate() {
-                    // if get_bit(&hash, pos as u8) != v {
-                    //     return Err(SetError)
-                    // }
+                // if get_bit(&hash, pos as u8) != v {
+                //     return Err(SetError)
+                // }
                 // }
                 merkle_tree.leaf_vec.push(hash.clone());
                 merkle_tree.nodes_vec.push(ArrayTypes::Leaf {
@@ -142,7 +143,6 @@ impl MerkleTreeData {
         proof: &mut Vec<u8>,
         depth: u8,
     ) -> Result<bool, SetError> {
-
         match self.nodes_vec[current_node_index] {
             ArrayTypes::Empty => {
                 proof.push(EMPTY);
@@ -154,18 +154,15 @@ impl MerkleTreeData {
                     proof.push(byte);
                 }
                 return Ok(self.leaf_vec[data] == to_check);
-                
             }
             ArrayTypes::Middle { children } => {
                 proof.push(MIDDLE);
-                
+
                 if matches!(self.nodes_vec[children.0], ArrayTypes::Leaf { .. })
                     && matches!(self.nodes_vec[children.1], ArrayTypes::Leaf { .. })
                 {
-                    if let ArrayTypes::Leaf { data: child_0_data } = self.nodes_vec[children.0]
-                    {
-                        if let ArrayTypes::Leaf { data: child_1_data } =
-                            self.nodes_vec[children.1]
+                    if let ArrayTypes::Leaf { data: child_0_data } = self.nodes_vec[children.0] {
+                        if let ArrayTypes::Leaf { data: child_1_data } = self.nodes_vec[children.1]
                         {
                             proof.push(TERMINAL);
                             for byte in self.leaf_vec[child_0_data] {
@@ -183,7 +180,7 @@ impl MerkleTreeData {
                         }
                     }
                 }
-                
+
                 if get_bit(&to_check, depth) == 0 {
                     let r: bool = self.is_included(children.0, to_check, proof, depth + 1)?;
                     self.other_included(
@@ -1516,7 +1513,7 @@ fn test_random_bytes() {
         let mut small_rng = SmallRng::from_entropy();
 
         // Generate a random length for the Vec
-        let vec_length: usize = small_rng.gen_range(0..=500); 
+        let vec_length: usize = small_rng.gen_range(0..=500);
 
         // Generate a Vec of random [u8; 32] arrays
         let mut random_data: Vec<[u8; 32]> = Vec::with_capacity(vec_length);
@@ -1525,11 +1522,11 @@ fn test_random_bytes() {
             small_rng.fill(&mut array);
             random_data.push(array);
         }
-        
+
         let (root, tree) = generate_merkle_tree(&mut random_data);
         assert_eq!(tree.hash_cache.len(), tree.nodes_vec.len());
         assert_eq!(root, tree.hash_cache[tree.nodes_vec.len() - 1]);
-        assert_eq!(root, compute_merkle_set_root(&mut random_data));  // interestingly the old way has this bug too
+        assert_eq!(root, compute_merkle_set_root(&mut random_data));
         let mut rng = rand::thread_rng();
         let index = rng.gen_range(0..random_data.len());
         let (included, proof) = tree.generate_proof(random_data[index]).unwrap();
@@ -1540,5 +1537,4 @@ fn test_random_bytes() {
             tree.hash_cache[tree.hash_cache.len() - 1]
         );
     }
-    
 }
