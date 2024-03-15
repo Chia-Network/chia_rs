@@ -1,3 +1,5 @@
+[![Coverage Status](https://coveralls.io/repos/github/Chia-Network/chia_rs/badge.svg?branch=main)](https://coveralls.io/github/Chia-Network/chia_rs?branch=main)
+
 This cargo workspace contains code useful for working with the Chia network.
 
 # Tests
