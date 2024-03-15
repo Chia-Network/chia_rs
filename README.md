@@ -1,6 +1,6 @@
-![PyPI](https://img.shields.io/pypi/v/chiapos?logo=pypi)
-![PyPI - Format](https://img.shields.io/pypi/format/chiapos?logo=pypi)
-![GitHub](https://img.shields.io/github/license/Chia-Network/chiapos?logo=Github)
+![PyPI](https://img.shields.io/pypi/v/chia_rs?logo=pypi)
+![PyPI - Format](https://img.shields.io/pypi/format/chia_rs?logo=pypi)
+![GitHub](https://img.shields.io/github/license/Chia-Network/chia_rs?logo=Github)
 [![Coverage Status](https://coveralls.io/repos/github/Chia-Network/chia_rs/badge.svg?branch=main)](https://coveralls.io/github/Chia-Network/chia_rs?branch=main)
 
 This cargo workspace contains code useful for working with the Chia network.
