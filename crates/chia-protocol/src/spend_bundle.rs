@@ -58,7 +58,7 @@ impl SpendBundle {
                 return Err(EvalErr(a.nil(), "cost exceeded".to_string()));
             }
             cost_left -= cost;
-            let parent_coin_info: Bytes32 = cs.coin.coin_id().into();
+            let parent_coin_info: Bytes32 = cs.coin.coin_id();
 
             while let Some((c, tail)) = a.next(conds) {
                 conds = tail;
@@ -216,7 +216,7 @@ ff01\
             let additions = bundle.additions().expect("additions");
 
             let new_coin = Coin::new(
-                test_coin.coin_id().into(),
+                test_coin.coin_id(),
                 hex::decode("2222222222222222222222222222222222222222222222222222222222222222")
                     .unwrap()
                     .try_into()

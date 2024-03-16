@@ -49,7 +49,7 @@ fn main() {
     };
 
     let new_coin = Coin {
-        parent_coin_info: new_parent_coin.coin_id().into(),
+        parent_coin_info: new_parent_coin.coin_id(),
         puzzle_hash,
         amount: spend.coin.amount,
     };

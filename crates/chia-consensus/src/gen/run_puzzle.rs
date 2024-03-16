@@ -45,8 +45,7 @@ pub fn run_puzzle<V: SpendVisitor>(
             puzzle_hash: puzzle_hash.into(),
             amount,
         }
-        .coin_id()
-        .into(),
+        .coin_id(),
     );
 
     let mut spend = Spend::new(

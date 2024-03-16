@@ -17,7 +17,7 @@ pub struct Coin {
 }
 
 impl Coin {
-    pub fn coin_id(&self) -> [u8; 32] {
+    pub fn coin_id(&self) -> Bytes32 {
         let mut hasher = Sha256::new();
         hasher.update(self.parent_coin_info);
         hasher.update(self.puzzle_hash);
@@ -41,7 +41,8 @@ impl Coin {
             hasher.update(&amount_bytes[start..]);
         }
 
-        hasher.finalize().as_slice().try_into().unwrap()
+        let coin_id: [u8; 32] = hasher.finalize().as_slice().try_into().unwrap();
+        Bytes32::new(coin_id)
     }
 }
 
@@ -110,7 +111,7 @@ mod tests {
         sha256.update(parent_coin);
         sha256.update(puzzle_hash);
         sha256.update(bytes);
-        assert_eq!(c.coin_id(), &sha256.finalize() as &[u8]);
+        assert_eq!(c.coin_id().to_bytes(), &sha256.finalize() as &[u8]);
     }
 
     #[test]
