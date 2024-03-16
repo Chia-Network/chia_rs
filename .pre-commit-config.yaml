@@ -33,7 +33,7 @@ repos:
         name: build benchmarks
         description: run cargo bench on the workspace
         stages: [pre-push]
-        entry: cargo bench --no-run --workspace
+        entry: cargo bench --no-run --workspace --profile dev
         language: system
         pass_filenames: false
       - id: tests
