@@ -34,8 +34,7 @@ fuzz_target!(|data: &[u8]| {
             puzzle_hash: puzzle_hash.into(),
             amount,
         }
-        .coin_id()
-        .into(),
+        .coin_id(),
     );
     let parent_id = a.new_atom(&parent_id).expect("atom failed");
     let puzzle_hash = a.new_atom(&puzzle_hash).expect("atom failed");

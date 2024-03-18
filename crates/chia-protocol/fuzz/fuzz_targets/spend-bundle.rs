@@ -31,7 +31,7 @@ fuzz_target!(|data: &[u8]| {
             .expect("run");
         total_cost += cost;
 
-        let parent_coin_info: Bytes32 = cs.coin.coin_id().into();
+        let parent_coin_info = cs.coin.coin_id();
 
         while let Some((c, tail)) = a.next(conds) {
             conds = tail;

@@ -141,7 +141,7 @@ pub fn fast_forward_singleton(
         amount: new_solution.lineage_proof.parent_amount,
     };
 
-    if parent_coin.coin_id() != *coin.parent_coin_info {
+    if parent_coin.coin_id() != coin.parent_coin_info {
         return Err(Error::ParentCoinMismatch);
     }
 
@@ -166,7 +166,7 @@ pub fn fast_forward_singleton(
 
     let expected_new_parent = new_parent.coin_id();
 
-    if *new_coin.parent_coin_info != expected_new_parent {
+    if new_coin.parent_coin_info != expected_new_parent {
         return Err(Error::CoinMismatch);
     }
 
@@ -224,7 +224,7 @@ mod tests {
         };
 
         let new_coin = Coin {
-            parent_coin_info: new_parent_coin.coin_id().into(),
+            parent_coin_info: new_parent_coin.coin_id(),
             puzzle_hash,
             amount: if new_amount == 0 {
                 spend.coin.amount
@@ -292,7 +292,7 @@ mod tests {
         };
 
         let mut new_coin = Coin {
-            parent_coin_info: new_parent_coin.coin_id().into(),
+            parent_coin_info: new_parent_coin.coin_id(),
             puzzle_hash,
             amount: spend.coin.amount,
         };
@@ -463,7 +463,7 @@ mod tests {
 
                 new_coin.puzzle_hash = parent_puzzle_hash;
 
-                coin.parent_coin_info = new_parent.coin_id().into();
+                coin.parent_coin_info = new_parent.coin_id();
                 coin.puzzle_hash = parent_puzzle_hash;
             },
             Error::InnerPuzzleHashMismatch,

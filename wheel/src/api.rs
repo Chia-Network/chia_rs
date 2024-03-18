@@ -283,7 +283,7 @@ fn supports_fast_forward(spend: &CoinSpend) -> bool {
         amount: spend.coin.amount,
     };
     let new_coin = Coin {
-        parent_coin_info: new_parent.coin_id().into(),
+        parent_coin_info: new_parent.coin_id(),
         puzzle_hash: spend.coin.puzzle_hash,
         amount: spend.coin.amount,
     };
