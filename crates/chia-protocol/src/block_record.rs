@@ -134,7 +134,7 @@ impl BlockRecord {
             None,
             Some(ctx),
         )?;
-        ctx.get_item("ret").unwrap().extract::<u64>()
+        ctx.get_item("ret").unwrap().unwrap().extract::<u64>()
     }
 
     fn ip_iters_impl(&self, py: Python, constants: &PyAny) -> PyResult<u64> {
@@ -149,7 +149,7 @@ impl BlockRecord {
             None,
             Some(ctx),
             )?;
-        ctx.get_item("ret").unwrap().extract::<u64>()
+        ctx.get_item("ret").unwrap().unwrap().extract::<u64>()
     }
 
     fn sp_total_iters_impl(&self, py: Python, constants: &PyAny) -> PyResult<u128> {

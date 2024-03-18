@@ -17,7 +17,7 @@ chia-bls = ["dep:chia-bls"]
 py-bindings = ["dep:pyo3"]
 
 [dependencies]
-pyo3 = { version = ">=0.19.0", optional = true }
+pyo3 = { version = "0.20.3", optional = true }
 clvmr = "0.6.1"
 clvm-derive = { version = "0.5.2", path = "../clvm-derive", optional = true }
 chia-bls = { version = "0.5.1", path = "../chia-bls", optional = true }
