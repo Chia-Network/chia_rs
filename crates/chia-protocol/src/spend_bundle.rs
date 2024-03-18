@@ -3,7 +3,6 @@ use crate::Bytes32;
 use crate::Coin;
 use chia_bls::G2Element;
 use chia_streamable_macro::streamable;
-use chia_streamable_macro::Streamable;
 use chia_traits::Streamable;
 use clvm_traits::FromClvm;
 use clvmr::allocator::{NodePtr, SExp};

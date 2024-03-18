@@ -1,6 +1,6 @@
-use crate::Bytes32;
 use chia_streamable_macro::streamable;
-use chia_streamable_macro::Streamable;
+
+use crate::Bytes32;
 
 #[streamable]
 pub struct SubEpochSummary {

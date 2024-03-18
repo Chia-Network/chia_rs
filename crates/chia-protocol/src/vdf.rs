@@ -1,4 +1,4 @@
-use chia_streamable_macro::{streamable, Streamable};
+use chia_streamable_macro::streamable;
 
 use crate::ClassgroupElement;
 use crate::{Bytes, Bytes32};

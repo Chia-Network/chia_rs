@@ -1,5 +1,4 @@
 use chia_streamable_macro::streamable;
-use chia_streamable_macro::Streamable;
 
 use crate::EndOfSubSlotBundle;
 use crate::FullBlock;
