@@ -1,34 +1,31 @@
-use std::time::Instant;
+use std::{collections::HashMap, sync::Arc, time::Instant};
 
-use chia_protocol::{Bytes32, Coin, FullBlock, Program};
-use clvmr::{NodePtr, ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV, MEMPOOL_MODE};
+use chia_protocol::{BlockRecord, Bytes32, Coin, FullBlock, Program};
+use clvmr::NodePtr;
 
 use crate::{
-    allocator::make_allocator,
+    block_validation::{
+        header_validation::{get_header_block, validate_header_block, HeaderValidationOptions},
+        npc::get_npc,
+    },
     consensus_constants::ConsensusConstants,
     gen::{
-        conditions::{EmptyVisitor, MempoolVisitor, SpendBundleConditions},
-        flags::{
-            AGG_SIG_ARGS, ALLOW_BACKREFS, ANALYZE_SPENDS, ENABLE_SOFTFORK_CONDITION,
-            NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
-        },
-        run_block_generator::{run_block_generator, run_block_generator2},
+        conditions::SpendBundleConditions,
         validation_error::{ErrorCode, ValidationErr},
     },
 };
 
-pub type NpcResult = Result<SpendBundleConditions, ValidationErr>;
+use self::npc::NpcResult;
 
-pub struct BlockValidationOptions {
+mod header_validation;
+mod npc;
+mod unfinished_header_validation;
+
+pub struct PreValidationOptions {
     pub check_filter: bool,
     pub expected_difficulty: u64,
     pub expected_sub_slot_iters: u64,
     pub validate_signatures: bool,
-}
-
-pub struct BlockGenerator {
-    pub program: Program,
-    pub generator_refs: Vec<Program>,
 }
 
 pub struct PreValidationResult {
@@ -46,6 +43,11 @@ pub struct PreValidationResult {
 
     /// The time (in milliseconds) it took to pre-validate the block.
     pub timing: u32,
+}
+
+pub struct BlockGenerator {
+    pub program: Program,
+    pub generator_refs: Vec<Program>,
 }
 
 macro_rules! validate {
@@ -68,77 +70,6 @@ macro_rules! validation_err {
     };
 }
 
-pub fn flags_for_height(height: u32, constants: &ConsensusConstants) -> u32 {
-    let mut flags = 0;
-
-    if height >= constants.soft_fork2_height {
-        flags |= NO_RELATIVE_CONDITIONS_ON_EPHEMERAL;
-    }
-
-    if height >= constants.hard_fork_height {
-        // The hard-fork initiated with 2.0. To activate June 2024
-        // * Costs are ascribed to some unknown condition codes, to allow for
-        //    soft-forking in new conditions with cost
-        // * A new condition, SOFTFORK, is added which takes a first parameter to
-        //   specify its cost. This allows soft-forks similar to the softfork
-        //   operator
-        // * BLS operators introduced in the soft-fork (behind the softfork
-        //   guard) are made available outside of the guard.
-        // * Division with negative numbers are allowed, and round toward
-        //   negative infinity
-        // * AGG_SIG_* conditions are allowed to have unknown additional
-        //   arguments
-        // * Allow the block generator to be serialized with the improved clvm
-        //   serialization format (with back-references)
-        flags = flags
-            | ENABLE_SOFTFORK_CONDITION
-            | ENABLE_BLS_OPS_OUTSIDE_GUARD
-            | ENABLE_FIXED_DIV
-            | AGG_SIG_ARGS
-            | ALLOW_BACKREFS;
-    }
-
-    flags
-}
-
-pub fn get_npc(
-    generator: BlockGenerator,
-    max_cost: u64,
-    mempool_mode: bool,
-    height: u32,
-    constants: &ConsensusConstants,
-) -> NpcResult {
-    let mut flags = flags_for_height(height, constants);
-
-    if mempool_mode {
-        flags |= MEMPOOL_MODE;
-    }
-
-    let analyze_spends = (flags & ANALYZE_SPENDS) != 0;
-
-    let run_block = if height >= constants.hard_fork_fix_height {
-        if analyze_spends {
-            run_block_generator2::<Program, MempoolVisitor>
-        } else {
-            run_block_generator2::<Program, EmptyVisitor>
-        }
-    } else if analyze_spends {
-        run_block_generator::<Program, MempoolVisitor>
-    } else {
-        run_block_generator::<Program, EmptyVisitor>
-    };
-
-    let mut allocator = make_allocator(flags);
-
-    run_block(
-        &mut allocator,
-        &generator.program,
-        &generator.generator_refs,
-        max_cost,
-        flags,
-    )
-}
-
 pub fn removals_and_additions(conditions: &SpendBundleConditions) -> (Vec<Bytes32>, Vec<Coin>) {
     let mut removals = Vec::new();
     let mut additions = Vec::new();
@@ -159,10 +90,11 @@ pub fn removals_and_additions(conditions: &SpendBundleConditions) -> (Vec<Bytes3
 
 pub fn pre_validate_block(
     block: FullBlock,
+    blocks: Arc<HashMap<Bytes32, BlockRecord>>,
     prev_generator: Option<BlockGenerator>,
     mut npc_result: Option<NpcResult>,
     constants: &ConsensusConstants,
-    options: &BlockValidationOptions,
+    options: &PreValidationOptions,
 ) -> PreValidationResult {
     let start_time = Instant::now();
 
@@ -205,6 +137,17 @@ pub fn pre_validate_block(
     } else {
         Default::default()
     };
+
+    let header_block = get_header_block(block, additions, removals);
+
+    let header_options = HeaderValidationOptions {
+        check_filter: options.check_filter,
+        expected_difficulty: options.expected_difficulty,
+        expected_sub_slot_iters: options.expected_sub_slot_iters,
+        check_sub_epoch_summary: true,
+    };
+
+    let result = validate_header_block(header_block, blocks, constants, &header_options);
 
     todo!()
 }
