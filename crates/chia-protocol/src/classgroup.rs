@@ -1,5 +1,5 @@
 use crate::Bytes100;
-use chia_streamable_macro::{streamable, Streamable};
+use chia_streamable_macro::streamable;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;

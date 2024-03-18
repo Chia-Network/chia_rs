@@ -90,7 +90,7 @@ pub fn streamable(attr: TokenStream, item: TokenStream) -> TokenStream {
     }
 
     let main_derives = quote! {
-        #[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
+        #[derive(chia_streamable_macro::Streamable, Hash, Debug, Clone, Eq, PartialEq)]
     };
 
     // If you're calling the macro from `chia-protocol`, enable Python bindings and fuzzing conditionally.

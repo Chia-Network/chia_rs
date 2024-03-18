@@ -1,5 +1,5 @@
 use crate::coin::Coin;
-use chia_streamable_macro::{streamable, Streamable};
+use chia_streamable_macro::streamable;
 
 #[streamable]
 pub struct CoinState {
