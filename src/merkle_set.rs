@@ -335,12 +335,16 @@ impl MerkleTreeData {
 
     #[staticmethod]
     #[pyo3(name = "check_proof")]
-    pub fn py_check_proof(proof: &PyList) -> MerkleTreeData {
+    pub fn py_check_proof(proof: &PyList) -> PyResult<MerkleTreeData> {
         let mut proof_vec = Vec::new();
         for p in proof {
             proof_vec.push(p.extract::<u8>().unwrap());
         }
-        return deserialize_proof(&proof_vec: &Vec<u8>);
+        let result = deserialize_proof(&proof_vec);
+        match result {
+            Ok(_) => Ok(result.unwrap()),
+            Err(_) =>  Err(exceptions::PyValueError::new_err("Error in proof"))
+        }
     }
 }
 
