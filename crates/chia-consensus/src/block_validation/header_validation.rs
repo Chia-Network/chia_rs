@@ -1,8 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use chia_protocol::{
-    BlockRecord, Bytes, Bytes32, Coin, FullBlock, HeaderBlock, UnfinishedHeaderBlock,
-};
+use chia_protocol::{BlockRecord, Bytes, Bytes32, Coin, FullBlock, HeaderBlock};
 use chiabip158::Bip158Filter;
 
 use crate::{
@@ -10,7 +8,7 @@ use crate::{
         validate_unfinished_header_block, UnfinishedHeaderValidationOptions,
     },
     consensus_constants::ConsensusConstants,
-    gen::validation_error::ValidationErr,
+    gen::validation_error::ErrorCode,
 };
 
 pub fn get_header_block(
@@ -63,7 +61,7 @@ pub fn validate_header_block(
     blocks: Arc<HashMap<Bytes32, BlockRecord>>,
     constants: &ConsensusConstants,
     options: &HeaderValidationOptions,
-) -> Result<u64, ValidationErr> {
+) -> Result<u64, ErrorCode> {
     let unfinished_header_block = header_block.into_unfinished_header_block();
 
     let unfinished_options = UnfinishedHeaderValidationOptions {

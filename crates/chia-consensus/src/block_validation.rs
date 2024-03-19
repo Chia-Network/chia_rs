@@ -19,6 +19,7 @@ use self::npc::NpcResult;
 
 mod header_validation;
 mod npc;
+mod pot_iterations;
 mod unfinished_header_validation;
 
 pub struct PreValidationOptions {

@@ -53,6 +53,7 @@ pub enum ErrorCode {
     InvalidSoftforkCondition,
     InvalidSoftforkCost,
     TooManyAnnouncements,
+    InvalidPrevBlockHash,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
@@ -139,6 +140,7 @@ impl From<ErrorCode> for u32 {
             ErrorCode::InvalidSoftforkCondition => 142,
             ErrorCode::InvalidSoftforkCost => 143,
             ErrorCode::TooManyAnnouncements => 144,
+            ErrorCode::InvalidPrevBlockHash => 51,
         }
     }
 }
