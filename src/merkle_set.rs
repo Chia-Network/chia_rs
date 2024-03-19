@@ -3,6 +3,10 @@ pub use self::small::SmallRng;
 use clvmr::sha2::{Digest, Sha256};
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
+#[cfg(feature = "py-bindings")]
+use pyo3::{pyclass, pymethods, IntoPy, PyAny, PyObject, PyResult, Python, PyErr};
+use pyo3::exceptions;
+use pyo3::types::PyList;
 
 fn get_bit(val: &[u8; 32], bit: u8) -> u8 {
     ((val[(bit / 8) as usize] & (0x80 >> (bit & 7))) != 0).into()
@@ -34,6 +38,7 @@ pub enum ArrayTypes {
 
 // represents a MerkleTree by putting all the nodes in a vec. Root is the last entry.
 #[derive(PartialEq, Debug, Clone)]
+#[pyclass]
 pub struct MerkleTreeData {
     nodes_vec: Vec<ArrayTypes>,
     leaf_vec: Vec<[u8; 32]>,
@@ -45,6 +50,7 @@ const TERMINAL: u8 = 1;
 const TRUNCATED: u8 = 2;
 const MIDDLE: u8 = 3;
 #[derive(Debug)]
+#[pyclass]
 pub struct SetError;
 
 pub fn deserialize_proof(proof: &Vec<u8>) -> Result<MerkleTreeData, SetError> {
@@ -303,6 +309,38 @@ impl MerkleTreeData {
             ArrayTypes::Empty { .. } => BLANK,
             ArrayTypes::Truncated => return self.hash_cache[node_index],
         }
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+impl MerkleTreeData {
+    #[new]
+    pub fn init(leafs: &PyList) -> Self {
+        let mut data = Vec::new();
+        for leaf in leafs {
+            data.push(leaf.extract::<[u8;32]>().unwrap())
+        }
+        generate_merkle_tree(&mut data[..]).1
+    }
+
+    #[pyo3(name = "generate_proof")]
+    pub fn py_generate_proof(&self, to_check: [u8; 32]) -> PyResult<(bool, Vec<u8>)> {
+        let result = self.generate_proof(to_check);
+        match result {
+            Ok(_) => Ok(result.unwrap()),
+            Err(_) =>  Err(exceptions::PyValueError::new_err("Unable to find proof"))
+        }
+    }
+
+    #[staticmethod]
+    #[pyo3(name = "check_proof")]
+    pub fn py_check_proof(proof: &PyList) -> MerkleTreeData {
+        let mut proof_vec = Vec::new();
+        for p in proof {
+            proof_vec.push(p.extract::<u8>().unwrap());
+        }
+        return deserialize_proof(&proof_vec: &Vec<u8>);
     }
 }
 
