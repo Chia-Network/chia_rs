@@ -4,6 +4,7 @@ use crate::Bytes;
 use crate::Bytes32;
 use crate::EndOfSubSlotBundle;
 use crate::RewardChainBlock;
+use crate::UnfinishedHeaderBlock;
 use crate::VDFProof;
 use crate::{Foliage, FoliageTransactionBlock, TransactionsInfo};
 use chia_traits::Streamable;
@@ -71,6 +72,18 @@ impl HeaderBlock {
 
     pub fn first_in_sub_slot(&self) -> bool {
         !self.finished_sub_slots.is_empty()
+    }
+
+    pub fn into_unfinished_header_block(self) -> UnfinishedHeaderBlock {
+        UnfinishedHeaderBlock {
+            finished_sub_slots: self.finished_sub_slots,
+            reward_chain_block: self.reward_chain_block.get_unfinished(),
+            challenge_chain_sp_proof: self.challenge_chain_sp_proof,
+            reward_chain_sp_proof: self.reward_chain_sp_proof,
+            foliage: self.foliage,
+            foliage_transaction_block: self.foliage_transaction_block,
+            transactions_filter: self.transactions_filter,
+        }
     }
 }
 

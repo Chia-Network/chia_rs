@@ -6,7 +6,9 @@ use thiserror::Error;
 use pyo3::PyErr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ErrorCode {
+    Unknown,
     GeneratorRuntimeError,
     NegativeAmount,
     AmountExceedsMaximum,
@@ -51,6 +53,7 @@ pub enum ErrorCode {
     InvalidSoftforkCondition,
     InvalidSoftforkCost,
     TooManyAnnouncements,
+    InvalidPrevBlockHash,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
@@ -92,6 +95,7 @@ pub fn first(a: &Allocator, n: NodePtr) -> Result<NodePtr, ValidationErr> {
 impl From<ErrorCode> for u32 {
     fn from(err: ErrorCode) -> u32 {
         match err {
+            ErrorCode::Unknown => 1,
             ErrorCode::GeneratorRuntimeError => 117,
             ErrorCode::NegativeAmount => 124,
             ErrorCode::AmountExceedsMaximum => 16,
@@ -136,6 +140,7 @@ impl From<ErrorCode> for u32 {
             ErrorCode::InvalidSoftforkCondition => 142,
             ErrorCode::InvalidSoftforkCost => 143,
             ErrorCode::TooManyAnnouncements => 144,
+            ErrorCode::InvalidPrevBlockHash => 51,
         }
     }
 }
