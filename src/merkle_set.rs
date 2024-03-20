@@ -1,11 +1,12 @@
-#[cfg(feature = "small_rng")]
-pub use self::small::SmallRng;
+
 use clvmr::sha2::{Digest, Sha256};
-use rand::rngs::SmallRng;
+use rand::rngs::SmallRng;  // cargo says this isn't required but tests won't run without it
 use rand::{Rng, SeedableRng};
 #[cfg(feature = "py-bindings")]
-use pyo3::{pyclass, pymethods, IntoPy, PyAny, PyObject, PyResult, Python, PyErr};
+use pyo3::{pyclass, pymethods, PyResult};
+#[cfg(feature = "py-bindings")]
 use pyo3::exceptions;
+#[cfg(feature = "py-bindings")]
 use pyo3::types::PyList;
 
 fn get_bit(val: &[u8; 32], bit: u8) -> u8 {
@@ -38,7 +39,10 @@ pub enum ArrayTypes {
 
 // represents a MerkleTree by putting all the nodes in a vec. Root is the last entry.
 #[derive(PartialEq, Debug, Clone)]
-#[pyclass]
+#[cfg_attr(
+    feature = "py-bindings",
+    pyclass(frozen, name = "MerkleSet"),
+)]
 pub struct MerkleTreeData {
     nodes_vec: Vec<ArrayTypes>,
     leaf_vec: Vec<[u8; 32]>,
@@ -50,10 +54,13 @@ const TERMINAL: u8 = 1;
 const TRUNCATED: u8 = 2;
 const MIDDLE: u8 = 3;
 #[derive(Debug)]
-#[pyclass]
+#[cfg_attr(
+    feature = "py-bindings",
+    pyclass(frozen, name = "SetError"),
+)]
 pub struct SetError;
 
-pub fn deserialize_proof(proof: &Vec<u8>) -> Result<MerkleTreeData, SetError> {
+pub fn deserialize_proof(proof: &[u8]) -> Result<MerkleTreeData, SetError> {
     let mut merkle_tree: MerkleTreeData = MerkleTreeData {
         nodes_vec: Vec::new(),
         leaf_vec: Vec::new(),
@@ -70,7 +77,7 @@ pub fn deserialize_proof(proof: &Vec<u8>) -> Result<MerkleTreeData, SetError> {
 fn _deserialize(
     proof: &[u8],
     pos: usize,
-    bits: &mut Vec<u8>,
+    bits: &mut [u8],
     merkle_tree: &mut MerkleTreeData,
 ) -> Result<usize, SetError> {
     if let Some(&t) = proof.get(pos) {
@@ -88,7 +95,7 @@ fn _deserialize(
                 //     return Err(SetError)
                 // }
                 // }
-                merkle_tree.leaf_vec.push(hash.clone());
+                merkle_tree.leaf_vec.push(hash);
                 merkle_tree.nodes_vec.push(ArrayTypes::Leaf {
                     data: merkle_tree.leaf_vec.len() - 1,
                 });
@@ -102,11 +109,11 @@ fn _deserialize(
                 Ok(pos + 33)
             }
             MIDDLE => {
-                let mut left_bits = bits.clone();
+                let mut left_bits = bits.to_owned();
                 left_bits.push(0);
                 let new_pos = _deserialize(proof, pos + 1, &mut left_bits, merkle_tree)?;
                 let left_pointer = merkle_tree.nodes_vec.len() - 1;
-                let mut right_bits = bits.clone();
+                let mut right_bits = bits.to_owned();
                 right_bits.push(1);
                 let final_pos = _deserialize(proof, new_pos, &mut right_bits, merkle_tree)?;
                 let right_pointer = merkle_tree.nodes_vec.len() - 1;
@@ -121,7 +128,7 @@ fn _deserialize(
                     &merkle_tree.hash_cache[left_pointer],
                     &merkle_tree.hash_cache[right_pointer],
                 );
-                merkle_tree.hash_cache.push(node_hash.clone());
+                merkle_tree.hash_cache.push(node_hash);
                 Ok(final_pos)
             }
             _ => Err(SetError),
@@ -139,7 +146,7 @@ impl MerkleTreeData {
     pub fn generate_proof(&self, to_check: [u8; 32]) -> Result<(bool, Vec<u8>), SetError> {
         let mut proof = Vec::new();
         let r = self.is_included(self.nodes_vec.len() - 1, to_check, &mut proof, 0)?;
-        return Ok((r, proof));
+        Ok((r, proof))
     }
 
     pub fn is_included(
@@ -159,7 +166,7 @@ impl MerkleTreeData {
                 for byte in self.leaf_vec[data] {
                     proof.push(byte);
                 }
-                return Ok(self.leaf_vec[data] == to_check);
+                Ok(self.leaf_vec[data] == to_check)
             }
             ArrayTypes::Middle { children } => {
                 proof.push(MIDDLE);
@@ -196,7 +203,7 @@ impl MerkleTreeData {
                         depth + 1,
                         matches!(self.nodes_vec[children.0], ArrayTypes::Empty),
                     )?;
-                    return Ok(r);
+                    Ok(r)
                 } else {
                     self.other_included(
                         children.0,
@@ -205,7 +212,7 @@ impl MerkleTreeData {
                         depth + 1,
                         matches!(self.nodes_vec[children.1], ArrayTypes::Empty),
                     )?;
-                    return self.is_included(children.1, to_check, proof, depth + 1);
+                    self.is_included(children.1, to_check, proof, depth + 1)
                 }
             }
             ArrayTypes::Truncated {} => Err(SetError),
@@ -223,7 +230,7 @@ impl MerkleTreeData {
         match self.nodes_vec[current_node_index] {
             ArrayTypes::Empty => {
                 proof.push(EMPTY);
-                return Ok(());
+                Ok(())
             }
             ArrayTypes::Middle { .. } => {
                 if collapse || !self.is_double(current_node_index)? {
@@ -258,9 +265,9 @@ impl MerkleTreeData {
     fn is_double(&self, node_index: usize) -> Result<bool, SetError> {
         if let ArrayTypes::Middle { children } = self.nodes_vec[node_index] {
             if matches!(self.nodes_vec[children.0], ArrayTypes::Empty) {
-                return self.is_double(children.1);
+                self.is_double(children.1)
             } else if matches!(self.nodes_vec[children.1], ArrayTypes::Empty) {
-                return self.is_double(children.0);
+                self.is_double(children.0)
             } else {
                 return Ok(
                     matches!(self.nodes_vec[children.0], ArrayTypes::Leaf { .. })
@@ -307,7 +314,7 @@ impl MerkleTreeData {
                 )
             }
             ArrayTypes::Empty { .. } => BLANK,
-            ArrayTypes::Truncated => return self.hash_cache[node_index],
+            ArrayTypes::Truncated => self.hash_cache[node_index],
         }
     }
 }
@@ -316,33 +323,38 @@ impl MerkleTreeData {
 #[pymethods]
 impl MerkleTreeData {
     #[new]
-    pub fn init(leafs: &PyList) -> Self {
-        let mut data = Vec::new();
+    pub fn init(leafs: &PyList) -> PyResult<Self> {
+        // TODO: instantiate Vec with length of PyList
+        // TODO: use .map_err()
+        // TODO: cargo clippy
+        let mut data: Vec<[u8; 32]> = Vec::with_capacity(leafs.len());
+        
         for leaf in leafs {
             data.push(leaf.extract::<[u8;32]>().unwrap())
         }
-        generate_merkle_tree(&mut data[..]).1
+        Ok(generate_merkle_tree(&mut data[..]).1)
     }
 
     #[pyo3(name = "generate_proof")]
     pub fn py_generate_proof(&self, to_check: [u8; 32]) -> PyResult<(bool, Vec<u8>)> {
         let result = self.generate_proof(to_check);
-        match result {
-            Ok(_) => Ok(result.unwrap()),
-            Err(_) =>  Err(exceptions::PyValueError::new_err("Unable to find proof"))
-        }
+        result.map_err(|_| exceptions::PyValueError::new_err("Unable to find proof"))
+        // match result {
+        //     Ok(r) => Ok(r),
+        //     Err(_) =>  Err(exceptions::PyValueError::new_err("Unable to find proof"))
+        // }
     }
 
     #[staticmethod]
     #[pyo3(name = "check_proof")]
     pub fn py_check_proof(proof: &PyList) -> PyResult<MerkleTreeData> {
-        let mut proof_vec = Vec::new();
+        let mut proof_vec = Vec::with_capacity(proof.len());;
         for p in proof {
             proof_vec.push(p.extract::<u8>().unwrap());
         }
         let result = deserialize_proof(&proof_vec);
         match result {
-            Ok(_) => Ok(result.unwrap()),
+            Ok(r) => Ok(r),
             Err(_) =>  Err(exceptions::PyValueError::new_err("Error in proof"))
         }
     }
@@ -554,7 +566,7 @@ pub fn generate_merkle_tree(leafs: &mut [[u8; 32]]) -> ([u8; 32], MerkleTreeData
             hasher.update([NodeType::Term as u8]);
             hasher.update(hash);
             let root: [u8; 32] = hasher.finalize().into();
-            merkle_tree.hash_cache.push(root.clone());
+            merkle_tree.hash_cache.push(root);
             (root, merkle_tree)
         }
         (hash, NodeType::Mid) => (hash, merkle_tree),
@@ -576,10 +588,10 @@ fn generate_merkle_tree_recurse(
         merkle_tree.nodes_vec.push(ArrayTypes::Leaf {
             data: merkle_tree.leaf_vec.len(),
         });
-        merkle_tree.leaf_vec.push(range[0].clone());
+        merkle_tree.leaf_vec.push(range[0]);
         let mut hasher = Sha256::new();
         hasher.update([NodeType::Term as u8]);
-        hasher.update(range[0].clone());
+        hasher.update(range[0]);
         merkle_tree.hash_cache.push(hasher.finalize().into());
         return (range[0], NodeType::Term);
     }
@@ -629,10 +641,10 @@ fn generate_merkle_tree_recurse(
             merkle_tree.nodes_vec.push(ArrayTypes::Leaf {
                 data: merkle_tree.leaf_vec.len(),
             });
-            merkle_tree.leaf_vec.push(range[0].clone());
+            merkle_tree.leaf_vec.push(range[0]);
             let mut hasher = Sha256::new();
             hasher.update([NodeType::Term as u8]);
-            hasher.update(range[0].clone());
+            hasher.update(range[0]);
             merkle_tree.hash_cache.push(hasher.finalize().into());
             (range[0], NodeType::Term)
         } else {
@@ -656,14 +668,14 @@ fn generate_merkle_tree_recurse(
                         children: (node_length - 1, node_length - 2),
                     });
                     let node_hash = hash(NodeType::Empty, child_type, &BLANK, &child_hash);
-                    merkle_tree.hash_cache.push(node_hash.clone());
+                    merkle_tree.hash_cache.push(node_hash);
                     (node_hash, NodeType::Mid)
                 } else {
                     merkle_tree.nodes_vec.push(ArrayTypes::Middle {
                         children: (node_length - 2, node_length - 1),
                     });
                     let node_hash = hash(child_type, NodeType::Empty, &child_hash, &BLANK);
-                    merkle_tree.hash_cache.push(node_hash.clone());
+                    merkle_tree.hash_cache.push(node_hash);
                     (node_hash, NodeType::Mid)
                 }
             } else {
@@ -681,19 +693,19 @@ fn generate_merkle_tree_recurse(
         merkle_tree.nodes_vec.push(ArrayTypes::Leaf {
             data: merkle_tree.leaf_vec.len(),
         });
-        merkle_tree.leaf_vec.push(range[0].clone());
+        merkle_tree.leaf_vec.push(range[0]);
         let mut hasher = Sha256::new();
         hasher.update([NodeType::Term as u8]);
-        hasher.update(range[0].clone());
+        hasher.update(range[0]);
         merkle_tree.hash_cache.push(hasher.finalize().into());
 
         merkle_tree.nodes_vec.push(ArrayTypes::Leaf {
             data: merkle_tree.leaf_vec.len(),
         });
-        merkle_tree.leaf_vec.push(range[left as usize].clone());
+        merkle_tree.leaf_vec.push(range[left as usize]);
         let mut hasher = Sha256::new();
         hasher.update([NodeType::Term as u8]);
-        hasher.update(range[left as usize].clone());
+        hasher.update(range[left as usize]);
         merkle_tree.hash_cache.push(hasher.finalize().into());
 
         let nodes_len = merkle_tree.nodes_vec.len();
@@ -706,7 +718,7 @@ fn generate_merkle_tree_recurse(
             &range[0],
             &range[left as usize],
         );
-        merkle_tree.hash_cache.push(node_hash.clone());
+        merkle_tree.hash_cache.push(node_hash);
         (node_hash, NodeType::MidDbl)
     } else {
         // we are a middle node
