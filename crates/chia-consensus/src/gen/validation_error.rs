@@ -51,6 +51,9 @@ pub enum ErrorCode {
     InvalidSoftforkCondition,
     InvalidSoftforkCost,
     TooManyAnnouncements,
+    InvalidMessageMode,
+    InvalidCoinId,
+    MessageNotSentOrReceived,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
@@ -136,6 +139,9 @@ impl From<ErrorCode> for u32 {
             ErrorCode::InvalidSoftforkCondition => 142,
             ErrorCode::InvalidSoftforkCost => 143,
             ErrorCode::TooManyAnnouncements => 144,
+            ErrorCode::InvalidMessageMode => 145,
+            ErrorCode::InvalidCoinId => 146,
+            ErrorCode::MessageNotSentOrReceived => 147,
         }
     }
 }

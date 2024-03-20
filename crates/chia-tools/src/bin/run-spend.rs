@@ -115,6 +115,12 @@ impl DebugPrint for Condition {
             Self::AssertBeforeHeightAbsolute(h) => format!("ASSERT_BEFORE_HEIGHT_ABSOLUTE {h}"),
             Self::AssertEphemeral => "ASSERT_EPHEMERAL".to_string(),
             Self::Softfork(cost) => format!("SOFTFORK {cost}"),
+            Self::SendMessage(src, dst, msg) => {
+                format!("SEND_MESSAGE {src:?} {dst:?} {}", msg.debug_print(a))
+            }
+            Self::ReceiveMessage(src, dst, msg) => {
+                format!("RECEIVE_MESSAGE {src:?} {dst:?} {}", msg.debug_print(a))
+            }
             Self::Skip => "[Skip] REMARK ...".to_string(),
             Self::SkipRelativeCondition => "[SkipRelativeCondition]".to_string(),
         }
