@@ -3,13 +3,15 @@ from chia.util.ints import uint64
 import pytest
 from typing import List
 
+
 def test_instantiation() -> None:
     bls_cache = BLSCache.generator()
     assert bls_cache.len() == 0
     assert BLSCache is not None
-    seed: bytes = bytes([0,  50, 6,  244, 24,  199, 1,  25,  52,  88,  192,
-                        19, 18, 12, 89,  6,   220, 18, 102, 58,  209, 82,
-                        12, 62, 89, 110, 182, 9,   44, 20,  254, 22])
+    seed: bytes = bytes.fromhex(
+        "003206f418c701193458c013120c5906dc12663ad1520c3e596eb6092c14fe16"
+    )
+
     sk: PrivateKey = AugSchemeMPL.key_gen(seed)
     pk: G1Element = sk.get_g1()
     msg = b"hello"
@@ -23,21 +25,23 @@ def test_instantiation() -> None:
     assert result
     assert bls_cache.len() == 1
     pks.append(pk.to_bytes())
-    
+
     msg = b"world"
     msgs.append(msg)
-    sig: G2Element = AugSchemeMPL.aggregate([sig, AugSchemeMPL.sign(sk, msg)]) 
+    sig: G2Element = AugSchemeMPL.aggregate([sig, AugSchemeMPL.sign(sk, msg)])
     result = bls_cache.aggregate_verify(pks, msgs, sig, True)
     assert result
     assert bls_cache.len() == 2
+
 
 def test_cache_limit() -> None:
     bls_cache = BLSCache.generator(3)
     assert bls_cache.len() == 0
     assert BLSCache is not None
-    seed: bytes = bytes([0,  50, 6,  244, 24,  199, 1,  25,  52,  88,  192,
-                        19, 18, 12, 89,  6,   220, 18, 102, 58,  209, 82,
-                        12, 62, 89, 110, 182, 9,   44, 20,  254, 22])
+    seed: bytes = bytes.fromhex(
+        "003206f418c701193458c013120c5906dc12663ad1520c3e596eb6092c14fe16"
+    )
+
     sk: PrivateKey = AugSchemeMPL.key_gen(seed)
     pk: G1Element = sk.get_g1()
     pks: List[bytes] = []

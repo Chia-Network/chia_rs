@@ -1,3 +1,11 @@
+// This cache is a bit weird because it's trying to account for validating
+// mempool signatures versus block signatures. When validating block signatures,
+// there's not much point in caching the pairings because we're probably not going
+// to see them again unless there's a reorg. However, a spend in the mempool
+// is likely to reappear in a block later, so we can save having to do the pairing
+// again. So caching is primarily useful after "catch-up" (fast sync?) is done and
+// we're monitoring the mempool in real-time.
+
 extern crate lru;
 use crate::aggregate_verify as agg_ver;
 use crate::gtelement::GTElement;
@@ -120,7 +128,7 @@ impl BLSCache {
                 }
                 prod == sig.pair(&PublicKey::generator())
             }
-            _ => pairings.len() == 0,
+            _ => pairings.is_empty(),
         }
     }
 }
