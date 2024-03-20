@@ -1,7 +1,7 @@
 use super::conditions::{MempoolVisitor, NewCoin, Spend, SpendBundleConditions};
 use super::run_block_generator::{run_block_generator, run_block_generator2};
 use crate::allocator::make_allocator;
-use crate::gen::flags::{ALLOW_BACKREFS, MEMPOOL_MODE};
+use crate::gen::flags::{ALLOW_BACKREFS, ENABLE_MESSAGE_CONDITIONS, MEMPOOL_MODE};
 use chia_protocol::{Bytes, Bytes48};
 use clvmr::allocator::NodePtr;
 use clvmr::Allocator;
@@ -196,6 +196,7 @@ fn print_diff(output: &str, expected: &str) {
 #[case("negative-reserve-fee")]
 #[case("recursion-pairs")]
 #[case("unknown-condition")]
+#[case("duplicate-messages")]
 fn run_generator(#[case] name: &str) {
     use std::fs::read_to_string;
 
@@ -218,7 +219,13 @@ fn run_generator(#[case] name: &str) {
         block_refs.push(hex::decode(env_hex).expect("hex decode env-file"));
     }
 
-    for (flags, expected) in zip(&[ALLOW_BACKREFS, ALLOW_BACKREFS | MEMPOOL_MODE], expected) {
+    for (flags, expected) in zip(
+        &[
+            ALLOW_BACKREFS | ENABLE_MESSAGE_CONDITIONS,
+            ALLOW_BACKREFS | MEMPOOL_MODE | ENABLE_MESSAGE_CONDITIONS,
+        ],
+        expected,
+    ) {
         println!("flags: {:x}", flags);
         let mut a = make_allocator(*flags);
         let conds = run_block_generator::<_, MempoolVisitor>(
