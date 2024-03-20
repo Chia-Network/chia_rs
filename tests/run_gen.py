@@ -21,7 +21,6 @@ def run_gen(fn: str, flags: int = 0, args: Optional[str] = None, version: int = 
         try:
             with open(args, "r") as f:
                 block_refs = [bytes.fromhex(f.read())]
-            print("using ", args)
         except OSError as e:
             pass
 
