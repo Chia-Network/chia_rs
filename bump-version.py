@@ -6,6 +6,7 @@
 import os
 import re
 import sys
+from pathlib import Path
 from typing import Callable, Set
 
 v = sys.argv[1]
@@ -24,7 +25,8 @@ our_crates = [
     "crates/chia-wallet",
     "crates/chia-client",
     "crates/chia-ssl",
-    "crates/fuzz",
+    "crates/chia-consensus",
+    "crates/chia-consensus/fuzz",
     "crates/chia-wallet/fuzz",
     "crates/clvm-utils/fuzz",
 ]
@@ -51,8 +53,8 @@ def update_cargo(name: str, crates: Set[str]) -> None:
 
             if split[0] == "version" and name in crates:
                 line = f'version = "{v}"\n'
-            elif split[0] in crates:
-                line = re.sub('version = "(>?=?)\d+\.\d+\.\d+"', f'version = "\\g<1>{v}"', line)
+            elif split[0] in crates and line.startswith(split[0] + " = "):
+                line = re.sub('version = "([>=^]?)\d+\.\d+\.\d+"', f'version = "\\g<1>{v}"', line)
             subst += line
 
     with open(f"{name}/Cargo.toml", "w") as f:
@@ -64,12 +66,14 @@ crates = crates_with_changes()
 crates.add(".")
 crates.add("chia")
 
+crate_names = set([Path(n).name for n in crates])
+
 print("bumping version of crates:")
-for c in crates:
+for c in crate_names:
     print(f" - {c}")
 
 for c in our_crates:
-    update_cargo(c, crates)
+    update_cargo(c, crate_names)
 
-update_cargo(".", crates)
-update_cargo("wheel", crates)
+update_cargo(".", crate_names)
+update_cargo("wheel", crate_names)
