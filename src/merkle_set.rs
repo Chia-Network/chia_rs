@@ -349,10 +349,12 @@ impl MerkleTreeData {
         return Python::with_gil(|py| Ok(PyBytes::new(py, &self.hash_cache[self.hash_cache.len() - 1]).into()));
     }
 
-    #[pyo3(name = "generate_proof")]
-    pub fn py_generate_proof(&self, to_check: [u8; 32]) -> PyResult<(bool, Vec<u8>)> {
-        let result = self.generate_proof(to_check);
-        result.map_err(|_| exceptions::PyValueError::new_err("Unable to find proof"))
+    #[pyo3(name = "is_included_already_hashed")]
+    pub fn py_generate_proof(&self, to_check: [u8; 32]) -> PyResult<(bool, PyObject)> {
+        let (found, proof) = self.generate_proof(to_check).unwrap();
+        return Python::with_gil(|py| Ok((found, PyBytes::new(py, &proof).into())));
+
+        // result.map_err(|_| exceptions::PyValueError::new_err("Unable to find proof"))
         // match result {
         //     Ok(r) => Ok(r),
         //     Err(_) =>  Err(exceptions::PyValueError::new_err("Unable to find proof"))
@@ -373,6 +375,7 @@ impl MerkleTreeData {
         }
     }
 }
+
 
 fn encode_type(t: NodeType) -> u8 {
     match t {

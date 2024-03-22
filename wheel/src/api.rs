@@ -13,6 +13,7 @@ use chia::gen::run_puzzle::run_puzzle as native_run_puzzle;
 use chia::gen::solution_generator::solution_generator as native_solution_generator;
 use chia::gen::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
 use chia::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
+use chia::merkle_set::deserialize_proof as deserialise_proof;
 use chia::merkle_set::MerkleTreeData;
 use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
@@ -44,6 +45,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use pyo3::types::PyList;
 use pyo3::types::PyTuple;
+use pyo3::exceptions;
 use pyo3::wrap_pyfunction;
 use std::iter::zip;
 
@@ -76,6 +78,15 @@ pub fn compute_merkle_set_root<'p>(
         buffer.push(b.as_bytes().try_into()?);
     }
     Ok(PyBytes::new(py, &compute_merkle_root_impl(&mut buffer)))
+}
+
+#[pyfunction]
+pub fn deserialize_proof(proof: Py<PyBytes>) -> PyResult<MerkleTreeData> {
+    let bytes = Python::with_gil(|py| proof.as_bytes(py));
+    match deserialise_proof(bytes) {
+        Ok(r) => Ok(r),
+        Err(_) => Err(exceptions::PyValueError::new_err("Error deserialising proof.")),
+    }
 }
 
 #[pyfunction]
@@ -482,6 +493,7 @@ pub fn chia_rs(py: Python, m: &PyModule) -> PyResult<()> {
     // merkle tree
 
     m.add_class::<MerkleTreeData>()?;
+    m.add_function(wrap_pyfunction!(deserialize_proof, m)?)?;
 
     compression::add_submodule(py, m)?;
 

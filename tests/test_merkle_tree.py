@@ -1,6 +1,6 @@
 import chia_rs
 
-from chia_rs import MerkleSet
+from chia_rs import MerkleSet, deserialize_proof
 from hashlib import sha256
 
 def test_serialise_and_deserialise():
@@ -24,5 +24,8 @@ def test_serialise_and_deserialise():
     my_tree = MerkleSet(leafs)
     assert my_tree is not None
     expected = bytearray([127, 85, 186, 79, 243, 22, 56, 220, 77, 153, 55, 64, 115, 132, 111, 92, 128, 236, 177, 34, 34, 174, 184, 33, 11, 197, 246, 63, 244, 247, 209, 130])
-
     assert my_tree.get_root() == bytes(expected)
+    (result, proof) = my_tree.is_included_already_hashed(a)
+    assert result
+    new_tree = deserialize_proof(proof)
+    assert new_tree.get_root() == expected
