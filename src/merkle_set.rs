@@ -9,7 +9,9 @@ use pyo3::{pyclass, pymethods, PyResult};
 #[cfg(feature = "py-bindings")]
 use pyo3::exceptions;
 #[cfg(feature = "py-bindings")]
-use pyo3::types::PyList;
+use pyo3::types::{PyList, PyBytes};
+#[cfg(feature = "py-bindings")]
+use pyo3::prelude::*;  // needed for PyBytes
 
 fn get_bit(val: &[u8; 32], bit: u8) -> u8 {
     ((val[(bit / 8) as usize] & (0x80 >> (bit & 7))) != 0).into()
@@ -340,11 +342,11 @@ impl MerkleTreeData {
     }
 
     #[pyo3(name = "get_root")]
-    pub fn py_get_root(&self) -> PyResult<[u8; 32]> {
+    pub fn py_get_root(&self) -> PyResult<PyObject> {  // compiler doesn't like PyBytes as return type
         if self.hash_cache.is_empty() {
             return Err(exceptions::PyValueError::new_err("Tree is empty"))
         }
-        Ok(self.hash_cache[self.hash_cache.len() - 1])
+        return Python::with_gil(|py| Ok(PyBytes::new(py, &self.hash_cache[self.hash_cache.len() - 1]).into()));
     }
 
     #[pyo3(name = "generate_proof")]
@@ -938,7 +940,6 @@ fn test_compute_merkle_root_duplicate_4() {
         &hashdown(&[1_u8, 1], &a, &b),
         &hashdown(&[1_u8, 1], &c, &d),
     );
-    // panic!("expected: {:?}", expected);
     // tree is ((a,b), (c,d)) - 3 middle nodes, 4 leaf nodes
 
     // rotations
