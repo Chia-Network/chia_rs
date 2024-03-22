@@ -1,6 +1,8 @@
 
 use clvmr::sha2::{Digest, Sha256};
+#[cfg(test)]
 use rand::rngs::SmallRng;  // cargo says this isn't required but tests won't run without it
+#[cfg(test)]
 use rand::{Rng, SeedableRng};
 #[cfg(feature = "py-bindings")]
 use pyo3::{pyclass, pymethods, PyResult};
@@ -282,10 +284,11 @@ impl MerkleTreeData {
     }
 
     // this is useful to keep around to check the correctness of the tree
+    #[cfg(test)]
     fn get_merkle_root_old(&self) -> [u8; 32] {
         self.get_partial_hash(self.nodes_vec.len() - 1)
     }
-
+    #[cfg(test)]
     fn get_partial_hash(&self, index: usize) -> [u8; 32] {
         if self.nodes_vec.is_empty() {
             return BLANK;
@@ -300,6 +303,7 @@ impl MerkleTreeData {
             self.get_partial_hash_recurse(index)
         }
     }
+    #[cfg(test)]
     fn get_partial_hash_recurse(&self, node_index: usize) -> [u8; 32] {
         match self.nodes_vec[node_index] {
             ArrayTypes::Leaf { data } => self.leaf_vec[data],
@@ -335,6 +339,14 @@ impl MerkleTreeData {
         Ok(generate_merkle_tree(&mut data[..]).1)
     }
 
+    #[pyo3(name = "get_root")]
+    pub fn py_get_root(&self) -> PyResult<[u8; 32]> {
+        if self.hash_cache.is_empty() {
+            return Err(exceptions::PyValueError::new_err("Tree is empty"))
+        }
+        Ok(self.hash_cache[self.hash_cache.len() - 1])
+    }
+
     #[pyo3(name = "generate_proof")]
     pub fn py_generate_proof(&self, to_check: [u8; 32]) -> PyResult<(bool, Vec<u8>)> {
         let result = self.generate_proof(to_check);
@@ -348,7 +360,7 @@ impl MerkleTreeData {
     #[staticmethod]
     #[pyo3(name = "check_proof")]
     pub fn py_check_proof(proof: &PyList) -> PyResult<MerkleTreeData> {
-        let mut proof_vec = Vec::with_capacity(proof.len());;
+        let mut proof_vec = Vec::with_capacity(proof.len());
         for p in proof {
             proof_vec.push(p.extract::<u8>().unwrap());
         }
@@ -386,13 +398,6 @@ fn hash(ltype: NodeType, rtype: NodeType, left: &[u8; 32], right: &[u8; 32]) -> 
     hasher.update([encode_type(ltype), encode_type(rtype)]);
     hasher.update(left);
     hasher.update(right);
-    hasher.finalize().into()
-}
-
-fn h2(buf1: &[u8], buf2: &[u8]) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    hasher.update(buf1);
-    hasher.update(buf2);
     hasher.finalize().into()
 }
 
@@ -751,6 +756,14 @@ fn generate_merkle_tree_recurse(
     }
 }
 
+#[cfg(test)]
+fn h2(buf1: &[u8], buf2: &[u8]) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(buf1);
+    hasher.update(buf2);
+    hasher.finalize().into()
+}
+
 #[test]
 fn test_get_bit_msb() {
     let val1 = [
@@ -925,6 +938,7 @@ fn test_compute_merkle_root_duplicate_4() {
         &hashdown(&[1_u8, 1], &a, &b),
         &hashdown(&[1_u8, 1], &c, &d),
     );
+    panic!("expected: {:?}", expected);
     // tree is ((a,b), (c,d)) - 3 middle nodes, 4 leaf nodes
 
     // rotations
