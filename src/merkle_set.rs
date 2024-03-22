@@ -938,7 +938,7 @@ fn test_compute_merkle_root_duplicate_4() {
         &hashdown(&[1_u8, 1], &a, &b),
         &hashdown(&[1_u8, 1], &c, &d),
     );
-    panic!("expected: {:?}", expected);
+    // panic!("expected: {:?}", expected);
     // tree is ((a,b), (c,d)) - 3 middle nodes, 4 leaf nodes
 
     // rotations
