@@ -1,6 +1,6 @@
 [package]
 name = "chia_rs"
-version = "0.6.0"
+version = "0.6.1"
 authors = ["Richard Kiss <him@richardkiss.com>"]
 edition = "2021"
 license = "Apache-2.0"
@@ -19,7 +19,7 @@ clvmr = "0.6.1"
 hex = "0.4.3"
 sha2 = "0.10.8"
 pyo3 = { version = "=0.19.0", features = ["multiple-pymethods"] }
-chia-consensus = { version = "=0.6.0", path = "../crates/chia-consensus", features = ["py-bindings"] }
+chia-consensus = { version = "=0.6.1", path = "../crates/chia-consensus", features = ["py-bindings"] }
 chia-bls = { version = "=0.6.0", path = "../crates/chia-bls", features = ["py-bindings"]  }
 chia-protocol = { version = "=0.6.0", path = "../crates/chia-protocol", features = ["py-bindings"]  }
 chia-traits = { version = "=0.6.0", path = "../crates/chia-traits", features = ["py-bindings"]  }

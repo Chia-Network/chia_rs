@@ -350,7 +350,7 @@ dependencies = [
 
 [[package]]
 name = "chia-consensus"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "chia-protocol",
  "chia-traits 0.6.0",
@@ -511,7 +511,7 @@ dependencies = [
 
 [[package]]
 name = "chia_rs"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "chia-bls 0.6.0",
  "chia-consensus",
