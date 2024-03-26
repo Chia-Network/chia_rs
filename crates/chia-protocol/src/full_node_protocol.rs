@@ -165,3 +165,15 @@ pub struct RequestPeers {}
 pub struct RespondPeers {
     peer_list: Vec<TimestampedPeerInfo>,
 }
+
+#[streamable(message)]
+pub struct NewUnfinishedBlock2 {
+    unfinished_reward_hash: Bytes32,
+    foliage_hash: Option<Bytes32>,
+}
+
+#[streamable(message)]
+pub struct RequestUnfinishedBlock2 {
+    unfinished_reward_hash: Bytes32,
+    foliage_hash: Option<Bytes32>,
+}
