@@ -6,7 +6,7 @@ Build
 Use `wasm-pack` to build the wasm `pkg` file used with npm. Install it with:
 
 ```
-$ cargo install wasm-pack
+$ cargo install wasm-pack --locked
 ```
 
 Then build with

@@ -43,7 +43,7 @@ jobs:
         path: ./target/package/*-*.crate
 
     - name: install wasm-pack
-      run: cargo install wasm-pack
+      run: cargo install wasm-pack --locked
 
     - name: wasm-pack build and pack
       run: cd wasm && wasm-pack build && wasm-pack pack
@@ -153,7 +153,7 @@ jobs:
       run: |
         cd crates/chia-ssl
         cargo publish
-    
+
     - name: publish to crates.io if tagged (chia-consensus)
       continue-on-error: true
       if: startsWith(github.event.ref, 'refs/tags')

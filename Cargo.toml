@@ -60,15 +60,15 @@ clvm-traits = ["dep:clvm-traits"]
 clvm-utils = ["dep:clvm-utils"]
 
 [dependencies]
-chia-bls = { path = "./crates/chia-bls", optional = true }
-chia-client = { path = "./crates/chia-client", optional = true }
-chia-consensus = { path = "./crates/chia-consensus", optional = true }
-chia-protocol = { path = "./crates/chia-protocol", optional = true }
-chia-ssl = { path = "./crates/chia-ssl", optional = true }
-chia-traits = { path = "./crates/chia-traits", optional = true }
-chia-wallet = { path = "./crates/chia-wallet", optional = true }
-clvm-traits = { path = "./crates/clvm-traits", optional = true }
-clvm-utils = { path = "./crates/clvm-utils", optional = true }
+chia-bls = { path = "./crates/chia-bls", version = "0.6.0", optional = true }
+chia-client = { path = "./crates/chia-client", version = "0.6.0", optional = true }
+chia-consensus = { path = "./crates/chia-consensus", version = "0.6.1", optional = true }
+chia-protocol = { path = "./crates/chia-protocol", version = "0.6.0", optional = true }
+chia-ssl = { path = "./crates/chia-ssl", version = "0.6.0", optional = true }
+chia-traits = { path = "./crates/chia-traits", version = "0.6.0", optional = true }
+chia-wallet = { path = "./crates/chia-wallet", version = "0.6.0", optional = true }
+clvm-traits = { path = "./crates/clvm-traits", version = "0.6.0", optional = true }
+clvm-utils = { path = "./crates/clvm-utils", version = "0.6.0", optional = true }
 
 [profile.release]
 lto = "thin"
