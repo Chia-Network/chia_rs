@@ -569,7 +569,7 @@ pub fn parse_args(
             }
         }
         SEND_MESSAGE => {
-            let mode = sanitize_message_mode(a, first(a, c)?, flags)?;
+            let mode = sanitize_message_mode(a, first(a, c)?)?;
             c = rest(a, c)?;
             let message = sanitize_announce_msg(a, first(a, c)?, ErrorCode::InvalidMessage)?;
             c = rest(a, c)?;
@@ -586,7 +586,7 @@ pub fn parse_args(
             ))
         }
         RECEIVE_MESSAGE => {
-            let mode = sanitize_message_mode(a, first(a, c)?, flags)?;
+            let mode = sanitize_message_mode(a, first(a, c)?)?;
             c = rest(a, c)?;
             let message = sanitize_announce_msg(a, first(a, c)?, ErrorCode::InvalidMessage)?;
             c = rest(a, c)?;
@@ -1707,7 +1707,10 @@ fn cond_test_cb(
 }
 
 #[cfg(test)]
-const MEMPOOL_MODE: u32 = COND_ARGS_NIL | STRICT_ARGS_COUNT | NO_UNKNOWN_CONDS;
+use crate::gen::flags::MEMPOOL_MODE;
+
+#[cfg(test)]
+use crate::gen::flags::ENABLE_MESSAGE_CONDITIONS;
 
 #[cfg(test)]
 fn cond_test(input: &str) -> Result<(Allocator, SpendBundleConditions), ValidationErr> {
@@ -1906,8 +1909,6 @@ fn test_message_strict_args_count(
     #[case] arg: &str,
     #[values(STRICT_ARGS_COUNT, 0)] flags: u32,
 ) {
-    use crate::gen::flags::ENABLE_MESSAGE_CONDITIONS;
-
     // extra args are disallowed when STRICT_ARG_COUNT is set
     // pad determines whether the extra (unknown) argument is added to the
     // SEND_MESSAGE or the RECEIVE_MESSAGE condition
@@ -4597,76 +4598,69 @@ fn test_eligible_for_ff_invalid_agg_sig_me(
 #[cfg(test)]
 enum Ex {
     Fail,
-    FailMempool,
     Pass,
 }
 
 #[cfg(test)]
 #[rstest]
-// no committment (not allowed in mempool mode)
-#[case("(66 (0 ({msg1} ) ((67 (0 ({msg1} )", Ex::FailMempool)]
+// no committment
+#[case("(66 (0 ({msg1} ) ((67 (0 ({msg1} )", Ex::Pass)]
 #[case("(66 (0 ({msg2} ) ((67 (0 ({msg1} )", Ex::Fail)]
 #[case("(66 (0 ({msg1} ) ((67 (0 ({msg2} )", Ex::Fail)]
-// only sender coin-ID committment (not allowed in mempool mode)
-#[case("(66 (0x38 ({msg1} ) ((67 (0x38 ({msg1} ({coin12} )", Ex::FailMempool)]
+// only sender coin-ID committment
+#[case("(66 (0x38 ({msg1} ) ((67 (0x38 ({msg1} ({coin12} )", Ex::Pass)]
 #[case("(66 (0x38 ({msg1} ) ((67 (0x38 ({msg2} ({coin12} )", Ex::Fail)]
 #[case("(66 (0x38 ({msg2} ) ((67 (0x38 ({msg1} ({coin12} )", Ex::Fail)]
 #[case("(66 (0x38 ({msg1} ) ((67 (0x38 ({msg1} ({coin21} )", Ex::Fail)]
-// only receiver coin-ID committment (not allowed in mempool mode)
-#[case("(66 (0x07 ({msg1} ({coin12} ) ((67 (0x07 ({msg1} )", Ex::FailMempool)]
+// only receiver coin-ID committment
+#[case("(66 (0x07 ({msg1} ({coin12} ) ((67 (0x07 ({msg1} )", Ex::Pass)]
 #[case("(66 (0x07 ({msg1} ({coin21} ) ((67 (0x07 ({msg1} )", Ex::Fail)]
 #[case("(66 (0x07 ({msg2} ({coin12} ) ((67 (0x07 ({msg1} )", Ex::Fail)]
 #[case("(66 (0x07 ({msg1} ({coin12} ) ((67 (0x07 ({msg2} )", Ex::Fail)]
-// only sender parent committment (not allowed in mempool mode)
-#[case("(66 (0x20 ({msg1} ) ((67 (0x20 ({msg1} ({h1} )", Ex::FailMempool)]
+// only sender parent committment
+#[case("(66 (0x20 ({msg1} ) ((67 (0x20 ({msg1} ({h1} )", Ex::Pass)]
 #[case("(66 (0x20 ({msg1} ) ((67 (0x20 ({msg1} ({h2} )", Ex::Fail)]
 #[case("(66 (0x20 ({msg2} ) ((67 (0x20 ({msg1} ({h1} )", Ex::Fail)]
 #[case("(66 (0x20 ({msg1} ) ((67 (0x20 ({msg2} ({h1} )", Ex::Fail)]
-// only receiver parent committment (not allowed in mempool mode)
-#[case("(66 (0x04 ({msg1} ({h1} ) ((67 (0x04 ({msg1} )", Ex::FailMempool)]
+// only receiver parent committment
+#[case("(66 (0x04 ({msg1} ({h1} ) ((67 (0x04 ({msg1} )", Ex::Pass)]
 #[case("(66 (0x04 ({msg1} ({h2} ) ((67 (0x04 ({msg1} )", Ex::Fail)]
 #[case("(66 (0x04 ({msg2} ({h1} ) ((67 (0x04 ({msg1} )", Ex::Fail)]
 #[case("(66 (0x04 ({msg1} ({h1} ) ((67 (0x04 ({msg2} )", Ex::Fail)]
-// only sender puzzle committment (not allowed in mempool mode)
-#[case("(66 (0x10 ({msg1} ) ((67 (0x10 ({msg1} ({h2} )", Ex::FailMempool)]
+// only sender puzzle committment
+#[case("(66 (0x10 ({msg1} ) ((67 (0x10 ({msg1} ({h2} )", Ex::Pass)]
 #[case("(66 (0x10 ({msg1} ) ((67 (0x10 ({msg1} ({h1} )", Ex::Fail)]
 #[case("(66 (0x10 ({msg2} ) ((67 (0x10 ({msg1} ({h2} )", Ex::Fail)]
 #[case("(66 (0x10 ({msg1} ) ((67 (0x10 ({msg2} ({h2} )", Ex::Fail)]
-// only receiver puzzle committment (not allowed in mempool mode)
-#[case("(66 (0x02 ({msg1} ({h2} ) ((67 (0x02 ({msg1} )", Ex::FailMempool)]
+// only receiver puzzle committment
+#[case("(66 (0x02 ({msg1} ({h2} ) ((67 (0x02 ({msg1} )", Ex::Pass)]
 #[case("(66 (0x02 ({msg1} ({h1} ) ((67 (0x02 ({msg1} )", Ex::Fail)]
 #[case("(66 (0x02 ({msg2} ({h2} ) ((67 (0x02 ({msg1} )", Ex::Fail)]
 #[case("(66 (0x02 ({msg1} ({h2} ) ((67 (0x02 ({msg2} )", Ex::Fail)]
-// only sender amount committment (not allowed in mempool mode)
-#[case("(66 (0x08 ({msg1} ) ((67 (0x08 ({msg1} (123 )", Ex::FailMempool)]
+// only sender amount committment
+#[case("(66 (0x08 ({msg1} ) ((67 (0x08 ({msg1} (123 )", Ex::Pass)]
 #[case("(66 (0x08 ({msg1} ) ((67 (0x08 ({msg1} (124 )", Ex::Fail)]
 #[case("(66 (0x08 ({msg2} ) ((67 (0x08 ({msg1} (123 )", Ex::Fail)]
 #[case("(66 (0x08 ({msg1} ) ((67 (0x08 ({msg2} (123 )", Ex::Fail)]
-// only receiver amount committment (not allowed in mempool mode)
-#[case("(66 (0x01 ({msg1} (123 ) ((67 (0x01 ({msg1} )", Ex::FailMempool)]
+// only receiver amount committment
+#[case("(66 (0x01 ({msg1} (123 ) ((67 (0x01 ({msg1} )", Ex::Pass)]
 #[case("(66 (0x01 ({msg1} (124 ) ((67 (0x01 ({msg1} )", Ex::Fail)]
 #[case("(66 (0x01 ({msg2} (123 ) ((67 (0x01 ({msg1} )", Ex::Fail)]
 #[case("(66 (0x01 ({msg1} (123 ) ((67 (0x01 ({msg2} )", Ex::Fail)]
-// only amount committment (not allowed in mempool mode)
-#[case("(66 (0x09 ({msg1} (123 ) ((67 (0x09 ({msg1} (123 )", Ex::FailMempool)]
+// only amount committment
+#[case("(66 (0x09 ({msg1} (123 ) ((67 (0x09 ({msg1} (123 )", Ex::Pass)]
 #[case("(66 (0x09 ({msg1} (124 ) ((67 (0x09 ({msg1} (123 )", Ex::Fail)]
 #[case("(66 (0x09 ({msg1} (123 ) ((67 (0x09 ({msg1} (124 )", Ex::Fail)]
 #[case("(66 (0x09 ({msg2} (123 ) ((67 (0x09 ({msg1} (123 )", Ex::Fail)]
 #[case("(66 (0x09 ({msg1} (123 ) ((67 (0x09 ({msg2} (123 )", Ex::Fail)]
-// only amount committment on receiver (not allowed in mempool mode)
-#[case(
-    "(66 (0x39 ({msg1} (123 ) ((67 (0x39 ({msg1} ({coin12} )",
-    Ex::FailMempool
-)]
+// only amount committment on receiver
+#[case("(66 (0x39 ({msg1} (123 ) ((67 (0x39 ({msg1} ({coin12} )", Ex::Pass)]
 #[case("(66 (0x39 ({msg1} (124 ) ((67 (0x39 ({msg1} ({coin12} )", Ex::Fail)]
 #[case("(66 (0x39 ({msg1} (123 ) ((67 (0x39 ({msg1} ({coin21} )", Ex::Fail)]
 #[case("(66 (0x39 ({msg2} (123 ) ((67 (0x39 ({msg1} ({coin12} )", Ex::Fail)]
 #[case("(66 (0x39 ({msg1} (123 ) ((67 (0x39 ({msg2} ({coin12} )", Ex::Fail)]
-// only amount committment on sender (not allowed in mempool mode)
-#[case(
-    "(66 (0x0f ({msg1} ({coin12} ) ((67 (0x0f ({msg1} (123 )",
-    Ex::FailMempool
-)]
+// only amount committment on sender
+#[case("(66 (0x0f ({msg1} ({coin12} ) ((67 (0x0f ({msg1} (123 )", Ex::Pass)]
 #[case("(66 (0x0f ({msg1} ({coin12} ) ((67 (0x0f ({msg1} (124 )", Ex::Fail)]
 #[case("(66 (0x0f ({msg1} ({coin21} ) ((67 (0x0f ({msg1} (123 )", Ex::Fail)]
 #[case("(66 (0x0f ({msg2} ({coin12} ) ((67 (0x0f ({msg1} (123 )", Ex::Fail)]
@@ -4750,17 +4744,11 @@ enum Ex {
 #[case("(67 (0x12 ({msg1} ({coin12} )", Ex::Fail)]
 #[case("(66 (0x12 ({msg1} ({coin12} )", Ex::Fail)]
 fn test_message_conditions_single_spend(#[case] test_case: &str, #[case] expect: Ex) {
-    use crate::gen::flags::ENABLE_MESSAGE_CONDITIONS;
-    for flags in &[
-        ENABLE_MESSAGE_CONDITIONS,
-        ENABLE_MESSAGE_CONDITIONS | NO_UNKNOWN_CONDS,
-    ] {
+    for flags in &[ENABLE_MESSAGE_CONDITIONS, MEMPOOL_MODE] {
         let ret = cond_test_flag(&format!("((({{h1}} ({{h2}} (123 (({test_case}))))"), *flags);
 
-        let mempool = (flags & NO_UNKNOWN_CONDS) != 0;
         let expect_pass = match expect {
             Ex::Pass => true,
-            Ex::FailMempool => !mempool,
             Ex::Fail => false,
         };
 
@@ -4777,15 +4765,7 @@ fn test_message_conditions_single_spend(#[case] test_case: &str, #[case] expect:
         } else {
             let actual_err = ret.unwrap_err().1;
             println!("Error: {actual_err:?}");
-            if mempool {
-                assert!([
-                    ErrorCode::MessageNotSentOrReceived,
-                    ErrorCode::InvalidMessageMode
-                ]
-                .contains(&actual_err));
-            } else {
-                assert_eq!(ErrorCode::MessageNotSentOrReceived, actual_err);
-            }
+            assert_eq!(ErrorCode::MessageNotSentOrReceived, actual_err);
         }
     }
 }
@@ -4795,7 +4775,6 @@ fn test_message_conditions_single_spend(#[case] test_case: &str, #[case] expect:
 #[case(512, None)]
 #[case(513, Some(ErrorCode::TooManyAnnouncements))]
 fn test_limit_messages(#[case] count: i32, #[case] expect_err: Option<ErrorCode>) {
-    use crate::gen::flags::ENABLE_MESSAGE_CONDITIONS;
     let r = cond_test_cb(
         "((({h1} ({h1} (123 ({} )))",
         ENABLE_MESSAGE_CONDITIONS,
@@ -4845,122 +4824,117 @@ fn test_limit_messages(#[case] count: i32, #[case] expect_err: Option<ErrorCode>
 
 #[cfg(test)]
 #[rstest]
-#[case("(66 (0x38 ({longmsg} )", [ErrorCode::InvalidMessage, ErrorCode::InvalidMessageMode])]
-#[case("(66 (0x3c ({long} ({msg1} )", [ErrorCode::InvalidParentId, ErrorCode::InvalidParentId])]
-#[case("(66 (0x3c ({msg2} ({msg1} )", [ErrorCode::InvalidParentId, ErrorCode::InvalidParentId])]
-#[case("(66 (0x3a ({long} ({msg1} )", [ErrorCode::InvalidPuzzleHash, ErrorCode::InvalidPuzzleHash])]
-#[case("(66 (0x3a ({msg2} ({msg1} )", [ErrorCode::InvalidPuzzleHash, ErrorCode::InvalidPuzzleHash])]
-#[case("(66 (0x3f ({long} ({msg1} )", [ErrorCode::InvalidCoinId, ErrorCode::InvalidCoinId])]
-#[case("(66 (0x3f ({msg2} ({msg1} )", [ErrorCode::InvalidCoinId, ErrorCode::InvalidCoinId])]
+#[case("(66 (0x38 ({longmsg} )", ErrorCode::InvalidMessage)]
+#[case("(66 (0x3c ({long} ({msg1} )", ErrorCode::InvalidParentId)]
+#[case("(66 (0x3c ({msg2} ({msg1} )", ErrorCode::InvalidParentId)]
+#[case("(66 (0x3a ({long} ({msg1} )", ErrorCode::InvalidPuzzleHash)]
+#[case("(66 (0x3a ({msg2} ({msg1} )", ErrorCode::InvalidPuzzleHash)]
+#[case("(66 (0x3f ({long} ({msg1} )", ErrorCode::InvalidCoinId)]
+#[case("(66 (0x3f ({msg2} ({msg1} )", ErrorCode::InvalidCoinId)]
 #[case(
     "(66 (0x08 ({msg1} ) ((67 (0x08 ({msg1} (-1 )",
-    [ErrorCode::NegativeAmount, ErrorCode::InvalidMessageMode]
+    ErrorCode::NegativeAmount
 )]
 #[case(
     "(66 (0x08 ({msg1} ) ((67 (0x08 ({msg1} )",
-    [ErrorCode::InvalidCondition, ErrorCode::InvalidMessageMode]
+    ErrorCode::InvalidCondition
 )]
 #[case(
     "(66 (0x01 ({msg1} (-1 ) ((67 (0x01 ({msg1} )",
-    [ErrorCode::NegativeAmount, ErrorCode::InvalidMessageMode]
+    ErrorCode::NegativeAmount
 )]
 #[case(
     "(66 (0x01 ({msg1} ) ((67 (0x01 ({msg1} )",
-    [ErrorCode::InvalidCondition, ErrorCode::InvalidMessageMode]
+    ErrorCode::InvalidCondition
 )]
 #[case(
     "(66 (0x02 ({msg1} ({msg2} ) ((67 (0x02 ({msg1} )",
-    [ErrorCode::InvalidPuzzleHash, ErrorCode::InvalidMessageMode]
+    ErrorCode::InvalidPuzzleHash
 )]
 #[case(
     "(66 (0x02 ({msg1} ) ((67 (0x02 ({msg1} )",
-    [ErrorCode::InvalidCondition, ErrorCode::InvalidMessageMode]
+    ErrorCode::InvalidCondition
 )]
 #[case(
     "(66 (0x10 ({msg1} ) ((67 (0x10 ({msg1} ({msg2} )",
-    [ErrorCode::InvalidPuzzleHash, ErrorCode::InvalidMessageMode]
+    ErrorCode::InvalidPuzzleHash
 )]
 #[case(
     "(66 (0x10 ({msg1} ) ((67 (0x10 ({msg1} )",
-    [ErrorCode::InvalidCondition, ErrorCode::InvalidMessageMode]
+    ErrorCode::InvalidCondition
 )]
 #[case(
     "(66 (0x04 ({msg1} ({msg2} ) ((67 (0x04 ({msg1} )",
-    [ErrorCode::InvalidParentId, ErrorCode::InvalidMessageMode]
+    ErrorCode::InvalidParentId
 )]
 #[case(
     "(66 (0x04 ({msg1} ) ((67 (0x04 ({msg1} )",
-    [ErrorCode::InvalidCondition, ErrorCode::InvalidMessageMode]
+    ErrorCode::InvalidCondition
 )]
 #[case(
     "(66 (0x20 ({msg1} ) ((67 (0x20 ({msg1} ({msg2} )",
-    [ErrorCode::InvalidParentId, ErrorCode::InvalidMessageMode]
+    ErrorCode::InvalidParentId
 )]
 #[case(
     "(66 (0x20 ({msg1} ) ((67 (0x20 ({msg1} )",
-    [ErrorCode::InvalidCondition, ErrorCode::InvalidMessageMode]
+    ErrorCode::InvalidCondition
 )]
 #[case(
     "(66 (0x07 ({msg1} ({msg2} ) ((67 (0x07 ({msg1} )",
-    [ErrorCode::InvalidCoinId, ErrorCode::InvalidMessageMode]
+    ErrorCode::InvalidCoinId
 )]
 #[case(
     "(66 (0x07 ({msg1} ) ((67 (0x07 ({msg1} )",
-    [ErrorCode::InvalidCondition, ErrorCode::InvalidMessageMode]
+    ErrorCode::InvalidCondition
 )]
 #[case(
     "(66 (0x38 ({msg1} ) ((67 (0x38 ({msg1} ({msg2} )",
-    [ErrorCode::InvalidCoinId, ErrorCode::InvalidMessageMode]
+    ErrorCode::InvalidCoinId
 )]
 #[case(
     "(66 (0x38 ({msg1} ) ((67 (0x38 ({msg1} )",
-    [ErrorCode::InvalidCondition, ErrorCode::InvalidMessageMode]
+    ErrorCode::InvalidCondition
 )]
 // message mode must be specified in canonical mode
 #[case(
     "(66 (0x00 ({msg1} ) ((67 (0x00 ({msg1} )",
-    [ErrorCode::InvalidMessageMode, ErrorCode::InvalidMessageMode]
+    ErrorCode::InvalidMessageMode
 )]
 #[case(
     "(66 (0x01 ({msg1} (123 ) ((67 (0x00 ({msg1} )",
-    [ErrorCode::InvalidMessageMode, ErrorCode::InvalidMessageMode]
+    ErrorCode::InvalidMessageMode
 )]
 // negative messages modes are not allowed
 #[case(
     "(66 (-1 ({msg1} (123 ) ((67 (0x01 ({msg1} )",
-    [ErrorCode::InvalidMessageMode, ErrorCode::InvalidMessageMode]
+    ErrorCode::InvalidMessageMode
 )]
 #[case(
     "(66 (0x01 ({msg1} (123 ) ((67 (-1 ({msg1} )",
-    [ErrorCode::InvalidMessageMode, ErrorCode::InvalidMessageMode]
+    ErrorCode::InvalidMessageMode
 )]
 // amounts must be specified in canonical mode
 #[case(
     "(66 (0x01 ({msg1} (0x0040 ) ((67 (0x01 ({msg1} (123 )",
-    [ErrorCode::InvalidCoinAmount, ErrorCode::InvalidMessageMode]
+    ErrorCode::InvalidCoinAmount
 )]
 #[case(
     "(66 (0x01 ({msg1} (0x00 ) ((67 (0x01 ({msg1} (123 )",
-    [ErrorCode::InvalidCoinAmount, ErrorCode::InvalidMessageMode]
+    ErrorCode::InvalidCoinAmount
 )]
 // coin amounts can't be negative
 #[case(
     "(66 (0x01 ({msg1} (-1 ) ((67 (0x01 ({msg1} (123 )",
-    [ErrorCode::NegativeAmount, ErrorCode::InvalidMessageMode]
+    ErrorCode::NegativeAmount
 )]
 #[case(
     "(66 (0x01 ({msg1} (-1 ) ((67 (0x01 ({msg1} (123 )",
-    [ErrorCode::NegativeAmount, ErrorCode::InvalidMessageMode]
+    ErrorCode::NegativeAmount
 )]
-fn test_message_conditions_failures(#[case] test_case: &str, #[case] expect: [ErrorCode; 2]) {
-    use crate::gen::flags::ENABLE_MESSAGE_CONDITIONS;
-    for i in 0..2 {
-        let ret = cond_test_flag(
-            &format!("((({{h1}} ({{h2}} (123 (({test_case}))))"),
-            ENABLE_MESSAGE_CONDITIONS | (if i == 0 { 0 } else { MEMPOOL_MODE }),
-        );
+fn test_message_conditions_failures(#[case] test_case: &str, #[case] expect: ErrorCode) {
+    for flags in [ENABLE_MESSAGE_CONDITIONS, MEMPOOL_MODE] {
+        let ret = cond_test_flag(&format!("((({{h1}} ({{h2}} (123 (({test_case}))))"), flags);
 
-        let expect = expect[i];
         let Err(ValidationErr(_, code)) = ret else {
             panic!("expected failure: {expect:?}");
         };
@@ -4970,84 +4944,64 @@ fn test_message_conditions_failures(#[case] test_case: &str, #[case] expect: [Er
 
 #[cfg(test)]
 #[rstest]
-// no committment (not allowed in mempool mode)
-#[case("(66 (0 ({msg1} )", "(67 (0 ({msg1} )", Ex::FailMempool)]
+// no committment
+#[case("(66 (0 ({msg1} )", "(67 (0 ({msg1} )", Ex::Pass)]
 #[case("(66 (0 ({msg2} )", "(67 (0 ({msg1} )", Ex::Fail)]
 #[case("(66 (0 ({msg1} )", "(67 (0 ({msg2} )", Ex::Fail)]
-// only sender coin-ID committment (not allowed in mempool mode)
-#[case(
-    "(66 (0x38 ({msg1} )",
-    "(67 (0x38 ({msg1} ({coin12} )",
-    Ex::FailMempool
-)]
+// only sender coin-ID committment
+#[case("(66 (0x38 ({msg1} )", "(67 (0x38 ({msg1} ({coin12} )", Ex::Pass)]
 #[case("(66 (0x38 ({msg1} )", "(67 (0x38 ({msg2} ({coin12} )", Ex::Fail)]
 #[case("(66 (0x38 ({msg2} )", "(67 (0x38 ({msg1} ({coin12} )", Ex::Fail)]
 #[case("(66 (0x38 ({msg1} )", "(67 (0x38 ({msg1} ({coin21} )", Ex::Fail)]
-// only receiver coin-ID committment (not allowed in mempool mode)
-#[case(
-    "(66 (0x07 ({msg1} ({coin21} )",
-    "(67 (0x07 ({msg1} )",
-    Ex::FailMempool
-)]
+// only receiver coin-ID committment
+#[case("(66 (0x07 ({msg1} ({coin21} )", "(67 (0x07 ({msg1} )", Ex::Pass)]
 #[case("(66 (0x07 ({msg1} ({coin12} )", "(67 (0x07 ({msg1} )", Ex::Fail)]
 #[case("(66 (0x07 ({msg2} ({coin21} )", "(67 (0x07 ({msg1} )", Ex::Fail)]
 #[case("(66 (0x07 ({msg1} ({coin21} )", "(67 (0x07 ({msg2} )", Ex::Fail)]
-// only sender parent committment (not allowed in mempool mode)
-#[case("(66 (0x20 ({msg1} )", "(67 (0x20 ({msg1} ({h1} )", Ex::FailMempool)]
+// only sender parent committment
+#[case("(66 (0x20 ({msg1} )", "(67 (0x20 ({msg1} ({h1} )", Ex::Pass)]
 #[case("(66 (0x20 ({msg1} )", "(67 (0x20 ({msg1} ({h2} )", Ex::Fail)]
 #[case("(66 (0x20 ({msg2} )", "(67 (0x20 ({msg1} ({h1} )", Ex::Fail)]
 #[case("(66 (0x20 ({msg1} )", "(67 (0x20 ({msg2} ({h1} )", Ex::Fail)]
-// only receiver parent committment (not allowed in mempool mode)
-#[case("(66 (0x04 ({msg1} ({h2} )", "(67 (0x04 ({msg1} )", Ex::FailMempool)]
+// only receiver parent committment
+#[case("(66 (0x04 ({msg1} ({h2} )", "(67 (0x04 ({msg1} )", Ex::Pass)]
 #[case("(66 (0x04 ({msg1} ({h1} )", "(67 (0x04 ({msg1} )", Ex::Fail)]
 #[case("(66 (0x04 ({msg2} ({h2} )", "(67 (0x04 ({msg1} )", Ex::Fail)]
 #[case("(66 (0x04 ({msg1} ({h2} )", "(67 (0x04 ({msg2} )", Ex::Fail)]
-// only sender puzzle committment (not allowed in mempool mode)
-#[case("(66 (0x10 ({msg1} )", "(67 (0x10 ({msg1} ({h2} )", Ex::FailMempool)]
+// only sender puzzle committment
+#[case("(66 (0x10 ({msg1} )", "(67 (0x10 ({msg1} ({h2} )", Ex::Pass)]
 #[case("(66 (0x10 ({msg1} )", "(67 (0x10 ({msg1} ({h1} )", Ex::Fail)]
 #[case("(66 (0x10 ({msg2} )", "(67 (0x10 ({msg1} ({h2} )", Ex::Fail)]
 #[case("(66 (0x10 ({msg1} )", "(67 (0x10 ({msg2} ({h2} )", Ex::Fail)]
-// only receiver puzzle committment (not allowed in mempool mode)
-#[case("(66 (0x02 ({msg1} ({h1} )", "(67 (0x02 ({msg1} )", Ex::FailMempool)]
+// only receiver puzzle committment
+#[case("(66 (0x02 ({msg1} ({h1} )", "(67 (0x02 ({msg1} )", Ex::Pass)]
 #[case("(66 (0x02 ({msg1} ({h2} )", "(67 (0x02 ({msg1} )", Ex::Fail)]
 #[case("(66 (0x02 ({msg2} ({h1} )", "(67 (0x02 ({msg1} )", Ex::Fail)]
 #[case("(66 (0x02 ({msg1} ({h1} )", "(67 (0x02 ({msg2} )", Ex::Fail)]
-// only sender amount committment (not allowed in mempool mode)
-#[case("(66 (0x08 ({msg1} )", "(67 (0x08 ({msg1} (123 )", Ex::FailMempool)]
+// only sender amount committment
+#[case("(66 (0x08 ({msg1} )", "(67 (0x08 ({msg1} (123 )", Ex::Pass)]
 #[case("(66 (0x08 ({msg1} )", "(67 (0x08 ({msg1} (124 )", Ex::Fail)]
 #[case("(66 (0x08 ({msg2} )", "(67 (0x08 ({msg1} (123 )", Ex::Fail)]
 #[case("(66 (0x08 ({msg1} )", "(67 (0x08 ({msg2} (123 )", Ex::Fail)]
-// only receiver amount committment (not allowed in mempool mode)
-#[case("(66 (0x01 ({msg1} (123 )", "(67 (0x01 ({msg1} )", Ex::FailMempool)]
+// only receiver amount committment
+#[case("(66 (0x01 ({msg1} (123 )", "(67 (0x01 ({msg1} )", Ex::Pass)]
 #[case("(66 (0x01 ({msg1} (124 )", "(67 (0x01 ({msg1} )", Ex::Fail)]
 #[case("(66 (0x01 ({msg2} (123 )", "(67 (0x01 ({msg1} )", Ex::Fail)]
 #[case("(66 (0x01 ({msg1} (123 )", "(67 (0x01 ({msg2} )", Ex::Fail)]
-// only amount committment (not allowed in mempool mode)
-#[case(
-    "(66 (0x09 ({msg1} (123 )",
-    "(67 (0x09 ({msg1} (123 )",
-    Ex::FailMempool
-)]
+// only amount committment
+#[case("(66 (0x09 ({msg1} (123 )", "(67 (0x09 ({msg1} (123 )", Ex::Pass)]
 #[case("(66 (0x09 ({msg1} (124 )", "(67 (0x09 ({msg1} (123 )", Ex::Fail)]
 #[case("(66 (0x09 ({msg1} (123 )", "(67 (0x09 ({msg1} (124 )", Ex::Fail)]
 #[case("(66 (0x09 ({msg2} (123 )", "(67 (0x09 ({msg1} (123 )", Ex::Fail)]
 #[case("(66 (0x09 ({msg1} (123 )", "(67 (0x09 ({msg2} (123 )", Ex::Fail)]
-// only amount committment on receiver (not allowed in mempool mode)
-#[case(
-    "(66 (0x39 ({msg1} (123 )",
-    "(67 (0x39 ({msg1} ({coin12} )",
-    Ex::FailMempool
-)]
+// only amount committment on receiver
+#[case("(66 (0x39 ({msg1} (123 )", "(67 (0x39 ({msg1} ({coin12} )", Ex::Pass)]
 #[case("(66 (0x39 ({msg1} (124 )", "(67 (0x39 ({msg1} ({coin12} )", Ex::Fail)]
 #[case("(66 (0x39 ({msg1} (123 )", "(67 (0x39 ({msg1} ({coin21} )", Ex::Fail)]
 #[case("(66 (0x39 ({msg2} (123 )", "(67 (0x39 ({msg1} ({coin12} )", Ex::Fail)]
 #[case("(66 (0x39 ({msg1} (123 )", "(67 (0x39 ({msg2} ({coin12} )", Ex::Fail)]
-// only amount committment on sender (not allowed in mempool mode)
-#[case(
-    "(66 (0x0f ({msg1} ({coin21} )",
-    "(67 (0x0f ({msg1} (123 )",
-    Ex::FailMempool
-)]
+// only amount committment on sender
+#[case("(66 (0x0f ({msg1} ({coin21} )", "(67 (0x0f ({msg1} (123 )", Ex::Pass)]
 #[case("(66 (0x0f ({msg1} ({coin21} )", "(67 (0x0f ({msg1} (124 )", Ex::Fail)]
 #[case("(66 (0x0f ({msg1} ({coin12} )", "(67 (0x0f ({msg1} (123 )", Ex::Fail)]
 #[case("(66 (0x0f ({msg2} ({coin21} )", "(67 (0x0f ({msg1} (123 )", Ex::Fail)]
@@ -5195,11 +5149,7 @@ fn test_message_conditions_two_spends(
     #[case] coin2_case: &str,
     #[case] expect: Ex,
 ) {
-    use crate::gen::flags::ENABLE_MESSAGE_CONDITIONS;
-    for flags in &[
-        ENABLE_MESSAGE_CONDITIONS,
-        ENABLE_MESSAGE_CONDITIONS | NO_UNKNOWN_CONDS,
-    ] {
+    for flags in &[ENABLE_MESSAGE_CONDITIONS, MEMPOOL_MODE] {
         let test = format!(
             "(\
             (({{h1}} ({{h2}} (123 (\
@@ -5212,10 +5162,8 @@ fn test_message_conditions_two_spends(
         );
         let ret = cond_test_flag(&test, *flags);
 
-        let mempool = (flags & NO_UNKNOWN_CONDS) != 0;
         let expect_pass = match expect {
             Ex::Pass => true,
-            Ex::FailMempool => !mempool,
             Ex::Fail => false,
         };
 
@@ -5238,15 +5186,7 @@ fn test_message_conditions_two_spends(
         } else {
             let actual_err = ret.unwrap_err().1;
             println!("Error: {actual_err:?}");
-            if mempool {
-                assert!([
-                    ErrorCode::MessageNotSentOrReceived,
-                    ErrorCode::InvalidMessageMode
-                ]
-                .contains(&actual_err));
-            } else {
-                assert_eq!(ErrorCode::MessageNotSentOrReceived, actual_err);
-            }
+            assert_eq!(ErrorCode::MessageNotSentOrReceived, actual_err);
         }
     }
 }
@@ -5254,7 +5194,6 @@ fn test_message_conditions_two_spends(
 // generates all positive test cases between two spends
 #[test]
 fn test_all_message_conditions() {
-    use crate::gen::flags::ENABLE_MESSAGE_CONDITIONS;
     for mode in 0..0b111111 {
         let coin1_case = match mode & 0b111 {
             0 => "",
@@ -5314,8 +5253,6 @@ fn test_all_message_conditions() {
 
 #[test]
 fn test_message_eligible_for_ff() {
-    use crate::gen::flags::ENABLE_MESSAGE_CONDITIONS;
-
     for mode in 0..0b111111 {
         let coin1_case = match mode & 0b111 {
             0 => "",
