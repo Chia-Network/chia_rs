@@ -4753,7 +4753,7 @@ fn test_message_conditions_single_spend(#[case] test_case: &str, #[case] expect:
         };
 
         if let Ok((a, conds)) = ret {
-            assert_eq!(expect_pass, true);
+            assert!(expect_pass);
             assert_eq!(conds.cost, 0);
             assert_eq!(conds.spends.len(), 1);
             let spend = &conds.spends[0];
@@ -5168,7 +5168,7 @@ fn test_message_conditions_two_spends(
         };
 
         if let Ok((a, conds)) = ret {
-            assert_eq!(expect_pass, true);
+            assert!(expect_pass);
             assert_eq!(conds.cost, 0);
             assert_eq!(conds.spends.len(), 2);
 
