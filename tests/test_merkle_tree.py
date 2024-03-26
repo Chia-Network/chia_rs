@@ -1,7 +1,13 @@
 import chia_rs
 
-from chia_rs import MerkleSet, deserialize_proof
+from chia_rs import MerkleSet, deserialize_proof, compute_merkle_set_root
 from hashlib import sha256
+from itertools import permutations
+from chia.types.blockchain_format.sized_bytes import bytes32
+import pytest
+
+def hashdown(buf: bytes) -> bytes32:
+    return bytes32(sha256(bytes([0] * 30) + buf).digest())
 
 def test_serialise_and_deserialise():
     a = [
@@ -29,3 +35,52 @@ def test_serialise_and_deserialise():
     assert result
     new_tree = deserialize_proof(proof)
     assert new_tree.get_root() == expected
+
+@pytest.mark.asyncio
+async def test_merkle_set_5() -> None:
+    BLANK = bytes32([0] * 32)
+
+    a = bytes32([0x58] + [0] * 31)
+    b = bytes32([0x23] + [0] * 31)
+    c = bytes32([0x21] + [0] * 31)
+    d = bytes32([0xCA] + [0] * 31)
+    e = bytes32([0x20] + [0] * 31)
+
+    # build the expected tree bottom up, since that's simpler
+    expected = hashdown(b"\1\1" + e + c)
+    expected = hashdown(b"\2\1" + expected + b)
+    expected = hashdown(b"\2\0" + expected + BLANK)
+    expected = hashdown(b"\2\0" + expected + BLANK)
+    expected = hashdown(b"\2\0" + expected + BLANK)
+    expected = hashdown(b"\0\2" + BLANK + expected)
+    expected = hashdown(b"\2\1" + expected + a)
+    expected = hashdown(b"\2\1" + expected + d)
+
+    values = [a, b, c, d, e]
+    for vals in permutations(values):
+        leafs = []
+        for v in vals:
+            leafs.append(v)
+        merkle_set = MerkleSet(leafs)
+
+        assert merkle_set.get_root() == bytes32(compute_merkle_set_root(list(vals)))
+        assert merkle_set.get_root() == expected
+    # this tree looks like this:
+    #
+    #             o
+    #            / \
+    #           o   d
+    #          / \
+    #         o   a
+    #        / \
+    #       E   o
+    #          / \
+    #         o   E
+    #        / \
+    #       o   E
+    #      / \
+    #     o   E
+    #    / \
+    #   o   b
+    #  / \
+    # e   c
