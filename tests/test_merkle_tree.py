@@ -1,8 +1,11 @@
 import chia_rs
 
-from chia_rs import MerkleSet, deserialize_proof, compute_merkle_set_root
+from chia_rs import MerkleSet, deserialize_proof, compute_merkle_set_root, Coin
 from hashlib import sha256
 from itertools import permutations
+import random
+from random import Random
+from typing import List, Optional, Tuple
 from chia.types.blockchain_format.sized_bytes import bytes32
 import pytest
 
@@ -84,3 +87,88 @@ async def test_merkle_set_5() -> None:
     #   o   b
     #  / \
     # e   c
+        
+    
+@pytest.mark.asyncio
+async def test_merkle_left_edge() -> None:
+    BLANK = bytes32([0] * 32)
+    a = bytes32([0x80] + [0] * 31)
+    b = bytes32([0] * 31 + [1])
+    c = bytes32([0] * 31 + [2])
+    d = bytes32([0] * 31 + [3])
+    values = [a, b, c, d]
+
+    expected = hashdown(b"\1\1" + c + d)
+    expected = hashdown(b"\1\2" + b + expected)
+
+    for _ in range(253):
+        expected = hashdown(b"\2\0" + expected + BLANK)
+
+    expected = hashdown(b"\2\1" + expected + a)
+
+    for vals in permutations(values):
+        leafs = []
+        for v in vals:
+            leafs.append(v)
+        merkle_set = MerkleSet(leafs)
+        assert merkle_set.get_root() == bytes32(compute_merkle_set_root(list(vals)))
+        assert merkle_set.get_root() == expected
+    # this tree looks like this:
+    #           o
+    #          / \
+    #         o   a
+    #        / \
+    #       o   E
+    #      / \
+    #     .   E
+    #     .
+    #     .
+    #    / \
+    #   o   E
+    #  / \
+    # b   o
+    #    / \
+    #   c   d
+        
+
+@pytest.mark.anyio
+async def test_merkle_right_edge() -> None:
+    BLANK = bytes32([0] * 32)
+    a = bytes32([0x40] + [0] * 31)
+    b = bytes32([0xFF] * 31 + [0xFF])
+    c = bytes32([0xFF] * 31 + [0xFE])
+    d = bytes32([0xFF] * 31 + [0xFD])
+    values = [a, b, c, d]
+
+    expected = hashdown(b"\1\1" + c + b)
+    expected = hashdown(b"\1\2" + d + expected)
+
+    for _ in range(253):
+        expected = hashdown(b"\0\2" + BLANK + expected)
+
+    expected = hashdown(b"\1\2" + a + expected)
+
+    for vals in permutations(values):
+        leafs = []
+        for v in vals:
+            leafs.append(v)
+        merkle_set = MerkleSet(leafs)
+        assert merkle_set.get_root() == bytes32(compute_merkle_set_root(list(vals)))
+        assert merkle_set.get_root() == expected
+    # this tree looks like this:
+    #           o
+    #          / \
+    #         a   o
+    #            / \
+    #           E   o
+    #              / \
+    #             E   o
+    #                 .
+    #                 .
+    #                 .
+    #                 o
+    #                / \
+    #               d   o
+    #                  / \
+    #                 c   b
+        
