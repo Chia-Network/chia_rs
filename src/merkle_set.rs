@@ -175,26 +175,23 @@ impl MerkleTreeData {
             ArrayTypes::Middle { children } => {
                 proof.push(MIDDLE);
 
-                if matches!(self.nodes_vec[children.0], ArrayTypes::Leaf { .. })
-                    && matches!(self.nodes_vec[children.1], ArrayTypes::Leaf { .. })
+                if let (
+                    ArrayTypes::Leaf { data: child_0_data },
+                    ArrayTypes::Leaf { data: child_1_data },
+                ) = (self.nodes_vec[children.0], self.nodes_vec[children.1])
                 {
-                    if let ArrayTypes::Leaf { data: child_0_data } = self.nodes_vec[children.0] {
-                        if let ArrayTypes::Leaf { data: child_1_data } = self.nodes_vec[children.1]
-                        {
-                            proof.push(TERMINAL);
-                            for byte in self.leaf_vec[child_0_data] {
-                                proof.push(byte);
-                            }
-                            proof.push(TERMINAL);
-                            for byte in self.leaf_vec[child_1_data] {
-                                proof.push(byte);
-                            }
-                            if self.leaf_vec[child_0_data] == to_check {
-                                return Ok(true);
-                            } else {
-                                return Ok(self.leaf_vec[child_1_data] == to_check);
-                            }
-                        }
+                    proof.push(TERMINAL);
+                    for byte in self.leaf_vec[child_0_data] {
+                        proof.push(byte);
+                    }
+                    proof.push(TERMINAL);
+                    for byte in self.leaf_vec[child_1_data] {
+                        proof.push(byte);
+                    }
+                    if self.leaf_vec[child_0_data] == to_check {
+                        return Ok(true);
+                    } else {
+                        return Ok(self.leaf_vec[child_1_data] == to_check);
                     }
                 }
 
