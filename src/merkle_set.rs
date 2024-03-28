@@ -70,7 +70,7 @@ pub fn deserialize_proof(proof: &[u8]) -> Result<MerkleTreeData, SetError> {
         leaf_vec: Vec::new(),
         hash_cache: Vec::new(),
     };
-    let pos = _deserialize(proof, 0, &mut Vec::<u8>::new(), &mut merkle_tree)?;
+    let pos = _deserialize(proof, 0, &mut merkle_tree)?;
     if pos != proof.len() {
         Err(SetError)
     } else {
@@ -81,7 +81,6 @@ pub fn deserialize_proof(proof: &[u8]) -> Result<MerkleTreeData, SetError> {
 fn _deserialize(
     proof: &[u8],
     pos: usize,
-    bits: &mut [u8],
     merkle_tree: &mut MerkleTreeData,
 ) -> Result<usize, SetError> {
     if let Some(&t) = proof.get(pos) {
@@ -93,12 +92,6 @@ fn _deserialize(
             }
             TERMINAL => {
                 let hash: [u8; 32] = proof[pos + 1..pos + 33].try_into().map_err(|_| SetError)?;
-                // bit checking doesn't work if the leaf nodes have been collapsed a level
-                // for (pos, &v) in bits.iter().enumerate() {
-                // if get_bit(&hash, pos as u8) != v {
-                //     return Err(SetError)
-                // }
-                // }
                 merkle_tree.leaf_vec.push(hash);
                 merkle_tree.nodes_vec.push(ArrayTypes::Leaf {
                     data: merkle_tree.leaf_vec.len() - 1,
@@ -113,13 +106,10 @@ fn _deserialize(
                 Ok(pos + 33)
             }
             MIDDLE => {
-                let mut left_bits = bits.to_owned();
-                left_bits.push(0);
-                let new_pos = _deserialize(proof, pos + 1, &mut left_bits, merkle_tree)?;
+                let new_pos = _deserialize(proof, pos + 1, merkle_tree)?;
                 let left_pointer = merkle_tree.nodes_vec.len() - 1;
-                let mut right_bits = bits.to_owned();
-                right_bits.push(1);
-                let final_pos = _deserialize(proof, new_pos, &mut right_bits, merkle_tree)?;
+                
+                let final_pos = _deserialize(proof, new_pos, merkle_tree)?;
                 let right_pointer = merkle_tree.nodes_vec.len() - 1;
                 merkle_tree.nodes_vec.push(ArrayTypes::Middle {
                     children: (left_pointer, right_pointer),
