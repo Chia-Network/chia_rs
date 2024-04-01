@@ -57,11 +57,7 @@ const MIDDLE: u8 = 3;
 pub struct SetError;
 
 pub fn deserialize_proof(proof: &[u8]) -> Result<MerkleSet, SetError> {
-    let mut merkle_tree: MerkleSet = MerkleSet {
-        nodes_vec: Vec::new(),
-        leaf_vec: Vec::new(),
-        hash_cache: Vec::new(),
-    };
+    let mut merkle_tree: MerkleSet = MerkleSet::default();
     let pos = _deserialize(proof, 0, &mut merkle_tree)?;
     if pos != proof.len() {
         Err(SetError)
@@ -124,7 +120,18 @@ fn _deserialize(
     }
 }
 
+impl Default for MerkleSet {
+    fn default() -> MerkleSet { 
+        MerkleSet {
+            nodes_vec: Vec::new(),
+            leaf_vec: Vec::new(),
+            hash_cache: Vec::new(),
+        }
+     }
+}
+
 impl MerkleSet {
+
     pub fn get_merkle_root(&self) -> [u8; 32] {
         self.hash_cache[self.hash_cache.len() - 1]
     }
@@ -368,18 +375,10 @@ pub fn generate_merkle_tree(leafs: &mut [[u8; 32]]) -> ([u8; 32], MerkleSet) {
     if leafs.is_empty() {
         return (
             BLANK,
-            MerkleSet {
-                nodes_vec: Vec::new(),
-                leaf_vec: Vec::new(),
-                hash_cache: Vec::new(),
-            },
+            MerkleSet::default()
         );
     }
-    let mut merkle_tree: MerkleSet = MerkleSet {
-        nodes_vec: Vec::new(),
-        leaf_vec: Vec::new(),
-        hash_cache: Vec::new(),
-    };
+    let mut merkle_tree: MerkleSet =  MerkleSet::default();
     match generate_merkle_tree_recurse(leafs, 0, &mut merkle_tree) {
         (hash, NodeType::Term) => {
             // if there's only a single item in the set, we prepend "Term"
