@@ -97,7 +97,7 @@ def rust_type_to_python(t: str) -> str:
     return ret
 
 
-def parse_rust_source(filename: str) -> List[Tuple[str, List[str]]]:
+def parse_rust_source(filename: str, upper_case: bool) -> List[Tuple[str, List[str]]]:
     ret: List[Tuple[str], List[str]] = []
     in_struct: Optional[str] = None
     members: List[str] = []
@@ -139,7 +139,7 @@ def parse_rust_source(filename: str) -> List[Tuple[str, List[str]]]:
                     rust_type, line = rust_type.rsplit("}",1)
                     line = "}" + line
                 py_type = rust_type_to_python(rust_type)
-                members.append(f"{name}: {py_type}")
+                members.append(f"{name.upper() if upper_case else name}: {py_type}")
 
             # did we reach the end?
             if "}" in line:
@@ -231,9 +231,9 @@ classes = []
 for f in sorted(glob(str(input_dir / "*.rs"))):
     if f.endswith("bytes.rs") or f.endswith("lazy_node.rs"):
         continue
-    classes.extend(parse_rust_source(f))
+    classes.extend(parse_rust_source(f, upper_case=False))
 
-raw_classes = parse_rust_source(str(crates_dir / "chia-consensus" / "src" / "consensus_constants.rs"))
+raw_classes = parse_rust_source(str(crates_dir / "chia-consensus" / "src" / "consensus_constants.rs"), upper_case=True)
 
 with open(output_file, "w") as f:
     f.write(
