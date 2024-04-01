@@ -60,7 +60,7 @@ pub struct SetError;
 
 pub fn deserialize_proof(proof: &[u8]) -> Result<MerkleSet, SetError> {
     let mut merkle_tree: MerkleSet = MerkleSet::default();
-    let pos = _deserialize(proof, 0, &mut merkle_tree)?;
+    let pos = _deserialize(&mut merkle_tree, proof, 0)?;
     if pos != proof.len() {
         Err(SetError)
     } else {
@@ -69,9 +69,9 @@ pub fn deserialize_proof(proof: &[u8]) -> Result<MerkleSet, SetError> {
 }
 
 fn _deserialize(
+    merkle_tree: &mut MerkleSet,
     proof: &[u8],
     pos: usize,
-    merkle_tree: &mut MerkleSet,
 ) -> Result<usize, SetError> {
     if let Some(&t) = proof.get(pos) {
         match t {
@@ -96,10 +96,10 @@ fn _deserialize(
                 Ok(pos + 33)
             }
             MIDDLE => {
-                let new_pos = _deserialize(proof, pos + 1, merkle_tree)?;
+                let new_pos = _deserialize(merkle_tree, proof, pos + 1, )?;
                 let left_pointer = merkle_tree.nodes_vec.len() - 1;
                 
-                let final_pos = _deserialize(proof, new_pos, merkle_tree)?;
+                let final_pos = _deserialize(merkle_tree, proof, new_pos)?;
                 let right_pointer = merkle_tree.nodes_vec.len() - 1;
                 merkle_tree.nodes_vec.push(ArrayTypes::Middle {
                     children: (left_pointer, right_pointer),
@@ -138,16 +138,17 @@ impl MerkleSet {
         self.hash_cache[self.hash_cache.len() - 1]
     }
 
-    pub fn generate_proof(&self, to_check: [u8; 32]) -> Result<(bool, Vec<u8>), SetError> {
+    // returns a tuple of a bool representing if the value has been found, and if so bytes that represent the proof of inclusion
+    pub fn generate_proof(&self, included_leaf: [u8; 32]) -> Result<(bool, Vec<u8>), SetError> {
         let mut proof = Vec::new();
-        let r = self.is_included(self.nodes_vec.len() - 1, to_check, &mut proof, 0)?;
+        let r = self.is_included(self.nodes_vec.len() - 1, included_leaf, &mut proof, 0)?;
         Ok((r, proof))
     }
 
     pub fn is_included(
         &self,
         current_node_index: usize,
-        to_check: [u8; 32],
+        included_leaf: [u8; 32],
         proof: &mut Vec<u8>,
         depth: u8,
     ) -> Result<bool, SetError> {
@@ -161,7 +162,7 @@ impl MerkleSet {
                 for byte in self.leaf_vec[data] {
                     proof.push(byte);
                 }
-                Ok(self.leaf_vec[data] == to_check)
+                Ok(self.leaf_vec[data] == included_leaf)
             }
             ArrayTypes::Middle { children } => {
                 proof.push(MIDDLE);
@@ -179,29 +180,29 @@ impl MerkleSet {
                     for byte in self.leaf_vec[child_1_data] {
                         proof.push(byte);
                     }
-                    if self.leaf_vec[child_0_data] == to_check {
+                    if self.leaf_vec[child_0_data] == included_leaf {
                         return Ok(true);
                     } else {
-                        return Ok(self.leaf_vec[child_1_data] == to_check);
+                        return Ok(self.leaf_vec[child_1_data] == included_leaf);
                     }
                 }
 
-                if get_bit(&to_check, depth) {
+                if get_bit(&included_leaf, depth) {
                     // bit is 1 so truncate left branch and search right branch
                     self.other_included(
                         children.0,
-                        to_check,
+                        included_leaf,
                         proof,
                         depth + 1,
                         matches!(self.nodes_vec[children.1], ArrayTypes::Empty),
                     )?;
-                    self.is_included(children.1, to_check, proof, depth + 1)
+                    self.is_included(children.1, included_leaf, proof, depth + 1)
                 } else {
                     // bit is 0 is search left and then truncate right branch
-                    let r: bool = self.is_included(children.0, to_check, proof, depth + 1)?;
+                    let r: bool = self.is_included(children.0, included_leaf, proof, depth + 1)?;
                     self.other_included(
                         children.1,
-                        to_check,
+                        included_leaf,
                         proof,
                         depth + 1,
                         matches!(self.nodes_vec[children.0], ArrayTypes::Empty),
@@ -216,7 +217,7 @@ impl MerkleSet {
     fn other_included(
         &self,
         current_node_index: usize,
-        to_check: [u8; 32],
+        included_leaf: [u8; 32],
         proof: &mut Vec<u8>,
         depth: u8,
         collapse: bool,
@@ -234,7 +235,7 @@ impl MerkleSet {
                     }
                     Ok(())
                 } else {
-                    self.is_included(current_node_index, to_check, proof, depth)?;
+                    self.is_included(current_node_index, included_leaf, proof, depth)?;
                     Ok(())
                 }
             }
@@ -257,21 +258,21 @@ impl MerkleSet {
 
     // check if a node_index contains any descendants with two leafs as its children
     fn is_double(&self, node_index: usize) -> Result<bool, SetError> {
-        if let ArrayTypes::Middle { children } = self.nodes_vec[node_index] {
-            if matches!(self.nodes_vec[children.0], ArrayTypes::Empty) {
-                self.is_double(children.1)
-            } else if matches!(self.nodes_vec[children.1], ArrayTypes::Empty) {
-                self.is_double(children.0)
-            } else {
-                return Ok(
-                    matches!(self.nodes_vec[children.0], ArrayTypes::Leaf { .. })
-                        && matches!(self.nodes_vec[children.1], ArrayTypes::Leaf { .. }),
-                );
+        match self.nodes_vec[node_index] {
+            ArrayTypes::Middle {children: (children_0, children_1) } => {
+                if matches!(self.nodes_vec[children_0], ArrayTypes::Empty) {
+                    return self.is_double(children_1)
+                } else if matches!(self.nodes_vec[children_1], ArrayTypes::Empty) {
+                    return self.is_double(children_0)
+                } else {
+                    return Ok(
+                        matches!(self.nodes_vec[children_0], ArrayTypes::Leaf { .. })
+                            && matches!(self.nodes_vec[children_1], ArrayTypes::Leaf { .. }),
+                    );
+                }
             }
-        } else if matches!(self.nodes_vec[node_index], ArrayTypes::Truncated) {
-            Ok(false)
-        } else {
-            Err(SetError)
+            ArrayTypes::Truncated => return Ok(false),
+            _ => return Err(SetError)
         }
     }
 
@@ -334,8 +335,8 @@ impl MerkleSet {
     }
 
     #[pyo3(name = "is_included_already_hashed")]
-    pub fn py_generate_proof(&self, to_check: [u8; 32]) -> PyResult<(bool, PyObject)> {
-        let (found, proof) = self.generate_proof(to_check).unwrap();
+    pub fn py_generate_proof(&self, included_leaf: [u8; 32]) -> PyResult<(bool, PyObject)> {
+        let (found, proof) = self.generate_proof(included_leaf).unwrap();
         return Python::with_gil(|py| Ok((found, PyBytes::new(py, &proof).into())));
 
         // result.map_err(|_| exceptions::PyValueError::new_err("Unable to find proof"))
