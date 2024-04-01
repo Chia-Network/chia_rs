@@ -186,7 +186,18 @@ impl MerkleSet {
                     }
                 }
 
-                if get_bit(&to_check, depth) == 0 {
+                if get_bit(&to_check, depth) {
+                    // bit is 1 so truncate left branch and search right branch
+                    self.other_included(
+                        children.0,
+                        to_check,
+                        proof,
+                        depth + 1,
+                        matches!(self.nodes_vec[children.1], ArrayTypes::Empty),
+                    )?;
+                    self.is_included(children.1, to_check, proof, depth + 1)
+                } else {
+                    // bit is 0 is search left and then truncate right branch
                     let r: bool = self.is_included(children.0, to_check, proof, depth + 1)?;
                     self.other_included(
                         children.1,
@@ -196,15 +207,6 @@ impl MerkleSet {
                         matches!(self.nodes_vec[children.0], ArrayTypes::Empty),
                     )?;
                     Ok(r)
-                } else {
-                    self.other_included(
-                        children.0,
-                        to_check,
-                        proof,
-                        depth + 1,
-                        matches!(self.nodes_vec[children.1], ArrayTypes::Empty),
-                    )?;
-                    self.is_included(children.1, to_check, proof, depth + 1)
                 }
             }
             ArrayTypes::Truncated {} => Err(SetError),
@@ -434,15 +436,15 @@ fn generate_merkle_tree_recurse(
         let left_bit = get_bit(&range[left as usize], depth);
         let right_bit = get_bit(&range[right as usize], depth);
 
-        if left_bit == 1 && right_bit == 0 {
+        if left_bit && !right_bit {
             range.swap(left as usize, right as usize);
             left += 1;
             right -= 1;
         } else {
-            if left_bit == 0 {
+            if !left_bit {
                 left += 1;
             }
-            if right_bit == 1 {
+            if right_bit {
                 right -= 1;
             }
         }
@@ -579,24 +581,10 @@ fn test_get_bit_msb() {
         0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0,
     ];
-    assert_eq!(get_bit(&val1, 0), 1);
-    assert_eq!(get_bit(&val1, 1), 0);
-    assert_eq!(get_bit(&val1, 2), 0);
-    assert_eq!(get_bit(&val1, 3), 0);
-    assert_eq!(get_bit(&val1, 4), 0);
-    assert_eq!(get_bit(&val1, 5), 0);
-    assert_eq!(get_bit(&val1, 6), 0);
-    assert_eq!(get_bit(&val1, 7), 0);
-    assert_eq!(get_bit(&val1, 8), 0);
-    assert_eq!(get_bit(&val1, 9), 0);
-    assert_eq!(get_bit(&val1, 248), 0);
-    assert_eq!(get_bit(&val1, 249), 0);
-    assert_eq!(get_bit(&val1, 250), 0);
-    assert_eq!(get_bit(&val1, 251), 0);
-    assert_eq!(get_bit(&val1, 252), 0);
-    assert_eq!(get_bit(&val1, 253), 0);
-    assert_eq!(get_bit(&val1, 254), 0);
-    assert_eq!(get_bit(&val1, 255), 0);
+    assert!(get_bit(&val1, 0));
+    for bit in 1..255 {
+        assert!(!get_bit(&val1, bit))
+    }
 }
 
 #[test]
@@ -605,24 +593,12 @@ fn test_get_bit_lsb() {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0x0f,
     ];
-    assert_eq!(get_bit(&val1, 0), 0);
-    assert_eq!(get_bit(&val1, 1), 0);
-    assert_eq!(get_bit(&val1, 2), 0);
-    assert_eq!(get_bit(&val1, 3), 0);
-    assert_eq!(get_bit(&val1, 4), 0);
-    assert_eq!(get_bit(&val1, 5), 0);
-    assert_eq!(get_bit(&val1, 6), 0);
-    assert_eq!(get_bit(&val1, 7), 0);
-    assert_eq!(get_bit(&val1, 8), 0);
-    assert_eq!(get_bit(&val1, 9), 0);
-    assert_eq!(get_bit(&val1, 248), 0);
-    assert_eq!(get_bit(&val1, 249), 0);
-    assert_eq!(get_bit(&val1, 250), 0);
-    assert_eq!(get_bit(&val1, 251), 0);
-    assert_eq!(get_bit(&val1, 252), 1);
-    assert_eq!(get_bit(&val1, 253), 1);
-    assert_eq!(get_bit(&val1, 254), 1);
-    assert_eq!(get_bit(&val1, 255), 1);
+    for bit in 0..251 {
+        assert!(!get_bit(&val1, bit))
+    }
+    for bit in 252..255 {
+        assert!(get_bit(&val1, bit))
+    }
 }
 
 #[test]
@@ -631,22 +607,12 @@ fn test_get_bit_mixed() {
         0x55, 0x55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0,
     ];
-    assert_eq!(get_bit(&val1, 0), 0);
-    assert_eq!(get_bit(&val1, 1), 1);
-    assert_eq!(get_bit(&val1, 2), 0);
-    assert_eq!(get_bit(&val1, 3), 1);
-    assert_eq!(get_bit(&val1, 4), 0);
-    assert_eq!(get_bit(&val1, 5), 1);
-    assert_eq!(get_bit(&val1, 6), 0);
-    assert_eq!(get_bit(&val1, 7), 1);
-    assert_eq!(get_bit(&val1, 8), 0);
-    assert_eq!(get_bit(&val1, 9), 1);
-    assert_eq!(get_bit(&val1, 10), 0);
-    assert_eq!(get_bit(&val1, 11), 1);
-    assert_eq!(get_bit(&val1, 12), 0);
-    assert_eq!(get_bit(&val1, 13), 1);
-    assert_eq!(get_bit(&val1, 14), 0);
-    assert_eq!(get_bit(&val1, 15), 1);
+    for bit in (0..15).step_by(2) {
+        assert!(!get_bit(&val1, bit))
+    }
+    for bit in (1..15).step_by(2) {
+        assert!(get_bit(&val1, bit))
+    }
 }
 
 #[test]

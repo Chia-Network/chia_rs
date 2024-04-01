@@ -1,8 +1,8 @@
 // This code is used to create a merkle root. To create a full merkle set, look at merkle_tree.rs
 
 use clvmr::sha2::{Digest, Sha256};
-pub fn get_bit(val: &[u8; 32], bit: u8) -> u8 {
-    ((val[(bit / 8) as usize] & (0x80 >> (bit & 7))) != 0).into()
+pub fn get_bit(val: &[u8; 32], bit: u8) -> bool {
+    (val[(bit / 8) as usize] & (0x80 >> (bit & 7))) != 0
 }
 
 #[repr(u8)]
@@ -97,15 +97,15 @@ fn radix_sort(range: &mut [[u8; 32]], depth: u8) -> ([u8; 32], NodeType) {
         let left_bit = get_bit(&range[left as usize], depth);
         let right_bit = get_bit(&range[right as usize], depth);
 
-        if left_bit == 1 && right_bit == 0 {
+        if left_bit && !right_bit {
             range.swap(left as usize, right as usize);
             left += 1;
             right -= 1;
         } else {
-            if left_bit == 0 {
+            if !left_bit {
                 left += 1;
             }
-            if right_bit == 1 {
+            if right_bit {
                 right -= 1;
             }
         }
