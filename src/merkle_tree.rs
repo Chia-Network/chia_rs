@@ -48,6 +48,8 @@ const TERMINAL: u8 = 1;
 const TRUNCATED: u8 = 2;
 const MIDDLE: u8 = 3;
 
+const EMPTY_NODE_HASH: [u8; 32] = [127, 156, 158, 49, 172, 130, 86, 202, 47, 37, 133, 131, 223, 38, 45, 188, 125, 111, 104, 242, 160, 48, 67, 213, 201, 154, 74, 229, 167, 57, 108, 233];
+
 
 #[derive(Debug)]
 #[cfg_attr(
@@ -365,7 +367,12 @@ fn array_type_to_node_type(array_type: ArrayTypes) -> NodeType {
     }
 }
 
-
+fn hash_leaf(leaf: [u8; 32]) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update([NodeType::Term as u8]);
+    hasher.update(leaf);
+    hasher.finalize().into()
+}
 
 
 pub fn generate_merkle_tree(leafs: &mut [[u8; 32]]) -> ([u8; 32], MerkleSet) {
@@ -386,10 +393,7 @@ pub fn generate_merkle_tree(leafs: &mut [[u8; 32]]) -> ([u8; 32], MerkleSet) {
             // the reason we don't just check the length of "leafs" is that it
             // may contain duplicates and boil down to a single node
             // (effectively), which is a case we need to support
-            let mut hasher = Sha256::new();
-            hasher.update([NodeType::Term as u8]);
-            hasher.update(hash);
-            let root: [u8; 32] = hasher.finalize().into();
+            let root = hash_leaf(hash);
             merkle_tree.hash_cache.push(root);
             (root, merkle_tree)
         }
@@ -413,10 +417,7 @@ fn generate_merkle_tree_recurse(
             data: merkle_tree.leaf_vec.len(),
         });
         merkle_tree.leaf_vec.push(range[0]);
-        let mut hasher = Sha256::new();
-        hasher.update([NodeType::Term as u8]);
-        hasher.update(range[0]);
-        merkle_tree.hash_cache.push(hasher.finalize().into());
+        merkle_tree.hash_cache.push(hash_leaf(range[0]));
         return (range[0], NodeType::Term);
     }
 
@@ -466,10 +467,7 @@ fn generate_merkle_tree_recurse(
                 data: merkle_tree.leaf_vec.len(),
             });
             merkle_tree.leaf_vec.push(range[0]);
-            let mut hasher = Sha256::new();
-            hasher.update([NodeType::Term as u8]);
-            hasher.update(range[0]);
-            merkle_tree.hash_cache.push(hasher.finalize().into());
+            merkle_tree.hash_cache.push(hash_leaf(range[0]));
             (range[0], NodeType::Term)
         } else {
             // this means either the left or right bucket/sub tree was empty.
@@ -482,10 +480,7 @@ fn generate_merkle_tree_recurse(
             if child_type == NodeType::Mid {
                 // most recent nodes are our children
                 merkle_tree.nodes_vec.push(ArrayTypes::Empty);
-                let mut hasher = Sha256::new();
-                hasher.update([NodeType::Empty as u8]);
-                hasher.update(BLANK);
-                merkle_tree.hash_cache.push(hasher.finalize().into());
+                merkle_tree.hash_cache.push(EMPTY_NODE_HASH);
                 let node_length: usize = merkle_tree.nodes_vec.len();
                 if left_empty {
                     merkle_tree.nodes_vec.push(ArrayTypes::Middle {
@@ -518,19 +513,13 @@ fn generate_merkle_tree_recurse(
             data: merkle_tree.leaf_vec.len(),
         });
         merkle_tree.leaf_vec.push(range[0]);
-        let mut hasher = Sha256::new();
-        hasher.update([NodeType::Term as u8]);
-        hasher.update(range[0]);
-        merkle_tree.hash_cache.push(hasher.finalize().into());
+        merkle_tree.hash_cache.push(hash_leaf(range[0]));
 
         merkle_tree.nodes_vec.push(ArrayTypes::Leaf {
             data: merkle_tree.leaf_vec.len(),
         });
         merkle_tree.leaf_vec.push(range[left as usize]);
-        let mut hasher = Sha256::new();
-        hasher.update([NodeType::Term as u8]);
-        hasher.update(range[left as usize]);
-        merkle_tree.hash_cache.push(hasher.finalize().into());
+        merkle_tree.hash_cache.push(hash_leaf(range[left as usize]));
 
         let nodes_len = merkle_tree.nodes_vec.len();
         merkle_tree.nodes_vec.push(ArrayTypes::Middle {
