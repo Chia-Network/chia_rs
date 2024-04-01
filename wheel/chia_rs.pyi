@@ -3654,3 +3654,47 @@ class WeightProof:
     def replace(self, *, sub_epochs: Union[ List[SubEpochData], _Unspec] = _Unspec(),
         sub_epoch_segments: Union[ List[SubEpochChallengeSegment], _Unspec] = _Unspec(),
         recent_chain_data: Union[ List[HeaderBlock], _Unspec] = _Unspec()) -> WeightProof: ...
+
+class ConsensusConstants:
+    slot_blocks_target: uint32
+    min_blocks_per_challenge_block: uint8
+    max_sub_slot_blocks: uint32
+    num_sps_sub_slot: uint8
+    sub_slot_iters_starting: uint64
+    difficulty_constant_factor: uint128
+    difficulty_starting: uint64
+    difficulty_change_max_factor: uint32
+    sub_epoch_blocks: uint32
+    epoch_blocks: uint32
+    significant_bits: uint8
+    discriminant_size_bits: uint16
+    number_zero_bits_plot_filter: uint8
+    min_plot_size: uint8
+    max_plot_size: uint8
+    sub_slot_time_target: uint16
+    num_sp_intervals_extra: uint8
+    max_future_time2: uint8
+    number_of_timestamps: uint8
+    genesis_challenge: bytes32
+    agg_sig_me_additional_data: bytes32
+    genesis_pre_farm_pool_puzzle_hash: bytes32
+    genesis_pre_farm_farmer_puzzle_hash: bytes32
+    max_vdf_witness_size: uint8
+    mempool_block_buffer: uint8
+    max_coin_amount: uint64
+    max_block_cost_clvm: uint64
+    cost_per_byte: uint64
+    weight_proof_threshold: uint8
+    weight_proof_recent_blocks: uint32
+    max_block_count_per_requests: uint32
+    blocks_cache_size: uint32
+    max_generator_size: uint32
+    max_generator_ref_list_size: uint32
+    pool_sub_slot_iters: uint64
+    soft_fork2_height: uint32
+    soft_fork4_height: uint32
+    hard_fork_height: uint32
+    hard_fork_fix_height: uint32
+    plot_filter_128_height: uint32
+    plot_filter_64_height: uint32
+    plot_filter_32_height: uint32

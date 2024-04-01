@@ -3,7 +3,8 @@ from typing import Any, List, Optional, Tuple
 from glob import glob
 
 output_file = Path(__file__).parent.resolve() / "chia_rs.pyi"
-input_dir = Path(__file__).parent.parent.resolve() / "crates" / "chia-protocol" / "src"
+crates_dir = Path(__file__).parent.parent.resolve() / "crates"
+input_dir = crates_dir / "chia-protocol" / "src"
 
 # enums are exposed to python as int
 enums = set(["NodeType", "ProtocolMessageTypes"])
@@ -129,7 +130,7 @@ def parse_rust_source(filename: str) -> List[Tuple[str, List[str]]]:
                 continue
 
             # a field
-            if ":" in line:
+            if ":" in line and "///" not in line:
                 name, rust_type = line.split("//")[0].strip().split(":")
                 # members are separated by , in rust. Strip that off
                 try:
@@ -231,6 +232,8 @@ for f in sorted(glob(str(input_dir / "*.rs"))):
     if f.endswith("bytes.rs") or f.endswith("lazy_node.rs"):
         continue
     classes.extend(parse_rust_source(f))
+
+raw_classes = parse_rust_source(str(crates_dir / "chia-consensus" / "src" / "consensus_constants.rs"))
 
 with open(output_file, "w") as f:
     f.write(
@@ -409,3 +412,9 @@ class AugSchemeMPL:
 
     for c in classes:
         print_class(f, c[0], c[1], extra_members.get(c[0]))
+
+    for c in raw_classes:
+        f.write(f"\nclass {c[0]}:\n")
+        for m in c[1]:
+            f.write(f"    {m}\n")
+
