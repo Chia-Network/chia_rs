@@ -6,8 +6,9 @@ use chia_py_streamable_macro::{PyGetters, PyJsonDict, PyStreamable};
 
 #[cfg_attr(
     feature = "py-bindings",
-    pyo3::pyclass(frozen, rename_all = "SCREAMING_SNAKE_CASE"),
-    derive(PyJsonDict, PyStreamable, PyGetters)
+    pyo3::pyclass(frozen),
+    derive(PyJsonDict, PyStreamable, PyGetters),
+    py_uppercase
 )]
 #[streamable]
 pub struct ConsensusConstants {
@@ -62,7 +63,7 @@ pub struct ConsensusConstants {
     num_sp_intervals_extra: u8,
 
     /// After soft-fork2, this is the new MAX_FUTURE_TIME.
-    max_future_time2: u8,
+    max_future_time2: u32,
 
     /// Than the average of the last NUMBER_OF_TIMESTAMPS blocks.
     number_of_timestamps: u8,

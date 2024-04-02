@@ -3672,7 +3672,7 @@ class ConsensusConstants:
     MAX_PLOT_SIZE: uint8
     SUB_SLOT_TIME_TARGET: uint16
     NUM_SP_INTERVALS_EXTRA: uint8
-    MAX_FUTURE_TIME2: uint8
+    MAX_FUTURE_TIME2: uint32
     NUMBER_OF_TIMESTAMPS: uint8
     GENESIS_CHALLENGE: bytes32
     AGG_SIG_ME_ADDITIONAL_DATA: bytes32
@@ -3716,7 +3716,7 @@ class ConsensusConstants:
         MAX_PLOT_SIZE: uint8,
         SUB_SLOT_TIME_TARGET: uint16,
         NUM_SP_INTERVALS_EXTRA: uint8,
-        MAX_FUTURE_TIME2: uint8,
+        MAX_FUTURE_TIME2: uint32,
         NUMBER_OF_TIMESTAMPS: uint8,
         GENESIS_CHALLENGE: bytes,
         AGG_SIG_ME_ADDITIONAL_DATA: bytes,
@@ -3777,7 +3777,7 @@ class ConsensusConstants:
         MAX_PLOT_SIZE: Union[ uint8, _Unspec] = _Unspec(),
         SUB_SLOT_TIME_TARGET: Union[ uint16, _Unspec] = _Unspec(),
         NUM_SP_INTERVALS_EXTRA: Union[ uint8, _Unspec] = _Unspec(),
-        MAX_FUTURE_TIME2: Union[ uint8, _Unspec] = _Unspec(),
+        MAX_FUTURE_TIME2: Union[ uint32, _Unspec] = _Unspec(),
         NUMBER_OF_TIMESTAMPS: Union[ uint8, _Unspec] = _Unspec(),
         GENESIS_CHALLENGE: Union[ bytes32, _Unspec] = _Unspec(),
         AGG_SIG_ME_ADDITIONAL_DATA: Union[ bytes32, _Unspec] = _Unspec(),
