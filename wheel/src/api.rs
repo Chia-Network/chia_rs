@@ -3,6 +3,7 @@ use crate::run_generator::{
     PySpendBundleConditions,
 };
 use chia_consensus::allocator::make_allocator;
+use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::gen::conditions::MempoolVisitor;
 use chia_consensus::gen::flags::{
     AGG_SIG_ARGS, ALLOW_BACKREFS, ANALYZE_SPENDS, COND_ARGS_NIL, ENABLE_MESSAGE_CONDITIONS,
@@ -492,6 +493,10 @@ pub fn chia_rs(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_class::<GTElement>()?;
     m.add_class::<SecretKey>()?;
     m.add_class::<AugSchemeMPL>()?;
+
+    // constants
+
+    m.add_class::<ConsensusConstants>()?;
 
     Ok(())
 }
