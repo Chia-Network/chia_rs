@@ -25,6 +25,8 @@ cargo test --all --release
 You may need a python virtual environment activated for the tests to link.
 This seems to be caused by the pyo3 dependency in the `wheel`.
 
+To run the python tests, check out the README in the `wheel` folder.
+
 # Benchmarks
 
 To run benchmarks for a specific crate:
