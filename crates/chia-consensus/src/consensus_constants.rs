@@ -1,6 +1,8 @@
 use chia_protocol::Bytes32;
-use chia_py_streamable_macro::{PyGetters, PyJsonDict, PyStreamable};
 use chia_streamable_macro::streamable;
+
+#[cfg(feature = "py-bindings")]
+use chia_py_streamable_macro::{PyGetters, PyJsonDict, PyStreamable};
 
 #[cfg_attr(
     feature = "py-bindings",

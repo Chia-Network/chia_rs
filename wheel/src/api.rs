@@ -40,6 +40,7 @@ use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV, LIMIT_HEAP, NO_UNKNO
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
+use pyo3::pybacked::PyBackedBytes;
 use pyo3::types::PyBytes;
 use pyo3::types::PyList;
 use pyo3::types::PyTuple;
@@ -167,9 +168,8 @@ fn run_puzzle(
     Ok(convert_spend_bundle_conds(&a, conds))
 }
 
-// this is like a CoinSpend but with owned Vec<u8> instead of Program
-// todo: use references again, figure out Python lifetimes in below function
-type CoinSpendOwned<'a> = (Coin, Vec<u8>, Vec<u8>);
+// this is like a CoinSpend but with PyBackedBytes instead of Program
+type CoinSpendOwned<'a> = (Coin, PyBackedBytes, PyBackedBytes);
 
 fn convert_list_of_tuples<'a>(spends: &Bound<'a, PyAny>) -> PyResult<Vec<CoinSpendOwned<'a>>> {
     let mut native_spends = Vec::<CoinSpendOwned>::new();
@@ -177,8 +177,8 @@ fn convert_list_of_tuples<'a>(spends: &Bound<'a, PyAny>) -> PyResult<Vec<CoinSpe
         let s = maybe_s?;
         let tuple = s.downcast::<PyTuple>()?;
         let coin = tuple.get_item(0)?.extract::<Coin>()?;
-        let puzzle = tuple.get_item(1)?.extract::<Vec<u8>>()?;
-        let solution = tuple.get_item(2)?.extract::<Vec<u8>>()?;
+        let puzzle = tuple.get_item(1)?.extract::<PyBackedBytes>()?;
+        let solution = tuple.get_item(2)?.extract::<PyBackedBytes>()?;
         native_spends.push((coin, puzzle, solution));
     }
     Ok(native_spends)
