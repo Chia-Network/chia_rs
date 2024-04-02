@@ -277,7 +277,7 @@ fn test_tree_hash_cached(
     let filename = format!("../../generator-tests/{name}.txt");
     println!("file: {filename}",);
     let test_file = read_to_string(filename).expect("test file not found");
-    let (generator, _) = test_file.split_once('\n').expect("invalid test file");
+    let generator = test_file.lines().next().expect("invalid test file");
     let generator = hex::decode(generator).expect("invalid hex encoded generator");
 
     let generator = if compressed {
