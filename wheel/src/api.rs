@@ -69,22 +69,25 @@ use chia_bls::{
 pub fn compute_merkle_set_root<'p>(
     py: Python<'p>,
     values: Vec<&'p PyBytes>,
-) -> PyResult<&'p PyBytes> {
+) -> PyResult<Bound<'p, PyBytes>> {
     let mut buffer = Vec::<[u8; 32]>::with_capacity(values.len());
     for b in values {
         buffer.push(b.as_bytes().try_into()?);
     }
-    Ok(PyBytes::new(py, &compute_merkle_root_impl(&mut buffer)))
+    Ok(PyBytes::new_bound(
+        py,
+        &compute_merkle_root_impl(&mut buffer),
+    ))
 }
 
 #[pyfunction]
-pub fn tree_hash(py: Python, blob: PyBuffer<u8>) -> PyResult<&PyBytes> {
+pub fn tree_hash(py: Python, blob: PyBuffer<u8>) -> PyResult<Bound<PyBytes>> {
     if !blob.is_c_contiguous() {
         panic!("tree_hash() must be called with a contiguous buffer");
     }
     let slice =
         unsafe { std::slice::from_raw_parts(blob.buf_ptr() as *const u8, blob.len_bytes()) };
-    Ok(PyBytes::new(py, &tree_hash_from_bytes(slice)?))
+    Ok(PyBytes::new_bound(py, &tree_hash_from_bytes(slice)?))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -98,7 +101,7 @@ pub fn get_puzzle_and_solution_for_coin(
     find_amount: u64,
     find_ph: Bytes32,
     flags: u32,
-) -> PyResult<(&PyBytes, &PyBytes)> {
+) -> PyResult<(Bound<PyBytes>, Bound<PyBytes>)> {
     let mut allocator = make_allocator(LIMIT_HEAP);
 
     if !program.is_c_contiguous() {
@@ -142,8 +145,8 @@ pub fn get_puzzle_and_solution_for_coin(
     match r {
         Err(eval_err) => eval_err_to_pyresult(eval_err, allocator),
         Ok((puzzle, solution)) => Ok((
-            PyBytes::new(py, &serialize(&allocator, puzzle)?),
-            PyBytes::new(py, &serialize(&allocator, solution)?),
+            PyBytes::new_bound(py, &serialize(&allocator, puzzle)?),
+            PyBytes::new_bound(py, &serialize(&allocator, solution)?),
         )),
     }
 }
@@ -164,32 +167,36 @@ fn run_puzzle(
     Ok(convert_spend_bundle_conds(&a, conds))
 }
 
-// this is like a CoinSpend but with references to the puzzle and solution,
-// rather than owning them
-type CoinSpendRef<'a> = (Coin, &'a [u8], &'a [u8]);
+// this is like a CoinSpend but with owned Vec<u8> instead of Program
+// todo: use references again, figure out Python lifetimes in below function
+type CoinSpendOwned<'a> = (Coin, Vec<u8>, Vec<u8>);
 
-fn convert_list_of_tuples(spends: &PyAny) -> PyResult<Vec<CoinSpendRef>> {
-    let mut native_spends = Vec::<CoinSpendRef>::new();
-    for s in spends.iter()? {
-        let tuple = s?.downcast::<PyTuple>()?;
+fn convert_list_of_tuples<'a>(spends: &Bound<'a, PyAny>) -> PyResult<Vec<CoinSpendOwned<'a>>> {
+    let mut native_spends = Vec::<CoinSpendOwned>::new();
+    for maybe_s in spends.iter()? {
+        let s = maybe_s?;
+        let tuple = s.downcast::<PyTuple>()?;
         let coin = tuple.get_item(0)?.extract::<Coin>()?;
-        let puzzle = tuple.get_item(1)?.extract::<&[u8]>()?;
-        let solution = tuple.get_item(2)?.extract::<&[u8]>()?;
+        let puzzle = tuple.get_item(1)?.extract::<Vec<u8>>()?;
+        let solution = tuple.get_item(2)?.extract::<Vec<u8>>()?;
         native_spends.push((coin, puzzle, solution));
     }
     Ok(native_spends)
 }
 
 #[pyfunction]
-fn solution_generator<'p>(py: Python<'p>, spends: &PyAny) -> PyResult<&'p PyBytes> {
+fn solution_generator<'p>(py: Python<'p>, spends: &Bound<PyAny>) -> PyResult<Bound<'p, PyBytes>> {
     let spends = convert_list_of_tuples(spends)?;
-    Ok(PyBytes::new(py, &native_solution_generator(spends)?))
+    Ok(PyBytes::new_bound(py, &native_solution_generator(spends)?))
 }
 
 #[pyfunction]
-fn solution_generator_backrefs<'p>(py: Python<'p>, spends: &PyAny) -> PyResult<&'p PyBytes> {
+fn solution_generator_backrefs<'p>(
+    py: Python<'p>,
+    spends: &Bound<PyAny>,
+) -> PyResult<Bound<'p, PyBytes>> {
     let spends = convert_list_of_tuples(spends)?;
-    Ok(PyBytes::new(
+    Ok(PyBytes::new_bound(
         py,
         &native_solution_generator_backrefs(spends)?,
     ))
@@ -214,7 +221,7 @@ impl AugSchemeMPL {
     }
 
     #[staticmethod]
-    pub fn aggregate(sigs: &PyList) -> PyResult<Signature> {
+    pub fn aggregate(sigs: &Bound<PyList>) -> PyResult<Signature> {
         let mut ret = Signature::default();
         for p2 in sigs {
             ret += &p2.extract::<Signature>()?;
@@ -228,7 +235,11 @@ impl AugSchemeMPL {
     }
 
     #[staticmethod]
-    pub fn aggregate_verify(pks: &PyList, msgs: &PyList, sig: &Signature) -> PyResult<bool> {
+    pub fn aggregate_verify(
+        pks: &Bound<PyList>,
+        msgs: &Bound<PyList>,
+        sig: &Signature,
+    ) -> PyResult<bool> {
         let mut data = Vec::<(PublicKey, Vec<u8>)>::new();
         if pks.len() != msgs.len() {
             return Err(PyRuntimeError::new_err(
@@ -314,20 +325,20 @@ fn fast_forward_singleton<'p>(
     spend: &CoinSpend,
     new_coin: &Coin,
     new_parent: &Coin,
-) -> PyResult<&'p PyBytes> {
+) -> PyResult<Bound<'p, PyBytes>> {
     let mut a = make_allocator(LIMIT_HEAP);
     let puzzle = node_from_bytes(&mut a, spend.puzzle_reveal.as_slice())?;
     let solution = node_from_bytes(&mut a, spend.solution.as_slice())?;
 
     let new_solution = native_ff(&mut a, puzzle, solution, &spend.coin, new_coin, new_parent)?;
-    Ok(PyBytes::new(
+    Ok(PyBytes::new_bound(
         py,
         node_to_bytes(&a, new_solution)?.as_slice(),
     ))
 }
 
 #[pymodule]
-pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn chia_rs(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     // generator functions
     m.add_function(wrap_pyfunction!(run_block_generator, m)?)?;
     m.add_function(wrap_pyfunction!(run_block_generator2, m)?)?;

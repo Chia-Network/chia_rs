@@ -301,8 +301,10 @@ impl ToJsonDict for PublicKey {
 }
 
 #[cfg(feature = "py-bindings")]
-pub fn parse_hex_string(o: &PyAny, len: usize, name: &str) -> PyResult<Vec<u8>> {
+pub fn parse_hex_string(o: &pyo3::Bound<pyo3::PyAny>, len: usize, name: &str) -> PyResult<Vec<u8>> {
     use pyo3::exceptions::{PyTypeError, PyValueError};
+    use pyo3::prelude::PyAnyMethods;
+
     if let Ok(s) = o.extract::<String>() {
         let s = if let Some(st) = s.strip_prefix("0x") {
             st
@@ -346,7 +348,7 @@ pub fn parse_hex_string(o: &PyAny, len: usize, name: &str) -> PyResult<Vec<u8>> 
 
 #[cfg(feature = "py-bindings")]
 impl FromJsonDict for PublicKey {
-    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+    fn from_json_dict(o: &pyo3::Bound<PyAny>) -> PyResult<Self> {
         Ok(Self::from_bytes(
             parse_hex_string(o, 48, "PublicKey")?
                 .as_slice()
@@ -741,7 +743,7 @@ mod pytests {
             let pk = sk.public_key();
             Python::with_gil(|py| {
                 let string = pk.to_json_dict(py).expect("to_json_dict");
-                let pk2 = PublicKey::from_json_dict(string.as_ref(py)).unwrap();
+                let pk2 = PublicKey::from_json_dict(string.bind(py)).unwrap();
                 assert_eq!(pk, pk2);
             });
         }
@@ -757,8 +759,8 @@ mod pytests {
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
             let err =
-                PublicKey::from_json_dict(input.to_string().into_py(py).as_ref(py)).unwrap_err();
-            assert_eq!(err.value(py).to_string(), msg.to_string());
+                PublicKey::from_json_dict(input.to_string().into_py(py).bind(py)).unwrap_err();
+            assert_eq!(err.value_bound(py).to_string(), msg.to_string());
         });
     }
 }

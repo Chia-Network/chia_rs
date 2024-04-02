@@ -162,7 +162,7 @@ impl BlockRecord {
         &self,
         py: Python<'a>,
         constants: Bound<PyAny>,
-    ) -> PyResult<&'a PyAny> {
+    ) -> PyResult<Bound<'a, PyAny>> {
         ChiaToPython::to_python(&self.sp_sub_slot_total_iters_impl(py, constants)?, py)
     }
 
@@ -170,19 +170,23 @@ impl BlockRecord {
         &self,
         py: Python<'a>,
         constants: Bound<PyAny>,
-    ) -> PyResult<&'a PyAny> {
+    ) -> PyResult<Bound<'a, PyAny>> {
         ChiaToPython::to_python(&self.ip_sub_slot_total_iters_impl(py, constants)?, py)
     }
 
-    fn sp_iters<'a>(&self, py: Python<'a>, constants: Bound<PyAny>) -> PyResult<&'a PyAny> {
+    fn sp_iters<'a>(&self, py: Python<'a>, constants: Bound<PyAny>) -> PyResult<Bound<'a, PyAny>> {
         ChiaToPython::to_python(&self.sp_iters_impl(py, constants)?, py)
     }
 
-    fn ip_iters<'a>(&self, py: Python<'a>, constants: Bound<PyAny>) -> PyResult<&'a PyAny> {
+    fn ip_iters<'a>(&self, py: Python<'a>, constants: Bound<PyAny>) -> PyResult<Bound<'a, PyAny>> {
         ChiaToPython::to_python(&self.ip_iters_impl(py, constants)?, py)
     }
 
-    fn sp_total_iters<'a>(&self, py: Python<'a>, constants: Bound<PyAny>) -> PyResult<&'a PyAny> {
+    fn sp_total_iters<'a>(
+        &self,
+        py: Python<'a>,
+        constants: Bound<PyAny>,
+    ) -> PyResult<Bound<'a, PyAny>> {
         ChiaToPython::to_python(&self.sp_total_iters_impl(py, constants)?, py)
     }
 }

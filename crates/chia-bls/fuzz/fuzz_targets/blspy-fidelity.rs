@@ -15,14 +15,6 @@ use chia_bls::secret_key::SecretKey;
 use chia_bls::signature::{aggregate, sign};
 use pyo3::types::{PyBytes, PyList, PyTuple};
 
-fn to_bytes(obj: &PyAny) -> &[u8] {
-    obj.call_method0("__bytes__")
-        .unwrap()
-        .downcast::<PyBytes>()
-        .unwrap()
-        .as_bytes()
-}
-
 fuzz_target!(|data: &[u8]| {
     if data.len() < 32 {
         return;
@@ -35,19 +27,29 @@ fuzz_target!(|data: &[u8]| {
         print(sys.executable)
         "#, None, None).unwrap();
         */
-        let blspy = py.import("blspy").unwrap();
+        let blspy = py.import_bound("blspy").unwrap();
         let aug = blspy.getattr("AugSchemeMPL").unwrap();
 
         // Generate key pair from seed
         let rust_sk = SecretKey::from_seed(data);
         let py_sk = aug
-            .call_method1("key_gen", PyTuple::new(py, [PyBytes::new(py, data)]))
+            .call_method1(
+                "key_gen",
+                PyTuple::new_bound(py, [PyBytes::new_bound(py, data)]),
+            )
             .unwrap();
 
         // convert to bytes
         let rust_sk_bytes = rust_sk.to_bytes();
-        let py_sk_bytes = to_bytes(py_sk);
-        assert_eq!(py_sk_bytes, rust_sk_bytes);
+        assert_eq!(
+            py_sk
+                .call_method0("__bytes__")
+                .unwrap()
+                .downcast::<PyBytes>()
+                .unwrap()
+                .as_bytes(),
+            rust_sk_bytes
+        );
 
         // get the public key
         let rust_pk = rust_sk.public_key();
@@ -55,34 +57,69 @@ fuzz_target!(|data: &[u8]| {
 
         // convert to bytes
         let rust_pk_bytes = rust_pk.to_bytes();
-        let py_pk_bytes = to_bytes(py_pk);
-        assert_eq!(py_pk_bytes, rust_pk_bytes);
+
+        assert_eq!(
+            py_pk
+                .call_method0("__bytes__")
+                .unwrap()
+                .downcast::<PyBytes>()
+                .unwrap()
+                .as_bytes(),
+            rust_pk_bytes
+        );
 
         let idx = u32::from_be_bytes(<[u8; 4]>::try_from(&data[0..4]).unwrap());
         let rust_sk1 = rust_sk.derive_unhardened(idx);
         let py_sk1 = aug
             .call_method1(
                 "derive_child_sk_unhardened",
-                PyTuple::new(py, [py_sk, idx.to_object(py).as_ref(py)]),
+                PyTuple::new_bound(py, [&py_sk, idx.to_object(py).bind(py)]),
             )
             .unwrap();
-        assert_eq!(to_bytes(py_sk1), rust_sk1.to_bytes());
+        assert_eq!(
+            py_sk1
+                .call_method0("__bytes__")
+                .unwrap()
+                .downcast::<PyBytes>()
+                .unwrap()
+                .as_bytes(),
+            rust_sk1.to_bytes()
+        );
 
         let rust_pk1 = rust_pk.derive_unhardened(idx);
         let py_pk1 = aug
             .call_method1(
                 "derive_child_pk_unhardened",
-                PyTuple::new(py, [py_pk, idx.to_object(py).as_ref(py)]),
+                PyTuple::new_bound(py, [&py_pk, idx.to_object(py).bind(py)]),
             )
             .unwrap();
-        assert_eq!(to_bytes(py_pk1), rust_pk1.to_bytes());
+        assert_eq!(
+            py_pk1
+                .call_method0("__bytes__")
+                .unwrap()
+                .downcast::<PyBytes>()
+                .unwrap()
+                .as_bytes(),
+            rust_pk1.to_bytes()
+        );
 
         // sign with the derived keys
         let rust_sig1 = sign(&rust_sk1, data);
         let py_sig1 = aug
-            .call_method1("sign", PyTuple::new(py, [py_sk1, PyBytes::new(py, data)]))
+            .call_method1(
+                "sign",
+                PyTuple::new_bound(py, [&py_sk1, PyBytes::new_bound(py, data).as_any()]),
+            )
             .unwrap();
-        assert_eq!(to_bytes(py_sig1), rust_sig1.to_bytes());
+        assert_eq!(
+            py_sig1
+                .call_method0("__bytes__")
+                .unwrap()
+                .downcast::<PyBytes>()
+                .unwrap()
+                .as_bytes(),
+            rust_sig1.to_bytes()
+        );
 
         // derive hardened
         let idx = u32::from_be_bytes(<[u8; 4]>::try_from(&data[4..8]).unwrap());
@@ -90,26 +127,53 @@ fuzz_target!(|data: &[u8]| {
         let py_sk2 = aug
             .call_method1(
                 "derive_child_sk",
-                PyTuple::new(py, [py_sk, idx.to_object(py).as_ref(py)]),
+                PyTuple::new_bound(py, [&py_sk, idx.to_object(py).bind(py)]),
             )
             .unwrap();
-        assert_eq!(to_bytes(py_sk2), rust_sk2.to_bytes());
+        assert_eq!(
+            py_sk2
+                .call_method0("__bytes__")
+                .unwrap()
+                .downcast::<PyBytes>()
+                .unwrap()
+                .as_bytes(),
+            rust_sk2.to_bytes()
+        );
 
         // sign with the derived keys
         let rust_sig2 = sign(&rust_sk2, data);
         let py_sig2 = aug
-            .call_method1("sign", PyTuple::new(py, [py_sk2, PyBytes::new(py, data)]))
+            .call_method1(
+                "sign",
+                PyTuple::new_bound(py, [py_sk2, PyBytes::new_bound(py, data).as_any().clone()]),
+            )
             .unwrap();
-        assert_eq!(to_bytes(py_sig2), rust_sig2.to_bytes());
+        assert_eq!(
+            py_sig2
+                .call_method0("__bytes__")
+                .unwrap()
+                .downcast::<PyBytes>()
+                .unwrap()
+                .as_bytes(),
+            rust_sig2.to_bytes()
+        );
 
         // aggregate
         let rust_agg = aggregate([rust_sig1, rust_sig2]);
         let py_agg = aug
             .call_method1(
                 "aggregate",
-                PyTuple::new(py, [PyList::new(py, [py_sig1, py_sig2])]),
+                PyTuple::new_bound(py, [PyList::new_bound(py, [py_sig1, py_sig2])]),
             )
             .unwrap();
-        assert_eq!(to_bytes(py_agg), rust_agg.to_bytes());
+        assert_eq!(
+            py_agg
+                .call_method0("__bytes__")
+                .unwrap()
+                .downcast::<PyBytes>()
+                .unwrap()
+                .as_bytes(),
+            rust_agg.to_bytes()
+        );
     });
 });

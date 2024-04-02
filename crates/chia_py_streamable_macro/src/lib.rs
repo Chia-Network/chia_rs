@@ -74,8 +74,8 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
         }
 
         impl #crate_name::ChiaToPython for #ident {
-            fn to_python<'a>(&self, py: pyo3::Python<'a>) -> pyo3::PyResult<&'a pyo3::PyAny> {
-                Ok(pyo3::IntoPy::into_py(self.clone(), py).into_ref(py))
+            fn to_python<'a>(&self, py: pyo3::Python<'a>) -> pyo3::PyResult<pyo3::Bound<'a, pyo3::PyAny>> {
+                Ok(pyo3::IntoPy::into_py(self.clone(), py).into_any().bind(py).clone())
             }
         }
     };
@@ -135,7 +135,7 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
         impl #ident {
             #[staticmethod]
             #[pyo3(signature=(json_dict))]
-            pub fn from_json_dict(json_dict: &pyo3::PyAny) -> pyo3::PyResult<Self> {
+            pub fn from_json_dict(json_dict: &pyo3::Bound<pyo3::PyAny>) -> pyo3::PyResult<Self> {
                 <Self as #crate_name::from_json_dict::FromJsonDict>::from_json_dict(json_dict)
             }
 
@@ -248,7 +248,7 @@ pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenSt
                 }
 
                 impl #crate_name::from_json_dict::FromJsonDict for #ident {
-                    fn from_json_dict(o: &pyo3::PyAny) -> pyo3::PyResult<Self> {
+                    fn from_json_dict(o: &pyo3::Bound<pyo3::PyAny>) -> pyo3::PyResult<Self> {
                         let v = <u8 as #crate_name::from_json_dict::FromJsonDict>::from_json_dict(o)?;
                         <Self as #crate_name::Streamable>::parse::<false>(&mut std::io::Cursor::<&[u8]>::new(&[v])).map_err(|e| e.into())
                     }
@@ -283,9 +283,11 @@ pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenSt
                 }
 
                 impl #crate_name::from_json_dict::FromJsonDict for #ident {
-                    fn from_json_dict(o: &pyo3::PyAny) -> pyo3::PyResult<Self> {
+                    fn from_json_dict(o: &pyo3::Bound<pyo3::PyAny>) -> pyo3::PyResult<Self> {
                         Ok(Self{
-                            #(#fnames: <#ftypes as #crate_name::from_json_dict::FromJsonDict>::from_json_dict(o.get_item(stringify!(#fnames))?)?,)*
+                            #(#fnames: <#ftypes as #crate_name::from_json_dict::FromJsonDict>::from_json_dict(
+                                &pyo3::prelude::PyAnyMethods::get_item(o, stringify!(#fnames))?
+                            )?,)*
                         })
                     }
                 }
@@ -333,7 +335,7 @@ pub fn py_getters_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStre
         impl #ident {
             #(
             #[getter]
-            fn #fnames<'a> (&self, py: pyo3::Python<'a>) -> pyo3::PyResult<&'a pyo3::PyAny> {
+            fn #fnames<'a>(& self, py: pyo3::Python<'a>) -> pyo3::PyResult<pyo3::Bound<'a, pyo3::PyAny>> {
                 #crate_name::ChiaToPython::to_python(&self.#fnames, py)
             }
             )*

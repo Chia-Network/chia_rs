@@ -86,7 +86,7 @@ impl ToJsonDict for Bytes {
 
 #[cfg(feature = "py-bindings")]
 impl FromJsonDict for Bytes {
-    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+    fn from_json_dict(o: &Bound<PyAny>) -> PyResult<Self> {
         let s: String = o.extract()?;
         if !s.starts_with("0x") {
             return Err(PyValueError::new_err(
@@ -212,7 +212,7 @@ impl<const N: usize> ToJsonDict for BytesImpl<N> {
 
 #[cfg(feature = "py-bindings")]
 impl<const N: usize> FromJsonDict for BytesImpl<N> {
-    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+    fn from_json_dict(o: &Bound<PyAny>) -> PyResult<Self> {
         let s: String = o.extract()?;
         if !s.starts_with("0x") {
             return Err(PyValueError::new_err(
@@ -344,26 +344,27 @@ pub type Bytes100 = BytesImpl<100>;
 #[cfg(feature = "py-bindings")]
 impl<const N: usize> ToPyObject for BytesImpl<N> {
     fn to_object(&self, py: Python) -> PyObject {
-        PyBytes::new(py, &self.0).into()
+        PyBytes::new_bound(py, &self.0).into()
     }
 }
 
 #[cfg(feature = "py-bindings")]
 impl<const N: usize> IntoPy<PyObject> for BytesImpl<N> {
     fn into_py(self, py: Python) -> PyObject {
-        PyBytes::new(py, &self.0).into()
+        PyBytes::new_bound(py, &self.0).into()
     }
 }
 
 #[cfg(feature = "py-bindings")]
 impl<const N: usize> ChiaToPython for BytesImpl<N> {
-    fn to_python<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
+    fn to_python<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
         if N == 32 {
-            let bytes_module = PyModule::import(py, "chia.types.blockchain_format.sized_bytes")?;
+            let bytes_module =
+                PyModule::import_bound(py, "chia.types.blockchain_format.sized_bytes")?;
             let ty = bytes_module.getattr("bytes32")?;
             ty.call1((self.0.into_py(py),))
         } else {
-            Ok(PyBytes::new(py, &self.0).into())
+            Ok(PyBytes::new_bound(py, &self.0).into_any())
         }
     }
 }
@@ -371,7 +372,7 @@ impl<const N: usize> ChiaToPython for BytesImpl<N> {
 #[cfg(feature = "py-bindings")]
 impl<'py, const N: usize> FromPyObject<'py> for BytesImpl<N> {
     fn extract(obj: &'py PyAny) -> PyResult<Self> {
-        let b = <PyBytes as PyTryFrom>::try_from(obj)?;
+        let b = obj.downcast::<PyBytes>()?;
         let slice: &[u8] = b.as_bytes();
         let buf: [u8; N] = slice.try_into()?;
         Ok(BytesImpl::<N>(buf))
@@ -381,28 +382,28 @@ impl<'py, const N: usize> FromPyObject<'py> for BytesImpl<N> {
 #[cfg(feature = "py-bindings")]
 impl ToPyObject for Bytes {
     fn to_object(&self, py: Python) -> PyObject {
-        PyBytes::new(py, &self.0).into()
+        PyBytes::new_bound(py, &self.0).into()
     }
 }
 
 #[cfg(feature = "py-bindings")]
 impl IntoPy<PyObject> for Bytes {
     fn into_py(self, py: Python) -> PyObject {
-        PyBytes::new(py, &self.0).into()
+        PyBytes::new_bound(py, &self.0).into()
     }
 }
 
 #[cfg(feature = "py-bindings")]
 impl ChiaToPython for Bytes {
-    fn to_python<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
-        Ok(PyBytes::new(py, &self.0).into())
+    fn to_python<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
+        Ok(PyBytes::new_bound(py, &self.0).into_any())
     }
 }
 
 #[cfg(feature = "py-bindings")]
 impl<'py> FromPyObject<'py> for Bytes {
     fn extract(obj: &'py PyAny) -> PyResult<Self> {
-        let b = <PyBytes as PyTryFrom>::try_from(obj)?;
+        let b = obj.downcast::<PyBytes>()?;
         Ok(Bytes(b.as_bytes().to_vec()))
     }
 }
