@@ -29,7 +29,12 @@ fn encode_type(t: NodeType) -> u8 {
     }
 }
 
-pub(crate) fn hash(ltype: NodeType, rtype: NodeType, left: &[u8; 32], right: &[u8; 32]) -> [u8; 32] {
+pub(crate) fn hash(
+    ltype: NodeType,
+    rtype: NodeType,
+    left: &[u8; 32],
+    right: &[u8; 32],
+) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update([
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

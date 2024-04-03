@@ -41,12 +41,12 @@ use chia_protocol::{
 use clvm_utils::tree_hash_from_bytes;
 use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV, LIMIT_HEAP, NO_UNKNOWN_OPS};
 use pyo3::buffer::PyBuffer;
+use pyo3::exceptions;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use pyo3::types::PyList;
 use pyo3::types::PyTuple;
-use pyo3::exceptions;
 use pyo3::wrap_pyfunction;
 use std::iter::zip;
 
@@ -84,7 +84,8 @@ pub fn compute_merkle_set_root<'p>(
 #[pyfunction]
 pub fn deserialize_proof(proof: Py<PyBytes>) -> PyResult<MerkleSet> {
     let bytes = Python::with_gil(|py| proof.as_bytes(py));
-    deserialise_proof(bytes).map_err(|_| exceptions::PyValueError::new_err("Error deserialising proof."))
+    deserialise_proof(bytes)
+        .map_err(|_| exceptions::PyValueError::new_err("Error deserialising proof."))
 }
 
 #[pyfunction]
