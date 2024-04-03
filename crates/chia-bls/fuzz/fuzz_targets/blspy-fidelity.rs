@@ -13,7 +13,18 @@ use pyo3::prelude::*;
 use chia_bls::derivable_key::DerivableKey;
 use chia_bls::secret_key::SecretKey;
 use chia_bls::signature::{aggregate, sign};
+use pyo3::pybacked::PyBackedBytes;
 use pyo3::types::{PyBytes, PyList, PyTuple};
+
+fn to_bytes(value: &Bound<PyAny>) -> PyBackedBytes {
+    value
+        .call_method0("__bytes__")
+        .unwrap()
+        .downcast::<PyBytes>()
+        .unwrap()
+        .extract()
+        .unwrap()
+}
 
 fuzz_target!(|data: &[u8]| {
     if data.len() < 32 {
@@ -41,15 +52,7 @@ fuzz_target!(|data: &[u8]| {
 
         // convert to bytes
         let rust_sk_bytes = rust_sk.to_bytes();
-        assert_eq!(
-            py_sk
-                .call_method0("__bytes__")
-                .unwrap()
-                .downcast::<PyBytes>()
-                .unwrap()
-                .as_bytes(),
-            rust_sk_bytes
-        );
+        assert_eq!(to_bytes(&py_sk).as_ref(), rust_sk_bytes);
 
         // get the public key
         let rust_pk = rust_sk.public_key();
@@ -58,15 +61,7 @@ fuzz_target!(|data: &[u8]| {
         // convert to bytes
         let rust_pk_bytes = rust_pk.to_bytes();
 
-        assert_eq!(
-            py_pk
-                .call_method0("__bytes__")
-                .unwrap()
-                .downcast::<PyBytes>()
-                .unwrap()
-                .as_bytes(),
-            rust_pk_bytes
-        );
+        assert_eq!(to_bytes(&py_pk).as_ref(), rust_pk_bytes);
 
         let idx = u32::from_be_bytes(<[u8; 4]>::try_from(&data[0..4]).unwrap());
         let rust_sk1 = rust_sk.derive_unhardened(idx);
@@ -76,15 +71,7 @@ fuzz_target!(|data: &[u8]| {
                 PyTuple::new_bound(py, [&py_sk, idx.to_object(py).bind(py)]),
             )
             .unwrap();
-        assert_eq!(
-            py_sk1
-                .call_method0("__bytes__")
-                .unwrap()
-                .downcast::<PyBytes>()
-                .unwrap()
-                .as_bytes(),
-            rust_sk1.to_bytes()
-        );
+        assert_eq!(to_bytes(&py_sk1).as_ref(), rust_sk1.to_bytes());
 
         let rust_pk1 = rust_pk.derive_unhardened(idx);
         let py_pk1 = aug
@@ -93,15 +80,7 @@ fuzz_target!(|data: &[u8]| {
                 PyTuple::new_bound(py, [&py_pk, idx.to_object(py).bind(py)]),
             )
             .unwrap();
-        assert_eq!(
-            py_pk1
-                .call_method0("__bytes__")
-                .unwrap()
-                .downcast::<PyBytes>()
-                .unwrap()
-                .as_bytes(),
-            rust_pk1.to_bytes()
-        );
+        assert_eq!(to_bytes(&py_pk1).as_ref(), rust_pk1.to_bytes());
 
         // sign with the derived keys
         let rust_sig1 = sign(&rust_sk1, data);
@@ -111,15 +90,7 @@ fuzz_target!(|data: &[u8]| {
                 PyTuple::new_bound(py, [&py_sk1, PyBytes::new_bound(py, data).as_any()]),
             )
             .unwrap();
-        assert_eq!(
-            py_sig1
-                .call_method0("__bytes__")
-                .unwrap()
-                .downcast::<PyBytes>()
-                .unwrap()
-                .as_bytes(),
-            rust_sig1.to_bytes()
-        );
+        assert_eq!(to_bytes(&py_sig1).as_ref(), rust_sig1.to_bytes());
 
         // derive hardened
         let idx = u32::from_be_bytes(<[u8; 4]>::try_from(&data[4..8]).unwrap());
@@ -130,15 +101,7 @@ fuzz_target!(|data: &[u8]| {
                 PyTuple::new_bound(py, [&py_sk, idx.to_object(py).bind(py)]),
             )
             .unwrap();
-        assert_eq!(
-            py_sk2
-                .call_method0("__bytes__")
-                .unwrap()
-                .downcast::<PyBytes>()
-                .unwrap()
-                .as_bytes(),
-            rust_sk2.to_bytes()
-        );
+        assert_eq!(to_bytes(&py_sk2).as_ref(), rust_sk2.to_bytes());
 
         // sign with the derived keys
         let rust_sig2 = sign(&rust_sk2, data);
@@ -148,15 +111,7 @@ fuzz_target!(|data: &[u8]| {
                 PyTuple::new_bound(py, [py_sk2, PyBytes::new_bound(py, data).as_any().clone()]),
             )
             .unwrap();
-        assert_eq!(
-            py_sig2
-                .call_method0("__bytes__")
-                .unwrap()
-                .downcast::<PyBytes>()
-                .unwrap()
-                .as_bytes(),
-            rust_sig2.to_bytes()
-        );
+        assert_eq!(to_bytes(&py_sig2).as_ref(), rust_sig2.to_bytes());
 
         // aggregate
         let rust_agg = aggregate([rust_sig1, rust_sig2]);
@@ -166,14 +121,6 @@ fuzz_target!(|data: &[u8]| {
                 PyTuple::new_bound(py, [PyList::new_bound(py, [py_sig1, py_sig2])]),
             )
             .unwrap();
-        assert_eq!(
-            py_agg
-                .call_method0("__bytes__")
-                .unwrap()
-                .downcast::<PyBytes>()
-                .unwrap()
-                .as_bytes(),
-            rust_agg.to_bytes()
-        );
+        assert_eq!(to_bytes(&py_agg).as_ref(), rust_agg.to_bytes());
     });
 });
