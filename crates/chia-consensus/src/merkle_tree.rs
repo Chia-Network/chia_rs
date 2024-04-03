@@ -249,9 +249,9 @@ impl MerkleSet {
                 children: (children_0, children_1),
             } => {
                 if matches!(self.nodes_vec[children_0], ArrayTypes::Empty) {
-                    return self.is_double(children_1);
+                    self.is_double(children_1)
                 } else if matches!(self.nodes_vec[children_1], ArrayTypes::Empty) {
-                    return self.is_double(children_0);
+                    self.is_double(children_0)
                 } else {
                     return Ok(
                         matches!(self.nodes_vec[children_0], ArrayTypes::Leaf { .. })
@@ -259,8 +259,8 @@ impl MerkleSet {
                     );
                 }
             }
-            ArrayTypes::Truncated => return Ok(false),
-            _ => return Err(SetError),
+            ArrayTypes::Truncated => Ok(false),
+            _ => Err(SetError),
         }
     }
 
