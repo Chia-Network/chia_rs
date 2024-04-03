@@ -16,7 +16,7 @@ fn maybe_upper_fields(py_uppercase: bool, fnames: Vec<syn::Ident>) -> Vec<syn::I
     }
 }
 
-#[proc_macro_derive(PyStreamable, attributes(py_uppercase))]
+#[proc_macro_derive(PyStreamable, attributes(py_uppercase, py_pickle))]
 pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let found_crate = crate_name("chia-traits").expect("chia-traits is present in `Cargo.toml`");
 
@@ -33,9 +33,12 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
     } = parse_macro_input!(input);
 
     let mut py_uppercase = false;
+    let mut py_pickle = false;
     for attr in attrs.iter() {
         if attr.path().is_ident("py_uppercase") {
             py_uppercase = true;
+        } else if attr.path().is_ident("py_pickle") {
+            py_pickle = true;
         }
     }
 
@@ -100,10 +103,11 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
         }
     };
 
+    let mut fnames = Vec::<syn::Ident>::new();
+    let mut ftypes = Vec::<syn::Type>::new();
+
     match fields {
         syn::Fields::Named(FieldsNamed { named, .. }) => {
-            let mut fnames = Vec::<syn::Ident>::new();
-            let mut ftypes = Vec::<syn::Type>::new();
             for f in named.iter() {
                 fnames.push(f.ident.as_ref().unwrap().clone());
                 ftypes.push(f.ty.clone());
@@ -242,6 +246,44 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
         }
     };
     py_protocol.extend(streamable);
+
+    let pickle = quote! {
+        #[pyo3::pymethods]
+        impl #ident {
+            pub fn __setstate__(
+                &mut self,
+                state: &pyo3::Bound<pyo3::types::PyBytes>,
+            ) -> pyo3::PyResult<()> {
+                use chia_traits::Streamable;
+                use pyo3::prelude::PyBytesMethods;
+
+                *self = Self::parse::<true>(&mut std::io::Cursor::new(state.as_bytes()))?;
+
+                Ok(())
+            }
+
+            pub fn __getstate__<'py>(
+                &self,
+                py: pyo3::Python<'py>,
+            ) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyBytes>> {
+                use chia_traits::Streamable;
+
+                let mut bytes = Vec::new();
+                self.stream(&mut bytes)?;
+                Ok(pyo3::types::PyBytes::new_bound(py, &bytes))
+            }
+
+            pub fn __getnewargs__<'py>(&self, py: pyo3::Python<'py>) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyTuple>> {
+                let mut args = Vec::new();
+                #( args.push(#crate_name::ChiaToPython::to_python(&self.#fnames, py)?); )*
+                Ok(pyo3::types::PyTuple::new_bound(py, args))
+            }
+        }
+    };
+    if py_pickle {
+        py_protocol.extend(pickle);
+    }
+
     py_protocol.into()
 }
 

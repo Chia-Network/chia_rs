@@ -6,9 +6,10 @@ use chia_py_streamable_macro::{PyGetters, PyJsonDict, PyStreamable};
 
 #[cfg_attr(
     feature = "py-bindings",
-    pyo3::pyclass(frozen),
+    pyo3::pyclass(module = "chia_rs"),
     derive(PyJsonDict, PyStreamable, PyGetters),
-    py_uppercase
+    py_uppercase,
+    py_pickle
 )]
 #[streamable]
 pub struct ConsensusConstants {
