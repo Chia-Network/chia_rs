@@ -1,27 +1,21 @@
-
 // This file contains the code used to create a full MerkleSet and is heavily reliant on the code in merkle_set.rs.
 
-use clvmr::sha2::{Digest, Sha256};
-use crate::merkle_set::{
-    hash,
-    BLANK,
-    get_bit,
-    NodeType,
-};
 #[cfg(test)]
 use crate::merkle_set::compute_merkle_set_root;
-#[cfg(test)]
-use rand::rngs::SmallRng;  // cargo says this isn't required but tests won't run without it
-#[cfg(test)]
-use rand::{Rng, SeedableRng};
-#[cfg(feature = "py-bindings")]
-use pyo3::{pyclass, pymethods, PyResult};
+use crate::merkle_set::{get_bit, hash, NodeType, BLANK};
+use clvmr::sha2::{Digest, Sha256};
 #[cfg(feature = "py-bindings")]
 use pyo3::exceptions;
 #[cfg(feature = "py-bindings")]
-use pyo3::types::{PyList, PyBytes};
+use pyo3::prelude::*;
 #[cfg(feature = "py-bindings")]
-use pyo3::prelude::*;  // needed for PyBytes
+use pyo3::types::{PyBytes, PyList};
+#[cfg(feature = "py-bindings")]
+use pyo3::{pyclass, pymethods, PyResult};
+#[cfg(test)]
+use rand::rngs::SmallRng; // cargo says this isn't required but tests won't run without it
+#[cfg(test)]
+use rand::{Rng, SeedableRng}; // needed for PyBytes
 
 // the ArrayType is used to create a more lasting MerkleTree representation in the MerkleSet struct
 #[derive(PartialEq, Debug, Copy, Clone)]
@@ -34,10 +28,7 @@ pub enum ArrayTypes {
 
 // represents a MerkleTree by putting all the nodes in a vec. Root is the last entry.
 #[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(
-    feature = "py-bindings",
-    pyclass(frozen, name = "MerkleSet"),
-)]
+#[cfg_attr(feature = "py-bindings", pyclass(frozen, name = "MerkleSet"))]
 pub struct MerkleSet {
     pub nodes_vec: Vec<ArrayTypes>,
     pub leaf_vec: Vec<[u8; 32]>,
@@ -49,14 +40,13 @@ const TERMINAL: u8 = 1;
 const TRUNCATED: u8 = 2;
 const MIDDLE: u8 = 3;
 
-const EMPTY_NODE_HASH: [u8; 32] = [127, 156, 158, 49, 172, 130, 86, 202, 47, 37, 133, 131, 223, 38, 45, 188, 125, 111, 104, 242, 160, 48, 67, 213, 201, 154, 74, 229, 167, 57, 108, 233];
-
+const EMPTY_NODE_HASH: [u8; 32] = [
+    127, 156, 158, 49, 172, 130, 86, 202, 47, 37, 133, 131, 223, 38, 45, 188, 125, 111, 104, 242,
+    160, 48, 67, 213, 201, 154, 74, 229, 167, 57, 108, 233,
+];
 
 #[derive(Debug)]
-#[cfg_attr(
-    feature = "py-bindings",
-    pyclass(frozen, name = "SetError"),
-)]
+#[cfg_attr(feature = "py-bindings", pyclass(frozen, name = "SetError"))]
 pub struct SetError;
 
 pub fn deserialize_proof(proof: &[u8]) -> Result<MerkleSet, SetError> {
@@ -69,11 +59,7 @@ pub fn deserialize_proof(proof: &[u8]) -> Result<MerkleSet, SetError> {
     }
 }
 
-fn _deserialize(
-    merkle_tree: &mut MerkleSet,
-    proof: &[u8],
-    pos: usize,
-) -> Result<usize, SetError> {
+fn _deserialize(merkle_tree: &mut MerkleSet, proof: &[u8], pos: usize) -> Result<usize, SetError> {
     if let Some(&t) = proof.get(pos) {
         match t {
             EMPTY => {
@@ -97,9 +83,9 @@ fn _deserialize(
                 Ok(pos + 33)
             }
             MIDDLE => {
-                let new_pos = _deserialize(merkle_tree, proof, pos + 1, )?;
+                let new_pos = _deserialize(merkle_tree, proof, pos + 1)?;
                 let left_pointer = merkle_tree.nodes_vec.len() - 1;
-                
+
                 let final_pos = _deserialize(merkle_tree, proof, new_pos)?;
                 let right_pointer = merkle_tree.nodes_vec.len() - 1;
                 merkle_tree.nodes_vec.push(ArrayTypes::Middle {
@@ -124,17 +110,16 @@ fn _deserialize(
 }
 
 impl Default for MerkleSet {
-    fn default() -> MerkleSet { 
+    fn default() -> MerkleSet {
         MerkleSet {
             nodes_vec: Vec::new(),
             leaf_vec: Vec::new(),
             hash_cache: Vec::new(),
         }
-     }
+    }
 }
 
 impl MerkleSet {
-
     pub fn get_merkle_root(&self) -> [u8; 32] {
         self.hash_cache[self.hash_cache.len() - 1]
     }
@@ -260,11 +245,13 @@ impl MerkleSet {
     // check if a node_index contains any descendants with two leafs as its children
     fn is_double(&self, node_index: usize) -> Result<bool, SetError> {
         match self.nodes_vec[node_index] {
-            ArrayTypes::Middle {children: (children_0, children_1) } => {
+            ArrayTypes::Middle {
+                children: (children_0, children_1),
+            } => {
                 if matches!(self.nodes_vec[children_0], ArrayTypes::Empty) {
-                    return self.is_double(children_1)
+                    return self.is_double(children_1);
                 } else if matches!(self.nodes_vec[children_1], ArrayTypes::Empty) {
-                    return self.is_double(children_0)
+                    return self.is_double(children_0);
                 } else {
                     return Ok(
                         matches!(self.nodes_vec[children_0], ArrayTypes::Leaf { .. })
@@ -273,7 +260,7 @@ impl MerkleSet {
                 }
             }
             ArrayTypes::Truncated => return Ok(false),
-            _ => return Err(SetError)
+            _ => return Err(SetError),
         }
     }
 
@@ -320,19 +307,22 @@ impl MerkleSet {
     #[new]
     pub fn init(leafs: &PyList) -> PyResult<Self> {
         let mut data: Vec<[u8; 32]> = Vec::with_capacity(leafs.len());
-        
+
         for leaf in leafs {
-            data.push(leaf.extract::<[u8;32]>().unwrap())
+            data.push(leaf.extract::<[u8; 32]>().unwrap())
         }
         Ok(generate_merkle_tree(&mut data[..]).1)
     }
 
     #[pyo3(name = "get_root")]
-    pub fn py_get_root(&self) -> PyResult<PyObject> {  // compiler doesn't like PyBytes as return type
+    pub fn py_get_root(&self) -> PyResult<PyObject> {
+        // compiler doesn't like PyBytes as return type
         if self.hash_cache.is_empty() {
-            return Err(exceptions::PyValueError::new_err("Tree is empty"))
+            return Err(exceptions::PyValueError::new_err("Tree is empty"));
         }
-        return Python::with_gil(|py| Ok(PyBytes::new(py, &self.hash_cache[self.hash_cache.len() - 1]).into()));
+        return Python::with_gil(|py| {
+            Ok(PyBytes::new(py, &self.hash_cache[self.hash_cache.len() - 1]).into())
+        });
     }
 
     #[pyo3(name = "is_included_already_hashed")]
@@ -351,7 +341,7 @@ impl MerkleSet {
         let result = deserialize_proof(&proof_vec);
         match result {
             Ok(r) => Ok(r),
-            Err(_) =>  Err(exceptions::PyValueError::new_err("Error in proof"))
+            Err(_) => Err(exceptions::PyValueError::new_err("Error in proof")),
         }
     }
 }
@@ -372,18 +362,14 @@ fn hash_leaf(leaf: [u8; 32]) -> [u8; 32] {
     hasher.finalize().into()
 }
 
-
 pub fn generate_merkle_tree(leafs: &mut [[u8; 32]]) -> ([u8; 32], MerkleSet) {
     // Leafs are already hashed
 
     // There's a special case for empty sets
     if leafs.is_empty() {
-        return (
-            BLANK,
-            MerkleSet::default()
-        );
+        return (BLANK, MerkleSet::default());
     }
-    let mut merkle_tree: MerkleSet =  MerkleSet::default();
+    let mut merkle_tree: MerkleSet = MerkleSet::default();
     match generate_merkle_tree_recurse(leafs, 0, &mut merkle_tree) {
         (hash, NodeType::Term) => {
             // if there's only a single item in the set, we prepend "Term"
@@ -561,7 +547,6 @@ fn generate_merkle_tree_recurse(
         (node_hash, node_type)
     }
 }
-
 
 #[cfg(test)]
 fn h2(buf1: &[u8], buf2: &[u8]) -> [u8; 32] {
@@ -1320,8 +1305,12 @@ fn test_merkle_right_edge() {
     //                  / \
     //                 c   b
 
-    let ArrayTypes::Middle{ children } = tree.nodes_vec.last().unwrap() else { panic!("expected middle node"); };
-    let ArrayTypes::Leaf{ .. } = tree.nodes_vec[children.0] else { panic!("expected leaf"); };
+    let ArrayTypes::Middle { children } = tree.nodes_vec.last().unwrap() else {
+        panic!("expected middle node");
+    };
+    let ArrayTypes::Leaf { .. } = tree.nodes_vec[children.0] else {
+        panic!("expected leaf");
+    };
     // generate proof of inclusion for every node
     let (included, _proof) = tree.generate_proof(d).unwrap();
     assert!(included);
