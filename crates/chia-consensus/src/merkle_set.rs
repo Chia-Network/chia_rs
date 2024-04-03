@@ -1,13 +1,16 @@
 use clvmr::sha2::{Digest, Sha256};
 use hex_literal::hex;
 
-fn get_bit(val: &[u8; 32], bit: u8) -> u8 {
-    ((val[(bit / 8) as usize] & (0x80 >> (bit & 7))) != 0).into()
+use clvmr::sha2::{Digest, Sha256};
+pub fn get_bit(val: &[u8; 32], bit: u8) -> bool {
+    (val[(bit / 8) as usize] & (0x80 >> (bit & 7))) != 0
 }
 
 #[repr(u8)]
 #[derive(PartialEq, Eq, Copy, Clone)]
-enum NodeType {
+
+// the NodeType is used in the radix sort to establish what data to hash to
+pub enum NodeType {
     Empty,
     Term,
     Mid,
@@ -27,7 +30,7 @@ fn encode_type(t: NodeType) -> u8 {
     }
 }
 
-fn hash(ltype: NodeType, rtype: NodeType, left: &[u8; 32], right: &[u8; 32]) -> [u8; 32] {
+pub(crate) fn hash(ltype: NodeType, rtype: NodeType, left: &[u8; 32], right: &[u8; 32]) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(hex!(
         "000000000000000000000000000000000000000000000000000000000000"
@@ -40,9 +43,39 @@ fn hash(ltype: NodeType, rtype: NodeType, left: &[u8; 32], right: &[u8; 32]) -> 
 
 const BLANK: [u8; 32] = hex!("0000000000000000000000000000000000000000000000000000000000000000");
 
+// returns the merkle root and the merkle tree
+pub fn compute_merkle_set_root(leafs: &mut [[u8; 32]]) -> [u8; 32] {
+    // Leafs are already hashed
+
+    // There's a special case for empty sets
+    if leafs.is_empty() {
+        return BLANK;
+    }
+
+    match radix_sort(leafs, 0) {
+        (hash, NodeType::Term) => {
+            // if there's only a single item in the set, we prepend "Term"
+            // and hash it
+            // the reason we don't just check the length of "leafs" is that it
+            // may contain duplicates and boil down to a single node
+            // (effectively), which is a case we need to support
+            let mut hasher = Sha256::new();
+            hasher.update([NodeType::Term as u8]);
+            hasher.update(hash);
+            hasher.finalize().into()
+        }
+        (hash, NodeType::Mid) => hash,
+        (hash, NodeType::MidDbl) => hash,
+        (_, NodeType::Empty) => panic!("unexpected"),
+    }
+}
+
 // this function performs an in-place, recursive radix sort of the range.
 // as each level returns, values are hashed pair-wise and as a hash tree.
-// the return value is the merkle tree root that the values in the range form
+// It will also populate a MerkleTreeData struct at each level of the call
+// the return value is a tuple of:
+// - merkle tree root that the values in the range form
+// - the type of node that this is
 fn radix_sort(range: &mut [[u8; 32]], depth: u8) -> ([u8; 32], NodeType) {
     assert!(!range.is_empty());
 
@@ -63,15 +96,15 @@ fn radix_sort(range: &mut [[u8; 32]], depth: u8) -> ([u8; 32], NodeType) {
         let left_bit = get_bit(&range[left as usize], depth);
         let right_bit = get_bit(&range[right as usize], depth);
 
-        if left_bit == 1 && right_bit == 0 {
+        if left_bit && !right_bit {
             range.swap(left as usize, right as usize);
             left += 1;
             right -= 1;
         } else {
-            if left_bit == 0 {
+            if !left_bit {
                 left += 1;
             }
-            if right_bit == 1 {
+            if right_bit {
                 right -= 1;
             }
         }
