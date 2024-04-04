@@ -49,6 +49,8 @@ jobs:
         python -m pip install maturin
         rustup target add x86_64-unknown-linux-musl
         python -m pip install pytest
+        python -m pip install pytest-asyncio
+        python -m pip install trio
         python -m pip install mypy
         python -m pip install black
 
