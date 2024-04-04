@@ -3,6 +3,7 @@ use crate::run_generator::{
     PySpendBundleConditions,
 };
 use chia_consensus::allocator::make_allocator;
+use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::gen::conditions::MempoolVisitor;
 use chia_consensus::gen::flags::{
     AGG_SIG_ARGS, ALLOW_BACKREFS, ANALYZE_SPENDS, COND_ARGS_NIL, ENABLE_MESSAGE_CONDITIONS,
@@ -346,6 +347,9 @@ pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
         chia_consensus::gen::conditions::ELIGIBLE_FOR_FF,
     )?;
     m.add_class::<PySpend>()?;
+
+    // constants
+    m.add_class::<ConsensusConstants>()?;
 
     // clvm functions
     m.add("COND_ARGS_NIL", COND_ARGS_NIL)?;
