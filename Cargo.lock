@@ -355,6 +355,8 @@ dependencies = [
  "chia-protocol",
  "chia-traits 0.6.0",
  "chia-wallet",
+ "chia_py_streamable_macro",
+ "chia_streamable_macro 0.6.0",
  "clvm-derive",
  "clvm-traits",
  "clvm-utils",
@@ -365,6 +367,7 @@ dependencies = [
  "num-traits",
  "pyo3",
  "rstest 0.16.0",
+ "sha2",
  "text-diff",
  "thiserror",
 ]
