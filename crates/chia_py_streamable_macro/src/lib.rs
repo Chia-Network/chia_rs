@@ -266,11 +266,7 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                     &self,
                     py: pyo3::Python<'py>,
                 ) -> pyo3::PyResult<&'py pyo3::types::PyBytes> {
-                    use chia_traits::Streamable;
-
-                    let mut bytes = Vec::new();
-                    self.stream(&mut bytes)?;
-                    Ok(pyo3::types::PyBytes::new(py, &bytes))
+                    self.py_to_bytes(py)
                 }
 
                 pub fn __getnewargs__<'py>(&self, py: pyo3::Python<'py>) -> pyo3::PyResult<&'py pyo3::types::PyTuple> {
