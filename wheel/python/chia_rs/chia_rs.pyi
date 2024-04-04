@@ -337,15 +337,15 @@ class SpendBundleConditions:
 
 class MerkleSet:
     nodes: List[uint64]
-    leafs: List[bytes32]
-    hash_cache: List[bytes32]
-    def get_root(self) -> bytes32: ...def is_included_already_hashed(self, to_check: bytes32) -> (bool, bytes): ...
+    leafs: List[bytes]
+    hash_cache: List[bytes]
+    def get_root(self) -> bytes: ...def is_included_already_hashed(self, to_check: bytes) -> (bool, bytes): ...
     def check_proof(proof: bytes) -> MerkleSet: ...
     def __init__(
         self,
         nodes: Sequence[uint64],
-        leafs: Sequence[bytes32],
-        hash_cache: Sequence[bytes32]
+        leafs: Sequence[bytes],
+        hash_cache: Sequence[bytes]
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -366,8 +366,8 @@ class MerkleSet:
     @staticmethod
     def from_json_dict(json_dict: Dict[str, Any]) -> MerkleSet: ...
     def replace(self, *, nodes: Union[ List[uint64], _Unspec] = _Unspec(),
-        leafs: Union[ List[bytes32], _Unspec] = _Unspec(),
-        hash_cache: Union[ List[bytes32], _Unspec] = _Unspec()) -> MerkleSet: ...
+        leafs: Union[ List[bytes], _Unspec] = _Unspec(),
+        hash_cache: Union[ List[bytes], _Unspec] = _Unspec()) -> MerkleSet: ...
 
 class BlockRecord:
     header_hash: bytes32
