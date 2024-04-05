@@ -1,7 +1,7 @@
 // This code is used to create a merkle root. To create a full merkle set, look at merkle_tree.rs
 
 use clvmr::sha2::{Digest, Sha256};
-pub fn get_bit(val: &[u8; 32], bit: u8) -> bool {
+pub(crate) fn get_bit(val: &[u8; 32], bit: u8) -> bool {
     (val[(bit / 8) as usize] & (0x80 >> (bit & 7))) != 0
 }
 
