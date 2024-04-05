@@ -311,7 +311,7 @@ def run_chia_program(
 
 class LazyNode:
     pair: Optional[Tuple[LazyNode, LazyNode]]
-    atom: bytes
+    atom: Optional[bytes]
 
 def serialized_length(program: ReadableBuffer) -> int: ...
 def tree_hash(program: ReadableBuffer) -> bytes32: ...
