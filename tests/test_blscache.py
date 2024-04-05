@@ -1,11 +1,12 @@
 from chia_rs import G1Element, PrivateKey, AugSchemeMPL, G2Element, BLSCache
 from chia.util.ints import uint64
+from chia.types.blockchain_format.sized_bytes import bytes48
 import pytest
 from typing import List
 
 
 def test_instantiation() -> None:
-    bls_cache = BLSCache.generator()
+    bls_cache = BLSCache()
     assert bls_cache.len() == 0
     assert BLSCache is not None
     seed: bytes = bytes.fromhex(
@@ -16,7 +17,7 @@ def test_instantiation() -> None:
     pk: G1Element = sk.get_g1()
     msg = b"hello"
     sig: G2Element = AugSchemeMPL.sign(sk, msg)
-    pks: List[bytes] = [pk.to_bytes()]
+    pks: List[bytes48] = [bytes48(pk.to_bytes())]
     msgs: List[bytes] = [msg]
     result = bls_cache.aggregate_verify(pks, msgs, sig, True)
     assert result
@@ -24,7 +25,7 @@ def test_instantiation() -> None:
     result = bls_cache.aggregate_verify(pks, msgs, sig, True)
     assert result
     assert bls_cache.len() == 1
-    pks.append(pk.to_bytes())
+    pks.append(bytes48(pk.to_bytes()))
 
     msg = b"world"
     msgs.append(msg)
@@ -44,9 +45,9 @@ def test_cache_limit() -> None:
 
     sk: PrivateKey = AugSchemeMPL.key_gen(seed)
     pk: G1Element = sk.get_g1()
-    pks: List[bytes] = []
+    pks: List[bytes48] = []
     msgs: List[bytes] = []
-    pk_bytes = pk.to_bytes()
+    pk_bytes = bytes48(pk.to_bytes())
     sigs: List[G2Element] = []
     for i in [1, 2, 3, 4]:
         msgs.append(i.to_bytes())
