@@ -1,15 +1,17 @@
 from chia_rs import run_puzzle, run_chia_program, ALLOW_BACKREFS
 from chia.types.blockchain_format.sized_bytes import bytes32
-from hashlib import sha256
 import pytest
 from run_gen import print_spend_bundle_conditions
 from clvm.SExp import SExp
 from clvm.casts import int_from_bytes
 from clvm_tools import binutils
-import os
+
 
 @pytest.mark.parametrize("flags", [0, ALLOW_BACKREFS])
-@pytest.mark.parametrize("input_file", ["generator-tests/block-834752.txt", "generator-tests/block-834752-compressed.txt"])
+@pytest.mark.parametrize(
+    "input_file",
+    ["generator-tests/block-834752.txt", "generator-tests/block-834752-compressed.txt"],
+)
 def test_block_834752(flags: int, input_file: str) -> None:
     block = bytes.fromhex(open(input_file, "r").read().split("\n")[0])
 
@@ -20,24 +22,31 @@ def test_block_834752(flags: int, input_file: str) -> None:
     else:
         cost, ret = run_chia_program(block, b"\xff\x80\x80", 11000000000, flags)
 
+    assert ret.pair is not None
     ret = ret.pair[0]
     puzzles = []
 
     while ret.pair is not None:
         spend = ret.pair[0]
+        assert spend.pair is not None
+
         parent = spend.pair[0].atom
+        assert parent is not None
         spend = spend.pair[1]
+        assert spend.pair is not None
 
         puzzle = SExp.to(spend.pair[0])
         spend = spend.pair[1]
+        assert spend.pair is not None
 
         amount = int_from_bytes(spend.pair[0].atom)
         spend = spend.pair[1]
+        assert spend.pair is not None
 
         solution = SExp.to(spend.pair[0])
         spend = spend.pair[1]
 
-        puzzles.append((parent, amount, puzzle.as_bin(), solution.as_bin()))
+        puzzles.append((bytes32(parent), amount, puzzle.as_bin(), solution.as_bin()))
         ret = ret.pair[1]
 
     output = ""
@@ -45,7 +54,9 @@ def test_block_834752(flags: int, input_file: str) -> None:
         conds = run_puzzle(puzzle, solution, parent, amount, 11000000000, flags)
         output += print_spend_bundle_conditions(conds)
 
-    assert output == """\
+    assert (
+        output
+        == """\
 SPENDS:
 - coin id: afd297097757a8f5a3f3266933a6c29a7674c71028825562e7e4cac02b9228f6 ph: b78c1c1c0fe082b9c7f18d7e7c716b1607fd62dbdf3eef18f79e2717789ac55f
   CREATE_COIN: ph: dca1429bcffab70d2218df91683ebe292305925337c0fffa91d5244838ffbd80 amount: 1
@@ -92,6 +103,8 @@ cost: 3792835
 removal_amount: 1
 addition_amount: 1
 """
+    )
+
 
 @pytest.mark.parametrize("flags", [0, ALLOW_BACKREFS])
 def test_failure(flags: int) -> None:
@@ -108,13 +121,16 @@ def test_failure(flags: int) -> None:
     conds = run_puzzle(puzzle, solution1, parent, amount, 11000000000, flags)
     output += print_spend_bundle_conditions(conds)
     print(output)
-    assert output == """\
+    assert (
+        output
+        == """\
 SPENDS:
 - coin id: 7767e945d8b73704d3ed84277b3df4572cec7d418629dc2f0325385e708c7724 ph: 51f3dbcff4ada9fe7030d6c017f243b903f9baf503e2d0590b3b78b5c2589674
 cost: 465
 removal_amount: 1337
 addition_amount: 0
 """
+    )
 
     with pytest.raises(ValueError, match="ValidationError"):
         # the puzzle does not expect (2)

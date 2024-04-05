@@ -1,11 +1,18 @@
-from chia_rs import Spend, CoinSpend, Coin, supports_fast_forward, fast_forward_singleton
+from chia_rs import (
+    CoinSpend,
+    Coin,
+    supports_fast_forward,
+    fast_forward_singleton,
+)
 import pytest
+
 
 @pytest.mark.parametrize("file", ["bb13", "e3c0"])
 def test_supports_fast_forward(file: str) -> None:
     with open(f"ff-tests/{file}.spend", "rb") as f:
         spend = CoinSpend.from_bytes(f.read())
     assert supports_fast_forward(spend)
+
 
 @pytest.mark.parametrize("file", ["bb13", "e3c0"])
 def test_fast_forward_singleton(file: str) -> None:

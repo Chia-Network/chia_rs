@@ -1,6 +1,5 @@
-from typing import List, Tuple, Optional, Any, Callable
+from typing import List, Optional, Any, Callable
 
-import string
 import sys
 import time
 from chia_rs import BlockRecord, ClassgroupElement
@@ -28,9 +27,9 @@ def get_u32(rng: Random) -> uint32:
 
 
 def get_ssi(rng: Random) -> uint64:
-    return uint64(DEFAULT_CONSTANTS.NUM_SPS_SUB_SLOT * rng.randint(0, 0xFFFF) + rng.randint(
-        0, 1
-    ))
+    return uint64(
+        DEFAULT_CONSTANTS.NUM_SPS_SUB_SLOT * rng.randint(0, 0xFFFF) + rng.randint(0, 1)
+    )
 
 
 def get_u64(rng: Random) -> uint64:
@@ -114,8 +113,15 @@ def test_bytes32():
     rng.seed(1337)
     br = get_block_record(rng)
     assert isinstance(br.header_hash, bytes32)
-    assert f"{br.header_hash}" == "e433713dd932b2314eab219aa5504f71b9fe9f2d8e2f5cadfa892d8dc6a7ba53"
-    assert br.header_hash.__str__() == "e433713dd932b2314eab219aa5504f71b9fe9f2d8e2f5cadfa892d8dc6a7ba53"
+    assert (
+        f"{br.header_hash}"
+        == "e433713dd932b2314eab219aa5504f71b9fe9f2d8e2f5cadfa892d8dc6a7ba53"
+    )
+    assert (
+        br.header_hash.__str__()
+        == "e433713dd932b2314eab219aa5504f71b9fe9f2d8e2f5cadfa892d8dc6a7ba53"
+    )
+
 
 def wrap_call(expr: str, br: Any) -> str:
     try:
