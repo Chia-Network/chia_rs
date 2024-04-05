@@ -22,24 +22,30 @@ def test_block_834752(flags: int, input_file: str) -> None:
     else:
         cost, ret = run_chia_program(block, b"\xff\x80\x80", 11000000000, flags)
 
+    assert ret.pair is not None
     ret = ret.pair[0]
     puzzles = []
 
     while ret.pair is not None:
         spend = ret.pair[0]
+        assert spend.pair is not None
+
         parent = spend.pair[0].atom
         spend = spend.pair[1]
+        assert spend.pair is not None
 
         puzzle = SExp.to(spend.pair[0])
         spend = spend.pair[1]
+        assert spend.pair is not None
 
         amount = int_from_bytes(spend.pair[0].atom)
         spend = spend.pair[1]
+        assert spend.pair is not None
 
         solution = SExp.to(spend.pair[0])
         spend = spend.pair[1]
 
-        puzzles.append((parent, amount, puzzle.as_bin(), solution.as_bin()))
+        puzzles.append((bytes32(parent), amount, puzzle.as_bin(), solution.as_bin()))
         ret = ret.pair[1]
 
     output = ""
