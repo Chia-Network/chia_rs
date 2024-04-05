@@ -2,13 +2,19 @@
 
 from typing import Optional
 from run_gen import run_gen, print_spend_bundle_conditions
-from chia_rs import MEMPOOL_MODE, ENABLE_MESSAGE_CONDITIONS, ALLOW_BACKREFS, SpendBundleConditions
+from chia_rs import (
+    MEMPOOL_MODE,
+    ENABLE_MESSAGE_CONDITIONS,
+    ALLOW_BACKREFS,
+    SpendBundleConditions,
+)
 from dataclasses import dataclass
 from pathlib import Path
 from sys import stdout, exit
 import glob
 
 failed = 0
+
 
 def compare_output(output, expected, title):
     global failed
@@ -26,16 +32,21 @@ def parse_output(result, error_code) -> str:
     else:
         return print_spend_bundle_conditions(result)
 
+
 @dataclass
 class Results:
     output: str
     result: Optional[SpendBundleConditions]
     run_time: float
 
+
 def run_generator(file: str, flags: int, version: int) -> Results:
-    error_code, result, run_time = run_gen(file, flags, file.replace(".txt", ".env"), version)
+    error_code, result, run_time = run_gen(
+        file, flags, file.replace(".txt", ".env"), version
+    )
     output = parse_output(result, error_code)
     return Results(output, result, run_time)
+
 
 def validate_except_cost(output1: str, output2: str):
     lines1 = output1.split("\n")
@@ -47,8 +58,9 @@ def validate_except_cost(output1: str, output2: str):
             continue
         assert l1 == l2
 
+
 print(f"{'test name':43s}   consensus | mempool")
-for g in sorted(glob.glob('../generator-tests/*.txt')):
+for g in sorted(glob.glob("../generator-tests/*.txt")):
     name = f"{Path(g).name:43s}"
     stdout.write(f"{name} running generator...\r")
     stdout.flush()
@@ -61,20 +73,26 @@ for g in sorted(glob.glob('../generator-tests/*.txt')):
 
     stdout.write(f"{name} running generator (mempool mode) ...\r")
     stdout.flush()
-    mempool = run_generator(g, ALLOW_BACKREFS | MEMPOOL_MODE | ENABLE_MESSAGE_CONDITIONS, version=1)
+    mempool = run_generator(
+        g, ALLOW_BACKREFS | MEMPOOL_MODE | ENABLE_MESSAGE_CONDITIONS, version=1
+    )
 
     stdout.write(f"{name} running generator2 (mempool mode)...\r")
     stdout.flush()
-    mempool2 = run_generator(g, ALLOW_BACKREFS | MEMPOOL_MODE | ENABLE_MESSAGE_CONDITIONS, version=2)
+    mempool2 = run_generator(
+        g, ALLOW_BACKREFS | MEMPOOL_MODE | ENABLE_MESSAGE_CONDITIONS, version=2
+    )
     validate_except_cost(mempool.output, mempool2.output)
 
     with open(g) as f:
-        expected = f.read().split('\n', 1)[1]
+        expected = f.read().split("\n", 1)[1]
         if not "STRICT" in expected:
             expected_mempool = expected
-            if consensus.result is not None \
-                and mempool.result is not None \
-                and consensus.result.cost != mempool.result.cost:
+            if (
+                consensus.result is not None
+                and mempool.result is not None
+                and consensus.result.cost != mempool.result.cost
+            ):
                 print("\n\ncost when running in mempool mode differs from normal mode!")
                 failed = 1
         else:
@@ -106,10 +124,12 @@ for g in sorted(glob.glob('../generator-tests/*.txt')):
         compare_output(consensus.output, expected, "")
         compare_output(mempool.output, expected_mempool, "STRICT")
 
-        stdout.write(f"{name} {consensus.run_time:.2f}s "
+        stdout.write(
+            f"{name} {consensus.run_time:.2f}s "
             f"{consensus2.run_time:.2f}s | "
             f"{mempool.run_time:.2f}s "
-            f"{mempool2.run_time:.2f}s")
+            f"{mempool2.run_time:.2f}s"
+        )
 
         if consensus.run_time > limit or consensus2.run_time > limit:
             stdout.write(f" - exceeds limit ({limit})!")

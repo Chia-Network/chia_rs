@@ -135,47 +135,36 @@ def test_coin_name() -> None:
     assert c.name() == sha256(parent_coin + puzzle_hash + bytes([0, 0x80])).digest()
 
     c = Coin(parent_coin, puzzle_hash, uint64(0x8000))
-    assert (
-        c.name() == sha256(parent_coin + puzzle_hash + bytes([0, 0x80, 0])).digest()
-    )
+    assert c.name() == sha256(parent_coin + puzzle_hash + bytes([0, 0x80, 0])).digest()
 
     c = Coin(parent_coin, puzzle_hash, uint64(0x800000))
     assert (
-        c.name()
-        == sha256(parent_coin + puzzle_hash + bytes([0, 0x80, 0, 0])).digest()
+        c.name() == sha256(parent_coin + puzzle_hash + bytes([0, 0x80, 0, 0])).digest()
     )
 
     c = Coin(parent_coin, puzzle_hash, uint64(0x80000000))
     assert (
         c.name()
-        == sha256(
-            parent_coin + puzzle_hash + bytes([0, 0x80, 0, 0, 0])
-        ).digest()
+        == sha256(parent_coin + puzzle_hash + bytes([0, 0x80, 0, 0, 0])).digest()
     )
 
     c = Coin(parent_coin, puzzle_hash, uint64(0x8000000000))
     assert (
         c.name()
-        == sha256(
-            parent_coin + puzzle_hash + bytes([0, 0x80, 0, 0, 0, 0])
-        ).digest()
+        == sha256(parent_coin + puzzle_hash + bytes([0, 0x80, 0, 0, 0, 0])).digest()
     )
 
     c = Coin(parent_coin, puzzle_hash, uint64(0x800000000000))
     assert (
         c.name()
-        == sha256(
-            parent_coin + puzzle_hash + bytes([0, 0x80, 0, 0, 0, 0, 0])
-        ).digest()
+        == sha256(parent_coin + puzzle_hash + bytes([0, 0x80, 0, 0, 0, 0, 0])).digest()
     )
 
     c = Coin(parent_coin, puzzle_hash, uint64(0x80000000000000))
     assert (
         c.name()
         == sha256(
-            parent_coin
-            + puzzle_hash
-            + bytes([0, 0x80, 0, 0, 0, 0, 0, 0])
+            parent_coin + puzzle_hash + bytes([0, 0x80, 0, 0, 0, 0, 0, 0])
         ).digest()
     )
 
@@ -183,9 +172,7 @@ def test_coin_name() -> None:
     assert (
         c.name()
         == sha256(
-            parent_coin
-            + puzzle_hash
-            + bytes([0, 0x80, 0, 0, 0, 0, 0, 0, 0])
+            parent_coin + puzzle_hash + bytes([0, 0x80, 0, 0, 0, 0, 0, 0, 0])
         ).digest()
     )
 
@@ -390,6 +377,7 @@ def test_coin_hash() -> None:
 
     assert hash(c1) == hash(c4)
     assert type(hash(c1)) is int
+
 
 def test_coin_fields() -> None:
 

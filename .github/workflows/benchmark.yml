@@ -50,6 +50,7 @@ jobs:
         rustup target add x86_64-unknown-linux-musl
         python -m pip install pytest
         python -m pip install mypy
+        python -m pip install black
 
     - name: Build
       run: |
@@ -59,6 +60,11 @@ jobs:
     - name: python mypy
       run: |
         mypy --ignore-missing-imports tests
+
+    - name: python black
+      run: |
+        black --check tests
+        black --check wheel/generate_type_stubs.py
 
     - name: python tests
       run: |

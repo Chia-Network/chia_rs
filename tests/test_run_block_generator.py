@@ -3,6 +3,7 @@ from chia_rs import MEMPOOL_MODE
 from run_gen import print_spend_bundle_conditions
 import pytest
 
+
 def test_run_block_generator_cost() -> None:
 
     # the total cost of this generator is 635805370
@@ -11,7 +12,9 @@ def test_run_block_generator_cost() -> None:
     # longer pay the cost of the generator ROM
     hard_fork_consensus_cost = 596498808
 
-    generator = bytes.fromhex(open("generator-tests/block-834768.txt", "r").read().split("\n")[0])
+    generator = bytes.fromhex(
+        open("generator-tests/block-834768.txt", "r").read().split("\n")[0]
+    )
     err, conds = run_block_generator(generator, [], original_consensus_cost, 0)
     assert err is None
     assert conds is not None
