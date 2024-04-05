@@ -1,4 +1,3 @@
-
 // This cache is a bit weird because it's trying to account for validating
 // mempool signatures versus block signatures. When validating block signatures,
 // there's not much point in caching the pairings because we're probably not going
