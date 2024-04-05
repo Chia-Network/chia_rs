@@ -1,6 +1,5 @@
-from typing import List, Tuple, Optional, Any, Callable
+from typing import List, Optional, Any, Callable
 
-import string
 import sys
 import time
 from chia_rs import BlockRecord, ClassgroupElement

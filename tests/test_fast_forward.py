@@ -1,5 +1,4 @@
 from chia_rs import (
-    Spend,
     CoinSpend,
     Coin,
     supports_fast_forward,

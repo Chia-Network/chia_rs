@@ -2,9 +2,8 @@ import chia_rs
 
 print("chia_rs path:", chia_rs.__file__)
 
-from chia_rs import tree_hash, Spend, SpendBundleConditions, Coin
+from chia_rs import tree_hash
 from hashlib import sha256
-import pytest
 
 
 def ha(buf: bytes) -> bytes:
