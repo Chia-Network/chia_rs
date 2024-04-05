@@ -31,6 +31,7 @@ def test_block_834752(flags: int, input_file: str) -> None:
         assert spend.pair is not None
 
         parent = spend.pair[0].atom
+        assert parent is not None
         spend = spend.pair[1]
         assert spend.pair is not None
 
