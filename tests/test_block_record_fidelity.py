@@ -112,7 +112,8 @@ def test_bytes32():
     rng = Random()
     rng.seed(1337)
     br = get_block_record(rng)
-    assert isinstance(br.header_hash, bytes32)
+    # the following line is commented until chia-blockchain uses the moved sized bytes class
+    # assert isinstance(br.header_hash, bytes32)
     assert (
         f"{br.header_hash}"
         == "e433713dd932b2314eab219aa5504f71b9fe9f2d8e2f5cadfa892d8dc6a7ba53"
