@@ -256,7 +256,7 @@ with open(output_file, "w") as file:
 #
 
 from typing import List, Optional, Sequence, Tuple, Union, Dict, Any, ClassVar
-from chia.types.blockchain_format.sized_bytes import bytes32, bytes100
+from chia.types.blockchain_format.sized_bytes import bytes32, bytes48, bytes100
 from chia.util.ints import uint8, uint16, uint32, uint64, uint128, int8, int16, int32, int64
 from chia.types.blockchain_format.program import Program as ChiaProgram
 
@@ -316,6 +316,12 @@ class LazyNode:
 def serialized_length(program: ReadableBuffer) -> int: ...
 def tree_hash(program: ReadableBuffer) -> bytes32: ...
 def get_puzzle_and_solution_for_coin(program: ReadableBuffer, args: ReadableBuffer, max_cost: int, find_parent: bytes32, find_amount: int, find_ph: bytes32, flags: int) -> Tuple[bytes, bytes]: ...
+
+class BLSCache:
+    def len(self) -> uint: ...
+    def aggregate_verify(self, pks: List[bytes48], msgs: List[bytes], sig: G2Element, force_cache: bool) -> bool: ...
+    @staticmethod
+    def generator(cls, size: Optional[uint]) -> BLSCache: ...
 
 class AugSchemeMPL:
     @staticmethod

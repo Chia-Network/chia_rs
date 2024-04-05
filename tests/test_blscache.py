@@ -28,7 +28,7 @@ def test_instantiation() -> None:
 
     msg = b"world"
     msgs.append(msg)
-    sig: G2Element = AugSchemeMPL.aggregate([sig, AugSchemeMPL.sign(sk, msg)])
+    sig = AugSchemeMPL.aggregate([sig, AugSchemeMPL.sign(sk, msg)])
     result = bls_cache.aggregate_verify(pks, msgs, sig, True)
     assert result
     assert bls_cache.len() == 2
