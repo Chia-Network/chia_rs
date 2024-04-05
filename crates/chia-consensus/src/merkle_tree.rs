@@ -265,9 +265,12 @@ impl MerkleSet {
     }
 
     // this is useful to keep around to check the correctness of the tree
-    pub fn get_merkle_root_old(&self) -> [u8; 32] {
+
+    #[cfg(test)]
+    fn get_merkle_root_old(&self) -> [u8; 32] {
         self.get_partial_hash(self.nodes_vec.len() - 1)
     }
+    #[cfg(test)]
     fn get_partial_hash(&self, index: usize) -> [u8; 32] {
         if self.nodes_vec.is_empty() {
             return BLANK;
@@ -282,6 +285,7 @@ impl MerkleSet {
             self.get_partial_hash_recurse(index)
         }
     }
+    #[cfg(test)]
     fn get_partial_hash_recurse(&self, node_index: usize) -> [u8; 32] {
         match self.nodes_vec[node_index] {
             ArrayTypes::Leaf { data } => self.leaf_vec[data],

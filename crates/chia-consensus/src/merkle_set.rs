@@ -2,7 +2,7 @@ use clvmr::sha2::{Digest, Sha256};
 use hex_literal::hex;
 
 use clvmr::sha2::{Digest, Sha256};
-pub fn get_bit(val: &[u8; 32], bit: u8) -> bool {
+pub(crate) fn get_bit(val: &[u8; 32], bit: u8) -> bool {
     (val[(bit / 8) as usize] & (0x80 >> (bit & 7))) != 0
 }
 
