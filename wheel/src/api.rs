@@ -63,7 +63,8 @@ use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs};
 use clvmr::ChiaDialect;
 
 use chia_bls::{
-    hash_to_g2 as native_hash_to_g2, DerivableKey, GTElement, PublicKey, SecretKey, Signature, BLSCache
+    hash_to_g2 as native_hash_to_g2, BLSCache, DerivableKey, GTElement, PublicKey, SecretKey,
+    Signature,
 };
 
 #[pyfunction]
