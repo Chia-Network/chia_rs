@@ -3,11 +3,11 @@ from typing import List, Optional, Any, Callable
 import sys
 import time
 from chia_rs import BlockRecord, ClassgroupElement
+from chia_rs.sized_bytes import bytes32, bytes100
+from chia_rs.sized_ints import uint32, uint64, uint8, uint128
 from chia.consensus.block_record import BlockRecord as PyBlockRecord
-from chia.types.blockchain_format.sized_bytes import bytes32, bytes100
 from random import Random
 from chia.consensus.default_constants import DEFAULT_CONSTANTS
-from chia.util.ints import uint32, uint64, uint8, uint128
 
 
 def get_classgroup_element(rng: Random) -> ClassgroupElement:

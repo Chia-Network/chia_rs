@@ -1,6 +1,6 @@
 from chia_rs import Coin
-from chia.util.ints import uint64
-from chia.types.blockchain_format.sized_bytes import bytes32
+from chia_rs.sized_ints import uint64
+from chia_rs.sized_bytes import bytes32
 import pytest
 
 coin = b"bcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc"
