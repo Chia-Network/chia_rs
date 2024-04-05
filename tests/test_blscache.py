@@ -50,9 +50,9 @@ def test_cache_limit() -> None:
     pk_bytes = bytes48(pk.to_bytes())
     sigs: List[G2Element] = []
     for i in [0xcafe, 0xf00d, 0xabcd, 0x1234]:
-        msgs.append(i)
+        msgs.append(i.to_bytes(8))
         pks.append(pk_bytes)
-        sigs.append(AugSchemeMPL.sign(sk, i))
+        sigs.append(AugSchemeMPL.sign(sk, i.to_bytes(8)))
     result = bls_cache.aggregate_verify(pks, msgs, AugSchemeMPL.aggregate(sigs), True)
     assert result
     assert bls_cache.len() == 3
