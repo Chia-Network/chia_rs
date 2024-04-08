@@ -9,8 +9,6 @@ pub mod secret_key;
 pub mod signature;
 
 pub use cached_bls::BLSCache;
-pub use cached_bls::Bytes32;
-pub use cached_bls::Bytes48;
 pub use derivable_key::DerivableKey;
 pub use error::{Error, Result};
 pub use gtelement::GTElement;

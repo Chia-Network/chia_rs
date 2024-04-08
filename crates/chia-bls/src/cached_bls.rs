@@ -6,7 +6,6 @@
 // again. So caching is primarily useful after "catch-up" (fast sync?) is done and
 // we're monitoring the mempool in real-time.
 
-extern crate lru;
 use crate::aggregate_verify as agg_ver;
 use crate::gtelement::GTElement;
 use crate::hash_to_g2;
@@ -23,22 +22,19 @@ use pyo3::types::{PyBool, PyInt, PyList};
 #[cfg(feature = "py-bindings")]
 use pyo3::{pyclass, pymethods, PyResult};
 
-pub type Bytes32 = [u8; 32];
-pub type Bytes48 = [u8; 48];
-
 #[cfg_attr(feature = "py-bindings", pyclass(name = "BLSCache"))]
 pub struct BLSCache {
-    cache: LruCache<Bytes32, GTElement>,
+    cache: LruCache<[u8; 32], GTElement>,
 }
 
 impl BLSCache {
     pub fn generator(cache_size: Option<usize>) -> Self {
-        let cache: LruCache<Bytes32, GTElement> =
+        let cache: LruCache<[u8; 32], GTElement> =
             LruCache::new(NonZeroUsize::new(cache_size.unwrap_or(50000)).unwrap());
         Self { cache }
     }
 
-    pub fn get_pairings<P: Borrow<[Bytes48]>, M: Borrow<[Vec<u8>]>>(
+    pub fn get_pairings<P: Borrow<[[u8; 48]]>, M: Borrow<[Vec<u8>]>>(
         &mut self,
         pks: &P,
         msgs: &M,
@@ -52,7 +48,7 @@ impl BLSCache {
             aug_msg.extend_from_slice(msg.borrow()); // pk + msg
             let mut hasher = Sha256::new();
             hasher.update(aug_msg);
-            let h: Bytes32 = hasher.finalize().into();
+            let h: [u8; 32] = hasher.finalize().into();
             let pairing: Option<&GTElement> = self.cache.get(&h);
             match pairing {
                 Some(pairing) => {
@@ -74,7 +70,7 @@ impl BLSCache {
         }
 
         // G1Element.from_bytes can be expensive due to subgroup check, so we avoid recomputing it with this cache
-        let mut pk_bytes_to_g1: HashMap<Bytes48, PublicKey> = HashMap::new();
+        let mut pk_bytes_to_g1: HashMap<[u8; 48], PublicKey> = HashMap::new();
         let mut ret: Vec<GTElement> = vec![];
 
         for (i, pairing) in pairings.iter_mut().enumerate() {
@@ -93,7 +89,7 @@ impl BLSCache {
                 let pairing: GTElement = aug_hash.pair(pk_parsed);
                 let mut hasher = Sha256::new();
                 hasher.update(&aug_msg);
-                let h: Bytes32 = hasher.finalize().into();
+                let h: [u8; 32] = hasher.finalize().into();
                 self.cache.put(h, pairing.clone());
                 ret.push(pairing);
             }
@@ -104,7 +100,7 @@ impl BLSCache {
 
     pub fn aggregate_verify(
         &mut self,
-        pks: &Vec<Bytes48>,
+        pks: &Vec<[u8; 48]>,
         msgs: &Vec<Vec<u8>>,
         sig: &Signature,
         force_cache: bool,
@@ -162,9 +158,9 @@ impl BLSCache {
         sig: &Signature,
         force_cache: &PyBool,
     ) -> PyResult<bool> {
-        let pks_r: Vec<Bytes48> = pks
+        let pks_r: Vec<[u8; 48]> = pks
             .iter()
-            .map(|item| item.extract::<Bytes48>())
+            .map(|item| item.extract::<[u8; 48]>())
             .collect::<PyResult<_>>()?;
         let msgs_r: Vec<Vec<u8>> = msgs
             .iter()
@@ -200,7 +196,7 @@ pub mod tests {
         let pairing = aug_hash.pair(&pk);
         let mut hasher = Sha256::new();
         hasher.update(&aug_msg);
-        let h: Bytes32 = hasher.finalize().into();
+        let h: [u8; 32] = hasher.finalize().into();
         bls_cache.cache.put(h, pairing.clone());
         assert_eq!(*bls_cache.cache.get(&h).unwrap(), pairing);
     }
@@ -287,7 +283,7 @@ pub mod tests {
         aug_msg.extend_from_slice(&msg); // pk + msg
         let mut hasher = Sha256::new();
         hasher.update(aug_msg);
-        let h: Bytes32 = hasher.finalize().into();
+        let h: [u8; 32] = hasher.finalize().into();
         // assert first key has been removed
         assert!(bls_cache.cache.get(&h).is_none());
     }
