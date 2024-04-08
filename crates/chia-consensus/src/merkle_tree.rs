@@ -11,7 +11,7 @@ use pyo3::types::{PyBytes, PyList};
 #[cfg(feature = "py-bindings")]
 use pyo3::{pyclass, pymethods, PyResult};
 
-// the ArrayType is used to create a more lasting MerkleTree representation in the MerkleSet struct
+// the ArrayTypes  used to create a more lasting MerkleTree representation in the MerkleSet struct
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum ArrayTypes {
     Leaf { data: usize },                // indexes for the data_hash array
@@ -21,12 +21,12 @@ pub enum ArrayTypes {
 }
 
 // represents a MerkleTree by putting all the nodes in a vec. Root is the last entry.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, Default)]
 #[cfg_attr(feature = "py-bindings", pyclass(frozen, name = "MerkleSet"))]
 pub struct MerkleSet {
-    pub nodes_vec: Vec<ArrayTypes>,
-    pub leaf_vec: Vec<[u8; 32]>,
-    pub hash_cache: Vec<[u8; 32]>, // same size and order as nodes_vec
+    nodes_vec: Vec<ArrayTypes>,
+    leaf_vec: Vec<[u8; 32]>,
+    hash_cache: Vec<[u8; 32]>, // same size and order as nodes_vec
 }
 
 const EMPTY: u8 = 0;
@@ -38,14 +38,21 @@ const EMPTY_NODE_HASH: [u8; 32] = [
     127, 156, 158, 49, 172, 130, 86, 202, 47, 37, 133, 131, 223, 38, 45, 188, 125, 111, 104, 242,
     160, 48, 67, 213, 201, 154, 74, 229, 167, 57, 108, 233,
 ];
+// the above was calculated from the following code snippet which was previously used
+/*
+    let mut hasher = Sha256::new();
+    hasher.update([NodeType::Empty as u8]);
+    hasher.update(BLANK);
+    hasher.finalize().into();
+*/
 
 #[derive(Debug)]
 #[cfg_attr(feature = "py-bindings", pyclass(frozen, name = "SetError"))]
 pub struct SetError;
 
 pub fn deserialize_proof(proof: &[u8]) -> Result<MerkleSet, SetError> {
-    let mut merkle_tree: MerkleSet = MerkleSet::default();
-    let pos = _deserialize(&mut merkle_tree, proof, 0)?;
+    let mut merkle_tree = MerkleSet::default();
+    let pos = deserialize_recurse(&mut merkle_tree, proof, 0)?;
     if pos != proof.len() {
         Err(SetError)
     } else {
@@ -53,63 +60,50 @@ pub fn deserialize_proof(proof: &[u8]) -> Result<MerkleSet, SetError> {
     }
 }
 
-fn _deserialize(merkle_tree: &mut MerkleSet, proof: &[u8], pos: usize) -> Result<usize, SetError> {
-    if let Some(&t) = proof.get(pos) {
-        match t {
-            EMPTY => {
-                merkle_tree.nodes_vec.push(ArrayTypes::Empty);
-                merkle_tree.hash_cache.push(BLANK);
-                Ok(pos + 1)
-            }
-            TERMINAL => {
-                let hash: [u8; 32] = proof[pos + 1..pos + 33].try_into().map_err(|_| SetError)?;
-                merkle_tree.leaf_vec.push(hash);
-                merkle_tree.nodes_vec.push(ArrayTypes::Leaf {
-                    data: merkle_tree.leaf_vec.len() - 1,
-                });
-                merkle_tree.hash_cache.push(hash);
-                Ok(pos + 33)
-            }
-            TRUNCATED => {
-                let hash: [u8; 32] = proof[pos + 1..pos + 33].try_into().map_err(|_| SetError)?;
-                merkle_tree.nodes_vec.push(ArrayTypes::Truncated);
-                merkle_tree.hash_cache.push(hash);
-                Ok(pos + 33)
-            }
-            MIDDLE => {
-                let new_pos = _deserialize(merkle_tree, proof, pos + 1)?;
-                let left_pointer = merkle_tree.nodes_vec.len() - 1;
-
-                let final_pos = _deserialize(merkle_tree, proof, new_pos)?;
-                let right_pointer = merkle_tree.nodes_vec.len() - 1;
-                merkle_tree.nodes_vec.push(ArrayTypes::Middle {
-                    children: (left_pointer, right_pointer),
-                });
-                let left_type = array_type_to_node_type(merkle_tree.nodes_vec[left_pointer]);
-                let right_type = array_type_to_node_type(merkle_tree.nodes_vec[right_pointer]);
-                let node_hash = hash(
-                    left_type,
-                    right_type,
-                    &merkle_tree.hash_cache[left_pointer],
-                    &merkle_tree.hash_cache[right_pointer],
-                );
-                merkle_tree.hash_cache.push(node_hash);
-                Ok(final_pos)
-            }
-            _ => Err(SetError),
+fn deserialize_recurse(merkle_tree: &mut MerkleSet, proof: &[u8], pos: usize) -> Result<usize, SetError> {
+    let Some(&t) = proof.get(pos) else { return Err(SetError) };
+    match t {
+        EMPTY => {
+            merkle_tree.nodes_vec.push(ArrayTypes::Empty);
+            merkle_tree.hash_cache.push(BLANK);
+            Ok(pos + 1)
         }
-    } else {
-        Err(SetError)
-    }
-}
-
-impl Default for MerkleSet {
-    fn default() -> MerkleSet {
-        MerkleSet {
-            nodes_vec: Vec::new(),
-            leaf_vec: Vec::new(),
-            hash_cache: Vec::new(),
+        TERMINAL => {
+            let hash: [u8; 32] = proof[pos + 1..pos + 33].try_into().map_err(|_| SetError)?;
+            merkle_tree.leaf_vec.push(hash);
+            merkle_tree.nodes_vec.push(ArrayTypes::Leaf {
+                data: merkle_tree.leaf_vec.len() - 1,
+            });
+            merkle_tree.hash_cache.push(hash);
+            Ok(pos + 33)
         }
+        TRUNCATED => {
+            let hash: [u8; 32] = proof[pos + 1..pos + 33].try_into().map_err(|_| SetError)?;
+            merkle_tree.nodes_vec.push(ArrayTypes::Truncated);
+            merkle_tree.hash_cache.push(hash);
+            Ok(pos + 33)
+        }
+        MIDDLE => {
+            let new_pos = deserialize_recurse(merkle_tree, proof, pos + 1)?;
+            let left_pointer = merkle_tree.nodes_vec.len() - 1;
+
+            let final_pos = deserialize_recurse(merkle_tree, proof, new_pos)?;
+            let right_pointer = merkle_tree.nodes_vec.len() - 1;
+            merkle_tree.nodes_vec.push(ArrayTypes::Middle {
+                children: (left_pointer, right_pointer),
+            });
+            let left_type = array_type_to_node_type(merkle_tree.nodes_vec[left_pointer]);
+            let right_type = array_type_to_node_type(merkle_tree.nodes_vec[right_pointer]);
+            let node_hash = hash(
+                left_type,
+                right_type,
+                &merkle_tree.hash_cache[left_pointer],
+                &merkle_tree.hash_cache[right_pointer],
+            );
+            merkle_tree.hash_cache.push(node_hash);
+            Ok(final_pos)
+        }
+        _ => Err(SetError),
     }
 }
 
@@ -526,14 +520,8 @@ mod tests {
                 return BLANK;
             }
 
-            if let ArrayTypes::Leaf { data } = self.nodes_vec[index] {
-                let mut hasher = Sha256::new();
-                hasher.update([NodeType::Term as u8]);
-                hasher.update(self.leaf_vec[data]);
-                hasher.finalize().into()
-            } else {
-                self.get_partial_hash_recurse(index)
-            }
+            let ArrayTypes::Leaf { data } = self.nodes_vec[index] else { return self.get_partial_hash_recurse(index) };
+            hash_leaf(self.leaf_vec[data])
         }
 
         fn get_partial_hash_recurse(&self, node_index: usize) -> [u8; 32] {
@@ -1366,5 +1354,36 @@ mod tests {
                 tree.hash_cache[tree.hash_cache.len() - 1]
             );
         }
+    }
+
+    #[test]
+    fn test_bad_proof() {
+        // Create a random number generator
+        let mut small_rng = SmallRng::from_entropy();
+
+        // Generate a random length for the Vec
+        let vec_length: usize = small_rng.gen_range(0..=500);
+
+        // Generate a Vec of random [u8; 32] arrays
+        let mut random_data: Vec<[u8; 32]> = Vec::with_capacity(vec_length);
+        for _ in 0..vec_length {
+            let mut array: [u8; 32] = [0; 32];
+            small_rng.fill(&mut array);
+            random_data.push(array);
+        }
+
+        let (root, tree) = generate_merkle_tree(&mut random_data);
+        assert_eq!(tree.hash_cache.len(), tree.nodes_vec.len());
+        assert_eq!(root, tree.hash_cache[tree.nodes_vec.len() - 1]);
+        assert_eq!(root, compute_merkle_set_root(&mut random_data));
+        let mut rng = rand::thread_rng();
+        let index = rng.gen_range(0..random_data.len());
+        let (included, proof) = tree.generate_proof(random_data[index]).unwrap();
+        assert!(included);
+        let rebuilt = deserialize_proof(&proof[0..proof.len() - 2]).unwrap();
+        assert_eq!(
+            rebuilt.hash_cache[rebuilt.hash_cache.len() - 1],
+            tree.hash_cache[tree.hash_cache.len() - 1]
+        );
     }
 }
