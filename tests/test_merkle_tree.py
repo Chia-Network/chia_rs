@@ -197,8 +197,7 @@ def test_serialise_and_deserialise():
     assert new_tree.get_root() == expected
 
 
-@pytest.mark.asyncio
-async def test_merkle_set_5() -> None:
+def test_merkle_set_5() -> None:
     BLANK = bytes32([0] * 32)
 
     a = bytes32([0x58] + [0] * 31)
@@ -247,8 +246,7 @@ async def test_merkle_set_5() -> None:
     # e   c
 
 
-@pytest.mark.asyncio
-async def test_merkle_left_edge() -> None:
+def test_merkle_left_edge() -> None:
     BLANK = bytes32([0] * 32)
     a = bytes32([0x80] + [0] * 31)
     b = bytes32([0] * 31 + [1])
@@ -289,8 +287,7 @@ async def test_merkle_left_edge() -> None:
     #   c   d
 
 
-@pytest.mark.anyio
-async def test_merkle_right_edge() -> None:
+def test_merkle_right_edge() -> None:
     BLANK = bytes32([0] * 32)
     a = bytes32([0x40] + [0] * 31)
     b = bytes32([0xFF] * 31 + [0xFF])
