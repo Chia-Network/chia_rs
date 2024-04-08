@@ -44,10 +44,9 @@ impl BLSCache {
         let mut missing_count: usize = 0;
 
         for (pk, msg) in pks.borrow().iter().zip(msgs.borrow().iter()) {
-            let mut aug_msg = pk.to_vec();
-            aug_msg.extend_from_slice(msg.borrow()); // pk + msg
             let mut hasher = Sha256::new();
-            hasher.update(aug_msg);
+            hasher.update(pk);
+            hasher.update(msg); // pk + msg
             let h: [u8; 32] = hasher.finalize().into();
             let pairing: Option<&GTElement> = self.cache.get(&h);
             match pairing {
@@ -112,8 +111,7 @@ impl BLSCache {
                 let pk = PublicKey::from_bytes_unchecked(pk).unwrap();
                 data.push((pk.clone(), msg.clone()));
             }
-            let res: bool = agg_ver(sig, data);
-            return res;
+            return agg_ver(sig, data);
         }
         let pairings_prod = pairings.pop(); // start with the first pairing
         match pairings_prod {
