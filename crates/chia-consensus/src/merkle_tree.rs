@@ -60,8 +60,14 @@ pub fn deserialize_proof(proof: &[u8]) -> Result<MerkleSet, SetError> {
     }
 }
 
-fn deserialize_recurse(merkle_tree: &mut MerkleSet, proof: &[u8], pos: usize) -> Result<usize, SetError> {
-    let Some(&t) = proof.get(pos) else { return Err(SetError) };
+fn deserialize_recurse(
+    merkle_tree: &mut MerkleSet,
+    proof: &[u8],
+    pos: usize,
+) -> Result<usize, SetError> {
+    let Some(&t) = proof.get(pos) else {
+        return Err(SetError);
+    };
     match t {
         EMPTY => {
             merkle_tree.nodes_vec.push(ArrayTypes::Empty);
@@ -69,7 +75,9 @@ fn deserialize_recurse(merkle_tree: &mut MerkleSet, proof: &[u8], pos: usize) ->
             Ok(pos + 1)
         }
         TERMINAL => {
-            if proof.len() < pos + 33 { return Err(SetError) };
+            if proof.len() < pos + 33 {
+                return Err(SetError);
+            };
             let hash: [u8; 32] = proof[pos + 1..pos + 33].try_into().map_err(|_| SetError)?;
             merkle_tree.leaf_vec.push(hash);
             merkle_tree.nodes_vec.push(ArrayTypes::Leaf {
@@ -79,14 +87,18 @@ fn deserialize_recurse(merkle_tree: &mut MerkleSet, proof: &[u8], pos: usize) ->
             Ok(pos + 33)
         }
         TRUNCATED => {
-            if proof.len() < pos + 33 { return Err(SetError) };
+            if proof.len() < pos + 33 {
+                return Err(SetError);
+            };
             let hash: [u8; 32] = proof[pos + 1..pos + 33].try_into().map_err(|_| SetError)?;
             merkle_tree.nodes_vec.push(ArrayTypes::Truncated);
             merkle_tree.hash_cache.push(hash);
             Ok(pos + 33)
         }
         MIDDLE => {
-            if proof.len() < pos + 1 { return Err(SetError) };
+            if proof.len() < pos + 1 {
+                return Err(SetError);
+            };
             let new_pos = deserialize_recurse(merkle_tree, proof, pos + 1)?;
             let left_pointer = merkle_tree.nodes_vec.len() - 1;
 
@@ -523,7 +535,9 @@ mod tests {
                 return BLANK;
             }
 
-            let ArrayTypes::Leaf { data } = self.nodes_vec[index] else { return self.get_partial_hash_recurse(index) };
+            let ArrayTypes::Leaf { data } = self.nodes_vec[index] else {
+                return self.get_partial_hash_recurse(index);
+            };
             hash_leaf(self.leaf_vec[data])
         }
 
