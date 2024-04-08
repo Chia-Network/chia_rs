@@ -69,6 +69,7 @@ fn deserialize_recurse(merkle_tree: &mut MerkleSet, proof: &[u8], pos: usize) ->
             Ok(pos + 1)
         }
         TERMINAL => {
+            if proof.len() < pos + 33 { return Err(SetError) };
             let hash: [u8; 32] = proof[pos + 1..pos + 33].try_into().map_err(|_| SetError)?;
             merkle_tree.leaf_vec.push(hash);
             merkle_tree.nodes_vec.push(ArrayTypes::Leaf {
@@ -78,12 +79,14 @@ fn deserialize_recurse(merkle_tree: &mut MerkleSet, proof: &[u8], pos: usize) ->
             Ok(pos + 33)
         }
         TRUNCATED => {
+            if proof.len() < pos + 33 { return Err(SetError) };
             let hash: [u8; 32] = proof[pos + 1..pos + 33].try_into().map_err(|_| SetError)?;
             merkle_tree.nodes_vec.push(ArrayTypes::Truncated);
             merkle_tree.hash_cache.push(hash);
             Ok(pos + 33)
         }
         MIDDLE => {
+            if proof.len() < pos + 1 { return Err(SetError) };
             let new_pos = deserialize_recurse(merkle_tree, proof, pos + 1)?;
             let left_pointer = merkle_tree.nodes_vec.len() - 1;
 
@@ -1357,33 +1360,32 @@ mod tests {
     }
 
     #[test]
-    fn test_bad_proof() {
-        // Create a random number generator
-        let mut small_rng = SmallRng::from_entropy();
+    fn test_bad_proofs() {
+        for _i in [1..1000000] {
+            // Create a random number generator
+            let mut small_rng = SmallRng::from_entropy();
 
-        // Generate a random length for the Vec
-        let vec_length: usize = small_rng.gen_range(0..=500);
+            // Generate a random length for the Vec
+            let vec_length: usize = small_rng.gen_range(0..=500);
 
-        // Generate a Vec of random [u8; 32] arrays
-        let mut random_data: Vec<[u8; 32]> = Vec::with_capacity(vec_length);
-        for _ in 0..vec_length {
-            let mut array: [u8; 32] = [0; 32];
-            small_rng.fill(&mut array);
-            random_data.push(array);
+            // Generate a Vec of random [u8; 32] arrays
+            let mut random_data: Vec<[u8; 32]> = Vec::with_capacity(vec_length);
+            for _ in 0..vec_length {
+                let mut array: [u8; 32] = [0; 32];
+                small_rng.fill(&mut array);
+                random_data.push(array);
+            }
+
+            let (root, tree) = generate_merkle_tree(&mut random_data);
+            assert_eq!(tree.hash_cache.len(), tree.nodes_vec.len());
+            assert_eq!(root, tree.hash_cache[tree.nodes_vec.len() - 1]);
+            assert_eq!(root, compute_merkle_set_root(&mut random_data));
+            let mut rng = rand::thread_rng();
+            let index = rng.gen_range(0..random_data.len());
+            let (included, proof) = tree.generate_proof(random_data[index]).unwrap();
+            assert!(included);
+            let rebuilt = deserialize_proof(&proof[0..proof.len() - 2]);
+            assert!(matches!(rebuilt, Err(SetError)));
         }
-
-        let (root, tree) = generate_merkle_tree(&mut random_data);
-        assert_eq!(tree.hash_cache.len(), tree.nodes_vec.len());
-        assert_eq!(root, tree.hash_cache[tree.nodes_vec.len() - 1]);
-        assert_eq!(root, compute_merkle_set_root(&mut random_data));
-        let mut rng = rand::thread_rng();
-        let index = rng.gen_range(0..random_data.len());
-        let (included, proof) = tree.generate_proof(random_data[index]).unwrap();
-        assert!(included);
-        let rebuilt = deserialize_proof(&proof[0..proof.len() - 2]).unwrap();
-        assert_eq!(
-            rebuilt.hash_cache[rebuilt.hash_cache.len() - 1],
-            tree.hash_cache[tree.hash_cache.len() - 1]
-        );
     }
 }
