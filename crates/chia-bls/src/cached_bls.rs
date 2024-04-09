@@ -27,7 +27,18 @@ pub struct BLSCache {
     cache: LruCache<[u8; 32], GTElement>,
 }
 
+impl Default for BLSCache {
+    fn default() -> Self {
+        Self::new(50000)
+    }
+}
+
 impl BLSCache {
+    pub fn new(cache_size: usize) -> BLSCache {
+        let cache: LruCache<[u8; 32], GTElement> = LruCache::new(NonZeroUsize::new(cache_size).unwrap());
+        Self { cache }
+    } 
+
     pub fn generator(cache_size: Option<usize>) -> Self {
         let cache: LruCache<[u8; 32], GTElement> =
             LruCache::new(NonZeroUsize::new(cache_size.unwrap_or(50000)).unwrap());
@@ -133,19 +144,13 @@ impl BLSCache {
 impl BLSCache {
     #[new]
     pub fn init() -> Self {
-        Self::generator(None)
+        Self::default()
     }
 
     #[staticmethod]
     #[pyo3(name = "generator")]
     pub fn py_generator(size: Option<&PyInt>) -> Self {
-        match size {
-            Some(s) => {
-                let usize_value: usize = s.extract::<usize>().unwrap();
-                Self::generator(Some(usize_value))
-            }
-            None => Self::generator(None),
-        }
+        size.map(|s| Self::new(s.extract().unwrap())).unwrap_or_default()
     }
 
     #[pyo3(name = "aggregate_verify")]
@@ -183,7 +188,7 @@ pub mod tests {
 
     #[test]
     pub fn test_instantiation() {
-        let mut bls_cache: BLSCache = BLSCache::generator(None);
+        let mut bls_cache: BLSCache = BLSCache::default();
         let byte_array: [u8; 32] = [0; 32];
         let sk: SecretKey = SecretKey::from_seed(&byte_array);
         let pk: PublicKey = sk.public_key();
@@ -201,12 +206,12 @@ pub mod tests {
 
     #[test]
     pub fn test_aggregate_verify() {
-        let mut bls_cache: BLSCache = BLSCache::generator(None);
+        let mut bls_cache: BLSCache = BLSCache::default();
         assert_eq!(bls_cache.cache.len(), 0);
         let byte_array: [u8; 32] = [0; 32];
         let sk: SecretKey = SecretKey::from_seed(&byte_array);
         let pk: PublicKey = sk.public_key();
-        let msg: Vec<u8> = [106; 32].to_vec();
+        let msg: Vec<u8> = vec![106; 32];
         let sig: Signature = sign(&sk, &msg);
         let pk_list: Vec<[u8; 48]> = [pk.to_bytes()].to_vec();
         let msg_list: Vec<Vec<u8>> = [msg].to_vec();
@@ -219,12 +224,12 @@ pub mod tests {
 
     #[test]
     pub fn test_cache() {
-        let mut bls_cache: BLSCache = BLSCache::generator(None);
+        let mut bls_cache: BLSCache = BLSCache::default();
         assert_eq!(bls_cache.cache.len(), 0);
         let byte_array: [u8; 32] = [0; 32];
         let sk: SecretKey = SecretKey::from_seed(&byte_array);
         let pk: PublicKey = sk.public_key();
-        let msg: Vec<u8> = [106; 32].to_vec();
+        let msg: Vec<u8> = vec![106; 32];
         let sig: Signature = sign(&sk, &msg);
         let mut pk_list: Vec<[u8; 48]> = [pk.to_bytes()].to_vec();
         let mut msg_list: Vec<Vec<u8>> = [msg].to_vec();
@@ -235,7 +240,7 @@ pub mod tests {
         let byte_array: [u8; 32] = [1; 32];
         let sk: SecretKey = SecretKey::from_seed(&byte_array);
         let pk: PublicKey = sk.public_key();
-        let msg: Vec<u8> = [107; 32].to_vec();
+        let msg: Vec<u8> = vec![107; 32];
         let sig = aggregate([sig, sign(&sk, &msg)]);
         pk_list.push(pk.to_bytes());
         msg_list.push(msg);
@@ -243,7 +248,7 @@ pub mod tests {
         assert_eq!(bls_cache.cache.len(), 2);
         // try reusing a pubkey
         let pk: PublicKey = sk.public_key();
-        let msg: Vec<u8> = [108; 32].to_vec();
+        let msg: Vec<u8> = vec![108; 32];
         let sig = aggregate([sig, sign(&sk, &msg)]);
         pk_list.push(pk.to_bytes());
         msg_list.push(msg);
@@ -258,17 +263,17 @@ pub mod tests {
     #[test]
     pub fn test_cache_limit() {
         // set cache size to 3
-        let mut bls_cache: BLSCache = BLSCache::generator(Some(3));
+        let mut bls_cache: BLSCache = BLSCache::new(3);
         assert_eq!(bls_cache.cache.len(), 0);
         // create 5 pk/msg combos
         for i in 1..=5 {
             let byte_array: [u8; 32] = [i as u8; 32];
             let sk: SecretKey = SecretKey::from_seed(&byte_array);
             let pk: PublicKey = sk.public_key();
-            let msg: Vec<u8> = [106; 32].to_vec();
+            let msg: Vec<u8> = vec![106; 32];
             let sig: Signature = sign(&sk, &msg);
-            let pk_list: Vec<[u8; 48]> = [pk.to_bytes()].to_vec();
-            let msg_list: Vec<Vec<u8>> = [msg].to_vec();
+            let pk_list: Vec<[u8; 48]> = vec![pk.to_bytes()];
+            let msg_list: Vec<Vec<u8>> = vec![msg];
             assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig, true));
         }
         assert_eq!(bls_cache.cache.len(), 3);
@@ -276,7 +281,7 @@ pub mod tests {
         let byte_array: [u8; 32] = [1; 32];
         let sk: SecretKey = SecretKey::from_seed(&byte_array);
         let pk: PublicKey = sk.public_key();
-        let msg: Vec<u8> = [106; 32].to_vec();
+        let msg: Vec<u8> = vec![106; 32];
         let mut aug_msg = pk.to_bytes().to_vec();
         aug_msg.extend_from_slice(&msg); // pk + msg
         let mut hasher = Sha256::new();
