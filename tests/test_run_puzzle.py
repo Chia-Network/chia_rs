@@ -1,5 +1,5 @@
 from chia_rs import run_puzzle, run_chia_program, ALLOW_BACKREFS
-from chia.types.blockchain_format.sized_bytes import bytes32
+from chia_rs.sized_bytes import bytes32
 import pytest
 from run_gen import print_spend_bundle_conditions
 from clvm.SExp import SExp

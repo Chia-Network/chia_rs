@@ -3,11 +3,11 @@ from typing import List, Optional, Any, Callable
 import sys
 import time
 from chia_rs import BlockRecord, ClassgroupElement
+from chia_rs.sized_bytes import bytes32, bytes100
+from chia_rs.sized_ints import uint32, uint64, uint8, uint128
 from chia.consensus.block_record import BlockRecord as PyBlockRecord
-from chia.types.blockchain_format.sized_bytes import bytes32, bytes100
 from random import Random
 from chia.consensus.default_constants import DEFAULT_CONSTANTS
-from chia.util.ints import uint32, uint64, uint8, uint128
 
 
 def get_classgroup_element(rng: Random) -> ClassgroupElement:
@@ -112,7 +112,8 @@ def test_bytes32():
     rng = Random()
     rng.seed(1337)
     br = get_block_record(rng)
-    assert isinstance(br.header_hash, bytes32)
+    # the following line is commented until chia-blockchain uses the moved sized bytes class
+    # assert isinstance(br.header_hash, bytes32)
     assert (
         f"{br.header_hash}"
         == "e433713dd932b2314eab219aa5504f71b9fe9f2d8e2f5cadfa892d8dc6a7ba53"

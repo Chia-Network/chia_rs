@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple, TextIO
 from glob import glob
 
-output_file = Path(__file__).parent.resolve() / "chia_rs.pyi"
+output_file = Path(__file__).parent.resolve() / "python" / "chia_rs" / "chia_rs.pyi"
 crates_dir = Path(__file__).parent.parent.resolve() / "crates"
 input_dir = crates_dir / "chia-protocol" / "src"
 
@@ -29,7 +29,7 @@ def print_class(
     # manipulate strings with newlines
     nl = "\n"
 
-    def add_indent(x):
+    def add_indent(x: str):
         return "\n    " + x
 
     init_args = "".join([(",\n        " + transform_type(x)) for x in members])
@@ -256,8 +256,8 @@ with open(output_file, "w") as file:
 #
 
 from typing import List, Optional, Sequence, Tuple, Union, Dict, Any, ClassVar
-from chia.types.blockchain_format.sized_bytes import bytes32, bytes100
-from chia.util.ints import uint8, uint16, uint32, uint64, uint128, int8, int16, int32, int64
+from .sized_bytes import bytes32, bytes100
+from .sized_ints import uint8, uint16, uint32, uint64, uint128, int8, int16, int32, int64
 from chia.types.blockchain_format.program import Program as ChiaProgram
 
 ReadableBuffer = Union[bytes, bytearray, memoryview]

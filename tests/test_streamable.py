@@ -1,5 +1,5 @@
 from chia_rs import Spend, SpendBundleConditions, Coin, G1Element, G2Element, Program
-from chia.util.ints import uint64
+from chia_rs.sized_ints import uint64
 import pytest
 import copy
 
