@@ -35,9 +35,10 @@ impl Default for BLSCache {
 
 impl BLSCache {
     pub fn new(cache_size: usize) -> BLSCache {
-        let cache: LruCache<[u8; 32], GTElement> = LruCache::new(NonZeroUsize::new(cache_size).unwrap());
+        let cache: LruCache<[u8; 32], GTElement> =
+            LruCache::new(NonZeroUsize::new(cache_size).unwrap());
         Self { cache }
-    } 
+    }
 
     pub fn generator(cache_size: Option<usize>) -> Self {
         let cache: LruCache<[u8; 32], GTElement> =
@@ -150,7 +151,8 @@ impl BLSCache {
     #[staticmethod]
     #[pyo3(name = "generator")]
     pub fn py_generator(size: Option<&PyInt>) -> Self {
-        size.map(|s| Self::new(s.extract().unwrap())).unwrap_or_default()
+        size.map(|s| Self::new(s.extract().unwrap()))
+            .unwrap_or_default()
     }
 
     #[pyo3(name = "aggregate_verify")]
