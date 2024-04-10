@@ -193,26 +193,26 @@ mod tests {
         // this checks the correctness of the tree and its merkle root by manually hashing down the tree
         // it is an alternate way of calculating the merkle root which we can use to validate the hash_cache version
         fn get_merkle_root_old(&self) -> [u8; 32] {
-            self.get_partial_hash(self.nodes_vec.len() - 1)
+            self.get_partial_hash(self.nodes_vec.len() as u32 - 1)
         }
 
-        fn get_partial_hash(&self, index: usize) -> [u8; 32] {
+        fn get_partial_hash(&self, index: u32) -> [u8; 32] {
             if self.nodes_vec.is_empty() {
                 return BLANK;
             }
 
-            let ArrayTypes::Leaf { data } = self.nodes_vec[index] else {
+            let ArrayTypes::Leaf { data } = self.nodes_vec[index as usize] else {
                 return self.get_partial_hash_recurse(index);
             };
-            hash_leaf(self.leaf_vec[data])
+            hash_leaf(self.leaf_vec[data as usize])
         }
 
-        fn get_partial_hash_recurse(&self, node_index: usize) -> [u8; 32] {
-            match self.nodes_vec[node_index] {
-                ArrayTypes::Leaf { data } => self.leaf_vec[data],
+        fn get_partial_hash_recurse(&self, node_index: u32) -> [u8; 32] {
+            match self.nodes_vec[node_index as usize] {
+                ArrayTypes::Leaf { data } => self.leaf_vec[data as usize],
                 ArrayTypes::Middle { children } => {
-                    let left_type: NodeType = array_type_to_node_type(self.nodes_vec[children.0]);
-                    let right_type: NodeType = array_type_to_node_type(self.nodes_vec[children.1]);
+                    let left_type: NodeType = array_type_to_node_type(self.nodes_vec[children.0 as usize]);
+                    let right_type: NodeType = array_type_to_node_type(self.nodes_vec[children.1 as usize]);
                     hash(
                         left_type,
                         right_type,
@@ -221,7 +221,7 @@ mod tests {
                     )
                 }
                 ArrayTypes::Empty { .. } => BLANK,
-                ArrayTypes::Truncated => self.hash_cache[node_index],
+                ArrayTypes::Truncated => self.hash_cache[node_index as usize],
             }
         }
     }
@@ -781,8 +781,8 @@ mod tests {
         assert_eq!(tree.nodes_vec.len(), 17);
         assert_eq!(tree.leaf_vec.len(), 5);
         if let ArrayTypes::Middle { children } = tree.nodes_vec[tree.nodes_vec.len() - 1] {
-            if let ArrayTypes::Leaf { data } = tree.nodes_vec[children.1] {
-                assert_eq!(tree.leaf_vec[data], d);
+            if let ArrayTypes::Leaf { data } = tree.nodes_vec[children.1 as usize] {
+                assert_eq!(tree.leaf_vec[data as usize], d);
             } else {
                 assert!(false) // node should be a leaf
             }
@@ -849,8 +849,8 @@ mod tests {
         //   c   d
         assert_eq!(tree.nodes_vec.len(), 513);
         if let ArrayTypes::Middle { children } = tree.nodes_vec[tree.nodes_vec.len() - 1] {
-            if let ArrayTypes::Leaf { data } = tree.nodes_vec[children.1] {
-                assert_eq!(tree.leaf_vec[data], a);
+            if let ArrayTypes::Leaf { data } = tree.nodes_vec[children.1 as usize] {
+                assert_eq!(tree.leaf_vec[data as usize], a);
             } else {
                 assert!(false) // node should be a leaf
             }
@@ -923,8 +923,8 @@ mod tests {
         //   c   d
         assert_eq!(tree.nodes_vec.len(), 513);
         if let ArrayTypes::Middle { children } = tree.nodes_vec[tree.nodes_vec.len() - 1] {
-            if let ArrayTypes::Leaf { data } = tree.nodes_vec[children.1] {
-                assert_eq!(tree.leaf_vec[data], a);
+            if let ArrayTypes::Leaf { data } = tree.nodes_vec[children.1 as usize] {
+                assert_eq!(tree.leaf_vec[data as usize], a);
             } else {
                 panic!("node should be a leaf");
             }
@@ -998,7 +998,7 @@ mod tests {
         let ArrayTypes::Middle { children } = tree.nodes_vec.last().unwrap() else {
             panic!("expected middle node");
         };
-        let ArrayTypes::Leaf { .. } = tree.nodes_vec[children.0] else {
+        let ArrayTypes::Leaf { .. } = tree.nodes_vec[children.0 as usize] else {
             panic!("expected leaf");
         };
         // generate proof of inclusion for every node
