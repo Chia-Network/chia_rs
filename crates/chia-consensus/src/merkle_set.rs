@@ -190,7 +190,8 @@ mod tests {
     use rand::{Rng, SeedableRng}; // needed for PyBytes
 
     impl MerkleSet {
-        // this is useful to keep around to check the correctness of the tree
+        // this checks the correctness of the tree and its merkle root by manually hashing down the tree
+        // it is an alternate way of calculating the merkle root which we can use to validate the hash_cache version
         fn get_merkle_root_old(&self) -> [u8; 32] {
             self.get_partial_hash(self.nodes_vec.len() - 1)
         }
