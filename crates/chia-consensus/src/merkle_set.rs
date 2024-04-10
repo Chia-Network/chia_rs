@@ -75,12 +75,6 @@ pub fn compute_merkle_set_root(leafs: &mut [[u8; 32]]) -> [u8; 32] {
     }
 }
 
-// this function performs an in-place, recursive radix sort of the range.
-// as each level returns, values are hashed pair-wise and as a hash tree.
-// It will also populate a MerkleTreeData struct at each level of the call
-// the return value is a tuple of:
-// - merkle tree root that the values in the range form
-// - the type of node that this is
 fn radix_sort(range: &mut [[u8; 32]], depth: u8) -> ([u8; 32], NodeType) {
     assert!(!range.is_empty());
 
