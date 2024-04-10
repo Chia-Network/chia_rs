@@ -45,7 +45,7 @@ pub(crate) fn hash(
     hasher.finalize().into()
 }
 
-pub const BLANK: [u8; 32] = [
+pub(crate) const BLANK: [u8; 32] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 ];
 
@@ -76,12 +76,6 @@ pub fn compute_merkle_set_root(leafs: &mut [[u8; 32]]) -> [u8; 32] {
     }
 }
 
-// this function performs an in-place, recursive radix sort of the range.
-// as each level returns, values are hashed pair-wise and as a hash tree.
-// It will also populate a MerkleTreeData struct at each level of the call
-// the return value is a tuple of:
-// - merkle tree root that the values in the range form
-// - the type of node that this is
 fn radix_sort(range: &mut [[u8; 32]], depth: u8) -> ([u8; 32], NodeType) {
     assert!(!range.is_empty());
 
@@ -351,6 +345,7 @@ mod tests {
         assert_eq!(tree.leaf_vec.len(), 1);
         assert_eq!(tree.leaf_vec[0], a);
         assert_eq!(tree.nodes_vec[0], ArrayTypes::Leaf { data: 0 });
+        assert_eq!(root, MerkleSet::new(&mut [a, a]).get_merkle_root())
     }
 
     #[test]
@@ -399,6 +394,7 @@ mod tests {
         assert_eq!(root, tree.get_merkle_root_old());
         assert_eq!(root, compute_merkle_set_root(&mut [b, c, d, a, a]));
         assert_eq!(tree, tree_2);
+        assert_eq!(root, MerkleSet::new(&mut [b, c, d, a, a]).get_merkle_root());
 
         let (root, tree_2) = generate_merkle_tree(&mut [c, d, a, b, a]);
         assert_eq!(root, expected);
@@ -406,6 +402,7 @@ mod tests {
         assert_eq!(root, tree.get_merkle_root_old());
         assert_eq!(root, compute_merkle_set_root(&mut [c, d, a, b, a]));
         assert_eq!(tree, tree_2);
+        assert_eq!(root, MerkleSet::new(&mut [c, d, a, b, a]).get_merkle_root());
 
         let (root, tree_2) = generate_merkle_tree(&mut [d, a, b, c, a]);
         assert_eq!(root, expected);
@@ -413,6 +410,7 @@ mod tests {
         assert_eq!(root, tree.get_merkle_root_old());
         assert_eq!(root, compute_merkle_set_root(&mut [d, a, b, c, a]));
         assert_eq!(tree, tree_2);
+        assert_eq!(root, MerkleSet::new(&mut [d, a, b, c, a]).get_merkle_root());
 
         // reverse rotations
         let (root, tree_2) = generate_merkle_tree(&mut [d, c, b, a, a]);
@@ -421,6 +419,7 @@ mod tests {
         assert_eq!(root, tree.get_merkle_root_old());
         assert_eq!(root, compute_merkle_set_root(&mut [d, c, b, a, a]));
         assert_eq!(tree, tree_2);
+        assert_eq!(root, MerkleSet::new(&mut [d, c, b, a, a]).get_merkle_root());
 
         let (root, tree_2) = generate_merkle_tree(&mut [c, b, a, d, a]);
         assert_eq!(root, expected);
@@ -428,6 +427,7 @@ mod tests {
         assert_eq!(root, tree.get_merkle_root_old());
         assert_eq!(root, compute_merkle_set_root(&mut [c, b, a, d, a, a]));
         assert_eq!(tree, tree_2);
+        assert_eq!(root, MerkleSet::new(&mut [c, b, a, d, a, a]).get_merkle_root());
 
         let (root, tree_2) = generate_merkle_tree(&mut [b, a, d, c, a]);
         assert_eq!(root, expected);
@@ -435,6 +435,7 @@ mod tests {
         assert_eq!(root, tree.get_merkle_root_old());
         assert_eq!(root, compute_merkle_set_root(&mut [b, a, d, c, a]));
         assert_eq!(tree, tree_2);
+        assert_eq!(root, MerkleSet::new(&mut [b, a, d, c, a]).get_merkle_root());
 
         let (root, tree_2) = generate_merkle_tree(&mut [a, d, c, b, a]);
         assert_eq!(root, expected);
@@ -442,6 +443,7 @@ mod tests {
         assert_eq!(root, tree.get_merkle_root_old());
         assert_eq!(root, compute_merkle_set_root(&mut [a, d, c, b, a]));
         assert_eq!(tree, tree_2);
+        assert_eq!(root, MerkleSet::new(&mut [a, d, c, b, a]).get_merkle_root());
 
         // shuffled
         let (root, tree_2) = generate_merkle_tree(&mut [c, a, d, b, a]);
@@ -450,6 +452,7 @@ mod tests {
         assert_eq!(root, tree.get_merkle_root_old());
         assert_eq!(root, compute_merkle_set_root(&mut [c, a, d, b, a]));
         assert_eq!(tree, tree_2);
+        assert_eq!(root, MerkleSet::new(&mut [c, a, d, b, a]).get_merkle_root());
 
         let (root, tree_2) = generate_merkle_tree(&mut [d, c, b, a, a]);
         assert_eq!(root, expected);
@@ -457,6 +460,7 @@ mod tests {
         assert_eq!(root, tree.get_merkle_root_old());
         assert_eq!(root, compute_merkle_set_root(&mut [d, c, b, a, a]));
         assert_eq!(tree, tree_2);
+        assert_eq!(root, MerkleSet::new(&mut [d, c, b, a, a]).get_merkle_root());
 
         let (root, tree_2) = generate_merkle_tree(&mut [c, d, a, b, a]);
         assert_eq!(root, expected);
@@ -464,6 +468,7 @@ mod tests {
         assert_eq!(root, tree.get_merkle_root_old());
         assert_eq!(root, compute_merkle_set_root(&mut [c, d, a, b, a]));
         assert_eq!(tree, tree_2);
+        assert_eq!(root, MerkleSet::new(&mut [c, d, a, b, a]).get_merkle_root());
 
         let (root, tree_2) = generate_merkle_tree(&mut [a, b, c, d, a]);
         assert_eq!(root, expected);
@@ -471,6 +476,7 @@ mod tests {
         assert_eq!(root, tree.get_merkle_root_old());
         assert_eq!(root, compute_merkle_set_root(&mut [a, b, c, d, a]));
         assert_eq!(tree, tree_2);
+        assert_eq!(root, MerkleSet::new(&mut [a, b, c, d, a]).get_merkle_root());
     }
 
     #[test]
@@ -1014,13 +1020,9 @@ mod tests {
     #[test]
     fn test_random_bytes() {
         for _i in [1..1000000] {
-            // Create a random number generator
+
             let mut small_rng = SmallRng::from_entropy();
-
-            // Generate a random length for the Vec
             let vec_length: usize = small_rng.gen_range(0..=500);
-
-            // Generate a Vec of random [u8; 32] arrays
             let mut random_data: Vec<[u8; 32]> = Vec::with_capacity(vec_length);
             for _ in 0..vec_length {
                 let mut array: [u8; 32] = [0; 32];
