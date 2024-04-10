@@ -14,7 +14,7 @@ use pyo3::{pyclass, pymethods, PyResult};
 // the ArrayTypes  used to create a more lasting MerkleTree representation in the MerkleSet struct
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum ArrayTypes {
-    Leaf { data: u32 },                // indexes for the data_hash array
+    Leaf { data: u32 },              // indexes for the data_hash array
     Middle { children: (u32, u32) }, // indexes for a Vec of ArrayTypes
     Empty,
     Truncated,
@@ -81,7 +81,7 @@ fn deserialize_recurse(
             let hash: [u8; 32] = proof[pos + 1..pos + 33].try_into().map_err(|_| SetError)?;
             merkle_tree.leaf_vec.push(hash);
             merkle_tree.nodes_vec.push(ArrayTypes::Leaf {
-                data: merkle_tree.leaf_vec.len() as u32 - 1 ,
+                data: merkle_tree.leaf_vec.len() as u32 - 1,
             });
             merkle_tree.hash_cache.push(hash);
             Ok(pos + 33)
@@ -134,7 +134,12 @@ impl MerkleSet {
     // returns a tuple of a bool representing if the value has been found, and if so bytes that represent the proof of inclusion
     pub fn generate_proof(&self, included_leaf: [u8; 32]) -> Result<(bool, Vec<u8>), SetError> {
         let mut proof = Vec::new();
-        let r = self.is_included(self.nodes_vec.len() as u32 - 1, included_leaf, &mut proof, 0)?;
+        let r = self.is_included(
+            self.nodes_vec.len() as u32 - 1,
+            included_leaf,
+            &mut proof,
+            0,
+        )?;
         Ok((r, proof))
     }
 
@@ -163,8 +168,10 @@ impl MerkleSet {
                 if let (
                     ArrayTypes::Leaf { data: child_0_data },
                     ArrayTypes::Leaf { data: child_1_data },
-                ) = (self.nodes_vec[children.0 as usize], self.nodes_vec[children.1 as usize])
-                {
+                ) = (
+                    self.nodes_vec[children.0 as usize],
+                    self.nodes_vec[children.1 as usize],
+                ) {
                     proof.push(TERMINAL);
                     for byte in self.leaf_vec[child_0_data as usize] {
                         proof.push(byte);
@@ -260,10 +267,13 @@ impl MerkleSet {
                 } else if matches!(self.nodes_vec[children_1 as usize], ArrayTypes::Empty) {
                     self.is_double(children_0 as usize)
                 } else {
-                    return Ok(
-                        matches!(self.nodes_vec[children_0 as usize], ArrayTypes::Leaf { .. })
-                            && matches!(self.nodes_vec[children_1 as usize], ArrayTypes::Leaf { .. }),
-                    ); 
+                    return Ok(matches!(
+                        self.nodes_vec[children_0 as usize],
+                        ArrayTypes::Leaf { .. }
+                    ) && matches!(
+                        self.nodes_vec[children_1 as usize],
+                        ArrayTypes::Leaf { .. }
+                    ));
                 }
             }
             ArrayTypes::Truncated => Ok(false),
@@ -534,24 +544,26 @@ mod tests {
         pub(crate) fn get_merkle_root_old(&self) -> [u8; 32] {
             self.get_partial_hash(self.nodes_vec.len() as u32 - 1)
         }
-    
+
         fn get_partial_hash(&self, index: u32) -> [u8; 32] {
             if self.nodes_vec.is_empty() {
                 return BLANK;
             }
-    
+
             let ArrayTypes::Leaf { data } = self.nodes_vec[index as usize] else {
                 return self.get_partial_hash_recurse(index);
             };
             hash_leaf(self.leaf_vec[data as usize])
         }
-    
+
         fn get_partial_hash_recurse(&self, node_index: u32) -> [u8; 32] {
             match self.nodes_vec[node_index as usize] {
                 ArrayTypes::Leaf { data } => self.leaf_vec[data as usize],
                 ArrayTypes::Middle { children } => {
-                    let left_type: NodeType = array_type_to_node_type(self.nodes_vec[children.0 as usize]);
-                    let right_type: NodeType = array_type_to_node_type(self.nodes_vec[children.1 as usize]);
+                    let left_type: NodeType =
+                        array_type_to_node_type(self.nodes_vec[children.0 as usize]);
+                    let right_type: NodeType =
+                        array_type_to_node_type(self.nodes_vec[children.1 as usize]);
                     hash(
                         left_type,
                         right_type,
@@ -723,7 +735,6 @@ mod tests {
         assert_eq!(root, tree.get_merkle_root_old());
     }
 
-
     #[test]
     fn test_compute_merkle_root_5() {
         let a = [
@@ -849,7 +860,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn test_merkle_left_edge_duplicates() {
         let a = [
@@ -907,7 +917,6 @@ mod tests {
             tree.hash_cache[tree.hash_cache.len() - 1]
         );
     }
-
 
     #[test]
     fn test_merkle_right_edge() {
