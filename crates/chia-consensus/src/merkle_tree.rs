@@ -123,6 +123,10 @@ fn deserialize_recurse(
 }
 
 impl MerkleSet {
+    pub fn new(leafs: &mut [[u8; 32]]) -> MerkleSet {
+        generate_merkle_tree(leafs).1
+    }
+
     pub fn get_merkle_root(&self) -> [u8; 32] {
         self.hash_cache[self.hash_cache.len() - 1]
     }
@@ -329,6 +333,7 @@ pub(crate) fn hash_leaf(leaf: [u8; 32]) -> [u8; 32] {
     hasher.finalize().into()
 }
 
+// this is an expanded version of the radix sort function which builds the merkle tree and its hash cache as it goes
 pub fn generate_merkle_tree(leafs: &mut [[u8; 32]]) -> ([u8; 32], MerkleSet) {
     // Leafs are already hashed
 
@@ -354,7 +359,12 @@ pub fn generate_merkle_tree(leafs: &mut [[u8; 32]]) -> ([u8; 32], MerkleSet) {
     }
 }
 
-// this is an expanded version of the radix sort function which builds the merkle tree and its hash cache as it goes
+// this function performs an in-place, recursive radix sort of the range.
+// as each level returns, values are hashed pair-wise and as a hash tree.
+// It will also populate a MerkleSet struct at each level of the call
+// the return value is a tuple of:
+// - merkle tree root that the values in the range form
+// - the type of node that this is
 fn generate_merkle_tree_recurse(
     range: &mut [[u8; 32]],
     depth: u8,
