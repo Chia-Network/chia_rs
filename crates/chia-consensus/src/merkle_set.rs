@@ -926,7 +926,7 @@ mod tests {
             if let ArrayTypes::Leaf { data } = tree.nodes_vec[children.1] {
                 assert_eq!(tree.leaf_vec[data], a);
             } else {
-                assert!(false) // node should be a leaf
+                panic!("node should be a leaf");
             }
         } else {
             assert!(false) // root node should be a Middle
