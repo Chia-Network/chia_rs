@@ -864,12 +864,12 @@ mod tests {
             let (root, tree) = generate_merkle_tree(&mut random_data);
             assert_eq!(root, tree.get_merkle_root());
             assert_eq!(root, compute_merkle_set_root(&mut random_data));
-            let mut rng = rand::thread_rng();
-            let index = rng.gen_range(0..random_data.len());
-            let (included, proof) = tree.generate_proof(random_data[index]).unwrap();
-            assert!(included);
-            let rebuilt = deserialize_proof(&proof).unwrap();
-            assert_eq!(rebuilt.get_merkle_root(), tree.get_merkle_root());
+            for data in random_data {
+                let (included, proof) = tree.generate_proof(data).unwrap();
+                assert!(included);
+                let rebuilt = deserialize_proof(&proof).unwrap();
+                assert_eq!(rebuilt.get_merkle_root(), tree.get_merkle_root());
+            }
         }
     }
 
