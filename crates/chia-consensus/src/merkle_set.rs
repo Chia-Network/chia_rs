@@ -182,10 +182,7 @@ fn radix_sort(range: &mut [[u8; 32]], depth: u8) -> ([u8; 32], NodeType) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::merkle_tree::{
-        deserialize_proof, generate_merkle_tree,
-        MerkleSet, SetError,
-    };
+    use crate::merkle_tree::{deserialize_proof, generate_merkle_tree, MerkleSet, SetError};
     use rand::rngs::SmallRng; // cargo says this isn't required but tests won't run without it
     use rand::{Rng, SeedableRng}; // needed for PyBytes
 
@@ -377,7 +374,10 @@ mod tests {
         assert_eq!(root, tree.get_merkle_root_old());
         assert_eq!(root, compute_merkle_set_root(&mut [c, b, a, d, a, a]));
         assert_eq!(tree, tree_2);
-        assert_eq!(root, MerkleSet::new(&mut [c, b, a, d, a, a]).get_merkle_root());
+        assert_eq!(
+            root,
+            MerkleSet::new(&mut [c, b, a, d, a, a]).get_merkle_root()
+        );
 
         let (root, tree_2) = generate_merkle_tree(&mut [b, a, d, c, a]);
         assert_eq!(root, expected);
@@ -852,7 +852,6 @@ mod tests {
     #[test]
     fn test_random_bytes() {
         for _i in [1..1000000] {
-
             let mut small_rng = SmallRng::from_entropy();
             let vec_length: usize = small_rng.gen_range(0..=500);
             let mut random_data: Vec<[u8; 32]> = Vec::with_capacity(vec_length);
@@ -870,10 +869,7 @@ mod tests {
             let (included, proof) = tree.generate_proof(random_data[index]).unwrap();
             assert!(included);
             let rebuilt = deserialize_proof(&proof).unwrap();
-            assert_eq!(
-                rebuilt.get_merkle_root(),
-                tree.get_merkle_root()
-            );
+            assert_eq!(rebuilt.get_merkle_root(), tree.get_merkle_root());
         }
     }
 
