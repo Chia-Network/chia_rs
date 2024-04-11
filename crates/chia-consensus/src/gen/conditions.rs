@@ -17,8 +17,8 @@ use super::opcodes::{
 use super::sanitize_int::{sanitize_uint, SanitizedUint};
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
 use crate::gen::flags::{
-    AGG_SIG_ARGS, COND_ARGS_NIL, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL, NO_UNKNOWN_CONDS,
-    STRICT_ARGS_COUNT,
+    AGG_SIG_ARGS, COND_ARGS_NIL, ENABLE_NIL_CONDITIONS, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
+    NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
 };
 use crate::gen::messages::{Message, SpendId};
 use crate::gen::spend_visitor::SpendVisitor;
@@ -905,7 +905,19 @@ pub fn parse_conditions<V: SpendVisitor>(
 
     while let Some((mut c, next)) = next(a, iter)? {
         iter = next;
-        let Some(op) = parse_opcode(a, first(a, c)?, flags) else {
+        let Ok(op) = first(a, c) else {
+            if (flags & ENABLE_NIL_CONDITIONS) != 0 {
+                if (flags & NO_UNKNOWN_CONDS) != 0 && a.atom_len(c) != 0 {
+                    // when nil conditions are allowed, don't allow *any* atom
+                    // in the conditions list (as long as unknown conditions are
+                    // disallowed)
+                    return Err(ValidationErr(c, ErrorCode::InvalidCondition));
+                }
+                continue;
+            }
+            return Err(ValidationErr(c, ErrorCode::InvalidCondition));
+        };
+        let Some(op) = parse_opcode(a, op, flags) else {
             // in strict mode we don't allow unknown conditions
             if (flags & NO_UNKNOWN_CONDS) != 0 {
                 return Err(ValidationErr(c, ErrorCode::InvalidConditionOpcode));
@@ -2301,6 +2313,48 @@ fn test_reserve_fee_insufficient_fee() {
             .1,
         ErrorCode::ReserveFeeConditionFailed
     );
+}
+
+#[test]
+fn test_nil_conditions() {
+    let spend_with_nil_cond = "((({h1} ({h2} (123 ((0 ((51 ({h2} (42 )))))";
+    for flags in [0, MEMPOOL_MODE] {
+        assert_eq!(
+            cond_test_flag(spend_with_nil_cond, flags).unwrap_err().1,
+            ErrorCode::InvalidCondition
+        );
+    }
+
+    for flags in [ENABLE_NIL_CONDITIONS, MEMPOOL_MODE | ENABLE_NIL_CONDITIONS] {
+        let (a, conds) = cond_test_flag(spend_with_nil_cond, flags).unwrap();
+        assert_eq!(conds.cost, CREATE_COIN_COST);
+        assert_eq!(conds.spends.len(), 1);
+        let spend = &conds.spends[0];
+        assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+        assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
+        assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    }
+}
+
+#[test]
+fn test_atom_conditions() {
+    let spend_with_atom_cond = "((({h1} ({h2} (123 ((1 ((51 ({h2} (42 )))))";
+    for flags in [0, MEMPOOL_MODE, ENABLE_NIL_CONDITIONS | NO_UNKNOWN_CONDS] {
+        assert_eq!(
+            cond_test_flag(spend_with_atom_cond, flags).unwrap_err().1,
+            ErrorCode::InvalidCondition
+        );
+    }
+
+    for flags in [ENABLE_NIL_CONDITIONS] {
+        let (a, conds) = cond_test_flag(spend_with_atom_cond, flags).unwrap();
+        assert_eq!(conds.cost, CREATE_COIN_COST);
+        assert_eq!(conds.spends.len(), 1);
+        let spend = &conds.spends[0];
+        assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+        assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
+        assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    }
 }
 
 // TOOD: test announcement across coins

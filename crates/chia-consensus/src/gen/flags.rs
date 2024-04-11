@@ -36,6 +36,11 @@ pub const ANALYZE_SPENDS: u32 = 0x4000000;
 // This enables support for the new SEND_MESSAGE and RECEIVE_MESSAGE conditions
 pub const ENABLE_MESSAGE_CONDITIONS: u32 = 0x8000000;
 
+// This enables NIL conditions. i.e. an empty list in the conditions list,
+// instead of the expected (op-code argument ...) list. This is a hard fork
+// when enabled.
+pub const ENABLE_NIL_CONDITIONS: u32 = 0x10000000;
+
 pub const MEMPOOL_MODE: u32 = CLVM_MEMPOOL_MODE
     | NO_UNKNOWN_CONDS
     | COND_ARGS_NIL
