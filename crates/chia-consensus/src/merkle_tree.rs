@@ -52,95 +52,95 @@ const EMPTY_NODE_HASH: [u8; 32] = [
 #[cfg_attr(feature = "py-bindings", pyclass(frozen, name = "SetError"))]
 pub struct SetError;
 
-pub fn deserialize_proof(proof: &[u8]) -> Result<MerkleSet, SetError> {
-    let mut merkle_tree = MerkleSet::default();
-    deserialize_proof_impl(&mut merkle_tree, proof)?;
-    Ok(merkle_tree)
-}
-
-// returns the number of bytes consumed from proof
-fn deserialize_proof_impl(merkle_tree: &mut MerkleSet, proof: &[u8]) -> Result<(), SetError> {
-    use std::io::Cursor;
-    use std::io::Read;
-
-    #[repr(u8)]
-    enum ParseOp {
-        Node,
-        Middle,
+impl MerkleSet {
+    pub fn from_proof(proof: &[u8]) -> Result<MerkleSet, SetError> {
+        let mut merkle_tree = MerkleSet::default();
+        merkle_tree.deserialize_proof_impl(proof)?;
+        Ok(merkle_tree)
     }
 
-    let mut proof = Cursor::<&[u8]>::new(proof);
-    let mut values = Vec::<u32>::new();
-    let mut ops = vec![ParseOp::Node];
-    let mut depth = 0;
+    // returns the number of bytes consumed from proof
+    fn deserialize_proof_impl(&mut self, proof: &[u8]) -> Result<(), SetError> {
+        use std::io::Cursor;
+        use std::io::Read;
 
-    while let Some(op) = ops.pop() {
-        match op {
-            ParseOp::Node => {
-                let mut b = [0; 1];
-                proof.read_exact(&mut b).map_err(|_| SetError)?;
+        #[repr(u8)]
+        enum ParseOp {
+            Node,
+            Middle,
+        }
 
-                match b[0] {
-                    EMPTY => {
-                        values.push(merkle_tree.nodes_vec.len() as u32);
-                        merkle_tree.nodes_vec.push(ArrayTypes::Empty);
-                        merkle_tree.hash_cache.push(BLANK);
-                    }
-                    TERMINAL => {
-                        let mut hash = [0; 32];
-                        proof.read_exact(&mut hash).map_err(|_| SetError)?;
-                        values.push(merkle_tree.nodes_vec.len() as u32);
-                        merkle_tree.nodes_vec.push(ArrayTypes::Leaf);
-                        merkle_tree.hash_cache.push(hash);
-                    }
-                    TRUNCATED => {
-                        let mut hash = [0; 32];
-                        proof.read_exact(&mut hash).map_err(|_| SetError)?;
-                        values.push(merkle_tree.nodes_vec.len() as u32);
-                        merkle_tree.nodes_vec.push(ArrayTypes::Truncated);
-                        merkle_tree.hash_cache.push(hash);
-                    }
-                    MIDDLE => {
-                        if depth > 256 {
+        let mut proof = Cursor::<&[u8]>::new(proof);
+        let mut values = Vec::<u32>::new();
+        let mut ops = vec![ParseOp::Node];
+        let mut depth = 0;
+
+        while let Some(op) = ops.pop() {
+            match op {
+                ParseOp::Node => {
+                    let mut b = [0; 1];
+                    proof.read_exact(&mut b).map_err(|_| SetError)?;
+
+                    match b[0] {
+                        EMPTY => {
+                            values.push(self.nodes_vec.len() as u32);
+                            self.nodes_vec.push(ArrayTypes::Empty);
+                            self.hash_cache.push(BLANK);
+                        }
+                        TERMINAL => {
+                            let mut hash = [0; 32];
+                            proof.read_exact(&mut hash).map_err(|_| SetError)?;
+                            values.push(self.nodes_vec.len() as u32);
+                            self.nodes_vec.push(ArrayTypes::Leaf);
+                            self.hash_cache.push(hash);
+                        }
+                        TRUNCATED => {
+                            let mut hash = [0; 32];
+                            proof.read_exact(&mut hash).map_err(|_| SetError)?;
+                            values.push(self.nodes_vec.len() as u32);
+                            self.nodes_vec.push(ArrayTypes::Truncated);
+                            self.hash_cache.push(hash);
+                        }
+                        MIDDLE => {
+                            if depth > 256 {
+                                return Err(SetError);
+                            }
+                            ops.push(ParseOp::Middle);
+                            ops.push(ParseOp::Node);
+                            ops.push(ParseOp::Node);
+                            depth += 1;
+                        }
+                        _ => {
                             return Err(SetError);
                         }
-                        ops.push(ParseOp::Middle);
-                        ops.push(ParseOp::Node);
-                        ops.push(ParseOp::Node);
-                        depth += 1;
-                    }
-                    _ => {
-                        return Err(SetError);
                     }
                 }
-            }
-            ParseOp::Middle => {
-                assert!(values.len() >= 2);
-                let right = values.pop().unwrap();
-                let left = values.pop().unwrap();
-                values.push(merkle_tree.nodes_vec.len() as u32);
-                merkle_tree.nodes_vec.push(ArrayTypes::Middle(left, right));
-                let left_type = array_type_to_node_type(merkle_tree.nodes_vec[left as usize]);
-                let right_type = array_type_to_node_type(merkle_tree.nodes_vec[right as usize]);
-                let node_hash = hash(
-                    left_type,
-                    right_type,
-                    &merkle_tree.hash_cache[left as usize],
-                    &merkle_tree.hash_cache[right as usize],
-                );
-                merkle_tree.hash_cache.push(node_hash);
-                depth -= 1;
+                ParseOp::Middle => {
+                    assert!(values.len() >= 2);
+                    let right = values.pop().unwrap();
+                    let left = values.pop().unwrap();
+                    values.push(self.nodes_vec.len() as u32);
+                    self.nodes_vec.push(ArrayTypes::Middle(left, right));
+                    let left_type = array_type_to_node_type(self.nodes_vec[left as usize]);
+                    let right_type = array_type_to_node_type(self.nodes_vec[right as usize]);
+                    let node_hash = hash(
+                        left_type,
+                        right_type,
+                        &self.hash_cache[left as usize],
+                        &self.hash_cache[right as usize],
+                    );
+                    self.hash_cache.push(node_hash);
+                    depth -= 1;
+                }
             }
         }
+        if proof.position() != proof.get_ref().len() as u64 {
+            Err(SetError)
+        } else {
+            Ok(())
+        }
     }
-    if proof.position() != proof.get_ref().len() as u64 {
-        Err(SetError)
-    } else {
-        Ok(())
-    }
-}
 
-impl MerkleSet {
     pub fn get_merkle_root(&self) -> [u8; 32] {
         match self.nodes_vec.last().unwrap() {
             ArrayTypes::Leaf => hash_leaf(self.hash_cache.last().unwrap()),
@@ -295,10 +295,6 @@ impl MerkleSet {
 
     #[pyo3(name = "get_root")]
     pub fn py_get_root(&self, py: Python) -> PyResult<PyObject> {
-        // compiler doesn't like PyBytes as return type
-        if self.hash_cache.is_empty() {
-            return Err(PyValueError::new_err("Tree is empty"));
-        }
         Ok(PyBytes::new(py, &self.get_merkle_root()).into())
     }
 
@@ -693,7 +689,7 @@ mod tests {
             let Ok(Some(proof)) = tree.generate_proof(data) else {
                 panic!("failed to generate proof");
             };
-            let rebuilt = deserialize_proof(&proof).expect("failed to parse proof");
+            let rebuilt = MerkleSet::from_proof(&proof).expect("failed to parse proof");
             assert_eq!(rebuilt.get_merkle_root(), root);
             assert_eq!(rebuilt.generate_proof(data).unwrap(), Some(proof));
         }
@@ -937,7 +933,7 @@ mod tests {
             let Ok(Some(proof)) = tree.generate_proof(&random_data[index]) else {
                 panic!("failed to generate proof");
             };
-            let rebuilt = deserialize_proof(&proof[0..proof.len() - 2]);
+            let rebuilt = MerkleSet::from_proof(&proof[0..proof.len() - 2]);
             assert!(matches!(rebuilt, Err(SetError)));
         }
     }
@@ -977,6 +973,6 @@ mod tests {
     #[test]
     fn test_deserialize_malicious_proof() {
         let malicious_proof = vec![MIDDLE].repeat(40000);
-        assert!(deserialize_proof(&malicious_proof).is_err());
+        assert!(MerkleSet::from_proof(&malicious_proof).is_err());
     }
 }
