@@ -27,8 +27,7 @@ pub enum ArrayTypes {
 #[derive(PartialEq, Debug, Clone, Default)]
 #[cfg_attr(feature = "py-bindings", pyclass(frozen, name = "MerkleSet"))]
 pub struct MerkleSet {
-    nodes_vec: Vec<ArrayTypes>,
-    hash_cache: Vec<[u8; 32]>, // same size and order as nodes_vec
+    nodes_vec: Vec<(ArrayTypes, [u8; 32])>,
 }
 
 const EMPTY: u8 = 0;
@@ -84,22 +83,19 @@ impl MerkleSet {
                     match b[0] {
                         EMPTY => {
                             values.push(self.nodes_vec.len() as u32);
-                            self.nodes_vec.push(ArrayTypes::Empty);
-                            self.hash_cache.push(BLANK);
+                            self.nodes_vec.push((ArrayTypes::Empty, BLANK));
                         }
                         TERMINAL => {
                             let mut hash = [0; 32];
                             proof.read_exact(&mut hash).map_err(|_| SetError)?;
                             values.push(self.nodes_vec.len() as u32);
-                            self.nodes_vec.push(ArrayTypes::Leaf);
-                            self.hash_cache.push(hash);
+                            self.nodes_vec.push((ArrayTypes::Leaf, hash));
                         }
                         TRUNCATED => {
                             let mut hash = [0; 32];
                             proof.read_exact(&mut hash).map_err(|_| SetError)?;
                             values.push(self.nodes_vec.len() as u32);
-                            self.nodes_vec.push(ArrayTypes::Truncated);
-                            self.hash_cache.push(hash);
+                            self.nodes_vec.push((ArrayTypes::Truncated, hash));
                         }
                         MIDDLE => {
                             if depth > 256 {
@@ -120,16 +116,16 @@ impl MerkleSet {
                     let right = values.pop().unwrap();
                     let left = values.pop().unwrap();
                     values.push(self.nodes_vec.len() as u32);
-                    self.nodes_vec.push(ArrayTypes::Middle(left, right));
-                    let left_type = array_type_to_node_type(self.nodes_vec[left as usize]);
-                    let right_type = array_type_to_node_type(self.nodes_vec[right as usize]);
+                    let left_type = array_type_to_node_type(self.nodes_vec[left as usize].0);
+                    let right_type = array_type_to_node_type(self.nodes_vec[right as usize].0);
                     let node_hash = hash(
                         left_type,
                         right_type,
-                        &self.hash_cache[left as usize],
-                        &self.hash_cache[right as usize],
+                        &self.nodes_vec[left as usize].1,
+                        &self.nodes_vec[right as usize].1,
                     );
-                    self.hash_cache.push(node_hash);
+                    self.nodes_vec
+                        .push((ArrayTypes::Middle(left, right), node_hash));
                     depth -= 1;
                 }
             }
@@ -142,11 +138,11 @@ impl MerkleSet {
     }
 
     pub fn get_merkle_root(&self) -> [u8; 32] {
-        match self.nodes_vec.last().unwrap() {
-            ArrayTypes::Leaf => hash_leaf(self.hash_cache.last().unwrap()),
-            ArrayTypes::Middle(_, _) => *self.hash_cache.last().unwrap(),
+        match self.nodes_vec.last().unwrap().0 {
+            ArrayTypes::Leaf => hash_leaf(&self.nodes_vec.last().unwrap().1),
+            ArrayTypes::Middle(_, _) => self.nodes_vec.last().unwrap().1,
             ArrayTypes::Empty => BLANK,
-            ArrayTypes::Truncated => *self.hash_cache.last().unwrap(),
+            ArrayTypes::Truncated => self.nodes_vec.last().unwrap().1,
         }
     }
 
@@ -167,29 +163,29 @@ impl MerkleSet {
         proof: &mut Vec<u8>,
         depth: u8,
     ) -> Result<bool, SetError> {
-        match self.nodes_vec[current_node_index] {
+        match self.nodes_vec[current_node_index].0 {
             ArrayTypes::Empty => {
                 proof.push(EMPTY);
                 Ok(false)
             }
             ArrayTypes::Leaf => {
                 proof.push(TERMINAL);
-                proof.extend_from_slice(&self.hash_cache[current_node_index]);
-                Ok(&self.hash_cache[current_node_index] == included_leaf)
+                proof.extend_from_slice(&self.nodes_vec[current_node_index].1);
+                Ok(&self.nodes_vec[current_node_index].1 == included_leaf)
             }
             ArrayTypes::Middle(left, right) => {
                 proof.push(MIDDLE);
 
                 if let (ArrayTypes::Leaf, ArrayTypes::Leaf) = (
-                    self.nodes_vec[left as usize],
-                    self.nodes_vec[right as usize],
+                    self.nodes_vec[left as usize].0,
+                    self.nodes_vec[right as usize].0,
                 ) {
                     proof.push(TERMINAL);
-                    proof.extend_from_slice(&self.hash_cache[left as usize]);
+                    proof.extend_from_slice(&self.nodes_vec[left as usize].1);
                     proof.push(TERMINAL);
-                    proof.extend_from_slice(&self.hash_cache[right as usize]);
-                    return Ok(&self.hash_cache[left as usize] == included_leaf
-                        || &self.hash_cache[right as usize] == included_leaf);
+                    proof.extend_from_slice(&self.nodes_vec[right as usize].1);
+                    return Ok(&self.nodes_vec[left as usize].1 == included_leaf
+                        || &self.nodes_vec[right as usize].1 == included_leaf);
                 }
 
                 if get_bit(included_leaf, depth) {
@@ -199,7 +195,7 @@ impl MerkleSet {
                         included_leaf,
                         proof,
                         depth + 1,
-                        matches!(self.nodes_vec[right as usize], ArrayTypes::Empty),
+                        matches!(self.nodes_vec[right as usize].0, ArrayTypes::Empty),
                     )?;
                     self.is_included(right as usize, included_leaf, proof, depth + 1)
                 } else {
@@ -211,7 +207,7 @@ impl MerkleSet {
                         included_leaf,
                         proof,
                         depth + 1,
-                        matches!(self.nodes_vec[left as usize], ArrayTypes::Empty),
+                        matches!(self.nodes_vec[left as usize].0, ArrayTypes::Empty),
                     )?;
                     Ok(r)
                 }
@@ -228,7 +224,7 @@ impl MerkleSet {
         depth: u8,
         collapse: bool,
     ) -> Result<(), SetError> {
-        match self.nodes_vec[current_node_index] {
+        match self.nodes_vec[current_node_index].0 {
             ArrayTypes::Empty => {
                 proof.push(EMPTY);
                 Ok(())
@@ -236,7 +232,7 @@ impl MerkleSet {
             ArrayTypes::Middle { .. } => {
                 if collapse || !self.is_double(current_node_index)? {
                     proof.push(TRUNCATED);
-                    proof.extend_from_slice(&self.hash_cache[current_node_index]);
+                    proof.extend_from_slice(&self.nodes_vec[current_node_index].1);
                     Ok(())
                 } else {
                     self.is_included(current_node_index, included_leaf, proof, depth)?;
@@ -245,12 +241,12 @@ impl MerkleSet {
             }
             ArrayTypes::Truncated => {
                 proof.push(TRUNCATED);
-                proof.extend_from_slice(&self.hash_cache[current_node_index]);
+                proof.extend_from_slice(&self.nodes_vec[current_node_index].1);
                 Ok(())
             }
             ArrayTypes::Leaf => {
                 proof.push(TERMINAL);
-                proof.extend_from_slice(&self.hash_cache[current_node_index]);
+                proof.extend_from_slice(&self.nodes_vec[current_node_index].1);
                 Ok(())
             }
         }
@@ -258,17 +254,15 @@ impl MerkleSet {
 
     // check if a node_index contains any descendants with two leafs as its children
     fn is_double(&self, node_index: usize) -> Result<bool, SetError> {
-        match self.nodes_vec[node_index] {
-            ArrayTypes::Middle(children_0, children_1) => {
-                if matches!(self.nodes_vec[children_0 as usize], ArrayTypes::Empty) {
-                    self.is_double(children_1 as usize)
-                } else if matches!(self.nodes_vec[children_1 as usize], ArrayTypes::Empty) {
-                    self.is_double(children_0 as usize)
+        match self.nodes_vec[node_index].0 {
+            ArrayTypes::Middle(left, right) => {
+                if matches!(self.nodes_vec[left as usize].0, ArrayTypes::Empty) {
+                    self.is_double(right as usize)
+                } else if matches!(self.nodes_vec[right as usize].0, ArrayTypes::Empty) {
+                    self.is_double(left as usize)
                 } else {
-                    return Ok(
-                        matches!(self.nodes_vec[children_0 as usize], ArrayTypes::Leaf)
-                            && matches!(self.nodes_vec[children_1 as usize], ArrayTypes::Leaf),
-                    );
+                    return Ok(matches!(self.nodes_vec[left as usize].0, ArrayTypes::Leaf)
+                        && matches!(self.nodes_vec[right as usize].0, ArrayTypes::Leaf));
                 }
             }
             ArrayTypes::Truncated => Ok(false),
@@ -336,8 +330,7 @@ impl MerkleSet {
 
         // There's a special case for empty sets
         if leafs.is_empty() {
-            merkle_tree.nodes_vec.push(ArrayTypes::Empty);
-            merkle_tree.hash_cache.push(BLANK);
+            merkle_tree.nodes_vec.push((ArrayTypes::Empty, BLANK));
             return merkle_tree;
         }
         merkle_tree.generate_merkle_tree_recurse(leafs, 0);
@@ -359,8 +352,7 @@ impl MerkleSet {
 
         if range.len() == 1 {
             // we've reached a leaf node
-            self.nodes_vec.push(ArrayTypes::Leaf);
-            self.hash_cache.push(range[0]);
+            self.nodes_vec.push((ArrayTypes::Leaf, range[0]));
             return (range[0], NodeType::Term);
         }
 
@@ -406,8 +398,7 @@ impl MerkleSet {
                 // so just return one of the duplicates as if there was only one
                 debug_assert!(range.len() > 1);
                 debug_assert!(range[0] == range[1]);
-                self.nodes_vec.push(ArrayTypes::Leaf);
-                self.hash_cache.push(range[0]);
+                self.nodes_vec.push((ArrayTypes::Leaf, range[0]));
                 (range[0], NodeType::Term)
             } else {
                 // this means either the left or right bucket/sub tree was empty.
@@ -418,20 +409,21 @@ impl MerkleSet {
                 // blank hash)
                 if child_type == NodeType::Mid {
                     // most recent nodes are our children
-                    self.nodes_vec.push(ArrayTypes::Empty);
-                    self.hash_cache.push(EMPTY_NODE_HASH);
+                    self.nodes_vec.push((ArrayTypes::Empty, EMPTY_NODE_HASH));
                     let node_length: u32 = self.nodes_vec.len() as u32;
                     if left_empty {
-                        self.nodes_vec
-                            .push(ArrayTypes::Middle(node_length - 1, node_length - 2));
                         let node_hash = hash(NodeType::Empty, child_type, &BLANK, &child_hash);
-                        self.hash_cache.push(node_hash);
+                        self.nodes_vec.push((
+                            ArrayTypes::Middle(node_length - 1, node_length - 2),
+                            node_hash,
+                        ));
                         (node_hash, NodeType::Mid)
                     } else {
-                        self.nodes_vec
-                            .push(ArrayTypes::Middle(node_length - 2, node_length - 1));
                         let node_hash = hash(child_type, NodeType::Empty, &child_hash, &BLANK);
-                        self.hash_cache.push(node_hash);
+                        self.nodes_vec.push((
+                            ArrayTypes::Middle(node_length - 2, node_length - 1),
+                            node_hash,
+                        ));
                         (node_hash, NodeType::Mid)
                     }
                 } else {
@@ -446,22 +438,19 @@ impl MerkleSet {
             debug_assert!(range.len() > 1);
             debug_assert!(left < range.len() as i32);
 
-            self.nodes_vec.push(ArrayTypes::Leaf);
-            self.hash_cache.push(range[0]);
-
-            self.nodes_vec.push(ArrayTypes::Leaf);
-            self.hash_cache.push(range[left as usize]);
-
-            let nodes_len: u32 = self.nodes_vec.len() as u32;
+            self.nodes_vec.push((ArrayTypes::Leaf, range[0]));
             self.nodes_vec
-                .push(ArrayTypes::Middle(nodes_len - 2, nodes_len - 1));
+                .push((ArrayTypes::Leaf, range[left as usize]));
+
+            let nodes_len = self.nodes_vec.len() as u32;
             let node_hash = hash(
                 NodeType::Term,
                 NodeType::Term,
                 &range[0],
                 &range[left as usize],
             );
-            self.hash_cache.push(node_hash);
+            self.nodes_vec
+                .push((ArrayTypes::Middle(nodes_len - 2, nodes_len - 1), node_hash));
             (node_hash, NodeType::MidDbl)
         } else {
             // we are a middle node
@@ -473,22 +462,21 @@ impl MerkleSet {
             let (right_hash, right_type) =
                 self.generate_merkle_tree_recurse(&mut range[left as usize..], depth + 1);
 
+            let node_hash = hash(left_type, right_type, &left_hash, &right_hash);
             let node_type: NodeType = if left_type == NodeType::Term && right_type == NodeType::Term
             {
-                self.nodes_vec.push(ArrayTypes::Middle(
-                    left_child_index,
-                    self.nodes_vec.len() as u32 - 1,
+                self.nodes_vec.push((
+                    ArrayTypes::Middle(left_child_index, self.nodes_vec.len() as u32 - 1),
+                    node_hash,
                 ));
                 NodeType::MidDbl
             } else {
-                self.nodes_vec.push(ArrayTypes::Middle(
-                    left_child_index,
-                    self.nodes_vec.len() as u32 - 1,
+                self.nodes_vec.push((
+                    ArrayTypes::Middle(left_child_index, self.nodes_vec.len() as u32 - 1),
+                    node_hash,
                 ));
                 NodeType::Mid
             };
-            let node_hash = hash(left_type, right_type, &left_hash, &right_hash);
-            self.hash_cache.push(node_hash);
             (node_hash, node_type)
         }
     }
@@ -512,20 +500,20 @@ mod tests {
                 return BLANK;
             }
 
-            let ArrayTypes::Leaf = self.nodes_vec[index as usize] else {
+            let ArrayTypes::Leaf = self.nodes_vec[index as usize].0 else {
                 return self.get_partial_hash_recurse(index);
             };
-            hash_leaf(&self.hash_cache[index as usize])
+            hash_leaf(&self.nodes_vec[index as usize].1)
         }
 
         fn get_partial_hash_recurse(&self, node_index: u32) -> [u8; 32] {
-            match self.nodes_vec[node_index as usize] {
-                ArrayTypes::Leaf => self.hash_cache[node_index as usize],
+            match self.nodes_vec[node_index as usize].0 {
+                ArrayTypes::Leaf => self.nodes_vec[node_index as usize].1,
                 ArrayTypes::Middle(left, right) => {
                     let left_type: NodeType =
-                        array_type_to_node_type(self.nodes_vec[left as usize]);
+                        array_type_to_node_type(self.nodes_vec[left as usize].0);
                     let right_type: NodeType =
-                        array_type_to_node_type(self.nodes_vec[right as usize]);
+                        array_type_to_node_type(self.nodes_vec[right as usize].0);
                     hash(
                         left_type,
                         right_type,
@@ -534,7 +522,7 @@ mod tests {
                     )
                 }
                 ArrayTypes::Empty { .. } => BLANK,
-                ArrayTypes::Truncated => self.hash_cache[node_index as usize],
+                ArrayTypes::Truncated => self.nodes_vec[node_index as usize].1,
             }
         }
     }
@@ -548,9 +536,9 @@ mod tests {
         ];
 
         let tree = MerkleSet::from_leafs(&mut [a, a]);
-        assert_eq!(tree.hash_cache.len(), 1);
-        assert_eq!(tree.hash_cache[0], a);
-        assert_eq!(tree.nodes_vec[0], ArrayTypes::Leaf);
+        assert_eq!(tree.nodes_vec.len(), 1);
+        assert_eq!(tree.nodes_vec[0].1, a);
+        assert_eq!(tree.nodes_vec[0].0, ArrayTypes::Leaf);
     }
 
     #[test]
@@ -577,26 +565,26 @@ mod tests {
         let tree = MerkleSet::from_leafs(&mut [a, b, c, d, a]);
         let node_len = tree.nodes_vec.len();
         assert!(matches!(
-            tree.nodes_vec[node_len - 1],
+            tree.nodes_vec[node_len - 1].0,
             ArrayTypes::Middle { .. }
         )); // check root node is a middle
         assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
 
         // singles
         let tree = MerkleSet::from_leafs(&mut [a]);
-        assert_eq!(tree.hash_cache[0], a);
+        assert_eq!(tree.nodes_vec[0].1, a);
         assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
 
         let tree = MerkleSet::from_leafs(&mut [b]);
-        assert_eq!(tree.hash_cache[0], b);
+        assert_eq!(tree.nodes_vec[0].1, b);
         assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
 
         let tree = MerkleSet::from_leafs(&mut [c]);
-        assert_eq!(tree.hash_cache[0], c);
+        assert_eq!(tree.nodes_vec[0].1, c);
         assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
 
         let tree = MerkleSet::from_leafs(&mut [d]);
-        assert_eq!(tree.hash_cache[0], d);
+        assert_eq!(tree.nodes_vec[0].1, d);
         assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
     }
 
@@ -621,62 +609,62 @@ mod tests {
 
         // pairs a, b
         let tree = MerkleSet::from_leafs(&mut [a, b]);
-        assert_eq!(tree.hash_cache[0], a);
-        assert_eq!(tree.hash_cache[1], b);
+        assert_eq!(tree.nodes_vec[0].1, a);
+        assert_eq!(tree.nodes_vec[1].1, b);
         assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
         let tree = MerkleSet::from_leafs(&mut [b, a]);
-        assert_eq!(tree.hash_cache[0], a);
-        assert_eq!(tree.hash_cache[1], b);
+        assert_eq!(tree.nodes_vec[0].1, a);
+        assert_eq!(tree.nodes_vec[1].1, b);
         assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
 
         // pairs a, c
         let tree = MerkleSet::from_leafs(&mut [a, c]);
-        assert_eq!(tree.hash_cache[0], a);
-        assert_eq!(tree.hash_cache[1], c);
+        assert_eq!(tree.nodes_vec[0].1, a);
+        assert_eq!(tree.nodes_vec[1].1, c);
         assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
         let tree = MerkleSet::from_leafs(&mut [c, a]);
-        assert_eq!(tree.hash_cache[0], a);
-        assert_eq!(tree.hash_cache[1], c);
+        assert_eq!(tree.nodes_vec[0].1, a);
+        assert_eq!(tree.nodes_vec[1].1, c);
         assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
 
         // pairs a, d
         let tree = MerkleSet::from_leafs(&mut [a, d]);
-        assert_eq!(tree.hash_cache[0], a);
-        assert_eq!(tree.hash_cache[1], d);
+        assert_eq!(tree.nodes_vec[0].1, a);
+        assert_eq!(tree.nodes_vec[1].1, d);
         assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
         let tree = MerkleSet::from_leafs(&mut [d, a]);
-        assert_eq!(tree.hash_cache[0], a);
-        assert_eq!(tree.hash_cache[1], d);
+        assert_eq!(tree.nodes_vec[0].1, a);
+        assert_eq!(tree.nodes_vec[1].1, d);
         assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
 
         // pairs b, c
         let tree = MerkleSet::from_leafs(&mut [b, c]);
-        assert_eq!(tree.hash_cache[0], b);
-        assert_eq!(tree.hash_cache[1], c);
+        assert_eq!(tree.nodes_vec[0].1, b);
+        assert_eq!(tree.nodes_vec[1].1, c);
         assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
         let tree = MerkleSet::from_leafs(&mut [c, b]);
-        assert_eq!(tree.hash_cache[0], b);
-        assert_eq!(tree.hash_cache[1], c);
+        assert_eq!(tree.nodes_vec[0].1, b);
+        assert_eq!(tree.nodes_vec[1].1, c);
         assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
 
         // pairs b, d
         let tree = MerkleSet::from_leafs(&mut [b, d]);
-        assert_eq!(tree.hash_cache[0], b);
-        assert_eq!(tree.hash_cache[1], d);
+        assert_eq!(tree.nodes_vec[0].1, b);
+        assert_eq!(tree.nodes_vec[1].1, d);
         assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
         let tree = MerkleSet::from_leafs(&mut [d, b]);
-        assert_eq!(tree.hash_cache[0], b);
-        assert_eq!(tree.hash_cache[1], d);
+        assert_eq!(tree.nodes_vec[0].1, b);
+        assert_eq!(tree.nodes_vec[1].1, d);
         assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
 
         // pairs c, d
         let tree = MerkleSet::from_leafs(&mut [c, d]);
-        assert_eq!(tree.hash_cache[0], c);
-        assert_eq!(tree.hash_cache[1], d);
+        assert_eq!(tree.nodes_vec[0].1, c);
+        assert_eq!(tree.nodes_vec[1].1, d);
         assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
         let tree = MerkleSet::from_leafs(&mut [d, c]);
-        assert_eq!(tree.hash_cache[0], c);
-        assert_eq!(tree.hash_cache[1], d);
+        assert_eq!(tree.nodes_vec[0].1, c);
+        assert_eq!(tree.nodes_vec[1].1, d);
         assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
     }
 
@@ -741,13 +729,13 @@ mod tests {
         //  / \
         // e   c
         assert_eq!(tree.nodes_vec.len(), 17);
-        let Some(ArrayTypes::Middle(_left, right)) = tree.nodes_vec.last() else {
+        let Some((ArrayTypes::Middle(_left, right), _)) = tree.nodes_vec.last() else {
             panic!("root node should be a Middle");
         };
-        let ArrayTypes::Leaf = tree.nodes_vec[*right as usize] else {
+        let ArrayTypes::Leaf = tree.nodes_vec[*right as usize].0 else {
             panic!("node should be a leaf");
         };
-        assert_eq!(tree.hash_cache[*right as usize], d);
+        assert_eq!(tree.nodes_vec[*right as usize].1, d);
     }
 
     #[test]
@@ -788,13 +776,13 @@ mod tests {
         //    / \
         //   c   d
         assert_eq!(tree.nodes_vec.len(), 513);
-        let Some(ArrayTypes::Middle(_left, right)) = tree.nodes_vec.last() else {
+        let Some((ArrayTypes::Middle(_left, right), _)) = tree.nodes_vec.last() else {
             panic!("root node should be a Middle");
         };
-        let ArrayTypes::Leaf = tree.nodes_vec[*right as usize] else {
+        let ArrayTypes::Leaf = tree.nodes_vec[*right as usize].0 else {
             panic!("node should be a leaf");
         };
-        assert_eq!(tree.hash_cache[*right as usize], a);
+        assert_eq!(tree.nodes_vec[*right as usize].1, a);
     }
 
     #[test]
@@ -834,13 +822,13 @@ mod tests {
         //    / \
         //   c   d
         assert_eq!(tree.nodes_vec.len(), 513);
-        let Some(ArrayTypes::Middle(_left, right)) = tree.nodes_vec.last() else {
+        let Some((ArrayTypes::Middle(_left, right), _)) = tree.nodes_vec.last() else {
             panic!("expected middle node");
         };
-        let ArrayTypes::Leaf = tree.nodes_vec[*right as usize] else {
+        let ArrayTypes::Leaf = tree.nodes_vec[*right as usize].0 else {
             panic!("node should be leaf");
         };
-        assert_eq!(tree.hash_cache[*right as usize], a);
+        assert_eq!(tree.nodes_vec[*right as usize].1, a);
     }
 
     #[test]
@@ -885,10 +873,10 @@ mod tests {
         //                  / \
         //                 c   b
 
-        let Some(ArrayTypes::Middle(left, _right)) = tree.nodes_vec.last() else {
+        let Some((ArrayTypes::Middle(left, _right), _)) = tree.nodes_vec.last() else {
             panic!("expected middle node");
         };
-        let ArrayTypes::Leaf = tree.nodes_vec[*left as usize] else {
+        let ArrayTypes::Leaf = tree.nodes_vec[*left as usize].0 else {
             panic!("expected leaf");
         };
     }
