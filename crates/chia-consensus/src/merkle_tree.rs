@@ -14,7 +14,7 @@ use pyo3::{pyclass, pymethods};
 fn get_bit(val: &[u8; 32], bit: u8) -> bool {
     (val[(bit / 8) as usize] & (0x80 >> (bit & 7))) != 0
 }
-// the ArrayTypes  used to create a more lasting MerkleTree representation in the MerkleSet struct
+// the ArrayTypes used to create a more lasting MerkleSet representation in the MerkleSet struct
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum ArrayTypes {
     Leaf,
@@ -23,7 +23,7 @@ pub enum ArrayTypes {
     Truncated,
 }
 
-// represents a MerkleTree by putting all the nodes in a vec. Root is the last entry.
+// represents a MerkleSet by putting all the nodes in a vec. Root is the last entry.
 #[derive(PartialEq, Debug, Clone, Default)]
 #[cfg_attr(feature = "py-bindings", pyclass(frozen, name = "MerkleSet"))]
 pub struct MerkleSet {
@@ -141,10 +141,6 @@ fn deserialize_proof_impl(merkle_tree: &mut MerkleSet, proof: &[u8]) -> Result<(
 }
 
 impl MerkleSet {
-    pub fn new(leafs: &mut [[u8; 32]]) -> MerkleSet {
-        generate_merkle_tree(leafs).1
-    }
-
     pub fn get_merkle_root(&self) -> [u8; 32] {
         match self.nodes_vec.last().unwrap() {
             ArrayTypes::Leaf => hash_leaf(self.hash_cache.last().unwrap()),
@@ -294,7 +290,7 @@ impl MerkleSet {
                     .map_err(|_| PyValueError::new_err("invalid leaf"))?,
             );
         }
-        Ok(generate_merkle_tree(&mut data[..]).1)
+        Ok(MerkleSet::from_leafs(&mut data))
     }
 
     #[pyo3(name = "get_root")]
@@ -336,176 +332,169 @@ fn hash_leaf(leaf: &[u8; 32]) -> [u8; 32] {
     hasher.finalize().into()
 }
 
-// this is an expanded version of the radix sort function which builds the merkle tree and its hash cache as it goes
-pub fn generate_merkle_tree(leafs: &mut [[u8; 32]]) -> ([u8; 32], MerkleSet) {
-    // Leafs are already hashed
+impl MerkleSet {
+    // this is an expanded version of the radix sort function which builds the merkle tree and its hash cache as it goes
+    pub fn from_leafs(leafs: &mut [[u8; 32]]) -> MerkleSet {
+        // Leafs are already hashed
+        let mut merkle_tree = MerkleSet::default();
 
-    let mut merkle_tree: MerkleSet = MerkleSet::default();
-
-    // There's a special case for empty sets
-    if leafs.is_empty() {
-        merkle_tree.nodes_vec.push(ArrayTypes::Empty);
-        merkle_tree.hash_cache.push(BLANK);
-        return (BLANK, merkle_tree);
-    }
-    generate_merkle_tree_recurse(leafs, 0, &mut merkle_tree);
-
-    (merkle_tree.get_merkle_root(), merkle_tree)
-}
-
-// this function performs an in-place, recursive radix sort of the range.
-// as each level returns, values are hashed pair-wise and as a hash tree.
-// It will also populate a MerkleSet struct at each level of the call
-// the return value as a tuple of:
-// - merkle tree root that the values in the range form
-// - the type of node that this is
-fn generate_merkle_tree_recurse(
-    range: &mut [[u8; 32]],
-    depth: u8,
-    merkle_tree: &mut MerkleSet,
-) -> ([u8; 32], NodeType) {
-    assert!(!range.is_empty());
-
-    if range.len() == 1 {
-        // we've reached a leaf node
-        merkle_tree.nodes_vec.push(ArrayTypes::Leaf);
-        merkle_tree.hash_cache.push(range[0]);
-        return (range[0], NodeType::Term);
-    }
-
-    // first sort the range based on the bit at "depth" (starting with the most
-    // significant bit). It also sorts the two resulting ranges recursively by
-    // the next bit. The return value is the SHA256 digest of the resulting
-    // merkle tree. Any node that only has a children on one side, is a no-op,
-    // where that child's hash is forwarded up the tree.
-    let mut left: i32 = 0;
-    let mut right = range.len() as i32 - 1;
-
-    // move 0 bits to the left, and 1 bits to the right
-    while left <= right {
-        let left_bit = get_bit(&range[left as usize], depth);
-        let right_bit = get_bit(&range[right as usize], depth);
-
-        if left_bit && !right_bit {
-            range.swap(left as usize, right as usize);
-            left += 1;
-            right -= 1;
-        } else {
-            if !left_bit {
-                left += 1;
-            }
-            if right_bit {
-                right -= 1;
-            }
+        // There's a special case for empty sets
+        if leafs.is_empty() {
+            merkle_tree.nodes_vec.push(ArrayTypes::Empty);
+            merkle_tree.hash_cache.push(BLANK);
+            return merkle_tree;
         }
-    }
-
-    // we now have one or two branches of the tree, at this depth
-    // if either left or right is empty, this level of the tree does not hash
-    // anything, but just forwards the hash of the one sub tree. Otherwise, it
-    // computes the hashes of the two sub trees and combines them in a hash.
-
-    let left_empty: bool = left == 0;
-    let right_empty: bool = right == range.len() as i32 - 1;
-
-    if left_empty || right_empty {
-        if depth == 255 {
-            // if every bit is identical, we have a duplicate value
-            // duplicate values are collapsed (since this is a set)
-            // so just return one of the duplicates as if there was only one
-            debug_assert!(range.len() > 1);
-            debug_assert!(range[0] == range[1]);
-            merkle_tree.nodes_vec.push(ArrayTypes::Leaf);
-            merkle_tree.hash_cache.push(range[0]);
-            (range[0], NodeType::Term)
-        } else {
-            // this means either the left or right bucket/sub tree was empty.
-            // let left_child_index: u32 =  merkle_tree.nodes_vec.len() as u32;
-            let (child_hash, child_type) =
-                generate_merkle_tree_recurse(range, depth + 1, merkle_tree);
-
-            // in this case we may need to insert an Empty node (prefix 0 and a
-            // blank hash)
-            if child_type == NodeType::Mid {
-                // most recent nodes are our children
-                merkle_tree.nodes_vec.push(ArrayTypes::Empty);
-                merkle_tree.hash_cache.push(EMPTY_NODE_HASH);
-                let node_length: u32 = merkle_tree.nodes_vec.len() as u32;
-                if left_empty {
-                    merkle_tree
-                        .nodes_vec
-                        .push(ArrayTypes::Middle(node_length - 1, node_length - 2));
-                    let node_hash = hash(NodeType::Empty, child_type, &BLANK, &child_hash);
-                    merkle_tree.hash_cache.push(node_hash);
-                    (node_hash, NodeType::Mid)
-                } else {
-                    merkle_tree
-                        .nodes_vec
-                        .push(ArrayTypes::Middle(node_length - 2, node_length - 1));
-                    let node_hash = hash(child_type, NodeType::Empty, &child_hash, &BLANK);
-                    merkle_tree.hash_cache.push(node_hash);
-                    (node_hash, NodeType::Mid)
-                }
-            } else {
-                (child_hash, child_type)
-            }
-        }
-    } else if depth == 255 {
-        // this is an edge case where we make it all the way down to the
-        // bottom of the tree, and split the last pair. This has the same
-        // effect as the else-block, but since we use u8 for depth, it would
-        // overflow
-        debug_assert!(range.len() > 1);
-        debug_assert!(left < range.len() as i32);
-
-        merkle_tree.nodes_vec.push(ArrayTypes::Leaf);
-        merkle_tree.hash_cache.push(range[0]);
-
-        merkle_tree.nodes_vec.push(ArrayTypes::Leaf);
-        merkle_tree.hash_cache.push(range[left as usize]);
-
-        let nodes_len: u32 = merkle_tree.nodes_vec.len() as u32;
+        merkle_tree.generate_merkle_tree_recurse(leafs, 0);
         merkle_tree
-            .nodes_vec
-            .push(ArrayTypes::Middle(nodes_len - 2, nodes_len - 1));
-        let node_hash = hash(
-            NodeType::Term,
-            NodeType::Term,
-            &range[0],
-            &range[left as usize],
-        );
-        merkle_tree.hash_cache.push(node_hash);
-        (node_hash, NodeType::MidDbl)
-    } else {
-        // we are a middle node
-        // recursively sort and hash our left and right children and return the resultant hash upwards
-        let (left_hash, left_type) =
-            generate_merkle_tree_recurse(&mut range[..left as usize], depth + 1, merkle_tree);
-        // make a note of where the left child node is
-        let left_child_index: u32 = merkle_tree.nodes_vec.len() as u32 - 1;
-        let (right_hash, right_type) =
-            generate_merkle_tree_recurse(&mut range[left as usize..], depth + 1, merkle_tree);
+    }
 
-        let node_type: NodeType = if left_type == NodeType::Term && right_type == NodeType::Term {
-            // Prune the two empties beneath us and push ourselves as empty
-            // merkle_tree.nodes_vec.remove(usize::try_from(left_child_index).unwrap());
-            // merkle_tree.nodes_vec.remove(merkle_tree.nodes_vec.len() - 1);
-            // merkle_tree.nodes_vec.push(ArrayTypes::Empty);
-            merkle_tree.nodes_vec.push(ArrayTypes::Middle(
-                left_child_index,
-                merkle_tree.nodes_vec.len() as u32 - 1,
-            ));
-            NodeType::MidDbl
+    // this function performs an in-place, recursive radix sort of the range.
+    // as each level returns, values are hashed pair-wise and as a hash tree.
+    // It will also populate a MerkleSet struct at each level of the call
+    // the return value as a tuple of:
+    // - merkle tree root that the values in the range form
+    // - the type of node that this is
+    fn generate_merkle_tree_recurse(
+        &mut self,
+        range: &mut [[u8; 32]],
+        depth: u8,
+    ) -> ([u8; 32], NodeType) {
+        assert!(!range.is_empty());
+
+        if range.len() == 1 {
+            // we've reached a leaf node
+            self.nodes_vec.push(ArrayTypes::Leaf);
+            self.hash_cache.push(range[0]);
+            return (range[0], NodeType::Term);
+        }
+
+        // first sort the range based on the bit at "depth" (starting with the most
+        // significant bit). It also sorts the two resulting ranges recursively by
+        // the next bit. The return value is the SHA256 digest of the resulting
+        // merkle tree. Any node that only has a children on one side, is a no-op,
+        // where that child's hash is forwarded up the tree.
+        let mut left: i32 = 0;
+        let mut right = range.len() as i32 - 1;
+
+        // move 0 bits to the left, and 1 bits to the right
+        while left <= right {
+            let left_bit = get_bit(&range[left as usize], depth);
+            let right_bit = get_bit(&range[right as usize], depth);
+
+            if left_bit && !right_bit {
+                range.swap(left as usize, right as usize);
+                left += 1;
+                right -= 1;
+            } else {
+                if !left_bit {
+                    left += 1;
+                }
+                if right_bit {
+                    right -= 1;
+                }
+            }
+        }
+
+        // we now have one or two branches of the tree, at this depth
+        // if either left or right is empty, this level of the tree does not hash
+        // anything, but just forwards the hash of the one sub tree. Otherwise, it
+        // computes the hashes of the two sub trees and combines them in a hash.
+
+        let left_empty: bool = left == 0;
+        let right_empty: bool = right == range.len() as i32 - 1;
+
+        if left_empty || right_empty {
+            if depth == 255 {
+                // if every bit is identical, we have a duplicate value
+                // duplicate values are collapsed (since this is a set)
+                // so just return one of the duplicates as if there was only one
+                debug_assert!(range.len() > 1);
+                debug_assert!(range[0] == range[1]);
+                self.nodes_vec.push(ArrayTypes::Leaf);
+                self.hash_cache.push(range[0]);
+                (range[0], NodeType::Term)
+            } else {
+                // this means either the left or right bucket/sub tree was empty.
+                // let left_child_index: u32 =  self.nodes_vec.len() as u32;
+                let (child_hash, child_type) = self.generate_merkle_tree_recurse(range, depth + 1);
+
+                // in this case we may need to insert an Empty node (prefix 0 and a
+                // blank hash)
+                if child_type == NodeType::Mid {
+                    // most recent nodes are our children
+                    self.nodes_vec.push(ArrayTypes::Empty);
+                    self.hash_cache.push(EMPTY_NODE_HASH);
+                    let node_length: u32 = self.nodes_vec.len() as u32;
+                    if left_empty {
+                        self.nodes_vec
+                            .push(ArrayTypes::Middle(node_length - 1, node_length - 2));
+                        let node_hash = hash(NodeType::Empty, child_type, &BLANK, &child_hash);
+                        self.hash_cache.push(node_hash);
+                        (node_hash, NodeType::Mid)
+                    } else {
+                        self.nodes_vec
+                            .push(ArrayTypes::Middle(node_length - 2, node_length - 1));
+                        let node_hash = hash(child_type, NodeType::Empty, &child_hash, &BLANK);
+                        self.hash_cache.push(node_hash);
+                        (node_hash, NodeType::Mid)
+                    }
+                } else {
+                    (child_hash, child_type)
+                }
+            }
+        } else if depth == 255 {
+            // this is an edge case where we make it all the way down to the
+            // bottom of the tree, and split the last pair. This has the same
+            // effect as the else-block, but since we use u8 for depth, it would
+            // overflow
+            debug_assert!(range.len() > 1);
+            debug_assert!(left < range.len() as i32);
+
+            self.nodes_vec.push(ArrayTypes::Leaf);
+            self.hash_cache.push(range[0]);
+
+            self.nodes_vec.push(ArrayTypes::Leaf);
+            self.hash_cache.push(range[left as usize]);
+
+            let nodes_len: u32 = self.nodes_vec.len() as u32;
+            self.nodes_vec
+                .push(ArrayTypes::Middle(nodes_len - 2, nodes_len - 1));
+            let node_hash = hash(
+                NodeType::Term,
+                NodeType::Term,
+                &range[0],
+                &range[left as usize],
+            );
+            self.hash_cache.push(node_hash);
+            (node_hash, NodeType::MidDbl)
         } else {
-            merkle_tree.nodes_vec.push(ArrayTypes::Middle(
-                left_child_index,
-                merkle_tree.nodes_vec.len() as u32 - 1,
-            ));
-            NodeType::Mid
-        };
-        let node_hash = hash(left_type, right_type, &left_hash, &right_hash);
-        merkle_tree.hash_cache.push(node_hash);
-        (node_hash, node_type)
+            // we are a middle node
+            // recursively sort and hash our left and right children and return the resultant hash upwards
+            let (left_hash, left_type) =
+                self.generate_merkle_tree_recurse(&mut range[..left as usize], depth + 1);
+            // make a note of where the left child node is
+            let left_child_index: u32 = self.nodes_vec.len() as u32 - 1;
+            let (right_hash, right_type) =
+                self.generate_merkle_tree_recurse(&mut range[left as usize..], depth + 1);
+
+            let node_type: NodeType = if left_type == NodeType::Term && right_type == NodeType::Term
+            {
+                self.nodes_vec.push(ArrayTypes::Middle(
+                    left_child_index,
+                    self.nodes_vec.len() as u32 - 1,
+                ));
+                NodeType::MidDbl
+            } else {
+                self.nodes_vec.push(ArrayTypes::Middle(
+                    left_child_index,
+                    self.nodes_vec.len() as u32 - 1,
+                ));
+                NodeType::Mid
+            };
+            let node_hash = hash(left_type, right_type, &left_hash, &right_hash);
+            self.hash_cache.push(node_hash);
+            (node_hash, node_type)
+        }
     }
 }
 
@@ -562,7 +551,7 @@ mod tests {
             0, 0, 0, 0,
         ];
 
-        let (_, tree) = generate_merkle_tree(&mut [a, a]);
+        let tree = MerkleSet::from_leafs(&mut [a, a]);
         assert_eq!(tree.hash_cache.len(), 1);
         assert_eq!(tree.hash_cache[0], a);
         assert_eq!(tree.nodes_vec[0], ArrayTypes::Leaf);
@@ -589,30 +578,30 @@ mod tests {
         // tree is ((a,b), (c,d)) - 3 middle nodes, 4 leaf nodes
 
         // rotations
-        let (root, tree) = generate_merkle_tree(&mut [a, b, c, d, a]);
+        let tree = MerkleSet::from_leafs(&mut [a, b, c, d, a]);
         let node_len = tree.nodes_vec.len();
         assert!(matches!(
             tree.nodes_vec[node_len - 1],
             ArrayTypes::Middle { .. }
         )); // check root node is a middle
-        assert_eq!(root, tree.get_merkle_root_old());
+        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
 
         // singles
-        let (root, tree) = generate_merkle_tree(&mut [a]);
+        let tree = MerkleSet::from_leafs(&mut [a]);
         assert_eq!(tree.hash_cache[0], a);
-        assert_eq!(root, tree.get_merkle_root_old());
+        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
 
-        let (root, tree) = generate_merkle_tree(&mut [b]);
+        let tree = MerkleSet::from_leafs(&mut [b]);
         assert_eq!(tree.hash_cache[0], b);
-        assert_eq!(root, tree.get_merkle_root_old());
+        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
 
-        let (root, tree) = generate_merkle_tree(&mut [c]);
+        let tree = MerkleSet::from_leafs(&mut [c]);
         assert_eq!(tree.hash_cache[0], c);
-        assert_eq!(root, tree.get_merkle_root_old());
+        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
 
-        let (root, tree) = generate_merkle_tree(&mut [d]);
+        let tree = MerkleSet::from_leafs(&mut [d]);
         assert_eq!(tree.hash_cache[0], d);
-        assert_eq!(root, tree.get_merkle_root_old());
+        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
     }
 
     #[test]
@@ -635,69 +624,70 @@ mod tests {
         ];
 
         // pairs a, b
-        let (root, tree) = generate_merkle_tree(&mut [a, b]);
+        let tree = MerkleSet::from_leafs(&mut [a, b]);
         assert_eq!(tree.hash_cache[0], a);
         assert_eq!(tree.hash_cache[1], b);
-        assert_eq!(root, tree.get_merkle_root_old());
-        let (root, tree) = generate_merkle_tree(&mut [b, a]);
+        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
+        let tree = MerkleSet::from_leafs(&mut [b, a]);
         assert_eq!(tree.hash_cache[0], a);
         assert_eq!(tree.hash_cache[1], b);
-        assert_eq!(root, tree.get_merkle_root_old());
+        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
 
         // pairs a, c
-        let (root, tree) = generate_merkle_tree(&mut [a, c]);
+        let tree = MerkleSet::from_leafs(&mut [a, c]);
         assert_eq!(tree.hash_cache[0], a);
         assert_eq!(tree.hash_cache[1], c);
-        assert_eq!(root, tree.get_merkle_root_old());
-        let (root, tree) = generate_merkle_tree(&mut [c, a]);
+        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
+        let tree = MerkleSet::from_leafs(&mut [c, a]);
         assert_eq!(tree.hash_cache[0], a);
         assert_eq!(tree.hash_cache[1], c);
-        assert_eq!(root, tree.get_merkle_root_old());
+        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
 
         // pairs a, d
-        let (root, tree) = generate_merkle_tree(&mut [a, d]);
+        let tree = MerkleSet::from_leafs(&mut [a, d]);
         assert_eq!(tree.hash_cache[0], a);
         assert_eq!(tree.hash_cache[1], d);
-        assert_eq!(root, tree.get_merkle_root_old());
-        let (root, tree) = generate_merkle_tree(&mut [d, a]);
+        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
+        let tree = MerkleSet::from_leafs(&mut [d, a]);
         assert_eq!(tree.hash_cache[0], a);
         assert_eq!(tree.hash_cache[1], d);
-        assert_eq!(root, tree.get_merkle_root_old());
+        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
 
         // pairs b, c
-        let (root, tree) = generate_merkle_tree(&mut [b, c]);
+        let tree = MerkleSet::from_leafs(&mut [b, c]);
         assert_eq!(tree.hash_cache[0], b);
         assert_eq!(tree.hash_cache[1], c);
-        assert_eq!(root, tree.get_merkle_root_old());
-        let (root, tree) = generate_merkle_tree(&mut [c, b]);
+        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
+        let tree = MerkleSet::from_leafs(&mut [c, b]);
         assert_eq!(tree.hash_cache[0], b);
         assert_eq!(tree.hash_cache[1], c);
-        assert_eq!(root, tree.get_merkle_root_old());
+        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
 
         // pairs b, d
-        let (root, tree) = generate_merkle_tree(&mut [b, d]);
+        let tree = MerkleSet::from_leafs(&mut [b, d]);
         assert_eq!(tree.hash_cache[0], b);
         assert_eq!(tree.hash_cache[1], d);
-        assert_eq!(root, tree.get_merkle_root_old());
-        let (root, tree) = generate_merkle_tree(&mut [d, b]);
+        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
+        let tree = MerkleSet::from_leafs(&mut [d, b]);
         assert_eq!(tree.hash_cache[0], b);
         assert_eq!(tree.hash_cache[1], d);
-        assert_eq!(root, tree.get_merkle_root_old());
+        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
 
         // pairs c, d
-        let (root, tree) = generate_merkle_tree(&mut [c, d]);
+        let tree = MerkleSet::from_leafs(&mut [c, d]);
         assert_eq!(tree.hash_cache[0], c);
         assert_eq!(tree.hash_cache[1], d);
-        assert_eq!(root, tree.get_merkle_root_old());
-        let (root, tree) = generate_merkle_tree(&mut [d, c]);
+        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
+        let tree = MerkleSet::from_leafs(&mut [d, c]);
         assert_eq!(tree.hash_cache[0], c);
         assert_eq!(tree.hash_cache[1], d);
-        assert_eq!(root, tree.get_merkle_root_old());
+        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
     }
 
     fn test_tree(leafs: &mut [[u8; 32]]) {
-        let (root, tree) = generate_merkle_tree(leafs);
-        assert_eq!(tree.get_merkle_root(), root);
+        let tree = MerkleSet::from_leafs(leafs);
+        let root = tree.get_merkle_root();
+        assert_eq!(root, tree.get_merkle_root_old());
         assert_eq!(compute_merkle_set_root(leafs), root);
         for data in leafs {
             let Ok(Some(proof)) = tree.generate_proof(data) else {
@@ -733,8 +723,8 @@ mod tests {
         ];
 
         test_tree(&mut [a, b, c, d, e]);
-        let (root, tree) = generate_merkle_tree(&mut [a, b, c, d, e]);
-        assert_eq!(root, tree.get_merkle_root_old());
+        let tree = MerkleSet::from_leafs(&mut [a, b, c, d, e]);
+        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
         // this tree looks like this:
         //
         //             o
@@ -783,8 +773,8 @@ mod tests {
             0, 0, 3,
         ];
         test_tree(&mut [a, b, c, d]);
-        let (root, tree) = generate_merkle_tree(&mut [a, b, c, d]);
-        assert_eq!(root, tree.get_merkle_root_old());
+        let tree = MerkleSet::from_leafs(&mut [a, b, c, d]);
+        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
         // this tree looks like this:
         //           o
         //          / \
@@ -829,9 +819,8 @@ mod tests {
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 3,
         ];
-        test_tree(&mut [a, b, c, d]);
-        let (root, tree) = generate_merkle_tree(&mut [a, b, c, d]);
-        assert_eq!(root, tree.get_merkle_root_old());
+        let tree = MerkleSet::from_leafs(&mut [a, b, c, d]);
+        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
         // this tree looks like this:
         //           o
         //          / \
@@ -881,8 +870,8 @@ mod tests {
         ];
 
         test_tree(&mut [a, b, c, d]);
-        let (root, tree) = generate_merkle_tree(&mut [a, b, c, d]);
-        assert_eq!(root, tree.get_merkle_root_old());
+        let tree = MerkleSet::from_leafs(&mut [a, b, c, d]);
+        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
         // this tree looks like this:
         //           o
         //          / \
@@ -941,8 +930,8 @@ mod tests {
                 random_data.push(array);
             }
 
-            let (root, tree) = generate_merkle_tree(&mut random_data);
-            assert_eq!(root, tree.get_merkle_root());
+            let tree = MerkleSet::from_leafs(&mut random_data);
+            let root = tree.get_merkle_root();
             assert_eq!(root, compute_merkle_set_root(&mut random_data));
             let index = rng.gen_range(0..random_data.len());
             let Ok(Some(proof)) = tree.generate_proof(&random_data[index]) else {
@@ -955,8 +944,7 @@ mod tests {
 
     #[test]
     fn test_merkle_set_0() {
-        let (root, tree) = generate_merkle_tree(&mut []);
-        assert_eq!(root, BLANK);
+        let tree = MerkleSet::from_leafs(&mut []);
         assert_eq!(tree.get_merkle_root(), BLANK);
     }
 
