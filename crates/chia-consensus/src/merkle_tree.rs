@@ -55,7 +55,7 @@ pub struct SetError;
 
 pub fn deserialize_proof(proof: &[u8]) -> Result<MerkleSet, SetError> {
     let mut merkle_tree = MerkleSet::default();
-    let pos = deserialize_recurse(&mut merkle_tree, proof)?;
+    let pos = deserialize_recurse(&mut merkle_tree, proof, 0)?;
     if pos != proof.len() {
         Err(SetError)
     } else {
@@ -63,8 +63,12 @@ pub fn deserialize_proof(proof: &[u8]) -> Result<MerkleSet, SetError> {
     }
 }
 
-// TODO: use a Cursor<u8> for proof
-fn deserialize_recurse(merkle_tree: &mut MerkleSet, proof: &[u8]) -> Result<usize, SetError> {
+// returns the number of bytes consumed from proof
+fn deserialize_recurse(
+    merkle_tree: &mut MerkleSet,
+    proof: &[u8],
+    depth: u16,
+) -> Result<usize, SetError> {
     let Some(&t) = proof.first() else {
         return Err(SetError);
     };
@@ -96,13 +100,13 @@ fn deserialize_recurse(merkle_tree: &mut MerkleSet, proof: &[u8]) -> Result<usiz
             Ok(33)
         }
         MIDDLE => {
-            if proof.is_empty() {
+            if proof.is_empty() || depth == 256 {
                 return Err(SetError);
             };
-            let new_pos = deserialize_recurse(merkle_tree, &proof[1..])?;
+            let new_pos = deserialize_recurse(merkle_tree, &proof[1..], depth + 1)?;
             let left_pointer = merkle_tree.nodes_vec.len() - 1;
 
-            let final_pos = deserialize_recurse(merkle_tree, &proof[1 + new_pos..])?;
+            let final_pos = deserialize_recurse(merkle_tree, &proof[1 + new_pos..], depth + 1)?;
             let right_pointer = merkle_tree.nodes_vec.len() - 1;
             merkle_tree.nodes_vec.push(ArrayTypes::Middle {
                 children: (left_pointer as u32, right_pointer as u32),
