@@ -12,7 +12,7 @@ use chia_consensus::gen::run_puzzle::run_puzzle as native_run_puzzle;
 use chia_consensus::gen::solution_generator::solution_generator as native_solution_generator;
 use chia_consensus::gen::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
 use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
-use chia_consensus::merkle_tree::deserialize_proof as deserialise_proof;
+use chia_consensus::merkle_tree::deserialize_proof as native_deserialize_proof;
 use chia_consensus::merkle_tree::MerkleSet;
 use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
@@ -39,8 +39,7 @@ use chia_protocol::{
 use clvm_utils::tree_hash_from_bytes;
 use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV, LIMIT_HEAP, NO_UNKNOWN_OPS};
 use pyo3::buffer::PyBuffer;
-use pyo3::exceptions;
-use pyo3::exceptions::PyRuntimeError;
+use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use pyo3::types::PyList;
@@ -80,10 +79,8 @@ pub fn compute_merkle_set_root<'p>(
 }
 
 #[pyfunction]
-pub fn deserialize_proof(proof: Py<PyBytes>) -> PyResult<MerkleSet> {
-    let bytes = Python::with_gil(|py| proof.as_bytes(py));
-    deserialise_proof(bytes)
-        .map_err(|_| exceptions::PyValueError::new_err("Error deserialising proof."))
+pub fn deserialize_proof(proof: &[u8]) -> PyResult<MerkleSet> {
+    native_deserialize_proof(proof).map_err(|_| PyValueError::new_err("Invalid proof"))
 }
 
 #[pyfunction]
