@@ -300,7 +300,10 @@ impl MerkleSet {
         let mut data: Vec<[u8; 32]> = Vec::with_capacity(leafs.len());
 
         for leaf in leafs {
-            data.push(leaf.extract::<[u8; 32]>().unwrap())
+            data.push(
+                leaf.extract::<[u8; 32]>()
+                    .map_err(|_| PyValueError::new_err("invalid leaf"))?,
+            );
         }
         Ok(generate_merkle_tree(&mut data[..]).1)
     }
