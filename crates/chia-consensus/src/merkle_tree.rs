@@ -17,8 +17,8 @@ fn get_bit(val: &[u8; 32], bit: u8) -> bool {
 // the ArrayTypes  used to create a more lasting MerkleTree representation in the MerkleSet struct
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum ArrayTypes {
-    Leaf { data: u32 },              // index into the leaf_vec array
-    Middle { children: (u32, u32) }, // indexes into nodes_vec
+    Leaf(u32),        // index into the leaf_vec array
+    Middle(u32, u32), // indexes into nodes_vec
     Empty,
     Truncated,
 }
@@ -91,9 +91,9 @@ fn deserialize_proof_impl(merkle_tree: &mut MerkleSet, proof: &[u8]) -> Result<(
                         let mut hash = [0; 32];
                         proof.read_exact(&mut hash).map_err(|_| SetError)?;
                         values.push(merkle_tree.nodes_vec.len() as u32);
-                        merkle_tree.nodes_vec.push(ArrayTypes::Leaf {
-                            data: merkle_tree.leaf_vec.len() as u32,
-                        });
+                        merkle_tree
+                            .nodes_vec
+                            .push(ArrayTypes::Leaf(merkle_tree.leaf_vec.len() as u32));
                         merkle_tree.leaf_vec.push(hash);
                         merkle_tree.hash_cache.push(hash);
                     }
@@ -123,9 +123,7 @@ fn deserialize_proof_impl(merkle_tree: &mut MerkleSet, proof: &[u8]) -> Result<(
                 let right = values.pop().unwrap();
                 let left = values.pop().unwrap();
                 values.push(merkle_tree.nodes_vec.len() as u32);
-                merkle_tree.nodes_vec.push(ArrayTypes::Middle {
-                    children: (left, right),
-                });
+                merkle_tree.nodes_vec.push(ArrayTypes::Middle(left, right));
                 let left_type = array_type_to_node_type(merkle_tree.nodes_vec[left as usize]);
                 let right_type = array_type_to_node_type(merkle_tree.nodes_vec[right as usize]);
                 let node_hash = hash(
@@ -153,8 +151,8 @@ impl MerkleSet {
 
     pub fn get_merkle_root(&self) -> [u8; 32] {
         match self.nodes_vec.last().unwrap() {
-            ArrayTypes::Leaf { .. } => hash_leaf(self.hash_cache.last().unwrap()),
-            ArrayTypes::Middle { .. } => *self.hash_cache.last().unwrap(),
+            ArrayTypes::Leaf(_) => hash_leaf(self.hash_cache.last().unwrap()),
+            ArrayTypes::Middle(_, _) => *self.hash_cache.last().unwrap(),
             ArrayTypes::Empty => BLANK,
             ArrayTypes::Truncated => *self.hash_cache.last().unwrap(),
         }
@@ -182,20 +180,17 @@ impl MerkleSet {
                 proof.push(EMPTY);
                 Ok(false)
             }
-            ArrayTypes::Leaf { data } => {
+            ArrayTypes::Leaf(idx) => {
                 proof.push(TERMINAL);
-                proof.extend_from_slice(&self.leaf_vec[data as usize]);
-                Ok(&self.leaf_vec[data as usize] == included_leaf)
+                proof.extend_from_slice(&self.leaf_vec[idx as usize]);
+                Ok(&self.leaf_vec[idx as usize] == included_leaf)
             }
-            ArrayTypes::Middle { children } => {
+            ArrayTypes::Middle(left, right) => {
                 proof.push(MIDDLE);
 
-                if let (
-                    ArrayTypes::Leaf { data: child_0_data },
-                    ArrayTypes::Leaf { data: child_1_data },
-                ) = (
-                    self.nodes_vec[children.0 as usize],
-                    self.nodes_vec[children.1 as usize],
+                if let (ArrayTypes::Leaf(child_0_data), ArrayTypes::Leaf(child_1_data)) = (
+                    self.nodes_vec[left as usize],
+                    self.nodes_vec[right as usize],
                 ) {
                     proof.push(TERMINAL);
                     for byte in self.leaf_vec[child_0_data as usize] {
@@ -215,23 +210,23 @@ impl MerkleSet {
                 if get_bit(included_leaf, depth) {
                     // bit is 1 so truncate left branch and search right branch
                     self.other_included(
-                        children.0 as usize,
+                        left as usize,
                         included_leaf,
                         proof,
                         depth + 1,
-                        matches!(self.nodes_vec[children.1 as usize], ArrayTypes::Empty),
+                        matches!(self.nodes_vec[right as usize], ArrayTypes::Empty),
                     )?;
-                    self.is_included(children.1 as usize, included_leaf, proof, depth + 1)
+                    self.is_included(right as usize, included_leaf, proof, depth + 1)
                 } else {
                     // bit is 0 is search left and then truncate right branch
                     let r: bool =
-                        self.is_included(children.0 as usize, included_leaf, proof, depth + 1)?;
+                        self.is_included(left as usize, included_leaf, proof, depth + 1)?;
                     self.other_included(
-                        children.1 as usize,
+                        right as usize,
                         included_leaf,
                         proof,
                         depth + 1,
-                        matches!(self.nodes_vec[children.0 as usize], ArrayTypes::Empty),
+                        matches!(self.nodes_vec[left as usize], ArrayTypes::Empty),
                     )?;
                     Ok(r)
                 }
@@ -268,9 +263,9 @@ impl MerkleSet {
                 proof.extend_from_slice(&self.hash_cache[current_node_index]);
                 Ok(())
             }
-            ArrayTypes::Leaf { data } => {
+            ArrayTypes::Leaf(idx) => {
                 proof.push(TERMINAL);
-                proof.extend_from_slice(&self.leaf_vec[data as usize]);
+                proof.extend_from_slice(&self.leaf_vec[idx as usize]);
                 Ok(())
             }
         }
@@ -279,21 +274,16 @@ impl MerkleSet {
     // check if a node_index contains any descendants with two leafs as its children
     fn is_double(&self, node_index: usize) -> Result<bool, SetError> {
         match self.nodes_vec[node_index] {
-            ArrayTypes::Middle {
-                children: (children_0, children_1),
-            } => {
+            ArrayTypes::Middle(children_0, children_1) => {
                 if matches!(self.nodes_vec[children_0 as usize], ArrayTypes::Empty) {
                     self.is_double(children_1 as usize)
                 } else if matches!(self.nodes_vec[children_1 as usize], ArrayTypes::Empty) {
                     self.is_double(children_0 as usize)
                 } else {
-                    return Ok(matches!(
-                        self.nodes_vec[children_0 as usize],
-                        ArrayTypes::Leaf { .. }
-                    ) && matches!(
-                        self.nodes_vec[children_1 as usize],
-                        ArrayTypes::Leaf { .. }
-                    ));
+                    return Ok(
+                        matches!(self.nodes_vec[children_0 as usize], ArrayTypes::Leaf(_))
+                            && matches!(self.nodes_vec[children_1 as usize], ArrayTypes::Leaf(_)),
+                    );
                 }
             }
             ArrayTypes::Truncated => Ok(false),
@@ -341,8 +331,8 @@ impl MerkleSet {
 fn array_type_to_node_type(array_type: ArrayTypes) -> NodeType {
     match array_type {
         ArrayTypes::Empty => NodeType::Empty,
-        ArrayTypes::Leaf { .. } => NodeType::Term,
-        ArrayTypes::Middle { .. } => NodeType::Mid,
+        ArrayTypes::Leaf(_) => NodeType::Term,
+        ArrayTypes::Middle(_, _) => NodeType::Mid,
         ArrayTypes::Truncated => NodeType::Mid,
     }
 }
@@ -386,9 +376,9 @@ fn generate_merkle_tree_recurse(
 
     if range.len() == 1 {
         // we've reached a leaf node
-        merkle_tree.nodes_vec.push(ArrayTypes::Leaf {
-            data: merkle_tree.leaf_vec.len() as u32,
-        });
+        merkle_tree
+            .nodes_vec
+            .push(ArrayTypes::Leaf(merkle_tree.leaf_vec.len() as u32));
         merkle_tree.leaf_vec.push(range[0]);
         merkle_tree.hash_cache.push(range[0]);
         return (range[0], NodeType::Term);
@@ -436,9 +426,9 @@ fn generate_merkle_tree_recurse(
             // so just return one of the duplicates as if there was only one
             debug_assert!(range.len() > 1);
             debug_assert!(range[0] == range[1]);
-            merkle_tree.nodes_vec.push(ArrayTypes::Leaf {
-                data: merkle_tree.leaf_vec.len() as u32,
-            });
+            merkle_tree
+                .nodes_vec
+                .push(ArrayTypes::Leaf(merkle_tree.leaf_vec.len() as u32));
             merkle_tree.leaf_vec.push(range[0]);
             merkle_tree.hash_cache.push(range[0]);
             (range[0], NodeType::Term)
@@ -456,16 +446,16 @@ fn generate_merkle_tree_recurse(
                 merkle_tree.hash_cache.push(EMPTY_NODE_HASH);
                 let node_length: u32 = merkle_tree.nodes_vec.len() as u32;
                 if left_empty {
-                    merkle_tree.nodes_vec.push(ArrayTypes::Middle {
-                        children: (node_length - 1, node_length - 2),
-                    });
+                    merkle_tree
+                        .nodes_vec
+                        .push(ArrayTypes::Middle(node_length - 1, node_length - 2));
                     let node_hash = hash(NodeType::Empty, child_type, &BLANK, &child_hash);
                     merkle_tree.hash_cache.push(node_hash);
                     (node_hash, NodeType::Mid)
                 } else {
-                    merkle_tree.nodes_vec.push(ArrayTypes::Middle {
-                        children: (node_length - 2, node_length - 1),
-                    });
+                    merkle_tree
+                        .nodes_vec
+                        .push(ArrayTypes::Middle(node_length - 2, node_length - 1));
                     let node_hash = hash(child_type, NodeType::Empty, &child_hash, &BLANK);
                     merkle_tree.hash_cache.push(node_hash);
                     (node_hash, NodeType::Mid)
@@ -482,22 +472,22 @@ fn generate_merkle_tree_recurse(
         debug_assert!(range.len() > 1);
         debug_assert!(left < range.len() as i32);
 
-        merkle_tree.nodes_vec.push(ArrayTypes::Leaf {
-            data: merkle_tree.leaf_vec.len() as u32,
-        });
+        merkle_tree
+            .nodes_vec
+            .push(ArrayTypes::Leaf(merkle_tree.leaf_vec.len() as u32));
         merkle_tree.leaf_vec.push(range[0]);
         merkle_tree.hash_cache.push(range[0]);
 
-        merkle_tree.nodes_vec.push(ArrayTypes::Leaf {
-            data: merkle_tree.leaf_vec.len() as u32,
-        });
+        merkle_tree
+            .nodes_vec
+            .push(ArrayTypes::Leaf(merkle_tree.leaf_vec.len() as u32));
         merkle_tree.leaf_vec.push(range[left as usize]);
         merkle_tree.hash_cache.push(range[left as usize]);
 
         let nodes_len: u32 = merkle_tree.nodes_vec.len() as u32;
-        merkle_tree.nodes_vec.push(ArrayTypes::Middle {
-            children: (nodes_len - 2, nodes_len - 1),
-        });
+        merkle_tree
+            .nodes_vec
+            .push(ArrayTypes::Middle(nodes_len - 2, nodes_len - 1));
         let node_hash = hash(
             NodeType::Term,
             NodeType::Term,
@@ -521,14 +511,16 @@ fn generate_merkle_tree_recurse(
             // merkle_tree.nodes_vec.remove(usize::try_from(left_child_index).unwrap());
             // merkle_tree.nodes_vec.remove(merkle_tree.nodes_vec.len() - 1);
             // merkle_tree.nodes_vec.push(ArrayTypes::Empty);
-            merkle_tree.nodes_vec.push(ArrayTypes::Middle {
-                children: (left_child_index, merkle_tree.nodes_vec.len() as u32 - 1),
-            });
+            merkle_tree.nodes_vec.push(ArrayTypes::Middle(
+                left_child_index,
+                merkle_tree.nodes_vec.len() as u32 - 1,
+            ));
             NodeType::MidDbl
         } else {
-            merkle_tree.nodes_vec.push(ArrayTypes::Middle {
-                children: (left_child_index, merkle_tree.nodes_vec.len() as u32 - 1),
-            });
+            merkle_tree.nodes_vec.push(ArrayTypes::Middle(
+                left_child_index,
+                merkle_tree.nodes_vec.len() as u32 - 1,
+            ));
             NodeType::Mid
         };
         let node_hash = hash(left_type, right_type, &left_hash, &right_hash);
@@ -555,7 +547,7 @@ mod tests {
                 return BLANK;
             }
 
-            let ArrayTypes::Leaf { data } = self.nodes_vec[index as usize] else {
+            let ArrayTypes::Leaf(data) = self.nodes_vec[index as usize] else {
                 return self.get_partial_hash_recurse(index);
             };
             hash_leaf(&self.leaf_vec[data as usize])
@@ -563,17 +555,17 @@ mod tests {
 
         fn get_partial_hash_recurse(&self, node_index: u32) -> [u8; 32] {
             match self.nodes_vec[node_index as usize] {
-                ArrayTypes::Leaf { data } => self.leaf_vec[data as usize],
-                ArrayTypes::Middle { children } => {
+                ArrayTypes::Leaf(data) => self.leaf_vec[data as usize],
+                ArrayTypes::Middle(left, right) => {
                     let left_type: NodeType =
-                        array_type_to_node_type(self.nodes_vec[children.0 as usize]);
+                        array_type_to_node_type(self.nodes_vec[left as usize]);
                     let right_type: NodeType =
-                        array_type_to_node_type(self.nodes_vec[children.1 as usize]);
+                        array_type_to_node_type(self.nodes_vec[right as usize]);
                     hash(
                         left_type,
                         right_type,
-                        &self.get_partial_hash_recurse(children.0),
-                        &self.get_partial_hash_recurse(children.1),
+                        &self.get_partial_hash_recurse(left),
+                        &self.get_partial_hash_recurse(right),
                     )
                 }
                 ArrayTypes::Empty { .. } => BLANK,
@@ -593,7 +585,7 @@ mod tests {
         let (_, tree) = generate_merkle_tree(&mut [a, a]);
         assert_eq!(tree.leaf_vec.len(), 1);
         assert_eq!(tree.leaf_vec[0], a);
-        assert_eq!(tree.nodes_vec[0], ArrayTypes::Leaf { data: 0 });
+        assert_eq!(tree.nodes_vec[0], ArrayTypes::Leaf(0));
     }
 
     #[test]
@@ -802,10 +794,10 @@ mod tests {
         // e   c
         assert_eq!(tree.nodes_vec.len(), 17);
         assert_eq!(tree.leaf_vec.len(), 5);
-        let ArrayTypes::Middle { children } = tree.nodes_vec[tree.nodes_vec.len() - 1] else {
+        let Some(ArrayTypes::Middle(_left, right)) = tree.nodes_vec.last() else {
             panic!("root node should be a Middle");
         };
-        let ArrayTypes::Leaf { data } = tree.nodes_vec[children.1 as usize] else {
+        let ArrayTypes::Leaf(data) = tree.nodes_vec[*right as usize] else {
             panic!("node should be a leaf");
         };
         assert_eq!(tree.leaf_vec[data as usize], d);
@@ -850,10 +842,10 @@ mod tests {
         //    / \
         //   c   d
         assert_eq!(tree.nodes_vec.len(), 513);
-        let ArrayTypes::Middle { children } = tree.nodes_vec[tree.nodes_vec.len() - 1] else {
+        let Some(ArrayTypes::Middle(_left, right)) = tree.nodes_vec.last() else {
             panic!("root node should be a Middle");
         };
-        let ArrayTypes::Leaf { data } = tree.nodes_vec[children.1 as usize] else {
+        let ArrayTypes::Leaf(data) = tree.nodes_vec[*right as usize] else {
             panic!("node should be a leaf");
         };
         assert_eq!(tree.leaf_vec[data as usize], a);
@@ -898,10 +890,10 @@ mod tests {
         //    / \
         //   c   d
         assert_eq!(tree.nodes_vec.len(), 513);
-        let ArrayTypes::Middle { children } = tree.nodes_vec[tree.nodes_vec.len() - 1] else {
+        let Some(ArrayTypes::Middle(_left, right)) = tree.nodes_vec.last() else {
             panic!("expected middle node");
         };
-        let ArrayTypes::Leaf { data } = tree.nodes_vec[children.1 as usize] else {
+        let ArrayTypes::Leaf(data) = tree.nodes_vec[*right as usize] else {
             panic!("node should be leaf");
         };
         assert_eq!(tree.leaf_vec[data as usize], a);
@@ -949,10 +941,10 @@ mod tests {
         //                  / \
         //                 c   b
 
-        let ArrayTypes::Middle { children } = tree.nodes_vec.last().unwrap() else {
+        let Some(ArrayTypes::Middle(left, _right)) = tree.nodes_vec.last() else {
             panic!("expected middle node");
         };
-        let ArrayTypes::Leaf { .. } = tree.nodes_vec[children.0 as usize] else {
+        let ArrayTypes::Leaf(_) = tree.nodes_vec[*left as usize] else {
             panic!("expected leaf");
         };
     }
@@ -1037,7 +1029,7 @@ mod tests {
 
     #[test]
     fn test_deserialize_malicious_proof() {
-        let malicious_proof = vec![MIDDLE].repeat(4000);
+        let malicious_proof = vec![MIDDLE].repeat(40000);
         assert!(deserialize_proof(&malicious_proof).is_err());
     }
 }
