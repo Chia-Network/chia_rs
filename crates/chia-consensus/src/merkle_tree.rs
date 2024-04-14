@@ -190,24 +190,12 @@ impl MerkleSet {
 
                 if get_bit(leaf, depth) {
                     // bit is 1 so truncate left branch and search right branch
-                    self.other_included(
-                        left as usize,
-                        leaf,
-                        proof,
-                        depth + 1,
-                        matches!(self.nodes_vec[right as usize].0, ArrayTypes::Empty),
-                    )?;
+                    self.other_included(left as usize, proof)?;
                     self.is_included(right as usize, leaf, proof, depth + 1)
                 } else {
                     // bit is 0 is search left and then truncate right branch
                     let r = self.is_included(left as usize, leaf, proof, depth + 1)?;
-                    self.other_included(
-                        right as usize,
-                        leaf,
-                        proof,
-                        depth + 1,
-                        matches!(self.nodes_vec[left as usize].0, ArrayTypes::Empty),
-                    )?;
+                    self.other_included(right as usize, proof)?;
                     Ok(r)
                 }
             }
@@ -219,27 +207,14 @@ impl MerkleSet {
     fn other_included(
         &self,
         current_node_index: usize,
-        leaf: &[u8; 32],
         proof: &mut Vec<u8>,
-        depth: u8,
-        collapse: bool,
     ) -> Result<(), SetError> {
         match self.nodes_vec[current_node_index].0 {
             ArrayTypes::Empty => {
                 proof.push(EMPTY);
                 Ok(())
             }
-            ArrayTypes::Middle { .. } => {
-                if collapse || !self.is_double(current_node_index)? {
-                    proof.push(TRUNCATED);
-                    proof.extend_from_slice(&self.nodes_vec[current_node_index].1);
-                    Ok(())
-                } else {
-                    self.is_included(current_node_index, leaf, proof, depth)?;
-                    Ok(())
-                }
-            }
-            ArrayTypes::Truncated => {
+            ArrayTypes::Middle(_, _) | ArrayTypes::Truncated => {
                 proof.push(TRUNCATED);
                 proof.extend_from_slice(&self.nodes_vec[current_node_index].1);
                 Ok(())
@@ -249,24 +224,6 @@ impl MerkleSet {
                 proof.extend_from_slice(&self.nodes_vec[current_node_index].1);
                 Ok(())
             }
-        }
-    }
-
-    // check if a node_index contains any descendants with two leafs as its children
-    fn is_double(&self, node_index: usize) -> Result<bool, SetError> {
-        match self.nodes_vec[node_index].0 {
-            ArrayTypes::Middle(left, right) => {
-                if matches!(self.nodes_vec[left as usize].0, ArrayTypes::Empty) {
-                    self.is_double(right as usize)
-                } else if matches!(self.nodes_vec[right as usize].0, ArrayTypes::Empty) {
-                    self.is_double(left as usize)
-                } else {
-                    return Ok(matches!(self.nodes_vec[left as usize].0, ArrayTypes::Leaf)
-                        && matches!(self.nodes_vec[right as usize].0, ArrayTypes::Leaf));
-                }
-            }
-            ArrayTypes::Truncated => Ok(false),
-            _ => Err(SetError),
         }
     }
 }
