@@ -143,10 +143,10 @@ impl MerkleSet {
         }
     }
 
-    // returns a tuple of a bool representing if the value has been found, and if so bytes that represent the proof of inclusion
-    pub fn generate_proof(&self, included_leaf: &[u8; 32]) -> Result<Option<Vec<u8>>, SetError> {
+    // searches for "leaf" in the tree, returns the proof if found, otherwise None
+    pub fn generate_proof(&self, leaf: &[u8; 32]) -> Result<Option<Vec<u8>>, SetError> {
         let mut proof = Vec::new();
-        if self.is_included(self.nodes_vec.len() - 1, included_leaf, &mut proof, 0)? {
+        if self.is_included(self.nodes_vec.len() - 1, leaf, &mut proof, 0)? {
             Ok(Some(proof))
         } else {
             Ok(None)
@@ -156,7 +156,7 @@ impl MerkleSet {
     fn is_included(
         &self,
         current_node_index: usize,
-        included_leaf: &[u8; 32],
+        leaf: &[u8; 32],
         proof: &mut Vec<u8>,
         depth: u8,
     ) -> Result<bool, SetError> {
@@ -168,7 +168,7 @@ impl MerkleSet {
             ArrayTypes::Leaf => {
                 proof.push(TERMINAL);
                 proof.extend_from_slice(&self.nodes_vec[current_node_index].1);
-                Ok(&self.nodes_vec[current_node_index].1 == included_leaf)
+                Ok(&self.nodes_vec[current_node_index].1 == leaf)
             }
             ArrayTypes::Middle(left, right) => {
                 proof.push(MIDDLE);
@@ -184,27 +184,26 @@ impl MerkleSet {
                     proof.extend_from_slice(&self.nodes_vec[left as usize].1);
                     proof.push(TERMINAL);
                     proof.extend_from_slice(&self.nodes_vec[right as usize].1);
-                    return Ok(&self.nodes_vec[left as usize].1 == included_leaf
-                        || &self.nodes_vec[right as usize].1 == included_leaf);
+                    return Ok(&self.nodes_vec[left as usize].1 == leaf
+                        || &self.nodes_vec[right as usize].1 == leaf);
                 }
 
-                if get_bit(included_leaf, depth) {
+                if get_bit(leaf, depth) {
                     // bit is 1 so truncate left branch and search right branch
                     self.other_included(
                         left as usize,
-                        included_leaf,
+                        leaf,
                         proof,
                         depth + 1,
                         matches!(self.nodes_vec[right as usize].0, ArrayTypes::Empty),
                     )?;
-                    self.is_included(right as usize, included_leaf, proof, depth + 1)
+                    self.is_included(right as usize, leaf, proof, depth + 1)
                 } else {
                     // bit is 0 is search left and then truncate right branch
-                    let r: bool =
-                        self.is_included(left as usize, included_leaf, proof, depth + 1)?;
+                    let r = self.is_included(left as usize, leaf, proof, depth + 1)?;
                     self.other_included(
                         right as usize,
-                        included_leaf,
+                        leaf,
                         proof,
                         depth + 1,
                         matches!(self.nodes_vec[left as usize].0, ArrayTypes::Empty),
@@ -216,10 +215,11 @@ impl MerkleSet {
         }
     }
 
+    // this function builds the proof of the subtree we are not traversing
     fn other_included(
         &self,
         current_node_index: usize,
-        included_leaf: &[u8; 32],
+        leaf: &[u8; 32],
         proof: &mut Vec<u8>,
         depth: u8,
         collapse: bool,
@@ -235,7 +235,7 @@ impl MerkleSet {
                     proof.extend_from_slice(&self.nodes_vec[current_node_index].1);
                     Ok(())
                 } else {
-                    self.is_included(current_node_index, included_leaf, proof, depth)?;
+                    self.is_included(current_node_index, leaf, proof, depth)?;
                     Ok(())
                 }
             }
@@ -670,13 +670,24 @@ mod tests {
         let root = tree.get_merkle_root();
         assert_eq!(root, tree.get_merkle_root_old());
         assert_eq!(compute_merkle_set_root(leafs), root);
-        for data in leafs {
-            let Ok(Some(proof)) = tree.generate_proof(data) else {
+        for item in leafs {
+            let Ok(Some(proof)) = tree.generate_proof(item) else {
                 panic!("failed to generate proof");
             };
             let rebuilt = MerkleSet::from_proof(&proof).expect("failed to parse proof");
             assert_eq!(rebuilt.get_merkle_root(), root);
-            assert_eq!(rebuilt.generate_proof(data).unwrap(), Some(proof));
+            assert_eq!(rebuilt.generate_proof(item).unwrap(), Some(proof));
+        }
+
+        let mut rng = SmallRng::seed_from_u64(1337);
+        // make sure that random hashes are never considered part of the tree
+        for _n in 0..1000 {
+            let mut item = [0_u8; 32];
+            rng.fill(&mut item);
+            assert!(tree
+                .generate_proof(&item)
+                .expect("failed to generate proof")
+                .is_none());
         }
     }
 
