@@ -32,8 +32,8 @@ pub struct MerkleSet {
 
 const EMPTY: u8 = 0;
 const TERMINAL: u8 = 1;
-const TRUNCATED: u8 = 2;
-const MIDDLE: u8 = 3;
+const MIDDLE: u8 = 2;
+const TRUNCATED: u8 = 3;
 
 const EMPTY_NODE_HASH: [u8; 32] = [
     127, 156, 158, 49, 172, 130, 86, 202, 47, 37, 133, 131, 223, 38, 45, 188, 125, 111, 104, 242,
