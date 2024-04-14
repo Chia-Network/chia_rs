@@ -112,15 +112,12 @@ impl MerkleSet {
                     }
                 }
                 ParseOp::Middle => {
-                    assert!(values.len() >= 2);
-                    let right = values.pop().unwrap();
-                    let left = values.pop().unwrap();
+                    let right = values.pop().expect("internal error (value stack empty)");
+                    let left = values.pop().expect("internal error (value stack empty)");
                     values.push(self.nodes_vec.len() as u32);
-                    let left_type = array_type_to_node_type(self.nodes_vec[left as usize].0);
-                    let right_type = array_type_to_node_type(self.nodes_vec[right as usize].0);
                     let node_hash = hash(
-                        left_type,
-                        right_type,
+                        self.nodes_vec[left as usize].0.into(),
+                        self.nodes_vec[right as usize].0.into(),
                         &self.nodes_vec[left as usize].1,
                         &self.nodes_vec[right as usize].1,
                     );
@@ -176,9 +173,12 @@ impl MerkleSet {
             ArrayTypes::Middle(left, right) => {
                 proof.push(MIDDLE);
 
-                if let (ArrayTypes::Leaf, ArrayTypes::Leaf) = (
-                    self.nodes_vec[left as usize].0,
-                    self.nodes_vec[right as usize].0,
+                if matches!(
+                    (
+                        self.nodes_vec[left as usize].0,
+                        self.nodes_vec[right as usize].0
+                    ),
+                    (ArrayTypes::Leaf, ArrayTypes::Leaf)
                 ) {
                     proof.push(TERMINAL);
                     proof.extend_from_slice(&self.nodes_vec[left as usize].1);
@@ -306,12 +306,14 @@ impl MerkleSet {
     }
 }
 
-fn array_type_to_node_type(array_type: ArrayTypes) -> NodeType {
-    match array_type {
-        ArrayTypes::Empty => NodeType::Empty,
-        ArrayTypes::Leaf => NodeType::Term,
-        ArrayTypes::Middle(_, _) => NodeType::Mid,
-        ArrayTypes::Truncated => NodeType::Mid,
+impl From<ArrayTypes> for NodeType {
+    fn from(val: ArrayTypes) -> NodeType {
+        match val {
+            ArrayTypes::Empty => NodeType::Empty,
+            ArrayTypes::Leaf => NodeType::Term,
+            ArrayTypes::Middle(_, _) => NodeType::Mid,
+            ArrayTypes::Truncated => NodeType::Mid,
+        }
     }
 }
 
@@ -489,8 +491,9 @@ mod tests {
     use rand::{Rng, SeedableRng};
 
     impl MerkleSet {
-        // this checks the correctness of the tree and its merkle root by manually hashing down the tree
-        // it is an alternate way of calculating the merkle root which we can use to validate the hash_cache version
+        // this checks the correctness of the tree and its merkle root by
+        // manually hashing down the tree it is an alternate way of calculating
+        // the merkle root which we can use to validate the cached version
         pub fn get_merkle_root_old(&self) -> [u8; 32] {
             self.get_partial_hash(self.nodes_vec.len() as u32 - 1)
         }
@@ -509,18 +512,12 @@ mod tests {
         fn get_partial_hash_recurse(&self, node_index: u32) -> [u8; 32] {
             match self.nodes_vec[node_index as usize].0 {
                 ArrayTypes::Leaf => self.nodes_vec[node_index as usize].1,
-                ArrayTypes::Middle(left, right) => {
-                    let left_type: NodeType =
-                        array_type_to_node_type(self.nodes_vec[left as usize].0);
-                    let right_type: NodeType =
-                        array_type_to_node_type(self.nodes_vec[right as usize].0);
-                    hash(
-                        left_type,
-                        right_type,
-                        &self.get_partial_hash_recurse(left),
-                        &self.get_partial_hash_recurse(right),
-                    )
-                }
+                ArrayTypes::Middle(left, right) => hash(
+                    self.nodes_vec[left as usize].0.into(),
+                    self.nodes_vec[right as usize].0.into(),
+                    &self.get_partial_hash_recurse(left),
+                    &self.get_partial_hash_recurse(right),
+                ),
                 ArrayTypes::Empty { .. } => BLANK,
                 ArrayTypes::Truncated => self.nodes_vec[node_index as usize].1,
             }
