@@ -116,7 +116,7 @@ impl OwnedSpendBundleConditions {
             ));
         }
 
-        OwnedSpendBundleConditions {
+        Self {
             spends,
             reserve_fee: sb.reserve_fee,
             height_absolute: sb.height_absolute,
