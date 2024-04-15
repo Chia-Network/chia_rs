@@ -5,6 +5,7 @@ pub mod flags;
 pub mod get_puzzle_and_solution;
 pub mod messages;
 pub mod opcodes;
+pub mod owned_conditions;
 pub mod run_block_generator;
 pub mod run_puzzle;
 pub mod sanitize_int;

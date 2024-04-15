@@ -1,7 +1,4 @@
-use crate::run_generator::{
-    convert_spend_bundle_conds, run_block_generator, run_block_generator2, PySpend,
-    PySpendBundleConditions,
-};
+use crate::run_generator::{convert_spend_bundle_conds, run_block_generator, run_block_generator2};
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::gen::conditions::MempoolVisitor;
@@ -10,6 +7,7 @@ use chia_consensus::gen::flags::{
     ENABLE_SOFTFORK_CONDITION, MEMPOOL_MODE, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL, NO_UNKNOWN_CONDS,
     STRICT_ARGS_COUNT,
 };
+use chia_consensus::gen::owned_conditions::{PySpend, PySpendBundleConditions};
 use chia_consensus::gen::run_puzzle::run_puzzle as native_run_puzzle;
 use chia_consensus::gen::solution_generator::solution_generator as native_solution_generator;
 use chia_consensus::gen::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
