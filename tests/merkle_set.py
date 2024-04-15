@@ -233,11 +233,17 @@ class MiddleNode(Node):
         elif children[1].is_empty() and children[0].is_double():
             self.hash = children[0].hash
         else:
-            if children[0].is_empty() and (children[1].is_empty() or children[1].is_terminal()):
+            if children[0].is_empty() and (
+                children[1].is_empty() or children[1].is_terminal()
+            ):
                 raise SetError()
             if children[1].is_empty() and children[0].is_terminal():
                 raise SetError
-            if children[0].is_terminal() and children[1].is_terminal() and children[0].hash >= children[1].hash:
+            if (
+                children[0].is_terminal()
+                and children[1].is_terminal()
+                and children[0].hash >= children[1].hash
+            ):
                 raise SetError
             self.hash = hashdown(children[0].get_hash() + children[1].get_hash())
 
@@ -322,7 +328,9 @@ def confirm_included_already_hashed(root: bytes32, val: bytes, proof: bytes) -> 
     return _confirm(root, val, proof, True)
 
 
-def confirm_not_included_already_hashed(root: bytes32, val: bytes, proof: bytes) -> bool:
+def confirm_not_included_already_hashed(
+    root: bytes32, val: bytes, proof: bytes
+) -> bool:
     return _confirm(root, val, proof, False)
 
 
