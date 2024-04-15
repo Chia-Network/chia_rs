@@ -1,11 +1,11 @@
 use chia_protocol::{Bytes, Bytes32, Bytes48};
 use chia_streamable_macro::Streamable;
-
-#[cfg(feature = "py-bindings")]
-use chia_py_streamable_macro::{PyJsonDict, PyStreamable};
 use clvmr::{Allocator, NodePtr};
 
 use super::conditions::{Spend, SpendBundleConditions};
+
+#[cfg(feature = "py-bindings")]
+use chia_py_streamable_macro::{PyJsonDict, PyStreamable};
 
 #[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(
