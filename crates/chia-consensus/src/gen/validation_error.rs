@@ -7,6 +7,7 @@ use pyo3::PyErr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorCode {
+    Unknown,
     GeneratorRuntimeError,
     NegativeAmount,
     AmountExceedsMaximum,
@@ -54,6 +55,7 @@ pub enum ErrorCode {
     InvalidMessageMode,
     InvalidCoinId,
     MessageNotSentOrReceived,
+    InvalidPrevBlockHash,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
@@ -95,6 +97,7 @@ pub fn first(a: &Allocator, n: NodePtr) -> Result<NodePtr, ValidationErr> {
 impl From<ErrorCode> for u32 {
     fn from(err: ErrorCode) -> u32 {
         match err {
+            ErrorCode::Unknown => 1,
             ErrorCode::GeneratorRuntimeError => 117,
             ErrorCode::NegativeAmount => 124,
             ErrorCode::AmountExceedsMaximum => 16,
@@ -142,6 +145,7 @@ impl From<ErrorCode> for u32 {
             ErrorCode::InvalidMessageMode => 145,
             ErrorCode::InvalidCoinId => 146,
             ErrorCode::MessageNotSentOrReceived => 147,
+            ErrorCode::InvalidPrevBlockHash => 51,
         }
     }
 }

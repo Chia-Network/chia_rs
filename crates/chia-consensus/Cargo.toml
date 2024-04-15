@@ -26,6 +26,7 @@ chia-protocol = { version = "0.6.0", path = "../chia-protocol" }
 chia-wallet = { version = "0.6.0", path = "../chia-wallet" }
 hex-literal = "0.4.1"
 thiserror = "1.0.44"
+chiabip158 = "1.5.1"
 
 [dev-dependencies]
 num-traits = "0.2.15"
