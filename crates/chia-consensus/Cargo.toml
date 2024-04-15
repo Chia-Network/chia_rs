@@ -44,3 +44,7 @@ harness = false
 [[bench]]
 name = "tree-hash"
 harness = false
+
+[[bench]]
+name = "merkle-set"
+harness = false
