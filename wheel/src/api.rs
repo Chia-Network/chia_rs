@@ -7,7 +7,7 @@ use chia_consensus::gen::flags::{
     ENABLE_SOFTFORK_CONDITION, MEMPOOL_MODE, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL, NO_UNKNOWN_CONDS,
     STRICT_ARGS_COUNT,
 };
-use chia_consensus::gen::owned_conditions::{PySpend, PySpendBundleConditions};
+use chia_consensus::gen::owned_conditions::{OwnedSpend, OwnedSpendBundleConditions};
 use chia_consensus::gen::run_puzzle::run_puzzle as native_run_puzzle;
 use chia_consensus::gen::solution_generator::solution_generator as native_solution_generator;
 use chia_consensus::gen::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
@@ -155,7 +155,7 @@ fn run_puzzle(
     amount: u64,
     max_cost: Cost,
     flags: u32,
-) -> PyResult<PySpendBundleConditions> {
+) -> PyResult<OwnedSpendBundleConditions> {
     let mut a = make_allocator(LIMIT_HEAP);
     let conds = native_run_puzzle::<MempoolVisitor>(
         &mut a, puzzle, solution, parent_id, amount, max_cost, flags,
@@ -335,7 +335,7 @@ pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(solution_generator_backrefs, m)?)?;
     m.add_function(wrap_pyfunction!(supports_fast_forward, m)?)?;
     m.add_function(wrap_pyfunction!(fast_forward_singleton, m)?)?;
-    m.add_class::<PySpendBundleConditions>()?;
+    m.add_class::<OwnedSpendBundleConditions>()?;
     m.add(
         "ELIGIBLE_FOR_DEDUP",
         chia_consensus::gen::conditions::ELIGIBLE_FOR_DEDUP,
@@ -344,7 +344,7 @@ pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
         "ELIGIBLE_FOR_FF",
         chia_consensus::gen::conditions::ELIGIBLE_FOR_FF,
     )?;
-    m.add_class::<PySpend>()?;
+    m.add_class::<OwnedSpend>()?;
 
     // constants
     m.add_class::<ConsensusConstants>()?;

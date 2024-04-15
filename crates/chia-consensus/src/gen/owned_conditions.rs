@@ -10,7 +10,7 @@ use chia_py_streamable_macro::{PyJsonDict, PyStreamable};
     pyo3::pyclass(name = "Spend", get_all, frozen),
     derive(PyJsonDict, PyStreamable)
 )]
-pub struct PySpend {
+pub struct OwnedSpend {
     pub coin_id: Bytes32,
     pub parent_id: Bytes32,
     pub puzzle_hash: Bytes32,
@@ -38,8 +38,8 @@ pub struct PySpend {
     pyo3::pyclass(name = "SpendBundleConditions", get_all, frozen),
     derive(PyJsonDict, PyStreamable)
 )]
-pub struct PySpendBundleConditions {
-    pub spends: Vec<PySpend>,
+pub struct OwnedSpendBundleConditions {
+    pub spends: Vec<OwnedSpend>,
     pub reserve_fee: u64,
     // the highest height/time conditions (i.e. most strict)
     pub height_absolute: u32,

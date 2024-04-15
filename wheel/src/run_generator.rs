@@ -1,7 +1,7 @@
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::gen::conditions::{EmptyVisitor, MempoolVisitor, Spend, SpendBundleConditions};
 use chia_consensus::gen::flags::ANALYZE_SPENDS;
-use chia_consensus::gen::owned_conditions::{PySpend, PySpendBundleConditions};
+use chia_consensus::gen::owned_conditions::{OwnedSpend, OwnedSpendBundleConditions};
 use chia_consensus::gen::run_block_generator::run_block_generator as native_run_block_generator;
 use chia_consensus::gen::run_block_generator::run_block_generator2 as native_run_block_generator2;
 use chia_consensus::gen::validation_error::ValidationErr;
@@ -25,7 +25,7 @@ fn convert_agg_sigs(a: &Allocator, agg_sigs: &[(NodePtr, NodePtr)]) -> Vec<(Byte
     ret
 }
 
-fn convert_spend(a: &Allocator, spend: Spend) -> PySpend {
+fn convert_spend(a: &Allocator, spend: Spend) -> OwnedSpend {
     let mut create_coin =
         Vec::<(Bytes32, u64, Option<Bytes>)>::with_capacity(spend.create_coin.len());
     for c in spend.create_coin {
@@ -40,7 +40,7 @@ fn convert_spend(a: &Allocator, spend: Spend) -> PySpend {
         ));
     }
 
-    PySpend {
+    OwnedSpend {
         coin_id: *spend.coin_id,
         parent_id: a.atom(spend.parent_id).as_ref().try_into().unwrap(),
         puzzle_hash: a.atom(spend.puzzle_hash).as_ref().try_into().unwrap(),
@@ -66,8 +66,8 @@ fn convert_spend(a: &Allocator, spend: Spend) -> PySpend {
 pub fn convert_spend_bundle_conds(
     a: &Allocator,
     sb: SpendBundleConditions,
-) -> PySpendBundleConditions {
-    let mut spends = Vec::<PySpend>::new();
+) -> OwnedSpendBundleConditions {
+    let mut spends = Vec::<OwnedSpend>::new();
     for s in sb.spends {
         spends.push(convert_spend(a, s));
     }
@@ -80,7 +80,7 @@ pub fn convert_spend_bundle_conds(
         ));
     }
 
-    PySpendBundleConditions {
+    OwnedSpendBundleConditions {
         spends,
         reserve_fee: sb.reserve_fee,
         height_absolute: sb.height_absolute,
@@ -101,7 +101,7 @@ pub fn run_block_generator(
     block_refs: &PyList,
     max_cost: Cost,
     flags: u32,
-) -> PyResult<(Option<u32>, Option<PySpendBundleConditions>)> {
+) -> PyResult<(Option<u32>, Option<OwnedSpendBundleConditions>)> {
     let mut allocator = make_allocator(flags);
 
     let mut refs = Vec::<&[u8]>::new();
@@ -152,7 +152,7 @@ pub fn run_block_generator2(
     block_refs: &PyList,
     max_cost: Cost,
     flags: u32,
-) -> PyResult<(Option<u32>, Option<PySpendBundleConditions>)> {
+) -> PyResult<(Option<u32>, Option<OwnedSpendBundleConditions>)> {
     let mut allocator = make_allocator(flags);
 
     let mut refs = Vec::<&[u8]>::new();
