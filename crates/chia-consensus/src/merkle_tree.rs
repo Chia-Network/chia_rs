@@ -422,20 +422,23 @@ impl MerkleSet {
                 self.generate_merkle_tree_recurse(&mut range[..left as usize], depth + 1);
             // make a note of where the left child node is
             let left_child_index: u32 = self.nodes_vec.len() as u32 - 1;
+            
             let (right_hash, right_type) =
                 self.generate_merkle_tree_recurse(&mut range[left as usize..], depth + 1);
-
+            let right_child_index: u32 = self.nodes_vec.len() as u32 - 1;
+            
             let node_hash = hash(left_type, right_type, &left_hash, &right_hash);
             let node_type: NodeType = if left_type == NodeType::Term && right_type == NodeType::Term
             {
-                self.nodes_vec.push((
-                    ArrayTypes::Middle(left_child_index, self.nodes_vec.len() as u32 - 1),
-                    node_hash,
-                ));
-                NodeType::MidDbl
+                return self.make_padding_middle(left_child_index, right_child_index, depth);
+                // self.nodes_vec.push((
+                //     ArrayTypes::Middle(left_child_index, right_child_index),
+                //     node_hash,
+                // ));
+                // NodeType::MidDbl
             } else {
                 self.nodes_vec.push((
-                    ArrayTypes::Middle(left_child_index, self.nodes_vec.len() as u32 - 1),
+                    ArrayTypes::Middle(left_child_index, right_child_index),
                     node_hash,
                 ));
                 NodeType::Mid
@@ -443,7 +446,42 @@ impl MerkleSet {
             (node_hash, node_type)
         }
     }
+
+    fn make_padding_middle(&mut self, left_index: u32, right_index: u32, depth: u8) -> ([u8; 32], NodeType) {
+        let left_bit = get_bit(&self.nodes_vec[left_index as usize].1, depth);
+        let right_bit = get_bit(&self.nodes_vec[right_index as usize].1, depth);
+        if left_bit != right_bit {
+            let node_hash = hash(NodeType::Term, NodeType::Term, &self.nodes_vec[left_index as usize].1, &self.nodes_vec[right_index as usize].1);
+            self.nodes_vec.push((
+                ArrayTypes::Middle(left_index, right_index),
+                node_hash,
+            ));
+            return (node_hash, NodeType::MidDbl)
+        } else {
+            if left_bit { // left
+                self.nodes_vec.push((ArrayTypes::Empty, EMPTY_NODE_HASH));
+                let new_left_index = self.nodes_vec.len() as u32 - 1;
+                let (new_right_hash, new_right_type) = self.make_padding_middle(left_index, right_index, depth + 1);
+                let node_hash = hash(NodeType::Empty, new_right_type, &BLANK, &new_right_hash);
+                self.nodes_vec.push((ArrayTypes::Middle(new_left_index, self.nodes_vec.len() as u32 - 1), node_hash));
+                return (node_hash, NodeType::Mid)
+            } else {
+                
+                let (new_left_hash, new_left_type) = self.make_padding_middle(left_index, right_index, depth + 1);
+                let new_left_index = self.nodes_vec.len() as u32 - 1;
+                
+                self.nodes_vec.push((ArrayTypes::Empty, EMPTY_NODE_HASH));
+                let new_right_index = self.nodes_vec.len() as u32 - 1;
+                
+                let node_hash = hash(new_left_type, NodeType::Empty, &new_left_hash, &BLANK);
+                self.nodes_vec.push((ArrayTypes::Middle(new_left_index, new_right_index), node_hash));
+                return (node_hash, NodeType::Mid)
+            }
+        }
+    }
+    
 }
+
 
 #[cfg(test)]
 mod tests {
