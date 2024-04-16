@@ -6,7 +6,7 @@ from itertools import permutations
 import random
 from random import Random
 from typing import List, Optional, Tuple
-from chia.types.blockchain_format.sized_bytes import bytes32
+from chia_rs.sized_bytes import bytes32
 import pytest
 
 
