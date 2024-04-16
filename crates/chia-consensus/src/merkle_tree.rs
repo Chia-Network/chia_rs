@@ -456,27 +456,25 @@ impl MerkleSet {
                 ArrayTypes::Middle(left_index, right_index),
                 node_hash,
             ));
-            return (node_hash, NodeType::MidDbl)
+            (node_hash, NodeType::MidDbl)
+        } else if left_bit { // left
+            self.nodes_vec.push((ArrayTypes::Empty, EMPTY_NODE_HASH));
+            let new_left_index = self.nodes_vec.len() as u32 - 1;
+            let (new_right_hash, new_right_type) = self.make_padding_middle(left_index, right_index, depth + 1);
+            let node_hash = hash(NodeType::Empty, new_right_type, &BLANK, &new_right_hash);
+            self.nodes_vec.push((ArrayTypes::Middle(new_left_index, self.nodes_vec.len() as u32 - 1), node_hash));
+            (node_hash, NodeType::Mid)
         } else {
-            if left_bit { // left
-                self.nodes_vec.push((ArrayTypes::Empty, EMPTY_NODE_HASH));
-                let new_left_index = self.nodes_vec.len() as u32 - 1;
-                let (new_right_hash, new_right_type) = self.make_padding_middle(left_index, right_index, depth + 1);
-                let node_hash = hash(NodeType::Empty, new_right_type, &BLANK, &new_right_hash);
-                self.nodes_vec.push((ArrayTypes::Middle(new_left_index, self.nodes_vec.len() as u32 - 1), node_hash));
-                return (node_hash, NodeType::Mid)
-            } else {
-                
-                let (new_left_hash, new_left_type) = self.make_padding_middle(left_index, right_index, depth + 1);
-                let new_left_index = self.nodes_vec.len() as u32 - 1;
-                
-                self.nodes_vec.push((ArrayTypes::Empty, EMPTY_NODE_HASH));
-                let new_right_index = self.nodes_vec.len() as u32 - 1;
-                
-                let node_hash = hash(new_left_type, NodeType::Empty, &new_left_hash, &BLANK);
-                self.nodes_vec.push((ArrayTypes::Middle(new_left_index, new_right_index), node_hash));
-                return (node_hash, NodeType::Mid)
-            }
+            
+            let (new_left_hash, new_left_type) = self.make_padding_middle(left_index, right_index, depth + 1);
+            let new_left_index = self.nodes_vec.len() as u32 - 1;
+            
+            self.nodes_vec.push((ArrayTypes::Empty, EMPTY_NODE_HASH));
+            let new_right_index = self.nodes_vec.len() as u32 - 1;
+            
+            let node_hash = hash(new_left_type, NodeType::Empty, &new_left_hash, &BLANK);
+            self.nodes_vec.push((ArrayTypes::Middle(new_left_index, new_right_index), node_hash));
+            (node_hash, NodeType::Mid)
         }
     }
     
