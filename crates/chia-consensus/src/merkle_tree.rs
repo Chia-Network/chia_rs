@@ -1,6 +1,10 @@
 // This file contains the code used to create a full MerkleSet and is heavily reliant on the code in merkle_set.rs.
 
 use crate::merkle_set::{hash, NodeType, BLANK};
+#[cfg(feature = "py-bindings")]
+use chia_protocol::Bytes32;
+#[cfg(feature = "py-bindings")]
+use chia_traits::ChiaToPython;
 use clvmr::sha2::{Digest, Sha256};
 #[cfg(feature = "py-bindings")]
 use pyo3::exceptions::PyValueError;
@@ -245,8 +249,8 @@ impl MerkleSet {
     }
 
     #[pyo3(name = "get_root")]
-    pub fn py_get_root(&self, py: Python) -> PyResult<PyObject> {
-        Ok(PyBytes::new(py, &self.get_merkle_root()).into())
+    pub fn py_get_root<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
+        ChiaToPython::to_python(&Bytes32::new(self.get_merkle_root()), py)
     }
 
     #[pyo3(name = "is_included_already_hashed")]
