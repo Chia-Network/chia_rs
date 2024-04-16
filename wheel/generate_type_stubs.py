@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Optional, Tuple, TextIO
+from typing import List, Optional, Sequence, Tuple, TextIO
 from glob import glob
 
 output_file = Path(__file__).parent.resolve() / "python" / "chia_rs" / "chia_rs.pyi"
@@ -343,10 +343,10 @@ class AugSchemeMPL:
 
 class MerkleSet:
     def get_root(self) -> bytes32: ...
-    def is_included_already_hashed(self, to_check: bytes) -> Tuple[bool, bytes]: ...
+    def is_included_already_hashed(self, to_check: bytes32) -> Tuple[bool, bytes]: ...
     def __init__(
         self,
-        leafs: List[bytes32],
+        leafs: Sequence[bytes32],
     ) -> None: ...
 """
     )

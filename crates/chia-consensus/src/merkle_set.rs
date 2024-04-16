@@ -43,7 +43,8 @@ pub(crate) fn hash(
     hasher.finalize().into()
 }
 
-pub(crate) const BLANK: [u8; 32] = hex!("0000000000000000000000000000000000000000000000000000000000000000");
+pub(crate) const BLANK: [u8; 32] =
+    hex!("0000000000000000000000000000000000000000000000000000000000000000");
 
 // this function performs an in-place, recursive radix sort of the range.
 // as each level returns, values are hashed pair-wise and as a hash tree.

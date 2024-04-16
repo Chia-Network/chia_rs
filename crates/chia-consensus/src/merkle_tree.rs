@@ -11,7 +11,7 @@ use pyo3::exceptions::PyValueError;
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
 #[cfg(feature = "py-bindings")]
-use pyo3::types::{PyBytes, PyList};
+use pyo3::types::{PyBytes, PySequence};
 #[cfg(feature = "py-bindings")]
 use pyo3::{pyclass, pymethods};
 
@@ -236,12 +236,13 @@ impl MerkleSet {
 #[pymethods]
 impl MerkleSet {
     #[new]
-    pub fn init(leafs: &PyList) -> PyResult<Self> {
-        let mut data: Vec<[u8; 32]> = Vec::with_capacity(leafs.len());
+    pub fn init(leafs: &PySequence) -> PyResult<Self> {
+        let mut data: Vec<[u8; 32]> = Vec::with_capacity(leafs.len()?);
 
-        for leaf in leafs {
+        for leaf in leafs.iter()? {
             data.push(
-                leaf.extract::<[u8; 32]>()
+                leaf?
+                    .extract::<[u8; 32]>()
                     .map_err(|_| PyValueError::new_err("invalid leaf"))?,
             );
         }

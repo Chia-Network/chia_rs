@@ -94,7 +94,7 @@ class MerkleSet:
     def is_included_already_hashed(self, to_check: bytes) -> Tuple[bool, bytes]: ...
     def __init__(
         self,
-        leafs: List[bytes32],
+        leafs: Sequence[bytes32],
     ) -> None: ...
 
 class G1Element:
