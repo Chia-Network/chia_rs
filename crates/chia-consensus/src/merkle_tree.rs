@@ -156,6 +156,37 @@ impl MerkleSet {
             Ok(None)
         }
     }
+    
+    // The Python implementation of MerkleSet doesn't shorten branches in the same way the Rust does
+    // when we generate proofs we need to add in the extra empty and mid nodes
+    fn pad_middles_for_proof_gen(
+        &self, 
+        proof: &mut Vec<u8>, 
+        children: (&[u8; 32], &[u8; 32]), 
+        depth: u8,
+        leaf: &[u8; 32]
+    )  -> Result<bool, SetError> {
+        let left_bit = get_bit(&children.0, depth);
+        let right_bit = get_bit(&children.1, depth);
+        if left_bit != right_bit {
+            proof.push(TERMINAL);
+            proof.extend_from_slice(children.0);
+            proof.push(TERMINAL);
+            proof.extend_from_slice(children.1);
+        } else {
+            proof.push(MIDDLE);
+            if left_bit { // left bit is 1 so we should make an empty node left and children right
+                proof.push(EMPTY);
+                return self.pad_middles_for_proof_gen(proof, children, depth + 1, leaf);
+            } else {
+                let result = self.pad_middles_for_proof_gen(proof, children, depth + 1, leaf);
+                proof.push(EMPTY);
+                return result;
+            }
+        }
+        Ok(children.0 == leaf
+            || children.1 == leaf)
+    }
 
     fn is_included(
         &self,
@@ -184,12 +215,19 @@ impl MerkleSet {
                     ),
                     (ArrayTypes::Leaf, ArrayTypes::Leaf)
                 ) {
-                    proof.push(TERMINAL);
-                    proof.extend_from_slice(&self.nodes_vec[left as usize].1);
-                    proof.push(TERMINAL);
-                    proof.extend_from_slice(&self.nodes_vec[right as usize].1);
-                    return Ok(&self.nodes_vec[left as usize].1 == leaf
-                        || &self.nodes_vec[right as usize].1 == leaf);
+                    // TODO: special case here
+                    return self.pad_middles_for_proof_gen(
+                        proof, 
+                        (&self.nodes_vec[left as usize].1, &self.nodes_vec[right as usize].1),
+                        depth,
+                        leaf,
+                    )
+                    // proof.push(TERMINAL);
+                    // proof.extend_from_slice(&self.nodes_vec[left as usize].1);
+                    // proof.push(TERMINAL);
+                    // proof.extend_from_slice(&self.nodes_vec[right as usize].1);
+                    // return Ok(&self.nodes_vec[left as usize].1 == leaf
+                    //     || &self.nodes_vec[right as usize].1 == leaf);
                 }
 
                 if get_bit(leaf, depth) {
