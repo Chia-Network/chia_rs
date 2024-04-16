@@ -486,4 +486,11 @@ mod test {
             merkle_tree_right_edge(),
         ]
     }
+
+    #[test]
+    fn test_compute_merkle_root() {
+        for (root, mut leafs) in merkle_set_test_cases() {
+            assert_eq!(compute_merkle_set_root(&mut leafs), root);
+        }
+    }
 }
