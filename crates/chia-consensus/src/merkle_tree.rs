@@ -431,11 +431,6 @@ impl MerkleSet {
             let node_type: NodeType = if left_type == NodeType::Term && right_type == NodeType::Term
             {
                 return self.make_padding_middle(left_child_index, right_child_index, depth);
-                // self.nodes_vec.push((
-                //     ArrayTypes::Middle(left_child_index, right_child_index),
-                //     node_hash,
-                // ));
-                // NodeType::MidDbl
             } else {
                 self.nodes_vec.push((
                     ArrayTypes::Middle(left_child_index, right_child_index),
@@ -457,7 +452,7 @@ impl MerkleSet {
                 node_hash,
             ));
             (node_hash, NodeType::MidDbl)
-        } else if left_bit { // left
+        } else if left_bit { // left bit is 1 so add an empty to left and make new mid to the right
             self.nodes_vec.push((ArrayTypes::Empty, EMPTY_NODE_HASH));
             let new_left_index = self.nodes_vec.len() as u32 - 1;
             let (new_right_hash, new_right_type) = self.make_padding_middle(left_index, right_index, depth + 1);
