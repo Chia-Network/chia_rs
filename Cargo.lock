@@ -384,6 +384,7 @@ dependencies = [
 name = "chia-consensus"
 version = "0.6.1"
 dependencies = [
+ "chia-bls 0.6.0",
  "chia-protocol",
  "chia-traits 0.6.0",
  "chia-wallet",

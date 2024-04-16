@@ -1,4 +1,4 @@
-use chia_protocol::{Bytes, Bytes32, Bytes48};
+use chia_protocol::{Bytes, Bytes32, Bytes48, Coin};
 use chia_streamable_macro::Streamable;
 use clvmr::{Allocator, NodePtr};
 
@@ -97,6 +97,14 @@ impl OwnedSpend {
             agg_sig_parent_amount: convert_agg_sigs(a, &spend.agg_sig_parent_amount),
             agg_sig_parent_puzzle: convert_agg_sigs(a, &spend.agg_sig_parent_puzzle),
             flags: spend.flags,
+        }
+    }
+
+    pub fn to_coin(&self) -> Coin {
+        Coin {
+            parent_coin_info: self.parent_id,
+            puzzle_hash: self.puzzle_hash,
+            amount: self.coin_amount,
         }
     }
 }

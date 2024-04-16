@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc, time::Instant};
 
-use chia_protocol::{BlockRecord, Bytes, Bytes32, Bytes48, Coin, FullBlock, Program};
+use chia_bls::{aggregate_verify, PublicKey};
+use chia_protocol::{BlockRecord, Bytes32, Coin, FullBlock, Program};
 use clvmr::NodePtr;
 
 use crate::{
@@ -9,14 +10,11 @@ use crate::{
             get_header_block, validate_finished_header_block, HeaderValidationOptions,
         },
         npc::get_npc,
+        signature_validation::pkm_pairs,
     },
     consensus_constants::ConsensusConstants,
     gen::{
-        conditions::SpendBundleConditions,
-        opcodes::{
-            AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT,
-            AGG_SIG_PARENT_PUZZLE, AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT,
-        },
+        owned_conditions::OwnedSpendBundleConditions,
         validation_error::{ErrorCode, ValidationErr},
     },
 };
@@ -26,6 +24,7 @@ use self::npc::NpcResult;
 mod finished_header_validation;
 mod npc;
 mod pot_iterations;
+mod signature_validation;
 mod unfinished_header_validation;
 
 pub struct PreValidationOptions {
@@ -78,17 +77,19 @@ pub struct BlockGenerator {
     pub generator_refs: Vec<Program>,
 }
 
-pub fn removals_and_additions(conditions: &SpendBundleConditions) -> (Vec<Bytes32>, Vec<Coin>) {
+pub fn removals_and_additions(
+    conditions: &OwnedSpendBundleConditions,
+) -> (Vec<Bytes32>, Vec<Coin>) {
     let mut removals = Vec::new();
     let mut additions = Vec::new();
 
     for spend in conditions.spends.iter() {
-        removals.push(*spend.coin_id);
-        for new_coin in spend.create_coin.iter() {
+        removals.push(spend.coin_id);
+        for (puzzle_hash, amount, _) in spend.create_coin.iter() {
             additions.push(Coin {
-                parent_coin_info: *spend.coin_id,
-                puzzle_hash: new_coin.puzzle_hash,
-                amount: new_coin.amount,
+                parent_coin_info: spend.coin_id,
+                puzzle_hash: *puzzle_hash,
+                amount: *amount,
             });
         }
     }
@@ -153,7 +154,7 @@ pub fn pre_validate_block(
         check_sub_epoch_summary: true,
     };
 
-    let (required_iters, error_code) =
+    let (required_iters, mut error_code) =
         match validate_finished_header_block(header_block, blocks, constants, &header_options) {
             Ok(required_iters) => (Some(required_iters), None),
             Err(error_code) => (None, Some(error_code)),
@@ -161,12 +162,31 @@ pub fn pre_validate_block(
 
     let should_validate_signatures = error_code.is_none() && options.validate_signatures;
     let signatures_valid = if should_validate_signatures {
-        match (npc_result, block.transactions_info) {
+        match (&npc_result, block.transactions_info) {
             (Some(npc_result), Some(transactions_info)) => {
                 let Ok(conditions) = npc_result else {
                     return PreValidationResult::unknown(start_time);
                 };
-                todo!()
+
+                let Some(pairs) = pkm_pairs(conditions, constants.agg_sig_me_additional_data)
+                else {
+                    return PreValidationResult::unknown(start_time);
+                };
+
+                let mut data = Vec::with_capacity(pairs.len());
+
+                for (pk, msg) in pairs {
+                    let Ok(pk) = PublicKey::from_bytes_unchecked(&pk.to_bytes()) else {
+                        return PreValidationResult::unknown(start_time);
+                    };
+                    data.push((pk, msg.into_inner()));
+                }
+
+                if !aggregate_verify(&transactions_info.aggregated_signature, data) {
+                    error_code = Some(ErrorCode::BadAggregateSignature);
+                }
+
+                true
             }
             _ => false,
         }
@@ -174,5 +194,11 @@ pub fn pre_validate_block(
         false
     };
 
-    todo!()
+    PreValidationResult {
+        error: error_code.map(|code| ValidationErr(NodePtr::NIL, code)),
+        required_iters,
+        npc_result,
+        validated_signature: signatures_valid,
+        timing: start_time.elapsed().as_millis() as u32,
+    }
 }

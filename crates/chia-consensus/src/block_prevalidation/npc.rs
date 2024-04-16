@@ -5,11 +5,12 @@ use crate::{
     allocator::make_allocator,
     consensus_constants::ConsensusConstants,
     gen::{
-        conditions::{EmptyVisitor, MempoolVisitor, SpendBundleConditions},
+        conditions::{EmptyVisitor, MempoolVisitor},
         flags::{
             AGG_SIG_ARGS, ALLOW_BACKREFS, ANALYZE_SPENDS, ENABLE_SOFTFORK_CONDITION,
             NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
         },
+        owned_conditions::OwnedSpendBundleConditions,
         run_block_generator::{run_block_generator, run_block_generator2},
         validation_error::ValidationErr,
     },
@@ -17,7 +18,7 @@ use crate::{
 
 use super::BlockGenerator;
 
-pub type NpcResult = Result<SpendBundleConditions, ValidationErr>;
+pub type NpcResult = Result<OwnedSpendBundleConditions, ValidationErr>;
 
 pub fn flags_for_height(height: u32, constants: &ConsensusConstants) -> u32 {
     let mut flags = 0;
@@ -88,4 +89,5 @@ pub fn get_npc(
         max_cost,
         flags,
     )
+    .map(|conds| OwnedSpendBundleConditions::from(&allocator, conds))
 }

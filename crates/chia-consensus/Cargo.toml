@@ -24,6 +24,7 @@ clvm-traits = { version = "0.6.0", path = "../clvm-traits" }
 clvm-derive = { version = "0.6.0", path = "../clvm-derive" }
 chia-protocol = { version = "0.6.0", path = "../chia-protocol" }
 chia-wallet = { version = "0.6.0", path = "../chia-wallet" }
+chia-bls = { version = "0.6.0", path = "../chia-bls" }
 hex-literal = "0.4.1"
 thiserror = "1.0.44"
 chiabip158 = "1.5.1"

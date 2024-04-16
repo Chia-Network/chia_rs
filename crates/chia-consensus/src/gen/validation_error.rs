@@ -56,6 +56,7 @@ pub enum ErrorCode {
     InvalidCoinId,
     MessageNotSentOrReceived,
     InvalidPrevBlockHash,
+    BadAggregateSignature,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
@@ -146,6 +147,7 @@ impl From<ErrorCode> for u32 {
             ErrorCode::InvalidCoinId => 146,
             ErrorCode::MessageNotSentOrReceived => 147,
             ErrorCode::InvalidPrevBlockHash => 51,
+            ErrorCode::BadAggregateSignature => 7,
         }
     }
 }
