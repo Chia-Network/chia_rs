@@ -77,9 +77,7 @@ pub struct BlockGenerator {
     pub generator_refs: Vec<Program>,
 }
 
-pub fn removals_and_additions(
-    conditions: &OwnedSpendBundleConditions,
-) -> (Vec<Bytes32>, Vec<Coin>) {
+fn removals_and_additions(conditions: &OwnedSpendBundleConditions) -> (Vec<Bytes32>, Vec<Coin>) {
     let mut removals = Vec::new();
     let mut additions = Vec::new();
 
@@ -102,11 +100,12 @@ pub fn pre_validate_block(
     block: FullBlock,
     blocks: Arc<HashMap<Bytes32, BlockRecord>>,
     prev_generator: Option<BlockGenerator>,
-    npc_result: Option<NpcResult>,
+    cached_npc_result: Option<NpcResult>,
     constants: &ConsensusConstants,
     options: &PreValidationOptions,
 ) -> PreValidationResult {
     let start_time = Instant::now();
+    let npc_result;
 
     let mut removals = Vec::new();
     let mut additions = Vec::new();
@@ -114,13 +113,14 @@ pub fn pre_validate_block(
     let transactions_info = block.transactions_info.clone();
 
     // Use the cached NPC result if present.
-    if let Some(npc_result) = npc_result.as_ref() {
-        match npc_result {
+    if let Some(cached_npc_result) = cached_npc_result {
+        match cached_npc_result {
             Ok(conditions) => {
-                (removals, additions) = removals_and_additions(conditions);
+                (removals, additions) = removals_and_additions(&conditions);
+                npc_result = Some(NpcResult::Ok(conditions));
             }
             Err(error) => {
-                return PreValidationResult::error(*error, Some(npc_result.clone()), start_time)
+                return PreValidationResult::error(error, Some(cached_npc_result), start_time)
             }
         }
     } else if let Some(transactions_generator) = block.transactions_generator.clone() {
@@ -147,6 +147,9 @@ pub fn pre_validate_block(
         };
 
         (removals, additions) = removals_and_additions(&conditions);
+        npc_result = Some(NpcResult::Ok(conditions));
+    } else {
+        npc_result = None;
     }
 
     let header_block = get_block_header(block, additions, removals);
