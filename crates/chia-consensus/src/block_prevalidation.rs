@@ -7,7 +7,7 @@ use clvmr::NodePtr;
 use crate::{
     block_prevalidation::{
         finished_header_validation::{
-            get_header_block, validate_finished_header_block, HeaderValidationOptions,
+            get_block_header, validate_finished_header_block, HeaderValidationOptions,
         },
         npc::get_npc,
         signature_validation::pkm_pairs,
@@ -85,6 +85,7 @@ pub fn removals_and_additions(
 
     for spend in conditions.spends.iter() {
         removals.push(spend.coin_id);
+
         for (puzzle_hash, amount, _) in spend.create_coin.iter() {
             additions.push(Coin {
                 parent_coin_info: spend.coin_id,
@@ -107,96 +108,97 @@ pub fn pre_validate_block(
 ) -> PreValidationResult {
     let start_time = Instant::now();
 
-    let (removals, additions) = match (&npc_result, block.transactions_generator.clone()) {
-        // If we have a valid NPC result, we can use that to get the removals and additions.
-        (Some(Ok(conditions)), _) => removals_and_additions(conditions),
+    let mut removals = Vec::new();
+    let mut additions = Vec::new();
 
-        // The NPC result is an error.
-        (Some(Err(error)), _) => return PreValidationResult::error(*error, npc_result, start_time),
+    let transactions_info = block.transactions_info.clone();
 
-        // If we have a generator, we can use that to get the removals and additions.
-        (None, Some(transactions_generator)) => {
-            let prev_generator = prev_generator.expect("missing previous generator");
-
-            if transactions_generator != prev_generator.program {
-                return PreValidationResult::unknown(start_time);
+    // Use the cached NPC result if present.
+    if let Some(npc_result) = npc_result.as_ref() {
+        match npc_result {
+            Ok(conditions) => {
+                (removals, additions) = removals_and_additions(conditions);
             }
+            Err(error) => {
+                return PreValidationResult::error(*error, Some(npc_result.clone()), start_time)
+            }
+        }
+    } else if let Some(transactions_generator) = block.transactions_generator.clone() {
+        let Some(prev_generator) = prev_generator else {
+            return PreValidationResult::unknown(start_time);
+        };
 
-            let block_cost = block
-                .transactions_info
-                .as_ref()
-                .expect("missing transactions info")
-                .cost;
+        let Some(transactions_info) = transactions_info.as_ref() else {
+            return PreValidationResult::unknown(start_time);
+        };
 
-            let Ok(conditions) = get_npc(
-                prev_generator,
-                constants.max_block_cost_clvm.min(block_cost),
-                false,
-                block.height(),
-                constants,
-            ) else {
+        if prev_generator.program != transactions_generator {
+            return PreValidationResult::unknown(start_time);
+        }
+
+        let Ok(conditions) = get_npc(
+            prev_generator,
+            constants.max_block_cost_clvm.min(transactions_info.cost),
+            false,
+            block.height(),
+            constants,
+        ) else {
+            return PreValidationResult::unknown(start_time);
+        };
+
+        (removals, additions) = removals_and_additions(&conditions);
+    }
+
+    let header_block = get_block_header(block, additions, removals);
+
+    let mut result = validate_finished_header_block(
+        header_block,
+        blocks,
+        constants,
+        &HeaderValidationOptions {
+            check_filter: options.check_filter,
+            expected_difficulty: options.expected_difficulty,
+            expected_sub_slot_iters: options.expected_sub_slot_iters,
+            check_sub_epoch_summary: true,
+        },
+    );
+
+    if let Err(error_code) = result {
+        return PreValidationResult::error(error_code.into(), npc_result, start_time);
+    }
+
+    let mut signatures_valid = false;
+
+    if options.validate_signatures {
+        if let (Some(npc_result), Some(transactions_info)) = (&npc_result, transactions_info) {
+            let Ok(conditions) = npc_result else {
                 return PreValidationResult::unknown(start_time);
             };
 
-            removals_and_additions(&conditions)
-        }
+            let Some(pairs) = pkm_pairs(conditions, constants.agg_sig_me_additional_data) else {
+                return PreValidationResult::unknown(start_time);
+            };
 
-        // We don't have either a valid NPC result or a generator, so we can't get the removals and additions.
-        (None, None) => Default::default(),
-    };
+            let mut data = Vec::with_capacity(pairs.len());
 
-    let header_block = get_header_block(block.clone(), additions, removals);
-
-    let header_options = HeaderValidationOptions {
-        check_filter: options.check_filter,
-        expected_difficulty: options.expected_difficulty,
-        expected_sub_slot_iters: options.expected_sub_slot_iters,
-        check_sub_epoch_summary: true,
-    };
-
-    let (required_iters, mut error_code) =
-        match validate_finished_header_block(header_block, blocks, constants, &header_options) {
-            Ok(required_iters) => (Some(required_iters), None),
-            Err(error_code) => (None, Some(error_code)),
-        };
-
-    let should_validate_signatures = error_code.is_none() && options.validate_signatures;
-    let signatures_valid = if should_validate_signatures {
-        match (&npc_result, block.transactions_info) {
-            (Some(npc_result), Some(transactions_info)) => {
-                let Ok(conditions) = npc_result else {
+            for (pk, msg) in pairs {
+                let Ok(pk) = PublicKey::from_bytes_unchecked(&pk.to_bytes()) else {
                     return PreValidationResult::unknown(start_time);
                 };
-
-                let Some(pairs) = pkm_pairs(conditions, constants.agg_sig_me_additional_data)
-                else {
-                    return PreValidationResult::unknown(start_time);
-                };
-
-                let mut data = Vec::with_capacity(pairs.len());
-
-                for (pk, msg) in pairs {
-                    let Ok(pk) = PublicKey::from_bytes_unchecked(&pk.to_bytes()) else {
-                        return PreValidationResult::unknown(start_time);
-                    };
-                    data.push((pk, msg.into_inner()));
-                }
-
-                if !aggregate_verify(&transactions_info.aggregated_signature, data) {
-                    error_code = Some(ErrorCode::BadAggregateSignature);
-                }
-
-                true
+                data.push((pk, msg.into_inner()));
             }
-            _ => false,
+
+            if !aggregate_verify(&transactions_info.aggregated_signature, data) {
+                result = Err(ErrorCode::BadAggregateSignature);
+            }
+
+            signatures_valid = true;
         }
-    } else {
-        false
     };
 
     PreValidationResult {
-        error: error_code.map(|code| ValidationErr(NodePtr::NIL, code)),
-        required_iters,
+        error: result.err().map(Into::into),
+        required_iters: result.ok(),
         npc_result,
         validated_signature: signatures_valid,
         timing: start_time.elapsed().as_millis() as u32,

@@ -11,7 +11,7 @@ use crate::{
     gen::validation_error::ErrorCode,
 };
 
-pub fn get_header_block(
+pub fn get_block_header(
     block: FullBlock,
     additions: Vec<Coin>,
     removals: Vec<Bytes32>,

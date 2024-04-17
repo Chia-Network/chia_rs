@@ -73,6 +73,12 @@ impl From<EvalErr> for ValidationErr {
     }
 }
 
+impl From<ErrorCode> for ValidationErr {
+    fn from(code: ErrorCode) -> Self {
+        ValidationErr(NodePtr::NIL, code)
+    }
+}
+
 impl From<std::io::Error> for ValidationErr {
     fn from(_: std::io::Error) -> Self {
         ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError)
