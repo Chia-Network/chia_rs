@@ -106,4 +106,3 @@ cargo fuzz list
 ```
 cargo fuzz run <name-of-fuzzer>
 ```
-
