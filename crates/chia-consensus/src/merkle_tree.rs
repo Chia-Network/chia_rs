@@ -296,7 +296,7 @@ impl MerkleSet {
             merkle_tree.nodes_vec.push((ArrayTypes::Empty, BLANK));
             return merkle_tree;
         }
-        merkle_tree.generate_merkle_tree_recurse(leafs, 0);
+        merkle_tree.generate_merkle_tree_recurse(leafs, 0, Vec::new());
         merkle_tree
     }
 
@@ -310,11 +310,30 @@ impl MerkleSet {
         &mut self,
         range: &mut [[u8; 32]],
         depth: u8,
+        bits: Vec<bool>,
     ) -> ([u8; 32], NodeType) {
         assert!(!range.is_empty());
 
         if range.len() == 1 {
             // we've reached a leaf node
+            for i in 0..depth {
+                let bit = get_bit(&range[0], i);
+                if bit != bits[i as usize] {
+                    // DEBUGGING
+                    let mut range_bits: Vec<bool> = Vec::new();
+                    for j in 0..255 {
+                        range_bits.push(get_bit(&range[0], j))
+                    }
+                    println!("Leaf bits: {:?}", range_bits);
+                    println!("Traced bits: {:?}", bits);
+                    println!("Error location: {:?}", i);
+
+                    // ASSERTION
+                    assert!(bit == bits[i as usize]);
+                }
+            }
+            
+
             self.nodes_vec.push((ArrayTypes::Leaf, range[0]));
             return (range[0], NodeType::Term);
         }
@@ -366,7 +385,9 @@ impl MerkleSet {
             } else {
                 // this means either the left or right bucket/sub tree was empty.
                 // let left_child_index: u32 =  self.nodes_vec.len() as u32;
-                let (child_hash, child_type) = self.generate_merkle_tree_recurse(range, depth + 1);
+                let mut new_bits = bits.clone();
+                new_bits.push(if left_empty {true} else {false});
+                let (child_hash, child_type) = self.generate_merkle_tree_recurse(range, depth + 1, new_bits);
 
                 // in this case we may need to insert an Empty node (prefix 0 and a
                 // blank hash)
@@ -418,13 +439,17 @@ impl MerkleSet {
         } else {
             // we are a middle node
             // recursively sort and hash our left and right children and return the resultant hash upwards
+            let mut new_bits = bits.clone();
+            new_bits.push(false);
             let (left_hash, left_type) =
-                self.generate_merkle_tree_recurse(&mut range[..left as usize], depth + 1);
+                self.generate_merkle_tree_recurse(&mut range[..left as usize], depth + 1, new_bits);
             // make a note of where the left child node is
             let left_child_index: u32 = self.nodes_vec.len() as u32 - 1;
             
+            let mut new_bits = bits.clone();
+            new_bits.push(false);
             let (right_hash, right_type) =
-                self.generate_merkle_tree_recurse(&mut range[left as usize..], depth + 1);
+                self.generate_merkle_tree_recurse(&mut range[left as usize..], depth + 1, new_bits);
             let right_child_index: u32 = self.nodes_vec.len() as u32 - 1;
             
             let node_hash = hash(left_type, right_type, &left_hash, &right_hash);
@@ -453,6 +478,7 @@ impl MerkleSet {
             ));
             (node_hash, NodeType::MidDbl)
         } else if left_bit { // left bit is 1 so add an empty to left and make new mid to the right
+            panic!("hello");
             self.nodes_vec.push((ArrayTypes::Empty, EMPTY_NODE_HASH));
             let new_left_index = self.nodes_vec.len() as u32 - 1;
             let (new_right_hash, new_right_type) = self.make_padding_middle(left_index, right_index, depth + 1);
@@ -460,7 +486,7 @@ impl MerkleSet {
             self.nodes_vec.push((ArrayTypes::Middle(new_left_index, self.nodes_vec.len() as u32 - 1), node_hash));
             (node_hash, NodeType::Mid)
         } else {
-            
+            panic!("goodbye");
             let (new_left_hash, new_left_type) = self.make_padding_middle(left_index, right_index, depth + 1);
             let new_left_index = self.nodes_vec.len() as u32 - 1;
             
