@@ -86,7 +86,7 @@ impl MerkleSet {
                     ParseOp::Node => {
                         let mut b = [0; 1];
                         proof.read_exact(&mut b).map_err(|_| SetError)?;
-    
+
                         match b[0] {
                             EMPTY => {
                                 values.push((self.nodes_vec.len() as u32, NodeType::Empty));
@@ -98,7 +98,7 @@ impl MerkleSet {
                                 // audit the leaf is correctly positioned by comparing its bits with the traced route
                                 for (pos, v) in bits.iter().enumerate() {
                                     if get_bit(&hash, pos as u8) != *v {
-                                        return Err(SetError)
+                                        return Err(SetError);
                                     }
                                 }
                                 values.push((self.nodes_vec.len() as u32, NodeType::Term));
@@ -118,14 +118,14 @@ impl MerkleSet {
                                 ops.push(ParseOp::Node);
                                 ops.push(ParseOp::Node);
 
-                                bits_stack.push(Vec::new());  // we don't audit mid, so this is just placeholder value
-                                let mut new_bits = bits.clone();  
-                                new_bits.push(true);  // this gets processed second so it is the right
+                                bits_stack.push(Vec::new()); // we don't audit mid, so this is just placeholder value
+                                let mut new_bits = bits.clone();
+                                new_bits.push(true); // this gets processed second so it is the right
                                 bits_stack.push(new_bits);
                                 let mut new_bits = bits.clone();
-                                new_bits.push(false);  // this gets processed first so it is left branch
+                                new_bits.push(false); // this gets processed first so it is left branch
                                 bits_stack.push(new_bits);
-    
+
                                 depth += 1;
                             }
                             _ => {
@@ -136,7 +136,7 @@ impl MerkleSet {
                     ParseOp::Middle => {
                         let right = values.pop().expect("internal error");
                         let left = values.pop().expect("internal error");
-    
+
                         // Note that proofs are expected to include every tree layer
                         // (i.e. no collapsing), however, the node hashes are
                         // computed on a collapsed tree (or as-if it was collapsed).
@@ -148,7 +148,7 @@ impl MerkleSet {
                             (NodeType::MidDbl, NodeType::Empty) => NodeType::MidDbl,
                             (_, _) => NodeType::Mid,
                         };
-    
+
                         // since our tree is complete (i.e. no collapsing) when we
                         // generate it from a proof, the collapsing for purposes of
                         // hash computation just means we copy the child hash to its
