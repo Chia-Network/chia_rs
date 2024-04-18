@@ -1,6 +1,8 @@
 // This file contains the code used to create a full MerkleSet and is heavily reliant on the code in merkle_set.rs.
 
 use crate::merkle_set::{hash, NodeType, BLANK};
+use hex_literal::hex;
+
 #[cfg(feature = "py-bindings")]
 use chia_protocol::Bytes32;
 #[cfg(feature = "py-bindings")]
@@ -39,17 +41,9 @@ const TERMINAL: u8 = 1;
 const MIDDLE: u8 = 2;
 const TRUNCATED: u8 = 3;
 
-const EMPTY_NODE_HASH: [u8; 32] = [
-    127, 156, 158, 49, 172, 130, 86, 202, 47, 37, 133, 131, 223, 38, 45, 188, 125, 111, 104, 242,
-    160, 48, 67, 213, 201, 154, 74, 229, 167, 57, 108, 233,
-];
-// the above was calculated from the following code snippet which was previously used
-/*
-    let mut hasher = Sha256::new();
-    hasher.update([NodeType::Empty as u8]);
-    hasher.update(BLANK);
-    hasher.finalize().into();
-*/
+// sha256(bytes([0] * 32)).hexdigest()
+const EMPTY_NODE_HASH: [u8; 32] =
+    hex!("66687aadf862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925");
 
 #[derive(Debug)]
 #[cfg_attr(feature = "py-bindings", pyclass(frozen, name = "SetError"))]
@@ -685,6 +679,38 @@ mod tests {
     fn test_deserialize_malicious_proof() {
         let malicious_proof = vec![MIDDLE].repeat(40000);
         assert!(MerkleSet::from_proof(&malicious_proof).is_err());
+    }
+
+    #[test]
+    fn test_proofs_must_be_complete() {
+        // when we produce a proof, we must include all levels of the tree. i.e.
+        // no collapsing
+        let a = hex!("c000000000000000000000000000000000000000000000000000000000000000");
+        let b = hex!("c800000000000000000000000000000000000000000000000000000000000000");
+        // these leafs form a tree that look like this:
+        //       o
+        //      / \
+        //     a   b
+
+        // but the proof for b, must look like this:
+        //      o
+        //     / \
+        //    E   o
+        //       / \
+        //      E   o
+        //         / \
+        //        o   E
+        //       / \
+        //      o   E
+        //     / \
+        //    a   b
+        let tree = MerkleSet::from_leafs(&mut [a, b]);
+        let proof = tree.generate_proof(&b).unwrap().unwrap();
+        assert_eq!(hex::encode(proof), "0200020002020201c00000000000000000000000000000000000000000000000000000000000000001c8000000000000000000000000000000000000000000000000000000000000000000");
+
+        // in fact, the proof for a looks the same, since a and b are siblings
+        let proof = tree.generate_proof(&b).unwrap().unwrap();
+        assert_eq!(hex::encode(proof), "0200020002020201c00000000000000000000000000000000000000000000000000000000000000001c8000000000000000000000000000000000000000000000000000000000000000000");
     }
 
     #[test]
