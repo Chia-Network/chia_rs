@@ -652,6 +652,7 @@ mod tests {
         }
     }
 
+    #[test]
     fn test_bad_proofs_2() {
         // Create a random number generator
         let mut rng = SmallRng::seed_from_u64(1337);
