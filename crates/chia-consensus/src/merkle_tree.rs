@@ -665,7 +665,7 @@ mod tests {
         let mut array: [u8; 32] = [0; 32];
         rng.fill(&mut array);
         random_data.push(array);
-        
+
         let mut bad_proof: Vec<u8> = Vec::new();
         bad_proof.push(MIDDLE);
         bad_proof.push(TRUNCATED);
@@ -676,7 +676,7 @@ mod tests {
         bad_proof.push(TERMINAL);
         bad_proof.extend_from_slice(&[0x0; 32]);
         let rebuilt = MerkleSet::from_proof(&bad_proof[0..bad_proof.len()]);
-        assert!(matches!(rebuilt, Err(SetError)));  // this is failing the audit
+        assert!(matches!(rebuilt, Err(SetError))); // this is failing the audit
     }
 
     #[test]
