@@ -533,9 +533,9 @@ mod tests {
     use super::*;
     use crate::merkle_set::compute_merkle_set_root;
     use crate::merkle_set::test::merkle_set_test_cases;
+    use hex_literal::hex;
     use rand::rngs::SmallRng;
     use rand::{Rng, SeedableRng};
-    use sha2::digest::typenum::Min;
 
     impl MerkleSet {
         // this checks the correctness of the tree and its merkle root by
@@ -672,7 +672,9 @@ mod tests {
         bad_proof.extend_from_slice(&random_data[0]);
         bad_proof.push(MIDDLE);
         bad_proof.push(TERMINAL);
-        bad_proof.extend_from_slice(&[0x1; 32]); // this ought to be on the right
+        let bytes: [u8; 32] =
+            hex!("8000000000000000000000000000000000000000000000000000000000000000");
+        bad_proof.extend_from_slice(&bytes); // this ought to be on the right
         bad_proof.push(TERMINAL);
         bad_proof.extend_from_slice(&[0x0; 32]);
         let rebuilt = MerkleSet::from_proof(&bad_proof[0..bad_proof.len()]);
