@@ -119,6 +119,11 @@ impl MerkleSet {
                     let right = values.pop().expect("internal error");
                     let left = values.pop().expect("internal error");
 
+                    // Note that proofs are expected to include every tree layer
+                    // (i.e. no collapsing), however, the node hashes are
+                    // computed on a collapsed tree (or as-if it was collapsed).
+                    // This section propagates the MidDbl type up the tree, to
+                    // allow collapsing of the hash computation
                     let new_node_type = match (left.1, right.1) {
                         (NodeType::Term, NodeType::Term) => NodeType::MidDbl,
                         (NodeType::Empty, NodeType::MidDbl) => NodeType::MidDbl,
@@ -126,7 +131,15 @@ impl MerkleSet {
                         (_, _) => NodeType::Mid,
                     };
 
+                    // since our tree is complete (i.e. no collapsing) when we
+                    // generate it from a proof, the collapsing for purposes of
+                    // hash computation just means we copy the child hash to its
+                    // parent hash (in the cases where the tree would have been
+                    // collapsed).
                     let node_hash = match (left.1, right.1) {
+                        // We collapse this layer for purposes of hash
+                        // computation, by simply copying the hash from the node
+                        // leading to the leafs, left or right.
                         (NodeType::Empty, NodeType::MidDbl) => {
                             values.push(right);
                             self.nodes_vec[right.0 as usize].1
@@ -135,6 +148,8 @@ impl MerkleSet {
                             values.push(left);
                             self.nodes_vec[left.0 as usize].1
                         }
+                        // this is the case where we do *not* collapse the tree,
+                        // but compute a new hash for the node.
                         (_, _) => {
                             values.push((self.nodes_vec.len() as u32, new_node_type));
                             hash(
