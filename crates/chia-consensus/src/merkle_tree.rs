@@ -81,7 +81,9 @@ impl MerkleSet {
         bits_stack.push(Vec::new());
 
         while let Some(op) = ops.pop() {
-            let Some(bits) = bits_stack.pop() else {return Err(SetError);};
+            let Some(bits) = bits_stack.pop() else {
+                return Err(SetError);
+            };
             match op {
                 ParseOp::Node => {
                     let mut b = [0; 1];
