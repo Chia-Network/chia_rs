@@ -77,93 +77,114 @@ impl MerkleSet {
         let mut values = Vec::<(u32, NodeType)>::new();
         let mut ops = vec![ParseOp::Node];
         let mut depth = 0;
+        let mut bits_stack: Vec<Vec<bool>> = Vec::new();
+        bits_stack.push(Vec::new());
 
         while let Some(op) = ops.pop() {
-            match op {
-                ParseOp::Node => {
-                    let mut b = [0; 1];
-                    proof.read_exact(&mut b).map_err(|_| SetError)?;
+            if let Some(bits) = bits_stack.pop() {
+                match op {
+                    ParseOp::Node => {
+                        let mut b = [0; 1];
+                        proof.read_exact(&mut b).map_err(|_| SetError)?;
+    
+                        match b[0] {
+                            EMPTY => {
+                                values.push((self.nodes_vec.len() as u32, NodeType::Empty));
+                                self.nodes_vec.push((ArrayTypes::Empty, BLANK));
+                            }
+                            TERMINAL => {
+                                let mut hash = [0; 32];
+                                proof.read_exact(&mut hash).map_err(|_| SetError)?;
+                                // audit the leaf is correctly positioned by comparing its bits with the traced route
+                                for (pos, v) in bits.iter().enumerate() {
+                                    if get_bit(&hash, pos as u8) != *v {
+                                        return Err(SetError)
+                                    }
+                                }
+                                values.push((self.nodes_vec.len() as u32, NodeType::Term));
+                                self.nodes_vec.push((ArrayTypes::Leaf, hash));
+                            }
+                            TRUNCATED => {
+                                let mut hash = [0; 32];
+                                proof.read_exact(&mut hash).map_err(|_| SetError)?;
+                                values.push((self.nodes_vec.len() as u32, NodeType::Mid));
+                                self.nodes_vec.push((ArrayTypes::Truncated, hash));
+                            }
+                            MIDDLE => {
+                                if depth > 256 {
+                                    return Err(SetError);
+                                }
+                                ops.push(ParseOp::Middle);
+                                ops.push(ParseOp::Node);
+                                ops.push(ParseOp::Node);
 
-                    match b[0] {
-                        EMPTY => {
-                            values.push((self.nodes_vec.len() as u32, NodeType::Empty));
-                            self.nodes_vec.push((ArrayTypes::Empty, BLANK));
-                        }
-                        TERMINAL => {
-                            let mut hash = [0; 32];
-                            proof.read_exact(&mut hash).map_err(|_| SetError)?;
-                            values.push((self.nodes_vec.len() as u32, NodeType::Term));
-                            self.nodes_vec.push((ArrayTypes::Leaf, hash));
-                        }
-                        TRUNCATED => {
-                            let mut hash = [0; 32];
-                            proof.read_exact(&mut hash).map_err(|_| SetError)?;
-                            values.push((self.nodes_vec.len() as u32, NodeType::Mid));
-                            self.nodes_vec.push((ArrayTypes::Truncated, hash));
-                        }
-                        MIDDLE => {
-                            if depth > 256 {
+                                bits_stack.push(Vec::new());  // we don't audit mid, so this is just placeholder value
+                                let mut new_bits = bits.clone();  
+                                new_bits.push(true);  // this gets processed second so it is the right
+                                bits_stack.push(new_bits);
+                                let mut new_bits = bits.clone();
+                                new_bits.push(false);  // this gets processed first so it is left branch
+                                bits_stack.push(new_bits);
+    
+                                depth += 1;
+                            }
+                            _ => {
                                 return Err(SetError);
                             }
-                            ops.push(ParseOp::Middle);
-                            ops.push(ParseOp::Node);
-                            ops.push(ParseOp::Node);
-                            depth += 1;
-                        }
-                        _ => {
-                            return Err(SetError);
                         }
                     }
+                    ParseOp::Middle => {
+                        let right = values.pop().expect("internal error");
+                        let left = values.pop().expect("internal error");
+    
+                        // Note that proofs are expected to include every tree layer
+                        // (i.e. no collapsing), however, the node hashes are
+                        // computed on a collapsed tree (or as-if it was collapsed).
+                        // This section propagates the MidDbl type up the tree, to
+                        // allow collapsing of the hash computation
+                        let new_node_type = match (left.1, right.1) {
+                            (NodeType::Term, NodeType::Term) => NodeType::MidDbl,
+                            (NodeType::Empty, NodeType::MidDbl) => NodeType::MidDbl,
+                            (NodeType::MidDbl, NodeType::Empty) => NodeType::MidDbl,
+                            (_, _) => NodeType::Mid,
+                        };
+    
+                        // since our tree is complete (i.e. no collapsing) when we
+                        // generate it from a proof, the collapsing for purposes of
+                        // hash computation just means we copy the child hash to its
+                        // parent hash (in the cases where the tree would have been
+                        // collapsed).
+                        let node_hash = match (left.1, right.1) {
+                            // We collapse this layer for purposes of hash
+                            // computation, by simply copying the hash from the node
+                            // leading to the leafs, left or right.
+                            (NodeType::Empty, NodeType::MidDbl) => {
+                                values.push(right);
+                                self.nodes_vec[right.0 as usize].1
+                            }
+                            (NodeType::MidDbl, NodeType::Empty) => {
+                                values.push(left);
+                                self.nodes_vec[left.0 as usize].1
+                            }
+                            // this is the case where we do *not* collapse the tree,
+                            // but compute a new hash for the node.
+                            (_, _) => {
+                                values.push((self.nodes_vec.len() as u32, new_node_type));
+                                hash(
+                                    self.nodes_vec[left.0 as usize].0.into(),
+                                    self.nodes_vec[right.0 as usize].0.into(),
+                                    &self.nodes_vec[left.0 as usize].1,
+                                    &self.nodes_vec[right.0 as usize].1,
+                                )
+                            }
+                        };
+                        self.nodes_vec
+                            .push((ArrayTypes::Middle(left.0, right.0), node_hash));
+                        depth -= 1;
+                    }
                 }
-                ParseOp::Middle => {
-                    let right = values.pop().expect("internal error");
-                    let left = values.pop().expect("internal error");
-
-                    // Note that proofs are expected to include every tree layer
-                    // (i.e. no collapsing), however, the node hashes are
-                    // computed on a collapsed tree (or as-if it was collapsed).
-                    // This section propagates the MidDbl type up the tree, to
-                    // allow collapsing of the hash computation
-                    let new_node_type = match (left.1, right.1) {
-                        (NodeType::Term, NodeType::Term) => NodeType::MidDbl,
-                        (NodeType::Empty, NodeType::MidDbl) => NodeType::MidDbl,
-                        (NodeType::MidDbl, NodeType::Empty) => NodeType::MidDbl,
-                        (_, _) => NodeType::Mid,
-                    };
-
-                    // since our tree is complete (i.e. no collapsing) when we
-                    // generate it from a proof, the collapsing for purposes of
-                    // hash computation just means we copy the child hash to its
-                    // parent hash (in the cases where the tree would have been
-                    // collapsed).
-                    let node_hash = match (left.1, right.1) {
-                        // We collapse this layer for purposes of hash
-                        // computation, by simply copying the hash from the node
-                        // leading to the leafs, left or right.
-                        (NodeType::Empty, NodeType::MidDbl) => {
-                            values.push(right);
-                            self.nodes_vec[right.0 as usize].1
-                        }
-                        (NodeType::MidDbl, NodeType::Empty) => {
-                            values.push(left);
-                            self.nodes_vec[left.0 as usize].1
-                        }
-                        // this is the case where we do *not* collapse the tree,
-                        // but compute a new hash for the node.
-                        (_, _) => {
-                            values.push((self.nodes_vec.len() as u32, new_node_type));
-                            hash(
-                                self.nodes_vec[left.0 as usize].0.into(),
-                                self.nodes_vec[right.0 as usize].0.into(),
-                                &self.nodes_vec[left.0 as usize].1,
-                                &self.nodes_vec[right.0 as usize].1,
-                            )
-                        }
-                    };
-                    self.nodes_vec
-                        .push((ArrayTypes::Middle(left.0, right.0), node_hash));
-                    depth -= 1;
-                }
+            } else {
+                return Err(SetError);
             }
         }
         if proof.position() != proof.get_ref().len() as u64 {
