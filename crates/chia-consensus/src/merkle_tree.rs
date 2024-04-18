@@ -74,7 +74,7 @@ impl MerkleSet {
         }
 
         let mut proof = Cursor::<&[u8]>::new(proof);
-        let mut values = Vec::<u32>::new();
+        let mut values = Vec::<(u32, NodeType)>::new();
         let mut ops = vec![ParseOp::Node];
         let mut depth = 0;
 
@@ -86,19 +86,19 @@ impl MerkleSet {
 
                     match b[0] {
                         EMPTY => {
-                            values.push(self.nodes_vec.len() as u32);
+                            values.push((self.nodes_vec.len() as u32, NodeType::Empty));
                             self.nodes_vec.push((ArrayTypes::Empty, BLANK));
                         }
                         TERMINAL => {
                             let mut hash = [0; 32];
                             proof.read_exact(&mut hash).map_err(|_| SetError)?;
-                            values.push(self.nodes_vec.len() as u32);
+                            values.push((self.nodes_vec.len() as u32, NodeType::Term));
                             self.nodes_vec.push((ArrayTypes::Leaf, hash));
                         }
                         TRUNCATED => {
                             let mut hash = [0; 32];
                             proof.read_exact(&mut hash).map_err(|_| SetError)?;
-                            values.push(self.nodes_vec.len() as u32);
+                            values.push((self.nodes_vec.len() as u32, NodeType::Mid));
                             self.nodes_vec.push((ArrayTypes::Truncated, hash));
                         }
                         MIDDLE => {
@@ -116,17 +116,52 @@ impl MerkleSet {
                     }
                 }
                 ParseOp::Middle => {
-                    let right = values.pop().expect("internal error (value stack empty)");
-                    let left = values.pop().expect("internal error (value stack empty)");
-                    values.push(self.nodes_vec.len() as u32);
-                    let node_hash = hash(
-                        self.nodes_vec[left as usize].0.into(),
-                        self.nodes_vec[right as usize].0.into(),
-                        &self.nodes_vec[left as usize].1,
-                        &self.nodes_vec[right as usize].1,
-                    );
+                    let right = values.pop().expect("internal error");
+                    let left = values.pop().expect("internal error");
+
+                    // Note that proofs are expected to include every tree layer
+                    // (i.e. no collapsing), however, the node hashes are
+                    // computed on a collapsed tree (or as-if it was collapsed).
+                    // This section propagates the MidDbl type up the tree, to
+                    // allow collapsing of the hash computation
+                    let new_node_type = match (left.1, right.1) {
+                        (NodeType::Term, NodeType::Term) => NodeType::MidDbl,
+                        (NodeType::Empty, NodeType::MidDbl) => NodeType::MidDbl,
+                        (NodeType::MidDbl, NodeType::Empty) => NodeType::MidDbl,
+                        (_, _) => NodeType::Mid,
+                    };
+
+                    // since our tree is complete (i.e. no collapsing) when we
+                    // generate it from a proof, the collapsing for purposes of
+                    // hash computation just means we copy the child hash to its
+                    // parent hash (in the cases where the tree would have been
+                    // collapsed).
+                    let node_hash = match (left.1, right.1) {
+                        // We collapse this layer for purposes of hash
+                        // computation, by simply copying the hash from the node
+                        // leading to the leafs, left or right.
+                        (NodeType::Empty, NodeType::MidDbl) => {
+                            values.push(right);
+                            self.nodes_vec[right.0 as usize].1
+                        }
+                        (NodeType::MidDbl, NodeType::Empty) => {
+                            values.push(left);
+                            self.nodes_vec[left.0 as usize].1
+                        }
+                        // this is the case where we do *not* collapse the tree,
+                        // but compute a new hash for the node.
+                        (_, _) => {
+                            values.push((self.nodes_vec.len() as u32, new_node_type));
+                            hash(
+                                self.nodes_vec[left.0 as usize].0.into(),
+                                self.nodes_vec[right.0 as usize].0.into(),
+                                &self.nodes_vec[left.0 as usize].1,
+                                &self.nodes_vec[right.0 as usize].1,
+                            )
+                        }
+                    };
                     self.nodes_vec
-                        .push((ArrayTypes::Middle(left, right), node_hash));
+                        .push((ArrayTypes::Middle(left.0, right.0), node_hash));
                     depth -= 1;
                 }
             }
@@ -175,8 +210,6 @@ impl MerkleSet {
                 Ok(&self.nodes_vec[current_node_index].1 == leaf)
             }
             ArrayTypes::Middle(left, right) => {
-                proof.push(MIDDLE);
-
                 if matches!(
                     (
                         self.nodes_vec[left as usize].0,
@@ -184,14 +217,20 @@ impl MerkleSet {
                     ),
                     (ArrayTypes::Leaf, ArrayTypes::Leaf)
                 ) {
-                    proof.push(TERMINAL);
-                    proof.extend_from_slice(&self.nodes_vec[left as usize].1);
-                    proof.push(TERMINAL);
-                    proof.extend_from_slice(&self.nodes_vec[right as usize].1);
+                    pad_middles_for_proof_gen(
+                        proof,
+                        &self.nodes_vec[left as usize].1,
+                        &self.nodes_vec[right as usize].1,
+                        depth,
+                    );
+
+                    // TODO: It's a bit odd to check for set membership and
+                    // generating a proof in the same function
                     return Ok(&self.nodes_vec[left as usize].1 == leaf
                         || &self.nodes_vec[right as usize].1 == leaf);
                 }
 
+                proof.push(MIDDLE);
                 if get_bit(leaf, depth) {
                     // bit is 1 so truncate left branch and search right branch
                     self.other_included(left as usize, proof)?;
@@ -229,6 +268,30 @@ impl MerkleSet {
                 Ok(())
             }
         }
+    }
+}
+
+// When we generate proofs, we don't collapse redundant empty nodes, we include
+// all of them to make sure the path to the item exactly matches the bits in the
+// item's hash. However, when we compute node hashes (and the root hash) we *do*
+// collapse sequences of empty nodes. This function re-introduces them into the
+// proof.
+fn pad_middles_for_proof_gen(proof: &mut Vec<u8>, left: &[u8; 32], right: &[u8; 32], depth: u8) {
+    let left_bit = get_bit(left, depth);
+    let right_bit = get_bit(right, depth);
+    proof.push(MIDDLE);
+    if left_bit != right_bit {
+        proof.push(TERMINAL);
+        proof.extend_from_slice(left);
+        proof.push(TERMINAL);
+        proof.extend_from_slice(right);
+    } else if left_bit {
+        // left bit is 1 so we should make an empty node left and children right
+        proof.push(EMPTY);
+        pad_middles_for_proof_gen(proof, left, right, depth + 1);
+    } else {
+        pad_middles_for_proof_gen(proof, left, right, depth + 1);
+        proof.push(EMPTY);
     }
 }
 

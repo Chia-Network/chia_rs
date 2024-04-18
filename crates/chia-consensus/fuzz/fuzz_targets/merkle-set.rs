@@ -23,5 +23,6 @@ fuzz_target!(|data: &[u8]| {
             .generate_proof(item)
             .expect("failed to validate proof")
             .is_some());
+        assert_eq!(rebuilt.get_merkle_root(), tree.get_merkle_root());
     }
 });
