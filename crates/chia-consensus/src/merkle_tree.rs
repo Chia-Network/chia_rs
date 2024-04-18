@@ -535,6 +535,7 @@ mod tests {
     use crate::merkle_set::test::merkle_set_test_cases;
     use rand::rngs::SmallRng;
     use rand::{Rng, SeedableRng};
+    use sha2::digest::typenum::Min;
 
     impl MerkleSet {
         // this checks the correctness of the tree and its merkle root by
