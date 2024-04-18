@@ -177,7 +177,7 @@ pub fn compute_merkle_set_root(leafs: &mut [[u8; 32]]) -> [u8; 32] {
 }
 
 #[cfg(test)]
-mod test {
+pub mod test {
     use super::*;
 
     fn h2(buf1: &[u8], buf2: &[u8]) -> [u8; 32] {
@@ -405,7 +405,7 @@ mod test {
         //                 c   b
     }
 
-    fn merkle_set_test_cases() -> Vec<([u8; 32], Vec<[u8; 32]>)> {
+    pub fn merkle_set_test_cases() -> Vec<([u8; 32], Vec<[u8; 32]>)> {
         let a = hex!("7000000000000000000000000000000000000000000000000000000000000000");
         let b = hex!("7100000000000000000000000000000000000000000000000000000000000000");
         let c = hex!("8000000000000000000000000000000000000000000000000000000000000000");

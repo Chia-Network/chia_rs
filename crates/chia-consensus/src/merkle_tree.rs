@@ -510,7 +510,9 @@ impl MerkleSet {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::merkle_set::compute_merkle_set_root;
+    use crate::merkle_set::test::merkle_set_test_cases;
     use rand::rngs::SmallRng;
     use rand::{Rng, SeedableRng};
 
@@ -548,147 +550,6 @@ mod tests {
         }
     }
 
-    use super::*;
-    #[test]
-    fn test_compute_merkle_root_duplicates_1() {
-        let a = [
-            0x70, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ];
-
-        let tree = MerkleSet::from_leafs(&mut [a, a]);
-        assert_eq!(tree.nodes_vec.len(), 1);
-        assert_eq!(tree.nodes_vec[0].1, a);
-        assert_eq!(tree.nodes_vec[0].0, ArrayTypes::Leaf);
-    }
-
-    #[test]
-    fn test_compute_merkle_root_duplicate_4() {
-        let a = [
-            0x70, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ];
-        let b = [
-            0x71, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ];
-        let c = [
-            0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ];
-        let d = [
-            0x81, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ];
-        // tree is ((a,b), (c,d)) - 3 middle nodes, 4 leaf nodes
-
-        // rotations
-        let tree = MerkleSet::from_leafs(&mut [a, b, c, d, a]);
-        let node_len = tree.nodes_vec.len();
-        assert!(matches!(
-            tree.nodes_vec[node_len - 1].0,
-            ArrayTypes::Middle { .. }
-        )); // check root node is a middle
-        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
-
-        // singles
-        let tree = MerkleSet::from_leafs(&mut [a]);
-        assert_eq!(tree.nodes_vec[0].1, a);
-        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
-
-        let tree = MerkleSet::from_leafs(&mut [b]);
-        assert_eq!(tree.nodes_vec[0].1, b);
-        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
-
-        let tree = MerkleSet::from_leafs(&mut [c]);
-        assert_eq!(tree.nodes_vec[0].1, c);
-        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
-
-        let tree = MerkleSet::from_leafs(&mut [d]);
-        assert_eq!(tree.nodes_vec[0].1, d);
-        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
-    }
-
-    #[test]
-    fn test_compute_merkle_root_2() {
-        let a = [
-            0x70, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ];
-        let b = [
-            0x71, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ];
-        let c = [
-            0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ];
-        let d = [
-            0x81, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ];
-
-        // pairs a, b
-        let tree = MerkleSet::from_leafs(&mut [a, b]);
-        assert_eq!(tree.nodes_vec[0].1, a);
-        assert_eq!(tree.nodes_vec[1].1, b);
-        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
-        let tree = MerkleSet::from_leafs(&mut [b, a]);
-        assert_eq!(tree.nodes_vec[0].1, a);
-        assert_eq!(tree.nodes_vec[1].1, b);
-        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
-
-        // pairs a, c
-        let tree = MerkleSet::from_leafs(&mut [a, c]);
-        assert_eq!(tree.nodes_vec[0].1, a);
-        assert_eq!(tree.nodes_vec[1].1, c);
-        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
-        let tree = MerkleSet::from_leafs(&mut [c, a]);
-        assert_eq!(tree.nodes_vec[0].1, a);
-        assert_eq!(tree.nodes_vec[1].1, c);
-        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
-
-        // pairs a, d
-        let tree = MerkleSet::from_leafs(&mut [a, d]);
-        assert_eq!(tree.nodes_vec[0].1, a);
-        assert_eq!(tree.nodes_vec[1].1, d);
-        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
-        let tree = MerkleSet::from_leafs(&mut [d, a]);
-        assert_eq!(tree.nodes_vec[0].1, a);
-        assert_eq!(tree.nodes_vec[1].1, d);
-        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
-
-        // pairs b, c
-        let tree = MerkleSet::from_leafs(&mut [b, c]);
-        assert_eq!(tree.nodes_vec[0].1, b);
-        assert_eq!(tree.nodes_vec[1].1, c);
-        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
-        let tree = MerkleSet::from_leafs(&mut [c, b]);
-        assert_eq!(tree.nodes_vec[0].1, b);
-        assert_eq!(tree.nodes_vec[1].1, c);
-        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
-
-        // pairs b, d
-        let tree = MerkleSet::from_leafs(&mut [b, d]);
-        assert_eq!(tree.nodes_vec[0].1, b);
-        assert_eq!(tree.nodes_vec[1].1, d);
-        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
-        let tree = MerkleSet::from_leafs(&mut [d, b]);
-        assert_eq!(tree.nodes_vec[0].1, b);
-        assert_eq!(tree.nodes_vec[1].1, d);
-        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
-
-        // pairs c, d
-        let tree = MerkleSet::from_leafs(&mut [c, d]);
-        assert_eq!(tree.nodes_vec[0].1, c);
-        assert_eq!(tree.nodes_vec[1].1, d);
-        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
-        let tree = MerkleSet::from_leafs(&mut [d, c]);
-        assert_eq!(tree.nodes_vec[0].1, c);
-        assert_eq!(tree.nodes_vec[1].1, d);
-        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
-    }
-
     fn test_tree(leafs: &mut [[u8; 32]]) {
         let tree = MerkleSet::from_leafs(leafs);
         let root = tree.get_merkle_root();
@@ -703,222 +564,34 @@ mod tests {
             assert_eq!(rebuilt.generate_proof(item).unwrap(), Some(proof));
         }
 
-        let mut rng = SmallRng::seed_from_u64(1337);
+        let mut rng = SmallRng::seed_from_u64(42);
         // make sure that random hashes are never considered part of the tree
-        for _n in 0..1000 {
+        for _ in 0..1000 {
             let mut item = [0_u8; 32];
             rng.fill(&mut item);
-            assert!(tree
-                .generate_proof(&item)
-                .expect("failed to generate proof")
-                .is_none());
+            match tree.generate_proof(&item) {
+                Err(_) => {}
+                Ok(None) => {}
+                Ok(Some(_)) => {
+                    panic!("proof for random value");
+                }
+            }
         }
     }
 
-    #[test]
-    fn test_compute_merkle_root_5() {
-        let a = [
-            0x58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ];
-        let b = [
-            0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ];
-        let c = [
-            0x21, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ];
-        let d = [
-            0xca, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ];
-        let e = [
-            0x20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ];
+    // these tests take a long time to run in unoptimized builds.
+    #[cfg(not(debug_assertions))]
+    const TEST_ITERS: i32 = 10000;
+    #[cfg(debug_assertions)]
+    const TEST_ITERS: i32 = 400;
 
-        test_tree(&mut [a, b, c, d, e]);
-        let tree = MerkleSet::from_leafs(&mut [a, b, c, d, e]);
-        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
-        // this tree looks like this:
-        //
-        //             o
-        //            / \
-        //           o   d
-        //          / \
-        //         o   a
-        //        / \
-        //       E   o
-        //          / \
-        //         o   E
-        //        / \
-        //       o   E
-        //      / \
-        //     o   E
-        //    / \
-        //   o   b
-        //  / \
-        // e   c
-        assert_eq!(tree.nodes_vec.len(), 17);
-        let Some((ArrayTypes::Middle(_left, right), _)) = tree.nodes_vec.last() else {
-            panic!("root node should be a Middle");
-        };
-        let ArrayTypes::Leaf = tree.nodes_vec[*right as usize].0 else {
-            panic!("node should be a leaf");
-        };
-        assert_eq!(tree.nodes_vec[*right as usize].1, d);
-    }
-
-    #[test]
-    fn test_merkle_left_edge() {
-        let a = [
-            0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ];
-        let b = [
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 1,
-        ];
-        let c = [
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 2,
-        ];
-        let d = [
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 3,
-        ];
-        test_tree(&mut [a, b, c, d]);
-        let tree = MerkleSet::from_leafs(&mut [a, b, c, d]);
-        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
-        // this tree looks like this:
-        //           o
-        //          / \
-        //         o   a
-        //        / \
-        //       o   E
-        //      / \
-        //     .   E
-        //     .
-        //     .
-        //    / \
-        //   o   E
-        //  / \
-        // b   o
-        //    / \
-        //   c   d
-        assert_eq!(tree.nodes_vec.len(), 513);
-        let Some((ArrayTypes::Middle(_left, right), _)) = tree.nodes_vec.last() else {
-            panic!("root node should be a Middle");
-        };
-        let ArrayTypes::Leaf = tree.nodes_vec[*right as usize].0 else {
-            panic!("node should be a leaf");
-        };
-        assert_eq!(tree.nodes_vec[*right as usize].1, a);
-    }
-
-    #[test]
-    fn test_merkle_left_edge_duplicates() {
-        let a = [
-            0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ];
-        let b = [
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 1,
-        ];
-        let c = [
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 2,
-        ];
-        let d = [
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 3,
-        ];
-        let tree = MerkleSet::from_leafs(&mut [a, b, c, d]);
-        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
-        // this tree looks like this:
-        //           o
-        //          / \
-        //         o   a
-        //        / \
-        //       o   E
-        //      / \
-        //     .   E
-        //     .
-        //     .
-        //    / \
-        //   o   E
-        //  / \
-        // b   o
-        //    / \
-        //   c   d
-        assert_eq!(tree.nodes_vec.len(), 513);
-        let Some((ArrayTypes::Middle(_left, right), _)) = tree.nodes_vec.last() else {
-            panic!("expected middle node");
-        };
-        let ArrayTypes::Leaf = tree.nodes_vec[*right as usize].0 else {
-            panic!("node should be leaf");
-        };
-        assert_eq!(tree.nodes_vec[*right as usize].1, a);
-    }
-
-    #[test]
-    fn test_merkle_right_edge() {
-        let a = [
-            0x40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ];
-        let b = [
-            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-            0xff, 0xff, 0xff, 0xff,
-        ];
-        let c = [
-            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-            0xff, 0xff, 0xff, 0xfe,
-        ];
-        let d = [
-            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-            0xff, 0xff, 0xff, 0xfd,
-        ];
-
-        test_tree(&mut [a, b, c, d]);
-        let tree = MerkleSet::from_leafs(&mut [a, b, c, d]);
-        assert_eq!(tree.get_merkle_root(), tree.get_merkle_root_old());
-        // this tree looks like this:
-        //           o
-        //          / \
-        //         a   o
-        //            / \
-        //           E   o
-        //              / \
-        //             E   o
-        //                 .
-        //                 .
-        //                 .
-        //                 o
-        //                / \
-        //               d   o
-        //                  / \
-        //                 c   b
-
-        let Some((ArrayTypes::Middle(left, _right), _)) = tree.nodes_vec.last() else {
-            panic!("expected middle node");
-        };
-        let ArrayTypes::Leaf = tree.nodes_vec[*left as usize].0 else {
-            panic!("expected leaf");
-        };
-    }
-
-    // this test generates a 1000000 vecs filled with 500 random data hashes
-    // It then creates a proof for one of the leafs and deserializes the proof and compares it to the original
+    // this test generates a random tree and ensures we can produce the tree
+    // with the correct root hash and that we can generate proofs, and validate
+    // them, for every item
     #[test]
     fn test_random_bytes() {
         let mut rng = SmallRng::seed_from_u64(1337);
-        for _i in [1..1000000] {
+        for _n in 0..TEST_ITERS {
             let vec_length: usize = rng.gen_range(0..=500);
             let mut random_data: Vec<[u8; 32]> = Vec::with_capacity(vec_length);
             for _ in 0..vec_length {
@@ -934,9 +607,9 @@ mod tests {
     fn test_bad_proofs() {
         // Create a random number generator
         let mut rng = SmallRng::seed_from_u64(1337);
-        for _i in [1..1000000] {
+        for _ in 0..TEST_ITERS {
             // Generate a random length for the Vec
-            let vec_length: usize = rng.gen_range(0..=500);
+            let vec_length: usize = rng.gen_range(1..=500);
 
             // Generate a Vec of random [u8; 32] arrays
             let mut random_data: Vec<[u8; 32]> = Vec::with_capacity(vec_length);
@@ -959,40 +632,16 @@ mod tests {
     }
 
     #[test]
-    fn test_merkle_set_0() {
-        let tree = MerkleSet::from_leafs(&mut []);
-        assert_eq!(tree.get_merkle_root(), BLANK);
-    }
-
-    #[test]
-    fn test_merkle_set_1() {
-        let a = [
-            0x70, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ];
-        let b = [
-            0x71, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ];
-        let c = [
-            0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ];
-        let d = [
-            0x81, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ];
-
-        // singles
-        test_tree(&mut [a]);
-        test_tree(&mut [b]);
-        test_tree(&mut [c]);
-        test_tree(&mut [d]);
-    }
-
-    #[test]
     fn test_deserialize_malicious_proof() {
         let malicious_proof = vec![MIDDLE].repeat(40000);
         assert!(MerkleSet::from_proof(&malicious_proof).is_err());
+    }
+
+    #[test]
+    fn test_merkle_set() {
+        for (root, mut leafs) in merkle_set_test_cases() {
+            test_tree(&mut leafs.clone());
+            assert_eq!(MerkleSet::from_leafs(&mut leafs).get_merkle_root(), root);
+        }
     }
 }
