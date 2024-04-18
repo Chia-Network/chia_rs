@@ -11,7 +11,7 @@ macro_rules! primitive_int {
     ($t:ty, $name:expr) => {
         impl ChiaToPython for $t {
             fn to_python<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
-                let int_module = PyModule::import(py, "chia.util.ints")?;
+                let int_module = PyModule::import(py, "chia_rs.sized_ints")?;
                 let ty = int_module.getattr($name)?;
                 ty.call1((self.into_py(py),))
             }
