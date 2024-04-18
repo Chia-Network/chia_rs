@@ -77,8 +77,13 @@ impl MerkleSet {
         let mut values = Vec::<(u32, NodeType)>::new();
         let mut ops = vec![ParseOp::Node];
         let mut depth = 0;
+        let mut bits_stack: Vec<Vec<bool>> = Vec::new();
+        bits_stack.push(Vec::new());
 
         while let Some(op) = ops.pop() {
+            let Some(bits) = bits_stack.pop() else {
+                return Err(SetError);
+            };
             match op {
                 ParseOp::Node => {
                     let mut b = [0; 1];
@@ -92,6 +97,12 @@ impl MerkleSet {
                         TERMINAL => {
                             let mut hash = [0; 32];
                             proof.read_exact(&mut hash).map_err(|_| SetError)?;
+                            // audit the leaf is correctly positioned by comparing its bits with the traced route
+                            for (pos, v) in bits.iter().enumerate() {
+                                if get_bit(&hash, pos as u8) != *v {
+                                    return Err(SetError);
+                                }
+                            }
                             values.push((self.nodes_vec.len() as u32, NodeType::Term));
                             self.nodes_vec.push((ArrayTypes::Leaf, hash));
                         }
@@ -108,6 +119,15 @@ impl MerkleSet {
                             ops.push(ParseOp::Middle);
                             ops.push(ParseOp::Node);
                             ops.push(ParseOp::Node);
+
+                            bits_stack.push(Vec::new()); // we don't audit mid, so this is just placeholder value
+                            let mut new_bits = bits.clone();
+                            new_bits.push(true); // this gets processed second so it is the right
+                            bits_stack.push(new_bits);
+                            let mut new_bits = bits.clone();
+                            new_bits.push(false); // this gets processed first so it is left branch
+                            bits_stack.push(new_bits);
+
                             depth += 1;
                         }
                         _ => {
@@ -513,6 +533,7 @@ mod tests {
     use super::*;
     use crate::merkle_set::compute_merkle_set_root;
     use crate::merkle_set::test::merkle_set_test_cases;
+    use hex_literal::hex;
     use rand::rngs::SmallRng;
     use rand::{Rng, SeedableRng};
 
@@ -629,6 +650,35 @@ mod tests {
             let rebuilt = MerkleSet::from_proof(&proof[0..proof.len() - 2]);
             assert!(matches!(rebuilt, Err(SetError)));
         }
+    }
+
+    #[test]
+    fn test_bad_proofs_2() {
+        // Create a random number generator
+        let mut rng = SmallRng::seed_from_u64(1337);
+        // Generate a random length for the Vec
+        let vec_length: usize = rng.gen_range(5..=500);
+
+        // Generate a Vec of random [u8; 32] arrays
+        let mut random_data: Vec<[u8; 32]> = Vec::with_capacity(vec_length);
+
+        let mut array: [u8; 32] = [0; 32];
+        rng.fill(&mut array);
+        random_data.push(array);
+
+        let mut bad_proof: Vec<u8> = Vec::new();
+        bad_proof.push(MIDDLE);
+        bad_proof.push(TRUNCATED);
+        bad_proof.extend_from_slice(&random_data[0]);
+        bad_proof.push(MIDDLE);
+        bad_proof.push(TERMINAL);
+        let bytes: [u8; 32] =
+            hex!("8000000000000000000000000000000000000000000000000000000000000000");
+        bad_proof.extend_from_slice(&bytes); // this ought to be on the right
+        bad_proof.push(TERMINAL);
+        bad_proof.extend_from_slice(&[0x0; 32]);
+        let rebuilt = MerkleSet::from_proof(&bad_proof[0..bad_proof.len()]);
+        assert!(matches!(rebuilt, Err(SetError))); // this is failing the audit
     }
 
     #[test]
