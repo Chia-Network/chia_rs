@@ -652,6 +652,32 @@ mod tests {
         }
     }
 
+    fn test_bad_proofs_2() {
+        // Create a random number generator
+        let mut rng = SmallRng::seed_from_u64(1337);
+        // Generate a random length for the Vec
+        let vec_length: usize = rng.gen_range(5..=500);
+
+        // Generate a Vec of random [u8; 32] arrays
+        let mut random_data: Vec<[u8; 32]> = Vec::with_capacity(vec_length);
+
+        let mut array: [u8; 32] = [0; 32];
+        rng.fill(&mut array);
+        random_data.push(array);
+        
+        let mut bad_proof: Vec<u8> = Vec::new();
+        bad_proof.push(MIDDLE);
+        bad_proof.push(TRUNCATED);
+        bad_proof.extend_from_slice(&random_data[0]);
+        bad_proof.push(MIDDLE);
+        bad_proof.push(TERMINAL);
+        bad_proof.extend_from_slice(&[0x1; 32]); // this ought to be on the right
+        bad_proof.push(TERMINAL);
+        bad_proof.extend_from_slice(&[0x0; 32]);
+        let rebuilt = MerkleSet::from_proof(&bad_proof[0..bad_proof.len()]);
+        assert!(matches!(rebuilt, Err(SetError)));  // this is failing the audit
+    }
+
     #[test]
     fn test_deserialize_malicious_proof() {
         let malicious_proof = vec![MIDDLE].repeat(40000);
