@@ -5,35 +5,34 @@ import sys
 import time
 from chia_rs import (
     MerkleSet as RustMerkleSet,
-    deserialize_proof as ru_deserialize_proof,
     compute_merkle_set_root,
+    confirm_included_already_hashed as ru_confirm_included_already_hashed,
+    confirm_not_included_already_hashed as ru_confirm_not_included_already_hashed,
 )
 from random import Random
 from merkle_set import (
     MerkleSet as PythonMerkleSet,
-    deserialize_proof as py_deserialize_proof,
+    confirm_included_already_hashed as py_confirm_included_already_hashed,
+    confirm_not_included_already_hashed as py_confirm_not_included_already_hashed,
 )
 from chia_rs.sized_bytes import bytes32
 
 
 def check_proof(
     proof: bytes,
-    deserialize: Callable[[bytes], Any],
+    confirm_included_already_hashed: Callable[[bytes32, bytes32, bytes], bool],
+    confirm_not_included_already_hashed: Callable[[bytes32, bytes32, bytes], bool],
     *,
     root: bytes32,
     item: bytes32,
     expect_included: bool = True,
 ) -> None:
-    proof_tree = deserialize(proof)
-    assert proof_tree.get_root() == root
-    included, junk = proof_tree.is_included_already_hashed(item)
-    assert included == expect_included
-
-    # the rust implementation does not round-trip proofs of exclusions.
-    # doing so requires additional complexity (and cost).
-    # rust deliberately generates an empty proof from a tree generated from a
-    # proof
-    assert junk == b"" or junk == proof
+    if expect_included:
+        assert confirm_included_already_hashed(root, item, proof)
+        assert not confirm_not_included_already_hashed(root, item, proof)
+    else:
+        assert not confirm_included_already_hashed(root, item, proof)
+        assert confirm_not_included_already_hashed(root, item, proof)
 
 
 def check_tree(leafs: List[bytes32]) -> None:
@@ -51,8 +50,20 @@ def check_tree(leafs: List[bytes32]) -> None:
         assert py_proof == ru_proof
         proof = ru_proof
 
-        check_proof(proof, py_deserialize_proof, root=root, item=item)
-        check_proof(proof, ru_deserialize_proof, root=root, item=item)
+        check_proof(
+            proof,
+            py_confirm_included_already_hashed,
+            py_confirm_not_included_already_hashed,
+            root=root,
+            item=item,
+        )
+        check_proof(
+            proof,
+            ru_confirm_included_already_hashed,
+            ru_confirm_not_included_already_hashed,
+            root=root,
+            item=item,
+        )
 
     for i in range(256):
         item = bytes32([i] + [2] * 31)
@@ -64,10 +75,20 @@ def check_tree(leafs: List[bytes32]) -> None:
         proof = ru_proof
 
         check_proof(
-            proof, py_deserialize_proof, root=root, item=item, expect_included=False
+            proof,
+            py_confirm_included_already_hashed,
+            py_confirm_not_included_already_hashed,
+            root=root,
+            item=item,
+            expect_included=False,
         )
         check_proof(
-            proof, ru_deserialize_proof, root=root, item=item, expect_included=False
+            proof,
+            ru_confirm_included_already_hashed,
+            ru_confirm_not_included_already_hashed,
+            root=root,
+            item=item,
+            expect_included=False,
         )
 
 

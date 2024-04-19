@@ -1,4 +1,4 @@
-use chia_consensus::merkle_tree::MerkleSet;
+use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
@@ -9,8 +9,9 @@ fn run(c: &mut Criterion) {
 
     let mut rng = SmallRng::seed_from_u64(1337);
 
-    let mut leafs = Vec::<[u8; 32]>::with_capacity(1000);
-    for _ in 0..1000 {
+    const NUM_LEAFS: usize = 1000;
+    let mut leafs = Vec::<[u8; 32]>::with_capacity(NUM_LEAFS);
+    for _ in 0..NUM_LEAFS {
         let mut item = [0_u8; 32];
         rng.fill(&mut item);
         leafs.push(item);
@@ -24,7 +25,10 @@ fn run(c: &mut Criterion) {
         })
     });
 
-    let tree = MerkleSet::from_leafs(&mut leafs);
+    // build the tree from the first half of the leafs. The second half are
+    // examples of leafs *not* included in the tree, to also cover
+    // proofs-of-exclusion
+    let tree = MerkleSet::from_leafs(&mut leafs[0..NUM_LEAFS / 2]);
 
     group.bench_function("generate_proof", |b| {
         b.iter(|| {
@@ -45,11 +49,23 @@ fn run(c: &mut Criterion) {
         );
     }
 
-    group.bench_function("deserialize_proof", |b| {
+    group.bench_function("parse_proof", |b| {
         b.iter(|| {
             let start = Instant::now();
             for p in &proofs {
                 let _ = black_box(MerkleSet::from_proof(p));
+            }
+            start.elapsed()
+        })
+    });
+    let root = &tree.get_root();
+    use std::iter::zip;
+    group.bench_function("validate_merkle_proof", |b| {
+        b.iter(|| {
+            let start = Instant::now();
+            for (p, leaf) in zip(&proofs, &leafs) {
+                let _ =
+                    black_box(validate_merkle_proof(&p, leaf, root).expect("expect valid proof"));
             }
             start.elapsed()
         })
