@@ -13,6 +13,6 @@ lazy_static = "1.4.0"
 rand = "0.8.5"
 rcgen = { version = "0.11.1", features = ["pem", "x509-parser"] }
 rsa = "0.9.5"
-rustls = "0.21.2"
+rustls = "0.21.11"
 thiserror = "1.0.50"
 time = "0.3.22"
