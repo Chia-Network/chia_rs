@@ -109,7 +109,9 @@ class Node(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def other_included(self, tocheck: bytes, depth: int, p: List[bytes], collapse: bool) -> None:
+    def other_included(
+        self, tocheck: bytes, depth: int, p: List[bytes], collapse: bool
+    ) -> None:
         pass
 
     @abstractmethod
@@ -171,7 +173,9 @@ class EmptyNode(Node):
         p.append(EMPTY)
         return False
 
-    def other_included(self, tocheck: bytes, depth: int, p: List[bytes], collapse: bool) -> None:
+    def other_included(
+        self, tocheck: bytes, depth: int, p: List[bytes], collapse: bool
+    ) -> None:
         p.append(EMPTY)
 
     def _audit(self, hashes: List[bytes], bits: List[int]) -> None:
@@ -222,7 +226,9 @@ class TerminalNode(Node):
         p.append(TERMINAL + self.hash)
         return tocheck == self.hash
 
-    def other_included(self, tocheck: bytes, depth: int, p: List[bytes], collapse: bool) -> None:
+    def other_included(
+        self, tocheck: bytes, depth: int, p: List[bytes], collapse: bool
+    ) -> None:
         p.append(TERMINAL + self.hash)
 
     def _audit(self, hashes: List[bytes], bits: List[int]) -> None:
@@ -239,11 +245,17 @@ class MiddleNode(Node):
         elif children[1].is_empty() and children[0].is_double():
             self.hash = children[0].hash
         else:
-            if children[0].is_empty() and (children[1].is_empty() or children[1].is_terminal()):
+            if children[0].is_empty() and (
+                children[1].is_empty() or children[1].is_terminal()
+            ):
                 raise SetError()
             if children[1].is_empty() and children[0].is_terminal():
                 raise SetError
-            if children[0].is_terminal() and children[1].is_terminal() and children[0].hash >= children[1].hash:
+            if (
+                children[0].is_terminal()
+                and children[1].is_terminal()
+                and children[0].hash >= children[1].hash
+            ):
                 raise SetError
             self.hash = hashdown(children[0].get_hash() + children[1].get_hash())
 
@@ -277,13 +289,19 @@ class MiddleNode(Node):
         p.append(MIDDLE)
         if get_bit(tocheck, depth) == 0:
             r = self.children[0].is_included(tocheck, depth + 1, p)
-            self.children[1].other_included(tocheck, depth + 1, p, not self.children[0].is_empty())
+            self.children[1].other_included(
+                tocheck, depth + 1, p, not self.children[0].is_empty()
+            )
             return r
         else:
-            self.children[0].other_included(tocheck, depth + 1, p, not self.children[1].is_empty())
+            self.children[0].other_included(
+                tocheck, depth + 1, p, not self.children[1].is_empty()
+            )
             return self.children[1].is_included(tocheck, depth + 1, p)
 
-    def other_included(self, tocheck: bytes, depth: int, p: List[bytes], collapse: bool) -> None:
+    def other_included(
+        self, tocheck: bytes, depth: int, p: List[bytes], collapse: bool
+    ) -> None:
         if collapse or not self.is_double():
             p.append(TRUNCATED + self.hash)
         else:
@@ -316,7 +334,9 @@ class TruncatedNode(Node):
     def is_included(self, tocheck: bytes, depth: int, p: List[bytes]) -> bool:
         raise SetError()
 
-    def other_included(self, tocheck: bytes, depth: int, p: List[bytes], collapse: bool) -> None:
+    def other_included(
+        self, tocheck: bytes, depth: int, p: List[bytes], collapse: bool
+    ) -> None:
         p.append(TRUNCATED + self.hash)
 
     def _audit(self, hashes: List[bytes], bits: List[int]) -> None:
@@ -331,7 +351,9 @@ def confirm_included_already_hashed(root: bytes32, val: bytes, proof: bytes) -> 
     return _confirm(root, val, proof, True)
 
 
-def confirm_not_included_already_hashed(root: bytes32, val: bytes, proof: bytes) -> bool:
+def confirm_not_included_already_hashed(
+    root: bytes32, val: bytes, proof: bytes
+) -> bool:
     return _confirm(root, val, proof, False)
 
 
