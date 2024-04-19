@@ -7,7 +7,7 @@ fn get_bit(val: &[u8; 32], bit: u8) -> u8 {
 
 #[repr(u8)]
 #[derive(PartialEq, Eq, Copy, Clone)]
-enum NodeType {
+pub(crate) enum NodeType {
     Empty,
     Term,
     Mid,
@@ -27,7 +27,12 @@ fn encode_type(t: NodeType) -> u8 {
     }
 }
 
-fn hash(ltype: NodeType, rtype: NodeType, left: &[u8; 32], right: &[u8; 32]) -> [u8; 32] {
+pub(crate) fn hash(
+    ltype: NodeType,
+    rtype: NodeType,
+    left: &[u8; 32],
+    right: &[u8; 32],
+) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(hex!(
         "000000000000000000000000000000000000000000000000000000000000"
@@ -38,7 +43,8 @@ fn hash(ltype: NodeType, rtype: NodeType, left: &[u8; 32], right: &[u8; 32]) -> 
     hasher.finalize().into()
 }
 
-const BLANK: [u8; 32] = hex!("0000000000000000000000000000000000000000000000000000000000000000");
+pub(crate) const BLANK: [u8; 32] =
+    hex!("0000000000000000000000000000000000000000000000000000000000000000");
 
 // this function performs an in-place, recursive radix sort of the range.
 // as each level returns, values are hashed pair-wise and as a hash tree.
@@ -171,7 +177,7 @@ pub fn compute_merkle_set_root(leafs: &mut [[u8; 32]]) -> [u8; 32] {
 }
 
 #[cfg(test)]
-mod test {
+pub mod test {
     use super::*;
 
     fn h2(buf1: &[u8], buf2: &[u8]) -> [u8; 32] {
@@ -399,7 +405,7 @@ mod test {
         //                 c   b
     }
 
-    fn merkle_set_test_cases() -> Vec<([u8; 32], Vec<[u8; 32]>)> {
+    pub fn merkle_set_test_cases() -> Vec<([u8; 32], Vec<[u8; 32]>)> {
         let a = hex!("7000000000000000000000000000000000000000000000000000000000000000");
         let b = hex!("7100000000000000000000000000000000000000000000000000000000000000");
         let c = hex!("8000000000000000000000000000000000000000000000000000000000000000");

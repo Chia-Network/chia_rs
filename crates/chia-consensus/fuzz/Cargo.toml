@@ -98,3 +98,17 @@ path = "fuzz_targets/parse-spend-id.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "deserialize-proof"
+path = "fuzz_targets/deserialize-proof.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "merkle-set"
+path = "fuzz_targets/merkle-set.rs"
+test = false
+doc = false
+bench = false

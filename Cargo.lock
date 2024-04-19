@@ -366,6 +366,7 @@ dependencies = [
  "hex-literal",
  "num-traits",
  "pyo3",
+ "rand",
  "rstest 0.16.0",
  "sha2",
  "text-diff",
