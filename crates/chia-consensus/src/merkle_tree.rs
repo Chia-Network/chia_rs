@@ -187,7 +187,7 @@ impl MerkleSet {
         }
     }
 
-    pub fn get_merkle_root(&self) -> [u8; 32] {
+    pub fn get_root(&self) -> [u8; 32] {
         match self.nodes_vec.last().unwrap().0 {
             ArrayTypes::Leaf => hash_leaf(&self.nodes_vec.last().unwrap().1),
             ArrayTypes::Middle(_, _) => self.nodes_vec.last().unwrap().1,
@@ -327,7 +327,7 @@ impl MerkleSet {
 
     #[pyo3(name = "get_root")]
     pub fn py_get_root<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
-        ChiaToPython::to_python(&Bytes32::new(self.get_merkle_root()), py)
+        ChiaToPython::to_python(&Bytes32::new(self.get_root()), py)
     }
 
     #[pyo3(name = "is_included_already_hashed")]
@@ -567,7 +567,7 @@ mod tests {
 
     fn test_tree(leafs: &mut [[u8; 32]]) {
         let tree = MerkleSet::from_leafs(leafs);
-        let root = tree.get_merkle_root();
+        let root = tree.get_root();
         assert_eq!(root, tree.get_merkle_root_old());
         assert_eq!(compute_merkle_set_root(leafs), root);
         for item in leafs {
@@ -575,7 +575,7 @@ mod tests {
                 panic!("failed to generate proof");
             };
             let rebuilt = MerkleSet::from_proof(&proof).expect("failed to parse proof");
-            assert_eq!(rebuilt.get_merkle_root(), root);
+            assert_eq!(rebuilt.get_root(), root);
             assert_eq!(rebuilt.generate_proof(item).unwrap(), Some(proof));
         }
 
@@ -635,7 +635,7 @@ mod tests {
             }
 
             let tree = MerkleSet::from_leafs(&mut random_data);
-            let root = tree.get_merkle_root();
+            let root = tree.get_root();
             assert_eq!(root, compute_merkle_set_root(&mut random_data));
             let index = rng.gen_range(0..random_data.len());
             let Ok(Some(proof)) = tree.generate_proof(&random_data[index]) else {
@@ -717,7 +717,7 @@ mod tests {
     fn test_merkle_set() {
         for (root, mut leafs) in merkle_set_test_cases() {
             test_tree(&mut leafs.clone());
-            assert_eq!(MerkleSet::from_leafs(&mut leafs).get_merkle_root(), root);
+            assert_eq!(MerkleSet::from_leafs(&mut leafs).get_root(), root);
         }
     }
 }
