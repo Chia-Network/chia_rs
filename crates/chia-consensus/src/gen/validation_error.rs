@@ -122,7 +122,7 @@ pub enum ErrorCode {
     InvalidPrefarm,
     AssertSecondsRelativeFailed,
     BadCoinbaseSignature,
-    // InitialTransactionFreeze (removed)
+    // InitialTransactionFreeze (removed in `chia-blockchain` as well)
     NoTransactionsWhileSyncing,
     AlreadyIncludingTransaction,
     IncompatibleNetworkId,
@@ -317,6 +317,7 @@ impl From<ErrorCode> for u32 {
             ErrorCode::InvalidPrefarm => 104,
             ErrorCode::AssertSecondsRelativeFailed => 105,
             ErrorCode::BadCoinbaseSignature => 106,
+            // ErrorCode::InitialTransactionFreeze => 107 (removed in `chia-blockchain`` as well)
             ErrorCode::NoTransactionsWhileSyncing => 108,
             ErrorCode::AlreadyIncludingTransaction => 109,
             ErrorCode::IncompatibleNetworkId => 110,
