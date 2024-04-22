@@ -5,17 +5,20 @@ use chia_streamable_macro::streamable;
 use pyo3::prelude::*;
 
 #[streamable]
+#[derive(Copy)]
 pub struct ClassgroupElement {
     data: Bytes100,
 }
 
-impl ClassgroupElement {
-    pub fn get_default_element() -> ClassgroupElement {
+impl Default for ClassgroupElement {
+    fn default() -> ClassgroupElement {
         let mut data = [0_u8; 100];
         data[0] = 0x08;
         ClassgroupElement { data: data.into() }
     }
+}
 
+impl ClassgroupElement {
     pub fn get_size() -> i32 {
         100
     }
@@ -41,7 +44,7 @@ impl ClassgroupElement {
     #[staticmethod]
     #[pyo3(name = "get_default_element")]
     pub fn py_get_default_element() -> ClassgroupElement {
-        Self::get_default_element()
+        Self::default()
     }
 
     #[staticmethod]

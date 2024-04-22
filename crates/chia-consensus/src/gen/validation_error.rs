@@ -1,3 +1,5 @@
+use std::fmt;
+
 use clvmr::allocator::{Allocator, Atom, NodePtr, SExp};
 use clvmr::reduction::EvalErr;
 use thiserror::Error;
@@ -57,7 +59,18 @@ pub enum ErrorCode {
     MessageNotSentOrReceived,
     InvalidPrevBlockHash,
     BadAggregateSignature,
+    InvalidHeight,
+    InvalidWeight,
+    InvalidCcIpVdf,
 }
+
+impl fmt::Display for ErrorCode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl std::error::Error for ErrorCode {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
 #[error("validation error: {1:?}")]
@@ -154,6 +167,9 @@ impl From<ErrorCode> for u32 {
             ErrorCode::MessageNotSentOrReceived => 147,
             ErrorCode::InvalidPrevBlockHash => 51,
             ErrorCode::BadAggregateSignature => 7,
+            ErrorCode::InvalidHeight => 34,
+            ErrorCode::InvalidWeight => 38,
+            ErrorCode::InvalidCcIpVdf => 88,
         }
     }
 }

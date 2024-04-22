@@ -26,6 +26,7 @@ mod npc;
 mod pot_iterations;
 mod signature_validation;
 mod unfinished_header_validation;
+mod vdf;
 
 pub struct PreValidationOptions {
     pub check_filter: bool,
