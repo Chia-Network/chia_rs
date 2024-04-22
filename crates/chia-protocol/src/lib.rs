@@ -20,6 +20,7 @@ pub mod slots;
 pub mod spend_bundle;
 pub mod sub_epoch_summary;
 pub mod unfinished_block;
+pub mod unfinished_header_block;
 pub mod vdf;
 pub mod wallet_protocol;
 pub mod weight_proof;
