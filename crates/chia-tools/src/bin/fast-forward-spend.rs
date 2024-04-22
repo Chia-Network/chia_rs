@@ -2,8 +2,8 @@ use clap::Parser;
 use std::fs;
 
 use chia_consensus::fast_forward::fast_forward_singleton;
-use chia_protocol::bytes::Bytes32;
-use chia_protocol::{coin::Coin, coin_spend::CoinSpend, program::Program};
+use chia_protocol::Bytes32;
+use chia_protocol::{Coin, CoinSpend, Program};
 use chia_traits::streamable::Streamable;
 use clvm_traits::{FromNodePtr, ToNodePtr};
 use clvm_utils::tree_hash;

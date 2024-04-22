@@ -264,7 +264,7 @@ fn main() {
     use chia_consensus::gen::flags::ENABLE_SOFTFORK_CONDITION;
     use chia_consensus::gen::opcodes::parse_opcode;
     use chia_consensus::gen::validation_error::{first, rest};
-    use chia_protocol::coin_spend::CoinSpend;
+    use chia_protocol::CoinSpend;
     use clvmr::reduction::{EvalErr, Reduction};
     use clvmr::{run_program, ChiaDialect};
     use std::fs::read;
