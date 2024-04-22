@@ -677,7 +677,7 @@ mod tests {
 
     #[test]
     fn test_deserialize_malicious_proof() {
-        let malicious_proof = vec![MIDDLE].repeat(40000);
+        let malicious_proof = [MIDDLE].repeat(40000);
         assert!(MerkleSet::from_proof(&malicious_proof).is_err());
     }
 

@@ -30,7 +30,7 @@ fn run(c: &mut Criterion) {
         b.iter(|| {
             let start = Instant::now();
             for item in &leafs {
-                let _ = black_box(tree.generate_proof(&item));
+                let _ = black_box(tree.generate_proof(item));
             }
             start.elapsed()
         })
@@ -39,7 +39,7 @@ fn run(c: &mut Criterion) {
     let mut proofs = Vec::<Vec<u8>>::with_capacity(leafs.len());
     for item in &leafs {
         proofs.push(
-            tree.generate_proof(&item)
+            tree.generate_proof(item)
                 .expect("failed to generate proof")
                 .expect("item not found"),
         );
@@ -49,7 +49,7 @@ fn run(c: &mut Criterion) {
         b.iter(|| {
             let start = Instant::now();
             for p in &proofs {
-                let _ = black_box(MerkleSet::from_proof(&p));
+                let _ = black_box(MerkleSet::from_proof(p));
             }
             start.elapsed()
         })
