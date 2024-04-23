@@ -271,7 +271,7 @@ pub fn parse_args(
 ) -> Result<Condition, ValidationErr> {
     match op {
         AGG_SIG_UNSAFE => {
-            let pubkey = sanitize_hash(a, first(a, c)?, 48, ErrorCode::InvalidPubkey)?;
+            let pubkey = sanitize_hash(a, first(a, c)?, 48, ErrorCode::InvalidPublicKey)?;
             c = rest(a, c)?;
             let message = sanitize_announce_msg(a, first(a, c)?, ErrorCode::InvalidMessage)?;
             // AGG_SIG_UNSAFE takes exactly two parameters
@@ -291,7 +291,7 @@ pub fn parse_args(
             }
         }
         AGG_SIG_ME => {
-            let pubkey = sanitize_hash(a, first(a, c)?, 48, ErrorCode::InvalidPubkey)?;
+            let pubkey = sanitize_hash(a, first(a, c)?, 48, ErrorCode::InvalidPublicKey)?;
             c = rest(a, c)?;
             let message = sanitize_announce_msg(a, first(a, c)?, ErrorCode::InvalidMessage)?;
             // AGG_SIG_ME takes exactly two parameters
@@ -316,7 +316,7 @@ pub fn parse_args(
         | AGG_SIG_AMOUNT
         | AGG_SIG_PARENT_PUZZLE
         | AGG_SIG_PARENT_AMOUNT => {
-            let pubkey = sanitize_hash(a, first(a, c)?, 48, ErrorCode::InvalidPubkey)?;
+            let pubkey = sanitize_hash(a, first(a, c)?, 48, ErrorCode::InvalidPublicKey)?;
             c = rest(a, c)?;
             let message = sanitize_announce_msg(a, first(a, c)?, ErrorCode::InvalidMessage)?;
             // AGG_SIG_* take two parameters
@@ -342,10 +342,10 @@ pub fn parse_args(
             let node = first(a, c)?;
             let amount = match sanitize_uint(a, node, 8, ErrorCode::InvalidCoinAmount)? {
                 SanitizedUint::PositiveOverflow => {
-                    return Err(ValidationErr(node, ErrorCode::AmountExceedsMaximum));
+                    return Err(ValidationErr(node, ErrorCode::CoinAmountExceedsMaximum));
                 }
                 SanitizedUint::NegativeOverflow => {
-                    return Err(ValidationErr(node, ErrorCode::NegativeAmount));
+                    return Err(ValidationErr(node, ErrorCode::CoinAmountNegative));
                 }
                 SanitizedUint::Ok(amount) => amount,
             };
@@ -452,7 +452,7 @@ pub fn parse_args(
         }
         ASSERT_MY_PUZZLEHASH => {
             maybe_check_args_terminator(a, c, flags)?;
-            let id = sanitize_hash(a, first(a, c)?, 32, ErrorCode::AssertMyPuzzlehashFailed)?;
+            let id = sanitize_hash(a, first(a, c)?, 32, ErrorCode::AssertMyPuzzleHashFailed)?;
             Ok(Condition::AssertMyPuzzlehash(id))
         }
         ASSERT_MY_AMOUNT => {
@@ -490,7 +490,7 @@ pub fn parse_args(
         ASSERT_SECONDS_RELATIVE => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertSecondsRelative;
+            let code = ErrorCode::AssertSecondsRelativeFailed;
             match sanitize_uint(a, node, 8, code)? {
                 SanitizedUint::PositiveOverflow => Err(ValidationErr(node, code)),
                 SanitizedUint::NegativeOverflow => Ok(Condition::SkipRelativeCondition),
@@ -500,7 +500,7 @@ pub fn parse_args(
         ASSERT_SECONDS_ABSOLUTE => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertSecondsAbsolute;
+            let code = ErrorCode::AssertSecondsAbsoluteFailed;
             match sanitize_uint(a, node, 4, code)? {
                 SanitizedUint::PositiveOverflow => Err(ValidationErr(node, code)),
                 SanitizedUint::NegativeOverflow => Ok(Condition::Skip),
@@ -510,7 +510,7 @@ pub fn parse_args(
         ASSERT_HEIGHT_RELATIVE => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertHeightRelative;
+            let code = ErrorCode::AssertHeightRelativeFailed;
             match sanitize_uint(a, node, 4, code)? {
                 SanitizedUint::PositiveOverflow => Err(ValidationErr(node, code)),
                 SanitizedUint::NegativeOverflow => Ok(Condition::SkipRelativeCondition),
@@ -520,7 +520,7 @@ pub fn parse_args(
         ASSERT_HEIGHT_ABSOLUTE => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertHeightAbsolute;
+            let code = ErrorCode::AssertHeightAbsoluteFailed;
             match sanitize_uint(a, node, 4, code)? {
                 SanitizedUint::PositiveOverflow => Err(ValidationErr(node, code)),
                 SanitizedUint::NegativeOverflow => Ok(Condition::Skip),
@@ -530,7 +530,7 @@ pub fn parse_args(
         ASSERT_BEFORE_SECONDS_RELATIVE => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertBeforeSecondsRelative;
+            let code = ErrorCode::AssertBeforeSecondsRelativeFailed;
             match sanitize_uint(a, node, 8, code)? {
                 SanitizedUint::PositiveOverflow => Ok(Condition::SkipRelativeCondition),
                 SanitizedUint::NegativeOverflow => Err(ValidationErr(node, code)),
@@ -541,7 +541,7 @@ pub fn parse_args(
             maybe_check_args_terminator(a, c, flags)?;
 
             let node = first(a, c)?;
-            let code = ErrorCode::AssertBeforeSecondsAbsolute;
+            let code = ErrorCode::AssertBeforeSecondsAbsoluteFailed;
             match sanitize_uint(a, node, 8, code)? {
                 SanitizedUint::PositiveOverflow => Ok(Condition::Skip),
                 SanitizedUint::NegativeOverflow => Err(ValidationErr(node, code)),
@@ -551,7 +551,7 @@ pub fn parse_args(
         ASSERT_BEFORE_HEIGHT_RELATIVE => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertBeforeHeightRelative;
+            let code = ErrorCode::AssertBeforeHeightRelativeFailed;
             match sanitize_uint(a, node, 4, code)? {
                 SanitizedUint::PositiveOverflow => Ok(Condition::SkipRelativeCondition),
                 SanitizedUint::NegativeOverflow => Err(ValidationErr(node, code)),
@@ -561,7 +561,7 @@ pub fn parse_args(
         ASSERT_BEFORE_HEIGHT_ABSOLUTE => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertBeforeHeightAbsolute;
+            let code = ErrorCode::AssertBeforeHeightAbsoluteFailed;
             match sanitize_uint(a, node, 4, code)? {
                 SanitizedUint::PositiveOverflow => Ok(Condition::Skip),
                 SanitizedUint::NegativeOverflow => Err(ValidationErr(node, code)),
@@ -1104,7 +1104,7 @@ pub fn parse_conditions<V: SpendVisitor>(
             }
             Condition::AssertMyPuzzlehash(hash) => {
                 if a.atom(hash).as_ref() != a.atom(spend.puzzle_hash).as_ref() {
-                    return Err(ValidationErr(c, ErrorCode::AssertMyPuzzlehashFailed));
+                    return Err(ValidationErr(c, ErrorCode::AssertMyPuzzleHashFailed));
                 }
             }
             Condition::CreateCoinAnnouncement(msg) => {
@@ -2095,27 +2095,27 @@ fn test_single_condition_no_op(#[case] condition: ConditionOpcode, #[case] value
 #[case(
     ASSERT_SECONDS_ABSOLUTE,
     "0x010000000000000000",
-    ErrorCode::AssertSecondsAbsolute
+    ErrorCode::AssertSecondsAbsoluteFailed
 )]
 #[case(
     ASSERT_SECONDS_RELATIVE,
     "0x010000000000000000",
-    ErrorCode::AssertSecondsRelative
+    ErrorCode::AssertSecondsRelativeFailed
 )]
 #[case(
     ASSERT_HEIGHT_ABSOLUTE,
     "0x0100000000",
-    ErrorCode::AssertHeightAbsolute
+    ErrorCode::AssertHeightAbsoluteFailed
 )]
 #[case(
     ASSERT_HEIGHT_RELATIVE,
     "0x0100000000",
-    ErrorCode::AssertHeightRelative
+    ErrorCode::AssertHeightRelativeFailed
 )]
 #[case(
     ASSERT_BEFORE_SECONDS_ABSOLUTE,
     "-1",
-    ErrorCode::AssertBeforeSecondsAbsolute
+    ErrorCode::AssertBeforeSecondsAbsoluteFailed
 )]
 #[case(
     ASSERT_BEFORE_SECONDS_ABSOLUTE,
@@ -2125,12 +2125,12 @@ fn test_single_condition_no_op(#[case] condition: ConditionOpcode, #[case] value
 #[case(
     ASSERT_BEFORE_SECONDS_RELATIVE,
     "-1",
-    ErrorCode::AssertBeforeSecondsRelative
+    ErrorCode::AssertBeforeSecondsRelativeFailed
 )]
 #[case(
     ASSERT_BEFORE_HEIGHT_ABSOLUTE,
     "-1",
-    ErrorCode::AssertBeforeHeightAbsolute
+    ErrorCode::AssertBeforeHeightAbsoluteFailed
 )]
 #[case(
     ASSERT_BEFORE_HEIGHT_ABSOLUTE,
@@ -2140,7 +2140,7 @@ fn test_single_condition_no_op(#[case] condition: ConditionOpcode, #[case] value
 #[case(
     ASSERT_BEFORE_HEIGHT_RELATIVE,
     "-1",
-    ErrorCode::AssertBeforeHeightRelative
+    ErrorCode::AssertBeforeHeightRelativeFailed
 )]
 #[case(ASSERT_MY_BIRTH_HEIGHT, "-1", ErrorCode::AssertMyBirthHeightFailed)]
 #[case(
@@ -2589,7 +2589,7 @@ fn test_single_assert_my_puzzle_hash_mismatch() {
         cond_test("((({h1} ({h2} (123 (((72 ({h1} )))))")
             .unwrap_err()
             .1,
-        ErrorCode::AssertMyPuzzlehashFailed
+        ErrorCode::AssertMyPuzzleHashFailed
     );
 }
 
@@ -2601,7 +2601,7 @@ fn test_single_invalid_assert_my_puzzle_hash() {
         cond_test("((({h1} ({h2} (123 (((72 ({long} )))))")
             .unwrap_err()
             .1,
-        ErrorCode::AssertMyPuzzlehashFailed
+        ErrorCode::AssertMyPuzzleHashFailed
     );
 }
 
@@ -2668,7 +2668,7 @@ fn test_create_coin_amount_exceeds_max() {
         cond_test("((({h1} ({h2} (123 (((51 ({h2} (0x010000000000000000 )))))")
             .unwrap_err()
             .1,
-        ErrorCode::AmountExceedsMaximum
+        ErrorCode::CoinAmountExceedsMaximum
     );
 }
 
@@ -2679,7 +2679,7 @@ fn test_create_coin_negative_amount() {
         cond_test("((({h1} ({h2} (123 (((51 ({h2} (-1 )))))")
             .unwrap_err()
             .1,
-        ErrorCode::NegativeAmount
+        ErrorCode::CoinAmountNegative
     );
 }
 
@@ -3102,7 +3102,7 @@ fn test_agg_sig_invalid_pubkey(
         )
         .unwrap_err()
         .1,
-        ErrorCode::InvalidPubkey
+        ErrorCode::InvalidPublicKey
     );
 }
 
@@ -3417,7 +3417,7 @@ fn test_agg_sig_unsafe_invalid_pubkey() {
         cond_test("((({h1} ({h2} (123 (((49 ({h2} ({msg1} )))))")
             .unwrap_err()
             .1,
-        ErrorCode::InvalidPubkey
+        ErrorCode::InvalidPublicKey
     );
 }
 
@@ -4833,7 +4833,7 @@ fn test_limit_messages(#[case] count: i32, #[case] expect_err: Option<ErrorCode>
 #[case("(66 (0x3f ({msg2} ({msg1} )", ErrorCode::InvalidCoinId)]
 #[case(
     "(66 (0x08 ({msg1} ) ((67 (0x08 ({msg1} (-1 )",
-    ErrorCode::NegativeAmount
+    ErrorCode::CoinAmountNegative
 )]
 #[case(
     "(66 (0x08 ({msg1} ) ((67 (0x08 ({msg1} )",
@@ -4841,7 +4841,7 @@ fn test_limit_messages(#[case] count: i32, #[case] expect_err: Option<ErrorCode>
 )]
 #[case(
     "(66 (0x01 ({msg1} (-1 ) ((67 (0x01 ({msg1} )",
-    ErrorCode::NegativeAmount
+    ErrorCode::CoinAmountNegative
 )]
 #[case(
     "(66 (0x01 ({msg1} ) ((67 (0x01 ({msg1} )",
@@ -4925,11 +4925,11 @@ fn test_limit_messages(#[case] count: i32, #[case] expect_err: Option<ErrorCode>
 // coin amounts can't be negative
 #[case(
     "(66 (0x01 ({msg1} (-1 ) ((67 (0x01 ({msg1} (123 )",
-    ErrorCode::NegativeAmount
+    ErrorCode::CoinAmountNegative
 )]
 #[case(
     "(66 (0x01 ({msg1} (-1 ) ((67 (0x01 ({msg1} (123 )",
-    ErrorCode::NegativeAmount
+    ErrorCode::CoinAmountNegative
 )]
 fn test_message_conditions_failures(#[case] test_case: &str, #[case] expect: ErrorCode) {
     for flags in [ENABLE_MESSAGE_CONDITIONS, MEMPOOL_MODE] {
