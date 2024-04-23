@@ -107,3 +107,19 @@ cargo fuzz list
 cargo fuzz run <name-of-fuzzer>
 ```
 
+# Bumping version number
+
+Make sure you have `cargo-workspaces` installed:
+
+```
+cargo install cargo-workspaces
+```
+
+To bump the versions of all relevant crates:
+
+```
+cargo ws version --all --no-git-commit
+```
+
+Select "minor update" if there has not been any incompatible API changes,
+otherwise "major update".
