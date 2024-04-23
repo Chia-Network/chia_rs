@@ -41,7 +41,7 @@ fn run(c: &mut Criterion) {
         proofs.push(
             tree.generate_proof(&item)
                 .expect("failed to generate proof")
-                .expect("item not found"),
+                .1,
         );
     }
 
