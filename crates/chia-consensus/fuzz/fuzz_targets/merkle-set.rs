@@ -14,15 +14,16 @@ fuzz_target!(|data: &[u8]| {
     let tree = MerkleSet::from_leafs(&mut leafs);
 
     for item in &leafs {
-        let proof = tree
-            .generate_proof(item)
-            .expect("failed to generate proof")
-            .expect("item not found");
+        let (true, proof) = tree.generate_proof(item).expect("failed to generate proof") else {
+            panic!("item is expected to exist");
+        };
         let rebuilt = MerkleSet::from_proof(&proof).expect("failed to parse proof");
-        assert!(rebuilt
-            .generate_proof(item)
-            .expect("failed to validate proof")
-            .is_some());
+        assert!(
+            rebuilt
+                .generate_proof(item)
+                .expect("failed to validate proof")
+                .0
+        );
         assert_eq!(rebuilt.get_root(), tree.get_root());
     }
 });

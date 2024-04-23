@@ -22,12 +22,18 @@ def check_proof(
     *,
     root: bytes32,
     item: bytes32,
+    expect_included: bool = True,
 ) -> None:
     proof_tree = deserialize(proof)
     assert proof_tree.get_root() == root
-    included, proof2 = proof_tree.is_included_already_hashed(item)
-    assert included
-    assert proof == proof2
+    included, junk = proof_tree.is_included_already_hashed(item)
+    assert included == expect_included
+
+    # the rust implementation does not round-trip proofs of exclusions.
+    # doing so requires additional complexity (and cost).
+    # rust deliberately generates an empty proof from a tree generated from a
+    # proof
+    assert junk == b"" or junk == proof
 
 
 def check_tree(leafs: List[bytes32]) -> None:
@@ -43,11 +49,26 @@ def check_tree(leafs: List[bytes32]) -> None:
         ru_included, ru_proof = ru_tree.is_included_already_hashed(item)
         assert ru_included
         assert py_proof == ru_proof
+        proof = ru_proof
 
-        check_proof(py_proof, py_deserialize_proof, root=root, item=item)
-        check_proof(ru_proof, py_deserialize_proof, root=root, item=item)
-        check_proof(py_proof, ru_deserialize_proof, root=root, item=item)
-        check_proof(ru_proof, ru_deserialize_proof, root=root, item=item)
+        check_proof(proof, py_deserialize_proof, root=root, item=item)
+        check_proof(proof, ru_deserialize_proof, root=root, item=item)
+
+    for i in range(256):
+        item = bytes32([i] + [2] * 31)
+        py_included, py_proof = py_tree.is_included_already_hashed(item)
+        assert not py_included
+        ru_included, ru_proof = ru_tree.is_included_already_hashed(item)
+        assert not ru_included
+        assert py_proof == ru_proof
+        proof = ru_proof
+
+        check_proof(
+            proof, py_deserialize_proof, root=root, item=item, expect_included=False
+        )
+        check_proof(
+            proof, ru_deserialize_proof, root=root, item=item, expect_included=False
+        )
 
 
 def h(b: str) -> bytes32:
