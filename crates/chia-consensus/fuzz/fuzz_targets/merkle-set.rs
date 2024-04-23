@@ -1,5 +1,6 @@
 #![no_main]
-use chia_consensus::merkle_tree::MerkleSet;
+use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
+use clvmr::sha2::{Digest, Sha256};
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
@@ -12,18 +13,26 @@ fuzz_target!(|data: &[u8]| {
     }
 
     let tree = MerkleSet::from_leafs(&mut leafs);
+    let root = tree.get_root();
 
-    for item in &leafs {
-        let (true, proof) = tree.generate_proof(item).expect("failed to generate proof") else {
-            panic!("item is expected to exist");
-        };
+    // this is a leaf that's *not* in the tree, to also cover
+    // proofs-of-exclusion
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    leafs.push(hasher.finalize().into());
+
+    for (idx, item) in leafs.iter().enumerate() {
+        let expect_included = idx < num_leafs;
+        let (included, proof) = tree.generate_proof(item).expect("failed to generate proof");
+        assert_eq!(included, expect_included);
         let rebuilt = MerkleSet::from_proof(&proof).expect("failed to parse proof");
+        let (included, _junk) = rebuilt
+            .generate_proof(item)
+            .expect("failed to validate proof");
+        assert_eq!(rebuilt.get_root(), root);
+        assert_eq!(included, expect_included);
         assert!(
-            rebuilt
-                .generate_proof(item)
-                .expect("failed to validate proof")
-                .0
+            validate_merkle_proof(&proof, item, &root).expect("proof failed") == expect_included
         );
-        assert_eq!(rebuilt.get_root(), tree.get_root());
     }
 });

@@ -333,6 +333,21 @@ fn pad_middles_for_proof_gen(proof: &mut Vec<u8>, left: &[u8; 32], right: &[u8; 
     }
 }
 
+// returns true if the item is included in the tree with the specified root,
+// given the proof, or false if it's not included in the tree.
+// If neither can be proven, it fails with SetError
+pub fn validate_merkle_proof(
+    proof: &[u8],
+    item: &[u8; 32],
+    root: &[u8; 32],
+) -> Result<bool, SetError> {
+    let tree = MerkleSet::from_proof(proof)?;
+    if tree.get_root() != *root {
+        return Err(SetError);
+    }
+    Ok(tree.generate_proof(item)?.0)
+}
+
 #[cfg(feature = "py-bindings")]
 #[pymethods]
 impl MerkleSet {
@@ -607,7 +622,7 @@ mod tests {
             assert_eq!(rebuilt.get_root(), root);
             let (included, new_proof) = rebuilt.generate_proof(&item).unwrap();
             assert!(included);
-            assert_eq!(new_proof, vec![]);
+            assert_eq!(new_proof, Vec::<u8>::new());
             assert_eq!(rebuilt.get_root(), root);
         }
 
@@ -622,7 +637,7 @@ mod tests {
             let rebuilt = MerkleSet::from_proof(&proof).expect("failed to parse proof");
             let (included, new_proof) = rebuilt.generate_proof(&item).unwrap();
             assert!(!included);
-            assert_eq!(new_proof, vec![]);
+            assert_eq!(new_proof, Vec::<u8>::new());
             assert_eq!(rebuilt.get_root(), root);
         }
     }
