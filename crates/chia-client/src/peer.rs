@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicU16, Ordering};
 use std::{collections::HashMap, sync::Arc};
 
-use ::chia_protocol::*;
+use chia_protocol::*;
 use chia_traits::Streamable;
 use futures_util::stream::SplitSink;
 use futures_util::{SinkExt, StreamExt};

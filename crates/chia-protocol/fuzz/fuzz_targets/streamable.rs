@@ -1,5 +1,5 @@
 #![no_main]
-use ::chia_protocol::*;
+use chia_protocol::*;
 use chia_traits::Streamable;
 use libfuzzer_sys::fuzz_target;
 use sha2::{Digest, Sha256};
