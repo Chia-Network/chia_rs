@@ -2,8 +2,8 @@ use crate::gen::conditions::{parse_conditions, ParseState, Spend, SpendBundleCon
 use crate::gen::flags::ALLOW_BACKREFS;
 use crate::gen::spend_visitor::SpendVisitor;
 use crate::gen::validation_error::ValidationErr;
-use chia_protocol::bytes::Bytes32;
-use chia_protocol::coin::Coin;
+use chia_protocol::Bytes32;
+use chia_protocol::Coin;
 use clvm_utils::tree_hash;
 use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
