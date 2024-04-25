@@ -112,7 +112,7 @@ impl BLSCache {
     pub fn aggregate_verify(
         &mut self,
         pks: &Vec<[u8; 48]>,
-        msgs: &Vec<&[u8]>,
+        msgs: &[&[u8]],
         sig: &Signature,
         force_cache: bool,
     ) -> bool {
