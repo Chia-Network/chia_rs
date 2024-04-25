@@ -12,7 +12,6 @@ use crate::PublicKey;
 use crate::Signature;
 use lru::LruCache;
 use sha2::{Digest, Sha256};
-use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::num::NonZeroUsize;
 
@@ -45,73 +44,70 @@ impl BLSCache {
         Self { cache }
     }
 
-    fn get_pairings<P: Borrow<[[u8; 48]]>, M: AsRef<[u8]>>(
+    pub fn get_pairings<M: AsRef<[u8]>>(
         &mut self,
-        pks: &P,
+        pks: &[[u8; 48]],
         msgs: &[M],
         force_cache: bool,
     ) -> Vec<GTElement> {
         let mut pairings: Vec<Option<GTElement>> = vec![];
         let mut missing_count: usize = 0;
 
-        for (pk, msg) in pks.borrow().iter().zip(msgs.iter()) {
+        for (pk, msg) in pks.iter().zip(msgs.iter()) {
             let mut hasher = Sha256::new();
             hasher.update(pk);
             hasher.update(msg); // pk + msg
             let h: [u8; 32] = hasher.finalize().into();
-            let pairing: Option<&GTElement> = self.cache.get(&h);
-            match pairing {
-                Some(pairing) => {
-                    if !force_cache {
-                        // Heuristic to avoid more expensive sig validation with pairing
-                        // cache when it's empty and cached pairings won't be useful later
-                        // (e.g. while syncing)
-                        missing_count += 1;
-                        if missing_count > pks.borrow().len() / 2 {
-                            return vec![];
-                        }
-                    }
-                    pairings.push(Some(pairing.clone()));
-                }
-                _ => {
-                    pairings.push(None);
+
+            let pairing = self.cache.get(&h).cloned();
+
+            if !force_cache && pairing.is_some() {
+                // Heuristic to avoid more expensive sig validation with pairing
+                // cache when it's empty and cached pairings won't be useful later
+                // (e.g. while syncing)
+                missing_count += 1;
+                if missing_count > pks.len() / 2 {
+                    return vec![];
                 }
             }
+
+            pairings.push(pairing);
         }
 
         // G1Element.from_bytes can be expensive due to subgroup check, so we avoid recomputing it with this cache
         let mut pk_bytes_to_g1: HashMap<[u8; 48], PublicKey> = HashMap::new();
         let mut ret: Vec<GTElement> = vec![];
 
-        for (i, pairing) in pairings.iter_mut().enumerate() {
+        for (i, pairing) in pairings.into_iter().enumerate() {
             if let Some(pairing) = pairing {
                 // equivalent to `if pairing is not None`
-                ret.push(pairing.clone());
-            } else {
-                let mut aug_msg = pks.borrow()[i].to_vec();
-                aug_msg.extend_from_slice(msgs[i].as_ref()); // pk + msg
-                let aug_hash: Signature = hash_to_g2(&aug_msg);
-
-                let pk_parsed: &mut PublicKey = pk_bytes_to_g1
-                    .entry(pks.borrow()[i])
-                    .or_insert_with(|| PublicKey::from_bytes(&pks.borrow()[i]).unwrap());
-
-                let pairing: GTElement = aug_hash.pair(pk_parsed);
-                let mut hasher = Sha256::new();
-                hasher.update(&aug_msg);
-                let h: [u8; 32] = hasher.finalize().into();
-                self.cache.put(h, pairing.clone());
                 ret.push(pairing);
+                continue;
             }
+
+            let mut aug_msg = pks[i].to_vec();
+            aug_msg.extend_from_slice(msgs[i].as_ref()); // pk + msg
+            let aug_hash: Signature = hash_to_g2(&aug_msg);
+
+            let pk_parsed: &mut PublicKey = pk_bytes_to_g1
+                .entry(pks[i])
+                .or_insert_with(|| PublicKey::from_bytes(&pks[i]).unwrap());
+
+            let pairing: GTElement = aug_hash.pair(pk_parsed);
+            let mut hasher = Sha256::new();
+            hasher.update(&aug_msg);
+            let h: [u8; 32] = hasher.finalize().into();
+            self.cache.put(h, pairing.clone());
+            ret.push(pairing);
         }
 
         ret
     }
 
-    pub fn aggregate_verify(
+    pub fn aggregate_verify<M: AsRef<[u8]>>(
         &mut self,
-        pks: &Vec<[u8; 48]>,
-        msgs: &[&[u8]],
+        pks: &[[u8; 48]],
+        msgs: &[M],
         sig: &Signature,
         force_cache: bool,
     ) -> bool {
@@ -120,21 +116,22 @@ impl BLSCache {
             let mut data = Vec::<(PublicKey, &[u8])>::new();
             for (pk, msg) in pks.iter().zip(msgs.iter()) {
                 let pk = PublicKey::from_bytes_unchecked(pk).unwrap();
-                data.push((pk.clone(), msg));
+                data.push((pk.clone(), msg.as_ref()));
             }
             return agg_ver(sig, data);
         }
-        let pairings_prod = pairings.pop(); // start with the first pairing
-        match pairings_prod {
-            Some(mut prod) => {
-                for p in pairings.iter() {
-                    // loop through rest of list
-                    prod *= &p;
-                }
-                prod == sig.pair(&PublicKey::generator())
-            }
-            _ => pairings.is_empty(),
+
+        // start with the first pairing
+        let Some(mut prod) = pairings.pop() else {
+            return pairings.is_empty();
+        };
+
+        for p in pairings.iter() {
+            // loop through rest of list
+            prod *= p;
         }
+
+        prod == sig.pair(&PublicKey::generator())
     }
 }
 
@@ -213,7 +210,7 @@ pub mod tests {
         let sk: SecretKey = SecretKey::from_seed(&byte_array);
         let pk: PublicKey = sk.public_key();
         let msg: &[u8] = &[106; 32];
-        let sig: Signature = sign(&sk, &msg);
+        let sig: Signature = sign(&sk, msg);
         let pk_list: Vec<[u8; 48]> = [pk.to_bytes()].to_vec();
         let msg_list: Vec<&[u8]> = [msg].to_vec();
         assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig, true));
@@ -231,7 +228,7 @@ pub mod tests {
         let sk: SecretKey = SecretKey::from_seed(&byte_array);
         let pk: PublicKey = sk.public_key();
         let msg: &[u8] = &[106; 32];
-        let sig: Signature = sign(&sk, &msg);
+        let sig: Signature = sign(&sk, msg);
         let mut pk_list: Vec<[u8; 48]> = [pk.to_bytes()].to_vec();
         let mut msg_list: Vec<&[u8]> = [msg].to_vec();
         // add first to cache
@@ -242,7 +239,7 @@ pub mod tests {
         let sk: SecretKey = SecretKey::from_seed(&byte_array);
         let pk: PublicKey = sk.public_key();
         let msg: &[u8] = &[107; 32];
-        let sig = aggregate([sig, sign(&sk, &msg)]);
+        let sig = aggregate([sig, sign(&sk, msg)]);
         pk_list.push(pk.to_bytes());
         msg_list.push(msg);
         assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig, false));
@@ -250,7 +247,7 @@ pub mod tests {
         // try reusing a pubkey
         let pk: PublicKey = sk.public_key();
         let msg: &[u8] = &[108; 32];
-        let sig = aggregate([sig, sign(&sk, &msg)]);
+        let sig = aggregate([sig, sign(&sk, msg)]);
         pk_list.push(pk.to_bytes());
         msg_list.push(msg);
         // try with force_cache disabled
@@ -272,7 +269,7 @@ pub mod tests {
             let sk: SecretKey = SecretKey::from_seed(&byte_array);
             let pk: PublicKey = sk.public_key();
             let msg: &[u8] = &[106; 32];
-            let sig: Signature = sign(&sk, &msg);
+            let sig: Signature = sign(&sk, msg);
             let pk_list: Vec<[u8; 48]> = vec![pk.to_bytes()];
             let msg_list: Vec<&[u8]> = vec![msg];
             assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig, true));
