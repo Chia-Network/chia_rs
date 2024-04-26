@@ -620,7 +620,7 @@ mod tests {
             assert!(included);
             let rebuilt = MerkleSet::from_proof(&proof).expect("failed to parse proof");
             assert_eq!(rebuilt.get_root(), root);
-            let (included, new_proof) = rebuilt.generate_proof(&item).unwrap();
+            let (included, new_proof) = rebuilt.generate_proof(item).unwrap();
             assert!(included);
             assert_eq!(new_proof, Vec::<u8>::new());
             assert_eq!(rebuilt.get_root(), root);
