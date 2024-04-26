@@ -65,7 +65,7 @@ fn run(c: &mut Criterion) {
             let start = Instant::now();
             for (p, leaf) in zip(&proofs, &leafs) {
                 let _ =
-                    black_box(validate_merkle_proof(&p, leaf, root).expect("expect valid proof"));
+                    black_box(validate_merkle_proof(p, leaf, root).expect("expect valid proof"));
             }
             start.elapsed()
         })
