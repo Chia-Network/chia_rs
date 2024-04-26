@@ -142,8 +142,8 @@ mod tests {
         );
 
         let result = solution_generator([
-            (coin1.clone(), PUZZLE1.as_ref(), SOLUTION1.as_ref()),
-            (coin2.clone(), PUZZLE2.as_ref(), SOLUTION2.as_ref()),
+            (coin1, PUZZLE1.as_ref(), SOLUTION1.as_ref()),
+            (coin2, PUZZLE2.as_ref(), SOLUTION2.as_ref()),
         ])
         .expect("solution_generator");
 
@@ -194,7 +194,7 @@ mod tests {
         let generator_output = run_generator(&result);
         assert_eq!(generator_output, EXPECTED_GENERATOR_OUTPUT);
 
-        let result = solution_generator([(coin2.clone(), PUZZLE2.as_ref(), SOLUTION2.as_ref())])
+        let result = solution_generator([(coin2, PUZZLE2.as_ref(), SOLUTION2.as_ref())])
             .expect("solution_generator");
 
         assert_eq!(
@@ -234,8 +234,8 @@ mod tests {
         );
 
         let result = solution_generator_backrefs([
-            (coin1.clone(), PUZZLE1.as_ref(), SOLUTION1.as_ref()),
-            (coin2.clone(), PUZZLE2.as_ref(), SOLUTION2.as_ref()),
+            (coin1, PUZZLE1.as_ref(), SOLUTION1.as_ref()),
+            (coin2, PUZZLE2.as_ref(), SOLUTION2.as_ref()),
         ])
         .expect("solution_generator");
 

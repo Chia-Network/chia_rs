@@ -10,6 +10,7 @@ use sha2::{Digest, Sha256};
 use pyo3::prelude::*;
 
 #[streamable]
+#[derive(Copy)]
 pub struct Coin {
     parent_coin_info: Bytes32,
     puzzle_hash: Bytes32,

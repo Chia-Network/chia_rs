@@ -109,7 +109,7 @@ impl SpendBundle {
     fn removals(&self) -> Vec<Coin> {
         let mut ret = Vec::<Coin>::with_capacity(self.coin_spends.len());
         for cs in &self.coin_spends {
-            ret.push(cs.coin.clone());
+            ret.push(cs.coin);
         }
         ret
     }
@@ -189,7 +189,7 @@ mod tests {
             1,
         );
         let spend = CoinSpend::new(
-            test_coin.clone(),
+            test_coin,
             Program::new(vec![1_u8].into()),
             Program::new(solution.into()),
         );
