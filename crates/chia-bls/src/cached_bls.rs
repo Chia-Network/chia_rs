@@ -3,8 +3,7 @@
 // there's not much point in caching the pairings because we're probably not going
 // to see them again unless there's a reorg. However, a spend in the mempool
 // is likely to reappear in a block later, so we can save having to do the pairing
-// again. So caching is primarily useful after "catch-up" (fast sync?) is done and
-// we're monitoring the mempool in real-time.
+// again. So caching is primarily useful when synced and monitoring the mempool in real-time.
 
 use crate::aggregate_verify as agg_ver;
 use crate::gtelement::GTElement;
@@ -24,7 +23,7 @@ use pyo3::{pyclass, pymethods, PyResult};
 
 #[cfg_attr(feature = "py-bindings", pyclass(name = "BLSCache"))]
 pub struct BLSCache {
-    cache: LruCache<[u8; 32], GTElement>,
+    cache: LruCache<[u8; 32], GTElement>,  // LRUCache of hash(pubkey + message) -> GTElement
 }
 
 impl Default for BLSCache {
@@ -46,7 +45,7 @@ impl BLSCache {
         Self { cache }
     }
 
-    pub fn get_pairings<P: Borrow<[[u8; 48]]>, M: AsRef<[u8]>>(
+    fn get_pairings<P: Borrow<[[u8; 48]]>, M: AsRef<[u8]>>(
         &mut self,
         pks: &P,
         msgs: &[M],
