@@ -1,12 +1,10 @@
 use crate::error::{Error, Result};
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
-use chia_wallet::singleton::SingletonArgs;
-use chia_wallet::singleton::SingletonSolution;
-use chia_wallet::singleton::SingletonStruct;
-use chia_wallet::singleton::SINGLETON_TOP_LAYER_PUZZLE_HASH;
-use clvm_traits::FromClvm;
-use clvm_traits::ToClvm;
+use chia_wallet::singleton::{
+    SingletonArgs, SingletonSolution, SingletonStruct, SINGLETON_TOP_LAYER_PUZZLE_HASH,
+};
+use clvm_traits::{FromClvm, ToClvm};
 use clvm_utils::CurriedProgram;
 use clvm_utils::{tree_hash, tree_hash_atom, tree_hash_pair};
 use clvmr::allocator::{Allocator, NodePtr};
