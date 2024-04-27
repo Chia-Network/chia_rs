@@ -7,14 +7,14 @@ fuzz_target!(|data: &[u8]| {
     {
         use std::fmt;
 
-        use chia_wallet::{nft::NftMetadata, Proof};
+        use chia_wallet::{nft::NftMetadata, MaybeEveProof};
         use clvm_traits::{FromClvm, ToClvm};
         use clvmr::{allocator::NodePtr, Allocator};
         use libfuzzer_sys::arbitrary::{Arbitrary, Unstructured};
 
         let mut u = Unstructured::new(data);
         roundtrip::<NftMetadata>(&mut u);
-        roundtrip::<Proof>(&mut u);
+        roundtrip::<MaybeEveProof>(&mut u);
 
         fn roundtrip<'a, T>(u: &mut Unstructured<'a>)
         where
