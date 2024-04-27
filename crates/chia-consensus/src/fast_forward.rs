@@ -1,42 +1,15 @@
 use crate::error::{Error, Result};
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
+use chia_wallet::singleton::SingletonArgs;
+use chia_wallet::singleton::SingletonSolution;
+use chia_wallet::singleton::SingletonStruct;
 use chia_wallet::singleton::SINGLETON_TOP_LAYER_PUZZLE_HASH;
-use clvm_traits::{FromClvm, ToClvm};
+use clvm_traits::FromClvm;
+use clvm_traits::ToClvm;
 use clvm_utils::CurriedProgram;
 use clvm_utils::{tree_hash, tree_hash_atom, tree_hash_pair};
 use clvmr::allocator::{Allocator, NodePtr};
-
-#[derive(FromClvm, ToClvm, Debug)]
-#[clvm(tuple)]
-pub struct SingletonStruct {
-    pub mod_hash: Bytes32,
-    pub launcher_id: Bytes32,
-    pub launcher_puzzle_hash: Bytes32,
-}
-
-#[derive(FromClvm, ToClvm, Debug)]
-#[clvm(curry)]
-pub struct SingletonArgs<I> {
-    pub singleton_struct: SingletonStruct,
-    pub inner_puzzle: I,
-}
-
-#[derive(FromClvm, ToClvm, Debug)]
-#[clvm(list)]
-pub struct LineageProof {
-    pub parent_parent_coin_id: Bytes32,
-    pub parent_inner_puzzle_hash: Bytes32,
-    pub parent_amount: u64,
-}
-
-#[derive(FromClvm, ToClvm, Debug)]
-#[clvm(list)]
-pub struct SingletonSolution<I> {
-    pub lineage_proof: LineageProof,
-    pub amount: u64,
-    pub inner_solution: I,
-}
 
 // TODO: replace this with a generic function to compute the hash of curried
 // puzzles

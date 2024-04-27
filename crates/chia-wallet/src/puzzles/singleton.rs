@@ -2,7 +2,7 @@ use chia_protocol::Bytes32;
 use clvm_traits::{FromClvm, ToClvm};
 use hex_literal::hex;
 
-use crate::Proof;
+use crate::LineageProof;
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curry)]
@@ -21,8 +21,8 @@ pub struct SingletonStruct {
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(list)]
-pub struct SingletonSolution<I> {
-    pub proof: Proof,
+pub struct SingletonSolution<I, P = LineageProof> {
+    pub lineage_proof: P,
     pub amount: u64,
     pub inner_solution: I,
 }
