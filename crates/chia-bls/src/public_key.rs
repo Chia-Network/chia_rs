@@ -28,7 +28,7 @@ use pyo3::{pyclass, pymethods, IntoPy, PyAny, PyObject, PyResult, Python};
 #[derive(Clone, Default)]
 pub struct PublicKey(pub(crate) blst_p1);
 
-#[cfg(fuzzing)]
+#[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for PublicKey {
     fn arbitrary(_u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         // placeholder

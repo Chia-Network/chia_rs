@@ -93,7 +93,7 @@ pub fn streamable(attr: TokenStream, item: TokenStream) -> TokenStream {
         #[derive(chia_streamable_macro::Streamable, Hash, Debug, Clone, Eq, PartialEq)]
     };
 
-    // If you're calling the macro from `chia-protocol`, enable Python bindings and fuzzing conditionally.
+    // If you're calling the macro from `chia-protocol`, enable Python bindings and arbitrary conditionally.
     // Otherwise, you're calling it from an external crate which doesn't have this infrastructure setup.
     // In that case, the caller can add these macros manually if they want to.
     let attrs = if matches!(found_crate, FoundCrate::Itself) {
@@ -106,7 +106,7 @@ pub fn streamable(attr: TokenStream, item: TokenStream) -> TokenStream {
                 )
             )]
             #main_derives
-            #[cfg_attr(fuzzing, derive(arbitrary::Arbitrary))]
+            #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
         }
     } else {
         main_derives

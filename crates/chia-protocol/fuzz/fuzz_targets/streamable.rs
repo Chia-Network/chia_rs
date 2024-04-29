@@ -1,11 +1,9 @@
 #![no_main]
+use arbitrary::{Arbitrary, Unstructured};
 use chia_protocol::*;
 use chia_traits::Streamable;
 use libfuzzer_sys::fuzz_target;
 use sha2::{Digest, Sha256};
-
-#[cfg(fuzzing)]
-use arbitrary::{Arbitrary, Unstructured};
 
 pub fn test_streamable<T: Streamable + std::fmt::Debug + PartialEq>(obj: &T) {
     let bytes = obj.to_bytes().unwrap();
@@ -40,16 +38,11 @@ pub fn test_streamable<T: Streamable + std::fmt::Debug + PartialEq>(obj: &T) {
         assert!(T::from_bytes_unchecked(&corrupt_bytes) == Err(chia_traits::Error::EndOfBuffer));
     }
 }
-#[cfg(fuzzing)]
 fn test<'a, T: Arbitrary<'a> + Streamable + std::fmt::Debug + PartialEq>(data: &'a [u8]) {
     let mut u = Unstructured::new(data);
     let obj = <T as Arbitrary<'a>>::arbitrary(&mut u).unwrap();
     test_streamable(&obj);
 }
-
-// this is here to make clippy happy
-#[cfg(not(fuzzing))]
-fn test<T: Streamable + std::fmt::Debug + PartialEq>(_data: &[u8]) {}
 
 fuzz_target!(|data: &[u8]| {
     test::<Program>(data);
