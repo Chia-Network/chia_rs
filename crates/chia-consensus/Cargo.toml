@@ -30,7 +30,6 @@ thiserror = "1.0.44"
 [dev-dependencies]
 num-traits = "0.2.15"
 rstest = "0.16.0"
-text-diff = "0.4.0"
 criterion = "0.5.1"
 rand = { version = "0.8.5", features = [ "small_rng" ] }
 
