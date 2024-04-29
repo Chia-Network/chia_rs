@@ -9,7 +9,7 @@ use chia_tools::{iterate_tx_blocks, visit_spends};
 use chia_traits::streamable::Streamable;
 
 use chia_protocol::{Bytes32, Coin, CoinSpend, Program, SpendBundle};
-use chia_wallet::singleton::SINGLETON_TOP_LAYER_PUZZLE_HASH;
+use chia_puzzles::singleton::SINGLETON_TOP_LAYER_PUZZLE_HASH;
 use clvm_traits::{FromClvm, FromNodePtr};
 use clvm_utils::{tree_hash, CurriedProgram};
 use clvmr::allocator::NodePtr;

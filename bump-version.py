@@ -22,12 +22,12 @@ our_crates = [
     "crates/chia-tools",
     "crates/clvm-utils",
     "crates/clvm-derive",
-    "crates/chia-wallet",
+    "crates/chia-puzzles",
     "crates/chia-client",
     "crates/chia-ssl",
     "crates/chia-consensus",
     "crates/chia-consensus/fuzz",
-    "crates/chia-wallet/fuzz",
+    "crates/chia-puzzles/fuzz",
     "crates/clvm-utils/fuzz",
 ]
 

@@ -282,9 +282,9 @@ dependencies = [
  "chia-client",
  "chia-consensus",
  "chia-protocol",
+ "chia-puzzles",
  "chia-ssl",
  "chia-traits 0.7.0",
- "chia-wallet",
  "clvm-traits",
  "clvm-utils",
 ]
@@ -353,8 +353,8 @@ name = "chia-consensus"
 version = "0.7.0"
 dependencies = [
  "chia-protocol",
+ "chia-puzzles",
  "chia-traits 0.7.0",
- "chia-wallet",
  "chia_py_streamable_macro",
  "chia_streamable_macro 0.6.0",
  "clvm-derive",
@@ -420,6 +420,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "chia-puzzles"
+version = "0.7.0"
+dependencies = [
+ "arbitrary",
+ "chia-bls 0.7.0",
+ "chia-protocol",
+ "clvm-traits",
+ "clvm-utils",
+ "clvmr",
+ "hex",
+ "hex-literal",
+ "num-bigint",
+ "sha2",
+]
+
+[[package]]
+name = "chia-puzzles-fuzz"
+version = "0.6.0"
+dependencies = [
+ "chia-puzzles",
+ "clvm-traits",
+ "clvmr",
+ "libfuzzer-sys",
+ "pyo3",
+]
+
+[[package]]
 name = "chia-ssl"
 version = "0.7.0"
 dependencies = [
@@ -439,8 +466,8 @@ dependencies = [
  "chia-bls 0.7.0",
  "chia-consensus",
  "chia-protocol",
+ "chia-puzzles",
  "chia-traits 0.7.0",
- "chia-wallet",
  "clap",
  "clvm-traits",
  "clvm-utils",
@@ -473,33 +500,6 @@ dependencies = [
  "pyo3",
  "sha2",
  "thiserror",
-]
-
-[[package]]
-name = "chia-wallet"
-version = "0.7.0"
-dependencies = [
- "arbitrary",
- "chia-bls 0.7.0",
- "chia-protocol",
- "clvm-traits",
- "clvm-utils",
- "clvmr",
- "hex",
- "hex-literal",
- "num-bigint",
- "sha2",
-]
-
-[[package]]
-name = "chia-wallet-fuzz"
-version = "0.6.0"
-dependencies = [
- "chia-wallet",
- "clvm-traits",
- "clvmr",
- "libfuzzer-sys",
- "pyo3",
 ]
 
 [[package]]

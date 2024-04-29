@@ -13,7 +13,7 @@ chia-protocol = { version = "0.7.0", path = "../chia-protocol" }
 chia-traits = { version = "0.7.0", path = "../chia-traits" }
 clvm-utils = { version = "0.7.0", path = "../clvm-utils" }
 clvm-traits = { version = "0.7.0", path = "../clvm-traits" }
-chia-wallet = { version = "0.7.0", path = "../chia-wallet" }
+chia-puzzles = { version = "0.7.0", path = "../chia-puzzles" }
 chia-bls = { version = "0.7.0", path = "../chia-bls" }
 chia-consensus = { version = "0.7.0", path = "../chia-consensus" }
 clvmr = { version = "0.6.0", features = ["counters"] }
