@@ -51,6 +51,7 @@ pub use crate::slots::*;
 pub use crate::spend_bundle::*;
 pub use crate::sub_epoch_summary::*;
 pub use crate::unfinished_block::*;
+pub use crate::unfinished_header_block::*;
 pub use crate::vdf::*;
 pub use crate::wallet_protocol::*;
 pub use crate::weight_proof::*;
