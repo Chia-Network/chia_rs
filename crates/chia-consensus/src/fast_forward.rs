@@ -78,6 +78,11 @@ pub fn fast_forward_singleton(
     let singleton = CurriedProgram::<NodePtr, SingletonArgs<NodePtr>>::from_clvm(a, puzzle)?;
     let mut new_solution = SingletonSolution::<NodePtr>::from_clvm(a, solution)?;
 
+    let lineage_proof = match &mut new_solution.lineage_proof {
+        chia_wallet::Proof::Lineage(proof) => proof,
+        _ => return Err(Error::ExpectedLineageProof),
+    };
+
     // this is the tree hash of the singleton top layer puzzle
     // the tree hash of singleton_top_layer_v1_1.clsp
     if singleton.args.singleton_struct.mod_hash.as_ref() != SINGLETON_TOP_LAYER_PUZZLE_HASH {
@@ -100,16 +105,16 @@ pub fn fast_forward_singleton(
     // given the parent's parent, the parent's inner puzzle and parent's amount,
     // we can compute the hash of the curried inner puzzle for our parent coin
     let parent_puzzle_hash = curry_and_treehash(
-        &new_solution.lineage_proof.parent_inner_puzzle_hash,
+        &lineage_proof.parent_inner_puzzle_hash,
         &singleton.args.singleton_struct,
     );
 
     // now that we know the parent coin's puzzle hash, we have all the pieces to
     // compute the coin being spent (before the fast-forward).
     let parent_coin = Coin {
-        parent_coin_info: new_solution.lineage_proof.parent_parent_coin_id,
+        parent_coin_info: lineage_proof.parent_parent_coin_id,
         puzzle_hash: parent_puzzle_hash,
-        amount: new_solution.lineage_proof.parent_amount,
+        amount: lineage_proof.parent_amount,
     };
 
     if parent_coin.coin_id() != coin.parent_coin_info {
@@ -117,7 +122,7 @@ pub fn fast_forward_singleton(
     }
 
     let inner_puzzle_hash = tree_hash(a, singleton.args.inner_puzzle);
-    if inner_puzzle_hash != *new_solution.lineage_proof.parent_inner_puzzle_hash {
+    if inner_puzzle_hash != *lineage_proof.parent_inner_puzzle_hash {
         return Err(Error::InnerPuzzleHashMismatch);
     }
 
@@ -131,8 +136,8 @@ pub fn fast_forward_singleton(
     }
 
     // update the solution to use the new parent coin's information
-    new_solution.lineage_proof.parent_parent_coin_id = new_parent.parent_coin_info;
-    new_solution.lineage_proof.parent_amount = new_parent.amount;
+    lineage_proof.parent_parent_coin_id = new_parent.parent_coin_info;
+    lineage_proof.parent_amount = new_parent.amount;
     new_solution.amount = new_coin.amount;
 
     let expected_new_parent = new_parent.coin_id();
@@ -151,6 +156,7 @@ mod tests {
     use crate::gen::run_puzzle::run_puzzle;
     use chia_protocol::CoinSpend;
     use chia_traits::streamable::Streamable;
+    use chia_wallet::Proof;
     use clvm_traits::ToNodePtr;
     use clvmr::serde::{node_from_bytes, node_to_bytes};
     use hex_literal::hex;
@@ -333,7 +339,12 @@ mod tests {
 
     fn parse_solution(a: &mut Allocator, solution: &[u8]) -> SingletonSolution<NodePtr> {
         let new_solution = node_from_bytes(a, solution).expect("parse solution");
-        SingletonSolution::from_clvm(a, new_solution).expect("parse solution")
+        let solution = SingletonSolution::from_clvm(a, new_solution).expect("parse solution");
+        assert!(matches!(
+            solution.lineage_proof,
+            chia_wallet::Proof::Lineage(_)
+        ));
+        solution
     }
 
     fn serialize_solution(a: &mut Allocator, solution: &SingletonSolution<NodePtr>) -> Vec<u8> {
@@ -363,8 +374,12 @@ mod tests {
             |a, _coin, _new_coin, _new_parent, _puzzle, solution| {
                 let mut new_solution = parse_solution(a, solution);
 
+                let Proof::Lineage(lineage_proof) = &mut new_solution.lineage_proof else {
+                    unreachable!();
+                };
+
                 // corrupt the lineage proof
-                new_solution.lineage_proof.parent_parent_coin_id = Bytes32::from(hex!(
+                lineage_proof.parent_parent_coin_id = Bytes32::from(hex!(
                     "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe"
                 ));
 
@@ -380,8 +395,12 @@ mod tests {
             |a, _coin, _new_coin, _new_parent, _puzzle, solution| {
                 let mut new_solution = parse_solution(a, solution);
 
+                let Proof::Lineage(lineage_proof) = &mut new_solution.lineage_proof else {
+                    unreachable!();
+                };
+
                 // corrupt the lineage proof
-                new_solution.lineage_proof.parent_amount = 11;
+                lineage_proof.parent_amount = 11;
 
                 *solution = serialize_solution(a, &new_solution);
             },
@@ -395,8 +414,12 @@ mod tests {
             |a, _coin, _new_coin, _new_parent, _puzzle, solution| {
                 let mut new_solution = parse_solution(a, solution);
 
+                let Proof::Lineage(lineage_proof) = &mut new_solution.lineage_proof else {
+                    unreachable!();
+                };
+
                 // corrupt the lineage proof
-                new_solution.lineage_proof.parent_inner_puzzle_hash = Bytes32::from(hex!(
+                lineage_proof.parent_inner_puzzle_hash = Bytes32::from(hex!(
                     "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe"
                 ));
 
@@ -413,24 +436,28 @@ mod tests {
                 let mut new_solution = parse_solution(a, solution);
                 let singleton = parse_singleton(a, puzzle);
 
+                let Proof::Lineage(lineage_proof) = &mut new_solution.lineage_proof else {
+                    unreachable!();
+                };
+
                 // corrupt the lineage proof
-                new_solution.lineage_proof.parent_inner_puzzle_hash = Bytes32::from(hex!(
+                lineage_proof.parent_inner_puzzle_hash = Bytes32::from(hex!(
                     "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe"
                 ));
 
                 // adjust the coins puzzle hashes to match
                 let parent_puzzle_hash = curry_and_treehash(
-                    &new_solution.lineage_proof.parent_inner_puzzle_hash,
+                    &lineage_proof.parent_inner_puzzle_hash,
                     &singleton.args.singleton_struct,
                 );
 
-                *solution = serialize_solution(a, &new_solution);
-
                 *new_parent = Coin {
-                    parent_coin_info: new_solution.lineage_proof.parent_parent_coin_id,
+                    parent_coin_info: lineage_proof.parent_parent_coin_id,
                     puzzle_hash: parent_puzzle_hash,
-                    amount: new_solution.lineage_proof.parent_amount,
+                    amount: lineage_proof.parent_amount,
                 };
+
+                *solution = serialize_solution(a, &new_solution);
 
                 new_coin.puzzle_hash = parent_puzzle_hash;
 

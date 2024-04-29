@@ -4,7 +4,7 @@ use clvm_traits::{FromClvm, ToClvm};
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(fuzzing, derive(arbitrary::Arbitrary))]
 #[clvm(untagged, tuple)]
-pub enum MaybeEveProof {
+pub enum Proof {
     Lineage(LineageProof),
     Eve(EveProof),
 }
