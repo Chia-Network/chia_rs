@@ -148,6 +148,8 @@ mod tests {
     use clvmr::{serde::node_to_bytes, Allocator, NodePtr};
     use hex::ToHex;
 
+    use crate::{OwnedAtom, SizedAtom};
+
     use super::*;
 
     fn encode<T>(a: &mut Allocator, value: T) -> Result<String, ToClvmError>
@@ -265,6 +267,26 @@ mod tests {
             Ok("8568656c6c6f".to_owned())
         );
         assert_eq!(encode(a, "".to_string()), Ok("80".to_owned()));
+    }
+
+    #[test]
+    fn test_owned_atom() {
+        let a = &mut Allocator::new();
+        assert_eq!(encode(a, OwnedAtom::new(Vec::new())), Ok("80".to_owned()));
+        assert_eq!(
+            encode(a, OwnedAtom::new(b"hello".to_vec())),
+            Ok("8568656c6c6f".to_owned())
+        );
+    }
+
+    #[test]
+    fn test_sized_atom() {
+        let a = &mut Allocator::new();
+        assert_eq!(encode(a, SizedAtom::new([])), Ok("80".to_owned()));
+        assert_eq!(
+            encode(a, SizedAtom::new(*b"hello")),
+            Ok("8568656c6c6f".to_owned())
+        );
     }
 
     #[cfg(feature = "chia-bls")]
