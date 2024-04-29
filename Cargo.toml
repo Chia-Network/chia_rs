@@ -12,8 +12,8 @@ members = [
     "crates/chia-ssl",
     "crates/chia-tools",
     "crates/chia-traits",
-    "crates/chia-wallet",
-    "crates/chia-wallet/fuzz",
+    "crates/chia-puzzles",
+    "crates/chia-puzzles/fuzz",
     "crates/clvm-derive",
     "crates/clvm-traits",
     "crates/clvm-utils",
@@ -44,7 +44,7 @@ default = [
     "protocol",
     "ssl",
     "traits",
-    "wallet",
+    "puzzles",
     "clvm-traits",
     "clvm-utils"
 ]
@@ -55,7 +55,7 @@ consensus = ["dep:chia-consensus"]
 protocol = ["dep:chia-protocol"]
 ssl = ["dep:chia-ssl"]
 traits = ["dep:chia-traits"]
-wallet = ["dep:chia-wallet"]
+puzzles = ["dep:chia-puzzles"]
 clvm-traits = ["dep:clvm-traits"]
 clvm-utils = ["dep:clvm-utils"]
 
@@ -66,7 +66,7 @@ chia-consensus = { path = "./crates/chia-consensus", version = "0.7.0", optional
 chia-protocol = { path = "./crates/chia-protocol", version = "0.7.0", optional = true }
 chia-ssl = { path = "./crates/chia-ssl", version = "0.7.0", optional = true }
 chia-traits = { path = "./crates/chia-traits", version = "0.7.0", optional = true }
-chia-wallet = { path = "./crates/chia-wallet", version = "0.7.0", optional = true }
+chia-puzzles = { path = "./crates/chia-puzzles", version = "0.7.0", optional = true }
 clvm-traits = { path = "./crates/clvm-traits", version = "0.7.0", optional = true }
 clvm-utils = { path = "./crates/clvm-utils", version = "0.7.0", optional = true }
 

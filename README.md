@@ -93,7 +93,7 @@ The following crates have fuzzers:
 
 * chia-bls
 * chia-protocol
-* chia-wallet
+* chia-puzzles
 * clvm-utils
 * chia (the root crate)
 

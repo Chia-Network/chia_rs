@@ -23,7 +23,7 @@ chia-traits = { version = "0.7.0", path = "../chia-traits" }
 clvm-traits = { version = "0.7.0", path = "../clvm-traits" }
 clvm-derive = { version = "0.6.0", path = "../clvm-derive" }
 chia-protocol = { version = "0.7.0", path = "../chia-protocol" }
-chia-wallet = { version = "0.7.0", path = "../chia-wallet" }
+chia-puzzles = { version = "0.7.0", path = "../chia-puzzles" }
 hex-literal = "0.4.1"
 thiserror = "1.0.44"
 

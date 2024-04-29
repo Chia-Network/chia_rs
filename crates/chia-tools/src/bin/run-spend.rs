@@ -1,16 +1,16 @@
 use chia_consensus::gen::conditions::Condition;
+use chia_puzzles::Proof;
 use chia_traits::Streamable;
-use chia_wallet::Proof;
 use clap::Parser;
 use clvm_traits::{FromClvm, ToNodePtr};
 use clvm_utils::tree_hash;
 use clvm_utils::CurriedProgram;
 use clvmr::{allocator::NodePtr, Allocator};
 
-use chia_wallet::cat::{CatArgs, CatSolution, CAT_PUZZLE_HASH};
-use chia_wallet::did::{DidArgs, DidSolution, DID_INNER_PUZZLE_HASH};
-use chia_wallet::singleton::{SingletonArgs, SingletonSolution, SINGLETON_TOP_LAYER_PUZZLE_HASH};
-use chia_wallet::standard::{StandardArgs, StandardSolution, STANDARD_PUZZLE_HASH};
+use chia_puzzles::cat::{CatArgs, CatSolution, CAT_PUZZLE_HASH};
+use chia_puzzles::did::{DidArgs, DidSolution, DID_INNER_PUZZLE_HASH};
+use chia_puzzles::singleton::{SingletonArgs, SingletonSolution, SINGLETON_TOP_LAYER_PUZZLE_HASH};
+use chia_puzzles::standard::{StandardArgs, StandardSolution, STANDARD_PUZZLE_HASH};
 
 /// Run a puzzle given a solution and print the resulting conditions
 #[derive(Parser, Debug)]

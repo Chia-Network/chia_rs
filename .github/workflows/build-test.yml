@@ -339,9 +339,9 @@ jobs:
           cd crates/chia-protocol
           cargo +nightly fuzz build
           cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=20 || exit 255"
-      - name: cargo fuzz (chia-wallet)
+      - name: cargo fuzz (chia-puzzles)
         run: |
-          cd crates/chia-wallet
+          cd crates/chia-puzzles
           cargo +nightly fuzz build
           cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=20 || exit 255"
 
