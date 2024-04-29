@@ -4,6 +4,7 @@ use chia_protocol::Coin;
 use chia_wallet::singleton::{
     SingletonArgs, SingletonSolution, SingletonStruct, SINGLETON_TOP_LAYER_PUZZLE_HASH,
 };
+use chia_wallet::Proof;
 use clvm_traits::{FromClvm, ToClvm};
 use clvm_utils::CurriedProgram;
 use clvm_utils::{tree_hash, tree_hash_atom, tree_hash_pair};
@@ -79,7 +80,7 @@ pub fn fast_forward_singleton(
     let mut new_solution = SingletonSolution::<NodePtr>::from_clvm(a, solution)?;
 
     let lineage_proof = match &mut new_solution.lineage_proof {
-        chia_wallet::Proof::Lineage(proof) => proof,
+        Proof::Lineage(proof) => proof,
         _ => return Err(Error::ExpectedLineageProof),
     };
 
@@ -156,7 +157,6 @@ mod tests {
     use crate::gen::run_puzzle::run_puzzle;
     use chia_protocol::CoinSpend;
     use chia_traits::streamable::Streamable;
-    use chia_wallet::Proof;
     use clvm_traits::ToNodePtr;
     use clvmr::serde::{node_from_bytes, node_to_bytes};
     use hex_literal::hex;
@@ -340,10 +340,7 @@ mod tests {
     fn parse_solution(a: &mut Allocator, solution: &[u8]) -> SingletonSolution<NodePtr> {
         let new_solution = node_from_bytes(a, solution).expect("parse solution");
         let solution = SingletonSolution::from_clvm(a, new_solution).expect("parse solution");
-        assert!(matches!(
-            solution.lineage_proof,
-            chia_wallet::Proof::Lineage(_)
-        ));
+        assert!(matches!(solution.lineage_proof, Proof::Lineage(_)));
         solution
     }
 
