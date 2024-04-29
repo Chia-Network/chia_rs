@@ -139,7 +139,7 @@ impl<N> ToClvm<N> for NftMetadata {
 }
 
 /// This is the puzzle reveal of the [NFT1 state layer](https://chialisp.com/nfts) puzzle.
-pub static NFT_STATE_LAYER_PUZZLE: [u8; 827] = hex!(
+pub const NFT_STATE_LAYER_PUZZLE: [u8; 827] = hex!(
     "
     ff02ffff01ff02ff3effff04ff02ffff04ff05ffff04ffff02ff2fff5f80ffff
     04ff80ffff04ffff04ffff04ff0bffff04ff17ff808080ffff01ff808080ffff
@@ -178,7 +178,7 @@ pub const NFT_STATE_LAYER_PUZZLE_HASH: [u8; 32] = hex!(
 );
 
 /// This is the puzzle reveal of the [NFT1 ownership layer](https://chialisp.com/nfts) puzzle.
-pub static NFT_OWNERSHIP_LAYER_PUZZLE: [u8; 1226] = hex!(
+pub const NFT_OWNERSHIP_LAYER_PUZZLE: [u8; 1226] = hex!(
     "
     ff02ffff01ff02ff26ffff04ff02ffff04ff05ffff04ff17ffff04ff0bffff04
     ffff02ff2fff5f80ff80808080808080ffff04ffff01ffffff82ad4cff0233ff
@@ -230,7 +230,7 @@ pub const NFT_OWNERSHIP_LAYER_PUZZLE_HASH: [u8; 32] = hex!(
 );
 
 /// This is the puzzle reveal of the [NFT1 royalty transfer](https://chialisp.com/nfts) puzzle.
-pub static NFT_ROYALTY_TRANSFER_PUZZLE: [u8; 687] = hex!(
+pub const NFT_ROYALTY_TRANSFER_PUZZLE: [u8; 687] = hex!(
     "
     ff02ffff01ff02ffff03ff81bfffff01ff04ff82013fffff04ff80ffff04ffff
     02ffff03ffff22ff82013fffff20ffff09ff82013fff2f808080ffff01ff04ff
@@ -265,7 +265,7 @@ pub const NFT_ROYALTY_TRANSFER_PUZZLE_HASH: [u8; 32] = hex!(
 );
 
 /// This is the puzzle reveal of the [NFT1 metadata updater](https://chialisp.com/nfts) puzzle.
-pub static NFT_METADATA_UPDATER_PUZZLE: [u8; 241] = hex!(
+pub const NFT_METADATA_UPDATER_PUZZLE: [u8; 241] = hex!(
     "
     ff02ffff01ff04ffff04ffff02ffff03ffff22ff27ff3780ffff01ff02ffff03
     ffff21ffff09ff27ffff01826d7580ffff09ff27ffff01826c7580ffff09ff27
@@ -286,7 +286,7 @@ pub const NFT_METADATA_UPDATER_PUZZLE_HASH: [u8; 32] = hex!(
 );
 
 /// This is the puzzle reveal of the [NFT1 intermediate launcher](https://chialisp.com/nfts) puzzle.
-pub static NFT_INTERMEDIATE_LAUNCHER_PUZZLE: [u8; 65] = hex!(
+pub const NFT_INTERMEDIATE_LAUNCHER_PUZZLE: [u8; 65] = hex!(
     "
     ff02ffff01ff04ffff04ff04ffff04ff05ffff01ff01808080ffff04ffff04ff
     06ffff04ffff0bff0bff1780ff808080ff808080ffff04ffff01ff333cff0180

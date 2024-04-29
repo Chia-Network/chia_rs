@@ -50,7 +50,7 @@ pub fn cat_puzzle_hash(asset_id: [u8; 32], inner_puzzle_hash: [u8; 32]) -> [u8; 
 }
 
 /// This is the puzzle reveal of the [CAT2 standard](https://chialisp.com/cats) puzzle.
-pub static CAT_PUZZLE: [u8; 1672] = hex!(
+pub const CAT_PUZZLE: [u8; 1672] = hex!(
     "
     ff02ffff01ff02ff5effff04ff02ffff04ffff04ff05ffff04ffff0bff34ff05
     80ffff04ff0bff80808080ffff04ffff02ff17ff2f80ffff04ff5fffff04ffff
@@ -116,7 +116,7 @@ pub const CAT_PUZZLE_HASH: [u8; 32] = hex!(
 );
 
 /// This is the puzzle reveal of the [CAT2 multi-issuance TAIL](https://chialisp.com/cats#multi) puzzle.
-pub static EVERYTHING_WITH_SIGNATURE_TAIL_PUZZLE: [u8; 41] = hex!(
+pub const EVERYTHING_WITH_SIGNATURE_TAIL_PUZZLE: [u8; 41] = hex!(
     "
     ff02ffff01ff04ffff04ff02ffff04ff05ffff04ff5fff80808080ff8080ffff
     04ffff0132ff018080
@@ -129,7 +129,7 @@ pub static EVERYTHING_WITH_SIGNATURE_TAIL_PUZZLE: [u8; 41] = hex!(
 /// It is recommended not to use CAT1 for anything other than backwards compatibility (e.g. offer compression),
 /// due to security issues uncovered in an audit. You can read more about the vulnerability that prompted the creation
 /// of CAT2 in the [CATbleed Post Mortem](https://github.com/Chia-Network/post-mortem/blob/main/2022-08/2022-08-19-CATbleed.md).
-pub static CAT_PUZZLE_V1: [u8; 1420] = hex!(
+pub const CAT_PUZZLE_V1: [u8; 1420] = hex!(
     "
     ff02ffff01ff02ff5effff04ff02ffff04ffff04ff05ffff04ffff0bff2cff05
     80ffff04ff0bff80808080ffff04ffff02ff17ff2f80ffff04ff5fffff04ffff

@@ -1,7 +1,7 @@
 use hex_literal::hex;
 
 /// This is the puzzle reveal of the [offer settlement payments](https://chialisp.com/offers) puzzle.
-pub static SETTLEMENT_PAYMENTS_PUZZLE: [u8; 293] = hex!(
+pub const SETTLEMENT_PAYMENTS_PUZZLE: [u8; 293] = hex!(
     "
     ff02ffff01ff02ff0affff04ff02ffff04ff03ff80808080ffff04ffff01ffff
     333effff02ffff03ff05ffff01ff04ffff04ff0cffff04ffff02ff1effff04ff
@@ -27,7 +27,7 @@ pub const SETTLEMENT_PAYMENTS_PUZZLE_HASH: [u8; 32] = hex!(
 ///
 /// **Warning:**
 /// It is recommended not to use settlement payments v1 for anything other than backwards compatibility (e.g. offer compression).
-pub static SETTLEMENT_PAYMENTS_PUZZLE_V1: [u8; 267] = hex!(
+pub const SETTLEMENT_PAYMENTS_PUZZLE_V1: [u8; 267] = hex!(
     "
     ff02ffff01ff02ff0affff04ff02ffff04ff03ff80808080ffff04ffff01ffff
     333effff02ffff03ff05ffff01ff04ffff04ff0cffff04ffff02ff1effff04ff
