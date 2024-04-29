@@ -183,7 +183,7 @@ fn run_puzzle(
     let conds = native_run_puzzle::<MempoolVisitor>(
         &mut a, puzzle, solution, parent_id, amount, max_cost, flags,
     )?;
-    Ok(OwnedSpendBundleConditions::from(&a, conds))
+    Ok(OwnedSpendBundleConditions::from(&a, conds)?)
 }
 
 // this is like a CoinSpend but with references to the puzzle and solution,

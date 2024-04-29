@@ -1,14 +1,24 @@
-from chia_rs import Spend, SpendBundleConditions, Coin, G1Element, G2Element, Program
+from chia_rs import (
+    Spend,
+    SpendBundleConditions,
+    Coin,
+    G1Element,
+    G2Element,
+    Program,
+    AugSchemeMPL,
+)
 from chia_rs.sized_ints import uint64
+from chia_rs.sized_bytes import bytes32
 import pytest
 import copy
 
+sk = AugSchemeMPL.key_gen(bytes32.random())
+pk = sk.get_g1()
 
 coin = b"bcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc"
 parent = b"edededededededededededededededed"
 ph = b"abababababababababababababababab"
 ph2 = b"cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
-sig = b"abababababababababababababababababababababababab"
 
 
 def test_hash_spend() -> None:
@@ -25,7 +35,7 @@ def test_hash_spend() -> None:
         None,
         None,
         [(ph2, 1000000, None)],
-        [(sig, b"msg")],
+        [(pk, b"msg")],
         [],
         [],
         [],
@@ -46,7 +56,7 @@ def test_hash_spend() -> None:
         None,
         None,
         [(ph2, 1000000, None)],
-        [(sig, b"msg")],
+        [(pk, b"msg")],
         [],
         [],
         [],
@@ -65,10 +75,10 @@ def test_hash_spend() -> None:
 def test_hash_spend_bundle_conditions() -> None:
 
     a1 = SpendBundleConditions(
-        [], 1000, 1337, 42, None, None, [(sig, b"msg")], 12345678, 123, 456
+        [], 1000, 1337, 42, None, None, [(pk, b"msg")], 12345678, 123, 456
     )
     a2 = SpendBundleConditions(
-        [], 1001, 1337, 42, None, None, [(sig, b"msg")], 12345678, 123, 456
+        [], 1001, 1337, 42, None, None, [(pk, b"msg")], 12345678, 123, 456
     )
     b = hash(a1)
     c = hash(a2)
@@ -91,7 +101,7 @@ def test_json_spend() -> None:
         None,
         None,
         [(ph2, 1000000, None)],
-        [(sig, b"msg")],
+        [(pk, b"msg")],
         [],
         [],
         [],
@@ -113,7 +123,7 @@ def test_json_spend() -> None:
         "birth_height": None,
         "birth_seconds": None,
         "create_coin": [["0x" + ph2.hex(), 1000000, None]],
-        "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
+        "agg_sig_me": [["0x" + bytes(pk).hex(), "0x6d7367"]],
         "agg_sig_parent": [],
         "agg_sig_puzzle": [],
         "agg_sig_amount": [],
@@ -138,7 +148,7 @@ def test_from_json_spend() -> None:
         None,
         None,
         [(ph2, 1000000, None)],
-        [(sig, b"msg")],
+        [(pk, b"msg")],
         [],
         [],
         [],
@@ -161,7 +171,7 @@ def test_from_json_spend() -> None:
             "birth_height": None,
             "birth_seconds": None,
             "create_coin": [["0x" + ph2.hex(), 1000000, None]],
-            "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
+            "agg_sig_me": [["0x" + bytes(pk).hex(), "0x6d7367"]],
             "agg_sig_parent": [],
             "agg_sig_puzzle": [],
             "agg_sig_amount": [],
@@ -188,7 +198,7 @@ def test_from_json_spend_set_optional() -> None:
         None,
         None,
         [(ph2, 1000000, None)],
-        [(sig, b"msg")],
+        [(pk, b"msg")],
         [],
         [],
         [],
@@ -211,7 +221,7 @@ def test_from_json_spend_set_optional() -> None:
             "birth_height": None,
             "birth_seconds": None,
             "create_coin": [["0x" + ph2.hex(), 1000000, None]],
-            "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
+            "agg_sig_me": [["0x" + bytes(pk).hex(), "0x6d7367"]],
             "agg_sig_parent": [],
             "agg_sig_puzzle": [],
             "agg_sig_amount": [],
@@ -241,7 +251,7 @@ def test_invalid_hex_prefix() -> None:
                 "birth_height": None,
                 "birth_seconds": None,
                 "create_coin": [["0x" + ph2.hex(), 1000000, None]],
-                "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
+                "agg_sig_me": [["0x" + bytes(pk).hex(), "0x6d7367"]],
                 "agg_sig_parent": [],
                 "agg_sig_puzzle": [],
                 "agg_sig_amount": [],
@@ -270,7 +280,7 @@ def test_invalid_hex_prefix_bytes() -> None:
                 "birth_seconds": None,
                 "create_coin": [["0x" + ph2.hex(), 1000000, None]],
                 # the message field is missing the 0x prefix and is variable length bytes
-                "agg_sig_me": [["0x" + sig.hex(), "6d7367"]],
+                "agg_sig_me": [["0x" + bytes(pk).hex(), "6d7367"]],
                 "agg_sig_parent": [],
                 "agg_sig_puzzle": [],
                 "agg_sig_amount": [],
@@ -299,7 +309,7 @@ def test_invalid_hex_digit() -> None:
                 "birth_height": None,
                 "birth_seconds": None,
                 "create_coin": [["0x" + ph2.hex(), 1000000, None]],
-                "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
+                "agg_sig_me": [["0x" + bytes(pk).hex(), "0x6d7367"]],
                 "agg_sig_parent": [],
                 "agg_sig_puzzle": [],
                 "agg_sig_amount": [],
@@ -328,7 +338,7 @@ def test_invalid_hex_length() -> None:
                 "birth_height": None,
                 "birth_seconds": None,
                 "create_coin": [["0x" + ph2.hex(), 1000000, None]],
-                "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
+                "agg_sig_me": [["0x" + bytes(pk).hex(), "0x6d7367"]],
                 "agg_sig_parent": [],
                 "agg_sig_puzzle": [],
                 "agg_sig_amount": [],
@@ -356,7 +366,7 @@ def test_missing_field() -> None:
                 "birth_height": None,
                 "birth_seconds": None,
                 "create_coin": [["0x" + ph2.hex(), 1000000, None]],
-                "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
+                "agg_sig_me": [["0x" + bytes(pk).hex(), "0x6d7367"]],
                 "agg_sig_parent": [],
                 "agg_sig_puzzle": [],
                 "agg_sig_amount": [],
@@ -371,7 +381,7 @@ def test_missing_field() -> None:
 def test_json_spend_bundle_conditions() -> None:
 
     a = SpendBundleConditions(
-        [], 1000, 1337, 42, None, None, [(sig, b"msg")], 12345678, 123, 456
+        [], 1000, 1337, 42, None, None, [(pk, b"msg")], 12345678, 123, 456
     )
 
     assert a.to_json_dict() == {
@@ -381,7 +391,7 @@ def test_json_spend_bundle_conditions() -> None:
         "seconds_absolute": 42,
         "before_height_absolute": None,
         "before_seconds_absolute": None,
-        "agg_sig_unsafe": [["0x" + sig.hex(), "0x6d7367"]],
+        "agg_sig_unsafe": [["0x" + bytes(pk).hex(), "0x6d7367"]],
         "cost": 12345678,
         "removal_amount": 123,
         "addition_amount": 456,
@@ -391,7 +401,7 @@ def test_json_spend_bundle_conditions() -> None:
 def test_from_json_spend_bundle_conditions() -> None:
 
     a = SpendBundleConditions(
-        [], 1000, 1337, 42, None, None, [(sig, b"msg")], 12345678, 123, 456
+        [], 1000, 1337, 42, None, None, [(pk, b"msg")], 12345678, 123, 456
     )
     b = SpendBundleConditions.from_json_dict(
         {
@@ -401,7 +411,7 @@ def test_from_json_spend_bundle_conditions() -> None:
             "seconds_absolute": 42,
             "before_height_absolute": None,
             "before_seconds_absolute": None,
-            "agg_sig_unsafe": [["0x" + sig.hex(), "0x6d7367"]],
+            "agg_sig_unsafe": [["0x" + bytes(pk).hex(), "0x6d7367"]],
             "cost": 12345678,
             "removal_amount": 123,
             "addition_amount": 456,
@@ -424,7 +434,7 @@ def test_copy_spend() -> None:
         None,
         None,
         [(ph2, 1000000, None)],
-        [(sig, b"msg")],
+        [(pk, b"msg")],
         [],
         [],
         [],
@@ -446,7 +456,7 @@ def test_copy_spend() -> None:
 def test_copy_spend_bundle_conditions() -> None:
 
     a = SpendBundleConditions(
-        [], 1000, 1337, 42, None, None, [(sig, b"msg")], 12345678, 123, 456
+        [], 1000, 1337, 42, None, None, [(pk, b"msg")], 12345678, 123, 456
     )
     b = copy.copy(a)
 

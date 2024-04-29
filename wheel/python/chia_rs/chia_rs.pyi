@@ -238,13 +238,13 @@ class Spend:
     birth_height: Optional[int]
     birth_seconds: Optional[int]
     create_coin: List[Tuple[bytes, int, Optional[bytes]]]
-    agg_sig_me: List[Tuple[bytes, bytes]]
-    agg_sig_parent: List[Tuple[bytes, bytes]]
-    agg_sig_puzzle: List[Tuple[bytes, bytes]]
-    agg_sig_amount: List[Tuple[bytes, bytes]]
-    agg_sig_puzzle_amount: List[Tuple[bytes, bytes]]
-    agg_sig_parent_amount: List[Tuple[bytes, bytes]]
-    agg_sig_parent_puzzle: List[Tuple[bytes, bytes]]
+    agg_sig_me: List[Tuple[G1Element, bytes]]
+    agg_sig_parent: List[Tuple[G1Element, bytes]]
+    agg_sig_puzzle: List[Tuple[G1Element, bytes]]
+    agg_sig_amount: List[Tuple[G1Element, bytes]]
+    agg_sig_puzzle_amount: List[Tuple[G1Element, bytes]]
+    agg_sig_parent_amount: List[Tuple[G1Element, bytes]]
+    agg_sig_parent_puzzle: List[Tuple[G1Element, bytes]]
     flags: int
     def __init__(
         self,
@@ -259,13 +259,13 @@ class Spend:
         birth_height: Optional[int],
         birth_seconds: Optional[int],
         create_coin: Sequence[Tuple[bytes, int, Optional[bytes]]],
-        agg_sig_me: Sequence[Tuple[bytes, bytes]],
-        agg_sig_parent: Sequence[Tuple[bytes, bytes]],
-        agg_sig_puzzle: Sequence[Tuple[bytes, bytes]],
-        agg_sig_amount: Sequence[Tuple[bytes, bytes]],
-        agg_sig_puzzle_amount: Sequence[Tuple[bytes, bytes]],
-        agg_sig_parent_amount: Sequence[Tuple[bytes, bytes]],
-        agg_sig_parent_puzzle: Sequence[Tuple[bytes, bytes]],
+        agg_sig_me: Sequence[Tuple[G1Element, bytes]],
+        agg_sig_parent: Sequence[Tuple[G1Element, bytes]],
+        agg_sig_puzzle: Sequence[Tuple[G1Element, bytes]],
+        agg_sig_amount: Sequence[Tuple[G1Element, bytes]],
+        agg_sig_puzzle_amount: Sequence[Tuple[G1Element, bytes]],
+        agg_sig_parent_amount: Sequence[Tuple[G1Element, bytes]],
+        agg_sig_parent_puzzle: Sequence[Tuple[G1Element, bytes]],
         flags: int
     ) -> None: ...
     def __hash__(self) -> int: ...
@@ -297,13 +297,13 @@ class Spend:
         birth_height: Union[ Optional[int], _Unspec] = _Unspec(),
         birth_seconds: Union[ Optional[int], _Unspec] = _Unspec(),
         create_coin: Union[ List[Tuple[bytes, int, Optional[bytes]]], _Unspec] = _Unspec(),
-        agg_sig_me: Union[ List[Tuple[bytes, bytes]], _Unspec] = _Unspec(),
-        agg_sig_parent: Union[ List[Tuple[bytes, bytes]], _Unspec] = _Unspec(),
-        agg_sig_puzzle: Union[ List[Tuple[bytes, bytes]], _Unspec] = _Unspec(),
-        agg_sig_amount: Union[ List[Tuple[bytes, bytes]], _Unspec] = _Unspec(),
-        agg_sig_puzzle_amount: Union[ List[Tuple[bytes, bytes]], _Unspec] = _Unspec(),
-        agg_sig_parent_amount: Union[ List[Tuple[bytes, bytes]], _Unspec] = _Unspec(),
-        agg_sig_parent_puzzle: Union[ List[Tuple[bytes, bytes]], _Unspec] = _Unspec(),
+        agg_sig_me: Union[ List[Tuple[G1Element, bytes]], _Unspec] = _Unspec(),
+        agg_sig_parent: Union[ List[Tuple[G1Element, bytes]], _Unspec] = _Unspec(),
+        agg_sig_puzzle: Union[ List[Tuple[G1Element, bytes]], _Unspec] = _Unspec(),
+        agg_sig_amount: Union[ List[Tuple[G1Element, bytes]], _Unspec] = _Unspec(),
+        agg_sig_puzzle_amount: Union[ List[Tuple[G1Element, bytes]], _Unspec] = _Unspec(),
+        agg_sig_parent_amount: Union[ List[Tuple[G1Element, bytes]], _Unspec] = _Unspec(),
+        agg_sig_parent_puzzle: Union[ List[Tuple[G1Element, bytes]], _Unspec] = _Unspec(),
         flags: Union[ int, _Unspec] = _Unspec()) -> Spend: ...
 
 class SpendBundleConditions:
@@ -313,7 +313,7 @@ class SpendBundleConditions:
     seconds_absolute: int
     before_height_absolute: Optional[int]
     before_seconds_absolute: Optional[int]
-    agg_sig_unsafe: List[Tuple[bytes, bytes]]
+    agg_sig_unsafe: List[Tuple[G1Element, bytes]]
     cost: int
     removal_amount: int
     addition_amount: int
@@ -325,7 +325,7 @@ class SpendBundleConditions:
         seconds_absolute: int,
         before_height_absolute: Optional[int],
         before_seconds_absolute: Optional[int],
-        agg_sig_unsafe: Sequence[Tuple[bytes, bytes]],
+        agg_sig_unsafe: Sequence[Tuple[G1Element, bytes]],
         cost: int,
         removal_amount: int,
         addition_amount: int
@@ -354,7 +354,7 @@ class SpendBundleConditions:
         seconds_absolute: Union[ int, _Unspec] = _Unspec(),
         before_height_absolute: Union[ Optional[int], _Unspec] = _Unspec(),
         before_seconds_absolute: Union[ Optional[int], _Unspec] = _Unspec(),
-        agg_sig_unsafe: Union[ List[Tuple[bytes, bytes]], _Unspec] = _Unspec(),
+        agg_sig_unsafe: Union[ List[Tuple[G1Element, bytes]], _Unspec] = _Unspec(),
         cost: Union[ int, _Unspec] = _Unspec(),
         removal_amount: Union[ int, _Unspec] = _Unspec(),
         addition_amount: Union[ int, _Unspec] = _Unspec()) -> SpendBundleConditions: ...
