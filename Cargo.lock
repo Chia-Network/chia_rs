@@ -352,6 +352,7 @@ dependencies = [
 name = "chia-consensus"
 version = "0.7.0"
 dependencies = [
+ "chia-bls 0.7.0",
  "chia-protocol",
  "chia-puzzles",
  "chia-traits 0.7.0",

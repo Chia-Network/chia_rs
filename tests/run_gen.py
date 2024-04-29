@@ -53,7 +53,7 @@ def print_spend_bundle_conditions(result) -> str:
     if result.before_height_absolute is not None:
         ret += f"ASSERT_BEFORE_HEIGHT_ABSOLUTE {result.before_height_absolute}\n"
     for a in sorted(result.agg_sig_unsafe):
-        ret += f"AGG_SIG_UNSAFE pk: {a[0].hex()} msg: {a[1].hex()}\n"
+        ret += f"AGG_SIG_UNSAFE pk: {a[0]} msg: {a[1].hex()}\n"
     ret += "SPENDS:\n"
     for s in sorted(result.spends, key=lambda x: x.coin_id):
         ret += f"- coin id: {s.coin_id.hex()} ph: {s.puzzle_hash.hex()}\n"
@@ -72,7 +72,7 @@ def print_spend_bundle_conditions(result) -> str:
             else:
                 ret += f"  CREATE_COIN: ph: {a[0].hex()} amount: {a[1]}\n"
         for a in sorted(s.agg_sig_me):
-            ret += f"  AGG_SIG_ME pk: {a[0].hex()} msg: {a[1].hex()}\n"
+            ret += f"  AGG_SIG_ME pk: {a[0]} msg: {a[1].hex()}\n"
     ret += f"cost: {result.cost}\n"
     ret += f"removal_amount: {result.removal_amount}\n"
     ret += f"addition_amount: {result.addition_amount}\n"

@@ -4,7 +4,7 @@ use chia_consensus::gen::flags::ANALYZE_SPENDS;
 use chia_consensus::gen::owned_conditions::OwnedSpendBundleConditions;
 use chia_consensus::gen::run_block_generator::run_block_generator as native_run_block_generator;
 use chia_consensus::gen::run_block_generator::run_block_generator2 as native_run_block_generator2;
-use chia_consensus::gen::validation_error::ValidationErr;
+use chia_consensus::gen::validation_error::{ErrorCode, ValidationErr};
 
 use clvmr::cost::Cost;
 
@@ -49,14 +49,12 @@ pub fn run_block_generator(
     Ok(
         match run_block(&mut allocator, program, &refs, max_cost, flags) {
             Ok(spend_bundle_conds) => {
-                // everything was successful
-                (
-                    None,
-                    Some(OwnedSpendBundleConditions::from(
-                        &allocator,
-                        spend_bundle_conds,
-                    )),
-                )
+                let conds = OwnedSpendBundleConditions::from(&allocator, spend_bundle_conds);
+                match conds {
+                    // everything was successful
+                    Ok(c) => (None, Some(c)),
+                    Err(_) => (Some(ErrorCode::InvalidPublicKey.into()), None),
+                }
             }
             Err(ValidationErr(_, error_code)) => {
                 // a validation error occurred
@@ -103,14 +101,12 @@ pub fn run_block_generator2(
     Ok(
         match run_block(&mut allocator, program, &refs, max_cost, flags) {
             Ok(spend_bundle_conds) => {
-                // everything was successful
-                (
-                    None,
-                    Some(OwnedSpendBundleConditions::from(
-                        &allocator,
-                        spend_bundle_conds,
-                    )),
-                )
+                let conds = OwnedSpendBundleConditions::from(&allocator, spend_bundle_conds);
+                match conds {
+                    // everything was successful
+                    Ok(c) => (None, Some(c)),
+                    Err(_) => (Some(ErrorCode::InvalidPublicKey.into()), None),
+                }
             }
             Err(ValidationErr(_, error_code)) => {
                 // a validation error occurred

@@ -20,6 +20,9 @@ pub enum Error {
     #[error("Validation {0}")]
     Validation(#[from] ValidationErr),
 
+    #[error("BLS {0}")]
+    Bls(#[from] chia_bls::Error),
+
     #[error("not a singleton mod hash")]
     NotSingletonModHash,
 
