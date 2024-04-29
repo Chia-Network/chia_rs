@@ -171,7 +171,7 @@ pub static NFT_STATE_LAYER_PUZZLE: [u8; 827] = hex!(
 );
 
 /// This is the puzzle hash of the [NFT1 state layer](https://chialisp.com/nfts) puzzle.
-pub static NFT_STATE_LAYER_PUZZLE_HASH: [u8; 32] = hex!(
+pub const NFT_STATE_LAYER_PUZZLE_HASH: [u8; 32] = hex!(
     "
     a04d9f57764f54a43e4030befb4d80026e870519aaa66334aef8304f5d0393c2
     "
@@ -223,7 +223,7 @@ pub static NFT_OWNERSHIP_LAYER_PUZZLE: [u8; 1226] = hex!(
 );
 
 /// This is the puzzle hash of the [NFT1 ownership layer](https://chialisp.com/nfts) puzzle.
-pub static NFT_OWNERSHIP_LAYER_PUZZLE_HASH: [u8; 32] = hex!(
+pub const NFT_OWNERSHIP_LAYER_PUZZLE_HASH: [u8; 32] = hex!(
     "
     c5abea79afaa001b5427dfa0c8cf42ca6f38f5841b78f9b3c252733eb2de2726
     "
@@ -258,7 +258,7 @@ pub static NFT_ROYALTY_TRANSFER_PUZZLE: [u8; 687] = hex!(
 );
 
 /// This is the puzzle hash of the [NFT1 royalty transfer](https://chialisp.com/nfts) puzzle.
-pub static NFT_ROYALTY_TRANSFER_PUZZLE_HASH: [u8; 32] = hex!(
+pub const NFT_ROYALTY_TRANSFER_PUZZLE_HASH: [u8; 32] = hex!(
     "
     025dee0fb1e9fa110302a7e9bfb6e381ca09618e2778b0184fa5c6b275cfce1f
     "
@@ -279,7 +279,7 @@ pub static NFT_METADATA_UPDATER_PUZZLE: [u8; 241] = hex!(
 );
 
 /// This is the puzzle hash of the [NFT1 metadata updater](https://chialisp.com/nfts) puzzle.
-pub static NFT_METADATA_UPDATER_PUZZLE_HASH: [u8; 32] = hex!(
+pub const NFT_METADATA_UPDATER_PUZZLE_HASH: [u8; 32] = hex!(
     "
     fe8a4b4e27a2e29a4d3fc7ce9d527adbcaccbab6ada3903ccf3ba9a769d2d78b
     "
@@ -295,7 +295,7 @@ pub static NFT_INTERMEDIATE_LAUNCHER_PUZZLE: [u8; 65] = hex!(
 );
 
 /// This is the puzzle hash of the [NFT1 intermediate launcher](https://chialisp.com/nfts) puzzle.
-pub static NFT_INTERMEDIATE_LAUNCHER_PUZZLE_HASH: [u8; 32] = hex!(
+pub const NFT_INTERMEDIATE_LAUNCHER_PUZZLE_HASH: [u8; 32] = hex!(
     "
     7a32d2d9571d3436791c0ad3d7fcfdb9c43ace2b0f0ff13f98d29f0cc093f445
     "

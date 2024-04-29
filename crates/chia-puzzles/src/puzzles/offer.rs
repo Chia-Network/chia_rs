@@ -17,7 +17,7 @@ pub static SETTLEMENT_PAYMENTS_PUZZLE: [u8; 293] = hex!(
 );
 
 /// This is the puzzle hash of the [offer settlement payments](https://chialisp.com/offers) puzzle.
-pub static SETTLEMENT_PAYMENTS_PUZZLE_HASH: [u8; 32] = hex!(
+pub const SETTLEMENT_PAYMENTS_PUZZLE_HASH: [u8; 32] = hex!(
     "
     cfbfdeed5c4ca2de3d0bf520b9cb4bb7743a359bd2e6a188d19ce7dffc21d3e7
     "
@@ -45,7 +45,7 @@ pub static SETTLEMENT_PAYMENTS_PUZZLE_V1: [u8; 267] = hex!(
 ///
 /// **Warning:**
 /// It is recommended not to use settlement payments v1 for anything other than backwards compatibility (e.g. offer compression).
-pub static SETTLEMENT_PAYMENTS_PUZZLE_HASH_V1: [u8; 32] = hex!(
+pub const SETTLEMENT_PAYMENTS_PUZZLE_HASH_V1: [u8; 32] = hex!(
     "
     bae24162efbd568f89bc7a340798a6118df0189eb9e3f8697bcea27af99f8f79
     "

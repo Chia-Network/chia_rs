@@ -46,7 +46,7 @@ impl SingletonStruct {
 }
 
 /// This is the puzzle reveal of the [singleton launcher](https://chialisp.com/singletons#launcher) puzzle.
-pub const SINGLETON_LAUNCHER_PUZZLE: [u8; 175] = hex!(
+pub static SINGLETON_LAUNCHER_PUZZLE: [u8; 175] = hex!(
     "
     ff02ffff01ff04ffff04ff04ffff04ff05ffff04ff0bff80808080ffff04ffff
     04ff0affff04ffff02ff0effff04ff02ffff04ffff04ff05ffff04ff0bffff04
@@ -65,7 +65,7 @@ pub const SINGLETON_LAUNCHER_PUZZLE_HASH: [u8; 32] = hex!(
 );
 
 /// This is the puzzle reveal of the [singleton](https://chialisp.com/singletons) puzzle.
-pub const SINGLETON_TOP_LAYER_PUZZLE: [u8; 967] = hex!(
+pub static SINGLETON_TOP_LAYER_PUZZLE: [u8; 967] = hex!(
     "
     ff02ffff01ff02ffff03ffff18ff2fff3480ffff01ff04ffff04ff20ffff04ff
     2fff808080ffff04ffff02ff3effff04ff02ffff04ff05ffff04ffff02ff2aff

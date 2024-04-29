@@ -52,7 +52,7 @@ where
 }
 
 /// This is the puzzle reveal of the [DID1 standard](https://chialisp.com/dids) puzzle.
-pub const DID_INNER_PUZZLE: [u8; 1012] = hex!(
+pub static DID_INNER_PUZZLE: [u8; 1012] = hex!(
     "
     ff02ffff01ff02ffff03ff81bfffff01ff02ff05ff82017f80ffff01ff02ffff
     03ffff22ffff09ffff02ff7effff04ff02ffff04ff8217ffff80808080ff0b80

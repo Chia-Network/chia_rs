@@ -23,7 +23,7 @@ pub fn standard_puzzle_hash(synthetic_key: &PublicKey) -> [u8; 32] {
 }
 
 /// This is the puzzle reveal of the [standard transaction](https://chialisp.com/standard-transactions) puzzle.
-pub const STANDARD_PUZZLE: [u8; 227] = hex!(
+pub static STANDARD_PUZZLE: [u8; 227] = hex!(
     "
     ff02ffff01ff02ffff03ff0bffff01ff02ffff03ffff09ff05ffff1dff0bffff
     1effff0bff0bffff02ff06ffff04ff02ffff04ff17ff8080808080808080ffff
