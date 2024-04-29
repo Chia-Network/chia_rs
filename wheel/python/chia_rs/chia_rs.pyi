@@ -2384,6 +2384,9 @@ class UnfinishedHeaderBlock:
     foliage: Foliage
     foliage_transaction_block: Optional[FoliageTransactionBlock]
     transactions_filter: bytes
+    prev_header_hash: bytes32
+    header_hash: bytes32
+    total_iters: uint128
     def __init__(
         self,
         finished_sub_slots: Sequence[EndOfSubSlotBundle],

@@ -197,6 +197,11 @@ extra_members = {
         "is_transaction_block: bool",
         "first_in_sub_slot: bool",
     ],
+    "UnfinishedHeaderBlock": [
+        "prev_header_hash: bytes32",
+        "header_hash: bytes32",
+        "total_iters: uint128",
+    ],
     "RewardChainBlock": [
         "def get_unfinished(self) -> RewardChainBlockUnfinished: ...",
     ],
