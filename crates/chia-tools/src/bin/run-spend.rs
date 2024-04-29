@@ -1,5 +1,6 @@
 use chia_consensus::gen::conditions::Condition;
 use chia_traits::Streamable;
+use chia_wallet::Proof;
 use clap::Parser;
 use clvm_traits::{FromClvm, ToNodePtr};
 use clvm_utils::tree_hash;
@@ -10,7 +11,6 @@ use chia_wallet::cat::{CatArgs, CatSolution, CAT_PUZZLE_HASH};
 use chia_wallet::did::{DidArgs, DidSolution, DID_INNER_PUZZLE_HASH};
 use chia_wallet::singleton::{SingletonArgs, SingletonSolution, SINGLETON_TOP_LAYER_PUZZLE_HASH};
 use chia_wallet::standard::{StandardArgs, StandardSolution, STANDARD_PUZZLE_HASH};
-use chia_wallet::Proof;
 
 /// Run a puzzle given a solution and print the resulting conditions
 #[derive(Parser, Debug)]
@@ -238,7 +238,7 @@ fn print_puzzle_info(a: &Allocator, puzzle: NodePtr, solution: NodePtr) {
                 return;
             };
             println!("  solution");
-            match sol.proof {
+            match sol.lineage_proof {
                 Proof::Lineage(lp) => {
                     println!("    lineage-proof: {lp:?}");
                 }

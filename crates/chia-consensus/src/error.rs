@@ -41,6 +41,9 @@ pub enum Error {
     #[error("coin mismatch")]
     CoinMismatch,
 
+    #[error("expected lineage proof, found eve proof")]
+    ExpectedLineageProof,
+
     #[error("{0}")]
     Custom(String),
 }

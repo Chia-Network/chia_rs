@@ -22,7 +22,7 @@ pub struct SingletonStruct {
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(list)]
 pub struct SingletonSolution<I> {
-    pub proof: Proof,
+    pub lineage_proof: Proof,
     pub amount: u64,
     pub inner_solution: I,
 }
