@@ -475,6 +475,27 @@ where
     }
 }
 
+pub fn aggregate_verify_gt<Gt: Borrow<GTElement>, I>(sig: &Signature, data: I) -> bool
+where
+    I: IntoIterator<Item = Gt>,
+{
+    if !sig.is_valid() {
+        return false;
+    }
+
+    let mut data = data.into_iter();
+    let Some(agg) = data.next() else {
+        return *sig == Signature::default();
+    };
+
+    let mut agg = agg.borrow().clone();
+    for gt in data {
+        agg *= gt.borrow();
+    }
+
+    agg == sig.pair(&PublicKey::generator())
+}
+
 // Signs msg using sk without augmenting the message with the public key. This
 // function is used when the caller augments the message with some other public
 // key
@@ -682,6 +703,44 @@ mod tests {
         assert!(aggregate_pairing(pairs.clone()));
         // order does not matter
         assert!(aggregate_pairing(pairs.into_iter().rev()));
+    }
+
+    #[rstest]
+    fn test_aggregate_gt_signature(#[values(0, 1, 2, 3, 4, 5, 100)] num_keys: usize) {
+        let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
+        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+        let msg = b"foobar";
+        let mut agg = Signature::default();
+        let mut gts = Vec::<GTElement>::new();
+        let mut pks = Vec::<PublicKey>::new();
+        for idx in 0..num_keys {
+            let derived = sk.derive_hardened(idx as u32);
+            let pk = derived.public_key();
+            let sig = sign(&derived, msg);
+            agg.aggregate(&sig);
+            gts.push(aug_msg_to_g2(&pk, msg).pair(&pk));
+            pks.push(pk);
+        }
+
+        assert!(aggregate_verify_gt(&agg, &gts));
+        assert!(aggregate_verify(&agg, pks.iter().map(|pk| (pk, &msg[..]))));
+
+        // the order of the GTElements does not matter
+        for _ in 0..num_keys {
+            gts.rotate_right(1);
+            pks.rotate_right(1);
+            assert!(aggregate_verify_gt(&agg, &gts));
+            assert!(aggregate_verify(&agg, pks.iter().map(|pk| (pk, &msg[..]))));
+        }
+        for _ in 0..num_keys {
+            gts.rotate_right(1);
+            pks.rotate_right(1);
+            assert!(!aggregate_verify_gt(&agg, &gts[1..]));
+            assert!(!aggregate_verify(
+                &agg,
+                pks[1..].iter().map(|pk| (pk, &msg[..]))
+            ));
+        }
     }
 
     #[test]
