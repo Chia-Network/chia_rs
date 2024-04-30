@@ -200,8 +200,6 @@ impl<N> FromClvm<N> for chia_bls::Signature {
 mod tests {
     use clvmr::{serde::node_from_bytes, Allocator, NodePtr};
 
-    use crate::{OwnedAtom, SizedAtom};
-
     use super::*;
 
     fn decode<T>(a: &mut Allocator, hex: &str) -> Result<T, FromClvmError>
@@ -286,23 +284,6 @@ mod tests {
         let a = &mut Allocator::new();
         assert_eq!(decode(a, "8568656c6c6f"), Ok("hello".to_string()));
         assert_eq!(decode(a, "80"), Ok("".to_string()));
-    }
-
-    #[test]
-    fn test_owned_atom() {
-        let a = &mut Allocator::new();
-        assert_eq!(decode(a, "80"), Ok(OwnedAtom::new(Vec::new())));
-        assert_eq!(
-            decode(a, "8568656c6c6f"),
-            Ok(OwnedAtom::new(b"hello".to_vec()))
-        );
-    }
-
-    #[test]
-    fn test_sized_atom() {
-        let a = &mut Allocator::new();
-        assert_eq!(decode(a, "80"), Ok(SizedAtom::new([])));
-        assert_eq!(decode(a, "8568656c6c6f"), Ok(SizedAtom::new(*b"hello")));
     }
 
     #[cfg(feature = "chia-bls")]

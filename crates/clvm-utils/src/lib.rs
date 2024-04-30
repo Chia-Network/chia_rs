@@ -26,8 +26,12 @@
 
 mod curried_program;
 mod curry_tree_hash;
+mod owned_atom;
+mod sized_atom;
 mod tree_hash;
 
 pub use curried_program::*;
 pub use curry_tree_hash::*;
+pub use owned_atom::*;
+pub use sized_atom::*;
 pub use tree_hash::*;
