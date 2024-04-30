@@ -9,6 +9,11 @@ use chia_protocol::SpendBundle;
 use crate::BlockGenerator;
 use crate::gen::solution_generator::solution_generator;
 use chia_protocol::Program;
+use crate::gen::flags::{
+    AGG_SIG_ARGS, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL, ALLOW_BACKREFS, 
+    ENABLE_SOFTFORK_CONDITION, ENABLE_MESSAGE_CONDITIONS
+};
+use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV};
 
 // currently in multiprocess_validation.py
 // called via blockchain.py from full_node.py when a full node wants to add a block or batch of blocks
@@ -51,4 +56,39 @@ pub fn simple_solution_generator(bundle: SpendBundle) -> BlockGenerator {
     }
     let block_program = solution_generator(spends);
     BlockGenerator(Program.from_bytes(block_program), &[], &[])
+}
+
+pub fn get_flags_for_height_and_constants(height: u32, constats: ConsensusConstants) -> u32 {
+    let mut flags: u32 = 0;
+    if height >= constants.SOFT_FORK2_HEIGHT{
+        flags = flags | NO_RELATIVE_CONDITIONS_ON_EPHEMERAL
+    }
+    if height >= constants.SOFT_FORK4_HEIGHT{
+        flags = flags | ENABLE_MESSAGE_CONDITIONS
+    }
+    if height >= constants.HARD_FORK_HEIGHT {
+        //  the hard-fork initiated with 2.0. To activate June 2024
+        //  * costs are ascribed to some unknown condition codes, to allow for
+            // soft-forking in new conditions with cost
+        //  * a new condition, SOFTFORK, is added which takes a first parameter to
+        //    specify its cost. This allows soft-forks similar to the softfork
+        //    operator
+        //  * BLS operators introduced in the soft-fork (behind the softfork
+        //    guard) are made available outside of the guard.
+        //  * division with negative numbers are allowed, and round toward
+        //    negative infinity
+        //  * AGG_SIG_* conditions are allowed to have unknown additional
+        //    arguments
+        //  * Allow the block generator to be serialized with the improved clvm
+        //   serialization format (with back-references)
+        flags = (
+            flags
+            | ENABLE_SOFTFORK_CONDITION
+            | ENABLE_BLS_OPS_OUTSIDE_GUARD
+            | ENABLE_FIXED_DIV
+            | AGG_SIG_ARGS
+            | ALLOW_BACKREFS
+        )
+    }
+    flags
 }
