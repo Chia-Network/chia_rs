@@ -288,6 +288,11 @@ impl Signature {
     }
 }
 
+// validate a series of public keys (G1 points) and G2 points. These points are
+// paired and the resulting GT points are multiplied. If the resulting GT point
+// is the identity, the function returns true, otherwise false. To validate an
+// aggregate signature, include the G1 generator and the signature as one of the
+// pairs.
 pub fn aggregate_pairing<G1: Borrow<PublicKey>, G2: Borrow<Signature>, I>(data: I) -> bool
 where
     I: IntoIterator<Item = (G1, G2)>,
@@ -361,6 +366,8 @@ pub fn hash_to_g2_with_dst(msg: &[u8], dst: &[u8]) -> Signature {
     Signature(p2)
 }
 
+// aggregate the signatures into a single one. It can then be validated using
+// aggregate_verify()
 pub fn aggregate<Sig: Borrow<Signature>, I>(sigs: I) -> Signature
 where
     I: IntoIterator<Item = Sig>,
@@ -373,6 +380,8 @@ where
     ret
 }
 
+// verify a signature given a single public key and message using the augmented
+// scheme, i.e. the public key is pre-pended to the message before hashed to G2.
 pub fn verify<Msg: AsRef<[u8]>>(sig: &Signature, key: &PublicKey, msg: Msg) -> bool {
     unsafe {
         let mut pubkey_affine = MaybeUninit::<blst_p1_affine>::uninit();
@@ -400,6 +409,9 @@ pub fn verify<Msg: AsRef<[u8]>>(sig: &Signature, key: &PublicKey, msg: Msg) -> b
     }
 }
 
+// verify an aggregate signature given all public keys and messages.
+// Messages will been augmented with the public key.
+// returns true if the signature is valid.
 pub fn aggregate_verify<Pk: Borrow<PublicKey>, Msg: Borrow<[u8]>, I>(
     sig: &Signature,
     data: I,
@@ -475,6 +487,10 @@ where
     }
 }
 
+// verify an aggregate signature by pre-paired public keys and messages.
+// Messages having been augmented and hashed to G2 and then paired with the G1
+// public key.
+// returns true if the signature is valid.
 pub fn aggregate_verify_gt<Gt: Borrow<GTElement>, I>(sig: &Signature, data: I) -> bool
 where
     I: IntoIterator<Item = Gt>,
@@ -517,6 +533,8 @@ pub fn sign_raw<Msg: AsRef<[u8]>>(sk: &SecretKey, msg: Msg) -> Signature {
     Signature(p2)
 }
 
+// Signs msg using sk using the augmented scheme, meaning the public key is
+// pre-pended to msg befire signing.
 pub fn sign<Msg: AsRef<[u8]>>(sk: &SecretKey, msg: Msg) -> Signature {
     let mut aug_msg = sk.public_key().to_bytes().to_vec();
     aug_msg.extend_from_slice(msg.as_ref());
