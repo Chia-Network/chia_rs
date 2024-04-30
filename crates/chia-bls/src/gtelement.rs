@@ -6,7 +6,7 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::mem::MaybeUninit;
-use std::ops::MulAssign;
+use std::ops::{Mul, MulAssign};
 
 #[cfg(feature = "py-bindings")]
 use chia_py_streamable_macro::PyStreamable;
@@ -19,7 +19,8 @@ use pyo3::exceptions::PyValueError;
 #[cfg(feature = "py-bindings")]
 use pyo3::{pyclass, pymethods, IntoPy, PyAny, PyObject, PyResult, Python};
 
-#[cfg_attr(feature = "py-bindings", pyclass, derive(PyStreamable, Clone))]
+#[cfg_attr(feature = "py-bindings", pyclass, derive(PyStreamable))]
+#[derive(Clone)]
 pub struct GTElement(pub(crate) blst_fp12);
 
 impl GTElement {
@@ -90,6 +91,18 @@ impl MulAssign<&GTElement> for GTElement {
         unsafe {
             blst_fp12_mul(&mut self.0, &self.0, &rhs.0);
         }
+    }
+}
+
+impl Mul<&GTElement> for &GTElement {
+    type Output = GTElement;
+    fn mul(self, rhs: &GTElement) -> GTElement {
+        let gt = unsafe {
+            let mut gt = MaybeUninit::<blst_fp12>::uninit();
+            blst_fp12_mul(gt.as_mut_ptr(), &self.0, &rhs.0);
+            gt.assume_init()
+        };
+        GTElement(gt)
     }
 }
 

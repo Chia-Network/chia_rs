@@ -288,6 +288,11 @@ impl Signature {
     }
 }
 
+// validate a series of public keys (G1 points) and G2 points. These points are
+// paired and the resulting GT points are multiplied. If the resulting GT point
+// is the identity, the function returns true, otherwise false. To validate an
+// aggregate signature, include the G1 generator and the signature as one of the
+// pairs.
 pub fn aggregate_pairing<G1: Borrow<PublicKey>, G2: Borrow<Signature>, I>(data: I) -> bool
 where
     I: IntoIterator<Item = (G1, G2)>,
@@ -361,6 +366,8 @@ pub fn hash_to_g2_with_dst(msg: &[u8], dst: &[u8]) -> Signature {
     Signature(p2)
 }
 
+// aggregate the signatures into a single one. It can then be validated using
+// aggregate_verify()
 pub fn aggregate<Sig: Borrow<Signature>, I>(sigs: I) -> Signature
 where
     I: IntoIterator<Item = Sig>,
@@ -373,6 +380,8 @@ where
     ret
 }
 
+// verify a signature given a single public key and message using the augmented
+// scheme, i.e. the public key is pre-pended to the message before hashed to G2.
 pub fn verify<Msg: AsRef<[u8]>>(sig: &Signature, key: &PublicKey, msg: Msg) -> bool {
     unsafe {
         let mut pubkey_affine = MaybeUninit::<blst_p1_affine>::uninit();
@@ -400,6 +409,9 @@ pub fn verify<Msg: AsRef<[u8]>>(sig: &Signature, key: &PublicKey, msg: Msg) -> b
     }
 }
 
+// verify an aggregate signature given all public keys and messages.
+// Messages will been augmented with the public key.
+// returns true if the signature is valid.
 pub fn aggregate_verify<Pk: Borrow<PublicKey>, Msg: Borrow<[u8]>, I>(
     sig: &Signature,
     data: I,
@@ -475,6 +487,31 @@ where
     }
 }
 
+// verify an aggregate signature by pre-paired public keys and messages.
+// Messages having been augmented and hashed to G2 and then paired with the G1
+// public key.
+// returns true if the signature is valid.
+pub fn aggregate_verify_gt<Gt: Borrow<GTElement>, I>(sig: &Signature, data: I) -> bool
+where
+    I: IntoIterator<Item = Gt>,
+{
+    if !sig.is_valid() {
+        return false;
+    }
+
+    let mut data = data.into_iter();
+    let Some(agg) = data.next() else {
+        return *sig == Signature::default();
+    };
+
+    let mut agg = agg.borrow().clone();
+    for gt in data {
+        agg *= gt.borrow();
+    }
+
+    agg == sig.pair(&PublicKey::generator())
+}
+
 // Signs msg using sk without augmenting the message with the public key. This
 // function is used when the caller augments the message with some other public
 // key
@@ -496,6 +533,8 @@ pub fn sign_raw<Msg: AsRef<[u8]>>(sk: &SecretKey, msg: Msg) -> Signature {
     Signature(p2)
 }
 
+// Signs msg using sk using the augmented scheme, meaning the public key is
+// pre-pended to msg befire signing.
 pub fn sign<Msg: AsRef<[u8]>>(sk: &SecretKey, msg: Msg) -> Signature {
     let mut aug_msg = sk.public_key().to_bytes().to_vec();
     aug_msg.extend_from_slice(msg.as_ref());
@@ -682,6 +721,44 @@ mod tests {
         assert!(aggregate_pairing(pairs.clone()));
         // order does not matter
         assert!(aggregate_pairing(pairs.into_iter().rev()));
+    }
+
+    #[rstest]
+    fn test_aggregate_gt_signature(#[values(0, 1, 2, 3, 4, 5, 100)] num_keys: usize) {
+        let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
+        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+        let msg = b"foobar";
+        let mut agg = Signature::default();
+        let mut gts = Vec::<GTElement>::new();
+        let mut pks = Vec::<PublicKey>::new();
+        for idx in 0..num_keys {
+            let derived = sk.derive_hardened(idx as u32);
+            let pk = derived.public_key();
+            let sig = sign(&derived, msg);
+            agg.aggregate(&sig);
+            gts.push(aug_msg_to_g2(&pk, msg).pair(&pk));
+            pks.push(pk);
+        }
+
+        assert!(aggregate_verify_gt(&agg, &gts));
+        assert!(aggregate_verify(&agg, pks.iter().map(|pk| (pk, &msg[..]))));
+
+        // the order of the GTElements does not matter
+        for _ in 0..num_keys {
+            gts.rotate_right(1);
+            pks.rotate_right(1);
+            assert!(aggregate_verify_gt(&agg, &gts));
+            assert!(aggregate_verify(&agg, pks.iter().map(|pk| (pk, &msg[..]))));
+        }
+        for _ in 0..num_keys {
+            gts.rotate_right(1);
+            pks.rotate_right(1);
+            assert!(!aggregate_verify_gt(&agg, &gts[1..]));
+            assert!(!aggregate_verify(
+                &agg,
+                pks[1..].iter().map(|pk| (pk, &msg[..]))
+            ));
+        }
     }
 
     #[test]
