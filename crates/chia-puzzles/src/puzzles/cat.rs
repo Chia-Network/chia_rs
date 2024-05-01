@@ -21,6 +21,12 @@ pub struct EverythingWithSignatureTailArgs {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[clvm(curry)]
+pub struct GenesisByCoinIdTailArgs {
+    pub genesis_coin_id: Bytes32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(list)]
 pub struct CatSolution<I> {
     pub inner_puzzle_solution: I,
@@ -47,6 +53,16 @@ pub fn cat_puzzle_hash(asset_id: [u8; 32], inner_puzzle_hash: [u8; 32]) -> [u8; 
         CAT_PUZZLE_HASH,
         &[mod_hash, asset_id_hash, inner_puzzle_hash],
     )
+}
+
+pub fn everything_with_signature_asset_id(public_key: &PublicKey) -> [u8; 32] {
+    let pk_tree_hash = tree_hash_atom(&public_key.to_bytes());
+    curry_tree_hash(EVERYTHING_WITH_SIGNATURE_TAIL_PUZZLE_HASH, &[pk_tree_hash])
+}
+
+pub fn genesis_by_coin_id_asset_id(genesis_coin_id: [u8; 32]) -> [u8; 32] {
+    let coin_id_hash = tree_hash_atom(&genesis_coin_id);
+    curry_tree_hash(GENESIS_BY_COIN_ID_TAIL_PUZZLE_HASH, &[coin_id_hash])
 }
 
 /// This is the puzzle reveal of the [CAT2 standard](https://chialisp.com/cats) puzzle.
@@ -120,6 +136,28 @@ pub const EVERYTHING_WITH_SIGNATURE_TAIL_PUZZLE: [u8; 41] = hex!(
     "
     ff02ffff01ff04ffff04ff02ffff04ff05ffff04ff5fff80808080ff8080ffff
     04ffff0132ff018080
+    "
+);
+
+/// This is the puzzle hash of the [CAT2 multi-issuance TAIL](https://chialisp.com/cats#multi) puzzle.
+pub const EVERYTHING_WITH_SIGNATURE_TAIL_PUZZLE_HASH: [u8; 32] = hex!(
+    "
+    1720d13250a7c16988eaf530331cefa9dd57a76b2c82236bec8bbbff91499b89
+    "
+);
+
+/// This is the puzzle reveal of the [CAT2 single-issuance TAIL](https://chialisp.com/cats/#single) puzzle.
+pub const GENESIS_BY_COIN_ID_TAIL_PUZZLE: [u8; 45] = hex!(
+    "
+    ff02ffff03ff2fffff01ff0880ffff01ff02ffff03ffff09ff2dff0280ff80ff
+    ff01ff088080ff018080ff0180
+    "
+);
+
+/// This is the puzzle hash of the [CAT2 single-issuance TAIL](https://chialisp.com/cats/#single) puzzle.
+pub const GENESIS_BY_COIN_ID_TAIL_PUZZLE_HASH: [u8; 32] = hex!(
+    "
+    493afb89eed93ab86741b2aa61b8f5de495d33ff9b781dfc8919e602b2afa150
     "
 );
 
@@ -208,10 +246,12 @@ mod tests {
     fn puzzle_hashes() {
         assert_puzzle_hash!(CAT_PUZZLE => CAT_PUZZLE_HASH);
         assert_puzzle_hash!(CAT_PUZZLE_V1 => CAT_PUZZLE_HASH_V1);
+        assert_puzzle_hash!(EVERYTHING_WITH_SIGNATURE_TAIL_PUZZLE => EVERYTHING_WITH_SIGNATURE_TAIL_PUZZLE_HASH);
+        assert_puzzle_hash!(GENESIS_BY_COIN_ID_TAIL_PUZZLE => GENESIS_BY_COIN_ID_TAIL_PUZZLE_HASH);
     }
 
     #[test]
-    fn curry_tree_hash() {
+    fn curry_cat_tree_hash() {
         let inner_args = StandardArgs {
             synthetic_key: PublicKey::default(),
         };
@@ -239,6 +279,48 @@ mod tests {
             asset_id,
             standard_puzzle_hash(&inner_args.synthetic_key),
         ));
+
+        assert_eq!(expected_tree_hash, actual_tree_hash);
+    }
+
+    #[test]
+    fn curry_everything_with_signature() {
+        let public_key = PublicKey::default();
+
+        let mut a = Allocator::new();
+        let mod_ptr = node_from_bytes(&mut a, &EVERYTHING_WITH_SIGNATURE_TAIL_PUZZLE).unwrap();
+        let curried_ptr = CurriedProgram {
+            program: mod_ptr,
+            args: EverythingWithSignatureTailArgs {
+                public_key: public_key.clone(),
+            },
+        }
+        .to_node_ptr(&mut a)
+        .unwrap();
+
+        let expected_tree_hash = hex::encode(tree_hash(&a, curried_ptr));
+        let actual_tree_hash = hex::encode(everything_with_signature_asset_id(&public_key));
+
+        assert_eq!(expected_tree_hash, actual_tree_hash);
+    }
+
+    #[test]
+    fn curry_genesis_by_coin_id() {
+        let genesis_coin_id = [120; 32];
+
+        let mut a = Allocator::new();
+        let mod_ptr = node_from_bytes(&mut a, &GENESIS_BY_COIN_ID_TAIL_PUZZLE).unwrap();
+        let curried_ptr = CurriedProgram {
+            program: mod_ptr,
+            args: GenesisByCoinIdTailArgs {
+                genesis_coin_id: genesis_coin_id.into(),
+            },
+        }
+        .to_node_ptr(&mut a)
+        .unwrap();
+
+        let expected_tree_hash = hex::encode(tree_hash(&a, curried_ptr));
+        let actual_tree_hash = hex::encode(genesis_by_coin_id_asset_id(genesis_coin_id));
 
         assert_eq!(expected_tree_hash, actual_tree_hash);
     }
