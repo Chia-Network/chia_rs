@@ -9,3 +9,5 @@ pub mod generator_rom;
 pub mod merkle_set;
 pub mod merkle_tree;
 pub mod generator_types;
+pub mod npc_result;
+pub mod multiprocess_validation;

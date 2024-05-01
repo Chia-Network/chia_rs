@@ -1,12 +1,13 @@
 
 use std::thread;
 use std::sync::{Arc, Mutex};
-use crate::{ConsensusConstants, BlockGenerator};
+use crate::consensus_constants::ConsensusConstants;
 use crate::gen::errors::Err;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use chia_protocol::SpendBundle;
-use crate::BlockGenerator;
+use chia_protocol::Coin;
+use crate::generator_types::BlockGenerator;
 use crate::gen::solution_generator::solution_generator;
 use chia_protocol::Program;
 use crate::gen::flags::{
@@ -14,6 +15,8 @@ use crate::gen::flags::{
     ENABLE_SOFTFORK_CONDITION, ENABLE_MESSAGE_CONDITIONS
 };
 use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV};
+use crate::npc_result::{NPCResult, get_name_puzzle_conditions};
+use crate::gen::condition_tools::pkm_pairs;
 
 // currently in multiprocess_validation.py
 // called via blockchain.py from full_node.py when a full node wants to add a block or batch of blocks
@@ -37,28 +40,36 @@ fn pre_validate_spendbundle() {
 // called in threads from pre_validate_spend_bundle()
 // returns (error, cached_results, new_cache_entries, duration)
 fn validate_clvm_and_signature(
-    spend_bundle_bytes: bytes, 
-    max_cost: int, 
+    spend_bundle_bytes: &[u8], 
+    max_cost: u64, 
     constants: ConsensusConstants, 
-    height: uint32
+    height: u32
 ) -> (Option<Err>, Vec<u8>, HashMap<[u8; 32], Vec<u8>> , u128) {
     let start_time = Instant::now();
     let additional_data = constants.AGG_SIG_ME_ADDITIONAL_DATA;
     let bundle = SpendBundle::from_bytes(spend_bundle_bytes);
-    let solution = simple_solution_generator(bundle);
-    return (None, start.elapsed());
+    let program = simple_solution_generator(bundle);
+    let result: NPCResult = get_name_puzzle_conditions(
+        program, max_cost, true, constants, height
+    );
+    let (pks, msgs) = pkm_pairs(result.conds, additional_data);
+    return (None, start_time.elapsed());
 }
 
 pub fn simple_solution_generator(bundle: SpendBundle) -> BlockGenerator {
-    let mut spends = Vec<(Coin, &[u8], &[u8])>::new();
+    let mut spends = Vec::<(Coin, &[u8], &[u8])>::new();
     for cs in bundle.coin_spends {
         spends.append((cs.coin, cs.puzzle_reveal.to_bytes(), cs.solution.to_bytes()));
     }
     let block_program = solution_generator(spends);
-    BlockGenerator(Program.from_bytes(block_program), &[], &[])
+    BlockGenerator{
+        program: Program::from_bytes(block_program), 
+        generator_refs: &[], 
+        block_height_list: &[]
+    }
 }
 
-pub fn get_flags_for_height_and_constants(height: u32, constats: ConsensusConstants) -> u32 {
+pub fn get_flags_for_height_and_constants(height: u32, constants: ConsensusConstants) -> u32 {
     let mut flags: u32 = 0;
     if height >= constants.SOFT_FORK2_HEIGHT{
         flags = flags | NO_RELATIVE_CONDITIONS_ON_EPHEMERAL
@@ -81,14 +92,13 @@ pub fn get_flags_for_height_and_constants(height: u32, constats: ConsensusConsta
         //    arguments
         //  * Allow the block generator to be serialized with the improved clvm
         //   serialization format (with back-references)
-        flags = (
+        flags = 
             flags
             | ENABLE_SOFTFORK_CONDITION
             | ENABLE_BLS_OPS_OUTSIDE_GUARD
             | ENABLE_FIXED_DIV
             | AGG_SIG_ARGS
             | ALLOW_BACKREFS
-        )
     }
     flags
 }
