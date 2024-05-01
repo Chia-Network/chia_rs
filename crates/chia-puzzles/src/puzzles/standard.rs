@@ -1,4 +1,5 @@
 use chia_bls::PublicKey;
+use chia_protocol::Bytes32;
 use clvm_traits::{FromClvm, ToClvm};
 use clvm_utils::{curry_tree_hash, tree_hash_atom};
 use hex_literal::hex;
@@ -17,9 +18,9 @@ pub struct StandardSolution<P, S> {
     pub solution: S,
 }
 
-pub fn standard_puzzle_hash(synthetic_key: &PublicKey) -> [u8; 32] {
+pub fn standard_puzzle_hash(synthetic_key: &PublicKey) -> Bytes32 {
     let sk_tree_hash = tree_hash_atom(&synthetic_key.to_bytes());
-    curry_tree_hash(STANDARD_PUZZLE_HASH, &[sk_tree_hash])
+    curry_tree_hash(STANDARD_PUZZLE_HASH, &[sk_tree_hash]).into()
 }
 
 /// This is the puzzle reveal of the [standard transaction](https://chialisp.com/standard-transactions) puzzle.

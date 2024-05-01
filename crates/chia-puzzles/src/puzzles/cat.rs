@@ -46,23 +46,24 @@ pub struct CoinProof {
     pub amount: u64,
 }
 
-pub fn cat_puzzle_hash(asset_id: [u8; 32], inner_puzzle_hash: [u8; 32]) -> [u8; 32] {
+pub fn cat_puzzle_hash(asset_id: Bytes32, inner_puzzle_hash: Bytes32) -> Bytes32 {
     let mod_hash = tree_hash_atom(&CAT_PUZZLE_HASH);
     let asset_id_hash = tree_hash_atom(&asset_id);
     curry_tree_hash(
         CAT_PUZZLE_HASH,
-        &[mod_hash, asset_id_hash, inner_puzzle_hash],
+        &[mod_hash, asset_id_hash, inner_puzzle_hash.to_bytes()],
     )
+    .into()
 }
 
-pub fn everything_with_signature_asset_id(public_key: &PublicKey) -> [u8; 32] {
+pub fn everything_with_signature_asset_id(public_key: &PublicKey) -> Bytes32 {
     let pk_tree_hash = tree_hash_atom(&public_key.to_bytes());
-    curry_tree_hash(EVERYTHING_WITH_SIGNATURE_TAIL_PUZZLE_HASH, &[pk_tree_hash])
+    curry_tree_hash(EVERYTHING_WITH_SIGNATURE_TAIL_PUZZLE_HASH, &[pk_tree_hash]).into()
 }
 
-pub fn genesis_by_coin_id_asset_id(genesis_coin_id: [u8; 32]) -> [u8; 32] {
+pub fn genesis_by_coin_id_asset_id(genesis_coin_id: Bytes32) -> Bytes32 {
     let coin_id_hash = tree_hash_atom(&genesis_coin_id);
-    curry_tree_hash(GENESIS_BY_COIN_ID_TAIL_PUZZLE_HASH, &[coin_id_hash])
+    curry_tree_hash(GENESIS_BY_COIN_ID_TAIL_PUZZLE_HASH, &[coin_id_hash]).into()
 }
 
 /// This is the puzzle reveal of the [CAT2 standard](https://chialisp.com/cats) puzzle.
@@ -255,7 +256,7 @@ mod tests {
         let inner_args = StandardArgs {
             synthetic_key: PublicKey::default(),
         };
-        let asset_id = [120; 32];
+        let asset_id = Bytes32::new([120; 32]);
 
         let mut a = Allocator::new();
         let mod_ptr = node_from_bytes(&mut a, &CAT_PUZZLE).unwrap();
@@ -268,7 +269,7 @@ mod tests {
                     program: inner_mod_ptr,
                     args: &inner_args,
                 },
-                tail_program_hash: asset_id.into(),
+                tail_program_hash: asset_id,
             },
         }
         .to_node_ptr(&mut a)
@@ -306,15 +307,13 @@ mod tests {
 
     #[test]
     fn curry_genesis_by_coin_id() {
-        let genesis_coin_id = [120; 32];
+        let genesis_coin_id = Bytes32::new([120; 32]);
 
         let mut a = Allocator::new();
         let mod_ptr = node_from_bytes(&mut a, &GENESIS_BY_COIN_ID_TAIL_PUZZLE).unwrap();
         let curried_ptr = CurriedProgram {
             program: mod_ptr,
-            args: GenesisByCoinIdTailArgs {
-                genesis_coin_id: genesis_coin_id.into(),
-            },
+            args: GenesisByCoinIdTailArgs { genesis_coin_id },
         }
         .to_node_ptr(&mut a)
         .unwrap();
