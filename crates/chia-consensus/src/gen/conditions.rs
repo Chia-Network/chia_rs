@@ -25,6 +25,7 @@ use crate::gen::spend_visitor::SpendVisitor;
 use crate::gen::validation_error::check_nil;
 use chia_bls::PublicKey;
 use chia_protocol::Bytes32;
+use chia_streamable_macro::streamable;
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use clvmr::cost::Cost;
 use clvmr::sha2::{Digest, Sha256};
@@ -648,7 +649,7 @@ impl PartialEq for NewCoin {
 }
 
 // These are all the conditions related directly to a specific spend.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Spend {
     // the parent coin ID of the coin being spent
     pub parent_id: NodePtr,
@@ -727,7 +728,7 @@ impl Spend {
 // spend bundle level, like reserve_fee and absolute time locks. Other
 // conditions are per spend, like relative time-locks and create coins (because
 // they have an implied parent coin ID).
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct SpendBundleConditions {
     pub spends: Vec<Spend>,
     // conditions

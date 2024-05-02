@@ -46,7 +46,7 @@ fn validate_clvm_and_signature(
     height: u32
 ) -> (Option<Err>, Vec<u8>, HashMap<[u8; 32], Vec<u8>> , u128) {
     let start_time = Instant::now();
-    let additional_data = constants.AGG_SIG_ME_ADDITIONAL_DATA;
+    let additional_data = constants.agg_sig_me_additional_data;
     let bundle = SpendBundle::from_bytes(spend_bundle_bytes);
     let program = simple_solution_generator(bundle);
     let result: NPCResult = get_name_puzzle_conditions(
@@ -59,7 +59,7 @@ fn validate_clvm_and_signature(
 pub fn simple_solution_generator(bundle: SpendBundle) -> BlockGenerator {
     let mut spends = Vec::<(Coin, &[u8], &[u8])>::new();
     for cs in bundle.coin_spends {
-        spends.append((cs.coin, cs.puzzle_reveal.to_bytes(), cs.solution.to_bytes()));
+        spends.push((cs.coin, cs.puzzle_reveal.into_inner().as_slice(), cs.solution.into_inner().as_slice()));
     }
     let block_program = solution_generator(spends);
     BlockGenerator{
@@ -71,13 +71,13 @@ pub fn simple_solution_generator(bundle: SpendBundle) -> BlockGenerator {
 
 pub fn get_flags_for_height_and_constants(height: u32, constants: ConsensusConstants) -> u32 {
     let mut flags: u32 = 0;
-    if height >= constants.SOFT_FORK2_HEIGHT{
+    if height >= constants.soft_fork2_height{
         flags = flags | NO_RELATIVE_CONDITIONS_ON_EPHEMERAL
     }
-    if height >= constants.SOFT_FORK4_HEIGHT{
+    if height >= constants.soft_fork4_height{
         flags = flags | ENABLE_MESSAGE_CONDITIONS
     }
-    if height >= constants.HARD_FORK_HEIGHT {
+    if height >= constants.hard_fork_height {
         //  the hard-fork initiated with 2.0. To activate June 2024
         //  * costs are ascribed to some unknown condition codes, to allow for
             // soft-forking in new conditions with cost
