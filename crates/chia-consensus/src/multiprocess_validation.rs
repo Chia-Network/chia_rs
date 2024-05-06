@@ -46,15 +46,15 @@ fn validate_clvm_and_signature(
     constants: ConsensusConstants, 
     height: u32,
     
-) -> (Option<Err>, Vec<u8>, HashMap<[u8; 32], Vec<u8>> , u128) {
+) -> Result<(NPCResult, HashMap<[u8; 32], Vec<u8>> , u128), Err> {
     let start_time = Instant::now();
     let additional_data = constants.agg_sig_me_additional_data;
     let program = simple_solution_generator(spend_bundle);
-    let result: NPCResult = get_name_puzzle_conditions(
+    let npcresult: NPCResult = get_name_puzzle_conditions(
         program, max_cost, true, constants, height
     );
-    let (pks, msgs) = pkm_pairs(result.conds, additional_data);
-    return (None, start_time.elapsed());
+    let (pks, msgs) = pkm_pairs(npcresult.conds, additional_data)?;
+    Ok((npcresult, start_time.elapsed()))
 }
 
 pub fn simple_solution_generator(bundle: SpendBundle) -> Result<BlockGenerator, Err> {
