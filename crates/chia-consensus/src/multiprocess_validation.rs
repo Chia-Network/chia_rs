@@ -17,6 +17,7 @@ use crate::gen::flags::{
 use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV};
 use crate::npc_result::{NPCResult, get_name_puzzle_conditions};
 use crate::gen::condition_tools::pkm_pairs;
+use chia_traits::Streamable;
 
 // currently in multiprocess_validation.py
 // called via blockchain.py from full_node.py when a full node wants to add a block or batch of blocks
@@ -40,15 +41,15 @@ fn pre_validate_spendbundle() {
 // called in threads from pre_validate_spend_bundle()
 // returns (error, cached_results, new_cache_entries, duration)
 fn validate_clvm_and_signature(
-    spend_bundle_bytes: &[u8], 
+    spend_bundle: SpendBundle, 
     max_cost: u64, 
     constants: ConsensusConstants, 
-    height: u32
+    height: u32,
+    
 ) -> (Option<Err>, Vec<u8>, HashMap<[u8; 32], Vec<u8>> , u128) {
     let start_time = Instant::now();
     let additional_data = constants.agg_sig_me_additional_data;
-    let bundle = SpendBundle::from_bytes(spend_bundle_bytes);
-    let program = simple_solution_generator(bundle);
+    let program = simple_solution_generator(spend_bundle);
     let result: NPCResult = get_name_puzzle_conditions(
         program, max_cost, true, constants, height
     );
@@ -56,17 +57,17 @@ fn validate_clvm_and_signature(
     return (None, start_time.elapsed());
 }
 
-pub fn simple_solution_generator(bundle: SpendBundle) -> BlockGenerator {
+pub fn simple_solution_generator(bundle: SpendBundle) -> Result<BlockGenerator, Err> {
     let mut spends = Vec::<(Coin, &[u8], &[u8])>::new();
     for cs in bundle.coin_spends {
         spends.push((cs.coin, cs.puzzle_reveal.into_inner().as_slice(), cs.solution.into_inner().as_slice()));
     }
-    let block_program = solution_generator(spends);
-    BlockGenerator{
-        program: Program::from_bytes(block_program), 
-        generator_refs: &[], 
-        block_height_list: &[]
-    }
+    let block_program = solution_generator(spends)?;
+    Ok(BlockGenerator{
+        program: Program::from_bytes(block_program.as_slice())?, 
+        generator_refs: Vec::<Program>::new(),
+        block_height_list: Vec::<u32>::new(),
+    })
 }
 
 pub fn get_flags_for_height_and_constants(height: u32, constants: ConsensusConstants) -> u32 {
