@@ -7,8 +7,9 @@
 
 ![PyPI](https://img.shields.io/pypi/v/chia_rs?logo=pypi)
 ![PyPI - Format](https://img.shields.io/pypi/format/chia_rs?logo=pypi)
-![Docs.rs](https://img.shields.io/docsrs/chia?link=https%3A%2F%2Fdocs.rs%2Fchia)
-![Crates.io](https://img.shields.io/crates/dr/chia)
+[![Crates.io](https://img.shields.io/crates/v/chia.svg)](https://crates.io/crates/chia)
+[![Downloads](https://img.shields.io/crates/d/chia.svg)](https://crates.io/crates/chia)
+[![Docs](https://docs.rs/chia/badge.svg)](https://docs.rs/chia/latest/chia/)
 
 A collection of Rust crates for working with the Chia blockchain. There are also Python bindings in the form of a wheel.
 
