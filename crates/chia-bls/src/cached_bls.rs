@@ -21,7 +21,7 @@ use pyo3::{pyclass, pymethods, PyResult};
 
 #[cfg_attr(feature = "py-bindings", pyclass(name = "BLSCache"))]
 pub struct BLSCache {
-    cache: LruCache<[u8; 32], GTElement>,  // LRUCache of hash(pubkey + message) -> GTElement
+    cache: LruCache<[u8; 32], GTElement>, // LRUCache of hash(pubkey + message) -> GTElement
 }
 
 impl Default for BLSCache {
@@ -59,22 +59,21 @@ impl BLSCache {
 
             if let Some(pairing) = pairing {
                 // equivalent to `if pairing is not None`
-                return pairing
+                return pairing;
             }
             // if pairing is None then make pairing and add to cache
             let mut aug_msg = pk.to_bytes().to_vec();
             aug_msg.extend_from_slice(msg.as_ref()); // pk + msg
             let aug_hash: Signature = hash_to_g2(&aug_msg);
 
-            let pairing: GTElement = aug_hash.pair(&pk);
+            let pairing: GTElement = aug_hash.pair(pk);
             let mut hasher = Sha256::new();
             hasher.update(&aug_msg);
             let h: [u8; 32] = hasher.finalize().into();
             self.cache.put(h, pairing.clone());
             pairing
-         });
+        });
         agg_ver_gt(sig, iter)
-        
     }
 }
 
