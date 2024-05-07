@@ -9,6 +9,12 @@ repos:
     -   id: check-added-large-files
 -   repo: local
     hooks:
+      - id: prettier
+        name: prettier
+        description: run prettier check
+        entry: npx prettier --check .
+        language: system
+        pass_filenames: false
       - id: fmt
         name: fmt
         description: run cargo fmt on the workspace
