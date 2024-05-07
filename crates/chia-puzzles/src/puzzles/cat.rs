@@ -298,9 +298,7 @@ mod tests {
         let tree_hash = hex::encode(
             CurriedProgram {
                 program: EVERYTHING_WITH_SIGNATURE_TAIL_PUZZLE_HASH,
-                args: EverythingWithSignatureTailArgs {
-                    public_key: public_key.clone(),
-                },
+                args: EverythingWithSignatureTailArgs { public_key },
             }
             .tree_hash(),
         );
