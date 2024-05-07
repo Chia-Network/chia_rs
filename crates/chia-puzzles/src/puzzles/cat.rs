@@ -292,9 +292,7 @@ mod tests {
         let mod_ptr = node_from_bytes(&mut a, &EVERYTHING_WITH_SIGNATURE_TAIL_PUZZLE).unwrap();
         let curried_ptr = CurriedProgram {
             program: mod_ptr,
-            args: EverythingWithSignatureTailArgs {
-                public_key: public_key.clone(),
-            },
+            args: EverythingWithSignatureTailArgs { public_key },
         }
         .to_node_ptr(&mut a)
         .unwrap();
