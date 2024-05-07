@@ -1,0 +1,8 @@
+version: '3.9'
+services:
+  chia_rs:
+    build: .
+    container_name: chia_rs
+    volumes:
+      - .:/var/data
+      - /var/data/target/

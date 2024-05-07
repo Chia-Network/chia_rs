@@ -123,3 +123,17 @@ cargo ws version --all --no-git-commit
 
 Select "minor update" if there has not been any incompatible API changes,
 otherwise "major update".
+
+# Running in Docker
+Start basic local image in docker as a detached service
+```
+docker-compose up -d
+```
+Run tests command in container
+```
+docker exec chia_rs cargo test --all
+```
+Start interactive bash session. You can then run all commands above as you would on host.
+```
+docker exec -it chia_rs bash
+```
