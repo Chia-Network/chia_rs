@@ -46,7 +46,7 @@ impl BLSCache {
 
     pub fn get_pairings<M: AsRef<[u8]>>(
         &mut self,
-        pks: &[[u8; 48]],
+        pks: &[PublicKey],
         msgs: &[M],
         force_cache: bool,
     ) -> Vec<GTElement> {
@@ -55,11 +55,11 @@ impl BLSCache {
 
         for (pk, msg) in pks.iter().zip(msgs.iter()) {
             let mut hasher = Sha256::new();
-            hasher.update(pk);
+            hasher.update(pk.to_bytes());
             hasher.update(msg); // pk + msg
             let h: [u8; 32] = hasher.finalize().into();
 
-            let pairing = self.cache.get(&h).cloned();
+            let pairing: Option<GTElement> = self.cache.get(&h).cloned();
 
             if !force_cache && pairing.is_some() {
                 // Heuristic to avoid more expensive sig validation with pairing
@@ -73,9 +73,6 @@ impl BLSCache {
 
             pairings.push(pairing);
         }
-
-        // G1Element.from_bytes can be expensive due to subgroup check, so we avoid recomputing it with this cache
-        let mut pk_bytes_to_g1: HashMap<[u8; 48], PublicKey> = HashMap::new();
         let mut ret: Vec<GTElement> = vec![];
 
         for (i, pairing) in pairings.into_iter().enumerate() {
@@ -85,15 +82,11 @@ impl BLSCache {
                 continue;
             }
 
-            let mut aug_msg = pks[i].to_vec();
+            let mut aug_msg = pks[i].to_bytes().to_vec();
             aug_msg.extend_from_slice(msgs[i].as_ref()); // pk + msg
             let aug_hash: Signature = hash_to_g2(&aug_msg);
 
-            let pk_parsed: &mut PublicKey = pk_bytes_to_g1
-                .entry(pks[i])
-                .or_insert_with(|| PublicKey::from_bytes(&pks[i]).unwrap());
-
-            let pairing: GTElement = aug_hash.pair(pk_parsed);
+            let pairing: GTElement = aug_hash.pair(&pks[i]);
             let mut hasher = Sha256::new();
             hasher.update(&aug_msg);
             let h: [u8; 32] = hasher.finalize().into();
@@ -106,7 +99,7 @@ impl BLSCache {
 
     pub fn aggregate_verify<M: AsRef<[u8]>>(
         &mut self,
-        pks: &[[u8; 48]],
+        pks: &[PublicKey],
         msgs: &[M],
         sig: &Signature,
         force_cache: bool,
@@ -115,7 +108,6 @@ impl BLSCache {
         if pairings.is_empty() {
             let mut data = Vec::<(PublicKey, &[u8])>::new();
             for (pk, msg) in pks.iter().zip(msgs.iter()) {
-                let pk = PublicKey::from_bytes_unchecked(pk).unwrap();
                 data.push((pk.clone(), msg.as_ref()));
             }
             return agg_ver(sig, data);
@@ -136,46 +128,50 @@ impl BLSCache {
 }
 
 // Python Functions
-#[cfg(feature = "py-bindings")]
-#[pymethods]
-impl BLSCache {
-    #[new]
-    pub fn init() -> Self {
-        Self::default()
-    }
 
-    #[staticmethod]
-    #[pyo3(name = "generator")]
-    pub fn py_generator(size: Option<&PyInt>) -> Self {
-        size.map(|s| Self::new(s.extract().unwrap()))
-            .unwrap_or_default()
-    }
+// Commented out for now as we may remove these
+// as the python consensus code that uses it is being ported to rust.
 
-    #[pyo3(name = "aggregate_verify")]
-    pub fn py_aggregate_verify(
-        &mut self,
-        pks: &PyList,
-        msgs: &PyList,
-        sig: &Signature,
-        force_cache: &PyBool,
-    ) -> PyResult<bool> {
-        let pks_r: Vec<[u8; 48]> = pks
-            .iter()
-            .map(|item| item.extract::<[u8; 48]>())
-            .collect::<PyResult<_>>()?;
-        let msgs_r: Vec<&[u8]> = msgs
-            .iter()
-            .map(|item| item.extract::<&[u8]>())
-            .collect::<PyResult<_>>()?;
-        let force_cache_bool = force_cache.extract::<bool>()?;
-        Ok(self.aggregate_verify(&pks_r, &msgs_r, sig, force_cache_bool))
-    }
+// #[cfg(feature = "py-bindings")]
+// #[pymethods]
+// impl BLSCache {
+//     #[new]
+//     pub fn init() -> Self {
+//         Self::default()
+//     }
 
-    #[pyo3(name = "len")]
-    pub fn py_len(&self) -> PyResult<usize> {
-        Ok(self.cache.len())
-    }
-}
+//     #[staticmethod]
+//     #[pyo3(name = "generator")]
+//     pub fn py_generator(size: Option<&PyInt>) -> Self {
+//         size.map(|s| Self::new(s.extract().unwrap()))
+//             .unwrap_or_default()
+//     }
+
+//     #[pyo3(name = "aggregate_verify")]
+//     pub fn py_aggregate_verify(
+//         &mut self,
+//         pks: &PyList,
+//         msgs: &PyList,
+//         sig: &Signature,
+//         force_cache: &PyBool,
+//     ) -> PyResult<bool> {
+//         let pks_r: Vec<[u8; 48]> = pks
+//             .iter()
+//             .map(|item| item.extract::<[u8; 48]>())
+//             .collect::<PyResult<_>>()?;
+//         let msgs_r: Vec<&[u8]> = msgs
+//             .iter()
+//             .map(|item| item.extract::<&[u8]>())
+//             .collect::<PyResult<_>>()?;
+//         let force_cache_bool = force_cache.extract::<bool>()?;
+//         Ok(self.aggregate_verify(&pks_r, &msgs_r, sig, force_cache_bool))
+//     }
+
+//     #[pyo3(name = "len")]
+//     pub fn py_len(&self) -> PyResult<usize> {
+//         Ok(self.cache.len())
+//     }
+// }
 
 #[cfg(test)]
 pub mod tests {
@@ -211,7 +207,7 @@ pub mod tests {
         let pk: PublicKey = sk.public_key();
         let msg: &[u8] = &[106; 32];
         let sig: Signature = sign(&sk, msg);
-        let pk_list: Vec<[u8; 48]> = [pk.to_bytes()].to_vec();
+        let pk_list: Vec<PublicKey> = [pk].to_vec();
         let msg_list: Vec<&[u8]> = [msg].to_vec();
         assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig, true));
         assert_eq!(bls_cache.cache.len(), 1);
@@ -229,7 +225,7 @@ pub mod tests {
         let pk: PublicKey = sk.public_key();
         let msg: &[u8] = &[106; 32];
         let sig: Signature = sign(&sk, msg);
-        let mut pk_list: Vec<[u8; 48]> = [pk.to_bytes()].to_vec();
+        let mut pk_list: Vec<PublicKey> = [pk].to_vec();
         let mut msg_list: Vec<&[u8]> = [msg].to_vec();
         // add first to cache
         // try one cached, one not cached
@@ -240,7 +236,7 @@ pub mod tests {
         let pk: PublicKey = sk.public_key();
         let msg: &[u8] = &[107; 32];
         let sig = aggregate([sig, sign(&sk, msg)]);
-        pk_list.push(pk.to_bytes());
+        pk_list.push(pk);
         msg_list.push(msg);
         assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig, false));
         assert_eq!(bls_cache.cache.len(), 2);
@@ -248,7 +244,7 @@ pub mod tests {
         let pk: PublicKey = sk.public_key();
         let msg: &[u8] = &[108; 32];
         let sig = aggregate([sig, sign(&sk, msg)]);
-        pk_list.push(pk.to_bytes());
+        pk_list.push(pk);
         msg_list.push(msg);
         // try with force_cache disabled
         assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig, false));
@@ -270,7 +266,7 @@ pub mod tests {
             let pk: PublicKey = sk.public_key();
             let msg: &[u8] = &[106; 32];
             let sig: Signature = sign(&sk, msg);
-            let pk_list: Vec<[u8; 48]> = vec![pk.to_bytes()];
+            let pk_list: Vec<PublicKey> = [pk].to_vec();
             let msg_list: Vec<&[u8]> = vec![msg];
             assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig, true));
         }
