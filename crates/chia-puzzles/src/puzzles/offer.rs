@@ -3,6 +3,7 @@ use clvm_traits::{FromClvm, ToClvm};
 use hex_literal::hex;
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(tuple)]
 pub struct SettlementPaymentsSolution {
     pub notarized_payments: Vec<NotarizedPayment>,
@@ -15,6 +16,7 @@ impl SettlementPaymentsSolution {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(tuple)]
 pub struct NotarizedPayment {
     pub nonce: Bytes32,
@@ -28,6 +30,7 @@ impl NotarizedPayment {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(tuple, untagged)]
 pub enum Payment {
     WithoutMemos(PaymentWithoutMemos),
@@ -73,6 +76,7 @@ impl Payment {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(list)]
 pub struct PaymentWithoutMemos {
     pub puzzle_hash: Bytes32,
@@ -89,6 +93,7 @@ impl PaymentWithoutMemos {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(list)]
 pub struct PaymentWithMemos {
     pub puzzle_hash: Bytes32,

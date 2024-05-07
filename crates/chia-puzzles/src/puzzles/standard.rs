@@ -5,6 +5,7 @@ use clvm_utils::{curry_tree_hash, tree_hash_atom};
 use hex_literal::hex;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(curry)]
 pub struct StandardArgs {
     pub synthetic_key: PublicKey,
@@ -17,6 +18,7 @@ impl StandardArgs {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(list)]
 pub struct StandardSolution<P, S> {
     pub original_public_key: Option<PublicKey>,

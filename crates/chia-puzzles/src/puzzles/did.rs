@@ -8,6 +8,7 @@ use hex_literal::hex;
 use crate::singleton::SingletonStruct;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(curry)]
 pub struct DidArgs<I, M> {
     pub inner_puzzle: I,
@@ -18,6 +19,7 @@ pub struct DidArgs<I, M> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum DidSolution<I> {
     InnerSpend(I),
 }

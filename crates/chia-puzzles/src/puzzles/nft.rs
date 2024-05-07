@@ -5,6 +5,7 @@ use hex_literal::hex;
 use crate::singleton::{SingletonStruct, SINGLETON_LAUNCHER_PUZZLE_HASH};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(curry)]
 pub struct NftIntermediateLauncherArgs {
     pub launcher_puzzle_hash: Bytes32,
@@ -23,6 +24,7 @@ impl NftIntermediateLauncherArgs {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(curry)]
 pub struct NftStateLayerArgs<I, M> {
     pub mod_hash: Bytes32,
@@ -43,6 +45,7 @@ impl<I, M> NftStateLayerArgs<I, M> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(list)]
 pub struct NftStateLayerSolution<I> {
     pub inner_solution: I,
@@ -55,6 +58,7 @@ impl<I> NftStateLayerSolution<I> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(curry)]
 pub struct NftOwnershipLayerArgs<I, P> {
     pub mod_hash: Bytes32,
@@ -75,6 +79,7 @@ impl<I, P> NftOwnershipLayerArgs<I, P> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(list)]
 pub struct NftOwnershipLayerSolution<I> {
     pub inner_solution: I,
@@ -86,7 +91,8 @@ impl<I> NftOwnershipLayerSolution<I> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(curry)]
 pub struct NftRoyaltyTransferPuzzleArgs {
     pub singleton_struct: SingletonStruct,
