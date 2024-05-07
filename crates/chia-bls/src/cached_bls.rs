@@ -6,14 +6,12 @@
 // again. So caching is primarily useful when synced and monitoring the mempool in real-time.
 
 use crate::aggregate_verify_gt as agg_ver_gt;
-use crate::aggregate_verify as agg_ver;
 use crate::gtelement::GTElement;
 use crate::hash_to_g2;
 use crate::PublicKey;
 use crate::Signature;
 use lru::LruCache;
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
 use std::num::NonZeroUsize;
 
 #[cfg(feature = "py-bindings")]
@@ -45,15 +43,13 @@ impl BLSCache {
         Self { cache }
     }
 
-    pub fn get_pairings<M: AsRef<[u8]>>(
+    pub fn aggregate_verify<M: AsRef<[u8]>>(
         &mut self,
         pks: &[PublicKey],
         msgs: &[M],
-        force_cache: bool,
-    ) -> Option<GTElement> {
-        let mut missing_count: usize = 0;
-        let mut ret: Option<GTElement> = None;
-        for (pk, msg) in pks.iter().zip(msgs.iter()) {
+        sig: &Signature,
+    ) -> bool {
+        let iter = pks.iter().zip(msgs.iter()).map(|(pk, msg)| -> GTElement {
             let mut hasher = Sha256::new();
             hasher.update(pk.to_bytes());
             hasher.update(msg); // pk + msg
@@ -61,24 +57,9 @@ impl BLSCache {
 
             let pairing: Option<GTElement> = self.cache.get(&h).cloned();
 
-            if !force_cache && pairing.is_some() {
-                // Heuristic to avoid more expensive sig validation with pairing
-                // cache when it's empty and cached pairings won't be useful later
-                // (e.g. while syncing)
-                missing_count += 1;
-                if missing_count > pks.len() / 2 {
-                    return None;
-                }
-            }
-
             if let Some(pairing) = pairing {
                 // equivalent to `if pairing is not None`
-                if let Some(ref current) = ret {
-                    ret = Some(current * &pairing);
-                } else {
-                    ret = Some(pairing);
-                }
-                continue;
+                return pairing
             }
             // if pairing is None then make pairing and add to cache
             let mut aug_msg = pk.to_bytes().to_vec();
@@ -90,34 +71,9 @@ impl BLSCache {
             hasher.update(&aug_msg);
             let h: [u8; 32] = hasher.finalize().into();
             self.cache.put(h, pairing.clone());
-            if let Some(ref current) = ret {
-                ret = Some(current * &pairing);
-            } else {
-                ret = Some(pairing);
-            }
-        }
-        
-        ret
-    }
-
-    pub fn aggregate_verify<M: AsRef<[u8]>>(
-        &mut self,
-        pks: &[PublicKey],
-        msgs: &[M],
-        sig: &Signature,
-        force_cache: bool,
-    ) -> bool {
-        let pairings: Option<GTElement> = self.get_pairings(pks, msgs, force_cache);
-        match pairings {
-            Some(pairing) => agg_ver_gt(sig, [pairing]),
-            None => {
-                let mut data = Vec::<(PublicKey, &[u8])>::new();
-                for (pk, msg) in pks.iter().zip(msgs.iter()) {
-                    data.push((pk.clone(), msg.as_ref()));
-                }
-                return agg_ver(sig, data);
-            }
-        }
+            pairing
+         });
+        agg_ver_gt(sig, iter)
         
     }
 }
@@ -204,10 +160,10 @@ pub mod tests {
         let sig: Signature = sign(&sk, msg);
         let pk_list: Vec<PublicKey> = [pk].to_vec();
         let msg_list: Vec<&[u8]> = [msg].to_vec();
-        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig, true));
+        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig));
         assert_eq!(bls_cache.cache.len(), 1);
         // try again with (pk, msg) cached
-        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig, true));
+        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig));
         assert_eq!(bls_cache.cache.len(), 1);
     }
 
@@ -224,7 +180,7 @@ pub mod tests {
         let mut msg_list: Vec<&[u8]> = [msg].to_vec();
         // add first to cache
         // try one cached, one not cached
-        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig, false));
+        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig));
         assert_eq!(bls_cache.cache.len(), 1);
         let byte_array: [u8; 32] = [1; 32];
         let sk: SecretKey = SecretKey::from_seed(&byte_array);
@@ -233,7 +189,7 @@ pub mod tests {
         let sig = aggregate([sig, sign(&sk, msg)]);
         pk_list.push(pk);
         msg_list.push(msg);
-        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig, false));
+        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig));
         assert_eq!(bls_cache.cache.len(), 2);
         // try reusing a pubkey
         let pk: PublicKey = sk.public_key();
@@ -241,11 +197,8 @@ pub mod tests {
         let sig = aggregate([sig, sign(&sk, msg)]);
         pk_list.push(pk);
         msg_list.push(msg);
-        // try with force_cache disabled
-        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig, false));
-        assert_eq!(bls_cache.cache.len(), 2);
-        // now force it to save the pairing
-        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig, true));
+        // check verification
+        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig));
         assert_eq!(bls_cache.cache.len(), 3);
     }
 
@@ -263,7 +216,7 @@ pub mod tests {
             let sig: Signature = sign(&sk, msg);
             let pk_list: Vec<PublicKey> = [pk].to_vec();
             let msg_list: Vec<&[u8]> = vec![msg];
-            assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig, true));
+            assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig));
         }
         assert_eq!(bls_cache.cache.len(), 3);
         // recreate first key
