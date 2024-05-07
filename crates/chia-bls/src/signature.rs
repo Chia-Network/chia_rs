@@ -696,12 +696,12 @@ mod tests {
         for idx in 0..4 {
             let derived = sk.derive_hardened(idx as u32);
             let pk = derived.public_key();
-            data.push((pk.clone(), msg));
+            data.push((pk, msg));
             let sig = sign(&derived, msg);
             agg1.aggregate(&sig);
             agg2 += &sig;
             sigs.push(sig);
-            pairs.push((pk.clone(), aug_msg_to_g2(&pk, msg)));
+            pairs.push((pk, aug_msg_to_g2(&pk, msg)));
         }
         let agg3 = aggregate(&sigs);
         let agg4 = &sigs[0] + &sigs[1] + &sigs[2] + &sigs[3];
@@ -771,10 +771,10 @@ mod tests {
         let mut pairs = Vec::<(PublicKey, Signature)>::new();
         for _idx in 0..2 {
             let pk = sk.public_key();
-            data.push((pk.clone(), msg));
+            data.push((pk, msg));
             agg.aggregate(&sign(&sk, *msg));
 
-            pairs.push((pk.clone(), aug_msg_to_g2(&pk, msg)));
+            pairs.push((pk, aug_msg_to_g2(&pk, msg)));
         }
 
         assert_eq!(agg.to_bytes(), <[u8; 96]>::from_hex("a1cca6540a4a06d096cb5b5fc76af5fd099476e70b623b8c6e4cf02ffde94fc0f75f4e17c67a9e350940893306798a3519368b02dc3464b7270ea4ca233cfa85a38da9e25c9314e81270b54d1e773a2ec5c3e14c62dac7abdebe52f4688310d3").unwrap());

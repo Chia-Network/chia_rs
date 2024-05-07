@@ -6,7 +6,8 @@ use hex_literal::hex;
 
 use crate::LineageProof;
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(curry)]
 pub struct CatArgs<I> {
     pub mod_hash: Bytes32,
@@ -14,19 +15,22 @@ pub struct CatArgs<I> {
     pub inner_puzzle: I,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(curry)]
 pub struct EverythingWithSignatureTailArgs {
     pub public_key: PublicKey,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(curry)]
 pub struct GenesisByCoinIdTailArgs {
     pub genesis_coin_id: Bytes32,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(list)]
 pub struct CatSolution<I> {
     pub inner_puzzle_solution: I,
@@ -38,7 +42,8 @@ pub struct CatSolution<I> {
     pub extra_delta: i64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(list)]
 pub struct CoinProof {
     pub parent_coin_info: Bytes32,
@@ -292,9 +297,7 @@ mod tests {
         let mod_ptr = node_from_bytes(&mut a, &EVERYTHING_WITH_SIGNATURE_TAIL_PUZZLE).unwrap();
         let curried_ptr = CurriedProgram {
             program: mod_ptr,
-            args: EverythingWithSignatureTailArgs {
-                public_key: public_key.clone(),
-            },
+            args: EverythingWithSignatureTailArgs { public_key },
         }
         .to_node_ptr(&mut a)
         .unwrap();

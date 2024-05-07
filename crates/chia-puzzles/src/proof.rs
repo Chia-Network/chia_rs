@@ -1,7 +1,7 @@
 use chia_protocol::Bytes32;
 use clvm_traits::{FromClvm, ToClvm};
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(untagged, tuple)]
 pub enum Proof {
@@ -9,7 +9,7 @@ pub enum Proof {
     Eve(EveProof),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(list)]
 pub struct LineageProof {
@@ -18,7 +18,7 @@ pub struct LineageProof {
     pub parent_amount: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(list)]
 pub struct EveProof {
