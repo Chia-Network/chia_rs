@@ -12,10 +12,6 @@
 
 A collection of Rust crates for working with the Chia blockchain. There are also Python bindings in the form of a wheel.
 
-## Workspace Structure
-
-All of the crates can be found within the `crates` directory. There is also a `wheel` for Python bindings, and various test files.
-
 ## Prerequisites
 
 - [Python](https://www.python.org/downloads/) 3.8 or higher installed.
