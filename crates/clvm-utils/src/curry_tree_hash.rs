@@ -1,6 +1,6 @@
-use crate::{tree_hash_atom, tree_hash_pair};
+use crate::{tree_hash_atom, tree_hash_pair, TreeHash};
 
-pub fn curry_tree_hash(program_hash: [u8; 32], arg_hashes: &[[u8; 32]]) -> [u8; 32] {
+pub fn curry_tree_hash(program_hash: TreeHash, arg_hashes: &[TreeHash]) -> TreeHash {
     let nil = tree_hash_atom(&[]);
     let op_q = tree_hash_atom(&[1]);
     let op_a = tree_hash_atom(&[2]);

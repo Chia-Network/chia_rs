@@ -5,7 +5,7 @@ use crate::gen::flags::ALLOW_BACKREFS;
 use crate::gen::spend_visitor::SpendVisitor;
 use crate::gen::validation_error::{first, ErrorCode, ValidationErr};
 use crate::generator_rom::{CLVM_DESERIALIZER, COST_PER_BYTE, GENERATOR_ROM};
-use clvm_utils::tree_hash_cached;
+use clvm_utils::{tree_hash_cached, TreeHash};
 use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;
@@ -155,7 +155,7 @@ pub fn run_block_generator2<GenBuf: AsRef<[u8]>, V: SpendVisitor>(
 
     let mut ret = SpendBundleConditions::default();
     let mut state = ParseState::default();
-    let mut cache = HashMap::<NodePtr, [u8; 32]>::new();
+    let mut cache = HashMap::<NodePtr, TreeHash>::new();
 
     while let Some((spend, rest)) = a.next(all_spends) {
         all_spends = rest;

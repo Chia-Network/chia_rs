@@ -1,5 +1,6 @@
 use chia_traits::{chia_error, read_bytes, Streamable};
 use clvm_traits::{ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError, ToClvm, ToClvmError};
+use clvm_utils::TreeHash;
 use sha2::{Digest, Sha256};
 use std::array::TryFromSliceError;
 use std::fmt;
@@ -340,6 +341,18 @@ pub type Bytes32 = BytesImpl<32>;
 pub type Bytes48 = BytesImpl<48>;
 pub type Bytes96 = BytesImpl<96>;
 pub type Bytes100 = BytesImpl<100>;
+
+impl From<Bytes32> for TreeHash {
+    fn from(value: Bytes32) -> Self {
+        Self::new(value.0)
+    }
+}
+
+impl From<TreeHash> for Bytes32 {
+    fn from(value: TreeHash) -> Self {
+        Self(value.to_bytes())
+    }
+}
 
 #[cfg(feature = "py-bindings")]
 impl<const N: usize> ToPyObject for BytesImpl<N> {

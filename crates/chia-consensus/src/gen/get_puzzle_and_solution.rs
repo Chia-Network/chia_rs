@@ -46,7 +46,7 @@ pub fn get_puzzle_and_solution_for_coin(
         }
 
         let puzzle_hash = tree_hash(a, puzzle);
-        if puzzle_hash != find_ph.as_ref() {
+        if puzzle_hash != find_ph.into() {
             continue;
         }
 

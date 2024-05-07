@@ -1,7 +1,7 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
-use clvm_utils::{tree_hash, tree_hash_cached};
+use clvm_utils::{tree_hash, tree_hash_cached, TreeHash};
 use clvmr::{Allocator, NodePtr};
 use fuzzing_utils::{make_tree, BitCursor};
 use std::collections::{HashMap, HashSet};
@@ -11,7 +11,7 @@ use clvmr::serde::{node_from_bytes_backrefs_record, node_to_bytes_backrefs};
 fn test_hash(a: &Allocator, node: NodePtr, backrefs: &HashSet<NodePtr>) {
     let hash1 = tree_hash(a, node);
 
-    let mut cache = HashMap::<NodePtr, [u8; 32]>::new();
+    let mut cache = HashMap::<NodePtr, TreeHash>::new();
     let hash2 = tree_hash_cached(a, node, backrefs, &mut cache);
     assert_eq!(hash1, hash2);
 }

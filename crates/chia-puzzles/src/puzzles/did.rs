@@ -3,6 +3,7 @@ use clvm_traits::{
     clvm_list, match_list, match_tuple, ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError, Raw,
     ToClvm, ToClvmError,
 };
+use clvm_utils::TreeHash;
 use hex_literal::hex;
 
 use crate::singleton::SingletonStruct;
@@ -92,11 +93,11 @@ pub const DID_INNER_PUZZLE: [u8; 1012] = hex!(
 );
 
 /// This is the puzzle hash of the [DID1 standard](https://chialisp.com/dids) puzzle.
-pub const DID_INNER_PUZZLE_HASH: [u8; 32] = hex!(
+pub const DID_INNER_PUZZLE_HASH: TreeHash = TreeHash::new(hex!(
     "
     33143d2bef64f14036742673afd158126b94284b4530a28c354fac202b0c910e
     "
-);
+));
 
 #[cfg(test)]
 mod tests {
