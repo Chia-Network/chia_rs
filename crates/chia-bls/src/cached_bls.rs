@@ -5,6 +5,7 @@
 // is likely to reappear in a block later, so we can save having to do the pairing
 // again. So caching is primarily useful when synced and monitoring the mempool in real-time.
 
+use crate::aggregate_verify_gt as agg_ver_gt;
 use crate::aggregate_verify as agg_ver;
 use crate::gtelement::GTElement;
 use crate::hash_to_g2;
@@ -49,10 +50,9 @@ impl BLSCache {
         pks: &[PublicKey],
         msgs: &[M],
         force_cache: bool,
-    ) -> Vec<GTElement> {
-        let mut pairings: Vec<Option<GTElement>> = vec![];
+    ) -> Option<GTElement> {
         let mut missing_count: usize = 0;
-
+        let mut ret: Option<GTElement> = None;
         for (pk, msg) in pks.iter().zip(msgs.iter()) {
             let mut hasher = Sha256::new();
             hasher.update(pk.to_bytes());
@@ -67,33 +67,36 @@ impl BLSCache {
                 // (e.g. while syncing)
                 missing_count += 1;
                 if missing_count > pks.len() / 2 {
-                    return vec![];
+                    return None;
                 }
             }
 
-            pairings.push(pairing);
-        }
-        let mut ret: Vec<GTElement> = vec![];
-
-        for (i, pairing) in pairings.into_iter().enumerate() {
             if let Some(pairing) = pairing {
                 // equivalent to `if pairing is not None`
-                ret.push(pairing);
+                if let Some(ref current) = ret {
+                    ret = Some(current * &pairing);
+                } else {
+                    ret = Some(pairing);
+                }
                 continue;
             }
-
-            let mut aug_msg = pks[i].to_bytes().to_vec();
-            aug_msg.extend_from_slice(msgs[i].as_ref()); // pk + msg
+            // if pairing is None then make pairing and add to cache
+            let mut aug_msg = pk.to_bytes().to_vec();
+            aug_msg.extend_from_slice(msg.as_ref()); // pk + msg
             let aug_hash: Signature = hash_to_g2(&aug_msg);
 
-            let pairing: GTElement = aug_hash.pair(&pks[i]);
+            let pairing: GTElement = aug_hash.pair(&pk);
             let mut hasher = Sha256::new();
             hasher.update(&aug_msg);
             let h: [u8; 32] = hasher.finalize().into();
             self.cache.put(h, pairing.clone());
-            ret.push(pairing);
+            if let Some(ref current) = ret {
+                ret = Some(current * &pairing);
+            } else {
+                ret = Some(pairing);
+            }
         }
-
+        
         ret
     }
 
@@ -104,26 +107,18 @@ impl BLSCache {
         sig: &Signature,
         force_cache: bool,
     ) -> bool {
-        let mut pairings: Vec<GTElement> = self.get_pairings(pks, msgs, force_cache);
-        if pairings.is_empty() {
-            let mut data = Vec::<(PublicKey, &[u8])>::new();
-            for (pk, msg) in pks.iter().zip(msgs.iter()) {
-                data.push((pk.clone(), msg.as_ref()));
+        let pairings: Option<GTElement> = self.get_pairings(pks, msgs, force_cache);
+        match pairings {
+            Some(pairing) => agg_ver_gt(sig, [pairing]),
+            None => {
+                let mut data = Vec::<(PublicKey, &[u8])>::new();
+                for (pk, msg) in pks.iter().zip(msgs.iter()) {
+                    data.push((pk.clone(), msg.as_ref()));
+                }
+                return agg_ver(sig, data);
             }
-            return agg_ver(sig, data);
         }
-
-        // start with the first pairing
-        let Some(mut prod) = pairings.pop() else {
-            return pairings.is_empty();
-        };
-
-        for p in pairings.iter() {
-            // loop through rest of list
-            prod *= p;
-        }
-
-        prod == sig.pair(&PublicKey::generator())
+        
     }
 }
 
