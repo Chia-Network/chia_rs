@@ -1,4 +1,110 @@
+use chia_protocol::{Bytes, Bytes32};
+use clvm_traits::{FromClvm, ToClvm};
 use hex_literal::hex;
+
+#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[clvm(tuple)]
+pub struct SettlementPaymentsSolution {
+    pub notarized_payments: Vec<NotarizedPayment>,
+}
+
+impl SettlementPaymentsSolution {
+    pub fn new(notarized_payments: Vec<NotarizedPayment>) -> Self {
+        Self { notarized_payments }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[clvm(tuple)]
+pub struct NotarizedPayment {
+    pub nonce: Bytes32,
+    pub payments: Vec<Payment>,
+}
+
+impl NotarizedPayment {
+    pub fn new(nonce: Bytes32, payments: Vec<Payment>) -> Self {
+        Self { nonce, payments }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[clvm(tuple, untagged)]
+pub enum Payment {
+    WithoutMemos(PaymentWithoutMemos),
+    WithMemos(PaymentWithMemos),
+}
+
+impl Payment {
+    pub fn without_memos(puzzle_hash: Bytes32, amount: u64) -> Self {
+        Self::WithoutMemos(PaymentWithoutMemos::new(puzzle_hash, amount))
+    }
+
+    pub fn with_memos(puzzle_hash: Bytes32, amount: u64, memos: Vec<Bytes>) -> Self {
+        Self::WithMemos(PaymentWithMemos::new(puzzle_hash, amount, memos))
+    }
+
+    pub fn has_memos(&self) -> bool {
+        match self {
+            Self::WithoutMemos(_) => false,
+            Self::WithMemos(_) => true,
+        }
+    }
+
+    pub fn puzzle_hash(&self) -> Bytes32 {
+        match self {
+            Self::WithoutMemos(payment) => payment.puzzle_hash,
+            Self::WithMemos(payment) => payment.puzzle_hash,
+        }
+    }
+
+    pub fn amount(&self) -> u64 {
+        match self {
+            Self::WithoutMemos(payment) => payment.amount,
+            Self::WithMemos(payment) => payment.amount,
+        }
+    }
+
+    pub fn memos(&self) -> Option<&Vec<Bytes>> {
+        match self {
+            Self::WithoutMemos(_) => None,
+            Self::WithMemos(payment) => Some(&payment.memos),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
+#[clvm(list)]
+pub struct PaymentWithoutMemos {
+    pub puzzle_hash: Bytes32,
+    pub amount: u64,
+}
+
+impl PaymentWithoutMemos {
+    pub fn new(puzzle_hash: Bytes32, amount: u64) -> Self {
+        Self {
+            puzzle_hash,
+            amount,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[clvm(list)]
+pub struct PaymentWithMemos {
+    pub puzzle_hash: Bytes32,
+    pub amount: u64,
+    pub memos: Vec<Bytes>,
+}
+
+impl PaymentWithMemos {
+    pub fn new(puzzle_hash: Bytes32, amount: u64, memos: Vec<Bytes>) -> Self {
+        Self {
+            puzzle_hash,
+            amount,
+            memos,
+        }
+    }
+}
 
 /// This is the puzzle reveal of the [offer settlement payments](https://chialisp.com/offers) puzzle.
 pub const SETTLEMENT_PAYMENTS_PUZZLE: [u8; 293] = hex!(

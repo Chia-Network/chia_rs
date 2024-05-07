@@ -1,21 +1,47 @@
 use chia_bls::PublicKey;
 use chia_protocol::Bytes32;
-use clvm_traits::{FromClvm, ToClvm};
+use clvm_traits::{clvm_quote, FromClvm, ToClvm};
 use clvm_utils::{curry_tree_hash, tree_hash_atom};
 use hex_literal::hex;
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curry)]
 pub struct StandardArgs {
     pub synthetic_key: PublicKey,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+impl StandardArgs {
+    pub fn new(synthetic_key: PublicKey) -> Self {
+        Self { synthetic_key }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(list)]
 pub struct StandardSolution<P, S> {
     pub original_public_key: Option<PublicKey>,
     pub delegated_puzzle: P,
     pub solution: S,
+}
+
+impl<P, S> StandardSolution<P, S> {
+    pub fn new(original_public_key: Option<PublicKey>, delegated_puzzle: P, solution: S) -> Self {
+        Self {
+            original_public_key,
+            delegated_puzzle,
+            solution,
+        }
+    }
+}
+
+impl<T> StandardSolution<(u8, T), ()> {
+    pub fn from_conditions(conditions: T) -> Self {
+        Self {
+            original_public_key: None,
+            delegated_puzzle: clvm_quote!(conditions),
+            solution: (),
+        }
+    }
 }
 
 pub fn standard_puzzle_hash(synthetic_key: &PublicKey) -> Bytes32 {

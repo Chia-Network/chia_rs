@@ -4,14 +4,23 @@ use hex_literal::hex;
 
 use crate::Proof;
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curry)]
 pub struct SingletonArgs<I> {
     pub singleton_struct: SingletonStruct,
     pub inner_puzzle: I,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+impl<I> SingletonArgs<I> {
+    pub fn new(launcher_id: Bytes32, inner_puzzle: I) -> Self {
+        Self {
+            singleton_struct: SingletonStruct::new(launcher_id),
+            inner_puzzle,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(tuple)]
 pub struct SingletonStruct {
     pub mod_hash: Bytes32,
@@ -19,7 +28,17 @@ pub struct SingletonStruct {
     pub launcher_puzzle_hash: Bytes32,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+impl SingletonStruct {
+    pub fn new(launcher_id: Bytes32) -> Self {
+        Self {
+            mod_hash: SINGLETON_TOP_LAYER_PUZZLE_HASH.into(),
+            launcher_id,
+            launcher_puzzle_hash: SINGLETON_LAUNCHER_PUZZLE_HASH.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(list)]
 pub struct SingletonSolution<I> {
     pub lineage_proof: Proof,
@@ -33,16 +52,6 @@ pub struct LauncherSolution<T> {
     pub singleton_puzzle_hash: Bytes32,
     pub amount: u64,
     pub key_value_list: T,
-}
-
-impl SingletonStruct {
-    pub fn new(launcher_id: Bytes32) -> Self {
-        Self {
-            mod_hash: SINGLETON_TOP_LAYER_PUZZLE_HASH.into(),
-            launcher_id,
-            launcher_puzzle_hash: SINGLETON_LAUNCHER_PUZZLE_HASH.into(),
-        }
-    }
 }
 
 /// This is the puzzle reveal of the [singleton launcher](https://chialisp.com/singletons#launcher) puzzle.

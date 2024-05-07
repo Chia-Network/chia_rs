@@ -3,21 +3,29 @@ use hex_literal::hex;
 use num_bigint::BigInt;
 use sha2::{digest::FixedOutput, Digest, Sha256};
 
+use crate::standard::DEFAULT_HIDDEN_PUZZLE_HASH;
+
 const GROUP_ORDER_BYTES: [u8; 32] =
     hex!("73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001");
 
 pub trait DeriveSynthetic {
-    fn derive_synthetic(&self, hidden_puzzle_hash: &[u8; 32]) -> Self;
+    fn derive_synthetic_hidden(&self, hidden_puzzle_hash: &[u8; 32]) -> Self;
+    fn derive_synthetic(&self) -> Self
+    where
+        Self: Sized,
+    {
+        self.derive_synthetic_hidden(&DEFAULT_HIDDEN_PUZZLE_HASH)
+    }
 }
 
 impl DeriveSynthetic for PublicKey {
-    fn derive_synthetic(&self, hidden_puzzle_hash: &[u8; 32]) -> Self {
+    fn derive_synthetic_hidden(&self, hidden_puzzle_hash: &[u8; 32]) -> Self {
         self + &synthetic_offset(self, hidden_puzzle_hash).public_key()
     }
 }
 
 impl DeriveSynthetic for SecretKey {
-    fn derive_synthetic(&self, hidden_puzzle_hash: &[u8; 32]) -> Self {
+    fn derive_synthetic_hidden(&self, hidden_puzzle_hash: &[u8; 32]) -> Self {
         self + &synthetic_offset(&self.public_key(), hidden_puzzle_hash)
     }
 }
@@ -44,8 +52,6 @@ fn synthetic_offset(public_key: &PublicKey, hidden_puzzle_hash: &[u8; 32]) -> Se
 
 #[cfg(test)]
 mod tests {
-    use crate::standard::DEFAULT_HIDDEN_PUZZLE_HASH;
-
     use super::*;
 
     use chia_bls::{derive_keys::master_to_wallet_unhardened_intermediate, DerivableKey};
@@ -83,7 +89,7 @@ mod tests {
         for (index, hex) in hex_keys.iter().enumerate() {
             let key = intermediate
                 .derive_unhardened(index as u32)
-                .derive_synthetic(&DEFAULT_HIDDEN_PUZZLE_HASH);
+                .derive_synthetic();
             assert_eq!(key.to_bytes().encode_hex::<String>(), *hex);
         }
     }
@@ -118,7 +124,7 @@ mod tests {
         for (index, hex) in hex_keys.iter().enumerate() {
             let key = intermediate
                 .derive_unhardened(index as u32)
-                .derive_synthetic(&DEFAULT_HIDDEN_PUZZLE_HASH);
+                .derive_synthetic();
             assert_eq!(key.to_bytes().encode_hex::<String>(), *hex);
         }
     }

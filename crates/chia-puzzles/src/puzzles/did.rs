@@ -7,7 +7,7 @@ use hex_literal::hex;
 
 use crate::singleton::SingletonStruct;
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curry)]
 pub struct DidArgs<I, M> {
     pub inner_puzzle: I,
@@ -17,7 +17,7 @@ pub struct DidArgs<I, M> {
     pub metadata: M,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DidSolution<I> {
     InnerSpend(I),
 }

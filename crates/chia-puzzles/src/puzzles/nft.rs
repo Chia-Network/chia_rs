@@ -2,9 +2,9 @@ use chia_protocol::Bytes32;
 use clvm_traits::{ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError, Raw, ToClvm, ToClvmError};
 use hex_literal::hex;
 
-use crate::singleton::SingletonStruct;
+use crate::singleton::{SingletonStruct, SINGLETON_LAUNCHER_PUZZLE_HASH};
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curry)]
 pub struct NftIntermediateLauncherArgs {
     pub launcher_puzzle_hash: Bytes32,
@@ -12,7 +12,17 @@ pub struct NftIntermediateLauncherArgs {
     pub mint_total: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+impl NftIntermediateLauncherArgs {
+    pub fn new(mint_number: usize, mint_total: usize) -> Self {
+        Self {
+            launcher_puzzle_hash: SINGLETON_LAUNCHER_PUZZLE_HASH.into(),
+            mint_number,
+            mint_total,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curry)]
 pub struct NftStateLayerArgs<I, M> {
     pub mod_hash: Bytes32,
@@ -21,13 +31,30 @@ pub struct NftStateLayerArgs<I, M> {
     pub inner_puzzle: I,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+impl<I, M> NftStateLayerArgs<I, M> {
+    pub fn with_default_updater(metadata: M, inner_puzzle: I) -> Self {
+        Self {
+            mod_hash: NFT_STATE_LAYER_PUZZLE_HASH.into(),
+            metadata,
+            metadata_updater_puzzle_hash: NFT_METADATA_UPDATER_PUZZLE_HASH.into(),
+            inner_puzzle,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(list)]
 pub struct NftStateLayerSolution<I> {
     pub inner_solution: I,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+impl<I> NftStateLayerSolution<I> {
+    pub fn new(inner_solution: I) -> Self {
+        Self { inner_solution }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curry)]
 pub struct NftOwnershipLayerArgs<I, P> {
     pub mod_hash: Bytes32,
@@ -36,10 +63,27 @@ pub struct NftOwnershipLayerArgs<I, P> {
     pub inner_puzzle: I,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+impl<I, P> NftOwnershipLayerArgs<I, P> {
+    pub fn new(current_owner: Option<Bytes32>, transfer_program: P, inner_puzzle: I) -> Self {
+        Self {
+            mod_hash: NFT_OWNERSHIP_LAYER_PUZZLE_HASH.into(),
+            current_owner,
+            transfer_program,
+            inner_puzzle,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(list)]
 pub struct NftOwnershipLayerSolution<I> {
     pub inner_solution: I,
+}
+
+impl<I> NftOwnershipLayerSolution<I> {
+    pub fn new(inner_solution: I) -> Self {
+        Self { inner_solution }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
@@ -48,6 +92,20 @@ pub struct NftRoyaltyTransferPuzzleArgs {
     pub singleton_struct: SingletonStruct,
     pub royalty_puzzle_hash: Bytes32,
     pub trade_price_percentage: u16,
+}
+
+impl NftRoyaltyTransferPuzzleArgs {
+    pub fn new(
+        launcher_id: Bytes32,
+        royalty_puzzle_hash: Bytes32,
+        trade_price_percentage: u16,
+    ) -> Self {
+        Self {
+            singleton_struct: SingletonStruct::new(launcher_id),
+            royalty_puzzle_hash,
+            trade_price_percentage,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

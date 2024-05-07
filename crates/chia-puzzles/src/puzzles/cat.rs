@@ -6,7 +6,7 @@ use hex_literal::hex;
 
 use crate::LineageProof;
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curry)]
 pub struct CatArgs<I> {
     pub mod_hash: Bytes32,
@@ -14,19 +14,41 @@ pub struct CatArgs<I> {
     pub inner_puzzle: I,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+impl<I> CatArgs<I> {
+    pub fn new(asset_id: Bytes32, inner_puzzle: I) -> Self {
+        Self {
+            mod_hash: CAT_PUZZLE_HASH.into(),
+            tail_program_hash: asset_id,
+            inner_puzzle,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curry)]
 pub struct EverythingWithSignatureTailArgs {
     pub public_key: PublicKey,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+impl EverythingWithSignatureTailArgs {
+    pub fn new(public_key: PublicKey) -> Self {
+        Self { public_key }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curry)]
 pub struct GenesisByCoinIdTailArgs {
     pub genesis_coin_id: Bytes32,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+impl GenesisByCoinIdTailArgs {
+    pub fn new(genesis_coin_id: Bytes32) -> Self {
+        Self { genesis_coin_id }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(list)]
 pub struct CatSolution<I> {
     pub inner_puzzle_solution: I,
@@ -38,7 +60,7 @@ pub struct CatSolution<I> {
     pub extra_delta: i64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(list)]
 pub struct CoinProof {
     pub parent_coin_info: Bytes32,
