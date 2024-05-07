@@ -5,10 +5,10 @@ on:
     branches:
       - main
     tags:
-        - '**'
+      - "**"
   pull_request:
     branches:
-      - '**'
+      - "**"
 
 jobs:
   build_crate:
@@ -18,166 +18,166 @@ jobs:
       fail-fast: false
 
     steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
-    - name: Set up rusts
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        components: rustfmt, clippy
+      - name: Set up rusts
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
 
-    - name: prettier check
-      run: npx prettier --check .
+      - name: prettier check
+        run: npx prettier --check .
 
-    - name: fmt
-      run: cargo fmt -- --files-with-diff --check
-    - name: clippy
-      run: cargo clippy
-    - name: tests
-      run: cargo test && cargo test --release
-    - name: build
-      run: cargo build --release
+      - name: fmt
+        run: cargo fmt -- --files-with-diff --check
+      - name: clippy
+        run: cargo clippy
+      - name: tests
+        run: cargo test && cargo test --release
+      - name: build
+        run: cargo build --release
 
-    - name: Upload crate artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: crate
-        path: ./target/package/*-*.crate
+      - name: Upload crate artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: crate
+          path: ./target/package/*-*.crate
 
-    - name: install wasm-pack
-      run: cargo install wasm-pack --locked
+      - name: install wasm-pack
+        run: cargo install wasm-pack --locked
 
-    - name: wasm-pack build and pack
-      run: cd wasm && wasm-pack build && wasm-pack pack
+      - name: wasm-pack build and pack
+        run: cd wasm && wasm-pack build && wasm-pack pack
 
-    - name: Upload npm pkg artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: npm-pkg
-        path: ./wasm/pkg/*-*.tgz
+      - name: Upload npm pkg artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: npm-pkg
+          path: ./wasm/pkg/*-*.tgz
 
-    # this has not been tested, so probably needs to be debugged next time a tag is created
-    - name: publish to crates.io if tagged (chia_py_streamable_macro)
-      continue-on-error: true
-      if: startsWith(github.event.ref, 'refs/tags')
-      env:
-        CARGO_REGISTRY_TOKEN: ${{ secrets.cargo_registry_token }}
-      run: |
-        cd crates/chia_py_streamable_macro
-        cargo publish
+      # this has not been tested, so probably needs to be debugged next time a tag is created
+      - name: publish to crates.io if tagged (chia_py_streamable_macro)
+        continue-on-error: true
+        if: startsWith(github.event.ref, 'refs/tags')
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.cargo_registry_token }}
+        run: |
+          cd crates/chia_py_streamable_macro
+          cargo publish
 
-    - name: publish to crates.io if tagged (chia_streamable_macro)
-      continue-on-error: true
-      if: startsWith(github.event.ref, 'refs/tags')
-      env:
-        CARGO_REGISTRY_TOKEN: ${{ secrets.cargo_registry_token }}
-      run: |
-        cd crates/chia_streamable_macro
-        cargo publish
+      - name: publish to crates.io if tagged (chia_streamable_macro)
+        continue-on-error: true
+        if: startsWith(github.event.ref, 'refs/tags')
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.cargo_registry_token }}
+        run: |
+          cd crates/chia_streamable_macro
+          cargo publish
 
-    - name: publish to crates.io if tagged (chia-traits)
-      continue-on-error: true
-      if: startsWith(github.event.ref, 'refs/tags')
-      env:
-        CARGO_REGISTRY_TOKEN: ${{ secrets.cargo_registry_token }}
-      run: |
-        cd crates/chia-traits
-        cargo publish
+      - name: publish to crates.io if tagged (chia-traits)
+        continue-on-error: true
+        if: startsWith(github.event.ref, 'refs/tags')
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.cargo_registry_token }}
+        run: |
+          cd crates/chia-traits
+          cargo publish
 
-    - name: publish to crates.io if tagged (chia-bls)
-      continue-on-error: true
-      if: startsWith(github.event.ref, 'refs/tags')
-      env:
-        CARGO_REGISTRY_TOKEN: ${{ secrets.cargo_registry_token }}
-      run: |
-        cd crates/chia-bls
-        cargo publish
+      - name: publish to crates.io if tagged (chia-bls)
+        continue-on-error: true
+        if: startsWith(github.event.ref, 'refs/tags')
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.cargo_registry_token }}
+        run: |
+          cd crates/chia-bls
+          cargo publish
 
-    - name: publish to crates.io if tagged (clvm-derive)
-      continue-on-error: true
-      if: startsWith(github.event.ref, 'refs/tags')
-      env:
-        CARGO_REGISTRY_TOKEN: ${{ secrets.cargo_registry_token }}
-      run: |
-        cd crates/clvm-derive
-        cargo publish
+      - name: publish to crates.io if tagged (clvm-derive)
+        continue-on-error: true
+        if: startsWith(github.event.ref, 'refs/tags')
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.cargo_registry_token }}
+        run: |
+          cd crates/clvm-derive
+          cargo publish
 
-    - name: publish to crates.io if tagged (clvm-traits)
-      continue-on-error: true
-      if: startsWith(github.event.ref, 'refs/tags')
-      env:
-        CARGO_REGISTRY_TOKEN: ${{ secrets.cargo_registry_token }}
-      run: |
-        cd crates/clvm-traits
-        cargo publish
+      - name: publish to crates.io if tagged (clvm-traits)
+        continue-on-error: true
+        if: startsWith(github.event.ref, 'refs/tags')
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.cargo_registry_token }}
+        run: |
+          cd crates/clvm-traits
+          cargo publish
 
-    - name: publish to crates.io if tagged (clvm-utils)
-      continue-on-error: true
-      if: startsWith(github.event.ref, 'refs/tags')
-      env:
-        CARGO_REGISTRY_TOKEN: ${{ secrets.cargo_registry_token }}
-      run: |
-        cd crates/clvm-utils
-        cargo publish
+      - name: publish to crates.io if tagged (clvm-utils)
+        continue-on-error: true
+        if: startsWith(github.event.ref, 'refs/tags')
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.cargo_registry_token }}
+        run: |
+          cd crates/clvm-utils
+          cargo publish
 
-    - name: publish to crates.io if tagged (chia-protocol)
-      continue-on-error: true
-      if: startsWith(github.event.ref, 'refs/tags')
-      env:
-        CARGO_REGISTRY_TOKEN: ${{ secrets.cargo_registry_token }}
-      run: |
-        cd crates/chia-protocol
-        cargo publish
+      - name: publish to crates.io if tagged (chia-protocol)
+        continue-on-error: true
+        if: startsWith(github.event.ref, 'refs/tags')
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.cargo_registry_token }}
+        run: |
+          cd crates/chia-protocol
+          cargo publish
 
-    - name: publish to crates.io if tagged (chia-puzzles)
-      continue-on-error: true
-      if: startsWith(github.event.ref, 'refs/tags')
-      env:
-        CARGO_REGISTRY_TOKEN: ${{ secrets.cargo_registry_token }}
-      run: |
-        cd crates/chia-puzzles
-        cargo publish
+      - name: publish to crates.io if tagged (chia-puzzles)
+        continue-on-error: true
+        if: startsWith(github.event.ref, 'refs/tags')
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.cargo_registry_token }}
+        run: |
+          cd crates/chia-puzzles
+          cargo publish
 
-    - name: publish to crates.io if tagged (chia-client)
-      continue-on-error: true
-      if: startsWith(github.event.ref, 'refs/tags')
-      env:
-        CARGO_REGISTRY_TOKEN: ${{ secrets.cargo_registry_token }}
-      run: |
-        cd crates/chia-client
-        cargo publish
+      - name: publish to crates.io if tagged (chia-client)
+        continue-on-error: true
+        if: startsWith(github.event.ref, 'refs/tags')
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.cargo_registry_token }}
+        run: |
+          cd crates/chia-client
+          cargo publish
 
-    - name: publish to crates.io if tagged (chia-ssl)
-      continue-on-error: true
-      if: startsWith(github.event.ref, 'refs/tags')
-      env:
-        CARGO_REGISTRY_TOKEN: ${{ secrets.cargo_registry_token }}
-      run: |
-        cd crates/chia-ssl
-        cargo publish
+      - name: publish to crates.io if tagged (chia-ssl)
+        continue-on-error: true
+        if: startsWith(github.event.ref, 'refs/tags')
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.cargo_registry_token }}
+        run: |
+          cd crates/chia-ssl
+          cargo publish
 
-    - name: publish to crates.io if tagged (chia-consensus)
-      continue-on-error: true
-      if: startsWith(github.event.ref, 'refs/tags')
-      env:
-        CARGO_REGISTRY_TOKEN: ${{ secrets.cargo_registry_token }}
-      run: |
-        cd crates/chia-consensus
-        cargo publish
+      - name: publish to crates.io if tagged (chia-consensus)
+        continue-on-error: true
+        if: startsWith(github.event.ref, 'refs/tags')
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.cargo_registry_token }}
+        run: |
+          cd crates/chia-consensus
+          cargo publish
 
-    - name: publish to crates.io if tagged (chia)
-      continue-on-error: true
-      if: startsWith(github.event.ref, 'refs/tags')
-      env:
-        CARGO_REGISTRY_TOKEN: ${{ secrets.cargo_registry_token }}
-      run: |
-        cargo publish
+      - name: publish to crates.io if tagged (chia)
+        continue-on-error: true
+        if: startsWith(github.event.ref, 'refs/tags')
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.cargo_registry_token }}
+        run: |
+          cargo publish
 
-    # this has not been tested, so probably needs to be debugged next time a tag is created
-    - name: publish to npmjs.com if tagged
-      if: startsWith(github.event.ref, 'refs/tags')
-      uses: JS-DevTools/npm-publish@v1
-      with:
-        token: ${{ secrets.node_auth_token }}
-        package: wasm/pkg/package.json
+      # this has not been tested, so probably needs to be debugged next time a tag is created
+      - name: publish to npmjs.com if tagged
+        if: startsWith(github.event.ref, 'refs/tags')
+        uses: JS-DevTools/npm-publish@v1
+        with:
+          token: ${{ secrets.node_auth_token }}
+          package: wasm/pkg/package.json
