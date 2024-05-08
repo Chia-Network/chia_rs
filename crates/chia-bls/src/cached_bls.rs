@@ -44,14 +44,14 @@ impl BLSCache {
         Self { cache }
     }
 
-    pub fn aggregate_verify<M: Iterator<Item = T>, T: AsRef<[u8]>, P: Iterator<Item = U>, U: Borrow<PublicKey>>(
+    pub fn aggregate_verify<M: IntoIterator<Item = T>, T: AsRef<[u8]>, P: IntoIterator<Item = U>, U: Borrow<PublicKey>>(
         &mut self,
         pks: P,
         msgs: M,
         sig: &Signature,
     ) -> bool
     where T: Copy {
-        let iter = pks.zip(msgs).map(|(pk, msg)| -> GTElement {
+        let iter = pks.into_iter().zip(msgs.into_iter()).map(|(pk, msg)| -> GTElement {
             let mut hasher = Sha256::new();
             hasher.update(pk.borrow().to_bytes());
             hasher.update(msg); // pk + msg
@@ -160,7 +160,7 @@ pub mod tests {
         assert!(bls_cache.aggregate_verify(pk_list.iter(), msg_list.iter(), &sig));
         assert_eq!(bls_cache.cache.len(), 1);
         // try again with (pk, msg) cached
-        assert!(bls_cache.aggregate_verify(pk_list.iter(), msg_list.iter(), &sig));
+        assert!(bls_cache.aggregate_verify(pk_list, msg_list, &sig));
         assert_eq!(bls_cache.cache.len(), 1);
     }
 
@@ -177,7 +177,7 @@ pub mod tests {
         let mut msg_list: Vec<&[u8]> = [msg].to_vec();
         // add first to cache
         // try one cached, one not cached
-        assert!(bls_cache.aggregate_verify(pk_list.iter(), msg_list.iter(), &sig));
+        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig));
         assert_eq!(bls_cache.cache.len(), 1);
         let byte_array: [u8; 32] = [1; 32];
         let sk: SecretKey = SecretKey::from_seed(&byte_array);
@@ -186,7 +186,7 @@ pub mod tests {
         let sig = aggregate([sig, sign(&sk, msg)]);
         pk_list.push(pk);
         msg_list.push(msg);
-        assert!(bls_cache.aggregate_verify(pk_list.iter(), msg_list.iter(), &sig));
+        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig));
         assert_eq!(bls_cache.cache.len(), 2);
         // try reusing a pubkey
         let pk: PublicKey = sk.public_key();
@@ -195,7 +195,7 @@ pub mod tests {
         pk_list.push(pk);
         msg_list.push(msg);
         // check verification
-        assert!(bls_cache.aggregate_verify(pk_list.iter(), msg_list.iter(), &sig));
+        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig));
         assert_eq!(bls_cache.cache.len(), 3);
     }
 
