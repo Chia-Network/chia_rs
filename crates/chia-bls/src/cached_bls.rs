@@ -13,9 +13,10 @@ use crate::Signature;
 use lru::LruCache;
 use sha2::{Digest, Sha256};
 use std::num::NonZeroUsize;
+use std::borrow::Borrow;
 
 #[cfg(feature = "py-bindings")]
-use pyo3::types::{PyBool, PyInt, PyList};
+use pyo3::types::{PyInt, PyList};
 #[cfg(feature = "py-bindings")]
 use pyo3::{pyclass, pymethods, PyResult};
 
@@ -43,15 +44,16 @@ impl BLSCache {
         Self { cache }
     }
 
-    pub fn aggregate_verify<M: AsRef<[u8]>>(
+    pub fn aggregate_verify<M: Iterator<Item = T>, T: AsRef<[u8]>, P: Iterator<Item = U>, U: Borrow<PublicKey>>(
         &mut self,
-        pks: &[PublicKey],
-        msgs: &[M],
+        pks: P,
+        msgs: M,
         sig: &Signature,
-    ) -> bool {
-        let iter = pks.iter().zip(msgs.iter()).map(|(pk, msg)| -> GTElement {
+    ) -> bool
+    where T: Copy {
+        let iter = pks.zip(msgs).map(|(pk, msg)| -> GTElement {
             let mut hasher = Sha256::new();
-            hasher.update(pk.to_bytes());
+            hasher.update(pk.borrow().to_bytes());
             hasher.update(msg); // pk + msg
             let h: [u8; 32] = hasher.finalize().into();
 
@@ -62,11 +64,11 @@ impl BLSCache {
                 return pairing;
             }
             // if pairing is None then make pairing and add to cache
-            let mut aug_msg = pk.to_bytes().to_vec();
+            let mut aug_msg = pk.borrow().to_bytes().to_vec();
             aug_msg.extend_from_slice(msg.as_ref()); // pk + msg
             let aug_hash: Signature = hash_to_g2(&aug_msg);
 
-            let pairing: GTElement = aug_hash.pair(pk);
+            let pairing: GTElement = aug_hash.pair(pk.borrow());
             let mut hasher = Sha256::new();
             hasher.update(&aug_msg);
             let h: [u8; 32] = hasher.finalize().into();
@@ -104,15 +106,13 @@ impl BLSCache {
         msgs: &PyList,
         sig: &Signature,
     ) -> PyResult<bool> {
-        let pks_r: Vec<PublicKey> = pks
+        let pks_r = pks
             .iter()
-            .map(|item| item.extract::<PublicKey>())
-            .collect::<PyResult<_>>()?;
-        let msgs_r: Vec<&[u8]> = msgs
+            .map(|item| item.extract::<PublicKey>().unwrap());
+        let msgs_r = msgs
             .iter()
-            .map(|item| item.extract::<&[u8]>())
-            .collect::<PyResult<_>>()?;
-        Ok(self.aggregate_verify(&pks_r, &msgs_r, sig))
+            .map(|item| item.extract::<&[u8]>().unwrap());
+        Ok(self.aggregate_verify(pks_r, msgs_r, sig))
     }
 
     #[pyo3(name = "len")]
@@ -157,10 +157,10 @@ pub mod tests {
         let sig: Signature = sign(&sk, msg);
         let pk_list: Vec<PublicKey> = [pk].to_vec();
         let msg_list: Vec<&[u8]> = [msg].to_vec();
-        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig));
+        assert!(bls_cache.aggregate_verify(pk_list.iter(), msg_list.iter(), &sig));
         assert_eq!(bls_cache.cache.len(), 1);
         // try again with (pk, msg) cached
-        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig));
+        assert!(bls_cache.aggregate_verify(pk_list.iter(), msg_list.iter(), &sig));
         assert_eq!(bls_cache.cache.len(), 1);
     }
 
@@ -177,7 +177,7 @@ pub mod tests {
         let mut msg_list: Vec<&[u8]> = [msg].to_vec();
         // add first to cache
         // try one cached, one not cached
-        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig));
+        assert!(bls_cache.aggregate_verify(pk_list.iter(), msg_list.iter(), &sig));
         assert_eq!(bls_cache.cache.len(), 1);
         let byte_array: [u8; 32] = [1; 32];
         let sk: SecretKey = SecretKey::from_seed(&byte_array);
@@ -186,7 +186,7 @@ pub mod tests {
         let sig = aggregate([sig, sign(&sk, msg)]);
         pk_list.push(pk);
         msg_list.push(msg);
-        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig));
+        assert!(bls_cache.aggregate_verify(pk_list.iter(), msg_list.iter(), &sig));
         assert_eq!(bls_cache.cache.len(), 2);
         // try reusing a pubkey
         let pk: PublicKey = sk.public_key();
@@ -195,7 +195,7 @@ pub mod tests {
         pk_list.push(pk);
         msg_list.push(msg);
         // check verification
-        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig));
+        assert!(bls_cache.aggregate_verify(pk_list.iter(), msg_list.iter(), &sig));
         assert_eq!(bls_cache.cache.len(), 3);
     }
 
@@ -213,7 +213,7 @@ pub mod tests {
             let sig: Signature = sign(&sk, msg);
             let pk_list: Vec<PublicKey> = [pk].to_vec();
             let msg_list: Vec<&[u8]> = vec![msg];
-            assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig));
+            assert!(bls_cache.aggregate_verify(pk_list.iter(), msg_list.iter(), &sig));
         }
         assert_eq!(bls_cache.cache.len(), 3);
         // recreate first key
