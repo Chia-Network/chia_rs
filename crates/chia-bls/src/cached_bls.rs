@@ -77,52 +77,6 @@ impl BLSCache {
     }
 }
 
-// Python Functions
-
-// Commented out for now as we may remove these
-// as the python consensus code that uses it is being ported to rust.
-
-// #[cfg(feature = "py-bindings")]
-// #[pymethods]
-// impl BLSCache {
-//     #[new]
-//     pub fn init() -> Self {
-//         Self::default()
-//     }
-
-//     #[staticmethod]
-//     #[pyo3(name = "generator")]
-//     pub fn py_generator(size: Option<&PyInt>) -> Self {
-//         size.map(|s| Self::new(s.extract().unwrap()))
-//             .unwrap_or_default()
-//     }
-
-//     #[pyo3(name = "aggregate_verify")]
-//     pub fn py_aggregate_verify(
-//         &mut self,
-//         pks: &PyList,
-//         msgs: &PyList,
-//         sig: &Signature,
-//         force_cache: &PyBool,
-//     ) -> PyResult<bool> {
-//         let pks_r: Vec<[u8; 48]> = pks
-//             .iter()
-//             .map(|item| item.extract::<[u8; 48]>())
-//             .collect::<PyResult<_>>()?;
-//         let msgs_r: Vec<&[u8]> = msgs
-//             .iter()
-//             .map(|item| item.extract::<&[u8]>())
-//             .collect::<PyResult<_>>()?;
-//         let force_cache_bool = force_cache.extract::<bool>()?;
-//         Ok(self.aggregate_verify(&pks_r, &msgs_r, sig, force_cache_bool))
-//     }
-
-//     #[pyo3(name = "len")]
-//     pub fn py_len(&self) -> PyResult<usize> {
-//         Ok(self.cache.len())
-//     }
-// }
-
 #[cfg(test)]
 pub mod tests {
     use super::*;
