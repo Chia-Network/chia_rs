@@ -12,8 +12,8 @@ use crate::PublicKey;
 use crate::Signature;
 use lru::LruCache;
 use sha2::{Digest, Sha256};
-use std::num::NonZeroUsize;
 use std::borrow::Borrow;
+use std::num::NonZeroUsize;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::types::{PyInt, PyList};
@@ -44,14 +44,21 @@ impl BLSCache {
         Self { cache }
     }
 
-    pub fn aggregate_verify<M: IntoIterator<Item = T>, T: AsRef<[u8]>, P: IntoIterator<Item = U>, U: Borrow<PublicKey>>(
+    pub fn aggregate_verify<
+        M: IntoIterator<Item = T>,
+        T: AsRef<[u8]>,
+        P: IntoIterator<Item = U>,
+        U: Borrow<PublicKey>,
+    >(
         &mut self,
         pks: P,
         msgs: M,
         sig: &Signature,
     ) -> bool
-    where T: Copy {
-        let iter = pks.into_iter().zip(msgs.into_iter()).map(|(pk, msg)| -> GTElement {
+    where
+        T: Copy,
+    {
+        let iter = pks.into_iter().zip(msgs).map(|(pk, msg)| -> GTElement {
             let mut hasher = Sha256::new();
             hasher.update(pk.borrow().to_bytes());
             hasher.update(msg); // pk + msg
@@ -106,12 +113,8 @@ impl BLSCache {
         msgs: &PyList,
         sig: &Signature,
     ) -> PyResult<bool> {
-        let pks_r = pks
-            .iter()
-            .map(|item| item.extract::<PublicKey>().unwrap());
-        let msgs_r = msgs
-            .iter()
-            .map(|item| item.extract::<&[u8]>().unwrap());
+        let pks_r = pks.iter().map(|item| item.extract::<PublicKey>().unwrap());
+        let msgs_r = msgs.iter().map(|item| item.extract::<&[u8]>().unwrap());
         Ok(self.aggregate_verify(pks_r, msgs_r, sig))
     }
 
