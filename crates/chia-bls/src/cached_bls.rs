@@ -128,6 +128,9 @@ pub mod tests {
     use crate::aggregate;
     use crate::sign;
     use crate::SecretKey;
+    use std::time::{Duration, Instant};
+    use crate::aggregate_verify as agg_ver;
+
 
     #[test]
     pub fn test_instantiation() {
@@ -229,5 +232,89 @@ pub mod tests {
         let h: [u8; 32] = hasher.finalize().into();
         // assert first key has been removed
         assert!(bls_cache.cache.get(&h).is_none());
+    }
+
+    #[test]
+    pub fn test_benchmarks() {
+        let mut bls_cache: BLSCache = BLSCache::default();  // 50000
+        assert_eq!(bls_cache.cache.len(), 0);
+        // benchmark at 100% cache hit rate
+        let mut pk_list: Vec<PublicKey> = [].to_vec();
+        let mut msg_list: Vec<&[u8]> = vec![];
+        let mut aggsig: Option<Signature> = None;
+        for i in 0..=25000 { //cache is half full
+            let byte_array: [u8; 32] = [i as u8; 32];
+            let sk: SecretKey = SecretKey::from_seed(&byte_array);
+            let pk: PublicKey = sk.public_key();
+            let msg: &[u8] = &[106; 32];
+            let sig: Signature = sign(&sk, msg);
+            pk_list.push(pk.clone());
+            msg_list.push(msg);
+            assert!(bls_cache.aggregate_verify([pk].iter(), [msg].iter(), &sig));
+            if aggsig.is_none() {aggsig = Some(sig);} else {aggsig = Some(aggregate([aggsig.unwrap(), sig]));}
+        }
+        let start = Instant::now();
+        assert!(bls_cache.aggregate_verify(pk_list.iter(), msg_list.iter(), &aggsig.clone().unwrap()));
+        let benchmark_1 = start.elapsed();
+        println!("Time elapsed in bls_cache.aggregate_verify() is: {:?}", benchmark_1);
+        let mut data = Vec::<(PublicKey, &[u8])>::new();
+        for (pk, msg) in pk_list.iter().zip(msg_list.iter()) {
+            data.push((pk.clone(), msg.as_ref()));
+        }
+        let full_aggsig = aggsig.clone().unwrap();
+        
+        let start = Instant::now();
+        assert!(agg_ver(&aggsig.unwrap(), data.clone())); 
+        let benchmark_2: Duration = start.elapsed();
+        println!("Time elapsed in agg_ver() is: {:?}", benchmark_2);
+        assert!(benchmark_1 < benchmark_2);
+
+        //benchmark at 50% cache hit
+        // reinstantiate the cache and re-cache half of the original setaggregate_verify
+        let mut bls_cache = BLSCache::default();
+        let mut aggsig: Option<Signature> = None;
+        for i in 0..=12500 {
+            let byte_array: [u8; 32] = [i as u8; 32];
+            let sk: SecretKey = SecretKey::from_seed(&byte_array);
+            let sig: Signature = sign(&sk, msg_list[i as usize]);
+            if aggsig.is_none() {aggsig = Some(sig.clone());} else {aggsig = Some(aggregate([aggsig.unwrap(), sig.clone()]));}
+            assert!(bls_cache.aggregate_verify([pk_list[i as usize].clone()].iter(), [msg_list[i as usize]].iter(), &sig));
+        }
+        let start = Instant::now();
+        assert!(bls_cache.aggregate_verify(pk_list.iter(), msg_list.iter(), &full_aggsig.clone()));
+        let benchmark_1 = start.elapsed();
+        println!("Time elapsed in bls_cache.aggregate_verify() is: {:?}", benchmark_1);
+        println!("Time elapsed in agg_ver() is: {:?}", benchmark_2);
+        assert!(benchmark_1 < benchmark_2);
+
+        //benchmark at 25% cache hit
+        // reinstantiate the cache and re-cache 25% of the original setaggregate_verify
+        let mut bls_cache = BLSCache::default();
+        let mut aggsig: Option<Signature> = None;
+        for i in 0..=6250 {
+            let byte_array: [u8; 32] = [i as u8; 32];
+            let sk: SecretKey = SecretKey::from_seed(&byte_array);
+            let sig: Signature = sign(&sk, msg_list[i as usize]);
+            if aggsig.is_none() {aggsig = Some(sig.clone());} else {aggsig = Some(aggregate([aggsig.unwrap(), sig.clone()]));}
+            assert!(bls_cache.aggregate_verify([pk_list[i as usize].clone()].iter(), [msg_list[i as usize]].iter(), &sig));
+        }
+        let start = Instant::now();
+        assert!(bls_cache.aggregate_verify(pk_list.iter(), msg_list.iter(), &full_aggsig.clone()));
+        let benchmark_1 = start.elapsed();
+        println!("Time elapsed in bls_cache.aggregate_verify() is: {:?}", benchmark_1);
+        println!("Time elapsed in agg_ver() is: {:?}", benchmark_2);
+        assert!(benchmark_1 < benchmark_2);
+
+        //benchmark at 0% cache hit
+        // reinstantiate the cache with no cached values
+        let mut bls_cache = BLSCache::default();
+        let start = Instant::now();
+        assert!(bls_cache.aggregate_verify(pk_list.iter(), msg_list.iter(), &full_aggsig.clone()));
+        let benchmark_1 = start.elapsed();
+        println!("Time elapsed in bls_cache.aggregate_verify() is: {:?}", benchmark_1);
+        println!("Time elapsed in agg_ver() is: {:?}", benchmark_2);
+        assert!(benchmark_1 < benchmark_2);
+
+
     }
 }
