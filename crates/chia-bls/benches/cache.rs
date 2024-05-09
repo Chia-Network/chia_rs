@@ -8,7 +8,7 @@ fn cache_benchmark(c: &mut Criterion) {
     let mut pk_list: Vec<PublicKey> = [].to_vec();
     let mut msg_list: Vec<&[u8]> = vec![];
     let mut aggsig: Option<Signature> = None;
-    for i in 0..=25000 { //cache is half full
+    for i in 0..=2000 { //cache is half full
         let byte_array: [u8; 32] = [i as u8; 32];
         let sk: SecretKey = SecretKey::from_seed(&byte_array);
         let pk: PublicKey = sk.public_key();
@@ -29,7 +29,7 @@ fn cache_benchmark(c: &mut Criterion) {
 
     let mut bls_cache = BLSCache::default();
     let mut aggsig: Option<Signature> = None;
-    for i in 0..=12500 {
+    for i in 0..=1000 {
         let byte_array: [u8; 32] = [i as u8; 32];
         let sk: SecretKey = SecretKey::from_seed(&byte_array);
         let sig: Signature = sign(&sk, msg_list[i as usize]);
@@ -39,30 +39,30 @@ fn cache_benchmark(c: &mut Criterion) {
 
     c.bench_function("bls_cache.aggregate_verify, 50% cache hit", |b| {
         b.iter(|| {
-            assert!(bls_cache.aggregate_verify(pk_list.iter(), msg_list.iter(), &full_aggsig.clone()));
+            assert!(bls_cache.clone().aggregate_verify(pk_list.iter(), msg_list.iter(), &full_aggsig.clone()));
         });
     });
 
-    let mut bls_cache = BLSCache::default();
+    let bls_cache = BLSCache::default();
     let mut aggsig: Option<Signature> = None;
-    for i in 0..=6250 {
+    for i in 0..=500 {
         let byte_array: [u8; 32] = [i as u8; 32];
         let sk: SecretKey = SecretKey::from_seed(&byte_array);
         let sig: Signature = sign(&sk, msg_list[i as usize]);
         if aggsig.is_none() {aggsig = Some(sig.clone());} else {aggsig = Some(aggregate([aggsig.unwrap(), sig.clone()]));}
-        assert!(bls_cache.aggregate_verify([pk_list[i as usize].clone()].iter(), [msg_list[i as usize]].iter(), &sig));
+        assert!(bls_cache.clone().aggregate_verify([pk_list[i as usize].clone()].iter(), [msg_list[i as usize]].iter(), &sig));
     }
     
     c.bench_function("bls_cache.aggregate_verify, 25% cache hit", |b| {
         b.iter(|| {
-            assert!(bls_cache.aggregate_verify(pk_list.iter(), msg_list.iter(), &full_aggsig.clone()));
+            assert!(bls_cache.clone().aggregate_verify(pk_list.iter(), msg_list.iter(), &full_aggsig.clone()));
         });
     });
 
-    let mut bls_cache = BLSCache::default();
+    let bls_cache = BLSCache::default();
     c.bench_function("bls_cache.aggregate_verify, 0% cache hit", |b| {
         b.iter(|| {
-            assert!(bls_cache.aggregate_verify(pk_list.iter(), msg_list.iter(), &full_aggsig.clone()));
+            assert!(bls_cache.clone().aggregate_verify(pk_list.iter(), msg_list.iter(), &full_aggsig.clone()));
         });
     });
 
@@ -70,7 +70,7 @@ fn cache_benchmark(c: &mut Criterion) {
     for (pk, msg) in pk_list.iter().zip(msg_list.iter()) {
         data.push((pk.clone(), msg.as_ref()));
     }
-    c.bench_function("agg_ver", |b| {
+    c.bench_function("agg_ver, no cache", |b| {
         b.iter(|| {
             assert!(agg_ver(&full_aggsig, data.clone()));
         });

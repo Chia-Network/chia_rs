@@ -21,6 +21,7 @@ use pyo3::types::{PyInt, PyList};
 use pyo3::{pyclass, pymethods, PyResult};
 
 #[cfg_attr(feature = "py-bindings", pyclass(name = "BLSCache"))]
+#[derive(Clone)]
 pub struct BLSCache {
     cache: LruCache<[u8; 32], GTElement>, // LRUCache of hash(pubkey + message) -> GTElement
 }
