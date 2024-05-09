@@ -64,9 +64,7 @@ impl BLSCache {
             hasher.update(msg); // pk + msg
             let h: [u8; 32] = hasher.finalize().into();
 
-            let pairing: Option<GTElement> = self.cache.get(&h).cloned();
-
-            if let Some(pairing) = pairing {
+            if let Some(pairing) = self.cache.get(&h).cloned() {
                 // equivalent to `if pairing is not None`
                 return pairing;
             }
