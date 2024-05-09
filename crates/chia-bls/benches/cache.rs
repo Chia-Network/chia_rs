@@ -1,78 +1,79 @@
+use chia_bls::aggregate_verify;
+use chia_bls::{sign, BLSCache, PublicKey, SecretKey, Signature};
 use criterion::{criterion_group, criterion_main, Criterion};
-use chia_bls::{BLSCache, PublicKey, Signature, SecretKey, aggregate, sign};
-use chia_bls::aggregate_verify as agg_ver;
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 
 fn cache_benchmark(c: &mut Criterion) {
-    let mut bls_cache: BLSCache = BLSCache::default();  // 50000
-    // benchmark at 100% cache hit rate
-    let mut pk_list: Vec<PublicKey> = [].to_vec();
-    let mut msg_list: Vec<&[u8]> = vec![];
-    let mut aggsig: Option<Signature> = None;
-    for i in 0..=2000 { //cache is half full
-        let byte_array: [u8; 32] = [i as u8; 32];
-        let sk: SecretKey = SecretKey::from_seed(&byte_array);
-        let pk: PublicKey = sk.public_key();
-        let msg: &[u8] = &[106; 32];
-        let sig: Signature = sign(&sk, msg);
-        pk_list.push(pk.clone());
-        msg_list.push(msg);
-        assert!(bls_cache.aggregate_verify([pk].iter(), [msg].iter(), &sig));
-        if aggsig.is_none() {aggsig = Some(sig);} else {aggsig = Some(aggregate([aggsig.unwrap(), sig]));}
+    let mut rng = StdRng::seed_from_u64(1337);
+    let mut data = [0u8; 32];
+    rng.fill(data.as_mut_slice());
+
+    let sk = SecretKey::from_seed(&data);
+    let msg = b"The quick brown fox jumps over the lazy dog";
+
+    let mut pks = Vec::<PublicKey>::new();
+
+    let mut agg_sig = Signature::default();
+    for i in 0..1000 {
+        let derived = sk.derive_hardened(i as u32);
+        let pk = derived.public_key();
+        let sig = sign(&derived, msg);
+        agg_sig.aggregate(&sig);
+        pks.push(pk);
     }
 
-    c.bench_function("bls_cache.aggregate_verify, 100% cache hit", |b| {
-        b.iter(|| {
-            assert!(bls_cache.aggregate_verify(pk_list.iter(), msg_list.iter(), &aggsig.clone().unwrap()));
-        });
-    });
-    let full_aggsig = aggsig.clone().unwrap();
+    let mut bls_cache: BLSCache = BLSCache::default();
 
-    let mut bls_cache = BLSCache::default();
-    let mut aggsig: Option<Signature> = None;
-    for i in 0..=1000 {
-        let byte_array: [u8; 32] = [i as u8; 32];
-        let sk: SecretKey = SecretKey::from_seed(&byte_array);
-        let sig: Signature = sign(&sk, msg_list[i as usize]);
-        if aggsig.is_none() {aggsig = Some(sig.clone());} else {aggsig = Some(aggregate([aggsig.unwrap(), sig.clone()]));}
-        assert!(bls_cache.aggregate_verify([pk_list[i as usize].clone()].iter(), [msg_list[i as usize]].iter(), &sig));
-    }
-
-    c.bench_function("bls_cache.aggregate_verify, 50% cache hit", |b| {
+    c.bench_function("bls_cache.aggregate_verify, 0% cache hits", |b| {
+        let mut cache = bls_cache.clone();
         b.iter(|| {
-            assert!(bls_cache.clone().aggregate_verify(pk_list.iter(), msg_list.iter(), &full_aggsig.clone()));
+            assert!(cache.aggregate_verify(&pks, [&msg].iter().cycle(), &agg_sig));
         });
     });
 
-    let bls_cache = BLSCache::default();
-    let mut aggsig: Option<Signature> = None;
-    for i in 0..=500 {
-        let byte_array: [u8; 32] = [i as u8; 32];
-        let sk: SecretKey = SecretKey::from_seed(&byte_array);
-        let sig: Signature = sign(&sk, msg_list[i as usize]);
-        if aggsig.is_none() {aggsig = Some(sig.clone());} else {aggsig = Some(aggregate([aggsig.unwrap(), sig.clone()]));}
-        assert!(bls_cache.clone().aggregate_verify([pk_list[i as usize].clone()].iter(), [msg_list[i as usize]].iter(), &sig));
-    }
-    
-    c.bench_function("bls_cache.aggregate_verify, 25% cache hit", |b| {
+    // populate 10% of keys
+    bls_cache.aggregate_verify(&pks[0..100], [&msg].iter().cycle(), &agg_sig);
+    c.bench_function("bls_cache.aggregate_verify, 10% cache hits", |b| {
+        let mut cache = bls_cache.clone();
         b.iter(|| {
-            assert!(bls_cache.clone().aggregate_verify(pk_list.iter(), msg_list.iter(), &full_aggsig.clone()));
+            assert!(cache.aggregate_verify(&pks, [&msg].iter().cycle(), &agg_sig));
         });
     });
 
-    let bls_cache = BLSCache::default();
-    c.bench_function("bls_cache.aggregate_verify, 0% cache hit", |b| {
+    // populate another 10% of keys
+    bls_cache.aggregate_verify(&pks[100..200], [&msg].iter().cycle(), &agg_sig);
+    c.bench_function("bls_cache.aggregate_verify, 20% cache hits", |b| {
+        let mut cache = bls_cache.clone();
         b.iter(|| {
-            assert!(bls_cache.clone().aggregate_verify(pk_list.iter(), msg_list.iter(), &full_aggsig.clone()));
+            assert!(cache.aggregate_verify(&pks, [&msg].iter().cycle(), &agg_sig));
         });
     });
 
-    let mut data = Vec::<(PublicKey, &[u8])>::new();
-    for (pk, msg) in pk_list.iter().zip(msg_list.iter()) {
-        data.push((pk.clone(), msg.as_ref()));
-    }
-    c.bench_function("agg_ver, no cache", |b| {
+    // populate another 30% of keys
+    bls_cache.aggregate_verify(&pks[200..500], [&msg].iter().cycle(), &agg_sig);
+    c.bench_function("bls_cache.aggregate_verify, 50% cache hits", |b| {
+        let mut cache = bls_cache.clone();
         b.iter(|| {
-            assert!(agg_ver(&full_aggsig, data.clone()));
+            assert!(cache.aggregate_verify(&pks, [&msg].iter().cycle(), &agg_sig));
+        });
+    });
+
+    // populate all other keys
+    bls_cache.aggregate_verify(&pks[500..1000], [&msg].iter().cycle(), &agg_sig);
+    c.bench_function("bls_cache.aggregate_verify, 100% cache hits", |b| {
+        let mut cache = bls_cache.clone();
+        b.iter(|| {
+            assert!(cache.aggregate_verify(&pks, [&msg].iter().cycle(), &agg_sig));
+        });
+    });
+
+    c.bench_function("bls_cache.aggregate_verify, no cache", |b| {
+        b.iter(|| {
+            assert!(aggregate_verify(
+                &agg_sig,
+                pks.iter().map(|pk| (pk, &msg[..]))
+            ));
         });
     });
 }
