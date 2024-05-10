@@ -25,7 +25,7 @@ use pyo3::{pyclass, pymethods, IntoPy, PyAny, PyObject, PyResult, Python};
     pyclass(name = "G1Element"),
     derive(PyStreamable)
 )]
-#[derive(Clone, Default)]
+#[derive(Clone, Copy, Default)]
 pub struct PublicKey(pub(crate) blst_p1);
 
 #[cfg(feature = "arbitrary")]
@@ -237,7 +237,7 @@ impl Neg for PublicKey {
 impl Neg for &PublicKey {
     type Output = PublicKey;
     fn neg(self) -> Self::Output {
-        let mut ret = self.clone();
+        let mut ret = *self;
         ret.negate();
         ret
     }
@@ -254,7 +254,7 @@ impl AddAssign<&PublicKey> for PublicKey {
 impl SubAssign<&PublicKey> for PublicKey {
     fn sub_assign(&mut self, rhs: &PublicKey) {
         unsafe {
-            let mut neg = rhs.clone();
+            let mut neg = *rhs;
             blst_p1_cneg(&mut neg.0, true);
             blst_p1_add_or_double(&mut self.0, &self.0, &neg.0);
         }
@@ -629,7 +629,7 @@ mod tests {
             rng.fill(&mut data[1..]);
 
             let g1 = PublicKey::from_integer(&data);
-            let mut g1_neg = g1.clone();
+            let mut g1_neg = g1;
             g1_neg.negate();
             assert!(g1_neg != g1);
 
@@ -641,7 +641,7 @@ mod tests {
     #[test]
     fn test_negate_infinity() {
         let g1 = PublicKey::default();
-        let mut g1_neg = g1.clone();
+        let mut g1_neg = g1;
         // negate on infinity is a no-op
         g1_neg.negate();
         assert!(g1_neg == g1);
@@ -657,10 +657,10 @@ mod tests {
             rng.fill(&mut data[1..]);
 
             let g1 = PublicKey::from_integer(&data);
-            let mut g1_neg = g1.clone();
+            let mut g1_neg = g1;
             g1_neg.negate();
 
-            let mut g1_double = g1.clone();
+            let mut g1_double = g1;
             // adding the negative undoes adding the positive
             g1_double += &g1;
             assert!(g1_double != g1);
@@ -679,7 +679,7 @@ mod tests {
             rng.fill(&mut data[1..]);
 
             let mut g1 = PublicKey::from_integer(&data);
-            let mut g1_double = g1.clone();
+            let mut g1_double = g1;
             g1_double += &g1;
             assert!(g1_double != g1);
             // scalar multiply by 2 is the same as adding oneself

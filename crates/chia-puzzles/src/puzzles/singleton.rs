@@ -4,14 +4,16 @@ use hex_literal::hex;
 
 use crate::Proof;
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(curry)]
 pub struct SingletonArgs<I> {
     pub singleton_struct: SingletonStruct,
     pub inner_puzzle: I,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(tuple)]
 pub struct SingletonStruct {
     pub mod_hash: Bytes32,
@@ -19,7 +21,8 @@ pub struct SingletonStruct {
     pub launcher_puzzle_hash: Bytes32,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(list)]
 pub struct SingletonSolution<I> {
     pub lineage_proof: Proof,
@@ -27,7 +30,8 @@ pub struct SingletonSolution<I> {
     pub inner_solution: I,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(list)]
 pub struct LauncherSolution<T> {
     pub singleton_puzzle_hash: Bytes32,

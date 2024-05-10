@@ -1,4 +1,46 @@
+use chia_protocol::{Bytes, Bytes32};
+use clvm_traits::{FromClvm, ToClvm};
 use hex_literal::hex;
+
+#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[clvm(tuple)]
+pub struct SettlementPaymentsSolution {
+    pub notarized_payments: Vec<NotarizedPayment>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[clvm(tuple)]
+pub struct NotarizedPayment {
+    pub nonce: Bytes32,
+    pub payments: Vec<Payment>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[clvm(tuple, untagged)]
+pub enum Payment {
+    WithoutMemos(PaymentWithoutMemos),
+    WithMemos(PaymentWithMemos),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[clvm(list)]
+pub struct PaymentWithoutMemos {
+    pub puzzle_hash: Bytes32,
+    pub amount: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[clvm(list)]
+pub struct PaymentWithMemos {
+    pub puzzle_hash: Bytes32,
+    pub amount: u64,
+    pub memos: Vec<Bytes>,
+}
 
 /// This is the puzzle reveal of the [offer settlement payments](https://chialisp.com/offers) puzzle.
 pub const SETTLEMENT_PAYMENTS_PUZZLE: [u8; 293] = hex!(
