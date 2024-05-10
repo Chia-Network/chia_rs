@@ -3,7 +3,6 @@ from typing import List
 from chia.util.hash import std_hash
 from chia.util.lru_cache import LRUCache
 from chia.util import cached_bls as cached_bls_old
-import time
 
 def test_instantiation() -> None:
     bls_cache = BLSCache()
@@ -79,31 +78,16 @@ def test_cached_bls():
     assert AugSchemeMPL.aggregate_verify([pk for pk in pks], msgs, agg_sig)
 
     # Verify with empty cache and populate it
-    start = time.time()
     assert cached_bls.aggregate_verify(pks_half, msgs_half, agg_sig_half)
-    benchmark_1 = time.time() - start
-    start = time.time()
     assert cached_bls_old.aggregate_verify(pks_half_bytes, msgs_half, agg_sig_half, True)
-    benchmark_2 = time.time() - start
-    print(f"Benchmark new: {benchmark_1}, Benchmark old: {benchmark_2}")
 
     # Verify with partial cache hit
-    start = time.time()
     assert cached_bls.aggregate_verify(pks, msgs, agg_sig)
-    benchmark_1 = time.time() - start
-    start = time.time()
     assert cached_bls_old.aggregate_verify(pks_bytes, msgs, agg_sig, True)
-    benchmark_2 = time.time() - start
-    print(f"Benchmark new: {benchmark_1}, Benchmark old: {benchmark_2}")
 
     # Verify with full cache hit
-    start = time.time()
     assert cached_bls.aggregate_verify(pks, msgs, agg_sig)
-    benchmark_1 = time.time() - start
-    start = time.time()
     assert cached_bls_old.aggregate_verify(pks_bytes, msgs, agg_sig)
-    benchmark_2 = time.time() - start
-    print(f"Benchmark new: {benchmark_1}, Benchmark old: {benchmark_2}")
 
     # Use a small cache which can not accommodate all pairings
     bls_cache = BLSCache.generator(n_keys // 2)
@@ -114,22 +98,12 @@ def test_cached_bls():
         assert cached_bls_old.aggregate_verify([bytes(pk)], [msg], sig, True, local_cache)
     
     # Verify the same messages with aggregated signature (full cache hit)
-    start = time.time()
     assert cached_bls.aggregate_verify(pks_half, msgs_half, agg_sig_half)
-    benchmark_1 = time.time() - start
-    start = time.time()
     assert cached_bls_old.aggregate_verify(pks_half_bytes, msgs_half, agg_sig_half, False, local_cache)
-    benchmark_2 = time.time() - start
-    print(f"Benchmark new: {benchmark_1}, Benchmark old: {benchmark_2}")
 
     # Verify more messages (partial cache hit)
-    start = time.time()
     assert cached_bls.aggregate_verify(pks, msgs, agg_sig)
-    benchmark_1 = time.time() - start
-    start = time.time()
     assert cached_bls_old.aggregate_verify(pks_bytes, msgs, agg_sig, False, local_cache)
-    benchmark_2 = time.time() - start
-    print(f"Benchmark new: {benchmark_1}, Benchmark old: {benchmark_2}")
 
 def test_cached_bls_repeat_pk():
     cached_bls = BLSCache()
@@ -145,11 +119,5 @@ def test_cached_bls_repeat_pk():
 
     assert AugSchemeMPL.aggregate_verify([pk for pk in pks], msgs, agg_sig)
 
-    start = time.time()
     assert cached_bls.aggregate_verify(pks, msgs, agg_sig)
-    benchmark_1 = time.time() - start
-    start = time.time()
     assert cached_bls_old.aggregate_verify(pks_bytes, msgs, agg_sig, True)
-    benchmark_2 = time.time() - start
-    print(f"Benchmark new: {benchmark_1}, Benchmark old: {benchmark_2}")
-
