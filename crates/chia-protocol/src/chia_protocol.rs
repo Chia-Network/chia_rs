@@ -119,6 +119,22 @@ pub enum ProtocolMessageTypes {
     RespondBlockHeaders = 88,
     RequestFeeEstimates = 89,
     RespondFeeEstimates = 90,
+
+    // Unfinished block protocol
+    NewUnfinishedBlock2 = 92,
+    RequestUnfinishedBlock2 = 93,
+
+    // New wallet sync protocol
+    RequestRemovePuzzleSubscriptions = 94,
+    RespondRemovePuzzleSubscriptions = 95,
+    RequestRemoveCoinSubscriptions = 96,
+    RespondRemoveCoinSubscriptions = 97,
+    RequestPuzzleState = 98,
+    RespondPuzzleState = 99,
+    RejectPuzzleState = 100,
+    RequestCoinState = 101,
+    RespondCoinState = 102,
+    RejectCoinState = 103,
 }
 
 #[cfg(feature = "py-bindings")]

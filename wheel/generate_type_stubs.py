@@ -7,7 +7,7 @@ crates_dir = Path(__file__).parent.parent.resolve() / "crates"
 input_dir = crates_dir / "chia-protocol" / "src"
 
 # enums are exposed to python as int
-enums = set(["NodeType", "ProtocolMessageTypes"])
+enums = set(["NodeType", "ProtocolMessageTypes", "RejectStateReason"])
 
 
 def transform_type(m: str) -> str:

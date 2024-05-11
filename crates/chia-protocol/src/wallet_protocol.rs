@@ -1,4 +1,4 @@
-use chia_streamable_macro::streamable;
+use chia_streamable_macro::{streamable, Streamable};
 
 use crate::Coin;
 use crate::CoinState;
@@ -213,4 +213,93 @@ pub struct RequestFeeEstimates {
 #[streamable(message)]
 pub struct RespondFeeEstimates {
     estimates: FeeEstimateGroup,
+}
+
+#[streamable(message)]
+pub struct RequestRemovePuzzleSubscriptions {
+    puzzle_hashes: Option<Vec<Bytes32>>,
+}
+
+#[streamable(message)]
+pub struct RespondRemovePuzzleSubscriptions {
+    puzzle_hashes: Vec<Bytes32>,
+}
+
+#[streamable(message)]
+pub struct RequestRemoveCoinSubscriptions {
+    coin_ids: Option<Vec<Bytes32>>,
+}
+
+#[streamable(message)]
+pub struct RespondRemoveCoinSubscriptions {
+    coin_ids: Vec<Bytes32>,
+}
+
+#[streamable]
+pub struct CoinStateFilters {
+    include_spent: bool,
+    include_unspent: bool,
+    include_hinted: bool,
+    min_amount: u64,
+}
+
+#[streamable(message)]
+pub struct RequestPuzzleState {
+    puzzle_hashes: Vec<Bytes32>,
+    previous_height: Option<u32>,
+    header_hash: Bytes32,
+    filters: CoinStateFilters,
+    subscribe_when_finished: bool,
+}
+
+#[streamable(message)]
+pub struct RespondPuzzleState {
+    puzzle_hashes: Vec<Bytes32>,
+    height: u32,
+    header_hash: Bytes32,
+    is_finished: bool,
+    coin_states: Vec<CoinState>,
+}
+
+#[streamable(message)]
+pub struct RejectPuzzleState {
+    reason: RejectStateReason,
+}
+
+#[streamable(message)]
+pub struct RequestCoinState {
+    coin_ids: Vec<Bytes32>,
+    previous_height: Option<u32>,
+    header_hash: Bytes32,
+    subscribe: bool,
+}
+
+#[streamable(message)]
+pub struct RespondCoinState {
+    coin_ids: Vec<Bytes32>,
+    coin_states: Vec<CoinState>,
+}
+
+#[streamable(message)]
+pub struct RejectCoinState {
+    reason: RejectStateReason,
+}
+
+#[cfg(feature = "py-bindings")]
+use chia_py_streamable_macro::{PyJsonDict, PyStreamable};
+
+#[repr(u8)]
+#[cfg_attr(feature = "py-bindings", derive(PyJsonDict, PyStreamable))]
+#[derive(Streamable, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+pub enum RejectStateReason {
+    Reorg = 0,
+    ExceededSubscriptionLimit = 1,
+}
+
+#[cfg(feature = "py-bindings")]
+impl chia_traits::ChiaToPython for RejectStateReason {
+    fn to_python<'a>(&self, py: pyo3::Python<'a>) -> pyo3::PyResult<&'a pyo3::PyAny> {
+        Ok(pyo3::IntoPy::into_py(*self, py).into_ref(py))
+    }
 }
