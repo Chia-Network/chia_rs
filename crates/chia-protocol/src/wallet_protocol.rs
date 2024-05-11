@@ -1,4 +1,4 @@
-use chia_streamable_macro::streamable;
+use chia_streamable_macro::{streamable, Streamable};
 
 use crate::Coin;
 use crate::CoinState;
@@ -263,7 +263,7 @@ pub struct RespondPuzzleState {
 
 #[streamable(message)]
 pub struct RejectPuzzleState {
-    reason: u8, // RejectStateReason
+    reason: RejectStateReason,
 }
 
 #[streamable(message)]
@@ -282,11 +282,24 @@ pub struct RespondCoinState {
 
 #[streamable(message)]
 pub struct RejectCoinState {
-    reason: u8, // RejectStateReason
+    reason: RejectStateReason,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg(feature = "py-bindings")]
+use chia_py_streamable_macro::{PyJsonDict, PyStreamable};
+
+#[repr(u8)]
+#[cfg_attr(feature = "py-bindings", derive(PyJsonDict, PyStreamable))]
+#[derive(Streamable, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum RejectStateReason {
     Reorg = 0,
     ExceededSubscriptionLimit = 1,
+}
+
+#[cfg(feature = "py-bindings")]
+impl chia_traits::ChiaToPython for RejectStateReason {
+    fn to_python<'a>(&self, py: pyo3::Python<'a>) -> pyo3::PyResult<&'a pyo3::PyAny> {
+        Ok(pyo3::IntoPy::into_py(*self, py).into_ref(py))
+    }
 }
