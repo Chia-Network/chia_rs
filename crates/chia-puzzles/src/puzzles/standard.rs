@@ -1,7 +1,6 @@
 use chia_bls::PublicKey;
-use chia_protocol::Bytes32;
 use clvm_traits::{FromClvm, ToClvm};
-use clvm_utils::{curry_tree_hash, tree_hash_atom};
+use clvm_utils::TreeHash;
 use hex_literal::hex;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
@@ -20,11 +19,6 @@ pub struct StandardSolution<P, S> {
     pub solution: S,
 }
 
-pub fn standard_puzzle_hash(synthetic_key: &PublicKey) -> Bytes32 {
-    let sk_tree_hash = tree_hash_atom(&synthetic_key.to_bytes());
-    curry_tree_hash(STANDARD_PUZZLE_HASH, &[sk_tree_hash]).into()
-}
-
 /// This is the puzzle reveal of the [standard transaction](https://chialisp.com/standard-transactions) puzzle.
 pub const STANDARD_PUZZLE: [u8; 227] = hex!(
     "
@@ -40,26 +34,26 @@ pub const STANDARD_PUZZLE: [u8; 227] = hex!(
 );
 
 /// This is the puzzle hash of the [standard transaction](https://chialisp.com/standard-transactions) puzzle.
-pub const STANDARD_PUZZLE_HASH: [u8; 32] = hex!(
+pub const STANDARD_PUZZLE_HASH: TreeHash = TreeHash::new(hex!(
     "
     e9aaa49f45bad5c889b86ee3341550c155cfdd10c3a6757de618d20612fffd52
     "
-);
+));
 
 /// This is the puzzle reveal of the [default hidden puzzle](https://chialisp.com/standard-transactions#default-hidden-puzzle).
 pub const DEFAULT_HIDDEN_PUZZLE: [u8; 3] = hex!("ff0980");
 
 /// This is the puzzle hash of the [default hidden puzzle](https://chialisp.com/standard-transactions#default-hidden-puzzle).
-pub const DEFAULT_HIDDEN_PUZZLE_HASH: [u8; 32] = hex!(
+pub const DEFAULT_HIDDEN_PUZZLE_HASH: TreeHash = TreeHash::new(hex!(
     "
     711d6c4e32c92e53179b199484cf8c897542bc57f2b22582799f9d657eec4699
     "
-);
+));
 
 #[cfg(test)]
 mod tests {
     use clvm_traits::ToNodePtr;
-    use clvm_utils::{tree_hash, CurriedProgram};
+    use clvm_utils::{tree_hash, CurriedProgram, ToTreeHash};
     use clvmr::{serde::node_from_bytes, Allocator};
 
     use super::*;
@@ -87,9 +81,16 @@ mod tests {
         .to_node_ptr(&mut a)
         .unwrap();
 
-        let expected_tree_hash = hex::encode(tree_hash(&a, curried_ptr));
-        let actual_tree_hash = hex::encode(standard_puzzle_hash(&args.synthetic_key));
+        let allocated_tree_hash = hex::encode(tree_hash(&a, curried_ptr));
 
-        assert_eq!(expected_tree_hash, actual_tree_hash);
+        let tree_hash = hex::encode(
+            CurriedProgram {
+                program: STANDARD_PUZZLE_HASH,
+                args: &args,
+            }
+            .tree_hash(),
+        );
+
+        assert_eq!(allocated_tree_hash, tree_hash);
     }
 }

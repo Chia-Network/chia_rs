@@ -1,7 +1,7 @@
 use chia_bls::PublicKey;
 use chia_protocol::{Bytes32, Coin};
 use clvm_traits::{FromClvm, ToClvm};
-use clvm_utils::{curry_tree_hash, tree_hash_atom};
+use clvm_utils::TreeHash;
 use hex_literal::hex;
 
 use crate::LineageProof;
@@ -49,26 +49,6 @@ pub struct CoinProof {
     pub parent_coin_info: Bytes32,
     pub inner_puzzle_hash: Bytes32,
     pub amount: u64,
-}
-
-pub fn cat_puzzle_hash(asset_id: Bytes32, inner_puzzle_hash: Bytes32) -> Bytes32 {
-    let mod_hash = tree_hash_atom(&CAT_PUZZLE_HASH);
-    let asset_id_hash = tree_hash_atom(&asset_id);
-    curry_tree_hash(
-        CAT_PUZZLE_HASH,
-        &[mod_hash, asset_id_hash, inner_puzzle_hash.to_bytes()],
-    )
-    .into()
-}
-
-pub fn everything_with_signature_asset_id(public_key: &PublicKey) -> Bytes32 {
-    let pk_tree_hash = tree_hash_atom(&public_key.to_bytes());
-    curry_tree_hash(EVERYTHING_WITH_SIGNATURE_TAIL_PUZZLE_HASH, &[pk_tree_hash]).into()
-}
-
-pub fn genesis_by_coin_id_asset_id(genesis_coin_id: Bytes32) -> Bytes32 {
-    let coin_id_hash = tree_hash_atom(&genesis_coin_id);
-    curry_tree_hash(GENESIS_BY_COIN_ID_TAIL_PUZZLE_HASH, &[coin_id_hash]).into()
 }
 
 /// This is the puzzle reveal of the [CAT2 standard](https://chialisp.com/cats) puzzle.
@@ -131,11 +111,11 @@ pub const CAT_PUZZLE: [u8; 1672] = hex!(
 );
 
 /// This is the puzzle hash of the [CAT2 standard](https://chialisp.com/cats) puzzle.
-pub const CAT_PUZZLE_HASH: [u8; 32] = hex!(
+pub const CAT_PUZZLE_HASH: TreeHash = TreeHash::new(hex!(
     "
     37bef360ee858133b69d595a906dc45d01af50379dad515eb9518abb7c1d2a7a
     "
-);
+));
 
 /// This is the puzzle reveal of the [CAT2 multi-issuance TAIL](https://chialisp.com/cats#multi) puzzle.
 pub const EVERYTHING_WITH_SIGNATURE_TAIL_PUZZLE: [u8; 41] = hex!(
@@ -146,11 +126,11 @@ pub const EVERYTHING_WITH_SIGNATURE_TAIL_PUZZLE: [u8; 41] = hex!(
 );
 
 /// This is the puzzle hash of the [CAT2 multi-issuance TAIL](https://chialisp.com/cats#multi) puzzle.
-pub const EVERYTHING_WITH_SIGNATURE_TAIL_PUZZLE_HASH: [u8; 32] = hex!(
+pub const EVERYTHING_WITH_SIGNATURE_TAIL_PUZZLE_HASH: TreeHash = TreeHash::new(hex!(
     "
     1720d13250a7c16988eaf530331cefa9dd57a76b2c82236bec8bbbff91499b89
     "
-);
+));
 
 /// This is the puzzle reveal of the [CAT2 single-issuance TAIL](https://chialisp.com/cats/#single) puzzle.
 pub const GENESIS_BY_COIN_ID_TAIL_PUZZLE: [u8; 45] = hex!(
@@ -161,11 +141,11 @@ pub const GENESIS_BY_COIN_ID_TAIL_PUZZLE: [u8; 45] = hex!(
 );
 
 /// This is the puzzle hash of the [CAT2 single-issuance TAIL](https://chialisp.com/cats/#single) puzzle.
-pub const GENESIS_BY_COIN_ID_TAIL_PUZZLE_HASH: [u8; 32] = hex!(
+pub const GENESIS_BY_COIN_ID_TAIL_PUZZLE_HASH: TreeHash = TreeHash::new(hex!(
     "
     493afb89eed93ab86741b2aa61b8f5de495d33ff9b781dfc8919e602b2afa150
     "
-);
+));
 
 /// This is the puzzle reveal of the old [CAT1 standard](https://chialisp.com/cats) puzzle.
 ///
@@ -229,23 +209,23 @@ pub const CAT_PUZZLE_V1: [u8; 1420] = hex!(
 /// It is recommended not to use CAT1 for anything other than backwards compatibility (e.g. offer compression),
 /// due to security issues uncovered in an audit. You can read more about the vulnerability that prompted the creation
 /// of CAT2 in the [CATbleed Post Mortem](https://github.com/Chia-Network/post-mortem/blob/main/2022-08/2022-08-19-CATbleed.md).
-pub const CAT_PUZZLE_HASH_V1: [u8; 32] = hex!(
+pub const CAT_PUZZLE_HASH_V1: TreeHash = TreeHash::new(hex!(
     "
     72dec062874cd4d3aab892a0906688a1ae412b0109982e1797a170add88bdcdc
     "
-);
+));
 
 #[cfg(test)]
 mod tests {
     use clvm_traits::ToNodePtr;
-    use clvm_utils::{tree_hash, CurriedProgram};
+    use clvm_utils::{tree_hash, CurriedProgram, ToTreeHash};
     use clvmr::{serde::node_from_bytes, Allocator};
 
     use super::*;
 
     use crate::{
         assert_puzzle_hash,
-        standard::{standard_puzzle_hash, StandardArgs, STANDARD_PUZZLE},
+        standard::{StandardArgs, STANDARD_PUZZLE, STANDARD_PUZZLE_HASH},
     };
 
     #[test]
@@ -280,13 +260,24 @@ mod tests {
         .to_node_ptr(&mut a)
         .unwrap();
 
-        let expected_tree_hash = hex::encode(tree_hash(&a, curried_ptr));
-        let actual_tree_hash = hex::encode(cat_puzzle_hash(
-            asset_id,
-            standard_puzzle_hash(&inner_args.synthetic_key),
-        ));
+        let allocated_tree_hash = hex::encode(tree_hash(&a, curried_ptr));
 
-        assert_eq!(expected_tree_hash, actual_tree_hash);
+        let tree_hash = hex::encode(
+            CurriedProgram {
+                program: CAT_PUZZLE_HASH,
+                args: CatArgs {
+                    mod_hash: CAT_PUZZLE_HASH.into(),
+                    inner_puzzle: CurriedProgram {
+                        program: STANDARD_PUZZLE_HASH,
+                        args: &inner_args,
+                    },
+                    tail_program_hash: asset_id,
+                },
+            }
+            .tree_hash(),
+        );
+
+        assert_eq!(allocated_tree_hash, tree_hash);
     }
 
     #[test]
@@ -302,10 +293,17 @@ mod tests {
         .to_node_ptr(&mut a)
         .unwrap();
 
-        let expected_tree_hash = hex::encode(tree_hash(&a, curried_ptr));
-        let actual_tree_hash = hex::encode(everything_with_signature_asset_id(&public_key));
+        let allocated_tree_hash = hex::encode(tree_hash(&a, curried_ptr));
 
-        assert_eq!(expected_tree_hash, actual_tree_hash);
+        let tree_hash = hex::encode(
+            CurriedProgram {
+                program: EVERYTHING_WITH_SIGNATURE_TAIL_PUZZLE_HASH,
+                args: EverythingWithSignatureTailArgs { public_key },
+            }
+            .tree_hash(),
+        );
+
+        assert_eq!(allocated_tree_hash, tree_hash);
     }
 
     #[test]
@@ -321,9 +319,16 @@ mod tests {
         .to_node_ptr(&mut a)
         .unwrap();
 
-        let expected_tree_hash = hex::encode(tree_hash(&a, curried_ptr));
-        let actual_tree_hash = hex::encode(genesis_by_coin_id_asset_id(genesis_coin_id));
+        let allocated_tree_hash = hex::encode(tree_hash(&a, curried_ptr));
 
-        assert_eq!(expected_tree_hash, actual_tree_hash);
+        let tree_hash = hex::encode(
+            CurriedProgram {
+                program: GENESIS_BY_COIN_ID_TAIL_PUZZLE_HASH,
+                args: GenesisByCoinIdTailArgs { genesis_coin_id },
+            }
+            .tree_hash(),
+        );
+
+        assert_eq!(allocated_tree_hash, tree_hash);
     }
 }

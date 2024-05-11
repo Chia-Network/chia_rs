@@ -1,5 +1,6 @@
 use chia_protocol::Bytes32;
 use clvm_traits::{FromClvm, ToClvm};
+use clvm_utils::TreeHash;
 use hex_literal::hex;
 
 use crate::Proof;
@@ -62,11 +63,11 @@ pub const SINGLETON_LAUNCHER_PUZZLE: [u8; 175] = hex!(
 );
 
 /// This is the puzzle hash of the [singleton launcher](https://chialisp.com/singletons#launcher) puzzle.
-pub const SINGLETON_LAUNCHER_PUZZLE_HASH: [u8; 32] = hex!(
+pub const SINGLETON_LAUNCHER_PUZZLE_HASH: TreeHash = TreeHash::new(hex!(
     "
     eff07522495060c066f66f32acc2a77e3a3e737aca8baea4d1a64ea4cdc13da9
     "
-);
+));
 
 /// This is the puzzle reveal of the [singleton](https://chialisp.com/singletons) puzzle.
 pub const SINGLETON_TOP_LAYER_PUZZLE: [u8; 967] = hex!(
@@ -106,11 +107,11 @@ pub const SINGLETON_TOP_LAYER_PUZZLE: [u8; 967] = hex!(
 );
 
 /// This is the puzzle hash of the [singleton](https://chialisp.com/singletons) puzzle.
-pub const SINGLETON_TOP_LAYER_PUZZLE_HASH: [u8; 32] = hex!(
+pub const SINGLETON_TOP_LAYER_PUZZLE_HASH: TreeHash = TreeHash::new(hex!(
     "
     7faa3253bfddd1e0decb0906b2dc6247bbc4cf608f58345d173adb63e8b47c9f
     "
-);
+));
 
 #[cfg(test)]
 mod tests {

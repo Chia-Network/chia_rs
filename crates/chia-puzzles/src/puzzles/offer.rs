@@ -1,5 +1,6 @@
 use chia_protocol::{Bytes, Bytes32};
 use clvm_traits::{FromClvm, ToClvm};
+use clvm_utils::TreeHash;
 use hex_literal::hex;
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
@@ -59,11 +60,11 @@ pub const SETTLEMENT_PAYMENTS_PUZZLE: [u8; 293] = hex!(
 );
 
 /// This is the puzzle hash of the [offer settlement payments](https://chialisp.com/offers) puzzle.
-pub const SETTLEMENT_PAYMENTS_PUZZLE_HASH: [u8; 32] = hex!(
+pub const SETTLEMENT_PAYMENTS_PUZZLE_HASH: TreeHash = TreeHash::new(hex!(
     "
     cfbfdeed5c4ca2de3d0bf520b9cb4bb7743a359bd2e6a188d19ce7dffc21d3e7
     "
-);
+));
 
 /// This is the puzzle reveal of the old [offer settlement payments](https://chialisp.com/offers) puzzle.
 ///
@@ -87,11 +88,11 @@ pub const SETTLEMENT_PAYMENTS_PUZZLE_V1: [u8; 267] = hex!(
 ///
 /// **Warning:**
 /// It is recommended not to use settlement payments v1 for anything other than backwards compatibility (e.g. offer compression).
-pub const SETTLEMENT_PAYMENTS_PUZZLE_HASH_V1: [u8; 32] = hex!(
+pub const SETTLEMENT_PAYMENTS_PUZZLE_HASH_V1: TreeHash = TreeHash::new(hex!(
     "
     bae24162efbd568f89bc7a340798a6118df0189eb9e3f8697bcea27af99f8f79
     "
-);
+));
 
 #[cfg(test)]
 mod tests {

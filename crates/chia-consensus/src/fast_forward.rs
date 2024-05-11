@@ -7,6 +7,7 @@ use chia_puzzles::singleton::{
 use chia_puzzles::Proof;
 use clvm_traits::{FromClvm, ToClvm};
 use clvm_utils::CurriedProgram;
+use clvm_utils::TreeHash;
 use clvm_utils::{tree_hash, tree_hash_atom, tree_hash_pair};
 use clvmr::allocator::{Allocator, NodePtr};
 
@@ -15,7 +16,7 @@ use clvmr::allocator::{Allocator, NodePtr};
 const OP_QUOTE: u8 = 1;
 const OP_APPLY: u8 = 2;
 const OP_CONS: u8 = 4;
-fn curry_single_arg(arg_hash: [u8; 32], rest: [u8; 32]) -> [u8; 32] {
+fn curry_single_arg(arg_hash: TreeHash, rest: TreeHash) -> TreeHash {
     tree_hash_pair(
         tree_hash_atom(&[OP_CONS]),
         tree_hash_pair(
@@ -35,7 +36,7 @@ fn curry_and_treehash(inner_puzzle_hash: &Bytes32, singleton_struct: &SingletonS
     );
 
     let args_hash = tree_hash_atom(&[OP_QUOTE]);
-    let args_hash = curry_single_arg(inner_puzzle_hash.into(), args_hash);
+    let args_hash = curry_single_arg((*inner_puzzle_hash).into(), args_hash);
     let args_hash = curry_single_arg(singleton_struct_hash, args_hash);
 
     tree_hash_pair(
@@ -43,7 +44,7 @@ fn curry_and_treehash(inner_puzzle_hash: &Bytes32, singleton_struct: &SingletonS
         tree_hash_pair(
             tree_hash_pair(
                 tree_hash_atom(&[OP_QUOTE]),
-                (&singleton_struct.mod_hash).into(),
+                singleton_struct.mod_hash.into(),
             ),
             tree_hash_pair(args_hash, tree_hash_atom(&[])),
         ),
@@ -86,7 +87,9 @@ pub fn fast_forward_singleton(
 
     // this is the tree hash of the singleton top layer puzzle
     // the tree hash of singleton_top_layer_v1_1.clsp
-    if singleton.args.singleton_struct.mod_hash.as_ref() != SINGLETON_TOP_LAYER_PUZZLE_HASH {
+    if singleton.args.singleton_struct.mod_hash.as_ref()
+        != SINGLETON_TOP_LAYER_PUZZLE_HASH.to_bytes()
+    {
         return Err(Error::NotSingletonModHash);
     }
 
@@ -123,13 +126,13 @@ pub fn fast_forward_singleton(
     }
 
     let inner_puzzle_hash = tree_hash(a, singleton.args.inner_puzzle);
-    if inner_puzzle_hash != *lineage_proof.parent_inner_puzzle_hash {
+    if inner_puzzle_hash != lineage_proof.parent_inner_puzzle_hash.into() {
         return Err(Error::InnerPuzzleHashMismatch);
     }
 
     let puzzle_hash = tree_hash(a, puzzle);
 
-    if puzzle_hash != *new_parent.puzzle_hash || puzzle_hash != *coin.puzzle_hash {
+    if puzzle_hash != new_parent.puzzle_hash.into() || puzzle_hash != coin.puzzle_hash.into() {
         // we can only fast-forward if the puzzle hash match the new coin
         // the spend is assumed to be valied already, so we don't check it
         // against the original coin being spent

@@ -2,7 +2,63 @@ use clvmr::allocator::{Allocator, NodePtr, SExp};
 use clvmr::serde::node_from_bytes_backrefs_record;
 use clvmr::sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
-use std::io;
+use std::ops::Deref;
+use std::{fmt, io};
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct TreeHash([u8; 32]);
+
+impl TreeHash {
+    pub const fn new(hash: [u8; 32]) -> Self {
+        Self(hash)
+    }
+
+    pub const fn to_bytes(&self) -> [u8; 32] {
+        self.0
+    }
+
+    pub fn to_vec(&self) -> Vec<u8> {
+        self.0.to_vec()
+    }
+}
+
+impl fmt::Debug for TreeHash {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "TreeHash({})", self)
+    }
+}
+
+impl fmt::Display for TreeHash {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", hex::encode(self.0))
+    }
+}
+
+impl From<[u8; 32]> for TreeHash {
+    fn from(hash: [u8; 32]) -> Self {
+        Self::new(hash)
+    }
+}
+
+impl From<TreeHash> for [u8; 32] {
+    fn from(hash: TreeHash) -> [u8; 32] {
+        hash.0
+    }
+}
+
+impl AsRef<[u8]> for TreeHash {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl Deref for TreeHash {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 enum TreeOp {
     SExp(NodePtr),
@@ -10,22 +66,22 @@ enum TreeOp {
     ConsAddCache(NodePtr),
 }
 
-pub fn tree_hash_atom(bytes: &[u8]) -> [u8; 32] {
+pub fn tree_hash_atom(bytes: &[u8]) -> TreeHash {
     let mut sha256 = Sha256::new();
     sha256.update([1]);
     sha256.update(bytes);
-    sha256.finalize().into()
+    TreeHash::new(sha256.finalize().into())
 }
 
-pub fn tree_hash_pair(first: [u8; 32], rest: [u8; 32]) -> [u8; 32] {
+pub fn tree_hash_pair(first: TreeHash, rest: TreeHash) -> TreeHash {
     let mut sha256 = Sha256::new();
     sha256.update([2]);
     sha256.update(first);
     sha256.update(rest);
-    sha256.finalize().into()
+    TreeHash::new(sha256.finalize().into())
 }
 
-pub fn tree_hash(a: &Allocator, node: NodePtr) -> [u8; 32] {
+pub fn tree_hash(a: &Allocator, node: NodePtr) -> TreeHash {
     let mut hashes = Vec::new();
     let mut ops = vec![TreeOp::SExp(node)];
 
@@ -58,8 +114,8 @@ pub fn tree_hash_cached(
     a: &Allocator,
     node: NodePtr,
     backrefs: &HashSet<NodePtr>,
-    cache: &mut HashMap<NodePtr, [u8; 32]>,
-) -> [u8; 32] {
+    cache: &mut HashMap<NodePtr, TreeHash>,
+) -> TreeHash {
     let mut hashes = Vec::new();
     let mut ops = vec![TreeOp::SExp(node)];
 
@@ -106,10 +162,10 @@ pub fn tree_hash_cached(
     hashes[0]
 }
 
-pub fn tree_hash_from_bytes(buf: &[u8]) -> io::Result<[u8; 32]> {
+pub fn tree_hash_from_bytes(buf: &[u8]) -> io::Result<TreeHash> {
     let mut a = Allocator::new();
     let (node, backrefs) = node_from_bytes_backrefs_record(&mut a, buf)?;
-    let mut cache = HashMap::<NodePtr, [u8; 32]>::new();
+    let mut cache = HashMap::<NodePtr, TreeHash>::new();
     Ok(tree_hash_cached(&a, node, &backrefs, &mut cache))
 }
 
@@ -127,7 +183,7 @@ fn test_tree_hash() {
         sha256.update([1, 2, 3]);
         let atom1_hash = sha256.finalize();
 
-        assert_eq!(tree_hash(&a, atom1), atom1_hash.as_slice());
+        assert_eq!(tree_hash(&a, atom1).as_ref(), atom1_hash.as_slice());
         atom1_hash
     };
 
@@ -138,7 +194,7 @@ fn test_tree_hash() {
         sha256.update([4, 5, 6]);
         let atom2_hash = sha256.finalize();
 
-        assert_eq!(tree_hash(&a, atom2), atom2_hash.as_slice());
+        assert_eq!(tree_hash(&a, atom2).as_ref(), atom2_hash.as_slice());
         atom2_hash
     };
 
@@ -150,7 +206,7 @@ fn test_tree_hash() {
         sha256.update(atom2_hash.as_slice());
         let root_hash = sha256.finalize();
 
-        assert_eq!(tree_hash(&a, root), root_hash.as_slice());
+        assert_eq!(tree_hash(&a, root).as_ref(), root_hash.as_slice());
         root_hash
     };
 
@@ -171,7 +227,7 @@ fn test_tree_hash() {
         sha256.update(root_hash.as_slice());
         sha256.update(atom3_hash.as_slice());
 
-        assert_eq!(tree_hash(&a, root2), sha256.finalize().as_slice());
+        assert_eq!(tree_hash(&a, root2).as_ref(), sha256.finalize().as_slice());
     }
 }
 
@@ -289,7 +345,7 @@ fn test_tree_hash_cached(
     };
 
     let mut a = Allocator::new();
-    let mut cache = HashMap::<NodePtr, [u8; 32]>::new();
+    let mut cache = HashMap::<NodePtr, TreeHash>::new();
     let (node, backrefs) = node_from_bytes_backrefs_record(&mut a, &generator)
         .expect("node_from_bytes_backrefs_records");
 
@@ -299,7 +355,7 @@ fn test_tree_hash_cached(
     //     println!("  {key:?}: {}", hex::encode(value));
     // }
     assert_eq!(hash1, hash2);
-    assert_eq!(hash1, hex::decode(expect).unwrap().as_slice());
+    assert_eq!(hash1.as_ref(), hex::decode(expect).unwrap().as_slice());
     assert!(!compressed || !backrefs.is_empty());
 }
 
@@ -313,7 +369,7 @@ fn test_sha256_atom(buf: &[u8]) {
         hasher.update(buf);
     }
 
-    assert_eq!(hash, hasher.finalize().as_slice());
+    assert_eq!(hash.as_ref(), hasher.finalize().as_slice());
 }
 
 #[test]
