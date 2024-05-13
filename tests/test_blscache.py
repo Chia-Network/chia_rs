@@ -134,6 +134,7 @@ def test_cached_bls_repeat_pk():
     assert cached_bls.aggregate_verify(pks, msgs, agg_sig)
     assert cached_bls_old.aggregate_verify(pks_bytes, msgs, agg_sig, True)
 
+
 def test_bad_cache_size():
     with pytest.raises(ValueError) as exc_info:
         bls_cache = BLSCache(0)
