@@ -3,6 +3,7 @@ from typing import List
 from chia.util.hash import std_hash
 from chia.util.lru_cache import LRUCache
 from chia.util import cached_bls as cached_bls_old
+import pytest
 
 
 def test_instantiation() -> None:
@@ -36,7 +37,7 @@ def test_instantiation() -> None:
 
 
 def test_cache_limit() -> None:
-    bls_cache = BLSCache.generator(3)
+    bls_cache = BLSCache(3)
     assert bls_cache.len() == 0
     assert BLSCache is not None
     seed: bytes = bytes.fromhex(
@@ -94,23 +95,23 @@ def test_cached_bls():
     assert cached_bls_old.aggregate_verify(pks_bytes, msgs, agg_sig)
 
     # Use a small cache which can not accommodate all pairings
-    bls_cache = BLSCache.generator(n_keys // 2)
+    bls_cache = BLSCache(n_keys // 2)
     local_cache = LRUCache(n_keys // 2)
     # Verify signatures and cache pairings one at a time
     for pk, msg, sig in zip(pks_half, msgs_half, sigs_half):
-        assert cached_bls.aggregate_verify([pk], [msg], sig)
+        assert bls_cache.aggregate_verify([pk], [msg], sig)
         assert cached_bls_old.aggregate_verify(
             [bytes(pk)], [msg], sig, True, local_cache
         )
 
     # Verify the same messages with aggregated signature (full cache hit)
-    assert cached_bls.aggregate_verify(pks_half, msgs_half, agg_sig_half)
+    assert bls_cache.aggregate_verify(pks_half, msgs_half, agg_sig_half)
     assert cached_bls_old.aggregate_verify(
         pks_half_bytes, msgs_half, agg_sig_half, False, local_cache
     )
 
     # Verify more messages (partial cache hit)
-    assert cached_bls.aggregate_verify(pks, msgs, agg_sig)
+    assert bls_cache.aggregate_verify(pks, msgs, agg_sig)
     assert cached_bls_old.aggregate_verify(pks_bytes, msgs, agg_sig, False, local_cache)
 
 
@@ -132,3 +133,18 @@ def test_cached_bls_repeat_pk():
 
     assert cached_bls.aggregate_verify(pks, msgs, agg_sig)
     assert cached_bls_old.aggregate_verify(pks_bytes, msgs, agg_sig, True)
+
+def test_bad_cache_size():
+    with pytest.raises(ValueError) as exc_info:
+        bls_cache = BLSCache(0)
+
+    assert str(exc_info.value) == "Cannot have a cache size less than one."
+    with pytest.raises(ValueError) as exc_info:
+        bls_cache = BLSCache(-1)
+
+    assert str(exc_info.value) == "Cannot have a cache size less than one."
+
+    with pytest.raises(ValueError) as exc_info:
+        bls_cache = BLSCache(-100000)
+
+    assert str(exc_info.value) == "Cannot have a cache size less than one."

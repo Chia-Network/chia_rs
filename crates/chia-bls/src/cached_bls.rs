@@ -11,6 +11,7 @@ use crate::hash_to_g2;
 use crate::PublicKey;
 use crate::Signature;
 use lru::LruCache;
+
 use sha2::{Digest, Sha256};
 use std::borrow::Borrow;
 use std::num::NonZeroUsize;
@@ -19,6 +20,8 @@ use std::num::NonZeroUsize;
 use pyo3::types::{PyInt, PyList};
 #[cfg(feature = "py-bindings")]
 use pyo3::{pyclass, pymethods, PyResult};
+#[cfg(feature = "py-bindings")]
+use pyo3::exceptions::PyValueError;
 
 #[cfg_attr(feature = "py-bindings", pyclass(name = "BLSCache"))]
 #[derive(Clone)]
@@ -28,20 +31,14 @@ pub struct BLSCache {
 
 impl Default for BLSCache {
     fn default() -> Self {
-        Self::new(50000)
+        Self::new(None)
     }
 }
 
 impl BLSCache {
-    pub fn new(cache_size: usize) -> BLSCache {
+    pub fn new(cache_size: Option<NonZeroUsize>) -> BLSCache {
         let cache: LruCache<[u8; 32], GTElement> =
-            LruCache::new(NonZeroUsize::new(cache_size).unwrap());
-        Self { cache }
-    }
-
-    pub fn generator(cache_size: Option<usize>) -> Self {
-        let cache: LruCache<[u8; 32], GTElement> =
-            LruCache::new(NonZeroUsize::new(cache_size.unwrap_or(50000)).unwrap());
+        LruCache::new(cache_size.unwrap_or(NonZeroUsize::new(50000).unwrap()));
         Self { cache }
     }
 
@@ -91,15 +88,16 @@ impl BLSCache {
 #[pymethods]
 impl BLSCache {
     #[new]
-    pub fn init() -> Self {
-        Self::default()
-    }
-
-    #[staticmethod]
-    #[pyo3(name = "generator")]
-    pub fn py_generator(size: Option<&PyInt>) -> Self {
-        size.map(|s| Self::new(s.extract().unwrap()))
-            .unwrap_or_default()
+    pub fn init(size: Option<&PyInt>) -> PyResult<Self> {
+        match size {
+            Some(p_size) => {
+                let r_size = p_size.extract::<isize>().unwrap();
+                if r_size < 1 {return Err(PyValueError::new_err("Cannot have a cache size less than one."))} else {
+                    return Ok(Self::new(NonZeroUsize::new(p_size.extract::<usize>().unwrap())))
+                }
+            },
+            None => Ok(Self::default())
+        }
     }
 
     #[pyo3(name = "aggregate_verify")]
@@ -201,7 +199,7 @@ pub mod tests {
     #[test]
     pub fn test_cache_limit() {
         // set cache size to 3
-        let mut bls_cache: BLSCache = BLSCache::new(3);
+        let mut bls_cache: BLSCache = BLSCache::new(NonZeroUsize::new(3));
         assert_eq!(bls_cache.cache.len(), 0);
         // create 5 pk/msg combos
         for i in 1..=5 {
