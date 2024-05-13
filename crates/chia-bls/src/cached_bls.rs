@@ -17,11 +17,11 @@ use std::borrow::Borrow;
 use std::num::NonZeroUsize;
 
 #[cfg(feature = "py-bindings")]
+use pyo3::exceptions::PyValueError;
+#[cfg(feature = "py-bindings")]
 use pyo3::types::{PyInt, PyList};
 #[cfg(feature = "py-bindings")]
 use pyo3::{pyclass, pymethods, PyResult};
-#[cfg(feature = "py-bindings")]
-use pyo3::exceptions::PyValueError;
 
 #[cfg_attr(feature = "py-bindings", pyclass(name = "BLSCache"))]
 #[derive(Clone)]
@@ -38,7 +38,7 @@ impl Default for BLSCache {
 impl BLSCache {
     pub fn new(cache_size: Option<NonZeroUsize>) -> BLSCache {
         let cache: LruCache<[u8; 32], GTElement> =
-        LruCache::new(cache_size.unwrap_or(NonZeroUsize::new(50000).unwrap()));
+            LruCache::new(cache_size.unwrap_or(NonZeroUsize::new(50000).unwrap()));
         Self { cache }
     }
 
@@ -92,11 +92,17 @@ impl BLSCache {
         match size {
             Some(p_size) => {
                 let r_size = p_size.extract::<isize>().unwrap();
-                if r_size < 1 {return Err(PyValueError::new_err("Cannot have a cache size less than one."))} else {
-                    return Ok(Self::new(NonZeroUsize::new(p_size.extract::<usize>().unwrap())))
+                if r_size < 1 {
+                    Err(PyValueError::new_err(
+                        "Cannot have a cache size less than one.",
+                    ))
+                } else {
+                    Ok(Self::new(NonZeroUsize::new(
+                        p_size.extract::<usize>().unwrap(),
+                    )))
                 }
-            },
-            None => Ok(Self::default())
+            }
+            None => Ok(Self::default()),
         }
     }
 
