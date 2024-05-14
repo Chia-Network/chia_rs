@@ -140,7 +140,7 @@ def test_bad_cache_size():
         bls_cache = BLSCache(0)
 
     assert str(exc_info.value) == "Cannot have a cache size less than one."
-    
+
     with pytest.raises(OverflowError) as exc_info:
         bls_cache = BLSCache(-1)
 

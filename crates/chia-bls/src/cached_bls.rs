@@ -19,7 +19,7 @@ use std::num::NonZeroUsize;
 #[cfg(feature = "py-bindings")]
 use pyo3::exceptions::PyValueError;
 #[cfg(feature = "py-bindings")]
-use pyo3::types::{PyInt, PyList};
+use pyo3::types::PyList;
 #[cfg(feature = "py-bindings")]
 use pyo3::{pyclass, pymethods, PyResult};
 
@@ -96,9 +96,7 @@ impl BLSCache {
                         "Cannot have a cache size less than one.",
                     ))
                 } else {
-                    Ok(Self::new(NonZeroUsize::new(
-                        p_size as usize,
-                    )))
+                    Ok(Self::new(NonZeroUsize::new(p_size as usize)))
                 }
             }
             None => Ok(Self::default()),
