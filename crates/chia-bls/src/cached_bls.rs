@@ -214,6 +214,7 @@ pub mod tests {
             let sig: Signature = sign(&sk, msg);
             let pk_list: Vec<PublicKey> = [pk].to_vec();
             let msg_list: Vec<&[u8]> = vec![msg];
+            // add to cache by validating them one at a time
             assert!(bls_cache.aggregate_verify(pk_list.iter(), msg_list.iter(), &sig));
         }
         assert_eq!(bls_cache.cache.len(), 3);
@@ -229,5 +230,13 @@ pub mod tests {
         let h: [u8; 32] = hasher.finalize().into();
         // assert first key has been removed
         assert!(bls_cache.cache.get(&h).is_none());
+    }
+
+    pub fn test_empty_sig() {
+        let mut bls_cache: BLSCache = BLSCache::default();
+        let sig: Signature = aggregate(&[]);
+        let pk_list: [PublicKey; 0] = [];
+        let msg_list: Vec<&[u8]> = vec![];
+        assert!(bls_cache.aggregate_verify(pk_list, msg_list, &sig));
     }
 }
