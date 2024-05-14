@@ -130,7 +130,7 @@ pub mod tests {
     use crate::SecretKey;
 
     #[test]
-    pub fn test_instantiation() {
+    fn test_instantiation() {
         let mut bls_cache: BLSCache = BLSCache::default();
         let byte_array: [u8; 32] = [0; 32];
         let sk: SecretKey = SecretKey::from_seed(&byte_array);
@@ -148,7 +148,7 @@ pub mod tests {
     }
 
     #[test]
-    pub fn test_aggregate_verify() {
+    fn test_aggregate_verify() {
         let mut bls_cache: BLSCache = BLSCache::default();
         assert_eq!(bls_cache.cache.len(), 0);
         let byte_array: [u8; 32] = [0; 32];
@@ -166,7 +166,7 @@ pub mod tests {
     }
 
     #[test]
-    pub fn test_cache() {
+    fn test_cache() {
         let mut bls_cache: BLSCache = BLSCache::default();
         assert_eq!(bls_cache.cache.len(), 0);
         let byte_array: [u8; 32] = [0; 32];
@@ -201,7 +201,7 @@ pub mod tests {
     }
 
     #[test]
-    pub fn test_cache_limit() {
+    fn test_cache_limit() {
         // set cache size to 3
         let mut bls_cache: BLSCache = BLSCache::new(NonZeroUsize::new(3));
         assert_eq!(bls_cache.cache.len(), 0);
@@ -232,7 +232,8 @@ pub mod tests {
         assert!(bls_cache.cache.get(&h).is_none());
     }
 
-    pub fn test_empty_sig() {
+    #[test]
+    fn test_empty_sig() {
         let mut bls_cache: BLSCache = BLSCache::default();
         let sig: Signature = aggregate(&[]);
         let pk_list: [PublicKey; 0] = [];
