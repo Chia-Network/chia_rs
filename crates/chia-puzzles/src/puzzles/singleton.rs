@@ -44,6 +44,16 @@ pub struct SingletonStruct {
     pub launcher_puzzle_hash: Bytes32,
 }
 
+impl SingletonStruct {
+    pub fn new(launcher_id: Bytes32) -> Self {
+        Self {
+            mod_hash: SINGLETON_TOP_LAYER_PUZZLE_HASH.into(),
+            launcher_id,
+            launcher_puzzle_hash: SINGLETON_LAUNCHER_PUZZLE_HASH.into(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(list)]
@@ -60,16 +70,6 @@ pub struct LauncherSolution<T> {
     pub singleton_puzzle_hash: Bytes32,
     pub amount: u64,
     pub key_value_list: T,
-}
-
-impl SingletonStruct {
-    pub fn new(launcher_id: Bytes32) -> Self {
-        Self {
-            mod_hash: SINGLETON_TOP_LAYER_PUZZLE_HASH.into(),
-            launcher_id,
-            launcher_puzzle_hash: SINGLETON_LAUNCHER_PUZZLE_HASH.into(),
-        }
-    }
 }
 
 /// This is the puzzle reveal of the [singleton launcher](https://chialisp.com/singletons#launcher) puzzle.
