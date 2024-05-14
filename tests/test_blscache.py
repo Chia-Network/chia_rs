@@ -146,24 +146,35 @@ def test_bad_cache_size():
     with pytest.raises(ValueError):
         bls_cache = BLSCache(0)
 
-    assert pytest.raises(expected_exception=ValueError, match="Cannot have a cache size less than one.")
+    assert pytest.raises(
+        expected_exception=ValueError, match="Cannot have a cache size less than one."
+    )
 
     with pytest.raises(OverflowError):
         bls_cache = BLSCache(-1)
 
-    assert pytest.raises(expected_exception=OverflowError, match="can't convert negative int to unsigned")
+    assert pytest.raises(
+        expected_exception=OverflowError, match="can't convert negative int to unsigned"
+    )
 
     with pytest.raises(OverflowError):
         bls_cache = BLSCache(-100000)
 
-    assert pytest.raises(expected_exception=OverflowError, match="can't convert negative int to unsigned")
+    assert pytest.raises(
+        expected_exception=OverflowError, match="can't convert negative int to unsigned"
+    )
 
     with pytest.raises(OverflowError):
         bls_cache = BLSCache(-9223372036854775809)
 
-    assert pytest.raises(expected_exception=OverflowError, match="can't convert negative int to unsigned")
+    assert pytest.raises(
+        expected_exception=OverflowError, match="can't convert negative int to unsigned"
+    )
 
     with pytest.raises(OverflowError):
         bls_cache = BLSCache(9223372036854775809)
 
-    assert pytest.raises(expected_exception=OverflowError, match="out of range integral type conversion attempted")
+    assert pytest.raises(
+        expected_exception=OverflowError,
+        match="out of range integral type conversion attempted",
+    )
