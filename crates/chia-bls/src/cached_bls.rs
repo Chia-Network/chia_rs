@@ -37,8 +37,9 @@ impl Default for BLSCache {
 
 impl BLSCache {
     pub fn new(cache_size: Option<NonZeroUsize>) -> BLSCache {
-        let cache: LruCache<[u8; 32], GTElement> =
-            LruCache::new(cache_size.unwrap_or(NonZeroUsize::new(50000).unwrap()));
+        let cache: LruCache<[u8; 32], GTElement> = LruCache::new(
+            cache_size.unwrap_or(NonZeroUsize::new(50000).expect("50000 should be non-zero")),
+        );
         Self { cache }
     }
 
