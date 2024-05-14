@@ -140,12 +140,18 @@ def test_bad_cache_size():
         bls_cache = BLSCache(0)
 
     assert str(exc_info.value) == "Cannot have a cache size less than one."
-    with pytest.raises(ValueError) as exc_info:
+    
+    with pytest.raises(OverflowError) as exc_info:
         bls_cache = BLSCache(-1)
 
-    assert str(exc_info.value) == "Cannot have a cache size less than one."
+    assert str(exc_info.value) == "can't convert negative int to unsigned"
 
-    with pytest.raises(ValueError) as exc_info:
+    with pytest.raises(OverflowError) as exc_info:
         bls_cache = BLSCache(-100000)
 
-    assert str(exc_info.value) == "Cannot have a cache size less than one."
+    assert str(exc_info.value) == "can't convert negative int to unsigned"
+
+    with pytest.raises(OverflowError) as exc_info:
+        bls_cache = BLSCache(-9223372036854775809)
+
+    assert str(exc_info.value) == "can't convert negative int to unsigned"

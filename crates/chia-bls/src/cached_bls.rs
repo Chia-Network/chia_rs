@@ -88,17 +88,16 @@ impl BLSCache {
 #[pymethods]
 impl BLSCache {
     #[new]
-    pub fn init(size: Option<&PyInt>) -> PyResult<Self> {
+    pub fn init(size: Option<u32>) -> PyResult<Self> {
         match size {
             Some(p_size) => {
-                let r_size = p_size.extract::<isize>().unwrap();
-                if r_size < 1 {
+                if p_size < 1 {
                     Err(PyValueError::new_err(
                         "Cannot have a cache size less than one.",
                     ))
                 } else {
                     Ok(Self::new(NonZeroUsize::new(
-                        p_size.extract::<usize>().unwrap(),
+                        p_size as usize,
                     )))
                 }
             }
