@@ -161,10 +161,7 @@ fn print_puzzle_info(a: &Allocator, puzzle: NodePtr, solution: NodePtr) {
                 return;
             };
             println!("    mod-hash: {:?}", uncurried.args.mod_hash);
-            println!(
-                "    tail-program-hash: {:?}",
-                uncurried.args.tail_program_hash
-            );
+            println!("    asset-id: {:?}", uncurried.args.asset_id);
             let Ok(sol) = CatSolution::<NodePtr>::from_clvm(a, solution) else {
                 println!("-- failed to parse solution");
                 return;
