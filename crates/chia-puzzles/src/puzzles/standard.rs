@@ -1,5 +1,5 @@
 use chia_bls::PublicKey;
-use clvm_traits::{FromClvm, ToClvm};
+use clvm_traits::{clvm_quote, FromClvm, ToClvm};
 use clvm_utils::{CurriedProgram, ToTreeHash, TreeHash};
 use hex_literal::hex;
 
@@ -31,6 +31,17 @@ pub struct StandardSolution<P, S> {
     pub original_public_key: Option<PublicKey>,
     pub delegated_puzzle: P,
     pub solution: S,
+}
+
+impl<T> StandardSolution<(u8, T), ()> {
+    /// Outputs the provided condition list directly, without using the hidden puzzle.
+    pub fn from_conditions(conditions: T) -> Self {
+        Self {
+            original_public_key: None,
+            delegated_puzzle: clvm_quote!(conditions),
+            solution: (),
+        }
+    }
 }
 
 /// This is the puzzle reveal of the [standard transaction](https://chialisp.com/standard-transactions) puzzle.
