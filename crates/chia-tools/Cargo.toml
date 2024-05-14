@@ -16,7 +16,7 @@ clvm-traits = { version = "0.8.0", path = "../clvm-traits" }
 chia-puzzles = { version = "0.8.0", path = "../chia-puzzles" }
 chia-bls = { version = "0.8.0", path = "../chia-bls" }
 chia-consensus = { version = "0.8.0", path = "../chia-consensus" }
-clvmr = { version = "0.6.0", features = ["counters"] }
+clvmr = { version = "0.7.0", features = ["counters"] }
 rusqlite = { version = "0.30.0", features = ["bundled"] }
 clap = { version = "4.3.9", features = ["derive"] }
 zstd = "0.12.3"

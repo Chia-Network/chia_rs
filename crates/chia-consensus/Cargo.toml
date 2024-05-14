@@ -12,7 +12,7 @@ repository = "https://github.com/Chia-Network/chia_rs"
 py-bindings = ["dep:pyo3", "dep:chia_py_streamable_macro"]
 
 [dependencies]
-clvmr = "0.6.1"
+clvmr = "0.7.0"
 hex = "0.4.3"
 pyo3 = { version = ">=0.19.0", optional = true }
 sha2 = "0.10.8"
