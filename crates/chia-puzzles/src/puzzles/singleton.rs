@@ -1,6 +1,6 @@
 use chia_protocol::Bytes32;
 use clvm_traits::{FromClvm, ToClvm};
-use clvm_utils::TreeHash;
+use clvm_utils::{CurriedProgram, ToTreeHash, TreeHash};
 use hex_literal::hex;
 
 use crate::Proof;
@@ -11,6 +11,28 @@ use crate::Proof;
 pub struct SingletonArgs<I> {
     pub singleton_struct: SingletonStruct,
     pub inner_puzzle: I,
+}
+
+impl<I> SingletonArgs<I> {
+    pub fn new(launcher_id: Bytes32, inner_puzzle: I) -> Self {
+        Self {
+            singleton_struct: SingletonStruct::new(launcher_id),
+            inner_puzzle,
+        }
+    }
+}
+
+impl SingletonArgs<TreeHash> {
+    pub fn curry_tree_hash(launcher_id: Bytes32, inner_puzzle: TreeHash) -> TreeHash {
+        CurriedProgram {
+            program: SINGLETON_TOP_LAYER_PUZZLE_HASH,
+            args: SingletonArgs {
+                singleton_struct: SingletonStruct::new(launcher_id),
+                inner_puzzle,
+            },
+        }
+        .tree_hash()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
