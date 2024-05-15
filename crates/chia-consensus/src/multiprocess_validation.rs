@@ -2,6 +2,7 @@
 use std::thread;
 use std::sync::{Arc, Mutex};
 use crate::consensus_constants::ConsensusConstants;
+use crate::gen::validation_error::ValidationErr;
 use crate::gen::errors::Err;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -18,6 +19,7 @@ use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV};
 use crate::npc_result::{NPCResult, get_name_puzzle_conditions};
 use crate::gen::condition_tools::pkm_pairs;
 use chia_traits::Streamable;
+use chia_bls::cached_bls::BLSCache;
 
 // currently in multiprocess_validation.py
 // called via blockchain.py from full_node.py when a full node wants to add a block or batch of blocks
@@ -33,8 +35,12 @@ fn batch_pre_validate_blocks() {
 
 // currently in mempool_manager.py
 // called in full_node.py when adding a transaction
-fn pre_validate_spendbundle() {
-
+fn pre_validate_spendbundle(new_spend: SpendBundle, max_cost: u64, constants: ConsensusConstants, peak_height: u32, cache: Arc<Mutex<BLSCache>>) -> Result<NPCResult, Err> {
+    if new_spend.coin_spends.is_empty() {
+        Err(())
+    } else {
+        validate_clvm_and_signature(new_spend, max_cost, constants, peak_height, cache)
+    }
 }
 
 // currently in mempool_manager.py
@@ -45,8 +51,8 @@ fn validate_clvm_and_signature(
     max_cost: u64, 
     constants: ConsensusConstants, 
     height: u32,
-    
-) -> Result<(NPCResult, HashMap<[u8; 32], Vec<u8>> , u128), Err> {
+    cache: Arc<Mutex<BLSCache>>
+) -> Result<(NPCResult, Duration), Err> {
     let start_time = Instant::now();
     let additional_data = constants.agg_sig_me_additional_data;
     let program = simple_solution_generator(spend_bundle);
@@ -54,6 +60,11 @@ fn validate_clvm_and_signature(
         program, max_cost, true, constants, height
     );
     let (pks, msgs) = pkm_pairs(npcresult.conds, additional_data)?;
+
+    // Verify aggregated signature
+    if !cache.lock().unwrap().aggregate_verify(pks, msgs, &spend_bundle.aggregated_signature) {
+        Err(ValidationErr)
+    }
     Ok((npcresult, start_time.elapsed()))
 }
 
