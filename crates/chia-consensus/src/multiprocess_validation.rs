@@ -2,6 +2,7 @@
 use std::thread;
 use std::sync::{Arc, Mutex};
 use crate::consensus_constants::ConsensusConstants;
+use crate::gen::owned_conditions::OwnedSpendBundleConditions;
 use crate::gen::validation_error::ValidationErr;
 use crate::gen::errors::Err;
 use std::collections::HashMap;
@@ -16,7 +17,7 @@ use crate::gen::flags::{
     ENABLE_SOFTFORK_CONDITION, ENABLE_MESSAGE_CONDITIONS
 };
 use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV};
-use crate::npc_result::{NPCResult, get_name_puzzle_conditions};
+use crate::npc_result::get_name_puzzle_conditions;
 use crate::gen::condition_tools::pkm_pairs;
 use chia_traits::Streamable;
 use chia_bls::cached_bls::BLSCache;
@@ -52,13 +53,13 @@ fn validate_clvm_and_signature(
     constants: ConsensusConstants, 
     height: u32,
     cache: Arc<Mutex<BLSCache>>
-) -> Result<(NPCResult, Duration), Err> {
+) -> Result<(OwnedSpendBundleConditions, Duration), Err> {
     let start_time = Instant::now();
     let additional_data = constants.agg_sig_me_additional_data;
     let program = simple_solution_generator(spend_bundle);
-    let npcresult: NPCResult = get_name_puzzle_conditions(
+    let npcresult = get_name_puzzle_conditions(
         program, max_cost, true, constants, height
-    );
+    )?;
     let (pks, msgs) = pkm_pairs(npcresult.conds, additional_data)?;
 
     // Verify aggregated signature
