@@ -352,7 +352,7 @@ pub fn validate_merkle_proof(
 #[pymethods]
 impl MerkleSet {
     #[new]
-    pub fn init(leafs: &PyList) -> PyResult<Self> {
+    pub fn init(leafs: &Bound<PyList>) -> PyResult<Self> {
         let mut data: Vec<[u8; 32]> = Vec::with_capacity(leafs.len());
 
         for leaf in leafs {
@@ -365,7 +365,7 @@ impl MerkleSet {
     }
 
     #[pyo3(name = "get_root")]
-    pub fn py_get_root<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
+    pub fn py_get_root<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
         ChiaToPython::to_python(&Bytes32::new(self.get_root()), py)
     }
 
@@ -376,7 +376,7 @@ impl MerkleSet {
         included_leaf: [u8; 32],
     ) -> PyResult<(bool, PyObject)> {
         match self.generate_proof(&included_leaf) {
-            Ok((included, proof)) => Ok((included, PyBytes::new(py, &proof).into())),
+            Ok((included, proof)) => Ok((included, PyBytes::new_bound(py, &proof).into())),
             Err(_) => Err(PyValueError::new_err("invalid proof")),
         }
     }

@@ -139,8 +139,8 @@ pub enum ProtocolMessageTypes {
 
 #[cfg(feature = "py-bindings")]
 impl chia_traits::ChiaToPython for ProtocolMessageTypes {
-    fn to_python<'a>(&self, py: pyo3::Python<'a>) -> pyo3::PyResult<&'a pyo3::PyAny> {
-        Ok(pyo3::IntoPy::into_py(*self, py).into_ref(py))
+    fn to_python<'a>(&self, py: pyo3::Python<'a>) -> pyo3::PyResult<pyo3::Bound<'a, pyo3::PyAny>> {
+        Ok(pyo3::IntoPy::into_py(*self, py).bind(py).clone().into_any())
     }
 }
 
@@ -164,8 +164,8 @@ pub enum NodeType {
 
 #[cfg(feature = "py-bindings")]
 impl chia_traits::ChiaToPython for NodeType {
-    fn to_python<'a>(&self, py: pyo3::Python<'a>) -> pyo3::PyResult<&'a pyo3::PyAny> {
-        Ok(pyo3::IntoPy::into_py(*self, py).into_ref(py))
+    fn to_python<'a>(&self, py: pyo3::Python<'a>) -> pyo3::PyResult<pyo3::Bound<'a, pyo3::PyAny>> {
+        Ok(pyo3::IntoPy::into_py(*self, py).bind(py).clone().into_any())
     }
 }
 

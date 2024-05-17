@@ -112,19 +112,19 @@ impl FullBlock {
 
     #[getter]
     #[pyo3(name = "total_iters")]
-    fn py_total_iters<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
+    fn py_total_iters<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
         ChiaToPython::to_python(&self.total_iters(), py)
     }
 
     #[getter]
     #[pyo3(name = "height")]
-    fn py_height<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
+    fn py_height<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
         ChiaToPython::to_python(&self.height(), py)
     }
 
     #[getter]
     #[pyo3(name = "weight")]
-    fn py_weight<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
+    fn py_weight<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
         ChiaToPython::to_python(&self.weight(), py)
     }
 

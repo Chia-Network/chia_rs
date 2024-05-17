@@ -19,7 +19,9 @@ use std::num::NonZeroUsize;
 #[cfg(feature = "py-bindings")]
 use pyo3::exceptions::PyValueError;
 #[cfg(feature = "py-bindings")]
-use pyo3::types::PyList;
+use pyo3::pybacked::PyBackedBytes;
+#[cfg(feature = "py-bindings")]
+use pyo3::types::{PyAnyMethods, PyList};
 #[cfg(feature = "py-bindings")]
 use pyo3::{pyclass, pymethods, PyResult};
 
@@ -107,12 +109,14 @@ impl BLSCache {
     #[pyo3(name = "aggregate_verify")]
     pub fn py_aggregate_verify(
         &mut self,
-        pks: &PyList,
-        msgs: &PyList,
+        pks: &pyo3::Bound<PyList>,
+        msgs: &pyo3::Bound<PyList>,
         sig: &Signature,
     ) -> PyResult<bool> {
         let pks_r = pks.iter().map(|item| item.extract::<PublicKey>().unwrap());
-        let msgs_r = msgs.iter().map(|item| item.extract::<&[u8]>().unwrap());
+        let msgs_r = msgs
+            .iter()
+            .map(|item| item.extract::<PyBackedBytes>().unwrap());
         Ok(self.aggregate_verify(pks_r, msgs_r, sig))
     }
 
