@@ -127,7 +127,7 @@ jobs:
       uses: Chia-Network/actions/clean-workspace@main
 
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
@@ -205,7 +205,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
@@ -224,7 +224,7 @@ jobs:
       uses: Chia-Network/actions/clean-workspace@main
 
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
@@ -257,7 +257,7 @@ jobs:
       uses: Chia-Network/actions/clean-workspace@main
 
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
@@ -280,7 +280,7 @@ jobs:
     runs-on: ubuntu-latest
     name: cargo fmt
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
@@ -298,7 +298,7 @@ jobs:
   clippy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
@@ -312,7 +312,7 @@ jobs:
     env:
         CARGO_PROFILE_RELEASE_LTO: false
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - name: cargo-fuzz
         run: cargo +nightly install cargo-fuzz
@@ -358,7 +358,7 @@ jobs:
         run: |
           git config --global core.autocrlf false
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 1
       - uses: dtolnay/rust-toolchain@stable
@@ -426,7 +426,7 @@ jobs:
       uses: Chia-Network/actions/clean-workspace@main
 
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
