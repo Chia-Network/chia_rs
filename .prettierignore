@@ -1,0 +1,6 @@
+# Cache and build folders
+.mypy_cache/
+target/
+
+# Ignore all Markdown files for now
+**/*.md
