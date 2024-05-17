@@ -194,7 +194,7 @@ jobs:
         pip install --no-index --find-links target/wheels/ chia_rs
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: packages
         path: ./target/wheels/
@@ -271,7 +271,7 @@ jobs:
         maturin sdist -m wheel/Cargo.toml
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: packages
         path: ./target/wheels/
