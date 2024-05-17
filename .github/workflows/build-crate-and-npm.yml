@@ -174,7 +174,7 @@ jobs:
     # this has not been tested, so probably needs to be debugged next time a tag is created
     - name: publish to npmjs.com if tagged
       if: startsWith(github.event.ref, 'refs/tags')
-      uses: JS-DevTools/npm-publish@v1
+      uses: JS-DevTools/npm-publish@v3
       with:
         token: ${{ secrets.node_auth_token }}
         package: wasm/pkg/package.json
