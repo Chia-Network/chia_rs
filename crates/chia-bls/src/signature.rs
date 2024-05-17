@@ -243,7 +243,7 @@ impl ToJsonDict for Signature {
 
 #[cfg(feature = "py-bindings")]
 impl FromJsonDict for Signature {
-    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+    fn from_json_dict(o: &pyo3::Bound<PyAny>) -> PyResult<Self> {
         Ok(Self::from_bytes(
             parse_hex_string(o, 96, "Signature")?
                 .as_slice()
@@ -1258,7 +1258,7 @@ mod pytests {
             let sig = sign(&sk, msg);
             Python::with_gil(|py| {
                 let string = sig.to_json_dict(py).expect("to_json_dict");
-                let sig2 = Signature::from_json_dict(string.as_ref(py)).unwrap();
+                let sig2 = Signature::from_json_dict(string.bind(py)).unwrap();
                 assert_eq!(sig, sig2);
             });
         }
@@ -1274,8 +1274,8 @@ mod pytests {
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
             let err =
-                Signature::from_json_dict(input.to_string().into_py(py).as_ref(py)).unwrap_err();
-            assert_eq!(err.value(py).to_string(), msg.to_string());
+                Signature::from_json_dict(input.to_string().into_py(py).bind(py)).unwrap_err();
+            assert_eq!(err.value_bound(py).to_string(), msg.to_string());
         });
     }
 }

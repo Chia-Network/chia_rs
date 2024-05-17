@@ -1,9 +1,11 @@
 use pyo3::exceptions::PyValueError;
+use pyo3::types::PyAnyMethods;
+use pyo3::Bound;
 use pyo3::PyAny;
 use pyo3::PyResult;
 
 pub trait FromJsonDict {
-    fn from_json_dict(o: &PyAny) -> PyResult<Self>
+    fn from_json_dict(o: &Bound<PyAny>) -> PyResult<Self>
     where
         Self: Sized;
 }
@@ -12,7 +14,7 @@ impl<T> FromJsonDict for Option<T>
 where
     T: FromJsonDict,
 {
-    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+    fn from_json_dict(o: &Bound<PyAny>) -> PyResult<Self> {
         if o.is_none() {
             return Ok(None);
         }
@@ -23,7 +25,7 @@ where
 macro_rules! from_json_primitive {
     ($t:ty) => {
         impl $crate::from_json_dict::FromJsonDict for $t {
-            fn from_json_dict(o: &pyo3::PyAny) -> pyo3::PyResult<Self> {
+            fn from_json_dict(o: &Bound<PyAny>) -> pyo3::PyResult<Self> {
                 o.extract()
             }
         }
@@ -47,10 +49,10 @@ impl<T> FromJsonDict for Vec<T>
 where
     T: FromJsonDict,
 {
-    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+    fn from_json_dict(o: &Bound<PyAny>) -> PyResult<Self> {
         let mut ret = Vec::<T>::new();
         for v in o.iter()? {
-            ret.push(<T as FromJsonDict>::from_json_dict(v?)?);
+            ret.push(<T as FromJsonDict>::from_json_dict(&v?)?);
         }
         Ok(ret)
     }
@@ -61,7 +63,7 @@ where
     T: FromJsonDict,
     U: FromJsonDict,
 {
-    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+    fn from_json_dict(o: &Bound<PyAny>) -> PyResult<Self> {
         if o.len()? != 2 {
             return Err(PyValueError::new_err(format!(
                 "expected 2 elements, got {}",
@@ -69,8 +71,8 @@ where
             )));
         }
         Ok((
-            <T as FromJsonDict>::from_json_dict(o.get_item(0)?)?,
-            <U as FromJsonDict>::from_json_dict(o.get_item(1)?)?,
+            <T as FromJsonDict>::from_json_dict(&o.get_item(0)?)?,
+            <U as FromJsonDict>::from_json_dict(&o.get_item(1)?)?,
         ))
     }
 }
@@ -81,7 +83,7 @@ where
     U: FromJsonDict,
     V: FromJsonDict,
 {
-    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+    fn from_json_dict(o: &Bound<PyAny>) -> PyResult<Self> {
         if o.len()? != 3 {
             return Err(PyValueError::new_err(format!(
                 "expected 3 elements, got {}",
@@ -89,9 +91,9 @@ where
             )));
         }
         Ok((
-            <T as FromJsonDict>::from_json_dict(o.get_item(0)?)?,
-            <U as FromJsonDict>::from_json_dict(o.get_item(1)?)?,
-            <V as FromJsonDict>::from_json_dict(o.get_item(2)?)?,
+            <T as FromJsonDict>::from_json_dict(&o.get_item(0)?)?,
+            <U as FromJsonDict>::from_json_dict(&o.get_item(1)?)?,
+            <V as FromJsonDict>::from_json_dict(&o.get_item(2)?)?,
         ))
     }
 }

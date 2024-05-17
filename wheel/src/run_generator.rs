@@ -16,7 +16,7 @@ use pyo3::types::PyList;
 pub fn run_block_generator(
     _py: Python,
     program: PyBuffer<u8>,
-    block_refs: &PyList,
+    block_refs: &Bound<PyList>,
     max_cost: Cost,
     flags: u32,
 ) -> PyResult<(Option<u32>, Option<OwnedSpendBundleConditions>)> {
@@ -68,7 +68,7 @@ pub fn run_block_generator(
 pub fn run_block_generator2(
     _py: Python,
     program: PyBuffer<u8>,
-    block_refs: &PyList,
+    block_refs: &Bound<PyList>,
     max_cost: Cost,
     flags: u32,
 ) -> PyResult<(Option<u32>, Option<OwnedSpendBundleConditions>)> {

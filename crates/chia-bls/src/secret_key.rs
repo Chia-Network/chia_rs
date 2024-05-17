@@ -232,7 +232,7 @@ impl ToJsonDict for SecretKey {
 
 #[cfg(feature = "py-bindings")]
 impl FromJsonDict for SecretKey {
-    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+    fn from_json_dict(o: &pyo3::Bound<PyAny>) -> PyResult<Self> {
         Ok(Self::from_bytes(
             parse_hex_string(o, 32, "PrivateKey")?
                 .as_slice()
@@ -526,7 +526,7 @@ mod pytests {
             let sk = SecretKey::from_seed(&data);
             Python::with_gil(|py| {
                 let string = sk.to_json_dict(py).expect("to_json_dict");
-                let sk2 = SecretKey::from_json_dict(string.as_ref(py)).unwrap();
+                let sk2 = SecretKey::from_json_dict(string.bind(py)).unwrap();
                 assert_eq!(sk, sk2);
                 assert_eq!(sk.public_key(), sk2.public_key());
             });
@@ -558,8 +558,8 @@ mod pytests {
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
             let err =
-                SecretKey::from_json_dict(input.to_string().into_py(py).as_ref(py)).unwrap_err();
-            assert_eq!(err.value(py).to_string(), msg.to_string());
+                SecretKey::from_json_dict(input.to_string().into_py(py).bind(py)).unwrap_err();
+            assert_eq!(err.value_bound(py).to_string(), msg.to_string());
         });
     }
 }

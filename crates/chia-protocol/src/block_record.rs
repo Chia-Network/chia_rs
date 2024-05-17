@@ -94,7 +94,7 @@ impl BlockRecord {
     }
 
     #[pyo3(name = "is_challenge_block")]
-    fn py_is_challenge_block(&self, constants: &PyAny) -> PyResult<bool> {
+    fn py_is_challenge_block(&self, constants: &Bound<PyAny>) -> PyResult<bool> {
         Ok(self.is_challenge_block(
             constants
                 .getattr("MIN_BLOCKS_PER_CHALLENGE_BLOCK")?
@@ -104,7 +104,7 @@ impl BlockRecord {
 
     // TODO: at some point it would be nice to port
     // chia.consensus.pot_iterations to rust, and make this less hacky
-    fn sp_sub_slot_total_iters_impl(&self, py: Python, constants: &PyAny) -> PyResult<u128> {
+    fn sp_sub_slot_total_iters_impl(&self, py: Python, constants: &Bound<PyAny>) -> PyResult<u128> {
         let ret = self
             .total_iters
             .checked_sub(self.ip_iters_impl(py, constants)? as u128)
@@ -117,42 +117,42 @@ impl BlockRecord {
         }
     }
 
-    fn ip_sub_slot_total_iters_impl(&self, py: Python, constants: &PyAny) -> PyResult<u128> {
+    fn ip_sub_slot_total_iters_impl(&self, py: Python, constants: &Bound<PyAny>) -> PyResult<u128> {
         self.total_iters
             .checked_sub(self.ip_iters_impl(py, constants)? as u128)
             .ok_or(PyValueError::new_err("uint128 overflow"))
     }
 
-    fn sp_iters_impl(&self, py: Python, constants: &PyAny) -> PyResult<u64> {
-        let ctx: &PyDict = PyDict::new(py);
+    fn sp_iters_impl(&self, py: Python, constants: &Bound<PyAny>) -> PyResult<u64> {
+        let ctx = PyDict::new_bound(py);
         ctx.set_item("sub_slot_iters", self.sub_slot_iters)?;
         ctx.set_item("signage_point_index", self.signage_point_index)?;
         ctx.set_item("constants", constants)?;
-        py.run(
+        py.run_bound(
             "from chia.consensus.pot_iterations import calculate_ip_iters, calculate_sp_iters\n\
             ret = calculate_sp_iters(constants, sub_slot_iters, signage_point_index)\n",
             None,
-            Some(ctx),
+            Some(&ctx),
         )?;
-        ctx.get_item("ret").unwrap().extract::<u64>()
+        ctx.get_item("ret").unwrap().unwrap().extract::<u64>()
     }
 
-    fn ip_iters_impl(&self, py: Python, constants: &PyAny) -> PyResult<u64> {
-        let ctx: &PyDict = PyDict::new(py);
+    fn ip_iters_impl(&self, py: Python, constants: &Bound<PyAny>) -> PyResult<u64> {
+        let ctx = PyDict::new_bound(py);
         ctx.set_item("sub_slot_iters", self.sub_slot_iters)?;
         ctx.set_item("signage_point_index", self.signage_point_index)?;
         ctx.set_item("required_iters", self.required_iters)?;
         ctx.set_item("constants", constants)?;
-        py.run(
+        py.run_bound(
             "from chia.consensus.pot_iterations import calculate_ip_iters, calculate_sp_iters\n\
             ret = calculate_ip_iters(constants, sub_slot_iters, signage_point_index, required_iters)\n",
             None,
-            Some(ctx),
+            Some(&ctx),
             )?;
-        ctx.get_item("ret").unwrap().extract::<u64>()
+        ctx.get_item("ret").unwrap().unwrap().extract::<u64>()
     }
 
-    fn sp_total_iters_impl(&self, py: Python, constants: &PyAny) -> PyResult<u128> {
+    fn sp_total_iters_impl(&self, py: Python, constants: &Bound<PyAny>) -> PyResult<u128> {
         self.sp_sub_slot_total_iters_impl(py, constants)?
             .checked_add(self.sp_iters_impl(py, constants)? as u128)
             .ok_or(PyValueError::new_err("uint128 overflow"))
@@ -161,28 +161,32 @@ impl BlockRecord {
     fn sp_sub_slot_total_iters<'a>(
         &self,
         py: Python<'a>,
-        constants: &PyAny,
-    ) -> PyResult<&'a PyAny> {
+        constants: &Bound<PyAny>,
+    ) -> PyResult<Bound<'a, PyAny>> {
         ChiaToPython::to_python(&self.sp_sub_slot_total_iters_impl(py, constants)?, py)
     }
 
     fn ip_sub_slot_total_iters<'a>(
         &self,
         py: Python<'a>,
-        constants: &PyAny,
-    ) -> PyResult<&'a PyAny> {
+        constants: &Bound<PyAny>,
+    ) -> PyResult<Bound<'a, PyAny>> {
         ChiaToPython::to_python(&self.ip_sub_slot_total_iters_impl(py, constants)?, py)
     }
 
-    fn sp_iters<'a>(&self, py: Python<'a>, constants: &PyAny) -> PyResult<&'a PyAny> {
+    fn sp_iters<'a>(&self, py: Python<'a>, constants: &Bound<PyAny>) -> PyResult<Bound<'a, PyAny>> {
         ChiaToPython::to_python(&self.sp_iters_impl(py, constants)?, py)
     }
 
-    fn ip_iters<'a>(&self, py: Python<'a>, constants: &PyAny) -> PyResult<&'a PyAny> {
+    fn ip_iters<'a>(&self, py: Python<'a>, constants: &Bound<PyAny>) -> PyResult<Bound<'a, PyAny>> {
         ChiaToPython::to_python(&self.ip_iters_impl(py, constants)?, py)
     }
 
-    fn sp_total_iters<'a>(&self, py: Python<'a>, constants: &PyAny) -> PyResult<&'a PyAny> {
+    fn sp_total_iters<'a>(
+        &self,
+        py: Python<'a>,
+        constants: &Bound<PyAny>,
+    ) -> PyResult<Bound<'a, PyAny>> {
         ChiaToPython::to_python(&self.sp_total_iters_impl(py, constants)?, py)
     }
 }

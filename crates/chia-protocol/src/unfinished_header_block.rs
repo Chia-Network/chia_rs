@@ -68,7 +68,7 @@ impl UnfinishedHeaderBlock {
 
     #[getter]
     #[pyo3(name = "total_iters")]
-    fn py_total_iters<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
+    fn py_total_iters<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
         ChiaToPython::to_python(&self.total_iters(), py)
     }
 }

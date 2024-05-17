@@ -122,13 +122,13 @@ impl SpendBundle {
 
     fn debug(&self, py: Python<'_>) -> PyResult<()> {
         use pyo3::types::PyDict;
-        let ctx: &PyDict = PyDict::new(py);
+        let ctx = PyDict::new_bound(py);
         ctx.set_item("self", self.clone().into_py(py))?;
-        py.run(
+        py.run_bound(
             "from chia.wallet.util.debug_spend_bundle import debug_spend_bundle\n\
             debug_spend_bundle(self)\n",
             None,
-            Some(ctx),
+            Some(&ctx),
         )
     }
 }

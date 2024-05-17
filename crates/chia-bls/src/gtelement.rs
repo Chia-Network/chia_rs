@@ -17,6 +17,8 @@ use chia_traits::to_json_dict::ToJsonDict;
 #[cfg(feature = "py-bindings")]
 use pyo3::exceptions::PyValueError;
 #[cfg(feature = "py-bindings")]
+use pyo3::types::PyAnyMethods;
+#[cfg(feature = "py-bindings")]
 use pyo3::{pyclass, pymethods, IntoPy, PyAny, PyObject, PyResult, Python};
 
 #[cfg_attr(feature = "py-bindings", pyclass, derive(PyStreamable))]
@@ -116,7 +118,7 @@ impl ToJsonDict for GTElement {
 
 #[cfg(feature = "py-bindings")]
 impl FromJsonDict for GTElement {
-    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+    fn from_json_dict(o: &pyo3::Bound<PyAny>) -> PyResult<Self> {
         let s: String = o.extract()?;
         if !s.starts_with("0x") {
             return Err(PyValueError::new_err(
