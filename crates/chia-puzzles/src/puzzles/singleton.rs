@@ -1,6 +1,6 @@
 use chia_protocol::Bytes32;
 use clvm_traits::{FromClvm, ToClvm};
-use clvm_utils::TreeHash;
+use clvm_utils::{CurriedProgram, ToTreeHash, TreeHash};
 use hex_literal::hex;
 
 use crate::Proof;
@@ -13,6 +13,28 @@ pub struct SingletonArgs<I> {
     pub inner_puzzle: I,
 }
 
+impl<I> SingletonArgs<I> {
+    pub fn new(launcher_id: Bytes32, inner_puzzle: I) -> Self {
+        Self {
+            singleton_struct: SingletonStruct::new(launcher_id),
+            inner_puzzle,
+        }
+    }
+}
+
+impl SingletonArgs<TreeHash> {
+    pub fn curry_tree_hash(launcher_id: Bytes32, inner_puzzle: TreeHash) -> TreeHash {
+        CurriedProgram {
+            program: SINGLETON_TOP_LAYER_PUZZLE_HASH,
+            args: SingletonArgs {
+                singleton_struct: SingletonStruct::new(launcher_id),
+                inner_puzzle,
+            },
+        }
+        .tree_hash()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(tuple)]
@@ -20,6 +42,16 @@ pub struct SingletonStruct {
     pub mod_hash: Bytes32,
     pub launcher_id: Bytes32,
     pub launcher_puzzle_hash: Bytes32,
+}
+
+impl SingletonStruct {
+    pub fn new(launcher_id: Bytes32) -> Self {
+        Self {
+            mod_hash: SINGLETON_TOP_LAYER_PUZZLE_HASH.into(),
+            launcher_id,
+            launcher_puzzle_hash: SINGLETON_LAUNCHER_PUZZLE_HASH.into(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
@@ -38,16 +70,6 @@ pub struct LauncherSolution<T> {
     pub singleton_puzzle_hash: Bytes32,
     pub amount: u64,
     pub key_value_list: T,
-}
-
-impl SingletonStruct {
-    pub fn new(launcher_id: Bytes32) -> Self {
-        Self {
-            mod_hash: SINGLETON_TOP_LAYER_PUZZLE_HASH.into(),
-            launcher_id,
-            launcher_puzzle_hash: SINGLETON_LAUNCHER_PUZZLE_HASH.into(),
-        }
-    }
 }
 
 /// This is the puzzle reveal of the [singleton launcher](https://chialisp.com/singletons#launcher) puzzle.
