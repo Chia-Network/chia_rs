@@ -113,15 +113,17 @@ impl BLSCache {
         msgs: &pyo3::Bound<PyList>,
         sig: &Signature,
     ) -> PyResult<bool> {
-        let pks_r = pks
-            .iter()
-            .unwrap()
-            .map(|item| item.unwrap().extract::<PublicKey>().unwrap());
-        let msgs_r = msgs
-            .iter()
-            .unwrap()
-            .map(|item| item.unwrap().extract::<PyBackedBytes>().unwrap());
-        Ok(self.aggregate_verify(pks_r, msgs_r, sig))
+        let pks = pks
+            .iter()?
+            .map(|item| item?.extract())
+            .collect::<PyResult<Vec<PublicKey>>>()?;
+
+        let msgs = msgs
+            .iter()?
+            .map(|item| item?.extract())
+            .collect::<PyResult<Vec<PyBackedBytes>>>()?;
+
+        Ok(self.aggregate_verify(pks, msgs, sig))
     }
 
     #[pyo3(name = "len")]
