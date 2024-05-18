@@ -39,6 +39,10 @@ impl Bytes {
         self.0.as_slice()
     }
 
+    pub fn to_vec(&self) -> Vec<u8> {
+        self.0.clone()
+    }
+
     pub fn into_inner(self) -> Vec<u8> {
         self.0
     }
@@ -124,6 +128,12 @@ impl From<&[u8]> for Bytes {
     }
 }
 
+impl<const N: usize> From<BytesImpl<N>> for Bytes {
+    fn from(value: BytesImpl<N>) -> Self {
+        Self(value.0.to_vec())
+    }
+}
+
 impl From<Vec<u8>> for Bytes {
     fn from(value: Vec<u8>) -> Self {
         Self(value)
@@ -157,6 +167,14 @@ pub struct BytesImpl<const N: usize>([u8; N]);
 impl<const N: usize> BytesImpl<N> {
     pub fn new(bytes: [u8; N]) -> Self {
         Self(bytes)
+    }
+
+    pub const fn len(&self) -> usize {
+        N
+    }
+
+    pub const fn is_empty(&self) -> bool {
+        N == 0
     }
 
     pub fn as_slice(&self) -> &[u8] {
@@ -278,6 +296,22 @@ impl<const N: usize> TryFrom<&Vec<u8>> for BytesImpl<N> {
 
     fn try_from(value: &Vec<u8>) -> Result<Self, TryFromSliceError> {
         value.as_slice().try_into()
+    }
+}
+
+impl<const N: usize> TryFrom<Bytes> for BytesImpl<N> {
+    type Error = TryFromSliceError;
+
+    fn try_from(value: Bytes) -> Result<Self, TryFromSliceError> {
+        value.0.as_slice().try_into()
+    }
+}
+
+impl<const N: usize> TryFrom<&Bytes> for BytesImpl<N> {
+    type Error = TryFromSliceError;
+
+    fn try_from(value: &Bytes) -> Result<Self, TryFromSliceError> {
+        value.0.as_slice().try_into()
     }
 }
 
