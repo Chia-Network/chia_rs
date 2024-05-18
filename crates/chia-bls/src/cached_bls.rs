@@ -14,7 +14,7 @@ use crate::{GTElement, PublicKey, Signature};
 /// is likely to reappear in a block later, so we can save having to do the pairing
 /// again. So caching is primarily useful when synced and monitoring the mempool in real-time.
 #[cfg_attr(feature = "py-bindings", pyo3::pyclass(name = "BLSCache"))]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct BlsCache {
     // sha256(pubkey + message) -> GTElement
     cache: LruCache<[u8; 32], GTElement>,
@@ -51,18 +51,20 @@ impl BlsCache {
                 return pairing;
             }
 
-            // Calculate the pairing and add it to the cache.
+            // Otherwise, we need to calculate the pairing and add it to the cache.
             let mut aug_msg = pk.borrow().to_bytes().to_vec();
             aug_msg.extend_from_slice(msg.as_ref());
-            let aug_hash: Signature = hash_to_g2(&aug_msg);
+            let aug_hash = hash_to_g2(&aug_msg);
 
-            let pairing: GTElement = aug_hash.pair(pk.borrow());
             let mut hasher = Sha256::new();
             hasher.update(&aug_msg);
-            let h: [u8; 32] = hasher.finalize().into();
-            self.cache.put(h, pairing.clone());
+            let hash: [u8; 32] = hasher.finalize().into();
+
+            let pairing = aug_hash.pair(pk.borrow());
+            self.cache.put(hash, pairing.clone());
             pairing
         });
+
         aggregate_verify_gt(sig, iter)
     }
 }
