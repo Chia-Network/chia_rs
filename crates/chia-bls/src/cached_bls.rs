@@ -128,7 +128,7 @@ mod python {
 
         #[pyo3(name = "len")]
         pub fn py_len(&self) -> PyResult<usize> {
-            Ok(self.cache.len())
+            Ok(self.len())
         }
     }
 }
