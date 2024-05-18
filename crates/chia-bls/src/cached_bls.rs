@@ -33,6 +33,14 @@ impl BlsCache {
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.cache.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.cache.is_empty()
+    }
+
     pub fn aggregate_verify(
         &mut self,
         pks: impl IntoIterator<Item = impl Borrow<PublicKey>>,
@@ -128,119 +136,125 @@ mod python {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::aggregate;
+
     use crate::sign;
     use crate::SecretKey;
 
     #[test]
-    fn test_instantiation() {
-        let mut bls_cache: BlsCache = BlsCache::default();
-        let byte_array: [u8; 32] = [0; 32];
-        let sk: SecretKey = SecretKey::from_seed(&byte_array);
-        let pk: PublicKey = sk.public_key();
-        let msg: [u8; 32] = [106; 32];
-        let mut aug_msg: Vec<u8> = pk.clone().to_bytes().to_vec();
-        aug_msg.extend_from_slice(&msg); // pk + msg
-        let aug_hash = hash_to_g2(&aug_msg);
-        let pairing = aug_hash.pair(&pk);
-        let mut hasher = Sha256::new();
-        hasher.update(&aug_msg);
-        let h: [u8; 32] = hasher.finalize().into();
-        bls_cache.cache.put(h, pairing.clone());
-        assert_eq!(*bls_cache.cache.get(&h).unwrap(), pairing);
-    }
-
-    #[test]
     fn test_aggregate_verify() {
-        let mut bls_cache: BlsCache = BlsCache::default();
-        assert_eq!(bls_cache.cache.len(), 0);
-        let byte_array: [u8; 32] = [0; 32];
-        let sk: SecretKey = SecretKey::from_seed(&byte_array);
-        let pk: PublicKey = sk.public_key();
-        let msg: &[u8] = &[106; 32];
-        let sig: Signature = sign(&sk, msg);
-        let pk_list: Vec<PublicKey> = [pk].to_vec();
-        let msg_list: Vec<&[u8]> = [msg].to_vec();
-        assert!(bls_cache.aggregate_verify(pk_list.iter(), msg_list.iter(), &sig));
-        assert_eq!(bls_cache.cache.len(), 1);
-        // try again with (pk, msg) cached
+        let mut bls_cache = BlsCache::default();
+
+        let sk = SecretKey::from_seed(&[0; 32]);
+        let pk = sk.public_key();
+        let msg = [106; 32];
+
+        let sig = sign(&sk, msg);
+        let pk_list = [pk];
+        let msg_list = [msg];
+
+        // Before we cache anything, it should be empty.
+        assert!(bls_cache.is_empty());
+
+        // Verify the signature and add to the cache.
         assert!(bls_cache.aggregate_verify(pk_list, msg_list, &sig));
-        assert_eq!(bls_cache.cache.len(), 1);
+        assert_eq!(bls_cache.len(), 1);
+
+        // Now that it's cached, it shouldn't cache it again.
+        assert!(bls_cache.aggregate_verify(pk_list, msg_list, &sig));
+        assert_eq!(bls_cache.len(), 1);
     }
 
     #[test]
     fn test_cache() {
-        let mut bls_cache: BlsCache = BlsCache::default();
-        assert_eq!(bls_cache.cache.len(), 0);
-        let byte_array: [u8; 32] = [0; 32];
-        let sk: SecretKey = SecretKey::from_seed(&byte_array);
-        let pk: PublicKey = sk.public_key();
-        let msg: &[u8] = &[106; 32];
-        let sig: Signature = sign(&sk, msg);
-        let mut pk_list: Vec<PublicKey> = [pk].to_vec();
-        let mut msg_list: Vec<&[u8]> = [msg].to_vec();
-        // add first to cache
-        // try one cached, one not cached
-        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig));
-        assert_eq!(bls_cache.cache.len(), 1);
-        let byte_array: [u8; 32] = [1; 32];
-        let sk: SecretKey = SecretKey::from_seed(&byte_array);
-        let pk: PublicKey = sk.public_key();
-        let msg: &[u8] = &[107; 32];
-        let sig = aggregate([sig, sign(&sk, msg)]);
-        pk_list.push(pk);
-        msg_list.push(msg);
-        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig));
-        assert_eq!(bls_cache.cache.len(), 2);
-        // try reusing a pubkey
-        let pk: PublicKey = sk.public_key();
-        let msg: &[u8] = &[108; 32];
-        let sig = aggregate([sig, sign(&sk, msg)]);
-        pk_list.push(pk);
-        msg_list.push(msg);
-        // check verification
-        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &sig));
-        assert_eq!(bls_cache.cache.len(), 3);
+        let mut bls_cache = BlsCache::default();
+
+        let sk1 = SecretKey::from_seed(&[0; 32]);
+        let pk1 = sk1.public_key();
+        let msg1 = [106; 32];
+
+        let mut agg_sig = sign(&sk1, msg1);
+        let mut pk_list = vec![pk1];
+        let mut msg_list = vec![msg1];
+
+        // Before we cache anything, it should be empty.
+        assert!(bls_cache.is_empty());
+
+        // Add the first signature to cache.
+        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &agg_sig));
+        assert_eq!(bls_cache.len(), 1);
+
+        // Try with the first key message pair in the cache but not the second.
+        let sk2 = SecretKey::from_seed(&[1; 32]);
+        let pk2 = sk2.public_key();
+        let msg2 = [107; 32];
+
+        agg_sig += &sign(&sk2, msg2);
+        pk_list.push(pk2);
+        msg_list.push(msg2);
+
+        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &agg_sig));
+        assert_eq!(bls_cache.len(), 2);
+
+        // Try reusing a public key.
+        let msg3 = [108; 32];
+
+        agg_sig += &sign(&sk2, msg3);
+        pk_list.push(pk2);
+        msg_list.push(msg3);
+
+        // Verify this signature and add to the cache as well (since it's still a different aggregate).
+        assert!(bls_cache.aggregate_verify(pk_list, msg_list, &agg_sig));
+        assert_eq!(bls_cache.len(), 3);
     }
 
     #[test]
     fn test_cache_limit() {
-        // set cache size to 3
-        let mut bls_cache: BlsCache = BlsCache::new(NonZeroUsize::new(3).unwrap());
-        assert_eq!(bls_cache.cache.len(), 0);
-        // create 5 pk/msg combos
+        // The cache is limited to only 3 items.
+        let mut bls_cache = BlsCache::new(NonZeroUsize::new(3).unwrap());
+
+        // Before we cache anything, it should be empty.
+        assert!(bls_cache.is_empty());
+
+        // Create 5 pubkey message pairs.
         for i in 1..=5 {
-            let byte_array: [u8; 32] = [i as u8; 32];
-            let sk: SecretKey = SecretKey::from_seed(&byte_array);
-            let pk: PublicKey = sk.public_key();
-            let msg: &[u8] = &[106; 32];
-            let sig: Signature = sign(&sk, msg);
-            let pk_list: Vec<PublicKey> = [pk].to_vec();
-            let msg_list: Vec<&[u8]> = vec![msg];
-            // add to cache by validating them one at a time
+            let sk = SecretKey::from_seed(&[i as u8; 32]);
+            let pk = sk.public_key();
+            let msg = [106; 32];
+
+            let sig = sign(&sk, msg);
+            let pk_list = [pk];
+            let msg_list = [msg];
+
+            // Add to cache by validating them one at a time.
             assert!(bls_cache.aggregate_verify(pk_list.iter(), msg_list.iter(), &sig));
         }
+
+        // The cache should be full now.
         assert_eq!(bls_cache.cache.len(), 3);
-        // recreate first key
-        let byte_array: [u8; 32] = [1; 32];
-        let sk: SecretKey = SecretKey::from_seed(&byte_array);
-        let pk: PublicKey = sk.public_key();
-        let msg: Vec<u8> = vec![106; 32];
-        let mut aug_msg = pk.to_bytes().to_vec();
-        aug_msg.extend_from_slice(&msg); // pk + msg
+
+        // Recreate first key.
+        let sk = SecretKey::from_seed(&[1; 32]);
+        let pk = sk.public_key();
+        let msg = [106; 32];
+
+        let aug_msg = [&pk.to_bytes(), msg.as_ref()].concat();
+
         let mut hasher = Sha256::new();
         hasher.update(aug_msg);
-        let h: [u8; 32] = hasher.finalize().into();
-        // assert first key has been removed
-        assert!(bls_cache.cache.get(&h).is_none());
+        let hash: [u8; 32] = hasher.finalize().into();
+
+        // The first key should have been removed, since it's the oldest that's been accessed.
+        assert!(!bls_cache.cache.contains(&hash));
     }
 
     #[test]
     fn test_empty_sig() {
-        let mut bls_cache: BlsCache = BlsCache::default();
-        let sig: Signature = aggregate(&[]);
-        let pk_list: [PublicKey; 0] = [];
-        let msg_list: Vec<&[u8]> = vec![];
-        assert!(bls_cache.aggregate_verify(pk_list, msg_list, &sig));
+        let mut bls_cache = BlsCache::default();
+
+        assert!(bls_cache.aggregate_verify(
+            [] as [&PublicKey; 0],
+            [] as [&[u8]; 0],
+            &Signature::default()
+        ));
     }
 }
