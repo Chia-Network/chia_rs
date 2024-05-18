@@ -1,5 +1,5 @@
 use chia_bls::aggregate_verify;
-use chia_bls::{sign, BLSCache, PublicKey, SecretKey, Signature};
+use chia_bls::{sign, BlsCache, PublicKey, SecretKey, Signature};
 use criterion::{criterion_group, criterion_main, Criterion};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
@@ -23,7 +23,7 @@ fn cache_benchmark(c: &mut Criterion) {
         pks.push(pk);
     }
 
-    let mut bls_cache: BLSCache = BLSCache::default();
+    let mut bls_cache: BlsCache = BlsCache::default();
 
     c.bench_function("bls_cache.aggregate_verify, 0% cache hits", |b| {
         let mut cache = bls_cache.clone();

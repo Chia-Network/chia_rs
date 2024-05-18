@@ -1,74 +1,59 @@
-// This cache is a bit weird because it's trying to account for validating
-// mempool signatures versus block signatures. When validating block signatures,
-// there's not much point in caching the pairings because we're probably not going
-// to see them again unless there's a reorg. However, a spend in the mempool
-// is likely to reappear in a block later, so we can save having to do the pairing
-// again. So caching is primarily useful when synced and monitoring the mempool in real-time.
-
-use crate::aggregate_verify_gt as agg_ver_gt;
-use crate::gtelement::GTElement;
-use crate::hash_to_g2;
-use crate::PublicKey;
-use crate::Signature;
-use lru::LruCache;
-
-use sha2::{Digest, Sha256};
 use std::borrow::Borrow;
 use std::num::NonZeroUsize;
 
-#[cfg(feature = "py-bindings")]
-use pyo3::exceptions::PyValueError;
-#[cfg(feature = "py-bindings")]
-use pyo3::pybacked::PyBackedBytes;
-#[cfg(feature = "py-bindings")]
-use pyo3::types::{PyAnyMethods, PyList};
-#[cfg(feature = "py-bindings")]
-use pyo3::{pyclass, pymethods, PyResult};
+use lru::LruCache;
+use sha2::{Digest, Sha256};
 
-#[cfg_attr(feature = "py-bindings", pyclass(name = "BLSCache"))]
+use crate::{aggregate_verify_gt, hash_to_g2};
+use crate::{GTElement, PublicKey, Signature};
+
+/// This cache is a bit weird because it's trying to account for validating
+/// mempool signatures versus block signatures. When validating block signatures,
+/// there's not much point in caching the pairings because we're probably not going
+/// to see them again unless there's a reorg. However, a spend in the mempool
+/// is likely to reappear in a block later, so we can save having to do the pairing
+/// again. So caching is primarily useful when synced and monitoring the mempool in real-time.
+#[cfg_attr(feature = "py-bindings", pyo3::pyclass(name = "BLSCache"))]
 #[derive(Clone)]
-pub struct BLSCache {
-    cache: LruCache<[u8; 32], GTElement>, // LRUCache of hash(pubkey + message) -> GTElement
+pub struct BlsCache {
+    // sha256(pubkey + message) -> GTElement
+    cache: LruCache<[u8; 32], GTElement>,
 }
 
-impl Default for BLSCache {
+impl Default for BlsCache {
     fn default() -> Self {
-        Self::new(None)
+        Self::new(NonZeroUsize::new(50000).unwrap())
     }
 }
 
-impl BLSCache {
-    pub fn new(cache_size: Option<NonZeroUsize>) -> BLSCache {
-        let cache: LruCache<[u8; 32], GTElement> = LruCache::new(
-            cache_size.unwrap_or(NonZeroUsize::new(50000).expect("50000 should be non-zero")),
-        );
-        Self { cache }
+impl BlsCache {
+    pub fn new(cache_size: NonZeroUsize) -> Self {
+        Self {
+            cache: LruCache::new(cache_size),
+        }
     }
 
-    pub fn aggregate_verify<
-        M: IntoIterator<Item = T>,
-        T: AsRef<[u8]>,
-        P: IntoIterator<Item = U>,
-        U: Borrow<PublicKey>,
-    >(
+    pub fn aggregate_verify(
         &mut self,
-        pks: P,
-        msgs: M,
+        pks: impl IntoIterator<Item = impl Borrow<PublicKey>>,
+        msgs: impl IntoIterator<Item = impl AsRef<[u8]>>,
         sig: &Signature,
     ) -> bool {
         let iter = pks.into_iter().zip(msgs).map(|(pk, msg)| -> GTElement {
+            // Hash pubkey + message
             let mut hasher = Sha256::new();
             hasher.update(pk.borrow().to_bytes());
-            hasher.update(msg.as_ref()); // pk + msg
-            let h: [u8; 32] = hasher.finalize().into();
+            hasher.update(msg.as_ref());
+            let hash: [u8; 32] = hasher.finalize().into();
 
-            if let Some(pairing) = self.cache.get(&h).cloned() {
-                // equivalent to `if pairing is not None`
+            // If the pairing is in the cache, we don't need to recalculate it.
+            if let Some(pairing) = self.cache.get(&hash).cloned() {
                 return pairing;
             }
-            // if pairing is None then make pairing and add to cache
+
+            // Calculate the pairing and add it to the cache.
             let mut aug_msg = pk.borrow().to_bytes().to_vec();
-            aug_msg.extend_from_slice(msg.as_ref()); // pk + msg
+            aug_msg.extend_from_slice(msg.as_ref());
             let aug_hash: Signature = hash_to_g2(&aug_msg);
 
             let pairing: GTElement = aug_hash.pair(pk.borrow());
@@ -78,57 +63,63 @@ impl BLSCache {
             self.cache.put(h, pairing.clone());
             pairing
         });
-        agg_ver_gt(sig, iter)
+        aggregate_verify_gt(sig, iter)
     }
 }
 
-// Python Functions
-
-// Commented out for now as we may remove these
-// as the python consensus code that uses it is being ported to rust.
-
 #[cfg(feature = "py-bindings")]
-#[pymethods]
-impl BLSCache {
-    #[new]
-    pub fn init(size: Option<u32>) -> PyResult<Self> {
-        match size {
-            Some(p_size) => {
-                if p_size < 1 {
-                    Err(PyValueError::new_err(
-                        "Cannot have a cache size less than one.",
-                    ))
-                } else {
-                    Ok(Self::new(NonZeroUsize::new(p_size as usize)))
-                }
-            }
-            None => Ok(Self::default()),
+mod python {
+    use super::*;
+
+    use pyo3::{
+        exceptions::PyValueError,
+        pybacked::PyBackedBytes,
+        pymethods,
+        types::{PyAnyMethods, PyList},
+        Bound, PyResult,
+    };
+
+    #[pymethods]
+    impl BlsCache {
+        #[new]
+        pub fn init(size: Option<u32>) -> PyResult<Self> {
+            let Some(size) = size else {
+                return Ok(Self::default());
+            };
+
+            let Some(size) = NonZeroUsize::new(size as usize) else {
+                return Err(PyValueError::new_err(
+                    "Cannot have a cache size less than one.",
+                ));
+            };
+
+            Ok(Self::new(size))
         }
-    }
 
-    #[pyo3(name = "aggregate_verify")]
-    pub fn py_aggregate_verify(
-        &mut self,
-        pks: &pyo3::Bound<PyList>,
-        msgs: &pyo3::Bound<PyList>,
-        sig: &Signature,
-    ) -> PyResult<bool> {
-        let pks = pks
-            .iter()?
-            .map(|item| item?.extract())
-            .collect::<PyResult<Vec<PublicKey>>>()?;
+        #[pyo3(name = "aggregate_verify")]
+        pub fn py_aggregate_verify(
+            &mut self,
+            pks: &Bound<PyList>,
+            msgs: &Bound<PyList>,
+            sig: &Signature,
+        ) -> PyResult<bool> {
+            let pks = pks
+                .iter()?
+                .map(|item| item?.extract())
+                .collect::<PyResult<Vec<PublicKey>>>()?;
 
-        let msgs = msgs
-            .iter()?
-            .map(|item| item?.extract())
-            .collect::<PyResult<Vec<PyBackedBytes>>>()?;
+            let msgs = msgs
+                .iter()?
+                .map(|item| item?.extract())
+                .collect::<PyResult<Vec<PyBackedBytes>>>()?;
 
-        Ok(self.aggregate_verify(pks, msgs, sig))
-    }
+            Ok(self.aggregate_verify(pks, msgs, sig))
+        }
 
-    #[pyo3(name = "len")]
-    pub fn py_len(&self) -> PyResult<usize> {
-        Ok(self.cache.len())
+        #[pyo3(name = "len")]
+        pub fn py_len(&self) -> PyResult<usize> {
+            Ok(self.cache.len())
+        }
     }
 }
 
@@ -141,7 +132,7 @@ pub mod tests {
 
     #[test]
     fn test_instantiation() {
-        let mut bls_cache: BLSCache = BLSCache::default();
+        let mut bls_cache: BlsCache = BlsCache::default();
         let byte_array: [u8; 32] = [0; 32];
         let sk: SecretKey = SecretKey::from_seed(&byte_array);
         let pk: PublicKey = sk.public_key();
@@ -159,7 +150,7 @@ pub mod tests {
 
     #[test]
     fn test_aggregate_verify() {
-        let mut bls_cache: BLSCache = BLSCache::default();
+        let mut bls_cache: BlsCache = BlsCache::default();
         assert_eq!(bls_cache.cache.len(), 0);
         let byte_array: [u8; 32] = [0; 32];
         let sk: SecretKey = SecretKey::from_seed(&byte_array);
@@ -177,7 +168,7 @@ pub mod tests {
 
     #[test]
     fn test_cache() {
-        let mut bls_cache: BLSCache = BLSCache::default();
+        let mut bls_cache: BlsCache = BlsCache::default();
         assert_eq!(bls_cache.cache.len(), 0);
         let byte_array: [u8; 32] = [0; 32];
         let sk: SecretKey = SecretKey::from_seed(&byte_array);
@@ -213,7 +204,7 @@ pub mod tests {
     #[test]
     fn test_cache_limit() {
         // set cache size to 3
-        let mut bls_cache: BLSCache = BLSCache::new(NonZeroUsize::new(3));
+        let mut bls_cache: BlsCache = BlsCache::new(NonZeroUsize::new(3).unwrap());
         assert_eq!(bls_cache.cache.len(), 0);
         // create 5 pk/msg combos
         for i in 1..=5 {
@@ -244,7 +235,7 @@ pub mod tests {
 
     #[test]
     fn test_empty_sig() {
-        let mut bls_cache: BLSCache = BLSCache::default();
+        let mut bls_cache: BlsCache = BlsCache::default();
         let sig: Signature = aggregate(&[]);
         let pk_list: [PublicKey; 0] = [];
         let msg_list: Vec<&[u8]> = vec![];
