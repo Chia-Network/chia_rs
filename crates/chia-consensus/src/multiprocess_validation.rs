@@ -58,20 +58,31 @@ fn validate_clvm_and_signature(
     max_cost: u64, 
     constants: ConsensusConstants, 
     height: u32,
+    syncing: bool,
     cache: Arc<Mutex<BLSCache>>
 ) -> Result<(OwnedSpendBundleConditions, Duration), Err> {
     let start_time = Instant::now();
     let additional_data = constants.agg_sig_me_additional_data;
-    let program = simple_solution_generator(spend_bundle);
+    let program: BlockGenerator = simple_solution_generator(spend_bundle)?;
     let npcresult = get_name_puzzle_conditions(
         program, max_cost, true, constants, height
     )?;
     let (pks, msgs) = pkm_pairs(npcresult.conds, additional_data)?;
 
     // Verify aggregated signature
-    if !cache.lock().unwrap().aggregate_verify(pks, msgs, &spend_bundle.aggregated_signature) {
-        Err(ValidationErr)
-    }
+    if !{
+            if syncing { // if we're syncing use the chia_bls::aggregate_verify to avoid using the cache
+                aggregate_verify(
+                    &agg_sig,
+                    pks.iter().map(|pk| (pk, &msg[..]))
+                )
+            } else {  // if we're fully synced then use the cache
+                cache.lock().unwrap().aggregate_verify(pks, msgs, &spend_bundle.aggregated_signature)
+            } 
+        } 
+        {
+            Err(ValidationErr)
+        }
     Ok((npcresult, start_time.elapsed()))
 }
 

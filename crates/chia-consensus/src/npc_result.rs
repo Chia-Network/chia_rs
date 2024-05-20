@@ -37,7 +37,7 @@ pub fn get_name_puzzle_conditions<GenBuf: AsRef<[u8]>>(
     mempool_mode: bool,
     height: u32,
     constants: ConsensusConstants,
-) -> Result<SpendBundleConditions, ValidationErr> {
+) -> Result<OwnedSpendBundleConditions, ValidationErr> {
     let run_block: fn(&mut Allocator,
         &[u8],
         &[GenBuf],
@@ -53,5 +53,6 @@ pub fn get_name_puzzle_conditions<GenBuf: AsRef<[u8]>>(
         block_args.push(gen.into_inner().as_slice());
     }
     let mut a2 = make_allocator(LIMIT_HEAP);
-    run_block(&mut a2, generator.program.into_inner().as_slice(), &block_args, max_cost, flags)
+    let sbc: SpendBundleConditions = run_block(&mut a2, generator.program.into_inner().as_slice(), &block_args, max_cost, flags);
+    OwnedSpendBundleConditions.from(&mut a2, sbc)
 }
