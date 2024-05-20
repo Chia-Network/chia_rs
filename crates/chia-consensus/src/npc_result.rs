@@ -31,7 +31,7 @@ use chia_py_streamable_macro::{PyGetters, PyJsonDict, PyStreamable};
 //     conds: Option<OwnedSpendBundleConditions>,
 // }
 
-pub fn get_name_puzzle_conditions<GenBuf: AsRef<[u8]>(
+pub fn get_name_puzzle_conditions<GenBuf: AsRef<[u8]>>(
     generator: BlockGenerator,
     max_cost: u64,
     mempool_mode: bool,

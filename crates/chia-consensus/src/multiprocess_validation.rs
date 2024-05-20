@@ -36,7 +36,13 @@ fn batch_pre_validate_blocks() {
 
 // currently in mempool_manager.py
 // called in full_node.py when adding a transaction
-fn pre_validate_spendbundle(new_spend: SpendBundle, max_cost: u64, constants: ConsensusConstants, peak_height: u32, cache: Arc<Mutex<BLSCache>>) -> Result<NPCResult, Err> {
+fn pre_validate_spendbundle(
+    new_spend: SpendBundle, 
+    max_cost: u64, 
+    constants: ConsensusConstants, 
+    peak_height: u32, 
+    cache: Arc<Mutex<BLSCache>>
+) -> Result<OwnedSpendBundleConditions, Err> {
     if new_spend.coin_spends.is_empty() {
         Err(())
     } else {
@@ -67,6 +73,21 @@ fn validate_clvm_and_signature(
         Err(ValidationErr)
     }
     Ok((npcresult, start_time.elapsed()))
+}
+
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+mod py_funcs {
+    #[pyo3(name = "pre_validate_spendbundle")]
+    pub fn py_pre_validate_spendbundle(
+        new_spend: SpendBundle, 
+        max_cost: u64, 
+        constants: ConsensusConstants, 
+        peak_height: u32, 
+        cache: Arc<Mutex<BLSCache>>
+    ) {
+
+    }
 }
 
 pub fn simple_solution_generator(bundle: SpendBundle) -> Result<BlockGenerator, Err> {
