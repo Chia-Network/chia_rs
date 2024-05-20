@@ -199,7 +199,7 @@ mod derive_tests {
     fn test_hidden_values() {
         #[derive(ToClvm, FromClvm)]
         #[hide_values]
-        #[derive(Debug, PartialEq, Eq)]
+        #[derive(Debug, PartialEq)]
         #[clvm(list)]
         struct RunTailCondition<P, S> {
             #[clvm(hidden_value = 51)]
@@ -223,7 +223,7 @@ mod derive_tests {
 
     #[test]
     fn test_enum() {
-        #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
+        #[derive(Debug, ToClvm, FromClvm, PartialEq)]
         #[clvm(list)]
         enum Enum {
             A(i32),
@@ -238,7 +238,7 @@ mod derive_tests {
 
     #[test]
     fn test_explicit_discriminant() {
-        #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
+        #[derive(Debug, ToClvm, FromClvm, PartialEq)]
         #[clvm(list)]
         #[repr(u8)]
         enum Enum {
@@ -254,7 +254,7 @@ mod derive_tests {
 
     #[test]
     fn test_untagged_enum() {
-        #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
+        #[derive(Debug, ToClvm, FromClvm, PartialEq)]
         #[clvm(list, untagged)]
         enum Enum {
             A(i32),
@@ -280,7 +280,7 @@ mod derive_tests {
 
     #[test]
     fn test_untagged_enum_parsing_order() {
-        #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
+        #[derive(Debug, ToClvm, FromClvm, PartialEq)]
         #[clvm(list, untagged)]
         enum Enum {
             // This variant is parsed first, so `B` will never be deserialized.

@@ -296,6 +296,45 @@ let ptr = value.to_clvm(a).unwrap();
 assert_eq!(Either::from_clvm(a, ptr).unwrap(), value);
 ```
 
+## Hidden Values
+
+Sometimes you may want to include constants inside of a struct without actually exposing them as fields.
+It's possible to do this with `#[clvm(hidden_value)]`, however you must use an attribute macro to remove the hidden fields.
+
+This has to be done in the proper order, or it will not work.
+
+The order is as follows:
+
+- Derive `ToClvm` and `FromClvm`, so that the hidden fields are serialized and deserialized properly.
+- Use `#[hide_values]` to remove them from the struct or enum.
+- Add any other derives you want after, so they don't see the hidden fields.
+- Write any `#[clvm(...)]` options you want to use.
+
+Here is an example of this:
+
+```rust
+use clvmr::Allocator;
+use clvm_traits::{hide_values, ToClvm, FromClvm};
+
+#[derive(ToClvm, FromClvm)]
+#[hide_values]
+#[derive(Debug, PartialEq, Eq)]
+#[clvm(list)]
+struct CustomTerminator {
+    value: u32,
+    #[clvm(hidden_value = 42, rest)]
+    terminator: u8,
+}
+
+let value = CustomTerminator {
+    value: 100,
+};
+
+let a = &mut Allocator::new();
+let ptr = value.to_clvm(a).unwrap();
+assert_eq!(CustomTerminator::from_clvm(a, ptr).unwrap(), value);
+```
+
 ## Crate Name
 
 You can override the name of the `clvm_traits` crate used within the macros:
