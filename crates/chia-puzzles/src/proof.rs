@@ -3,10 +3,10 @@ use clvm_traits::{FromClvm, ToClvm};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[clvm(untagged, tuple)]
+#[clvm(untagged, list)]
 pub enum Proof {
-    Lineage(LineageProof),
-    Eve(EveProof),
+    Lineage(#[clvm(rest)] LineageProof),
+    Eve(#[clvm(rest)] EveProof),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]

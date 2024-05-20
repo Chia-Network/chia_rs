@@ -12,6 +12,23 @@ pub trait ClvmEncoder {
         rest: Self::Node,
     ) -> Result<Self::Node, ToClvmError>;
 
+    fn encode_curried_arg(
+        &mut self,
+        first: Self::Node,
+        rest: Self::Node,
+    ) -> Result<Self::Node, ToClvmError> {
+        let q = self.encode_atom(&[1])?;
+        let c = self.encode_atom(&[4])?;
+
+        let quoted = self.encode_pair(q, first)?;
+        let nil = self.encode_atom(&[])?;
+
+        let op_rest = self.encode_pair(rest, nil)?;
+        let op_args = self.encode_pair(quoted, op_rest)?;
+
+        self.encode_pair(c, op_args)
+    }
+
     /// This is a helper function that just calls `clone` on the node.
     /// It's required only because the compiler can't infer that `N` is `Clone`,
     /// since there's no `Clone` bound on the `ToClvm` trait.
@@ -24,7 +41,13 @@ impl ClvmEncoder for Allocator {
     type Node = NodePtr;
 
     fn encode_atom(&mut self, bytes: &[u8]) -> Result<Self::Node, ToClvmError> {
-        self.new_atom(bytes).or(Err(ToClvmError::OutOfMemory))
+        Ok(if bytes.is_empty() {
+            self.nil()
+        } else if bytes == [1] {
+            self.one()
+        } else {
+            self.new_atom(bytes).or(Err(ToClvmError::OutOfMemory))?
+        })
     }
 
     fn encode_pair(

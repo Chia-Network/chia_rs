@@ -65,9 +65,10 @@ mod derive_tests {
     #[test]
     fn test_tuple() {
         #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
-        #[clvm(tuple)]
+        #[clvm(list)]
         struct TupleStruct {
             a: u64,
+            #[clvm(rest)]
             b: i32,
         }
 
@@ -104,8 +105,8 @@ mod derive_tests {
     #[test]
     fn test_unnamed() {
         #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
-        #[clvm(tuple)]
-        struct UnnamedStruct(String, String);
+        #[clvm(list)]
+        struct UnnamedStruct(String, #[clvm(rest)] String);
 
         check(UnnamedStruct("A".to_string(), "B".to_string()), "ff4142");
     }
@@ -113,19 +114,40 @@ mod derive_tests {
     #[test]
     fn test_newtype() {
         #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
-        #[clvm(tuple)]
-        struct NewTypeStruct(String);
+        #[clvm(list)]
+        struct NewTypeStruct(#[clvm(rest)] String);
 
         check(NewTypeStruct("XYZ".to_string()), "8358595a");
     }
 
     #[test]
+    fn test_literals() {
+        #[derive(ToClvm, FromClvm)]
+        #[hide_values]
+        #[derive(Debug, PartialEq, Eq)]
+        #[clvm(list)]
+        struct RunTailCondition<P, S> {
+            #[clvm(hidden_value = 51)]
+            opcode: u8,
+            #[clvm(hidden_value = ())]
+            blank_puzzle_hash: (),
+            #[clvm(hidden_value = -113)]
+            magic_amount: i8,
+            puzzle: P,
+            solution: S,
+        }
+    }
+
+    #[test]
     fn test_enum() {
         #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
-        #[clvm(tuple)]
+        #[clvm(list)]
         enum Enum {
-            A(i32),
-            B { x: i32 },
+            A(#[clvm(rest)] i32),
+            B {
+                #[clvm(rest)]
+                x: i32,
+            },
             C,
         }
 
@@ -137,11 +159,14 @@ mod derive_tests {
     #[test]
     fn test_explicit_enum() {
         #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
-        #[clvm(tuple)]
+        #[clvm(list)]
         #[repr(u8)]
         enum Enum {
-            A(i32) = 42,
-            B { x: i32 } = 34,
+            A(#[clvm(rest)] i32) = 42,
+            B {
+                #[clvm(rest)]
+                x: i32,
+            } = 34,
             C = 11,
         }
 
@@ -153,11 +178,10 @@ mod derive_tests {
     #[test]
     fn test_untagged_enum() {
         #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
-        #[clvm(tuple, untagged)]
+        #[clvm(list, untagged)]
         enum Enum {
-            A(i32),
+            A(#[clvm(rest)] i32),
 
-            #[clvm(list)]
             B {
                 x: i32,
                 y: i32,
@@ -182,14 +206,14 @@ mod derive_tests {
     #[test]
     fn test_untagged_enum_parsing_order() {
         #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
-        #[clvm(tuple, untagged)]
+        #[clvm(list, untagged)]
         enum Enum {
             // This variant is parsed first, so `B` will never be deserialized.
-            A(i32),
+            A(#[clvm(rest)] i32),
             // When `B` is serialized, it will round trip as `A` instead.
-            B(i32),
+            B(#[clvm(rest)] i32),
             // `C` will be deserialized as a fallback when the bytes don't deserialize to a valid `i32`.
-            C(String),
+            C(#[clvm(rest)] String),
         }
 
         // This round trips to the same value, since `A` is parsed first.
