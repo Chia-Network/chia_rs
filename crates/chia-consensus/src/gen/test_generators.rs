@@ -31,10 +31,7 @@ fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
     }
     let mut agg_sigs = Vec::<(Bytes48, Bytes)>::new();
     for (pk, msg) in &c.agg_sig_unsafe {
-        agg_sigs.push((
-            a.atom(*pk).as_ref().try_into().unwrap(),
-            a.atom(*msg).as_ref().into(),
-        ));
+        agg_sigs.push((pk.to_bytes().into(), a.atom(*msg).as_ref().into()));
     }
     agg_sigs.sort();
     for (pk, msg) in agg_sigs {
@@ -88,10 +85,7 @@ fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
 
         let mut agg_sigs = Vec::<(Bytes48, Bytes)>::new();
         for (pk, msg) in s.agg_sig_me {
-            agg_sigs.push((
-                a.atom(pk).as_ref().try_into().unwrap(),
-                a.atom(msg).as_ref().into(),
-            ));
+            agg_sigs.push((pk.to_bytes().into(), a.atom(msg).as_ref().into()));
         }
         agg_sigs.sort();
         for (pk, msg) in agg_sigs {
@@ -149,6 +143,7 @@ fn print_diff(output: &str, expected: &str) {
 }
 
 #[rstest]
+#[case("infinity-g1")]
 #[case("block-1ee588dc")]
 #[case("block-6fe59b24")]
 #[case("block-b45268ac")]

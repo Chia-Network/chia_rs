@@ -17,12 +17,13 @@ use super::opcodes::{
 use super::sanitize_int::{sanitize_uint, SanitizedUint};
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
 use crate::gen::flags::{
-    AGG_SIG_ARGS, COND_ARGS_NIL, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL, NO_UNKNOWN_CONDS,
-    STRICT_ARGS_COUNT,
+    AGG_SIG_ARGS, COND_ARGS_NIL, DISALLOW_INFINITY_G1, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
+    NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
 };
 use crate::gen::messages::{Message, SpendId};
 use crate::gen::spend_visitor::SpendVisitor;
 use crate::gen::validation_error::check_nil;
+use chia_bls::PublicKey;
 use chia_protocol::Bytes32;
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use clvmr::cost::Cost;
@@ -667,13 +668,13 @@ pub struct Spend {
     pub create_coin: HashSet<NewCoin>,
     // Agg Sig Me conditions
     // Maybe this should be an array of vectors
-    pub agg_sig_me: Vec<(NodePtr, NodePtr)>,
-    pub agg_sig_parent: Vec<(NodePtr, NodePtr)>,
-    pub agg_sig_puzzle: Vec<(NodePtr, NodePtr)>,
-    pub agg_sig_amount: Vec<(NodePtr, NodePtr)>,
-    pub agg_sig_puzzle_amount: Vec<(NodePtr, NodePtr)>,
-    pub agg_sig_parent_amount: Vec<(NodePtr, NodePtr)>,
-    pub agg_sig_parent_puzzle: Vec<(NodePtr, NodePtr)>,
+    pub agg_sig_me: Vec<(PublicKey, NodePtr)>,
+    pub agg_sig_parent: Vec<(PublicKey, NodePtr)>,
+    pub agg_sig_puzzle: Vec<(PublicKey, NodePtr)>,
+    pub agg_sig_amount: Vec<(PublicKey, NodePtr)>,
+    pub agg_sig_puzzle_amount: Vec<(PublicKey, NodePtr)>,
+    pub agg_sig_parent_amount: Vec<(PublicKey, NodePtr)>,
+    pub agg_sig_parent_puzzle: Vec<(PublicKey, NodePtr)>,
     // Flags describing properties of this spend. See flags above
     pub flags: u32,
 }
@@ -727,7 +728,7 @@ pub struct SpendBundleConditions {
     pub height_absolute: u32,
     pub seconds_absolute: u64,
     // Unsafe Agg Sig conditions (i.e. not tied to the spend generating it)
-    pub agg_sig_unsafe: Vec<(NodePtr, NodePtr)>,
+    pub agg_sig_unsafe: Vec<(PublicKey, NodePtr)>,
     // when set, this is the lowest (i.e. most restrictive) of all
     // ASSERT_BEFORE_HEIGHT_ABSOLUTE conditions
     pub before_height_absolute: Option<u32>,
@@ -887,6 +888,20 @@ fn decrement(cnt: &mut u32, n: NodePtr) -> Result<(), ValidationErr> {
     } else {
         *cnt -= 1;
         Ok(())
+    }
+}
+
+fn to_key(a: &Allocator, pk: NodePtr, flags: u32) -> Result<Option<PublicKey>, ValidationErr> {
+    let key = PublicKey::from_bytes(a.atom(pk).as_ref().try_into().expect("internal error"))
+        .map_err(|_| ValidationErr(pk, ErrorCode::InvalidPublicKey))?;
+    if key.is_inf() {
+        if (flags & DISALLOW_INFINITY_G1) != 0 {
+            Err(ValidationErr(pk, ErrorCode::InvalidPublicKey))
+        } else {
+            Ok(None)
+        }
+    } else {
+        Ok(Some(key))
     }
 }
 
@@ -1132,28 +1147,44 @@ pub fn parse_conditions<V: SpendVisitor>(
                 state.assert_concurrent_puzzle.insert(id);
             }
             Condition::AggSigMe(pk, msg) => {
-                spend.agg_sig_me.push((pk, msg));
+                if let Some(pk) = to_key(a, pk, flags)? {
+                    spend.agg_sig_me.push((pk, msg));
+                }
             }
             Condition::AggSigParent(pk, msg) => {
-                spend.agg_sig_parent.push((pk, msg));
+                if let Some(pk) = to_key(a, pk, flags)? {
+                    spend.agg_sig_parent.push((pk, msg));
+                }
             }
             Condition::AggSigPuzzle(pk, msg) => {
-                spend.agg_sig_puzzle.push((pk, msg));
+                if let Some(pk) = to_key(a, pk, flags)? {
+                    spend.agg_sig_puzzle.push((pk, msg));
+                }
             }
             Condition::AggSigAmount(pk, msg) => {
-                spend.agg_sig_amount.push((pk, msg));
+                if let Some(pk) = to_key(a, pk, flags)? {
+                    spend.agg_sig_amount.push((pk, msg));
+                }
             }
             Condition::AggSigPuzzleAmount(pk, msg) => {
-                spend.agg_sig_puzzle_amount.push((pk, msg));
+                if let Some(pk) = to_key(a, pk, flags)? {
+                    spend.agg_sig_puzzle_amount.push((pk, msg));
+                }
             }
             Condition::AggSigParentAmount(pk, msg) => {
-                spend.agg_sig_parent_amount.push((pk, msg));
+                if let Some(pk) = to_key(a, pk, flags)? {
+                    spend.agg_sig_parent_amount.push((pk, msg));
+                }
             }
             Condition::AggSigParentPuzzle(pk, msg) => {
-                spend.agg_sig_parent_puzzle.push((pk, msg));
+                if let Some(pk) = to_key(a, pk, flags)? {
+                    spend.agg_sig_parent_puzzle.push((pk, msg));
+                }
             }
             Condition::AggSigUnsafe(pk, msg) => {
-                ret.agg_sig_unsafe.push((pk, msg));
+                if let Some(pk) = to_key(a, pk, flags)? {
+                    ret.agg_sig_unsafe.push((pk, msg));
+                }
             }
             Condition::Softfork(cost) => {
                 if *max_cost < cost {
@@ -1463,6 +1494,8 @@ use clvmr::serde::node_to_bytes;
 #[cfg(test)]
 use hex::FromHex;
 #[cfg(test)]
+use hex_literal::hex;
+#[cfg(test)]
 use num_traits::Num;
 #[cfg(test)]
 use rstest::rstest;
@@ -1483,10 +1516,7 @@ const LONG_VEC: &[u8; 33] = &[
 ];
 
 #[cfg(test)]
-const PUBKEY: &[u8; 48] = &[
-    6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
-    6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
-];
+const PUBKEY: &[u8; 48] = &hex!("97f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb");
 #[cfg(test)]
 const MSG1: &[u8; 13] = &[3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
 #[cfg(test)]
@@ -2988,7 +3018,7 @@ fn test_duplicate_create_coin_with_hint() {
 }
 
 #[cfg(test)]
-fn agg_sig_vec(c: ConditionOpcode, s: &Spend) -> &[(NodePtr, NodePtr)] {
+fn agg_sig_vec(c: ConditionOpcode, s: &Spend) -> &[(PublicKey, NodePtr)] {
     match c {
         AGG_SIG_ME => &s.agg_sig_me,
         AGG_SIG_PARENT => &s.agg_sig_parent,
@@ -3036,7 +3066,7 @@ fn test_single_agg_sig_me(
     let agg_sigs = agg_sig_vec(condition, spend);
     assert_eq!(agg_sigs.len(), 1);
     for c in agg_sigs {
-        assert_eq!(a.atom(c.0).as_ref(), PUBKEY);
+        assert_eq!(c.0, PublicKey::from_bytes(PUBKEY).unwrap());
         assert_eq!(a.atom(c.1).as_ref(), MSG1);
     }
     assert_eq!(spend.flags, 0);
@@ -3073,7 +3103,7 @@ fn test_duplicate_agg_sig(
     let agg_sigs = agg_sig_vec(condition, spend);
     assert_eq!(agg_sigs.len(), 2);
     for c in agg_sigs {
-        assert_eq!(a.atom(c.0).as_ref(), PUBKEY);
+        assert_eq!(c.0, PublicKey::from_bytes(PUBKEY).unwrap());
         assert_eq!(a.atom(c.1).as_ref(), MSG1);
     }
     assert_eq!(spend.flags, 0);
@@ -3088,6 +3118,7 @@ fn test_duplicate_agg_sig(
 #[case(AGG_SIG_PUZZLE_AMOUNT)]
 #[case(AGG_SIG_PARENT_PUZZLE)]
 #[case(AGG_SIG_PARENT_AMOUNT)]
+#[case(AGG_SIG_UNSAFE)]
 fn test_agg_sig_invalid_pubkey(
     #[case] condition: ConditionOpcode,
     #[values(MEMPOOL_MODE, 0)] mempool: u32,
@@ -3104,6 +3135,45 @@ fn test_agg_sig_invalid_pubkey(
         .1,
         ErrorCode::InvalidPublicKey
     );
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(AGG_SIG_ME)]
+#[case(AGG_SIG_PARENT)]
+#[case(AGG_SIG_PUZZLE)]
+#[case(AGG_SIG_AMOUNT)]
+#[case(AGG_SIG_PUZZLE_AMOUNT)]
+#[case(AGG_SIG_PARENT_PUZZLE)]
+#[case(AGG_SIG_PARENT_AMOUNT)]
+#[case(AGG_SIG_UNSAFE)]
+fn test_agg_sig_infinity_pubkey(
+    #[case] condition: ConditionOpcode,
+    #[values(DISALLOW_INFINITY_G1, 0)] mempool: u32,
+) {
+    let ret = cond_test_flag(
+        &format!(
+            "((({{h1}} ({{h2}} (123 ((({} (0xc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 ({{msg1}} )))))",
+            condition as u8
+            ),
+            ENABLE_SOFTFORK_CONDITION | mempool
+    );
+
+    if mempool != 0 {
+        assert_eq!(ret.unwrap_err().1, ErrorCode::InvalidPublicKey);
+    } else {
+        let ret = ret.expect("expected conditions to be valid").1;
+        assert!(ret.agg_sig_unsafe.is_empty());
+        for c in ret.spends {
+            assert!(c.agg_sig_me.is_empty());
+            assert!(c.agg_sig_parent.is_empty());
+            assert!(c.agg_sig_puzzle.is_empty());
+            assert!(c.agg_sig_amount.is_empty());
+            assert!(c.agg_sig_puzzle_amount.is_empty());
+            assert!(c.agg_sig_parent_amount.is_empty());
+            assert!(c.agg_sig_parent_puzzle.is_empty());
+        }
+    }
 }
 
 #[cfg(test)]
@@ -3188,7 +3258,7 @@ fn test_single_agg_sig_unsafe() {
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(conds.agg_sig_unsafe.len(), 1);
     for (pk, msg) in &conds.agg_sig_unsafe {
-        assert_eq!(a.atom(*pk).as_ref(), PUBKEY);
+        assert_eq!(*pk, PublicKey::from_bytes(PUBKEY).unwrap());
         assert_eq!(a.atom(*msg).as_ref(), MSG1);
     }
     assert_eq!(spend.flags, 0);
@@ -3281,7 +3351,7 @@ fn test_agg_sig_unsafe_extra_arg_allowed() {
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(conds.agg_sig_unsafe.len(), 1);
     for (pk, msg) in &conds.agg_sig_unsafe {
-        assert_eq!(a.atom(*pk).as_ref(), PUBKEY);
+        assert_eq!(*pk, PublicKey::from_bytes(PUBKEY).unwrap());
         assert_eq!(a.atom(*msg).as_ref(), MSG1);
     }
     assert_eq!(spend.flags, 0);
@@ -3306,7 +3376,7 @@ fn test_agg_sig_me_extra_arg_allowed() {
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.agg_sig_me.len(), 1);
     for c in &spend.agg_sig_me {
-        assert_eq!(a.atom(c.0).as_ref(), PUBKEY);
+        assert_eq!(c.0, PublicKey::from_bytes(PUBKEY).unwrap());
         assert_eq!(a.atom(c.1).as_ref(), MSG1);
     }
     assert_eq!(spend.flags, 0);
@@ -3328,7 +3398,7 @@ fn test_agg_sig_unsafe_invalid_terminator() {
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(conds.agg_sig_unsafe.len(), 1);
     for (pk, msg) in &conds.agg_sig_unsafe {
-        assert_eq!(a.atom(*pk).as_ref(), PUBKEY);
+        assert_eq!(*pk, PublicKey::from_bytes(PUBKEY).unwrap());
         assert_eq!(a.atom(*msg).as_ref(), MSG1);
     }
     assert_eq!(spend.flags, 0);
@@ -3365,7 +3435,7 @@ fn test_agg_sig_me_invalid_terminator() {
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.agg_sig_me.len(), 1);
     for (pk, msg) in &conds.agg_sig_unsafe {
-        assert_eq!(a.atom(*pk).as_ref(), PUBKEY);
+        assert_eq!(*pk, PublicKey::from_bytes(PUBKEY).unwrap());
         assert_eq!(a.atom(*msg).as_ref(), MSG1);
     }
     assert_eq!(spend.flags, 0);
@@ -3404,7 +3474,7 @@ fn test_duplicate_agg_sig_unsafe() {
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(conds.agg_sig_unsafe.len(), 2);
     for (pk, msg) in &conds.agg_sig_unsafe {
-        assert_eq!(a.atom(*pk).as_ref(), PUBKEY);
+        assert_eq!(*pk, PublicKey::from_bytes(PUBKEY).unwrap());
         assert_eq!(a.atom(*msg).as_ref(), MSG1);
     }
     assert_eq!(spend.flags, 0);
