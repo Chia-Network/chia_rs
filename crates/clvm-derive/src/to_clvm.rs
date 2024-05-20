@@ -56,6 +56,7 @@ fn encode_fields(
         Repr::Curry => quote!(encoder.encode_atom(&[1])?),
     };
 
+    // We're going to build the return value in reverse order, so we need to start with the terminator.
     body.extend(quote! {
         let mut node = #initial_value;
     });
@@ -66,15 +67,18 @@ fn encode_fields(
 
         let mut if_body = TokenStream::new();
 
+        // Encode the field value.
         if_body.extend(quote! {
             let value_node = <#ty as #crate_name::ToClvm<#node_name>>::to_clvm(&#value_name, encoder)?;
         });
 
         if field.rest {
+            // This field represents the rest of the arguments, so we can replace the terminator with it.
             if_body.extend(quote! {
                 node = value_node;
             });
         } else {
+            // Prepend the field value to the existing node with a new pair.
             if_body.extend(quote! {
                 node = encoder.#encode_next(value_node, node)?;
             });
@@ -82,12 +86,14 @@ fn encode_fields(
 
         if let Some(default) = &field.optional_with_default {
             if let Some(default) = default {
+                // If the field is equal to the default value, don't encode it.
                 body.extend(quote! {
                     if #value_name != #default {
                         #if_body
                     }
                 });
             } else {
+                // If the field is `None` and optional, don't encode it.
                 body.extend(quote! {
                     if let Some(#value_name) = #value_name {
                         #if_body
@@ -95,6 +101,7 @@ fn encode_fields(
                 });
             }
         } else {
+            // Encode the field unconditionally if it's not optional.
             body.extend(if_body);
         }
     }
@@ -108,10 +115,12 @@ fn impl_for_struct(ast: DeriveInput, struct_info: StructInfo, node_name: Ident) 
     let mut body = TokenStream::new();
 
     for (i, field) in struct_info.fields.iter().enumerate() {
+        // We can't encode fields that are hidden, since they aren't on the actual struct.
         if field.hidden_with_value.is_some() {
             continue;
         }
 
+        // Rename the field so it doesn't clash with anything else in scope such as `node`.
         let value_name = Ident::new(&format!("field_{}", i), Span::mixed_site());
 
         match struct_info.kind {
@@ -181,6 +190,7 @@ fn impl_for_enum(ast: DeriveInput, enum_info: EnumInfo, node_name: Ident) -> Tok
 
         for variant in enum_info.variants.iter() {
             let repr = variant.repr.unwrap_or(enum_info.default_repr);
+
             variant_bodies.push(encode_fields(
                 &crate_name,
                 &node_name,
@@ -189,6 +199,7 @@ fn impl_for_enum(ast: DeriveInput, enum_info: EnumInfo, node_name: Ident) -> Tok
             ));
         }
 
+        // Encode the variant's fields directly.
         quote! {
             match self {
                 #( #variant_destructures => {
@@ -206,6 +217,7 @@ fn impl_for_enum(ast: DeriveInput, enum_info: EnumInfo, node_name: Ident) -> Tok
         } = variant_discriminants(&enum_info);
 
         if enum_info.default_repr == Repr::Atom {
+            // Encode the discriminant by itself as an atom.
             quote! {
                 #( #discriminant_consts )*
 
@@ -239,6 +251,7 @@ fn impl_for_enum(ast: DeriveInput, enum_info: EnumInfo, node_name: Ident) -> Tok
                 ));
             }
 
+            // Encode the discriminant followed by the variant's fields.
             quote! {
                 #( #discriminant_consts )*
 
