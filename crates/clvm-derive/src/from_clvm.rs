@@ -70,7 +70,7 @@ fn field_parser_fn_body(
                 let (#ident, optional_node) = optional_node.and_then(|node| decoder.#decode_next(&node).ok())
                     .map(|(a, b)| (Some(a), Some(b))).unwrap_or((None, None));
 
-                if let Some(new_node) = optional_node {
+                if let Some(new_node) = optional_node.as_ref().map(|node| decoder.clone_node(node)) {
                     node = new_node;
                 }
             });

@@ -63,65 +63,178 @@ mod derive_tests {
     }
 
     #[test]
-    fn test_tuple() {
-        #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
+    fn test_list_struct() {
+        #[derive(Debug, ToClvm, FromClvm, PartialEq)]
         #[clvm(list)]
-        struct TupleStruct {
+        struct Struct {
+            a: u64,
+            b: i32,
+        }
+
+        // Includes the nil terminator.
+        check(Struct { a: 52, b: -32 }, "ff34ff81e080");
+    }
+
+    #[test]
+    fn test_list_struct_with_rest() {
+        #[derive(Debug, ToClvm, FromClvm, PartialEq)]
+        #[clvm(list)]
+        struct Struct {
             a: u64,
             #[clvm(rest)]
             b: i32,
         }
 
-        check(TupleStruct { a: 52, b: -32 }, "ff3481e0");
+        // Does not include the nil terminator.
+        check(Struct { a: 52, b: -32 }, "ff3481e0");
     }
 
     #[test]
-    fn test_list() {
-        #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
-        #[clvm(list)]
-        struct ListStruct {
-            a: u64,
-            b: i32,
-        }
-
-        check(ListStruct { a: 52, b: -32 }, "ff34ff81e080");
-    }
-
-    #[test]
-    fn test_curry() {
-        #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
+    fn test_curry_struct() {
+        #[derive(Debug, ToClvm, FromClvm, PartialEq)]
         #[clvm(curry)]
-        struct CurryStruct {
+        struct Struct {
             a: u64,
             b: i32,
         }
 
         check(
-            CurryStruct { a: 52, b: -32 },
+            Struct { a: 52, b: -32 },
             "ff04ffff0134ffff04ffff0181e0ff018080",
         );
     }
 
     #[test]
-    fn test_unnamed() {
-        #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
-        #[clvm(list)]
-        struct UnnamedStruct(String, #[clvm(rest)] String);
+    fn test_curry_struct_with_rest() {
+        #[derive(Debug, ToClvm, FromClvm, PartialEq)]
+        #[clvm(curry)]
+        struct Struct {
+            a: u64,
+            #[clvm(rest)]
+            b: i32,
+        }
 
-        check(UnnamedStruct("A".to_string(), "B".to_string()), "ff4142");
+        check(Struct { a: 52, b: -32 }, "ff04ffff0134ff81e080");
     }
 
     #[test]
-    fn test_newtype() {
-        #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
+    fn test_tuple_struct() {
+        #[derive(Debug, ToClvm, FromClvm, PartialEq)]
         #[clvm(list)]
-        struct NewTypeStruct(#[clvm(rest)] String);
+        struct Struct(String, String);
 
-        check(NewTypeStruct("XYZ".to_string()), "8358595a");
+        check(Struct("A".to_string(), "B".to_string()), "ff41ff4280");
     }
 
     #[test]
-    fn test_literals() {
+    fn test_newtype_struct() {
+        #[derive(Debug, ToClvm, FromClvm, PartialEq)]
+        #[clvm(list)]
+        struct Struct(#[clvm(rest)] String);
+
+        check(Struct("XYZ".to_string()), "8358595a");
+    }
+
+    #[test]
+    fn test_optional() {
+        #[derive(Debug, ToClvm, FromClvm, PartialEq)]
+        #[clvm(list)]
+        struct Struct {
+            a: u64,
+            #[clvm(optional)]
+            b: Option<i32>,
+        }
+
+        check(
+            Struct {
+                a: 52,
+                b: Some(-32),
+            },
+            "ff34ff81e080",
+        );
+        check(Struct { a: 52, b: None }, "ff3480");
+    }
+
+    #[test]
+    fn test_default() {
+        #[derive(Debug, ToClvm, FromClvm, PartialEq)]
+        #[clvm(list)]
+        struct Struct {
+            a: u64,
+            #[clvm(default = 42)]
+            b: i32,
+        }
+
+        check(Struct { a: 52, b: 32 }, "ff34ff2080");
+        check(Struct { a: 52, b: 42 }, "ff3480");
+    }
+
+    #[test]
+    fn test_default_owned() {
+        #[derive(Debug, ToClvm, FromClvm, PartialEq)]
+        #[clvm(list)]
+        struct Struct {
+            a: u64,
+            #[clvm(default = "Hello".to_string())]
+            b: String,
+        }
+
+        check(
+            Struct {
+                a: 52,
+                b: "World".to_string(),
+            },
+            "ff34ff85576f726c6480",
+        );
+        check(
+            Struct {
+                a: 52,
+                b: "Hello".to_string(),
+            },
+            "ff3480",
+        );
+    }
+
+    #[test]
+    fn test_multiple_optional() {
+        #[derive(Debug, ToClvm, FromClvm, PartialEq)]
+        #[clvm(list)]
+        struct Struct {
+            a: u64,
+            #[clvm(optional)]
+            b: Option<i32>,
+            #[clvm(optional)]
+            c: Option<i32>,
+        }
+
+        check(
+            Struct {
+                a: 52,
+                b: Some(-32),
+                c: Some(42),
+            },
+            "ff34ff81e0ff2a80",
+        );
+        check(
+            Struct {
+                a: 52,
+                b: Some(42),
+                c: None,
+            },
+            "ff34ff2a80",
+        );
+        check(
+            Struct {
+                a: 52,
+                b: None,
+                c: None,
+            },
+            "ff3480",
+        );
+    }
+
+    #[test]
+    fn test_hidden_values() {
         #[derive(ToClvm, FromClvm)]
         #[hide_values]
         #[derive(Debug, PartialEq, Eq)]
@@ -136,6 +249,14 @@ mod derive_tests {
             puzzle: P,
             solution: S,
         }
+
+        check(
+            RunTailCondition {
+                puzzle: "puzzle".to_string(),
+                solution: "solution".to_string(),
+            },
+            "ff33ff80ff818fff8670757a7a6c65ff88736f6c7574696f6e80",
+        );
     }
 
     #[test]
@@ -143,35 +264,29 @@ mod derive_tests {
         #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
         #[clvm(list)]
         enum Enum {
-            A(#[clvm(rest)] i32),
-            B {
-                #[clvm(rest)]
-                x: i32,
-            },
+            A(i32),
+            B { x: i32 },
             C,
         }
 
-        check(Enum::A(32), "ff8020");
-        check(Enum::B { x: -72 }, "ff0181b8");
+        check(Enum::A(32), "ff80ff2080");
+        check(Enum::B { x: -72 }, "ff01ff81b880");
         check(Enum::C, "ff0280");
     }
 
     #[test]
-    fn test_explicit_enum() {
+    fn test_explicit_discriminant() {
         #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
         #[clvm(list)]
         #[repr(u8)]
         enum Enum {
-            A(#[clvm(rest)] i32) = 42,
-            B {
-                #[clvm(rest)]
-                x: i32,
-            } = 34,
+            A(i32) = 42,
+            B { x: i32 } = 34,
             C = 11,
         }
 
-        check(Enum::A(32), "ff2a20");
-        check(Enum::B { x: -72 }, "ff2281b8");
+        check(Enum::A(32), "ff2aff2080");
+        check(Enum::B { x: -72 }, "ff22ff81b880");
         check(Enum::C, "ff0b80");
     }
 
@@ -180,20 +295,18 @@ mod derive_tests {
         #[derive(Debug, ToClvm, FromClvm, PartialEq, Eq)]
         #[clvm(list, untagged)]
         enum Enum {
-            A(#[clvm(rest)] i32),
-
+            A(i32),
             B {
                 x: i32,
                 y: i32,
             },
-
             #[clvm(curry)]
             C {
                 curried_value: String,
             },
         }
 
-        check(Enum::A(32), "20");
+        check(Enum::A(32), "ff2080");
         check(Enum::B { x: -72, y: 94 }, "ff81b8ff5e80");
         check(
             Enum::C {
@@ -209,11 +322,11 @@ mod derive_tests {
         #[clvm(list, untagged)]
         enum Enum {
             // This variant is parsed first, so `B` will never be deserialized.
-            A(#[clvm(rest)] i32),
+            A(i32),
             // When `B` is serialized, it will round trip as `A` instead.
-            B(#[clvm(rest)] i32),
+            B(i32),
             // `C` will be deserialized as a fallback when the bytes don't deserialize to a valid `i32`.
-            C(#[clvm(rest)] String),
+            C(String),
         }
 
         // This round trips to the same value, since `A` is parsed first.
@@ -235,5 +348,18 @@ mod derive_tests {
             coerce_into::<Enum, Enum>(Enum::C("Hello, world!".into())),
             Enum::C("Hello, world!".into())
         );
+    }
+
+    #[test]
+    fn test_custom_crate_name() {
+        use clvm_traits as clvm_traits2;
+        #[derive(Debug, ToClvm, FromClvm, PartialEq)]
+        #[clvm(list, crate_name = clvm_traits2)]
+        struct Struct {
+            a: u64,
+            b: i32,
+        }
+
+        check(Struct { a: 52, b: -32 }, "ff34ff81e080");
     }
 }

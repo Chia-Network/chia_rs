@@ -4,7 +4,7 @@ use syn::{parse_quote, DeriveInput, GenericParam, Ident, Index};
 
 use crate::{
     crate_name,
-    helpers::{add_trait_bounds, variant_discriminants, DiscriminantInfo},
+    helpers::{add_trait_bounds, option_type, variant_discriminants, DiscriminantInfo},
     parser::{parse, EnumInfo, FieldInfo, ParsedInfo, Repr, StructInfo, StructKind, VariantKind},
 };
 
@@ -63,7 +63,12 @@ fn encode_fields(
 
     for (i, field) in fields.iter().enumerate().rev() {
         let value_name = &value_names[i];
-        let ty = &field.ty;
+        let mut ty = &field.ty;
+
+        // If the field is optional, we need to unwrap the `Option<T>` type into just `T`.
+        if field.optional_with_default == Some(None) {
+            ty = option_type(ty).expect("expected `Option` type for `optional` field");
+        }
 
         let mut if_body = TokenStream::new();
 
@@ -88,7 +93,7 @@ fn encode_fields(
             if let Some(default) = default {
                 // If the field is equal to the default value, don't encode it.
                 body.extend(quote! {
-                    if #value_name != #default {
+                    if #value_name != &#default {
                         #if_body
                     }
                 });
