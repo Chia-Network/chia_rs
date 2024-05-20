@@ -303,3 +303,18 @@ impl chia_traits::ChiaToPython for RejectStateReason {
         Ok(pyo3::IntoPy::into_py(*self, py).bind(py).clone())
     }
 }
+
+#[streamable(message)]
+pub struct SubscribedMempoolItems {
+    transaction_ids: Vec<Bytes32>,
+}
+
+#[streamable(message)]
+pub struct MempoolItemAdded {
+    transaction_id: Bytes32,
+}
+
+#[streamable(message)]
+pub struct MempoolItemsRemoved {
+    transaction_ids: Vec<Bytes32>,
+}
