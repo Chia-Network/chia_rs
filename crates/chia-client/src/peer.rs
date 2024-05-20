@@ -20,6 +20,9 @@ type Requests = Arc<Mutex<HashMap<u16, oneshot::Sender<Message>>>>;
 pub enum PeerEvent {
     CoinStateUpdate(CoinStateUpdate),
     NewPeakWallet(NewPeakWallet),
+    SubscribedMempoolItems(SubscribedMempoolItems),
+    MempoolItemAdded(MempoolItemAdded),
+    MempoolItemsRemoved(MempoolItemsRemoved),
 }
 
 pub struct Peer {
@@ -64,18 +67,25 @@ impl Peer {
         &self,
         network_id: String,
         node_type: NodeType,
+        mempool_updates: bool,
     ) -> Result<(), Error<()>> {
+        let mut capabilities = vec![
+            (1, "1".to_string()),
+            (2, "1".to_string()),
+            (3, "1".to_string()),
+        ];
+
+        if mempool_updates {
+            capabilities.push((5, "1".to_string()));
+        }
+
         let body = Handshake {
             network_id,
             protocol_version: "0.0.34".to_string(),
             software_version: "0.0.0".to_string(),
             server_port: 0,
             node_type,
-            capabilities: vec![
-                (1, "1".to_string()),
-                (2, "1".to_string()),
-                (3, "1".to_string()),
-            ],
+            capabilities,
         };
         self.send(body).await
     }
@@ -350,7 +360,13 @@ impl Peer {
         }
 
         // TODO: Handle unexpected messages.
-        events!(CoinStateUpdate, NewPeakWallet);
+        events!(
+            CoinStateUpdate,
+            NewPeakWallet,
+            SubscribedMempoolItems,
+            MempoolItemAdded,
+            MempoolItemsRemoved
+        );
 
         Ok(())
     }

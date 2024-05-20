@@ -135,6 +135,11 @@ pub enum ProtocolMessageTypes {
     RequestCoinState = 101,
     RespondCoinState = 102,
     RejectCoinState = 103,
+
+    // Wallet protocol mempool updates
+    SubscribedMempoolItems = 104,
+    MempoolItemAdded = 105,
+    MempoolItemsRemoved = 106,
 }
 
 #[cfg(feature = "py-bindings")]
