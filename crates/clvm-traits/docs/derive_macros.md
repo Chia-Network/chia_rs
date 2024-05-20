@@ -12,52 +12,18 @@ Pick whichever representation fits your use-case the best.
 Note that the syntax `(A . B)` represents a cons-pair with two values, `A` and `B`.
 This is how non-atomic values are structured in CLVM.
 
-### Tuple
-
-This represents values in an unterminated series of nested cons-pairs.
-
-For example:
-
-- `()` is encoded as `()`, since it's not possible to create a cons-pair with no values.
-- `(A)` is encoded as `A`, since it's not possible to create a cons-pair with one value.
-- `(A, B)` is encoded as `(A . B)`, since it's already a valid cons-pair.
-- `(A, B, C)` is encoded as `(A . (B . C))`, since every cons-pair must contain two values.
-- `(A, B, C, D)` is encoded as `(A . (B . (C . D)))` for the same reason as above.
-
-```rust
-use clvmr::Allocator;
-use clvm_traits::{ToClvm, FromClvm};
-
-#[derive(Debug, PartialEq, Eq, ToClvm, FromClvm)]
-#[clvm(tuple)]
-struct Point {
-    x: i32,
-    y: i32,
-}
-
-let point = Point {
-    x: 5,
-    y: 2,
-};
-
-let a = &mut Allocator::new();
-let ptr = point.to_clvm(a).unwrap();
-assert_eq!(Point::from_clvm(a, ptr).unwrap(), point);
-```
-
 ### List
 
-This represents values in a null terminated series of nested cons-pairs, also known as a proper list.
+This represents values in a nil terminated series of nested cons-pairs, also known as a proper list.
 
-For example:
+For example, with the list `[A, B, C]`, we build the list in reverse:
 
-- `()` is encoded as `()`, since it's already a null value.
-- `(A)` is encoded as `(A, ())`, since it's null terminated.
-- `(A, B)` is encoded as `(A . (B . ()))`, nesting the cons-pairs just like tuples, except with a null terminator.
-- `(A, B, C)` is encoded as `(A . (B . (C . ())))` for the same reason.
+- Start with the nil terminator `()`
+- Create the first cons pair `(C . ())`
+- Then continue on with `(B . (C . ()))`
+- Finally, the list is represented as `(A . (B . (C . ())))`
 
-Note that the following code is for example purposes only and is not indicative of how to create a secure program.
-Using a password like shown in this example is an insecure method of locking coins, but it's effective for learning.
+Note that the following example of using a password for a Chia puzzle is insecure, but it's effective for demonstration.
 
 ```rust
 use clvmr::Allocator;
@@ -78,18 +44,43 @@ let ptr = solution.to_clvm(a).unwrap();
 assert_eq!(PasswordSolution::from_clvm(a, ptr).unwrap(), solution);
 ```
 
+### Unterminated List
+
+You can omit the nil terminator by using `#[clvm(rest)]`:
+
+```rust
+use clvmr::Allocator;
+use clvm_traits::{ToClvm, FromClvm};
+
+#[derive(Debug, PartialEq, Eq, ToClvm, FromClvm)]
+#[clvm(list)]
+struct Point {
+    x: i32,
+    #[clvm(rest)]
+    y: i32,
+}
+
+let point = Point {
+    x: 5,
+    y: 2,
+};
+
+let a = &mut Allocator::new();
+let ptr = point.to_clvm(a).unwrap();
+assert_eq!(Point::from_clvm(a, ptr).unwrap(), point);
+```
+
 ### Curry
 
-This represents the argument part of a curried CLVM program. Currying is a method of partially
-applying some of the arguments without immediately calling the function.
+This represents the argument part of a curried CLVM program. Currying is a way to partially
+apply some of the arguments without immediately calling the function.
 
-For example, `(A, B, C)` is encoded as `(c (q . A) (c (q . B) (c (q . C) 1)))`. Note that the
-arguments are quoted and terminated with `1`, which is how partial application is implemented in CLVM.
+For example, the curried arguments `[A, B, C]` are encoded as `(c (q . A) (c (q . B) (c (q . C) 1)))`.
+Note that the arguments are quoted and terminated with `1`, which is how partial application is implemented in CLVM.
 
 You can read more about currying on the [Chia blockchain documentation](https://docs.chia.net/guides/chialisp-currying).
 
-Note that the following code is for example purposes only and is not indicative of how to create a secure program.
-Using a password like shown in this example is an insecure method of locking coins, but it's effective for learning.
+Again, the following example is for demonstration purposes only:
 
 ```rust
 use clvmr::Allocator;
@@ -126,7 +117,7 @@ use clvmr::Allocator;
 use clvm_traits::{ToClvm, FromClvm};
 
 #[derive(Debug, PartialEq, Eq, ToClvm, FromClvm)]
-#[clvm(tuple)]
+#[clvm(atom)]
 enum Status {
     Pending,
     Completed,
@@ -150,7 +141,7 @@ use clvmr::Allocator;
 use clvm_traits::{ToClvm, FromClvm};
 
 #[derive(Debug, PartialEq, Eq, ToClvm, FromClvm)]
-#[clvm(tuple)]
+#[clvm(atom)]
 #[repr(u8)]
 enum Status {
     Pending = 36,
@@ -177,8 +168,6 @@ use clvm_traits::{ToClvm, FromClvm};
 #[clvm(list)]
 enum SpendMode {
     AppendValue { value: i32 },
-
-    #[clvm(tuple)]
     ClearValues,
 }
 
@@ -194,7 +183,7 @@ assert_eq!(SpendMode::from_clvm(a, ptr).unwrap(), mode);
 ### Untagged Enums
 
 Often, the discriminator isn't necessary to encode, and you'd prefer to try to match each variant in order until one matches.
-This is what `#[clvm(untagged)]` allows you to do. However, due to current limitations, it's not possible to mix this with `#[clvm(curry)]`.
+This is what `#[clvm(untagged)]` allows you to do.
 
 Note that if there is any ambiguity, the first variant which matches a value will be the resulting value.
 For example, if both `A` and `B` are in that order and are the same type, if you serialize a value of `B`, it will be deserialized as `A`.
@@ -204,7 +193,7 @@ use clvmr::Allocator;
 use clvm_traits::{ToClvm, FromClvm};
 
 #[derive(Debug, PartialEq, Eq, ToClvm, FromClvm)]
-#[clvm(tuple, untagged)]
+#[clvm(list, untagged)]
 enum Either {
     ShortList([i32; 4]),
     ExtendedList([i32; 16]),

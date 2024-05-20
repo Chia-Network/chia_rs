@@ -148,14 +148,10 @@ fn impl_for_struct(ast: DeriveInput, struct_info: StructInfo, node_name: Ident) 
 fn impl_for_enum(ast: DeriveInput, enum_info: EnumInfo, node_name: Ident) -> TokenStream {
     let crate_name = crate_name(enum_info.crate_name.clone());
 
-    let mut variant_bodies = Vec::new();
     let mut variant_destructures = Vec::new();
 
     for variant in enum_info.variants.iter() {
         let variant_name = &variant.name;
-
-        let repr = variant.repr.unwrap_or(enum_info.default_repr);
-        let variant_body = encode_fields(&crate_name, &node_name, &variant.fields, repr);
 
         let field_names: Vec<Ident> = variant
             .fields
@@ -177,11 +173,22 @@ fn impl_for_enum(ast: DeriveInput, enum_info: EnumInfo, node_name: Ident) -> Tok
             }
         };
 
-        variant_bodies.push(variant_body);
         variant_destructures.push(destructure);
     }
 
     let body = if enum_info.is_untagged {
+        let mut variant_bodies = Vec::new();
+
+        for variant in enum_info.variants.iter() {
+            let repr = variant.repr.unwrap_or(enum_info.default_repr);
+            variant_bodies.push(encode_fields(
+                &crate_name,
+                &node_name,
+                &variant.fields,
+                repr,
+            ));
+        }
+
         quote! {
             match self {
                 #( #variant_destructures => {
@@ -204,7 +211,7 @@ fn impl_for_enum(ast: DeriveInput, enum_info: EnumInfo, node_name: Ident) -> Tok
 
                 match self {
                     #( Self::#variant_names => {
-                        #crate_name::ToClvm::<#discriminant_type>::to_clvm(
+                        <#discriminant_type as #crate_name::ToClvm<#node_name>>::to_clvm(
                             &#discriminant_names,
                             encoder,
                         )
@@ -219,6 +226,18 @@ fn impl_for_enum(ast: DeriveInput, enum_info: EnumInfo, node_name: Ident) -> Tok
                 // Encode `(c (q . A) B)` pairs for curried arguments.
                 Repr::Curry => quote!(encode_curried_arg),
             };
+
+            let mut variant_bodies = Vec::new();
+
+            for variant in enum_info.variants.iter() {
+                let repr = variant.repr.unwrap_or(enum_info.default_repr);
+                variant_bodies.push(encode_fields(
+                    &crate_name,
+                    &node_name,
+                    &variant.fields,
+                    repr,
+                ));
+            }
 
             quote! {
                 #( #discriminant_consts )*
