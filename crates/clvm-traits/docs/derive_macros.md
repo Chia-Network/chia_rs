@@ -44,32 +44,6 @@ let ptr = solution.to_clvm(a).unwrap();
 assert_eq!(PasswordSolution::from_clvm(a, ptr).unwrap(), solution);
 ```
 
-### Unterminated List
-
-You can omit the nil terminator by using `#[clvm(rest)]`:
-
-```rust
-use clvmr::Allocator;
-use clvm_traits::{ToClvm, FromClvm};
-
-#[derive(Debug, PartialEq, Eq, ToClvm, FromClvm)]
-#[clvm(list)]
-struct Point {
-    x: i32,
-    #[clvm(rest)]
-    y: i32,
-}
-
-let point = Point {
-    x: 5,
-    y: 2,
-};
-
-let a = &mut Allocator::new();
-let ptr = point.to_clvm(a).unwrap();
-assert_eq!(Point::from_clvm(a, ptr).unwrap(), point);
-```
-
 ### Curry
 
 This represents the argument part of a curried CLVM program. Currying is a way to partially
@@ -156,6 +130,65 @@ let person = Person {
 let a = &mut Allocator::new();
 let ptr = person.to_clvm(a).unwrap();
 assert_eq!(Person::from_clvm(a, ptr).unwrap(), person);
+```
+
+## Consume the Rest
+
+You can consume the rest of the list items (or curried arguments, if using the `curry` representation) by using `#[clvm(rest)]`.
+This is useful for types which are represented compactly, without a nil terminator. Or for extending a list of arguments with another.
+You can also use it if you want to lazily parse the rest later.
+
+Here's a simple example of a compact representation:
+
+```rust
+use clvmr::Allocator;
+use clvm_traits::{ToClvm, FromClvm};
+
+#[derive(Debug, PartialEq, Eq, ToClvm, FromClvm)]
+#[clvm(list)]
+struct Point {
+    x: i32,
+    #[clvm(rest)]
+    y: i32,
+}
+
+let point = Point {
+    x: 5,
+    y: 2,
+};
+
+let a = &mut Allocator::new();
+let ptr = point.to_clvm(a).unwrap();
+assert_eq!(Point::from_clvm(a, ptr).unwrap(), point);
+```
+
+And here's an example of lazily parsing the rest later:
+
+```rust
+use clvmr::{Allocator, NodePtr};
+use clvm_traits::{ToClvm, FromClvm};
+
+#[derive(Debug, PartialEq, Eq, ToClvm, FromClvm)]
+#[clvm(list)]
+struct Items<T> {
+    first: String,
+    #[clvm(rest)]
+    rest: T,
+}
+
+let items = Items {
+    first: "First Item".to_string(),
+    rest: [1, 2, 3, 4, 5],
+};
+
+let a = &mut Allocator::new();
+let ptr = items.to_clvm(a).unwrap();
+
+let items = Items::<NodePtr>::from_clvm(a, ptr).unwrap();
+assert_eq!(items.first, "First Item".to_string());
+
+let rest: [u8; 5] = FromClvm::from_clvm(a, items.rest).unwrap();
+assert_eq!(rest, [1, 2, 3, 4, 5]);
 ```
 
 ## Enums
@@ -261,4 +294,17 @@ let value = Either::ShortList([42; 4]);
 let a = &mut Allocator::new();
 let ptr = value.to_clvm(a).unwrap();
 assert_eq!(Either::from_clvm(a, ptr).unwrap(), value);
+```
+
+## Crate Name
+
+You can override the name of the `clvm_traits` crate used within the macros:
+
+```rust
+use clvmr::Allocator;
+use clvm_traits::{self as renamed_clvm_traits, ToClvm, FromClvm};
+
+#[derive(Debug, PartialEq, Eq, ToClvm, FromClvm)]
+#[clvm(list, crate_name = renamed_clvm_traits)]
+struct Example;
 ```
