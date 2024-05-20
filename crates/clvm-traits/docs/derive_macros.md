@@ -101,6 +101,63 @@ let ptr = args.to_clvm(a).unwrap();
 assert_eq!(PasswordArgs::from_clvm(a, ptr).unwrap(), args);
 ```
 
+## Optional Fields
+
+You may mark the last field in a struct or enum variant as optional.
+However, specifying multiple optional fields would be ambiguous, so it's not allowed.
+
+### Optional Value
+
+You can specify a field as optional directly, which will be set to `None` if it's not present:
+
+```rust
+use clvmr::Allocator;
+use clvm_traits::{ToClvm, FromClvm};
+
+#[derive(Debug, PartialEq, Eq, ToClvm, FromClvm)]
+#[clvm(list)]
+struct Person {
+    name: String,
+    #[clvm(optional)]
+    email: Option<String>,
+}
+
+let person = Person {
+    name: "Bob".to_string(),
+    email: Some("bob@example.com".to_string()),
+};
+
+let a = &mut Allocator::new();
+let ptr = person.to_clvm(a).unwrap();
+assert_eq!(Person::from_clvm(a, ptr).unwrap(), person);
+```
+
+### Default Value
+
+You can also specify the default value manually. The field will not be serialized if it matches the default value:
+
+```rust
+use clvmr::Allocator;
+use clvm_traits::{ToClvm, FromClvm};
+
+#[derive(Debug, PartialEq, Eq, ToClvm, FromClvm)]
+#[clvm(list)]
+struct Person {
+    name: String,
+    #[clvm(default = 18)]
+    age: u8,
+}
+
+let person = Person {
+    name: "Bob".to_string(),
+    age: 24,
+};
+
+let a = &mut Allocator::new();
+let ptr = person.to_clvm(a).unwrap();
+assert_eq!(Person::from_clvm(a, ptr).unwrap(), person);
+```
+
 ## Enums
 
 In Rust, enums contain a discriminant, a value used to distinguish between each variant of the enum.

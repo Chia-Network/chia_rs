@@ -196,44 +196,6 @@ mod derive_tests {
     }
 
     #[test]
-    fn test_multiple_optional() {
-        #[derive(Debug, ToClvm, FromClvm, PartialEq)]
-        #[clvm(list)]
-        struct Struct {
-            a: u64,
-            #[clvm(optional)]
-            b: Option<i32>,
-            #[clvm(optional)]
-            c: Option<i32>,
-        }
-
-        check(
-            Struct {
-                a: 52,
-                b: Some(-32),
-                c: Some(42),
-            },
-            "ff34ff81e0ff2a80",
-        );
-        check(
-            Struct {
-                a: 52,
-                b: Some(42),
-                c: None,
-            },
-            "ff34ff2a80",
-        );
-        check(
-            Struct {
-                a: 52,
-                b: None,
-                c: None,
-            },
-            "ff3480",
-        );
-    }
-
-    #[test]
     fn test_hidden_values() {
         #[derive(ToClvm, FromClvm)]
         #[hide_values]

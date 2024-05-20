@@ -27,8 +27,8 @@ pub fn parse_named_fields(fields: &FieldsNamed) -> Vec<FieldInfo> {
             panic!("nothing can come after the `rest` field, since it consumes all arguments");
         }
 
-        if optional && options.default.is_none() {
-            panic!("all fields after an optional field must also be optional");
+        if optional {
+            panic!("only the last field can be optional, to prevent ambiguity");
         }
 
         rest = options.rest;
@@ -63,8 +63,8 @@ pub fn parse_unnamed_fields(fields: &FieldsUnnamed) -> Vec<FieldInfo> {
             panic!("nothing can come after the `rest` field, since it consumes all arguments");
         }
 
-        if optional && options.default.is_none() {
-            panic!("all fields after an optional field must also be optional");
+        if optional {
+            panic!("only the last field can be optional, to prevent ambiguity");
         }
 
         rest = options.rest;
