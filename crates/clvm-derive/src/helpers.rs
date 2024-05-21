@@ -1,9 +1,6 @@
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
-use syn::{
-    parse_quote, Expr, GenericArgument, GenericParam, Generics, Ident, PathArguments, Type,
-    TypeParamBound,
-};
+use syn::{parse_quote, Expr, GenericParam, Generics, Ident, TypeParamBound};
 
 use crate::parser::EnumInfo;
 
@@ -13,44 +10,6 @@ pub fn add_trait_bounds(generics: &mut Generics, bound: TypeParamBound) {
             type_param.bounds.push(bound.clone());
         }
     }
-}
-
-pub fn option_type(ty: &Type) -> Option<&Type> {
-    let Type::Path(ty) = ty else { return None };
-
-    if ty.qself.is_some() {
-        return None;
-    }
-
-    let ty = &ty.path;
-
-    if ty.segments.is_empty() || ty.segments.last().unwrap().ident != "Option" {
-        return None;
-    }
-
-    if !(ty.segments.len() == 1
-        || (ty.segments.len() == 3
-            && ["core", "std"].contains(&ty.segments[0].ident.to_string().as_str())
-            && ty.segments[1].ident == "option"))
-    {
-        return None;
-    }
-
-    let last_segment = ty.segments.last().unwrap();
-
-    let PathArguments::AngleBracketed(generics) = &last_segment.arguments else {
-        return None;
-    };
-
-    if generics.args.len() != 1 {
-        return None;
-    }
-
-    let GenericArgument::Type(inner_type) = &generics.args[0] else {
-        return None;
-    };
-
-    Some(inner_type)
 }
 
 pub struct DiscriminantInfo {

@@ -1,10 +1,10 @@
 use proc_macro2::{Span, TokenStream};
-use quote::quote;
+use quote::{quote, ToTokens};
 use syn::{parse_quote, DeriveInput, GenericParam, Ident, Index};
 
 use crate::{
     crate_name,
-    helpers::{add_trait_bounds, option_type, variant_discriminants, DiscriminantInfo},
+    helpers::{add_trait_bounds, variant_discriminants, DiscriminantInfo},
     parser::{parse, EnumInfo, FieldInfo, ParsedInfo, Repr, StructInfo, StructKind, VariantKind},
 };
 
@@ -43,7 +43,7 @@ fn encode_fields(
     }
 
     let encode_next = match repr {
-        Repr::Atom => unreachable!(),
+        Repr::Atom | Repr::Transparent => unreachable!(),
         // Encode `(A . B)` pairs for lists.
         Repr::List => quote!(encode_pair),
         // Encode `(c (q . A) B)` pairs for curried arguments.
@@ -51,7 +51,7 @@ fn encode_fields(
     };
 
     let initial_value = match repr {
-        Repr::Atom => unreachable!(),
+        Repr::Atom | Repr::Transparent => unreachable!(),
         Repr::List => quote!(encoder.encode_atom(&[])?),
         Repr::Curry => quote!(encoder.encode_atom(&[1])?),
     };
@@ -63,12 +63,7 @@ fn encode_fields(
 
     for (i, field) in fields.iter().enumerate().rev() {
         let value_name = &value_names[i];
-        let mut ty = &field.ty;
-
-        // If the field is optional, we need to unwrap the `Option<T>` type into just `T`.
-        if field.optional_with_default == Some(None) {
-            ty = option_type(ty).expect("expected `Option` type for `optional` field");
-        }
+        let ty = &field.ty;
 
         let mut if_body = TokenStream::new();
 
@@ -90,21 +85,17 @@ fn encode_fields(
         }
 
         if let Some(default) = &field.optional_with_default {
-            if let Some(default) = default {
-                // If the field is equal to the default value, don't encode it.
-                body.extend(quote! {
-                    if #value_name != &#default {
-                        #if_body
-                    }
-                });
-            } else {
-                // If the field is `None` and optional, don't encode it.
-                body.extend(quote! {
-                    if let Some(#value_name) = #value_name {
-                        #if_body
-                    }
-                });
-            }
+            let default = default
+                .as_ref()
+                .map(|expr| expr.to_token_stream())
+                .unwrap_or_else(|| quote!(<#ty as ::std::default::Default>::default()));
+
+            // If the field is equal to the default value, don't encode it.
+            body.extend(quote! {
+                if #value_name != &#default {
+                    #if_body
+                }
+            });
         } else {
             // Encode the field unconditionally if it's not optional.
             body.extend(if_body);
@@ -237,7 +228,7 @@ fn impl_for_enum(ast: DeriveInput, enum_info: EnumInfo, node_name: Ident) -> Tok
             }
         } else {
             let encode_next = match enum_info.default_repr {
-                Repr::Atom => unreachable!(),
+                Repr::Atom | Repr::Transparent => unreachable!(),
                 // Encode `(A . B)` pairs for lists.
                 Repr::List => quote!(encode_pair),
                 // Encode `(c (q . A) B)` pairs for curried arguments.

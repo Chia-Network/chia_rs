@@ -1,10 +1,10 @@
 use proc_macro2::{Span, TokenStream};
-use quote::quote;
+use quote::{quote, ToTokens};
 use syn::{parse_quote, DeriveInput, GenericParam, Ident};
 
 use crate::{
     crate_name,
-    helpers::{add_trait_bounds, option_type, variant_discriminants, DiscriminantInfo},
+    helpers::{add_trait_bounds, variant_discriminants, DiscriminantInfo},
     parser::{parse, EnumInfo, FieldInfo, ParsedInfo, Repr, StructInfo, StructKind, VariantKind},
 };
 
@@ -38,7 +38,7 @@ fn field_parser_fn_body(
         .collect();
 
     let decode_next = match repr {
-        Repr::Atom => unreachable!(),
+        Repr::Atom | Repr::Transparent => unreachable!(),
         // Decode `(A . B)` pairs for lists.
         Repr::List => quote!(decode_pair),
         // Decode `(c (q . A) B)` pairs for curried arguments.
@@ -92,14 +92,7 @@ fn field_parser_fn_body(
 
     for (i, field) in fields.iter().enumerate() {
         let ident = &temp_names[i];
-        let mut ty = &field.ty;
-
-        // If the field is optional, we need to unwrap the `Option<T>` type into just `T`.
-        // This is because it's still important to validate the value is correct.
-        // We only set it to `None` if it's non-existent, not if parsing fails.
-        if field.optional_with_default == Some(None) {
-            ty = option_type(ty).expect("expected `Option` type for `optional` field");
-        }
+        let ty = &field.ty;
 
         // This handles the actual decoding of the field's value.
         let mut decoded_value = quote! {
@@ -107,23 +100,15 @@ fn field_parser_fn_body(
         };
 
         if let Some(default) = &field.optional_with_default {
-            if let Some(default) = default {
-                // If there's a default value, we need to use it instead if the field isn't present.
-                decoded_value = quote! {
-                    #ident.map(|#ident| #decoded_value).unwrap_or(Ok(#default))?
-                };
-            } else {
-                // Otherwise, we can just return `None` if the field isn't present.
-                // And wrap it in `Some` if it is.
-                decoded_value = quote! {
-                    match #ident.map(|#ident| -> ::std::result::Result<#ty, #crate_name::FromClvmError> {
-                        #decoded_value
-                    }) {
-                        Some(value) => value.map(Some),
-                        None => Ok(None),
-                    }?
-                };
-            }
+            let default = default
+                .as_ref()
+                .map(|expr| expr.to_token_stream())
+                .unwrap_or_else(|| quote!(<#ty as ::std::default::Default>::default()));
+
+            // If there's a default value, we need to use it instead if the field isn't present.
+            decoded_value = quote! {
+                #ident.map(|#ident| #decoded_value).unwrap_or(Ok(#default))?
+            };
         } else {
             // If the field isn't optional, we can simply return any parsing errors early for this field.
             decoded_value = quote!(#decoded_value?);
@@ -161,7 +146,7 @@ fn field_parser_fn_body(
 
 fn check_rest_value(crate_name: &Ident, repr: Repr) -> TokenStream {
     match repr {
-        Repr::Atom => unreachable!(),
+        Repr::Atom | Repr::Transparent => unreachable!(),
         Repr::List => {
             // If the last field is not `rest`, we need to check that the `node` is nil.
             // If it's not nil, it's not a proper list, and we should return an error.
@@ -285,7 +270,7 @@ fn impl_for_enum(ast: DeriveInput, enum_info: EnumInfo, node_name: Ident) -> Tok
             let variant_parsers = enum_variant_parsers(&crate_name, &node_name, &enum_info);
 
             let decode_next = match enum_info.default_repr {
-                Repr::Atom => unreachable!(),
+                Repr::Atom | Repr::Transparent => unreachable!(),
                 // Decode `(A . B)` pairs for lists.
                 Repr::List => quote!(decode_pair),
                 // Decode `(c (q . A) B)` pairs for curried arguments.

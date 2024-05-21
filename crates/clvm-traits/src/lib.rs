@@ -141,7 +141,7 @@ mod derive_tests {
         #[clvm(list)]
         struct Struct {
             a: u64,
-            #[clvm(optional)]
+            #[clvm(default)]
             b: Option<i32>,
         }
 

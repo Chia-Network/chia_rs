@@ -5,9 +5,8 @@ use hex_literal::hex;
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[clvm(list)]
+#[clvm(transparent)]
 pub struct SettlementPaymentsSolution {
-    #[clvm(rest)]
     pub notarized_payments: Vec<NotarizedPayment>,
 }
 
@@ -22,10 +21,10 @@ pub struct NotarizedPayment {
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[clvm(untagged, list)]
+#[clvm(transparent)]
 pub enum Payment {
-    WithoutMemos(#[clvm(rest)] PaymentWithoutMemos),
-    WithMemos(#[clvm(rest)] PaymentWithMemos),
+    WithoutMemos(PaymentWithoutMemos),
+    WithMemos(PaymentWithMemos),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]

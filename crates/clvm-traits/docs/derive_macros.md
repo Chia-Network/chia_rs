@@ -16,6 +16,8 @@ This is how non-atomic values are structured in CLVM.
 
 This represents values in a nil terminated series of nested cons-pairs, also known as a proper list.
 
+Note that if you mark the last field to [consume the rest of the list](#consume-the-rest), there is no nil terminator.
+
 For example, with the list `[A, B, C]`, we build the list in reverse:
 
 - Start with the nil terminator `()`
@@ -49,8 +51,10 @@ assert_eq!(PasswordSolution::from_clvm(a, ptr).unwrap(), solution);
 This represents the argument part of a curried CLVM program.
 In Chia, currying commits to and partially applies some of the arguments of a program, without calling it.
 
+The arguments are quoted and terminated with `1`, which is how partial application is implemented in CLVM.
+Note that if you mark the last field to [consume the rest of the arguments](#consume-the-rest), there is no `1` terminator.
+
 For example, the curried arguments `[A, B, C]` are encoded as `(c (q . A) (c (q . B) (c (q . C) 1)))`.
-Note that the arguments are quoted and terminated with `1`, which is how partial application is implemented in CLVM.
 
 You can read more about currying on the [Chia blockchain documentation](https://docs.chia.net/guides/chialisp-currying).
 
@@ -77,12 +81,16 @@ assert_eq!(PasswordArgs::from_clvm(a, ptr).unwrap(), args);
 
 ## Optional Fields
 
-You may mark the last field in a struct or enum variant as optional.
-However, specifying multiple optional fields would be ambiguous, so it's not allowed.
+You can only mark the last field in a struct or enum variant as optional.
+
+This restriction is in place because if you were able to have multiple optional fields,
+or an optional field that isn't at the end, it would be ambiguous.
 
 ### Optional Value
 
-You can specify a field as optional directly, which will be set to `None` if it's not present:
+You can set a field as optional by marking it as `#[clvm(default)]`.
+If the field isn't present when deserializing, it will default to the `Default` implementation of the type.
+When serializing, it will check if it's equal to the default and omit it if so.
 
 ```rust
 use clvmr::Allocator;
@@ -92,7 +100,7 @@ use clvm_traits::{ToClvm, FromClvm};
 #[clvm(list)]
 struct Person {
     name: String,
-    #[clvm(optional)]
+    #[clvm(default)]
     email: Option<String>,
 }
 
@@ -108,7 +116,8 @@ assert_eq!(Person::from_clvm(a, ptr).unwrap(), person);
 
 ### Default Value
 
-You can also specify the default value manually. The field will not be serialized if it matches the default value:
+You can also specify the default value to check against manually.
+This is useful if you want to override the `Default` trait, or if the `Default` trait isn't implemented.
 
 ```rust
 use clvmr::Allocator;

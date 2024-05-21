@@ -10,13 +10,13 @@ pub struct EnumInfo {
     pub crate_name: Option<Ident>,
 }
 
-pub fn parse_enum(options: ClvmOptions, data_enum: &DataEnum) -> EnumInfo {
+pub fn parse_enum(mut options: ClvmOptions, data_enum: &DataEnum) -> EnumInfo {
     if options.hidden_value.is_some() {
         panic!("`hidden_value` only applies to fields");
     }
 
     if options.default.is_some() {
-        panic!("`default` and `optional` only apply to fields");
+        panic!("`default` only applies to fields");
     }
 
     if options.rest {
@@ -25,12 +25,21 @@ pub fn parse_enum(options: ClvmOptions, data_enum: &DataEnum) -> EnumInfo {
 
     let repr = Repr::expect(options.repr);
 
+    if repr == Repr::Transparent {
+        if options.untagged {
+            panic!("`transparent` enums are implicitly untagged");
+        }
+
+        options.untagged = true;
+    }
+
     let mut variants = Vec::new();
 
     for variant in data_enum.variants.iter() {
         let variant_options = parse_clvm_options(&variant.attrs);
+        let variant_repr = variant_options.repr;
 
-        if repr == Repr::Atom && variant_options.repr.is_some() {
+        if repr == Repr::Atom && variant_repr.is_some() {
             panic!("cannot override `atom` representation for individual enum variants");
         }
 
@@ -38,11 +47,24 @@ pub fn parse_enum(options: ClvmOptions, data_enum: &DataEnum) -> EnumInfo {
             panic!("cannot have fields in an `atom` enum variant");
         }
 
-        if !options.untagged && variant_options.repr.is_some() {
+        if !options.untagged && variant_repr.is_some() {
             panic!("cannot specify representation for individual enum variants in a tagged enum");
         }
 
-        variants.push(parse_variant(variant_options, variant));
+        let mut variant_info = parse_variant(variant_options, variant);
+
+        if (repr == Repr::Transparent && variant_repr.is_none())
+            || variant_repr == Some(Repr::Transparent)
+        {
+            if variant_info.fields.len() != 1 {
+                panic!("`transparent` enum variants must have exactly one field");
+            }
+
+            variant_info.fields[0].rest = true;
+            variant_info.repr = Some(Repr::List);
+        }
+
+        variants.push(variant_info);
     }
 
     EnumInfo {

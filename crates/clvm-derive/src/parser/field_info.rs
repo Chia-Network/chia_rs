@@ -100,10 +100,10 @@ fn check_field_options(options: &ClvmOptions) {
     }
 
     if options.default.is_some() && options.hidden_value.is_some() {
-        panic!("neither `default` nor `optional` can be used with the `hidden_value` option set");
+        panic!("`default` can't be used with `hidden_value` set");
     }
 
     if options.default.is_some() && options.rest {
-        panic!("`default` can't be used with the `rest` option set");
+        panic!("`default` can't be used with `rest` option set");
     }
 }

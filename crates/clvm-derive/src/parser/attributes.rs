@@ -13,13 +13,17 @@ pub enum Repr {
     List,
     /// Represents `(c (q . A) (c (q . B) (c (q . C) 1)))`.
     Curry,
-    /// Represents `A` on its own.
+    /// Represents the first field `A` on its own, with no other fields allowed.
+    Transparent,
+    /// Represents `A` on its own, if it's an atom.
     Atom,
 }
 
 impl Repr {
     pub fn expect(repr: Option<Repr>) -> Repr {
-        repr.expect("missing either `list`, `curry`, or `atom` in `clvm` attribute options")
+        repr.expect(
+            "missing either `list`, `curry`, `transparent`, or `atom` in `clvm` attribute options",
+        )
     }
 }
 
@@ -28,6 +32,7 @@ impl fmt::Display for Repr {
         f.write_str(match self {
             Self::List => "list",
             Self::Curry => "curry",
+            Self::Transparent => "transparent",
             Self::Atom => "atom",
         })
     }
@@ -60,8 +65,7 @@ enum ClvmOption {
     HiddenValue(Expr),
     CrateName(Ident),
     Untagged,
-    Optional,
-    Default(Expr),
+    Default(Option<Expr>),
     Rest,
 }
 
@@ -72,6 +76,7 @@ impl Parse for ClvmOption {
         match ident.to_string().as_str() {
             "list" => Ok(Self::Repr(Repr::List)),
             "curry" => Ok(Self::Repr(Repr::Curry)),
+            "transparent" => Ok(Self::Repr(Repr::Transparent)),
             "atom" => Ok(Self::Repr(Repr::Atom)),
             "untagged" => Ok(Self::Untagged),
             "hidden_value" => {
@@ -82,10 +87,13 @@ impl Parse for ClvmOption {
                 input.parse::<Token![=]>()?;
                 Ok(Self::CrateName(input.parse()?))
             }
-            "optional" => Ok(Self::Optional),
             "default" => {
-                input.parse::<Token![=]>()?;
-                Ok(Self::Default(input.parse()?))
+                if input.peek(Token![=]) {
+                    input.parse::<Token![=]>()?;
+                    Ok(Self::Default(Some(input.parse()?)))
+                } else {
+                    Ok(Self::Default(None))
+                }
             }
             "rest" => Ok(Self::Rest),
             _ => Err(syn::Error::new(ident.span(), "unknown argument")),
@@ -164,15 +172,9 @@ pub fn parse_clvm_options(attrs: &[Attribute]) -> ClvmOptions {
                 }
                 ClvmOption::Default(default) => {
                     if options.default.is_some() {
-                        panic!("can't specify `default` again when `default` or `optional` is already set");
+                        panic!("duplicate `default` option");
                     }
-                    options.default = Some(Some(default));
-                }
-                ClvmOption::Optional => {
-                    if options.default.is_some() {
-                        panic!("can't specify `optional` again when `default` or `optional` is already set");
-                    }
-                    options.default = Some(None);
+                    options.default = Some(default);
                 }
                 ClvmOption::Rest => {
                     if options.rest {

@@ -30,14 +30,14 @@ pub fn parse_struct(options: ClvmOptions, data_struct: &DataStruct) -> StructInf
     }
 
     if options.default.is_some() {
-        panic!("`default` and `optional` only apply to fields");
+        panic!("`default` only applies to fields");
     }
 
     if options.rest {
         panic!("`rest` only applies to fields");
     }
 
-    let repr = Repr::expect(options.repr);
+    let mut repr = Repr::expect(options.repr);
 
     if repr == Repr::Atom {
         panic!("`atom` is not a valid representation for structs");
@@ -45,24 +45,25 @@ pub fn parse_struct(options: ClvmOptions, data_struct: &DataStruct) -> StructInf
 
     let crate_name = options.crate_name;
 
-    match &data_struct.fields {
-        Fields::Unit => StructInfo {
-            kind: StructKind::Unit,
-            fields: Vec::new(),
-            repr,
-            crate_name,
-        },
-        Fields::Named(fields) => StructInfo {
-            kind: StructKind::Named,
-            fields: parse_named_fields(fields),
-            repr,
-            crate_name,
-        },
-        Fields::Unnamed(fields) => StructInfo {
-            kind: StructKind::Unnamed,
-            fields: parse_unnamed_fields(fields),
-            repr,
-            crate_name,
-        },
+    let (kind, mut fields) = match &data_struct.fields {
+        Fields::Unit => (StructKind::Unit, Vec::new()),
+        Fields::Named(fields) => (StructKind::Named, parse_named_fields(fields)),
+        Fields::Unnamed(fields) => (StructKind::Unnamed, parse_unnamed_fields(fields)),
+    };
+
+    if repr == Repr::Transparent {
+        if fields.len() != 1 {
+            panic!("`transparent` structs must have exactly one field");
+        }
+
+        fields[0].rest = true;
+        repr = Repr::List;
+    }
+
+    StructInfo {
+        kind,
+        fields,
+        repr,
+        crate_name,
     }
 }

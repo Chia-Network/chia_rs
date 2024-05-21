@@ -41,13 +41,7 @@ impl ClvmEncoder for Allocator {
     type Node = NodePtr;
 
     fn encode_atom(&mut self, bytes: &[u8]) -> Result<Self::Node, ToClvmError> {
-        Ok(if bytes.is_empty() {
-            self.nil()
-        } else if bytes == [1] {
-            self.one()
-        } else {
-            self.new_atom(bytes).or(Err(ToClvmError::OutOfMemory))?
-        })
+        self.new_atom(bytes).or(Err(ToClvmError::OutOfMemory))
     }
 
     fn encode_pair(
