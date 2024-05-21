@@ -7,12 +7,15 @@ use sha2::{Digest, Sha256};
 use crate::{aggregate_verify_gt, hash_to_g2};
 use crate::{GTElement, PublicKey, Signature};
 
-/// This cache is a bit weird because it's trying to account for validating
-/// mempool signatures versus block signatures. When validating block signatures,
-/// there's not much point in caching the pairings because we're probably not going
-/// to see them again unless there's a reorg. However, a spend in the mempool
-/// is likely to reappear in a block later, so we can save having to do the pairing
-/// again. So caching is primarily useful when synced and monitoring the mempool in real-time.
+/// This is a cache of pairings of public keys and their corresponding message.
+/// It accelerates aggregate verification when some public keys have already
+/// been paired, and found in the cache.
+/// We use it to cache pairings when validating transactions inserted into the
+/// mempool, as many of those transactions are likely to show up in a full block
+/// later. This makes it a lot cheaper to validate the full block.
+/// However, validating a signature where we have no cached GT elements, the
+/// aggregate_verify() primitive is faster. When long-syncing, that's
+/// preferable.
 #[cfg_attr(feature = "py-bindings", pyo3::pyclass(name = "BLSCache"))]
 #[derive(Debug, Clone)]
 pub struct BlsCache {
@@ -86,7 +89,7 @@ mod python {
         pybacked::PyBackedBytes,
         pymethods,
         types::{PyAnyMethods, PyList},
-        Bound, PyResult,
+        Bound, PyObject, PyResult,
     };
 
     #[pymethods]
@@ -129,6 +132,37 @@ mod python {
         #[pyo3(name = "len")]
         pub fn py_len(&self) -> PyResult<usize> {
             Ok(self.len())
+        }
+
+        #[pyo3(name = "items")]
+        pub fn py_items(&self, py: pyo3::Python) -> PyResult<PyObject> {
+            use pyo3::prelude::*;
+            use pyo3::types::PyBytes;
+            let ret = PyList::empty_bound(py);
+            for (key, value) in self.cache.iter() {
+                ret.append((
+                    PyBytes::new_bound(py, key),
+                    PyBytes::new_bound(py, &value.to_bytes()),
+                ))?;
+            }
+            Ok(ret.into())
+        }
+
+        #[pyo3(name = "update")]
+        pub fn py_update(&mut self, other: &Bound<PyList>) -> PyResult<()> {
+            for item in other.borrow().iter()? {
+                let (key, value): (Vec<u8>, Vec<u8>) = item?.extract()?;
+                self.cache.put(
+                    key.try_into()
+                        .map_err(|_| PyValueError::new_err("invalid key"))?,
+                    GTElement::from_bytes(
+                        (&value[..])
+                            .try_into()
+                            .map_err(|_| PyValueError::new_err("invalid GTElement"))?,
+                    ),
+                );
+            }
+            Ok(())
         }
     }
 }
