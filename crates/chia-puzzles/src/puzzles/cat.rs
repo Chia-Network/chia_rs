@@ -1,7 +1,7 @@
 use chia_bls::PublicKey;
 use chia_protocol::{Bytes32, Coin};
 use clvm_traits::{FromClvm, ToClvm};
-use clvm_utils::TreeHash;
+use clvm_utils::{CurriedProgram, ToTreeHash, TreeHash};
 use hex_literal::hex;
 
 use crate::LineageProof;
@@ -11,8 +11,32 @@ use crate::LineageProof;
 #[clvm(curry)]
 pub struct CatArgs<I> {
     pub mod_hash: Bytes32,
-    pub tail_program_hash: Bytes32,
+    pub asset_id: Bytes32,
     pub inner_puzzle: I,
+}
+
+impl<I> CatArgs<I> {
+    pub fn new(asset_id: Bytes32, inner_puzzle: I) -> Self {
+        Self {
+            mod_hash: CAT_PUZZLE_HASH.into(),
+            asset_id,
+            inner_puzzle,
+        }
+    }
+}
+
+impl CatArgs<TreeHash> {
+    pub fn curry_tree_hash(asset_id: Bytes32, inner_puzzle: TreeHash) -> TreeHash {
+        CurriedProgram {
+            program: CAT_PUZZLE_HASH,
+            args: CatArgs {
+                mod_hash: CAT_PUZZLE_HASH.into(),
+                asset_id,
+                inner_puzzle,
+            },
+        }
+        .tree_hash()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
@@ -22,11 +46,39 @@ pub struct EverythingWithSignatureTailArgs {
     pub public_key: PublicKey,
 }
 
+impl EverythingWithSignatureTailArgs {
+    pub fn new(public_key: PublicKey) -> Self {
+        Self { public_key }
+    }
+
+    pub fn curry_tree_hash(public_key: PublicKey) -> TreeHash {
+        CurriedProgram {
+            program: EVERYTHING_WITH_SIGNATURE_TAIL_PUZZLE_HASH,
+            args: EverythingWithSignatureTailArgs { public_key },
+        }
+        .tree_hash()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(curry)]
 pub struct GenesisByCoinIdTailArgs {
     pub genesis_coin_id: Bytes32,
+}
+
+impl GenesisByCoinIdTailArgs {
+    pub fn new(genesis_coin_id: Bytes32) -> Self {
+        Self { genesis_coin_id }
+    }
+
+    pub fn curry_tree_hash(genesis_coin_id: Bytes32) -> TreeHash {
+        CurriedProgram {
+            program: GENESIS_BY_COIN_ID_TAIL_PUZZLE_HASH,
+            args: GenesisByCoinIdTailArgs { genesis_coin_id },
+        }
+        .tree_hash()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
@@ -218,14 +270,14 @@ pub const CAT_PUZZLE_HASH_V1: TreeHash = TreeHash::new(hex!(
 #[cfg(test)]
 mod tests {
     use clvm_traits::ToNodePtr;
-    use clvm_utils::{tree_hash, CurriedProgram, ToTreeHash};
+    use clvm_utils::tree_hash;
     use clvmr::{serde::node_from_bytes, Allocator};
 
     use super::*;
 
     use crate::{
         assert_puzzle_hash,
-        standard::{StandardArgs, STANDARD_PUZZLE, STANDARD_PUZZLE_HASH},
+        standard::{StandardArgs, STANDARD_PUZZLE},
     };
 
     #[test]
@@ -238,44 +290,30 @@ mod tests {
 
     #[test]
     fn curry_cat_tree_hash() {
-        let inner_args = StandardArgs {
-            synthetic_key: PublicKey::default(),
-        };
+        let synthetic_key = PublicKey::default();
         let asset_id = Bytes32::new([120; 32]);
 
         let mut a = Allocator::new();
         let mod_ptr = node_from_bytes(&mut a, &CAT_PUZZLE).unwrap();
         let inner_mod_ptr = node_from_bytes(&mut a, &STANDARD_PUZZLE).unwrap();
+
         let curried_ptr = CurriedProgram {
             program: mod_ptr,
-            args: CatArgs {
-                mod_hash: CAT_PUZZLE_HASH.into(),
-                inner_puzzle: CurriedProgram {
+            args: CatArgs::new(
+                asset_id,
+                CurriedProgram {
                     program: inner_mod_ptr,
-                    args: &inner_args,
+                    args: StandardArgs::new(synthetic_key),
                 },
-                tail_program_hash: asset_id,
-            },
+            ),
         }
         .to_node_ptr(&mut a)
         .unwrap();
 
         let allocated_tree_hash = hex::encode(tree_hash(&a, curried_ptr));
 
-        let tree_hash = hex::encode(
-            CurriedProgram {
-                program: CAT_PUZZLE_HASH,
-                args: CatArgs {
-                    mod_hash: CAT_PUZZLE_HASH.into(),
-                    inner_puzzle: CurriedProgram {
-                        program: STANDARD_PUZZLE_HASH,
-                        args: &inner_args,
-                    },
-                    tail_program_hash: asset_id,
-                },
-            }
-            .tree_hash(),
-        );
+        let inner_puzzle_hash = StandardArgs::curry_tree_hash(synthetic_key);
+        let tree_hash = hex::encode(CatArgs::curry_tree_hash(asset_id, inner_puzzle_hash));
 
         assert_eq!(allocated_tree_hash, tree_hash);
     }
@@ -286,22 +324,17 @@ mod tests {
 
         let mut a = Allocator::new();
         let mod_ptr = node_from_bytes(&mut a, &EVERYTHING_WITH_SIGNATURE_TAIL_PUZZLE).unwrap();
+
         let curried_ptr = CurriedProgram {
             program: mod_ptr,
-            args: EverythingWithSignatureTailArgs { public_key },
+            args: EverythingWithSignatureTailArgs::new(public_key),
         }
         .to_node_ptr(&mut a)
         .unwrap();
 
         let allocated_tree_hash = hex::encode(tree_hash(&a, curried_ptr));
 
-        let tree_hash = hex::encode(
-            CurriedProgram {
-                program: EVERYTHING_WITH_SIGNATURE_TAIL_PUZZLE_HASH,
-                args: EverythingWithSignatureTailArgs { public_key },
-            }
-            .tree_hash(),
-        );
+        let tree_hash = hex::encode(EverythingWithSignatureTailArgs::curry_tree_hash(public_key));
 
         assert_eq!(allocated_tree_hash, tree_hash);
     }
@@ -312,22 +345,17 @@ mod tests {
 
         let mut a = Allocator::new();
         let mod_ptr = node_from_bytes(&mut a, &GENESIS_BY_COIN_ID_TAIL_PUZZLE).unwrap();
+
         let curried_ptr = CurriedProgram {
             program: mod_ptr,
-            args: GenesisByCoinIdTailArgs { genesis_coin_id },
+            args: GenesisByCoinIdTailArgs::new(genesis_coin_id),
         }
         .to_node_ptr(&mut a)
         .unwrap();
 
         let allocated_tree_hash = hex::encode(tree_hash(&a, curried_ptr));
 
-        let tree_hash = hex::encode(
-            CurriedProgram {
-                program: GENESIS_BY_COIN_ID_TAIL_PUZZLE_HASH,
-                args: GenesisByCoinIdTailArgs { genesis_coin_id },
-            }
-            .tree_hash(),
-        );
+        let tree_hash = hex::encode(GenesisByCoinIdTailArgs::curry_tree_hash(genesis_coin_id));
 
         assert_eq!(allocated_tree_hash, tree_hash);
     }
