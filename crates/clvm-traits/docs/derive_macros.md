@@ -86,6 +86,27 @@ let ptr = args.to_clvm(a).unwrap();
 assert_eq!(PuzzleArgs::from_clvm(a, ptr).unwrap(), args);
 ```
 
+### Transparent
+
+If you want a struct to have the same CLVM representation as its inner struct (a newtype), you can use the `transparent` representation.
+
+```rust
+use clvmr::Allocator;
+use clvm_traits::{ToClvm, FromClvm};
+
+#[derive(Debug, PartialEq, Eq, ToClvm, FromClvm)]
+#[clvm(transparent)]
+struct CustomString(String);
+
+// The CLVM representation for this is the same as the string itself.
+// So `"Hello"` in this case.
+let string = CustomString("Hello".to_string());
+
+let a = &mut Allocator::new();
+let ptr = string.to_clvm(a).unwrap();
+assert_eq!(CustomString::from_clvm(a, ptr).unwrap(), string);
+```
+
 ## Optional Fields
 
 You can only mark the last field in a struct or enum variant as optional.
