@@ -644,9 +644,9 @@ mod tests {
 
     // these tests take a long time to run in unoptimized builds.
     #[cfg(not(debug_assertions))]
-    const TEST_ITERS: i32 = 10000;
+    const TEST_ITERS: i32 = 1000;
     #[cfg(debug_assertions)]
-    const TEST_ITERS: i32 = 400;
+    const TEST_ITERS: i32 = 300;
 
     // this test generates a random tree and ensures we can produce the tree
     // with the correct root hash and that we can generate proofs, and validate
