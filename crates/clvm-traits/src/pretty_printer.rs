@@ -33,7 +33,7 @@ where
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Pretty(String);
+pub struct Pretty(pub String);
 
 impl ClvmEncoder for PrettyPrinter {
     type Node = Pretty;
