@@ -15,6 +15,7 @@ mod error;
 mod from_clvm;
 mod macros;
 mod match_byte;
+mod pretty_printer;
 mod to_clvm;
 mod wrappers;
 
@@ -23,6 +24,7 @@ pub use clvm_encoder::*;
 pub use error::*;
 pub use from_clvm::*;
 pub use match_byte::*;
+pub use pretty_printer::*;
 pub use to_clvm::*;
 pub use wrappers::*;
 
