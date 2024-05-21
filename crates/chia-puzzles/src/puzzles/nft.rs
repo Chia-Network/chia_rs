@@ -1,9 +1,9 @@
 use chia_protocol::Bytes32;
 use clvm_traits::{ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError, Raw, ToClvm, ToClvmError};
-use clvm_utils::TreeHash;
+use clvm_utils::{CurriedProgram, ToTreeHash, TreeHash};
 use hex_literal::hex;
 
-use crate::singleton::SingletonStruct;
+use crate::singleton::{SingletonStruct, SINGLETON_LAUNCHER_PUZZLE_HASH};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -14,6 +14,28 @@ pub struct NftIntermediateLauncherArgs {
     pub mint_total: usize,
 }
 
+impl NftIntermediateLauncherArgs {
+    pub fn new(mint_number: usize, mint_total: usize) -> Self {
+        Self {
+            launcher_puzzle_hash: SINGLETON_LAUNCHER_PUZZLE_HASH.into(),
+            mint_number,
+            mint_total,
+        }
+    }
+
+    pub fn curry_tree_hash(mint_number: usize, mint_total: usize) -> TreeHash {
+        CurriedProgram {
+            program: NFT_INTERMEDIATE_LAUNCHER_PUZZLE_HASH,
+            args: NftIntermediateLauncherArgs {
+                launcher_puzzle_hash: SINGLETON_LAUNCHER_PUZZLE_HASH.into(),
+                mint_number,
+                mint_total,
+            },
+        }
+        .tree_hash()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(curry)]
@@ -22,6 +44,32 @@ pub struct NftStateLayerArgs<I, M> {
     pub metadata: M,
     pub metadata_updater_puzzle_hash: Bytes32,
     pub inner_puzzle: I,
+}
+
+impl<I, M> NftStateLayerArgs<I, M> {
+    pub fn new(metadata: M, inner_puzzle: I) -> Self {
+        Self {
+            mod_hash: NFT_STATE_LAYER_PUZZLE_HASH.into(),
+            metadata,
+            metadata_updater_puzzle_hash: NFT_METADATA_UPDATER_PUZZLE_HASH.into(),
+            inner_puzzle,
+        }
+    }
+}
+
+impl NftStateLayerArgs<TreeHash, TreeHash> {
+    pub fn curry_tree_hash(metadata: TreeHash, inner_puzzle: TreeHash) -> TreeHash {
+        CurriedProgram {
+            program: NFT_STATE_LAYER_PUZZLE_HASH,
+            args: NftStateLayerArgs {
+                mod_hash: NFT_STATE_LAYER_PUZZLE_HASH.into(),
+                metadata,
+                metadata_updater_puzzle_hash: NFT_METADATA_UPDATER_PUZZLE_HASH.into(),
+                inner_puzzle,
+            },
+        }
+        .tree_hash()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
@@ -41,6 +89,36 @@ pub struct NftOwnershipLayerArgs<I, P> {
     pub inner_puzzle: I,
 }
 
+impl<I, P> NftOwnershipLayerArgs<I, P> {
+    pub fn new(current_owner: Option<Bytes32>, transfer_program: P, inner_puzzle: I) -> Self {
+        Self {
+            mod_hash: NFT_OWNERSHIP_LAYER_PUZZLE_HASH.into(),
+            current_owner,
+            transfer_program,
+            inner_puzzle,
+        }
+    }
+}
+
+impl NftOwnershipLayerArgs<TreeHash, TreeHash> {
+    pub fn curry_tree_hash(
+        current_owner: Option<Bytes32>,
+        transfer_program: TreeHash,
+        inner_puzzle: TreeHash,
+    ) -> TreeHash {
+        CurriedProgram {
+            program: NFT_OWNERSHIP_LAYER_PUZZLE_HASH,
+            args: NftOwnershipLayerArgs {
+                mod_hash: NFT_OWNERSHIP_LAYER_PUZZLE_HASH.into(),
+                current_owner,
+                transfer_program,
+                inner_puzzle,
+            },
+        }
+        .tree_hash()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(list)]
@@ -55,6 +133,36 @@ pub struct NftRoyaltyTransferPuzzleArgs {
     pub singleton_struct: SingletonStruct,
     pub royalty_puzzle_hash: Bytes32,
     pub trade_price_percentage: u16,
+}
+
+impl NftRoyaltyTransferPuzzleArgs {
+    pub fn new(
+        launcher_id: Bytes32,
+        royalty_puzzle_hash: Bytes32,
+        trade_price_percentage: u16,
+    ) -> Self {
+        Self {
+            singleton_struct: SingletonStruct::new(launcher_id),
+            royalty_puzzle_hash,
+            trade_price_percentage,
+        }
+    }
+
+    pub fn curry_tree_hash(
+        launcher_id: Bytes32,
+        royalty_puzzle_hash: Bytes32,
+        trade_price_percentage: u16,
+    ) -> TreeHash {
+        CurriedProgram {
+            program: NFT_ROYALTY_TRANSFER_PUZZLE_HASH,
+            args: NftRoyaltyTransferPuzzleArgs {
+                singleton_struct: SingletonStruct::new(launcher_id),
+                royalty_puzzle_hash,
+                trade_price_percentage,
+            },
+        }
+        .tree_hash()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
