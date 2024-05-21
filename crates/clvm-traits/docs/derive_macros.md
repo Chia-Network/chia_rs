@@ -46,8 +46,8 @@ assert_eq!(PasswordSolution::from_clvm(a, ptr).unwrap(), solution);
 
 ### Curry
 
-This represents the argument part of a curried CLVM program. Currying is a way to partially
-apply some of the arguments without immediately calling the function.
+This represents the argument part of a curried CLVM program.
+In Chia, currying commits to and partially applies some of the arguments of a program, without calling it.
 
 For example, the curried arguments `[A, B, C]` are encoded as `(c (q . A) (c (q . B) (c (q . C) 1)))`.
 Note that the arguments are quoted and terminated with `1`, which is how partial application is implemented in CLVM.
