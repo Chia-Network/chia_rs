@@ -25,25 +25,29 @@ For example, with the list `[A, B, C]`, we build the list in reverse:
 - Then continue on with `(B . (C . ()))`
 - Finally, the list is represented as `(A . (B . (C . ())))`
 
-Note that the following example of using a password for a Chia puzzle is insecure, but it's effective for demonstration.
-
 ```rust
 use clvmr::Allocator;
 use clvm_traits::{ToClvm, FromClvm};
 
 #[derive(Debug, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(list)]
-struct PasswordSolution {
-    password: String,
+struct Tiers {
+    high: u8,
+    medium: u8,
+    low: u8,
 }
 
-let solution = PasswordSolution {
-    password: "Hello".into(),
+// The CLVM representation for this is `(10 5 1)`.
+// It can also be written as `(10 . (5 . (1 . ())))`.
+let value = Tiers {
+    high: 10,
+    medium: 5,
+    low: 1,
 };
 
 let a = &mut Allocator::new();
-let ptr = solution.to_clvm(a).unwrap();
-assert_eq!(PasswordSolution::from_clvm(a, ptr).unwrap(), solution);
+let ptr = value.to_clvm(a).unwrap();
+assert_eq!(Tiers::from_clvm(a, ptr).unwrap(), value);
 ```
 
 ### Curry
@@ -58,7 +62,7 @@ For example, the curried arguments `[A, B, C]` are encoded as `(c (q . A) (c (q 
 
 You can read more about currying on the [Chia blockchain documentation](https://docs.chia.net/guides/chialisp-currying).
 
-Again, the following example is for demonstration purposes only:
+The following example is for demonstration purposes only:
 
 ```rust
 use clvmr::Allocator;
@@ -66,17 +70,20 @@ use clvm_traits::{ToClvm, FromClvm};
 
 #[derive(Debug, PartialEq, Eq, ToClvm, FromClvm)]
 #[clvm(curry)]
-struct PasswordArgs {
-    password: String,
+struct PuzzleArgs {
+    code_to_unlock: u32,
+    verification_level: u8,
 }
 
-let args = PasswordArgs {
-    password: "Hello".into(),
+// The CLVM representation for this is `(c (q . 4328714) (c (q . 5) 1))`.
+let args = PuzzleArgs {
+    code_to_unlock: 4328714,
+    verification_level: 5,
 };
 
 let a = &mut Allocator::new();
 let ptr = args.to_clvm(a).unwrap();
-assert_eq!(PasswordArgs::from_clvm(a, ptr).unwrap(), args);
+assert_eq!(PuzzleArgs::from_clvm(a, ptr).unwrap(), args);
 ```
 
 ## Optional Fields
@@ -104,6 +111,8 @@ struct Person {
     email: Option<String>,
 }
 
+// The CLVM representation of this is `("Bob" "bob@example.com")`.
+// If `email` had been set to `None`, the representation would have just been `("Bob")`.
 let person = Person {
     name: "Bob".to_string(),
     email: Some("bob@example.com".to_string()),
@@ -131,6 +140,8 @@ struct Person {
     age: u8,
 }
 
+// The CLVM representation for this is `("Bob" 24)`.
+// If `age` had been set to `18`, the representation would have been just `("Bob")`.
 let person = Person {
     name: "Bob".to_string(),
     age: 24,
@@ -161,6 +172,7 @@ struct Point {
     y: i32,
 }
 
+// The CLVM representation of this is `(5 . 2)` (with no nil terminator).
 let point = Point {
     x: 5,
     y: 2,
@@ -185,6 +197,8 @@ struct Items<T> {
     rest: T,
 }
 
+// The CLVM representation of this is `("First Item" 1 2 3 4 5)`.
+// Notice how the list is not a separate argument, but rather the rest of the arguments.
 let items = Items {
     first: "First Item".to_string(),
     rest: [1, 2, 3, 4, 5],
@@ -193,9 +207,11 @@ let items = Items {
 let a = &mut Allocator::new();
 let ptr = items.to_clvm(a).unwrap();
 
+// We parse `("First Item" . <rest>)`
 let items = Items::<NodePtr>::from_clvm(a, ptr).unwrap();
 assert_eq!(items.first, "First Item".to_string());
 
+// Then parse rest into a separate list of `(1 2 3 4 5)`.
 let rest: [u8; 5] = FromClvm::from_clvm(a, items.rest).unwrap();
 assert_eq!(rest, [1, 2, 3, 4, 5]);
 ```
@@ -222,6 +238,7 @@ enum Status {
     Completed,
 }
 
+// The CLVM representation of this is just `0`.
 let status = Status::Pending;
 
 let a = &mut Allocator::new();
@@ -247,6 +264,7 @@ enum Status {
     Completed = 42,
 }
 
+// The CLVM representation of this is `36`.
 let status = Status::Pending;
 
 let a = &mut Allocator::new();
@@ -270,6 +288,7 @@ enum SpendMode {
     ClearValues,
 }
 
+// The CLVM representation of this is `(42)`.
 let mode = SpendMode::AppendValue {
     value: 42
 };
@@ -298,6 +317,7 @@ enum Either {
     ExtendedList([i32; 16]),
 }
 
+// The CLVM representation of this is `((42 42 42 42))`.
 let value = Either::ShortList([42; 4]);
 
 let a = &mut Allocator::new();
@@ -335,6 +355,7 @@ struct CustomTerminator {
     terminator: u8,
 }
 
+// The CLVM representation of this is `(100 . 42)`.
 let value = CustomTerminator {
     value: 100,
 };
