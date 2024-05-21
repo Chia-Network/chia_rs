@@ -67,7 +67,7 @@ use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs};
 use clvmr::ChiaDialect;
 
 use chia_bls::{
-    hash_to_g2 as native_hash_to_g2, BLSCache, DerivableKey, GTElement, PublicKey, SecretKey,
+    hash_to_g2 as native_hash_to_g2, BlsCache, DerivableKey, GTElement, PublicKey, SecretKey,
     Signature,
 };
 
@@ -541,7 +541,7 @@ pub fn chia_rs(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_class::<GTElement>()?;
     m.add_class::<SecretKey>()?;
     m.add_class::<AugSchemeMPL>()?;
-    m.add_class::<BLSCache>()?;
+    m.add_class::<BlsCache>()?;
 
     Ok(())
 }

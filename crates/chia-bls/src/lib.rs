@@ -8,7 +8,7 @@ pub mod public_key;
 pub mod secret_key;
 pub mod signature;
 
-pub use cached_bls::BLSCache;
+pub use cached_bls::BlsCache;
 pub use derivable_key::DerivableKey;
 pub use error::{Error, Result};
 pub use gtelement::GTElement;
