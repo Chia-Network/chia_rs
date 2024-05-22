@@ -59,7 +59,6 @@ def test_cache_limit() -> None:
 
 
 # old Python tests ported
-# benchmark old vs new BLSCache
 def test_cached_bls():
     cached_bls = BLSCache()
     n_keys = 10
@@ -113,6 +112,43 @@ def test_cached_bls():
     # Verify more messages (partial cache hit)
     assert bls_cache.aggregate_verify(pks, msgs, agg_sig)
     assert cached_bls_old.aggregate_verify(pks_bytes, msgs, agg_sig, False, local_cache)
+
+
+def test_cached_bls_flattening():
+    cached_bls = BLSCache()
+    n_keys = 10
+    seed = b"a" * 31
+    sks = [AugSchemeMPL.key_gen(seed + bytes([i])) for i in range(n_keys)]
+    pks = [sk.get_g1() for sk in sks]
+    aggsig = AugSchemeMPL.aggregate(
+        [AugSchemeMPL.sign(sk, b"foobar", pk) for sk, pk in zip(sks, pks)]
+    )
+
+    assert cached_bls.aggregate_verify(pks, [b"foobar"] * n_keys, aggsig)
+    assert len(cached_bls.items()) == n_keys
+    gts = [
+        bytes(pk.pair(AugSchemeMPL.g2_from_message(bytes(pk) + b"foobar")))
+        for pk in pks
+    ]
+    for key, value in cached_bls.items():
+        assert isinstance(key, bytes)
+        assert isinstance(value, bytes)
+        assert value in gts
+        gts.remove(value)
+
+    cache_copy = BLSCache()
+    cache_copy.update(cached_bls.items())
+
+    assert len(cache_copy.items()) == n_keys
+    gts = [
+        bytes(pk.pair(AugSchemeMPL.g2_from_message(bytes(pk) + b"foobar")))
+        for pk in pks
+    ]
+    for key, value in cache_copy.items():
+        assert isinstance(key, bytes)
+        assert isinstance(value, bytes)
+        assert value in gts
+        gts.remove(value)
 
 
 def test_cached_bls_repeat_pk():
