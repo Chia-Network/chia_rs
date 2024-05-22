@@ -1,5 +1,5 @@
 #[derive(Copy, Clone)]
-enum Err {
+pub enum Err {
     // temporary errors. Don't blacklist
     DOES_NOT_EXTEND = -1,
     BAD_HEADER_SIGNATURE = -2,
