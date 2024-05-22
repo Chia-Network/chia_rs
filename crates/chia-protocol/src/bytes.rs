@@ -48,12 +48,6 @@ impl Bytes {
     }
 }
 
-impl Bytes32 {
-    pub const fn const_new(data: [u8; 32]) -> Self {
-        BytesImpl(data)
-    }
-}
-
 impl fmt::Debug for Bytes {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&hex::encode(self))
@@ -171,7 +165,7 @@ impl Deref for Bytes {
 pub struct BytesImpl<const N: usize>([u8; N]);
 
 impl<const N: usize> BytesImpl<N> {
-    pub fn new(bytes: [u8; N]) -> Self {
+    pub const fn new(bytes: [u8; N]) -> Self {
         Self(bytes)
     }
 
