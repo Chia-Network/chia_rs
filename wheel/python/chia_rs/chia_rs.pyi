@@ -85,7 +85,6 @@ class BLSCache:
     def __init__(self, cache_size: Optional[int] = 50000) -> None: ...
     def len(self) -> int: ...
     def aggregate_verify(self, pks: List[G1Element], msgs: List[bytes], sig: G2Element) -> bool: ...
-    
 
 class AugSchemeMPL:
     @staticmethod
@@ -4148,6 +4147,7 @@ class ConsensusConstants:
     POOL_SUB_SLOT_ITERS: uint64
     SOFT_FORK2_HEIGHT: uint32
     SOFT_FORK4_HEIGHT: uint32
+    SOFT_FORK5_HEIGHT: uint32
     HARD_FORK_HEIGHT: uint32
     HARD_FORK_FIX_HEIGHT: uint32
     PLOT_FILTER_128_HEIGHT: uint32
@@ -4192,6 +4192,7 @@ class ConsensusConstants:
         POOL_SUB_SLOT_ITERS: uint64,
         SOFT_FORK2_HEIGHT: uint32,
         SOFT_FORK4_HEIGHT: uint32,
+        SOFT_FORK5_HEIGHT: uint32,
         HARD_FORK_HEIGHT: uint32,
         HARD_FORK_FIX_HEIGHT: uint32,
         PLOT_FILTER_128_HEIGHT: uint32,
@@ -4253,6 +4254,7 @@ class ConsensusConstants:
         POOL_SUB_SLOT_ITERS: Union[ uint64, _Unspec] = _Unspec(),
         SOFT_FORK2_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         SOFT_FORK4_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
+        SOFT_FORK5_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         HARD_FORK_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         HARD_FORK_FIX_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_FILTER_128_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
