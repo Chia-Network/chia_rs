@@ -117,6 +117,9 @@ pub struct ConsensusConstants {
     /// Soft fork initiated in 2.3.0 release.
     soft_fork4_height: u32,
 
+    /// Soft fork initiated in 2.4.0 release.
+    soft_fork5_height: u32,
+
     /// The hard fork planned with the 2.0 release.
     /// This is the block with the first plot filter adjustment.
     hard_fork_height: u32,
