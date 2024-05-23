@@ -1,9 +1,9 @@
 use clvmr::{Allocator, NodePtr};
 
-use crate::{ToClvm, ToClvmError};
+use crate::{clvm_list, clvm_quote, ToClvm, ToClvmError};
 
-pub trait ClvmEncoder {
-    type Node: Clone;
+pub trait ClvmEncoder: Sized {
+    type Node: Clone + ToClvm<Self::Node>;
 
     fn encode_atom(&mut self, bytes: &[u8]) -> Result<Self::Node, ToClvmError>;
     fn encode_pair(
@@ -17,16 +17,8 @@ pub trait ClvmEncoder {
         first: Self::Node,
         rest: Self::Node,
     ) -> Result<Self::Node, ToClvmError> {
-        let q = self.encode_atom(&[1])?;
-        let c = self.encode_atom(&[4])?;
-
-        let quoted = self.encode_pair(q, first)?;
-        let nil = self.encode_atom(&[])?;
-
-        let op_rest = self.encode_pair(rest, nil)?;
-        let op_args = self.encode_pair(quoted, op_rest)?;
-
-        self.encode_pair(c, op_args)
+        const OP_C: u8 = 4;
+        clvm_list!(OP_C, clvm_quote!(first), rest).to_clvm(self)
     }
 
     /// This is a helper function that just calls `clone` on the node.

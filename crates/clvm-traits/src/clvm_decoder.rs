@@ -1,9 +1,12 @@
 use clvmr::{allocator::SExp, Allocator, Atom, NodePtr};
 
-use crate::{FromClvm, FromClvmError};
+use crate::{
+    destructure_list, destructure_quote, match_list, match_quote, FromClvm, FromClvmError,
+    MatchByte,
+};
 
-pub trait ClvmDecoder {
-    type Node: Clone;
+pub trait ClvmDecoder: Sized {
+    type Node: Clone + FromClvm<Self::Node>;
 
     fn decode_atom(&self, node: &Self::Node) -> Result<Atom, FromClvmError>;
     fn decode_pair(&self, node: &Self::Node) -> Result<(Self::Node, Self::Node), FromClvmError>;
@@ -12,29 +15,12 @@ pub trait ClvmDecoder {
         &self,
         node: &Self::Node,
     ) -> Result<(Self::Node, Self::Node), FromClvmError> {
-        let (c, rest) = self.decode_pair(node)?;
-        if self.decode_atom(&c)?.as_ref() != [4] {
-            return Err(FromClvmError::Custom("expected `c` operator".to_string()));
-        }
-
-        let (quoted_value, rest) = self.decode_pair(&rest)?;
-
-        let (q, value) = self.decode_pair(&quoted_value)?;
-        if self.decode_atom(&q)?.as_ref() != [1] {
-            return Err(FromClvmError::Custom("expected `q` operator".to_string()));
-        }
-
-        let (rest, nil) = self.decode_pair(&rest)?;
-        let nil_atom = self.decode_atom(&nil)?;
-        let nil_ref = nil_atom.as_ref();
-        if !nil_ref.is_empty() {
-            return Err(FromClvmError::WrongAtomLength {
-                expected: 0,
-                found: nil_ref.len(),
-            });
-        }
-
-        Ok((value, rest))
+        let destructure_list!(_, destructure_quote!(first), rest) =
+            <match_list!(MatchByte<4>, match_quote!(Self::Node), Self::Node)>::from_clvm(
+                self,
+                node.clone(),
+            )?;
+        Ok((first, rest))
     }
 
     /// This is a helper function that just calls `clone` on the node.
