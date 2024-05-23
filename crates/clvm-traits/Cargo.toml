@@ -23,7 +23,7 @@ clvm-derive = { version = "0.6.0", path = "../clvm-derive", optional = true }
 chia-bls = { version = "0.8.0", path = "../chia-bls", optional = true }
 num-bigint = "0.4.3"
 thiserror = "1.0.44"
+hex = "0.4.3"
 
 [dev-dependencies]
-hex = "0.4.3"
 hex-literal = "0.4.1"
