@@ -11,8 +11,8 @@ pub struct EnumInfo {
 }
 
 pub fn parse_enum(mut options: ClvmOptions, data_enum: &DataEnum) -> EnumInfo {
-    if options.hidden_value.is_some() {
-        panic!("`hidden_value` only applies to fields");
+    if options.constant.is_some() {
+        panic!("`constant` only applies to fields");
     }
 
     if options.default.is_some() {

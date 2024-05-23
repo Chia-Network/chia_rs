@@ -346,33 +346,33 @@ let ptr = value.to_clvm(a).unwrap();
 assert_eq!(Either::from_clvm(a, ptr).unwrap(), value);
 ```
 
-## Hidden Values
+## Constant Values
 
 Sometimes you may want to include constants inside of a struct without actually exposing them as fields.
-It's possible to do this with `#[clvm(hidden_value)]`, however you must use an attribute macro to remove the hidden fields.
+It's possible to do this with `#[clvm(constant = ...)]`, however you must use an attribute macro to remove the constant fields.
 
 This has to be done in the proper order, or it will not work.
 
 The order is as follows:
 
-- Derive `ToClvm` and `FromClvm`, so that the hidden fields are serialized and deserialized properly.
-- Use `#[hide_values]` to remove them from the struct or enum.
-- Add any other derives you want after, so they don't see the hidden fields.
+- Derive `ToClvm` and `FromClvm`, so that the constant fields are serialized and deserialized properly.
+- Use `#[apply_constants]` to remove them from the actual struct or enum, but keep them in the encoded output.
+- Add any other derives you want after, so they don't see the constant fields.
 - Write any `#[clvm(...)]` options you want to use.
 
 Here is an example of this:
 
 ```rust
 use clvmr::Allocator;
-use clvm_traits::{hide_values, ToClvm, FromClvm};
+use clvm_traits::{apply_constants, ToClvm, FromClvm};
 
 #[derive(ToClvm, FromClvm)]
-#[hide_values]
+#[apply_constants]
 #[derive(Debug, PartialEq, Eq)]
 #[clvm(list)]
 struct CustomTerminator {
     value: u32,
-    #[clvm(hidden_value = 42, rest)]
+    #[clvm(constant = 42, rest)]
     terminator: u8,
 }
 

@@ -4,7 +4,7 @@ use syn::{punctuated::Punctuated, Data, DeriveInput, Fields};
 
 use crate::parser::parse_clvm_options;
 
-pub fn impl_hide_values(mut ast: DeriveInput) -> TokenStream {
+pub fn impl_apply_constants(mut ast: DeriveInput) -> TokenStream {
     match &mut ast.data {
         Data::Enum(data_enum) => {
             for variant in data_enum.variants.iter_mut() {
@@ -27,7 +27,7 @@ fn remove_fields(fields: &mut Fields) {
                 .named
                 .clone()
                 .into_iter()
-                .filter(|field| parse_clvm_options(&field.attrs).hidden_value.is_none());
+                .filter(|field| parse_clvm_options(&field.attrs).constant.is_none());
 
             fields.named = Punctuated::from_iter(retained_fields);
         }
@@ -36,7 +36,7 @@ fn remove_fields(fields: &mut Fields) {
                 .unnamed
                 .clone()
                 .into_iter()
-                .filter(|field| parse_clvm_options(&field.attrs).hidden_value.is_none());
+                .filter(|field| parse_clvm_options(&field.attrs).constant.is_none());
 
             fields.unnamed = Punctuated::from_iter(retained_fields);
         }

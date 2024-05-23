@@ -196,17 +196,17 @@ mod derive_tests {
     }
 
     #[test]
-    fn test_hidden_values() {
+    fn test_constants() {
         #[derive(ToClvm, FromClvm)]
-        #[hide_values]
+        #[apply_constants]
         #[derive(Debug, PartialEq)]
         #[clvm(list)]
         struct RunTailCondition<P, S> {
-            #[clvm(hidden_value = 51)]
+            #[clvm(constant = 51)]
             opcode: u8,
-            #[clvm(hidden_value = ())]
+            #[clvm(constant = ())]
             blank_puzzle_hash: (),
-            #[clvm(hidden_value = -113)]
+            #[clvm(constant = -113)]
             magic_amount: i8,
             puzzle: P,
             solution: S,

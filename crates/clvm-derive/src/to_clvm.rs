@@ -32,9 +32,9 @@ fn encode_fields(
     for (i, field) in fields.iter().enumerate() {
         let value_name = Ident::new(&format!("field_{}", i), Span::mixed_site());
 
-        if let Some(value) = &field.hidden_with_value {
+        if let Some(value) = &field.constant {
             body.extend(quote! {
-                // Use the hidden field's value directly, since it's not in `self`.
+                // Use the constant's value directly, since it's not in `self`.
                 let #value_name = #value;
             });
         }
@@ -111,8 +111,8 @@ fn impl_for_struct(ast: DeriveInput, struct_info: StructInfo, node_name: Ident) 
     let mut body = TokenStream::new();
 
     for (i, field) in struct_info.fields.iter().enumerate() {
-        // We can't encode fields that are hidden, since they aren't on the actual struct.
-        if field.hidden_with_value.is_some() {
+        // We can't encode fields that are constant, since they aren't on the actual struct.
+        if field.constant.is_some() {
             continue;
         }
 

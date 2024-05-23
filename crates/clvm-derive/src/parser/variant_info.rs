@@ -26,8 +26,8 @@ pub fn parse_variant(options: ClvmOptions, variant: &Variant) -> VariantInfo {
         panic!("`repr` only applies to enums");
     }
 
-    if options.hidden_value.is_some() {
-        panic!("`hidden_value` only applies to fields");
+    if options.constant.is_some() {
+        panic!("`constant` only applies to fields");
     }
 
     if options.crate_name.is_some() {

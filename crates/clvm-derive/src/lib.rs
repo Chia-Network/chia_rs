@@ -7,7 +7,7 @@ mod parser;
 mod to_clvm;
 
 use from_clvm::from_clvm;
-use hide_values::impl_hide_values;
+use hide_values::impl_apply_constants;
 use proc_macro::TokenStream;
 
 use proc_macro2::Span;
@@ -33,7 +33,7 @@ pub fn from_clvm_derive(input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn hide_values(_attr: TokenStream, input: TokenStream) -> TokenStream {
+pub fn apply_constants(_attr: TokenStream, input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
-    impl_hide_values(ast).into()
+    impl_apply_constants(ast).into()
 }

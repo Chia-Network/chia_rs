@@ -25,8 +25,8 @@ pub fn parse_struct(options: ClvmOptions, data_struct: &DataStruct) -> StructInf
         panic!("`repr` only applies to enums");
     }
 
-    if options.hidden_value.is_some() {
-        panic!("`hidden_value` only applies to fields");
+    if options.constant.is_some() {
+        panic!("`constant` only applies to fields");
     }
 
     if options.default.is_some() {

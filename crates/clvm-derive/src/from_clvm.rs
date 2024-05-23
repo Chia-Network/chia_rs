@@ -116,15 +116,15 @@ fn field_parser_fn_body(
 
         let field_ident = field.ident.clone();
 
-        if let Some(value) = &field.hidden_with_value {
-            // If the field is hidden, we need to check that the value is correct before continuing.
+        if let Some(value) = &field.constant {
+            // If the field is constant, we need to check that the value is correct before continuing.
             body.extend(quote! {
                 let value: #ty = #value;
 
                 if #decoded_value != value {
                     return Err(#crate_name::FromClvmError::Custom(
                         format!(
-                            "hidden field `{}` has an incorrect value",
+                            "constant `{}` has an incorrect value",
                             stringify!(#field_ident),
                         )
                     ));

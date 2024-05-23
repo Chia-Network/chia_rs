@@ -45,7 +45,7 @@ pub struct ClvmOptions {
     pub repr: Option<Repr>,
     /// The value of the field, also removed the actual field from the struct.
     /// This is useful for constant fields which shouldn't be in the constructor.
-    pub hidden_value: Option<Expr>,
+    pub constant: Option<Expr>,
     /// Whether the enum should parse variants one after the other instead of using the discriminant.
     pub untagged: bool,
     /// The integer type used for the enum discriminant.
@@ -62,7 +62,7 @@ pub struct ClvmOptions {
 /// All of the possible options of the `clvm` attribute.
 enum ClvmOption {
     Repr(Repr),
-    HiddenValue(Expr),
+    Constant(Expr),
     CrateName(Ident),
     Untagged,
     Default(Option<Expr>),
@@ -79,9 +79,9 @@ impl Parse for ClvmOption {
             "transparent" => Ok(Self::Repr(Repr::Transparent)),
             "atom" => Ok(Self::Repr(Repr::Atom)),
             "untagged" => Ok(Self::Untagged),
-            "hidden_value" => {
+            "constant" => {
                 input.parse::<Token![=]>()?;
-                Ok(Self::HiddenValue(input.parse()?))
+                Ok(Self::Constant(input.parse()?))
             }
             "crate_name" => {
                 input.parse::<Token![=]>()?;
@@ -105,7 +105,7 @@ impl Parse for ClvmOption {
 pub fn parse_clvm_options(attrs: &[Attribute]) -> ClvmOptions {
     let mut options = ClvmOptions {
         repr: None,
-        hidden_value: None,
+        constant: None,
         untagged: false,
         enum_repr: None,
         crate_name: None,
@@ -158,11 +158,11 @@ pub fn parse_clvm_options(attrs: &[Attribute]) -> ClvmOptions {
                     }
                     options.repr = Some(repr);
                 }
-                ClvmOption::HiddenValue(value) => {
-                    if options.hidden_value.is_some() {
-                        panic!("duplicate `hidden_value` option");
+                ClvmOption::Constant(value) => {
+                    if options.constant.is_some() {
+                        panic!("duplicate `constant` option");
                     }
-                    options.hidden_value = Some(value);
+                    options.constant = Some(value);
                 }
                 ClvmOption::CrateName(crate_name) => {
                     if options.crate_name.is_some() {

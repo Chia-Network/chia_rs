@@ -5,7 +5,7 @@ use super::{parse_clvm_options, ClvmOptions};
 pub struct FieldInfo {
     pub ident: Ident,
     pub ty: Type,
-    pub hidden_with_value: Option<Expr>,
+    pub constant: Option<Expr>,
     pub optional_with_default: Option<Option<Expr>>,
     pub rest: bool,
 }
@@ -37,7 +37,7 @@ pub fn parse_named_fields(fields: &FieldsNamed) -> Vec<FieldInfo> {
         items.push(FieldInfo {
             ident,
             ty,
-            hidden_with_value: options.hidden_value,
+            constant: options.constant,
             optional_with_default: options.default,
             rest: options.rest,
         });
@@ -73,7 +73,7 @@ pub fn parse_unnamed_fields(fields: &FieldsUnnamed) -> Vec<FieldInfo> {
         items.push(FieldInfo {
             ident,
             ty,
-            hidden_with_value: options.hidden_value,
+            constant: options.constant,
             optional_with_default: options.default,
             rest: options.rest,
         });
@@ -99,8 +99,8 @@ fn check_field_options(options: &ClvmOptions) {
         panic!("`crate_name` can't be set on individual fields");
     }
 
-    if options.default.is_some() && options.hidden_value.is_some() {
-        panic!("`default` can't be used with `hidden_value` set");
+    if options.default.is_some() && options.constant.is_some() {
+        panic!("`default` can't be used with `constant` set");
     }
 
     if options.default.is_some() && options.rest {
