@@ -175,7 +175,7 @@ pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
     max_block_cost_clvm: 11000000000,
     cost_per_byte: 12000,
     weight_proof_threshold: 2,
-    blocks_cache_size: 4608 + 128 * 4,
+    blocks_cache_size: 4608 + (128 * 4),
     weight_proof_recent_blocks: 1000,
     max_block_count_per_requests: 32,
     max_generator_size: 1000000,
