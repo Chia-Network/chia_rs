@@ -56,7 +56,7 @@ fn pre_validate_spendbundle(
 fn validate_clvm_and_signature(
     spend_bundle: SpendBundle, 
     max_cost: u64, 
-    constants: ConsensusConstants, 
+    agg_sig_me_add_data: &[u8], 
     height: u32,
     syncing: bool,
     cache: Arc<Mutex<BLSCache>>
@@ -89,6 +89,9 @@ fn validate_clvm_and_signature(
 #[cfg(feature = "py-bindings")]
 #[pymethods]
 mod py_funcs {
+    use crate::gen::owned_conditions;
+
+
     #[pyo3(name = "pre_validate_spendbundle")]
     pub fn py_pre_validate_spendbundle(
         new_spend: SpendBundle, 
@@ -96,8 +99,16 @@ mod py_funcs {
         constants: ConsensusConstants, 
         peak_height: u32, 
         cache: Arc<Mutex<BLSCache>>
-    ) {
-
+    ) -> PyResult<(SpendBundle, OwnedSpendBundleConditions)> {
+        let sbc = validate_clvm_and_signature(new_spend, max_cost, constants, height, syncing, True);  // TODO: use cache
+        match sbc {
+            Ok(owned_conditions) => {
+                Ok((new_spend, sbc.0))
+            },
+            Err(e) => {
+                Err(e)
+            }
+        }
     }
 }
 
@@ -146,4 +157,30 @@ pub fn get_flags_for_height_and_constants(height: u32, constants: ConsensusConst
             | ALLOW_BACKREFS
     }
     flags
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    
+
+    #[test]
+    fn test_validate_no_pks() {
+        let solution = "ff\
+ff33\
+ffa02222222222222222222222222222222222222222222222222222222222222222\
+ff01\
+80\
+80";
+        let solution = hex::decode(solution).expect("hex::decode");
+        let spend = CoinSpend::new(
+            test_coin,
+            Program::new(vec![1_u8].into()),
+            Program::new(solution),
+        );
+        let coin_spends: Vec<CoinSpends> = vec![spend];
+        let spend_bundle = SpendBundle{coin_spends: coin_spends, aggregated_signature: Signature.aggregate([])};
+        let result = validate_clvm_and_signature(spend_bundle, 10000, );
+    }
 }
