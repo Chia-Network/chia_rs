@@ -37,10 +37,11 @@ impl SingletonArgs<TreeHash> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[clvm(tuple)]
+#[clvm(list)]
 pub struct SingletonStruct {
     pub mod_hash: Bytes32,
     pub launcher_id: Bytes32,
+    #[clvm(rest)]
     pub launcher_puzzle_hash: Bytes32,
 }
 

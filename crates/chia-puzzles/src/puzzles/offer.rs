@@ -5,22 +5,23 @@ use hex_literal::hex;
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[clvm(tuple)]
+#[clvm(transparent)]
 pub struct SettlementPaymentsSolution {
     pub notarized_payments: Vec<NotarizedPayment>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[clvm(tuple)]
+#[clvm(list)]
 pub struct NotarizedPayment {
     pub nonce: Bytes32,
+    #[clvm(rest)]
     pub payments: Vec<Payment>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[clvm(tuple, untagged)]
+#[clvm(transparent)]
 pub enum Payment {
     WithoutMemos(PaymentWithoutMemos),
     WithMemos(PaymentWithMemos),
