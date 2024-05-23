@@ -48,12 +48,6 @@ impl Bytes {
     }
 }
 
-impl Bytes32 {
-    pub const fn const_new(data: [u8; 32]) -> Self {
-        BytesImpl(data)
-    }
-}
-
 impl fmt::Debug for Bytes {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&hex::encode(self))
