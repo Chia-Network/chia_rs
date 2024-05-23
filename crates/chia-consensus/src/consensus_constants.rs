@@ -143,9 +143,11 @@ pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
     max_sub_slot_blocks: 128,
     num_sps_sub_slot: 64,
     sub_slot_iters_starting: u64::pow(2, 27),
+
     difficulty_constant_factor: u128::pow(2, 67),
     difficulty_starting: 7,
     difficulty_change_max_factor: 3,
+
     sub_epoch_blocks: 384,
     epoch_blocks: 4608,
     significant_bits: 8,
@@ -157,6 +159,7 @@ pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
     num_sp_intervals_extra: 3,
     max_future_time2: 2 * 60,
     number_of_timestamps: 11,
+
     genesis_challenge: Bytes32::new(hex!(
         "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     )),
@@ -176,6 +179,7 @@ pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
     cost_per_byte: 12000,
     weight_proof_threshold: 2,
     blocks_cache_size: 4608 + 128 * 4,
+
     weight_proof_recent_blocks: 1000,
     max_block_count_per_requests: 32,
     max_generator_size: 1000000,
@@ -184,6 +188,7 @@ pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
     soft_fork2_height: 0,
     soft_fork4_height: 5716000,
     soft_fork5_height: 5940000,
+
     hard_fork_height: 5496000,
     hard_fork_fix_height: 5496000,
     plot_filter_128_height: 10542000,
