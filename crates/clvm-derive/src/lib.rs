@@ -1,13 +1,13 @@
 extern crate proc_macro;
 
+mod apply_constants;
 mod from_clvm;
 mod helpers;
-mod hide_values;
 mod parser;
 mod to_clvm;
 
+use apply_constants::impl_apply_constants;
 use from_clvm::from_clvm;
-use hide_values::impl_apply_constants;
 use proc_macro::TokenStream;
 
 use proc_macro2::Span;
