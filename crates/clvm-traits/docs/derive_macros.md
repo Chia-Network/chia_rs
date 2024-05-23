@@ -245,7 +245,7 @@ For convenience, this is the behavior when deriving `ToClvm` and `FromClvm` for 
 
 ### Simple Example
 
-In this example, since the `tuple` representation is used and the only values are the discriminants, the variants will be encoded as an atom.
+In this example, since the `atom` representation, the variants will be encoded as an integer.
 Discriminants default to the `isize` type and the first value is `0`. Subsequent values are incremented by `1` by default.
 
 ```rust
