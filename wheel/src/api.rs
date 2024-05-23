@@ -3,9 +3,9 @@ use chia_consensus::allocator::make_allocator;
 use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::gen::conditions::MempoolVisitor;
 use chia_consensus::gen::flags::{
-    AGG_SIG_ARGS, ALLOW_BACKREFS, ANALYZE_SPENDS, COND_ARGS_NIL, ENABLE_MESSAGE_CONDITIONS,
-    ENABLE_SOFTFORK_CONDITION, MEMPOOL_MODE, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL, NO_UNKNOWN_CONDS,
-    STRICT_ARGS_COUNT,
+    AGG_SIG_ARGS, ALLOW_BACKREFS, ANALYZE_SPENDS, COND_ARGS_NIL, DISALLOW_INFINITY_G1,
+    ENABLE_MESSAGE_CONDITIONS, ENABLE_SOFTFORK_CONDITION, MEMPOOL_MODE,
+    NO_RELATIVE_CONDITIONS_ON_EPHEMERAL, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
 };
 use chia_consensus::gen::owned_conditions::{OwnedSpend, OwnedSpendBundleConditions};
 use chia_consensus::gen::run_puzzle::run_puzzle as native_run_puzzle;
@@ -408,6 +408,7 @@ pub fn chia_rs(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add("MEMPOOL_MODE", MEMPOOL_MODE)?;
     m.add("ALLOW_BACKREFS", ALLOW_BACKREFS)?;
     m.add("ANALYZE_SPENDS", ANALYZE_SPENDS)?;
+    m.add("DISALLOW_INFINITY_G1", DISALLOW_INFINITY_G1)?;
 
     // Chia classes
     m.add_class::<Coin>()?;

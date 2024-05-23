@@ -1,5 +1,6 @@
 use clap::Parser;
 
+use chia_bls::PublicKey;
 use chia_consensus::gen::conditions::{EmptyVisitor, NewCoin, Spend, SpendBundleConditions};
 use chia_consensus::gen::flags::{ALLOW_BACKREFS, MEMPOOL_MODE};
 use chia_consensus::gen::run_block_generator::{run_block_generator, run_block_generator2};
@@ -63,11 +64,15 @@ fn compare_new_coins(a: &Allocator, lhs: &HashSet<NewCoin>, rhs: &HashSet<NewCoi
     }
 }
 
-fn compare_agg_sig(a: &Allocator, lhs: &Vec<(NodePtr, NodePtr)>, rhs: &Vec<(NodePtr, NodePtr)>) {
+fn compare_agg_sig(
+    a: &Allocator,
+    lhs: &Vec<(PublicKey, NodePtr)>,
+    rhs: &Vec<(PublicKey, NodePtr)>,
+) {
     assert_eq!(lhs.len(), rhs.len());
 
     for (l, r) in std::iter::zip(lhs, rhs) {
-        assert_eq!(a.atom(l.0), a.atom(r.0));
+        assert_eq!(l.0, r.0);
         assert_eq!(a.atom(l.1), a.atom(r.1));
     }
 }

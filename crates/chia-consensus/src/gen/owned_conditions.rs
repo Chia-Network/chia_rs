@@ -112,10 +112,7 @@ impl OwnedSpendBundleConditions {
 
         let mut agg_sigs = Vec::<(PublicKey, Bytes)>::with_capacity(sb.agg_sig_unsafe.len());
         for (pk, msg) in sb.agg_sig_unsafe {
-            agg_sigs.push((
-                PublicKey::from_bytes(a.atom(pk).as_ref().try_into().unwrap())?,
-                a.atom(msg).as_ref().into(),
-            ));
+            agg_sigs.push((pk, a.atom(msg).as_ref().into()));
         }
 
         Ok(Self {
@@ -135,14 +132,11 @@ impl OwnedSpendBundleConditions {
 
 fn convert_agg_sigs(
     a: &Allocator,
-    agg_sigs: &[(NodePtr, NodePtr)],
+    agg_sigs: &[(PublicKey, NodePtr)],
 ) -> Result<Vec<(PublicKey, Bytes)>> {
     let mut ret = Vec::<(PublicKey, Bytes)>::new();
     for (pk, msg) in agg_sigs {
-        ret.push((
-            PublicKey::from_bytes(a.atom(*pk).as_ref().try_into().unwrap())?,
-            a.atom(*msg).as_ref().into(),
-        ));
+        ret.push((*pk, a.atom(*msg).as_ref().into()));
     }
     Ok(ret)
 }

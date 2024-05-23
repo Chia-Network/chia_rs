@@ -134,6 +134,10 @@ impl PublicKey {
         unsafe { blst_p1_is_inf(&self.0) || blst_p1_in_g1(&self.0) }
     }
 
+    pub fn is_inf(&self) -> bool {
+        unsafe { blst_p1_is_inf(&self.0) }
+    }
+
     pub fn negate(&mut self) {
         unsafe {
             blst_p1_cneg(&mut self.0, true);
@@ -547,6 +551,32 @@ mod tests {
             let sk = SecretKey::from_seed(&data);
             let pk = sk.public_key();
             assert!(pk.is_valid());
+        }
+    }
+
+    #[test]
+    fn test_default_is_inf() {
+        let pk = PublicKey::default();
+        assert!(pk.is_inf());
+    }
+
+    #[test]
+    fn test_infinity() {
+        let mut data = [0u8; 48];
+        data[0] = 0xc0;
+        let pk = PublicKey::from_bytes(&data).unwrap();
+        assert!(pk.is_inf());
+    }
+
+    #[test]
+    fn test_is_inf() {
+        let mut rng = StdRng::seed_from_u64(1337);
+        let mut data = [0u8; 32];
+        for _i in 0..500 {
+            rng.fill(data.as_mut_slice());
+            let sk = SecretKey::from_seed(&data);
+            let pk = sk.public_key();
+            assert!(!pk.is_inf());
         }
     }
 

@@ -36,10 +36,17 @@ pub const ANALYZE_SPENDS: u32 = 0x4000000;
 // This enables support for the new SEND_MESSAGE and RECEIVE_MESSAGE conditions
 pub const ENABLE_MESSAGE_CONDITIONS: u32 = 0x8000000;
 
+// When this flag is set, we reject AGG_SIG_* conditions whose public key is the
+// infinity G1 point. Such public keys are mathematically valid, but do not
+// provide any security guarantees. Chia has historically allowed them. Enabling
+// this flag is a soft-fork.
+pub const DISALLOW_INFINITY_G1: u32 = 0x10000000;
+
 pub const MEMPOOL_MODE: u32 = CLVM_MEMPOOL_MODE
     | NO_UNKNOWN_CONDS
     | COND_ARGS_NIL
     | STRICT_ARGS_COUNT
     | NO_RELATIVE_CONDITIONS_ON_EPHEMERAL
     | ANALYZE_SPENDS
-    | ENABLE_MESSAGE_CONDITIONS;
+    | ENABLE_MESSAGE_CONDITIONS
+    | DISALLOW_INFINITY_G1;
