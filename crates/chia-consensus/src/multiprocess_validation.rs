@@ -4,8 +4,7 @@ use std::sync::{Arc, Mutex};
 use crate::consensus_constants::ConsensusConstants;
 
 use crate::gen::owned_conditions::OwnedSpendBundleConditions;
-use crate::gen::validation_error::ValidationErr;
-use crate::gen::errors::Err;
+use crate::gen::validation_error::ErrorCode;
 use std::time::{Duration, Instant};
 use chia_protocol::SpendBundle;
 use chia_protocol::Coin;
@@ -44,31 +43,37 @@ fn pre_validate_spendbundle(
     peak_height: u32, 
     syncing: bool,
     cache: Arc<Mutex<BlsCache>>
-) -> Result<OwnedSpendBundleConditions, Err> {
+) -> Result<OwnedSpendBundleConditions, ErrorCode> {
     if new_spend.coin_spends.is_empty() {
-        Err(())
+        Err(ErrorCode::InvalidSpendBundle)
     } else {
-        validate_clvm_and_signature(new_spend, max_cost, constants, peak_height, syncing, cache)    }
+        let (result, duration) = validate_clvm_and_signature(&new_spend, max_cost, constants, peak_height, syncing, cache)?;
+        Ok(result)
+    }
 }
 
 // currently in mempool_manager.py
 // called in threads from pre_validate_spend_bundle()
 // returns (error, cached_results, new_cache_entries, duration)
 fn validate_clvm_and_signature(
-    spend_bundle: SpendBundle, 
+    spend_bundle: &SpendBundle, 
     max_cost: u64, 
     constants: ConsensusConstants, 
     height: u32,
     syncing: bool,
     cache: Arc<Mutex<BlsCache>>
-) -> Result<(OwnedSpendBundleConditions, Duration), Err> {
+) -> Result<(OwnedSpendBundleConditions, Duration), ErrorCode> {
     let start_time = Instant::now();
     let additional_data = constants.agg_sig_me_additional_data;
-    let program: BlockGenerator = simple_solution_generator(spend_bundle)?;
+    let program: BlockGenerator = simple_solution_generator(&spend_bundle)?;
     let npcresult = get_name_puzzle_conditions(
         program, max_cost, true, height, constants
-    )?;
-    let (pks, msgs) = pkm_pairs(npcresult, additional_data)?;
+    );
+    match npcresult {
+        Err(e) => {return Err(e)},
+        Ok(unwrapped) => {let npcresult = unwrapped;}
+    }
+    let (pks, msgs) = pkm_pairs(npcresult, additional_data.as_slice())?;
 
     // Verify aggregated signature
     if !{
@@ -82,58 +87,69 @@ fn validate_clvm_and_signature(
             } 
         } 
         {
-            Err(ValidationErr)
+            return Err(ErrorCode::InvalidSpendBundle)
         }
     Ok((npcresult, start_time.elapsed()))
 }
 
-#[cfg(feature = "py-bindings")]
-mod py_funcs {
-    use super::*;
-    use pyo3::{
-        exceptions::PyValueError,
-        pybacked::PyBackedBytes,
-        pyfunction,
-        types::{PyAnyMethods, PyList},
-        Bound, PyObject, PyResult,
-    };
-    use crate::gen::owned_conditions;
+// #[cfg(feature = "py-bindings")]
+// mod py_funcs {
+//     use super::*;
+//     use pyo3::{
+//         exceptions::PyValueError,
+//         pybacked::PyBackedBytes,
+//         pyfunction,
+//         types::{PyAnyMethods, PyList},
+//         Bound, PyObject, PyResult,
+//     };
+//     use crate::gen::owned_conditions;
     
 
     
-    #[pyfunction]
-    #[pyo3(name = "pre_validate_spendbundle")]
-    pub fn py_pre_validate_spendbundle(
-        new_spend: SpendBundle, 
-        max_cost: u64, 
-        constants: ConsensusConstants, 
-        peak_height: u32, 
-        syncing: bool,
-        cache: BlsCache
-    ) -> PyResult<(SpendBundle, OwnedSpendBundleConditions)> {
-        let sbc = validate_clvm_and_signature(new_spend, max_cost, constants, peak_height, syncing, Arc::new(Mutex::new(cache)));  // TODO: use cache properly
-        match sbc {
-            Ok(owned_conditions) => {
-                Ok((new_spend, sbc.0))
-            },
-            Err(e) => {
-                Err(e)
-            }
-        }
-    }
-}
+//     #[pyfunction]
+//     #[pyo3(name = "pre_validate_spendbundle")]
+//     pub fn py_pre_validate_spendbundle(
+//         new_spend: SpendBundle, 
+//         max_cost: u64, 
+//         constants: ConsensusConstants, 
+//         peak_height: u32, 
+//         syncing: bool,
+//         cache: BlsCache
+//     ) -> Result<(SpendBundle, OwnedSpendBundleConditions), ErrorCode> {
+//         let sbc = validate_clvm_and_signature(&new_spend, max_cost, constants, peak_height, syncing, Arc::new(Mutex::new(cache)));  // TODO: use cache properly
+//         match sbc {
+//             Ok(owned_conditions) => {
+//                 Ok((new_spend, owned_conditions.0))
+//             },
+//             Err(e) => {
+//                 Err(e)
+//             }
+//         }
+//     }
+// }
 
-pub fn simple_solution_generator(bundle: SpendBundle) -> Result<BlockGenerator, Err> {
+pub fn simple_solution_generator(bundle: &SpendBundle) -> Result<BlockGenerator, ErrorCode> {
     let mut spends = Vec::<(Coin, &[u8], &[u8])>::new();
-    for cs in bundle.coin_spends {
-        spends.push((cs.coin, cs.puzzle_reveal.into_inner().as_slice(), cs.solution.into_inner().as_slice()));
+    for cs in bundle.clone().coin_spends {
+        let puz = cs.puzzle_reveal.into_inner().as_slice();
+        spends.push((cs.coin, puz, cs.solution.into_inner().as_slice()));
     }
-    let block_program = solution_generator(spends)?;
-    Ok(BlockGenerator{
-        program: Program::from_bytes(block_program.as_slice())?, 
-        generator_refs: Vec::<Program>::new(),
-        block_height_list: Vec::<u32>::new(),
-    })
+    let block_program = solution_generator(spends);
+    match block_program {
+        Ok(bp) => {
+            let program = Program::from_bytes(bp.as_slice());
+            match program {
+                Ok(p) => Ok(BlockGenerator{
+                    program: p,
+                    generator_refs: Vec::<Program>::new(),
+                    block_height_list: Vec::<u32>::new(),
+                }),
+                Err(_) =>  Err(ErrorCode::InvalidSpendBundle)
+            }
+        },
+        Err(_) => Err(ErrorCode::InvalidSpendBundle),
+    }
+    
 }
 
 pub fn get_flags_for_height_and_constants(height: u32, constants: ConsensusConstants) -> u32 {
@@ -205,12 +221,13 @@ ff01\
         let coin_spends: Vec<CoinSpend> = vec![spend];
         let spend_bundle = SpendBundle{coin_spends: coin_spends, aggregated_signature: Signature::default()};
         let result = validate_clvm_and_signature(
-            spend_bundle, 
+            &spend_bundle, 
             1000000, 
             TEST_CONSTANTS,
             236,
             true,
             Arc::new(Mutex::new(BlsCache::default())),
         );
+        result.unwrap();
     }
 }

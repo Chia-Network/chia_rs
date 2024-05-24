@@ -2,7 +2,7 @@ use crate::gen::conditions::{
     parse_conditions, MempoolVisitor, ParseState, Spend, SpendBundleConditions,
 };
 use crate::gen::owned_conditions::OwnedSpendBundleConditions;
-use crate::gen::validation_error::ValidationErr;
+use crate::gen::validation_error::ErrorCode;
 use crate::generator_types::BlockGenerator;
 use crate::consensus_constants::ConsensusConstants;
 use crate::gen::run_block_generator::{run_block_generator, run_block_generator2};
@@ -55,5 +55,5 @@ pub fn get_name_puzzle_conditions<GenBuf: AsRef<[u8]>>(
     }
     let mut a2 = make_allocator(LIMIT_HEAP);
     let sbc: SpendBundleConditions = run_block(&mut a2, generator.program.into_inner().as_slice(), &block_args, max_cost, flags);
-    OwnedSpendBundleConditions.from(&mut a2, sbc)
+    Ok(OwnedSpendBundleConditions::from(&mut a2, sbc))
 }

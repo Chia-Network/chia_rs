@@ -1,20 +1,20 @@
 use std::collections::HashMap;
-use crate::gen::SpendBundleConditions;
-use crate::gen::conditions::Condition;
+use crate::gen::owned_conditions::OwnedSpendBundleConditions;
 use chia_bls::PublicKey;
+use chia_protocol::Coin;
 use crate::gen::opcodes::{AGG_SIG_AMOUNT, AGG_SIG_PARENT, AGG_SIG_PARENT_PUZZLE, AGG_SIG_PUZZLE_AMOUNT,
-    AGG_SIG_PUZZLE_AMOUNT, AGG_SIG_ME, AGG_SIG_UNSAFE, AGG_SIG_PUZZLE, AGG_SIG_PARENT_AMOUNT};
+    AGG_SIG_PUZZLE_AMOUNT, AGG_SIG_ME, AGG_SIG_UNSAFE, AGG_SIG_PUZZLE, AGG_SIG_PARENT_AMOUNT, ConditionOpcode};
 
 pub fn pkm_pairs(conditions: OwnedSpendBundleConditions, additional_data: &[u8]) -> Result<(Vec<PublicKey>, Vec<&[u8]>), Err> {
-    let pks = Vec<PublicKey>::new();
-    let msgs = Vec<&[u8]>::new();
+    let pks = Vec::<PublicKey>::new();
+    let msgs = Vec::<&[u8]>::new();
     let disallowed = agg_sig_additional_data(additional_data);
     for (pk, msg) in conditions.agg_sig_unsafe {
         pks.push(pk);
-        msgs.push(msg);
+        msgs.push(&msg);
         for (_, disallowed_val) in disallowed.into_iter() {
-            if msg.ends_with(disallowed_val) {
-                return Err()
+            if msg.ends_with(disallowed_val.as_slice()) {
+                return Err(())
             }
         }
     }
@@ -43,7 +43,7 @@ fn make_aggsig_final_message(
     msg: Vec<u8>,
     spend: &dyn Into<Coin>,
     agg_sig_additional_data: HashMap<ConditionOpcode, Vec<u8>>,
-) -> Vec<u8> {
+) -> &[u8] {
     let coin: Coin;
     if let Some(coin_spend) = spend.into().as_any().downcast_ref::<Coin>() {
         coin = coin_spend.clone();
@@ -73,8 +73,7 @@ fn make_aggsig_final_message(
 }
 
 fn agg_sig_additional_data(agg_sig_data: &[u8]) -> HashMap<ConditionOpcode, Vec<u8>> {
-    let mut ret: HashMap<ConditionOpcode, Vec<u8>> = HashMap::new();
-
+    let mut ret: HashMap<ConditionOpcode, &[u8]> = HashMap::new();
     for code in [
         AGG_SIG_PARENT,
         AGG_SIG_PUZZLE,
