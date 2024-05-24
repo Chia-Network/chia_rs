@@ -56,7 +56,7 @@ fn pre_validate_spendbundle(
 fn validate_clvm_and_signature(
     spend_bundle: SpendBundle, 
     max_cost: u64, 
-    agg_sig_me_add_data: &[u8], 
+    constants: ConsensusConstants, 
     height: u32,
     syncing: bool,
     cache: Arc<Mutex<BLSCache>>
@@ -87,12 +87,11 @@ fn validate_clvm_and_signature(
 }
 
 #[cfg(feature = "py-bindings")]
-#[pymethods]
 mod py_funcs {
     use crate::gen::owned_conditions;
 
-
     #[pyo3(name = "pre_validate_spendbundle")]
+    #[pymethods]
     pub fn py_pre_validate_spendbundle(
         new_spend: SpendBundle, 
         max_cost: u64, 
@@ -162,8 +161,8 @@ pub fn get_flags_for_height_and_constants(height: u32, constants: ConsensusConst
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    
+    use crate::consensus_constants::TEST_CONSTANTS;
+    use crate::coin_spend::CoinSpend;
 
     #[test]
     fn test_validate_no_pks() {
@@ -173,7 +172,7 @@ ffa02222222222222222222222222222222222222222222222222222222222222222\
 ff01\
 80\
 80";
-        let solution = hex::decode(solution).expect("hex::decode");
+        let solution = hex::decode(solution).expect("hex::decode").try_into().unwrap();
         let spend = CoinSpend::new(
             test_coin,
             Program::new(vec![1_u8].into()),
@@ -181,6 +180,13 @@ ff01\
         );
         let coin_spends: Vec<CoinSpends> = vec![spend];
         let spend_bundle = SpendBundle{coin_spends: coin_spends, aggregated_signature: Signature.aggregate([])};
-        let result = validate_clvm_and_signature(spend_bundle, 10000, );
+        let result = validate_clvm_and_signature(
+            spend_bundle, 
+            1000000, 
+            TEST_CONSTANTS,
+            236,
+            True,
+            BLSCache::default(),
+        );
     }
 }

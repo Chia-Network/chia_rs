@@ -11,6 +11,7 @@ use crate::gen::flags::MEMPOOL_MODE;
 use chia_streamable_macro::streamable;
 use chia_protocol::Program;
 use crate::allocator::make_allocator;
+use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::LIMIT_HEAP;
 
 #[cfg(feature = "py-bindings")]
