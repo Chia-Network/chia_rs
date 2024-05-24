@@ -2,10 +2,10 @@
 use std::thread;
 use std::sync::{Arc, Mutex};
 use crate::consensus_constants::ConsensusConstants;
+
 use crate::gen::owned_conditions::OwnedSpendBundleConditions;
 use crate::gen::validation_error::ValidationErr;
 use crate::gen::errors::Err;
-use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use chia_protocol::SpendBundle;
 use chia_protocol::Coin;
@@ -20,7 +20,8 @@ use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV};
 use crate::npc_result::get_name_puzzle_conditions;
 use crate::gen::condition_tools::pkm_pairs;
 use chia_traits::Streamable;
-use chia_bls::cached_bls::BLSCache;
+use chia_bls::BlsCache;
+use chia_bls::aggregate_verify;
 
 // currently in multiprocess_validation.py
 // called via blockchain.py from full_node.py when a full node wants to add a block or batch of blocks
@@ -41,13 +42,13 @@ fn pre_validate_spendbundle(
     max_cost: u64, 
     constants: ConsensusConstants, 
     peak_height: u32, 
-    cache: Arc<Mutex<BLSCache>>
+    syncing: bool,
+    cache: Arc<Mutex<BlsCache>>
 ) -> Result<OwnedSpendBundleConditions, Err> {
     if new_spend.coin_spends.is_empty() {
         Err(())
     } else {
-        validate_clvm_and_signature(new_spend, max_cost, constants, peak_height, cache)
-    }
+        validate_clvm_and_signature(new_spend, max_cost, constants, peak_height, syncing, cache)    }
 }
 
 // currently in mempool_manager.py
@@ -59,22 +60,22 @@ fn validate_clvm_and_signature(
     constants: ConsensusConstants, 
     height: u32,
     syncing: bool,
-    cache: Arc<Mutex<BLSCache>>
+    cache: Arc<Mutex<BlsCache>>
 ) -> Result<(OwnedSpendBundleConditions, Duration), Err> {
     let start_time = Instant::now();
     let additional_data = constants.agg_sig_me_additional_data;
     let program: BlockGenerator = simple_solution_generator(spend_bundle)?;
     let npcresult = get_name_puzzle_conditions(
-        program, max_cost, true, constants, height
+        program, max_cost, true, height, constants
     )?;
-    let (pks, msgs) = pkm_pairs(npcresult.conds, additional_data)?;
+    let (pks, msgs) = pkm_pairs(npcresult, additional_data)?;
 
     // Verify aggregated signature
     if !{
             if syncing { // if we're syncing use the chia_bls::aggregate_verify to avoid using the cache
                 aggregate_verify(
-                    &agg_sig,
-                    pks.iter().map(|pk| (pk, &msg[..]))
+                    &spend_bundle.aggregated_signature,
+                    pks.iter().map(|pk| (pk, &msgs[..]))
                 )
             } else {  // if we're fully synced then use the cache
                 cache.lock().unwrap().aggregate_verify(pks, msgs, &spend_bundle.aggregated_signature)
@@ -88,16 +89,26 @@ fn validate_clvm_and_signature(
 
 #[cfg(feature = "py-bindings")]
 mod py_funcs {
+    use super::*;
+    use pyo3::{
+        exceptions::PyValueError,
+        pybacked::PyBackedBytes,
+        pyfunction,
+        types::{PyAnyMethods, PyList},
+        Bound, PyObject, PyResult,
+    };
     use crate::gen::owned_conditions;
+    
 
+    
+    #[pyfunction]
     #[pyo3(name = "pre_validate_spendbundle")]
-    #[pymethods]
     pub fn py_pre_validate_spendbundle(
         new_spend: SpendBundle, 
         max_cost: u64, 
         constants: ConsensusConstants, 
         peak_height: u32, 
-        cache: Arc<Mutex<BLSCache>>
+        cache: Arc<Mutex<BlsCache>>
     ) -> PyResult<(SpendBundle, OwnedSpendBundleConditions)> {
         let sbc = validate_clvm_and_signature(new_spend, max_cost, constants, height, syncing, True);  // TODO: use cache
         match sbc {
@@ -162,7 +173,8 @@ pub fn get_flags_for_height_and_constants(height: u32, constants: ConsensusConst
 mod tests {
     use super::*;
     use crate::consensus_constants::TEST_CONSTANTS;
-    use crate::coin_spend::CoinSpend;
+    use chia_protocol::CoinSpend;
+    use chia_bls::Signature;
 
     #[test]
     fn test_validate_no_pks() {
@@ -178,15 +190,15 @@ ff01\
             Program::new(vec![1_u8].into()),
             Program::new(solution),
         );
-        let coin_spends: Vec<CoinSpends> = vec![spend];
-        let spend_bundle = SpendBundle{coin_spends: coin_spends, aggregated_signature: Signature.aggregate([])};
+        let coin_spends: Vec<CoinSpend> = vec![spend];
+        let spend_bundle = SpendBundle{coin_spends: coin_spends, aggregated_signature: Signature::aggregate([])};
         let result = validate_clvm_and_signature(
             spend_bundle, 
             1000000, 
             TEST_CONSTANTS,
             236,
-            True,
-            BLSCache::default(),
+            true,
+            BlsCache::default(),
         );
     }
 }
