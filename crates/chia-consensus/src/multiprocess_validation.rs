@@ -108,9 +108,10 @@ mod py_funcs {
         max_cost: u64, 
         constants: ConsensusConstants, 
         peak_height: u32, 
-        cache: Arc<Mutex<BlsCache>>
+        syncing: bool,
+        cache: BlsCache
     ) -> PyResult<(SpendBundle, OwnedSpendBundleConditions)> {
-        let sbc = validate_clvm_and_signature(new_spend, max_cost, constants, height, syncing, True);  // TODO: use cache
+        let sbc = validate_clvm_and_signature(new_spend, max_cost, constants, peak_height, syncing, Arc::new(Mutex::new(cache)));  // TODO: use cache properly
         match sbc {
             Ok(owned_conditions) => {
                 Ok((new_spend, sbc.0))
@@ -178,6 +179,17 @@ mod tests {
 
     #[test]
     fn test_validate_no_pks() {
+        let test_coin = Coin::new(
+            hex::decode("4444444444444444444444444444444444444444444444444444444444444444")
+                .unwrap()
+                .try_into()
+                .unwrap(),
+            hex::decode("3333333333333333333333333333333333333333333333333333333333333333")
+                .unwrap()
+                .try_into()
+                .unwrap(),
+            1,
+        );
         let solution = "ff\
 ff33\
 ffa02222222222222222222222222222222222222222222222222222222222222222\
@@ -191,14 +203,14 @@ ff01\
             Program::new(solution),
         );
         let coin_spends: Vec<CoinSpend> = vec![spend];
-        let spend_bundle = SpendBundle{coin_spends: coin_spends, aggregated_signature: Signature::aggregate([])};
+        let spend_bundle = SpendBundle{coin_spends: coin_spends, aggregated_signature: Signature::default()};
         let result = validate_clvm_and_signature(
             spend_bundle, 
             1000000, 
             TEST_CONSTANTS,
             236,
             true,
-            BlsCache::default(),
+            Arc::new(Mutex::new(BlsCache::default())),
         );
     }
 }
