@@ -1,20 +1,22 @@
 use std::collections::HashMap;
-use crate::gen::owned_conditions::OwnedSpendBundleConditions;
+use crate::gen::owned_conditions::{OwnedSpendBundleConditions, OwnedSpend};
 use chia_bls::PublicKey;
 use chia_protocol::Coin;
-use crate::gen::opcodes::{AGG_SIG_AMOUNT, AGG_SIG_PARENT, AGG_SIG_PARENT_PUZZLE, AGG_SIG_PUZZLE_AMOUNT,
+use crate::gen::validation_error::ErrorCode;
+use crate::gen::opcodes::{AGG_SIG_AMOUNT, AGG_SIG_PARENT, AGG_SIG_PARENT_PUZZLE,
     AGG_SIG_PUZZLE_AMOUNT, AGG_SIG_ME, AGG_SIG_UNSAFE, AGG_SIG_PUZZLE, AGG_SIG_PARENT_AMOUNT, ConditionOpcode};
+use crate::gen::conditions::Spend;
 
-pub fn pkm_pairs(conditions: OwnedSpendBundleConditions, additional_data: &[u8]) -> Result<(Vec<PublicKey>, Vec<&[u8]>), Err> {
-    let pks = Vec::<PublicKey>::new();
-    let msgs = Vec::<&[u8]>::new();
+pub fn pkm_pairs(conditions: OwnedSpendBundleConditions, additional_data: &[u8]) -> Result<(Vec<PublicKey>, Vec<Vec<u8>>), ErrorCode> {
+    let mut pks = Vec::<PublicKey>::new();
+    let mut msgs = Vec::<Vec<u8>>::new();
     let disallowed = agg_sig_additional_data(additional_data);
     for (pk, msg) in conditions.agg_sig_unsafe {
         pks.push(pk);
-        msgs.push(&msg);
+        msgs.push(msg.as_slice().to_vec());
         for (_, disallowed_val) in disallowed.into_iter() {
             if msg.ends_with(disallowed_val.as_slice()) {
-                return Err(())
+                return Err(ErrorCode::InvalidCondition)
             }
         }
     }
@@ -31,7 +33,7 @@ pub fn pkm_pairs(conditions: OwnedSpendBundleConditions, additional_data: &[u8])
         for (condition, items) in condition_items_pairs {
             for (pk, msg) in items {
                 pks.push(pk);
-                msgs.push(make_aggsig_final_message(condition, &msg, spend, data));
+                msgs.push(make_aggsig_final_message(condition, msg.as_slice().to_vec(), spend, disallowed));
             }
         }
     }
@@ -41,35 +43,44 @@ pub fn pkm_pairs(conditions: OwnedSpendBundleConditions, additional_data: &[u8])
 fn make_aggsig_final_message(
     opcode: ConditionOpcode,
     msg: Vec<u8>,
-    spend: &dyn Into<Coin>,
+    spend: OwnedSpend,
     agg_sig_additional_data: HashMap<ConditionOpcode, Vec<u8>>,
-) -> &[u8] {
-    let coin: Coin;
-    if let Some(coin_spend) = spend.into().as_any().downcast_ref::<Coin>() {
-        coin = coin_spend.clone();
-    } else if let Some(spend) = spend.into().as_any().downcast_ref::<Spend>() {
-        coin = Coin::new(
-            spend.parent_id.clone(),
-            spend.puzzle_hash.clone(),
-            spend.coin_amount as u64,
-        );
-    } else {
-        panic!("Expected Coin or Spend, got {:?}", spend); 
+) -> Vec<u8> {
+    let coin: Coin = Coin::new(
+        spend.parent_id.clone(),
+        spend.puzzle_hash.clone(),
+        spend.coin_amount as u64,
+    );
+
+    let addendum = match opcode {
+        AGG_SIG_PARENT => coin.parent_coin_info.clone(),
+        AGG_SIG_PUZZLE => coin.puzzle_hash.clone(),
+        AGG_SIG_AMOUNT => int_to_bytes(coin.amount),
+        AGG_SIG_PUZZLE_AMOUNT => {
+            let mut data = coin.puzzle_hash.clone();
+            data.extend(int_to_bytes(coin.amount));
+            data
+        }
+        AGG_SIG_PARENT_AMOUNT => {
+            let mut data = coin.parent_coin_info.clone();
+            data.extend(int_to_bytes(coin.amount));
+            data
+        }
+        AGG_SIG_PARENT_PUZZLE => {
+            let mut data = coin.parent_coin_info.clone();
+            data.extend(coin.puzzle_hash.clone());
+            data
+        }
+        AGG_SIG_ME => coin_name(&coin),
+    };
+
+    let mut result = msg.to_vec();
+    result.extend(addendum);
+    if let Some(additional_data) = agg_sig_additional_data.get(&opcode) {
+        result.extend(additional_data.clone());
     }
 
-    let mut coin_to_addendum_f_lookup: HashMap<ConditionOpcode, Box<dyn Fn(&Coin) -> Vec<u8>>> = HashMap::new();
-    coin_to_addendum_f_lookup.insert(AGG_SIG_PARENT, Box::new(|coin| coin.parent_coin_info.clone()));
-    coin_to_addendum_f_lookup.insert(AGG_SIG_PUZZLE, Box::new(|coin| coin.puzzle_hash.clone()));
-    coin_to_addendum_f_lookup.insert(AGG_SIG_AMOUNT, Box::new(|coin| int_to_bytes(coin.amount)));
-    coin_to_addendum_f_lookup.insert(AGG_SIG_PUZZLE_AMOUNT, Box::new(|coin| coin.puzzle_hash.clone() + &int_to_bytes(coin.amount)));
-    coin_to_addendum_f_lookup.insert(AGG_SIG_PARENT_AMOUNT, Box::new(|coin| coin.parent_coin_info.clone() + &int_to_bytes(coin.amount)));
-    coin_to_addendum_f_lookup.insert(AGG_SIG_PARENT_PUZZLE, Box::new(|coin| coin.parent_coin_info.clone() + &coin.puzzle_hash.clone()));
-    coin_to_addendum_f_lookup.insert(AGG_SIG_ME, Box::new(|coin| coin.name().into_bytes()));
-
-    let addendum = coin_to_addendum_f_lookup.get(&opcode).expect("Opcode not found")(coin);
-    let additional_data = agg_sig_additional_data.get(&opcode).expect("Opcode not found").clone();
-
-    [&msg[..], &addendum[..], &additional_data[..]].concat()
+    result.as_slice()
 }
 
 fn agg_sig_additional_data(agg_sig_data: &[u8]) -> HashMap<ConditionOpcode, Vec<u8>> {

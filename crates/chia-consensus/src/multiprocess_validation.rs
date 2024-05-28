@@ -71,25 +71,26 @@ fn validate_clvm_and_signature(
     );
     match npcresult {
         Err(e) => {return Err(e)},
-        Ok(unwrapped) => {let npcresult = unwrapped;}
-    }
-    let (pks, msgs) = pkm_pairs(npcresult, additional_data.as_slice())?;
-
-    // Verify aggregated signature
-    if !{
-            if syncing { // if we're syncing use the chia_bls::aggregate_verify to avoid using the cache
-                aggregate_verify(
-                    &spend_bundle.aggregated_signature,
-                    pks.iter().map(|pk| (pk, &msgs[..]))
-                )
-            } else {  // if we're fully synced then use the cache
-                cache.lock().unwrap().aggregate_verify(pks, msgs, &spend_bundle.aggregated_signature)
+        Ok(unwrapped) => {
+            let npcresult = unwrapped;
+            let (pks, msgs) = pkm_pairs(npcresult, additional_data.as_slice())?;
+            // Verify aggregated signature
+            if !{
+                if syncing { // if we're syncing use the chia_bls::aggregate_verify to avoid using the cache
+                    aggregate_verify(
+                        &spend_bundle.aggregated_signature,
+                        pks.iter().map(|pk| (pk, &msgs[..]))
+                    )
+                } else {  // if we're fully synced then use the cache
+                    cache.lock().unwrap().aggregate_verify(pks, msgs, &spend_bundle.aggregated_signature)
+                } 
             } 
-        } 
-        {
-            return Err(ErrorCode::InvalidSpendBundle)
+            {
+                Err(ErrorCode::InvalidSpendBundle)
+            }
+            Ok((npcresult, start_time.elapsed()))
         }
-    Ok((npcresult, start_time.elapsed()))
+    }
 }
 
 // #[cfg(feature = "py-bindings")]

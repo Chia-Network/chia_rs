@@ -38,7 +38,7 @@ pub fn get_name_puzzle_conditions<GenBuf: AsRef<[u8]>>(
     mempool_mode: bool,
     height: u32,
     constants: ConsensusConstants,
-) -> Result<OwnedSpendBundleConditions, ValidationErr> {
+) -> Result<OwnedSpendBundleConditions, ErrorCode> {
     let run_block: fn(&mut Allocator,
         &[u8],
         &[GenBuf],
