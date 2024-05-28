@@ -62,8 +62,8 @@ fn make_aggsig_final_message(
         }
         AGG_SIG_ME => {
             let coin: Coin = Coin::new(
-                spend.parent_id.clone(),
-                spend.puzzle_hash.clone(),
+                spend.parent_id,
+                spend.puzzle_hash,
                 spend.coin_amount as u64,
             );
             coin.coin_id().as_slice().to_vec()
