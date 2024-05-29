@@ -77,16 +77,19 @@ fn validate_clvm_and_signature(
             // Verify aggregated signature
             if !{
                 if syncing { // if we're syncing use the chia_bls::aggregate_verify to avoid using the cache
+                let data: Vec<(&PublicKey, &[u8])> = public_keys.iter()
+                    .zip(msgs.iter().map(|msg| msg.as_slice()))
+                    .collect();
                     aggregate_verify(
                         &spend_bundle.aggregated_signature,
-                        pks.iter().map(|pk| (pk, &msgs[..]))
+                        data
                     )
                 } else {  // if we're fully synced then use the cache
                     cache.lock().unwrap().aggregate_verify(pks, msgs, &spend_bundle.aggregated_signature)
                 } 
             } 
             {
-                Err(ErrorCode::InvalidSpendBundle)
+                return Err(ErrorCode::InvalidSpendBundle);
             }
             Ok((npcresult, start_time.elapsed()))
         }

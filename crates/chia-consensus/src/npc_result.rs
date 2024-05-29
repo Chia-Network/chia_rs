@@ -45,8 +45,8 @@ pub fn get_name_puzzle_conditions<GenBuf: AsRef<[u8]>>(
         u64,
         u32
     ) = 
-        if height >= constants.hard_fork_fix_height {run_block_generator2} 
-        else {run_block_generator};
+        if height >= constants.hard_fork_fix_height {&run_block_generator2} 
+        else {&run_block_generator};
     let mut flags = get_flags_for_height_and_constants(height, constants);
     if mempool_mode {flags = flags | MEMPOOL_MODE};
     let mut block_args = Vec::<&[u8]>::new();
@@ -55,5 +55,13 @@ pub fn get_name_puzzle_conditions<GenBuf: AsRef<[u8]>>(
     }
     let mut a2 = make_allocator(LIMIT_HEAP);
     let sbc: SpendBundleConditions = run_block(&mut a2, generator.program.into_inner().as_slice(), &block_args, max_cost, flags);
-    Ok(OwnedSpendBundleConditions::from(&mut a2, sbc))
+    let result = OwnedSpendBundleConditions::from(&mut a2, sbc);
+    match result {
+        Ok(r) => {
+            Ok(r)
+        },
+        Err(e) => {
+            Err(ErrorCode::InvalidSpendBundle)
+        }
+    }
 }

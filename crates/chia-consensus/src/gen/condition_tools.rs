@@ -3,6 +3,7 @@ use crate::gen::owned_conditions::{OwnedSpendBundleConditions, OwnedSpend};
 use chia_bls::PublicKey;
 use chia_protocol::Coin;
 use chia_protocol::Bytes;
+use sha2::{Digest, Sha256};
 use crate::gen::validation_error::ErrorCode;
 use crate::gen::opcodes::{AGG_SIG_AMOUNT, AGG_SIG_PARENT, AGG_SIG_PARENT_PUZZLE,
     AGG_SIG_PUZZLE_AMOUNT, AGG_SIG_ME, AGG_SIG_UNSAFE, AGG_SIG_PUZZLE, AGG_SIG_PARENT_AMOUNT, ConditionOpcode};
@@ -15,7 +16,7 @@ pub fn pkm_pairs(conditions: OwnedSpendBundleConditions, additional_data: &[u8])
     for (pk, msg) in conditions.agg_sig_unsafe {
         pks.push(pk);
         msgs.push(msg.as_slice().to_vec());
-        for (_, disallowed_val) in disallowed.into_iter() {
+        for (_, disallowed_val) in disallowed.clone().into_iter() {
             if msg.ends_with(disallowed_val.as_slice()) {
                 return Err(ErrorCode::InvalidCondition)
             }
@@ -23,18 +24,18 @@ pub fn pkm_pairs(conditions: OwnedSpendBundleConditions, additional_data: &[u8])
     }
     for spend in conditions.spends {
         let condition_items_pairs = [
-            (AGG_SIG_PARENT, spend.agg_sig_parent),
-            (AGG_SIG_PUZZLE, spend.agg_sig_puzzle),
-            (AGG_SIG_AMOUNT, spend.agg_sig_amount),
-            (AGG_SIG_PUZZLE_AMOUNT, spend.agg_sig_puzzle_amount),
-            (AGG_SIG_PARENT_AMOUNT, spend.agg_sig_parent_amount),
-            (AGG_SIG_PARENT_PUZZLE, spend.agg_sig_parent_puzzle),
-            (AGG_SIG_ME, spend.agg_sig_me),
+            (AGG_SIG_PARENT, spend.clone().agg_sig_parent),
+            (AGG_SIG_PUZZLE, spend.clone().agg_sig_puzzle),
+            (AGG_SIG_AMOUNT, spend.clone().agg_sig_amount),
+            (AGG_SIG_PUZZLE_AMOUNT, spend.clone().agg_sig_puzzle_amount),
+            (AGG_SIG_PARENT_AMOUNT, spend.clone().agg_sig_parent_amount),
+            (AGG_SIG_PARENT_PUZZLE, spend.clone().agg_sig_parent_puzzle),
+            (AGG_SIG_ME, spend.clone().agg_sig_me),
         ];
         for (condition, items) in condition_items_pairs {
             for (pk, msg) in items {
                 pks.push(pk);
-                msgs.push(make_aggsig_final_message(condition, msg.as_slice().to_vec(), spend, disallowed));
+                msgs.push(make_aggsig_final_message(condition, msg.as_slice().to_vec(), spend.clone(), disallowed.clone()));
             }
         }
     }
@@ -103,7 +104,7 @@ fn u64_to_bytes(val: u64) -> Bytes {
 }
 
 fn agg_sig_additional_data(agg_sig_data: &[u8]) -> HashMap<ConditionOpcode, Vec<u8>> {
-    let mut ret: HashMap<ConditionOpcode, &[u8]> = HashMap::new();
+    let mut ret: HashMap<ConditionOpcode, Vec<u8>> = HashMap::new();
     for code in [
         AGG_SIG_PARENT,
         AGG_SIG_PUZZLE,
@@ -112,9 +113,13 @@ fn agg_sig_additional_data(agg_sig_data: &[u8]) -> HashMap<ConditionOpcode, Vec<
         AGG_SIG_PARENT_AMOUNT,
         AGG_SIG_PARENT_PUZZLE,
     ] {
-        ret.insert(code, std_hash(&(agg_sig_data.clone() + &[code as u8])));
+        let mut hasher = Sha256::new();
+        hasher.update(agg_sig_data.clone());
+        hasher.update(&[code as u8]);
+        let val: Vec<u8> = hasher.finalize().as_slice().to_vec();
+        ret.insert(code, val);
     }
-    ret.insert(AGG_SIG_ME, agg_sig_data);
+    ret.insert(AGG_SIG_ME, agg_sig_data.to_vec());
 
     ret
 }
