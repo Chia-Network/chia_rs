@@ -69,6 +69,9 @@ fn make_aggsig_final_message(
             );
             coin.coin_id().as_slice().to_vec()
         },
+        _ => {
+            Vec::<u8>::new()
+        }
     };
 
     let mut result = msg.to_vec();

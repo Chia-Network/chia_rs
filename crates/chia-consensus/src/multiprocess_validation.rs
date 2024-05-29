@@ -19,6 +19,7 @@ use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV};
 use crate::npc_result::get_name_puzzle_conditions;
 use crate::gen::condition_tools::pkm_pairs;
 use chia_traits::Streamable;
+use chia_bls::PublicKey;
 use chia_bls::BlsCache;
 use chia_bls::aggregate_verify;
 
@@ -77,7 +78,7 @@ fn validate_clvm_and_signature(
             // Verify aggregated signature
             if !{
                 if syncing { // if we're syncing use the chia_bls::aggregate_verify to avoid using the cache
-                let data: Vec<(&PublicKey, &[u8])> = public_keys.iter()
+                let data: Vec<(&PublicKey, &[u8])> = pks.iter()
                     .zip(msgs.iter().map(|msg| msg.as_slice()))
                     .collect();
                     aggregate_verify(
@@ -134,9 +135,12 @@ fn validate_clvm_and_signature(
 
 pub fn simple_solution_generator(bundle: &SpendBundle) -> Result<BlockGenerator, ErrorCode> {
     let mut spends = Vec::<(Coin, &[u8], &[u8])>::new();
-    for cs in bundle.clone().coin_spends {
-        let puz = cs.puzzle_reveal.into_inner().as_slice();
-        spends.push((cs.coin, puz, cs.solution.into_inner().as_slice()));
+    for cs in &bundle.coin_spends {
+        let puzzle_reveal = cs.puzzle_reveal.clone().into_inner();
+        let puz = puzzle_reveal.as_slice();
+        let solution_reveal = cs.solution.clone().into_inner();
+        let sol = solution_reveal.as_slice();
+        spends.push((cs.coin, puz.clone(), sol.clone()));
     }
     let block_program = solution_generator(spends);
     match block_program {
