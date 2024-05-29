@@ -1,16 +1,16 @@
+use crate::allocator::make_allocator;
+use crate::consensus_constants::ConsensusConstants;
 use crate::gen::conditions::{
     parse_conditions, MempoolVisitor, ParseState, Spend, SpendBundleConditions,
 };
+use crate::gen::flags::MEMPOOL_MODE;
 use crate::gen::owned_conditions::OwnedSpendBundleConditions;
+use crate::gen::run_block_generator::{run_block_generator, run_block_generator2};
 use crate::gen::validation_error::ErrorCode;
 use crate::generator_types::BlockGenerator;
-use crate::consensus_constants::ConsensusConstants;
-use crate::gen::run_block_generator::{run_block_generator, run_block_generator2};
 use crate::multiprocess_validation::get_flags_for_height_and_constants;
-use crate::gen::flags::MEMPOOL_MODE;
-use chia_streamable_macro::streamable;
 use chia_protocol::Program;
-use crate::allocator::make_allocator;
+use chia_streamable_macro::streamable;
 use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::LIMIT_HEAP;
 
@@ -39,29 +39,31 @@ pub fn get_name_puzzle_conditions<GenBuf: AsRef<[u8]>>(
     height: u32,
     constants: ConsensusConstants,
 ) -> Result<OwnedSpendBundleConditions, ErrorCode> {
-    let run_block: fn(&mut Allocator,
-        &[u8],
-        &[GenBuf],
-        u64,
-        u32
-    ) = 
-        if height >= constants.hard_fork_fix_height {&run_block_generator2} 
-        else {&run_block_generator};
+    let run_block: fn(&mut Allocator, &[u8], &[GenBuf], u64, u32) =
+        if height >= constants.hard_fork_fix_height {
+            &run_block_generator2
+        } else {
+            &run_block_generator
+        };
     let mut flags = get_flags_for_height_and_constants(height, constants);
-    if mempool_mode {flags = flags | MEMPOOL_MODE};
+    if mempool_mode {
+        flags = flags | MEMPOOL_MODE
+    };
     let mut block_args = Vec::<&[u8]>::new();
     for gen in generator.generator_refs {
         block_args.push(gen.into_inner().as_slice());
     }
     let mut a2 = make_allocator(LIMIT_HEAP);
-    let sbc: SpendBundleConditions = run_block(&mut a2, generator.program.into_inner().as_slice(), &block_args, max_cost, flags);
+    let sbc: SpendBundleConditions = run_block(
+        &mut a2,
+        generator.program.into_inner().as_slice(),
+        &block_args,
+        max_cost,
+        flags,
+    );
     let result = OwnedSpendBundleConditions::from(&mut a2, sbc);
     match result {
-        Ok(r) => {
-            Ok(r)
-        },
-        Err(e) => {
-            Err(ErrorCode::InvalidSpendBundle)
-        }
+        Ok(r) => Ok(r),
+        Err(e) => Err(ErrorCode::InvalidSpendBundle),
     }
 }

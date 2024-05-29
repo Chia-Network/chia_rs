@@ -1,54 +1,56 @@
-
-use std::thread;
-use std::sync::{Arc, Mutex};
 use crate::consensus_constants::ConsensusConstants;
+use std::sync::{Arc, Mutex};
+use std::thread;
 
-use crate::gen::owned_conditions::OwnedSpendBundleConditions;
-use crate::gen::validation_error::ErrorCode;
-use std::time::{Duration, Instant};
-use chia_protocol::SpendBundle;
-use chia_protocol::Coin;
-use crate::generator_types::BlockGenerator;
-use crate::gen::solution_generator::solution_generator;
-use chia_protocol::Program;
-use crate::gen::flags::{
-    AGG_SIG_ARGS, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL, ALLOW_BACKREFS, 
-    ENABLE_SOFTFORK_CONDITION, ENABLE_MESSAGE_CONDITIONS
-};
-use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV};
-use crate::npc_result::get_name_puzzle_conditions;
 use crate::gen::condition_tools::pkm_pairs;
-use chia_traits::Streamable;
-use chia_bls::PublicKey;
-use chia_bls::BlsCache;
+use crate::gen::flags::{
+    AGG_SIG_ARGS, ALLOW_BACKREFS, ENABLE_MESSAGE_CONDITIONS, ENABLE_SOFTFORK_CONDITION,
+    NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
+};
+use crate::gen::owned_conditions::OwnedSpendBundleConditions;
+use crate::gen::solution_generator::solution_generator;
+use crate::gen::validation_error::ErrorCode;
+use crate::generator_types::BlockGenerator;
+use crate::npc_result::get_name_puzzle_conditions;
 use chia_bls::aggregate_verify;
+use chia_bls::BlsCache;
+use chia_bls::PublicKey;
+use chia_protocol::Coin;
+use chia_protocol::Program;
+use chia_protocol::SpendBundle;
+use chia_traits::Streamable;
+use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV};
+use std::time::{Duration, Instant};
 
 // currently in multiprocess_validation.py
 // called via blockchain.py from full_node.py when a full node wants to add a block or batch of blocks
-fn pre_validate_blocks_multiprocessing() {
-
-}
+fn pre_validate_blocks_multiprocessing() {}
 
 // currently in multiprocess_validation.py
 // called in threads from pre_validate_blocks_multiprocessing
-fn batch_pre_validate_blocks() {
-
-}
+fn batch_pre_validate_blocks() {}
 
 // currently in mempool_manager.py
 // called in full_node.py when adding a transaction
 fn pre_validate_spendbundle(
-    new_spend: SpendBundle, 
-    max_cost: u64, 
-    constants: ConsensusConstants, 
-    peak_height: u32, 
+    new_spend: SpendBundle,
+    max_cost: u64,
+    constants: ConsensusConstants,
+    peak_height: u32,
     syncing: bool,
-    cache: Arc<Mutex<BlsCache>>
+    cache: Arc<Mutex<BlsCache>>,
 ) -> Result<OwnedSpendBundleConditions, ErrorCode> {
     if new_spend.coin_spends.is_empty() {
         Err(ErrorCode::InvalidSpendBundle)
     } else {
-        let (result, duration) = validate_clvm_and_signature(&new_spend, max_cost, constants, peak_height, syncing, cache)?;
+        let (result, duration) = validate_clvm_and_signature(
+            &new_spend,
+            max_cost,
+            constants,
+            peak_height,
+            syncing,
+            cache,
+        )?;
         Ok(result)
     }
 }
@@ -57,39 +59,40 @@ fn pre_validate_spendbundle(
 // called in threads from pre_validate_spend_bundle()
 // returns (error, cached_results, new_cache_entries, duration)
 fn validate_clvm_and_signature(
-    spend_bundle: &SpendBundle, 
-    max_cost: u64, 
-    constants: ConsensusConstants, 
+    spend_bundle: &SpendBundle,
+    max_cost: u64,
+    constants: ConsensusConstants,
     height: u32,
     syncing: bool,
-    cache: Arc<Mutex<BlsCache>>
+    cache: Arc<Mutex<BlsCache>>,
 ) -> Result<(OwnedSpendBundleConditions, Duration), ErrorCode> {
     let start_time = Instant::now();
     let additional_data = constants.agg_sig_me_additional_data;
     let program: BlockGenerator = simple_solution_generator(&spend_bundle)?;
-    let npcresult = get_name_puzzle_conditions(
-        program, max_cost, true, height, constants
-    );
+    let npcresult = get_name_puzzle_conditions(program, max_cost, true, height, constants);
     match npcresult {
-        Err(e) => {return Err(e)},
+        Err(e) => return Err(e),
         Ok(unwrapped) => {
             let npcresult = unwrapped;
             let (pks, msgs) = pkm_pairs(npcresult, additional_data.as_slice())?;
             // Verify aggregated signature
             if !{
-                if syncing { // if we're syncing use the chia_bls::aggregate_verify to avoid using the cache
-                let data: Vec<(&PublicKey, &[u8])> = pks.iter()
-                    .zip(msgs.iter().map(|msg| msg.as_slice()))
-                    .collect();
-                    aggregate_verify(
+                if syncing {
+                    // if we're syncing use the chia_bls::aggregate_verify to avoid using the cache
+                    let data: Vec<(&PublicKey, &[u8])> = pks
+                        .iter()
+                        .zip(msgs.iter().map(|msg| msg.as_slice()))
+                        .collect();
+                    aggregate_verify(&spend_bundle.aggregated_signature, data)
+                } else {
+                    // if we're fully synced then use the cache
+                    cache.lock().unwrap().aggregate_verify(
+                        pks,
+                        msgs,
                         &spend_bundle.aggregated_signature,
-                        data
                     )
-                } else {  // if we're fully synced then use the cache
-                    cache.lock().unwrap().aggregate_verify(pks, msgs, &spend_bundle.aggregated_signature)
-                } 
-            } 
-            {
+                }
+            } {
                 return Err(ErrorCode::InvalidSpendBundle);
             }
             Ok((npcresult, start_time.elapsed()))
@@ -108,16 +111,14 @@ fn validate_clvm_and_signature(
 //         Bound, PyObject, PyResult,
 //     };
 //     use crate::gen::owned_conditions;
-    
 
-    
 //     #[pyfunction]
 //     #[pyo3(name = "pre_validate_spendbundle")]
 //     pub fn py_pre_validate_spendbundle(
-//         new_spend: SpendBundle, 
-//         max_cost: u64, 
-//         constants: ConsensusConstants, 
-//         peak_height: u32, 
+//         new_spend: SpendBundle,
+//         max_cost: u64,
+//         constants: ConsensusConstants,
+//         peak_height: u32,
 //         syncing: bool,
 //         cache: BlsCache
 //     ) -> Result<(SpendBundle, OwnedSpendBundleConditions), ErrorCode> {
@@ -145,31 +146,30 @@ pub fn simple_solution_generator(bundle: &SpendBundle) -> Result<BlockGenerator,
         Ok(bp) => {
             let program = Program::from_bytes(bp.as_slice());
             match program {
-                Ok(p) => Ok(BlockGenerator{
+                Ok(p) => Ok(BlockGenerator {
                     program: p,
                     generator_refs: Vec::<Program>::new(),
                     block_height_list: Vec::<u32>::new(),
                 }),
-                Err(_) =>  Err(ErrorCode::InvalidSpendBundle)
+                Err(_) => Err(ErrorCode::InvalidSpendBundle),
             }
-        },
+        }
         Err(_) => Err(ErrorCode::InvalidSpendBundle),
     }
-    
 }
 
 pub fn get_flags_for_height_and_constants(height: u32, constants: ConsensusConstants) -> u32 {
     let mut flags: u32 = 0;
-    if height >= constants.soft_fork2_height{
+    if height >= constants.soft_fork2_height {
         flags = flags | NO_RELATIVE_CONDITIONS_ON_EPHEMERAL
     }
-    if height >= constants.soft_fork4_height{
+    if height >= constants.soft_fork4_height {
         flags = flags | ENABLE_MESSAGE_CONDITIONS
     }
     if height >= constants.hard_fork_height {
         //  the hard-fork initiated with 2.0. To activate June 2024
         //  * costs are ascribed to some unknown condition codes, to allow for
-            // soft-forking in new conditions with cost
+        // soft-forking in new conditions with cost
         //  * a new condition, SOFTFORK, is added which takes a first parameter to
         //    specify its cost. This allows soft-forks similar to the softfork
         //    operator
@@ -181,8 +181,7 @@ pub fn get_flags_for_height_and_constants(height: u32, constants: ConsensusConst
         //    arguments
         //  * Allow the block generator to be serialized with the improved clvm
         //   serialization format (with back-references)
-        flags = 
-            flags
+        flags = flags
             | ENABLE_SOFTFORK_CONDITION
             | ENABLE_BLS_OPS_OUTSIDE_GUARD
             | ENABLE_FIXED_DIV
@@ -196,8 +195,8 @@ pub fn get_flags_for_height_and_constants(height: u32, constants: ConsensusConst
 mod tests {
     use super::*;
     use crate::consensus_constants::TEST_CONSTANTS;
-    use chia_protocol::CoinSpend;
     use chia_bls::Signature;
+    use chia_protocol::CoinSpend;
 
     #[test]
     fn test_validate_no_pks() {
@@ -218,17 +217,23 @@ ffa02222222222222222222222222222222222222222222222222222222222222222\
 ff01\
 80\
 80";
-        let solution = hex::decode(solution).expect("hex::decode").try_into().unwrap();
+        let solution = hex::decode(solution)
+            .expect("hex::decode")
+            .try_into()
+            .unwrap();
         let spend = CoinSpend::new(
             test_coin,
             Program::new(vec![1_u8].into()),
             Program::new(solution),
         );
         let coin_spends: Vec<CoinSpend> = vec![spend];
-        let spend_bundle = SpendBundle{coin_spends: coin_spends, aggregated_signature: Signature::default()};
+        let spend_bundle = SpendBundle {
+            coin_spends: coin_spends,
+            aggregated_signature: Signature::default(),
+        };
         let result = validate_clvm_and_signature(
-            &spend_bundle, 
-            1000000, 
+            &spend_bundle,
+            1000000,
             TEST_CONSTANTS,
             236,
             true,
