@@ -134,13 +134,11 @@ fn validate_clvm_and_signature(
 // }
 
 pub fn simple_solution_generator(bundle: &SpendBundle) -> Result<BlockGenerator, ErrorCode> {
-    let mut spends = Vec::<(Coin, &[u8], &[u8])>::new();
+    let mut spends = Vec::<(Coin, Vec<u8>, Vec<u8>)>::new();
     for cs in &bundle.coin_spends {
-        let puzzle_reveal = cs.puzzle_reveal.clone().into_inner();
-        let puz = puzzle_reveal.as_slice();
-        let solution_reveal = cs.solution.clone().into_inner();
-        let sol = solution_reveal.as_slice();
-        spends.push((cs.coin, puz.clone(), sol.clone()));
+        let puzzle_reveal = cs.puzzle_reveal.to_vec();
+        let solution_reveal = cs.solution.to_vec();
+        spends.push((cs.coin, puzzle_reveal, solution_reveal));
     }
     let block_program = solution_generator(spends);
     match block_program {
