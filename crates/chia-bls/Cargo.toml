@@ -28,9 +28,9 @@ lru = { workspace = true }
 
 
 [dev-dependencies]
-rand = "0.8.5"
-criterion = "0.5.1"
-rstest = "0.17.0"
+rand = { workspace = true }
+criterion = { workspace = true }
+rstest = { workspace = true }
 
 [lib]
 crate-type = ["rlib"]

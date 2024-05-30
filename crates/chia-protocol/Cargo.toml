@@ -13,20 +13,20 @@ py-bindings = ["dep:pyo3", "dep:chia_py_streamable_macro", "chia-traits/py-bindi
 arbitrary = ["dep:arbitrary", "chia-bls/arbitrary"]
 
 [dependencies]
-pyo3 = { version = "0.21.2", features = ["multiple-pymethods", "num-bigint"], optional = true }
-sha2 = "0.10.8"
-hex = "0.4.3"
+pyo3 = { workspace = true, features = ["multiple-pymethods", "num-bigint"], optional = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
 chia_streamable_macro = { workspace = true }
 chia_py_streamable_macro = { workspace = true, optional = true }
-clvmr = "0.7.0"
+clvmr = { workspace = true }
 chia-traits = { workspace = true }
 clvm-traits = { workspace = true, features = ["derive"] }
 clvm-utils = { workspace = true }
 chia-bls = { workspace = true }
-arbitrary = { version = "1.3.0", features = ["derive"], optional = true }
+arbitrary = { workspace = true, features = ["derive"], optional = true }
 
 [dev-dependencies]
-rstest = "0.17.0"
+rstest = { workspace = true }
 
 [lib]
 crate-type = ["rlib"]

@@ -11,8 +11,8 @@ repository = "https://github.com/Chia-Network/chia_rs"
 [dependencies]
 chia-protocol = { workspace = true }
 chia-traits = { workspace = true }
-tokio = { version = "1.32.0", features = ["rt", "sync"] }
-tokio-tungstenite = "0.21.0"
-futures-util = "0.3.28"
-tungstenite = "0.21.0"
-thiserror = "1.0.47"
+tokio = { workspace = true, features = ["rt", "sync"] }
+tokio-tungstenite = { workspace = true }
+futures-util = { workspace = true }
+tungstenite = { workspace = true }
+thiserror = { workspace = true }

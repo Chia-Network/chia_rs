@@ -12,10 +12,10 @@ repository = "https://github.com/Chia-Network/chia_rs"
 py-bindings = ["dep:pyo3", "dep:chia_py_streamable_macro"]
 
 [dependencies]
-clvmr = "0.7.0"
-hex = "0.4.3"
-pyo3 = { version = "0.21.2", optional = true }
-sha2 = "0.10.8"
+clvmr = { workspace = true }
+hex = { workspace = true }
+pyo3 = { workspace = true, optional = true }
+sha2 = { workspace = true }
 chia_streamable_macro = { workspace = true }
 chia_py_streamable_macro = { workspace = true, optional = true }
 clvm-utils = { workspace = true }
@@ -25,15 +25,15 @@ clvm-derive = { workspace = true }
 chia-protocol = { workspace = true }
 chia-puzzles = { workspace = true }
 chia-bls = { workspace = true }
-hex-literal = "0.4.1"
-thiserror = "1.0.44"
+hex-literal = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
-num-traits = "0.2.15"
-rstest = "0.16.0"
-text-diff = "0.4.0"
-criterion = "0.5.1"
-rand = { version = "0.8.5", features = [ "small_rng" ] }
+num-traits = { workspace = true }
+rstest = { workspace = true }
+text-diff = { workspace = true }
+criterion = { workspace = true }
+rand = { workspace = true, features = [ "small_rng" ] }
 
 [lib]
 bench = false
