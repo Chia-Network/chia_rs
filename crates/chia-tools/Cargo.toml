@@ -17,7 +17,7 @@ chia-puzzles = { version = "0.9.0", path = "../chia-puzzles" }
 chia-bls = { version = "0.9.0", path = "../chia-bls" }
 chia-consensus = { version = "0.9.0", path = "../chia-consensus" }
 clvmr = { version = "0.7.0", features = ["counters"] }
-rusqlite = { version = "0.30.0", features = ["bundled"] }
+rusqlite = { version = "0.31.0", features = ["bundled"] }
 clap = { version = "4.3.9", features = ["derive"] }
 zstd = "0.12.3"
 blocking-threadpool = "1.0.1"
