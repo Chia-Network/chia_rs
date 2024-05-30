@@ -7,6 +7,7 @@ use std::time::SystemTime;
 
 use rusqlite::Connection;
 
+use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::gen::conditions::{parse_spends, MempoolVisitor};
 use chia_consensus::gen::flags::MEMPOOL_MODE;
 use chia_consensus::generator_rom::{COST_PER_BYTE, GENERATOR_ROM};
@@ -161,9 +162,14 @@ fn main() {
         let start_conditions = SystemTime::now();
         // we pass in what's left of max_cost here, to fail early in case the
         // cost of a condition brings us over the cost limit
-        let Ok(conds) =
-            parse_spends::<MempoolVisitor>(&a, generator_output, ti.cost - clvm_cost, MEMPOOL_MODE)
-        else {
+        // TODO: Use real constants
+        let Ok(conds) = parse_spends::<MempoolVisitor>(
+            &a,
+            generator_output,
+            ti.cost - clvm_cost,
+            MEMPOOL_MODE,
+            &TEST_CONSTANTS,
+        ) else {
             panic!("failed to parse conditions in block {height}");
         };
         let conditions_timing = start_conditions

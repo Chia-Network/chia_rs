@@ -1,4 +1,5 @@
 #![no_main]
+use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::gen::conditions::{
     process_single_spend, MempoolVisitor, ParseState, SpendBundleConditions,
 };
@@ -30,6 +31,7 @@ fuzz_target!(|data: &[u8]| {
             conds,
             *flags,
             &mut cost_left,
+            &TEST_CONSTANTS,
         );
     }
 });

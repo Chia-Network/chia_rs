@@ -183,10 +183,11 @@ fn run_puzzle(
     amount: u64,
     max_cost: Cost,
     flags: u32,
+    constants: &ConsensusConstants,
 ) -> PyResult<OwnedSpendBundleConditions> {
     let mut a = make_allocator(LIMIT_HEAP);
     let conds = native_run_puzzle::<MempoolVisitor>(
-        &mut a, puzzle, solution, parent_id, amount, max_cost, flags,
+        &mut a, puzzle, solution, parent_id, amount, max_cost, flags, constants,
     )?;
     Ok(OwnedSpendBundleConditions::from(&a, conds)?)
 }

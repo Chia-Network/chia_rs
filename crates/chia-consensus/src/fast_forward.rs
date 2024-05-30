@@ -155,6 +155,7 @@ pub fn fast_forward_singleton(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::consensus_constants::TEST_CONSTANTS;
     use crate::gen::conditions::MempoolVisitor;
     use crate::gen::run_puzzle::run_puzzle;
     use chia_protocol::CoinSpend;
@@ -233,6 +234,7 @@ mod tests {
             spend.coin.amount,
             11_000_000_000,
             0,
+            &TEST_CONSTANTS,
         )
         .expect("run_puzzle");
 
@@ -245,6 +247,7 @@ mod tests {
             new_coin.amount,
             11_000_000_000,
             0,
+            &TEST_CONSTANTS,
         )
         .expect("run_puzzle");
 

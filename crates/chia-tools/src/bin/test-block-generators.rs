@@ -1,6 +1,7 @@
 use clap::Parser;
 
 use chia_bls::PublicKey;
+use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::gen::conditions::{EmptyVisitor, NewCoin, Spend, SpendBundleConditions};
 use chia_consensus::gen::flags::{ALLOW_BACKREFS, MEMPOOL_MODE};
 use chia_consensus::gen::run_block_generator::{run_block_generator, run_block_generator2};
@@ -125,6 +126,9 @@ fn compare(a: &Allocator, lhs: &SpendBundleConditions, rhs: &SpendBundleConditio
 fn main() {
     let args = Args::parse();
 
+    // TODO: Use the real consants here
+    let constants = &TEST_CONSTANTS;
+
     assert!(!(args.validate && !(args.mempool || args.rust_generator || args.test_backrefs)), "it doesn't make sense to validate the output against identical runs. Specify --mempool, --rust-generator or --test-backrefs");
 
     let num_cores = args
@@ -175,8 +179,9 @@ fn main() {
                     prg.as_ref()
                 };
 
-                let mut conditions = block_runner(&mut a, generator, &block_refs, ti.cost, flags)
-                    .expect("failed to run block generator");
+                let mut conditions =
+                    block_runner(&mut a, generator, &block_refs, ti.cost, flags, constants)
+                        .expect("failed to run block generator");
 
                 if args.rust_generator || args.test_backrefs {
                     assert!(conditions.cost <= ti.cost);
@@ -197,6 +202,7 @@ fn main() {
                         &block_refs,
                         ti.cost,
                         0,
+                        constants,
                     )
                     .expect("failed to run block generator");
                     assert_eq!(baseline.cost, ti.cost);

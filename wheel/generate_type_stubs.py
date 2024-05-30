@@ -279,15 +279,15 @@ def supports_fast_forward(spend: CoinSpend) -> bool : ...
 def fast_forward_singleton(spend: CoinSpend, new_coin: Coin, new_parent: Coin) -> bytes: ...
 
 def run_block_generator(
-    program: ReadableBuffer, args: List[ReadableBuffer], max_cost: int, flags: int
+    program: ReadableBuffer, args: List[ReadableBuffer], max_cost: int, flags: int, constants: ConsensusConstants
 ) -> Tuple[Optional[int], Optional[SpendBundleConditions]]: ...
 
 def run_block_generator2(
-    program: ReadableBuffer, args: List[ReadableBuffer], max_cost: int, flags: int
+    program: ReadableBuffer, args: List[ReadableBuffer], max_cost: int, flags: int, constants: ConsensusConstants
 ) -> Tuple[Optional[int], Optional[SpendBundleConditions]]: ...
 
 def run_puzzle(
-    puzzle: bytes, solution: bytes, parent_id: bytes32, amount: int, max_cost: int, flags: int
+    puzzle: bytes, solution: bytes, parent_id: bytes32, amount: int, max_cost: int, flags: int, constants: ConsensusConstants
 ) -> SpendBundleConditions: ...
 
 def deserialize_proof(
