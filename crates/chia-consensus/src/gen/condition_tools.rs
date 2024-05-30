@@ -41,9 +41,9 @@ pub fn pkm_pairs(
                 pks.push(pk);
                 msgs.push(make_aggsig_final_message(
                     condition,
-                    msg.as_slice().to_vec(),
-                    spend.clone(),
-                    disallowed.clone(),
+                    &msg.as_slice(),
+                    &spend,
+                    &disallowed,
                 ));
             }
         }
@@ -53,9 +53,9 @@ pub fn pkm_pairs(
 
 fn make_aggsig_final_message(
     opcode: ConditionOpcode,
-    msg: Vec<u8>,
-    spend: OwnedSpend,
-    agg_sig_additional_data: HashMap<ConditionOpcode, Vec<u8>>,
+    msg: &[u8],
+    spend: &OwnedSpend,
+    agg_sig_additional_data: &HashMap<ConditionOpcode, Vec<u8>>,
 ) -> Vec<u8> {
     let addendum: Vec<u8> = match opcode {
         AGG_SIG_PARENT => spend.parent_id.as_slice().to_vec(),

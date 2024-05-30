@@ -69,7 +69,7 @@ fn validate_clvm_and_signature(
 ) -> Result<(OwnedSpendBundleConditions, Duration), ErrorCode> {
     let start_time = Instant::now();
     let additional_data = constants.agg_sig_me_additional_data;
-    let program: BlockGenerator = simple_solution_generator(&spend_bundle)?;
+    let program: BlockGenerator = simple_solution_generator(spend_bundle)?;
     let npcresult = get_name_puzzle_conditions(program, max_cost, true, height, &constants);
     match npcresult {
         Err(e) => return Err(e),
