@@ -18,12 +18,14 @@ use chia_protocol::SpendBundle;
 use chia_traits::Streamable;
 use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV};
 use std::sync::{Arc, Mutex};
-use std::thread;
+// use std::thread;
 use std::time::{Duration, Instant};
 
 // currently in multiprocess_validation.py
 // called via blockchain.py from full_node.py when a full node wants to add a block or batch of blocks
-fn pre_validate_blocks_multiprocessing() {}
+pub fn pre_validate_blocks_multiprocessing() {
+    batch_pre_validate_blocks()
+}
 
 // currently in multiprocess_validation.py
 // called in threads from pre_validate_blocks_multiprocessing
@@ -42,7 +44,7 @@ pub fn pre_validate_spendbundle(
     if new_spend.coin_spends.is_empty() {
         Err(ErrorCode::InvalidSpendBundle)
     } else {
-        let (result, duration) = validate_clvm_and_signature(
+        let (result, _duration) = validate_clvm_and_signature(
             &new_spend,
             max_cost,
             constants,

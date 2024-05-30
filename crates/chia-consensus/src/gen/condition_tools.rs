@@ -1,7 +1,6 @@
-use crate::gen::conditions::Spend;
 use crate::gen::opcodes::{
     ConditionOpcode, AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT,
-    AGG_SIG_PARENT_PUZZLE, AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT, AGG_SIG_UNSAFE,
+    AGG_SIG_PARENT_PUZZLE, AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT,
 };
 use crate::gen::owned_conditions::{OwnedSpend, OwnedSpendBundleConditions};
 use crate::gen::validation_error::ErrorCode;

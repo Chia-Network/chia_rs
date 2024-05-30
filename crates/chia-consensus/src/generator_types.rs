@@ -1,7 +1,6 @@
 use chia_protocol::Program;
 use chia_streamable_macro::streamable;
 
-#[cfg(feature = "py-bindings")]
 #[cfg_attr(feature = "py-bindings", pyo3::pyclass(module = "chia_rs"))]
 #[streamable]
 pub struct BlockGenerator {
