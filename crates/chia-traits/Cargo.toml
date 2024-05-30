@@ -10,7 +10,7 @@ authors = ["Arvid Norberg <arvid@chia.net>"]
 py-bindings = ["dep:pyo3"]
 
 [dependencies]
-pyo3 = { version = "0.21.2", features = ["multiple-pymethods"], optional = true }
+pyo3 = { workspace = true, features = ["multiple-pymethods"], optional = true }
 chia_streamable_macro = { workspace = true }
-sha2 = "0.10.8"
-thiserror = "1.0.44"
+sha2 = { workspace = true }
+thiserror = { workspace = true }
