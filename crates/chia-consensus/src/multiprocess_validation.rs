@@ -1,6 +1,4 @@
 use crate::consensus_constants::ConsensusConstants;
-use std::sync::{Arc, Mutex};
-use std::thread;
 use crate::gen::condition_tools::pkm_pairs;
 use crate::gen::flags::{
     AGG_SIG_ARGS, ALLOW_BACKREFS, ENABLE_MESSAGE_CONDITIONS, ENABLE_SOFTFORK_CONDITION,
@@ -19,6 +17,8 @@ use chia_protocol::Program;
 use chia_protocol::SpendBundle;
 use chia_traits::Streamable;
 use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV};
+use std::sync::{Arc, Mutex};
+use std::thread;
 use std::time::{Duration, Instant};
 
 // currently in multiprocess_validation.py
