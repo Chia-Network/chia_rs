@@ -15,6 +15,17 @@ repository = "https://github.com/Chia-Network/chia_rs"
 [workspace]
 members = ["crates/*", "crates/*/fuzz", "wasm", "wheel"]
 
+[dependencies]
+chia-bls = { workspace = true, optional = true }
+chia-client = { workspace = true, optional = true }
+chia-consensus = { workspace = true, optional = true }
+chia-protocol = { workspace = true, optional = true }
+chia-ssl = { workspace = true, optional = true }
+chia-traits = { workspace = true, optional = true }
+chia-puzzles = { workspace = true, optional = true }
+clvm-traits = { workspace = true, optional = true }
+clvm-utils = { workspace = true, optional = true }
+
 [features]
 default = [
     "bls",
@@ -38,17 +49,6 @@ puzzles = ["dep:chia-puzzles"]
 clvm-traits = ["dep:clvm-traits"]
 clvm-utils = ["dep:clvm-utils"]
 
-[dependencies]
-chia-bls = { path = "./crates/chia-bls", version = "0.9.0", optional = true }
-chia-client = { path = "./crates/chia-client", version = "0.9.0", optional = true }
-chia-consensus = { path = "./crates/chia-consensus", version = "0.9.0", optional = true }
-chia-protocol = { path = "./crates/chia-protocol", version = "0.9.0", optional = true }
-chia-ssl = { path = "./crates/chia-ssl", version = "0.7.0", optional = true }
-chia-traits = { path = "./crates/chia-traits", version = "0.9.0", optional = true }
-chia-puzzles = { path = "./crates/chia-puzzles", version = "0.9.0", optional = true }
-clvm-traits = { path = "./crates/clvm-traits", version = "0.9.0", optional = true }
-clvm-utils = { path = "./crates/clvm-utils", version = "0.9.0", optional = true }
-
 [profile.release]
 lto = "thin"
 
@@ -56,3 +56,14 @@ lto = "thin"
 # Pin the `blst` dependency to the correct revision, since the fix has not been properly released yet.
 [patch.crates-io]
 blst = { git = "https://github.com/supranational/blst.git", rev = "0d46eefa45fc1e57aceb42bba0e84eab3a7a9725" }
+
+[workspace.dependencies]
+chia-bls = { path = "./crates/chia-bls", version = "0.9.0" }
+chia-client = { path = "./crates/chia-client", version = "0.9.0" }
+chia-consensus = { path = "./crates/chia-consensus", version = "0.9.0" }
+chia-protocol = { path = "./crates/chia-protocol", version = "0.9.0" }
+chia-ssl = { path = "./crates/chia-ssl", version = "0.7.0" }
+chia-traits = { path = "./crates/chia-traits", version = "0.9.0" }
+chia-puzzles = { path = "./crates/chia-puzzles", version = "0.9.0" }
+clvm-traits = { path = "./crates/clvm-traits", version = "0.9.0" }
+clvm-utils = { path = "./crates/clvm-utils", version = "0.9.0" }
