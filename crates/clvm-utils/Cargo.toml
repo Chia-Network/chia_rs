@@ -10,9 +10,9 @@ repository = "https://github.com/Chia-Network/chia_rs"
 
 [dependencies]
 clvmr = "0.7.0"
-clvm-traits = { version = "0.9.0", path = "../clvm-traits" }
+clvm-traits = { workspace = true }
 hex = "0.4.3"
 
 [dev-dependencies]
 rstest = "0.16.0"
-clvm-traits = { version = "0.9.0", path = "../clvm-traits", features = ["derive"] }
+clvm-traits = { workspace = true, features = ["derive"] }

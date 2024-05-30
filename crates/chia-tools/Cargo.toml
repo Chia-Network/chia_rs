@@ -9,13 +9,13 @@ homepage = "https://github.com/Chia-Network/chia_rs"
 repository = "https://github.com/Chia-Network/chia_rs"
 
 [dependencies]
-chia-protocol = { version = "0.9.0", path = "../chia-protocol" }
-chia-traits = { version = "0.9.0", path = "../chia-traits" }
-clvm-utils = { version = "0.9.0", path = "../clvm-utils" }
-clvm-traits = { version = "0.9.0", path = "../clvm-traits" }
-chia-puzzles = { version = "0.9.0", path = "../chia-puzzles" }
-chia-bls = { version = "0.9.0", path = "../chia-bls" }
-chia-consensus = { version = "0.9.0", path = "../chia-consensus" }
+chia-protocol = { workspace = true }
+chia-traits = { workspace = true }
+clvm-utils = { workspace = true }
+clvm-traits = { workspace = true }
+chia-puzzles = { workspace = true }
+chia-bls = { workspace = true }
+chia-consensus = { workspace = true }
 clvmr = { version = "0.7.0", features = ["counters"] }
 rusqlite = { version = "0.30.0", features = ["bundled"] }
 clap = { version = "4.3.9", features = ["derive"] }

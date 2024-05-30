@@ -16,15 +16,15 @@ clvmr = "0.7.0"
 hex = "0.4.3"
 pyo3 = { version = "0.21.2", optional = true }
 sha2 = "0.10.8"
-chia_streamable_macro = { version = "0.8.0", path = "../chia_streamable_macro" }
-chia_py_streamable_macro = { version = "0.9.0", path = "../chia_py_streamable_macro", optional = true }
-clvm-utils = { version = "0.9.0", path = "../clvm-utils" }
-chia-traits = { version = "0.9.0", path = "../chia-traits" }
-clvm-traits = { version = "0.9.0", path = "../clvm-traits" }
-clvm-derive = { version = "0.9.0", path = "../clvm-derive" }
-chia-protocol = { version = "0.9.0", path = "../chia-protocol" }
-chia-puzzles = { version = "0.9.0", path = "../chia-puzzles" }
-chia-bls = { version = "0.9.0", path = "../chia-bls" }
+chia_streamable_macro = { workspace = true }
+chia_py_streamable_macro = { workspace = true, optional = true }
+clvm-utils = { workspace = true }
+chia-traits = { workspace = true }
+clvm-traits = { workspace = true }
+clvm-derive = { workspace = true }
+chia-protocol = { workspace = true }
+chia-puzzles = { workspace = true }
+chia-bls = { workspace = true }
 hex-literal = "0.4.1"
 thiserror = "1.0.44"
 
