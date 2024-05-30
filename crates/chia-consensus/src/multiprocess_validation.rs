@@ -70,7 +70,7 @@ fn validate_clvm_and_signature(
     let start_time = Instant::now();
     let additional_data = constants.agg_sig_me_additional_data;
     let program: BlockGenerator = simple_solution_generator(&spend_bundle)?;
-    let npcresult = get_name_puzzle_conditions(program, max_cost, true, height, constants);
+    let npcresult = get_name_puzzle_conditions(program, max_cost, true, height, &constants);
     match npcresult {
         Err(e) => return Err(e),
         Ok(unwrapped) => {
@@ -159,7 +159,7 @@ pub fn simple_solution_generator(bundle: &SpendBundle) -> Result<BlockGenerator,
     }
 }
 
-pub fn get_flags_for_height_and_constants(height: u32, constants: ConsensusConstants) -> u32 {
+pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusConstants) -> u32 {
     let mut flags: u32 = 0;
     if height >= constants.soft_fork2_height {
         flags = flags | NO_RELATIVE_CONDITIONS_ON_EPHEMERAL

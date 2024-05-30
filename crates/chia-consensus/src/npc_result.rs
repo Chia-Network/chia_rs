@@ -32,9 +32,9 @@ pub fn get_name_puzzle_conditions(
     max_cost: u64,
     mempool_mode: bool,
     height: u32,
-    constants: ConsensusConstants,
+    constants: &ConsensusConstants,
 ) -> Result<OwnedSpendBundleConditions, ErrorCode> {
-    let mut flags = get_flags_for_height_and_constants(height, constants.clone());
+    let mut flags = get_flags_for_height_and_constants(height, constants);
     if mempool_mode {
         flags = flags | MEMPOOL_MODE
     };
