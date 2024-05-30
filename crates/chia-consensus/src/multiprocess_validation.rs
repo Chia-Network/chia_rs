@@ -1,7 +1,6 @@
 use crate::consensus_constants::ConsensusConstants;
 use std::sync::{Arc, Mutex};
 use std::thread;
-
 use crate::gen::condition_tools::pkm_pairs;
 use crate::gen::flags::{
     AGG_SIG_ARGS, ALLOW_BACKREFS, ENABLE_MESSAGE_CONDITIONS, ENABLE_SOFTFORK_CONDITION,
@@ -74,7 +73,7 @@ fn validate_clvm_and_signature(
         Err(e) => return Err(e),
         Ok(unwrapped) => {
             let npcresult = unwrapped;
-            let (pks, msgs) = pkm_pairs(npcresult, additional_data.as_slice())?;
+            let (pks, msgs) = pkm_pairs(npcresult.clone(), additional_data.as_slice())?;
             // Verify aggregated signature
             if !{
                 if syncing {

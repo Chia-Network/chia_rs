@@ -126,7 +126,7 @@ fn agg_sig_additional_data(agg_sig_data: &[u8]) -> HashMap<ConditionOpcode, Vec<
         AGG_SIG_PARENT_PUZZLE,
     ] {
         let mut hasher = Sha256::new();
-        hasher.update(agg_sig_data.clone());
+        hasher.update(agg_sig_data);
         hasher.update(&[code as u8]);
         let val: Vec<u8> = hasher.finalize().as_slice().to_vec();
         ret.insert(code, val);
