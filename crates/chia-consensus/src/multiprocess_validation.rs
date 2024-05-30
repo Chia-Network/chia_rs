@@ -72,27 +72,26 @@ fn validate_clvm_and_signature(
     let program: BlockGenerator = simple_solution_generator(spend_bundle)?;
     let npcresult = get_name_puzzle_conditions(program, max_cost, true, height, &constants)?;
     let (pks, msgs) = pkm_pairs(npcresult.clone(), additional_data.as_slice())?;
-        // Verify aggregated signature
-        if !{
-            if syncing {
-                // if we're syncing use the chia_bls::aggregate_verify to avoid using the cache
-                let data: Vec<(&PublicKey, &[u8])> = pks
-                    .iter()
-                    .zip(msgs.iter().map(|msg| msg.as_slice()))
-                    .collect();
-                aggregate_verify(&spend_bundle.aggregated_signature, data)
-            } else {
-                // if we're fully synced then use the cache
-                cache.lock().unwrap().aggregate_verify(
-                    pks,
-                    msgs,
-                    &spend_bundle.aggregated_signature,
-                )
-            }
-        } {
-            return Err(ErrorCode::InvalidSpendBundle);
+    // Verify aggregated signature
+    if !{
+        if syncing {
+            // if we're syncing use the chia_bls::aggregate_verify to avoid using the cache
+            let data: Vec<(&PublicKey, &[u8])> = pks
+                .iter()
+                .zip(msgs.iter().map(|msg| msg.as_slice()))
+                .collect();
+            aggregate_verify(&spend_bundle.aggregated_signature, data)
+        } else {
+            // if we're fully synced then use the cache
+            cache
+                .lock()
+                .unwrap()
+                .aggregate_verify(pks, msgs, &spend_bundle.aggregated_signature)
         }
-        Ok((npcresult, start_time.elapsed()))
+    } {
+        return Err(ErrorCode::InvalidSpendBundle);
+    }
+    Ok((npcresult, start_time.elapsed()))
 }
 
 // #[cfg(feature = "py-bindings")]
