@@ -31,7 +31,7 @@ fn batch_pre_validate_blocks() {}
 
 // currently in mempool_manager.py
 // called in full_node.py when adding a transaction
-fn pre_validate_spendbundle(
+pub fn pre_validate_spendbundle(
     new_spend: SpendBundle,
     max_cost: u64,
     constants: ConsensusConstants,
@@ -232,7 +232,7 @@ ff01\
         };
         let result = validate_clvm_and_signature(
             &spend_bundle,
-            1000000,
+            TEST_CONSTANTS.max_block_cost_clvm,
             TEST_CONSTANTS,
             236,
             true,
