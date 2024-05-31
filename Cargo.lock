@@ -328,15 +328,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "chia-bls-fuzz"
-version = "0.9.0"
-dependencies = [
- "chia-bls 0.9.0",
- "libfuzzer-sys",
- "pyo3",
-]
-
-[[package]]
 name = "chia-client"
 version = "0.9.0"
 dependencies = [
@@ -408,20 +399,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "chia-protocol-fuzz"
-version = "0.8.0"
-dependencies = [
- "arbitrary",
- "chia-protocol",
- "chia-traits 0.9.0",
- "clvm-traits",
- "clvmr",
- "hex",
- "libfuzzer-sys",
- "sha2",
-]
-
-[[package]]
 name = "chia-puzzles"
 version = "0.9.0"
 dependencies = [
@@ -435,17 +412,6 @@ dependencies = [
  "hex-literal",
  "num-bigint",
  "sha2",
-]
-
-[[package]]
-name = "chia-puzzles-fuzz"
-version = "0.9.0"
-dependencies = [
- "chia-puzzles",
- "clvm-traits",
- "clvmr",
- "libfuzzer-sys",
- "pyo3",
 ]
 
 [[package]]
@@ -657,17 +623,6 @@ dependencies = [
  "clvmr",
  "hex",
  "rstest",
-]
-
-[[package]]
-name = "clvm-utils-fuzz"
-version = "0.8.0"
-dependencies = [
- "chia-fuzz",
- "clvm-traits",
- "clvm-utils",
- "clvmr",
- "libfuzzer-sys",
 ]
 
 [[package]]
@@ -1704,9 +1659,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.81"
+version = "1.0.84"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d1597b0c024618f09a9c3b8655b7e430397a36d23fdafec26d6965e9eec3eba"
+checksum = "ec96c6a92621310b51366f1e28d05ef11489516e93be030060e5fc12024a49d6"
 dependencies = [
  "unicode-ident",
 ]
