@@ -16,6 +16,7 @@ repository = "https://github.com/Chia-Network/chia_rs"
 members = ["crates/*", "crates/*/fuzz", "wasm", "wheel"]
 
 [workspace.lints.rust]
+unsafe_code = "deny"
 rust_2018_idioms = "deny"
 rust_2021_compatibility = "deny"
 future_incompatible = "deny"
