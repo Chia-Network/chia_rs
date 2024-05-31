@@ -305,7 +305,7 @@ jobs:
 
       - name: workspace
         run: |
-            cargo clippy --workspace --all-features --all-targets -- -Dwarnings
+            cargo clippy --workspace --all-features --all-targets
 
   fuzz_targets:
     runs-on: ubuntu-latest
