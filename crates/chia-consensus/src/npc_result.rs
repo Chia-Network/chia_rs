@@ -6,7 +6,6 @@ use crate::gen::flags::MEMPOOL_MODE;
 use crate::gen::owned_conditions::OwnedSpendBundleConditions;
 use crate::gen::run_block_generator::{run_block_generator, run_block_generator2};
 use crate::gen::validation_error::{ErrorCode, ValidationErr};
-use crate::generator_types::BlockGenerator;
 use crate::multiprocess_validation::get_flags_for_height_and_constants;
 #[cfg(feature = "py-bindings")]
 use chia_py_streamable_macro::{PyGetters, PyJsonDict, PyStreamable};
