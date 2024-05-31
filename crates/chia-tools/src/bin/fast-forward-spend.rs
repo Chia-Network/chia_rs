@@ -37,7 +37,7 @@ fn main() {
         .try_into()
         .unwrap();
 
-    let mut a = Allocator::new_limited(500000000);
+    let mut a = Allocator::new_limited(500_000_000);
     let puzzle = spend.puzzle_reveal.to_node_ptr(&mut a).expect("to_clvm");
     let solution = spend.solution.to_node_ptr(&mut a).expect("to_clvm");
     let puzzle_hash = Bytes32::from(tree_hash(&a, puzzle));

@@ -54,12 +54,12 @@ fn run(c: &mut Criterion) {
                         &mut a,
                         gen,
                         &block_refs,
-                        11000000000,
+                        11_000_000_000,
                         ALLOW_BACKREFS,
                     );
                     let _ = black_box(conds);
                     start.elapsed()
-                })
+                });
             });
 
             group.bench_function(format!("run_block_generator2 {name}{name_suffix}"), |b| {
@@ -71,12 +71,12 @@ fn run(c: &mut Criterion) {
                         &mut a,
                         gen,
                         &block_refs,
-                        11000000000,
+                        11_000_000_000,
                         ALLOW_BACKREFS,
                     );
                     let _ = black_box(conds);
                     start.elapsed()
-                })
+                });
             });
         }
     }

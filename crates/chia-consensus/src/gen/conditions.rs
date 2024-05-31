@@ -97,32 +97,17 @@ impl SpendVisitor for MempoolVisitor {
                     spend.flags &= !ELIGIBLE_FOR_FF;
                 }
             }
-            Condition::AggSigMe(_, _) => {
+            Condition::AggSigMe(_, _)
+            | Condition::AggSigParent(_, _)
+            | Condition::AggSigParentAmount(_, _)
+            | Condition::AggSigParentPuzzle(_, _) => {
                 spend.flags &= !ELIGIBLE_FOR_DEDUP;
                 spend.flags &= !ELIGIBLE_FOR_FF;
             }
-            Condition::AggSigParent(_, _) => {
-                spend.flags &= !ELIGIBLE_FOR_DEDUP;
-                spend.flags &= !ELIGIBLE_FOR_FF;
-            }
-            Condition::AggSigPuzzle(_, _) => {
-                spend.flags &= !ELIGIBLE_FOR_DEDUP;
-            }
-            Condition::AggSigAmount(_, _) => {
-                spend.flags &= !ELIGIBLE_FOR_DEDUP;
-            }
-            Condition::AggSigPuzzleAmount(_, _) => {
-                spend.flags &= !ELIGIBLE_FOR_DEDUP;
-            }
-            Condition::AggSigParentAmount(_, _) => {
-                spend.flags &= !ELIGIBLE_FOR_DEDUP;
-                spend.flags &= !ELIGIBLE_FOR_FF;
-            }
-            Condition::AggSigParentPuzzle(_, _) => {
-                spend.flags &= !ELIGIBLE_FOR_DEDUP;
-                spend.flags &= !ELIGIBLE_FOR_FF;
-            }
-            Condition::AggSigUnsafe(_, _) => {
+            Condition::AggSigPuzzle(_, _)
+            | Condition::AggSigAmount(_, _)
+            | Condition::AggSigPuzzleAmount(_, _)
+            | Condition::AggSigUnsafe(_, _) => {
                 spend.flags &= !ELIGIBLE_FOR_DEDUP;
             }
             Condition::SendMessage(src_mode, _dst, _msg) => {
@@ -285,7 +270,7 @@ pub fn parse_args(
                 // just any atom will do
                 match a.sexp(rest(a, c)?) {
                     SExp::Pair(_, _) => Err(ValidationErr(c, ErrorCode::InvalidCondition)),
-                    _ => Ok(Condition::AggSigUnsafe(pubkey, message)),
+                    SExp::Atom => Ok(Condition::AggSigUnsafe(pubkey, message)),
                 }
             } else {
                 Ok(Condition::AggSigUnsafe(pubkey, message))
@@ -305,7 +290,7 @@ pub fn parse_args(
                 // just any atom will do
                 match a.sexp(rest(a, c)?) {
                     SExp::Pair(_, _) => Err(ValidationErr(c, ErrorCode::InvalidCondition)),
-                    _ => Ok(Condition::AggSigMe(pubkey, message)),
+                    SExp::Atom => Ok(Condition::AggSigMe(pubkey, message)),
                 }
             } else {
                 Ok(Condition::AggSigMe(pubkey, message))
@@ -466,8 +451,9 @@ pub fn parse_args(
             let node = first(a, c)?;
             let code = ErrorCode::AssertMyBirthSecondsFailed;
             match sanitize_uint(a, node, 8, code)? {
-                SanitizedUint::PositiveOverflow => Err(ValidationErr(node, code)),
-                SanitizedUint::NegativeOverflow => Err(ValidationErr(node, code)),
+                SanitizedUint::PositiveOverflow | SanitizedUint::NegativeOverflow => {
+                    Err(ValidationErr(node, code))
+                }
                 SanitizedUint::Ok(r) => Ok(Condition::AssertMyBirthSeconds(r)),
             }
         }
@@ -476,8 +462,9 @@ pub fn parse_args(
             let node = first(a, c)?;
             let code = ErrorCode::AssertMyBirthHeightFailed;
             match sanitize_uint(a, node, 4, code)? {
-                SanitizedUint::PositiveOverflow => Err(ValidationErr(node, code)),
-                SanitizedUint::NegativeOverflow => Err(ValidationErr(node, code)),
+                SanitizedUint::PositiveOverflow | SanitizedUint::NegativeOverflow => {
+                    Err(ValidationErr(node, code))
+                }
                 SanitizedUint::Ok(r) => Ok(Condition::AssertMyBirthHeight(r as u32)),
             }
         }

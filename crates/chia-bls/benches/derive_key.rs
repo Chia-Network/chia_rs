@@ -20,7 +20,7 @@ fn key_derivation_benchmark(c: &mut Criterion) {
                 black_box(sk.derive_unhardened(i as u32));
             }
             start.elapsed()
-        })
+        });
     });
     c.bench_function("secret key, hardened", |b| {
         b.iter_custom(|iters| {
@@ -29,7 +29,7 @@ fn key_derivation_benchmark(c: &mut Criterion) {
                 black_box(sk.derive_hardened(i as u32));
             }
             start.elapsed()
-        })
+        });
     });
     c.bench_function("public key, unhardened", |b| {
         b.iter_custom(|iters| {
@@ -38,7 +38,7 @@ fn key_derivation_benchmark(c: &mut Criterion) {
                 black_box(pk.derive_unhardened(i as u32));
             }
             start.elapsed()
-        })
+        });
     });
 }
 

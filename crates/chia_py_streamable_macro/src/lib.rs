@@ -1,3 +1,5 @@
+#![allow(clippy::missing_panics_doc)]
+
 use proc_macro2::{Ident, Span};
 use proc_macro_crate::{crate_name, FoundCrate};
 use quote::quote;
@@ -32,7 +34,7 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
 
     let mut py_uppercase = false;
     let mut py_pickle = false;
-    for attr in attrs.iter() {
+    for attr in &attrs {
         if attr.path().is_ident("py_uppercase") {
             py_uppercase = true;
         } else if attr.path().is_ident("py_pickle") {
@@ -65,7 +67,7 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
             }
             .into();
         }
-        _ => {
+        syn::Data::Union(_) => {
             panic!("Streamable only support struct");
         }
     };
@@ -106,7 +108,7 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
 
     match fields {
         syn::Fields::Named(FieldsNamed { named, .. }) => {
-            for f in named.iter() {
+            for f in &named {
                 fnames.push(f.ident.as_ref().unwrap().clone());
                 ftypes.push(f.ty.clone());
             }
@@ -297,7 +299,7 @@ pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenSt
     } = parse_macro_input!(input);
 
     let mut py_uppercase = false;
-    for attr in attrs.iter() {
+    for attr in &attrs {
         if attr.path().is_ident("py_uppercase") {
             py_uppercase = true;
         }
@@ -322,7 +324,7 @@ pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenSt
             }
             .into();
         }
-        _ => {
+        syn::Data::Union(_) => {
             panic!("PyJsonDict only support struct");
         }
     };
@@ -333,7 +335,7 @@ pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenSt
         syn::Fields::Named(FieldsNamed { named, .. }) => {
             let mut fnames = Vec::<Ident>::new();
             let mut ftypes = Vec::<syn::Type>::new();
-            for f in named.iter() {
+            for f in &named {
                 fnames.push(f.ident.as_ref().unwrap().clone());
                 ftypes.push(f.ty.clone());
             }
@@ -376,7 +378,7 @@ pub fn py_getters_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStre
     } = parse_macro_input!(input);
 
     let mut py_uppercase = false;
-    for attr in attrs.iter() {
+    for attr in &attrs {
         if attr.path().is_ident("py_uppercase") {
             py_uppercase = true;
         }
@@ -402,7 +404,7 @@ pub fn py_getters_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStre
 
     let mut fnames = Vec::<Ident>::new();
     let mut ftypes = Vec::<syn::Type>::new();
-    for f in named.into_iter() {
+    for f in named {
         fnames.push(f.ident.unwrap());
         ftypes.push(f.ty);
     }

@@ -1111,7 +1111,7 @@ mod tests {
         data[0] = 0xc0;
         let sig = Signature::from_bytes(&data).unwrap();
         assert_eq!(
-            format!("{:?}", sig),
+            format!("{sig:?}"),
             format!("<G2Element {}>", hex::encode(data))
         );
     }

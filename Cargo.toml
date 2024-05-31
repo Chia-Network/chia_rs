@@ -37,6 +37,7 @@ all = "deny"
 pedantic = { level = "warn", priority = -1 }
 must_use_candidate = "allow"
 missing_errors_doc = "allow"
+missing_panics_doc = "allow"
 wildcard_imports = "allow"
 too_many_lines = "allow"
 module_name_repetitions = "allow"
@@ -44,6 +45,7 @@ doc_markdown = "allow"
 cast_possible_truncation = "allow"
 cast_sign_loss = "allow"
 similar_names = "allow"
+cast_precision_loss = "allow"
 
 [dependencies]
 chia-bls = { workspace = true, optional = true }

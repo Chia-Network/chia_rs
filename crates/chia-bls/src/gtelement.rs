@@ -40,8 +40,9 @@ impl GTElement {
     pub fn to_bytes(&self) -> [u8; Self::SIZE] {
         unsafe {
             let mut bytes = MaybeUninit::<[u8; Self::SIZE]>::uninit();
+            let buf: *const blst_fp12 = &self.0;
             std::ptr::copy_nonoverlapping(
-                std::mem::transmute::<*const blst_fp12, *const u8>(&self.0),
+                buf.cast::<u8>(),
                 bytes.as_mut_ptr().cast::<u8>(),
                 Self::SIZE,
             );

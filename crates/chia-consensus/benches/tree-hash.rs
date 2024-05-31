@@ -37,7 +37,7 @@ fn run(c: &mut Criterion) {
                     let start = Instant::now();
                     let _ = black_box(clvm_utils::tree_hash(&a, gen));
                     start.elapsed()
-                })
+                });
             });
         }
 
@@ -47,7 +47,7 @@ fn run(c: &mut Criterion) {
                     let start = Instant::now();
                     let _ = black_box(clvm_utils::tree_hash_from_bytes(gen));
                     start.elapsed()
-                })
+                });
             });
         }
     }
