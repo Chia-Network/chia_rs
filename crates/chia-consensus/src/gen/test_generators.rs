@@ -1,6 +1,7 @@
 use super::conditions::{MempoolVisitor, NewCoin, Spend, SpendBundleConditions};
 use super::run_block_generator::{run_block_generator, run_block_generator2};
 use crate::allocator::make_allocator;
+use crate::consensus_constants::TEST_CONSTANTS;
 use crate::gen::flags::{ALLOW_BACKREFS, ENABLE_MESSAGE_CONDITIONS, MEMPOOL_MODE};
 use chia_protocol::{Bytes, Bytes48};
 use clvmr::allocator::NodePtr;
@@ -229,6 +230,7 @@ fn run_generator(#[case] name: &str) {
             &block_refs,
             11_000_000_000,
             *flags,
+            &TEST_CONSTANTS,
         );
 
         let (expected_cost, output) = match conds {
@@ -243,6 +245,7 @@ fn run_generator(#[case] name: &str) {
             &block_refs,
             11_000_000_000,
             *flags,
+            &TEST_CONSTANTS,
         );
         let output_hard_fork = match conds {
             Ok(mut conditions) => {

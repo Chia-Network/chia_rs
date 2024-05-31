@@ -5,7 +5,7 @@ use crate::gen::conditions::{
 use crate::gen::flags::ALLOW_BACKREFS;
 use crate::gen::spend_visitor::SpendVisitor;
 use crate::gen::validation_error::{first, ErrorCode, ValidationErr};
-use crate::generator_rom::{CLVM_DESERIALIZER, COST_PER_BYTE, GENERATOR_ROM};
+use crate::generator_rom::{CLVM_DESERIALIZER, GENERATOR_ROM};
 use clvm_utils::{tree_hash_cached, TreeHash};
 use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::chia_dialect::ChiaDialect;
@@ -47,7 +47,7 @@ pub fn run_block_generator<GenBuf: AsRef<[u8]>, V: SpendVisitor>(
     constants: &ConsensusConstants,
 ) -> Result<SpendBundleConditions, ValidationErr> {
     let mut cost_left = max_cost;
-    let byte_cost = program.len() as u64 * COST_PER_BYTE;
+    let byte_cost = program.len() as u64 * constants.cost_per_byte;
 
     subtract_cost(a, &mut cost_left, byte_cost)?;
 
@@ -120,7 +120,7 @@ pub fn run_block_generator2<GenBuf: AsRef<[u8]>, V: SpendVisitor>(
     flags: u32,
     constants: &ConsensusConstants,
 ) -> Result<SpendBundleConditions, ValidationErr> {
-    let byte_cost = program.len() as u64 * COST_PER_BYTE;
+    let byte_cost = program.len() as u64 * constants.cost_per_byte;
 
     let mut cost_left = max_cost;
     subtract_cost(a, &mut cost_left, byte_cost)?;
