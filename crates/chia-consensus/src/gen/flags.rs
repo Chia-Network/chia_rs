@@ -14,9 +14,6 @@ pub const COND_ARGS_NIL: u32 = 0x40000;
 // currently supported for those conditions. This is meant for mempool-mode
 pub const STRICT_ARGS_COUNT: u32 = 0x80000;
 
-// disallow relative height- and time conditions on ephemeral spends
-pub const NO_RELATIVE_CONDITIONS_ON_EPHEMERAL: u32 = 0x0020_0000;
-
 // enable softfork condition. Enabling this flag is a hard fork
 pub const ENABLE_SOFTFORK_CONDITION: u32 = 0x0040_0000;
 
@@ -46,7 +43,6 @@ pub const MEMPOOL_MODE: u32 = CLVM_MEMPOOL_MODE
     | NO_UNKNOWN_CONDS
     | COND_ARGS_NIL
     | STRICT_ARGS_COUNT
-    | NO_RELATIVE_CONDITIONS_ON_EPHEMERAL
     | ANALYZE_SPENDS
     | ENABLE_MESSAGE_CONDITIONS
     | DISALLOW_INFINITY_G1;
