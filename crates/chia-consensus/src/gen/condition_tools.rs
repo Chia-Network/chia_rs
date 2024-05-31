@@ -27,14 +27,15 @@ pub fn pkm_pairs(
         }
     }
     for spend in conditions.spends {
+        let spend_clone = spend.clone();
         let condition_items_pairs = [
-            (AGG_SIG_PARENT, spend.clone().agg_sig_parent),
-            (AGG_SIG_PUZZLE, spend.clone().agg_sig_puzzle),
-            (AGG_SIG_AMOUNT, spend.clone().agg_sig_amount),
-            (AGG_SIG_PUZZLE_AMOUNT, spend.clone().agg_sig_puzzle_amount),
-            (AGG_SIG_PARENT_AMOUNT, spend.clone().agg_sig_parent_amount),
-            (AGG_SIG_PARENT_PUZZLE, spend.clone().agg_sig_parent_puzzle),
-            (AGG_SIG_ME, spend.clone().agg_sig_me),
+            (AGG_SIG_PARENT, spend_clone.agg_sig_parent),
+            (AGG_SIG_PUZZLE, spend_clone.agg_sig_puzzle),
+            (AGG_SIG_AMOUNT, spend_clone.agg_sig_amount),
+            (AGG_SIG_PUZZLE_AMOUNT, spend_clone.agg_sig_puzzle_amount),
+            (AGG_SIG_PARENT_AMOUNT, spend_clone.agg_sig_parent_amount),
+            (AGG_SIG_PARENT_PUZZLE, spend_clone.agg_sig_parent_puzzle),
+            (AGG_SIG_ME, spend_clone.agg_sig_me),
         ];
         for (condition, items) in condition_items_pairs {
             for (pk, msg) in items {
