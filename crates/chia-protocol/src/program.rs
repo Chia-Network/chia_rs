@@ -188,16 +188,16 @@ fn clvm_convert(a: &mut Allocator, o: &Bound<'_, PyAny>) -> PyResult<NodePtr> {
             .map_err(|e| PyMemoryError::new_err(e.to_string()))
     // Tuple (SExp-like)
     } else if let Ok(pair) = o.downcast::<PyTuple>() {
-        if pair.len() != 2 {
-            Err(PyValueError::new_err(format!(
-                "can't cast tuple of size {}",
-                pair.len()
-            )))
-        } else {
+        if pair.len() == 2 {
             let left = clvm_convert(a, &pair.get_item(0)?)?;
             let right = clvm_convert(a, &pair.get_item(1)?)?;
             a.new_pair(left, right)
                 .map_err(|e| PyMemoryError::new_err(e.to_string()))
+        } else {
+            Err(PyValueError::new_err(format!(
+                "can't cast tuple of size {}",
+                pair.len()
+            )))
         }
     // List
     } else if let Ok(list) = o.downcast::<PyList>() {
@@ -302,6 +302,7 @@ fn to_program(py: Python<'_>, node: LazyNode) -> PyResult<Bound<'_, PyAny>> {
 }
 
 #[cfg(feature = "py-bindings")]
+#[allow(clippy::needless_pass_by_value)]
 #[pymethods]
 impl Program {
     #[pyo3(name = "default")]
@@ -313,7 +314,7 @@ impl Program {
     #[staticmethod]
     #[pyo3(name = "to")]
     fn py_to(args: &Bound<'_, PyAny>) -> PyResult<Program> {
-        let mut a = Allocator::new_limited(500000000);
+        let mut a = Allocator::new_limited(500_000_000);
         let clvm = clvm_convert(&mut a, args)?;
         Program::from_node_ptr(&a, clvm)
             .map_err(|error| PyErr::new::<PyTypeError, _>(error.to_string()))
@@ -371,7 +372,7 @@ impl Program {
         use clvmr::reduction::Response;
         use std::rc::Rc;
 
-        let mut a = Allocator::new_limited(500000000);
+        let mut a = Allocator::new_limited(500_000_000);
         // The python behavior here is a bit messy, and is best not emulated
         // on the rust side. We must be able to pass a Program as an argument,
         // and it being treated as the CLVM structure it represents. In python's
@@ -403,7 +404,7 @@ impl Program {
 
     fn to_program<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
         use std::rc::Rc;
-        let mut a = Allocator::new_limited(500000000);
+        let mut a = Allocator::new_limited(500_000_000);
         let prg = node_from_bytes_backrefs(&mut a, self.0.as_ref())?;
         let prg = LazyNode::new(Rc::new(a), prg);
         to_program(py, prg)
@@ -413,7 +414,7 @@ impl Program {
         use clvm_utils::CurriedProgram;
         use std::rc::Rc;
 
-        let mut a = Allocator::new_limited(500000000);
+        let mut a = Allocator::new_limited(500_000_000);
         let prg = node_from_bytes_backrefs(&mut a, self.0.as_ref())?;
         let Ok(uncurried) = CurriedProgram::<NodePtr, NodePtr>::from_node_ptr(&a, prg) else {
             let a = Rc::new(a);
@@ -431,7 +432,7 @@ impl Program {
             }
             // the args of curried puzzles are in the form of:
             // (c . ((q . <arg1>) . (<rest> . ())))
-            let (_, ((_, arg), (rest, _))) = <(
+            let (_, ((_, arg), (rest, ()))) = <(
                 clvm_traits::MatchByte<4>,
                 (clvm_traits::match_quote!(NodePtr), (NodePtr, ())),
             ) as FromNodePtr>::from_node_ptr(&a, args)

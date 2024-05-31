@@ -196,7 +196,7 @@ impl From<ValidationErr> for PyErr {
 pub fn first(a: &Allocator, n: NodePtr) -> Result<NodePtr, ValidationErr> {
     match a.sexp(n) {
         SExp::Pair(left, _) => Ok(left),
-        _ => Err(ValidationErr(n, ErrorCode::InvalidCondition)),
+        SExp::Atom => Err(ValidationErr(n, ErrorCode::InvalidCondition)),
     }
 }
 
@@ -213,18 +213,19 @@ impl From<ErrorCode> for u32 {
             ErrorCode::BadAggregateSignature => 7,
             ErrorCode::WrongPuzzleHash => 8,
             ErrorCode::BadFarmerCoinAmount => 9,
-            ErrorCode::InvalidCondition => 10,
-            ErrorCode::InvalidConditionOpcode => 10,
-            ErrorCode::InvalidParentId => 10,
-            ErrorCode::InvalidPuzzleHash => 10,
-            ErrorCode::InvalidPublicKey => 10,
-            ErrorCode::InvalidMessage => 10,
-            ErrorCode::InvalidCoinAmount => 10,
-            ErrorCode::InvalidCoinAnnouncement => 10,
-            ErrorCode::InvalidPuzzleAnnouncement => 10,
+            ErrorCode::InvalidCondition
+            | ErrorCode::InvalidConditionOpcode
+            | ErrorCode::InvalidParentId
+            | ErrorCode::InvalidPuzzleHash
+            | ErrorCode::InvalidPublicKey
+            | ErrorCode::InvalidMessage
+            | ErrorCode::InvalidCoinAmount
+            | ErrorCode::InvalidCoinAnnouncement
+            | ErrorCode::InvalidPuzzleAnnouncement => 10,
             ErrorCode::AssertMyCoinIdFailed => 11,
-            ErrorCode::AssertPuzzleAnnouncementFailed => 12,
-            ErrorCode::AssertCoinAnnouncementFailed => 12,
+            ErrorCode::AssertPuzzleAnnouncementFailed | ErrorCode::AssertCoinAnnouncementFailed => {
+                12
+            }
             ErrorCode::AssertHeightRelativeFailed => 13,
             ErrorCode::AssertHeightAbsoluteFailed => 14,
             ErrorCode::AssertSecondsAbsoluteFailed => 15,
@@ -365,7 +366,7 @@ impl From<ErrorCode> for u32 {
 pub fn rest(a: &Allocator, n: NodePtr) -> Result<NodePtr, ValidationErr> {
     match a.sexp(n) {
         SExp::Pair(_, right) => Ok(right),
-        _ => Err(ValidationErr(n, ErrorCode::InvalidCondition)),
+        SExp::Atom => Err(ValidationErr(n, ErrorCode::InvalidCondition)),
     }
 }
 
@@ -386,7 +387,7 @@ pub fn next(a: &Allocator, n: NodePtr) -> Result<Option<(NodePtr, NodePtr)>, Val
 pub fn atom(a: &Allocator, n: NodePtr, code: ErrorCode) -> Result<Atom<'_>, ValidationErr> {
     match a.sexp(n) {
         SExp::Atom => Ok(a.atom(n)),
-        _ => Err(ValidationErr(n, code)),
+        SExp::Pair(..) => Err(ValidationErr(n, code)),
     }
 }
 

@@ -10,6 +10,7 @@ use clvmr::cost::Cost;
 use clvmr::op_utils::{first, rest};
 use clvmr::reduction::EvalErr;
 use clvmr::Allocator;
+use clvmr::ENABLE_FIXED_DIV;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
@@ -39,14 +40,13 @@ impl SpendBundle {
     }
 
     pub fn additions(&self) -> Result<Vec<Coin>, EvalErr> {
-        const CREATE_COIN_COST: Cost = 1800000;
+        const CREATE_COIN_COST: Cost = 1_800_000;
         const CREATE_COIN: u8 = 51;
 
         let mut ret = Vec::<Coin>::new();
-        let mut cost_left = 11000000000;
+        let mut cost_left = 11_000_000_000;
         let mut a = Allocator::new();
         let checkpoint = a.checkpoint();
-        use clvmr::ENABLE_FIXED_DIV;
 
         for cs in &self.coin_spends {
             a.restore_checkpoint(&checkpoint);
@@ -65,9 +65,7 @@ impl SpendBundle {
                 let c = rest(&a, c)?;
                 let buf = match a.sexp(op) {
                     SExp::Atom => a.atom(op),
-                    _ => {
-                        return Err(EvalErr(op, "invalid condition".to_string()));
-                    }
+                    SExp::Pair(..) => return Err(EvalErr(op, "invalid condition".to_string())),
                 };
                 let buf = buf.as_ref();
                 if buf.len() != 1 {
@@ -94,6 +92,7 @@ impl SpendBundle {
 
 #[cfg(feature = "py-bindings")]
 #[pymethods]
+#[allow(clippy::needless_pass_by_value)]
 impl SpendBundle {
     #[staticmethod]
     #[pyo3(name = "aggregate")]

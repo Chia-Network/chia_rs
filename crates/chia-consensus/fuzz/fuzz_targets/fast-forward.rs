@@ -22,7 +22,7 @@ fuzz_target!(|data: &[u8]| {
     let new_parents_parent =
         hex!("abababababababababababababababababababababababababababababababab");
 
-    let mut a = Allocator::new_limited(500000000);
+    let mut a = Allocator::new_limited(500_000_000);
     let Ok(puzzle) = spend.puzzle_reveal.to_node_ptr(&mut a) else {
         return;
     };
@@ -88,7 +88,7 @@ fn test_ff(
         spend.solution.as_slice(),
         &spend.coin.parent_coin_info,
         spend.coin.amount,
-        11000000000,
+        11_000_000_000,
         0,
     );
 
@@ -99,7 +99,7 @@ fn test_ff(
         new_solution.as_slice(),
         &new_coin.parent_coin_info,
         new_coin.amount,
-        11000000000,
+        11_000_000_000,
         0,
     );
 

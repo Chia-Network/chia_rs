@@ -71,10 +71,10 @@ impl OwnedSpend {
             create_coin.push((
                 c.puzzle_hash,
                 c.amount,
-                if c.hint != a.nil() {
-                    Some(a.atom(c.hint).as_ref().into())
-                } else {
+                if c.hint == a.nil() {
                     None
+                } else {
+                    Some(a.atom(c.hint).as_ref().into())
                 },
             ));
         }
@@ -91,13 +91,13 @@ impl OwnedSpend {
             birth_height: spend.birth_height,
             birth_seconds: spend.birth_seconds,
             create_coin,
-            agg_sig_me: convert_agg_sigs(a, &spend.agg_sig_me)?,
-            agg_sig_parent: convert_agg_sigs(a, &spend.agg_sig_parent)?,
-            agg_sig_puzzle: convert_agg_sigs(a, &spend.agg_sig_puzzle)?,
-            agg_sig_amount: convert_agg_sigs(a, &spend.agg_sig_amount)?,
-            agg_sig_puzzle_amount: convert_agg_sigs(a, &spend.agg_sig_puzzle_amount)?,
-            agg_sig_parent_amount: convert_agg_sigs(a, &spend.agg_sig_parent_amount)?,
-            agg_sig_parent_puzzle: convert_agg_sigs(a, &spend.agg_sig_parent_puzzle)?,
+            agg_sig_me: convert_agg_sigs(a, &spend.agg_sig_me),
+            agg_sig_parent: convert_agg_sigs(a, &spend.agg_sig_parent),
+            agg_sig_puzzle: convert_agg_sigs(a, &spend.agg_sig_puzzle),
+            agg_sig_amount: convert_agg_sigs(a, &spend.agg_sig_amount),
+            agg_sig_puzzle_amount: convert_agg_sigs(a, &spend.agg_sig_puzzle_amount),
+            agg_sig_parent_amount: convert_agg_sigs(a, &spend.agg_sig_parent_amount),
+            agg_sig_parent_puzzle: convert_agg_sigs(a, &spend.agg_sig_parent_puzzle),
             flags: spend.flags,
         })
     }
@@ -130,13 +130,10 @@ impl OwnedSpendBundleConditions {
     }
 }
 
-fn convert_agg_sigs(
-    a: &Allocator,
-    agg_sigs: &[(PublicKey, NodePtr)],
-) -> Result<Vec<(PublicKey, Bytes)>> {
+fn convert_agg_sigs(a: &Allocator, agg_sigs: &[(PublicKey, NodePtr)]) -> Vec<(PublicKey, Bytes)> {
     let mut ret = Vec::<(PublicKey, Bytes)>::new();
     for (pk, msg) in agg_sigs {
         ret.push((*pk, a.atom(*msg).as_ref().into()));
     }
-    Ok(ret)
+    ret
 }

@@ -48,10 +48,10 @@ pub trait Streamable {
     {
         let mut cursor = Cursor::new(bytes);
         let ret = Self::parse::<false>(&mut cursor)?;
-        if cursor.position() != bytes.len() as u64 {
-            Err(Error::InputTooLarge)
-        } else {
+        if cursor.position() == bytes.len() as u64 {
             Ok(ret)
+        } else {
+            Err(Error::InputTooLarge)
         }
     }
     fn from_bytes_unchecked(bytes: &[u8]) -> Result<Self>
@@ -60,10 +60,10 @@ pub trait Streamable {
     {
         let mut cursor = Cursor::new(bytes);
         let ret = Self::parse::<true>(&mut cursor)?;
-        if cursor.position() != bytes.len() as u64 {
-            Err(Error::InputTooLarge)
-        } else {
+        if cursor.position() == bytes.len() as u64 {
             Ok(ret)
+        } else {
+            Err(Error::InputTooLarge)
         }
     }
     fn hash(&self) -> [u8; 32] {
@@ -294,12 +294,14 @@ impl<T: Streamable, U: Streamable, V: Streamable, W: Streamable> Streamable for 
 // ===== TESTS ====
 
 #[cfg(test)]
+#[allow(clippy::needless_pass_by_value)]
 fn from_bytes<T: Streamable + std::fmt::Debug + PartialEq>(buf: &[u8], expected: T) {
     let mut input = Cursor::<&[u8]>::new(buf);
     assert_eq!(T::parse::<false>(&mut input).unwrap(), expected);
 }
 
 #[cfg(test)]
+#[allow(clippy::needless_pass_by_value)]
 fn from_bytes_fail<T: Streamable + std::fmt::Debug + PartialEq>(buf: &[u8], expected: Error) {
     let mut input = Cursor::<&[u8]>::new(buf);
     assert_eq!(T::parse::<false>(&mut input).unwrap_err(), expected);

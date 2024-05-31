@@ -23,6 +23,6 @@ fuzz_target!(|data: &[u8]| {
         ENABLE_SOFTFORK_CONDITION,
         ENABLE_MESSAGE_CONDITIONS,
     ] {
-        let _ret = parse_spends::<MempoolVisitor>(&a, input, 33000000000, *flags);
+        let _ret = parse_spends::<MempoolVisitor>(&a, input, 33_000_000_000, *flags);
     }
 });

@@ -65,8 +65,8 @@ pub const REMARK: ConditionOpcode = 1;
 // ENABLE_SOFTFORK_CONDITION flag
 pub const SOFTFORK: ConditionOpcode = 90;
 
-pub const CREATE_COIN_COST: Cost = 1800000;
-pub const AGG_SIG_COST: Cost = 1200000;
+pub const CREATE_COIN_COST: Cost = 1_800_000;
+pub const AGG_SIG_COST: Cost = 1_200_000;
 
 // when ENABLE_SOFTFORK_CONDITION is enabled
 // 2-byte condition opcodes have costs according to this table:
@@ -111,7 +111,7 @@ pub fn compute_unknown_condition_cost(op: ConditionOpcode) -> Cost {
 pub fn parse_opcode(a: &Allocator, op: NodePtr, flags: u32) -> Option<ConditionOpcode> {
     let buf = match a.sexp(op) {
         SExp::Atom => a.atom(op),
-        _ => return None,
+        SExp::Pair(..) => return None,
     };
     let buf = buf.as_ref();
     if buf.len() == 2 && (flags & ENABLE_SOFTFORK_CONDITION) != 0 {
@@ -123,7 +123,7 @@ pub fn parse_opcode(a: &Allocator, op: NodePtr, flags: u32) -> Option<ConditionO
             Some(ConditionOpcode::from_be_bytes(buf.try_into().unwrap()))
         }
     } else if buf.len() == 1 {
-        let b0 = buf[0] as ConditionOpcode;
+        let b0 = ConditionOpcode::from(buf[0]);
         match b0 {
             AGG_SIG_UNSAFE
             | AGG_SIG_ME

@@ -18,7 +18,7 @@ fuzz_target!(|data: &[u8]| {
         return;
     };
 
-    let additions = HashSet::from_iter(additions.iter().cloned());
+    let additions = additions.iter().copied().collect::<HashSet<_>>();
 
     let mut expected = HashSet::new();
 
@@ -27,7 +27,7 @@ fuzz_target!(|data: &[u8]| {
     for cs in &bundle.coin_spends {
         let (cost, mut conds) = cs
             .puzzle_reveal
-            .run(&mut a, ENABLE_FIXED_DIV, 11000000000, &cs.solution)
+            .run(&mut a, ENABLE_FIXED_DIV, 11_000_000_000, &cs.solution)
             .expect("run");
         total_cost += cost;
 
@@ -49,12 +49,12 @@ fuzz_target!(|data: &[u8]| {
                     puzzle_hash,
                     amount,
                 });
-                total_cost += 1800000;
+                total_cost += 1_800_000;
             }
         }
     }
 
-    assert!(total_cost <= 11000000000);
+    assert!(total_cost <= 11_000_000_000);
 
     assert_eq!(additions, expected);
 });

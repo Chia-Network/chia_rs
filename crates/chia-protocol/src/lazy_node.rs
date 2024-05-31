@@ -27,7 +27,7 @@ impl LazyNode {
                 let v = PyTuple::new_bound(py, &[r1, r2]);
                 Ok(Some(v.into()))
             }
-            _ => Ok(None),
+            SExp::Atom => Ok(None),
         }
     }
 
@@ -37,7 +37,7 @@ impl LazyNode {
             SExp::Atom => {
                 Some(PyBytes::new_bound(py, self.allocator.atom(self.node).as_ref()).into())
             }
-            _ => None,
+            SExp::Pair(..) => None,
         }
     }
 }

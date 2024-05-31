@@ -101,7 +101,7 @@ mod tests {
         let mut a = Allocator::new();
         let program = node_from_bytes_backrefs(&mut a, program).expect("node_from_bytes");
         let env = a.nil();
-        let generator_output = run_program(&mut a, &dialect, program, env, 11000000000)
+        let generator_output = run_program(&mut a, &dialect, program, env, 11_000_000_000)
             .expect("run_program")
             .1;
         node_to_bytes(&a, generator_output).expect("node_to_bytes")
@@ -133,12 +133,12 @@ mod tests {
         let coin1: Coin = Coin::new(
             hex!("ccd5bb71183532bff220ba46c268991a00000000000000000000000000036840").into(),
             hex!("fcc78a9e396df6ceebc217d2446bc016e0b3d5922fb32e5783ec5a85d490cfb6").into(),
-            1750000000000,
+            1_750_000_000_000,
         );
         let coin2: Coin = Coin::new(
             hex!("ccd5bb71183532bff220ba46c268991a00000000000000000000000000000000").into(),
             hex!("d23da14695a188ae5708dd152263c4db883eb27edeb936178d4d988b8f3ce5fc").into(),
-            18375000000000000000,
+            18_375_000_000_000_000_000,
         );
 
         let result = solution_generator([
@@ -225,12 +225,12 @@ mod tests {
         let coin1: Coin = Coin::new(
             hex!("ccd5bb71183532bff220ba46c268991a00000000000000000000000000036840").into(),
             hex!("fcc78a9e396df6ceebc217d2446bc016e0b3d5922fb32e5783ec5a85d490cfb6").into(),
-            1750000000000,
+            1_750_000_000_000,
         );
         let coin2: Coin = Coin::new(
             hex!("ccd5bb71183532bff220ba46c268991a00000000000000000000000000000000").into(),
             hex!("d23da14695a188ae5708dd152263c4db883eb27edeb936178d4d988b8f3ce5fc").into(),
-            18375000000000000000,
+            18_375_000_000_000_000_000,
         );
 
         let result = solution_generator_backrefs([

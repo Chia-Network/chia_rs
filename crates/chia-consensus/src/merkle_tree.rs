@@ -148,9 +148,9 @@ impl MerkleSet {
                     // This section propagates the MidDbl type up the tree, to
                     // allow collapsing of the hash computation
                     let new_node_type = match (left.1, right.1) {
-                        (NodeType::Term, NodeType::Term) => NodeType::MidDbl,
-                        (NodeType::Empty, NodeType::MidDbl) => NodeType::MidDbl,
-                        (NodeType::MidDbl, NodeType::Empty) => NodeType::MidDbl,
+                        (NodeType::Term, NodeType::Term)
+                        | (NodeType::Empty, NodeType::MidDbl)
+                        | (NodeType::MidDbl, NodeType::Empty) => NodeType::MidDbl,
                         (_, _) => NodeType::Mid,
                     };
 
@@ -189,19 +189,18 @@ impl MerkleSet {
                 }
             }
         }
-        if proof.position() != proof.get_ref().len() as u64 {
-            Err(SetError)
-        } else {
+        if proof.position() == proof.get_ref().len() as u64 {
             Ok(())
+        } else {
+            Err(SetError)
         }
     }
 
     pub fn get_root(&self) -> [u8; 32] {
         match self.nodes_vec.last().unwrap().0 {
             ArrayTypes::Leaf => hash_leaf(&self.nodes_vec.last().unwrap().1),
-            ArrayTypes::Middle(_, _) => self.nodes_vec.last().unwrap().1,
+            ArrayTypes::Middle(_, _) | ArrayTypes::Truncated => self.nodes_vec.last().unwrap().1,
             ArrayTypes::Empty => BLANK,
-            ArrayTypes::Truncated => self.nodes_vec.last().unwrap().1,
         }
     }
 
@@ -258,12 +257,12 @@ impl MerkleSet {
                 proof.push(MIDDLE);
                 if get_bit(leaf, depth) {
                     // bit is 1 so truncate left branch and search right branch
-                    self.other_included(left as usize, proof)?;
+                    self.other_included(left as usize, proof);
                     self.generate_proof_impl(right as usize, leaf, proof, depth + 1)
                 } else {
                     // bit is 0 is search left and then truncate right branch
                     let r = self.generate_proof_impl(left as usize, leaf, proof, depth + 1)?;
-                    self.other_included(right as usize, proof)?;
+                    self.other_included(right as usize, proof);
                     Ok(r)
                 }
             }
@@ -277,25 +276,18 @@ impl MerkleSet {
     // tree levels that terminate in a double-leaf node. So, when validating the
     // proof, we'll need to full sub tree in that case, to enable correctly
     // computing the root hash.
-    fn other_included(
-        &self,
-        current_node_index: usize,
-        proof: &mut Vec<u8>,
-    ) -> Result<(), SetError> {
+    fn other_included(&self, current_node_index: usize, proof: &mut Vec<u8>) {
         match self.nodes_vec[current_node_index].0 {
             ArrayTypes::Empty => {
                 proof.push(EMPTY);
-                Ok(())
             }
             ArrayTypes::Middle(_, _) | ArrayTypes::Truncated => {
                 proof.push(TRUNCATED);
                 proof.extend_from_slice(&self.nodes_vec[current_node_index].1);
-                Ok(())
             }
             ArrayTypes::Leaf => {
                 proof.push(TERMINAL);
                 proof.extend_from_slice(&self.nodes_vec[current_node_index].1);
-                Ok(())
             }
         }
     }
@@ -387,8 +379,7 @@ impl From<ArrayTypes> for NodeType {
         match val {
             ArrayTypes::Empty => NodeType::Empty,
             ArrayTypes::Leaf => NodeType::Term,
-            ArrayTypes::Middle(_, _) => NodeType::Mid,
-            ArrayTypes::Truncated => NodeType::Mid,
+            ArrayTypes::Middle(_, _) | ArrayTypes::Truncated => NodeType::Mid,
         }
     }
 }
@@ -593,7 +584,7 @@ mod tests {
 
         fn get_partial_hash_recurse(&self, node_index: u32) -> [u8; 32] {
             match self.nodes_vec[node_index as usize].0 {
-                ArrayTypes::Leaf => self.nodes_vec[node_index as usize].1,
+                ArrayTypes::Leaf | ArrayTypes::Truncated => self.nodes_vec[node_index as usize].1,
                 ArrayTypes::Middle(left, right) => hash(
                     self.nodes_vec[left as usize].0.into(),
                     self.nodes_vec[right as usize].0.into(),
@@ -601,7 +592,6 @@ mod tests {
                     &self.get_partial_hash_recurse(right),
                 ),
                 ArrayTypes::Empty { .. } => BLANK,
-                ArrayTypes::Truncated => self.nodes_vec[node_index as usize].1,
             }
         }
     }

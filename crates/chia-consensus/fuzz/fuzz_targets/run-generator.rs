@@ -9,8 +9,13 @@ use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
     let mut a1 = make_allocator(LIMIT_HEAP);
-    let r1 =
-        run_block_generator::<&[u8], MempoolVisitor>(&mut a1, data, &[], 110000000, ALLOW_BACKREFS);
+    let r1 = run_block_generator::<&[u8], MempoolVisitor>(
+        &mut a1,
+        data,
+        &[],
+        110_000_000,
+        ALLOW_BACKREFS,
+    );
     drop(a1);
 
     let mut a2 = make_allocator(LIMIT_HEAP);
@@ -18,11 +23,12 @@ fuzz_target!(|data: &[u8]| {
         &mut a2,
         data,
         &[],
-        110000000,
+        110_000_000,
         ALLOW_BACKREFS,
     );
     drop(a2);
 
+    #[allow(clippy::match_same_arms)]
     match (r1, r2) {
         (Err(ValidationErr(_, ErrorCode::CostExceeded)), Ok(_)) => {
             // Since run_block_generator2 cost less, it's not a problem if the

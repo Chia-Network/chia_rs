@@ -455,6 +455,7 @@ impl<'py> FromPyObject<'py> for Bytes {
 }
 
 #[cfg(test)]
+#[allow(clippy::needless_pass_by_value)]
 mod tests {
     use super::*;
 
@@ -570,9 +571,9 @@ mod tests {
             24, 25, 26, 27, 28, 29, 30, 31, 32,
         ]
         .into();
-        println!("{:?}", val);
+        println!("{val:?}");
         let buf = stream(&val);
-        println!("buf: {:?}", buf);
+        println!("buf: {buf:?}");
         from_bytes(&buf, val);
     }
 

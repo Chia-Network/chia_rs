@@ -78,7 +78,7 @@ impl DebugPrint for Condition {
                 amount,
                 hint.debug_print(a)
             ),
-            Self::ReserveFee(amount) => format!("RESERVE_FEE {}", amount),
+            Self::ReserveFee(amount) => format!("RESERVE_FEE {amount}"),
             Self::CreateCoinAnnouncement(msg) => {
                 format!("CREATE_COIN_ANNOUNCEMENT {}", msg.debug_print(a))
             }
@@ -285,7 +285,7 @@ fn main() {
     println!("   coin-id: {}\n", hex::encode(spend.coin.coin_id()));
     let dialect = ChiaDialect::new(0);
     let Reduction(_clvm_cost, conditions) =
-        match run_program(&mut a, &dialect, puzzle, solution, 11000000000) {
+        match run_program(&mut a, &dialect, puzzle, solution, 11_000_000_000) {
             Ok(r) => r,
             Err(EvalErr(_, e)) => {
                 println!("Eval Error: {e:?}");

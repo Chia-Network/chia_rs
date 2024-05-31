@@ -84,7 +84,7 @@ fn make_dummy_id(seed: u64) -> Bytes32 {
 #[cfg(test)]
 fn make_dummy_puzzle(a: &mut Allocator, seed: u32) -> NodePtr {
     let first = a.new_atom(&seed.to_be_bytes()).unwrap();
-    let second = a.new_atom(&(0xffffffff - seed).to_be_bytes()).unwrap();
+    let second = a.new_atom(&(0xffff_ffff - seed).to_be_bytes()).unwrap();
     a.new_pair(first, second).unwrap()
 }
 

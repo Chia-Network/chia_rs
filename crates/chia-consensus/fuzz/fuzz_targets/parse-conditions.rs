@@ -72,7 +72,7 @@ fuzz_target!(|data: &[u8]| {
             flags: 0_u32,
         };
         let mut visitor = MempoolVisitor::new_spend(&mut coin_spend);
-        let mut max_cost: u64 = 3300000000;
+        let mut max_cost = 3_300_000_000;
         let _ret = parse_conditions(
             &a,
             &mut ret,
