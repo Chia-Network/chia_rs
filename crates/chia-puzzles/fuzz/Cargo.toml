@@ -9,11 +9,11 @@ edition = "2021"
 cargo-fuzz = true
 
 [dependencies]
-libfuzzer-sys = "0.4"
-clvmr = "0.7.0"
-pyo3 = { version = "0.21.2", features = ["auto-initialize"]}
-chia-puzzles = { path = "..", features = ["arbitrary"] }
-clvm-traits = { version = "0.9.0", path = "../../clvm-traits" }
+libfuzzer-sys = { workspace = true }
+clvmr = { workspace = true }
+pyo3 = { workspace = true, features = ["auto-initialize"]}
+chia-puzzles = { workspace = true, features = ["arbitrary"] }
+clvm-traits = { workspace = true }
 
 [[bin]]
 name = "roundtrip"

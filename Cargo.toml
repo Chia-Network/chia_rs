@@ -70,6 +70,7 @@ chia-puzzles = { path = "./crates/chia-puzzles", version = "0.9.0" }
 clvm-traits = { path = "./crates/clvm-traits", version = "0.9.0" }
 clvm-utils = { path = "./crates/clvm-utils", version = "0.9.0" }
 clvm-derive = { path = "./crates/clvm-derive", version = "0.9.0" }
+chia-fuzz = { path = "./crates/chia-consensus/fuzz", version = "0.6.0" }
 blst = { version = "0.3.11", git = "https://github.com/supranational/blst.git", rev = "0d46eefa45fc1e57aceb42bba0e84eab3a7a9725", features = ["portable"] }
 clvmr = "0.7.0"
 syn = "2.0.27"
@@ -104,3 +105,5 @@ rusqlite = "0.30.0"
 clap = "4.3.9"
 zstd = "0.12.3"
 blocking-threadpool = "1.0.1"
+libfuzzer-sys = "0.4"
+wasm-bindgen = "0.2.92"

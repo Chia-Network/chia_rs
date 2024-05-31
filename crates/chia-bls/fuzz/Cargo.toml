@@ -9,11 +9,9 @@ edition = "2021"
 cargo-fuzz = true
 
 [dependencies]
-libfuzzer-sys = "0.4"
-pyo3 = { version = "0.21.2", features = ["auto-initialize"]}
-
-[dependencies.chia-bls]
-path = ".."
+libfuzzer-sys = { workspace = true }
+pyo3 = { workspace = true, features = ["auto-initialize"]}
+chia-bls = { workspace = true }
 
 [[bin]]
 name = "derive"
