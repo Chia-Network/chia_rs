@@ -728,7 +728,7 @@ impl Spend {
 // spend bundle level, like reserve_fee and absolute time locks. Other
 // conditions are per spend, like relative time-locks and create coins (because
 // they have an implied parent coin ID).
-#[derive(Default, Debug)]
+#[derive(Debug, Default)]
 pub struct SpendBundleConditions {
     pub spends: Vec<Spend>,
     // conditions

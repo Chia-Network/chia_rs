@@ -85,7 +85,7 @@ fn make_aggsig_final_message(
     let mut result = msg.to_vec();
     result.extend(addendum);
     if let Some(additional_data) = agg_sig_additional_data.get(&opcode) {
-        result.extend(additional_data.clone());
+        result.extend_from_slice(additional_data);
     }
 
     result
@@ -116,14 +116,8 @@ fn u64_to_bytes(val: u64) -> Bytes {
 
 fn agg_sig_additional_data(agg_sig_data: &[u8]) -> HashMap<ConditionOpcode, Vec<u8>> {
     let mut ret: HashMap<ConditionOpcode, Vec<u8>> = HashMap::new();
-    for code in [
-        AGG_SIG_PARENT,
-        AGG_SIG_PUZZLE,
-        AGG_SIG_AMOUNT,
-        AGG_SIG_PUZZLE_AMOUNT,
-        AGG_SIG_PARENT_AMOUNT,
-        AGG_SIG_PARENT_PUZZLE,
-    ] {
+    // these are equivalent to AGG_SIG_PARENT through to AGG_SIG_PARENT_PUZZLE in opcodes.rs
+    for code in 43_u16..48_u16 {  
         let mut hasher = Sha256::new();
         hasher.update(agg_sig_data);
         hasher.update(&[code as u8]);
