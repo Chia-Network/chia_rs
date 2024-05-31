@@ -214,7 +214,7 @@ impl AddAssign<&SecretKey> for SecretKey {
 }
 
 impl fmt::Debug for SecretKey {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_fmt(format_args!(
             "<PrivateKey {}>",
             &hex::encode(self.to_bytes())
@@ -224,7 +224,7 @@ impl fmt::Debug for SecretKey {
 
 #[cfg(feature = "py-bindings")]
 impl ToJsonDict for SecretKey {
-    fn to_json_dict(&self, py: Python) -> pyo3::PyResult<PyObject> {
+    fn to_json_dict(&self, py: Python<'_>) -> pyo3::PyResult<PyObject> {
         let bytes = self.to_bytes();
         Ok(("0x".to_string() + &hex::encode(bytes)).into_py(py))
     }
@@ -232,7 +232,7 @@ impl ToJsonDict for SecretKey {
 
 #[cfg(feature = "py-bindings")]
 impl FromJsonDict for SecretKey {
-    fn from_json_dict(o: &pyo3::Bound<PyAny>) -> PyResult<Self> {
+    fn from_json_dict(o: &pyo3::Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self::from_bytes(
             parse_hex_string(o, 32, "PrivateKey")?
                 .as_slice()

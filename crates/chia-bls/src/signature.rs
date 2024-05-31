@@ -168,7 +168,7 @@ impl Hash for Signature {
 }
 
 impl fmt::Debug for Signature {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_fmt(format_args!(
             "<G2Element {}>",
             &hex::encode(self.to_bytes())
@@ -235,7 +235,7 @@ impl Add<&Signature> for &Signature {
 
 #[cfg(feature = "py-bindings")]
 impl ToJsonDict for Signature {
-    fn to_json_dict(&self, py: Python) -> pyo3::PyResult<PyObject> {
+    fn to_json_dict(&self, py: Python<'_>) -> pyo3::PyResult<PyObject> {
         let bytes = self.to_bytes();
         Ok(("0x".to_string() + &hex::encode(bytes)).into_py(py))
     }
@@ -243,7 +243,7 @@ impl ToJsonDict for Signature {
 
 #[cfg(feature = "py-bindings")]
 impl FromJsonDict for Signature {
-    fn from_json_dict(o: &pyo3::Bound<PyAny>) -> PyResult<Self> {
+    fn from_json_dict(o: &pyo3::Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self::from_bytes(
             parse_hex_string(o, 96, "Signature")?
                 .as_slice()

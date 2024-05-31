@@ -61,7 +61,7 @@ enum MakeTreeOp {
     Tree,
 }
 
-pub fn make_tree(a: &mut Allocator, cursor: &mut BitCursor, short_atoms: bool) -> NodePtr {
+pub fn make_tree(a: &mut Allocator, cursor: &mut BitCursor<'_>, short_atoms: bool) -> NodePtr {
     let mut value_stack = Vec::<NodePtr>::new();
     let mut op_stack = vec![MakeTreeOp::Tree];
 
@@ -101,7 +101,7 @@ pub fn make_tree(a: &mut Allocator, cursor: &mut BitCursor, short_atoms: bool) -
     value_stack.pop().unwrap()
 }
 
-pub fn make_list(a: &mut Allocator, cursor: &mut BitCursor) -> NodePtr {
+pub fn make_list(a: &mut Allocator, cursor: &mut BitCursor<'_>) -> NodePtr {
     let mut ret = NodePtr::NIL;
 
     let mut length = cursor.read_bits(5).unwrap_or(0);

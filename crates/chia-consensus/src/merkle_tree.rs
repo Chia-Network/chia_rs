@@ -352,7 +352,7 @@ pub fn validate_merkle_proof(
 #[pymethods]
 impl MerkleSet {
     #[new]
-    pub fn init(leafs: &Bound<PyList>) -> PyResult<Self> {
+    pub fn init(leafs: &Bound<'_, PyList>) -> PyResult<Self> {
         let mut data: Vec<[u8; 32]> = Vec::with_capacity(leafs.len());
 
         for leaf in leafs {
@@ -372,7 +372,7 @@ impl MerkleSet {
     #[pyo3(name = "is_included_already_hashed")]
     pub fn py_generate_proof(
         &self,
-        py: Python,
+        py: Python<'_>,
         included_leaf: [u8; 32],
     ) -> PyResult<(bool, PyObject)> {
         match self.generate_proof(&included_leaf) {

@@ -170,7 +170,7 @@ use pyo3::exceptions::*;
 // the detour via Allocator. propagating python errors through ToClvmError is a
 // bit tricky though
 #[cfg(feature = "py-bindings")]
-fn clvm_convert(a: &mut Allocator, o: &Bound<PyAny>) -> PyResult<NodePtr> {
+fn clvm_convert(a: &mut Allocator, o: &Bound<'_, PyAny>) -> PyResult<NodePtr> {
     // None
     if o.is_none() {
         Ok(a.nil())
@@ -249,7 +249,7 @@ fn clvm_convert(a: &mut Allocator, o: &Bound<PyAny>) -> PyResult<NodePtr> {
 }
 
 #[cfg(feature = "py-bindings")]
-fn clvm_serialize(a: &mut Allocator, o: &Bound<PyAny>) -> PyResult<NodePtr> {
+fn clvm_serialize(a: &mut Allocator, o: &Bound<'_, PyAny>) -> PyResult<NodePtr> {
     /*
     When passing arguments to run(), there's some special treatment, before falling
     back on the regular python -> CLVM conversion (implemented by clvm_convert
@@ -295,7 +295,7 @@ fn clvm_serialize(a: &mut Allocator, o: &Bound<PyAny>) -> PyResult<NodePtr> {
 }
 
 #[cfg(feature = "py-bindings")]
-fn to_program(py: Python<'_>, node: LazyNode) -> PyResult<Bound<PyAny>> {
+fn to_program(py: Python<'_>, node: LazyNode) -> PyResult<Bound<'_, PyAny>> {
     let int_module = PyModule::import_bound(py, "chia.types.blockchain_format.program")?;
     let ty = int_module.getattr("Program")?;
     ty.call1((node.into_py(py),))
@@ -312,7 +312,7 @@ impl Program {
 
     #[staticmethod]
     #[pyo3(name = "to")]
-    fn py_to(args: &Bound<PyAny>) -> PyResult<Program> {
+    fn py_to(args: &Bound<'_, PyAny>) -> PyResult<Program> {
         let mut a = Allocator::new_limited(500000000);
         let clvm = clvm_convert(&mut a, args)?;
         Program::from_node_ptr(&a, clvm)
@@ -346,7 +346,7 @@ impl Program {
         &self,
         py: Python<'a>,
         max_cost: u64,
-        args: &Bound<PyAny>,
+        args: &Bound<'_, PyAny>,
     ) -> PyResult<(u64, Bound<'a, PyAny>)> {
         use clvmr::MEMPOOL_MODE;
         self._run(py, max_cost, MEMPOOL_MODE, args)
@@ -356,7 +356,7 @@ impl Program {
         &self,
         py: Python<'a>,
         max_cost: u64,
-        args: &Bound<PyAny>,
+        args: &Bound<'_, PyAny>,
     ) -> PyResult<(u64, Bound<'a, PyAny>)> {
         self._run(py, max_cost, 0, args)
     }
@@ -366,7 +366,7 @@ impl Program {
         py: Python<'a>,
         max_cost: u64,
         flags: u32,
-        args: &Bound<PyAny>,
+        args: &Bound<'_, PyAny>,
     ) -> PyResult<(u64, Bound<'a, PyAny>)> {
         use clvmr::reduction::Response;
         use std::rc::Rc;
@@ -480,14 +480,14 @@ impl Streamable for Program {
 
 #[cfg(feature = "py-bindings")]
 impl ToJsonDict for Program {
-    fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
+    fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
         self.0.to_json_dict(py)
     }
 }
 
 #[cfg(feature = "py-bindings")]
 impl FromJsonDict for Program {
-    fn from_json_dict(o: &Bound<PyAny>) -> PyResult<Self> {
+    fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self> {
         let bytes = Bytes::from_json_dict(o)?;
         let len =
             serialized_length_from_bytes(bytes.as_slice()).map_err(|_e| Error::EndOfBuffer)?;

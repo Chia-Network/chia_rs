@@ -15,7 +15,7 @@ use chia_bls::secret_key::SecretKey;
 use chia_bls::signature::{aggregate, sign};
 use pyo3::types::{PyBytes, PyList, PyTuple};
 
-fn to_bytes(obj: &Bound<PyAny>) -> Vec<u8> {
+fn to_bytes(obj: &Bound<'_, PyAny>) -> Vec<u8> {
     obj.call_method0("__bytes__")
         .unwrap()
         .downcast::<PyBytes>()

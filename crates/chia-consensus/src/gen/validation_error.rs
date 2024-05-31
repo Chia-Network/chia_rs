@@ -383,7 +383,7 @@ pub fn next(a: &Allocator, n: NodePtr) -> Result<Option<(NodePtr, NodePtr)>, Val
     }
 }
 
-pub fn atom(a: &Allocator, n: NodePtr, code: ErrorCode) -> Result<Atom, ValidationErr> {
+pub fn atom(a: &Allocator, n: NodePtr, code: ErrorCode) -> Result<Atom<'_>, ValidationErr> {
     match a.sexp(n) {
         SExp::Atom => Ok(a.atom(n)),
         _ => Err(ValidationErr(n, code)),

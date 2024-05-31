@@ -29,7 +29,7 @@ impl fmt::Debug for TreeHash {
 }
 
 impl fmt::Display for TreeHash {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", hex::encode(self.0))
     }
 }

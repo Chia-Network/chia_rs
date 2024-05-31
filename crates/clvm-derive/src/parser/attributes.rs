@@ -70,7 +70,7 @@ enum ClvmOption {
 }
 
 impl Parse for ClvmOption {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
         let ident = input.parse::<Ident>()?;
 
         match ident.to_string().as_str() {

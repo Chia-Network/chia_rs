@@ -290,7 +290,7 @@ impl Add<&PublicKey> for PublicKey {
 }
 
 impl fmt::Debug for PublicKey {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_fmt(format_args!(
             "<G1Element {}>",
             &hex::encode(self.to_bytes())
@@ -300,14 +300,14 @@ impl fmt::Debug for PublicKey {
 
 #[cfg(feature = "py-bindings")]
 impl ToJsonDict for PublicKey {
-    fn to_json_dict(&self, py: Python) -> pyo3::PyResult<PyObject> {
+    fn to_json_dict(&self, py: Python<'_>) -> pyo3::PyResult<PyObject> {
         let bytes = self.to_bytes();
         Ok(("0x".to_string() + &hex::encode(bytes)).into_py(py))
     }
 }
 
 #[cfg(feature = "py-bindings")]
-pub fn parse_hex_string(o: &pyo3::Bound<PyAny>, len: usize, name: &str) -> PyResult<Vec<u8>> {
+pub fn parse_hex_string(o: &pyo3::Bound<'_, PyAny>, len: usize, name: &str) -> PyResult<Vec<u8>> {
     use pyo3::exceptions::{PyTypeError, PyValueError};
     if let Ok(s) = o.extract::<String>() {
         let s = if let Some(st) = s.strip_prefix("0x") {
@@ -352,7 +352,7 @@ pub fn parse_hex_string(o: &pyo3::Bound<PyAny>, len: usize, name: &str) -> PyRes
 
 #[cfg(feature = "py-bindings")]
 impl FromJsonDict for PublicKey {
-    fn from_json_dict(o: &pyo3::Bound<PyAny>) -> PyResult<Self> {
+    fn from_json_dict(o: &pyo3::Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self::from_bytes(
             parse_hex_string(o, 48, "PublicKey")?
                 .as_slice()

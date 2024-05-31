@@ -110,7 +110,7 @@ impl Mul<&GTElement> for &GTElement {
 
 #[cfg(feature = "py-bindings")]
 impl ToJsonDict for GTElement {
-    fn to_json_dict(&self, py: Python) -> pyo3::PyResult<PyObject> {
+    fn to_json_dict(&self, py: Python<'_>) -> pyo3::PyResult<PyObject> {
         let bytes = self.to_bytes();
         Ok(hex::encode(bytes).into_py(py))
     }
@@ -118,7 +118,7 @@ impl ToJsonDict for GTElement {
 
 #[cfg(feature = "py-bindings")]
 impl FromJsonDict for GTElement {
-    fn from_json_dict(o: &pyo3::Bound<PyAny>) -> PyResult<Self> {
+    fn from_json_dict(o: &pyo3::Bound<'_, PyAny>) -> PyResult<Self> {
         let s: String = o.extract()?;
         if !s.starts_with("0x") {
             return Err(PyValueError::new_err(
@@ -144,7 +144,7 @@ impl FromJsonDict for GTElement {
 }
 
 impl fmt::Debug for GTElement {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_fmt(format_args!(
             "<GTElement {}>",
             &hex::encode(self.to_bytes())

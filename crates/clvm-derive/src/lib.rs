@@ -1,5 +1,3 @@
-extern crate proc_macro;
-
 mod apply_constants;
 mod from_clvm;
 mod helpers;

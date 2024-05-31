@@ -15,7 +15,10 @@ repository = "https://github.com/Chia-Network/chia_rs"
 [workspace]
 members = ["crates/*", "crates/*/fuzz", "wasm", "wheel"]
 
-[workspace.lints]
+[workspace.lints.rust]
+rust_2018_idioms = "deny"
+rust_2021_compatibility = "deny"
+future_incompatible = "deny"
 
 [dependencies]
 chia-bls = { workspace = true, optional = true }

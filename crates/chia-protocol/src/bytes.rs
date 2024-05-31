@@ -55,7 +55,7 @@ impl fmt::Debug for Bytes {
 }
 
 impl fmt::Display for Bytes {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&hex::encode(self))
     }
 }
@@ -84,14 +84,14 @@ impl Streamable for Bytes {
 
 #[cfg(feature = "py-bindings")]
 impl ToJsonDict for Bytes {
-    fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
+    fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
         Ok(format!("0x{self}").to_object(py))
     }
 }
 
 #[cfg(feature = "py-bindings")]
 impl FromJsonDict for Bytes {
-    fn from_json_dict(o: &Bound<PyAny>) -> PyResult<Self> {
+    fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self> {
         let s: String = o.extract()?;
         if !s.starts_with("0x") {
             return Err(PyValueError::new_err(
@@ -203,7 +203,7 @@ impl<const N: usize> fmt::Debug for BytesImpl<N> {
 }
 
 impl<const N: usize> fmt::Display for BytesImpl<N> {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&hex::encode(self))
     }
 }
@@ -224,14 +224,14 @@ impl<const N: usize> Streamable for BytesImpl<N> {
 
 #[cfg(feature = "py-bindings")]
 impl<const N: usize> ToJsonDict for BytesImpl<N> {
-    fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
+    fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
         Ok(format!("0x{self}").to_object(py))
     }
 }
 
 #[cfg(feature = "py-bindings")]
 impl<const N: usize> FromJsonDict for BytesImpl<N> {
-    fn from_json_dict(o: &Bound<PyAny>) -> PyResult<Self> {
+    fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self> {
         let s: String = o.extract()?;
         if !s.starts_with("0x") {
             return Err(PyValueError::new_err(
@@ -390,14 +390,14 @@ impl From<TreeHash> for Bytes32 {
 
 #[cfg(feature = "py-bindings")]
 impl<const N: usize> ToPyObject for BytesImpl<N> {
-    fn to_object(&self, py: Python) -> PyObject {
+    fn to_object(&self, py: Python<'_>) -> PyObject {
         PyBytes::new_bound(py, &self.0).into()
     }
 }
 
 #[cfg(feature = "py-bindings")]
 impl<const N: usize> IntoPy<PyObject> for BytesImpl<N> {
-    fn into_py(self, py: Python) -> PyObject {
+    fn into_py(self, py: Python<'_>) -> PyObject {
         PyBytes::new_bound(py, &self.0).into()
     }
 }
@@ -427,14 +427,14 @@ impl<'py, const N: usize> FromPyObject<'py> for BytesImpl<N> {
 
 #[cfg(feature = "py-bindings")]
 impl ToPyObject for Bytes {
-    fn to_object(&self, py: Python) -> PyObject {
+    fn to_object(&self, py: Python<'_>) -> PyObject {
         PyBytes::new_bound(py, &self.0).into()
     }
 }
 
 #[cfg(feature = "py-bindings")]
 impl IntoPy<PyObject> for Bytes {
-    fn into_py(self, py: Python) -> PyObject {
+    fn into_py(self, py: Python<'_>) -> PyObject {
         PyBytes::new_bound(py, &self.0).into()
     }
 }

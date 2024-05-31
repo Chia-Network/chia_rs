@@ -25,7 +25,7 @@ pub fn serialized_length(program: PyBuffer<u8>) -> PyResult<u64> {
 #[allow(clippy::borrow_deref_ref)]
 #[pyfunction]
 pub fn run_chia_program(
-    py: Python,
+    py: Python<'_>,
     program: &[u8],
     args: &[u8],
     max_cost: Cost,

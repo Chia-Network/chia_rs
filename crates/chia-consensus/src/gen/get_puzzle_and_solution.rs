@@ -8,7 +8,7 @@ use clvmr::op_utils::u64_from_bytes;
 pub fn parse_coin_spend(
     a: &Allocator,
     coin_spend: NodePtr,
-) -> Result<(Atom, u64, NodePtr, NodePtr), ValidationErr> {
+) -> Result<(Atom<'_>, u64, NodePtr, NodePtr), ValidationErr> {
     let parent = atom(a, first(a, coin_spend)?, ErrorCode::InvalidParentId)?;
     let coin_spend = rest(a, coin_spend)?;
     let puzzle = first(a, coin_spend)?;

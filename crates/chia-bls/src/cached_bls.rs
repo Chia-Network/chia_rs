@@ -112,8 +112,8 @@ mod python {
         #[pyo3(name = "aggregate_verify")]
         pub fn py_aggregate_verify(
             &mut self,
-            pks: &Bound<PyList>,
-            msgs: &Bound<PyList>,
+            pks: &Bound<'_, PyList>,
+            msgs: &Bound<'_, PyList>,
             sig: &Signature,
         ) -> PyResult<bool> {
             let pks = pks
@@ -135,7 +135,7 @@ mod python {
         }
 
         #[pyo3(name = "items")]
-        pub fn py_items(&self, py: pyo3::Python) -> PyResult<PyObject> {
+        pub fn py_items(&self, py: pyo3::Python<'_>) -> PyResult<PyObject> {
             use pyo3::prelude::*;
             use pyo3::types::PyBytes;
             let ret = PyList::empty_bound(py);
@@ -149,7 +149,7 @@ mod python {
         }
 
         #[pyo3(name = "update")]
-        pub fn py_update(&mut self, other: &Bound<PyList>) -> PyResult<()> {
+        pub fn py_update(&mut self, other: &Bound<'_, PyList>) -> PyResult<()> {
             for item in other.borrow().iter()? {
                 let (key, value): (Vec<u8>, Vec<u8>) = item?.extract()?;
                 self.cache.put(
