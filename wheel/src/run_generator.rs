@@ -26,17 +26,19 @@ pub fn run_block_generator(
     for g in block_refs {
         let buf = g.extract::<PyBuffer<u8>>()?;
 
-        if !buf.is_c_contiguous() {
-            panic!("block_refs buffers must be contiguous");
-        }
+        assert!(
+            buf.is_c_contiguous(),
+            "block_refs buffers must be contiguous"
+        );
         let slice =
             unsafe { std::slice::from_raw_parts(buf.buf_ptr() as *const u8, buf.len_bytes()) };
         refs.push(slice);
     }
 
-    if !program.is_c_contiguous() {
-        panic!("program buffer must be contiguous");
-    }
+    assert!(
+        program.is_c_contiguous(),
+        "program buffer must be contiguous"
+    );
     let program =
         unsafe { std::slice::from_raw_parts(program.buf_ptr() as *const u8, program.len_bytes()) };
 
@@ -78,17 +80,19 @@ pub fn run_block_generator2(
     for g in block_refs {
         let buf = g.extract::<PyBuffer<u8>>()?;
 
-        if !buf.is_c_contiguous() {
-            panic!("block_refs buffers must be contiguous");
-        }
+        assert!(
+            buf.is_c_contiguous(),
+            "block_refs buffers must be contiguous"
+        );
         let slice =
             unsafe { std::slice::from_raw_parts(buf.buf_ptr() as *const u8, buf.len_bytes()) };
         refs.push(slice);
     }
 
-    if !program.is_c_contiguous() {
-        panic!("program buffer must be contiguous");
-    }
+    assert!(
+        program.is_c_contiguous(),
+        "program buffer must be contiguous"
+    );
     let program =
         unsafe { std::slice::from_raw_parts(program.buf_ptr() as *const u8, program.len_bytes()) };
 

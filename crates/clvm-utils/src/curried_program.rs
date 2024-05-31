@@ -40,7 +40,7 @@ mod tests {
 
     use super::*;
 
-    fn check<P, A>(program: P, args: A, expected: &str)
+    fn check<P, A>(program: &P, args: &A, expected: &str)
     where
         P: Debug + PartialEq + ToClvm<NodePtr> + FromClvm<NodePtr>,
         A: Debug + PartialEq + ToClvm<NodePtr> + FromClvm<NodePtr>,
@@ -57,15 +57,15 @@ mod tests {
         assert_eq!(hex::encode(actual), expected);
 
         let curried = CurriedProgram::<P, A>::from_clvm(a, curry).unwrap();
-        assert_eq!(curried.program, program);
-        assert_eq!(curried.args, args);
+        assert_eq!(&curried.program, program);
+        assert_eq!(&curried.args, args);
     }
 
     #[test]
     fn curry() {
         check(
-            "xyz".to_string(),
-            clvm_curried_args!("a".to_string(), "b".to_string(), "c".to_string()),
+            &"xyz".to_string(),
+            &clvm_curried_args!("a".to_string(), "b".to_string(), "c".to_string()),
             "ff02ffff018378797affff04ffff0161ffff04ffff0162ffff04ffff0163ff0180808080",
         );
     }

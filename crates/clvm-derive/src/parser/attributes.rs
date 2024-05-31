@@ -142,44 +142,35 @@ pub fn parse_clvm_options(attrs: &[Attribute]) -> ClvmOptions {
 
         let parsed_options = attr
             .parse_args_with(Punctuated::<ClvmOption, Token![,]>::parse_terminated)
-            .unwrap_or_else(|error| panic!("failed to parse `clvm` attribute options: {}", error));
+            .unwrap_or_else(|error| panic!("failed to parse `clvm` attribute options: {error}"));
 
         for option in parsed_options {
             match option {
                 ClvmOption::Untagged => {
-                    if options.untagged {
-                        panic!("duplicate `untagged` option");
-                    }
+                    assert!(!options.untagged, "duplicate `untagged` option");
                     options.untagged = true;
                 }
                 ClvmOption::Repr(repr) => {
-                    if options.repr.is_some() {
-                        panic!("duplicate repr option `{repr}`");
-                    }
+                    assert!(options.repr.is_none(), "duplicate repr option `{repr}`");
                     options.repr = Some(repr);
                 }
                 ClvmOption::Constant(value) => {
-                    if options.constant.is_some() {
-                        panic!("duplicate `constant` option");
-                    }
+                    assert!(options.constant.is_none(), "duplicate `constant` option");
                     options.constant = Some(value);
                 }
                 ClvmOption::CrateName(crate_name) => {
-                    if options.crate_name.is_some() {
-                        panic!("duplicate `crate_name` option");
-                    }
+                    assert!(
+                        options.crate_name.is_none(),
+                        "duplicate `crate_name` option"
+                    );
                     options.crate_name = Some(crate_name);
                 }
                 ClvmOption::Default(default) => {
-                    if options.default.is_some() {
-                        panic!("duplicate `default` option");
-                    }
+                    assert!(options.default.is_none(), "duplicate `default` option");
                     options.default = Some(default);
                 }
                 ClvmOption::Rest => {
-                    if options.rest {
-                        panic!("duplicate `rest` option");
-                    }
+                    assert!(!options.rest, "duplicate `rest` option");
                     options.rest = true;
                 }
             }

@@ -14,9 +14,7 @@ use std::rc::Rc;
 #[allow(clippy::borrow_deref_ref)]
 #[pyfunction]
 pub fn serialized_length(program: PyBuffer<u8>) -> PyResult<u64> {
-    if !program.is_c_contiguous() {
-        panic!("program must be contiguous");
-    }
+    assert!(program.is_c_contiguous(), "program must be contiguous");
     let program =
         unsafe { std::slice::from_raw_parts(program.buf_ptr() as *const u8, program.len_bytes()) };
     Ok(serialized_length_from_bytes(program)?)
@@ -50,6 +48,6 @@ pub fn run_chia_program(
             let val = LazyNode::new(Rc::new(allocator), reduction.1);
             Ok((reduction.0, val))
         }
-        Err(eval_err) => eval_err_to_pyresult(eval_err, allocator),
+        Err(eval_err) => eval_err_to_pyresult(eval_err, &allocator),
     }
 }

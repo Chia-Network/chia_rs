@@ -43,7 +43,7 @@ impl Signature {
     pub fn from_bytes_unchecked(buf: &[u8; 96]) -> Result<Self> {
         let p2 = unsafe {
             let mut p2_affine = MaybeUninit::<blst_p2_affine>::uninit();
-            let ret = blst_p2_uncompress(p2_affine.as_mut_ptr(), buf as *const u8);
+            let ret = blst_p2_uncompress(p2_affine.as_mut_ptr(), buf.as_ptr());
             if ret != BLST_ERROR::BLST_SUCCESS {
                 return Err(Error::InvalidSignature(ret));
             }
@@ -56,17 +56,17 @@ impl Signature {
 
     pub fn from_bytes(buf: &[u8; 96]) -> Result<Self> {
         let ret = Self::from_bytes_unchecked(buf)?;
-        if !ret.is_valid() {
-            Err(Error::InvalidSignature(BLST_ERROR::BLST_POINT_NOT_ON_CURVE))
-        } else {
+        if ret.is_valid() {
             Ok(ret)
+        } else {
+            Err(Error::InvalidSignature(BLST_ERROR::BLST_POINT_NOT_ON_CURVE))
         }
     }
 
     pub fn from_uncompressed(buf: &[u8; 192]) -> Result<Self> {
         let p2 = unsafe {
             let mut p2_affine = MaybeUninit::<blst_p2_affine>::uninit();
-            let ret = blst_p2_deserialize(p2_affine.as_mut_ptr(), buf as *const u8);
+            let ret = blst_p2_deserialize(p2_affine.as_mut_ptr(), buf.as_ptr());
             if ret != BLST_ERROR::BLST_SUCCESS {
                 return Err(Error::InvalidSignature(ret));
             }
@@ -80,7 +80,7 @@ impl Signature {
     pub fn to_bytes(&self) -> [u8; 96] {
         unsafe {
             let mut bytes = MaybeUninit::<[u8; 96]>::uninit();
-            blst_p2_compress(bytes.as_mut_ptr() as *mut u8, &self.0);
+            blst_p2_compress(bytes.as_mut_ptr().cast::<u8>(), &self.0);
             bytes.assume_init()
         }
     }
@@ -111,7 +111,7 @@ impl Signature {
         unsafe {
             let mut scalar = MaybeUninit::<blst_scalar>::uninit();
             blst_scalar_from_be_bytes(scalar.as_mut_ptr(), int_bytes.as_ptr(), int_bytes.len());
-            blst_p2_mult(&mut self.0, &self.0, scalar.as_ptr() as *const u8, 256);
+            blst_p2_mult(&mut self.0, &self.0, scalar.as_ptr().cast::<u8>(), 256);
         }
     }
 
@@ -163,7 +163,7 @@ impl Eq for Signature {}
 
 impl Hash for Signature {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write(&self.to_bytes())
+        state.write(&self.to_bytes());
     }
 }
 
@@ -275,10 +275,11 @@ impl Signature {
         Self::generator()
     }
 
-    fn __str__(&self) -> PyResult<String> {
-        Ok(hex::encode(self.to_bytes()))
+    fn __str__(&self) -> String {
+        hex::encode(self.to_bytes())
     }
 
+    #[must_use]
     pub fn __add__(&self, rhs: &Self) -> Self {
         self + rhs
     }
@@ -304,7 +305,7 @@ where
 
     let mut v: Vec<u64> = vec![0; unsafe { blst_pairing_sizeof() } / 8];
     let ctx = unsafe {
-        let ctx = v.as_mut_slice().as_mut_ptr() as *mut blst_pairing;
+        let ctx = v.as_mut_slice().as_mut_ptr().cast::<blst_pairing>();
         blst_pairing_init(
             ctx,
             true, // hash
@@ -374,7 +375,7 @@ where
 {
     let mut ret = Signature::default();
 
-    for s in sigs.into_iter() {
+    for s in sigs {
         ret.aggregate(s.borrow());
     }
     ret
@@ -438,7 +439,7 @@ where
 
     let mut v: Vec<u64> = vec![0; unsafe { blst_pairing_sizeof() } / 8];
     let ctx = unsafe {
-        let ctx = v.as_mut_slice().as_mut_ptr() as *mut blst_pairing;
+        let ctx = v.as_mut_ptr().cast::<blst_pairing>();
         blst_pairing_init(
             ctx,
             true, // hash

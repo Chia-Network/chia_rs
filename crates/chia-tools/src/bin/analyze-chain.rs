@@ -60,7 +60,7 @@ fn main() {
 
     // We only create a single allocator, load it with the generator ROM and
     // then we keep reusing it
-    let mut a = Allocator::new_limited(500000000);
+    let mut a = Allocator::new_limited(500_000_000);
     let generator_rom =
         node_from_bytes(&mut a, &GENERATOR_ROM).expect("failed to parse generator ROM");
     let allocator_checkpoint = a.checkpoint();

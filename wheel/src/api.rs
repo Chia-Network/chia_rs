@@ -109,9 +109,10 @@ pub fn confirm_not_included_already_hashed(
 
 #[pyfunction]
 pub fn tree_hash(py: Python<'_>, blob: PyBuffer<u8>) -> PyResult<Bound<'_, PyBytes>> {
-    if !blob.is_c_contiguous() {
-        panic!("tree_hash() must be called with a contiguous buffer");
-    }
+    assert!(
+        blob.is_c_contiguous(),
+        "tree_hash() must be called with a contiguous buffer"
+    );
     let slice =
         unsafe { std::slice::from_raw_parts(blob.buf_ptr() as *const u8, blob.len_bytes()) };
     Ok(PyBytes::new_bound(py, &tree_hash_from_bytes(slice)?))
@@ -131,15 +132,11 @@ pub fn get_puzzle_and_solution_for_coin(
 ) -> PyResult<(Bound<'_, PyBytes>, Bound<'_, PyBytes>)> {
     let mut allocator = make_allocator(LIMIT_HEAP);
 
-    if !program.is_c_contiguous() {
-        panic!("program must be contiguous");
-    }
+    assert!(program.is_c_contiguous(), "program must be contiguous");
     let program =
         unsafe { std::slice::from_raw_parts(program.buf_ptr() as *const u8, program.len_bytes()) };
 
-    if !args.is_c_contiguous() {
-        panic!("args must be contiguous");
-    }
+    assert!(args.is_c_contiguous(), "args must be contiguous");
     let args = unsafe { std::slice::from_raw_parts(args.buf_ptr() as *const u8, args.len_bytes()) };
 
     let deserialize = if (flags & ALLOW_BACKREFS) != 0 {
@@ -170,7 +167,7 @@ pub fn get_puzzle_and_solution_for_coin(
         };
     */
     match r {
-        Err(eval_err) => eval_err_to_pyresult(eval_err, allocator),
+        Err(eval_err) => eval_err_to_pyresult(eval_err, &allocator),
         Ok((puzzle, solution)) => Ok((
             PyBytes::new_bound(py, &serialize(&allocator, puzzle)?),
             PyBytes::new_bound(py, &serialize(&allocator, solution)?),

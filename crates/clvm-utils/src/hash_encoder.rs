@@ -1,3 +1,5 @@
+#![allow(clippy::items_after_statements)]
+
 use clvm_traits::{ClvmEncoder, ToClvm, ToClvmError};
 
 use crate::{tree_hash_atom, tree_hash_pair, TreeHash};

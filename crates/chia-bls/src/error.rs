@@ -31,6 +31,6 @@ use pyo3::PyErr;
 #[cfg(feature = "py-bindings")]
 impl From<Error> for PyErr {
     fn from(err: Error) -> PyErr {
-        pyo3::exceptions::PyValueError::new_err(format!("BLS Error {:?}", err))
+        pyo3::exceptions::PyValueError::new_err(format!("BLS Error {err:?}"))
     }
 }

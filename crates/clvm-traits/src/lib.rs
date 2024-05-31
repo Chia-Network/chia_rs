@@ -37,7 +37,7 @@ mod derive_tests {
 
     use clvmr::{serde::node_to_bytes, Allocator, NodePtr};
 
-    fn check<T>(value: T, expected: &str)
+    fn check<T>(value: &T, expected: &str)
     where
         T: Debug + PartialEq + ToClvm<NodePtr> + FromClvm<NodePtr>,
     {
@@ -49,7 +49,7 @@ mod derive_tests {
         assert_eq!(expected, hex::encode(actual));
 
         let round_trip = T::from_clvm(a, ptr).unwrap();
-        assert_eq!(value, round_trip);
+        assert_eq!(value, &round_trip);
     }
 
     fn coerce_into<A, B>(value: A) -> B
@@ -72,7 +72,7 @@ mod derive_tests {
         }
 
         // Includes the nil terminator.
-        check(Struct { a: 52, b: -32 }, "ff34ff81e080");
+        check(&Struct { a: 52, b: -32 }, "ff34ff81e080");
     }
 
     #[test]
@@ -86,7 +86,7 @@ mod derive_tests {
         }
 
         // Does not include the nil terminator.
-        check(Struct { a: 52, b: -32 }, "ff3481e0");
+        check(&Struct { a: 52, b: -32 }, "ff3481e0");
     }
 
     #[test]
@@ -99,7 +99,7 @@ mod derive_tests {
         }
 
         check(
-            Struct { a: 52, b: -32 },
+            &Struct { a: 52, b: -32 },
             "ff04ffff0134ffff04ffff0181e0ff018080",
         );
     }
@@ -114,7 +114,7 @@ mod derive_tests {
             b: i32,
         }
 
-        check(Struct { a: 52, b: -32 }, "ff04ffff0134ff81e080");
+        check(&Struct { a: 52, b: -32 }, "ff04ffff0134ff81e080");
     }
 
     #[test]
@@ -123,7 +123,7 @@ mod derive_tests {
         #[clvm(list)]
         struct Struct(String, String);
 
-        check(Struct("A".to_string(), "B".to_string()), "ff41ff4280");
+        check(&Struct("A".to_string(), "B".to_string()), "ff41ff4280");
     }
 
     #[test]
@@ -132,7 +132,7 @@ mod derive_tests {
         #[clvm(list)]
         struct Struct(#[clvm(rest)] String);
 
-        check(Struct("XYZ".to_string()), "8358595a");
+        check(&Struct("XYZ".to_string()), "8358595a");
     }
 
     #[test]
@@ -146,13 +146,13 @@ mod derive_tests {
         }
 
         check(
-            Struct {
+            &Struct {
                 a: 52,
                 b: Some(-32),
             },
             "ff34ff81e080",
         );
-        check(Struct { a: 52, b: None }, "ff3480");
+        check(&Struct { a: 52, b: None }, "ff3480");
     }
 
     #[test]
@@ -165,8 +165,8 @@ mod derive_tests {
             b: i32,
         }
 
-        check(Struct { a: 52, b: 32 }, "ff34ff2080");
-        check(Struct { a: 52, b: 42 }, "ff3480");
+        check(&Struct { a: 52, b: 32 }, "ff34ff2080");
+        check(&Struct { a: 52, b: 42 }, "ff3480");
     }
 
     #[test]
@@ -180,14 +180,14 @@ mod derive_tests {
         }
 
         check(
-            Struct {
+            &Struct {
                 a: 52,
                 b: "World".to_string(),
             },
             "ff34ff85576f726c6480",
         );
         check(
-            Struct {
+            &Struct {
                 a: 52,
                 b: "Hello".to_string(),
             },
@@ -213,7 +213,7 @@ mod derive_tests {
         }
 
         check(
-            RunTailCondition {
+            &RunTailCondition {
                 puzzle: "puzzle".to_string(),
                 solution: "solution".to_string(),
             },
@@ -231,9 +231,9 @@ mod derive_tests {
             C,
         }
 
-        check(Enum::A(32), "ff80ff2080");
-        check(Enum::B { x: -72 }, "ff01ff81b880");
-        check(Enum::C, "ff0280");
+        check(&Enum::A(32), "ff80ff2080");
+        check(&Enum::B { x: -72 }, "ff01ff81b880");
+        check(&Enum::C, "ff0280");
     }
 
     #[test]
@@ -247,9 +247,9 @@ mod derive_tests {
             C = 11,
         }
 
-        check(Enum::A(32), "ff2aff2080");
-        check(Enum::B { x: -72 }, "ff22ff81b880");
-        check(Enum::C, "ff0b80");
+        check(&Enum::A(32), "ff2aff2080");
+        check(&Enum::B { x: -72 }, "ff22ff81b880");
+        check(&Enum::C, "ff0b80");
     }
 
     #[test]
@@ -268,10 +268,10 @@ mod derive_tests {
             },
         }
 
-        check(Enum::A(32), "ff2080");
-        check(Enum::B { x: -72, y: 94 }, "ff81b8ff5e80");
+        check(&Enum::A(32), "ff2080");
+        check(&Enum::B { x: -72, y: 94 }, "ff81b8ff5e80");
         check(
-            Enum::C {
+            &Enum::C {
                 curried_value: "Hello".to_string(),
             },
             "ff04ffff018548656c6c6fff0180",
@@ -322,6 +322,6 @@ mod derive_tests {
             b: i32,
         }
 
-        check(Struct { a: 52, b: -32 }, "ff34ff81e080");
+        check(&Struct { a: 52, b: -32 }, "ff34ff81e080");
     }
 }

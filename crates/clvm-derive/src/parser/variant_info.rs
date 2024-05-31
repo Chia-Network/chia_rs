@@ -17,39 +17,37 @@ pub enum VariantKind {
     Named,
 }
 
-pub fn parse_variant(options: ClvmOptions, variant: &Variant) -> VariantInfo {
-    if options.untagged {
-        panic!("`untagged` only applies to enums");
-    }
+pub fn parse_variant(options: &ClvmOptions, variant: &Variant) -> VariantInfo {
+    assert!(!options.untagged, "`untagged` only applies to enums");
 
-    if options.enum_repr.is_some() {
-        panic!("`repr` only applies to enums");
-    }
+    assert!(options.enum_repr.is_none(), "`repr` only applies to enums");
 
-    if options.constant.is_some() {
-        panic!("`constant` only applies to fields");
-    }
+    assert!(
+        options.constant.is_none(),
+        "`constant` only applies to fields"
+    );
 
-    if options.crate_name.is_some() {
-        panic!("`crate_name` can't be set on individual enum variants");
-    }
+    assert!(
+        options.crate_name.is_none(),
+        "`crate_name` can't be set on individual enum variants"
+    );
 
-    if options.default.is_some() {
-        panic!("`default` only applies to fields");
-    }
+    assert!(
+        options.default.is_none(),
+        "`default` only applies to fields"
+    );
 
-    if options.rest {
-        panic!("`rest` only applies to fields");
-    }
+    assert!(!options.rest, "`rest` only applies to fields");
 
     let name = variant.ident.clone();
     let discriminant = variant.discriminant.clone().map(|(_, expr)| expr);
 
     let repr = options.repr;
 
-    if repr == Some(Repr::Atom) {
-        panic!("`atom` is not a valid representation for individual enum variants");
-    }
+    assert!(
+        !(repr == Some(Repr::Atom)),
+        "`atom` is not a valid representation for individual enum variants"
+    );
 
     let (kind, fields) = match &variant.fields {
         Fields::Unit => (VariantKind::Unit, Vec::new()),

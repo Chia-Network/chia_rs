@@ -31,11 +31,7 @@ impl GTElement {
     pub fn from_bytes(bytes: &[u8; Self::SIZE]) -> Self {
         let gt = unsafe {
             let mut gt = MaybeUninit::<blst_fp12>::uninit();
-            std::ptr::copy_nonoverlapping(
-                bytes as *const u8,
-                gt.as_mut_ptr() as *mut u8,
-                Self::SIZE,
-            );
+            std::ptr::copy_nonoverlapping(bytes.as_ptr(), gt.as_mut_ptr().cast::<u8>(), Self::SIZE);
             gt.assume_init()
         };
         Self(gt)
@@ -46,7 +42,7 @@ impl GTElement {
             let mut bytes = MaybeUninit::<[u8; Self::SIZE]>::uninit();
             std::ptr::copy_nonoverlapping(
                 std::mem::transmute::<*const blst_fp12, *const u8>(&self.0),
-                bytes.as_mut_ptr() as *mut u8,
+                bytes.as_mut_ptr().cast::<u8>(),
                 Self::SIZE,
             );
             bytes.assume_init()
@@ -60,10 +56,11 @@ impl GTElement {
     #[pyo3(name = "SIZE")]
     const PY_SIZE: usize = Self::SIZE;
 
-    fn __str__(&self) -> PyResult<String> {
-        Ok(hex::encode(self.to_bytes()))
+    fn __str__(&self) -> String {
+        hex::encode(self.to_bytes())
     }
 
+    #[must_use]
     pub fn __mul__(&self, rhs: &Self) -> Self {
         let mut ret = self.clone();
         ret *= rhs;
@@ -84,7 +81,7 @@ impl Eq for GTElement {}
 
 impl Hash for GTElement {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write(&self.to_bytes())
+        state.write(&self.to_bytes());
     }
 }
 

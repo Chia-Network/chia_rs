@@ -51,18 +51,18 @@ impl PublicKey {
             }
             // return infinity element (point all zero)
             return Ok(Self::default());
-        } else {
-            if (bytes[0] & 0xc0) != 0x80 {
-                return Err(Error::G1InfinityInvalidBits);
-            }
-            if zeros_only {
-                return Err(Error::G1InfinityNotZero);
-            }
+        }
+
+        if (bytes[0] & 0xc0) != 0x80 {
+            return Err(Error::G1InfinityInvalidBits);
+        }
+        if zeros_only {
+            return Err(Error::G1InfinityNotZero);
         }
 
         let p1 = unsafe {
             let mut p1_affine = MaybeUninit::<blst_p1_affine>::uninit();
-            let ret = blst_p1_uncompress(p1_affine.as_mut_ptr(), bytes as *const u8);
+            let ret = blst_p1_uncompress(p1_affine.as_mut_ptr(), bytes.as_ptr());
             if ret != BLST_ERROR::BLST_SUCCESS {
                 return Err(Error::InvalidPublicKey(ret));
             }
@@ -89,7 +89,7 @@ impl PublicKey {
             blst_p1_mult(
                 p1.as_mut_ptr(),
                 blst_p1_generator(),
-                scalar.as_ptr() as *const u8,
+                scalar.as_ptr().cast::<u8>(),
                 256,
             );
             p1.assume_init()
@@ -99,17 +99,17 @@ impl PublicKey {
 
     pub fn from_bytes(bytes: &[u8; 48]) -> Result<Self> {
         let ret = Self::from_bytes_unchecked(bytes)?;
-        if !ret.is_valid() {
-            Err(Error::InvalidPublicKey(BLST_ERROR::BLST_POINT_NOT_ON_CURVE))
-        } else {
+        if ret.is_valid() {
             Ok(ret)
+        } else {
+            Err(Error::InvalidPublicKey(BLST_ERROR::BLST_POINT_NOT_ON_CURVE))
         }
     }
 
     pub fn from_uncompressed(buf: &[u8; 96]) -> Result<Self> {
         let p1 = unsafe {
             let mut p1_affine = MaybeUninit::<blst_p1_affine>::uninit();
-            let ret = blst_p1_deserialize(p1_affine.as_mut_ptr(), buf as *const u8);
+            let ret = blst_p1_deserialize(p1_affine.as_mut_ptr(), buf.as_ptr());
             if ret != BLST_ERROR::BLST_SUCCESS {
                 return Err(Error::InvalidSignature(ret));
             }
@@ -123,7 +123,7 @@ impl PublicKey {
     pub fn to_bytes(&self) -> [u8; 48] {
         unsafe {
             let mut bytes = MaybeUninit::<[u8; 48]>::uninit();
-            blst_p1_compress(bytes.as_mut_ptr() as *mut u8, &self.0);
+            blst_p1_compress(bytes.as_mut_ptr().cast::<u8>(), &self.0);
             bytes.assume_init()
         }
     }
@@ -148,10 +148,11 @@ impl PublicKey {
         unsafe {
             let mut scalar = MaybeUninit::<blst_scalar>::uninit();
             blst_scalar_from_be_bytes(scalar.as_mut_ptr(), int_bytes.as_ptr(), int_bytes.len());
-            blst_p1_mult(&mut self.0, &self.0, scalar.as_ptr() as *const u8, 256);
+            blst_p1_mult(&mut self.0, &self.0, scalar.as_ptr().cast::<u8>(), 256);
         }
     }
 
+    #[allow(clippy::missing_panics_doc)]
     pub fn get_fingerprint(&self) -> u32 {
         let mut hasher = Sha256::new();
         hasher.update(self.to_bytes());
@@ -186,10 +187,11 @@ impl PublicKey {
         self.get_fingerprint()
     }
 
-    fn __str__(&self) -> PyResult<String> {
-        Ok(hex::encode(self.to_bytes()))
+    fn __str__(&self) -> String {
+        hex::encode(self.to_bytes())
     }
 
+    #[must_use]
     pub fn __add__(&self, rhs: &Self) -> Self {
         self + rhs
     }
@@ -228,7 +230,7 @@ impl Streamable for PublicKey {
 
 impl Hash for PublicKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write(&self.to_bytes())
+        state.write(&self.to_bytes());
     }
 }
 
@@ -321,31 +323,30 @@ pub fn parse_hex_string(o: &pyo3::Bound<'_, PyAny>, len: usize, name: &str) -> P
             }
             Ok(v) => v,
         };
-        if buf.len() != len {
+        if buf.len() == len {
+            Ok(buf)
+        } else {
             Err(PyValueError::new_err(format!(
                 "{}, invalid length {} expected {}",
                 name,
                 buf.len(),
                 len
             )))
-        } else {
-            Ok(buf)
         }
     } else if let Ok(buf) = o.extract::<Vec<u8>>() {
-        if buf.len() != len {
+        if buf.len() == len {
+            Ok(buf)
+        } else {
             Err(PyValueError::new_err(format!(
                 "{}, invalid length {} expected {}",
                 name,
                 buf.len(),
                 len
             )))
-        } else {
-            Ok(buf)
         }
     } else {
         Err(PyTypeError::new_err(format!(
-            "invalid input type for {}",
-            name
+            "invalid input type for {name}"
         )))
     }
 }
@@ -373,12 +374,12 @@ impl DerivableKey for PublicKey {
             let mut nonce = MaybeUninit::<blst_scalar>::uninit();
             blst_scalar_from_lendian(nonce.as_mut_ptr(), digest.as_ptr());
             let mut bte = MaybeUninit::<[u8; 48]>::uninit();
-            blst_bendian_from_scalar(bte.as_mut_ptr() as *mut u8, nonce.as_ptr());
+            blst_bendian_from_scalar(bte.as_mut_ptr().cast::<u8>(), nonce.as_ptr());
             let mut p1 = MaybeUninit::<blst_p1>::uninit();
             blst_p1_mult(
                 p1.as_mut_ptr(),
                 blst_p1_generator(),
-                bte.as_ptr() as *const u8,
+                bte.as_ptr().cast::<u8>(),
                 256,
             );
             blst_p1_add(p1.as_mut_ptr(), p1.as_mut_ptr(), &self.0);
@@ -490,7 +491,7 @@ mod tests {
         .try_into()
         .unwrap();
         let pk = PublicKey::from_bytes(&bytes).unwrap();
-        assert_eq!(pk.get_fingerprint(), 651010559);
+        assert_eq!(pk.get_fingerprint(), 651_010_559);
     }
 
     #[test]
@@ -608,7 +609,7 @@ mod tests {
         data[0] = 0xc0;
         let pk = PublicKey::from_bytes(&data).unwrap();
         assert_eq!(
-            format!("{:?}", pk),
+            format!("{pk:?}"),
             format!("<G1Element {}>", hex::encode(data))
         );
     }

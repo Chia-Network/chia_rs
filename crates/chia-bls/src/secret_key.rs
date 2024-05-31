@@ -47,8 +47,8 @@ fn flip_bits(input: [u8; 32]) -> [u8; 32] {
     ret
 }
 
-fn ikm_to_lamport_sk(ikm: &[u8; 32], salt: &[u8; 4]) -> [u8; 255 * 32] {
-    let mut extracter = HkdfExtract::<Sha256>::new(Some(salt));
+fn ikm_to_lamport_sk(ikm: &[u8; 32], salt: [u8; 4]) -> [u8; 255 * 32] {
+    let mut extracter = HkdfExtract::<Sha256>::new(Some(&salt));
     extracter.input_ikm(ikm);
     let (_, h) = extracter.finalize();
 
@@ -61,8 +61,8 @@ fn to_lamport_pk(ikm: [u8; 32], idx: u32) -> [u8; 32] {
     let not_ikm = flip_bits(ikm);
     let salt = idx.to_be_bytes();
 
-    let mut lamport0 = ikm_to_lamport_sk(&ikm, &salt);
-    let mut lamport1 = ikm_to_lamport_sk(&not_ikm, &salt);
+    let mut lamport0 = ikm_to_lamport_sk(&ikm, salt);
+    let mut lamport1 = ikm_to_lamport_sk(&not_ikm, salt);
 
     for i in (0..32 * 255).step_by(32) {
         let hash = sha256(&lamport0[i..i + 32]);
@@ -94,6 +94,10 @@ pub fn is_all_zero(buf: &[u8]) -> bool {
 }
 
 impl SecretKey {
+    /// # Panics
+    ///
+    /// Panics if the seed produces an invalid SecretKey.
+    #[must_use]
     pub fn from_seed(seed: &[u8]) -> Self {
         // described here:
         // https://eips.ethereum.org/EIPS/eip-2333#derive_master_sk
@@ -109,7 +113,7 @@ impl SecretKey {
                 0,
             );
             let mut bytes = MaybeUninit::<[u8; 32]>::uninit();
-            blst_bendian_from_scalar(bytes.as_mut_ptr() as *mut u8, &scalar.assume_init());
+            blst_bendian_from_scalar(bytes.as_mut_ptr().cast::<u8>(), &scalar.assume_init());
             bytes.assume_init()
         };
         Self::from_bytes(&bytes).expect("from_seed")
@@ -137,7 +141,7 @@ impl SecretKey {
     pub fn to_bytes(&self) -> [u8; 32] {
         unsafe {
             let mut bytes = MaybeUninit::<[u8; 32]>::uninit();
-            blst_bendian_from_scalar(bytes.as_mut_ptr() as *mut u8, &self.0);
+            blst_bendian_from_scalar(bytes.as_mut_ptr().cast::<u8>(), &self.0);
             bytes.assume_init()
         }
     }
@@ -151,6 +155,7 @@ impl SecretKey {
         PublicKey(p1)
     }
 
+    #[must_use]
     pub fn derive_hardened(&self, idx: u32) -> SecretKey {
         // described here:
         // https://eips.ethereum.org/EIPS/eip-2333#derive_child_sk
@@ -179,7 +184,7 @@ impl Streamable for SecretKey {
 
 impl Hash for SecretKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write(&self.to_bytes())
+        state.write(&self.to_bytes());
     }
 }
 
@@ -278,8 +283,8 @@ impl SecretKey {
         self.public_key()
     }
 
-    fn __str__(&self) -> PyResult<String> {
-        Ok(hex::encode(self.to_bytes()))
+    fn __str__(&self) -> String {
+        hex::encode(self.to_bytes())
     }
 }
 
@@ -342,7 +347,7 @@ mod tests {
 
         for (i, hex) in derived_hex.iter().enumerate() {
             let derived = sk.derive_unhardened(i as u32);
-            assert_eq!(derived.to_bytes(), <[u8; 32]>::from_hex(hex).unwrap())
+            assert_eq!(derived.to_bytes(), <[u8; 32]>::from_hex(hex).unwrap());
         }
     }
 
@@ -407,7 +412,7 @@ mod tests {
 
         for (i, hex) in derived_hex.iter().enumerate() {
             let derived = sk.derive_hardened(i as u32);
-            assert_eq!(derived.to_bytes(), <[u8; 32]>::from_hex(hex).unwrap())
+            assert_eq!(derived.to_bytes(), <[u8; 32]>::from_hex(hex).unwrap());
         }
     }
 
@@ -415,7 +420,7 @@ mod tests {
     fn test_debug() {
         let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
         let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
-        assert_eq!(format!("{:?}", sk), format!("<PrivateKey {}>", sk_hex));
+        assert_eq!(format!("{sk:?}"), format!("<PrivateKey {sk_hex}>"));
     }
 
     #[test]

@@ -13,8 +13,8 @@ pub fn to_clvm(ast: DeriveInput) -> TokenStream {
     let node_name = Ident::new("Node", Span::mixed_site());
 
     match parsed {
-        ParsedInfo::Struct(struct_info) => impl_for_struct(ast, struct_info, node_name),
-        ParsedInfo::Enum(enum_info) => impl_for_enum(ast, enum_info, node_name),
+        ParsedInfo::Struct(struct_info) => impl_for_struct(ast, struct_info, &node_name),
+        ParsedInfo::Enum(enum_info) => impl_for_enum(ast, &enum_info, &node_name),
     }
 }
 
@@ -30,7 +30,7 @@ fn encode_fields(
     // Generate the values that need to be encoded for each field.
     // As well as a unique name for each field to reference later.
     for (i, field) in fields.iter().enumerate() {
-        let value_name = Ident::new(&format!("field_{}", i), Span::mixed_site());
+        let value_name = Ident::new(&format!("field_{i}"), Span::mixed_site());
 
         if let Some(value) = &field.constant {
             body.extend(quote! {
@@ -85,10 +85,10 @@ fn encode_fields(
         }
 
         if let Some(default) = &field.optional_with_default {
-            let default = default
-                .as_ref()
-                .map(|expr| expr.to_token_stream())
-                .unwrap_or_else(|| quote!(<#ty as ::std::default::Default>::default()));
+            let default = default.as_ref().map_or_else(
+                || quote!(<#ty as ::std::default::Default>::default()),
+                ToTokens::to_token_stream,
+            );
 
             // If the field is equal to the default value, don't encode it.
             body.extend(quote! {
@@ -105,7 +105,7 @@ fn encode_fields(
     body
 }
 
-fn impl_for_struct(ast: DeriveInput, struct_info: StructInfo, node_name: Ident) -> TokenStream {
+fn impl_for_struct(ast: DeriveInput, struct_info: StructInfo, node_name: &Ident) -> TokenStream {
     let crate_name = crate_name(struct_info.crate_name);
 
     let mut body = TokenStream::new();
@@ -117,7 +117,7 @@ fn impl_for_struct(ast: DeriveInput, struct_info: StructInfo, node_name: Ident) 
         }
 
         // Rename the field so it doesn't clash with anything else in scope such as `node`.
-        let value_name = Ident::new(&format!("field_{}", i), Span::mixed_site());
+        let value_name = Ident::new(&format!("field_{i}"), Span::mixed_site());
 
         match struct_info.kind {
             StructKind::Named => {
@@ -138,7 +138,7 @@ fn impl_for_struct(ast: DeriveInput, struct_info: StructInfo, node_name: Ident) 
 
     body.extend(encode_fields(
         &crate_name,
-        &node_name,
+        node_name,
         &struct_info.fields,
         struct_info.repr,
     ));
@@ -147,15 +147,15 @@ fn impl_for_struct(ast: DeriveInput, struct_info: StructInfo, node_name: Ident) 
         Ok(node)
     });
 
-    trait_impl(ast, crate_name, node_name, body)
+    trait_impl(ast, &crate_name, node_name, &body)
 }
 
-fn impl_for_enum(ast: DeriveInput, enum_info: EnumInfo, node_name: Ident) -> TokenStream {
+fn impl_for_enum(ast: DeriveInput, enum_info: &EnumInfo, node_name: &Ident) -> TokenStream {
     let crate_name = crate_name(enum_info.crate_name.clone());
 
     let mut variant_destructures = Vec::new();
 
-    for variant in enum_info.variants.iter() {
+    for variant in &enum_info.variants {
         let variant_name = &variant.name;
 
         let field_names: Vec<Ident> = variant
@@ -165,7 +165,7 @@ fn impl_for_enum(ast: DeriveInput, enum_info: EnumInfo, node_name: Ident) -> Tok
             .collect();
 
         let value_names: Vec<Ident> = (0..variant.fields.len())
-            .map(|i| Ident::new(&format!("field_{}", i), Span::mixed_site()))
+            .map(|i| Ident::new(&format!("field_{i}"), Span::mixed_site()))
             .collect();
 
         let destructure = match variant.kind {
@@ -184,15 +184,10 @@ fn impl_for_enum(ast: DeriveInput, enum_info: EnumInfo, node_name: Ident) -> Tok
     let body = if enum_info.is_untagged {
         let mut variant_bodies = Vec::new();
 
-        for variant in enum_info.variants.iter() {
+        for variant in &enum_info.variants {
             let repr = variant.repr.unwrap_or(enum_info.default_repr);
 
-            variant_bodies.push(encode_fields(
-                &crate_name,
-                &node_name,
-                &variant.fields,
-                repr,
-            ));
+            variant_bodies.push(encode_fields(&crate_name, node_name, &variant.fields, repr));
         }
 
         // Encode the variant's fields directly.
@@ -210,7 +205,7 @@ fn impl_for_enum(ast: DeriveInput, enum_info: EnumInfo, node_name: Ident) -> Tok
             discriminant_consts,
             discriminant_names,
             variant_names,
-        } = variant_discriminants(&enum_info);
+        } = variant_discriminants(enum_info);
 
         if enum_info.default_repr == Repr::Atom {
             // Encode the discriminant by itself as an atom.
@@ -237,14 +232,9 @@ fn impl_for_enum(ast: DeriveInput, enum_info: EnumInfo, node_name: Ident) -> Tok
 
             let mut variant_bodies = Vec::new();
 
-            for variant in enum_info.variants.iter() {
+            for variant in &enum_info.variants {
                 let repr = variant.repr.unwrap_or(enum_info.default_repr);
-                variant_bodies.push(encode_fields(
-                    &crate_name,
-                    &node_name,
-                    &variant.fields,
-                    repr,
-                ));
+                variant_bodies.push(encode_fields(&crate_name, node_name, &variant.fields, repr));
             }
 
             // Encode the discriminant followed by the variant's fields.
@@ -267,14 +257,14 @@ fn impl_for_enum(ast: DeriveInput, enum_info: EnumInfo, node_name: Ident) -> Tok
         }
     };
 
-    trait_impl(ast, crate_name, node_name, body)
+    trait_impl(ast, &crate_name, node_name, &body)
 }
 
 fn trait_impl(
     mut ast: DeriveInput,
-    crate_name: Ident,
-    node_name: Ident,
-    body: TokenStream,
+    crate_name: &Ident,
+    node_name: &Ident,
+    body: &TokenStream,
 ) -> TokenStream {
     let type_name = ast.ident;
 
@@ -282,7 +272,7 @@ fn trait_impl(
     // This isn't always perfect, but it's how derive macros work.
     add_trait_bounds(
         &mut ast.generics,
-        parse_quote!(#crate_name::ToClvm<#node_name>),
+        &parse_quote!(#crate_name::ToClvm<#node_name>),
     );
 
     let generics_clone = ast.generics.clone();

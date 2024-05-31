@@ -139,7 +139,7 @@ mod python {
             use pyo3::prelude::*;
             use pyo3::types::PyBytes;
             let ret = PyList::empty_bound(py);
-            for (key, value) in self.cache.iter() {
+            for (key, value) in &self.cache {
                 ret.append((
                     PyBytes::new_bound(py, key),
                     PyBytes::new_bound(py, &value.to_bytes()),
@@ -251,7 +251,7 @@ pub mod tests {
 
         // Create 5 pubkey message pairs.
         for i in 1..=5 {
-            let sk = SecretKey::from_seed(&[i as u8; 32]);
+            let sk = SecretKey::from_seed(&[i; 32]);
             let pk = sk.public_key();
             let msg = [106; 32];
 

@@ -1,24 +1,21 @@
-use anyhow::Error;
 use bip39::{Language, Mnemonic, Seed};
 use std::array::TryFromSliceError;
 
-pub fn entropy_to_mnemonic(entropy: &[u8; 32]) -> String {
-    Mnemonic::from_entropy(entropy, Language::English)
-        .unwrap()
-        .into_phrase()
+pub fn entropy_to_mnemonic(entropy: &[u8; 32]) -> anyhow::Result<String> {
+    Ok(Mnemonic::from_entropy(entropy, Language::English)?.into_phrase())
 }
 
-pub fn mnemonic_to_entropy(mnemonic: &str) -> Result<[u8; 32], Error> {
+pub fn mnemonic_to_entropy(mnemonic: &str) -> anyhow::Result<[u8; 32]> {
     let m = Mnemonic::from_phrase(mnemonic, Language::English)?;
     let ent = m.entropy();
     ent.try_into().map_err(|e: TryFromSliceError| {
-        Error::from(e).context("incorrect number of words in mnemonic")
+        anyhow::Error::from(e).context("incorrect number of words in mnemonic")
     })
 }
 
-pub fn entropy_to_seed(entropy: &[u8; 32]) -> [u8; 64] {
-    let m = Mnemonic::from_entropy(entropy, Language::English).unwrap();
-    Seed::new(&m, "").as_bytes().try_into().unwrap()
+pub fn entropy_to_seed(entropy: &[u8; 32]) -> anyhow::Result<[u8; 64]> {
+    let m = Mnemonic::from_entropy(entropy, Language::English)?;
+    Ok(Seed::new(&m, "").as_bytes().try_into()?)
 }
 
 #[cfg(test)]
@@ -32,7 +29,7 @@ fn test_parse_mnemonic() {
     // (whereas the trezor test vectors use "TREZOR")
 
     // phrase, entropy, seed
-    let test_cases = &[
+    let test_cases = [
         ("all hour make first leader extend hole alien behind guard gospel lava path output census museum junior mass reopen famous sing advance salt reform",
         "066dca1a2bb7e8a1db2832148ce9933eea0f3ac9548d793112d9a95c9407efad",
         "fc795be0c3f18c50dddb34e72179dc597d64055497ecc1e69e2e56a5409651bc139aae8070d4df0ea14d8d2a518a9a00bb1cc6e92e053fe34051f6821df9164c"
@@ -47,19 +44,21 @@ fn test_parse_mnemonic() {
     ];
 
     for (phrase, entropy, seed) in test_cases {
-        println!("{}", phrase);
+        println!("{phrase}");
         assert_eq!(
             hex::encode(mnemonic_to_entropy(phrase).unwrap()),
             entropy.to_string()
         );
         assert_eq!(
-            entropy_to_mnemonic(&<[u8; 32]>::from_hex(entropy).unwrap()).as_str(),
-            *phrase
+            entropy_to_mnemonic(&<[u8; 32]>::from_hex(entropy).unwrap())
+                .unwrap()
+                .as_str(),
+            phrase
         );
         assert_eq!(
-            hex::encode(entropy_to_seed(&<[u8; 32]>::from_hex(entropy).unwrap())),
+            hex::encode(entropy_to_seed(&<[u8; 32]>::from_hex(entropy).unwrap()).unwrap()),
             seed.to_string()
-        )
+        );
     }
 }
 

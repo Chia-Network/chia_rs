@@ -42,7 +42,7 @@ clvm_primitive!(isize);
 
 impl<N> ToClvm<N> for bool {
     fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
-        (if *self { 1 } else { 0 }).to_clvm(encoder)
+        i32::from(*self).to_clvm(encoder)
     }
 }
 
@@ -154,7 +154,7 @@ mod tests {
     where
         T: ToClvm<NodePtr>,
     {
-        let actual = value.to_clvm(a).unwrap();
+        let actual = value.to_clvm(a)?;
         let actual_bytes = node_to_bytes(a, actual).unwrap();
         Ok(actual_bytes.encode_hex())
     }
@@ -264,7 +264,7 @@ mod tests {
             encode(a, "hello".to_string()),
             Ok("8568656c6c6f".to_owned())
         );
-        assert_eq!(encode(a, "".to_string()), Ok("80".to_owned()));
+        assert_eq!(encode(a, String::new()), Ok("80".to_owned()));
     }
 
     #[cfg(feature = "chia-bls")]

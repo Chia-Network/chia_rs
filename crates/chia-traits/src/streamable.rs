@@ -309,10 +309,10 @@ fn from_bytes_fail<T: Streamable + std::fmt::Debug + PartialEq>(buf: &[u8], expe
 fn test_parse_u64() {
     from_bytes::<u64>(&[0, 0, 0, 0, 0, 0, 0, 0], 0);
     from_bytes::<u64>(&[0, 0, 0, 0, 0, 0, 0, 1], 1);
-    from_bytes::<u64>(&[0x80, 0, 0, 0, 0, 0, 0, 0], 0x8000000000000000);
+    from_bytes::<u64>(&[0x80, 0, 0, 0, 0, 0, 0, 0], 0x8000_0000_0000_0000);
     from_bytes::<u64>(
         &[0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff],
-        0xffffffffffffffff,
+        0xffff_ffff_ffff_ffff,
     );
 
     // truncated
@@ -330,14 +330,14 @@ fn test_parse_u128() {
     from_bytes::<u128>(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], 1);
     from_bytes::<u128>(
         &[0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        0x80000000000000000000000000000000,
+        0x8000_0000_0000_0000_0000_0000_0000_0000,
     );
     from_bytes::<u128>(
         &[
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
             0xff, 0xff,
         ],
-        0xffffffffffffffffffffffffffffffff,
+        0xffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff,
     );
 
     // truncated
@@ -364,13 +364,13 @@ fn test_parse_empty_list() {
 #[test]
 fn test_parse_list_1() {
     let buf: &[u8] = &[0, 0, 0, 1, 1, 2, 3, 4];
-    from_bytes::<Vec<u32>>(buf, vec![0x01020304]);
+    from_bytes::<Vec<u32>>(buf, vec![0x0102_0304]);
 }
 
 #[test]
 fn test_parse_list_3() {
     let buf: &[u8] = &[0, 0, 0, 3, 1, 2, 3, 4, 1, 3, 3, 7, 0, 0, 4, 2];
-    from_bytes::<Vec<u32>>(buf, vec![0x01020304, 0x01030307, 0x402]);
+    from_bytes::<Vec<u32>>(buf, vec![0x0102_0304, 0x0103_0307, 0x402]);
 }
 
 #[test]
@@ -378,7 +378,7 @@ fn test_parse_list_list_3() {
     let buf: &[u8] = &[
         0, 0, 0, 3, 0, 0, 0, 1, 1, 2, 3, 4, 0, 0, 0, 1, 1, 3, 3, 7, 0, 0, 0, 1, 0, 0, 4, 2,
     ];
-    from_bytes::<Vec<Vec<u32>>>(buf, vec![vec![0x01020304], vec![0x01030307], vec![0x402]]);
+    from_bytes::<Vec<Vec<u32>>>(buf, vec![vec![0x0102_0304], vec![0x0103_0307], vec![0x402]]);
 }
 
 #[test]
@@ -474,7 +474,7 @@ fn test_parse_invalid_utf8_str() {
 #[test]
 fn test_parse_empty_str() {
     let buf: &[u8] = &[0, 0, 0, 0];
-    from_bytes::<String>(buf, "".to_string());
+    from_bytes::<String>(buf, String::new());
 }
 
 #[test]
@@ -505,7 +505,7 @@ fn test_parse_struct() {
         TestStruct {
             a: vec![42_i8, -1],
             b: "baz".to_string(),
-            c: (0xffffffff, 0x1337),
+            c: (0xffff_ffff, 0x1337),
         },
     );
 }
@@ -534,7 +534,7 @@ fn stream<T: Streamable>(v: &T) -> Vec<u8> {
 
 #[test]
 fn test_stream_i32() {
-    let b: i32 = 0x01020304;
+    let b: i32 = 0x0102_0304;
     let buf = stream(&b);
     assert_eq!(&buf[..], [1, 2, 3, 4]);
 }
@@ -590,7 +590,7 @@ fn test_stream_optional_set2() {
 
 #[test]
 fn test_stream_tuple() {
-    let b: (u8, u32, u64, bool) = (42, 0x1337, 0x0102030405060708, true);
+    let b: (u8, u32, u64, bool) = (42, 0x1337, 0x0102_0304_0506_0708, true);
     let buf = stream(&b);
     assert_eq!(&buf[..], [42, 0, 0, 0x13, 0x37, 1, 2, 3, 4, 5, 6, 7, 8, 1]);
 }
@@ -651,7 +651,7 @@ fn test_stream_string() {
 
 #[test]
 fn test_stream_empty_string() {
-    let b = "".to_string();
+    let b = String::new();
     let buf = stream(&b);
     assert_eq!(&buf[..], [0, 0, 0, 0]);
 }
@@ -689,7 +689,7 @@ fn test_stream_custom_tuple() {
 
 #[test]
 fn test_stream_list() {
-    let out = stream(&vec![0x1030307_u32, 42, 0xffffffff]);
+    let out = stream(&vec![0x0103_0307_u32, 42, 0xffff_ffff]);
     assert_eq!(
         &out,
         &[0, 0, 0, 3, 1, 3, 3, 7, 0, 0, 0, 42, 0xff, 0xff, 0xff, 0xff]
@@ -705,9 +705,9 @@ fn test_stream_list_of_empty() {
 #[test]
 fn test_stream_list_list() {
     let out = stream(&vec![
-        vec![0x1030307_u32],
+        vec![0x0103_0307_u32],
         vec![42_u32],
-        vec![0xffffffff_u32],
+        vec![0xffff_ffff_u32],
     ]);
     assert_eq!(
         &out,

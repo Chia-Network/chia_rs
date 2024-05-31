@@ -17,31 +17,28 @@ pub enum StructKind {
 }
 
 pub fn parse_struct(options: ClvmOptions, data_struct: &DataStruct) -> StructInfo {
-    if options.untagged {
-        panic!("`untagged` only applies to enums");
-    }
+    assert!(!options.untagged, "`untagged` only applies to enums");
 
-    if options.enum_repr.is_some() {
-        panic!("`repr` only applies to enums");
-    }
+    assert!(options.enum_repr.is_none(), "`repr` only applies to enums");
 
-    if options.constant.is_some() {
-        panic!("`constant` only applies to fields");
-    }
+    assert!(
+        options.constant.is_none(),
+        "`constant` only applies to fields"
+    );
 
-    if options.default.is_some() {
-        panic!("`default` only applies to fields");
-    }
+    assert!(
+        options.default.is_none(),
+        "`default` only applies to fields"
+    );
 
-    if options.rest {
-        panic!("`rest` only applies to fields");
-    }
+    assert!(!options.rest, "`rest` only applies to fields");
 
     let mut repr = Repr::expect(options.repr);
 
-    if repr == Repr::Atom {
-        panic!("`atom` is not a valid representation for structs");
-    }
+    assert!(
+        repr != Repr::Atom,
+        "`atom` is not a valid representation for structs"
+    );
 
     let crate_name = options.crate_name;
 
@@ -52,9 +49,10 @@ pub fn parse_struct(options: ClvmOptions, data_struct: &DataStruct) -> StructInf
     };
 
     if repr == Repr::Transparent {
-        if fields.len() != 1 {
-            panic!("`transparent` structs must have exactly one field");
-        }
+        assert!(
+            fields.len() == 1,
+            "`transparent` structs must have exactly one field"
+        );
 
         fields[0].rest = true;
         repr = Repr::List;

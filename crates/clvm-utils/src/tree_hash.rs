@@ -24,7 +24,7 @@ impl TreeHash {
 
 impl fmt::Debug for TreeHash {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "TreeHash({})", self)
+        write!(f, "TreeHash({self})")
     }
 }
 
@@ -81,6 +81,7 @@ pub fn tree_hash_pair(first: TreeHash, rest: TreeHash) -> TreeHash {
     TreeHash::new(sha256.finalize().into())
 }
 
+#[allow(clippy::missing_panics_doc)]
 pub fn tree_hash(a: &Allocator, node: NodePtr) -> TreeHash {
     let mut hashes = Vec::new();
     let mut ops = vec![TreeOp::SExp(node)];
@@ -102,7 +103,7 @@ pub fn tree_hash(a: &Allocator, node: NodePtr) -> TreeHash {
                 let rest = hashes.pop().unwrap();
                 hashes.push(tree_hash_pair(first, rest));
             }
-            _ => unreachable!(),
+            TreeOp::ConsAddCache(_) => unreachable!(),
         }
     }
 
@@ -110,12 +111,16 @@ pub fn tree_hash(a: &Allocator, node: NodePtr) -> TreeHash {
     hashes[0]
 }
 
-pub fn tree_hash_cached(
+#[allow(clippy::missing_panics_doc)]
+pub fn tree_hash_cached<S>(
     a: &Allocator,
     node: NodePtr,
-    backrefs: &HashSet<NodePtr>,
-    cache: &mut HashMap<NodePtr, TreeHash>,
-) -> TreeHash {
+    backrefs: &HashSet<NodePtr, S>,
+    cache: &mut HashMap<NodePtr, TreeHash, S>,
+) -> TreeHash
+where
+    S: std::hash::BuildHasher,
+{
     let mut hashes = Vec::new();
     let mut ops = vec![TreeOp::SExp(node)];
 
