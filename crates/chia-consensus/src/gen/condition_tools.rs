@@ -58,7 +58,8 @@ fn make_aggsig_final_message(
     spend: &OwnedSpend,
     agg_sig_additional_data: &HashMap<ConditionOpcode, Vec<u8>>,
 ) -> Vec<u8> {
-    let addendum: Vec<u8> = match opcode {
+    let mut result = msg.to_vec();
+    result.extend(match opcode {
         AGG_SIG_PARENT => spend.parent_id.as_slice().to_vec(),
         AGG_SIG_PUZZLE => spend.puzzle_hash.as_slice().to_vec(),
         AGG_SIG_AMOUNT => u64_to_bytes(spend.coin_amount).as_slice().to_vec(),
@@ -81,10 +82,7 @@ fn make_aggsig_final_message(
             coin.coin_id().as_slice().to_vec()
         }
         _ => Vec::<u8>::new(),
-    };
-
-    let mut result = msg.to_vec();
-    result.extend(addendum);
+    });
     if let Some(additional_data) = agg_sig_additional_data.get(&opcode) {
         result.extend_from_slice(additional_data);
     }
