@@ -9,6 +9,9 @@ homepage = "https://github.com/Chia-Network/chia_rs"
 repository = "https://github.com/Chia-Network/chia_rs"
 readme = "README.md"
 
+[lints]
+workspace = true
+
 [lib]
 name = "chia_rs"
 crate-type = ["cdylib"]

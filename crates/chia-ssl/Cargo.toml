@@ -8,6 +8,9 @@ authors = ["Brandon Haggstrom <b.haggstrom@chia.net>"]
 homepage = "https://github.com/Chia-Network/chia_rs"
 repository = "https://github.com/Chia-Network/chia_rs"
 
+[lints]
+workspace = true
+
 [dependencies]
 lazy_static = { workspace = true }
 rand = { workspace = true }

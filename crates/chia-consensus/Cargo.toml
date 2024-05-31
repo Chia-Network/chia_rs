@@ -8,6 +8,9 @@ authors = ["Richard Kiss <him@richardkiss.com>", "Arvid Norberg <arvid@chia.net>
 homepage = "https://github.com/Chia-Network/chia_rs"
 repository = "https://github.com/Chia-Network/chia_rs"
 
+[lints]
+workspace = true
+
 [features]
 py-bindings = ["dep:pyo3", "dep:chia_py_streamable_macro"]
 

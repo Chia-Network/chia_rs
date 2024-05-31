@@ -8,6 +8,9 @@ authors = ["Arvid Norberg <arvid@chia.net>"]
 homepage = "https://github.com/Chia-Network/chia_rs"
 repository = "https://github.com/Chia-Network/chia_rs"
 
+[lints]
+workspace = true
+
 [dependencies]
 chia-protocol = { workspace = true }
 chia-traits = { workspace = true }

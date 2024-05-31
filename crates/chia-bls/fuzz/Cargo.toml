@@ -8,6 +8,9 @@ edition = "2021"
 [package.metadata]
 cargo-fuzz = true
 
+[lints]
+workspace = true
+
 [dependencies]
 libfuzzer-sys = "0.4"
 pyo3 = { version = "0.21.2", features = ["auto-initialize"]}
