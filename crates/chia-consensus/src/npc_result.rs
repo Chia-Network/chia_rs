@@ -28,7 +28,7 @@ use clvmr::chia_dialect::LIMIT_HEAP;
 // }
 
 pub fn get_name_puzzle_conditions(
-    generator: BlockGenerator,
+    generator_program: Vec<u8>,
     max_cost: u64,
     mempool_mode: bool,
     height: u32,
@@ -36,18 +36,15 @@ pub fn get_name_puzzle_conditions(
 ) -> Result<OwnedSpendBundleConditions, ErrorCode> {
     let mut flags = get_flags_for_height_and_constants(height, constants);
     if mempool_mode {
-        flags = flags | MEMPOOL_MODE
+        flags |= MEMPOOL_MODE
     };
-    let mut block_args = Vec::<Vec<u8>>::new();
-    for gen in generator.generator_refs {
-        block_args.push(gen.to_vec());
-    }
+    let block_args = Vec::<Vec<u8>>::new();
     let mut a2 = make_allocator(LIMIT_HEAP);
     let sbc_result: Result<SpendBundleConditions, ValidationErr> =
         if height >= constants.hard_fork_fix_height {
             run_block_generator2::<_, EmptyVisitor>(
                 &mut a2,
-                generator.program.into_inner().as_slice(),
+                generator_program.as_slice(),
                 &block_args,
                 max_cost,
                 flags,
@@ -55,7 +52,7 @@ pub fn get_name_puzzle_conditions(
         } else {
             run_block_generator::<_, EmptyVisitor>(
                 &mut a2,
-                generator.program.into_inner().as_slice(),
+                generator_program.as_slice(),
                 &block_args,
                 max_cost,
                 flags,
@@ -63,7 +60,7 @@ pub fn get_name_puzzle_conditions(
         };
     match sbc_result {
         Ok(sbc) => {
-            let result = OwnedSpendBundleConditions::from(&mut a2, sbc);
+            let result = OwnedSpendBundleConditions::from(&a2, sbc);
             match result {
                 Ok(r) => Ok(r),
                 Err(_) => Err(ErrorCode::InvalidSpendBundle),

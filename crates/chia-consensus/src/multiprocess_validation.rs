@@ -68,8 +68,8 @@ fn validate_clvm_and_signature(
     cache: Arc<Mutex<BlsCache>>,
 ) -> Result<(OwnedSpendBundleConditions, Duration), ErrorCode> {
     let start_time = Instant::now();
-    let additional_data = constants.agg_sig_me_additional_data;
-    let program: BlockGenerator = simple_solution_generator(spend_bundle)?;
+    let additional_data: chia_protocol::BytesImpl<32> = constants.agg_sig_me_additional_data;
+    let program: Vec<u8> = simple_solution_generator(spend_bundle)?;
     let npcresult = get_name_puzzle_conditions(program, max_cost, true, height, &constants)?;
     let (pks, msgs) = pkm_pairs(npcresult.clone(), additional_data.as_slice())?;
     // Verify aggregated signature
@@ -128,7 +128,7 @@ fn validate_clvm_and_signature(
 //     }
 // }
 
-pub fn simple_solution_generator(bundle: &SpendBundle) -> Result<BlockGenerator, ErrorCode> {
+pub fn simple_solution_generator(bundle: &SpendBundle) -> Result<Vec<u8>, ErrorCode> {
     let mut spends = Vec::<(Coin, Vec<u8>, Vec<u8>)>::new();
     for cs in &bundle.coin_spends {
         let puzzle_reveal = cs.puzzle_reveal.to_vec();
@@ -137,17 +137,7 @@ pub fn simple_solution_generator(bundle: &SpendBundle) -> Result<BlockGenerator,
     }
     let block_program = solution_generator(spends);
     match block_program {
-        Ok(bp) => {
-            let program = Program::from_bytes(bp.as_slice());
-            match program {
-                Ok(p) => Ok(BlockGenerator {
-                    program: p,
-                    generator_refs: Vec::<Program>::new(),
-                    block_height_list: Vec::<u32>::new(),
-                }),
-                Err(_) => Err(ErrorCode::InvalidSpendBundle),
-            }
-        }
+        Ok(bp) => Ok(bp),
         Err(_) => Err(ErrorCode::InvalidSpendBundle),
     }
 }
@@ -155,10 +145,10 @@ pub fn simple_solution_generator(bundle: &SpendBundle) -> Result<BlockGenerator,
 pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusConstants) -> u32 {
     let mut flags: u32 = 0;
     if height >= constants.soft_fork2_height {
-        flags = flags | NO_RELATIVE_CONDITIONS_ON_EPHEMERAL
+        flags |= NO_RELATIVE_CONDITIONS_ON_EPHEMERAL
     }
     if height >= constants.soft_fork4_height {
-        flags = flags | ENABLE_MESSAGE_CONDITIONS
+        flags |= ENABLE_MESSAGE_CONDITIONS
     }
     if height >= constants.hard_fork_height {
         //  the hard-fork initiated with 2.0. To activate June 2024
