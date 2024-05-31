@@ -285,10 +285,9 @@ pub mod tests {
     fn test_empty_sig() {
         let mut bls_cache = BlsCache::default();
 
-        assert!(bls_cache.aggregate_verify(
-            [] as [&PublicKey; 0],
-            [] as [&[u8]; 0],
-            &Signature::default()
-        ));
+        let pks: [&PublicKey; 0] = [];
+        let msgs: [&[u8]; 0] = [];
+
+        assert!(bls_cache.aggregate_verify(pks, msgs, &Signature::default()));
     }
 }

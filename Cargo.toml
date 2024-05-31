@@ -22,6 +22,16 @@ future_incompatible = "deny"
 non_ascii_idents = "deny"
 nonstandard_style = "deny"
 unused_qualifications = "deny"
+unreachable_code = "deny"
+unreachable_patterns = "deny"
+dead_code = "deny"
+deprecated = "deny"
+deprecated_in_future = "deny"
+trivial_casts = "deny"
+trivial_numeric_casts = "deny"
+
+[workspace.lints.clippy]
+all = "deny"
 
 [dependencies]
 chia-bls = { workspace = true, optional = true }

@@ -112,7 +112,7 @@ mod tests {
         sha256.update(parent_coin);
         sha256.update(puzzle_hash);
         sha256.update(bytes);
-        assert_eq!(c.coin_id().to_bytes(), &sha256.finalize() as &[u8]);
+        assert_eq!(c.coin_id().to_bytes(), sha256.finalize().as_ref());
     }
 
     #[test]

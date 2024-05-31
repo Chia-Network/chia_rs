@@ -895,12 +895,12 @@ mod tests {
         assert!(aggregate_verify(
             &aggsig,
             [
-                (&pk1, &message1 as &[u8]),
-                (&pk2, &message2),
-                (&pk2, &message1),
-                (&pk1, &message3),
-                (&pk1, &message1),
-                (&pk1, &message4)
+                (&pk1, message1.as_ref()),
+                (&pk2, message2.as_ref()),
+                (&pk2, message1.as_ref()),
+                (&pk1, message3.as_ref()),
+                (&pk1, message1.as_ref()),
+                (&pk1, message4.as_ref())
             ]
         ));
 
@@ -955,7 +955,8 @@ mod tests {
         assert_eq!(aggsig, sig);
         assert_eq!(aggsig, Signature::default());
 
-        assert!(aggregate_verify(&aggsig, [] as [(&PublicKey, &[u8]); 0]));
+        let pairs: [(&PublicKey, &[u8]); 0] = [];
+        assert!(aggregate_verify(&aggsig, pairs));
     }
 
     #[test]

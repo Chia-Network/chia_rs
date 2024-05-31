@@ -258,7 +258,7 @@ mod tests {
     fn test_array() {
         let a = &mut Allocator::new();
         assert_eq!(decode(a, "ff01ff02ff03ff0480"), Ok([1, 2, 3, 4]));
-        assert_eq!(decode(a, "80"), Ok([] as [i32; 0]));
+        assert_eq!(decode(a, "80"), Ok([0; 0]));
     }
 
     #[test]
