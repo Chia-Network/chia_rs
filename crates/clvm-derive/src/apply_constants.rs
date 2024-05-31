@@ -22,7 +22,7 @@ pub fn impl_apply_constants(mut ast: DeriveInput) -> TokenStream {
 
 fn remove_fields(fields: &mut Fields) {
     match fields {
-        syn::Fields::Named(fields) => {
+        Fields::Named(fields) => {
             let retained_fields = fields
                 .named
                 .clone()
@@ -31,7 +31,7 @@ fn remove_fields(fields: &mut Fields) {
 
             fields.named = Punctuated::from_iter(retained_fields);
         }
-        syn::Fields::Unnamed(fields) => {
+        Fields::Unnamed(fields) => {
             let retained_fields = fields
                 .unnamed
                 .clone()
@@ -40,6 +40,6 @@ fn remove_fields(fields: &mut Fields) {
 
             fields.unnamed = Punctuated::from_iter(retained_fields);
         }
-        syn::Fields::Unit => {}
+        Fields::Unit => {}
     }
 }

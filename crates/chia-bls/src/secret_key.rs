@@ -224,7 +224,7 @@ impl fmt::Debug for SecretKey {
 
 #[cfg(feature = "py-bindings")]
 impl ToJsonDict for SecretKey {
-    fn to_json_dict(&self, py: Python<'_>) -> pyo3::PyResult<PyObject> {
+    fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
         let bytes = self.to_bytes();
         Ok(("0x".to_string() + &hex::encode(bytes)).into_py(py))
     }
@@ -278,7 +278,7 @@ impl SecretKey {
         self.public_key()
     }
 
-    fn __str__(&self) -> pyo3::PyResult<String> {
+    fn __str__(&self) -> PyResult<String> {
         Ok(hex::encode(self.to_bytes()))
     }
 }
@@ -420,7 +420,7 @@ mod tests {
 
     #[test]
     fn test_hash() {
-        fn hash<T: std::hash::Hash>(v: &T) -> u64 {
+        fn hash<T: Hash>(v: &T) -> u64 {
             use std::collections::hash_map::DefaultHasher;
             let mut h = DefaultHasher::new();
             v.hash(&mut h);

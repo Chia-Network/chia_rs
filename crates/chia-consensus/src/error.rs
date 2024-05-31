@@ -52,7 +52,7 @@ pub enum Error {
 }
 
 #[cfg(feature = "py-bindings")]
-impl std::convert::From<Error> for PyErr {
+impl From<Error> for PyErr {
     fn from(err: Error) -> PyErr {
         pyo3::exceptions::PyValueError::new_err(err.to_string())
     }

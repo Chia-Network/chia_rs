@@ -60,7 +60,7 @@ impl GTElement {
     #[pyo3(name = "SIZE")]
     const PY_SIZE: usize = Self::SIZE;
 
-    fn __str__(&self) -> pyo3::PyResult<String> {
+    fn __str__(&self) -> PyResult<String> {
         Ok(hex::encode(self.to_bytes()))
     }
 
@@ -110,7 +110,7 @@ impl Mul<&GTElement> for &GTElement {
 
 #[cfg(feature = "py-bindings")]
 impl ToJsonDict for GTElement {
-    fn to_json_dict(&self, py: Python<'_>) -> pyo3::PyResult<PyObject> {
+    fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
         let bytes = self.to_bytes();
         Ok(hex::encode(bytes).into_py(py))
     }

@@ -186,7 +186,7 @@ impl From<std::io::Error> for ValidationErr {
 }
 
 #[cfg(feature = "py-bindings")]
-impl std::convert::From<ValidationErr> for PyErr {
+impl From<ValidationErr> for PyErr {
     fn from(err: ValidationErr) -> PyErr {
         pyo3::exceptions::PyValueError::new_err(("ValidationError", u32::from(err.1)))
     }

@@ -3,11 +3,11 @@ use proc_macro_crate::{crate_name, FoundCrate};
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, FieldsNamed, FieldsUnnamed};
 
-fn maybe_upper_fields(py_uppercase: bool, fnames: Vec<syn::Ident>) -> Vec<syn::Ident> {
+fn maybe_upper_fields(py_uppercase: bool, fnames: Vec<Ident>) -> Vec<Ident> {
     if py_uppercase {
         fnames
             .into_iter()
-            .map(|f| syn::Ident::new(&f.to_string().to_uppercase(), Span::call_site()))
+            .map(|f| Ident::new(&f.to_string().to_uppercase(), Span::call_site()))
             .collect()
     } else {
         fnames
@@ -101,7 +101,7 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
         }
     };
 
-    let mut fnames = Vec::<syn::Ident>::new();
+    let mut fnames = Vec::<Ident>::new();
     let mut ftypes = Vec::<syn::Type>::new();
 
     match fields {
@@ -331,7 +331,7 @@ pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenSt
 
     match fields {
         syn::Fields::Named(FieldsNamed { named, .. }) => {
-            let mut fnames = Vec::<syn::Ident>::new();
+            let mut fnames = Vec::<Ident>::new();
             let mut ftypes = Vec::<syn::Type>::new();
             for f in named.iter() {
                 fnames.push(f.ident.as_ref().unwrap().clone());
@@ -400,7 +400,7 @@ pub fn py_getters_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStre
         }
     };
 
-    let mut fnames = Vec::<syn::Ident>::new();
+    let mut fnames = Vec::<Ident>::new();
     let mut ftypes = Vec::<syn::Type>::new();
     for f in named.into_iter() {
         fnames.push(f.ident.unwrap());

@@ -431,12 +431,11 @@ impl Program {
             }
             // the args of curried puzzles are in the form of:
             // (c . ((q . <arg1>) . (<rest> . ())))
-            let (_, ((_, arg), (rest, _))) =
-                <(
-                    clvm_traits::MatchByte<4>,
-                    (clvm_traits::match_quote!(NodePtr), (NodePtr, ())),
-                ) as clvm_traits::FromNodePtr>::from_node_ptr(&a, args)
-                .map_err(|error| PyErr::new::<PyTypeError, _>(error.to_string()))?;
+            let (_, ((_, arg), (rest, _))) = <(
+                clvm_traits::MatchByte<4>,
+                (clvm_traits::match_quote!(NodePtr), (NodePtr, ())),
+            ) as FromNodePtr>::from_node_ptr(&a, args)
+            .map_err(|error| PyErr::new::<PyTypeError, _>(error.to_string()))?;
             curried_args.push(arg);
             args = rest;
         }

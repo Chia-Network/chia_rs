@@ -1,7 +1,7 @@
 use crate::chia_error::{Error, Result};
 use sha2::{Digest, Sha256};
 use std::io::Cursor;
-use std::mem::size_of;
+use std::mem;
 
 pub fn read_bytes<'a>(input: &'a mut Cursor<&[u8]>, len: usize) -> Result<&'a [u8]> {
     let pos = input.position();
@@ -83,7 +83,7 @@ macro_rules! streamable_primitive {
                 Ok(out.extend_from_slice(&self.to_be_bytes()))
             }
             fn parse<const TRUSTED: bool>(input: &mut Cursor<&[u8]>) -> Result<Self> {
-                let sz = size_of::<$t>();
+                let sz = mem::size_of::<$t>();
                 Ok(<$t>::from_be_bytes(
                     read_bytes(input, sz)?.try_into().unwrap(),
                 ))
@@ -126,10 +126,10 @@ impl<T: Streamable> Streamable for Vec<T> {
     fn parse<const TRUSTED: bool>(input: &mut Cursor<&[u8]>) -> Result<Self> {
         let len = u32::parse::<TRUSTED>(input)?;
 
-        let mut ret = if std::mem::size_of::<T>() == 0 {
+        let mut ret = if mem::size_of::<T>() == 0 {
             Vec::<T>::new()
         } else {
-            let limit = 2 * 1024 * 1024 / std::mem::size_of::<T>();
+            let limit = 2 * 1024 * 1024 / mem::size_of::<T>();
             Vec::<T>::with_capacity(std::cmp::min(limit, len as usize))
         };
         for _ in 0..len {
@@ -294,16 +294,13 @@ impl<T: Streamable, U: Streamable, V: Streamable, W: Streamable> Streamable for 
 // ===== TESTS ====
 
 #[cfg(test)]
-fn from_bytes<T: Streamable + std::fmt::Debug + std::cmp::PartialEq>(buf: &[u8], expected: T) {
+fn from_bytes<T: Streamable + std::fmt::Debug + PartialEq>(buf: &[u8], expected: T) {
     let mut input = Cursor::<&[u8]>::new(buf);
     assert_eq!(T::parse::<false>(&mut input).unwrap(), expected);
 }
 
 #[cfg(test)]
-fn from_bytes_fail<T: Streamable + std::fmt::Debug + std::cmp::PartialEq>(
-    buf: &[u8],
-    expected: Error,
-) {
+fn from_bytes_fail<T: Streamable + std::fmt::Debug + PartialEq>(buf: &[u8], expected: Error) {
     let mut input = Cursor::<&[u8]>::new(buf);
     assert_eq!(T::parse::<false>(&mut input).unwrap_err(), expected);
 }

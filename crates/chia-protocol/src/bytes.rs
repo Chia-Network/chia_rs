@@ -529,12 +529,12 @@ mod tests {
         }
     }
 
-    fn from_bytes<T: Streamable + std::fmt::Debug + std::cmp::PartialEq>(buf: &[u8], expected: T) {
+    fn from_bytes<T: Streamable + fmt::Debug + PartialEq>(buf: &[u8], expected: T) {
         let mut input = Cursor::<&[u8]>::new(buf);
         assert_eq!(T::parse::<false>(&mut input).unwrap(), expected);
     }
 
-    fn from_bytes_fail<T: Streamable + std::fmt::Debug + std::cmp::PartialEq>(
+    fn from_bytes_fail<T: Streamable + fmt::Debug + PartialEq>(
         buf: &[u8],
         expected: chia_error::Error,
     ) {

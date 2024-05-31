@@ -19,6 +19,9 @@ members = ["crates/*", "crates/*/fuzz", "wasm", "wheel"]
 rust_2018_idioms = "deny"
 rust_2021_compatibility = "deny"
 future_incompatible = "deny"
+non_ascii_idents = "deny"
+nonstandard_style = "deny"
+unused_qualifications = "deny"
 
 [dependencies]
 chia-bls = { workspace = true, optional = true }
