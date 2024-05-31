@@ -17,13 +17,13 @@ chia-bls = ["dep:chia-bls"]
 py-bindings = ["dep:pyo3"]
 
 [dependencies]
-pyo3 = { version = "0.21.2", optional = true }
-clvmr = "0.7.0"
-clvm-derive = { version = "0.9.0", path = "../clvm-derive", optional = true }
-chia-bls = { version = "0.9.0", path = "../chia-bls", optional = true }
-num-bigint = "0.4.3"
-thiserror = "1.0.44"
+pyo3 = { workspace = true, optional = true }
+clvmr = { workspace = true }
+clvm-derive = { workspace = true, optional = true }
+chia-bls = { workspace = true, optional = true }
+num-bigint = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
-hex = "0.4.3"
-hex-literal = "0.4.1"
+hex = { workspace = true }
+hex-literal = { workspace = true }
