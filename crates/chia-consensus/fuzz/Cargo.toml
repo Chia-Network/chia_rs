@@ -9,14 +9,14 @@ edition = "2021"
 cargo-fuzz = true
 
 [dependencies]
-libfuzzer-sys = "0.4"
-clvmr = "0.7.0"
-clvm-utils = { path = "../../clvm-utils" }
-clvm-traits = { path = "../../clvm-traits" }
-chia-protocol = { path = "../../chia-protocol" }
-chia-traits = { path = "../../chia-traits" }
-chia-consensus = { path = ".." }
-hex-literal = "=0.4.1"
+libfuzzer-sys = { workspace = true }
+clvmr = { workspace = true }
+clvm-utils = { workspace = true }
+clvm-traits = { workspace = true }
+chia-protocol = { workspace = true }
+chia-traits = { workspace = true }
+chia-consensus = { workspace = true }
+hex-literal = { workspace = true }
 
 [lib]
 name = "fuzzing_utils"
