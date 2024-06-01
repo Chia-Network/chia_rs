@@ -29,6 +29,20 @@ pub struct Payment {
     pub memos: Vec<Bytes>,
 }
 
+impl Payment {
+    pub fn new(puzzle_hash: Bytes32, amount: u64) -> Self {
+        Self::with_memos(puzzle_hash, amount, Vec::new())
+    }
+
+    pub fn with_memos(puzzle_hash: Bytes32, amount: u64, memos: Vec<Bytes>) -> Self {
+        Self {
+            puzzle_hash,
+            amount,
+            memos,
+        }
+    }
+}
+
 /// This is the puzzle reveal of the [offer settlement payments](https://chialisp.com/offers) puzzle.
 pub const SETTLEMENT_PAYMENTS_PUZZLE: [u8; 293] = hex!(
     "
