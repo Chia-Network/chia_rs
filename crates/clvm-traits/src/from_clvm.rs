@@ -1,3 +1,5 @@
+use std::{rc::Rc, sync::Arc};
+
 use num_bigint::{BigInt, Sign};
 
 use crate::{ClvmDecoder, FromClvmError};
@@ -65,6 +67,33 @@ impl<N> FromClvm<N> for bool {
                 "expected boolean value of either `()` or `1`".to_string(),
             )),
         }
+    }
+}
+
+impl<N, T> FromClvm<N> for Box<T>
+where
+    T: FromClvm<N>,
+{
+    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+        T::from_clvm(decoder, node).map(Box::new)
+    }
+}
+
+impl<N, T> FromClvm<N> for Rc<T>
+where
+    T: FromClvm<N>,
+{
+    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+        T::from_clvm(decoder, node).map(Rc::new)
+    }
+}
+
+impl<N, T> FromClvm<N> for Arc<T>
+where
+    T: FromClvm<N>,
+{
+    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+        T::from_clvm(decoder, node).map(Arc::new)
     }
 }
 
@@ -235,6 +264,14 @@ mod tests {
                 "expected boolean value of either `()` or `1`".to_string(),
             ))
         );
+    }
+
+    #[test]
+    fn test_smart_pointers() {
+        let a = &mut Allocator::new();
+        assert_eq!(decode(a, "80"), Ok(Box::new(0u8)));
+        assert_eq!(decode(a, "80"), Ok(Rc::new(0u8)));
+        assert_eq!(decode(a, "80"), Ok(Arc::new(0u8)));
     }
 
     #[test]

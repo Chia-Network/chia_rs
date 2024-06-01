@@ -188,7 +188,7 @@ fn print_puzzle_info(a: &Allocator, puzzle: NodePtr, solution: NodePtr) {
             };
             println!(
                 "    recovery_did_list_hash: {:?}",
-                uncurried.args.recovery_did_list_hash
+                uncurried.args.recovery_list_hash
             );
             println!(
                 "    num_verifications_required: {:?}",
@@ -205,7 +205,9 @@ fn print_puzzle_info(a: &Allocator, puzzle: NodePtr, solution: NodePtr) {
             };
 
             println!("\nInner Puzzle\n");
-            let DidSolution::InnerSpend(inner_sol) = sol;
+            let DidSolution::Spend(inner_sol) = sol else {
+                unimplemented!();
+            };
             print_puzzle_info(a, uncurried.args.inner_puzzle, inner_sol);
         }
         SINGLETON_TOP_LAYER_PUZZLE_HASH => {
