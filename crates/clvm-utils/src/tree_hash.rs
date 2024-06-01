@@ -81,7 +81,6 @@ pub fn tree_hash_pair(first: TreeHash, rest: TreeHash) -> TreeHash {
     TreeHash::new(sha256.finalize().into())
 }
 
-#[allow(clippy::missing_panics_doc)]
 pub fn tree_hash(a: &Allocator, node: NodePtr) -> TreeHash {
     let mut hashes = Vec::new();
     let mut ops = vec![TreeOp::SExp(node)];
@@ -111,7 +110,6 @@ pub fn tree_hash(a: &Allocator, node: NodePtr) -> TreeHash {
     hashes[0]
 }
 
-#[allow(clippy::missing_panics_doc)]
 pub fn tree_hash_cached<S>(
     a: &Allocator,
     node: NodePtr,

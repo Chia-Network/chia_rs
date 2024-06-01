@@ -152,7 +152,6 @@ impl PublicKey {
         }
     }
 
-    #[allow(clippy::missing_panics_doc)]
     pub fn get_fingerprint(&self) -> u32 {
         let mut hasher = Sha256::new();
         hasher.update(self.to_bytes());
