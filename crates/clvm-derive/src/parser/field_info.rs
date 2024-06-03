@@ -16,20 +16,22 @@ pub fn parse_named_fields(fields: &FieldsNamed) -> Vec<FieldInfo> {
     let mut rest = false;
     let mut optional = false;
 
-    for field in fields.named.iter() {
+    for field in &fields.named {
         let ident = field.ident.clone().unwrap();
         let ty = field.ty.clone();
 
         let options = parse_clvm_options(&field.attrs);
         check_field_options(&options);
 
-        if rest {
-            panic!("nothing can come after the `rest` field, since it consumes all arguments");
-        }
+        assert!(
+            !rest,
+            "nothing can come after the `rest` field, since it consumes all arguments"
+        );
 
-        if optional {
-            panic!("only the last field can be optional, to prevent ambiguity");
-        }
+        assert!(
+            !optional,
+            "only the last field can be optional, to prevent ambiguity"
+        );
 
         rest = options.rest;
         optional = options.default.is_some();
@@ -59,13 +61,15 @@ pub fn parse_unnamed_fields(fields: &FieldsUnnamed) -> Vec<FieldInfo> {
         let options = parse_clvm_options(&field.attrs);
         check_field_options(&options);
 
-        if rest {
-            panic!("nothing can come after the `rest` field, since it consumes all arguments");
-        }
+        assert!(
+            !rest,
+            "nothing can come after the `rest` field, since it consumes all arguments"
+        );
 
-        if optional {
-            panic!("only the last field can be optional, to prevent ambiguity");
-        }
+        assert!(
+            !optional,
+            "only the last field can be optional, to prevent ambiguity"
+        );
 
         rest = options.rest;
         optional = options.default.is_some();
@@ -83,27 +87,26 @@ pub fn parse_unnamed_fields(fields: &FieldsUnnamed) -> Vec<FieldInfo> {
 }
 
 fn check_field_options(options: &ClvmOptions) {
-    if options.untagged {
-        panic!("`untagged` only applies to enums");
-    }
+    assert!(!options.untagged, "`untagged` only applies to enums");
 
-    if options.enum_repr.is_some() {
-        panic!("`repr` only applies to enums");
-    }
+    assert!(options.enum_repr.is_none(), "`repr` only applies to enums");
 
     if let Some(repr) = options.repr {
         panic!("`{repr}` can't be set on individual fields");
     }
 
-    if options.crate_name.is_some() {
-        panic!("`crate_name` can't be set on individual fields");
-    }
+    assert!(
+        options.crate_name.is_none(),
+        "`crate_name` can't be set on individual fields"
+    );
 
-    if options.default.is_some() && options.constant.is_some() {
-        panic!("`default` can't be used with `constant` set");
-    }
+    assert!(
+        !(options.default.is_some() && options.constant.is_some()),
+        "`default` can't be used with `constant` set"
+    );
 
-    if options.default.is_some() && options.rest {
-        panic!("`default` can't be used with `rest` option set");
-    }
+    assert!(
+        !(options.default.is_some() && options.rest),
+        "`default` can't be used with `rest` option set"
+    );
 }

@@ -37,6 +37,9 @@ pub fn master_to_pool_singleton(key: &SecretKey, pool_wallet_idx: u32) -> Secret
     derive_path_hardened(key, &[12381_u32, 8444, 5, pool_wallet_idx])
 }
 
+/// # Panics
+///
+/// Panics if `pool_wallet_idx` or `idx` is greater than or equal to 10000.
 pub fn master_to_pool_authentication(key: &SecretKey, pool_wallet_idx: u32, idx: u32) -> SecretKey {
     assert!(pool_wallet_idx < 10000);
     assert!(idx < 10000);

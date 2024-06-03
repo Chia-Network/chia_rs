@@ -10,10 +10,12 @@ const GROUP_ORDER_BYTES: [u8; 32] =
 
 pub trait DeriveSynthetic {
     /// Derive a synthetic key that includes a custom hidden puzzle hash.
+    #[must_use]
     fn derive_synthetic_hidden(&self, hidden_puzzle_hash: &[u8; 32]) -> Self;
 
     /// Derive a synthetic key that includes [`DEFAULT_HIDDEN_PUZZLE_HASH`].
     /// The default hidden puzzle is `(=)`.
+    #[must_use]
     fn derive_synthetic(&self) -> Self
     where
         Self: Sized,

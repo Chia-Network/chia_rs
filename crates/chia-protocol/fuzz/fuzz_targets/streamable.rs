@@ -7,15 +7,12 @@ use sha2::{Digest, Sha256};
 
 pub fn test_streamable<T: Streamable + std::fmt::Debug + PartialEq>(obj: &T) {
     let bytes = obj.to_bytes().unwrap();
-    let obj2 = match T::from_bytes(&bytes) {
-        Err(_) => {
-            panic!(
-                "failed to parse input: {}, from object: {:?}",
-                hex::encode(bytes),
-                &obj
-            );
-        }
-        Ok(o) => o,
+    let Ok(obj2) = T::from_bytes(&bytes) else {
+        panic!(
+            "failed to parse input: {}, from object: {:?}",
+            hex::encode(&bytes),
+            &obj
+        )
     };
     assert_eq!(obj, &obj2);
 

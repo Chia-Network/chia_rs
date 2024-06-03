@@ -4,7 +4,7 @@ use syn::{parse_quote, Expr, GenericParam, Generics, Ident, TypeParamBound};
 
 use crate::parser::EnumInfo;
 
-pub fn add_trait_bounds(generics: &mut Generics, bound: TypeParamBound) {
+pub fn add_trait_bounds(generics: &mut Generics, bound: &TypeParamBound) {
     for param in &mut generics.params {
         if let GenericParam::Type(ref mut type_param) = *param {
             type_param.bounds.push(bound.clone());
@@ -54,7 +54,7 @@ pub fn variant_discriminants(enum_info: &EnumInfo) -> DiscriminantInfo {
         // Generate a constant for each variant's discriminant.
         // This is required because you can't directly put an expression inside of a match pattern.
         // So we use a constant to match against instead.
-        let discriminant_name = Ident::new(&format!("DISCRIMINANT_{}", i), Span::mixed_site());
+        let discriminant_name = Ident::new(&format!("DISCRIMINANT_{i}"), Span::mixed_site());
 
         discriminant_names.push(discriminant_name.clone());
         discriminant_consts.push(quote! {

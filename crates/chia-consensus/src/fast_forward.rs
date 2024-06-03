@@ -80,9 +80,8 @@ pub fn fast_forward_singleton(
     let singleton = CurriedProgram::<NodePtr, SingletonArgs<NodePtr>>::from_clvm(a, puzzle)?;
     let mut new_solution = SingletonSolution::<NodePtr>::from_clvm(a, solution)?;
 
-    let lineage_proof = match &mut new_solution.lineage_proof {
-        Proof::Lineage(proof) => proof,
-        _ => return Err(Error::ExpectedLineageProof),
+    let Proof::Lineage(lineage_proof) = &mut new_solution.lineage_proof else {
+        return Err(Error::ExpectedLineageProof);
     };
 
     // this is the tree hash of the singleton top layer puzzle
@@ -188,7 +187,7 @@ mod tests {
         let spend = CoinSpend::from_bytes(&spend_bytes).expect("parse CoinSpend");
         let new_parents_parent = hex::decode(new_parents_parent).unwrap();
 
-        let mut a = Allocator::new_limited(500000000);
+        let mut a = Allocator::new_limited(500_000_000);
         let puzzle = spend.puzzle_reveal.to_node_ptr(&mut a).expect("to_clvm");
         let solution = spend.solution.to_node_ptr(&mut a).expect("to_clvm");
         let puzzle_hash = Bytes32::from(tree_hash(&a, puzzle));
@@ -232,7 +231,7 @@ mod tests {
             spend.solution.as_slice(),
             &spend.coin.parent_coin_info,
             spend.coin.amount,
-            11000000000,
+            11_000_000_000,
             0,
         )
         .expect("run_puzzle");
@@ -244,7 +243,7 @@ mod tests {
             new_solution.as_slice(),
             &new_coin.parent_coin_info,
             new_coin.amount,
-            11000000000,
+            11_000_000_000,
             0,
         )
         .expect("run_puzzle");
@@ -252,6 +251,7 @@ mod tests {
         assert!(conditions1.spends[0].create_coin == conditions2.spends[0].create_coin);
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     fn run_ff_test(
         mutate: fn(&mut Allocator, &mut Coin, &mut Coin, &mut Coin, &mut Vec<u8>, &mut Vec<u8>),
         expected_err: Error,
@@ -261,7 +261,7 @@ mod tests {
         let new_parents_parent: &[u8] =
             &hex!("abababababababababababababababababababababababababababababababab");
 
-        let mut a = Allocator::new_limited(500000000);
+        let mut a = Allocator::new_limited(500_000_000);
         let puzzle = spend.puzzle_reveal.to_node_ptr(&mut a).expect("to_clvm");
         let puzzle_hash = Bytes32::from(tree_hash(&a, puzzle));
 

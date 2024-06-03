@@ -19,7 +19,7 @@ fuzz_target!(|data: &[u8]| {
     let conds = make_tree(&mut a, &mut BitCursor::new(data), false);
 
     for flags in &[0, COND_ARGS_NIL, STRICT_ARGS_COUNT, NO_UNKNOWN_CONDS] {
-        let mut cost_left = 11000000;
+        let mut cost_left = 11_000_000;
         let _ = process_single_spend::<MempoolVisitor>(
             &a,
             &mut ret,

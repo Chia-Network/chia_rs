@@ -22,8 +22,7 @@ fn encode_type(t: NodeType) -> u8 {
     match t {
         NodeType::Empty => 0,
         NodeType::Term => 1,
-        NodeType::Mid => 2,
-        NodeType::MidDbl => 2,
+        NodeType::Mid | NodeType::MidDbl => 2,
     }
 }
 
@@ -170,8 +169,7 @@ pub fn compute_merkle_set_root(leafs: &mut [[u8; 32]]) -> [u8; 32] {
             hasher.update(hash);
             hasher.finalize().into()
         }
-        (hash, NodeType::Mid) => hash,
-        (hash, NodeType::MidDbl) => hash,
+        (hash, NodeType::Mid | NodeType::MidDbl) => hash,
         (_, NodeType::Empty) => panic!("unexpected"),
     }
 }
@@ -187,10 +185,10 @@ pub mod test {
         hasher.finalize().into()
     }
 
+    const PREFIX: [u8; 30] = hex!("000000000000000000000000000000000000000000000000000000000000");
+
     fn hashdown(buf1: &[u8], buf2: &[u8], buf3: &[u8]) -> [u8; 32] {
         let mut hasher = Sha256::new();
-        const PREFIX: [u8; 30] =
-            hex!("000000000000000000000000000000000000000000000000000000000000");
         hasher.update(PREFIX);
         hasher.update(buf1);
         hasher.update(buf2);
@@ -265,6 +263,7 @@ pub mod test {
         assert_eq!(get_bit(&val1, 15), 1);
     }
 
+    #[allow(clippy::many_single_char_names)]
     fn merkle_tree_5() -> ([u8; 32], Vec<[u8; 32]>) {
         let a = hex!("5800000000000000000000000000000000000000000000000000000000000000");
         let b = hex!("2300000000000000000000000000000000000000000000000000000000000000");

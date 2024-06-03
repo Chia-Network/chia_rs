@@ -15,6 +15,40 @@ repository = "https://github.com/Chia-Network/chia_rs"
 [workspace]
 members = ["crates/*", "crates/*/fuzz", "wasm", "wheel"]
 
+[workspace.lints.rust]
+unsafe_code = "deny"
+rust_2018_idioms = "deny"
+rust_2021_compatibility = "deny"
+future_incompatible = "deny"
+non_ascii_idents = "deny"
+nonstandard_style = "deny"
+unused_imports = "deny"
+unused_import_braces = "deny"
+unused_qualifications = "deny"
+unreachable_code = "deny"
+unreachable_patterns = "deny"
+dead_code = "deny"
+deprecated = "deny"
+deprecated_in_future = "deny"
+trivial_casts = "deny"
+trivial_numeric_casts = "deny"
+
+[workspace.lints.clippy]
+all = "deny"
+pedantic = { level = "warn", priority = -1 }
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+wildcard_imports = "allow"
+too_many_lines = "allow"
+module_name_repetitions = "allow"
+doc_markdown = "allow"
+cast_possible_truncation = "allow"
+cast_sign_loss = "allow"
+cast_precision_loss = "allow"
+cast_possible_wrap = "allow"
+similar_names = "allow"
+
 [dependencies]
 chia-bls = { workspace = true, optional = true }
 chia-client = { workspace = true, optional = true }

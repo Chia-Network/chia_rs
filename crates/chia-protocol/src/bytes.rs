@@ -55,7 +55,7 @@ impl fmt::Debug for Bytes {
 }
 
 impl fmt::Display for Bytes {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&hex::encode(self))
     }
 }
@@ -84,14 +84,14 @@ impl Streamable for Bytes {
 
 #[cfg(feature = "py-bindings")]
 impl ToJsonDict for Bytes {
-    fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
+    fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
         Ok(format!("0x{self}").to_object(py))
     }
 }
 
 #[cfg(feature = "py-bindings")]
 impl FromJsonDict for Bytes {
-    fn from_json_dict(o: &Bound<PyAny>) -> PyResult<Self> {
+    fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self> {
         let s: String = o.extract()?;
         if !s.starts_with("0x") {
             return Err(PyValueError::new_err(
@@ -203,7 +203,7 @@ impl<const N: usize> fmt::Debug for BytesImpl<N> {
 }
 
 impl<const N: usize> fmt::Display for BytesImpl<N> {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&hex::encode(self))
     }
 }
@@ -224,14 +224,14 @@ impl<const N: usize> Streamable for BytesImpl<N> {
 
 #[cfg(feature = "py-bindings")]
 impl<const N: usize> ToJsonDict for BytesImpl<N> {
-    fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
+    fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
         Ok(format!("0x{self}").to_object(py))
     }
 }
 
 #[cfg(feature = "py-bindings")]
 impl<const N: usize> FromJsonDict for BytesImpl<N> {
-    fn from_json_dict(o: &Bound<PyAny>) -> PyResult<Self> {
+    fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self> {
         let s: String = o.extract()?;
         if !s.starts_with("0x") {
             return Err(PyValueError::new_err(
@@ -390,14 +390,14 @@ impl From<TreeHash> for Bytes32 {
 
 #[cfg(feature = "py-bindings")]
 impl<const N: usize> ToPyObject for BytesImpl<N> {
-    fn to_object(&self, py: Python) -> PyObject {
+    fn to_object(&self, py: Python<'_>) -> PyObject {
         PyBytes::new_bound(py, &self.0).into()
     }
 }
 
 #[cfg(feature = "py-bindings")]
 impl<const N: usize> IntoPy<PyObject> for BytesImpl<N> {
-    fn into_py(self, py: Python) -> PyObject {
+    fn into_py(self, py: Python<'_>) -> PyObject {
         PyBytes::new_bound(py, &self.0).into()
     }
 }
@@ -427,14 +427,14 @@ impl<'py, const N: usize> FromPyObject<'py> for BytesImpl<N> {
 
 #[cfg(feature = "py-bindings")]
 impl ToPyObject for Bytes {
-    fn to_object(&self, py: Python) -> PyObject {
+    fn to_object(&self, py: Python<'_>) -> PyObject {
         PyBytes::new_bound(py, &self.0).into()
     }
 }
 
 #[cfg(feature = "py-bindings")]
 impl IntoPy<PyObject> for Bytes {
-    fn into_py(self, py: Python) -> PyObject {
+    fn into_py(self, py: Python<'_>) -> PyObject {
         PyBytes::new_bound(py, &self.0).into()
     }
 }
@@ -455,6 +455,7 @@ impl<'py> FromPyObject<'py> for Bytes {
 }
 
 #[cfg(test)]
+#[allow(clippy::needless_pass_by_value)]
 mod tests {
     use super::*;
 
@@ -529,12 +530,12 @@ mod tests {
         }
     }
 
-    fn from_bytes<T: Streamable + std::fmt::Debug + std::cmp::PartialEq>(buf: &[u8], expected: T) {
+    fn from_bytes<T: Streamable + fmt::Debug + PartialEq>(buf: &[u8], expected: T) {
         let mut input = Cursor::<&[u8]>::new(buf);
         assert_eq!(T::parse::<false>(&mut input).unwrap(), expected);
     }
 
-    fn from_bytes_fail<T: Streamable + std::fmt::Debug + std::cmp::PartialEq>(
+    fn from_bytes_fail<T: Streamable + fmt::Debug + PartialEq>(
         buf: &[u8],
         expected: chia_error::Error,
     ) {
@@ -570,9 +571,9 @@ mod tests {
             24, 25, 26, 27, 28, 29, 30, 31, 32,
         ]
         .into();
-        println!("{:?}", val);
+        println!("{val:?}");
         let buf = stream(&val);
-        println!("buf: {:?}", buf);
+        println!("buf: {buf:?}");
         from_bytes(&buf, val);
     }
 

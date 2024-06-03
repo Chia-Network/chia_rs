@@ -1,4 +1,4 @@
-extern crate proc_macro;
+#![allow(clippy::option_option)]
 
 mod apply_constants;
 mod from_clvm;

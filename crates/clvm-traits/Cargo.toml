@@ -11,6 +11,9 @@ repository = "https://github.com/Chia-Network/chia_rs"
 [package.metadata.docs.rs]
 features = ["derive", "chia-bls"]
 
+[lints]
+workspace = true
+
 [features]
 derive = ["dep:clvm-derive"]
 chia-bls = ["dep:chia-bls"]

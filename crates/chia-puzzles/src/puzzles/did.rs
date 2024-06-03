@@ -36,8 +36,7 @@ where
                 <match_list!(I)>::from_clvm(decoder, args.0)?.0,
             )),
             _ => Err(FromClvmError::Custom(format!(
-                "unexpected did spend mode {}",
-                mode
+                "unexpected did spend mode {mode}"
             ))),
         }
     }

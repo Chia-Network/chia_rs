@@ -19,7 +19,7 @@ impl ToPyObject for LazyNode {
 #[pymethods]
 impl LazyNode {
     #[getter(pair)]
-    pub fn pair(&self, py: Python) -> PyResult<Option<PyObject>> {
+    pub fn pair(&self, py: Python<'_>) -> PyResult<Option<PyObject>> {
         match &self.allocator.sexp(self.node) {
             SExp::Pair(p1, p2) => {
                 let r1 = Self::new(self.allocator.clone(), *p1);
@@ -27,17 +27,17 @@ impl LazyNode {
                 let v = PyTuple::new_bound(py, &[r1, r2]);
                 Ok(Some(v.into()))
             }
-            _ => Ok(None),
+            SExp::Atom => Ok(None),
         }
     }
 
     #[getter(atom)]
-    pub fn atom(&self, py: Python) -> Option<PyObject> {
+    pub fn atom(&self, py: Python<'_>) -> Option<PyObject> {
         match &self.allocator.sexp(self.node) {
             SExp::Atom => {
                 Some(PyBytes::new_bound(py, self.allocator.atom(self.node).as_ref()).into())
             }
-            _ => None,
+            SExp::Pair(..) => None,
         }
     }
 }

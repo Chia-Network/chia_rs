@@ -5,7 +5,7 @@ use pyo3::PyAny;
 use pyo3::PyResult;
 
 pub trait FromJsonDict {
-    fn from_json_dict(o: &Bound<PyAny>) -> PyResult<Self>
+    fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self>
     where
         Self: Sized;
 }
@@ -14,7 +14,7 @@ impl<T> FromJsonDict for Option<T>
 where
     T: FromJsonDict,
 {
-    fn from_json_dict(o: &Bound<PyAny>) -> PyResult<Self> {
+    fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self> {
         if o.is_none() {
             return Ok(None);
         }
@@ -25,7 +25,7 @@ where
 macro_rules! from_json_primitive {
     ($t:ty) => {
         impl $crate::from_json_dict::FromJsonDict for $t {
-            fn from_json_dict(o: &Bound<PyAny>) -> pyo3::PyResult<Self> {
+            fn from_json_dict(o: &Bound<'_, PyAny>) -> pyo3::PyResult<Self> {
                 o.extract()
             }
         }
@@ -49,7 +49,7 @@ impl<T> FromJsonDict for Vec<T>
 where
     T: FromJsonDict,
 {
-    fn from_json_dict(o: &Bound<PyAny>) -> PyResult<Self> {
+    fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self> {
         let mut ret = Vec::<T>::new();
         for v in o.iter()? {
             ret.push(<T as FromJsonDict>::from_json_dict(&v?)?);
@@ -63,7 +63,7 @@ where
     T: FromJsonDict,
     U: FromJsonDict,
 {
-    fn from_json_dict(o: &Bound<PyAny>) -> PyResult<Self> {
+    fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self> {
         if o.len()? != 2 {
             return Err(PyValueError::new_err(format!(
                 "expected 2 elements, got {}",
@@ -83,7 +83,7 @@ where
     U: FromJsonDict,
     V: FromJsonDict,
 {
-    fn from_json_dict(o: &Bound<PyAny>) -> PyResult<Self> {
+    fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self> {
         if o.len()? != 3 {
             return Err(PyValueError::new_err(format!(
                 "expected 3 elements, got {}",

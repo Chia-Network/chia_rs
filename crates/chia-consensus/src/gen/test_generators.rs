@@ -67,18 +67,18 @@ fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
         let mut create_coin: Vec<&NewCoin> = s.create_coin.iter().collect();
         create_coin.sort_by_key(|cc| (cc.puzzle_hash, cc.amount));
         for cc in create_coin {
-            if cc.hint != NodePtr::NIL {
+            if cc.hint == NodePtr::NIL {
+                ret += &format!(
+                    "  CREATE_COIN: ph: {} amount: {}\n",
+                    hex::encode(cc.puzzle_hash),
+                    cc.amount
+                );
+            } else {
                 ret += &format!(
                     "  CREATE_COIN: ph: {} amount: {} hint: {}\n",
                     hex::encode(cc.puzzle_hash),
                     cc.amount,
                     hex::encode(a.atom(cc.hint))
-                );
-            } else {
-                ret += &format!(
-                    "  CREATE_COIN: ph: {} amount: {}\n",
-                    hex::encode(cc.puzzle_hash),
-                    cc.amount
                 );
             }
         }
@@ -209,7 +209,7 @@ fn run_generator(#[case] name: &str) {
     let mut block_refs = Vec::<Vec<u8>>::new();
 
     let filename = format!("../../generator-tests/{name}.env");
-    if let Ok(env_hex) = std::fs::read_to_string(&filename) {
+    if let Ok(env_hex) = read_to_string(&filename) {
         println!("block-ref file: {filename}");
         block_refs.push(hex::decode(env_hex).expect("hex decode env-file"));
     }
@@ -221,13 +221,13 @@ fn run_generator(#[case] name: &str) {
         ],
         expected,
     ) {
-        println!("flags: {:x}", flags);
+        println!("flags: {flags:x}");
         let mut a = make_allocator(*flags);
         let conds = run_block_generator::<_, MempoolVisitor>(
             &mut a,
             &generator,
             &block_refs,
-            11000000000,
+            11_000_000_000,
             *flags,
         );
 
@@ -241,7 +241,7 @@ fn run_generator(#[case] name: &str) {
             &mut a,
             &generator,
             &block_refs,
-            11000000000,
+            11_000_000_000,
             *flags,
         );
         let output_hard_fork = match conds {

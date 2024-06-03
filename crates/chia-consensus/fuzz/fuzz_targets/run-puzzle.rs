@@ -20,7 +20,7 @@ fuzz_target!(|data: &[u8]| {
         spend.solution.as_slice(),
         (&spend.coin.parent_coin_info).into(),
         spend.coin.amount,
-        11000000000,
+        11_000_000_000,
         ALLOW_BACKREFS,
     );
 });

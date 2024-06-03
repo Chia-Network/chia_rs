@@ -13,8 +13,8 @@ pub fn from_clvm(ast: DeriveInput) -> TokenStream {
     let node_name = Ident::new("Node", Span::mixed_site());
 
     match parsed {
-        ParsedInfo::Struct(struct_info) => impl_for_struct(ast, struct_info, node_name),
-        ParsedInfo::Enum(enum_info) => impl_for_enum(ast, enum_info, node_name),
+        ParsedInfo::Struct(struct_info) => impl_for_struct(ast, struct_info, &node_name),
+        ParsedInfo::Enum(enum_info) => impl_for_enum(ast, &enum_info, &node_name),
     }
 }
 
@@ -34,7 +34,7 @@ fn field_parser_fn_body(
 
     // Generate temporary names for the fields, used in the function body.
     let temp_names: Vec<Ident> = (0..fields.len())
-        .map(|i| Ident::new(&format!("field_{}", i), Span::mixed_site()))
+        .map(|i| Ident::new(&format!("field_{i}"), Span::mixed_site()))
         .collect();
 
     let decode_next = match repr {
@@ -83,7 +83,7 @@ fn field_parser_fn_body(
         }
     }
 
-    if !fields.last().map(|field| field.rest).unwrap_or(false) {
+    if !fields.last().is_some_and(|field| field.rest) {
         body.extend(check_rest_value(crate_name, repr));
     }
 
@@ -100,10 +100,10 @@ fn field_parser_fn_body(
         };
 
         if let Some(default) = &field.optional_with_default {
-            let default = default
-                .as_ref()
-                .map(|expr| expr.to_token_stream())
-                .unwrap_or_else(|| quote!(<#ty as ::std::default::Default>::default()));
+            let default = default.as_ref().map_or_else(
+                || quote!(<#ty as ::std::default::Default>::default()),
+                ToTokens::to_token_stream,
+            );
 
             // If there's a default value, we need to use it instead if the field isn't present.
             decoded_value = quote! {
@@ -183,7 +183,7 @@ fn check_rest_value(crate_name: &Ident, repr: Repr) -> TokenStream {
     }
 }
 
-fn impl_for_struct(ast: DeriveInput, struct_info: StructInfo, node_name: Ident) -> TokenStream {
+fn impl_for_struct(ast: DeriveInput, struct_info: StructInfo, node_name: &Ident) -> TokenStream {
     let crate_name = crate_name(struct_info.crate_name);
 
     let ParsedFields {
@@ -192,7 +192,7 @@ fn impl_for_struct(ast: DeriveInput, struct_info: StructInfo, node_name: Ident) 
         mut body,
     } = field_parser_fn_body(
         &crate_name,
-        &node_name,
+        node_name,
         &struct_info.fields,
         struct_info.repr,
     );
@@ -216,16 +216,16 @@ fn impl_for_struct(ast: DeriveInput, struct_info: StructInfo, node_name: Ident) 
         }
     }
 
-    trait_impl(ast, crate_name, node_name, body)
+    trait_impl(ast, &crate_name, node_name, &body)
 }
 
-fn impl_for_enum(ast: DeriveInput, enum_info: EnumInfo, node_name: Ident) -> TokenStream {
+fn impl_for_enum(ast: DeriveInput, enum_info: &EnumInfo, node_name: &Ident) -> TokenStream {
     let crate_name = crate_name(enum_info.crate_name.clone());
 
     let mut body = TokenStream::new();
 
     if enum_info.is_untagged {
-        let variant_parsers = enum_variant_parsers(&crate_name, &node_name, &enum_info);
+        let variant_parsers = enum_variant_parsers(&crate_name, node_name, enum_info);
 
         // If the enum is untagged, we need to try each variant parser until one succeeds.
         for parser in variant_parsers {
@@ -247,7 +247,7 @@ fn impl_for_enum(ast: DeriveInput, enum_info: EnumInfo, node_name: Ident) -> Tok
             discriminant_consts,
             discriminant_names,
             variant_names,
-        } = variant_discriminants(&enum_info);
+        } = variant_discriminants(enum_info);
 
         if enum_info.default_repr == Repr::Atom {
             // If the enum is represented as an atom, we can simply decode the discriminant and match against it.
@@ -267,7 +267,7 @@ fn impl_for_enum(ast: DeriveInput, enum_info: EnumInfo, node_name: Ident) -> Tok
                 }
             });
         } else {
-            let variant_parsers = enum_variant_parsers(&crate_name, &node_name, &enum_info);
+            let variant_parsers = enum_variant_parsers(&crate_name, node_name, enum_info);
 
             let decode_next = match enum_info.default_repr {
                 Repr::Atom | Repr::Transparent => unreachable!(),
@@ -299,7 +299,7 @@ fn impl_for_enum(ast: DeriveInput, enum_info: EnumInfo, node_name: Ident) -> Tok
         }
     }
 
-    trait_impl(ast, crate_name, node_name, body)
+    trait_impl(ast, &crate_name, node_name, &body)
 }
 
 fn enum_variant_parsers(
@@ -309,7 +309,7 @@ fn enum_variant_parsers(
 ) -> Vec<TokenStream> {
     let mut variant_parsers = Vec::new();
 
-    for variant in enum_info.variants.iter() {
+    for variant in &enum_info.variants {
         let variant_name = &variant.name;
         let repr = variant.repr.unwrap_or(enum_info.default_repr);
 
@@ -353,9 +353,9 @@ fn enum_variant_parsers(
 // This generates the `FromClvm` trait implementation and augments generics with the `FromClvm` bound.
 fn trait_impl(
     mut ast: DeriveInput,
-    crate_name: Ident,
-    node_name: Ident,
-    body: TokenStream,
+    crate_name: &Ident,
+    node_name: &Ident,
+    body: &TokenStream,
 ) -> TokenStream {
     let type_name = ast.ident;
 
@@ -363,7 +363,7 @@ fn trait_impl(
     // This isn't always perfect, but it's how derive macros work.
     add_trait_bounds(
         &mut ast.generics,
-        parse_quote!(#crate_name::FromClvm<#node_name>),
+        &parse_quote!(#crate_name::FromClvm<#node_name>),
     );
 
     let generics_clone = ast.generics.clone();

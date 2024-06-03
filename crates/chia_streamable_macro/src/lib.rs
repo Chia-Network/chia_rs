@@ -1,14 +1,13 @@
-extern crate proc_macro;
+#![allow(clippy::missing_panics_doc)]
 
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use proc_macro_crate::{crate_name, FoundCrate};
 use quote::quote;
 use syn::token::Pub;
-use syn::Lit::Int;
 use syn::{
-    parse_macro_input, Data, DeriveInput, Expr, Fields, FieldsNamed, FieldsUnnamed, Index, Type,
-    Visibility,
+    parse_macro_input, Data, DeriveInput, Expr, Fields, FieldsNamed, FieldsUnnamed, Index, Lit,
+    Type, Visibility,
 };
 
 #[proc_macro_attribute]
@@ -42,7 +41,7 @@ pub fn streamable(attr: TokenStream, item: TokenStream) -> TokenStream {
                 &field
                     .ident
                     .as_ref()
-                    .map(|ident| ident.to_string())
+                    .map(ToString::to_string)
                     .unwrap_or(format!("field_{i}")),
                 Span::mixed_site(),
             ));
@@ -141,32 +140,21 @@ pub fn chia_streamable_macro(input: TokenStream) -> TokenStream {
         Data::Enum(e) => {
             let mut names = Vec::<Ident>::new();
             let mut values = Vec::<u8>::new();
-            for v in e.variants.iter() {
+            for v in &e.variants {
                 names.push(v.ident.clone());
-                let expr = match &v.discriminant {
-                    Some((_, expr)) => expr,
-                    None => {
-                        panic!("unsupported enum");
-                    }
+                let Some((_, expr)) = &v.discriminant else {
+                    panic!("unsupported enum");
                 };
-                let l = match expr {
-                    Expr::Lit(l) => l,
-                    _ => {
-                        panic!("unsupported enum (no literal)");
-                    }
+                let Expr::Lit(l) = expr else {
+                    panic!("unsupported enum (no literal)");
                 };
-                let i = match &l.lit {
-                    Int(i) => i,
-                    _ => {
-                        panic!("unsupported enum (literal is not integer)");
-                    }
+                let Lit::Int(i) = &l.lit else {
+                    panic!("unsupported enum (literal is not integer)");
                 };
-                match i.base10_parse::<u8>() {
-                    Ok(v) => values.push(v),
-                    Err(_) => {
-                        panic!("unsupported enum (value not u8)");
-                    }
-                }
+                values.push(
+                    i.base10_parse::<u8>()
+                        .expect("unsupported enum (value not u8)"),
+                );
             }
             let ret = quote! {
                 impl #crate_name::Streamable for #ident {
@@ -199,7 +187,7 @@ pub fn chia_streamable_macro(input: TokenStream) -> TokenStream {
             }
             Fields::Unit => {}
             Fields::Named(FieldsNamed { named, .. }) => {
-                for f in named.iter() {
+                for f in &named {
                     fnames.push(f.ident.as_ref().unwrap().clone());
                     ftypes.push(f.ty.clone());
                 }

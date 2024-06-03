@@ -1,3 +1,5 @@
+#![allow(unsafe_code)]
+
 pub mod cached_bls;
 pub mod derivable_key;
 pub mod derive_keys;

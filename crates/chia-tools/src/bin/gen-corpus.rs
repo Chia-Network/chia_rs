@@ -8,12 +8,17 @@ use clap::Parser;
 use chia_tools::{iterate_tx_blocks, visit_spends};
 use chia_traits::streamable::Streamable;
 
+use chia_bls::G2Element;
 use chia_protocol::{Bytes32, Coin, CoinSpend, Program, SpendBundle};
 use chia_puzzles::singleton::SINGLETON_TOP_LAYER_PUZZLE_HASH;
 use clvm_traits::{FromClvm, FromNodePtr};
 use clvm_utils::{tree_hash, CurriedProgram};
 use clvmr::allocator::NodePtr;
 use clvmr::Allocator;
+use std::collections::HashSet;
+use std::fs::write;
+use std::io::Write;
+use std::sync::{Arc, Mutex};
 use std::thread::available_parallelism;
 use std::time::{Duration, Instant};
 
@@ -52,11 +57,6 @@ fn main() {
         .queue_len(num_cores + 5)
         .build();
 
-    use chia_bls::G2Element;
-    use std::collections::HashSet;
-    use std::fs::write;
-    use std::sync::{Arc, Mutex};
-
     let seen_puzzles = Arc::new(Mutex::new(HashSet::<Bytes32>::new()));
     let seen_singletons = Arc::new(Mutex::new(HashSet::<Bytes32>::new()));
 
@@ -74,7 +74,7 @@ fn main() {
             let seen_puzzles = seen_puzzles.clone();
             let seen_singletons = seen_singletons.clone();
             pool.execute(move || {
-                let mut a = Allocator::new_limited(500000000);
+                let mut a = Allocator::new_limited(500_000_000);
 
                 let generator = prg.as_ref();
 
@@ -149,8 +149,7 @@ fn main() {
                 }
             });
             if last_time.elapsed() > Duration::new(4, 0) {
-                let rate = (height - last_height) as f64 / last_time.elapsed().as_secs_f64();
-                use std::io::Write;
+                let rate = f64::from(height - last_height) / last_time.elapsed().as_secs_f64();
                 print!("\rheight: {height} ({rate:0.1} blocks/s)   ");
                 let _ = std::io::stdout().flush();
                 last_height = height;
