@@ -1,5 +1,4 @@
-use chia_bls::derivable_key::DerivableKey;
-use chia_bls::secret_key::SecretKey;
+use chia_bls::{DerivableKey, SecretKey};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};

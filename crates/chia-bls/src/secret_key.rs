@@ -10,7 +10,7 @@ use std::mem::MaybeUninit;
 use std::ops::{Add, AddAssign};
 
 #[cfg(feature = "py-bindings")]
-use crate::public_key::parse_hex_string;
+use crate::parse_hex::parse_hex_string;
 #[cfg(feature = "py-bindings")]
 use crate::Signature;
 #[cfg(feature = "py-bindings")]

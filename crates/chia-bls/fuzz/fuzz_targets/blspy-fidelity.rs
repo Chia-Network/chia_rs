@@ -10,9 +10,8 @@
 use libfuzzer_sys::fuzz_target;
 use pyo3::prelude::*;
 
-use chia_bls::derivable_key::DerivableKey;
-use chia_bls::secret_key::SecretKey;
-use chia_bls::signature::{aggregate, sign};
+use chia_bls::{aggregate, sign};
+use chia_bls::{DerivableKey, SecretKey};
 use pyo3::types::{PyBytes, PyList, PyTuple};
 
 fn to_bytes(obj: &Bound<'_, PyAny>) -> Vec<u8> {
