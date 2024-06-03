@@ -21,16 +21,6 @@ use std::sync::{Arc, Mutex};
 // use std::thread;
 use std::time::{Duration, Instant};
 
-// currently in multiprocess_validation.py
-// called via blockchain.py from full_node.py when a full node wants to add a block or batch of blocks
-pub fn pre_validate_blocks_multiprocessing() {
-    batch_pre_validate_blocks()
-}
-
-// currently in multiprocess_validation.py
-// called in threads from pre_validate_blocks_multiprocessing
-fn batch_pre_validate_blocks() {}
-
 // currently in mempool_manager.py
 // called in full_node.py when adding a transaction
 pub fn pre_validate_spendbundle(
