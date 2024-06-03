@@ -9,23 +9,10 @@ use std::io::Cursor;
 use std::mem::MaybeUninit;
 use std::ops::{Add, AddAssign};
 
-#[cfg(feature = "py-bindings")]
-use crate::parse_hex::parse_hex_string;
-#[cfg(feature = "py-bindings")]
-use crate::Signature;
-#[cfg(feature = "py-bindings")]
-use chia_py_streamable_macro::PyStreamable;
-#[cfg(feature = "py-bindings")]
-use chia_traits::from_json_dict::FromJsonDict;
-#[cfg(feature = "py-bindings")]
-use chia_traits::to_json_dict::ToJsonDict;
-#[cfg(feature = "py-bindings")]
-use pyo3::{pyclass, pymethods, IntoPy, PyAny, PyObject, PyResult, Python};
-
 #[cfg_attr(
     feature = "py-bindings",
-    pyclass(frozen, name = "PrivateKey"),
-    derive(PyStreamable)
+    pyo3::pyclass(frozen, name = "PrivateKey"),
+    derive(chia_py_streamable_macro::PyStreamable)
 )]
 #[derive(PartialEq, Eq, Clone)]
 pub struct SecretKey(pub(crate) blst_scalar);
@@ -227,26 +214,6 @@ impl fmt::Debug for SecretKey {
     }
 }
 
-#[cfg(feature = "py-bindings")]
-impl ToJsonDict for SecretKey {
-    fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let bytes = self.to_bytes();
-        Ok(("0x".to_string() + &hex::encode(bytes)).into_py(py))
-    }
-}
-
-#[cfg(feature = "py-bindings")]
-impl FromJsonDict for SecretKey {
-    fn from_json_dict(o: &pyo3::Bound<'_, PyAny>) -> PyResult<Self> {
-        Ok(Self::from_bytes(
-            parse_hex_string(o, 32, "PrivateKey")?
-                .as_slice()
-                .try_into()
-                .unwrap(),
-        )?)
-    }
-}
-
 impl DerivableKey for SecretKey {
     fn derive_unhardened(&self, idx: u32) -> Self {
         let pk = self.public_key();
@@ -270,21 +237,48 @@ impl DerivableKey for SecretKey {
 }
 
 #[cfg(feature = "py-bindings")]
-#[pymethods]
-impl SecretKey {
-    #[classattr]
-    const PRIVATE_KEY_SIZE: usize = 32;
+mod pybindings {
+    use super::*;
 
-    pub fn sign_g2(&self, msg: &[u8]) -> Signature {
-        crate::sign(self, msg)
+    use crate::{parse_hex::parse_hex_string, PublicKey, Signature};
+
+    use chia_traits::{FromJsonDict, ToJsonDict};
+    use pyo3::prelude::*;
+
+    #[pymethods]
+    impl SecretKey {
+        #[classattr]
+        const PRIVATE_KEY_SIZE: usize = 32;
+
+        pub fn sign_g2(&self, msg: &[u8]) -> Signature {
+            crate::sign(self, msg)
+        }
+
+        pub fn get_g1(&self) -> PublicKey {
+            self.public_key()
+        }
+
+        fn __str__(&self) -> String {
+            hex::encode(self.to_bytes())
+        }
     }
 
-    pub fn get_g1(&self) -> PublicKey {
-        self.public_key()
+    impl ToJsonDict for SecretKey {
+        fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
+            let bytes = self.to_bytes();
+            Ok(("0x".to_string() + &hex::encode(bytes)).into_py(py))
+        }
     }
 
-    fn __str__(&self) -> String {
-        hex::encode(self.to_bytes())
+    impl FromJsonDict for SecretKey {
+        fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self> {
+            Ok(Self::from_bytes(
+                parse_hex_string(o, 32, "PrivateKey")?
+                    .as_slice()
+                    .try_into()
+                    .unwrap(),
+            )?)
+        }
     }
 }
 
@@ -517,6 +511,7 @@ mod tests {
 #[cfg(feature = "py-bindings")]
 mod pytests {
     use super::*;
+    use pyo3::{IntoPy, Python};
     use rand::rngs::StdRng;
     use rand::{Rng, SeedableRng};
     use rstest::rstest;
