@@ -52,11 +52,6 @@ clvm-utils = ["dep:clvm-utils"]
 [profile.release]
 lto = "thin"
 
-# This is also necessary in `wheel/Cargo.toml` to make sure the `wheel` crate builds as well.
-# Pin the `blst` dependency to the correct revision, since the fix has not been properly released yet.
-[patch.crates-io]
-blst = { git = "https://github.com/supranational/blst.git", rev = "0d46eefa45fc1e57aceb42bba0e84eab3a7a9725" }
-
 [workspace.dependencies]
 chia_py_streamable_macro = { path = "./crates/chia_py_streamable_macro", version = "0.9.0" }
 chia_streamable_macro = { path = "./crates/chia_streamable_macro", version = "0.8.0" }
@@ -71,7 +66,7 @@ clvm-traits = { path = "./crates/clvm-traits", version = "0.9.0" }
 clvm-utils = { path = "./crates/clvm-utils", version = "0.9.0" }
 clvm-derive = { path = "./crates/clvm-derive", version = "0.9.0" }
 chia-fuzz = { path = "./crates/chia-consensus/fuzz", version = "0.6.0" }
-blst = { version = "0.3.11", git = "https://github.com/supranational/blst.git", rev = "0d46eefa45fc1e57aceb42bba0e84eab3a7a9725", features = ["portable"] }
+blst = { version = "0.3.12", features = ["portable"] }
 clvmr = "0.7.0"
 syn = "2.0.27"
 quote = "1.0.32"
