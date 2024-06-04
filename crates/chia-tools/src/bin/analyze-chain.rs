@@ -10,7 +10,7 @@ use rusqlite::Connection;
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::gen::conditions::{parse_spends, MempoolVisitor};
 use chia_consensus::gen::flags::MEMPOOL_MODE;
-use chia_consensus::generator_rom::{COST_PER_BYTE, GENERATOR_ROM};
+use chia_consensus::generator_rom::GENERATOR_ROM;
 use clvmr::reduction::Reduction;
 use clvmr::run_program_with_counters;
 use clvmr::serde::node_from_bytes;
@@ -143,7 +143,7 @@ fn main() {
             .elapsed()
             .expect("failed to get system time");
 
-        let byte_cost = program.len() as u64 * COST_PER_BYTE;
+        let byte_cost = program.len() as u64 * TEST_CONSTANTS.cost_per_byte;
 
         args = a.new_pair(args, a.nil()).expect("failed to allocate pair");
         let args = a.new_pair(args, a.nil()).expect("failed to allocate pair");
