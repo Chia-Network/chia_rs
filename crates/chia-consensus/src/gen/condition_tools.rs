@@ -1,3 +1,4 @@
+use crate::consensus_constants::ConsensusConstants;
 use crate::gen::opcodes::{
     ConditionOpcode, AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT,
     AGG_SIG_PARENT_PUZZLE, AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT,
@@ -7,25 +8,13 @@ use crate::gen::validation_error::ErrorCode;
 use chia_bls::PublicKey;
 use chia_protocol::Bytes;
 use chia_protocol::Coin;
-use sha2::{Digest, Sha256};
-use std::collections::HashMap;
 
 pub fn pkm_pairs(
     conditions: OwnedSpendBundleConditions,
-    additional_data: &[u8],
+    constants: &ConsensusConstants,
 ) -> Result<(Vec<PublicKey>, Vec<Vec<u8>>), ErrorCode> {
     let mut pks = Vec::<PublicKey>::new();
     let mut msgs = Vec::<Vec<u8>>::new();
-    let disallowed = agg_sig_additional_data(additional_data);
-    for (pk, msg) in conditions.agg_sig_unsafe {
-        pks.push(pk);
-        msgs.push(msg.as_slice().to_vec());
-        for (_, disallowed_val) in disallowed.clone() {
-            if msg.ends_with(disallowed_val.as_slice()) {
-                return Err(ErrorCode::InvalidCondition);
-            }
-        }
-    }
     for spend in conditions.spends {
         let spend_clone = spend.clone();
         let condition_items_pairs = [
@@ -44,7 +33,7 @@ pub fn pkm_pairs(
                     condition,
                     msg.as_slice(),
                     &spend,
-                    &disallowed,
+                    constants,
                 ));
             }
         }
@@ -56,35 +45,53 @@ fn make_aggsig_final_message(
     opcode: ConditionOpcode,
     msg: &[u8],
     spend: &OwnedSpend,
-    agg_sig_additional_data: &HashMap<ConditionOpcode, Vec<u8>>,
+    constants: &ConsensusConstants,
 ) -> Vec<u8> {
     let mut result = msg.to_vec();
     result.extend(match opcode {
-        AGG_SIG_PARENT => spend.parent_id.as_slice().to_vec(),
-        AGG_SIG_PUZZLE => spend.puzzle_hash.as_slice().to_vec(),
-        AGG_SIG_AMOUNT => u64_to_bytes(spend.coin_amount).as_slice().to_vec(),
+        AGG_SIG_PARENT => [
+            spend.parent_id.as_slice(),
+            constants.agg_sig_parent_additional_data.as_slice(),
+        ]
+        .concat(),
+        AGG_SIG_PUZZLE => [
+            spend.puzzle_hash.as_slice(),
+            constants.agg_sig_puzzle_additional_data.as_slice(),
+        ]
+        .concat(),
+        AGG_SIG_AMOUNT => [
+            u64_to_bytes(spend.coin_amount).as_slice(),
+            constants.agg_sig_amount_additional_data.as_slice(),
+        ]
+        .concat(),
         AGG_SIG_PUZZLE_AMOUNT => [
             spend.puzzle_hash.as_slice(),
             u64_to_bytes(spend.coin_amount).as_slice(),
+            constants.agg_sig_puzzle_amount_additional_data.as_slice(),
         ]
         .concat(),
         AGG_SIG_PARENT_AMOUNT => [
             spend.parent_id.as_slice(),
             u64_to_bytes(spend.coin_amount).as_slice(),
+            constants.agg_sig_parent_amount_additional_data.as_slice(),
         ]
         .concat(),
-        AGG_SIG_PARENT_PUZZLE => {
-            [spend.parent_id.as_slice(), spend.puzzle_hash.as_slice()].concat()
-        }
+        AGG_SIG_PARENT_PUZZLE => [
+            spend.parent_id.as_slice(),
+            spend.puzzle_hash.as_slice(),
+            constants.agg_sig_parent_puzzle_additional_data.as_slice(),
+        ]
+        .concat(),
         AGG_SIG_ME => {
             let coin: Coin = Coin::new(spend.parent_id, spend.puzzle_hash, spend.coin_amount);
-            coin.coin_id().as_slice().to_vec()
+            [
+                coin.coin_id().as_slice(),
+                constants.agg_sig_me_additional_data.as_slice(),
+            ]
+            .concat()
         }
         _ => Vec::<u8>::new(),
     });
-    if let Some(additional_data) = agg_sig_additional_data.get(&opcode) {
-        result.extend_from_slice(additional_data);
-    }
 
     result
 }
@@ -110,19 +117,4 @@ pub fn u64_to_bytes(val: u64) -> Bytes {
         };
         Bytes::new(amount_bytes[start..].to_vec())
     }
-}
-
-fn agg_sig_additional_data(agg_sig_data: &[u8]) -> HashMap<ConditionOpcode, Vec<u8>> {
-    let mut ret: HashMap<ConditionOpcode, Vec<u8>> = HashMap::new();
-    // these are equivalent to AGG_SIG_PARENT through to AGG_SIG_PARENT_PUZZLE in opcodes.rs
-    for code in 43_u16..48_u16 {
-        let mut hasher = Sha256::new();
-        hasher.update(agg_sig_data);
-        hasher.update([code as u8]);
-        let val: Vec<u8> = hasher.finalize().as_slice().to_vec();
-        ret.insert(code, val);
-    }
-    ret.insert(AGG_SIG_ME, agg_sig_data.to_vec());
-
-    ret
 }

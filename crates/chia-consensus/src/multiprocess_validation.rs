@@ -53,14 +53,13 @@ fn validate_clvm_and_signature(
     cache: Arc<Mutex<BlsCache>>,
 ) -> Result<(OwnedSpendBundleConditions, Duration), ErrorCode> {
     let start_time = Instant::now();
-    let additional_data: chia_protocol::BytesImpl<32> = constants.agg_sig_me_additional_data;
     let npcresult =
         match get_name_puzzle_conditions(spend_bundle, max_cost, true, height, constants) {
             Ok(result) => result,
             Err(error) => return Err(error.1),
         };
 
-    let (pks, msgs) = pkm_pairs(npcresult.clone(), additional_data.as_slice())?;
+    let (pks, msgs) = pkm_pairs(npcresult.clone(), constants)?;
     // Verify aggregated signature
     if !{
         if syncing {
