@@ -1,6 +1,6 @@
 #![allow(unsafe_code)]
 
-mod cached_bls;
+mod bls_cache;
 mod derive_keys;
 mod error;
 mod gtelement;
@@ -12,7 +12,7 @@ mod signature;
 #[cfg(feature = "py-bindings")]
 mod parse_hex;
 
-pub use cached_bls::BlsCache;
+pub use bls_cache::BlsCache;
 pub use derive_keys::*;
 pub use error::{Error, Result};
 pub use gtelement::GTElement;
