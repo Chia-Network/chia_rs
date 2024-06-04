@@ -304,17 +304,49 @@ impl chia_traits::ChiaToPython for RejectStateReason {
     }
 }
 
-#[streamable(message)]
-pub struct SubscribedMempoolItems {
-    transaction_ids: Vec<Bytes32>,
+#[repr(u8)]
+#[cfg_attr(feature = "py-bindings", derive(PyJsonDict, PyStreamable))]
+#[derive(Streamable, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+pub enum MempoolRemoveReason {
+    Conflict = 1,
+    BlockInclusion = 2,
+    PoolFull = 3,
+    Expired = 4,
+}
+
+#[cfg(feature = "py-bindings")]
+impl chia_traits::ChiaToPython for MempoolRemoveReason {
+    fn to_python<'a>(&self, py: pyo3::Python<'a>) -> pyo3::PyResult<pyo3::Bound<'a, pyo3::PyAny>> {
+        Ok(pyo3::IntoPy::into_py(*self, py).bind(py).clone())
+    }
+}
+
+#[streamable]
+pub struct RemovedMempoolItem {
+    transaction_id: Bytes32,
+    reason: MempoolRemoveReason,
 }
 
 #[streamable(message)]
-pub struct MempoolItemAdded {
-    transaction_id: Bytes32,
+pub struct MempoolItemsAdded {
+    transaction_ids: Vec<Bytes32>,
 }
 
 #[streamable(message)]
 pub struct MempoolItemsRemoved {
-    transaction_ids: Vec<Bytes32>,
+    removed_items: Vec<RemovedMempoolItem>,
+}
+
+#[streamable(message)]
+pub struct RequestCostInfo {}
+
+#[streamable(message)]
+pub struct RespondCostInfo {
+    max_transaction_cost: u64,
+    max_block_cost: u64,
+    max_mempool_cost: u64,
+    mempool_cost: u64,
+    mempool_fee: u64,
+    bump_fee_per_cost: u8,
 }
