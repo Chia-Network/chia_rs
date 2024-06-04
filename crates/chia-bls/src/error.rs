@@ -26,11 +26,14 @@ impl From<Error> for chia_traits::Error {
 }
 
 #[cfg(feature = "py-bindings")]
-use pyo3::PyErr;
+mod pybindings {
+    use super::*;
 
-#[cfg(feature = "py-bindings")]
-impl From<Error> for PyErr {
-    fn from(err: Error) -> PyErr {
-        pyo3::exceptions::PyValueError::new_err(format!("BLS Error {err:?}"))
+    use pyo3::{exceptions::PyValueError, PyErr};
+
+    impl From<Error> for PyErr {
+        fn from(err: Error) -> PyErr {
+            PyValueError::new_err(format!("BLS Error {err:?}"))
+        }
     }
 }
