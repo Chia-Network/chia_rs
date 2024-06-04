@@ -1,4 +1,5 @@
 #![no_main]
+use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::fast_forward::fast_forward_singleton;
 use chia_consensus::gen::conditions::{MempoolVisitor, ELIGIBLE_FOR_FF};
 use chia_consensus::gen::run_puzzle::run_puzzle;
@@ -90,6 +91,7 @@ fn test_ff(
         spend.coin.amount,
         11_000_000_000,
         0,
+        &TEST_CONSTANTS,
     );
 
     // run new spend
@@ -101,6 +103,7 @@ fn test_ff(
         new_coin.amount,
         11_000_000_000,
         0,
+        &TEST_CONSTANTS,
     );
 
     // These are the kinds of failures that can happen because of the

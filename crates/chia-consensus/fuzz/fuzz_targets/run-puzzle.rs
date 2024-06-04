@@ -1,4 +1,5 @@
 #![no_main]
+use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::gen::conditions::MempoolVisitor;
 use chia_consensus::gen::flags::ALLOW_BACKREFS;
 use chia_consensus::gen::run_puzzle::run_puzzle;
@@ -22,5 +23,6 @@ fuzz_target!(|data: &[u8]| {
         spend.coin.amount,
         11_000_000_000,
         ALLOW_BACKREFS,
+        &TEST_CONSTANTS,
     );
 });

@@ -16,6 +16,7 @@ use super::opcodes::{
 };
 use super::sanitize_int::{sanitize_uint, SanitizedUint};
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
+use crate::consensus_constants::ConsensusConstants;
 use crate::gen::flags::{
     AGG_SIG_ARGS, COND_ARGS_NIL, DISALLOW_INFINITY_G1, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
     NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
@@ -236,6 +237,31 @@ pub enum Condition {
     // this means the condition is unconditionally true and can be skipped
     Skip,
     SkipRelativeCondition,
+}
+
+fn check_agg_sig_unsafe_message(
+    a: &Allocator,
+    msg: NodePtr,
+    constants: &ConsensusConstants,
+) -> Result<(), ValidationErr> {
+    if a.atom_len(msg) < 32 {
+        return Ok(());
+    }
+    let buf = a.atom(msg);
+    for additional_data in &[
+        constants.agg_sig_me_additional_data.as_ref(),
+        constants.agg_sig_parent_additional_data.as_ref(),
+        constants.agg_sig_puzzle_additional_data.as_ref(),
+        constants.agg_sig_amount_additional_data.as_ref(),
+        constants.agg_sig_puzzle_amount_additional_data.as_ref(),
+        constants.agg_sig_parent_amount_additional_data.as_ref(),
+        constants.agg_sig_parent_puzzle_additional_data.as_ref(),
+    ] {
+        if buf.as_ref().ends_with(additional_data) {
+            return Err(ValidationErr(msg, ErrorCode::InvalidMessage));
+        }
+    }
+    Ok(())
 }
 
 fn maybe_check_args_terminator(
@@ -817,6 +843,7 @@ pub fn process_single_spend<V: SpendVisitor>(
     conditions: NodePtr,
     flags: u32,
     max_cost: &mut Cost,
+    constants: &ConsensusConstants,
 ) -> Result<(), ValidationErr> {
     let parent_id = sanitize_hash(a, parent_id, 32, ErrorCode::InvalidParentId)?;
     let puzzle_hash = sanitize_hash(a, puzzle_hash, 32, ErrorCode::InvalidPuzzleHash)?;
@@ -856,6 +883,7 @@ pub fn process_single_spend<V: SpendVisitor>(
         conditions,
         flags,
         max_cost,
+        constants,
         &mut visitor,
     )
 }
@@ -901,6 +929,7 @@ pub fn parse_conditions<V: SpendVisitor>(
     mut iter: NodePtr,
     flags: u32,
     max_cost: &mut Cost,
+    constants: &ConsensusConstants,
     visitor: &mut V,
 ) -> Result<(), ValidationErr> {
     let mut announce_countdown: u32 = 1024;
@@ -1169,6 +1198,9 @@ pub fn parse_conditions<V: SpendVisitor>(
                 }
             }
             Condition::AggSigUnsafe(pk, msg) => {
+                // AGG_SIG_UNSAFE messages are not allowed to end with the
+                // suffix added to other AGG_SIG_* conditions
+                check_agg_sig_unsafe_message(a, msg, constants)?;
                 if let Some(pk) = to_key(a, pk, flags)? {
                     ret.agg_sig_unsafe.push((pk, msg));
                 }
@@ -1256,6 +1288,7 @@ pub fn parse_spends<V: SpendVisitor>(
     spends: NodePtr,
     max_cost: Cost,
     flags: u32,
+    constants: &ConsensusConstants,
 ) -> Result<SpendBundleConditions, ValidationErr> {
     let mut ret = SpendBundleConditions::default();
     let mut state = ParseState::default();
@@ -1282,6 +1315,7 @@ pub fn parse_spends<V: SpendVisitor>(
             conds,
             flags,
             &mut cost_left,
+            constants,
         )?;
     }
 
@@ -1472,6 +1506,8 @@ fn u64_to_bytes(n: u64) -> Vec<u8> {
     }
     buf
 }
+#[cfg(test)]
+use crate::consensus_constants::TEST_CONSTANTS;
 #[cfg(test)]
 use crate::gen::flags::ENABLE_SOFTFORK_CONDITION;
 #[cfg(test)]
@@ -1713,7 +1749,7 @@ fn cond_test_cb(
         print!("{c:02x}");
     }
     println!();
-    match parse_spends::<MempoolVisitor>(&a, n, 11_000_000_000, flags) {
+    match parse_spends::<MempoolVisitor>(&a, n, 11_000_000_000, flags, &TEST_CONSTANTS) {
         Ok(list) => {
             for n in &list.spends {
                 println!("{n:?}");
@@ -3474,7 +3510,7 @@ fn test_agg_sig_unsafe_invalid_pubkey() {
 }
 
 #[test]
-fn test_agg_sig_unsafe_invalid_msg() {
+fn test_agg_sig_unsafe_long_msg() {
     // AGG_SIG_UNSAFE
     assert_eq!(
         cond_test("((({h1} ({h2} (123 (((49 ({pubkey} ({longmsg} )))))")
@@ -3482,6 +3518,40 @@ fn test_agg_sig_unsafe_invalid_msg() {
             .1,
         ErrorCode::InvalidMessage
     );
+}
+
+#[cfg(test)]
+#[rstest]
+// these are the suffixes used for AGG_SIG_* conditions (other than
+// AGG_SIG_UNSAFE)
+#[case("0xccd5bb71183532bff220ba46c268991a3ff07eb358e8255a65c30a2dce0e5fbb")]
+#[case("0xbaf5d69c647c91966170302d18521b0a85663433d161e72c826ed08677b53a74")]
+#[case("0x284fa2ef486c7a41cc29fc99c9d08376161e93dd37817edb8219f42dca7592c4")]
+#[case("0xcda186a9cd030f7a130fae45005e81cae7a90e0fa205b75f6aebc0d598e0348e")]
+#[case("0x0f7d90dff0613e6901e24dae59f1e690f18b8f5fbdcf1bb192ac9deaf7de22ad")]
+#[case("0x585796bd90bb553c0430b87027ffee08d88aba0162c6e1abbbcc6b583f2ae7f9")]
+#[case("0x2ebfdae17b29d83bae476a25ea06f0c4bd57298faddbbc3ec5ad29b9b86ce5df")]
+// The same suffixes, but 1 byte prepended
+#[case("0x01ccd5bb71183532bff220ba46c268991a3ff07eb358e8255a65c30a2dce0e5fbb")]
+#[case("0x01baf5d69c647c91966170302d18521b0a85663433d161e72c826ed08677b53a74")]
+#[case("0x01284fa2ef486c7a41cc29fc99c9d08376161e93dd37817edb8219f42dca7592c4")]
+#[case("0x01cda186a9cd030f7a130fae45005e81cae7a90e0fa205b75f6aebc0d598e0348e")]
+#[case("0x010f7d90dff0613e6901e24dae59f1e690f18b8f5fbdcf1bb192ac9deaf7de22ad")]
+#[case("0x01585796bd90bb553c0430b87027ffee08d88aba0162c6e1abbbcc6b583f2ae7f9")]
+#[case("0x012ebfdae17b29d83bae476a25ea06f0c4bd57298faddbbc3ec5ad29b9b86ce5df")]
+fn test_agg_sig_unsafe_invalid_msg(
+    #[case] msg: &str,
+    #[values(43, 44, 45, 46, 47, 48, 49, 50)] opcode: u16,
+) {
+    let ret = cond_test_flag(
+        format!("((({{h1}} ({{h2}} (123 ((({opcode} ({{pubkey}} ({msg} )))))").as_str(),
+        ENABLE_SOFTFORK_CONDITION,
+    );
+    if opcode == AGG_SIG_UNSAFE {
+        assert_eq!(ret.unwrap_err().1, ErrorCode::InvalidMessage);
+    } else {
+        assert!(ret.is_ok());
+    }
 }
 
 #[test]

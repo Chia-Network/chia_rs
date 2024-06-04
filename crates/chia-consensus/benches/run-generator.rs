@@ -1,3 +1,4 @@
+use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::gen::conditions::MempoolVisitor;
 use chia_consensus::gen::flags::ALLOW_BACKREFS;
 use chia_consensus::gen::run_block_generator::{run_block_generator, run_block_generator2};
@@ -56,6 +57,7 @@ fn run(c: &mut Criterion) {
                         &block_refs,
                         11_000_000_000,
                         ALLOW_BACKREFS,
+                        &TEST_CONSTANTS,
                     );
                     let _ = black_box(conds);
                     start.elapsed()
@@ -73,6 +75,7 @@ fn run(c: &mut Criterion) {
                         &block_refs,
                         11_000_000_000,
                         ALLOW_BACKREFS,
+                        &TEST_CONSTANTS,
                     );
                     let _ = black_box(conds);
                     start.elapsed()

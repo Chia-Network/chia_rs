@@ -95,6 +95,7 @@ mod python {
     #[pymethods]
     impl BlsCache {
         #[new]
+        #[pyo3(signature = (size=None))]
         pub fn init(size: Option<u32>) -> PyResult<Self> {
             let Some(size) = size else {
                 return Ok(Self::default());

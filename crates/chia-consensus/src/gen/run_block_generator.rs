@@ -1,10 +1,11 @@
+use crate::consensus_constants::ConsensusConstants;
 use crate::gen::conditions::{
     parse_spends, process_single_spend, validate_conditions, ParseState, SpendBundleConditions,
 };
 use crate::gen::flags::ALLOW_BACKREFS;
 use crate::gen::spend_visitor::SpendVisitor;
 use crate::gen::validation_error::{first, ErrorCode, ValidationErr};
-use crate::generator_rom::{CLVM_DESERIALIZER, COST_PER_BYTE, GENERATOR_ROM};
+use crate::generator_rom::{CLVM_DESERIALIZER, GENERATOR_ROM};
 use clvm_utils::{tree_hash_cached, TreeHash};
 use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::chia_dialect::ChiaDialect;
@@ -43,9 +44,10 @@ pub fn run_block_generator<GenBuf: AsRef<[u8]>, V: SpendVisitor>(
     block_refs: &[GenBuf],
     max_cost: u64,
     flags: u32,
+    constants: &ConsensusConstants,
 ) -> Result<SpendBundleConditions, ValidationErr> {
     let mut cost_left = max_cost;
-    let byte_cost = program.len() as u64 * COST_PER_BYTE;
+    let byte_cost = program.len() as u64 * constants.cost_per_byte;
 
     subtract_cost(a, &mut cost_left, byte_cost)?;
 
@@ -76,7 +78,7 @@ pub fn run_block_generator<GenBuf: AsRef<[u8]>, V: SpendVisitor>(
 
     // we pass in what's left of max_cost here, to fail early in case the
     // cost of a condition brings us over the cost limit
-    let mut result = parse_spends::<V>(a, generator_output, cost_left, flags)?;
+    let mut result = parse_spends::<V>(a, generator_output, cost_left, flags, constants)?;
     result.cost += max_cost - cost_left;
     Ok(result)
 }
@@ -116,8 +118,9 @@ pub fn run_block_generator2<GenBuf: AsRef<[u8]>, V: SpendVisitor>(
     block_refs: &[GenBuf],
     max_cost: u64,
     flags: u32,
+    constants: &ConsensusConstants,
 ) -> Result<SpendBundleConditions, ValidationErr> {
-    let byte_cost = program.len() as u64 * COST_PER_BYTE;
+    let byte_cost = program.len() as u64 * constants.cost_per_byte;
 
     let mut cost_left = max_cost;
     subtract_cost(a, &mut cost_left, byte_cost)?;
@@ -181,6 +184,7 @@ pub fn run_block_generator2<GenBuf: AsRef<[u8]>, V: SpendVisitor>(
             conditions,
             flags,
             &mut cost_left,
+            constants,
         )?;
     }
     if a.atom_len(all_spends) != 0 {

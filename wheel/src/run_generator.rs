@@ -1,4 +1,5 @@
 use chia_consensus::allocator::make_allocator;
+use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::gen::conditions::{EmptyVisitor, MempoolVisitor};
 use chia_consensus::gen::flags::ANALYZE_SPENDS;
 use chia_consensus::gen::owned_conditions::OwnedSpendBundleConditions;
@@ -19,6 +20,7 @@ pub fn run_block_generator(
     block_refs: &Bound<'_, PyList>,
     max_cost: Cost,
     flags: u32,
+    constants: &ConsensusConstants,
 ) -> PyResult<(Option<u32>, Option<OwnedSpendBundleConditions>)> {
     let mut allocator = make_allocator(flags);
 
@@ -49,7 +51,7 @@ pub fn run_block_generator(
     };
 
     Ok(
-        match run_block(&mut allocator, program, &refs, max_cost, flags) {
+        match run_block(&mut allocator, program, &refs, max_cost, flags, constants) {
             Ok(spend_bundle_conds) => {
                 let conds = OwnedSpendBundleConditions::from(&allocator, spend_bundle_conds);
                 match conds {
@@ -73,6 +75,7 @@ pub fn run_block_generator2(
     block_refs: &Bound<'_, PyList>,
     max_cost: Cost,
     flags: u32,
+    constants: &ConsensusConstants,
 ) -> PyResult<(Option<u32>, Option<OwnedSpendBundleConditions>)> {
     let mut allocator = make_allocator(flags);
 
@@ -103,7 +106,7 @@ pub fn run_block_generator2(
     };
 
     Ok(
-        match run_block(&mut allocator, program, &refs, max_cost, flags) {
+        match run_block(&mut allocator, program, &refs, max_cost, flags, constants) {
             Ok(spend_bundle_conds) => {
                 let conds = OwnedSpendBundleConditions::from(&allocator, spend_bundle_conds);
                 match conds {

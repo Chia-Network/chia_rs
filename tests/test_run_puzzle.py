@@ -1,7 +1,7 @@
 from chia_rs import run_puzzle, run_chia_program, ALLOW_BACKREFS
 from chia_rs.sized_bytes import bytes32
 import pytest
-from run_gen import print_spend_bundle_conditions
+from run_gen import print_spend_bundle_conditions, DEFAULT_CONSTANTS
 from clvm.SExp import SExp
 from clvm.casts import int_from_bytes
 from clvm_tools import binutils
@@ -51,7 +51,9 @@ def test_block_834752(flags: int, input_file: str) -> None:
 
     output = ""
     for parent, amount, puzzle, solution in puzzles:
-        conds = run_puzzle(puzzle, solution, parent, amount, 11000000000, flags)
+        conds = run_puzzle(
+            puzzle, solution, parent, amount, 11000000000, flags, DEFAULT_CONSTANTS
+        )
         output += print_spend_bundle_conditions(conds)
 
     assert (
@@ -118,7 +120,9 @@ def test_failure(flags: int) -> None:
     solution2 = binutils.assemble("(2)").as_bin()
 
     # the puzzle expects (1)
-    conds = run_puzzle(puzzle, solution1, parent, amount, 11000000000, flags)
+    conds = run_puzzle(
+        puzzle, solution1, parent, amount, 11000000000, flags, DEFAULT_CONSTANTS
+    )
     output += print_spend_bundle_conditions(conds)
     print(output)
     assert (
@@ -134,4 +138,6 @@ addition_amount: 0
 
     with pytest.raises(ValueError, match="ValidationError"):
         # the puzzle does not expect (2)
-        run_puzzle(puzzle, solution2, parent, amount, 11000000000, flags)
+        run_puzzle(
+            puzzle, solution2, parent, amount, 11000000000, flags, DEFAULT_CONSTANTS
+        )
