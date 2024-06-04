@@ -1,5 +1,9 @@
-use crate::derivable_key::DerivableKey;
 use crate::secret_key::SecretKey;
+
+pub trait DerivableKey {
+    #[must_use]
+    fn derive_unhardened(&self, idx: u32) -> Self;
+}
 
 fn derive_path_unhardened<Key: DerivableKey>(key: &Key, path: &[u32]) -> Key {
     let mut derived = key.derive_unhardened(path[0]);

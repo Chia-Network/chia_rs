@@ -1,7 +1,6 @@
 #![allow(unsafe_code)]
 
 mod cached_bls;
-mod derivable_key;
 mod derive_keys;
 mod error;
 mod gtelement;
@@ -14,7 +13,6 @@ mod signature;
 mod parse_hex;
 
 pub use cached_bls::BlsCache;
-pub use derivable_key::DerivableKey;
 pub use derive_keys::*;
 pub use error::{Error, Result};
 pub use gtelement::GTElement;
