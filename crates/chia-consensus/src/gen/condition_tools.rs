@@ -77,8 +77,7 @@ fn make_aggsig_final_message(
             [spend.parent_id.as_slice(), spend.puzzle_hash.as_slice()].concat()
         }
         AGG_SIG_ME => {
-            let coin: Coin =
-                Coin::new(spend.parent_id, spend.puzzle_hash, spend.coin_amount as u64);
+            let coin: Coin = Coin::new(spend.parent_id, spend.puzzle_hash, spend.coin_amount);
             coin.coin_id().as_slice().to_vec()
         }
         _ => Vec::<u8>::new(),
@@ -90,7 +89,7 @@ fn make_aggsig_final_message(
     result
 }
 
-fn u64_to_bytes(val: u64) -> Bytes {
+pub fn u64_to_bytes(val: u64) -> Bytes {
     let amount_bytes: [u8; 8] = val.to_be_bytes();
     if val >= 0x8000000000000000_u64 {
         let mut ret = Vec::<u8>::new();

@@ -5,13 +5,11 @@ use crate::gen::flags::{
     NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
 };
 use crate::gen::owned_conditions::OwnedSpendBundleConditions;
-use crate::gen::solution_generator::solution_generator;
 use crate::gen::validation_error::ErrorCode;
 use crate::npc_result::get_name_puzzle_conditions;
 use chia_bls::aggregate_verify;
 use chia_bls::BlsCache;
 use chia_bls::PublicKey;
-use chia_protocol::Coin;
 use chia_protocol::SpendBundle;
 use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV};
 use std::sync::{Arc, Mutex};
@@ -56,12 +54,12 @@ fn validate_clvm_and_signature(
 ) -> Result<(OwnedSpendBundleConditions, Duration), ErrorCode> {
     let start_time = Instant::now();
     let additional_data: chia_protocol::BytesImpl<32> = constants.agg_sig_me_additional_data;
-    let program: Vec<u8> = simple_solution_generator(spend_bundle)?;
-    let npcresult = match get_name_puzzle_conditions(program, max_cost, true, height, &constants) {
-        Ok(result) => result,
-        Err(error) => return Err(error.1)
-    };
-    
+    let npcresult =
+        match get_name_puzzle_conditions(&spend_bundle, max_cost, true, height, &constants) {
+            Ok(result) => result,
+            Err(error) => return Err(error.1),
+        };
+
     let (pks, msgs) = pkm_pairs(npcresult.clone(), additional_data.as_slice())?;
     // Verify aggregated signature
     if !{
@@ -119,20 +117,6 @@ fn validate_clvm_and_signature(
 //     }
 // }
 
-pub fn simple_solution_generator(bundle: &SpendBundle) -> Result<Vec<u8>, ErrorCode> {
-    let mut spends = Vec::<(Coin, Vec<u8>, Vec<u8>)>::new();
-    for cs in &bundle.coin_spends {
-        let puzzle_reveal = cs.puzzle_reveal.to_vec();
-        let solution_reveal = cs.solution.to_vec();
-        spends.push((cs.coin, puzzle_reveal, solution_reveal));
-    }
-    let block_program = solution_generator(spends);
-    match block_program {
-        Ok(bp) => Ok(bp),
-        Err(_) => Err(ErrorCode::InvalidSpendBundle),
-    }
-}
-
 pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusConstants) -> u32 {
     let mut flags: u32 = 0;
     if height >= constants.soft_fork2_height {
@@ -171,8 +155,7 @@ mod tests {
     use super::*;
     use crate::consensus_constants::TEST_CONSTANTS;
     use chia_bls::Signature;
-    use chia_protocol::CoinSpend;
-    use chia_protocol::Program;
+    use chia_protocol::{Coin, CoinSpend, Program};
 
     #[test]
     fn test_validate_no_pks() {
