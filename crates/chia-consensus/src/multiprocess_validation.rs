@@ -9,7 +9,6 @@ use crate::gen::validation_error::ErrorCode;
 use crate::npc_result::get_name_puzzle_conditions;
 use chia_bls::aggregate_verify;
 use chia_bls::BlsCache;
-use chia_bls::PublicKey;
 use chia_protocol::SpendBundle;
 use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV};
 use std::sync::{Arc, Mutex};
@@ -59,22 +58,17 @@ fn validate_clvm_and_signature(
             Err(error) => return Err(error.1),
         };
 
-    let (pks, msgs) = pkm_pairs(npcresult.clone(), constants)?;
+    let pks_msgs_iter = pkm_pairs(npcresult.clone(), constants)?;
     // Verify aggregated signature
     if !{
         if syncing {
-            // if we're syncing use the chia_bls::aggregate_verify to avoid using the cache
-            let data: Vec<(&PublicKey, &[u8])> = pks
-                .iter()
-                .zip(msgs.iter().map(|msg| msg.as_slice()))
-                .collect();
-            aggregate_verify(&spend_bundle.aggregated_signature, data)
+            aggregate_verify(&spend_bundle.aggregated_signature, pks_msgs_iter)
         } else {
             // if we're fully synced then use the cache
             cache
                 .lock()
                 .unwrap()
-                .aggregate_verify(pks, msgs, &spend_bundle.aggregated_signature)
+                .aggregate_verify_with_iter(pks_msgs_iter, &spend_bundle.aggregated_signature)
         }
     } {
         return Err(ErrorCode::InvalidSpendBundle);

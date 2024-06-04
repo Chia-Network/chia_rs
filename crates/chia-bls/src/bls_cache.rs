@@ -78,6 +78,40 @@ impl BlsCache {
 
         aggregate_verify_gt(sig, iter)
     }
+
+    pub fn aggregate_verify_with_iter(
+        &mut self,
+        pks_msgs: impl IntoIterator<Item = (PublicKey, Vec<u8>)>,
+        sig: &Signature,
+    ) -> bool {
+        let iter = pks_msgs.into_iter().map(|(pk, msg)| -> GTElement {
+            // Hash pubkey + message
+            let mut hasher = Sha256::new();
+            hasher.update(pk.borrow().to_bytes());
+            hasher.update(&msg);
+            let hash: [u8; 32] = hasher.finalize().into();
+
+            // If the pairing is in the cache, we don't need to recalculate it.
+            if let Some(pairing) = self.cache.get(&hash).cloned() {
+                return pairing;
+            }
+
+            // Otherwise, we need to calculate the pairing and add it to the cache.
+            let mut aug_msg = pk.borrow().to_bytes().to_vec();
+            aug_msg.extend(&msg);
+            let aug_hash = hash_to_g2(&aug_msg);
+
+            let mut hasher = Sha256::new();
+            hasher.update(&aug_msg);
+            let hash: [u8; 32] = hasher.finalize().into();
+
+            let pairing = aug_hash.pair(pk.borrow());
+            self.cache.put(hash, pairing.clone());
+            pairing
+        });
+
+        aggregate_verify_gt(sig, iter)
+    }
 }
 
 #[cfg(feature = "py-bindings")]
