@@ -20,7 +20,7 @@ pub fn pkm_pairs(
     for (pk, msg) in conditions.agg_sig_unsafe {
         pks.push(pk);
         msgs.push(msg.as_slice().to_vec());
-        for (_, disallowed_val) in disallowed.clone().into_iter() {
+        for (_, disallowed_val) in disallowed.clone() {
             if msg.ends_with(disallowed_val.as_slice()) {
                 return Err(ErrorCode::InvalidCondition);
             }
@@ -42,7 +42,7 @@ pub fn pkm_pairs(
                 pks.push(pk);
                 msgs.push(make_aggsig_final_message(
                     condition,
-                    &msg.as_slice(),
+                    msg.as_slice(),
                     &spend,
                     &disallowed,
                 ));
@@ -64,7 +64,7 @@ fn make_aggsig_final_message(
         AGG_SIG_PUZZLE => spend.puzzle_hash.as_slice().to_vec(),
         AGG_SIG_AMOUNT => u64_to_bytes(spend.coin_amount).as_slice().to_vec(),
         AGG_SIG_PUZZLE_AMOUNT => [
-            spend.parent_id.as_slice(),
+            spend.puzzle_hash.as_slice(),
             u64_to_bytes(spend.coin_amount).as_slice(),
         ]
         .concat(),
@@ -91,18 +91,18 @@ fn make_aggsig_final_message(
 
 pub fn u64_to_bytes(val: u64) -> Bytes {
     let amount_bytes: [u8; 8] = val.to_be_bytes();
-    if val >= 0x8000000000000000_u64 {
+    if val >= 0x8000_0000_0000_0000_u64 {
         let mut ret = Vec::<u8>::new();
         ret.push(0_u8);
         ret.extend(amount_bytes);
         Bytes::new(ret)
     } else {
         let start = match val {
-            n if n >= 0x80000000000000_u64 => 0,
-            n if n >= 0x800000000000_u64 => 1,
-            n if n >= 0x8000000000_u64 => 2,
-            n if n >= 0x80000000_u64 => 3,
-            n if n >= 0x800000_u64 => 4,
+            n if n >= 0x0080_0000_0000_0000_u64 => 0,
+            n if n >= 0x8000_0000_0000_u64 => 1,
+            n if n >= 0x0080_0000_0000_u64 => 2,
+            n if n >= 0x8000_0000_u64 => 3,
+            n if n >= 0x0080_0000_u64 => 4,
             n if n >= 0x8000_u64 => 5,
             n if n >= 0x80_u64 => 6,
             n if n > 0 => 7,
@@ -118,7 +118,7 @@ fn agg_sig_additional_data(agg_sig_data: &[u8]) -> HashMap<ConditionOpcode, Vec<
     for code in 43_u16..48_u16 {
         let mut hasher = Sha256::new();
         hasher.update(agg_sig_data);
-        hasher.update(&[code as u8]);
+        hasher.update([code as u8]);
         let val: Vec<u8> = hasher.finalize().as_slice().to_vec();
         ret.insert(code, val);
     }

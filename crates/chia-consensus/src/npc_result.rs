@@ -45,7 +45,7 @@ pub fn get_name_puzzle_conditions(
 ) -> Result<OwnedSpendBundleConditions, ValidationErr> {
     let mut flags = get_flags_for_height_and_constants(height, constants);
     if mempool_mode {
-        flags |= MEMPOOL_MODE
+        flags |= MEMPOOL_MODE;
     };
     // below is an adapted version of the code from run_block_generators::run_block_generator2()
     // it assumes no block references are passed in

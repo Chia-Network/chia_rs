@@ -19,9 +19,9 @@ use std::time::{Duration, Instant};
 // currently in mempool_manager.py
 // called in full_node.py when adding a transaction
 pub fn pre_validate_spendbundle(
-    new_spend: SpendBundle,
+    new_spend: &SpendBundle,
     max_cost: u64,
-    constants: ConsensusConstants,
+    constants: &ConsensusConstants,
     peak_height: u32,
     syncing: bool,
     cache: Arc<Mutex<BlsCache>>,
@@ -30,7 +30,7 @@ pub fn pre_validate_spendbundle(
         Err(ErrorCode::InvalidSpendBundle)
     } else {
         let (result, _duration) = validate_clvm_and_signature(
-            &new_spend,
+            new_spend,
             max_cost,
             constants,
             peak_height,
@@ -47,7 +47,7 @@ pub fn pre_validate_spendbundle(
 fn validate_clvm_and_signature(
     spend_bundle: &SpendBundle,
     max_cost: u64,
-    constants: ConsensusConstants,
+    constants: &ConsensusConstants,
     height: u32,
     syncing: bool,
     cache: Arc<Mutex<BlsCache>>,
@@ -55,7 +55,7 @@ fn validate_clvm_and_signature(
     let start_time = Instant::now();
     let additional_data: chia_protocol::BytesImpl<32> = constants.agg_sig_me_additional_data;
     let npcresult =
-        match get_name_puzzle_conditions(&spend_bundle, max_cost, true, height, &constants) {
+        match get_name_puzzle_conditions(spend_bundle, max_cost, true, height, constants) {
             Ok(result) => result,
             Err(error) => return Err(error.1),
         };
@@ -120,10 +120,10 @@ fn validate_clvm_and_signature(
 pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusConstants) -> u32 {
     let mut flags: u32 = 0;
     if height >= constants.soft_fork2_height {
-        flags |= NO_RELATIVE_CONDITIONS_ON_EPHEMERAL
+        flags |= NO_RELATIVE_CONDITIONS_ON_EPHEMERAL;
     }
     if height >= constants.soft_fork4_height {
-        flags |= ENABLE_MESSAGE_CONDITIONS
+        flags |= ENABLE_MESSAGE_CONDITIONS;
     }
     if height >= constants.hard_fork_height {
         //  the hard-fork initiated with 2.0. To activate June 2024
@@ -145,7 +145,7 @@ pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusCons
             | ENABLE_BLS_OPS_OUTSIDE_GUARD
             | ENABLE_FIXED_DIV
             | AGG_SIG_ARGS
-            | ALLOW_BACKREFS
+            | ALLOW_BACKREFS;
     }
     flags
 }
@@ -193,7 +193,7 @@ ff01\
         let result = validate_clvm_and_signature(
             &spend_bundle,
             TEST_CONSTANTS.max_block_cost_clvm,
-            TEST_CONSTANTS,
+            &TEST_CONSTANTS,
             236,
             true,
             Arc::new(Mutex::new(BlsCache::default())),
