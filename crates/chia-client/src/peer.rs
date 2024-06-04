@@ -20,8 +20,7 @@ type Requests = Arc<Mutex<HashMap<u16, oneshot::Sender<Message>>>>;
 pub enum PeerEvent {
     CoinStateUpdate(CoinStateUpdate),
     NewPeakWallet(NewPeakWallet),
-    SubscribedMempoolItems(SubscribedMempoolItems),
-    MempoolItemAdded(MempoolItemAdded),
+    MempoolItemsAdded(MempoolItemsAdded),
     MempoolItemsRemoved(MempoolItemsRemoved),
 }
 
@@ -363,8 +362,7 @@ impl Peer {
         events!(
             CoinStateUpdate,
             NewPeakWallet,
-            SubscribedMempoolItems,
-            MempoolItemAdded,
+            MempoolItemsAdded,
             MempoolItemsRemoved
         );
 
