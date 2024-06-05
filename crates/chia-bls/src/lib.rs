@@ -1,19 +1,22 @@
 #![allow(unsafe_code)]
 
-pub mod cached_bls;
-pub mod derivable_key;
-pub mod derive_keys;
-pub mod error;
-pub mod gtelement;
-pub mod mnemonic;
-pub mod public_key;
-pub mod secret_key;
-pub mod signature;
+mod bls_cache;
+mod derive_keys;
+mod error;
+mod gtelement;
+mod mnemonic;
+mod public_key;
+mod secret_key;
+mod signature;
 
-pub use cached_bls::BlsCache;
-pub use derivable_key::DerivableKey;
+#[cfg(feature = "py-bindings")]
+mod parse_hex;
+
+pub use bls_cache::BlsCache;
+pub use derive_keys::*;
 pub use error::{Error, Result};
 pub use gtelement::GTElement;
+pub use mnemonic::*;
 pub use public_key::{hash_to_g1, hash_to_g1_with_dst, PublicKey};
 pub use secret_key::SecretKey;
 pub use signature::{

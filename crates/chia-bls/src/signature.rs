@@ -9,24 +9,13 @@ use std::io::Cursor;
 use std::mem::MaybeUninit;
 use std::ops::{Add, AddAssign, Neg, SubAssign};
 
-#[cfg(feature = "py-bindings")]
-use crate::public_key::parse_hex_string;
-#[cfg(feature = "py-bindings")]
-use chia_py_streamable_macro::PyStreamable;
-#[cfg(feature = "py-bindings")]
-use chia_traits::from_json_dict::FromJsonDict;
-#[cfg(feature = "py-bindings")]
-use chia_traits::to_json_dict::ToJsonDict;
-#[cfg(feature = "py-bindings")]
-use pyo3::{pyclass, pymethods, IntoPy, PyAny, PyObject, PyResult, Python};
-
 // we use the augmented scheme
 pub const DST: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_AUG_";
 
 #[cfg_attr(
     feature = "py-bindings",
-    pyclass(name = "G2Element"),
-    derive(PyStreamable)
+    pyo3::pyclass(name = "G2Element"),
+    derive(chia_py_streamable_macro::PyStreamable)
 )]
 #[derive(Clone, Default)]
 pub struct Signature(pub(crate) blst_p2);
@@ -230,62 +219,6 @@ impl Add<&Signature> for &Signature {
             ret.assume_init()
         };
         Signature(p1)
-    }
-}
-
-#[cfg(feature = "py-bindings")]
-impl ToJsonDict for Signature {
-    fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let bytes = self.to_bytes();
-        Ok(("0x".to_string() + &hex::encode(bytes)).into_py(py))
-    }
-}
-
-#[cfg(feature = "py-bindings")]
-impl FromJsonDict for Signature {
-    fn from_json_dict(o: &pyo3::Bound<'_, PyAny>) -> PyResult<Self> {
-        Ok(Self::from_bytes(
-            parse_hex_string(o, 96, "Signature")?
-                .as_slice()
-                .try_into()
-                .unwrap(),
-        )?)
-    }
-}
-
-#[cfg(feature = "py-bindings")]
-#[pymethods]
-impl Signature {
-    #[classattr]
-    const SIZE: usize = 96;
-
-    #[new]
-    pub fn init() -> Self {
-        Self::default()
-    }
-
-    #[pyo3(name = "pair")]
-    pub fn py_pair(&self, other: &PublicKey) -> GTElement {
-        self.pair(other)
-    }
-
-    #[staticmethod]
-    #[pyo3(name = "generator")]
-    pub fn py_generator() -> Self {
-        Self::generator()
-    }
-
-    fn __str__(&self) -> String {
-        hex::encode(self.to_bytes())
-    }
-
-    #[must_use]
-    pub fn __add__(&self, rhs: &Self) -> Self {
-        self + rhs
-    }
-
-    pub fn __iadd__(&mut self, rhs: &Self) {
-        *self += rhs;
     }
 }
 
@@ -540,6 +473,69 @@ pub fn sign<Msg: AsRef<[u8]>>(sk: &SecretKey, msg: Msg) -> Signature {
     let mut aug_msg = sk.public_key().to_bytes().to_vec();
     aug_msg.extend_from_slice(msg.as_ref());
     sign_raw(sk, aug_msg)
+}
+
+#[cfg(feature = "py-bindings")]
+mod pybindings {
+    use super::*;
+
+    use crate::parse_hex::parse_hex_string;
+
+    use chia_traits::{FromJsonDict, ToJsonDict};
+    use pyo3::prelude::*;
+
+    #[pymethods]
+    impl Signature {
+        #[classattr]
+        const SIZE: usize = 96;
+
+        #[new]
+        pub fn init() -> Self {
+            Self::default()
+        }
+
+        #[pyo3(name = "pair")]
+        pub fn py_pair(&self, other: &PublicKey) -> GTElement {
+            self.pair(other)
+        }
+
+        #[staticmethod]
+        #[pyo3(name = "generator")]
+        pub fn py_generator() -> Self {
+            Self::generator()
+        }
+
+        fn __str__(&self) -> String {
+            hex::encode(self.to_bytes())
+        }
+
+        #[must_use]
+        pub fn __add__(&self, rhs: &Self) -> Self {
+            self + rhs
+        }
+
+        pub fn __iadd__(&mut self, rhs: &Self) {
+            *self += rhs;
+        }
+    }
+
+    impl ToJsonDict for Signature {
+        fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
+            let bytes = self.to_bytes();
+            Ok(("0x".to_string() + &hex::encode(bytes)).into_py(py))
+        }
+    }
+
+    impl FromJsonDict for Signature {
+        fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self> {
+            Ok(Self::from_bytes(
+                parse_hex_string(o, 96, "Signature")?
+                    .as_slice()
+                    .try_into()
+                    .unwrap(),
+            )?)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1243,6 +1239,8 @@ mod tests {
 #[cfg(feature = "py-bindings")]
 mod pytests {
     use super::*;
+
+    use pyo3::{IntoPy, Python};
     use rand::rngs::StdRng;
     use rand::{Rng, SeedableRng};
     use rstest::rstest;

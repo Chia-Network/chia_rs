@@ -60,7 +60,7 @@ fn synthetic_offset(public_key: &PublicKey, hidden_puzzle_hash: &[u8; 32]) -> Se
 mod tests {
     use super::*;
 
-    use chia_bls::{derive_keys::master_to_wallet_unhardened_intermediate, DerivableKey};
+    use chia_bls::{master_to_wallet_unhardened_intermediate, DerivableKey};
     use hex::ToHex;
     use hex_literal::hex;
 

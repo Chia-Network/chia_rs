@@ -8,20 +8,11 @@ use std::io::Cursor;
 use std::mem::MaybeUninit;
 use std::ops::{Mul, MulAssign};
 
-#[cfg(feature = "py-bindings")]
-use chia_py_streamable_macro::PyStreamable;
-#[cfg(feature = "py-bindings")]
-use chia_traits::from_json_dict::FromJsonDict;
-#[cfg(feature = "py-bindings")]
-use chia_traits::to_json_dict::ToJsonDict;
-#[cfg(feature = "py-bindings")]
-use pyo3::exceptions::PyValueError;
-#[cfg(feature = "py-bindings")]
-use pyo3::types::PyAnyMethods;
-#[cfg(feature = "py-bindings")]
-use pyo3::{pyclass, pymethods, IntoPy, PyAny, PyObject, PyResult, Python};
-
-#[cfg_attr(feature = "py-bindings", pyclass, derive(PyStreamable))]
+#[cfg_attr(
+    feature = "py-bindings",
+    pyo3::pyclass,
+    derive(chia_py_streamable_macro::PyStreamable)
+)]
 #[derive(Clone)]
 pub struct GTElement(pub(crate) blst_fp12);
 
@@ -48,28 +39,6 @@ impl GTElement {
             );
             bytes.assume_init()
         }
-    }
-}
-#[cfg(feature = "py-bindings")]
-#[pymethods]
-impl GTElement {
-    #[classattr]
-    #[pyo3(name = "SIZE")]
-    const PY_SIZE: usize = Self::SIZE;
-
-    fn __str__(&self) -> String {
-        hex::encode(self.to_bytes())
-    }
-
-    #[must_use]
-    pub fn __mul__(&self, rhs: &Self) -> Self {
-        let mut ret = self.clone();
-        ret *= rhs;
-        ret
-    }
-
-    pub fn __imul__(&mut self, rhs: &Self) {
-        *self *= rhs;
     }
 }
 
@@ -106,41 +75,6 @@ impl Mul<&GTElement> for &GTElement {
     }
 }
 
-#[cfg(feature = "py-bindings")]
-impl ToJsonDict for GTElement {
-    fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let bytes = self.to_bytes();
-        Ok(hex::encode(bytes).into_py(py))
-    }
-}
-
-#[cfg(feature = "py-bindings")]
-impl FromJsonDict for GTElement {
-    fn from_json_dict(o: &pyo3::Bound<'_, PyAny>) -> PyResult<Self> {
-        let s: String = o.extract()?;
-        if !s.starts_with("0x") {
-            return Err(PyValueError::new_err(
-                "bytes object is expected to start with 0x",
-            ));
-        }
-        let s = &s[2..];
-        let buf = match hex::decode(s) {
-            Err(_) => {
-                return Err(PyValueError::new_err("invalid hex"));
-            }
-            Ok(v) => v,
-        };
-        if buf.len() != Self::SIZE {
-            return Err(PyValueError::new_err(format!(
-                "GTElement, invalid length {} expected {}",
-                buf.len(),
-                Self::SIZE
-            )));
-        }
-        Ok(Self::from_bytes(buf.as_slice().try_into().unwrap()))
-    }
-}
-
 impl fmt::Debug for GTElement {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_fmt(format_args!(
@@ -164,5 +98,68 @@ impl Streamable for GTElement {
         Ok(GTElement::from_bytes(
             read_bytes(input, Self::SIZE)?.try_into().unwrap(),
         ))
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+mod pybindings {
+    use super::*;
+
+    use chia_traits::{FromJsonDict, ToJsonDict};
+    use pyo3::{exceptions::PyValueError, prelude::*};
+
+    #[pymethods]
+    impl GTElement {
+        #[classattr]
+        #[pyo3(name = "SIZE")]
+        const PY_SIZE: usize = Self::SIZE;
+
+        fn __str__(&self) -> String {
+            hex::encode(self.to_bytes())
+        }
+
+        #[must_use]
+        pub fn __mul__(&self, rhs: &Self) -> Self {
+            let mut ret = self.clone();
+            ret *= rhs;
+            ret
+        }
+
+        pub fn __imul__(&mut self, rhs: &Self) {
+            *self *= rhs;
+        }
+    }
+
+    impl ToJsonDict for GTElement {
+        fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
+            let bytes = self.to_bytes();
+            Ok(hex::encode(bytes).into_py(py))
+        }
+    }
+
+    impl FromJsonDict for GTElement {
+        fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self> {
+            let s: String = o.extract()?;
+            if !s.starts_with("0x") {
+                return Err(PyValueError::new_err(
+                    "bytes object is expected to start with 0x",
+                ));
+            }
+            let s = &s[2..];
+            let buf = match hex::decode(s) {
+                Err(_) => {
+                    return Err(PyValueError::new_err("invalid hex"));
+                }
+                Ok(v) => v,
+            };
+            if buf.len() != Self::SIZE {
+                return Err(PyValueError::new_err(format!(
+                    "GTElement, invalid length {} expected {}",
+                    buf.len(),
+                    Self::SIZE
+                )));
+            }
+            Ok(Self::from_bytes(buf.as_slice().try_into().unwrap()))
+        }
     }
 }

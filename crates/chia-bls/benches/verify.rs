@@ -1,4 +1,3 @@
-use chia_bls::signature;
 use chia_bls::{
     aggregate_verify, aggregate_verify_gt, hash_to_g2, sign, GTElement, PublicKey, SecretKey,
     Signature,
@@ -51,12 +50,12 @@ fn verify_benchmark(c: &mut Criterion) {
 
     c.bench_function("verify, small msg", |b| {
         b.iter(|| {
-            assert!(signature::verify(&sig_small, &pk, black_box(&msg_small)));
+            assert!(chia_bls::verify(&sig_small, &pk, black_box(&msg_small)));
         });
     });
     c.bench_function("verify, 4kiB msg", |b| {
         b.iter(|| {
-            assert!(signature::verify(&sig_large, &pk, black_box(&msg_large)));
+            assert!(chia_bls::verify(&sig_large, &pk, black_box(&msg_large)));
         });
     });
 }
