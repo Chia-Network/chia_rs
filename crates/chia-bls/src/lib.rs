@@ -4,7 +4,6 @@ mod bls_cache;
 mod derive_keys;
 mod error;
 mod gtelement;
-mod mnemonic;
 mod public_key;
 mod secret_key;
 mod signature;
@@ -16,7 +15,6 @@ pub use bls_cache::BlsCache;
 pub use derive_keys::*;
 pub use error::{Error, Result};
 pub use gtelement::GTElement;
-pub use mnemonic::*;
 pub use public_key::{hash_to_g1, hash_to_g1_with_dst, PublicKey};
 pub use secret_key::SecretKey;
 pub use signature::{
