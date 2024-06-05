@@ -3,53 +3,11 @@ use crate::gen::opcodes::{
     ConditionOpcode, AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT,
     AGG_SIG_PARENT_PUZZLE, AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT,
 };
-use crate::gen::owned_conditions::{OwnedSpend, OwnedSpendBundleConditions};
-use crate::gen::validation_error::ErrorCode;
-use chia_bls::PublicKey;
+use crate::gen::owned_conditions::OwnedSpend;
 use chia_protocol::Bytes;
 use chia_protocol::Coin;
-use std::sync::Arc;
 
-
-pub fn pkm_pairs(
-    conditions: OwnedSpendBundleConditions,
-    constants: &ConsensusConstants,
-) -> Result<impl Iterator<Item = (PublicKey, Vec<u8>)>, ErrorCode> {
-    let constants = Arc::new(constants.clone());
-    let iter = conditions.spends.into_iter().flat_map(move |spend| {
-        {
-            let spend_clone = spend.clone();
-            let constants = constants.clone();
-            let condition_items_pairs = vec![
-                (AGG_SIG_PARENT, spend_clone.agg_sig_parent),
-                (AGG_SIG_PUZZLE, spend_clone.agg_sig_puzzle),
-                (AGG_SIG_AMOUNT, spend_clone.agg_sig_amount),
-                (AGG_SIG_PUZZLE_AMOUNT, spend_clone.agg_sig_puzzle_amount),
-                (AGG_SIG_PARENT_AMOUNT, spend_clone.agg_sig_parent_amount),
-                (AGG_SIG_PARENT_PUZZLE, spend_clone.agg_sig_parent_puzzle),
-                (AGG_SIG_ME, spend_clone.agg_sig_me),
-            ];
-            condition_items_pairs.into_iter().flat_map(move |(condition, items)| {
-                let spend = spend.clone();
-                let constants = constants.clone();
-                items.into_iter().map(move |(pk, msg)| {
-                    (
-                        pk,
-                        make_aggsig_final_message(
-                            condition,
-                            msg.as_slice(),
-                            &spend,
-                            &constants,
-                        )
-                    )
-                })
-            })
-        }
-    }); 
-    Ok(iter)
-}
-
-fn make_aggsig_final_message(
+pub fn make_aggsig_final_message(
     opcode: ConditionOpcode,
     msg: &[u8],
     spend: &OwnedSpend,

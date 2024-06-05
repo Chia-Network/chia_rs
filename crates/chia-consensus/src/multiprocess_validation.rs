@@ -1,8 +1,12 @@
 use crate::consensus_constants::ConsensusConstants;
-use crate::gen::condition_tools::pkm_pairs;
+use crate::gen::condition_tools::make_aggsig_final_message;
 use crate::gen::flags::{
     AGG_SIG_ARGS, ALLOW_BACKREFS, ENABLE_MESSAGE_CONDITIONS, ENABLE_SOFTFORK_CONDITION,
     NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
+};
+use crate::gen::opcodes::{
+    AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT,
+    AGG_SIG_PARENT_PUZZLE, AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT,
 };
 use crate::gen::owned_conditions::OwnedSpendBundleConditions;
 use crate::gen::validation_error::ErrorCode;
@@ -58,17 +62,44 @@ fn validate_clvm_and_signature(
             Err(error) => return Err(error.1),
         };
 
-    let pks_msgs_iter = pkm_pairs(npcresult.clone(), constants)?;
+    let iter = npcresult.clone().spends.into_iter().flat_map(|spend| {
+        {
+            let spend_clone = spend.clone();
+            let condition_items_pairs = vec![
+                (AGG_SIG_PARENT, spend_clone.agg_sig_parent),
+                (AGG_SIG_PUZZLE, spend_clone.agg_sig_puzzle),
+                (AGG_SIG_AMOUNT, spend_clone.agg_sig_amount),
+                (AGG_SIG_PUZZLE_AMOUNT, spend_clone.agg_sig_puzzle_amount),
+                (AGG_SIG_PARENT_AMOUNT, spend_clone.agg_sig_parent_amount),
+                (AGG_SIG_PARENT_PUZZLE, spend_clone.agg_sig_parent_puzzle),
+                (AGG_SIG_ME, spend_clone.agg_sig_me),
+            ];
+            condition_items_pairs.into_iter().flat_map(move |(condition, items)| {
+                let spend = spend.clone();
+                items.into_iter().map(move |(pk, msg)| {
+                    (
+                        pk,
+                        make_aggsig_final_message(
+                            condition,
+                            msg.as_slice(),
+                            &spend,
+                            &constants,
+                        )
+                    )
+                })
+            })
+        }
+    }); 
     // Verify aggregated signature
     if !{
         if syncing {
-            aggregate_verify(&spend_bundle.aggregated_signature, pks_msgs_iter)
+            aggregate_verify(&spend_bundle.aggregated_signature, iter)
         } else {
             // if we're fully synced then use the cache
             cache
                 .lock()
                 .unwrap()
-                .aggregate_verify_with_iter(pks_msgs_iter, &spend_bundle.aggregated_signature)
+                .aggregate_verify_with_iter(iter, &spend_bundle.aggregated_signature)
         }
     } {
         return Err(ErrorCode::InvalidSpendBundle);
