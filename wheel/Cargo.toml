@@ -27,6 +27,6 @@ chia-bls = { workspace = true, features = ["py-bindings"]  }
 chia-protocol = { workspace = true, features = ["py-bindings"]  }
 chia-traits = { workspace = true, features = ["py-bindings"]  }
 clvm-traits = { workspace = true, features = ["derive", "py-bindings"] }
-clvm-utils = { workspace = true, path = "../crates/clvm-utils" }
-chia_py_streamable_macro = { workspace = true, path = "../crates/chia_py_streamable_macro" }
-chia_streamable_macro = { workspace = true, path = "../crates/chia_streamable_macro" }
+clvm-utils = { workspace = true }
+chia_py_streamable_macro = { workspace = true }
+chia_streamable_macro = { workspace = true }
