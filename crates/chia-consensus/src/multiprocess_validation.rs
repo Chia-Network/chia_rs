@@ -5,8 +5,8 @@ use crate::gen::flags::{
     NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
 };
 use crate::gen::opcodes::{
-    AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT,
-    AGG_SIG_PARENT_PUZZLE, AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT,
+    AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT, AGG_SIG_PARENT_PUZZLE,
+    AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT,
 };
 use crate::gen::owned_conditions::OwnedSpendBundleConditions;
 use crate::gen::validation_error::ErrorCode;
@@ -63,33 +63,28 @@ fn validate_clvm_and_signature(
         };
 
     let iter = npcresult.clone().spends.into_iter().flat_map(|spend| {
-        {
-            let spend_clone = spend.clone();
-            let condition_items_pairs = vec![
-                (AGG_SIG_PARENT, spend_clone.agg_sig_parent),
-                (AGG_SIG_PUZZLE, spend_clone.agg_sig_puzzle),
-                (AGG_SIG_AMOUNT, spend_clone.agg_sig_amount),
-                (AGG_SIG_PUZZLE_AMOUNT, spend_clone.agg_sig_puzzle_amount),
-                (AGG_SIG_PARENT_AMOUNT, spend_clone.agg_sig_parent_amount),
-                (AGG_SIG_PARENT_PUZZLE, spend_clone.agg_sig_parent_puzzle),
-                (AGG_SIG_ME, spend_clone.agg_sig_me),
-            ];
-            condition_items_pairs.into_iter().flat_map(move |(condition, items)| {
+        let spend_clone = spend.clone();
+        let condition_items_pairs = vec![
+            (AGG_SIG_PARENT, spend_clone.agg_sig_parent),
+            (AGG_SIG_PUZZLE, spend_clone.agg_sig_puzzle),
+            (AGG_SIG_AMOUNT, spend_clone.agg_sig_amount),
+            (AGG_SIG_PUZZLE_AMOUNT, spend_clone.agg_sig_puzzle_amount),
+            (AGG_SIG_PARENT_AMOUNT, spend_clone.agg_sig_parent_amount),
+            (AGG_SIG_PARENT_PUZZLE, spend_clone.agg_sig_parent_puzzle),
+            (AGG_SIG_ME, spend_clone.agg_sig_me),
+        ];
+        condition_items_pairs
+            .into_iter()
+            .flat_map(move |(condition, items)| {
                 let spend = spend.clone();
                 items.into_iter().map(move |(pk, msg)| {
                     (
                         pk,
-                        make_aggsig_final_message(
-                            condition,
-                            msg.as_slice(),
-                            &spend,
-                            &constants,
-                        )
+                        make_aggsig_final_message(condition, msg.as_slice(), &spend, constants),
                     )
                 })
             })
-        }
-    }); 
+    });
     // Verify aggregated signature
     if !{
         if syncing {
