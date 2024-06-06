@@ -85,6 +85,13 @@ fn validate_clvm_and_signature(
                 })
             })
     });
+    let unsafe_items = npcresult.clone().agg_sig_unsafe.into_iter().map(move |(pk, msg)| {
+        (
+            pk,
+            msg.as_slice().to_vec()
+        )
+    });
+    let iter = iter.chain(unsafe_items);
     // Verify aggregated signature
     if !{
         if syncing {
@@ -173,8 +180,9 @@ pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusCons
 mod tests {
     use super::*;
     use crate::consensus_constants::TEST_CONSTANTS;
-    use chia_bls::Signature;
+    use chia_bls::{SecretKey, Signature, sign};
     use chia_protocol::{Coin, CoinSpend, Program};
+    use hex::FromHex;
 
     #[test]
     fn test_validate_no_pks() {
@@ -219,4 +227,55 @@ ff01\
         );
         result.unwrap();
     }
+
+    #[test]
+    fn test_validate_unsafe() {
+        let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
+        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+        //let pk: PublicKey = sk.public_key(); //0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2
+        // panic!("{:?}", pk);
+        let test_coin = Coin::new(
+            hex::decode("4444444444444444444444444444444444444444444444444444444444444444")
+                .unwrap()
+                .try_into()
+                .unwrap(),
+            hex::decode("3333333333333333333333333333333333333333333333333333333333333333")
+                .unwrap()
+                .try_into()
+                .unwrap(),
+            1,
+        );
+
+        let solution = "ffff31ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080";
+        // ((49 0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2 "hello"))
+
+        let solution = hex::decode(solution)
+            .expect("hex::decode")
+            .try_into()
+            .unwrap();
+        let spend = CoinSpend::new(
+            test_coin,
+            Program::new(vec![1_u8].into()),
+            Program::new(solution),
+        );
+        let msg = b"hello";
+        let sig = sign(&sk, msg);
+        let coin_spends: Vec<CoinSpend> = vec![spend];
+        let spend_bundle = SpendBundle {
+            coin_spends: coin_spends,
+            aggregated_signature: sig,
+        };
+        let result = validate_clvm_and_signature(
+            &spend_bundle,
+            TEST_CONSTANTS.max_block_cost_clvm,
+            &TEST_CONSTANTS,
+            236,
+            true,
+            Arc::new(Mutex::new(BlsCache::default())),
+        );
+        match result{
+            Ok(_) => return,
+            Err(e) => panic!("{:?}", e)
+        }
+    }    
 }
