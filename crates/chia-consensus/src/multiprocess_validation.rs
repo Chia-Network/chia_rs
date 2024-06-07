@@ -56,11 +56,7 @@ fn validate_clvm_and_signature(
     cache: Arc<Mutex<BlsCache>>,
 ) -> Result<(OwnedSpendBundleConditions, Duration), ErrorCode> {
     let start_time = Instant::now();
-    let npcresult =
-        match get_name_puzzle_conditions(spend_bundle, max_cost, true, height, constants) {
-            Ok(result) => result,
-            Err(error) => return Err(error.1),
-        };
+    let npcresult = get_name_puzzle_conditions(spend_bundle, max_cost, true, height, constants).map_err(|e| Err(e.1) }?;
 
     let iter = npcresult.spends.iter().flat_map(|spend| {
         // let spend_clone = spend.clone();
