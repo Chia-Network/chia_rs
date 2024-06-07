@@ -115,7 +115,7 @@ pub fn fast_forward_singleton(
     // now that we know the parent coin's puzzle hash, we have all the pieces to
     // compute the coin being spent (before the fast-forward).
     let parent_coin = Coin {
-        parent_coin_info: lineage_proof.parent_parent_coin_id,
+        parent_coin_info: lineage_proof.parent_parent_coin_info,
         puzzle_hash: parent_puzzle_hash,
         amount: lineage_proof.parent_amount,
     };
@@ -139,7 +139,7 @@ pub fn fast_forward_singleton(
     }
 
     // update the solution to use the new parent coin's information
-    lineage_proof.parent_parent_coin_id = new_parent.parent_coin_info;
+    lineage_proof.parent_parent_coin_info = new_parent.parent_coin_info;
     lineage_proof.parent_amount = new_parent.amount;
     new_solution.amount = new_coin.amount;
 
@@ -382,7 +382,7 @@ mod tests {
                 };
 
                 // corrupt the lineage proof
-                lineage_proof.parent_parent_coin_id = Bytes32::from(hex!(
+                lineage_proof.parent_parent_coin_info = Bytes32::from(hex!(
                     "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe"
                 ));
 
@@ -455,7 +455,7 @@ mod tests {
                 );
 
                 *new_parent = Coin {
-                    parent_coin_info: lineage_proof.parent_parent_coin_id,
+                    parent_coin_info: lineage_proof.parent_parent_coin_info,
                     puzzle_hash: parent_puzzle_hash,
                     amount: lineage_proof.parent_amount,
                 };
