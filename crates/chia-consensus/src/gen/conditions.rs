@@ -4353,33 +4353,30 @@ fn test_relative_condition_on_ephemeral(
        ))"
     );
 
-    match expect_error {
-        Some(err) => {
-            assert_eq!(cond_test(&test).unwrap_err().1, err);
-        }
-        None => {
-            // we don't expect any error
-            let (a, conds) = cond_test(&test).unwrap();
+    if let Some(err) = expect_error {
+        assert_eq!(cond_test(&test).unwrap_err().1, err);
+    } else {
+        // we don't expect any error
+        let (a, conds) = cond_test(&test).unwrap();
 
-            assert_eq!(conds.reserve_fee, 0);
-            assert_eq!(conds.cost, CREATE_COIN_COST);
+        assert_eq!(conds.reserve_fee, 0);
+        assert_eq!(conds.cost, CREATE_COIN_COST);
 
-            assert_eq!(conds.spends.len(), 2);
-            let spend = &conds.spends[0];
-            assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
-            assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
-            assert_eq!(spend.agg_sig_me.len(), 0);
-            assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+        assert_eq!(conds.spends.len(), 2);
+        let spend = &conds.spends[0];
+        assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
+        assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
+        assert_eq!(spend.agg_sig_me.len(), 0);
+        assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
 
-            let spend = &conds.spends[1];
-            assert_eq!(
-                *spend.coin_id,
-                test_coin_id((&(*conds.spends[0].coin_id)).into(), H2, 123)
-            );
-            assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-            assert_eq!(spend.agg_sig_me.len(), 0);
-            assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
-        }
+        let spend = &conds.spends[1];
+        assert_eq!(
+            *spend.coin_id,
+            test_coin_id((&(*conds.spends[0].coin_id)).into(), H2, 123)
+        );
+        assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
+        assert_eq!(spend.agg_sig_me.len(), 0);
+        assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
     }
 }
 
