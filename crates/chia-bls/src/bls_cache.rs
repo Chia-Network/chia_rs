@@ -210,7 +210,9 @@ pub mod tests {
         assert!(bls_cache.is_empty());
 
         // Add the first signature to cache.
-        assert!(bls_cache.aggregate_verify(pk_list.clone().into_iter().zip(msg_list.clone()), &agg_sig));
+        assert!(
+            bls_cache.aggregate_verify(pk_list.clone().into_iter().zip(msg_list.clone()), &agg_sig)
+        );
         assert_eq!(bls_cache.len(), 1);
 
         // Try with the first key message pair in the cache but not the second.
@@ -222,7 +224,9 @@ pub mod tests {
         pk_list.push(pk2);
         msg_list.push(msg2);
 
-        assert!(bls_cache.aggregate_verify(pk_list.clone().into_iter().zip(msg_list.clone()), &agg_sig));
+        assert!(
+            bls_cache.aggregate_verify(pk_list.clone().into_iter().zip(msg_list.clone()), &agg_sig)
+        );
         assert_eq!(bls_cache.len(), 2);
 
         // Try reusing a public key.

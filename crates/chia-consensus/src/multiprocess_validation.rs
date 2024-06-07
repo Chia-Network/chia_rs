@@ -1,7 +1,8 @@
 use crate::consensus_constants::ConsensusConstants;
 use crate::gen::condition_tools::make_aggsig_final_message;
 use crate::gen::flags::{
-    AGG_SIG_ARGS, ALLOW_BACKREFS, DISALLOW_INFINITY_G1, ENABLE_MESSAGE_CONDITIONS, ENABLE_SOFTFORK_CONDITION, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL
+    AGG_SIG_ARGS, ALLOW_BACKREFS, DISALLOW_INFINITY_G1, ENABLE_MESSAGE_CONDITIONS,
+    ENABLE_SOFTFORK_CONDITION, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
 };
 use crate::gen::opcodes::{
     AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT, AGG_SIG_PARENT_PUZZLE,
@@ -55,7 +56,8 @@ fn validate_clvm_and_signature(
     cache: Arc<Mutex<BlsCache>>,
 ) -> Result<(OwnedSpendBundleConditions, Duration), ErrorCode> {
     let start_time = Instant::now();
-    let npcresult = get_name_puzzle_conditions(spend_bundle, max_cost, true, height, constants).map_err(|e| e.1)?;
+    let npcresult = get_name_puzzle_conditions(spend_bundle, max_cost, true, height, constants)
+        .map_err(|e| e.1)?;
     let iter = npcresult.spends.iter().flat_map(|spend| {
         // let spend_clone = spend.clone();
         let condition_items_pairs = vec![
@@ -77,14 +79,13 @@ fn validate_clvm_and_signature(
                         make_aggsig_final_message(*condition, msg.as_slice(), &spend, constants),
                     )
                 })
-            }).collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>()
     });
-    let unsafe_items = npcresult.agg_sig_unsafe.iter().map(|(pk, msg)| {
-        (
-            pk,
-            msg.as_slice().to_vec()
-        )
-    });
+    let unsafe_items = npcresult
+        .agg_sig_unsafe
+        .iter()
+        .map(|(pk, msg)| (pk, msg.as_slice().to_vec()));
     let iter = iter.chain(unsafe_items);
     // Verify aggregated signature
     if !{
@@ -179,10 +180,10 @@ pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusCons
 mod tests {
     use super::*;
     use crate::consensus_constants::TEST_CONSTANTS;
-    use chia_bls::{SecretKey, Signature, sign};
+    use chia_bls::{sign, SecretKey, Signature};
+    use chia_protocol::Bytes32;
     use chia_protocol::{Coin, CoinSpend, Program};
     use clvm_utils::tree_hash_atom;
-    use chia_protocol::Bytes32;
     use hex::FromHex;
 
     #[test]
@@ -274,11 +275,11 @@ ff01\
             true,
             Arc::new(Mutex::new(BlsCache::default())),
         );
-        match result{
+        match result {
             Ok(_) => return,
-            Err(e) => panic!("{:?}", e)
+            Err(e) => panic!("{:?}", e),
         }
-    }    
+    }
 
     #[test]
     fn test_validate_aggsig_me() {
@@ -293,7 +294,7 @@ ff01\
                 .unwrap()
                 .try_into()
                 .unwrap(),
-                full_puz,
+            full_puz,
             1,
         );
 
@@ -311,11 +312,13 @@ ff01\
         );
         let msg = b"hello";
         let mut result = msg.to_vec();
-        result.extend([
-            test_coin.coin_id().as_slice(),
-            TEST_CONSTANTS.agg_sig_me_additional_data.as_slice(),
-        ]
-        .concat());
+        result.extend(
+            [
+                test_coin.coin_id().as_slice(),
+                TEST_CONSTANTS.agg_sig_me_additional_data.as_slice(),
+            ]
+            .concat(),
+        );
         let sig = sign(&sk, result.as_slice());
         let coin_spends: Vec<CoinSpend> = vec![spend];
         let spend_bundle = SpendBundle {
@@ -330,9 +333,9 @@ ff01\
             true,
             Arc::new(Mutex::new(BlsCache::default())),
         );
-        match result{
+        match result {
             Ok(_) => return,
-            Err(e) => panic!("{:?}", e)
+            Err(e) => panic!("{:?}", e),
         }
-    }    
+    }
 }
