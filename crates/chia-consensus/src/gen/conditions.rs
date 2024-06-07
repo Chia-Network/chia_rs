@@ -18,8 +18,7 @@ use super::sanitize_int::{sanitize_uint, SanitizedUint};
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
 use crate::consensus_constants::ConsensusConstants;
 use crate::gen::flags::{
-    AGG_SIG_ARGS, COND_ARGS_NIL, DISALLOW_INFINITY_G1, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
-    NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
+    AGG_SIG_ARGS, COND_ARGS_NIL, DISALLOW_INFINITY_G1, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
 };
 use crate::gen::messages::{Message, SpendId};
 use crate::gen::spend_visitor::SpendVisitor;
@@ -1330,7 +1329,7 @@ pub fn validate_conditions(
     ret: &SpendBundleConditions,
     state: ParseState,
     spends: NodePtr,
-    flags: u32,
+    _flags: u32,
 ) -> Result<(), ValidationErr> {
     if ret.removal_amount < ret.addition_amount {
         // The sum of removal amounts must not be less than the sum of addition
@@ -1432,15 +1431,15 @@ pub fn validate_conditions(
         }
     }
 
-    if (flags & NO_RELATIVE_CONDITIONS_ON_EPHEMERAL) != 0 {
-        for spend_idx in state.assert_not_ephemeral {
-            // make sure this coin was NOT created in this block
-            if is_ephemeral(a, spend_idx, &state.spent_coins, &ret.spends) {
-                return Err(ValidationErr(
-                    ret.spends[spend_idx].parent_id,
-                    ErrorCode::EphemeralRelativeCondition,
-                ));
-            }
+    for spend_idx in state.assert_not_ephemeral {
+        // make sure this coin was NOT created in this block
+        // because consensus rules do not allow relative conditions on
+        // ephemeral spends
+        if is_ephemeral(a, spend_idx, &state.spent_coins, &ret.spends) {
+            return Err(ValidationErr(
+                ret.spends[spend_idx].parent_id,
+                ErrorCode::EphemeralRelativeCondition,
+            ));
         }
     }
 
@@ -4330,8 +4329,7 @@ fn test_assert_ephemeral_wrong_parent() {
 )]
 fn test_relative_condition_on_ephemeral(
     #[case] condition: ConditionOpcode,
-    #[case] mut expect_error: Option<ErrorCode>,
-    #[values(0, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL)] no_rel_conds_on_ephemeral: u32,
+    #[case] expect_error: Option<ErrorCode>,
 ) {
     // this test ensures that we disallow relative conditions (including
     // assert-my-birth conditions) on ephemeral coin spends.
@@ -4340,11 +4338,6 @@ fn test_relative_condition_on_ephemeral(
     // ephemeral coins
 
     let cond = condition as u8;
-
-    if no_rel_conds_on_ephemeral == 0 {
-        // if we allow relative conditions, all cases should pass
-        expect_error = None;
-    }
 
     // the coin11 value is the coinID computed from (H1, H1, 123).
     // coin11 is the first coin we spend in this case.
@@ -4360,34 +4353,34 @@ fn test_relative_condition_on_ephemeral(
        ))"
     );
 
-    let flags = no_rel_conds_on_ephemeral;
+    match expect_error {
+        Some(err) => {
+            assert_eq!(cond_test(&test).unwrap_err().1, err);
+        }
+        None => {
+            // we don't expect any error
+            let (a, conds) = cond_test(&test).unwrap();
 
-    if let Some(err) = expect_error {
-        assert_eq!(cond_test_flag(&test, flags).unwrap_err().1, err);
-        return;
+            assert_eq!(conds.reserve_fee, 0);
+            assert_eq!(conds.cost, CREATE_COIN_COST);
+
+            assert_eq!(conds.spends.len(), 2);
+            let spend = &conds.spends[0];
+            assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
+            assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
+            assert_eq!(spend.agg_sig_me.len(), 0);
+            assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+
+            let spend = &conds.spends[1];
+            assert_eq!(
+                *spend.coin_id,
+                test_coin_id((&(*conds.spends[0].coin_id)).into(), H2, 123)
+            );
+            assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
+            assert_eq!(spend.agg_sig_me.len(), 0);
+            assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
+        }
     }
-
-    // we don't expect any error
-    let (a, conds) = cond_test_flag(&test, flags).unwrap();
-
-    assert_eq!(conds.reserve_fee, 0);
-    assert_eq!(conds.cost, CREATE_COIN_COST);
-
-    assert_eq!(conds.spends.len(), 2);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
-    assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
-    assert_eq!(spend.agg_sig_me.len(), 0);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-
-    let spend = &conds.spends[1];
-    assert_eq!(
-        *spend.coin_id,
-        test_coin_id((&(*conds.spends[0].coin_id)).into(), H2, 123)
-    );
-    assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert_eq!(spend.agg_sig_me.len(), 0);
-    assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
 }
 
 #[cfg(test)]
