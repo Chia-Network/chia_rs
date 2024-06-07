@@ -62,30 +62,30 @@ fn validate_clvm_and_signature(
             Err(error) => return Err(error.1),
         };
 
-    let iter = npcresult.clone().spends.into_iter().flat_map(|spend| {
-        let spend_clone = spend.clone();
+    let iter = npcresult.spends.iter().flat_map(|spend| {
+        // let spend_clone = spend.clone();
         let condition_items_pairs = vec![
-            (AGG_SIG_PARENT, spend_clone.agg_sig_parent),
-            (AGG_SIG_PUZZLE, spend_clone.agg_sig_puzzle),
-            (AGG_SIG_AMOUNT, spend_clone.agg_sig_amount),
-            (AGG_SIG_PUZZLE_AMOUNT, spend_clone.agg_sig_puzzle_amount),
-            (AGG_SIG_PARENT_AMOUNT, spend_clone.agg_sig_parent_amount),
-            (AGG_SIG_PARENT_PUZZLE, spend_clone.agg_sig_parent_puzzle),
-            (AGG_SIG_ME, spend_clone.agg_sig_me),
+            (AGG_SIG_PARENT, &spend.agg_sig_parent),
+            (AGG_SIG_PUZZLE, &spend.agg_sig_puzzle),
+            (AGG_SIG_AMOUNT, &spend.agg_sig_amount),
+            (AGG_SIG_PUZZLE_AMOUNT, &spend.agg_sig_puzzle_amount),
+            (AGG_SIG_PARENT_AMOUNT, &spend.agg_sig_parent_amount),
+            (AGG_SIG_PARENT_PUZZLE, &spend.agg_sig_parent_puzzle),
+            (AGG_SIG_ME, &spend.agg_sig_me),
         ];
         condition_items_pairs
-            .into_iter()
-            .flat_map(move |(condition, items)| {
+            .iter()
+            .flat_map(|(condition, items)| {
                 let spend = spend.clone();
-                items.into_iter().map(move |(pk, msg)| {
+                items.iter().map(move |(pk, msg)| {
                     (
                         pk,
-                        make_aggsig_final_message(condition, msg.as_slice(), &spend, constants),
+                        make_aggsig_final_message(*condition, msg.as_slice(), &spend, constants),
                     )
                 })
-            })
+            }).collect::<Vec<_>>()
     });
-    let unsafe_items = npcresult.clone().agg_sig_unsafe.into_iter().map(move |(pk, msg)| {
+    let unsafe_items = npcresult.agg_sig_unsafe.iter().map(|(pk, msg)| {
         (
             pk,
             msg.as_slice().to_vec()

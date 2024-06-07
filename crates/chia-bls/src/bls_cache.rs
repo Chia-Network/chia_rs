@@ -79,9 +79,9 @@ impl BlsCache {
         aggregate_verify_gt(sig, iter)
     }
 
-    pub fn aggregate_verify_with_iter(
+    pub fn aggregate_verify_with_iter<Pk: Borrow<PublicKey>>(
         &mut self,
-        pks_msgs: impl IntoIterator<Item = (PublicKey, Vec<u8>)>,
+        pks_msgs: impl IntoIterator<Item = (Pk, Vec<u8>)>,
         sig: &Signature,
     ) -> bool {
         let iter = pks_msgs.into_iter().map(|(pk, msg)| -> GTElement {
