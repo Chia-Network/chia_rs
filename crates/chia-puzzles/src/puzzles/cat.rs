@@ -4,7 +4,7 @@ use clvm_traits::{FromClvm, ToClvm};
 use clvm_utils::{CurriedProgram, ToTreeHash, TreeHash};
 use hex_literal::hex;
 
-use crate::LineageProof;
+use crate::{CoinProof, LineageProof};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -92,15 +92,6 @@ pub struct CatSolution<I> {
     pub next_coin_proof: CoinProof,
     pub prev_subtotal: i64,
     pub extra_delta: i64,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[clvm(list)]
-pub struct CoinProof {
-    pub parent_coin_info: Bytes32,
-    pub inner_puzzle_hash: Bytes32,
-    pub amount: u64,
 }
 
 /// This is the puzzle reveal of the [CAT2 standard](https://chialisp.com/cats) puzzle.

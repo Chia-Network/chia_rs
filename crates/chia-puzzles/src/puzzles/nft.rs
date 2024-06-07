@@ -132,33 +132,35 @@ pub struct NftOwnershipLayerSolution<I> {
 pub struct NftRoyaltyTransferPuzzleArgs {
     pub singleton_struct: SingletonStruct,
     pub royalty_puzzle_hash: Bytes32,
-    pub trade_price_percentage: u16,
+    /// The royalty percentage expressed as ten-thousandths.
+    /// For example, 300 represents 3%.
+    pub royalty_ten_thousandths: u16,
 }
 
 impl NftRoyaltyTransferPuzzleArgs {
     pub fn new(
         launcher_id: Bytes32,
         royalty_puzzle_hash: Bytes32,
-        trade_price_percentage: u16,
+        royalty_ten_thousandths: u16,
     ) -> Self {
         Self {
             singleton_struct: SingletonStruct::new(launcher_id),
             royalty_puzzle_hash,
-            trade_price_percentage,
+            royalty_ten_thousandths,
         }
     }
 
     pub fn curry_tree_hash(
         launcher_id: Bytes32,
         royalty_puzzle_hash: Bytes32,
-        trade_price_percentage: u16,
+        royalty_ten_thousandths: u16,
     ) -> TreeHash {
         CurriedProgram {
             program: NFT_ROYALTY_TRANSFER_PUZZLE_HASH,
             args: NftRoyaltyTransferPuzzleArgs {
                 singleton_struct: SingletonStruct::new(launcher_id),
                 royalty_puzzle_hash,
-                trade_price_percentage,
+                royalty_ten_thousandths,
             },
         }
         .tree_hash()

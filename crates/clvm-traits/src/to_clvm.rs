@@ -1,3 +1,5 @@
+use std::{rc::Rc, sync::Arc};
+
 use num_bigint::BigInt;
 
 use crate::{ClvmEncoder, ToClvmError};
@@ -52,6 +54,33 @@ where
 {
     fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
         T::to_clvm(*self, encoder)
+    }
+}
+
+impl<N, T> ToClvm<N> for Box<T>
+where
+    T: ToClvm<N>,
+{
+    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+        T::to_clvm(self, encoder)
+    }
+}
+
+impl<N, T> ToClvm<N> for Rc<T>
+where
+    T: ToClvm<N>,
+{
+    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+        T::to_clvm(self, encoder)
+    }
+}
+
+impl<N, T> ToClvm<N> for Arc<T>
+where
+    T: ToClvm<N>,
+{
+    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+        T::to_clvm(self, encoder)
     }
 }
 
@@ -193,6 +222,14 @@ mod tests {
         assert_eq!(encode(a, Some(42)), encode(a, Some(42)));
         assert_eq!(encode(a, Some(&42)), encode(a, Some(42)));
         assert_eq!(encode(a, Some(&42)), encode(a, Some(42)));
+    }
+
+    #[test]
+    fn test_smart_pointers() {
+        let a = &mut Allocator::new();
+        assert_eq!(encode(a, Box::new(42)), encode(a, 42));
+        assert_eq!(encode(a, Rc::new(42)), encode(a, 42));
+        assert_eq!(encode(a, Arc::new(42)), encode(a, 42));
     }
 
     #[test]
