@@ -1,8 +1,7 @@
 use crate::consensus_constants::ConsensusConstants;
 use crate::gen::condition_tools::make_aggsig_final_message;
 use crate::gen::flags::{
-    AGG_SIG_ARGS, ALLOW_BACKREFS, ENABLE_MESSAGE_CONDITIONS, ENABLE_SOFTFORK_CONDITION,
-    NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
+    AGG_SIG_ARGS, ALLOW_BACKREFS, DISALLOW_INFINITY_G1, ENABLE_MESSAGE_CONDITIONS, ENABLE_SOFTFORK_CONDITION, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL
 };
 use crate::gen::opcodes::{
     AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT, AGG_SIG_PARENT_PUZZLE,
@@ -56,8 +55,7 @@ fn validate_clvm_and_signature(
     cache: Arc<Mutex<BlsCache>>,
 ) -> Result<(OwnedSpendBundleConditions, Duration), ErrorCode> {
     let start_time = Instant::now();
-    let npcresult = get_name_puzzle_conditions(spend_bundle, max_cost, true, height, constants).map_err(|e| Err(e.1) }?;
-
+    let npcresult = get_name_puzzle_conditions(spend_bundle, max_cost, true, height, constants).map_err(|e| e.1)?;
     let iter = npcresult.spends.iter().flat_map(|spend| {
         // let spend_clone = spend.clone();
         let condition_items_pairs = vec![
@@ -147,6 +145,11 @@ pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusCons
     if height >= constants.soft_fork4_height {
         flags |= ENABLE_MESSAGE_CONDITIONS;
     }
+
+    if height >= constants.soft_fork5_height {
+        flags |= DISALLOW_INFINITY_G1;
+    }
+
     if height >= constants.hard_fork_height {
         //  the hard-fork initiated with 2.0. To activate June 2024
         //  * costs are ascribed to some unknown condition codes, to allow for
