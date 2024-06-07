@@ -60,7 +60,7 @@ fn validate_clvm_and_signature(
         .map_err(|e| e.1)?;
     let iter = npcresult.spends.iter().flat_map(|spend| {
         // let spend_clone = spend.clone();
-        let condition_items_pairs = vec![
+        let condition_items_pairs = [
             (AGG_SIG_PARENT, &spend.agg_sig_parent),
             (AGG_SIG_PUZZLE, &spend.agg_sig_puzzle),
             (AGG_SIG_AMOUNT, &spend.agg_sig_amount),
