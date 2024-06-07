@@ -21,26 +21,11 @@ pub struct NotarizedPayment {
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[clvm(transparent)]
-pub enum Payment {
-    WithoutMemos(PaymentWithoutMemos),
-    WithMemos(PaymentWithMemos),
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(list)]
-pub struct PaymentWithoutMemos {
+pub struct Payment {
     pub puzzle_hash: Bytes32,
     pub amount: u64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[clvm(list)]
-pub struct PaymentWithMemos {
-    pub puzzle_hash: Bytes32,
-    pub amount: u64,
+    #[clvm(default)]
     pub memos: Vec<Bytes>,
 }
 
