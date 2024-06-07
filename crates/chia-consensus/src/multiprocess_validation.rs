@@ -95,7 +95,7 @@ fn validate_clvm_and_signature(
             cache
                 .lock()
                 .unwrap()
-                .aggregate_verify_with_iter(iter, &spend_bundle.aggregated_signature)
+                .aggregate_verify(iter, &spend_bundle.aggregated_signature)
         }
     } {
         return Err(ErrorCode::InvalidSpendBundle);

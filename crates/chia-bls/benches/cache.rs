@@ -16,7 +16,7 @@ fn cache_benchmark(c: &mut Criterion) {
 
     let mut agg_sig = Signature::default();
     for i in 0..1000 {
-        let derived = sk.derive_hardened(i as u32);
+        let derived = sk.derive_hardened(i);
         let pk = derived.public_key();
         let sig = sign(&derived, msg);
         agg_sig.aggregate(&sig);
@@ -28,43 +28,43 @@ fn cache_benchmark(c: &mut Criterion) {
     c.bench_function("bls_cache.aggregate_verify, 0% cache hits", |b| {
         let mut cache = bls_cache.clone();
         b.iter(|| {
-            assert!(cache.aggregate_verify(&pks, [&msg].iter().cycle(), &agg_sig));
+            assert!(cache.aggregate_verify(pks.iter().zip([&msg].iter().cycle()), &agg_sig));
         });
     });
 
     // populate 10% of keys
-    bls_cache.aggregate_verify(&pks[0..100], [&msg].iter().cycle(), &agg_sig);
+    bls_cache.aggregate_verify(pks[0..100].into_iter().zip([&msg].iter().cycle()), &agg_sig);
     c.bench_function("bls_cache.aggregate_verify, 10% cache hits", |b| {
         let mut cache = bls_cache.clone();
         b.iter(|| {
-            assert!(cache.aggregate_verify(&pks, [&msg].iter().cycle(), &agg_sig));
+            assert!(cache.aggregate_verify(pks.iter().zip([&msg].iter().cycle()), &agg_sig));
         });
     });
 
     // populate another 10% of keys
-    bls_cache.aggregate_verify(&pks[100..200], [&msg].iter().cycle(), &agg_sig);
+    bls_cache.aggregate_verify(pks[100..200].into_iter().zip([&msg].iter().cycle()), &agg_sig);
     c.bench_function("bls_cache.aggregate_verify, 20% cache hits", |b| {
         let mut cache = bls_cache.clone();
         b.iter(|| {
-            assert!(cache.aggregate_verify(&pks, [&msg].iter().cycle(), &agg_sig));
+            assert!(cache.aggregate_verify(pks.iter().zip([&msg].iter().cycle()), &agg_sig));
         });
     });
 
     // populate another 30% of keys
-    bls_cache.aggregate_verify(&pks[200..500], [&msg].iter().cycle(), &agg_sig);
+    bls_cache.aggregate_verify(pks[200..500].into_iter().zip([&msg].iter().cycle()), &agg_sig);
     c.bench_function("bls_cache.aggregate_verify, 50% cache hits", |b| {
         let mut cache = bls_cache.clone();
         b.iter(|| {
-            assert!(cache.aggregate_verify(&pks, [&msg].iter().cycle(), &agg_sig));
+            assert!(cache.aggregate_verify(pks.iter().zip([&msg].iter().cycle()), &agg_sig));
         });
     });
 
     // populate all other keys
-    bls_cache.aggregate_verify(&pks[500..1000], [&msg].iter().cycle(), &agg_sig);
+    bls_cache.aggregate_verify(pks[500..1000].into_iter().zip([&msg].iter().cycle()), &agg_sig);
     c.bench_function("bls_cache.aggregate_verify, 100% cache hits", |b| {
         let mut cache = bls_cache.clone();
         b.iter(|| {
-            assert!(cache.aggregate_verify(&pks, [&msg].iter().cycle(), &agg_sig));
+            assert!(cache.aggregate_verify(pks.iter().zip([&msg].iter().cycle()), &agg_sig));
         });
     });
 

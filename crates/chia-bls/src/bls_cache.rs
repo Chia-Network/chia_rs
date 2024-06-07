@@ -44,13 +44,12 @@ impl BlsCache {
         self.cache.is_empty()
     }
 
-    pub fn aggregate_verify(
+    pub fn aggregate_verify<Pk: Borrow<PublicKey>, Msg: AsRef<[u8]>>(
         &mut self,
-        pks: impl IntoIterator<Item = impl Borrow<PublicKey>>,
-        msgs: impl IntoIterator<Item = impl AsRef<[u8]>>,
+        pks_msgs: impl IntoIterator<Item = (Pk, Msg)>,
         sig: &Signature,
     ) -> bool {
-        let iter = pks.into_iter().zip(msgs).map(|(pk, msg)| -> GTElement {
+        let iter = pks_msgs.into_iter().map(|(pk, msg)| -> GTElement {
             // Hash pubkey + message
             let mut hasher = Sha256::new();
             hasher.update(pk.borrow().to_bytes());
@@ -64,41 +63,7 @@ impl BlsCache {
 
             // Otherwise, we need to calculate the pairing and add it to the cache.
             let mut aug_msg = pk.borrow().to_bytes().to_vec();
-            aug_msg.extend_from_slice(msg.as_ref());
-            let aug_hash = hash_to_g2(&aug_msg);
-
-            let mut hasher = Sha256::new();
-            hasher.update(&aug_msg);
-            let hash: [u8; 32] = hasher.finalize().into();
-
-            let pairing = aug_hash.pair(pk.borrow());
-            self.cache.put(hash, pairing.clone());
-            pairing
-        });
-
-        aggregate_verify_gt(sig, iter)
-    }
-
-    pub fn aggregate_verify_with_iter<Pk: Borrow<PublicKey>>(
-        &mut self,
-        pks_msgs: impl IntoIterator<Item = (Pk, Vec<u8>)>,
-        sig: &Signature,
-    ) -> bool {
-        let iter = pks_msgs.into_iter().map(|(pk, msg)| -> GTElement {
-            // Hash pubkey + message
-            let mut hasher = Sha256::new();
-            hasher.update(pk.borrow().to_bytes());
-            hasher.update(&msg);
-            let hash: [u8; 32] = hasher.finalize().into();
-
-            // If the pairing is in the cache, we don't need to recalculate it.
-            if let Some(pairing) = self.cache.get(&hash).cloned() {
-                return pairing;
-            }
-
-            // Otherwise, we need to calculate the pairing and add it to the cache.
-            let mut aug_msg = pk.borrow().to_bytes().to_vec();
-            aug_msg.extend(&msg);
+            aug_msg.extend(msg.as_ref());
             let aug_hash = hash_to_g2(&aug_msg);
 
             let mut hasher = Sha256::new();
@@ -149,16 +114,16 @@ impl BlsCache {
         sig: &Signature,
     ) -> PyResult<bool> {
         let pks = pks
-            .iter()?
-            .map(|item| item?.extract())
-            .collect::<PyResult<Vec<PublicKey>>>()?;
+                .iter()?
+                .map(|item| item?.extract())
+                .collect::<PyResult<Vec<PublicKey>>>()?;
 
-        let msgs = msgs
-            .iter()?
-            .map(|item| item?.extract())
-            .collect::<PyResult<Vec<PyBackedBytes>>>()?;
+            let msgs = msgs
+                .iter()?
+                .map(|item| item?.extract())
+                .collect::<PyResult<Vec<Vec<u8>>>>()?;
 
-        Ok(self.aggregate_verify(pks, msgs, sig))
+            Ok(self.aggregate_verify(pks.into_iter().zip(msgs), sig))
     }
 
     #[pyo3(name = "len")]
@@ -221,11 +186,11 @@ pub mod tests {
         assert!(bls_cache.is_empty());
 
         // Verify the signature and add to the cache.
-        assert!(bls_cache.aggregate_verify(pk_list, msg_list, &sig));
+        assert!(bls_cache.aggregate_verify(pk_list.into_iter().zip(msg_list), &sig));
         assert_eq!(bls_cache.len(), 1);
 
         // Now that it's cached, it shouldn't cache it again.
-        assert!(bls_cache.aggregate_verify(pk_list, msg_list, &sig));
+        assert!(bls_cache.aggregate_verify(pk_list.into_iter().zip(msg_list), &sig));
         assert_eq!(bls_cache.len(), 1);
     }
 
@@ -245,7 +210,7 @@ pub mod tests {
         assert!(bls_cache.is_empty());
 
         // Add the first signature to cache.
-        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &agg_sig));
+        assert!(bls_cache.aggregate_verify(pk_list.clone().into_iter().zip(msg_list.clone()), &agg_sig));
         assert_eq!(bls_cache.len(), 1);
 
         // Try with the first key message pair in the cache but not the second.
@@ -257,7 +222,7 @@ pub mod tests {
         pk_list.push(pk2);
         msg_list.push(msg2);
 
-        assert!(bls_cache.aggregate_verify(&pk_list, &msg_list, &agg_sig));
+        assert!(bls_cache.aggregate_verify(pk_list.clone().into_iter().zip(msg_list.clone()), &agg_sig));
         assert_eq!(bls_cache.len(), 2);
 
         // Try reusing a public key.
@@ -268,7 +233,7 @@ pub mod tests {
         msg_list.push(msg3);
 
         // Verify this signature and add to the cache as well (since it's still a different aggregate).
-        assert!(bls_cache.aggregate_verify(pk_list, msg_list, &agg_sig));
+        assert!(bls_cache.aggregate_verify(pk_list.into_iter().zip(msg_list), &agg_sig));
         assert_eq!(bls_cache.len(), 3);
     }
 
@@ -291,7 +256,7 @@ pub mod tests {
             let msg_list = [msg];
 
             // Add to cache by validating them one at a time.
-            assert!(bls_cache.aggregate_verify(pk_list.iter(), msg_list.iter(), &sig));
+            assert!(bls_cache.aggregate_verify(pk_list.into_iter().zip(msg_list), &sig));
         }
 
         // The cache should be full now.
@@ -319,6 +284,6 @@ pub mod tests {
         let pks: [&PublicKey; 0] = [];
         let msgs: [&[u8]; 0] = [];
 
-        assert!(bls_cache.aggregate_verify(pks, msgs, &Signature::default()));
+        assert!(bls_cache.aggregate_verify(pks.into_iter().zip(msgs), &Signature::default()));
     }
 }

@@ -1,6 +1,5 @@
 use crate::allocator::make_allocator;
 use crate::consensus_constants::ConsensusConstants;
-use crate::gen::condition_tools::u64_to_bytes;
 use crate::gen::conditions::{
     process_single_spend, validate_conditions, EmptyVisitor, ParseState, SpendBundleConditions,
 };
@@ -61,7 +60,7 @@ pub fn get_name_puzzle_conditions(
         let puz = node_from_bytes(&mut a, coin_spend.puzzle_reveal.as_slice())?;
         let sol = node_from_bytes(&mut a, coin_spend.solution.as_slice())?;
         let parent = a.new_atom(coin_spend.coin.parent_coin_info.as_slice())?;
-        let amount = a.new_atom(u64_to_bytes(coin_spend.coin.amount).as_slice())?;
+        let amount = a.new_number(coin_spend.coin.amount.into())?;
         let Reduction(clvm_cost, conditions) = run_program(&mut a, &dialect, puz, sol, cost_left)?;
 
         subtract_cost(&a, &mut cost_left, clvm_cost)?;
