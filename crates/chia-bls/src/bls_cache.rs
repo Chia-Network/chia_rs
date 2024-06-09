@@ -84,35 +84,24 @@ impl BlsCache {
 mod stubs {
     use super::*;
 
-    use chia_traits::{field, Bytes, StubBuilder, TypeStub};
+    use chia_traits::{none, Bytes, StubBuilder, TypeStub};
 
     impl TypeStub for BlsCache {
         fn type_stub(builder: &StubBuilder) -> String {
             if !builder.has("BLSCache") {
                 builder
                     .class::<Self>("BLSCache")
-                    .method::<()>(
-                        "__init__",
-                        &[field::<Option<usize>>(
-                            builder,
-                            "cache_size",
-                            Some("50000".to_string()),
-                        )],
-                    )
-                    .method::<usize>("len", &[])
-                    .method::<bool>(
-                        "aggregate_verify",
-                        &[
-                            field::<Vec<PublicKey>>(builder, "pks", None),
-                            field::<Vec<Bytes>>(builder, "msgs", None),
-                            field::<Signature>(builder, "sig", None),
-                        ],
-                    )
-                    .method::<Vec<(Bytes, Bytes)>>("items", &[])
-                    .method::<()>(
-                        "update",
-                        &[field::<Vec<(Bytes, Bytes)>>(builder, "other", None)],
-                    )
+                    .method::<()>("__init__", |m| {
+                        m.default_param::<Option<usize>>("cache_size", "50000")
+                    })
+                    .method::<usize>("len", none)
+                    .method::<bool>("aggregate_verify", |m| {
+                        m.param::<Vec<PublicKey>>("pks")
+                            .param::<Vec<Bytes>>("msgs")
+                            .param::<Signature>("sig")
+                    })
+                    .method::<Vec<(Bytes, Bytes)>>("items", none)
+                    .method::<()>("update", |m| m.param::<Vec<(Bytes, Bytes)>>("other"))
                     .generate();
             }
             "BLSCache".to_string()

@@ -105,7 +105,7 @@ impl Streamable for GTElement {
 mod stubs {
     use super::*;
 
-    use chia_traits::{field, StubBuilder, TypeStub};
+    use chia_traits::{none, StubBuilder, TypeStub};
 
     impl TypeStub for GTElement {
         fn type_stub(builder: &StubBuilder) -> String {
@@ -113,9 +113,9 @@ mod stubs {
                 builder
                     .class::<Self>("GTElement")
                     .static_getter_field::<usize>("SIZE")
-                    .method::<String>("__str__", &[])
-                    .method::<Self>("__mul__", &[field::<Self>(builder, "rhs", None)])
-                    .method::<Self>("__imul__", &[field::<Self>(builder, "rhs", None)])
+                    .method::<String>("__str__", none)
+                    .method::<Self>("__mul__", |m| m.param::<Self>("rhs"))
+                    .method::<Self>("__imul__", |m| m.param::<Self>("rhs"))
                     .generate_streamable();
             }
             "GTElement".to_string()

@@ -114,20 +114,50 @@ where
         self
     }
 
-    pub fn method<T: TypeStub>(mut self, name: &str, params: &[String]) -> Self {
-        self.items.push(method::<T>(self.builder, name, params));
-        self
+    pub fn method<T: TypeStub>(
+        self,
+        name: &str,
+        f: impl FnOnce(MethodBuilder<'_, T>) -> MethodBuilder<'_, T>,
+    ) -> Self {
+        self.raw_method(false, name, |mut builder| {
+            builder.params.push("self".to_string());
+            f(builder)
+        })
     }
 
-    pub fn static_method<T: TypeStub>(mut self, name: &str, params: &[String]) -> Self {
-        self.items
-            .push(static_method::<T>(self.builder, name, params));
-        self
+    pub fn static_method<T: TypeStub>(
+        self,
+        name: &str,
+        f: impl FnOnce(MethodBuilder<'_, T>) -> MethodBuilder<'_, T>,
+    ) -> Self {
+        self.raw_method(true, name, f)
     }
 
-    pub fn class_method<T: TypeStub>(mut self, name: &str, params: &[String]) -> Self {
+    pub fn class_method<T: TypeStub>(
+        self,
+        name: &str,
+        f: impl FnOnce(MethodBuilder<'_, T>) -> MethodBuilder<'_, T>,
+    ) -> Self {
+        self.raw_method(false, name, |mut builder| {
+            builder.params.push("cls".to_string());
+            f(builder)
+        })
+    }
+
+    fn raw_method<T: TypeStub>(
+        mut self,
+        is_static: bool,
+        name: &str,
+        f: impl FnOnce(MethodBuilder<'_, T>) -> MethodBuilder<'_, T>,
+    ) -> Self {
+        let params = f(MethodBuilder {
+            _phantom: PhantomData,
+            builder: self.builder,
+            params: Vec::new(),
+        })
+        .params;
         self.items
-            .push(class_method::<T>(self.builder, name, params));
+            .push(raw_method::<T>(self.builder, is_static, name, &params));
         self
     }
 
@@ -142,7 +172,7 @@ where
         self.builder.define(&self.name, stub);
     }
 
-    pub fn generate_streamable(&self) {
+    pub fn generate_streamable(self) {
         Self {
             _phantom: PhantomData,
             builder: self.builder,
@@ -150,38 +180,53 @@ where
             init_fields: [self.init_fields.clone(), self.items.clone()].concat(),
             items: Vec::new(),
         }
-        .method::<()>("__init__", &self.init_fields)
-        .method::<Int>("__hash__", &[])
-        .method::<String>("__repr__", &[])
-        .method::<Any>("__richcmp__", &[])
-        .method::<C>("__deepcopy__", &[])
-        .method::<C>("__copy__", &[])
-        .static_method::<C>(
-            "from_bytes",
-            &[field::<Bytes>(self.builder, "buffer", None)],
-        )
-        .static_method::<C>(
-            "from_bytes_unchecked",
-            &[field::<Bytes>(self.builder, "buffer", None)],
-        )
-        .static_method::<(C, Int)>(
-            "parse_rust",
-            &[
-                field::<ReadableBuffer>(self.builder, "buffer", None),
-                field::<bool>(self.builder, "trusted", Some("False".to_string())),
-            ],
-        )
-        .method::<Bytes>("to_bytes", &[])
-        .method::<Bytes>("__bytes__", &[])
-        .method::<Bytes>("stream_to_bytes", &[])
-        .method::<SizedBytes<32>>("get_hash", &[])
-        .method::<Any>("to_json_dict", &[])
-        .static_method::<C>(
-            "from_json_dict",
-            &[field::<Any>(self.builder, "json_dict", None)],
-        )
+        .method::<()>("__init__", |mut builder| {
+            builder.params.extend(self.init_fields);
+            builder
+        })
+        .method::<Int>("__hash__", none)
+        .method::<String>("__repr__", none)
+        .method::<Any>("__richcmp__", none)
+        .method::<C>("__deepcopy__", none)
+        .method::<C>("__copy__", none)
+        .static_method::<C>("from_bytes", |m| m.param::<Bytes>("buffer"))
+        .static_method::<C>("from_bytes_unchecked", |m| m.param::<Bytes>("buffer"))
+        .static_method::<(C, Int)>("parse_rust", |m| {
+            m.param::<ReadableBuffer>("buffer")
+                .default_param::<bool>("trusted", "False")
+        })
+        .method::<Bytes>("to_bytes", none)
+        .method::<Bytes>("__bytes__", none)
+        .method::<Bytes>("stream_to_bytes", none)
+        .method::<SizedBytes<32>>("get_hash", none)
+        .method::<Any>("to_json_dict", none)
+        .static_method::<C>("from_json_dict", |m| m.param::<Any>("json_dict"))
         .generate();
     }
+}
+
+#[must_use]
+pub struct MethodBuilder<'a, R> {
+    _phantom: PhantomData<R>,
+    builder: &'a StubBuilder,
+    params: Vec<String>,
+}
+
+impl<'a, R> MethodBuilder<'a, R> {
+    pub fn param<T: TypeStub>(mut self, name: &str) -> Self {
+        self.params.push(field::<T>(self.builder, name, None));
+        self
+    }
+
+    pub fn default_param<T: TypeStub>(mut self, name: &str, default: &str) -> Self {
+        self.params
+            .push(field::<T>(self.builder, name, Some(default.to_string())));
+        self
+    }
+}
+
+pub fn none<R>(builder: MethodBuilder<'_, R>) -> MethodBuilder<'_, R> {
+    builder
 }
 
 pub trait TypeStub {
@@ -242,33 +287,17 @@ impl TypeStub for ReadableBuffer {
     }
 }
 
-pub fn static_getter_field<T: TypeStub>(builder: &StubBuilder, name: &str) -> String {
+fn static_getter_field<T: TypeStub>(builder: &StubBuilder, name: &str) -> String {
     builder.import("typing", &["ClassVar"]);
     format!("{name}: ClassVar[{}] = ...", T::type_stub(builder))
 }
 
-pub fn field<T: TypeStub>(builder: &StubBuilder, name: &str, default: Option<String>) -> String {
+fn field<T: TypeStub>(builder: &StubBuilder, name: &str, default: Option<String>) -> String {
     if let Some(default) = default {
         format!("{name}: {} = {default}", T::type_stub(builder))
     } else {
         format!("{name}: {}", T::type_stub(builder))
     }
-}
-
-fn method<T: TypeStub>(builder: &StubBuilder, name: &str, params: &[String]) -> String {
-    let mut params = params.to_vec();
-    params.insert(0, "self".to_string());
-    raw_method::<T>(builder, false, name, &params)
-}
-
-fn static_method<T: TypeStub>(builder: &StubBuilder, name: &str, params: &[String]) -> String {
-    raw_method::<T>(builder, true, name, params)
-}
-
-fn class_method<T: TypeStub>(builder: &StubBuilder, name: &str, params: &[String]) -> String {
-    let mut params = params.to_vec();
-    params.insert(0, "cls".to_string());
-    raw_method::<T>(builder, false, name, &params)
 }
 
 fn raw_method<T: TypeStub>(

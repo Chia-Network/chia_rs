@@ -481,7 +481,7 @@ mod stubs {
 
     use crate::{GTElement, Signature};
 
-    use chia_traits::{field, StubBuilder, TypeStub};
+    use chia_traits::{none, StubBuilder, TypeStub};
 
     impl TypeStub for Signature {
         fn type_stub(builder: &StubBuilder) -> String {
@@ -489,12 +489,12 @@ mod stubs {
                 builder
                     .class::<Self>("G2Element")
                     .static_getter_field::<usize>("SIZE")
-                    .class_method::<Self>("__new__", &[])
-                    .method::<GTElement>("pair", &[field::<PublicKey>(builder, "public_key", None)])
-                    .static_method::<Self>("generator", &[])
-                    .method::<String>("__str__", &[])
-                    .method::<Self>("__add__", &[field::<Self>(builder, "rhs", None)])
-                    .method::<Self>("__iadd__", &[field::<Self>(builder, "rhs", None)])
+                    .class_method::<Self>("__new__", none)
+                    .method::<GTElement>("pair", |m| m.param::<PublicKey>("public_key"))
+                    .static_method::<Self>("generator", none)
+                    .method::<String>("__str__", none)
+                    .method::<Self>("__add__", |m| m.param::<Self>("rhs"))
+                    .method::<Self>("__iadd__", |m| m.param::<Self>("rhs"))
                     .generate_streamable();
             }
             "G2Element".to_string()
