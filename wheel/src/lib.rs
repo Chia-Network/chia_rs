@@ -4,3 +4,7 @@ mod adapt_response;
 mod api;
 mod run_generator;
 mod run_program;
+mod visitor;
+
+pub use api::bindings;
+pub use visitor::Visitor;

@@ -14,7 +14,7 @@ workspace = true
 
 [lib]
 name = "chia_rs"
-crate-type = ["cdylib"]
+crate-type = ["rlib", "cdylib"]
 path = "src/lib.rs"
 
 [dependencies]
@@ -23,9 +23,9 @@ hex = { workspace = true }
 sha2 = { workspace = true }
 pyo3 = { workspace = true, features = ["multiple-pymethods"] }
 chia-consensus = { workspace = true, features = ["py-bindings"] }
-chia-bls = { workspace = true, features = ["py-bindings"]  }
+chia-bls = { workspace = true, features = ["py-bindings", "py-stubs"] }
 chia-protocol = { workspace = true, features = ["py-bindings"]  }
-chia-traits = { workspace = true, features = ["py-bindings"]  }
+chia-traits = { workspace = true, features = ["py-bindings", "py-stubs"]  }
 clvm-traits = { workspace = true, features = ["derive", "py-bindings"] }
 clvm-utils = { workspace = true }
 chia_py_streamable_macro = { workspace = true }

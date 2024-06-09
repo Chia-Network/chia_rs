@@ -1,4 +1,5 @@
 use crate::run_generator::{run_block_generator, run_block_generator2};
+use crate::visitor::Visitor;
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::gen::conditions::MempoolVisitor;
@@ -534,12 +535,19 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // facilities from chia-bls
 
-    m.add_class::<PublicKey>()?;
-    m.add_class::<Signature>()?;
-    m.add_class::<GTElement>()?;
-    m.add_class::<SecretKey>()?;
+    bindings(m)?;
     m.add_class::<AugSchemeMPL>()?;
-    m.add_class::<BlsCache>()?;
+
+    Ok(())
+}
+
+pub fn bindings(m: &impl Visitor) -> Result<(), PyErr> {
+    m.visit::<BlsCache>()?;
+    m.visit::<PublicKey>()?;
+    m.visit::<Signature>()?;
+    m.visit::<GTElement>()?;
+    m.visit::<SecretKey>()?;
+    // m.visit::<AugSchemeMPL>()?;
 
     Ok(())
 }
