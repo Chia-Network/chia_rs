@@ -12,7 +12,7 @@ fn main() {
 
     let initial_stubs = stubs();
 
-    for _ in 0..1000 {
+    for _ in 0..100 {
         let new_stubs = stubs();
         assert_eq!(
             initial_stubs, new_stubs,

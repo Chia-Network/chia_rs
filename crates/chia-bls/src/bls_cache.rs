@@ -80,39 +80,11 @@ impl BlsCache {
     }
 }
 
-#[cfg(feature = "py-stubs")]
-mod stubs {
-    use super::*;
-
-    use chia_traits::{none, Bytes, StubBuilder, TypeStub};
-
-    impl TypeStub for BlsCache {
-        fn type_stub(builder: &StubBuilder) -> String {
-            if !builder.has("BLSCache") {
-                builder
-                    .class::<Self>("BLSCache")
-                    .method::<()>("__init__", |m| {
-                        m.default_param::<Option<usize>>("cache_size", "50000")
-                    })
-                    .method::<usize>("len", none)
-                    .method::<bool>("aggregate_verify", |m| {
-                        m.param::<Vec<PublicKey>>("pks")
-                            .param::<Vec<Bytes>>("msgs")
-                            .param::<Signature>("sig")
-                    })
-                    .method::<Vec<(Bytes, Bytes)>>("items", none)
-                    .method::<()>("update", |m| m.param::<Vec<(Bytes, Bytes)>>("other"))
-                    .generate();
-            }
-            "BLSCache".to_string()
-        }
-    }
-}
-
 #[cfg(feature = "py-bindings")]
 mod python {
     use super::*;
 
+    use chia_traits::{none, Bytes, StubBuilder, TypeStub};
     use pyo3::{
         exceptions::PyValueError,
         pybacked::PyBackedBytes,
@@ -193,6 +165,28 @@ mod python {
                 );
             }
             Ok(())
+        }
+    }
+
+    impl TypeStub for BlsCache {
+        fn type_stub(builder: &StubBuilder) -> String {
+            if !builder.has("BLSCache") {
+                builder
+                    .class::<Self>("BLSCache")
+                    .method::<()>("__init__", |m| {
+                        m.default_param::<Option<usize>>("cache_size", "50000")
+                    })
+                    .method::<usize>("len", none)
+                    .method::<bool>("aggregate_verify", |m| {
+                        m.param::<Vec<PublicKey>>("pks")
+                            .param::<Vec<Bytes>>("msgs")
+                            .param::<Signature>("sig")
+                    })
+                    .method::<Vec<(Bytes, Bytes)>>("items", none)
+                    .method::<()>("update", |m| m.param::<Vec<(Bytes, Bytes)>>("other"))
+                    .generate();
+            }
+            "BLSCache".to_string()
         }
     }
 }

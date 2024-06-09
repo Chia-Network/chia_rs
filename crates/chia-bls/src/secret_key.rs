@@ -236,39 +236,13 @@ impl DerivableKey for SecretKey {
     }
 }
 
-#[cfg(feature = "py-stubs")]
-mod stubs {
-    use crate::Signature;
-
-    use super::*;
-
-    use chia_traits::{none, Bytes, StubBuilder, TypeStub};
-
-    impl TypeStub for SecretKey {
-        fn type_stub(builder: &StubBuilder) -> String {
-            if !builder.has("PrivateKey") {
-                builder
-                    .class::<Self>("PrivateKey")
-                    .static_getter_field::<usize>("PRIVATE_KEY_SIZE")
-                    .method::<Signature>("sign_g2", |m| {
-                        m.param::<Bytes>("msg").param::<Bytes>("dst")
-                    })
-                    .method::<PublicKey>("get_g1", none)
-                    .method::<String>("__str__", none)
-                    .generate_streamable();
-            }
-            "PrivateKey".to_string()
-        }
-    }
-}
-
 #[cfg(feature = "py-bindings")]
 mod pybindings {
     use super::*;
 
     use crate::{parse_hex::parse_hex_string, PublicKey, Signature};
 
-    use chia_traits::{FromJsonDict, ToJsonDict};
+    use chia_traits::{none, Bytes, FromJsonDict, StubBuilder, ToJsonDict, TypeStub};
     use pyo3::prelude::*;
 
     #[pymethods]
@@ -304,6 +278,23 @@ mod pybindings {
                     .try_into()
                     .unwrap(),
             )?)
+        }
+    }
+
+    impl TypeStub for SecretKey {
+        fn type_stub(builder: &StubBuilder) -> String {
+            if !builder.has("PrivateKey") {
+                builder
+                    .class::<Self>("PrivateKey")
+                    .static_getter_field::<usize>("PRIVATE_KEY_SIZE")
+                    .method::<Signature>("sign_g2", |m| {
+                        m.param::<Bytes>("msg").param::<Bytes>("dst")
+                    })
+                    .method::<PublicKey>("get_g1", none)
+                    .method::<String>("__str__", none)
+                    .generate_streamable();
+            }
+            "PrivateKey".to_string()
         }
     }
 }

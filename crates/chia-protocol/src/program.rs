@@ -451,6 +451,29 @@ impl Program {
     }
 }
 
+#[cfg(feature = "py-bindings")]
+impl chia_traits::TypeStub for Program {
+    fn type_stub(builder: &chia_traits::StubBuilder) -> String {
+        if !builder.has("Program") {
+            builder.class::<Self>("Program").generate_streamable();
+        }
+        /*
+            "Program": [
+            "def get_tree_hash(self) -> bytes32: ...",
+            "@staticmethod\n    def default() -> Program: ...",
+            "@staticmethod\n    def fromhex(hex) -> Program: ...",
+            "def run_mempool_with_cost(self, max_cost: int, args: object) -> Tuple[int, ChiaProgram]: ...",
+            "def run_with_cost(self, max_cost: int, args: object) -> Tuple[int, ChiaProgram]: ...",
+            "def _run(self, max_cost: int, flags: int, args: object) -> Tuple[int, ChiaProgram]: ...",
+            "@staticmethod\n    def to(o: object) -> Program: ...",
+            "@staticmethod\n    def from_program(p: ChiaProgram) -> Program: ...",
+            "def to_program(self) -> ChiaProgram: ...",
+            "def uncurry(self) -> Tuple[ChiaProgram, ChiaProgram]: ...",
+        ], */
+        "Program".to_string()
+    }
+}
+
 impl Streamable for Program {
     fn update_digest(&self, digest: &mut Sha256) {
         digest.update(&self.0);

@@ -475,40 +475,13 @@ pub fn sign<Msg: AsRef<[u8]>>(sk: &SecretKey, msg: Msg) -> Signature {
     sign_raw(sk, aug_msg)
 }
 
-#[cfg(feature = "py-stubs")]
-mod stubs {
-    use super::*;
-
-    use crate::{GTElement, Signature};
-
-    use chia_traits::{none, StubBuilder, TypeStub};
-
-    impl TypeStub for Signature {
-        fn type_stub(builder: &StubBuilder) -> String {
-            if !builder.has("G2Element") {
-                builder
-                    .class::<Self>("G2Element")
-                    .static_getter_field::<usize>("SIZE")
-                    .class_method::<Self>("__new__", none)
-                    .method::<GTElement>("pair", |m| m.param::<PublicKey>("public_key"))
-                    .static_method::<Self>("generator", none)
-                    .method::<String>("__str__", none)
-                    .method::<Self>("__add__", |m| m.param::<Self>("rhs"))
-                    .method::<Self>("__iadd__", |m| m.param::<Self>("rhs"))
-                    .generate_streamable();
-            }
-            "G2Element".to_string()
-        }
-    }
-}
-
 #[cfg(feature = "py-bindings")]
 mod pybindings {
     use super::*;
 
     use crate::parse_hex::parse_hex_string;
 
-    use chia_traits::{FromJsonDict, ToJsonDict};
+    use chia_traits::{none, FromJsonDict, StubBuilder, ToJsonDict, TypeStub};
     use pyo3::prelude::*;
 
     #[pymethods]
@@ -561,6 +534,24 @@ mod pybindings {
                     .try_into()
                     .unwrap(),
             )?)
+        }
+    }
+
+    impl TypeStub for Signature {
+        fn type_stub(builder: &StubBuilder) -> String {
+            if !builder.has("G2Element") {
+                builder
+                    .class::<Self>("G2Element")
+                    .static_getter_field::<usize>("SIZE")
+                    .class_method::<Self>("__new__", none)
+                    .method::<GTElement>("pair", |m| m.param::<PublicKey>("public_key"))
+                    .static_method::<Self>("generator", none)
+                    .method::<String>("__str__", none)
+                    .method::<Self>("__add__", |m| m.param::<Self>("rhs"))
+                    .method::<Self>("__iadd__", |m| m.param::<Self>("rhs"))
+                    .generate_streamable();
+            }
+            "G2Element".to_string()
         }
     }
 }

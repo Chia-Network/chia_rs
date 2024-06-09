@@ -10,8 +10,7 @@ authors = ["Arvid Norberg <arvid@chia.net>"]
 workspace = true
 
 [features]
-py-bindings = ["dep:pyo3"]
-py-stubs = ["dep:indexmap"]
+py-bindings = ["dep:pyo3", "dep:indexmap"]
 
 [dependencies]
 pyo3 = { workspace = true, features = ["multiple-pymethods"], optional = true }

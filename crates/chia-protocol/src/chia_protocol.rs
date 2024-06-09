@@ -144,6 +144,13 @@ impl chia_traits::ChiaToPython for ProtocolMessageTypes {
     }
 }
 
+#[cfg(feature = "py-bindings")]
+impl chia_traits::TypeStub for ProtocolMessageTypes {
+    fn type_stub(_builder: &chia_traits::StubBuilder) -> String {
+        "int".to_string()
+    }
+}
+
 pub trait ChiaProtocolMessage {
     fn msg_type() -> ProtocolMessageTypes;
 }
@@ -166,6 +173,13 @@ pub enum NodeType {
 impl chia_traits::ChiaToPython for NodeType {
     fn to_python<'a>(&self, py: pyo3::Python<'a>) -> pyo3::PyResult<pyo3::Bound<'a, pyo3::PyAny>> {
         Ok(pyo3::IntoPy::into_py(*self, py).bind(py).clone().into_any())
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+impl chia_traits::TypeStub for NodeType {
+    fn type_stub(_builder: &chia_traits::StubBuilder) -> String {
+        "int".to_string()
     }
 }
 

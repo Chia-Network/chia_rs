@@ -296,41 +296,13 @@ pub fn hash_to_g1_with_dst(msg: &[u8], dst: &[u8]) -> PublicKey {
     PublicKey(p1)
 }
 
-#[cfg(feature = "py-stubs")]
-mod stubs {
-    use super::*;
-
-    use crate::{GTElement, Signature};
-
-    use chia_traits::{none, Int, StubBuilder, TypeStub};
-
-    impl TypeStub for PublicKey {
-        fn type_stub(builder: &StubBuilder) -> String {
-            if !builder.has("G1Element") {
-                builder
-                    .class::<Self>("G1Element")
-                    .static_getter_field::<usize>("SIZE")
-                    .class_method::<Self>("__new__", none)
-                    .method::<Int>("get_fingerprint", none)
-                    .method::<GTElement>("pair", |m| m.param::<Signature>("signature"))
-                    .static_method::<Self>("generator", none)
-                    .method::<String>("__str__", none)
-                    .method::<Self>("__add__", |m| m.param::<Self>("rhs"))
-                    .method::<Self>("__iadd__", |m| m.param::<Self>("rhs"))
-                    .generate_streamable();
-            }
-            "G1Element".to_string()
-        }
-    }
-}
-
 #[cfg(feature = "py-bindings")]
 mod pybindings {
     use super::*;
 
     use crate::{parse_hex::parse_hex_string, GTElement, Signature};
 
-    use chia_traits::{FromJsonDict, ToJsonDict};
+    use chia_traits::{none, FromJsonDict, Int, StubBuilder, ToJsonDict, TypeStub};
     use pyo3::prelude::*;
 
     #[pymethods]
@@ -387,6 +359,25 @@ mod pybindings {
                     .try_into()
                     .unwrap(),
             )?)
+        }
+    }
+
+    impl TypeStub for PublicKey {
+        fn type_stub(builder: &StubBuilder) -> String {
+            if !builder.has("G1Element") {
+                builder
+                    .class::<Self>("G1Element")
+                    .static_getter_field::<usize>("SIZE")
+                    .class_method::<Self>("__new__", none)
+                    .method::<Int>("get_fingerprint", none)
+                    .method::<GTElement>("pair", |m| m.param::<Signature>("signature"))
+                    .static_method::<Self>("generator", none)
+                    .method::<String>("__str__", none)
+                    .method::<Self>("__add__", |m| m.param::<Self>("rhs"))
+                    .method::<Self>("__iadd__", |m| m.param::<Self>("rhs"))
+                    .generate_streamable();
+            }
+            "G1Element".to_string()
         }
     }
 }

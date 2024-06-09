@@ -102,7 +102,8 @@ pub fn streamable(attr: TokenStream, item: TokenStream) -> TokenStream {
                     chia_py_streamable_macro::PyJsonDict,
                     chia_py_streamable_macro::PyStreamable,
                     chia_py_streamable_macro::PyGetters
-                )
+                ),
+                generate_type_stubs
             )]
             #main_derives
             #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
