@@ -1,6 +1,6 @@
 use std::{env, fs, path::PathBuf};
 
-use chia_bls::{BlsCache, G1Element, G2Element, GTElement};
+use chia_bls::{BlsCache, G1Element, G2Element, GTElement, SecretKey};
 use chia_traits::StubBuilder;
 
 fn main() -> anyhow::Result<()> {
@@ -37,6 +37,7 @@ fn stubs() -> String {
     builder.stub::<G1Element>();
     builder.stub::<G2Element>();
     builder.stub::<GTElement>();
+    builder.stub::<SecretKey>();
 
     builder.generate()
 }
