@@ -101,6 +101,32 @@ impl Streamable for GTElement {
     }
 }
 
+#[cfg(feature = "py-stubs")]
+mod stubs {
+    use super::*;
+
+    use chia_traits::{
+        field, method, static_getter_field, streamable_class, StubBuilder, TypeStub,
+    };
+
+    impl TypeStub for GTElement {
+        fn type_stub(b: &mut StubBuilder) -> String {
+            if !b.has("GTElement") {
+                let mul_params = &[field::<Self>(b, "rhs", None)];
+                let items = &[
+                    static_getter_field::<usize>(b, "SIZE"),
+                    method::<String>(b, "__str__", &[]),
+                    method::<Self>(b, "__mul__", mul_params),
+                    method::<Self>(b, "__imul__", mul_params),
+                ];
+                let class = streamable_class::<Self>(b, &[], items);
+                b.define("GTElement", class);
+            }
+            "GTElement".to_string()
+        }
+    }
+}
+
 #[cfg(feature = "py-bindings")]
 mod pybindings {
     use super::*;

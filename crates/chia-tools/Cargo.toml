@@ -13,11 +13,11 @@ workspace = true
 
 [dependencies]
 chia-protocol = { workspace = true }
-chia-traits = { workspace = true }
+chia-traits = { workspace = true, features = ["py-stubs"] }
 clvm-utils = { workspace = true }
 clvm-traits = { workspace = true }
 chia-puzzles = { workspace = true }
-chia-bls = { workspace = true }
+chia-bls = { workspace = true, features = ["py-stubs"] }
 chia-consensus = { workspace = true }
 clvmr = { workspace = true, features = ["counters"] }
 rusqlite = { workspace = true, features = ["bundled"] }
@@ -26,6 +26,7 @@ zstd = { workspace = true }
 blocking-threadpool = { workspace = true }
 hex = { workspace = true }
 hex-literal = { workspace = true }
+anyhow = { workspace = true }
 
 [lib]
 name = "chia_tools"
@@ -68,5 +69,10 @@ bench = false
 
 [[bin]]
 name = "get-generator"
+test = false
+bench = false
+
+[[bin]]
+name = "type-stubs"
 test = false
 bench = false

@@ -11,9 +11,11 @@ workspace = true
 
 [features]
 py-bindings = ["dep:pyo3"]
+py-stubs = ["dep:indexmap"]
 
 [dependencies]
 pyo3 = { workspace = true, features = ["multiple-pymethods"], optional = true }
 chia_streamable_macro = { workspace = true }
 sha2 = { workspace = true }
 thiserror = { workspace = true }
+indexmap = { workspace = true, optional = true }

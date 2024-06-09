@@ -464,6 +464,7 @@ dependencies = [
 name = "chia-tools"
 version = "0.10.0"
 dependencies = [
+ "anyhow",
  "blocking-threadpool",
  "chia-bls 0.10.0",
  "chia-consensus",
@@ -497,6 +498,7 @@ name = "chia-traits"
 version = "0.10.0"
 dependencies = [
  "chia_streamable_macro 0.10.0",
+ "indexmap",
  "pyo3",
  "sha2",
  "thiserror",

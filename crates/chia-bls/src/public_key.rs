@@ -296,6 +296,40 @@ pub fn hash_to_g1_with_dst(msg: &[u8], dst: &[u8]) -> PublicKey {
     PublicKey(p1)
 }
 
+#[cfg(feature = "py-stubs")]
+mod stubs {
+    use super::*;
+
+    use crate::{GTElement, Signature};
+
+    use chia_traits::{
+        class_method, field, method, static_getter_field, static_method, streamable_class, Int,
+        StubBuilder, TypeStub,
+    };
+
+    impl TypeStub for PublicKey {
+        fn type_stub(b: &mut StubBuilder) -> String {
+            if !b.has("G1Element") {
+                let add_params = &[field::<Self>(b, "other", None)];
+                let pair_params = &[field::<Signature>(b, "other", None)];
+                let items = &[
+                    class_method::<Self>(b, "__new__", &[]),
+                    static_getter_field::<usize>(b, "SIZE"),
+                    method::<Int>(b, "get_fingerprint", &[]),
+                    method::<GTElement>(b, "pair", pair_params),
+                    static_method::<Self>(b, "generator", &[]),
+                    method::<String>(b, "__str__", &[]),
+                    method::<Self>(b, "__add__", add_params),
+                    method::<Self>(b, "__iadd__", add_params),
+                ];
+                let class = streamable_class::<Self>(b, &[], items);
+                b.define("G1Element", class);
+            }
+            "G1Element".to_string()
+        }
+    }
+}
+
 #[cfg(feature = "py-bindings")]
 mod pybindings {
     use super::*;
