@@ -9,6 +9,7 @@ use hex_literal::hex;
     feature = "py-bindings",
     pyo3::pyclass(module = "chia_rs"),
     derive(PyJsonDict, PyStreamable, PyGetters),
+    generate_type_stubs,
     py_uppercase,
     py_pickle
 )]

@@ -290,7 +290,6 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(solution_generator_backrefs, m)?)?;
     m.add_function(wrap_pyfunction!(supports_fast_forward, m)?)?;
     m.add_function(wrap_pyfunction!(fast_forward_singleton, m)?)?;
-    m.add_class::<OwnedSpendBundleConditions>()?;
     m.add(
         "ELIGIBLE_FOR_DEDUP",
         chia_consensus::gen::conditions::ELIGIBLE_FOR_DEDUP,
@@ -299,10 +298,6 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
         "ELIGIBLE_FOR_FF",
         chia_consensus::gen::conditions::ELIGIBLE_FOR_FF,
     )?;
-    m.add_class::<OwnedSpend>()?;
-
-    // constants
-    m.add_class::<ConsensusConstants>()?;
 
     // merkle tree
     m.add_class::<MerkleSet>()?;
@@ -340,6 +335,11 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 
 pub fn bindings(m: &impl Visitor) -> Result<(), PyErr> {
+    // chia-consensus
+    m.visit::<OwnedSpendBundleConditions>()?;
+    m.visit::<OwnedSpend>()?;
+    m.visit::<ConsensusConstants>()?;
+
     // chia-protocol
     m.visit::<Coin>()?;
     m.visit::<PoolTarget>()?;
