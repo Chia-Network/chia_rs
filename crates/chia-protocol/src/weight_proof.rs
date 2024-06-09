@@ -25,7 +25,12 @@ pub struct SubEpochData {
 //                            0.48
 // total number of challenge blocks == total number of reward chain blocks
 
-#[streamable]
+#[streamable(no_stub)]
+#[cfg_attr(feature = "py-bindings", generate_type_stubs(
+    class
+        .method::<bool>("is_end_of_slot", |m| m)
+        .method::<bool>("is_challenge", |m| m)
+))]
 pub struct SubSlotData {
     proof_of_space: Option<ProofOfSpace>,
     cc_signage_point: Option<VDFProof>,

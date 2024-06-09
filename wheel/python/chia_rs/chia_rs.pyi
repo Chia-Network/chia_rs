@@ -851,6 +851,7 @@ class RewardChainBlock:
     reward_chain_ip_vdf: VDFInfo
     infused_challenge_chain_ip_vdf: Optional[VDFInfo]
     is_transaction_block: bool
+    get_unfinished: RewardChainBlockUnfinished
     def __init__(
         self,
         weight: uint128,
@@ -921,6 +922,12 @@ class ChallengeBlockInfo:
 class SpendBundle:
     coin_spends: List[CoinSpend]
     aggregated_signature: G2Element
+    @staticmethod
+    def aggregate(spend_bundles: List[SpendBundle]) -> SpendBundle: ...
+    def name(self) -> bytes32: ...
+    def additions(self) -> List[Coin]: ...
+    def removals(self) -> List[Coin]: ...
+    def debug(self) -> None: ...
     def __init__(self, coin_spends: List[CoinSpend], aggregated_signature: G2Element) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -1024,6 +1031,8 @@ class SubSlotData:
     cc_ip_vdf_info: Optional[VDFInfo]
     icc_ip_vdf_info: Optional[VDFInfo]
     total_iters: Optional[uint128]
+    def is_end_of_slot(self) -> bool: ...
+    def is_challenge(self) -> bool: ...
     def __init__(
         self,
         proof_of_space: Optional[ProofOfSpace],
@@ -1300,6 +1309,14 @@ class BlockRecord:
     finished_infused_challenge_slot_hashes: Optional[List[bytes32]]
     finished_reward_slot_hashes: Optional[List[bytes32]]
     sub_epoch_summary_included: Optional[SubEpochSummary]
+    is_transaction_block: bool
+    first_in_sub_slot: bool
+    def is_challenge_block(self, constants: ConsensusConstants) -> bool: ...
+    def sp_sub_slot_total_iters(self, constants: ConsensusConstants) -> uint128: ...
+    def ip_sub_slot_total_iters(self, constants: ConsensusConstants) -> uint128: ...
+    def sp_iters(self, constants: ConsensusConstants) -> uint64: ...
+    def ip_iters(self, constants: ConsensusConstants) -> uint64: ...
+    def sp_total_iters(self, constants: ConsensusConstants) -> uint128: ...
     def __init__(
         self,
         header_hash: bytes32,
@@ -2081,6 +2098,9 @@ class UnfinishedHeaderBlock:
     foliage: Foliage
     foliage_transaction_block: Optional[FoliageTransactionBlock]
     transactions_filter: bytes
+    prev_header_hash: bytes32
+    header_hash: bytes32
+    total_iters: uint128
     def __init__(
         self,
         finished_sub_slots: List[EndOfSubSlotBundle],

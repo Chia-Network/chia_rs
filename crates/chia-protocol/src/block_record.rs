@@ -5,10 +5,32 @@ use crate::{Bytes32, ClassgroupElement, Coin, SubEpochSummary};
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
 
+// We don't have the real `ConsensusConstants` because it would be a circular dependency.
+#[cfg(feature = "py-bindings")]
+struct Constants;
+
+#[cfg(feature = "py-bindings")]
+impl chia_traits::TypeStub for Constants {
+    fn type_stub(_builder: &chia_traits::StubBuilder) -> String {
+        "ConsensusConstants".to_string()
+    }
+}
+
 // This class is not included or hashed into the blockchain, but it is kept in memory as a more
 // efficient way to maintain data about the blockchain. This allows us to validate future blocks,
 // difficulty adjustments, etc, without saving the whole header block in memory.
-#[streamable]
+#[streamable(no_stub)]
+#[cfg_attr(feature = "py-bindings", generate_type_stubs(
+    class
+        .field::<bool>("is_transaction_block", None, false)
+        .field::<bool>("first_in_sub_slot", None, false)
+        .method::<bool>("is_challenge_block", |m| m.param::<Constants>("constants"))
+        .method::<u128>("sp_sub_slot_total_iters", |m| m.param::<Constants>("constants"))
+        .method::<u128>("ip_sub_slot_total_iters", |m| m.param::<Constants>("constants"))
+        .method::<u64>("sp_iters", |m| m.param::<Constants>("constants"))
+        .method::<u64>("ip_iters", |m| m.param::<Constants>("constants"))
+        .method::<u128>("sp_total_iters", |m| m.param::<Constants>("constants"))
+))]
 pub struct BlockRecord {
     header_hash: Bytes32,
     // Header hash of the previous block

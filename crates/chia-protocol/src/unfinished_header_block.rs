@@ -6,7 +6,13 @@ use crate::{
     RewardChainBlockUnfinished, VDFProof,
 };
 
-#[streamable]
+#[streamable(no_stub)]
+#[cfg_attr(feature = "py-bindings", generate_type_stubs(
+    class
+        .field::<Bytes32>("prev_header_hash", None, false)
+        .field::<Bytes32>("header_hash", None, false)
+        .field::<u128>("total_iters", None, false)
+))]
 pub struct UnfinishedHeaderBlock {
     /// Same as a FullBlock but without TransactionInfo and Generator, used by light clients.
     /// If first sb.
