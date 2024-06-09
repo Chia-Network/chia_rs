@@ -9,8 +9,11 @@ use sha2::{Digest, Sha256};
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
 
-#[streamable]
+#[streamable(no_stub)]
 #[derive(Copy)]
+#[cfg_attr(feature = "py-bindings", generate_type_stubs(
+    class.method::<Bytes32>("name", |m| m)
+))]
 pub struct Coin {
     parent_coin_info: Bytes32,
     puzzle_hash: Bytes32,

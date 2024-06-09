@@ -4,8 +4,14 @@ use chia_streamable_macro::streamable;
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
 
-#[streamable]
+#[streamable(no_stub)]
 #[derive(Copy)]
+#[cfg_attr(feature = "py-bindings", generate_type_stubs(
+    class
+        .static_method::<Self>("create", |m| m.param::<chia_traits::Bytes>("buffer"))
+        .static_method::<Self>("get_default_element", |m| m)
+        .static_method::<usize>("get_size", |m| m)
+))]
 pub struct ClassgroupElement {
     data: Bytes100,
 }

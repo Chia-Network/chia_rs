@@ -23,8 +23,6 @@ pub fn streamable(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     };
 
-    let is_message = &attr.to_string() == "message";
-
     let mut input: DeriveInput = parse_macro_input!(item);
     let name = input.ident.clone();
     let name_ref = &name;
@@ -75,7 +73,7 @@ pub fn streamable(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
         });
 
-        if is_message {
+        if &attr.to_string() == "message" {
             extra_impls.push(quote! {
                 impl #chia_protocol::ChiaProtocolMessage for #name_ref {
                     fn msg_type() -> #chia_protocol::ProtocolMessageTypes {
@@ -96,18 +94,27 @@ pub fn streamable(attr: TokenStream, item: TokenStream) -> TokenStream {
     // Otherwise, you're calling it from an external crate which doesn't have this infrastructure setup.
     // In that case, the caller can add these macros manually if they want to.
     let attrs = if matches!(found_crate, FoundCrate::Itself) {
-        quote! {
+        let mut derives = proc_macro2::TokenStream::new();
+
+        derives.extend(quote! {
             #[cfg_attr(
                 feature = "py-bindings", pyo3::pyclass(frozen), derive(
                     chia_py_streamable_macro::PyJsonDict,
                     chia_py_streamable_macro::PyStreamable,
                     chia_py_streamable_macro::PyGetters
-                ),
-                generate_type_stubs
+                )
             )]
             #main_derives
             #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+        });
+
+        if &attr.to_string() != "no_stub" {
+            derives.extend(quote! {
+                #[cfg_attr(feature = "py-bindings", generate_type_stubs(class))]
+            });
         }
+
+        derives
     } else {
         main_derives
     };

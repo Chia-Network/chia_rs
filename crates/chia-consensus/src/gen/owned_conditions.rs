@@ -13,7 +13,7 @@ use chia_py_streamable_macro::{PyJsonDict, PyStreamable};
     feature = "py-bindings",
     pyo3::pyclass(name = "Spend", get_all, frozen),
     derive(PyJsonDict, PyStreamable),
-    generate_type_stubs
+    generate_type_stubs(class)
 )]
 pub struct OwnedSpend {
     pub coin_id: Bytes32,
@@ -42,7 +42,7 @@ pub struct OwnedSpend {
     feature = "py-bindings",
     pyo3::pyclass(name = "SpendBundleConditions", get_all, frozen),
     derive(PyJsonDict, PyStreamable),
-    generate_type_stubs
+    generate_type_stubs(class)
 )]
 pub struct OwnedSpendBundleConditions {
     pub spends: Vec<OwnedSpend>,

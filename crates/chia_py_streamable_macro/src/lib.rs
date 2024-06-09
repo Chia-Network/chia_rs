@@ -32,12 +32,12 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
         ident, data, attrs, ..
     } = parse_macro_input!(input);
 
-    let mut generate_type_stubs = false;
+    let mut generate_type_stubs: Option<syn::Expr> = None;
     let mut py_uppercase = false;
     let mut py_pickle = false;
     for attr in &attrs {
         if attr.path().is_ident("generate_type_stubs") {
-            generate_type_stubs = true;
+            generate_type_stubs = Some(attr.parse_args().unwrap());
         } else if attr.path().is_ident("py_uppercase") {
             py_uppercase = true;
         } else if attr.path().is_ident("py_pickle") {
@@ -283,15 +283,16 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
         py_protocol.extend(pickle);
     }
 
-    if generate_type_stubs {
+    if let Some(expr) = generate_type_stubs {
         let lit_name = ident.to_string();
 
         py_protocol.extend(quote! {
             impl #crate_name::TypeStub for #ident {
                 fn type_stub(builder: &#crate_name::StubBuilder) -> String {
                     if !builder.has(#lit_name) {
-                        builder
-                            .class::<Self>(#lit_name)
+                        let class = builder.class::<Self>(#lit_name);
+                        let class = #expr;
+                        class
                             #( .field::<#ftypes>( stringify!(#fnames_maybe_upper), None, true ) )*
                             .generate_streamable();
                     }
