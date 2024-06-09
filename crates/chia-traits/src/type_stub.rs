@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::{cell::RefCell, marker::PhantomData};
 
 use indexmap::{IndexMap, IndexSet};
 
@@ -73,6 +73,115 @@ impl StubBuilder {
 
         result
     }
+
+    pub fn class<T>(&self, name: &str) -> ClassBuilder<'_, T> {
+        ClassBuilder {
+            _phantom: PhantomData,
+            builder: self,
+            name: name.to_string(),
+            init_fields: Vec::new(),
+            items: Vec::new(),
+        }
+    }
+}
+
+#[must_use]
+pub struct ClassBuilder<'a, C> {
+    _phantom: PhantomData<C>,
+    builder: &'a StubBuilder,
+    name: String,
+    init_fields: Vec<String>,
+    items: Vec<String>,
+}
+
+impl<'a, C> ClassBuilder<'a, C>
+where
+    C: TypeStub,
+{
+    pub fn field<T: TypeStub>(mut self, name: &str, default: Option<String>, init: bool) -> Self {
+        if init {
+            self.init_fields
+                .push(field::<T>(self.builder, name, default));
+        } else {
+            self.items.push(field::<T>(self.builder, name, default));
+        }
+        self
+    }
+
+    pub fn static_getter_field<T: TypeStub>(mut self, name: &str) -> Self {
+        self.items
+            .push(static_getter_field::<T>(self.builder, name));
+        self
+    }
+
+    pub fn method<T: TypeStub>(mut self, name: &str, params: &[String]) -> Self {
+        self.items.push(method::<T>(self.builder, name, params));
+        self
+    }
+
+    pub fn static_method<T: TypeStub>(mut self, name: &str, params: &[String]) -> Self {
+        self.items
+            .push(static_method::<T>(self.builder, name, params));
+        self
+    }
+
+    pub fn class_method<T: TypeStub>(mut self, name: &str, params: &[String]) -> Self {
+        self.items
+            .push(class_method::<T>(self.builder, name, params));
+        self
+    }
+
+    pub fn generate(self) {
+        let mut stub = format!("class {}:", C::type_stub(self.builder));
+
+        for item in self.init_fields.iter().chain(self.items.iter()) {
+            let lines: Vec<String> = item.lines().map(|line| format!("    {line}")).collect();
+            stub.push_str(&format!("\n{}", lines.join("\n")));
+        }
+
+        self.builder.define(&self.name, stub);
+    }
+
+    pub fn generate_streamable(&self) {
+        Self {
+            _phantom: PhantomData,
+            builder: self.builder,
+            name: self.name.clone(),
+            init_fields: [self.init_fields.clone(), self.items.clone()].concat(),
+            items: Vec::new(),
+        }
+        .method::<()>("__init__", &self.init_fields)
+        .method::<Int>("__hash__", &[])
+        .method::<String>("__repr__", &[])
+        .method::<Any>("__richcmp__", &[])
+        .method::<C>("__deepcopy__", &[])
+        .method::<C>("__copy__", &[])
+        .static_method::<C>(
+            "from_bytes",
+            &[field::<Bytes>(self.builder, "buffer", None)],
+        )
+        .static_method::<C>(
+            "from_bytes_unchecked",
+            &[field::<Bytes>(self.builder, "buffer", None)],
+        )
+        .static_method::<(C, Int)>(
+            "parse_rust",
+            &[
+                field::<ReadableBuffer>(self.builder, "buffer", None),
+                field::<bool>(self.builder, "trusted", Some("False".to_string())),
+            ],
+        )
+        .method::<Bytes>("to_bytes", &[])
+        .method::<Bytes>("__bytes__", &[])
+        .method::<Bytes>("stream_to_bytes", &[])
+        .method::<SizedBytes<32>>("get_hash", &[])
+        .method::<Any>("to_json_dict", &[])
+        .static_method::<C>(
+            "from_json_dict",
+            &[field::<Any>(self.builder, "json_dict", None)],
+        )
+        .generate();
+    }
 }
 
 pub trait TypeStub {
@@ -131,52 +240,6 @@ impl TypeStub for ReadableBuffer {
         );
         "ReadableBuffer".to_string()
     }
-}
-
-pub fn streamable_class<T: TypeStub>(
-    b: &StubBuilder,
-    init_fields: &[String],
-    other_items: &[String],
-) -> String {
-    let mut items = init_fields.to_vec();
-    items.extend_from_slice(other_items);
-
-    items.push(method::<()>(b, "__init__", init_fields));
-
-    let from_json_dict_params = &[field::<Any>(b, "json_dict", None)];
-    let parse_rust_params = &[
-        field::<ReadableBuffer>(b, "buffer", None),
-        field::<bool>(b, "trusted", Some("False".to_string())),
-    ];
-    let from_bytes_params = &[field::<Bytes>(b, "buffer", None)];
-
-    items.extend_from_slice(&[
-        method::<Int>(b, "__hash__", &[]),
-        method::<String>(b, "__repr__", &[]),
-        method::<Any>(b, "__richcmp__", &[]),
-        method::<T>(b, "__deepcopy__", &[]),
-        method::<T>(b, "__copy__", &[]),
-        static_method::<T>(b, "from_bytes", from_bytes_params),
-        static_method::<T>(b, "from_bytes_unchecked", from_bytes_params),
-        static_method::<(T, Int)>(b, "parse_rust", parse_rust_params),
-        method::<Bytes>(b, "to_bytes", &[]),
-        method::<Bytes>(b, "__bytes__", &[]),
-        method::<Bytes>(b, "stream_to_bytes", &[]),
-        method::<SizedBytes<32>>(b, "get_hash", &[]),
-        method::<Any>(b, "to_json_dict", &[]),
-        static_method::<T>(b, "from_json_dict", from_json_dict_params),
-    ]);
-
-    class::<T>(b, &items)
-}
-
-pub fn class<T: TypeStub>(builder: &StubBuilder, items: &[String]) -> String {
-    let mut stub = format!("class {}:", T::type_stub(builder));
-    for item in items {
-        let lines: Vec<String> = item.lines().map(|line| format!("    {line}")).collect();
-        stub.push_str(&format!("\n{}", lines.join("\n")));
-    }
-    stub
 }
 
 pub fn static_getter_field<T: TypeStub>(builder: &StubBuilder, name: &str) -> String {

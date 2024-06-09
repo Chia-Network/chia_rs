@@ -481,25 +481,21 @@ mod stubs {
 
     use crate::{GTElement, Signature};
 
-    use chia_traits::{
-        class_method, field, method, static_getter_field, static_method, streamable_class,
-        StubBuilder, TypeStub,
-    };
+    use chia_traits::{field, StubBuilder, TypeStub};
 
     impl TypeStub for Signature {
-        fn type_stub(b: &StubBuilder) -> String {
-            if !b.has("G2Element") {
-                let items = &[
-                    static_getter_field::<usize>(b, "SIZE"),
-                    class_method::<Self>(b, "__new__", &[]),
-                    method::<GTElement>(b, "pair", &[field::<PublicKey>(b, "public_key", None)]),
-                    static_method::<Self>(b, "generator", &[]),
-                    method::<String>(b, "__str__", &[]),
-                    method::<Self>(b, "__add__", &[field::<Self>(b, "rhs", None)]),
-                    method::<Self>(b, "__iadd__", &[field::<Self>(b, "rhs", None)]),
-                ];
-                let class = streamable_class::<Self>(b, &[], items);
-                b.define("G2Element", class);
+        fn type_stub(builder: &StubBuilder) -> String {
+            if !builder.has("G2Element") {
+                builder
+                    .class::<Self>("G2Element")
+                    .static_getter_field::<usize>("SIZE")
+                    .class_method::<Self>("__new__", &[])
+                    .method::<GTElement>("pair", &[field::<PublicKey>(builder, "public_key", None)])
+                    .static_method::<Self>("generator", &[])
+                    .method::<String>("__str__", &[])
+                    .method::<Self>("__add__", &[field::<Self>(builder, "rhs", None)])
+                    .method::<Self>("__iadd__", &[field::<Self>(builder, "rhs", None)])
+                    .generate_streamable();
             }
             "G2Element".to_string()
         }

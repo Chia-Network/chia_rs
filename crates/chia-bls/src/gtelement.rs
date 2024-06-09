@@ -105,21 +105,18 @@ impl Streamable for GTElement {
 mod stubs {
     use super::*;
 
-    use chia_traits::{
-        field, method, static_getter_field, streamable_class, StubBuilder, TypeStub,
-    };
+    use chia_traits::{field, StubBuilder, TypeStub};
 
     impl TypeStub for GTElement {
-        fn type_stub(b: &StubBuilder) -> String {
-            if !b.has("GTElement") {
-                let items = &[
-                    static_getter_field::<usize>(b, "SIZE"),
-                    method::<String>(b, "__str__", &[]),
-                    method::<Self>(b, "__mul__", &[field::<Self>(b, "rhs", None)]),
-                    method::<Self>(b, "__imul__", &[field::<Self>(b, "rhs", None)]),
-                ];
-                let class = streamable_class::<Self>(b, &[], items);
-                b.define("GTElement", class);
+        fn type_stub(builder: &StubBuilder) -> String {
+            if !builder.has("GTElement") {
+                builder
+                    .class::<Self>("GTElement")
+                    .static_getter_field::<usize>("SIZE")
+                    .method::<String>("__str__", &[])
+                    .method::<Self>("__mul__", &[field::<Self>(builder, "rhs", None)])
+                    .method::<Self>("__imul__", &[field::<Self>(builder, "rhs", None)])
+                    .generate_streamable();
             }
             "GTElement".to_string()
         }
