@@ -1,4 +1,4 @@
-pub use indexmap::{IndexMap, IndexSet};
+use indexmap::{IndexMap, IndexSet};
 
 #[derive(Default)]
 pub struct StubBuilder {
