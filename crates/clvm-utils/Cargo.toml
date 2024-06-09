@@ -18,4 +18,4 @@ hex = { workspace = true }
 
 [dev-dependencies]
 rstest = { workspace = true }
-clvm-traits = { workspace = true, features = ["derive"] }
+clvm-traits = { path = "../clvm-traits", features = ["derive"] }
