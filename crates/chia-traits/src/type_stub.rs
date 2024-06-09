@@ -242,6 +242,15 @@ impl TypeStub for Any {
     }
 }
 
+pub struct Object;
+
+impl TypeStub for Object {
+    fn type_stub(builder: &StubBuilder) -> String {
+        builder.import("typing", &["Object"]);
+        "Object".to_string()
+    }
+}
+
 impl TypeStub for () {
     fn type_stub(_builder: &StubBuilder) -> String {
         "None".to_string()
@@ -271,6 +280,18 @@ impl<const LEN: usize> TypeStub for SizedBytes<LEN> {
         let name = format!("bytes{LEN}");
         builder.import(".sized_bytes", &[&name]);
         name
+    }
+}
+
+pub struct ChiaProgram;
+
+impl TypeStub for ChiaProgram {
+    fn type_stub(builder: &StubBuilder) -> String {
+        builder.import(
+            "chia.types.blockchain_format.program",
+            &["Program as ChiaProgram"],
+        );
+        "ChiaProgram".to_string()
     }
 }
 
