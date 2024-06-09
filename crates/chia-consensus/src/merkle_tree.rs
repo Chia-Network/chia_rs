@@ -554,6 +554,29 @@ impl MerkleSet {
     }
 }
 
+#[cfg(feature = "py-bindings")]
+mod stubs {
+    use super::*;
+
+    use chia_traits::{Bytes, StubBuilder, TypeStub};
+
+    impl TypeStub for MerkleSet {
+        fn type_stub(builder: &StubBuilder) -> String {
+            if !builder.has("MerkleSet") {
+                builder
+                    .class::<Self>("MerkleSet")
+                    .method::<Bytes32>("get_root", |m| m)
+                    .method::<(bool, Bytes)>("is_included_already_hashed", |m| {
+                        m.param::<Bytes>("to_check")
+                    })
+                    .method::<()>("__init__", |m| m.param::<Vec<Bytes32>>("leafs"))
+                    .generate();
+            }
+            "MerkleSet".to_string()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

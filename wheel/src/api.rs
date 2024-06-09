@@ -3,7 +3,7 @@ use crate::visitor::Visitor;
 use aug_scheme_mpl::AugSchemeMPL;
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::consensus_constants::ConsensusConstants;
-use chia_consensus::gen::conditions::MempoolVisitor;
+use chia_consensus::gen::conditions::{MempoolVisitor, ELIGIBLE_FOR_DEDUP, ELIGIBLE_FOR_FF};
 use chia_consensus::gen::flags::{
     AGG_SIG_ARGS, ALLOW_BACKREFS, ANALYZE_SPENDS, COND_ARGS_NIL, DISALLOW_INFINITY_G1,
     ENABLE_MESSAGE_CONDITIONS, ENABLE_SOFTFORK_CONDITION, MEMPOOL_MODE, NO_UNKNOWN_CONDS,
@@ -290,40 +290,13 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(solution_generator_backrefs, m)?)?;
     m.add_function(wrap_pyfunction!(supports_fast_forward, m)?)?;
     m.add_function(wrap_pyfunction!(fast_forward_singleton, m)?)?;
-    m.add(
-        "ELIGIBLE_FOR_DEDUP",
-        chia_consensus::gen::conditions::ELIGIBLE_FOR_DEDUP,
-    )?;
-    m.add(
-        "ELIGIBLE_FOR_FF",
-        chia_consensus::gen::conditions::ELIGIBLE_FOR_FF,
-    )?;
 
     // merkle tree
-    m.add_class::<MerkleSet>()?;
     m.add_function(wrap_pyfunction!(confirm_included_already_hashed, m)?)?;
     m.add_function(wrap_pyfunction!(confirm_not_included_already_hashed, m)?)?;
 
-    // clvm functions
-    m.add("COND_ARGS_NIL", COND_ARGS_NIL)?;
-    m.add("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;
-    m.add("STRICT_ARGS_COUNT", STRICT_ARGS_COUNT)?;
-    m.add("AGG_SIG_ARGS", AGG_SIG_ARGS)?;
-    m.add("ENABLE_FIXED_DIV", ENABLE_FIXED_DIV)?;
-    m.add("ENABLE_SOFTFORK_CONDITION", ENABLE_SOFTFORK_CONDITION)?;
-    m.add("ENABLE_MESSAGE_CONDITIONS", ENABLE_MESSAGE_CONDITIONS)?;
-    m.add("MEMPOOL_MODE", MEMPOOL_MODE)?;
-    m.add("ALLOW_BACKREFS", ALLOW_BACKREFS)?;
-    m.add("ANALYZE_SPENDS", ANALYZE_SPENDS)?;
-    m.add("DISALLOW_INFINITY_G1", DISALLOW_INFINITY_G1)?;
-
     // facilities from clvm_rs
-
     m.add_function(wrap_pyfunction!(run_chia_program, m)?)?;
-    m.add("NO_UNKNOWN_OPS", NO_UNKNOWN_OPS)?;
-    m.add("LIMIT_HEAP", LIMIT_HEAP)?;
-    m.add("ENABLE_BLS_OPS_OUTSIDE_GUARD", ENABLE_BLS_OPS_OUTSIDE_GUARD)?;
-
     m.add_function(wrap_pyfunction!(serialized_length, m)?)?;
     m.add_function(wrap_pyfunction!(compute_merkle_set_root, m)?)?;
     m.add_function(wrap_pyfunction!(tree_hash, m)?)?;
@@ -335,10 +308,29 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 
 pub fn bindings(m: &impl Visitor) -> Result<(), PyErr> {
+    // clvm
+    m.int("NO_UNKNOWN_OPS", NO_UNKNOWN_OPS)?;
+    m.int("LIMIT_HEAP", LIMIT_HEAP)?;
+    m.int("ENABLE_BLS_OPS_OUTSIDE_GUARD", ENABLE_BLS_OPS_OUTSIDE_GUARD)?;
+
     // chia-consensus
     m.visit::<OwnedSpendBundleConditions>()?;
     m.visit::<OwnedSpend>()?;
     m.visit::<ConsensusConstants>()?;
+    m.visit::<MerkleSet>()?;
+    m.int("COND_ARGS_NIL", COND_ARGS_NIL)?;
+    m.int("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;
+    m.int("STRICT_ARGS_COUNT", STRICT_ARGS_COUNT)?;
+    m.int("AGG_SIG_ARGS", AGG_SIG_ARGS)?;
+    m.int("ENABLE_FIXED_DIV", ENABLE_FIXED_DIV)?;
+    m.int("ENABLE_SOFTFORK_CONDITION", ENABLE_SOFTFORK_CONDITION)?;
+    m.int("ENABLE_MESSAGE_CONDITIONS", ENABLE_MESSAGE_CONDITIONS)?;
+    m.int("MEMPOOL_MODE", MEMPOOL_MODE)?;
+    m.int("ALLOW_BACKREFS", ALLOW_BACKREFS)?;
+    m.int("ANALYZE_SPENDS", ANALYZE_SPENDS)?;
+    m.int("DISALLOW_INFINITY_G1", DISALLOW_INFINITY_G1)?;
+    m.int("ELIGIBLE_FOR_DEDUP", ELIGIBLE_FOR_DEDUP)?;
+    m.int("ELIGIBLE_FOR_FF", ELIGIBLE_FOR_FF)?;
 
     // chia-protocol
     m.visit::<Coin>()?;
