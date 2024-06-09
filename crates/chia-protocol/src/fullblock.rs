@@ -9,7 +9,18 @@ use crate::VDFProof;
 use crate::{Foliage, FoliageTransactionBlock, TransactionsInfo};
 use chia_traits::Streamable;
 
-#[streamable]
+#[streamable(no_stub)]
+#[cfg_attr(feature = "py-bindings", generate_type_stubs(
+    class
+    .field::<Bytes32>("prev_header_hash", None, false)
+    .field::<Bytes32>("header_hash", None, false)
+    .method::<bool>("is_transaction_block", |m| m)
+    .field::<u128>("total_iters", None, false)
+    .field::<u32>("height", None, false)
+    .field::<u128>("weight", None, false)
+    .method::<Vec<Coin>>("get_included_reward_coins", |m| m)
+    .method::<bool>("is_fully_compactified", |m| m)
+))]
 pub struct FullBlock {
     finished_sub_slots: Vec<EndOfSubSlotBundle>,
     reward_chain_block: RewardChainBlock,

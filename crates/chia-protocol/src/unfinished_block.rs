@@ -8,7 +8,14 @@ use crate::VDFProof;
 use crate::{Foliage, FoliageTransactionBlock, TransactionsInfo};
 use chia_traits::Streamable;
 
-#[streamable]
+#[streamable(no_stub)]
+#[cfg_attr(feature = "py-bindings", generate_type_stubs(
+    class
+    .field::<Bytes32>("prev_header_hash", None, false)
+    .field::<Bytes32>("partial_hash", None, false)
+    .method::<bool>("is_transaction_block", |m| m)
+    .field::<u128>("total_iters", None, false)
+))]
 pub struct UnfinishedBlock {
     // Full block, without the final VDFs
     finished_sub_slots: Vec<EndOfSubSlotBundle>, // If first sb

@@ -1184,6 +1184,10 @@ class UnfinishedBlock:
     transactions_info: Optional[TransactionsInfo]
     transactions_generator: Optional[Program]
     transactions_generator_ref_list: List[uint32]
+    prev_header_hash: bytes32
+    partial_hash: bytes32
+    def is_transaction_block(self) -> bool: ...
+    total_iters: uint128
     def __init__(
         self,
         finished_sub_slots: List[EndOfSubSlotBundle],
@@ -1228,6 +1232,14 @@ class FullBlock:
     transactions_info: Optional[TransactionsInfo]
     transactions_generator: Optional[Program]
     transactions_generator_ref_list: List[uint32]
+    prev_header_hash: bytes32
+    header_hash: bytes32
+    def is_transaction_block(self) -> bool: ...
+    total_iters: uint128
+    height: uint32
+    weight: uint128
+    def get_included_reward_coins(self) -> List[Coin]: ...
+    def is_fully_compactified(self) -> bool: ...
     def __init__(
         self,
         finished_sub_slots: List[EndOfSubSlotBundle],
@@ -1376,6 +1388,15 @@ class HeaderBlock:
     foliage_transaction_block: Optional[FoliageTransactionBlock]
     transactions_filter: bytes
     transactions_info: Optional[TransactionsInfo]
+    prev_header_hash: bytes32
+    prev_hash: bytes32
+    height: uint32
+    weight: uint128
+    header_hash: bytes32
+    total_iters: uint128
+    def log_string(self) -> str: ...
+    def is_transaction_block(self) -> bool: ...
+    def first_in_sub_slot(self) -> bool: ...
     def __init__(
         self,
         finished_sub_slots: List[EndOfSubSlotBundle],
