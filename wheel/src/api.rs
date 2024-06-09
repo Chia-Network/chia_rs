@@ -1,5 +1,6 @@
 use crate::run_generator::{run_block_generator, run_block_generator2};
 use crate::visitor::Visitor;
+use aug_scheme_mpl::AugSchemeMPL;
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::gen::conditions::MempoolVisitor;
@@ -43,14 +44,12 @@ use chia_protocol::{
 use clvm_utils::tree_hash_from_bytes;
 use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV, LIMIT_HEAP, NO_UNKNOWN_OPS};
 use pyo3::buffer::PyBuffer;
-use pyo3::exceptions::{PyRuntimeError, PyValueError};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::pybacked::PyBackedBytes;
 use pyo3::types::PyBytes;
-use pyo3::types::PyList;
 use pyo3::types::PyTuple;
 use pyo3::wrap_pyfunction;
-use std::iter::zip;
 
 use crate::run_program::{run_chia_program, serialized_length};
 
@@ -67,10 +66,9 @@ use clvmr::serde::node_to_bytes;
 use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs};
 use clvmr::ChiaDialect;
 
-use chia_bls::{
-    hash_to_g2 as native_hash_to_g2, BlsCache, DerivableKey, GTElement, PublicKey, SecretKey,
-    Signature,
-};
+use chia_bls::{BlsCache, GTElement, PublicKey, SecretKey, Signature};
+
+mod aug_scheme_mpl;
 
 #[pyfunction]
 pub fn compute_merkle_set_root<'p>(
@@ -229,90 +227,6 @@ fn solution_generator_backrefs<'p>(
         py,
         &native_solution_generator_backrefs(spends)?,
     ))
-}
-
-#[pyclass]
-struct AugSchemeMPL {}
-
-#[pymethods]
-impl AugSchemeMPL {
-    #[staticmethod]
-    #[pyo3(signature = (pk,msg,prepend_pk=None))]
-    pub fn sign(pk: &SecretKey, msg: &[u8], prepend_pk: Option<&PublicKey>) -> Signature {
-        match prepend_pk {
-            Some(prefix) => {
-                let mut aug_msg = prefix.to_bytes().to_vec();
-                aug_msg.extend_from_slice(msg);
-                chia_bls::sign_raw(pk, aug_msg)
-            }
-            None => chia_bls::sign(pk, msg),
-        }
-    }
-
-    #[staticmethod]
-    pub fn aggregate(sigs: &Bound<'_, PyList>) -> PyResult<Signature> {
-        let mut ret = Signature::default();
-        for p2 in sigs {
-            ret += &p2.extract::<Signature>()?;
-        }
-        Ok(ret)
-    }
-
-    #[staticmethod]
-    pub fn verify(pk: &PublicKey, msg: &[u8], sig: &Signature) -> bool {
-        chia_bls::verify(sig, pk, msg)
-    }
-
-    #[staticmethod]
-    pub fn aggregate_verify(
-        pks: &Bound<'_, PyList>,
-        msgs: &Bound<'_, PyList>,
-        sig: &Signature,
-    ) -> PyResult<bool> {
-        let mut data = Vec::<(PublicKey, Vec<u8>)>::new();
-        if pks.len() != msgs.len() {
-            return Err(PyRuntimeError::new_err(
-                "aggregate_verify expects the same number of public keys as messages",
-            ));
-        }
-        for (pk, msg) in zip(pks, msgs) {
-            let pk = pk.extract::<PublicKey>()?;
-            let msg = msg.extract::<Vec<u8>>()?;
-            data.push((pk, msg));
-        }
-
-        Ok(chia_bls::aggregate_verify(sig, data))
-    }
-
-    #[staticmethod]
-    pub fn g2_from_message(msg: &[u8]) -> Signature {
-        native_hash_to_g2(msg)
-    }
-
-    #[staticmethod]
-    pub fn derive_child_sk(sk: &SecretKey, index: u32) -> SecretKey {
-        sk.derive_hardened(index)
-    }
-
-    #[staticmethod]
-    pub fn derive_child_sk_unhardened(sk: &SecretKey, index: u32) -> SecretKey {
-        sk.derive_unhardened(index)
-    }
-
-    #[staticmethod]
-    pub fn derive_child_pk_unhardened(pk: &PublicKey, index: u32) -> PublicKey {
-        pk.derive_unhardened(index)
-    }
-
-    #[staticmethod]
-    pub fn key_gen(seed: &[u8]) -> PyResult<SecretKey> {
-        if seed.len() < 32 {
-            return Err(PyRuntimeError::new_err(
-                "Seed size must be at leat 32 bytes",
-            ));
-        }
-        Ok(SecretKey::from_seed(seed))
-    }
 }
 
 #[pyfunction]
@@ -533,21 +447,19 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(tree_hash, m)?)?;
     m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin, m)?)?;
 
-    // facilities from chia-bls
-
     bindings(m)?;
-    m.add_class::<AugSchemeMPL>()?;
 
     Ok(())
 }
 
 pub fn bindings(m: &impl Visitor) -> Result<(), PyErr> {
+    // chia-bls
+    m.visit::<AugSchemeMPL>()?;
     m.visit::<BlsCache>()?;
     m.visit::<PublicKey>()?;
     m.visit::<Signature>()?;
     m.visit::<GTElement>()?;
     m.visit::<SecretKey>()?;
-    // m.visit::<AugSchemeMPL>()?;
 
     Ok(())
 }
