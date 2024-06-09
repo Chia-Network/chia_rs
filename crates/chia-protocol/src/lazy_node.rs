@@ -1,3 +1,4 @@
+use chia_traits::{Bytes, TypeStub};
 use clvmr::{allocator::NodePtr, allocator::SExp, Allocator};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyTuple};
@@ -48,5 +49,18 @@ impl LazyNode {
             allocator: a,
             node: n,
         }
+    }
+}
+
+impl TypeStub for LazyNode {
+    fn type_stub(builder: &chia_traits::StubBuilder) -> String {
+        if !builder.has("LazyNode") {
+            builder
+                .class::<Self>()
+                .field::<Option<(Self, Self)>>("pair", None, false)
+                .field::<Option<Bytes>>("atom", None, false)
+                .generate();
+        }
+        "LazyNode".to_string()
     }
 }

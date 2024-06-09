@@ -1991,6 +1991,10 @@ class TimestampedPeerInfo:
         timestamp: Union[uint64, _Unspec] = _Unspec,
     ) -> TimestampedPeerInfo: ...
 
+class LazyNode:
+    pair: Optional[Tuple[LazyNode, LazyNode]]
+    atom: Optional[bytes]
+
 class RequestPuzzleSolution:
     coin_name: bytes32
     height: uint32
