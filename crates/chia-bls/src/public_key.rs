@@ -310,11 +310,11 @@ mod stubs {
     impl TypeStub for PublicKey {
         fn type_stub(b: &mut StubBuilder) -> String {
             if !b.has("G1Element") {
-                let add_params = &[field::<Self>(b, "other", None)];
-                let pair_params = &[field::<Signature>(b, "other", None)];
+                let add_params = &[field::<Self>(b, "rhs", None)];
+                let pair_params = &[field::<Signature>(b, "signature", None)];
                 let items = &[
-                    class_method::<Self>(b, "__new__", &[]),
                     static_getter_field::<usize>(b, "SIZE"),
+                    class_method::<Self>(b, "__new__", &[]),
                     method::<Int>(b, "get_fingerprint", &[]),
                     method::<GTElement>(b, "pair", pair_params),
                     static_method::<Self>(b, "generator", &[]),

@@ -84,7 +84,7 @@ impl BlsCache {
 mod stubs {
     use super::*;
 
-    use chia_traits::{class, field, method, Bytes, NoneType, StubBuilder, TypeStub};
+    use chia_traits::{class, field, method, Bytes, StubBuilder, TypeStub};
 
     impl TypeStub for BlsCache {
         fn type_stub(b: &mut StubBuilder) -> String {
@@ -95,17 +95,17 @@ mod stubs {
                     Some("50000".to_string()),
                 )];
                 let aggregate_verify_params = &[
-                    field::<PublicKey>(b, "pks", None),
-                    field::<Bytes>(b, "msgs", None),
+                    field::<Vec<PublicKey>>(b, "pks", None),
+                    field::<Vec<Bytes>>(b, "msgs", None),
                     field::<Signature>(b, "sig", None),
                 ];
                 let update_params = &[field::<Vec<(Bytes, Bytes)>>(b, "other", None)];
                 let items = &[
-                    method::<NoneType>(b, "__init__", init_params),
+                    method::<()>(b, "__init__", init_params),
                     method::<usize>(b, "len", &[]),
                     method::<bool>(b, "aggregate_verify", aggregate_verify_params),
                     method::<Vec<(Bytes, Bytes)>>(b, "items", &[]),
-                    method::<NoneType>(b, "update", update_params),
+                    method::<()>(b, "update", update_params),
                 ];
                 let class = class::<Self>(b, items);
                 b.define("BLSCache", class);

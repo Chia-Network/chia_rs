@@ -75,9 +75,7 @@ impl TypeStub for Any {
     }
 }
 
-pub struct NoneType;
-
-impl TypeStub for NoneType {
+impl TypeStub for () {
     fn type_stub(_builder: &mut StubBuilder) -> String {
         "None".to_string()
     }
@@ -130,11 +128,11 @@ pub fn streamable_class<T: TypeStub>(
     let mut items = init_fields.to_vec();
     items.extend_from_slice(other_items);
 
-    items.push(method::<NoneType>(b, "__init__", init_fields));
+    items.push(method::<()>(b, "__init__", init_fields));
 
     let from_json_dict_params = &[field::<Any>(b, "json_dict", None)];
     let parse_rust_params = &[
-        field::<ReadableBuffer>(b, "blob", None),
+        field::<ReadableBuffer>(b, "buffer", None),
         field::<bool>(b, "trusted", Some("False".to_string())),
     ];
     let from_bytes_params = &[field::<Bytes>(b, "buffer", None)];
@@ -313,6 +311,8 @@ macro_rules! tuple_stub {
                 builder.import("typing", &["Tuple"]);
                 let mut stub = "Tuple[".to_string();
                 $( stub.push_str(&format!("{}, ", <$ty as TypeStub>::type_stub(builder))); )+
+                stub.pop().unwrap();
+                stub.pop().unwrap();
                 stub.push(']');
                 stub
             }
