@@ -16,7 +16,10 @@ fn maybe_upper_fields(py_uppercase: bool, fnames: Vec<Ident>) -> Vec<Ident> {
     }
 }
 
-#[proc_macro_derive(PyStreamable, attributes(generate_type_stubs, py_uppercase, py_pickle))]
+#[proc_macro_derive(
+    PyStreamable,
+    attributes(generate_type_stubs, stub_class_name, py_uppercase, py_pickle)
+)]
 pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let found_crate = crate_name("chia-traits").expect("chia-traits is present in `Cargo.toml`");
 
@@ -33,11 +36,14 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
     } = parse_macro_input!(input);
 
     let mut generate_type_stubs: Option<syn::Expr> = None;
+    let mut stub_class_name: Option<syn::LitStr> = None;
     let mut py_uppercase = false;
     let mut py_pickle = false;
     for attr in &attrs {
         if attr.path().is_ident("generate_type_stubs") {
             generate_type_stubs = Some(attr.parse_args().unwrap());
+        } else if attr.path().is_ident("stub_class_name") {
+            stub_class_name = Some(attr.parse_args().unwrap());
         } else if attr.path().is_ident("py_uppercase") {
             py_uppercase = true;
         } else if attr.path().is_ident("py_pickle") {
@@ -284,13 +290,18 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
     }
 
     if let Some(expr) = generate_type_stubs {
-        let lit_name = ident.to_string();
+        let lit_name = stub_class_name
+            .map(|name| {
+                let string = name.token().to_string();
+                string[1..string.len() - 1].to_string()
+            })
+            .unwrap_or(ident.to_string());
 
         py_protocol.extend(quote! {
             impl #crate_name::TypeStub for #ident {
                 fn type_stub(builder: &#crate_name::StubBuilder) -> String {
                     if !builder.has(#lit_name) {
-                        let class = builder.class::<Self>(#lit_name);
+                        let class = builder.class::<Self>();
                         let class = #expr;
                         class
                             #( .field::<#ftypes>( stringify!(#fnames_maybe_upper), None, true ) )*

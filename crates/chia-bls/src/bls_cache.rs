@@ -172,7 +172,7 @@ mod python {
         fn type_stub(builder: &StubBuilder) -> String {
             if !builder.has("BLSCache") {
                 builder
-                    .class::<Self>("BLSCache")
+                    .class::<Self>()
                     .method::<()>("__init__", |m| {
                         m.default_param::<Option<usize>>("cache_size", "50000")
                     })

@@ -461,7 +461,7 @@ mod stubs {
         fn type_stub(builder: &StubBuilder) -> String {
             if !builder.has("Program") {
                 builder
-                    .class::<Self>("Program")
+                    .class::<Self>()
                     .method::<crate::Bytes32>("get_tree_hash", |m| m)
                     .static_method::<Self>("default", |m| m)
                     .static_method::<Self>("fromhex", |m| m.param::<String>("hex"))

@@ -541,7 +541,7 @@ mod pybindings {
         fn type_stub(builder: &StubBuilder) -> String {
             if !builder.has("G2Element") {
                 builder
-                    .class::<Self>("G2Element")
+                    .class::<Self>()
                     .static_getter_field::<usize>("SIZE")
                     .class_method::<Self>("__new__", none)
                     .method::<GTElement>("pair", |m| m.param::<PublicKey>("public_key"))

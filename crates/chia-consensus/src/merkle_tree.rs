@@ -564,7 +564,7 @@ mod stubs {
         fn type_stub(builder: &StubBuilder) -> String {
             if !builder.has("MerkleSet") {
                 builder
-                    .class::<Self>("MerkleSet")
+                    .class::<Self>()
                     .method::<Bytes32>("get_root", |m| m)
                     .method::<(bool, Bytes)>("is_included_already_hashed", |m| {
                         m.param::<Bytes>("to_check")

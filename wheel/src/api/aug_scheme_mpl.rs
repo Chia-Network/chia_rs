@@ -92,7 +92,7 @@ impl TypeStub for AugSchemeMPL {
     fn type_stub(builder: &StubBuilder) -> String {
         if !builder.has("AugSchemeMPL") {
             builder
-                .class::<Self>("AugSchemeMPL")
+                .class::<Self>()
                 .static_method::<Signature>("sign", |m| {
                     m.param::<SecretKey>("sk")
                         .param::<Bytes>("msg")

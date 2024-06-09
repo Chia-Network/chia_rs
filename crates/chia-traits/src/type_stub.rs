@@ -83,11 +83,10 @@ impl StubBuilder {
         result
     }
 
-    pub fn class<T>(&self, name: &str) -> ClassBuilder<'_, T> {
+    pub fn class<T>(&self) -> ClassBuilder<'_, T> {
         ClassBuilder {
             _phantom: PhantomData,
             builder: self,
-            name: name.to_string(),
             init_fields: Vec::new(),
             items: Vec::new(),
         }
@@ -102,7 +101,6 @@ impl StubBuilder {
 pub struct ClassBuilder<'a, C> {
     _phantom: PhantomData<C>,
     builder: &'a StubBuilder,
-    name: String,
     init_fields: Vec<String>,
     items: Vec<String>,
 }
@@ -182,14 +180,13 @@ where
             stub.push_str(&format!("\n{}", lines.join("\n")));
         }
 
-        self.builder.define(&self.name, stub);
+        self.builder.define(&C::type_stub(self.builder), stub);
     }
 
     pub fn generate_streamable(self) {
         Self {
             _phantom: PhantomData,
             builder: self.builder,
-            name: self.name.clone(),
             init_fields: [self.init_fields.clone(), self.items.clone()].concat(),
             items: Vec::new(),
         }

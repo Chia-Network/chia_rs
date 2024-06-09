@@ -167,7 +167,7 @@ mod pybindings {
         fn type_stub(builder: &StubBuilder) -> String {
             if !builder.has("GTElement") {
                 builder
-                    .class::<Self>("GTElement")
+                    .class::<Self>()
                     .static_getter_field::<usize>("SIZE")
                     .method::<String>("__str__", none)
                     .method::<Self>("__mul__", |m| m.param::<Self>("rhs"))

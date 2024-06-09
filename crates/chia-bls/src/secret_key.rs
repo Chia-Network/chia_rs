@@ -285,7 +285,7 @@ mod pybindings {
         fn type_stub(builder: &StubBuilder) -> String {
             if !builder.has("PrivateKey") {
                 builder
-                    .class::<Self>("PrivateKey")
+                    .class::<Self>()
                     .static_getter_field::<usize>("PRIVATE_KEY_SIZE")
                     .method::<Signature>("sign_g2", |m| {
                         m.param::<Bytes>("msg").param::<Bytes>("dst")

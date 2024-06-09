@@ -366,7 +366,7 @@ mod pybindings {
         fn type_stub(builder: &StubBuilder) -> String {
             if !builder.has("G1Element") {
                 builder
-                    .class::<Self>("G1Element")
+                    .class::<Self>()
                     .static_getter_field::<usize>("SIZE")
                     .class_method::<Self>("__new__", none)
                     .method::<Int>("get_fingerprint", none)
