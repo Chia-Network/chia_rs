@@ -315,7 +315,7 @@ impl TypeStub for Any {
 pub struct Object;
 
 impl TypeStub for Object {
-    fn type_stub(builder: &StubBuilder) -> String {
+    fn type_stub(_builder: &StubBuilder) -> String {
         "object".to_string()
     }
 }
