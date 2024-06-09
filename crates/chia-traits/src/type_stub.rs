@@ -255,17 +255,17 @@ pub fn field<T: TypeStub>(builder: &StubBuilder, name: &str, default: Option<Str
     }
 }
 
-pub fn method<T: TypeStub>(builder: &StubBuilder, name: &str, params: &[String]) -> String {
+fn method<T: TypeStub>(builder: &StubBuilder, name: &str, params: &[String]) -> String {
     let mut params = params.to_vec();
     params.insert(0, "self".to_string());
     raw_method::<T>(builder, false, name, &params)
 }
 
-pub fn static_method<T: TypeStub>(builder: &StubBuilder, name: &str, params: &[String]) -> String {
+fn static_method<T: TypeStub>(builder: &StubBuilder, name: &str, params: &[String]) -> String {
     raw_method::<T>(builder, true, name, params)
 }
 
-pub fn class_method<T: TypeStub>(builder: &StubBuilder, name: &str, params: &[String]) -> String {
+fn class_method<T: TypeStub>(builder: &StubBuilder, name: &str, params: &[String]) -> String {
     let mut params = params.to_vec();
     params.insert(0, "cls".to_string());
     raw_method::<T>(builder, false, name, &params)
