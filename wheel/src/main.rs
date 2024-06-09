@@ -25,7 +25,7 @@ fn main() {
 
 fn stubs() -> String {
     let builder = StubBuilder::default();
-    bindings(&builder).unwrap();
+    bindings(&builder);
     builder.generate()
 }
 

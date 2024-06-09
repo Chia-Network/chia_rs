@@ -302,7 +302,7 @@ mod pybindings {
 
     use crate::{parse_hex::parse_hex_string, GTElement, Signature};
 
-    use chia_traits::{none, FromJsonDict, Int, StubBuilder, ToJsonDict, TypeStub};
+    use chia_traits::{FromJsonDict, Int, StubBuilder, ToJsonDict, TypeStub};
     use pyo3::prelude::*;
 
     #[pymethods]
@@ -364,15 +364,15 @@ mod pybindings {
 
     impl TypeStub for PublicKey {
         fn type_stub(builder: &StubBuilder) -> String {
-            if !builder.has("G1Element") {
+            if !builder.has_class("G1Element") {
                 builder
                     .class::<Self>()
                     .static_getter_field::<usize>("SIZE")
-                    .class_method::<Self>("__new__", none)
-                    .method::<Int>("get_fingerprint", none)
+                    .class_method::<Self>("__new__", |m| m)
+                    .method::<Int>("get_fingerprint", |m| m)
                     .method::<GTElement>("pair", |m| m.param::<Signature>("signature"))
-                    .static_method::<Self>("generator", none)
-                    .method::<String>("__str__", none)
+                    .static_method::<Self>("generator", |m| m)
+                    .method::<String>("__str__", |m| m)
                     .method::<Self>("__add__", |m| m.param::<Self>("rhs"))
                     .method::<Self>("__iadd__", |m| m.param::<Self>("rhs"))
                     .generate_streamable();

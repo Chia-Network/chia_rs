@@ -242,7 +242,7 @@ mod pybindings {
 
     use crate::{parse_hex::parse_hex_string, PublicKey, Signature};
 
-    use chia_traits::{none, Bytes, FromJsonDict, StubBuilder, ToJsonDict, TypeStub};
+    use chia_traits::{Bytes, FromJsonDict, StubBuilder, ToJsonDict, TypeStub};
     use pyo3::prelude::*;
 
     #[pymethods]
@@ -283,15 +283,15 @@ mod pybindings {
 
     impl TypeStub for SecretKey {
         fn type_stub(builder: &StubBuilder) -> String {
-            if !builder.has("PrivateKey") {
+            if !builder.has_class("PrivateKey") {
                 builder
                     .class::<Self>()
                     .static_getter_field::<usize>("PRIVATE_KEY_SIZE")
                     .method::<Signature>("sign_g2", |m| {
                         m.param::<Bytes>("msg").param::<Bytes>("dst")
                     })
-                    .method::<PublicKey>("get_g1", none)
-                    .method::<String>("__str__", none)
+                    .method::<PublicKey>("get_g1", |m| m)
+                    .method::<String>("__str__", |m| m)
                     .generate_streamable();
             }
             "PrivateKey".to_string()

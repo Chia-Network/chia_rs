@@ -54,7 +54,7 @@ impl LazyNode {
 
 impl TypeStub for LazyNode {
     fn type_stub(builder: &chia_traits::StubBuilder) -> String {
-        if !builder.has("LazyNode") {
+        if !builder.has_class("LazyNode") {
             builder
                 .class::<Self>()
                 .field::<Option<(Self, Self)>>("pair", None, false)

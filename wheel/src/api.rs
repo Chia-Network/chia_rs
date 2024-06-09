@@ -41,6 +41,7 @@ use chia_protocol::{
     SubEpochSummary, SubSlotData, SubSlotProofs, TimestampedPeerInfo, TransactionAck,
     TransactionsInfo, UnfinishedBlock, UnfinishedHeaderBlock, VDFInfo, VDFProof, WeightProof,
 };
+use chia_traits::{Bytes, Int, ReadableBuffer};
 use clvm_utils::tree_hash_from_bytes;
 use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV, LIMIT_HEAP, NO_UNKNOWN_OPS};
 use pyo3::buffer::PyBuffer;
@@ -281,182 +282,292 @@ fn fast_forward_singleton<'p>(
 }
 
 #[pymodule]
+#[allow(clippy::unnecessary_wraps)]
 pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
-    // generator functions
-    m.add_function(wrap_pyfunction!(run_block_generator, m)?)?;
-    m.add_function(wrap_pyfunction!(run_block_generator2, m)?)?;
-    m.add_function(wrap_pyfunction!(run_puzzle, m)?)?;
-    m.add_function(wrap_pyfunction!(solution_generator, m)?)?;
-    m.add_function(wrap_pyfunction!(solution_generator_backrefs, m)?)?;
-    m.add_function(wrap_pyfunction!(supports_fast_forward, m)?)?;
-    m.add_function(wrap_pyfunction!(fast_forward_singleton, m)?)?;
-
-    // merkle tree
-    m.add_function(wrap_pyfunction!(confirm_included_already_hashed, m)?)?;
-    m.add_function(wrap_pyfunction!(confirm_not_included_already_hashed, m)?)?;
-
-    // facilities from clvm_rs
-    m.add_function(wrap_pyfunction!(run_chia_program, m)?)?;
-    m.add_function(wrap_pyfunction!(serialized_length, m)?)?;
-    m.add_function(wrap_pyfunction!(compute_merkle_set_root, m)?)?;
-    m.add_function(wrap_pyfunction!(tree_hash, m)?)?;
-    m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin, m)?)?;
-
-    bindings(m)?;
-
+    bindings(m);
     Ok(())
 }
 
-pub fn bindings(m: &impl Visitor) -> Result<(), PyErr> {
+pub fn bindings(m: &impl Visitor) {
     // clvmr constants
-    m.int("NO_UNKNOWN_OPS", NO_UNKNOWN_OPS)?;
-    m.int("LIMIT_HEAP", LIMIT_HEAP)?;
-    m.int("ENABLE_BLS_OPS_OUTSIDE_GUARD", ENABLE_BLS_OPS_OUTSIDE_GUARD)?;
+    m.int("NO_UNKNOWN_OPS", NO_UNKNOWN_OPS);
+    m.int("LIMIT_HEAP", LIMIT_HEAP);
+    m.int("ENABLE_BLS_OPS_OUTSIDE_GUARD", ENABLE_BLS_OPS_OUTSIDE_GUARD);
 
     // chia-consensus constants
-    m.int("COND_ARGS_NIL", COND_ARGS_NIL)?;
-    m.int("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;
-    m.int("STRICT_ARGS_COUNT", STRICT_ARGS_COUNT)?;
-    m.int("AGG_SIG_ARGS", AGG_SIG_ARGS)?;
-    m.int("ENABLE_FIXED_DIV", ENABLE_FIXED_DIV)?;
-    m.int("ENABLE_SOFTFORK_CONDITION", ENABLE_SOFTFORK_CONDITION)?;
-    m.int("ENABLE_MESSAGE_CONDITIONS", ENABLE_MESSAGE_CONDITIONS)?;
-    m.int("MEMPOOL_MODE", MEMPOOL_MODE)?;
-    m.int("ALLOW_BACKREFS", ALLOW_BACKREFS)?;
-    m.int("ANALYZE_SPENDS", ANALYZE_SPENDS)?;
-    m.int("DISALLOW_INFINITY_G1", DISALLOW_INFINITY_G1)?;
-    m.int("ELIGIBLE_FOR_DEDUP", ELIGIBLE_FOR_DEDUP)?;
-    m.int("ELIGIBLE_FOR_FF", ELIGIBLE_FOR_FF)?;
+    m.int("COND_ARGS_NIL", COND_ARGS_NIL);
+    m.int("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS);
+    m.int("STRICT_ARGS_COUNT", STRICT_ARGS_COUNT);
+    m.int("AGG_SIG_ARGS", AGG_SIG_ARGS);
+    m.int("ENABLE_FIXED_DIV", ENABLE_FIXED_DIV);
+    m.int("ENABLE_SOFTFORK_CONDITION", ENABLE_SOFTFORK_CONDITION);
+    m.int("ENABLE_MESSAGE_CONDITIONS", ENABLE_MESSAGE_CONDITIONS);
+    m.int("MEMPOOL_MODE", MEMPOOL_MODE);
+    m.int("ALLOW_BACKREFS", ALLOW_BACKREFS);
+    m.int("ANALYZE_SPENDS", ANALYZE_SPENDS);
+    m.int("DISALLOW_INFINITY_G1", DISALLOW_INFINITY_G1);
+    m.int("ELIGIBLE_FOR_DEDUP", ELIGIBLE_FOR_DEDUP);
+    m.int("ELIGIBLE_FOR_FF", ELIGIBLE_FOR_FF);
+
+    // generator functions
+    m.function::<(Option<u32>, Option<OwnedSpendBundleConditions>)>(
+        "run_block_generator",
+        |m| m.add_function(wrap_pyfunction!(run_block_generator, m)?),
+        |m| {
+            m.param::<ReadableBuffer>("program")
+                .param::<Vec<ReadableBuffer>>("args")
+                .param::<Int>("max_cost")
+                .param::<ConsensusConstants>("constants")
+        },
+    );
+
+    m.function::<(Option<u32>, Option<OwnedSpendBundleConditions>)>(
+        "run_block_generator2",
+        |m| m.add_function(wrap_pyfunction!(run_block_generator2, m)?),
+        |m| {
+            m.param::<ReadableBuffer>("program")
+                .param::<Vec<ReadableBuffer>>("args")
+                .param::<Int>("max_cost")
+                .param::<ConsensusConstants>("constants")
+        },
+    );
+
+    m.function::<OwnedSpendBundleConditions>(
+        "run_puzzle",
+        |m| m.add_function(wrap_pyfunction!(run_puzzle, m)?),
+        |m| {
+            m.param::<Bytes>("puzzle")
+                .param::<Bytes>("solution")
+                .param::<Bytes32>("parent_id")
+                .param::<Int>("amount")
+                .param::<Int>("max_cost")
+                .param::<Int>("flags")
+                .param::<ConsensusConstants>("constants")
+        },
+    );
+
+    m.function::<Bytes>(
+        "solution_generator",
+        |m| m.add_function(wrap_pyfunction!(solution_generator, m)?),
+        |m| m.param::<Vec<(Coin, Bytes, Bytes)>>("spends"),
+    );
+
+    m.function::<Bytes>(
+        "solution_generator_backrefs",
+        |m| m.add_function(wrap_pyfunction!(solution_generator_backrefs, m)?),
+        |m| m.param::<Vec<(Coin, Bytes, Bytes)>>("spends"),
+    );
+
+    m.function::<bool>(
+        "supports_fast_forward",
+        |m| m.add_function(wrap_pyfunction!(supports_fast_forward, m)?),
+        |m| m.param::<CoinSpend>("spend"),
+    );
+
+    m.function::<Bytes>(
+        "fast_forward_singleton",
+        |m| m.add_function(wrap_pyfunction!(fast_forward_singleton, m)?),
+        |m| {
+            m.param::<CoinSpend>("spend")
+                .param::<Coin>("new_coin")
+                .param::<Coin>("new_parent")
+        },
+    );
+
+    // merkle tree functions
+    m.function::<Bytes>(
+        "confirm_included_already_hashed",
+        |m| m.add_function(wrap_pyfunction!(confirm_included_already_hashed, m)?),
+        |m| {
+            m.param::<CoinSpend>("spend")
+                .param::<Bytes32>("root")
+                .param::<Bytes32>("item")
+                .param::<Bytes>("proof")
+        },
+    );
+
+    m.function::<Bytes>(
+        "confirm_not_included_already_hashed",
+        |m| m.add_function(wrap_pyfunction!(confirm_not_included_already_hashed, m)?),
+        |m| {
+            m.param::<CoinSpend>("spend")
+                .param::<Bytes32>("root")
+                .param::<Bytes32>("item")
+                .param::<Bytes>("proof")
+        },
+    );
+
+    // clvmr functions
+    m.function::<Bytes>(
+        "compute_merkle_set_root",
+        |m| m.add_function(wrap_pyfunction!(compute_merkle_set_root, m)?),
+        |m| m.param::<Vec<Bytes>>("values"),
+    );
+
+    m.function::<(Int, LazyNode)>(
+        "run_chia_program",
+        |m| m.add_function(wrap_pyfunction!(run_chia_program, m)?),
+        |m| {
+            m.param::<Bytes>("program")
+                .param::<Bytes>("args")
+                .param::<Int>("max_cost")
+                .param::<Int>("flags")
+        },
+    );
+
+    m.function::<Int>(
+        "serialized_length",
+        |m| m.add_function(wrap_pyfunction!(serialized_length, m)?),
+        |m| m.param::<ReadableBuffer>("program"),
+    );
+
+    m.function::<Bytes32>(
+        "tree_hash",
+        |m| m.add_function(wrap_pyfunction!(tree_hash, m)?),
+        |m| m.param::<ReadableBuffer>("program"),
+    );
+
+    m.function::<(Bytes, Bytes)>(
+        "get_puzzle_and_solution_for_coin",
+        |m| m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin, m)?),
+        |m| {
+            m.param::<ReadableBuffer>("program")
+                .param::<ReadableBuffer>("args")
+                .param::<Int>("max_cost")
+                .param::<Bytes32>("find_parent")
+                .param::<Int>("find_amount")
+                .param::<Bytes32>("find_ph")
+                .param::<Int>("flags")
+        },
+    );
 
     // chia-consensus
-    m.visit::<OwnedSpendBundleConditions>()?;
-    m.visit::<OwnedSpend>()?;
-    m.visit::<ConsensusConstants>()?;
-    m.visit::<MerkleSet>()?;
+    m.visit::<OwnedSpendBundleConditions>();
+    m.visit::<OwnedSpend>();
+    m.visit::<ConsensusConstants>();
+    m.visit::<MerkleSet>();
 
     // chia-protocol
-    m.visit::<Message>()?;
-    m.visit::<Handshake>()?;
-    m.visit::<Coin>()?;
-    m.visit::<PoolTarget>()?;
-    m.visit::<ClassgroupElement>()?;
-    m.visit::<EndOfSubSlotBundle>()?;
-    m.visit::<TransactionsInfo>()?;
-    m.visit::<FoliageTransactionBlock>()?;
-    m.visit::<FoliageBlockData>()?;
-    m.visit::<Foliage>()?;
-    m.visit::<ProofOfSpace>()?;
-    m.visit::<RewardChainBlockUnfinished>()?;
-    m.visit::<RewardChainBlock>()?;
-    m.visit::<ChallengeBlockInfo>()?;
-    m.visit::<ChallengeChainSubSlot>()?;
-    m.visit::<InfusedChallengeChainSubSlot>()?;
-    m.visit::<RewardChainSubSlot>()?;
-    m.visit::<SubSlotProofs>()?;
-    m.visit::<SpendBundle>()?;
-    m.visit::<Program>()?;
-    m.visit::<CoinSpend>()?;
-    m.visit::<VDFInfo>()?;
-    m.visit::<VDFProof>()?;
-    m.visit::<SubSlotData>()?;
-    m.visit::<SubEpochData>()?;
-    m.visit::<SubEpochChallengeSegment>()?;
-    m.visit::<SubEpochSegments>()?;
-    m.visit::<SubEpochSummary>()?;
-    m.visit::<UnfinishedBlock>()?;
-    m.visit::<FullBlock>()?;
-    m.visit::<BlockRecord>()?;
-    m.visit::<WeightProof>()?;
-    m.visit::<RecentChainData>()?;
-    m.visit::<ProofBlockHeader>()?;
-    m.visit::<TimestampedPeerInfo>()?;
-    m.visit::<LazyNode>()?;
+    m.visit::<Message>();
+    m.visit::<Handshake>();
+    m.visit::<Coin>();
+    m.visit::<PoolTarget>();
+    m.visit::<ClassgroupElement>();
+    m.visit::<EndOfSubSlotBundle>();
+    m.visit::<TransactionsInfo>();
+    m.visit::<FoliageTransactionBlock>();
+    m.visit::<FoliageBlockData>();
+    m.visit::<Foliage>();
+    m.visit::<ProofOfSpace>();
+    m.visit::<RewardChainBlockUnfinished>();
+    m.visit::<RewardChainBlock>();
+    m.visit::<ChallengeBlockInfo>();
+    m.visit::<ChallengeChainSubSlot>();
+    m.visit::<InfusedChallengeChainSubSlot>();
+    m.visit::<RewardChainSubSlot>();
+    m.visit::<SubSlotProofs>();
+    m.visit::<SpendBundle>();
+    m.visit::<Program>();
+    m.visit::<CoinSpend>();
+    m.visit::<VDFInfo>();
+    m.visit::<VDFProof>();
+    m.visit::<SubSlotData>();
+    m.visit::<SubEpochData>();
+    m.visit::<SubEpochChallengeSegment>();
+    m.visit::<SubEpochSegments>();
+    m.visit::<SubEpochSummary>();
+    m.visit::<UnfinishedBlock>();
+    m.visit::<FullBlock>();
+    m.visit::<BlockRecord>();
+    m.visit::<WeightProof>();
+    m.visit::<RecentChainData>();
+    m.visit::<ProofBlockHeader>();
+    m.visit::<TimestampedPeerInfo>();
+    m.visit::<LazyNode>();
 
     // chia-protocol (wallet)
-    m.visit::<RequestPuzzleSolution>()?;
-    m.visit::<PuzzleSolutionResponse>()?;
-    m.visit::<RespondPuzzleSolution>()?;
-    m.visit::<RejectPuzzleSolution>()?;
-    m.visit::<SendTransaction>()?;
-    m.visit::<TransactionAck>()?;
-    m.visit::<NewPeakWallet>()?;
-    m.visit::<RequestBlockHeader>()?;
-    m.visit::<RespondBlockHeader>()?;
-    m.visit::<RejectHeaderRequest>()?;
-    m.visit::<RequestRemovals>()?;
-    m.visit::<RespondRemovals>()?;
-    m.visit::<RejectRemovalsRequest>()?;
-    m.visit::<RequestAdditions>()?;
-    m.visit::<RespondAdditions>()?;
-    m.visit::<RejectAdditionsRequest>()?;
-    m.visit::<RespondBlockHeaders>()?;
-    m.visit::<RejectBlockHeaders>()?;
-    m.visit::<RequestBlockHeaders>()?;
-    m.visit::<RequestHeaderBlocks>()?;
-    m.visit::<RejectHeaderBlocks>()?;
-    m.visit::<RespondHeaderBlocks>()?;
-    m.visit::<HeaderBlock>()?;
-    m.visit::<UnfinishedHeaderBlock>()?;
-    m.visit::<CoinState>()?;
-    m.visit::<RegisterForPhUpdates>()?;
-    m.visit::<RespondToPhUpdates>()?;
-    m.visit::<RegisterForCoinUpdates>()?;
-    m.visit::<RespondToCoinUpdates>()?;
-    m.visit::<CoinStateUpdate>()?;
-    m.visit::<RequestChildren>()?;
-    m.visit::<RespondChildren>()?;
-    m.visit::<RequestSesInfo>()?;
-    m.visit::<RespondSesInfo>()?;
-    m.visit::<RequestFeeEstimates>()?;
-    m.visit::<RespondFeeEstimates>()?;
-    m.visit::<RequestRemovePuzzleSubscriptions>()?;
-    m.visit::<RespondRemovePuzzleSubscriptions>()?;
-    m.visit::<RequestRemoveCoinSubscriptions>()?;
-    m.visit::<RespondRemoveCoinSubscriptions>()?;
-    m.visit::<CoinStateFilters>()?;
-    m.visit::<RequestPuzzleState>()?;
-    m.visit::<RespondPuzzleState>()?;
-    m.visit::<RejectPuzzleState>()?;
-    m.visit::<RequestCoinState>()?;
-    m.visit::<RespondCoinState>()?;
-    m.visit::<RejectCoinState>()?;
+    m.visit::<RequestPuzzleSolution>();
+    m.visit::<PuzzleSolutionResponse>();
+    m.visit::<RespondPuzzleSolution>();
+    m.visit::<RejectPuzzleSolution>();
+    m.visit::<SendTransaction>();
+    m.visit::<TransactionAck>();
+    m.visit::<NewPeakWallet>();
+    m.visit::<RequestBlockHeader>();
+    m.visit::<RespondBlockHeader>();
+    m.visit::<RejectHeaderRequest>();
+    m.visit::<RequestRemovals>();
+    m.visit::<RespondRemovals>();
+    m.visit::<RejectRemovalsRequest>();
+    m.visit::<RequestAdditions>();
+    m.visit::<RespondAdditions>();
+    m.visit::<RejectAdditionsRequest>();
+    m.visit::<RespondBlockHeaders>();
+    m.visit::<RejectBlockHeaders>();
+    m.visit::<RequestBlockHeaders>();
+    m.visit::<RequestHeaderBlocks>();
+    m.visit::<RejectHeaderBlocks>();
+    m.visit::<RespondHeaderBlocks>();
+    m.visit::<HeaderBlock>();
+    m.visit::<UnfinishedHeaderBlock>();
+    m.visit::<CoinState>();
+    m.visit::<RegisterForPhUpdates>();
+    m.visit::<RespondToPhUpdates>();
+    m.visit::<RegisterForCoinUpdates>();
+    m.visit::<RespondToCoinUpdates>();
+    m.visit::<CoinStateUpdate>();
+    m.visit::<RequestChildren>();
+    m.visit::<RespondChildren>();
+    m.visit::<RequestSesInfo>();
+    m.visit::<RespondSesInfo>();
+    m.visit::<RequestFeeEstimates>();
+    m.visit::<RespondFeeEstimates>();
+    m.visit::<RequestRemovePuzzleSubscriptions>();
+    m.visit::<RespondRemovePuzzleSubscriptions>();
+    m.visit::<RequestRemoveCoinSubscriptions>();
+    m.visit::<RespondRemoveCoinSubscriptions>();
+    m.visit::<CoinStateFilters>();
+    m.visit::<RequestPuzzleState>();
+    m.visit::<RespondPuzzleState>();
+    m.visit::<RejectPuzzleState>();
+    m.visit::<RequestCoinState>();
+    m.visit::<RespondCoinState>();
+    m.visit::<RejectCoinState>();
 
     // chia-protocol (full node)
-    m.visit::<NewPeak>()?;
-    m.visit::<NewTransaction>()?;
-    m.visit::<RequestTransaction>()?;
-    m.visit::<RespondTransaction>()?;
-    m.visit::<RequestProofOfWeight>()?;
-    m.visit::<RespondProofOfWeight>()?;
-    m.visit::<RequestBlock>()?;
-    m.visit::<RejectBlock>()?;
-    m.visit::<RequestBlocks>()?;
-    m.visit::<RespondBlocks>()?;
-    m.visit::<RejectBlocks>()?;
-    m.visit::<RespondBlock>()?;
-    m.visit::<NewUnfinishedBlock>()?;
-    m.visit::<RequestUnfinishedBlock>()?;
-    m.visit::<RespondUnfinishedBlock>()?;
-    m.visit::<NewSignagePointOrEndOfSubSlot>()?;
-    m.visit::<RequestSignagePointOrEndOfSubSlot>()?;
-    m.visit::<RespondSignagePoint>()?;
-    m.visit::<RespondEndOfSubSlot>()?;
-    m.visit::<RequestMempoolTransactions>()?;
-    m.visit::<NewCompactVDF>()?;
-    m.visit::<RequestCompactVDF>()?;
-    m.visit::<RespondCompactVDF>()?;
-    m.visit::<RequestPeers>()?;
-    m.visit::<RespondPeers>()?;
-    m.visit::<NewUnfinishedBlock2>()?;
-    m.visit::<RequestUnfinishedBlock2>()?;
+    m.visit::<NewPeak>();
+    m.visit::<NewTransaction>();
+    m.visit::<RequestTransaction>();
+    m.visit::<RespondTransaction>();
+    m.visit::<RequestProofOfWeight>();
+    m.visit::<RespondProofOfWeight>();
+    m.visit::<RequestBlock>();
+    m.visit::<RejectBlock>();
+    m.visit::<RequestBlocks>();
+    m.visit::<RespondBlocks>();
+    m.visit::<RejectBlocks>();
+    m.visit::<RespondBlock>();
+    m.visit::<NewUnfinishedBlock>();
+    m.visit::<RequestUnfinishedBlock>();
+    m.visit::<RespondUnfinishedBlock>();
+    m.visit::<NewSignagePointOrEndOfSubSlot>();
+    m.visit::<RequestSignagePointOrEndOfSubSlot>();
+    m.visit::<RespondSignagePoint>();
+    m.visit::<RespondEndOfSubSlot>();
+    m.visit::<RequestMempoolTransactions>();
+    m.visit::<NewCompactVDF>();
+    m.visit::<RequestCompactVDF>();
+    m.visit::<RespondCompactVDF>();
+    m.visit::<RequestPeers>();
+    m.visit::<RespondPeers>();
+    m.visit::<NewUnfinishedBlock2>();
+    m.visit::<RequestUnfinishedBlock2>();
 
     // chia-bls
-    m.visit::<AugSchemeMPL>()?;
-    m.visit::<BlsCache>()?;
-    m.visit::<PublicKey>()?;
-    m.visit::<Signature>()?;
-    m.visit::<GTElement>()?;
-    m.visit::<SecretKey>()?;
-
-    Ok(())
+    m.visit::<AugSchemeMPL>();
+    m.visit::<BlsCache>();
+    m.visit::<PublicKey>();
+    m.visit::<Signature>();
+    m.visit::<GTElement>();
+    m.visit::<SecretKey>();
 }

@@ -300,7 +300,7 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
         py_protocol.extend(quote! {
             impl #crate_name::TypeStub for #ident {
                 fn type_stub(builder: &#crate_name::StubBuilder) -> String {
-                    if !builder.has(#lit_name) {
+                    if !builder.has_class(#lit_name) {
                         let class = builder.class::<Self>();
                         let class = #expr;
                         class

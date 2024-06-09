@@ -562,7 +562,7 @@ mod stubs {
 
     impl TypeStub for MerkleSet {
         fn type_stub(builder: &StubBuilder) -> String {
-            if !builder.has("MerkleSet") {
+            if !builder.has_class("MerkleSet") {
                 builder
                     .class::<Self>()
                     .method::<Bytes32>("get_root", |m| m)

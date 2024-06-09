@@ -459,7 +459,7 @@ mod stubs {
 
     impl TypeStub for Program {
         fn type_stub(builder: &StubBuilder) -> String {
-            if !builder.has("Program") {
+            if !builder.has_class("Program") {
                 builder
                     .class::<Self>()
                     .method::<crate::Bytes32>("get_tree_hash", |m| m)

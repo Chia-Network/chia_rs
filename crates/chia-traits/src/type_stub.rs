@@ -4,8 +4,11 @@ use indexmap::{IndexMap, IndexSet};
 
 #[derive(Default)]
 pub struct StubBuilder {
-    definitions: RefCell<IndexMap<String, String>>,
     imports: RefCell<IndexMap<String, IndexSet<String>>>,
+    type_aliases: RefCell<IndexMap<String, String>>,
+    constants: RefCell<IndexMap<String, String>>,
+    functions: RefCell<IndexMap<String, String>>,
+    classes: RefCell<IndexMap<String, String>>,
 }
 
 impl StubBuilder {
@@ -14,12 +17,6 @@ impl StubBuilder {
     }
 
     pub fn import(&self, module: &str, imports: &[&str]) {
-        for import in imports {
-            self.definitions
-                .borrow_mut()
-                .shift_remove(import.to_owned());
-        }
-
         self.imports
             .borrow_mut()
             .entry(module.to_string())
@@ -27,8 +24,8 @@ impl StubBuilder {
             .extend(imports.iter().map(ToString::to_string));
     }
 
-    pub fn has(&self, name: &str) -> bool {
-        let has = self.definitions.borrow().contains_key(name)
+    pub fn has_class(&self, name: &str) -> bool {
+        let has = self.classes.borrow().contains_key(name)
             || self
                 .imports
                 .borrow()
@@ -37,18 +34,12 @@ impl StubBuilder {
 
         // Placeholder to prevent infinite recursion.
         if !has {
-            self.definitions
+            self.classes
                 .borrow_mut()
                 .insert(name.to_string(), String::new());
         }
 
         has
-    }
-
-    pub fn define(&self, name: &str, definition: String) {
-        self.definitions
-            .borrow_mut()
-            .insert(name.to_string(), definition);
     }
 
     pub fn generate(self) -> String {
@@ -66,18 +57,21 @@ impl StubBuilder {
             result.push('\n');
         }
 
-        for (i, definition) in self
-            .definitions
-            .into_inner()
-            .into_iter()
-            .map(|(_, v)| v)
-            .enumerate()
-        {
-            if i == 0 {
+        result.pop().unwrap();
+
+        for definitions in [
+            self.type_aliases.into_inner(),
+            self.constants.into_inner(),
+            self.functions.into_inner(),
+            self.classes.into_inner(),
+        ] {
+            for (i, definition) in definitions.into_iter().map(|(_, v)| v).enumerate() {
+                if i == 0 {
+                    result.push('\n');
+                }
                 result.push('\n');
+                result.push_str(&definition);
             }
-            result.push('\n');
-            result.push_str(&definition);
         }
 
         result
@@ -94,7 +88,23 @@ impl StubBuilder {
     }
 
     pub fn constant<T: TypeStub>(&self, name: &str) {
-        self.define(name, format!("{name}: {} = ...", T::type_stub(self)));
+        let ty = T::type_stub(self);
+        self.constants
+            .borrow_mut()
+            .insert(name.to_string(), format!("{name}: {ty} = ..."));
+    }
+
+    pub fn function<R: TypeStub>(&self, name: &str) -> FunctionBuilder<'_, R> {
+        self.functions
+            .borrow_mut()
+            .insert(name.to_string(), String::new());
+
+        FunctionBuilder {
+            _phantom: PhantomData,
+            name: name.to_string(),
+            builder: self,
+            params: Vec::new(),
+        }
     }
 }
 
@@ -181,7 +191,8 @@ where
             stub.push_str(&format!("\n{}", lines.join("\n")));
         }
 
-        self.builder.define(&C::type_stub(self.builder), stub);
+        let ty = C::type_stub(self.builder);
+        self.builder.classes.borrow_mut().insert(ty, stub);
     }
 
     pub fn generate_streamable(self) {
@@ -196,22 +207,22 @@ where
             builder.params.extend_from_slice(&self.init_fields);
             builder
         })
-        .method::<Int>("__hash__", none)
-        .method::<String>("__repr__", none)
-        .method::<Any>("__richcmp__", none)
-        .method::<C>("__deepcopy__", none)
-        .method::<C>("__copy__", none)
+        .method::<Int>("__hash__", |m| m)
+        .method::<String>("__repr__", |m| m)
+        .method::<Any>("__richcmp__", |m| m)
+        .method::<C>("__deepcopy__", |m| m)
+        .method::<C>("__copy__", |m| m)
         .static_method::<C>("from_bytes", |m| m.param::<Bytes>("buffer"))
         .static_method::<C>("from_bytes_unchecked", |m| m.param::<Bytes>("buffer"))
         .static_method::<(C, Int)>("parse_rust", |m| {
             m.param::<ReadableBuffer>("buffer")
                 .default_param::<bool>("trusted", "False")
         })
-        .method::<Bytes>("to_bytes", none)
-        .method::<Bytes>("__bytes__", none)
-        .method::<Bytes>("stream_to_bytes", none)
-        .method::<SizedBytes<32>>("get_hash", none)
-        .method::<Any>("to_json_dict", none)
+        .method::<Bytes>("to_bytes", |m| m)
+        .method::<Bytes>("__bytes__", |m| m)
+        .method::<Bytes>("stream_to_bytes", |m| m)
+        .method::<SizedBytes<32>>("get_hash", |m| m)
+        .method::<Any>("to_json_dict", |m| m)
         .static_method::<C>("from_json_dict", |m| m.param::<Any>("json_dict"));
 
         if !self.init_fields.is_empty() {
@@ -252,8 +263,40 @@ impl<'a, R> MethodBuilder<'a, R> {
     }
 }
 
-pub fn none<R>(builder: MethodBuilder<'_, R>) -> MethodBuilder<'_, R> {
-    builder
+#[must_use]
+pub struct FunctionBuilder<'a, R> {
+    _phantom: PhantomData<R>,
+    name: String,
+    builder: &'a StubBuilder,
+    params: Vec<String>,
+}
+
+impl<'a, R> FunctionBuilder<'a, R>
+where
+    R: TypeStub,
+{
+    pub fn param<T: TypeStub>(self, name: &str) -> Self {
+        let field = field::<T>(self.builder, name, None);
+        self.raw_param(&field)
+    }
+
+    pub fn default_param<T: TypeStub>(self, name: &str, default: &str) -> Self {
+        let field = field::<T>(self.builder, name, Some(default.to_string()));
+        self.raw_param(&field)
+    }
+
+    fn raw_param(mut self, param: &str) -> Self {
+        self.params.push(param.to_string());
+        self
+    }
+
+    pub fn generate(self) {
+        let function = raw_method::<R>(self.builder, false, &self.name, &self.params);
+        self.builder
+            .functions
+            .borrow_mut()
+            .insert(self.name, format!("\n{function}"));
+    }
 }
 
 pub trait TypeStub {
@@ -273,8 +316,7 @@ pub struct Object;
 
 impl TypeStub for Object {
     fn type_stub(builder: &StubBuilder) -> String {
-        builder.import("typing", &["Object"]);
-        "Object".to_string()
+        "object".to_string()
     }
 }
 
@@ -327,9 +369,9 @@ pub struct ReadableBuffer;
 impl TypeStub for ReadableBuffer {
     fn type_stub(builder: &StubBuilder) -> String {
         builder.import("typing", &["Union"]);
-        builder.define(
-            "ReadableBuffer",
-            "ReadableBuffer = Union[bytes, bytearray, memoryview]".to_string(),
+        builder.type_aliases.borrow_mut().insert(
+            "ReadableBuffer".to_string(),
+            "\nReadableBuffer = Union[bytes, bytearray, memoryview]".to_string(),
         );
         "ReadableBuffer".to_string()
     }
@@ -339,7 +381,10 @@ struct Unspec;
 
 impl TypeStub for Unspec {
     fn type_stub(builder: &StubBuilder) -> String {
-        builder.define("_Unspec", "class _Unspec:\n    pass".to_string());
+        builder.type_aliases.borrow_mut().insert(
+            "_Unspec".to_string(),
+            "\nclass _Unspec:\n    pass".to_string(),
+        );
         "_Unspec".to_string()
     }
 }
