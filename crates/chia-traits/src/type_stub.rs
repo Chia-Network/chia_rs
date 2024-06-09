@@ -88,6 +88,7 @@ impl StubBuilder {
             _phantom: PhantomData,
             builder: self,
             init_fields: Vec::new(),
+            replace_fields: Vec::new(),
             items: Vec::new(),
         }
     }
@@ -102,6 +103,7 @@ pub struct ClassBuilder<'a, C> {
     _phantom: PhantomData<C>,
     builder: &'a StubBuilder,
     init_fields: Vec<String>,
+    replace_fields: Vec<String>,
     items: Vec<String>,
 }
 
@@ -112,7 +114,12 @@ where
     pub fn field<T: TypeStub>(mut self, name: &str, default: Option<String>, init: bool) -> Self {
         if init {
             self.init_fields
-                .push(field::<T>(self.builder, name, default));
+                .push(field::<T>(self.builder, name, default.clone()));
+            self.replace_fields.push(field::<Replace<T>>(
+                self.builder,
+                name,
+                Some(default.unwrap_or_else(|| Unspec::type_stub(self.builder))),
+            ));
         } else {
             self.items.push(field::<T>(self.builder, name, default));
         }
@@ -130,10 +137,7 @@ where
         name: &str,
         f: impl FnOnce(MethodBuilder<'_, T>) -> MethodBuilder<'_, T>,
     ) -> Self {
-        self.raw_method(false, name, |mut builder| {
-            builder.params.push("self".to_string());
-            f(builder)
-        })
+        self.raw_method(false, name, |builder| f(builder.raw_param("self")))
     }
 
     pub fn static_method<T: TypeStub>(
@@ -149,10 +153,7 @@ where
         name: &str,
         f: impl FnOnce(MethodBuilder<'_, T>) -> MethodBuilder<'_, T>,
     ) -> Self {
-        self.raw_method(false, name, |mut builder| {
-            builder.params.push("cls".to_string());
-            f(builder)
-        })
+        self.raw_method(false, name, |builder| f(builder.raw_param("cls")))
     }
 
     fn raw_method<T: TypeStub>(
@@ -184,14 +185,15 @@ where
     }
 
     pub fn generate_streamable(self) {
-        Self {
+        let mut class = Self {
             _phantom: PhantomData,
             builder: self.builder,
             init_fields: [self.init_fields.clone(), self.items.clone()].concat(),
+            replace_fields: Vec::new(),
             items: Vec::new(),
         }
         .method::<()>("__init__", |mut builder| {
-            builder.params.extend(self.init_fields);
+            builder.params.extend_from_slice(&self.init_fields);
             builder
         })
         .method::<Int>("__hash__", none)
@@ -210,8 +212,19 @@ where
         .method::<Bytes>("stream_to_bytes", none)
         .method::<SizedBytes<32>>("get_hash", none)
         .method::<Any>("to_json_dict", none)
-        .static_method::<C>("from_json_dict", |m| m.param::<Any>("json_dict"))
-        .generate();
+        .static_method::<C>("from_json_dict", |m| m.param::<Any>("json_dict"));
+
+        if !self.init_fields.is_empty() {
+            class = class.method::<C>("replace", |m| {
+                let mut m = m.raw_param("*");
+                for field in self.replace_fields {
+                    m = m.raw_param(&field);
+                }
+                m
+            });
+        }
+
+        class.generate();
     }
 }
 
@@ -223,14 +236,18 @@ pub struct MethodBuilder<'a, R> {
 }
 
 impl<'a, R> MethodBuilder<'a, R> {
-    pub fn param<T: TypeStub>(mut self, name: &str) -> Self {
-        self.params.push(field::<T>(self.builder, name, None));
-        self
+    pub fn param<T: TypeStub>(self, name: &str) -> Self {
+        let field = field::<T>(self.builder, name, None);
+        self.raw_param(&field)
     }
 
-    pub fn default_param<T: TypeStub>(mut self, name: &str, default: &str) -> Self {
-        self.params
-            .push(field::<T>(self.builder, name, Some(default.to_string())));
+    pub fn default_param<T: TypeStub>(self, name: &str, default: &str) -> Self {
+        let field = field::<T>(self.builder, name, Some(default.to_string()));
+        self.raw_param(&field)
+    }
+
+    fn raw_param(mut self, param: &str) -> Self {
+        self.params.push(param.to_string());
         self
     }
 }
@@ -315,6 +332,31 @@ impl TypeStub for ReadableBuffer {
             "ReadableBuffer = Union[bytes, bytearray, memoryview]".to_string(),
         );
         "ReadableBuffer".to_string()
+    }
+}
+
+struct Unspec;
+
+impl TypeStub for Unspec {
+    fn type_stub(builder: &StubBuilder) -> String {
+        builder.define("_Unspec", "class _Unspec:\n    pass".to_string());
+        "_Unspec".to_string()
+    }
+}
+
+struct Replace<T>(PhantomData<T>);
+
+impl<T> TypeStub for Replace<T>
+where
+    T: TypeStub,
+{
+    fn type_stub(builder: &StubBuilder) -> String {
+        builder.import("typing", &["Union"]);
+        format!(
+            "Union[{}, {}]",
+            T::type_stub(builder),
+            Unspec::type_stub(builder)
+        )
     }
 }
 

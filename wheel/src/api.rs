@@ -18,8 +18,8 @@ use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
 use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
     CoinSpend, CoinState, CoinStateFilters, CoinStateUpdate, EndOfSubSlotBundle, Foliage,
-    FoliageBlockData, FoliageTransactionBlock, FullBlock, HeaderBlock,
-    InfusedChallengeChainSubSlot, NewCompactVDF, NewPeak, NewPeakWallet,
+    FoliageBlockData, FoliageTransactionBlock, FullBlock, Handshake, HeaderBlock,
+    InfusedChallengeChainSubSlot, Message, NewCompactVDF, NewPeak, NewPeakWallet,
     NewSignagePointOrEndOfSubSlot, NewTransaction, NewUnfinishedBlock, NewUnfinishedBlock2,
     PoolTarget, Program, ProofBlockHeader, ProofOfSpace, PuzzleSolutionResponse, RecentChainData,
     RegisterForCoinUpdates, RegisterForPhUpdates, RejectAdditionsRequest, RejectBlock,
@@ -335,6 +335,8 @@ pub fn bindings(m: &impl Visitor) -> Result<(), PyErr> {
     m.visit::<MerkleSet>()?;
 
     // chia-protocol
+    m.visit::<Message>()?;
+    m.visit::<Handshake>()?;
     m.visit::<Coin>()?;
     m.visit::<PoolTarget>()?;
     m.visit::<ClassgroupElement>()?;
