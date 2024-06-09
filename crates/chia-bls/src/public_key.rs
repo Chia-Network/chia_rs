@@ -308,19 +308,17 @@ mod stubs {
     };
 
     impl TypeStub for PublicKey {
-        fn type_stub(b: &mut StubBuilder) -> String {
+        fn type_stub(b: &StubBuilder) -> String {
             if !b.has("G1Element") {
-                let add_params = &[field::<Self>(b, "rhs", None)];
-                let pair_params = &[field::<Signature>(b, "signature", None)];
                 let items = &[
                     static_getter_field::<usize>(b, "SIZE"),
                     class_method::<Self>(b, "__new__", &[]),
                     method::<Int>(b, "get_fingerprint", &[]),
-                    method::<GTElement>(b, "pair", pair_params),
+                    method::<GTElement>(b, "pair", &[field::<Signature>(b, "signature", None)]),
                     static_method::<Self>(b, "generator", &[]),
                     method::<String>(b, "__str__", &[]),
-                    method::<Self>(b, "__add__", add_params),
-                    method::<Self>(b, "__iadd__", add_params),
+                    method::<Self>(b, "__add__", &[field::<Self>(b, "rhs", None)]),
+                    method::<Self>(b, "__iadd__", &[field::<Self>(b, "rhs", None)]),
                 ];
                 let class = streamable_class::<Self>(b, &[], items);
                 b.define("G1Element", class);

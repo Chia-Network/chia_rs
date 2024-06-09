@@ -1,47 +1,60 @@
+use std::cell::RefCell;
+
 use indexmap::{IndexMap, IndexSet};
 
 #[derive(Default)]
 pub struct StubBuilder {
-    definitions: IndexMap<String, String>,
-    imports: IndexMap<String, IndexSet<String>>,
+    definitions: RefCell<IndexMap<String, String>>,
+    imports: RefCell<IndexMap<String, IndexSet<String>>>,
 }
 
 impl StubBuilder {
-    pub fn stub<T: TypeStub>(&mut self) {
+    pub fn stub<T: TypeStub>(&self) {
         T::type_stub(self);
     }
 
-    pub fn import(&mut self, module: &str, imports: &[&str]) {
+    pub fn import(&self, module: &str, imports: &[&str]) {
         for import in imports {
-            self.definitions.shift_remove(import.to_owned());
+            self.definitions
+                .borrow_mut()
+                .shift_remove(import.to_owned());
         }
 
         self.imports
+            .borrow_mut()
             .entry(module.to_string())
             .or_default()
             .extend(imports.iter().map(ToString::to_string));
     }
 
-    pub fn has(&mut self, name: &str) -> bool {
-        let has = self.definitions.contains_key(name)
-            || self.imports.values().any(|imports| imports.contains(name));
+    pub fn has(&self, name: &str) -> bool {
+        let has = self.definitions.borrow().contains_key(name)
+            || self
+                .imports
+                .borrow()
+                .values()
+                .any(|imports| imports.contains(name));
 
         // Placeholder to prevent infinite recursion.
         if !has {
-            self.definitions.insert(name.to_string(), String::new());
+            self.definitions
+                .borrow_mut()
+                .insert(name.to_string(), String::new());
         }
 
         has
     }
 
-    pub fn define(&mut self, name: &str, definition: String) {
-        self.definitions.insert(name.to_string(), definition);
+    pub fn define(&self, name: &str, definition: String) {
+        self.definitions
+            .borrow_mut()
+            .insert(name.to_string(), definition);
     }
 
-    pub fn generate(&self) -> String {
+    pub fn generate(self) -> String {
         let mut result = String::new();
 
-        for (module, imports) in &self.imports {
+        for (module, imports) in self.imports.into_inner() {
             result.push_str(&format!("from {module} import "));
             result.push_str(
                 &imports
@@ -53,9 +66,9 @@ impl StubBuilder {
             result.push('\n');
         }
 
-        for (_, definition) in &self.definitions {
+        for (_, definition) in self.definitions.into_inner() {
             result.push_str("\n\n");
-            result.push_str(definition);
+            result.push_str(&definition);
         }
 
         result
@@ -63,20 +76,20 @@ impl StubBuilder {
 }
 
 pub trait TypeStub {
-    fn type_stub(builder: &mut StubBuilder) -> String;
+    fn type_stub(builder: &StubBuilder) -> String;
 }
 
 pub struct Any;
 
 impl TypeStub for Any {
-    fn type_stub(builder: &mut StubBuilder) -> String {
+    fn type_stub(builder: &StubBuilder) -> String {
         builder.import("typing", &["Any"]);
         "Any".to_string()
     }
 }
 
 impl TypeStub for () {
-    fn type_stub(_builder: &mut StubBuilder) -> String {
+    fn type_stub(_builder: &StubBuilder) -> String {
         "None".to_string()
     }
 }
@@ -84,7 +97,7 @@ impl TypeStub for () {
 pub struct Int;
 
 impl TypeStub for Int {
-    fn type_stub(_builder: &mut StubBuilder) -> String {
+    fn type_stub(_builder: &StubBuilder) -> String {
         "int".to_string()
     }
 }
@@ -92,7 +105,7 @@ impl TypeStub for Int {
 pub struct Bytes;
 
 impl TypeStub for Bytes {
-    fn type_stub(_builder: &mut StubBuilder) -> String {
+    fn type_stub(_builder: &StubBuilder) -> String {
         "bytes".to_string()
     }
 }
@@ -100,7 +113,7 @@ impl TypeStub for Bytes {
 pub struct SizedBytes<const LEN: usize>;
 
 impl<const LEN: usize> TypeStub for SizedBytes<LEN> {
-    fn type_stub(builder: &mut StubBuilder) -> String {
+    fn type_stub(builder: &StubBuilder) -> String {
         let name = format!("bytes{LEN}");
         builder.import(".sized_bytes", &[&name]);
         name
@@ -110,7 +123,7 @@ impl<const LEN: usize> TypeStub for SizedBytes<LEN> {
 pub struct ReadableBuffer;
 
 impl TypeStub for ReadableBuffer {
-    fn type_stub(builder: &mut StubBuilder) -> String {
+    fn type_stub(builder: &StubBuilder) -> String {
         builder.import("typing", &["Union"]);
         builder.define(
             "ReadableBuffer",
@@ -121,7 +134,7 @@ impl TypeStub for ReadableBuffer {
 }
 
 pub fn streamable_class<T: TypeStub>(
-    b: &mut StubBuilder,
+    b: &StubBuilder,
     init_fields: &[String],
     other_items: &[String],
 ) -> String {
@@ -157,7 +170,7 @@ pub fn streamable_class<T: TypeStub>(
     class::<T>(b, &items)
 }
 
-pub fn class<T: TypeStub>(builder: &mut StubBuilder, items: &[String]) -> String {
+pub fn class<T: TypeStub>(builder: &StubBuilder, items: &[String]) -> String {
     let mut stub = format!("class {}:", T::type_stub(builder));
     for item in items {
         let lines: Vec<String> = item.lines().map(|line| format!("    {line}")).collect();
@@ -166,16 +179,12 @@ pub fn class<T: TypeStub>(builder: &mut StubBuilder, items: &[String]) -> String
     stub
 }
 
-pub fn static_getter_field<T: TypeStub>(builder: &mut StubBuilder, name: &str) -> String {
+pub fn static_getter_field<T: TypeStub>(builder: &StubBuilder, name: &str) -> String {
     builder.import("typing", &["ClassVar"]);
     format!("{name}: ClassVar[{}] = ...", T::type_stub(builder))
 }
 
-pub fn field<T: TypeStub>(
-    builder: &mut StubBuilder,
-    name: &str,
-    default: Option<String>,
-) -> String {
+pub fn field<T: TypeStub>(builder: &StubBuilder, name: &str, default: Option<String>) -> String {
     if let Some(default) = default {
         format!("{name}: {} = {default}", T::type_stub(builder))
     } else {
@@ -183,32 +192,24 @@ pub fn field<T: TypeStub>(
     }
 }
 
-pub fn method<T: TypeStub>(builder: &mut StubBuilder, name: &str, params: &[String]) -> String {
+pub fn method<T: TypeStub>(builder: &StubBuilder, name: &str, params: &[String]) -> String {
     let mut params = params.to_vec();
     params.insert(0, "self".to_string());
     raw_method::<T>(builder, false, name, &params)
 }
 
-pub fn static_method<T: TypeStub>(
-    builder: &mut StubBuilder,
-    name: &str,
-    params: &[String],
-) -> String {
+pub fn static_method<T: TypeStub>(builder: &StubBuilder, name: &str, params: &[String]) -> String {
     raw_method::<T>(builder, true, name, params)
 }
 
-pub fn class_method<T: TypeStub>(
-    builder: &mut StubBuilder,
-    name: &str,
-    params: &[String],
-) -> String {
+pub fn class_method<T: TypeStub>(builder: &StubBuilder, name: &str, params: &[String]) -> String {
     let mut params = params.to_vec();
     params.insert(0, "cls".to_string());
     raw_method::<T>(builder, false, name, &params)
 }
 
 fn raw_method<T: TypeStub>(
-    builder: &mut StubBuilder,
+    builder: &StubBuilder,
     is_static: bool,
     name: &str,
     params: &[String],
@@ -243,7 +244,7 @@ impl<T> TypeStub for Vec<T>
 where
     T: TypeStub,
 {
-    fn type_stub(builder: &mut StubBuilder) -> String {
+    fn type_stub(builder: &StubBuilder) -> String {
         builder.import("typing", &["List"]);
         format!("List[{}]", T::type_stub(builder))
     }
@@ -253,20 +254,20 @@ impl<T> TypeStub for Option<T>
 where
     T: TypeStub,
 {
-    fn type_stub(builder: &mut StubBuilder) -> String {
+    fn type_stub(builder: &StubBuilder) -> String {
         builder.import("typing", &["Optional"]);
         format!("Optional[{}]", T::type_stub(builder))
     }
 }
 
 impl TypeStub for String {
-    fn type_stub(_builder: &mut StubBuilder) -> String {
+    fn type_stub(_builder: &StubBuilder) -> String {
         "str".to_string()
     }
 }
 
 impl TypeStub for bool {
-    fn type_stub(_builder: &mut StubBuilder) -> String {
+    fn type_stub(_builder: &StubBuilder) -> String {
         "bool".to_string()
     }
 }
@@ -274,7 +275,7 @@ impl TypeStub for bool {
 macro_rules! int_stub {
     ( $ty:ty, $name:literal ) => {
         impl TypeStub for $ty {
-            fn type_stub(builder: &mut StubBuilder) -> String {
+            fn type_stub(builder: &StubBuilder) -> String {
                 builder.import(".sized_ints", &[$name]);
                 $name.to_string()
             }
@@ -293,13 +294,13 @@ int_stub!(i32, "int32");
 int_stub!(i64, "int64");
 
 impl TypeStub for usize {
-    fn type_stub(_builder: &mut StubBuilder) -> String {
+    fn type_stub(_builder: &StubBuilder) -> String {
         "int".to_string()
     }
 }
 
 impl TypeStub for isize {
-    fn type_stub(_builder: &mut StubBuilder) -> String {
+    fn type_stub(_builder: &StubBuilder) -> String {
         "int".to_string()
     }
 }
@@ -307,7 +308,7 @@ impl TypeStub for isize {
 macro_rules! tuple_stub {
     ( $( $ty:ident ),+ ) => {
         impl< $( $ty ),+ > TypeStub for ( $( $ty, )+ ) where $( $ty: TypeStub ),+ {
-            fn type_stub(builder: &mut StubBuilder) -> String {
+            fn type_stub(builder: &StubBuilder) -> String {
                 builder.import("typing", &["Tuple"]);
                 let mut stub = "Tuple[".to_string();
                 $( stub.push_str(&format!("{}, ", <$ty as TypeStub>::type_stub(builder))); )+

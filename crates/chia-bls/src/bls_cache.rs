@@ -87,25 +87,34 @@ mod stubs {
     use chia_traits::{class, field, method, Bytes, StubBuilder, TypeStub};
 
     impl TypeStub for BlsCache {
-        fn type_stub(b: &mut StubBuilder) -> String {
+        fn type_stub(b: &StubBuilder) -> String {
             if !b.has("BLSCache") {
-                let init_params = &[field::<Option<usize>>(
-                    b,
-                    "cache_size",
-                    Some("50000".to_string()),
-                )];
-                let aggregate_verify_params = &[
-                    field::<Vec<PublicKey>>(b, "pks", None),
-                    field::<Vec<Bytes>>(b, "msgs", None),
-                    field::<Signature>(b, "sig", None),
-                ];
-                let update_params = &[field::<Vec<(Bytes, Bytes)>>(b, "other", None)];
                 let items = &[
-                    method::<()>(b, "__init__", init_params),
+                    method::<()>(
+                        b,
+                        "__init__",
+                        &[field::<Option<usize>>(
+                            b,
+                            "cache_size",
+                            Some("50000".to_string()),
+                        )],
+                    ),
                     method::<usize>(b, "len", &[]),
-                    method::<bool>(b, "aggregate_verify", aggregate_verify_params),
+                    method::<bool>(
+                        b,
+                        "aggregate_verify",
+                        &[
+                            field::<Vec<PublicKey>>(b, "pks", None),
+                            field::<Vec<Bytes>>(b, "msgs", None),
+                            field::<Signature>(b, "sig", None),
+                        ],
+                    ),
                     method::<Vec<(Bytes, Bytes)>>(b, "items", &[]),
-                    method::<()>(b, "update", update_params),
+                    method::<()>(
+                        b,
+                        "update",
+                        &[field::<Vec<(Bytes, Bytes)>>(b, "other", None)],
+                    ),
                 ];
                 let class = class::<Self>(b, items);
                 b.define("BLSCache", class);

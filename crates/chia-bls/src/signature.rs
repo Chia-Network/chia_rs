@@ -487,18 +487,16 @@ mod stubs {
     };
 
     impl TypeStub for Signature {
-        fn type_stub(b: &mut StubBuilder) -> String {
+        fn type_stub(b: &StubBuilder) -> String {
             if !b.has("G2Element") {
-                let add_params = &[field::<Self>(b, "rhs", None)];
-                let pair_params = &[field::<PublicKey>(b, "public_key", None)];
                 let items = &[
                     static_getter_field::<usize>(b, "SIZE"),
                     class_method::<Self>(b, "__new__", &[]),
-                    method::<GTElement>(b, "pair", pair_params),
+                    method::<GTElement>(b, "pair", &[field::<PublicKey>(b, "public_key", None)]),
                     static_method::<Self>(b, "generator", &[]),
                     method::<String>(b, "__str__", &[]),
-                    method::<Self>(b, "__add__", add_params),
-                    method::<Self>(b, "__iadd__", add_params),
+                    method::<Self>(b, "__add__", &[field::<Self>(b, "rhs", None)]),
+                    method::<Self>(b, "__iadd__", &[field::<Self>(b, "rhs", None)]),
                 ];
                 let class = streamable_class::<Self>(b, &[], items);
                 b.define("G2Element", class);

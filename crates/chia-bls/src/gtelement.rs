@@ -110,14 +110,13 @@ mod stubs {
     };
 
     impl TypeStub for GTElement {
-        fn type_stub(b: &mut StubBuilder) -> String {
+        fn type_stub(b: &StubBuilder) -> String {
             if !b.has("GTElement") {
-                let mul_params = &[field::<Self>(b, "rhs", None)];
                 let items = &[
                     static_getter_field::<usize>(b, "SIZE"),
                     method::<String>(b, "__str__", &[]),
-                    method::<Self>(b, "__mul__", mul_params),
-                    method::<Self>(b, "__imul__", mul_params),
+                    method::<Self>(b, "__mul__", &[field::<Self>(b, "rhs", None)]),
+                    method::<Self>(b, "__imul__", &[field::<Self>(b, "rhs", None)]),
                 ];
                 let class = streamable_class::<Self>(b, &[], items);
                 b.define("GTElement", class);
