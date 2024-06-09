@@ -1,4 +1,4 @@
-use chia_traits::{StubBuilder, TypeStub};
+use chia_traits::{Int, StubBuilder, TypeStub};
 use pyo3::{prelude::*, PyClass};
 
 pub trait Visitor {
@@ -23,7 +23,7 @@ impl Visitor for StubBuilder {
     }
 
     fn int(&self, name: &str, _value: u32) -> Result<(), PyErr> {
-        self.define(name, format!("{name}: int = ..."));
+        self.constant::<Int>(name);
         Ok(())
     }
 }

@@ -308,16 +308,12 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 
 pub fn bindings(m: &impl Visitor) -> Result<(), PyErr> {
-    // clvm
+    // clvmr constants
     m.int("NO_UNKNOWN_OPS", NO_UNKNOWN_OPS)?;
     m.int("LIMIT_HEAP", LIMIT_HEAP)?;
     m.int("ENABLE_BLS_OPS_OUTSIDE_GUARD", ENABLE_BLS_OPS_OUTSIDE_GUARD)?;
 
-    // chia-consensus
-    m.visit::<OwnedSpendBundleConditions>()?;
-    m.visit::<OwnedSpend>()?;
-    m.visit::<ConsensusConstants>()?;
-    m.visit::<MerkleSet>()?;
+    // chia-consensus constants
     m.int("COND_ARGS_NIL", COND_ARGS_NIL)?;
     m.int("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;
     m.int("STRICT_ARGS_COUNT", STRICT_ARGS_COUNT)?;
@@ -331,6 +327,12 @@ pub fn bindings(m: &impl Visitor) -> Result<(), PyErr> {
     m.int("DISALLOW_INFINITY_G1", DISALLOW_INFINITY_G1)?;
     m.int("ELIGIBLE_FOR_DEDUP", ELIGIBLE_FOR_DEDUP)?;
     m.int("ELIGIBLE_FOR_FF", ELIGIBLE_FOR_FF)?;
+
+    // chia-consensus
+    m.visit::<OwnedSpendBundleConditions>()?;
+    m.visit::<OwnedSpend>()?;
+    m.visit::<ConsensusConstants>()?;
+    m.visit::<MerkleSet>()?;
 
     // chia-protocol
     m.visit::<Coin>()?;

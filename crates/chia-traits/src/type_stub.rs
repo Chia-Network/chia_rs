@@ -66,8 +66,17 @@ impl StubBuilder {
             result.push('\n');
         }
 
-        for (_, definition) in self.definitions.into_inner() {
-            result.push_str("\n\n");
+        for (i, definition) in self
+            .definitions
+            .into_inner()
+            .into_iter()
+            .map(|(_, v)| v)
+            .enumerate()
+        {
+            if i == 0 {
+                result.push('\n');
+            }
+            result.push('\n');
             result.push_str(&definition);
         }
 
@@ -82,6 +91,10 @@ impl StubBuilder {
             init_fields: Vec::new(),
             items: Vec::new(),
         }
+    }
+
+    pub fn constant<T: TypeStub>(&self, name: &str) {
+        self.define(name, format!("{name}: {} = ...", T::type_stub(self)));
     }
 }
 
@@ -162,7 +175,7 @@ where
     }
 
     pub fn generate(self) {
-        let mut stub = format!("class {}:", C::type_stub(self.builder));
+        let mut stub = format!("\nclass {}:", C::type_stub(self.builder));
 
         for item in self.init_fields.iter().chain(self.items.iter()) {
             let lines: Vec<String> = item.lines().map(|line| format!("    {line}")).collect();
