@@ -11,10 +11,11 @@ use crate::gen::opcodes::{
 use crate::gen::owned_conditions::OwnedSpendBundleConditions;
 use crate::gen::validation_error::ErrorCode;
 use crate::npc_result::get_name_puzzle_conditions;
-use chia_bls::aggregate_verify;
+use chia_bls::GTElement;
 use chia_bls::BlsCache;
 use chia_protocol::SpendBundle;
 use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV};
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 // use std::thread;
 use std::time::{Duration, Instant};
@@ -26,18 +27,16 @@ pub fn pre_validate_spendbundle(
     max_cost: u64,
     constants: &ConsensusConstants,
     peak_height: u32,
-    syncing: bool,
     cache: Arc<Mutex<BlsCache>>,
 ) -> Result<OwnedSpendBundleConditions, ErrorCode> {
     if new_spend.coin_spends.is_empty() {
         Err(ErrorCode::InvalidSpendBundle)
     } else {
-        let (result, _duration) = validate_clvm_and_signature(
+        let (result, _added, _duration) = validate_clvm_and_signature(
             new_spend,
             max_cost,
             constants,
             peak_height,
-            syncing,
             cache,
         )?;
         Ok(result)
@@ -52,9 +51,8 @@ fn validate_clvm_and_signature(
     max_cost: u64,
     constants: &ConsensusConstants,
     height: u32,
-    syncing: bool,
     cache: Arc<Mutex<BlsCache>>,
-) -> Result<(OwnedSpendBundleConditions, Duration), ErrorCode> {
+) -> Result<(OwnedSpendBundleConditions, HashMap<[u8; 32], GTElement>, Duration), ErrorCode> {
     let start_time = Instant::now();
     let npcresult = get_name_puzzle_conditions(spend_bundle, max_cost, true, height, constants)
         .map_err(|e| e.1)?;
@@ -88,20 +86,15 @@ fn validate_clvm_and_signature(
         .map(|(pk, msg)| (pk, msg.as_slice().to_vec()));
     let iter = iter.chain(unsafe_items);
     // Verify aggregated signature
-    if !{
-        if syncing {
-            aggregate_verify(&spend_bundle.aggregated_signature, iter)
-        } else {
-            // if we're fully synced then use the cache
-            cache
-                .lock()
-                .unwrap()
-                .aggregate_verify(iter, &spend_bundle.aggregated_signature)
-        }
-    } {
+    let (result, added) = cache
+        .lock()
+        .unwrap()
+        .aggregate_verify(iter, &spend_bundle.aggregated_signature);
+    if !result
+    {
         return Err(ErrorCode::InvalidSpendBundle);
     }
-    Ok((npcresult, start_time.elapsed()))
+    Ok((npcresult, added, start_time.elapsed()))
 }
 
 // #[cfg(feature = "py-bindings")]
@@ -224,7 +217,6 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             236,
-            true,
             Arc::new(Mutex::new(BlsCache::default())),
         );
         result.unwrap();
@@ -272,7 +264,6 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             236,
-            true,
             Arc::new(Mutex::new(BlsCache::default())),
         );
         match result {
@@ -330,7 +321,6 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             236,
-            true,
             Arc::new(Mutex::new(BlsCache::default())),
         );
         match result {
