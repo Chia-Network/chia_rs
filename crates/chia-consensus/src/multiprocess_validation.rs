@@ -174,6 +174,7 @@ pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusCons
 mod tests {
     use super::*;
     use crate::consensus_constants::TEST_CONSTANTS;
+    use crate::gen::condition_tools::u64_to_bytes;
     use chia_bls::{sign, SecretKey, Signature};
     use chia_protocol::Bytes32;
     use chia_protocol::{Coin, CoinSpend, Program};
@@ -368,6 +369,74 @@ ff01\
                 TEST_CONSTANTS
                     .agg_sig_parent_puzzle_additional_data
                     .as_slice(),
+            ]
+            .concat(),
+        );
+        let sig = sign(&sk, result.as_slice());
+        let coin_spends: Vec<CoinSpend> = vec![spend];
+        let spend_bundle = SpendBundle {
+            coin_spends: coin_spends,
+            aggregated_signature: sig,
+        };
+        let result = validate_clvm_and_signature(
+            &spend_bundle,
+            TEST_CONSTANTS.max_block_cost_clvm,
+            &TEST_CONSTANTS,
+            TEST_CONSTANTS.hard_fork_height - 1,
+            Arc::new(Mutex::new(BlsCache::default())),
+        );
+        if let Ok(_) = result {
+            panic!("height too low!")
+        };
+        let result = validate_clvm_and_signature(
+            &spend_bundle,
+            TEST_CONSTANTS.max_block_cost_clvm,
+            &TEST_CONSTANTS,
+            TEST_CONSTANTS.hard_fork_height + 1,
+            Arc::new(Mutex::new(BlsCache::default())),
+        );
+        match result {
+            Ok(_) => return,
+            Err(e) => panic!("{:?}", e),
+        }
+    }
+
+    #[test]
+    fn test_validate_aggsig_parent_amount() {
+        let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
+        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+        //let pk: PublicKey = sk.public_key(); //0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2
+        // panic!("{:?}", pk);
+
+        let full_puz = Bytes32::new(tree_hash_atom(&[1_u8]).to_bytes());
+        let test_coin = Coin::new(
+            hex::decode("4444444444444444444444444444444444444444444444444444444444444444")
+                .unwrap()
+                .try_into()
+                .unwrap(),
+            full_puz,
+            1,
+        );
+
+        let solution = "ffff2fffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080";
+        // ((47 0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2 "hello"))
+
+        let solution = hex::decode(solution)
+            .expect("hex::decode")
+            .try_into()
+            .unwrap();
+        let spend = CoinSpend::new(
+            test_coin,
+            Program::new(vec![1_u8].into()),
+            Program::new(solution),
+        );
+        let msg = b"hello";
+        let mut result = msg.to_vec();
+        result.extend(
+            [
+                test_coin.parent_coin_info.as_slice(),
+                u64_to_bytes(test_coin.amount).as_slice(),
+                TEST_CONSTANTS.agg_sig_parent_amount_additional_data.as_slice(),
             ]
             .concat(),
         );
