@@ -28,7 +28,11 @@ fn cache_benchmark(c: &mut Criterion) {
     c.bench_function("bls_cache.aggregate_verify, 0% cache hits", |b| {
         let mut cache = bls_cache.clone();
         b.iter(|| {
-            assert!(cache.aggregate_verify(pks.iter().zip([&msg].iter().cycle()), &agg_sig).0);
+            assert!(
+                cache
+                    .aggregate_verify(pks.iter().zip([&msg].iter().cycle()), &agg_sig)
+                    .0
+            );
         });
     });
 
@@ -37,7 +41,11 @@ fn cache_benchmark(c: &mut Criterion) {
     c.bench_function("bls_cache.aggregate_verify, 10% cache hits", |b| {
         let mut cache = bls_cache.clone();
         b.iter(|| {
-            assert!(cache.aggregate_verify(pks.iter().zip([&msg].iter().cycle()), &agg_sig).0);
+            assert!(
+                cache
+                    .aggregate_verify(pks.iter().zip([&msg].iter().cycle()), &agg_sig)
+                    .0
+            );
         });
     });
 
@@ -49,7 +57,11 @@ fn cache_benchmark(c: &mut Criterion) {
     c.bench_function("bls_cache.aggregate_verify, 20% cache hits", |b| {
         let mut cache = bls_cache.clone();
         b.iter(|| {
-            assert!(cache.aggregate_verify(pks.iter().zip([&msg].iter().cycle()), &agg_sig).0);
+            assert!(
+                cache
+                    .aggregate_verify(pks.iter().zip([&msg].iter().cycle()), &agg_sig)
+                    .0
+            );
         });
     });
 
@@ -61,7 +73,11 @@ fn cache_benchmark(c: &mut Criterion) {
     c.bench_function("bls_cache.aggregate_verify, 50% cache hits", |b| {
         let mut cache = bls_cache.clone();
         b.iter(|| {
-            assert!(cache.aggregate_verify(pks.iter().zip([&msg].iter().cycle()), &agg_sig).0);
+            assert!(
+                cache
+                    .aggregate_verify(pks.iter().zip([&msg].iter().cycle()), &agg_sig)
+                    .0
+            );
         });
     });
 
@@ -73,7 +89,11 @@ fn cache_benchmark(c: &mut Criterion) {
     c.bench_function("bls_cache.aggregate_verify, 100% cache hits", |b| {
         let mut cache = bls_cache.clone();
         b.iter(|| {
-            assert!(cache.aggregate_verify(pks.iter().zip([&msg].iter().cycle()), &agg_sig).0);
+            assert!(
+                cache
+                    .aggregate_verify(pks.iter().zip([&msg].iter().cycle()), &agg_sig)
+                    .0
+            );
         });
     });
 

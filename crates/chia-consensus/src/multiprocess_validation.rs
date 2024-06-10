@@ -11,8 +11,8 @@ use crate::gen::opcodes::{
 use crate::gen::owned_conditions::OwnedSpendBundleConditions;
 use crate::gen::validation_error::ErrorCode;
 use crate::npc_result::get_name_puzzle_conditions;
-use chia_bls::GTElement;
 use chia_bls::BlsCache;
+use chia_bls::GTElement;
 use chia_protocol::SpendBundle;
 use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV};
 use std::collections::HashMap;
@@ -32,13 +32,8 @@ pub fn pre_validate_spendbundle(
     if new_spend.coin_spends.is_empty() {
         Err(ErrorCode::InvalidSpendBundle)
     } else {
-        let (result, _added, _duration) = validate_clvm_and_signature(
-            new_spend,
-            max_cost,
-            constants,
-            peak_height,
-            cache,
-        )?;
+        let (result, _added, _duration) =
+            validate_clvm_and_signature(new_spend, max_cost, constants, peak_height, cache)?;
         Ok(result)
     }
 }
@@ -52,7 +47,14 @@ fn validate_clvm_and_signature(
     constants: &ConsensusConstants,
     height: u32,
     cache: Arc<Mutex<BlsCache>>,
-) -> Result<(OwnedSpendBundleConditions, HashMap<[u8; 32], GTElement>, Duration), ErrorCode> {
+) -> Result<
+    (
+        OwnedSpendBundleConditions,
+        HashMap<[u8; 32], GTElement>,
+        Duration,
+    ),
+    ErrorCode,
+> {
     let start_time = Instant::now();
     let npcresult = get_name_puzzle_conditions(spend_bundle, max_cost, true, height, constants)
         .map_err(|e| e.1)?;
@@ -90,8 +92,7 @@ fn validate_clvm_and_signature(
         .lock()
         .unwrap()
         .aggregate_verify(iter, &spend_bundle.aggregated_signature);
-    if !result
-    {
+    if !result {
         return Err(ErrorCode::InvalidSpendBundle);
     }
     Ok((npcresult, added, start_time.elapsed()))
@@ -320,7 +321,77 @@ ff01\
             &spend_bundle,
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
-            236,
+            1,
+            Arc::new(Mutex::new(BlsCache::default())),
+        );
+        match result {
+            Ok(_) => return,
+            Err(e) => panic!("{:?}", e),
+        }
+    }
+
+    #[test]
+    fn test_validate_aggsig_parent_puzzle() {
+        let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
+        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+        //let pk: PublicKey = sk.public_key(); //0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2
+        // panic!("{:?}", pk);
+
+        let full_puz = Bytes32::new(tree_hash_atom(&[1_u8]).to_bytes());
+        let test_coin = Coin::new(
+            hex::decode("4444444444444444444444444444444444444444444444444444444444444444")
+                .unwrap()
+                .try_into()
+                .unwrap(),
+            full_puz,
+            1,
+        );
+
+        let solution = "ffff30ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080";
+        // ((48 0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2 "hello"))
+
+        let solution = hex::decode(solution)
+            .expect("hex::decode")
+            .try_into()
+            .unwrap();
+        let spend = CoinSpend::new(
+            test_coin,
+            Program::new(vec![1_u8].into()),
+            Program::new(solution),
+        );
+        let msg = b"hello";
+        let mut result = msg.to_vec();
+        result.extend(
+            [
+                test_coin.parent_coin_info.as_slice(),
+                test_coin.puzzle_hash.as_slice(),
+                TEST_CONSTANTS
+                    .agg_sig_parent_puzzle_additional_data
+                    .as_slice(),
+            ]
+            .concat(),
+        );
+        let sig = sign(&sk, result.as_slice());
+        let coin_spends: Vec<CoinSpend> = vec![spend];
+        let spend_bundle = SpendBundle {
+            coin_spends: coin_spends,
+            aggregated_signature: sig,
+        };
+        let result = validate_clvm_and_signature(
+            &spend_bundle,
+            TEST_CONSTANTS.max_block_cost_clvm,
+            &TEST_CONSTANTS,
+            TEST_CONSTANTS.hard_fork_height - 1,
+            Arc::new(Mutex::new(BlsCache::default())),
+        );
+        if let Ok(_) = result {
+            panic!("height too low!")
+        };
+        let result = validate_clvm_and_signature(
+            &spend_bundle,
+            TEST_CONSTANTS.max_block_cost_clvm,
+            &TEST_CONSTANTS,
+            TEST_CONSTANTS.hard_fork_height + 1,
             Arc::new(Mutex::new(BlsCache::default())),
         );
         match result {
