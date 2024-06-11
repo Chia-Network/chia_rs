@@ -3,3 +3,4 @@ target/
 __pycache__/
 venv/
 *.so
+*.pyd
