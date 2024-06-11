@@ -41,7 +41,7 @@ pub fn pre_validate_spendbundle(
 // currently in mempool_manager.py
 // called in threads from pre_validate_spend_bundle()
 // returns (error, cached_results, new_cache_entries, duration)
-fn validate_clvm_and_signature(
+pub fn validate_clvm_and_signature(
     spend_bundle: &SpendBundle,
     max_cost: u64,
     constants: &ConsensusConstants,
@@ -97,40 +97,6 @@ fn validate_clvm_and_signature(
     }
     Ok((npcresult, added, start_time.elapsed()))
 }
-
-// #[cfg(feature = "py-bindings")]
-// mod py_funcs {
-//     use super::*;
-//     use pyo3::{
-//         exceptions::PyValueError,
-//         pybacked::PyBackedBytes,
-//         pyfunction,
-//         types::{PyAnyMethods, PyList},
-//         Bound, PyObject, PyResult,
-//     };
-//     use crate::gen::owned_conditions;
-
-//     #[pyfunction]
-//     #[pyo3(name = "pre_validate_spendbundle")]
-//     pub fn py_pre_validate_spendbundle(
-//         new_spend: SpendBundle,
-//         max_cost: u64,
-//         constants: ConsensusConstants,
-//         peak_height: u32,
-//         syncing: bool,
-//         cache: BlsCache
-//     ) -> Result<(SpendBundle, OwnedSpendBundleConditions), ErrorCode> {
-//         let sbc = validate_clvm_and_signature(&new_spend, max_cost, constants, peak_height, syncing, Arc::new(Mutex::new(cache)));  // TODO: use cache properly
-//         match sbc {
-//             Ok(owned_conditions) => {
-//                 Ok((new_spend, owned_conditions.0))
-//             },
-//             Err(e) => {
-//                 Err(e)
-//             }
-//         }
-//     }
-// }
 
 pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusConstants) -> u32 {
     let mut flags: u32 = 0;
@@ -436,7 +402,9 @@ ff01\
             [
                 test_coin.parent_coin_info.as_slice(),
                 u64_to_bytes(test_coin.amount).as_slice(),
-                TEST_CONSTANTS.agg_sig_parent_amount_additional_data.as_slice(),
+                TEST_CONSTANTS
+                    .agg_sig_parent_amount_additional_data
+                    .as_slice(),
             ]
             .concat(),
         );
@@ -504,7 +472,9 @@ ff01\
             [
                 test_coin.puzzle_hash.as_slice(),
                 u64_to_bytes(test_coin.amount).as_slice(),
-                TEST_CONSTANTS.agg_sig_puzzle_amount_additional_data.as_slice(),
+                TEST_CONSTANTS
+                    .agg_sig_puzzle_amount_additional_data
+                    .as_slice(),
             ]
             .concat(),
         );

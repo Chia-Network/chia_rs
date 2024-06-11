@@ -13,6 +13,9 @@ use chia_consensus::gen::solution_generator::solution_generator as native_soluti
 use chia_consensus::gen::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
 use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
+use chia_consensus::multiprocess_validation::validate_clvm_and_signature;
+
+use chia_consensus::gen::validation_error::ErrorCode;
 use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
     CoinSpend, CoinState, CoinStateFilters, CoinStateUpdate, EndOfSubSlotBundle, Foliage,
@@ -42,14 +45,17 @@ use chia_protocol::{
 use clvm_utils::tree_hash_from_bytes;
 use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV, LIMIT_HEAP, NO_UNKNOWN_OPS};
 use pyo3::buffer::PyBuffer;
-use pyo3::exceptions::{PyRuntimeError, PyValueError};
+use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::pybacked::PyBackedBytes;
 use pyo3::types::PyBytes;
 use pyo3::types::PyList;
 use pyo3::types::PyTuple;
 use pyo3::wrap_pyfunction;
+use std::collections::HashMap;
 use std::iter::zip;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use crate::run_program::{run_chia_program, serialized_length};
 
@@ -365,6 +371,47 @@ fn fast_forward_singleton<'p>(
     ))
 }
 
+#[pyfunction]
+#[pyo3(name = "validate_clvm_and_signature")]
+pub fn py_validate_clvm_and_signature(
+    new_spend: SpendBundle,
+    max_cost: u64,
+    constants: ConsensusConstants,
+    peak_height: u32,
+    cache: BlsCache,
+) -> PyResult<(
+    SpendBundle,
+    OwnedSpendBundleConditions,
+    HashMap<[u8; 32], GTElement>,
+    f32,
+)> {
+    let sbc: Result<
+        (
+            OwnedSpendBundleConditions,
+            HashMap<[u8; 32], GTElement>,
+            Duration,
+        ),
+        ErrorCode,
+    > = validate_clvm_and_signature(
+        &new_spend,
+        max_cost,
+        &constants,
+        peak_height,
+        Arc::new(Mutex::new(cache)),
+    ); // TODO: use cache properly
+    match sbc {
+        Ok((owned_conditions, additions, duration)) => Ok((
+            new_spend,
+            owned_conditions,
+            additions,
+            duration.as_secs_f32(),
+        )),
+        Err(e) => {
+            Err(PyErr::new::<PyTypeError, _>(e as u32))
+        }
+    }
+}
+
 #[pymodule]
 pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // generator functions
@@ -393,6 +440,9 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<MerkleSet>()?;
     m.add_function(wrap_pyfunction!(confirm_included_already_hashed, m)?)?;
     m.add_function(wrap_pyfunction!(confirm_not_included_already_hashed, m)?)?;
+
+    // multithread validattion
+    m.add_function(wrap_pyfunction!(py_validate_clvm_and_signature, m)?)?;
 
     // clvm functions
     m.add("COND_ARGS_NIL", COND_ARGS_NIL)?;
