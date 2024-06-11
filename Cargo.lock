@@ -497,6 +497,7 @@ name = "chia-traits"
 version = "0.10.0"
 dependencies = [
  "chia_streamable_macro 0.10.0",
+ "indexmap",
  "pyo3",
  "sha2",
  "thiserror",

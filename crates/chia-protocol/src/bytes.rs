@@ -109,6 +109,13 @@ impl FromJsonDict for Bytes {
     }
 }
 
+#[cfg(feature = "py-bindings")]
+impl chia_traits::TypeStub for Bytes {
+    fn type_stub(_builder: &chia_traits::StubBuilder) -> String {
+        "bytes".to_string()
+    }
+}
+
 impl<N> ToClvm<N> for Bytes {
     fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
         encoder.encode_atom(self.0.as_slice())
@@ -451,6 +458,13 @@ impl<'py> FromPyObject<'py> for Bytes {
     fn extract(obj: &'py PyAny) -> PyResult<Self> {
         let b = obj.downcast::<PyBytes>()?;
         Ok(Bytes(b.as_bytes().to_vec()))
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+impl<const N: usize> chia_traits::TypeStub for BytesImpl<N> {
+    fn type_stub(builder: &chia_traits::StubBuilder) -> String {
+        chia_traits::SizedBytes::<N>::type_stub(builder)
     }
 }
 

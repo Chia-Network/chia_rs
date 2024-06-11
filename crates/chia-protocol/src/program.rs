@@ -451,6 +451,43 @@ impl Program {
     }
 }
 
+#[cfg(feature = "py-bindings")]
+mod stubs {
+    use super::*;
+
+    use chia_traits::{ChiaProgram, Int, Object, StubBuilder, TypeStub};
+
+    impl TypeStub for Program {
+        fn type_stub(builder: &StubBuilder) -> String {
+            if !builder.has_class("Program") {
+                builder
+                    .class::<Self>()
+                    .method::<crate::Bytes32>("get_tree_hash", |m| m)
+                    .static_method::<Self>("default", |m| m)
+                    .static_method::<Self>("fromhex", |m| m.param::<String>("hex"))
+                    .method::<(Int, ChiaProgram)>("run_mempool_with_cost", |m| {
+                        m.param::<Int>("max_cost").param::<Object>("args")
+                    })
+                    .method::<(Int, ChiaProgram)>("run_with_cost", |m| {
+                        m.param::<Int>("max_cost").param::<Object>("args")
+                    })
+                    .method::<(Int, ChiaProgram)>("_run", |m| {
+                        m.param::<Int>("max_cost")
+                            .param::<Int>("flags")
+                            .param::<Object>("args")
+                    })
+                    .static_method::<Self>("to", |m| m.param::<Object>("value"))
+                    .static_method::<Self>("from_program", |m| m.param::<ChiaProgram>("program"))
+                    .method::<ChiaProgram>("to_program", |m| m)
+                    .method::<(ChiaProgram, ChiaProgram)>("uncurry", |m| m)
+                    .generate_streamable();
+            }
+
+            "Program".to_string()
+        }
+    }
+}
+
 impl Streamable for Program {
     fn update_digest(&self, digest: &mut Sha256) {
         digest.update(&self.0);

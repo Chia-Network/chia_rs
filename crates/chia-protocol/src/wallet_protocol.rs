@@ -303,3 +303,10 @@ impl chia_traits::ChiaToPython for RejectStateReason {
         Ok(pyo3::IntoPy::into_py(*self, py).bind(py).clone())
     }
 }
+
+#[cfg(feature = "py-bindings")]
+impl chia_traits::TypeStub for RejectStateReason {
+    fn type_stub(_builder: &chia_traits::StubBuilder) -> String {
+        "int".to_string()
+    }
+}

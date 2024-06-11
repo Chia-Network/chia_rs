@@ -105,7 +105,7 @@ impl Streamable for GTElement {
 mod pybindings {
     use super::*;
 
-    use chia_traits::{FromJsonDict, ToJsonDict};
+    use chia_traits::{FromJsonDict, StubBuilder, ToJsonDict, TypeStub};
     use pyo3::{exceptions::PyValueError, prelude::*};
 
     #[pymethods]
@@ -160,6 +160,21 @@ mod pybindings {
                 )));
             }
             Ok(Self::from_bytes(buf.as_slice().try_into().unwrap()))
+        }
+    }
+
+    impl TypeStub for GTElement {
+        fn type_stub(builder: &StubBuilder) -> String {
+            if !builder.has_class("GTElement") {
+                builder
+                    .class::<Self>()
+                    .static_getter_field::<usize>("SIZE")
+                    .method::<String>("__str__", |m| m)
+                    .method::<Self>("__mul__", |m| m.param::<Self>("rhs"))
+                    .method::<Self>("__imul__", |m| m.param::<Self>("rhs"))
+                    .generate_streamable();
+            }
+            "GTElement".to_string()
         }
     }
 }

@@ -481,7 +481,7 @@ mod pybindings {
 
     use crate::parse_hex::parse_hex_string;
 
-    use chia_traits::{FromJsonDict, ToJsonDict};
+    use chia_traits::{FromJsonDict, StubBuilder, ToJsonDict, TypeStub};
     use pyo3::prelude::*;
 
     #[pymethods]
@@ -534,6 +534,24 @@ mod pybindings {
                     .try_into()
                     .unwrap(),
             )?)
+        }
+    }
+
+    impl TypeStub for Signature {
+        fn type_stub(builder: &StubBuilder) -> String {
+            if !builder.has_class("G2Element") {
+                builder
+                    .class::<Self>()
+                    .static_getter_field::<usize>("SIZE")
+                    .class_method::<Self>("__new__", |m| m)
+                    .method::<GTElement>("pair", |m| m.param::<PublicKey>("public_key"))
+                    .static_method::<Self>("generator", |m| m)
+                    .method::<String>("__str__", |m| m)
+                    .method::<Self>("__add__", |m| m.param::<Self>("rhs"))
+                    .method::<Self>("__iadd__", |m| m.param::<Self>("rhs"))
+                    .generate_streamable();
+            }
+            "G2Element".to_string()
         }
     }
 }

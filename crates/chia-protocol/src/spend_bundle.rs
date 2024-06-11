@@ -15,7 +15,15 @@ use clvmr::ENABLE_FIXED_DIV;
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
 
-#[streamable]
+#[streamable(no_stub)]
+#[cfg_attr(feature = "py-bindings", generate_type_stubs(
+    class
+        .static_method::<Self>("aggregate", |m| m.param::<Vec<Self>>("spend_bundles"))
+        .method::<Bytes32>("name", |m| m)
+        .method::<Vec<Coin>>("additions", |m| m)
+        .method::<Vec<Coin>>("removals", |m| m)
+        .method::<()>("debug", |m| m)
+))]
 pub struct SpendBundle {
     coin_spends: Vec<CoinSpend>,
     aggregated_signature: G2Element,

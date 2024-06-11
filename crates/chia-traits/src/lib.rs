@@ -17,3 +17,9 @@ pub use crate::streamable::*;
 pub mod int;
 #[cfg(feature = "py-bindings")]
 pub use crate::int::*;
+
+#[cfg(feature = "py-bindings")]
+mod type_stub;
+
+#[cfg(feature = "py-bindings")]
+pub use crate::type_stub::*;

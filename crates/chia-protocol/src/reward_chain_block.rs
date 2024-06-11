@@ -20,7 +20,10 @@ pub struct RewardChainBlockUnfinished {
     reward_chain_sp_signature: G2Element,
 }
 
-#[streamable]
+#[streamable(no_stub)]
+#[cfg_attr(feature = "py-bindings", generate_type_stubs(
+    class.field::<RewardChainBlockUnfinished>("get_unfinished", None, false)
+))]
 pub struct RewardChainBlock {
     weight: u128,
     height: u32,
