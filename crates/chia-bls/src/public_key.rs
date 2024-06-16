@@ -311,23 +311,28 @@ mod pybindings {
         const SIZE: usize = 48;
 
         #[new]
-        pub fn init() -> Self {
+        fn init() -> Self {
             Self::default()
         }
 
         #[staticmethod]
         #[pyo3(name = "generator")]
-        pub fn py_generator() -> Self {
+        fn py_generator() -> Self {
             Self::generator()
         }
 
-        pub fn pair(&self, other: &Signature) -> GTElement {
+        fn pair(&self, other: &Signature) -> GTElement {
             other.pair(self)
         }
 
         #[pyo3(name = "get_fingerprint")]
-        pub fn py_get_fingerprint(&self) -> u32 {
+        fn py_get_fingerprint(&self) -> u32 {
             self.get_fingerprint()
+        }
+
+        #[pyo3(name = "derive_unhardened")]
+        fn py_derive_unhardened(&self, idx: u32) -> Self {
+            self.derive_unhardened(idx)
         }
 
         fn __str__(&self) -> String {

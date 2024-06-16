@@ -389,6 +389,7 @@ class MerkleSet:
             "def __str__(self) -> str: ...",
             "def __add__(self, other: G1Element) -> G1Element: ...",
             "def __iadd__(self, other: G1Element) -> G1Element: ...",
+            "def derive_unhardened(self, int) -> G1Element: ...",
         ],
     )
     print_class(
@@ -426,6 +427,9 @@ class MerkleSet:
             "def sign_g2(self, msg: bytes, dst: bytes) -> G2Element: ...",
             "def get_g1(self) -> G1Element: ...",
             "def __str__(self) -> str: ...",
+            "def public_key(self) -> G1Element: ...",
+            "def derive_hardened(self, int) -> PrivateKey: ...",
+            "def derive_unhardened(self, int) -> PrivateKey: ...",
         ],
     )
 
