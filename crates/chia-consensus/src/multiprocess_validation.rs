@@ -2,7 +2,7 @@ use crate::consensus_constants::ConsensusConstants;
 use crate::gen::condition_tools::make_aggsig_final_message;
 use crate::gen::flags::{
     AGG_SIG_ARGS, ALLOW_BACKREFS, DISALLOW_INFINITY_G1, ENABLE_MESSAGE_CONDITIONS,
-    ENABLE_SOFTFORK_CONDITION, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
+    ENABLE_SOFTFORK_CONDITION
 };
 use crate::gen::opcodes::{
     AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT, AGG_SIG_PARENT_PUZZLE,
@@ -100,9 +100,7 @@ pub fn validate_clvm_and_signature(
 
 pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusConstants) -> u32 {
     let mut flags: u32 = 0;
-    if height >= constants.soft_fork2_height {
-        flags |= NO_RELATIVE_CONDITIONS_ON_EPHEMERAL;
-    }
+    
     if height >= constants.soft_fork4_height {
         flags |= ENABLE_MESSAGE_CONDITIONS;
     }
@@ -186,8 +184,7 @@ ff01\
             &TEST_CONSTANTS,
             236,
             Arc::new(Mutex::new(BlsCache::default())),
-        );
-        result.unwrap();
+        ).expect("SpendBundle should be valid for this test");
     }
 
     #[test]
@@ -227,17 +224,13 @@ ff01\
             coin_spends: coin_spends,
             aggregated_signature: sig,
         };
-        let result = validate_clvm_and_signature(
+        let _result = validate_clvm_and_signature(
             &spend_bundle,
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             236,
             Arc::new(Mutex::new(BlsCache::default())),
-        );
-        match result {
-            Ok(_) => return,
-            Err(e) => panic!("{:?}", e),
-        }
+        ).expect("SpendBundle should be valid for this test");
     }
 
     #[test]
@@ -284,17 +277,13 @@ ff01\
             coin_spends: coin_spends,
             aggregated_signature: sig,
         };
-        let result = validate_clvm_and_signature(
+        let _result = validate_clvm_and_signature(
             &spend_bundle,
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             1,
             Arc::new(Mutex::new(BlsCache::default())),
-        );
-        match result {
-            Ok(_) => return,
-            Err(e) => panic!("{:?}", e),
-        }
+        ).expect("SpendBundle should be valid for this test");
     }
 
     #[test]
@@ -354,17 +343,13 @@ ff01\
         if let Ok(_) = result {
             panic!("height too low!")
         };
-        let result = validate_clvm_and_signature(
+        let _result = validate_clvm_and_signature(
             &spend_bundle,
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             TEST_CONSTANTS.hard_fork_height + 1,
             Arc::new(Mutex::new(BlsCache::default())),
-        );
-        match result {
-            Ok(_) => return,
-            Err(e) => panic!("{:?}", e),
-        }
+        ).expect("SpendBundle should be valid for this test");
     }
 
     #[test]
@@ -424,17 +409,13 @@ ff01\
         if let Ok(_) = result {
             panic!("height too low!")
         };
-        let result = validate_clvm_and_signature(
+        let _result = validate_clvm_and_signature(
             &spend_bundle,
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             TEST_CONSTANTS.hard_fork_height + 1,
             Arc::new(Mutex::new(BlsCache::default())),
-        );
-        match result {
-            Ok(_) => return,
-            Err(e) => panic!("{:?}", e),
-        }
+        ).expect("SpendBundle should be valid for this test");
     }
 
     #[test]
@@ -494,16 +475,12 @@ ff01\
         if let Ok(_) = result {
             panic!("height too low!")
         };
-        let result = validate_clvm_and_signature(
+        let _result = validate_clvm_and_signature(
             &spend_bundle,
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             TEST_CONSTANTS.hard_fork_height + 1,
             Arc::new(Mutex::new(BlsCache::default())),
-        );
-        match result {
-            Ok(_) => return,
-            Err(e) => panic!("{:?}", e),
-        }
+        ).expect("SpendBundle should be valid for this test");
     }
 }
