@@ -85,8 +85,6 @@ pub fn get_name_puzzle_conditions(
     validate_conditions(&a, &ret, state, a.nil(), flags)?;
 
     ret.cost = max_cost - cost_left;
-    let Ok(osbc) = OwnedSpendBundleConditions::from(&a, ret) else {
-        return Err(ValidationErr(a.nil(), ErrorCode::InvalidSpendBundle));
-    };
+    let osbc = OwnedSpendBundleConditions::from(&a, ret);
     Ok(osbc)
 }
