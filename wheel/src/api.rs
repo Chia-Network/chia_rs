@@ -406,9 +406,7 @@ pub fn py_validate_clvm_and_signature(
             additions,
             duration.as_secs_f32(),
         )),
-        Err(e) => {
-            Err(PyErr::new::<PyTypeError, _>(e as u32))
-        }
+        Err(e) => Err(PyErr::new::<PyTypeError, _>(e as u32)),
     }
 }
 
