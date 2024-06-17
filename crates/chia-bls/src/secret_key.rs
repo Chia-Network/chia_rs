@@ -250,16 +250,31 @@ mod pybindings {
         #[classattr]
         const PRIVATE_KEY_SIZE: usize = 32;
 
-        pub fn sign_g2(&self, msg: &[u8]) -> Signature {
+        fn sign_g2(&self, msg: &[u8]) -> Signature {
             crate::sign(self, msg)
         }
 
-        pub fn get_g1(&self) -> PublicKey {
+        fn get_g1(&self) -> PublicKey {
+            self.public_key()
+        }
+
+        #[pyo3(name = "public_key")]
+        fn py_public_key(&self) -> PublicKey {
             self.public_key()
         }
 
         fn __str__(&self) -> String {
             hex::encode(self.to_bytes())
+        }
+
+        #[pyo3(name = "derive_hardened")]
+        fn py_derive_hardened(&self, idx: u32) -> Self {
+            self.derive_hardened(idx)
+        }
+
+        #[pyo3(name = "derive_unhardened")]
+        fn py_derive_unhardened(&self, idx: u32) -> Self {
+            self.derive_unhardened(idx)
         }
     }
 
