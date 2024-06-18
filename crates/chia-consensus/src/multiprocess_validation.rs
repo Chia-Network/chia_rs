@@ -170,7 +170,7 @@ ff01\
         );
         let spend = CoinSpend::new(
             test_coin,
-            [1_u8].into(),
+            Program::new(vec![1_u8].into()),
             solution.into(),
         );
         let coin_spends: Vec<CoinSpend> = vec![spend];
@@ -178,7 +178,7 @@ ff01\
             coin_spends: coin_spends,
             aggregated_signature: Signature::default(),
         };
-        let _result = validate_clvm_and_signature(
+        validate_clvm_and_signature(
             &spend_bundle,
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
@@ -219,7 +219,7 @@ ff01\
             coin_spends: coin_spends,
             aggregated_signature: sig,
         };
-        let _result = validate_clvm_and_signature(
+        validate_clvm_and_signature(
             &spend_bundle,
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
@@ -268,7 +268,7 @@ ff01\
             coin_spends: coin_spends,
             aggregated_signature: sig,
         };
-        let _result = validate_clvm_and_signature(
+        validate_clvm_and_signature(
             &spend_bundle,
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
@@ -330,7 +330,7 @@ ff01\
         if let Ok(_) = result {
             panic!("height too low!")
         };
-        let _result = validate_clvm_and_signature(
+        validate_clvm_and_signature(
             &spend_bundle,
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
@@ -392,7 +392,7 @@ ff01\
         if let Ok(_) = result {
             panic!("height too low!")
         };
-        let _result = validate_clvm_and_signature(
+        validate_clvm_and_signature(
             &spend_bundle,
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
@@ -454,7 +454,7 @@ ff01\
         if let Ok(_) = result {
             panic!("height too low!")
         };
-        let _result = validate_clvm_and_signature(
+        validate_clvm_and_signature(
             &spend_bundle,
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
