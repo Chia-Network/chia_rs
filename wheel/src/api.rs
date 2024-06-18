@@ -52,7 +52,6 @@ use pyo3::types::PyBytes;
 use pyo3::types::PyList;
 use pyo3::types::PyTuple;
 use pyo3::wrap_pyfunction;
-use std::collections::HashMap;
 use std::iter::zip;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -382,13 +381,13 @@ pub fn py_validate_clvm_and_signature(
 ) -> PyResult<(
     SpendBundle,
     OwnedSpendBundleConditions,
-    HashMap<[u8; 32], GTElement>,
+    Vec<([u8; 32], GTElement)>,
     f32,
 )> {
     let sbc: Result<
         (
             OwnedSpendBundleConditions,
-            HashMap<[u8; 32], GTElement>,
+            Vec<([u8; 32], GTElement)>,
             Duration,
         ),
         ErrorCode,

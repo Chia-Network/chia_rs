@@ -15,7 +15,6 @@ use chia_bls::BlsCache;
 use chia_bls::GTElement;
 use chia_protocol::SpendBundle;
 use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV};
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 // use std::thread;
 use std::time::{Duration, Instant};
@@ -50,7 +49,7 @@ pub fn validate_clvm_and_signature(
 ) -> Result<
     (
         OwnedSpendBundleConditions,
-        HashMap<[u8; 32], GTElement>,
+        Vec<([u8; 32], GTElement)>,
         Duration,
     ),
     ErrorCode,

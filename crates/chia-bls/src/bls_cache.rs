@@ -3,7 +3,6 @@ use crate::{GTElement, PublicKey, Signature};
 use lru::LruCache;
 use sha2::{Digest, Sha256};
 use std::borrow::Borrow;
-use std::collections::HashMap;
 use std::num::NonZeroUsize;
 
 /// This is a cache of pairings of public keys and their corresponding message.
@@ -42,13 +41,22 @@ impl BlsCache {
     pub fn is_empty(&self) -> bool {
         self.cache.is_empty()
     }
+    
+    pub fn update(&mut self, new_items: Vec<([u8; 32], GTElement)>) {
+        for (key, value) in new_items.into_iter() {
+            self.cache.put(
+                key,
+                value,
+            );
+        }
+    }
 
     pub fn aggregate_verify<Pk: Borrow<PublicKey>, Msg: AsRef<[u8]>>(
         &mut self,
         pks_msgs: impl IntoIterator<Item = (Pk, Msg)>,
         sig: &Signature,
-    ) -> (bool, HashMap<[u8; 32], GTElement>) {
-        let mut added: HashMap<[u8; 32], GTElement> = HashMap::new();
+    ) -> (bool, Vec<([u8; 32], GTElement)>) {
+        let mut added: Vec<([u8; 32], GTElement)> = Vec::new();
         let iter = pks_msgs.into_iter().map(|(pk, msg)| -> GTElement {
             // Hash pubkey + message
             let mut hasher = Sha256::new();
@@ -72,7 +80,7 @@ impl BlsCache {
 
             let pairing = aug_hash.pair(pk.borrow());
             self.cache.put(hash, pairing.clone());
-            added.insert(hash, pairing.clone());
+            added.push((hash, pairing.clone()));
             pairing
         });
 
@@ -113,7 +121,7 @@ impl BlsCache {
         pks: &Bound<'_, PyList>,
         msgs: &Bound<'_, PyList>,
         sig: &Signature,
-    ) -> PyResult<(bool, HashMap<[u8; 32], GTElement>)> {
+    ) -> PyResult<(bool, Vec<([u8; 32], GTElement)>)> {
         let pks = pks
             .iter()?
             .map(|item| item?.extract())
@@ -163,6 +171,8 @@ impl BlsCache {
         Ok(())
     }
 }
+
+
 
 #[cfg(test)]
 pub mod tests {
