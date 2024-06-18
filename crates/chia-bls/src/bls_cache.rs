@@ -41,13 +41,10 @@ impl BlsCache {
     pub fn is_empty(&self) -> bool {
         self.cache.is_empty()
     }
-    
+
     pub fn update(&mut self, new_items: Vec<([u8; 32], GTElement)>) {
-        for (key, value) in new_items.into_iter() {
-            self.cache.put(
-                key,
-                value,
-            );
+        for (key, value) in new_items {
+            self.cache.put(key, value);
         }
     }
 
