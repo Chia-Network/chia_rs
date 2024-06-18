@@ -384,29 +384,20 @@ pub fn py_validate_clvm_and_signature(
     Vec<([u8; 32], GTElement)>,
     f32,
 )> {
-    let sbc: Result<
-        (
-            OwnedSpendBundleConditions,
-            Vec<([u8; 32], GTElement)>,
-            Duration,
-        ),
-        ErrorCode,
-    > = validate_clvm_and_signature(
+    let (owned_conditions, additions, duration) = validate_clvm_and_signature(
         &new_spend,
         max_cost,
         &constants,
         peak_height,
-        Arc::new(Mutex::new(cache)),
-    ); // TODO: use cache properly
-    match sbc {
-        Ok((owned_conditions, additions, duration)) => Ok((
-            new_spend,
-            owned_conditions,
-            additions,
-            duration.as_secs_f32(),
-        )),
-        Err(e) => Err(PyErr::new::<PyTypeError, _>(e as u32)),
-    }
+        Arc::new(Mutex::new(cache)), // TODO: use cache properly
+    )
+    .map_err(|e| PyErr::new::<PyTypeError, _>(e as u32))?;
+    Ok((
+        new_spend,
+        owned_conditions,
+        additions,
+        duration.as_secs_f32(),
+    ))
 }
 
 #[pymodule]

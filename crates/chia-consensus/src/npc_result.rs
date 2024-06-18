@@ -55,7 +55,7 @@ pub fn get_name_puzzle_conditions(
     let mut state = ParseState::default();
     let mut cache = HashMap::<NodePtr, TreeHash>::new();
 
-    for coin_spend in spend_bundle.coin_spends.clone() {
+    for coin_spend in &spend_bundle.coin_spends {
         // process the spend
         let puz = node_from_bytes(&mut a, coin_spend.puzzle_reveal.as_slice())?;
         let sol = node_from_bytes(&mut a, coin_spend.solution.as_slice())?;
@@ -83,7 +83,7 @@ pub fn get_name_puzzle_conditions(
     }
 
     validate_conditions(&a, &ret, state, a.nil(), flags)?;
-
+    assert!(max_cost >= cost_left);
     ret.cost = max_cost - cost_left;
     let osbc = OwnedSpendBundleConditions::from(&a, ret);
     Ok(osbc)

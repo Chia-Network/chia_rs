@@ -148,12 +148,8 @@ mod tests {
     #[test]
     fn test_validate_no_pks() {
         let test_coin = Coin::new(
-            Bytes32::new(hex!(
-                "4444444444444444444444444444444444444444444444444444444444444444"
-            )),
-            Bytes32::new(hex!(
-                "3333333333333333333333333333333333333333333333333333333333333333"
-            )),
+            hex!("4444444444444444444444444444444444444444444444444444444444444444").into(),
+            hex!("3333333333333333333333333333333333333333333333333333333333333333").into(),
             1,
         );
 
@@ -168,11 +164,7 @@ ff01\
             )
             .to_vec(),
         );
-        let spend = CoinSpend::new(
-            test_coin,
-            Program::new(vec![1_u8].into()),
-            solution.into(),
-        );
+        let spend = CoinSpend::new(test_coin, Program::new(vec![1_u8].into()), solution.into());
         let coin_spends: Vec<CoinSpend> = vec![spend];
         let spend_bundle = SpendBundle {
             coin_spends: coin_spends,
@@ -195,22 +187,18 @@ ff01\
         //let pk: PublicKey = sk.public_key(); //0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2
         // panic!("{:?}", pk);
         let test_coin = Coin::new(
-            Bytes32::new(hex!(
-                "4444444444444444444444444444444444444444444444444444444444444444"
-            )),
-            Bytes32::new(hex!(
-                "3333333333333333333333333333333333333333333333333333333333333333"
-            )),
+            hex!("4444444444444444444444444444444444444444444444444444444444444444").into(),
+            hex!("3333333333333333333333333333333333333333333333333333333333333333").into(),
             1,
         );
 
-        let solution = Bytes::new(hex!("ffff31ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080").to_vec());
+        let solution = hex!("ffff31ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080").to_vec();
         // ((49 0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2 "hello"))
 
         let spend = CoinSpend::new(
             test_coin,
             Program::new(vec![1_u8].into()),
-            Program::new(solution),
+            Program::new(solution.into()),
         );
         let msg = b"hello";
         let sig = sign(&sk, msg);
@@ -238,20 +226,18 @@ ff01\
 
         let full_puz = Bytes32::new(tree_hash_atom(&[1_u8]).to_bytes());
         let test_coin = Coin::new(
-            Bytes32::new(hex!(
-                "4444444444444444444444444444444444444444444444444444444444444444"
-            )),
+            hex!("4444444444444444444444444444444444444444444444444444444444444444").into(),
             full_puz,
             1,
         );
 
-        let solution = Bytes::new(hex!("ffff32ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080").to_vec());
+        let solution = hex!("ffff32ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080").to_vec();
         // ((50 0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2 "hello"))
 
         let spend = CoinSpend::new(
             test_coin,
             Program::new(vec![1_u8].into()),
-            Program::new(solution),
+            Program::new(solution.into()),
         );
         let msg = b"hello";
         let mut result = msg.to_vec();
@@ -287,20 +273,18 @@ ff01\
 
         let full_puz = Bytes32::new(tree_hash_atom(&[1_u8]).to_bytes());
         let test_coin = Coin::new(
-            Bytes32::new(hex!(
-                "4444444444444444444444444444444444444444444444444444444444444444"
-            )),
+            hex!("4444444444444444444444444444444444444444444444444444444444444444").into(),
             full_puz,
             1,
         );
 
-        let solution = Bytes::new(hex!("ffff30ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080").to_vec());
+        let solution = hex!("ffff30ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080").to_vec();
         // ((48 0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2 "hello"))
 
         let spend = CoinSpend::new(
             test_coin,
             Program::new(vec![1_u8].into()),
-            Program::new(solution),
+            Program::new(solution.into()),
         );
         let msg = b"hello";
         let mut result = msg.to_vec();
@@ -349,20 +333,18 @@ ff01\
 
         let full_puz = Bytes32::new(tree_hash_atom(&[1_u8]).to_bytes());
         let test_coin = Coin::new(
-            Bytes32::new(hex!(
-                "4444444444444444444444444444444444444444444444444444444444444444"
-            )),
+            hex!("4444444444444444444444444444444444444444444444444444444444444444").into(),
             full_puz,
             1,
         );
 
-        let solution = Bytes::new(hex!("ffff2fffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080").to_vec());
+        let solution = hex!("ffff2fffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080").to_vec();
         // ((47 0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2 "hello"))
 
         let spend = CoinSpend::new(
             test_coin,
             Program::new(vec![1_u8].into()),
-            Program::new(solution),
+            Program::new(solution.into()),
         );
         let msg = b"hello";
         let mut result = msg.to_vec();
@@ -411,20 +393,18 @@ ff01\
 
         let full_puz = Bytes32::new(tree_hash_atom(&[1_u8]).to_bytes());
         let test_coin = Coin::new(
-            Bytes32::new(hex!(
-                "4444444444444444444444444444444444444444444444444444444444444444"
-            )),
+            hex!("4444444444444444444444444444444444444444444444444444444444444444").into(),
             full_puz,
             1,
         );
 
-        let solution = Bytes::new(hex!("ffff2effb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080").to_vec());
+        let solution = hex!("ffff2effb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080").to_vec();
         // ((46 0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2 "hello"))
 
         let spend = CoinSpend::new(
             test_coin,
             Program::new(vec![1_u8].into()),
-            Program::new(solution),
+            Program::new(solution.into()),
         );
         let msg = b"hello";
         let mut result = msg.to_vec();
