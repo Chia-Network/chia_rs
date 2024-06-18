@@ -3,7 +3,7 @@ use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::gen::conditions::{
     process_single_spend, MempoolVisitor, ParseState, SpendBundleConditions,
 };
-use chia_consensus::gen::flags::{COND_ARGS_NIL, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
+use chia_consensus::gen::flags::{NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
 use clvmr::allocator::Allocator;
 use fuzzing_utils::{make_tree, BitCursor};
 use libfuzzer_sys::fuzz_target;
@@ -19,7 +19,7 @@ fuzz_target!(|data: &[u8]| {
 
     let conds = make_tree(&mut a, &mut BitCursor::new(data), false);
 
-    for flags in &[0, COND_ARGS_NIL, STRICT_ARGS_COUNT, NO_UNKNOWN_CONDS] {
+    for flags in &[0, STRICT_ARGS_COUNT, NO_UNKNOWN_CONDS] {
         let mut cost_left = 11_000_000;
         let _ = process_single_spend::<MempoolVisitor>(
             &a,

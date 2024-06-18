@@ -6,7 +6,7 @@ use clvmr::allocator::Allocator;
 use fuzzing_utils::{make_list, BitCursor};
 
 use chia_consensus::gen::flags::{
-    COND_ARGS_NIL, ENABLE_MESSAGE_CONDITIONS, ENABLE_SOFTFORK_CONDITION, STRICT_ARGS_COUNT,
+    ENABLE_MESSAGE_CONDITIONS, ENABLE_SOFTFORK_CONDITION, STRICT_ARGS_COUNT,
 };
 
 use chia_consensus::gen::opcodes::{
@@ -24,7 +24,6 @@ fuzz_target!(|data: &[u8]| {
 
     for flags in &[
         0,
-        COND_ARGS_NIL,
         STRICT_ARGS_COUNT,
         ENABLE_SOFTFORK_CONDITION,
         ENABLE_MESSAGE_CONDITIONS,

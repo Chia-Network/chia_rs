@@ -17,9 +17,7 @@ use super::opcodes::{
 use super::sanitize_int::{sanitize_uint, SanitizedUint};
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
 use crate::consensus_constants::ConsensusConstants;
-use crate::gen::flags::{
-    AGG_SIG_ARGS, COND_ARGS_NIL, DISALLOW_INFINITY_G1, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
-};
+use crate::gen::flags::{DISALLOW_INFINITY_G1, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
 use crate::gen::messages::{Message, SpendId};
 use crate::gen::spend_visitor::SpendVisitor;
 use crate::gen::validation_error::check_nil;
@@ -281,47 +279,9 @@ pub fn parse_args(
     flags: u32,
 ) -> Result<Condition, ValidationErr> {
     match op {
-        AGG_SIG_UNSAFE => {
-            let pubkey = sanitize_hash(a, first(a, c)?, 48, ErrorCode::InvalidPublicKey)?;
-            c = rest(a, c)?;
-            let message = sanitize_announce_msg(a, first(a, c)?, ErrorCode::InvalidMessage)?;
-            // AGG_SIG_UNSAFE takes exactly two parameters
-            if (flags & COND_ARGS_NIL) != 0 || (flags & STRICT_ARGS_COUNT) != 0 {
-                // make sure there aren't more than two
-                check_nil(a, rest(a, c)?)?;
-                Ok(Condition::AggSigUnsafe(pubkey, message))
-            } else if (flags & AGG_SIG_ARGS) == 0 {
-                // but the argument list still doesn't need to be terminated by NIL,
-                // just any atom will do
-                match a.sexp(rest(a, c)?) {
-                    SExp::Pair(_, _) => Err(ValidationErr(c, ErrorCode::InvalidCondition)),
-                    SExp::Atom => Ok(Condition::AggSigUnsafe(pubkey, message)),
-                }
-            } else {
-                Ok(Condition::AggSigUnsafe(pubkey, message))
-            }
-        }
-        AGG_SIG_ME => {
-            let pubkey = sanitize_hash(a, first(a, c)?, 48, ErrorCode::InvalidPublicKey)?;
-            c = rest(a, c)?;
-            let message = sanitize_announce_msg(a, first(a, c)?, ErrorCode::InvalidMessage)?;
-            // AGG_SIG_ME takes exactly two parameters
-            if (flags & COND_ARGS_NIL) != 0 || (flags & STRICT_ARGS_COUNT) != 0 {
-                // make sure there aren't more than two
-                check_nil(a, rest(a, c)?)?;
-                Ok(Condition::AggSigMe(pubkey, message))
-            } else if (flags & AGG_SIG_ARGS) == 0 {
-                // but the argument list still doesn't need to be terminated by NIL,
-                // just any atom will do
-                match a.sexp(rest(a, c)?) {
-                    SExp::Pair(_, _) => Err(ValidationErr(c, ErrorCode::InvalidCondition)),
-                    SExp::Atom => Ok(Condition::AggSigMe(pubkey, message)),
-                }
-            } else {
-                Ok(Condition::AggSigMe(pubkey, message))
-            }
-        }
-        AGG_SIG_PUZZLE
+        AGG_SIG_UNSAFE
+        | AGG_SIG_ME
+        | AGG_SIG_PUZZLE
         | AGG_SIG_PUZZLE_AMOUNT
         | AGG_SIG_PARENT
         | AGG_SIG_AMOUNT
@@ -336,6 +296,8 @@ pub fn parse_args(
                 check_nil(a, rest(a, c)?)?;
             }
             match op {
+                AGG_SIG_UNSAFE => Ok(Condition::AggSigUnsafe(pubkey, message)),
+                AGG_SIG_ME => Ok(Condition::AggSigMe(pubkey, message)),
                 AGG_SIG_PARENT => Ok(Condition::AggSigParent(pubkey, message)),
                 AGG_SIG_PUZZLE => Ok(Condition::AggSigPuzzle(pubkey, message)),
                 AGG_SIG_AMOUNT => Ok(Condition::AggSigAmount(pubkey, message)),
@@ -1926,7 +1888,7 @@ fn test_strict_args_count(
             "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 )))))",
             condition as u8, arg
         ),
-        flags | ENABLE_SOFTFORK_CONDITION | AGG_SIG_ARGS,
+        flags | ENABLE_SOFTFORK_CONDITION,
     );
     if flags == 0 {
         // two of the cases won't pass, even when garbage at the end is allowed.
@@ -3281,20 +3243,10 @@ fn test_single_agg_sig_unsafe() {
     assert_eq!(spend.flags, 0);
 }
 
-#[test]
-fn test_agg_sig_unsafe_extra_arg() {
-    // AGG_SIG_UNSAFE
-    // extra args are disallowed in non-mempool mode
-    assert_eq!(
-        cond_test_flag("((({h1} ({h2} (123 (((49 ({pubkey} ({msg1} (456 )))))", 0)
-            .unwrap_err()
-            .1,
-        ErrorCode::InvalidCondition
-    );
-}
-
 #[cfg(test)]
 #[rstest]
+#[case(AGG_SIG_ME)]
+#[case(AGG_SIG_UNSAFE)]
 #[case(AGG_SIG_PARENT)]
 #[case(AGG_SIG_PUZZLE)]
 #[case(AGG_SIG_AMOUNT)]
@@ -3319,8 +3271,10 @@ fn test_agg_sig_extra_arg(#[case] condition: ConditionOpcode) {
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert!((spend.flags & ELIGIBLE_FOR_DEDUP) == 0);
 
-    let agg_sigs = agg_sig_vec(condition, spend);
-    assert_eq!(agg_sigs.len(), 1);
+    if condition != AGG_SIG_UNSAFE {
+        let agg_sigs = agg_sig_vec(condition, spend);
+        assert_eq!(agg_sigs.len(), 1);
+    }
 
     // but not in mempool mode
     assert_eq!(
@@ -3335,68 +3289,6 @@ fn test_agg_sig_extra_arg(#[case] condition: ConditionOpcode) {
         .1,
         ErrorCode::InvalidCondition
     );
-}
-
-#[test]
-fn test_agg_sig_me_extra_arg() {
-    // AGG_SIG_ME
-    // extra args are disallowed in non-mempool mode
-    assert_eq!(
-        cond_test_flag("((({h1} ({h2} (123 (((50 ({pubkey} ({msg1} (456 )))))", 0)
-            .unwrap_err()
-            .1,
-        ErrorCode::InvalidCondition
-    );
-}
-
-#[test]
-fn test_agg_sig_unsafe_extra_arg_allowed() {
-    // AGG_SIG_UNSAFE
-    // extra args are allowed when the AGG_SIG_ARGS flag is set
-    let (a, conds) = cond_test_flag(
-        "((({h1} ({h2} (123 (((49 ({pubkey} ({msg1} (456 )))))",
-        AGG_SIG_ARGS,
-    )
-    .unwrap();
-
-    assert_eq!(conds.cost, AGG_SIG_COST);
-    assert_eq!(conds.spends.len(), 1);
-    assert_eq!(conds.removal_amount, 123);
-    assert_eq!(conds.addition_amount, 0);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert_eq!(conds.agg_sig_unsafe.len(), 1);
-    for (pk, msg) in &conds.agg_sig_unsafe {
-        assert_eq!(*pk, PublicKey::from_bytes(PUBKEY).unwrap());
-        assert_eq!(a.atom(*msg).as_ref(), MSG1);
-    }
-    assert_eq!(spend.flags, 0);
-}
-
-#[test]
-fn test_agg_sig_me_extra_arg_allowed() {
-    // AGG_SIG_ME
-    // extra args are allowed when the AGG_SIG_ARGS flag is set
-    let (a, conds) = cond_test_flag(
-        "((({h1} ({h2} (123 (((50 ({pubkey} ({msg1} (456 )))))",
-        AGG_SIG_ARGS,
-    )
-    .unwrap();
-
-    assert_eq!(conds.cost, AGG_SIG_COST);
-    assert_eq!(conds.spends.len(), 1);
-    assert_eq!(conds.removal_amount, 123);
-    assert_eq!(conds.addition_amount, 0);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert_eq!(spend.agg_sig_me.len(), 1);
-    for c in &spend.agg_sig_me {
-        assert_eq!(c.0, PublicKey::from_bytes(PUBKEY).unwrap());
-        assert_eq!(a.atom(c.1).as_ref(), MSG1);
-    }
-    assert_eq!(spend.flags, 0);
 }
 
 #[test]
@@ -3422,20 +3314,6 @@ fn test_agg_sig_unsafe_invalid_terminator() {
 }
 
 #[test]
-fn test_agg_sig_unsafe_invalid_terminator_mempool() {
-    // AGG_SIG_UNSAFE
-    assert_eq!(
-        cond_test_flag(
-            "((({h1} ({h2} (123 (((49 ({pubkey} ({msg1} 456 ))))",
-            COND_ARGS_NIL
-        )
-        .unwrap_err()
-        .1,
-        ErrorCode::InvalidCondition
-    );
-}
-
-#[test]
 fn test_agg_sig_me_invalid_terminator() {
     // AGG_SIG_ME
     // this has an invalid list terminator of the argument list. This is OK
@@ -3456,22 +3334,6 @@ fn test_agg_sig_me_invalid_terminator() {
         assert_eq!(a.atom(*msg).as_ref(), MSG1);
     }
     assert_eq!(spend.flags, 0);
-}
-
-#[test]
-fn test_agg_sig_me_invalid_terminator_mempool() {
-    // AGG_SIG_ME
-    // this has an invalid list terminator of the argument list. This is NOT OK
-    // according to the stricter rules
-    assert_eq!(
-        cond_test_flag(
-            "((({h1} ({h2} (123 (((50 ({pubkey} ({msg1} 456 ))))",
-            COND_ARGS_NIL
-        )
-        .unwrap_err()
-        .1,
-        ErrorCode::InvalidCondition
-    );
 }
 
 #[test]
