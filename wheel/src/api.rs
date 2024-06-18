@@ -15,7 +15,6 @@ use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_i
 use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
 use chia_consensus::multiprocess_validation::validate_clvm_and_signature;
 
-use chia_consensus::gen::validation_error::ErrorCode;
 use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
     CoinSpend, CoinState, CoinStateFilters, CoinStateUpdate, EndOfSubSlotBundle, Foliage,
@@ -54,7 +53,6 @@ use pyo3::types::PyTuple;
 use pyo3::wrap_pyfunction;
 use std::iter::zip;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 use crate::run_program::{run_chia_program, serialized_length};
 
