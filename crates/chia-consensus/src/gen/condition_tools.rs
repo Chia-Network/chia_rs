@@ -77,3 +77,24 @@ pub fn u64_to_bytes(val: u64) -> Bytes {
         Bytes::new(amount_bytes[start..].to_vec())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clvmr::Allocator;
+    use crate::allocator::make_allocator;
+    use clvmr::chia_dialect::LIMIT_HEAP;
+
+    #[test]
+    fn test_validate_u64() {
+        let mut a: Allocator = make_allocator(LIMIT_HEAP);
+        for v in 0..10000{
+            let ptr = a.new_small_number(v).expect("valid u64");
+            assert_eq!(a.atom(ptr).as_ref(), u64_to_bytes(v as u64).as_slice())
+        }
+        for v in 18446744073709551615_u64 - 1000..18446744073709551615 {
+            let ptr = a.new_number(v.into()).expect("valid u64");
+            assert_eq!(a.atom(ptr).as_ref(), u64_to_bytes(v).as_slice())
+        }
+    }
+}
