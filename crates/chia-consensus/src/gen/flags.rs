@@ -9,9 +9,6 @@ pub const NO_UNKNOWN_CONDS: u32 = 0x20000;
 // currently supported for those conditions. This is meant for mempool-mode
 pub const STRICT_ARGS_COUNT: u32 = 0x80000;
 
-// enable softfork condition. Enabling this flag is a hard fork
-pub const ENABLE_SOFTFORK_CONDITION: u32 = 0x0040_0000;
-
 // when this flag is set, the block generator serialization is allowed to
 // contain back-references
 pub const ALLOW_BACKREFS: u32 = 0x0200_0000;

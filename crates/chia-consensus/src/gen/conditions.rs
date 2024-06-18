@@ -366,7 +366,7 @@ pub fn parse_args(
         }
         256..=65535 => {
             // All of these conditions are unknown
-            // but they have costs (when ENABLE_SOFTFORK_CONDITION is enabled)
+            // but they have costs
             if (flags & NO_UNKNOWN_CONDS) != 0 {
                 Err(ValidationErr(c, ErrorCode::InvalidConditionOpcode))
             } else {
@@ -1470,8 +1470,6 @@ fn u64_to_bytes(n: u64) -> Vec<u8> {
 #[cfg(test)]
 use crate::consensus_constants::TEST_CONSTANTS;
 #[cfg(test)]
-use crate::gen::flags::ENABLE_SOFTFORK_CONDITION;
-#[cfg(test)]
 use clvmr::number::Number;
 #[cfg(test)]
 use clvmr::serde::node_to_bytes;
@@ -1888,7 +1886,7 @@ fn test_strict_args_count(
             "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 )))))",
             condition as u8, arg
         ),
-        flags | ENABLE_SOFTFORK_CONDITION,
+        flags,
     );
     if flags == 0 {
         // two of the cases won't pass, even when garbage at the end is allowed.
@@ -1933,7 +1931,7 @@ fn test_message_strict_args_count(
         &format!(
             "((({{h1}} ({{h2}} (123 (((66 ({mode} ({msg} {arg} {extra1} ) ((67 ({mode} ({msg} {extra2} ) ))))"
         ),
-        flags | ENABLE_SOFTFORK_CONDITION | ENABLE_MESSAGE_CONDITIONS,
+        flags | ENABLE_MESSAGE_CONDITIONS,
     );
     if flags == 0 {
         ret.unwrap();
@@ -1985,7 +1983,7 @@ fn test_extra_arg(
                 "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 ) {} ))))",
                 condition as u8, arg, extra_cond
             ),
-            ENABLE_SOFTFORK_CONDITION | MEMPOOL_MODE,
+            MEMPOOL_MODE,
         )
         .unwrap_err()
         .1,
@@ -1997,7 +1995,7 @@ fn test_extra_arg(
             "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 ) {} ))))",
             condition as u8, arg, extra_cond
         ),
-        ENABLE_SOFTFORK_CONDITION,
+        0,
     )
     .unwrap();
 
@@ -2252,7 +2250,7 @@ fn test_missing_arg(#[case] condition: ConditionOpcode) {
     assert_eq!(
         cond_test_flag(
             &format!("((({{h1}} ({{h2}} (123 ((({} )))))", condition as u8),
-            ENABLE_SOFTFORK_CONDITION
+            0
         )
         .unwrap_err()
         .1,
@@ -3030,7 +3028,7 @@ fn test_single_agg_sig_me(
 ) {
     let (a, conds) = cond_test_flag(
         &format!("((({{h1}} ({{h2}} (123 ((({condition} ({{pubkey}} ({{msg1}} )))))"),
-        ENABLE_SOFTFORK_CONDITION | mempool,
+        mempool,
     )
     .unwrap();
 
@@ -3068,7 +3066,7 @@ fn test_duplicate_agg_sig(
     // aggregated, and so must all copies of the public keys
     let (a, conds) =
         cond_test_flag(&format!("((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{msg1}} ) (({} ({{pubkey}} ({{msg1}} ) ))))", condition as u8, condition as u8),
-            ENABLE_SOFTFORK_CONDITION | mempool)
+            mempool)
             .unwrap();
 
     assert_eq!(conds.cost, AGG_SIG_COST * 2);
@@ -3108,7 +3106,7 @@ fn test_agg_sig_invalid_pubkey(
                 "((({{h1}} ({{h2}} (123 ((({} ({{h2}} ({{msg1}} )))))",
                 condition as u8
             ),
-            ENABLE_SOFTFORK_CONDITION | mempool
+            mempool
         )
         .unwrap_err()
         .1,
@@ -3135,7 +3133,7 @@ fn test_agg_sig_infinity_pubkey(
             "((({{h1}} ({{h2}} (123 ((({} (0xc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 ({{msg1}} )))))",
             condition as u8
             ),
-            ENABLE_SOFTFORK_CONDITION | mempool
+            mempool
     );
 
     if mempool != 0 {
@@ -3174,7 +3172,7 @@ fn test_agg_sig_invalid_msg(
                 "((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{longmsg}} )))))",
                 condition as u8
             ),
-            ENABLE_SOFTFORK_CONDITION | mempool
+            mempool
         )
         .unwrap_err()
         .1,
@@ -3196,7 +3194,7 @@ fn test_agg_sig_exceed_cost(#[case] condition: ConditionOpcode) {
     assert_eq!(
         cond_test_cb(
             "((({h1} ({h2} (123 ({} )))",
-            ENABLE_SOFTFORK_CONDITION,
+            0,
             Some(Box::new(move |a: &mut Allocator| -> NodePtr {
                 let mut rest: NodePtr = a.nil();
 
@@ -3260,7 +3258,7 @@ fn test_agg_sig_extra_arg(#[case] condition: ConditionOpcode) {
             "((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{msg1}} ( 1337 ) ))))",
             condition as u8
         ),
-        ENABLE_SOFTFORK_CONDITION,
+        0,
     )
     .unwrap();
 
@@ -3283,7 +3281,7 @@ fn test_agg_sig_extra_arg(#[case] condition: ConditionOpcode) {
                 "((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{msg1}} ( 1337 ) ))))",
                 condition as u8
             ),
-            MEMPOOL_MODE | ENABLE_SOFTFORK_CONDITION,
+            MEMPOOL_MODE,
         )
         .unwrap_err()
         .1,
@@ -3406,7 +3404,7 @@ fn test_agg_sig_unsafe_invalid_msg(
 ) {
     let ret = cond_test_flag(
         format!("((({{h1}} ({{h2}} (123 ((({opcode} ({{pubkey}} ({msg} )))))").as_str(),
-        ENABLE_SOFTFORK_CONDITION,
+        0,
     );
     if opcode == AGG_SIG_UNSAFE {
         assert_eq!(ret.unwrap_err().1, ErrorCode::InvalidMessage);
@@ -4282,42 +4280,9 @@ fn test_relative_condition_on_ephemeral(
 #[case("((0xff01 )", 106)]
 fn test_softfork_condition(#[case] conditions: &str, #[case] expected_cost: Cost) {
     // SOFTFORK (90)
-    let (_, spends) = cond_test_flag(
-        &format!("((({{h1}} ({{h2}} (1234 ({conditions}))))"),
-        ENABLE_SOFTFORK_CONDITION,
-    )
-    .unwrap();
-    assert_eq!(spends.cost, expected_cost);
-
-    // when NO_UNKNOWN_CONDS is enabled, any SOFTFORK condition is an error
-    // (because we don't know of any yet)
-    assert_eq!(
-        cond_test_flag(
-            &format!("((({{h1}} ({{h2}} (1234 ({conditions}))))"),
-            ENABLE_SOFTFORK_CONDITION | NO_UNKNOWN_CONDS
-        )
-        .unwrap_err()
-        .1,
-        ErrorCode::InvalidConditionOpcode
-    );
-
-    // if softfork conditions aren't enabled, they are just plain unknown
-    // conditions (that don't incur a cost
     let (_, spends) =
         cond_test_flag(&format!("((({{h1}} ({{h2}} (1234 ({conditions}))))"), 0).unwrap();
-    assert_eq!(spends.cost, 0);
-
-    // if softfork conditions aren't enabled, but we don't allow unknown
-    // conditions (mempool mode) they fail
-    assert_eq!(
-        cond_test_flag(
-            &format!("((({{h1}} ({{h2}} (1234 ({conditions}))))"),
-            NO_UNKNOWN_CONDS
-        )
-        .unwrap_err()
-        .1,
-        ErrorCode::InvalidConditionOpcode
-    );
+    assert_eq!(spends.cost, expected_cost);
 }
 
 #[cfg(test)]
@@ -4332,12 +4297,9 @@ fn test_softfork_condition(#[case] conditions: &str, #[case] expected_cost: Cost
 fn test_softfork_condition_failures(#[case] conditions: &str, #[case] expected_err: ErrorCode) {
     // SOFTFORK (90)
     assert_eq!(
-        cond_test_flag(
-            &format!("((({{h1}} ({{h2}} (1234 ({conditions}))))"),
-            ENABLE_SOFTFORK_CONDITION
-        )
-        .unwrap_err()
-        .1,
+        cond_test_flag(&format!("((({{h1}} ({{h2}} (1234 ({conditions}))))"), 0)
+            .unwrap_err()
+            .1,
         expected_err
     );
 }
@@ -4536,7 +4498,7 @@ fn test_eligible_for_ff_invalid_agg_sig_me(
        ))"
     );
 
-    let (_a, cond) = cond_test_flag(test, ENABLE_SOFTFORK_CONDITION).expect("cond_test");
+    let (_a, cond) = cond_test_flag(test, 0).expect("cond_test");
     assert!(cond.spends.len() == 1);
     let flags = cond.spends[0].flags;
     if eligible {

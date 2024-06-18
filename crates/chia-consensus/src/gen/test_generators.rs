@@ -2,9 +2,7 @@ use super::conditions::{MempoolVisitor, NewCoin, Spend, SpendBundleConditions};
 use super::run_block_generator::{run_block_generator, run_block_generator2};
 use crate::allocator::make_allocator;
 use crate::consensus_constants::TEST_CONSTANTS;
-use crate::gen::flags::{
-    ALLOW_BACKREFS, ENABLE_MESSAGE_CONDITIONS, ENABLE_SOFTFORK_CONDITION, MEMPOOL_MODE,
-};
+use crate::gen::flags::{ALLOW_BACKREFS, ENABLE_MESSAGE_CONDITIONS, MEMPOOL_MODE};
 use chia_protocol::{Bytes, Bytes48};
 use clvmr::allocator::NodePtr;
 use clvmr::Allocator;
@@ -229,8 +227,7 @@ fn run_generator(#[case] name: &str) {
         block_refs.push(hex::decode(env_hex).expect("hex decode env-file"));
     }
 
-    const DEFAULT_FLAGS: u32 =
-        ALLOW_BACKREFS | ENABLE_SOFTFORK_CONDITION | ENABLE_MESSAGE_CONDITIONS;
+    const DEFAULT_FLAGS: u32 = ALLOW_BACKREFS | ENABLE_MESSAGE_CONDITIONS;
     for (flags, expected) in zip(&[DEFAULT_FLAGS, DEFAULT_FLAGS | MEMPOOL_MODE], expected) {
         println!("flags: {flags:x}");
         let mut a = make_allocator(*flags);
