@@ -170,8 +170,8 @@ ff01\
         );
         let spend = CoinSpend::new(
             test_coin,
-            Program::new(vec![1_u8].into()),
-            Program::new(solution),
+            [1_u8].into(),
+            solution.into(),
         );
         let coin_spends: Vec<CoinSpend> = vec![spend];
         let spend_bundle = SpendBundle {
