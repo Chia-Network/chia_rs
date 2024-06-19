@@ -7,7 +7,6 @@ use chia_consensus::gen::flags::{ALLOW_BACKREFS, MEMPOOL_MODE};
 use chia_consensus::gen::run_block_generator::{run_block_generator, run_block_generator2};
 use chia_tools::iterate_tx_blocks;
 use clvmr::allocator::NodePtr;
-use clvmr::serde::{node_from_bytes, node_to_bytes_backrefs};
 use clvmr::Allocator;
 use std::collections::HashSet;
 use std::io::Write;
@@ -47,10 +46,6 @@ struct Args {
     /// start running block generators at this height
     #[arg(long, default_value_t = 0)]
     start_height: u32,
-
-    /// when enabled, run the rust port of the ROM generator
-    #[arg(long, default_value_t = false)]
-    rust_generator: bool,
 }
 
 fn compare_new_coin(a: &Allocator, lhs: &NewCoin, rhs: &NewCoin) {
@@ -129,7 +124,10 @@ fn main() {
     // TODO: Use the real consants here
     let constants = &TEST_CONSTANTS;
 
-    assert!(!(args.validate && !(args.mempool || args.rust_generator || args.test_backrefs)), "it doesn't make sense to validate the output against identical runs. Specify --mempool, --rust-generator or --test-backrefs");
+    assert!(
+        args.validate && !args.mempool,
+        "it doesn't make sense to validate the output against identical runs. Specify --mempool"
+    );
 
     let num_cores = args
         .num_jobs
@@ -140,20 +138,9 @@ fn main() {
         .queue_len(num_cores + 5)
         .build();
 
-    let flags = if args.mempool { MEMPOOL_MODE } else { 0 }
-        | if args.test_backrefs {
-            ALLOW_BACKREFS
-        } else {
-            0
-        };
+    let flags = if args.mempool { MEMPOOL_MODE } else { 0 } | ALLOW_BACKREFS;
 
-    let block_runner = if args.rust_generator {
-        run_block_generator2::<_, EmptyVisitor>
-    } else {
-        run_block_generator::<_, EmptyVisitor>
-    };
-
-    let mut last_height = 0;
+    let mut last_height = args.start_height;
     let mut last_time = Instant::now();
     iterate_tx_blocks(
         &args.file,
@@ -164,26 +151,24 @@ fn main() {
                 let mut a = Allocator::new_limited(500_000_000);
 
                 let ti = block.transactions_info.as_ref().expect("transactions_info");
-                let prg = block
+                let generator = block
                     .transactions_generator
                     .as_ref()
                     .expect("transactions_generator");
 
-                let storage: Vec<u8>;
-                let generator = if args.test_backrefs {
-                    // re-serialize the generator with back-references
-                    let gen = node_from_bytes(&mut a, prg.as_ref()).expect("node_from_bytes");
-                    storage = node_to_bytes_backrefs(&a, gen).expect("node_to_bytes_backrefs");
-                    &storage[..]
+                // after the hard fork, we run blocks without paying for the
+                // CLVM generator ROM
+                let block_runner = if height >= 5_496_000 {
+                    run_block_generator2::<_, EmptyVisitor>
                 } else {
-                    prg.as_ref()
+                    run_block_generator::<_, EmptyVisitor>
                 };
 
                 let mut conditions =
                     block_runner(&mut a, generator, &block_refs, ti.cost, flags, constants)
                         .expect("failed to run block generator");
 
-                if args.rust_generator || args.test_backrefs {
+                if args.test_backrefs {
                     assert!(conditions.cost <= ti.cost);
                     assert!(conditions.cost > 0);
 
@@ -198,10 +183,10 @@ fn main() {
                 if args.validate {
                     let mut baseline = run_block_generator::<_, EmptyVisitor>(
                         &mut a,
-                        prg.as_ref(),
+                        generator.as_ref(),
                         &block_refs,
                         ti.cost,
-                        0,
+                        ALLOW_BACKREFS,
                         constants,
                     )
                     .expect("failed to run block generator");
