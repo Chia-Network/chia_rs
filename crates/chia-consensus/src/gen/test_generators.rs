@@ -2,7 +2,9 @@ use super::conditions::{MempoolVisitor, NewCoin, Spend, SpendBundleConditions};
 use super::run_block_generator::{run_block_generator, run_block_generator2};
 use crate::allocator::make_allocator;
 use crate::consensus_constants::TEST_CONSTANTS;
-use crate::gen::flags::{ALLOW_BACKREFS, ENABLE_MESSAGE_CONDITIONS, MEMPOOL_MODE};
+use crate::gen::flags::{
+    ALLOW_BACKREFS, ENABLE_MESSAGE_CONDITIONS, ENABLE_SOFTFORK_CONDITION, MEMPOOL_MODE,
+};
 use chia_protocol::{Bytes, Bytes48};
 use clvmr::allocator::NodePtr;
 use clvmr::Allocator;
@@ -84,17 +86,28 @@ fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
             }
         }
 
-        let mut agg_sigs = Vec::<(Bytes48, Bytes)>::new();
-        for (pk, msg) in s.agg_sig_me {
-            agg_sigs.push((pk.to_bytes().into(), a.atom(msg).as_ref().into()));
-        }
-        agg_sigs.sort();
-        for (pk, msg) in agg_sigs {
-            ret += &format!(
-                "  AGG_SIG_ME pk: {} msg: {}\n",
-                hex::encode(pk),
-                hex::encode(msg)
-            );
+        for sig_conds in [
+            (&s.agg_sig_me, "AGG_SIG_ME"),
+            (&s.agg_sig_parent, "AGG_SIG_PARENT"),
+            (&s.agg_sig_puzzle, "AGG_SIG_PUZZLE"),
+            (&s.agg_sig_amount, "AGG_SIG_AMOUNT"),
+            (&s.agg_sig_puzzle_amount, "AGG_SIG_PUZZLE_AMOUNT"),
+            (&s.agg_sig_parent_amount, "AGG_SIG_PARENT_AMOUNT"),
+            (&s.agg_sig_parent_puzzle, "AGG_SIG_PARENT_PUZZLE"),
+        ] {
+            let mut agg_sigs = Vec::<(Bytes48, Bytes)>::new();
+            for (pk, msg) in sig_conds.0 {
+                agg_sigs.push((pk.to_bytes().into(), a.atom(*msg).as_ref().into()));
+            }
+            agg_sigs.sort();
+            for (pk, msg) in &agg_sigs {
+                ret += &format!(
+                    "  {} pk: {} msg: {}\n",
+                    sig_conds.1,
+                    hex::encode(pk),
+                    hex::encode(msg)
+                );
+            }
         }
     }
 
@@ -144,6 +157,7 @@ fn print_diff(output: &str, expected: &str) {
 }
 
 #[rstest]
+#[case("new-agg-sigs")]
 #[case("infinity-g1")]
 #[case("block-1ee588dc")]
 #[case("block-6fe59b24")]
@@ -215,13 +229,9 @@ fn run_generator(#[case] name: &str) {
         block_refs.push(hex::decode(env_hex).expect("hex decode env-file"));
     }
 
-    for (flags, expected) in zip(
-        &[
-            ALLOW_BACKREFS | ENABLE_MESSAGE_CONDITIONS,
-            ALLOW_BACKREFS | MEMPOOL_MODE | ENABLE_MESSAGE_CONDITIONS,
-        ],
-        expected,
-    ) {
+    const DEFAULT_FLAGS: u32 =
+        ALLOW_BACKREFS | ENABLE_SOFTFORK_CONDITION | ENABLE_MESSAGE_CONDITIONS;
+    for (flags, expected) in zip(&[DEFAULT_FLAGS, DEFAULT_FLAGS | MEMPOOL_MODE], expected) {
         println!("flags: {flags:x}");
         let mut a = make_allocator(*flags);
         let conds = run_block_generator::<_, MempoolVisitor>(

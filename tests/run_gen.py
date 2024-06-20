@@ -152,6 +152,18 @@ def print_spend_bundle_conditions(result) -> str:
                 ret += f"  CREATE_COIN: ph: {a[0].hex()} amount: {a[1]}\n"
         for a in sorted(s.agg_sig_me):
             ret += f"  AGG_SIG_ME pk: {a[0]} msg: {a[1].hex()}\n"
+        for a in sorted(s.agg_sig_parent):
+            ret += f"  AGG_SIG_PARENT pk: {a[0]} msg: {a[1].hex()}\n"
+        for a in sorted(s.agg_sig_puzzle):
+            ret += f"  AGG_SIG_PUZZLE pk: {a[0]} msg: {a[1].hex()}\n"
+        for a in sorted(s.agg_sig_amount):
+            ret += f"  AGG_SIG_AMOUNT pk: {a[0]} msg: {a[1].hex()}\n"
+        for a in sorted(s.agg_sig_puzzle_amount):
+            ret += f"  AGG_SIG_PUZZLE_AMOUNT pk: {a[0]} msg: {a[1].hex()}\n"
+        for a in sorted(s.agg_sig_parent_amount):
+            ret += f"  AGG_SIG_PARENT_AMOUNT pk: {a[0]} msg: {a[1].hex()}\n"
+        for a in sorted(s.agg_sig_parent_puzzle):
+            ret += f"  AGG_SIG_PARENT_PUZZLE pk: {a[0]} msg: {a[1].hex()}\n"
     ret += f"cost: {result.cost}\n"
     ret += f"removal_amount: {result.removal_amount}\n"
     ret += f"addition_amount: {result.addition_amount}\n"
