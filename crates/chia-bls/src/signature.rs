@@ -10,7 +10,7 @@ use std::mem::MaybeUninit;
 use std::ops::{Add, AddAssign, Neg, SubAssign};
 
 // we use the augmented scheme
-pub const DST: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_AUG_";
+pub(crate) const DST: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_AUG_";
 
 #[cfg_attr(
     feature = "py-bindings",
@@ -476,6 +476,42 @@ pub fn sign<Msg: AsRef<[u8]>>(sk: &SecretKey, msg: Msg) -> Signature {
 }
 
 #[cfg(feature = "py-bindings")]
+#[pyo3::pymethods]
+impl Signature {
+    #[classattr]
+    pub const SIZE: usize = 96;
+
+    #[new]
+    pub fn init() -> Self {
+        Self::default()
+    }
+
+    #[pyo3(name = "pair")]
+    pub fn py_pair(&self, other: &PublicKey) -> GTElement {
+        self.pair(other)
+    }
+
+    #[staticmethod]
+    #[pyo3(name = "generator")]
+    pub fn py_generator() -> Self {
+        Self::generator()
+    }
+
+    pub fn __str__(&self) -> String {
+        hex::encode(self.to_bytes())
+    }
+
+    #[must_use]
+    pub fn __add__(&self, rhs: &Self) -> Self {
+        self + rhs
+    }
+
+    pub fn __iadd__(&mut self, rhs: &Self) {
+        *self += rhs;
+    }
+}
+
+#[cfg(feature = "py-bindings")]
 mod pybindings {
     use super::*;
 
@@ -483,41 +519,6 @@ mod pybindings {
 
     use chia_traits::{FromJsonDict, ToJsonDict};
     use pyo3::prelude::*;
-
-    #[pymethods]
-    impl Signature {
-        #[classattr]
-        const SIZE: usize = 96;
-
-        #[new]
-        pub fn init() -> Self {
-            Self::default()
-        }
-
-        #[pyo3(name = "pair")]
-        pub fn py_pair(&self, other: &PublicKey) -> GTElement {
-            self.pair(other)
-        }
-
-        #[staticmethod]
-        #[pyo3(name = "generator")]
-        pub fn py_generator() -> Self {
-            Self::generator()
-        }
-
-        fn __str__(&self) -> String {
-            hex::encode(self.to_bytes())
-        }
-
-        #[must_use]
-        pub fn __add__(&self, rhs: &Self) -> Self {
-            self + rhs
-        }
-
-        pub fn __iadd__(&mut self, rhs: &Self) {
-            *self += rhs;
-        }
-    }
 
     impl ToJsonDict for Signature {
         fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {

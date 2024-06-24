@@ -81,90 +81,86 @@ impl BlsCache {
 }
 
 #[cfg(feature = "py-bindings")]
-mod python {
-    use super::*;
+use pyo3::{
+    exceptions::PyValueError,
+    pybacked::PyBackedBytes,
+    types::{PyAnyMethods, PyList},
+    Bound, PyObject, PyResult,
+};
 
-    use pyo3::{
-        exceptions::PyValueError,
-        pybacked::PyBackedBytes,
-        pymethods,
-        types::{PyAnyMethods, PyList},
-        Bound, PyObject, PyResult,
-    };
+#[cfg(feature = "py-bindings")]
+#[pyo3::pymethods]
+impl BlsCache {
+    #[new]
+    #[pyo3(signature = (size=None))]
+    pub fn init(size: Option<u32>) -> PyResult<Self> {
+        let Some(size) = size else {
+            return Ok(Self::default());
+        };
 
-    #[pymethods]
-    impl BlsCache {
-        #[new]
-        #[pyo3(signature = (size=None))]
-        pub fn init(size: Option<u32>) -> PyResult<Self> {
-            let Some(size) = size else {
-                return Ok(Self::default());
-            };
+        let Some(size) = NonZeroUsize::new(size as usize) else {
+            return Err(PyValueError::new_err(
+                "Cannot have a cache size less than one.",
+            ));
+        };
 
-            let Some(size) = NonZeroUsize::new(size as usize) else {
-                return Err(PyValueError::new_err(
-                    "Cannot have a cache size less than one.",
-                ));
-            };
+        Ok(Self::new(size))
+    }
 
-            Ok(Self::new(size))
+    #[pyo3(name = "aggregate_verify")]
+    pub fn py_aggregate_verify(
+        &mut self,
+        pks: &Bound<'_, PyList>,
+        msgs: &Bound<'_, PyList>,
+        sig: &Signature,
+    ) -> PyResult<bool> {
+        let pks = pks
+            .iter()?
+            .map(|item| item?.extract())
+            .collect::<PyResult<Vec<PublicKey>>>()?;
+
+        let msgs = msgs
+            .iter()?
+            .map(|item| item?.extract())
+            .collect::<PyResult<Vec<PyBackedBytes>>>()?;
+
+        Ok(self.aggregate_verify(pks, msgs, sig))
+    }
+
+    #[pyo3(name = "len")]
+    pub fn py_len(&self) -> PyResult<usize> {
+        Ok(self.len())
+    }
+
+    #[pyo3(name = "items")]
+    pub fn py_items(&self, py: pyo3::Python<'_>) -> PyResult<PyObject> {
+        use pyo3::prelude::*;
+        use pyo3::types::PyBytes;
+        let ret = PyList::empty_bound(py);
+        for (key, value) in &self.cache {
+            ret.append((
+                PyBytes::new_bound(py, key),
+                PyBytes::new_bound(py, &value.to_bytes()),
+            ))?;
         }
+        Ok(ret.into())
+    }
 
-        #[pyo3(name = "aggregate_verify")]
-        pub fn py_aggregate_verify(
-            &mut self,
-            pks: &Bound<'_, PyList>,
-            msgs: &Bound<'_, PyList>,
-            sig: &Signature,
-        ) -> PyResult<bool> {
-            let pks = pks
-                .iter()?
-                .map(|item| item?.extract())
-                .collect::<PyResult<Vec<PublicKey>>>()?;
-
-            let msgs = msgs
-                .iter()?
-                .map(|item| item?.extract())
-                .collect::<PyResult<Vec<PyBackedBytes>>>()?;
-
-            Ok(self.aggregate_verify(pks, msgs, sig))
+    #[pyo3(name = "update")]
+    pub fn py_update(&mut self, other: &Bound<'_, PyList>) -> PyResult<()> {
+        for item in other.borrow().iter()? {
+            let (key, value): (Vec<u8>, Vec<u8>) = item?.extract()?;
+            self.cache.put(
+                key.try_into()
+                    .map_err(|_| PyValueError::new_err("invalid key"))?,
+                GTElement::from_bytes(
+                    (&value[..])
+                        .try_into()
+                        .map_err(|_| PyValueError::new_err("invalid GTElement"))?,
+                ),
+            );
         }
-
-        #[pyo3(name = "len")]
-        pub fn py_len(&self) -> PyResult<usize> {
-            Ok(self.len())
-        }
-
-        #[pyo3(name = "items")]
-        pub fn py_items(&self, py: pyo3::Python<'_>) -> PyResult<PyObject> {
-            use pyo3::prelude::*;
-            use pyo3::types::PyBytes;
-            let ret = PyList::empty_bound(py);
-            for (key, value) in &self.cache {
-                ret.append((
-                    PyBytes::new_bound(py, key),
-                    PyBytes::new_bound(py, &value.to_bytes()),
-                ))?;
-            }
-            Ok(ret.into())
-        }
-
-        #[pyo3(name = "update")]
-        pub fn py_update(&mut self, other: &Bound<'_, PyList>) -> PyResult<()> {
-            for item in other.borrow().iter()? {
-                let (key, value): (Vec<u8>, Vec<u8>) = item?.extract()?;
-                self.cache.put(
-                    key.try_into()
-                        .map_err(|_| PyValueError::new_err("invalid key"))?,
-                    GTElement::from_bytes(
-                        (&value[..])
-                            .try_into()
-                            .map_err(|_| PyValueError::new_err("invalid GTElement"))?,
-                    ),
-                );
-            }
-            Ok(())
-        }
+        Ok(())
     }
 }
 

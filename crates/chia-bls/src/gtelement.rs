@@ -102,33 +102,34 @@ impl Streamable for GTElement {
 }
 
 #[cfg(feature = "py-bindings")]
+#[pyo3::pymethods]
+impl GTElement {
+    #[classattr]
+    #[pyo3(name = "SIZE")]
+    pub const PY_SIZE: usize = Self::SIZE;
+
+    pub fn __str__(&self) -> String {
+        hex::encode(self.to_bytes())
+    }
+
+    #[must_use]
+    pub fn __mul__(&self, rhs: &Self) -> Self {
+        let mut ret = self.clone();
+        ret *= rhs;
+        ret
+    }
+
+    pub fn __imul__(&mut self, rhs: &Self) {
+        *self *= rhs;
+    }
+}
+
+#[cfg(feature = "py-bindings")]
 mod pybindings {
     use super::*;
 
     use chia_traits::{FromJsonDict, ToJsonDict};
     use pyo3::{exceptions::PyValueError, prelude::*};
-
-    #[pymethods]
-    impl GTElement {
-        #[classattr]
-        #[pyo3(name = "SIZE")]
-        const PY_SIZE: usize = Self::SIZE;
-
-        fn __str__(&self) -> String {
-            hex::encode(self.to_bytes())
-        }
-
-        #[must_use]
-        pub fn __mul__(&self, rhs: &Self) -> Self {
-            let mut ret = self.clone();
-            ret *= rhs;
-            ret
-        }
-
-        pub fn __imul__(&mut self, rhs: &Self) {
-            *self *= rhs;
-        }
-    }
 
     impl ToJsonDict for GTElement {
         fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
