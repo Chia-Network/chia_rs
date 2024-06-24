@@ -475,6 +475,7 @@ pub fn sign<Msg: AsRef<[u8]>>(sk: &SecretKey, msg: Msg) -> Signature {
     sign_raw(sk, aug_msg)
 }
 
+#[cfg(feature = "py-bindings")]
 #[pyo3::pymethods]
 impl Signature {
     #[classattr]

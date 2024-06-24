@@ -236,6 +236,7 @@ impl DerivableKey for SecretKey {
     }
 }
 
+#[cfg(feature = "py-bindings")]
 #[pyo3::pymethods]
 impl SecretKey {
     #[classattr]

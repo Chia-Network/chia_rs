@@ -296,6 +296,7 @@ pub fn hash_to_g1_with_dst(msg: &[u8], dst: &[u8]) -> PublicKey {
     PublicKey(p1)
 }
 
+#[cfg(feature = "py-bindings")]
 #[pyo3::pymethods]
 impl PublicKey {
     #[classattr]
