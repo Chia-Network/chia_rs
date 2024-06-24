@@ -273,7 +273,7 @@ impl DerivableKey for PublicKey {
     }
 }
 
-pub const DST: &[u8] = b"BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_AUG_";
+pub(crate) const DST: &[u8] = b"BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_AUG_";
 
 pub fn hash_to_g1(msg: &[u8]) -> PublicKey {
     hash_to_g1_with_dst(msg, DST)
@@ -296,58 +296,59 @@ pub fn hash_to_g1_with_dst(msg: &[u8], dst: &[u8]) -> PublicKey {
     PublicKey(p1)
 }
 
+#[pyo3::pymethods]
+impl PublicKey {
+    #[classattr]
+    pub const SIZE: usize = 48;
+
+    #[new]
+    pub fn init() -> Self {
+        Self::default()
+    }
+
+    #[staticmethod]
+    #[pyo3(name = "generator")]
+    pub fn py_generator() -> Self {
+        Self::generator()
+    }
+
+    pub fn pair(&self, other: &crate::Signature) -> crate::GTElement {
+        other.pair(self)
+    }
+
+    #[pyo3(name = "get_fingerprint")]
+    pub fn py_get_fingerprint(&self) -> u32 {
+        self.get_fingerprint()
+    }
+
+    #[pyo3(name = "derive_unhardened")]
+    #[must_use]
+    pub fn py_derive_unhardened(&self, idx: u32) -> Self {
+        self.derive_unhardened(idx)
+    }
+
+    pub fn __str__(&self) -> String {
+        hex::encode(self.to_bytes())
+    }
+
+    #[must_use]
+    pub fn __add__(&self, rhs: &Self) -> Self {
+        self + rhs
+    }
+
+    pub fn __iadd__(&mut self, rhs: &Self) {
+        *self += rhs;
+    }
+}
+
 #[cfg(feature = "py-bindings")]
 mod pybindings {
     use super::*;
 
-    use crate::{parse_hex::parse_hex_string, GTElement, Signature};
+    use crate::parse_hex::parse_hex_string;
 
     use chia_traits::{FromJsonDict, ToJsonDict};
     use pyo3::prelude::*;
-
-    #[pymethods]
-    impl PublicKey {
-        #[classattr]
-        const SIZE: usize = 48;
-
-        #[new]
-        fn init() -> Self {
-            Self::default()
-        }
-
-        #[staticmethod]
-        #[pyo3(name = "generator")]
-        fn py_generator() -> Self {
-            Self::generator()
-        }
-
-        fn pair(&self, other: &Signature) -> GTElement {
-            other.pair(self)
-        }
-
-        #[pyo3(name = "get_fingerprint")]
-        fn py_get_fingerprint(&self) -> u32 {
-            self.get_fingerprint()
-        }
-
-        #[pyo3(name = "derive_unhardened")]
-        fn py_derive_unhardened(&self, idx: u32) -> Self {
-            self.derive_unhardened(idx)
-        }
-
-        fn __str__(&self) -> String {
-            hex::encode(self.to_bytes())
-        }
-
-        #[must_use]
-        pub fn __add__(&self, rhs: &Self) -> Self {
-            self + rhs
-        }
-
-        pub fn __iadd__(&mut self, rhs: &Self) {
-            *self += rhs;
-        }
-    }
 
     impl ToJsonDict for PublicKey {
         fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {

@@ -236,47 +236,49 @@ impl DerivableKey for SecretKey {
     }
 }
 
+#[pyo3::pymethods]
+impl SecretKey {
+    #[classattr]
+    pub const PRIVATE_KEY_SIZE: usize = 32;
+
+    pub fn sign_g2(&self, msg: &[u8]) -> crate::Signature {
+        crate::sign(self, msg)
+    }
+
+    pub fn get_g1(&self) -> PublicKey {
+        self.public_key()
+    }
+
+    #[pyo3(name = "public_key")]
+    pub fn py_public_key(&self) -> PublicKey {
+        self.public_key()
+    }
+
+    pub fn __str__(&self) -> String {
+        hex::encode(self.to_bytes())
+    }
+
+    #[pyo3(name = "derive_hardened")]
+    #[must_use]
+    pub fn py_derive_hardened(&self, idx: u32) -> Self {
+        self.derive_hardened(idx)
+    }
+
+    #[pyo3(name = "derive_unhardened")]
+    #[must_use]
+    pub fn py_derive_unhardened(&self, idx: u32) -> Self {
+        self.derive_unhardened(idx)
+    }
+}
+
 #[cfg(feature = "py-bindings")]
 mod pybindings {
     use super::*;
 
-    use crate::{parse_hex::parse_hex_string, PublicKey, Signature};
+    use crate::parse_hex::parse_hex_string;
 
     use chia_traits::{FromJsonDict, ToJsonDict};
     use pyo3::prelude::*;
-
-    #[pymethods]
-    impl SecretKey {
-        #[classattr]
-        const PRIVATE_KEY_SIZE: usize = 32;
-
-        fn sign_g2(&self, msg: &[u8]) -> Signature {
-            crate::sign(self, msg)
-        }
-
-        fn get_g1(&self) -> PublicKey {
-            self.public_key()
-        }
-
-        #[pyo3(name = "public_key")]
-        fn py_public_key(&self) -> PublicKey {
-            self.public_key()
-        }
-
-        fn __str__(&self) -> String {
-            hex::encode(self.to_bytes())
-        }
-
-        #[pyo3(name = "derive_hardened")]
-        fn py_derive_hardened(&self, idx: u32) -> Self {
-            self.derive_hardened(idx)
-        }
-
-        #[pyo3(name = "derive_unhardened")]
-        fn py_derive_unhardened(&self, idx: u32) -> Self {
-            self.derive_unhardened(idx)
-        }
-    }
 
     impl ToJsonDict for SecretKey {
         fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {

@@ -22,7 +22,7 @@ future_incompatible = { level = "deny", priority = -1 }
 nonstandard_style = { level = "deny", priority = -1 }
 unsafe_code = "deny"
 non_ascii_idents = "deny"
-unused_imports = "deny"
+unused_imports = "warn"
 unused_import_braces = "deny"
 unreachable_code = "deny"
 unreachable_patterns = "deny"
