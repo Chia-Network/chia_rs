@@ -1,5 +1,6 @@
 mod coin_id;
 mod condition_sanitizers;
+pub mod condition_tools;
 pub mod conditions;
 pub mod flags;
 pub mod get_puzzle_and_solution;

@@ -1,5 +1,10 @@
-from chia_rs import G1Element, PrivateKey, AugSchemeMPL, G2Element, BLSCache
+from chia_rs import G1Element, PrivateKey, AugSchemeMPL, G2Element, BLSCache, validate_clvm_and_signature
 from typing import List
+from chia.consensus.default_constants import DEFAULT_CONSTANTS
+from chia.types.spend_bundle import SpendBundle
+from chia.types.blockchain_format.coin import Coin
+from chia.types.blockchain_format.program import Program
+from chia.types.coin_spend import CoinSpend
 from chia.util.hash import std_hash
 from chia.util.lru_cache import LRUCache
 from chia.util import cached_bls as cached_bls_old
@@ -214,3 +219,32 @@ def test_bad_cache_size():
         expected_exception=OverflowError,
         match="out of range integral type conversion attempted",
     )
+
+def test_validate_clvm_and_sig():
+    cache = BLSCache()
+    puz_reveal = Program.to(1)
+    coin = Coin(bytes.fromhex("4444444444444444444444444444444444444444444444444444444444444444"), puz_reveal.get_tree_hash(), 200)
+    
+    sol_bytes = bytes.fromhex("ffff32ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080")
+    # ((50 0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2 "hello"))
+    solution = Program.from_bytes(sol_bytes)
+    coin_spends = [CoinSpend(coin, puz_reveal, solution)]
+    sk = AugSchemeMPL.key_gen(bytes.fromhex("52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb"))
+    # pk = sk.get_g1()
+    sig = AugSchemeMPL.sign(
+        sk,
+        (b"hello" + coin.name() + DEFAULT_CONSTANTS.AGG_SIG_ME_ADDITIONAL_DATA),  # noqa
+    )
+    
+    new_spend = SpendBundle(coin_spends, sig)
+
+    (sbc, additions, duration) = validate_clvm_and_signature(
+        new_spend,
+        DEFAULT_CONSTANTS.MAX_BLOCK_COST_CLVM,
+        DEFAULT_CONSTANTS,
+        DEFAULT_CONSTANTS.HARD_FORK_HEIGHT + 1,
+        cache
+    )
+    assert sbc is not None
+    assert additions is not None
+    assert duration is not None
