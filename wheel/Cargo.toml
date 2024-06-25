@@ -17,6 +17,9 @@ name = "chia_rs"
 crate-type = ["cdylib"]
 path = "src/lib.rs"
 
+[package.metadata.maturin]
+python-source = "python"
+
 [dependencies]
 clvmr = { workspace = true }
 hex = { workspace = true }
