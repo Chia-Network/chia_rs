@@ -371,19 +371,18 @@ fn fast_forward_singleton<'p>(
 #[pyfunction]
 #[pyo3(name = "validate_clvm_and_signature")]
 pub fn py_validate_clvm_and_signature(
-    new_spend: SpendBundle,
+    new_spend: &SpendBundle,
     max_cost: u64,
-    constants: ConsensusConstants,
+    constants: &ConsensusConstants,
     peak_height: u32,
     cache: BlsCache,
 ) -> PyResult<(
-    SpendBundle,
     OwnedSpendBundleConditions,
     Vec<([u8; 32], GTElement)>,
     f32,
 )> {
     let (owned_conditions, additions, duration) = validate_clvm_and_signature(
-        &new_spend,
+        new_spend,
         max_cost,
         &constants,
         peak_height,
@@ -391,7 +390,6 @@ pub fn py_validate_clvm_and_signature(
     )
     .map_err(|e| PyErr::new::<PyTypeError, _>(e as u32))?;
     Ok((
-        new_spend,
         owned_conditions,
         additions,
         duration.as_secs_f32(),
