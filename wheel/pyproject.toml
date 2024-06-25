@@ -6,3 +6,4 @@ build-backend = "maturin"
 bindings = "pyo3"
 features = ["pyo3/extension-module"]
 python-source = "python"
+include = ["python/chia_rs/chia_rs.pyi"]
