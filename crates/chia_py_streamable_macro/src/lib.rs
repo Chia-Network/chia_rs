@@ -101,6 +101,12 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 Ok(pyo3::IntoPy::into_py(self.clone(), py).into_bound(py))
             }
         }
+
+        impl pyo3::ToPyObject for #ident {
+            fn to_object(&self, py: pyo3::Python) -> pyo3::PyObject {
+                pyo3::Bound::new(py, self.clone()).unwrap().to_object(py)
+            }
+        }
     };
 
     let mut fnames = Vec::<Ident>::new();

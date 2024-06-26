@@ -1,4 +1,5 @@
 use crate::run_generator::{run_block_generator, run_block_generator2};
+use crate::weight_proof::PyWeightProof;
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::gen::conditions::MempoolVisitor;
@@ -37,7 +38,7 @@ use chia_protocol::{
     RespondUnfinishedBlock, RewardChainBlock, RewardChainBlockUnfinished, RewardChainSubSlot,
     SendTransaction, SpendBundle, SubEpochChallengeSegment, SubEpochData, SubEpochSegments,
     SubEpochSummary, SubSlotData, SubSlotProofs, TimestampedPeerInfo, TransactionAck,
-    TransactionsInfo, UnfinishedBlock, UnfinishedHeaderBlock, VDFInfo, VDFProof, WeightProof,
+    TransactionsInfo, UnfinishedBlock, UnfinishedHeaderBlock, VDFInfo, VDFProof,
 };
 use clvm_utils::tree_hash_from_bytes;
 use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV, LIMIT_HEAP, NO_UNKNOWN_OPS};
@@ -437,7 +438,7 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<UnfinishedBlock>()?;
     m.add_class::<FullBlock>()?;
     m.add_class::<BlockRecord>()?;
-    m.add_class::<WeightProof>()?;
+    m.add_class::<PyWeightProof>()?;
     m.add_class::<RecentChainData>()?;
     m.add_class::<ProofBlockHeader>()?;
     m.add_class::<TimestampedPeerInfo>()?;
