@@ -270,6 +270,12 @@ impl SecretKey {
     pub fn py_derive_unhardened(&self, idx: u32) -> Self {
         self.derive_unhardened(idx)
     }
+
+    #[pyo3(name = "from_seed")]
+    #[must_use]
+    pub fn py_from_seed(&self, seed: &[u8]) -> Self {
+        self.from_seed(seed)
+    }
 }
 
 #[cfg(feature = "py-bindings")]
