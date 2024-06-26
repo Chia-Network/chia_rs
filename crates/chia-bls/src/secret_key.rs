@@ -272,9 +272,9 @@ impl SecretKey {
     }
 
     #[pyo3(name = "from_seed")]
-    #[must_use]
-    pub fn py_from_seed(&self, seed: &[u8]) -> Self {
-        self.from_seed(seed)
+    #[staticmethod]
+    pub fn py_from_seed(seed: &[u8]) -> Self {
+        Self::from_seed(seed)
     }
 }
 

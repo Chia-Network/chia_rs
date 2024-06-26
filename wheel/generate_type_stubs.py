@@ -430,6 +430,8 @@ class MerkleSet:
             "def public_key(self) -> G1Element: ...",
             "def derive_hardened(self, int) -> PrivateKey: ...",
             "def derive_unhardened(self, int) -> PrivateKey: ...",
+            "@staticmethod",
+            "def from_seed(bytes) -> PrivateKey: ...",
         ],
     )
 
