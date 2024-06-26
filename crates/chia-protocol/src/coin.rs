@@ -1,16 +1,14 @@
-use crate::{Bytes32, BytesImpl};
+use crate::Bytes32;
 use chia_streamable_macro::streamable;
-use clvm_traits::{
-    clvm_list, destructure_list, match_list, ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError,
-    ToClvm, ToClvmError,
-};
+use clvm_traits::{FromClvm, ToClvm};
 use sha2::{Digest, Sha256};
 
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
 
 #[streamable]
-#[derive(Copy)]
+#[derive(Copy, ToClvm, FromClvm)]
+#[clvm(list)]
 pub struct Coin {
     parent_coin_info: Bytes32,
     puzzle_hash: Bytes32,
@@ -52,24 +50,6 @@ impl Coin {
 impl Coin {
     fn name<'p>(&self, py: Python<'p>) -> Bound<'p, pyo3::types::PyBytes> {
         pyo3::types::PyBytes::new_bound(py, &self.coin_id())
-    }
-}
-
-impl<N> ToClvm<N> for Coin {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
-        clvm_list!(self.parent_coin_info, self.puzzle_hash, self.amount).to_clvm(encoder)
-    }
-}
-
-impl<N> FromClvm<N> for Coin {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
-        let destructure_list!(parent_coin_info, puzzle_hash, amount) =
-            <match_list!(BytesImpl<32>, BytesImpl<32>, u64)>::from_clvm(decoder, node)?;
-        Ok(Coin {
-            parent_coin_info,
-            puzzle_hash,
-            amount,
-        })
     }
 }
 
