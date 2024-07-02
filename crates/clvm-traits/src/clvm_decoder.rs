@@ -51,24 +51,6 @@ impl ClvmDecoder for Allocator {
     }
 }
 
-pub trait FromNodePtr {
-    fn from_node_ptr(a: &Allocator, node: NodePtr) -> Result<Self, FromClvmError>
-    where
-        Self: Sized;
-}
-
-impl<T> FromNodePtr for T
-where
-    T: FromClvm<Allocator>,
-{
-    fn from_node_ptr(a: &Allocator, node: NodePtr) -> Result<Self, FromClvmError>
-    where
-        Self: Sized,
-    {
-        T::from_clvm(a, node)
-    }
-}
-
 impl FromClvm<Allocator> for NodePtr {
     fn from_clvm(_decoder: &Allocator, node: NodePtr) -> Result<Self, FromClvmError> {
         Ok(node)

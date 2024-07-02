@@ -11,7 +11,7 @@ use chia_traits::streamable::Streamable;
 use chia_bls::G2Element;
 use chia_protocol::{Bytes32, Coin, CoinSpend, Program, SpendBundle};
 use chia_puzzles::singleton::SINGLETON_TOP_LAYER_PUZZLE_HASH;
-use clvm_traits::{FromClvm, FromNodePtr};
+use clvm_traits::FromClvm;
 use clvm_utils::{tree_hash, CurriedProgram};
 use clvmr::allocator::NodePtr;
 use clvmr::Allocator;
@@ -100,9 +100,8 @@ fn main() {
                         if !run_puzzle && !fast_forward && !args.spend_bundles {
                             return;
                         }
-                        let puzzle_reveal =
-                            Program::from_node_ptr(a, puzzle).expect("puzzle reveal");
-                        let solution = Program::from_node_ptr(a, solution).expect("solution");
+                        let puzzle_reveal = Program::from_clvm(a, puzzle).expect("puzzle reveal");
+                        let solution = Program::from_clvm(a, solution).expect("solution");
                         let coin = Coin {
                             parent_coin_info,
                             puzzle_hash,

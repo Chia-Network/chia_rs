@@ -160,7 +160,7 @@ mod tests {
     use crate::gen::run_puzzle::run_puzzle;
     use chia_protocol::CoinSpend;
     use chia_traits::streamable::Streamable;
-    use clvm_traits::ToNodePtr;
+    use clvm_traits::ToClvm;
     use clvmr::serde::{node_from_bytes, node_to_bytes};
     use hex_literal::hex;
     use rstest::rstest;
@@ -189,8 +189,8 @@ mod tests {
         let new_parents_parent = hex::decode(new_parents_parent).unwrap();
 
         let mut a = Allocator::new_limited(500_000_000);
-        let puzzle = spend.puzzle_reveal.to_node_ptr(&mut a).expect("to_clvm");
-        let solution = spend.solution.to_node_ptr(&mut a).expect("to_clvm");
+        let puzzle = spend.puzzle_reveal.to_clvm(&mut a).expect("to_clvm");
+        let solution = spend.solution.to_clvm(&mut a).expect("to_clvm");
         let puzzle_hash = Bytes32::from(tree_hash(&a, puzzle));
 
         let new_parent_coin = Coin {
@@ -265,7 +265,7 @@ mod tests {
             &hex!("abababababababababababababababababababababababababababababababab");
 
         let mut a = Allocator::new_limited(500_000_000);
-        let puzzle = spend.puzzle_reveal.to_node_ptr(&mut a).expect("to_clvm");
+        let puzzle = spend.puzzle_reveal.to_clvm(&mut a).expect("to_clvm");
         let puzzle_hash = Bytes32::from(tree_hash(&a, puzzle));
 
         let mut new_parent_coin = Coin {
