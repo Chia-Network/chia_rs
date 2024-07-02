@@ -1,6 +1,7 @@
 use chia_traits::{chia_error, read_bytes, Streamable};
 use clvm_traits::{ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError, ToClvm, ToClvmError};
 use clvm_utils::TreeHash;
+use clvmr::Atom;
 use sha2::{Digest, Sha256};
 use std::array::TryFromSliceError;
 use std::fmt;
@@ -111,7 +112,7 @@ impl FromJsonDict for Bytes {
 
 impl<N> ToClvm<N> for Bytes {
     fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
-        encoder.encode_atom(self.0.as_slice())
+        encoder.encode_atom(Atom::Borrowed(self.0.as_slice()))
     }
 }
 
@@ -258,7 +259,7 @@ impl<const N: usize> FromJsonDict for BytesImpl<N> {
 
 impl<N, const LEN: usize> ToClvm<N> for BytesImpl<LEN> {
     fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
-        encoder.encode_atom(self.0.as_slice())
+        encoder.encode_atom(Atom::Borrowed(self.0.as_slice()))
     }
 }
 

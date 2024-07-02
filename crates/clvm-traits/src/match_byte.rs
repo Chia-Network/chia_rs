@@ -7,12 +7,7 @@ pub struct MatchByte<const BYTE: u8>;
 
 impl<N, const BYTE: u8> ToClvm<N> for MatchByte<BYTE> {
     fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
-        if BYTE == 0 {
-            return encoder.encode_atom(&[]);
-        }
-        let number = BigInt::from(BYTE);
-        let bytes = number.to_signed_bytes_be();
-        encoder.encode_atom(&bytes)
+        encoder.encode_bigint(BigInt::from(BYTE))
     }
 }
 
