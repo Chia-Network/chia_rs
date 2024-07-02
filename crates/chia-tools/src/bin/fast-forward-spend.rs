@@ -5,7 +5,7 @@ use chia_consensus::fast_forward::fast_forward_singleton;
 use chia_protocol::Bytes32;
 use chia_protocol::{Coin, CoinSpend, Program};
 use chia_traits::streamable::Streamable;
-use clvm_traits::{FromNodePtr, ToNodePtr};
+use clvm_traits::{FromClvm, ToClvm};
 use clvm_utils::tree_hash;
 use clvmr::allocator::Allocator;
 
@@ -38,8 +38,8 @@ fn main() {
         .unwrap();
 
     let mut a = Allocator::new_limited(500_000_000);
-    let puzzle = spend.puzzle_reveal.to_node_ptr(&mut a).expect("to_clvm");
-    let solution = spend.solution.to_node_ptr(&mut a).expect("to_clvm");
+    let puzzle = spend.puzzle_reveal.to_clvm(&mut a).expect("to_clvm");
+    let solution = spend.solution.to_clvm(&mut a).expect("to_clvm");
     let puzzle_hash = Bytes32::from(tree_hash(&a, puzzle));
 
     let new_parent_coin = Coin {
@@ -67,7 +67,7 @@ fn main() {
     let new_spend = CoinSpend {
         coin: new_parent_coin,
         puzzle_reveal: spend.puzzle_reveal,
-        solution: Program::from_node_ptr(&a, new_solution).expect("new solution"),
+        solution: Program::from_clvm(&a, new_solution).expect("new solution"),
     };
     let mut bytes = Vec::<u8>::new();
     new_spend.stream(&mut bytes).expect("stream CoinSpend");

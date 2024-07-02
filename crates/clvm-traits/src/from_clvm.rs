@@ -4,17 +4,17 @@ use num_bigint::{BigInt, Sign};
 
 use crate::{ClvmDecoder, FromClvmError};
 
-pub trait FromClvm<N>: Sized {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError>;
+pub trait FromClvm<D>: Sized
+where
+    D: ClvmDecoder,
+{
+    fn from_clvm(decoder: &D, node: D::Node) -> Result<Self, FromClvmError>;
 }
 
 macro_rules! clvm_primitive {
     ($primitive:ty) => {
-        impl<N> FromClvm<N> for $primitive {
-            fn from_clvm(
-                decoder: &impl ClvmDecoder<Node = N>,
-                node: N,
-            ) -> Result<Self, FromClvmError> {
+        impl<N, D: ClvmDecoder<Node = N>> FromClvm<D> for $primitive {
+            fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
                 const LEN: usize = std::mem::size_of::<$primitive>();
 
                 let bytes = decoder.decode_atom(&node)?;
@@ -57,8 +57,8 @@ clvm_primitive!(i128);
 clvm_primitive!(usize);
 clvm_primitive!(isize);
 
-impl<N> FromClvm<N> for bool {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+impl<N, D: ClvmDecoder<Node = N>> FromClvm<D> for bool {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
         let atom = decoder.decode_atom(&node)?;
         match atom.as_ref() {
             [] => Ok(false),
@@ -70,39 +70,39 @@ impl<N> FromClvm<N> for bool {
     }
 }
 
-impl<N, T> FromClvm<N> for Box<T>
+impl<N, D: ClvmDecoder<Node = N>, T> FromClvm<D> for Box<T>
 where
-    T: FromClvm<N>,
+    T: FromClvm<D>,
 {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
         T::from_clvm(decoder, node).map(Box::new)
     }
 }
 
-impl<N, T> FromClvm<N> for Rc<T>
+impl<N, D: ClvmDecoder<Node = N>, T> FromClvm<D> for Rc<T>
 where
-    T: FromClvm<N>,
+    T: FromClvm<D>,
 {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
         T::from_clvm(decoder, node).map(Rc::new)
     }
 }
 
-impl<N, T> FromClvm<N> for Arc<T>
+impl<N, D: ClvmDecoder<Node = N>, T> FromClvm<D> for Arc<T>
 where
-    T: FromClvm<N>,
+    T: FromClvm<D>,
 {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
         T::from_clvm(decoder, node).map(Arc::new)
     }
 }
 
-impl<N, A, B> FromClvm<N> for (A, B)
+impl<N, D: ClvmDecoder<Node = N>, A, B> FromClvm<D> for (A, B)
 where
-    A: FromClvm<N>,
-    B: FromClvm<N>,
+    A: FromClvm<D>,
+    B: FromClvm<D>,
 {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
         let (first, rest) = decoder.decode_pair(&node)?;
         let first = A::from_clvm(decoder, first)?;
         let rest = B::from_clvm(decoder, rest)?;
@@ -110,8 +110,8 @@ where
     }
 }
 
-impl<N> FromClvm<N> for () {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+impl<N, D: ClvmDecoder<Node = N>> FromClvm<D> for () {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
         let bytes = decoder.decode_atom(&node)?;
         if bytes.as_ref().is_empty() {
             Ok(())
@@ -124,11 +124,11 @@ impl<N> FromClvm<N> for () {
     }
 }
 
-impl<N, T, const LEN: usize> FromClvm<N> for [T; LEN]
+impl<N, D: ClvmDecoder<Node = N>, T, const LEN: usize> FromClvm<D> for [T; LEN]
 where
-    T: FromClvm<N>,
+    T: FromClvm<D>,
 {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, mut node: N) -> Result<Self, FromClvmError> {
+    fn from_clvm(decoder: &D, mut node: N) -> Result<Self, FromClvmError> {
         let mut items = Vec::with_capacity(LEN);
         loop {
             if let Ok((first, rest)) = decoder.decode_pair(&node) {
@@ -153,11 +153,11 @@ where
     }
 }
 
-impl<N, T> FromClvm<N> for Vec<T>
+impl<N, D: ClvmDecoder<Node = N>, T> FromClvm<D> for Vec<T>
 where
-    T: FromClvm<N>,
+    T: FromClvm<D>,
 {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, mut node: N) -> Result<Self, FromClvmError> {
+    fn from_clvm(decoder: &D, mut node: N) -> Result<Self, FromClvmError> {
         let mut items = Vec::new();
         loop {
             if let Ok((first, rest)) = decoder.decode_pair(&node) {
@@ -178,11 +178,11 @@ where
     }
 }
 
-impl<N, T> FromClvm<N> for Option<T>
+impl<N, D: ClvmDecoder<Node = N>, T> FromClvm<D> for Option<T>
 where
-    T: FromClvm<N>,
+    T: FromClvm<D>,
 {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
         if let Ok(atom) = decoder.decode_atom(&node) {
             if atom.as_ref().is_empty() {
                 return Ok(None);
@@ -192,16 +192,16 @@ where
     }
 }
 
-impl<N> FromClvm<N> for String {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+impl<N, D: ClvmDecoder<Node = N>> FromClvm<D> for String {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
         let bytes = decoder.decode_atom(&node)?;
         Ok(Self::from_utf8(bytes.as_ref().to_vec())?)
     }
 }
 
 #[cfg(feature = "chia-bls")]
-impl<N> FromClvm<N> for chia_bls::PublicKey {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+impl<N, D: ClvmDecoder<Node = N>> FromClvm<D> for chia_bls::PublicKey {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
         let bytes = decoder.decode_atom(&node)?;
         let error = Err(FromClvmError::WrongAtomLength {
             expected: 48,
@@ -213,8 +213,8 @@ impl<N> FromClvm<N> for chia_bls::PublicKey {
 }
 
 #[cfg(feature = "chia-bls")]
-impl<N> FromClvm<N> for chia_bls::Signature {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+impl<N, D: ClvmDecoder<Node = N>> FromClvm<D> for chia_bls::Signature {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
         let bytes = decoder.decode_atom(&node)?;
         let error = Err(FromClvmError::WrongAtomLength {
             expected: 96,
@@ -227,13 +227,13 @@ impl<N> FromClvm<N> for chia_bls::Signature {
 
 #[cfg(test)]
 mod tests {
-    use clvmr::{serde::node_from_bytes, Allocator, NodePtr};
+    use clvmr::{serde::node_from_bytes, Allocator};
 
     use super::*;
 
     fn decode<T>(a: &mut Allocator, hex: &str) -> Result<T, FromClvmError>
     where
-        T: FromClvm<NodePtr>,
+        T: FromClvm<Allocator>,
     {
         let bytes = hex::decode(hex).unwrap();
         let actual = node_from_bytes(a, &bytes).unwrap();

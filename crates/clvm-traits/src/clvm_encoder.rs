@@ -1,16 +1,32 @@
-use clvmr::{Allocator, NodePtr};
+use clvmr::{Allocator, Atom, NodePtr};
+use num_bigint::BigInt;
 
 use crate::{clvm_list, clvm_quote, ToClvm, ToClvmError};
 
 pub trait ClvmEncoder: Sized {
-    type Node: Clone + ToClvm<Self::Node>;
+    type Node: Clone + ToClvm<Self>;
 
-    fn encode_atom(&mut self, bytes: &[u8]) -> Result<Self::Node, ToClvmError>;
+    fn encode_atom(&mut self, atom: Atom<'_>) -> Result<Self::Node, ToClvmError>;
     fn encode_pair(
         &mut self,
         first: Self::Node,
         rest: Self::Node,
     ) -> Result<Self::Node, ToClvmError>;
+
+    fn encode_bigint(&mut self, number: BigInt) -> Result<Self::Node, ToClvmError> {
+        let bytes = number.to_signed_bytes_be();
+        let mut slice = bytes.as_slice();
+
+        // Remove leading zeros.
+        while !slice.is_empty() && slice[0] == 0 {
+            if slice.len() > 1 && (slice[1] & 0x80 == 0x80) {
+                break;
+            }
+            slice = &slice[1..];
+        }
+
+        self.encode_atom(Atom::Borrowed(slice))
+    }
 
     fn encode_curried_arg(
         &mut self,
@@ -32,8 +48,12 @@ pub trait ClvmEncoder: Sized {
 impl ClvmEncoder for Allocator {
     type Node = NodePtr;
 
-    fn encode_atom(&mut self, bytes: &[u8]) -> Result<Self::Node, ToClvmError> {
-        self.new_atom(bytes).or(Err(ToClvmError::OutOfMemory))
+    fn encode_atom(&mut self, atom: Atom<'_>) -> Result<Self::Node, ToClvmError> {
+        match atom {
+            Atom::Borrowed(bytes) => self.new_atom(bytes),
+            Atom::U32(bytes, _len) => self.new_small_number(u32::from_be_bytes(bytes)),
+        }
+        .or(Err(ToClvmError::OutOfMemory))
     }
 
     fn encode_pair(
@@ -43,26 +63,14 @@ impl ClvmEncoder for Allocator {
     ) -> Result<Self::Node, ToClvmError> {
         self.new_pair(first, rest).or(Err(ToClvmError::OutOfMemory))
     }
-}
 
-pub trait ToNodePtr {
-    fn to_node_ptr(&self, a: &mut Allocator) -> Result<NodePtr, ToClvmError>;
-}
-
-impl<T> ToNodePtr for T
-where
-    T: ToClvm<NodePtr>,
-{
-    fn to_node_ptr(&self, a: &mut Allocator) -> Result<NodePtr, ToClvmError> {
-        self.to_clvm(a)
+    fn encode_bigint(&mut self, number: BigInt) -> Result<Self::Node, ToClvmError> {
+        self.new_number(number).or(Err(ToClvmError::OutOfMemory))
     }
 }
 
-impl ToClvm<NodePtr> for NodePtr {
-    fn to_clvm(
-        &self,
-        _encoder: &mut impl ClvmEncoder<Node = NodePtr>,
-    ) -> Result<NodePtr, ToClvmError> {
+impl ToClvm<Allocator> for NodePtr {
+    fn to_clvm(&self, _encoder: &mut Allocator) -> Result<NodePtr, ToClvmError> {
         Ok(*self)
     }
 }
