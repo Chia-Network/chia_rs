@@ -69,19 +69,6 @@ impl ClvmEncoder for Allocator {
     }
 }
 
-pub trait ToNodePtr {
-    fn to_node_ptr(&self, a: &mut Allocator) -> Result<NodePtr, ToClvmError>;
-}
-
-impl<T> ToNodePtr for T
-where
-    T: ToClvm<Allocator>,
-{
-    fn to_node_ptr(&self, a: &mut Allocator) -> Result<NodePtr, ToClvmError> {
-        self.to_clvm(a)
-    }
-}
-
 impl ToClvm<Allocator> for NodePtr {
     fn to_clvm(&self, _encoder: &mut Allocator) -> Result<NodePtr, ToClvmError> {
         Ok(*self)

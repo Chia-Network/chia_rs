@@ -2,7 +2,7 @@ use chia_consensus::gen::conditions::Condition;
 use chia_puzzles::Proof;
 use chia_traits::Streamable;
 use clap::Parser;
-use clvm_traits::{FromClvm, ToNodePtr};
+use clvm_traits::{FromClvm, ToClvm};
 use clvm_utils::tree_hash;
 use clvm_utils::CurriedProgram;
 use clvmr::{allocator::NodePtr, Allocator};
@@ -275,11 +275,11 @@ fn main() {
 
     let puzzle = spend
         .puzzle_reveal
-        .to_node_ptr(&mut a)
+        .to_clvm(&mut a)
         .expect("deserialize puzzle");
     let solution = spend
         .solution
-        .to_node_ptr(&mut a)
+        .to_clvm(&mut a)
         .expect("deserialize solution");
 
     println!("Spending {:?}", &spend.coin);
