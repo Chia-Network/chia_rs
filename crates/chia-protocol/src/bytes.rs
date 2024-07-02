@@ -110,14 +110,14 @@ impl FromJsonDict for Bytes {
     }
 }
 
-impl<N> ToClvm<N> for Bytes {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+impl<N, E: ClvmEncoder<Node = N>> ToClvm<E> for Bytes {
+    fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
         encoder.encode_atom(Atom::Borrowed(self.0.as_slice()))
     }
 }
 
-impl<N> FromClvm<N> for Bytes {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+impl<N, D: ClvmDecoder<Node = N>> FromClvm<D> for Bytes {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
         let bytes = decoder.decode_atom(&node)?;
         Ok(Self(bytes.as_ref().to_vec()))
     }
@@ -257,14 +257,14 @@ impl<const N: usize> FromJsonDict for BytesImpl<N> {
     }
 }
 
-impl<N, const LEN: usize> ToClvm<N> for BytesImpl<LEN> {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+impl<N, E: ClvmEncoder<Node = N>, const LEN: usize> ToClvm<E> for BytesImpl<LEN> {
+    fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
         encoder.encode_atom(Atom::Borrowed(self.0.as_slice()))
     }
 }
 
-impl<N, const LEN: usize> FromClvm<N> for BytesImpl<LEN> {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+impl<N, D: ClvmDecoder<Node = N>, const LEN: usize> FromClvm<D> for BytesImpl<LEN> {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
         let bytes = decoder.decode_atom(&node)?;
         if bytes.as_ref().len() != LEN {
             return Err(FromClvmError::WrongAtomLength {

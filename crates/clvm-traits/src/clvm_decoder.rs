@@ -6,7 +6,7 @@ use crate::{
 };
 
 pub trait ClvmDecoder: Sized {
-    type Node: Clone + FromClvm<Self::Node>;
+    type Node: Clone + FromClvm<Self>;
 
     fn decode_atom(&self, node: &Self::Node) -> Result<Atom<'_>, FromClvmError>;
     fn decode_pair(&self, node: &Self::Node) -> Result<(Self::Node, Self::Node), FromClvmError>;
@@ -59,7 +59,7 @@ pub trait FromNodePtr {
 
 impl<T> FromNodePtr for T
 where
-    T: FromClvm<NodePtr>,
+    T: FromClvm<Allocator>,
 {
     fn from_node_ptr(a: &Allocator, node: NodePtr) -> Result<Self, FromClvmError>
     where
@@ -69,11 +69,8 @@ where
     }
 }
 
-impl FromClvm<NodePtr> for NodePtr {
-    fn from_clvm(
-        _decoder: &impl ClvmDecoder<Node = NodePtr>,
-        node: NodePtr,
-    ) -> Result<Self, FromClvmError> {
+impl FromClvm<Allocator> for NodePtr {
+    fn from_clvm(_decoder: &Allocator, node: NodePtr) -> Result<Self, FromClvmError> {
         Ok(node)
     }
 }

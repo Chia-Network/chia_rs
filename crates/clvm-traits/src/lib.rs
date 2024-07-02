@@ -37,11 +37,11 @@ mod derive_tests {
 
     use std::fmt::Debug;
 
-    use clvmr::{serde::node_to_bytes, Allocator, NodePtr};
+    use clvmr::{serde::node_to_bytes, Allocator};
 
     fn check<T>(value: &T, expected: &str)
     where
-        T: Debug + PartialEq + ToClvm<NodePtr> + FromClvm<NodePtr>,
+        T: Debug + PartialEq + ToClvm<Allocator> + FromClvm<Allocator>,
     {
         let a = &mut Allocator::new();
 
@@ -56,8 +56,8 @@ mod derive_tests {
 
     fn coerce_into<A, B>(value: A) -> B
     where
-        A: ToClvm<NodePtr>,
-        B: FromClvm<NodePtr>,
+        A: ToClvm<Allocator>,
+        B: FromClvm<Allocator>,
     {
         let a = &mut Allocator::new();
         let ptr = value.to_clvm(a).unwrap();

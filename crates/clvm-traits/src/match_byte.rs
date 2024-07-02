@@ -5,14 +5,14 @@ use crate::{ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError, ToClvm, ToClvmErr
 #[derive(Debug, Copy, Clone)]
 pub struct MatchByte<const BYTE: u8>;
 
-impl<N, const BYTE: u8> ToClvm<N> for MatchByte<BYTE> {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+impl<N, E: ClvmEncoder<Node = N>, const BYTE: u8> ToClvm<E> for MatchByte<BYTE> {
+    fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
         encoder.encode_bigint(BigInt::from(BYTE))
     }
 }
 
-impl<N, const BYTE: u8> FromClvm<N> for MatchByte<BYTE> {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+impl<N, D: ClvmDecoder<Node = N>, const BYTE: u8> FromClvm<D> for MatchByte<BYTE> {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
         match decoder.decode_atom(&node)?.as_ref() {
             [] if BYTE == 0 => Ok(Self),
             [byte] if *byte == BYTE && BYTE > 0 => Ok(Self),
