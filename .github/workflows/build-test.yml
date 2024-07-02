@@ -158,7 +158,7 @@ jobs:
     - name: Build Linux with maturin on Python ${{ matrix.python }}
       if: matrix.os.matrix == 'ubuntu'
       run: |
-        docker run --rm \
+        docker run --rm --pull always \
           -v ${{ github.workspace }}:/ws --workdir=/ws \
           ${{ matrix.python.by-arch[matrix.arch.matrix].docker-url }} \
           bash -exc '\
