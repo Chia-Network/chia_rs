@@ -11,7 +11,7 @@ pub trait ToTreeHash {
 
 impl<T> ToTreeHash for T
 where
-    T: ToClvm<TreeHash>,
+    T: ToClvm<TreeHasher>,
 {
     fn tree_hash(&self) -> TreeHash {
         self.to_clvm(&mut TreeHasher).unwrap()
@@ -37,11 +37,8 @@ impl ClvmEncoder for TreeHasher {
     }
 }
 
-impl ToClvm<TreeHash> for TreeHash {
-    fn to_clvm(
-        &self,
-        _encoder: &mut impl ClvmEncoder<Node = TreeHash>,
-    ) -> Result<TreeHash, ToClvmError> {
+impl ToClvm<TreeHasher> for TreeHash {
+    fn to_clvm(&self, _encoder: &mut TreeHasher) -> Result<TreeHash, ToClvmError> {
         Ok(*self)
     }
 }

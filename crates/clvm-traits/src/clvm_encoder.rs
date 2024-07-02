@@ -4,7 +4,7 @@ use num_bigint::BigInt;
 use crate::{clvm_list, clvm_quote, ToClvm, ToClvmError};
 
 pub trait ClvmEncoder: Sized {
-    type Node: Clone + ToClvm<Self::Node>;
+    type Node: Clone + ToClvm<Self>;
 
     fn encode_atom(&mut self, atom: Atom<'_>) -> Result<Self::Node, ToClvmError>;
     fn encode_pair(
@@ -75,18 +75,15 @@ pub trait ToNodePtr {
 
 impl<T> ToNodePtr for T
 where
-    T: ToClvm<NodePtr>,
+    T: ToClvm<Allocator>,
 {
     fn to_node_ptr(&self, a: &mut Allocator) -> Result<NodePtr, ToClvmError> {
         self.to_clvm(a)
     }
 }
 
-impl ToClvm<NodePtr> for NodePtr {
-    fn to_clvm(
-        &self,
-        _encoder: &mut impl ClvmEncoder<Node = NodePtr>,
-    ) -> Result<NodePtr, ToClvmError> {
+impl ToClvm<Allocator> for NodePtr {
+    fn to_clvm(&self, _encoder: &mut Allocator) -> Result<NodePtr, ToClvmError> {
         Ok(*self)
     }
 }
