@@ -46,11 +46,11 @@ jobs:
             cibw-build: 'cp38-*'
             by-arch:
               arm:
-                manylinux-version: 2014
+                manylinux-version: 2_28
                 docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-aarch64
                 rustup-target: aarch64-unknown-linux-musl
               intel:
-                manylinux-version: 2014
+                manylinux-version: 2_28
                 docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-x86_64
                 rustup-target: x86_64-unknown-linux-musl
             matrix: '3.8'
@@ -58,11 +58,11 @@ jobs:
             cibw-build: 'cp39-*'
             by-arch:
               arm:
-                manylinux-version: 2014
+                manylinux-version: 2_28
                 docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-aarch64
                 rustup-target: aarch64-unknown-linux-musl
               intel:
-                manylinux-version: 2014
+                manylinux-version: 2_28
                 docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-x86_64
                 rustup-target: x86_64-unknown-linux-musl
             matrix: '3.9'
@@ -70,11 +70,11 @@ jobs:
             cibw-build: 'cp310-*'
             by-arch:
               arm:
-                manylinux-version: 2014
+                manylinux-version: 2_28
                 docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-aarch64
                 rustup-target: aarch64-unknown-linux-musl
               intel:
-                manylinux-version: 2014
+                manylinux-version: 2_28
                 docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-x86_64
                 rustup-target: x86_64-unknown-linux-musl
             matrix: '3.10'
@@ -82,11 +82,11 @@ jobs:
             cibw-build: 'cp311-*'
             by-arch:
               arm:
-                manylinux-version: 2014
+                manylinux-version: 2_28
                 docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-aarch64
                 rustup-target: aarch64-unknown-linux-musl
               intel:
-                manylinux-version: 2014
+                manylinux-version: 2_28
                 docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-x86_64
                 rustup-target: x86_64-unknown-linux-musl
             matrix: '3.11'
@@ -94,11 +94,11 @@ jobs:
             cibw-build: 'cp312-*'
             by-arch:
               arm:
-                manylinux-version: 2014
+                manylinux-version: 2_28
                 docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-aarch64
                 rustup-target: aarch64-unknown-linux-musl
               intel:
-                manylinux-version: 2014
+                manylinux-version: 2_28
                 docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-x86_64
                 rustup-target: x86_64-unknown-linux-musl
             matrix: '3.12'
