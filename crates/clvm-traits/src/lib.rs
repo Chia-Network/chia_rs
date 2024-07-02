@@ -26,6 +26,8 @@ pub use match_byte::*;
 pub use to_clvm::*;
 pub use wrappers::*;
 
+pub use clvmr::Atom;
+
 #[cfg(test)]
 #[cfg(feature = "derive")]
 mod derive_tests {

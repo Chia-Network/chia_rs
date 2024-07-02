@@ -52,8 +52,8 @@ fn encode_fields(
 
     let initial_value = match repr {
         Repr::Atom | Repr::Transparent => unreachable!(),
-        Repr::List => quote!(encoder.encode_atom(&[])?),
-        Repr::Curry => quote!(encoder.encode_atom(&[1])?),
+        Repr::List => quote!(encoder.encode_atom(#crate_name::Atom::Borrowed(&[]))?),
+        Repr::Curry => quote!(encoder.encode_atom(#crate_name::Atom::Borrowed(&[1]))?),
     };
 
     // We're going to build the return value in reverse order, so we need to start with the terminator.

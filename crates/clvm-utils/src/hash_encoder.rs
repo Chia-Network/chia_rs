@@ -1,6 +1,7 @@
 #![allow(clippy::items_after_statements)]
 
 use clvm_traits::{ClvmEncoder, ToClvm, ToClvmError};
+use clvmr::Atom;
 
 use crate::{tree_hash_atom, tree_hash_pair, TreeHash};
 
@@ -23,8 +24,8 @@ pub struct TreeHasher;
 impl ClvmEncoder for TreeHasher {
     type Node = TreeHash;
 
-    fn encode_atom(&mut self, bytes: &[u8]) -> Result<Self::Node, ToClvmError> {
-        Ok(tree_hash_atom(bytes))
+    fn encode_atom(&mut self, bytes: Atom<'_>) -> Result<Self::Node, ToClvmError> {
+        Ok(tree_hash_atom(bytes.as_ref()))
     }
 
     fn encode_pair(

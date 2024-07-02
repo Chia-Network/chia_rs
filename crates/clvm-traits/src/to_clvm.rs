@@ -1,5 +1,6 @@
 use std::{rc::Rc, sync::Arc};
 
+use clvmr::Atom;
 use num_bigint::BigInt;
 
 use crate::{ClvmEncoder, ToClvmError};
@@ -8,22 +9,11 @@ pub trait ToClvm<N> {
     fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError>;
 }
 
-pub fn simplify_int_bytes(mut slice: &[u8]) -> &[u8] {
-    while (!slice.is_empty()) && (slice[0] == 0) {
-        if slice.len() > 1 && (slice[1] & 0x80 == 0x80) {
-            break;
-        }
-        slice = &slice[1..];
-    }
-    slice
-}
-
 macro_rules! clvm_primitive {
     ($primitive:ty) => {
         impl<N> ToClvm<N> for $primitive {
             fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
-                let number = BigInt::from(*self);
-                encoder.encode_atom(simplify_int_bytes(&number.to_signed_bytes_be()))
+                encoder.encode_bigint(BigInt::from(*self))
             }
         }
     };
@@ -98,7 +88,7 @@ where
 
 impl<N> ToClvm<N> for () {
     fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
-        encoder.encode_atom(&[])
+        encoder.encode_atom(Atom::Borrowed(&[]))
     }
 }
 
@@ -107,7 +97,7 @@ where
     T: ToClvm<N>,
 {
     fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
-        let mut result = encoder.encode_atom(&[])?;
+        let mut result = encoder.encode_atom(Atom::Borrowed(&[]))?;
         for item in self.iter().rev() {
             let value = item.to_clvm(encoder)?;
             result = encoder.encode_pair(value, result)?;
@@ -141,14 +131,14 @@ where
     fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
         match self {
             Some(value) => value.to_clvm(encoder),
-            None => encoder.encode_atom(&[]),
+            None => encoder.encode_atom(Atom::Borrowed(&[])),
         }
     }
 }
 
 impl<N> ToClvm<N> for &str {
     fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
-        encoder.encode_atom(self.as_bytes())
+        encoder.encode_atom(Atom::Borrowed(self.as_bytes()))
     }
 }
 
@@ -161,14 +151,14 @@ impl<N> ToClvm<N> for String {
 #[cfg(feature = "chia-bls")]
 impl<N> ToClvm<N> for chia_bls::PublicKey {
     fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
-        encoder.encode_atom(&self.to_bytes())
+        encoder.encode_atom(Atom::Borrowed(&self.to_bytes()))
     }
 }
 
 #[cfg(feature = "chia-bls")]
 impl<N> ToClvm<N> for chia_bls::Signature {
     fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
-        encoder.encode_atom(&self.to_bytes())
+        encoder.encode_atom(Atom::Borrowed(&self.to_bytes()))
     }
 }
 
