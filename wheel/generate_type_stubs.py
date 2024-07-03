@@ -226,7 +226,6 @@ extra_members = {
         "def name(self) -> bytes32: ...",
         "def removals(self) -> List[Coin]: ...",
         "def additions(self) -> List[Coin]: ...",
-        "def debug(self) -> None: ...",
     ],
     "BlockRecord": [
         "is_transaction_block: bool",

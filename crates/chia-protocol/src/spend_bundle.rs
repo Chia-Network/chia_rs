@@ -118,18 +118,6 @@ impl SpendBundle {
         self.additions()
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.1))
     }
-
-    fn debug(&self, py: Python<'_>) -> PyResult<()> {
-        use pyo3::types::PyDict;
-        let ctx = PyDict::new_bound(py);
-        ctx.set_item("self", self.clone().into_py(py))?;
-        py.run_bound(
-            "from chia.wallet.util.debug_spend_bundle import debug_spend_bundle\n\
-            debug_spend_bundle(self)\n",
-            None,
-            Some(&ctx),
-        )
-    }
 }
 
 #[cfg(test)]
