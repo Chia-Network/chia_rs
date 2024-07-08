@@ -393,7 +393,10 @@ pub fn py_validate_clvm_and_signature(
         peak_height,
         Arc::new(Mutex::new(real_cache)), // TODO: use cache properly
     )
-    .map_err(|e| PyErr::new::<PyTypeError, _>(e as u32))?;
+    .map_err(|e| {
+        let error_code: u32 = e.into();
+        PyErr::new::<PyTypeError, _>(error_code)
+    })?;  // cast validation error to int
     Ok((
         owned_conditions,
         additions,
