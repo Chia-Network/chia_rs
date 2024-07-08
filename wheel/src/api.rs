@@ -375,18 +375,23 @@ pub fn py_validate_clvm_and_signature(
     max_cost: u64,
     constants: &ConsensusConstants,
     peak_height: u32,
-    cache: BlsCache,
+    cache: Option<BlsCache>,
 ) -> PyResult<(
     OwnedSpendBundleConditions,
     Vec<([u8; 32], GTElement)>,
     f32,
 )> {
+    let real_cache = if let Some(unwrapped_cache) = cache {
+        unwrapped_cache
+    } else {
+        BlsCache::default()
+    };
     let (owned_conditions, additions, duration) = validate_clvm_and_signature(
         new_spend,
         max_cost,
         &constants,
         peak_height,
-        Arc::new(Mutex::new(cache)), // TODO: use cache properly
+        Arc::new(Mutex::new(real_cache)), // TODO: use cache properly
     )
     .map_err(|e| PyErr::new::<PyTypeError, _>(e as u32))?;
     Ok((
