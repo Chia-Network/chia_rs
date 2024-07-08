@@ -297,6 +297,9 @@ pub fn hash_to_g1_with_dst(msg: &[u8], dst: &[u8]) -> PublicKey {
 }
 
 #[cfg(feature = "py-bindings")]
+use num_bigint::BigInt;
+
+#[cfg(feature = "py-bindings")]
 #[pyo3::pymethods]
 impl PublicKey {
     #[classattr]
@@ -339,6 +342,16 @@ impl PublicKey {
 
     pub fn __iadd__(&mut self, rhs: &Self) {
         *self += rhs;
+    }
+
+    #[must_use]
+    #[pyo3(name = "scalar_multiply")]
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn py_scalar_multiply(&self, scalar: BigInt) -> Self {
+        let mut clone = *self;
+        let bytes = scalar.to_signed_bytes_be();
+        clone.scalar_multiply(&bytes);
+        clone
     }
 }
 
