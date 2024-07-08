@@ -50,6 +50,9 @@ class {name}:{"".join(map(add_indent, members))}
     def __init__(
         self{init_args}
     ) -> None: ...
+    def __new__(
+        cls{init_args}
+    ) -> {name}: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
     def __richcmp__(self) -> Any: ...
@@ -356,6 +359,7 @@ def get_puzzle_and_solution_for_coin(program: ReadableBuffer, args: ReadableBuff
 
 class BLSCache:
     def __init__(self, cache_size: Optional[int] = 50000) -> None: ...
+    def __new__(cls, cache_size: Optional[int] = 50000) -> BLSCache: ...
     def len(self) -> int: ...
     def aggregate_verify(self, pks: List[G1Element], msgs: List[bytes], sig: G2Element) -> bool: ...
     def items(self) -> List[Tuple[bytes, bytes]]: ...
@@ -388,6 +392,10 @@ class MerkleSet:
         self,
         leafs: List[bytes32],
     ) -> None: ...
+    def __new__(
+        cls,
+        leafs: List[bytes32],
+    ) -> MerkleSet: ...
 """
     )
 
@@ -397,7 +405,6 @@ class MerkleSet:
         [],
         [
             "SIZE: ClassVar[int] = ...",
-            "def __new__(cls) -> G1Element: ...",
             "def get_fingerprint(self) -> int: ...",
             "def verify(self, signature: G2Element, msg: bytes) -> bool: ...",
             "def pair(self, other: G2Element) -> GTElement: ...",
@@ -415,7 +422,6 @@ class MerkleSet:
         [],
         [
             "SIZE: ClassVar[int] = ...",
-            "def __new__(cls) -> G2Element: ...",
             "def pair(self, other: G1Element) -> GTElement: ...",
             "@staticmethod",
             "def generator() -> G2Element: ...",
