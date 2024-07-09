@@ -376,11 +376,7 @@ pub fn py_validate_clvm_and_signature(
     constants: &ConsensusConstants,
     peak_height: u32,
     cache: Option<BlsCache>,
-) -> PyResult<(
-    OwnedSpendBundleConditions,
-    Vec<([u8; 32], GTElement)>,
-    f32,
-)> {
+) -> PyResult<(OwnedSpendBundleConditions, Vec<([u8; 32], GTElement)>, f32)> {
     let real_cache = if let Some(unwrapped_cache) = cache {
         unwrapped_cache
     } else {
@@ -396,12 +392,8 @@ pub fn py_validate_clvm_and_signature(
     .map_err(|e| {
         let error_code: u32 = e.into();
         PyErr::new::<PyTypeError, _>(error_code)
-    })?;  // cast validation error to int
-    Ok((
-        owned_conditions,
-        additions,
-        duration.as_secs_f32(),
-    ))
+    })?; // cast validation error to int
+    Ok((owned_conditions, additions, duration.as_secs_f32()))
 }
 
 #[pymodule]

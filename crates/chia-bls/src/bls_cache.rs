@@ -168,8 +168,6 @@ impl BlsCache {
     }
 }
 
-
-
 #[cfg(test)]
 pub mod tests {
     use super::*;
