@@ -52,8 +52,8 @@ impl BlsCache {
         &mut self,
         pks_msgs: impl IntoIterator<Item = (Pk, Msg)>,
         sig: &Signature,
-    ) -> (bool, Vec<([u8; 32], GTElement)>) {
-        let mut added: Vec<([u8; 32], GTElement)> = Vec::new();
+    ) -> (bool, Vec<([u8; 32], Vec<u8>)>) {
+        let mut added: Vec<([u8; 32], Vec<u8>)> = Vec::new();
         let iter = pks_msgs.into_iter().map(|(pk, msg)| -> GTElement {
             // Hash pubkey + message
             let mut hasher = Sha256::new();
@@ -77,7 +77,7 @@ impl BlsCache {
 
             let pairing = aug_hash.pair(pk.borrow());
             self.cache.put(hash, pairing.clone());
-            added.push((hash, pairing.clone()));
+            added.push((hash, pairing.to_bytes().to_vec()));
             pairing
         });
 
@@ -117,7 +117,7 @@ impl BlsCache {
         pks: &Bound<'_, PyList>,
         msgs: &Bound<'_, PyList>,
         sig: &Signature,
-    ) -> PyResult<(bool, Vec<([u8; 32], GTElement)>)> {
+    ) -> PyResult<(bool, Vec<([u8; 32], Vec<u8>)>)> {
         let pks = pks
             .iter()?
             .map(|item| item?.extract())
