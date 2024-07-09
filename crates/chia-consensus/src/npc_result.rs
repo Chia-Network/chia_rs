@@ -1,7 +1,7 @@
 use crate::allocator::make_allocator;
 use crate::consensus_constants::ConsensusConstants;
 use crate::gen::conditions::{
-    process_single_spend, validate_conditions, EmptyVisitor, ParseState, SpendBundleConditions,
+    process_single_spend, validate_conditions, MempoolVisitor, ParseState, SpendBundleConditions
 };
 use crate::gen::flags::MEMPOOL_MODE;
 use crate::gen::owned_conditions::OwnedSpendBundleConditions;
@@ -67,8 +67,7 @@ pub fn get_name_puzzle_conditions(
 
         let buf = tree_hash_cached(&a, puz, &HashSet::<NodePtr>::new(), &mut cache);
         let puzzle_hash = a.new_atom(&buf)?;
-
-        process_single_spend::<EmptyVisitor>(
+        process_single_spend::<MempoolVisitor>(
             &a,
             &mut ret,
             &mut state,
