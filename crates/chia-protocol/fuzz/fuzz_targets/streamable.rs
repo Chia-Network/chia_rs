@@ -2,8 +2,8 @@
 use arbitrary::{Arbitrary, Unstructured};
 use chia_protocol::*;
 use chia_traits::Streamable;
-use libfuzzer_sys::fuzz_target;
 use clvmr::sha2::Sha256;
+use libfuzzer_sys::fuzz_target;
 
 pub fn test_streamable<T: Streamable + std::fmt::Debug + PartialEq>(obj: &T) {
     let bytes = obj.to_bytes().unwrap();
