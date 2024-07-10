@@ -91,7 +91,7 @@ pub fn validate_clvm_and_signature(
         .unwrap()
         .aggregate_verify(iter, &spend_bundle.aggregated_signature);
     if !result {
-        return Err(ErrorCode::InvalidSpendBundle);
+        return Err(ErrorCode::BadAggregateSignature);
     }
     Ok((npcresult, added, start_time.elapsed()))
 }
