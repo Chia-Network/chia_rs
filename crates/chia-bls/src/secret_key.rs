@@ -1,8 +1,8 @@
 use crate::{DerivableKey, Error, PublicKey, Result};
 use blst::*;
 use chia_traits::{read_bytes, Streamable};
-use hkdf::HkdfExtract;
 use clvmr::sha2::Sha256;
+use hkdf::HkdfExtract;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;

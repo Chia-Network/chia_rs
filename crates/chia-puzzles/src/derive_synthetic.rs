@@ -1,8 +1,8 @@
+use crate::standard::DEFAULT_HIDDEN_PUZZLE_HASH;
 use chia_bls::{PublicKey, SecretKey};
+use clvmr::sha2::Sha256;
 use hex_literal::hex;
 use num_bigint::BigInt;
-use clvmr::sha2::Sha256;
-use crate::standard::DEFAULT_HIDDEN_PUZZLE_HASH;
 
 const GROUP_ORDER_BYTES: [u8; 32] =
     hex!("73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001");
