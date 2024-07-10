@@ -1,7 +1,7 @@
 use blst::*;
 use chia_traits::chia_error::Result;
 use chia_traits::{read_bytes, Streamable};
-use sha2::{Digest, Sha256};
+use clvmr::sha2::Sha256;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;

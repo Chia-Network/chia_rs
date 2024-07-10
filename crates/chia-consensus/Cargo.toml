@@ -18,7 +18,6 @@ py-bindings = ["dep:pyo3", "dep:chia_py_streamable_macro"]
 clvmr = { workspace = true }
 hex = { workspace = true }
 pyo3 = { workspace = true, optional = true }
-sha2 = { workspace = true }
 chia_streamable_macro = { workspace = true }
 chia_py_streamable_macro = { workspace = true, optional = true }
 clvm-utils = { workspace = true }

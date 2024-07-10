@@ -2,7 +2,7 @@ use std::borrow::Borrow;
 use std::num::NonZeroUsize;
 
 use lru::LruCache;
-use sha2::{Digest, Sha256};
+use clvmr::sha2::Sha256;
 
 use crate::{aggregate_verify_gt, hash_to_g2};
 use crate::{GTElement, PublicKey, Signature};
@@ -55,7 +55,7 @@ impl BlsCache {
             let mut hasher = Sha256::new();
             hasher.update(pk.borrow().to_bytes());
             hasher.update(msg.as_ref());
-            let hash: [u8; 32] = hasher.finalize().into();
+            let hash: [u8; 32] = hasher.finalize();
 
             // If the pairing is in the cache, we don't need to recalculate it.
             if let Some(pairing) = self.cache.get(&hash).cloned() {
@@ -69,7 +69,7 @@ impl BlsCache {
 
             let mut hasher = Sha256::new();
             hasher.update(&aug_msg);
-            let hash: [u8; 32] = hasher.finalize().into();
+            let hash: [u8; 32] = hasher.finalize();
 
             let pairing = aug_hash.pair(pk.borrow());
             self.cache.put(hash, pairing.clone());
@@ -272,7 +272,7 @@ pub mod tests {
 
         let mut hasher = Sha256::new();
         hasher.update(aug_msg);
-        let hash: [u8; 32] = hasher.finalize().into();
+        let hash: [u8; 32] = hasher.finalize();
 
         // The first key should have been removed, since it's the oldest that's been accessed.
         assert!(!bls_cache.cache.contains(&hash));
