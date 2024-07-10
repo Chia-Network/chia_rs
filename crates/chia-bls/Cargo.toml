@@ -19,6 +19,7 @@ arbitrary = ["dep:arbitrary"]
 chia-traits = { workspace = true }
 chia_py_streamable_macro = { workspace = true, optional = true }
 anyhow = { workspace = true }
+sha2 = { workspace = true }
 clvmr = { workspace = true }
 hkdf = { workspace = true }
 blst = { workspace = true }
@@ -27,7 +28,6 @@ thiserror = { workspace = true }
 pyo3 = { workspace = true, features = ["multiple-pymethods"], optional = true }
 arbitrary = { workspace = true, optional = true }
 lru = { workspace = true }
-sha2 = { workspace = true }
 
 [dev-dependencies]
 rand = { workspace = true }
