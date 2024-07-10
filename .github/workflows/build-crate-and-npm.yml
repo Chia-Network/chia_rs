@@ -34,7 +34,7 @@ jobs:
     - name: tests
       run: cargo test && cargo test --release
     - name: build
-      run: cargo build --release
+      run: cargo build --workspace --release
 
     - name: Upload crate artifacts
       uses: actions/upload-artifact@v4
