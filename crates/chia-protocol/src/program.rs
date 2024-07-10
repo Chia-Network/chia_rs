@@ -11,7 +11,7 @@ use clvmr::serde::{
     serialized_length_from_bytes_trusted,
 };
 use clvmr::{Allocator, ChiaDialect};
-use sha2::{Digest, Sha256};
+use clvmr::sha2::Sha256;
 use std::io::Cursor;
 use std::ops::Deref;
 
