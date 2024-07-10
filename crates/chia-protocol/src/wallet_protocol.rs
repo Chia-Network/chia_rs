@@ -292,6 +292,7 @@ use chia_py_streamable_macro::{PyJsonDict, PyStreamable};
 #[cfg_attr(feature = "py-bindings", derive(PyJsonDict, PyStreamable))]
 #[derive(Streamable, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum RejectStateReason {
     Reorg = 0,
     ExceededSubscriptionLimit = 1,

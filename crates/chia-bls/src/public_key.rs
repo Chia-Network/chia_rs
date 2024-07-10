@@ -26,6 +26,16 @@ impl<'a> arbitrary::Arbitrary<'a> for PublicKey {
     }
 }
 
+#[cfg(feature = "serde")]
+impl serde::Serialize for PublicKey {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        serializer.serialize_str(&hex::encode(self.to_bytes()))
+    }
+}
+
 impl PublicKey {
     pub fn from_bytes_unchecked(bytes: &[u8; 48]) -> Result<Self> {
         // check if the element is canonical
