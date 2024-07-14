@@ -1,6 +1,10 @@
 mod error;
+mod event;
 mod peer;
-mod utils;
+mod request_map;
+mod response;
 
 pub use error::*;
+pub use event::*;
 pub use peer::*;
+pub use response::*;

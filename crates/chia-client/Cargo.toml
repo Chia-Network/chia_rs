@@ -15,7 +15,10 @@ workspace = true
 chia-protocol = { workspace = true }
 chia-traits = { workspace = true }
 tokio = { workspace = true, features = ["rt", "sync"] }
-tokio-tungstenite = { workspace = true }
+tokio-tungstenite = { workspace = true, features = ["native-tls"] }
 futures-util = { workspace = true }
 tungstenite = { workspace = true }
 thiserror = { workspace = true }
+sha2 = { workspace = true }
+log = { workspace = true }
+native-tls = { workspace = true }
