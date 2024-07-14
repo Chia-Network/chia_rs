@@ -14,7 +14,7 @@ workspace = true
 [dependencies]
 chia-protocol = { workspace = true }
 chia-traits = { workspace = true }
-tokio = { workspace = true, features = ["rt", "sync"] }
+tokio = { workspace = true, features = ["rt", "sync", "time"] }
 tokio-tungstenite = { workspace = true, features = ["native-tls"] }
 futures-util = { workspace = true }
 tungstenite = { workspace = true }
