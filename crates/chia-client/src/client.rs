@@ -112,13 +112,37 @@ impl Client {
         (client, receiver)
     }
 
-    pub async fn peer_count(&self) -> usize {
+    pub async fn len(&self) -> usize {
         self.0.peers.read().await.len()
+    }
+
+    pub async fn is_empty(&self) -> bool {
+        self.0.peers.read().await.is_empty()
+    }
+
+    pub async fn peer_ids(&self) -> Vec<PeerId> {
+        self.0.peers.read().await.keys().copied().collect()
+    }
+
+    pub async fn peers(&self) -> Vec<Peer> {
+        self.0.peers.read().await.values().cloned().collect()
+    }
+
+    pub async fn peer(&self, peer_id: PeerId) -> Option<Peer> {
+        self.0.peers.read().await.get(&peer_id).cloned()
+    }
+
+    pub async fn remove_peer(&self, peer_id: PeerId) -> Option<Peer> {
+        self.0.peers.write().await.remove(&peer_id)
+    }
+
+    pub async fn clear(&self) {
+        self.0.peers.write().await.clear();
     }
 
     pub async fn find_peers(&self) {
         // If we don't have any peers, try to connect to DNS introducers.
-        if self.peer_count().await == 0 && self.connect_dns().await {
+        if self.len().await == 0 && self.connect_dns().await {
             return;
         }
 

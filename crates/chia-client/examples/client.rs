@@ -29,7 +29,7 @@ async fn main() -> anyhow::Result<()> {
     tokio::spawn(async move {
         loop {
             sleep(Duration::from_secs(10)).await;
-            let count = client_clone.peer_count().await;
+            let count = client_clone.len().await;
             log::info!("Currently connected to {} peers", count);
             client.find_peers().await;
         }
