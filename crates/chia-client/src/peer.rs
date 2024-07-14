@@ -1,22 +1,21 @@
-use std::sync::Arc;
+use std::{fmt, net::IpAddr, sync::Arc};
 
-use chia_protocol::{
-    ChiaProtocolMessage, CoinStateUpdate, Handshake, Message, NewPeakWallet, ProtocolMessageTypes,
-};
+use chia_protocol::{ChiaProtocolMessage, Message};
 use chia_traits::Streamable;
 use futures_util::{
     stream::{SplitSink, SplitStream},
     SinkExt, StreamExt,
 };
+use native_tls::TlsConnector;
 use sha2::{digest::FixedOutput, Digest, Sha256};
 use tokio::{
     net::TcpStream,
     sync::{mpsc, oneshot, Mutex},
     task::JoinHandle,
 };
-use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
+use tokio_tungstenite::{Connector, MaybeTlsStream, WebSocketStream};
 
-use crate::{request_map::RequestMap, Error, Event, Response, Result};
+use crate::{request_map::RequestMap, Error, Response, Result};
 
 type WebSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 type Sink = SplitSink<WebSocket, tungstenite::Message>;
@@ -24,6 +23,12 @@ type Stream = SplitStream<WebSocket>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PeerId([u8; 32]);
+
+impl fmt::Display for PeerId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", hex::encode(self.0))
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Peer(Arc<PeerInner>);
@@ -34,13 +39,45 @@ struct PeerInner {
     inbound_handle: JoinHandle<Result<()>>,
     requests: Arc<RequestMap>,
     peer_id: PeerId,
+    ip_addr: IpAddr,
 }
 
 impl Peer {
-    pub fn new(ws: WebSocket) -> Result<(Self, mpsc::Receiver<Event>)> {
-        let cert = match ws.get_ref() {
-            MaybeTlsStream::NativeTls(tls) => tls.get_ref().peer_certificate()?,
-            _ => None,
+    pub async fn connect(
+        ip: IpAddr,
+        port: u16,
+        tls_connector: TlsConnector,
+    ) -> Result<(Self, mpsc::Receiver<Message>)> {
+        let uri = if ip.is_ipv4() {
+            format!("wss://{ip}:{port}/ws")
+        } else {
+            format!("wss://[{ip}]:{port}/ws")
+        };
+        Self::connect_addr(&uri, tls_connector).await
+    }
+
+    pub async fn connect_addr(
+        uri: &str,
+        tls_connector: TlsConnector,
+    ) -> Result<(Self, mpsc::Receiver<Message>)> {
+        let (ws, _) = tokio_tungstenite::connect_async_tls_with_config(
+            uri,
+            None,
+            false,
+            Some(Connector::NativeTls(tls_connector)),
+        )
+        .await?;
+        Self::from_websocket(ws)
+    }
+
+    pub fn from_websocket(ws: WebSocket) -> Result<(Self, mpsc::Receiver<Message>)> {
+        let (addr, cert) = match ws.get_ref() {
+            MaybeTlsStream::NativeTls(tls) => {
+                let tls_stream = tls.get_ref();
+                let tcp_stream = tls_stream.get_ref().get_ref();
+                (tcp_stream.peer_addr()?, tls_stream.peer_certificate()?)
+            }
+            _ => return Err(Error::MissingCertificate),
         };
 
         let Some(cert) = cert else {
@@ -63,6 +100,7 @@ impl Peer {
             inbound_handle,
             requests,
             peer_id,
+            ip_addr: addr.ip(),
         }));
 
         Ok((peer, receiver))
@@ -70,6 +108,10 @@ impl Peer {
 
     pub fn peer_id(&self) -> PeerId {
         self.0.peer_id
+    }
+
+    pub fn ip_addr(&self) -> IpAddr {
+        self.0.ip_addr
     }
 
     pub async fn send<T>(&self, body: T) -> Result<()>
@@ -147,46 +189,29 @@ impl Drop for PeerInner {
 
 async fn handle_inbound_messages(
     mut stream: Stream,
-    sender: mpsc::Sender<Event>,
+    sender: mpsc::Sender<Message>,
     requests: Arc<RequestMap>,
 ) -> Result<()> {
     while let Some(message) = stream.next().await {
         let message = Message::from_bytes(&message?.into_data())?;
 
-        match message.msg_type {
-            ProtocolMessageTypes::CoinStateUpdate => {
-                let event = Event::CoinStateUpdate(CoinStateUpdate::from_bytes(&message.data)?);
-                sender.send(event).await.map_err(|error| {
-                    log::error!("Failed to send `CoinStateUpdate` event: {error}");
-                    Error::EventNotSent
-                })?;
-            }
-            ProtocolMessageTypes::NewPeakWallet => {
-                let event = Event::NewPeakWallet(NewPeakWallet::from_bytes(&message.data)?);
-                sender.send(event).await.map_err(|error| {
-                    log::error!("Failed to send `NewPeakWallet` event: {error}");
-                    Error::EventNotSent
-                })?;
-            }
-            ProtocolMessageTypes::Handshake => {
-                let event = Event::Handshake(Handshake::from_bytes(&message.data)?);
-                sender.send(event).await.map_err(|error| {
-                    log::error!("Failed to send `Handshake` event: {error}");
-                    Error::EventNotSent
-                })?;
-            }
-            kind => {
-                let Some(id) = message.id else {
-                    log::error!("Received unknown message without an id.");
-                    return Err(Error::UnexpectedMessage(kind));
-                };
-                let Some(request) = requests.remove(id).await else {
-                    log::error!("Received message with untracked id {id}.");
-                    return Err(Error::UnexpectedMessage(kind));
-                };
-                request.send(message);
-            }
-        }
+        let Some(id) = message.id else {
+            sender.send(message).await.map_err(|error| {
+                log::debug!("Failed to send peer message event: {error}");
+                Error::EventNotSent
+            })?;
+            continue;
+        };
+
+        let Some(request) = requests.remove(id).await else {
+            log::warn!(
+                "Received {:?} message with untracked id {id}",
+                message.msg_type
+            );
+            return Err(Error::UnexpectedMessage(message.msg_type));
+        };
+
+        request.send(message);
     }
     Ok(())
 }

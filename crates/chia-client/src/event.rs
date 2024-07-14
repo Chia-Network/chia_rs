@@ -1,8 +1,9 @@
-use chia_protocol::{CoinStateUpdate, Handshake, NewPeakWallet};
+use chia_protocol::Message;
+
+use crate::PeerId;
 
 #[derive(Debug, Clone)]
 pub enum Event {
-    Handshake(Handshake),
-    NewPeakWallet(NewPeakWallet),
-    CoinStateUpdate(CoinStateUpdate),
+    Message(PeerId, Message),
+    ConnectionClosed(PeerId),
 }
