@@ -5,6 +5,7 @@ To make new generator tests, one can use this template:
 ```
 
 example puzzle:
+
 ```
 (mod (N)
     (defun another_send (n)
@@ -19,16 +20,19 @@ example puzzle:
 ```
 
 To compile it to CLVM:
+
 ```
 run puzzle.cl
 ```
 
 solution:
+
 ```
 (1024)
 ```
 
 The complete generator becomes:
+
 ```
 (q (
 (0x0101010101010101010101010101010101010101010101010101010101010101
