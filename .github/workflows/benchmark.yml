@@ -129,6 +129,11 @@ jobs:
       with:
         fetch-depth: 1
 
+    - name: Install pkg-config and openssl
+      run: |
+        sudo apt-get install -y pkg-config
+        sudo apt-get install -y libssl-dev
+
     - name: Set up rust
       uses: dtolnay/rust-toolchain@stable
 
