@@ -1,4 +1,4 @@
-name: build - check - upload
+name: Python wheel
 
 on:
   push:
@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   build-wheels:
-    name: Wheel - ${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }}
+    name: Python wheel (${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }})
     runs-on: ${{ matrix.os.runs-on[matrix.arch.matrix] }}
     strategy:
       fail-fast: false
