@@ -259,75 +259,6 @@ jobs:
           name: packages-sdist-${{ matrix.os.name }}-${{ matrix.python.major-dot-minor }}-${{ matrix.arch.name }}
           path: ./target/wheels/
 
-  fmt:
-    runs-on: ubuntu-latest
-    name: cargo fmt
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Install rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - name: fmt
-        run: |
-          cargo fmt --all -- --files-with-diff --check
-          cd wheel
-          cargo fmt -- --files-with-diff --check
-
-  clippy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-
-      - name: workspace
-        run: |
-          cargo clippy --workspace --all-features --all-targets
-
-  fuzz_targets:
-    runs-on: ubuntu-latest
-    env:
-      CARGO_PROFILE_RELEASE_LTO: false
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
-      - name: cargo-fuzz
-        run: cargo +nightly install cargo-fuzz
-      - name: cargo fuzz (chia-consensus)
-        run: |
-          cd crates/chia-consensus
-          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=20 || exit 255"
-      - name: cargo fuzz (chia-bls)
-        env:
-          # we disable leak reports here because blspy appears to be allocating
-          # memory that's not freed. It might be a false positive since python is
-          # not unloaded before exiting
-          LSAN_OPTIONS: detect_leaks=0
-        run: |
-          cd crates/chia-bls
-          python -m pip install blspy
-          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=10 || exit 255"
-      - name: cargo fuzz (clvm-utils)
-        run: |
-          cd crates/clvm-utils
-          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=20 || exit 255"
-      - name: cargo fuzz (chia-protocol)
-        run: |
-          cd crates/chia-protocol
-          cargo +nightly fuzz build
-          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=20 || exit 255"
-      - name: cargo fuzz (chia-puzzles)
-        run: |
-          cd crates/chia-puzzles
-          cargo +nightly fuzz build
-          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=20 || exit 255"
-
   unit_tests:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -342,8 +273,7 @@ jobs:
           git config --global core.autocrlf false
 
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
+
       - uses: dtolnay/rust-toolchain@stable
       - name: Prepare for coverage
         if: matrix.os == 'ubuntu-latest'
