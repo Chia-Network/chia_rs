@@ -294,8 +294,6 @@ jobs:
     needs:
       - build-wheels
       - build-sdist
-      - fmt
-      - clippy
       - unit_tests
     strategy:
       fail-fast: false

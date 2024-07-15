@@ -121,8 +121,8 @@ jobs:
           token: ${{ secrets.node_auth_token }}
           package: wasm/pkg/package.json
 
-  benchmarks:
-    name: Benchmarks
+  benchmark:
+    name: Benchmark
     runs-on: benchmark
     steps:
       - uses: actions/checkout@v4
@@ -133,7 +133,8 @@ jobs:
       - name: Run benchmarks
         run: cargo bench --workspace
 
-  fuzz_targets:
+  fuzz:
+    name: Fuzz
     runs-on: ubuntu-latest
     env:
       CARGO_PROFILE_RELEASE_LTO: false
