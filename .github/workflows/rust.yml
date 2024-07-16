@@ -45,7 +45,7 @@ jobs:
         run: cargo audit --ignore RUSTSEC-2023-0071
 
       - name: Install cargo-machete
-        run: cargo binstall cargo-machete
+        run: cargo binstall cargo-machete -y
 
       - name: Unused dependencies
         run: cargo machete
@@ -81,7 +81,7 @@ jobs:
       - name: Prepare for coverage
         if: matrix.os == 'ubuntu-latest'
         run: |
-          cargo binstall grcov
+          cargo binstall grcov -y
           echo "RUSTFLAGS=-Cinstrument-coverage" >> "$GITHUB_ENV"
           echo "LLVM_PROFILE_FILE=$(pwd)/target/chia_rs-%p-%m.profraw" >> "$GITHUB_ENV"
           echo "CARGO_TARGET_DIR=$(pwd)/target" >> "$GITHUB_ENV"
@@ -130,7 +130,7 @@ jobs:
           path: ./target/package/*-*.crate
 
       - name: Install wasm-pack
-        run: cargo binstall wasm-pack
+        run: cargo binstall wasm-pack -y
 
       - name: Build and pack wasm
         run: |
@@ -145,7 +145,7 @@ jobs:
           path: ./wasm/pkg/*-*.tgz
 
       - name: Install cargo-workspaces
-        run: cargo binstall cargo-workspaces
+        run: cargo binstall cargo-workspaces -y
 
       - name: Publish to crates.io if tagged
         if: startsWith(github.event.ref, 'refs/tags')
