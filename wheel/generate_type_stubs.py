@@ -379,6 +379,7 @@ class MerkleSet:
             "SIZE: ClassVar[int] = ...",
             "def __new__(cls) -> G1Element: ...",
             "def get_fingerprint(self) -> int: ...",
+            "def verify(self, signature: G2Element, msg: bytes) -> bool: ...",
             "def pair(self, other: G2Element) -> GTElement: ...",
             "@staticmethod",
             "def generator() -> G1Element: ...",
