@@ -247,7 +247,7 @@ jobs:
           name: packages-sdist-${{ matrix.os.name }}-${{ matrix.python.major-dot-minor }}-${{ matrix.arch.name }}
           path: ./target/wheels/
 
-  tests:
+  lint:
     name: Python lint
     runs-on: ubuntu-latest
     steps:
