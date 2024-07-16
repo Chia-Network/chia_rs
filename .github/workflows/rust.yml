@@ -42,6 +42,12 @@ jobs:
       - name: Audit
         run: cargo audit --ignore RUSTSEC-2023-0071
 
+      - name: Install cargo-machete
+        run: cargo install cargo-machete --locked
+
+      - name: Unused dependencies
+        run: cargo machete
+
   test:
     name: Test
     runs-on: ${{ matrix.os }}
