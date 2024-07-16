@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   test-riscv64:
-    name: Test riscv64 crate
+    name: Test
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -41,7 +41,7 @@ jobs:
             '
 
   build-wheels:
-    name: ${{ matrix.os }} 📦 Build Wheel ${{ matrix.python.major-dot-minor }}
+    name: Wheel (${{ matrix.os }} ${{ matrix.python.major-dot-minor }})
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
