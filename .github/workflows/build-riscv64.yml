@@ -23,8 +23,7 @@ jobs:
         os: [ubuntu-latest]
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up QEMU on x86_64
         id: qemu
@@ -58,8 +57,7 @@ jobs:
             matrix: "3.11"
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up QEMU on x86_64
         id: qemu
@@ -94,8 +92,7 @@ jobs:
     needs:
       - build-wheels
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set env
         uses: Chia-Network/actions/setjobenv@main
