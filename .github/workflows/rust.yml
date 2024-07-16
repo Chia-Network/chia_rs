@@ -54,6 +54,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The test files are read verbatim, making it problematic if git is
+      # allowed to insert \r when checking out files.
+      - name: disable git autocrlf
+        run: |
+          git config --global core.autocrlf false
+
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
