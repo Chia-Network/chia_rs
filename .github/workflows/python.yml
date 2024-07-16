@@ -136,7 +136,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install dependencies
-        run: python -m pip install maturin
+        run: pip install maturin
 
       - name: Build MacOS wheel (Python ${{ matrix.python }})
         if: matrix.os.matrix == 'macos'
@@ -256,7 +256,7 @@ jobs:
           python-version: 3.12
 
       - name: Install dependencies
-        run: python -m pip install mypy black
+        run: pip install mypy black
 
       - name: python mypy
         run: mypy --ignore-missing-imports tests
@@ -319,9 +319,7 @@ jobs:
       - uses: chia-network/actions/activate-venv@main
 
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install maturin colorama clvm_tools
+        run: pip install maturin colorama clvm_tools
 
       - name: Build
         run: maturin develop --release -m wheel/Cargo.toml
