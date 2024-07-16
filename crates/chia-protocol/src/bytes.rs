@@ -1,7 +1,7 @@
 use chia_traits::{chia_error, read_bytes, Streamable};
 use clvm_traits::{ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError, ToClvm, ToClvmError};
 use clvm_utils::TreeHash;
-use sha2::{Digest, Sha256};
+use clvmr::sha2::Sha256;
 use std::array::TryFromSliceError;
 use std::fmt;
 use std::io::Cursor;

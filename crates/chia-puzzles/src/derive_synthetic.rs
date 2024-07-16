@@ -1,7 +1,7 @@
 use chia_bls::{PublicKey, SecretKey};
+use clvmr::sha2::Sha256;
 use hex_literal::hex;
 use num_bigint::BigInt;
-use sha2::{digest::FixedOutput, Digest, Sha256};
 
 use crate::standard::DEFAULT_HIDDEN_PUZZLE_HASH;
 
@@ -52,7 +52,7 @@ fn synthetic_offset(public_key: &PublicKey, hidden_puzzle_hash: &[u8; 32]) -> Se
     let mut hasher = Sha256::new();
     hasher.update(public_key.to_bytes());
     hasher.update(hidden_puzzle_hash);
-    let bytes: [u8; 32] = hasher.finalize_fixed().into();
+    let bytes: [u8; 32] = hasher.finalize();
     SecretKey::from_bytes(&mod_by_group_order(bytes)).unwrap()
 }
 

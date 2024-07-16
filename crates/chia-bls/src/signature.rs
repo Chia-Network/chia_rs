@@ -1,7 +1,7 @@
 use crate::{Error, GTElement, PublicKey, Result, SecretKey};
 use blst::*;
 use chia_traits::{read_bytes, Streamable};
-use sha2::{Digest, Sha256};
+use clvmr::sha2::Sha256;
 use std::borrow::Borrow;
 use std::fmt;
 use std::hash::{Hash, Hasher};

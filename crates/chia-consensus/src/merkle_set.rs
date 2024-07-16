@@ -1,4 +1,4 @@
-use clvmr::sha2::{Digest, Sha256};
+use clvmr::sha2::Sha256;
 use hex_literal::hex;
 
 fn get_bit(val: &[u8; 32], bit: u8) -> u8 {
@@ -39,7 +39,7 @@ pub(crate) fn hash(
     hasher.update([encode_type(ltype), encode_type(rtype)]);
     hasher.update(left);
     hasher.update(right);
-    hasher.finalize().into()
+    hasher.finalize()
 }
 
 pub(crate) const BLANK: [u8; 32] =
@@ -167,7 +167,7 @@ pub fn compute_merkle_set_root(leafs: &mut [[u8; 32]]) -> [u8; 32] {
             let mut hasher = Sha256::new();
             hasher.update([NodeType::Term as u8]);
             hasher.update(hash);
-            hasher.finalize().into()
+            hasher.finalize()
         }
         (hash, NodeType::Mid | NodeType::MidDbl) => hash,
         (_, NodeType::Empty) => panic!("unexpected"),
@@ -182,7 +182,7 @@ pub mod test {
         let mut hasher = Sha256::new();
         hasher.update(buf1);
         hasher.update(buf2);
-        hasher.finalize().into()
+        hasher.finalize()
     }
 
     const PREFIX: [u8; 30] = hex!("000000000000000000000000000000000000000000000000000000000000");
@@ -193,7 +193,7 @@ pub mod test {
         hasher.update(buf1);
         hasher.update(buf2);
         hasher.update(buf3);
-        hasher.finalize().into()
+        hasher.finalize()
     }
 
     #[test]

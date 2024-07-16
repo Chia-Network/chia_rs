@@ -4,7 +4,7 @@ use clvm_traits::{
     clvm_list, destructure_list, match_list, ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError,
     ToClvm, ToClvmError,
 };
-use sha2::{Digest, Sha256};
+use clvmr::sha2::Sha256;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;

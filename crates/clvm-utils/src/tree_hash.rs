@@ -1,6 +1,6 @@
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use clvmr::serde::node_from_bytes_backrefs_record;
-use clvmr::sha2::{Digest, Sha256};
+use clvmr::sha2::Sha256;
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 use std::{fmt, io};
@@ -70,7 +70,7 @@ pub fn tree_hash_atom(bytes: &[u8]) -> TreeHash {
     let mut sha256 = Sha256::new();
     sha256.update([1]);
     sha256.update(bytes);
-    TreeHash::new(sha256.finalize().into())
+    TreeHash::new(sha256.finalize())
 }
 
 pub fn tree_hash_pair(first: TreeHash, rest: TreeHash) -> TreeHash {
@@ -78,7 +78,7 @@ pub fn tree_hash_pair(first: TreeHash, rest: TreeHash) -> TreeHash {
     sha256.update([2]);
     sha256.update(first);
     sha256.update(rest);
-    TreeHash::new(sha256.finalize().into())
+    TreeHash::new(sha256.finalize())
 }
 
 pub fn tree_hash(a: &Allocator, node: NodePtr) -> TreeHash {

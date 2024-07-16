@@ -71,13 +71,13 @@ fn u64_to_bytes(n: u64) -> Vec<u8> {
 }
 
 #[cfg(test)]
-use clvmr::sha2::{Digest, Sha256};
+use clvmr::sha2::Sha256;
 
 #[cfg(test)]
 fn make_dummy_id(seed: u64) -> Bytes32 {
     let mut sha256 = Sha256::new();
     sha256.update(seed.to_be_bytes());
-    let id: [u8; 32] = sha256.finalize().into();
+    let id: [u8; 32] = sha256.finalize();
     id.into()
 }
 

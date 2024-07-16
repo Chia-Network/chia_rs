@@ -1,6 +1,6 @@
 #![no_main]
 use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
-use clvmr::sha2::{Digest, Sha256};
+use clvmr::sha2::Sha256;
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
@@ -19,7 +19,7 @@ fuzz_target!(|data: &[u8]| {
     // proofs-of-exclusion
     let mut hasher = Sha256::new();
     hasher.update(data);
-    leafs.push(hasher.finalize().into());
+    leafs.push(hasher.finalize());
 
     for (idx, item) in leafs.iter().enumerate() {
         let expect_included = idx < num_leafs;

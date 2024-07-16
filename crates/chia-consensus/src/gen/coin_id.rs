@@ -1,6 +1,6 @@
 use chia_protocol::Bytes32;
 use clvmr::allocator::{Allocator, NodePtr};
-use clvmr::sha2::{Digest, Sha256};
+use clvmr::sha2::Sha256;
 
 pub fn compute_coin_id(
     a: &Allocator,
@@ -12,7 +12,7 @@ pub fn compute_coin_id(
     hasher.update(a.atom(parent_id));
     hasher.update(a.atom(puzzle_hash));
     hasher.update(amount);
-    let coin_id: [u8; 32] = hasher.finalize().into();
+    let coin_id: [u8; 32] = hasher.finalize();
     coin_id.into()
 }
 

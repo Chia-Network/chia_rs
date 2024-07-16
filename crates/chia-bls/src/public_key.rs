@@ -3,7 +3,7 @@ use crate::{DerivableKey, Error, Result};
 
 use blst::*;
 use chia_traits::{read_bytes, Streamable};
-use sha2::{digest::FixedOutput, Digest, Sha256};
+use clvmr::sha2::Sha256;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
@@ -143,7 +143,7 @@ impl PublicKey {
     pub fn get_fingerprint(&self) -> u32 {
         let mut hasher = Sha256::new();
         hasher.update(self.to_bytes());
-        let hash: [u8; 32] = hasher.finalize_fixed().into();
+        let hash: [u8; 32] = hasher.finalize();
         u32::from_be_bytes(hash[0..4].try_into().unwrap())
     }
 }
@@ -252,7 +252,7 @@ impl DerivableKey for PublicKey {
         let mut hasher = Sha256::new();
         hasher.update(self.to_bytes());
         hasher.update(idx.to_be_bytes());
-        let digest: [u8; 32] = hasher.finalize_fixed().into();
+        let digest: [u8; 32] = hasher.finalize();
 
         let p1 = unsafe {
             let mut nonce = MaybeUninit::<blst_scalar>::uninit();

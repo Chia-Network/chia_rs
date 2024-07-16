@@ -17,7 +17,6 @@ arbitrary = ["dep:arbitrary", "chia-bls/arbitrary"]
 
 [dependencies]
 pyo3 = { workspace = true, features = ["multiple-pymethods", "num-bigint"], optional = true }
-sha2 = { workspace = true }
 hex = { workspace = true }
 chia_streamable_macro = { workspace = true }
 chia_py_streamable_macro = { workspace = true, optional = true }
