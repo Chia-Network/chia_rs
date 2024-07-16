@@ -48,6 +48,9 @@ jobs:
       - name: Unused dependencies
         run: cargo machete
 
+      - name: Display sccache stats
+        run: sccache --show-stats
+
   test:
     name: Test
     runs-on: ${{ matrix.os }}
@@ -84,6 +87,9 @@ jobs:
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         with:
           path-to-lcov: "./lcov.info"
+
+      - name: Display sccache stats
+        run: sccache --show-stats
 
   publish:
     name: Publish
@@ -153,6 +159,9 @@ jobs:
       - name: Run benchmarks
         run: cargo bench --workspace --exclude chia_rs
 
+      - name: Display sccache stats
+        run: sccache --show-stats
+
   fuzz:
     name: Fuzz
     runs-on: ubuntu-latest
@@ -203,3 +212,6 @@ jobs:
           cd crates/chia-puzzles
           cargo +nightly fuzz build
           cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=20 || exit 255"
+
+      - name: Display sccache stats
+        run: sccache --show-stats
