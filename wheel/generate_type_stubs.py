@@ -420,7 +420,7 @@ class MerkleSet:
         [],
         [
             "PRIVATE_KEY_SIZE: ClassVar[int] = ...",
-            "def sign(self, msg: bytes, prepend_pk: Optional[G1Element] = None) -> G2Element: ...",
+            "def sign(self, msg: bytes, final_pk: Optional[G1Element] = None) -> G2Element: ...",
             "def get_g1(self) -> G1Element: ...",
             "def __str__(self) -> str: ...",
             "def public_key(self) -> G1Element: ...",

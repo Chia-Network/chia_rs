@@ -242,8 +242,8 @@ impl SecretKey {
     #[classattr]
     pub const PRIVATE_KEY_SIZE: usize = 32;
 
-    pub fn sign(&self, msg: &[u8], prepend_pk: Option<PublicKey>) -> crate::Signature {
-        match prepend_pk {
+    pub fn sign(&self, msg: &[u8], final_pk: Option<PublicKey>) -> crate::Signature {
+        match final_pk {
             Some(prefix) => {
                 let mut aug_msg = prefix.to_bytes().to_vec();
                 aug_msg.extend_from_slice(msg);
