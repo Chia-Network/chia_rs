@@ -1,4 +1,4 @@
-name: Python wheel
+name: Python
 
 on:
   push:
@@ -20,8 +20,8 @@ permissions:
   contents: read
 
 jobs:
-  build-wheels:
-    name: Python wheel (${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }})
+  build-wheel:
+    name: Build wheel (${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }})
     runs-on: ${{ matrix.os.runs-on[matrix.arch.matrix] }}
     strategy:
       fail-fast: false
@@ -301,7 +301,7 @@ jobs:
           pytest tests
 
   generator-benchmarks:
-    name: Generator performance
+    name: Benchmark generators
     runs-on: benchmark
     strategy:
       fail-fast: false
@@ -349,9 +349,10 @@ jobs:
     name: Upload to PyPI - ${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }}
     runs-on: ${{ matrix.os.runs-on[matrix.arch.matrix] }}
     needs:
-      - build-wheels
+      - build-wheel
       - build-sdist
       - unit-tests
+      - check-typestubs
     strategy:
       fail-fast: false
       matrix:
