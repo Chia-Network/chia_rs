@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   build-wheel:
-    name: Build wheel (${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }})
+    name: Wheel (${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }})
     runs-on: ${{ matrix.os.runs-on[matrix.arch.matrix] }}
     strategy:
       fail-fast: false
@@ -138,7 +138,7 @@ jobs:
       - name: Install dependencies
         run: pip install maturin
 
-      - name: Build MacOS wheel (Python ${{ matrix.python }})
+      - name: MacOS wheel (Python ${{ matrix.python }})
         if: matrix.os.matrix == 'macos'
         env:
           MACOSX_DEPLOYMENT_TARGET: "11.0"
@@ -147,7 +147,7 @@ jobs:
           . venv/bin/activate
           maturin build -i python --release -m wheel/Cargo.toml
 
-      - name: Build Linux wheel (Python ${{ matrix.python }})
+      - name: Linux wheel (Python ${{ matrix.python }})
         if: matrix.os.matrix == 'ubuntu'
         run: |
           docker run --rm --pull always \
@@ -164,7 +164,7 @@ jobs:
               CC=gcc maturin build --release --manylinux ${{ matrix.python.by-arch[matrix.arch.matrix].manylinux-version }} -m wheel/Cargo.toml \
             '
 
-      - name: Build Windows wheel (Python ${{ matrix.python }})
+      - name: Windows wheel (Python ${{ matrix.python }})
         if: matrix.os.matrix == 'windows'
         env:
           CC: "clang"
