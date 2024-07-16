@@ -1,7 +1,7 @@
 use crate::allocator::make_allocator;
 use crate::consensus_constants::ConsensusConstants;
 use crate::gen::conditions::{
-    process_single_spend, validate_conditions, MempoolVisitor, ParseState, SpendBundleConditions
+    process_single_spend, validate_conditions, MempoolVisitor, ParseState, SpendBundleConditions,
 };
 use crate::gen::flags::MEMPOOL_MODE;
 use crate::gen::owned_conditions::OwnedSpendBundleConditions;

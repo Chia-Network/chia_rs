@@ -406,10 +406,11 @@ pub fn py_get_name_puzzle_conditions(
     mempool_mode: bool,
     height: u32,
 ) -> PyResult<OwnedSpendBundleConditions> {
-    let osbc = get_name_puzzle_conditions(spend_bundle, max_cost, mempool_mode, height, constants).map_err(|e| {
-        let error_code: u32 = e.1.into();
-        PyErr::new::<PyTypeError, _>(error_code) 
-    })?;
+    let osbc = get_name_puzzle_conditions(spend_bundle, max_cost, mempool_mode, height, constants)
+        .map_err(|e| {
+            let error_code: u32 = e.1.into();
+            PyErr::new::<PyTypeError, _>(error_code)
+        })?;
     Ok(osbc)
 }
 
