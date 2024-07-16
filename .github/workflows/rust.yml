@@ -30,6 +30,8 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - uses: cargo-bins/cargo-binstall@main
+
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.5
 
@@ -43,7 +45,7 @@ jobs:
         run: cargo audit --ignore RUSTSEC-2023-0071
 
       - name: Install cargo-machete
-        run: cargo install cargo-machete --locked
+        run: cargo binstall cargo-machete
 
       - name: Unused dependencies
         run: cargo machete
@@ -71,11 +73,13 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - uses: cargo-bins/cargo-binstall@main
+
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.5
 
       - name: Install cargo-tarpaulin
-        run: cargo install cargo-tarpaulin --locked
+        run: cargo binstall cargo-tarpaulin
 
       - name: Tests
         run: cargo tarpaulin --workspace --all-features --release --out lcov
@@ -101,6 +105,8 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - uses: cargo-bins/cargo-binstall@main
+
       - name: Build
         run: cargo build --release
 
@@ -111,7 +117,7 @@ jobs:
           path: ./target/package/*-*.crate
 
       - name: Install wasm-pack
-        run: cargo install wasm-pack --locked
+        run: cargo binstall wasm-pack
 
       - name: Build and pack wasm
         run: |
@@ -126,7 +132,7 @@ jobs:
           path: ./wasm/pkg/*-*.tgz
 
       - name: Install cargo-workspaces
-        run: cargo install cargo-workspaces --locked
+        run: cargo binstall cargo-workspaces
 
       - name: Publish to crates.io if tagged
         if: startsWith(github.event.ref, 'refs/tags')
