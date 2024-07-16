@@ -2,8 +2,8 @@
 use libfuzzer_sys::fuzz_target;
 
 use chia_consensus::gen::conditions::{parse_spends, MempoolVisitor};
+use chia_fuzz::{make_list, BitCursor};
 use clvmr::{Allocator, NodePtr};
-use fuzzing_utils::{make_list, BitCursor};
 
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::gen::flags::{ENABLE_MESSAGE_CONDITIONS, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};

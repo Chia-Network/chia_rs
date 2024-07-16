@@ -6,11 +6,11 @@ use chia_consensus::gen::conditions::{
     parse_conditions, MempoolVisitor, ParseState, Spend, SpendBundleConditions,
 };
 use chia_consensus::gen::spend_visitor::SpendVisitor;
+use chia_fuzz::{make_list, BitCursor};
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
 use clvm_utils::tree_hash;
 use clvmr::{Allocator, NodePtr};
-use fuzzing_utils::{make_list, BitCursor};
 use std::collections::HashSet;
 use std::sync::Arc;
 

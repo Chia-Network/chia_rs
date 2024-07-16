@@ -28,6 +28,12 @@ repos:
         entry: cargo clippy --workspace --all-features --all-targets
         language: system
         pass_filenames: false
+      - id: machete
+        name: machete
+        description: check for unused dependencies
+        entry: cargo machete
+        language: system
+        pass_filenames: false
       - id: build
         name: build
         description: run cargo build on the workspace

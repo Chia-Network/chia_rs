@@ -311,7 +311,6 @@ dependencies = [
 name = "chia-bls"
 version = "0.10.0"
 dependencies = [
- "anyhow",
  "arbitrary",
  "blst",
  "chia-traits 0.10.0",
@@ -359,7 +358,6 @@ dependencies = [
  "chia-traits 0.10.0",
  "chia_py_streamable_macro",
  "chia_streamable_macro 0.10.0",
- "clvm-derive",
  "clvm-traits",
  "clvm-utils",
  "clvmr",
@@ -445,7 +443,6 @@ dependencies = [
  "clvm-traits",
  "clvmr",
  "libfuzzer-sys",
- "pyo3",
 ]
 
 [[package]]
@@ -475,7 +472,6 @@ dependencies = [
  "clvm-utils",
  "clvmr",
  "hex",
- "hex-literal",
  "rusqlite",
  "zstd",
 ]
@@ -519,15 +515,10 @@ dependencies = [
  "chia-bls 0.10.0",
  "chia-consensus",
  "chia-protocol",
- "chia-traits 0.10.0",
- "chia_py_streamable_macro",
- "chia_streamable_macro 0.10.0",
- "clvm-traits",
  "clvm-utils",
  "clvmr",
  "hex",
  "pyo3",
- "sha2",
 ]
 
 [[package]]
