@@ -36,7 +36,7 @@ pub struct Peer(Arc<PeerInner>);
 #[derive(Debug)]
 struct PeerInner {
     sink: Mutex<Sink>,
-    inbound_handle: JoinHandle<Result<()>>,
+    inbound_handle: JoinHandle<()>,
     requests: Arc<RequestMap>,
     peer_id: PeerId,
     ip_addr: IpAddr,
@@ -90,10 +90,15 @@ impl Peer {
         let peer_id = PeerId(hasher.finalize_fixed().into());
         let (sink, stream) = ws.split();
         let (sender, receiver) = mpsc::channel(32);
-        let requests = Arc::new(RequestMap::new());
 
-        let inbound_handle =
-            tokio::spawn(handle_inbound_messages(stream, sender, requests.clone()));
+        let requests = Arc::new(RequestMap::new());
+        let requests_clone = requests.clone();
+
+        let inbound_handle = tokio::spawn(async move {
+            if let Err(error) = handle_inbound_messages(stream, sender, requests_clone).await {
+                log::warn!("Error handling message: {error}");
+            }
+        });
 
         let peer = Self(Arc::new(PeerInner {
             sink: Mutex::new(sink),
@@ -192,27 +197,46 @@ async fn handle_inbound_messages(
     sender: mpsc::Sender<Message>,
     requests: Arc<RequestMap>,
 ) -> Result<()> {
+    use tungstenite::Message::{Binary, Close, Frame, Ping, Pong, Text};
+
     while let Some(message) = stream.next().await {
         let message = message?;
-        let message = Message::from_bytes(&message.into_data())?;
 
-        let Some(id) = message.id else {
-            sender.send(message).await.map_err(|error| {
-                log::debug!("Failed to send peer message event: {error}");
-                Error::EventNotSent
-            })?;
-            continue;
-        };
+        match message {
+            Text(text) => {
+                log::warn!("Received unexpected text message: {text}");
+            }
+            Close(close) => {
+                log::warn!("Received close: {close:?}");
+                break;
+            }
+            Ping(_ping) => {}
+            Pong(_pong) => {}
+            Binary(binary) => {
+                let message = Message::from_bytes(&binary)?;
 
-        let Some(request) = requests.remove(id).await else {
-            log::warn!(
-                "Received {:?} message with untracked id {id}",
-                message.msg_type
-            );
-            return Err(Error::UnexpectedMessage(message.msg_type));
-        };
+                let Some(id) = message.id else {
+                    sender.send(message).await.map_err(|error| {
+                        log::warn!("Failed to send peer message event: {error}");
+                        Error::EventNotSent
+                    })?;
+                    continue;
+                };
 
-        request.send(message);
+                let Some(request) = requests.remove(id).await else {
+                    log::warn!(
+                        "Received {:?} message with untracked id {id}",
+                        message.msg_type
+                    );
+                    return Err(Error::UnexpectedMessage(message.msg_type));
+                };
+
+                request.send(message);
+            }
+            Frame(frame) => {
+                log::warn!("Received frame: {frame}");
+            }
+        }
     }
     Ok(())
 }

@@ -275,7 +275,7 @@ impl Client {
             let (peer, mut receiver) = match result {
                 Ok(result) => result,
                 Err((ip, port, error)) => {
-                    log::debug!(
+                    log::warn!(
                         "{error} for peer {}",
                         if ip.is_ipv4() {
                             format!("{ip}:{port}")
@@ -303,7 +303,7 @@ impl Client {
                         .send(Event::Message(peer_id, message))
                         .await
                     {
-                        log::debug!("Failed to send client message event: {error}");
+                        log::warn!("Failed to send client message event: {error}");
                         break;
                     }
                 }
@@ -316,7 +316,7 @@ impl Client {
                     .send(Event::ConnectionClosed(peer_id))
                     .await
                 {
-                    log::debug!("Failed to send client connection closed event: {error}");
+                    log::warn!("Failed to send client connection closed event: {error}");
                 }
 
                 log::info!("Peer {ip} disconnected");
