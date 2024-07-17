@@ -17,7 +17,7 @@ async fn main() -> anyhow::Result<()> {
     let (client, mut receiver) = Client::new(
         tls_connector,
         ClientOptions {
-            network: Network::testnet11(),
+            network: Network::mainnet(),
             target_peers: 20,
             connection_concurrency: 10,
             node_type: NodeType::Wallet,
