@@ -3,10 +3,10 @@ use std::{fmt, net::IpAddr, sync::Arc};
 use chia_protocol::{
     Bytes32, ChiaProtocolMessage, CoinStateFilters, Message, PuzzleSolutionResponse,
     RegisterForCoinUpdates, RegisterForPhUpdates, RejectCoinState, RejectPuzzleSolution,
-    RejectPuzzleState, RequestCoinState, RequestPeers, RequestPuzzleSolution, RequestPuzzleState,
-    RequestTransaction, RespondCoinState, RespondPeers, RespondPuzzleSolution, RespondPuzzleState,
-    RespondToCoinUpdates, RespondToPhUpdates, RespondTransaction, SendTransaction, SpendBundle,
-    TransactionAck,
+    RejectPuzzleState, RequestChildren, RequestCoinState, RequestPeers, RequestPuzzleSolution,
+    RequestPuzzleState, RequestTransaction, RespondChildren, RespondCoinState, RespondPeers,
+    RespondPuzzleSolution, RespondPuzzleState, RespondToCoinUpdates, RespondToPhUpdates,
+    RespondTransaction, SendTransaction, SpendBundle, TransactionAck,
 };
 use chia_traits::Streamable;
 use futures_util::{
@@ -22,11 +22,12 @@ use tokio::{
 };
 use tokio_tungstenite::{Connector, MaybeTlsStream, WebSocketStream};
 
-use crate::{request_map::RequestMap, Error, Response, Result};
+use crate::{request_map::RequestMap, Error, Result};
 
 type WebSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 type Sink = SplitSink<WebSocket, tungstenite::Message>;
 type Stream = SplitStream<WebSocket>;
+type Response<T, E> = std::result::Result<T, E>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PeerId([u8; 32]);
@@ -199,9 +200,13 @@ impl Peer {
             ))
             .await?
         {
-            Response::Success(response) => Ok(Response::Success(response.response)),
-            Response::Rejection(rejection) => Ok(Response::Rejection(rejection)),
+            Ok(response) => Ok(Ok(response.response)),
+            Err(rejection) => Ok(Err(rejection)),
         }
+    }
+
+    pub async fn request_children(&self, coin_id: Bytes32) -> Result<RespondChildren> {
+        self.request_infallible(RequestChildren::new(coin_id)).await
     }
 
     pub async fn request_peers(&self) -> Result<RespondPeers> {
@@ -235,9 +240,9 @@ impl Peer {
             ));
         }
         if message.msg_type == T::msg_type() {
-            Ok(Response::Success(T::from_bytes(&message.data)?))
+            Ok(Ok(T::from_bytes(&message.data)?))
         } else {
-            Ok(Response::Rejection(E::from_bytes(&message.data)?))
+            Ok(Err(E::from_bytes(&message.data)?))
         }
     }
 
