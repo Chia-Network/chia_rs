@@ -6,9 +6,7 @@ use std::{
     time::Duration,
 };
 
-use chia_protocol::{
-    Handshake, Message, NodeType, ProtocolMessageTypes, RequestPeers, RespondPeers,
-};
+use chia_protocol::{Handshake, Message, NodeType, ProtocolMessageTypes, RespondPeers};
 use chia_traits::Streamable;
 use dns_lookup::lookup_host;
 use futures_util::{stream::FuturesUnordered, StreamExt};
@@ -157,11 +155,8 @@ impl Client {
             }
 
             // Request new peers from the peer.
-            let Ok(Ok(response)): std::result::Result<Result<RespondPeers>, _> = timeout(
-                self.0.options.request_peers_timeout,
-                peer.request_infallible(RequestPeers::new()),
-            )
-            .await
+            let Ok(Ok(response)): std::result::Result<Result<RespondPeers>, _> =
+                timeout(self.0.options.request_peers_timeout, peer.request_peers()).await
             else {
                 log::info!("Failed to request peers from {}", peer.ip_addr());
                 self.remove_peer(peer_id).await;

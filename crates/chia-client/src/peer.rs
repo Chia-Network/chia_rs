@@ -1,6 +1,13 @@
 use std::{fmt, net::IpAddr, sync::Arc};
 
-use chia_protocol::{ChiaProtocolMessage, Message};
+use chia_protocol::{
+    Bytes32, ChiaProtocolMessage, CoinStateFilters, Message, PuzzleSolutionResponse,
+    RegisterForCoinUpdates, RegisterForPhUpdates, RejectCoinState, RejectPuzzleSolution,
+    RejectPuzzleState, RequestCoinState, RequestPeers, RequestPuzzleSolution, RequestPuzzleState,
+    RequestTransaction, RespondCoinState, RespondPeers, RespondPuzzleSolution, RespondPuzzleState,
+    RespondToCoinUpdates, RespondToPhUpdates, RespondTransaction, SendTransaction, SpendBundle,
+    TransactionAck,
+};
 use chia_traits::Streamable;
 use futures_util::{
     stream::{SplitSink, SplitStream},
@@ -117,6 +124,88 @@ impl Peer {
 
     pub fn ip_addr(&self) -> IpAddr {
         self.0.ip_addr
+    }
+
+    pub async fn send_transaction(&self, spend_bundle: SpendBundle) -> Result<TransactionAck> {
+        self.request_infallible(SendTransaction::new(spend_bundle))
+            .await
+    }
+
+    pub async fn request_puzzle_state(
+        &self,
+        puzzle_hashes: Vec<Bytes32>,
+        previous_height: Option<u32>,
+        header_hash: Bytes32,
+        filters: CoinStateFilters,
+        subscribe_when_finished: bool,
+    ) -> Result<Response<RespondPuzzleState, RejectPuzzleState>> {
+        self.request_fallible(RequestPuzzleState::new(
+            puzzle_hashes,
+            previous_height,
+            header_hash,
+            filters,
+            subscribe_when_finished,
+        ))
+        .await
+    }
+
+    pub async fn request_coin_state(
+        &self,
+        coin_ids: Vec<Bytes32>,
+        previous_height: Option<u32>,
+        header_hash: Bytes32,
+        subscribe: bool,
+    ) -> Result<Response<RespondCoinState, RejectCoinState>> {
+        self.request_fallible(RequestCoinState::new(
+            coin_ids,
+            previous_height,
+            header_hash,
+            subscribe,
+        ))
+        .await
+    }
+
+    pub async fn register_for_ph_updates(
+        &self,
+        puzzle_hashes: Vec<Bytes32>,
+        min_height: u32,
+    ) -> Result<RespondToPhUpdates> {
+        self.request_infallible(RegisterForPhUpdates::new(puzzle_hashes, min_height))
+            .await
+    }
+
+    pub async fn register_for_coin_updates(
+        &self,
+        coin_ids: Vec<Bytes32>,
+        min_height: u32,
+    ) -> Result<RespondToCoinUpdates> {
+        self.request_infallible(RegisterForCoinUpdates::new(coin_ids, min_height))
+            .await
+    }
+
+    pub async fn request_transaction(&self, transaction_id: Bytes32) -> Result<RespondTransaction> {
+        self.request_infallible(RequestTransaction::new(transaction_id))
+            .await
+    }
+
+    pub async fn request_puzzle_and_solution(
+        &self,
+        coin_id: Bytes32,
+        height: u32,
+    ) -> Result<Response<PuzzleSolutionResponse, RejectPuzzleSolution>> {
+        match self
+            .request_fallible::<RespondPuzzleSolution, _, _>(RequestPuzzleSolution::new(
+                coin_id, height,
+            ))
+            .await?
+        {
+            Response::Success(response) => Ok(Response::Success(response.response)),
+            Response::Rejection(rejection) => Ok(Response::Rejection(rejection)),
+        }
+    }
+
+    pub async fn request_peers(&self) -> Result<RespondPeers> {
+        self.request_infallible(RequestPeers::new()).await
     }
 
     pub async fn send<T>(&self, body: T) -> Result<()>
