@@ -41,8 +41,11 @@ pub enum Error {
     #[error("Failed to receive message")]
     Recv(#[from] RecvError),
 
-    #[error("Timeout error: {0}")]
-    Timeout(#[from] Elapsed),
+    #[error("Connection timeout: {0}")]
+    ConnectionTimeout(Elapsed),
+
+    #[error("Handshake timeout: {0}")]
+    HandshakeTimeout(Elapsed),
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),

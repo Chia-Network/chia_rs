@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use chia_client::{create_tls_connector, Client, ClientOptions, Event, Network};
+use chia_client::{create_tls_connector, Client, ClientOptions, Network};
 use chia_protocol::NodeType;
 use chia_ssl::ChiaCertificate;
 use tokio::time::sleep;
@@ -35,34 +35,23 @@ async fn main() -> anyhow::Result<()> {
     );
 
     log::info!("Connecting to DNS introducers");
-    client.find_peers(true).await;
 
-    let client_clone = client.clone();
-
+    let client2 = client.clone();
     tokio::spawn(async move {
         loop {
-            sleep(Duration::from_secs(10)).await;
-            let count = client_clone.len().await;
-            log::info!("Currently connected to {} peers", count);
-            // client_clone.find_peers(true).await;
+            client2.find_peers(true).await;
+            sleep(Duration::from_secs(5)).await;
         }
     });
 
-    while let Some(event) = receiver.recv().await {
-        let Event::Message(peer_id, message) = event else {
-            continue;
-        };
+    tokio::spawn(async move {
+        loop {
+            sleep(Duration::from_secs(5)).await;
+            log::info!("Currently connected to {} peers", client.len().await);
+        }
+    });
 
-        let Some(peer) = client.peer(peer_id).await else {
-            continue;
-        };
-
-        log::info!(
-            "Received message from peer {}: {:?}",
-            peer.ip_addr(),
-            message.msg_type
-        );
-    }
+    while let Some(_event) = receiver.recv().await {}
 
     Ok(())
 }

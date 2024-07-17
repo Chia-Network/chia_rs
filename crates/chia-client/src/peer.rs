@@ -193,7 +193,8 @@ async fn handle_inbound_messages(
     requests: Arc<RequestMap>,
 ) -> Result<()> {
     while let Some(message) = stream.next().await {
-        let message = Message::from_bytes(&message?.into_data())?;
+        let message = message?;
+        let message = Message::from_bytes(&message.into_data())?;
 
         let Some(id) = message.id else {
             sender.send(message).await.map_err(|error| {
