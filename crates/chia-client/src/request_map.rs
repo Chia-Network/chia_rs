@@ -44,6 +44,7 @@ impl RequestMap {
         for i in 0..=u16::MAX {
             if !items.contains_key(&i) {
                 index = Some(i);
+                break;
             }
         }
 
