@@ -16,7 +16,7 @@ use native_tls::TlsConnector;
 use rand::{seq::SliceRandom, thread_rng};
 use semver::Version;
 use tokio::{
-    sync::{mpsc, Mutex, RwLock, RwLockWriteGuard},
+    sync::{mpsc, Mutex, RwLock, RwLockWriteGuard, Semaphore},
     time::timeout,
 };
 
@@ -53,6 +53,9 @@ pub struct ClientOptions {
     /// This defaults to `5`.
     pub target_peers: usize,
 
+    /// The maximum number of concurrent connections that can be initiated at once.
+    pub connection_concurrency: usize,
+
     /// How long to wait when trying to connect to a peer.
     pub connection_timeout: Duration,
 
@@ -63,40 +66,17 @@ pub struct ClientOptions {
     pub request_peers_timeout: Duration,
 }
 
-impl Default for ClientOptions {
-    fn default() -> Self {
-        Self {
-            network: Network::mainnet(),
-            node_type: NodeType::Wallet,
-            capabilities: vec![
-                (1, "1".to_string()),
-                (2, "1".to_string()),
-                (3, "1".to_string()),
-            ],
-            protocol_version: Version::parse("0.0.37").expect("invalid version"),
-            software_version: "0.0.0".to_string(),
-            target_peers: 5,
-            connection_timeout: Duration::from_secs(3),
-            handshake_timeout: Duration::from_secs(1),
-            request_peers_timeout: Duration::from_secs(3),
-        }
-    }
-}
-
 #[derive(Debug)]
 struct ClientInner {
     peers: Arc<RwLock<HashMap<PeerId, Peer>>>,
     message_sender: Arc<Mutex<mpsc::Sender<Event>>>,
     options: ClientOptions,
     tls_connector: TlsConnector,
+    connection_lock: Semaphore,
 }
 
 impl Client {
-    pub fn new(tls_connector: TlsConnector) -> (Self, mpsc::Receiver<Event>) {
-        Self::with_options(tls_connector, ClientOptions::default())
-    }
-
-    pub fn with_options(
+    pub fn new(
         tls_connector: TlsConnector,
         options: ClientOptions,
     ) -> (Self, mpsc::Receiver<Event>) {
@@ -107,6 +87,7 @@ impl Client {
             message_sender: Arc::new(Mutex::new(sender)),
             options,
             tls_connector,
+            connection_lock: Semaphore::new(1),
         }));
 
         (client, receiver)
@@ -140,13 +121,13 @@ impl Client {
         self.0.peers.write().await.clear();
     }
 
-    pub async fn find_peers(&self) {
+    pub async fn find_peers(&self, prefer_introducers: bool) {
+        let mut peers = self.0.peers.write().await;
+
         // If we don't have any peers, try to connect to DNS introducers.
-        if self.len().await == 0 && self.connect_dns().await {
+        if (peers.is_empty() || prefer_introducers) && self.connect_dns(&mut peers).await {
             return;
         }
-
-        let mut peers = self.0.peers.write().await;
 
         // If we still don't have any peers, we can't do anything.
         if peers.len() >= self.0.options.target_peers {
@@ -170,12 +151,12 @@ impl Client {
             )
             .await
             else {
-                log::info!("Failed to request peers from peer {peer_id}");
+                log::info!("Failed to request peers from {}", peer.ip_addr());
                 peers.remove(&peer_id);
                 continue;
             };
 
-            log::info!("Requested peers from peer {peer_id}");
+            log::info!("Requested peers from {}", peer.ip_addr());
 
             let mut ips = HashSet::new();
 
@@ -194,8 +175,8 @@ impl Client {
             let mut iter = ips.into_iter();
 
             loop {
-                let required_peers = self.0.options.target_peers - peers.len();
-                let next_peers: Vec<_> = iter.by_ref().take(required_peers).collect();
+                let max_peers = self.0.options.connection_concurrency - peers.len();
+                let next_peers: Vec<_> = iter.by_ref().take(max_peers).collect();
                 if next_peers.is_empty() {
                     break;
                 }
@@ -204,11 +185,8 @@ impl Client {
         }
     }
 
-    async fn connect_dns(&self) -> bool {
+    async fn connect_dns(&self, peers: &mut RwLockWriteGuard<'_, HashMap<PeerId, Peer>>) -> bool {
         log::info!("Requesting peers from DNS introducer");
-
-        // Lock the peer map early to prevent adding too many connections.
-        let mut peers = self.0.peers.write().await;
 
         let mut ips = Vec::new();
 
@@ -234,17 +212,17 @@ impl Client {
                 break;
             }
 
-            // Calculate how many peers we still need to connect to.
-            let required_peers = self.0.options.target_peers - peers.len();
-
-            // Get the remaining peers we can and need to connect to.
-            let peers_to_try = &ips[cursor..ips.len().min(cursor + required_peers)];
+            // Get the remaining peers we can connect to, up to the concurrency limit.
+            let peers_to_try = &ips[cursor
+                ..ips
+                    .len()
+                    .min(cursor + self.0.options.connection_concurrency)];
 
             // Increment the cursor by the number of peers we're trying to connect to.
-            cursor += required_peers;
+            cursor += peers_to_try.len();
 
             self.connect_peers(
-                &mut peers,
+                peers,
                 peers_to_try
                     .iter()
                     .map(|ip| (*ip, self.0.options.network.default_port))
@@ -270,18 +248,34 @@ impl Client {
         let mut connections = FuturesUnordered::new();
 
         for (ip, port) in ips {
-            connections.push(self.connect_peer(ip, port));
+            connections.push(async move {
+                self.connect_peer(ip, port)
+                    .await
+                    .map_err(|error| (ip, port, error))
+            });
         }
 
         while let Some(result) = connections.next().await {
-            let (ip, peer, mut receiver) = match result {
+            if peers.len() >= self.0.options.target_peers {
+                break;
+            }
+
+            let (peer, mut receiver) = match result {
                 Ok(result) => result,
-                Err(error) => {
-                    log::debug!("Failed to connect to peer: {error}");
+                Err((ip, port, error)) => {
+                    log::debug!(
+                        "{error} for peer {}",
+                        if ip.is_ipv4() {
+                            format!("{ip}:{port}")
+                        } else {
+                            format!("[{ip}]:{port}")
+                        }
+                    );
                     continue;
                 }
             };
 
+            let ip = peer.ip_addr();
             let peer_id = peer.peer_id();
             peers.insert(peer_id, peer);
 
@@ -321,11 +315,9 @@ impl Client {
 
     /// Does not lock the peer map or add the peer automatically.
     /// This prevents deadlocks when called from within a lock.
-    async fn connect_peer(
-        &self,
-        ip: IpAddr,
-        port: u16,
-    ) -> Result<(IpAddr, Peer, mpsc::Receiver<Message>)> {
+    async fn connect_peer(&self, ip: IpAddr, port: u16) -> Result<(Peer, mpsc::Receiver<Message>)> {
+        log::debug!("Connecting to peer {ip}");
+
         let (peer, mut receiver) = timeout(
             self.0.options.connection_timeout,
             Peer::connect(ip, port, self.0.tls_connector.clone()),
@@ -354,6 +346,10 @@ impl Client {
 
         let handshake = Handshake::from_bytes(&message.data)?;
 
+        if handshake.network_id != options.network.network_id {
+            return Err(Error::WrongNetworkId(handshake.network_id));
+        }
+
         let Ok(protocol_version) = Version::parse(&handshake.protocol_version) else {
             return Err(Error::InvalidProtocolVersion(handshake.protocol_version));
         };
@@ -365,6 +361,6 @@ impl Client {
             ));
         }
 
-        Ok((ip, peer, receiver))
+        Ok((peer, receiver))
     }
 }

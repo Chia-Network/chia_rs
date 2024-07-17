@@ -1,6 +1,7 @@
 use std::time::Duration;
 
-use chia_client::{create_tls_connector, Client, ClientOptions, Event};
+use chia_client::{create_tls_connector, Client, ClientOptions, Event, Network};
+use chia_protocol::NodeType;
 use chia_ssl::ChiaCertificate;
 use tokio::time::sleep;
 
@@ -13,16 +14,28 @@ async fn main() -> anyhow::Result<()> {
     let tls_connector = create_tls_connector(cert.cert_pem.as_bytes(), cert.key_pem.as_bytes())?;
 
     log::info!("Creating client");
-    let (client, mut receiver) = Client::with_options(
+    let (client, mut receiver) = Client::new(
         tls_connector,
         ClientOptions {
+            network: Network::testnet11(),
             target_peers: 20,
-            ..Default::default()
+            connection_concurrency: 10,
+            node_type: NodeType::Wallet,
+            capabilities: vec![
+                (1, "1".to_string()),
+                (2, "1".to_string()),
+                (3, "1".to_string()),
+            ],
+            protocol_version: "0.0.34".parse()?,
+            software_version: "0.0.0".to_string(),
+            connection_timeout: Duration::from_secs(3),
+            handshake_timeout: Duration::from_secs(2),
+            request_peers_timeout: Duration::from_secs(3),
         },
     );
 
     log::info!("Connecting to DNS introducers");
-    client.find_peers().await;
+    client.find_peers(true).await;
 
     let client_clone = client.clone();
 
@@ -31,23 +44,24 @@ async fn main() -> anyhow::Result<()> {
             sleep(Duration::from_secs(10)).await;
             let count = client_clone.len().await;
             log::info!("Currently connected to {} peers", count);
-            client.find_peers().await;
+            // client_clone.find_peers(true).await;
         }
     });
 
     while let Some(event) = receiver.recv().await {
-        match event {
-            Event::Message(peer_id, message) => {
-                log::info!(
-                    "Received message from peer {}: {:?}",
-                    peer_id,
-                    message.msg_type
-                );
-            }
-            Event::ConnectionClosed(peer_id) => {
-                log::info!("Peer {} disconnected", peer_id);
-            }
-        }
+        let Event::Message(peer_id, message) = event else {
+            continue;
+        };
+
+        let Some(peer) = client.peer(peer_id).await else {
+            continue;
+        };
+
+        log::info!(
+            "Received message from peer {}: {:?}",
+            peer.ip_addr(),
+            message.msg_type
+        );
     }
 
     Ok(())

@@ -14,6 +14,9 @@ pub enum Error {
     #[error("Invalid protocol version {0}")]
     InvalidProtocolVersion(String),
 
+    #[error("Wrong network id {0}")]
+    WrongNetworkId(String),
+
     #[error("Outdated protocol version {0}, expected {1}")]
     OutdatedProtocolVersion(Version, Version),
 
