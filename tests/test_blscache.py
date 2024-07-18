@@ -1,4 +1,4 @@
-from chia_rs import G1Element, PrivateKey, AugSchemeMPL, G2Element, BLSCache, validate_clvm_and_signature
+from chia_rs import G1Element, GTElement, PrivateKey, AugSchemeMPL, G2Element, BLSCache, validate_clvm_and_signature
 from typing import List
 from chia.consensus.default_constants import DEFAULT_CONSTANTS
 from chia.types.spend_bundle import SpendBundle
@@ -132,12 +132,12 @@ def test_cached_bls_flattening():
     assert cached_bls.aggregate_verify(pks, [b"foobar"] * n_keys, aggsig)
     assert len(cached_bls.items()) == n_keys
     gts = [
-        bytes(pk.pair(AugSchemeMPL.g2_from_message(bytes(pk) + b"foobar")))
+        pk.pair(AugSchemeMPL.g2_from_message(bytes(pk) + b"foobar"))
         for pk in pks
     ]
     for key, value in cached_bls.items():
         assert isinstance(key, bytes)
-        assert isinstance(value, bytes)
+        assert isinstance(value, GTElement)
         assert value in gts
         gts.remove(value)
 
@@ -146,12 +146,12 @@ def test_cached_bls_flattening():
 
     assert len(cache_copy.items()) == n_keys
     gts = [
-        bytes(pk.pair(AugSchemeMPL.g2_from_message(bytes(pk) + b"foobar")))
+        pk.pair(AugSchemeMPL.g2_from_message(bytes(pk) + b"foobar"))
         for pk in pks
     ]
     for key, value in cache_copy.items():
         assert isinstance(key, bytes)
-        assert isinstance(value, bytes)
+        assert isinstance(value, GTElement)
         assert value in gts
         gts.remove(value)
 
