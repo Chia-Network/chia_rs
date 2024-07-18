@@ -377,7 +377,7 @@ pub fn py_validate_clvm_and_signature(
     constants: &ConsensusConstants,
     peak_height: u32,
     cache: Option<BlsCache>,
-) -> PyResult<(OwnedSpendBundleConditions, Vec<([u8; 32], Vec<u8>)>, f32)> {
+) -> PyResult<(OwnedSpendBundleConditions, Vec<([u8; 32], GTElement)>, f32)> {
     let real_cache = if let Some(unwrapped_cache) = cache {
         unwrapped_cache
     } else {

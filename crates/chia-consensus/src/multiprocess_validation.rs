@@ -11,7 +11,7 @@ use crate::gen::opcodes::{
 use crate::gen::owned_conditions::OwnedSpendBundleConditions;
 use crate::gen::validation_error::ErrorCode;
 use crate::npc_result::get_name_puzzle_conditions;
-use chia_bls::BlsCache;
+use chia_bls::{BlsCache, GTElement};
 use chia_protocol::SpendBundle;
 use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV};
 use std::sync::{Arc, Mutex};
@@ -48,7 +48,7 @@ pub fn validate_clvm_and_signature(
 ) -> Result<
     (
         OwnedSpendBundleConditions,
-        Vec<([u8; 32], Vec<u8>)>,
+        Vec<([u8; 32], GTElement)>,
         Duration,
     ),
     ErrorCode,

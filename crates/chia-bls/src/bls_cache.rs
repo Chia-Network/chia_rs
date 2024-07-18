@@ -42,7 +42,7 @@ impl BlsCache {
         self.cache.is_empty()
     }
 
-    pub fn update(&mut self, new_items: Vec<([u8; 32], GTElement)>) {
+    pub fn update(&mut self, new_items: impl IntoIterator<Item=([u8; 32], GTElement)>) {
         for (key, value) in new_items {
             self.cache.put(key, value);
         }
@@ -52,8 +52,8 @@ impl BlsCache {
         &mut self,
         pks_msgs: impl IntoIterator<Item = (Pk, Msg)>,
         sig: &Signature,
-    ) -> (bool, Vec<([u8; 32], Vec<u8>)>) {
-        let mut added: Vec<([u8; 32], Vec<u8>)> = Vec::new();
+    ) -> (bool, Vec<([u8; 32], GTElement)>) {
+        let mut added: Vec<([u8; 32], GTElement)> = Vec::new();
         let iter = pks_msgs.into_iter().map(|(pk, msg)| -> GTElement {
             // Hash pubkey + message
             let mut hasher = Sha256::new();
@@ -77,7 +77,7 @@ impl BlsCache {
 
             let pairing = aug_hash.pair(pk.borrow());
             self.cache.put(hash, pairing.clone());
-            added.push((hash, pairing.to_bytes().to_vec()));
+            added.push((hash, pairing.clone()));
             pairing
         });
 
@@ -117,7 +117,7 @@ impl BlsCache {
         pks: &Bound<'_, PyList>,
         msgs: &Bound<'_, PyList>,
         sig: &Signature,
-    ) -> PyResult<(bool, Vec<([u8; 32], Vec<u8>)>)> {
+    ) -> PyResult<(bool, Vec<([u8; 32], GTElement)>)> {
         let pks = pks
             .iter()?
             .map(|item| item?.extract())
@@ -153,15 +153,11 @@ impl BlsCache {
     #[pyo3(name = "update")]
     pub fn py_update(&mut self, other: &Bound<'_, PyList>) -> PyResult<()> {
         for item in other.borrow().iter()? {
-            let (key, value): (Vec<u8>, Vec<u8>) = item?.extract()?;
+            let (key, value): (Vec<u8>, GTElement) = item?.extract()?;
             self.cache.put(
                 key.try_into()
                     .map_err(|_| PyValueError::new_err("invalid key"))?,
-                GTElement::from_bytes(
-                    (&value[..])
-                        .try_into()
-                        .map_err(|_| PyValueError::new_err("invalid GTElement"))?,
-                ),
+                value,
             );
         }
         Ok(())
