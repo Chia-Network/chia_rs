@@ -307,12 +307,20 @@ def confirm_not_included_already_hashed(
 ) -> bool: ...
 
 def validate_clvm_and_signature(
-    new_spend: &SpendBundle,
-    max_cost: u64,
-    constants: &ConsensusConstants,
-    peak_height: u32,
-    cache: BlsCache,
+    new_spend: SpendBundle,
+    max_cost: int,
+    constants: ConsensusConstants,
+    peak_height: int,
+    cache: Option[BLSCache],
 ) -> Tuple[SpendBundleConditions, List[Tuple[SpendBundleConditions, List[Tuple[Bytes32, GTElement]]]], float]: ...
+
+def get_name_puzzle_conditions(
+    spend_bundle: SpendBundle,
+    max_cost: int,
+    constants: ConsensusConstants,
+    mempool_mode: bool,
+    height: int,
+) -> SpendBundleConditions: ...
 
 COND_ARGS_NIL: int = ...
 NO_UNKNOWN_CONDS: int = ...
