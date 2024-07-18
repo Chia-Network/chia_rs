@@ -1,4 +1,4 @@
-use std::{fmt, net::IpAddr, sync::Arc};
+use std::{fmt, net::SocketAddr, sync::Arc};
 
 use chia_protocol::{
     Bytes32, ChiaProtocolMessage, CoinStateFilters, Message, PuzzleSolutionResponse,
@@ -47,21 +47,15 @@ struct PeerInner {
     inbound_handle: JoinHandle<()>,
     requests: Arc<RequestMap>,
     peer_id: PeerId,
-    ip_addr: IpAddr,
+    socket_addr: SocketAddr,
 }
 
 impl Peer {
     pub async fn connect(
-        ip: IpAddr,
-        port: u16,
+        socket_addr: SocketAddr,
         tls_connector: TlsConnector,
     ) -> Result<(Self, mpsc::Receiver<Message>)> {
-        let uri = if ip.is_ipv4() {
-            format!("wss://{ip}:{port}/ws")
-        } else {
-            format!("wss://[{ip}]:{port}/ws")
-        };
-        Self::connect_addr(&uri, tls_connector).await
+        Self::connect_addr(&format!("wss://{socket_addr}/ws"), tls_connector).await
     }
 
     pub async fn connect_addr(
@@ -79,7 +73,7 @@ impl Peer {
     }
 
     pub fn from_websocket(ws: WebSocket) -> Result<(Self, mpsc::Receiver<Message>)> {
-        let (addr, cert) = match ws.get_ref() {
+        let (socket_addr, cert) = match ws.get_ref() {
             MaybeTlsStream::NativeTls(tls) => {
                 let tls_stream = tls.get_ref();
                 let tcp_stream = tls_stream.get_ref().get_ref();
@@ -113,7 +107,7 @@ impl Peer {
             inbound_handle,
             requests,
             peer_id,
-            ip_addr: addr.ip(),
+            socket_addr,
         }));
 
         Ok((peer, receiver))
@@ -123,8 +117,8 @@ impl Peer {
         self.0.peer_id
     }
 
-    pub fn ip_addr(&self) -> IpAddr {
-        self.0.ip_addr
+    pub fn socket_addr(&self) -> SocketAddr {
+        self.0.socket_addr
     }
 
     pub async fn send_transaction(&self, spend_bundle: SpendBundle) -> Result<TransactionAck> {

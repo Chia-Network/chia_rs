@@ -1,7 +1,11 @@
 use chia_protocol::ProtocolMessageTypes;
 use semver::Version;
 use thiserror::Error;
-use tokio::{sync::oneshot::error::RecvError, time::error::Elapsed};
+use tokio::sync::mpsc::error::SendError;
+use tokio::sync::oneshot::error::RecvError;
+use tokio::time::error::Elapsed;
+
+use crate::Event;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -37,6 +41,9 @@ pub enum Error {
 
     #[error("Failed to send event")]
     EventNotSent,
+
+    #[error("Failed to send message")]
+    Send(#[from] SendError<Event>),
 
     #[error("Failed to receive message")]
     Recv(#[from] RecvError),

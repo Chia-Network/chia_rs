@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{net::SocketAddr, time::Duration};
 
 use chia_client::{create_tls_connector, Peer};
 use chia_protocol::{Handshake, NodeType, ProtocolMessageTypes};
@@ -15,8 +15,11 @@ async fn main() -> anyhow::Result<()> {
     let tls = create_tls_connector(cert.cert_pem.as_bytes(), cert.key_pem.as_bytes())?;
 
     for ip in lookup_host("dns-introducer.chia.net")? {
-        let Ok(response) =
-            timeout(Duration::from_secs(3), Peer::connect(ip, 8444, tls.clone())).await
+        let Ok(response) = timeout(
+            Duration::from_secs(3),
+            Peer::connect(SocketAddr::new(ip, 8444), tls.clone()),
+        )
+        .await
         else {
             log::info!("{ip} exceeded connection timeout of 3 seconds");
             continue;

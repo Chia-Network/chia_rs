@@ -1,4 +1,4 @@
-use std::env;
+use std::{env, net::SocketAddr};
 
 use chia_client::{create_tls_connector, Peer};
 use chia_protocol::{Handshake, NodeType};
@@ -9,8 +9,11 @@ use chia_traits::Streamable;
 async fn main() -> anyhow::Result<()> {
     let ssl = ChiaCertificate::generate()?;
     let tls_connector = create_tls_connector(ssl.cert_pem.as_bytes(), ssl.key_pem.as_bytes())?;
-    let (peer, mut receiver) =
-        Peer::connect(env::var("PEER")?.parse()?, 58444, tls_connector).await?;
+    let (peer, mut receiver) = Peer::connect(
+        SocketAddr::new(env::var("PEER")?.parse()?, 58444),
+        tls_connector,
+    )
+    .await?;
 
     peer.send(Handshake {
         network_id: "testnet11".to_string(),
