@@ -1,10 +1,7 @@
-from chia_rs import G1Element, GTElement, PrivateKey, AugSchemeMPL, G2Element, BLSCache, validate_clvm_and_signature
+from chia_rs import SpendBundle, CoinSpend, Program, ConsensusConstants, G1Element, GTElement, PrivateKey, AugSchemeMPL, G2Element, BLSCache, validate_clvm_and_signature
 from typing import List
 from chia.consensus.default_constants import DEFAULT_CONSTANTS
-from chia.types.spend_bundle import SpendBundle
 from chia.types.blockchain_format.coin import Coin
-from chia.types.blockchain_format.program import Program
-from chia.types.coin_spend import CoinSpend
 from chia.util.hash import std_hash
 from chia.util.lru_cache import LRUCache
 from chia.util import cached_bls as cached_bls_old
@@ -237,7 +234,6 @@ def test_validate_clvm_and_sig():
     )
     
     new_spend = SpendBundle(coin_spends, sig)
-
     (sbc, additions, duration) = validate_clvm_and_signature(
         new_spend,
         DEFAULT_CONSTANTS.MAX_BLOCK_COST_CLVM,
