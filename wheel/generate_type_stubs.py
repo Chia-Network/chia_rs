@@ -379,6 +379,7 @@ class MerkleSet:
             "SIZE: ClassVar[int] = ...",
             "def __new__(cls) -> G1Element: ...",
             "def get_fingerprint(self) -> int: ...",
+            "def verify(self, signature: G2Element, msg: bytes) -> bool: ...",
             "def pair(self, other: G2Element) -> GTElement: ...",
             "@staticmethod",
             "def generator() -> G1Element: ...",
@@ -420,7 +421,7 @@ class MerkleSet:
         [],
         [
             "PRIVATE_KEY_SIZE: ClassVar[int] = ...",
-            "def sign_g2(self, msg: bytes, dst: bytes) -> G2Element: ...",
+            "def sign(self, msg: bytes, final_pk: Optional[G1Element] = None) -> G2Element: ...",
             "def get_g1(self) -> G1Element: ...",
             "def __str__(self) -> str: ...",
             "def public_key(self) -> G1Element: ...",
