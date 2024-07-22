@@ -1,12 +1,14 @@
 from pathlib import Path
-from typing import Any, List, Optional, Tuple
+from typing import List, Optional, Tuple, TextIO
 from glob import glob
 
-output_file = Path(__file__).parent.resolve() / "chia_rs.pyi"
-input_dir = Path(__file__).parent.parent.resolve() / "crates" / "chia-protocol" / "src"
+output_file = Path(__file__).parent.resolve() / "python" / "chia_rs" / "chia_rs.pyi"
+crates_dir = Path(__file__).parent.parent.resolve() / "crates"
+input_dir = crates_dir / "chia-protocol" / "src"
 
 # enums are exposed to python as int
-enums = set(["NodeType", "ProtocolMessageTypes"])
+enums = set(["NodeType", "ProtocolMessageTypes", "RejectStateReason"])
+
 
 def transform_type(m: str) -> str:
     n, t = m.split(":")
@@ -19,28 +21,32 @@ def transform_type(m: str) -> str:
     return f"{n}:{t}"
 
 
-def print_class(f: Any, name: str, members: List[str], extra: Optional[List[str]] = None):
+def print_class(
+    file: TextIO, name: str, members: List[str], extra: Optional[List[str]] = None
+):
 
     # f-strings don't allow backslashes, which makes it a bit tricky to
     # manipulate strings with newlines
     nl = "\n"
-    def add_indent(x):
-        return '\n    ' + x
 
-    init_args = ''.join([(',\n        ' + transform_type(x)) for x in members])
+    def add_indent(x: str):
+        return "\n    " + x
+
+    init_args = "".join([(",\n        " + transform_type(x)) for x in members])
 
     all_replace_parameters = []
     for m in members:
-        replace_param_name, replace_type = m.split(':')
-        all_replace_parameters.append(f"{replace_param_name}: Union[{replace_type}, _Unspec] = _Unspec()")
+        replace_param_name, replace_type = m.split(":")
+        all_replace_parameters.append(
+            f"{replace_param_name}: Union[{replace_type}, _Unspec] = _Unspec()"
+        )
 
     if extra is not None:
         members.extend(extra)
-    members = ''.join(map(add_indent, members));
 
-    f.write(
+    file.write(
         f"""
-class {name}:{members}
+class {name}:{"".join(map(add_indent, members))}
     def __init__(
         self{init_args}
     ) -> None: ...
@@ -59,26 +65,30 @@ class {name}:{members}
     def __bytes__(self) -> bytes: ...
     def stream_to_bytes(self) -> bytes: ...
     def get_hash(self) -> bytes32: ...
-    def to_json_dict(self) -> Dict[str, Any]: ...
+    def to_json_dict(self) -> Any: ...
     @staticmethod
-    def from_json_dict(json_dict: Dict[str, Any]) -> {name}: ...
+    def from_json_dict(json_dict: Any) -> {name}: ...
 """
     )
 
     if len(all_replace_parameters) > 0:
         indent = ",\n        "
-        f.write(
+        file.write(
             f"""    def replace(self, *, {indent.join(all_replace_parameters)}) -> {name}: ...
-""")
+"""
+        )
 
 
 def rust_type_to_python(t: str) -> str:
     ret = (
         t.replace("<", "[")
         .replace(">", "]")
+        .replace("(", "Tuple[")
+        .replace(")", "]")
         .replace("Vec", "List")
         .replace("Option", "Optional")
         .replace("Bytes", "bytes")
+        .replace("String", "str")
         .replace("u8", "uint8")
         .replace("u16", "uint16")
         .replace("u32", "uint32")
@@ -96,8 +106,8 @@ def rust_type_to_python(t: str) -> str:
     return ret
 
 
-def parse_rust_source(filename: str) -> List[Tuple[str, List[str]]]:
-    ret: List[Tuple[str], List[str]] = []
+def parse_rust_source(filename: str, upper_case: bool) -> List[Tuple[str, List[str]]]:
+    ret: List[Tuple[str, List[str]]] = []
     in_struct: Optional[str] = None
     members: List[str] = []
     with open(filename) as f:
@@ -129,16 +139,16 @@ def parse_rust_source(filename: str) -> List[Tuple[str, List[str]]]:
                 continue
 
             # a field
-            if ":" in line:
+            if ":" in line and "///" not in line:
                 name, rust_type = line.split("//")[0].strip().split(":")
                 # members are separated by , in rust. Strip that off
                 try:
-                    rust_type, line = rust_type.rsplit(",",1)
+                    rust_type, line = rust_type.rsplit(",", 1)
                 except:
-                    rust_type, line = rust_type.rsplit("}",1)
+                    rust_type, line = rust_type.rsplit("}", 1)
                     line = "}" + line
                 py_type = rust_type_to_python(rust_type)
-                members.append(f"{name}: {py_type}")
+                members.append(f"{name.upper() if upper_case else name}: {py_type}")
 
             # did we reach the end?
             if "}" in line:
@@ -146,7 +156,6 @@ def parse_rust_source(filename: str) -> List[Tuple[str, List[str]]]:
                 members = []
                 in_struct = None
                 continue
-
 
     assert in_struct is None
     return ret
@@ -180,7 +189,6 @@ extra_members = {
     "HeaderBlock": [
         "prev_header_hash: bytes32",
         "prev_hash: bytes32",
-        "header_hash: bytes32",
         "height: uint32",
         "weight: uint128",
         "header_hash: bytes32",
@@ -188,6 +196,11 @@ extra_members = {
         "log_string: str",
         "is_transaction_block: bool",
         "first_in_sub_slot: bool",
+    ],
+    "UnfinishedHeaderBlock": [
+        "prev_header_hash: bytes32",
+        "header_hash: bytes32",
+        "total_iters: uint128",
     ],
     "RewardChainBlock": [
         "def get_unfinished(self) -> RewardChainBlockUnfinished: ...",
@@ -213,7 +226,6 @@ extra_members = {
         "def name(self) -> bytes32: ...",
         "def removals(self) -> List[Coin]: ...",
         "def additions(self) -> List[Coin]: ...",
-        "def debug(self) -> None: ...",
     ],
     "BlockRecord": [
         "is_transaction_block: bool",
@@ -228,23 +240,29 @@ extra_members = {
 }
 
 classes = []
-for f in sorted(glob(str(input_dir / "*.rs"))):
-    if f.endswith("bytes.rs") or f.endswith("lazy_node.rs"):
+for filepath in sorted(glob(str(input_dir / "*.rs"))):
+    if filepath.endswith("bytes.rs") or filepath.endswith("lazy_node.rs"):
         continue
-    classes.extend(parse_rust_source(f))
+    classes.extend(parse_rust_source(filepath, upper_case=False))
 
-with open(output_file, "w") as f:
-    f.write(
+classes.extend(
+    parse_rust_source(
+        str(crates_dir / "chia-consensus" / "src" / "consensus_constants.rs"),
+        upper_case=True,
+    )
+)
+
+with open(output_file, "w") as file:
+    file.write(
         """
 #
 # this file is generated by generate_type_stubs.py
 #
 
-from typing import List, Optional, Sequence, Tuple
-from chia.types.blockchain_format.sized_bytes import bytes32
-from chia.util.ints import uint8, uint16, uint32, uint64, uint128, int8, int16, int32, int64, int128
+from typing import List, Optional, Sequence, Tuple, Union, Dict, Any, ClassVar
+from .sized_bytes import bytes32, bytes100
+from .sized_ints import uint8, uint16, uint32, uint64, uint128, int8, int16, int32, int64
 from chia.types.blockchain_format.program import Program as ChiaProgram
-from chia.consensus.constants import ConsensusConstants
 
 ReadableBuffer = Union[bytes, bytearray, memoryview]
 
@@ -260,25 +278,39 @@ def supports_fast_forward(spend: CoinSpend) -> bool : ...
 def fast_forward_singleton(spend: CoinSpend, new_coin: Coin, new_parent: Coin) -> bytes: ...
 
 def run_block_generator(
-    program: ReadableBuffer, args: List[ReadableBuffer], max_cost: int, flags: int
+    program: ReadableBuffer, args: List[ReadableBuffer], max_cost: int, flags: int, constants: ConsensusConstants
 ) -> Tuple[Optional[int], Optional[SpendBundleConditions]]: ...
 
 def run_block_generator2(
-    program: ReadableBuffer, args: List[ReadableBuffer], max_cost: int, flags: int
+    program: ReadableBuffer, args: List[ReadableBuffer], max_cost: int, flags: int, constants: ConsensusConstants
 ) -> Tuple[Optional[int], Optional[SpendBundleConditions]]: ...
 
 def run_puzzle(
-    puzzle: bytes, solution: bytes, parent_id: bytes32, amount: int, max_cost: int, flags: int
+    puzzle: bytes, solution: bytes, parent_id: bytes32, amount: int, max_cost: int, flags: int, constants: ConsensusConstants
 ) -> SpendBundleConditions: ...
 
-COND_ARGS_NIL: int = ...
+def deserialize_proof(
+    proof: bytes
+) -> MerkleSet: ...
+
+def confirm_included_already_hashed(
+    root: bytes32,
+    item: bytes32,
+    proof: bytes,
+) -> bool: ...
+
+def confirm_not_included_already_hashed(
+    root: bytes32,
+    item: bytes32,
+    proof: bytes,
+) -> bool: ...
+
 NO_UNKNOWN_CONDS: int = ...
 STRICT_ARGS_COUNT: int = ...
-AGG_SIG_ARGS: int = ...
 LIMIT_HEAP: int = ...
-ENABLE_SOFTFORK_CONDITION: int = ...
+ENABLE_MESSAGE_CONDITIONS: int = ...
+DISALLOW_INFINITY_G1: int = ...
 MEMPOOL_MODE: int = ...
-NO_RELATIVE_CONDITIONS_ON_EPHEMERAL: int = ...
 ENABLE_BLS_OPS: int = ...
 ENABLE_SECP_OPS: int = ...
 ENABLE_BLS_OPS_OUTSIDE_GUARD: int = ...
@@ -292,19 +324,26 @@ NO_UNKNOWN_OPS: int = ...
 
 def run_chia_program(
     program: bytes, args: bytes, max_cost: int, flags: int
-) -> Pair[int, LazyNode]: ...
+) -> Tuple[int, LazyNode]: ...
 
 class LazyNode:
-    def pair() -> Optional[Tuple[LazyNode, LazyNode]]: ...
-    def atom() -> bytes: ...
+    pair: Optional[Tuple[LazyNode, LazyNode]]
+    atom: Optional[bytes]
 
 def serialized_length(program: ReadableBuffer) -> int: ...
 def tree_hash(program: ReadableBuffer) -> bytes32: ...
 def get_puzzle_and_solution_for_coin(program: ReadableBuffer, args: ReadableBuffer, max_cost: int, find_parent: bytes32, find_amount: int, find_ph: bytes32, flags: int) -> Tuple[bytes, bytes]: ...
 
+class BLSCache:
+    def __init__(self, cache_size: Optional[int] = 50000) -> None: ...
+    def len(self) -> int: ...
+    def aggregate_verify(self, pks: List[G1Element], msgs: List[bytes], sig: G2Element) -> bool: ...
+    def items(self) -> List[Tuple[bytes, bytes]]: ...
+    def update(self, other: List[Tuple[bytes, bytes]]) -> None: ...
+
 class AugSchemeMPL:
     @staticmethod
-    def sign(pk: PrivateKey, msg: bytes, prepend_pk: G1Element = None) -> G2Element: ...
+    def sign(pk: PrivateKey, msg: bytes, prepend_pk: Optional[G1Element] = None) -> G2Element: ...
     @staticmethod
     def aggregate(sigs: Sequence[G2Element]) -> G2Element: ...
     @staticmethod
@@ -321,54 +360,81 @@ class AugSchemeMPL:
     def derive_child_sk_unhardened(pk: PrivateKey, index: int) -> PrivateKey: ...
     @staticmethod
     def derive_child_pk_unhardened(pk: G1Element, index: int) -> G1Element: ...
+
+class MerkleSet:
+    def get_root(self) -> bytes32: ...
+    def is_included_already_hashed(self, to_check: bytes) -> Tuple[bool, bytes]: ...
+    def __init__(
+        self,
+        leafs: List[bytes32],
+    ) -> None: ...
 """
     )
 
-    print_class(f, "G1Element", [], [
-        "SIZE: ClassVar[int] = ...",
-        "def __new__(cls) -> G1Element: ...",
-        "def get_fingerprint(self) -> int: ...",
-        "def pair(self, other: G2Element) -> GTElement: ...",
-        "@staticmethod",
-        "def from_bytes_unchecked(b: bytes) -> G1Element: ...",
-        "@staticmethod",
-        "def generator() -> G1Element: ...",
-        "def __str__(self) -> str: ...",
-        "def __repr__(self) -> str: ...",
-        "def __add__(self, other: G1Element) -> G1Element: ...",
-        "def __iadd__(self, other: G1Element) -> G1Element: ...",
-    ])
-    print_class(f, "G2Element", [], [
-        "SIZE: ClassVar[int] = ...",
-        "def __new__(cls) -> G2Element: ...",
-        "@staticmethod",
-        "def from_bytes_unchecked(b: bytes) -> G2Element: ...",
-        "def pair(self, other: G1Element) -> GTElement: ...",
-        "@staticmethod",
-        "def generator() -> G2Element: ...",
-        "def __str__(self) -> str: ...",
-        "def __repr__(self) -> str: ...",
-        "def __add__(self, other: G2Element) -> G2Element: ...",
-        "def __iadd__(self, other: G2Element) -> G2Element: ...",
-        ])
-    print_class(f, "GTElement", [], [
-        "SIZE: ClassVar[int] = ...",
-        "@staticmethod",
-        "def from_bytes_unchecked(b: bytes) -> GTElement: ...",
-        "def __str__(self) -> str: ...",
-        "def __repr__(self) -> str: ...",
-        "def __mul__(self, rhs: GTElement) -> GTElement: ...",
-        "def __imul__(self, rhs: GTElement) -> GTElement : ...",
-        ])
-    print_class(f, "PrivateKey", [], [
-        "PRIVATE_KEY_SIZE: ClassVar[int] = ...",
-        "def sign_g2(self, msg: bytes, dst: bytes) -> G2Element: ...",
-        "def get_g1(self) -> G1Element: ...",
-        "def __str__(self) -> str: ...",
-        "def __repr__(self) -> str: ...",
-        ])
+    print_class(
+        file,
+        "G1Element",
+        [],
+        [
+            "SIZE: ClassVar[int] = ...",
+            "def __new__(cls) -> G1Element: ...",
+            "def get_fingerprint(self) -> int: ...",
+            "def verify(self, signature: G2Element, msg: bytes) -> bool: ...",
+            "def pair(self, other: G2Element) -> GTElement: ...",
+            "@staticmethod",
+            "def generator() -> G1Element: ...",
+            "def __str__(self) -> str: ...",
+            "def __add__(self, other: G1Element) -> G1Element: ...",
+            "def __iadd__(self, other: G1Element) -> G1Element: ...",
+            "def derive_unhardened(self, int) -> G1Element: ...",
+        ],
+    )
+    print_class(
+        file,
+        "G2Element",
+        [],
+        [
+            "SIZE: ClassVar[int] = ...",
+            "def __new__(cls) -> G2Element: ...",
+            "def pair(self, other: G1Element) -> GTElement: ...",
+            "@staticmethod",
+            "def generator() -> G2Element: ...",
+            "def __str__(self) -> str: ...",
+            "def __add__(self, other: G2Element) -> G2Element: ...",
+            "def __iadd__(self, other: G2Element) -> G2Element: ...",
+        ],
+    )
+    print_class(
+        file,
+        "GTElement",
+        [],
+        [
+            "SIZE: ClassVar[int] = ...",
+            "def __str__(self) -> str: ...",
+            "def __mul__(self, rhs: GTElement) -> GTElement: ...",
+            "def __imul__(self, rhs: GTElement) -> GTElement : ...",
+        ],
+    )
+    print_class(
+        file,
+        "PrivateKey",
+        [],
+        [
+            "PRIVATE_KEY_SIZE: ClassVar[int] = ...",
+            "def sign(self, msg: bytes, final_pk: Optional[G1Element] = None) -> G2Element: ...",
+            "def get_g1(self) -> G1Element: ...",
+            "def __str__(self) -> str: ...",
+            "def public_key(self) -> G1Element: ...",
+            "def derive_hardened(self, int) -> PrivateKey: ...",
+            "def derive_unhardened(self, int) -> PrivateKey: ...",
+            "@staticmethod",
+            "def from_seed(bytes) -> PrivateKey: ...",
+        ],
+    )
 
-    print_class(f, "Spend",
+    print_class(
+        file,
+        "Spend",
         [
             "coin_id: bytes",
             "parent_id: bytes",
@@ -381,18 +447,20 @@ class AugSchemeMPL:
             "birth_height: Optional[int]",
             "birth_seconds: Optional[int]",
             "create_coin: List[Tuple[bytes, int, Optional[bytes]]]",
-            "agg_sig_me: List[Tuple[bytes, bytes]]",
-            "agg_sig_parent: List[Tuple[bytes, bytes]]",
-            "agg_sig_puzzle: List[Tuple[bytes, bytes]]",
-            "agg_sig_amount: List[Tuple[bytes, bytes]]",
-            "agg_sig_puzzle_amount: List[Tuple[bytes, bytes]]",
-            "agg_sig_parent_amount: List[Tuple[bytes, bytes]]",
-            "agg_sig_parent_puzzle: List[Tuple[bytes, bytes]]",
+            "agg_sig_me: List[Tuple[G1Element, bytes]]",
+            "agg_sig_parent: List[Tuple[G1Element, bytes]]",
+            "agg_sig_puzzle: List[Tuple[G1Element, bytes]]",
+            "agg_sig_amount: List[Tuple[G1Element, bytes]]",
+            "agg_sig_puzzle_amount: List[Tuple[G1Element, bytes]]",
+            "agg_sig_parent_amount: List[Tuple[G1Element, bytes]]",
+            "agg_sig_parent_puzzle: List[Tuple[G1Element, bytes]]",
             "flags: int",
         ],
     )
 
-    print_class(f, "SpendBundleConditions",
+    print_class(
+        file,
+        "SpendBundleConditions",
         [
             "spends: List[Spend]",
             "reserve_fee: int",
@@ -400,12 +468,12 @@ class AugSchemeMPL:
             "seconds_absolute: int",
             "before_height_absolute: Optional[int]",
             "before_seconds_absolute: Optional[int]",
-            "agg_sig_unsafe: List[Tuple[bytes, bytes]]",
+            "agg_sig_unsafe: List[Tuple[G1Element, bytes]]",
             "cost: int",
             "removal_amount: int",
             "addition_amount: int",
         ],
     )
 
-    for c in classes:
-        print_class(f, c[0], c[1], extra_members.get(c[0]))
+    for item in classes:
+        print_class(file, item[0], item[1], extra_members.get(item[0]))

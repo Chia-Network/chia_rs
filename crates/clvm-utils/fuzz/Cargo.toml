@@ -1,6 +1,6 @@
 [package]
 name = "clvm-utils-fuzz"
-version = "0.4.0"
+version = "0.10.0"
 authors = ["Automatically generated"]
 publish = false
 edition = "2021"
@@ -8,13 +8,15 @@ edition = "2021"
 [package.metadata]
 cargo-fuzz = true
 
+[lints]
+workspace = true
+
 [dependencies]
-libfuzzer-sys = "0.4"
-clvmr = "=0.6.0"
-chia-fuzz = { path = "../../chia-consensus/fuzz" }
-clvm-utils = { path = ".." }
-clvm-traits = { path = "../../clvm-traits" }
-chia-consensus = { path = "../../chia-consensus" }
+libfuzzer-sys = { workspace = true }
+clvmr ={ workspace = true }
+chia-fuzz = { workspace = true }
+clvm-utils = { workspace = true }
+clvm-traits = { workspace = true }
 
 [[bin]]
 name = "tree-hash"

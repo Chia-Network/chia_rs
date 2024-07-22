@@ -1,4 +1,3 @@
-use rcgen::RcgenError;
 use time::error::ComponentRange;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -12,7 +11,7 @@ pub enum Error {
     Pkcs8(#[from] rsa::pkcs8::Error),
 
     #[error("{0}")]
-    CertGen(#[from] RcgenError),
+    CertGen(#[from] rcgen::Error),
 
     #[error("{0}")]
     DateRange(#[from] ComponentRange),

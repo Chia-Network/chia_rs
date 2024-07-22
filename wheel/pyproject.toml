@@ -5,3 +5,4 @@ build-backend = "maturin"
 [tool.maturin]
 bindings = "pyo3"
 features = ["pyo3/extension-module"]
+python-source = "python"

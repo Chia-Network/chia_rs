@@ -1,11 +1,11 @@
-use chia_streamable_macro::Streamable;
+use chia_streamable_macro::streamable;
 
 use crate::coin::Coin;
 use crate::program::Program;
-use crate::streamable_struct;
 
-streamable_struct!(CoinSpend {
+#[streamable]
+pub struct CoinSpend {
     coin: Coin,
     puzzle_reveal: Program,
     solution: Program,
-});
+}

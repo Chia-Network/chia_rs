@@ -24,13 +24,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
       - name: Set up QEMU on x86_64
         id: qemu
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
         with:
           platforms: riscv64
 
@@ -63,13 +63,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
       - name: Set up QEMU on x86_64
         id: qemu
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
         with:
           platforms: riscv64
 
@@ -88,9 +88,9 @@ jobs:
             '
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: packages
+          name: packages-${{ matrix.os }}-${{ matrix.python.major-dot-minor }}
           path: ./target/wheels
           if-no-files-found: error
   upload:
@@ -100,7 +100,7 @@ jobs:
       - build_wheels
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -111,14 +111,15 @@ jobs:
 
       - name: Download artifacts
         if: env.RELEASE == 'true'
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
-          name: packages
+          merge-multiple: true
+          pattern: packages-*
           path: ./target/wheels
 
       - name: Configure AWS credentials
         if: env.RELEASE == 'true'
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ secrets.CHIA_AWS_ACCOUNT_ID }}:role/installer-upload
           aws-region: us-west-2

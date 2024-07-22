@@ -1,4 +1,3 @@
-
 name: Tests
 
 on:
@@ -6,10 +5,10 @@ on:
     branches:
       - main
     tags:
-        - '**'
+      - "**"
   pull_request:
     branches:
-      - '**'
+      - "**"
 
 jobs:
   tests:
@@ -19,50 +18,56 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
-        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
 
     steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 1
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
-    - uses: chia-network/actions/setup-python@main
-      name: Install Python ${{ matrix.python-version }}
-      with:
-        python-version: ${{ matrix.python-version }}
+      - uses: chia-network/actions/setup-python@main
+        name: Install Python ${{ matrix.python-version }}
+        with:
+          python-version: ${{ matrix.python-version }}
 
-    - name: Update pip
-      run: |
+      - name: Update pip
+        run: |
           python -m pip install --upgrade pip
 
-    - name: Set up rust
-      uses: dtolnay/rust-toolchain@stable
+      - name: Set up rust
+        uses: dtolnay/rust-toolchain@stable
 
-    - name: setup venv
-      run: |
-        python -m venv venv
+      - name: setup venv
+        run: |
+          python -m venv venv
 
-    - uses: chia-network/actions/activate-venv@main
+      - uses: chia-network/actions/activate-venv@main
 
-    - name: Install dependencies
-      run: |
-        python -m pip install maturin
-        rustup target add x86_64-unknown-linux-musl
-        python -m pip install pytest
-        python -m pip install mypy
+      - name: Install dependencies
+        run: |
+          python -m pip install maturin
+          rustup target add x86_64-unknown-linux-musl
+          python -m pip install pytest pytest-xdist
+          python -m pip install mypy
+          python -m pip install black
 
-    - name: Build
-      run: |
-        python -m pip install clvm_tools colorama blspy chia-blockchain==2.1.2 clvm==0.9.8
-        maturin develop --release -m wheel/Cargo.toml
+      - name: Build
+        run: |
+          python -m pip install clvm_tools colorama blspy chia-blockchain==2.1.2 clvm==0.9.8
+          maturin develop --release -m wheel/Cargo.toml
 
-    - name: python mypy
-      run: |
-        mypy --ignore-missing-imports tests
+      - name: python mypy
+        run: |
+          mypy --ignore-missing-imports tests
 
-    - name: python tests
-      run: |
-        pytest tests
+      - name: python black
+        run: |
+          black --check tests
+          black --check wheel/generate_type_stubs.py
+
+      - name: python tests
+        run: |
+          pytest tests
 
   generator-benchmarks:
     name: Generator performance
@@ -70,47 +75,47 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.10', '3.11', '3.12']
+        python-version: ["3.10", "3.11", "3.12"]
 
     steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 1
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
-    - uses: chia-network/actions/setup-python@main
-      name: Install Python ${{ matrix.python-version }}
-      with:
-        python-version: ${{ matrix.python-version }}
+      - uses: chia-network/actions/setup-python@main
+        name: Install Python ${{ matrix.python-version }}
+        with:
+          python-version: ${{ matrix.python-version }}
 
-    - name: Set up rust
-      uses: dtolnay/rust-toolchain@stable
+      - name: Set up rust
+        uses: dtolnay/rust-toolchain@stable
 
-    - name: setup venv
-      run: |
-        python -m venv venv
+      - name: setup venv
+        run: |
+          python -m venv venv
 
-    - uses: chia-network/actions/activate-venv@main
+      - uses: chia-network/actions/activate-venv@main
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install maturin colorama clvm_tools
-        rustup target add x86_64-unknown-linux-musl
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install maturin colorama clvm_tools
+          rustup target add x86_64-unknown-linux-musl
 
-    - name: Build
-      run: |
-        maturin develop --release -m wheel/Cargo.toml
+      - name: Build
+        run: |
+          maturin develop --release -m wheel/Cargo.toml
 
-    - name: test generators
-      run: |
-        cd tests
-        ./test-generators.py
+      - name: test generators
+        run: |
+          cd tests
+          ./test-generators.py
 
-    - name: Run cost checks
-      run: |
-        cd tests
-        ./generate-programs.py
-        ./run-programs.py
+      - name: Run cost checks
+        run: |
+          cd tests
+          ./generate-programs.py
+          ./run-programs.py
 
   benchmarks:
     name: rust benchmarks
@@ -119,13 +124,13 @@ jobs:
       fail-fast: false
 
     steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 1
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
-    - name: Set up rust
-      uses: dtolnay/rust-toolchain@stable
+      - name: Set up rust
+        uses: dtolnay/rust-toolchain@stable
 
-    - name: cargo bench
-      run: |
-        cargo bench --workspace --exclude chia_rs
+      - name: cargo bench
+        run: |
+          cargo bench --workspace --exclude chia_rs

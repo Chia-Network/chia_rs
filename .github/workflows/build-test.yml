@@ -3,12 +3,12 @@ name: build - check - upload
 on:
   push:
     branches:
-    - main
+      - main
   release:
     types: [published]
   pull_request:
     branches:
-    - '**'
+      - "**"
 
 concurrency:
   # SHA is added to the end if on `main` to let all main workflows run
@@ -31,7 +31,7 @@ jobs:
             matrix: macos
             runs-on:
               arm: [macOS, ARM64]
-              intel: [macos-latest]
+              intel: [macos-12]
           - name: Ubuntu
             matrix: ubuntu
             runs-on:
@@ -42,66 +42,66 @@ jobs:
             runs-on:
               intel: [windows-latest]
         python:
-          - major-dot-minor: '3.8'
-            cibw-build: 'cp38-*'
+          - major-dot-minor: "3.8"
+            cibw-build: "cp38-*"
             by-arch:
               arm:
-                manylinux-version: 2014
+                manylinux-version: 2_28
                 docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-aarch64
                 rustup-target: aarch64-unknown-linux-musl
               intel:
-                manylinux-version: 2014
+                manylinux-version: 2_28
                 docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-x86_64
                 rustup-target: x86_64-unknown-linux-musl
-            matrix: '3.8'
-          - major-dot-minor: '3.9'
-            cibw-build: 'cp39-*'
+            matrix: "3.8"
+          - major-dot-minor: "3.9"
+            cibw-build: "cp39-*"
             by-arch:
               arm:
-                manylinux-version: 2014
+                manylinux-version: 2_28
                 docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-aarch64
                 rustup-target: aarch64-unknown-linux-musl
               intel:
-                manylinux-version: 2014
+                manylinux-version: 2_28
                 docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-x86_64
                 rustup-target: x86_64-unknown-linux-musl
-            matrix: '3.9'
-          - major-dot-minor: '3.10'
-            cibw-build: 'cp310-*'
+            matrix: "3.9"
+          - major-dot-minor: "3.10"
+            cibw-build: "cp310-*"
             by-arch:
               arm:
-                manylinux-version: 2014
+                manylinux-version: 2_28
                 docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-aarch64
                 rustup-target: aarch64-unknown-linux-musl
               intel:
-                manylinux-version: 2014
+                manylinux-version: 2_28
                 docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-x86_64
                 rustup-target: x86_64-unknown-linux-musl
-            matrix: '3.10'
-          - major-dot-minor: '3.11'
-            cibw-build: 'cp311-*'
+            matrix: "3.10"
+          - major-dot-minor: "3.11"
+            cibw-build: "cp311-*"
             by-arch:
               arm:
-                manylinux-version: 2014
+                manylinux-version: 2_28
                 docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-aarch64
                 rustup-target: aarch64-unknown-linux-musl
               intel:
-                manylinux-version: 2014
+                manylinux-version: 2_28
                 docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-x86_64
                 rustup-target: x86_64-unknown-linux-musl
-            matrix: '3.11'
-          - major-dot-minor: '3.12'
-            cibw-build: 'cp312-*'
+            matrix: "3.11"
+          - major-dot-minor: "3.12"
+            cibw-build: "cp312-*"
             by-arch:
               arm:
-                manylinux-version: 2014
+                manylinux-version: 2_28
                 docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-aarch64
                 rustup-target: aarch64-unknown-linux-musl
               intel:
-                manylinux-version: 2014
+                manylinux-version: 2_28
                 docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-x86_64
                 rustup-target: x86_64-unknown-linux-musl
-            matrix: '3.12'
+            matrix: "3.12"
 
         arch:
           - name: ARM
@@ -123,115 +123,115 @@ jobs:
               matrix: arm
 
     steps:
-    - name: Clean workspace
-      uses: Chia-Network/actions/clean-workspace@main
+      - name: Clean workspace
+        uses: Chia-Network/actions/clean-workspace@main
 
-    - name: Checkout code
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - uses: Chia-Network/actions/setup-python@main
-      with:
-        python-version: ${{ matrix.python.major-dot-minor }}
+      - uses: Chia-Network/actions/setup-python@main
+        with:
+          python-version: ${{ matrix.python.major-dot-minor }}
 
-    - name: Update pip
-      run: |
+      - name: Update pip
+        run: |
           python -m pip install --upgrade pip
 
-    - name: Set up rust
-      uses: dtolnay/rust-toolchain@stable
+      - name: Set up rust
+        uses: dtolnay/rust-toolchain@stable
 
-    - name: Install dependencies
-      run: |
+      - name: Install dependencies
+        run: |
           python -m pip install maturin
 
-    - name: Build MacOs with maturin on Python ${{ matrix.python }}
-      if: matrix.os.matrix == 'macos'
-      env:
-        MACOSX_DEPLOYMENT_TARGET: '11.0'
-      run: |
-        python${{ matrix.python.major-dot-minor }} -m venv venv
-        . venv/bin/activate
-        maturin build -i python --release -m wheel/Cargo.toml
+      - name: Build MacOs with maturin on Python ${{ matrix.python }}
+        if: matrix.os.matrix == 'macos'
+        env:
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
+        run: |
+          python${{ matrix.python.major-dot-minor }} -m venv venv
+          . venv/bin/activate
+          maturin build -i python --release -m wheel/Cargo.toml
 
-    - name: Build Linux with maturin on Python ${{ matrix.python }}
-      if: matrix.os.matrix == 'ubuntu'
-      run: |
-        docker run --rm \
-          -v ${{ github.workspace }}:/ws --workdir=/ws \
-          ${{ matrix.python.by-arch[matrix.arch.matrix].docker-url }} \
-          bash -exc '\
-            yum -y install openssl-devel && \
-            source $HOME/.cargo/env && \
-            rustup target add ${{ matrix.python.by-arch[matrix.arch.matrix].rustup-target }} && \
-            python${{ matrix.python.major-dot-minor }} -m venv /venv && \
-            . /venv/bin/activate && \
-            pip install --upgrade pip && \
-            pip install maturin && \
-            CC=gcc maturin build --release --manylinux ${{ matrix.python.by-arch[matrix.arch.matrix].manylinux-version }} -m wheel/Cargo.toml \
-          '
+      - name: Build Linux with maturin on Python ${{ matrix.python }}
+        if: matrix.os.matrix == 'ubuntu'
+        run: |
+          docker run --rm --pull always \
+            -v ${{ github.workspace }}:/ws --workdir=/ws \
+            ${{ matrix.python.by-arch[matrix.arch.matrix].docker-url }} \
+            bash -exc '\
+              yum -y install openssl-devel && \
+              source $HOME/.cargo/env && \
+              rustup target add ${{ matrix.python.by-arch[matrix.arch.matrix].rustup-target }} && \
+              python${{ matrix.python.major-dot-minor }} -m venv /venv && \
+              . /venv/bin/activate && \
+              pip install --upgrade pip && \
+              pip install maturin && \
+              CC=gcc maturin build --release --manylinux ${{ matrix.python.by-arch[matrix.arch.matrix].manylinux-version }} -m wheel/Cargo.toml \
+            '
 
-    - name: Build Windows with maturin on Python ${{ matrix.python }}
-      if: matrix.os.matrix == 'windows'
-      env:
-        CC: 'clang'
-        CFLAGS: "-D__BLST_PORTABLE__"
-      run: |
-        py -${{ matrix.python.major-dot-minor }} -m venv venv
-        . .\venv\Scripts\Activate.ps1
-        maturin build -i python --release -m wheel/Cargo.toml
+      - name: Build Windows with maturin on Python ${{ matrix.python }}
+        if: matrix.os.matrix == 'windows'
+        env:
+          CC: "clang"
+          CFLAGS: "-D__BLST_PORTABLE__"
+        run: |
+          py -${{ matrix.python.major-dot-minor }} -m venv venv
+          . .\venv\Scripts\Activate.ps1
+          maturin build -i python --release -m wheel/Cargo.toml
 
-    - uses: Chia-Network/actions/create-venv@main
-      id: create-venv
+      - uses: Chia-Network/actions/create-venv@main
+        id: create-venv
 
-    - uses: Chia-Network/actions/activate-venv@main
-      with:
-        directories: ${{ steps.create-venv.outputs.activate-venv-directories }}
+      - uses: Chia-Network/actions/activate-venv@main
+        with:
+          directories: ${{ steps.create-venv.outputs.activate-venv-directories }}
 
-    - name: Install chia_rs wheel
-      run: |
-        pip install --no-index --find-links target/wheels/ chia_rs
+      - name: Install chia_rs wheel
+        run: |
+          pip install --no-index --find-links target/wheels/ chia_rs
 
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: packages
-        path: ./target/wheels/
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.os.name }}-${{ matrix.python.major-dot-minor }}-${{ matrix.arch.name }}
+          path: ./target/wheels/
 
   check-typestubs:
     name: Check chia_rs.pyi
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - uses: Chia-Network/actions/setup-python@main
+      - uses: Chia-Network/actions/setup-python@main
 
-    - name: check generated chia_rs.pyi
-      run: |
-        python wheel/generate_type_stubs.py
-        git diff --exit-code
+      - name: check generated chia_rs.pyi
+        run: |
+          python wheel/generate_type_stubs.py
+          git diff --exit-code
 
   build-tools:
     name: build chia-tools
     runs-on: ubuntu-latest
     steps:
-    - name: Clean workspace
-      uses: Chia-Network/actions/clean-workspace@main
+      - name: Clean workspace
+        uses: Chia-Network/actions/clean-workspace@main
 
-    - name: Checkout code
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: cargo build
-      run: |
-        cd crates/chia-tools
-        cargo build
+      - name: cargo build
+        run: |
+          cd crates/chia-tools
+          cargo build
 
   build-sdist:
     name: sdist - ${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }}
@@ -246,77 +246,73 @@ jobs:
               arm: [Linux, ARM64]
               intel: [ubuntu-latest]
         python:
-          - major-dot-minor: '3.8'
-            matrix: '3.8'
+          - major-dot-minor: "3.8"
+            matrix: "3.8"
         arch:
           - name: Intel
             matrix: intel
 
     steps:
-    - name: Clean workspace
-      uses: Chia-Network/actions/clean-workspace@main
+      - name: Clean workspace
+        uses: Chia-Network/actions/clean-workspace@main
 
-    - name: Checkout code
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - uses: Chia-Network/actions/setup-python@main
-      with:
-        python-version: ${{ matrix.python.major-dot-minor }}
+      - uses: Chia-Network/actions/setup-python@main
+        with:
+          python-version: ${{ matrix.python.major-dot-minor }}
 
-    - name: Build source distribution
-      run: |
-        pip install maturin
-        maturin sdist -m wheel/Cargo.toml
+      - name: Build source distribution
+        run: |
+          pip install maturin
+          maturin sdist -m wheel/Cargo.toml
 
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: packages
-        path: ./target/wheels/
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-sdist-${{ matrix.os.name }}-${{ matrix.python.major-dot-minor }}-${{ matrix.arch.name }}
+          path: ./target/wheels/
 
   fmt:
     runs-on: ubuntu-latest
     name: cargo fmt
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
       - name: Install rust
         uses: dtolnay/rust-toolchain@stable
         with:
-            components: rustfmt, clippy
+          components: rustfmt, clippy
 
       - name: fmt
         run: |
-            cargo fmt --all -- --files-with-diff --check
-            cd wheel
-            cargo fmt -- --files-with-diff --check
+          cargo fmt --all -- --files-with-diff --check
+          cd wheel
+          cargo fmt -- --files-with-diff --check
 
   clippy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
 
       - name: workspace
         run: |
-            cargo clippy --workspace --all-features -- -Dwarnings
-      - name: wheel
-        run: |
-            cd wheel
-            cargo clippy --all-features -- -Dwarnings
+          cargo clippy --workspace --all-features --all-targets
 
   fuzz_targets:
     runs-on: ubuntu-latest
     env:
-        CARGO_PROFILE_RELEASE_LTO: false
+      CARGO_PROFILE_RELEASE_LTO: false
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - name: cargo-fuzz
         run: cargo +nightly install cargo-fuzz
@@ -343,9 +339,9 @@ jobs:
           cd crates/chia-protocol
           cargo +nightly fuzz build
           cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=20 || exit 255"
-      - name: cargo fuzz (chia-wallet)
+      - name: cargo fuzz (chia-puzzles)
         run: |
-          cd crates/chia-wallet
+          cd crates/chia-puzzles
           cargo +nightly fuzz build
           cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=20 || exit 255"
 
@@ -362,14 +358,14 @@ jobs:
         run: |
           git config --global core.autocrlf false
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 1
       - uses: dtolnay/rust-toolchain@stable
       - name: Prepare for coverage
         if: matrix.os == 'ubuntu-latest'
         run: |
-          cargo install grcov
+          cargo install grcov --locked
           echo "RUSTFLAGS=-Cinstrument-coverage" >> "$GITHUB_ENV"
           echo "LLVM_PROFILE_FILE=$(pwd)/target/chia_rs-%p-%m.profraw" >> "$GITHUB_ENV"
           echo "CARGO_TARGET_DIR=$(pwd)/target" >> "$GITHUB_ENV"
@@ -387,7 +383,7 @@ jobs:
           source venv/bin/activate
           git clone https://github.com/Chia-Network/clvm_tools.git --branch=main --single-branch
           pip install ./clvm_tools
-          pip install colorama maturin pytest chia-blockchain==2.1.2 clvm==0.9.8
+          pip install colorama maturin pytest pytest-xdist chia-blockchain==2.1.2 clvm==0.9.8
           maturin develop --release -m wheel/Cargo.toml
           pytest tests
           grcov . --binary-path target -s . --branch --ignore-not-existing --ignore='*/.cargo/*' --ignore='tests/*' --ignore='venv/*' -o rust_cov.info
@@ -398,7 +394,7 @@ jobs:
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         with:
-          path-to-lcov: './lcov.info'
+          path-to-lcov: "./lcov.info"
 
   upload:
     name: Upload to PyPI - ${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }}
@@ -419,47 +415,48 @@ jobs:
               arm: [Linux, ARM64]
               intel: [ubuntu-latest]
         python:
-          - major-dot-minor: '3.9'
-            matrix: '3.9'
+          - major-dot-minor: "3.9"
+            matrix: "3.9"
         arch:
           - name: Intel
             matrix: intel
 
     steps:
-    - name: Clean workspace
-      uses: Chia-Network/actions/clean-workspace@main
+      - name: Clean workspace
+        uses: Chia-Network/actions/clean-workspace@main
 
-    - name: Checkout code
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - uses: Chia-Network/actions/setup-python@main
-      with:
-        python-version: ${{ matrix.python.major-dot-minor }}
+      - uses: Chia-Network/actions/setup-python@main
+        with:
+          python-version: ${{ matrix.python.major-dot-minor }}
 
-    - name: Download artifacts
-      uses: actions/download-artifact@v3
-      with:
-        name: packages
-        path: ./dist
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          pattern: packages-*
+          path: ./dist
 
-    - name: Set Env
-      uses: Chia-Network/actions/setjobenv@main
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set Env
+        uses: Chia-Network/actions/setjobenv@main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: publish (PyPi)
-      if: env.RELEASE == 'true'
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        packages-dir: dist/
-        skip-existing: true
+      - name: publish (PyPi)
+        if: env.RELEASE == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          skip-existing: true
 
-    - name: publish (Test PyPi)
-      if: env.PRE_RELEASE == 'true'
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        repository-url: https://test.pypi.org/legacy/
-        packages-dir: dist/
-        skip-existing: true
+      - name: publish (Test PyPi)
+        if: env.PRE_RELEASE == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist/
+          skip-existing: true

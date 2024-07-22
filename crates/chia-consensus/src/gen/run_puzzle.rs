@@ -1,9 +1,10 @@
+use crate::consensus_constants::ConsensusConstants;
 use crate::gen::conditions::{parse_conditions, ParseState, Spend, SpendBundleConditions};
 use crate::gen::flags::ALLOW_BACKREFS;
 use crate::gen::spend_visitor::SpendVisitor;
 use crate::gen::validation_error::ValidationErr;
-use chia_protocol::bytes::Bytes32;
-use chia_protocol::coin::Coin;
+use chia_protocol::Bytes32;
+use chia_protocol::Coin;
 use clvm_utils::tree_hash;
 use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
@@ -12,6 +13,7 @@ use clvmr::run_program::run_program;
 use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs};
 use std::sync::Arc;
 
+#[allow(clippy::too_many_arguments)]
 pub fn run_puzzle<V: SpendVisitor>(
     a: &mut Allocator,
     puzzle: &[u8],
@@ -20,6 +22,7 @@ pub fn run_puzzle<V: SpendVisitor>(
     amount: u64,
     max_cost: u64,
     flags: u32,
+    constants: &ConsensusConstants,
 ) -> Result<SpendBundleConditions, ValidationErr> {
     let deserialize = if (flags & ALLOW_BACKREFS) != 0 {
         node_from_bytes_backrefs
@@ -45,8 +48,7 @@ pub fn run_puzzle<V: SpendVisitor>(
             puzzle_hash: puzzle_hash.into(),
             amount,
         }
-        .coin_id()
-        .into(),
+        .coin_id(),
     );
 
     let mut spend = Spend::new(
@@ -68,6 +70,7 @@ pub fn run_puzzle<V: SpendVisitor>(
         conditions,
         flags,
         &mut cost_left,
+        constants,
         &mut visitor,
     )?;
     ret.cost = max_cost - cost_left;

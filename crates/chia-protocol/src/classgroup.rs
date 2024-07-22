@@ -1,22 +1,25 @@
-use crate::streamable_struct;
 use crate::Bytes100;
-use chia_streamable_macro::Streamable;
+use chia_streamable_macro::streamable;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
 
-streamable_struct!(ClassgroupElement { data: Bytes100 });
+#[streamable]
+#[derive(Copy)]
+pub struct ClassgroupElement {
+    data: Bytes100,
+}
 
-impl ClassgroupElement {
-    pub fn get_default_element() -> ClassgroupElement {
+impl Default for ClassgroupElement {
+    fn default() -> Self {
         let mut data = [0_u8; 100];
         data[0] = 0x08;
-        ClassgroupElement { data: data.into() }
+        Self { data: data.into() }
     }
+}
 
-    pub fn get_size() -> i32 {
-        100
-    }
+impl ClassgroupElement {
+    pub const SIZE: usize = 100;
 }
 
 #[cfg(feature = "py-bindings")]
@@ -39,12 +42,12 @@ impl ClassgroupElement {
     #[staticmethod]
     #[pyo3(name = "get_default_element")]
     pub fn py_get_default_element() -> ClassgroupElement {
-        Self::get_default_element()
+        Self::default()
     }
 
     #[staticmethod]
     #[pyo3(name = "get_size")]
     pub fn py_get_size() -> i32 {
-        Self::get_size()
+        Self::SIZE as i32
     }
 }

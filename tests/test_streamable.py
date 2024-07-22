@@ -1,38 +1,115 @@
-from chia_rs import Spend, SpendBundleConditions, Coin, G1Element, G2Element, Program
-from chia.util.ints import uint64
+from chia_rs import (
+    Spend,
+    SpendBundleConditions,
+    Coin,
+    G1Element,
+    G2Element,
+    Program,
+    AugSchemeMPL,
+)
+from chia_rs.sized_ints import uint64
+from chia_rs.sized_bytes import bytes32
 import pytest
 import copy
 
+sk = AugSchemeMPL.key_gen(bytes32.random())
+pk = sk.get_g1()
 
 coin = b"bcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc"
 parent = b"edededededededededededededededed"
 ph = b"abababababababababababababababab"
 ph2 = b"cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
-sig = b"abababababababababababababababababababababababab"
+
 
 def test_hash_spend() -> None:
 
-    a1 = Spend(coin, parent, ph, 123, None, 0, None, None, None, None, [(ph2, 1000000, None)], [(sig, b"msg")], [], [], [], [], [], [], False)
-    a2 = Spend(coin, parent, ph, 123, None, 1, None, None, None, None, [(ph2, 1000000, None)], [(sig, b"msg")], [], [], [], [], [], [], False)
+    a1 = Spend(
+        coin,
+        parent,
+        ph,
+        123,
+        None,
+        0,
+        None,
+        None,
+        None,
+        None,
+        [(ph2, 1000000, None)],
+        [(pk, b"msg")],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        False,
+    )
+    a2 = Spend(
+        coin,
+        parent,
+        ph,
+        123,
+        None,
+        1,
+        None,
+        None,
+        None,
+        None,
+        [(ph2, 1000000, None)],
+        [(pk, b"msg")],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        False,
+    )
     b = hash(a1)
     c = hash(a2)
     assert type(b) is int
     assert type(c) is int
     assert b != c
+
 
 def test_hash_spend_bundle_conditions() -> None:
 
-    a1 = SpendBundleConditions([], 1000, 1337, 42, None, None, [(sig, b"msg")], 12345678, 123, 456)
-    a2 = SpendBundleConditions([], 1001, 1337, 42, None, None, [(sig, b"msg")], 12345678, 123, 456)
+    a1 = SpendBundleConditions(
+        [], 1000, 1337, 42, None, None, [(pk, b"msg")], 12345678, 123, 456
+    )
+    a2 = SpendBundleConditions(
+        [], 1001, 1337, 42, None, None, [(pk, b"msg")], 12345678, 123, 456
+    )
     b = hash(a1)
     c = hash(a2)
     assert type(b) is int
     assert type(c) is int
     assert b != c
 
+
 def test_json_spend() -> None:
 
-    a = Spend(coin, parent, ph, 123, None, 0, None, None, None, None, [(ph2, 1000000, None)], [(sig, b"msg")], [], [], [], [], [], [], False)
+    a = Spend(
+        coin,
+        parent,
+        ph,
+        123,
+        None,
+        0,
+        None,
+        None,
+        None,
+        None,
+        [(ph2, 1000000, None)],
+        [(pk, b"msg")],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        False,
+    )
 
     assert a.to_json_dict() == {
         "coin_id": "0x" + coin.hex(),
@@ -46,7 +123,7 @@ def test_json_spend() -> None:
         "birth_height": None,
         "birth_seconds": None,
         "create_coin": [["0x" + ph2.hex(), 1000000, None]],
-        "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
+        "agg_sig_me": [["0x" + bytes(pk).hex(), "0x6d7367"]],
         "agg_sig_parent": [],
         "agg_sig_puzzle": [],
         "agg_sig_amount": [],
@@ -56,90 +133,33 @@ def test_json_spend() -> None:
         "flags": 0,
     }
 
+
 def test_from_json_spend() -> None:
 
-    a = Spend(coin, parent, ph, 123, None, 0, None, None, None, None, [(ph2, 1000000, None)], [(sig, b"msg")], [], [], [], [], [], [], False)
+    a = Spend(
+        coin,
+        parent,
+        ph,
+        123,
+        None,
+        0,
+        None,
+        None,
+        None,
+        None,
+        [(ph2, 1000000, None)],
+        [(pk, b"msg")],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        False,
+    )
 
-    b = Spend.from_json_dict({
-        "coin_id": "0x" + coin.hex(),
-        "parent_id": "0x" + parent.hex(),
-        "puzzle_hash": "0x" + ph.hex(),
-        "coin_amount": 123,
-        "height_relative": None,
-        "seconds_relative": 0,
-        "before_height_relative": None,
-        "before_seconds_relative": None,
-        "birth_height": None,
-        "birth_seconds": None,
-        "create_coin": [["0x" + ph2.hex(), 1000000, None]],
-        "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
-        "agg_sig_parent": [],
-        "agg_sig_puzzle": [],
-        "agg_sig_amount": [],
-        "agg_sig_puzzle_amount": [],
-        "agg_sig_parent_amount": [],
-        "agg_sig_parent_puzzle": [],
-        "flags": 0,
-    })
-    assert a == b
-
-def test_from_json_spend_set_optional() -> None:
-
-    a = Spend(coin, parent, ph, 123, 1337, 0, None, None, None, None, [(ph2, 1000000, None)], [(sig, b"msg")], [], [], [], [], [], [], False)
-
-    b = Spend.from_json_dict({
-        "coin_id": "0x" + coin.hex(),
-        "parent_id": "0x" + parent.hex(),
-        "puzzle_hash": "0x" + ph.hex(),
-        "coin_amount": 123,
-        "height_relative": 1337,
-        "seconds_relative": 0,
-        "before_height_relative": None,
-        "before_seconds_relative": None,
-        "birth_height": None,
-        "birth_seconds": None,
-        "create_coin": [["0x" + ph2.hex(), 1000000, None]],
-        "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
-        "agg_sig_parent": [],
-        "agg_sig_puzzle": [],
-        "agg_sig_amount": [],
-        "agg_sig_puzzle_amount": [],
-        "agg_sig_parent_amount": [],
-        "agg_sig_parent_puzzle": [],
-        "flags": 0,
-    })
-    assert a == b
-
-def test_invalid_hex_prefix() -> None:
-
-    with pytest.raises(ValueError, match="bytes object is expected to start with 0x"):
-        a = Spend.from_json_dict({
-            # this field is missing the 0x prefix
-            "coin_id": coin.hex(),
-            "parent_id": "0x" + parent.hex(),
-            "puzzle_hash": "0x" + ph.hex(),
-            "coin_amount": 123,
-            "height_relative": None,
-            "seconds_relative": 0,
-            "before_height_relative": None,
-            "before_seconds_relative": None,
-            "birth_height": None,
-            "birth_seconds": None,
-            "create_coin": [["0x" + ph2.hex(), 1000000, None]],
-            "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
-            "agg_sig_parent": [],
-            "agg_sig_puzzle": [],
-            "agg_sig_amount": [],
-            "agg_sig_puzzle_amount": [],
-            "agg_sig_parent_amount": [],
-            "agg_sig_parent_puzzle": [],
-            "flags": 0,
-        })
-
-def test_invalid_hex_prefix_bytes() -> None:
-
-    with pytest.raises(ValueError, match="bytes object is expected to start with 0x"):
-        a = Spend.from_json_dict({
+    b = Spend.from_json_dict(
+        {
             "coin_id": "0x" + coin.hex(),
             "parent_id": "0x" + parent.hex(),
             "puzzle_hash": "0x" + ph.hex(),
@@ -151,8 +171,7 @@ def test_invalid_hex_prefix_bytes() -> None:
             "birth_height": None,
             "birth_seconds": None,
             "create_coin": [["0x" + ph2.hex(), 1000000, None]],
-            # the message field is missing the 0x prefix and is variable length bytes
-            "agg_sig_me": [["0x" + sig.hex(), "6d7367"]],
+            "agg_sig_me": [["0x" + bytes(pk).hex(), "0x6d7367"]],
             "agg_sig_parent": [],
             "agg_sig_puzzle": [],
             "agg_sig_amount": [],
@@ -160,89 +179,210 @@ def test_invalid_hex_prefix_bytes() -> None:
             "agg_sig_parent_amount": [],
             "agg_sig_parent_puzzle": [],
             "flags": 0,
-        })
+        }
+    )
+    assert a == b
+
+
+def test_from_json_spend_set_optional() -> None:
+
+    a = Spend(
+        coin,
+        parent,
+        ph,
+        123,
+        1337,
+        0,
+        None,
+        None,
+        None,
+        None,
+        [(ph2, 1000000, None)],
+        [(pk, b"msg")],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        False,
+    )
+
+    b = Spend.from_json_dict(
+        {
+            "coin_id": "0x" + coin.hex(),
+            "parent_id": "0x" + parent.hex(),
+            "puzzle_hash": "0x" + ph.hex(),
+            "coin_amount": 123,
+            "height_relative": 1337,
+            "seconds_relative": 0,
+            "before_height_relative": None,
+            "before_seconds_relative": None,
+            "birth_height": None,
+            "birth_seconds": None,
+            "create_coin": [["0x" + ph2.hex(), 1000000, None]],
+            "agg_sig_me": [["0x" + bytes(pk).hex(), "0x6d7367"]],
+            "agg_sig_parent": [],
+            "agg_sig_puzzle": [],
+            "agg_sig_amount": [],
+            "agg_sig_puzzle_amount": [],
+            "agg_sig_parent_amount": [],
+            "agg_sig_parent_puzzle": [],
+            "flags": 0,
+        }
+    )
+    assert a == b
+
+
+def test_invalid_hex_prefix() -> None:
+
+    with pytest.raises(ValueError, match="bytes object is expected to start with 0x"):
+        a = Spend.from_json_dict(
+            {
+                # this field is missing the 0x prefix
+                "coin_id": coin.hex(),
+                "parent_id": "0x" + parent.hex(),
+                "puzzle_hash": "0x" + ph.hex(),
+                "coin_amount": 123,
+                "height_relative": None,
+                "seconds_relative": 0,
+                "before_height_relative": None,
+                "before_seconds_relative": None,
+                "birth_height": None,
+                "birth_seconds": None,
+                "create_coin": [["0x" + ph2.hex(), 1000000, None]],
+                "agg_sig_me": [["0x" + bytes(pk).hex(), "0x6d7367"]],
+                "agg_sig_parent": [],
+                "agg_sig_puzzle": [],
+                "agg_sig_amount": [],
+                "agg_sig_puzzle_amount": [],
+                "agg_sig_parent_amount": [],
+                "agg_sig_parent_puzzle": [],
+                "flags": 0,
+            }
+        )
+
+
+def test_invalid_hex_prefix_bytes() -> None:
+
+    with pytest.raises(ValueError, match="bytes object is expected to start with 0x"):
+        a = Spend.from_json_dict(
+            {
+                "coin_id": "0x" + coin.hex(),
+                "parent_id": "0x" + parent.hex(),
+                "puzzle_hash": "0x" + ph.hex(),
+                "coin_amount": 123,
+                "height_relative": None,
+                "seconds_relative": 0,
+                "before_height_relative": None,
+                "before_seconds_relative": None,
+                "birth_height": None,
+                "birth_seconds": None,
+                "create_coin": [["0x" + ph2.hex(), 1000000, None]],
+                # the message field is missing the 0x prefix and is variable length bytes
+                "agg_sig_me": [["0x" + bytes(pk).hex(), "6d7367"]],
+                "agg_sig_parent": [],
+                "agg_sig_puzzle": [],
+                "agg_sig_amount": [],
+                "agg_sig_puzzle_amount": [],
+                "agg_sig_parent_amount": [],
+                "agg_sig_parent_puzzle": [],
+                "flags": 0,
+            }
+        )
+
 
 def test_invalid_hex_digit() -> None:
 
     with pytest.raises(ValueError, match="invalid hex"):
-        a = Spend.from_json_dict({
-            # this field is has an invalid hex digit (the last one)
-            "coin_id": "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeg",
-            "parent_id": "0x" + parent.hex(),
-            "puzzle_hash": "0x" + ph.hex(),
-            "coin_amount": 123,
-            "height_relative": None,
-            "seconds_relative": 0,
-            "before_height_relative": None,
-            "before_seconds_relative": None,
-            "birth_height": None,
-            "birth_seconds": None,
-            "create_coin": [["0x" + ph2.hex(), 1000000, None]],
-            "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
-            "agg_sig_parent": [],
-            "agg_sig_puzzle": [],
-            "agg_sig_amount": [],
-            "agg_sig_puzzle_amount": [],
-            "agg_sig_parent_amount": [],
-            "agg_sig_parent_puzzle": [],
-            "flags": 0,
-        })
+        a = Spend.from_json_dict(
+            {
+                # this field is has an invalid hex digit (the last one)
+                "coin_id": "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeg",
+                "parent_id": "0x" + parent.hex(),
+                "puzzle_hash": "0x" + ph.hex(),
+                "coin_amount": 123,
+                "height_relative": None,
+                "seconds_relative": 0,
+                "before_height_relative": None,
+                "before_seconds_relative": None,
+                "birth_height": None,
+                "birth_seconds": None,
+                "create_coin": [["0x" + ph2.hex(), 1000000, None]],
+                "agg_sig_me": [["0x" + bytes(pk).hex(), "0x6d7367"]],
+                "agg_sig_parent": [],
+                "agg_sig_puzzle": [],
+                "agg_sig_amount": [],
+                "agg_sig_puzzle_amount": [],
+                "agg_sig_parent_amount": [],
+                "agg_sig_parent_puzzle": [],
+                "flags": 0,
+            }
+        )
+
 
 def test_invalid_hex_length() -> None:
 
     with pytest.raises(ValueError, match="invalid length 33 expected 32"):
-        a = Spend.from_json_dict({
-            # this field is has invalid length
-            "coin_id": "0x" + coin.hex() + "ff",
-            "parent_id": "0x" + parent.hex(),
-            "puzzle_hash": "0x" + ph.hex(),
-            "coin_amount": 123,
-            "height_relative": None,
-            "seconds_relative": 0,
-            "before_height_relative": None,
-            "before_seconds_relative": None,
-            "birth_height": None,
-            "birth_seconds": None,
-            "create_coin": [["0x" + ph2.hex(), 1000000, None]],
-            "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
-            "agg_sig_parent": [],
-            "agg_sig_puzzle": [],
-            "agg_sig_amount": [],
-            "agg_sig_puzzle_amount": [],
-            "agg_sig_parent_amount": [],
-            "agg_sig_parent_puzzle": [],
-            "flags": 0,
-        })
+        a = Spend.from_json_dict(
+            {
+                # this field is has invalid length
+                "coin_id": "0x" + coin.hex() + "ff",
+                "parent_id": "0x" + parent.hex(),
+                "puzzle_hash": "0x" + ph.hex(),
+                "coin_amount": 123,
+                "height_relative": None,
+                "seconds_relative": 0,
+                "before_height_relative": None,
+                "before_seconds_relative": None,
+                "birth_height": None,
+                "birth_seconds": None,
+                "create_coin": [["0x" + ph2.hex(), 1000000, None]],
+                "agg_sig_me": [["0x" + bytes(pk).hex(), "0x6d7367"]],
+                "agg_sig_parent": [],
+                "agg_sig_puzzle": [],
+                "agg_sig_amount": [],
+                "agg_sig_puzzle_amount": [],
+                "agg_sig_parent_amount": [],
+                "agg_sig_parent_puzzle": [],
+                "flags": 0,
+            }
+        )
+
 
 def test_missing_field() -> None:
 
     with pytest.raises(KeyError, match="coin_id"):
-        a = Spend.from_json_dict({
-            # coin_id is missing
-            "parent_id": "0x" + parent.hex(),
-            "puzzle_hash": "0x" + ph.hex(),
-            "coin_amount": 123,
-            "height_relative": None,
-            "seconds_relative": 0,
-            "before_height_relative": None,
-            "before_seconds_relative": None,
-            "birth_height": None,
-            "birth_seconds": None,
-            "create_coin": [["0x" + ph2.hex(), 1000000, None]],
-            "agg_sig_me": [["0x" + sig.hex(), "0x6d7367"]],
-            "agg_sig_parent": [],
-            "agg_sig_puzzle": [],
-            "agg_sig_amount": [],
-            "agg_sig_puzzle_amount": [],
-            "agg_sig_parent_amount": [],
-            "agg_sig_parent_puzzle": [],
-            "flags": 0,
-        })
+        a = Spend.from_json_dict(
+            {
+                # coin_id is missing
+                "parent_id": "0x" + parent.hex(),
+                "puzzle_hash": "0x" + ph.hex(),
+                "coin_amount": 123,
+                "height_relative": None,
+                "seconds_relative": 0,
+                "before_height_relative": None,
+                "before_seconds_relative": None,
+                "birth_height": None,
+                "birth_seconds": None,
+                "create_coin": [["0x" + ph2.hex(), 1000000, None]],
+                "agg_sig_me": [["0x" + bytes(pk).hex(), "0x6d7367"]],
+                "agg_sig_parent": [],
+                "agg_sig_puzzle": [],
+                "agg_sig_amount": [],
+                "agg_sig_puzzle_amount": [],
+                "agg_sig_parent_amount": [],
+                "agg_sig_parent_puzzle": [],
+                "flags": 0,
+            }
+        )
 
 
 def test_json_spend_bundle_conditions() -> None:
 
-    a = SpendBundleConditions([], 1000, 1337, 42, None, None, [(sig, b"msg")], 12345678, 123, 456)
+    a = SpendBundleConditions(
+        [], 1000, 1337, 42, None, None, [(pk, b"msg")], 12345678, 123, 456
+    )
 
     assert a.to_json_dict() == {
         "spends": [],
@@ -251,33 +391,58 @@ def test_json_spend_bundle_conditions() -> None:
         "seconds_absolute": 42,
         "before_height_absolute": None,
         "before_seconds_absolute": None,
-        "agg_sig_unsafe": [["0x" + sig.hex(), "0x6d7367"]],
+        "agg_sig_unsafe": [["0x" + bytes(pk).hex(), "0x6d7367"]],
         "cost": 12345678,
         "removal_amount": 123,
         "addition_amount": 456,
     }
 
+
 def test_from_json_spend_bundle_conditions() -> None:
 
-    a = SpendBundleConditions([], 1000, 1337, 42, None, None, [(sig, b"msg")], 12345678, 123, 456)
-    b = SpendBundleConditions.from_json_dict({
-        "spends": [],
-        "reserve_fee": 1000,
-        "height_absolute": 1337,
-        "seconds_absolute": 42,
-        "before_height_absolute": None,
-        "before_seconds_absolute": None,
-        "agg_sig_unsafe": [["0x" + sig.hex(), "0x6d7367"]],
-        "cost": 12345678,
-        "removal_amount": 123,
-        "addition_amount": 456,
-    })
+    a = SpendBundleConditions(
+        [], 1000, 1337, 42, None, None, [(pk, b"msg")], 12345678, 123, 456
+    )
+    b = SpendBundleConditions.from_json_dict(
+        {
+            "spends": [],
+            "reserve_fee": 1000,
+            "height_absolute": 1337,
+            "seconds_absolute": 42,
+            "before_height_absolute": None,
+            "before_seconds_absolute": None,
+            "agg_sig_unsafe": [["0x" + bytes(pk).hex(), "0x6d7367"]],
+            "cost": 12345678,
+            "removal_amount": 123,
+            "addition_amount": 456,
+        }
+    )
     assert a == b
 
 
 def test_copy_spend() -> None:
 
-    a = Spend(coin, parent, ph, 123, None, 0, None, None, None, None, [(ph2, 1000000, None)], [(sig, b"msg")], [], [], [], [], [], [], False)
+    a = Spend(
+        coin,
+        parent,
+        ph,
+        123,
+        None,
+        0,
+        None,
+        None,
+        None,
+        None,
+        [(ph2, 1000000, None)],
+        [(pk, b"msg")],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        False,
+    )
     b = copy.copy(a)
 
     assert a == b
@@ -287,9 +452,12 @@ def test_copy_spend() -> None:
     assert a == b
     assert a is not b
 
+
 def test_copy_spend_bundle_conditions() -> None:
 
-    a = SpendBundleConditions([], 1000, 1337, 42, None, None, [(sig, b"msg")], 12345678, 123, 456)
+    a = SpendBundleConditions(
+        [], 1000, 1337, 42, None, None, [(pk, b"msg")], 12345678, 123, 456
+    )
     b = copy.copy(a)
 
     assert a == b
@@ -340,11 +508,14 @@ def test_coin_parse_rust() -> None:
     assert buffer[consumed:] == b"more bytes following, that should be ignored"
     assert c1 == Coin(coin, ph2, uint64(0xFFFFFFFFFFFFFFFF))
 
+
 def sha2(buf: bytes) -> bytes:
     from hashlib import sha256
+
     ctx = sha256()
     ctx.update(buf)
     return ctx.digest()
+
 
 def test_coin_get_hash() -> None:
 
@@ -357,37 +528,70 @@ def test_coin_get_hash() -> None:
     c3 = Coin(coin, ph2, uint64(0xFFFFFFFFFFFFFFFF))
     assert sha2(c3.to_bytes()) == c3.get_hash()
 
+
 def test_g1_element() -> None:
 
-    a = G1Element.from_bytes(bytes.fromhex("a24d88ce995cea579675377728938eeb3956d5da608414efc9064774dc9653764edeb4823fc8da22c810917bf389c127"))
+    a = G1Element.from_bytes(
+        bytes.fromhex(
+            "a24d88ce995cea579675377728938eeb3956d5da608414efc9064774dc9653764edeb4823fc8da22c810917bf389c127"
+        )
+    )
     b = bytes(a)
-    assert b == bytes.fromhex("a24d88ce995cea579675377728938eeb3956d5da608414efc9064774dc9653764edeb4823fc8da22c810917bf389c127")
+    assert b == bytes.fromhex(
+        "a24d88ce995cea579675377728938eeb3956d5da608414efc9064774dc9653764edeb4823fc8da22c810917bf389c127"
+    )
     c = G1Element.from_bytes(b)
     assert a == c
 
-    assert a.to_json_dict() == "0xa24d88ce995cea579675377728938eeb3956d5da608414efc9064774dc9653764edeb4823fc8da22c810917bf389c127"
+    assert (
+        a.to_json_dict()
+        == "0xa24d88ce995cea579675377728938eeb3956d5da608414efc9064774dc9653764edeb4823fc8da22c810917bf389c127"
+    )
 
-    d = G1Element.from_json_dict("0xa24d88ce995cea579675377728938eeb3956d5da608414efc9064774dc9653764edeb4823fc8da22c810917bf389c127")
+    d = G1Element.from_json_dict(
+        "0xa24d88ce995cea579675377728938eeb3956d5da608414efc9064774dc9653764edeb4823fc8da22c810917bf389c127"
+    )
     assert d == a
 
-    d = G1Element.from_json_dict(bytes.fromhex("a24d88ce995cea579675377728938eeb3956d5da608414efc9064774dc9653764edeb4823fc8da22c810917bf389c127"))
+    d = G1Element.from_json_dict(
+        bytes.fromhex(
+            "a24d88ce995cea579675377728938eeb3956d5da608414efc9064774dc9653764edeb4823fc8da22c810917bf389c127"
+        )
+    )
     assert d == a
+
 
 def test_g2_element() -> None:
 
-    a = G2Element.from_bytes(bytes.fromhex("a566b4d972db20765c668ce7fdcd76a4a5a8201dc2d5b1e747e2993fcdd99c8c96c1ca0503ade72809ae6d19c5e8400e10900a24ae56b7c9c84231ed5b7dd4c0790dd1aef56e0820e86994aa02c33bd409d3f17ace74c7fa40b00fe5022cc6d6"))
+    a = G2Element.from_bytes(
+        bytes.fromhex(
+            "a566b4d972db20765c668ce7fdcd76a4a5a8201dc2d5b1e747e2993fcdd99c8c96c1ca0503ade72809ae6d19c5e8400e10900a24ae56b7c9c84231ed5b7dd4c0790dd1aef56e0820e86994aa02c33bd409d3f17ace74c7fa40b00fe5022cc6d6"
+        )
+    )
     b = bytes(a)
-    assert b == bytes.fromhex("a566b4d972db20765c668ce7fdcd76a4a5a8201dc2d5b1e747e2993fcdd99c8c96c1ca0503ade72809ae6d19c5e8400e10900a24ae56b7c9c84231ed5b7dd4c0790dd1aef56e0820e86994aa02c33bd409d3f17ace74c7fa40b00fe5022cc6d6")
+    assert b == bytes.fromhex(
+        "a566b4d972db20765c668ce7fdcd76a4a5a8201dc2d5b1e747e2993fcdd99c8c96c1ca0503ade72809ae6d19c5e8400e10900a24ae56b7c9c84231ed5b7dd4c0790dd1aef56e0820e86994aa02c33bd409d3f17ace74c7fa40b00fe5022cc6d6"
+    )
     c = G2Element.from_bytes(b)
     assert a == c
 
-    assert a.to_json_dict() == "0xa566b4d972db20765c668ce7fdcd76a4a5a8201dc2d5b1e747e2993fcdd99c8c96c1ca0503ade72809ae6d19c5e8400e10900a24ae56b7c9c84231ed5b7dd4c0790dd1aef56e0820e86994aa02c33bd409d3f17ace74c7fa40b00fe5022cc6d6"
+    assert (
+        a.to_json_dict()
+        == "0xa566b4d972db20765c668ce7fdcd76a4a5a8201dc2d5b1e747e2993fcdd99c8c96c1ca0503ade72809ae6d19c5e8400e10900a24ae56b7c9c84231ed5b7dd4c0790dd1aef56e0820e86994aa02c33bd409d3f17ace74c7fa40b00fe5022cc6d6"
+    )
 
-    d = G2Element.from_json_dict("0xa566b4d972db20765c668ce7fdcd76a4a5a8201dc2d5b1e747e2993fcdd99c8c96c1ca0503ade72809ae6d19c5e8400e10900a24ae56b7c9c84231ed5b7dd4c0790dd1aef56e0820e86994aa02c33bd409d3f17ace74c7fa40b00fe5022cc6d6")
+    d = G2Element.from_json_dict(
+        "0xa566b4d972db20765c668ce7fdcd76a4a5a8201dc2d5b1e747e2993fcdd99c8c96c1ca0503ade72809ae6d19c5e8400e10900a24ae56b7c9c84231ed5b7dd4c0790dd1aef56e0820e86994aa02c33bd409d3f17ace74c7fa40b00fe5022cc6d6"
+    )
     assert a == d
 
-    d = G2Element.from_json_dict(bytes.fromhex("a566b4d972db20765c668ce7fdcd76a4a5a8201dc2d5b1e747e2993fcdd99c8c96c1ca0503ade72809ae6d19c5e8400e10900a24ae56b7c9c84231ed5b7dd4c0790dd1aef56e0820e86994aa02c33bd409d3f17ace74c7fa40b00fe5022cc6d6"))
+    d = G2Element.from_json_dict(
+        bytes.fromhex(
+            "a566b4d972db20765c668ce7fdcd76a4a5a8201dc2d5b1e747e2993fcdd99c8c96c1ca0503ade72809ae6d19c5e8400e10900a24ae56b7c9c84231ed5b7dd4c0790dd1aef56e0820e86994aa02c33bd409d3f17ace74c7fa40b00fe5022cc6d6"
+        )
+    )
     assert a == d
+
 
 def test_program() -> None:
     p = Program.from_json_dict("0xff8080")

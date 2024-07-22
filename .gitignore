@@ -1,3 +1,9 @@
 target/
 .idea/
 __pycache__/
+venv/
+*.so
+*.pyd
+node_modules/
+.mypy_cache/
+.pytest_cache/

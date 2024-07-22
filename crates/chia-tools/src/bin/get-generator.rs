@@ -40,6 +40,6 @@ fn main() {
             .transactions_generator
             .expect("not a transaction block");
 
-        println!("{}\n", hex::encode(program.as_ref()))
+        println!("{}\n", hex::encode(program.as_ref()));
     }
 }

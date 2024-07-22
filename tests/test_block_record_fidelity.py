@@ -1,14 +1,13 @@
-from typing import List, Tuple, Optional, Any, Callable
+from typing import List, Optional, Any, Callable
 
-import string
 import sys
 import time
 from chia_rs import BlockRecord, ClassgroupElement
+from chia_rs.sized_bytes import bytes32, bytes100
+from chia_rs.sized_ints import uint32, uint64, uint8, uint128
 from chia.consensus.block_record import BlockRecord as PyBlockRecord
-from chia.types.blockchain_format.sized_bytes import bytes32, bytes100
 from random import Random
 from chia.consensus.default_constants import DEFAULT_CONSTANTS
-from chia.util.ints import uint32, uint64, uint8, uint128
 
 
 def get_classgroup_element(rng: Random) -> ClassgroupElement:
@@ -28,9 +27,9 @@ def get_u32(rng: Random) -> uint32:
 
 
 def get_ssi(rng: Random) -> uint64:
-    return uint64(DEFAULT_CONSTANTS.NUM_SPS_SUB_SLOT * rng.randint(0, 0xFFFF) + rng.randint(
-        0, 1
-    ))
+    return uint64(
+        DEFAULT_CONSTANTS.NUM_SPS_SUB_SLOT * rng.randint(0, 0xFFFF) + rng.randint(0, 1)
+    )
 
 
 def get_u64(rng: Random) -> uint64:
@@ -113,9 +112,17 @@ def test_bytes32():
     rng = Random()
     rng.seed(1337)
     br = get_block_record(rng)
-    assert isinstance(br.header_hash, bytes32)
-    assert f"{br.header_hash}" == "e433713dd932b2314eab219aa5504f71b9fe9f2d8e2f5cadfa892d8dc6a7ba53"
-    assert br.header_hash.__str__() == "e433713dd932b2314eab219aa5504f71b9fe9f2d8e2f5cadfa892d8dc6a7ba53"
+    # the following line is commented until chia-blockchain uses the moved sized bytes class
+    # assert isinstance(br.header_hash, bytes32)
+    assert (
+        f"{br.header_hash}"
+        == "e433713dd932b2314eab219aa5504f71b9fe9f2d8e2f5cadfa892d8dc6a7ba53"
+    )
+    assert (
+        br.header_hash.__str__()
+        == "e433713dd932b2314eab219aa5504f71b9fe9f2d8e2f5cadfa892d8dc6a7ba53"
+    )
+
 
 def wrap_call(expr: str, br: Any) -> str:
     try:

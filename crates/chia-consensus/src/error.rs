@@ -20,6 +20,9 @@ pub enum Error {
     #[error("Validation {0}")]
     Validation(#[from] ValidationErr),
 
+    #[error("BLS {0}")]
+    Bls(#[from] chia_bls::Error),
+
     #[error("not a singleton mod hash")]
     NotSingletonModHash,
 
@@ -41,12 +44,15 @@ pub enum Error {
     #[error("coin mismatch")]
     CoinMismatch,
 
+    #[error("expected lineage proof, found eve proof")]
+    ExpectedLineageProof,
+
     #[error("{0}")]
     Custom(String),
 }
 
 #[cfg(feature = "py-bindings")]
-impl std::convert::From<Error> for PyErr {
+impl From<Error> for PyErr {
     fn from(err: Error) -> PyErr {
         pyo3::exceptions::PyValueError::new_err(err.to_string())
     }

@@ -1,10 +1,11 @@
+use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::gen::conditions::MempoolVisitor;
 use chia_consensus::gen::flags::ALLOW_BACKREFS;
 use chia_consensus::gen::run_block_generator::{run_block_generator, run_block_generator2};
 use clvmr::serde::{node_from_bytes, node_to_bytes_backrefs};
 use clvmr::Allocator;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use std::fs::read_to_string;
+use std::fs;
 use std::time::Instant;
 
 fn run(c: &mut Criterion) {
@@ -26,14 +27,14 @@ fn run(c: &mut Criterion) {
     ] {
         let filename = format!("../../generator-tests/{name}.txt");
         println!("file: {filename}");
-        let test_file = read_to_string(filename).expect("test file not found");
+        let test_file = fs::read_to_string(filename).expect("test file not found");
         let generator = test_file.split_once('\n').expect("invalid test file").0;
         let generator = hex::decode(generator).expect("invalid hex encoded generator");
 
         let mut block_refs = Vec::<Vec<u8>>::new();
 
         let filename = format!("../../generator-tests/{name}.env");
-        if let Ok(env_hex) = std::fs::read_to_string(&filename) {
+        if let Ok(env_hex) = fs::read_to_string(&filename) {
             println!("block-ref file: {filename}");
             block_refs.push(hex::decode(env_hex).expect("hex decode env-file"));
         }
@@ -54,12 +55,13 @@ fn run(c: &mut Criterion) {
                         &mut a,
                         gen,
                         &block_refs,
-                        11000000000,
+                        11_000_000_000,
                         ALLOW_BACKREFS,
+                        &TEST_CONSTANTS,
                     );
                     let _ = black_box(conds);
                     start.elapsed()
-                })
+                });
             });
 
             group.bench_function(format!("run_block_generator2 {name}{name_suffix}"), |b| {
@@ -71,12 +73,13 @@ fn run(c: &mut Criterion) {
                         &mut a,
                         gen,
                         &block_refs,
-                        11000000000,
+                        11_000_000_000,
                         ALLOW_BACKREFS,
+                        &TEST_CONSTANTS,
                     );
                     let _ = black_box(conds);
                     start.elapsed()
-                })
+                });
             });
         }
     }

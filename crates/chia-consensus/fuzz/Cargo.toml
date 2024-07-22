@@ -1,6 +1,6 @@
 [package]
 name = "chia-fuzz"
-version = "0.5.1"
+version = "0.10.0"
 authors = ["Automatically generated"]
 publish = false
 edition = "2021"
@@ -8,15 +8,18 @@ edition = "2021"
 [package.metadata]
 cargo-fuzz = true
 
+[lints]
+workspace = true
+
 [dependencies]
-libfuzzer-sys = "0.4"
-clvmr = "0.6.0"
-clvm-utils = { path = "../../clvm-utils" }
-clvm-traits = { path = "../../clvm-traits" }
-chia-protocol = { path = "../../chia-protocol" }
-chia-traits = { path = "../../chia-traits" }
-chia-consensus = { path = ".." }
-hex-literal = "=0.4.1"
+libfuzzer-sys = { workspace = true }
+clvmr = { workspace = true }
+clvm-utils = { workspace = true }
+clvm-traits = { workspace = true }
+chia-protocol = { workspace = true }
+chia-traits = { workspace = true }
+chia-consensus = { workspace = true }
+hex-literal = { workspace = true }
 
 [lib]
 name = "fuzzing_utils"
@@ -88,6 +91,27 @@ bench = false
 [[bin]]
 name = "fast-forward"
 path = "fuzz_targets/fast-forward.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parse-spend-id"
+path = "fuzz_targets/parse-spend-id.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "deserialize-proof"
+path = "fuzz_targets/deserialize-proof.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "merkle-set"
+path = "fuzz_targets/merkle-set.rs"
 test = false
 doc = false
 bench = false

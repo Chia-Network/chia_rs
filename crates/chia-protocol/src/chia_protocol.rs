@@ -1,7 +1,5 @@
-use chia_streamable_macro::Streamable;
+use chia_streamable_macro::{streamable, Streamable};
 
-use crate::message_struct;
-use crate::streamable_struct;
 use crate::Bytes;
 
 #[cfg(feature = "py-bindings")]
@@ -9,7 +7,7 @@ use chia_py_streamable_macro::{PyJsonDict, PyStreamable};
 
 #[repr(u8)]
 #[cfg_attr(feature = "py-bindings", derive(PyJsonDict, PyStreamable))]
-#[cfg_attr(fuzzing, derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Streamable, Hash, Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ProtocolMessageTypes {
     // Shared protocol (all services)
@@ -121,12 +119,28 @@ pub enum ProtocolMessageTypes {
     RespondBlockHeaders = 88,
     RequestFeeEstimates = 89,
     RespondFeeEstimates = 90,
+
+    // Unfinished block protocol
+    NewUnfinishedBlock2 = 92,
+    RequestUnfinishedBlock2 = 93,
+
+    // New wallet sync protocol
+    RequestRemovePuzzleSubscriptions = 94,
+    RespondRemovePuzzleSubscriptions = 95,
+    RequestRemoveCoinSubscriptions = 96,
+    RespondRemoveCoinSubscriptions = 97,
+    RequestPuzzleState = 98,
+    RespondPuzzleState = 99,
+    RejectPuzzleState = 100,
+    RequestCoinState = 101,
+    RespondCoinState = 102,
+    RejectCoinState = 103,
 }
 
 #[cfg(feature = "py-bindings")]
 impl chia_traits::ChiaToPython for ProtocolMessageTypes {
-    fn to_python<'a>(&self, py: pyo3::Python<'a>) -> pyo3::PyResult<&'a pyo3::PyAny> {
-        Ok(pyo3::IntoPy::into_py(*self, py).into_ref(py))
+    fn to_python<'a>(&self, py: pyo3::Python<'a>) -> pyo3::PyResult<pyo3::Bound<'a, pyo3::PyAny>> {
+        Ok(pyo3::IntoPy::into_py(*self, py).bind(py).clone().into_any())
     }
 }
 
@@ -136,7 +150,7 @@ pub trait ChiaProtocolMessage {
 
 #[repr(u8)]
 #[cfg_attr(feature = "py-bindings", derive(PyJsonDict, PyStreamable))]
-#[cfg_attr(fuzzing, derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Streamable, Hash, Debug, Copy, Clone, Eq, PartialEq)]
 pub enum NodeType {
     FullNode = 1,
@@ -150,18 +164,20 @@ pub enum NodeType {
 
 #[cfg(feature = "py-bindings")]
 impl chia_traits::ChiaToPython for NodeType {
-    fn to_python<'a>(&self, py: pyo3::Python<'a>) -> pyo3::PyResult<&'a pyo3::PyAny> {
-        Ok(pyo3::IntoPy::into_py(*self, py).into_ref(py))
+    fn to_python<'a>(&self, py: pyo3::Python<'a>) -> pyo3::PyResult<pyo3::Bound<'a, pyo3::PyAny>> {
+        Ok(pyo3::IntoPy::into_py(*self, py).bind(py).clone().into_any())
     }
 }
 
-streamable_struct! (Message {
+#[streamable]
+pub struct Message {
     msg_type: ProtocolMessageTypes,
     id: Option<u16>,
     data: Bytes,
-});
+}
 
-message_struct! (Handshake {
+#[streamable(message)]
+pub struct Handshake {
     // Network id, usually the genesis challenge of the blockchain
     network_id: String,
     // Protocol version to determine which messages the peer supports
@@ -174,4 +190,4 @@ message_struct! (Handshake {
     node_type: NodeType,
     // Key value dict to signal support for additional capabilities/features
     capabilities: Vec<(u16, String)>,
-});
+}

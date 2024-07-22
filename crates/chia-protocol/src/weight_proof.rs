@@ -1,5 +1,4 @@
-use crate::streamable_struct;
-use chia_streamable_macro::Streamable;
+use chia_streamable_macro::streamable;
 
 use crate::Bytes32;
 use crate::EndOfSubSlotBundle;
@@ -8,12 +7,13 @@ use crate::ProofOfSpace;
 use crate::RewardChainBlock;
 use crate::{VDFInfo, VDFProof};
 
-streamable_struct! (SubEpochData {
+#[streamable]
+pub struct SubEpochData {
     reward_chain_hash: Bytes32,
     num_blocks_overflow: u8,
     new_sub_slot_iters: Option<u64>,
     new_difficulty: Option<u64>,
-});
+}
 
 // number of challenge blocks
 // Average iters for challenge blocks
@@ -25,7 +25,8 @@ streamable_struct! (SubEpochData {
 //                            0.48
 // total number of challenge blocks == total number of reward chain blocks
 
-streamable_struct! (SubSlotData {
+#[streamable]
+pub struct SubSlotData {
     proof_of_space: Option<ProofOfSpace>,
     cc_signage_point: Option<VDFProof>,
     cc_infusion_point: Option<VDFProof>,
@@ -39,7 +40,7 @@ streamable_struct! (SubSlotData {
     cc_ip_vdf_info: Option<VDFInfo>,
     icc_ip_vdf_info: Option<VDFInfo>,
     total_iters: Option<u128>,
-});
+}
 
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
@@ -55,28 +56,33 @@ impl SubSlotData {
     }
 }
 
-streamable_struct! (SubEpochChallengeSegment {
+#[streamable]
+pub struct SubEpochChallengeSegment {
     sub_epoch_n: u32,
     sub_slots: Vec<SubSlotData>,
     rc_slot_end_info: Option<VDFInfo>,
-});
+}
 
-streamable_struct! (SubEpochSegments {
+#[streamable]
+pub struct SubEpochSegments {
     challenge_segments: Vec<SubEpochChallengeSegment>,
-});
+}
 
 // this is used only for serialization to database
-streamable_struct! (RecentChainData {
+#[streamable]
+pub struct RecentChainData {
     recent_chain_data: Vec<HeaderBlock>,
-});
+}
 
-streamable_struct! (ProofBlockHeader {
+#[streamable]
+pub struct ProofBlockHeader {
     finished_sub_slots: Vec<EndOfSubSlotBundle>,
     reward_chain_block: RewardChainBlock,
-});
+}
 
-streamable_struct! (WeightProof {
+#[streamable]
+pub struct WeightProof {
     sub_epochs: Vec<SubEpochData>,
-    sub_epoch_segments: Vec<SubEpochChallengeSegment>,  // sampled sub epoch
+    sub_epoch_segments: Vec<SubEpochChallengeSegment>, // sampled sub epoch
     recent_chain_data: Vec<HeaderBlock>,
-});
+}

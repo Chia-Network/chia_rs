@@ -2,19 +2,12 @@ from typing import Dict, List
 
 all_counters: Dict[str, List[int]] = {}
 
-keys = ["val_stack:",
-     "env_stack:",
-     "op_stack:",
-     "atoms:",
+keys = ["atoms:",
+     "small_atoms:",
      "pairs:",
      "heap:",
      "block_cost:",
-     "clvm_cost:",
-     "cond_cost:",
-     "parse_time:",
-     "ref_lookup_time:",
      "execute_time:",
-     "conditions_time:",
      "timestamp:",
      "time_delta:",
 ]
@@ -38,7 +31,7 @@ with open("chain-resource-usage.log", "r") as f:
         num_samples += 1
 
 with open("chain-resource-usage.dat", "w+") as out:
-    out.write("# ")
+    out.write("# height: ")
     for k in keys:
         out.write(f"{k} ")
     out.write(f"\n")
@@ -53,7 +46,7 @@ for k in keys:
     all_counters[k] = sorted(all_counters[k])
 
 with open("chain-resource-usage-cdf.dat", "w+") as out:
-    out.write("# ")
+    out.write("# height: ")
     for k in keys:
         out.write(f"{k} ")
     out.write(f"\n")

@@ -1,5 +1,7 @@
 use super::coin_id::compute_coin_id;
-use super::condition_sanitizers::{parse_amount, sanitize_announce_msg, sanitize_hash};
+use super::condition_sanitizers::{
+    parse_amount, sanitize_announce_msg, sanitize_hash, sanitize_message_mode,
+};
 use super::opcodes::{
     compute_unknown_condition_cost, parse_opcode, ConditionOpcode, AGG_SIG_AMOUNT, AGG_SIG_COST,
     AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT, AGG_SIG_PARENT_PUZZLE, AGG_SIG_PUZZLE,
@@ -9,18 +11,18 @@ use super::opcodes::{
     ASSERT_HEIGHT_ABSOLUTE, ASSERT_HEIGHT_RELATIVE, ASSERT_MY_AMOUNT, ASSERT_MY_BIRTH_HEIGHT,
     ASSERT_MY_BIRTH_SECONDS, ASSERT_MY_COIN_ID, ASSERT_MY_PARENT_ID, ASSERT_MY_PUZZLEHASH,
     ASSERT_PUZZLE_ANNOUNCEMENT, ASSERT_SECONDS_ABSOLUTE, ASSERT_SECONDS_RELATIVE, CREATE_COIN,
-    CREATE_COIN_ANNOUNCEMENT, CREATE_COIN_COST, CREATE_PUZZLE_ANNOUNCEMENT, REMARK, RESERVE_FEE,
-    SOFTFORK,
+    CREATE_COIN_ANNOUNCEMENT, CREATE_COIN_COST, CREATE_PUZZLE_ANNOUNCEMENT, RECEIVE_MESSAGE,
+    REMARK, RESERVE_FEE, SEND_MESSAGE, SOFTFORK,
 };
 use super::sanitize_int::{sanitize_uint, SanitizedUint};
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
-use crate::gen::flags::{
-    AGG_SIG_ARGS, COND_ARGS_NIL, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL, NO_UNKNOWN_CONDS,
-    STRICT_ARGS_COUNT,
-};
+use crate::consensus_constants::ConsensusConstants;
+use crate::gen::flags::{DISALLOW_INFINITY_G1, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
+use crate::gen::messages::{Message, SpendId};
 use crate::gen::spend_visitor::SpendVisitor;
 use crate::gen::validation_error::check_nil;
-use chia_protocol::bytes::Bytes32;
+use chia_bls::PublicKey;
+use chia_protocol::Bytes32;
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use clvmr::cost::Cost;
 use clvmr::sha2::{Digest, Sha256};
@@ -93,32 +95,33 @@ impl SpendVisitor for MempoolVisitor {
                     spend.flags &= !ELIGIBLE_FOR_FF;
                 }
             }
-            Condition::AggSigMe(_, _) => {
+            Condition::AggSigMe(_, _)
+            | Condition::AggSigParent(_, _)
+            | Condition::AggSigParentAmount(_, _)
+            | Condition::AggSigParentPuzzle(_, _) => {
                 spend.flags &= !ELIGIBLE_FOR_DEDUP;
                 spend.flags &= !ELIGIBLE_FOR_FF;
             }
-            Condition::AggSigParent(_, _) => {
-                spend.flags &= !ELIGIBLE_FOR_DEDUP;
-                spend.flags &= !ELIGIBLE_FOR_FF;
-            }
-            Condition::AggSigPuzzle(_, _) => {
-                spend.flags &= !ELIGIBLE_FOR_DEDUP;
-            }
-            Condition::AggSigAmount(_, _) => {
+            Condition::AggSigPuzzle(_, _)
+            | Condition::AggSigAmount(_, _)
+            | Condition::AggSigPuzzleAmount(_, _)
+            | Condition::AggSigUnsafe(_, _) => {
                 spend.flags &= !ELIGIBLE_FOR_DEDUP;
             }
-            Condition::AggSigPuzzleAmount(_, _) => {
+            Condition::SendMessage(src_mode, _dst, _msg) => {
+                if (src_mode & super::messages::PARENT) != 0 {
+                    spend.flags &= !ELIGIBLE_FOR_FF;
+                }
+                // de-duplicating a coin spend that's sending a message may
+                // leave a receiver without a message, which is a failure
                 spend.flags &= !ELIGIBLE_FOR_DEDUP;
             }
-            Condition::AggSigParentAmount(_, _) => {
-                spend.flags &= !ELIGIBLE_FOR_DEDUP;
-                spend.flags &= !ELIGIBLE_FOR_FF;
-            }
-            Condition::AggSigParentPuzzle(_, _) => {
-                spend.flags &= !ELIGIBLE_FOR_DEDUP;
-                spend.flags &= !ELIGIBLE_FOR_FF;
-            }
-            Condition::AggSigUnsafe(_, _) => {
+            Condition::ReceiveMessage(_src, dst_mode, _msg) => {
+                if (dst_mode & super::messages::PARENT) != 0 {
+                    spend.flags &= !ELIGIBLE_FOR_FF;
+                }
+                // de-duplicating a coin spend that's receiving a message may
+                // leave a sent-message un-received, which is a failure
                 spend.flags &= !ELIGIBLE_FOR_DEDUP;
             }
             _ => {}
@@ -169,7 +172,7 @@ impl SpendVisitor for MempoolVisitor {
 //  )
 // )))
 
-#[derive(PartialEq, Hash, Eq, Debug)]
+#[derive(Debug)]
 pub enum Condition {
     // pubkey (48 bytes) and message (<= 1024 bytes)
     AggSigUnsafe(NodePtr, NodePtr),
@@ -224,9 +227,38 @@ pub enum Condition {
     // the specified cost
     Softfork(Cost),
 
+    // source, destination, message
+    SendMessage(u8, SpendId, NodePtr),
+    ReceiveMessage(SpendId, u8, NodePtr),
+
     // this means the condition is unconditionally true and can be skipped
     Skip,
     SkipRelativeCondition,
+}
+
+fn check_agg_sig_unsafe_message(
+    a: &Allocator,
+    msg: NodePtr,
+    constants: &ConsensusConstants,
+) -> Result<(), ValidationErr> {
+    if a.atom_len(msg) < 32 {
+        return Ok(());
+    }
+    let buf = a.atom(msg);
+    for additional_data in &[
+        constants.agg_sig_me_additional_data.as_ref(),
+        constants.agg_sig_parent_additional_data.as_ref(),
+        constants.agg_sig_puzzle_additional_data.as_ref(),
+        constants.agg_sig_amount_additional_data.as_ref(),
+        constants.agg_sig_puzzle_amount_additional_data.as_ref(),
+        constants.agg_sig_parent_amount_additional_data.as_ref(),
+        constants.agg_sig_parent_puzzle_additional_data.as_ref(),
+    ] {
+        if buf.as_ref().ends_with(additional_data) {
+            return Err(ValidationErr(msg, ErrorCode::InvalidMessage));
+        }
+    }
+    Ok(())
 }
 
 fn maybe_check_args_terminator(
@@ -247,53 +279,15 @@ pub fn parse_args(
     flags: u32,
 ) -> Result<Condition, ValidationErr> {
     match op {
-        AGG_SIG_UNSAFE => {
-            let pubkey = sanitize_hash(a, first(a, c)?, 48, ErrorCode::InvalidPubkey)?;
-            c = rest(a, c)?;
-            let message = sanitize_announce_msg(a, first(a, c)?, ErrorCode::InvalidMessage)?;
-            // AGG_SIG_UNSAFE takes exactly two parameters
-            if (flags & COND_ARGS_NIL) != 0 {
-                // make sure there aren't more than two
-                check_nil(a, rest(a, c)?)?;
-                Ok(Condition::AggSigUnsafe(pubkey, message))
-            } else if (flags & AGG_SIG_ARGS) == 0 {
-                // but the argument list still doesn't need to be terminated by NIL,
-                // just any atom will do
-                match a.sexp(rest(a, c)?) {
-                    SExp::Pair(_, _) => Err(ValidationErr(c, ErrorCode::InvalidCondition)),
-                    _ => Ok(Condition::AggSigUnsafe(pubkey, message)),
-                }
-            } else {
-                Ok(Condition::AggSigUnsafe(pubkey, message))
-            }
-        }
-        AGG_SIG_ME => {
-            let pubkey = sanitize_hash(a, first(a, c)?, 48, ErrorCode::InvalidPubkey)?;
-            c = rest(a, c)?;
-            let message = sanitize_announce_msg(a, first(a, c)?, ErrorCode::InvalidMessage)?;
-            // AGG_SIG_ME takes exactly two parameters
-            if (flags & COND_ARGS_NIL) != 0 {
-                // make sure there aren't more than two
-                check_nil(a, rest(a, c)?)?;
-                Ok(Condition::AggSigMe(pubkey, message))
-            } else if (flags & AGG_SIG_ARGS) == 0 {
-                // but the argument list still doesn't need to be terminated by NIL,
-                // just any atom will do
-                match a.sexp(rest(a, c)?) {
-                    SExp::Pair(_, _) => Err(ValidationErr(c, ErrorCode::InvalidCondition)),
-                    _ => Ok(Condition::AggSigMe(pubkey, message)),
-                }
-            } else {
-                Ok(Condition::AggSigMe(pubkey, message))
-            }
-        }
-        AGG_SIG_PUZZLE
+        AGG_SIG_UNSAFE
+        | AGG_SIG_ME
+        | AGG_SIG_PUZZLE
         | AGG_SIG_PUZZLE_AMOUNT
         | AGG_SIG_PARENT
         | AGG_SIG_AMOUNT
         | AGG_SIG_PARENT_PUZZLE
         | AGG_SIG_PARENT_AMOUNT => {
-            let pubkey = sanitize_hash(a, first(a, c)?, 48, ErrorCode::InvalidPubkey)?;
+            let pubkey = sanitize_hash(a, first(a, c)?, 48, ErrorCode::InvalidPublicKey)?;
             c = rest(a, c)?;
             let message = sanitize_announce_msg(a, first(a, c)?, ErrorCode::InvalidMessage)?;
             // AGG_SIG_* take two parameters
@@ -302,6 +296,8 @@ pub fn parse_args(
                 check_nil(a, rest(a, c)?)?;
             }
             match op {
+                AGG_SIG_UNSAFE => Ok(Condition::AggSigUnsafe(pubkey, message)),
+                AGG_SIG_ME => Ok(Condition::AggSigMe(pubkey, message)),
                 AGG_SIG_PARENT => Ok(Condition::AggSigParent(pubkey, message)),
                 AGG_SIG_PUZZLE => Ok(Condition::AggSigPuzzle(pubkey, message)),
                 AGG_SIG_AMOUNT => Ok(Condition::AggSigAmount(pubkey, message)),
@@ -319,10 +315,10 @@ pub fn parse_args(
             let node = first(a, c)?;
             let amount = match sanitize_uint(a, node, 8, ErrorCode::InvalidCoinAmount)? {
                 SanitizedUint::PositiveOverflow => {
-                    return Err(ValidationErr(node, ErrorCode::AmountExceedsMaximum));
+                    return Err(ValidationErr(node, ErrorCode::CoinAmountExceedsMaximum));
                 }
                 SanitizedUint::NegativeOverflow => {
-                    return Err(ValidationErr(node, ErrorCode::NegativeAmount));
+                    return Err(ValidationErr(node, ErrorCode::CoinAmountNegative));
                 }
                 SanitizedUint::Ok(amount) => amount,
             };
@@ -370,7 +366,7 @@ pub fn parse_args(
         }
         256..=65535 => {
             // All of these conditions are unknown
-            // but they have costs (when ENABLE_SOFTFORK_CONDITION is enabled)
+            // but they have costs
             if (flags & NO_UNKNOWN_CONDS) != 0 {
                 Err(ValidationErr(c, ErrorCode::InvalidConditionOpcode))
             } else {
@@ -429,7 +425,7 @@ pub fn parse_args(
         }
         ASSERT_MY_PUZZLEHASH => {
             maybe_check_args_terminator(a, c, flags)?;
-            let id = sanitize_hash(a, first(a, c)?, 32, ErrorCode::AssertMyPuzzlehashFailed)?;
+            let id = sanitize_hash(a, first(a, c)?, 32, ErrorCode::AssertMyPuzzleHashFailed)?;
             Ok(Condition::AssertMyPuzzlehash(id))
         }
         ASSERT_MY_AMOUNT => {
@@ -442,8 +438,9 @@ pub fn parse_args(
             let node = first(a, c)?;
             let code = ErrorCode::AssertMyBirthSecondsFailed;
             match sanitize_uint(a, node, 8, code)? {
-                SanitizedUint::PositiveOverflow => Err(ValidationErr(node, code)),
-                SanitizedUint::NegativeOverflow => Err(ValidationErr(node, code)),
+                SanitizedUint::PositiveOverflow | SanitizedUint::NegativeOverflow => {
+                    Err(ValidationErr(node, code))
+                }
                 SanitizedUint::Ok(r) => Ok(Condition::AssertMyBirthSeconds(r)),
             }
         }
@@ -452,8 +449,9 @@ pub fn parse_args(
             let node = first(a, c)?;
             let code = ErrorCode::AssertMyBirthHeightFailed;
             match sanitize_uint(a, node, 4, code)? {
-                SanitizedUint::PositiveOverflow => Err(ValidationErr(node, code)),
-                SanitizedUint::NegativeOverflow => Err(ValidationErr(node, code)),
+                SanitizedUint::PositiveOverflow | SanitizedUint::NegativeOverflow => {
+                    Err(ValidationErr(node, code))
+                }
                 SanitizedUint::Ok(r) => Ok(Condition::AssertMyBirthHeight(r as u32)),
             }
         }
@@ -467,7 +465,7 @@ pub fn parse_args(
         ASSERT_SECONDS_RELATIVE => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertSecondsRelative;
+            let code = ErrorCode::AssertSecondsRelativeFailed;
             match sanitize_uint(a, node, 8, code)? {
                 SanitizedUint::PositiveOverflow => Err(ValidationErr(node, code)),
                 SanitizedUint::NegativeOverflow => Ok(Condition::SkipRelativeCondition),
@@ -477,7 +475,7 @@ pub fn parse_args(
         ASSERT_SECONDS_ABSOLUTE => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertSecondsAbsolute;
+            let code = ErrorCode::AssertSecondsAbsoluteFailed;
             match sanitize_uint(a, node, 4, code)? {
                 SanitizedUint::PositiveOverflow => Err(ValidationErr(node, code)),
                 SanitizedUint::NegativeOverflow => Ok(Condition::Skip),
@@ -487,7 +485,7 @@ pub fn parse_args(
         ASSERT_HEIGHT_RELATIVE => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertHeightRelative;
+            let code = ErrorCode::AssertHeightRelativeFailed;
             match sanitize_uint(a, node, 4, code)? {
                 SanitizedUint::PositiveOverflow => Err(ValidationErr(node, code)),
                 SanitizedUint::NegativeOverflow => Ok(Condition::SkipRelativeCondition),
@@ -497,7 +495,7 @@ pub fn parse_args(
         ASSERT_HEIGHT_ABSOLUTE => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertHeightAbsolute;
+            let code = ErrorCode::AssertHeightAbsoluteFailed;
             match sanitize_uint(a, node, 4, code)? {
                 SanitizedUint::PositiveOverflow => Err(ValidationErr(node, code)),
                 SanitizedUint::NegativeOverflow => Ok(Condition::Skip),
@@ -507,7 +505,7 @@ pub fn parse_args(
         ASSERT_BEFORE_SECONDS_RELATIVE => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertBeforeSecondsRelative;
+            let code = ErrorCode::AssertBeforeSecondsRelativeFailed;
             match sanitize_uint(a, node, 8, code)? {
                 SanitizedUint::PositiveOverflow => Ok(Condition::SkipRelativeCondition),
                 SanitizedUint::NegativeOverflow => Err(ValidationErr(node, code)),
@@ -518,7 +516,7 @@ pub fn parse_args(
             maybe_check_args_terminator(a, c, flags)?;
 
             let node = first(a, c)?;
-            let code = ErrorCode::AssertBeforeSecondsAbsolute;
+            let code = ErrorCode::AssertBeforeSecondsAbsoluteFailed;
             match sanitize_uint(a, node, 8, code)? {
                 SanitizedUint::PositiveOverflow => Ok(Condition::Skip),
                 SanitizedUint::NegativeOverflow => Err(ValidationErr(node, code)),
@@ -528,7 +526,7 @@ pub fn parse_args(
         ASSERT_BEFORE_HEIGHT_RELATIVE => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertBeforeHeightRelative;
+            let code = ErrorCode::AssertBeforeHeightRelativeFailed;
             match sanitize_uint(a, node, 4, code)? {
                 SanitizedUint::PositiveOverflow => Ok(Condition::SkipRelativeCondition),
                 SanitizedUint::NegativeOverflow => Err(ValidationErr(node, code)),
@@ -538,12 +536,45 @@ pub fn parse_args(
         ASSERT_BEFORE_HEIGHT_ABSOLUTE => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertBeforeHeightAbsolute;
+            let code = ErrorCode::AssertBeforeHeightAbsoluteFailed;
             match sanitize_uint(a, node, 4, code)? {
                 SanitizedUint::PositiveOverflow => Ok(Condition::Skip),
                 SanitizedUint::NegativeOverflow => Err(ValidationErr(node, code)),
                 SanitizedUint::Ok(r) => Ok(Condition::AssertBeforeHeightAbsolute(r as u32)),
             }
+        }
+        SEND_MESSAGE => {
+            let mode = sanitize_message_mode(a, first(a, c)?)?;
+            c = rest(a, c)?;
+            let message = sanitize_announce_msg(a, first(a, c)?, ErrorCode::InvalidMessage)?;
+            c = rest(a, c)?;
+            let dst = SpendId::parse(a, &mut c, (mode & 0b111) as u8)?;
+
+            if (flags & STRICT_ARGS_COUNT) != 0 {
+                check_nil(a, c)?;
+            }
+
+            Ok(Condition::SendMessage(
+                ((mode >> 3) & 0b111) as u8,
+                dst,
+                message,
+            ))
+        }
+        RECEIVE_MESSAGE => {
+            let mode = sanitize_message_mode(a, first(a, c)?)?;
+            c = rest(a, c)?;
+            let message = sanitize_announce_msg(a, first(a, c)?, ErrorCode::InvalidMessage)?;
+            c = rest(a, c)?;
+            let src = SpendId::parse(a, &mut c, ((mode >> 3) & 0b111) as u8)?;
+
+            if (flags & STRICT_ARGS_COUNT) != 0 {
+                check_nil(a, c)?;
+            }
+            Ok(Condition::ReceiveMessage(
+                src,
+                (mode & 0b111) as u8,
+                message,
+            ))
         }
         REMARK => {
             // this condition is always true, we always ignore arguments
@@ -611,13 +642,13 @@ pub struct Spend {
     pub create_coin: HashSet<NewCoin>,
     // Agg Sig Me conditions
     // Maybe this should be an array of vectors
-    pub agg_sig_me: Vec<(NodePtr, NodePtr)>,
-    pub agg_sig_parent: Vec<(NodePtr, NodePtr)>,
-    pub agg_sig_puzzle: Vec<(NodePtr, NodePtr)>,
-    pub agg_sig_amount: Vec<(NodePtr, NodePtr)>,
-    pub agg_sig_puzzle_amount: Vec<(NodePtr, NodePtr)>,
-    pub agg_sig_parent_amount: Vec<(NodePtr, NodePtr)>,
-    pub agg_sig_parent_puzzle: Vec<(NodePtr, NodePtr)>,
+    pub agg_sig_me: Vec<(PublicKey, NodePtr)>,
+    pub agg_sig_parent: Vec<(PublicKey, NodePtr)>,
+    pub agg_sig_puzzle: Vec<(PublicKey, NodePtr)>,
+    pub agg_sig_amount: Vec<(PublicKey, NodePtr)>,
+    pub agg_sig_puzzle_amount: Vec<(PublicKey, NodePtr)>,
+    pub agg_sig_parent_amount: Vec<(PublicKey, NodePtr)>,
+    pub agg_sig_parent_puzzle: Vec<(PublicKey, NodePtr)>,
     // Flags describing properties of this spend. See flags above
     pub flags: u32,
 }
@@ -671,7 +702,7 @@ pub struct SpendBundleConditions {
     pub height_absolute: u32,
     pub seconds_absolute: u64,
     // Unsafe Agg Sig conditions (i.e. not tied to the spend generating it)
-    pub agg_sig_unsafe: Vec<(NodePtr, NodePtr)>,
+    pub agg_sig_unsafe: Vec<(PublicKey, NodePtr)>,
     // when set, this is the lowest (i.e. most restrictive) of all
     // ASSERT_BEFORE_HEIGHT_ABSOLUTE conditions
     pub before_height_absolute: Option<u32>,
@@ -701,6 +732,11 @@ pub struct ParseState {
     // validated.
     assert_coin: HashSet<NodePtr>,
     assert_puzzle: HashSet<NodePtr>,
+
+    // These are just list of all the messages being sent or received. There's
+    // no deduplication. We defer resolving and checking the messages until
+    // after we're done parsing all conditions for all spends
+    messages: Vec<Message>,
 
     // the assert concurrent spend coin IDs are inserted into this set and
     // checked once everything has been parsed.
@@ -768,6 +804,7 @@ pub fn process_single_spend<V: SpendVisitor>(
     conditions: NodePtr,
     flags: u32,
     max_cost: &mut Cost,
+    constants: &ConsensusConstants,
 ) -> Result<(), ValidationErr> {
     let parent_id = sanitize_hash(a, parent_id, 32, ErrorCode::InvalidParentId)?;
     let puzzle_hash = sanitize_hash(a, puzzle_hash, 32, ErrorCode::InvalidPuzzleHash)?;
@@ -807,6 +844,7 @@ pub fn process_single_spend<V: SpendVisitor>(
         conditions,
         flags,
         max_cost,
+        constants,
         &mut visitor,
     )
 }
@@ -829,6 +867,20 @@ fn decrement(cnt: &mut u32, n: NodePtr) -> Result<(), ValidationErr> {
     }
 }
 
+fn to_key(a: &Allocator, pk: NodePtr, flags: u32) -> Result<Option<PublicKey>, ValidationErr> {
+    let key = PublicKey::from_bytes(a.atom(pk).as_ref().try_into().expect("internal error"))
+        .map_err(|_| ValidationErr(pk, ErrorCode::InvalidPublicKey))?;
+    if key.is_inf() {
+        if (flags & DISALLOW_INFINITY_G1) != 0 {
+            Err(ValidationErr(pk, ErrorCode::InvalidPublicKey))
+        } else {
+            Ok(None)
+        }
+    } else {
+        Ok(Some(key))
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn parse_conditions<V: SpendVisitor>(
     a: &Allocator,
@@ -838,6 +890,7 @@ pub fn parse_conditions<V: SpendVisitor>(
     mut iter: NodePtr,
     flags: u32,
     max_cost: &mut Cost,
+    constants: &ConsensusConstants,
     visitor: &mut V,
 ) -> Result<(), ValidationErr> {
     let mut announce_countdown: u32 = 1024;
@@ -1043,7 +1096,7 @@ pub fn parse_conditions<V: SpendVisitor>(
             }
             Condition::AssertMyPuzzlehash(hash) => {
                 if a.atom(hash).as_ref() != a.atom(spend.puzzle_hash).as_ref() {
-                    return Err(ValidationErr(c, ErrorCode::AssertMyPuzzlehashFailed));
+                    return Err(ValidationErr(c, ErrorCode::AssertMyPuzzleHashFailed));
                 }
             }
             Condition::CreateCoinAnnouncement(msg) => {
@@ -1071,34 +1124,85 @@ pub fn parse_conditions<V: SpendVisitor>(
                 state.assert_concurrent_puzzle.insert(id);
             }
             Condition::AggSigMe(pk, msg) => {
-                spend.agg_sig_me.push((pk, msg));
+                if let Some(pk) = to_key(a, pk, flags)? {
+                    spend.agg_sig_me.push((pk, msg));
+                }
             }
             Condition::AggSigParent(pk, msg) => {
-                spend.agg_sig_parent.push((pk, msg));
+                if let Some(pk) = to_key(a, pk, flags)? {
+                    spend.agg_sig_parent.push((pk, msg));
+                }
             }
             Condition::AggSigPuzzle(pk, msg) => {
-                spend.agg_sig_puzzle.push((pk, msg));
+                if let Some(pk) = to_key(a, pk, flags)? {
+                    spend.agg_sig_puzzle.push((pk, msg));
+                }
             }
             Condition::AggSigAmount(pk, msg) => {
-                spend.agg_sig_amount.push((pk, msg));
+                if let Some(pk) = to_key(a, pk, flags)? {
+                    spend.agg_sig_amount.push((pk, msg));
+                }
             }
             Condition::AggSigPuzzleAmount(pk, msg) => {
-                spend.agg_sig_puzzle_amount.push((pk, msg));
+                if let Some(pk) = to_key(a, pk, flags)? {
+                    spend.agg_sig_puzzle_amount.push((pk, msg));
+                }
             }
             Condition::AggSigParentAmount(pk, msg) => {
-                spend.agg_sig_parent_amount.push((pk, msg));
+                if let Some(pk) = to_key(a, pk, flags)? {
+                    spend.agg_sig_parent_amount.push((pk, msg));
+                }
             }
             Condition::AggSigParentPuzzle(pk, msg) => {
-                spend.agg_sig_parent_puzzle.push((pk, msg));
+                if let Some(pk) = to_key(a, pk, flags)? {
+                    spend.agg_sig_parent_puzzle.push((pk, msg));
+                }
             }
             Condition::AggSigUnsafe(pk, msg) => {
-                ret.agg_sig_unsafe.push((pk, msg));
+                // AGG_SIG_UNSAFE messages are not allowed to end with the
+                // suffix added to other AGG_SIG_* conditions
+                check_agg_sig_unsafe_message(a, msg, constants)?;
+                if let Some(pk) = to_key(a, pk, flags)? {
+                    ret.agg_sig_unsafe.push((pk, msg));
+                }
             }
             Condition::Softfork(cost) => {
                 if *max_cost < cost {
                     return Err(ValidationErr(c, ErrorCode::CostExceeded));
                 }
                 *max_cost -= cost;
+            }
+            Condition::SendMessage(src_mode, dst, msg) => {
+                decrement(&mut announce_countdown, msg)?;
+                let src = SpendId::from_self(
+                    src_mode,
+                    spend.parent_id,
+                    spend.puzzle_hash,
+                    spend.coin_amount,
+                    &spend.coin_id,
+                )?;
+                state.messages.push(Message {
+                    src,
+                    dst,
+                    msg,
+                    counter: 1,
+                });
+            }
+            Condition::ReceiveMessage(src, dst_mode, msg) => {
+                decrement(&mut announce_countdown, msg)?;
+                let dst = SpendId::from_self(
+                    dst_mode,
+                    spend.parent_id,
+                    spend.puzzle_hash,
+                    spend.coin_amount,
+                    &spend.coin_id,
+                )?;
+                state.messages.push(Message {
+                    src,
+                    dst,
+                    msg,
+                    counter: -1,
+                });
             }
             Condition::SkipRelativeCondition => {
                 assert_not_ephemeral(&mut spend.flags, state, ret.spends.len());
@@ -1145,6 +1249,7 @@ pub fn parse_spends<V: SpendVisitor>(
     spends: NodePtr,
     max_cost: Cost,
     flags: u32,
+    constants: &ConsensusConstants,
 ) -> Result<SpendBundleConditions, ValidationErr> {
     let mut ret = SpendBundleConditions::default();
     let mut state = ParseState::default();
@@ -1171,6 +1276,7 @@ pub fn parse_spends<V: SpendVisitor>(
             conds,
             flags,
             &mut cost_left,
+            constants,
         )?;
     }
 
@@ -1185,7 +1291,7 @@ pub fn validate_conditions(
     ret: &SpendBundleConditions,
     state: ParseState,
     spends: NodePtr,
-    flags: u32,
+    _flags: u32,
 ) -> Result<(), ValidationErr> {
     if ret.removal_amount < ret.addition_amount {
         // The sum of removal amounts must not be less than the sum of addition
@@ -1287,15 +1393,15 @@ pub fn validate_conditions(
         }
     }
 
-    if (flags & NO_RELATIVE_CONDITIONS_ON_EPHEMERAL) != 0 {
-        for spend_idx in state.assert_not_ephemeral {
-            // make sure this coin was NOT created in this block
-            if is_ephemeral(a, spend_idx, &state.spent_coins, &ret.spends) {
-                return Err(ValidationErr(
-                    ret.spends[spend_idx].parent_id,
-                    ErrorCode::EphemeralRelativeCondition,
-                ));
-            }
+    for spend_idx in state.assert_not_ephemeral {
+        // make sure this coin was NOT created in this block
+        // because consensus rules do not allow relative conditions on
+        // ephemeral spends
+        if is_ephemeral(a, spend_idx, &state.spent_coins, &ret.spends) {
+            return Err(ValidationErr(
+                ret.spends[spend_idx].parent_id,
+                ErrorCode::EphemeralRelativeCondition,
+            ));
         }
     }
 
@@ -1315,6 +1421,27 @@ pub fn validate_conditions(
                 return Err(ValidationErr(
                     puzzle_assert,
                     ErrorCode::AssertPuzzleAnnouncementFailed,
+                ));
+            }
+        }
+    }
+
+    if !state.messages.is_empty() {
+        // the integers count the number of times the message has been sent
+        // minus the number of times it's been received. At the end we ensure
+        // all counters are 0, otherwise some message wasn't received or sent
+        // the right number of times.
+        let mut messages = HashMap::<Vec<u8>, i32>::new();
+
+        for msg in &state.messages {
+            *messages.entry(msg.make_key(a)).or_insert(0) += i32::from(msg.counter);
+        }
+
+        for count in messages.values() {
+            if *count != 0 {
+                return Err(ValidationErr(
+                    NodePtr::NIL,
+                    ErrorCode::MessageNotSentOrReceived,
                 ));
             }
         }
@@ -1341,13 +1468,15 @@ fn u64_to_bytes(n: u64) -> Vec<u8> {
     buf
 }
 #[cfg(test)]
-use crate::gen::flags::ENABLE_SOFTFORK_CONDITION;
+use crate::consensus_constants::TEST_CONSTANTS;
 #[cfg(test)]
 use clvmr::number::Number;
 #[cfg(test)]
 use clvmr::serde::node_to_bytes;
 #[cfg(test)]
 use hex::FromHex;
+#[cfg(test)]
+use hex_literal::hex;
 #[cfg(test)]
 use num_traits::Num;
 #[cfg(test)]
@@ -1369,10 +1498,7 @@ const LONG_VEC: &[u8; 33] = &[
 ];
 
 #[cfg(test)]
-const PUBKEY: &[u8; 48] = &[
-    6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
-    6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
-];
+const PUBKEY: &[u8; 48] = &hex!("97f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb");
 #[cfg(test)]
 const MSG1: &[u8; 13] = &[3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
 #[cfg(test)]
@@ -1490,7 +1616,7 @@ fn parse_list_impl(
         let num = Number::from_str_radix(v, 10).unwrap();
         (a.new_number(num).unwrap(), v.len() + 1)
     } else {
-        panic!("atom not supported \"{}\"", input);
+        panic!("atom not supported \"{input}\"");
     }
 }
 
@@ -1518,6 +1644,10 @@ fn parse_list(a: &mut Allocator, input: &str, callback: &Callback) -> NodePtr {
     subs.insert("coin12", a.new_atom(&test_coin_id(H1, H2, 123)).unwrap());
     subs.insert("coin21", a.new_atom(&test_coin_id(H2, H1, 123)).unwrap());
     subs.insert("coin22", a.new_atom(&test_coin_id(H2, H2, 123)).unwrap());
+    subs.insert(
+        "coin21_456",
+        a.new_atom(&test_coin_id(H2, H1, 456)).unwrap(),
+    );
     subs.insert(
         "coin12_h2_42",
         a.new_atom(&test_coin_id(
@@ -1563,6 +1693,7 @@ fn parse_list(a: &mut Allocator, input: &str, callback: &Callback) -> NodePtr {
 // string. Since the parser is recursive and simple, large structures have to be
 // constructed this way
 #[cfg(test)]
+#[allow(clippy::needless_pass_by_value)]
 fn cond_test_cb(
     input: &str,
     flags: u32,
@@ -1570,17 +1701,17 @@ fn cond_test_cb(
 ) -> Result<(Allocator, SpendBundleConditions), ValidationErr> {
     let mut a = Allocator::new();
 
-    println!("input: {}", input);
+    println!("input: {input}");
 
     let n = parse_list(&mut a, input, &callback);
     for c in node_to_bytes(&a, n).unwrap() {
-        print!("{:02x}", c);
+        print!("{c:02x}");
     }
     println!();
-    match parse_spends::<MempoolVisitor>(&a, n, 11000000000, flags) {
+    match parse_spends::<MempoolVisitor>(&a, n, 11_000_000_000, flags, &TEST_CONSTANTS) {
         Ok(list) => {
             for n in &list.spends {
-                println!("{:?}", n);
+                println!("{n:?}");
             }
             Ok((a, list))
         }
@@ -1589,7 +1720,10 @@ fn cond_test_cb(
 }
 
 #[cfg(test)]
-const MEMPOOL_MODE: u32 = COND_ARGS_NIL | STRICT_ARGS_COUNT | NO_UNKNOWN_CONDS;
+use crate::gen::flags::MEMPOOL_MODE;
+
+#[cfg(test)]
+use crate::gen::flags::ENABLE_MESSAGE_CONDITIONS;
 
 #[cfg(test)]
 fn cond_test(input: &str) -> Result<(Allocator, SpendBundleConditions), ValidationErr> {
@@ -1741,24 +1875,69 @@ fn test_invalid_spend_list_terminator() {
 #[case(AGG_SIG_PARENT_AMOUNT, "{pubkey} ({msg1}")]
 #[case(ASSERT_CONCURRENT_SPEND, "{coin12}")]
 #[case(ASSERT_CONCURRENT_PUZZLE, "{h2}")]
-fn test_extra_arg_mempool(
+fn test_strict_args_count(
     #[case] condition: ConditionOpcode,
     #[case] arg: &str,
-    #[values(MEMPOOL_MODE, 0)] mempool: u32,
+    #[values(STRICT_ARGS_COUNT, 0)] flags: u32,
 ) {
-    // extra args are disallowed in mempool mode
-    assert_eq!(
-        cond_test_flag(
-            &format!(
-                "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 )))))",
-                condition as u8, arg
-            ),
-            STRICT_ARGS_COUNT | ENABLE_SOFTFORK_CONDITION | mempool
-        )
-        .unwrap_err()
-        .1,
-        ErrorCode::InvalidCondition
+    // extra args are disallowed when STRICT_ARGS_COUNT is set
+    let ret = cond_test_flag(
+        &format!(
+            "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 )))))",
+            condition as u8, arg
+        ),
+        flags,
     );
+    if flags == 0 {
+        // two of the cases won't pass, even when garbage at the end is allowed.
+        if condition == ASSERT_COIN_ANNOUNCEMENT {
+            assert_eq!(ret.unwrap_err().1, ErrorCode::AssertCoinAnnouncementFailed,);
+        } else if condition == ASSERT_PUZZLE_ANNOUNCEMENT {
+            assert_eq!(
+                ret.unwrap_err().1,
+                ErrorCode::AssertPuzzleAnnouncementFailed,
+            );
+        } else {
+            assert!(ret.is_ok());
+        }
+    } else {
+        assert_eq!(ret.unwrap_err().1, ErrorCode::InvalidCondition);
+    }
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(0x07, "0x1337", "({coin12}")]
+#[case(0x04, "0x1337", "({h1}")]
+#[case(0x06, "0x1337", "({h1} ({h2}")]
+#[case(0x05, "0x1337", "({h1} (123")]
+#[case(0x02, "0x1337", "({h2}")]
+#[case(0x03, "0x1337", "({h2} (123")]
+#[case(0x01, "0x1337", "(123")]
+#[case(0, "0x1337", "")]
+fn test_message_strict_args_count(
+    #[values(0, 1)] pad: u8,
+    #[case] mode: u8,
+    #[case] msg: &str,
+    #[case] arg: &str,
+    #[values(STRICT_ARGS_COUNT, 0)] flags: u32,
+) {
+    // extra args are disallowed when STRICT_ARG_COUNT is set
+    // pad determines whether the extra (unknown) argument is added to the
+    // SEND_MESSAGE or the RECEIVE_MESSAGE condition
+    let extra1 = if pad == 0 { "(1337" } else { "" };
+    let extra2 = if pad == 1 { "(1337" } else { "" };
+    let ret = cond_test_flag(
+        &format!(
+            "((({{h1}} ({{h2}} (123 (((66 ({mode} ({msg} {arg} {extra1} ) ((67 ({mode} ({msg} {extra2} ) ))))"
+        ),
+        flags | ENABLE_MESSAGE_CONDITIONS,
+    );
+    if flags == 0 {
+        ret.unwrap();
+    } else {
+        assert_eq!(ret.unwrap_err().1, ErrorCode::InvalidCondition);
+    }
 }
 
 #[cfg(test)]
@@ -1804,7 +1983,7 @@ fn test_extra_arg(
                 "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 ) {} ))))",
                 condition as u8, arg, extra_cond
             ),
-            ENABLE_SOFTFORK_CONDITION | MEMPOOL_MODE,
+            MEMPOOL_MODE,
         )
         .unwrap_err()
         .1,
@@ -1816,7 +1995,7 @@ fn test_extra_arg(
             "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 ) {} ))))",
             condition as u8, arg, extra_cond
         ),
-        ENABLE_SOFTFORK_CONDITION,
+        0,
     )
     .unwrap();
 
@@ -1830,7 +2009,7 @@ fn test_extra_arg(
     ]
     .contains(&condition);
 
-    let expected_cost = if has_agg_sig { 1200000 } else { 0 };
+    let expected_cost = if has_agg_sig { 1_200_000 } else { 0 };
 
     let expected_flags = if has_agg_sig { 0 } else { ELIGIBLE_FOR_DEDUP };
 
@@ -1926,27 +2105,27 @@ fn test_single_condition_no_op(#[case] condition: ConditionOpcode, #[case] value
 #[case(
     ASSERT_SECONDS_ABSOLUTE,
     "0x010000000000000000",
-    ErrorCode::AssertSecondsAbsolute
+    ErrorCode::AssertSecondsAbsoluteFailed
 )]
 #[case(
     ASSERT_SECONDS_RELATIVE,
     "0x010000000000000000",
-    ErrorCode::AssertSecondsRelative
+    ErrorCode::AssertSecondsRelativeFailed
 )]
 #[case(
     ASSERT_HEIGHT_ABSOLUTE,
     "0x0100000000",
-    ErrorCode::AssertHeightAbsolute
+    ErrorCode::AssertHeightAbsoluteFailed
 )]
 #[case(
     ASSERT_HEIGHT_RELATIVE,
     "0x0100000000",
-    ErrorCode::AssertHeightRelative
+    ErrorCode::AssertHeightRelativeFailed
 )]
 #[case(
     ASSERT_BEFORE_SECONDS_ABSOLUTE,
     "-1",
-    ErrorCode::AssertBeforeSecondsAbsolute
+    ErrorCode::AssertBeforeSecondsAbsoluteFailed
 )]
 #[case(
     ASSERT_BEFORE_SECONDS_ABSOLUTE,
@@ -1956,12 +2135,12 @@ fn test_single_condition_no_op(#[case] condition: ConditionOpcode, #[case] value
 #[case(
     ASSERT_BEFORE_SECONDS_RELATIVE,
     "-1",
-    ErrorCode::AssertBeforeSecondsRelative
+    ErrorCode::AssertBeforeSecondsRelativeFailed
 )]
 #[case(
     ASSERT_BEFORE_HEIGHT_ABSOLUTE,
     "-1",
-    ErrorCode::AssertBeforeHeightAbsolute
+    ErrorCode::AssertBeforeHeightAbsoluteFailed
 )]
 #[case(
     ASSERT_BEFORE_HEIGHT_ABSOLUTE,
@@ -1971,7 +2150,7 @@ fn test_single_condition_no_op(#[case] condition: ConditionOpcode, #[case] value
 #[case(
     ASSERT_BEFORE_HEIGHT_RELATIVE,
     "-1",
-    ErrorCode::AssertBeforeHeightRelative
+    ErrorCode::AssertBeforeHeightRelativeFailed
 )]
 #[case(ASSERT_MY_BIRTH_HEIGHT, "-1", ErrorCode::AssertMyBirthHeightFailed)]
 #[case(
@@ -2071,7 +2250,7 @@ fn test_missing_arg(#[case] condition: ConditionOpcode) {
     assert_eq!(
         cond_test_flag(
             &format!("((({{h1}} ({{h2}} (123 ((({} )))))", condition as u8),
-            ENABLE_SOFTFORK_CONDITION
+            0
         )
         .unwrap_err()
         .1,
@@ -2420,7 +2599,7 @@ fn test_single_assert_my_puzzle_hash_mismatch() {
         cond_test("((({h1} ({h2} (123 (((72 ({h1} )))))")
             .unwrap_err()
             .1,
-        ErrorCode::AssertMyPuzzlehashFailed
+        ErrorCode::AssertMyPuzzleHashFailed
     );
 }
 
@@ -2432,7 +2611,7 @@ fn test_single_invalid_assert_my_puzzle_hash() {
         cond_test("((({h1} ({h2} (123 (((72 ({long} )))))")
             .unwrap_err()
             .1,
-        ErrorCode::AssertMyPuzzlehashFailed
+        ErrorCode::AssertMyPuzzleHashFailed
     );
 }
 
@@ -2466,15 +2645,15 @@ fn test_create_coin_max_amount() {
 
     assert_eq!(conds.cost, CREATE_COIN_COST);
     assert_eq!(conds.spends.len(), 1);
-    assert_eq!(conds.removal_amount, 0xffffffffffffffff);
-    assert_eq!(conds.addition_amount, 0xffffffffffffffff);
+    assert_eq!(conds.removal_amount, 0xffff_ffff_ffff_ffff);
+    assert_eq!(conds.addition_amount, 0xffff_ffff_ffff_ffff);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 0xffffffffffffffff));
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 0xffff_ffff_ffff_ffff));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
         assert_eq!(c.puzzle_hash.as_ref(), H2);
-        assert_eq!(c.amount, 0xffffffffffffffff_u64);
+        assert_eq!(c.amount, 0xffff_ffff_ffff_ffff_u64);
         assert_eq!(c.hint, a.nil());
     }
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP | ELIGIBLE_FOR_FF);
@@ -2499,7 +2678,7 @@ fn test_create_coin_amount_exceeds_max() {
         cond_test("((({h1} ({h2} (123 (((51 ({h2} (0x010000000000000000 )))))")
             .unwrap_err()
             .1,
-        ErrorCode::AmountExceedsMaximum
+        ErrorCode::CoinAmountExceedsMaximum
     );
 }
 
@@ -2510,7 +2689,7 @@ fn test_create_coin_negative_amount() {
         cond_test("((({h1} ({h2} (123 (((51 ({h2} (-1 )))))")
             .unwrap_err()
             .1,
-        ErrorCode::NegativeAmount
+        ErrorCode::CoinAmountNegative
     );
 }
 
@@ -2781,7 +2960,7 @@ fn test_create_coin_exceed_cost() {
                     let coin = a.new_pair(val, coin).unwrap();
                     let val = a.new_atom(H2).unwrap();
                     let coin = a.new_pair(val, coin).unwrap();
-                    let val = a.new_atom(&u64_to_bytes(CREATE_COIN as u64)).unwrap();
+                    let val = a.new_atom(&u64_to_bytes(u64::from(CREATE_COIN))).unwrap();
                     let coin = a.new_pair(val, coin).unwrap();
 
                     // add the CREATE_COIN condition to the list (called rest)
@@ -2819,7 +2998,7 @@ fn test_duplicate_create_coin_with_hint() {
 }
 
 #[cfg(test)]
-fn agg_sig_vec(c: ConditionOpcode, s: &Spend) -> &[(NodePtr, NodePtr)] {
+fn agg_sig_vec(c: ConditionOpcode, s: &Spend) -> &[(PublicKey, NodePtr)] {
     match c {
         AGG_SIG_ME => &s.agg_sig_me,
         AGG_SIG_PARENT => &s.agg_sig_parent,
@@ -2848,11 +3027,8 @@ fn test_single_agg_sig_me(
     #[values(MEMPOOL_MODE, 0)] mempool: u32,
 ) {
     let (a, conds) = cond_test_flag(
-        &format!(
-            "((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{msg1}} )))))",
-            condition
-        ),
-        ENABLE_SOFTFORK_CONDITION | mempool,
+        &format!("((({{h1}} ({{h2}} (123 ((({condition} ({{pubkey}} ({{msg1}} )))))"),
+        mempool,
     )
     .unwrap();
 
@@ -2867,7 +3043,7 @@ fn test_single_agg_sig_me(
     let agg_sigs = agg_sig_vec(condition, spend);
     assert_eq!(agg_sigs.len(), 1);
     for c in agg_sigs {
-        assert_eq!(a.atom(c.0).as_ref(), PUBKEY);
+        assert_eq!(c.0, PublicKey::from_bytes(PUBKEY).unwrap());
         assert_eq!(a.atom(c.1).as_ref(), MSG1);
     }
     assert_eq!(spend.flags, 0);
@@ -2890,7 +3066,7 @@ fn test_duplicate_agg_sig(
     // aggregated, and so must all copies of the public keys
     let (a, conds) =
         cond_test_flag(&format!("((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{msg1}} ) (({} ({{pubkey}} ({{msg1}} ) ))))", condition as u8, condition as u8),
-            ENABLE_SOFTFORK_CONDITION | mempool)
+            mempool)
             .unwrap();
 
     assert_eq!(conds.cost, AGG_SIG_COST * 2);
@@ -2904,7 +3080,7 @@ fn test_duplicate_agg_sig(
     let agg_sigs = agg_sig_vec(condition, spend);
     assert_eq!(agg_sigs.len(), 2);
     for c in agg_sigs {
-        assert_eq!(a.atom(c.0).as_ref(), PUBKEY);
+        assert_eq!(c.0, PublicKey::from_bytes(PUBKEY).unwrap());
         assert_eq!(a.atom(c.1).as_ref(), MSG1);
     }
     assert_eq!(spend.flags, 0);
@@ -2919,6 +3095,7 @@ fn test_duplicate_agg_sig(
 #[case(AGG_SIG_PUZZLE_AMOUNT)]
 #[case(AGG_SIG_PARENT_PUZZLE)]
 #[case(AGG_SIG_PARENT_AMOUNT)]
+#[case(AGG_SIG_UNSAFE)]
 fn test_agg_sig_invalid_pubkey(
     #[case] condition: ConditionOpcode,
     #[values(MEMPOOL_MODE, 0)] mempool: u32,
@@ -2929,12 +3106,51 @@ fn test_agg_sig_invalid_pubkey(
                 "((({{h1}} ({{h2}} (123 ((({} ({{h2}} ({{msg1}} )))))",
                 condition as u8
             ),
-            ENABLE_SOFTFORK_CONDITION | mempool
+            mempool
         )
         .unwrap_err()
         .1,
-        ErrorCode::InvalidPubkey
+        ErrorCode::InvalidPublicKey
     );
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(AGG_SIG_ME)]
+#[case(AGG_SIG_PARENT)]
+#[case(AGG_SIG_PUZZLE)]
+#[case(AGG_SIG_AMOUNT)]
+#[case(AGG_SIG_PUZZLE_AMOUNT)]
+#[case(AGG_SIG_PARENT_PUZZLE)]
+#[case(AGG_SIG_PARENT_AMOUNT)]
+#[case(AGG_SIG_UNSAFE)]
+fn test_agg_sig_infinity_pubkey(
+    #[case] condition: ConditionOpcode,
+    #[values(DISALLOW_INFINITY_G1, 0)] mempool: u32,
+) {
+    let ret = cond_test_flag(
+        &format!(
+            "((({{h1}} ({{h2}} (123 ((({} (0xc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 ({{msg1}} )))))",
+            condition as u8
+            ),
+            mempool
+    );
+
+    if mempool != 0 {
+        assert_eq!(ret.unwrap_err().1, ErrorCode::InvalidPublicKey);
+    } else {
+        let ret = ret.expect("expected conditions to be valid").1;
+        assert!(ret.agg_sig_unsafe.is_empty());
+        for c in ret.spends {
+            assert!(c.agg_sig_me.is_empty());
+            assert!(c.agg_sig_parent.is_empty());
+            assert!(c.agg_sig_puzzle.is_empty());
+            assert!(c.agg_sig_amount.is_empty());
+            assert!(c.agg_sig_puzzle_amount.is_empty());
+            assert!(c.agg_sig_parent_amount.is_empty());
+            assert!(c.agg_sig_parent_puzzle.is_empty());
+        }
+    }
 }
 
 #[cfg(test)]
@@ -2956,7 +3172,7 @@ fn test_agg_sig_invalid_msg(
                 "((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{longmsg}} )))))",
                 condition as u8
             ),
-            ENABLE_SOFTFORK_CONDITION | mempool
+            mempool
         )
         .unwrap_err()
         .1,
@@ -2978,7 +3194,7 @@ fn test_agg_sig_exceed_cost(#[case] condition: ConditionOpcode) {
     assert_eq!(
         cond_test_cb(
             "((({h1} ({h2} (123 ({} )))",
-            ENABLE_SOFTFORK_CONDITION,
+            0,
             Some(Box::new(move |a: &mut Allocator| -> NodePtr {
                 let mut rest: NodePtr = a.nil();
 
@@ -2990,7 +3206,7 @@ fn test_agg_sig_exceed_cost(#[case] condition: ConditionOpcode) {
                     let aggsig = a.new_pair(val, aggsig).unwrap();
                     let val = a.new_atom(PUBKEY).unwrap();
                     let aggsig = a.new_pair(val, aggsig).unwrap();
-                    let val = a.new_atom(&u64_to_bytes(condition as u64)).unwrap();
+                    let val = a.new_atom(&u64_to_bytes(u64::from(condition))).unwrap();
                     let aggsig = a.new_pair(val, aggsig).unwrap();
 
                     // add the condition to the list (called rest)
@@ -3019,26 +3235,16 @@ fn test_single_agg_sig_unsafe() {
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(conds.agg_sig_unsafe.len(), 1);
     for (pk, msg) in &conds.agg_sig_unsafe {
-        assert_eq!(a.atom(*pk).as_ref(), PUBKEY);
+        assert_eq!(*pk, PublicKey::from_bytes(PUBKEY).unwrap());
         assert_eq!(a.atom(*msg).as_ref(), MSG1);
     }
     assert_eq!(spend.flags, 0);
 }
 
-#[test]
-fn test_agg_sig_unsafe_extra_arg() {
-    // AGG_SIG_UNSAFE
-    // extra args are disallowed in non-mempool mode
-    assert_eq!(
-        cond_test_flag("((({h1} ({h2} (123 (((49 ({pubkey} ({msg1} (456 )))))", 0)
-            .unwrap_err()
-            .1,
-        ErrorCode::InvalidCondition
-    );
-}
-
 #[cfg(test)]
 #[rstest]
+#[case(AGG_SIG_ME)]
+#[case(AGG_SIG_UNSAFE)]
 #[case(AGG_SIG_PARENT)]
 #[case(AGG_SIG_PUZZLE)]
 #[case(AGG_SIG_AMOUNT)]
@@ -3052,19 +3258,21 @@ fn test_agg_sig_extra_arg(#[case] condition: ConditionOpcode) {
             "((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{msg1}} ( 1337 ) ))))",
             condition as u8
         ),
-        ENABLE_SOFTFORK_CONDITION,
+        0,
     )
     .unwrap();
 
-    assert_eq!(conds.cost, 1200000);
+    assert_eq!(conds.cost, 1_200_000);
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert!((spend.flags & ELIGIBLE_FOR_DEDUP) == 0);
 
-    let agg_sigs = agg_sig_vec(condition, spend);
-    assert_eq!(agg_sigs.len(), 1);
+    if condition != AGG_SIG_UNSAFE {
+        let agg_sigs = agg_sig_vec(condition, spend);
+        assert_eq!(agg_sigs.len(), 1);
+    }
 
     // but not in mempool mode
     assert_eq!(
@@ -3073,74 +3281,12 @@ fn test_agg_sig_extra_arg(#[case] condition: ConditionOpcode) {
                 "((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{msg1}} ( 1337 ) ))))",
                 condition as u8
             ),
-            MEMPOOL_MODE | ENABLE_SOFTFORK_CONDITION,
+            MEMPOOL_MODE,
         )
         .unwrap_err()
         .1,
         ErrorCode::InvalidCondition
     );
-}
-
-#[test]
-fn test_agg_sig_me_extra_arg() {
-    // AGG_SIG_ME
-    // extra args are disallowed in non-mempool mode
-    assert_eq!(
-        cond_test_flag("((({h1} ({h2} (123 (((50 ({pubkey} ({msg1} (456 )))))", 0)
-            .unwrap_err()
-            .1,
-        ErrorCode::InvalidCondition
-    );
-}
-
-#[test]
-fn test_agg_sig_unsafe_extra_arg_allowed() {
-    // AGG_SIG_UNSAFE
-    // extra args are allowed when the AGG_SIG_ARGS flag is set
-    let (a, conds) = cond_test_flag(
-        "((({h1} ({h2} (123 (((49 ({pubkey} ({msg1} (456 )))))",
-        AGG_SIG_ARGS,
-    )
-    .unwrap();
-
-    assert_eq!(conds.cost, AGG_SIG_COST);
-    assert_eq!(conds.spends.len(), 1);
-    assert_eq!(conds.removal_amount, 123);
-    assert_eq!(conds.addition_amount, 0);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert_eq!(conds.agg_sig_unsafe.len(), 1);
-    for (pk, msg) in &conds.agg_sig_unsafe {
-        assert_eq!(a.atom(*pk).as_ref(), PUBKEY);
-        assert_eq!(a.atom(*msg).as_ref(), MSG1);
-    }
-    assert_eq!(spend.flags, 0);
-}
-
-#[test]
-fn test_agg_sig_me_extra_arg_allowed() {
-    // AGG_SIG_ME
-    // extra args are allowed when the AGG_SIG_ARGS flag is set
-    let (a, conds) = cond_test_flag(
-        "((({h1} ({h2} (123 (((50 ({pubkey} ({msg1} (456 )))))",
-        AGG_SIG_ARGS,
-    )
-    .unwrap();
-
-    assert_eq!(conds.cost, AGG_SIG_COST);
-    assert_eq!(conds.spends.len(), 1);
-    assert_eq!(conds.removal_amount, 123);
-    assert_eq!(conds.addition_amount, 0);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert_eq!(spend.agg_sig_me.len(), 1);
-    for c in &spend.agg_sig_me {
-        assert_eq!(a.atom(c.0).as_ref(), PUBKEY);
-        assert_eq!(a.atom(c.1).as_ref(), MSG1);
-    }
-    assert_eq!(spend.flags, 0);
 }
 
 #[test]
@@ -3159,24 +3305,10 @@ fn test_agg_sig_unsafe_invalid_terminator() {
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(conds.agg_sig_unsafe.len(), 1);
     for (pk, msg) in &conds.agg_sig_unsafe {
-        assert_eq!(a.atom(*pk).as_ref(), PUBKEY);
+        assert_eq!(*pk, PublicKey::from_bytes(PUBKEY).unwrap());
         assert_eq!(a.atom(*msg).as_ref(), MSG1);
     }
     assert_eq!(spend.flags, 0);
-}
-
-#[test]
-fn test_agg_sig_unsafe_invalid_terminator_mempool() {
-    // AGG_SIG_UNSAFE
-    assert_eq!(
-        cond_test_flag(
-            "((({h1} ({h2} (123 (((49 ({pubkey} ({msg1} 456 ))))",
-            COND_ARGS_NIL
-        )
-        .unwrap_err()
-        .1,
-        ErrorCode::InvalidCondition
-    );
 }
 
 #[test]
@@ -3196,26 +3328,10 @@ fn test_agg_sig_me_invalid_terminator() {
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.agg_sig_me.len(), 1);
     for (pk, msg) in &conds.agg_sig_unsafe {
-        assert_eq!(a.atom(*pk).as_ref(), PUBKEY);
+        assert_eq!(*pk, PublicKey::from_bytes(PUBKEY).unwrap());
         assert_eq!(a.atom(*msg).as_ref(), MSG1);
     }
     assert_eq!(spend.flags, 0);
-}
-
-#[test]
-fn test_agg_sig_me_invalid_terminator_mempool() {
-    // AGG_SIG_ME
-    // this has an invalid list terminator of the argument list. This is NOT OK
-    // according to the stricter rules
-    assert_eq!(
-        cond_test_flag(
-            "((({h1} ({h2} (123 (((50 ({pubkey} ({msg1} 456 ))))",
-            COND_ARGS_NIL
-        )
-        .unwrap_err()
-        .1,
-        ErrorCode::InvalidCondition
-    );
 }
 
 #[test]
@@ -3235,7 +3351,7 @@ fn test_duplicate_agg_sig_unsafe() {
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(conds.agg_sig_unsafe.len(), 2);
     for (pk, msg) in &conds.agg_sig_unsafe {
-        assert_eq!(a.atom(*pk).as_ref(), PUBKEY);
+        assert_eq!(*pk, PublicKey::from_bytes(PUBKEY).unwrap());
         assert_eq!(a.atom(*msg).as_ref(), MSG1);
     }
     assert_eq!(spend.flags, 0);
@@ -3248,12 +3364,12 @@ fn test_agg_sig_unsafe_invalid_pubkey() {
         cond_test("((({h1} ({h2} (123 (((49 ({h2} ({msg1} )))))")
             .unwrap_err()
             .1,
-        ErrorCode::InvalidPubkey
+        ErrorCode::InvalidPublicKey
     );
 }
 
 #[test]
-fn test_agg_sig_unsafe_invalid_msg() {
+fn test_agg_sig_unsafe_long_msg() {
     // AGG_SIG_UNSAFE
     assert_eq!(
         cond_test("((({h1} ({h2} (123 (((49 ({pubkey} ({longmsg} )))))")
@@ -3261,6 +3377,40 @@ fn test_agg_sig_unsafe_invalid_msg() {
             .1,
         ErrorCode::InvalidMessage
     );
+}
+
+#[cfg(test)]
+#[rstest]
+// these are the suffixes used for AGG_SIG_* conditions (other than
+// AGG_SIG_UNSAFE)
+#[case("0xccd5bb71183532bff220ba46c268991a3ff07eb358e8255a65c30a2dce0e5fbb")]
+#[case("0xbaf5d69c647c91966170302d18521b0a85663433d161e72c826ed08677b53a74")]
+#[case("0x284fa2ef486c7a41cc29fc99c9d08376161e93dd37817edb8219f42dca7592c4")]
+#[case("0xcda186a9cd030f7a130fae45005e81cae7a90e0fa205b75f6aebc0d598e0348e")]
+#[case("0x0f7d90dff0613e6901e24dae59f1e690f18b8f5fbdcf1bb192ac9deaf7de22ad")]
+#[case("0x585796bd90bb553c0430b87027ffee08d88aba0162c6e1abbbcc6b583f2ae7f9")]
+#[case("0x2ebfdae17b29d83bae476a25ea06f0c4bd57298faddbbc3ec5ad29b9b86ce5df")]
+// The same suffixes, but 1 byte prepended
+#[case("0x01ccd5bb71183532bff220ba46c268991a3ff07eb358e8255a65c30a2dce0e5fbb")]
+#[case("0x01baf5d69c647c91966170302d18521b0a85663433d161e72c826ed08677b53a74")]
+#[case("0x01284fa2ef486c7a41cc29fc99c9d08376161e93dd37817edb8219f42dca7592c4")]
+#[case("0x01cda186a9cd030f7a130fae45005e81cae7a90e0fa205b75f6aebc0d598e0348e")]
+#[case("0x010f7d90dff0613e6901e24dae59f1e690f18b8f5fbdcf1bb192ac9deaf7de22ad")]
+#[case("0x01585796bd90bb553c0430b87027ffee08d88aba0162c6e1abbbcc6b583f2ae7f9")]
+#[case("0x012ebfdae17b29d83bae476a25ea06f0c4bd57298faddbbc3ec5ad29b9b86ce5df")]
+fn test_agg_sig_unsafe_invalid_msg(
+    #[case] msg: &str,
+    #[values(43, 44, 45, 46, 47, 48, 49, 50)] opcode: u16,
+) {
+    let ret = cond_test_flag(
+        format!("((({{h1}} ({{h2}} (123 ((({opcode} ({{pubkey}} ({msg} )))))").as_str(),
+        0,
+    );
+    if opcode == AGG_SIG_UNSAFE {
+        assert_eq!(ret.unwrap_err().1, ErrorCode::InvalidMessage);
+    } else {
+        assert!(ret.is_ok());
+    }
 }
 
 #[test]
@@ -3282,7 +3432,9 @@ fn test_agg_sig_unsafe_exceed_cost() {
                     let aggsig = a.new_pair(val, aggsig).unwrap();
                     let val = a.new_atom(PUBKEY).unwrap();
                     let aggsig = a.new_pair(val, aggsig).unwrap();
-                    let val = a.new_atom(&u64_to_bytes(AGG_SIG_UNSAFE as u64)).unwrap();
+                    let val = a
+                        .new_atom(&u64_to_bytes(u64::from(AGG_SIG_UNSAFE)))
+                        .unwrap();
                     let aggsig = a.new_pair(val, aggsig).unwrap();
 
                     // add the AGG_SIG_UNSAFE condition to the list (called rest)
@@ -4037,8 +4189,7 @@ fn test_assert_ephemeral_wrong_parent() {
 )]
 fn test_relative_condition_on_ephemeral(
     #[case] condition: ConditionOpcode,
-    #[case] mut expect_error: Option<ErrorCode>,
-    #[values(0, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL)] no_rel_conds_on_ephemeral: u32,
+    #[case] expect_error: Option<ErrorCode>,
 ) {
     // this test ensures that we disallow relative conditions (including
     // assert-my-birth conditions) on ephemeral coin spends.
@@ -4047,11 +4198,6 @@ fn test_relative_condition_on_ephemeral(
     // ephemeral coins
 
     let cond = condition as u8;
-
-    if no_rel_conds_on_ephemeral == 0 {
-        // if we allow relative conditions, all cases should pass
-        expect_error = None;
-    }
 
     // the coin11 value is the coinID computed from (H1, H1, 123).
     // coin11 is the first coin we spend in this case.
@@ -4062,41 +4208,35 @@ fn test_relative_condition_on_ephemeral(
            ((51 ({{h2}} (123 ) \
            ))\
        (({{coin11}} ({{h2}} (123 (\
-           (({} (1000 ) \
+           (({cond} (1000 ) \
            ))\
-       ))",
-        cond
+       ))"
     );
 
-    let flags = no_rel_conds_on_ephemeral;
+    if let Some(err) = expect_error {
+        assert_eq!(cond_test(&test).unwrap_err().1, err);
+    } else {
+        // we don't expect any error
+        let (a, conds) = cond_test(&test).unwrap();
 
-    match expect_error {
-        Some(err) => {
-            assert_eq!(cond_test_flag(&test, flags).unwrap_err().1, err);
-        }
-        None => {
-            // we don't expect any error
-            let (a, conds) = cond_test_flag(&test, flags).unwrap();
+        assert_eq!(conds.reserve_fee, 0);
+        assert_eq!(conds.cost, CREATE_COIN_COST);
 
-            assert_eq!(conds.reserve_fee, 0);
-            assert_eq!(conds.cost, CREATE_COIN_COST);
+        assert_eq!(conds.spends.len(), 2);
+        let spend = &conds.spends[0];
+        assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
+        assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
+        assert_eq!(spend.agg_sig_me.len(), 0);
+        assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
 
-            assert_eq!(conds.spends.len(), 2);
-            let spend = &conds.spends[0];
-            assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
-            assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
-            assert_eq!(spend.agg_sig_me.len(), 0);
-            assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
-
-            let spend = &conds.spends[1];
-            assert_eq!(
-                *spend.coin_id,
-                test_coin_id((&(*conds.spends[0].coin_id)).into(), H2, 123)
-            );
-            assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-            assert_eq!(spend.agg_sig_me.len(), 0);
-            assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
-        }
+        let spend = &conds.spends[1];
+        assert_eq!(
+            *spend.coin_id,
+            test_coin_id((&(*conds.spends[0].coin_id)).into(), H2, 123)
+        );
+        assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
+        assert_eq!(spend.agg_sig_me.len(), 0);
+        assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
     }
 }
 
@@ -4109,9 +4249,9 @@ fn test_relative_condition_on_ephemeral(
 // the cost accumulates
 #[case("((90 (1 ) ((90 (2 ) ((90 (3 )", (1 + 2 + 3) * 10000)]
 // the cost can be large
-#[case("((90 (10000 )", 100000000)]
+#[case("((90 (10000 )", 100_000_000)]
 // the upper cost limit in the test is 11000000000
-#[case("((90 (1100000 )", 11000000000)]
+#[case("((90 (1100000 )", 11_000_000_000)]
 // additional arguments are ignored
 #[case("((90 (1 ( 42 ( 1337 )", 10000)]
 // reserved opcodes with fixed cost
@@ -4126,56 +4266,23 @@ fn test_relative_condition_on_ephemeral(
 #[case("((264 )", 162)]
 #[case("((265 )", 172)]
 #[case("((266 )", 183)]
-#[case("((504 )", 338000000)]
-#[case("((505 )", 359000000)]
-#[case("((506 )", 382000000)]
-#[case("((507 )", 406000000)]
-#[case("((508 )", 431000000)]
-#[case("((509 )", 458000000)]
-#[case("((510 )", 487000000)]
-#[case("((511 )", 517000000)]
+#[case("((504 )", 338_000_000)]
+#[case("((505 )", 359_000_000)]
+#[case("((506 )", 382_000_000)]
+#[case("((507 )", 406_000_000)]
+#[case("((508 )", 431_000_000)]
+#[case("((509 )", 458_000_000)]
+#[case("((510 )", 487_000_000)]
+#[case("((511 )", 517_000_000)]
 #[case("((512 )", 100)]
 #[case("((513 )", 106)]
 #[case("((0xff00 )", 100)]
 #[case("((0xff01 )", 106)]
 fn test_softfork_condition(#[case] conditions: &str, #[case] expected_cost: Cost) {
     // SOFTFORK (90)
-    let (_, spends) = cond_test_flag(
-        &format!("((({{h1}} ({{h2}} (1234 ({}))))", conditions),
-        ENABLE_SOFTFORK_CONDITION,
-    )
-    .unwrap();
-    assert_eq!(spends.cost, expected_cost);
-
-    // when NO_UNKNOWN_CONDS is enabled, any SOFTFORK condition is an error
-    // (because we don't know of any yet)
-    assert_eq!(
-        cond_test_flag(
-            &format!("((({{h1}} ({{h2}} (1234 ({}))))", conditions),
-            ENABLE_SOFTFORK_CONDITION | NO_UNKNOWN_CONDS
-        )
-        .unwrap_err()
-        .1,
-        ErrorCode::InvalidConditionOpcode
-    );
-
-    // if softfork conditions aren't enabled, they are just plain unknown
-    // conditions (that don't incur a cost
     let (_, spends) =
-        cond_test_flag(&format!("((({{h1}} ({{h2}} (1234 ({}))))", conditions), 0).unwrap();
-    assert_eq!(spends.cost, 0);
-
-    // if softfork conditions aren't enabled, but we don't allow unknown
-    // conditions (mempool mode) they fail
-    assert_eq!(
-        cond_test_flag(
-            &format!("((({{h1}} ({{h2}} (1234 ({}))))", conditions),
-            NO_UNKNOWN_CONDS
-        )
-        .unwrap_err()
-        .1,
-        ErrorCode::InvalidConditionOpcode
-    );
+        cond_test_flag(&format!("((({{h1}} ({{h2}} (1234 ({conditions}))))"), 0).unwrap();
+    assert_eq!(spends.cost, expected_cost);
 }
 
 #[cfg(test)]
@@ -4190,12 +4297,9 @@ fn test_softfork_condition(#[case] conditions: &str, #[case] expected_cost: Cost
 fn test_softfork_condition_failures(#[case] conditions: &str, #[case] expected_err: ErrorCode) {
     // SOFTFORK (90)
     assert_eq!(
-        cond_test_flag(
-            &format!("((({{h1}} ({{h2}} (1234 ({}))))", conditions),
-            ENABLE_SOFTFORK_CONDITION
-        )
-        .unwrap_err()
-        .1,
+        cond_test_flag(&format!("((({{h1}} ({{h2}} (1234 ({conditions}))))"), 0)
+            .unwrap_err()
+            .1,
         expected_err
     );
 }
@@ -4256,7 +4360,7 @@ fn test_limit_announcements(
                 let ann = a.nil();
                 let val = a.new_atom(H2).unwrap();
                 let ann = a.new_pair(val, ann).unwrap();
-                let val = a.new_atom(&u64_to_bytes(cond as u64)).unwrap();
+                let val = a.new_atom(&u64_to_bytes(u64::from(cond))).unwrap();
                 let ann = a.new_pair(val, ann).unwrap();
 
                 // add the condition to the list
@@ -4328,10 +4432,9 @@ fn test_eligible_for_ff_output_coin(#[case] amount: u64, #[case] ph: &str, #[cas
     let test: &str = &format!(
         "(\
        (({{h1}} ({{h2}} (123 (\
-           ((51 ({} ({} ) \
+           ((51 ({ph} ({amount} ) \
            ))\
-       ))",
-        ph, amount
+       ))"
     );
 
     let (_a, cond) = cond_test(test).expect("cond_test");
@@ -4359,12 +4462,11 @@ fn test_eligible_for_ff_invalid_assert_parent(
     let test: &str = &format!(
         "(\
        (({{h1}} ({{h2}} (123 (\
-           (({} ({} ) \
+           (({condition} ({arg} ) \
            ((73 (123 ) \
            ((51 ({{h2}} (123 ) \
            ))\
-       ))",
-        condition, arg
+       ))"
     );
 
     let (_a, cond) = cond_test(test).expect("cond_test");
@@ -4390,19 +4492,781 @@ fn test_eligible_for_ff_invalid_agg_sig_me(
     let test: &str = &format!(
         "(\
        (({{h1}} ({{h2}} (1 (\
-           (({} ({{pubkey}} ({{msg1}} ) \
+           (({condition} ({{pubkey}} ({{msg1}} ) \
            ((51 ({{h2}} (1 ) \
            ))\
-       ))",
-        condition
+       ))"
     );
 
-    let (_a, cond) = cond_test_flag(test, ENABLE_SOFTFORK_CONDITION).expect("cond_test");
+    let (_a, cond) = cond_test_flag(test, 0).expect("cond_test");
     assert!(cond.spends.len() == 1);
     let flags = cond.spends[0].flags;
     if eligible {
         assert!((flags & ELIGIBLE_FOR_FF) != 0);
     } else {
         assert!((flags & ELIGIBLE_FOR_FF) == 0);
+    }
+}
+
+// the message condition takes a mode-parameter. This is a 6-bit integer that
+// determines which aspects of the sending spend and receiving spends must
+// match. The second argument is the message. The message and mode must always
+// match between the sender and receiver
+// Additional parameters depend on the mode. If the mode specifies 0
+// committments, there are no additional parameters (however, this is not
+// allowed in mempool mode).
+// The mode integer is a bitfield, the 3 least significant bits indicate
+// properties of the destination spend, the 3 most significant bits indicate
+// properties of the sending spend.
+// 0b100000 = sender parent id
+// 0b010000 = sender puzzle hash
+// 0b001000 = sender amount
+// 0b000100 = receiver parent id
+// 0b000010 = receiver puzzle hash
+// 0b000001 = receiver amount
+
+// 66=SEND_MESSAGE
+// 67=RECEIVE_MESSAGE
+#[cfg(test)]
+enum Ex {
+    Fail,
+    Pass,
+}
+
+#[cfg(test)]
+#[rstest]
+// no committment
+#[case("(66 (0 ({msg1} ) ((67 (0 ({msg1} )", Ex::Pass)]
+#[case("(66 (0 ({msg2} ) ((67 (0 ({msg1} )", Ex::Fail)]
+#[case("(66 (0 ({msg1} ) ((67 (0 ({msg2} )", Ex::Fail)]
+// only sender coin-ID committment
+#[case("(66 (0x38 ({msg1} ) ((67 (0x38 ({msg1} ({coin12} )", Ex::Pass)]
+#[case("(66 (0x38 ({msg1} ) ((67 (0x38 ({msg2} ({coin12} )", Ex::Fail)]
+#[case("(66 (0x38 ({msg2} ) ((67 (0x38 ({msg1} ({coin12} )", Ex::Fail)]
+#[case("(66 (0x38 ({msg1} ) ((67 (0x38 ({msg1} ({coin21} )", Ex::Fail)]
+// only receiver coin-ID committment
+#[case("(66 (0x07 ({msg1} ({coin12} ) ((67 (0x07 ({msg1} )", Ex::Pass)]
+#[case("(66 (0x07 ({msg1} ({coin21} ) ((67 (0x07 ({msg1} )", Ex::Fail)]
+#[case("(66 (0x07 ({msg2} ({coin12} ) ((67 (0x07 ({msg1} )", Ex::Fail)]
+#[case("(66 (0x07 ({msg1} ({coin12} ) ((67 (0x07 ({msg2} )", Ex::Fail)]
+// only sender parent committment
+#[case("(66 (0x20 ({msg1} ) ((67 (0x20 ({msg1} ({h1} )", Ex::Pass)]
+#[case("(66 (0x20 ({msg1} ) ((67 (0x20 ({msg1} ({h2} )", Ex::Fail)]
+#[case("(66 (0x20 ({msg2} ) ((67 (0x20 ({msg1} ({h1} )", Ex::Fail)]
+#[case("(66 (0x20 ({msg1} ) ((67 (0x20 ({msg2} ({h1} )", Ex::Fail)]
+// only receiver parent committment
+#[case("(66 (0x04 ({msg1} ({h1} ) ((67 (0x04 ({msg1} )", Ex::Pass)]
+#[case("(66 (0x04 ({msg1} ({h2} ) ((67 (0x04 ({msg1} )", Ex::Fail)]
+#[case("(66 (0x04 ({msg2} ({h1} ) ((67 (0x04 ({msg1} )", Ex::Fail)]
+#[case("(66 (0x04 ({msg1} ({h1} ) ((67 (0x04 ({msg2} )", Ex::Fail)]
+// only sender puzzle committment
+#[case("(66 (0x10 ({msg1} ) ((67 (0x10 ({msg1} ({h2} )", Ex::Pass)]
+#[case("(66 (0x10 ({msg1} ) ((67 (0x10 ({msg1} ({h1} )", Ex::Fail)]
+#[case("(66 (0x10 ({msg2} ) ((67 (0x10 ({msg1} ({h2} )", Ex::Fail)]
+#[case("(66 (0x10 ({msg1} ) ((67 (0x10 ({msg2} ({h2} )", Ex::Fail)]
+// only receiver puzzle committment
+#[case("(66 (0x02 ({msg1} ({h2} ) ((67 (0x02 ({msg1} )", Ex::Pass)]
+#[case("(66 (0x02 ({msg1} ({h1} ) ((67 (0x02 ({msg1} )", Ex::Fail)]
+#[case("(66 (0x02 ({msg2} ({h2} ) ((67 (0x02 ({msg1} )", Ex::Fail)]
+#[case("(66 (0x02 ({msg1} ({h2} ) ((67 (0x02 ({msg2} )", Ex::Fail)]
+// only sender amount committment
+#[case("(66 (0x08 ({msg1} ) ((67 (0x08 ({msg1} (123 )", Ex::Pass)]
+#[case("(66 (0x08 ({msg1} ) ((67 (0x08 ({msg1} (124 )", Ex::Fail)]
+#[case("(66 (0x08 ({msg2} ) ((67 (0x08 ({msg1} (123 )", Ex::Fail)]
+#[case("(66 (0x08 ({msg1} ) ((67 (0x08 ({msg2} (123 )", Ex::Fail)]
+// only receiver amount committment
+#[case("(66 (0x01 ({msg1} (123 ) ((67 (0x01 ({msg1} )", Ex::Pass)]
+#[case("(66 (0x01 ({msg1} (124 ) ((67 (0x01 ({msg1} )", Ex::Fail)]
+#[case("(66 (0x01 ({msg2} (123 ) ((67 (0x01 ({msg1} )", Ex::Fail)]
+#[case("(66 (0x01 ({msg1} (123 ) ((67 (0x01 ({msg2} )", Ex::Fail)]
+// only amount committment
+#[case("(66 (0x09 ({msg1} (123 ) ((67 (0x09 ({msg1} (123 )", Ex::Pass)]
+#[case("(66 (0x09 ({msg1} (124 ) ((67 (0x09 ({msg1} (123 )", Ex::Fail)]
+#[case("(66 (0x09 ({msg1} (123 ) ((67 (0x09 ({msg1} (124 )", Ex::Fail)]
+#[case("(66 (0x09 ({msg2} (123 ) ((67 (0x09 ({msg1} (123 )", Ex::Fail)]
+#[case("(66 (0x09 ({msg1} (123 ) ((67 (0x09 ({msg2} (123 )", Ex::Fail)]
+// only amount committment on receiver
+#[case("(66 (0x39 ({msg1} (123 ) ((67 (0x39 ({msg1} ({coin12} )", Ex::Pass)]
+#[case("(66 (0x39 ({msg1} (124 ) ((67 (0x39 ({msg1} ({coin12} )", Ex::Fail)]
+#[case("(66 (0x39 ({msg1} (123 ) ((67 (0x39 ({msg1} ({coin21} )", Ex::Fail)]
+#[case("(66 (0x39 ({msg2} (123 ) ((67 (0x39 ({msg1} ({coin12} )", Ex::Fail)]
+#[case("(66 (0x39 ({msg1} (123 ) ((67 (0x39 ({msg2} ({coin12} )", Ex::Fail)]
+// only amount committment on sender
+#[case("(66 (0x0f ({msg1} ({coin12} ) ((67 (0x0f ({msg1} (123 )", Ex::Pass)]
+#[case("(66 (0x0f ({msg1} ({coin12} ) ((67 (0x0f ({msg1} (124 )", Ex::Fail)]
+#[case("(66 (0x0f ({msg1} ({coin21} ) ((67 (0x0f ({msg1} (123 )", Ex::Fail)]
+#[case("(66 (0x0f ({msg2} ({coin12} ) ((67 (0x0f ({msg1} (123 )", Ex::Fail)]
+#[case("(66 (0x0f ({msg1} ({coin12} ) ((67 (0x0f ({msg2} (123 )", Ex::Fail)]
+// sender and receiver coin ID committment (full committment)
+#[case(
+    "(66 (0x3f ({msg1} ({coin12} ) ((67 (0x3f ({msg1} ({coin12} )",
+    Ex::Pass
+)]
+#[case(
+    "(67 (0x3f ({msg1} ({coin12} ) ((66 (0x3f ({msg1} ({coin12} )",
+    Ex::Pass
+)]
+//   wrong coin-id
+#[case(
+    "(66 (0x3f ({msg1} ({coin21} ) ((67 (0x3f ({msg1} ({coin12} )",
+    Ex::Fail
+)]
+#[case(
+    "(66 (0x3f ({msg1} ({coin12} ) ((67 (0x3f ({msg1} ({coin21} )",
+    Ex::Fail
+)]
+//   wrong message
+#[case(
+    "(66 (0x3f ({msg2} ({coin12} ) ((67 (0x3f ({msg1} ({coin12} )",
+    Ex::Fail
+)]
+#[case(
+    "(66 (0x3f ({msg1} ({coin12} ) ((67 (0x3f ({msg2} ({coin12} )",
+    Ex::Fail
+)]
+//    mismatching message
+#[case(
+    "(67 (0x3f ({msg2} ({coin12} ) ((66 (0x3f ({msg1} ({coin12} )",
+    Ex::Fail
+)]
+// sender and receiver puzzle committment
+#[case("(66 (0x12 ({msg1} ({h2} ) ((67 (0x12 ({msg1} ({h2} )", Ex::Pass)]
+#[case("(67 (0x12 ({msg1} ({h2} ) ((66 (0x12 ({msg1} ({h2} )", Ex::Pass)]
+//    wrong messages
+#[case("(66 (0x12 ({msg2} ({h2} ) ((67 (0x12 ({msg1} ({h2} )", Ex::Fail)]
+#[case("(66 (0x12 ({msg1} ({h2} ) ((67 (0x12 ({msg2} ({h2} )", Ex::Fail)]
+//    wrong puzzle
+#[case("(66 (0x12 ({msg1} ({h1} ) ((67 (0x12 ({msg1} ({h2} )", Ex::Fail)]
+#[case("(66 (0x12 ({msg1} ({h2} ) ((67 (0x12 ({msg1} ({h1} )", Ex::Fail)]
+// sender parent and receiver puzzle committment
+#[case("(66 (0x22 ({msg1} ({h2} ) ((67 (0x22 ({msg1} ({h1} )", Ex::Pass)]
+#[case("(67 (0x22 ({msg1} ({h1} ) ((66 (0x22 ({msg1} ({h2} )", Ex::Pass)]
+//    wrong messages
+#[case("(66 (0x22 ({msg2} ({h2} ) ((67 (0x22 ({msg1} ({h1} )", Ex::Fail)]
+#[case("(66 (0x22 ({msg1} ({h2} ) ((67 (0x22 ({msg2} ({h1} )", Ex::Fail)]
+//    wrong puzzle
+#[case("(66 (0x22 ({msg1} ({h1} ) ((67 (0x22 ({msg1} ({h1} )", Ex::Fail)]
+//    wrong parent
+#[case("(66 (0x22 ({msg1} ({h2} ) ((67 (0x22 ({msg1} ({h2} )", Ex::Fail)]
+// sender parent and receiver puzzle & amount committment
+#[case("(66 (0x23 ({msg1} ({h2} (123 ) ((67 (0x23 ({msg1} ({h1} )", Ex::Pass)]
+#[case("(67 (0x23 ({msg1} ({h1} ) ((66 (0x23 ({msg1} ({h2} (123 )", Ex::Pass)]
+//    wrong messages
+#[case("(66 (0x23 ({msg2} ({h2} (123 ) ((67 (0x23 ({msg1} ({h1} )", Ex::Fail)]
+#[case("(66 (0x23 ({msg1} ({h2} (123 ) ((67 (0x23 ({msg2} ({h1} )", Ex::Fail)]
+//    wrong puzzle
+#[case("(66 (0x23 ({msg1} ({h1} (123 ) ((67 (0x23 ({msg1} ({h1} )", Ex::Fail)]
+//    wrong amount
+#[case("(66 (0x23 ({msg1} ({h2} (122 ) ((67 (0x23 ({msg1} ({h1} )", Ex::Fail)]
+//    wrong parent
+#[case("(66 (0x23 ({msg1} ({h2} (123 ) ((67 (0x23 ({msg1} ({h2} )", Ex::Fail)]
+// sender parent & puzzle and receiver puzzle committment
+#[case("(66 (0x32 ({msg1} ({h2} ) ((67 (0x32 ({msg1} ({h1} ({h2} )", Ex::Pass)]
+#[case("(67 (0x32 ({msg1} ({h1} ({h2} ) ((66 (0x32 ({msg1} ({h2} )", Ex::Pass)]
+//    wrong messages
+#[case("(66 (0x32 ({msg2} ({h2} ) ((67 (0x32 ({msg1} ({h1} ({h2} )", Ex::Fail)]
+#[case("(66 (0x32 ({msg1} ({h2} ) ((67 (0x32 ({msg2} ({h1} ({h2} )", Ex::Fail)]
+//    wrong puzzle
+#[case("(66 (0x32 ({msg1} ({h1} ) ((67 (0x32 ({msg1} ({h1} ({h2} )", Ex::Fail)]
+//    wrong puzzle
+#[case("(66 (0x32 ({msg1} ({h2} ) ((67 (0x32 ({msg1} ({h1} ({h1} )", Ex::Fail)]
+//    wrong parent
+#[case("(66 (0x32 ({msg1} ({h2} ) ((67 (0x32 ({msg1} ({h2} ({h2} )", Ex::Fail)]
+// No sender or no recipient of the message
+#[case("(67 (0x12 ({msg1} ({coin12} )", Ex::Fail)]
+#[case("(66 (0x12 ({msg1} ({coin12} )", Ex::Fail)]
+fn test_message_conditions_single_spend(#[case] test_case: &str, #[case] expect: Ex) {
+    for flags in &[ENABLE_MESSAGE_CONDITIONS, MEMPOOL_MODE] {
+        let ret = cond_test_flag(&format!("((({{h1}} ({{h2}} (123 (({test_case}))))"), *flags);
+
+        let expect_pass = match expect {
+            Ex::Pass => true,
+            Ex::Fail => false,
+        };
+
+        if let Ok((a, conds)) = ret {
+            assert!(expect_pass);
+            assert_eq!(conds.cost, 0);
+            assert_eq!(conds.spends.len(), 1);
+            let spend = &conds.spends[0];
+            assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+            assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
+            assert_eq!(spend.flags, 0);
+        } else if expect_pass {
+            panic!("failed: {:?}", ret.unwrap_err().1);
+        } else {
+            let actual_err = ret.unwrap_err().1;
+            println!("Error: {actual_err:?}");
+            assert_eq!(ErrorCode::MessageNotSentOrReceived, actual_err);
+        }
+    }
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(512, None)]
+#[case(513, Some(ErrorCode::TooManyAnnouncements))]
+fn test_limit_messages(#[case] count: i32, #[case] expect_err: Option<ErrorCode>) {
+    let r = cond_test_cb(
+        "((({h1} ({h1} (123 ({} )))",
+        ENABLE_MESSAGE_CONDITIONS,
+        Some(Box::new(move |a: &mut Allocator| -> NodePtr {
+            let mut rest: NodePtr = a.nil();
+
+            // generate a lot of announcements
+            // this builds one condition
+            // borrow-rules prevent this from being succint
+            // (66 0x3f {msg1} {coin12})
+            let send = a.nil();
+            let val = a.new_atom(&test_coin_id(H1, H1, 123)).unwrap();
+            let send = a.new_pair(val, send).unwrap();
+            let val = a.new_atom(MSG1).unwrap();
+            let send = a.new_pair(val, send).unwrap();
+            let val = a.new_small_number(0x3f).unwrap();
+            let send = a.new_pair(val, send).unwrap();
+            let val = a.new_small_number(SEND_MESSAGE.into()).unwrap();
+            let send = a.new_pair(val, send).unwrap();
+
+            // (67 0x3f {msg1} {coin12})
+            let recv = a.nil();
+            let val = a.new_atom(&test_coin_id(H1, H1, 123)).unwrap();
+            let recv = a.new_pair(val, recv).unwrap();
+            let val = a.new_atom(MSG1).unwrap();
+            let recv = a.new_pair(val, recv).unwrap();
+            let val = a.new_small_number(0x3f).unwrap();
+            let recv = a.new_pair(val, recv).unwrap();
+            let val = a.new_small_number(RECEIVE_MESSAGE.into()).unwrap();
+            let recv = a.new_pair(val, recv).unwrap();
+
+            for _ in 0..count {
+                // add the condition to the list
+                rest = a.new_pair(send, rest).unwrap();
+                rest = a.new_pair(recv, rest).unwrap();
+            }
+            rest
+        })),
+    );
+
+    if expect_err.is_some() {
+        assert_eq!(r.unwrap_err().1, expect_err.unwrap());
+    } else {
+        r.unwrap();
+    }
+}
+
+#[cfg(test)]
+#[rstest]
+#[case("(66 (0x38 ({longmsg} )", ErrorCode::InvalidMessage)]
+#[case("(66 (0x3c ({long} ({msg1} )", ErrorCode::InvalidParentId)]
+#[case("(66 (0x3c ({msg2} ({msg1} )", ErrorCode::InvalidParentId)]
+#[case("(66 (0x3a ({long} ({msg1} )", ErrorCode::InvalidPuzzleHash)]
+#[case("(66 (0x3a ({msg2} ({msg1} )", ErrorCode::InvalidPuzzleHash)]
+#[case("(66 (0x3f ({long} ({msg1} )", ErrorCode::InvalidCoinId)]
+#[case("(66 (0x3f ({msg2} ({msg1} )", ErrorCode::InvalidCoinId)]
+#[case(
+    "(66 (0x08 ({msg1} ) ((67 (0x08 ({msg1} (-1 )",
+    ErrorCode::CoinAmountNegative
+)]
+#[case(
+    "(66 (0x08 ({msg1} ) ((67 (0x08 ({msg1} )",
+    ErrorCode::InvalidCondition
+)]
+#[case(
+    "(66 (0x01 ({msg1} (-1 ) ((67 (0x01 ({msg1} )",
+    ErrorCode::CoinAmountNegative
+)]
+#[case(
+    "(66 (0x01 ({msg1} ) ((67 (0x01 ({msg1} )",
+    ErrorCode::InvalidCondition
+)]
+#[case(
+    "(66 (0x02 ({msg1} ({msg2} ) ((67 (0x02 ({msg1} )",
+    ErrorCode::InvalidPuzzleHash
+)]
+#[case(
+    "(66 (0x02 ({msg1} ) ((67 (0x02 ({msg1} )",
+    ErrorCode::InvalidCondition
+)]
+#[case(
+    "(66 (0x10 ({msg1} ) ((67 (0x10 ({msg1} ({msg2} )",
+    ErrorCode::InvalidPuzzleHash
+)]
+#[case(
+    "(66 (0x10 ({msg1} ) ((67 (0x10 ({msg1} )",
+    ErrorCode::InvalidCondition
+)]
+#[case(
+    "(66 (0x04 ({msg1} ({msg2} ) ((67 (0x04 ({msg1} )",
+    ErrorCode::InvalidParentId
+)]
+#[case(
+    "(66 (0x04 ({msg1} ) ((67 (0x04 ({msg1} )",
+    ErrorCode::InvalidCondition
+)]
+#[case(
+    "(66 (0x20 ({msg1} ) ((67 (0x20 ({msg1} ({msg2} )",
+    ErrorCode::InvalidParentId
+)]
+#[case(
+    "(66 (0x20 ({msg1} ) ((67 (0x20 ({msg1} )",
+    ErrorCode::InvalidCondition
+)]
+#[case(
+    "(66 (0x07 ({msg1} ({msg2} ) ((67 (0x07 ({msg1} )",
+    ErrorCode::InvalidCoinId
+)]
+#[case(
+    "(66 (0x07 ({msg1} ) ((67 (0x07 ({msg1} )",
+    ErrorCode::InvalidCondition
+)]
+#[case(
+    "(66 (0x38 ({msg1} ) ((67 (0x38 ({msg1} ({msg2} )",
+    ErrorCode::InvalidCoinId
+)]
+#[case(
+    "(66 (0x38 ({msg1} ) ((67 (0x38 ({msg1} )",
+    ErrorCode::InvalidCondition
+)]
+// message mode must be specified in canonical mode
+#[case(
+    "(66 (0x00 ({msg1} ) ((67 (0x00 ({msg1} )",
+    ErrorCode::InvalidMessageMode
+)]
+#[case(
+    "(66 (0x01 ({msg1} (123 ) ((67 (0x00 ({msg1} )",
+    ErrorCode::InvalidMessageMode
+)]
+// negative messages modes are not allowed
+#[case(
+    "(66 (-1 ({msg1} (123 ) ((67 (0x01 ({msg1} )",
+    ErrorCode::InvalidMessageMode
+)]
+#[case(
+    "(66 (0x01 ({msg1} (123 ) ((67 (-1 ({msg1} )",
+    ErrorCode::InvalidMessageMode
+)]
+// amounts must be specified in canonical mode
+#[case(
+    "(66 (0x01 ({msg1} (0x0040 ) ((67 (0x01 ({msg1} (123 )",
+    ErrorCode::InvalidCoinAmount
+)]
+#[case(
+    "(66 (0x01 ({msg1} (0x00 ) ((67 (0x01 ({msg1} (123 )",
+    ErrorCode::InvalidCoinAmount
+)]
+// coin amounts can't be negative
+#[case(
+    "(66 (0x01 ({msg1} (-1 ) ((67 (0x01 ({msg1} (123 )",
+    ErrorCode::CoinAmountNegative
+)]
+#[case(
+    "(66 (0x01 ({msg1} (-1 ) ((67 (0x01 ({msg1} (123 )",
+    ErrorCode::CoinAmountNegative
+)]
+fn test_message_conditions_failures(#[case] test_case: &str, #[case] expect: ErrorCode) {
+    for flags in [ENABLE_MESSAGE_CONDITIONS, MEMPOOL_MODE] {
+        let ret = cond_test_flag(&format!("((({{h1}} ({{h2}} (123 (({test_case}))))"), flags);
+
+        let Err(ValidationErr(_, code)) = ret else {
+            panic!("expected failure: {expect:?}");
+        };
+        assert_eq!(code, expect);
+    }
+}
+
+#[cfg(test)]
+#[rstest]
+// no committment
+#[case("(66 (0 ({msg1} )", "(67 (0 ({msg1} )", Ex::Pass)]
+#[case("(66 (0 ({msg2} )", "(67 (0 ({msg1} )", Ex::Fail)]
+#[case("(66 (0 ({msg1} )", "(67 (0 ({msg2} )", Ex::Fail)]
+// only sender coin-ID committment
+#[case("(66 (0x38 ({msg1} )", "(67 (0x38 ({msg1} ({coin12} )", Ex::Pass)]
+#[case("(66 (0x38 ({msg1} )", "(67 (0x38 ({msg2} ({coin12} )", Ex::Fail)]
+#[case("(66 (0x38 ({msg2} )", "(67 (0x38 ({msg1} ({coin12} )", Ex::Fail)]
+#[case("(66 (0x38 ({msg1} )", "(67 (0x38 ({msg1} ({coin21} )", Ex::Fail)]
+// only receiver coin-ID committment
+#[case("(66 (0x07 ({msg1} ({coin21} )", "(67 (0x07 ({msg1} )", Ex::Pass)]
+#[case("(66 (0x07 ({msg1} ({coin12} )", "(67 (0x07 ({msg1} )", Ex::Fail)]
+#[case("(66 (0x07 ({msg2} ({coin21} )", "(67 (0x07 ({msg1} )", Ex::Fail)]
+#[case("(66 (0x07 ({msg1} ({coin21} )", "(67 (0x07 ({msg2} )", Ex::Fail)]
+// only sender parent committment
+#[case("(66 (0x20 ({msg1} )", "(67 (0x20 ({msg1} ({h1} )", Ex::Pass)]
+#[case("(66 (0x20 ({msg1} )", "(67 (0x20 ({msg1} ({h2} )", Ex::Fail)]
+#[case("(66 (0x20 ({msg2} )", "(67 (0x20 ({msg1} ({h1} )", Ex::Fail)]
+#[case("(66 (0x20 ({msg1} )", "(67 (0x20 ({msg2} ({h1} )", Ex::Fail)]
+// only receiver parent committment
+#[case("(66 (0x04 ({msg1} ({h2} )", "(67 (0x04 ({msg1} )", Ex::Pass)]
+#[case("(66 (0x04 ({msg1} ({h1} )", "(67 (0x04 ({msg1} )", Ex::Fail)]
+#[case("(66 (0x04 ({msg2} ({h2} )", "(67 (0x04 ({msg1} )", Ex::Fail)]
+#[case("(66 (0x04 ({msg1} ({h2} )", "(67 (0x04 ({msg2} )", Ex::Fail)]
+// only sender puzzle committment
+#[case("(66 (0x10 ({msg1} )", "(67 (0x10 ({msg1} ({h2} )", Ex::Pass)]
+#[case("(66 (0x10 ({msg1} )", "(67 (0x10 ({msg1} ({h1} )", Ex::Fail)]
+#[case("(66 (0x10 ({msg2} )", "(67 (0x10 ({msg1} ({h2} )", Ex::Fail)]
+#[case("(66 (0x10 ({msg1} )", "(67 (0x10 ({msg2} ({h2} )", Ex::Fail)]
+// only receiver puzzle committment
+#[case("(66 (0x02 ({msg1} ({h1} )", "(67 (0x02 ({msg1} )", Ex::Pass)]
+#[case("(66 (0x02 ({msg1} ({h2} )", "(67 (0x02 ({msg1} )", Ex::Fail)]
+#[case("(66 (0x02 ({msg2} ({h1} )", "(67 (0x02 ({msg1} )", Ex::Fail)]
+#[case("(66 (0x02 ({msg1} ({h1} )", "(67 (0x02 ({msg2} )", Ex::Fail)]
+// only sender amount committment
+#[case("(66 (0x08 ({msg1} )", "(67 (0x08 ({msg1} (123 )", Ex::Pass)]
+#[case("(66 (0x08 ({msg1} )", "(67 (0x08 ({msg1} (124 )", Ex::Fail)]
+#[case("(66 (0x08 ({msg2} )", "(67 (0x08 ({msg1} (123 )", Ex::Fail)]
+#[case("(66 (0x08 ({msg1} )", "(67 (0x08 ({msg2} (123 )", Ex::Fail)]
+// only receiver amount committment
+#[case("(66 (0x01 ({msg1} (123 )", "(67 (0x01 ({msg1} )", Ex::Pass)]
+#[case("(66 (0x01 ({msg1} (124 )", "(67 (0x01 ({msg1} )", Ex::Fail)]
+#[case("(66 (0x01 ({msg2} (123 )", "(67 (0x01 ({msg1} )", Ex::Fail)]
+#[case("(66 (0x01 ({msg1} (123 )", "(67 (0x01 ({msg2} )", Ex::Fail)]
+// only amount committment
+#[case("(66 (0x09 ({msg1} (123 )", "(67 (0x09 ({msg1} (123 )", Ex::Pass)]
+#[case("(66 (0x09 ({msg1} (124 )", "(67 (0x09 ({msg1} (123 )", Ex::Fail)]
+#[case("(66 (0x09 ({msg1} (123 )", "(67 (0x09 ({msg1} (124 )", Ex::Fail)]
+#[case("(66 (0x09 ({msg2} (123 )", "(67 (0x09 ({msg1} (123 )", Ex::Fail)]
+#[case("(66 (0x09 ({msg1} (123 )", "(67 (0x09 ({msg2} (123 )", Ex::Fail)]
+// only amount committment on receiver
+#[case("(66 (0x39 ({msg1} (123 )", "(67 (0x39 ({msg1} ({coin12} )", Ex::Pass)]
+#[case("(66 (0x39 ({msg1} (124 )", "(67 (0x39 ({msg1} ({coin12} )", Ex::Fail)]
+#[case("(66 (0x39 ({msg1} (123 )", "(67 (0x39 ({msg1} ({coin21} )", Ex::Fail)]
+#[case("(66 (0x39 ({msg2} (123 )", "(67 (0x39 ({msg1} ({coin12} )", Ex::Fail)]
+#[case("(66 (0x39 ({msg1} (123 )", "(67 (0x39 ({msg2} ({coin12} )", Ex::Fail)]
+// only amount committment on sender
+#[case("(66 (0x0f ({msg1} ({coin21} )", "(67 (0x0f ({msg1} (123 )", Ex::Pass)]
+#[case("(66 (0x0f ({msg1} ({coin21} )", "(67 (0x0f ({msg1} (124 )", Ex::Fail)]
+#[case("(66 (0x0f ({msg1} ({coin12} )", "(67 (0x0f ({msg1} (123 )", Ex::Fail)]
+#[case("(66 (0x0f ({msg2} ({coin21} )", "(67 (0x0f ({msg1} (123 )", Ex::Fail)]
+#[case("(66 (0x0f ({msg1} ({coin21} )", "(67 (0x0f ({msg2} (123 )", Ex::Fail)]
+// sender and receiver coin ID committment (full committment)
+#[case(
+    "(66 (0x3f ({msg1} ({coin21} )",
+    "(67 (0x3f ({msg1} ({coin12} )",
+    Ex::Pass
+)]
+#[case(
+    "(67 (0x3f ({msg1} ({coin21} )",
+    "(66 (0x3f ({msg1} ({coin12} )",
+    Ex::Pass
+)]
+//   wrong coin-id
+#[case(
+    "(66 (0x3f ({msg1} ({coin12} )",
+    "(67 (0x3f ({msg1} ({coin12} )",
+    Ex::Fail
+)]
+#[case(
+    "(66 (0x3f ({msg1} ({coin21} )",
+    "(67 (0x3f ({msg1} ({coin21} )",
+    Ex::Fail
+)]
+//   wrong message
+#[case(
+    "(66 (0x3f ({msg2} ({coin21} )",
+    "(67 (0x3f ({msg1} ({coin12} )",
+    Ex::Fail
+)]
+#[case(
+    "(66 (0x3f ({msg1} ({coin21} )",
+    "(67 (0x3f ({msg2} ({coin12} )",
+    Ex::Fail
+)]
+//    mismatching message
+#[case(
+    "(67 (0x3f ({msg2} ({coin21} )",
+    "(66 (0x3f ({msg1} ({coin12} )",
+    Ex::Fail
+)]
+// sender and receiver puzzle committment
+#[case("(66 (0x12 ({msg1} ({h1} )", "(67 (0x12 ({msg1} ({h2} )", Ex::Pass)]
+#[case("(67 (0x12 ({msg1} ({h1} )", "(66 (0x12 ({msg1} ({h2} )", Ex::Pass)]
+//    wrong messages
+#[case("(66 (0x12 ({msg2} ({h1} )", "(67 (0x12 ({msg1} ({h2} )", Ex::Fail)]
+#[case("(66 (0x12 ({msg1} ({h1} )", "(67 (0x12 ({msg2} ({h2} )", Ex::Fail)]
+//    wrong puzzle
+#[case("(66 (0x12 ({msg1} ({h2} )", "(67 (0x12 ({msg1} ({h2} )", Ex::Fail)]
+#[case("(66 (0x12 ({msg1} ({h1} )", "(67 (0x12 ({msg1} ({h1} )", Ex::Fail)]
+// sender parent and receiver puzzle committment
+#[case("(66 (0x22 ({msg1} ({h1} )", "(67 (0x22 ({msg1} ({h1} )", Ex::Pass)]
+#[case("(67 (0x22 ({msg1} ({h2} )", "(66 (0x22 ({msg1} ({h2} )", Ex::Pass)]
+//    wrong messages
+#[case("(66 (0x22 ({msg2} ({h1} )", "(67 (0x22 ({msg1} ({h1} )", Ex::Fail)]
+#[case("(66 (0x22 ({msg1} ({h1} )", "(67 (0x22 ({msg2} ({h1} )", Ex::Fail)]
+//    wrong puzzle
+#[case("(66 (0x22 ({msg1} ({h2} )", "(67 (0x22 ({msg1} ({h1} )", Ex::Fail)]
+//    wrong parent
+#[case("(66 (0x22 ({msg1} ({h1} )", "(67 (0x22 ({msg1} ({h2} )", Ex::Fail)]
+// sender parent and receiver puzzle & amount committment
+#[case(
+    "(66 (0x23 ({msg1} ({h1} (123 )",
+    "(67 (0x23 ({msg1} ({h1} )",
+    Ex::Pass
+)]
+#[case(
+    "(67 (0x23 ({msg1} ({h2} )",
+    "(66 (0x23 ({msg1} ({h2} (123 )",
+    Ex::Pass
+)]
+//    wrong messages
+#[case(
+    "(66 (0x23 ({msg2} ({h1} (123 )",
+    "(67 (0x23 ({msg1} ({h1} )",
+    Ex::Fail
+)]
+#[case(
+    "(66 (0x23 ({msg1} ({h1} (123 )",
+    "(67 (0x23 ({msg2} ({h1} )",
+    Ex::Fail
+)]
+//    wrong puzzle
+#[case(
+    "(66 (0x23 ({msg1} ({h2} (123 )",
+    "(67 (0x23 ({msg1} ({h1} )",
+    Ex::Fail
+)]
+//    wrong amount
+#[case(
+    "(66 (0x23 ({msg1} ({h1} (122 )",
+    "(67 (0x23 ({msg1} ({h1} )",
+    Ex::Fail
+)]
+//    wrong parent
+#[case(
+    "(66 (0x23 ({msg1} ({h1} (123 )",
+    "(67 (0x23 ({msg1} ({h2} )",
+    Ex::Fail
+)]
+// sender parent & puzzle and receiver puzzle committment
+#[case(
+    "(66 (0x32 ({msg1} ({h1} )",
+    "(67 (0x32 ({msg1} ({h1} ({h2} )",
+    Ex::Pass
+)]
+#[case(
+    "(67 (0x32 ({msg1} ({h2} ({h1} )",
+    "(66 (0x32 ({msg1} ({h2} )",
+    Ex::Pass
+)]
+//    wrong messages
+#[case(
+    "(66 (0x32 ({msg2} ({h1} )",
+    "(67 (0x32 ({msg1} ({h1} ({h2} )",
+    Ex::Fail
+)]
+#[case(
+    "(66 (0x32 ({msg1} ({h1} )",
+    "(67 (0x32 ({msg2} ({h1} ({h2} )",
+    Ex::Fail
+)]
+//    wrong puzzle
+#[case(
+    "(66 (0x32 ({msg1} ({h2} )",
+    "(67 (0x32 ({msg1} ({h1} ({h2} )",
+    Ex::Fail
+)]
+//    wrong puzzle
+#[case(
+    "(66 (0x32 ({msg1} ({h1} )",
+    "(67 (0x32 ({msg1} ({h1} ({h1} )",
+    Ex::Fail
+)]
+//    wrong parent
+#[case(
+    "(66 (0x32 ({msg1} ({h1} )",
+    "(67 (0x32 ({msg1} ({h2} ({h2} )",
+    Ex::Fail
+)]
+fn test_message_conditions_two_spends(
+    #[case] coin1_case: &str,
+    #[case] coin2_case: &str,
+    #[case] expect: Ex,
+) {
+    for flags in &[ENABLE_MESSAGE_CONDITIONS, MEMPOOL_MODE] {
+        let test = format!(
+            "(\
+            (({{h1}} ({{h2}} (123 (\
+                ({coin1_case} \
+                ))\
+            (({{h2}} ({{h1}} (123 (\
+                ({coin2_case} \
+                ))\
+            ))"
+        );
+        let ret = cond_test_flag(&test, *flags);
+
+        let expect_pass = match expect {
+            Ex::Pass => true,
+            Ex::Fail => false,
+        };
+
+        if let Ok((a, conds)) = ret {
+            assert!(expect_pass);
+            assert_eq!(conds.cost, 0);
+            assert_eq!(conds.spends.len(), 2);
+
+            let spend = &conds.spends[0];
+            assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+            assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
+            assert_eq!(spend.flags, 0);
+
+            let spend = &conds.spends[1];
+            assert_eq!(*spend.coin_id, test_coin_id(H2, H1, 123));
+            assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
+            assert_eq!(spend.flags, 0);
+        } else if expect_pass {
+            panic!("failed: {:?}", ret.unwrap_err().1);
+        } else {
+            let actual_err = ret.unwrap_err().1;
+            println!("Error: {actual_err:?}");
+            assert_eq!(ErrorCode::MessageNotSentOrReceived, actual_err);
+        }
+    }
+}
+
+// generates all positive test cases between two spends
+#[test]
+fn test_all_message_conditions() {
+    for mode in 0..0b11_1111 {
+        let coin1_case = match mode & 0b111 {
+            0 => "",
+            0b001 => "(456 ",
+            0b010 => "({h1} ",
+            0b011 => "({h1} (456 ",
+            0b100 => "({h2} ",
+            0b101 => "({h2} (456 ",
+            0b110 => "({h2} ({h1} ",
+            0b111 => "({coin21_456} ",
+            _ => {
+                panic!("unexpected {mode}");
+            }
+        };
+
+        let coin2_case = match mode >> 3 {
+            0 => "",
+            0b001 => "(123 ",
+            0b010 => "({h2} ",
+            0b011 => "({h2} (123 ",
+            0b100 => "({h1} ",
+            0b101 => "({h1} (123 ",
+            0b110 => "({h1} ({h2} ",
+            0b111 => "({coin12} ",
+            _ => {
+                panic!("unexpected {mode}");
+            }
+        };
+
+        let test = format!(
+            "(\
+        (({{h1}} ({{h2}} (123 (\
+            ((66 ({mode} ({{msg2}} {coin1_case} )\
+            ))\
+        (({{h2}} ({{h1}} (456 (\
+            ((67 ({mode} ({{msg2}} {coin2_case} )\
+            ))\
+        ))"
+        );
+        let (a, conds) =
+            cond_test_flag(&test, ENABLE_MESSAGE_CONDITIONS).expect("condition expected to pass");
+
+        assert_eq!(conds.cost, 0);
+        assert_eq!(conds.spends.len(), 2);
+
+        let spend = &conds.spends[0];
+        assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+        assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
+        assert_eq!(spend.flags, 0);
+
+        let spend = &conds.spends[1];
+        assert_eq!(*spend.coin_id, test_coin_id(H2, H1, 456));
+        assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
+        assert_eq!(spend.flags, 0);
+    }
+}
+
+#[test]
+fn test_message_eligible_for_ff() {
+    for mode in 0..0b11_1111 {
+        let coin1_case = match mode & 0b111 {
+            0 => "",
+            0b001 => "(123 ",
+            0b010 => "({h1} ",
+            0b011 => "({h1} (123 ",
+            0b100 => "({h2} ",
+            0b101 => "({h2} (123 ",
+            0b110 => "({h2} ({h1} ",
+            0b111 => "({coin21} ",
+            _ => {
+                panic!("unexpected {mode}");
+            }
+        };
+
+        let coin2_case = match mode >> 3 {
+            0 => "",
+            0b001 => "(123 ",
+            0b010 => "({h2} ",
+            0b011 => "({h2} (123 ",
+            0b100 => "({h1} ",
+            0b101 => "({h1} (123 ",
+            0b110 => "({h1} ({h2} ",
+            0b111 => "({coin12} ",
+            _ => {
+                panic!("unexpected {mode}");
+            }
+        };
+
+        // this is a model example of a spend that's eligible for FF
+        // it mimics the output of singleton_top_layer_v1_1
+        // The first test is where the sender is the spend that may be
+        // fast-forwarded
+        // 73=ASSERT_MY_AMOUNT
+        // 71=ASSERT_MY_PARENT_ID
+        // 51=CREATE_COIN
+        // 66=SEND_MESSAGE
+        // 67=RECEIVE_MESSAGE
+        let test = format!(
+            "(\
+       (({{h1}} ({{h2}} (123 (\
+           ((73 (123 ) \
+           ((71 ({{h1}} ) \
+           ((51 ({{h2}} (123 ) \
+           ((66 ({mode} ({{msg2}} {coin1_case} )\
+           ))\
+       (({{h2}} ({{h1}} (123 (\
+           ((67 ({mode} ({{msg2}} {coin2_case} )\
+           ))\
+       ))"
+        );
+
+        let (_a, cond) = cond_test_flag(&test, ENABLE_MESSAGE_CONDITIONS).expect("cond_test");
+        assert!(cond.spends.len() == 2);
+        assert_eq!(
+            (cond.spends[0].flags & ELIGIBLE_FOR_FF) != 0,
+            (mode & 0b10_0000) == 0
+        );
+        assert_eq!((cond.spends[1].flags & ELIGIBLE_FOR_FF), 0);
+
+        // flip sender and receiver. The receiving spend is the one eligible for
+        // fast-forwarding
+        let test = format!(
+            "(\
+       (({{h2}} ({{h1}} (123 (\
+           ((73 (123 ) \
+           ((71 ({{h2}} ) \
+           ((51 ({{h1}} (123 ) \
+           ((67 ({mode} ({{msg2}} {coin2_case} )\
+           ))\
+       (({{h1}} ({{h2}} (123 (\
+           ((66 ({mode} ({{msg2}} {coin1_case} )\
+           ))\
+       ))"
+        );
+
+        let (_a, cond) = cond_test_flag(&test, ENABLE_MESSAGE_CONDITIONS).expect("cond_test");
+        assert!(cond.spends.len() == 2);
+        assert_eq!(
+            (cond.spends[0].flags & ELIGIBLE_FOR_FF) != 0,
+            (mode & 0b100) == 0
+        );
+        assert_eq!((cond.spends[1].flags & ELIGIBLE_FOR_FF), 0);
     }
 }

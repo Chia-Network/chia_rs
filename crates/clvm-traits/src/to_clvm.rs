@@ -1,3 +1,5 @@
+use std::{rc::Rc, sync::Arc};
+
 use num_bigint::BigInt;
 
 use crate::{ClvmEncoder, ToClvmError};
@@ -40,12 +42,45 @@ clvm_primitive!(i128);
 clvm_primitive!(usize);
 clvm_primitive!(isize);
 
+impl<N> ToClvm<N> for bool {
+    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+        i32::from(*self).to_clvm(encoder)
+    }
+}
+
 impl<N, T> ToClvm<N> for &T
 where
     T: ToClvm<N>,
 {
     fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
         T::to_clvm(*self, encoder)
+    }
+}
+
+impl<N, T> ToClvm<N> for Box<T>
+where
+    T: ToClvm<N>,
+{
+    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+        T::to_clvm(self, encoder)
+    }
+}
+
+impl<N, T> ToClvm<N> for Rc<T>
+where
+    T: ToClvm<N>,
+{
+    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+        T::to_clvm(self, encoder)
+    }
+}
+
+impl<N, T> ToClvm<N> for Arc<T>
+where
+    T: ToClvm<N>,
+{
+    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+        T::to_clvm(self, encoder)
     }
 }
 
@@ -148,7 +183,7 @@ mod tests {
     where
         T: ToClvm<NodePtr>,
     {
-        let actual = value.to_clvm(a).unwrap();
+        let actual = value.to_clvm(a)?;
         let actual_bytes = node_to_bytes(a, actual).unwrap();
         Ok(actual_bytes.encode_hex())
     }
@@ -174,12 +209,27 @@ mod tests {
     }
 
     #[test]
+    fn test_bool() {
+        let a = &mut Allocator::new();
+        assert_eq!(encode(a, true), Ok("01".to_owned()));
+        assert_eq!(encode(a, false), Ok("80".to_owned()));
+    }
+
+    #[test]
     fn test_reference() {
         let a = &mut Allocator::new();
         assert_eq!(encode(a, [1, 2, 3]), encode(a, [1, 2, 3]));
         assert_eq!(encode(a, Some(42)), encode(a, Some(42)));
         assert_eq!(encode(a, Some(&42)), encode(a, Some(42)));
         assert_eq!(encode(a, Some(&42)), encode(a, Some(42)));
+    }
+
+    #[test]
+    fn test_smart_pointers() {
+        let a = &mut Allocator::new();
+        assert_eq!(encode(a, Box::new(42)), encode(a, 42));
+        assert_eq!(encode(a, Rc::new(42)), encode(a, 42));
+        assert_eq!(encode(a, Arc::new(42)), encode(a, 42));
     }
 
     #[test]
@@ -251,7 +301,7 @@ mod tests {
             encode(a, "hello".to_string()),
             Ok("8568656c6c6f".to_owned())
         );
-        assert_eq!(encode(a, "".to_string()), Ok("80".to_owned()));
+        assert_eq!(encode(a, String::new()), Ok("80".to_owned()));
     }
 
     #[cfg(feature = "chia-bls")]

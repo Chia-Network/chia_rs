@@ -10,18 +10,19 @@ pub fn sanitize_hash(
 ) -> Result<NodePtr, ValidationErr> {
     let buf = atom(a, n, code)?;
 
-    if buf.as_ref().len() != size {
-        Err(ValidationErr(n, code))
-    } else {
+    if buf.as_ref().len() == size {
         Ok(n)
+    } else {
+        Err(ValidationErr(n, code))
     }
 }
 
 pub fn parse_amount(a: &Allocator, n: NodePtr, code: ErrorCode) -> Result<u64, ValidationErr> {
     // amounts are not allowed to exceed 2^64. i.e. 8 bytes
     match sanitize_uint(a, n, 8, code)? {
-        SanitizedUint::NegativeOverflow => Err(ValidationErr(n, code)),
-        SanitizedUint::PositiveOverflow => Err(ValidationErr(n, code)),
+        SanitizedUint::NegativeOverflow | SanitizedUint::PositiveOverflow => {
+            Err(ValidationErr(n, code))
+        }
         SanitizedUint::Ok(r) => Ok(r),
     }
 }
@@ -37,6 +38,51 @@ pub fn sanitize_announce_msg(
         Err(ValidationErr(n, code))
     } else {
         Ok(n)
+    }
+}
+
+pub fn sanitize_message_mode(a: &Allocator, node: NodePtr) -> Result<u32, ValidationErr> {
+    let Some(mode) = a.small_number(node) else {
+        return Err(ValidationErr(node, ErrorCode::InvalidMessageMode));
+    };
+    // only 6 bits are allowed to be set
+    if (mode & !0b11_1111) != 0 {
+        return Err(ValidationErr(node, ErrorCode::InvalidMessageMode));
+    }
+    Ok(mode)
+}
+
+#[cfg(test)]
+use rstest::rstest;
+
+#[cfg(test)]
+#[rstest]
+#[case(0, true)]
+#[case(-1, false)]
+#[case(1, true)]
+#[case(10_000_000_000, false)]
+#[case(0xffff_ffff_ffff, false)]
+#[case(-0xffff_ffff_ffff, false)]
+#[case(0b100_1001, false)]
+#[case(0b00_1001, true)]
+#[case(0b01_0010, true)]
+#[case(0b10_0100, true)]
+#[case(0b10_1101, true)]
+#[case(0b10_0001, true)]
+#[case(0b11_1111, true)]
+#[case(0b11_1100, true)]
+#[case(0b10_0111, true)]
+#[case(0b00_0111, true)]
+#[case(0b11_1000, true)]
+fn test_sanitize_mode(#[case] value: i64, #[case] pass: bool) {
+    let mut a = Allocator::new();
+    let node = a.new_number(value.into()).unwrap();
+
+    let ret = sanitize_message_mode(&a, node);
+    if pass {
+        assert_eq!(i64::from(ret.unwrap()), value);
+    } else {
+        assert_eq!(ret.unwrap_err().1, ErrorCode::InvalidMessageMode);
     }
 }
 
@@ -158,6 +204,6 @@ fn test_sanitize_amount() {
     // this is small enough though
     assert_eq!(
         amount_tester(&[0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]),
-        Ok(0xffffffffffffffff)
+        Ok(0xffff_ffff_ffff_ffff)
     );
 }

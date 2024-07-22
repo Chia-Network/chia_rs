@@ -1,4 +1,5 @@
 #![no_main]
+use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::fast_forward::fast_forward_singleton;
 use chia_consensus::gen::conditions::{MempoolVisitor, ELIGIBLE_FOR_FF};
 use chia_consensus::gen::run_puzzle::run_puzzle;
@@ -22,7 +23,7 @@ fuzz_target!(|data: &[u8]| {
     let new_parents_parent =
         hex!("abababababababababababababababababababababababababababababababab");
 
-    let mut a = Allocator::new_limited(500000000);
+    let mut a = Allocator::new_limited(500_000_000);
     let Ok(puzzle) = spend.puzzle_reveal.to_node_ptr(&mut a) else {
         return;
     };
@@ -44,7 +45,7 @@ fuzz_target!(|data: &[u8]| {
             };
 
             let new_coin = Coin {
-                parent_coin_info: new_parent_coin.coin_id().into(),
+                parent_coin_info: new_parent_coin.coin_id(),
                 puzzle_hash,
                 amount: if new_amount == 0 {
                     spend.coin.amount
@@ -88,8 +89,9 @@ fn test_ff(
         spend.solution.as_slice(),
         &spend.coin.parent_coin_info,
         spend.coin.amount,
-        11000000000,
+        11_000_000_000,
         0,
+        &TEST_CONSTANTS,
     );
 
     // run new spend
@@ -99,8 +101,9 @@ fn test_ff(
         new_solution.as_slice(),
         &new_coin.parent_coin_info,
         new_coin.amount,
-        11000000000,
+        11_000_000_000,
         0,
+        &TEST_CONSTANTS,
     );
 
     // These are the kinds of failures that can happen because of the

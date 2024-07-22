@@ -1,5 +1,6 @@
 use crate::secret_key::is_all_zero;
 use crate::{DerivableKey, Error, Result};
+
 use blst::*;
 use chia_traits::{read_bytes, Streamable};
 use sha2::{digest::FixedOutput, Digest, Sha256};
@@ -9,26 +10,15 @@ use std::io::Cursor;
 use std::mem::MaybeUninit;
 use std::ops::{Add, AddAssign, Neg, SubAssign};
 
-#[cfg(feature = "py-bindings")]
-use crate::{GTElement, Signature};
-#[cfg(feature = "py-bindings")]
-use chia_py_streamable_macro::PyStreamable;
-#[cfg(feature = "py-bindings")]
-use chia_traits::from_json_dict::FromJsonDict;
-#[cfg(feature = "py-bindings")]
-use chia_traits::to_json_dict::ToJsonDict;
-#[cfg(feature = "py-bindings")]
-use pyo3::{pyclass, pymethods, IntoPy, PyAny, PyObject, PyResult, Python};
-
 #[cfg_attr(
     feature = "py-bindings",
-    pyclass(name = "G1Element"),
-    derive(PyStreamable)
+    pyo3::pyclass(name = "G1Element"),
+    derive(chia_py_streamable_macro::PyStreamable)
 )]
-#[derive(Clone, Default)]
+#[derive(Clone, Copy, Default)]
 pub struct PublicKey(pub(crate) blst_p1);
 
-#[cfg(fuzzing)]
+#[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for PublicKey {
     fn arbitrary(_u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         // placeholder
@@ -49,18 +39,18 @@ impl PublicKey {
             }
             // return infinity element (point all zero)
             return Ok(Self::default());
-        } else {
-            if (bytes[0] & 0xc0) != 0x80 {
-                return Err(Error::G1InfinityInvalidBits);
-            }
-            if zeros_only {
-                return Err(Error::G1InfinityNotZero);
-            }
+        }
+
+        if (bytes[0] & 0xc0) != 0x80 {
+            return Err(Error::G1InfinityInvalidBits);
+        }
+        if zeros_only {
+            return Err(Error::G1InfinityNotZero);
         }
 
         let p1 = unsafe {
             let mut p1_affine = MaybeUninit::<blst_p1_affine>::uninit();
-            let ret = blst_p1_uncompress(p1_affine.as_mut_ptr(), bytes as *const u8);
+            let ret = blst_p1_uncompress(p1_affine.as_mut_ptr(), bytes.as_ptr());
             if ret != BLST_ERROR::BLST_SUCCESS {
                 return Err(Error::InvalidPublicKey(ret));
             }
@@ -87,7 +77,7 @@ impl PublicKey {
             blst_p1_mult(
                 p1.as_mut_ptr(),
                 blst_p1_generator(),
-                scalar.as_ptr() as *const u8,
+                scalar.as_ptr().cast::<u8>(),
                 256,
             );
             p1.assume_init()
@@ -97,17 +87,17 @@ impl PublicKey {
 
     pub fn from_bytes(bytes: &[u8; 48]) -> Result<Self> {
         let ret = Self::from_bytes_unchecked(bytes)?;
-        if !ret.is_valid() {
-            Err(Error::InvalidPublicKey(BLST_ERROR::BLST_POINT_NOT_ON_CURVE))
-        } else {
+        if ret.is_valid() {
             Ok(ret)
+        } else {
+            Err(Error::InvalidPublicKey(BLST_ERROR::BLST_POINT_NOT_ON_CURVE))
         }
     }
 
     pub fn from_uncompressed(buf: &[u8; 96]) -> Result<Self> {
         let p1 = unsafe {
             let mut p1_affine = MaybeUninit::<blst_p1_affine>::uninit();
-            let ret = blst_p1_deserialize(p1_affine.as_mut_ptr(), buf as *const u8);
+            let ret = blst_p1_deserialize(p1_affine.as_mut_ptr(), buf.as_ptr());
             if ret != BLST_ERROR::BLST_SUCCESS {
                 return Err(Error::InvalidSignature(ret));
             }
@@ -121,7 +111,7 @@ impl PublicKey {
     pub fn to_bytes(&self) -> [u8; 48] {
         unsafe {
             let mut bytes = MaybeUninit::<[u8; 48]>::uninit();
-            blst_p1_compress(bytes.as_mut_ptr() as *mut u8, &self.0);
+            blst_p1_compress(bytes.as_mut_ptr().cast::<u8>(), &self.0);
             bytes.assume_init()
         }
     }
@@ -130,6 +120,10 @@ impl PublicKey {
         // Infinity was considered a valid G1Element in older Relic versions
         // For historical compatibililty this behavior is maintained.
         unsafe { blst_p1_is_inf(&self.0) || blst_p1_in_g1(&self.0) }
+    }
+
+    pub fn is_inf(&self) -> bool {
+        unsafe { blst_p1_is_inf(&self.0) }
     }
 
     pub fn negate(&mut self) {
@@ -142,7 +136,7 @@ impl PublicKey {
         unsafe {
             let mut scalar = MaybeUninit::<blst_scalar>::uninit();
             blst_scalar_from_be_bytes(scalar.as_mut_ptr(), int_bytes.as_ptr(), int_bytes.len());
-            blst_p1_mult(&mut self.0, &self.0, scalar.as_ptr() as *const u8, 256);
+            blst_p1_mult(&mut self.0, &self.0, scalar.as_ptr().cast::<u8>(), 256);
         }
     }
 
@@ -151,45 +145,6 @@ impl PublicKey {
         hasher.update(self.to_bytes());
         let hash: [u8; 32] = hasher.finalize_fixed().into();
         u32::from_be_bytes(hash[0..4].try_into().unwrap())
-    }
-}
-
-#[cfg(feature = "py-bindings")]
-#[pymethods]
-impl PublicKey {
-    #[classattr]
-    const SIZE: usize = 48;
-
-    #[new]
-    pub fn init() -> Self {
-        Self::default()
-    }
-
-    #[staticmethod]
-    #[pyo3(name = "generator")]
-    pub fn py_generator() -> Self {
-        Self::generator()
-    }
-
-    pub fn pair(&self, other: &Signature) -> GTElement {
-        other.pair(self)
-    }
-
-    #[pyo3(name = "get_fingerprint")]
-    pub fn py_get_fingerprint(&self) -> u32 {
-        self.get_fingerprint()
-    }
-
-    fn __str__(&self) -> pyo3::PyResult<String> {
-        Ok(hex::encode(self.to_bytes()))
-    }
-
-    pub fn __add__(&self, rhs: &Self) -> Self {
-        self + rhs
-    }
-
-    pub fn __iadd__(&mut self, rhs: &Self) {
-        *self += rhs;
     }
 }
 
@@ -222,7 +177,7 @@ impl Streamable for PublicKey {
 
 impl Hash for PublicKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write(&self.to_bytes())
+        state.write(&self.to_bytes());
     }
 }
 
@@ -237,7 +192,7 @@ impl Neg for PublicKey {
 impl Neg for &PublicKey {
     type Output = PublicKey;
     fn neg(self) -> Self::Output {
-        let mut ret = self.clone();
+        let mut ret = *self;
         ret.negate();
         ret
     }
@@ -254,7 +209,7 @@ impl AddAssign<&PublicKey> for PublicKey {
 impl SubAssign<&PublicKey> for PublicKey {
     fn sub_assign(&mut self, rhs: &PublicKey) {
         unsafe {
-            let mut neg = rhs.clone();
+            let mut neg = *rhs;
             blst_p1_cneg(&mut neg.0, true);
             blst_p1_add_or_double(&mut self.0, &self.0, &neg.0);
         }
@@ -284,75 +239,11 @@ impl Add<&PublicKey> for PublicKey {
 }
 
 impl fmt::Debug for PublicKey {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_fmt(format_args!(
             "<G1Element {}>",
             &hex::encode(self.to_bytes())
         ))
-    }
-}
-
-#[cfg(feature = "py-bindings")]
-impl ToJsonDict for PublicKey {
-    fn to_json_dict(&self, py: Python) -> pyo3::PyResult<PyObject> {
-        let bytes = self.to_bytes();
-        Ok(("0x".to_string() + &hex::encode(bytes)).into_py(py))
-    }
-}
-
-#[cfg(feature = "py-bindings")]
-pub fn parse_hex_string(o: &PyAny, len: usize, name: &str) -> PyResult<Vec<u8>> {
-    use pyo3::exceptions::{PyTypeError, PyValueError};
-    if let Ok(s) = o.extract::<String>() {
-        let s = if let Some(st) = s.strip_prefix("0x") {
-            st
-        } else {
-            &s[..]
-        };
-        let buf = match hex::decode(s) {
-            Err(_) => {
-                return Err(PyValueError::new_err("invalid hex"));
-            }
-            Ok(v) => v,
-        };
-        if buf.len() != len {
-            Err(PyValueError::new_err(format!(
-                "{}, invalid length {} expected {}",
-                name,
-                buf.len(),
-                len
-            )))
-        } else {
-            Ok(buf)
-        }
-    } else if let Ok(buf) = o.extract::<Vec<u8>>() {
-        if buf.len() != len {
-            Err(PyValueError::new_err(format!(
-                "{}, invalid length {} expected {}",
-                name,
-                buf.len(),
-                len
-            )))
-        } else {
-            Ok(buf)
-        }
-    } else {
-        Err(PyTypeError::new_err(format!(
-            "invalid input type for {}",
-            name
-        )))
-    }
-}
-
-#[cfg(feature = "py-bindings")]
-impl FromJsonDict for PublicKey {
-    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
-        Ok(Self::from_bytes(
-            parse_hex_string(o, 48, "PublicKey")?
-                .as_slice()
-                .try_into()
-                .unwrap(),
-        )?)
     }
 }
 
@@ -367,12 +258,12 @@ impl DerivableKey for PublicKey {
             let mut nonce = MaybeUninit::<blst_scalar>::uninit();
             blst_scalar_from_lendian(nonce.as_mut_ptr(), digest.as_ptr());
             let mut bte = MaybeUninit::<[u8; 48]>::uninit();
-            blst_bendian_from_scalar(bte.as_mut_ptr() as *mut u8, nonce.as_ptr());
+            blst_bendian_from_scalar(bte.as_mut_ptr().cast::<u8>(), nonce.as_ptr());
             let mut p1 = MaybeUninit::<blst_p1>::uninit();
             blst_p1_mult(
                 p1.as_mut_ptr(),
                 blst_p1_generator(),
-                bte.as_ptr() as *const u8,
+                bte.as_ptr().cast::<u8>(),
                 256,
             );
             blst_p1_add(p1.as_mut_ptr(), p1.as_mut_ptr(), &self.0);
@@ -382,7 +273,7 @@ impl DerivableKey for PublicKey {
     }
 }
 
-pub const DST: &[u8] = b"BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_AUG_";
+pub(crate) const DST: &[u8] = b"BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_AUG_";
 
 pub fn hash_to_g1(msg: &[u8]) -> PublicKey {
     hash_to_g1_with_dst(msg, DST)
@@ -403,6 +294,84 @@ pub fn hash_to_g1_with_dst(msg: &[u8], dst: &[u8]) -> PublicKey {
         p1.assume_init()
     };
     PublicKey(p1)
+}
+
+#[cfg(feature = "py-bindings")]
+#[pyo3::pymethods]
+impl PublicKey {
+    #[classattr]
+    pub const SIZE: usize = 48;
+
+    #[new]
+    pub fn init() -> Self {
+        Self::default()
+    }
+
+    #[staticmethod]
+    #[pyo3(name = "generator")]
+    pub fn py_generator() -> Self {
+        Self::generator()
+    }
+
+    pub fn verify(&self, signature: &crate::Signature, msg: &[u8]) -> bool {
+        crate::verify(signature, self, msg)
+    }
+
+    pub fn pair(&self, other: &crate::Signature) -> crate::GTElement {
+        other.pair(self)
+    }
+
+    #[pyo3(name = "get_fingerprint")]
+    pub fn py_get_fingerprint(&self) -> u32 {
+        self.get_fingerprint()
+    }
+
+    #[pyo3(name = "derive_unhardened")]
+    #[must_use]
+    pub fn py_derive_unhardened(&self, idx: u32) -> Self {
+        self.derive_unhardened(idx)
+    }
+
+    pub fn __str__(&self) -> String {
+        hex::encode(self.to_bytes())
+    }
+
+    #[must_use]
+    pub fn __add__(&self, rhs: &Self) -> Self {
+        self + rhs
+    }
+
+    pub fn __iadd__(&mut self, rhs: &Self) {
+        *self += rhs;
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+mod pybindings {
+    use super::*;
+
+    use crate::parse_hex::parse_hex_string;
+
+    use chia_traits::{FromJsonDict, ToJsonDict};
+    use pyo3::prelude::*;
+
+    impl ToJsonDict for PublicKey {
+        fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
+            let bytes = self.to_bytes();
+            Ok(("0x".to_string() + &hex::encode(bytes)).into_py(py))
+        }
+    }
+
+    impl FromJsonDict for PublicKey {
+        fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self> {
+            Ok(Self::from_bytes(
+                parse_hex_string(o, 48, "PublicKey")?
+                    .as_slice()
+                    .try_into()
+                    .unwrap(),
+            )?)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -484,7 +453,7 @@ mod tests {
         .try_into()
         .unwrap();
         let pk = PublicKey::from_bytes(&bytes).unwrap();
-        assert_eq!(pk.get_fingerprint(), 651010559);
+        assert_eq!(pk.get_fingerprint(), 651_010_559);
     }
 
     #[test]
@@ -549,8 +518,34 @@ mod tests {
     }
 
     #[test]
+    fn test_default_is_inf() {
+        let pk = PublicKey::default();
+        assert!(pk.is_inf());
+    }
+
+    #[test]
+    fn test_infinity() {
+        let mut data = [0u8; 48];
+        data[0] = 0xc0;
+        let pk = PublicKey::from_bytes(&data).unwrap();
+        assert!(pk.is_inf());
+    }
+
+    #[test]
+    fn test_is_inf() {
+        let mut rng = StdRng::seed_from_u64(1337);
+        let mut data = [0u8; 32];
+        for _i in 0..500 {
+            rng.fill(data.as_mut_slice());
+            let sk = SecretKey::from_seed(&data);
+            let pk = sk.public_key();
+            assert!(!pk.is_inf());
+        }
+    }
+
+    #[test]
     fn test_hash() {
-        fn hash<T: std::hash::Hash>(v: T) -> u64 {
+        fn hash<T: Hash>(v: T) -> u64 {
             use std::collections::hash_map::DefaultHasher;
             let mut h = DefaultHasher::new();
             v.hash(&mut h);
@@ -576,7 +571,7 @@ mod tests {
         data[0] = 0xc0;
         let pk = PublicKey::from_bytes(&data).unwrap();
         assert_eq!(
-            format!("{:?}", pk),
+            format!("{pk:?}"),
             format!("<G1Element {}>", hex::encode(data))
         );
     }
@@ -629,7 +624,7 @@ mod tests {
             rng.fill(&mut data[1..]);
 
             let g1 = PublicKey::from_integer(&data);
-            let mut g1_neg = g1.clone();
+            let mut g1_neg = g1;
             g1_neg.negate();
             assert!(g1_neg != g1);
 
@@ -641,7 +636,7 @@ mod tests {
     #[test]
     fn test_negate_infinity() {
         let g1 = PublicKey::default();
-        let mut g1_neg = g1.clone();
+        let mut g1_neg = g1;
         // negate on infinity is a no-op
         g1_neg.negate();
         assert!(g1_neg == g1);
@@ -657,10 +652,10 @@ mod tests {
             rng.fill(&mut data[1..]);
 
             let g1 = PublicKey::from_integer(&data);
-            let mut g1_neg = g1.clone();
+            let mut g1_neg = g1;
             g1_neg.negate();
 
-            let mut g1_double = g1.clone();
+            let mut g1_double = g1;
             // adding the negative undoes adding the positive
             g1_double += &g1;
             assert!(g1_double != g1);
@@ -679,7 +674,7 @@ mod tests {
             rng.fill(&mut data[1..]);
 
             let mut g1 = PublicKey::from_integer(&data);
-            let mut g1_double = g1.clone();
+            let mut g1_double = g1;
             g1_double += &g1;
             assert!(g1_double != g1);
             // scalar multiply by 2 is the same as adding oneself
@@ -726,6 +721,7 @@ mod tests {
 mod pytests {
     use super::*;
     use crate::SecretKey;
+    use pyo3::{IntoPy, Python};
     use rand::rngs::StdRng;
     use rand::{Rng, SeedableRng};
     use rstest::rstest;
@@ -741,7 +737,7 @@ mod pytests {
             let pk = sk.public_key();
             Python::with_gil(|py| {
                 let string = pk.to_json_dict(py).expect("to_json_dict");
-                let pk2 = PublicKey::from_json_dict(string.as_ref(py)).unwrap();
+                let pk2 = PublicKey::from_json_dict(string.bind(py)).unwrap();
                 assert_eq!(pk, pk2);
             });
         }
@@ -757,8 +753,8 @@ mod pytests {
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
             let err =
-                PublicKey::from_json_dict(input.to_string().into_py(py).as_ref(py)).unwrap_err();
-            assert_eq!(err.value(py).to_string(), msg.to_string());
+                PublicKey::from_json_dict(input.to_string().into_py(py).bind(py)).unwrap_err();
+            assert_eq!(err.value_bound(py).to_string(), msg.to_string());
         });
     }
 }

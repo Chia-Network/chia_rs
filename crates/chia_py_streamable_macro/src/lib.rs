@@ -1,11 +1,22 @@
-extern crate proc_macro;
+#![allow(clippy::missing_panics_doc)]
 
 use proc_macro2::{Ident, Span};
 use proc_macro_crate::{crate_name, FoundCrate};
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, FieldsNamed, FieldsUnnamed};
 
-#[proc_macro_derive(PyStreamable)]
+fn maybe_upper_fields(py_uppercase: bool, fnames: Vec<Ident>) -> Vec<Ident> {
+    if py_uppercase {
+        fnames
+            .into_iter()
+            .map(|f| Ident::new(&f.to_string().to_uppercase(), Span::call_site()))
+            .collect()
+    } else {
+        fnames
+    }
+}
+
+#[proc_macro_derive(PyStreamable, attributes(py_uppercase, py_pickle))]
 pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let found_crate = crate_name("chia-traits").expect("chia-traits is present in `Cargo.toml`");
 
@@ -17,7 +28,19 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
         }
     };
 
-    let DeriveInput { ident, data, .. } = parse_macro_input!(input);
+    let DeriveInput {
+        ident, data, attrs, ..
+    } = parse_macro_input!(input);
+
+    let mut py_uppercase = false;
+    let mut py_pickle = false;
+    for attr in &attrs {
+        if attr.path().is_ident("py_uppercase") {
+            py_uppercase = true;
+        } else if attr.path().is_ident("py_pickle") {
+            py_pickle = true;
+        }
+    }
 
     let fields = match data {
         syn::Data::Struct(s) => s.fields,
@@ -44,7 +67,7 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
             }
             .into();
         }
-        _ => {
+        syn::Data::Union(_) => {
             panic!("Streamable only support struct");
         }
     };
@@ -74,29 +97,32 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
         }
 
         impl #crate_name::ChiaToPython for #ident {
-            fn to_python<'a>(&self, py: pyo3::Python<'a>) -> pyo3::PyResult<&'a pyo3::PyAny> {
-                Ok(pyo3::IntoPy::into_py(self.clone(), py).into_ref(py))
+            fn to_python<'a>(&self, py: pyo3::Python<'a>) -> pyo3::PyResult<pyo3::Bound<'a, pyo3::PyAny>> {
+                Ok(pyo3::IntoPy::into_py(self.clone(), py).into_bound(py))
             }
         }
     };
 
+    let mut fnames = Vec::<Ident>::new();
+    let mut ftypes = Vec::<syn::Type>::new();
+
     match fields {
         syn::Fields::Named(FieldsNamed { named, .. }) => {
-            let mut fnames = Vec::<syn::Ident>::new();
-            let mut ftypes = Vec::<syn::Type>::new();
-            for f in named.iter() {
+            for f in &named {
                 fnames.push(f.ident.as_ref().unwrap().clone());
                 ftypes.push(f.ty.clone());
             }
+
+            let fnames_maybe_upper = maybe_upper_fields(py_uppercase, fnames.clone());
 
             py_protocol.extend(quote! {
                 #[pyo3::pymethods]
                 impl #ident {
                     #[allow(too_many_arguments)]
                     #[new]
-                    #[pyo3(signature = (#(#fnames),*))]
-                    pub fn new ( #(#fnames : #ftypes),* ) -> Self {
-                        Self { #(#fnames),* }
+                    #[pyo3(signature = (#(#fnames_maybe_upper),*))]
+                    pub fn py_new ( #(#fnames_maybe_upper : #ftypes),* ) -> Self {
+                        Self { #(#fnames: #fnames_maybe_upper),* }
                     }
                 }
             });
@@ -112,7 +138,7 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                             for (field, value) in iter {
                                 let field = field.extract::<String>()?;
                                 match field.as_str() {
-                                    #(stringify!(#fnames) => {
+                                    #(stringify!(#fnames_maybe_upper) => {
                                         ret.#fnames = value.extract()?;
                                     }),*
                                     _ => { return Err(pyo3::exceptions::PyKeyError::new_err(format!("unknown field {field}"))); }
@@ -135,7 +161,7 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
         impl #ident {
             #[staticmethod]
             #[pyo3(signature=(json_dict))]
-            pub fn from_json_dict(json_dict: &pyo3::PyAny) -> pyo3::PyResult<Self> {
+            pub fn from_json_dict(json_dict: &pyo3::Bound<pyo3::PyAny>) -> pyo3::PyResult<Self> {
                 <Self as #crate_name::from_json_dict::FromJsonDict>::from_json_dict(json_dict)
             }
 
@@ -190,23 +216,23 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 }
             }
 
-            pub fn get_hash<'p>(&self, py: pyo3::Python<'p>) -> pyo3::PyResult<&'p pyo3::types::PyBytes> {
+            pub fn get_hash<'p>(&self, py: pyo3::Python<'p>) -> pyo3::PyResult<pyo3::Bound<'p, pyo3::types::PyBytes>> {
                 let mut ctx = <sha2::Sha256 as sha2::Digest>::new();
                 #crate_name::Streamable::update_digest(self, &mut ctx);
-                Ok(pyo3::types::PyBytes::new(py, sha2::Digest::finalize(ctx).as_slice()))
+                Ok(pyo3::types::PyBytes::new_bound(py, sha2::Digest::finalize(ctx).as_slice()))
             }
             #[pyo3(name = "to_bytes")]
-            pub fn py_to_bytes<'p>(&self, py: pyo3::Python<'p>) -> pyo3::PyResult<&'p pyo3::types::PyBytes> {
+            pub fn py_to_bytes<'p>(&self, py: pyo3::Python<'p>) -> pyo3::PyResult<pyo3::Bound<'p, pyo3::types::PyBytes>> {
                 let mut writer = Vec::<u8>::new();
                 #crate_name::Streamable::stream(self, &mut writer).map_err(|e| <#crate_name::chia_error::Error as Into<pyo3::PyErr>>::into(e))?;
-                Ok(pyo3::types::PyBytes::new(py, &writer))
+                Ok(pyo3::types::PyBytes::new_bound(py, &writer))
             }
 
-            pub fn stream_to_bytes<'p>(&self, py: pyo3::Python<'p>) -> pyo3::PyResult<&'p pyo3::types::PyBytes> {
+            pub fn stream_to_bytes<'p>(&self, py: pyo3::Python<'p>) -> pyo3::PyResult<pyo3::Bound<'p, pyo3::types::PyBytes>> {
                 self.py_to_bytes(py)
             }
 
-            pub fn __bytes__<'p>(&self, py: pyo3::Python<'p>) -> pyo3::PyResult<&'p pyo3::types::PyBytes> {
+            pub fn __bytes__<'p>(&self, py: pyo3::Python<'p>) -> pyo3::PyResult<pyo3::Bound<'p, pyo3::types::PyBytes>> {
                 self.py_to_bytes(py)
             }
 
@@ -220,10 +246,43 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
         }
     };
     py_protocol.extend(streamable);
+
+    if py_pickle {
+        let pickle = quote! {
+            #[pyo3::pymethods]
+            impl #ident {
+                pub fn __setstate__(
+                    &mut self,
+                    state: &pyo3::types::PyBytes,
+                ) -> pyo3::PyResult<()> {
+                    use chia_traits::Streamable;
+
+                    *self = Self::parse::<true>(&mut std::io::Cursor::new(state.as_bytes()))?;
+
+                    Ok(())
+                }
+
+                pub fn __getstate__<'py>(
+                    &self,
+                    py: pyo3::Python<'py>,
+                ) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyBytes>> {
+                    self.py_to_bytes(py)
+                }
+
+                pub fn __getnewargs__<'py>(&self, py: pyo3::Python<'py>) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyTuple>> {
+                    let mut args = Vec::new();
+                    #( args.push(#crate_name::ChiaToPython::to_python(&self.#fnames, py)?); )*
+                    Ok(pyo3::types::PyTuple::new_bound(py, args))
+                }
+            }
+        };
+        py_protocol.extend(pickle);
+    }
+
     py_protocol.into()
 }
 
-#[proc_macro_derive(PyJsonDict)]
+#[proc_macro_derive(PyJsonDict, attributes(py_uppercase))]
 pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let found_crate = crate_name("chia-traits").expect("chia-traits is present in `Cargo.toml`");
 
@@ -235,7 +294,16 @@ pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenSt
         }
     };
 
-    let DeriveInput { ident, data, .. } = parse_macro_input!(input);
+    let DeriveInput {
+        ident, data, attrs, ..
+    } = parse_macro_input!(input);
+
+    let mut py_uppercase = false;
+    for attr in &attrs {
+        if attr.path().is_ident("py_uppercase") {
+            py_uppercase = true;
+        }
+    }
 
     let fields = match data {
         syn::Data::Struct(s) => s.fields,
@@ -248,7 +316,7 @@ pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenSt
                 }
 
                 impl #crate_name::from_json_dict::FromJsonDict for #ident {
-                    fn from_json_dict(o: &pyo3::PyAny) -> pyo3::PyResult<Self> {
+                    fn from_json_dict(o: &pyo3::Bound<pyo3::PyAny>) -> pyo3::PyResult<Self> {
                         let v = <u8 as #crate_name::from_json_dict::FromJsonDict>::from_json_dict(o)?;
                         <Self as #crate_name::Streamable>::parse::<false>(&mut std::io::Cursor::<&[u8]>::new(&[v])).map_err(|e| e.into())
                     }
@@ -256,7 +324,7 @@ pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenSt
             }
             .into();
         }
-        _ => {
+        syn::Data::Union(_) => {
             panic!("PyJsonDict only support struct");
         }
     };
@@ -265,27 +333,31 @@ pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenSt
 
     match fields {
         syn::Fields::Named(FieldsNamed { named, .. }) => {
-            let mut fnames = Vec::<syn::Ident>::new();
+            let mut fnames = Vec::<Ident>::new();
             let mut ftypes = Vec::<syn::Type>::new();
-            for f in named.iter() {
+            for f in &named {
                 fnames.push(f.ident.as_ref().unwrap().clone());
                 ftypes.push(f.ty.clone());
             }
+
+            let fnames_maybe_upper = maybe_upper_fields(py_uppercase, fnames.clone());
 
             py_protocol.extend( quote! {
 
                 impl #crate_name::to_json_dict::ToJsonDict for #ident {
                     fn to_json_dict(&self, py: pyo3::Python) -> pyo3::PyResult<pyo3::PyObject> {
-                        let ret = pyo3::types::PyDict::new(py);
-                        #(ret.set_item(stringify!(#fnames), self.#fnames.to_json_dict(py)?)?);*;
+                        use pyo3::prelude::PyDictMethods;
+                        let ret = pyo3::types::PyDict::new_bound(py);
+                        #(ret.set_item(stringify!(#fnames_maybe_upper), self.#fnames.to_json_dict(py)?)?);*;
                         Ok(ret.into())
                     }
                 }
 
                 impl #crate_name::from_json_dict::FromJsonDict for #ident {
-                    fn from_json_dict(o: &pyo3::PyAny) -> pyo3::PyResult<Self> {
+                    fn from_json_dict(o: &pyo3::Bound<pyo3::PyAny>) -> pyo3::PyResult<Self> {
+                        use pyo3::prelude::PyAnyMethods;
                         Ok(Self{
-                            #(#fnames: <#ftypes as #crate_name::from_json_dict::FromJsonDict>::from_json_dict(o.get_item(stringify!(#fnames))?)?,)*
+                            #(#fnames: <#ftypes as #crate_name::from_json_dict::FromJsonDict>::from_json_dict(&o.get_item(stringify!(#fnames_maybe_upper))?)?,)*
                         })
                     }
                 }
@@ -299,9 +371,18 @@ pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenSt
     py_protocol.into()
 }
 
-#[proc_macro_derive(PyGetters)]
+#[proc_macro_derive(PyGetters, attributes(py_uppercase))]
 pub fn py_getters_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let DeriveInput { ident, data, .. } = parse_macro_input!(input);
+    let DeriveInput {
+        ident, data, attrs, ..
+    } = parse_macro_input!(input);
+
+    let mut py_uppercase = false;
+    for attr in &attrs {
+        if attr.path().is_ident("py_uppercase") {
+            py_uppercase = true;
+        }
+    }
 
     let syn::Data::Struct(s) = data else {
         panic!("python binding only support struct");
@@ -321,19 +402,21 @@ pub fn py_getters_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStre
         }
     };
 
-    let mut fnames = Vec::<syn::Ident>::new();
+    let mut fnames = Vec::<Ident>::new();
     let mut ftypes = Vec::<syn::Type>::new();
-    for f in named.into_iter() {
+    for f in named {
         fnames.push(f.ident.unwrap());
         ftypes.push(f.ty);
     }
+
+    let fnames_maybe_upper = maybe_upper_fields(py_uppercase, fnames.clone());
 
     let ret = quote! {
         #[pyo3::pymethods]
         impl #ident {
             #(
             #[getter]
-            fn #fnames<'a> (&self, py: pyo3::Python<'a>) -> pyo3::PyResult<&'a pyo3::PyAny> {
+            fn #fnames_maybe_upper<'a> (&self, py: pyo3::Python<'a>) -> pyo3::PyResult<pyo3::Bound<'a, pyo3::PyAny>> {
                 #crate_name::ChiaToPython::to_python(&self.#fnames, py)
             }
             )*

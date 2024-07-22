@@ -26,8 +26,10 @@
 
 mod curried_program;
 mod curry_tree_hash;
+mod hash_encoder;
 mod tree_hash;
 
 pub use curried_program::*;
 pub use curry_tree_hash::*;
+pub use hash_encoder::*;
 pub use tree_hash::*;

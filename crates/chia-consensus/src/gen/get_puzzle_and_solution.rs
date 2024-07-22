@@ -1,5 +1,5 @@
 use crate::gen::validation_error::{atom, check_nil, first, next, rest, ErrorCode, ValidationErr};
-use ::chia_protocol::bytes::Bytes32;
+use chia_protocol::Bytes32;
 use clvm_utils::tree_hash;
 use clvmr::allocator::{Allocator, Atom, NodePtr};
 use clvmr::op_utils::u64_from_bytes;
@@ -8,7 +8,7 @@ use clvmr::op_utils::u64_from_bytes;
 pub fn parse_coin_spend(
     a: &Allocator,
     coin_spend: NodePtr,
-) -> Result<(Atom, u64, NodePtr, NodePtr), ValidationErr> {
+) -> Result<(Atom<'_>, u64, NodePtr, NodePtr), ValidationErr> {
     let parent = atom(a, first(a, coin_spend)?, ErrorCode::InvalidParentId)?;
     let coin_spend = rest(a, coin_spend)?;
     let puzzle = first(a, coin_spend)?;
@@ -46,7 +46,7 @@ pub fn get_puzzle_and_solution_for_coin(
         }
 
         let puzzle_hash = tree_hash(a, puzzle);
-        if puzzle_hash != find_ph.as_ref() {
+        if puzzle_hash != find_ph.into() {
             continue;
         }
 
@@ -84,7 +84,7 @@ fn make_dummy_id(seed: u64) -> Bytes32 {
 #[cfg(test)]
 fn make_dummy_puzzle(a: &mut Allocator, seed: u32) -> NodePtr {
     let first = a.new_atom(&seed.to_be_bytes()).unwrap();
-    let second = a.new_atom(&(0xffffffff - seed).to_be_bytes()).unwrap();
+    let second = a.new_atom(&(0xffff_ffff - seed).to_be_bytes()).unwrap();
     a.new_pair(first, second).unwrap()
 }
 

@@ -1,6 +1,7 @@
-use chia_bls::secret_key::SecretKey;
-use chia_bls::signature;
-use chia_bls::signature::sign;
+use chia_bls::{
+    aggregate_verify, aggregate_verify_gt, hash_to_g2, sign, GTElement, PublicKey, SecretKey,
+    Signature,
+};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
@@ -17,14 +18,44 @@ fn verify_benchmark(c: &mut Criterion) {
     let sig_small = sign(&sk, msg_small);
     let sig_large = sign(&sk, msg_large);
 
+    let mut agg_sig = Signature::default();
+    let mut gts = Vec::<GTElement>::new();
+    let mut pks = Vec::<PublicKey>::new();
+    for idx in 0..1000 {
+        let derived = sk.derive_hardened(idx as u32);
+        let pk = derived.public_key();
+        let sig = sign(&derived, msg_small);
+        agg_sig.aggregate(&sig);
+
+        let mut augmented = pk.to_bytes().to_vec();
+        augmented.extend_from_slice(msg_small);
+        gts.push(hash_to_g2(augmented.as_slice()).pair(&pk));
+        pks.push(pk);
+    }
+
+    c.bench_function("aggregate_verify_gt, small msg", |b| {
+        b.iter(|| {
+            assert!(aggregate_verify_gt(&agg_sig, &gts));
+        });
+    });
+
+    c.bench_function("aggregate_verify, small msg", |b| {
+        b.iter(|| {
+            assert!(aggregate_verify(
+                &agg_sig,
+                pks.iter().map(|pk| (pk, &msg_small[..]))
+            ));
+        });
+    });
+
     c.bench_function("verify, small msg", |b| {
         b.iter(|| {
-            signature::verify(&sig_small, &pk, black_box(&msg_small));
+            assert!(chia_bls::verify(&sig_small, &pk, black_box(&msg_small)));
         });
     });
     c.bench_function("verify, 4kiB msg", |b| {
         b.iter(|| {
-            signature::verify(&sig_large, &pk, black_box(&msg_large));
+            assert!(chia_bls::verify(&sig_large, &pk, black_box(&msg_large)));
         });
     });
 }

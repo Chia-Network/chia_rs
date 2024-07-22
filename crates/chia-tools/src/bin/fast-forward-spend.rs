@@ -2,8 +2,8 @@ use clap::Parser;
 use std::fs;
 
 use chia_consensus::fast_forward::fast_forward_singleton;
-use chia_protocol::bytes::Bytes32;
-use chia_protocol::{coin::Coin, coin_spend::CoinSpend, program::Program};
+use chia_protocol::Bytes32;
+use chia_protocol::{Coin, CoinSpend, Program};
 use chia_traits::streamable::Streamable;
 use clvm_traits::{FromNodePtr, ToNodePtr};
 use clvm_utils::tree_hash;
@@ -37,7 +37,7 @@ fn main() {
         .try_into()
         .unwrap();
 
-    let mut a = Allocator::new_limited(500000000);
+    let mut a = Allocator::new_limited(500_000_000);
     let puzzle = spend.puzzle_reveal.to_node_ptr(&mut a).expect("to_clvm");
     let solution = spend.solution.to_node_ptr(&mut a).expect("to_clvm");
     let puzzle_hash = Bytes32::from(tree_hash(&a, puzzle));
@@ -49,7 +49,7 @@ fn main() {
     };
 
     let new_coin = Coin {
-        parent_coin_info: new_parent_coin.coin_id().into(),
+        parent_coin_info: new_parent_coin.coin_id(),
         puzzle_hash,
         amount: spend.coin.amount,
     };

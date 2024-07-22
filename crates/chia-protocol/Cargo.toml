@@ -1,6 +1,6 @@
 [package]
 name = "chia-protocol"
-version = "0.5.1"
+version = "0.10.0"
 edition = "2021"
 license = "Apache-2.0"
 description = "Chia network protocol message types"
@@ -8,24 +8,28 @@ authors = ["Arvid Norberg <arvid@chia.net>"]
 homepage = "https://github.com/Chia-Network/chia_rs"
 repository = "https://github.com/Chia-Network/chia_rs"
 
+[lints]
+workspace = true
+
 [features]
-py-bindings = ["dep:pyo3", "dep:chia_py_streamable_macro", "chia-traits/py-bindings"]
+py-bindings = ["dep:pyo3", "dep:chia_py_streamable_macro", "chia-traits/py-bindings", "chia-bls/py-bindings"]
+arbitrary = ["dep:arbitrary", "chia-bls/arbitrary"]
 
 [dependencies]
-pyo3 = { version = "0.19.0", features = ["multiple-pymethods", "num-bigint"], optional = true }
-sha2 = "0.10.8"
-hex = "0.4.3"
-chia_streamable_macro = { version = "0.3.0", path = "../chia_streamable_macro" }
-chia_py_streamable_macro = { version = "0.5.1", path = "../chia_py_streamable_macro", optional = true }
-clvmr = "0.6.0"
-chia-traits = { version = "0.5.1", path = "../chia-traits" }
-clvm-traits = { version = "0.5.1", path = "../clvm-traits", features = ["derive"] }
-clvm-utils = { version = "0.5.1", path = "../clvm-utils" }
-chia-bls = { version = "0.5.1", path = "../chia-bls" }
-arbitrary = { version = "1.3.0", features = ["derive"] }
+pyo3 = { workspace = true, features = ["multiple-pymethods", "num-bigint"], optional = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+chia_streamable_macro = { workspace = true }
+chia_py_streamable_macro = { workspace = true, optional = true }
+clvmr = { workspace = true }
+chia-traits = { workspace = true }
+clvm-traits = { workspace = true, features = ["derive"] }
+clvm-utils = { workspace = true }
+chia-bls = { workspace = true }
+arbitrary = { workspace = true, features = ["derive"], optional = true }
 
 [dev-dependencies]
-rstest = "0.17.0"
+rstest = { workspace = true }
 
 [lib]
 crate-type = ["rlib"]

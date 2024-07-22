@@ -1,44 +1,49 @@
-use crate::run_generator::{
-    convert_spend_bundle_conds, run_block_generator, run_block_generator2, PySpend,
-    PySpendBundleConditions,
-};
+use crate::run_generator::{run_block_generator, run_block_generator2};
 use chia_consensus::allocator::make_allocator;
+use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::gen::conditions::MempoolVisitor;
 use chia_consensus::gen::flags::{
-    AGG_SIG_ARGS, ALLOW_BACKREFS, ANALYZE_SPENDS, COND_ARGS_NIL, ENABLE_SOFTFORK_CONDITION,
-    MEMPOOL_MODE, NO_RELATIVE_CONDITIONS_ON_EPHEMERAL, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
+    ALLOW_BACKREFS, ANALYZE_SPENDS, DISALLOW_INFINITY_G1, ENABLE_MESSAGE_CONDITIONS, MEMPOOL_MODE,
+    NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
 };
+use chia_consensus::gen::owned_conditions::{OwnedSpend, OwnedSpendBundleConditions};
 use chia_consensus::gen::run_puzzle::run_puzzle as native_run_puzzle;
 use chia_consensus::gen::solution_generator::solution_generator as native_solution_generator;
 use chia_consensus::gen::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
 use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
+use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
 use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
-    CoinSpend, CoinState, CoinStateUpdate, EndOfSubSlotBundle, Foliage, FoliageBlockData,
-    FoliageTransactionBlock, FullBlock, HeaderBlock, InfusedChallengeChainSubSlot, NewCompactVDF,
-    NewPeak, NewPeakWallet, NewSignagePointOrEndOfSubSlot, NewTransaction, NewUnfinishedBlock,
+    CoinSpend, CoinState, CoinStateFilters, CoinStateUpdate, EndOfSubSlotBundle, Foliage,
+    FoliageBlockData, FoliageTransactionBlock, FullBlock, HeaderBlock,
+    InfusedChallengeChainSubSlot, NewCompactVDF, NewPeak, NewPeakWallet,
+    NewSignagePointOrEndOfSubSlot, NewTransaction, NewUnfinishedBlock, NewUnfinishedBlock2,
     PoolTarget, Program, ProofBlockHeader, ProofOfSpace, PuzzleSolutionResponse, RecentChainData,
     RegisterForCoinUpdates, RegisterForPhUpdates, RejectAdditionsRequest, RejectBlock,
-    RejectBlockHeaders, RejectBlocks, RejectHeaderBlocks, RejectHeaderRequest,
-    RejectPuzzleSolution, RejectRemovalsRequest, RequestAdditions, RequestBlock,
-    RequestBlockHeader, RequestBlockHeaders, RequestBlocks, RequestChildren, RequestCompactVDF,
-    RequestFeeEstimates, RequestHeaderBlocks, RequestMempoolTransactions, RequestPeers,
-    RequestProofOfWeight, RequestPuzzleSolution, RequestRemovals, RequestSesInfo,
+    RejectBlockHeaders, RejectBlocks, RejectCoinState, RejectHeaderBlocks, RejectHeaderRequest,
+    RejectPuzzleSolution, RejectPuzzleState, RejectRemovalsRequest, RequestAdditions, RequestBlock,
+    RequestBlockHeader, RequestBlockHeaders, RequestBlocks, RequestChildren, RequestCoinState,
+    RequestCompactVDF, RequestFeeEstimates, RequestHeaderBlocks, RequestMempoolTransactions,
+    RequestPeers, RequestProofOfWeight, RequestPuzzleSolution, RequestPuzzleState, RequestRemovals,
+    RequestRemoveCoinSubscriptions, RequestRemovePuzzleSubscriptions, RequestSesInfo,
     RequestSignagePointOrEndOfSubSlot, RequestTransaction, RequestUnfinishedBlock,
-    RespondAdditions, RespondBlock, RespondBlockHeader, RespondBlockHeaders, RespondBlocks,
-    RespondChildren, RespondCompactVDF, RespondEndOfSubSlot, RespondFeeEstimates,
-    RespondHeaderBlocks, RespondPeers, RespondProofOfWeight, RespondPuzzleSolution,
-    RespondRemovals, RespondSesInfo, RespondSignagePoint, RespondToCoinUpdates, RespondToPhUpdates,
-    RespondTransaction, RespondUnfinishedBlock, RewardChainBlock, RewardChainBlockUnfinished,
-    RewardChainSubSlot, SendTransaction, SpendBundle, SubEpochChallengeSegment, SubEpochData,
-    SubEpochSegments, SubEpochSummary, SubSlotData, SubSlotProofs, TimestampedPeerInfo,
-    TransactionAck, TransactionsInfo, UnfinishedBlock, VDFInfo, VDFProof, WeightProof,
+    RequestUnfinishedBlock2, RespondAdditions, RespondBlock, RespondBlockHeader,
+    RespondBlockHeaders, RespondBlocks, RespondChildren, RespondCoinState, RespondCompactVDF,
+    RespondEndOfSubSlot, RespondFeeEstimates, RespondHeaderBlocks, RespondPeers,
+    RespondProofOfWeight, RespondPuzzleSolution, RespondPuzzleState, RespondRemovals,
+    RespondRemoveCoinSubscriptions, RespondRemovePuzzleSubscriptions, RespondSesInfo,
+    RespondSignagePoint, RespondToCoinUpdates, RespondToPhUpdates, RespondTransaction,
+    RespondUnfinishedBlock, RewardChainBlock, RewardChainBlockUnfinished, RewardChainSubSlot,
+    SendTransaction, SpendBundle, SubEpochChallengeSegment, SubEpochData, SubEpochSegments,
+    SubEpochSummary, SubSlotData, SubSlotProofs, TimestampedPeerInfo, TransactionAck,
+    TransactionsInfo, UnfinishedBlock, UnfinishedHeaderBlock, VDFInfo, VDFProof, WeightProof,
 };
 use clvm_utils::tree_hash_from_bytes;
 use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV, LIMIT_HEAP, NO_UNKNOWN_OPS};
 use pyo3::buffer::PyBuffer;
-use pyo3::exceptions::PyRuntimeError;
+use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
+use pyo3::pybacked::PyBackedBytes;
 use pyo3::types::PyBytes;
 use pyo3::types::PyList;
 use pyo3::types::PyTuple;
@@ -61,29 +66,55 @@ use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs};
 use clvmr::ChiaDialect;
 
 use chia_bls::{
-    hash_to_g2 as native_hash_to_g2, DerivableKey, GTElement, PublicKey, SecretKey, Signature,
+    hash_to_g2 as native_hash_to_g2, BlsCache, DerivableKey, GTElement, PublicKey, SecretKey,
+    Signature,
 };
 
 #[pyfunction]
 pub fn compute_merkle_set_root<'p>(
     py: Python<'p>,
     values: Vec<&'p PyBytes>,
-) -> PyResult<&'p PyBytes> {
+) -> PyResult<Bound<'p, PyBytes>> {
     let mut buffer = Vec::<[u8; 32]>::with_capacity(values.len());
     for b in values {
         buffer.push(b.as_bytes().try_into()?);
     }
-    Ok(PyBytes::new(py, &compute_merkle_root_impl(&mut buffer)))
+    Ok(PyBytes::new_bound(
+        py,
+        &compute_merkle_root_impl(&mut buffer),
+    ))
 }
 
 #[pyfunction]
-pub fn tree_hash(py: Python, blob: PyBuffer<u8>) -> PyResult<&PyBytes> {
-    if !blob.is_c_contiguous() {
-        panic!("tree_hash() must be called with a contiguous buffer");
-    }
+pub fn confirm_included_already_hashed(
+    root: Bytes32,
+    item: Bytes32,
+    proof: &[u8],
+) -> PyResult<bool> {
+    validate_merkle_proof(proof, (&item).into(), (&root).into())
+        .map_err(|_| PyValueError::new_err("Invalid proof"))
+}
+
+#[pyfunction]
+pub fn confirm_not_included_already_hashed(
+    root: Bytes32,
+    item: Bytes32,
+    proof: &[u8],
+) -> PyResult<bool> {
+    validate_merkle_proof(proof, (&item).into(), (&root).into())
+        .map_err(|_| PyValueError::new_err("Invalid proof"))
+        .map(|r| !r)
+}
+
+#[pyfunction]
+pub fn tree_hash(py: Python<'_>, blob: PyBuffer<u8>) -> PyResult<Bound<'_, PyBytes>> {
+    assert!(
+        blob.is_c_contiguous(),
+        "tree_hash() must be called with a contiguous buffer"
+    );
     let slice =
         unsafe { std::slice::from_raw_parts(blob.buf_ptr() as *const u8, blob.len_bytes()) };
-    Ok(PyBytes::new(py, &tree_hash_from_bytes(slice)?))
+    Ok(PyBytes::new_bound(py, &tree_hash_from_bytes(slice)?))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -97,18 +128,14 @@ pub fn get_puzzle_and_solution_for_coin(
     find_amount: u64,
     find_ph: Bytes32,
     flags: u32,
-) -> PyResult<(&PyBytes, &PyBytes)> {
+) -> PyResult<(Bound<'_, PyBytes>, Bound<'_, PyBytes>)> {
     let mut allocator = make_allocator(LIMIT_HEAP);
 
-    if !program.is_c_contiguous() {
-        panic!("program must be contiguous");
-    }
+    assert!(program.is_c_contiguous(), "program must be contiguous");
     let program =
         unsafe { std::slice::from_raw_parts(program.buf_ptr() as *const u8, program.len_bytes()) };
 
-    if !args.is_c_contiguous() {
-        panic!("args must be contiguous");
-    }
+    assert!(args.is_c_contiguous(), "args must be contiguous");
     let args = unsafe { std::slice::from_raw_parts(args.buf_ptr() as *const u8, args.len_bytes()) };
 
     let deserialize = if (flags & ALLOW_BACKREFS) != 0 {
@@ -139,10 +166,10 @@ pub fn get_puzzle_and_solution_for_coin(
         };
     */
     match r {
-        Err(eval_err) => eval_err_to_pyresult(eval_err, allocator),
+        Err(eval_err) => eval_err_to_pyresult(eval_err, &allocator),
         Ok((puzzle, solution)) => Ok((
-            PyBytes::new(py, &serialize(&allocator, puzzle)?),
-            PyBytes::new(py, &serialize(&allocator, solution)?),
+            PyBytes::new_bound(py, &serialize(&allocator, puzzle)?),
+            PyBytes::new_bound(py, &serialize(&allocator, solution)?),
         )),
     }
 }
@@ -155,40 +182,48 @@ fn run_puzzle(
     amount: u64,
     max_cost: Cost,
     flags: u32,
-) -> PyResult<PySpendBundleConditions> {
+    constants: &ConsensusConstants,
+) -> PyResult<OwnedSpendBundleConditions> {
     let mut a = make_allocator(LIMIT_HEAP);
     let conds = native_run_puzzle::<MempoolVisitor>(
-        &mut a, puzzle, solution, parent_id, amount, max_cost, flags,
+        &mut a, puzzle, solution, parent_id, amount, max_cost, flags, constants,
     )?;
-    Ok(convert_spend_bundle_conds(&a, conds))
+    Ok(OwnedSpendBundleConditions::from(&a, conds))
 }
 
 // this is like a CoinSpend but with references to the puzzle and solution,
 // rather than owning them
-type CoinSpendRef<'a> = (Coin, &'a [u8], &'a [u8]);
+type CoinSpendRef = (Coin, PyBackedBytes, PyBackedBytes);
 
-fn convert_list_of_tuples(spends: &PyAny) -> PyResult<Vec<CoinSpendRef>> {
+fn convert_list_of_tuples(spends: &Bound<'_, PyAny>) -> PyResult<Vec<CoinSpendRef>> {
     let mut native_spends = Vec::<CoinSpendRef>::new();
     for s in spends.iter()? {
-        let tuple = s?.downcast::<PyTuple>()?;
+        let s = s?;
+        let tuple = s.downcast::<PyTuple>()?;
         let coin = tuple.get_item(0)?.extract::<Coin>()?;
-        let puzzle = tuple.get_item(1)?.extract::<&[u8]>()?;
-        let solution = tuple.get_item(2)?.extract::<&[u8]>()?;
+        let puzzle = tuple.get_item(1)?.extract::<PyBackedBytes>()?;
+        let solution = tuple.get_item(2)?.extract::<PyBackedBytes>()?;
         native_spends.push((coin, puzzle, solution));
     }
     Ok(native_spends)
 }
 
 #[pyfunction]
-fn solution_generator<'p>(py: Python<'p>, spends: &PyAny) -> PyResult<&'p PyBytes> {
+fn solution_generator<'p>(
+    py: Python<'p>,
+    spends: &Bound<'_, PyAny>,
+) -> PyResult<Bound<'p, PyBytes>> {
     let spends = convert_list_of_tuples(spends)?;
-    Ok(PyBytes::new(py, &native_solution_generator(spends)?))
+    Ok(PyBytes::new_bound(py, &native_solution_generator(spends)?))
 }
 
 #[pyfunction]
-fn solution_generator_backrefs<'p>(py: Python<'p>, spends: &PyAny) -> PyResult<&'p PyBytes> {
+fn solution_generator_backrefs<'p>(
+    py: Python<'p>,
+    spends: &Bound<'_, PyAny>,
+) -> PyResult<Bound<'p, PyBytes>> {
     let spends = convert_list_of_tuples(spends)?;
-    Ok(PyBytes::new(
+    Ok(PyBytes::new_bound(
         py,
         &native_solution_generator_backrefs(spends)?,
     ))
@@ -213,7 +248,7 @@ impl AugSchemeMPL {
     }
 
     #[staticmethod]
-    pub fn aggregate(sigs: &PyList) -> PyResult<Signature> {
+    pub fn aggregate(sigs: &Bound<'_, PyList>) -> PyResult<Signature> {
         let mut ret = Signature::default();
         for p2 in sigs {
             ret += &p2.extract::<Signature>()?;
@@ -227,7 +262,11 @@ impl AugSchemeMPL {
     }
 
     #[staticmethod]
-    pub fn aggregate_verify(pks: &PyList, msgs: &PyList, sig: &Signature) -> PyResult<bool> {
+    pub fn aggregate_verify(
+        pks: &Bound<'_, PyList>,
+        msgs: &Bound<'_, PyList>,
+        sig: &Signature,
+    ) -> PyResult<bool> {
         let mut data = Vec::<(PublicKey, Vec<u8>)>::new();
         if pks.len() != msgs.len() {
             return Err(PyRuntimeError::new_err(
@@ -283,7 +322,7 @@ fn supports_fast_forward(spend: &CoinSpend) -> bool {
         amount: spend.coin.amount,
     };
     let new_coin = Coin {
-        parent_coin_info: new_parent.coin_id().into(),
+        parent_coin_info: new_parent.coin_id(),
         puzzle_hash: spend.coin.puzzle_hash,
         amount: spend.coin.amount,
     };
@@ -313,20 +352,20 @@ fn fast_forward_singleton<'p>(
     spend: &CoinSpend,
     new_coin: &Coin,
     new_parent: &Coin,
-) -> PyResult<&'p PyBytes> {
+) -> PyResult<Bound<'p, PyBytes>> {
     let mut a = make_allocator(LIMIT_HEAP);
     let puzzle = node_from_bytes(&mut a, spend.puzzle_reveal.as_slice())?;
     let solution = node_from_bytes(&mut a, spend.solution.as_slice())?;
 
     let new_solution = native_ff(&mut a, puzzle, solution, &spend.coin, new_coin, new_parent)?;
-    Ok(PyBytes::new(
+    Ok(PyBytes::new_bound(
         py,
         node_to_bytes(&a, new_solution)?.as_slice(),
     ))
 }
 
 #[pymodule]
-pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // generator functions
     m.add_function(wrap_pyfunction!(run_block_generator, m)?)?;
     m.add_function(wrap_pyfunction!(run_block_generator2, m)?)?;
@@ -335,7 +374,7 @@ pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(solution_generator_backrefs, m)?)?;
     m.add_function(wrap_pyfunction!(supports_fast_forward, m)?)?;
     m.add_function(wrap_pyfunction!(fast_forward_singleton, m)?)?;
-    m.add_class::<PySpendBundleConditions>()?;
+    m.add_class::<OwnedSpendBundleConditions>()?;
     m.add(
         "ELIGIBLE_FOR_DEDUP",
         chia_consensus::gen::conditions::ELIGIBLE_FOR_DEDUP,
@@ -344,22 +383,25 @@ pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
         "ELIGIBLE_FOR_FF",
         chia_consensus::gen::conditions::ELIGIBLE_FOR_FF,
     )?;
-    m.add_class::<PySpend>()?;
+    m.add_class::<OwnedSpend>()?;
+
+    // constants
+    m.add_class::<ConsensusConstants>()?;
+
+    // merkle tree
+    m.add_class::<MerkleSet>()?;
+    m.add_function(wrap_pyfunction!(confirm_included_already_hashed, m)?)?;
+    m.add_function(wrap_pyfunction!(confirm_not_included_already_hashed, m)?)?;
 
     // clvm functions
-    m.add("COND_ARGS_NIL", COND_ARGS_NIL)?;
     m.add("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;
     m.add("STRICT_ARGS_COUNT", STRICT_ARGS_COUNT)?;
-    m.add("AGG_SIG_ARGS", AGG_SIG_ARGS)?;
     m.add("ENABLE_FIXED_DIV", ENABLE_FIXED_DIV)?;
-    m.add("ENABLE_SOFTFORK_CONDITION", ENABLE_SOFTFORK_CONDITION)?;
-    m.add(
-        "NO_RELATIVE_CONDITIONS_ON_EPHEMERAL",
-        NO_RELATIVE_CONDITIONS_ON_EPHEMERAL,
-    )?;
+    m.add("ENABLE_MESSAGE_CONDITIONS", ENABLE_MESSAGE_CONDITIONS)?;
     m.add("MEMPOOL_MODE", MEMPOOL_MODE)?;
     m.add("ALLOW_BACKREFS", ALLOW_BACKREFS)?;
     m.add("ANALYZE_SPENDS", ANALYZE_SPENDS)?;
+    m.add("DISALLOW_INFINITY_G1", DISALLOW_INFINITY_G1)?;
 
     // Chia classes
     m.add_class::<Coin>()?;
@@ -420,6 +462,7 @@ pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<RejectHeaderBlocks>()?;
     m.add_class::<RespondHeaderBlocks>()?;
     m.add_class::<HeaderBlock>()?;
+    m.add_class::<UnfinishedHeaderBlock>()?;
     m.add_class::<CoinState>()?;
     m.add_class::<RegisterForPhUpdates>()?;
     m.add_class::<RespondToPhUpdates>()?;
@@ -432,6 +475,17 @@ pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<RespondSesInfo>()?;
     m.add_class::<RequestFeeEstimates>()?;
     m.add_class::<RespondFeeEstimates>()?;
+    m.add_class::<RequestRemovePuzzleSubscriptions>()?;
+    m.add_class::<RespondRemovePuzzleSubscriptions>()?;
+    m.add_class::<RequestRemoveCoinSubscriptions>()?;
+    m.add_class::<RespondRemoveCoinSubscriptions>()?;
+    m.add_class::<CoinStateFilters>()?;
+    m.add_class::<RequestPuzzleState>()?;
+    m.add_class::<RespondPuzzleState>()?;
+    m.add_class::<RejectPuzzleState>()?;
+    m.add_class::<RequestCoinState>()?;
+    m.add_class::<RespondCoinState>()?;
+    m.add_class::<RejectCoinState>()?;
 
     // full node protocol
     m.add_class::<NewPeak>()?;
@@ -459,6 +513,8 @@ pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<RespondCompactVDF>()?;
     m.add_class::<RequestPeers>()?;
     m.add_class::<RespondPeers>()?;
+    m.add_class::<NewUnfinishedBlock2>()?;
+    m.add_class::<RequestUnfinishedBlock2>()?;
 
     // facilities from clvm_rs
 
@@ -479,6 +535,7 @@ pub fn chia_rs(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<GTElement>()?;
     m.add_class::<SecretKey>()?;
     m.add_class::<AugSchemeMPL>()?;
+    m.add_class::<BlsCache>()?;
 
     Ok(())
 }
