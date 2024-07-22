@@ -388,7 +388,7 @@ pub fn py_validate_clvm_and_signature(
         max_cost,
         &constants,
         peak_height,
-        Arc::new(Mutex::new(real_cache)), // TODO: use cache properly
+        &Arc::new(Mutex::new(real_cache)), // TODO: use cache properly
     )
     .map_err(|e| {
         let error_code: u32 = e.into();

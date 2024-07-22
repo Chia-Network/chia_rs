@@ -25,7 +25,7 @@ pub fn pre_validate_spendbundle(
     max_cost: u64,
     constants: &ConsensusConstants,
     peak_height: u32,
-    cache: Arc<Mutex<BlsCache>>,
+    cache: &Arc<Mutex<BlsCache>>,
 ) -> Result<OwnedSpendBundleConditions, ErrorCode> {
     if new_spend.coin_spends.is_empty() {
         Err(ErrorCode::InvalidSpendBundle)
@@ -44,7 +44,7 @@ pub fn validate_clvm_and_signature(
     max_cost: u64,
     constants: &ConsensusConstants,
     height: u32,
-    cache: Arc<Mutex<BlsCache>>,
+    cache: &Arc<Mutex<BlsCache>>,
 ) -> Result<
     (
         OwnedSpendBundleConditions,
@@ -174,7 +174,7 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             236,
-            Arc::new(Mutex::new(BlsCache::default())),
+            &Arc::new(Mutex::new(BlsCache::default())),
         )
         .expect("SpendBundle should be valid for this test");
     }
@@ -211,7 +211,7 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             236,
-            Arc::new(Mutex::new(BlsCache::default())),
+            &Arc::new(Mutex::new(BlsCache::default())),
         )
         .expect("SpendBundle should be valid for this test");
     }
@@ -250,7 +250,7 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm / 2, // same as mempool_manager default
             &TEST_CONSTANTS,
             236,
-            Arc::new(Mutex::new(BlsCache::default())),
+            &Arc::new(Mutex::new(BlsCache::default())),
         );
         assert!(matches!(result, Ok(..)));
         let result = validate_clvm_and_signature(
@@ -258,7 +258,7 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm / 3, // lower than mempool_manager default
             &TEST_CONSTANTS,
             236,
-            Arc::new(Mutex::new(BlsCache::default())),
+            &Arc::new(Mutex::new(BlsCache::default())),
         );
         assert!(matches!(result, Err(ErrorCode::CostExceeded)));
     }
@@ -305,7 +305,7 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             1,
-            Arc::new(Mutex::new(BlsCache::default())),
+            &Arc::new(Mutex::new(BlsCache::default())),
         )
         .expect("SpendBundle should be valid for this test");
     }
@@ -355,7 +355,7 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             TEST_CONSTANTS.hard_fork_height - 1,
-            Arc::new(Mutex::new(BlsCache::default())),
+            &Arc::new(Mutex::new(BlsCache::default())),
         );
         if let Ok(_) = result {
             panic!("height too low!")
@@ -365,7 +365,7 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             TEST_CONSTANTS.hard_fork_height + 1,
-            Arc::new(Mutex::new(BlsCache::default())),
+            &Arc::new(Mutex::new(BlsCache::default())),
         )
         .expect("SpendBundle should be valid for this test");
     }
@@ -415,7 +415,7 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             TEST_CONSTANTS.hard_fork_height - 1,
-            Arc::new(Mutex::new(BlsCache::default())),
+            &Arc::new(Mutex::new(BlsCache::default())),
         );
         if let Ok(_) = result {
             panic!("height too low!")
@@ -425,7 +425,7 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             TEST_CONSTANTS.hard_fork_height + 1,
-            Arc::new(Mutex::new(BlsCache::default())),
+            &Arc::new(Mutex::new(BlsCache::default())),
         )
         .expect("SpendBundle should be valid for this test");
     }
@@ -475,7 +475,7 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             TEST_CONSTANTS.hard_fork_height - 1,
-            Arc::new(Mutex::new(BlsCache::default())),
+            &Arc::new(Mutex::new(BlsCache::default())),
         );
         if let Ok(_) = result {
             panic!("height too low!")
@@ -485,7 +485,7 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             TEST_CONSTANTS.hard_fork_height + 1,
-            Arc::new(Mutex::new(BlsCache::default())),
+            &Arc::new(Mutex::new(BlsCache::default())),
         )
         .expect("SpendBundle should be valid for this test");
     }

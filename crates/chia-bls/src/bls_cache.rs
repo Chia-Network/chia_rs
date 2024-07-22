@@ -221,7 +221,7 @@ pub mod tests {
         // Add the first signature to cache.
         assert!(
             bls_cache
-                .aggregate_verify(pk_list.clone().into_iter().zip(msg_list.clone()), &agg_sig)
+                .aggregate_verify(pk_list.iter().zip(msg_list.iter()), &agg_sig)
                 .0
         );
         assert_eq!(bls_cache.len(), 1);
@@ -237,7 +237,7 @@ pub mod tests {
 
         assert!(
             bls_cache
-                .aggregate_verify(pk_list.clone().into_iter().zip(msg_list.clone()), &agg_sig)
+                .aggregate_verify(pk_list.iter().zip(msg_list.iter()), &agg_sig)
                 .0
         );
         assert_eq!(bls_cache.len(), 2);
@@ -252,7 +252,7 @@ pub mod tests {
         // Verify this signature and add to the cache as well (since it's still a different aggregate).
         assert!(
             bls_cache
-                .aggregate_verify(pk_list.into_iter().zip(msg_list), &agg_sig)
+                .aggregate_verify(pk_list.iter().zip(msg_list), &agg_sig)
                 .0
         );
         assert_eq!(bls_cache.len(), 3);
