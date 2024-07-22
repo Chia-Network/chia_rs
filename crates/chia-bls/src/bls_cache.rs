@@ -144,7 +144,7 @@ impl BlsCache {
         for (key, value) in &self.cache {
             ret.append((
                 PyBytes::new_bound(py, key),
-                PyBytes::new_bound(py, &value.to_bytes()),
+                value.clone().into_py(py),
             ))?;
         }
         Ok(ret.into())
