@@ -311,8 +311,8 @@ def validate_clvm_and_signature(
     max_cost: int,
     constants: ConsensusConstants,
     peak_height: int,
-    cache: Option[BLSCache],
-) -> Tuple[SpendBundleConditions, List[Tuple[SpendBundleConditions, List[Tuple[Bytes32, GTElement]]]], float]: ...
+    cache: Optional[BLSCache],
+) -> Tuple[SpendBundleConditions, List[Tuple[SpendBundleConditions, List[Tuple[bytes32, GTElement]]]], float]: ...
 
 def get_name_puzzle_conditions(
     spend_bundle: SpendBundle,
