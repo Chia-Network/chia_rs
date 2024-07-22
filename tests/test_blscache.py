@@ -1,4 +1,16 @@
-from chia_rs import SpendBundle, CoinSpend, Program, ConsensusConstants, G1Element, GTElement, PrivateKey, AugSchemeMPL, G2Element, BLSCache, validate_clvm_and_signature
+from chia_rs import (
+    SpendBundle,
+    CoinSpend,
+    Program,
+    ConsensusConstants,
+    G1Element,
+    GTElement,
+    PrivateKey,
+    AugSchemeMPL,
+    G2Element,
+    BLSCache,
+    validate_clvm_and_signature,
+)
 from typing import List
 from chia.consensus.default_constants import DEFAULT_CONSTANTS
 from chia.types.blockchain_format.coin import Coin
@@ -128,10 +140,7 @@ def test_cached_bls_flattening():
 
     assert cached_bls.aggregate_verify(pks, [b"foobar"] * n_keys, aggsig)
     assert len(cached_bls.items()) == n_keys
-    gts = [
-        pk.pair(AugSchemeMPL.g2_from_message(bytes(pk) + b"foobar"))
-        for pk in pks
-    ]
+    gts = [pk.pair(AugSchemeMPL.g2_from_message(bytes(pk) + b"foobar")) for pk in pks]
     for key, value in cached_bls.items():
         assert isinstance(key, bytes)
         assert isinstance(value, GTElement)
@@ -142,10 +151,7 @@ def test_cached_bls_flattening():
     cache_copy.update(cached_bls.items())
 
     assert len(cache_copy.items()) == n_keys
-    gts = [
-        pk.pair(AugSchemeMPL.g2_from_message(bytes(pk) + b"foobar"))
-        for pk in pks
-    ]
+    gts = [pk.pair(AugSchemeMPL.g2_from_message(bytes(pk) + b"foobar")) for pk in pks]
     for key, value in cache_copy.items():
         assert isinstance(key, bytes)
         assert isinstance(value, GTElement)
@@ -217,29 +223,42 @@ def test_bad_cache_size():
         match="out of range integral type conversion attempted",
     )
 
+
 def test_validate_clvm_and_sig():
     cache = BLSCache()
     puz_reveal = Program.to(1)
-    coin = Coin(bytes.fromhex("4444444444444444444444444444444444444444444444444444444444444444"), puz_reveal.get_tree_hash(), 200)
-    
-    sol_bytes = bytes.fromhex("ffff32ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080")
+    coin = Coin(
+        bytes.fromhex(
+            "4444444444444444444444444444444444444444444444444444444444444444"
+        ),
+        puz_reveal.get_tree_hash(),
+        200,
+    )
+
+    sol_bytes = bytes.fromhex(
+        "ffff32ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080"
+    )
     # ((50 0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2 "hello"))
     solution = Program.from_bytes(sol_bytes)
     coin_spends = [CoinSpend(coin, puz_reveal, solution)]
-    sk = AugSchemeMPL.key_gen(bytes.fromhex("52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb"))
+    sk = AugSchemeMPL.key_gen(
+        bytes.fromhex(
+            "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb"
+        )
+    )
     # pk = sk.get_g1()
     sig = AugSchemeMPL.sign(
         sk,
         (b"hello" + coin.name() + DEFAULT_CONSTANTS.AGG_SIG_ME_ADDITIONAL_DATA),  # noqa
     )
-    
+
     new_spend = SpendBundle(coin_spends, sig)
     (sbc, additions, duration) = validate_clvm_and_signature(
         new_spend,
         DEFAULT_CONSTANTS.MAX_BLOCK_COST_CLVM,
         DEFAULT_CONSTANTS,
         DEFAULT_CONSTANTS.HARD_FORK_HEIGHT + 1,
-        cache
+        cache,
     )
     assert sbc is not None
     assert additions is not None
