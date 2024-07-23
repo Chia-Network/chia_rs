@@ -323,7 +323,11 @@ def test_validate_clvm_and_sig():
     )
     sig = AugSchemeMPL.sign(
         sk,
-        (ChiaProgram.to("hello").as_atom() + coin.name() + DEFAULT_CONSTANTS.AGG_SIG_ME_ADDITIONAL_DATA),  # noqa
+        (
+            ChiaProgram.to("hello").as_atom()
+            + coin.name()
+            + DEFAULT_CONSTANTS.AGG_SIG_ME_ADDITIONAL_DATA
+        ),  # noqa
     )
 
     new_spend = SpendBundle(coin_spends, sig)
