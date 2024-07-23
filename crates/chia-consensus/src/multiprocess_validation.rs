@@ -197,7 +197,7 @@ ff01\
         let spend = CoinSpend::new(
             test_coin,
             Program::new(vec![1_u8].into()),
-            Program::new(solution.into()),
+            solution.into(),
         );
         let msg = b"hello";
         let sig = sign(&sk, msg);
@@ -234,7 +234,7 @@ ff01\
         let spend = CoinSpend::new(
             test_coin,
             Program::new(vec![1_u8].into()),
-            Program::new(solution.into()),
+            solution.into(),
         );
         // let msg = b"hello";
         // let sig = sign(&sk, msg);
@@ -283,7 +283,7 @@ ff01\
         let spend = CoinSpend::new(
             test_coin,
             Program::new(vec![1_u8].into()),
-            Program::new(solution.into()),
+            solution.into(),
         );
         let msg = b"hello";
         let mut result = msg.to_vec();
@@ -390,7 +390,7 @@ ff01\
         let spend = CoinSpend::new(
             test_coin,
             Program::new(vec![1_u8].into()),
-            Program::new(solution.into()),
+            solution.into(),
         );
         let msg = b"hello";
         let mut result = msg.to_vec();
@@ -450,7 +450,7 @@ ff01\
         let spend = CoinSpend::new(
             test_coin,
             Program::new(vec![1_u8].into()),
-            Program::new(solution.into()),
+            solution.into(),
         );
         let msg = b"hello";
         let mut result = msg.to_vec();
