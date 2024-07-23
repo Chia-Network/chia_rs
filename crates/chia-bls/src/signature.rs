@@ -511,6 +511,18 @@ impl Signature {
     }
 }
 
+impl Signature {
+    pub fn from_vec(bytes: Vec<u8>) -> Result<Self> {
+        if bytes.len() != 96 {
+            return Err(Error::InvalidSignature(BLST_ERROR::BLST_BAD_ENCODING));
+        }
+
+        let mut array = [0u8; 96];
+        array.copy_from_slice(&bytes[..96]);
+        Self::from_bytes(&array)
+    }
+}
+
 #[cfg(feature = "py-bindings")]
 mod pybindings {
     use super::*;

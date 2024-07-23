@@ -1,0 +1,20 @@
+[package]
+name = "chia_rs_swift"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+chia-bls = { workspace = true }
+uniffi = { version = "0.28.0" }
+
+
+[build-dependencies]
+uniffi = { version = "0.28.0", features = [ "build" ] }
+
+[lints]
+workspace = true
+
+[lib]
+name = "chia_rs_swift_lib"
+crate-type = ["cdylib", "lib"]
+path = "src/lib.rs"

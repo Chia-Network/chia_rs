@@ -1,0 +1,24 @@
+namespace chiaSwift {
+
+};
+
+[Error]
+enum BLSError {
+    "SecretKeyGroupOrder",
+    "G1NotCanonical",
+    "G1InfinityInvalidBits",
+    "G1InfinityNotZero",
+    "InvalidPublicKey",
+    "InvalidSignature",
+};
+
+interface Signature {
+    
+  
+    [Throws=BLSError, Name="from_vec"]
+    constructor(bytes bytes);
+
+    
+
+  
+};

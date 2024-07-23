@@ -13,7 +13,7 @@ homepage = "https://github.com/Chia-Network/chia_rs"
 repository = "https://github.com/Chia-Network/chia_rs"
 
 [workspace]
-members = ["crates/*", "crates/*/fuzz", "wasm", "wheel"]
+members = [ "chia_rs_swift","crates/*", "crates/*/fuzz", "wasm", "wheel", "uniffy-bindgen-cli"]
 
 [workspace.lints.rust]
 rust_2018_idioms = { level = "deny", priority = -1 }
