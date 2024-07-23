@@ -17,6 +17,7 @@ from chia_rs.sized_ints import uint8, uint16, uint32, uint64, uint128
 from typing import List
 from chia.util.hash import std_hash
 from chia.util.lru_cache import LRUCache
+from chia.types.blockchain_format.program import Program as ChiaProgram
 from chia.util import cached_bls as cached_bls_old
 import pytest
 
@@ -310,9 +311,9 @@ def test_validate_clvm_and_sig():
     )
 
     sol_bytes = bytes.fromhex(
-        "ffff32ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080"
+        "ffff32ffb08578d10c07f5f086b08145a40f2b4b55f5cafeb8e6ed8c3c60e3ef92a66b608131225eb15d71fb32285bd7e1c461655fff8568656c6c6f8080"
     )
-    # ((50 0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2 "hello"))
+    # ((50 0x8578d10c07f5f086b08145a40f2b4b55f5cafeb8e6ed8c3c60e3ef92a66b608131225eb15d71fb32285bd7e1c461655f "hello"))
     solution = Program.from_bytes(sol_bytes)
     coin_spends = [CoinSpend(coin, puz_reveal, solution)]
     sk = AugSchemeMPL.key_gen(
@@ -320,10 +321,9 @@ def test_validate_clvm_and_sig():
             "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb"
         )
     )
-    # pk = sk.get_g1()
     sig = AugSchemeMPL.sign(
         sk,
-        (b"hello" + coin.name() + DEFAULT_CONSTANTS.AGG_SIG_ME_ADDITIONAL_DATA),  # noqa
+        (ChiaProgram.to("hello").as_atom() + coin.name() + DEFAULT_CONSTANTS.AGG_SIG_ME_ADDITIONAL_DATA),  # noqa
     )
 
     new_spend = SpendBundle(coin_spends, sig)
