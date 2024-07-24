@@ -21,10 +21,6 @@ chia-traits = { workspace = true }
 chia-consensus = { workspace = true }
 hex-literal = { workspace = true }
 
-[lib]
-name = "fuzzing_utils"
-crate-type = ["rlib"]
-
 [[bin]]
 name = "puzzle-coin-solution"
 path = "fuzz_targets/puzzle-coin-solution.rs"
