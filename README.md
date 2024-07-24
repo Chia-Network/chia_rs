@@ -154,3 +154,5 @@ cargo ws version --all --no-git-commit
 ```
 
 Select "minor update" if there has not been any incompatible API changes, otherwise "major update".
+
+XYZ.
