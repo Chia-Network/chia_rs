@@ -1,14 +1,20 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
--   repo: https://github.com/pre-commit/pre-commit-hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v3.2.0
     hooks:
-    -   id: trailing-whitespace
-    -   id: check-yaml
-    -   id: check-added-large-files
--   repo: local
+      - id: trailing-whitespace
+      - id: check-yaml
+      - id: check-added-large-files
+  - repo: local
     hooks:
+      - id: prettier
+        name: Prettier
+        entry: npx prettier --write .
+        language: node
+        files: \.(js|jsx|ts|tsx|json|css|scss|md|yml|yaml)$
+        types: [file]
       - id: fmt
         name: fmt
         description: run cargo fmt on the workspace

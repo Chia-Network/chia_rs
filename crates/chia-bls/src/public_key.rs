@@ -313,6 +313,10 @@ impl PublicKey {
         Self::generator()
     }
 
+    pub fn verify(&self, signature: &crate::Signature, msg: &[u8]) -> bool {
+        crate::verify(signature, self, msg)
+    }
+
     pub fn pair(&self, other: &crate::Signature) -> crate::GTElement {
         other.pair(self)
     }

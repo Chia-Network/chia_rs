@@ -242,8 +242,15 @@ impl SecretKey {
     #[classattr]
     pub const PRIVATE_KEY_SIZE: usize = 32;
 
-    pub fn sign_g2(&self, msg: &[u8]) -> crate::Signature {
-        crate::sign(self, msg)
+    pub fn sign(&self, msg: &[u8], final_pk: Option<PublicKey>) -> crate::Signature {
+        match final_pk {
+            Some(prefix) => {
+                let mut aug_msg = prefix.to_bytes().to_vec();
+                aug_msg.extend_from_slice(msg);
+                crate::sign_raw(self, aug_msg)
+            }
+            None => crate::sign(self, msg),
+        }
     }
 
     pub fn get_g1(&self) -> PublicKey {
@@ -269,6 +276,12 @@ impl SecretKey {
     #[must_use]
     pub fn py_derive_unhardened(&self, idx: u32) -> Self {
         self.derive_unhardened(idx)
+    }
+
+    #[pyo3(name = "from_seed")]
+    #[staticmethod]
+    pub fn py_from_seed(seed: &[u8]) -> Self {
+        Self::from_seed(seed)
     }
 }
 

@@ -226,7 +226,6 @@ extra_members = {
         "def name(self) -> bytes32: ...",
         "def removals(self) -> List[Coin]: ...",
         "def additions(self) -> List[Coin]: ...",
-        "def debug(self) -> None: ...",
     ],
     "BlockRecord": [
         "is_transaction_block: bool",
@@ -322,12 +321,9 @@ def get_name_puzzle_conditions(
     height: int,
 ) -> SpendBundleConditions: ...
 
-COND_ARGS_NIL: int = ...
 NO_UNKNOWN_CONDS: int = ...
 STRICT_ARGS_COUNT: int = ...
-AGG_SIG_ARGS: int = ...
 LIMIT_HEAP: int = ...
-ENABLE_SOFTFORK_CONDITION: int = ...
 ENABLE_MESSAGE_CONDITIONS: int = ...
 DISALLOW_INFINITY_G1: int = ...
 MEMPOOL_MODE: int = ...
@@ -399,6 +395,7 @@ class MerkleSet:
             "SIZE: ClassVar[int] = ...",
             "def __new__(cls) -> G1Element: ...",
             "def get_fingerprint(self) -> int: ...",
+            "def verify(self, signature: G2Element, msg: bytes) -> bool: ...",
             "def pair(self, other: G2Element) -> GTElement: ...",
             "@staticmethod",
             "def generator() -> G1Element: ...",
@@ -440,12 +437,14 @@ class MerkleSet:
         [],
         [
             "PRIVATE_KEY_SIZE: ClassVar[int] = ...",
-            "def sign_g2(self, msg: bytes, dst: bytes) -> G2Element: ...",
+            "def sign(self, msg: bytes, final_pk: Optional[G1Element] = None) -> G2Element: ...",
             "def get_g1(self) -> G1Element: ...",
             "def __str__(self) -> str: ...",
             "def public_key(self) -> G1Element: ...",
             "def derive_hardened(self, int) -> PrivateKey: ...",
             "def derive_unhardened(self, int) -> PrivateKey: ...",
+            "@staticmethod",
+            "def from_seed(bytes) -> PrivateKey: ...",
         ],
     )
 

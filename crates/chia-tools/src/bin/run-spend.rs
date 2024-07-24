@@ -260,7 +260,6 @@ fn print_puzzle_info(a: &Allocator, puzzle: NodePtr, solution: NodePtr) {
 }
 fn main() {
     use chia_consensus::gen::conditions::parse_args;
-    use chia_consensus::gen::flags::ENABLE_SOFTFORK_CONDITION;
     use chia_consensus::gen::opcodes::parse_opcode;
     use chia_consensus::gen::validation_error::{first, rest};
     use chia_protocol::CoinSpend;
@@ -301,7 +300,7 @@ fn main() {
     while let Some((mut c, next)) = a.next(iter) {
         iter = next;
         let op_ptr = first(&a, c).expect("parsing conditions");
-        let op = match parse_opcode(&a, op_ptr, ENABLE_SOFTFORK_CONDITION) {
+        let op = match parse_opcode(&a, op_ptr, 0) {
             None => {
                 println!("  UNKNOWN CONDITION [{}]", &hex::encode(a.atom(op_ptr)));
                 continue;
