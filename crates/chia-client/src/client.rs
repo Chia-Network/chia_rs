@@ -28,33 +28,24 @@ pub struct Client(Arc<ClientInner>);
 pub struct ClientOptions {
     /// The network to connect to. By default, this is mainnet.
     pub network: Network,
-
     /// The type of service that this client represents.
     pub node_type: NodeType,
-
     /// The capabilities that this client supports.
     pub capabilities: Vec<(u16, String)>,
-
     /// The minimum protocol version that this client supports.
     /// If the protocol version of peers are lower than this, they will be disconnected.
     pub protocol_version: Version,
-
     /// The software version of this client.
     /// This is not important for the handshake, but is sent to the peer for informational purposes.
     pub software_version: String,
-
     /// The ideal number of peers that should be connected at any given time.
     pub target_peers: usize,
-
     /// The maximum number of concurrent connections that can be initiated at once.
     pub connection_concurrency: usize,
-
     /// How long to wait when trying to connect to a peer.
     pub connection_timeout: Duration,
-
     /// How long to wait for a handshake response from a peer before disconnecting.
     pub handshake_timeout: Duration,
-
     /// How long to wait for a response to a request for peers.
     pub request_peers_timeout: Duration,
 }

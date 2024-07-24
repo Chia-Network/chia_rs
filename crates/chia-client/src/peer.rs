@@ -51,14 +51,17 @@ struct PeerInner {
 }
 
 impl Peer {
+    /// Connects to a peer using its IP address and port.
     pub async fn connect(
         socket_addr: SocketAddr,
         tls_connector: TlsConnector,
     ) -> Result<(Self, mpsc::Receiver<Message>)> {
-        Self::connect_addr(&format!("wss://{socket_addr}/ws"), tls_connector).await
+        Self::connect_full_uri(&format!("wss://{socket_addr}/ws"), tls_connector).await
     }
 
-    pub async fn connect_addr(
+    /// Connects to a peer using its full WebSocket URI.
+    /// For example, `wss://127.0.0.1:8444/ws`.
+    pub async fn connect_full_uri(
         uri: &str,
         tls_connector: TlsConnector,
     ) -> Result<(Self, mpsc::Receiver<Message>)> {
@@ -72,6 +75,8 @@ impl Peer {
         Self::from_websocket(ws)
     }
 
+    /// Creates a peer from an existing WebSocket connection.
+    /// The connection must be secured with TLS, so that the certificate can be hashed in a peer id.
     pub fn from_websocket(ws: WebSocket) -> Result<(Self, mpsc::Receiver<Message>)> {
         let (socket_addr, cert) = match ws.get_ref() {
             MaybeTlsStream::NativeTls(tls) => {
@@ -113,10 +118,12 @@ impl Peer {
         Ok((peer, receiver))
     }
 
+    /// The hash of the TLS certificate used by the peer.
     pub fn peer_id(&self) -> PeerId {
         self.0.peer_id
     }
 
+    /// The IP address and port of the peer connection.
     pub fn socket_addr(&self) -> SocketAddr {
         self.0.socket_addr
     }
@@ -207,6 +214,7 @@ impl Peer {
         self.request_infallible(RequestPeers::new()).await
     }
 
+    /// Sends a message to the peer, but does not expect any response.
     pub async fn send<T>(&self, body: T) -> Result<()>
     where
         T: Streamable + ChiaProtocolMessage,
@@ -220,6 +228,7 @@ impl Peer {
         Ok(())
     }
 
+    /// Sends a message to the peer and expects a message that's either a response or a rejection.
     pub async fn request_fallible<T, E, B>(&self, body: B) -> Result<Response<T, E>>
     where
         T: Streamable + ChiaProtocolMessage,
@@ -240,6 +249,7 @@ impl Peer {
         }
     }
 
+    /// Sends a message to the peer and expects a specific response message.
     pub async fn request_infallible<T, B>(&self, body: B) -> Result<T>
     where
         T: Streamable + ChiaProtocolMessage,
@@ -255,6 +265,7 @@ impl Peer {
         Ok(T::from_bytes(&message.data)?)
     }
 
+    /// Sends a message to the peer and expects any arbitrary protocol message without parsing it.
     pub async fn request_raw<T>(&self, body: T) -> Result<Message>
     where
         T: Streamable + ChiaProtocolMessage,
