@@ -33,6 +33,8 @@ pub fn pre_validate_spendbundle(
     }
 }
 
+type Additions = Vec<([u8; 32], GTElement)>;
+type ValidationResult = Result<(OwnedSpendBundleConditions, Additions, Duration), ErrorCode>;
 // currently in mempool_manager.py
 // called in threads from pre_validate_spend_bundle()
 // returns (error, cached_results, new_cache_entries, duration)
@@ -42,14 +44,7 @@ pub fn validate_clvm_and_signature(
     constants: &ConsensusConstants,
     height: u32,
     cache: &Arc<Mutex<BlsCache>>,
-) -> Result<
-    (
-        OwnedSpendBundleConditions,
-        Vec<([u8; 32], GTElement)>,
-        Duration,
-    ),
-    ErrorCode,
-> {
+) -> ValidationResult {
     let start_time = Instant::now();
     let npcresult = get_name_puzzle_conditions(spend_bundle, max_cost, true, height, constants)
         .map_err(|e| e.1)?;
