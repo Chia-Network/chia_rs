@@ -42,7 +42,7 @@ impl BlsCache {
         self.cache.is_empty()
     }
 
-    pub fn update(&mut self, new_items: impl IntoIterator<Item=([u8; 32], GTElement)>) {
+    pub fn update(&mut self, new_items: impl IntoIterator<Item = ([u8; 32], GTElement)>) {
         for (key, value) in new_items {
             self.cache.put(key, value);
         }
@@ -142,10 +142,7 @@ impl BlsCache {
         use pyo3::types::PyBytes;
         let ret = PyList::empty_bound(py);
         for (key, value) in &self.cache {
-            ret.append((
-                PyBytes::new_bound(py, key),
-                value.clone().into_py(py),
-            ))?;
+            ret.append((PyBytes::new_bound(py, key), value.clone().into_py(py)))?;
         }
         Ok(ret.into())
     }
