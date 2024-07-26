@@ -12,11 +12,11 @@ use chia_protocol::SpendBundle;
 use clvm_utils::{tree_hash_cached, TreeHash};
 use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::chia_dialect::ChiaDialect;
+use clvmr::chia_dialect::LIMIT_HEAP;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
 use clvmr::serde::node_from_bytes;
 use std::collections::{HashMap, HashSet};
-use clvmr::chia_dialect::LIMIT_HEAP;
 
 pub fn get_name_puzzle_conditions(
     spend_bundle: &SpendBundle,
