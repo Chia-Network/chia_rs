@@ -12,7 +12,6 @@ use chia_bls::BlsCache;
 use chia_protocol::SpendBundle;
 use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV};
 use std::sync::Arc;
-// use std::thread;
 use std::time::{Duration, Instant};
 
 // currently in mempool_manager.py
@@ -164,8 +163,7 @@ ff01\
     fn test_validate_unsafe() {
         let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
         let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
-        //let pk: PublicKey = sk.public_key(); //0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2
-        // panic!("{:?}", pk);
+
         let test_coin = Coin::new(
             hex!("4444444444444444444444444444444444444444444444444444444444444444").into(),
             hex!("3333333333333333333333333333333333333333333333333333333333333333").into(),
@@ -195,10 +193,6 @@ ff01\
 
     #[test]
     fn test_go_over_cost() {
-        // let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
-        // let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
-        //let pk: PublicKey = sk.public_key(); //0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2
-        // panic!("{:?}", pk);
         let test_coin = Coin::new(
             hex!("9dcf97a184f32623d11a73124ceb99a5709b083721e878a16d78f596718ba7b2").into(),
             hex!("9dcf97a184f32623d11a73124ceb99a5709b083721e878a16d78f596718ba7b2").into(),
@@ -209,8 +203,7 @@ ff01\
         // this solution makes 2400 CREATE_COIN conditions
 
         let spend = CoinSpend::new(test_coin, Program::new(vec![1_u8].into()), solution.into());
-        // let msg = b"hello";
-        // let sig = sign(&sk, msg);
+
         let coin_spends: Vec<CoinSpend> = vec![spend.clone()];
 
         let spend_bundle = SpendBundle {
@@ -239,8 +232,6 @@ ff01\
     fn test_validate_aggsig_me() {
         let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
         let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
-        //let pk: PublicKey = sk.public_key(); //0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2
-        // panic!("{:?}", pk);
 
         let full_puz = Bytes32::new(tree_hash_atom(&[1_u8]).to_bytes());
         let test_coin = Coin::new(
@@ -332,8 +323,6 @@ ff01\
     fn test_validate_aggsig_parent_amount() {
         let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
         let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
-        //let pk: PublicKey = sk.public_key(); //0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2
-        // panic!("{:?}", pk);
 
         let full_puz = Bytes32::new(tree_hash_atom(&[1_u8]).to_bytes());
         let test_coin = Coin::new(
@@ -378,8 +367,6 @@ ff01\
     fn test_validate_aggsig_puzzle_amount() {
         let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
         let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
-        //let pk: PublicKey = sk.public_key(); //0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2
-        // panic!("{:?}", pk);
 
         let full_puz = Bytes32::new(tree_hash_atom(&[1_u8]).to_bytes());
         let test_coin = Coin::new(

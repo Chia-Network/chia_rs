@@ -16,24 +16,7 @@ use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
 use clvmr::serde::node_from_bytes;
 use std::collections::{HashMap, HashSet};
-// #[cfg(feature = "py-bindings")]
-// use chia_py_streamable_macro::{PyGetters, PyJsonDict, PyStreamable};
 use clvmr::chia_dialect::LIMIT_HEAP;
-
-// we may be able to remove this struct and just return a Rust native Result
-
-// #[cfg_attr(
-//     feature = "py-bindings",
-//     pyo3::pyclass(module = "chia_rs"),
-//     derive(PyJsonDict, PyStreamable, PyGetters),
-//     py_uppercase,
-//     py_pickle
-// )]
-// #[streamable]
-// pub struct NPCResult {
-//     error: Option<u16>,
-//     conds: Option<OwnedSpendBundleConditions>,
-// }
 
 pub fn get_name_puzzle_conditions(
     spend_bundle: &SpendBundle,
