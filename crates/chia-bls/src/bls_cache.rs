@@ -1,6 +1,7 @@
 use crate::{aggregate_verify_gt, hash_to_g2};
 use crate::{GTElement, PublicKey, Signature};
 use lru::LruCache;
+use parking_lot::Mutex;
 use sha2::{Digest, Sha256};
 use std::borrow::Borrow;
 use std::num::NonZeroUsize;
@@ -15,10 +16,10 @@ use std::num::NonZeroUsize;
 /// aggregate_verify() primitive is faster. When long-syncing, that's
 /// preferable.
 #[cfg_attr(feature = "py-bindings", pyo3::pyclass(name = "BLSCache"))]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct BlsCache {
     // sha256(pubkey + message) -> GTElement
-    cache: LruCache<[u8; 32], GTElement>,
+    cache: Mutex<LruCache<[u8; 32], GTElement>>,
 }
 
 impl Default for BlsCache {
@@ -30,30 +31,23 @@ impl Default for BlsCache {
 impl BlsCache {
     pub fn new(cache_size: NonZeroUsize) -> Self {
         Self {
-            cache: LruCache::new(cache_size),
+            cache: Mutex::new(LruCache::new(cache_size)),
         }
     }
 
     pub fn len(&self) -> usize {
-        self.cache.len()
+        self.cache.lock().len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.cache.is_empty()
-    }
-
-    pub fn update(&mut self, new_items: impl IntoIterator<Item = ([u8; 32], GTElement)>) {
-        for (key, value) in new_items {
-            self.cache.put(key, value);
-        }
+        self.cache.lock().is_empty()
     }
 
     pub fn aggregate_verify<Pk: Borrow<PublicKey>, Msg: AsRef<[u8]>>(
-        &mut self,
+        &self,
         pks_msgs: impl IntoIterator<Item = (Pk, Msg)>,
         sig: &Signature,
-    ) -> (bool, Vec<([u8; 32], GTElement)>) {
-        let mut added: Vec<([u8; 32], GTElement)> = Vec::new();
+    ) -> bool {
         let iter = pks_msgs.into_iter().map(|(pk, msg)| -> GTElement {
             // Hash pubkey + message
             let mut hasher = Sha256::new();
@@ -62,7 +56,7 @@ impl BlsCache {
             let hash: [u8; 32] = hasher.finalize().into();
 
             // If the pairing is in the cache, we don't need to recalculate it.
-            if let Some(pairing) = self.cache.get(&hash).cloned() {
+            if let Some(pairing) = self.cache.lock().get(&hash).cloned() {
                 return pairing;
             }
 
@@ -76,12 +70,11 @@ impl BlsCache {
             let hash: [u8; 32] = hasher.finalize().into();
 
             let pairing = aug_hash.pair(pk.borrow());
-            self.cache.put(hash, pairing.clone());
-            added.push((hash, pairing.clone()));
+            self.cache.lock().put(hash, pairing.clone());
             pairing
         });
 
-        (aggregate_verify_gt(sig, iter), added)
+        aggregate_verify_gt(sig, iter)
     }
 }
 
@@ -117,7 +110,7 @@ impl BlsCache {
         pks: &Bound<'_, PyList>,
         msgs: &Bound<'_, PyList>,
         sig: &Signature,
-    ) -> PyResult<(bool, Vec<([u8; 32], GTElement)>)> {
+    ) -> PyResult<bool> {
         let pks = pks
             .iter()?
             .map(|item| item?.extract())
@@ -141,7 +134,8 @@ impl BlsCache {
         use pyo3::prelude::*;
         use pyo3::types::PyBytes;
         let ret = PyList::empty_bound(py);
-        for (key, value) in &self.cache {
+        let cache = self.cache.lock();
+        for (key, value) in cache.iter() {
             ret.append((PyBytes::new_bound(py, key), value.clone().into_py(py)))?;
         }
         Ok(ret.into())
@@ -149,9 +143,10 @@ impl BlsCache {
 
     #[pyo3(name = "update")]
     pub fn py_update(&mut self, other: &Bound<'_, PyList>) -> PyResult<()> {
+        let mut cache = self.cache.lock();
         for item in other.borrow().iter()? {
             let (key, value): (Vec<u8>, GTElement) = item?.extract()?;
-            self.cache.put(
+            cache.put(
                 key.try_into()
                     .map_err(|_| PyValueError::new_err("invalid key"))?,
                 value,
@@ -170,7 +165,7 @@ pub mod tests {
 
     #[test]
     fn test_aggregate_verify() {
-        let mut bls_cache = BlsCache::default();
+        let bls_cache = BlsCache::default();
 
         let sk = SecretKey::from_seed(&[0; 32]);
         let pk = sk.public_key();
@@ -184,25 +179,17 @@ pub mod tests {
         assert!(bls_cache.is_empty());
 
         // Verify the signature and add to the cache.
-        assert!(
-            bls_cache
-                .aggregate_verify(pk_list.into_iter().zip(msg_list), &sig)
-                .0
-        );
+        assert!(bls_cache.aggregate_verify(pk_list.into_iter().zip(msg_list), &sig));
         assert_eq!(bls_cache.len(), 1);
 
         // Now that it's cached, it shouldn't cache it again.
-        assert!(
-            bls_cache
-                .aggregate_verify(pk_list.into_iter().zip(msg_list), &sig)
-                .0
-        );
+        assert!(bls_cache.aggregate_verify(pk_list.into_iter().zip(msg_list), &sig));
         assert_eq!(bls_cache.len(), 1);
     }
 
     #[test]
     fn test_cache() {
-        let mut bls_cache = BlsCache::default();
+        let bls_cache = BlsCache::default();
 
         let sk1 = SecretKey::from_seed(&[0; 32]);
         let pk1 = sk1.public_key();
@@ -216,11 +203,7 @@ pub mod tests {
         assert!(bls_cache.is_empty());
 
         // Add the first signature to cache.
-        assert!(
-            bls_cache
-                .aggregate_verify(pk_list.iter().zip(msg_list.iter()), &agg_sig)
-                .0
-        );
+        assert!(bls_cache.aggregate_verify(pk_list.iter().zip(msg_list.iter()), &agg_sig));
         assert_eq!(bls_cache.len(), 1);
 
         // Try with the first key message pair in the cache but not the second.
@@ -232,11 +215,7 @@ pub mod tests {
         pk_list.push(pk2);
         msg_list.push(msg2);
 
-        assert!(
-            bls_cache
-                .aggregate_verify(pk_list.iter().zip(msg_list.iter()), &agg_sig)
-                .0
-        );
+        assert!(bls_cache.aggregate_verify(pk_list.iter().zip(msg_list.iter()), &agg_sig));
         assert_eq!(bls_cache.len(), 2);
 
         // Try reusing a public key.
@@ -247,18 +226,14 @@ pub mod tests {
         msg_list.push(msg3);
 
         // Verify this signature and add to the cache as well (since it's still a different aggregate).
-        assert!(
-            bls_cache
-                .aggregate_verify(pk_list.iter().zip(msg_list), &agg_sig)
-                .0
-        );
+        assert!(bls_cache.aggregate_verify(pk_list.iter().zip(msg_list), &agg_sig));
         assert_eq!(bls_cache.len(), 3);
     }
 
     #[test]
     fn test_cache_limit() {
         // The cache is limited to only 3 items.
-        let mut bls_cache = BlsCache::new(NonZeroUsize::new(3).unwrap());
+        let bls_cache = BlsCache::new(NonZeroUsize::new(3).unwrap());
 
         // Before we cache anything, it should be empty.
         assert!(bls_cache.is_empty());
@@ -274,15 +249,11 @@ pub mod tests {
             let msg_list = [msg];
 
             // Add to cache by validating them one at a time.
-            assert!(
-                bls_cache
-                    .aggregate_verify(pk_list.into_iter().zip(msg_list), &sig)
-                    .0
-            );
+            assert!(bls_cache.aggregate_verify(pk_list.into_iter().zip(msg_list), &sig));
         }
 
         // The cache should be full now.
-        assert_eq!(bls_cache.cache.len(), 3);
+        assert_eq!(bls_cache.len(), 3);
 
         // Recreate first key.
         let sk = SecretKey::from_seed(&[1; 32]);
@@ -296,20 +267,16 @@ pub mod tests {
         let hash: [u8; 32] = hasher.finalize().into();
 
         // The first key should have been removed, since it's the oldest that's been accessed.
-        assert!(!bls_cache.cache.contains(&hash));
+        assert!(!bls_cache.cache.lock().contains(&hash));
     }
 
     #[test]
     fn test_empty_sig() {
-        let mut bls_cache = BlsCache::default();
+        let bls_cache = BlsCache::default();
 
         let pks: [&PublicKey; 0] = [];
         let msgs: [&[u8]; 0] = [];
 
-        assert!(
-            bls_cache
-                .aggregate_verify(pks.into_iter().zip(msgs), &Signature::default())
-                .0
-        );
+        assert!(bls_cache.aggregate_verify(pks.into_iter().zip(msgs), &Signature::default()));
     }
 }
