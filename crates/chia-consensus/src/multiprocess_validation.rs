@@ -56,17 +56,21 @@ pub fn validate_clvm_and_signature(
             (AGG_SIG_ME, &spend.agg_sig_me),
         ];
         condition_items_pairs
-            .iter()
-            .flat_map(|(condition, items)| {
-                let spend = spend.clone();
+            .into_iter()
+            .flat_map(move |(condition, items)| {
+                let spend_clone = spend.clone();
                 items.iter().map(move |(pk, msg)| {
                     (
                         pk,
-                        make_aggsig_final_message(*condition, msg.as_slice(), &spend, constants),
+                        make_aggsig_final_message(
+                            condition,
+                            msg.as_slice(),
+                            &spend_clone,
+                            constants,
+                        ),
                     )
                 })
             })
-            .collect::<Vec<_>>()
     });
     let unsafe_items = npcresult
         .agg_sig_unsafe
