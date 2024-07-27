@@ -1,8 +1,9 @@
 use std::{
     collections::{HashMap, HashSet},
     net::{IpAddr, SocketAddr},
+    ops::Deref,
     str::FromStr,
-    sync::Arc,
+    sync::{Arc, Weak},
     time::Duration,
 };
 
@@ -14,15 +15,11 @@ use native_tls::TlsConnector;
 use rand::{seq::SliceRandom, thread_rng};
 use semver::Version;
 use tokio::{
-    sync::{mpsc, Mutex, Semaphore},
+    sync::{mpsc, Mutex},
     time::timeout,
 };
 
 use crate::{Error, Event, Network, Peer, PeerId, Result};
-
-/// A client that can connect to many different peers on the network.
-#[derive(Debug, Clone)]
-pub struct Client(Arc<ClientInner>);
 
 #[derive(Debug, Clone)]
 pub struct ClientOptions {
@@ -50,13 +47,31 @@ pub struct ClientOptions {
     pub request_peers_timeout: Duration,
 }
 
+#[derive(Debug, Clone)]
+pub struct Client(Arc<ClientInner>);
+
+impl Deref for Client {
+    type Target = Mutex<ClientState>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0.state
+    }
+}
+
 #[derive(Debug)]
 struct ClientInner {
-    peers: Arc<Mutex<HashMap<PeerId, Peer>>>,
-    message_sender: Arc<Mutex<mpsc::Sender<Event>>>,
+    state: Arc<Mutex<ClientState>>,
     options: ClientOptions,
     tls_connector: TlsConnector,
-    connection_lock: Semaphore,
+}
+
+/// A client that can connect to many different peers on the network.
+#[derive(Debug)]
+pub struct ClientState {
+    peers: HashMap<PeerId, Peer>,
+    sender: mpsc::Sender<Event>,
+    banned_peers: HashSet<IpAddr>,
+    trusted_peers: HashSet<IpAddr>,
 }
 
 impl Client {
@@ -66,78 +81,48 @@ impl Client {
     ) -> (Self, mpsc::Receiver<Event>) {
         let (sender, receiver) = mpsc::channel(32);
 
+        let state = ClientState {
+            peers: HashMap::new(),
+            sender,
+            banned_peers: HashSet::new(),
+            trusted_peers: HashSet::new(),
+        };
+
         let client = Self(Arc::new(ClientInner {
-            peers: Arc::new(Mutex::new(HashMap::new())),
-            message_sender: Arc::new(Mutex::new(sender)),
+            state: Arc::new(Mutex::new(state)),
             options,
             tls_connector,
-            connection_lock: Semaphore::new(1),
         }));
 
         (client, receiver)
     }
 
-    pub async fn len(&self) -> usize {
-        self.0.peers.lock().await.len()
-    }
-
-    pub async fn is_empty(&self) -> bool {
-        self.0.peers.lock().await.is_empty()
-    }
-
-    pub async fn peer_map(&self) -> HashMap<PeerId, Peer> {
-        self.0.peers.lock().await.clone()
-    }
-
-    pub async fn peer(&self, peer_id: PeerId) -> Option<Peer> {
-        self.0.peers.lock().await.get(&peer_id).cloned()
-    }
-
-    pub async fn disconnect_peer(&self, peer_id: PeerId) {
-        self.0.peers.lock().await.remove(&peer_id);
-    }
-
-    pub async fn disconnect_all(&self) {
-        self.0.peers.lock().await.clear();
-    }
-
-    pub async fn find_peers(&self, prefer_introducers: bool) {
-        let _permit = self
-            .0
-            .connection_lock
-            .acquire()
-            .await
-            .expect("the semaphore should not be closed");
-
-        if self.len().await >= self.0.options.target_peers {
+    pub async fn discover_peers(&self, prefer_introducers: bool) {
+        if self.lock().await.peers.len() >= self.0.options.target_peers {
             return;
         }
 
         // If we don't have any peers, try to connect to DNS introducers.
-        if self.is_empty().await || prefer_introducers {
-            self.connect_dns().await;
+        if self.lock().await.peers.is_empty() || prefer_introducers {
+            self.discover_peers_with_dns().await;
 
             // If we still don't have any peers, we can't do anything.
-            if self.is_empty().await {
+            if self.lock().await.peers.is_empty() {
                 return;
             }
         }
 
-        if self.len().await >= self.0.options.target_peers {
+        if self.lock().await.peers.len() >= self.0.options.target_peers {
             return;
         }
 
-        if self.is_empty().await {
+        if self.lock().await.peers.is_empty() {
             log::error!("No peers connected after DNS lookups");
             return;
         }
 
-        let peer_lock = self.0.peers.lock().await;
-        let peers = peer_lock.clone();
-        drop(peer_lock);
-
-        for (peer_id, peer) in peers {
-            if self.len().await >= self.0.options.target_peers {
+        for (peer_id, peer) in self.lock().await.peers.clone() {
+            if self.lock().await.peers.len() >= self.0.options.target_peers {
                 break;
             }
 
@@ -146,7 +131,7 @@ impl Client {
                 timeout(self.0.options.request_peers_timeout, peer.request_peers()).await
             else {
                 log::info!("Failed to request peers from {}", peer.socket_addr());
-                self.disconnect_peer(peer_id).await;
+                self.lock().await.disconnect_peer(&peer_id);
                 continue;
             };
 
@@ -177,22 +162,33 @@ impl Client {
                     break;
                 }
 
-                self.connect_peers(next_peers).await;
+                self.connect_peers(&next_peers).await;
             }
         }
     }
 
-    async fn connect_dns(&self) {
-        log::info!("Requesting peers from DNS introducer");
+    pub async fn discover_peers_with_dns(&self) -> HashMap<SocketAddr, PeerId> {
+        let mut socket_addrs: Vec<SocketAddr> = self.dns_lookup().into_iter().collect();
 
-        let mut socket_addrs = Vec::new();
+        // Shuffle the list of IPs so that we don't always connect to the same ones.
+        // This also prevents bias towards IPv4 or IPv6.
+        socket_addrs.as_mut_slice().shuffle(&mut thread_rng());
+
+        self.connect_peers_batched(&socket_addrs).await
+    }
+
+    pub fn dns_lookup(&self) -> HashSet<SocketAddr> {
+        let mut socket_addrs = HashSet::new();
 
         for dns_introducer in &self.0.options.network.dns_introducers {
+            log::debug!("Performing DNS lookup of {dns_introducer}.");
+
             // If a DNS introducer lookup fails, we just skip it.
             let Ok(result) = lookup_host(dns_introducer) else {
                 log::warn!("Failed to lookup DNS introducer `{dns_introducer}`");
                 continue;
             };
+
             socket_addrs.extend(
                 result
                     .into_iter()
@@ -200,15 +196,22 @@ impl Client {
             );
         }
 
-        // Shuffle the list of IPs so that we don't always connect to the same ones.
-        // This also prevents bias towards IPv4 or IPv6.
-        socket_addrs.as_mut_slice().shuffle(&mut thread_rng());
+        log::info!(
+            "Found a total of {} IPs from DNS introducers.",
+            socket_addrs.len()
+        );
 
-        // Keep track of where we are in the peer list.
+        socket_addrs
+    }
+
+    pub async fn connect_peers_batched(
+        &self,
+        socket_addrs: &[SocketAddr],
+    ) -> HashMap<SocketAddr, PeerId> {
+        let mut peer_ids = HashMap::new();
         let mut cursor = 0;
 
-        while self.len().await < self.0.options.target_peers {
-            // If we've reached the end of the list of IPs, stop early.
+        while self.lock().await.peers.len() < self.0.options.target_peers {
             if cursor >= socket_addrs.len() {
                 break;
             }
@@ -222,39 +225,52 @@ impl Client {
             // Increment the cursor by the number of peers we're trying to connect to.
             cursor += new_addrs.len();
 
-            self.connect_peers(new_addrs.to_vec()).await;
+            peer_ids.extend(self.connect_peers(new_addrs).await);
         }
+
+        peer_ids
     }
 
-    async fn connect_peers(&self, socket_addrs: Vec<SocketAddr>) {
-        // Add the connections and wait for them to complete.
+    pub async fn connect_peers(&self, socket_addrs: &[SocketAddr]) -> HashMap<SocketAddr, PeerId> {
         let mut connections = FuturesUnordered::new();
 
-        let peers = self.peer_map().await;
+        let state = self.lock().await;
 
-        for socket_addr in socket_addrs {
-            if peers
+        for &socket_addr in socket_addrs {
+            // Skip peers which we are already connected to.
+            if state
+                .peers
                 .iter()
                 .any(|(_, peer)| peer.socket_addr().ip() == socket_addr.ip())
             {
                 continue;
             }
 
-            connections.push(async move { (socket_addr, self.connect_peer(socket_addr).await) });
+            // Add the next connection to the queue.
+            connections.push(async move {
+                let result = self.connect_peer(socket_addr).await;
+                (socket_addr, result)
+            });
         }
+
+        // Prevent a deadlock and allow the connections to resolve.
+        drop(state);
+
+        let mut peer_ids = HashMap::new();
 
         while let Some((socket_addr, result)) = connections.next().await {
-            if self.len().await >= self.0.options.target_peers {
-                break;
+            match result {
+                Err(error) => {
+                    log::warn!("Failed to connect to peer {socket_addr} with error: {error}",);
+                }
+                Ok(peer_id) => {
+                    peer_ids.insert(socket_addr, peer_id);
+                    log::info!("Connected to peer {socket_addr}");
+                }
             }
-
-            if let Err(error) = result {
-                log::warn!("Failed to connect to peer {socket_addr} with error: {error}",);
-                continue;
-            }
-
-            log::info!("Connected to peer {socket_addr}");
         }
+
+        peer_ids
     }
 
     pub async fn connect_peer(&self, socket_addr: SocketAddr) -> Result<PeerId> {
@@ -267,19 +283,17 @@ impl Client {
         .await
         .map_err(Error::ConnectionTimeout)??;
 
-        let options = &self.0.options;
-
         peer.send(Handshake {
-            network_id: options.network.network_id.clone(),
-            protocol_version: options.protocol_version.to_string(),
-            software_version: options.software_version.clone(),
+            network_id: self.0.options.network.network_id.clone(),
+            protocol_version: self.0.options.protocol_version.to_string(),
+            software_version: self.0.options.software_version.clone(),
             server_port: 0,
-            node_type: options.node_type,
-            capabilities: options.capabilities.clone(),
+            node_type: self.0.options.node_type,
+            capabilities: self.0.options.capabilities.clone(),
         })
         .await?;
 
-        let Some(message) = timeout(options.handshake_timeout, receiver.recv())
+        let Some(message) = timeout(self.0.options.handshake_timeout, receiver.recv())
             .await
             .map_err(Error::HandshakeTimeout)?
         else {
@@ -292,7 +306,7 @@ impl Client {
 
         let handshake = Handshake::from_bytes(&message.data)?;
 
-        if handshake.network_id != options.network.network_id {
+        if handshake.network_id != self.0.options.network.network_id {
             return Err(Error::WrongNetworkId(handshake.network_id));
         }
 
@@ -300,64 +314,115 @@ impl Client {
             return Err(Error::InvalidProtocolVersion(handshake.protocol_version));
         };
 
-        if protocol_version < options.protocol_version {
+        if protocol_version < self.0.options.protocol_version {
             return Err(Error::OutdatedProtocolVersion(
                 protocol_version,
-                options.protocol_version.clone(),
+                self.0.options.protocol_version.clone(),
             ));
         }
 
-        self.add_peer(peer, receiver).await
+        self.insert_peer(peer, receiver).await
     }
 
-    pub async fn add_peer(
+    pub async fn insert_peer(
         &self,
         peer: Peer,
-        mut receiver: mpsc::Receiver<Message>,
+        receiver: mpsc::Receiver<Message>,
     ) -> Result<PeerId> {
-        let socket_addr = peer.socket_addr();
-        let peer_id = peer.peer_id();
-
-        self.0.peers.lock().await.insert(peer_id, peer);
-
-        self.0
-            .message_sender
-            .lock()
-            .await
-            .send(Event::Connected(peer_id))
-            .await?;
+        let mut state = self.lock().await;
+        state.peers.insert(peer.peer_id(), peer.clone());
+        state.sender.send(Event::Connected(peer.peer_id())).await?;
 
         // Spawn a task to propagate messages from the peer.
-        let message_sender = self.0.message_sender.clone();
-        let peer_map = self.0.peers.clone();
+        // We downgrade the client to avoid a cycle and allow it to be dropped.
+        tokio::spawn(handle_peer_connection(
+            Arc::downgrade(&self.0.state),
+            peer.peer_id(),
+            peer.socket_addr(),
+            receiver,
+        ));
 
-        tokio::spawn(async move {
-            while let Some(message) = receiver.recv().await {
-                if let Err(error) = message_sender
-                    .lock()
-                    .await
-                    .send(Event::Message(peer_id, message))
-                    .await
-                {
-                    log::warn!("Failed to send client message event: {error}");
-                    break;
-                }
-            }
+        Ok(peer.peer_id())
+    }
+}
 
-            peer_map.lock().await.remove(&peer_id);
+impl ClientState {
+    pub fn peers(&self) -> &HashMap<PeerId, Peer> {
+        &self.peers
+    }
 
-            if let Err(error) = message_sender
-                .lock()
-                .await
-                .send(Event::Disconnected(socket_addr))
-                .await
-            {
-                log::warn!("Failed to send client connection closed event: {error}");
-            }
+    pub fn disconnect_peer(&mut self, peer_id: &PeerId) {
+        self.peers.remove(peer_id);
+    }
 
-            log::info!("Peer {socket_addr} disconnected");
-        });
+    pub fn disconnect_all(&mut self) {
+        self.peers.clear();
+    }
 
-        Ok(peer_id)
+    pub fn banned_peers(&self) -> &HashSet<IpAddr> {
+        &self.banned_peers
+    }
+
+    pub fn is_banned(&self, ip_addr: &IpAddr) -> bool {
+        self.banned_peers.contains(ip_addr)
+    }
+
+    pub fn ban_peer(&mut self, ip_addr: IpAddr) {
+        self.banned_peers.insert(ip_addr);
+    }
+
+    pub fn unban_peer(&mut self, ip_addr: &IpAddr) {
+        self.banned_peers.remove(ip_addr);
+    }
+
+    pub fn trusted_peers(&self) -> &HashSet<IpAddr> {
+        &self.trusted_peers
+    }
+
+    pub fn is_trusted(&self, ip_addr: &IpAddr) -> bool {
+        self.trusted_peers.contains(ip_addr)
+    }
+
+    pub fn trust_peer(&mut self, ip_addr: IpAddr) {
+        self.trusted_peers.insert(ip_addr);
+    }
+
+    pub fn untrust_peer(&mut self, ip_addr: &IpAddr) {
+        self.trusted_peers.remove(ip_addr);
+    }
+}
+
+async fn handle_peer_connection(
+    state: Weak<Mutex<ClientState>>,
+    peer_id: PeerId,
+    socket_addr: SocketAddr,
+    mut receiver: mpsc::Receiver<Message>,
+) {
+    while let Some(message) = receiver.recv().await {
+        // If the client has been dropped, we should gracefully end the task.
+        let Some(state) = state.upgrade() else {
+            return;
+        };
+        let state = state.lock().await;
+
+        // Close the connection if an error occurs.
+        if let Err(error) = state.sender.send(Event::Message(peer_id, message)).await {
+            log::warn!("Failed to send client message event: {error}");
+            break;
+        }
+    }
+
+    // If the client has been dropped, we should gracefully end the task.
+    let Some(state) = state.upgrade() else {
+        return;
+    };
+    let mut state = state.lock().await;
+
+    state.peers.remove(&peer_id);
+
+    log::info!("Peer {socket_addr} disconnected");
+
+    if let Err(error) = state.sender.send(Event::Disconnected(socket_addr)).await {
+        log::warn!("Failed to send client connection closed event: {error}");
     }
 }
