@@ -27,6 +27,7 @@ hex-literal = { workspace = true }
 rand = { workspace = true }
 semver = { workspace = true }
 hex = { workspace = true }
+console-subscriber = { workspace = true }
 
 [dev-dependencies]
 chia-ssl = { path = "../chia-ssl" }

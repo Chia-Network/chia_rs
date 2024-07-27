@@ -1,13 +1,15 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
-use chia_client::{create_tls_connector, Client, ClientOptions, Network};
-use chia_protocol::NodeType;
+use chia_client::{create_tls_connector, Client, ClientOptions, Event, Network};
+use chia_protocol::{NewPeakWallet, NodeType, ProtocolMessageTypes};
 use chia_ssl::ChiaCertificate;
-use tokio::time::sleep;
+use chia_traits::Streamable;
+use tokio::{sync::Mutex, time::sleep};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     env_logger::init();
+    // console_subscriber::init();
 
     log::info!("Generating certificate");
     let cert = ChiaCertificate::generate()?;
@@ -18,8 +20,8 @@ async fn main() -> anyhow::Result<()> {
         tls_connector,
         ClientOptions {
             network: Network::mainnet(),
-            target_peers: 20,
-            connection_concurrency: 10,
+            target_peers: 500,
+            connection_concurrency: 200,
             node_type: NodeType::Wallet,
             capabilities: vec![
                 (1, "1".to_string()),
@@ -36,25 +38,47 @@ async fn main() -> anyhow::Result<()> {
 
     log::info!("Connecting to DNS introducers");
 
-    let client2 = client.clone();
+    let clone = client.clone();
     tokio::spawn(async move {
         loop {
-            client2.discover_peers(true).await;
+            clone.discover_peers(true).await;
             sleep(Duration::from_secs(5)).await;
         }
     });
 
+    let height = Arc::new(Mutex::new(0));
+    let height_clone = height.clone();
+
     tokio::spawn(async move {
         loop {
-            sleep(Duration::from_secs(5)).await;
+            sleep(Duration::from_secs(1)).await;
             log::info!(
-                "Currently connected to {} peers",
-                client.lock().await.peers().len()
+                "Currently connected to {} peers, with peak height {}",
+                client.lock().await.peers().len(),
+                *height_clone.lock().await
             );
         }
     });
 
-    while let Some(_event) = receiver.recv().await {}
+    while let Some(event) = receiver.recv().await {
+        let Event::Message(_peer_id, message) = event else {
+            continue;
+        };
+
+        if message.msg_type != ProtocolMessageTypes::NewPeakWallet {
+            continue;
+        }
+
+        let Ok(new_peak) = NewPeakWallet::from_bytes(&message.data) else {
+            continue;
+        };
+
+        let mut height = height.lock().await;
+
+        if new_peak.height > *height {
+            *height = new_peak.height;
+        }
+    }
 
     Ok(())
 }

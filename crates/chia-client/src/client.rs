@@ -111,6 +111,7 @@ impl Client {
             if self.lock().await.peers.is_empty() {
                 return;
             }
+        } else {
         }
 
         let state = self.lock().await;
@@ -143,7 +144,9 @@ impl Client {
             .await
             else {
                 log::info!("Failed to request peers from {}", peer.socket_addr());
-                self.lock().await.ban(peer.socket_addr().ip()).await;
+
+                self.lock().await.ban(peer.socket_addr().ip());
+
                 continue;
             };
 
@@ -179,14 +182,14 @@ impl Client {
         }
     }
 
-    pub async fn discover_peers_with_dns(&self) -> HashMap<SocketAddr, PeerId> {
+    pub async fn discover_peers_with_dns(&self) {
         let mut socket_addrs: Vec<SocketAddr> = self.dns_lookup().into_iter().collect();
 
         // Shuffle the list of IPs so that we don't always connect to the same ones.
         // This also prevents bias towards IPv4 or IPv6.
         socket_addrs.as_mut_slice().shuffle(&mut thread_rng());
 
-        self.connect_peers_batched(&socket_addrs).await
+        self.connect_peers_batched(&socket_addrs).await;
     }
 
     pub fn dns_lookup(&self) -> HashSet<SocketAddr> {
@@ -216,41 +219,40 @@ impl Client {
         socket_addrs
     }
 
-    pub async fn connect_peers_batched(
-        &self,
-        socket_addrs: &[SocketAddr],
-    ) -> HashMap<SocketAddr, PeerId> {
-        let mut peer_ids = HashMap::new();
+    async fn connect_peers_batched(&self, socket_addrs: &[SocketAddr]) {
         let mut cursor = 0;
 
-        while self.lock().await.peers.len() < self.0.options.target_peers {
-            if cursor >= socket_addrs.len() {
+        loop {
+            if self.lock().await.peers.len() < self.0.options.target_peers {
+                if cursor >= socket_addrs.len() {
+                    break;
+                }
+
+                // Get the remaining peers we can connect to, up to the concurrency limit.
+                let new_addrs = &socket_addrs[cursor
+                    ..socket_addrs
+                        .len()
+                        .min(cursor + self.0.options.connection_concurrency)];
+
+                // Increment the cursor by the number of peers we're trying to connect to.
+                cursor += new_addrs.len();
+
+                self.connect_peers(new_addrs).await;
+            } else {
                 break;
             }
-
-            // Get the remaining peers we can connect to, up to the concurrency limit.
-            let new_addrs = &socket_addrs[cursor
-                ..socket_addrs
-                    .len()
-                    .min(cursor + self.0.options.connection_concurrency)];
-
-            // Increment the cursor by the number of peers we're trying to connect to.
-            cursor += new_addrs.len();
-
-            peer_ids.extend(self.connect_peers(new_addrs).await);
         }
-
-        peer_ids
     }
 
-    pub async fn connect_peers(&self, socket_addrs: &[SocketAddr]) -> HashMap<SocketAddr, PeerId> {
+    async fn connect_peers(&self, socket_addrs: &[SocketAddr]) {
         let mut connections = FuturesUnordered::new();
-
-        let state = self.lock().await;
 
         for &socket_addr in socket_addrs {
             // Skip peers which we are already connected to.
-            if state
+
+            if self
+                .lock()
+                .await
                 .peers
                 .iter()
                 .any(|(_, peer)| peer.socket_addr().ip() == socket_addr.ip())
@@ -265,28 +267,29 @@ impl Client {
             });
         }
 
-        // Prevent a deadlock and allow the connections to resolve.
-        drop(state);
-
-        let mut peer_ids = HashMap::new();
-
         while let Some((socket_addr, result)) = connections.next().await {
             match result {
                 Err(error) => {
-                    log::warn!("Failed to connect to peer {socket_addr} with error: {error}");
-                    self.lock().await.ban(socket_addr.ip()).await;
+                    log::debug!("Failed to connect to peer {socket_addr} with error: {error}");
+
+                    self.lock().await.ban(socket_addr.ip());
                 }
-                Ok(peer_id) => {
-                    peer_ids.insert(socket_addr, peer_id);
+                Ok((peer, receiver)) => {
+                    if self.lock().await.peers.len() >= self.0.options.target_peers {
+                        break;
+                    }
+
+                    self.insert_peer(peer, receiver).await.ok();
                     log::info!("Connected to peer {socket_addr}");
                 }
             }
         }
-
-        peer_ids
     }
 
-    pub async fn connect_peer(&self, socket_addr: SocketAddr) -> Result<PeerId> {
+    async fn connect_peer(
+        &self,
+        socket_addr: SocketAddr,
+    ) -> Result<(Peer, mpsc::Receiver<Message>)> {
         if self.lock().await.is_banned(&socket_addr.ip()) {
             return Err(Error::BannedPeer(socket_addr.ip()));
         }
@@ -343,14 +346,10 @@ impl Client {
             ));
         }
 
-        self.insert_peer(peer, receiver).await
+        Ok((peer, receiver))
     }
 
-    pub async fn insert_peer(
-        &self,
-        peer: Peer,
-        receiver: mpsc::Receiver<Message>,
-    ) -> Result<PeerId> {
+    async fn insert_peer(&self, peer: Peer, receiver: mpsc::Receiver<Message>) -> Result<()> {
         let mut state = self.lock().await;
 
         let ip_addr = peer.socket_addr().ip();
@@ -373,7 +372,7 @@ impl Client {
             receiver,
         ));
 
-        Ok(peer.peer_id())
+        Ok(())
     }
 }
 
@@ -382,12 +381,12 @@ impl ClientState {
         &self.peers
     }
 
-    pub async fn disconnect_peer(&mut self, peer_id: &PeerId) {
+    pub fn disconnect_peer(&mut self, peer_id: &PeerId) {
         if let Some(peer) = self.peers.remove(peer_id) {
-            self.sender
-                .send(Event::Disconnected(peer.socket_addr()))
-                .await
-                .ok();
+            // self.sender
+            //     .send(Event::Disconnected(peer.socket_addr()))
+            //     .await
+            //     .ok();
             log::info!("Peer {} disconnected", peer.socket_addr());
         }
     }
@@ -404,16 +403,19 @@ impl ClientState {
         self.banned_ips.contains(ip_addr)
     }
 
-    pub async fn ban(&mut self, ip_addr: IpAddr) {
+    pub fn ban(&mut self, ip_addr: IpAddr) {
         if self.is_trusted(&ip_addr) {
             log::warn!("Attempted to ban trusted peer {ip_addr}");
             return;
         }
 
+        if !self.banned_ips.insert(ip_addr) {
+            return;
+        }
+
         log::info!("Banning peer {ip_addr}");
 
-        self.banned_ips.insert(ip_addr);
-        self.sender.send(Event::Banned(ip_addr)).await.ok();
+        // self.sender.send(Event::Banned(ip_addr)).await.ok();
 
         let peer_ids: Vec<PeerId> = self
             .peers
@@ -423,7 +425,7 @@ impl ClientState {
             .collect();
 
         for peer_id in peer_ids {
-            self.disconnect_peer(&peer_id).await;
+            self.disconnect_peer(&peer_id);
         }
     }
 
@@ -464,6 +466,7 @@ async fn handle_peer_connection(
         let Some(state) = state.upgrade() else {
             return;
         };
+
         let state = state.lock().await;
 
         // Close the connection if an error occurs.
@@ -478,12 +481,13 @@ async fn handle_peer_connection(
     let Some(state) = state.upgrade() else {
         return;
     };
+
     let mut state = state.lock().await;
 
     if is_banned {
-        state.ban(socket_addr.ip()).await;
+        state.ban(socket_addr.ip());
     } else {
-        state.disconnect_peer(&peer_id).await;
+        state.disconnect_peer(&peer_id);
     }
 }
 
