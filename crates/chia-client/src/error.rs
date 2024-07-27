@@ -1,3 +1,5 @@
+use std::net::IpAddr;
+
 use chia_protocol::ProtocolMessageTypes;
 use semver::Version;
 use thiserror::Error;
@@ -32,6 +34,9 @@ pub enum Error {
 
     #[error("TLS error: {0}")]
     Tls(#[from] native_tls::Error),
+
+    #[error("Banned peer: {0}")]
+    BannedPeer(IpAddr),
 
     #[error("Unexpected message received with type {0:?}")]
     UnexpectedMessage(ProtocolMessageTypes),

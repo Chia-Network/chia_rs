@@ -1,5 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
+    future::Future,
     net::{IpAddr, SocketAddr},
     ops::Deref,
     str::FromStr,
@@ -70,8 +71,8 @@ struct ClientInner {
 pub struct ClientState {
     peers: HashMap<PeerId, Peer>,
     sender: mpsc::Sender<Event>,
-    banned_peers: HashSet<IpAddr>,
-    trusted_peers: HashSet<IpAddr>,
+    banned_ips: HashSet<IpAddr>,
+    trusted_ips: HashSet<IpAddr>,
 }
 
 impl Client {
@@ -84,8 +85,8 @@ impl Client {
         let state = ClientState {
             peers: HashMap::new(),
             sender,
-            banned_peers: HashSet::new(),
-            trusted_peers: HashSet::new(),
+            banned_ips: HashSet::new(),
+            trusted_ips: HashSet::new(),
         };
 
         let client = Self(Arc::new(ClientInner {
@@ -112,26 +113,37 @@ impl Client {
             }
         }
 
-        if self.lock().await.peers.len() >= self.0.options.target_peers {
+        let state = self.lock().await;
+
+        if state.peers.len() >= self.0.options.target_peers {
             return;
         }
 
-        if self.lock().await.peers.is_empty() {
+        if state.peers.is_empty() {
             log::error!("No peers connected after DNS lookups");
             return;
         }
 
-        for (peer_id, peer) in self.lock().await.peers.clone() {
+        let peers: Vec<Peer> = state.peers.values().cloned().collect();
+        let trusted = state.trusted_ips.clone();
+
+        drop(state);
+
+        for peer in peers {
             if self.lock().await.peers.len() >= self.0.options.target_peers {
                 break;
             }
 
             // Request new peers from the peer.
-            let Ok(Ok(response)): std::result::Result<Result<RespondPeers>, _> =
-                timeout(self.0.options.request_peers_timeout, peer.request_peers()).await
+            let Ok(Ok(response)): std::result::Result<Result<RespondPeers>, _> = maybe_timeout(
+                trusted.contains(&peer.socket_addr().ip()),
+                self.0.options.request_peers_timeout,
+                peer.request_peers(),
+            )
+            .await
             else {
                 log::info!("Failed to request peers from {}", peer.socket_addr());
-                self.lock().await.disconnect_peer(&peer_id);
+                self.lock().await.ban(peer.socket_addr().ip()).await;
                 continue;
             };
 
@@ -261,7 +273,8 @@ impl Client {
         while let Some((socket_addr, result)) = connections.next().await {
             match result {
                 Err(error) => {
-                    log::warn!("Failed to connect to peer {socket_addr} with error: {error}",);
+                    log::warn!("Failed to connect to peer {socket_addr} with error: {error}");
+                    self.lock().await.ban(socket_addr.ip()).await;
                 }
                 Ok(peer_id) => {
                     peer_ids.insert(socket_addr, peer_id);
@@ -274,14 +287,20 @@ impl Client {
     }
 
     pub async fn connect_peer(&self, socket_addr: SocketAddr) -> Result<PeerId> {
+        if self.lock().await.is_banned(&socket_addr.ip()) {
+            return Err(Error::BannedPeer(socket_addr.ip()));
+        }
+
         log::debug!("Connecting to peer {socket_addr}");
 
-        let (peer, mut receiver) = timeout(
+        let is_trusted = self.lock().await.is_trusted(&socket_addr.ip());
+
+        let (peer, mut receiver) = maybe_timeout(
+            is_trusted,
             self.0.options.connection_timeout,
             Peer::connect(socket_addr, self.0.tls_connector.clone()),
         )
-        .await
-        .map_err(Error::ConnectionTimeout)??;
+        .await??;
 
         peer.send(Handshake {
             network_id: self.0.options.network.network_id.clone(),
@@ -293,9 +312,12 @@ impl Client {
         })
         .await?;
 
-        let Some(message) = timeout(self.0.options.handshake_timeout, receiver.recv())
-            .await
-            .map_err(Error::HandshakeTimeout)?
+        let Some(message) = maybe_timeout(
+            is_trusted,
+            self.0.options.handshake_timeout,
+            receiver.recv(),
+        )
+        .await?
         else {
             return Err(Error::ExpectedHandshake);
         };
@@ -330,8 +352,17 @@ impl Client {
         receiver: mpsc::Receiver<Message>,
     ) -> Result<PeerId> {
         let mut state = self.lock().await;
+
+        let ip_addr = peer.socket_addr().ip();
+        if state.is_banned(&ip_addr) {
+            return Err(Error::BannedPeer(ip_addr));
+        }
+
         state.peers.insert(peer.peer_id(), peer.clone());
-        state.sender.send(Event::Connected(peer.peer_id())).await?;
+        state
+            .sender
+            .send(Event::Connected(peer.peer_id(), peer.socket_addr()))
+            .await?;
 
         // Spawn a task to propagate messages from the peer.
         // We downgrade the client to avoid a cycle and allow it to be dropped.
@@ -351,44 +382,72 @@ impl ClientState {
         &self.peers
     }
 
-    pub fn disconnect_peer(&mut self, peer_id: &PeerId) {
-        self.peers.remove(peer_id);
+    pub async fn disconnect_peer(&mut self, peer_id: &PeerId) {
+        if let Some(peer) = self.peers.remove(peer_id) {
+            self.sender
+                .send(Event::Disconnected(peer.socket_addr()))
+                .await
+                .ok();
+            log::info!("Peer {} disconnected", peer.socket_addr());
+        }
     }
 
     pub fn disconnect_all(&mut self) {
         self.peers.clear();
     }
 
-    pub fn banned_peers(&self) -> &HashSet<IpAddr> {
-        &self.banned_peers
+    pub fn banned_ips(&self) -> &HashSet<IpAddr> {
+        &self.banned_ips
     }
 
     pub fn is_banned(&self, ip_addr: &IpAddr) -> bool {
-        self.banned_peers.contains(ip_addr)
+        self.banned_ips.contains(ip_addr)
     }
 
-    pub fn ban_peer(&mut self, ip_addr: IpAddr) {
-        self.banned_peers.insert(ip_addr);
+    pub async fn ban(&mut self, ip_addr: IpAddr) {
+        if self.is_trusted(&ip_addr) {
+            log::warn!("Attempted to ban trusted peer {ip_addr}");
+            return;
+        }
+
+        log::info!("Banning peer {ip_addr}");
+
+        self.banned_ips.insert(ip_addr);
+        self.sender.send(Event::Banned(ip_addr)).await.ok();
+
+        let peer_ids: Vec<PeerId> = self
+            .peers
+            .keys()
+            .filter(|peer_id| self.peers[peer_id].socket_addr().ip() == ip_addr)
+            .copied()
+            .collect();
+
+        for peer_id in peer_ids {
+            self.disconnect_peer(&peer_id).await;
+        }
     }
 
-    pub fn unban_peer(&mut self, ip_addr: &IpAddr) {
-        self.banned_peers.remove(ip_addr);
+    pub fn unban(&mut self, ip_addr: &IpAddr) {
+        self.banned_ips.remove(ip_addr);
     }
 
-    pub fn trusted_peers(&self) -> &HashSet<IpAddr> {
-        &self.trusted_peers
+    pub fn trusted_ips(&self) -> &HashSet<IpAddr> {
+        &self.trusted_ips
     }
 
     pub fn is_trusted(&self, ip_addr: &IpAddr) -> bool {
-        self.trusted_peers.contains(ip_addr)
+        self.trusted_ips.contains(ip_addr)
     }
 
-    pub fn trust_peer(&mut self, ip_addr: IpAddr) {
-        self.trusted_peers.insert(ip_addr);
+    pub fn trust(&mut self, ip_addr: IpAddr) {
+        self.trusted_ips.insert(ip_addr);
+        if self.banned_ips.remove(&ip_addr) {
+            log::info!("Unbanning peer {ip_addr} since it's now trusted");
+        }
     }
 
-    pub fn untrust_peer(&mut self, ip_addr: &IpAddr) {
-        self.trusted_peers.remove(ip_addr);
+    pub fn untrust(&mut self, ip_addr: &IpAddr) {
+        self.trusted_ips.remove(ip_addr);
     }
 }
 
@@ -398,6 +457,8 @@ async fn handle_peer_connection(
     socket_addr: SocketAddr,
     mut receiver: mpsc::Receiver<Message>,
 ) {
+    let mut is_banned = false;
+
     while let Some(message) = receiver.recv().await {
         // If the client has been dropped, we should gracefully end the task.
         let Some(state) = state.upgrade() else {
@@ -408,6 +469,7 @@ async fn handle_peer_connection(
         // Close the connection if an error occurs.
         if let Err(error) = state.sender.send(Event::Message(peer_id, message)).await {
             log::warn!("Failed to send client message event: {error}");
+            is_banned = true;
             break;
         }
     }
@@ -418,11 +480,22 @@ async fn handle_peer_connection(
     };
     let mut state = state.lock().await;
 
-    state.peers.remove(&peer_id);
+    if is_banned {
+        state.ban(socket_addr.ip()).await;
+    } else {
+        state.disconnect_peer(&peer_id).await;
+    }
+}
 
-    log::info!("Peer {socket_addr} disconnected");
-
-    if let Err(error) = state.sender.send(Event::Disconnected(socket_addr)).await {
-        log::warn!("Failed to send client connection closed event: {error}");
+async fn maybe_timeout<F>(is_trusted: bool, duration: Duration, future: F) -> Result<F::Output>
+where
+    F: Future,
+{
+    if is_trusted {
+        Ok(future.await)
+    } else {
+        timeout(duration, future)
+            .await
+            .map_err(Error::ConnectionTimeout)
     }
 }
