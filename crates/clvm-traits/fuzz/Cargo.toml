@@ -1,0 +1,20 @@
+[package]
+name = "clvm-traits-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = { workspace = true }
+clvmr = { workspace = true }
+clvm-traits = { workspace = true }
+
+[[bin]]
+name = "int_encoding"
+path = "fuzz_targets/int_encoding.rs"
+test = false
+doc = false
+bench = false

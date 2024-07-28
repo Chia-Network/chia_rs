@@ -3,7 +3,7 @@ use std::{rc::Rc, sync::Arc};
 use clvmr::Atom;
 use num_bigint::BigInt;
 
-use crate::{ClvmEncoder, ToClvmError};
+use crate::{encode_number, ClvmEncoder, ToClvmError};
 
 pub trait ToClvm<E>
 where
@@ -16,7 +16,9 @@ macro_rules! clvm_primitive {
     ($primitive:ty) => {
         impl<N, E: ClvmEncoder<Node = N>> ToClvm<E> for $primitive {
             fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
-                encoder.encode_bigint(BigInt::from(*self))
+                let bytes = self.to_be_bytes();
+                #[allow(unused_comparisons)]
+                encoder.encode_atom(Atom::Borrowed(&encode_number(&bytes, *self < 0)))
             }
         }
     };
@@ -34,6 +36,12 @@ clvm_primitive!(u128);
 clvm_primitive!(i128);
 clvm_primitive!(usize);
 clvm_primitive!(isize);
+
+impl<N, E: ClvmEncoder<Node = N>> ToClvm<E> for BigInt {
+    fn to_clvm(&self, encoder: &mut E) -> Result<<E as ClvmEncoder>::Node, ToClvmError> {
+        encoder.encode_bigint(self.clone())
+    }
+}
 
 impl<N, E: ClvmEncoder<Node = N>> ToClvm<E> for bool {
     fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {

@@ -1,4 +1,5 @@
 use clvmr::{allocator::SExp, Allocator, Atom, NodePtr};
+use num_bigint::BigInt;
 
 use crate::{
     destructure_list, destructure_quote, match_list, match_quote, FromClvm, FromClvmError,
@@ -10,6 +11,11 @@ pub trait ClvmDecoder: Sized {
 
     fn decode_atom(&self, node: &Self::Node) -> Result<Atom<'_>, FromClvmError>;
     fn decode_pair(&self, node: &Self::Node) -> Result<(Self::Node, Self::Node), FromClvmError>;
+
+    fn decode_bigint(&self, node: &Self::Node) -> Result<BigInt, FromClvmError> {
+        let atom = self.decode_atom(node)?;
+        Ok(BigInt::from_signed_bytes_be(atom.as_ref()))
+    }
 
     fn decode_curried_arg(
         &self,
@@ -47,6 +53,14 @@ impl ClvmDecoder for Allocator {
             Ok((first, rest))
         } else {
             Err(FromClvmError::ExpectedPair)
+        }
+    }
+
+    fn decode_bigint(&self, node: &Self::Node) -> Result<BigInt, FromClvmError> {
+        if let SExp::Atom = self.sexp(*node) {
+            Ok(self.number(*node))
+        } else {
+            Err(FromClvmError::ExpectedAtom)
         }
     }
 }

@@ -1,8 +1,8 @@
 use std::{rc::Rc, sync::Arc};
 
-use num_bigint::{BigInt, Sign};
+use num_bigint::BigInt;
 
-use crate::{ClvmDecoder, FromClvmError};
+use crate::{decode_number, ClvmDecoder, FromClvmError};
 
 pub trait FromClvm<D>: Sized
 where
@@ -12,50 +12,45 @@ where
 }
 
 macro_rules! clvm_primitive {
-    ($primitive:ty) => {
+    ($primitive:ty, $signed:expr) => {
         impl<N, D: ClvmDecoder<Node = N>> FromClvm<D> for $primitive {
             fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
                 const LEN: usize = std::mem::size_of::<$primitive>();
 
-                let bytes = decoder.decode_atom(&node)?;
-                let number = BigInt::from_signed_bytes_be(bytes.as_ref());
-                let (sign, mut vec) = number.to_bytes_be();
+                let atom = decoder.decode_atom(&node)?;
+                let slice = atom.as_ref();
 
-                if vec.len() < std::mem::size_of::<$primitive>() {
-                    let mut zeros = vec![0; LEN - vec.len()];
-                    zeros.extend(vec);
-                    vec = zeros;
-                }
-
-                let value = <$primitive>::from_be_bytes(vec.as_slice().try_into().or(Err(
-                    FromClvmError::WrongAtomLength {
+                let Some(bytes) = decode_number(slice, $signed) else {
+                    return Err(FromClvmError::WrongAtomLength {
                         expected: LEN,
-                        found: bytes.as_ref().len(),
-                    },
-                ))?);
+                        found: slice.len(),
+                    });
+                };
 
-                Ok(if sign == Sign::Minus {
-                    value.wrapping_neg()
-                } else {
-                    value
-                })
+                Ok(<$primitive>::from_be_bytes(bytes))
             }
         }
     };
 }
 
-clvm_primitive!(u8);
-clvm_primitive!(i8);
-clvm_primitive!(u16);
-clvm_primitive!(i16);
-clvm_primitive!(u32);
-clvm_primitive!(i32);
-clvm_primitive!(u64);
-clvm_primitive!(i64);
-clvm_primitive!(u128);
-clvm_primitive!(i128);
-clvm_primitive!(usize);
-clvm_primitive!(isize);
+clvm_primitive!(u8, false);
+clvm_primitive!(i8, true);
+clvm_primitive!(u16, false);
+clvm_primitive!(i16, true);
+clvm_primitive!(u32, false);
+clvm_primitive!(i32, true);
+clvm_primitive!(u64, false);
+clvm_primitive!(i64, true);
+clvm_primitive!(u128, false);
+clvm_primitive!(i128, true);
+clvm_primitive!(usize, false);
+clvm_primitive!(isize, true);
+
+impl<N, D: ClvmDecoder<Node = N>> FromClvm<D> for BigInt {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
+        decoder.decode_bigint(&node)
+    }
+}
 
 impl<N, D: ClvmDecoder<Node = N>> FromClvm<D> for bool {
     fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
