@@ -11,7 +11,6 @@ use crate::npc_result::get_name_puzzle_conditions;
 use chia_bls::BlsCache;
 use chia_protocol::SpendBundle;
 use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV};
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 // currently in mempool_manager.py
@@ -109,6 +108,7 @@ mod tests {
     use clvm_utils::tree_hash_atom;
     use hex::FromHex;
     use hex_literal::hex;
+    use std::sync::Arc;
 
     #[test]
     fn test_validate_no_pks() {
