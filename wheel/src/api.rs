@@ -12,7 +12,9 @@ use chia_consensus::gen::solution_generator::solution_generator as native_soluti
 use chia_consensus::gen::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
 use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
-use chia_consensus::spendbundle_validation::{get_flags_for_height_and_constants, validate_clvm_and_signature};
+use chia_consensus::spendbundle_validation::{
+    get_flags_for_height_and_constants, validate_clvm_and_signature,
+};
 
 use chia_consensus::npc_result::get_conditions_from_spendbundle;
 use chia_protocol::{
@@ -416,7 +418,10 @@ pub fn py_get_conditions_from_spendbundle(
 
 #[pyfunction]
 #[pyo3(name = "get_flags_for_height_and_constants")]
-pub fn py_get_flags_for_height_and_constants(height: u32, constants: &ConsensusConstants) -> PyResult<u32> {
+pub fn py_get_flags_for_height_and_constants(
+    height: u32,
+    constants: &ConsensusConstants,
+) -> PyResult<u32> {
     let flags = get_flags_for_height_and_constants(height, constants);
     Ok(flags)
 }

@@ -82,8 +82,11 @@ pub fn u64_to_bytes(val: u64) -> Bytes {
 mod tests {
     use super::*;
     use crate::allocator::make_allocator;
+    use crate::consensus_constants::TEST_CONSTANTS;
     use clvmr::chia_dialect::LIMIT_HEAP;
     use clvmr::Allocator;
+    use hex_literal::hex;
+    use rstest::rstest;
 
     #[test]
     fn test_validate_u64() {
@@ -96,5 +99,96 @@ mod tests {
             let ptr = a.new_number(v.into()).expect("valid u64");
             assert_eq!(a.atom(ptr).as_ref(), u64_to_bytes(v).as_slice());
         }
+    }
+
+    #[rstest]
+    #[case(AGG_SIG_PARENT, b"parent_message", hex!("4444444444444444444444444444444444444444444444444444444444444444").into(), hex!("3333333333333333333333333333333333333333333333333333333333333333").into(), 10000)]
+    #[case(AGG_SIG_PUZZLE, b"puzzle_message", hex!("4444444444444444444444444444444444444444444444444444444444444444").into(), hex!("3333333333333333333333333333333333333333333333333333333333333333").into(), 261)]
+    #[case(AGG_SIG_AMOUNT, b"amount_message", hex!("4444444444444444444444444444444444444444444444444444444444444444").into(), hex!("3333333333333333333333333333333333333333333333333333333333333333").into(), 100000000005)]
+    #[case(AGG_SIG_PUZZLE_AMOUNT, b"puzzle_amount_message", hex!("4444444444444444444444444444444444444444444444444444444444444444").into(), hex!("3333333333333333333333333333333333333333333333333333333333333333").into(), 410)]
+    #[case(AGG_SIG_PARENT_AMOUNT, b"parent_amount_message", hex!("4444444444444444444444444444444444444444444444444444444444444444").into(), hex!("3333333333333333333333333333333333333333333333333333333333333333").into(), 909)]
+    #[case(AGG_SIG_PARENT_PUZZLE, b"parent_puzzle_message", hex!("4444444444444444444444444444444444444444444444444444444444444444").into(), hex!("3333333333333333333333333333333333333333333333333333333333333333").into(), 10061997)]
+    #[case(AGG_SIG_ME, b"me_message", hex!("4444444444444444444444444444444444444444444444444444444444444444").into(), hex!("3333333333333333333333333333333333333333333333333333333333333333").into(), 1303)]
+    fn test_make_aggsig_final_message(
+        #[case] opcode: ConditionOpcode,
+        #[case] msg: &[u8],
+        #[case] parent_id: Vec<u8>,
+        #[case] puzzle_hash: Vec<u8>,
+        #[case] coin_amount: u64,
+    ) {
+        use std::sync::Arc;
+
+        use chia_protocol::Bytes32;
+
+        use crate::r#gen::conditions::Spend;
+
+        let mut expected_result = Vec::new();
+        expected_result.extend(msg);
+
+        let coin = Coin::new(
+            Bytes32::try_from(parent_id.clone()).expect("test should pass"),
+            Bytes32::try_from(puzzle_hash.clone()).expect("test should pass"),
+            coin_amount,
+        );
+
+        match opcode {
+            AGG_SIG_PARENT => {
+                expected_result.extend(parent_id.as_slice());
+                expected_result.extend(TEST_CONSTANTS.agg_sig_parent_additional_data.as_slice());
+            }
+            AGG_SIG_PUZZLE => {
+                expected_result.extend(puzzle_hash.as_slice());
+                expected_result.extend(TEST_CONSTANTS.agg_sig_puzzle_additional_data.as_slice());
+            }
+            AGG_SIG_AMOUNT => {
+                expected_result.extend(u64_to_bytes(coin_amount).as_slice());
+                expected_result.extend(TEST_CONSTANTS.agg_sig_amount_additional_data.as_slice());
+            }
+            AGG_SIG_PUZZLE_AMOUNT => {
+                expected_result.extend(puzzle_hash.as_slice());
+                expected_result.extend(u64_to_bytes(coin_amount).as_slice());
+                expected_result.extend(
+                    TEST_CONSTANTS
+                        .agg_sig_puzzle_amount_additional_data
+                        .as_slice(),
+                );
+            }
+            AGG_SIG_PARENT_AMOUNT => {
+                expected_result.extend(parent_id.as_slice());
+                expected_result.extend(u64_to_bytes(coin_amount).as_slice());
+                expected_result.extend(
+                    TEST_CONSTANTS
+                        .agg_sig_parent_amount_additional_data
+                        .as_slice(),
+                );
+            }
+            AGG_SIG_PARENT_PUZZLE => {
+                expected_result.extend(parent_id.as_slice());
+                expected_result.extend(puzzle_hash.as_slice());
+                expected_result.extend(
+                    TEST_CONSTANTS
+                        .agg_sig_parent_puzzle_additional_data
+                        .as_slice(),
+                );
+            }
+            AGG_SIG_ME => {
+                expected_result.extend(coin.coin_id().as_slice());
+                expected_result.extend(TEST_CONSTANTS.agg_sig_me_additional_data.as_slice());
+            }
+            _ => {}
+        };
+        let mut a: Allocator = make_allocator(LIMIT_HEAP);
+        let spend = Spend::new(
+            a.new_atom(parent_id.as_slice()).expect("should pass"),
+            coin_amount,
+            a.new_atom(puzzle_hash.as_slice())
+                .expect("test should pass"),
+            Arc::new(Bytes32::try_from(coin.coin_id()).expect("test should pass")),
+        );
+
+        let spend = OwnedSpend::from(&mut a, spend);
+
+        let result = make_aggsig_final_message(opcode, msg, &spend, &TEST_CONSTANTS);
+        assert_eq!(result, expected_result);
     }
 }
