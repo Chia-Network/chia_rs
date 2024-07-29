@@ -18,7 +18,7 @@ use clvmr::run_program::run_program;
 use clvmr::serde::node_from_bytes;
 use std::collections::{HashMap, HashSet};
 
-pub fn get_name_puzzle_conditions(
+pub fn get_conditions_from_spendbundle(
     spend_bundle: &SpendBundle,
     max_cost: u64,
     mempool_mode: bool,

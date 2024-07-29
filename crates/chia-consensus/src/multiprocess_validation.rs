@@ -7,7 +7,7 @@ use crate::gen::opcodes::{
 };
 use crate::gen::owned_conditions::OwnedSpendBundleConditions;
 use crate::gen::validation_error::ErrorCode;
-use crate::npc_result::get_name_puzzle_conditions;
+use crate::npc_result::get_conditions_from_spendbundle;
 use chia_bls::BlsCache;
 use chia_protocol::SpendBundle;
 use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV};
@@ -24,8 +24,9 @@ pub fn validate_clvm_and_signature(
     cache: &BlsCache,
 ) -> Result<(OwnedSpendBundleConditions, Duration), ErrorCode> {
     let start_time = Instant::now();
-    let npcresult = get_name_puzzle_conditions(spend_bundle, max_cost, true, height, constants)
-        .map_err(|e| e.1)?;
+    let npcresult =
+        get_conditions_from_spendbundle(spend_bundle, max_cost, true, height, constants)
+            .map_err(|e| e.1)?;
     let iter = npcresult.spends.iter().flat_map(|spend| {
         let condition_items_pairs = [
             (AGG_SIG_PARENT, &spend.agg_sig_parent),

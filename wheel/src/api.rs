@@ -14,7 +14,7 @@ use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_i
 use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
 use chia_consensus::multiprocess_validation::validate_clvm_and_signature;
 
-use chia_consensus::npc_result::get_name_puzzle_conditions;
+use chia_consensus::npc_result::get_conditions_from_spendbundle;
 use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
     CoinSpend, CoinState, CoinStateFilters, CoinStateUpdate, EndOfSubSlotBundle, Foliage,
@@ -398,19 +398,20 @@ pub fn py_validate_clvm_and_signature(
 }
 
 #[pyfunction]
-#[pyo3(name = "get_name_puzzle_conditions")]
-pub fn py_get_name_puzzle_conditions(
+#[pyo3(name = "get_conditions_from_spendbundle")]
+pub fn py_get_conditions_from_spendbundle(
     spend_bundle: &SpendBundle,
     max_cost: u64,
     constants: &ConsensusConstants,
     mempool_mode: bool,
     height: u32,
 ) -> PyResult<OwnedSpendBundleConditions> {
-    let osbc = get_name_puzzle_conditions(spend_bundle, max_cost, mempool_mode, height, constants)
-        .map_err(|e| {
-            let error_code: u32 = e.1.into();
-            PyErr::new::<PyTypeError, _>(error_code)
-        })?;
+    let osbc =
+        get_conditions_from_spendbundle(spend_bundle, max_cost, mempool_mode, height, constants)
+            .map_err(|e| {
+                let error_code: u32 = e.1.into();
+                PyErr::new::<PyTypeError, _>(error_code)
+            })?;
     Ok(osbc)
 }
 
@@ -445,7 +446,7 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // multithread validattion
     m.add_function(wrap_pyfunction!(py_validate_clvm_and_signature, m)?)?;
-    m.add_function(wrap_pyfunction!(py_get_name_puzzle_conditions, m)?)?;
+    m.add_function(wrap_pyfunction!(py_get_conditions_from_spendbundle, m)?)?;
 
     // clvm functions
     m.add("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;
