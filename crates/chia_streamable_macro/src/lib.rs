@@ -106,6 +106,7 @@ pub fn streamable(attr: TokenStream, item: TokenStream) -> TokenStream {
             )]
             #main_derives
             #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+            #[cfg_attr(feature = "serde", derive(serde::Serialize))]
         }
     } else {
         main_derives

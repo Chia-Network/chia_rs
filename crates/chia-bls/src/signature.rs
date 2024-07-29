@@ -28,6 +28,16 @@ impl<'a> arbitrary::Arbitrary<'a> for Signature {
     }
 }
 
+#[cfg(feature = "serde")]
+impl serde::Serialize for Signature {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        serializer.serialize_str(&hex::encode(self.to_bytes()))
+    }
+}
+
 impl Signature {
     pub fn from_bytes_unchecked(buf: &[u8; 96]) -> Result<Self> {
         let p2 = unsafe {

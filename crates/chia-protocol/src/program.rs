@@ -16,6 +16,7 @@ use std::io::Cursor;
 use std::ops::Deref;
 
 #[cfg_attr(feature = "py-bindings", pyclass, derive(PyStreamable))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Program(Bytes);
 

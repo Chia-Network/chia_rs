@@ -323,6 +323,7 @@ dependencies = [
  "pyo3",
  "rand",
  "rstest",
+ "serde",
  "sha2",
  "thiserror",
 ]
@@ -404,6 +405,7 @@ dependencies = [
  "hex",
  "pyo3",
  "rstest",
+ "serde",
  "sha2",
 ]
 
