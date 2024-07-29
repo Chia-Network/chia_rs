@@ -21,14 +21,12 @@ use std::collections::{HashMap, HashSet};
 pub fn get_conditions_from_spendbundle(
     spend_bundle: &SpendBundle,
     max_cost: u64,
-    mempool_mode: bool,
     height: u32,
     constants: &ConsensusConstants,
 ) -> Result<OwnedSpendBundleConditions, ValidationErr> {
     let mut flags = get_flags_for_height_and_constants(height, constants);
-    if mempool_mode {
-        flags |= MEMPOOL_MODE;
-    };
+    flags |= MEMPOOL_MODE;
+
     // below is an adapted version of the code from run_block_generators::run_block_generator2()
     // it assumes no block references are passed in
     let mut cost_left = max_cost;

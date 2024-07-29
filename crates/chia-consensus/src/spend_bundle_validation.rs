@@ -24,9 +24,8 @@ pub fn validate_clvm_and_signature(
     cache: &BlsCache,
 ) -> Result<(OwnedSpendBundleConditions, Duration), ErrorCode> {
     let start_time = Instant::now();
-    let npcresult =
-        get_conditions_from_spendbundle(spend_bundle, max_cost, true, height, constants)
-            .map_err(|e| e.1)?;
+    let npcresult = get_conditions_from_spendbundle(spend_bundle, max_cost, height, constants)
+        .map_err(|e| e.1)?;
     let iter = npcresult.spends.iter().flat_map(|spend| {
         let condition_items_pairs = [
             (AGG_SIG_PARENT, &spend.agg_sig_parent),

@@ -61,7 +61,6 @@ def get_conditions_from_spendbundle(
     spend_bundle: SpendBundle,
     max_cost: int,
     constants: ConsensusConstants,
-    mempool_mode: bool,
     height: int,
 ) -> SpendBundleConditions: ...
 

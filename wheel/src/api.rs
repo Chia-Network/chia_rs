@@ -403,15 +403,14 @@ pub fn py_get_conditions_from_spendbundle(
     spend_bundle: &SpendBundle,
     max_cost: u64,
     constants: &ConsensusConstants,
-    mempool_mode: bool,
     height: u32,
 ) -> PyResult<OwnedSpendBundleConditions> {
-    let osbc =
-        get_conditions_from_spendbundle(spend_bundle, max_cost, mempool_mode, height, constants)
-            .map_err(|e| {
-                let error_code: u32 = e.1.into();
-                PyErr::new::<PyTypeError, _>(error_code)
-            })?;
+    let osbc = get_conditions_from_spendbundle(spend_bundle, max_cost, height, constants).map_err(
+        |e| {
+            let error_code: u32 = e.1.into();
+            PyErr::new::<PyTypeError, _>(error_code)
+        },
+    )?;
     Ok(osbc)
 }
 
