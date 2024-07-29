@@ -1,29 +1,24 @@
 use std::{rc::Rc, sync::Arc};
 
+use clvmr::Atom;
 use num_bigint::BigInt;
 
-use crate::{ClvmEncoder, ToClvmError};
+use crate::{encode_number, ClvmEncoder, ToClvmError};
 
-pub trait ToClvm<N> {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError>;
-}
-
-pub fn simplify_int_bytes(mut slice: &[u8]) -> &[u8] {
-    while (!slice.is_empty()) && (slice[0] == 0) {
-        if slice.len() > 1 && (slice[1] & 0x80 == 0x80) {
-            break;
-        }
-        slice = &slice[1..];
-    }
-    slice
+pub trait ToClvm<E>
+where
+    E: ClvmEncoder,
+{
+    fn to_clvm(&self, encoder: &mut E) -> Result<E::Node, ToClvmError>;
 }
 
 macro_rules! clvm_primitive {
     ($primitive:ty) => {
-        impl<N> ToClvm<N> for $primitive {
-            fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
-                let number = BigInt::from(*self);
-                encoder.encode_atom(simplify_int_bytes(&number.to_signed_bytes_be()))
+        impl<N, E: ClvmEncoder<Node = N>> ToClvm<E> for $primitive {
+            fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
+                let bytes = self.to_be_bytes();
+                #[allow(unused_comparisons)]
+                encoder.encode_atom(Atom::Borrowed(&encode_number(&bytes, *self < 0)))
             }
         }
     };
@@ -42,72 +37,78 @@ clvm_primitive!(i128);
 clvm_primitive!(usize);
 clvm_primitive!(isize);
 
-impl<N> ToClvm<N> for bool {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+impl<N, E: ClvmEncoder<Node = N>> ToClvm<E> for BigInt {
+    fn to_clvm(&self, encoder: &mut E) -> Result<<E as ClvmEncoder>::Node, ToClvmError> {
+        encoder.encode_bigint(self.clone())
+    }
+}
+
+impl<N, E: ClvmEncoder<Node = N>> ToClvm<E> for bool {
+    fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
         i32::from(*self).to_clvm(encoder)
     }
 }
 
-impl<N, T> ToClvm<N> for &T
+impl<N, E: ClvmEncoder<Node = N>, T> ToClvm<E> for &T
 where
-    T: ToClvm<N>,
+    T: ToClvm<E>,
 {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+    fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
         T::to_clvm(*self, encoder)
     }
 }
 
-impl<N, T> ToClvm<N> for Box<T>
+impl<N, E: ClvmEncoder<Node = N>, T> ToClvm<E> for Box<T>
 where
-    T: ToClvm<N>,
+    T: ToClvm<E>,
 {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+    fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
         T::to_clvm(self, encoder)
     }
 }
 
-impl<N, T> ToClvm<N> for Rc<T>
+impl<N, E: ClvmEncoder<Node = N>, T> ToClvm<E> for Rc<T>
 where
-    T: ToClvm<N>,
+    T: ToClvm<E>,
 {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+    fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
         T::to_clvm(self, encoder)
     }
 }
 
-impl<N, T> ToClvm<N> for Arc<T>
+impl<N, E: ClvmEncoder<Node = N>, T> ToClvm<E> for Arc<T>
 where
-    T: ToClvm<N>,
+    T: ToClvm<E>,
 {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+    fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
         T::to_clvm(self, encoder)
     }
 }
 
-impl<N, A, B> ToClvm<N> for (A, B)
+impl<N, E: ClvmEncoder<Node = N>, A, B> ToClvm<E> for (A, B)
 where
-    A: ToClvm<N>,
-    B: ToClvm<N>,
+    A: ToClvm<E>,
+    B: ToClvm<E>,
 {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+    fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
         let first = self.0.to_clvm(encoder)?;
         let rest = self.1.to_clvm(encoder)?;
         encoder.encode_pair(first, rest)
     }
 }
 
-impl<N> ToClvm<N> for () {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
-        encoder.encode_atom(&[])
+impl<N, E: ClvmEncoder<Node = N>> ToClvm<E> for () {
+    fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
+        encoder.encode_atom(Atom::Borrowed(&[]))
     }
 }
 
-impl<N, T> ToClvm<N> for &[T]
+impl<N, E: ClvmEncoder<Node = N>, T> ToClvm<E> for &[T]
 where
-    T: ToClvm<N>,
+    T: ToClvm<E>,
 {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
-        let mut result = encoder.encode_atom(&[])?;
+    fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
+        let mut result = encoder.encode_atom(Atom::Borrowed(&[]))?;
         for item in self.iter().rev() {
             let value = item.to_clvm(encoder)?;
             result = encoder.encode_pair(value, result)?;
@@ -116,72 +117,72 @@ where
     }
 }
 
-impl<N, T, const LEN: usize> ToClvm<N> for [T; LEN]
+impl<N, E: ClvmEncoder<Node = N>, T, const LEN: usize> ToClvm<E> for [T; LEN]
 where
-    T: ToClvm<N>,
+    T: ToClvm<E>,
 {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+    fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
         self.as_slice().to_clvm(encoder)
     }
 }
 
-impl<N, T> ToClvm<N> for Vec<T>
+impl<N, E: ClvmEncoder<Node = N>, T> ToClvm<E> for Vec<T>
 where
-    T: ToClvm<N>,
+    T: ToClvm<E>,
 {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+    fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
         self.as_slice().to_clvm(encoder)
     }
 }
 
-impl<N, T> ToClvm<N> for Option<T>
+impl<N, E: ClvmEncoder<Node = N>, T> ToClvm<E> for Option<T>
 where
-    T: ToClvm<N>,
+    T: ToClvm<E>,
 {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+    fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
         match self {
             Some(value) => value.to_clvm(encoder),
-            None => encoder.encode_atom(&[]),
+            None => encoder.encode_atom(Atom::Borrowed(&[])),
         }
     }
 }
 
-impl<N> ToClvm<N> for &str {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
-        encoder.encode_atom(self.as_bytes())
+impl<N, E: ClvmEncoder<Node = N>> ToClvm<E> for &str {
+    fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
+        encoder.encode_atom(Atom::Borrowed(self.as_bytes()))
     }
 }
 
-impl<N> ToClvm<N> for String {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+impl<N, E: ClvmEncoder<Node = N>> ToClvm<E> for String {
+    fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
         self.as_str().to_clvm(encoder)
     }
 }
 
 #[cfg(feature = "chia-bls")]
-impl<N> ToClvm<N> for chia_bls::PublicKey {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
-        encoder.encode_atom(&self.to_bytes())
+impl<N, E: ClvmEncoder<Node = N>> ToClvm<E> for chia_bls::PublicKey {
+    fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
+        encoder.encode_atom(Atom::Borrowed(&self.to_bytes()))
     }
 }
 
 #[cfg(feature = "chia-bls")]
-impl<N> ToClvm<N> for chia_bls::Signature {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
-        encoder.encode_atom(&self.to_bytes())
+impl<N, E: ClvmEncoder<Node = N>> ToClvm<E> for chia_bls::Signature {
+    fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
+        encoder.encode_atom(Atom::Borrowed(&self.to_bytes()))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use clvmr::{serde::node_to_bytes, Allocator, NodePtr};
+    use clvmr::{serde::node_to_bytes, Allocator};
     use hex::ToHex;
 
     use super::*;
 
     fn encode<T>(a: &mut Allocator, value: T) -> Result<String, ToClvmError>
     where
-        T: ToClvm<NodePtr>,
+        T: ToClvm<Allocator>,
     {
         let actual = value.to_clvm(a)?;
         let actual_bytes = node_to_bytes(a, actual).unwrap();

@@ -13,6 +13,7 @@ mod clvm_decoder;
 mod clvm_encoder;
 mod error;
 mod from_clvm;
+mod int_encoding;
 mod macros;
 mod match_byte;
 mod to_clvm;
@@ -22,9 +23,12 @@ pub use clvm_decoder::*;
 pub use clvm_encoder::*;
 pub use error::*;
 pub use from_clvm::*;
+pub use int_encoding::*;
 pub use match_byte::*;
 pub use to_clvm::*;
 pub use wrappers::*;
+
+pub use clvmr::Atom;
 
 #[cfg(test)]
 #[cfg(feature = "derive")]
@@ -35,11 +39,11 @@ mod derive_tests {
 
     use std::fmt::Debug;
 
-    use clvmr::{serde::node_to_bytes, Allocator, NodePtr};
+    use clvmr::{serde::node_to_bytes, Allocator};
 
     fn check<T>(value: &T, expected: &str)
     where
-        T: Debug + PartialEq + ToClvm<NodePtr> + FromClvm<NodePtr>,
+        T: Debug + PartialEq + ToClvm<Allocator> + FromClvm<Allocator>,
     {
         let a = &mut Allocator::new();
 
@@ -54,8 +58,8 @@ mod derive_tests {
 
     fn coerce_into<A, B>(value: A) -> B
     where
-        A: ToClvm<NodePtr>,
-        B: FromClvm<NodePtr>,
+        A: ToClvm<Allocator>,
+        B: FromClvm<Allocator>,
     {
         let a = &mut Allocator::new();
         let ptr = value.to_clvm(a).unwrap();

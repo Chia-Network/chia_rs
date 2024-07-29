@@ -260,7 +260,7 @@ pub const CAT_PUZZLE_HASH_V1: TreeHash = TreeHash::new(hex!(
 
 #[cfg(test)]
 mod tests {
-    use clvm_traits::ToNodePtr;
+    use clvm_traits::ToClvm;
     use clvm_utils::tree_hash;
     use clvmr::{serde::node_from_bytes, Allocator};
 
@@ -298,7 +298,7 @@ mod tests {
                 },
             ),
         }
-        .to_node_ptr(&mut a)
+        .to_clvm(&mut a)
         .unwrap();
 
         let allocated_tree_hash = hex::encode(tree_hash(&a, curried_ptr));
@@ -320,7 +320,7 @@ mod tests {
             program: mod_ptr,
             args: EverythingWithSignatureTailArgs::new(public_key),
         }
-        .to_node_ptr(&mut a)
+        .to_clvm(&mut a)
         .unwrap();
 
         let allocated_tree_hash = hex::encode(tree_hash(&a, curried_ptr));
@@ -341,7 +341,7 @@ mod tests {
             program: mod_ptr,
             args: GenesisByCoinIdTailArgs::new(genesis_coin_id),
         }
-        .to_node_ptr(&mut a)
+        .to_clvm(&mut a)
         .unwrap();
 
         let allocated_tree_hash = hex::encode(tree_hash(&a, curried_ptr));

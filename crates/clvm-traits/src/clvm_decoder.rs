@@ -1,4 +1,5 @@
 use clvmr::{allocator::SExp, Allocator, Atom, NodePtr};
+use num_bigint::BigInt;
 
 use crate::{
     destructure_list, destructure_quote, match_list, match_quote, FromClvm, FromClvmError,
@@ -6,10 +7,15 @@ use crate::{
 };
 
 pub trait ClvmDecoder: Sized {
-    type Node: Clone + FromClvm<Self::Node>;
+    type Node: Clone + FromClvm<Self>;
 
     fn decode_atom(&self, node: &Self::Node) -> Result<Atom<'_>, FromClvmError>;
     fn decode_pair(&self, node: &Self::Node) -> Result<(Self::Node, Self::Node), FromClvmError>;
+
+    fn decode_bigint(&self, node: &Self::Node) -> Result<BigInt, FromClvmError> {
+        let atom = self.decode_atom(node)?;
+        Ok(BigInt::from_signed_bytes_be(atom.as_ref()))
+    }
 
     fn decode_curried_arg(
         &self,
@@ -49,31 +55,18 @@ impl ClvmDecoder for Allocator {
             Err(FromClvmError::ExpectedPair)
         }
     }
-}
 
-pub trait FromNodePtr {
-    fn from_node_ptr(a: &Allocator, node: NodePtr) -> Result<Self, FromClvmError>
-    where
-        Self: Sized;
-}
-
-impl<T> FromNodePtr for T
-where
-    T: FromClvm<NodePtr>,
-{
-    fn from_node_ptr(a: &Allocator, node: NodePtr) -> Result<Self, FromClvmError>
-    where
-        Self: Sized,
-    {
-        T::from_clvm(a, node)
+    fn decode_bigint(&self, node: &Self::Node) -> Result<BigInt, FromClvmError> {
+        if let SExp::Atom = self.sexp(*node) {
+            Ok(self.number(*node))
+        } else {
+            Err(FromClvmError::ExpectedAtom)
+        }
     }
 }
 
-impl FromClvm<NodePtr> for NodePtr {
-    fn from_clvm(
-        _decoder: &impl ClvmDecoder<Node = NodePtr>,
-        node: NodePtr,
-    ) -> Result<Self, FromClvmError> {
+impl FromClvm<Allocator> for NodePtr {
+    fn from_clvm(_decoder: &Allocator, node: NodePtr) -> Result<Self, FromClvmError> {
         Ok(node)
     }
 }

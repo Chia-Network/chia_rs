@@ -77,7 +77,7 @@ pub const DEFAULT_HIDDEN_PUZZLE_HASH: TreeHash = TreeHash::new(hex!(
 
 #[cfg(test)]
 mod tests {
-    use clvm_traits::ToNodePtr;
+    use clvm_traits::ToClvm;
     use clvm_utils::tree_hash;
     use clvmr::{serde::node_from_bytes, Allocator};
 
@@ -102,7 +102,7 @@ mod tests {
             program: mod_ptr,
             args: StandardArgs::new(synthetic_key),
         }
-        .to_node_ptr(&mut a)
+        .to_clvm(&mut a)
         .unwrap();
 
         let allocated_tree_hash = hex::encode(tree_hash(&a, curried_ptr));

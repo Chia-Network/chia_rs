@@ -650,6 +650,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "clvm-traits-fuzz"
+version = "0.0.0"
+dependencies = [
+ "clvm-traits",
+ "clvmr",
+ "libfuzzer-sys",
+]
+
+[[package]]
 name = "clvm-utils"
 version = "0.10.0"
 dependencies = [

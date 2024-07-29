@@ -55,14 +55,14 @@ impl Coin {
     }
 }
 
-impl<N> ToClvm<N> for Coin {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+impl<N, E: ClvmEncoder<Node = N>> ToClvm<E> for Coin {
+    fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
         clvm_list!(self.parent_coin_info, self.puzzle_hash, self.amount).to_clvm(encoder)
     }
 }
 
-impl<N> FromClvm<N> for Coin {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+impl<N, D: ClvmDecoder<Node = N>> FromClvm<D> for Coin {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
         let destructure_list!(parent_coin_info, puzzle_hash, amount) =
             <match_list!(BytesImpl<32>, BytesImpl<32>, u64)>::from_clvm(decoder, node)?;
         Ok(Coin {
