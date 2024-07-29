@@ -15,24 +15,6 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 // currently in mempool_manager.py
-// called in full_node.py when adding a transaction
-pub fn pre_validate_spendbundle(
-    new_spend: &SpendBundle,
-    max_cost: u64,
-    constants: &ConsensusConstants,
-    peak_height: u32,
-    cache: &Arc<BlsCache>,
-) -> Result<OwnedSpendBundleConditions, ErrorCode> {
-    if new_spend.coin_spends.is_empty() {
-        Err(ErrorCode::InvalidSpendBundle)
-    } else {
-        let (result, _duration) =
-            validate_clvm_and_signature(new_spend, max_cost, constants, peak_height, cache)?;
-        Ok(result)
-    }
-}
-
-// currently in mempool_manager.py
 // called in threads from pre_validate_spend_bundle()
 // returns (error, cached_results, new_cache_entries, duration)
 pub fn validate_clvm_and_signature(
