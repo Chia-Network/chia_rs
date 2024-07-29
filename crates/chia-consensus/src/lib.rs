@@ -8,5 +8,5 @@ pub mod gen;
 pub mod generator_rom;
 pub mod merkle_set;
 pub mod merkle_tree;
-pub mod multiprocess_validation;
+pub mod spend_bundle_validation;
 pub mod npc_result;

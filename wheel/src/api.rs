@@ -12,7 +12,7 @@ use chia_consensus::gen::solution_generator::solution_generator as native_soluti
 use chia_consensus::gen::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
 use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
-use chia_consensus::multiprocess_validation::validate_clvm_and_signature;
+use chia_consensus::spend_bundle_validation::validate_clvm_and_signature;
 
 use chia_consensus::npc_result::get_conditions_from_spendbundle;
 use chia_protocol::{
