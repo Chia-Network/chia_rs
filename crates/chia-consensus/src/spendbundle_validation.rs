@@ -7,7 +7,7 @@ use crate::gen::opcodes::{
 };
 use crate::gen::owned_conditions::OwnedSpendBundleConditions;
 use crate::gen::validation_error::ErrorCode;
-use crate::npc_result::get_conditions_from_spendbundle;
+use crate::spendbundle_conditions::get_conditions_from_spendbundle;
 use chia_bls::BlsCache;
 use chia_protocol::SpendBundle;
 use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV};

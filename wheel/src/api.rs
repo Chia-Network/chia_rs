@@ -16,7 +16,7 @@ use chia_consensus::spendbundle_validation::{
     get_flags_for_height_and_constants, validate_clvm_and_signature,
 };
 
-use chia_consensus::npc_result::get_conditions_from_spendbundle;
+use chia_consensus::spendbundle_conditions::get_conditions_from_spendbundle;
 use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
     CoinSpend, CoinState, CoinStateFilters, CoinStateUpdate, EndOfSubSlotBundle, Foliage,
