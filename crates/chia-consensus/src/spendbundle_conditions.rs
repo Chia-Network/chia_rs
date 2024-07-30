@@ -24,8 +24,7 @@ pub fn get_conditions_from_spendbundle(
     height: u32,
     constants: &ConsensusConstants,
 ) -> Result<OwnedSpendBundleConditions, ValidationErr> {
-    let mut flags = get_flags_for_height_and_constants(height, constants);
-    flags |= MEMPOOL_MODE;
+    let flags = get_flags_for_height_and_constants(height, constants) | MEMPOOL_MODE;
 
     // below is an adapted version of the code from run_block_generators::run_block_generator2()
     // it assumes no block references are passed in
