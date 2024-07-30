@@ -22,6 +22,14 @@ pub struct BlsCache {
     cache: Mutex<LruCache<[u8; 32], GTElement>>,
 }
 
+impl Clone for BlsCache {
+    fn clone(&self) -> Self {
+        Self {
+            cache: Mutex::new(self.cache.lock().clone()),
+        }
+    }
+}
+
 impl Default for BlsCache {
     fn default() -> Self {
         Self::new(NonZeroUsize::new(50000).unwrap())

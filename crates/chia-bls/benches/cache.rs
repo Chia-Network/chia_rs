@@ -23,45 +23,50 @@ fn cache_benchmark(c: &mut Criterion) {
         pks.push(pk);
     }
 
+    let bls_cache = BlsCache::default();
     c.bench_function("bls_cache.aggregate_verify, 0% cache hits", |b| {
         b.iter(|| {
-            let bls_cache = BlsCache::default();
+            let bls_cache = bls_cache.clone();
             assert!(bls_cache.aggregate_verify(pks.iter().zip([&msg].iter().cycle()), &agg_sig));
         });
     });
 
     // populate 10% of keys
+    let bls_cache = BlsCache::default();
+    bls_cache.aggregate_verify(pks[0..100].iter().zip([&msg].iter().cycle()), &agg_sig);
     c.bench_function("bls_cache.aggregate_verify, 10% cache hits", |b| {
         b.iter(|| {
-            let bls_cache = BlsCache::default();
-            bls_cache.aggregate_verify(pks[0..100].iter().zip([&msg].iter().cycle()), &agg_sig);
+            let bls_cache = bls_cache.clone();
             assert!(bls_cache.aggregate_verify(pks.iter().zip([&msg].iter().cycle()), &agg_sig));
         });
     });
 
     // populate another 10% of keys
+    let bls_cache = BlsCache::default();
+    bls_cache.aggregate_verify(pks[0..200].iter().zip([&msg].iter().cycle()), &agg_sig);
     c.bench_function("bls_cache.aggregate_verify, 20% cache hits", |b| {
         b.iter(|| {
-            let bls_cache = BlsCache::default();
-            bls_cache.aggregate_verify(pks[0..200].iter().zip([&msg].iter().cycle()), &agg_sig);
+            let bls_cache = bls_cache.clone();
             assert!(bls_cache.aggregate_verify(pks.iter().zip([&msg].iter().cycle()), &agg_sig));
         });
     });
 
     // populate another 30% of keys
+    let bls_cache = BlsCache::default();
+    bls_cache.aggregate_verify(pks[0..500].iter().zip([&msg].iter().cycle()), &agg_sig);
     c.bench_function("bls_cache.aggregate_verify, 50% cache hits", |b| {
         b.iter(|| {
-            let bls_cache = BlsCache::default();
-            bls_cache.aggregate_verify(pks[0..500].iter().zip([&msg].iter().cycle()), &agg_sig);
+            let bls_cache = bls_cache.clone();
             assert!(bls_cache.aggregate_verify(pks.iter().zip([&msg].iter().cycle()), &agg_sig));
         });
     });
 
     // populate all other keys
+    let bls_cache = BlsCache::default();
+    bls_cache.aggregate_verify(pks[0..1000].iter().zip([&msg].iter().cycle()), &agg_sig);
     c.bench_function("bls_cache.aggregate_verify, 100% cache hits", |b| {
         b.iter(|| {
-            let bls_cache = BlsCache::default();
-            bls_cache.aggregate_verify(pks[0..1000].iter().zip([&msg].iter().cycle()), &agg_sig);
+            let bls_cache = bls_cache.clone();
             assert!(bls_cache.aggregate_verify(pks.iter().zip([&msg].iter().cycle()), &agg_sig));
         });
     });
