@@ -9,4 +9,4 @@ pub mod generator_rom;
 pub mod merkle_set;
 pub mod merkle_tree;
 pub mod spendbundle_conditions;
-pub mod multiprocess_validation;
+pub mod spendbundle_validation;

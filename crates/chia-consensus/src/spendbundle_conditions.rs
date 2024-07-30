@@ -7,7 +7,7 @@ use crate::gen::flags::MEMPOOL_MODE;
 use crate::gen::owned_conditions::OwnedSpendBundleConditions;
 use crate::gen::run_block_generator::subtract_cost;
 use crate::gen::validation_error::ValidationErr;
-use crate::multiprocess_validation::get_flags_for_height_and_constants;
+use crate::spendbundle_validation::get_flags_for_height_and_constants;
 use chia_protocol::SpendBundle;
 use clvm_utils::{tree_hash_cached, TreeHash};
 use clvmr::allocator::{Allocator, NodePtr};
