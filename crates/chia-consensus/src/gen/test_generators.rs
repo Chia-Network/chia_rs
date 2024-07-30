@@ -231,7 +231,7 @@ fn run_generator(#[case] name: &str) {
     for (flags, expected) in zip(&[DEFAULT_FLAGS, DEFAULT_FLAGS | MEMPOOL_MODE], expected) {
         println!("flags: {flags:x}");
         let mut a = make_allocator(*flags);
-        let conds = run_block_generator::<_, MempoolVisitor>(
+        let conds = run_block_generator::<_, MempoolVisitor, _>(
             &mut a,
             &generator,
             &block_refs,
@@ -246,7 +246,7 @@ fn run_generator(#[case] name: &str) {
         };
 
         let mut a = make_allocator(*flags);
-        let conds = run_block_generator2::<_, MempoolVisitor>(
+        let conds = run_block_generator2::<_, MempoolVisitor, _>(
             &mut a,
             &generator,
             &block_refs,

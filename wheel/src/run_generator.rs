@@ -45,9 +45,9 @@ pub fn run_block_generator(
         unsafe { std::slice::from_raw_parts(program.buf_ptr() as *const u8, program.len_bytes()) };
 
     let run_block = if (flags & ANALYZE_SPENDS) == 0 {
-        native_run_block_generator::<_, EmptyVisitor>
+        native_run_block_generator::<_, EmptyVisitor, _>
     } else {
-        native_run_block_generator::<_, MempoolVisitor>
+        native_run_block_generator::<_, MempoolVisitor, _>
     };
 
     Ok(
@@ -99,9 +99,9 @@ pub fn run_block_generator2(
         unsafe { std::slice::from_raw_parts(program.buf_ptr() as *const u8, program.len_bytes()) };
 
     let run_block = if (flags & ANALYZE_SPENDS) == 0 {
-        native_run_block_generator2::<_, EmptyVisitor>
+        native_run_block_generator2::<_, EmptyVisitor, _>
     } else {
-        native_run_block_generator2::<_, MempoolVisitor>
+        native_run_block_generator2::<_, MempoolVisitor, _>
     };
 
     Ok(

@@ -159,9 +159,9 @@ fn main() {
                 // after the hard fork, we run blocks without paying for the
                 // CLVM generator ROM
                 let block_runner = if height >= 5_496_000 {
-                    run_block_generator2::<_, EmptyVisitor>
+                    run_block_generator2::<_, EmptyVisitor, _>
                 } else {
-                    run_block_generator::<_, EmptyVisitor>
+                    run_block_generator::<_, EmptyVisitor, _>
                 };
 
                 let mut conditions =
@@ -181,7 +181,7 @@ fn main() {
                 }
 
                 if args.validate {
-                    let mut baseline = run_block_generator::<_, EmptyVisitor>(
+                    let mut baseline = run_block_generator::<_, EmptyVisitor, _>(
                         &mut a,
                         generator.as_ref(),
                         &block_refs,
