@@ -9,7 +9,6 @@ use tokio::{sync::Mutex, time::sleep};
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     env_logger::init();
-    // console_subscriber::init();
 
     log::info!("Generating certificate");
     let cert = ChiaCertificate::generate()?;
@@ -20,8 +19,8 @@ async fn main() -> anyhow::Result<()> {
         tls_connector,
         ClientOptions {
             network: Network::mainnet(),
-            target_peers: 500,
-            connection_concurrency: 200,
+            target_peers: 1000,
+            connection_concurrency: 50,
             node_type: NodeType::Wallet,
             capabilities: vec![
                 (1, "1".to_string()),
@@ -30,9 +29,9 @@ async fn main() -> anyhow::Result<()> {
             ],
             protocol_version: "0.0.34".parse()?,
             software_version: "0.0.0".to_string(),
-            connection_timeout: Duration::from_secs(3),
-            handshake_timeout: Duration::from_secs(2),
-            request_peers_timeout: Duration::from_secs(3),
+            connection_timeout: Duration::from_secs(5),
+            handshake_timeout: Duration::from_secs(5),
+            request_peers_timeout: Duration::from_secs(5),
         },
     );
 
