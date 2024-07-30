@@ -1,4 +1,4 @@
-use crate::run_generator::{run_block_generator, run_block_generator2};
+use crate::run_generator::{py_to_slice, run_block_generator, run_block_generator2};
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::gen::conditions::MempoolVisitor;
@@ -107,20 +107,15 @@ pub fn confirm_not_included_already_hashed(
 }
 
 #[pyfunction]
-pub fn tree_hash(py: Python<'_>, blob: PyBuffer<u8>) -> PyResult<Bound<'_, PyBytes>> {
-    assert!(
-        blob.is_c_contiguous(),
-        "tree_hash() must be called with a contiguous buffer"
-    );
-    let slice =
-        unsafe { std::slice::from_raw_parts(blob.buf_ptr() as *const u8, blob.len_bytes()) };
+pub fn tree_hash<'a>(py: Python<'a>, blob: PyBuffer<u8>) -> PyResult<Bound<'_, PyBytes>> {
+    let slice = py_to_slice::<'a>(blob);
     Ok(PyBytes::new_bound(py, &tree_hash_from_bytes(slice)?))
 }
 
 #[allow(clippy::too_many_arguments)]
 #[pyfunction]
-pub fn get_puzzle_and_solution_for_coin(
-    py: Python<'_>,
+pub fn get_puzzle_and_solution_for_coin<'a>(
+    py: Python<'a>,
     program: PyBuffer<u8>,
     args: PyBuffer<u8>,
     max_cost: Cost,
@@ -131,12 +126,8 @@ pub fn get_puzzle_and_solution_for_coin(
 ) -> PyResult<(Bound<'_, PyBytes>, Bound<'_, PyBytes>)> {
     let mut allocator = make_allocator(LIMIT_HEAP);
 
-    assert!(program.is_c_contiguous(), "program must be contiguous");
-    let program =
-        unsafe { std::slice::from_raw_parts(program.buf_ptr() as *const u8, program.len_bytes()) };
-
-    assert!(args.is_c_contiguous(), "args must be contiguous");
-    let args = unsafe { std::slice::from_raw_parts(args.buf_ptr() as *const u8, args.len_bytes()) };
+    let program = py_to_slice::<'a>(program);
+    let args = py_to_slice::<'a>(args);
 
     let deserialize = if (flags & ALLOW_BACKREFS) != 0 {
         node_from_bytes_backrefs
