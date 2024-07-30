@@ -122,7 +122,7 @@ mod tests {
 
         use crate::r#gen::conditions::Spend;
 
-        let mut expected_result = Vec::new();
+        let mut expected_result = Vec::<u8>::new();
         expected_result.extend(msg);
 
         let coin = Coin::new(

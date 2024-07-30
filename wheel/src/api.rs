@@ -16,7 +16,7 @@ use chia_consensus::spendbundle_validation::{
     get_flags_for_height_and_constants, validate_clvm_and_signature,
 };
 
-use chia_consensus::spendbundle_conditions::get_name_puzzle_conditions;
+use chia_consensus::spendbundle_conditions::get_conditions_from_spendbundle;
 use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
     CoinSpend, CoinState, CoinStateFilters, CoinStateUpdate, EndOfSubSlotBundle, Foliage,
@@ -400,14 +400,14 @@ pub fn py_validate_clvm_and_signature(
 }
 
 #[pyfunction]
-#[pyo3(name = "get_name_puzzle_conditions")]
-pub fn py_get_name_puzzle_conditions(
+#[pyo3(name = "get_conditions_from_spendbundle")]
+pub fn py_get_conditions_from_spendbundle(
     spend_bundle: &SpendBundle,
     max_cost: u64,
     constants: &ConsensusConstants,
     height: u32,
 ) -> PyResult<OwnedSpendBundleConditions> {
-    let osbc = get_name_puzzle_conditions(spend_bundle, max_cost, height, constants).map_err(
+    let osbc = get_conditions_from_spendbundle(spend_bundle, max_cost, height, constants).map_err(
         |e| {
             let error_code: u32 = e.1.into();
             PyErr::new::<PyTypeError, _>(error_code)
@@ -457,7 +457,7 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // multithread validattion
     m.add_function(wrap_pyfunction!(py_validate_clvm_and_signature, m)?)?;
-    m.add_function(wrap_pyfunction!(pyget_name_puzzle_conditions, m)?)?;
+    m.add_function(wrap_pyfunction!(py_get_conditions_from_spendbundle, m)?)?;
     m.add_function(wrap_pyfunction!(py_get_flags_for_height_and_constants, m)?)?;
 
     // clvm functions
