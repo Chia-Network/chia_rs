@@ -52,7 +52,6 @@ use std::iter::zip;
 
 use crate::run_program::{run_chia_program, serialized_length};
 
-use crate::adapt_response::eval_err_to_pyresult;
 use chia_consensus::fast_forward::fast_forward_singleton as native_ff;
 use chia_consensus::gen::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
 use chia_consensus::gen::validation_error::ValidationErr;
@@ -138,14 +137,19 @@ pub fn get_puzzle_and_solution_for_coin<'a>(
     let args = deserialize(&mut allocator, args)?;
     let dialect = &ChiaDialect::new(flags);
 
-    let r = py.allow_threads(|| -> Result<(NodePtr, NodePtr), EvalErr> {
-        let Reduction(_cost, result) =
-            run_program(&mut allocator, dialect, program, args, max_cost)?;
-        match parse_puzzle_solution(&allocator, result, find_parent, find_amount, find_ph) {
-            Err(ValidationErr(n, _)) => Err(EvalErr(n, "coin not found".to_string())),
-            Ok(pair) => Ok(pair),
-        }
-    });
+    let (puzzle, solution) = py
+        .allow_threads(|| -> Result<(NodePtr, NodePtr), EvalErr> {
+            let Reduction(_cost, result) =
+                run_program(&mut allocator, dialect, program, args, max_cost)?;
+            match parse_puzzle_solution(&allocator, result, find_parent, find_amount, find_ph) {
+                Err(ValidationErr(n, _)) => Err(EvalErr(n, "coin not found".to_string())),
+                Ok(pair) => Ok(pair),
+            }
+        })
+        .map_err(|e| {
+            let blob = node_to_bytes(&allocator, e.0).ok().map(hex::encode);
+            PyValueError::new_err((e.1, blob))
+        })?;
 
     // keep serializing normally, until wallets support backrefs
     let serialize = node_to_bytes;
@@ -156,13 +160,10 @@ pub fn get_puzzle_and_solution_for_coin<'a>(
             node_to_bytes
         };
     */
-    match r {
-        Err(eval_err) => eval_err_to_pyresult(eval_err, &allocator),
-        Ok((puzzle, solution)) => Ok((
-            PyBytes::new_bound(py, &serialize(&allocator, puzzle)?),
-            PyBytes::new_bound(py, &serialize(&allocator, solution)?),
-        )),
-    }
+    Ok((
+        PyBytes::new_bound(py, &serialize(&allocator, puzzle)?),
+        PyBytes::new_bound(py, &serialize(&allocator, solution)?),
+    ))
 }
 
 #[pyfunction]
