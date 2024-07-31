@@ -24,6 +24,31 @@ fn subtract_cost(a: &Allocator, cost_left: &mut Cost, subtract: Cost) -> Result<
     }
 }
 
+/// Prepares the arguments passed to the block generator. They are in the form:
+/// (DESERIALIZER_MOD (block1 block2 block3 ...))
+pub fn setup_generator_args<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
+    a: &mut Allocator,
+    block_refs: I,
+) -> Result<NodePtr, ValidationErr>
+where
+    <I as IntoIterator>::IntoIter: DoubleEndedIterator,
+{
+    let clvm_deserializer = node_from_bytes(a, &CLVM_DESERIALIZER)?;
+
+    // iterate in reverse order since we're building a linked list from
+    // the tail
+    let mut blocks = NodePtr::NIL;
+    for g in block_refs.into_iter().rev() {
+        let ref_gen = a.new_atom(g.as_ref())?;
+        blocks = a.new_pair(ref_gen, blocks)?;
+    }
+
+    // the first argument to the generator is the serializer, followed by a list
+    // of the blocks it requested.
+    let args = a.new_pair(blocks, NodePtr::NIL)?;
+    Ok(a.new_pair(clvm_deserializer, args)?)
+}
+
 // Runs the generator ROM and passes in the program (transactions generator).
 // The program is expected to return a list of spends. Each item being:
 
@@ -38,14 +63,17 @@ fn subtract_cost(a: &Allocator, cost_left: &mut Cost, subtract: Cost) -> Result<
 // the only reason we need to pass in the allocator is because the returned
 // SpendBundleConditions contains NodePtr fields. If that's changed, we could
 // create the allocator inside this functions as well.
-pub fn run_block_generator<GenBuf: AsRef<[u8]>, V: SpendVisitor>(
+pub fn run_block_generator<GenBuf: AsRef<[u8]>, V: SpendVisitor, I: IntoIterator<Item = GenBuf>>(
     a: &mut Allocator,
     program: &[u8],
-    block_refs: &[GenBuf],
+    block_refs: I,
     max_cost: u64,
     flags: u32,
     constants: &ConsensusConstants,
-) -> Result<SpendBundleConditions, ValidationErr> {
+) -> Result<SpendBundleConditions, ValidationErr>
+where
+    <I as IntoIterator>::IntoIter: DoubleEndedIterator,
+{
     let mut cost_left = max_cost;
     let byte_cost = program.len() as u64 * constants.cost_per_byte;
 
@@ -58,10 +86,12 @@ pub fn run_block_generator<GenBuf: AsRef<[u8]>, V: SpendVisitor>(
         node_from_bytes(a, program)?
     };
 
+    // this is setting up the arguments to be passed to the generator ROM,
+    // not the actual generator (the ROM does that).
     // iterate in reverse order since we're building a linked list from
     // the tail
     let mut args = a.nil();
-    for g in block_refs.iter().rev() {
+    for g in block_refs.into_iter().rev() {
         let ref_gen = a.new_atom(g.as_ref())?;
         args = a.new_pair(ref_gen, args)?;
     }
@@ -112,39 +142,29 @@ pub fn extract_n<const N: usize>(
 // you only pay cost for the generator, the puzzles and the conditions).
 // it also does not apply the stack depth or object allocation limits the same,
 // as each puzzle run in its own environment.
-pub fn run_block_generator2<GenBuf: AsRef<[u8]>, V: SpendVisitor>(
+pub fn run_block_generator2<GenBuf: AsRef<[u8]>, V: SpendVisitor, I: IntoIterator<Item = GenBuf>>(
     a: &mut Allocator,
     program: &[u8],
-    block_refs: &[GenBuf],
+    block_refs: I,
     max_cost: u64,
     flags: u32,
     constants: &ConsensusConstants,
-) -> Result<SpendBundleConditions, ValidationErr> {
+) -> Result<SpendBundleConditions, ValidationErr>
+where
+    <I as IntoIterator>::IntoIter: DoubleEndedIterator,
+{
     let byte_cost = program.len() as u64 * constants.cost_per_byte;
 
     let mut cost_left = max_cost;
     subtract_cost(a, &mut cost_left, byte_cost)?;
 
-    let clvm_deserializer = node_from_bytes(a, &CLVM_DESERIALIZER)?;
     let (program, backrefs) = if (flags & ALLOW_BACKREFS) != 0 {
         node_from_bytes_backrefs_record(a, program)?
     } else {
         (node_from_bytes(a, program)?, HashSet::<NodePtr>::new())
     };
 
-    // iterate in reverse order since we're building a linked list from
-    // the tail
-    let mut blocks = a.nil();
-    for g in block_refs.iter().rev() {
-        let ref_gen = a.new_atom(g.as_ref())?;
-        blocks = a.new_pair(ref_gen, blocks)?;
-    }
-
-    // the first argument to the generator is the serializer, followed by a list
-    // of the blocks it requested.
-    let mut args = a.new_pair(blocks, a.nil())?;
-    args = a.new_pair(clvm_deserializer, args)?;
-
+    let args = setup_generator_args(a, block_refs)?;
     let dialect = ChiaDialect::new(flags);
 
     let Reduction(clvm_cost, mut all_spends) = run_program(a, &dialect, program, args, cost_left)?;

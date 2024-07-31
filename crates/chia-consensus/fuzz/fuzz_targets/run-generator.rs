@@ -10,10 +10,10 @@ use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
     let mut a1 = make_allocator(LIMIT_HEAP);
-    let r1 = run_block_generator::<&[u8], MempoolVisitor>(
+    let r1 = run_block_generator::<&[u8], MempoolVisitor, _>(
         &mut a1,
         data,
-        &[],
+        [],
         110_000_000,
         ALLOW_BACKREFS,
         &TEST_CONSTANTS,
@@ -21,10 +21,10 @@ fuzz_target!(|data: &[u8]| {
     drop(a1);
 
     let mut a2 = make_allocator(LIMIT_HEAP);
-    let r2 = run_block_generator2::<&[u8], MempoolVisitor>(
+    let r2 = run_block_generator2::<&[u8], MempoolVisitor, _>(
         &mut a2,
         data,
-        &[],
+        [],
         110_000_000,
         ALLOW_BACKREFS,
         &TEST_CONSTANTS,
