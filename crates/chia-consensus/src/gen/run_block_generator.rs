@@ -15,7 +15,11 @@ use clvmr::run_program::run_program;
 use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs, node_from_bytes_backrefs_record};
 use std::collections::{HashMap, HashSet};
 
-pub fn subtract_cost(a: &Allocator, cost_left: &mut Cost, subtract: Cost) -> Result<(), ValidationErr> {
+pub fn subtract_cost(
+    a: &Allocator,
+    cost_left: &mut Cost,
+    subtract: Cost,
+) -> Result<(), ValidationErr> {
     if subtract > *cost_left {
         Err(ValidationErr(a.nil(), ErrorCode::CostExceeded))
     } else {

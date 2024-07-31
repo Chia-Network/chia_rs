@@ -3,7 +3,6 @@ use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV};
 use crate::consensus_constants::ConsensusConstants;
 use crate::gen::flags::{ALLOW_BACKREFS, DISALLOW_INFINITY_G1, ENABLE_MESSAGE_CONDITIONS};
 
-
 pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusConstants) -> u32 {
     let mut flags: u32 = 0;
 
