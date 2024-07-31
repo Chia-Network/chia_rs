@@ -305,6 +305,19 @@ def confirm_not_included_already_hashed(
     proof: bytes,
 ) -> bool: ...
 
+def get_name_puzzle_conditions(
+    spend_bundle: SpendBundle,
+    max_cost: int,
+    constants: ConsensusConstants,
+    height: int,
+) -> SpendBundleConditions: ...
+
+def get_flags_for_height_and_constants(
+    height: int,
+    constants: ConsensusConstants
+) -> int: ...
+
+
 NO_UNKNOWN_CONDS: int = ...
 STRICT_ARGS_COUNT: int = ...
 LIMIT_HEAP: int = ...
