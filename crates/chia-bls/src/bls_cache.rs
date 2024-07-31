@@ -1,11 +1,10 @@
-use std::borrow::Borrow;
-use std::num::NonZeroUsize;
-
-use clvmr::sha2::Sha256;
-use lru::LruCache;
 
 use crate::{aggregate_verify_gt, hash_to_g2};
 use crate::{GTElement, PublicKey, Signature};
+use lru::LruCache;
+use sha2::{Digest, Sha256};
+use std::borrow::Borrow;
+use std::num::NonZeroUsize;
 
 /// This is a cache of pairings of public keys and their corresponding message.
 /// It accelerates aggregate verification when some public keys have already
@@ -44,11 +43,18 @@ impl BlsCache {
         self.cache.is_empty()
     }
 
+    pub fn update(&mut self, new_items: impl IntoIterator<Item = ([u8; 32], GTElement)>) {
+        for (key, value) in new_items {
+            self.cache.put(key, value);
+        }
+    }
+
     pub fn aggregate_verify<Pk: Borrow<PublicKey>, Msg: AsRef<[u8]>>(
         &mut self,
         pks_msgs: impl IntoIterator<Item = (Pk, Msg)>,
         sig: &Signature,
-    ) -> bool {
+    ) -> (bool, Vec<([u8; 32], Vec<u8>)>) {
+        let mut added: Vec<([u8; 32], Vec<u8>)> = Vec::new();
         let iter = pks_msgs.into_iter().map(|(pk, msg)| -> GTElement {
             // Hash pubkey + message
             let mut hasher = Sha256::new();
@@ -63,7 +69,7 @@ impl BlsCache {
 
             // Otherwise, we need to calculate the pairing and add it to the cache.
             let mut aug_msg = pk.borrow().to_bytes().to_vec();
-            aug_msg.extend_from_slice(msg.as_ref());
+            aug_msg.extend(msg.as_ref());
             let aug_hash = hash_to_g2(&aug_msg);
 
             let mut hasher = Sha256::new();
@@ -72,17 +78,17 @@ impl BlsCache {
 
             let pairing = aug_hash.pair(pk.borrow());
             self.cache.put(hash, pairing.clone());
+            added.push((hash, pairing.to_bytes().to_vec()));
             pairing
         });
 
-        aggregate_verify_gt(sig, iter)
+        (aggregate_verify_gt(sig, iter), added)
     }
 }
 
 #[cfg(feature = "py-bindings")]
 use pyo3::{
     exceptions::PyValueError,
-    pybacked::PyBackedBytes,
     types::{PyAnyMethods, PyList},
     Bound, PyObject, PyResult,
 };
@@ -112,7 +118,7 @@ impl BlsCache {
         pks: &Bound<'_, PyList>,
         msgs: &Bound<'_, PyList>,
         sig: &Signature,
-    ) -> PyResult<bool> {
+    ) -> PyResult<(bool, Vec<([u8; 32], Vec<u8>)>)> {
         let pks = pks
             .iter()?
             .map(|item| item?.extract())
@@ -121,7 +127,7 @@ impl BlsCache {
         let msgs = msgs
             .iter()?
             .map(|item| item?.extract())
-            .collect::<PyResult<Vec<PyBackedBytes>>>()?;
+            .collect::<PyResult<Vec<Vec<u8>>>>()?;
 
         Ok(self.aggregate_verify(pks.into_iter().zip(msgs), sig))
     }
@@ -137,10 +143,7 @@ impl BlsCache {
         use pyo3::types::PyBytes;
         let ret = PyList::empty_bound(py);
         for (key, value) in &self.cache {
-            ret.append((
-                PyBytes::new_bound(py, key),
-                PyBytes::new_bound(py, &value.to_bytes()),
-            ))?;
+            ret.append((PyBytes::new_bound(py, key), value.clone().into_py(py)))?;
         }
         Ok(ret.into())
     }
@@ -148,15 +151,11 @@ impl BlsCache {
     #[pyo3(name = "update")]
     pub fn py_update(&mut self, other: &Bound<'_, PyList>) -> PyResult<()> {
         for item in other.borrow().iter()? {
-            let (key, value): (Vec<u8>, Vec<u8>) = item?.extract()?;
+            let (key, value): (Vec<u8>, GTElement) = item?.extract()?;
             self.cache.put(
                 key.try_into()
                     .map_err(|_| PyValueError::new_err("invalid key"))?,
-                GTElement::from_bytes(
-                    (&value[..])
-                        .try_into()
-                        .map_err(|_| PyValueError::new_err("invalid GTElement"))?,
-                ),
+                value,
             );
         }
         Ok(())

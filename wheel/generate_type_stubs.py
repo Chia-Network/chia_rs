@@ -305,7 +305,15 @@ def confirm_not_included_already_hashed(
     proof: bytes,
 ) -> bool: ...
 
-def get_conditions_from_spendbundle(
+def validate_clvm_and_signature(
+    new_spend: SpendBundle,
+    max_cost: int,
+    constants: ConsensusConstants,
+    peak_height: int,
+    cache: Option[BLSCache],
+) -> Tuple[SpendBundleConditions, List[Tuple[SpendBundleConditions, List[Tuple[Bytes32, bytes]]]], float]: ...
+
+def get_name_puzzle_conditions(
     spend_bundle: SpendBundle,
     max_cost: int,
     constants: ConsensusConstants,
