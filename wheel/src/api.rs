@@ -12,6 +12,11 @@ use chia_consensus::gen::solution_generator::solution_generator as native_soluti
 use chia_consensus::gen::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
 use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
+use chia_consensus::spendbundle_validation::{
+    get_flags_for_height_and_constants, validate_clvm_and_signature,
+};
+
+use chia_consensus::spendbundle_conditions::get_conditions_from_spendbundle;
 use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
     CoinSpend, CoinState, CoinStateFilters, CoinStateUpdate, EndOfSubSlotBundle, Foliage,
@@ -41,7 +46,7 @@ use chia_protocol::{
 use clvm_utils::tree_hash_from_bytes;
 use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV, LIMIT_HEAP, NO_UNKNOWN_OPS};
 use pyo3::buffer::PyBuffer;
-use pyo3::exceptions::{PyRuntimeError, PyValueError};
+use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::pybacked::PyBackedBytes;
 use pyo3::types::PyBytes;
@@ -49,6 +54,7 @@ use pyo3::types::PyList;
 use pyo3::types::PyTuple;
 use pyo3::wrap_pyfunction;
 use std::iter::zip;
+use std::sync::Arc;
 
 use crate::run_program::{run_chia_program, serialized_length};
 
@@ -356,6 +362,62 @@ fn fast_forward_singleton<'p>(
     ))
 }
 
+#[pyfunction]
+#[pyo3(name = "validate_clvm_and_signature")]
+pub fn py_validate_clvm_and_signature(
+    new_spend: &SpendBundle,
+    max_cost: u64,
+    constants: &ConsensusConstants,
+    peak_height: u32,
+    cache: Option<&BlsCache>,
+) -> PyResult<(OwnedSpendBundleConditions, f32)> {
+    let empty_cache = BlsCache::default();
+    let real_cache = if let Some(unwrapped_cache) = cache {
+        unwrapped_cache
+    } else {
+        &empty_cache
+    };
+    let (owned_conditions, duration) = validate_clvm_and_signature(
+        new_spend,
+        max_cost,
+        constants,
+        peak_height,
+        &Arc::new(real_cache),
+    )
+    .map_err(|e| {
+        let error_code: u32 = e.into();
+        PyErr::new::<PyTypeError, _>(error_code)
+    })?; // cast validation error to int
+    Ok((owned_conditions, duration.as_secs_f32()))
+}
+
+#[pyfunction]
+#[pyo3(name = "get_conditions_from_spendbundle")]
+pub fn py_get_conditions_from_spendbundle(
+    spend_bundle: &SpendBundle,
+    max_cost: u64,
+    constants: &ConsensusConstants,
+    height: u32,
+) -> PyResult<OwnedSpendBundleConditions> {
+    let osbc = get_conditions_from_spendbundle(spend_bundle, max_cost, height, constants).map_err(
+        |e| {
+            let error_code: u32 = e.1.into();
+            PyErr::new::<PyTypeError, _>(error_code)
+        },
+    )?;
+    Ok(osbc)
+}
+
+#[pyfunction]
+#[pyo3(name = "get_flags_for_height_and_constants")]
+pub fn py_get_flags_for_height_and_constants(
+    height: u32,
+    constants: &ConsensusConstants,
+) -> PyResult<u32> {
+    let flags = get_flags_for_height_and_constants(height, constants);
+    Ok(flags)
+}
+
 #[pymodule]
 pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // generator functions
@@ -384,6 +446,11 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<MerkleSet>()?;
     m.add_function(wrap_pyfunction!(confirm_included_already_hashed, m)?)?;
     m.add_function(wrap_pyfunction!(confirm_not_included_already_hashed, m)?)?;
+
+    // multithread validattion
+    m.add_function(wrap_pyfunction!(py_validate_clvm_and_signature, m)?)?;
+    m.add_function(wrap_pyfunction!(py_get_conditions_from_spendbundle, m)?)?;
+    m.add_function(wrap_pyfunction!(py_get_flags_for_height_and_constants, m)?)?;
 
     // clvm functions
     m.add("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;

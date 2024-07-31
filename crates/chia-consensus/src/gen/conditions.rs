@@ -610,13 +610,13 @@ impl PartialEq for NewCoin {
 }
 
 // These are all the conditions related directly to a specific spend.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct Spend {
     // the parent coin ID of the coin being spent
     pub parent_id: NodePtr,
     // the amount of the coin that's being spent
     pub coin_amount: u64,
-    // the puzzle hash of the p
+    // the puzzle hash of the coin that's being spent
     pub puzzle_hash: NodePtr,
     // the coin ID of the coin being spent. This is computed from parent_id,
     // coin_amount and puzzle_hash
