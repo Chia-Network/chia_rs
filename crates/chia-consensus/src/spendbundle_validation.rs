@@ -1,9 +1,7 @@
+use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV};
+
 use crate::consensus_constants::ConsensusConstants;
 use crate::gen::flags::{ALLOW_BACKREFS, DISALLOW_INFINITY_G1, ENABLE_MESSAGE_CONDITIONS};
-use crate::gen::opcodes::{
-    AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT, AGG_SIG_PARENT_PUZZLE,
-    AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT,
-};
 
 
 pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusConstants) -> u32 {
