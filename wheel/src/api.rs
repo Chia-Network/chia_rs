@@ -13,7 +13,9 @@ use chia_consensus::gen::solution_generator::solution_generator_backrefs as nati
 use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
 use chia_consensus::spendbundle_conditions::get_conditions_from_spendbundle;
-use chia_consensus::spendbundle_validation::{get_flags_for_height_and_constants, validate_clvm_and_signature};
+use chia_consensus::spendbundle_validation::{
+    get_flags_for_height_and_constants, validate_clvm_and_signature,
+};
 use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
     CoinSpend, CoinState, CoinStateFilters, CoinStateUpdate, EndOfSubSlotBundle, Foliage,
