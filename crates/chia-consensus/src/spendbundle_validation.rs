@@ -24,14 +24,7 @@ pub fn validate_clvm_and_signature(
     constants: &ConsensusConstants,
     height: u32,
     cache: &Arc<Mutex<BlsCache>>,
-) -> Result<
-    (
-        OwnedSpendBundleConditions,
-        Vec<PairingInfo>,
-        Duration,
-    ),
-    ErrorCode,
-> {
+) -> Result<(OwnedSpendBundleConditions, Vec<PairingInfo>, Duration), ErrorCode> {
     let start_time = Instant::now();
     let npcresult = get_conditions_from_spendbundle(spend_bundle, max_cost, height, constants)
         .map_err(|e| e.1)?;
