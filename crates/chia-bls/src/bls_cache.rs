@@ -28,6 +28,9 @@ impl Default for BlsCache {
     }
 }
 
+pub type PairingInfo = ([u8; 32], Vec<u8>);
+type AggregateVerifyResult = (bool, Vec<PairingInfo>);
+
 impl BlsCache {
     pub fn new(cache_size: NonZeroUsize) -> Self {
         Self {
@@ -53,7 +56,7 @@ impl BlsCache {
         &mut self,
         pks_msgs: impl IntoIterator<Item = (Pk, Msg)>,
         sig: &Signature,
-    ) -> (bool, Vec<([u8; 32], Vec<u8>)>) {
+    ) -> AggregateVerifyResult {
         let mut added: Vec<([u8; 32], Vec<u8>)> = Vec::new();
         let iter = pks_msgs.into_iter().map(|(pk, msg)| -> GTElement {
             // Hash pubkey + message

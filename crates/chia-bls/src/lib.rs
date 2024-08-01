@@ -11,6 +11,7 @@ mod signature;
 #[cfg(feature = "py-bindings")]
 mod parse_hex;
 
+pub use bls_cache::PairingInfo;
 pub use bls_cache::BlsCache;
 pub use derive_keys::*;
 pub use error::{Error, Result};
