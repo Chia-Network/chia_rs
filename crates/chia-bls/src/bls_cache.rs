@@ -121,7 +121,7 @@ impl BlsCache {
         pks: &Bound<'_, PyList>,
         msgs: &Bound<'_, PyList>,
         sig: &Signature,
-    ) -> PyResult<(bool, Vec<([u8; 32], Vec<u8>)>)> {
+    ) -> PyResult<(bool, Vec<PairingInfo>)> {
         let pks = pks
             .iter()?
             .map(|item| item?.extract())
