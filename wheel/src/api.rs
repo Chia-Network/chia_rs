@@ -70,8 +70,8 @@ use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs};
 use clvmr::ChiaDialect;
 
 use chia_bls::{
-    hash_to_g2 as native_hash_to_g2, BlsCache, DerivableKey, GTElement, PublicKey, SecretKey,
-    Signature,
+    hash_to_g2 as native_hash_to_g2, BlsCache, DerivableKey, GTElement, PairingInfo, PublicKey,
+    SecretKey, Signature,
 };
 
 #[pyfunction]
@@ -369,16 +369,12 @@ pub fn py_validate_clvm_and_signature(
     constants: &ConsensusConstants,
     peak_height: u32,
     cache: Option<BlsCache>,
-) -> PyResult<(OwnedSpendBundleConditions, Vec<([u8; 32], Vec<u8>)>, f32)> {
-    let real_cache = if let Some(unwrapped_cache) = cache {
-        unwrapped_cache
-    } else {
-        BlsCache::default()
-    };
+) -> PyResult<(OwnedSpendBundleConditions, Vec<PairingInfo>, f32)> {
+    let real_cache = cache.unwrap_or_default();
     let (owned_conditions, additions, duration) = validate_clvm_and_signature(
         new_spend,
         max_cost,
-        &constants,
+        constants,
         peak_height,
         &Arc::new(Mutex::new(real_cache)), // TODO: use cache properly
     )
