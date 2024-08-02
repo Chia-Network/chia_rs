@@ -191,11 +191,11 @@ pub mod tests {
         assert!(bls_cache.is_empty());
 
         // Verify the signature and add to the cache.
-        assert!(bls_cache.aggregate_verify(pks_msgs, &sig));
+        assert!(bls_cache.aggregate_verify(pks_msgs, &sig).0);
         assert_eq!(bls_cache.len(), 1);
 
         // Now that it's cached, it shouldn't cache it again.
-        assert!(bls_cache.aggregate_verify(pks_msgs, &sig));
+        assert!(bls_cache.aggregate_verify(pks_msgs, &sig).0);
         assert_eq!(bls_cache.len(), 1);
     }
 
@@ -214,7 +214,7 @@ pub mod tests {
         assert!(bls_cache.is_empty());
 
         // Add the first signature to cache.
-        assert!(bls_cache.aggregate_verify(pks_msgs.clone(), &agg_sig));
+        assert!(bls_cache.aggregate_verify(pks_msgs.clone(), &agg_sig).0);
         assert_eq!(bls_cache.len(), 1);
 
         // Try with the first key message pair in the cache but not the second.
@@ -225,7 +225,7 @@ pub mod tests {
         agg_sig += &sign(&sk2, msg2);
         pks_msgs.push((pk2, msg2));
 
-        assert!(bls_cache.aggregate_verify(pks_msgs.clone(), &agg_sig));
+        assert!(bls_cache.aggregate_verify(pks_msgs.clone(), &agg_sig).0);
         assert_eq!(bls_cache.len(), 2);
 
         // Try reusing a public key.
@@ -235,7 +235,7 @@ pub mod tests {
         pks_msgs.push((pk2, msg3));
 
         // Verify this signature and add to the cache as well (since it's still a different aggregate).
-        assert!(bls_cache.aggregate_verify(pks_msgs, &agg_sig));
+        assert!(bls_cache.aggregate_verify(pks_msgs, &agg_sig).0);
         assert_eq!(bls_cache.len(), 3);
     }
 
@@ -257,7 +257,7 @@ pub mod tests {
             let pks_msgs = [(pk, msg)];
 
             // Add to cache by validating them one at a time.
-            assert!(bls_cache.aggregate_verify(pks_msgs, &sig));
+            assert!(bls_cache.aggregate_verify(pks_msgs, &sig).0);
         }
 
         // The cache should be full now.
@@ -284,6 +284,6 @@ pub mod tests {
 
         let pks_msgs: [(&PublicKey, &[u8]); 0] = [];
 
-        assert!(bls_cache.aggregate_verify(pks_msgs, &Signature::default()));
+        assert!(bls_cache.aggregate_verify(pks_msgs, &Signature::default()).0);
     }
 }
