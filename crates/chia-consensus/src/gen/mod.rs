@@ -3,6 +3,7 @@ mod condition_sanitizers;
 pub mod conditions;
 pub mod flags;
 pub mod get_puzzle_and_solution;
+pub mod make_aggsig_final_message;
 pub mod messages;
 pub mod opcodes;
 pub mod owned_conditions;

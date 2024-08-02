@@ -83,7 +83,7 @@ mod tests {
         #[case] filename: &str,
         #[case] spends: usize,
         #[case] additions: usize,
-        #[values(0, 1, 1000000, 5000000)] height: u32,
+        #[values(0, 1, 1_000_000, 5_000_000)] height: u32,
         #[case] cost: u64,
     ) {
         let bundle = SpendBundle::from_bytes(
