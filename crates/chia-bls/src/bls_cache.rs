@@ -146,7 +146,10 @@ impl BlsCache {
         use pyo3::types::PyBytes;
         let ret = PyList::empty_bound(py);
         for (key, value) in &self.cache {
-            ret.append((PyBytes::new_bound(py, key), value.clone().into_py(py)))?;
+            ret.append((
+                PyBytes::new_bound(py, key),
+                PyBytes::new_bound(py, &value.to_bytes()),
+            ))?;
         }
         Ok(ret.into())
     }
@@ -154,11 +157,11 @@ impl BlsCache {
     #[pyo3(name = "update")]
     pub fn py_update(&mut self, other: &Bound<'_, PyList>) -> PyResult<()> {
         for item in other.borrow().iter()? {
-            let (key, value): (Vec<u8>, GTElement) = item?.extract()?;
+            let (key, value): (Vec<u8>, [u8; 576]) = item?.extract()?;
             self.cache.put(
                 key.try_into()
                     .map_err(|_| PyValueError::new_err("invalid key"))?,
-                value,
+                GTElement::from_bytes(&value),
             );
         }
         Ok(())
