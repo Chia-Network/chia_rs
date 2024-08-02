@@ -284,6 +284,10 @@ pub mod tests {
 
         let pks_msgs: [(&PublicKey, &[u8]); 0] = [];
 
-        assert!(bls_cache.aggregate_verify(pks_msgs, &Signature::default()).0);
+        assert!(
+            bls_cache
+                .aggregate_verify(pks_msgs, &Signature::default())
+                .0
+        );
     }
 }
