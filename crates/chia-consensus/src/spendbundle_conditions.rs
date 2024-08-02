@@ -9,14 +9,13 @@ use crate::gen::run_block_generator::subtract_cost;
 use crate::gen::validation_error::ValidationErr;
 use crate::spendbundle_validation::get_flags_for_height_and_constants;
 use chia_protocol::SpendBundle;
-use clvm_utils::{tree_hash_cached, TreeHash};
-use clvmr::allocator::{Allocator, NodePtr};
+use clvm_utils::tree_hash;
+use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::chia_dialect::LIMIT_HEAP;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
 use clvmr::serde::node_from_bytes;
-use std::collections::{HashMap, HashSet};
 
 pub fn get_conditions_from_spendbundle(
     spend_bundle: &SpendBundle,
@@ -33,7 +32,6 @@ pub fn get_conditions_from_spendbundle(
     let mut a: Allocator = make_allocator(LIMIT_HEAP);
     let mut ret = SpendBundleConditions::default();
     let mut state = ParseState::default();
-    let mut cache = HashMap::<NodePtr, TreeHash>::new();
 
     for coin_spend in &spend_bundle.coin_spends {
         // process the spend
@@ -45,7 +43,7 @@ pub fn get_conditions_from_spendbundle(
 
         subtract_cost(&a, &mut cost_left, clvm_cost)?;
 
-        let buf = tree_hash_cached(&a, puz, &HashSet::<NodePtr>::new(), &mut cache);
+        let buf = tree_hash(&a, puz);
         let puzzle_hash = a.new_atom(&buf)?;
         process_single_spend::<MempoolVisitor>(
             &a,

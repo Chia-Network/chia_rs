@@ -380,9 +380,8 @@ pub fn py_get_conditions_from_spendbundle(
 pub fn py_get_flags_for_height_and_constants(
     height: u32,
     constants: &ConsensusConstants,
-) -> PyResult<u32> {
-    let flags = get_flags_for_height_and_constants(height, constants);
-    Ok(flags)
+) -> u32 {
+    get_flags_for_height_and_constants(height, constants)
 }
 
 #[pymodule]
