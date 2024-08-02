@@ -440,7 +440,7 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(confirm_included_already_hashed, m)?)?;
     m.add_function(wrap_pyfunction!(confirm_not_included_already_hashed, m)?)?;
 
-    // multithread validattion
+    // spendbundle validation
     m.add_function(wrap_pyfunction!(py_validate_clvm_and_signature, m)?)?;
     m.add_function(wrap_pyfunction!(py_get_conditions_from_spendbundle, m)?)?;
     m.add_function(wrap_pyfunction!(py_get_flags_for_height_and_constants, m)?)?;
