@@ -2,7 +2,6 @@
 use crate::{aggregate_verify_gt, hash_to_g2};
 use crate::{GTElement, PublicKey, Signature};
 use lru::LruCache;
-use pyo3::pybacked::PyBackedBytes;
 use sha2::{Digest, Sha256};
 use std::borrow::Borrow;
 use std::num::NonZeroUsize;
@@ -93,6 +92,7 @@ impl BlsCache {
 #[cfg(feature = "py-bindings")]
 use pyo3::{
     exceptions::PyValueError,
+    pybacked::PyBackedBytes,
     types::{PyAnyMethods, PyList},
     Bound, PyObject, PyResult,
 };
