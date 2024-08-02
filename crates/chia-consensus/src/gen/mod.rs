@@ -17,4 +17,4 @@ pub mod validation_error;
 // unoptimized builds. Only run these with --release
 #[cfg(not(debug_assertions))]
 #[cfg(test)]
-mod test_generators;
+pub(crate) mod test_generators;

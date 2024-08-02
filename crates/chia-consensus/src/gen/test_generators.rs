@@ -12,7 +12,7 @@ use text_diff::Difference;
 
 use rstest::rstest;
 
-fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
+pub(crate) fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
     let mut ret = String::new();
     if c.reserve_fee > 0 {
         ret += &format!("RESERVE_FEE: {}\n", c.reserve_fee);
@@ -115,7 +115,7 @@ fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
     ret
 }
 
-fn print_diff(output: &str, expected: &str) {
+pub(crate) fn print_diff(output: &str, expected: &str) {
     println!("\x1b[102m \x1b[0m - output from test");
     println!("\x1b[101m \x1b[0m - expected output");
     for diff in diff(expected, output, "\n").1 {
