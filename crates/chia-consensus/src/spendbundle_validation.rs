@@ -46,14 +46,14 @@ mod tests {
                 TEST_CONSTANTS.soft_fork4_height - 1,
                 &TEST_CONSTANTS
             ),
-            33554592
+            33_554_592
         );
         assert_eq!(
             get_flags_for_height_and_constants(
                 TEST_CONSTANTS.soft_fork5_height - 1,
                 &TEST_CONSTANTS
             ),
-            167772320
+            167_772_320
         );
         assert_eq!(
             get_flags_for_height_and_constants(
@@ -67,7 +67,7 @@ mod tests {
                 TEST_CONSTANTS.soft_fork5_height + 1,
                 &TEST_CONSTANTS
             ),
-            436207776
+            436_207_776
         );
     }
 }
