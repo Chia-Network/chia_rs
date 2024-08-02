@@ -2,6 +2,8 @@ import blspy
 import chia_rs
 from random import getrandbits
 import sys
+from typing import Any, Type
+import pytest
 
 
 def randbytes(n: int) -> bytes:
@@ -184,6 +186,29 @@ def test_bls() -> None:
 
         # get_fingerprint()
         assert pk1.get_fingerprint() == pk2.get_fingerprint()
+
+        obj: Any
+        klass: Any
+        for obj, klass in [
+            (pk2, G1Element),
+            (sig2, G2Element),
+            (sk2, PrivateKey),
+            (pair2, chia_rs.GTElement),
+        ]:
+            print(f"{klass}")
+            # to_json_dict
+            expected_json = "0x" + bytes(obj).hex()
+            assert obj.to_json_dict() == expected_json
+            # from_json_dict
+            assert obj == klass.from_json_dict(expected_json)
+            # binary blobs are also accepted in JSON dicts
+            assert obj == klass.from_json_dict(bytes(obj))
+            # too short
+            with pytest.raises(ValueError, match="invalid length"):
+                obj2 = klass.from_json_dict(bytes(obj)[0:-1])
+            # too long
+            with pytest.raises(ValueError, match="invalid length"):
+                obj2 = klass.from_json_dict(bytes(obj) + b"a")
 
 
 # ------------------------------------- 8< ----------------------------------
