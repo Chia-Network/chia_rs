@@ -65,3 +65,43 @@ pub fn get_conditions_from_spendbundle(
     let osbc = OwnedSpendBundleConditions::from(&a, ret);
     Ok(osbc)
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::consensus_constants::TEST_CONSTANTS;
+
+    use super::*;
+    use chia_bls::Signature;
+    use chia_protocol::{Coin, CoinSpend, Program};
+    use hex_literal::hex;
+
+    #[test]
+    fn test_get_conditions_from_spendbundle() {
+        let test_coin = Coin::new(
+            hex!("4444444444444444444444444444444444444444444444444444444444444444").into(),
+            hex!("3333333333333333333333333333333333333333333333333333333333333333").into(),
+            1,
+        );
+
+        let solution = hex!("ffff31ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080").to_vec();
+        // ((49 0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2 "hello"))
+
+        let spend = CoinSpend::new(test_coin, Program::new(vec![1_u8].into()), solution.into());
+
+        let coin_spends: Vec<CoinSpend> = vec![spend];
+        let spend_bundle = SpendBundle {
+            coin_spends,
+            aggregated_signature: Signature::default(),
+        };
+        let osbc = get_conditions_from_spendbundle(
+            &spend_bundle,
+            TEST_CONSTANTS.max_block_cost_clvm,
+            236,
+            &TEST_CONSTANTS,
+        )
+        .expect("test should pass");
+
+        assert!(osbc.spends.len() == 1);
+        assert!(osbc.agg_sig_unsafe.len() == 1);
+    }
+}
