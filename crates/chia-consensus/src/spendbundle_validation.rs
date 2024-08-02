@@ -33,3 +33,41 @@ pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusCons
     }
     flags
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::consensus_constants::TEST_CONSTANTS;
+
+    #[test]
+    fn test_get_flags() {
+        assert_eq!(
+            get_flags_for_height_and_constants(
+                TEST_CONSTANTS.soft_fork4_height - 1,
+                &TEST_CONSTANTS
+            ),
+            33554592
+        );
+        assert_eq!(
+            get_flags_for_height_and_constants(
+                TEST_CONSTANTS.soft_fork5_height - 1,
+                &TEST_CONSTANTS
+            ),
+            167772320
+        );
+        assert_eq!(
+            get_flags_for_height_and_constants(
+                TEST_CONSTANTS.hard_fork_height - 1,
+                &TEST_CONSTANTS
+            ),
+            0
+        );
+        assert_eq!(
+            get_flags_for_height_and_constants(
+                TEST_CONSTANTS.soft_fork5_height + 1,
+                &TEST_CONSTANTS
+            ),
+            436207776
+        );
+    }
+}
