@@ -2,6 +2,7 @@
 use crate::{aggregate_verify_gt, hash_to_g2};
 use crate::{GTElement, PublicKey, Signature};
 use lru::LruCache;
+use pyo3::pybacked::PyBackedBytes;
 use sha2::{Digest, Sha256};
 use std::borrow::Borrow;
 use std::num::NonZeroUsize;
@@ -72,7 +73,7 @@ impl BlsCache {
 
             // Otherwise, we need to calculate the pairing and add it to the cache.
             let mut aug_msg = pk.borrow().to_bytes().to_vec();
-            aug_msg.extend(msg.as_ref());
+            aug_msg.extend_from_slice(msg.as_ref());
             let aug_hash = hash_to_g2(&aug_msg);
 
             let mut hasher = Sha256::new();
@@ -130,7 +131,7 @@ impl BlsCache {
         let msgs = msgs
             .iter()?
             .map(|item| item?.extract())
-            .collect::<PyResult<Vec<Vec<u8>>>>()?;
+            .collect::<PyResult<Vec<PyBackedBytes>>>()?;
 
         Ok(self.aggregate_verify(pks.into_iter().zip(msgs), sig))
     }
