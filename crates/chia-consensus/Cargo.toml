@@ -1,6 +1,6 @@
 [package]
 name = "chia-consensus"
-version = "0.10.0"
+version = "0.11.0"
 edition = "2021"
 license = "Apache-2.0"
 description = "Utility functions and types used by the Chia blockchain full node"
@@ -36,7 +36,7 @@ num-traits = { workspace = true }
 rstest = { workspace = true }
 text-diff = { workspace = true }
 criterion = { workspace = true }
-rand = { workspace = true, features = [ "small_rng" ] }
+rand = { workspace = true, features = ["small_rng"] }
 
 [lib]
 bench = false
