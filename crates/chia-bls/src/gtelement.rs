@@ -128,39 +128,25 @@ impl GTElement {
 mod pybindings {
     use super::*;
 
+    use crate::parse_hex::parse_hex_string;
     use chia_traits::{FromJsonDict, ToJsonDict};
-    use pyo3::{exceptions::PyValueError, prelude::*};
+    use pyo3::prelude::*;
 
     impl ToJsonDict for GTElement {
         fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
             let bytes = self.to_bytes();
-            Ok(hex::encode(bytes).into_py(py))
+            Ok(("0x".to_string() + &hex::encode(bytes)).into_py(py))
         }
     }
 
     impl FromJsonDict for GTElement {
         fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self> {
-            let s: String = o.extract()?;
-            if !s.starts_with("0x") {
-                return Err(PyValueError::new_err(
-                    "bytes object is expected to start with 0x",
-                ));
-            }
-            let s = &s[2..];
-            let buf = match hex::decode(s) {
-                Err(_) => {
-                    return Err(PyValueError::new_err("invalid hex"));
-                }
-                Ok(v) => v,
-            };
-            if buf.len() != Self::SIZE {
-                return Err(PyValueError::new_err(format!(
-                    "GTElement, invalid length {} expected {}",
-                    buf.len(),
-                    Self::SIZE
-                )));
-            }
-            Ok(Self::from_bytes(buf.as_slice().try_into().unwrap()))
+            Ok(Self::from_bytes(
+                parse_hex_string(o, Self::SIZE, "GTElement")?
+                    .as_slice()
+                    .try_into()
+                    .unwrap(),
+            ))
         }
     }
 }
