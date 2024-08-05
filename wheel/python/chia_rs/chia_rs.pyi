@@ -49,7 +49,7 @@ def confirm_not_included_already_hashed(
     proof: bytes,
 ) -> bool: ...
 
-def get_name_puzzle_conditions(
+def get_conditions_from_spendbundle(
     spend_bundle: SpendBundle,
     max_cost: int,
     constants: ConsensusConstants,
