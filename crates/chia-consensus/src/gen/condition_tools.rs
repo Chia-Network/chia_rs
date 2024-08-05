@@ -55,7 +55,7 @@ pub fn make_aggsig_final_message(
     result
 }
 
-pub fn u64_to_bytes(val: u64) -> Bytes {
+pub(crate) fn u64_to_bytes(val: u64) -> Bytes {
     let amount_bytes: [u8; 8] = val.to_be_bytes();
     if val >= 0x8000_0000_0000_0000_u64 {
         let mut ret = Vec::<u8>::new();
