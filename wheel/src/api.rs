@@ -7,6 +7,7 @@ use chia_consensus::gen::flags::{
     NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
 };
 use chia_consensus::gen::owned_conditions::{OwnedSpend, OwnedSpendBundleConditions};
+use chia_consensus::gen::run_block_generator::setup_generator_args;
 use chia_consensus::gen::run_puzzle::run_puzzle as native_run_puzzle;
 use chia_consensus::gen::solution_generator::solution_generator as native_solution_generator;
 use chia_consensus::gen::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
@@ -52,6 +53,7 @@ use pyo3::types::PyBytes;
 use pyo3::types::PyList;
 use pyo3::types::PyTuple;
 use pyo3::wrap_pyfunction;
+use std::collections::HashSet;
 use std::iter::zip;
 
 use crate::run_program::{run_chia_program, serialized_length};
@@ -65,7 +67,7 @@ use clvmr::reduction::EvalErr;
 use clvmr::reduction::Reduction;
 use clvmr::run_program;
 use clvmr::serde::node_to_bytes;
-use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs};
+use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs, node_from_bytes_backrefs_record};
 use clvmr::ChiaDialect;
 
 use chia_bls::{
@@ -115,6 +117,8 @@ pub fn tree_hash<'a>(py: Python<'a>, blob: PyBuffer<u8>) -> PyResult<Bound<'_, P
     Ok(PyBytes::new_bound(py, &tree_hash_from_bytes(slice)?))
 }
 
+// there is an updated version of this function that doesn't require serializing
+// and deserializing the generator and arguments.
 #[allow(clippy::too_many_arguments)]
 #[pyfunction]
 pub fn get_puzzle_and_solution_for_coin<'a>(
@@ -145,7 +149,12 @@ pub fn get_puzzle_and_solution_for_coin<'a>(
         .allow_threads(|| -> Result<(NodePtr, NodePtr), EvalErr> {
             let Reduction(_cost, result) =
                 run_program(&mut allocator, dialect, program, args, max_cost)?;
-            match parse_puzzle_solution(&allocator, result, find_parent, find_amount, find_ph) {
+            match parse_puzzle_solution(
+                &allocator,
+                result,
+                &HashSet::new(),
+                &Coin::new(find_parent, find_ph, find_amount),
+            ) {
                 Err(ValidationErr(n, _)) => Err(EvalErr(n, "coin not found".to_string())),
                 Ok(pair) => Ok(pair),
             }
@@ -167,6 +176,55 @@ pub fn get_puzzle_and_solution_for_coin<'a>(
     Ok((
         PyBytes::new_bound(py, &serialize(&allocator, puzzle)?),
         PyBytes::new_bound(py, &serialize(&allocator, solution)?),
+    ))
+}
+
+// This is a new version of get_puzzle_and_solution_for_coin() which uses the
+// right types for generator, blocks_refs and the return value.
+// The old version was written when Program was a python type had to be
+// serialized to bytes through rust boundary.
+#[allow(clippy::too_many_arguments)]
+#[pyfunction]
+pub fn get_puzzle_and_solution_for_coin2<'a>(
+    py: Python<'a>,
+    generator: &Program,
+    block_refs: &Bound<'a, PyList>,
+    max_cost: Cost,
+    find_coin: &Coin,
+    flags: u32,
+) -> PyResult<(Program, Program)> {
+    let mut allocator = make_allocator(LIMIT_HEAP);
+
+    let refs = block_refs.into_iter().map(|b| {
+        let buf = b
+            .extract::<PyBuffer<u8>>()
+            .expect("block_refs should be a list of buffers");
+        py_to_slice::<'a>(buf)
+    });
+
+    let (generator, backrefs) =
+        node_from_bytes_backrefs_record(&mut allocator, generator.as_ref())?;
+    let args = setup_generator_args(&mut allocator, refs)?;
+    let dialect = &ChiaDialect::new(flags);
+
+    let (puzzle, solution) = py
+        .allow_threads(|| -> Result<(NodePtr, NodePtr), EvalErr> {
+            let Reduction(_cost, result) =
+                run_program(&mut allocator, dialect, generator, args, max_cost)?;
+            match parse_puzzle_solution(&allocator, result, &backrefs, find_coin) {
+                Err(ValidationErr(n, _)) => Err(EvalErr(n, "coin not found".to_string())),
+                Ok(pair) => Ok(pair),
+            }
+        })
+        .map_err(|e| {
+            let blob = node_to_bytes(&allocator, e.0).ok().map(hex::encode);
+            PyValueError::new_err((e.1, blob))
+        })?;
+
+    // keep serializing normally, until wallets support backrefs
+    Ok((
+        node_to_bytes(&allocator, puzzle)?.into(),
+        node_to_bytes(&allocator, solution)?.into(),
     ))
 }
 
@@ -571,6 +629,7 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(compute_merkle_set_root, m)?)?;
     m.add_function(wrap_pyfunction!(tree_hash, m)?)?;
     m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin, m)?)?;
+    m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin2, m)?)?;
 
     // facilities from chia-bls
 
