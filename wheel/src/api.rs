@@ -369,12 +369,17 @@ pub fn py_get_conditions_from_spendbundle(
     use chia_consensus::allocator::make_allocator;
     use chia_consensus::gen::owned_conditions::OwnedSpendBundleConditions;
     let mut a = make_allocator(LIMIT_HEAP);
-    let conditions =
-        get_conditions_from_spendbundle(&mut a, spend_bundle, max_cost, height, constants)
-            .map_err(|e| {
-                let error_code: u32 = e.1.into();
-                PyErr::new::<PyTypeError, _>(error_code)
-            })?;
+    let conditions = get_conditions_from_spendbundle(
+        &mut a,
+        &spend_bundle.coin_spends,
+        max_cost,
+        height,
+        constants,
+    )
+    .map_err(|e| {
+        let error_code: u32 = e.1.into();
+        PyErr::new::<PyTypeError, _>(error_code)
+    })?;
     Ok(OwnedSpendBundleConditions::from(&a, conditions))
 }
 

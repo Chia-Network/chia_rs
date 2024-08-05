@@ -1,3 +1,5 @@
+use std::borrow::Borrow;
+
 use crate::consensus_constants::ConsensusConstants;
 use crate::gen::conditions::{
     process_single_spend, validate_conditions, MempoolVisitor, ParseState, SpendBundleConditions,
@@ -6,7 +8,7 @@ use crate::gen::flags::MEMPOOL_MODE;
 use crate::gen::run_block_generator::subtract_cost;
 use crate::gen::validation_error::ValidationErr;
 use crate::spendbundle_validation::get_flags_for_height_and_constants;
-use chia_protocol::SpendBundle;
+use chia_protocol::CoinSpend;
 use clvm_utils::tree_hash;
 use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
@@ -16,7 +18,7 @@ use clvmr::serde::node_from_bytes;
 
 pub fn get_conditions_from_spendbundle(
     a: &mut Allocator,
-    spend_bundle: &SpendBundle,
+    coin_spends: impl IntoIterator<Item = impl Borrow<CoinSpend>>,
     max_cost: u64,
     height: u32,
     constants: &ConsensusConstants,
@@ -30,7 +32,9 @@ pub fn get_conditions_from_spendbundle(
     let mut ret = SpendBundleConditions::default();
     let mut state = ParseState::default();
 
-    for coin_spend in &spend_bundle.coin_spends {
+    for coin_spend in coin_spends {
+        let coin_spend = coin_spend.borrow();
+
         // process the spend
         let puz = node_from_bytes(a, coin_spend.puzzle_reveal.as_slice())?;
         let sol = node_from_bytes(a, coin_spend.solution.as_slice())?;
@@ -70,7 +74,7 @@ mod tests {
     use crate::allocator::make_allocator;
     use crate::gen::conditions::{ELIGIBLE_FOR_DEDUP, ELIGIBLE_FOR_FF};
     use chia_bls::Signature;
-    use chia_protocol::CoinSpend;
+    use chia_protocol::{CoinSpend, SpendBundle};
     use chia_traits::Streamable;
     use clvmr::chia_dialect::LIMIT_HEAP;
     use rstest::rstest;
@@ -83,7 +87,7 @@ mod tests {
         #[case] filename: &str,
         #[case] spends: usize,
         #[case] additions: usize,
-        #[values(0, 1, 1000000, 5000000)] height: u32,
+        #[values(0, 1, 1_000_000, 5_000_000)] height: u32,
         #[case] cost: u64,
     ) {
         let bundle = SpendBundle::from_bytes(
@@ -92,9 +96,14 @@ mod tests {
         .expect("parse bundle");
 
         let mut a = make_allocator(LIMIT_HEAP);
-        let conditions =
-            get_conditions_from_spendbundle(&mut a, &bundle, cost, height, &TEST_CONSTANTS)
-                .expect("get_conditions_from_spendbundle");
+        let conditions = get_conditions_from_spendbundle(
+            &mut a,
+            &bundle.coin_spends,
+            cost,
+            height,
+            &TEST_CONSTANTS,
+        )
+        .expect("get_conditions_from_spendbundle");
 
         assert_eq!(conditions.spends.len(), spends);
         let create_coins = conditions
@@ -121,9 +130,14 @@ mod tests {
         let bundle = SpendBundle::new(vec![spend], Signature::default());
 
         let mut a = make_allocator(LIMIT_HEAP);
-        let conditions =
-            get_conditions_from_spendbundle(&mut a, &bundle, cost, height, &TEST_CONSTANTS)
-                .expect("get_conditions_from_spendbundle");
+        let conditions = get_conditions_from_spendbundle(
+            &mut a,
+            &bundle.coin_spends,
+            cost,
+            height,
+            &TEST_CONSTANTS,
+        )
+        .expect("get_conditions_from_spendbundle");
 
         assert_eq!(conditions.spends.len(), 1);
         let spend = &conditions.spends[0];
@@ -287,7 +301,7 @@ mod tests {
         let mut a = make_allocator(LIMIT_HEAP);
         let conds = get_conditions_from_spendbundle(
             &mut a,
-            &bundle,
+            &bundle.coin_spends,
             11_000_000_000,
             5_000_000,
             &TEST_CONSTANTS,
