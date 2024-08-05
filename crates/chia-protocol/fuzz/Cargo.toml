@@ -18,7 +18,6 @@ chia-traits = { workspace = true }
 clvm-traits = { workspace = true }
 chia-protocol = { workspace = true, features = ["arbitrary"] }
 arbitrary = { workspace = true }
-sha2 = { workspace = true }
 hex = { workspace = true }
 
 [[bin]]
