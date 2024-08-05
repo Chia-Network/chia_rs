@@ -1,3 +1,4 @@
+use crate::allocator::make_allocator;
 use crate::consensus_constants::ConsensusConstants;
 use crate::gen::condition_tools::make_aggsig_final_message;
 use crate::gen::flags::{ALLOW_BACKREFS, DISALLOW_INFINITY_G1, ENABLE_MESSAGE_CONDITIONS};
@@ -11,7 +12,7 @@ use crate::spendbundle_conditions::get_conditions_from_spendbundle;
 use chia_bls::BlsCache;
 use chia_bls::PairingInfo;
 use chia_protocol::SpendBundle;
-use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV};
+use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV, LIMIT_HEAP};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -26,8 +27,10 @@ pub fn validate_clvm_and_signature(
     cache: &Arc<Mutex<BlsCache>>,
 ) -> Result<(OwnedSpendBundleConditions, Vec<PairingInfo>, Duration), ErrorCode> {
     let start_time = Instant::now();
-    let npcresult = get_conditions_from_spendbundle(spend_bundle, max_cost, height, constants)
+    let mut a = make_allocator(LIMIT_HEAP);
+    let sbc = get_conditions_from_spendbundle(&mut a, spend_bundle, max_cost, height, constants)
         .map_err(|e| e.1)?;
+    let npcresult = OwnedSpendBundleConditions::from(&a, sbc);
     let iter = npcresult.spends.iter().flat_map(|spend| {
         let condition_items_pairs = [
             (AGG_SIG_PARENT, &spend.agg_sig_parent),
@@ -113,8 +116,8 @@ mod tests {
     use clvm_utils::tree_hash_atom;
     use hex::FromHex;
     use hex_literal::hex;
-    use std::sync::Arc;
     use rstest::rstest;
+    use std::sync::Arc;
 
     #[rstest]
     #[case(0, 0)]
