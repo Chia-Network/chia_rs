@@ -369,16 +369,11 @@ pub fn py_validate_clvm_and_signature(
     constants: &ConsensusConstants,
     peak_height: u32,
 ) -> PyResult<(OwnedSpendBundleConditions, Vec<PairingInfo>, f32)> {
-    let (owned_conditions, additions, duration) = validate_clvm_and_signature(
-        new_spend,
-        max_cost,
-        constants,
-        peak_height,
-    )
-    .map_err(|e| {
-        let error_code: u32 = e.into();
-        PyErr::new::<PyTypeError, _>(error_code)
-    })?; // cast validation error to int
+    let (owned_conditions, additions, duration) =
+        validate_clvm_and_signature(new_spend, max_cost, constants, peak_height).map_err(|e| {
+            let error_code: u32 = e.into();
+            PyErr::new::<PyTypeError, _>(error_code)
+        })?; // cast validation error to int
     Ok((owned_conditions, additions, duration.as_secs_f32()))
 }
 
