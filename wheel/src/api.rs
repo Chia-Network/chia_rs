@@ -368,15 +368,12 @@ pub fn py_validate_clvm_and_signature(
     max_cost: u64,
     constants: &ConsensusConstants,
     peak_height: u32,
-    cache: Option<BlsCache>,
 ) -> PyResult<(OwnedSpendBundleConditions, Vec<PairingInfo>, f32)> {
-    let real_cache = cache.unwrap_or_default();
     let (owned_conditions, additions, duration) = validate_clvm_and_signature(
         new_spend,
         max_cost,
         constants,
         peak_height,
-        &Arc::new(Mutex::new(real_cache)), // TODO: use cache properly
     )
     .map_err(|e| {
         let error_code: u32 = e.into();

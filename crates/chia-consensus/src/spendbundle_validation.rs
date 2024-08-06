@@ -10,11 +10,10 @@ use crate::gen::owned_conditions::OwnedSpendBundleConditions;
 use crate::gen::validation_error::ErrorCode;
 use crate::spendbundle_conditions::get_conditions_from_spendbundle;
 use chia_bls::PairingInfo;
-use chia_bls::{aggregate_verify_gt, hash_to_g2, BlsCache};
+use chia_bls::{aggregate_verify_gt, hash_to_g2};
 use chia_protocol::SpendBundle;
 use clvmr::sha2::Sha256;
 use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV, LIMIT_HEAP};
-use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 // currently in mempool_manager.py
@@ -25,7 +24,6 @@ pub fn validate_clvm_and_signature(
     max_cost: u64,
     constants: &ConsensusConstants,
     height: u32,
-    cache: &Arc<Mutex<BlsCache>>,
 ) -> Result<(OwnedSpendBundleConditions, Vec<PairingInfo>, Duration), ErrorCode> {
     let start_time = Instant::now();
     let mut a = make_allocator(LIMIT_HEAP);
@@ -185,7 +183,6 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             236,
-            &Arc::new(Mutex::new(BlsCache::default())),
         )
         .expect("SpendBundle should be valid for this test");
     }
@@ -217,7 +214,6 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             236,
-            &Arc::new(Mutex::new(BlsCache::default())),
         )
         .expect("SpendBundle should be valid for this test");
     }
@@ -246,7 +242,6 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm / 2, // same as mempool_manager default
             &TEST_CONSTANTS,
             236,
-            &Arc::new(Mutex::new(BlsCache::default())),
         );
         assert!(matches!(result, Ok(..)));
         let result = validate_clvm_and_signature(
@@ -254,7 +249,6 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm / 3, // lower than mempool_manager default
             &TEST_CONSTANTS,
             236,
-            &Arc::new(Mutex::new(BlsCache::default())),
         );
         assert!(matches!(result, Err(ErrorCode::CostExceeded)));
     }
@@ -295,7 +289,6 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             1,
-            &Arc::new(Mutex::new(BlsCache::default())),
         )
         .expect("SpendBundle should be valid for this test");
     }
@@ -345,7 +338,6 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             TEST_CONSTANTS.hard_fork_height + 1,
-            &Arc::new(Mutex::new(BlsCache::default())),
         )
         .expect("SpendBundle should be valid for this test");
     }
@@ -389,7 +381,6 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             TEST_CONSTANTS.hard_fork_height + 1,
-            &Arc::new(Mutex::new(BlsCache::default())),
         )
         .expect("SpendBundle should be valid for this test");
     }
@@ -433,7 +424,6 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             TEST_CONSTANTS.hard_fork_height + 1,
-            &Arc::new(Mutex::new(BlsCache::default())),
         )
         .expect("SpendBundle should be valid for this test");
     }

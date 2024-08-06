@@ -310,7 +310,6 @@ def validate_clvm_and_signature(
     max_cost: int,
     constants: ConsensusConstants,
     peak_height: int,
-    cache: Optional[BLSCache],
 ) -> Tuple[SpendBundleConditions, List[Tuple[SpendBundleConditions, List[Tuple[bytes32, bytes]]]], float]: ...
 
 def get_conditions_from_spendbundle(
