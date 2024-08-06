@@ -1,8 +1,7 @@
-
 use crate::{aggregate_verify_gt, hash_to_g2};
 use crate::{GTElement, PublicKey, Signature};
 use lru::LruCache;
-use sha2::{Digest, Sha256};
+use clvmr::sha2::Sha256;
 use std::borrow::Borrow;
 use std::num::NonZeroUsize;
 
