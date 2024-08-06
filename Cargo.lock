@@ -346,8 +346,6 @@ dependencies = [
  "hex-literal",
  "log",
  "native-tls",
- "rand",
- "semver",
  "sha2",
  "thiserror",
  "tokio",

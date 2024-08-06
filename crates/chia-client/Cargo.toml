@@ -24,8 +24,6 @@ log = { workspace = true }
 native-tls = { workspace = true }
 dns-lookup = { workspace = true }
 hex-literal = { workspace = true }
-rand = { workspace = true }
-semver = { workspace = true }
 hex = { workspace = true }
 
 [dev-dependencies]
