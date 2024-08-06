@@ -53,7 +53,6 @@ use pyo3::types::PyList;
 use pyo3::types::PyTuple;
 use pyo3::wrap_pyfunction;
 use std::iter::zip;
-use std::sync::{Arc, Mutex};
 
 use crate::run_program::{run_chia_program, serialized_length};
 
