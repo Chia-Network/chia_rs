@@ -339,7 +339,6 @@ def test_validate_clvm_and_sig():
         DEFAULT_CONSTANTS.MAX_BLOCK_COST_CLVM,
         DEFAULT_CONSTANTS,
         DEFAULT_CONSTANTS.HARD_FORK_HEIGHT + 1,
-        cache,
     )
 
     assert sbc is not None

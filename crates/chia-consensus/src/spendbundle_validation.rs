@@ -9,29 +9,35 @@ use crate::gen::opcodes::{
 use crate::gen::owned_conditions::OwnedSpendBundleConditions;
 use crate::gen::validation_error::ErrorCode;
 use crate::spendbundle_conditions::get_conditions_from_spendbundle;
-use chia_bls::BlsCache;
-use chia_bls::PairingInfo;
+use chia_bls::GTElement;
+use chia_bls::{aggregate_verify_gt, hash_to_g2};
 use chia_protocol::SpendBundle;
+use clvmr::sha2::Sha256;
 use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV, LIMIT_HEAP};
-use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+
+// type definition makes clippy happy
+pub type ValidationPair = ([u8; 32], GTElement);
 
 // currently in mempool_manager.py
 // called in threads from pre_validate_spend_bundle()
-// returns (error, cached_results, new_cache_entries, duration)
+// pybinding returns (error, cached_results, new_cache_entries, duration)
 pub fn validate_clvm_and_signature(
     spend_bundle: &SpendBundle,
     max_cost: u64,
     constants: &ConsensusConstants,
     height: u32,
-    cache: &Arc<Mutex<BlsCache>>,
-) -> Result<(OwnedSpendBundleConditions, Vec<PairingInfo>, Duration), ErrorCode> {
+) -> Result<(OwnedSpendBundleConditions, Vec<ValidationPair>, Duration), ErrorCode> {
     let start_time = Instant::now();
     let mut a = make_allocator(LIMIT_HEAP);
     let sbc = get_conditions_from_spendbundle(&mut a, spend_bundle, max_cost, height, constants)
         .map_err(|e| e.1)?;
     let npcresult = OwnedSpendBundleConditions::from(&a, sbc);
-    let iter = npcresult.spends.iter().flat_map(|spend| {
+
+    // Collect all pairs in a single vector to avoid multiple iterations
+    let mut pairs = Vec::new();
+
+    for spend in &npcresult.spends {
         let condition_items_pairs = [
             (AGG_SIG_PARENT, &spend.agg_sig_parent),
             (AGG_SIG_PUZZLE, &spend.agg_sig_puzzle),
@@ -41,37 +47,46 @@ pub fn validate_clvm_and_signature(
             (AGG_SIG_PARENT_PUZZLE, &spend.agg_sig_parent_puzzle),
             (AGG_SIG_ME, &spend.agg_sig_me),
         ];
-        condition_items_pairs
-            .into_iter()
-            .flat_map(move |(condition, items)| {
-                let spend_clone = spend.clone();
-                items.iter().map(move |(pk, msg)| {
-                    (
-                        pk,
-                        make_aggsig_final_message(
-                            condition,
-                            msg.as_slice(),
-                            &spend_clone,
-                            constants,
-                        ),
-                    )
-                })
-            })
-    });
-    let unsafe_items = npcresult
-        .agg_sig_unsafe
-        .iter()
-        .map(|(pk, msg)| (pk, msg.as_slice().to_vec()));
-    let iter = iter.chain(unsafe_items);
+
+        for (condition, items) in condition_items_pairs {
+            for (pk, msg) in items {
+                let mut aug_msg = pk.to_bytes().to_vec();
+                let msg = make_aggsig_final_message(condition, msg.as_slice(), spend, constants);
+                aug_msg.extend_from_slice(msg.as_ref());
+                let aug_hash = hash_to_g2(&aug_msg);
+                let pairing = aug_hash.pair(pk);
+                pairs.push((hash_pk_and_msg(&pk.to_bytes(), &msg), pairing));
+            }
+        }
+    }
+
+    // Adding unsafe items
+    for (pk, msg) in &npcresult.agg_sig_unsafe {
+        let mut aug_msg = pk.to_bytes().to_vec();
+        aug_msg.extend_from_slice(msg.as_ref());
+        let aug_hash = hash_to_g2(&aug_msg);
+        let pairing = aug_hash.pair(pk);
+        pairs.push((hash_pk_and_msg(&pk.to_bytes(), msg), pairing));
+    }
+
     // Verify aggregated signature
-    let (result, added) = cache
-        .lock()
-        .unwrap()
-        .aggregate_verify(iter, &spend_bundle.aggregated_signature);
+    let result = aggregate_verify_gt(
+        &spend_bundle.aggregated_signature,
+        pairs.iter().map(|tuple| tuple.1),
+    );
     if !result {
         return Err(ErrorCode::BadAggregateSignature);
     }
-    Ok((npcresult, added, start_time.elapsed()))
+
+    // Collect results
+    Ok((npcresult, pairs, start_time.elapsed()))
+}
+
+fn hash_pk_and_msg(pk: &[u8], msg: &[u8]) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(pk);
+    hasher.update(msg);
+    hasher.finalize()
 }
 
 pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusConstants) -> u32 {
@@ -117,7 +132,6 @@ mod tests {
     use hex::FromHex;
     use hex_literal::hex;
     use rstest::rstest;
-    use std::sync::Arc;
 
     #[rstest]
     #[case(0, 0)]
@@ -161,7 +175,6 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             236,
-            &Arc::new(Mutex::new(BlsCache::default())),
         )
         .expect("SpendBundle should be valid for this test");
     }
@@ -193,7 +206,6 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             236,
-            &Arc::new(Mutex::new(BlsCache::default())),
         )
         .expect("SpendBundle should be valid for this test");
     }
@@ -222,7 +234,6 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm / 2, // same as mempool_manager default
             &TEST_CONSTANTS,
             236,
-            &Arc::new(Mutex::new(BlsCache::default())),
         );
         assert!(matches!(result, Ok(..)));
         let result = validate_clvm_and_signature(
@@ -230,7 +241,6 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm / 3, // lower than mempool_manager default
             &TEST_CONSTANTS,
             236,
-            &Arc::new(Mutex::new(BlsCache::default())),
         );
         assert!(matches!(result, Err(ErrorCode::CostExceeded)));
     }
@@ -271,7 +281,6 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             1,
-            &Arc::new(Mutex::new(BlsCache::default())),
         )
         .expect("SpendBundle should be valid for this test");
     }
@@ -321,7 +330,6 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             TEST_CONSTANTS.hard_fork_height + 1,
-            &Arc::new(Mutex::new(BlsCache::default())),
         )
         .expect("SpendBundle should be valid for this test");
     }
@@ -365,7 +373,6 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             TEST_CONSTANTS.hard_fork_height + 1,
-            &Arc::new(Mutex::new(BlsCache::default())),
         )
         .expect("SpendBundle should be valid for this test");
     }
@@ -409,7 +416,6 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             TEST_CONSTANTS.hard_fork_height + 1,
-            &Arc::new(Mutex::new(BlsCache::default())),
         )
         .expect("SpendBundle should be valid for this test");
     }

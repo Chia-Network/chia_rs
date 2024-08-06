@@ -65,8 +65,8 @@ impl BlsCache {
             let hash: [u8; 32] = hasher.finalize();
 
             // If the pairing is in the cache, we don't need to recalculate it.
-            if let Some(pairing) = self.cache.get(&hash).cloned() {
-                return pairing;
+            if let Some(pairing) = self.cache.get(&hash) {
+                return *pairing;
             }
 
             // Otherwise, we need to calculate the pairing and add it to the cache.
@@ -79,7 +79,7 @@ impl BlsCache {
             let hash: [u8; 32] = hasher.finalize();
 
             let pairing = aug_hash.pair(pk.borrow());
-            self.cache.put(hash, pairing.clone());
+            self.cache.put(hash, pairing);
             added.push((hash, pairing.to_bytes().to_vec()));
             pairing
         });

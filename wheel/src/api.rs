@@ -53,7 +53,6 @@ use pyo3::types::PyList;
 use pyo3::types::PyTuple;
 use pyo3::wrap_pyfunction;
 use std::iter::zip;
-use std::sync::{Arc, Mutex};
 
 use crate::run_program::{run_chia_program, serialized_length};
 
@@ -368,20 +367,16 @@ pub fn py_validate_clvm_and_signature(
     max_cost: u64,
     constants: &ConsensusConstants,
     peak_height: u32,
-    cache: Option<BlsCache>,
 ) -> PyResult<(OwnedSpendBundleConditions, Vec<PairingInfo>, f32)> {
-    let real_cache = cache.unwrap_or_default();
-    let (owned_conditions, additions, duration) = validate_clvm_and_signature(
-        new_spend,
-        max_cost,
-        constants,
-        peak_height,
-        &Arc::new(Mutex::new(real_cache)), // TODO: use cache properly
-    )
-    .map_err(|e| {
-        let error_code: u32 = e.into();
-        PyErr::new::<PyTypeError, _>(error_code)
-    })?; // cast validation error to int
+    let (owned_conditions, additions, duration) =
+        validate_clvm_and_signature(new_spend, max_cost, constants, peak_height).map_err(|e| {
+            let error_code: u32 = e.into();
+            PyErr::new::<PyTypeError, _>(error_code)
+        })?; // cast validation error to int
+    let additions = additions
+        .into_iter()
+        .map(|tuple| (tuple.0, tuple.1.to_bytes().to_vec()))
+        .collect();
     Ok((owned_conditions, additions, duration.as_secs_f32()))
 }
 

@@ -13,7 +13,7 @@ use std::ops::{Mul, MulAssign};
     pyo3::pyclass,
     derive(chia_py_streamable_macro::PyStreamable)
 )]
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct GTElement(pub(crate) blst_fp12);
 
 impl GTElement {
@@ -114,7 +114,7 @@ impl GTElement {
 
     #[must_use]
     pub fn __mul__(&self, rhs: &Self) -> Self {
-        let mut ret = self.clone();
+        let mut ret = *self;
         ret *= rhs;
         ret
     }

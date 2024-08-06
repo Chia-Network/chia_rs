@@ -438,7 +438,7 @@ where
         return *sig == Signature::default();
     };
 
-    let mut agg = agg.borrow().clone();
+    let mut agg = *agg.borrow();
     for gt in data {
         agg *= gt.borrow();
     }
