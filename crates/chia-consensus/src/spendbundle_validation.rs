@@ -9,9 +9,10 @@ use crate::gen::opcodes::{
 use crate::gen::owned_conditions::OwnedSpendBundleConditions;
 use crate::gen::validation_error::ErrorCode;
 use crate::spendbundle_conditions::get_conditions_from_spendbundle;
-use chia_bls::BlsCache;
 use chia_bls::PairingInfo;
+use chia_bls::{aggregate_verify_gt, hash_to_g2, BlsCache};
 use chia_protocol::SpendBundle;
+use clvmr::sha2::Sha256;
 use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV, LIMIT_HEAP};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -31,7 +32,8 @@ pub fn validate_clvm_and_signature(
     let sbc = get_conditions_from_spendbundle(&mut a, spend_bundle, max_cost, height, constants)
         .map_err(|e| e.1)?;
     let npcresult = OwnedSpendBundleConditions::from(&a, sbc);
-    let iter = npcresult.spends.iter().flat_map(|spend| {
+    let spends = npcresult.spends.clone();
+    let iter = spends.iter().flat_map(|spend| {
         let condition_items_pairs = [
             (AGG_SIG_PARENT, &spend.agg_sig_parent),
             (AGG_SIG_PUZZLE, &spend.agg_sig_puzzle),
@@ -46,32 +48,54 @@ pub fn validate_clvm_and_signature(
             .flat_map(move |(condition, items)| {
                 let spend_clone = spend.clone();
                 items.iter().map(move |(pk, msg)| {
-                    (
-                        pk,
-                        make_aggsig_final_message(
-                            condition,
-                            msg.as_slice(),
-                            &spend_clone,
-                            constants,
-                        ),
-                    )
+                    let mut aug_msg = pk.to_bytes().to_vec();
+                    let msg = make_aggsig_final_message(
+                        condition,
+                        msg.as_slice(),
+                        &spend_clone,
+                        constants,
+                    );
+                    aug_msg.extend_from_slice(msg.as_ref());
+                    let aug_hash = hash_to_g2(&aug_msg);
+                    let pairing = aug_hash.pair(pk);
+
+                    let mut hasher = Sha256::new();
+                    hasher.update(pk.to_bytes());
+                    hasher.update(msg.as_slice());
+                    let hash: [u8; 32] = hasher.finalize();
+                    (hash, pairing)
                 })
             })
     });
-    let unsafe_items = npcresult
-        .agg_sig_unsafe
-        .iter()
-        .map(|(pk, msg)| (pk, msg.as_slice().to_vec()));
+    let unsafes = npcresult.agg_sig_unsafe.clone();
+    let unsafe_items = unsafes.iter().map(|(pk, msg)| {
+        let mut aug_msg = pk.to_bytes().to_vec();
+        aug_msg.extend_from_slice(msg.as_ref());
+        let aug_hash = hash_to_g2(&aug_msg);
+        let pairing = aug_hash.pair(pk);
+
+        let mut hasher = Sha256::new();
+        hasher.update(pk.to_bytes());
+        hasher.update(msg.as_slice());
+        let hash: [u8; 32] = hasher.finalize();
+        (hash, pairing)
+    });
     let iter = iter.chain(unsafe_items);
+
     // Verify aggregated signature
-    let (result, added) = cache
-        .lock()
-        .unwrap()
-        .aggregate_verify(iter, &spend_bundle.aggregated_signature);
+    let result = aggregate_verify_gt(
+        &spend_bundle.aggregated_signature,
+        iter.clone().map(|tuple| tuple.1),
+    );
     if !result {
         return Err(ErrorCode::BadAggregateSignature);
     }
-    Ok((npcresult, added, start_time.elapsed()))
+    Ok((
+        npcresult,
+        iter.map(|tuple| (tuple.0, tuple.1.to_bytes().to_vec()))
+            .collect(),
+        start_time.elapsed(),
+    ))
 }
 
 pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusConstants) -> u32 {
