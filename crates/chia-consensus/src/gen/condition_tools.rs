@@ -102,25 +102,25 @@ mod tests {
     }
 
     #[rstest]
-    #[case(AGG_SIG_PARENT, b"parent_message", hex!("4444444444444444444444444444444444444444444444444444444444444444").into(), hex!("3333333333333333333333333333333333333333333333333333333333333333").into(), 10000)]
-    #[case(AGG_SIG_PUZZLE, b"puzzle_message", hex!("4444444444444444444444444444444444444444444444444444444444444444").into(), hex!("3333333333333333333333333333333333333333333333333333333333333333").into(), 261)]
-    #[case(AGG_SIG_AMOUNT, b"amount_message", hex!("4444444444444444444444444444444444444444444444444444444444444444").into(), hex!("3333333333333333333333333333333333333333333333333333333333333333").into(), 100_000_000_005)]
-    #[case(AGG_SIG_PUZZLE_AMOUNT, b"puzzle_amount_message", hex!("4444444444444444444444444444444444444444444444444444444444444444").into(), hex!("3333333333333333333333333333333333333333333333333333333333333333").into(), 410)]
-    #[case(AGG_SIG_PARENT_AMOUNT, b"parent_amount_message", hex!("4444444444444444444444444444444444444444444444444444444444444444").into(), hex!("3333333333333333333333333333333333333333333333333333333333333333").into(), 909)]
-    #[case(AGG_SIG_PARENT_PUZZLE, b"parent_puzzle_message", hex!("4444444444444444444444444444444444444444444444444444444444444444").into(), hex!("3333333333333333333333333333333333333333333333333333333333333333").into(), 10_061_997)]
-    #[case(AGG_SIG_ME, b"me_message", hex!("4444444444444444444444444444444444444444444444444444444444444444").into(), hex!("3333333333333333333333333333333333333333333333333333333333333333").into(), 1303)]
-    fn test_make_aggsig_final_message(
-        #[case] opcode: ConditionOpcode,
-        #[case] msg: &[u8],
-        #[case] parent_id: Vec<u8>,
-        #[case] puzzle_hash: Vec<u8>,
-        #[case] coin_amount: u64,
-    ) {
+    #[case(AGG_SIG_PARENT, 10000)]
+    #[case(AGG_SIG_PUZZLE, 261)]
+    #[case(AGG_SIG_AMOUNT, 100_000_000_005)]
+    #[case(AGG_SIG_PUZZLE_AMOUNT, 410)]
+    #[case(AGG_SIG_PARENT_AMOUNT, 909)]
+    #[case(AGG_SIG_PARENT_PUZZLE, 10_061_997)]
+    #[case(AGG_SIG_ME, 1303)]
+    fn test_make_aggsig_final_message(#[case] opcode: ConditionOpcode, #[case] coin_amount: u64) {
         use std::sync::Arc;
 
         use chia_protocol::Bytes32;
 
         use crate::r#gen::conditions::Spend;
+
+        let parent_id: Vec<u8> =
+            hex!("4444444444444444444444444444444444444444444444444444444444444444").into();
+        let puzzle_hash: Vec<u8> =
+            hex!("3333333333333333333333333333333333333333333333333333333333333333").into();
+        let msg = b"message";
 
         let mut expected_result = Vec::<u8>::new();
         expected_result.extend(msg);
