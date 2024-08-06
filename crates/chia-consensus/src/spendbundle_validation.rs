@@ -57,11 +57,7 @@ pub fn validate_clvm_and_signature(
                     let aug_hash = hash_to_g2(&aug_msg);
                     let pairing = aug_hash.pair(pk);
 
-                    let mut hasher = Sha256::new();
-                    hasher.update(pk.to_bytes());
-                    hasher.update(msg.as_slice());
-                    let hash: [u8; 32] = hasher.finalize();
-                    (hash, pairing)
+                    (hash_pk_and_msg(&pk.to_bytes(), &msg), pairing)
                 })
             })
     });
@@ -71,12 +67,7 @@ pub fn validate_clvm_and_signature(
         aug_msg.extend_from_slice(msg.as_ref());
         let aug_hash = hash_to_g2(&aug_msg);
         let pairing = aug_hash.pair(pk);
-
-        let mut hasher = Sha256::new();
-        hasher.update(pk.to_bytes());
-        hasher.update(msg.as_slice());
-        let hash: [u8; 32] = hasher.finalize();
-        (hash, pairing)
+        (hash_pk_and_msg(&pk.to_bytes(), msg), pairing)
     });
     let iter = iter.chain(unsafe_items);
 
@@ -94,6 +85,13 @@ pub fn validate_clvm_and_signature(
             .collect(),
         start_time.elapsed(),
     ))
+}
+
+fn hash_pk_and_msg(pk: &[u8], msg: &[u8]) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(pk);
+    hasher.update(msg);
+    hasher.finalize()
 }
 
 pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusConstants) -> u32 {
