@@ -1455,7 +1455,7 @@ pub fn validate_conditions(
 }
 
 #[cfg(test)]
-fn u64_to_bytes(n: u64) -> Vec<u8> {
+pub(crate) fn u64_to_bytes(n: u64) -> Vec<u8> {
     let mut buf = Vec::<u8>::new();
     buf.extend_from_slice(&n.to_be_bytes());
     if (buf[0] & 0x80) != 0 {
