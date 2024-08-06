@@ -12,6 +12,7 @@ mod signature;
 mod parse_hex;
 
 pub use bls_cache::BlsCache;
+pub use bls_cache::PairingInfo;
 pub use derive_keys::*;
 pub use error::{Error, Result};
 pub use gtelement::GTElement;
