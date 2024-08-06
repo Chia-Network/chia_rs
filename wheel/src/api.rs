@@ -373,6 +373,10 @@ pub fn py_validate_clvm_and_signature(
             let error_code: u32 = e.into();
             PyErr::new::<PyTypeError, _>(error_code)
         })?; // cast validation error to int
+    let additions = additions
+        .into_iter()
+        .map(|tuple| (tuple.0, tuple.1.to_bytes().to_vec()))
+        .collect();
     Ok((owned_conditions, additions, duration.as_secs_f32()))
 }
 

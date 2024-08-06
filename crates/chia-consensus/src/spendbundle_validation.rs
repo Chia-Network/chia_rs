@@ -9,29 +9,35 @@ use crate::gen::opcodes::{
 use crate::gen::owned_conditions::OwnedSpendBundleConditions;
 use crate::gen::validation_error::ErrorCode;
 use crate::spendbundle_conditions::get_conditions_from_spendbundle;
-use chia_bls::PairingInfo;
+use chia_bls::GTElement;
 use chia_bls::{aggregate_verify_gt, hash_to_g2};
 use chia_protocol::SpendBundle;
 use clvmr::sha2::Sha256;
 use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV, LIMIT_HEAP};
 use std::time::{Duration, Instant};
 
+// type definition makes clippy happy
+pub type ValidationPair = ([u8; 32], GTElement);
+
 // currently in mempool_manager.py
 // called in threads from pre_validate_spend_bundle()
-// returns (error, cached_results, new_cache_entries, duration)
+// pybinding returns (error, cached_results, new_cache_entries, duration)
 pub fn validate_clvm_and_signature(
     spend_bundle: &SpendBundle,
     max_cost: u64,
     constants: &ConsensusConstants,
     height: u32,
-) -> Result<(OwnedSpendBundleConditions, Vec<PairingInfo>, Duration), ErrorCode> {
+) -> Result<(OwnedSpendBundleConditions, Vec<ValidationPair>, Duration), ErrorCode> {
     let start_time = Instant::now();
     let mut a = make_allocator(LIMIT_HEAP);
     let sbc = get_conditions_from_spendbundle(&mut a, spend_bundle, max_cost, height, constants)
         .map_err(|e| e.1)?;
     let npcresult = OwnedSpendBundleConditions::from(&a, sbc);
-    let spends = npcresult.spends.clone();
-    let iter = spends.iter().flat_map(|spend| {
+
+    // Collect all pairs in a single vector to avoid multiple iterations
+    let mut pairs = Vec::new();
+
+    for spend in &npcresult.spends {
         let condition_items_pairs = [
             (AGG_SIG_PARENT, &spend.agg_sig_parent),
             (AGG_SIG_PUZZLE, &spend.agg_sig_puzzle),
@@ -41,50 +47,39 @@ pub fn validate_clvm_and_signature(
             (AGG_SIG_PARENT_PUZZLE, &spend.agg_sig_parent_puzzle),
             (AGG_SIG_ME, &spend.agg_sig_me),
         ];
-        condition_items_pairs
-            .into_iter()
-            .flat_map(move |(condition, items)| {
-                let spend_clone = spend.clone();
-                items.iter().map(move |(pk, msg)| {
-                    let mut aug_msg = pk.to_bytes().to_vec();
-                    let msg = make_aggsig_final_message(
-                        condition,
-                        msg.as_slice(),
-                        &spend_clone,
-                        constants,
-                    );
-                    aug_msg.extend_from_slice(msg.as_ref());
-                    let aug_hash = hash_to_g2(&aug_msg);
-                    let pairing = aug_hash.pair(pk);
 
-                    (hash_pk_and_msg(&pk.to_bytes(), &msg), pairing)
-                })
-            })
-    });
-    let unsafes = npcresult.agg_sig_unsafe.clone();
-    let unsafe_items = unsafes.iter().map(|(pk, msg)| {
+        for (condition, items) in condition_items_pairs {
+            for (pk, msg) in items {
+                let mut aug_msg = pk.to_bytes().to_vec();
+                let msg = make_aggsig_final_message(condition, msg.as_slice(), spend, constants);
+                aug_msg.extend_from_slice(msg.as_ref());
+                let aug_hash = hash_to_g2(&aug_msg);
+                let pairing = aug_hash.pair(pk);
+                pairs.push((hash_pk_and_msg(&pk.to_bytes(), &msg), pairing));
+            }
+        }
+    }
+
+    // Adding unsafe items
+    for (pk, msg) in &npcresult.agg_sig_unsafe {
         let mut aug_msg = pk.to_bytes().to_vec();
         aug_msg.extend_from_slice(msg.as_ref());
         let aug_hash = hash_to_g2(&aug_msg);
         let pairing = aug_hash.pair(pk);
-        (hash_pk_and_msg(&pk.to_bytes(), msg), pairing)
-    });
-    let iter = iter.chain(unsafe_items);
+        pairs.push((hash_pk_and_msg(&pk.to_bytes(), msg), pairing));
+    }
 
     // Verify aggregated signature
     let result = aggregate_verify_gt(
         &spend_bundle.aggregated_signature,
-        iter.clone().map(|tuple| tuple.1),
+        pairs.iter().map(|tuple| tuple.1),
     );
     if !result {
         return Err(ErrorCode::BadAggregateSignature);
     }
-    Ok((
-        npcresult,
-        iter.map(|tuple| (tuple.0, tuple.1.to_bytes().to_vec()))
-            .collect(),
-        start_time.elapsed(),
-    ))
+
+    // Collect results
+    Ok((npcresult, pairs, start_time.elapsed()))
 }
 
 fn hash_pk_and_msg(pk: &[u8], msg: &[u8]) -> [u8; 32] {
@@ -137,7 +132,6 @@ mod tests {
     use hex::FromHex;
     use hex_literal::hex;
     use rstest::rstest;
-    use std::sync::Arc;
 
     #[rstest]
     #[case(0, 0)]
