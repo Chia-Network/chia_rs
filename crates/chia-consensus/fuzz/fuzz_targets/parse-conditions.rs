@@ -14,7 +14,7 @@ use fuzzing_utils::{make_list, BitCursor};
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use chia_consensus::gen::flags::{ENABLE_MESSAGE_CONDITIONS, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
+use chia_consensus::gen::flags::{NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
 
 fuzz_target!(|data: &[u8]| {
     let mut a = Allocator::new();
@@ -40,12 +40,7 @@ fuzz_target!(|data: &[u8]| {
 
     let mut state = ParseState::default();
 
-    for flags in &[
-        0,
-        STRICT_ARGS_COUNT,
-        NO_UNKNOWN_CONDS,
-        ENABLE_MESSAGE_CONDITIONS,
-    ] {
+    for flags in &[0, STRICT_ARGS_COUNT, NO_UNKNOWN_CONDS] {
         let mut coin_spend = Spend {
             parent_id,
             coin_amount: amount,
