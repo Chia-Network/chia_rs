@@ -13,7 +13,9 @@ use chia_consensus::gen::solution_generator::solution_generator_backrefs as nati
 use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
 use chia_consensus::spendbundle_conditions::get_conditions_from_spendbundle;
-use chia_consensus::spendbundle_validation::get_flags_for_height_and_constants;
+use chia_consensus::spendbundle_validation::{
+    get_flags_for_height_and_constants, validate_clvm_and_signature,
+};
 use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
     CoinSpend, CoinState, CoinStateFilters, CoinStateUpdate, EndOfSubSlotBundle, Foliage,
@@ -359,6 +361,23 @@ fn fast_forward_singleton<'p>(
 }
 
 #[pyfunction]
+#[pyo3(name = "validate_clvm_and_signature")]
+#[allow(clippy::type_complexity)]
+pub fn py_validate_clvm_and_signature(
+    new_spend: &SpendBundle,
+    max_cost: u64,
+    constants: &ConsensusConstants,
+    peak_height: u32,
+) -> PyResult<(OwnedSpendBundleConditions, Vec<([u8; 32], GTElement)>, f32)> {
+    let (owned_conditions, additions, duration) =
+        validate_clvm_and_signature(new_spend, max_cost, constants, peak_height).map_err(|e| {
+            let error_code: u32 = e.into();
+            PyErr::new::<PyTypeError, _>(error_code)
+        })?; // cast validation error to int
+    Ok((owned_conditions, additions, duration.as_secs_f32()))
+}
+
+#[pyfunction]
 #[pyo3(name = "get_conditions_from_spendbundle")]
 pub fn py_get_conditions_from_spendbundle(
     spend_bundle: &SpendBundle,
@@ -413,7 +432,8 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(confirm_included_already_hashed, m)?)?;
     m.add_function(wrap_pyfunction!(confirm_not_included_already_hashed, m)?)?;
 
-    // multithread validattion
+    // spendbundle validation
+    m.add_function(wrap_pyfunction!(py_validate_clvm_and_signature, m)?)?;
     m.add_function(wrap_pyfunction!(py_get_conditions_from_spendbundle, m)?)?;
     m.add_function(wrap_pyfunction!(py_get_flags_for_height_and_constants, m)?)?;
 

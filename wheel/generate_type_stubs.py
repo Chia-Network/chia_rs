@@ -305,6 +305,13 @@ def confirm_not_included_already_hashed(
     proof: bytes,
 ) -> bool: ...
 
+def validate_clvm_and_signature(
+    new_spend: SpendBundle,
+    max_cost: int,
+    constants: ConsensusConstants,
+    peak_height: int,
+) -> Tuple[SpendBundleConditions, List[Tuple[bytes32, GTElement]], float]: ...
+
 def get_conditions_from_spendbundle(
     spend_bundle: SpendBundle,
     max_cost: int,
