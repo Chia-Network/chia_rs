@@ -14,8 +14,19 @@ workspace = true
 [dependencies]
 chia-protocol = { workspace = true }
 chia-traits = { workspace = true }
-tokio = { workspace = true, features = ["rt", "sync"] }
-tokio-tungstenite = { workspace = true }
+tokio = { workspace = true, features = ["rt", "sync", "time"] }
+tokio-tungstenite = { workspace = true, features = ["native-tls"] }
 futures-util = { workspace = true }
 tungstenite = { workspace = true }
 thiserror = { workspace = true }
+sha2 = { workspace = true }
+log = { workspace = true }
+native-tls = { workspace = true }
+hex-literal = { workspace = true }
+hex = { workspace = true }
+
+[dev-dependencies]
+chia-ssl = { path = "../chia-ssl" }
+tokio = { workspace = true, features = ["full"] }
+anyhow = { workspace = true }
+env_logger = { workspace = true }

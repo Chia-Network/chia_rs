@@ -1,363 +1,341 @@
-use std::sync::atomic::{AtomicU16, Ordering};
-use std::{collections::HashMap, sync::Arc};
+use std::{fmt, net::SocketAddr, sync::Arc};
 
-use chia_protocol::*;
+use chia_protocol::{
+    Bytes32, ChiaProtocolMessage, CoinStateFilters, Message, PuzzleSolutionResponse,
+    RegisterForCoinUpdates, RegisterForPhUpdates, RejectCoinState, RejectPuzzleSolution,
+    RejectPuzzleState, RequestChildren, RequestCoinState, RequestPeers, RequestPuzzleSolution,
+    RequestPuzzleState, RequestTransaction, RespondChildren, RespondCoinState, RespondPeers,
+    RespondPuzzleSolution, RespondPuzzleState, RespondToCoinUpdates, RespondToPhUpdates,
+    RespondTransaction, SendTransaction, SpendBundle, TransactionAck,
+};
 use chia_traits::Streamable;
-use futures_util::stream::SplitSink;
-use futures_util::{SinkExt, StreamExt};
-use tokio::sync::{broadcast, oneshot, Mutex};
-use tokio::{net::TcpStream, task::JoinHandle};
-use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
-use tungstenite::Message as WsMessage;
+use futures_util::{
+    stream::{SplitSink, SplitStream},
+    SinkExt, StreamExt,
+};
+use native_tls::TlsConnector;
+use sha2::{digest::FixedOutput, Digest, Sha256};
+use tokio::{
+    net::TcpStream,
+    sync::{mpsc, oneshot, Mutex},
+    task::JoinHandle,
+};
+use tokio_tungstenite::{Connector, MaybeTlsStream, WebSocketStream};
 
-use crate::utils::stream;
-use crate::Error;
+use crate::{request_map::RequestMap, Error, Result};
 
 type WebSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
-type Requests = Arc<Mutex<HashMap<u16, oneshot::Sender<Message>>>>;
+type Sink = SplitSink<WebSocket, tungstenite::Message>;
+type Stream = SplitStream<WebSocket>;
+type Response<T, E> = std::result::Result<T, E>;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PeerEvent {
-    CoinStateUpdate(CoinStateUpdate),
-    NewPeakWallet(NewPeakWallet),
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct PeerId([u8; 32]);
+
+impl fmt::Display for PeerId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", hex::encode(self.0))
+    }
 }
 
-pub struct Peer {
-    sink: Mutex<SplitSink<WebSocket, tungstenite::Message>>,
-    inbound_task: JoinHandle<()>,
-    event_receiver: broadcast::Receiver<PeerEvent>,
-    requests: Requests,
+#[derive(Debug, Clone)]
+pub struct Peer(Arc<PeerInner>);
 
-    // TODO: This does not currently prevent multiple requests with the same id at the same time.
-    // If one of them is still running while all other ids are being iterated through.
-    nonce: AtomicU16,
+#[derive(Debug)]
+struct PeerInner {
+    sink: Mutex<Sink>,
+    inbound_handle: JoinHandle<()>,
+    requests: Arc<RequestMap>,
+    peer_id: PeerId,
+    socket_addr: SocketAddr,
 }
 
 impl Peer {
-    pub fn new(ws: WebSocket) -> Self {
-        let (sink, mut stream) = ws.split();
-        let (event_sender, event_receiver) = broadcast::channel(32);
+    /// Connects to a peer using its IP address and port.
+    pub async fn connect(
+        socket_addr: SocketAddr,
+        tls_connector: TlsConnector,
+    ) -> Result<(Self, mpsc::Receiver<Message>)> {
+        Self::connect_full_uri(&format!("wss://{socket_addr}/ws"), tls_connector).await
+    }
 
-        let requests = Requests::default();
-        let requests_clone = Arc::clone(&requests);
+    /// Connects to a peer using its full WebSocket URI.
+    /// For example, `wss://127.0.0.1:8444/ws`.
+    pub async fn connect_full_uri(
+        uri: &str,
+        tls_connector: TlsConnector,
+    ) -> Result<(Self, mpsc::Receiver<Message>)> {
+        let (ws, _) = tokio_tungstenite::connect_async_tls_with_config(
+            uri,
+            None,
+            false,
+            Some(Connector::NativeTls(tls_connector)),
+        )
+        .await?;
+        Self::from_websocket(ws)
+    }
 
-        let inbound_task = tokio::spawn(async move {
-            while let Some(message) = stream.next().await {
-                if let Ok(message) = message {
-                    Self::handle_inbound(message, &requests_clone, &event_sender)
-                        .await
-                        .ok();
-                }
+    /// Creates a peer from an existing WebSocket connection.
+    /// The connection must be secured with TLS, so that the certificate can be hashed in a peer id.
+    pub fn from_websocket(ws: WebSocket) -> Result<(Self, mpsc::Receiver<Message>)> {
+        let (socket_addr, cert) = match ws.get_ref() {
+            MaybeTlsStream::NativeTls(tls) => {
+                let tls_stream = tls.get_ref();
+                let tcp_stream = tls_stream.get_ref().get_ref();
+                (tcp_stream.peer_addr()?, tls_stream.peer_certificate()?)
+            }
+            _ => return Err(Error::MissingCertificate),
+        };
+
+        let Some(cert) = cert else {
+            return Err(Error::MissingCertificate);
+        };
+
+        let mut hasher = Sha256::new();
+        hasher.update(cert.to_der()?);
+
+        let peer_id = PeerId(hasher.finalize_fixed().into());
+        let (sink, stream) = ws.split();
+        let (sender, receiver) = mpsc::channel(32);
+
+        let requests = Arc::new(RequestMap::new());
+        let requests_clone = requests.clone();
+
+        let inbound_handle = tokio::spawn(async move {
+            if let Err(error) = handle_inbound_messages(stream, sender, requests_clone).await {
+                log::warn!("Error handling message: {error}");
             }
         });
 
-        Self {
+        let peer = Self(Arc::new(PeerInner {
             sink: Mutex::new(sink),
-            inbound_task,
-            event_receiver,
+            inbound_handle,
             requests,
-            nonce: AtomicU16::new(0),
-        }
+            peer_id,
+            socket_addr,
+        }));
+
+        Ok((peer, receiver))
     }
 
-    pub async fn send_handshake(
-        &self,
-        network_id: String,
-        node_type: NodeType,
-    ) -> Result<(), Error<()>> {
-        let body = Handshake {
-            network_id,
-            protocol_version: "0.0.34".to_string(),
-            software_version: "0.0.0".to_string(),
-            server_port: 0,
-            node_type,
-            capabilities: vec![
-                (1, "1".to_string()),
-                (2, "1".to_string()),
-                (3, "1".to_string()),
-            ],
-        };
-        self.send(body).await
+    /// The hash of the TLS certificate used by the peer.
+    pub fn peer_id(&self) -> PeerId {
+        self.0.peer_id
     }
 
-    pub async fn request_puzzle_and_solution(
-        &self,
-        coin_id: Bytes32,
-        height: u32,
-    ) -> Result<PuzzleSolutionResponse, Error<RejectPuzzleSolution>> {
-        let body = RequestPuzzleSolution {
-            coin_name: coin_id,
-            height,
-        };
-        let response: RespondPuzzleSolution = self.request_or_reject(body).await?;
-        Ok(response.response)
+    /// The IP address and port of the peer connection.
+    pub fn socket_addr(&self) -> SocketAddr {
+        self.0.socket_addr
     }
 
-    pub async fn send_transaction(
-        &self,
-        spend_bundle: SpendBundle,
-    ) -> Result<TransactionAck, Error<()>> {
-        let body = SendTransaction {
-            transaction: spend_bundle,
-        };
-        self.request(body).await
+    pub async fn send_transaction(&self, spend_bundle: SpendBundle) -> Result<TransactionAck> {
+        self.request_infallible(SendTransaction::new(spend_bundle))
+            .await
     }
 
-    pub async fn request_block_header(
+    pub async fn request_puzzle_state(
         &self,
-        height: u32,
-    ) -> Result<HeaderBlock, Error<RejectHeaderRequest>> {
-        let body = RequestBlockHeader { height };
-        let response: RespondBlockHeader = self.request_or_reject(body).await?;
-        Ok(response.header_block)
-    }
-
-    pub async fn request_block_headers(
-        &self,
-        start_height: u32,
-        end_height: u32,
-        return_filter: bool,
-    ) -> Result<Vec<HeaderBlock>, Error<()>> {
-        let body = RequestBlockHeaders {
-            start_height,
-            end_height,
-            return_filter,
-        };
-        let response: RespondBlockHeaders =
-            self.request_or_reject(body)
-                .await
-                .map_err(|error: Error<RejectBlockHeaders>| match error {
-                    Error::Rejection(_rejection) => Error::Rejection(()),
-                    Error::Chia(error) => Error::Chia(error),
-                    Error::WebSocket(error) => Error::WebSocket(error),
-                    Error::InvalidResponse(error) => Error::InvalidResponse(error),
-                    Error::MissingResponse => Error::MissingResponse,
-                })?;
-        Ok(response.header_blocks)
-    }
-
-    pub async fn request_removals(
-        &self,
-        height: u32,
+        puzzle_hashes: Vec<Bytes32>,
+        previous_height: Option<u32>,
         header_hash: Bytes32,
-        coin_ids: Option<Vec<Bytes32>>,
-    ) -> Result<RespondRemovals, Error<RejectRemovalsRequest>> {
-        let body = RequestRemovals {
-            height,
+        filters: CoinStateFilters,
+        subscribe_when_finished: bool,
+    ) -> Result<Response<RespondPuzzleState, RejectPuzzleState>> {
+        self.request_fallible(RequestPuzzleState::new(
+            puzzle_hashes,
+            previous_height,
             header_hash,
-            coin_names: coin_ids,
-        };
-        self.request_or_reject(body).await
+            filters,
+            subscribe_when_finished,
+        ))
+        .await
     }
 
-    pub async fn request_additions(
+    pub async fn request_coin_state(
         &self,
-        height: u32,
-        header_hash: Option<Bytes32>,
-        puzzle_hashes: Option<Vec<Bytes32>>,
-    ) -> Result<RespondAdditions, Error<RejectAdditionsRequest>> {
-        let body = RequestAdditions {
-            height,
+        coin_ids: Vec<Bytes32>,
+        previous_height: Option<u32>,
+        header_hash: Bytes32,
+        subscribe: bool,
+    ) -> Result<Response<RespondCoinState, RejectCoinState>> {
+        self.request_fallible(RequestCoinState::new(
+            coin_ids,
+            previous_height,
             header_hash,
-            puzzle_hashes,
-        };
-        self.request_or_reject(body).await
+            subscribe,
+        ))
+        .await
     }
 
     pub async fn register_for_ph_updates(
         &self,
         puzzle_hashes: Vec<Bytes32>,
         min_height: u32,
-    ) -> Result<Vec<CoinState>, Error<()>> {
-        let body = RegisterForPhUpdates {
-            puzzle_hashes,
-            min_height,
-        };
-        let response: RespondToPhUpdates = self.request(body).await?;
-        Ok(response.coin_states)
+    ) -> Result<RespondToPhUpdates> {
+        self.request_infallible(RegisterForPhUpdates::new(puzzle_hashes, min_height))
+            .await
     }
 
     pub async fn register_for_coin_updates(
         &self,
         coin_ids: Vec<Bytes32>,
         min_height: u32,
-    ) -> Result<Vec<CoinState>, Error<()>> {
-        let body = RegisterForCoinUpdates {
-            coin_ids,
-            min_height,
-        };
-        let response: RespondToCoinUpdates = self.request(body).await?;
-        Ok(response.coin_states)
+    ) -> Result<RespondToCoinUpdates> {
+        self.request_infallible(RegisterForCoinUpdates::new(coin_ids, min_height))
+            .await
     }
 
-    pub async fn request_children(&self, coin_id: Bytes32) -> Result<Vec<CoinState>, Error<()>> {
-        let body = RequestChildren { coin_name: coin_id };
-        let response: RespondChildren = self.request(body).await?;
-        Ok(response.coin_states)
+    pub async fn request_transaction(&self, transaction_id: Bytes32) -> Result<RespondTransaction> {
+        self.request_infallible(RequestTransaction::new(transaction_id))
+            .await
     }
 
-    pub async fn request_ses_info(
+    pub async fn request_puzzle_and_solution(
         &self,
-        start_height: u32,
-        end_height: u32,
-    ) -> Result<RespondSesInfo, Error<()>> {
-        let body = RequestSesInfo {
-            start_height,
-            end_height,
-        };
-        self.request(body).await
+        coin_id: Bytes32,
+        height: u32,
+    ) -> Result<Response<PuzzleSolutionResponse, RejectPuzzleSolution>> {
+        match self
+            .request_fallible::<RespondPuzzleSolution, _, _>(RequestPuzzleSolution::new(
+                coin_id, height,
+            ))
+            .await?
+        {
+            Ok(response) => Ok(Ok(response.response)),
+            Err(rejection) => Ok(Err(rejection)),
+        }
     }
 
-    pub async fn request_fee_estimates(
-        &self,
-        time_targets: Vec<u64>,
-    ) -> Result<FeeEstimateGroup, Error<()>> {
-        let body = RequestFeeEstimates { time_targets };
-        let response: RespondFeeEstimates = self.request(body).await?;
-        Ok(response.estimates)
+    pub async fn request_children(&self, coin_id: Bytes32) -> Result<RespondChildren> {
+        self.request_infallible(RequestChildren::new(coin_id)).await
     }
 
-    pub async fn send<T>(&self, body: T) -> Result<(), Error<()>>
+    pub async fn request_peers(&self) -> Result<RespondPeers> {
+        self.request_infallible(RequestPeers::new()).await
+    }
+
+    /// Sends a message to the peer, but does not expect any response.
+    pub async fn send<T>(&self, body: T) -> Result<()>
     where
         T: Streamable + ChiaProtocolMessage,
     {
-        // Create the message.
-        let message = Message {
-            msg_type: T::msg_type(),
-            id: None,
-            data: stream(&body)?.into(),
-        };
+        let message = Message::new(T::msg_type(), None, body.to_bytes()?.into())
+            .to_bytes()?
+            .into();
 
-        // Send the message through the websocket.
-        let mut sink = self.sink.lock().await;
-        sink.send(stream(&message)?.into()).await?;
+        self.0.sink.lock().await.send(message).await?;
 
         Ok(())
     }
 
-    pub async fn request_or_reject<T, R, B>(&self, body: B) -> Result<T, Error<R>>
+    /// Sends a message to the peer and expects a message that's either a response or a rejection.
+    pub async fn request_fallible<T, E, B>(&self, body: B) -> Result<Response<T, E>>
     where
         T: Streamable + ChiaProtocolMessage,
-        R: Streamable + ChiaProtocolMessage,
+        E: Streamable + ChiaProtocolMessage,
         B: Streamable + ChiaProtocolMessage,
     {
         let message = self.request_raw(body).await?;
-        let data = message.data.as_ref();
-
+        if message.msg_type != T::msg_type() && message.msg_type != E::msg_type() {
+            return Err(Error::InvalidResponse(
+                vec![T::msg_type(), E::msg_type()],
+                message.msg_type,
+            ));
+        }
         if message.msg_type == T::msg_type() {
-            T::from_bytes(data).or(Err(Error::InvalidResponse(message)))
-        } else if message.msg_type == R::msg_type() {
-            let rejection = R::from_bytes(data).or(Err(Error::InvalidResponse(message)))?;
-            Err(Error::Rejection(rejection))
+            Ok(Ok(T::from_bytes(&message.data)?))
         } else {
-            Err(Error::InvalidResponse(message))
+            Ok(Err(E::from_bytes(&message.data)?))
         }
     }
 
-    pub async fn request<Response, T>(&self, body: T) -> Result<Response, Error<()>>
+    /// Sends a message to the peer and expects a specific response message.
+    pub async fn request_infallible<T, B>(&self, body: B) -> Result<T>
     where
-        Response: Streamable + ChiaProtocolMessage,
         T: Streamable + ChiaProtocolMessage,
+        B: Streamable + ChiaProtocolMessage,
     {
         let message = self.request_raw(body).await?;
-        let data = message.data.as_ref();
-
-        if message.msg_type == Response::msg_type() {
-            Response::from_bytes(data).or(Err(Error::InvalidResponse(message)))
-        } else {
-            Err(Error::InvalidResponse(message))
+        if message.msg_type != T::msg_type() {
+            return Err(Error::InvalidResponse(
+                vec![T::msg_type()],
+                message.msg_type,
+            ));
         }
+        Ok(T::from_bytes(&message.data)?)
     }
 
-    pub async fn request_raw<T, R>(&self, body: T) -> Result<Message, Error<R>>
+    /// Sends a message to the peer and expects any arbitrary protocol message without parsing it.
+    pub async fn request_raw<T>(&self, body: T) -> Result<Message>
     where
         T: Streamable + ChiaProtocolMessage,
     {
-        // Get the current nonce and increment.
-        let message_id = self.nonce.fetch_add(1, Ordering::SeqCst);
+        let (sender, receiver) = oneshot::channel();
 
-        // Create the message.
         let message = Message {
             msg_type: T::msg_type(),
-            id: Some(message_id),
-            data: stream(&body)?.into(),
-        };
-
-        // Create a saved oneshot channel to receive the response.
-        let (sender, receiver) = oneshot::channel::<Message>();
-        self.requests.lock().await.insert(message_id, sender);
-
-        // Send the message.
-        let bytes = match stream(&message) {
-            Ok(bytes) => bytes.into(),
-            Err(error) => {
-                self.requests.lock().await.remove(&message_id);
-                return Err(error.into());
-            }
-        };
-        let send_result = self.sink.lock().await.send(bytes).await;
-
-        if let Err(error) = send_result {
-            self.requests.lock().await.remove(&message_id);
-            return Err(error.into());
+            id: Some(self.0.requests.insert(sender).await),
+            data: body.to_bytes()?.into(),
         }
+        .to_bytes()?
+        .into();
 
-        // Wait for the response.
-        let response = receiver.await;
-
-        // Remove the one shot channel.
-        self.requests.lock().await.remove(&message_id);
-
-        // Handle the response, if present.
-        response.or(Err(Error::MissingResponse))
-    }
-
-    pub fn receiver(&self) -> &broadcast::Receiver<PeerEvent> {
-        &self.event_receiver
-    }
-
-    pub fn receiver_mut(&mut self) -> &mut broadcast::Receiver<PeerEvent> {
-        &mut self.event_receiver
-    }
-
-    async fn handle_inbound(
-        message: WsMessage,
-        requests: &Requests,
-        event_sender: &broadcast::Sender<PeerEvent>,
-    ) -> Result<(), Error<()>> {
-        // Parse the message.
-        let message = Message::from_bytes(message.into_data().as_ref())?;
-
-        if let Some(id) = message.id {
-            // Send response through oneshot channel if present.
-            if let Some(request) = requests.lock().await.remove(&id) {
-                request.send(message).ok();
-            }
-            return Ok(());
-        }
-
-        macro_rules! events {
-            ( $( $event:ident ),+ $(,)? ) => {
-                match message.msg_type {
-                    $( ProtocolMessageTypes::$event => {
-                        event_sender
-                            .send(PeerEvent::$event($event::from_bytes(message.data.as_ref())?))
-                            .ok();
-                    } )+
-                    _ => {}
-                }
-            };
-        }
-
-        // TODO: Handle unexpected messages.
-        events!(CoinStateUpdate, NewPeakWallet);
-
-        Ok(())
+        self.0.sink.lock().await.send(message).await?;
+        Ok(receiver.await?)
     }
 }
 
-impl Drop for Peer {
+impl Drop for PeerInner {
     fn drop(&mut self) {
-        self.inbound_task.abort();
+        self.inbound_handle.abort();
     }
+}
+
+async fn handle_inbound_messages(
+    mut stream: Stream,
+    sender: mpsc::Sender<Message>,
+    requests: Arc<RequestMap>,
+) -> Result<()> {
+    use tungstenite::Message::{Binary, Close, Frame, Ping, Pong, Text};
+
+    while let Some(message) = stream.next().await {
+        let message = message?;
+
+        match message {
+            Text(text) => {
+                log::warn!("Received unexpected text message: {text}");
+            }
+            Close(close) => {
+                log::warn!("Received close: {close:?}");
+                break;
+            }
+            Ping(_ping) => {}
+            Pong(_pong) => {}
+            Binary(binary) => {
+                let message = Message::from_bytes(&binary)?;
+
+                let Some(id) = message.id else {
+                    sender.send(message).await.map_err(|error| {
+                        log::warn!("Failed to send peer message event: {error}");
+                        Error::EventNotSent
+                    })?;
+                    continue;
+                };
+
+                let Some(request) = requests.remove(id).await else {
+                    log::warn!(
+                        "Received {:?} message with untracked id {id}",
+                        message.msg_type
+                    );
+                    return Err(Error::UnexpectedMessage(message.msg_type));
+                };
+
+                request.send(message);
+            }
+            Frame(frame) => {
+                log::warn!("Received frame: {frame}");
+            }
+        }
+    }
+    Ok(())
 }
