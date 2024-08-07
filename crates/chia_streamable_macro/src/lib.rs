@@ -98,7 +98,7 @@ pub fn streamable(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attrs = if matches!(found_crate, FoundCrate::Itself) {
         quote! {
             #[cfg_attr(
-                feature = "py-bindings", pyo3::pyclass(frozen), derive(
+                feature = "py-bindings", pyo3::pyclass(frozen, subclass), derive(
                     chia_py_streamable_macro::PyJsonDict,
                     chia_py_streamable_macro::PyStreamable,
                     chia_py_streamable_macro::PyGetters
