@@ -15,7 +15,7 @@ use clvmr::ENABLE_FIXED_DIV;
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
 
-#[streamable]
+#[streamable(subclass)]
 pub struct SpendBundle {
     coin_spends: Vec<CoinSpend>,
     aggregated_signature: G2Element,
