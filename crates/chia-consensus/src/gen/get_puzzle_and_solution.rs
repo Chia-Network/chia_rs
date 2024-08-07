@@ -59,8 +59,20 @@ pub fn get_puzzle_and_solution_for_coin(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::gen::conditions::u64_to_bytes;
+    use crate::consensus_constants::TEST_CONSTANTS;
+    use crate::gen::conditions::{u64_to_bytes, MempoolVisitor};
+    use crate::gen::flags::{ALLOW_BACKREFS, MEMPOOL_MODE};
+    use crate::gen::run_block_generator::{run_block_generator2, setup_generator_args};
+    use clvm_traits::FromClvm;
+    use clvmr::reduction::Reduction;
+    use clvmr::serde::node_from_bytes_backrefs;
     use clvmr::sha2::Sha256;
+    use clvmr::{run_program, ChiaDialect};
+    use rstest::rstest;
+    use std::collections::HashSet;
+    use std::fs;
+
+    const MAX_COST: u64 = 11_000_000_000;
 
     fn make_dummy_id(seed: u64) -> Bytes32 {
         let mut sha256 = Sha256::new();
@@ -193,5 +205,78 @@ mod test {
             parse_coin_spend(&a, spend3).unwrap_err().1,
             ErrorCode::InvalidCoinAmount
         );
+    }
+
+    #[rstest]
+    #[case("block-1ee588dc")]
+    #[case("block-6fe59b24")]
+    #[case("block-834752-compressed")]
+    #[case("block-834752")]
+    #[case("block-834760")]
+    #[case("block-834761")]
+    #[case("block-834765")]
+    #[case("block-834766")]
+    #[case("block-834768")]
+    #[case("block-b45268ac")]
+    #[case("block-c2a8df0d")]
+    #[case("block-e5002df2")]
+    fn test_get_puzzle_and_solution(#[case] name: &str) {
+        let filename = format!("../../generator-tests/{name}.txt");
+        println!("file: {filename}");
+        let test_file = fs::read_to_string(filename).expect("test file not found");
+        let generator = test_file.split_once('\n').expect("invalid test file").0;
+        let generator = hex::decode(generator).expect("invalid hex encoded generator");
+
+        let mut a = Allocator::new();
+        let blocks: &[&[u8]] = &[];
+        let conds = run_block_generator2::<_, MempoolVisitor, _>(
+            &mut a,
+            &generator,
+            blocks,
+            MAX_COST,
+            ALLOW_BACKREFS | MEMPOOL_MODE,
+            &TEST_CONSTANTS,
+        )
+        .expect("run_block_generator2");
+
+        let mut a2 = Allocator::new();
+        let generator_node =
+            node_from_bytes_backrefs(&mut a2, &generator).expect("node_from_bytes_backrefs");
+        let checkpoint = a2.checkpoint();
+        for s in &conds.spends {
+            a2.restore_checkpoint(&checkpoint);
+            let mut expected_additions: HashSet<(Bytes32, u64)> =
+                HashSet::from_iter(s.create_coin.iter().map(|c| (c.puzzle_hash, c.amount)));
+
+            let dialect = &ChiaDialect::new(MEMPOOL_MODE);
+            let args = setup_generator_args(&mut a2, blocks).expect("setup_generator_args");
+            let Reduction(_, result) =
+                run_program(&mut a2, dialect, generator_node, args, MAX_COST)
+                    .expect("run_program (generator)");
+
+            let (puzzle, solution) = get_puzzle_and_solution_for_coin(
+                &a2,
+                result,
+                a.atom(s.parent_id).as_ref().try_into().unwrap(),
+                s.coin_amount,
+                a.atom(s.puzzle_hash).as_ref().try_into().unwrap(),
+            )
+            .expect("get_puzzle_and_solution_for_coin");
+
+            let Reduction(_, mut iter) = run_program(&mut a2, dialect, puzzle, solution, MAX_COST)
+                .expect("run_program (puzzle)");
+
+            while let Some((c, next)) = next(&a2, iter).expect("next") {
+                iter = next;
+                // 51 is CREATE_COIN
+                if let Ok((_create_coin, (puzzle_hash, (amount, _rest)))) =
+                    <(clvm_traits::MatchByte<51>, (Bytes32, (u64, NodePtr)))>::from_clvm(&a2, c)
+                {
+                    assert!(expected_additions.contains(&(puzzle_hash, amount)));
+                    expected_additions.remove(&(puzzle_hash, amount));
+                }
+            }
+            assert!(expected_additions.is_empty());
+        }
     }
 }
