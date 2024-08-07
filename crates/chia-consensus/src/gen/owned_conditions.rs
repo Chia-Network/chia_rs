@@ -11,7 +11,7 @@ use chia_py_streamable_macro::{PyJsonDict, PyStreamable};
 #[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(
     feature = "py-bindings",
-    pyo3::pyclass(name = "Spend", get_all, frozen, subclass),
+    pyo3::pyclass(name = "Spend", get_all, frozen),
     derive(PyJsonDict, PyStreamable)
 )]
 pub struct OwnedSpend {
@@ -39,7 +39,7 @@ pub struct OwnedSpend {
 #[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(
     feature = "py-bindings",
-    pyo3::pyclass(name = "SpendBundleConditions", get_all, frozen, subclass),
+    pyo3::pyclass(name = "SpendBundleConditions", get_all, frozen),
     derive(PyJsonDict, PyStreamable)
 )]
 pub struct OwnedSpendBundleConditions {

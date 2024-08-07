@@ -11,7 +11,7 @@ use std::ops::{Add, AddAssign};
 
 #[cfg_attr(
     feature = "py-bindings",
-    pyo3::pyclass(frozen, subclass, name = "PrivateKey"),
+    pyo3::pyclass(frozen, name = "PrivateKey"),
     derive(chia_py_streamable_macro::PyStreamable)
 )]
 #[derive(PartialEq, Eq, Clone)]
