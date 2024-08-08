@@ -2,7 +2,9 @@ use clap::Parser;
 
 use chia_bls::PublicKey;
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
-use chia_consensus::gen::conditions::{EmptyVisitor, NewCoin, Spend, SpendBundleConditions};
+use chia_consensus::gen::conditions::{
+    EmptyVisitor, NewCoin, SpendBundleConditions, SpendConditions,
+};
 use chia_consensus::gen::flags::{ALLOW_BACKREFS, MEMPOOL_MODE};
 use chia_consensus::gen::run_block_generator::{run_block_generator, run_block_generator2};
 use chia_tools::iterate_tx_blocks;
@@ -75,7 +77,7 @@ fn compare_agg_sig(
     }
 }
 
-fn compare_spend(a: &Allocator, lhs: &Spend, rhs: &Spend) {
+fn compare_spend(a: &Allocator, lhs: &SpendConditions, rhs: &SpendConditions) {
     assert_eq!(a.atom(lhs.parent_id), a.atom(rhs.parent_id));
     assert_eq!(lhs.coin_amount, rhs.coin_amount);
     assert_eq!(*lhs.coin_id, *rhs.coin_id);
@@ -97,7 +99,7 @@ fn compare_spend(a: &Allocator, lhs: &Spend, rhs: &Spend) {
     assert_eq!(a.atom(lhs.puzzle_hash), a.atom(rhs.puzzle_hash));
 }
 
-fn compare_spends(a: &Allocator, lhs: &Vec<Spend>, rhs: &Vec<Spend>) {
+fn compare_spends(a: &Allocator, lhs: &Vec<SpendConditions>, rhs: &Vec<SpendConditions>) {
     assert_eq!(lhs.len(), rhs.len());
 
     for (l, r) in std::iter::zip(lhs, rhs) {
