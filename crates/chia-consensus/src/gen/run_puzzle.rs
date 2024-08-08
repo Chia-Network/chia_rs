@@ -1,5 +1,7 @@
 use crate::consensus_constants::ConsensusConstants;
-use crate::gen::conditions::{parse_conditions, ParseState, Spend, SpendBundleConditions};
+use crate::gen::conditions::{
+    parse_conditions, ParseState, SpendBundleConditions, SpendConditions,
+};
 use crate::gen::flags::ALLOW_BACKREFS;
 use crate::gen::spend_visitor::SpendVisitor;
 use crate::gen::validation_error::ValidationErr;
@@ -51,7 +53,7 @@ pub fn run_puzzle<V: SpendVisitor>(
         .coin_id(),
     );
 
-    let mut spend = Spend::new(
+    let mut spend = SpendConditions::new(
         a.new_atom(parent_id)?,
         amount,
         a.new_atom(&puzzle_hash)?,

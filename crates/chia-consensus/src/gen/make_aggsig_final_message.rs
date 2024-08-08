@@ -3,14 +3,14 @@ use crate::gen::opcodes::{
     ConditionOpcode, AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT,
     AGG_SIG_PARENT_PUZZLE, AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT,
 };
-use crate::gen::owned_conditions::OwnedSpend;
+use crate::gen::owned_conditions::OwnedSpendConditions;
 use chia_protocol::Bytes;
 use chia_protocol::Coin;
 
 pub fn make_aggsig_final_message(
     opcode: ConditionOpcode,
     msg: &[u8],
-    spend: &OwnedSpend,
+    spend: &OwnedSpendConditions,
     constants: &ConsensusConstants,
 ) -> Vec<u8> {
     let mut result = Vec::<u8>::with_capacity(msg.len() + 96);
@@ -114,7 +114,7 @@ mod tests {
 
         use chia_protocol::Bytes32;
 
-        use crate::r#gen::conditions::Spend;
+        use crate::r#gen::conditions::SpendConditions;
 
         let parent_id: Vec<u8> =
             hex!("4444444444444444444444444444444444444444444444444444444444444444").into();
@@ -178,7 +178,7 @@ mod tests {
             _ => {}
         };
         let mut a: Allocator = make_allocator(LIMIT_HEAP);
-        let spend = Spend::new(
+        let spend = SpendConditions::new(
             a.new_atom(parent_id.as_slice()).expect("should pass"),
             coin_amount,
             a.new_atom(puzzle_hash.as_slice())
@@ -186,7 +186,7 @@ mod tests {
             Arc::new(Bytes32::try_from(coin.coin_id()).expect("test should pass")),
         );
 
-        let spend = OwnedSpend::from(&a, spend);
+        let spend = OwnedSpendConditions::from(&a, spend);
 
         let result = make_aggsig_final_message(opcode, msg, &spend, &TEST_CONSTANTS);
         assert_eq!(result, expected_result);
