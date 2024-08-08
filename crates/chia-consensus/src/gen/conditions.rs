@@ -1723,9 +1723,6 @@ fn cond_test_cb(
 use crate::gen::flags::MEMPOOL_MODE;
 
 #[cfg(test)]
-use crate::gen::flags::ENABLE_MESSAGE_CONDITIONS;
-
-#[cfg(test)]
 fn cond_test(input: &str) -> Result<(Allocator, SpendBundleConditions), ValidationErr> {
     // by default, run all tests in strict mempool mode
     cond_test_cb(input, MEMPOOL_MODE, None)
@@ -1931,7 +1928,7 @@ fn test_message_strict_args_count(
         &format!(
             "((({{h1}} ({{h2}} (123 (((66 ({mode} ({msg} {arg} {extra1} ) ((67 ({mode} ({msg} {extra2} ) ))))"
         ),
-        flags | ENABLE_MESSAGE_CONDITIONS,
+        flags,
     );
     if flags == 0 {
         ret.unwrap();
@@ -4676,29 +4673,28 @@ enum Ex {
 #[case("(67 (0x12 ({msg1} ({coin12} )", Ex::Fail)]
 #[case("(66 (0x12 ({msg1} ({coin12} )", Ex::Fail)]
 fn test_message_conditions_single_spend(#[case] test_case: &str, #[case] expect: Ex) {
-    for flags in &[ENABLE_MESSAGE_CONDITIONS, MEMPOOL_MODE] {
-        let ret = cond_test_flag(&format!("((({{h1}} ({{h2}} (123 (({test_case}))))"), *flags);
+    let flags = MEMPOOL_MODE;
+    let ret = cond_test_flag(&format!("((({{h1}} ({{h2}} (123 (({test_case}))))"), flags);
 
-        let expect_pass = match expect {
-            Ex::Pass => true,
-            Ex::Fail => false,
-        };
+    let expect_pass = match expect {
+        Ex::Pass => true,
+        Ex::Fail => false,
+    };
 
-        if let Ok((a, conds)) = ret {
-            assert!(expect_pass);
-            assert_eq!(conds.cost, 0);
-            assert_eq!(conds.spends.len(), 1);
-            let spend = &conds.spends[0];
-            assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-            assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-            assert_eq!(spend.flags, 0);
-        } else if expect_pass {
-            panic!("failed: {:?}", ret.unwrap_err().1);
-        } else {
-            let actual_err = ret.unwrap_err().1;
-            println!("Error: {actual_err:?}");
-            assert_eq!(ErrorCode::MessageNotSentOrReceived, actual_err);
-        }
+    if let Ok((a, conds)) = ret {
+        assert!(expect_pass);
+        assert_eq!(conds.cost, 0);
+        assert_eq!(conds.spends.len(), 1);
+        let spend = &conds.spends[0];
+        assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+        assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
+        assert_eq!(spend.flags, 0);
+    } else if expect_pass {
+        panic!("failed: {:?}", ret.unwrap_err().1);
+    } else {
+        let actual_err = ret.unwrap_err().1;
+        println!("Error: {actual_err:?}");
+        assert_eq!(ErrorCode::MessageNotSentOrReceived, actual_err);
     }
 }
 
@@ -4709,7 +4705,7 @@ fn test_message_conditions_single_spend(#[case] test_case: &str, #[case] expect:
 fn test_limit_messages(#[case] count: i32, #[case] expect_err: Option<ErrorCode>) {
     let r = cond_test_cb(
         "((({h1} ({h1} (123 ({} )))",
-        ENABLE_MESSAGE_CONDITIONS,
+        0,
         Some(Box::new(move |a: &mut Allocator| -> NodePtr {
             let mut rest: NodePtr = a.nil();
 
@@ -4864,14 +4860,13 @@ fn test_limit_messages(#[case] count: i32, #[case] expect_err: Option<ErrorCode>
     ErrorCode::CoinAmountNegative
 )]
 fn test_message_conditions_failures(#[case] test_case: &str, #[case] expect: ErrorCode) {
-    for flags in [ENABLE_MESSAGE_CONDITIONS, MEMPOOL_MODE] {
-        let ret = cond_test_flag(&format!("((({{h1}} ({{h2}} (123 (({test_case}))))"), flags);
+    let flags = MEMPOOL_MODE;
+    let ret = cond_test_flag(&format!("((({{h1}} ({{h2}} (123 (({test_case}))))"), flags);
 
-        let Err(ValidationErr(_, code)) = ret else {
-            panic!("expected failure: {expect:?}");
-        };
-        assert_eq!(code, expect);
-    }
+    let Err(ValidationErr(_, code)) = ret else {
+        panic!("expected failure: {expect:?}");
+    };
+    assert_eq!(code, expect);
 }
 
 #[cfg(test)]
@@ -5081,45 +5076,44 @@ fn test_message_conditions_two_spends(
     #[case] coin2_case: &str,
     #[case] expect: Ex,
 ) {
-    for flags in &[ENABLE_MESSAGE_CONDITIONS, MEMPOOL_MODE] {
-        let test = format!(
-            "(\
-            (({{h1}} ({{h2}} (123 (\
-                ({coin1_case} \
-                ))\
-            (({{h2}} ({{h1}} (123 (\
-                ({coin2_case} \
-                ))\
-            ))"
-        );
-        let ret = cond_test_flag(&test, *flags);
+    let flags = MEMPOOL_MODE;
+    let test = format!(
+        "(\
+        (({{h1}} ({{h2}} (123 (\
+            ({coin1_case} \
+            ))\
+        (({{h2}} ({{h1}} (123 (\
+            ({coin2_case} \
+            ))\
+        ))"
+    );
+    let ret = cond_test_flag(&test, flags);
 
-        let expect_pass = match expect {
-            Ex::Pass => true,
-            Ex::Fail => false,
-        };
+    let expect_pass = match expect {
+        Ex::Pass => true,
+        Ex::Fail => false,
+    };
 
-        if let Ok((a, conds)) = ret {
-            assert!(expect_pass);
-            assert_eq!(conds.cost, 0);
-            assert_eq!(conds.spends.len(), 2);
+    if let Ok((a, conds)) = ret {
+        assert!(expect_pass);
+        assert_eq!(conds.cost, 0);
+        assert_eq!(conds.spends.len(), 2);
 
-            let spend = &conds.spends[0];
-            assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-            assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-            assert_eq!(spend.flags, 0);
+        let spend = &conds.spends[0];
+        assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+        assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
+        assert_eq!(spend.flags, 0);
 
-            let spend = &conds.spends[1];
-            assert_eq!(*spend.coin_id, test_coin_id(H2, H1, 123));
-            assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
-            assert_eq!(spend.flags, 0);
-        } else if expect_pass {
-            panic!("failed: {:?}", ret.unwrap_err().1);
-        } else {
-            let actual_err = ret.unwrap_err().1;
-            println!("Error: {actual_err:?}");
-            assert_eq!(ErrorCode::MessageNotSentOrReceived, actual_err);
-        }
+        let spend = &conds.spends[1];
+        assert_eq!(*spend.coin_id, test_coin_id(H2, H1, 123));
+        assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
+        assert_eq!(spend.flags, 0);
+    } else if expect_pass {
+        panic!("failed: {:?}", ret.unwrap_err().1);
+    } else {
+        let actual_err = ret.unwrap_err().1;
+        println!("Error: {actual_err:?}");
+        assert_eq!(ErrorCode::MessageNotSentOrReceived, actual_err);
     }
 }
 
@@ -5165,8 +5159,7 @@ fn test_all_message_conditions() {
             ))\
         ))"
         );
-        let (a, conds) =
-            cond_test_flag(&test, ENABLE_MESSAGE_CONDITIONS).expect("condition expected to pass");
+        let (a, conds) = cond_test_flag(&test, 0).expect("condition expected to pass");
 
         assert_eq!(conds.cost, 0);
         assert_eq!(conds.spends.len(), 2);
@@ -5237,7 +5230,7 @@ fn test_message_eligible_for_ff() {
        ))"
         );
 
-        let (_a, cond) = cond_test_flag(&test, ENABLE_MESSAGE_CONDITIONS).expect("cond_test");
+        let (_a, cond) = cond_test_flag(&test, 0).expect("cond_test");
         assert!(cond.spends.len() == 2);
         assert_eq!(
             (cond.spends[0].flags & ELIGIBLE_FOR_FF) != 0,
@@ -5261,7 +5254,7 @@ fn test_message_eligible_for_ff() {
        ))"
         );
 
-        let (_a, cond) = cond_test_flag(&test, ENABLE_MESSAGE_CONDITIONS).expect("cond_test");
+        let (_a, cond) = cond_test_flag(&test, 0).expect("cond_test");
         assert!(cond.spends.len() == 2);
         assert_eq!(
             (cond.spends[0].flags & ELIGIBLE_FOR_FF) != 0,

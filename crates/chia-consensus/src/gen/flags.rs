@@ -17,9 +17,6 @@ pub const ALLOW_BACKREFS: u32 = 0x0200_0000;
 // what features are detected of the spends
 pub const ANALYZE_SPENDS: u32 = 0x0400_0000;
 
-// This enables support for the new SEND_MESSAGE and RECEIVE_MESSAGE conditions
-pub const ENABLE_MESSAGE_CONDITIONS: u32 = 0x0800_0000;
-
 // When this flag is set, we reject AGG_SIG_* conditions whose public key is the
 // infinity G1 point. Such public keys are mathematically valid, but do not
 // provide any security guarantees. Chia has historically allowed them. Enabling
@@ -30,5 +27,4 @@ pub const MEMPOOL_MODE: u32 = CLVM_MEMPOOL_MODE
     | NO_UNKNOWN_CONDS
     | STRICT_ARGS_COUNT
     | ANALYZE_SPENDS
-    | ENABLE_MESSAGE_CONDITIONS
     | DISALLOW_INFINITY_G1;
