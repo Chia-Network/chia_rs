@@ -315,6 +315,7 @@ dependencies = [
  "hex",
  "hkdf",
  "lru",
+ "num-bigint",
  "pyo3",
  "rand",
  "rstest",

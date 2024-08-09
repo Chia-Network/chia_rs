@@ -476,6 +476,9 @@ pub fn sign<Msg: AsRef<[u8]>>(sk: &SecretKey, msg: Msg) -> Signature {
 }
 
 #[cfg(feature = "py-bindings")]
+use num_bigint::BigInt;
+
+#[cfg(feature = "py-bindings")]
 #[pyo3::pymethods]
 impl Signature {
     #[classattr]
@@ -508,6 +511,16 @@ impl Signature {
 
     pub fn __iadd__(&mut self, rhs: &Self) {
         *self += rhs;
+    }
+
+    #[must_use]
+    #[pyo3(name = "scalar_multiply")]
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn py_scalar_multiply(&self, scalar: BigInt) -> Self {
+        let mut clone = self.clone();
+        let bytes = scalar.to_signed_bytes_be();
+        clone.scalar_multiply(&bytes);
+        clone
     }
 }
 
@@ -1201,6 +1214,27 @@ mod tests {
             g2.scalar_multiply(&[2]);
             assert!(g2_double == g2);
         }
+    }
+
+    #[test]
+    fn test_scalar_multiply_large() {
+        let mut rng = StdRng::seed_from_u64(1337);
+        let mut data = [0; 4198];
+        rng.fill(data.as_mut_slice());
+        let seed: [u8; 32] = rng.gen();
+        let msg: [u8; 32] = rng.gen();
+        let sk = SecretKey::from_seed(&seed);
+        let mut g2 = sign(&sk, msg);
+        g2.scalar_multiply(&data);
+        assert_eq!(
+            hex::encode(g2.to_bytes()),
+            "
+            ae4d384a25c51283b8be8c6546d23e1555995c87fbcc0fe12169b63a052c4a1f
+            c9d3a020e8e010d4be619e3c0980a1f213b951fe75375012c5df6a690548a637
+            ef25f8da1e4f9c8f4d2062531ce688c040258a76543831abde774872e00af74b
+            "
+            .replace([' ', '\n'], "")
+        );
     }
 
     #[test]

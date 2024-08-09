@@ -407,6 +407,7 @@ class MerkleSet:
             "def __add__(self, other: G1Element) -> G1Element: ...",
             "def __iadd__(self, other: G1Element) -> G1Element: ...",
             "def derive_unhardened(self, int) -> G1Element: ...",
+            "def scalar_multiply(self, value: int) -> G1Element: ...",
         ],
     )
     print_class(
@@ -422,6 +423,7 @@ class MerkleSet:
             "def __str__(self) -> str: ...",
             "def __add__(self, other: G2Element) -> G2Element: ...",
             "def __iadd__(self, other: G2Element) -> G2Element: ...",
+            "def scalar_multiply(self, value: int) -> G2Element: ...",
         ],
     )
     print_class(
