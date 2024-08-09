@@ -455,7 +455,7 @@ class MerkleSet:
 
     print_class(
         file,
-        "Spend",
+        "SpendConditions",
         [
             "coin_id: bytes",
             "parent_id: bytes",
