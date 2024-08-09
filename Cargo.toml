@@ -48,6 +48,7 @@ cast_precision_loss = "allow"
 cast_possible_wrap = "allow"
 cast_lossless = "allow"
 similar_names = "allow"
+implicit_hasher = "allow"
 
 [dependencies]
 chia-bls = { workspace = true, optional = true }
