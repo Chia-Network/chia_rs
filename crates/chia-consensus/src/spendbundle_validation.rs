@@ -90,7 +90,7 @@ fn hash_pk_and_msg(pk: &[u8], msg: &[u8]) -> [u8; 32] {
 }
 
 pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusConstants) -> u32 {
-    let mut flags: u32 = 0;
+    let mut flags: u32 = ENABLE_FIXED_DIV;
 
     if height >= constants.soft_fork5_height {
         flags |= DISALLOW_INFINITY_G1;
@@ -111,7 +111,7 @@ pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusCons
         //    arguments
         //  * Allow the block generator to be serialized with the improved clvm
         //   serialization format (with back-references)
-        flags = flags | ENABLE_BLS_OPS_OUTSIDE_GUARD | ENABLE_FIXED_DIV | ALLOW_BACKREFS;
+        flags = flags | ENABLE_BLS_OPS_OUTSIDE_GUARD | ALLOW_BACKREFS;
     }
     flags
 }
