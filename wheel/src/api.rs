@@ -6,7 +6,7 @@ use chia_consensus::gen::flags::{
     ALLOW_BACKREFS, ANALYZE_SPENDS, DISALLOW_INFINITY_G1, MEMPOOL_MODE, NO_UNKNOWN_CONDS,
     STRICT_ARGS_COUNT,
 };
-use chia_consensus::gen::owned_conditions::{OwnedSpend, OwnedSpendBundleConditions};
+use chia_consensus::gen::owned_conditions::{OwnedSpendBundleConditions, OwnedSpendConditions};
 use chia_consensus::gen::run_block_generator::setup_generator_args;
 use chia_consensus::gen::run_puzzle::run_puzzle as native_run_puzzle;
 use chia_consensus::gen::solution_generator::solution_generator as native_solution_generator;
@@ -480,7 +480,7 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
         "ELIGIBLE_FOR_FF",
         chia_consensus::gen::conditions::ELIGIBLE_FOR_FF,
     )?;
-    m.add_class::<OwnedSpend>()?;
+    m.add_class::<OwnedSpendConditions>()?;
 
     // constants
     m.add_class::<ConsensusConstants>()?;

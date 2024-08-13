@@ -1,4 +1,4 @@
-use super::conditions::{MempoolVisitor, NewCoin, Spend, SpendBundleConditions};
+use super::conditions::{MempoolVisitor, NewCoin, SpendBundleConditions, SpendConditions};
 use super::run_block_generator::{run_block_generator, run_block_generator2};
 use crate::allocator::make_allocator;
 use crate::consensus_constants::TEST_CONSTANTS;
@@ -44,7 +44,7 @@ pub(crate) fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> Stri
     }
     ret += "SPENDS:\n";
 
-    let mut spends: Vec<Spend> = c.spends.clone();
+    let mut spends: Vec<SpendConditions> = c.spends.clone();
     spends.sort_by_key(|s| *s.coin_id);
     for s in spends {
         ret += &format!(

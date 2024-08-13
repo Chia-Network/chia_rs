@@ -1,5 +1,5 @@
 from chia_rs import (
-    Spend,
+    SpendConditions,
     SpendBundleConditions,
     Coin,
     G1Element,
@@ -23,7 +23,7 @@ ph2 = b"cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
 
 def test_hash_spend() -> None:
 
-    a1 = Spend(
+    a1 = SpendConditions(
         coin,
         parent,
         ph,
@@ -44,7 +44,7 @@ def test_hash_spend() -> None:
         [],
         False,
     )
-    a2 = Spend(
+    a2 = SpendConditions(
         coin,
         parent,
         ph,
@@ -89,7 +89,7 @@ def test_hash_spend_bundle_conditions() -> None:
 
 def test_json_spend() -> None:
 
-    a = Spend(
+    a = SpendConditions(
         coin,
         parent,
         ph,
@@ -136,7 +136,7 @@ def test_json_spend() -> None:
 
 def test_from_json_spend() -> None:
 
-    a = Spend(
+    a = SpendConditions(
         coin,
         parent,
         ph,
@@ -158,7 +158,7 @@ def test_from_json_spend() -> None:
         False,
     )
 
-    b = Spend.from_json_dict(
+    b = SpendConditions.from_json_dict(
         {
             "coin_id": "0x" + coin.hex(),
             "parent_id": "0x" + parent.hex(),
@@ -186,7 +186,7 @@ def test_from_json_spend() -> None:
 
 def test_from_json_spend_set_optional() -> None:
 
-    a = Spend(
+    a = SpendConditions(
         coin,
         parent,
         ph,
@@ -208,7 +208,7 @@ def test_from_json_spend_set_optional() -> None:
         False,
     )
 
-    b = Spend.from_json_dict(
+    b = SpendConditions.from_json_dict(
         {
             "coin_id": "0x" + coin.hex(),
             "parent_id": "0x" + parent.hex(),
@@ -237,7 +237,7 @@ def test_from_json_spend_set_optional() -> None:
 def test_invalid_hex_prefix() -> None:
 
     with pytest.raises(ValueError, match="bytes object is expected to start with 0x"):
-        a = Spend.from_json_dict(
+        a = SpendConditions.from_json_dict(
             {
                 # this field is missing the 0x prefix
                 "coin_id": coin.hex(),
@@ -266,7 +266,7 @@ def test_invalid_hex_prefix() -> None:
 def test_invalid_hex_prefix_bytes() -> None:
 
     with pytest.raises(ValueError, match="bytes object is expected to start with 0x"):
-        a = Spend.from_json_dict(
+        a = SpendConditions.from_json_dict(
             {
                 "coin_id": "0x" + coin.hex(),
                 "parent_id": "0x" + parent.hex(),
@@ -295,7 +295,7 @@ def test_invalid_hex_prefix_bytes() -> None:
 def test_invalid_hex_digit() -> None:
 
     with pytest.raises(ValueError, match="invalid hex"):
-        a = Spend.from_json_dict(
+        a = SpendConditions.from_json_dict(
             {
                 # this field is has an invalid hex digit (the last one)
                 "coin_id": "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeg",
@@ -324,7 +324,7 @@ def test_invalid_hex_digit() -> None:
 def test_invalid_hex_length() -> None:
 
     with pytest.raises(ValueError, match="invalid length 33 expected 32"):
-        a = Spend.from_json_dict(
+        a = SpendConditions.from_json_dict(
             {
                 # this field is has invalid length
                 "coin_id": "0x" + coin.hex() + "ff",
@@ -353,7 +353,7 @@ def test_invalid_hex_length() -> None:
 def test_missing_field() -> None:
 
     with pytest.raises(KeyError, match="coin_id"):
-        a = Spend.from_json_dict(
+        a = SpendConditions.from_json_dict(
             {
                 # coin_id is missing
                 "parent_id": "0x" + parent.hex(),
@@ -422,7 +422,7 @@ def test_from_json_spend_bundle_conditions() -> None:
 
 def test_copy_spend() -> None:
 
-    a = Spend(
+    a = SpendConditions(
         coin,
         parent,
         ph,
