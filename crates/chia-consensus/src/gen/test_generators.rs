@@ -1,4 +1,4 @@
-use super::conditions::{MempoolVisitor, NewCoin, SpendConditions, SpendBundleConditions};
+use super::conditions::{MempoolVisitor, NewCoin, SpendBundleConditions, SpendConditions};
 use super::run_block_generator::{run_block_generator, run_block_generator2};
 use crate::allocator::make_allocator;
 use crate::consensus_constants::TEST_CONSTANTS;
