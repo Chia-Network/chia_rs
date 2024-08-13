@@ -3,7 +3,7 @@ use libfuzzer_sys::fuzz_target;
 
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::gen::conditions::{
-    parse_conditions, MempoolVisitor, ParseState, SpendBundleConditions,
+    parse_conditions, MempoolVisitor, ParseState, SpendBundleConditions, SpendConditions,
 };
 use chia_consensus::gen::spend_visitor::SpendVisitor;
 use chia_protocol::Bytes32;
@@ -41,7 +41,7 @@ fuzz_target!(|data: &[u8]| {
     let mut state = ParseState::default();
 
     for flags in &[0, STRICT_ARGS_COUNT, NO_UNKNOWN_CONDS] {
-        let mut coin_spend = Spend {
+        let mut coin_spend = SpendConditions {
             parent_id,
             coin_amount: amount,
             puzzle_hash,
