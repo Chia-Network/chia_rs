@@ -3,7 +3,7 @@ use libfuzzer_sys::fuzz_target;
 
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::gen::conditions::{
-    parse_conditions, MempoolVisitor, ParseState, SpendBundleConditions, SpendConditions,
+    parse_conditions, MempoolVisitor, ParseState, SpendBundleConditions,
 };
 use chia_consensus::gen::spend_visitor::SpendVisitor;
 use chia_protocol::Bytes32;
