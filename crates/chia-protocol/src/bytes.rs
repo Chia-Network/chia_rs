@@ -410,6 +410,10 @@ impl<const N: usize> ChiaToPython for BytesImpl<N> {
             let bytes_module = PyModule::import_bound(py, "chia_rs.sized_bytes")?;
             let ty = bytes_module.getattr("bytes32")?;
             ty.call1((self.0.into_py(py),))
+        } else if N == 48 {
+            let bytes_module = PyModule::import_bound(py, "chia_rs.sized_bytes")?;
+            let ty = bytes_module.getattr("bytes48")?;
+            ty.call1((self.0.into_py(py),))
         } else {
             Ok(PyBytes::new_bound(py, &self.0).into_any())
         }

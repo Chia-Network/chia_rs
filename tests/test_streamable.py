@@ -11,8 +11,10 @@ from chia_rs.sized_ints import uint64
 from chia_rs.sized_bytes import bytes32
 import pytest
 import copy
+import random
 
-sk = AugSchemeMPL.key_gen(bytes32.random())
+rng = random.Random(1337)
+sk = AugSchemeMPL.key_gen(bytes32.random(rng))
 pk = sk.get_g1()
 
 coin = b"bcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc"
@@ -70,6 +72,14 @@ def test_hash_spend() -> None:
     assert type(b) is int
     assert type(c) is int
     assert b != c
+
+    assert a1.get_hash() == bytes32.fromhex(
+        "2b72a6614da0368147fa6cb785445d6569603e38f2de230e5f30692bf6410245"
+    )
+    assert (
+        str(a1.get_hash())
+        == "2b72a6614da0368147fa6cb785445d6569603e38f2de230e5f30692bf6410245"
+    )
 
 
 def test_hash_spend_bundle_conditions() -> None:
