@@ -271,7 +271,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chia"
-version = "0.11.0"
+version = "0.12.0"
 dependencies = [
  "chia-bls 0.11.0",
  "chia-client",
@@ -346,7 +346,7 @@ dependencies = [
 
 [[package]]
 name = "chia-consensus"
-version = "0.11.0"
+version = "0.12.0"
 dependencies = [
  "chia-bls 0.11.0",
  "chia-protocol",
@@ -371,7 +371,7 @@ dependencies = [
 
 [[package]]
 name = "chia-fuzz"
-version = "0.11.0"
+version = "0.12.0"
 dependencies = [
  "chia-consensus",
  "chia-protocol",
@@ -453,7 +453,7 @@ dependencies = [
 
 [[package]]
 name = "chia-tools"
-version = "0.11.0"
+version = "0.12.0"
 dependencies = [
  "blocking-threadpool",
  "chia-bls 0.11.0",
@@ -504,7 +504,7 @@ dependencies = [
 
 [[package]]
 name = "chia_rs"
-version = "0.11.0"
+version = "0.12.0"
 dependencies = [
  "chia-bls 0.11.0",
  "chia-consensus",
@@ -660,7 +660,7 @@ dependencies = [
 
 [[package]]
 name = "clvm-utils-fuzz"
-version = "0.11.0"
+version = "0.12.0"
 dependencies = [
  "chia-fuzz",
  "clvm-traits",
