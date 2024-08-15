@@ -482,7 +482,7 @@ class MerkleSet:
         file,
         "SpendBundleConditions",
         [
-            "spends: List[Spend]",
+            "spends: List[SpendConditions]",
             "reserve_fee: int",
             "height_absolute: int",
             "seconds_absolute: int",
