@@ -338,7 +338,7 @@ class SpendConditions:
         flags: Union[ int, _Unspec] = _Unspec()) -> SpendConditions: ...
 
 class SpendBundleConditions:
-    spends: List[Spend]
+    spends: List[SpendConditions]
     reserve_fee: int
     height_absolute: int
     seconds_absolute: int
@@ -350,7 +350,7 @@ class SpendBundleConditions:
     addition_amount: int
     def __init__(
         self,
-        spends: Sequence[Spend],
+        spends: Sequence[SpendConditions],
         reserve_fee: int,
         height_absolute: int,
         seconds_absolute: int,
@@ -379,7 +379,7 @@ class SpendBundleConditions:
     def to_json_dict(self) -> Any: ...
     @staticmethod
     def from_json_dict(json_dict: Any) -> SpendBundleConditions: ...
-    def replace(self, *, spends: Union[ List[Spend], _Unspec] = _Unspec(),
+    def replace(self, *, spends: Union[ List[SpendConditions], _Unspec] = _Unspec(),
         reserve_fee: Union[ int, _Unspec] = _Unspec(),
         height_absolute: Union[ int, _Unspec] = _Unspec(),
         seconds_absolute: Union[ int, _Unspec] = _Unspec(),
