@@ -41,3 +41,6 @@ def _add_zeros():
     for cls in list(globals().values()):
         if isinstance(cls, type) and cls is not SizedBytes and issubclass(cls, SizedBytes):
             cls.zeros = cls(b"\x00" * cls._size)
+
+
+_add_zeros()
