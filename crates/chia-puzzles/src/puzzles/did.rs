@@ -11,7 +11,7 @@ use crate::{singleton::SingletonStruct, CoinProof};
 #[clvm(curry)]
 pub struct DidArgs<I, M> {
     pub inner_puzzle: I,
-    pub recovery_list_hash: Bytes32,
+    pub recovery_list_hash: Option<Bytes32>,
     pub num_verifications_required: u64,
     pub singleton_struct: SingletonStruct,
     pub metadata: M,
@@ -20,7 +20,7 @@ pub struct DidArgs<I, M> {
 impl<I, M> DidArgs<I, M> {
     pub fn new(
         inner_puzzle: I,
-        recovery_list_hash: Bytes32,
+        recovery_list_hash: Option<Bytes32>,
         num_verifications_required: u64,
         singleton_struct: SingletonStruct,
         metadata: M,
@@ -38,7 +38,7 @@ impl<I, M> DidArgs<I, M> {
 impl DidArgs<TreeHash, TreeHash> {
     pub fn curry_tree_hash(
         inner_puzzle: TreeHash,
-        recovery_list_hash: Bytes32,
+        recovery_list_hash: Option<Bytes32>,
         num_verifications_required: u64,
         singleton_struct: SingletonStruct,
         metadata: TreeHash,
@@ -154,13 +154,7 @@ mod tests {
         let puzzle = node_from_bytes(a, &DID_INNER_PUZZLE).unwrap();
         let curried = CurriedProgram {
             program: puzzle,
-            args: DidArgs::new(
-                1,
-                Bytes32::default(),
-                1,
-                SingletonStruct::new(Bytes32::default()),
-                (),
-            ),
+            args: DidArgs::new(1, None, 1, SingletonStruct::new(Bytes32::default()), ()),
         }
         .to_clvm(a)
         .unwrap();
