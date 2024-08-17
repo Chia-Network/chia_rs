@@ -19,9 +19,18 @@ use pyo3::prelude::*;
 #[cfg(feature = "py-bindings")]
 use pyo3::types::PyBytes;
 
+#[cfg(not(feature = "serde"))]
 #[derive(Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Bytes(Vec<u8>);
+
+#[cfg(feature = "serde")]
+#[serde_with::serde_as]
+#[derive(
+    Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+pub struct Bytes(#[serde_as(as = "chia_traits::HexOrBytes<chia_traits::AllowPrefix>")] Vec<u8>);
 
 impl Bytes {
     pub fn new(bytes: Vec<u8>) -> Self {
@@ -161,9 +170,20 @@ impl Deref for Bytes {
     }
 }
 
+#[cfg(not(feature = "serde"))]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct BytesImpl<const N: usize>([u8; N]);
+
+#[cfg(feature = "serde")]
+#[serde_with::serde_as]
+#[derive(
+    Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+pub struct BytesImpl<const N: usize>(
+    #[serde_as(as = "chia_traits::HexOrBytes<chia_traits::PreferPrefix>")] [u8; N],
+);
 
 impl<const N: usize> BytesImpl<N> {
     pub const fn new(bytes: [u8; N]) -> Self {

@@ -6,7 +6,18 @@ use std::ops::Deref;
 use std::{fmt, io};
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct TreeHash([u8; 32]);
+#[cfg_attr(
+    feature = "serde",
+    serde_with::serde_as,
+    derive(serde::Serialize, serde::Deserialize)
+)]
+pub struct TreeHash(
+    #[cfg_attr(
+        feature = "serde",
+        serde_as(as = "chia_traits::HexOrBytes<chia_traits::PreferPrefix>")
+    )]
+    [u8; 32],
+);
 
 impl TreeHash {
     pub const fn new(hash: [u8; 32]) -> Self {

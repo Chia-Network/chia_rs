@@ -11,9 +11,19 @@ workspace = true
 
 [features]
 py-bindings = ["dep:pyo3"]
+serde = ["dep:serde", "dep:serde_with", "dep:hex"]
 
 [dependencies]
 pyo3 = { workspace = true, features = ["multiple-pymethods"], optional = true }
 chia_streamable_macro = { workspace = true }
 clvmr = { workspace = true }
 thiserror = { workspace = true }
+serde = { workspace = true, optional = true }
+serde_with = { workspace = true, optional = true }
+hex = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+bincode = { workspace = true }
+hex-literal = { workspace = true }

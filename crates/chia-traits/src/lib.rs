@@ -17,3 +17,9 @@ pub use crate::streamable::*;
 pub mod int;
 #[cfg(feature = "py-bindings")]
 pub use crate::int::*;
+
+#[cfg(feature = "serde")]
+mod serde;
+
+#[cfg(feature = "serde")]
+pub use crate::serde::*;

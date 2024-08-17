@@ -11,6 +11,11 @@ use pyo3::prelude::*;
 
 #[streamable]
 #[derive(Copy)]
+#[cfg_attr(
+    feature = "serde",
+    serde_with::serde_as,
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct Coin {
     parent_coin_info: Bytes32,
     puzzle_hash: Bytes32,
