@@ -296,6 +296,34 @@ pub fn hash_to_g1_with_dst(msg: &[u8], dst: &[u8]) -> PublicKey {
     PublicKey(p1)
 }
 
+#[cfg(feature = "serde")]
+impl serde::Serialize for PublicKey {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        chia_traits::serialize_hex_or_bytes(
+            &self.to_bytes(),
+            serializer,
+            chia_traits::PrefixKind::PreferPrefix,
+        )
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for PublicKey {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let bytes = chia_traits::deserialize_hex_or_bytes(
+            deserializer,
+            chia_traits::PrefixKind::PreferPrefix,
+        )?;
+        Self::from_bytes(&bytes).map_err(serde::de::Error::custom)
+    }
+}
+
 #[cfg(feature = "py-bindings")]
 #[pyo3::pymethods]
 impl PublicKey {

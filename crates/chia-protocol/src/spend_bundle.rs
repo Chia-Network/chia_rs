@@ -16,6 +16,11 @@ use clvmr::ENABLE_FIXED_DIV;
 use pyo3::prelude::*;
 
 #[streamable(subclass)]
+#[cfg_attr(
+    feature = "serde",
+    serde_with::serde_as,
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct SpendBundle {
     coin_spends: Vec<CoinSpend>,
     aggregated_signature: G2Element,
@@ -245,5 +250,58 @@ ffff0101\
         test_impl(solution, |_test_coin, bundle: SpendBundle| {
             assert_eq!(bundle.additions().unwrap_err().1, "failed to parse spend");
         });
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "serde")]
+mod test_serde {
+    use chia_bls::Signature;
+
+    use crate::{Bytes32, Coin, CoinSpend, Program};
+
+    use super::SpendBundle;
+
+    #[test]
+    fn test_serde_json() {
+        let coin1 = Coin::new(Bytes32::new([1; 32]), Bytes32::new([2; 32]), 1);
+        let coin2 = Coin::new(Bytes32::new([3; 32]), Bytes32::new([4; 32]), 2);
+        let puzzle_reveal1 = Program::from(vec![5; 20]);
+        let puzzle_reveal2 = Program::from(vec![6; 40]);
+        let solution1 = Program::from(vec![7; 10]);
+        let solution2 = Program::from(vec![8; 30]);
+
+        let cs1 = CoinSpend::new(coin1, puzzle_reveal1, solution1);
+        let cs2 = CoinSpend::new(coin2, puzzle_reveal2, solution2);
+
+        let spend_bundle = SpendBundle::new(vec![cs1, cs2], Signature::default());
+        let json = serde_json::to_string_pretty(&spend_bundle).unwrap();
+
+        assert_eq!(
+            json,
+            r#"{
+  "coin_spends": [
+    {
+      "coin": {
+        "parent_coin_info": "0x0101010101010101010101010101010101010101010101010101010101010101",
+        "puzzle_hash": "0x0202020202020202020202020202020202020202020202020202020202020202",
+        "amount": 1
+      },
+      "puzzle_reveal": "0505050505050505050505050505050505050505",
+      "solution": "07070707070707070707"
+    },
+    {
+      "coin": {
+        "parent_coin_info": "0x0303030303030303030303030303030303030303030303030303030303030303",
+        "puzzle_hash": "0x0404040404040404040404040404040404040404040404040404040404040404",
+        "amount": 2
+      },
+      "puzzle_reveal": "06060606060606060606060606060606060606060606060606060606060606060606060606060606",
+      "solution": "080808080808080808080808080808080808080808080808080808080808"
+    }
+  ],
+  "aggregated_signature": "0xc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+}"#
+        );
     }
 }
