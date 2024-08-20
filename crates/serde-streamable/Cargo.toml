@@ -1,0 +1,28 @@
+[package]
+name = "serde-streamable"
+version = "0.11.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Serde serialization for the Chia streamable binary format"
+authors = ["Brandon Haggstrom <b.haggstrom@chia.net>"]
+homepage = "https://github.com/Chia-Network/chia_rs"
+repository = "https://github.com/Chia-Network/chia_rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
+clvmr = { workspace = true }
+
+[dev-dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_with = { workspace = true }
+rand = { workspace = true }
+criterion = { workspace = true }
+rstest = { workspace = true }
+
+[[bench]]
+name = "many_coins"
+harness = false
