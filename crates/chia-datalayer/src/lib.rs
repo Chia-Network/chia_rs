@@ -27,7 +27,7 @@ mod tests {
 
     #[test]
     fn test_well_something() {
-        let _index = 0;
+        let _index: Index = 0;
         let _key = Key::new();
         let _node_type = NodeType::Internal;
         let merkle_blob = MerkleBlob {
@@ -37,9 +37,6 @@ mod tests {
             last_allocated_index: 0,
         };
 
-        assert_eq!(
-            merkle_blob.blob,
-            Vec::new(),
-        );
+        assert_eq!(merkle_blob.blob, Vec::new());
     }
 }
