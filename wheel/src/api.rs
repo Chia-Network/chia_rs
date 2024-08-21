@@ -13,10 +13,12 @@ use chia_consensus::gen::solution_generator::solution_generator as native_soluti
 use chia_consensus::gen::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
 use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
+use chia_consensus::proof_of_space::get_quality_string as get_quality_string_impl;
 use chia_consensus::spendbundle_conditions::get_conditions_from_spendbundle;
 use chia_consensus::spendbundle_validation::{
     get_flags_for_height_and_constants, validate_clvm_and_signature,
 };
+use chia_consensus::vdf::validate_vdf_proof as validate_vdf_proof_impl;
 use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
     CoinSpend, CoinState, CoinStateFilters, CoinStateUpdate, EndOfSubSlotBundle, FeeEstimate,
@@ -78,6 +80,21 @@ use chia_bls::{
     hash_to_g2 as native_hash_to_g2, BlsCache, DerivableKey, GTElement, PublicKey, SecretKey,
     Signature,
 };
+
+#[pyfunction]
+pub fn validate_vdf_proof(
+    proof: &VDFProof,
+    input_el: &ClassgroupElement,
+    info: &VDFInfo,
+    constants: &ConsensusConstants,
+) -> bool {
+    validate_vdf_proof_impl(proof, input_el, info, constants)
+}
+
+#[pyfunction]
+pub fn get_quality_string(pos: &ProofOfSpace, plot_id: Bytes32) -> Option<Bytes32> {
+    get_quality_string_impl(pos, plot_id)
+}
 
 #[pyfunction]
 pub fn compute_merkle_set_root<'p>(
@@ -631,6 +648,10 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<SecretKey>()?;
     m.add_class::<AugSchemeMPL>()?;
     m.add_class::<BlsCache>()?;
+
+    // Rust bindings for chiavdf and chiapos
+    m.add_function(wrap_pyfunction!(validate_vdf_proof, m)?)?;
+    m.add_function(wrap_pyfunction!(get_quality_string, m)?)?;
 
     Ok(())
 }
