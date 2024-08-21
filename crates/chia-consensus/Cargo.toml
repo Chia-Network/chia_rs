@@ -29,6 +29,8 @@ chia-puzzles = { workspace = true }
 chia-bls = { workspace = true }
 hex-literal = { workspace = true }
 thiserror = { workspace = true }
+chiavdf = { workspace = true }
+chiapos = { workspace = true }
 
 [dev-dependencies]
 num-traits = { workspace = true }
