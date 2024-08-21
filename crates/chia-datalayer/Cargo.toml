@@ -1,0 +1,15 @@
+[package]
+name = "chia-datalayer"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "DataLayer modules for Chia blockchain"
+authors = ["Chia Network, Inc. <hello@chia.net>"]
+homepage = "https://github.com/Chia-Network/chia_rs"
+repository = "https://github.com/Chia-Network/chia_rs"
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["rlib"]
