@@ -48,20 +48,22 @@ pub struct MerkleBlob {
 }
 
 // TODO: fill out related to the serializations
-const METADATA_SIZE: u32 = 2;
-const DATA_SIZE: u32 = 0;
-const SPACING: u32 = METADATA_SIZE + DATA_SIZE;
+const METADATA_SIZE: usize = 2;
+const DATA_SIZE: usize = 0;
+const SPACING: usize = METADATA_SIZE + DATA_SIZE;
 
 impl MerkleBlob {
     pub fn get_raw_node(&self, index: TreeIndex) -> RawMerkleNode {
         // TODO: handle invalid indexes?
         // TODO: handle overflows?
-        let metadata_start = index * SPACING;
+        let metadata_start = index as usize * SPACING;
         let data_start = metadata_start + METADATA_SIZE;
         let end = data_start + DATA_SIZE;
 
-        let metadata_blob = &self.blob[metadata_start as usize..data_start as usize];
-        let data_blob = &self.blob[data_start as usize..end as usize];
+        let metadata_blob: [u8; METADATA_SIZE] = self.blob[metadata_start..data_start]
+            .try_into()
+            .expect("better handling");
+        let data_blob = &self.blob[data_start..end];
         let metadata = NodeMetadata::load(metadata_blob);
         RawMerkleNode::load(metadata, 0, data_blob)
     }
@@ -94,7 +96,6 @@ pub enum RawMerkleNode {
 }
 
 impl RawMerkleNode {
-    // TODO: how do i say what i'm passing in is length two if i [u8; 2] here
     pub fn load(metadata: NodeMetadata, index: TreeIndex, blob: &[u8]) -> Self {
         match metadata.node_type {
             NodeType::Internal => RawMerkleNode::Internal {
@@ -123,8 +124,7 @@ pub struct NodeMetadata {
 }
 
 impl NodeMetadata {
-    // TODO: how do i say what i'm passing in is length two if i [u8; 2] here
-    pub fn load(blob: &[u8]) -> Self {
+    pub fn load(blob: [u8; METADATA_SIZE]) -> Self {
         // TODO: identify some useful structured serialization tooling we use
         Self {
             node_type: NodeType::load(&blob[0]),
@@ -145,7 +145,7 @@ mod tests {
     fn test_something() {
         let a: [u8; 2] = [0, 1];
         assert_eq!(
-            NodeMetadata::load(&a),
+            NodeMetadata::load(a),
             NodeMetadata {
                 node_type: NodeType::Internal,
                 dirty: true
