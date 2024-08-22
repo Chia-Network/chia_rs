@@ -6,20 +6,28 @@ type Hash = [u8; 32];
 type KvId = Hash;
 
 #[derive(Debug, Hash, Eq, PartialEq)]
-
+#[repr(u8)]
 pub enum NodeType {
-    Internal,
-    Leaf,
+    Internal = 0,
+    Leaf = 1,
 }
 
 impl NodeType {
-    pub fn load(&value: &u8) -> Self {
+    pub fn load(value: u8) -> Result<Self, String> {
         // TODO: identify some useful structured serialization tooling we use
         // TODO: find a better way to tie serialization values to enumerators
         match value {
-            0 => NodeType::Internal,
-            1 => NodeType::Leaf,
+            // ha!  feel free to laugh at this
+            x if (NodeType::Internal as u8 == x) => Ok(NodeType::Internal),
+            x if (NodeType::Leaf as u8 == x) => Ok(NodeType::Leaf),
             other => panic!("unknown NodeType value: {}", other),
+        }
+    }
+
+    pub fn dump(self) -> u8 {
+        match self {
+            NodeType::Internal => NodeType::Internal as u8,
+            NodeType::Leaf => NodeType::Leaf as u8,
         }
     }
 }
@@ -64,13 +72,13 @@ impl MerkleBlob {
         let metadata_blob: [u8; METADATA_SIZE] = self
             .blob
             .get(metadata_start..data_start)
-            .ok_or(String::from("metadata blob out of bounds"))?
+            .ok_or("metadata blob out of bounds".to_string())?
             .try_into()
             .map_err(|e| format!("metadata blob wrong size: {e}"))?;
         let data_blob: [u8; DATA_SIZE] = self
             .blob
             .get(data_start..end)
-            .ok_or(String::from("data blob out of bounds"))?
+            .ok_or("data blob out of bounds".to_string())?
             .try_into()
             .map_err(|e| format!("data blob wrong size: {e}"))?;
         let metadata = match NodeMetadata::load(metadata_blob) {
@@ -85,14 +93,14 @@ impl MerkleBlob {
 }
 
 pub enum RawMerkleNode {
-    Root {
-        left: TreeIndex,
-        right: TreeIndex,
-        hash: Hash,
-        // TODO: kinda feels questionable having it be aware of its own location
-        // TODO: just always at zero?
-        index: TreeIndex,
-    },
+    // Root {
+    //     left: TreeIndex,
+    //     right: TreeIndex,
+    //     hash: Hash,
+    //     // TODO: kinda feels questionable having it be aware of its own location
+    //     // TODO: just always at zero?
+    //     index: TreeIndex,
+    // },
     Internal {
         parent: TreeIndex,
         left: TreeIndex,
@@ -111,6 +119,10 @@ pub enum RawMerkleNode {
 }
 
 impl RawMerkleNode {
+    // fn discriminant(&self) -> u8 {
+    //     unsafe { *(self as *const Self as *const u8) }
+    // }
+
     pub fn load(
         metadata: NodeMetadata,
         index: TreeIndex,
@@ -147,7 +159,7 @@ impl NodeMetadata {
     pub fn load(blob: [u8; METADATA_SIZE]) -> Result<Self, String> {
         // TODO: identify some useful structured serialization tooling we use
         Ok(Self {
-            node_type: NodeType::load(&blob[0]),
+            node_type: NodeType::load(blob[0])?,
             dirty: match blob[1] {
                 0 => false,
                 1 => true,
