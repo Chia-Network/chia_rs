@@ -47,25 +47,40 @@ pub struct MerkleBlob {
     pub blob: Vec<u8>,
 }
 
-// TODO: fill out related to the serializations
+// TODO: clearly shouldnt' be hard coded
 const METADATA_SIZE: usize = 2;
-const DATA_SIZE: usize = 0;
+// TODO: clearly shouldnt' be hard coded
+const DATA_SIZE: usize = 68;
 const SPACING: usize = METADATA_SIZE + DATA_SIZE;
 
 impl MerkleBlob {
-    pub fn get_raw_node(&self, index: TreeIndex) -> RawMerkleNode {
+    pub fn get_raw_node(&self, index: TreeIndex) -> Result<RawMerkleNode, String> {
         // TODO: handle invalid indexes?
         // TODO: handle overflows?
         let metadata_start = index as usize * SPACING;
         let data_start = metadata_start + METADATA_SIZE;
         let end = data_start + DATA_SIZE;
 
-        let metadata_blob: [u8; METADATA_SIZE] = self.blob[metadata_start..data_start]
+        let metadata_blob: [u8; METADATA_SIZE] = self
+            .blob
+            .get(metadata_start..data_start)
+            .ok_or(String::from("metadata blob out of bounds"))?
             .try_into()
-            .expect("better handling");
-        let data_blob = &self.blob[data_start..end];
-        let metadata = NodeMetadata::load(metadata_blob);
-        RawMerkleNode::load(metadata, 0, data_blob)
+            .map_err(|e| format!("metadata blob wrong size: {e}"))?;
+        let data_blob: [u8; DATA_SIZE] = self
+            .blob
+            .get(data_start..end)
+            .ok_or(String::from("data blob out of bounds"))?
+            .try_into()
+            .map_err(|e| format!("data blob wrong size: {e}"))?;
+        let metadata = match NodeMetadata::load(metadata_blob) {
+            Ok(metadata) => metadata,
+            Err(message) => return Err(format!("failed loading metadata: {message})")),
+        };
+        Ok(match RawMerkleNode::load(metadata, 0, data_blob) {
+            Ok(node) => node,
+            Err(message) => return Err(format!("failed loading raw node: {message}")),
+        })
     }
 }
 
@@ -96,23 +111,28 @@ pub enum RawMerkleNode {
 }
 
 impl RawMerkleNode {
-    pub fn load(metadata: NodeMetadata, index: TreeIndex, blob: &[u8]) -> Self {
+    pub fn load(
+        metadata: NodeMetadata,
+        index: TreeIndex,
+        blob: [u8; DATA_SIZE],
+    ) -> Result<Self, String> {
+        // TODO: add Err results
         match metadata.node_type {
-            NodeType::Internal => RawMerkleNode::Internal {
+            NodeType::Internal => Ok(RawMerkleNode::Internal {
                 // TODO: get these right
                 parent: TreeIndex::from_be_bytes(<[u8; 4]>::try_from(&blob[0..4]).unwrap()),
                 left: TreeIndex::from_be_bytes(<[u8; 4]>::try_from(&blob[4..8]).unwrap()),
                 right: TreeIndex::from_be_bytes(<[u8; 4]>::try_from(&blob[8..12]).unwrap()),
                 hash: <[u8; 32]>::try_from(&blob[12..46]).unwrap(),
                 index,
-            },
-            NodeType::Leaf => RawMerkleNode::Leaf {
+            }),
+            NodeType::Leaf => Ok(RawMerkleNode::Leaf {
                 // TODO: this try from really right?
                 parent: TreeIndex::from_be_bytes(<[u8; 4]>::try_from(&blob[0..4]).unwrap()),
                 key_value: KvId::try_from(&blob[4..36]).unwrap(),
                 hash: Hash::try_from(&blob[36..68]).unwrap(),
                 index,
-            },
+            }),
         }
     }
 }
@@ -124,16 +144,16 @@ pub struct NodeMetadata {
 }
 
 impl NodeMetadata {
-    pub fn load(blob: [u8; METADATA_SIZE]) -> Self {
+    pub fn load(blob: [u8; METADATA_SIZE]) -> Result<Self, String> {
         // TODO: identify some useful structured serialization tooling we use
-        Self {
+        Ok(Self {
             node_type: NodeType::load(&blob[0]),
             dirty: match blob[1] {
                 0 => false,
                 1 => true,
-                other => panic!("invalid dirty value: {}", other),
+                other => return Err(format!("invalid dirty value: {other}")),
             },
-        }
+        })
     }
 }
 
@@ -146,10 +166,10 @@ mod tests {
         let a: [u8; 2] = [0, 1];
         assert_eq!(
             NodeMetadata::load(a),
-            NodeMetadata {
+            Ok(NodeMetadata {
                 node_type: NodeType::Internal,
                 dirty: true
-            }
+            })
         );
     }
 }
