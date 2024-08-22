@@ -3,7 +3,7 @@
 type TreeIndex = u32;
 // type Key = Vec<u8>;
 type Hash = [u8; 32];
-type KVId = Hash;
+type KvId = Hash;
 
 #[derive(Debug, Hash, Eq, PartialEq)]
 
@@ -88,7 +88,7 @@ pub enum RawMerkleNode {
     },
     Leaf {
         parent: TreeIndex,
-        key_value: KVId,
+        key_value: KvId,
         hash: Hash,
         // TODO: kinda feels questionable having it be aware of its own location
         index: TreeIndex,
@@ -109,7 +109,7 @@ impl RawMerkleNode {
             NodeType::Leaf => RawMerkleNode::Leaf {
                 // TODO: this try from really right?
                 parent: TreeIndex::from_be_bytes(<[u8; 4]>::try_from(&blob[0..4]).unwrap()),
-                key_value: KVId::try_from(&blob[4..36]).unwrap(),
+                key_value: KvId::try_from(&blob[4..36]).unwrap(),
                 hash: Hash::try_from(&blob[36..68]).unwrap(),
                 index,
             },
