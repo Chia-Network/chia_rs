@@ -13,7 +13,7 @@ pub enum NodeType {
 }
 
 impl NodeType {
-    pub fn load(value: u8) -> Result<Self, String> {
+    pub fn from_u8(value: u8) -> Result<Self, String> {
         // TODO: identify some useful structured serialization tooling we use
         // TODO: find a better way to tie serialization values to enumerators
         match value {
@@ -24,7 +24,7 @@ impl NodeType {
         }
     }
 
-    pub fn dump(&self) -> u8 {
+    pub fn to_u8(&self) -> u8 {
         match self {
             NodeType::Internal => NodeType::Internal as u8,
             NodeType::Leaf => NodeType::Leaf as u8,
@@ -81,11 +81,11 @@ impl MerkleBlob {
             .ok_or("data blob out of bounds".to_string())?
             .try_into()
             .map_err(|e| format!("data blob wrong size: {e}"))?;
-        let metadata = match NodeMetadata::load(metadata_blob) {
+        let metadata = match NodeMetadata::from_bytes(metadata_blob) {
             Ok(metadata) => metadata,
             Err(message) => return Err(format!("failed loading metadata: {message})")),
         };
-        Ok(match RawMerkleNode::load(metadata, 0, data_blob) {
+        Ok(match RawMerkleNode::from_bytes(metadata, 0, data_blob) {
             Ok(node) => node,
             Err(message) => return Err(format!("failed loading raw node: {message}")),
         })
@@ -123,7 +123,7 @@ impl RawMerkleNode {
     //     unsafe { *(self as *const Self as *const u8) }
     // }
 
-    pub fn load(
+    pub fn from_bytes(
         metadata: NodeMetadata,
         index: TreeIndex,
         blob: [u8; DATA_SIZE],
@@ -156,10 +156,10 @@ pub struct NodeMetadata {
 }
 
 impl NodeMetadata {
-    pub fn load(blob: [u8; METADATA_SIZE]) -> Result<Self, String> {
+    pub fn from_bytes(blob: [u8; METADATA_SIZE]) -> Result<Self, String> {
         // TODO: identify some useful structured serialization tooling we use
         Ok(Self {
-            node_type: NodeType::load(blob[0])?,
+            node_type: NodeType::from_u8(blob[0])?,
             dirty: match blob[1] {
                 0 => false,
                 1 => true,
@@ -168,9 +168,9 @@ impl NodeMetadata {
         })
     }
 
-    pub fn dump(&self) -> [u8; METADATA_SIZE] {
+    pub fn to_bytes(&self) -> [u8; METADATA_SIZE] {
         [
-            self.node_type.dump(),
+            self.node_type.to_u8(),
             match self.dirty {
                 false => 0,
                 true => 1,
@@ -184,16 +184,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_node_metadata_load_dump() {
-        let dumped: [u8; 2] = [0, 1];
-        let loaded = NodeMetadata::load(dumped).unwrap();
+    fn test_node_metadata_from_to() {
+        let bytes: [u8; 2] = [0, 1];
+        let object = NodeMetadata::from_bytes(bytes).unwrap();
         assert_eq!(
-            loaded,
+            object,
             NodeMetadata {
                 node_type: NodeType::Internal,
                 dirty: true
             },
         );
-        assert_eq!(loaded.dump(), dumped);
+        assert_eq!(object.to_bytes(), bytes);
     }
 }
