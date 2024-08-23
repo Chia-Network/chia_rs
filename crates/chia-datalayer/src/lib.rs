@@ -24,7 +24,7 @@ impl NodeType {
         }
     }
 
-    pub fn dump(self) -> u8 {
+    pub fn dump(&self) -> u8 {
         match self {
             NodeType::Internal => NodeType::Internal as u8,
             NodeType::Leaf => NodeType::Leaf as u8,
@@ -167,6 +167,16 @@ impl NodeMetadata {
             },
         })
     }
+
+    pub fn dump(&self) -> [u8; METADATA_SIZE] {
+        [
+            self.node_type.dump(),
+            match self.dirty {
+                false => 0,
+                true => 1,
+            },
+        ]
+    }
 }
 
 #[cfg(test)]
@@ -174,14 +184,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_something() {
-        let a: [u8; 2] = [0, 1];
+    fn test_node_metadata_load_dump() {
+        let dumped: [u8; 2] = [0, 1];
+        let loaded = NodeMetadata::load(dumped).unwrap();
         assert_eq!(
-            NodeMetadata::load(a),
-            Ok(NodeMetadata {
+            loaded,
+            NodeMetadata {
                 node_type: NodeType::Internal,
                 dirty: true
-            })
+            },
         );
+        assert_eq!(loaded.dump(), dumped);
     }
 }
