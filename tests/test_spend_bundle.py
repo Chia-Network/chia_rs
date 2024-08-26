@@ -211,3 +211,13 @@ def test_spend_bundle(
 
     rem = f"{removals}"
     assert rem == expected_rem
+
+class NewAndImprovedSpendBundle(PySpendBundle):
+    test_bool = True
+
+def test_derive_class():
+    test = PySpendBundle.aggregate([])
+    assert isinstance(test, PySpendBundle)
+    test = NewAndImprovedSpendBundle.aggregate([])
+    assert isinstance(test, NewAndImprovedSpendBundle)
+    assert test.test_bool
