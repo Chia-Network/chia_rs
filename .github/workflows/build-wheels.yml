@@ -272,11 +272,18 @@ jobs:
         with:
           directories: ${{ steps.create-venv.outputs.activate-venv-directories }}
 
-      - name: Install cargo-tarpaulin
-        run: cargo install cargo-tarpaulin --locked
+      - name: Install llvm-tools-preview
+        run: rustup component add llvm-tools-preview
 
-      - name: Install coverage.py
-        run: pip install coverage
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Prepare for coverage
+        uses: |
+          source <(cargo llvm-cov show-env --export-prefix)
+          export CARGO_TARGET_DIR=$CARGO_LLVM_COV_TARGET_DIR
+          export CARGO_INCREMENTAL=1
+          cargo llvm-cov clean --workspace
 
       - name: Install lcov
         run: sudo apt-get install lcov
@@ -293,27 +300,22 @@ jobs:
       - name: Build wheel
         run: maturin develop --release -m wheel/Cargo.toml
 
-      - name: Prepare for coverage
+      - name: Run tests
         run: |
-          echo "RUSTFLAGS=-Cinstrument-coverage" >> "$GITHUB_ENV"
-          echo "LLVM_PROFILE_FILE=$(pwd)/target/chia_rs-%p-%m.profraw" >> "$GITHUB_ENV"
-          echo "CARGO_TARGET_DIR=$(pwd)/target" >> "$GITHUB_ENV"
-
-      - name: Rust tests
-        run: cargo tarpaulin --timeout 300 --workspace --all-features --release --out lcov --engine llvm
-
-      - name: Python tests
-        run: pytest --cov=chia_rs --cov-report lcov
+          cargo test --workspace --all-features --release
+          pytest --cov=chia_rs --cov-report lcov
 
       - name: Combine coverage files
-        run: lcov -a lcov.info -a coverage.lcov -o combined.lcov
+        run: |
+          cargo llvm-cov --no-run --lcov --output-path rust.lcov
+          lcov -a rust.lcov -a coverage.lcov -o combined.lcov
 
       - name: Upload Rust to Coveralls
         uses: coverallsapp/github-action@v2
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         with:
-          path-to-lcov: "./lcov.info"
+          path-to-lcov: "./rust.lcov"
 
       - name: Upload Python to Coveralls
         uses: coverallsapp/github-action@v2
@@ -321,13 +323,6 @@ jobs:
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         with:
           path-to-lcov: "./coverage.lcov"
-
-      - name: Upload combined to Coveralls
-        uses: coverallsapp/github-action@v2
-        env:
-          COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
-        with:
-          path-to-lcov: "./combined.lcov"
 
   upload:
     name: Upload to PyPI (${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }})
