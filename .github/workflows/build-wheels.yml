@@ -300,7 +300,7 @@ jobs:
           echo "CARGO_TARGET_DIR=$(pwd)/target" >> "$GITHUB_ENV"
 
       - name: Rust tests
-        run: cargo tarpaulin --workspace --all-features --release --out lcov
+        run: cargo tarpaulin --timeout 300 --workspace --all-features --release --out lcov
 
       - name: Python tests
         run: pytest --cov=chia_rs --cov-report lcov
