@@ -69,6 +69,7 @@ impl MerkleBlob {
         // TODO: garbage just to use stuff
         let index = self.get_new_index();
         self.insert_entry_to_blob(index, [0; SPACING])?;
+        self.get_random_leaf_node(vec![0, 1, 2, 3, 4, 5, 6, 7])?;
 
         Ok(())
     }
@@ -78,6 +79,26 @@ impl MerkleBlob {
             None => (self.blob.len() / SPACING) as TreeIndex,
             Some(new_index) => new_index,
         }
+    }
+
+    fn get_random_leaf_node(&self, seed: Vec<u8>) -> Result<RawMerkleNode, String> {
+        let mut node = self.get_raw_node(0)?;
+        for byte in seed {
+            for bit in 0..8 {
+                match node {
+                    RawMerkleNode::Leaf { .. } => return Ok(node),
+                    RawMerkleNode::Internal { left, right, .. } => {
+                        if byte & (1 << bit) != 0 {
+                            node = self.get_raw_node(left)?;
+                        } else {
+                            node = self.get_raw_node(right)?;
+                        }
+                    }
+                }
+            }
+        }
+
+        Err(format!("failed to find a node"))
     }
 
     fn insert_entry_to_blob(
@@ -288,5 +309,18 @@ mod tests {
         assert_eq!(lineage.len(), 2);
         let last_node = lineage.last().unwrap();
         assert_eq!(last_node.parent(), NULL_PARENT);
+    }
+
+    #[test]
+    fn test_get_random_leaf_node() {
+        let merkle_blob = example_blob();
+        let leaf = merkle_blob.get_random_leaf_node(vec![0; 8]).unwrap();
+        assert_eq!(
+            match leaf {
+                RawMerkleNode::Leaf { index, .. } => index,
+                RawMerkleNode::Internal { index, .. } => index,
+            },
+            2,
+        )
     }
 }
