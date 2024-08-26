@@ -276,37 +276,6 @@ jobs:
           name: packages-sdist-${{ matrix.os.name }}-${{ matrix.python.major-dot-minor }}-${{ matrix.arch.name }}
           path: ./target/wheels/
 
-  fmt:
-    runs-on: ubuntu-latest
-    name: cargo fmt
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Install rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - name: fmt
-        run: |
-          cargo fmt --all -- --files-with-diff --check
-          cd wheel
-          cargo fmt -- --files-with-diff --check
-
-  clippy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-
-      - name: workspace
-        run: |
-          cargo clippy --workspace --all-features --all-targets
-
   fuzz_targets:
     runs-on: ubuntu-latest
     env:
