@@ -296,7 +296,7 @@ jobs:
           cargo test --workspace --all-features --release
           maturin develop --release -m wheel/Cargo.toml
           pytest --cov=chia_rs tests --cov-report xml
-          cargo llvm-cov report --lcov --output-path coverage.lcov
+          cargo llvm-cov report --release --lcov --output-path coverage.lcov
 
       - name: Upload to Coveralls
         uses: coverallsapp/github-action@v2
