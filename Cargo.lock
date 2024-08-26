@@ -372,6 +372,9 @@ dependencies = [
 [[package]]
 name = "chia-datalayer"
 version = "0.1.0"
+dependencies = [
+ "hex-literal",
+]
 
 [[package]]
 name = "chia-fuzz"

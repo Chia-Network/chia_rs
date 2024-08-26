@@ -3,7 +3,7 @@
 type TreeIndex = u32;
 // type Key = Vec<u8>;
 type Hash = [u8; 32];
-type KvId = Hash;
+type KvId = u64;
 
 #[derive(Debug, Hash, Eq, PartialEq)]
 #[repr(u8)]
@@ -51,17 +51,53 @@ impl NodeType {
 
 #[derive(Debug)]
 pub struct MerkleBlob {
-    // TODO: shouldn't really all be pub
-    pub blob: Vec<u8>,
+    blob: Vec<u8>,
+    free_indexes: Vec<TreeIndex>,
 }
 
-// TODO: clearly shouldnt' be hard coded
+// TODO: clearly shouldn't be hard coded
 const METADATA_SIZE: usize = 2;
-// TODO: clearly shouldnt' be hard coded
-const DATA_SIZE: usize = 68;
+// TODO: clearly shouldn't be hard coded
+const DATA_SIZE: usize = 44;
 const SPACING: usize = METADATA_SIZE + DATA_SIZE;
 
+// TODO: probably bogus and overflowing or somesuch
+const NULL_PARENT: TreeIndex = 0xffffffff; // 1 << (4 * 8) - 1;
+
 impl MerkleBlob {
+    pub fn insert(&mut self) -> Result<(), String> {
+        // TODO: garbage just to use stuff
+        let index = self.get_new_index();
+        self.insert_entry_to_blob(index, [0; SPACING])?;
+
+        Ok(())
+    }
+
+    fn get_new_index(&mut self) -> TreeIndex {
+        match self.free_indexes.pop() {
+            None => (self.blob.len() / SPACING) as TreeIndex,
+            Some(new_index) => new_index,
+        }
+    }
+
+    fn insert_entry_to_blob(
+        &mut self,
+        index: TreeIndex,
+        entry: [u8; SPACING],
+    ) -> Result<(), String> {
+        let extend_index = (self.blob.len() / SPACING) as TreeIndex;
+        if index > extend_index {
+            return Err(format!("index out of range: {index}"));
+        } else if index == extend_index {
+            self.blob.extend_from_slice(&entry);
+        } else {
+            let start = index as usize * SPACING;
+            self.blob[start..start + SPACING].copy_from_slice(&entry);
+        }
+
+        Ok(())
+    }
+
     pub fn get_raw_node(&self, index: TreeIndex) -> Result<RawMerkleNode, String> {
         // TODO: handle invalid indexes?
         // TODO: handle overflows?
@@ -72,7 +108,12 @@ impl MerkleBlob {
         let metadata_blob: [u8; METADATA_SIZE] = self
             .blob
             .get(metadata_start..data_start)
-            .ok_or("metadata blob out of bounds".to_string())?
+            .ok_or(format!(
+                "metadata blob out of bounds: {} {} {}",
+                self.blob.len(),
+                metadata_start,
+                data_start
+            ))?
             .try_into()
             .map_err(|e| format!("metadata blob wrong size: {e}"))?;
         let data_blob: [u8; DATA_SIZE] = self
@@ -85,13 +126,30 @@ impl MerkleBlob {
             Ok(metadata) => metadata,
             Err(message) => return Err(format!("failed loading metadata: {message})")),
         };
-        Ok(match RawMerkleNode::from_bytes(metadata, 0, data_blob) {
-            Ok(node) => node,
-            Err(message) => return Err(format!("failed loading raw node: {message}")),
-        })
+        Ok(
+            match RawMerkleNode::from_bytes(metadata, index, data_blob) {
+                Ok(node) => node,
+                Err(message) => return Err(format!("failed loading raw node: {message}")),
+            },
+        )
+    }
+
+    pub fn get_lineage(&self, index: TreeIndex) -> Result<Vec<RawMerkleNode>, String> {
+        let mut next_index = index;
+        let mut lineage = vec![];
+        loop {
+            let node = self.get_raw_node(next_index)?;
+            next_index = node.parent();
+            lineage.push(node);
+
+            if next_index == NULL_PARENT {
+                return Ok(lineage);
+            }
+        }
     }
 }
 
+#[derive(Debug)]
 pub enum RawMerkleNode {
     // Root {
     //     left: TreeIndex,
@@ -135,16 +193,23 @@ impl RawMerkleNode {
                 parent: TreeIndex::from_be_bytes(<[u8; 4]>::try_from(&blob[0..4]).unwrap()),
                 left: TreeIndex::from_be_bytes(<[u8; 4]>::try_from(&blob[4..8]).unwrap()),
                 right: TreeIndex::from_be_bytes(<[u8; 4]>::try_from(&blob[8..12]).unwrap()),
-                hash: <[u8; 32]>::try_from(&blob[12..46]).unwrap(),
+                hash: <[u8; 32]>::try_from(&blob[12..44]).unwrap(),
                 index,
             }),
             NodeType::Leaf => Ok(RawMerkleNode::Leaf {
                 // TODO: this try from really right?
                 parent: TreeIndex::from_be_bytes(<[u8; 4]>::try_from(&blob[0..4]).unwrap()),
-                key_value: KvId::try_from(&blob[4..36]).unwrap(),
-                hash: Hash::try_from(&blob[36..68]).unwrap(),
+                key_value: KvId::from_be_bytes(<[u8; 8]>::try_from(&blob[4..12]).unwrap()),
+                hash: Hash::try_from(&blob[12..44]).unwrap(),
                 index,
             }),
+        }
+    }
+
+    pub fn parent(&self) -> TreeIndex {
+        match self {
+            RawMerkleNode::Internal { parent, .. } => *parent,
+            RawMerkleNode::Leaf { parent, .. } => *parent,
         }
     }
 }
@@ -181,8 +246,17 @@ impl NodeMetadata {
 
 #[cfg(test)]
 mod tests {
+    use hex_literal::hex;
+
     use super::*;
 
+    fn example_blob() -> MerkleBlob {
+        let something = hex!("0001ffffffff00000001000000020c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b0100000000000405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b0100000000001415161718191a1b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b");
+        MerkleBlob {
+            blob: Vec::from(something),
+            free_indexes: vec![],
+        }
+    }
     #[test]
     fn test_node_metadata_from_to() {
         let bytes: [u8; 2] = [0, 1];
@@ -195,5 +269,24 @@ mod tests {
             },
         );
         assert_eq!(object.to_bytes(), bytes);
+    }
+
+    #[test]
+    fn test_load_a_python_dump() {
+        // let kv_id = 0x1415161718191A1B;
+        let merkle_blob = example_blob();
+        merkle_blob.get_raw_node(0).unwrap();
+    }
+
+    #[test]
+    fn test_get_lineage() {
+        let merkle_blob = example_blob();
+        let lineage = merkle_blob.get_lineage(2).unwrap();
+        for node in &lineage {
+            println!("{node:?}");
+        }
+        assert_eq!(lineage.len(), 2);
+        let last_node = lineage.last().unwrap();
+        assert_eq!(last_node.parent(), NULL_PARENT);
     }
 }
