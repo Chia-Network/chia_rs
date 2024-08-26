@@ -1,2 +1,3 @@
-pub mod fuzzing_utils;
-pub use crate::fuzzing_utils::*;
+mod fuzzing_utils;
+
+pub use fuzzing_utils::*;
