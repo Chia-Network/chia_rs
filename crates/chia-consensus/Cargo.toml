@@ -13,6 +13,8 @@ workspace = true
 
 [features]
 py-bindings = ["dep:pyo3", "dep:chia_py_streamable_macro"]
+chiavdf = ["dep:chiavdf"]
+chiapos = ["dep:chiapos"]
 
 [dependencies]
 clvmr = { workspace = true }
@@ -29,8 +31,8 @@ chia-puzzles = { workspace = true }
 chia-bls = { workspace = true }
 hex-literal = { workspace = true }
 thiserror = { workspace = true }
-chiavdf = { workspace = true }
-chiapos = { workspace = true }
+chiavdf = { workspace = true, optional = true }
+chiapos = { workspace = true, optional = true }
 
 [dev-dependencies]
 num-traits = { workspace = true }
