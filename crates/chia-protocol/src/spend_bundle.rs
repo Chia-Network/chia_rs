@@ -14,6 +14,7 @@ use clvmr::ENABLE_FIXED_DIV;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
+use pyo3::types::PyType;
 
 #[streamable(subclass)]
 pub struct SpendBundle {
@@ -94,10 +95,10 @@ impl SpendBundle {
 #[pymethods]
 #[allow(clippy::needless_pass_by_value)]
 impl SpendBundle {
-    #[staticmethod]
+    #[classmethod]
     #[pyo3(name = "aggregate")]
-    fn py_aggregate(spend_bundles: Vec<SpendBundle>) -> SpendBundle {
-        SpendBundle::aggregate(&spend_bundles)
+    fn py_aggregate(_cls: &Bound<'_, PyType>, spend_bundles: Vec<Self>) -> Self {
+        Self::aggregate(&spend_bundles)
     }
 
     #[pyo3(name = "name")]
