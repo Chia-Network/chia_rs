@@ -1,4 +1,4 @@
-name: build - check - upload
+name: Python
 
 on:
   push:
@@ -20,8 +20,8 @@ permissions:
   contents: read
 
 jobs:
-  build-wheels:
-    name: Wheel - ${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }}
+  build_wheels:
+    name: Wheel (${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }})
     runs-on: ${{ matrix.os.runs-on[matrix.arch.matrix] }}
     strategy:
       fail-fast: false
@@ -199,7 +199,7 @@ jobs:
           name: packages-${{ matrix.os.name }}-${{ matrix.python.major-dot-minor }}-${{ matrix.arch.name }}
           path: ./target/wheels/
 
-  check-typestubs:
+  check_typestubs:
     name: Check chia_rs.pyi
     runs-on: ubuntu-latest
 
@@ -216,7 +216,7 @@ jobs:
           python wheel/generate_type_stubs.py
           git diff --exit-code
 
-  build-tools:
+  build_tools:
     name: build chia-tools
     runs-on: ubuntu-latest
     steps:
@@ -233,8 +233,8 @@ jobs:
           cd crates/chia-tools
           cargo build
 
-  build-sdist:
-    name: sdist - ${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }}
+  build_sdist:
+    name: Source dist (${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }})
     runs-on: ${{ matrix.os.runs-on[matrix.arch.matrix] }}
     strategy:
       fail-fast: false
@@ -406,8 +406,8 @@ jobs:
     name: Upload to PyPI - ${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }}
     runs-on: ${{ matrix.os.runs-on[matrix.arch.matrix] }}
     needs:
-      - build-wheels
-      - build-sdist
+      - build_wheels
+      - build_sdist
       - fmt
       - clippy
       - unit_tests
