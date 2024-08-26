@@ -278,14 +278,6 @@ jobs:
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
 
-      - name: Prepare for coverage
-        run: |
-          cargo llvm-cov clean --workspace
-          source <(cargo llvm-cov show-env --export-prefix)
-
-      - name: Install lcov
-        run: sudo apt-get install lcov
-
       - name: Install pytest
         run: pip install pytest pytest-xdist pytest-cov
 
@@ -295,17 +287,16 @@ jobs:
       - name: Install dependencies
         run: pip install colorama chia-blockchain==2.1.2
 
-      - name: Build wheel
-        run: maturin develop --release -m wheel/Cargo.toml
-
-      - name: Rust tests
-        run: cargo test --workspace --all-features --release
-
-      - name: Python tests
-        run: pytest --cov=chia_rs tests --cov-report lcov
-
-      - name: Coverage report
-        run: cargo llvm-cov report --lcov --output-path coverage.lcov
+      - name: Test with coverage
+        run: |
+          source <(cargo llvm-cov show-env --export-prefix)
+          export CARGO_TARGET_DIR=$CARGO_LLVM_COV_TARGET_DIR
+          export CARGO_INCREMENTAL=1
+          cargo llvm-cov clean --workspace
+          cargo test --workspace --all-features --release
+          maturin develop --release -m wheel/Cargo.toml
+          pytest --cov=chia_rs tests --cov-report xml
+          cargo llvm-cov report --lcov --output-path coverage.lcov
 
       - name: Upload to Coveralls
         uses: coverallsapp/github-action@v2
