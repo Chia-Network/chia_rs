@@ -262,41 +262,72 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - name: Update pip
+        run: python -m pip install --upgrade pip
+
+      - uses: Chia-Network/actions/create-venv@main
+        id: create-venv
+
+      - uses: Chia-Network/actions/activate-venv@main
+        with:
+          directories: ${{ steps.create-venv.outputs.activate-venv-directories }}
+
+      - name: Install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin --locked
+
+      - name: Install coverage.py
+        run: pip install coverage
+
+      - name: Install lcov
+        run: sudo apt-get install lcov
+
+      - name: Install pytest
+        run: pip install pytest pytest-xdist pytest-cov
+
+      - name: Install maturin
+        run: pip install maturin
+
+      - name: Install dependencies
+        run: pip install colorama chia-blockchain==2.1.2
+
+      - name: Build wheel
+        run: maturin develop --release -m wheel/Cargo.toml
+
       - name: Prepare for coverage
         run: |
-          cargo install grcov --locked
           echo "RUSTFLAGS=-Cinstrument-coverage" >> "$GITHUB_ENV"
           echo "LLVM_PROFILE_FILE=$(pwd)/target/chia_rs-%p-%m.profraw" >> "$GITHUB_ENV"
           echo "CARGO_TARGET_DIR=$(pwd)/target" >> "$GITHUB_ENV"
 
-      - name: Test
-        run: cargo test --workspace --all-features
+      - name: Rust tests
+        run: cargo tarpaulin --workspace --all-features --release --out lcov
 
-      - name: Test (release)
-        run: cargo test --workspace --all-features --release
+      - name: Python tests
+        run: pytest --cov=chia_rs --cov-report lcov
 
-      - name: Continue with coverage
-        run: |
-          sudo apt-get update
-          sudo apt-get install lcov -y
-          rustup component add llvm-tools-preview
-          python -m venv venv
-          source venv/bin/activate
-          git clone https://github.com/Chia-Network/clvm_tools.git --branch=main --single-branch
-          pip install ./clvm_tools
-          pip install colorama maturin pytest pytest-xdist chia-blockchain==2.1.2 clvm==0.9.8
-          maturin develop --release -m wheel/Cargo.toml
-          # run pytest in a single process to avoid a race writing the coverage report
-          pytest -n 0 tests
-          grcov . --binary-path target -s . --branch --ignore-not-existing --ignore='*/.cargo/*' --ignore='tests/*' --ignore='venv/*' -o rust_cov.info
-          python -c 'with open("rust_cov.info") as f: lines = [l for l in f if not (l.startswith("DA:") and int(l.split(",")[1].strip()) >= 2**63)]; open("lcov.info", "w").writelines(lines)'
+      - name: Combine coverage files
+        run: lcov -a lcov.info -a coverage.lcov -o combined.lcov
 
-      - name: Upload to Coveralls
+      - name: Upload Rust to Coveralls
         uses: coverallsapp/github-action@v2
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         with:
           path-to-lcov: "./lcov.info"
+
+      - name: Upload Python to Coveralls
+        uses: coverallsapp/github-action@v2
+        env:
+          COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
+        with:
+          path-to-lcov: "./coverage.lcov"
+
+      - name: Upload combined to Coveralls
+        uses: coverallsapp/github-action@v2
+        env:
+          COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
+        with:
+          path-to-lcov: "./combined.lcov"
 
   upload:
     name: Upload to PyPI (${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }})
