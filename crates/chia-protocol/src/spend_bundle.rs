@@ -14,6 +14,7 @@ use clvmr::ENABLE_FIXED_DIV;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
+#[cfg(feature = "py-bindings")]
 use pyo3::types::PyType;
 
 #[streamable(subclass)]
