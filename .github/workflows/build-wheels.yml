@@ -279,7 +279,7 @@ jobs:
         uses: taiki-e/install-action@cargo-llvm-cov
 
       - name: Prepare for coverage
-        uses: |
+        run: |
           source <(cargo llvm-cov show-env --export-prefix)
           export CARGO_TARGET_DIR=$CARGO_LLVM_COV_TARGET_DIR
           export CARGO_INCREMENTAL=1
