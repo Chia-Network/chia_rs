@@ -280,11 +280,8 @@ jobs:
 
       - name: Prepare for coverage
         run: |
-          source <(cargo llvm-cov show-env --export-prefix)
-          export CARGO_TARGET_DIR=$CARGO_LLVM_COV_TARGET_DIR
-          export CARGO_INCREMENTAL=1
-          export RUSTFLAGS="-Zinstrument-coverage"
           cargo llvm-cov clean --workspace
+          source <(cargo llvm-cov show-env --export-prefix)
 
       - name: Install lcov
         run: sudo apt-get install lcov
@@ -301,27 +298,21 @@ jobs:
       - name: Build wheel
         run: maturin develop --release -m wheel/Cargo.toml
 
-      - name: Run tests
-        run: |
-          cargo llvm-cov --workspace --all-features --release --lcov --output-path rust.lcov
-          pytest --cov=chia_rs --cov-report lcov
+      - name: Rust tests
+        run: cargo test --workspace --all-features --release
 
-      - name: Combine coverage files
-        run: lcov -a rust.lcov -a coverage.lcov -o combined.lcov
+      - name: Python tests
+        run: pytest --cov=chia_rs tests --cov-report lcov
 
-      - name: Upload Rust to Coveralls
+      - name: Coverage report
+        run: cargo llvm-cov report --lcov --output-path coverage.lcov
+
+      - name: Upload to Coveralls
         uses: coverallsapp/github-action@v2
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         with:
-          path-to-lcov: "./rust.lcov"
-
-      - name: Upload Python to Coveralls
-        uses: coverallsapp/github-action@v2
-        env:
-          COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
-        with:
-          path-to-lcov: "./coverage.lcov"
+          files: ["./coverage.xml", "./coverage.lcov"]
 
   upload:
     name: Upload to PyPI (${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }})
