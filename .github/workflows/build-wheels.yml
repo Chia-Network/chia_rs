@@ -305,10 +305,11 @@ jobs:
           cargo test --workspace --all-features --release
           pytest --cov=chia_rs --cov-report lcov
 
+      - name: Output Rust coverage
+        run: cargo llvm-cov --no-run --lcov --output-path rust.lcov
+
       - name: Combine coverage files
-        run: |
-          cargo llvm-cov --no-run --lcov --output-path rust.lcov
-          lcov -a rust.lcov -a coverage.lcov -o combined.lcov
+        run: lcov -a rust.lcov -a coverage.lcov -o combined.lcov
 
       - name: Upload Rust to Coveralls
         uses: coverallsapp/github-action@v2
