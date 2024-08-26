@@ -62,16 +62,13 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@nightly
 
-      - name: Nightly toolchain
-        run: rustup default nightly
-
       - name: Install cargo-fuzz
         run: cargo install cargo-fuzz
 
       - name: Fuzz (chia-consensus)
         run: |
           cd crates/chia-consensus
-          cargo fuzz list | xargs -I "%" sh -c "cargo fuzz run % -- -max_total_time=20 || exit 255"
+          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=20 || exit 255"
 
       - name: Fuzz (chia-bls)
         env:
@@ -82,24 +79,24 @@ jobs:
         run: |
           cd crates/chia-bls
           python -m pip install blspy
-          cargo fuzz list | xargs -I "%" sh -c "cargo fuzz run % -- -max_total_time=10 || exit 255"
+          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=10 || exit 255"
 
       - name: Fuzz (clvm-utils)
         run: |
           cd crates/clvm-utils
-          cargo fuzz list | xargs -I "%" sh -c "cargo fuzz run % -- -max_total_time=20 || exit 255"
+          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=20 || exit 255"
 
       - name: Fuzz (chia-protocol)
         run: |
           cd crates/chia-protocol
-          cargo fuzz list | xargs -I "%" sh -c "cargo fuzz run % -- -max_total_time=20 || exit 255"
+          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=20 || exit 255"
 
       - name: Fuzz (chia-puzzles)
         run: |
           cd crates/chia-puzzles
-          cargo fuzz list | xargs -I "%" sh -c "cargo fuzz run % -- -max_total_time=20 || exit 255"
+          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=20 || exit 255"
 
       - name: Fuzz (clvm-traits)
         run: |
           cd crates/clvm-traits
-          cargo fuzz list | xargs -I "%" sh -c "cargo fuzz run % -- -max_total_time=20 || exit 255"
+          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=20 || exit 255"
