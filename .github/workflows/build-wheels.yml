@@ -302,11 +302,8 @@ jobs:
 
       - name: Run tests
         run: |
-          cargo test --workspace --all-features --release
+          cargo llvm-cov --workspace --all-features --release --lcov --output-path rust.lcov
           pytest --cov=chia_rs --cov-report lcov
-
-      - name: Output Rust coverage
-        run: cargo llvm-cov --no-run --lcov --output-path rust.lcov
 
       - name: Combine coverage files
         run: lcov -a rust.lcov -a coverage.lcov -o combined.lcov
