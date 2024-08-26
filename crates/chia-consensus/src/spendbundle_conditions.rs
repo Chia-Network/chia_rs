@@ -31,6 +31,11 @@ pub fn get_conditions_from_spendbundle(
     let mut state = ParseState::default();
 
     for coin_spend in &spend_bundle.coin_spends {
+        let byte_cost = (coin_spend.puzzle_reveal.len() + coin_spend.solution.len()) as u64
+            * constants.cost_per_byte;
+
+        subtract_cost(a, &mut cost_left, byte_cost)?;
+
         // process the spend
         let puz = node_from_bytes(a, coin_spend.puzzle_reveal.as_slice())?;
         let sol = node_from_bytes(a, coin_spend.solution.as_slice())?;
@@ -77,8 +82,8 @@ mod tests {
     use std::fs::read;
 
     #[rstest]
-    #[case("3000253", 8, 2, 13_344_870)]
-    #[case("1000101", 34, 15, 66_723_677)]
+    #[case("3000253", 8, 2, 46_860_870)]
+    #[case("1000101", 34, 15, 231_687_677)]
     fn test_get_conditions_from_spendbundle(
         #[case] filename: &str,
         #[case] spends: usize,
@@ -112,7 +117,7 @@ mod tests {
         #[case] filename: &str,
         #[values(0, 1, 1_000_000, 5_000_000)] height: u32,
     ) {
-        let cost = 2_125_866;
+        let cost = 76_825_866;
         let spend = CoinSpend::from_bytes(
             &read(format!("../../ff-tests/{filename}.spend")).expect("read file"),
         )
@@ -297,9 +302,19 @@ mod tests {
             Ok(mut conditions) => {
                 // the cost of running the spend bundle should never be higher
                 // than the whole block but it's likely less.
-                println!("block_cost: {block_cost}");
-                println!("bundle_cost: {}", conditions.cost);
-                assert!(conditions.cost <= block_cost);
+                // but only if the byte cost is not taken into account. The
+                // block will likely be smaller because the compression makes it
+                // smaller.
+                let block_byte_cost = generator_buffer.len() as u64 * TEST_CONSTANTS.cost_per_byte;
+                let bundle_byte_cost = bundle
+                    .coin_spends
+                    .iter()
+                    .map(|s| s.puzzle_reveal.len() + s.solution.len())
+                    .sum::<usize>() as u64
+                    * TEST_CONSTANTS.cost_per_byte;
+                println!("block_cost: {block_cost} bytes: {block_byte_cost}");
+                println!("bundle_cost: {} bytes: {bundle_byte_cost}", conditions.cost);
+                assert!(conditions.cost - bundle_byte_cost <= block_cost - block_byte_cost);
                 assert!(conditions.cost > 0);
                 // update the cost we print here, just to be compatible with
                 // the test cases we have. We've already ensured the cost is
