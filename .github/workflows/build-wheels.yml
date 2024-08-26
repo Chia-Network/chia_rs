@@ -249,15 +249,15 @@ jobs:
           name: packages-sdist-${{ matrix.os.name }}-${{ matrix.python.major-dot-minor }}-${{ matrix.arch.name }}
           path: ./target/wheels/
 
-  unit_tests:
+  tests:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
-    name: Unit tests
+    name: Tests
     steps:
-      # the test files are read verbatim, making it problematic if git is
-      # allowed to insert \r when checking out files
+      # The test files are read verbatim, making it problematic if git is
+      # allowed to insert \r when checking out files.
       - name: Disable Git autocrlf
         run: git config --global core.autocrlf false
 
@@ -310,7 +310,7 @@ jobs:
     needs:
       - build_wheels
       - build_sdist
-      - unit_tests
+      - tests
       - check_typestubs
     strategy:
       fail-fast: false
