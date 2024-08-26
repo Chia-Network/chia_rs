@@ -182,8 +182,7 @@ jobs:
           directories: ${{ steps.create-venv.outputs.activate-venv-directories }}
 
       - name: Install wheel
-        run: |
-          pip install --no-index --find-links target/wheels/ chia_rs
+        run: pip install --no-index --find-links target/wheels/ chia_rs
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -228,10 +227,7 @@ jobs:
       - name: Clean workspace
         uses: Chia-Network/actions/clean-workspace@main
 
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v4
 
       - uses: Chia-Network/actions/setup-python@main
         with:
@@ -257,14 +253,13 @@ jobs:
     steps:
       # the test files are read verbatim, making it problematic if git is
       # allowed to insert \r when checking out files
-      - name: disable git autocrlf
-        run: |
-          git config --global core.autocrlf false
+      - name: Disable Git autocrlf
+        run: git config --global core.autocrlf false
 
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
+
       - uses: dtolnay/rust-toolchain@stable
+
       - name: Prepare for coverage
         if: matrix.os == 'ubuntu-latest'
         run: |
@@ -272,10 +267,13 @@ jobs:
           echo "RUSTFLAGS=-Cinstrument-coverage" >> "$GITHUB_ENV"
           echo "LLVM_PROFILE_FILE=$(pwd)/target/chia_rs-%p-%m.profraw" >> "$GITHUB_ENV"
           echo "CARGO_TARGET_DIR=$(pwd)/target" >> "$GITHUB_ENV"
-      - name: cargo test
+
+      - name: Test
         run: cargo test --workspace --all-features
-      - name: cargo test (release)
+
+      - name: Test (release)
         run: cargo test --workspace --all-features --release
+
       - name: Continue with coverage
         if: matrix.os == 'ubuntu-latest'
         run: |
@@ -292,6 +290,7 @@ jobs:
           pytest -n 0 tests
           grcov . --binary-path target -s . --branch --ignore-not-existing --ignore='*/.cargo/*' --ignore='tests/*' --ignore='venv/*' -o rust_cov.info
           python -c 'with open("rust_cov.info") as f: lines = [l for l in f if not (l.startswith("DA:") and int(l.split(",")[1].strip()) >= 2**63)]; open("lcov.info", "w").writelines(lines)'
+
       - name: Upload to Coveralls
         uses: coverallsapp/github-action@v2
         if: matrix.os == 'ubuntu-latest'
@@ -301,12 +300,13 @@ jobs:
           path-to-lcov: "./lcov.info"
 
   upload:
-    name: Upload to PyPI - ${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }}
+    name: Upload to PyPI (${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }})
     runs-on: ${{ matrix.os.runs-on[matrix.arch.matrix] }}
     needs:
       - build_wheels
       - build_sdist
       - unit_tests
+      - check_typestubs
     strategy:
       fail-fast: false
       matrix:
@@ -327,10 +327,7 @@ jobs:
       - name: Clean workspace
         uses: Chia-Network/actions/clean-workspace@main
 
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v4
 
       - uses: Chia-Network/actions/setup-python@main
         with:
@@ -348,14 +345,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: publish (PyPi)
+      - name: Publish (PyPi)
         if: env.RELEASE == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
           skip-existing: true
 
-      - name: publish (Test PyPi)
+      - name: Publish (Test PyPi)
         if: env.PRE_RELEASE == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
