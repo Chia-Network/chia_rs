@@ -132,6 +132,11 @@ jobs:
         with:
           python-version: ${{ matrix.python.major-dot-minor }}
 
+      # This fixes the below issue with the default pip version on some platforms:
+      # WARNING: There was an error checking the latest version of pip.
+      - name: Update pip
+        run: python -m pip install --upgrade pip
+
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
