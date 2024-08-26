@@ -34,6 +34,12 @@ jobs:
       - name: Tests (release)
         run: cargo test --workspace --all-features --release
 
+      - name: Install cargo-machete
+        run: cargo install cargo-machete --locked
+
+      - name: Unused dependencies
+        run: cargo machete
+
       - name: Install cargo-workspaces
         run: cargo install cargo-workspaces --locked
 
