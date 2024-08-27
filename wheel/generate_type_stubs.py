@@ -24,11 +24,6 @@ def transform_type(m: str) -> str:
 def print_class(
     file: TextIO, name: str, members: List[str], extra: Optional[List[str]] = None
 ):
-
-    # f-strings don't allow backslashes, which makes it a bit tricky to
-    # manipulate strings with newlines
-    nl = "\n"
-
     def add_indent(x: str):
         return "\n    " + x
 
