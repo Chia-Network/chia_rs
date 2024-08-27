@@ -159,9 +159,9 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
     py_protocol.extend(quote! {
         #[pyo3::pymethods]
         impl #ident {
-            #[staticmethod]
+            #[classmethod]
             #[pyo3(signature=(json_dict))]
-            pub fn from_json_dict(json_dict: &pyo3::Bound<pyo3::PyAny>) -> pyo3::PyResult<Self> {
+            pub fn from_json_dict(_cls: &pyo3::Bound<'_, pyo3::types::PyType>, json_dict: &pyo3::Bound<pyo3::PyAny>) -> pyo3::PyResult<Self> {
                 <Self as #crate_name::from_json_dict::FromJsonDict>::from_json_dict(json_dict)
             }
 
@@ -174,9 +174,9 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
     let streamable = quote! {
         #[pyo3::pymethods]
         impl #ident {
-            #[staticmethod]
+            #[classmethod]
             #[pyo3(name = "from_bytes")]
-            pub fn py_from_bytes(blob: pyo3::buffer::PyBuffer<u8>) -> pyo3::PyResult<Self> {
+            pub fn py_from_bytes(_cls: &pyo3::Bound<'_, pyo3::types::PyType>, blob: pyo3::buffer::PyBuffer<u8>) -> pyo3::PyResult<Self> {
                 if !blob.is_c_contiguous() {
                     panic!("from_bytes() must be called with a contiguous buffer");
                 }
@@ -186,9 +186,9 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 <Self as #crate_name::Streamable>::from_bytes(slice).map_err(|e| <#crate_name::chia_error::Error as Into<pyo3::PyErr>>::into(e))
             }
 
-            #[staticmethod]
+            #[classmethod]
             #[pyo3(name = "from_bytes_unchecked")]
-            pub fn py_from_bytes_unchecked(blob: pyo3::buffer::PyBuffer<u8>) -> pyo3::PyResult<Self> {
+            pub fn py_from_bytes_unchecked(_cls: &pyo3::Bound<'_, pyo3::types::PyType>, blob: pyo3::buffer::PyBuffer<u8>) -> pyo3::PyResult<Self> {
                 if !blob.is_c_contiguous() {
                     panic!("from_bytes_unchecked() must be called with a contiguous buffer");
                 }
@@ -199,9 +199,9 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
             }
 
             // returns the type as well as the number of bytes read from the buffer
-            #[staticmethod]
+            #[classmethod]
             #[pyo3(signature= (blob, trusted=false))]
-            pub fn parse_rust<'p>(blob: pyo3::buffer::PyBuffer<u8>, trusted: bool) -> pyo3::PyResult<(Self, u32)> {
+            pub fn parse_rust<'p>(_cls: &pyo3::Bound<'_, pyo3::types::PyType>, blob: pyo3::buffer::PyBuffer<u8>, trusted: bool) -> pyo3::PyResult<(Self, u32)> {
                 if !blob.is_c_contiguous() {
                     panic!("parse_rust() must be called with a contiguous buffer");
                 }

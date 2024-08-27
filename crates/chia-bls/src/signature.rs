@@ -1259,7 +1259,8 @@ mod pytests {
             let sig = sign(&sk, msg);
             Python::with_gil(|py| {
                 let string = sig.to_json_dict(py).expect("to_json_dict");
-                let sig2 = Signature::from_json_dict(string.bind(py)).unwrap();
+                let py_class = py.get_type_bound::<Signature>();
+                let sig2 = Signature::from_json_dict(&py_class, string.bind(py)).unwrap();
                 assert_eq!(sig, sig2);
             });
         }
@@ -1274,8 +1275,9 @@ mod pytests {
     fn test_json_dict(#[case] input: &str, #[case] msg: &str) {
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
+            let py_class = py.get_type_bound::<Signature>();
             let err =
-                Signature::from_json_dict(input.to_string().into_py(py).bind(py)).unwrap_err();
+                Signature::from_json_dict(&py_class, input.to_string().into_py(py).bind(py)).unwrap_err();
             assert_eq!(err.value_bound(py).to_string(), msg.to_string());
         });
     }

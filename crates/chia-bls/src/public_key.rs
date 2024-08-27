@@ -737,7 +737,8 @@ mod pytests {
             let pk = sk.public_key();
             Python::with_gil(|py| {
                 let string = pk.to_json_dict(py).expect("to_json_dict");
-                let pk2 = PublicKey::from_json_dict(string.bind(py)).unwrap();
+                let py_class = py.get_type_bound::<PublicKey>();
+                let pk2 = PublicKey::from_json_dict(&py_class, string.bind(py)).unwrap();
                 assert_eq!(pk, pk2);
             });
         }
@@ -752,8 +753,9 @@ mod pytests {
     fn test_json_dict(#[case] input: &str, #[case] msg: &str) {
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
+            let py_class = py.get_type_bound::<PublicKey>();
             let err =
-                PublicKey::from_json_dict(input.to_string().into_py(py).bind(py)).unwrap_err();
+            PublicKey::from_json_dict(&py_class, input.to_string().into_py(py).bind(py)).unwrap_err();
             assert_eq!(err.value_bound(py).to_string(), msg.to_string());
         });
     }
