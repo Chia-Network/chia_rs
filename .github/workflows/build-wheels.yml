@@ -299,7 +299,7 @@ jobs:
           cargo llvm-cov report --release --lcov --output-path rust.lcov
 
       - name: Install lcov
-        run: apt-get install -y lcov
+        run: sudo apt-get install -y lcov
 
       - name: Combine coverage
         run: |
