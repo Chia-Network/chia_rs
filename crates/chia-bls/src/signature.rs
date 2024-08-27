@@ -1276,8 +1276,8 @@ mod pytests {
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
             let py_class = py.get_type_bound::<Signature>();
-            let err =
-                Signature::from_json_dict(&py_class, input.to_string().into_py(py).bind(py)).unwrap_err();
+            let err = Signature::from_json_dict(&py_class, input.to_string().into_py(py).bind(py))
+                .unwrap_err();
             assert_eq!(err.value_bound(py).to_string(), msg.to_string());
         });
     }
