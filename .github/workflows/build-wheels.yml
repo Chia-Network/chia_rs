@@ -295,15 +295,22 @@ jobs:
           cargo llvm-cov clean --workspace
           cargo test --workspace --all-features --release
           maturin develop --release -m wheel/Cargo.toml
-          pytest --cov=chia_rs tests --cov-report xml
-          cargo llvm-cov report --release --lcov --output-path coverage.lcov
+          pytest --cov=chia_rs tests --cov-report lcov
+          cargo llvm-cov report --release --lcov --output-path rust.lcov
 
-      - name: Upload to Coveralls
+      - name: Upload Rust to Coveralls
         uses: coverallsapp/github-action@v2
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         with:
-          files: ./coverage.xml ./coverage.lcov
+          path-to-lcov: ./rust.lcov
+
+      - name: Upload Python to Coveralls
+        uses: coverallsapp/github-action@v2
+        env:
+          COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
+        with:
+          path-to-lcov: ./coverage.lcov
 
   upload:
     name: Upload to PyPI (${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }})
