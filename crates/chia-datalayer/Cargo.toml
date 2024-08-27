@@ -11,9 +11,14 @@ repository = "https://github.com/Chia-Network/chia_rs"
 [lints]
 workspace = true
 
+[features]
+py-bindings = ["dep:pyo3", "chia-traits/py-bindings"]
+
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-# dev?
+chia-traits = { workspace = true }
+# TODO: dev?
 hex-literal = { workspace = true }
+pyo3 = { workspace = true, optional = true }

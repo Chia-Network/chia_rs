@@ -1,5 +1,8 @@
 // use std::collections::HashMap;
 
+#[cfg(feature = "py-bindings")]
+use pyo3::{prelude::PyBytesMethods, pyclass, pymethods, types::PyBytes, Bound, PyResult};
+
 type TreeIndex = u32;
 // type Key = Vec<u8>;
 type Hash = [u8; 32];
@@ -50,6 +53,7 @@ impl NodeType {
 // }
 
 #[derive(Debug)]
+#[cfg_attr(feature = "py-bindings", pyclass(frozen, name = "MerkleBlob"))]
 pub struct MerkleBlob {
     blob: Vec<u8>,
     free_indexes: Vec<TreeIndex>,
@@ -167,6 +171,27 @@ impl MerkleBlob {
                 return Ok(lineage);
             }
         }
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+impl MerkleBlob {
+    #[new]
+    pub fn init(blob: &Bound<'_, PyBytes>) -> PyResult<Self> {
+        Ok(Self {
+            blob: blob.as_bytes().to_vec(),
+            free_indexes: vec![],
+        })
+    }
+
+    // #[pyo3(name = "get_root")]
+    // pub fn py_get_root<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
+    //     ChiaToPython::to_python(&Bytes32::new(self.get_root()), py)
+    // }
+
+    pub fn __len__(&self) -> PyResult<usize> {
+        Ok(self.blob.len())
     }
 }
 

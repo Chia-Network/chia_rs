@@ -54,6 +54,7 @@ implicit_hasher = "allow"
 chia-bls = { workspace = true, optional = true }
 chia-client = { workspace = true, optional = true }
 chia-consensus = { workspace = true, optional = true }
+chia-datalayer = { workspace = true, optional = true }
 chia-protocol = { workspace = true, optional = true }
 chia-ssl = { workspace = true, optional = true }
 chia-traits = { workspace = true, optional = true }
@@ -67,6 +68,7 @@ default = [
     "bls",
     "client",
     "consensus",
+    "datalayer",
     "protocol",
     "ssl",
     "traits",
@@ -78,6 +80,7 @@ default = [
 bls = ["dep:chia-bls"]
 client = ["dep:chia-client"]
 consensus = ["dep:chia-consensus"]
+datalayer = ["dep:chia-datalayer"]
 protocol = ["dep:chia-protocol"]
 ssl = ["dep:chia-ssl"]
 traits = ["dep:chia-traits"]
@@ -96,6 +99,7 @@ chia_streamable_macro = { path = "./crates/chia_streamable_macro", version = "0.
 chia-bls = { path = "./crates/chia-bls", version = "0.11.0" }
 chia-client = { path = "./crates/chia-client", version = "0.11.0" }
 chia-consensus = { path = "./crates/chia-consensus", version = "0.12.0" }
+chia-datalayer = { path = "./crates/chia-datalayer", version = "0.1.0" }
 chia-protocol = { path = "./crates/chia-protocol", version = "0.11.0" }
 chia-ssl = { path = "./crates/chia-ssl", version = "0.11.0" }
 chia-traits = { path = "./crates/chia-traits", version = "0.11.0" }

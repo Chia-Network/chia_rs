@@ -75,6 +75,8 @@ use chia_bls::{
     Signature,
 };
 
+use chia_datalayer::MerkleBlob;
+
 #[pyfunction]
 pub fn compute_merkle_set_root<'p>(
     py: Python<'p>,
@@ -484,6 +486,9 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // constants
     m.add_class::<ConsensusConstants>()?;
+
+    // datalayer
+    m.add_class::<MerkleBlob>()?;
 
     // merkle tree
     m.add_class::<MerkleSet>()?;

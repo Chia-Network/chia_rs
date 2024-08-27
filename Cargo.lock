@@ -276,6 +276,7 @@ dependencies = [
  "chia-bls 0.11.0",
  "chia-client",
  "chia-consensus",
+ "chia-datalayer",
  "chia-protocol",
  "chia-puzzles",
  "chia-ssl",
@@ -373,7 +374,9 @@ dependencies = [
 name = "chia-datalayer"
 version = "0.1.0"
 dependencies = [
+ "chia-traits 0.11.0",
  "hex-literal",
+ "pyo3",
 ]
 
 [[package]]
@@ -515,6 +518,7 @@ version = "0.12.0"
 dependencies = [
  "chia-bls 0.11.0",
  "chia-consensus",
+ "chia-datalayer",
  "chia-protocol",
  "chia-traits 0.11.0",
  "chia_py_streamable_macro",
