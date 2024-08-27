@@ -127,7 +127,7 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 }
             });
 
-            if named.len() > 0 {
+            if !named.is_empty() {
                 py_protocol.extend(quote! {
                     #[pyo3::pymethods]
                     impl #ident {
