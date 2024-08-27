@@ -3,6 +3,8 @@
 #[cfg(feature = "py-bindings")]
 use pyo3::{prelude::PyBytesMethods, pyclass, pymethods, types::PyBytes, Bound, PyResult};
 
+use std::cmp::Ordering;
+
 type TreeIndex = u32;
 // type Key = Vec<u8>;
 type Hash = [u8; 32];
@@ -23,7 +25,7 @@ impl NodeType {
             // ha!  feel free to laugh at this
             x if (NodeType::Internal as u8 == x) => Ok(NodeType::Internal),
             x if (NodeType::Leaf as u8 == x) => Ok(NodeType::Leaf),
-            other => panic!("unknown NodeType value: {}", other),
+            other => panic!("unknown NodeType value: {other}"),
         }
     }
 
@@ -66,7 +68,7 @@ const DATA_SIZE: usize = 44;
 const SPACING: usize = METADATA_SIZE + DATA_SIZE;
 
 // TODO: probably bogus and overflowing or somesuch
-const NULL_PARENT: TreeIndex = 0xffffffff; // 1 << (4 * 8) - 1;
+const NULL_PARENT: TreeIndex = 0xffff_ffffu32; // 1 << (4 * 8) - 1;
 
 impl MerkleBlob {
     pub fn insert(&mut self) -> Result<(), String> {
@@ -102,7 +104,7 @@ impl MerkleBlob {
             }
         }
 
-        Err(format!("failed to find a node"))
+        Err("failed to find a node".to_string())
     }
 
     fn insert_entry_to_blob(
@@ -111,13 +113,13 @@ impl MerkleBlob {
         entry: [u8; SPACING],
     ) -> Result<(), String> {
         let extend_index = (self.blob.len() / SPACING) as TreeIndex;
-        if index > extend_index {
-            return Err(format!("index out of range: {index}"));
-        } else if index == extend_index {
-            self.blob.extend_from_slice(&entry);
-        } else {
-            let start = index as usize * SPACING;
-            self.blob[start..start + SPACING].copy_from_slice(&entry);
+        match index.cmp(&extend_index) {
+            Ordering::Greater => return Err(format!("index out of range: {index}")),
+            Ordering::Equal => self.blob.extend_from_slice(&entry),
+            Ordering::Less => {
+                let start = index as usize * SPACING;
+                self.blob[start..start + SPACING].copy_from_slice(&entry);
+            }
         }
 
         Ok(())
@@ -152,7 +154,7 @@ impl MerkleBlob {
             Err(message) => return Err(format!("failed loading metadata: {message})")),
         };
         Ok(
-            match RawMerkleNode::from_bytes(metadata, index, data_blob) {
+            match RawMerkleNode::from_bytes(&metadata, index, data_blob) {
                 Ok(node) => node,
                 Err(message) => return Err(format!("failed loading raw node: {message}")),
             },
@@ -228,7 +230,7 @@ impl RawMerkleNode {
     // }
 
     pub fn from_bytes(
-        metadata: NodeMetadata,
+        metadata: &NodeMetadata,
         index: TreeIndex,
         blob: [u8; DATA_SIZE],
     ) -> Result<Self, String> {
@@ -254,8 +256,7 @@ impl RawMerkleNode {
 
     pub fn parent(&self) -> TreeIndex {
         match self {
-            RawMerkleNode::Internal { parent, .. } => *parent,
-            RawMerkleNode::Leaf { parent, .. } => *parent,
+            RawMerkleNode::Internal { parent, .. } | RawMerkleNode::Leaf { parent, .. } => *parent,
         }
     }
 }
@@ -280,13 +281,7 @@ impl NodeMetadata {
     }
 
     pub fn to_bytes(&self) -> [u8; METADATA_SIZE] {
-        [
-            self.node_type.to_u8(),
-            match self.dirty {
-                false => 0,
-                true => 1,
-            },
-        ]
+        [self.node_type.to_u8(), u8::from(self.dirty)]
     }
 }
 
