@@ -345,6 +345,7 @@ def run_chia_program(
     program: bytes, args: bytes, max_cost: int, flags: int
 ) -> Tuple[int, LazyNode]: ...
 
+@final
 class LazyNode:
     pair: Optional[Tuple[LazyNode, LazyNode]]
     atom: Optional[bytes]
@@ -383,6 +384,7 @@ class AugSchemeMPL:
     @staticmethod
     def derive_child_pk_unhardened(pk: G1Element, index: int) -> G1Element: ...
 
+@final
 class MerkleSet:
     def get_root(self) -> bytes32: ...
     def is_included_already_hashed(self, to_check: bytes) -> Tuple[bool, bytes]: ...
