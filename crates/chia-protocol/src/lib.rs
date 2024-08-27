@@ -6,7 +6,7 @@ mod coin;
 mod coin_spend;
 mod coin_state;
 mod end_of_sub_slot_bundle;
-mod fee_estimate;
+pub mod fee_estimate;
 mod foliage;
 mod full_node_protocol;
 mod fullblock;

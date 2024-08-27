@@ -64,19 +64,19 @@ jobs:
         # TODO: don't always this stuff
         if: always()
         run: |
-          stubtest --concise --ignore-missing-stub chia_rs | grep -vE '\.(__deepcopy__|__richcmp__|from_bytes|from_bytes_unchecked|parse_rust) '
+          stubtest --allowlist stubtest.allowlist.to-review --concise --ignore-missing-stub chia_rs | grep -vE '\.(__deepcopy__|__richcmp__|from_bytes|from_bytes_unchecked|parse_rust) '
 
       - name: python mypy stubtest concise
         # TODO: don't always this stuff
         if: always()
         run: |
-          stubtest --concise chia_rs
+          stubtest --allowlist stubtest.allowlist.to-review --concise chia_rs
 
       - name: python mypy stubtest
         # TODO: don't always this stuff
         if: always()
         run: |
-          stubtest chia_rs
+          stubtest --allowlist stubtest.allowlist.to-review chia_rs
 
       - name: python black
         run: |

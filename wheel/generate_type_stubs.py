@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple, TextIO
 from glob import glob
 
-output_file = Path(__file__).parent.resolve() / "python" / "chia_rs" / "chia_rs.pyi"
+output_file = Path(__file__).parent.resolve() / "python" / "chia_rs" / "__init__.pyi"
 crates_dir = Path(__file__).parent.parent.resolve() / "crates"
 input_dir = crates_dir / "chia-protocol" / "src"
 
@@ -44,6 +44,8 @@ def print_class(
     if extra is not None:
         members.extend(extra)
 
+    # TODO: make __richcmp__ dependent on streamable?
+    # def __richcmp__(self) -> Any: ...
     # TODO: don't let me merge this hardcoded SpendBundle @final exception
     file.write(
         f"""
@@ -54,15 +56,14 @@ class {name}:{"".join(map(add_indent, members))}
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
-    def __richcmp__(self) -> Any: ...
-    def __deepcopy__(self) -> {name}: ...
+    def __deepcopy__(self, memo: object) -> {name}: ...
     def __copy__(self) -> {name}: ...
     @staticmethod
-    def from_bytes(bytes) -> {name}: ...
+    def from_bytes(blob: bytes) -> {name}: ...
     @staticmethod
-    def from_bytes_unchecked(bytes) -> {name}: ...
+    def from_bytes_unchecked(blob: bytes) -> {name}: ...
     @staticmethod
-    def parse_rust(ReadableBuffer, bool = False) -> Tuple[{name}, int]: ...
+    def parse_rust(blob: ReadableBuffer, trusted: bool = False) -> Tuple[{name}, int]: ...
     def to_bytes(self) -> bytes: ...
     def __bytes__(self) -> bytes: ...
     def stream_to_bytes(self) -> bytes: ...
@@ -73,7 +74,8 @@ class {name}:{"".join(map(add_indent, members))}
 """
     )
 
-    if len(all_replace_parameters) > 0:
+    # TODO: program doesn't have named fields so the replace function isn't added
+    if len(all_replace_parameters) > 0 and name != "Program":
         indent = ",\n        "
         file.write(
             f"""    def replace(self, *, {indent.join(all_replace_parameters)}) -> {name}: ...
@@ -214,7 +216,7 @@ extra_members = {
     "Program": [
         "def get_tree_hash(self) -> bytes32: ...",
         "@staticmethod\n    def default() -> Program: ...",
-        "@staticmethod\n    def fromhex(hex) -> Program: ...",
+        "@staticmethod\n    def fromhex(h: str) -> Program: ...",
         "def run_mempool_with_cost(self, max_cost: int, args: object) -> Tuple[int, ChiaProgram]: ...",
         "def run_with_cost(self, max_cost: int, args: object) -> Tuple[int, ChiaProgram]: ...",
         "def _run(self, max_cost: int, flags: int, args: object) -> Tuple[int, ChiaProgram]: ...",
@@ -224,7 +226,7 @@ extra_members = {
         "def uncurry(self) -> Tuple[ChiaProgram, ChiaProgram]: ...",
     ],
     "SpendBundle": [
-        "@staticmethod\n    def aggregate(sbs: List[SpendBundle]) -> SpendBundle: ...",
+        "@staticmethod\n    def aggregate(spend_bundles: List[SpendBundle]) -> SpendBundle: ...",
         "def name(self) -> bytes32: ...",
         "def removals(self) -> List[Coin]: ...",
         "def additions(self) -> List[Coin]: ...",
@@ -274,26 +276,22 @@ class _Unspec:
 def solution_generator(spends: Sequence[Tuple[Coin, bytes, bytes]]) -> bytes: ...
 def solution_generator_backrefs(spends: Sequence[Tuple[Coin, bytes, bytes]]) -> bytes: ...
 
-def compute_merkle_set_root(items: Sequence[bytes]) -> bytes: ...
+def compute_merkle_set_root(values: Sequence[bytes]) -> bytes: ...
 
 def supports_fast_forward(spend: CoinSpend) -> bool : ...
 def fast_forward_singleton(spend: CoinSpend, new_coin: Coin, new_parent: Coin) -> bytes: ...
 
 def run_block_generator(
-    program: ReadableBuffer, args: List[ReadableBuffer], max_cost: int, flags: int, constants: ConsensusConstants
+    program: ReadableBuffer, block_refs: List[ReadableBuffer], max_cost: int, flags: int, constants: ConsensusConstants
 ) -> Tuple[Optional[int], Optional[SpendBundleConditions]]: ...
 
 def run_block_generator2(
-    program: ReadableBuffer, args: List[ReadableBuffer], max_cost: int, flags: int, constants: ConsensusConstants
+    program: ReadableBuffer, block_refs: List[ReadableBuffer], max_cost: int, flags: int, constants: ConsensusConstants
 ) -> Tuple[Optional[int], Optional[SpendBundleConditions]]: ...
 
 def run_puzzle(
     puzzle: bytes, solution: bytes, parent_id: bytes32, amount: int, max_cost: int, flags: int, constants: ConsensusConstants
 ) -> SpendBundleConditions: ...
-
-def deserialize_proof(
-    proof: bytes
-) -> MerkleSet: ...
 
 def confirm_included_already_hashed(
     root: bytes32,
@@ -351,9 +349,9 @@ class LazyNode:
     atom: Optional[bytes]
 
 def serialized_length(program: ReadableBuffer) -> int: ...
-def tree_hash(program: ReadableBuffer) -> bytes32: ...
+def tree_hash(blob: ReadableBuffer) -> bytes32: ...
 def get_puzzle_and_solution_for_coin(program: ReadableBuffer, args: ReadableBuffer, max_cost: int, find_parent: bytes32, find_amount: int, find_ph: bytes32, flags: int) -> Tuple[bytes, bytes]: ...
-def get_puzzle_and_solution_for_coin2(program: Program, block_refs: List[ReadableBuffer], max_cost: int, find_coin: Coin, flags: int) -> Tuple[Program, Program]: ...
+def get_puzzle_and_solution_for_coin2(generator: Program, block_refs: List[ReadableBuffer], max_cost: int, find_coin: Coin, flags: int) -> Tuple[Program, Program]: ...
 
 @final
 class BLSCache:
@@ -378,16 +376,16 @@ class AugSchemeMPL:
     @staticmethod
     def g2_from_message(msg: bytes) -> G2Element: ...
     @staticmethod
-    def derive_child_sk(pk: PrivateKey, index: int) -> PrivateKey: ...
+    def derive_child_sk(sk: PrivateKey, index: int) -> PrivateKey: ...
     @staticmethod
-    def derive_child_sk_unhardened(pk: PrivateKey, index: int) -> PrivateKey: ...
+    def derive_child_sk_unhardened(sk: PrivateKey, index: int) -> PrivateKey: ...
     @staticmethod
     def derive_child_pk_unhardened(pk: G1Element, index: int) -> G1Element: ...
 
 @final
 class MerkleSet:
     def get_root(self) -> bytes32: ...
-    def is_included_already_hashed(self, to_check: bytes) -> Tuple[bool, bytes]: ...
+    def is_included_already_hashed(self, included_leaf: bytes32) -> Tuple[bool, bytes]: ...
     def __init__(
         self,
         leafs: List[bytes32],
@@ -410,7 +408,7 @@ class MerkleSet:
             "def __str__(self) -> str: ...",
             "def __add__(self, other: G1Element) -> G1Element: ...",
             "def __iadd__(self, other: G1Element) -> G1Element: ...",
-            "def derive_unhardened(self, int) -> G1Element: ...",
+            "def derive_unhardened(self, idx: int) -> G1Element: ...",
         ],
     )
     print_class(
@@ -449,10 +447,10 @@ class MerkleSet:
             "def get_g1(self) -> G1Element: ...",
             "def __str__(self) -> str: ...",
             "def public_key(self) -> G1Element: ...",
-            "def derive_hardened(self, int) -> PrivateKey: ...",
-            "def derive_unhardened(self, int) -> PrivateKey: ...",
+            "def derive_hardened(self, idx: int) -> PrivateKey: ...",
+            "def derive_unhardened(self, idx: int) -> PrivateKey: ...",
             "@staticmethod",
-            "def from_seed(bytes) -> PrivateKey: ...",
+            "def from_seed(seed: bytes) -> PrivateKey: ...",
         ],
     )
 
