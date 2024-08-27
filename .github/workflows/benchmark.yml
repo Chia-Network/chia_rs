@@ -60,17 +60,23 @@ jobs:
         run: |
           mypy --ignore-missing-imports tests
 
+      - name: python mypy stubtest filtered
+        # TODO: don't always this stuff
+        if: always()
+        run: |
+          stubtest --concise --ignore-missing-stub chia_rs | grep -vE '\.(__deepcopy__|__richcmp__|from_bytes|from_bytes_unchecked|parse_rust) '
+
       - name: python mypy stubtest concise
+        # TODO: don't always this stuff
+        if: always()
         run: |
           stubtest --concise chia_rs
 
       - name: python mypy stubtest
+        # TODO: don't always this stuff
+        if: always()
         run: |
           stubtest chia_rs
-
-      - name: python mypy stubtest filtered
-        run: |
-          stubtest --ignore-missing-stub chia_rs | grep -vE '\.(__deepcopy__|__richcmp__|from_bytes|from_bytes_unchecked|parse_rust) '
 
       - name: python black
         run: |
