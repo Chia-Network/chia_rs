@@ -28,8 +28,6 @@ def print_class(
     # f-strings don't allow backslashes, which makes it a bit tricky to
     # manipulate strings with newlines
     nl = "\n"
-    if name == "FeeEstimate":
-        1/0
 
     def add_indent(x: str):
         return "\n    " + x
