@@ -228,19 +228,12 @@ ff01\
             coin_spends,
             aggregated_signature: G2Element::default(),
         };
-        let result = validate_clvm_and_signature(
-            &spend_bundle,
-            TEST_CONSTANTS.max_block_cost_clvm / 2, // same as mempool_manager default
-            &TEST_CONSTANTS,
-            236,
-        );
-        assert!(matches!(result, Ok(..)));
-        let result = validate_clvm_and_signature(
-            &spend_bundle,
-            TEST_CONSTANTS.max_block_cost_clvm / 3, // lower than mempool_manager default
-            &TEST_CONSTANTS,
-            236,
-        );
+        let result = validate_clvm_and_signature(&spend_bundle, 5526552044, &TEST_CONSTANTS, 236);
+        let Ok((conds, _, _)) = result else {
+            panic!("failed");
+        };
+        assert_eq!(conds.cost, 5526552044);
+        let result = validate_clvm_and_signature(&spend_bundle, 5526552043, &TEST_CONSTANTS, 236);
         assert!(matches!(result, Err(ErrorCode::CostExceeded)));
     }
 
