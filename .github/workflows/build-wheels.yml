@@ -291,26 +291,26 @@ jobs:
         run: |
           source <(cargo llvm-cov show-env --export-prefix)
           export CARGO_TARGET_DIR=$CARGO_LLVM_COV_TARGET_DIR
-          export CARGO_INCREMENTAL=1
+          export CARGO_INCREMENTAL=0
           cargo llvm-cov clean --workspace
-          cargo test --workspace --all-features --release
           maturin develop --release -m wheel/Cargo.toml
           pytest --cov=chia_rs tests --cov-report lcov
+          cargo test --workspace --all-features --release
           cargo llvm-cov report --release --lcov --output-path rust.lcov
 
-      - name: Upload Rust to Coveralls
-        uses: coverallsapp/github-action@v2
-        env:
-          COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
-        with:
-          path-to-lcov: ./rust.lcov
+      - name: Install lcov
+        run: apt-get install -y lcov
 
-      - name: Upload Python to Coveralls
+      - name: Combine coverage
+        run: |
+          lcov -a coverage.lcov -a rust.lcov -o combined.lcov
+
+      - name: Upload to Coveralls
         uses: coverallsapp/github-action@v2
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         with:
-          path-to-lcov: ./coverage.lcov
+          path-to-lcov: ./combined.lcov
 
   upload:
     name: Upload to PyPI (${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }})
