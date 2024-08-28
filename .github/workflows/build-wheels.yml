@@ -1,4 +1,4 @@
-name: build - check - upload
+name: Python wheels
 
 on:
   push:
