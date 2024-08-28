@@ -119,7 +119,7 @@ mod tests {
         let mut msg = b"message".to_vec();
 
         let mut expected_result = Vec::<u8>::new();
-        expected_result.extend(msg.clone());
+        expected_result.extend_from_slice(msg.as_slice());
 
         let coin = Coin::new(
             Bytes32::try_from(parent_id.clone()).expect("test should pass"),
