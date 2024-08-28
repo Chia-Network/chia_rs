@@ -7,4 +7,5 @@ def test_merkle_blob():
     )
     merkle_blob = MerkleBlob(blob)
     print(merkle_blob)
+    print(dir(merkle_blob))
     assert len(merkle_blob) == len(blob)

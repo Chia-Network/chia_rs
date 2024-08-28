@@ -5,9 +5,16 @@ use pyo3::{prelude::PyBytesMethods, pyclass, pymethods, types::PyBytes, Bound, P
 
 use std::cmp::Ordering;
 
+// TODO: clearly shouldn't be hard coded
+const METADATA_SIZE: usize = 2;
+// TODO: clearly shouldn't be hard coded
+const DATA_SIZE: usize = 44;
+const BLOCK_SIZE: usize = METADATA_SIZE + DATA_SIZE;
+
 type TreeIndex = u32;
 // type Key = Vec<u8>;
 type Hash = [u8; 32];
+type Block = [u8; BLOCK_SIZE];
 type KvId = u64;
 
 #[derive(Debug, Hash, Eq, PartialEq)]
@@ -61,12 +68,6 @@ pub struct MerkleBlob {
     free_indexes: Vec<TreeIndex>,
 }
 
-// TODO: clearly shouldn't be hard coded
-const METADATA_SIZE: usize = 2;
-// TODO: clearly shouldn't be hard coded
-const DATA_SIZE: usize = 44;
-const SPACING: usize = METADATA_SIZE + DATA_SIZE;
-
 // TODO: probably bogus and overflowing or somesuch
 const NULL_PARENT: TreeIndex = 0xffff_ffffu32; // 1 << (4 * 8) - 1;
 
@@ -74,7 +75,7 @@ impl MerkleBlob {
     pub fn insert(&mut self) -> Result<(), String> {
         // TODO: garbage just to use stuff
         let index = self.get_new_index();
-        self.insert_entry_to_blob(index, [0; SPACING])?;
+        self.insert_entry_to_blob(index, [0; BLOCK_SIZE])?;
         self.get_random_leaf_node(vec![0, 1, 2, 3, 4, 5, 6, 7])?;
 
         Ok(())
@@ -82,7 +83,7 @@ impl MerkleBlob {
 
     fn get_new_index(&mut self) -> TreeIndex {
         match self.free_indexes.pop() {
-            None => (self.blob.len() / SPACING) as TreeIndex,
+            None => (self.blob.len() / BLOCK_SIZE) as TreeIndex,
             Some(new_index) => new_index,
         }
     }
@@ -107,45 +108,43 @@ impl MerkleBlob {
         Err("failed to find a node".to_string())
     }
 
-    fn insert_entry_to_blob(
-        &mut self,
-        index: TreeIndex,
-        entry: [u8; SPACING],
-    ) -> Result<(), String> {
-        let extend_index = (self.blob.len() / SPACING) as TreeIndex;
+    fn insert_entry_to_blob(&mut self, index: TreeIndex, block: Block) -> Result<(), String> {
+        let extend_index = (self.blob.len() / BLOCK_SIZE) as TreeIndex;
         match index.cmp(&extend_index) {
             Ordering::Greater => return Err(format!("index out of range: {index}")),
-            Ordering::Equal => self.blob.extend_from_slice(&entry),
+            Ordering::Equal => self.blob.extend_from_slice(&block),
             Ordering::Less => {
-                let start = index as usize * SPACING;
-                self.blob[start..start + SPACING].copy_from_slice(&entry);
+                let start = index as usize * BLOCK_SIZE;
+                self.blob[start..start + BLOCK_SIZE].copy_from_slice(&block);
             }
         }
 
         Ok(())
     }
 
-    pub fn get_raw_node(&self, index: TreeIndex) -> Result<RawMerkleNode, String> {
-        // TODO: handle invalid indexes?
-        // TODO: handle overflows?
-        let metadata_start = index as usize * SPACING;
+    fn get_block(&self, index: TreeIndex) -> Result<Block, String> {
+        let metadata_start = index as usize * BLOCK_SIZE;
         let data_start = metadata_start + METADATA_SIZE;
         let end = data_start + DATA_SIZE;
 
-        let metadata_blob: [u8; METADATA_SIZE] = self
-            .blob
-            .get(metadata_start..data_start)
-            .ok_or(format!(
-                "metadata blob out of bounds: {} {} {}",
-                self.blob.len(),
-                metadata_start,
-                data_start
-            ))?
+        self.blob
+            .get(metadata_start..end)
+            .ok_or(format!("index out of bounds: {index}"))?
+            .try_into()
+            .map_err(|e| format!("failed getting block {index}: {e}"))
+    }
+
+    pub fn get_raw_node(&self, index: TreeIndex) -> Result<RawMerkleNode, String> {
+        // TODO: handle invalid indexes?
+        // TODO: handle overflows?
+        let block = self.get_block(index)?;
+        let metadata_blob: [u8; METADATA_SIZE] = block
+            .get(..METADATA_SIZE)
+            .ok_or(format!("metadata blob out of bounds: {}", block.len(),))?
             .try_into()
             .map_err(|e| format!("metadata blob wrong size: {e}"))?;
-        let data_blob: [u8; DATA_SIZE] = self
-            .blob
-            .get(data_start..end)
+        let data_blob: [u8; DATA_SIZE] = block
+            .get(METADATA_SIZE..)
             .ok_or("data blob out of bounds".to_string())?
             .try_into()
             .map_err(|e| format!("data blob wrong size: {e}"))?;
@@ -161,6 +160,14 @@ impl MerkleBlob {
         )
     }
 
+    pub fn get_parent_index(&self, index: TreeIndex) -> Result<TreeIndex, String> {
+        let block = self.get_block(index).unwrap();
+        let node_type =
+            NodeMetadata::node_type_from_bytes(block[..METADATA_SIZE].try_into().unwrap())?;
+
+        RawMerkleNode::parent_from_bytes(&node_type, block[METADATA_SIZE..].try_into().unwrap())
+    }
+
     pub fn get_lineage(&self, index: TreeIndex) -> Result<Vec<RawMerkleNode>, String> {
         let mut next_index = index;
         let mut lineage = vec![];
@@ -168,6 +175,26 @@ impl MerkleBlob {
             let node = self.get_raw_node(next_index)?;
             next_index = node.parent();
             lineage.push(node);
+
+            if next_index == NULL_PARENT {
+                return Ok(lineage);
+            }
+        }
+    }
+
+    pub fn get_lineage_indexes(&self, index: TreeIndex) -> Result<Vec<TreeIndex>, String> {
+        // TODO: yep, this 'optimization' might be overkill, and should be speed compared regardless
+        let mut next_index = index;
+        let mut lineage = vec![];
+        loop {
+            lineage.push(next_index);
+            let block = self.get_block(next_index)?;
+            let node_type =
+                NodeMetadata::node_type_from_bytes(block[..METADATA_SIZE].try_into().unwrap())?;
+            next_index = RawMerkleNode::parent_from_bytes(
+                &node_type,
+                block[METADATA_SIZE..].try_into().unwrap(),
+            )?;
 
             if next_index == NULL_PARENT {
                 return Ok(lineage);
@@ -197,7 +224,7 @@ impl MerkleBlob {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum RawMerkleNode {
     // Root {
     //     left: TreeIndex,
@@ -235,10 +262,11 @@ impl RawMerkleNode {
         blob: [u8; DATA_SIZE],
     ) -> Result<Self, String> {
         // TODO: add Err results
+        let parent = Self::parent_from_bytes(&metadata.node_type, &blob)?;
         match metadata.node_type {
             NodeType::Internal => Ok(RawMerkleNode::Internal {
                 // TODO: get these right
-                parent: TreeIndex::from_be_bytes(<[u8; 4]>::try_from(&blob[0..4]).unwrap()),
+                parent,
                 left: TreeIndex::from_be_bytes(<[u8; 4]>::try_from(&blob[4..8]).unwrap()),
                 right: TreeIndex::from_be_bytes(<[u8; 4]>::try_from(&blob[8..12]).unwrap()),
                 hash: <[u8; 32]>::try_from(&blob[12..44]).unwrap(),
@@ -246,12 +274,56 @@ impl RawMerkleNode {
             }),
             NodeType::Leaf => Ok(RawMerkleNode::Leaf {
                 // TODO: this try from really right?
-                parent: TreeIndex::from_be_bytes(<[u8; 4]>::try_from(&blob[0..4]).unwrap()),
+                parent,
                 key_value: KvId::from_be_bytes(<[u8; 8]>::try_from(&blob[4..12]).unwrap()),
                 hash: Hash::try_from(&blob[12..44]).unwrap(),
                 index,
             }),
         }
+    }
+
+    fn parent_from_bytes(
+        node_type: &NodeType,
+        blob: &[u8; DATA_SIZE],
+    ) -> Result<TreeIndex, String> {
+        // TODO: a little setup here for pre-optimization to allow walking parents without processing entire nodes
+        match node_type {
+            NodeType::Internal => Ok(TreeIndex::from_be_bytes(
+                <[u8; 4]>::try_from(&blob[0..4]).unwrap(),
+            )),
+            NodeType::Leaf => Ok(TreeIndex::from_be_bytes(
+                <[u8; 4]>::try_from(&blob[0..4]).unwrap(),
+            )),
+        }
+    }
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut blob: Vec<u8> = Vec::new();
+        match self {
+            RawMerkleNode::Internal {
+                parent,
+                left,
+                right,
+                hash,
+                index: _,
+            } => {
+                blob.extend(parent.to_be_bytes());
+                blob.extend(left.to_be_bytes());
+                blob.extend(right.to_be_bytes());
+                blob.extend(hash);
+            }
+            RawMerkleNode::Leaf {
+                parent,
+                key_value,
+                hash,
+                index: _,
+            } => {
+                blob.extend(parent.to_be_bytes());
+                blob.extend(key_value.to_be_bytes());
+                blob.extend(hash);
+            }
+        }
+
+        blob
     }
 
     pub fn parent(&self) -> TreeIndex {
@@ -271,7 +343,7 @@ impl NodeMetadata {
     pub fn from_bytes(blob: [u8; METADATA_SIZE]) -> Result<Self, String> {
         // TODO: identify some useful structured serialization tooling we use
         Ok(Self {
-            node_type: NodeType::from_u8(blob[0])?,
+            node_type: Self::node_type_from_bytes(blob)?,
             dirty: match blob[1] {
                 0 => false,
                 1 => true,
@@ -283,21 +355,29 @@ impl NodeMetadata {
     pub fn to_bytes(&self) -> [u8; METADATA_SIZE] {
         [self.node_type.to_u8(), u8::from(self.dirty)]
     }
+
+    pub fn node_type_from_bytes(blob: [u8; METADATA_SIZE]) -> Result<NodeType, String> {
+        NodeType::from_u8(blob[0])
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use core::array;
+
     use hex_literal::hex;
 
     use super::*;
 
-    fn example_blob() -> MerkleBlob {
-        let something = hex!("0001ffffffff00000001000000020c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b0100000000000405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b0100000000001415161718191a1b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b");
+    const EXAMPLE_BLOB: [u8; 138] = hex!("0001ffffffff00000001000000020c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b0100000000000405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b0100000000001415161718191a1b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b");
+
+    fn example_merkle_blob() -> MerkleBlob {
         MerkleBlob {
-            blob: Vec::from(something),
+            blob: Vec::from(EXAMPLE_BLOB),
             free_indexes: vec![],
         }
     }
+
     #[test]
     fn test_node_metadata_from_to() {
         let bytes: [u8; 2] = [0, 1];
@@ -315,13 +395,13 @@ mod tests {
     #[test]
     fn test_load_a_python_dump() {
         // let kv_id = 0x1415161718191A1B;
-        let merkle_blob = example_blob();
+        let merkle_blob = example_merkle_blob();
         merkle_blob.get_raw_node(0).unwrap();
     }
 
     #[test]
     fn test_get_lineage() {
-        let merkle_blob = example_blob();
+        let merkle_blob = example_merkle_blob();
         let lineage = merkle_blob.get_lineage(2).unwrap();
         for node in &lineage {
             println!("{node:?}");
@@ -333,14 +413,74 @@ mod tests {
 
     #[test]
     fn test_get_random_leaf_node() {
-        let merkle_blob = example_blob();
+        let merkle_blob = example_merkle_blob();
         let leaf = merkle_blob.get_random_leaf_node(vec![0; 8]).unwrap();
         assert_eq!(
             match leaf {
-                RawMerkleNode::Leaf { index, .. } => index,
-                RawMerkleNode::Internal { index, .. } => index,
+                RawMerkleNode::Internal { index, .. } | RawMerkleNode::Leaf { index, .. } => index,
             },
             2,
-        )
+        );
+    }
+
+    #[test]
+    fn test_build() {
+        let hash: Hash = array::from_fn(|i| i as u8 + 12);
+        let root = RawMerkleNode::Internal {
+            parent: NULL_PARENT,
+            left: 1,
+            right: 2,
+            hash,
+            index: 0,
+        };
+        let left_leaf = RawMerkleNode::Leaf {
+            parent: 0,
+            key_value: 0x0405_0607_0809_0A0B,
+            hash,
+            index: 1,
+        };
+        let right_leaf = RawMerkleNode::Leaf {
+            parent: 0,
+            key_value: 0x1415_1617_1819_1A1B,
+            hash,
+            index: 2,
+        };
+
+        let mut blob: Vec<u8> = Vec::new();
+
+        blob.extend(
+            NodeMetadata {
+                node_type: NodeType::Internal,
+                dirty: true,
+            }
+            .to_bytes(),
+        );
+        blob.extend(root.to_bytes());
+        blob.extend(
+            NodeMetadata {
+                node_type: NodeType::Leaf,
+                dirty: false,
+            }
+            .to_bytes(),
+        );
+        blob.extend(left_leaf.to_bytes());
+        blob.extend(
+            NodeMetadata {
+                node_type: NodeType::Leaf,
+                dirty: false,
+            }
+            .to_bytes(),
+        );
+        blob.extend(right_leaf.to_bytes());
+
+        assert_eq!(blob, Vec::from(EXAMPLE_BLOB));
+
+        let merkle_blob = MerkleBlob {
+            blob,
+            free_indexes: vec![],
+        };
+        assert_eq!(merkle_blob.get_raw_node(0).unwrap(), root);
+        assert_eq!(merkle_blob.get_raw_node(1).unwrap(), left_leaf);
+        assert_eq!(merkle_blob.get_raw_node(2).unwrap(), right_leaf);
     }
 }
