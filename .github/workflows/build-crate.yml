@@ -34,6 +34,9 @@ jobs:
       - name: Tests (release)
         run: cargo test --workspace --all-features --release
 
+      - name: Build (release)
+        run: cargo build --workspace --all-features --release
+
       - name: Install cargo-workspaces
         run: cargo install cargo-workspaces --locked
 
