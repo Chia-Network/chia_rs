@@ -119,20 +119,12 @@ pub struct ConsensusConstants {
 
     pool_sub_slot_iters: u64,
 
-    /// Soft fork initiated in 1.8.0 release.
-    soft_fork2_height: u32,
-
-    /// Soft fork initiated in 2.3.0 release.
-    soft_fork4_height: u32,
-
     /// Soft fork initiated in 2.4.0 release.
     soft_fork5_height: u32,
 
     /// The hard fork planned with the 2.0 release.
     /// This is the block with the first plot filter adjustment.
     hard_fork_height: u32,
-
-    hard_fork_fix_height: u32,
 
     /// The 128 plot filter adjustment height.
     plot_filter_128_height: u32,
@@ -206,11 +198,8 @@ pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
     max_generator_size: 1_000_000,
     max_generator_ref_list_size: 512,
     pool_sub_slot_iters: 37_600_000_000,
-    soft_fork2_height: 0,
-    soft_fork4_height: 5_716_000,
     soft_fork5_height: 5_940_000,
     hard_fork_height: 5_496_000,
-    hard_fork_fix_height: 5_496_000,
     plot_filter_128_height: 10_542_000,
     plot_filter_64_height: 15_592_000,
     plot_filter_32_height: 20_643_000,

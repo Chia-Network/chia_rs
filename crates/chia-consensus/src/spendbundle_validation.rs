@@ -132,7 +132,7 @@ mod tests {
     #[rstest]
     #[case(0, ENABLE_FIXED_DIV)]
     #[case(TEST_CONSTANTS.hard_fork_height, ENABLE_BLS_OPS_OUTSIDE_GUARD | ENABLE_FIXED_DIV | ALLOW_BACKREFS)]
-    #[case(TEST_CONSTANTS.soft_fork4_height, ENABLE_BLS_OPS_OUTSIDE_GUARD | ENABLE_FIXED_DIV | ALLOW_BACKREFS)]
+    #[case(5_716_000, ENABLE_BLS_OPS_OUTSIDE_GUARD | ENABLE_FIXED_DIV | ALLOW_BACKREFS)]
     #[case(TEST_CONSTANTS.soft_fork5_height, ENABLE_BLS_OPS_OUTSIDE_GUARD | ENABLE_FIXED_DIV | ALLOW_BACKREFS | DISALLOW_INFINITY_G1)]
     fn test_get_flags(#[case] height: u32, #[case] expected_value: u32) {
         assert_eq!(
