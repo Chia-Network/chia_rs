@@ -4,8 +4,8 @@ use chia_consensus::gen::conditions::{
     process_single_spend, MempoolVisitor, ParseState, SpendBundleConditions,
 };
 use chia_consensus::gen::flags::{NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
+use chia_fuzz::{make_tree, BitCursor};
 use clvmr::allocator::Allocator;
-use fuzzing_utils::{make_tree, BitCursor};
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
