@@ -213,7 +213,7 @@ def test_spend_bundle(
     assert rem == expected_rem
 
 
-class NewAndImprovedSpendBundle(PySpendBundle):
+class NewAndImprovedSpendBundle(SpendBundle):
     test_bool = True
 
     def new_function(self) -> bool:
@@ -222,8 +222,8 @@ class NewAndImprovedSpendBundle(PySpendBundle):
 
 def test_derive_class():
     # Test if aggregate() supports class inheritance
-    test = PySpendBundle.aggregate([])
-    assert isinstance(test, PySpendBundle)
+    test = SpendBundle.aggregate([])
+    assert isinstance(test, SpendBundle)
     test = NewAndImprovedSpendBundle.aggregate([])
     assert isinstance(test, NewAndImprovedSpendBundle)
     assert test.test_bool
@@ -241,3 +241,5 @@ def test_derive_class():
     assert isinstance(test, NewAndImprovedSpendBundle)
     assert test.test_bool
     assert test.new_function()
+
+    test = NewAndImprovedSpendBundle.parse_rust(obj_bytes)
