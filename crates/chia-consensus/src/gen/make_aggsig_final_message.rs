@@ -9,50 +9,46 @@ use chia_protocol::Coin;
 
 pub fn make_aggsig_final_message(
     opcode: ConditionOpcode,
-    msg: &[u8],
+    msg: &mut Vec<u8>,
     spend: &OwnedSpendConditions,
     constants: &ConsensusConstants,
-) -> Vec<u8> {
-    let mut result = Vec::<u8>::with_capacity(msg.len() + 96);
-    result.extend(msg);
+) {
     match opcode {
         AGG_SIG_PARENT => {
-            result.extend(spend.parent_id.as_slice());
-            result.extend(constants.agg_sig_parent_additional_data.as_slice());
+            msg.extend(spend.parent_id.as_slice());
+            msg.extend(constants.agg_sig_parent_additional_data.as_slice());
         }
         AGG_SIG_PUZZLE => {
-            result.extend(spend.puzzle_hash.as_slice());
-            result.extend(constants.agg_sig_puzzle_additional_data.as_slice());
+            msg.extend(spend.puzzle_hash.as_slice());
+            msg.extend(constants.agg_sig_puzzle_additional_data.as_slice());
         }
         AGG_SIG_AMOUNT => {
-            result.extend(u64_to_bytes(spend.coin_amount).as_slice());
-            result.extend(constants.agg_sig_amount_additional_data.as_slice());
+            msg.extend(u64_to_bytes(spend.coin_amount).as_slice());
+            msg.extend(constants.agg_sig_amount_additional_data.as_slice());
         }
         AGG_SIG_PUZZLE_AMOUNT => {
-            result.extend(spend.puzzle_hash.as_slice());
-            result.extend(u64_to_bytes(spend.coin_amount).as_slice());
-            result.extend(constants.agg_sig_puzzle_amount_additional_data.as_slice());
+            msg.extend(spend.puzzle_hash.as_slice());
+            msg.extend(u64_to_bytes(spend.coin_amount).as_slice());
+            msg.extend(constants.agg_sig_puzzle_amount_additional_data.as_slice());
         }
         AGG_SIG_PARENT_AMOUNT => {
-            result.extend(spend.parent_id.as_slice());
-            result.extend(u64_to_bytes(spend.coin_amount).as_slice());
-            result.extend(constants.agg_sig_parent_amount_additional_data.as_slice());
+            msg.extend(spend.parent_id.as_slice());
+            msg.extend(u64_to_bytes(spend.coin_amount).as_slice());
+            msg.extend(constants.agg_sig_parent_amount_additional_data.as_slice());
         }
         AGG_SIG_PARENT_PUZZLE => {
-            result.extend(spend.parent_id.as_slice());
-            result.extend(spend.puzzle_hash.as_slice());
-            result.extend(constants.agg_sig_parent_puzzle_additional_data.as_slice());
+            msg.extend(spend.parent_id.as_slice());
+            msg.extend(spend.puzzle_hash.as_slice());
+            msg.extend(constants.agg_sig_parent_puzzle_additional_data.as_slice());
         }
         AGG_SIG_ME => {
             let coin: Coin = Coin::new(spend.parent_id, spend.puzzle_hash, spend.coin_amount);
 
-            result.extend(coin.coin_id().as_slice());
-            result.extend(constants.agg_sig_me_additional_data.as_slice());
+            msg.extend(coin.coin_id().as_slice());
+            msg.extend(constants.agg_sig_me_additional_data.as_slice());
         }
-        _ => return result,
-    };
-
-    result
+        _ => {}
+    }
 }
 
 fn u64_to_bytes(val: u64) -> Bytes {
@@ -120,10 +116,10 @@ mod tests {
             hex!("4444444444444444444444444444444444444444444444444444444444444444").into();
         let puzzle_hash: Vec<u8> =
             hex!("3333333333333333333333333333333333333333333333333333333333333333").into();
-        let msg = b"message";
+        let mut msg = b"message".to_vec();
 
         let mut expected_result = Vec::<u8>::new();
-        expected_result.extend(msg);
+        expected_result.extend_from_slice(msg.as_slice());
 
         let coin = Coin::new(
             Bytes32::try_from(parent_id.clone()).expect("test should pass"),
@@ -188,7 +184,7 @@ mod tests {
 
         let spend = OwnedSpendConditions::from(&a, spend);
 
-        let result = make_aggsig_final_message(opcode, msg, &spend, &TEST_CONSTANTS);
-        assert_eq!(result, expected_result);
+        make_aggsig_final_message(opcode, &mut msg, &spend, &TEST_CONSTANTS);
+        assert_eq!(msg, expected_result);
     }
 }
