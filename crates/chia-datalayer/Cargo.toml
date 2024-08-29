@@ -18,6 +18,7 @@ py-bindings = ["dep:pyo3", "chia-traits/py-bindings"]
 crate-type = ["rlib"]
 
 [dependencies]
+clvmr = { workspace = true }
 chia-traits = { workspace = true }
 # TODO: dev?
 hex-literal = { workspace = true }

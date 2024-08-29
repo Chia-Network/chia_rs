@@ -375,6 +375,7 @@ name = "chia-datalayer"
 version = "0.1.0"
 dependencies = [
  "chia-traits 0.11.0",
+ "clvmr",
  "hex-literal",
  "pyo3",
 ]
