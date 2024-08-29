@@ -216,10 +216,28 @@ def test_spend_bundle(
 class NewAndImprovedSpendBundle(PySpendBundle):
     test_bool = True
 
+    def new_function(self) -> bool:
+        return self.test_bool
+
 
 def test_derive_class():
+    # Test if aggregate() supports class inheritance
     test = PySpendBundle.aggregate([])
     assert isinstance(test, PySpendBundle)
     test = NewAndImprovedSpendBundle.aggregate([])
     assert isinstance(test, NewAndImprovedSpendBundle)
     assert test.test_bool
+    assert test.new_function()
+
+    # Test if the Streamable macro functions support class inheritance
+    obj_bytes = bytes(test)
+    test = NewAndImprovedSpendBundle.from_bytes(obj_bytes)
+    assert isinstance(test, NewAndImprovedSpendBundle)
+    assert test.test_bool
+    assert test.new_function()
+
+    obj_json = test.to_json_dict()
+    test = NewAndImprovedSpendBundle.from_json_dict(obj_json)
+    assert isinstance(test, NewAndImprovedSpendBundle)
+    assert test.test_bool
+    assert test.new_function()
