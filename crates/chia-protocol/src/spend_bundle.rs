@@ -98,8 +98,14 @@ impl SpendBundle {
 impl SpendBundle {
     #[classmethod]
     #[pyo3(name = "aggregate")]
-    fn py_aggregate(_cls: &Bound<'_, PyType>, spend_bundles: Vec<Self>) -> Self {
-        Self::aggregate(&spend_bundles)
+    fn py_aggregate(cls: &Bound<'_, PyType>, spend_bundles: Vec<Self>) -> PyResult<PyObject> {
+        let aggregated = Self::aggregate(&spend_bundles);
+        Python::with_gil(|py| {
+            // Convert result into potential child class
+            let instance = cls.call((aggregated.coin_spends, aggregated.aggregated_signature), None)?;
+
+            Ok(instance.into_py(py))
+        })
     }
 
     #[pyo3(name = "name")]
