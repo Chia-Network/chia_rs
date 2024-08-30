@@ -234,12 +234,15 @@ ff01\
             coin_spends,
             aggregated_signature: G2Element::default(),
         };
-        let result = validate_clvm_and_signature(&spend_bundle, 5526552044, &TEST_CONSTANTS, 236);
-        let Ok((conds, _, _)) = result else {
-            panic!("failed");
-        };
-        assert_eq!(conds.cost, 5526552044);
-        let result = validate_clvm_and_signature(&spend_bundle, 5526552043, &TEST_CONSTANTS, 236);
+        let expected_cost = 5_527_116_044;
+        let max_cost = expected_cost;
+        let test_height = 236;
+        let (conds, _, _) =
+            validate_clvm_and_signature(&spend_bundle, max_cost, &TEST_CONSTANTS, test_height)
+                .expect("validate_clvm_and_signature failed");
+        assert_eq!(conds.cost, expected_cost);
+        let result =
+            validate_clvm_and_signature(&spend_bundle, max_cost - 1, &TEST_CONSTANTS, test_height);
         assert!(matches!(result, Err(ErrorCode::CostExceeded)));
     }
 
