@@ -271,9 +271,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chia"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
- "chia-bls 0.11.0",
+ "chia-bls 0.13.0",
  "chia-client",
  "chia-consensus",
  "chia-protocol",
@@ -303,7 +303,7 @@ dependencies = [
 
 [[package]]
 name = "chia-bls"
-version = "0.11.0"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -324,16 +324,16 @@ dependencies = [
 
 [[package]]
 name = "chia-bls-fuzz"
-version = "0.11.0"
+version = "0.13.0"
 dependencies = [
- "chia-bls 0.11.0",
+ "chia-bls 0.13.0",
  "libfuzzer-sys",
  "pyo3",
 ]
 
 [[package]]
 name = "chia-client"
-version = "0.11.0"
+version = "0.13.0"
 dependencies = [
  "chia-protocol",
  "chia-traits 0.11.0",
@@ -346,9 +346,9 @@ dependencies = [
 
 [[package]]
 name = "chia-consensus"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
- "chia-bls 0.11.0",
+ "chia-bls 0.13.0",
  "chia-protocol",
  "chia-puzzles",
  "chia-traits 0.11.0",
@@ -371,7 +371,7 @@ dependencies = [
 
 [[package]]
 name = "chia-fuzz"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "chia-consensus",
  "chia-protocol",
@@ -385,10 +385,10 @@ dependencies = [
 
 [[package]]
 name = "chia-protocol"
-version = "0.11.0"
+version = "0.13.0"
 dependencies = [
  "arbitrary",
- "chia-bls 0.11.0",
+ "chia-bls 0.13.0",
  "chia-traits 0.11.0",
  "chia_py_streamable_macro",
  "chia_streamable_macro 0.11.0",
@@ -402,7 +402,7 @@ dependencies = [
 
 [[package]]
 name = "chia-protocol-fuzz"
-version = "0.11.0"
+version = "0.13.0"
 dependencies = [
  "arbitrary",
  "chia-protocol",
@@ -415,10 +415,10 @@ dependencies = [
 
 [[package]]
 name = "chia-puzzles"
-version = "0.11.0"
+version = "0.13.0"
 dependencies = [
  "arbitrary",
- "chia-bls 0.11.0",
+ "chia-bls 0.13.0",
  "chia-protocol",
  "clvm-traits",
  "clvm-utils",
@@ -430,7 +430,7 @@ dependencies = [
 
 [[package]]
 name = "chia-puzzles-fuzz"
-version = "0.11.0"
+version = "0.13.0"
 dependencies = [
  "chia-puzzles",
  "clvm-traits",
@@ -453,10 +453,10 @@ dependencies = [
 
 [[package]]
 name = "chia-tools"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "blocking-threadpool",
- "chia-bls 0.11.0",
+ "chia-bls 0.13.0",
  "chia-consensus",
  "chia-protocol",
  "chia-puzzles",
@@ -494,7 +494,7 @@ dependencies = [
 
 [[package]]
 name = "chia_py_streamable_macro"
-version = "0.11.0"
+version = "0.13.0"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -504,9 +504,9 @@ dependencies = [
 
 [[package]]
 name = "chia_rs"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
- "chia-bls 0.11.0",
+ "chia-bls 0.13.0",
  "chia-consensus",
  "chia-protocol",
  "chia-traits 0.11.0",
@@ -618,7 +618,7 @@ checksum = "1462739cb27611015575c0c11df5df7601141071f07518d56fcc1be504cbec97"
 
 [[package]]
 name = "clvm-derive"
-version = "0.11.0"
+version = "0.13.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -627,9 +627,9 @@ dependencies = [
 
 [[package]]
 name = "clvm-traits"
-version = "0.11.0"
+version = "0.13.0"
 dependencies = [
- "chia-bls 0.11.0",
+ "chia-bls 0.13.0",
  "clvm-derive",
  "clvmr",
  "hex",
@@ -641,7 +641,7 @@ dependencies = [
 
 [[package]]
 name = "clvm-traits-fuzz"
-version = "0.11.0"
+version = "0.13.0"
 dependencies = [
  "clvm-traits",
  "clvmr",
@@ -650,7 +650,7 @@ dependencies = [
 
 [[package]]
 name = "clvm-utils"
-version = "0.11.0"
+version = "0.13.0"
 dependencies = [
  "clvm-traits",
  "clvmr",
@@ -660,7 +660,7 @@ dependencies = [
 
 [[package]]
 name = "clvm-utils-fuzz"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "chia-fuzz",
  "clvm-traits",
