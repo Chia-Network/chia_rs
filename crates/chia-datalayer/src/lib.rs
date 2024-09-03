@@ -1,7 +1,8 @@
 // use std::collections::HashMap;
 
+use pyo3::buffer::PyBuffer;
 #[cfg(feature = "py-bindings")]
-use pyo3::{prelude::PyBytesMethods, pyclass, pymethods, types::PyBytes, Bound, PyResult};
+use pyo3::{pyclass, pymethods, PyResult};
 
 use clvmr::sha2::Sha256;
 use std::cmp::Ordering;
@@ -178,7 +179,7 @@ fn get_keys_values_indexes(blob: &Vec<u8>) -> Result<HashMap<KvId, TreeIndex>, S
     Ok(kv_to_index)
 }
 
-#[cfg_attr(feature = "py-bindings", pyclass(frozen, name = "MerkleBlob"))]
+#[cfg_attr(feature = "py-bindings", pyclass(name = "MerkleBlob"))]
 pub struct MerkleBlob {
     blob: Vec<u8>,
     free_indexes: Vec<TreeIndex>,
@@ -212,19 +213,23 @@ impl MerkleBlob {
 
     pub fn insert(&mut self, key_value: KvId, hash: Hash) -> Result<(), String> {
         if self.blob.len() == 0 {
-            let metadata = NodeMetadata {
-                node_type: NodeType::Leaf,
-                dirty: false,
+            let new_leaf_block = ParsedBlock {
+                metadata: NodeMetadata {
+                    node_type: NodeType::Leaf,
+                    dirty: false,
+                },
+                node: RawMerkleNode::Leaf {
+                    parent: NULL_PARENT,
+                    key_value,
+                    hash,
+                    index: 0,
+                },
             };
-            let raw_merkle_node = RawMerkleNode::Leaf {
-                parent: NULL_PARENT,
-                key_value,
-                hash,
-                index: 0,
-            };
-            self.blob.extend(metadata.to_bytes());
-            self.blob.extend(raw_merkle_node.to_bytes());
+
+            self.blob.extend(new_leaf_block.to_bytes());
+
             self.kv_to_index.insert(key_value, 0);
+            self.free_indexes.clear();
             self.last_allocated_index = 1;
             return Ok(());
         }
@@ -266,6 +271,10 @@ impl MerkleBlob {
                 },
             };
             self.blob.extend(left_leaf_block.to_bytes());
+            self.kv_to_index.insert(
+                left_leaf_block.node.key_value(),
+                left_leaf_block.node.index(),
+            );
 
             let right_leaf_block = ParsedBlock {
                 metadata: NodeMetadata {
@@ -274,12 +283,16 @@ impl MerkleBlob {
                 },
                 node: RawMerkleNode::Leaf {
                     parent: 0,
-                    key_value: key_value,
-                    hash: hash,
+                    key_value,
+                    hash,
                     index: 2,
                 },
             };
             self.blob.extend(right_leaf_block.to_bytes());
+            self.kv_to_index.insert(
+                right_leaf_block.node.key_value(),
+                right_leaf_block.node.index(),
+            );
 
             self.free_indexes.clear();
             self.last_allocated_index = 3;
@@ -329,10 +342,11 @@ impl MerkleBlob {
         let mut old_leaf_block =
             ParsedBlock::from_bytes(self.get_block(old_leaf.index())?, old_leaf.index())?;
         old_leaf_block.node.set_parent(new_internal_node_index);
-        self.blob.copy_from_slice(&old_leaf_block.to_bytes());
+        let offset = old_leaf_block.node.index() as usize * BLOCK_SIZE;
+        self.blob[offset..offset + BLOCK_SIZE].copy_from_slice(&old_leaf_block.to_bytes());
 
         let mut old_parent_block =
-            ParsedBlock::from_bytes(self.get_block(old_leaf.index())?, old_leaf.index())?;
+            ParsedBlock::from_bytes(self.get_block(old_parent_index)?, old_parent_index)?;
         match old_parent_block.node {
             RawMerkleNode::Internal {
                 ref mut left,
@@ -349,7 +363,8 @@ impl MerkleBlob {
             }
             RawMerkleNode::Leaf { .. } => panic!(),
         }
-        self.blob.copy_from_slice(&old_parent_block.to_bytes());
+        let offset = old_parent_index as usize * BLOCK_SIZE;
+        self.blob[offset..offset + BLOCK_SIZE].copy_from_slice(&old_parent_block.to_bytes());
 
         self.mark_lineage_as_dirty(old_parent_index)?;
         self.kv_to_index.insert(key_value, new_internal_node_index);
@@ -357,12 +372,14 @@ impl MerkleBlob {
         Ok(())
     }
 
-    fn mark_lineage_as_dirty(&self, index: TreeIndex) -> Result<(), String> {
+    fn mark_lineage_as_dirty(&mut self, index: TreeIndex) -> Result<(), String> {
         let mut index = index;
 
         while index != NULL_PARENT {
             let mut block = ParsedBlock::from_bytes(self.get_block(index)?, index)?;
             block.metadata.dirty = true;
+            let offset = index as usize * BLOCK_SIZE;
+            self.blob[offset..offset + BLOCK_SIZE].copy_from_slice(&block.to_bytes());
             index = block.node.parent();
         }
 
@@ -381,7 +398,7 @@ impl MerkleBlob {
         match self.free_indexes.pop() {
             None => {
                 self.last_allocated_index += 1;
-                self.last_allocated_index
+                self.last_allocated_index - 1
             }
             Some(new_index) => new_index,
         }
@@ -507,8 +524,15 @@ impl MerkleBlob {
 #[pymethods]
 impl MerkleBlob {
     #[new]
-    pub fn init(blob: &Bound<'_, PyBytes>) -> PyResult<Self> {
-        Ok(Self::new(blob.as_bytes().to_vec()).unwrap())
+    pub fn py_init(blob: PyBuffer<u8>) -> PyResult<Self> {
+        if !blob.is_c_contiguous() {
+            panic!("from_bytes() must be called with a contiguous buffer");
+        }
+        #[allow(unsafe_code)]
+        let slice =
+            unsafe { std::slice::from_raw_parts(blob.buf_ptr() as *const u8, blob.len_bytes()) };
+
+        Ok(Self::new(Vec::from(slice)).unwrap())
     }
 
     // #[pyo3(name = "get_root")]
@@ -516,7 +540,18 @@ impl MerkleBlob {
     //     ChiaToPython::to_python(&Bytes32::new(self.get_root()), py)
     // }
 
-    pub fn __len__(&self) -> PyResult<usize> {
+    #[pyo3(name = "insert")]
+    pub fn py_insert(&mut self, key_value: KvId, hash: Hash) -> PyResult<()> {
+        // TODO: consider the error
+        // self.insert(key_value, hash).map_err(|_| PyValueError::new_err("yeppers"))
+        self.insert(key_value, hash).unwrap();
+        // self.insert(key_value, hash).map_err(|_| PyValueError::new_err("invalid key"))?;
+
+        Ok(())
+    }
+
+    #[pyo3(name = "__len__")]
+    pub fn py_len(&self) -> PyResult<usize> {
         Ok(self.blob.len())
     }
 }
@@ -687,9 +722,12 @@ impl NodeMetadata {
 
 #[cfg(test)]
 mod tests {
-    use hex_literal::hex;
-
     use super::*;
+    use chia_traits::Streamable;
+    use hex_literal::hex;
+    use std::fs;
+    use std::io;
+    use std::io::Write;
 
     const EXAMPLE_BLOB: [u8; 138] = hex!("0001ffffffff00000001000000020c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b0100000000000405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b0100000000001415161718191a1b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b");
     const HASH: Hash = [
@@ -821,5 +859,46 @@ mod tests {
         merkle_blob.blob[..BLOCK_SIZE].copy_from_slice(&root.to_bytes());
 
         assert_eq!(merkle_blob.blob, Vec::from(EXAMPLE_BLOB));
+    }
+
+    #[test]
+    fn test_just_insert_a_bunch() {
+        let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
+
+        use std::time::{Duration, Instant};
+        let mut total_time = Duration::new(0, 0);
+
+        for i in 0..100000 {
+            let start = Instant::now();
+            merkle_blob
+                // TODO: yeah this hash is garbage
+                .insert(i as KvId, HASH)
+                .unwrap();
+            let end = Instant::now();
+            total_time += end.duration_since(start);
+
+            // match i + 1 {
+            //     2 => assert_eq!(merkle_blob.blob.len(), 3 * BLOCK_SIZE),
+            //     3 => assert_eq!(merkle_blob.blob.len(), 5 * BLOCK_SIZE),
+            //     _ => (),
+            // }
+
+            // let file = fs::File::create(format!("/home/altendky/tmp/mbt/rs/{i:0>4}")).unwrap();
+            // let mut file = io::LineWriter::new(file);
+            // for block in merkle_blob.blob.chunks(BLOCK_SIZE) {
+            //     let mut s = String::new();
+            //     for byte in block {
+            //         s.push_str(&format!("{:02x}", byte));
+            //     }
+            //     s.push_str("\n");
+            //     file.write_all(s.as_bytes()).unwrap();
+            // }
+
+            // fs::write(format!("/home/altendky/tmp/mbt/rs/{i:0>4}"), &merkle_blob.blob).unwrap();
+        }
+        // println!("{:?}", merkle_blob.blob)
+
+        println!("total time: {total_time:?}")
+        // TODO: check, well...  something
     }
 }
