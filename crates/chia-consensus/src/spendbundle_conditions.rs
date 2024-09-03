@@ -4,6 +4,7 @@ use crate::gen::conditions::{
 };
 use crate::gen::flags::MEMPOOL_MODE;
 use crate::gen::run_block_generator::subtract_cost;
+use crate::gen::solution_generator::solution_generator;
 use crate::gen::validation_error::ValidationErr;
 use crate::spendbundle_validation::get_flags_for_height_and_constants;
 use chia_protocol::SpendBundle;
@@ -29,6 +30,20 @@ pub fn get_conditions_from_spendbundle(
     let dialect = ChiaDialect::new(flags);
     let mut ret = SpendBundleConditions::default();
     let mut state = ParseState::default();
+
+    let spends_info = spend_bundle.coin_spends.iter().map(|coin_spend| {
+        (
+            coin_spend.coin,
+            &coin_spend.puzzle_reveal,
+            &coin_spend.solution,
+        )
+    });
+    // We don't pay the size cost (nor execution cost) of being wrapped by a
+    // quote (in solution_generator).
+    const QUOTE_BYTES: usize = 2;
+    let generator_length_without_quote = solution_generator(spends_info)?.len() - QUOTE_BYTES;
+    let byte_cost = generator_length_without_quote as u64 * constants.cost_per_byte;
+    subtract_cost(a, &mut cost_left, byte_cost)?;
 
     for coin_spend in &spend_bundle.coin_spends {
         // process the spend
@@ -69,6 +84,7 @@ mod tests {
     use super::*;
     use crate::allocator::make_allocator;
     use crate::gen::conditions::{ELIGIBLE_FOR_DEDUP, ELIGIBLE_FOR_FF};
+    use crate::gen::run_block_generator::run_block_generator2;
     use chia_bls::Signature;
     use chia_protocol::CoinSpend;
     use chia_traits::Streamable;
@@ -77,8 +93,8 @@ mod tests {
     use std::fs::read;
 
     #[rstest]
-    #[case("3000253", 8, 2, 13_344_870)]
-    #[case("1000101", 34, 15, 66_723_677)]
+    #[case("3000253", 8, 2, 51_216_870)]
+    #[case("1000101", 34, 15, 250_083_677)]
     fn test_get_conditions_from_spendbundle(
         #[case] filename: &str,
         #[case] spends: usize,
@@ -103,6 +119,33 @@ mod tests {
             .fold(0, |sum, spend| sum + spend.create_coin.len());
         assert_eq!(create_coins, additions);
         assert_eq!(conditions.cost, cost);
+        // Generate a block with the same spend bundle and compare its cost
+        let program_spends = bundle.coin_spends.iter().map(|coin_spend| {
+            (
+                coin_spend.coin,
+                &coin_spend.puzzle_reveal,
+                &coin_spend.solution,
+            )
+        });
+        let program = solution_generator(program_spends).expect("solution_generator failed");
+        let blocks: &[&[u8]] = &[];
+        let block_conds = run_block_generator2::<_, MempoolVisitor, _>(
+            &mut a,
+            program.as_slice(),
+            blocks,
+            11_000_000_000,
+            MEMPOOL_MODE,
+            &TEST_CONSTANTS,
+        )
+        .expect("run_block_generator2 failed");
+        // The cost difference here is because get_conditions_from_spendbundle
+        // does not include the overhead to make a block.
+        const QUOTE_EXECUTION_COST: u64 = 20;
+        const QUOTE_BYTE_COST: u64 = 2 * TEST_CONSTANTS.cost_per_byte;
+        assert_eq!(
+            conditions.cost,
+            block_conds.cost - QUOTE_EXECUTION_COST - QUOTE_BYTE_COST
+        );
     }
 
     #[rstest]
@@ -112,7 +155,7 @@ mod tests {
         #[case] filename: &str,
         #[values(0, 1, 1_000_000, 5_000_000)] height: u32,
     ) {
-        let cost = 2_125_866;
+        let cost = 77_341_866;
         let spend = CoinSpend::from_bytes(
             &read(format!("../../ff-tests/{filename}.spend")).expect("read file"),
         )
@@ -297,9 +340,27 @@ mod tests {
             Ok(mut conditions) => {
                 // the cost of running the spend bundle should never be higher
                 // than the whole block but it's likely less.
-                println!("block_cost: {block_cost}");
-                println!("bundle_cost: {}", conditions.cost);
-                assert!(conditions.cost <= block_cost);
+                // but only if the byte cost is not taken into account. The
+                // block will likely be smaller because the compression makes it
+                // smaller.
+                let block_byte_cost = generator_buffer.len() as u64 * TEST_CONSTANTS.cost_per_byte;
+                let program_spends = bundle.coin_spends.iter().map(|coin_spend| {
+                    (
+                        coin_spend.coin,
+                        &coin_spend.puzzle_reveal,
+                        &coin_spend.solution,
+                    )
+                });
+                const QUOTE_BYTES: usize = 2;
+                let generator_length_without_quote = solution_generator(program_spends)
+                    .expect("solution_generator failed")
+                    .len()
+                    - QUOTE_BYTES;
+                let bundle_byte_cost =
+                    generator_length_without_quote as u64 * TEST_CONSTANTS.cost_per_byte;
+                println!("block_cost: {block_cost} bytes: {block_byte_cost}");
+                println!("bundle_cost: {} bytes: {bundle_byte_cost}", conditions.cost);
+                assert!(conditions.cost - bundle_byte_cost <= block_cost - block_byte_cost);
                 assert!(conditions.cost > 0);
                 // update the cost we print here, just to be compatible with
                 // the test cases we have. We've already ensured the cost is

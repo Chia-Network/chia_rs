@@ -43,7 +43,7 @@ fn field_parser_fn_body(
     let decode_next = match repr {
         Repr::Atom | Repr::Transparent => unreachable!(),
         // Decode `(A . B)` pairs for lists.
-        Repr::List => quote!(decode_pair),
+        Repr::List | Repr::Solution => quote!(decode_pair),
         // Decode `(c (q . A) B)` pairs for curried arguments.
         Repr::Curry => quote!(decode_curried_arg),
     };
@@ -150,6 +150,8 @@ fn field_parser_fn_body(
 fn check_rest_value(crate_name: &Ident, repr: Repr) -> TokenStream {
     match repr {
         Repr::Atom | Repr::Transparent => unreachable!(),
+        // We don't need to check the terminator of a solution.
+        Repr::Solution => quote! {},
         Repr::List => {
             // If the last field is not `rest`, we need to check that the `node` is nil.
             // If it's not nil, it's not a proper list, and we should return an error.
@@ -286,7 +288,7 @@ fn impl_for_enum(
             let decode_next = match enum_info.default_repr {
                 Repr::Atom | Repr::Transparent => unreachable!(),
                 // Decode `(A . B)` pairs for lists.
-                Repr::List => quote!(decode_pair),
+                Repr::List | Repr::Solution => quote!(decode_pair),
                 // Decode `(c (q . A) B)` pairs for curried arguments.
                 Repr::Curry => quote!(decode_curried_arg),
             };

@@ -48,14 +48,16 @@ fn encode_fields(
     let encode_next = match repr {
         Repr::Atom | Repr::Transparent => unreachable!(),
         // Encode `(A . B)` pairs for lists.
-        Repr::List => quote!(encode_pair),
+        Repr::List | Repr::Solution => quote!(encode_pair),
         // Encode `(c (q . A) B)` pairs for curried arguments.
         Repr::Curry => quote!(encode_curried_arg),
     };
 
     let initial_value = match repr {
         Repr::Atom | Repr::Transparent => unreachable!(),
-        Repr::List => quote!(encoder.encode_atom(#crate_name::Atom::Borrowed(&[]))?),
+        Repr::List | Repr::Solution => {
+            quote!(encoder.encode_atom(#crate_name::Atom::Borrowed(&[]))?)
+        }
         Repr::Curry => quote!(encoder.encode_atom(#crate_name::Atom::Borrowed(&[1]))?),
     };
 
@@ -243,7 +245,7 @@ fn impl_for_enum(
             let encode_next = match enum_info.default_repr {
                 Repr::Atom | Repr::Transparent => unreachable!(),
                 // Encode `(A . B)` pairs for lists.
-                Repr::List => quote!(encode_pair),
+                Repr::List | Repr::Solution => quote!(encode_pair),
                 // Encode `(c (q . A) B)` pairs for curried arguments.
                 Repr::Curry => quote!(encode_curried_arg),
             };

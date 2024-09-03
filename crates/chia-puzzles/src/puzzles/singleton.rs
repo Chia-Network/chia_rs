@@ -57,7 +57,7 @@ impl SingletonStruct {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[clvm(list)]
+#[clvm(solution)]
 pub struct SingletonSolution<I> {
     pub lineage_proof: Proof,
     pub amount: u64,
@@ -66,7 +66,7 @@ pub struct SingletonSolution<I> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[clvm(list)]
+#[clvm(solution)]
 pub struct LauncherSolution<T> {
     pub singleton_puzzle_hash: Bytes32,
     pub amount: u64,

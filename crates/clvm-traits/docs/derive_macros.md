@@ -50,6 +50,12 @@ let ptr = value.to_clvm(a).unwrap();
 assert_eq!(Tiers::from_clvm(a, ptr).unwrap(), value);
 ```
 
+### Solution
+
+The solution representation is the same as list, except it does not check the nil terminator when parsing.
+This allows it to be lenient to additional parameters that are in the CLVM object, since they don't affect anything.
+If you want your solution to be parsed strictly, you can use list instead.
+
 ### Curry
 
 This represents the argument part of a curried CLVM program.

@@ -28,20 +28,6 @@ repos:
         entry: cargo clippy --workspace --all-features --all-targets
         language: system
         pass_filenames: false
-      - id: build
-        name: build
-        description: run cargo build on the workspace
-        stages: [pre-push]
-        entry: cargo build --all-features --workspace
-        language: system
-        pass_filenames: false
-      - id: benchmarks
-        name: build benchmarks
-        description: run cargo bench on the workspace
-        stages: [pre-push]
-        entry: cargo bench --no-run --workspace --profile dev
-        language: system
-        pass_filenames: false
       - id: tests
         name: run tests
         description: run cargo test on the workspace
