@@ -164,6 +164,8 @@ jobs:
             ${{ matrix.python.by-arch[matrix.arch.matrix].docker-url }} \
             bash -exc '\
               yum -y install openssl-devel gmp-devel clang glibc-headers glibc-devel && \
+              clang -v clang_test.c -o clang_test && \
+              ./clang_test && \
               source $HOME/.cargo/env && \
               rustup target add ${{ matrix.python.by-arch[matrix.arch.matrix].rustup-target }} && \
               python${{ matrix.python.major-dot-minor }} -m venv /venv && \
