@@ -102,7 +102,10 @@ impl SpendBundle {
         let aggregated = Self::aggregate(&spend_bundles);
         Python::with_gil(|py| {
             // Convert result into potential child class
-            let instance = cls.call((aggregated.coin_spends, aggregated.aggregated_signature), None)?;
+            let instance = cls.call(
+                (aggregated.coin_spends, aggregated.aggregated_signature),
+                None,
+            )?;
 
             Ok(instance.into_py(py))
         })
