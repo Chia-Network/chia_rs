@@ -176,14 +176,27 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
         impl #ident {
             #[classmethod]
             #[pyo3(name = "from_bytes")]
-            pub fn py_from_bytes(_cls: &pyo3::Bound<'_, pyo3::types::PyType>, blob: pyo3::buffer::PyBuffer<u8>) -> pyo3::PyResult<Self> {
+            pub fn py_from_bytes(cls: &pyo3::Bound<'_, pyo3::types::PyType>, blob: pyo3::buffer::PyBuffer<u8>) -> pyo3::PyResult<pyo3::PyObject> {
                 if !blob.is_c_contiguous() {
                     panic!("from_bytes() must be called with a contiguous buffer");
                 }
                 let slice = unsafe {
                     std::slice::from_raw_parts(blob.buf_ptr() as *const u8, blob.len_bytes())
                 };
-                <Self as #crate_name::Streamable>::from_bytes(slice).map_err(|e| <#crate_name::chia_error::Error as Into<pyo3::PyErr>>::into(e))
+                let rust_obj = <Self as #crate_name::Streamable>::from_bytes(slice);
+                match rust_obj {
+                    Ok(obk) => {
+                        pyo3::Python::with_gil(|py| {
+                            // Convert result into potential child class
+                            // let instance = cls.call(py, (rust_obj,))?;
+                            let instance = <cls as pyo3::prelude::PyAnyMethods>::call1((rust_obj,))?;
+                
+                            Ok(pyo3::IntoPy::into_py(instance, py))
+                        })
+                    },
+                    Err(e) => Err(<#crate_name::chia_error::Error as Into<pyo3::PyErr>>::into(e))
+                }
+                
             }
 
             #[classmethod]
