@@ -163,7 +163,7 @@ jobs:
             -v ${{ github.workspace }}:/ws --workdir=/ws \
             ${{ matrix.python.by-arch[matrix.arch.matrix].docker-url }} \
             bash -exc '\
-              yum -y install openssl-devel gmp-devel clang && \
+              yum -y install openssl-devel gmp-devel clang glibc-headers glibc-devel && \
               source $HOME/.cargo/env && \
               rustup target add ${{ matrix.python.by-arch[matrix.arch.matrix].rustup-target }} && \
               python${{ matrix.python.major-dot-minor }} -m venv /venv && \
