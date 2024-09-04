@@ -161,6 +161,14 @@ jobs:
               CC=gcc maturin build --release --manylinux ${{ matrix.python.by-arch[matrix.arch.matrix].manylinux-version }} -m wheel/Cargo.toml --features=openssl,pyo3/extension-module \
             '
 
+      - name: Checkout MPIR for Windows
+        if: matrix.os.matrix == 'windows'
+        uses: actions/checkout@v4
+        with:
+          repository: Chia-Network/mpir_gc_x64
+          fetch-depth: 1
+          path: mpir_gc_x64
+
       - name: Build Windows with maturin on Python ${{ matrix.python.major-dot-minor }}
         if: matrix.os.matrix == 'windows'
         env:
