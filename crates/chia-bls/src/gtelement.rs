@@ -2,6 +2,10 @@ use blst::*;
 use chia_traits::chia_error::Result;
 use chia_traits::{read_bytes, Streamable};
 use clvmr::sha2::Sha256;
+#[cfg(feature = "py-bindings")]
+use pyo3::prelude::*;
+#[cfg(feature = "py-bindings")]
+use pyo3::types::PyType;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
@@ -112,6 +116,15 @@ impl GTElement {
         hex::encode(self.to_bytes())
     }
 
+    #[classmethod]
+    #[pyo3(name = "from_parent")]
+    pub fn from_parent(_cls: &Bound<'_, PyType>, instance: Self) -> PyResult<PyObject> {
+        Python::with_gil(|py| {
+            // ignore child case
+            Ok(instance.into_py(py))
+        })
+    }
+
     #[must_use]
     pub fn __mul__(&self, rhs: &Self) -> Self {
         let mut ret = self.clone();
@@ -130,7 +143,6 @@ mod pybindings {
 
     use crate::parse_hex::parse_hex_string;
     use chia_traits::{FromJsonDict, ToJsonDict};
-    use pyo3::prelude::*;
 
     impl ToJsonDict for GTElement {
         fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {

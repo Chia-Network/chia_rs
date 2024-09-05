@@ -3,6 +3,10 @@ use blst::*;
 use chia_traits::{read_bytes, Streamable};
 use clvmr::sha2::Sha256;
 use hkdf::HkdfExtract;
+#[cfg(feature = "py-bindings")]
+use pyo3::prelude::*;
+#[cfg(feature = "py-bindings")]
+use pyo3::types::PyType;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
@@ -264,6 +268,15 @@ impl SecretKey {
 
     pub fn __str__(&self) -> String {
         hex::encode(self.to_bytes())
+    }
+
+    #[classmethod]
+    #[pyo3(name = "from_parent")]
+    pub fn from_parent(_cls: &Bound<'_, PyType>, instance: Self) -> PyResult<PyObject> {
+        Python::with_gil(|py| {
+            // ignore child case
+            Ok(instance.into_py(py))
+        })
     }
 
     #[pyo3(name = "derive_hardened")]

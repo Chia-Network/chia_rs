@@ -111,6 +111,20 @@ impl SpendBundle {
         })
     }
 
+    #[classmethod]
+    #[pyo3(name = "from_parent")]
+    pub fn from_parent(cls: &Bound<'_, PyType>, spend_bundle: Self) -> PyResult<PyObject> {
+        Python::with_gil(|py| {
+            // Convert result into potential child class
+            let instance = cls.call(
+                (spend_bundle.coin_spends, spend_bundle.aggregated_signature),
+                None,
+            )?;
+
+            Ok(instance.into_py(py))
+        })
+    }
+
     #[pyo3(name = "name")]
     fn py_name(&self) -> Bytes32 {
         self.name()

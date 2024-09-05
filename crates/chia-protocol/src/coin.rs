@@ -8,6 +8,8 @@ use clvmr::sha2::Sha256;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
+#[cfg(feature = "py-bindings")]
+use pyo3::types::PyType;
 
 #[streamable]
 #[derive(Copy)]
@@ -52,6 +54,21 @@ impl Coin {
 impl Coin {
     fn name<'p>(&self, py: Python<'p>) -> Bound<'p, pyo3::types::PyBytes> {
         pyo3::types::PyBytes::new_bound(py, &self.coin_id())
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+impl Coin {
+    #[classmethod]
+    #[pyo3(name = "from_parent")]
+    pub fn from_parent(cls: &Bound<'_, PyType>, coin: Self) -> PyResult<PyObject> {
+        Python::with_gil(|py| {
+            // Convert result into potential child class
+            let instance = cls.call1((coin.parent_coin_info, coin.puzzle_hash, coin.amount))?;
+
+            Ok(instance.into_py(py))
+        })
     }
 }
 

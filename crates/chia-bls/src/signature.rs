@@ -2,6 +2,10 @@ use crate::{Error, GTElement, PublicKey, Result, SecretKey};
 use blst::*;
 use chia_traits::{read_bytes, Streamable};
 use clvmr::sha2::Sha256;
+#[cfg(feature = "py-bindings")]
+use pyo3::prelude::*;
+#[cfg(feature = "py-bindings")]
+use pyo3::types::PyType;
 use std::borrow::Borrow;
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -486,6 +490,15 @@ impl Signature {
         Self::default()
     }
 
+    #[classmethod]
+    #[pyo3(name = "from_parent")]
+    pub fn from_parent(_cls: &Bound<'_, PyType>, instance: Self) -> PyResult<PyObject> {
+        Python::with_gil(|py| {
+            // ignore child case
+            Ok(instance.into_py(py))
+        })
+    }
+
     #[pyo3(name = "pair")]
     pub fn py_pair(&self, other: &PublicKey) -> GTElement {
         self.pair(other)
@@ -518,7 +531,6 @@ mod pybindings {
     use crate::parse_hex::parse_hex_string;
 
     use chia_traits::{FromJsonDict, ToJsonDict};
-    use pyo3::prelude::*;
 
     impl ToJsonDict for Signature {
         fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
