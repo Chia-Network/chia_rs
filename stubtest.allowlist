@@ -1,6 +1,7 @@
 # this is offered to help with hinting only and is not intended to be
 # runtime accessible.  is there a better option for handling this?
 chia_rs.ReadableBuffer
+chia_rs.chia_rs.ReadableBuffer
 
 # TODO: perhaps these should be private as _*
 chia_rs.BlockRecord.ip_iters_impl
@@ -8,24 +9,34 @@ chia_rs.BlockRecord.ip_sub_slot_total_iters_impl
 chia_rs.BlockRecord.sp_iters_impl
 chia_rs.BlockRecord.sp_sub_slot_total_iters_impl
 chia_rs.BlockRecord.sp_total_iters_impl
+chia_rs.chia_rs.BlockRecord.ip_iters_impl
+chia_rs.chia_rs.BlockRecord.ip_sub_slot_total_iters_impl
+chia_rs.chia_rs.BlockRecord.sp_iters_impl
+chia_rs.chia_rs.BlockRecord.sp_sub_slot_total_iters_impl
+chia_rs.chia_rs.BlockRecord.sp_total_iters_impl
 
 # TODO: perhaps the inner should be private as _chia_rs
-chia_rs.chia_rs
+# chia_rs.chia_rs
 
 # TODO: G1Element->PublicKey expects *args
 chia_rs.G1Element.__init__
+chia_rs.chia_rs.G1Element.__init__
 
 # TODO: G2Element->Signature expects *args
 chia_rs.G2Element.__init__
+chia_rs.chia_rs.G2Element.__init__
 
 # TODO: expects *args
 chia_rs.GTElement.__init__
+chia_rs.chia_rs.GTElement.__init__
 
 # TODO: PrivateKey->SecretKey expects *args
 chia_rs.PrivateKey.__init__
+chia_rs.chia_rs.PrivateKey.__init__
 
 # TODO: expects *args
 chia_rs.RequestPeers.__init__
+chia_rs.chia_rs.RequestPeers.__init__
 
 # TODO: ask stubtest/mypy about these as they seem unlikely to be our doing
 chia_rs.sized_byte_class.Iterable

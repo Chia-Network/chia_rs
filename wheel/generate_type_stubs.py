@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple, TextIO
 from glob import glob
 
-output_file = Path(__file__).parent.resolve() / "python" / "chia_rs" / "__init__.pyi"
+output_file = Path(__file__).parent.resolve() / "python" / "chia_rs" / "chia_rs.pyi"
 crates_dir = Path(__file__).parent.parent.resolve() / "crates"
 input_dir = crates_dir / "chia-protocol" / "src"
 
