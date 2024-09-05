@@ -11,6 +11,8 @@ use syn::{
 pub enum Repr {
     /// Represents `(A . (B . (C . ())))`.
     List,
+    /// The same as `list`, but the terminator doesn't have to be `()`.
+    Solution,
     /// Represents `(c (q . A) (c (q . B) (c (q . C) 1)))`.
     Curry,
     /// Represents the first field `A` on its own, with no other fields allowed.
@@ -22,7 +24,7 @@ pub enum Repr {
 impl Repr {
     pub fn expect(repr: Option<Repr>) -> Repr {
         repr.expect(
-            "missing either `list`, `curry`, `transparent`, or `atom` in `clvm` attribute options",
+            "missing either `list`, `curry`, `solution`, `transparent`, or `atom` in `clvm` attribute options",
         )
     }
 }
@@ -31,6 +33,7 @@ impl fmt::Display for Repr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Self::List => "list",
+            Self::Solution => "solution",
             Self::Curry => "curry",
             Self::Transparent => "transparent",
             Self::Atom => "atom",
@@ -75,6 +78,7 @@ impl Parse for ClvmOption {
 
         match ident.to_string().as_str() {
             "list" => Ok(Self::Repr(Repr::List)),
+            "solution" => Ok(Self::Repr(Repr::Solution)),
             "curry" => Ok(Self::Repr(Repr::Curry)),
             "transparent" => Ok(Self::Repr(Repr::Transparent)),
             "atom" => Ok(Self::Repr(Repr::Atom)),

@@ -37,6 +37,9 @@ pub fn validate_clvm_and_signature(
     // Collect all pairs in a single vector to avoid multiple iterations
     let mut pairs = Vec::new();
 
+    let mut aug_msg = Vec::<u8>::new();
+    let mut final_msg = Vec::<u8>::new();
+
     for spend in &npcresult.spends {
         let condition_items_pairs = [
             (AGG_SIG_PARENT, &spend.agg_sig_parent),
@@ -50,12 +53,15 @@ pub fn validate_clvm_and_signature(
 
         for (condition, items) in condition_items_pairs {
             for (pk, msg) in items {
-                let mut aug_msg = pk.to_bytes().to_vec();
-                let msg = make_aggsig_final_message(condition, msg.as_slice(), spend, constants);
-                aug_msg.extend_from_slice(msg.as_ref());
+                aug_msg.clear();
+                final_msg.clear();
+                final_msg.extend_from_slice(msg.as_slice());
+                aug_msg.extend_from_slice(&pk.to_bytes());
+                make_aggsig_final_message(condition, &mut final_msg, spend, constants);
+                aug_msg.extend(&final_msg);
                 let aug_hash = hash_to_g2(&aug_msg);
                 let pairing = aug_hash.pair(pk);
-                pairs.push((hash_pk_and_msg(&pk.to_bytes(), &msg), pairing));
+                pairs.push((hash_pk_and_msg(&pk.to_bytes(), &final_msg), pairing));
             }
         }
     }
@@ -132,7 +138,7 @@ mod tests {
     #[rstest]
     #[case(0, ENABLE_FIXED_DIV)]
     #[case(TEST_CONSTANTS.hard_fork_height, ENABLE_BLS_OPS_OUTSIDE_GUARD | ENABLE_FIXED_DIV | ALLOW_BACKREFS)]
-    #[case(TEST_CONSTANTS.soft_fork4_height, ENABLE_BLS_OPS_OUTSIDE_GUARD | ENABLE_FIXED_DIV | ALLOW_BACKREFS)]
+    #[case(5_716_000, ENABLE_BLS_OPS_OUTSIDE_GUARD | ENABLE_FIXED_DIV | ALLOW_BACKREFS)]
     #[case(TEST_CONSTANTS.soft_fork5_height, ENABLE_BLS_OPS_OUTSIDE_GUARD | ENABLE_FIXED_DIV | ALLOW_BACKREFS | DISALLOW_INFINITY_G1)]
     fn test_get_flags(#[case] height: u32, #[case] expected_value: u32) {
         assert_eq!(
@@ -228,12 +234,15 @@ ff01\
             coin_spends,
             aggregated_signature: G2Element::default(),
         };
-        let result = validate_clvm_and_signature(&spend_bundle, 5526552044, &TEST_CONSTANTS, 236);
-        let Ok((conds, _, _)) = result else {
-            panic!("failed");
-        };
-        assert_eq!(conds.cost, 5526552044);
-        let result = validate_clvm_and_signature(&spend_bundle, 5526552043, &TEST_CONSTANTS, 236);
+        let expected_cost = 5_527_116_044;
+        let max_cost = expected_cost;
+        let test_height = 236;
+        let (conds, _, _) =
+            validate_clvm_and_signature(&spend_bundle, max_cost, &TEST_CONSTANTS, test_height)
+                .expect("validate_clvm_and_signature failed");
+        assert_eq!(conds.cost, expected_cost);
+        let result =
+            validate_clvm_and_signature(&spend_bundle, max_cost - 1, &TEST_CONSTANTS, test_height);
         assert!(matches!(result, Err(ErrorCode::CostExceeded)));
     }
 
