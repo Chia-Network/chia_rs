@@ -366,7 +366,6 @@ mod pybindings {
     use crate::parse_hex::parse_hex_string;
 
     use chia_traits::{FromJsonDict, ToJsonDict};
-    use pyo3::prelude::*;
 
     impl ToJsonDict for PublicKey {
         fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
@@ -751,7 +750,10 @@ mod pytests {
             Python::with_gil(|py| {
                 let string = pk.to_json_dict(py).expect("to_json_dict");
                 let py_class = py.get_type_bound::<PublicKey>();
-                let pk2 = PublicKey::from_json_dict(&py_class, string.bind(py)).unwrap();
+                let pk2: PublicKey = PublicKey::from_json_dict(&py_class, string.bind(py))
+                    .unwrap()
+                    .extract(py)
+                    .unwrap();
                 assert_eq!(pk, pk2);
             });
         }

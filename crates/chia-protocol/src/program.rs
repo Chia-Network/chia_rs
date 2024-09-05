@@ -157,9 +157,6 @@ use chia_traits::{FromJsonDict, ToJsonDict};
 use chia_py_streamable_macro::PyStreamable;
 
 #[cfg(feature = "py-bindings")]
-use pyo3::prelude::*;
-
-#[cfg(feature = "py-bindings")]
 use pyo3::types::{PyList, PyTuple};
 
 #[cfg(feature = "py-bindings")]

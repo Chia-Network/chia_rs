@@ -1272,7 +1272,10 @@ mod pytests {
             Python::with_gil(|py| {
                 let string = sig.to_json_dict(py).expect("to_json_dict");
                 let py_class = py.get_type_bound::<Signature>();
-                let sig2 = Signature::from_json_dict(&py_class, string.bind(py)).unwrap();
+                let sig2 = Signature::from_json_dict(&py_class, string.bind(py))
+                    .unwrap()
+                    .extract(py)
+                    .unwrap();
                 assert_eq!(sig, sig2);
             });
         }
