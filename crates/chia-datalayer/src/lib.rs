@@ -216,10 +216,7 @@ impl MerkleBlob {
             return self.insert_first(key_value, hash);
         }
 
-        let mut hasher = Sha256::new();
-        hasher.update(key_value.to_be_bytes());
-        let seed: Hash = hasher.finalize();
-        let old_leaf = self.get_random_leaf_node(Vec::from(seed))?;
+        let old_leaf = self.get_random_leaf_node_from_bytes(Vec::from(key_value.to_be_bytes()))?;
         let internal_node_hash = internal_hash(old_leaf.hash(), hash);
 
         if self.kv_to_index.len() == 1 {
@@ -427,7 +424,14 @@ impl MerkleBlob {
         }
     }
 
-    fn get_random_leaf_node(&self, seed: Vec<u8>) -> Result<RawMerkleNode, String> {
+    fn get_random_leaf_node_from_bytes(
+        &self,
+        seed_bytes: Vec<u8>,
+    ) -> Result<RawMerkleNode, String> {
+        let mut hasher = Sha256::new();
+        hasher.update(seed_bytes);
+        let seed: Hash = hasher.finalize();
+
         let mut node = self.get_raw_node(0)?;
         for byte in seed {
             for bit in 0..8 {
@@ -830,12 +834,14 @@ mod tests {
     #[test]
     fn test_get_random_leaf_node() {
         let merkle_blob = example_merkle_blob();
-        let leaf = merkle_blob.get_random_leaf_node(vec![0; 8]).unwrap();
+        let leaf = merkle_blob
+            .get_random_leaf_node_from_bytes(vec![0; 8])
+            .unwrap();
         assert_eq!(
             match leaf {
                 RawMerkleNode::Internal { index, .. } | RawMerkleNode::Leaf { index, .. } => index,
             },
-            2,
+            1,
         );
     }
 
