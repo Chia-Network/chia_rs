@@ -1,6 +1,6 @@
 # this is offered to help with hinting only and is not intended to be
 # runtime accessible.  is there a better option for handling this?
-# chia_rs.ReadableBuffer
+chia_rs.ReadableBuffer
 chia_rs.chia_rs.ReadableBuffer
 
 # TODO: perhaps these should be private as _*
