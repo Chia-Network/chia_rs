@@ -64,6 +64,7 @@ jobs:
           mypy --ignore-missing-imports tests
 
       - name: python mypy stubtest
+        shell: bash
         run: |
           FAILURE=0
           echo "::group::concise"
