@@ -1,8 +1,7 @@
 // use std::collections::HashMap;
 
-use pyo3::buffer::PyBuffer;
 #[cfg(feature = "py-bindings")]
-use pyo3::{pyclass, pymethods, PyResult};
+use pyo3::{buffer::PyBuffer, pyclass, pymethods, PyResult};
 
 use clvmr::sha2::Sha256;
 use std::cmp::Ordering;
@@ -212,27 +211,11 @@ impl MerkleBlob {
     }
 
     pub fn insert(&mut self, key_value: KvId, hash: Hash) -> Result<(), String> {
+        // TODO: what about only unused providing a blob length?
         if self.blob.len() == 0 {
-            let new_leaf_block = ParsedBlock {
-                metadata: NodeMetadata {
-                    node_type: NodeType::Leaf,
-                    dirty: false,
-                },
-                node: RawMerkleNode::Leaf {
-                    parent: NULL_PARENT,
-                    key_value,
-                    hash,
-                    index: 0,
-                },
-            };
-
-            self.blob.extend(new_leaf_block.to_bytes());
-
-            self.kv_to_index.insert(key_value, 0);
-            self.free_indexes.clear();
-            self.last_allocated_index = 1;
-            return Ok(());
+            return self.insert_first(key_value, hash);
         }
+
         let mut hasher = Sha256::new();
         hasher.update(key_value.to_be_bytes());
         let seed: Hash = hasher.finalize();
@@ -240,66 +223,109 @@ impl MerkleBlob {
         let internal_node_hash = internal_hash(old_leaf.hash(), hash);
 
         if self.kv_to_index.len() == 1 {
-            self.blob.clear();
-
-            let new_internal_block = ParsedBlock {
-                metadata: NodeMetadata {
-                    node_type: NodeType::Internal,
-                    dirty: false,
-                },
-                node: RawMerkleNode::Internal {
-                    parent: NULL_PARENT,
-                    left: 1,
-                    right: 2,
-                    hash: internal_node_hash,
-                    index: 0,
-                },
-            };
-
-            self.blob.extend(new_internal_block.to_bytes());
-
-            let left_leaf_block = ParsedBlock {
-                metadata: NodeMetadata {
-                    node_type: NodeType::Leaf,
-                    dirty: false,
-                },
-                node: RawMerkleNode::Leaf {
-                    parent: 0,
-                    key_value: old_leaf.key_value(),
-                    hash: old_leaf.hash(),
-                    index: 1,
-                },
-            };
-            self.blob.extend(left_leaf_block.to_bytes());
-            self.kv_to_index.insert(
-                left_leaf_block.node.key_value(),
-                left_leaf_block.node.index(),
-            );
-
-            let right_leaf_block = ParsedBlock {
-                metadata: NodeMetadata {
-                    node_type: NodeType::Leaf,
-                    dirty: false,
-                },
-                node: RawMerkleNode::Leaf {
-                    parent: 0,
-                    key_value,
-                    hash,
-                    index: 2,
-                },
-            };
-            self.blob.extend(right_leaf_block.to_bytes());
-            self.kv_to_index.insert(
-                right_leaf_block.node.key_value(),
-                right_leaf_block.node.index(),
-            );
-
-            self.free_indexes.clear();
-            self.last_allocated_index = 3;
-
-            return Ok(());
+            return self.insert_second(key_value, hash, old_leaf, internal_node_hash);
         }
 
+        self.insert_third_or_later(key_value, hash, old_leaf, internal_node_hash)
+    }
+
+    fn insert_first(&mut self, key_value: KvId, hash: Hash) -> Result<(), String> {
+        let new_leaf_block = ParsedBlock {
+            metadata: crate::NodeMetadata {
+                node_type: NodeType::Leaf,
+                dirty: false,
+            },
+            node: crate::RawMerkleNode::Leaf {
+                parent: NULL_PARENT,
+                key_value,
+                hash,
+                index: 0,
+            },
+        };
+
+        self.blob.extend(new_leaf_block.to_bytes());
+
+        self.kv_to_index.insert(key_value, 0);
+        self.free_indexes.clear();
+        self.last_allocated_index = 1;
+
+        Ok(())
+    }
+
+    fn insert_second(
+        &mut self,
+        key_value: KvId,
+        hash: Hash,
+        old_leaf: RawMerkleNode,
+        internal_node_hash: Hash,
+    ) -> Result<(), String> {
+        self.blob.clear();
+
+        let new_internal_block = ParsedBlock {
+            metadata: NodeMetadata {
+                node_type: NodeType::Internal,
+                dirty: false,
+            },
+            node: RawMerkleNode::Internal {
+                parent: NULL_PARENT,
+                left: 1,
+                right: 2,
+                hash: internal_node_hash,
+                index: 0,
+            },
+        };
+
+        self.blob.extend(new_internal_block.to_bytes());
+
+        let left_leaf_block = ParsedBlock {
+            metadata: NodeMetadata {
+                node_type: NodeType::Leaf,
+                dirty: false,
+            },
+            node: RawMerkleNode::Leaf {
+                parent: 0,
+                key_value: old_leaf.key_value(),
+                hash: old_leaf.hash(),
+                index: 1,
+            },
+        };
+        self.blob.extend(left_leaf_block.to_bytes());
+        self.kv_to_index.insert(
+            left_leaf_block.node.key_value(),
+            left_leaf_block.node.index(),
+        );
+
+        let right_leaf_block = ParsedBlock {
+            metadata: NodeMetadata {
+                node_type: NodeType::Leaf,
+                dirty: false,
+            },
+            node: RawMerkleNode::Leaf {
+                parent: 0,
+                key_value,
+                hash,
+                index: 2,
+            },
+        };
+        self.blob.extend(right_leaf_block.to_bytes());
+        self.kv_to_index.insert(
+            right_leaf_block.node.key_value(),
+            right_leaf_block.node.index(),
+        );
+
+        self.free_indexes.clear();
+        self.last_allocated_index = 3;
+
+        Ok(())
+    }
+
+    fn insert_third_or_later(
+        &mut self,
+        key_value: KvId,
+        hash: Hash,
+        old_leaf: RawMerkleNode,
+        internal_node_hash: Hash,
+    ) -> Result<(), String> {
         let new_leaf_index = self.get_new_index();
         let new_internal_node_index = self.get_new_index();
 
@@ -339,11 +365,10 @@ impl MerkleBlob {
             format!("{key_value:?} {hash:?}")
         );
 
-        let mut old_leaf_block =
-            ParsedBlock::from_bytes(self.get_block(old_leaf.index())?, old_leaf.index())?;
-        old_leaf_block.node.set_parent(new_internal_node_index);
-        let offset = old_leaf_block.node.index() as usize * BLOCK_SIZE;
-        self.blob[offset..offset + BLOCK_SIZE].copy_from_slice(&old_leaf_block.to_bytes());
+        let mut block =
+            ParsedBlock::from_bytes(self.get_block(old_leaf.index())?, new_internal_node_index)?;
+        block.node.set_parent(new_internal_node_index);
+        self.insert_entry_to_blob(old_leaf.index(), block.to_bytes())?;
 
         let mut old_parent_block =
             ParsedBlock::from_bytes(self.get_block(old_parent_index)?, old_parent_index)?;
@@ -363,8 +388,7 @@ impl MerkleBlob {
             }
             RawMerkleNode::Leaf { .. } => panic!(),
         }
-        let offset = old_parent_index as usize * BLOCK_SIZE;
-        self.blob[offset..offset + BLOCK_SIZE].copy_from_slice(&old_parent_block.to_bytes());
+        self.insert_entry_to_blob(old_parent_index, old_parent_block.to_bytes())?;
 
         self.mark_lineage_as_dirty(old_parent_index)?;
         self.kv_to_index.insert(key_value, new_internal_node_index);
@@ -378,8 +402,7 @@ impl MerkleBlob {
         while index != NULL_PARENT {
             let mut block = ParsedBlock::from_bytes(self.get_block(index)?, index)?;
             block.metadata.dirty = true;
-            let offset = index as usize * BLOCK_SIZE;
-            self.blob[offset..offset + BLOCK_SIZE].copy_from_slice(&block.to_bytes());
+            self.insert_entry_to_blob(index, block.to_bytes())?;
             index = block.node.parent();
         }
 
