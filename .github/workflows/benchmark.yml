@@ -63,23 +63,24 @@ jobs:
         run: |
           mypy --ignore-missing-imports tests
 
-      - name: python mypy stubtest filtered
-        # TODO: don't always this stuff
-        if: always()
-        run: |
-          stubtest ${{ env.stubtest_args }} --allowlist wheel/stubtest.allowlist --concise --ignore-missing-stub chia_rs | grep -vE '\.(__deepcopy__|__richcmp__|from_bytes|from_bytes_unchecked|parse_rust) '
-
-      - name: python mypy stubtest concise
-        # TODO: don't always this stuff
-        if: always()
-        run: |
-          stubtest ${{ env.stubtest_args }} --allowlist wheel/stubtest.allowlist --concise chia_rs
-
       - name: python mypy stubtest
-        # TODO: don't always this stuff
-        if: always()
         run: |
-          stubtest ${{ env.stubtest_args }} --allowlist wheel/stubtest.allowlist chia_rs
+          FAILURE=0
+          echo "::group::concise"
+          if ! stubtest ${{ env.stubtest_args }} --allowlist wheel/stubtest.allowlist --concise chia_rs
+          then
+            FAILURE=1
+          fi
+          echo "::endgroup::"
+
+          echo "::group::complete"
+          if ! stubtest ${{ env.stubtest_args }} --allowlist wheel/stubtest.allowlist chia_rs
+          then
+            FAILURE=1
+          fi
+          echo "::endgroup::"
+
+          exit ${FAILURE}
 
       - name: python black
         run: |
