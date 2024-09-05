@@ -32,6 +32,8 @@ def print_class(
     all_replace_parameters = []
     for m in members:
         replace_param_name, replace_type = m.split(":")
+        if replace_param_name.startswith("a") and replace_param_name[1:].isnumeric():
+            continue
         all_replace_parameters.append(
             f"{replace_param_name}: Union[{replace_type}, _Unspec] = _Unspec()"
         )
@@ -39,12 +41,14 @@ def print_class(
     if extra is not None:
         members.extend(extra)
 
-    # TODO: make __richcmp__ dependent on streamable?
+    # TODO: could theoretically be detected from the use of #[streamable(subclass)]
+    inheritable = name in ["SpendBundle"]
+
+    # TODO: when is __richcmp__ actually present?
     # def __richcmp__(self) -> Any: ...
-    # TODO: don't let me merge this hardcoded SpendBundle @final exception
     file.write(
         f"""
-{"@final" if name != "SpendBundle" else ""}
+{"" if inheritable else "@final"}
 class {name}:{"".join(map(add_indent, members))}
     def __init__(
         self{init_args}
@@ -69,8 +73,7 @@ class {name}:{"".join(map(add_indent, members))}
 """
     )
 
-    # TODO: program doesn't have named fields so the replace function isn't added
-    if len(all_replace_parameters) > 0 and name != "Program":
+    if len(all_replace_parameters) > 0:
         indent = ",\n        "
         file.write(
             f"""    def replace(self, *, {indent.join(all_replace_parameters)}) -> {name}: ...
