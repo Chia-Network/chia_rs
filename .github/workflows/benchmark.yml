@@ -21,7 +21,7 @@ jobs:
         python-version: ["3.8", "3.9", "3.10", "3.11"]
 
     env:
-      stubtest_args: ${{ matrix.python-version == '3.11' && '--allow-list stubtest.allowlist.3-11-plus' || ""}}
+      stubtest_args: ${{ matrix.python-version == '3.11' && '--allow-list wheel/stubtest.allowlist.3-11-plus' || ""}}
 
     steps:
       - uses: actions/checkout@v4
@@ -67,19 +67,19 @@ jobs:
         # TODO: don't always this stuff
         if: always()
         run: |
-          stubtest ${{ env.stubtest_args }} --allowlist stubtest.allowlist --concise --ignore-missing-stub chia_rs | grep -vE '\.(__deepcopy__|__richcmp__|from_bytes|from_bytes_unchecked|parse_rust) '
+          stubtest ${{ env.stubtest_args }} --allowlist wheel/stubtest.allowlist --concise --ignore-missing-stub chia_rs | grep -vE '\.(__deepcopy__|__richcmp__|from_bytes|from_bytes_unchecked|parse_rust) '
 
       - name: python mypy stubtest concise
         # TODO: don't always this stuff
         if: always()
         run: |
-          stubtest ${{ env.stubtest_args }} --allowlist stubtest.allowlist --concise chia_rs
+          stubtest ${{ env.stubtest_args }} --allowlist wheel/stubtest.allowlist --concise chia_rs
 
       - name: python mypy stubtest
         # TODO: don't always this stuff
         if: always()
         run: |
-          stubtest ${{ env.stubtest_args }} --allowlist stubtest.allowlist chia_rs
+          stubtest ${{ env.stubtest_args }} --allowlist wheel/stubtest.allowlist chia_rs
 
       - name: python black
         run: |
