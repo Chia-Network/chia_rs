@@ -21,7 +21,7 @@ jobs:
         python-version: ["3.8", "3.9", "3.10", "3.11"]
 
     env:
-      stubtest_args: ${{ matrix.python-version == '3.11' && '--allow-list wheel/stubtest.allowlist.3-11-plus' || ""}}
+      stubtest_args: ${{ matrix.python-version == '3.11' && '--allow-list wheel/stubtest.allowlist.3-11-plus' || ''}}
 
     steps:
       - uses: actions/checkout@v4
