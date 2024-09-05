@@ -44,7 +44,7 @@ def print_class(
     # TODO: could theoretically be detected from the use of #[streamable(subclass)]
     inheritable = name in ["SpendBundle"]
 
-    # TODO: when is __richcmp__ actually present?
+    # TODO: is __richcmp__ ever actually present?
     # def __richcmp__(self) -> Any: ...
     file.write(
         f"""
