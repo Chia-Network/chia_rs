@@ -618,8 +618,6 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<RespondPeers>()?;
     m.add_class::<NewUnfinishedBlock2>()?;
     m.add_class::<RequestUnfinishedBlock2>()?;
-
-    // TODO: i think this is part of the above group?
     m.add_class::<Handshake>()?;
     m.add_class::<FeeEstimate>()?;
     m.add_class::<FeeEstimateGroup>()?;
