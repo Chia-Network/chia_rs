@@ -19,7 +19,7 @@ type Hash = [u8; 32];
 type Block = [u8; BLOCK_SIZE];
 type KvId = u64;
 
-#[derive(Debug, Hash, Eq, PartialEq)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
 #[repr(u8)]
 pub enum NodeType {
     Internal = 0,
@@ -73,8 +73,176 @@ fn internal_hash(left_hash: Hash, right_hash: Hash) -> Hash {
     hasher.finalize()
 }
 
-// TODO: probably bogus and overflowing or somesuch
-const NULL_PARENT: TreeIndex = 0xffff_ffffu32; // 1 << (4 * 8) - 1;
+const NULL_PARENT: TreeIndex = 0xffff_ffffu32;
+
+#[derive(Debug, PartialEq)]
+pub struct NodeMetadata {
+    pub node_type: NodeType,
+    pub dirty: bool,
+}
+
+impl NodeMetadata {
+    pub fn from_bytes(blob: [u8; METADATA_SIZE]) -> Result<Self, String> {
+        // TODO: could save 1-2% of tree space by packing (and maybe don't do that)
+        // TODO: identify some useful structured serialization tooling we use
+        Ok(Self {
+            node_type: Self::node_type_from_bytes(blob)?,
+            dirty: Self::dirty_from_bytes(blob)?,
+        })
+    }
+
+    pub fn to_bytes(&self) -> [u8; METADATA_SIZE] {
+        [self.node_type.to_u8(), u8::from(self.dirty)]
+    }
+
+    pub fn node_type_from_bytes(blob: [u8; METADATA_SIZE]) -> Result<NodeType, String> {
+        NodeType::from_u8(blob[0])
+    }
+
+    pub fn dirty_from_bytes(blob: [u8; METADATA_SIZE]) -> Result<bool, String> {
+        match blob[1] {
+            0 => Ok(false),
+            1 => Ok(true),
+            other => return Err(format!("invalid dirty value: {other}")),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum RawMerkleNode {
+    // Root {
+    //     left: TreeIndex,
+    //     right: TreeIndex,
+    //     hash: Hash,
+    //     // TODO: kinda feels questionable having it be aware of its own location
+    //     // TODO: just always at zero?
+    //     index: TreeIndex,
+    // },
+    Internal {
+        parent: TreeIndex,
+        left: TreeIndex,
+        right: TreeIndex,
+        hash: Hash,
+        // TODO: kinda feels questionable having it be aware of its own location
+        index: TreeIndex,
+    },
+    Leaf {
+        parent: TreeIndex,
+        key_value: KvId,
+        hash: Hash,
+        // TODO: kinda feels questionable having it be aware of its own location
+        index: TreeIndex,
+    },
+}
+
+impl RawMerkleNode {
+    // fn discriminant(&self) -> u8 {
+    //     unsafe { *(self as *const Self as *const u8) }
+    // }
+
+    pub fn from_bytes(
+        metadata: &NodeMetadata,
+        index: TreeIndex,
+        blob: [u8; DATA_SIZE],
+    ) -> Result<Self, String> {
+        // TODO: add Err results
+        let parent = Self::parent_from_bytes(&metadata.node_type, &blob)?;
+        match metadata.node_type {
+            NodeType::Internal => Ok(RawMerkleNode::Internal {
+                // TODO: get these right
+                parent,
+                left: TreeIndex::from_be_bytes(<[u8; 4]>::try_from(&blob[4..8]).unwrap()),
+                right: TreeIndex::from_be_bytes(<[u8; 4]>::try_from(&blob[8..12]).unwrap()),
+                hash: <[u8; 32]>::try_from(&blob[12..44]).unwrap(),
+                index,
+            }),
+            NodeType::Leaf => Ok(RawMerkleNode::Leaf {
+                // TODO: this try from really right?
+                parent,
+                key_value: KvId::from_be_bytes(<[u8; 8]>::try_from(&blob[4..12]).unwrap()),
+                hash: Hash::try_from(&blob[12..44]).unwrap(),
+                index,
+            }),
+        }
+    }
+
+    fn parent_from_bytes(
+        node_type: &NodeType,
+        blob: &[u8; DATA_SIZE],
+    ) -> Result<TreeIndex, String> {
+        // TODO: a little setup here for pre-optimization to allow walking parents without processing entire nodes
+        match node_type {
+            NodeType::Internal => Ok(TreeIndex::from_be_bytes(
+                <[u8; 4]>::try_from(&blob[0..4]).unwrap(),
+            )),
+            NodeType::Leaf => Ok(TreeIndex::from_be_bytes(
+                <[u8; 4]>::try_from(&blob[0..4]).unwrap(),
+            )),
+        }
+    }
+    pub fn to_bytes(&self) -> [u8; DATA_SIZE] {
+        let mut blob: Vec<u8> = Vec::new();
+        match self {
+            RawMerkleNode::Internal {
+                parent,
+                left,
+                right,
+                hash,
+                index: _,
+            } => {
+                blob.extend(parent.to_be_bytes());
+                blob.extend(left.to_be_bytes());
+                blob.extend(right.to_be_bytes());
+                blob.extend(hash);
+            }
+            RawMerkleNode::Leaf {
+                parent,
+                key_value,
+                hash,
+                index: _,
+            } => {
+                blob.extend(parent.to_be_bytes());
+                blob.extend(key_value.to_be_bytes());
+                blob.extend(hash);
+            }
+        }
+
+        blob.try_into().unwrap()
+    }
+
+    pub fn parent(&self) -> TreeIndex {
+        match self {
+            RawMerkleNode::Internal { parent, .. } | RawMerkleNode::Leaf { parent, .. } => *parent,
+        }
+    }
+
+    pub fn hash(&self) -> Hash {
+        match self {
+            RawMerkleNode::Internal { hash, .. } | RawMerkleNode::Leaf { hash, .. } => *hash,
+        }
+    }
+
+    pub fn index(&self) -> TreeIndex {
+        match self {
+            RawMerkleNode::Internal { index, .. } | RawMerkleNode::Leaf { index, .. } => *index,
+        }
+    }
+
+    pub fn set_parent(&mut self, p: TreeIndex) {
+        match self {
+            &mut RawMerkleNode::Internal { ref mut parent, .. }
+            | RawMerkleNode::Leaf { ref mut parent, .. } => *parent = p,
+        }
+    }
+
+    // TODO: yes i know i'm trying to write this code in a non-rusty way and i need to stop that
+    pub fn key_value(&self) -> KvId {
+        match self {
+            RawMerkleNode::Leaf { key_value, .. } => *key_value,
+            _ => panic!(),
+        }
+    }
+}
 
 // TODO: does not enforce matching metadata node type and node enumeration type
 struct ParsedBlock {
@@ -116,6 +284,7 @@ impl ParsedBlock {
         )
     }
 }
+
 fn get_free_indexes(blob: &Vec<u8>) -> Result<Vec<TreeIndex>, String> {
     let index_count = blob.len() / BLOCK_SIZE;
 
@@ -583,175 +752,13 @@ impl MerkleBlob {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub enum RawMerkleNode {
-    // Root {
-    //     left: TreeIndex,
-    //     right: TreeIndex,
-    //     hash: Hash,
-    //     // TODO: kinda feels questionable having it be aware of its own location
-    //     // TODO: just always at zero?
-    //     index: TreeIndex,
-    // },
-    Internal {
-        parent: TreeIndex,
-        left: TreeIndex,
-        right: TreeIndex,
-        hash: Hash,
-        // TODO: kinda feels questionable having it be aware of its own location
-        index: TreeIndex,
-    },
-    Leaf {
-        parent: TreeIndex,
-        key_value: KvId,
-        hash: Hash,
-        // TODO: kinda feels questionable having it be aware of its own location
-        index: TreeIndex,
-    },
-}
-
-impl RawMerkleNode {
-    // fn discriminant(&self) -> u8 {
-    //     unsafe { *(self as *const Self as *const u8) }
-    // }
-
-    pub fn from_bytes(
-        metadata: &NodeMetadata,
-        index: TreeIndex,
-        blob: [u8; DATA_SIZE],
-    ) -> Result<Self, String> {
-        // TODO: add Err results
-        let parent = Self::parent_from_bytes(&metadata.node_type, &blob)?;
-        match metadata.node_type {
-            NodeType::Internal => Ok(RawMerkleNode::Internal {
-                // TODO: get these right
-                parent,
-                left: TreeIndex::from_be_bytes(<[u8; 4]>::try_from(&blob[4..8]).unwrap()),
-                right: TreeIndex::from_be_bytes(<[u8; 4]>::try_from(&blob[8..12]).unwrap()),
-                hash: <[u8; 32]>::try_from(&blob[12..44]).unwrap(),
-                index,
-            }),
-            NodeType::Leaf => Ok(RawMerkleNode::Leaf {
-                // TODO: this try from really right?
-                parent,
-                key_value: KvId::from_be_bytes(<[u8; 8]>::try_from(&blob[4..12]).unwrap()),
-                hash: Hash::try_from(&blob[12..44]).unwrap(),
-                index,
-            }),
-        }
-    }
-
-    fn parent_from_bytes(
-        node_type: &NodeType,
-        blob: &[u8; DATA_SIZE],
-    ) -> Result<TreeIndex, String> {
-        // TODO: a little setup here for pre-optimization to allow walking parents without processing entire nodes
-        match node_type {
-            NodeType::Internal => Ok(TreeIndex::from_be_bytes(
-                <[u8; 4]>::try_from(&blob[0..4]).unwrap(),
-            )),
-            NodeType::Leaf => Ok(TreeIndex::from_be_bytes(
-                <[u8; 4]>::try_from(&blob[0..4]).unwrap(),
-            )),
-        }
-    }
-    pub fn to_bytes(&self) -> [u8; DATA_SIZE] {
-        let mut blob: Vec<u8> = Vec::new();
-        match self {
-            RawMerkleNode::Internal {
-                parent,
-                left,
-                right,
-                hash,
-                index: _,
-            } => {
-                blob.extend(parent.to_be_bytes());
-                blob.extend(left.to_be_bytes());
-                blob.extend(right.to_be_bytes());
-                blob.extend(hash);
-            }
-            RawMerkleNode::Leaf {
-                parent,
-                key_value,
-                hash,
-                index: _,
-            } => {
-                blob.extend(parent.to_be_bytes());
-                blob.extend(key_value.to_be_bytes());
-                blob.extend(hash);
-            }
-        }
-
-        blob.try_into().unwrap()
-    }
-
-    pub fn parent(&self) -> TreeIndex {
-        match self {
-            RawMerkleNode::Internal { parent, .. } | RawMerkleNode::Leaf { parent, .. } => *parent,
-        }
-    }
-
-    pub fn hash(&self) -> Hash {
-        match self {
-            RawMerkleNode::Internal { hash, .. } | RawMerkleNode::Leaf { hash, .. } => *hash,
-        }
-    }
-
-    pub fn index(&self) -> TreeIndex {
-        match self {
-            RawMerkleNode::Internal { index, .. } | RawMerkleNode::Leaf { index, .. } => *index,
-        }
-    }
-
-    pub fn set_parent(&mut self, p: TreeIndex) {
-        match self {
-            &mut RawMerkleNode::Internal { ref mut parent, .. }
-            | RawMerkleNode::Leaf { ref mut parent, .. } => *parent = p,
-        }
-    }
-
-    // TODO: yes i know i'm trying to write this code in a non-rusty way and i need to stop that
-    pub fn key_value(&self) -> KvId {
-        match self {
-            RawMerkleNode::Leaf { key_value, .. } => *key_value,
-            _ => panic!(),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub struct NodeMetadata {
-    pub node_type: NodeType,
-    pub dirty: bool,
-}
-
-impl NodeMetadata {
-    pub fn from_bytes(blob: [u8; METADATA_SIZE]) -> Result<Self, String> {
-        // TODO: identify some useful structured serialization tooling we use
-        Ok(Self {
-            node_type: Self::node_type_from_bytes(blob)?,
-            dirty: match blob[1] {
-                0 => false,
-                1 => true,
-                other => return Err(format!("invalid dirty value: {other}")),
-            },
-        })
-    }
-
-    pub fn to_bytes(&self) -> [u8; METADATA_SIZE] {
-        [self.node_type.to_u8(), u8::from(self.dirty)]
-    }
-
-    pub fn node_type_from_bytes(blob: [u8; METADATA_SIZE]) -> Result<NodeType, String> {
-        NodeType::from_u8(blob[0])
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use chia_traits::Streamable;
+    use clvm_utils;
     use hex_literal::hex;
+    use rstest::rstest;
     use std::fs;
     use std::io;
     use std::io::Write;
@@ -799,17 +806,64 @@ mod tests {
     }
 
     #[test]
-    fn test_node_metadata_from_to() {
-        let bytes: [u8; 2] = [0, 1];
+    fn test_node_type_serialized_values() {
+        // TODO: can i make sure we cover all variants?
+        assert_eq!(NodeType::Internal as u8, 0);
+        assert_eq!(NodeType::Leaf as u8, 1);
+
+        for node_type in [NodeType::Internal, NodeType::Leaf] {
+            assert_eq!(node_type.to_u8(), node_type.clone() as u8,);
+            assert_eq!(
+                NodeType::from_u8(node_type.clone() as u8).unwrap(),
+                node_type,
+            )
+        }
+    }
+
+    #[test]
+    fn test_internal_hash() {
+        // TODO: yeah, various questions around this and how to express 'this is dl internal hash'
+        //       without silly repetition.  maybe just a use as.
+        // in Python: Program.to((left_hash, right_hash)).get_tree_hash_precalc(left_hash, right_hash)
+        let left: Hash = [
+            0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+            24, 25, 26, 27, 28, 29, 30, 31,
+        ];
+        let right: Hash = [
+            32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53,
+            54, 55, 56, 57, 58, 59, 60, 61, 62, 63,
+        ];
+        assert_eq!(
+            internal_hash(left, right),
+            clvm_utils::tree_hash_pair(
+                clvm_utils::TreeHash::new(left),
+                clvm_utils::TreeHash::new(right)
+            )
+            .to_bytes(),
+        );
+    }
+
+    #[rstest]
+    fn test_node_metadata_from_to(
+        #[values(false, true)] dirty: bool,
+        // TODO: can we make sure we cover all variants
+        #[values(NodeType::Internal, NodeType::Leaf)] node_type: NodeType,
+    ) {
+        let bytes: [u8; 2] = [node_type.to_u8(), dirty as u8];
         let object = NodeMetadata::from_bytes(bytes).unwrap();
         assert_eq!(
             object,
             NodeMetadata {
-                node_type: NodeType::Internal,
-                dirty: true
+                node_type: node_type,
+                dirty: dirty
             },
         );
         assert_eq!(object.to_bytes(), bytes);
+        assert_eq!(
+            NodeMetadata::node_type_from_bytes(bytes).unwrap(),
+            object.node_type
+        );
+        assert_eq!(NodeMetadata::dirty_from_bytes(bytes).unwrap(), object.dirty);
     }
 
     #[test]

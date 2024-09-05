@@ -20,6 +20,9 @@ crate-type = ["rlib"]
 [dependencies]
 clvmr = { workspace = true }
 chia-traits = { workspace = true }
-# TODO: dev?
-hex-literal = { workspace = true }
 pyo3 = { workspace = true, optional = true }
+
+[dev-dependencies]
+clvm-utils = { workspace = true }
+hex-literal = { workspace = true }
+rstest = { workspace = true }
