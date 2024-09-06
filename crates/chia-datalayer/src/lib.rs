@@ -363,10 +363,11 @@ impl MerkleBlob {
         let internal_node_hash = internal_hash(old_leaf.hash, hash);
 
         if self.kv_to_index.len() == 1 {
-            return self.insert_second(key_value, hash, old_leaf, internal_node_hash);
+            self.insert_second(key_value, hash, &old_leaf, internal_node_hash);
+            return Ok(());
         }
 
-        self.insert_third_or_later(key_value, hash, old_leaf, internal_node_hash)
+        self.insert_third_or_later(key_value, hash, &old_leaf, internal_node_hash)
     }
 
     fn insert_first(&mut self, key_value: KvId, hash: Hash) {
@@ -394,9 +395,9 @@ impl MerkleBlob {
         &mut self,
         key_value: KvId,
         hash: Hash,
-        old_leaf: Node,
+        old_leaf: &Node,
         internal_node_hash: Hash,
-    ) -> Result<(), String> {
+    ) {
         self.blob.clear();
 
         let new_internal_block = Block {
@@ -452,15 +453,13 @@ impl MerkleBlob {
 
         self.free_indexes.clear();
         self.last_allocated_index = 3;
-
-        Ok(())
     }
 
     fn insert_third_or_later(
         &mut self,
         key_value: KvId,
         hash: Hash,
-        old_leaf: Node,
+        old_leaf: &Node,
         internal_node_hash: Hash,
     ) -> Result<(), String> {
         let new_leaf_index = self.get_new_index();
