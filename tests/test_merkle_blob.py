@@ -82,4 +82,5 @@ def test_just_insert_a_bunch() -> None:
     # rs = pathlib.Path("~/repos/chia_rs/crates/chia-datalayer/src/test_just_insert_a_bunch_reference").expanduser().read_bytes()
     # b = bytes(merkle_blob.blob)
     # assert b == rs, 'not the same'
-    assert False, f"total time: {total_time}"
+
+    # assert False, f"total time: {total_time}"
