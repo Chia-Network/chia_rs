@@ -8,6 +8,11 @@ use super::conditions::{SpendBundleConditions, SpendConditions};
 #[cfg(feature = "py-bindings")]
 use chia_py_streamable_macro::{PyJsonDict, PyStreamable};
 
+#[cfg(feature = "py-bindings")]
+use pyo3::prelude::*;
+#[cfg(feature = "py-bindings")]
+use pyo3::types::PyType;
+
 #[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(
     feature = "py-bindings",
@@ -144,3 +149,30 @@ fn convert_agg_sigs(a: &Allocator, agg_sigs: &[(PublicKey, NodePtr)]) -> Vec<(Pu
     }
     ret
 }
+
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+impl OwnedSpendConditions {
+    #[classmethod]
+    #[pyo3(name = "from_parent")]
+    pub fn from_parent(_cls: &Bound<'_, PyType>, instance: Self) -> PyResult<PyObject> {
+        Python::with_gil(|py| {
+            // ignore child case - though this could be extended in the future to support child class
+            Ok(instance.into_py(py))
+        })
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+impl OwnedSpendBundleConditions {
+    #[classmethod]
+    #[pyo3(name = "from_parent")]
+    pub fn from_parent(_cls: &Bound<'_, PyType>, instance: Self) -> PyResult<PyObject> {
+        Python::with_gil(|py| {
+            // ignore child case - though this could be extended in the future to support child class
+            Ok(instance.into_py(py))
+        })
+    }
+}
+
