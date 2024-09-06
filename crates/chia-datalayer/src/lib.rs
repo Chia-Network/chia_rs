@@ -15,6 +15,7 @@ const DATA_SIZE: usize = 44;
 const BLOCK_SIZE: usize = METADATA_SIZE + DATA_SIZE;
 
 type TreeIndex = u32;
+type Parent = Option<TreeIndex>;
 // type Key = Vec<u8>;
 type Hash = [u8; 32];
 type BlockBytes = [u8; BLOCK_SIZE];
@@ -112,7 +113,7 @@ impl NodeMetadata {
 #[derive(Debug, PartialEq)]
 pub struct Node {
     // TODO: can this be an Option to avoid dealing with the magic number outside of serialization?
-    parent: TreeIndex,
+    parent: Parent,
     hash: Hash,
     specific: NodeSpecific,
     // TODO: kinda feels questionable having it be aware of its own location
@@ -165,11 +166,14 @@ impl Node {
         })
     }
 
-    fn parent_from_bytes(blob: &[u8; DATA_SIZE]) -> Result<TreeIndex, String> {
+    fn parent_from_bytes(blob: &[u8; DATA_SIZE]) -> Result<Parent, String> {
         // TODO: a little setup here for pre-optimization to allow walking parents without processing entire nodes
-        Ok(TreeIndex::from_be_bytes(
-            <[u8; 4]>::try_from(&blob[PARENT_RANGE]).unwrap(),
-        ))
+        let parent_integer =
+            TreeIndex::from_be_bytes(<[u8; 4]>::try_from(&blob[PARENT_RANGE]).unwrap());
+        match parent_integer {
+            NULL_PARENT => Ok(None),
+            _ => Ok(Some(parent_integer)),
+        }
     }
     pub fn to_bytes(&self) -> [u8; DATA_SIZE] {
         let mut blob: Vec<u8> = Vec::new();
@@ -180,7 +184,11 @@ impl Node {
                 hash,
                 index: _,
             } => {
-                blob.extend(parent.to_be_bytes());
+                let parent_integer = match parent {
+                    None => NULL_PARENT,
+                    Some(parent) => *parent,
+                };
+                blob.extend(parent_integer.to_be_bytes());
                 blob.extend(left.to_be_bytes());
                 blob.extend(right.to_be_bytes());
                 blob.extend(hash);
@@ -191,7 +199,11 @@ impl Node {
                 hash,
                 index: _,
             } => {
-                blob.extend(parent.to_be_bytes());
+                let parent_integer = match parent {
+                    None => NULL_PARENT,
+                    Some(parent) => *parent,
+                };
+                blob.extend(parent_integer.to_be_bytes());
                 blob.extend(key_value.to_be_bytes());
                 blob.extend(hash);
             }
@@ -365,7 +377,7 @@ impl MerkleBlob {
                 dirty: false,
             },
             node: Node {
-                parent: NULL_PARENT,
+                parent: None,
                 specific: NodeSpecific::Leaf { key_value },
                 hash,
                 index: 0,
@@ -396,7 +408,7 @@ impl MerkleBlob {
                 dirty: false,
             },
             node: Node {
-                parent: NULL_PARENT,
+                parent: None,
                 specific: NodeSpecific::Internal { left: 1, right: 2 },
                 hash: internal_node_hash,
                 index: 0,
@@ -411,7 +423,7 @@ impl MerkleBlob {
                 dirty: false,
             },
             node: Node {
-                parent: 0,
+                parent: Some(0),
                 specific: NodeSpecific::Leaf {
                     key_value: old_leaf.key_value(),
                 },
@@ -429,7 +441,7 @@ impl MerkleBlob {
                 dirty: false,
             },
             node: Node {
-                parent: 0,
+                parent: Some(0),
                 specific: NodeSpecific::Leaf { key_value },
                 hash,
                 index: 2,
@@ -463,7 +475,7 @@ impl MerkleBlob {
                 dirty: false,
             },
             node: Node {
-                parent: new_internal_node_index,
+                parent: Some(new_internal_node_index),
                 specific: NodeSpecific::Leaf { key_value },
                 hash,
                 index: new_leaf_index,
@@ -488,17 +500,13 @@ impl MerkleBlob {
         };
         self.insert_entry_to_blob(new_internal_node_index, new_internal_block.to_bytes())?;
 
-        let old_parent_index = old_leaf.parent;
-        assert_ne!(
-            old_parent_index,
-            NULL_PARENT,
-            "{}",
-            format!("{key_value:?} {hash:?}")
-        );
+        let Some(old_parent_index) = old_leaf.parent else {
+            panic!("{key_value:?} {hash:?}")
+        };
 
         let mut block =
             Block::from_bytes(self.get_block(old_leaf.index)?, new_internal_node_index)?;
-        block.node.parent = new_internal_node_index;
+        block.node.parent = Some(new_internal_node_index);
         self.insert_entry_to_blob(old_leaf.index, block.to_bytes())?;
 
         let mut old_parent_block =
@@ -528,13 +536,13 @@ impl MerkleBlob {
     }
 
     fn mark_lineage_as_dirty(&mut self, index: TreeIndex) -> Result<(), String> {
-        let mut index = index;
+        let mut next_index = Some(index);
 
-        while index != NULL_PARENT {
-            let mut block = Block::from_bytes(self.get_block(index)?, index)?;
+        while let Some(this_index) = next_index {
+            let mut block = Block::from_bytes(self.get_block(this_index)?, this_index)?;
             block.metadata.dirty = true;
-            self.insert_entry_to_blob(index, block.to_bytes())?;
-            index = block.node.parent;
+            self.insert_entry_to_blob(this_index, block.to_bytes())?;
+            next_index = block.node.parent;
         }
 
         Ok(())
@@ -635,39 +643,39 @@ impl MerkleBlob {
         })
     }
 
-    pub fn get_parent_index(&self, index: TreeIndex) -> Result<TreeIndex, String> {
+    pub fn get_parent_index(&self, index: TreeIndex) -> Result<Parent, String> {
         let block = self.get_block(index).unwrap();
 
         Node::parent_from_bytes(block[METADATA_SIZE..].try_into().unwrap())
     }
 
     pub fn get_lineage(&self, index: TreeIndex) -> Result<Vec<Node>, String> {
-        let mut next_index = index;
+        // TODO: what about an index that happens to be the null index?  a question for everywhere i guess
+        let mut next_index = Some(index);
         let mut lineage = vec![];
-        loop {
-            let node = self.get_node(next_index)?;
+
+        while let Some(this_index) = next_index {
+            let node = self.get_node(this_index)?;
             next_index = node.parent;
             lineage.push(node);
-
-            if next_index == NULL_PARENT {
-                return Ok(lineage);
-            }
         }
+
+        Ok(lineage)
     }
 
     pub fn get_lineage_indexes(&self, index: TreeIndex) -> Result<Vec<TreeIndex>, String> {
         // TODO: yep, this 'optimization' might be overkill, and should be speed compared regardless
-        let mut next_index = index;
-        let mut lineage = vec![];
-        loop {
-            lineage.push(next_index);
-            let block = self.get_block(next_index)?;
-            next_index = Node::parent_from_bytes(block[METADATA_SIZE..].try_into().unwrap())?;
+        // TODO: what about an index that happens to be the null index?  a question for everywhere i guess
+        let mut next_index = Some(index);
+        let mut lineage: Vec<TreeIndex> = vec![];
 
-            if next_index == NULL_PARENT {
-                return Ok(lineage);
-            }
+        while let Some(this_index) = next_index {
+            lineage.push(this_index);
+            let block = self.get_block(this_index)?;
+            next_index = Node::parent_from_bytes(block[METADATA_SIZE..].try_into().unwrap())?;
         }
+
+        Ok(lineage)
     }
 }
 
@@ -721,7 +729,7 @@ mod tests {
     ];
 
     const EXAMPLE_ROOT: Node = Node {
-        parent: NULL_PARENT,
+        parent: None,
         specific: NodeSpecific::Internal { left: 1, right: 2 },
         hash: HASH,
         index: 0,
@@ -731,7 +739,7 @@ mod tests {
         dirty: true,
     };
     const EXAMPLE_LEFT_LEAF: Node = Node {
-        parent: 0,
+        parent: Some(0),
         specific: NodeSpecific::Leaf {
             key_value: 0x0405_0607_0809_0A0B,
         },
@@ -743,7 +751,7 @@ mod tests {
         dirty: false,
     };
     const EXAMPLE_RIGHT_LEAF: Node = Node {
-        parent: 0,
+        parent: Some(0),
         specific: NodeSpecific::Leaf {
             key_value: 0x1415_1617_1819_1A1B,
         },
@@ -836,7 +844,7 @@ mod tests {
         }
         assert_eq!(lineage.len(), 2);
         let last_node = lineage.last().unwrap();
-        assert_eq!(last_node.parent, NULL_PARENT);
+        assert_eq!(last_node.parent, None);
     }
 
     #[test]
