@@ -755,13 +755,9 @@ impl MerkleBlob {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chia_traits::Streamable;
     use clvm_utils;
     use hex_literal::hex;
     use rstest::rstest;
-    use std::fs;
-    use std::io;
-    use std::io::Write;
 
     const EXAMPLE_BLOB: [u8; 138] = hex!("0001ffffffff00000001000000020c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b0100000000000405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b0100000000001415161718191a1b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b");
     const HASH: Hash = [
