@@ -6,6 +6,7 @@ use pyo3::{buffer::PyBuffer, pyclass, pymethods, PyResult};
 use clvmr::sha2::Sha256;
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::ops::Range;
 
 // TODO: clearly shouldn't be hard coded
 const METADATA_SIZE: usize = 2;
@@ -16,7 +17,7 @@ const BLOCK_SIZE: usize = METADATA_SIZE + DATA_SIZE;
 type TreeIndex = u32;
 // type Key = Vec<u8>;
 type Hash = [u8; 32];
-type Block = [u8; BLOCK_SIZE];
+type BlockBytes = [u8; BLOCK_SIZE];
 type KvId = u64;
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
@@ -124,6 +125,13 @@ pub enum NodeSpecific {
     Leaf { key_value: KvId },
 }
 
+const PARENT_RANGE: Range<usize> = 0..4;
+const LEFT_RANGE: Range<usize> = 4..8;
+const RIGHT_RANGE: Range<usize> = 8..12;
+const KEY_VALUE_RANGE: Range<usize> = 4..12;
+// TODO: move the common parts to the beginning of the serialization?
+const HASH_RANGE: Range<usize> = 12..44;
+
 impl Node {
     // fn discriminant(&self) -> u8 {
     //     unsafe { *(self as *const Self as *const u8) }
@@ -135,38 +143,33 @@ impl Node {
         blob: [u8; DATA_SIZE],
     ) -> Result<Self, String> {
         // TODO: add Err results
-        let parent = Self::parent_from_bytes(&metadata.node_type, &blob)?;
+        let parent = Self::parent_from_bytes(&blob)?;
         Ok(Self {
             parent,
             index,
-            // TODO: move the common parts to the beginning of the serialization?
-            hash: <[u8; 32]>::try_from(&blob[12..44]).unwrap(),
+            hash: <[u8; 32]>::try_from(&blob[HASH_RANGE]).unwrap(),
             specific: match metadata.node_type {
                 NodeType::Internal => NodeSpecific::Internal {
-                    left: TreeIndex::from_be_bytes(<[u8; 4]>::try_from(&blob[4..8]).unwrap()),
-                    right: TreeIndex::from_be_bytes(<[u8; 4]>::try_from(&blob[8..12]).unwrap()),
+                    left: TreeIndex::from_be_bytes(<[u8; 4]>::try_from(&blob[LEFT_RANGE]).unwrap()),
+                    right: TreeIndex::from_be_bytes(
+                        <[u8; 4]>::try_from(&blob[RIGHT_RANGE]).unwrap(),
+                    ),
                 },
                 NodeType::Leaf => NodeSpecific::Leaf {
                     // TODO: this try from really right?
-                    key_value: KvId::from_be_bytes(<[u8; 8]>::try_from(&blob[4..12]).unwrap()),
+                    key_value: KvId::from_be_bytes(
+                        <[u8; 8]>::try_from(&blob[KEY_VALUE_RANGE]).unwrap(),
+                    ),
                 },
             },
         })
     }
 
-    fn parent_from_bytes(
-        node_type: &NodeType,
-        blob: &[u8; DATA_SIZE],
-    ) -> Result<TreeIndex, String> {
+    fn parent_from_bytes(blob: &[u8; DATA_SIZE]) -> Result<TreeIndex, String> {
         // TODO: a little setup here for pre-optimization to allow walking parents without processing entire nodes
-        match node_type {
-            NodeType::Internal => Ok(TreeIndex::from_be_bytes(
-                <[u8; 4]>::try_from(&blob[0..4]).unwrap(),
-            )),
-            NodeType::Leaf => Ok(TreeIndex::from_be_bytes(
-                <[u8; 4]>::try_from(&blob[0..4]).unwrap(),
-            )),
-        }
+        Ok(TreeIndex::from_be_bytes(
+            <[u8; 4]>::try_from(&blob[PARENT_RANGE]).unwrap(),
+        ))
     }
     pub fn to_bytes(&self) -> [u8; DATA_SIZE] {
         let mut blob: Vec<u8> = Vec::new();
@@ -207,12 +210,12 @@ impl Node {
 }
 
 // TODO: does not enforce matching metadata node type and node enumeration type
-struct ParsedBlock {
+struct Block {
     metadata: NodeMetadata,
     node: Node,
 }
 
-impl ParsedBlock {
+impl Block {
     pub fn to_bytes(&self) -> [u8; BLOCK_SIZE] {
         let mut blob: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
         blob[..METADATA_SIZE].copy_from_slice(&self.metadata.to_bytes());
@@ -221,7 +224,7 @@ impl ParsedBlock {
         blob
     }
 
-    pub fn from_bytes(blob: [u8; BLOCK_SIZE], index: TreeIndex) -> Result<ParsedBlock, String> {
+    pub fn from_bytes(blob: [u8; BLOCK_SIZE], index: TreeIndex) -> Result<Block, String> {
         // TODO: handle invalid indexes?
         // TODO: handle overflows?
         let metadata_blob: [u8; METADATA_SIZE] = blob
@@ -239,8 +242,8 @@ impl ParsedBlock {
             Err(message) => return Err(format!("failed loading metadata: {message})")),
         };
         Ok(match Node::from_bytes(&metadata, index, data_blob) {
-            Ok(node) => ParsedBlock { metadata, node },
-            Err(message) => return Err(format!("failed loading raw node: {message}")),
+            Ok(node) => Block { metadata, node },
+            Err(message) => return Err(format!("failed loading node: {message}")),
         })
     }
 }
@@ -259,7 +262,7 @@ fn get_free_indexes(blob: &Vec<u8>) -> Result<Vec<TreeIndex>, String> {
         let index: TreeIndex = queue.pop().unwrap();
         let offset = index as usize * BLOCK_SIZE;
         let block =
-            ParsedBlock::from_bytes(blob[offset..offset + BLOCK_SIZE].try_into().unwrap(), index)?;
+            Block::from_bytes(blob[offset..offset + BLOCK_SIZE].try_into().unwrap(), index)?;
         seen_indexes[index as usize] = true;
         match block.node.specific {
             NodeSpecific::Internal { left, right } => {
@@ -295,7 +298,7 @@ fn get_keys_values_indexes(blob: &Vec<u8>) -> Result<HashMap<KvId, TreeIndex>, S
         let index: TreeIndex = queue.pop().unwrap();
         let offset = index as usize * BLOCK_SIZE;
         let block =
-            ParsedBlock::from_bytes(blob[offset..offset + BLOCK_SIZE].try_into().unwrap(), index)?;
+            Block::from_bytes(blob[offset..offset + BLOCK_SIZE].try_into().unwrap(), index)?;
         match block.node.specific {
             NodeSpecific::Leaf { key_value } => {
                 kv_to_index.insert(key_value, index);
@@ -356,7 +359,7 @@ impl MerkleBlob {
     }
 
     fn insert_first(&mut self, key_value: KvId, hash: Hash) -> Result<(), String> {
-        let new_leaf_block = ParsedBlock {
+        let new_leaf_block = Block {
             metadata: NodeMetadata {
                 node_type: NodeType::Leaf,
                 dirty: false,
@@ -387,7 +390,7 @@ impl MerkleBlob {
     ) -> Result<(), String> {
         self.blob.clear();
 
-        let new_internal_block = ParsedBlock {
+        let new_internal_block = Block {
             metadata: NodeMetadata {
                 node_type: NodeType::Internal,
                 dirty: false,
@@ -402,7 +405,7 @@ impl MerkleBlob {
 
         self.blob.extend(new_internal_block.to_bytes());
 
-        let left_leaf_block = ParsedBlock {
+        let left_leaf_block = Block {
             metadata: NodeMetadata {
                 node_type: NodeType::Leaf,
                 dirty: false,
@@ -420,7 +423,7 @@ impl MerkleBlob {
         self.kv_to_index
             .insert(left_leaf_block.node.key_value(), left_leaf_block.node.index);
 
-        let right_leaf_block = ParsedBlock {
+        let right_leaf_block = Block {
             metadata: NodeMetadata {
                 node_type: NodeType::Leaf,
                 dirty: false,
@@ -454,7 +457,7 @@ impl MerkleBlob {
         let new_leaf_index = self.get_new_index();
         let new_internal_node_index = self.get_new_index();
 
-        let new_leaf_block = ParsedBlock {
+        let new_leaf_block = Block {
             metadata: NodeMetadata {
                 node_type: NodeType::Leaf,
                 dirty: false,
@@ -468,7 +471,7 @@ impl MerkleBlob {
         };
         self.insert_entry_to_blob(new_leaf_index, new_leaf_block.to_bytes())?;
 
-        let new_internal_block = ParsedBlock {
+        let new_internal_block = Block {
             metadata: NodeMetadata {
                 node_type: NodeType::Internal,
                 dirty: false,
@@ -486,19 +489,20 @@ impl MerkleBlob {
         self.insert_entry_to_blob(new_internal_node_index, new_internal_block.to_bytes())?;
 
         let old_parent_index = old_leaf.parent;
-        assert!(
-            old_parent_index != NULL_PARENT,
+        assert_ne!(
+            old_parent_index,
+            NULL_PARENT,
             "{}",
             format!("{key_value:?} {hash:?}")
         );
 
         let mut block =
-            ParsedBlock::from_bytes(self.get_block(old_leaf.index)?, new_internal_node_index)?;
+            Block::from_bytes(self.get_block(old_leaf.index)?, new_internal_node_index)?;
         block.node.parent = new_internal_node_index;
         self.insert_entry_to_blob(old_leaf.index, block.to_bytes())?;
 
         let mut old_parent_block =
-            ParsedBlock::from_bytes(self.get_block(old_parent_index)?, old_parent_index)?;
+            Block::from_bytes(self.get_block(old_parent_index)?, old_parent_index)?;
         match old_parent_block.node.specific {
             NodeSpecific::Internal {
                 ref mut left,
@@ -527,7 +531,7 @@ impl MerkleBlob {
         let mut index = index;
 
         while index != NULL_PARENT {
-            let mut block = ParsedBlock::from_bytes(self.get_block(index)?, index)?;
+            let mut block = Block::from_bytes(self.get_block(index)?, index)?;
             block.metadata.dirty = true;
             self.insert_entry_to_blob(index, block.to_bytes())?;
             index = block.node.parent;
@@ -559,7 +563,7 @@ impl MerkleBlob {
         hasher.update(seed_bytes);
         let seed: Hash = hasher.finalize();
 
-        let mut node = self.get_raw_node(0)?;
+        let mut node = self.get_node(0)?;
         for byte in seed {
             for bit in 0..8 {
                 match node.specific {
@@ -571,7 +575,7 @@ impl MerkleBlob {
                         } else {
                             next = right;
                         }
-                        node = self.get_raw_node(next)?;
+                        node = self.get_node(next)?;
                     }
                 }
             }
@@ -580,7 +584,7 @@ impl MerkleBlob {
         Err("failed to find a node".to_string())
     }
 
-    fn insert_entry_to_blob(&mut self, index: TreeIndex, block: Block) -> Result<(), String> {
+    fn insert_entry_to_blob(&mut self, index: TreeIndex, block: BlockBytes) -> Result<(), String> {
         let extend_index = (self.blob.len() / BLOCK_SIZE) as TreeIndex;
         match index.cmp(&extend_index) {
             Ordering::Greater => return Err(format!("index out of range: {index}")),
@@ -594,7 +598,7 @@ impl MerkleBlob {
         Ok(())
     }
 
-    fn get_block(&self, index: TreeIndex) -> Result<Block, String> {
+    fn get_block(&self, index: TreeIndex) -> Result<BlockBytes, String> {
         let metadata_start = index as usize * BLOCK_SIZE;
         let data_start = metadata_start + METADATA_SIZE;
         let end = data_start + DATA_SIZE;
@@ -606,8 +610,8 @@ impl MerkleBlob {
             .map_err(|e| format!("failed getting block {index}: {e}"))
     }
 
-    pub fn get_raw_node(&self, index: TreeIndex) -> Result<Node, String> {
-        // TODO: use ParsedBlock::from_bytes()
+    pub fn get_node(&self, index: TreeIndex) -> Result<Node, String> {
+        // TODO: use Block::from_bytes()
         // TODO: handle invalid indexes?
         // TODO: handle overflows?
         let block = self.get_block(index)?;
@@ -627,23 +631,21 @@ impl MerkleBlob {
         };
         Ok(match Node::from_bytes(&metadata, index, data_blob) {
             Ok(node) => node,
-            Err(message) => return Err(format!("failed loading raw node: {message}")),
+            Err(message) => return Err(format!("failed loading node: {message}")),
         })
     }
 
     pub fn get_parent_index(&self, index: TreeIndex) -> Result<TreeIndex, String> {
         let block = self.get_block(index).unwrap();
-        let node_type =
-            NodeMetadata::node_type_from_bytes(block[..METADATA_SIZE].try_into().unwrap())?;
 
-        Node::parent_from_bytes(&node_type, block[METADATA_SIZE..].try_into().unwrap())
+        Node::parent_from_bytes(block[METADATA_SIZE..].try_into().unwrap())
     }
 
     pub fn get_lineage(&self, index: TreeIndex) -> Result<Vec<Node>, String> {
         let mut next_index = index;
         let mut lineage = vec![];
         loop {
-            let node = self.get_raw_node(next_index)?;
+            let node = self.get_node(next_index)?;
             next_index = node.parent;
             lineage.push(node);
 
@@ -660,10 +662,7 @@ impl MerkleBlob {
         loop {
             lineage.push(next_index);
             let block = self.get_block(next_index)?;
-            let node_type =
-                NodeMetadata::node_type_from_bytes(block[..METADATA_SIZE].try_into().unwrap())?;
-            next_index =
-                Node::parent_from_bytes(&node_type, block[METADATA_SIZE..].try_into().unwrap())?;
+            next_index = Node::parent_from_bytes(block[METADATA_SIZE..].try_into().unwrap())?;
 
             if next_index == NULL_PARENT {
                 return Ok(lineage);
@@ -825,7 +824,7 @@ mod tests {
     fn test_load_a_python_dump() {
         // let kv_id = 0x1415161718191A1B;
         let merkle_blob = example_merkle_blob();
-        merkle_blob.get_raw_node(0).unwrap();
+        merkle_blob.get_node(0).unwrap();
     }
 
     #[test]
@@ -864,9 +863,9 @@ mod tests {
 
         let merkle_blob = MerkleBlob::new(Vec::from(EXAMPLE_BLOB)).unwrap();
 
-        assert_eq!(merkle_blob.get_raw_node(0).unwrap(), EXAMPLE_ROOT);
-        assert_eq!(merkle_blob.get_raw_node(1).unwrap(), EXAMPLE_LEFT_LEAF);
-        assert_eq!(merkle_blob.get_raw_node(2).unwrap(), EXAMPLE_RIGHT_LEAF);
+        assert_eq!(merkle_blob.get_node(0).unwrap(), EXAMPLE_ROOT);
+        assert_eq!(merkle_blob.get_node(1).unwrap(), EXAMPLE_LEFT_LEAF);
+        assert_eq!(merkle_blob.get_node(2).unwrap(), EXAMPLE_RIGHT_LEAF);
     }
 
     #[test]
@@ -881,7 +880,7 @@ mod tests {
             .unwrap();
 
         // TODO: just hacking here to compare with the ~wrong~ simplified reference
-        let mut root = ParsedBlock::from_bytes(merkle_blob.get_block(0).unwrap(), 0).unwrap();
+        let mut root = Block::from_bytes(merkle_blob.get_block(0).unwrap(), 0).unwrap();
         root.metadata.dirty = true;
         root.node.hash = HASH;
         assert_eq!(root.metadata.node_type, NodeType::Internal);
