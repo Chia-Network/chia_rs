@@ -23,9 +23,8 @@ python-source = "python"
 [dependencies]
 clvmr = { workspace = true }
 hex = { workspace = true }
-
 pyo3 = { workspace = true, features = ["multiple-pymethods"] }
-chia-consensus = { workspace = true, features = ["py-bindings"] }
+chia-consensus = { workspace = true, features = ["py-bindings", "chiavdf", "chiapos"] }
 chia-bls = { workspace = true, features = ["py-bindings"]  }
 chia-protocol = { workspace = true, features = ["py-bindings"]  }
 chia-traits = { workspace = true, features = ["py-bindings"]  }
