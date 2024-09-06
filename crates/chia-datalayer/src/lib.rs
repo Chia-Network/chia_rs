@@ -110,14 +110,6 @@ impl NodeMetadata {
 
 #[derive(Debug, PartialEq)]
 pub enum Node {
-    // Root {
-    //     left: TreeIndex,
-    //     right: TreeIndex,
-    //     hash: Hash,
-    //     // TODO: kinda feels questionable having it be aware of its own location
-    //     // TODO: just always at zero?
-    //     index: TreeIndex,
-    // },
     Internal {
         parent: TreeIndex,
         left: TreeIndex,
