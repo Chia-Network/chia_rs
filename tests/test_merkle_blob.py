@@ -1,4 +1,3 @@
-
 from chia_rs import MerkleBlob
 from chia_rs.sized_bytes import bytes32
 from chia_rs.sized_ints import uint64
@@ -15,18 +14,52 @@ def test_merkle_blob():
 
 
 def test_just_insert_a_bunch() -> None:
-    HASH = bytes32([
-        12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34,
-        35, 36, 37, 38, 39, 40, 41, 42, 43,
-    ])
+    HASH = bytes32(
+        [
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+        ]
+    )
 
     import pathlib
+
     path = pathlib.Path("~/tmp/mbt/").expanduser()
     path.joinpath("py").mkdir(parents=True, exist_ok=True)
     path.joinpath("rs").mkdir(parents=True, exist_ok=True)
 
     merkle_blob = MerkleBlob(blob=bytearray())
     import time
+
     total_time = 0.0
     for i in range(100000):
         start = time.monotonic()
