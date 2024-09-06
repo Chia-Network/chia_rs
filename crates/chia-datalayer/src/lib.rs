@@ -388,11 +388,11 @@ impl MerkleBlob {
 
     fn insert_first(&mut self, key_value: KvId, hash: Hash) -> Result<(), String> {
         let new_leaf_block = ParsedBlock {
-            metadata: crate::NodeMetadata {
+            metadata: NodeMetadata {
                 node_type: NodeType::Leaf,
                 dirty: false,
             },
-            node: crate::Node::Leaf {
+            node: Node::Leaf {
                 parent: NULL_PARENT,
                 key_value,
                 hash,
