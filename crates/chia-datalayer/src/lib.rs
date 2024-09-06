@@ -105,7 +105,7 @@ impl NodeMetadata {
         match blob[1] {
             0 => Ok(false),
             1 => Ok(true),
-            other => return Err(format!("invalid dirty value: {other}")),
+            other => Err(format!("invalid dirty value: {other}")),
         }
     }
 }
@@ -166,8 +166,10 @@ impl Node {
 
     fn parent_from_bytes(blob: &[u8; DATA_SIZE]) -> Result<Parent, String> {
         // TODO: a little setup here for pre-optimization to allow walking parents without processing entire nodes
-        let parent_integer =
-            TreeIndex::from_be_bytes(<[u8; 4]>::try_from(&blob[PARENT_RANGE]).unwrap());
+        let parent_integer = TreeIndex::from_be_bytes(
+            <[u8; 4]>::try_from(&blob[PARENT_RANGE])
+                .map_err(|e| format!("data blob wrong size: {e}"))?,
+        );
         match parent_integer {
             NULL_PARENT => Ok(None),
             _ => Ok(Some(parent_integer)),
@@ -212,10 +214,11 @@ impl Node {
 
     // TODO: yes i know i'm trying to write this code in a non-rusty way and i need to stop that
     pub fn key_value(&self) -> KvId {
-        match self.specific {
-            NodeSpecific::Leaf { key_value } => key_value,
-            _ => panic!(),
-        }
+        let NodeSpecific::Leaf { key_value } = self.specific else {
+            panic!()
+        };
+
+        key_value
     }
 }
 
@@ -258,7 +261,7 @@ impl Block {
     }
 }
 
-fn get_free_indexes(blob: &Vec<u8>) -> Result<Vec<TreeIndex>, String> {
+fn get_free_indexes(blob: &[u8]) -> Result<Vec<TreeIndex>, String> {
     let index_count = blob.len() / BLOCK_SIZE;
 
     if index_count == 0 {
@@ -268,8 +271,7 @@ fn get_free_indexes(blob: &Vec<u8>) -> Result<Vec<TreeIndex>, String> {
     let mut seen_indexes: Vec<bool> = vec![false; index_count];
     let mut queue: Vec<TreeIndex> = vec![0];
 
-    while queue.len() > 0 {
-        let index: TreeIndex = queue.pop().unwrap();
+    while let Some(index) = queue.pop() {
         let offset = index as usize * BLOCK_SIZE;
         let block =
             Block::from_bytes(blob[offset..offset + BLOCK_SIZE].try_into().unwrap(), index)?;
@@ -286,14 +288,14 @@ fn get_free_indexes(blob: &Vec<u8>) -> Result<Vec<TreeIndex>, String> {
     let mut free_indexes: Vec<TreeIndex> = vec![];
     for (index, seen) in seen_indexes.iter().enumerate() {
         if !seen {
-            free_indexes.push(index as TreeIndex)
+            free_indexes.push(index as TreeIndex);
         }
     }
 
     Ok(free_indexes)
 }
 
-fn get_keys_values_indexes(blob: &Vec<u8>) -> Result<HashMap<KvId, TreeIndex>, String> {
+fn get_keys_values_indexes(blob: &[u8]) -> Result<HashMap<KvId, TreeIndex>, String> {
     let index_count = blob.len() / BLOCK_SIZE;
 
     let mut kv_to_index: HashMap<KvId, TreeIndex> = HashMap::default();
@@ -304,8 +306,7 @@ fn get_keys_values_indexes(blob: &Vec<u8>) -> Result<HashMap<KvId, TreeIndex>, S
 
     let mut queue: Vec<TreeIndex> = vec![0];
 
-    while queue.len() > 0 {
-        let index: TreeIndex = queue.pop().unwrap();
+    while let Some(index) = queue.pop() {
         let offset = index as usize * BLOCK_SIZE;
         let block =
             Block::from_bytes(blob[offset..offset + BLOCK_SIZE].try_into().unwrap(), index)?;
@@ -354,8 +355,8 @@ impl MerkleBlob {
 
     pub fn insert(&mut self, key_value: KvId, hash: Hash) -> Result<(), String> {
         // TODO: what about only unused providing a blob length?
-        if self.blob.len() == 0 {
-            return self.insert_first(key_value, hash);
+        if self.blob.is_empty() {
+            self.insert_first(key_value, hash);
         }
 
         let old_leaf = self.get_random_leaf_node_from_bytes(Vec::from(key_value.to_be_bytes()))?;
@@ -368,7 +369,7 @@ impl MerkleBlob {
         self.insert_third_or_later(key_value, hash, old_leaf, internal_node_hash)
     }
 
-    fn insert_first(&mut self, key_value: KvId, hash: Hash) -> Result<(), String> {
+    fn insert_first(&mut self, key_value: KvId, hash: Hash) {
         let new_leaf_block = Block {
             metadata: NodeMetadata {
                 node_type: NodeType::Leaf,
@@ -387,8 +388,6 @@ impl MerkleBlob {
         self.kv_to_index.insert(key_value, 0);
         self.free_indexes.clear();
         self.last_allocated_index = 1;
-
-        Ok(())
     }
 
     fn insert_second(
@@ -575,12 +574,7 @@ impl MerkleBlob {
                 match node.specific {
                     NodeSpecific::Leaf { .. } => return Ok(node),
                     NodeSpecific::Internal { left, right, .. } => {
-                        let next: TreeIndex;
-                        if byte & (1 << bit) != 0 {
-                            next = left;
-                        } else {
-                            next = right;
-                        }
+                        let next: TreeIndex = if byte & (1 << bit) != 0 { left } else { right };
                         node = self.get_node(next)?;
                     }
                 }
@@ -644,7 +638,11 @@ impl MerkleBlob {
     pub fn get_parent_index(&self, index: TreeIndex) -> Result<Parent, String> {
         let block = self.get_block(index).unwrap();
 
-        Node::parent_from_bytes(block[METADATA_SIZE..].try_into().unwrap())
+        Node::parent_from_bytes(
+            block[METADATA_SIZE..]
+                .try_into()
+                .map_err(|e| format!("data blob wrong size: {e}"))?,
+        )
     }
 
     pub fn get_lineage(&self, index: TreeIndex) -> Result<Vec<Node>, String> {
