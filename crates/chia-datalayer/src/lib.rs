@@ -112,7 +112,6 @@ impl NodeMetadata {
 
 #[derive(Debug, PartialEq)]
 pub struct Node {
-    // TODO: can this be an Option to avoid dealing with the magic number outside of serialization?
     parent: Parent,
     hash: Hash,
     specific: NodeSpecific,
