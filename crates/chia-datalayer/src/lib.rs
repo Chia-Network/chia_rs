@@ -677,11 +677,13 @@ impl MerkleBlob {
 #[cfg(feature = "py-bindings")]
 #[pymethods]
 impl MerkleBlob {
+    #[allow(clippy::needless_pass_by_value)]
     #[new]
     pub fn py_init(blob: PyBuffer<u8>) -> PyResult<Self> {
-        if !blob.is_c_contiguous() {
-            panic!("from_bytes() must be called with a contiguous buffer");
-        }
+        assert!(
+            blob.is_c_contiguous(),
+            "from_bytes() must be called with a contiguous buffer"
+        );
         #[allow(unsafe_code)]
         let slice =
             unsafe { std::slice::from_raw_parts(blob.buf_ptr() as *const u8, blob.len_bytes()) };
@@ -713,9 +715,9 @@ impl MerkleBlob {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use clvm_utils;
     use hex_literal::hex;
     use rstest::rstest;
+    use std::time::{Duration, Instant};
 
     const EXAMPLE_BLOB: [u8; 138] = hex!("0001ffffffff00000001000000020c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b0100000000000405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b0100000000001415161718191a1b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b");
     const HASH: Hash = [
@@ -773,7 +775,7 @@ mod tests {
             assert_eq!(
                 NodeType::from_u8(node_type.clone() as u8).unwrap(),
                 node_type,
-            )
+            );
         }
     }
 
@@ -808,13 +810,7 @@ mod tests {
     ) {
         let bytes: [u8; 2] = [node_type.to_u8(), dirty as u8];
         let object = NodeMetadata::from_bytes(bytes).unwrap();
-        assert_eq!(
-            object,
-            NodeMetadata {
-                node_type: node_type,
-                dirty: dirty
-            },
-        );
+        assert_eq!(object, NodeMetadata { node_type, dirty },);
         assert_eq!(object.to_bytes(), bytes);
         assert_eq!(
             NodeMetadata::node_type_from_bytes(bytes).unwrap(),
@@ -896,10 +892,9 @@ mod tests {
     fn test_just_insert_a_bunch() {
         let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
 
-        use std::time::{Duration, Instant};
         let mut total_time = Duration::new(0, 0);
 
-        for i in 0..100000 {
+        for i in 0..100_000 {
             let start = Instant::now();
             merkle_blob
                 // TODO: yeah this hash is garbage
@@ -929,7 +924,7 @@ mod tests {
         }
         // println!("{:?}", merkle_blob.blob)
 
-        println!("total time: {total_time:?}")
+        println!("total time: {total_time:?}");
         // TODO: check, well...  something
     }
 }
