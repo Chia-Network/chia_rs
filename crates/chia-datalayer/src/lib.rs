@@ -109,22 +109,19 @@ impl NodeMetadata {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Node {
-    Internal {
-        parent: TreeIndex,
-        left: TreeIndex,
-        right: TreeIndex,
-        hash: Hash,
-        // TODO: kinda feels questionable having it be aware of its own location
-        index: TreeIndex,
-    },
-    Leaf {
-        parent: TreeIndex,
-        key_value: KvId,
-        hash: Hash,
-        // TODO: kinda feels questionable having it be aware of its own location
-        index: TreeIndex,
-    },
+pub struct Node {
+    // TODO: can this be an Option to avoid dealing with the magic number outside of serialization?
+    parent: TreeIndex,
+    hash: Hash,
+    specific: NodeSpecific,
+    // TODO: kinda feels questionable having it be aware of its own location
+    index: TreeIndex,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum NodeSpecific {
+    Internal { left: TreeIndex, right: TreeIndex },
+    Leaf { key_value: KvId },
 }
 
 impl Node {
@@ -139,23 +136,22 @@ impl Node {
     ) -> Result<Self, String> {
         // TODO: add Err results
         let parent = Self::parent_from_bytes(&metadata.node_type, &blob)?;
-        match metadata.node_type {
-            NodeType::Internal => Ok(Node::Internal {
-                // TODO: get these right
-                parent,
-                left: TreeIndex::from_be_bytes(<[u8; 4]>::try_from(&blob[4..8]).unwrap()),
-                right: TreeIndex::from_be_bytes(<[u8; 4]>::try_from(&blob[8..12]).unwrap()),
-                hash: <[u8; 32]>::try_from(&blob[12..44]).unwrap(),
-                index,
-            }),
-            NodeType::Leaf => Ok(Node::Leaf {
-                // TODO: this try from really right?
-                parent,
-                key_value: KvId::from_be_bytes(<[u8; 8]>::try_from(&blob[4..12]).unwrap()),
-                hash: Hash::try_from(&blob[12..44]).unwrap(),
-                index,
-            }),
-        }
+        Ok(Self {
+            parent,
+            index,
+            // TODO: move the common parts to the beginning of the serialization?
+            hash: <[u8; 32]>::try_from(&blob[12..44]).unwrap(),
+            specific: match metadata.node_type {
+                NodeType::Internal => NodeSpecific::Internal {
+                    left: TreeIndex::from_be_bytes(<[u8; 4]>::try_from(&blob[4..8]).unwrap()),
+                    right: TreeIndex::from_be_bytes(<[u8; 4]>::try_from(&blob[8..12]).unwrap()),
+                },
+                NodeType::Leaf => NodeSpecific::Leaf {
+                    // TODO: this try from really right?
+                    key_value: KvId::from_be_bytes(<[u8; 8]>::try_from(&blob[4..12]).unwrap()),
+                },
+            },
+        })
     }
 
     fn parent_from_bytes(
@@ -175,10 +171,9 @@ impl Node {
     pub fn to_bytes(&self) -> [u8; DATA_SIZE] {
         let mut blob: Vec<u8> = Vec::new();
         match self {
-            Node::Internal {
+            Node {
                 parent,
-                left,
-                right,
+                specific: NodeSpecific::Internal { left, right },
                 hash,
                 index: _,
             } => {
@@ -187,9 +182,9 @@ impl Node {
                 blob.extend(right.to_be_bytes());
                 blob.extend(hash);
             }
-            Node::Leaf {
+            Node {
                 parent,
-                key_value,
+                specific: NodeSpecific::Leaf { key_value },
                 hash,
                 index: _,
             } => {
@@ -202,36 +197,10 @@ impl Node {
         blob.try_into().unwrap()
     }
 
-    pub fn parent(&self) -> TreeIndex {
-        match self {
-            Node::Internal { parent, .. } | Node::Leaf { parent, .. } => *parent,
-        }
-    }
-
-    pub fn hash(&self) -> Hash {
-        match self {
-            Node::Internal { hash, .. } | Node::Leaf { hash, .. } => *hash,
-        }
-    }
-
-    pub fn index(&self) -> TreeIndex {
-        match self {
-            Node::Internal { index, .. } | Node::Leaf { index, .. } => *index,
-        }
-    }
-
-    pub fn set_parent(&mut self, p: TreeIndex) {
-        match self {
-            &mut Node::Internal { ref mut parent, .. } | Node::Leaf { ref mut parent, .. } => {
-                *parent = p
-            }
-        }
-    }
-
     // TODO: yes i know i'm trying to write this code in a non-rusty way and i need to stop that
     pub fn key_value(&self) -> KvId {
-        match self {
-            Node::Leaf { key_value, .. } => *key_value,
+        match self.specific {
+            NodeSpecific::Leaf { key_value } => key_value,
             _ => panic!(),
         }
     }
@@ -292,12 +261,12 @@ fn get_free_indexes(blob: &Vec<u8>) -> Result<Vec<TreeIndex>, String> {
         let block =
             ParsedBlock::from_bytes(blob[offset..offset + BLOCK_SIZE].try_into().unwrap(), index)?;
         seen_indexes[index as usize] = true;
-        match block.node {
-            Node::Internal { left, right, .. } => {
+        match block.node.specific {
+            NodeSpecific::Internal { left, right } => {
                 queue.push(left);
                 queue.push(right);
             }
-            Node::Leaf { .. } => (),
+            NodeSpecific::Leaf { .. } => (),
         }
     }
 
@@ -327,11 +296,11 @@ fn get_keys_values_indexes(blob: &Vec<u8>) -> Result<HashMap<KvId, TreeIndex>, S
         let offset = index as usize * BLOCK_SIZE;
         let block =
             ParsedBlock::from_bytes(blob[offset..offset + BLOCK_SIZE].try_into().unwrap(), index)?;
-        match block.node {
-            Node::Leaf { key_value, .. } => {
+        match block.node.specific {
+            NodeSpecific::Leaf { key_value } => {
                 kv_to_index.insert(key_value, index);
             }
-            Node::Internal { .. } => (),
+            NodeSpecific::Internal { .. } => (),
         }
     }
 
@@ -377,7 +346,7 @@ impl MerkleBlob {
         }
 
         let old_leaf = self.get_random_leaf_node_from_bytes(Vec::from(key_value.to_be_bytes()))?;
-        let internal_node_hash = internal_hash(old_leaf.hash(), hash);
+        let internal_node_hash = internal_hash(old_leaf.hash, hash);
 
         if self.kv_to_index.len() == 1 {
             return self.insert_second(key_value, hash, old_leaf, internal_node_hash);
@@ -392,9 +361,9 @@ impl MerkleBlob {
                 node_type: NodeType::Leaf,
                 dirty: false,
             },
-            node: Node::Leaf {
+            node: Node {
                 parent: NULL_PARENT,
-                key_value,
+                specific: NodeSpecific::Leaf { key_value },
                 hash,
                 index: 0,
             },
@@ -423,10 +392,9 @@ impl MerkleBlob {
                 node_type: NodeType::Internal,
                 dirty: false,
             },
-            node: Node::Internal {
+            node: Node {
                 parent: NULL_PARENT,
-                left: 1,
-                right: 2,
+                specific: NodeSpecific::Internal { left: 1, right: 2 },
                 hash: internal_node_hash,
                 index: 0,
             },
@@ -439,27 +407,27 @@ impl MerkleBlob {
                 node_type: NodeType::Leaf,
                 dirty: false,
             },
-            node: Node::Leaf {
+            node: Node {
                 parent: 0,
-                key_value: old_leaf.key_value(),
-                hash: old_leaf.hash(),
+                specific: NodeSpecific::Leaf {
+                    key_value: old_leaf.key_value(),
+                },
+                hash: old_leaf.hash,
                 index: 1,
             },
         };
         self.blob.extend(left_leaf_block.to_bytes());
-        self.kv_to_index.insert(
-            left_leaf_block.node.key_value(),
-            left_leaf_block.node.index(),
-        );
+        self.kv_to_index
+            .insert(left_leaf_block.node.key_value(), left_leaf_block.node.index);
 
         let right_leaf_block = ParsedBlock {
             metadata: NodeMetadata {
                 node_type: NodeType::Leaf,
                 dirty: false,
             },
-            node: Node::Leaf {
+            node: Node {
                 parent: 0,
-                key_value,
+                specific: NodeSpecific::Leaf { key_value },
                 hash,
                 index: 2,
             },
@@ -467,7 +435,7 @@ impl MerkleBlob {
         self.blob.extend(right_leaf_block.to_bytes());
         self.kv_to_index.insert(
             right_leaf_block.node.key_value(),
-            right_leaf_block.node.index(),
+            right_leaf_block.node.index,
         );
 
         self.free_indexes.clear();
@@ -491,9 +459,9 @@ impl MerkleBlob {
                 node_type: NodeType::Leaf,
                 dirty: false,
             },
-            node: Node::Leaf {
+            node: Node {
                 parent: new_internal_node_index,
-                key_value,
+                specific: NodeSpecific::Leaf { key_value },
                 hash,
                 index: new_leaf_index,
             },
@@ -505,17 +473,19 @@ impl MerkleBlob {
                 node_type: NodeType::Internal,
                 dirty: false,
             },
-            node: Node::Internal {
-                parent: old_leaf.parent(),
-                left: old_leaf.index(),
-                right: new_leaf_index,
+            node: Node {
+                parent: old_leaf.parent,
+                specific: NodeSpecific::Internal {
+                    left: old_leaf.index,
+                    right: new_leaf_index,
+                },
                 hash: internal_node_hash,
                 index: new_internal_node_index,
             },
         };
         self.insert_entry_to_blob(new_internal_node_index, new_internal_block.to_bytes())?;
 
-        let old_parent_index = old_leaf.parent();
+        let old_parent_index = old_leaf.parent;
         assert!(
             old_parent_index != NULL_PARENT,
             "{}",
@@ -523,27 +493,27 @@ impl MerkleBlob {
         );
 
         let mut block =
-            ParsedBlock::from_bytes(self.get_block(old_leaf.index())?, new_internal_node_index)?;
-        block.node.set_parent(new_internal_node_index);
-        self.insert_entry_to_blob(old_leaf.index(), block.to_bytes())?;
+            ParsedBlock::from_bytes(self.get_block(old_leaf.index)?, new_internal_node_index)?;
+        block.node.parent = new_internal_node_index;
+        self.insert_entry_to_blob(old_leaf.index, block.to_bytes())?;
 
         let mut old_parent_block =
             ParsedBlock::from_bytes(self.get_block(old_parent_index)?, old_parent_index)?;
-        match old_parent_block.node {
-            Node::Internal {
+        match old_parent_block.node.specific {
+            NodeSpecific::Internal {
                 ref mut left,
                 ref mut right,
                 ..
             } => {
-                if old_leaf.index() == *left {
+                if old_leaf.index == *left {
                     *left = new_internal_node_index;
-                } else if old_leaf.index() == *right {
+                } else if old_leaf.index == *right {
                     *right = new_internal_node_index;
                 } else {
                     panic!();
                 }
             }
-            Node::Leaf { .. } => panic!(),
+            NodeSpecific::Leaf { .. } => panic!(),
         }
         self.insert_entry_to_blob(old_parent_index, old_parent_block.to_bytes())?;
 
@@ -560,7 +530,7 @@ impl MerkleBlob {
             let mut block = ParsedBlock::from_bytes(self.get_block(index)?, index)?;
             block.metadata.dirty = true;
             self.insert_entry_to_blob(index, block.to_bytes())?;
-            index = block.node.parent();
+            index = block.node.parent;
         }
 
         Ok(())
@@ -592,9 +562,9 @@ impl MerkleBlob {
         let mut node = self.get_raw_node(0)?;
         for byte in seed {
             for bit in 0..8 {
-                match node {
-                    Node::Leaf { .. } => return Ok(node),
-                    Node::Internal { left, right, .. } => {
+                match node.specific {
+                    NodeSpecific::Leaf { .. } => return Ok(node),
+                    NodeSpecific::Internal { left, right, .. } => {
                         let next: TreeIndex;
                         if byte & (1 << bit) != 0 {
                             next = left;
@@ -674,7 +644,7 @@ impl MerkleBlob {
         let mut lineage = vec![];
         loop {
             let node = self.get_raw_node(next_index)?;
-            next_index = node.parent();
+            next_index = node.parent;
             lineage.push(node);
 
             if next_index == NULL_PARENT {
@@ -751,10 +721,9 @@ mod tests {
         35, 36, 37, 38, 39, 40, 41, 42, 43,
     ];
 
-    const EXAMPLE_ROOT: Node = Node::Internal {
+    const EXAMPLE_ROOT: Node = Node {
         parent: NULL_PARENT,
-        left: 1,
-        right: 2,
+        specific: NodeSpecific::Internal { left: 1, right: 2 },
         hash: HASH,
         index: 0,
     };
@@ -762,9 +731,11 @@ mod tests {
         node_type: NodeType::Internal,
         dirty: true,
     };
-    const EXAMPLE_LEFT_LEAF: Node = Node::Leaf {
+    const EXAMPLE_LEFT_LEAF: Node = Node {
         parent: 0,
-        key_value: 0x0405_0607_0809_0A0B,
+        specific: NodeSpecific::Leaf {
+            key_value: 0x0405_0607_0809_0A0B,
+        },
         hash: HASH,
         index: 1,
     };
@@ -772,9 +743,11 @@ mod tests {
         node_type: NodeType::Leaf,
         dirty: false,
     };
-    const EXAMPLE_RIGHT_LEAF: Node = Node::Leaf {
+    const EXAMPLE_RIGHT_LEAF: Node = Node {
         parent: 0,
-        key_value: 0x1415_1617_1819_1A1B,
+        specific: NodeSpecific::Leaf {
+            key_value: 0x1415_1617_1819_1A1B,
+        },
         hash: HASH,
         index: 2,
     };
@@ -864,7 +837,7 @@ mod tests {
         }
         assert_eq!(lineage.len(), 2);
         let last_node = lineage.last().unwrap();
-        assert_eq!(last_node.parent(), NULL_PARENT);
+        assert_eq!(last_node.parent, NULL_PARENT);
     }
 
     #[test]
@@ -873,12 +846,7 @@ mod tests {
         let leaf = merkle_blob
             .get_random_leaf_node_from_bytes(vec![0; 8])
             .unwrap();
-        assert_eq!(
-            match leaf {
-                Node::Internal { index, .. } | Node::Leaf { index, .. } => index,
-            },
-            1,
-        );
+        assert_eq!(leaf.index, 1);
     }
 
     #[test]
@@ -906,21 +874,17 @@ mod tests {
         let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
 
         merkle_blob
-            .insert(EXAMPLE_LEFT_LEAF.key_value(), EXAMPLE_LEFT_LEAF.hash())
+            .insert(EXAMPLE_LEFT_LEAF.key_value(), EXAMPLE_LEFT_LEAF.hash)
             .unwrap();
         merkle_blob
-            .insert(EXAMPLE_RIGHT_LEAF.key_value(), EXAMPLE_RIGHT_LEAF.hash())
+            .insert(EXAMPLE_RIGHT_LEAF.key_value(), EXAMPLE_RIGHT_LEAF.hash)
             .unwrap();
 
         // TODO: just hacking here to compare with the ~wrong~ simplified reference
         let mut root = ParsedBlock::from_bytes(merkle_blob.get_block(0).unwrap(), 0).unwrap();
         root.metadata.dirty = true;
-        match root.node {
-            Node::Internal { ref mut hash, .. } => {
-                *hash = HASH;
-            }
-            Node::Leaf { .. } => panic!(),
-        }
+        root.node.hash = HASH;
+        assert_eq!(root.metadata.node_type, NodeType::Internal);
         merkle_blob.blob[..BLOCK_SIZE].copy_from_slice(&root.to_bytes());
 
         assert_eq!(merkle_blob.blob, Vec::from(EXAMPLE_BLOB));
