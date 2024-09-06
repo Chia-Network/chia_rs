@@ -143,9 +143,8 @@ impl Node {
         blob: [u8; DATA_SIZE],
     ) -> Result<Self, String> {
         // TODO: add Err results
-        let parent = Self::parent_from_bytes(&blob)?;
         Ok(Self {
-            parent,
+            parent: Self::parent_from_bytes(&blob)?,
             index,
             hash: <[u8; 32]>::try_from(&blob[HASH_RANGE]).unwrap(),
             specific: match metadata.node_type {
