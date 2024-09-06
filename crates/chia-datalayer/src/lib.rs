@@ -595,11 +595,13 @@ impl MerkleBlob {
                 match node {
                     Node::Leaf { .. } => return Ok(node),
                     Node::Internal { left, right, .. } => {
+                        let next: TreeIndex;
                         if byte & (1 << bit) != 0 {
-                            node = self.get_raw_node(left)?;
+                            next = left;
                         } else {
-                            node = self.get_raw_node(right)?;
+                            next = right;
                         }
+                        node = self.get_raw_node(next)?;
                     }
                 }
             }
