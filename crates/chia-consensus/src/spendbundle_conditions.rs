@@ -15,6 +15,8 @@ use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
 use clvmr::serde::node_from_bytes;
 
+const QUOTE_BYTES: usize = 2;
+
 pub fn get_conditions_from_spendbundle(
     a: &mut Allocator,
     spend_bundle: &SpendBundle,
@@ -22,8 +24,6 @@ pub fn get_conditions_from_spendbundle(
     height: u32,
     constants: &ConsensusConstants,
 ) -> Result<SpendBundleConditions, ValidationErr> {
-    const QUOTE_BYTES_COST: usize = 2;
-
     let flags = get_flags_for_height_and_constants(height, constants) | MEMPOOL_MODE;
 
     // below is an adapted version of the code from run_block_generators::run_block_generator2()
@@ -42,7 +42,7 @@ pub fn get_conditions_from_spendbundle(
     });
     // We don't pay the size cost (nor execution cost) of being wrapped by a
     // quote (in solution_generator).
-    let generator_length_without_quote = solution_generator(spends_info)?.len() - QUOTE_BYTES_COST;
+    let generator_length_without_quote = solution_generator(spends_info)?.len() - QUOTE_BYTES;
     let byte_cost = generator_length_without_quote as u64 * constants.cost_per_byte;
     subtract_cost(a, &mut cost_left, byte_cost)?;
 
@@ -93,6 +93,9 @@ mod tests {
     use rstest::rstest;
     use std::fs::read;
 
+    const QUOTE_EXECUTION_COST: u64 = 20;
+    const QUOTE_BYTES_COST: u64 = QUOTE_BYTES as u64 * TEST_CONSTANTS.cost_per_byte;
+
     #[rstest]
     #[case("3000253", 8, 2, 51_216_870)]
     #[case("1000101", 34, 15, 250_083_677)]
@@ -103,9 +106,6 @@ mod tests {
         #[values(0, 1, 1_000_000, 5_000_000)] height: u32,
         #[case] cost: u64,
     ) {
-        const QUOTE_EXECUTION_COST: u64 = 20;
-        const QUOTE_BYTE_COST: u64 = 2 * TEST_CONSTANTS.cost_per_byte;
-
         let bundle = SpendBundle::from_bytes(
             &read(format!("../../test-bundles/{filename}.bundle")).expect("read file"),
         )
@@ -146,7 +146,7 @@ mod tests {
         // does not include the overhead to make a block.
         assert_eq!(
             conditions.cost,
-            block_conds.cost - QUOTE_EXECUTION_COST - QUOTE_BYTE_COST
+            block_conds.cost - QUOTE_EXECUTION_COST - QUOTE_BYTES_COST
         );
     }
 
@@ -353,7 +353,6 @@ mod tests {
                         &coin_spend.solution,
                     )
                 });
-                const QUOTE_BYTES: usize = 2;
                 let generator_length_without_quote = solution_generator(program_spends)
                     .expect("solution_generator failed")
                     .len()
