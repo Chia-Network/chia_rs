@@ -222,7 +222,7 @@ extra_members = {
         "def uncurry(self) -> Tuple[ChiaProgram, ChiaProgram]: ...",
     ],
     "SpendBundle": [
-        "@classmethod\n    def aggregate(sbs: List[SpendBundle]) -> SpendBundle: ...",
+        "@classmethod\n    def aggregate(cls, sbs: List[SpendBundle]) -> SpendBundle: ...",
         "def name(self) -> bytes32: ...",
         "def removals(self) -> List[Coin]: ...",
         "def additions(self) -> List[Coin]: ...",

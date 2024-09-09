@@ -164,18 +164,13 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
             pub fn from_json_dict(cls: &pyo3::Bound<'_, pyo3::types::PyType>, json_dict: &pyo3::Bound<pyo3::PyAny>) -> pyo3::PyResult<pyo3::PyObject> {
                 use pyo3::prelude::PyAnyMethods;
                 use pyo3::IntoPy;
-                let rust_obj = <Self as #crate_name::from_json_dict::FromJsonDict>::from_json_dict(json_dict);
-                match rust_obj {
-                    Ok(obk) => {
-                        pyo3::Python::with_gil(|py| {
-                            // Convert result into potential child class
-                            // let instance = cls.call(py, (rust_obj,))?;
-                            let instance = cls.call_method1("from_parent", (obk.into_py(py),))?;
-                            Ok(instance.into_py(py))
-                        })
-                    },
-                    Err(e) => Err(e)
-                }
+                let rust_obj = <Self as #crate_name::from_json_dict::FromJsonDict>::from_json_dict(json_dict)?;
+                pyo3::Python::with_gil(|py| {
+                    // Convert result into potential child class
+                    // let instance = cls.call(py, (rust_obj,))?;
+                    let instance = cls.call_method1("from_parent", (rust_obj.into_py(py),))?;
+                    Ok(instance.into_py(py))
+                })
             }
 
             pub fn to_json_dict(&self, py: pyo3::Python) -> pyo3::PyResult<pyo3::PyObject> {
@@ -198,18 +193,13 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 let slice = unsafe {
                     std::slice::from_raw_parts(blob.buf_ptr() as *const u8, blob.len_bytes())
                 };
-                let rust_obj = <Self as #crate_name::Streamable>::from_bytes(slice);
-                match rust_obj {
-                    Ok(obk) => {
-                        pyo3::Python::with_gil(|py| {
-                            // Convert result into potential child class
-                            // let instance = cls.call(py, (rust_obj,))?;
-                            let instance = cls.call_method1("from_parent", (obk.into_py(py),))?;
-                            Ok(instance.into_py(py))
-                        })
-                    },
-                    Err(e) => Err(<#crate_name::chia_error::Error as Into<pyo3::PyErr>>::into(e))
-                }
+                let rust_obj = <Self as #crate_name::Streamable>::from_bytes(slice)?;
+                pyo3::Python::with_gil(|py| {
+                    // Convert result into potential child class
+                    // let instance = cls.call(py, (rust_obj,))?;
+                    let instance = cls.call_method1("from_parent", (rust_obj.into_py(py),))?;
+                    Ok(instance.into_py(py))
+                })
             }
 
             #[classmethod]
@@ -223,18 +213,13 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 let slice = unsafe {
                     std::slice::from_raw_parts(blob.buf_ptr() as *const u8, blob.len_bytes())
                 };
-                let rust_obj = <Self as #crate_name::Streamable>::from_bytes_unchecked(slice).map_err(|e| <#crate_name::chia_error::Error as Into<pyo3::PyErr>>::into(e));
-                match rust_obj {
-                    Ok(obk) => {
-                        pyo3::Python::with_gil(|py| {
-                            // Convert result into potential child class
-                            // let instance = cls.call(py, (rust_obj,))?;
-                            let instance = cls.call_method1("from_parent", (obk.into_py(py),))?;
-                            Ok(instance.into_py(py))
-                        })
-                    },
-                    Err(e) => Err(e)
-                }
+                let rust_obj = <Self as #crate_name::Streamable>::from_bytes_unchecked(slice).map_err(|e| <#crate_name::chia_error::Error as Into<pyo3::PyErr>>::into(e))?;
+                pyo3::Python::with_gil(|py| {
+                    // Convert result into potential child class
+                    // let instance = cls.call(py, (rust_obj,))?;
+                    let instance = cls.call_method1("from_parent", (rust_obj.into_py(py),))?;
+                    Ok(instance.into_py(py))
+                })
             }
 
             // returns the type as well as the number of bytes read from the buffer
