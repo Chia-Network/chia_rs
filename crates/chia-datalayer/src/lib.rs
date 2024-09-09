@@ -497,13 +497,15 @@ impl MerkleBlob {
             panic!("{key_value:?} {hash:?}")
         };
 
-        let mut block =
-            Block::from_bytes(self.get_block(old_leaf.index)?, new_internal_node_index)?;
+        let mut block = Block::from_bytes(
+            self.get_block_bytes(old_leaf.index)?,
+            new_internal_node_index,
+        )?;
         block.node.parent = Some(new_internal_node_index);
         self.insert_entry_to_blob(old_leaf.index, block.to_bytes())?;
 
         let mut old_parent_block =
-            Block::from_bytes(self.get_block(old_parent_index)?, old_parent_index)?;
+            Block::from_bytes(self.get_block_bytes(old_parent_index)?, old_parent_index)?;
         match old_parent_block.node.specific {
             NodeSpecific::Internal {
                 ref mut left,
@@ -532,7 +534,7 @@ impl MerkleBlob {
         let mut next_index = Some(index);
 
         while let Some(this_index) = next_index {
-            let mut block = Block::from_bytes(self.get_block(this_index)?, this_index)?;
+            let mut block = Block::from_bytes(self.get_block_bytes(this_index)?, this_index)?;
             block.metadata.dirty = true;
             self.insert_entry_to_blob(this_index, block.to_bytes())?;
             next_index = block.node.parent;
@@ -586,7 +588,7 @@ impl MerkleBlob {
         Ok(())
     }
 
-    fn get_block(&self, index: TreeIndex) -> Result<BlockBytes, String> {
+    fn get_block_bytes(&self, index: TreeIndex) -> Result<BlockBytes, String> {
         let metadata_start = index as usize * BLOCK_SIZE;
         let data_start = metadata_start + METADATA_SIZE;
         let end = data_start + DATA_SIZE;
@@ -602,7 +604,7 @@ impl MerkleBlob {
         // TODO: use Block::from_bytes()
         // TODO: handle invalid indexes?
         // TODO: handle overflows?
-        let block = self.get_block(index)?;
+        let block = self.get_block_bytes(index)?;
         let metadata_blob: [u8; METADATA_SIZE] = block
             .get(..METADATA_SIZE)
             .ok_or(format!("metadata blob out of bounds: {}", block.len(),))?
@@ -624,7 +626,7 @@ impl MerkleBlob {
     }
 
     pub fn get_parent_index(&self, index: TreeIndex) -> Result<Parent, String> {
-        let block = self.get_block(index).unwrap();
+        let block = self.get_block_bytes(index).unwrap();
 
         Node::parent_from_bytes(
             block[METADATA_SIZE..]
@@ -655,7 +657,7 @@ impl MerkleBlob {
 
         while let Some(this_index) = next_index {
             lineage.push(this_index);
-            let block = self.get_block(this_index)?;
+            let block = self.get_block_bytes(this_index)?;
             next_index = Node::parent_from_bytes(block[METADATA_SIZE..].try_into().unwrap())?;
         }
 
@@ -860,7 +862,7 @@ mod tests {
             .unwrap();
 
         // TODO: just hacking here to compare with the ~wrong~ simplified reference
-        let mut root = Block::from_bytes(merkle_blob.get_block(0).unwrap(), 0).unwrap();
+        let mut root = Block::from_bytes(merkle_blob.get_block_bytes(0).unwrap(), 0).unwrap();
         root.metadata.dirty = true;
         root.node.hash = HASH;
         assert_eq!(root.metadata.node_type, NodeType::Internal);
