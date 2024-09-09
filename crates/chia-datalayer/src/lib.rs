@@ -1,5 +1,3 @@
-// use std::collections::HashMap;
-
 #[cfg(feature = "py-bindings")]
 use pyo3::{buffer::PyBuffer, pyclass, pymethods, PyResult};
 
@@ -16,7 +14,6 @@ const BLOCK_SIZE: usize = METADATA_SIZE + DATA_SIZE;
 
 type TreeIndex = u32;
 type Parent = Option<TreeIndex>;
-// type Key = Vec<u8>;
 type Hash = [u8; 32];
 type BlockBytes = [u8; BLOCK_SIZE];
 type KvId = u64;
@@ -544,14 +541,6 @@ impl MerkleBlob {
         Ok(())
     }
 
-    // fn update_entry(
-    //     index: TreeIndex,
-    //     parent: Option[TreeIndex],
-    //     left: Option[TreeIndex],
-    //     right: Option[TreeIndex],
-    //     hash: Option[Hash],
-    //     key_value: Option[KvId],
-    // )
     fn get_new_index(&mut self) -> TreeIndex {
         match self.free_indexes.pop() {
             None => {
@@ -691,17 +680,10 @@ impl MerkleBlob {
         Ok(Self::new(Vec::from(slice)).unwrap())
     }
 
-    // #[pyo3(name = "get_root")]
-    // pub fn py_get_root<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
-    //     ChiaToPython::to_python(&Bytes32::new(self.get_root()), py)
-    // }
-
     #[pyo3(name = "insert")]
     pub fn py_insert(&mut self, key_value: KvId, hash: Hash) -> PyResult<()> {
         // TODO: consider the error
-        // self.insert(key_value, hash).map_err(|_| PyValueError::new_err("yeppers"))
         self.insert(key_value, hash).unwrap();
-        // self.insert(key_value, hash).map_err(|_| PyValueError::new_err("invalid key"))?;
 
         Ok(())
     }
@@ -821,7 +803,6 @@ mod tests {
 
     #[test]
     fn test_load_a_python_dump() {
-        // let kv_id = 0x1415161718191A1B;
         let merkle_blob = example_merkle_blob();
         merkle_blob.get_node(0).unwrap();
     }
