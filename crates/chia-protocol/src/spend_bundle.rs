@@ -16,6 +16,8 @@ use clvmr::ENABLE_FIXED_DIV;
 use pyo3::prelude::*;
 #[cfg(feature = "py-bindings")]
 use pyo3::types::PyType;
+#[cfg(feature = "py-bindings")]
+use pyo3::exceptions::PyNotImplementedError;
 
 #[streamable(subclass)]
 pub struct SpendBundle {
@@ -113,16 +115,8 @@ impl SpendBundle {
 
     #[classmethod]
     #[pyo3(name = "from_parent")]
-    pub fn from_parent(cls: &Bound<'_, PyType>, spend_bundle: Self) -> PyResult<PyObject> {
-        Python::with_gil(|py| {
-            // Convert result into potential child class
-            let instance = cls.call(
-                (spend_bundle.coin_spends, spend_bundle.aggregated_signature),
-                None,
-            )?;
-
-            Ok(instance.into_py(py))
-        })
+    pub fn from_parent(_cls: &Bound<'_, PyType>, _spend_bundle: Self) -> PyResult<PyObject> {
+        Err(PyNotImplementedError::new_err("This class does not support from_parent()."))
     }
 
     #[pyo3(name = "name")]

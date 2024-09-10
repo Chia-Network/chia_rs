@@ -10,6 +10,8 @@ use clvmr::sha2::Sha256;
 use pyo3::prelude::*;
 #[cfg(feature = "py-bindings")]
 use pyo3::types::PyType;
+#[cfg(feature = "py-bindings")]
+use pyo3::exceptions::PyNotImplementedError;
 
 #[streamable]
 #[derive(Copy)]
@@ -62,13 +64,8 @@ impl Coin {
 impl Coin {
     #[classmethod]
     #[pyo3(name = "from_parent")]
-    pub fn from_parent(cls: &Bound<'_, PyType>, coin: Self) -> PyResult<PyObject> {
-        Python::with_gil(|py| {
-            // Convert result into potential child class
-            let instance = cls.call1((coin.parent_coin_info, coin.puzzle_hash, coin.amount))?;
-
-            Ok(instance.into_py(py))
-        })
+    pub fn from_parent(_cls: &Bound<'_, PyType>, _coin: Self) -> PyResult<PyObject> {
+        Err(PyNotImplementedError::new_err("This class does not support from_parent()."))
     }
 }
 

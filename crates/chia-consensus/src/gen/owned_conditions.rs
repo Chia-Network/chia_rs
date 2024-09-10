@@ -12,6 +12,8 @@ use chia_py_streamable_macro::{PyJsonDict, PyStreamable};
 use pyo3::prelude::*;
 #[cfg(feature = "py-bindings")]
 use pyo3::types::PyType;
+#[cfg(feature = "py-bindings")]
+use pyo3::exceptions::PyNotImplementedError;
 
 #[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(
@@ -155,11 +157,8 @@ fn convert_agg_sigs(a: &Allocator, agg_sigs: &[(PublicKey, NodePtr)]) -> Vec<(Pu
 impl OwnedSpendConditions {
     #[classmethod]
     #[pyo3(name = "from_parent")]
-    pub fn from_parent(_cls: &Bound<'_, PyType>, instance: Self) -> PyResult<PyObject> {
-        Python::with_gil(|py| {
-            // ignore child case - though this could be extended in the future to support child class
-            Ok(instance.into_py(py))
-        })
+    pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: Self) -> PyResult<PyObject> {
+        Err(PyNotImplementedError::new_err("This class does not support from_parent()."))
     }
 }
 
@@ -168,10 +167,8 @@ impl OwnedSpendConditions {
 impl OwnedSpendBundleConditions {
     #[classmethod]
     #[pyo3(name = "from_parent")]
-    pub fn from_parent(_cls: &Bound<'_, PyType>, instance: Self) -> PyResult<PyObject> {
-        Python::with_gil(|py| {
-            // ignore child case - though this could be extended in the future to support child class
-            Ok(instance.into_py(py))
-        })
+    pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: Self) -> PyResult<PyObject> {
+        Err(PyNotImplementedError::new_err("This class does not support from_parent()."))
     }
 }
+

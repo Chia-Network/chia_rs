@@ -492,11 +492,8 @@ impl ToJsonDict for Program {
 impl Program {
     #[classmethod]
     #[pyo3(name = "from_parent")]
-    pub fn from_parent(_cls: &Bound<'_, PyType>, instance: Self) -> PyResult<PyObject> {
-        Python::with_gil(|py| {
-            // ignore child case
-            Ok(instance.into_py(py))
-        })
+    pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: Self) -> PyResult<PyObject> {
+        Err(PyNotImplementedError::new_err("This class does not support from_parent()."))
     }
 }
 
