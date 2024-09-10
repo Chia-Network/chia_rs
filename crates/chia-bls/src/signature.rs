@@ -492,11 +492,12 @@ impl Signature {
 
     #[classmethod]
     #[pyo3(name = "from_parent")]
-    pub fn from_parent(_cls: &Bound<'_, PyType>, instance: Self) -> PyResult<PyObject> {
-        Python::with_gil(|py| {
-            // ignore child case
-            Ok(instance.into_py(py))
-        })
+    pub fn from_parent(
+        _cls: &Bound<'_, PyType>,
+        py: Python<'_>,
+        instance: Self,
+    ) -> PyResult<PyObject> {
+        Ok(instance.into_py(py))
     }
 
     #[pyo3(name = "pair")]
@@ -1272,7 +1273,7 @@ mod pytests {
             Python::with_gil(|py| {
                 let string = sig.to_json_dict(py).expect("to_json_dict");
                 let py_class = py.get_type_bound::<Signature>();
-                let sig2 = Signature::from_json_dict(&py_class, string.bind(py))
+                let sig2 = Signature::from_json_dict(&py_class, py, string.bind(py))
                     .unwrap()
                     .extract(py)
                     .unwrap();
@@ -1291,8 +1292,9 @@ mod pytests {
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
             let py_class = py.get_type_bound::<Signature>();
-            let err = Signature::from_json_dict(&py_class, input.to_string().into_py(py).bind(py))
-                .unwrap_err();
+            let err =
+                Signature::from_json_dict(&py_class, py, input.to_string().into_py(py).bind(py))
+                    .unwrap_err();
             assert_eq!(err.value_bound(py).to_string(), msg.to_string());
         });
     }
