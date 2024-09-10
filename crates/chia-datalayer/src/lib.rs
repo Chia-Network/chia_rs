@@ -3,7 +3,8 @@ use pyo3::{buffer::PyBuffer, pyclass, pymethods, PyResult};
 
 use clvmr::sha2::Sha256;
 use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
+use std::iter::IntoIterator;
 use std::ops::Range;
 
 // TODO: clearly shouldn't be hard coded
@@ -63,13 +64,45 @@ impl NodeType {
 // }
 
 fn internal_hash(left_hash: Hash, right_hash: Hash) -> Hash {
-    // TODO: verify against original reference in blockchain
     let mut hasher = Sha256::new();
     hasher.update(b"\x02");
     hasher.update(left_hash);
     hasher.update(right_hash);
 
     hasher.finalize()
+}
+
+pub struct DotLines {
+    nodes: Vec<String>,
+    connections: Vec<String>,
+    pair_boxes: Vec<String>,
+}
+
+impl DotLines {
+    pub fn new() -> Self {
+        Self {
+            nodes: vec![],
+            connections: vec![],
+            pair_boxes: vec![],
+        }
+    }
+
+    pub fn push(&mut self, mut other: DotLines) {
+        self.nodes.append(&mut other.nodes);
+        self.connections.append(&mut other.connections);
+        self.pair_boxes.append(&mut other.pair_boxes);
+    }
+
+    pub fn dump(&mut self) -> String {
+        // TODO: consuming itself, secretly
+        let mut result = vec!["digraph {".to_string()];
+        result.append(&mut self.nodes);
+        result.append(&mut self.connections);
+        result.append(&mut self.pair_boxes);
+        result.push("}".to_string());
+
+        result.join("\n")
+    }
 }
 
 const NULL_PARENT: TreeIndex = 0xffff_ffffu32;
@@ -120,6 +153,20 @@ pub struct Node {
 pub enum NodeSpecific {
     Internal { left: TreeIndex, right: TreeIndex },
     Leaf { key_value: KvId },
+}
+
+impl NodeSpecific {
+    pub fn sibling_index(&self, index: TreeIndex) -> TreeIndex {
+        let NodeSpecific::Internal { right, left } = self else {
+            panic!()
+        };
+
+        match index {
+            x if (x == *right) => *left,
+            x if (x == *left) => *right,
+            _ => panic!(),
+        }
+    }
 }
 
 const PARENT_RANGE: Range<usize> = 0..4;
@@ -216,6 +263,42 @@ impl Node {
         };
 
         key_value
+    }
+
+    pub fn to_dot(&self) -> DotLines {
+        let index = self.index;
+        match self.specific {
+            NodeSpecific::Internal {left, right} => DotLines{
+                nodes: vec![
+                    format!("node_{index} [label=\"{index}\"]"),
+                ],
+                connections: vec![
+                    format!("node_{index} -> node_{left};"),
+                    format!("node_{index} -> node_{right};"),
+                    // TODO: can this be done without introducing a blank line?
+                    match self.parent{
+                        Some(parent) => format!("node_{index} -> node_{parent};"),
+                        None => "".to_string(),
+                    },
+                ],
+                pair_boxes: vec![
+                    format!("node [shape = box]; {{rank = same; node_{left}->node_{right}[style=invis]; rankdir = LR}}"),
+                ]
+            },
+            NodeSpecific::Leaf {key_value} => DotLines{
+                nodes: vec![
+                    format!("node_{index} [shape=box, label=\"{index}\\nkey_value: {key_value}\"];"),
+                ],
+                connections: vec![
+                    // TODO: dedupe with above
+                    match self.parent{
+                        Some(parent) => format!("node_{index} -> node_{parent};"),
+                        None => "".to_string(),
+                    },
+                ],
+                pair_boxes: vec![],
+            },
+        }
     }
 }
 
@@ -525,10 +608,105 @@ impl MerkleBlob {
         self.insert_entry_to_blob(old_parent_index, old_parent_block.to_bytes())?;
 
         self.mark_lineage_as_dirty(old_parent_index)?;
-        self.kv_to_index.insert(key_value, new_internal_node_index);
+        self.kv_to_index.insert(key_value, new_leaf_index);
 
         Ok(())
     }
+
+    pub fn delete(&mut self, key_value: KvId) -> Result<(), String> {
+        let leaf_index = *self.kv_to_index.get(&key_value).unwrap();
+        let leaf = self.get_node(leaf_index).unwrap();
+
+        match leaf.specific {
+            // TODO: blech
+            NodeSpecific::Leaf { .. } => (),
+            NodeSpecific::Internal { .. } => panic!(),
+        };
+        self.kv_to_index.remove(&key_value);
+
+        let Some(parent_index) = leaf.parent else {
+            self.free_indexes.clear();
+            self.last_allocated_index = 0;
+            self.blob.clear();
+            return Ok(());
+        };
+
+        self.free_indexes.push(leaf_index);
+        let parent = self.get_node(parent_index).unwrap();
+        // TODO: kinda implicit that we 'check' that parent is internal inside .sibling_index()
+        let sibling_index = parent.specific.sibling_index(leaf_index);
+        let mut sibling_block = self.get_block(sibling_index)?;
+
+        let Some(grandparent_index) = parent.parent else {
+            sibling_block.metadata.dirty = true;
+            sibling_block.node.parent = None;
+            let range = self.get_block_range(0);
+            self.blob[range].copy_from_slice(&sibling_block.to_bytes());
+
+            match sibling_block.node.specific {
+                NodeSpecific::Leaf { key_value } => {
+                    self.kv_to_index.insert(key_value, 0);
+                }
+                NodeSpecific::Internal { left, right } => {
+                    for child_index in [left, right] {
+                        let mut block = self.get_block(child_index)?;
+                        block.node.parent = Some(0);
+                        self.insert_entry_to_blob(child_index, block.to_bytes())?;
+                    }
+                }
+            };
+
+            self.free_indexes.push(sibling_index);
+
+            return Ok(());
+        };
+
+        self.free_indexes.push(parent_index);
+        let mut grandparent_block = self.get_block(grandparent_index).unwrap();
+
+        sibling_block.node.parent = Some(grandparent_index);
+        let range = self.get_block_range(sibling_index);
+        self.blob[range].copy_from_slice(&sibling_block.to_bytes());
+
+        match grandparent_block.node.specific {
+            NodeSpecific::Internal {
+                ref mut left,
+                ref mut right,
+                ..
+            } => match parent_index {
+                x if x == *left => *left = sibling_index,
+                x if x == *right => *right = sibling_index,
+                _ => panic!(),
+            },
+            NodeSpecific::Leaf { .. } => panic!(),
+        };
+        let range = self.get_block_range(grandparent_index);
+        self.blob[range].copy_from_slice(&grandparent_block.to_bytes());
+
+        self.mark_lineage_as_dirty(grandparent_index)?;
+
+        Ok(())
+    }
+
+    // fn update_parent(&mut self, index: TreeIndex, parent: Option<TreeIndex>) -> Result<(), String> {
+    //     let range = self.get_block_range(index);
+    //
+    //     let mut node = self.get_node(index)?;
+    //     node.parent = parent;
+    //     self.blob[range].copy_from_slice(&node.to_bytes());
+    //
+    //     Ok(())
+    // }
+
+    // fn update_left(&mut self, index: TreeIndex, left: Option<TreeIndex>) -> Result<(), String> {
+    //     let range = self.get_block_range(index);
+    //
+    //     let mut node = self.get_node(index)?;
+    //     node.left = left;
+    //     self.blob[range].copy_from_slice(&node.to_bytes());
+    //
+    //     Ok(())
+    // }
 
     fn mark_lineage_as_dirty(&mut self, index: TreeIndex) -> Result<(), String> {
         let mut next_index = Some(index);
@@ -588,13 +766,37 @@ impl MerkleBlob {
         Ok(())
     }
 
-    fn get_block_bytes(&self, index: TreeIndex) -> Result<BlockBytes, String> {
+    fn get_block(&self, index: TreeIndex) -> Result<Block, String> {
+        Block::from_bytes(self.get_block_bytes(index)?, index)
+    }
+
+    fn get_block_range(&self, index: TreeIndex) -> Range<usize> {
         let metadata_start = index as usize * BLOCK_SIZE;
         let data_start = metadata_start + METADATA_SIZE;
         let end = data_start + DATA_SIZE;
 
+        let range = metadata_start..end;
+        // checking range validity
+        self.blob.get(range.clone()).unwrap();
+
+        range
+    }
+
+    // fn get_block_slice(&self, index: TreeIndex) -> Result<&mut BlockBytes, String> {
+    //     let metadata_start = index as usize * BLOCK_SIZE;
+    //     let data_start = metadata_start + METADATA_SIZE;
+    //     let end = data_start + DATA_SIZE;
+    //
+    //     self.blob
+    //         .get(metadata_start..end)
+    //         .ok_or(format!("index out of bounds: {index}"))?
+    //         .try_into()
+    //         .map_err(|e| format!("failed getting block {index}: {e}"))
+    // }
+
+    fn get_block_bytes(&self, index: TreeIndex) -> Result<BlockBytes, String> {
         self.blob
-            .get(metadata_start..end)
+            .get(self.get_block_range(index))
             .ok_or(format!("index out of bounds: {index}"))?
             .try_into()
             .map_err(|e| format!("failed getting block {index}: {e}"))
@@ -663,6 +865,24 @@ impl MerkleBlob {
 
         Ok(lineage)
     }
+
+    pub fn to_dot(&self) -> DotLines {
+        let mut result = DotLines::new();
+        for node in self {
+            result.push(node.to_dot());
+        }
+
+        result
+    }
+}
+
+impl<'a> IntoIterator for &'a MerkleBlob {
+    type Item = Node;
+    type IntoIter = MerkleBlobIterator<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        MerkleBlobIterator::new(self)
+    }
 }
 
 #[cfg(feature = "py-bindings")]
@@ -690,9 +910,63 @@ impl MerkleBlob {
         Ok(())
     }
 
+    #[pyo3(name = "delete")]
+    pub fn py_delete(&mut self, key_value: KvId) -> PyResult<()> {
+        // TODO: consider the error
+        self.delete(key_value).unwrap();
+
+        Ok(())
+    }
+
     #[pyo3(name = "__len__")]
     pub fn py_len(&self) -> PyResult<usize> {
         Ok(self.blob.len())
+    }
+}
+
+pub struct MerkleBlobIterator<'a> {
+    merkle_blob: &'a MerkleBlob,
+    deque: VecDeque<TreeIndex>,
+    index_count: usize,
+}
+
+impl<'a> MerkleBlobIterator<'a> {
+    fn new(merkle_blob: &'a MerkleBlob) -> Self {
+        let index_count = merkle_blob.blob.len() / BLOCK_SIZE;
+        let mut deque = VecDeque::new();
+        deque.push_back(0);
+
+        Self {
+            merkle_blob,
+            deque: deque,
+            index_count,
+        }
+    }
+}
+
+impl Iterator for MerkleBlobIterator<'_> {
+    type Item = Node;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // left depth first
+
+        if self.index_count == 0 {
+            return None;
+        }
+
+        let Some(index) = self.deque.pop_front() else {
+            return None;
+        };
+        let block = self.merkle_blob.get_block(index).unwrap();
+        match block.node.specific {
+            NodeSpecific::Internal { left, right } => {
+                self.deque.push_front(right);
+                self.deque.push_front(left);
+            }
+            NodeSpecific::Leaf { .. } => (),
+        }
+
+        Some(block.node)
     }
 }
 
@@ -909,5 +1183,69 @@ mod tests {
 
         println!("total time: {total_time:?}");
         // TODO: check, well...  something
+    }
+
+    #[test]
+    fn test_delete() {
+        const COUNT: usize = 10;
+        let mut dots = vec![];
+
+        let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
+
+        let key_value_ids: [KvId; COUNT] = core::array::from_fn(|i| i as KvId);
+
+        for key_value_id in key_value_ids {
+            let mut hasher = Sha256::new();
+            hasher.update(key_value_id.to_be_bytes());
+            let hash: Hash = hasher.finalize();
+
+            println!("inserting: {key_value_id}");
+            merkle_blob.insert(key_value_id, hash).unwrap();
+            dots.push(merkle_blob.to_dot().dump());
+        }
+
+        for key_value_id in key_value_ids {
+            println!("deleting: {key_value_id}");
+            merkle_blob.delete(key_value_id).unwrap();
+            dots.push(merkle_blob.to_dot().dump());
+        }
+
+        // let mut key_value_ids: Vec<KvId> = vec![0; COUNT];
+        //
+        // for (i, key_value_id) in key_value_ids.iter_mut().enumerate() {
+        //     *key_value_id = i as KvId;
+        // }
+        // for i in 0..100_000 {
+        //     let start = Instant::now();
+        //     merkle_blob
+        //         // TODO: yeah this hash is garbage
+        //         .insert(i as KvId, HASH)
+        //         .unwrap();
+        //     let end = Instant::now();
+        //     total_time += end.duration_since(start);
+        //
+        //     // match i + 1 {
+        //     //     2 => assert_eq!(merkle_blob.blob.len(), 3 * BLOCK_SIZE),
+        //     //     3 => assert_eq!(merkle_blob.blob.len(), 5 * BLOCK_SIZE),
+        //     //     _ => (),
+        //     // }
+        //
+        //     // let file = fs::File::create(format!("/home/altendky/tmp/mbt/rs/{i:0>4}")).unwrap();
+        //     // let mut file = io::LineWriter::new(file);
+        //     // for block in merkle_blob.blob.chunks(BLOCK_SIZE) {
+        //     //     let mut s = String::new();
+        //     //     for byte in block {
+        //     //         s.push_str(&format!("{:02x}", byte));
+        //     //     }
+        //     //     s.push_str("\n");
+        //     //     file.write_all(s.as_bytes()).unwrap();
+        //     // }
+        //
+        //     // fs::write(format!("/home/altendky/tmp/mbt/rs/{i:0>4}"), &merkle_blob.blob).unwrap();
+        // }
+        // // println!("{:?}", merkle_blob.blob)
+        //
+        // println!("total time: {total_time:?}");
+        // // TODO: check, well...  something
     }
 }
