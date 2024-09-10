@@ -187,6 +187,9 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
             pub fn py_from_bytes(cls: &pyo3::Bound<'_, pyo3::types::PyType>, blob: pyo3::buffer::PyBuffer<u8>) -> pyo3::PyResult<pyo3::PyObject> {
                 use pyo3::prelude::PyAnyMethods;
                 use pyo3::IntoPy;
+                use pyo3::type_object::PyTypeInfo;
+                use std::borrow::Borrow;
+
                 if !blob.is_c_contiguous() {
                     panic!("from_bytes() must be called with a contiguous buffer");
                 }
@@ -197,8 +200,16 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 pyo3::Python::with_gil(|py| {
                     // Convert result into potential child class
                     // let instance = cls.call(py, (rust_obj,))?;
-                    let instance = cls.call_method1("from_parent", (rust_obj.into_py(py),))?;
-                    Ok(instance.into_py(py))
+                    // // if <cls as PyTypeInfo>::is_exact_type_of(rust_obj.into_py(py).as_ref(py)) {
+
+                    let cls_type = cls.borrow().as_ref();
+                    let cls_type: &PyAny = cls_type.into_any();
+                    if <Self as PyTypeInfo>::is_exact_type_of(cls_type) {
+                        Ok(rust_obj.into_py(py))
+                    } else {
+                        let instance = cls.call_method1("from_parent", (rust_obj.into_py(py),))?;
+                        Ok(instance.into_py(py))
+                    }
                 })
             }
 
