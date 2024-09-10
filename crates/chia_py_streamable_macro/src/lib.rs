@@ -203,8 +203,7 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                     // // if <cls as PyTypeInfo>::is_exact_type_of(rust_obj.into_py(py).as_ref(py)) {
 
                     let cls_type = cls.borrow().as_ref();
-                    let cls_type: &PyAny = cls_type.into_any();
-                    if <Self as PyTypeInfo>::is_exact_type_of(cls_type) {
+                    if <Self as PyTypeInfo>::is_exact_type_of_bound(cls_type) {
                         Ok(rust_obj.into_py(py))
                     } else {
                         let instance = cls.call_method1("from_parent", (rust_obj.into_py(py),))?;
