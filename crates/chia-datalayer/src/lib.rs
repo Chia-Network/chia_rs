@@ -78,6 +78,12 @@ pub struct DotLines {
     pair_boxes: Vec<String>,
 }
 
+impl Default for DotLines {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DotLines {
     pub fn new() -> Self {
         Self {
@@ -278,7 +284,7 @@ impl Node {
                     // TODO: can this be done without introducing a blank line?
                     match self.parent{
                         Some(parent) => format!("node_{index} -> node_{parent};"),
-                        None => "".to_string(),
+                        None => String::new(),
                     },
                 ],
                 pair_boxes: vec![
@@ -293,7 +299,7 @@ impl Node {
                     // TODO: dedupe with above
                     match self.parent{
                         Some(parent) => format!("node_{index} -> node_{parent};"),
-                        None => "".to_string(),
+                        None => String::new(),
                     },
                 ],
                 pair_boxes: vec![],
@@ -874,6 +880,10 @@ impl MerkleBlob {
 
         result
     }
+
+    pub fn iter(&self) -> MerkleBlobIterator<'_> {
+        <&Self as IntoIterator>::into_iter(self)
+    }
 }
 
 impl<'a> IntoIterator for &'a MerkleBlob {
@@ -938,7 +948,7 @@ impl<'a> MerkleBlobIterator<'a> {
 
         Self {
             merkle_blob,
-            deque: deque,
+            deque,
             index_count,
         }
     }
@@ -954,9 +964,7 @@ impl Iterator for MerkleBlobIterator<'_> {
             return None;
         }
 
-        let Some(index) = self.deque.pop_front() else {
-            return None;
-        };
+        let index = self.deque.pop_front()?;
         let block = self.merkle_blob.get_block(index).unwrap();
         match block.node.specific {
             NodeSpecific::Internal { left, right } => {
