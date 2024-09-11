@@ -309,7 +309,7 @@ impl Node {
 }
 
 // TODO: does not enforce matching metadata node type and node enumeration type
-struct Block {
+pub struct Block {
     metadata: NodeMetadata,
     node: Node,
 }
@@ -371,8 +371,8 @@ fn get_free_indexes(blob: &[u8]) -> Result<Vec<TreeIndex>, String> {
 
     let mut seen_indexes: Vec<bool> = vec![false; index_count];
 
-    for node in MerkleBlobIterator::new(blob) {
-        seen_indexes[node.index as usize] = true;
+    for block in MerkleBlobIterator::new(blob) {
+        seen_indexes[block.node.index as usize] = true;
     }
 
     let mut free_indexes: Vec<TreeIndex> = vec![];
@@ -396,10 +396,10 @@ fn get_keys_values_indexes(blob: &[u8]) -> Result<HashMap<KvId, TreeIndex>, Stri
         return Ok(kv_to_index);
     }
 
-    for node in MerkleBlobIterator::new(blob) {
-        match node.specific {
+    for block in MerkleBlobIterator::new(blob) {
+        match block.node.specific {
             NodeSpecific::Leaf { key_value } => {
-                kv_to_index.insert(key_value, node.index);
+                kv_to_index.insert(key_value, block.node.index);
             }
             NodeSpecific::Internal { .. } => (),
         }
@@ -764,14 +764,17 @@ impl MerkleBlob {
         Err("failed to find a node".to_string())
     }
 
-    fn insert_entry_to_blob(&mut self, index: TreeIndex, block: BlockBytes) -> Result<(), String> {
+    fn insert_entry_to_blob(
+        &mut self,
+        index: TreeIndex,
+        block_bytes: BlockBytes,
+    ) -> Result<(), String> {
         let extend_index = (self.blob.len() / BLOCK_SIZE) as TreeIndex;
         match index.cmp(&extend_index) {
             Ordering::Greater => return Err(format!("index out of range: {index}")),
-            Ordering::Equal => self.blob.extend_from_slice(&block),
+            Ordering::Equal => self.blob.extend_from_slice(&block_bytes),
             Ordering::Less => {
-                let start = index as usize * BLOCK_SIZE;
-                self.blob[start..start + BLOCK_SIZE].copy_from_slice(&block);
+                self.blob[Block::range(index)].copy_from_slice(&block_bytes);
             }
         }
 
@@ -868,8 +871,8 @@ impl MerkleBlob {
 
     pub fn to_dot(&self) -> DotLines {
         let mut result = DotLines::new();
-        for node in self {
-            result.push(node.to_dot());
+        for block in self {
+            result.push(block.node.to_dot());
         }
 
         result
@@ -878,10 +881,36 @@ impl MerkleBlob {
     pub fn iter(&self) -> MerkleBlobIterator<'_> {
         <&Self as IntoIterator>::into_iter(self)
     }
+
+    pub fn calculate_lazy_hashes(&mut self) {
+        // TODO: really want a truncated traversal, not filter
+        // TODO: yeah, storing the whole set of blocks via collect is not great
+        for mut block in self
+            .iter()
+            .filter(|block| block.metadata.dirty)
+            .collect::<Vec<_>>()
+        {
+            match block.node.specific {
+                NodeSpecific::Leaf { .. } => panic!("leaves should not be dirty"),
+                NodeSpecific::Internal { left, right, .. } => {
+                    // TODO: obviously inefficient to re-get/deserialize these blocks inside
+                    //       an iteration that's already doing that
+                    let left = self.get_block(left).unwrap();
+                    let right = self.get_block(right).unwrap();
+                    // TODO: wrap this up in Block maybe? just to have 'control' of dirty being 'accurate'
+                    block.node.hash = internal_hash(left.node.hash, right.node.hash);
+                    block.metadata.dirty = false;
+                    self.insert_entry_to_blob(block.node.index, block.to_bytes())
+                        .unwrap();
+                }
+            }
+        }
+    }
 }
 
 impl<'a> IntoIterator for &'a MerkleBlob {
-    type Item = Node;
+    // TODO: review efficiency in whatever use cases we end up with, vs Item = Node etc
+    type Item = Block;
     type IntoIter = MerkleBlobIterator<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -929,48 +958,63 @@ impl MerkleBlob {
     }
 }
 
+struct MerkleBlobIteratorItem {
+    visited: bool,
+    index: TreeIndex,
+}
+
 pub struct MerkleBlobIterator<'a> {
     blob: &'a [u8],
-    deque: VecDeque<TreeIndex>,
-    index_count: usize,
+    deque: VecDeque<MerkleBlobIteratorItem>,
 }
 
 impl<'a> MerkleBlobIterator<'a> {
     fn new(blob: &'a [u8]) -> Self {
-        let index_count = blob.len() / BLOCK_SIZE;
         let mut deque = VecDeque::new();
-        deque.push_back(0);
-
-        Self {
-            blob,
-            deque,
-            index_count,
+        if blob.len() / BLOCK_SIZE > 0 {
+            deque.push_back(MerkleBlobIteratorItem {
+                visited: false,
+                index: 0,
+            });
         }
+
+        Self { blob, deque }
     }
 }
 
 impl Iterator for MerkleBlobIterator<'_> {
-    type Item = Node;
+    type Item = Block;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // left depth first
+        // left sibling first, children before parents
 
-        if self.index_count == 0 {
-            return None;
-        }
+        loop {
+            let item = self.deque.pop_front()?;
+            let block_bytes: BlockBytes = self.blob[Block::range(item.index)].try_into().unwrap();
+            let block = Block::from_bytes(block_bytes, item.index).unwrap();
 
-        let index = self.deque.pop_front()?;
-        let block_bytes: BlockBytes = self.blob[Block::range(index)].try_into().unwrap();
-        let block = Block::from_bytes(block_bytes, index).unwrap();
-        match block.node.specific {
-            NodeSpecific::Internal { left, right } => {
-                self.deque.push_front(right);
-                self.deque.push_front(left);
+            match block.node.specific {
+                NodeSpecific::Leaf { .. } => return Some(block),
+                NodeSpecific::Internal { left, right } => {
+                    if item.visited {
+                        return Some(block);
+                    };
+
+                    self.deque.push_front(MerkleBlobIteratorItem {
+                        visited: true,
+                        index: item.index,
+                    });
+                    self.deque.push_front(MerkleBlobIteratorItem {
+                        visited: false,
+                        index: right,
+                    });
+                    self.deque.push_front(MerkleBlobIteratorItem {
+                        visited: false,
+                        index: left,
+                    });
+                }
             }
-            NodeSpecific::Leaf { .. } => (),
         }
-
-        Some(block.node)
     }
 }
 
@@ -1187,6 +1231,8 @@ mod tests {
 
         println!("total time: {total_time:?}");
         // TODO: check, well...  something
+
+        merkle_blob.calculate_lazy_hashes();
     }
 
     #[test]
