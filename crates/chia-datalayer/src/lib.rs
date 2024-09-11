@@ -648,8 +648,7 @@ impl MerkleBlob {
         let Some(grandparent_index) = parent.parent else {
             sibling_block.metadata.dirty = true;
             sibling_block.node.parent = None;
-            let range = Block::range(0);
-            self.blob[range].copy_from_slice(&sibling_block.to_bytes());
+            self.insert_entry_to_blob(0, sibling_block.to_bytes())?;
 
             match sibling_block.node.specific {
                 NodeSpecific::Leaf { key_value } => {
@@ -673,8 +672,7 @@ impl MerkleBlob {
         let mut grandparent_block = self.get_block(grandparent_index).unwrap();
 
         sibling_block.node.parent = Some(grandparent_index);
-        let range = Block::range(sibling_index);
-        self.blob[range].copy_from_slice(&sibling_block.to_bytes());
+        self.insert_entry_to_blob(sibling_index, sibling_block.to_bytes())?;
 
         match grandparent_block.node.specific {
             NodeSpecific::Internal {
@@ -688,8 +686,7 @@ impl MerkleBlob {
             },
             NodeSpecific::Leaf { .. } => panic!(),
         };
-        let range = Block::range(grandparent_index);
-        self.blob[range].copy_from_slice(&grandparent_block.to_bytes());
+        self.insert_entry_to_blob(grandparent_index, grandparent_block.to_bytes())?;
 
         self.mark_lineage_as_dirty(grandparent_index)?;
 
@@ -725,6 +722,11 @@ impl MerkleBlob {
 
         while let Some(this_index) = next_index {
             let mut block = Block::from_bytes(self.get_block_bytes(this_index)?, this_index)?;
+
+            if block.metadata.dirty {
+                return Ok(());
+            }
+
             block.metadata.dirty = true;
             self.insert_entry_to_blob(this_index, block.to_bytes())?;
             next_index = block.node.parent;
@@ -769,6 +771,7 @@ impl MerkleBlob {
         index: TreeIndex,
         block_bytes: BlockBytes,
     ) -> Result<(), String> {
+        assert_eq!(self.blob.len() % BLOCK_SIZE, 0);
         let extend_index = (self.blob.len() / BLOCK_SIZE) as TreeIndex;
         match index.cmp(&extend_index) {
             Ordering::Greater => return Err(format!("index out of range: {index}")),
@@ -1188,7 +1191,9 @@ mod tests {
         root.metadata.dirty = true;
         root.node.hash = HASH;
         assert_eq!(root.metadata.node_type, NodeType::Internal);
-        merkle_blob.blob[..BLOCK_SIZE].copy_from_slice(&root.to_bytes());
+        merkle_blob
+            .insert_entry_to_blob(0, root.to_bytes())
+            .unwrap();
 
         assert_eq!(merkle_blob.blob, Vec::from(EXAMPLE_BLOB));
     }
