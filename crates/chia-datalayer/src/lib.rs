@@ -445,6 +445,7 @@ impl MerkleBlob {
             self.insert_first(key_value, hash);
         }
 
+        // TODO: make this a parameter so we have one insert call where you specify the location
         let old_leaf = self.get_random_leaf_node_from_bytes(Vec::from(key_value.to_be_bytes()))?;
         let internal_node_hash = internal_hash(old_leaf.hash, hash);
 
@@ -693,6 +694,10 @@ impl MerkleBlob {
 
         Ok(())
     }
+
+    // fn upsert(&self, old_key_value: KvId, new_key_value: KvId, new_hash: Hash) -> Result<(), String> {
+    //     if old_key_value
+    // }
 
     // fn update_parent(&mut self, index: TreeIndex, parent: Option<TreeIndex>) -> Result<(), String> {
     //     let range = self.get_block_range(index);
