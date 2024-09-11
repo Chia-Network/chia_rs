@@ -315,15 +315,15 @@ struct Block {
 }
 
 impl Block {
-    pub fn to_bytes(&self) -> [u8; BLOCK_SIZE] {
-        let mut blob: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
+    pub fn to_bytes(&self) -> BlockBytes {
+        let mut blob: BlockBytes = [0; BLOCK_SIZE];
         blob[..METADATA_SIZE].copy_from_slice(&self.metadata.to_bytes());
         blob[METADATA_SIZE..].copy_from_slice(&self.node.to_bytes());
 
         blob
     }
 
-    pub fn from_bytes(blob: [u8; BLOCK_SIZE], index: TreeIndex) -> Result<Block, String> {
+    pub fn from_bytes(blob: BlockBytes, index: TreeIndex) -> Result<Block, String> {
         // TODO: handle invalid indexes?
         // TODO: handle overflows?
         let metadata_blob: [u8; METADATA_SIZE] = blob
@@ -345,8 +345,23 @@ impl Block {
             Err(message) => return Err(format!("failed loading node: {message}")),
         })
     }
+
+    fn range(index: TreeIndex) -> Range<usize> {
+        let metadata_start = index as usize * BLOCK_SIZE;
+        let data_start = metadata_start + METADATA_SIZE;
+        let end = data_start + DATA_SIZE;
+
+        // let range = metadata_start..end;
+        // // checking range validity
+        // self.blob.get(range.clone()).unwrap();
+        //
+        // range
+        metadata_start..end
+    }
 }
 
+// TODO: once error handling is well defined, remove allow and handle warning
+#[allow(clippy::unnecessary_wraps)]
 fn get_free_indexes(blob: &[u8]) -> Result<Vec<TreeIndex>, String> {
     let index_count = blob.len() / BLOCK_SIZE;
 
@@ -355,20 +370,9 @@ fn get_free_indexes(blob: &[u8]) -> Result<Vec<TreeIndex>, String> {
     }
 
     let mut seen_indexes: Vec<bool> = vec![false; index_count];
-    let mut queue: Vec<TreeIndex> = vec![0];
 
-    while let Some(index) = queue.pop() {
-        let offset = index as usize * BLOCK_SIZE;
-        let block =
-            Block::from_bytes(blob[offset..offset + BLOCK_SIZE].try_into().unwrap(), index)?;
-        seen_indexes[index as usize] = true;
-        match block.node.specific {
-            NodeSpecific::Internal { left, right } => {
-                queue.push(left);
-                queue.push(right);
-            }
-            NodeSpecific::Leaf { .. } => (),
-        }
+    for node in MerkleBlobIterator::new(blob) {
+        seen_indexes[node.index as usize] = true;
     }
 
     let mut free_indexes: Vec<TreeIndex> = vec![];
@@ -381,6 +385,8 @@ fn get_free_indexes(blob: &[u8]) -> Result<Vec<TreeIndex>, String> {
     Ok(free_indexes)
 }
 
+// TODO: once error handling is well defined, remove allow and handle warning
+#[allow(clippy::unnecessary_wraps)]
 fn get_keys_values_indexes(blob: &[u8]) -> Result<HashMap<KvId, TreeIndex>, String> {
     let index_count = blob.len() / BLOCK_SIZE;
 
@@ -390,15 +396,10 @@ fn get_keys_values_indexes(blob: &[u8]) -> Result<HashMap<KvId, TreeIndex>, Stri
         return Ok(kv_to_index);
     }
 
-    let mut queue: Vec<TreeIndex> = vec![0];
-
-    while let Some(index) = queue.pop() {
-        let offset = index as usize * BLOCK_SIZE;
-        let block =
-            Block::from_bytes(blob[offset..offset + BLOCK_SIZE].try_into().unwrap(), index)?;
-        match block.node.specific {
+    for node in MerkleBlobIterator::new(blob) {
+        match node.specific {
             NodeSpecific::Leaf { key_value } => {
-                kv_to_index.insert(key_value, index);
+                kv_to_index.insert(key_value, node.index);
             }
             NodeSpecific::Internal { .. } => (),
         }
@@ -647,7 +648,7 @@ impl MerkleBlob {
         let Some(grandparent_index) = parent.parent else {
             sibling_block.metadata.dirty = true;
             sibling_block.node.parent = None;
-            let range = self.get_block_range(0);
+            let range = Block::range(0);
             self.blob[range].copy_from_slice(&sibling_block.to_bytes());
 
             match sibling_block.node.specific {
@@ -672,7 +673,7 @@ impl MerkleBlob {
         let mut grandparent_block = self.get_block(grandparent_index).unwrap();
 
         sibling_block.node.parent = Some(grandparent_index);
-        let range = self.get_block_range(sibling_index);
+        let range = Block::range(sibling_index);
         self.blob[range].copy_from_slice(&sibling_block.to_bytes());
 
         match grandparent_block.node.specific {
@@ -687,7 +688,7 @@ impl MerkleBlob {
             },
             NodeSpecific::Leaf { .. } => panic!(),
         };
-        let range = self.get_block_range(grandparent_index);
+        let range = Block::range(grandparent_index);
         self.blob[range].copy_from_slice(&grandparent_block.to_bytes());
 
         self.mark_lineage_as_dirty(grandparent_index)?;
@@ -781,18 +782,6 @@ impl MerkleBlob {
         Block::from_bytes(self.get_block_bytes(index)?, index)
     }
 
-    fn get_block_range(&self, index: TreeIndex) -> Range<usize> {
-        let metadata_start = index as usize * BLOCK_SIZE;
-        let data_start = metadata_start + METADATA_SIZE;
-        let end = data_start + DATA_SIZE;
-
-        let range = metadata_start..end;
-        // checking range validity
-        self.blob.get(range.clone()).unwrap();
-
-        range
-    }
-
     // fn get_block_slice(&self, index: TreeIndex) -> Result<&mut BlockBytes, String> {
     //     let metadata_start = index as usize * BLOCK_SIZE;
     //     let data_start = metadata_start + METADATA_SIZE;
@@ -807,7 +796,7 @@ impl MerkleBlob {
 
     fn get_block_bytes(&self, index: TreeIndex) -> Result<BlockBytes, String> {
         self.blob
-            .get(self.get_block_range(index))
+            .get(Block::range(index))
             .ok_or(format!("index out of bounds: {index}"))?
             .try_into()
             .map_err(|e| format!("failed getting block {index}: {e}"))
@@ -896,7 +885,8 @@ impl<'a> IntoIterator for &'a MerkleBlob {
     type IntoIter = MerkleBlobIterator<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        MerkleBlobIterator::new(self)
+        // TODO: review types around this to avoid copying
+        MerkleBlobIterator::new(&self.blob[..])
     }
 }
 
@@ -940,19 +930,19 @@ impl MerkleBlob {
 }
 
 pub struct MerkleBlobIterator<'a> {
-    merkle_blob: &'a MerkleBlob,
+    blob: &'a [u8],
     deque: VecDeque<TreeIndex>,
     index_count: usize,
 }
 
 impl<'a> MerkleBlobIterator<'a> {
-    fn new(merkle_blob: &'a MerkleBlob) -> Self {
-        let index_count = merkle_blob.blob.len() / BLOCK_SIZE;
+    fn new(blob: &'a [u8]) -> Self {
+        let index_count = blob.len() / BLOCK_SIZE;
         let mut deque = VecDeque::new();
         deque.push_back(0);
 
         Self {
-            merkle_blob,
+            blob,
             deque,
             index_count,
         }
@@ -970,7 +960,8 @@ impl Iterator for MerkleBlobIterator<'_> {
         }
 
         let index = self.deque.pop_front()?;
-        let block = self.merkle_blob.get_block(index).unwrap();
+        let block_bytes: BlockBytes = self.blob[Block::range(index)].try_into().unwrap();
+        let block = Block::from_bytes(block_bytes, index).unwrap();
         match block.node.specific {
             NodeSpecific::Internal { left, right } => {
                 self.deque.push_front(right);
