@@ -158,7 +158,7 @@ impl OwnedSpendConditions {
     #[classmethod]
     #[pyo3(name = "from_parent")]
     pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: Self) -> PyResult<PyObject> {
-        Err(PyNotImplementedError::new_err("This class does not support from_parent()."))
+        Err(PyNotImplementedError::new_err("OwnedSpendConditions does not support from_parent()."))
     }
 }
 
@@ -168,7 +168,7 @@ impl OwnedSpendBundleConditions {
     #[classmethod]
     #[pyo3(name = "from_parent")]
     pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: Self) -> PyResult<PyObject> {
-        Err(PyNotImplementedError::new_err("This class does not support from_parent()."))
+        Err(PyNotImplementedError::new_err("OwnedSpendBundleConditions does not support from_parent()."))
     }
 }
 

@@ -330,7 +330,7 @@ impl PublicKey {
     #[classmethod]
     #[pyo3(name = "from_parent")]
     pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: Self) -> PyResult<PyObject> {
-        Err(PyNotImplementedError::new_err("This class does not support from_parent()."))
+        Err(PyNotImplementedError::new_err("PublicKey does not support from_parent()."))
     }
 
     #[pyo3(name = "get_fingerprint")]
