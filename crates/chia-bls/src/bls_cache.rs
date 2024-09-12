@@ -137,10 +137,7 @@ impl BlsCache {
         use pyo3::types::PyBytes;
         let ret = PyList::empty_bound(py);
         for (key, value) in &self.cache {
-            ret.append((
-                PyBytes::new_bound(py, key),
-                value.clone().into_py(py),
-            ))?;
+            ret.append((PyBytes::new_bound(py, key), value.clone().into_py(py)))?;
         }
         Ok(ret.into())
     }
