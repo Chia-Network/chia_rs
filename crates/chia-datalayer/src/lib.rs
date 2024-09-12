@@ -371,7 +371,7 @@ fn get_free_indexes(blob: &[u8]) -> Result<Vec<TreeIndex>, String> {
 
     let mut seen_indexes: Vec<bool> = vec![false; index_count];
 
-    for block in MerkleBlobIterator::new(blob) {
+    for block in MerkleBlobLeftChildFirstIterator::new(blob) {
         seen_indexes[block.node.index as usize] = true;
     }
 
@@ -396,7 +396,7 @@ fn get_keys_values_indexes(blob: &[u8]) -> Result<HashMap<KvId, TreeIndex>, Stri
         return Ok(kv_to_index);
     }
 
-    for block in MerkleBlobIterator::new(blob) {
+    for block in MerkleBlobLeftChildFirstIterator::new(blob) {
         match block.node.specific {
             NodeSpecific::Leaf { key_value } => {
                 kv_to_index.insert(key_value, block.node.index);
@@ -766,13 +766,18 @@ impl MerkleBlob {
         Err("failed to find a node".to_string())
     }
 
+    fn extend_index(&self) -> TreeIndex {
+        assert_eq!(self.blob.len() % BLOCK_SIZE, 0);
+
+        (self.blob.len() / BLOCK_SIZE) as TreeIndex
+    }
+
     fn insert_entry_to_blob(
         &mut self,
         index: TreeIndex,
         block_bytes: BlockBytes,
     ) -> Result<(), String> {
-        assert_eq!(self.blob.len() % BLOCK_SIZE, 0);
-        let extend_index = (self.blob.len() / BLOCK_SIZE) as TreeIndex;
+        let extend_index = self.extend_index();
         match index.cmp(&extend_index) {
             Ordering::Greater => return Err(format!("index out of range: {index}")),
             Ordering::Equal => self.blob.extend_from_slice(&block_bytes),
@@ -881,7 +886,7 @@ impl MerkleBlob {
         result
     }
 
-    pub fn iter(&self) -> MerkleBlobIterator<'_> {
+    pub fn iter(&self) -> MerkleBlobLeftChildFirstIterator<'_> {
         <&Self as IntoIterator>::into_iter(self)
     }
 
@@ -909,16 +914,73 @@ impl MerkleBlob {
             }
         }
     }
+
+    pub fn relocate_node(&mut self, source: TreeIndex, destination: TreeIndex) {
+        let extend_index = self.extend_index();
+        assert_ne!(source, 0);
+        assert!(source < extend_index);
+        assert!(!self.free_indexes.contains(&source));
+        assert!(destination <= extend_index);
+        assert!(destination == extend_index || self.free_indexes.contains(&destination));
+
+        let source_block = self.get_block(source).unwrap();
+        if let Some(parent) = source_block.node.parent {
+            let mut parent_block = self.get_block(parent).unwrap();
+            let NodeSpecific::Internal {
+                ref mut left,
+                ref mut right,
+            } = parent_block.node.specific
+            else {
+                panic!();
+            };
+            match source {
+                x if x == *left => *left = destination,
+                x if x == *right => *right = destination,
+                _ => panic!(),
+            }
+            self.insert_entry_to_blob(parent, parent_block.to_bytes())
+                .unwrap();
+        }
+
+        match source_block.node.specific {
+            NodeSpecific::Leaf { key_value } => {
+                self.kv_to_index.insert(key_value, destination);
+            }
+            NodeSpecific::Internal { left, right, .. } => {
+                for child in [left, right] {
+                    let mut block = self.get_block(child).unwrap();
+                    block.node.parent = Some(destination);
+                    self.insert_entry_to_blob(child, block.to_bytes()).unwrap();
+                }
+            }
+        }
+
+        self.free_indexes.push(source);
+    }
+
+    #[allow(unused)]
+    fn rebuild(&mut self) -> Result<(), String> {
+        panic!();
+        // TODO: could make insert_entry_to_blob a free function and not need to make
+        //       a merkle blob here?  maybe?
+        let mut new = Self::new(Vec::new())?;
+        for (index, block) in MerkleBlobParentFirstIterator::new(&self.blob).enumerate() {
+            // new.insert_entry_to_blob(index, )?
+        }
+        self.blob = new.blob;
+
+        Ok(())
+    }
 }
 
 impl<'a> IntoIterator for &'a MerkleBlob {
     // TODO: review efficiency in whatever use cases we end up with, vs Item = Node etc
     type Item = Block;
-    type IntoIter = MerkleBlobIterator<'a>;
+    type IntoIter = MerkleBlobLeftChildFirstIterator<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
         // TODO: review types around this to avoid copying
-        MerkleBlobIterator::new(&self.blob[..])
+        MerkleBlobLeftChildFirstIterator::new(&self.blob[..])
     }
 }
 
@@ -961,21 +1023,21 @@ impl MerkleBlob {
     }
 }
 
-struct MerkleBlobIteratorItem {
+struct MerkleBlobLeftChildFirstIteratorItem {
     visited: bool,
     index: TreeIndex,
 }
 
-pub struct MerkleBlobIterator<'a> {
+pub struct MerkleBlobLeftChildFirstIterator<'a> {
     blob: &'a [u8],
-    deque: VecDeque<MerkleBlobIteratorItem>,
+    deque: VecDeque<MerkleBlobLeftChildFirstIteratorItem>,
 }
 
-impl<'a> MerkleBlobIterator<'a> {
+impl<'a> MerkleBlobLeftChildFirstIterator<'a> {
     fn new(blob: &'a [u8]) -> Self {
         let mut deque = VecDeque::new();
         if blob.len() / BLOCK_SIZE > 0 {
-            deque.push_back(MerkleBlobIteratorItem {
+            deque.push_back(MerkleBlobLeftChildFirstIteratorItem {
                 visited: false,
                 index: 0,
             });
@@ -985,7 +1047,7 @@ impl<'a> MerkleBlobIterator<'a> {
     }
 }
 
-impl Iterator for MerkleBlobIterator<'_> {
+impl Iterator for MerkleBlobLeftChildFirstIterator<'_> {
     type Item = Block;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -1003,18 +1065,95 @@ impl Iterator for MerkleBlobIterator<'_> {
                         return Some(block);
                     };
 
-                    self.deque.push_front(MerkleBlobIteratorItem {
+                    self.deque.push_front(MerkleBlobLeftChildFirstIteratorItem {
                         visited: true,
                         index: item.index,
                     });
-                    self.deque.push_front(MerkleBlobIteratorItem {
+                    self.deque.push_front(MerkleBlobLeftChildFirstIteratorItem {
                         visited: false,
                         index: right,
                     });
-                    self.deque.push_front(MerkleBlobIteratorItem {
+                    self.deque.push_front(MerkleBlobLeftChildFirstIteratorItem {
                         visited: false,
                         index: left,
                     });
+                }
+            }
+        }
+    }
+}
+
+pub struct MerkleBlobParentFirstIterator<'a> {
+    blob: &'a [u8],
+    deque: VecDeque<TreeIndex>,
+}
+
+impl<'a> MerkleBlobParentFirstIterator<'a> {
+    fn new(blob: &'a [u8]) -> Self {
+        let mut deque = VecDeque::new();
+        if blob.len() / BLOCK_SIZE > 0 {
+            deque.push_back(0);
+        }
+
+        Self { blob, deque }
+    }
+}
+
+impl Iterator for MerkleBlobParentFirstIterator<'_> {
+    type Item = Block;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // left sibling first, parents before children
+
+        loop {
+            let index = self.deque.pop_front()?;
+            let block_bytes: BlockBytes = self.blob[Block::range(index)].try_into().unwrap();
+            let block = Block::from_bytes(block_bytes, index).unwrap();
+
+            match block.node.specific {
+                NodeSpecific::Leaf { .. } => return Some(block),
+                NodeSpecific::Internal { left, right } => {
+                    self.deque.push_front(right);
+                    self.deque.push_front(left);
+                }
+            }
+        }
+    }
+}
+
+pub struct MerkleBlobBreadthFirstIterator<'a> {
+    blob: &'a [u8],
+    deque: VecDeque<TreeIndex>,
+}
+
+impl<'a> MerkleBlobBreadthFirstIterator<'a> {
+    #[allow(unused)]
+    fn new(blob: &'a [u8]) -> Self {
+        let mut deque = VecDeque::new();
+        if blob.len() / BLOCK_SIZE > 0 {
+            deque.push_back(0);
+        }
+
+        Self { blob, deque }
+    }
+}
+
+impl Iterator for MerkleBlobBreadthFirstIterator<'_> {
+    type Item = Block;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // left sibling first, parent depth before child depth
+
+        loop {
+            let index = self.deque.pop_front()?;
+            let block_bytes: BlockBytes = self.blob[Block::range(index)].try_into().unwrap();
+            let block = Block::from_bytes(block_bytes, index).unwrap();
+
+            match block.node.specific {
+                NodeSpecific::Leaf { .. } => return Some(block),
+                NodeSpecific::Internal { left, right } => {
+                    self.deque.push_back(left);
+                    self.deque.push_back(right);
                 }
             }
         }
@@ -1071,6 +1210,16 @@ mod tests {
 
     fn example_merkle_blob() -> MerkleBlob {
         MerkleBlob::new(Vec::from(EXAMPLE_BLOB)).unwrap()
+    }
+
+    #[allow(unused)]
+    fn normalized_blob(merkle_blob: &MerkleBlob) -> Vec<u8> {
+        let mut new = MerkleBlob::new(merkle_blob.blob.clone()).unwrap();
+
+        new.calculate_lazy_hashes();
+        new.rebuild();
+
+        new.blob
     }
 
     #[test]
