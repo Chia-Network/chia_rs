@@ -98,31 +98,35 @@ impl SpendBundle {
 impl SpendBundle {
     #[classmethod]
     #[pyo3(name = "aggregate")]
-    fn py_aggregate(cls: &Bound<'_, PyType>, spend_bundles: Vec<Self>) -> PyResult<PyObject> {
+    fn py_aggregate(
+        cls: &Bound<'_, PyType>,
+        py: Python<'_>,
+        spend_bundles: Vec<Self>,
+    ) -> PyResult<PyObject> {
         let aggregated = Self::aggregate(&spend_bundles);
-        Python::with_gil(|py| {
-            // Convert result into potential child class
-            let instance = cls.call(
-                (aggregated.coin_spends, aggregated.aggregated_signature),
-                None,
-            )?;
+        // Convert result into potential child class
+        let instance = cls.call(
+            (aggregated.coin_spends, aggregated.aggregated_signature),
+            None,
+        )?;
 
-            Ok(instance.into_py(py))
-        })
+        Ok(instance.into_py(py))
     }
 
     #[classmethod]
     #[pyo3(name = "from_parent")]
-    pub fn from_parent(cls: &Bound<'_, PyType>, spend_bundle: Self) -> PyResult<PyObject> {
-        Python::with_gil(|py| {
-            // Convert result into potential child class
-            let instance = cls.call(
-                (spend_bundle.coin_spends, spend_bundle.aggregated_signature),
-                None,
-            )?;
+    pub fn from_parent(
+        cls: &Bound<'_, PyType>,
+        py: Python<'_>,
+        spend_bundle: Self,
+    ) -> PyResult<PyObject> {
+        // Convert result into potential child class
+        let instance = cls.call(
+            (spend_bundle.coin_spends, spend_bundle.aggregated_signature),
+            None,
+        )?;
 
-            Ok(instance.into_py(py))
-        })
+        Ok(instance.into_py(py))
     }
 
     #[pyo3(name = "name")]

@@ -274,7 +274,7 @@ impl SecretKey {
 
     #[classmethod]
     #[pyo3(name = "from_parent")]
-    pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: Self) -> PyResult<PyObject> {
+    pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: &Self) -> PyResult<PyObject> {
         Err(PyNotImplementedError::new_err(
             "SecretKey does not support from_parent().",
         ))

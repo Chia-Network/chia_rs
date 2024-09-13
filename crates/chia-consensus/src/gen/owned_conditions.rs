@@ -157,7 +157,7 @@ fn convert_agg_sigs(a: &Allocator, agg_sigs: &[(PublicKey, NodePtr)]) -> Vec<(Pu
 impl OwnedSpendConditions {
     #[classmethod]
     #[pyo3(name = "from_parent")]
-    pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: Self) -> PyResult<PyObject> {
+    pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: &Self) -> PyResult<PyObject> {
         Err(PyNotImplementedError::new_err(
             "OwnedSpendConditions does not support from_parent().",
         ))
@@ -169,7 +169,7 @@ impl OwnedSpendConditions {
 impl OwnedSpendBundleConditions {
     #[classmethod]
     #[pyo3(name = "from_parent")]
-    pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: Self) -> PyResult<PyObject> {
+    pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: &Self) -> PyResult<PyObject> {
         Err(PyNotImplementedError::new_err(
             "OwnedSpendBundleConditions does not support from_parent().",
         ))
