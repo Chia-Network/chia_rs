@@ -422,16 +422,19 @@ fn fast_forward_singleton<'p>(
 #[pyo3(name = "validate_clvm_and_signature")]
 #[allow(clippy::type_complexity)]
 pub fn py_validate_clvm_and_signature(
+    py: Python<'_>,
     new_spend: &SpendBundle,
     max_cost: u64,
     constants: &ConsensusConstants,
     peak_height: u32,
 ) -> PyResult<(OwnedSpendBundleConditions, Vec<([u8; 32], GTElement)>, f32)> {
-    let (owned_conditions, additions, duration) =
-        validate_clvm_and_signature(new_spend, max_cost, constants, peak_height).map_err(|e| {
+    let (owned_conditions, additions, duration) = py
+        .allow_threads(|| validate_clvm_and_signature(new_spend, max_cost, constants, peak_height))
+        .map_err(|e| {
+            // cast validation error to int
             let error_code: u32 = e.into();
             PyErr::new::<PyTypeError, _>(error_code)
-        })?; // cast validation error to int
+        })?;
     Ok((owned_conditions, additions, duration.as_secs_f32()))
 }
 
