@@ -104,7 +104,7 @@ impl SpendBundle {
         spend_bundles: Vec<Self>,
     ) -> PyResult<PyObject> {
         let aggregated = Bound::new(py, Self::aggregate(&spend_bundles))?;
-        if aggregated.is_exact_instance(&cls) {
+        if aggregated.is_exact_instance(cls) {
             Ok(aggregated.into_py(py))
         } else {
             let instance = cls.call_method1("from_parent", (aggregated.into_py(py),))?;
