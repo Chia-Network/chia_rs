@@ -4,7 +4,7 @@ use pyo3::{buffer::PyBuffer, pyclass, pymethods, PyResult};
 use clvmr::sha2::Sha256;
 use std::cmp::Ordering;
 use std::collections::{HashMap, VecDeque};
-use std::iter::IntoIterator;
+use std::iter::{zip, IntoIterator};
 use std::ops::Range;
 
 // TODO: clearly shouldn't be hard coded
@@ -409,6 +409,7 @@ fn get_keys_values_indexes(blob: &[u8]) -> Result<HashMap<KvId, TreeIndex>, Stri
 }
 
 #[cfg_attr(feature = "py-bindings", pyclass(name = "MerkleBlob"))]
+#[derive(Debug)]
 pub struct MerkleBlob {
     blob: Vec<u8>,
     free_indexes: Vec<TreeIndex>,
@@ -646,7 +647,6 @@ impl MerkleBlob {
         let mut sibling_block = self.get_block(sibling_index)?;
 
         let Some(grandparent_index) = parent.parent else {
-            sibling_block.metadata.dirty = true;
             sibling_block.node.parent = None;
             self.insert_entry_to_blob(0, sibling_block.to_bytes())?;
 
@@ -970,6 +970,21 @@ impl MerkleBlob {
         self.blob = new.blob;
 
         Ok(())
+    }
+}
+
+impl PartialEq for MerkleBlob {
+    fn eq(&self, other: &Self) -> bool {
+        for (self_block, other_block) in zip(self, other) {
+            if (self_block.metadata.dirty || other_block.metadata.dirty)
+                || self_block.node.hash != other_block.node.hash
+                || self_block.node.specific != other_block.node.specific
+            {
+                return false;
+            }
+        }
+
+        true
     }
 }
 
@@ -1390,11 +1405,12 @@ mod tests {
     }
 
     #[test]
-    fn test_delete() {
+    fn test_delete_in_reverse_creates_matching_trees() {
         const COUNT: usize = 10;
         let mut dots = vec![];
 
         let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
+        let mut reference_blobs = vec![];
 
         let key_value_ids: [KvId; COUNT] = core::array::from_fn(|i| i as KvId);
 
@@ -1404,52 +1420,18 @@ mod tests {
             let hash: Hash = hasher.finalize();
 
             println!("inserting: {key_value_id}");
+            merkle_blob.calculate_lazy_hashes();
+            reference_blobs.push(MerkleBlob::new(merkle_blob.blob.clone()).unwrap());
             merkle_blob.insert(key_value_id, hash).unwrap();
             dots.push(merkle_blob.to_dot().dump());
         }
 
-        for key_value_id in key_value_ids {
+        for key_value_id in key_value_ids.iter().rev() {
             println!("deleting: {key_value_id}");
-            merkle_blob.delete(key_value_id).unwrap();
+            merkle_blob.delete(*key_value_id).unwrap();
+            merkle_blob.calculate_lazy_hashes();
+            assert_eq!(merkle_blob, reference_blobs[*key_value_id as usize]);
             dots.push(merkle_blob.to_dot().dump());
         }
-
-        // let mut key_value_ids: Vec<KvId> = vec![0; COUNT];
-        //
-        // for (i, key_value_id) in key_value_ids.iter_mut().enumerate() {
-        //     *key_value_id = i as KvId;
-        // }
-        // for i in 0..100_000 {
-        //     let start = Instant::now();
-        //     merkle_blob
-        //         // TODO: yeah this hash is garbage
-        //         .insert(i as KvId, HASH)
-        //         .unwrap();
-        //     let end = Instant::now();
-        //     total_time += end.duration_since(start);
-        //
-        //     // match i + 1 {
-        //     //     2 => assert_eq!(merkle_blob.blob.len(), 3 * BLOCK_SIZE),
-        //     //     3 => assert_eq!(merkle_blob.blob.len(), 5 * BLOCK_SIZE),
-        //     //     _ => (),
-        //     // }
-        //
-        //     // let file = fs::File::create(format!("/home/altendky/tmp/mbt/rs/{i:0>4}")).unwrap();
-        //     // let mut file = io::LineWriter::new(file);
-        //     // for block in merkle_blob.blob.chunks(BLOCK_SIZE) {
-        //     //     let mut s = String::new();
-        //     //     for byte in block {
-        //     //         s.push_str(&format!("{:02x}", byte));
-        //     //     }
-        //     //     s.push_str("\n");
-        //     //     file.write_all(s.as_bytes()).unwrap();
-        //     // }
-        //
-        //     // fs::write(format!("/home/altendky/tmp/mbt/rs/{i:0>4}"), &merkle_blob.blob).unwrap();
-        // }
-        // // println!("{:?}", merkle_blob.blob)
-        //
-        // println!("total time: {total_time:?}");
-        // // TODO: check, well...  something
     }
 }
