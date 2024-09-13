@@ -410,11 +410,8 @@ fn get_keys_values_indexes(blob: &[u8]) -> Result<HashMap<KvId, TreeIndex>, Stri
     }
 
     for block in MerkleBlobLeftChildFirstIterator::new(blob) {
-        match block.node.specific {
-            NodeSpecific::Leaf { key_value } => {
-                kv_to_index.insert(key_value, block.node.index);
-            }
-            NodeSpecific::Internal { .. } => (),
+        if let NodeSpecific::Leaf { key_value } = block.node.specific {
+            kv_to_index.insert(key_value, block.node.index);
         }
     }
 
@@ -611,22 +608,23 @@ impl MerkleBlob {
 
         let mut old_parent_block =
             Block::from_bytes(self.get_block_bytes(old_parent_index)?, old_parent_index)?;
-        match old_parent_block.node.specific {
-            NodeSpecific::Internal {
-                ref mut left,
-                ref mut right,
-                ..
-            } => {
-                if old_leaf.index == *left {
-                    *left = new_internal_node_index;
-                } else if old_leaf.index == *right {
-                    *right = new_internal_node_index;
-                } else {
-                    panic!();
-                }
+        if let NodeSpecific::Internal {
+            ref mut left,
+            ref mut right,
+            ..
+        } = old_parent_block.node.specific
+        {
+            if old_leaf.index == *left {
+                *left = new_internal_node_index;
+            } else if old_leaf.index == *right {
+                *right = new_internal_node_index;
+            } else {
+                panic!();
             }
-            NodeSpecific::Leaf { .. } => panic!(),
-        }
+        } else {
+            panic!();
+        };
+
         self.insert_entry_to_blob(old_parent_index, old_parent_block.to_bytes())?;
 
         self.mark_lineage_as_dirty(old_parent_index)?;
@@ -639,11 +637,11 @@ impl MerkleBlob {
         let leaf_index = *self.kv_to_index.get(&key_value).unwrap();
         let leaf = self.get_node(leaf_index).unwrap();
 
-        match leaf.specific {
-            // TODO: blech
-            NodeSpecific::Leaf { .. } => (),
-            NodeSpecific::Internal { .. } => panic!(),
-        };
+        // TODO: blech
+        if let NodeSpecific::Leaf { .. } = leaf.specific {
+        } else {
+            panic!()
+        }
         self.kv_to_index.remove(&key_value);
 
         let Some(parent_index) = leaf.parent else {
@@ -687,18 +685,20 @@ impl MerkleBlob {
         sibling_block.node.parent = Some(grandparent_index);
         self.insert_entry_to_blob(sibling_index, sibling_block.to_bytes())?;
 
-        match grandparent_block.node.specific {
-            NodeSpecific::Internal {
-                ref mut left,
-                ref mut right,
-                ..
-            } => match parent_index {
+        if let NodeSpecific::Internal {
+            ref mut left,
+            ref mut right,
+            ..
+        } = grandparent_block.node.specific
+        {
+            match parent_index {
                 x if x == *left => *left = sibling_index,
                 x if x == *right => *right = sibling_index,
                 _ => panic!(),
-            },
-            NodeSpecific::Leaf { .. } => panic!(),
-        };
+            }
+        } else {
+            panic!()
+        }
         self.insert_entry_to_blob(grandparent_index, grandparent_block.to_bytes())?;
 
         self.mark_lineage_as_dirty(grandparent_index)?;
@@ -911,20 +911,18 @@ impl MerkleBlob {
             .filter(|block| block.metadata.dirty)
             .collect::<Vec<_>>()
         {
-            match block.node.specific {
-                NodeSpecific::Leaf { .. } => panic!("leaves should not be dirty"),
-                NodeSpecific::Internal { left, right, .. } => {
-                    // TODO: obviously inefficient to re-get/deserialize these blocks inside
-                    //       an iteration that's already doing that
-                    let left = self.get_block(left).unwrap();
-                    let right = self.get_block(right).unwrap();
-                    // TODO: wrap this up in Block maybe? just to have 'control' of dirty being 'accurate'
-                    block.node.hash = internal_hash(left.node.hash, right.node.hash);
-                    block.metadata.dirty = false;
-                    self.insert_entry_to_blob(block.node.index, block.to_bytes())
-                        .unwrap();
-                }
-            }
+            let NodeSpecific::Internal { left, right } = block.node.specific else {
+                panic!("leaves should not be dirty")
+            };
+            // TODO: obviously inefficient to re-get/deserialize these blocks inside
+            //       an iteration that's already doing that
+            let left = self.get_block(left).unwrap();
+            let right = self.get_block(right).unwrap();
+            // TODO: wrap this up in Block maybe? just to have 'control' of dirty being 'accurate'
+            block.node.hash = internal_hash(left.node.hash, right.node.hash);
+            block.metadata.dirty = false;
+            self.insert_entry_to_blob(block.node.index, block.to_bytes())
+                .unwrap();
         }
     }
 
