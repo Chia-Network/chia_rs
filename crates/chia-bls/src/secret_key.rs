@@ -4,11 +4,11 @@ use chia_traits::{read_bytes, Streamable};
 use clvmr::sha2::Sha256;
 use hkdf::HkdfExtract;
 #[cfg(feature = "py-bindings")]
+use pyo3::exceptions::PyNotImplementedError;
+#[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
 #[cfg(feature = "py-bindings")]
 use pyo3::types::PyType;
-#[cfg(feature = "py-bindings")]
-use pyo3::exceptions::PyNotImplementedError;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
@@ -275,7 +275,9 @@ impl SecretKey {
     #[classmethod]
     #[pyo3(name = "from_parent")]
     pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: Self) -> PyResult<PyObject> {
-        Err(PyNotImplementedError::new_err("SecretKey does not support from_parent()."))
+        Err(PyNotImplementedError::new_err(
+            "SecretKey does not support from_parent().",
+        ))
     }
 
     #[pyo3(name = "derive_hardened")]

@@ -493,7 +493,9 @@ impl Program {
     #[classmethod]
     #[pyo3(name = "from_parent")]
     pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: Self) -> PyResult<PyObject> {
-        Err(PyNotImplementedError::new_err("This class does not support from_parent()."))
+        Err(PyNotImplementedError::new_err(
+            "This class does not support from_parent().",
+        ))
     }
 }
 
