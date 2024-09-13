@@ -5,6 +5,7 @@ use clvmr::sha2::Sha256;
 use std::cmp::Ordering;
 use std::collections::{HashMap, VecDeque};
 use std::iter::{zip, IntoIterator};
+use std::mem::size_of;
 use std::ops::Range;
 
 // TODO: clearly shouldn't be hard coded
@@ -17,7 +18,7 @@ type TreeIndex = u32;
 type Parent = Option<TreeIndex>;
 type Hash = [u8; 32];
 type BlockBytes = [u8; BLOCK_SIZE];
-type KvId = u64;
+type KvId = i64;
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 #[repr(u8)]
@@ -175,12 +176,24 @@ impl NodeSpecific {
     }
 }
 
-const PARENT_RANGE: Range<usize> = 0..4;
-const LEFT_RANGE: Range<usize> = 4..8;
-const RIGHT_RANGE: Range<usize> = 8..12;
-const KEY_VALUE_RANGE: Range<usize> = 4..12;
-// TODO: move the common parts to the beginning of the serialization?
-const HASH_RANGE: Range<usize> = 12..44;
+const fn range_by_length(start: usize, length: usize) -> Range<usize> {
+    start..start + length
+}
+
+// define the serialized block format
+// TODO: consider in more detail other serialization tools such as serde and streamable
+// common fields
+const PARENT_RANGE: Range<usize> = range_by_length(0, size_of::<TreeIndex>());
+// internal specific fields
+const LEFT_RANGE: Range<usize> = range_by_length(PARENT_RANGE.end, size_of::<TreeIndex>());
+const RIGHT_RANGE: Range<usize> = range_by_length(LEFT_RANGE.end, size_of::<TreeIndex>());
+// leaf specific fields
+const KEY_VALUE_RANGE: Range<usize> = range_by_length(PARENT_RANGE.end, size_of::<KvId>());
+// and back to common fields
+// TODO: move the common parts to the beginning of the serialization
+// TODO: better way to pick the max of key value and right range, until we move hash first
+// NOTE: they happen to be the same location right now...
+const HASH_RANGE: Range<usize> = range_by_length(KEY_VALUE_RANGE.end, size_of::<Hash>());
 
 impl Node {
     // fn discriminant(&self) -> u8 {
