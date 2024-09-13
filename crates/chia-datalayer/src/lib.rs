@@ -64,7 +64,7 @@ impl NodeType {
 //     }
 // }
 
-fn internal_hash(left_hash: Hash, right_hash: Hash) -> Hash {
+fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(b"\x02");
     hasher.update(left_hash);
@@ -451,7 +451,7 @@ impl MerkleBlob {
         })
     }
 
-    pub fn insert(&mut self, key_value: KvId, hash: Hash) -> Result<(), String> {
+    pub fn insert(&mut self, key_value: KvId, hash: &Hash) -> Result<(), String> {
         // TODO: what about only unused providing a blob length?
         if self.blob.is_empty() {
             self.insert_first(key_value, hash);
@@ -459,17 +459,17 @@ impl MerkleBlob {
 
         // TODO: make this a parameter so we have one insert call where you specify the location
         let old_leaf = self.get_random_leaf_node_from_bytes(Vec::from(key_value.to_be_bytes()))?;
-        let internal_node_hash = internal_hash(old_leaf.hash, hash);
+        let internal_node_hash = internal_hash(&old_leaf.hash, hash);
 
         if self.kv_to_index.len() == 1 {
-            self.insert_second(key_value, hash, &old_leaf, internal_node_hash);
+            self.insert_second(key_value, hash, &old_leaf, &internal_node_hash);
             return Ok(());
         }
 
-        self.insert_third_or_later(key_value, hash, &old_leaf, internal_node_hash)
+        self.insert_third_or_later(key_value, hash, &old_leaf, &internal_node_hash)
     }
 
-    fn insert_first(&mut self, key_value: KvId, hash: Hash) {
+    fn insert_first(&mut self, key_value: KvId, hash: &Hash) {
         let new_leaf_block = Block {
             metadata: NodeMetadata {
                 node_type: NodeType::Leaf,
@@ -478,7 +478,7 @@ impl MerkleBlob {
             node: Node {
                 parent: None,
                 specific: NodeSpecific::Leaf { key_value },
-                hash,
+                hash: *hash,
                 index: 0,
             },
         };
@@ -493,9 +493,9 @@ impl MerkleBlob {
     fn insert_second(
         &mut self,
         key_value: KvId,
-        hash: Hash,
+        hash: &Hash,
         old_leaf: &Node,
-        internal_node_hash: Hash,
+        internal_node_hash: &Hash,
     ) {
         self.blob.clear();
 
@@ -507,7 +507,7 @@ impl MerkleBlob {
             node: Node {
                 parent: None,
                 specific: NodeSpecific::Internal { left: 1, right: 2 },
-                hash: internal_node_hash,
+                hash: *internal_node_hash,
                 index: 0,
             },
         };
@@ -540,7 +540,7 @@ impl MerkleBlob {
             node: Node {
                 parent: Some(0),
                 specific: NodeSpecific::Leaf { key_value },
-                hash,
+                hash: *hash,
                 index: 2,
             },
         };
@@ -557,9 +557,9 @@ impl MerkleBlob {
     fn insert_third_or_later(
         &mut self,
         key_value: KvId,
-        hash: Hash,
+        hash: &Hash,
         old_leaf: &Node,
-        internal_node_hash: Hash,
+        internal_node_hash: &Hash,
     ) -> Result<(), String> {
         let new_leaf_index = self.get_new_index();
         let new_internal_node_index = self.get_new_index();
@@ -572,7 +572,7 @@ impl MerkleBlob {
             node: Node {
                 parent: Some(new_internal_node_index),
                 specific: NodeSpecific::Leaf { key_value },
-                hash,
+                hash: *hash,
                 index: new_leaf_index,
             },
         };
@@ -589,7 +589,7 @@ impl MerkleBlob {
                     left: old_leaf.index,
                     right: new_leaf_index,
                 },
-                hash: internal_node_hash,
+                hash: *internal_node_hash,
                 index: new_internal_node_index,
             },
         };
@@ -706,7 +706,7 @@ impl MerkleBlob {
         Ok(())
     }
 
-    // fn upsert(&self, old_key_value: KvId, new_key_value: KvId, new_hash: Hash) -> Result<(), String> {
+    // fn upsert(&self, old_key_value: KvId, new_key_value: KvId, new_hash: &Hash) -> Result<(), String> {
     //     if old_key_value
     // }
 
@@ -919,7 +919,7 @@ impl MerkleBlob {
             let left = self.get_block(left).unwrap();
             let right = self.get_block(right).unwrap();
             // TODO: wrap this up in Block maybe? just to have 'control' of dirty being 'accurate'
-            block.node.hash = internal_hash(left.node.hash, right.node.hash);
+            block.node.hash = internal_hash(&left.node.hash, &right.node.hash);
             block.metadata.dirty = false;
             self.insert_entry_to_blob(block.node.index, block.to_bytes())
                 .unwrap();
@@ -1030,7 +1030,7 @@ impl MerkleBlob {
     #[pyo3(name = "insert")]
     pub fn py_insert(&mut self, key_value: KvId, hash: Hash) -> PyResult<()> {
         // TODO: consider the error
-        self.insert(key_value, hash).unwrap();
+        self.insert(key_value, &hash).unwrap();
 
         Ok(())
     }
@@ -1277,7 +1277,7 @@ mod tests {
             54, 55, 56, 57, 58, 59, 60, 61, 62, 63,
         ];
         assert_eq!(
-            internal_hash(left, right),
+            internal_hash(&left, &right),
             clvm_utils::tree_hash_pair(
                 clvm_utils::TreeHash::new(left),
                 clvm_utils::TreeHash::new(right)
@@ -1355,10 +1355,10 @@ mod tests {
         let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
 
         merkle_blob
-            .insert(EXAMPLE_LEFT_LEAF.key_value(), EXAMPLE_LEFT_LEAF.hash)
+            .insert(EXAMPLE_LEFT_LEAF.key_value(), &EXAMPLE_LEFT_LEAF.hash)
             .unwrap();
         merkle_blob
-            .insert(EXAMPLE_RIGHT_LEAF.key_value(), EXAMPLE_RIGHT_LEAF.hash)
+            .insert(EXAMPLE_RIGHT_LEAF.key_value(), &EXAMPLE_RIGHT_LEAF.hash)
             .unwrap();
 
         // TODO: just hacking here to compare with the ~wrong~ simplified reference
@@ -1383,7 +1383,7 @@ mod tests {
             let start = Instant::now();
             merkle_blob
                 // TODO: yeah this hash is garbage
-                .insert(i as KvId, HASH)
+                .insert(i as KvId, &HASH)
                 .unwrap();
             let end = Instant::now();
             total_time += end.duration_since(start);
@@ -1433,7 +1433,7 @@ mod tests {
             println!("inserting: {key_value_id}");
             merkle_blob.calculate_lazy_hashes();
             reference_blobs.push(MerkleBlob::new(merkle_blob.blob.clone()).unwrap());
-            merkle_blob.insert(key_value_id, hash).unwrap();
+            merkle_blob.insert(key_value_id, &hash).unwrap();
             dots.push(merkle_blob.to_dot().dump());
         }
 
