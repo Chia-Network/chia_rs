@@ -164,15 +164,15 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
             pub fn from_json_dict(cls: &pyo3::Bound<'_, pyo3::types::PyType>, py: pyo3::Python<'_>, json_dict: &pyo3::Bound<pyo3::PyAny>) -> pyo3::PyResult<pyo3::PyObject> {
                 use pyo3::prelude::PyAnyMethods;
                 use pyo3::IntoPy;
+                use pyo3::Bound;
                 use pyo3::type_object::PyTypeInfo;
                 use std::borrow::Borrow;
-                let rust_obj = <Self as #crate_name::from_json_dict::FromJsonDict>::from_json_dict(json_dict)?;
+                let rust_obj = Bound::new(py, <Self as #crate_name::from_json_dict::FromJsonDict>::from_json_dict(json_dict)?)?;
 
                 // Check if python class is different from rust class (in case of child classes)
                 // if so call the python class's conversion code
 
-                let cls_type = cls.borrow().as_ref();
-                if <Self as PyTypeInfo>::is_exact_type_of_bound(cls_type) {
+                if rust_obj.is_exact_instance(&cls) {
                     Ok(rust_obj.into_py(py))
                 } else {
                     let instance = cls.call_method1("from_parent", (rust_obj.into_py(py),))?;
@@ -194,6 +194,7 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
             pub fn py_from_bytes(cls: &pyo3::Bound<'_, pyo3::types::PyType>, py: pyo3::Python<'_>, blob: pyo3::buffer::PyBuffer<u8>) -> pyo3::PyResult<pyo3::PyObject> {
                 use pyo3::prelude::PyAnyMethods;
                 use pyo3::IntoPy;
+                use pyo3::Bound;
                 use pyo3::type_object::PyTypeInfo;
                 use std::borrow::Borrow;
 
@@ -203,13 +204,12 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 let slice = unsafe {
                     std::slice::from_raw_parts(blob.buf_ptr() as *const u8, blob.len_bytes())
                 };
-                let rust_obj = <Self as #crate_name::Streamable>::from_bytes(slice)?;
+                let rust_obj = Bound::new(py, <Self as #crate_name::Streamable>::from_bytes(slice)?)?;
 
                 // Check if python class is different from rust class (in case of child classes)
                 // if so call the python class's conversion code
 
-                let cls_type = cls.borrow().as_ref();
-                if <Self as PyTypeInfo>::is_exact_type_of_bound(cls_type) {
+                if rust_obj.is_exact_instance(&cls) {
                     Ok(rust_obj.into_py(py))
                 } else {
                     let instance = cls.call_method1("from_parent", (rust_obj.into_py(py),))?;
@@ -222,6 +222,7 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
             pub fn py_from_bytes_unchecked(cls: &pyo3::Bound<'_, pyo3::types::PyType>, py: pyo3::Python<'_>, blob: pyo3::buffer::PyBuffer<u8>) -> pyo3::PyResult<pyo3::PyObject> {
                 use pyo3::prelude::PyAnyMethods;
                 use pyo3::IntoPy;
+                use pyo3::Bound;
                 use pyo3::type_object::PyTypeInfo;
                 use std::borrow::Borrow;
                 if !blob.is_c_contiguous() {
@@ -230,13 +231,12 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 let slice = unsafe {
                     std::slice::from_raw_parts(blob.buf_ptr() as *const u8, blob.len_bytes())
                 };
-                let rust_obj = <Self as #crate_name::Streamable>::from_bytes_unchecked(slice).map_err(|e| <#crate_name::chia_error::Error as Into<pyo3::PyErr>>::into(e))?;
+                let rust_obj = Bound::new(py, <Self as #crate_name::Streamable>::from_bytes_unchecked(slice).map_err(|e| <#crate_name::chia_error::Error as Into<pyo3::PyErr>>::into(e))?)?;
 
                 // Check if python class is different from rust class (in case of child classes)
                 // if so call the python class's conversion code
 
-                let cls_type = cls.borrow().as_ref();
-                if <Self as PyTypeInfo>::is_exact_type_of_bound(cls_type) {
+                if rust_obj.is_exact_instance(&cls) {
                     Ok(rust_obj.into_py(py))
                 } else {
                     let instance = cls.call_method1("from_parent", (rust_obj.into_py(py),))?;
@@ -250,6 +250,7 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
             pub fn parse_rust<'p>(cls: &pyo3::Bound<'_, pyo3::types::PyType>, py: pyo3::Python<'_>, blob: pyo3::buffer::PyBuffer<u8>, trusted: bool) -> pyo3::PyResult<(pyo3::PyObject, u32)> {
                 use pyo3::prelude::PyAnyMethods;
                 use pyo3::IntoPy;
+                use pyo3::Bound;
                 use pyo3::type_object::PyTypeInfo;
                 use std::borrow::Borrow;
                 if !blob.is_c_contiguous() {
@@ -259,7 +260,7 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                     std::slice::from_raw_parts(blob.buf_ptr() as *const u8, blob.len_bytes())
                 };
                 let mut input = std::io::Cursor::<&[u8]>::new(slice);
-                let rust_obj= if trusted {
+                let rust_obj = if trusted {
                     <Self as #crate_name::Streamable>::parse::<true>(&mut input).map_err(|e| <#crate_name::chia_error::Error as Into<pyo3::PyErr>>::into(e)).map(|v| (v, input.position() as u32))
                 } else {
                     <Self as #crate_name::Streamable>::parse::<false>(&mut input).map_err(|e| <#crate_name::chia_error::Error as Into<pyo3::PyErr>>::into(e)).map(|v| (v, input.position() as u32))
@@ -268,8 +269,9 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 // Check if python class is different from rust class (in case of child classes)
                 // if so call the python class's conversion code
 
-                let cls_type = cls.borrow().as_ref();
-                if <Self as PyTypeInfo>::is_exact_type_of_bound(cls_type) {
+                let rust_obj = (Bound::new(py, rust_obj.0)?, rust_obj.1);
+
+                if rust_obj.0.is_exact_instance(&cls) {
                     Ok((rust_obj.0.into_py(py), rust_obj.1))
                 } else {
                     let instance = cls.call_method1("from_parent", (rust_obj.0.into_py(py),))?;
