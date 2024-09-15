@@ -25,18 +25,42 @@ fn main() {
 
     let blake3_include_path = dst.join("build").join("_deps").join("blake3-src").join("c");
 
-    println!(
-        "cargo:rustc-link-search=native={}",
-        dst.join("build").to_str().unwrap()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}",
-        dst.join("build")
-            .join("_deps")
-            .join("blake3-build")
-            .to_str()
-            .unwrap()
-    );
+    // Detect platform: macOS vs. Windows
+    if cfg!(target_os = "windows") {
+        // Windows: Add `Release` or `Debug` subdirectory based on build type
+        let build_type = if cfg!(debug_assertions) {
+            "Debug"
+        } else {
+            "Release"
+        };
+        println!(
+            "cargo:rustc-link-search=native={}",
+            dst.join("build").join(build_type).to_str().unwrap()
+        );
+        println!(
+            "cargo:rustc-link-search=native={}",
+            dst.join("build")
+                .join("_deps")
+                .join("blake3-build")
+                .join(build_type)
+                .to_str()
+                .unwrap()
+        );
+    } else {
+        // macOS (or other platforms): Keep it as is
+        println!(
+            "cargo:rustc-link-search=native={}",
+            dst.join("build").to_str().unwrap()
+        );
+        println!(
+            "cargo:rustc-link-search=native={}",
+            dst.join("build")
+                .join("_deps")
+                .join("blake3-build")
+                .to_str()
+                .unwrap()
+        );
+    }
 
     println!("cargo:rustc-link-lib=static=blake3");
     println!("cargo:rustc-link-lib=static=chiapos_static");
