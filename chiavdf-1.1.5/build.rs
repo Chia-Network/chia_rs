@@ -47,6 +47,16 @@ fn main() {
                 .unwrap()
         );
 
+        println!(
+            "cargo:rustc-link-search=native={}",
+            src_dir
+                .parent()
+                .unwrap()
+                .join("mpir_gc_x64")
+                .to_str()
+                .unwrap()
+        );
+
         println!("cargo:rustc-link-lib=mpir");
     } else {
         // macOS (or other platforms): Keep it as is
