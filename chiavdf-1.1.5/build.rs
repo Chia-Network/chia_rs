@@ -46,6 +46,8 @@ fn main() {
                 .to_str()
                 .unwrap()
         );
+
+        println!("cargo:rustc-link-lib=mpir");
     } else {
         // macOS (or other platforms): Keep it as is
         println!(
@@ -58,10 +60,11 @@ fn main() {
                 .to_str()
                 .unwrap()
         );
+
+        println!("cargo:rustc-link-lib=gmp");
     }
 
     println!("cargo:rustc-link-lib=static=chiavdfc");
-    println!("cargo:rustc-link-lib=gmp");
 
     let bindings = bindgen::Builder::default()
         .header(manifest_dir.join("wrapper.h").to_str().unwrap())
