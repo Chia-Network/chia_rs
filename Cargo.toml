@@ -139,5 +139,5 @@ zstd = "0.13.2"
 blocking-threadpool = "1.0.1"
 libfuzzer-sys = "0.4"
 wasm-bindgen = "0.2.93"
-chiavdf = "1.1.5"
+chiavdf = { git = "https://github.com/Chia-Network/chiavdf", rev = "0a033dc8d7273fdd389c761975fb44f7081da4e8" }
 chiapos = "2.0.6"

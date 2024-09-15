@@ -597,8 +597,7 @@ dependencies = [
 [[package]]
 name = "chiavdf"
 version = "1.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ac8ebe9490e1161bd7b85b6bd5b85ff5a8b8ae697933ab7c9ddce0b462c411b"
+source = "git+https://github.com/Chia-Network/chiavdf?rev=0a033dc8d7273fdd389c761975fb44f7081da4e8#0a033dc8d7273fdd389c761975fb44f7081da4e8"
 dependencies = [
  "bindgen",
  "cmake",
