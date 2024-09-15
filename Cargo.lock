@@ -586,11 +586,10 @@ dependencies = [
 [[package]]
 name = "chiapos"
 version = "2.0.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78a393ad4bb200d2033e69d02557940f827048783562994df24c2e994b54117d"
 dependencies = [
  "bindgen",
  "cmake",
+ "hex",
  "link-cplusplus",
 ]
 
