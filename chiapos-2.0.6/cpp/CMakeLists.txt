@@ -194,8 +194,8 @@ endif()
 
 find_package(Threads REQUIRED)
 
-add_library(uint128 STATIC ${CMAKE_CURRENT_SOURCE_DIR}/../uint128_t/uint128_t.cpp)
-target_include_directories(uint128 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../uint128_t)
+add_library(uint128 STATIC ${CMAKE_CURRENT_SOURCE_DIR}/uint128_t/uint128_t.cpp)
+target_include_directories(uint128 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/uint128_t)
 
 target_compile_features(fse PUBLIC cxx_std_17)
 target_compile_features(chiapos PUBLIC cxx_std_17)
