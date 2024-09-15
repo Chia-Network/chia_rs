@@ -221,7 +221,7 @@ target_link_libraries(RunTests PRIVATE fse Threads::Threads Catch2::Catch2WithMa
 
 if (BUILD_STATIC_CHIAPOS_LIBRARY)
   target_link_libraries(chiapos_static PRIVATE $<$<CXX_COMPILER_ID:MSVC>:uint128>)
-endif
+endif()
 
 if (${CP_LINK_BLADEBIT_HARVESTER})
 
