@@ -189,7 +189,7 @@ jobs:
         run: |
           py -${{ matrix.python.major-dot-minor }} -m venv venv
           . .\venv\Scripts\Activate.ps1
-          maturin build -i python --release -m wheel/Cargo.toml
+          maturin build -i python --release -m wheel/Cargo.toml -vv
 
       - uses: Chia-Network/actions/create-venv@main
         id: create-venv

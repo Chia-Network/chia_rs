@@ -1,8 +1,14 @@
-use std::env;
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::{env, fs};
 
 use cmake::Config;
+
+macro_rules! p {
+    ($($tokens: tt)*) => {
+        println!("cargo:warning={}", format!($($tokens)*))
+    }
+}
 
 fn main() {
     println!("cargo:rerun-if-changed=wrapper.h");
@@ -27,16 +33,21 @@ fn main() {
         .define("BUILD_PYTHON", "OFF")
         .build();
 
-    println!(
-        "cargo:rustc-link-search=native={}",
-        PathBuf::from_str(dst.display().to_string().as_str())
-            .unwrap()
-            .join("build")
-            .join("lib")
-            .join("static")
-            .to_str()
-            .unwrap()
-    );
+    let search = PathBuf::from_str(dst.display().to_string().as_str())
+        .unwrap()
+        .join("build")
+        .join("lib")
+        .join("static");
+
+    let search = search.to_str().unwrap();
+
+    p!("{search}");
+
+    fs::read_dir(search).unwrap().for_each(|path| {
+        p!("{:?}", path.unwrap().path());
+    });
+
+    println!("cargo:rustc-link-search=native={}", search);
     println!("cargo:rustc-link-lib=static=chiavdfc");
     println!("cargo:rustc-link-lib=gmp");
 
