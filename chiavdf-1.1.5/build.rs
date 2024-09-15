@@ -1,14 +1,8 @@
+use std::env;
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::{env, fs};
 
 use cmake::Config;
-
-macro_rules! p {
-    ($($tokens: tt)*) => {
-        println!("cargo:warning={}", format!($($tokens)*))
-    }
-}
 
 fn main() {
     println!("cargo:rerun-if-changed=wrapper.h");
@@ -33,21 +27,39 @@ fn main() {
         .define("BUILD_PYTHON", "OFF")
         .build();
 
-    let search = PathBuf::from_str(dst.display().to_string().as_str())
-        .unwrap()
-        .join("build")
-        .join("lib")
-        .join("static");
+    // Detect platform: macOS vs. Windows
+    if cfg!(target_os = "windows") {
+        // Windows: Add `Release` or `Debug` subdirectory based on build type
+        let build_type = if cfg!(debug_assertions) {
+            "Debug"
+        } else {
+            "Release"
+        };
+        println!(
+            "cargo:rustc-link-search=native={}",
+            PathBuf::from_str(dst.display().to_string().as_str())
+                .unwrap()
+                .join("build")
+                .join("lib")
+                .join("static")
+                .join(build_type)
+                .to_str()
+                .unwrap()
+        );
+    } else {
+        // macOS (or other platforms): Keep it as is
+        println!(
+            "cargo:rustc-link-search=native={}",
+            PathBuf::from_str(dst.display().to_string().as_str())
+                .unwrap()
+                .join("build")
+                .join("lib")
+                .join("static")
+                .to_str()
+                .unwrap()
+        );
+    }
 
-    let search = search.to_str().unwrap();
-
-    p!("{search}");
-
-    fs::read_dir(search).unwrap().for_each(|path| {
-        p!("{:?}", path.unwrap().path());
-    });
-
-    println!("cargo:rustc-link-search=native={}", search);
     println!("cargo:rustc-link-lib=static=chiavdfc");
     println!("cargo:rustc-link-lib=gmp");
 
