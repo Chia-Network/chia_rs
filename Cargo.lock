@@ -597,10 +597,11 @@ dependencies = [
 [[package]]
 name = "chiavdf"
 version = "1.1.5"
-source = "git+https://github.com/Chia-Network/chiavdf?rev=0a033dc8d7273fdd389c761975fb44f7081da4e8#0a033dc8d7273fdd389c761975fb44f7081da4e8"
 dependencies = [
  "bindgen",
  "cmake",
+ "hex",
+ "hex-literal",
  "link-cplusplus",
 ]
 
