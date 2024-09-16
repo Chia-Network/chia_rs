@@ -19,12 +19,14 @@ pub struct CoinSpend {
 impl CoinSpend {
     #[classmethod]
     #[pyo3(name = "from_parent")]
-    pub fn from_parent(cls: &Bound<'_, PyType>, cs: Self) -> PyResult<PyObject> {
-        Python::with_gil(|py| {
-            // Convert result into potential child class
-            let instance = cls.call1((cs.coin, cs.puzzle_reveal, cs.solution))?;
+    pub fn from_parent(
+        cls: &Bound<'_, PyType>,
+        py: Python<'_>,
+        cs: Self) -> PyResult<PyObject> 
+    {
+        // Convert result into potential child class
+        let instance = cls.call1((cs.coin, cs.puzzle_reveal, cs.solution))?;
 
-            Ok(instance.into_py(py))
-        })
+        Ok(instance.into_py(py))
     }
 }
