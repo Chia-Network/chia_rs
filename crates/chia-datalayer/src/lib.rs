@@ -92,7 +92,7 @@ impl DotLines {
             nodes: vec![],
             connections: vec![],
             pair_boxes: vec![],
-            note: "".to_string(),
+            note: String::new(),
         }
     }
 
@@ -105,7 +105,7 @@ impl DotLines {
     pub fn dump(&mut self) -> String {
         // TODO: consuming itself, secretly
         let note = &self.note;
-        let mut result = vec![format!("# {note}"), "".to_string(), "digraph {".to_string()];
+        let mut result = vec![format!("# {note}"), String::new(), "digraph {".to_string()];
         result.append(&mut self.nodes);
         result.append(&mut self.connections);
         result.append(&mut self.pair_boxes);
@@ -312,7 +312,7 @@ impl Node {
                 pair_boxes: vec![
                     format!("node [shape = box]; {{rank = same; node_{left}->node_{right}[style=invis]; rankdir = LR}}"),
                 ],
-                note: "".to_string(),
+                note: String::new(),
             },
             NodeSpecific::Leaf {key_value} => DotLines{
                 nodes: vec![
@@ -326,7 +326,7 @@ impl Node {
                     },
                 ],
                 pair_boxes: vec![],
-                note: "".to_string(),
+                note: String::new(),
             },
         }
     }
@@ -466,19 +466,20 @@ impl MerkleBlob {
         // TODO: what about only unused providing a blob length?
         if self.blob.is_empty() {
             self.insert_first(key_value, hash);
-            return Ok(());
+        } else {
+            // TODO: make this a parameter so we have one insert call where you specify the location
+            let old_leaf =
+                self.get_random_leaf_node_from_bytes(Vec::from(key_value.to_be_bytes()))?;
+            let internal_node_hash = internal_hash(&old_leaf.hash, hash);
+
+            if self.kv_to_index.len() == 1 {
+                self.insert_second(key_value, hash, &old_leaf, &internal_node_hash);
+            } else {
+                self.insert_third_or_later(key_value, hash, &old_leaf, &internal_node_hash)?;
+            }
         }
 
-        // TODO: make this a parameter so we have one insert call where you specify the location
-        let old_leaf = self.get_random_leaf_node_from_bytes(Vec::from(key_value.to_be_bytes()))?;
-        let internal_node_hash = internal_hash(&old_leaf.hash, hash);
-
-        if self.kv_to_index.len() == 1 {
-            self.insert_second(key_value, hash, &old_leaf, &internal_node_hash);
-            return Ok(());
-        }
-
-        self.insert_third_or_later(key_value, hash, &old_leaf, &internal_node_hash)
+        Ok(())
     }
 
     fn insert_first(&mut self, key_value: KvId, hash: &Hash) {
