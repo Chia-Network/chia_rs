@@ -54,15 +54,17 @@ where
         let amount_bytes = s.0.amount.to_be_bytes();
         // chialisp represents integers as small as possible so remove leading 0s
         let leading_zeroes = amount_bytes.iter().take_while(|&&b| b == 0).count();
-        let amount_size = amount_bytes[leading_zeroes..].len();
-
+        let mut amount_size = amount_bytes[leading_zeroes..].len();
         if amount_bytes[leading_zeroes] >= 0x80 {
-            // add 0x00 for two's compliment
-            size += 1;
+            // add 0x00 for two's compliment as amount is always positive
+            amount_size += 1;
         }
 
         // parent-id puzzle-reveal amount solution + bytes for list extension and atom prep bytes
         size += 32 + puzzle.len() + amount_size + solution.len() + 8;
+        if s.0.amount < 128 {
+            size -= 1;
+        }
     }
 
     size
@@ -226,8 +228,10 @@ mod tests {
         let generator_output = run_generator(&result);
         assert_eq!(generator_output, EXPECTED_GENERATOR_OUTPUT);
 
-        let result = solution_generator([(coin2, PUZZLE2.as_ref(), SOLUTION2.as_ref())])
-            .expect("solution_generator");
+        let spends = [(coin2, PUZZLE2.as_ref(), SOLUTION2.as_ref())];
+        let result = solution_generator(spends).expect("solution_generator");
+
+        assert_eq!(result.len(), calculate_generator_length(spends));
 
         assert_eq!(
             result,
@@ -255,11 +259,11 @@ mod tests {
     #[test]
     fn test_length_calculator() {
         let mut spends: Vec<(Coin, &[u8], &[u8])> = Vec::new();
-        for i in 1..100 {
+        for i in [1, 128, 129, 256, 257, 4_294_967_296, 4_294_967_297] {
             let coin: Coin = Coin::new(
                 hex!("ccd5bb71183532bff220ba46c268991a00000000000000000000000000036840").into(),
                 hex!("fcc78a9e396df6ceebc217d2446bc016e0b3d5922fb32e5783ec5a85d490cfb6").into(),
-                i * 100000,
+                i,
             );
             spends.push((coin, PUZZLE1.as_ref(), SOLUTION1.as_ref()));
             let result = solution_generator(spends.clone()).expect("solution_generator");

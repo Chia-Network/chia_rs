@@ -4,7 +4,7 @@ use crate::gen::conditions::{
 };
 use crate::gen::flags::MEMPOOL_MODE;
 use crate::gen::run_block_generator::subtract_cost;
-use crate::gen::solution_generator::solution_generator;
+use crate::gen::solution_generator::{calculate_generator_length, solution_generator};
 use crate::gen::validation_error::ValidationErr;
 use crate::spendbundle_validation::get_flags_for_height_and_constants;
 use chia_protocol::SpendBundle;
@@ -42,7 +42,8 @@ pub fn get_conditions_from_spendbundle(
     });
     // We don't pay the size cost (nor execution cost) of being wrapped by a
     // quote (in solution_generator).
-    let generator_length_without_quote = solution_generator(spends_info)?.len() - QUOTE_BYTES;
+    let generator_length_without_quote = calculate_generator_length(spends_info) - QUOTE_BYTES;
+
     let byte_cost = generator_length_without_quote as u64 * constants.cost_per_byte;
     subtract_cost(a, &mut cost_left, byte_cost)?;
 
