@@ -101,9 +101,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.86"
+version = "1.0.89"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3d1d046238990b9cf5bcde22a3fb3584ee5cf65fb2765f454ed428c7a0063da"
+checksum = "86fdf8605db99b54d3cd748a44c6d04df638eb5dafb219b135d0149bd0db01f6"
 
 [[package]]
 name = "arbitrary"
@@ -322,15 +322,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "chia-bls-fuzz"
-version = "0.13.0"
-dependencies = [
- "chia-bls 0.13.0",
- "libfuzzer-sys",
- "pyo3",
-]
-
-[[package]]
 name = "chia-client"
 version = "0.13.0"
 dependencies = [
@@ -399,19 +390,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "chia-protocol-fuzz"
-version = "0.13.0"
-dependencies = [
- "arbitrary",
- "chia-protocol",
- "chia-traits 0.11.0",
- "clvm-traits",
- "clvmr",
- "hex",
- "libfuzzer-sys",
-]
-
-[[package]]
 name = "chia-puzzles"
 version = "0.13.0"
 dependencies = [
@@ -424,16 +402,6 @@ dependencies = [
  "hex",
  "hex-literal",
  "num-bigint",
-]
-
-[[package]]
-name = "chia-puzzles-fuzz"
-version = "0.13.0"
-dependencies = [
- "chia-puzzles",
- "clvm-traits",
- "clvmr",
- "libfuzzer-sys",
 ]
 
 [[package]]
@@ -632,15 +600,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "clvm-traits-fuzz"
-version = "0.13.0"
-dependencies = [
- "clvm-traits",
- "clvmr",
- "libfuzzer-sys",
-]
-
-[[package]]
 name = "clvm-utils"
 version = "0.13.0"
 dependencies = [
@@ -648,17 +607,6 @@ dependencies = [
  "clvmr",
  "hex",
  "rstest",
-]
-
-[[package]]
-name = "clvm-utils-fuzz"
-version = "0.13.0"
-dependencies = [
- "chia-fuzz",
- "clvm-traits",
- "clvm-utils",
- "clvmr",
- "libfuzzer-sys",
 ]
 
 [[package]]
