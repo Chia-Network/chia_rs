@@ -32,7 +32,7 @@ pub fn validate_clvm_and_signature(
     let mut a = make_allocator(LIMIT_HEAP);
     let sbc = get_conditions_from_spendbundle(&mut a, spend_bundle, max_cost, height, constants)
         .map_err(|e| e.1)?;
-    let npcresult = OwnedSpendBundleConditions::from(&a, sbc);
+    let conditions = OwnedSpendBundleConditions::from(&a, sbc);
 
     // Collect all pairs in a single vector to avoid multiple iterations
     let mut pairs = Vec::new();
@@ -40,7 +40,7 @@ pub fn validate_clvm_and_signature(
     let mut aug_msg = Vec::<u8>::new();
     let mut final_msg = Vec::<u8>::new();
 
-    for spend in &npcresult.spends {
+    for spend in &conditions.spends {
         let condition_items_pairs = [
             (AGG_SIG_PARENT, &spend.agg_sig_parent),
             (AGG_SIG_PUZZLE, &spend.agg_sig_puzzle),
@@ -67,7 +67,7 @@ pub fn validate_clvm_and_signature(
     }
 
     // Adding unsafe items
-    for (pk, msg) in &npcresult.agg_sig_unsafe {
+    for (pk, msg) in &conditions.agg_sig_unsafe {
         let mut aug_msg = pk.to_bytes().to_vec();
         aug_msg.extend_from_slice(msg.as_ref());
         let aug_hash = hash_to_g2(&aug_msg);
@@ -85,7 +85,7 @@ pub fn validate_clvm_and_signature(
     }
 
     // Collect results
-    Ok((npcresult, pairs, start_time.elapsed()))
+    Ok((conditions, pairs, start_time.elapsed()))
 }
 
 fn hash_pk_and_msg(pk: &[u8], msg: &[u8]) -> [u8; 32] {
