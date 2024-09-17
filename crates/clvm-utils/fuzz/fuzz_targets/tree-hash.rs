@@ -1,9 +1,9 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
+use chia_fuzz::{make_tree, BitCursor};
 use clvm_utils::{tree_hash, tree_hash_cached, TreeHash};
 use clvmr::{Allocator, NodePtr};
-use fuzzing_utils::{make_tree, BitCursor};
 use std::collections::{HashMap, HashSet};
 
 use clvmr::serde::{node_from_bytes_backrefs_record, node_to_bytes_backrefs};
