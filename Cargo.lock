@@ -322,15 +322,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "chia-bls-fuzz"
-version = "0.13.0"
-dependencies = [
- "chia-bls 0.13.0",
- "libfuzzer-sys",
- "pyo3",
-]
-
-[[package]]
 name = "chia-client"
 version = "0.13.0"
 dependencies = [
@@ -399,19 +390,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "chia-protocol-fuzz"
-version = "0.13.0"
-dependencies = [
- "arbitrary",
- "chia-protocol",
- "chia-traits 0.11.0",
- "clvm-traits",
- "clvmr",
- "hex",
- "libfuzzer-sys",
-]
-
-[[package]]
 name = "chia-puzzles"
 version = "0.13.0"
 dependencies = [
@@ -424,16 +402,6 @@ dependencies = [
  "hex",
  "hex-literal",
  "num-bigint",
-]
-
-[[package]]
-name = "chia-puzzles-fuzz"
-version = "0.13.0"
-dependencies = [
- "chia-puzzles",
- "clvm-traits",
- "clvmr",
- "libfuzzer-sys",
 ]
 
 [[package]]
@@ -632,15 +600,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "clvm-traits-fuzz"
-version = "0.13.0"
-dependencies = [
- "clvm-traits",
- "clvmr",
- "libfuzzer-sys",
-]
-
-[[package]]
 name = "clvm-utils"
 version = "0.13.0"
 dependencies = [
@@ -648,17 +607,6 @@ dependencies = [
  "clvmr",
  "hex",
  "rstest",
-]
-
-[[package]]
-name = "clvm-utils-fuzz"
-version = "0.13.0"
-dependencies = [
- "chia-fuzz",
- "clvm-traits",
- "clvm-utils",
- "clvmr",
- "libfuzzer-sys",
 ]
 
 [[package]]
@@ -2370,9 +2318,9 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tokio"
-version = "1.39.3"
+version = "1.40.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9babc99b9923bfa4804bd74722ff02c0381021eafa4db9949217e3be8e84fff5"
+checksum = "e2b070231665d27ad9ec9b8df639893f46727666c6767db40317fbe920a5d998"
 dependencies = [
  "backtrace",
  "bytes",
