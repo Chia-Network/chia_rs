@@ -77,6 +77,7 @@ pub struct DotLines {
     nodes: Vec<String>,
     connections: Vec<String>,
     pair_boxes: Vec<String>,
+    note: String,
 }
 
 impl Default for DotLines {
@@ -91,6 +92,7 @@ impl DotLines {
             nodes: vec![],
             connections: vec![],
             pair_boxes: vec![],
+            note: "".to_string(),
         }
     }
 
@@ -102,13 +104,20 @@ impl DotLines {
 
     pub fn dump(&mut self) -> String {
         // TODO: consuming itself, secretly
-        let mut result = vec!["digraph {".to_string()];
+        let note = &self.note;
+        let mut result = vec![format!("# {note}"), "".to_string(), "digraph {".to_string()];
         result.append(&mut self.nodes);
         result.append(&mut self.connections);
         result.append(&mut self.pair_boxes);
         result.push("}".to_string());
 
         result.join("\n")
+    }
+
+    pub fn set_note(&mut self, note: &str) -> &mut Self {
+        self.note = String::from(note);
+
+        self
     }
 }
 
@@ -302,7 +311,8 @@ impl Node {
                 ],
                 pair_boxes: vec![
                     format!("node [shape = box]; {{rank = same; node_{left}->node_{right}[style=invis]; rankdir = LR}}"),
-                ]
+                ],
+                note: "".to_string(),
             },
             NodeSpecific::Leaf {key_value} => DotLines{
                 nodes: vec![
@@ -316,6 +326,7 @@ impl Node {
                     },
                 ],
                 pair_boxes: vec![],
+                note: "".to_string(),
             },
         }
     }
@@ -455,6 +466,7 @@ impl MerkleBlob {
         // TODO: what about only unused providing a blob length?
         if self.blob.is_empty() {
             self.insert_first(key_value, hash);
+            return Ok(());
         }
 
         // TODO: make this a parameter so we have one insert call where you specify the location
@@ -706,9 +718,57 @@ impl MerkleBlob {
         Ok(())
     }
 
-    // fn upsert(&self, old_key_value: KvId, new_key_value: KvId, new_hash: &Hash) -> Result<(), String> {
-    //     if old_key_value
-    // }
+    pub fn upsert(
+        &mut self,
+        old_key_value: KvId,
+        new_key_value: KvId,
+        new_hash: &Hash,
+    ) -> Result<(), String> {
+        let Some(leaf_index) = self.kv_to_index.get(&old_key_value) else {
+            self.insert(new_key_value, new_hash)?;
+            return Ok(());
+        };
+
+        let mut block = self.get_block(*leaf_index).unwrap();
+        if let NodeSpecific::Leaf { ref mut key_value } = block.node.specific {
+            block.node.hash.clone_from(new_hash);
+            *key_value = new_key_value;
+        } else {
+            panic!()
+        }
+        self.insert_entry_to_blob(*leaf_index, block.to_bytes())?;
+
+        if let Some(parent) = block.node.parent {
+            self.mark_lineage_as_dirty(parent)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn check(&self) {
+        let mut leaf_count: usize = 0;
+        let mut internal_count: usize = 0;
+
+        for block in self {
+            match block.node.specific {
+                NodeSpecific::Internal { .. } => internal_count += 1,
+                NodeSpecific::Leaf { key_value } => {
+                    leaf_count += 1;
+                    assert!(self.kv_to_index.contains_key(&key_value));
+                    // TODO: consider what type free indexes should be
+                    assert!(!self.free_indexes.contains(&block.node.index));
+                }
+            }
+        }
+
+        assert_eq!(leaf_count, self.kv_to_index.len());
+        assert_eq!(
+            leaf_count + internal_count + self.free_indexes.len(),
+            self.extend_index() as usize,
+        );
+
+        // TODO: check parent/child bidirectional accuracy
+    }
 
     // fn update_parent(&mut self, index: TreeIndex, parent: Option<TreeIndex>) -> Result<(), String> {
     //     let range = self.get_block_range(index);
@@ -1307,6 +1367,8 @@ mod tests {
     fn test_load_a_python_dump() {
         let merkle_blob = example_merkle_blob();
         merkle_blob.get_node(0).unwrap();
+
+        merkle_blob.check();
     }
 
     #[test]
@@ -1319,6 +1381,8 @@ mod tests {
         assert_eq!(lineage.len(), 2);
         let last_node = lineage.last().unwrap();
         assert_eq!(last_node.parent, None);
+
+        merkle_blob.check();
     }
 
     #[test]
@@ -1328,6 +1392,8 @@ mod tests {
             .get_random_leaf_node_from_bytes(vec![0; 8])
             .unwrap();
         assert_eq!(leaf.index, 1);
+
+        merkle_blob.check();
     }
 
     #[test]
@@ -1348,6 +1414,8 @@ mod tests {
         assert_eq!(merkle_blob.get_node(0).unwrap(), EXAMPLE_ROOT);
         assert_eq!(merkle_blob.get_node(1).unwrap(), EXAMPLE_LEFT_LEAF);
         assert_eq!(merkle_blob.get_node(2).unwrap(), EXAMPLE_RIGHT_LEAF);
+
+        merkle_blob.check();
     }
 
     #[test]
@@ -1371,6 +1439,8 @@ mod tests {
             .unwrap();
 
         assert_eq!(merkle_blob.blob, Vec::from(EXAMPLE_BLOB));
+
+        merkle_blob.check();
     }
 
     #[test]
@@ -1413,6 +1483,8 @@ mod tests {
         // TODO: check, well...  something
 
         merkle_blob.calculate_lazy_hashes();
+
+        merkle_blob.check();
     }
 
     #[test]
@@ -1437,6 +1509,8 @@ mod tests {
             dots.push(merkle_blob.to_dot().dump());
         }
 
+        merkle_blob.check();
+
         for key_value_id in key_value_ids.iter().rev() {
             println!("deleting: {key_value_id}");
             merkle_blob.delete(*key_value_id).unwrap();
@@ -1444,5 +1518,58 @@ mod tests {
             assert_eq!(merkle_blob, reference_blobs[*key_value_id as usize]);
             dots.push(merkle_blob.to_dot().dump());
         }
+
+        merkle_blob.check();
+    }
+
+    // TODO: better conditional execution than the commenting i'm doing now
+    #[allow(dead_code)]
+    fn open_dot(lines: &mut DotLines) {
+        use open;
+        use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
+        use url::Url;
+
+        let mut url = Url::parse("http://edotor.net").unwrap();
+        // https://edotor.net/?engine=dot#graph%20%7B%7D%0A -> graph {}
+        url.query_pairs_mut().append_pair("engine", "dot");
+        url.set_fragment(Some(
+            &utf8_percent_encode(&lines.dump(), NON_ALPHANUMERIC).to_string(),
+        ));
+        open::that(url.as_str()).unwrap();
+    }
+
+    #[test]
+    fn test_insert_first() {
+        let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
+
+        let key_value_id: KvId = 1;
+        // open_dot(&mut merkle_blob.to_dot().set_note("empty"));
+        merkle_blob.insert(key_value_id, &HASH).unwrap();
+        // open_dot(&mut merkle_blob.to_dot().set_note("first after"));
+
+        merkle_blob.check();
+
+        assert_eq!(merkle_blob.free_indexes.len(), 0);
+        assert_eq!(merkle_blob.kv_to_index.len(), 1);
+    }
+
+    #[test]
+    fn test_delete_root() {
+        let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
+
+        let key_value_id: KvId = 1;
+        // open_dot(&mut merkle_blob.to_dot().set_note("empty"));
+        merkle_blob.insert(key_value_id, &HASH).unwrap();
+        // open_dot(&mut merkle_blob.to_dot().set_note("first after"));
+        merkle_blob.check();
+
+        merkle_blob.delete(key_value_id).unwrap();
+
+        merkle_blob.check();
+        assert_eq!(
+            merkle_blob.free_indexes.len(),
+            merkle_blob.extend_index() as usize
+        );
+        assert_eq!(merkle_blob.kv_to_index.len(), 0);
     }
 }
