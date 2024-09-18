@@ -294,7 +294,7 @@ mod tests {
             );
             spends.push((coin, PUZZLE1.as_ref(), SOLUTION1.as_ref()));
             coin_spends.push(CoinSpend {
-                coin: coin,
+                coin,
                 puzzle_reveal: Program::from(PUZZLE1.as_ref()),
                 solution: Program::from(SOLUTION1.as_ref()),
             });
