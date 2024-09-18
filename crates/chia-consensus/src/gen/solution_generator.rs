@@ -1,4 +1,5 @@
 use chia_protocol::Coin;
+use chia_protocol::CoinSpend;
 use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::serde::{node_from_bytes_backrefs, node_to_bytes, node_to_bytes_backrefs};
 use std::io;
@@ -40,18 +41,17 @@ where
 }
 
 // calculate the size in bytes of a generator with no backref optimisations
-pub fn calculate_generator_length<BufRef, I>(spends: I) -> usize
+pub fn calculate_generator_length<I>(spends: I) -> usize
 where
-    BufRef: AsRef<[u8]>,
-    I: IntoIterator<Item = (Coin, BufRef, BufRef)>,
+    I: AsRef<[CoinSpend]>,
 {
     let mut size: usize = 5; // (q . (())) => ff01ff8080 => 5 bytes
 
-    for s in spends {
-        let puzzle = s.1.as_ref();
-        let solution = s.2.as_ref();
+    for s in spends.as_ref() {
+        let puzzle = s.puzzle_reveal.as_ref();
+        let solution = s.solution.as_ref();
 
-        let amount_bytes = s.0.amount.to_be_bytes();
+        let amount_bytes = s.coin.amount.to_be_bytes();
         // chialisp represents integers as small as possible so remove leading 0s
         let leading_zeroes = amount_bytes.iter().take_while(|&&b| b == 0).count();
         let mut amount_size: usize = 1; // rust converts 0 to 0x00, but in clvm it is 0x80
@@ -66,7 +66,7 @@ where
 
         // parent-id puzzle-reveal amount solution + bytes for list extension and atom prep bytes
         size += 32 + puzzle.len() + amount_size + solution.len() + 8;
-        if s.0.amount < 128 {
+        if s.coin.amount < 128 {
             size -= 1;
         }
     }
@@ -98,6 +98,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chia_protocol::Program;
     use clvmr::{run_program, ChiaDialect};
     use hex_literal::hex;
 
@@ -183,7 +184,21 @@ mod tests {
 
         let result = solution_generator(spends).expect("solution_generator");
 
-        assert_eq!(result.len(), calculate_generator_length(spends));
+        assert_eq!(
+            result.len(),
+            calculate_generator_length([
+                CoinSpend {
+                    coin: coin1,
+                    puzzle_reveal: Program::from(PUZZLE1.as_ref()),
+                    solution: Program::from(SOLUTION1.as_ref())
+                },
+                CoinSpend {
+                    coin: coin2,
+                    puzzle_reveal: Program::from(PUZZLE2.as_ref()),
+                    solution: Program::from(SOLUTION2.as_ref())
+                },
+            ])
+        );
 
         assert_eq!(
             result,
@@ -235,7 +250,14 @@ mod tests {
         let spends = [(coin2, PUZZLE2.as_ref(), SOLUTION2.as_ref())];
         let result = solution_generator(spends).expect("solution_generator");
 
-        assert_eq!(result.len(), calculate_generator_length(spends));
+        assert_eq!(
+            result.len(),
+            calculate_generator_length([CoinSpend {
+                coin: coin2,
+                puzzle_reveal: Program::from(PUZZLE2.as_ref()),
+                solution: Program::from(SOLUTION2.as_ref())
+            },])
+        );
 
         assert_eq!(
             result,
@@ -263,6 +285,7 @@ mod tests {
     #[test]
     fn test_length_calculator() {
         let mut spends: Vec<(Coin, &[u8], &[u8])> = Vec::new();
+        let mut coin_spends = Vec::<CoinSpend>::new();
         for i in [1, 128, 129, 256, 257, 4_294_967_296, 4_294_967_297] {
             let coin: Coin = Coin::new(
                 hex!("ccd5bb71183532bff220ba46c268991a00000000000000000000000000036840").into(),
@@ -270,9 +293,14 @@ mod tests {
                 i,
             );
             spends.push((coin, PUZZLE1.as_ref(), SOLUTION1.as_ref()));
+            coin_spends.push(CoinSpend {
+                coin: coin,
+                puzzle_reveal: Program::from(PUZZLE1.as_ref()),
+                solution: Program::from(SOLUTION1.as_ref()),
+            });
             let result = solution_generator(spends.clone()).expect("solution_generator");
 
-            assert_eq!(result.len(), calculate_generator_length(spends.clone()));
+            assert_eq!(result.len(), calculate_generator_length(&coin_spends));
         }
     }
 

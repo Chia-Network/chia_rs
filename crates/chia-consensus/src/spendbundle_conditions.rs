@@ -32,17 +32,10 @@ pub fn get_conditions_from_spendbundle(
     let dialect = ChiaDialect::new(flags);
     let mut ret = SpendBundleConditions::default();
     let mut state = ParseState::default();
-
-    let spends_info = spend_bundle.coin_spends.iter().map(|coin_spend| {
-        (
-            coin_spend.coin,
-            &coin_spend.puzzle_reveal,
-            &coin_spend.solution,
-        )
-    });
     // We don't pay the size cost (nor execution cost) of being wrapped by a
     // quote (in solution_generator).
-    let generator_length_without_quote = calculate_generator_length(spends_info) - QUOTE_BYTES;
+    let generator_length_without_quote =
+        calculate_generator_length(&spend_bundle.coin_spends) - QUOTE_BYTES;
 
     let byte_cost = generator_length_without_quote as u64 * constants.cost_per_byte;
     subtract_cost(a, &mut cost_left, byte_cost)?;
