@@ -40,6 +40,29 @@ where
     Ok(quote)
 }
 
+// do not use generally
+fn len_for_generator(val: u64) -> usize {
+    if val < 0x80 {
+        0 // this encompasses a chialisp optimisation that happens for small ints
+    } else if val < 0x8000 {
+        2
+    } else if val < 0x0080_0000 {
+        3
+    } else if val < 0x8000_0000 {
+        4
+    } else if val < 0x0080_0000_0000 {
+        5
+    } else if val < 0x8000_0000_0000 {
+        6
+    } else if val < 0x0080_0000_0000_0000 {
+        7
+    } else if val < 0x8000_0000_0000_0000 {
+        8
+    } else {
+        9
+    }
+}
+
 // calculate the size in bytes of a generator with no backref optimisations
 pub fn calculate_generator_length<I>(spends: I) -> usize
 where
@@ -50,25 +73,8 @@ where
     for s in spends.as_ref() {
         let puzzle = s.puzzle_reveal.as_ref();
         let solution = s.solution.as_ref();
-
-        let amount_bytes = s.coin.amount.to_be_bytes();
-        // chialisp represents integers as small as possible so remove leading 0s
-        let leading_zeroes = amount_bytes.iter().take_while(|&&b| b == 0).count();
-        let mut amount_size: usize = 1; // rust converts 0 to 0x00, but in clvm it is 0x80
-        if leading_zeroes < 8 {
-            // if amount is not 0x0000000000000000
-            amount_size = amount_bytes[leading_zeroes..].len();
-            if amount_bytes[leading_zeroes] >= 0x80 {
-                // add 0x00 for two's compliment as amount is always positive
-                amount_size += 1;
-            }
-        }
-
         // parent-id puzzle-reveal amount solution + bytes for list extension and atom prep bytes
-        size += 32 + puzzle.len() + amount_size + solution.len() + 8;
-        if s.coin.amount < 128 {
-            size -= 1;
-        }
+        size += 32 + puzzle.len() + len_for_generator(s.coin.amount) + solution.len() + 8;
     }
 
     size
@@ -286,7 +292,19 @@ mod tests {
     fn test_length_calculator() {
         let mut spends: Vec<(Coin, &[u8], &[u8])> = Vec::new();
         let mut coin_spends = Vec::<CoinSpend>::new();
-        for i in [1, 128, 129, 256, 257, 4_294_967_296, 4_294_967_297] {
+        for i in [
+            0,
+            1,
+            128,
+            129,
+            256,
+            257,
+            4_294_967_296,
+            4_294_967_297,
+            0x8000_0001,
+            0x8000_0000_0001,
+            0x8000_0000_0000_0001,
+        ] {
             let coin: Coin = Coin::new(
                 hex!("ccd5bb71183532bff220ba46c268991a00000000000000000000000000036840").into(),
                 hex!("fcc78a9e396df6ceebc217d2446bc016e0b3d5922fb32e5783ec5a85d490cfb6").into(),
