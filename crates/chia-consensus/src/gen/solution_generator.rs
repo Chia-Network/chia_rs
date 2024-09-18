@@ -54,10 +54,14 @@ where
         let amount_bytes = s.0.amount.to_be_bytes();
         // chialisp represents integers as small as possible so remove leading 0s
         let leading_zeroes = amount_bytes.iter().take_while(|&&b| b == 0).count();
-        let mut amount_size = amount_bytes[leading_zeroes..].len();
-        if amount_bytes[leading_zeroes] >= 0x80 {
-            // add 0x00 for two's compliment as amount is always positive
-            amount_size += 1;
+        let mut amount_size: usize = 1; // rust converts 0 to 0x00, but in clvm it is 0x80
+        if leading_zeroes < 8 {
+            // if amount is not 0x0000000000000000
+            amount_size = amount_bytes[leading_zeroes..].len();
+            if amount_bytes[leading_zeroes] >= 0x80 {
+                // add 0x00 for two's compliment as amount is always positive
+                amount_size += 1;
+            }
         }
 
         // parent-id puzzle-reveal amount solution + bytes for list extension and atom prep bytes
