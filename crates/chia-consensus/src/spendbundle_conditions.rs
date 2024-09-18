@@ -4,7 +4,7 @@ use crate::gen::conditions::{
 };
 use crate::gen::flags::MEMPOOL_MODE;
 use crate::gen::run_block_generator::subtract_cost;
-use crate::gen::solution_generator::{calculate_generator_length, solution_generator};
+use crate::gen::solution_generator::calculate_generator_length;
 use crate::gen::validation_error::ValidationErr;
 use crate::spendbundle_validation::get_flags_for_height_and_constants;
 use chia_protocol::SpendBundle;
@@ -87,6 +87,7 @@ mod tests {
     use crate::allocator::make_allocator;
     use crate::gen::conditions::{ELIGIBLE_FOR_DEDUP, ELIGIBLE_FOR_FF};
     use crate::gen::run_block_generator::run_block_generator2;
+    use crate::gen::solution_generator::solution_generator;
     use chia_bls::Signature;
     use chia_protocol::CoinSpend;
     use chia_traits::Streamable;
