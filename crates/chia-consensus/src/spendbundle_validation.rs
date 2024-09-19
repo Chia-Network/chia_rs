@@ -1,6 +1,6 @@
 use crate::allocator::make_allocator;
 use crate::consensus_constants::ConsensusConstants;
-use crate::gen::flags::{ALLOW_BACKREFS, DISALLOW_INFINITY_G1};
+use crate::gen::flags::ALLOW_BACKREFS;
 use crate::gen::make_aggsig_final_message::make_aggsig_final_message;
 use crate::gen::opcodes::{
     AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT, AGG_SIG_PARENT_PUZZLE,
@@ -98,10 +98,6 @@ fn hash_pk_and_msg(pk: &[u8], msg: &[u8]) -> [u8; 32] {
 pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusConstants) -> u32 {
     let mut flags: u32 = ENABLE_FIXED_DIV;
 
-    if height >= constants.soft_fork5_height {
-        flags |= DISALLOW_INFINITY_G1;
-    }
-
     if height >= constants.hard_fork_height {
         //  the hard-fork initiated with 2.0. To activate June 2024
         //  * costs are ascribed to some unknown condition codes, to allow for
@@ -139,7 +135,7 @@ mod tests {
     #[case(0, ENABLE_FIXED_DIV)]
     #[case(TEST_CONSTANTS.hard_fork_height, ENABLE_BLS_OPS_OUTSIDE_GUARD | ENABLE_FIXED_DIV | ALLOW_BACKREFS)]
     #[case(5_716_000, ENABLE_BLS_OPS_OUTSIDE_GUARD | ENABLE_FIXED_DIV | ALLOW_BACKREFS)]
-    #[case(TEST_CONSTANTS.soft_fork5_height, ENABLE_BLS_OPS_OUTSIDE_GUARD | ENABLE_FIXED_DIV | ALLOW_BACKREFS | DISALLOW_INFINITY_G1)]
+    #[case(TEST_CONSTANTS.soft_fork5_height, ENABLE_BLS_OPS_OUTSIDE_GUARD | ENABLE_FIXED_DIV | ALLOW_BACKREFS)]
     fn test_get_flags(#[case] height: u32, #[case] expected_value: u32) {
         assert_eq!(
             get_flags_for_height_and_constants(height, &TEST_CONSTANTS),
