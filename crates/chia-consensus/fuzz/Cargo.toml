@@ -115,3 +115,10 @@ path = "fuzz_targets/merkle-set.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "solution-generator"
+path = "fuzz_targets/solution-generator.rs"
+test = false
+doc = false
+bench = false
