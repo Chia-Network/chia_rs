@@ -1,9 +1,9 @@
 #![no_main]
+use chia_consensus::gen::solution_generator::{calculate_generator_length, solution_generator};
 use chia_protocol::{Coin, CoinSpend};
 use chia_traits::Streamable;
 use libfuzzer_sys::fuzz_target;
 use std::io::Cursor;
-use chia_consensus::gen::solution_generator::{calculate_generator_length, solution_generator};
 
 fuzz_target!(|data: &[u8]| {
     let mut spends = Vec::<CoinSpend>::new();
@@ -13,11 +13,14 @@ fuzz_target!(|data: &[u8]| {
             return;
         };
         spends.push(spend.clone());
-        generator_input.push((spend.coin, spend.puzzle_reveal.to_vec(), spend.solution.to_vec()));
+        generator_input.push((
+            spend.coin,
+            spend.puzzle_reveal.to_vec(),
+            spend.solution.to_vec(),
+        ));
     }
 
     let result = solution_generator(generator_input).expect("solution_generator");
 
     assert_eq!(result.len(), calculate_generator_length(spends));
-
 });
