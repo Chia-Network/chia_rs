@@ -17,7 +17,7 @@ use super::opcodes::{
 use super::sanitize_int::{sanitize_uint, SanitizedUint};
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
 use crate::consensus_constants::ConsensusConstants;
-use crate::gen::flags::{DISALLOW_INFINITY_G1, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
+use crate::gen::flags::{NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
 use crate::gen::messages::{Message, SpendId};
 use crate::gen::spend_visitor::SpendVisitor;
 use crate::gen::validation_error::check_nil;
@@ -867,17 +867,13 @@ fn decrement(cnt: &mut u32, n: NodePtr) -> Result<(), ValidationErr> {
     }
 }
 
-fn to_key(a: &Allocator, pk: NodePtr, flags: u32) -> Result<Option<PublicKey>, ValidationErr> {
+fn to_key(a: &Allocator, pk: NodePtr) -> Result<PublicKey, ValidationErr> {
     let key = PublicKey::from_bytes(a.atom(pk).as_ref().try_into().expect("internal error"))
         .map_err(|_| ValidationErr(pk, ErrorCode::InvalidPublicKey))?;
     if key.is_inf() {
-        if (flags & DISALLOW_INFINITY_G1) != 0 {
-            Err(ValidationErr(pk, ErrorCode::InvalidPublicKey))
-        } else {
-            Ok(None)
-        }
+        Err(ValidationErr(pk, ErrorCode::InvalidPublicKey))
     } else {
-        Ok(Some(key))
+        Ok(key)
     }
 }
 
@@ -1124,47 +1120,31 @@ pub fn parse_conditions<V: SpendVisitor>(
                 state.assert_concurrent_puzzle.insert(id);
             }
             Condition::AggSigMe(pk, msg) => {
-                if let Some(pk) = to_key(a, pk, flags)? {
-                    spend.agg_sig_me.push((pk, msg));
-                }
+                spend.agg_sig_me.push((to_key(a, pk)?, msg));
             }
             Condition::AggSigParent(pk, msg) => {
-                if let Some(pk) = to_key(a, pk, flags)? {
-                    spend.agg_sig_parent.push((pk, msg));
-                }
+                spend.agg_sig_parent.push((to_key(a, pk)?, msg));
             }
             Condition::AggSigPuzzle(pk, msg) => {
-                if let Some(pk) = to_key(a, pk, flags)? {
-                    spend.agg_sig_puzzle.push((pk, msg));
-                }
+                spend.agg_sig_puzzle.push((to_key(a, pk)?, msg));
             }
             Condition::AggSigAmount(pk, msg) => {
-                if let Some(pk) = to_key(a, pk, flags)? {
-                    spend.agg_sig_amount.push((pk, msg));
-                }
+                spend.agg_sig_amount.push((to_key(a, pk)?, msg));
             }
             Condition::AggSigPuzzleAmount(pk, msg) => {
-                if let Some(pk) = to_key(a, pk, flags)? {
-                    spend.agg_sig_puzzle_amount.push((pk, msg));
-                }
+                spend.agg_sig_puzzle_amount.push((to_key(a, pk)?, msg));
             }
             Condition::AggSigParentAmount(pk, msg) => {
-                if let Some(pk) = to_key(a, pk, flags)? {
-                    spend.agg_sig_parent_amount.push((pk, msg));
-                }
+                spend.agg_sig_parent_amount.push((to_key(a, pk)?, msg));
             }
             Condition::AggSigParentPuzzle(pk, msg) => {
-                if let Some(pk) = to_key(a, pk, flags)? {
-                    spend.agg_sig_parent_puzzle.push((pk, msg));
-                }
+                spend.agg_sig_parent_puzzle.push((to_key(a, pk)?, msg));
             }
             Condition::AggSigUnsafe(pk, msg) => {
                 // AGG_SIG_UNSAFE messages are not allowed to end with the
                 // suffix added to other AGG_SIG_* conditions
                 check_agg_sig_unsafe_message(a, msg, constants)?;
-                if let Some(pk) = to_key(a, pk, flags)? {
-                    ret.agg_sig_unsafe.push((pk, msg));
-                }
+                ret.agg_sig_unsafe.push((to_key(a, pk)?, msg));
             }
             Condition::Softfork(cost) => {
                 if *max_cost < cost {
@@ -3123,7 +3103,7 @@ fn test_agg_sig_invalid_pubkey(
 #[case(AGG_SIG_UNSAFE)]
 fn test_agg_sig_infinity_pubkey(
     #[case] condition: ConditionOpcode,
-    #[values(DISALLOW_INFINITY_G1, 0)] mempool: u32,
+    #[values(MEMPOOL_MODE, 0)] mempool: u32,
 ) {
     let ret = cond_test_flag(
         &format!(
@@ -3133,21 +3113,7 @@ fn test_agg_sig_infinity_pubkey(
             mempool
     );
 
-    if mempool != 0 {
-        assert_eq!(ret.unwrap_err().1, ErrorCode::InvalidPublicKey);
-    } else {
-        let ret = ret.expect("expected conditions to be valid").1;
-        assert!(ret.agg_sig_unsafe.is_empty());
-        for c in ret.spends {
-            assert!(c.agg_sig_me.is_empty());
-            assert!(c.agg_sig_parent.is_empty());
-            assert!(c.agg_sig_puzzle.is_empty());
-            assert!(c.agg_sig_amount.is_empty());
-            assert!(c.agg_sig_puzzle_amount.is_empty());
-            assert!(c.agg_sig_parent_amount.is_empty());
-            assert!(c.agg_sig_parent_puzzle.is_empty());
-        }
-    }
+    assert_eq!(ret.unwrap_err().1, ErrorCode::InvalidPublicKey);
 }
 
 #[cfg(test)]
