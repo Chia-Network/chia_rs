@@ -10,7 +10,7 @@ fuzz_target!(|data: &[u8]| {
     let mut spends = Vec::<CoinSpend>::new();
     let mut generator_input = Vec::<(Coin, Vec<u8>, Vec<u8>)>::new();
     let mut data = Cursor::new(data);
-    while let Ok(spend) = CoinSpend::parse::<true>(&mut data) {
+    while let Ok(spend) = CoinSpend::parse::<false>(&mut data) {
         spends.push(spend.clone());
         generator_input.push((
             spend.coin,
@@ -25,8 +25,5 @@ fuzz_target!(|data: &[u8]| {
         return;
     };
 
-    if result.len() !=  calculate_generator_length(spends.clone()){
-        panic!("DEBUG: {:?}", spends);
-    }
     assert_eq!(result.len(), calculate_generator_length(spends));
 });
