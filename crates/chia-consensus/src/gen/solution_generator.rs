@@ -74,8 +74,7 @@ where
         let solution = s.solution.as_ref();
         // parent-id puzzle-reveal amount solution
         // parent-id is always 32 bytes + prepend 1 byte = 33
-        // + 4 bytes for list extension
-        // + 2 bytes for the other atom prepended bytes
+        // + 6 bytes for list extension
         // coin amount is already prepended correctly in clvm_bytes_len()
         size += 39 + puzzle.len() + clvm_bytes_len(s.coin.amount) + solution.len();
     }
