@@ -1,5 +1,4 @@
 from chia_rs import SpendBundle
-from chia.types.spend_bundle import SpendBundle as PySpendBundle
 import pytest
 from typing import Type
 
@@ -189,7 +188,7 @@ puzzle_hash: 25192af3f69f3d2c347f97b31925f406372e35136dbe40dda6230750a6eaa1d2, \
 amount: 1232500000000 }]"
 
 
-@pytest.mark.parametrize("ty", [SpendBundle, PySpendBundle])
+@pytest.mark.parametrize("ty", [SpendBundle])
 @pytest.mark.parametrize(
     "input_file, expected_add, expected_rem",
     [

@@ -5,7 +5,6 @@ use chia_protocol::{Bytes32, SpendBundle};
 use chia_traits::Streamable;
 use clvm_traits::FromClvm;
 use clvmr::op_utils::{first, rest};
-use clvmr::ENABLE_FIXED_DIV;
 use clvmr::{Allocator, NodePtr};
 use libfuzzer_sys::fuzz_target;
 use std::collections::HashSet;
@@ -27,7 +26,7 @@ fuzz_target!(|data: &[u8]| {
     for cs in &bundle.coin_spends {
         let (cost, mut conds) = cs
             .puzzle_reveal
-            .run(&mut a, ENABLE_FIXED_DIV, 11_000_000_000, &cs.solution)
+            .run(&mut a, 0, 11_000_000_000, &cs.solution)
             .expect("run");
         total_cost += cost;
 
