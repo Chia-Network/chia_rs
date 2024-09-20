@@ -8,9 +8,9 @@ use std::io::Cursor;
 fuzz_target!(|data: &[u8]| {
     let mut spends = Vec::<CoinSpend>::new();
     let mut generator_input = Vec::<(Coin, Vec<u8>, Vec<u8>)>::new();
-    for _i in 1..1000 {
+    for _i in 1..2000 {
         let Ok(spend) = CoinSpend::parse::<false>(&mut Cursor::new(data)) else {
-            return;
+            break;
         };
         spends.push(spend.clone());
         generator_input.push((
