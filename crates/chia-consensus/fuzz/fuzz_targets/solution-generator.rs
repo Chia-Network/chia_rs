@@ -3,6 +3,7 @@ use chia_consensus::gen::solution_generator::{calculate_generator_length, soluti
 use chia_protocol::{Coin, CoinSpend};
 use chia_traits::Streamable;
 use libfuzzer_sys::fuzz_target;
+use core::panic;
 use std::io::Cursor;
 
 fuzz_target!(|data: &[u8]| {
@@ -24,5 +25,8 @@ fuzz_target!(|data: &[u8]| {
         return;
     };
 
+    if result.len() !=  calculate_generator_length(spends.clone()){
+        panic!("DEBUG: {:?}", spends);
+    }
     assert_eq!(result.len(), calculate_generator_length(spends));
 });
