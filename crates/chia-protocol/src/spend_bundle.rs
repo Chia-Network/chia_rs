@@ -10,7 +10,6 @@ use clvmr::cost::Cost;
 use clvmr::op_utils::{first, rest};
 use clvmr::reduction::EvalErr;
 use clvmr::Allocator;
-use clvmr::ENABLE_FIXED_DIV;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
@@ -50,9 +49,7 @@ impl SpendBundle {
 
         for cs in &self.coin_spends {
             a.restore_checkpoint(&checkpoint);
-            let (cost, mut conds) =
-                cs.puzzle_reveal
-                    .run(&mut a, ENABLE_FIXED_DIV, cost_left, &cs.solution)?;
+            let (cost, mut conds) = cs.puzzle_reveal.run(&mut a, 0, cost_left, &cs.solution)?;
             if cost > cost_left {
                 return Err(EvalErr(a.nil(), "cost exceeded".to_string()));
             }

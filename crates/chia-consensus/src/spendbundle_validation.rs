@@ -13,7 +13,7 @@ use chia_bls::GTElement;
 use chia_bls::{aggregate_verify_gt, hash_to_g2};
 use chia_protocol::SpendBundle;
 use clvmr::sha2::Sha256;
-use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV, LIMIT_HEAP};
+use clvmr::LIMIT_HEAP;
 use std::time::{Duration, Instant};
 
 // type definition makes clippy happy
@@ -96,7 +96,7 @@ fn hash_pk_and_msg(pk: &[u8], msg: &[u8]) -> [u8; 32] {
 }
 
 pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusConstants) -> u32 {
-    let mut flags: u32 = ENABLE_FIXED_DIV;
+    let mut flags: u32 = 0;
 
     if height >= constants.hard_fork_height {
         //  the hard-fork initiated with 2.0. To activate June 2024
@@ -113,7 +113,7 @@ pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusCons
         //    arguments
         //  * Allow the block generator to be serialized with the improved clvm
         //   serialization format (with back-references)
-        flags = flags | ENABLE_BLS_OPS_OUTSIDE_GUARD | ALLOW_BACKREFS;
+        flags |= ALLOW_BACKREFS;
     }
     flags
 }
@@ -132,10 +132,9 @@ mod tests {
     use rstest::rstest;
 
     #[rstest]
-    #[case(0, ENABLE_FIXED_DIV)]
-    #[case(TEST_CONSTANTS.hard_fork_height, ENABLE_BLS_OPS_OUTSIDE_GUARD | ENABLE_FIXED_DIV | ALLOW_BACKREFS)]
-    #[case(5_716_000, ENABLE_BLS_OPS_OUTSIDE_GUARD | ENABLE_FIXED_DIV | ALLOW_BACKREFS)]
-    #[case(TEST_CONSTANTS.soft_fork5_height, ENABLE_BLS_OPS_OUTSIDE_GUARD | ENABLE_FIXED_DIV | ALLOW_BACKREFS)]
+    #[case(0, 0)]
+    #[case(TEST_CONSTANTS.hard_fork_height, ALLOW_BACKREFS)]
+    #[case(5_716_000, ALLOW_BACKREFS)]
     fn test_get_flags(#[case] height: u32, #[case] expected_value: u32) {
         assert_eq!(
             get_flags_for_height_and_constants(height, &TEST_CONSTANTS),
