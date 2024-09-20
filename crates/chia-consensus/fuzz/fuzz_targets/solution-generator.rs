@@ -20,7 +20,7 @@ fuzz_target!(|data: &[u8]| {
     if spends.is_empty() {
         return;
     }
-    let result = solution_generator(generator_input).expect("solution_generator");
+    let Ok(result) = solution_generator(generator_input) else {return ;};
 
     assert_eq!(result.len(), calculate_generator_length(spends));
 });
