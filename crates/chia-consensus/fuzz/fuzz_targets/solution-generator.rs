@@ -8,10 +8,8 @@ use std::io::Cursor;
 fuzz_target!(|data: &[u8]| {
     let mut spends = Vec::<CoinSpend>::new();
     let mut generator_input = Vec::<(Coin, Vec<u8>, Vec<u8>)>::new();
-    for _i in 1..2000 {
-        let Ok(spend) = CoinSpend::parse::<false>(&mut Cursor::new(data)) else {
-            break;
-        };
+    let mut data = Cursor::new(data);
+    while let Ok(spend) = CoinSpend::parse::<true>(&mut data) {
         spends.push(spend.clone());
         generator_input.push((
             spend.coin,
@@ -19,7 +17,9 @@ fuzz_target!(|data: &[u8]| {
             spend.solution.to_vec(),
         ));
     }
-
+    if spends.is_empty() {
+        return;
+    }
     let result = solution_generator(generator_input).expect("solution_generator");
 
     assert_eq!(result.len(), calculate_generator_length(spends));
