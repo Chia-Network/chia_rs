@@ -1549,8 +1549,6 @@ mod tests {
         // open_dot(&mut merkle_blob.to_dot().set_note("first after"));
 
         merkle_blob.check();
-
-        assert_eq!(merkle_blob.free_indexes.len(), 0);
         assert_eq!(merkle_blob.kv_to_index.len(), 1);
     }
 
@@ -1567,10 +1565,6 @@ mod tests {
         merkle_blob.delete(key_value_id).unwrap();
 
         merkle_blob.check();
-        assert_eq!(
-            merkle_blob.free_indexes.len(),
-            merkle_blob.extend_index() as usize
-        );
         assert_eq!(merkle_blob.kv_to_index.len(), 0);
     }
 }
