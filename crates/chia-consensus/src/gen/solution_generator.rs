@@ -40,26 +40,25 @@ where
     Ok(quote)
 }
 
-// do not use generally
-fn len_for_generator(val: u64) -> usize {
+fn clvm_bytes_len(val: u64) -> usize {
     if val < 0x80 {
-        0 // this encompasses a chialisp optimisation that happens for small ints
+        1
     } else if val < 0x8000 {
-        2
-    } else if val < 0x0080_0000 {
         3
-    } else if val < 0x8000_0000 {
+    } else if val < 0x0080_0000 {
         4
-    } else if val < 0x0080_0000_0000 {
+    } else if val < 0x8000_0000 {
         5
-    } else if val < 0x8000_0000_0000 {
+    } else if val < 0x0080_0000_0000 {
         6
-    } else if val < 0x0080_0000_0000_0000 {
+    } else if val < 0x8000_0000_0000 {
         7
-    } else if val < 0x8000_0000_0000_0000 {
+    } else if val < 0x0080_0000_0000_0000 {
         8
-    } else {
+    } else if val < 0x8000_0000_0000_0000 {
         9
+    } else {
+        10
     }
 }
 
@@ -73,8 +72,12 @@ where
     for s in spends.as_ref() {
         let puzzle = s.puzzle_reveal.as_ref();
         let solution = s.solution.as_ref();
-        // parent-id puzzle-reveal amount solution + bytes for list extension and atom prep bytes
-        size += 32 + puzzle.len() + len_for_generator(s.coin.amount) + solution.len() + 8;
+        // parent-id puzzle-reveal amount solution
+        // parent-id is always 32 bytes + prepend 1 byte = 33
+        // + 4 bytes for list extension
+        // + 2 bytes for the other atom prepended bytes
+        // coin amount is already prepended correctly in clvm_bytes_len()
+        size += 39 + puzzle.len() + clvm_bytes_len(s.coin.amount) + solution.len();
     }
 
     size
