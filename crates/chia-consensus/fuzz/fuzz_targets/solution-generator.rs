@@ -25,5 +25,9 @@ fuzz_target!(|data: &[u8]| {
         return;
     };
 
+    if result.len() !=  calculate_generator_length(spends.clone()){
+        panic!("DEBUG: {:?}", spends);
+    }
+
     assert_eq!(result.len(), calculate_generator_length(spends));
 });
