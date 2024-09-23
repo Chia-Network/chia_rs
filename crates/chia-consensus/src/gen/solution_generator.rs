@@ -383,12 +383,12 @@ mod tests {
             puzzle_reveal: Program::from(puzzle),
             solution: Program::from(solution),
         });
-        let node = node_from_bytes(&mut a, puzzle.as_ref()).expect("atom");
+        let node = node_from_bytes(&mut a, puzzle).expect("atom");
         if node.is_atom() {
             let puz = node_to_bytes(&a, node).expect("bytes");
             discrepancy = puzzle.len() - puz.len();
         }
-        let node = node_from_bytes(&mut a, solution.as_ref()).expect("atom");
+        let node = node_from_bytes(&mut a, solution).expect("atom");
         if node.is_atom() {
             let sol = node_to_bytes(&a, node).expect("bytes");
             discrepancy = solution.len() - sol.len();
