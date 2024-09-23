@@ -12,6 +12,10 @@ use clvmr::serde::{
 };
 use clvmr::sha2::Sha256;
 use clvmr::{Allocator, ChiaDialect};
+#[cfg(feature = "py-bindings")]
+use pyo3::prelude::*;
+#[cfg(feature = "py-bindings")]
+use pyo3::types::PyType;
 use std::io::Cursor;
 use std::ops::Deref;
 
@@ -151,9 +155,6 @@ use chia_traits::{FromJsonDict, ToJsonDict};
 
 #[cfg(feature = "py-bindings")]
 use chia_py_streamable_macro::PyStreamable;
-
-#[cfg(feature = "py-bindings")]
-use pyo3::prelude::*;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::types::{PyList, PyTuple};
@@ -483,6 +484,18 @@ impl Streamable for Program {
 impl ToJsonDict for Program {
     fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
         self.0.to_json_dict(py)
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+impl Program {
+    #[classmethod]
+    #[pyo3(name = "from_parent")]
+    pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: &Self) -> PyResult<PyObject> {
+        Err(PyNotImplementedError::new_err(
+            "This class does not support from_parent().",
+        ))
     }
 }
 

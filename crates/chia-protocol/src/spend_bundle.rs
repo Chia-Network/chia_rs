@@ -13,6 +13,8 @@ use clvmr::Allocator;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
+#[cfg(feature = "py-bindings")]
+use pyo3::types::PyType;
 
 #[streamable(subclass)]
 pub struct SpendBundle {
@@ -91,10 +93,36 @@ impl SpendBundle {
 #[pymethods]
 #[allow(clippy::needless_pass_by_value)]
 impl SpendBundle {
-    #[staticmethod]
+    #[classmethod]
     #[pyo3(name = "aggregate")]
-    fn py_aggregate(spend_bundles: Vec<SpendBundle>) -> SpendBundle {
-        SpendBundle::aggregate(&spend_bundles)
+    fn py_aggregate(
+        cls: &Bound<'_, PyType>,
+        py: Python<'_>,
+        spend_bundles: Vec<Self>,
+    ) -> PyResult<PyObject> {
+        let aggregated = Bound::new(py, Self::aggregate(&spend_bundles))?;
+        if aggregated.is_exact_instance(cls) {
+            Ok(aggregated.into_py(py))
+        } else {
+            let instance = cls.call_method1("from_parent", (aggregated.into_py(py),))?;
+            Ok(instance.into_py(py))
+        }
+    }
+
+    #[classmethod]
+    #[pyo3(name = "from_parent")]
+    pub fn from_parent(
+        cls: &Bound<'_, PyType>,
+        py: Python<'_>,
+        spend_bundle: Self,
+    ) -> PyResult<PyObject> {
+        // Convert result into potential child class
+        let instance = cls.call(
+            (spend_bundle.coin_spends, spend_bundle.aggregated_signature),
+            None,
+        )?;
+
+        Ok(instance.into_py(py))
     }
 
     #[pyo3(name = "name")]
