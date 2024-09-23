@@ -1,7 +1,5 @@
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::consensus_constants::ConsensusConstants;
-use chia_consensus::gen::conditions::{EmptyVisitor, MempoolVisitor};
-use chia_consensus::gen::flags::ANALYZE_SPENDS;
 use chia_consensus::gen::owned_conditions::OwnedSpendBundleConditions;
 use chia_consensus::gen::run_block_generator::run_block_generator as native_run_block_generator;
 use chia_consensus::gen::run_block_generator::run_block_generator2 as native_run_block_generator2;
@@ -39,14 +37,10 @@ pub fn run_block_generator<'a>(
         })
         .collect::<Vec<&'a [u8]>>();
     let program = py_to_slice::<'a>(program);
-    let run_block = if (flags & ANALYZE_SPENDS) == 0 {
-        native_run_block_generator::<_, EmptyVisitor, _>
-    } else {
-        native_run_block_generator::<_, MempoolVisitor, _>
-    };
 
     py.allow_threads(|| {
-        match run_block(&mut allocator, program, refs, max_cost, flags, constants) {
+        match native_run_block_generator(&mut allocator, program, refs, max_cost, flags, constants)
+        {
             Ok(spend_bundle_conds) => (
                 None,
                 Some(OwnedSpendBundleConditions::from(
@@ -84,14 +78,10 @@ pub fn run_block_generator2<'a>(
         .collect::<Vec<&'a [u8]>>();
 
     let program = py_to_slice::<'a>(program);
-    let run_block = if (flags & ANALYZE_SPENDS) == 0 {
-        native_run_block_generator2::<_, EmptyVisitor, _>
-    } else {
-        native_run_block_generator2::<_, MempoolVisitor, _>
-    };
 
     py.allow_threads(|| {
-        match run_block(&mut allocator, program, refs, max_cost, flags, constants) {
+        match native_run_block_generator2(&mut allocator, program, refs, max_cost, flags, constants)
+        {
             Ok(spend_bundle_conds) => (
                 None,
                 Some(OwnedSpendBundleConditions::from(

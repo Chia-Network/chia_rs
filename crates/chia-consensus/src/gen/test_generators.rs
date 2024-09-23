@@ -1,4 +1,4 @@
-use super::conditions::{MempoolVisitor, NewCoin, SpendBundleConditions, SpendConditions};
+use super::conditions::{NewCoin, SpendBundleConditions, SpendConditions};
 use super::run_block_generator::{run_block_generator, run_block_generator2};
 use crate::allocator::make_allocator;
 use crate::consensus_constants::TEST_CONSTANTS;
@@ -231,7 +231,7 @@ fn run_generator(#[case] name: &str) {
     for (flags, expected) in zip(&[DEFAULT_FLAGS, DEFAULT_FLAGS | MEMPOOL_MODE], expected) {
         println!("flags: {flags:x}");
         let mut a = make_allocator(*flags);
-        let conds = run_block_generator::<_, MempoolVisitor, _>(
+        let conds = run_block_generator(
             &mut a,
             &generator,
             &block_refs,
@@ -246,7 +246,7 @@ fn run_generator(#[case] name: &str) {
         };
 
         let mut a = make_allocator(*flags);
-        let conds = run_block_generator2::<_, MempoolVisitor, _>(
+        let conds = run_block_generator2(
             &mut a,
             &generator,
             &block_refs,

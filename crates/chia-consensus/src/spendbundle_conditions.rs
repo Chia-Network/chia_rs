@@ -133,7 +133,7 @@ mod tests {
         });
         let program = solution_generator(program_spends).expect("solution_generator failed");
         let blocks: &[&[u8]] = &[];
-        let block_conds = run_block_generator2::<_, MempoolVisitor, _>(
+        let block_conds = run_block_generator2(
             &mut a,
             program.as_slice(),
             blocks,
@@ -312,7 +312,7 @@ mod tests {
         // of just the spend bundle will be lower
         let (block_cost, block_output) = {
             let mut a = make_allocator(DEFAULT_FLAGS);
-            let block_conds = run_block_generator::<_, MempoolVisitor, _>(
+            let block_conds = run_block_generator(
                 &mut a,
                 &generator_buffer,
                 &block_refs,
