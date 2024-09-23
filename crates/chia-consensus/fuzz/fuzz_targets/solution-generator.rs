@@ -45,6 +45,10 @@ fuzz_target!(|data: &[u8]| {
         return;
     };
 
+    if result.len() != calculate_generator_length(spends) - discrepancy {
+        panic!("Debug spends: {:?}", spends);
+    }
+
     assert_eq!(
         result.len(),
         calculate_generator_length(spends) - discrepancy
