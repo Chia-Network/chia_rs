@@ -4,7 +4,6 @@ use std::io::Write;
 use std::time::SystemTime;
 
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
-use chia_consensus::gen::conditions::EmptyVisitor;
 use chia_consensus::gen::flags::{ALLOW_BACKREFS, MEMPOOL_MODE};
 use chia_consensus::gen::run_block_generator::{run_block_generator, run_block_generator2};
 use chia_tools::iterate_tx_blocks;
@@ -51,9 +50,9 @@ fn main() {
             // after the hard fork, we run blocks without paying for the
             // CLVM generator ROM
             let block_runner = if height >= 5_496_000 {
-                run_block_generator2::<_, EmptyVisitor, _>
+                run_block_generator2
             } else {
-                run_block_generator::<_, EmptyVisitor, _>
+                run_block_generator
             };
 
             let generator = block

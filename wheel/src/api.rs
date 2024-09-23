@@ -3,7 +3,7 @@ use chia_consensus::allocator::make_allocator;
 use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::gen::conditions::MempoolVisitor;
 use chia_consensus::gen::flags::{
-    ALLOW_BACKREFS, ANALYZE_SPENDS, MEMPOOL_MODE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
+    ALLOW_BACKREFS, MEMPOOL_MODE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
 };
 use chia_consensus::gen::owned_conditions::{OwnedSpendBundleConditions, OwnedSpendConditions};
 use chia_consensus::gen::run_block_generator::setup_generator_args;
@@ -502,7 +502,6 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("STRICT_ARGS_COUNT", STRICT_ARGS_COUNT)?;
     m.add("MEMPOOL_MODE", MEMPOOL_MODE)?;
     m.add("ALLOW_BACKREFS", ALLOW_BACKREFS)?;
-    m.add("ANALYZE_SPENDS", ANALYZE_SPENDS)?;
 
     // Chia classes
     m.add_class::<Coin>()?;
