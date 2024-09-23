@@ -325,6 +325,39 @@ mod tests {
     }
 
     #[test]
+    fn test_length_calculator_edge_case() {
+        let mut spends: Vec<(Coin, &[u8], &[u8])> = Vec::new();
+        let mut coin_spends = Vec::<CoinSpend>::new();
+        let mut a = Allocator::new();
+        let mut discrepancy: usize = 0;
+
+        let coin: Coin = Coin::new(
+            hex!("ccd5bb71183532bff220ba46c268991a00000000000000000000000000036840").into(),
+            hex!("fcc78a9e396df6ceebc217d2446bc016e0b3d5922fb32e5783ec5a85d490cfb6").into(),
+            100,
+        );
+        spends.push((coin, hex!("f800000000").as_ref(), SOLUTION1.as_ref()));
+        coin_spends.push(CoinSpend {
+            coin,
+            puzzle_reveal: Program::from(hex!("f800000000").as_ref()),
+            solution: Program::from(SOLUTION1.as_ref()),
+        });
+        let node = node_from_bytes_backrefs(&mut a, hex!("f800000000").as_ref()).expect("atom");
+        if node.is_atom() {
+            let puz = node_to_bytes(&a, node).expect("bytes");
+            assert_eq!(puz.len(), 1);
+            discrepancy = hex!("f800000000").as_ref().len() - puz.len();
+        }
+        assert_eq!(discrepancy, 4);
+        let result = solution_generator(spends.clone()).expect("solution_generator");
+
+        assert_eq!(
+            result.len(),
+            calculate_generator_length(&coin_spends) - discrepancy
+        );
+    }
+
+    #[test]
     fn test_solution_generator_backre() {
         let coin1: Coin = Coin::new(
             hex!("ccd5bb71183532bff220ba46c268991a00000000000000000000000000036840").into(),
