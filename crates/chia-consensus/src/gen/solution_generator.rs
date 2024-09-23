@@ -1,7 +1,9 @@
 use chia_protocol::Coin;
 use chia_protocol::CoinSpend;
 use clvmr::allocator::{Allocator, NodePtr};
-use clvmr::serde::{node_from_bytes_backrefs, node_from_bytes, node_to_bytes, node_to_bytes_backrefs};
+use clvmr::serde::{
+    node_from_bytes, node_from_bytes_backrefs, node_to_bytes, node_to_bytes_backrefs,
+};
 use std::io;
 
 // the tuple has the Coin, puzzle-reveal and solution

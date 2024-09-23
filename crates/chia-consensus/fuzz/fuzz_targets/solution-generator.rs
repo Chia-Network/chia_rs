@@ -23,12 +23,16 @@ fuzz_target!(|data: &[u8]| {
             spend.solution.to_vec(),
         ));
         // Check if puzzle or solution are atoms which can represented in a smaller form
-        let Ok(node) = node_from_bytes(&mut a, spend.puzzle_reveal.as_ref()) else {return;};
+        let Ok(node) = node_from_bytes(&mut a, spend.puzzle_reveal.as_ref()) else {
+            return;
+        };
         if node.is_atom() {
             let puz = node_to_bytes(&a, node).expect("bytes");
             discrepancy += spend.puzzle_reveal.as_ref().len() - puz.len();
         }
-        let Ok(node) = node_from_bytes(&mut a, spend.solution.as_ref()) else {return;};
+        let Ok(node) = node_from_bytes(&mut a, spend.solution.as_ref()) else {
+            return;
+        };
         if node.is_atom() {
             let sol = node_to_bytes(&a, node).expect("bytes");
             discrepancy += spend.solution.as_ref().len() - sol.len();
