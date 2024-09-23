@@ -3,7 +3,7 @@ use chia_consensus::gen::solution_generator::{calculate_generator_length, soluti
 use chia_protocol::{Coin, CoinSpend};
 use chia_traits::Streamable;
 use clvmr::{
-    serde::{node_from_bytes_backrefs, node_to_bytes},
+    serde::{node_from_bytes, node_to_bytes},
     Allocator,
 };
 use libfuzzer_sys::fuzz_target;
@@ -23,12 +23,12 @@ fuzz_target!(|data: &[u8]| {
             spend.solution.to_vec(),
         ));
         // Check if puzzle or solution are atoms which can represented in a smaller form
-        let node = node_from_bytes_backrefs(&mut a, spend.puzzle_reveal.as_ref()).expect("atom");
+        let Ok(node) = node_from_bytes(&mut a, spend.puzzle_reveal.as_ref()) else {return;};
         if node.is_atom() {
             let puz = node_to_bytes(&a, node).expect("bytes");
             discrepancy += spend.puzzle_reveal.as_ref().len() - puz.len();
         }
-        let node = node_from_bytes_backrefs(&mut a, spend.solution.as_ref()).expect("atom");
+        let Ok(node) = node_from_bytes(&mut a, spend.solution.as_ref()) else {return;};
         if node.is_atom() {
             let sol = node_to_bytes(&a, node).expect("bytes");
             discrepancy += spend.solution.as_ref().len() - sol.len();

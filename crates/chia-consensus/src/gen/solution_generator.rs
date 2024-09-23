@@ -1,7 +1,7 @@
 use chia_protocol::Coin;
 use chia_protocol::CoinSpend;
 use clvmr::allocator::{Allocator, NodePtr};
-use clvmr::serde::{node_from_bytes_backrefs, node_to_bytes, node_to_bytes_backrefs};
+use clvmr::serde::{node_from_bytes_backrefs, node_from_bytes, node_to_bytes, node_to_bytes_backrefs};
 use std::io;
 
 // the tuple has the Coin, puzzle-reveal and solution
@@ -25,6 +25,42 @@ where
         let item = a.new_pair(amount, item)?;
         // puzzle reveal
         let puzzle = node_from_bytes_backrefs(a, s.1.as_ref())?;
+        let item = a.new_pair(puzzle, item)?;
+        // parent-id
+        let parent_id = a.new_atom(&s.0.parent_coin_info)?;
+        let item = a.new_pair(parent_id, item)?;
+
+        spend_list = a.new_pair(item, spend_list)?;
+    }
+
+    // the list of spends is the first (and only) item in an outer list
+    spend_list = a.new_pair(spend_list, a.nil())?;
+
+    let quote = a.new_pair(a.one(), spend_list)?;
+    Ok(quote)
+}
+
+// the tuple has the Coin, puzzle-reveal and solution
+fn build_generator_no_backrefs<BufRef, I>(a: &mut Allocator, spends: I) -> io::Result<NodePtr>
+where
+    BufRef: AsRef<[u8]>,
+    I: IntoIterator<Item = (Coin, BufRef, BufRef)>,
+{
+    // the generator we produce here is just a quoted list. Nothing fancy.
+    // Its format is as follows:
+    // (q . ( ( ( parent-id puzzle-reveal amount solution ) ... ) ) )
+
+    let mut spend_list = a.nil();
+    for s in spends {
+        let item = a.nil();
+        // solution
+        let solution = node_from_bytes(a, s.2.as_ref())?;
+        let item = a.new_pair(solution, item)?;
+        // amount
+        let amount = a.new_number(s.0.amount.into())?;
+        let item = a.new_pair(amount, item)?;
+        // puzzle reveal
+        let puzzle = node_from_bytes(a, s.1.as_ref())?;
         let item = a.new_pair(puzzle, item)?;
         // parent-id
         let parent_id = a.new_atom(&s.0.parent_coin_info)?;
@@ -89,7 +125,7 @@ where
     I: IntoIterator<Item = (Coin, BufRef, BufRef)>,
 {
     let mut a = Allocator::new();
-    let generator = build_generator(&mut a, spends)?;
+    let generator = build_generator_no_backrefs(&mut a, spends)?;
     node_to_bytes(&a, generator)
 }
 
@@ -109,6 +145,7 @@ mod tests {
     use chia_protocol::Program;
     use clvmr::{run_program, ChiaDialect};
     use hex_literal::hex;
+    use rstest::rstest;
 
     const PUZZLE1: [u8; 291] = hex!(
         "
@@ -324,8 +361,10 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_length_calculator_edge_case() {
+    #[rstest]
+    #[case(hex!("f800000000").as_ref(), SOLUTION1.as_ref())]
+    #[case(PUZZLE1.as_ref(), hex!("00").as_ref())]
+    fn test_length_calculator_edge_case(#[case] puzzle: &[u8], #[case] solution: &[u8]) {
         let mut spends: Vec<(Coin, &[u8], &[u8])> = Vec::new();
         let mut coin_spends = Vec::<CoinSpend>::new();
         let mut a = Allocator::new();
@@ -336,19 +375,22 @@ mod tests {
             hex!("fcc78a9e396df6ceebc217d2446bc016e0b3d5922fb32e5783ec5a85d490cfb6").into(),
             100,
         );
-        spends.push((coin, hex!("f800000000").as_ref(), SOLUTION1.as_ref()));
+        spends.push((coin, puzzle, solution));
         coin_spends.push(CoinSpend {
             coin,
-            puzzle_reveal: Program::from(hex!("f800000000").as_ref()),
-            solution: Program::from(SOLUTION1.as_ref()),
+            puzzle_reveal: Program::from(puzzle),
+            solution: Program::from(solution),
         });
-        let node = node_from_bytes_backrefs(&mut a, hex!("f800000000").as_ref()).expect("atom");
+        let node = node_from_bytes(&mut a, puzzle.as_ref()).expect("atom");
         if node.is_atom() {
             let puz = node_to_bytes(&a, node).expect("bytes");
-            assert_eq!(puz.len(), 1);
-            discrepancy = hex!("f800000000").as_ref().len() - puz.len();
+            discrepancy = puzzle.len() - puz.len();
         }
-        assert_eq!(discrepancy, 4);
+        let node = node_from_bytes(&mut a, solution.as_ref()).expect("atom");
+        if node.is_atom() {
+            let sol = node_to_bytes(&a, node).expect("bytes");
+            discrepancy = solution.len() - sol.len();
+        }
         let result = solution_generator(spends.clone()).expect("solution_generator");
 
         assert_eq!(
