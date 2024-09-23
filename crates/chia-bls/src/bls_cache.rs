@@ -83,7 +83,7 @@ impl BlsCache {
 use pyo3::{
     exceptions::PyValueError,
     pybacked::PyBackedBytes,
-    types::{PyAnyMethods, PyList},
+    types::{PyAnyMethods, PyList, PySequence},
     Bound, PyObject, PyResult,
 };
 
@@ -143,7 +143,7 @@ impl BlsCache {
     }
 
     #[pyo3(name = "update")]
-    pub fn py_update(&mut self, other: &Bound<'_, PyList>) -> PyResult<()> {
+    pub fn py_update(&mut self, other: &Bound<'_, PySequence>) -> PyResult<()> {
         for item in other.borrow().iter()? {
             let (key, value): (Vec<u8>, GTElement) = item?.extract()?;
             self.cache.put(
