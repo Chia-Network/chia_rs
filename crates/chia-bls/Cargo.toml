@@ -12,7 +12,7 @@ repository = "https://github.com/Chia-Network/chia_rs"
 workspace = true
 
 [features]
-py-bindings = ["dep:pyo3", "chia_py_streamable_macro", "chia-traits/py-bindings"]
+py-bindings = ["dep:pyo3", "dep:num-bigint", "chia_py_streamable_macro", "chia-traits/py-bindings"]
 arbitrary = ["dep:arbitrary"]
 
 [dependencies]
@@ -24,9 +24,10 @@ hkdf = { workspace = true }
 blst = { workspace = true }
 hex = { workspace = true }
 thiserror = { workspace = true }
-pyo3 = { workspace = true, features = ["multiple-pymethods"], optional = true }
+pyo3 = { workspace = true, features = ["multiple-pymethods", "num-bigint"], optional = true }
 arbitrary = { workspace = true, optional = true }
 lru = { workspace = true }
+num-bigint = { workspace = true, optional = true }
 
 [dev-dependencies]
 rand = { workspace = true }
