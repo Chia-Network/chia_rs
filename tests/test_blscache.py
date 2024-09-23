@@ -202,10 +202,9 @@ def test_cached_bls_flattening():
     gts = [pk.pair(AugSchemeMPL.g2_from_message(bytes(pk) + b"foobar")) for pk in pks]
     for key, value in cached_bls.items():
         assert isinstance(key, bytes)
-        assert isinstance(value, bytes)
-        reconstructed = GTElement.from_bytes(value)
-        assert reconstructed in gts
-        gts.remove(reconstructed)
+        assert isinstance(value, GTElement)
+        assert value in gts
+        gts.remove(value)
 
     cache_copy = BLSCache()
     cache_copy.update(cached_bls.items())
@@ -214,10 +213,9 @@ def test_cached_bls_flattening():
     gts = [pk.pair(AugSchemeMPL.g2_from_message(bytes(pk) + b"foobar")) for pk in pks]
     for key, value in cache_copy.items():
         assert isinstance(key, bytes)
-        assert isinstance(value, bytes)
-        reconstructed = GTElement.from_bytes(value)
-        assert reconstructed in gts
-        gts.remove(reconstructed)
+        assert isinstance(value, GTElement)
+        assert value in gts
+        gts.remove(value)
 
 
 def test_cached_bls_repeat_pk():
