@@ -34,9 +34,6 @@ fuzz_target!(|data: &[u8]| {
         return;
     }
     let result = solution_generator(generator_input).expect("solution_generator");
-    if result.len() as i64 != calculate_generator_length(spends.clone()) as i64 - discrepancy {
-        panic!("Debug spends: {:?}", spends);
-    }
 
     assert_eq!(
         result.len() as i64,
