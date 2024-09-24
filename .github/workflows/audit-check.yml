@@ -4,6 +4,10 @@ on:
     branches:
       - "**"
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   security_audit:
     runs-on: ubuntu-latest
