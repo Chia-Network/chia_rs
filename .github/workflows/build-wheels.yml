@@ -190,6 +190,7 @@ jobs:
           directories: ${{ steps.create-venv.outputs.activate-venv-directories }}
 
       - name: Install chia_rs wheel
+        shell: bash
         run: |
           TMP_DEST=$(mktemp -d)
           pip download --no-index --no-deps --only-binary :all: --find-links target/wheels/ --dest "${TMP_DEST}" chia_rs
