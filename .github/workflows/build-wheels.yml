@@ -193,7 +193,7 @@ jobs:
         run: |
           # TODO: pick a better directory
           pip download --no-index --no-deps --only-binary :all: --find-links target/wheels/ --dest ack/ chia_rs
-          pip install $(ls ack/)
+          pip install ack/$(ls ack/)
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
