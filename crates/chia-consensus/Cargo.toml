@@ -23,7 +23,6 @@ chia_py_streamable_macro = { workspace = true, optional = true }
 clvm-utils = { workspace = true }
 chia-traits = { workspace = true }
 clvm-traits = { workspace = true }
-clvm-derive = { workspace = true }
 chia-protocol = { workspace = true }
 chia-puzzles = { workspace = true }
 chia-bls = { workspace = true }

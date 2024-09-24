@@ -8,6 +8,13 @@ use super::conditions::{SpendBundleConditions, SpendConditions};
 #[cfg(feature = "py-bindings")]
 use chia_py_streamable_macro::{PyJsonDict, PyStreamable};
 
+#[cfg(feature = "py-bindings")]
+use pyo3::exceptions::PyNotImplementedError;
+#[cfg(feature = "py-bindings")]
+use pyo3::prelude::*;
+#[cfg(feature = "py-bindings")]
+use pyo3::types::PyType;
+
 #[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(
     feature = "py-bindings",
@@ -143,4 +150,28 @@ fn convert_agg_sigs(a: &Allocator, agg_sigs: &[(PublicKey, NodePtr)]) -> Vec<(Pu
         ret.push((*pk, a.atom(*msg).as_ref().into()));
     }
     ret
+}
+
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+impl OwnedSpendConditions {
+    #[classmethod]
+    #[pyo3(name = "from_parent")]
+    pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: &Self) -> PyResult<PyObject> {
+        Err(PyNotImplementedError::new_err(
+            "OwnedSpendConditions does not support from_parent().",
+        ))
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+impl OwnedSpendBundleConditions {
+    #[classmethod]
+    #[pyo3(name = "from_parent")]
+    pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: &Self) -> PyResult<PyObject> {
+        Err(PyNotImplementedError::new_err(
+            "OwnedSpendBundleConditions does not support from_parent().",
+        ))
+    }
 }

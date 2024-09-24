@@ -3,8 +3,7 @@ use chia_consensus::allocator::make_allocator;
 use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::gen::conditions::MempoolVisitor;
 use chia_consensus::gen::flags::{
-    ALLOW_BACKREFS, ANALYZE_SPENDS, DISALLOW_INFINITY_G1, MEMPOOL_MODE, NO_UNKNOWN_CONDS,
-    STRICT_ARGS_COUNT,
+    ALLOW_BACKREFS, MEMPOOL_MODE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
 };
 use chia_consensus::gen::owned_conditions::{OwnedSpendBundleConditions, OwnedSpendConditions};
 use chia_consensus::gen::run_block_generator::setup_generator_args;
@@ -45,7 +44,7 @@ use chia_protocol::{
     UnfinishedHeaderBlock, VDFInfo, VDFProof, WeightProof,
 };
 use clvm_utils::tree_hash_from_bytes;
-use clvmr::{ENABLE_BLS_OPS_OUTSIDE_GUARD, ENABLE_FIXED_DIV, LIMIT_HEAP, NO_UNKNOWN_OPS};
+use clvmr::{LIMIT_HEAP, NO_UNKNOWN_OPS};
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
@@ -423,16 +422,19 @@ fn fast_forward_singleton<'p>(
 #[pyo3(name = "validate_clvm_and_signature")]
 #[allow(clippy::type_complexity)]
 pub fn py_validate_clvm_and_signature(
+    py: Python<'_>,
     new_spend: &SpendBundle,
     max_cost: u64,
     constants: &ConsensusConstants,
     peak_height: u32,
 ) -> PyResult<(OwnedSpendBundleConditions, Vec<([u8; 32], GTElement)>, f32)> {
-    let (owned_conditions, additions, duration) =
-        validate_clvm_and_signature(new_spend, max_cost, constants, peak_height).map_err(|e| {
+    let (owned_conditions, additions, duration) = py
+        .allow_threads(|| validate_clvm_and_signature(new_spend, max_cost, constants, peak_height))
+        .map_err(|e| {
+            // cast validation error to int
             let error_code: u32 = e.into();
             PyErr::new::<PyTypeError, _>(error_code)
-        })?; // cast validation error to int
+        })?;
     Ok((owned_conditions, additions, duration.as_secs_f32()))
 }
 
@@ -499,11 +501,8 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // clvm functions
     m.add("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;
     m.add("STRICT_ARGS_COUNT", STRICT_ARGS_COUNT)?;
-    m.add("ENABLE_FIXED_DIV", ENABLE_FIXED_DIV)?;
     m.add("MEMPOOL_MODE", MEMPOOL_MODE)?;
     m.add("ALLOW_BACKREFS", ALLOW_BACKREFS)?;
-    m.add("ANALYZE_SPENDS", ANALYZE_SPENDS)?;
-    m.add("DISALLOW_INFINITY_G1", DISALLOW_INFINITY_G1)?;
 
     // Chia classes
     m.add_class::<Coin>()?;
@@ -629,7 +628,6 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(run_chia_program, m)?)?;
     m.add("NO_UNKNOWN_OPS", NO_UNKNOWN_OPS)?;
     m.add("LIMIT_HEAP", LIMIT_HEAP)?;
-    m.add("ENABLE_BLS_OPS_OUTSIDE_GUARD", ENABLE_BLS_OPS_OUTSIDE_GUARD)?;
 
     m.add_function(wrap_pyfunction!(serialized_length, m)?)?;
     m.add_function(wrap_pyfunction!(compute_merkle_set_root, m)?)?;

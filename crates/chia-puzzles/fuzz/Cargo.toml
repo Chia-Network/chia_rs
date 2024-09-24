@@ -14,7 +14,6 @@ workspace = true
 [dependencies]
 libfuzzer-sys = { workspace = true }
 clvmr = { workspace = true }
-pyo3 = { workspace = true, features = ["auto-initialize"]}
 chia-puzzles = { workspace = true, features = ["arbitrary"] }
 clvm-traits = { workspace = true }
 

@@ -83,7 +83,7 @@ impl BlsCache {
 use pyo3::{
     exceptions::PyValueError,
     pybacked::PyBackedBytes,
-    types::{PyAnyMethods, PyList},
+    types::{PyAnyMethods, PyList, PySequence},
     Bound, PyObject, PyResult,
 };
 
@@ -137,26 +137,19 @@ impl BlsCache {
         use pyo3::types::PyBytes;
         let ret = PyList::empty_bound(py);
         for (key, value) in &self.cache {
-            ret.append((
-                PyBytes::new_bound(py, key),
-                PyBytes::new_bound(py, &value.to_bytes()),
-            ))?;
+            ret.append((PyBytes::new_bound(py, key), value.clone().into_py(py)))?;
         }
         Ok(ret.into())
     }
 
     #[pyo3(name = "update")]
-    pub fn py_update(&mut self, other: &Bound<'_, PyList>) -> PyResult<()> {
+    pub fn py_update(&mut self, other: &Bound<'_, PySequence>) -> PyResult<()> {
         for item in other.borrow().iter()? {
-            let (key, value): (Vec<u8>, Vec<u8>) = item?.extract()?;
+            let (key, value): (Vec<u8>, GTElement) = item?.extract()?;
             self.cache.put(
                 key.try_into()
                     .map_err(|_| PyValueError::new_err("invalid key"))?,
-                GTElement::from_bytes(
-                    (&value[..])
-                        .try_into()
-                        .map_err(|_| PyValueError::new_err("invalid GTElement"))?,
-                ),
+                value,
             );
         }
         Ok(())

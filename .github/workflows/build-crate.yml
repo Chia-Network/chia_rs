@@ -28,6 +28,12 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-features --all-targets
 
+      - name: Install cargo-machete
+        run: cargo install cargo-machete
+
+      - name: Unused dependencies
+        run: cargo machete
+
       - name: Tests (debug)
         run: cargo test --workspace --all-features
 
