@@ -137,7 +137,7 @@ To list and run fuzzers:
 
 ```bash
 cargo fuzz list
-cargo fuzz run <name-of-fuzzer>
+cargo +nightly fuzz run <name-of-fuzzer> --jobs=10
 ```
 
 ## Bumping Version Number
