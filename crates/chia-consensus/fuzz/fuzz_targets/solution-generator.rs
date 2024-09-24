@@ -22,7 +22,7 @@ fuzz_target!(|data: &[u8]| {
             spend.puzzle_reveal.to_vec(),
             spend.solution.to_vec(),
         ));
-        // Check if puzzle or solution are atoms which can represented in a smaller form
+        // Check for atoms which can represented in a smaller form
         let node = node_from_bytes_backrefs(&mut a, spend.puzzle_reveal.as_ref()).expect("node");
         let puz = node_to_bytes(&a, node).expect("bytes");
         discrepancy += spend.puzzle_reveal.as_ref().len() as i64 - puz.len() as i64;
