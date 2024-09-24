@@ -6,3 +6,6 @@ build-backend = "maturin"
 bindings = "pyo3"
 features = ["pyo3/extension-module"]
 python-source = "python"
+
+[project]
+dependencies = ["typing_extensions"]
