@@ -10,6 +10,10 @@ on:
     branches:
       - "**"
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   build_crate:
     name: Build crate
