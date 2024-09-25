@@ -189,8 +189,15 @@ jobs:
           directories: ${{ steps.create-venv.outputs.activate-venv-directories }}
 
       - name: Install chia_rs wheel
+        shell: bash
         run: |
-          pip install --no-index --find-links target/wheels/ chia_rs
+          TMP_DEST=$(mktemp -d)
+          pip download --no-index --no-deps --only-binary :all: --find-links target/wheels/ --dest "${TMP_DEST}" chia_rs
+          echo ====
+          ls -l "${TMP_DEST}"
+          echo ====
+          pip install "${TMP_DEST}"/*
+          rm -rf "${TMP_DEST}"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
