@@ -40,6 +40,8 @@ where
     Ok(quote)
 }
 
+// this function returns the number of bytes the specified
+// number is serialized to, in CLVM serialized form
 fn clvm_bytes_len(val: u64) -> usize {
     if val < 0x80 {
         1
@@ -72,8 +74,9 @@ where
     for s in spends.as_ref() {
         let puzzle = s.puzzle_reveal.as_ref();
         let solution = s.solution.as_ref();
-        // parent-id puzzle-reveal amount solution
-        // parent-id is always 32 bytes + prepend 1 byte = 33
+        // Each spend has the following form:
+        // ( parent-id puzzle-reveal amount solution )
+        // parent-id is always 32 bytes + 1 byte length prefix = 33
         // + 6 bytes for list extension
         // coin amount is already prepended correctly in clvm_bytes_len()
         size += 39 + puzzle.len() + clvm_bytes_len(s.coin.amount) + solution.len();
@@ -439,5 +442,64 @@ mod tests {
 
         let generator_output = run_generator(&result);
         assert_eq!(generator_output, EXPECTED_GENERATOR_OUTPUT);
+    }
+
+    #[rstest]
+    #[case(0)]
+    #[case(1)]
+    #[case(0x7f)]
+    #[case(0x80)]
+    #[case(0xff)]
+    #[case(0x7fff)]
+    #[case(0x8000)]
+    #[case(0xffff)]
+    #[case(0x7fffff)]
+    #[case(0x800000)]
+    #[case(0xffffff)]
+    #[case(0x7fffffff)]
+    #[case(0x80000000)]
+    #[case(0xffffffff)]
+    #[case(0x7fffffffff)]
+    #[case(0x8000000000)]
+    #[case(0xffffffffff)]
+    #[case(0x7fffffffffff)]
+    #[case(0x800000000000)]
+    #[case(0xffffffffffff)]
+    #[case(0x7fffffffffffff)]
+    #[case(0x80000000000000)]
+    #[case(0xffffffffffffff)]
+    #[case(0x7fffffffffffffff)]
+    #[case(0x8000000000000000)]
+    #[case(0xffffffffffffffff)]
+    #[case(0x7)]
+    #[case(0x8)]
+    #[case(0xf)]
+    #[case(0x7ff)]
+    #[case(0x800)]
+    #[case(0xfff)]
+    #[case(0x7ffff)]
+    #[case(0x80000)]
+    #[case(0xfffff)]
+    #[case(0x7ffffff)]
+    #[case(0x8000000)]
+    #[case(0xfffffff)]
+    #[case(0x7ffffffff)]
+    #[case(0x800000000)]
+    #[case(0xfffffffff)]
+    #[case(0x7ffffffffff)]
+    #[case(0x80000000000)]
+    #[case(0xfffffffffff)]
+    #[case(0x7ffffffffffff)]
+    #[case(0x8000000000000)]
+    #[case(0xfffffffffffff)]
+    #[case(0x7ffffffffffffff)]
+    #[case(0x800000000000000)]
+    #[case(0xfffffffffffffff)]
+    fn test_clvm_bytes_len(#[case] n: u64) {
+        let len = clvm_bytes_len(n);
+        let mut a = Allocator::new();
+        let atom = a.new_number(n.into()).expect("new_number");
+        let bytes = node_to_bytes(&a, atom).expect("node_to_bytes");
+        assert_eq!(bytes.len(), len);
     }
 }
