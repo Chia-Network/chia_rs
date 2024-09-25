@@ -166,6 +166,7 @@ def parse_rust_source(filename: str, upper_case: bool) -> List[Tuple[str, List[s
 extra_members = {
     "Coin": [
         "def name(self) -> bytes32: ...",
+        "@classmethod\n    def from_parent(cls, _coin: Self): ...",
     ],
     "ClassgroupElement": [
         "@staticmethod\n    def create(bytes) -> ClassgroupElement: ...",
@@ -224,6 +225,7 @@ extra_members = {
         "def uncurry(self) -> Tuple[ChiaProgram, ChiaProgram]: ...",
     ],
     "SpendBundle": [
+        "@classmethod\n    def from_parent(cls, spend_bundle: Self): ...",
         "@classmethod\n    def aggregate(cls, spend_bundles: List[SpendBundle]) -> Self: ...",
         "def name(self) -> bytes32: ...",
         "def removals(self) -> List[Coin]: ...",
@@ -238,6 +240,9 @@ extra_members = {
         "def sp_iters(self, constants: ConsensusConstants) -> uint64: ...",
         "def ip_iters(self, constants: ConsensusConstants) -> uint64: ...",
         "def sp_total_iters(self, constants: ConsensusConstants) -> uint128: ...",
+    ],
+    "CoinSpend": [
+        "@classmethod\n    def from_parent(cls, cs: Self): ...",
     ],
 }
 
@@ -329,7 +334,6 @@ STRICT_ARGS_COUNT: int = ...
 LIMIT_HEAP: int = ...
 MEMPOOL_MODE: int = ...
 ALLOW_BACKREFS: int = ...
-ANALYZE_SPENDS: int = ...
 
 ELIGIBLE_FOR_DEDUP: int = ...
 ELIGIBLE_FOR_FF: int = ...
