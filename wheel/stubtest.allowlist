@@ -43,7 +43,7 @@ chia_rs.sized_byte_class.Iterable
 chia_rs.sized_byte_class.BinaryIO.write
 chia_rs.struct_stream.BinaryIO.write
 
-# TODO: why are we implementing these just so they can report not implemented?
+# these raise unimplemented
 chia_rs.G1Element.from_parent
 chia_rs.G2Element.from_parent
 chia_rs.GTElement.from_parent
@@ -61,3 +61,11 @@ chia_rs.chia_rs.SpendBundleConditions.from_parent
 chia_rs.chia_rs.SpendConditions.from_parent
 chia_rs.spend.Spend.from_parent
 chia_rs.spend.SpendConditions.from_parent
+
+# these are implemented but not intended to be called from python
+chia_rs.Coin.from_parent
+chia_rs.CoinSpend.from_parent
+chia_rs.SpendBundle.from_parent
+chia_rs.chia_rs.Coin.from_parent
+chia_rs.chia_rs.CoinSpend.from_parent
+chia_rs.chia_rs.SpendBundle.from_parent

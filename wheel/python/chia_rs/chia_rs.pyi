@@ -603,8 +603,6 @@ class Coin:
     puzzle_hash: bytes32
     amount: uint64
     def name(self) -> bytes32: ...
-    @classmethod
-    def from_parent(cls, _coin: Self): ...
     def __init__(
         self,
         parent_coin_info: bytes,
@@ -637,8 +635,6 @@ class CoinSpend:
     coin: Coin
     puzzle_reveal: Program
     solution: Program
-    @classmethod
-    def from_parent(cls, cs: Self): ...
     def __init__(
         self,
         coin: Coin,
@@ -2341,8 +2337,6 @@ class SubSlotProofs:
 class SpendBundle:
     coin_spends: List[CoinSpend]
     aggregated_signature: G2Element
-    @classmethod
-    def from_parent(cls, spend_bundle: Self): ...
     @classmethod
     def aggregate(cls, spend_bundles: List[SpendBundle]) -> Self: ...
     def name(self) -> bytes32: ...
