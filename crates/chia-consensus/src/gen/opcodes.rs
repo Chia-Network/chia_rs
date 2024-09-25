@@ -1,4 +1,3 @@
-use crate::gen::flags::ENABLE_MESSAGE_CONDITIONS;
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use clvmr::cost::Cost;
 
@@ -105,7 +104,7 @@ pub fn compute_unknown_condition_cost(op: ConditionOpcode) -> Cost {
     }
 }
 
-pub fn parse_opcode(a: &Allocator, op: NodePtr, flags: u32) -> Option<ConditionOpcode> {
+pub fn parse_opcode(a: &Allocator, op: NodePtr, _flags: u32) -> Option<ConditionOpcode> {
     let buf = match a.sexp(op) {
         SExp::Atom => a.atom(op),
         SExp::Pair(..) => return None,
@@ -154,16 +153,10 @@ pub fn parse_opcode(a: &Allocator, op: NodePtr, flags: u32) -> Option<ConditionO
             | AGG_SIG_AMOUNT
             | AGG_SIG_PUZZLE_AMOUNT
             | AGG_SIG_PARENT_AMOUNT
-            | AGG_SIG_PARENT_PUZZLE => Some(b0),
-            _ => {
-                if (flags & ENABLE_MESSAGE_CONDITIONS) != 0
-                    && [SEND_MESSAGE, RECEIVE_MESSAGE].contains(&b0)
-                {
-                    Some(b0)
-                } else {
-                    None
-                }
-            }
+            | AGG_SIG_PARENT_PUZZLE
+            | SEND_MESSAGE
+            | RECEIVE_MESSAGE => Some(b0),
+            _ => None,
         }
     } else {
         None
@@ -215,10 +208,7 @@ use rstest::rstest;
 fn test_parse_opcode(#[case] input: &[u8], #[case] expected: Option<ConditionOpcode>) {
     let mut a = Allocator::new();
     assert_eq!(opcode_tester(&mut a, input, 0), expected);
-    assert_eq!(
-        opcode_tester(&mut a, input, ENABLE_MESSAGE_CONDITIONS),
-        expected
-    );
+    assert_eq!(opcode_tester(&mut a, input, 0), expected);
 }
 
 #[cfg(test)]
@@ -236,41 +226,11 @@ fn test_parse_opcode(#[case] input: &[u8], #[case] expected: Option<ConditionOpc
 #[case(&[AGG_SIG_PARENT_PUZZLE as u8], Some(AGG_SIG_PARENT_PUZZLE))]
 #[case(&[ASSERT_EPHEMERAL as u8], Some(ASSERT_EPHEMERAL))]
 #[case(&[ASSERT_BEFORE_SECONDS_RELATIVE as u8], Some(ASSERT_BEFORE_SECONDS_RELATIVE))]
-#[case(&[SEND_MESSAGE as u8], None)]
-#[case(&[RECEIVE_MESSAGE as u8], None)]
+#[case(&[SEND_MESSAGE as u8], Some(SEND_MESSAGE))]
+#[case(&[RECEIVE_MESSAGE as u8], Some(RECEIVE_MESSAGE))]
 fn test_parse_opcode_softfork(#[case] input: &[u8], #[case] expected: Option<ConditionOpcode>) {
     let mut a = Allocator::new();
     assert_eq!(opcode_tester(&mut a, input, 0), expected);
-}
-
-#[cfg(test)]
-#[rstest]
-#[case(&[AGG_SIG_UNSAFE as u8], Some(AGG_SIG_UNSAFE), Some(AGG_SIG_UNSAFE))]
-#[case(&[AGG_SIG_ME as u8], Some(AGG_SIG_ME), Some(AGG_SIG_ME))]
-#[case(&[CREATE_COIN as u8], Some(CREATE_COIN), Some(CREATE_COIN))]
-// the SOFTOFORK and new AGG_SIG_* condition is only recognized when the flag is set
-#[case(&[SOFTFORK as u8], Some(SOFTFORK), Some(SOFTFORK))]
-#[case(&[AGG_SIG_PARENT as u8], Some(AGG_SIG_PARENT), Some(AGG_SIG_PARENT))]
-#[case(&[AGG_SIG_PUZZLE as u8], Some(AGG_SIG_PUZZLE), Some(AGG_SIG_PUZZLE))]
-#[case(&[AGG_SIG_AMOUNT as u8], Some(AGG_SIG_AMOUNT), Some(AGG_SIG_AMOUNT))]
-#[case(&[AGG_SIG_PUZZLE_AMOUNT as u8], Some(AGG_SIG_PUZZLE_AMOUNT), Some(AGG_SIG_PUZZLE_AMOUNT))]
-#[case(&[AGG_SIG_PARENT_AMOUNT as u8], Some(AGG_SIG_PARENT_AMOUNT), Some(AGG_SIG_PARENT_AMOUNT))]
-#[case(&[AGG_SIG_PARENT_PUZZLE as u8], Some(AGG_SIG_PARENT_PUZZLE), Some(AGG_SIG_PARENT_PUZZLE))]
-#[case(&[ASSERT_EPHEMERAL as u8], Some(ASSERT_EPHEMERAL), Some(ASSERT_EPHEMERAL))]
-#[case(&[ASSERT_BEFORE_SECONDS_RELATIVE as u8], Some(ASSERT_BEFORE_SECONDS_RELATIVE), Some(ASSERT_BEFORE_SECONDS_RELATIVE))]
-#[case(&[SEND_MESSAGE as u8], None, Some(SEND_MESSAGE))]
-#[case(&[RECEIVE_MESSAGE as u8], None, Some(RECEIVE_MESSAGE))]
-fn test_parse_opcode_message(
-    #[case] input: &[u8],
-    #[case] expected: Option<ConditionOpcode>,
-    #[case] expected2: Option<ConditionOpcode>,
-) {
-    let mut a = Allocator::new();
-    assert_eq!(opcode_tester(&mut a, input, 0), expected);
-    assert_eq!(
-        opcode_tester(&mut a, input, ENABLE_MESSAGE_CONDITIONS),
-        expected2
-    );
 }
 
 #[test]

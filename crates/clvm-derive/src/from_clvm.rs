@@ -11,10 +11,13 @@ use crate::{
 pub fn from_clvm(ast: DeriveInput) -> TokenStream {
     let parsed = parse("FromClvm", &ast);
     let node_name = Ident::new("Node", Span::mixed_site());
+    let decoder_name = Ident::new("D", Span::mixed_site());
 
     match parsed {
-        ParsedInfo::Struct(struct_info) => impl_for_struct(ast, struct_info, &node_name),
-        ParsedInfo::Enum(enum_info) => impl_for_enum(ast, &enum_info, &node_name),
+        ParsedInfo::Struct(struct_info) => {
+            impl_for_struct(ast, struct_info, &node_name, &decoder_name)
+        }
+        ParsedInfo::Enum(enum_info) => impl_for_enum(ast, &enum_info, &node_name, &decoder_name),
     }
 }
 
@@ -26,7 +29,7 @@ struct ParsedFields {
 
 fn field_parser_fn_body(
     crate_name: &Ident,
-    node_name: &Ident,
+    decoder_name: &Ident,
     fields: &[FieldInfo],
     repr: Repr,
 ) -> ParsedFields {
@@ -40,7 +43,7 @@ fn field_parser_fn_body(
     let decode_next = match repr {
         Repr::Atom | Repr::Transparent => unreachable!(),
         // Decode `(A . B)` pairs for lists.
-        Repr::List => quote!(decode_pair),
+        Repr::List | Repr::Solution => quote!(decode_pair),
         // Decode `(c (q . A) B)` pairs for curried arguments.
         Repr::Curry => quote!(decode_curried_arg),
     };
@@ -96,7 +99,7 @@ fn field_parser_fn_body(
 
         // This handles the actual decoding of the field's value.
         let mut decoded_value = quote! {
-            <#ty as #crate_name::FromClvm<#node_name>>::from_clvm(decoder, #ident)
+            <#ty as #crate_name::FromClvm<#decoder_name>>::from_clvm(decoder, #ident)
         };
 
         if let Some(default) = &field.optional_with_default {
@@ -147,6 +150,8 @@ fn field_parser_fn_body(
 fn check_rest_value(crate_name: &Ident, repr: Repr) -> TokenStream {
     match repr {
         Repr::Atom | Repr::Transparent => unreachable!(),
+        // We don't need to check the terminator of a solution.
+        Repr::Solution => quote! {},
         Repr::List => {
             // If the last field is not `rest`, we need to check that the `node` is nil.
             // If it's not nil, it's not a proper list, and we should return an error.
@@ -183,7 +188,12 @@ fn check_rest_value(crate_name: &Ident, repr: Repr) -> TokenStream {
     }
 }
 
-fn impl_for_struct(ast: DeriveInput, struct_info: StructInfo, node_name: &Ident) -> TokenStream {
+fn impl_for_struct(
+    ast: DeriveInput,
+    struct_info: StructInfo,
+    node_name: &Ident,
+    decoder_name: &Ident,
+) -> TokenStream {
     let crate_name = crate_name(struct_info.crate_name);
 
     let ParsedFields {
@@ -192,7 +202,7 @@ fn impl_for_struct(ast: DeriveInput, struct_info: StructInfo, node_name: &Ident)
         mut body,
     } = field_parser_fn_body(
         &crate_name,
-        node_name,
+        decoder_name,
         &struct_info.fields,
         struct_info.repr,
     );
@@ -216,16 +226,21 @@ fn impl_for_struct(ast: DeriveInput, struct_info: StructInfo, node_name: &Ident)
         }
     }
 
-    trait_impl(ast, &crate_name, node_name, &body)
+    trait_impl(ast, &crate_name, node_name, decoder_name, &body)
 }
 
-fn impl_for_enum(ast: DeriveInput, enum_info: &EnumInfo, node_name: &Ident) -> TokenStream {
+fn impl_for_enum(
+    ast: DeriveInput,
+    enum_info: &EnumInfo,
+    node_name: &Ident,
+    decoder_name: &Ident,
+) -> TokenStream {
     let crate_name = crate_name(enum_info.crate_name.clone());
 
     let mut body = TokenStream::new();
 
     if enum_info.is_untagged {
-        let variant_parsers = enum_variant_parsers(&crate_name, node_name, enum_info);
+        let variant_parsers = enum_variant_parsers(&crate_name, node_name, decoder_name, enum_info);
 
         // If the enum is untagged, we need to try each variant parser until one succeeds.
         for parser in variant_parsers {
@@ -252,7 +267,7 @@ fn impl_for_enum(ast: DeriveInput, enum_info: &EnumInfo, node_name: &Ident) -> T
         if enum_info.default_repr == Repr::Atom {
             // If the enum is represented as an atom, we can simply decode the discriminant and match against it.
             body.extend(quote! {
-                let discriminant = <#discriminant_type as #crate_name::FromClvm<#node_name>>::from_clvm(
+                let discriminant = <#discriminant_type as #crate_name::FromClvm<#decoder_name>>::from_clvm(
                     decoder,
                     node,
                 )?;
@@ -267,12 +282,13 @@ fn impl_for_enum(ast: DeriveInput, enum_info: &EnumInfo, node_name: &Ident) -> T
                 }
             });
         } else {
-            let variant_parsers = enum_variant_parsers(&crate_name, node_name, enum_info);
+            let variant_parsers =
+                enum_variant_parsers(&crate_name, node_name, decoder_name, enum_info);
 
             let decode_next = match enum_info.default_repr {
                 Repr::Atom | Repr::Transparent => unreachable!(),
                 // Decode `(A . B)` pairs for lists.
-                Repr::List => quote!(decode_pair),
+                Repr::List | Repr::Solution => quote!(decode_pair),
                 // Decode `(c (q . A) B)` pairs for curried arguments.
                 Repr::Curry => quote!(decode_curried_arg),
             };
@@ -282,7 +298,7 @@ fn impl_for_enum(ast: DeriveInput, enum_info: &EnumInfo, node_name: &Ident) -> T
             body.extend(quote! {
                 let (discriminant_node, node) = decoder.#decode_next(&node)?;
 
-                let discriminant = <#discriminant_type as #crate_name::FromClvm<#node_name>>::from_clvm(
+                let discriminant = <#discriminant_type as #crate_name::FromClvm<#decoder_name>>::from_clvm(
                     decoder,
                     discriminant_node,
                 )?;
@@ -299,12 +315,13 @@ fn impl_for_enum(ast: DeriveInput, enum_info: &EnumInfo, node_name: &Ident) -> T
         }
     }
 
-    trait_impl(ast, &crate_name, node_name, &body)
+    trait_impl(ast, &crate_name, node_name, decoder_name, &body)
 }
 
 fn enum_variant_parsers(
     crate_name: &Ident,
     node_name: &Ident,
+    decoder_name: &Ident,
     enum_info: &EnumInfo,
 ) -> Vec<TokenStream> {
     let mut variant_parsers = Vec::new();
@@ -317,7 +334,7 @@ fn enum_variant_parsers(
             decoded_names,
             decoded_values,
             mut body,
-        } = field_parser_fn_body(crate_name, node_name, &variant.fields, repr);
+        } = field_parser_fn_body(crate_name, decoder_name, &variant.fields, repr);
 
         match variant.kind {
             VariantKind::Unit => {
@@ -355,6 +372,7 @@ fn trait_impl(
     mut ast: DeriveInput,
     crate_name: &Ident,
     node_name: &Ident,
+    decoder_name: &Ident,
     body: &TokenStream,
 ) -> TokenStream {
     let type_name = ast.ident;
@@ -363,7 +381,7 @@ fn trait_impl(
     // This isn't always perfect, but it's how derive macros work.
     add_trait_bounds(
         &mut ast.generics,
-        &parse_quote!(#crate_name::FromClvm<#node_name>),
+        &parse_quote!(#crate_name::FromClvm<#decoder_name>),
     );
 
     let generics_clone = ast.generics.clone();
@@ -374,15 +392,19 @@ fn trait_impl(
         .params
         .push(GenericParam::Type(node_name.clone().into()));
 
+    ast.generics.params.push(GenericParam::Type(
+        parse_quote!(#decoder_name: #crate_name::ClvmDecoder<Node = #node_name>),
+    ));
+
     let (impl_generics, _, _) = ast.generics.split_for_impl();
 
     // Generate the final trait implementation.
     quote! {
         #[automatically_derived]
-        impl #impl_generics #crate_name::FromClvm<#node_name>
+        impl #impl_generics #crate_name::FromClvm<#decoder_name>
         for #type_name #ty_generics #where_clause {
             fn from_clvm(
-                decoder: &impl #crate_name::ClvmDecoder<Node = #node_name>,
+                decoder: &#decoder_name,
                 mut node: #node_name,
             ) -> ::std::result::Result<Self, #crate_name::FromClvmError> {
                 #body

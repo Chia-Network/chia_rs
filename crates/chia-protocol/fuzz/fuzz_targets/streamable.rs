@@ -2,8 +2,8 @@
 use arbitrary::{Arbitrary, Unstructured};
 use chia_protocol::*;
 use chia_traits::Streamable;
+use clvmr::sha2::Sha256;
 use libfuzzer_sys::fuzz_target;
-use sha2::{Digest, Sha256};
 
 pub fn test_streamable<T: Streamable + std::fmt::Debug + PartialEq>(obj: &T) {
     let bytes = obj.to_bytes().unwrap();
@@ -21,7 +21,7 @@ pub fn test_streamable<T: Streamable + std::fmt::Debug + PartialEq>(obj: &T) {
 
     let mut ctx = Sha256::new();
     ctx.update(&bytes);
-    let expect_hash: [u8; 32] = ctx.finalize().into();
+    let expect_hash: [u8; 32] = ctx.finalize();
     assert_eq!(obj.hash(), expect_hash);
 
     // make sure input too large is an error

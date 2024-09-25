@@ -51,7 +51,7 @@ fn run(c: &mut Criterion) {
                     let mut a = Allocator::new();
                     let start = Instant::now();
 
-                    let conds = run_block_generator::<_, MempoolVisitor>(
+                    let conds = run_block_generator(
                         &mut a,
                         gen,
                         &block_refs,
@@ -69,7 +69,7 @@ fn run(c: &mut Criterion) {
                     let mut a = Allocator::new();
                     let start = Instant::now();
 
-                    let conds = run_block_generator2::<_, MempoolVisitor>(
+                    let conds = run_block_generator2(
                         &mut a,
                         gen,
                         &block_refs,

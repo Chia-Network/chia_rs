@@ -1,7 +1,13 @@
 use blst::*;
 use chia_traits::chia_error::Result;
 use chia_traits::{read_bytes, Streamable};
-use sha2::{Digest, Sha256};
+use clvmr::sha2::Sha256;
+#[cfg(feature = "py-bindings")]
+use pyo3::exceptions::PyNotImplementedError;
+#[cfg(feature = "py-bindings")]
+use pyo3::prelude::*;
+#[cfg(feature = "py-bindings")]
+use pyo3::types::PyType;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
@@ -112,6 +118,14 @@ impl GTElement {
         hex::encode(self.to_bytes())
     }
 
+    #[classmethod]
+    #[pyo3(name = "from_parent")]
+    pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: &Self) -> PyResult<PyObject> {
+        Err(PyNotImplementedError::new_err(
+            "GTElement does not support from_parent().",
+        ))
+    }
+
     #[must_use]
     pub fn __mul__(&self, rhs: &Self) -> Self {
         let mut ret = self.clone();
@@ -128,39 +142,24 @@ impl GTElement {
 mod pybindings {
     use super::*;
 
+    use crate::parse_hex::parse_hex_string;
     use chia_traits::{FromJsonDict, ToJsonDict};
-    use pyo3::{exceptions::PyValueError, prelude::*};
 
     impl ToJsonDict for GTElement {
         fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
             let bytes = self.to_bytes();
-            Ok(hex::encode(bytes).into_py(py))
+            Ok(("0x".to_string() + &hex::encode(bytes)).into_py(py))
         }
     }
 
     impl FromJsonDict for GTElement {
         fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self> {
-            let s: String = o.extract()?;
-            if !s.starts_with("0x") {
-                return Err(PyValueError::new_err(
-                    "bytes object is expected to start with 0x",
-                ));
-            }
-            let s = &s[2..];
-            let buf = match hex::decode(s) {
-                Err(_) => {
-                    return Err(PyValueError::new_err("invalid hex"));
-                }
-                Ok(v) => v,
-            };
-            if buf.len() != Self::SIZE {
-                return Err(PyValueError::new_err(format!(
-                    "GTElement, invalid length {} expected {}",
-                    buf.len(),
-                    Self::SIZE
-                )));
-            }
-            Ok(Self::from_bytes(buf.as_slice().try_into().unwrap()))
+            Ok(Self::from_bytes(
+                parse_hex_string(o, Self::SIZE, "GTElement")?
+                    .as_slice()
+                    .try_into()
+                    .unwrap(),
+            ))
         }
     }
 }

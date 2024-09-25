@@ -1,6 +1,6 @@
 [package]
 name = "chia-traits"
-version = "0.10.0"
+version = "0.11.0"
 edition = "2021"
 license = "Apache-2.0"
 description = "Chia traits for Streamable types (chia's serialization format)"
@@ -15,5 +15,5 @@ py-bindings = ["dep:pyo3"]
 [dependencies]
 pyo3 = { workspace = true, features = ["multiple-pymethods"], optional = true }
 chia_streamable_macro = { workspace = true }
-sha2 = { workspace = true }
+clvmr = { workspace = true }
 thiserror = { workspace = true }

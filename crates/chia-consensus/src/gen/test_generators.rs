@@ -1,8 +1,8 @@
-use super::conditions::{MempoolVisitor, NewCoin, Spend, SpendBundleConditions};
+use super::conditions::{NewCoin, SpendBundleConditions, SpendConditions};
 use super::run_block_generator::{run_block_generator, run_block_generator2};
 use crate::allocator::make_allocator;
 use crate::consensus_constants::TEST_CONSTANTS;
-use crate::gen::flags::{ALLOW_BACKREFS, ENABLE_MESSAGE_CONDITIONS, MEMPOOL_MODE};
+use crate::gen::flags::{ALLOW_BACKREFS, MEMPOOL_MODE};
 use chia_protocol::{Bytes, Bytes48};
 use clvmr::allocator::NodePtr;
 use clvmr::Allocator;
@@ -12,7 +12,7 @@ use text_diff::Difference;
 
 use rstest::rstest;
 
-fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
+pub(crate) fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
     let mut ret = String::new();
     if c.reserve_fee > 0 {
         ret += &format!("RESERVE_FEE: {}\n", c.reserve_fee);
@@ -44,7 +44,7 @@ fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
     }
     ret += "SPENDS:\n";
 
-    let mut spends: Vec<Spend> = c.spends.clone();
+    let mut spends: Vec<SpendConditions> = c.spends.clone();
     spends.sort_by_key(|s| *s.coin_id);
     for s in spends {
         ret += &format!(
@@ -115,7 +115,7 @@ fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
     ret
 }
 
-fn print_diff(output: &str, expected: &str) {
+pub(crate) fn print_diff(output: &str, expected: &str) {
     println!("\x1b[102m \x1b[0m - output from test");
     println!("\x1b[101m \x1b[0m - expected output");
     for diff in diff(expected, output, "\n").1 {
@@ -227,11 +227,11 @@ fn run_generator(#[case] name: &str) {
         block_refs.push(hex::decode(env_hex).expect("hex decode env-file"));
     }
 
-    const DEFAULT_FLAGS: u32 = ALLOW_BACKREFS | ENABLE_MESSAGE_CONDITIONS;
+    const DEFAULT_FLAGS: u32 = ALLOW_BACKREFS;
     for (flags, expected) in zip(&[DEFAULT_FLAGS, DEFAULT_FLAGS | MEMPOOL_MODE], expected) {
         println!("flags: {flags:x}");
         let mut a = make_allocator(*flags);
-        let conds = run_block_generator::<_, MempoolVisitor>(
+        let conds = run_block_generator(
             &mut a,
             &generator,
             &block_refs,
@@ -246,7 +246,7 @@ fn run_generator(#[case] name: &str) {
         };
 
         let mut a = make_allocator(*flags);
-        let conds = run_block_generator2::<_, MempoolVisitor>(
+        let conds = run_block_generator2(
             &mut a,
             &generator,
             &block_refs,

@@ -1,7 +1,7 @@
 use crate::bytes::Bytes;
 use chia_traits::chia_error::{Error, Result};
 use chia_traits::Streamable;
-use clvm_traits::{FromClvmError, FromNodePtr, ToClvmError, ToNodePtr};
+use clvm_traits::{FromClvm, FromClvmError, ToClvm, ToClvmError};
 use clvmr::allocator::NodePtr;
 use clvmr::cost::Cost;
 use clvmr::reduction::EvalErr;
@@ -10,8 +10,12 @@ use clvmr::serde::{
     node_from_bytes, node_from_bytes_backrefs, node_to_bytes, serialized_length_from_bytes,
     serialized_length_from_bytes_trusted,
 };
+use clvmr::sha2::Sha256;
 use clvmr::{Allocator, ChiaDialect};
-use sha2::{Digest, Sha256};
+#[cfg(feature = "py-bindings")]
+use pyo3::prelude::*;
+#[cfg(feature = "py-bindings")]
+use pyo3::types::PyType;
 use std::io::Cursor;
 use std::ops::Deref;
 
@@ -54,14 +58,14 @@ impl Program {
         self.0.into_inner()
     }
 
-    pub fn run<A: ToNodePtr>(
+    pub fn run<A: ToClvm<Allocator>>(
         &self,
         a: &mut Allocator,
         flags: u32,
         max_cost: Cost,
         arg: &A,
     ) -> std::result::Result<(Cost, NodePtr), EvalErr> {
-        let arg = arg.to_node_ptr(a).map_err(|_| {
+        let arg = arg.to_clvm(a).map_err(|_| {
             EvalErr(
                 a.nil(),
                 "failed to convert argument to CLVM objects".to_string(),
@@ -151,9 +155,6 @@ use chia_traits::{FromJsonDict, ToJsonDict};
 
 #[cfg(feature = "py-bindings")]
 use chia_py_streamable_macro::PyStreamable;
-
-#[cfg(feature = "py-bindings")]
-use pyo3::prelude::*;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::types::{PyList, PyTuple};
@@ -316,7 +317,7 @@ impl Program {
     fn py_to(args: &Bound<'_, PyAny>) -> PyResult<Program> {
         let mut a = Allocator::new_limited(500_000_000);
         let clvm = clvm_convert(&mut a, args)?;
-        Program::from_node_ptr(&a, clvm)
+        Program::from_clvm(&a, clvm)
             .map_err(|error| PyErr::new::<PyTypeError, _>(error.to_string()))
     }
 
@@ -416,7 +417,7 @@ impl Program {
 
         let mut a = Allocator::new_limited(500_000_000);
         let prg = node_from_bytes_backrefs(&mut a, self.0.as_ref())?;
-        let Ok(uncurried) = CurriedProgram::<NodePtr, NodePtr>::from_node_ptr(&a, prg) else {
+        let Ok(uncurried) = CurriedProgram::<NodePtr, NodePtr>::from_clvm(&a, prg) else {
             let a = Rc::new(a);
             let prg = LazyNode::new(a.clone(), prg);
             let ret = a.nil();
@@ -432,11 +433,12 @@ impl Program {
             }
             // the args of curried puzzles are in the form of:
             // (c . ((q . <arg1>) . (<rest> . ())))
-            let (_, ((_, arg), (rest, ()))) = <(
-                clvm_traits::MatchByte<4>,
-                (clvm_traits::match_quote!(NodePtr), (NodePtr, ())),
-            ) as FromNodePtr>::from_node_ptr(&a, args)
-            .map_err(|error| PyErr::new::<PyTypeError, _>(error.to_string()))?;
+            let (_, ((_, arg), (rest, ()))) =
+                <(
+                    clvm_traits::MatchByte<4>,
+                    (clvm_traits::match_quote!(NodePtr), (NodePtr, ())),
+                ) as FromClvm<Allocator>>::from_clvm(&a, args)
+                .map_err(|error| PyErr::new::<PyTypeError, _>(error.to_string()))?;
             curried_args.push(arg);
             args = rest;
         }
@@ -486,6 +488,18 @@ impl ToJsonDict for Program {
 }
 
 #[cfg(feature = "py-bindings")]
+#[pymethods]
+impl Program {
+    #[classmethod]
+    #[pyo3(name = "from_parent")]
+    pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: &Self) -> PyResult<PyObject> {
+        Err(PyNotImplementedError::new_err(
+            "This class does not support from_parent().",
+        ))
+    }
+}
+
+#[cfg(feature = "py-bindings")]
 impl FromJsonDict for Program {
     fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self> {
         let bytes = Bytes::from_json_dict(o)?;
@@ -501,8 +515,8 @@ impl FromJsonDict for Program {
     }
 }
 
-impl FromNodePtr for Program {
-    fn from_node_ptr(a: &Allocator, node: NodePtr) -> std::result::Result<Self, FromClvmError> {
+impl FromClvm<Allocator> for Program {
+    fn from_clvm(a: &Allocator, node: NodePtr) -> std::result::Result<Self, FromClvmError> {
         Ok(Self(
             node_to_bytes(a, node)
                 .map_err(|error| FromClvmError::Custom(error.to_string()))?
@@ -511,8 +525,8 @@ impl FromNodePtr for Program {
     }
 }
 
-impl ToNodePtr for Program {
-    fn to_node_ptr(&self, a: &mut Allocator) -> std::result::Result<NodePtr, ToClvmError> {
+impl ToClvm<Allocator> for Program {
+    fn to_clvm(&self, a: &mut Allocator) -> std::result::Result<NodePtr, ToClvmError> {
         node_from_bytes(a, self.0.as_ref()).map_err(|error| ToClvmError::Custom(error.to_string()))
     }
 }
@@ -528,9 +542,9 @@ mod tests {
         let expected_bytes = hex::decode(expected).unwrap();
 
         let ptr = node_from_bytes(a, &expected_bytes).unwrap();
-        let program = Program::from_node_ptr(a, ptr).unwrap();
+        let program = Program::from_clvm(a, ptr).unwrap();
 
-        let round_trip = program.to_node_ptr(a).unwrap();
+        let round_trip = program.to_clvm(a).unwrap();
         assert_eq!(expected, hex::encode(node_to_bytes(a, round_trip).unwrap()));
     }
 

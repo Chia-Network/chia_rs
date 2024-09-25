@@ -4,10 +4,14 @@ use clvm_traits::{
     clvm_list, destructure_list, match_list, ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError,
     ToClvm, ToClvmError,
 };
-use sha2::{Digest, Sha256};
+use clvmr::sha2::Sha256;
 
 #[cfg(feature = "py-bindings")]
+use pyo3::exceptions::PyNotImplementedError;
+#[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
+#[cfg(feature = "py-bindings")]
+use pyo3::types::PyType;
 
 #[streamable]
 #[derive(Copy)]
@@ -55,14 +59,26 @@ impl Coin {
     }
 }
 
-impl<N> ToClvm<N> for Coin {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+impl Coin {
+    #[classmethod]
+    #[pyo3(name = "from_parent")]
+    pub fn from_parent(_cls: &Bound<'_, PyType>, _coin: Self) -> PyResult<PyObject> {
+        Err(PyNotImplementedError::new_err(
+            "Coin does not support from_parent().",
+        ))
+    }
+}
+
+impl<N, E: ClvmEncoder<Node = N>> ToClvm<E> for Coin {
+    fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
         clvm_list!(self.parent_coin_info, self.puzzle_hash, self.amount).to_clvm(encoder)
     }
 }
 
-impl<N> FromClvm<N> for Coin {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+impl<N, D: ClvmDecoder<Node = N>> FromClvm<D> for Coin {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
         let destructure_list!(parent_coin_info, puzzle_hash, amount) =
             <match_list!(BytesImpl<32>, BytesImpl<32>, u64)>::from_clvm(decoder, node)?;
         Ok(Coin {

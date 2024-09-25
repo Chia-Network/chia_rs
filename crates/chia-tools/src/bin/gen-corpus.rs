@@ -11,13 +11,15 @@ use chia_traits::streamable::Streamable;
 use chia_bls::G2Element;
 use chia_protocol::{Bytes32, Coin, CoinSpend, Program, SpendBundle};
 use chia_puzzles::singleton::SINGLETON_TOP_LAYER_PUZZLE_HASH;
-use clvm_traits::{FromClvm, FromNodePtr};
+use clvm_traits::FromClvm;
 use clvm_utils::{tree_hash, CurriedProgram};
 use clvmr::allocator::NodePtr;
 use clvmr::Allocator;
+use core::sync::atomic::Ordering;
 use std::collections::HashSet;
-use std::fs::write;
+use std::fs::{write, File};
 use std::io::Write;
+use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Mutex};
 use std::thread::available_parallelism;
 use std::time::{Duration, Instant};
@@ -36,6 +38,14 @@ struct Args {
     /// generate spend-bundles
     #[arg(long, default_value_t = false)]
     spend_bundles: bool,
+
+    /// generate corpus for solution-generator
+    #[arg(long, default_value_t = false)]
+    coin_spends: bool,
+
+    /// generate corpus for run-puzzle
+    #[arg(long, default_value_t = false)]
+    puzzles: bool,
 
     /// stop running block generators when reaching this height
     #[arg(short, long)]
@@ -62,6 +72,7 @@ fn main() {
 
     let mut last_height = 0;
     let mut last_time = Instant::now();
+    let corpus_counter = Arc::new(AtomicUsize::new(0));
     iterate_tx_blocks(
         &args.file,
         args.start_height,
@@ -73,6 +84,7 @@ fn main() {
 
             let seen_puzzles = seen_puzzles.clone();
             let seen_singletons = seen_singletons.clone();
+            let cnt = corpus_counter.clone();
             pool.execute(move || {
                 let mut a = Allocator::new_limited(500_000_000);
 
@@ -93,16 +105,17 @@ fn main() {
                                 _ => puzzle_hash,
                             };
 
-                        let run_puzzle = seen_puzzles.lock().unwrap().insert(mod_hash);
+                        let seen_puzzle = seen_puzzles.lock().unwrap().insert(mod_hash);
+                        let run_puzzle = args.puzzles && seen_puzzle;
                         let fast_forward = (mod_hash == SINGLETON_TOP_LAYER_PUZZLE_HASH.into())
                             && seen_singletons.lock().unwrap().insert(puzzle_hash);
 
-                        if !run_puzzle && !fast_forward && !args.spend_bundles {
+                        if !run_puzzle && !fast_forward && !args.spend_bundles && !args.coin_spends
+                        {
                             return;
                         }
-                        let puzzle_reveal =
-                            Program::from_node_ptr(a, puzzle).expect("puzzle reveal");
-                        let solution = Program::from_node_ptr(a, solution).expect("solution");
+                        let puzzle_reveal = Program::from_clvm(a, puzzle).expect("puzzle reveal");
+                        let solution = Program::from_clvm(a, solution).expect("solution");
                         let coin = Coin {
                             parent_coin_info,
                             puzzle_hash,
@@ -114,48 +127,67 @@ fn main() {
                             solution,
                         };
 
-                        if args.spend_bundles {
+                        if (args.spend_bundles || args.coin_spends) && !seen_puzzle {
                             bundle.coin_spends.push(spend.clone());
                         }
 
                         if !run_puzzle && !fast_forward {
                             return;
                         }
-                        let mut bytes = Vec::<u8>::new();
-                        spend.stream(&mut bytes).expect("stream CoinSpend");
+                        let bytes = spend.to_bytes().expect("stream CoinSpend");
                         if run_puzzle {
                             let directory = "../chia-consensus/fuzz/corpus/run-puzzle";
                             let _ = std::fs::create_dir_all(directory);
                             write(format!("{directory}/{mod_hash}.spend"), &bytes).expect("write");
-                            println!("{height}: {mod_hash}");
+                            cnt.fetch_add(1, Ordering::Relaxed);
                         }
 
                         if fast_forward {
                             let directory = "../chia-consensus/fuzz/corpus/fast-forward";
                             let _ = std::fs::create_dir_all(directory);
-                            write(format!("{directory}/{puzzle_hash}.spend"), bytes)
+                            write(format!("{directory}/{puzzle_hash}.spend"), &bytes)
                                 .expect("write");
-                            println!("{height}: {puzzle_hash}");
+                            cnt.fetch_add(1, Ordering::Relaxed);
                         }
                     },
                 )
                 .expect("failed to run block generator");
 
-                if args.spend_bundles {
+                if args.spend_bundles && !bundle.coin_spends.is_empty() {
                     let directory = "../chia-protocol/fuzz/corpus/spend-bundle";
                     let _ = std::fs::create_dir_all(directory);
                     let bytes = bundle.to_bytes().expect("to_bytes");
                     write(format!("{directory}/{height}.bundle"), bytes).expect("write");
+                    cnt.fetch_add(1, Ordering::Relaxed);
+                }
+
+                if args.coin_spends && !bundle.coin_spends.is_empty() {
+                    let directory = "../chia-consensus/fuzz/corpus/solution-generator";
+                    let _ = std::fs::create_dir_all(directory);
+                    let mut f =
+                        File::create(format!("{directory}/{height}.spends")).expect("open file");
+                    for cs in &bundle.coin_spends {
+                        f.write_all(&cs.to_bytes().expect("CoinSpend serialize"))
+                            .expect("file write");
+                    }
+                    cnt.fetch_add(1, Ordering::Relaxed);
                 }
             });
             if last_time.elapsed() > Duration::new(4, 0) {
                 let rate = f64::from(height - last_height) / last_time.elapsed().as_secs_f64();
-                print!("\rheight: {height} ({rate:0.1} blocks/s)   ");
+                print!(
+                    "\rheight: {height} ({rate:0.1} blocks/s) corpus: {}    ",
+                    corpus_counter.load(Ordering::Relaxed)
+                );
                 let _ = std::io::stdout().flush();
                 last_height = height;
                 last_time = Instant::now();
             }
         },
+    );
+    print!(
+        "\nwrote {} examples to the fuzzing corpus",
+        corpus_counter.load(Ordering::Relaxed)
     );
 
     assert_eq!(pool.panic_count(), 0);

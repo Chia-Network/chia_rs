@@ -2,10 +2,10 @@
 use libfuzzer_sys::fuzz_target;
 
 use chia_consensus::gen::conditions::parse_args;
+use chia_fuzz::{make_list, BitCursor};
 use clvmr::allocator::Allocator;
-use fuzzing_utils::{make_list, BitCursor};
 
-use chia_consensus::gen::flags::{ENABLE_MESSAGE_CONDITIONS, STRICT_ARGS_COUNT};
+use chia_consensus::gen::flags::STRICT_ARGS_COUNT;
 
 use chia_consensus::gen::opcodes::{
     AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT, AGG_SIG_PARENT_PUZZLE,
@@ -20,7 +20,7 @@ fuzz_target!(|data: &[u8]| {
     let mut a = Allocator::new();
     let input = make_list(&mut a, &mut BitCursor::new(data));
 
-    for flags in &[0, STRICT_ARGS_COUNT, ENABLE_MESSAGE_CONDITIONS] {
+    for flags in &[0, STRICT_ARGS_COUNT] {
         for op in &[
             AGG_SIG_ME,
             AGG_SIG_UNSAFE,

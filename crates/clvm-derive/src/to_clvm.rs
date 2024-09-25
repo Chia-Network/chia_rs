@@ -11,16 +11,19 @@ use crate::{
 pub fn to_clvm(ast: DeriveInput) -> TokenStream {
     let parsed = parse("ToClvm", &ast);
     let node_name = Ident::new("Node", Span::mixed_site());
+    let encoder_name = Ident::new("E", Span::mixed_site());
 
     match parsed {
-        ParsedInfo::Struct(struct_info) => impl_for_struct(ast, struct_info, &node_name),
-        ParsedInfo::Enum(enum_info) => impl_for_enum(ast, &enum_info, &node_name),
+        ParsedInfo::Struct(struct_info) => {
+            impl_for_struct(ast, struct_info, &node_name, &encoder_name)
+        }
+        ParsedInfo::Enum(enum_info) => impl_for_enum(ast, &enum_info, &node_name, &encoder_name),
     }
 }
 
 fn encode_fields(
     crate_name: &Ident,
-    node_name: &Ident,
+    encoder_name: &Ident,
     fields: &[FieldInfo],
     repr: Repr,
 ) -> TokenStream {
@@ -45,15 +48,17 @@ fn encode_fields(
     let encode_next = match repr {
         Repr::Atom | Repr::Transparent => unreachable!(),
         // Encode `(A . B)` pairs for lists.
-        Repr::List => quote!(encode_pair),
+        Repr::List | Repr::Solution => quote!(encode_pair),
         // Encode `(c (q . A) B)` pairs for curried arguments.
         Repr::Curry => quote!(encode_curried_arg),
     };
 
     let initial_value = match repr {
         Repr::Atom | Repr::Transparent => unreachable!(),
-        Repr::List => quote!(encoder.encode_atom(&[])?),
-        Repr::Curry => quote!(encoder.encode_atom(&[1])?),
+        Repr::List | Repr::Solution => {
+            quote!(encoder.encode_atom(#crate_name::Atom::Borrowed(&[]))?)
+        }
+        Repr::Curry => quote!(encoder.encode_atom(#crate_name::Atom::Borrowed(&[1]))?),
     };
 
     // We're going to build the return value in reverse order, so we need to start with the terminator.
@@ -69,7 +74,7 @@ fn encode_fields(
 
         // Encode the field value.
         if_body.extend(quote! {
-            let value_node = <#ty as #crate_name::ToClvm<#node_name>>::to_clvm(&#value_name, encoder)?;
+            let value_node = <#ty as #crate_name::ToClvm<#encoder_name>>::to_clvm(&#value_name, encoder)?;
         });
 
         if field.rest {
@@ -105,7 +110,12 @@ fn encode_fields(
     body
 }
 
-fn impl_for_struct(ast: DeriveInput, struct_info: StructInfo, node_name: &Ident) -> TokenStream {
+fn impl_for_struct(
+    ast: DeriveInput,
+    struct_info: StructInfo,
+    node_name: &Ident,
+    encoder_name: &Ident,
+) -> TokenStream {
     let crate_name = crate_name(struct_info.crate_name);
 
     let mut body = TokenStream::new();
@@ -138,7 +148,7 @@ fn impl_for_struct(ast: DeriveInput, struct_info: StructInfo, node_name: &Ident)
 
     body.extend(encode_fields(
         &crate_name,
-        node_name,
+        encoder_name,
         &struct_info.fields,
         struct_info.repr,
     ));
@@ -147,10 +157,15 @@ fn impl_for_struct(ast: DeriveInput, struct_info: StructInfo, node_name: &Ident)
         Ok(node)
     });
 
-    trait_impl(ast, &crate_name, node_name, &body)
+    trait_impl(ast, &crate_name, node_name, encoder_name, &body)
 }
 
-fn impl_for_enum(ast: DeriveInput, enum_info: &EnumInfo, node_name: &Ident) -> TokenStream {
+fn impl_for_enum(
+    ast: DeriveInput,
+    enum_info: &EnumInfo,
+    node_name: &Ident,
+    encoder_name: &Ident,
+) -> TokenStream {
     let crate_name = crate_name(enum_info.crate_name.clone());
 
     let mut variant_destructures = Vec::new();
@@ -187,7 +202,12 @@ fn impl_for_enum(ast: DeriveInput, enum_info: &EnumInfo, node_name: &Ident) -> T
         for variant in &enum_info.variants {
             let repr = variant.repr.unwrap_or(enum_info.default_repr);
 
-            variant_bodies.push(encode_fields(&crate_name, node_name, &variant.fields, repr));
+            variant_bodies.push(encode_fields(
+                &crate_name,
+                encoder_name,
+                &variant.fields,
+                repr,
+            ));
         }
 
         // Encode the variant's fields directly.
@@ -214,7 +234,7 @@ fn impl_for_enum(ast: DeriveInput, enum_info: &EnumInfo, node_name: &Ident) -> T
 
                 match self {
                     #( Self::#variant_names => {
-                        <#discriminant_type as #crate_name::ToClvm<#node_name>>::to_clvm(
+                        <#discriminant_type as #crate_name::ToClvm<#encoder_name>>::to_clvm(
                             &#discriminant_names,
                             encoder,
                         )
@@ -225,7 +245,7 @@ fn impl_for_enum(ast: DeriveInput, enum_info: &EnumInfo, node_name: &Ident) -> T
             let encode_next = match enum_info.default_repr {
                 Repr::Atom | Repr::Transparent => unreachable!(),
                 // Encode `(A . B)` pairs for lists.
-                Repr::List => quote!(encode_pair),
+                Repr::List | Repr::Solution => quote!(encode_pair),
                 // Encode `(c (q . A) B)` pairs for curried arguments.
                 Repr::Curry => quote!(encode_curried_arg),
             };
@@ -234,7 +254,12 @@ fn impl_for_enum(ast: DeriveInput, enum_info: &EnumInfo, node_name: &Ident) -> T
 
             for variant in &enum_info.variants {
                 let repr = variant.repr.unwrap_or(enum_info.default_repr);
-                variant_bodies.push(encode_fields(&crate_name, node_name, &variant.fields, repr));
+                variant_bodies.push(encode_fields(
+                    &crate_name,
+                    encoder_name,
+                    &variant.fields,
+                    repr,
+                ));
             }
 
             // Encode the discriminant followed by the variant's fields.
@@ -245,7 +270,7 @@ fn impl_for_enum(ast: DeriveInput, enum_info: &EnumInfo, node_name: &Ident) -> T
                     #( #variant_destructures => {
                         #variant_bodies
 
-                        let discriminant_node = <#discriminant_type as #crate_name::ToClvm<#node_name>>::to_clvm(
+                        let discriminant_node = <#discriminant_type as #crate_name::ToClvm<#encoder_name>>::to_clvm(
                             &#discriminant_names,
                             encoder,
                         )?;
@@ -257,13 +282,14 @@ fn impl_for_enum(ast: DeriveInput, enum_info: &EnumInfo, node_name: &Ident) -> T
         }
     };
 
-    trait_impl(ast, &crate_name, node_name, &body)
+    trait_impl(ast, &crate_name, node_name, encoder_name, &body)
 }
 
 fn trait_impl(
     mut ast: DeriveInput,
     crate_name: &Ident,
     node_name: &Ident,
+    encoder_name: &Ident,
     body: &TokenStream,
 ) -> TokenStream {
     let type_name = ast.ident;
@@ -272,7 +298,7 @@ fn trait_impl(
     // This isn't always perfect, but it's how derive macros work.
     add_trait_bounds(
         &mut ast.generics,
-        &parse_quote!(#crate_name::ToClvm<#node_name>),
+        &parse_quote!(#crate_name::ToClvm<#encoder_name>),
     );
 
     let generics_clone = ast.generics.clone();
@@ -283,16 +309,20 @@ fn trait_impl(
         .params
         .push(GenericParam::Type(node_name.clone().into()));
 
+    ast.generics.params.push(GenericParam::Type(
+        parse_quote!(#encoder_name: #crate_name::ClvmEncoder<Node = #node_name>),
+    ));
+
     let (impl_generics, _, _) = ast.generics.split_for_impl();
 
     // Generate the final trait implementation.
     quote! {
         #[automatically_derived]
-        impl #impl_generics #crate_name::ToClvm<#node_name>
+        impl #impl_generics #crate_name::ToClvm<#encoder_name>
         for #type_name #ty_generics #where_clause {
             fn to_clvm(
                 &self,
-                encoder: &mut impl #crate_name::ClvmEncoder<Node = #node_name>
+                encoder: &mut #encoder_name
             ) -> ::std::result::Result<#node_name, #crate_name::ToClvmError> {
                 #body
             }

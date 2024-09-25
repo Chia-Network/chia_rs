@@ -1,6 +1,6 @@
 [package]
 name = "chia-puzzles"
-version = "0.10.0"
+version = "0.13.0"
 edition = "2021"
 license = "Apache-2.0"
 description = "Chia primitives needed for building wallets."
@@ -16,7 +16,6 @@ arbitrary = ["dep:arbitrary", "chia-protocol/arbitrary"]
 
 [dependencies]
 clvmr = { workspace = true }
-sha2 = { workspace = true }
 num-bigint = { workspace = true }
 hex-literal = { workspace = true }
 clvm-utils = { workspace = true }

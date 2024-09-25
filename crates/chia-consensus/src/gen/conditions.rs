@@ -17,7 +17,7 @@ use super::opcodes::{
 use super::sanitize_int::{sanitize_uint, SanitizedUint};
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
 use crate::consensus_constants::ConsensusConstants;
-use crate::gen::flags::{DISALLOW_INFINITY_G1, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
+use crate::gen::flags::{NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
 use crate::gen::messages::{Message, SpendId};
 use crate::gen::spend_visitor::SpendVisitor;
 use crate::gen::validation_error::check_nil;
@@ -25,7 +25,7 @@ use chia_bls::PublicKey;
 use chia_protocol::Bytes32;
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use clvmr::cost::Cost;
-use clvmr::sha2::{Digest, Sha256};
+use clvmr::sha2::Sha256;
 use std::cmp::{max, min};
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
@@ -52,11 +52,11 @@ pub const ELIGIBLE_FOR_FF: u32 = 4;
 pub struct EmptyVisitor {}
 
 impl SpendVisitor for EmptyVisitor {
-    fn new_spend(_spend: &mut Spend) -> Self {
+    fn new_spend(_spend: &mut SpendConditions) -> Self {
         Self {}
     }
-    fn condition(&mut self, _spend: &mut Spend, _c: &Condition) {}
-    fn post_spend(&mut self, _a: &Allocator, _spend: &mut Spend) {}
+    fn condition(&mut self, _spend: &mut SpendConditions, _c: &Condition) {}
+    fn post_spend(&mut self, _a: &Allocator, _spend: &mut SpendConditions) {}
 }
 
 pub struct MempoolVisitor {
@@ -64,7 +64,7 @@ pub struct MempoolVisitor {
 }
 
 impl SpendVisitor for MempoolVisitor {
-    fn new_spend(spend: &mut Spend) -> Self {
+    fn new_spend(spend: &mut SpendConditions) -> Self {
         // assume it's eligibe. We'll clear this flag if it isn't
         let mut spend_flags = ELIGIBLE_FOR_DEDUP;
 
@@ -79,7 +79,7 @@ impl SpendVisitor for MempoolVisitor {
         }
     }
 
-    fn condition(&mut self, spend: &mut Spend, c: &Condition) {
+    fn condition(&mut self, spend: &mut SpendConditions, c: &Condition) {
         match c {
             Condition::AssertMyCoinId(_) => {
                 spend.flags &= !ELIGIBLE_FOR_FF;
@@ -129,7 +129,7 @@ impl SpendVisitor for MempoolVisitor {
         self.condition_counter += 1;
     }
 
-    fn post_spend(&mut self, a: &Allocator, spend: &mut Spend) {
+    fn post_spend(&mut self, a: &Allocator, spend: &mut SpendConditions) {
         // if this still looks like it might be a singleton, check the output coins
         // to look for something that looks like a singleton output, with the same
         // puzzle hash as our input coin
@@ -611,7 +611,7 @@ impl PartialEq for NewCoin {
 
 // These are all the conditions related directly to a specific spend.
 #[derive(Debug, Clone)]
-pub struct Spend {
+pub struct SpendConditions {
     // the parent coin ID of the coin being spent
     pub parent_id: NodePtr,
     // the amount of the coin that's being spent
@@ -653,14 +653,14 @@ pub struct Spend {
     pub flags: u32,
 }
 
-impl Spend {
+impl SpendConditions {
     pub fn new(
         parent_id: NodePtr,
         coin_amount: u64,
         puzzle_hash: NodePtr,
         coin_id: Arc<Bytes32>,
-    ) -> Spend {
-        Spend {
+    ) -> SpendConditions {
+        SpendConditions {
             parent_id,
             coin_amount,
             puzzle_hash,
@@ -691,7 +691,7 @@ impl Spend {
 // they have an implied parent coin ID).
 #[derive(Debug, Default)]
 pub struct SpendBundleConditions {
-    pub spends: Vec<Spend>,
+    pub spends: Vec<SpendConditions>,
     // conditions
     // all these integers are initialized to 0, which also means "no
     // constraint". i.e. a 0 in these conditions are inherently satisified and
@@ -832,7 +832,7 @@ pub fn process_single_spend<V: SpendVisitor>(
 
     ret.removal_amount += my_amount as u128;
 
-    let mut spend = Spend::new(parent_id, my_amount, puzzle_hash, coin_id);
+    let mut spend = SpendConditions::new(parent_id, my_amount, puzzle_hash, coin_id);
 
     let mut visitor = V::new_spend(&mut spend);
 
@@ -867,17 +867,13 @@ fn decrement(cnt: &mut u32, n: NodePtr) -> Result<(), ValidationErr> {
     }
 }
 
-fn to_key(a: &Allocator, pk: NodePtr, flags: u32) -> Result<Option<PublicKey>, ValidationErr> {
+fn to_key(a: &Allocator, pk: NodePtr) -> Result<PublicKey, ValidationErr> {
     let key = PublicKey::from_bytes(a.atom(pk).as_ref().try_into().expect("internal error"))
         .map_err(|_| ValidationErr(pk, ErrorCode::InvalidPublicKey))?;
     if key.is_inf() {
-        if (flags & DISALLOW_INFINITY_G1) != 0 {
-            Err(ValidationErr(pk, ErrorCode::InvalidPublicKey))
-        } else {
-            Ok(None)
-        }
+        Err(ValidationErr(pk, ErrorCode::InvalidPublicKey))
     } else {
-        Ok(Some(key))
+        Ok(key)
     }
 }
 
@@ -886,7 +882,7 @@ pub fn parse_conditions<V: SpendVisitor>(
     a: &Allocator,
     ret: &mut SpendBundleConditions,
     state: &mut ParseState,
-    mut spend: Spend,
+    mut spend: SpendConditions,
     mut iter: NodePtr,
     flags: u32,
     max_cost: &mut Cost,
@@ -1124,47 +1120,31 @@ pub fn parse_conditions<V: SpendVisitor>(
                 state.assert_concurrent_puzzle.insert(id);
             }
             Condition::AggSigMe(pk, msg) => {
-                if let Some(pk) = to_key(a, pk, flags)? {
-                    spend.agg_sig_me.push((pk, msg));
-                }
+                spend.agg_sig_me.push((to_key(a, pk)?, msg));
             }
             Condition::AggSigParent(pk, msg) => {
-                if let Some(pk) = to_key(a, pk, flags)? {
-                    spend.agg_sig_parent.push((pk, msg));
-                }
+                spend.agg_sig_parent.push((to_key(a, pk)?, msg));
             }
             Condition::AggSigPuzzle(pk, msg) => {
-                if let Some(pk) = to_key(a, pk, flags)? {
-                    spend.agg_sig_puzzle.push((pk, msg));
-                }
+                spend.agg_sig_puzzle.push((to_key(a, pk)?, msg));
             }
             Condition::AggSigAmount(pk, msg) => {
-                if let Some(pk) = to_key(a, pk, flags)? {
-                    spend.agg_sig_amount.push((pk, msg));
-                }
+                spend.agg_sig_amount.push((to_key(a, pk)?, msg));
             }
             Condition::AggSigPuzzleAmount(pk, msg) => {
-                if let Some(pk) = to_key(a, pk, flags)? {
-                    spend.agg_sig_puzzle_amount.push((pk, msg));
-                }
+                spend.agg_sig_puzzle_amount.push((to_key(a, pk)?, msg));
             }
             Condition::AggSigParentAmount(pk, msg) => {
-                if let Some(pk) = to_key(a, pk, flags)? {
-                    spend.agg_sig_parent_amount.push((pk, msg));
-                }
+                spend.agg_sig_parent_amount.push((to_key(a, pk)?, msg));
             }
             Condition::AggSigParentPuzzle(pk, msg) => {
-                if let Some(pk) = to_key(a, pk, flags)? {
-                    spend.agg_sig_parent_puzzle.push((pk, msg));
-                }
+                spend.agg_sig_parent_puzzle.push((to_key(a, pk)?, msg));
             }
             Condition::AggSigUnsafe(pk, msg) => {
                 // AGG_SIG_UNSAFE messages are not allowed to end with the
                 // suffix added to other AGG_SIG_* conditions
                 check_agg_sig_unsafe_message(a, msg, constants)?;
-                if let Some(pk) = to_key(a, pk, flags)? {
-                    ret.agg_sig_unsafe.push((pk, msg));
-                }
+                ret.agg_sig_unsafe.push((to_key(a, pk)?, msg));
             }
             Condition::Softfork(cost) => {
                 if *max_cost < cost {
@@ -1221,7 +1201,7 @@ fn is_ephemeral(
     a: &Allocator,
     spend_idx: usize,
     spent_ids: &HashMap<Arc<Bytes32>, usize>,
-    spends: &[Spend],
+    spends: &[SpendConditions],
 ) -> bool {
     let spend = &spends[spend_idx];
     let idx = match spent_ids.get(&Bytes32::try_from(a.atom(spend.parent_id).as_ref()).unwrap()) {
@@ -1369,7 +1349,7 @@ pub fn validate_conditions(
             let mut hasher = Sha256::new();
             hasher.update(*coin_id);
             hasher.update(a.atom(announce));
-            let announcement_id: [u8; 32] = hasher.finalize().into();
+            let announcement_id: [u8; 32] = hasher.finalize();
             announcements.insert(announcement_id.into());
         }
 
@@ -1412,7 +1392,7 @@ pub fn validate_conditions(
             let mut hasher = Sha256::new();
             hasher.update(a.atom(puzzle_hash));
             hasher.update(a.atom(announce));
-            let announcement_id: [u8; 32] = hasher.finalize().into();
+            let announcement_id: [u8; 32] = hasher.finalize();
             announcements.insert(announcement_id.into());
         }
 
@@ -1455,7 +1435,7 @@ pub fn validate_conditions(
 }
 
 #[cfg(test)]
-fn u64_to_bytes(n: u64) -> Vec<u8> {
+pub(crate) fn u64_to_bytes(n: u64) -> Vec<u8> {
     let mut buf = Vec::<u8>::new();
     buf.extend_from_slice(&n.to_be_bytes());
     if (buf[0] & 0x80) != 0 {
@@ -1556,7 +1536,7 @@ fn test_coin_id(parent_id: &[u8; 32], puzzle_hash: &[u8; 32], amount: u64) -> By
     hasher.update(puzzle_hash);
     let buf = u64_to_bytes(amount);
     hasher.update(&buf);
-    let coin_id: [u8; 32] = hasher.finalize().into();
+    let coin_id: [u8; 32] = hasher.finalize();
     coin_id.into()
 }
 
@@ -1721,9 +1701,6 @@ fn cond_test_cb(
 
 #[cfg(test)]
 use crate::gen::flags::MEMPOOL_MODE;
-
-#[cfg(test)]
-use crate::gen::flags::ENABLE_MESSAGE_CONDITIONS;
 
 #[cfg(test)]
 fn cond_test(input: &str) -> Result<(Allocator, SpendBundleConditions), ValidationErr> {
@@ -1931,7 +1908,7 @@ fn test_message_strict_args_count(
         &format!(
             "((({{h1}} ({{h2}} (123 (((66 ({mode} ({msg} {arg} {extra1} ) ((67 ({mode} ({msg} {extra2} ) ))))"
         ),
-        flags | ENABLE_MESSAGE_CONDITIONS,
+        flags,
     );
     if flags == 0 {
         ret.unwrap();
@@ -1942,38 +1919,38 @@ fn test_message_strict_args_count(
 
 #[cfg(test)]
 #[rstest]
-#[case(ASSERT_SECONDS_ABSOLUTE, "104", "", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.seconds_absolute, 104))]
-#[case(ASSERT_SECONDS_RELATIVE, "101", "", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.seconds_relative, Some(101)))]
-#[case(ASSERT_HEIGHT_RELATIVE, "101", "", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.height_relative, Some(101)))]
-#[case(ASSERT_HEIGHT_ABSOLUTE, "100", "", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.height_absolute, 100))]
-#[case(ASSERT_BEFORE_SECONDS_ABSOLUTE, "104", "", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.before_seconds_absolute, Some(104)))]
-#[case(ASSERT_BEFORE_SECONDS_RELATIVE, "101", "", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.before_seconds_relative, Some(101)))]
-#[case(ASSERT_BEFORE_HEIGHT_RELATIVE, "101", "", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.before_height_relative, Some(101)))]
-#[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, "100", "", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.before_height_absolute, Some(100)))]
-#[case(RESERVE_FEE, "100", "", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.reserve_fee, 100))]
-#[case(CREATE_COIN_ANNOUNCEMENT, "{msg1}", "((61 ({c11} )", |_: &SpendBundleConditions, _: &Spend| {})]
-#[case(ASSERT_COIN_ANNOUNCEMENT, "{c11}", "((60 ({msg1} )", |_: &SpendBundleConditions, _: &Spend| {})]
-#[case(CREATE_PUZZLE_ANNOUNCEMENT, "{msg1}", "((63 ({p21} )", |_: &SpendBundleConditions, _: &Spend| {})]
-#[case(ASSERT_PUZZLE_ANNOUNCEMENT, "{p21}", "((62 ({msg1} )", |_: &SpendBundleConditions, _: &Spend| {})]
-#[case(ASSERT_MY_AMOUNT, "123", "", |_: &SpendBundleConditions, _: &Spend| {})]
-#[case(ASSERT_MY_BIRTH_SECONDS, "123", "", |_: &SpendBundleConditions, s: &Spend| { assert_eq!(s.birth_seconds, Some(123)); })]
-#[case(ASSERT_MY_BIRTH_HEIGHT, "123", "", |_: &SpendBundleConditions, s: &Spend| { assert_eq!(s.birth_height, Some(123)); })]
-#[case(ASSERT_MY_COIN_ID, "{coin12}", "", |_: &SpendBundleConditions, _: &Spend| {})]
-#[case(ASSERT_MY_PARENT_ID, "{h1}", "", |_: &SpendBundleConditions, _: &Spend| {})]
-#[case(ASSERT_MY_PUZZLEHASH, "{h2}", "", |_: &SpendBundleConditions, _: &Spend| {})]
-#[case(ASSERT_CONCURRENT_SPEND, "{coin12}", "", |_: &SpendBundleConditions, _: &Spend| {})]
-#[case(ASSERT_CONCURRENT_PUZZLE, "{h2}", "", |_: &SpendBundleConditions, _: &Spend| {})]
-#[case(AGG_SIG_PARENT, "{pubkey} ({msg1}", "", |_: &SpendBundleConditions, _: &Spend| {})]
-#[case(AGG_SIG_PUZZLE, "{pubkey} ({msg1}", "", |_: &SpendBundleConditions, _: &Spend| {})]
-#[case(AGG_SIG_AMOUNT, "{pubkey} ({msg1}", "", |_: &SpendBundleConditions, _: &Spend| {})]
-#[case(AGG_SIG_PUZZLE_AMOUNT, "{pubkey} ({msg1}", "", |_: &SpendBundleConditions, _: &Spend| {})]
-#[case(AGG_SIG_PARENT_PUZZLE, "{pubkey} ({msg1}", "", |_: &SpendBundleConditions, _: &Spend| {})]
-#[case(AGG_SIG_PARENT_AMOUNT, "{pubkey} ({msg1}", "", |_: &SpendBundleConditions, _: &Spend| {})]
+#[case(ASSERT_SECONDS_ABSOLUTE, "104", "", |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.seconds_absolute, 104))]
+#[case(ASSERT_SECONDS_RELATIVE, "101", "", |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.seconds_relative, Some(101)))]
+#[case(ASSERT_HEIGHT_RELATIVE, "101", "", |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.height_relative, Some(101)))]
+#[case(ASSERT_HEIGHT_ABSOLUTE, "100", "", |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.height_absolute, 100))]
+#[case(ASSERT_BEFORE_SECONDS_ABSOLUTE, "104", "", |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.before_seconds_absolute, Some(104)))]
+#[case(ASSERT_BEFORE_SECONDS_RELATIVE, "101", "", |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.before_seconds_relative, Some(101)))]
+#[case(ASSERT_BEFORE_HEIGHT_RELATIVE, "101", "", |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.before_height_relative, Some(101)))]
+#[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, "100", "", |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.before_height_absolute, Some(100)))]
+#[case(RESERVE_FEE, "100", "", |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.reserve_fee, 100))]
+#[case(CREATE_COIN_ANNOUNCEMENT, "{msg1}", "((61 ({c11} )", |_: &SpendBundleConditions, _: &SpendConditions| {})]
+#[case(ASSERT_COIN_ANNOUNCEMENT, "{c11}", "((60 ({msg1} )", |_: &SpendBundleConditions, _: &SpendConditions| {})]
+#[case(CREATE_PUZZLE_ANNOUNCEMENT, "{msg1}", "((63 ({p21} )", |_: &SpendBundleConditions, _: &SpendConditions| {})]
+#[case(ASSERT_PUZZLE_ANNOUNCEMENT, "{p21}", "((62 ({msg1} )", |_: &SpendBundleConditions, _: &SpendConditions| {})]
+#[case(ASSERT_MY_AMOUNT, "123", "", |_: &SpendBundleConditions, _: &SpendConditions| {})]
+#[case(ASSERT_MY_BIRTH_SECONDS, "123", "", |_: &SpendBundleConditions, s: &SpendConditions| { assert_eq!(s.birth_seconds, Some(123)); })]
+#[case(ASSERT_MY_BIRTH_HEIGHT, "123", "", |_: &SpendBundleConditions, s: &SpendConditions| { assert_eq!(s.birth_height, Some(123)); })]
+#[case(ASSERT_MY_COIN_ID, "{coin12}", "", |_: &SpendBundleConditions, _: &SpendConditions| {})]
+#[case(ASSERT_MY_PARENT_ID, "{h1}", "", |_: &SpendBundleConditions, _: &SpendConditions| {})]
+#[case(ASSERT_MY_PUZZLEHASH, "{h2}", "", |_: &SpendBundleConditions, _: &SpendConditions| {})]
+#[case(ASSERT_CONCURRENT_SPEND, "{coin12}", "", |_: &SpendBundleConditions, _: &SpendConditions| {})]
+#[case(ASSERT_CONCURRENT_PUZZLE, "{h2}", "", |_: &SpendBundleConditions, _: &SpendConditions| {})]
+#[case(AGG_SIG_PARENT, "{pubkey} ({msg1}", "", |_: &SpendBundleConditions, _: &SpendConditions| {})]
+#[case(AGG_SIG_PUZZLE, "{pubkey} ({msg1}", "", |_: &SpendBundleConditions, _: &SpendConditions| {})]
+#[case(AGG_SIG_AMOUNT, "{pubkey} ({msg1}", "", |_: &SpendBundleConditions, _: &SpendConditions| {})]
+#[case(AGG_SIG_PUZZLE_AMOUNT, "{pubkey} ({msg1}", "", |_: &SpendBundleConditions, _: &SpendConditions| {})]
+#[case(AGG_SIG_PARENT_PUZZLE, "{pubkey} ({msg1}", "", |_: &SpendBundleConditions, _: &SpendConditions| {})]
+#[case(AGG_SIG_PARENT_AMOUNT, "{pubkey} ({msg1}", "", |_: &SpendBundleConditions, _: &SpendConditions| {})]
 fn test_extra_arg(
     #[case] condition: ConditionOpcode,
     #[case] arg: &str,
     #[case] extra_cond: &str,
-    #[case] test: impl Fn(&SpendBundleConditions, &Spend),
+    #[case] test: impl Fn(&SpendBundleConditions, &SpendConditions),
 ) {
     // extra args are ignored in consensus mode
     // and a failure in mempool mode
@@ -2025,36 +2002,36 @@ fn test_extra_arg(
 
 #[cfg(test)]
 #[rstest]
-#[case(ASSERT_SECONDS_ABSOLUTE, "104", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.seconds_absolute, 104))]
-#[case(ASSERT_SECONDS_ABSOLUTE, "0", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.seconds_absolute, 0))]
-#[case(ASSERT_SECONDS_ABSOLUTE, "-1", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.seconds_absolute, 0))]
-#[case(ASSERT_SECONDS_RELATIVE, "101", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.seconds_relative, Some(101)))]
-#[case(ASSERT_SECONDS_RELATIVE, "0", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.seconds_relative, Some(0)))]
-#[case(ASSERT_SECONDS_RELATIVE, "-1", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.seconds_relative, None))]
-#[case(ASSERT_HEIGHT_RELATIVE, "101", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.height_relative, Some(101)))]
-#[case(ASSERT_HEIGHT_RELATIVE, "0", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.height_relative, Some(0)))]
-#[case(ASSERT_HEIGHT_RELATIVE, "-1", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.height_relative, None))]
-#[case(ASSERT_HEIGHT_ABSOLUTE, "100", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.height_absolute, 100))]
-#[case(ASSERT_HEIGHT_ABSOLUTE, "-1", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.height_absolute, 0))]
-#[case(ASSERT_BEFORE_SECONDS_ABSOLUTE, "104", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.before_seconds_absolute, Some(104)))]
-#[case(ASSERT_BEFORE_SECONDS_RELATIVE, "101", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.before_seconds_relative, Some(101)))]
-#[case(ASSERT_BEFORE_SECONDS_RELATIVE, "0", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.before_seconds_relative, Some(0)))]
-#[case(ASSERT_BEFORE_HEIGHT_RELATIVE, "101", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.before_height_relative, Some(101)))]
-#[case(ASSERT_BEFORE_HEIGHT_RELATIVE, "0", |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.before_height_relative, Some(0)))]
-#[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, "100", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.before_height_absolute, Some(100)))]
-#[case(RESERVE_FEE, "100", |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.reserve_fee, 100))]
-#[case(ASSERT_MY_AMOUNT, "123", |_: &SpendBundleConditions, _: &Spend| {})]
-#[case(ASSERT_MY_BIRTH_SECONDS, "123", |_: &SpendBundleConditions, s: &Spend| { assert_eq!(s.birth_seconds, Some(123)); })]
-#[case(ASSERT_MY_BIRTH_HEIGHT, "123", |_: &SpendBundleConditions, s: &Spend| { assert_eq!(s.birth_height, Some(123)); })]
-#[case(ASSERT_MY_COIN_ID, "{coin12}", |_: &SpendBundleConditions, _: &Spend| {})]
-#[case(ASSERT_MY_PARENT_ID, "{h1}", |_: &SpendBundleConditions, _: &Spend| {})]
-#[case(ASSERT_MY_PUZZLEHASH, "{h2}", |_: &SpendBundleConditions, _: &Spend| {})]
-#[case(ASSERT_CONCURRENT_SPEND, "{coin12}", |_: &SpendBundleConditions, _: &Spend| {})]
-#[case(ASSERT_CONCURRENT_PUZZLE, "{h2}", |_: &SpendBundleConditions, _: &Spend| {})]
+#[case(ASSERT_SECONDS_ABSOLUTE, "104", |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.seconds_absolute, 104))]
+#[case(ASSERT_SECONDS_ABSOLUTE, "0", |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.seconds_absolute, 0))]
+#[case(ASSERT_SECONDS_ABSOLUTE, "-1", |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.seconds_absolute, 0))]
+#[case(ASSERT_SECONDS_RELATIVE, "101", |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.seconds_relative, Some(101)))]
+#[case(ASSERT_SECONDS_RELATIVE, "0", |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.seconds_relative, Some(0)))]
+#[case(ASSERT_SECONDS_RELATIVE, "-1", |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.seconds_relative, None))]
+#[case(ASSERT_HEIGHT_RELATIVE, "101", |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.height_relative, Some(101)))]
+#[case(ASSERT_HEIGHT_RELATIVE, "0", |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.height_relative, Some(0)))]
+#[case(ASSERT_HEIGHT_RELATIVE, "-1", |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.height_relative, None))]
+#[case(ASSERT_HEIGHT_ABSOLUTE, "100", |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.height_absolute, 100))]
+#[case(ASSERT_HEIGHT_ABSOLUTE, "-1", |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.height_absolute, 0))]
+#[case(ASSERT_BEFORE_SECONDS_ABSOLUTE, "104", |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.before_seconds_absolute, Some(104)))]
+#[case(ASSERT_BEFORE_SECONDS_RELATIVE, "101", |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.before_seconds_relative, Some(101)))]
+#[case(ASSERT_BEFORE_SECONDS_RELATIVE, "0", |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.before_seconds_relative, Some(0)))]
+#[case(ASSERT_BEFORE_HEIGHT_RELATIVE, "101", |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.before_height_relative, Some(101)))]
+#[case(ASSERT_BEFORE_HEIGHT_RELATIVE, "0", |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.before_height_relative, Some(0)))]
+#[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, "100", |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.before_height_absolute, Some(100)))]
+#[case(RESERVE_FEE, "100", |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.reserve_fee, 100))]
+#[case(ASSERT_MY_AMOUNT, "123", |_: &SpendBundleConditions, _: &SpendConditions| {})]
+#[case(ASSERT_MY_BIRTH_SECONDS, "123", |_: &SpendBundleConditions, s: &SpendConditions| { assert_eq!(s.birth_seconds, Some(123)); })]
+#[case(ASSERT_MY_BIRTH_HEIGHT, "123", |_: &SpendBundleConditions, s: &SpendConditions| { assert_eq!(s.birth_height, Some(123)); })]
+#[case(ASSERT_MY_COIN_ID, "{coin12}", |_: &SpendBundleConditions, _: &SpendConditions| {})]
+#[case(ASSERT_MY_PARENT_ID, "{h1}", |_: &SpendBundleConditions, _: &SpendConditions| {})]
+#[case(ASSERT_MY_PUZZLEHASH, "{h2}", |_: &SpendBundleConditions, _: &SpendConditions| {})]
+#[case(ASSERT_CONCURRENT_SPEND, "{coin12}", |_: &SpendBundleConditions, _: &SpendConditions| {})]
+#[case(ASSERT_CONCURRENT_PUZZLE, "{h2}", |_: &SpendBundleConditions, _: &SpendConditions| {})]
 fn test_single_condition(
     #[case] condition: ConditionOpcode,
     #[case] arg: &str,
-    #[case] test: impl Fn(&SpendBundleConditions, &Spend),
+    #[case] test: impl Fn(&SpendBundleConditions, &SpendConditions),
 ) {
     let (a, conds) = cond_test(&format!(
         "((({{h1}} ({{h2}} (123 ((({} ({} )))))",
@@ -2185,20 +2162,20 @@ fn test_single_condition_failure(
 #[cfg(test)]
 #[rstest]
 // we use the MAX value
-#[case(ASSERT_SECONDS_ABSOLUTE, |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.seconds_absolute, 503))]
-#[case(ASSERT_SECONDS_RELATIVE, |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.seconds_relative, Some(503)))]
-#[case(ASSERT_HEIGHT_RELATIVE, |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.height_relative, Some(503)))]
-#[case(ASSERT_HEIGHT_ABSOLUTE, |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.height_absolute, 503))]
+#[case(ASSERT_SECONDS_ABSOLUTE, |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.seconds_absolute, 503))]
+#[case(ASSERT_SECONDS_RELATIVE, |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.seconds_relative, Some(503)))]
+#[case(ASSERT_HEIGHT_RELATIVE, |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.height_relative, Some(503)))]
+#[case(ASSERT_HEIGHT_ABSOLUTE, |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.height_absolute, 503))]
 // we use the SUM of the values
-#[case(RESERVE_FEE, |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.reserve_fee, 693))]
+#[case(RESERVE_FEE, |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.reserve_fee, 693))]
 // we use the MIN value
-#[case(ASSERT_BEFORE_SECONDS_ABSOLUTE, |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.before_seconds_absolute, Some(90)))]
-#[case(ASSERT_BEFORE_SECONDS_RELATIVE, |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.before_seconds_relative, Some(90)))]
-#[case(ASSERT_BEFORE_HEIGHT_RELATIVE, |_: &SpendBundleConditions, s: &Spend| assert_eq!(s.before_height_relative, Some(90)))]
-#[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, |c: &SpendBundleConditions, _: &Spend| assert_eq!(c.before_height_absolute, Some(90)))]
+#[case(ASSERT_BEFORE_SECONDS_ABSOLUTE, |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.before_seconds_absolute, Some(90)))]
+#[case(ASSERT_BEFORE_SECONDS_RELATIVE, |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.before_seconds_relative, Some(90)))]
+#[case(ASSERT_BEFORE_HEIGHT_RELATIVE, |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.before_height_relative, Some(90)))]
+#[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.before_height_absolute, Some(90)))]
 fn test_multiple_conditions(
     #[case] condition: ConditionOpcode,
-    #[case] test: impl Fn(&SpendBundleConditions, &Spend),
+    #[case] test: impl Fn(&SpendBundleConditions, &SpendConditions),
 ) {
     let val = condition as u8;
     let (a, conds) = cond_test(&format!(
@@ -2998,7 +2975,7 @@ fn test_duplicate_create_coin_with_hint() {
 }
 
 #[cfg(test)]
-fn agg_sig_vec(c: ConditionOpcode, s: &Spend) -> &[(PublicKey, NodePtr)] {
+fn agg_sig_vec(c: ConditionOpcode, s: &SpendConditions) -> &[(PublicKey, NodePtr)] {
     match c {
         AGG_SIG_ME => &s.agg_sig_me,
         AGG_SIG_PARENT => &s.agg_sig_parent,
@@ -3126,7 +3103,7 @@ fn test_agg_sig_invalid_pubkey(
 #[case(AGG_SIG_UNSAFE)]
 fn test_agg_sig_infinity_pubkey(
     #[case] condition: ConditionOpcode,
-    #[values(DISALLOW_INFINITY_G1, 0)] mempool: u32,
+    #[values(MEMPOOL_MODE, 0)] mempool: u32,
 ) {
     let ret = cond_test_flag(
         &format!(
@@ -3136,21 +3113,7 @@ fn test_agg_sig_infinity_pubkey(
             mempool
     );
 
-    if mempool != 0 {
-        assert_eq!(ret.unwrap_err().1, ErrorCode::InvalidPublicKey);
-    } else {
-        let ret = ret.expect("expected conditions to be valid").1;
-        assert!(ret.agg_sig_unsafe.is_empty());
-        for c in ret.spends {
-            assert!(c.agg_sig_me.is_empty());
-            assert!(c.agg_sig_parent.is_empty());
-            assert!(c.agg_sig_puzzle.is_empty());
-            assert!(c.agg_sig_amount.is_empty());
-            assert!(c.agg_sig_puzzle_amount.is_empty());
-            assert!(c.agg_sig_parent_amount.is_empty());
-            assert!(c.agg_sig_parent_puzzle.is_empty());
-        }
-    }
+    assert_eq!(ret.unwrap_err().1, ErrorCode::InvalidPublicKey);
 }
 
 #[cfg(test)]
@@ -4029,11 +3992,11 @@ fn test_conflicting_my_birth_assertions(
 
 #[cfg(test)]
 #[rstest]
-#[case(ASSERT_MY_BIRTH_HEIGHT, |s: &Spend| assert_eq!(s.birth_height, Some(100)))]
-#[case(ASSERT_MY_BIRTH_SECONDS, |s: &Spend| assert_eq!(s.birth_seconds, Some(100)))]
+#[case(ASSERT_MY_BIRTH_HEIGHT, |s: &SpendConditions| assert_eq!(s.birth_height, Some(100)))]
+#[case(ASSERT_MY_BIRTH_SECONDS, |s: &SpendConditions| assert_eq!(s.birth_seconds, Some(100)))]
 fn test_multiple_my_birth_assertions(
     #[case] condition: ConditionOpcode,
-    #[case] test: impl Fn(&Spend),
+    #[case] test: impl Fn(&SpendConditions),
 ) {
     let val = condition as u8;
     let (a, conds) = cond_test(&format!(
@@ -4676,29 +4639,28 @@ enum Ex {
 #[case("(67 (0x12 ({msg1} ({coin12} )", Ex::Fail)]
 #[case("(66 (0x12 ({msg1} ({coin12} )", Ex::Fail)]
 fn test_message_conditions_single_spend(#[case] test_case: &str, #[case] expect: Ex) {
-    for flags in &[ENABLE_MESSAGE_CONDITIONS, MEMPOOL_MODE] {
-        let ret = cond_test_flag(&format!("((({{h1}} ({{h2}} (123 (({test_case}))))"), *flags);
+    let flags = MEMPOOL_MODE;
+    let ret = cond_test_flag(&format!("((({{h1}} ({{h2}} (123 (({test_case}))))"), flags);
 
-        let expect_pass = match expect {
-            Ex::Pass => true,
-            Ex::Fail => false,
-        };
+    let expect_pass = match expect {
+        Ex::Pass => true,
+        Ex::Fail => false,
+    };
 
-        if let Ok((a, conds)) = ret {
-            assert!(expect_pass);
-            assert_eq!(conds.cost, 0);
-            assert_eq!(conds.spends.len(), 1);
-            let spend = &conds.spends[0];
-            assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-            assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-            assert_eq!(spend.flags, 0);
-        } else if expect_pass {
-            panic!("failed: {:?}", ret.unwrap_err().1);
-        } else {
-            let actual_err = ret.unwrap_err().1;
-            println!("Error: {actual_err:?}");
-            assert_eq!(ErrorCode::MessageNotSentOrReceived, actual_err);
-        }
+    if let Ok((a, conds)) = ret {
+        assert!(expect_pass);
+        assert_eq!(conds.cost, 0);
+        assert_eq!(conds.spends.len(), 1);
+        let spend = &conds.spends[0];
+        assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+        assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
+        assert_eq!(spend.flags, 0);
+    } else if expect_pass {
+        panic!("failed: {:?}", ret.unwrap_err().1);
+    } else {
+        let actual_err = ret.unwrap_err().1;
+        println!("Error: {actual_err:?}");
+        assert_eq!(ErrorCode::MessageNotSentOrReceived, actual_err);
     }
 }
 
@@ -4709,7 +4671,7 @@ fn test_message_conditions_single_spend(#[case] test_case: &str, #[case] expect:
 fn test_limit_messages(#[case] count: i32, #[case] expect_err: Option<ErrorCode>) {
     let r = cond_test_cb(
         "((({h1} ({h1} (123 ({} )))",
-        ENABLE_MESSAGE_CONDITIONS,
+        0,
         Some(Box::new(move |a: &mut Allocator| -> NodePtr {
             let mut rest: NodePtr = a.nil();
 
@@ -4864,14 +4826,13 @@ fn test_limit_messages(#[case] count: i32, #[case] expect_err: Option<ErrorCode>
     ErrorCode::CoinAmountNegative
 )]
 fn test_message_conditions_failures(#[case] test_case: &str, #[case] expect: ErrorCode) {
-    for flags in [ENABLE_MESSAGE_CONDITIONS, MEMPOOL_MODE] {
-        let ret = cond_test_flag(&format!("((({{h1}} ({{h2}} (123 (({test_case}))))"), flags);
+    let flags = MEMPOOL_MODE;
+    let ret = cond_test_flag(&format!("((({{h1}} ({{h2}} (123 (({test_case}))))"), flags);
 
-        let Err(ValidationErr(_, code)) = ret else {
-            panic!("expected failure: {expect:?}");
-        };
-        assert_eq!(code, expect);
-    }
+    let Err(ValidationErr(_, code)) = ret else {
+        panic!("expected failure: {expect:?}");
+    };
+    assert_eq!(code, expect);
 }
 
 #[cfg(test)]
@@ -5081,45 +5042,44 @@ fn test_message_conditions_two_spends(
     #[case] coin2_case: &str,
     #[case] expect: Ex,
 ) {
-    for flags in &[ENABLE_MESSAGE_CONDITIONS, MEMPOOL_MODE] {
-        let test = format!(
-            "(\
-            (({{h1}} ({{h2}} (123 (\
-                ({coin1_case} \
-                ))\
-            (({{h2}} ({{h1}} (123 (\
-                ({coin2_case} \
-                ))\
-            ))"
-        );
-        let ret = cond_test_flag(&test, *flags);
+    let flags = MEMPOOL_MODE;
+    let test = format!(
+        "(\
+        (({{h1}} ({{h2}} (123 (\
+            ({coin1_case} \
+            ))\
+        (({{h2}} ({{h1}} (123 (\
+            ({coin2_case} \
+            ))\
+        ))"
+    );
+    let ret = cond_test_flag(&test, flags);
 
-        let expect_pass = match expect {
-            Ex::Pass => true,
-            Ex::Fail => false,
-        };
+    let expect_pass = match expect {
+        Ex::Pass => true,
+        Ex::Fail => false,
+    };
 
-        if let Ok((a, conds)) = ret {
-            assert!(expect_pass);
-            assert_eq!(conds.cost, 0);
-            assert_eq!(conds.spends.len(), 2);
+    if let Ok((a, conds)) = ret {
+        assert!(expect_pass);
+        assert_eq!(conds.cost, 0);
+        assert_eq!(conds.spends.len(), 2);
 
-            let spend = &conds.spends[0];
-            assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-            assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-            assert_eq!(spend.flags, 0);
+        let spend = &conds.spends[0];
+        assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+        assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
+        assert_eq!(spend.flags, 0);
 
-            let spend = &conds.spends[1];
-            assert_eq!(*spend.coin_id, test_coin_id(H2, H1, 123));
-            assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
-            assert_eq!(spend.flags, 0);
-        } else if expect_pass {
-            panic!("failed: {:?}", ret.unwrap_err().1);
-        } else {
-            let actual_err = ret.unwrap_err().1;
-            println!("Error: {actual_err:?}");
-            assert_eq!(ErrorCode::MessageNotSentOrReceived, actual_err);
-        }
+        let spend = &conds.spends[1];
+        assert_eq!(*spend.coin_id, test_coin_id(H2, H1, 123));
+        assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
+        assert_eq!(spend.flags, 0);
+    } else if expect_pass {
+        panic!("failed: {:?}", ret.unwrap_err().1);
+    } else {
+        let actual_err = ret.unwrap_err().1;
+        println!("Error: {actual_err:?}");
+        assert_eq!(ErrorCode::MessageNotSentOrReceived, actual_err);
     }
 }
 
@@ -5165,8 +5125,7 @@ fn test_all_message_conditions() {
             ))\
         ))"
         );
-        let (a, conds) =
-            cond_test_flag(&test, ENABLE_MESSAGE_CONDITIONS).expect("condition expected to pass");
+        let (a, conds) = cond_test_flag(&test, 0).expect("condition expected to pass");
 
         assert_eq!(conds.cost, 0);
         assert_eq!(conds.spends.len(), 2);
@@ -5237,7 +5196,7 @@ fn test_message_eligible_for_ff() {
        ))"
         );
 
-        let (_a, cond) = cond_test_flag(&test, ENABLE_MESSAGE_CONDITIONS).expect("cond_test");
+        let (_a, cond) = cond_test_flag(&test, 0).expect("cond_test");
         assert!(cond.spends.len() == 2);
         assert_eq!(
             (cond.spends[0].flags & ELIGIBLE_FOR_FF) != 0,
@@ -5261,7 +5220,7 @@ fn test_message_eligible_for_ff() {
        ))"
         );
 
-        let (_a, cond) = cond_test_flag(&test, ENABLE_MESSAGE_CONDITIONS).expect("cond_test");
+        let (_a, cond) = cond_test_flag(&test, 0).expect("cond_test");
         assert!(cond.spends.len() == 2);
         assert_eq!(
             (cond.spends[0].flags & ELIGIBLE_FOR_FF) != 0,

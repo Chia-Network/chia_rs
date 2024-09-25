@@ -26,7 +26,7 @@ impl StandardArgs {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[clvm(list)]
+#[clvm(solution)]
 pub struct StandardSolution<P, S> {
     pub original_public_key: Option<PublicKey>,
     pub delegated_puzzle: P,
@@ -77,7 +77,7 @@ pub const DEFAULT_HIDDEN_PUZZLE_HASH: TreeHash = TreeHash::new(hex!(
 
 #[cfg(test)]
 mod tests {
-    use clvm_traits::ToNodePtr;
+    use clvm_traits::ToClvm;
     use clvm_utils::tree_hash;
     use clvmr::{serde::node_from_bytes, Allocator};
 
@@ -102,7 +102,7 @@ mod tests {
             program: mod_ptr,
             args: StandardArgs::new(synthetic_key),
         }
-        .to_node_ptr(&mut a)
+        .to_clvm(&mut a)
         .unwrap();
 
         let allocated_tree_hash = hex::encode(tree_hash(&a, curried_ptr));

@@ -1,5 +1,4 @@
 from chia_rs import SpendBundle
-from chia.types.spend_bundle import SpendBundle as PySpendBundle
 import pytest
 from typing import Type
 
@@ -189,7 +188,7 @@ puzzle_hash: 25192af3f69f3d2c347f97b31925f406372e35136dbe40dda6230750a6eaa1d2, \
 amount: 1232500000000 }]"
 
 
-@pytest.mark.parametrize("ty", [SpendBundle, PySpendBundle])
+@pytest.mark.parametrize("ty", [SpendBundle])
 @pytest.mark.parametrize(
     "input_file, expected_add, expected_rem",
     [
@@ -211,3 +210,35 @@ def test_spend_bundle(
 
     rem = f"{removals}"
     assert rem == expected_rem
+
+
+class NewAndImprovedSpendBundle(SpendBundle):
+    test_bool = True
+
+    def new_function(self) -> bool:
+        return self.test_bool
+
+
+def test_derive_class():
+    # Test if aggregate() supports class inheritance
+    test = SpendBundle.aggregate([])
+    assert isinstance(test, SpendBundle)
+    test = NewAndImprovedSpendBundle.aggregate([])
+    assert isinstance(test, NewAndImprovedSpendBundle)
+    assert test.test_bool
+    assert test.new_function()
+
+    # Test if the Streamable macro functions support class inheritance
+    obj_bytes = bytes(test)
+    test = NewAndImprovedSpendBundle.from_bytes(obj_bytes)
+    assert isinstance(test, NewAndImprovedSpendBundle)
+    assert test.test_bool
+    assert test.new_function()
+
+    obj_json = test.to_json_dict()
+    test = NewAndImprovedSpendBundle.from_json_dict(obj_json)
+    assert isinstance(test, NewAndImprovedSpendBundle)
+    assert test.test_bool
+    assert test.new_function()
+
+    test = NewAndImprovedSpendBundle.parse_rust(obj_bytes)

@@ -74,7 +74,7 @@ impl NftStateLayerArgs<TreeHash, TreeHash> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[clvm(list)]
+#[clvm(solution)]
 pub struct NftStateLayerSolution<I> {
     pub inner_solution: I,
 }
@@ -121,7 +121,7 @@ impl NftOwnershipLayerArgs<TreeHash, TreeHash> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[clvm(list)]
+#[clvm(solution)]
 pub struct NftOwnershipLayerSolution<I> {
     pub inner_solution: I,
 }
@@ -195,8 +195,8 @@ impl Default for NftMetadata {
     }
 }
 
-impl<N> FromClvm<N> for NftMetadata {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+impl<N, D: ClvmDecoder<Node = N>> FromClvm<D> for NftMetadata {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
         let items: Vec<(String, Raw<N>)> = FromClvm::from_clvm(decoder, node)?;
         let mut metadata = Self::default();
 
@@ -218,8 +218,8 @@ impl<N> FromClvm<N> for NftMetadata {
     }
 }
 
-impl<N> ToClvm<N> for NftMetadata {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+impl<N, E: ClvmEncoder<Node = N>> ToClvm<E> for NftMetadata {
+    fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
         let mut items: Vec<(&str, Raw<N>)> = Vec::new();
 
         if !self.data_uris.is_empty() {

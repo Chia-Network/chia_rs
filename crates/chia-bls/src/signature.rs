@@ -1,7 +1,13 @@
 use crate::{Error, GTElement, PublicKey, Result, SecretKey};
 use blst::*;
 use chia_traits::{read_bytes, Streamable};
-use sha2::{Digest, Sha256};
+use clvmr::sha2::Sha256;
+#[cfg(feature = "py-bindings")]
+use pyo3::exceptions::PyNotImplementedError;
+#[cfg(feature = "py-bindings")]
+use pyo3::prelude::*;
+#[cfg(feature = "py-bindings")]
+use pyo3::types::PyType;
 use std::borrow::Borrow;
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -486,6 +492,14 @@ impl Signature {
         Self::default()
     }
 
+    #[classmethod]
+    #[pyo3(name = "from_parent")]
+    pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: &Self) -> PyResult<PyObject> {
+        Err(PyNotImplementedError::new_err(
+            "Signature does not support from_parent().",
+        ))
+    }
+
     #[pyo3(name = "pair")]
     pub fn py_pair(&self, other: &PublicKey) -> GTElement {
         self.pair(other)
@@ -518,7 +532,6 @@ mod pybindings {
     use crate::parse_hex::parse_hex_string;
 
     use chia_traits::{FromJsonDict, ToJsonDict};
-    use pyo3::prelude::*;
 
     impl ToJsonDict for Signature {
         fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
@@ -1259,7 +1272,11 @@ mod pytests {
             let sig = sign(&sk, msg);
             Python::with_gil(|py| {
                 let string = sig.to_json_dict(py).expect("to_json_dict");
-                let sig2 = Signature::from_json_dict(string.bind(py)).unwrap();
+                let py_class = py.get_type_bound::<Signature>();
+                let sig2 = Signature::from_json_dict(&py_class, py, string.bind(py))
+                    .unwrap()
+                    .extract(py)
+                    .unwrap();
                 assert_eq!(sig, sig2);
             });
         }
@@ -1274,8 +1291,10 @@ mod pytests {
     fn test_json_dict(#[case] input: &str, #[case] msg: &str) {
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
+            let py_class = py.get_type_bound::<Signature>();
             let err =
-                Signature::from_json_dict(input.to_string().into_py(py).bind(py)).unwrap_err();
+                Signature::from_json_dict(&py_class, py, input.to_string().into_py(py).bind(py))
+                    .unwrap_err();
             assert_eq!(err.value_bound(py).to_string(), msg.to_string());
         });
     }

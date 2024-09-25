@@ -24,6 +24,7 @@ pub fn streamable(attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     let is_message = &attr.to_string() == "message";
+    let is_subclass = &attr.to_string() == "subclass";
 
     let mut input: DeriveInput = parse_macro_input!(item);
     let name = input.ident.clone();
@@ -92,13 +93,19 @@ pub fn streamable(attr: TokenStream, item: TokenStream) -> TokenStream {
         #[derive(chia_streamable_macro::Streamable, Hash, Debug, Clone, Eq, PartialEq)]
     };
 
+    let class_attrs = if is_subclass {
+        quote!(frozen, subclass)
+    } else {
+        quote!(frozen)
+    };
+
     // If you're calling the macro from `chia-protocol`, enable Python bindings and arbitrary conditionally.
     // Otherwise, you're calling it from an external crate which doesn't have this infrastructure setup.
     // In that case, the caller can add these macros manually if they want to.
     let attrs = if matches!(found_crate, FoundCrate::Itself) {
         quote! {
             #[cfg_attr(
-                feature = "py-bindings", pyo3::pyclass(frozen), derive(
+                feature = "py-bindings", pyo3::pyclass(#class_attrs), derive(
                     chia_py_streamable_macro::PyJsonDict,
                     chia_py_streamable_macro::PyStreamable,
                     chia_py_streamable_macro::PyGetters
@@ -158,7 +165,7 @@ pub fn chia_streamable_macro(input: TokenStream) -> TokenStream {
             }
             let ret = quote! {
                 impl #crate_name::Streamable for #ident {
-                    fn update_digest(&self, digest: &mut sha2::Sha256) {
+                    fn update_digest(&self, digest: &mut clvmr::sha2::Sha256) {
                         <u8 as #crate_name::Streamable>::update_digest(&(*self as u8), digest);
                     }
                     fn stream(&self, out: &mut Vec<u8>) -> #crate_name::chia_error::Result<()> {
@@ -198,7 +205,7 @@ pub fn chia_streamable_macro(input: TokenStream) -> TokenStream {
     if !fnames.is_empty() {
         let ret = quote! {
             impl #crate_name::Streamable for #ident {
-                fn update_digest(&self, digest: &mut sha2::Sha256) {
+                fn update_digest(&self, digest: &mut clvmr::sha2::Sha256) {
                     #(self.#fnames.update_digest(digest);)*
                 }
                 fn stream(&self, out: &mut Vec<u8>) -> #crate_name::chia_error::Result<()> {
@@ -214,7 +221,7 @@ pub fn chia_streamable_macro(input: TokenStream) -> TokenStream {
     } else if !findices.is_empty() {
         let ret = quote! {
             impl #crate_name::Streamable for #ident {
-                fn update_digest(&self, digest: &mut sha2::Sha256) {
+                fn update_digest(&self, digest: &mut clvmr::sha2::Sha256) {
                     #(self.#findices.update_digest(digest);)*
                 }
                 fn stream(&self, out: &mut Vec<u8>) -> #crate_name::chia_error::Result<()> {
@@ -231,7 +238,7 @@ pub fn chia_streamable_macro(input: TokenStream) -> TokenStream {
         // this is an empty type (Unit)
         let ret = quote! {
             impl #crate_name::Streamable for #ident {
-                fn update_digest(&self, _digest: &mut sha2::Sha256) {}
+                fn update_digest(&self, _digest: &mut clvmr::sha2::Sha256) {}
                 fn stream(&self, _out: &mut Vec<u8>) -> #crate_name::chia_error::Result<()> {
                     Ok(())
                 }

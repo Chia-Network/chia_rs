@@ -1,6 +1,6 @@
 [package]
 name = "chia-tools"
-version = "0.10.0"
+version = "0.13.0"
 edition = "2021"
 license = "Apache-2.0"
 description = "Utility functions and types used by the Chia blockchain full node"
@@ -25,7 +25,6 @@ clap = { workspace = true, features = ["derive"] }
 zstd = { workspace = true }
 blocking-threadpool = { workspace = true }
 hex = { workspace = true }
-hex-literal = { workspace = true }
 
 [lib]
 name = "chia_tools"

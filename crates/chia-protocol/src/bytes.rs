@@ -1,7 +1,8 @@
 use chia_traits::{chia_error, read_bytes, Streamable};
 use clvm_traits::{ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError, ToClvm, ToClvmError};
 use clvm_utils::TreeHash;
-use sha2::{Digest, Sha256};
+use clvmr::sha2::Sha256;
+use clvmr::Atom;
 use std::array::TryFromSliceError;
 use std::fmt;
 use std::io::Cursor;
@@ -109,14 +110,14 @@ impl FromJsonDict for Bytes {
     }
 }
 
-impl<N> ToClvm<N> for Bytes {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
-        encoder.encode_atom(self.0.as_slice())
+impl<N, E: ClvmEncoder<Node = N>> ToClvm<E> for Bytes {
+    fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
+        encoder.encode_atom(Atom::Borrowed(self.0.as_slice()))
     }
 }
 
-impl<N> FromClvm<N> for Bytes {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+impl<N, D: ClvmDecoder<Node = N>> FromClvm<D> for Bytes {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
         let bytes = decoder.decode_atom(&node)?;
         Ok(Self(bytes.as_ref().to_vec()))
     }
@@ -256,14 +257,14 @@ impl<const N: usize> FromJsonDict for BytesImpl<N> {
     }
 }
 
-impl<N, const LEN: usize> ToClvm<N> for BytesImpl<LEN> {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
-        encoder.encode_atom(self.0.as_slice())
+impl<N, E: ClvmEncoder<Node = N>, const LEN: usize> ToClvm<E> for BytesImpl<LEN> {
+    fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
+        encoder.encode_atom(Atom::Borrowed(self.0.as_slice()))
     }
 }
 
-impl<N, const LEN: usize> FromClvm<N> for BytesImpl<LEN> {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+impl<N, D: ClvmDecoder<Node = N>, const LEN: usize> FromClvm<D> for BytesImpl<LEN> {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
         let bytes = decoder.decode_atom(&node)?;
         if bytes.as_ref().len() != LEN {
             return Err(FromClvmError::WrongAtomLength {
@@ -408,6 +409,10 @@ impl<const N: usize> ChiaToPython for BytesImpl<N> {
         if N == 32 {
             let bytes_module = PyModule::import_bound(py, "chia_rs.sized_bytes")?;
             let ty = bytes_module.getattr("bytes32")?;
+            ty.call1((self.0.into_py(py),))
+        } else if N == 48 {
+            let bytes_module = PyModule::import_bound(py, "chia_rs.sized_bytes")?;
+            let ty = bytes_module.getattr("bytes48")?;
             ty.call1((self.0.into_py(py),))
         } else {
             Ok(PyBytes::new_bound(py, &self.0).into_any())

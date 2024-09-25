@@ -4,7 +4,7 @@ use std::fmt;
 
 use chia_puzzles::{nft::NftMetadata, Proof};
 use clvm_traits::{FromClvm, ToClvm};
-use clvmr::{allocator::NodePtr, Allocator};
+use clvmr::Allocator;
 use libfuzzer_sys::arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
 
@@ -16,7 +16,7 @@ fuzz_target!(|data: &[u8]| {
 
 fn roundtrip<'a, T>(u: &mut Unstructured<'a>)
 where
-    T: Arbitrary<'a> + ToClvm<NodePtr> + FromClvm<NodePtr> + PartialEq + fmt::Debug,
+    T: Arbitrary<'a> + ToClvm<Allocator> + FromClvm<Allocator> + PartialEq + fmt::Debug,
 {
     let obj = T::arbitrary(u).unwrap();
     let mut a = Allocator::new();

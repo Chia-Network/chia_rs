@@ -7,7 +7,7 @@ use hex_literal::hex;
 use chia_protocol::Bytes32;
 #[cfg(feature = "py-bindings")]
 use chia_traits::ChiaToPython;
-use clvmr::sha2::{Digest, Sha256};
+use clvmr::sha2::Sha256;
 #[cfg(feature = "py-bindings")]
 use pyo3::exceptions::PyValueError;
 #[cfg(feature = "py-bindings")]
@@ -388,7 +388,7 @@ fn hash_leaf(leaf: &[u8; 32]) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update([NodeType::Term as u8]);
     hasher.update(leaf);
-    hasher.finalize().into()
+    hasher.finalize()
 }
 
 impl MerkleSet {

@@ -1,6 +1,6 @@
 [package]
 name = "chia-fuzz"
-version = "0.10.0"
+version = "0.13.0"
 authors = ["Automatically generated"]
 publish = false
 edition = "2021"
@@ -20,10 +20,6 @@ chia-protocol = { workspace = true }
 chia-traits = { workspace = true }
 chia-consensus = { workspace = true }
 hex-literal = { workspace = true }
-
-[lib]
-name = "fuzzing_utils"
-crate-type = ["rlib"]
 
 [[bin]]
 name = "puzzle-coin-solution"
@@ -112,6 +108,13 @@ bench = false
 [[bin]]
 name = "merkle-set"
 path = "fuzz_targets/merkle-set.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "solution-generator"
+path = "fuzz_targets/solution-generator.rs"
 test = false
 doc = false
 bench = false

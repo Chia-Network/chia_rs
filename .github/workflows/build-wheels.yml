@@ -1,4 +1,4 @@
-name: build - check - upload
+name: Python wheels
 
 on:
   push:
@@ -11,8 +11,7 @@ on:
       - "**"
 
 concurrency:
-  # SHA is added to the end if on `main` to let all main workflows run
-  group: ${{ github.ref }}-${{ github.workflow }}-${{ github.event_name }}-${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/long_lived/')) && github.sha || '' }}
+  group: ${{ github.event_name == 'pull_request' && format('{0}-{1}', github.workflow_ref, github.event.pull_request.number) || github.run_id }}
   cancel-in-progress: true
 
 permissions:
@@ -190,8 +189,15 @@ jobs:
           directories: ${{ steps.create-venv.outputs.activate-venv-directories }}
 
       - name: Install chia_rs wheel
+        shell: bash
         run: |
-          pip install --no-index --find-links target/wheels/ chia_rs
+          TMP_DEST=$(mktemp -d)
+          pip download --no-index --no-deps --only-binary :all: --find-links target/wheels/ --dest "${TMP_DEST}" chia_rs
+          echo ====
+          ls -l "${TMP_DEST}"
+          echo ====
+          pip install "${TMP_DEST}"/*
+          rm -rf "${TMP_DEST}"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -215,23 +221,6 @@ jobs:
         run: |
           python wheel/generate_type_stubs.py
           git diff --exit-code
-
-  build-tools:
-    name: build chia-tools
-    runs-on: ubuntu-latest
-    steps:
-      - name: Clean workspace
-        uses: Chia-Network/actions/clean-workspace@main
-
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: cargo build
-        run: |
-          cd crates/chia-tools
-          cargo build
 
   build-sdist:
     name: sdist - ${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }}
@@ -307,44 +296,6 @@ jobs:
         run: |
           cargo clippy --workspace --all-features --all-targets
 
-  fuzz_targets:
-    runs-on: ubuntu-latest
-    env:
-      CARGO_PROFILE_RELEASE_LTO: false
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
-      - name: cargo-fuzz
-        run: cargo +nightly install cargo-fuzz
-      - name: cargo fuzz (chia-consensus)
-        run: |
-          cd crates/chia-consensus
-          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=20 || exit 255"
-      - name: cargo fuzz (chia-bls)
-        env:
-          # we disable leak reports here because blspy appears to be allocating
-          # memory that's not freed. It might be a false positive since python is
-          # not unloaded before exiting
-          LSAN_OPTIONS: detect_leaks=0
-        run: |
-          cd crates/chia-bls
-          python -m pip install blspy
-          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=10 || exit 255"
-      - name: cargo fuzz (clvm-utils)
-        run: |
-          cd crates/clvm-utils
-          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=20 || exit 255"
-      - name: cargo fuzz (chia-protocol)
-        run: |
-          cd crates/chia-protocol
-          cargo +nightly fuzz build
-          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=20 || exit 255"
-      - name: cargo fuzz (chia-puzzles)
-        run: |
-          cd crates/chia-puzzles
-          cargo +nightly fuzz build
-          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=20 || exit 255"
-
   unit_tests:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -385,7 +336,8 @@ jobs:
           pip install ./clvm_tools
           pip install colorama maturin pytest pytest-xdist chia-blockchain==2.1.2 clvm==0.9.8
           maturin develop --release -m wheel/Cargo.toml
-          pytest tests
+          # run pytest in a single process to avoid a race writing the coverage report
+          pytest -n 0 tests
           grcov . --binary-path target -s . --branch --ignore-not-existing --ignore='*/.cargo/*' --ignore='tests/*' --ignore='venv/*' -o rust_cov.info
           python -c 'with open("rust_cov.info") as f: lines = [l for l in f if not (l.startswith("DA:") and int(l.split(",")[1].strip()) >= 2**63)]; open("lcov.info", "w").writelines(lines)'
       - name: Upload to Coveralls
