@@ -62,7 +62,7 @@ chia_rs.chia_rs.SpendConditions.from_parent
 chia_rs.spend.Spend.from_parent
 chia_rs.spend.SpendConditions.from_parent
 
-# these are impemented but not intended to be called from python
+# these are implemented but not intended to be called from python
 chia_rs.Coin.from_parent
 chia_rs.CoinSpend.from_parent
 chia_rs.SpendBundle.from_parent
