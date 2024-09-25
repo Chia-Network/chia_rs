@@ -18,29 +18,30 @@ use chia_consensus::spendbundle_validation::{
 };
 use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
-    CoinSpend, CoinState, CoinStateFilters, CoinStateUpdate, EndOfSubSlotBundle, Foliage,
-    FoliageBlockData, FoliageTransactionBlock, FullBlock, HeaderBlock,
-    InfusedChallengeChainSubSlot, NewCompactVDF, NewPeak, NewPeakWallet,
-    NewSignagePointOrEndOfSubSlot, NewTransaction, NewUnfinishedBlock, NewUnfinishedBlock2,
-    PoolTarget, Program, ProofBlockHeader, ProofOfSpace, PuzzleSolutionResponse, RecentChainData,
-    RegisterForCoinUpdates, RegisterForPhUpdates, RejectAdditionsRequest, RejectBlock,
-    RejectBlockHeaders, RejectBlocks, RejectCoinState, RejectHeaderBlocks, RejectHeaderRequest,
-    RejectPuzzleSolution, RejectPuzzleState, RejectRemovalsRequest, RequestAdditions, RequestBlock,
-    RequestBlockHeader, RequestBlockHeaders, RequestBlocks, RequestChildren, RequestCoinState,
-    RequestCompactVDF, RequestFeeEstimates, RequestHeaderBlocks, RequestMempoolTransactions,
-    RequestPeers, RequestProofOfWeight, RequestPuzzleSolution, RequestPuzzleState, RequestRemovals,
-    RequestRemoveCoinSubscriptions, RequestRemovePuzzleSubscriptions, RequestSesInfo,
-    RequestSignagePointOrEndOfSubSlot, RequestTransaction, RequestUnfinishedBlock,
-    RequestUnfinishedBlock2, RespondAdditions, RespondBlock, RespondBlockHeader,
-    RespondBlockHeaders, RespondBlocks, RespondChildren, RespondCoinState, RespondCompactVDF,
-    RespondEndOfSubSlot, RespondFeeEstimates, RespondHeaderBlocks, RespondPeers,
-    RespondProofOfWeight, RespondPuzzleSolution, RespondPuzzleState, RespondRemovals,
-    RespondRemoveCoinSubscriptions, RespondRemovePuzzleSubscriptions, RespondSesInfo,
-    RespondSignagePoint, RespondToCoinUpdates, RespondToPhUpdates, RespondTransaction,
-    RespondUnfinishedBlock, RewardChainBlock, RewardChainBlockUnfinished, RewardChainSubSlot,
-    SendTransaction, SpendBundle, SubEpochChallengeSegment, SubEpochData, SubEpochSegments,
-    SubEpochSummary, SubSlotData, SubSlotProofs, TimestampedPeerInfo, TransactionAck,
-    TransactionsInfo, UnfinishedBlock, UnfinishedHeaderBlock, VDFInfo, VDFProof, WeightProof,
+    CoinSpend, CoinState, CoinStateFilters, CoinStateUpdate, EndOfSubSlotBundle, FeeEstimate,
+    FeeEstimateGroup, FeeRate, Foliage, FoliageBlockData, FoliageTransactionBlock, FullBlock,
+    Handshake, HeaderBlock, InfusedChallengeChainSubSlot, LazyNode, Message, NewCompactVDF,
+    NewPeak, NewPeakWallet, NewSignagePointOrEndOfSubSlot, NewTransaction, NewUnfinishedBlock,
+    NewUnfinishedBlock2, PoolTarget, Program, ProofBlockHeader, ProofOfSpace,
+    PuzzleSolutionResponse, RecentChainData, RegisterForCoinUpdates, RegisterForPhUpdates,
+    RejectAdditionsRequest, RejectBlock, RejectBlockHeaders, RejectBlocks, RejectCoinState,
+    RejectHeaderBlocks, RejectHeaderRequest, RejectPuzzleSolution, RejectPuzzleState,
+    RejectRemovalsRequest, RequestAdditions, RequestBlock, RequestBlockHeader, RequestBlockHeaders,
+    RequestBlocks, RequestChildren, RequestCoinState, RequestCompactVDF, RequestFeeEstimates,
+    RequestHeaderBlocks, RequestMempoolTransactions, RequestPeers, RequestProofOfWeight,
+    RequestPuzzleSolution, RequestPuzzleState, RequestRemovals, RequestRemoveCoinSubscriptions,
+    RequestRemovePuzzleSubscriptions, RequestSesInfo, RequestSignagePointOrEndOfSubSlot,
+    RequestTransaction, RequestUnfinishedBlock, RequestUnfinishedBlock2, RespondAdditions,
+    RespondBlock, RespondBlockHeader, RespondBlockHeaders, RespondBlocks, RespondChildren,
+    RespondCoinState, RespondCompactVDF, RespondEndOfSubSlot, RespondFeeEstimates,
+    RespondHeaderBlocks, RespondPeers, RespondProofOfWeight, RespondPuzzleSolution,
+    RespondPuzzleState, RespondRemovals, RespondRemoveCoinSubscriptions,
+    RespondRemovePuzzleSubscriptions, RespondSesInfo, RespondSignagePoint, RespondToCoinUpdates,
+    RespondToPhUpdates, RespondTransaction, RespondUnfinishedBlock, RewardChainBlock,
+    RewardChainBlockUnfinished, RewardChainSubSlot, SendTransaction, SpendBundle,
+    SubEpochChallengeSegment, SubEpochData, SubEpochSegments, SubEpochSummary, SubSlotData,
+    SubSlotProofs, TimestampedPeerInfo, TransactionAck, TransactionsInfo, UnfinishedBlock,
+    UnfinishedHeaderBlock, VDFInfo, VDFProof, WeightProof,
 };
 use clvm_utils::tree_hash_from_bytes;
 use clvmr::{LIMIT_HEAP, NO_UNKNOWN_OPS};
@@ -615,6 +616,12 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<RespondPeers>()?;
     m.add_class::<NewUnfinishedBlock2>()?;
     m.add_class::<RequestUnfinishedBlock2>()?;
+    m.add_class::<Handshake>()?;
+    m.add_class::<FeeEstimate>()?;
+    m.add_class::<FeeEstimateGroup>()?;
+    m.add_class::<FeeRate>()?;
+    m.add_class::<LazyNode>()?;
+    m.add_class::<Message>()?;
 
     // facilities from clvm_rs
 
