@@ -15,7 +15,6 @@ workspace = true
 proc-macro = true
 
 [dependencies]
-clvmr = { workspace = true }
 syn = { workspace = true }
 quote = { workspace = true }
 proc-macro-crate = { workspace = true }

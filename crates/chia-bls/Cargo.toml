@@ -20,7 +20,6 @@ chia-traits = { workspace = true }
 chia-sha2 = { workspace = true }
 chia_py_streamable_macro = { workspace = true, optional = true }
 sha2 = { workspace = true }
-clvmr = { workspace = true }
 hkdf = { workspace = true }
 blst = { workspace = true }
 hex = { workspace = true }
