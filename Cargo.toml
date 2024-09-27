@@ -1,6 +1,6 @@
 [package]
 name = "chia"
-version = "0.14.0"
+version = "0.14.1"
 edition = "2021"
 license = "Apache-2.0"
 description = "A meta-crate that exports all of the Chia crates in the workspace."
@@ -99,14 +99,14 @@ openssl = ["chia-sha2/openssl", "clvmr/openssl"]
 lto = "thin"
 
 [workspace.dependencies]
-chia_py_streamable_macro = { path = "./crates/chia_py_streamable_macro", version = "0.13.0" }
-chia_streamable_macro = { path = "./crates/chia_streamable_macro", version = "0.11.0" }
+chia_py_streamable_macro = { path = "./crates/chia_py_streamable_macro", version = "0.14.1" }
+chia_streamable_macro = { path = "./crates/chia_streamable_macro", version = "0.14.1" }
 chia-bls = { path = "./crates/chia-bls", version = "0.14.0" }
 chia-client = { path = "./crates/chia-client", version = "0.14.0" }
 chia-consensus = { path = "./crates/chia-consensus", version = "0.14.0" }
 chia-protocol = { path = "./crates/chia-protocol", version = "0.14.0" }
 chia-ssl = { path = "./crates/chia-ssl", version = "0.11.0" }
-chia-traits = { path = "./crates/chia-traits", version = "0.11.0" }
+chia-traits = { path = "./crates/chia-traits", version = "0.14.1" }
 chia-puzzles = { path = "./crates/chia-puzzles", version = "0.14.0" }
 chia-sha2 = { path = "./crates/chia-sha2", version = "0.14.0" }
 clvm-traits = { path = "./crates/clvm-traits", version = "0.14.0" }
