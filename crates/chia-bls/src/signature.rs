@@ -1,7 +1,7 @@
 use crate::{Error, GTElement, PublicKey, Result, SecretKey};
 use blst::*;
+use chia_sha2::Sha256;
 use chia_traits::{read_bytes, Streamable};
-use clvmr::sha2::Sha256;
 #[cfg(feature = "py-bindings")]
 use pyo3::exceptions::PyNotImplementedError;
 #[cfg(feature = "py-bindings")]

@@ -1,10 +1,10 @@
 use crate::{Bytes32, BytesImpl};
+use chia_sha2::Sha256;
 use chia_streamable_macro::streamable;
 use clvm_traits::{
     clvm_list, destructure_list, match_list, ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError,
     ToClvm, ToClvmError,
 };
-use clvmr::sha2::Sha256;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::exceptions::PyNotImplementedError;

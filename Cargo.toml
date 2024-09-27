@@ -58,6 +58,7 @@ chia-protocol = { workspace = true, optional = true }
 chia-ssl = { workspace = true, optional = true }
 chia-traits = { workspace = true, optional = true }
 chia-puzzles = { workspace = true, optional = true }
+chia-sha2 = { workspace = true, optional = true }
 clvm-traits = { workspace = true, optional = true }
 clvm-utils = { workspace = true, optional = true }
 clvmr = { workspace = true }
@@ -76,6 +77,7 @@ default = [
     "ssl",
     "traits",
     "puzzles",
+    "sha2",
     "clvm-traits",
     "clvm-utils"
 ]
@@ -87,10 +89,11 @@ protocol = ["dep:chia-protocol"]
 ssl = ["dep:chia-ssl"]
 traits = ["dep:chia-traits"]
 puzzles = ["dep:chia-puzzles"]
+sha2 = ["dep:chia-sha2"]
 clvm-traits = ["dep:clvm-traits"]
 clvm-utils = ["dep:clvm-utils"]
 
-openssl = ["clvmr/openssl"]
+openssl = ["chia-sha2/openssl", "clvmr/openssl"]
 
 [profile.release]
 lto = "thin"
@@ -105,6 +108,7 @@ chia-protocol = { path = "./crates/chia-protocol", version = "0.14.0" }
 chia-ssl = { path = "./crates/chia-ssl", version = "0.11.0" }
 chia-traits = { path = "./crates/chia-traits", version = "0.11.0" }
 chia-puzzles = { path = "./crates/chia-puzzles", version = "0.14.0" }
+chia-sha2 = { path = "./crates/chia-sha2", version = "0.14.0" }
 clvm-traits = { path = "./crates/clvm-traits", version = "0.14.0" }
 clvm-utils = { path = "./crates/clvm-utils", version = "0.14.0" }
 clvm-derive = { path = "./crates/clvm-derive", version = "0.13.0" }
@@ -144,3 +148,4 @@ zstd = "0.13.2"
 blocking-threadpool = "1.0.1"
 libfuzzer-sys = "0.4"
 wasm-bindgen = "0.2.93"
+openssl = "0.10.66"

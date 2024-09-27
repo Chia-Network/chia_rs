@@ -285,7 +285,7 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 use pyo3::IntoPy;
                 use pyo3::types::PyModule;
                 use pyo3::prelude::PyAnyMethods;
-                let mut ctx = clvmr::sha2::Sha256::new();
+                let mut ctx = chia_sha2::Sha256::new();
                 #crate_name::Streamable::update_digest(self, &mut ctx);
                 let bytes_module = PyModule::import_bound(py, "chia_rs.sized_bytes")?;
                 let ty = bytes_module.getattr("bytes32")?;

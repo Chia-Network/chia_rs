@@ -5,9 +5,9 @@ use hex_literal::hex;
 
 #[cfg(feature = "py-bindings")]
 use chia_protocol::Bytes32;
+use chia_sha2::Sha256;
 #[cfg(feature = "py-bindings")]
 use chia_traits::ChiaToPython;
-use clvmr::sha2::Sha256;
 #[cfg(feature = "py-bindings")]
 use pyo3::exceptions::PyValueError;
 #[cfg(feature = "py-bindings")]

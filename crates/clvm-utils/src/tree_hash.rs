@@ -1,6 +1,6 @@
+use chia_sha2::Sha256;
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use clvmr::serde::node_from_bytes_backrefs_record;
-use clvmr::sha2::Sha256;
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 use std::{fmt, io};

@@ -1,6 +1,6 @@
 #![no_main]
 use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
-use clvmr::sha2::Sha256;
+use chia_sha2::Sha256;
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {

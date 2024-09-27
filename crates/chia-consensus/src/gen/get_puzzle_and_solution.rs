@@ -65,11 +65,11 @@ mod test {
     use crate::gen::flags::{ALLOW_BACKREFS, MEMPOOL_MODE};
     use crate::gen::run_block_generator::{run_block_generator2, setup_generator_args};
     use chia_protocol::Bytes32;
+    use chia_sha2::Sha256;
     use clvm_traits::FromClvm;
     use clvm_utils::tree_hash;
     use clvmr::reduction::Reduction;
     use clvmr::serde::node_from_bytes_backrefs;
-    use clvmr::sha2::Sha256;
     use clvmr::{run_program, ChiaDialect};
     use rstest::rstest;
     use std::collections::HashSet;

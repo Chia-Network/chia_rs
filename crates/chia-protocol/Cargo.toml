@@ -22,6 +22,7 @@ chia_streamable_macro = { workspace = true }
 chia_py_streamable_macro = { workspace = true, optional = true }
 clvmr = { workspace = true }
 chia-traits = { workspace = true }
+chia-sha2 = { workspace = true }
 clvm-traits = { workspace = true, features = ["derive"] }
 clvm-utils = { workspace = true }
 chia-bls = { workspace = true }
