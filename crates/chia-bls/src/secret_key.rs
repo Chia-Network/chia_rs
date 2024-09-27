@@ -1,7 +1,7 @@
 use crate::{DerivableKey, Error, PublicKey, Result};
 use blst::*;
+use chia_sha2::Sha256;
 use chia_traits::{read_bytes, Streamable};
-use clvmr::sha2::Sha256;
 use hkdf::HkdfExtract;
 #[cfg(feature = "py-bindings")]
 use pyo3::exceptions::PyNotImplementedError;

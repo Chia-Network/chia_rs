@@ -1,4 +1,5 @@
 use crate::bytes::Bytes;
+use chia_sha2::Sha256;
 use chia_traits::chia_error::{Error, Result};
 use chia_traits::Streamable;
 use clvm_traits::{FromClvm, FromClvmError, ToClvm, ToClvmError};
@@ -10,7 +11,6 @@ use clvmr::serde::{
     node_from_bytes, node_from_bytes_backrefs, node_to_bytes, serialized_length_from_bytes,
     serialized_length_from_bytes_trusted,
 };
-use clvmr::sha2::Sha256;
 use clvmr::{Allocator, ChiaDialect};
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;

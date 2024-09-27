@@ -1,5 +1,5 @@
 use chia_bls::{PublicKey, SecretKey};
-use clvmr::sha2::Sha256;
+use chia_sha2::Sha256;
 use hex_literal::hex;
 use num_bigint::BigInt;
 

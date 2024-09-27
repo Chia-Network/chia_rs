@@ -21,6 +21,7 @@ pyo3 = { workspace = true, optional = true }
 chia_streamable_macro = { workspace = true }
 chia_py_streamable_macro = { workspace = true, optional = true }
 clvm-utils = { workspace = true }
+chia-sha2 = { workspace = true }
 chia-traits = { workspace = true }
 clvm-traits = { workspace = true }
 chia-protocol = { workspace = true }

@@ -1,5 +1,5 @@
 use crate::chia_error::{Error, Result};
-use clvmr::sha2::Sha256;
+use chia_sha2::Sha256;
 use std::io::Cursor;
 use std::mem;
 

@@ -12,6 +12,7 @@ repository = "https://github.com/Chia-Network/chia_rs"
 workspace = true
 
 [dependencies]
+chia-sha2 = { workspace = true }
 clvmr = { workspace = true }
 clvm-traits = { workspace = true }
 hex = { workspace = true }

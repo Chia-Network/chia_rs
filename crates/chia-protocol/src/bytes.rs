@@ -1,7 +1,7 @@
+use chia_sha2::Sha256;
 use chia_traits::{chia_error, read_bytes, Streamable};
 use clvm_traits::{ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError, ToClvm, ToClvmError};
 use clvm_utils::TreeHash;
-use clvmr::sha2::Sha256;
 use clvmr::Atom;
 use std::array::TryFromSliceError;
 use std::fmt;

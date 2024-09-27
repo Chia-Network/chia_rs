@@ -12,7 +12,7 @@ use crate::spendbundle_conditions::get_conditions_from_spendbundle;
 use chia_bls::GTElement;
 use chia_bls::{aggregate_verify_gt, hash_to_g2};
 use chia_protocol::SpendBundle;
-use clvmr::sha2::Sha256;
+use chia_sha2::Sha256;
 use clvmr::LIMIT_HEAP;
 use std::time::{Duration, Instant};
 

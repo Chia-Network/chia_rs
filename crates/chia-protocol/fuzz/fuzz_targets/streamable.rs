@@ -1,8 +1,8 @@
 #![no_main]
 use arbitrary::{Arbitrary, Unstructured};
 use chia_protocol::*;
+use chia_sha2::Sha256;
 use chia_traits::Streamable;
-use clvmr::sha2::Sha256;
 use libfuzzer_sys::fuzz_target;
 
 pub fn test_streamable<T: Streamable + std::fmt::Debug + PartialEq>(obj: &T) {

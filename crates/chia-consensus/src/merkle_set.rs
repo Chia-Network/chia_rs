@@ -1,4 +1,4 @@
-use clvmr::sha2::Sha256;
+use chia_sha2::Sha256;
 use hex_literal::hex;
 
 fn get_bit(val: &[u8; 32], bit: u8) -> u8 {

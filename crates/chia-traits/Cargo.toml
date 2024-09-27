@@ -13,7 +13,7 @@ workspace = true
 py-bindings = ["dep:pyo3"]
 
 [dependencies]
+chia-sha2 = { workspace = true }
 pyo3 = { workspace = true, features = ["multiple-pymethods"], optional = true }
 chia_streamable_macro = { workspace = true }
-clvmr = { workspace = true }
 thiserror = { workspace = true }
