@@ -103,7 +103,7 @@ chia-client = { path = "./crates/chia-client", version = "0.14.0" }
 chia-consensus = { path = "./crates/chia-consensus", version = "0.14.0" }
 chia-protocol = { path = "./crates/chia-protocol", version = "0.14.0" }
 chia-ssl = { path = "./crates/chia-ssl", version = "0.11.0" }
-chia-traits = { path = "./crates/chia-traits", version = "0.11.0" }
+chia-traits = { path = "./crates/chia-traits", version = "0.14.0" }
 chia-puzzles = { path = "./crates/chia-puzzles", version = "0.14.0" }
 clvm-traits = { path = "./crates/clvm-traits", version = "0.14.0" }
 clvm-utils = { path = "./crates/clvm-utils", version = "0.14.0" }

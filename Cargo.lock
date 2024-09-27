@@ -279,7 +279,7 @@ dependencies = [
  "chia-protocol",
  "chia-puzzles",
  "chia-ssl",
- "chia-traits 0.11.0",
+ "chia-traits 0.14.0",
  "clvm-traits",
  "clvm-utils",
  "clvmr",
@@ -307,7 +307,7 @@ version = "0.14.0"
 dependencies = [
  "arbitrary",
  "blst",
- "chia-traits 0.11.0",
+ "chia-traits 0.14.0",
  "chia_py_streamable_macro",
  "clvmr",
  "criterion",
@@ -335,7 +335,7 @@ name = "chia-client"
 version = "0.14.0"
 dependencies = [
  "chia-protocol",
- "chia-traits 0.11.0",
+ "chia-traits 0.14.0",
  "futures-util",
  "thiserror",
  "tokio",
@@ -350,7 +350,7 @@ dependencies = [
  "chia-bls 0.14.0",
  "chia-protocol",
  "chia-puzzles",
- "chia-traits 0.11.0",
+ "chia-traits 0.14.0",
  "chia_py_streamable_macro",
  "chia_streamable_macro 0.11.0",
  "clvm-traits",
@@ -373,7 +373,7 @@ version = "0.13.0"
 dependencies = [
  "chia-consensus",
  "chia-protocol",
- "chia-traits 0.11.0",
+ "chia-traits 0.14.0",
  "clvm-traits",
  "clvm-utils",
  "clvmr",
@@ -387,7 +387,7 @@ version = "0.14.0"
 dependencies = [
  "arbitrary",
  "chia-bls 0.14.0",
- "chia-traits 0.11.0",
+ "chia-traits 0.14.0",
  "chia_py_streamable_macro",
  "chia_streamable_macro 0.11.0",
  "clvm-traits",
@@ -404,7 +404,7 @@ version = "0.13.0"
 dependencies = [
  "arbitrary",
  "chia-protocol",
- "chia-traits 0.11.0",
+ "chia-traits 0.14.0",
  "clvm-traits",
  "clvmr",
  "hex",
@@ -457,7 +457,7 @@ dependencies = [
  "chia-consensus",
  "chia-protocol",
  "chia-puzzles",
- "chia-traits 0.11.0",
+ "chia-traits 0.14.0",
  "clap",
  "clvm-traits",
  "clvm-utils",
@@ -480,7 +480,7 @@ dependencies = [
 
 [[package]]
 name = "chia-traits"
-version = "0.11.0"
+version = "0.14.0"
 dependencies = [
  "chia_streamable_macro 0.11.0",
  "clvmr",
