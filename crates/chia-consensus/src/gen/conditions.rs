@@ -1260,7 +1260,7 @@ pub fn parse_spends<V: SpendVisitor>(
         )?;
     }
 
-    validate_conditions(a, &ret, state, spends, flags)?;
+    validate_conditions(a, &ret, &state, spends, flags)?;
     ret.cost = max_cost - cost_left;
 
     Ok(ret)
@@ -1269,7 +1269,7 @@ pub fn parse_spends<V: SpendVisitor>(
 pub fn validate_conditions(
     a: &Allocator,
     ret: &SpendBundleConditions,
-    state: ParseState,
+    state: &ParseState,
     spends: NodePtr,
     _flags: u32,
 ) -> Result<(), ValidationErr> {
@@ -1309,13 +1309,13 @@ pub fn validate_conditions(
     }
 
     // check concurrent spent assertions
-    for coin_id in state.assert_concurrent_spend {
+    for coin_id in &state.assert_concurrent_spend {
         if !state
             .spent_coins
-            .contains_key(&Bytes32::try_from(a.atom(coin_id).as_ref()).unwrap())
+            .contains_key(&Bytes32::try_from(a.atom(*coin_id).as_ref()).unwrap())
         {
             return Err(ValidationErr(
-                coin_id,
+                *coin_id,
                 ErrorCode::AssertConcurrentSpendFailed,
             ));
         }
@@ -1326,14 +1326,14 @@ pub fn validate_conditions(
 
         // expand all the spent puzzle hashes into a set, to allow
         // fast lookups of all assertions
-        for ph in state.spent_puzzles {
-            spent_phs.insert(a.atom(ph).as_ref().try_into().unwrap());
+        for ph in &state.spent_puzzles {
+            spent_phs.insert(a.atom(*ph).as_ref().try_into().unwrap());
         }
 
-        for puzzle_assert in state.assert_concurrent_puzzle {
-            if !spent_phs.contains(&a.atom(puzzle_assert).as_ref().try_into().unwrap()) {
+        for puzzle_assert in &state.assert_concurrent_puzzle {
+            if !spent_phs.contains(&a.atom(*puzzle_assert).as_ref().try_into().unwrap()) {
                 return Err(ValidationErr(
-                    puzzle_assert,
+                    *puzzle_assert,
                     ErrorCode::AssertConcurrentPuzzleFailed,
                 ));
             }
@@ -1345,41 +1345,41 @@ pub fn validate_conditions(
     if !state.assert_coin.is_empty() {
         let mut announcements = HashSet::<Bytes32>::new();
 
-        for (coin_id, announce) in state.announce_coin {
+        for (coin_id, announce) in &state.announce_coin {
             let mut hasher = Sha256::new();
-            hasher.update(*coin_id);
-            hasher.update(a.atom(announce));
+            hasher.update(**coin_id);
+            hasher.update(a.atom(*announce));
             let announcement_id: [u8; 32] = hasher.finalize();
             announcements.insert(announcement_id.into());
         }
 
-        for coin_assert in state.assert_coin {
-            if !announcements.contains(&a.atom(coin_assert).as_ref().try_into().unwrap()) {
+        for coin_assert in &state.assert_coin {
+            if !announcements.contains(&a.atom(*coin_assert).as_ref().try_into().unwrap()) {
                 return Err(ValidationErr(
-                    coin_assert,
+                    *coin_assert,
                     ErrorCode::AssertCoinAnnouncementFailed,
                 ));
             }
         }
     }
 
-    for spend_idx in state.assert_ephemeral {
+    for spend_idx in &state.assert_ephemeral {
         // make sure this coin was created in this block
-        if !is_ephemeral(a, spend_idx, &state.spent_coins, &ret.spends) {
+        if !is_ephemeral(a, *spend_idx, &state.spent_coins, &ret.spends) {
             return Err(ValidationErr(
-                ret.spends[spend_idx].parent_id,
+                ret.spends[*spend_idx].parent_id,
                 ErrorCode::AssertEphemeralFailed,
             ));
         }
     }
 
-    for spend_idx in state.assert_not_ephemeral {
+    for spend_idx in &state.assert_not_ephemeral {
         // make sure this coin was NOT created in this block
         // because consensus rules do not allow relative conditions on
         // ephemeral spends
-        if is_ephemeral(a, spend_idx, &state.spent_coins, &ret.spends) {
+        if is_ephemeral(a, *spend_idx, &state.spent_coins, &ret.spends) {
             return Err(ValidationErr(
-                ret.spends[spend_idx].parent_id,
+                ret.spends[*spend_idx].parent_id,
                 ErrorCode::EphemeralRelativeCondition,
             ));
         }
@@ -1388,18 +1388,18 @@ pub fn validate_conditions(
     if !state.assert_puzzle.is_empty() {
         let mut announcements = HashSet::<Bytes32>::new();
 
-        for (puzzle_hash, announce) in state.announce_puzzle {
+        for (puzzle_hash, announce) in &state.announce_puzzle {
             let mut hasher = Sha256::new();
-            hasher.update(a.atom(puzzle_hash));
-            hasher.update(a.atom(announce));
+            hasher.update(a.atom(*puzzle_hash));
+            hasher.update(a.atom(*announce));
             let announcement_id: [u8; 32] = hasher.finalize();
             announcements.insert(announcement_id.into());
         }
 
-        for puzzle_assert in state.assert_puzzle {
-            if !announcements.contains(&a.atom(puzzle_assert).as_ref().try_into().unwrap()) {
+        for puzzle_assert in &state.assert_puzzle {
+            if !announcements.contains(&a.atom(*puzzle_assert).as_ref().try_into().unwrap()) {
                 return Err(ValidationErr(
-                    puzzle_assert,
+                    *puzzle_assert,
                     ErrorCode::AssertPuzzleAnnouncementFailed,
                 ));
             }
@@ -1434,19 +1434,6 @@ pub fn validate_conditions(
     Ok(())
 }
 
-#[cfg(test)]
-pub(crate) fn u64_to_bytes(n: u64) -> Vec<u8> {
-    let mut buf = Vec::<u8>::new();
-    buf.extend_from_slice(&n.to_be_bytes());
-    if (buf[0] & 0x80) != 0 {
-        buf.insert(0, 0);
-    } else {
-        while buf.len() > 1 && buf[0] == 0 && (buf[1] & 0x80) == 0 {
-            buf.remove(0);
-        }
-    }
-    buf
-}
 #[cfg(test)]
 use crate::consensus_constants::TEST_CONSTANTS;
 #[cfg(test)]
@@ -1520,6 +1507,9 @@ const LONGMSG: &[u8; 1025] = &[
     4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
     4,
 ];
+
+#[cfg(test)]
+use crate::gen::make_aggsig_final_message::u64_to_bytes;
 
 #[cfg(test)]
 fn hash_buf(b1: &[u8], b2: &[u8]) -> Vec<u8> {

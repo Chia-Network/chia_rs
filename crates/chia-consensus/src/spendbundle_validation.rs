@@ -122,7 +122,7 @@ pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusCons
 mod tests {
     use super::*;
     use crate::consensus_constants::TEST_CONSTANTS;
-    use crate::gen::conditions::u64_to_bytes;
+    use crate::gen::make_aggsig_final_message::u64_to_bytes;
     use chia_bls::{sign, G2Element, SecretKey, Signature};
     use chia_protocol::{Bytes, Bytes32};
     use chia_protocol::{Coin, CoinSpend, Program};

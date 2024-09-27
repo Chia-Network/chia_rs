@@ -61,8 +61,8 @@ pub fn get_puzzle_and_solution_for_coin(
 mod test {
     use super::*;
     use crate::consensus_constants::TEST_CONSTANTS;
-    use crate::gen::conditions::u64_to_bytes;
     use crate::gen::flags::{ALLOW_BACKREFS, MEMPOOL_MODE};
+    use crate::gen::make_aggsig_final_message::u64_to_bytes;
     use crate::gen::run_block_generator::{run_block_generator2, setup_generator_args};
     use chia_protocol::Bytes32;
     use clvm_traits::FromClvm;

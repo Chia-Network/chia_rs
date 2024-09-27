@@ -4,7 +4,6 @@ use crate::gen::opcodes::{
     AGG_SIG_PARENT_PUZZLE, AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT,
 };
 use crate::gen::owned_conditions::OwnedSpendConditions;
-use chia_protocol::Bytes;
 use chia_protocol::Coin;
 
 pub fn make_aggsig_final_message(
@@ -51,13 +50,13 @@ pub fn make_aggsig_final_message(
     }
 }
 
-fn u64_to_bytes(val: u64) -> Bytes {
+pub fn u64_to_bytes(val: u64) -> Vec<u8> {
     let amount_bytes: [u8; 8] = val.to_be_bytes();
     if val >= 0x8000_0000_0000_0000_u64 {
         let mut ret = Vec::<u8>::new();
         ret.push(0_u8);
         ret.extend(amount_bytes);
-        Bytes::new(ret)
+        ret
     } else {
         let start = match val {
             n if n >= 0x0080_0000_0000_0000_u64 => 0,
@@ -70,7 +69,7 @@ fn u64_to_bytes(val: u64) -> Bytes {
             n if n > 0 => 7,
             _ => 8,
         };
-        Bytes::new(amount_bytes[start..].to_vec())
+        amount_bytes[start..].to_vec()
     }
 }
 
