@@ -271,16 +271,16 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chia"
-version = "0.14.0"
+version = "0.14.1"
 dependencies = [
- "chia-bls 0.14.0",
+ "chia-bls 0.14.1",
  "chia-client",
  "chia-consensus",
  "chia-protocol",
  "chia-puzzles",
  "chia-sha2",
  "chia-ssl",
- "chia-traits 0.11.0",
+ "chia-traits 0.14.1",
  "clvm-traits",
  "clvm-utils",
  "clvmr",
@@ -304,12 +304,12 @@ dependencies = [
 
 [[package]]
 name = "chia-bls"
-version = "0.14.0"
+version = "0.14.1"
 dependencies = [
  "arbitrary",
  "blst",
  "chia-sha2",
- "chia-traits 0.11.0",
+ "chia-traits 0.14.1",
  "chia_py_streamable_macro",
  "criterion",
  "hex",
@@ -326,17 +326,17 @@ dependencies = [
 name = "chia-bls-fuzz"
 version = "0.13.0"
 dependencies = [
- "chia-bls 0.14.0",
+ "chia-bls 0.14.1",
  "libfuzzer-sys",
  "pyo3",
 ]
 
 [[package]]
 name = "chia-client"
-version = "0.14.0"
+version = "0.14.1"
 dependencies = [
  "chia-protocol",
- "chia-traits 0.11.0",
+ "chia-traits 0.14.1",
  "futures-util",
  "thiserror",
  "tokio",
@@ -346,15 +346,15 @@ dependencies = [
 
 [[package]]
 name = "chia-consensus"
-version = "0.14.0"
+version = "0.14.1"
 dependencies = [
- "chia-bls 0.14.0",
+ "chia-bls 0.14.1",
  "chia-protocol",
  "chia-puzzles",
  "chia-sha2",
- "chia-traits 0.11.0",
+ "chia-traits 0.14.1",
  "chia_py_streamable_macro",
- "chia_streamable_macro 0.11.0",
+ "chia_streamable_macro 0.14.1",
  "clvm-traits",
  "clvm-utils",
  "clvmr",
@@ -376,7 +376,7 @@ dependencies = [
  "chia-consensus",
  "chia-protocol",
  "chia-sha2",
- "chia-traits 0.11.0",
+ "chia-traits 0.14.1",
  "clvm-traits",
  "clvm-utils",
  "clvmr",
@@ -386,14 +386,14 @@ dependencies = [
 
 [[package]]
 name = "chia-protocol"
-version = "0.14.0"
+version = "0.14.1"
 dependencies = [
  "arbitrary",
- "chia-bls 0.14.0",
+ "chia-bls 0.14.1",
  "chia-sha2",
- "chia-traits 0.11.0",
+ "chia-traits 0.14.1",
  "chia_py_streamable_macro",
- "chia_streamable_macro 0.11.0",
+ "chia_streamable_macro 0.14.1",
  "clvm-traits",
  "clvm-utils",
  "clvmr",
@@ -409,7 +409,7 @@ dependencies = [
  "arbitrary",
  "chia-protocol",
  "chia-sha2",
- "chia-traits 0.11.0",
+ "chia-traits 0.14.1",
  "clvm-traits",
  "clvmr",
  "hex",
@@ -418,10 +418,10 @@ dependencies = [
 
 [[package]]
 name = "chia-puzzles"
-version = "0.14.0"
+version = "0.14.1"
 dependencies = [
  "arbitrary",
- "chia-bls 0.14.0",
+ "chia-bls 0.14.1",
  "chia-protocol",
  "chia-sha2",
  "clvm-traits",
@@ -444,7 +444,7 @@ dependencies = [
 
 [[package]]
 name = "chia-sha2"
-version = "0.14.0"
+version = "0.14.1"
 dependencies = [
  "openssl",
  "sha2",
@@ -464,14 +464,14 @@ dependencies = [
 
 [[package]]
 name = "chia-tools"
-version = "0.14.0"
+version = "0.14.1"
 dependencies = [
  "blocking-threadpool",
- "chia-bls 0.14.0",
+ "chia-bls 0.14.1",
  "chia-consensus",
  "chia-protocol",
  "chia-puzzles",
- "chia-traits 0.11.0",
+ "chia-traits 0.14.1",
  "clap",
  "clvm-traits",
  "clvm-utils",
@@ -494,17 +494,17 @@ dependencies = [
 
 [[package]]
 name = "chia-traits"
-version = "0.11.0"
+version = "0.14.1"
 dependencies = [
  "chia-sha2",
- "chia_streamable_macro 0.11.0",
+ "chia_streamable_macro 0.14.1",
  "pyo3",
  "thiserror",
 ]
 
 [[package]]
 name = "chia_py_streamable_macro"
-version = "0.13.0"
+version = "0.14.1"
 dependencies = [
  "proc-macro-crate 1.3.1",
  "proc-macro2",
@@ -514,9 +514,9 @@ dependencies = [
 
 [[package]]
 name = "chia_rs"
-version = "0.14.0"
+version = "0.14.1"
 dependencies = [
- "chia-bls 0.14.0",
+ "chia-bls 0.14.1",
  "chia-consensus",
  "chia-protocol",
  "clvm-utils",
@@ -539,7 +539,7 @@ dependencies = [
 
 [[package]]
 name = "chia_streamable_macro"
-version = "0.11.0"
+version = "0.14.1"
 dependencies = [
  "proc-macro-crate 1.3.1",
  "proc-macro2",
@@ -632,9 +632,9 @@ dependencies = [
 
 [[package]]
 name = "clvm-traits"
-version = "0.14.0"
+version = "0.14.1"
 dependencies = [
- "chia-bls 0.14.0",
+ "chia-bls 0.14.1",
  "clvm-derive",
  "clvmr",
  "hex",
@@ -655,7 +655,7 @@ dependencies = [
 
 [[package]]
 name = "clvm-utils"
-version = "0.14.0"
+version = "0.14.1"
 dependencies = [
  "chia-sha2",
  "clvm-traits",
