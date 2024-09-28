@@ -65,7 +65,7 @@ jobs:
 
       - name: python mypy
         run: |
-          mypy --ignore-missing-imports tests
+          mypy tests
 
       - name: python mypy stubtest
         shell: bash
