@@ -66,7 +66,7 @@ pub fn get_conditions_from_spendbundle(
         )?;
     }
 
-    validate_conditions(a, &ret, state, a.nil(), flags)?;
+    validate_conditions(a, &ret, &state, a.nil(), flags)?;
     assert!(max_cost >= cost_left);
     ret.cost = max_cost - cost_left;
     Ok(ret)

@@ -216,7 +216,7 @@ where
         return Err(ValidationErr(all_spends, ErrorCode::GeneratorRuntimeError));
     }
 
-    validate_conditions(a, &ret, state, a.nil(), flags)?;
+    validate_conditions(a, &ret, &state, a.nil(), flags)?;
 
     ret.cost = max_cost - cost_left;
     Ok(ret)
