@@ -465,7 +465,7 @@ pub fn py_get_flags_for_height_and_constants(height: u32, constants: &ConsensusC
 }
 
 #[pymodule]
-pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+pub fn _chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // generator functions
     m.add_function(wrap_pyfunction!(run_block_generator, m)?)?;
     m.add_function(wrap_pyfunction!(run_block_generator2, m)?)?;
