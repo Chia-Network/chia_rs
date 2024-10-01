@@ -1,6 +1,6 @@
 [package]
 name = "chia-consensus"
-version = "0.5.2"
+version = "0.14.1"
 edition = "2021"
 license = "Apache-2.0"
 description = "Utility functions and types used by the Chia blockchain full node"
@@ -8,27 +8,39 @@ authors = ["Richard Kiss <him@richardkiss.com>", "Arvid Norberg <arvid@chia.net>
 homepage = "https://github.com/Chia-Network/chia_rs"
 repository = "https://github.com/Chia-Network/chia_rs"
 
+[lints]
+workspace = true
+
 [features]
-py-bindings = ["dep:pyo3"]
+py-bindings = [
+    "dep:pyo3",
+    "dep:chia_py_streamable_macro",
+    "chia-traits/py-bindings",
+    "chia-protocol/py-bindings"
+]
 
 [dependencies]
-clvmr = "0.6.0"
-hex = "0.4.3"
-pyo3 = { version = ">=0.19.0", optional = true }
-clvm-utils = { version = "0.5.1", path = "../clvm-utils" }
-chia-traits = { version = "0.5.2", path = "../chia-traits" }
-clvm-traits = { version = "0.5.2", path = "../clvm-traits" }
-clvm-derive = { version = "0.5.2", path = "../clvm-derive" }
-chia-protocol = { version = "0.5.1", path = "../chia-protocol" }
-chia-wallet = { version = "0.5.1", path = "../chia-wallet" }
-hex-literal = "0.4.1"
-thiserror = "1.0.44"
+clvmr = { workspace = true }
+hex = { workspace = true }
+pyo3 = { workspace = true, optional = true }
+chia_streamable_macro = { workspace = true }
+chia_py_streamable_macro = { workspace = true, optional = true }
+clvm-utils = { workspace = true }
+chia-sha2 = { workspace = true }
+chia-traits = { workspace = true }
+clvm-traits = { workspace = true }
+chia-protocol = { workspace = true }
+chia-puzzles = { workspace = true }
+chia-bls = { workspace = true }
+hex-literal = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
-num-traits = "0.2.15"
-rstest = "0.16.0"
-text-diff = "0.4.0"
-criterion = "0.5.1"
+num-traits = { workspace = true }
+rstest = { workspace = true }
+text-diff = { workspace = true }
+criterion = { workspace = true }
+rand = { workspace = true, features = [ "small_rng" ] }
 
 [lib]
 bench = false
@@ -39,4 +51,8 @@ harness = false
 
 [[bench]]
 name = "tree-hash"
+harness = false
+
+[[bench]]
+name = "merkle-set"
 harness = false

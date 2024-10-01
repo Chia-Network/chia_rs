@@ -9,24 +9,24 @@ pub struct CurriedProgram<P, A> {
     pub args: A,
 }
 
-impl<N, P, A> FromClvm<N> for CurriedProgram<P, A>
+impl<N, D: ClvmDecoder<Node = N>, P, A> FromClvm<D> for CurriedProgram<P, A>
 where
-    P: FromClvm<N>,
-    A: FromClvm<N>,
+    P: FromClvm<D>,
+    A: FromClvm<D>,
 {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
         let destructure_list!(_, destructure_quote!(program), args) =
             <match_list!(MatchByte<2>, match_quote!(P), A)>::from_clvm(decoder, node)?;
         Ok(Self { program, args })
     }
 }
 
-impl<N, P, A> ToClvm<N> for CurriedProgram<P, A>
+impl<N, E: ClvmEncoder<Node = N>, P, A> ToClvm<E> for CurriedProgram<P, A>
 where
-    P: ToClvm<N>,
-    A: ToClvm<N>,
+    P: ToClvm<E>,
+    A: ToClvm<E>,
 {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+    fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
         clvm_list!(2, clvm_quote!(&self.program), &self.args).to_clvm(encoder)
     }
 }
@@ -36,14 +36,14 @@ mod tests {
     use std::fmt::Debug;
 
     use clvm_traits::clvm_curried_args;
-    use clvmr::{serde::node_to_bytes, Allocator, NodePtr};
+    use clvmr::{serde::node_to_bytes, Allocator};
 
     use super::*;
 
-    fn check<P, A>(program: P, args: A, expected: &str)
+    fn check<P, A>(program: &P, args: &A, expected: &str)
     where
-        P: Debug + PartialEq + ToClvm<NodePtr> + FromClvm<NodePtr>,
-        A: Debug + PartialEq + ToClvm<NodePtr> + FromClvm<NodePtr>,
+        P: Debug + PartialEq + ToClvm<Allocator> + FromClvm<Allocator>,
+        A: Debug + PartialEq + ToClvm<Allocator> + FromClvm<Allocator>,
     {
         let a = &mut Allocator::new();
 
@@ -57,15 +57,15 @@ mod tests {
         assert_eq!(hex::encode(actual), expected);
 
         let curried = CurriedProgram::<P, A>::from_clvm(a, curry).unwrap();
-        assert_eq!(curried.program, program);
-        assert_eq!(curried.args, args);
+        assert_eq!(&curried.program, program);
+        assert_eq!(&curried.args, args);
     }
 
     #[test]
     fn curry() {
         check(
-            "xyz".to_string(),
-            clvm_curried_args!("a".to_string(), "b".to_string(), "c".to_string()),
+            &"xyz".to_string(),
+            &clvm_curried_args!("a".to_string(), "b".to_string(), "c".to_string()),
             "ff02ffff018378797affff04ffff0161ffff04ffff0162ffff04ffff0163ff0180808080",
         );
     }

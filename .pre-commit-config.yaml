@@ -1,14 +1,20 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
--   repo: https://github.com/pre-commit/pre-commit-hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v3.2.0
     hooks:
-    -   id: trailing-whitespace
-    -   id: check-yaml
-    -   id: check-added-large-files
--   repo: local
+      - id: trailing-whitespace
+      - id: check-yaml
+      - id: check-added-large-files
+  - repo: local
     hooks:
+      - id: prettier
+        name: Prettier
+        entry: npx prettier --write
+        language: node
+        files: \.(js|jsx|ts|tsx|json|css|scss|md|yml|yaml)$
+        types: [file]
       - id: fmt
         name: fmt
         description: run cargo fmt on the workspace
@@ -19,21 +25,13 @@ repos:
         name: clippy
         description: run cargo clippy on the workspace
         stages: [pre-push]
-        entry: cargo clippy --workspace --all-features -- -Dwarnings
+        entry: cargo clippy --workspace --all-features --all-targets
         language: system
         pass_filenames: false
-      - id: build
-        name: build
-        description: run cargo build on the workspace
-        stages: [pre-push]
-        entry: cargo build --all-features --workspace
-        language: system
-        pass_filenames: false
-      - id: benchmarks
-        name: build benchmarks
-        description: run cargo bench on the workspace
-        stages: [pre-push]
-        entry: cargo bench --no-run --workspace
+      - id: machete
+        name: machete
+        description: run cargo machete on the workspace
+        entry: cargo machete
         language: system
         pass_filenames: false
       - id: tests

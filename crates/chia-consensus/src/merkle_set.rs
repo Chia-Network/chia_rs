@@ -1,4 +1,5 @@
-use clvmr::sha2::{Digest, Sha256};
+use chia_sha2::Sha256;
+use hex_literal::hex;
 
 fn get_bit(val: &[u8; 32], bit: u8) -> u8 {
     ((val[(bit / 8) as usize] & (0x80 >> (bit & 7))) != 0).into()
@@ -6,7 +7,7 @@ fn get_bit(val: &[u8; 32], bit: u8) -> u8 {
 
 #[repr(u8)]
 #[derive(PartialEq, Eq, Copy, Clone)]
-enum NodeType {
+pub(crate) enum NodeType {
     Empty,
     Term,
     Mid,
@@ -21,25 +22,28 @@ fn encode_type(t: NodeType) -> u8 {
     match t {
         NodeType::Empty => 0,
         NodeType::Term => 1,
-        NodeType::Mid => 2,
-        NodeType::MidDbl => 2,
+        NodeType::Mid | NodeType::MidDbl => 2,
     }
 }
 
-fn hash(ltype: NodeType, rtype: NodeType, left: &[u8; 32], right: &[u8; 32]) -> [u8; 32] {
+pub(crate) fn hash(
+    ltype: NodeType,
+    rtype: NodeType,
+    left: &[u8; 32],
+    right: &[u8; 32],
+) -> [u8; 32] {
     let mut hasher = Sha256::new();
-    hasher.update([
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    ]);
+    hasher.update(hex!(
+        "000000000000000000000000000000000000000000000000000000000000"
+    ));
     hasher.update([encode_type(ltype), encode_type(rtype)]);
     hasher.update(left);
     hasher.update(right);
-    hasher.finalize().into()
+    hasher.finalize()
 }
 
-const BLANK: [u8; 32] = [
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-];
+pub(crate) const BLANK: [u8; 32] =
+    hex!("0000000000000000000000000000000000000000000000000000000000000000");
 
 // this function performs an in-place, recursive radix sort of the range.
 // as each level returns, values are hashed pair-wise and as a hash tree.
@@ -163,551 +167,330 @@ pub fn compute_merkle_set_root(leafs: &mut [[u8; 32]]) -> [u8; 32] {
             let mut hasher = Sha256::new();
             hasher.update([NodeType::Term as u8]);
             hasher.update(hash);
-            hasher.finalize().into()
+            hasher.finalize()
         }
-        (hash, NodeType::Mid) => hash,
-        (hash, NodeType::MidDbl) => hash,
+        (hash, NodeType::Mid | NodeType::MidDbl) => hash,
         (_, NodeType::Empty) => panic!("unexpected"),
     }
 }
 
-#[test]
-fn test_get_bit_msb() {
-    let val1 = [
-        0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-    assert_eq!(get_bit(&val1, 0), 1);
-    assert_eq!(get_bit(&val1, 1), 0);
-    assert_eq!(get_bit(&val1, 2), 0);
-    assert_eq!(get_bit(&val1, 3), 0);
-    assert_eq!(get_bit(&val1, 4), 0);
-    assert_eq!(get_bit(&val1, 5), 0);
-    assert_eq!(get_bit(&val1, 6), 0);
-    assert_eq!(get_bit(&val1, 7), 0);
-    assert_eq!(get_bit(&val1, 8), 0);
-    assert_eq!(get_bit(&val1, 9), 0);
-    assert_eq!(get_bit(&val1, 248), 0);
-    assert_eq!(get_bit(&val1, 249), 0);
-    assert_eq!(get_bit(&val1, 250), 0);
-    assert_eq!(get_bit(&val1, 251), 0);
-    assert_eq!(get_bit(&val1, 252), 0);
-    assert_eq!(get_bit(&val1, 253), 0);
-    assert_eq!(get_bit(&val1, 254), 0);
-    assert_eq!(get_bit(&val1, 255), 0);
-}
+#[cfg(test)]
+pub mod test {
+    use super::*;
 
-#[test]
-fn test_get_bit_lsb() {
-    let val1 = [
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0x0f,
-    ];
-    assert_eq!(get_bit(&val1, 0), 0);
-    assert_eq!(get_bit(&val1, 1), 0);
-    assert_eq!(get_bit(&val1, 2), 0);
-    assert_eq!(get_bit(&val1, 3), 0);
-    assert_eq!(get_bit(&val1, 4), 0);
-    assert_eq!(get_bit(&val1, 5), 0);
-    assert_eq!(get_bit(&val1, 6), 0);
-    assert_eq!(get_bit(&val1, 7), 0);
-    assert_eq!(get_bit(&val1, 8), 0);
-    assert_eq!(get_bit(&val1, 9), 0);
-    assert_eq!(get_bit(&val1, 248), 0);
-    assert_eq!(get_bit(&val1, 249), 0);
-    assert_eq!(get_bit(&val1, 250), 0);
-    assert_eq!(get_bit(&val1, 251), 0);
-    assert_eq!(get_bit(&val1, 252), 1);
-    assert_eq!(get_bit(&val1, 253), 1);
-    assert_eq!(get_bit(&val1, 254), 1);
-    assert_eq!(get_bit(&val1, 255), 1);
-}
+    fn h2(buf1: &[u8], buf2: &[u8]) -> [u8; 32] {
+        let mut hasher = Sha256::new();
+        hasher.update(buf1);
+        hasher.update(buf2);
+        hasher.finalize()
+    }
 
-#[test]
-fn test_get_bit_mixed() {
-    let val1 = [
-        0x55, 0x55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0,
-    ];
-    assert_eq!(get_bit(&val1, 0), 0);
-    assert_eq!(get_bit(&val1, 1), 1);
-    assert_eq!(get_bit(&val1, 2), 0);
-    assert_eq!(get_bit(&val1, 3), 1);
-    assert_eq!(get_bit(&val1, 4), 0);
-    assert_eq!(get_bit(&val1, 5), 1);
-    assert_eq!(get_bit(&val1, 6), 0);
-    assert_eq!(get_bit(&val1, 7), 1);
-    assert_eq!(get_bit(&val1, 8), 0);
-    assert_eq!(get_bit(&val1, 9), 1);
-    assert_eq!(get_bit(&val1, 10), 0);
-    assert_eq!(get_bit(&val1, 11), 1);
-    assert_eq!(get_bit(&val1, 12), 0);
-    assert_eq!(get_bit(&val1, 13), 1);
-    assert_eq!(get_bit(&val1, 14), 0);
-    assert_eq!(get_bit(&val1, 15), 1);
-}
+    const PREFIX: [u8; 30] = hex!("000000000000000000000000000000000000000000000000000000000000");
 
-#[test]
-fn test_compute_merkle_root_0() {
-    assert_eq!(
-        compute_merkle_set_root(&mut []),
-        [
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0
+    fn hashdown(buf1: &[u8], buf2: &[u8], buf3: &[u8]) -> [u8; 32] {
+        let mut hasher = Sha256::new();
+        hasher.update(PREFIX);
+        hasher.update(buf1);
+        hasher.update(buf2);
+        hasher.update(buf3);
+        hasher.finalize()
+    }
+
+    #[test]
+    fn test_get_bit_msb() {
+        let val1 = hex!("8000000000000000000000000000000000000000000000000000000000000000");
+        assert_eq!(get_bit(&val1, 0), 1);
+        assert_eq!(get_bit(&val1, 1), 0);
+        assert_eq!(get_bit(&val1, 2), 0);
+        assert_eq!(get_bit(&val1, 3), 0);
+        assert_eq!(get_bit(&val1, 4), 0);
+        assert_eq!(get_bit(&val1, 5), 0);
+        assert_eq!(get_bit(&val1, 6), 0);
+        assert_eq!(get_bit(&val1, 7), 0);
+        assert_eq!(get_bit(&val1, 8), 0);
+        assert_eq!(get_bit(&val1, 9), 0);
+        assert_eq!(get_bit(&val1, 248), 0);
+        assert_eq!(get_bit(&val1, 249), 0);
+        assert_eq!(get_bit(&val1, 250), 0);
+        assert_eq!(get_bit(&val1, 251), 0);
+        assert_eq!(get_bit(&val1, 252), 0);
+        assert_eq!(get_bit(&val1, 253), 0);
+        assert_eq!(get_bit(&val1, 254), 0);
+        assert_eq!(get_bit(&val1, 255), 0);
+    }
+
+    #[test]
+    fn test_get_bit_lsb() {
+        let val1 = hex!("000000000000000000000000000000000000000000000000000000000000000f");
+        assert_eq!(get_bit(&val1, 0), 0);
+        assert_eq!(get_bit(&val1, 1), 0);
+        assert_eq!(get_bit(&val1, 2), 0);
+        assert_eq!(get_bit(&val1, 3), 0);
+        assert_eq!(get_bit(&val1, 4), 0);
+        assert_eq!(get_bit(&val1, 5), 0);
+        assert_eq!(get_bit(&val1, 6), 0);
+        assert_eq!(get_bit(&val1, 7), 0);
+        assert_eq!(get_bit(&val1, 8), 0);
+        assert_eq!(get_bit(&val1, 9), 0);
+        assert_eq!(get_bit(&val1, 248), 0);
+        assert_eq!(get_bit(&val1, 249), 0);
+        assert_eq!(get_bit(&val1, 250), 0);
+        assert_eq!(get_bit(&val1, 251), 0);
+        assert_eq!(get_bit(&val1, 252), 1);
+        assert_eq!(get_bit(&val1, 253), 1);
+        assert_eq!(get_bit(&val1, 254), 1);
+        assert_eq!(get_bit(&val1, 255), 1);
+    }
+
+    #[test]
+    fn test_get_bit_mixed() {
+        let val1 = hex!("5555000000000000000000000000000000000000000000000000000000000000");
+        assert_eq!(get_bit(&val1, 0), 0);
+        assert_eq!(get_bit(&val1, 1), 1);
+        assert_eq!(get_bit(&val1, 2), 0);
+        assert_eq!(get_bit(&val1, 3), 1);
+        assert_eq!(get_bit(&val1, 4), 0);
+        assert_eq!(get_bit(&val1, 5), 1);
+        assert_eq!(get_bit(&val1, 6), 0);
+        assert_eq!(get_bit(&val1, 7), 1);
+        assert_eq!(get_bit(&val1, 8), 0);
+        assert_eq!(get_bit(&val1, 9), 1);
+        assert_eq!(get_bit(&val1, 10), 0);
+        assert_eq!(get_bit(&val1, 11), 1);
+        assert_eq!(get_bit(&val1, 12), 0);
+        assert_eq!(get_bit(&val1, 13), 1);
+        assert_eq!(get_bit(&val1, 14), 0);
+        assert_eq!(get_bit(&val1, 15), 1);
+    }
+
+    #[allow(clippy::many_single_char_names)]
+    fn merkle_tree_5() -> ([u8; 32], Vec<[u8; 32]>) {
+        let a = hex!("5800000000000000000000000000000000000000000000000000000000000000");
+        let b = hex!("2300000000000000000000000000000000000000000000000000000000000000");
+        let c = hex!("2100000000000000000000000000000000000000000000000000000000000000");
+        let d = hex!("ca00000000000000000000000000000000000000000000000000000000000000");
+        let e = hex!("2000000000000000000000000000000000000000000000000000000000000000");
+
+        // build the expected tree bottom up, since that's simpler
+        let expected = hashdown(&[1, 1], &e, &c);
+        let expected = hashdown(&[2, 1], &expected, &b);
+        let expected = hashdown(&[2, 0], &expected, &BLANK);
+        let expected = hashdown(&[2, 0], &expected, &BLANK);
+        let expected = hashdown(&[2, 0], &expected, &BLANK);
+        let expected = hashdown(&[0, 2], &BLANK, &expected);
+        let expected = hashdown(&[2, 1], &expected, &a);
+        let expected = hashdown(&[2, 1], &expected, &d);
+
+        (expected, vec![a, b, c, d, e])
+        // this tree looks like this:
+        //
+        //             o
+        //            / \
+        //           o   d
+        //          / \
+        //         o   a
+        //        / \
+        //       E   o
+        //          / \
+        //         o   E
+        //        / \
+        //       o   E
+        //      / \
+        //     o   E
+        //    / \
+        //   o   b
+        //  / \
+        // e   c
+    }
+
+    fn merkle_tree_left_edge() -> ([u8; 32], Vec<[u8; 32]>) {
+        let a = hex!("8000000000000000000000000000000000000000000000000000000000000000");
+        let b = hex!("0000000000000000000000000000000000000000000000000000000000000001");
+        let c = hex!("0000000000000000000000000000000000000000000000000000000000000002");
+        let d = hex!("0000000000000000000000000000000000000000000000000000000000000003");
+
+        let mut expected = hashdown(&[1, 1], &c, &d);
+        expected = hashdown(&[1, 2], &b, &expected);
+
+        for _i in 0..253 {
+            expected = hashdown(&[2, 0], &expected, &BLANK);
+        }
+
+        expected = hashdown(&[2, 1], &expected, &a);
+        (expected, vec![a, b, c, d])
+        // this tree looks like this:
+        //           o
+        //          / \
+        //         o   a
+        //        / \
+        //       o   E
+        //      / \
+        //     .   E
+        //     .
+        //     .
+        //    / \
+        //   o   E
+        //  / \
+        // b   o
+        //    / \
+        //   c   d
+    }
+
+    fn merkle_tree_left_edge_duplicates() -> ([u8; 32], Vec<[u8; 32]>) {
+        let a = hex!("8000000000000000000000000000000000000000000000000000000000000000");
+        let b = hex!("0000000000000000000000000000000000000000000000000000000000000001");
+        let c = hex!("0000000000000000000000000000000000000000000000000000000000000002");
+        let d = hex!("0000000000000000000000000000000000000000000000000000000000000003");
+
+        let mut expected = hashdown(&[1, 1], &c, &d);
+        expected = hashdown(&[1, 2], &b, &expected);
+
+        for _i in 0..253 {
+            expected = hashdown(&[2, 0], &expected, &BLANK);
+        }
+
+        expected = hashdown(&[2, 1], &expected, &a);
+
+        // all fields are duplicated
+        (expected, vec![a, b, c, d, a, b, c, d])
+        // this tree looks like this:
+        //           o
+        //          / \
+        //         o   a
+        //        / \
+        //       o   E
+        //      / \
+        //     .   E
+        //     .
+        //     .
+        //    / \
+        //   o   E
+        //  / \
+        // b   o
+        //    / \
+        //   c   d
+    }
+
+    fn merkle_tree_right_edge() -> ([u8; 32], Vec<[u8; 32]>) {
+        let a = hex!("4000000000000000000000000000000000000000000000000000000000000000");
+        let b = hex!("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        let c = hex!("fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe");
+        let d = hex!("fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffd");
+
+        let mut expected = hashdown(&[1, 1], &c, &b);
+        expected = hashdown(&[1, 2], &d, &expected);
+
+        for _i in 0..253 {
+            expected = hashdown(&[0, 2], &BLANK, &expected);
+        }
+
+        expected = hashdown(&[1, 2], &a, &expected);
+        (expected, vec![a, b, c, d])
+        // this tree looks like this:
+        //           o
+        //          / \
+        //         a   o
+        //            / \
+        //           E   o
+        //              / \
+        //             E   o
+        //                 .
+        //                 .
+        //                 .
+        //                 o
+        //                / \
+        //               d   o
+        //                  / \
+        //                 c   b
+    }
+
+    pub fn merkle_set_test_cases() -> Vec<([u8; 32], Vec<[u8; 32]>)> {
+        let a = hex!("7000000000000000000000000000000000000000000000000000000000000000");
+        let b = hex!("7100000000000000000000000000000000000000000000000000000000000000");
+        let c = hex!("8000000000000000000000000000000000000000000000000000000000000000");
+        let d = hex!("8100000000000000000000000000000000000000000000000000000000000000");
+
+        let root4 = hashdown(
+            &[2_u8, 2],
+            &hashdown(&[1_u8, 1], &a, &b),
+            &hashdown(&[1_u8, 1], &c, &d),
+        );
+
+        let root3 = hashdown(&[2_u8, 1], &hashdown(&[1_u8, 1], &a, &b), &c);
+
+        vec![
+            // duplicates
+            (BLANK, vec![]),
+            (h2(&[1_u8], &a), vec![a, a]),
+            (h2(&[1_u8], &a), vec![a, a, a, a]),
+            // rotations (with duplicates)
+            (root4, vec![a, b, c, d, a]),
+            (root4, vec![b, c, d, a, a]),
+            (root4, vec![c, d, a, b, a]),
+            (root4, vec![d, a, b, c, a]),
+            // reverse rotations (with duplicates)
+            (root4, vec![d, c, b, a, a]),
+            (root4, vec![c, b, a, d, a]),
+            (root4, vec![b, a, d, c, a]),
+            (root4, vec![a, d, c, b, a]),
+            // shuffled (with duplicates)
+            (root4, vec![c, a, d, b, a]),
+            (root4, vec![d, c, b, a, a]),
+            (root4, vec![c, d, a, b, a]),
+            (root4, vec![a, b, c, d, a]),
+            // singles
+            (h2(&[1_u8], &a), vec![a]),
+            (h2(&[1_u8], &b), vec![b]),
+            (h2(&[1_u8], &c), vec![c]),
+            (h2(&[1_u8], &d), vec![d]),
+            // pairs
+            (hashdown(&[1_u8, 1], &a, &b), vec![a, b]),
+            (hashdown(&[1_u8, 1], &a, &b), vec![b, a]),
+            (hashdown(&[1_u8, 1], &a, &c), vec![a, c]),
+            (hashdown(&[1_u8, 1], &a, &c), vec![c, a]),
+            (hashdown(&[1_u8, 1], &a, &d), vec![a, d]),
+            (hashdown(&[1_u8, 1], &a, &d), vec![d, a]),
+            (hashdown(&[1_u8, 1], &b, &c), vec![b, c]),
+            (hashdown(&[1_u8, 1], &b, &c), vec![c, b]),
+            (hashdown(&[1_u8, 1], &b, &d), vec![b, d]),
+            (hashdown(&[1_u8, 1], &b, &d), vec![d, b]),
+            (hashdown(&[1_u8, 1], &c, &d), vec![c, d]),
+            (hashdown(&[1_u8, 1], &c, &d), vec![d, c]),
+            // triples
+            (root3, vec![a, b, c]),
+            (root3, vec![a, c, b]),
+            (root3, vec![b, a, c]),
+            (root3, vec![b, c, a]),
+            (root3, vec![c, a, b]),
+            (root3, vec![c, b, a]),
+            // quads
+            // rotations
+            (root4, vec![a, b, c, d]),
+            (root4, vec![b, c, d, a]),
+            (root4, vec![c, d, a, b]),
+            (root4, vec![d, a, b, c]),
+            // reverse rotations
+            (root4, vec![d, c, b, a]),
+            (root4, vec![c, b, a, d]),
+            (root4, vec![b, a, d, c]),
+            (root4, vec![a, d, c, b]),
+            // shuffled
+            (root4, vec![c, a, d, b]),
+            (root4, vec![d, c, b, a]),
+            (root4, vec![c, d, a, b]),
+            (root4, vec![a, b, c, d]),
+            // a few special case trees
+            merkle_tree_5(),
+            merkle_tree_left_edge(),
+            merkle_tree_left_edge_duplicates(),
+            merkle_tree_right_edge(),
         ]
-    );
-}
-
-#[cfg(test)]
-fn h2(buf1: &[u8], buf2: &[u8]) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    hasher.update(buf1);
-    hasher.update(buf2);
-    hasher.finalize().into()
-}
-
-#[cfg(test)]
-fn hashdown(buf1: &[u8], buf2: &[u8], buf3: &[u8]) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    const PREFIX: &[u8] = &[
-        0_u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    ];
-    hasher.update(PREFIX);
-    hasher.update(buf1);
-    hasher.update(buf2);
-    hasher.update(buf3);
-    hasher.finalize().into()
-}
-
-#[test]
-fn test_compute_merkle_root_duplicate_1() {
-    let a = [
-        0x70, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-
-    assert_eq!(compute_merkle_set_root(&mut [a, a]), h2(&[1_u8], &a));
-}
-
-#[test]
-fn test_compute_merkle_root_duplicates_1() {
-    let a = [
-        0x70, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-
-    assert_eq!(compute_merkle_set_root(&mut [a, a, a, a]), h2(&[1_u8], &a));
-}
-
-#[test]
-fn test_compute_merkle_root_duplicate_4() {
-    let a = [
-        0x70, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-    let b = [
-        0x71, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-    let c = [
-        0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-    let d = [
-        0x81, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-
-    let expected = hashdown(
-        &[2_u8, 2],
-        &hashdown(&[1_u8, 1], &a, &b),
-        &hashdown(&[1_u8, 1], &c, &d),
-    );
-
-    // rotations
-    assert_eq!(compute_merkle_set_root(&mut [a, b, c, d, a]), expected);
-    assert_eq!(compute_merkle_set_root(&mut [b, c, d, a, a]), expected);
-    assert_eq!(compute_merkle_set_root(&mut [c, d, a, b, a]), expected);
-    assert_eq!(compute_merkle_set_root(&mut [d, a, b, c, a]), expected);
-
-    // reverse rotations
-    assert_eq!(compute_merkle_set_root(&mut [d, c, b, a, a]), expected);
-    assert_eq!(compute_merkle_set_root(&mut [c, b, a, d, a]), expected);
-    assert_eq!(compute_merkle_set_root(&mut [b, a, d, c, a]), expected);
-    assert_eq!(compute_merkle_set_root(&mut [a, d, c, b, a]), expected);
-
-    // shuffled
-    assert_eq!(compute_merkle_set_root(&mut [c, a, d, b, a]), expected);
-    assert_eq!(compute_merkle_set_root(&mut [d, c, b, a, a]), expected);
-    assert_eq!(compute_merkle_set_root(&mut [c, d, a, b, a]), expected);
-    assert_eq!(compute_merkle_set_root(&mut [a, b, c, d, a]), expected);
-}
-
-#[test]
-fn test_compute_merkle_root_1() {
-    let a = [
-        0x70, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-    let b = [
-        0x71, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-    let c = [
-        0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-    let d = [
-        0x81, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-
-    // singles
-    assert_eq!(compute_merkle_set_root(&mut [a]), h2(&[1_u8], &a));
-    assert_eq!(compute_merkle_set_root(&mut [b]), h2(&[1_u8], &b));
-    assert_eq!(compute_merkle_set_root(&mut [c]), h2(&[1_u8], &c));
-    assert_eq!(compute_merkle_set_root(&mut [d]), h2(&[1_u8], &d));
-}
-
-#[test]
-fn test_compute_merkle_root_2() {
-    let a = [
-        0x70, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-    let b = [
-        0x71, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-    let c = [
-        0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-    let d = [
-        0x81, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-
-    // pairs
-    assert_eq!(
-        compute_merkle_set_root(&mut [a, b]),
-        hashdown(&[1_u8, 1], &a, &b)
-    );
-    assert_eq!(
-        compute_merkle_set_root(&mut [b, a]),
-        hashdown(&[1_u8, 1], &a, &b)
-    );
-    assert_eq!(
-        compute_merkle_set_root(&mut [a, c]),
-        hashdown(&[1_u8, 1], &a, &c)
-    );
-    assert_eq!(
-        compute_merkle_set_root(&mut [c, a]),
-        hashdown(&[1_u8, 1], &a, &c)
-    );
-    assert_eq!(
-        compute_merkle_set_root(&mut [a, d]),
-        hashdown(&[1_u8, 1], &a, &d)
-    );
-    assert_eq!(
-        compute_merkle_set_root(&mut [d, a]),
-        hashdown(&[1_u8, 1], &a, &d)
-    );
-    assert_eq!(
-        compute_merkle_set_root(&mut [b, c]),
-        hashdown(&[1_u8, 1], &b, &c)
-    );
-    assert_eq!(
-        compute_merkle_set_root(&mut [c, b]),
-        hashdown(&[1_u8, 1], &b, &c)
-    );
-    assert_eq!(
-        compute_merkle_set_root(&mut [b, d]),
-        hashdown(&[1_u8, 1], &b, &d)
-    );
-    assert_eq!(
-        compute_merkle_set_root(&mut [d, b]),
-        hashdown(&[1_u8, 1], &b, &d)
-    );
-    assert_eq!(
-        compute_merkle_set_root(&mut [c, d]),
-        hashdown(&[1_u8, 1], &c, &d)
-    );
-    assert_eq!(
-        compute_merkle_set_root(&mut [d, c]),
-        hashdown(&[1_u8, 1], &c, &d)
-    );
-}
-
-#[test]
-fn test_compute_merkle_root_3() {
-    let a = [
-        0x70, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-    let b = [
-        0x71, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-    let c = [
-        0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-
-    let expected = hashdown(&[2_u8, 1], &hashdown(&[1_u8, 1], &a, &b), &c);
-
-    // all permutations
-    assert_eq!(compute_merkle_set_root(&mut [a, b, c]), expected);
-    assert_eq!(compute_merkle_set_root(&mut [a, c, b]), expected);
-    assert_eq!(compute_merkle_set_root(&mut [b, a, c]), expected);
-    assert_eq!(compute_merkle_set_root(&mut [b, c, a]), expected);
-    assert_eq!(compute_merkle_set_root(&mut [c, a, b]), expected);
-    assert_eq!(compute_merkle_set_root(&mut [c, b, a]), expected);
-}
-
-#[test]
-fn test_compute_merkle_root_4() {
-    let a = [
-        0x70, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-    let b = [
-        0x71, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-    let c = [
-        0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-    let d = [
-        0x81, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-
-    let expected = hashdown(
-        &[2_u8, 2],
-        &hashdown(&[1_u8, 1], &a, &b),
-        &hashdown(&[1_u8, 1], &c, &d),
-    );
-
-    // rotations
-    assert_eq!(compute_merkle_set_root(&mut [a, b, c, d]), expected);
-    assert_eq!(compute_merkle_set_root(&mut [b, c, d, a]), expected);
-    assert_eq!(compute_merkle_set_root(&mut [c, d, a, b]), expected);
-    assert_eq!(compute_merkle_set_root(&mut [d, a, b, c]), expected);
-
-    // reverse rotations
-    assert_eq!(compute_merkle_set_root(&mut [d, c, b, a]), expected);
-    assert_eq!(compute_merkle_set_root(&mut [c, b, a, d]), expected);
-    assert_eq!(compute_merkle_set_root(&mut [b, a, d, c]), expected);
-    assert_eq!(compute_merkle_set_root(&mut [a, d, c, b]), expected);
-
-    // shuffled
-    assert_eq!(compute_merkle_set_root(&mut [c, a, d, b]), expected);
-    assert_eq!(compute_merkle_set_root(&mut [d, c, b, a]), expected);
-    assert_eq!(compute_merkle_set_root(&mut [c, d, a, b]), expected);
-    assert_eq!(compute_merkle_set_root(&mut [a, b, c, d]), expected);
-}
-
-#[test]
-fn test_compute_merkle_root_5() {
-    let a = [
-        0x58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-    let b = [
-        0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-    let c = [
-        0x21, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-    let d = [
-        0xca, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-    let e = [
-        0x20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-
-    // build the expected tree bottom up, since that's simpler
-    let expected = hashdown(&[1, 1], &e, &c);
-    let expected = hashdown(&[2, 1], &expected, &b);
-    let expected = hashdown(&[2, 0], &expected, &BLANK);
-    let expected = hashdown(&[2, 0], &expected, &BLANK);
-    let expected = hashdown(&[2, 0], &expected, &BLANK);
-    let expected = hashdown(&[0, 2], &BLANK, &expected);
-    let expected = hashdown(&[2, 1], &expected, &a);
-    let expected = hashdown(&[2, 1], &expected, &d);
-
-    assert_eq!(compute_merkle_set_root(&mut [a, b, c, d, e]), expected)
-    // this tree looks like this:
-    //
-    //             o
-    //            / \
-    //           o   d
-    //          / \
-    //         o   a
-    //        / \
-    //       E   o
-    //          / \
-    //         o   E
-    //        / \
-    //       o   E
-    //      / \
-    //     o   E
-    //    / \
-    //   o   b
-    //  / \
-    // e   c
-}
-
-#[test]
-fn test_merkle_left_edge() {
-    let a = [
-        0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-    let b = [
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 1,
-    ];
-    let c = [
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 2,
-    ];
-    let d = [
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 3,
-    ];
-
-    let mut expected = hashdown(&[1, 1], &c, &d);
-    expected = hashdown(&[1, 2], &b, &expected);
-
-    for _i in 0..253 {
-        expected = hashdown(&[2, 0], &expected, &BLANK);
     }
 
-    expected = hashdown(&[2, 1], &expected, &a);
-
-    assert_eq!(compute_merkle_set_root(&mut [a, b, c, d]), expected)
-    // this tree looks like this:
-    //           o
-    //          / \
-    //         o   a
-    //        / \
-    //       o   E
-    //      / \
-    //     .   E
-    //     .
-    //     .
-    //    / \
-    //   o   E
-    //  / \
-    // b   o
-    //    / \
-    //   c   d
-}
-
-#[test]
-fn test_merkle_left_edge_duplicates() {
-    let a = [
-        0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-    let b = [
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 1,
-    ];
-    let c = [
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 2,
-    ];
-    let d = [
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 3,
-    ];
-
-    let mut expected = hashdown(&[1, 1], &c, &d);
-    expected = hashdown(&[1, 2], &b, &expected);
-
-    for _i in 0..253 {
-        expected = hashdown(&[2, 0], &expected, &BLANK);
+    #[test]
+    fn test_compute_merkle_root() {
+        for (root, mut leafs) in merkle_set_test_cases() {
+            assert_eq!(compute_merkle_set_root(&mut leafs), root);
+        }
     }
-
-    expected = hashdown(&[2, 1], &expected, &a);
-
-    // all fields are duplicated
-    assert_eq!(
-        compute_merkle_set_root(&mut [a, b, c, d, a, b, c, d]),
-        expected
-    )
-    // this tree looks like this:
-    //           o
-    //          / \
-    //         o   a
-    //        / \
-    //       o   E
-    //      / \
-    //     .   E
-    //     .
-    //     .
-    //    / \
-    //   o   E
-    //  / \
-    // b   o
-    //    / \
-    //   c   d
-}
-
-#[test]
-fn test_merkle_right_edge() {
-    let a = [
-        0x40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0,
-    ];
-    let b = [
-        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-        0xff, 0xff,
-    ];
-    let c = [
-        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-        0xff, 0xfe,
-    ];
-    let d = [
-        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-        0xff, 0xfd,
-    ];
-
-    let mut expected = hashdown(&[1, 1], &c, &b);
-    expected = hashdown(&[1, 2], &d, &expected);
-
-    for _i in 0..253 {
-        expected = hashdown(&[0, 2], &BLANK, &expected);
-    }
-
-    expected = hashdown(&[1, 2], &a, &expected);
-
-    assert_eq!(compute_merkle_set_root(&mut [a, b, c, d]), expected)
-    // this tree looks like this:
-    //           o
-    //          / \
-    //         a   o
-    //            / \
-    //           E   o
-    //              / \
-    //             E   o
-    //                 .
-    //                 .
-    //                 .
-    //                 o
-    //                / \
-    //               d   o
-    //                  / \
-    //                 c   b
 }

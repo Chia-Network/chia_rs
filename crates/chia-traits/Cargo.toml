@@ -1,18 +1,19 @@
 [package]
 name = "chia-traits"
-version = "0.5.2"
+version = "0.14.1"
 edition = "2021"
 license = "Apache-2.0"
 description = "Chia traits for Streamable types (chia's serialization format)"
 authors = ["Arvid Norberg <arvid@chia.net>"]
 
+[lints]
+workspace = true
+
 [features]
-py-bindings = ["dep:pyo3", "dep:chia_py_streamable_macro"]
+py-bindings = ["dep:pyo3"]
 
 [dependencies]
-pyo3 = { version = "0.19.0", features = ["multiple-pymethods"], optional = true }
-chia_py_streamable_macro = { version = "0.5.1", path = "../chia_py_streamable_macro", optional = true }
-chia_streamable_macro = { version = "0.3.0", path = "../chia_streamable_macro" }
-sha2 = "0.10.8"
-hex = "0.4.3"
-thiserror = "1.0.44"
+chia-sha2 = { workspace = true }
+pyo3 = { workspace = true, features = ["multiple-pymethods"], optional = true }
+chia_streamable_macro = { workspace = true }
+thiserror = { workspace = true }

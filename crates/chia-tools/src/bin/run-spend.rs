@@ -1,16 +1,16 @@
 use chia_consensus::gen::conditions::Condition;
+use chia_puzzles::Proof;
 use chia_traits::Streamable;
 use clap::Parser;
-use clvm_traits::{FromClvm, ToNodePtr};
+use clvm_traits::{FromClvm, ToClvm};
 use clvm_utils::tree_hash;
 use clvm_utils::CurriedProgram;
 use clvmr::{allocator::NodePtr, Allocator};
 
-use chia_wallet::cat::{CatArgs, CatSolution, CAT_PUZZLE_HASH};
-use chia_wallet::did::{DidArgs, DidSolution, DID_INNER_PUZZLE_HASH};
-use chia_wallet::singleton::{SingletonArgs, SingletonSolution, SINGLETON_TOP_LAYER_PUZZLE_HASH};
-use chia_wallet::standard::{StandardArgs, StandardSolution, STANDARD_PUZZLE_HASH};
-use chia_wallet::Proof;
+use chia_puzzles::cat::{CatArgs, CatSolution, CAT_PUZZLE_HASH};
+use chia_puzzles::did::{DidArgs, DidSolution, DID_INNER_PUZZLE_HASH};
+use chia_puzzles::singleton::{SingletonArgs, SingletonSolution, SINGLETON_TOP_LAYER_PUZZLE_HASH};
+use chia_puzzles::standard::{StandardArgs, StandardSolution, STANDARD_PUZZLE_HASH};
 
 /// Run a puzzle given a solution and print the resulting conditions
 #[derive(Parser, Debug)]
@@ -78,7 +78,7 @@ impl DebugPrint for Condition {
                 amount,
                 hint.debug_print(a)
             ),
-            Self::ReserveFee(amount) => format!("RESERVE_FEE {}", amount),
+            Self::ReserveFee(amount) => format!("RESERVE_FEE {amount}"),
             Self::CreateCoinAnnouncement(msg) => {
                 format!("CREATE_COIN_ANNOUNCEMENT {}", msg.debug_print(a))
             }
@@ -115,6 +115,12 @@ impl DebugPrint for Condition {
             Self::AssertBeforeHeightAbsolute(h) => format!("ASSERT_BEFORE_HEIGHT_ABSOLUTE {h}"),
             Self::AssertEphemeral => "ASSERT_EPHEMERAL".to_string(),
             Self::Softfork(cost) => format!("SOFTFORK {cost}"),
+            Self::SendMessage(src, dst, msg) => {
+                format!("SEND_MESSAGE {src:?} {dst:?} {}", msg.debug_print(a))
+            }
+            Self::ReceiveMessage(src, dst, msg) => {
+                format!("RECEIVE_MESSAGE {src:?} {dst:?} {}", msg.debug_print(a))
+            }
             Self::Skip => "[Skip] REMARK ...".to_string(),
             Self::SkipRelativeCondition => "[SkipRelativeCondition]".to_string(),
         }
@@ -155,10 +161,7 @@ fn print_puzzle_info(a: &Allocator, puzzle: NodePtr, solution: NodePtr) {
                 return;
             };
             println!("    mod-hash: {:?}", uncurried.args.mod_hash);
-            println!(
-                "    tail-program-hash: {:?}",
-                uncurried.args.tail_program_hash
-            );
+            println!("    asset-id: {:?}", uncurried.args.asset_id);
             let Ok(sol) = CatSolution::<NodePtr>::from_clvm(a, solution) else {
                 println!("-- failed to parse solution");
                 return;
@@ -185,7 +188,7 @@ fn print_puzzle_info(a: &Allocator, puzzle: NodePtr, solution: NodePtr) {
             };
             println!(
                 "    recovery_did_list_hash: {:?}",
-                uncurried.args.recovery_did_list_hash
+                uncurried.args.recovery_list_hash
             );
             println!(
                 "    num_verifications_required: {:?}",
@@ -202,7 +205,9 @@ fn print_puzzle_info(a: &Allocator, puzzle: NodePtr, solution: NodePtr) {
             };
 
             println!("\nInner Puzzle\n");
-            let DidSolution::InnerSpend(inner_sol) = sol;
+            let DidSolution::Spend(inner_sol) = sol else {
+                unimplemented!();
+            };
             print_puzzle_info(a, uncurried.args.inner_puzzle, inner_sol);
         }
         SINGLETON_TOP_LAYER_PUZZLE_HASH => {
@@ -232,7 +237,7 @@ fn print_puzzle_info(a: &Allocator, puzzle: NodePtr, solution: NodePtr) {
                 return;
             };
             println!("  solution");
-            match sol.proof {
+            match sol.lineage_proof {
                 Proof::Lineage(lp) => {
                     println!("    lineage-proof: {lp:?}");
                 }
@@ -255,10 +260,9 @@ fn print_puzzle_info(a: &Allocator, puzzle: NodePtr, solution: NodePtr) {
 }
 fn main() {
     use chia_consensus::gen::conditions::parse_args;
-    use chia_consensus::gen::flags::ENABLE_SOFTFORK_CONDITION;
     use chia_consensus::gen::opcodes::parse_opcode;
     use chia_consensus::gen::validation_error::{first, rest};
-    use chia_protocol::coin_spend::CoinSpend;
+    use chia_protocol::CoinSpend;
     use clvmr::reduction::{EvalErr, Reduction};
     use clvmr::{run_program, ChiaDialect};
     use std::fs::read;
@@ -271,18 +275,18 @@ fn main() {
 
     let puzzle = spend
         .puzzle_reveal
-        .to_node_ptr(&mut a)
+        .to_clvm(&mut a)
         .expect("deserialize puzzle");
     let solution = spend
         .solution
-        .to_node_ptr(&mut a)
+        .to_clvm(&mut a)
         .expect("deserialize solution");
 
     println!("Spending {:?}", &spend.coin);
     println!("   coin-id: {}\n", hex::encode(spend.coin.coin_id()));
     let dialect = ChiaDialect::new(0);
     let Reduction(_clvm_cost, conditions) =
-        match run_program(&mut a, &dialect, puzzle, solution, 11000000000) {
+        match run_program(&mut a, &dialect, puzzle, solution, 11_000_000_000) {
             Ok(r) => r,
             Err(EvalErr(_, e)) => {
                 println!("Eval Error: {e:?}");
@@ -296,7 +300,7 @@ fn main() {
     while let Some((mut c, next)) = a.next(iter) {
         iter = next;
         let op_ptr = first(&a, c).expect("parsing conditions");
-        let op = match parse_opcode(&a, op_ptr, ENABLE_SOFTFORK_CONDITION) {
+        let op = match parse_opcode(&a, op_ptr, 0) {
             None => {
                 println!("  UNKNOWN CONDITION [{}]", &hex::encode(a.atom(op_ptr)));
                 continue;

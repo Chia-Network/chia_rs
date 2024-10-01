@@ -1,6 +1,6 @@
 [package]
 name = "clvm-utils"
-version = "0.5.1"
+version = "0.14.1"
 edition = "2021"
 license = "Apache-2.0"
 description = "Utility functions for processing clvm programs and structures"
@@ -8,10 +8,15 @@ authors = ["Arvid Norberg <arvid@chia.net>"]
 homepage = "https://github.com/Chia-Network/chia_rs"
 repository = "https://github.com/Chia-Network/chia_rs"
 
+[lints]
+workspace = true
+
 [dependencies]
-clvmr = "0.6.0"
-clvm-traits = { version = "0.5.1", path = "../clvm-traits" }
+chia-sha2 = { workspace = true }
+clvmr = { workspace = true }
+clvm-traits = { workspace = true }
+hex = { workspace = true }
 
 [dev-dependencies]
-hex = "0.4.3"
-rstest = "0.16.0"
+rstest = { workspace = true }
+clvm-traits = { path = "../clvm-traits", features = ["derive"] }

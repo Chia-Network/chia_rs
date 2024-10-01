@@ -42,7 +42,7 @@ impl<'a> BitCursor<'a> {
     }
 
     fn advance(&mut self, bits: u8) {
-        let bits = self.bit_offset as u32 + bits as u32;
+        let bits = u32::from(self.bit_offset) + u32::from(bits);
         if bits >= 8 {
             self.data = &self.data[(bits / 8) as usize..];
         }
@@ -61,7 +61,7 @@ enum MakeTreeOp {
     Tree,
 }
 
-pub fn make_tree(a: &mut Allocator, cursor: &mut BitCursor, short_atoms: bool) -> NodePtr {
+pub fn make_tree(a: &mut Allocator, cursor: &mut BitCursor<'_>, short_atoms: bool) -> NodePtr {
     let mut value_stack = Vec::<NodePtr>::new();
     let mut op_stack = vec![MakeTreeOp::Tree];
 
@@ -101,7 +101,7 @@ pub fn make_tree(a: &mut Allocator, cursor: &mut BitCursor, short_atoms: bool) -
     value_stack.pop().unwrap()
 }
 
-pub fn make_list(a: &mut Allocator, cursor: &mut BitCursor) -> NodePtr {
+pub fn make_list(a: &mut Allocator, cursor: &mut BitCursor<'_>) -> NodePtr {
     let mut ret = NodePtr::NIL;
 
     let mut length = cursor.read_bits(5).unwrap_or(0);
@@ -119,8 +119,8 @@ pub fn make_list(a: &mut Allocator, cursor: &mut BitCursor) -> NodePtr {
                     .unwrap()
             }
             4 | 5 => {
-                let mut num: i64 = ((cursor.read_bits(8).unwrap_or(0) as i64) << 8)
-                    | (cursor.read_bits(8).unwrap_or(0) as i64);
+                let mut num: i64 = (i64::from(cursor.read_bits(8).unwrap_or(0)) << 8)
+                    | i64::from(cursor.read_bits(8).unwrap_or(0));
                 if atom_kind == 4 {
                     num = -num;
                 }
@@ -132,11 +132,11 @@ pub fn make_list(a: &mut Allocator, cursor: &mut BitCursor) -> NodePtr {
                 a.new_atom(&BUFFER[..len as usize]).unwrap()
             }
         };
-        if !nil_terminated {
+        if nil_terminated {
+            ret = a.new_pair(value, ret).unwrap();
+        } else {
             ret = value;
             nil_terminated = true;
-        } else {
-            ret = a.new_pair(value, ret).unwrap();
         }
         length -= 1;
     }

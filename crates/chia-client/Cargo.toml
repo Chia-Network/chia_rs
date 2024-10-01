@@ -1,6 +1,6 @@
 [package]
 name = "chia-client"
-version = "0.5.1"
+version = "0.14.1"
 edition = "2021"
 license = "Apache-2.0"
 description = "Chia light client and async peer connections."
@@ -8,11 +8,14 @@ authors = ["Brandon Haggstrom <b.haggstrom@chia.net>"]
 homepage = "https://github.com/Chia-Network/chia_rs"
 repository = "https://github.com/Chia-Network/chia_rs"
 
+[lints]
+workspace = true
+
 [dependencies]
-chia-protocol = { version = "0.5.1", path = "../chia-protocol" }
-chia-traits = { version = "0.5.1", path = "../chia-traits" }
-tokio = { version = "1.32.0", features = ["rt", "sync"] }
-tokio-tungstenite = "0.21.0"
-futures-util = "0.3.28"
-tungstenite = "0.21.0"
-thiserror = "1.0.47"
+chia-protocol = { workspace = true }
+chia-traits = { workspace = true }
+tokio = { workspace = true, features = ["rt", "sync"] }
+tokio-tungstenite = { workspace = true }
+futures-util = { workspace = true }
+tungstenite = { workspace = true }
+thiserror = { workspace = true }

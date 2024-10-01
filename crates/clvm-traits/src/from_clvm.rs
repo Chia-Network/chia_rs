@@ -1,66 +1,103 @@
-use num_bigint::{BigInt, Sign};
+use std::{rc::Rc, sync::Arc};
 
-use crate::{ClvmDecoder, FromClvmError};
+use num_bigint::BigInt;
 
-pub trait FromClvm<N>: Sized {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError>;
+use crate::{decode_number, ClvmDecoder, FromClvmError};
+
+pub trait FromClvm<D>: Sized
+where
+    D: ClvmDecoder,
+{
+    fn from_clvm(decoder: &D, node: D::Node) -> Result<Self, FromClvmError>;
 }
 
 macro_rules! clvm_primitive {
-    ($primitive:ty) => {
-        impl<N> FromClvm<N> for $primitive {
-            fn from_clvm(
-                decoder: &impl ClvmDecoder<Node = N>,
-                node: N,
-            ) -> Result<Self, FromClvmError> {
+    ($primitive:ty, $signed:expr) => {
+        impl<N, D: ClvmDecoder<Node = N>> FromClvm<D> for $primitive {
+            fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
                 const LEN: usize = std::mem::size_of::<$primitive>();
 
-                let bytes = decoder.decode_atom(&node)?;
-                let number = BigInt::from_signed_bytes_be(bytes.as_ref());
-                let (sign, mut vec) = number.to_bytes_be();
+                let atom = decoder.decode_atom(&node)?;
+                let slice = atom.as_ref();
 
-                if vec.len() < std::mem::size_of::<$primitive>() {
-                    let mut zeros = vec![0; LEN - vec.len()];
-                    zeros.extend(vec);
-                    vec = zeros;
-                }
-
-                let value = <$primitive>::from_be_bytes(vec.as_slice().try_into().or(Err(
-                    FromClvmError::WrongAtomLength {
+                let Some(bytes) = decode_number(slice, $signed) else {
+                    return Err(FromClvmError::WrongAtomLength {
                         expected: LEN,
-                        found: bytes.as_ref().len(),
-                    },
-                ))?);
+                        found: slice.len(),
+                    });
+                };
 
-                Ok(if sign == Sign::Minus {
-                    value.wrapping_neg()
-                } else {
-                    value
-                })
+                Ok(<$primitive>::from_be_bytes(bytes))
             }
         }
     };
 }
 
-clvm_primitive!(u8);
-clvm_primitive!(i8);
-clvm_primitive!(u16);
-clvm_primitive!(i16);
-clvm_primitive!(u32);
-clvm_primitive!(i32);
-clvm_primitive!(u64);
-clvm_primitive!(i64);
-clvm_primitive!(u128);
-clvm_primitive!(i128);
-clvm_primitive!(usize);
-clvm_primitive!(isize);
+clvm_primitive!(u8, false);
+clvm_primitive!(i8, true);
+clvm_primitive!(u16, false);
+clvm_primitive!(i16, true);
+clvm_primitive!(u32, false);
+clvm_primitive!(i32, true);
+clvm_primitive!(u64, false);
+clvm_primitive!(i64, true);
+clvm_primitive!(u128, false);
+clvm_primitive!(i128, true);
+clvm_primitive!(usize, false);
+clvm_primitive!(isize, true);
 
-impl<N, A, B> FromClvm<N> for (A, B)
+impl<N, D: ClvmDecoder<Node = N>> FromClvm<D> for BigInt {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
+        decoder.decode_bigint(&node)
+    }
+}
+
+impl<N, D: ClvmDecoder<Node = N>> FromClvm<D> for bool {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
+        let atom = decoder.decode_atom(&node)?;
+        match atom.as_ref() {
+            [] => Ok(false),
+            [1] => Ok(true),
+            _ => Err(FromClvmError::Custom(
+                "expected boolean value of either `()` or `1`".to_string(),
+            )),
+        }
+    }
+}
+
+impl<N, D: ClvmDecoder<Node = N>, T> FromClvm<D> for Box<T>
 where
-    A: FromClvm<N>,
-    B: FromClvm<N>,
+    T: FromClvm<D>,
 {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
+        T::from_clvm(decoder, node).map(Box::new)
+    }
+}
+
+impl<N, D: ClvmDecoder<Node = N>, T> FromClvm<D> for Rc<T>
+where
+    T: FromClvm<D>,
+{
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
+        T::from_clvm(decoder, node).map(Rc::new)
+    }
+}
+
+impl<N, D: ClvmDecoder<Node = N>, T> FromClvm<D> for Arc<T>
+where
+    T: FromClvm<D>,
+{
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
+        T::from_clvm(decoder, node).map(Arc::new)
+    }
+}
+
+impl<N, D: ClvmDecoder<Node = N>, A, B> FromClvm<D> for (A, B)
+where
+    A: FromClvm<D>,
+    B: FromClvm<D>,
+{
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
         let (first, rest) = decoder.decode_pair(&node)?;
         let first = A::from_clvm(decoder, first)?;
         let rest = B::from_clvm(decoder, rest)?;
@@ -68,8 +105,8 @@ where
     }
 }
 
-impl<N> FromClvm<N> for () {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+impl<N, D: ClvmDecoder<Node = N>> FromClvm<D> for () {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
         let bytes = decoder.decode_atom(&node)?;
         if bytes.as_ref().is_empty() {
             Ok(())
@@ -82,40 +119,40 @@ impl<N> FromClvm<N> for () {
     }
 }
 
-impl<N, T, const LEN: usize> FromClvm<N> for [T; LEN]
+impl<N, D: ClvmDecoder<Node = N>, T, const LEN: usize> FromClvm<D> for [T; LEN]
 where
-    T: FromClvm<N>,
+    T: FromClvm<D>,
 {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, mut node: N) -> Result<Self, FromClvmError> {
+    fn from_clvm(decoder: &D, mut node: N) -> Result<Self, FromClvmError> {
         let mut items = Vec::with_capacity(LEN);
         loop {
             if let Ok((first, rest)) = decoder.decode_pair(&node) {
                 if items.len() >= LEN {
                     return Err(FromClvmError::ExpectedAtom);
-                } else {
-                    items.push(T::from_clvm(decoder, first)?);
-                    node = rest;
                 }
+
+                items.push(T::from_clvm(decoder, first)?);
+                node = rest;
             } else {
                 let bytes = decoder.decode_atom(&node)?;
                 if bytes.as_ref().is_empty() {
                     return items.try_into().or(Err(FromClvmError::ExpectedPair));
-                } else {
-                    return Err(FromClvmError::WrongAtomLength {
-                        expected: 0,
-                        found: bytes.as_ref().len(),
-                    });
                 }
+
+                return Err(FromClvmError::WrongAtomLength {
+                    expected: 0,
+                    found: bytes.as_ref().len(),
+                });
             }
         }
     }
 }
 
-impl<N, T> FromClvm<N> for Vec<T>
+impl<N, D: ClvmDecoder<Node = N>, T> FromClvm<D> for Vec<T>
 where
-    T: FromClvm<N>,
+    T: FromClvm<D>,
 {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, mut node: N) -> Result<Self, FromClvmError> {
+    fn from_clvm(decoder: &D, mut node: N) -> Result<Self, FromClvmError> {
         let mut items = Vec::new();
         loop {
             if let Ok((first, rest)) = decoder.decode_pair(&node) {
@@ -125,22 +162,22 @@ where
                 let bytes = decoder.decode_atom(&node)?;
                 if bytes.as_ref().is_empty() {
                     return Ok(items);
-                } else {
-                    return Err(FromClvmError::WrongAtomLength {
-                        expected: 0,
-                        found: bytes.as_ref().len(),
-                    });
                 }
+
+                return Err(FromClvmError::WrongAtomLength {
+                    expected: 0,
+                    found: bytes.as_ref().len(),
+                });
             }
         }
     }
 }
 
-impl<N, T> FromClvm<N> for Option<T>
+impl<N, D: ClvmDecoder<Node = N>, T> FromClvm<D> for Option<T>
 where
-    T: FromClvm<N>,
+    T: FromClvm<D>,
 {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
         if let Ok(atom) = decoder.decode_atom(&node) {
             if atom.as_ref().is_empty() {
                 return Ok(None);
@@ -150,16 +187,16 @@ where
     }
 }
 
-impl<N> FromClvm<N> for String {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+impl<N, D: ClvmDecoder<Node = N>> FromClvm<D> for String {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
         let bytes = decoder.decode_atom(&node)?;
         Ok(Self::from_utf8(bytes.as_ref().to_vec())?)
     }
 }
 
 #[cfg(feature = "chia-bls")]
-impl<N> FromClvm<N> for chia_bls::PublicKey {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+impl<N, D: ClvmDecoder<Node = N>> FromClvm<D> for chia_bls::PublicKey {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
         let bytes = decoder.decode_atom(&node)?;
         let error = Err(FromClvmError::WrongAtomLength {
             expected: 48,
@@ -171,8 +208,8 @@ impl<N> FromClvm<N> for chia_bls::PublicKey {
 }
 
 #[cfg(feature = "chia-bls")]
-impl<N> FromClvm<N> for chia_bls::Signature {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+impl<N, D: ClvmDecoder<Node = N>> FromClvm<D> for chia_bls::Signature {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
         let bytes = decoder.decode_atom(&node)?;
         let error = Err(FromClvmError::WrongAtomLength {
             expected: 96,
@@ -185,13 +222,13 @@ impl<N> FromClvm<N> for chia_bls::Signature {
 
 #[cfg(test)]
 mod tests {
-    use clvmr::{serde::node_from_bytes, Allocator, NodePtr};
+    use clvmr::{serde::node_from_bytes, Allocator};
 
     use super::*;
 
     fn decode<T>(a: &mut Allocator, hex: &str) -> Result<T, FromClvmError>
     where
-        T: FromClvm<NodePtr>,
+        T: FromClvm<Allocator>,
     {
         let bytes = hex::decode(hex).unwrap();
         let actual = node_from_bytes(a, &bytes).unwrap();
@@ -209,6 +246,27 @@ mod tests {
         assert_eq!(decode(a, "81e5"), Ok(-27i32));
         assert_eq!(decode(a, "80"), Ok(-0));
         assert_eq!(decode(a, "8180"), Ok(-128i8));
+    }
+
+    #[test]
+    fn test_bool() {
+        let a = &mut Allocator::new();
+        assert_eq!(decode(a, "80"), Ok(false));
+        assert_eq!(decode(a, "01"), Ok(true));
+        assert_eq!(
+            decode::<bool>(a, "05"),
+            Err(FromClvmError::Custom(
+                "expected boolean value of either `()` or `1`".to_string(),
+            ))
+        );
+    }
+
+    #[test]
+    fn test_smart_pointers() {
+        let a = &mut Allocator::new();
+        assert_eq!(decode(a, "80"), Ok(Box::new(0u8)));
+        assert_eq!(decode(a, "80"), Ok(Rc::new(0u8)));
+        assert_eq!(decode(a, "80"), Ok(Arc::new(0u8)));
     }
 
     #[test]
@@ -232,7 +290,7 @@ mod tests {
     fn test_array() {
         let a = &mut Allocator::new();
         assert_eq!(decode(a, "ff01ff02ff03ff0480"), Ok([1, 2, 3, 4]));
-        assert_eq!(decode(a, "80"), Ok([] as [i32; 0]));
+        assert_eq!(decode(a, "80"), Ok([0; 0]));
     }
 
     #[test]
@@ -250,14 +308,14 @@ mod tests {
 
         // Empty strings get decoded as None instead, since both values are represented by nil bytes.
         // This could be considered either intended behavior or not, depending on the way it's used.
-        assert_ne!(decode(a, "80"), Ok(Some("".to_string())));
+        assert_ne!(decode(a, "80"), Ok(Some(String::new())));
     }
 
     #[test]
     fn test_string() {
         let a = &mut Allocator::new();
         assert_eq!(decode(a, "8568656c6c6f"), Ok("hello".to_string()));
-        assert_eq!(decode(a, "80"), Ok("".to_string()));
+        assert_eq!(decode(a, "80"), Ok(String::new()));
     }
 
     #[cfg(feature = "chia-bls")]

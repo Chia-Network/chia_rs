@@ -1,6 +1,5 @@
-use chia_streamable_macro::Streamable;
+use chia_streamable_macro::streamable;
 
-use crate::streamable_struct;
 use crate::Bytes32;
 use crate::Coin;
 use crate::EndOfSubSlotBundle;
@@ -10,7 +9,8 @@ use crate::VDFProof;
 use crate::{Foliage, FoliageTransactionBlock, TransactionsInfo};
 use chia_traits::Streamable;
 
-streamable_struct! (FullBlock {
+#[streamable]
+pub struct FullBlock {
     finished_sub_slots: Vec<EndOfSubSlotBundle>,
     reward_chain_block: RewardChainBlock,
     challenge_chain_sp_proof: Option<VDFProof>, // # If not first sp in sub-slot
@@ -23,7 +23,7 @@ streamable_struct! (FullBlock {
     transactions_info: Option<TransactionsInfo>, // Reward chain foliage data (tx block additional)
     transactions_generator: Option<Program>,     // Program that generates transactions
     transactions_generator_ref_list: Vec<u32>, // List of block heights of previous generators referenced in this block
-});
+}
 
 impl FullBlock {
     pub fn prev_header_hash(&self) -> Bytes32 {
@@ -112,19 +112,19 @@ impl FullBlock {
 
     #[getter]
     #[pyo3(name = "total_iters")]
-    fn py_total_iters<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
+    fn py_total_iters<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
         ChiaToPython::to_python(&self.total_iters(), py)
     }
 
     #[getter]
     #[pyo3(name = "height")]
-    fn py_height<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
+    fn py_height<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
         ChiaToPython::to_python(&self.height(), py)
     }
 
     #[getter]
     #[pyo3(name = "weight")]
-    fn py_weight<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
+    fn py_weight<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
         ChiaToPython::to_python(&self.weight(), py)
     }
 

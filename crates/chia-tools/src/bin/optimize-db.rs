@@ -68,7 +68,7 @@ fn main() {
     println!(
         "{} fully compact blocks ({:.2}%)",
         compact,
-        compact as f64 / peak_height as f64 * 100.0
+        compact as f64 / f64::from(peak_height) * 100.0
     );
 
     println!("analyze block table");

@@ -3,7 +3,10 @@ mod condition_sanitizers;
 pub mod conditions;
 pub mod flags;
 pub mod get_puzzle_and_solution;
+pub mod make_aggsig_final_message;
+pub mod messages;
 pub mod opcodes;
+pub mod owned_conditions;
 pub mod run_block_generator;
 pub mod run_puzzle;
 pub mod sanitize_int;
@@ -15,4 +18,4 @@ pub mod validation_error;
 // unoptimized builds. Only run these with --release
 #[cfg(not(debug_assertions))]
 #[cfg(test)]
-mod test_generators;
+pub(crate) mod test_generators;

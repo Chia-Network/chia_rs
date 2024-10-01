@@ -2,12 +2,16 @@ import blspy
 import chia_rs
 from random import getrandbits
 import sys
+from typing import Any, Type
+import pytest
+
 
 def randbytes(n: int) -> bytes:
     ret = bytearray()
     for _ in range(n):
         ret.append(getrandbits(8))
     return bytes(ret)
+
 
 # make sure chia_rs counterpart behaves the same as blspy
 def test_bls() -> None:
@@ -18,8 +22,12 @@ def test_bls() -> None:
         seed = randbytes(32)
 
         #### generator() ####
-        assert bytes(blspy.G1Element.generator()) == bytes(chia_rs.G1Element.generator())
-        assert bytes(blspy.G2Element.generator()) == bytes(chia_rs.G2Element.generator())
+        assert bytes(blspy.G1Element.generator()) == bytes(
+            chia_rs.G1Element.generator()
+        )
+        assert bytes(blspy.G2Element.generator()) == bytes(
+            chia_rs.G2Element.generator()
+        )
 
         ####  default constructors  ####
         pk1 = blspy.G1Element()
@@ -179,6 +187,30 @@ def test_bls() -> None:
         # get_fingerprint()
         assert pk1.get_fingerprint() == pk2.get_fingerprint()
 
+        obj: Any
+        klass: Any
+        for obj, klass in [
+            (pk2, G1Element),
+            (sig2, G2Element),
+            (sk2, PrivateKey),
+            (pair2, chia_rs.GTElement),
+        ]:
+            print(f"{klass}")
+            # to_json_dict
+            expected_json = "0x" + bytes(obj).hex()
+            assert obj.to_json_dict() == expected_json
+            # from_json_dict
+            assert obj == klass.from_json_dict(expected_json)
+            # binary blobs are also accepted in JSON dicts
+            assert obj == klass.from_json_dict(bytes(obj))
+            # too short
+            with pytest.raises(ValueError, match="invalid length"):
+                obj2 = klass.from_json_dict(bytes(obj)[0:-1])
+            # too long
+            with pytest.raises(ValueError, match="invalid length"):
+                obj2 = klass.from_json_dict(bytes(obj) + b"a")
+
+
 # ------------------------------------- 8< ----------------------------------
 #
 # this is the original test from blspy, but converted to use chia_rs instead
@@ -193,6 +225,7 @@ from chia_rs import (
     G2Element,
     PrivateKey,
 )
+
 
 def test_schemes() -> None:
     # fmt: off
@@ -523,7 +556,7 @@ def test_aggregate_verify_zero_items() -> None:
 
 
 def test_invalid_points() -> None:
-    sk1 = AugSchemeMPL.key_gen(b"1" *32)
+    sk1 = AugSchemeMPL.key_gen(b"1" * 32)
     good_point = sk1.get_g1()
     good_point_bytes = bytes(good_point)
     start = time.time()
@@ -537,7 +570,9 @@ def test_invalid_points() -> None:
     print(f"from_bytes_unchecked avg: {(time.time() - start) }")
     assert gp1 == gp2
 
-    bad_point_hex: str = "8d5d0fb73b9c92df4eab4216e48c3e358578b4cc30f82c268bd6fef3bd34b558628daf1afef798d4c3b0fcd8b28c8973";
+    bad_point_hex: str = (
+        "8d5d0fb73b9c92df4eab4216e48c3e358578b4cc30f82c268bd6fef3bd34b558628daf1afef798d4c3b0fcd8b28c8973"
+    )
     try:
         G1Element.from_bytes(bytes.fromhex(bad_point_hex))
         assert False

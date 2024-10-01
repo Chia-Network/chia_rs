@@ -1,19 +1,22 @@
 use clap::Parser;
 
-use chia_consensus::gen::conditions::{EmptyVisitor, NewCoin, Spend, SpendBundleConditions};
+use chia_bls::PublicKey;
+use chia_consensus::consensus_constants::TEST_CONSTANTS;
+use chia_consensus::gen::conditions::{NewCoin, SpendBundleConditions, SpendConditions};
 use chia_consensus::gen::flags::{ALLOW_BACKREFS, MEMPOOL_MODE};
 use chia_consensus::gen::run_block_generator::{run_block_generator, run_block_generator2};
 use chia_tools::iterate_tx_blocks;
 use clvmr::allocator::NodePtr;
-use clvmr::serde::{node_from_bytes, node_to_bytes_backrefs};
 use clvmr::Allocator;
 use std::collections::HashSet;
+use std::io::Write;
 use std::thread::available_parallelism;
 use std::time::{Duration, Instant};
 
 /// Analyze the blocks in a chia blockchain database
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
+#[allow(clippy::struct_excessive_bools)]
 struct Args {
     /// Path to blockchain database file to analyze
     #[arg(short, long)]
@@ -43,10 +46,6 @@ struct Args {
     /// start running block generators at this height
     #[arg(long, default_value_t = 0)]
     start_height: u32,
-
-    /// when enabled, run the rust port of the ROM generator
-    #[arg(long, default_value_t = false)]
-    rust_generator: bool,
 }
 
 fn compare_new_coin(a: &Allocator, lhs: &NewCoin, rhs: &NewCoin) {
@@ -63,16 +62,20 @@ fn compare_new_coins(a: &Allocator, lhs: &HashSet<NewCoin>, rhs: &HashSet<NewCoi
     }
 }
 
-fn compare_agg_sig(a: &Allocator, lhs: &Vec<(NodePtr, NodePtr)>, rhs: &Vec<(NodePtr, NodePtr)>) {
+fn compare_agg_sig(
+    a: &Allocator,
+    lhs: &Vec<(PublicKey, NodePtr)>,
+    rhs: &Vec<(PublicKey, NodePtr)>,
+) {
     assert_eq!(lhs.len(), rhs.len());
 
     for (l, r) in std::iter::zip(lhs, rhs) {
-        assert_eq!(a.atom(l.0), a.atom(r.0));
+        assert_eq!(l.0, r.0);
         assert_eq!(a.atom(l.1), a.atom(r.1));
     }
 }
 
-fn compare_spend(a: &Allocator, lhs: &Spend, rhs: &Spend) {
+fn compare_spend(a: &Allocator, lhs: &SpendConditions, rhs: &SpendConditions) {
     assert_eq!(a.atom(lhs.parent_id), a.atom(rhs.parent_id));
     assert_eq!(lhs.coin_amount, rhs.coin_amount);
     assert_eq!(*lhs.coin_id, *rhs.coin_id);
@@ -94,7 +97,7 @@ fn compare_spend(a: &Allocator, lhs: &Spend, rhs: &Spend) {
     assert_eq!(a.atom(lhs.puzzle_hash), a.atom(rhs.puzzle_hash));
 }
 
-fn compare_spends(a: &Allocator, lhs: &Vec<Spend>, rhs: &Vec<Spend>) {
+fn compare_spends(a: &Allocator, lhs: &Vec<SpendConditions>, rhs: &Vec<SpendConditions>) {
     assert_eq!(lhs.len(), rhs.len());
 
     for (l, r) in std::iter::zip(lhs, rhs) {
@@ -118,9 +121,13 @@ fn compare(a: &Allocator, lhs: &SpendBundleConditions, rhs: &SpendBundleConditio
 fn main() {
     let args = Args::parse();
 
-    if args.validate && !(args.mempool || args.rust_generator || args.test_backrefs) {
-        panic!("it doesn't make sense to validate the output against identical runs. Specify --mempool, --rust-generator or --test-backrefs");
-    }
+    // TODO: Use the real consants here
+    let constants = &TEST_CONSTANTS;
+
+    assert!(
+        args.validate && !args.mempool,
+        "it doesn't make sense to validate the output against identical runs. Specify --mempool"
+    );
 
     let num_cores = args
         .num_jobs
@@ -131,20 +138,9 @@ fn main() {
         .queue_len(num_cores + 5)
         .build();
 
-    let flags = if args.mempool { MEMPOOL_MODE } else { 0 }
-        | if args.test_backrefs {
-            ALLOW_BACKREFS
-        } else {
-            0
-        };
+    let flags = if args.mempool { MEMPOOL_MODE } else { 0 } | ALLOW_BACKREFS;
 
-    let block_runner = if args.rust_generator {
-        run_block_generator2::<_, EmptyVisitor>
-    } else {
-        run_block_generator::<_, EmptyVisitor>
-    };
-
-    let mut last_height = 0;
+    let mut last_height = args.start_height;
     let mut last_time = Instant::now();
     iterate_tx_blocks(
         &args.file,
@@ -152,28 +148,27 @@ fn main() {
         args.max_height,
         |height, block, block_refs| {
             pool.execute(move || {
-                let mut a = Allocator::new_limited(500000000);
+                let mut a = Allocator::new_limited(500_000_000);
 
                 let ti = block.transactions_info.as_ref().expect("transactions_info");
-                let prg = block
+                let generator = block
                     .transactions_generator
                     .as_ref()
                     .expect("transactions_generator");
 
-                let storage: Vec<u8>;
-                let generator = if args.test_backrefs {
-                    // re-serialize the generator with back-references
-                    let gen = node_from_bytes(&mut a, prg.as_ref()).expect("node_from_bytes");
-                    storage = node_to_bytes_backrefs(&a, gen).expect("node_to_bytes_backrefs");
-                    &storage[..]
+                // after the hard fork, we run blocks without paying for the
+                // CLVM generator ROM
+                let block_runner = if height >= 5_496_000 {
+                    run_block_generator2
                 } else {
-                    prg.as_ref()
+                    run_block_generator
                 };
 
-                let mut conditions = block_runner(&mut a, generator, &block_refs, ti.cost, flags)
-                    .expect("failed to run block generator");
+                let mut conditions =
+                    block_runner(&mut a, generator, &block_refs, ti.cost, flags, constants)
+                        .expect("failed to run block generator");
 
-                if args.rust_generator || args.test_backrefs {
+                if args.test_backrefs {
                     assert!(conditions.cost <= ti.cost);
                     assert!(conditions.cost > 0);
 
@@ -186,12 +181,13 @@ fn main() {
                 }
 
                 if args.validate {
-                    let mut baseline = run_block_generator::<_, EmptyVisitor>(
+                    let mut baseline = run_block_generator(
                         &mut a,
-                        prg.as_ref(),
+                        generator.as_ref(),
                         &block_refs,
                         ti.cost,
-                        0,
+                        ALLOW_BACKREFS,
+                        constants,
                     )
                     .expect("failed to run block generator");
                     assert_eq!(baseline.cost, ti.cost);
@@ -206,8 +202,7 @@ fn main() {
 
             assert_eq!(pool.panic_count(), 0);
             if last_time.elapsed() > Duration::new(4, 0) {
-                let rate = (height - last_height) as f64 / last_time.elapsed().as_secs_f64();
-                use std::io::Write;
+                let rate = f64::from(height - last_height) / last_time.elapsed().as_secs_f64();
                 print!("\rheight: {height} ({rate:0.1} blocks/s)   ");
                 let _ = std::io::stdout().flush();
                 last_height = height;

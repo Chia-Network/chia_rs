@@ -1,0 +1,25 @@
+[package]
+name = "chia-puzzles-fuzz"
+version = "0.13.0"
+authors = ["Automatically generated"]
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[lints]
+workspace = true
+
+[dependencies]
+libfuzzer-sys = { workspace = true }
+clvmr = { workspace = true }
+chia-puzzles = { workspace = true, features = ["arbitrary"] }
+clvm-traits = { workspace = true }
+
+[[bin]]
+name = "roundtrip"
+path = "fuzz_targets/roundtrip.rs"
+test = false
+doc = false
+bench = false

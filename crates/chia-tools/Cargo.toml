@@ -1,6 +1,6 @@
 [package]
 name = "chia-tools"
-version = "0.5.2"
+version = "0.14.1"
 edition = "2021"
 license = "Apache-2.0"
 description = "Utility functions and types used by the Chia blockchain full node"
@@ -8,21 +8,23 @@ authors = ["Arvid Norberg <arvid@chia.net>"]
 homepage = "https://github.com/Chia-Network/chia_rs"
 repository = "https://github.com/Chia-Network/chia_rs"
 
+[lints]
+workspace = true
+
 [dependencies]
-chia-protocol = { version = "0.5.1", path = "../chia-protocol" }
-chia-traits = { version = "0.5.2", path = "../chia-traits" }
-clvm-utils = { version = "0.5.1", path = "../clvm-utils" }
-clvm-traits = { version = "0.5.2", path = "../clvm-traits" }
-chia-wallet = { version = "0.5.1", path = "../chia-wallet" }
-chia-bls = { version = "0.5.1", path = "../chia-bls" }
-chia-consensus = { version = "0.5.2", path = "../chia-consensus" }
-clvmr = { version = "0.6.0", features = ["counters"] }
-rusqlite = { version = "0.30.0", features = ["bundled"] }
-clap = { version = "4.3.9", features = ["derive"] }
-zstd = "0.12.3"
-blocking-threadpool = "1.0.1"
-hex = "0.4.3"
-hex-literal = "0.4.1"
+chia-protocol = { workspace = true }
+chia-traits = { workspace = true }
+clvm-utils = { workspace = true }
+clvm-traits = { workspace = true }
+chia-puzzles = { workspace = true }
+chia-bls = { workspace = true }
+chia-consensus = { workspace = true }
+clvmr = { workspace = true, features = ["counters"] }
+rusqlite = { workspace = true, features = ["bundled"] }
+clap = { workspace = true, features = ["derive"] }
+zstd = { workspace = true }
+blocking-threadpool = { workspace = true }
+hex = { workspace = true }
 
 [lib]
 name = "chia_tools"

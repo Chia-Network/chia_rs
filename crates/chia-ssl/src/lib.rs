@@ -1,4 +1,6 @@
-use rcgen::{Certificate, CertificateParams, DistinguishedName, DnType, KeyPair, SanType};
+use std::str::FromStr;
+
+use rcgen::{CertificateParams, DistinguishedName, DnType, Ia5String, KeyPair, SanType};
 use rsa::{
     pkcs8::{EncodePrivateKey, LineEnding},
     RsaPrivateKey,
@@ -26,16 +28,13 @@ impl ChiaCertificate {
 
         let mut params = CertificateParams::default();
 
-        params.alg = &rcgen::PKCS_RSA_SHA256;
-        params.key_pair = Some(KeyPair::from_pem(&key_pem)?);
-
         let mut subject = DistinguishedName::new();
         subject.push(DnType::CommonName, "Chia");
         subject.push(DnType::OrganizationName, "Chia");
         subject.push(DnType::OrganizationalUnitName, "Organic Farming Division");
         params.distinguished_name = subject;
 
-        params.subject_alt_names = vec![SanType::DnsName("chia.net".to_string())];
+        params.subject_alt_names = vec![SanType::DnsName(Ia5String::from_str("chia.net")?)];
 
         params.not_before = OffsetDateTime::now_utc() - Duration::DAY;
         params.not_after = PrimitiveDateTime::new(
@@ -44,8 +43,9 @@ impl ChiaCertificate {
         )
         .assume_utc();
 
-        let cert = Certificate::from_params(params)?;
-        let cert_pem = cert.serialize_pem_with_signer(&CHIA_CA)?;
+        let key_pair = KeyPair::from_pem_and_sign_algo(&key_pem, &rcgen::PKCS_RSA_SHA256)?;
+        let cert = params.signed_by(&key_pair, &CHIA_CA, &CHIA_CA_KEY_PAIR)?;
+        let cert_pem = cert.pem();
 
         Ok(ChiaCertificate { cert_pem, key_pem })
     }

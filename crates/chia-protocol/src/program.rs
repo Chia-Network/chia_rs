@@ -1,7 +1,8 @@
 use crate::bytes::Bytes;
+use chia_sha2::Sha256;
 use chia_traits::chia_error::{Error, Result};
 use chia_traits::Streamable;
-use clvm_traits::{FromClvmError, FromNodePtr, ToClvmError, ToNodePtr};
+use clvm_traits::{FromClvm, FromClvmError, ToClvm, ToClvmError};
 use clvmr::allocator::NodePtr;
 use clvmr::cost::Cost;
 use clvmr::reduction::EvalErr;
@@ -11,7 +12,10 @@ use clvmr::serde::{
     serialized_length_from_bytes_trusted,
 };
 use clvmr::{Allocator, ChiaDialect};
-use sha2::{Digest, Sha256};
+#[cfg(feature = "py-bindings")]
+use pyo3::prelude::*;
+#[cfg(feature = "py-bindings")]
+use pyo3::types::PyType;
 use std::io::Cursor;
 use std::ops::Deref;
 
@@ -54,14 +58,14 @@ impl Program {
         self.0.into_inner()
     }
 
-    pub fn run<A: ToNodePtr>(
+    pub fn run<A: ToClvm<Allocator>>(
         &self,
         a: &mut Allocator,
         flags: u32,
         max_cost: Cost,
         arg: &A,
     ) -> std::result::Result<(Cost, NodePtr), EvalErr> {
-        let arg = arg.to_node_ptr(a).map_err(|_| {
+        let arg = arg.to_clvm(a).map_err(|_| {
             EvalErr(
                 a.nil(),
                 "failed to convert argument to CLVM objects".to_string(),
@@ -119,7 +123,7 @@ impl Deref for Program {
     }
 }
 
-#[cfg(fuzzing)]
+#[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for Program {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         // generate an arbitrary CLVM structure. Not likely a valid program.
@@ -153,9 +157,6 @@ use chia_traits::{FromJsonDict, ToJsonDict};
 use chia_py_streamable_macro::PyStreamable;
 
 #[cfg(feature = "py-bindings")]
-use pyo3::prelude::*;
-
-#[cfg(feature = "py-bindings")]
 use pyo3::types::{PyList, PyTuple};
 
 #[cfg(feature = "py-bindings")]
@@ -170,7 +171,7 @@ use pyo3::exceptions::*;
 // the detour via Allocator. propagating python errors through ToClvmError is a
 // bit tricky though
 #[cfg(feature = "py-bindings")]
-fn clvm_convert(a: &mut Allocator, o: &PyAny) -> PyResult<NodePtr> {
+fn clvm_convert(a: &mut Allocator, o: &Bound<'_, PyAny>) -> PyResult<NodePtr> {
     // None
     if o.is_none() {
         Ok(a.nil())
@@ -188,26 +189,26 @@ fn clvm_convert(a: &mut Allocator, o: &PyAny) -> PyResult<NodePtr> {
             .map_err(|e| PyMemoryError::new_err(e.to_string()))
     // Tuple (SExp-like)
     } else if let Ok(pair) = o.downcast::<PyTuple>() {
-        if pair.len() != 2 {
+        if pair.len() == 2 {
+            let left = clvm_convert(a, &pair.get_item(0)?)?;
+            let right = clvm_convert(a, &pair.get_item(1)?)?;
+            a.new_pair(left, right)
+                .map_err(|e| PyMemoryError::new_err(e.to_string()))
+        } else {
             Err(PyValueError::new_err(format!(
                 "can't cast tuple of size {}",
                 pair.len()
             )))
-        } else {
-            let left = clvm_convert(a, pair.get_item(0)?)?;
-            let right = clvm_convert(a, pair.get_item(1)?)?;
-            a.new_pair(left, right)
-                .map_err(|e| PyMemoryError::new_err(e.to_string()))
         }
     // List
     } else if let Ok(list) = o.downcast::<PyList>() {
-        let mut rev = Vec::<&PyAny>::new();
+        let mut rev = Vec::new();
         for py_item in list.iter() {
             rev.push(py_item);
         }
         let mut ret = a.nil();
         for py_item in rev.into_iter().rev() {
-            let item = clvm_convert(a, py_item)?;
+            let item = clvm_convert(a, &py_item)?;
             ret = a
                 .new_pair(item, ret)
                 .map_err(|e| PyMemoryError::new_err(e.to_string()))?;
@@ -220,8 +221,8 @@ fn clvm_convert(a: &mut Allocator, o: &PyAny) -> PyResult<NodePtr> {
                 Err(PyTypeError::new_err(format!("invalid SExp item {o}")))
             } else {
                 let pair = pair.downcast::<PyTuple>()?;
-                let left = clvm_convert(a, &pair[0])?;
-                let right = clvm_convert(a, &pair[1])?;
+                let left = clvm_convert(a, &pair.get_item(0)?)?;
+                let right = clvm_convert(a, &pair.get_item(1)?)?;
                 a.new_pair(left, right)
                     .map_err(|e| PyMemoryError::new_err(e.to_string()))
             }
@@ -249,7 +250,7 @@ fn clvm_convert(a: &mut Allocator, o: &PyAny) -> PyResult<NodePtr> {
 }
 
 #[cfg(feature = "py-bindings")]
-fn clvm_serialize(a: &mut Allocator, o: &PyAny) -> PyResult<NodePtr> {
+fn clvm_serialize(a: &mut Allocator, o: &Bound<'_, PyAny>) -> PyResult<NodePtr> {
     /*
     When passing arguments to run(), there's some special treatment, before falling
     back on the regular python -> CLVM conversion (implemented by clvm_convert
@@ -274,13 +275,13 @@ fn clvm_serialize(a: &mut Allocator, o: &PyAny) -> PyResult<NodePtr> {
 
     // List
     if let Ok(list) = o.downcast::<PyList>() {
-        let mut rev = Vec::<&PyAny>::new();
+        let mut rev = Vec::new();
         for py_item in list.iter() {
             rev.push(py_item);
         }
         let mut ret = a.nil();
         for py_item in rev.into_iter().rev() {
-            let item = clvm_serialize(a, py_item)?;
+            let item = clvm_serialize(a, &py_item)?;
             ret = a
                 .new_pair(item, ret)
                 .map_err(|e| PyMemoryError::new_err(e.to_string()))?;
@@ -295,13 +296,14 @@ fn clvm_serialize(a: &mut Allocator, o: &PyAny) -> PyResult<NodePtr> {
 }
 
 #[cfg(feature = "py-bindings")]
-fn to_program(py: Python<'_>, node: LazyNode) -> PyResult<&PyAny> {
-    let int_module = PyModule::import(py, "chia.types.blockchain_format.program")?;
+fn to_program(py: Python<'_>, node: LazyNode) -> PyResult<Bound<'_, PyAny>> {
+    let int_module = PyModule::import_bound(py, "chia.types.blockchain_format.program")?;
     let ty = int_module.getattr("Program")?;
     ty.call1((node.into_py(py),))
 }
 
 #[cfg(feature = "py-bindings")]
+#[allow(clippy::needless_pass_by_value)]
 #[pymethods]
 impl Program {
     #[pyo3(name = "default")]
@@ -312,10 +314,10 @@ impl Program {
 
     #[staticmethod]
     #[pyo3(name = "to")]
-    fn py_to(args: &PyAny) -> PyResult<Program> {
-        let mut a = Allocator::new_limited(500000000);
+    fn py_to(args: &Bound<'_, PyAny>) -> PyResult<Program> {
+        let mut a = Allocator::new_limited(500_000_000);
         let clvm = clvm_convert(&mut a, args)?;
-        Program::from_node_ptr(&a, clvm)
+        Program::from_clvm(&a, clvm)
             .map_err(|error| PyErr::new::<PyTypeError, _>(error.to_string()))
     }
 
@@ -346,8 +348,8 @@ impl Program {
         &self,
         py: Python<'a>,
         max_cost: u64,
-        args: &PyAny,
-    ) -> PyResult<(u64, &'a PyAny)> {
+        args: &Bound<'_, PyAny>,
+    ) -> PyResult<(u64, Bound<'a, PyAny>)> {
         use clvmr::MEMPOOL_MODE;
         self._run(py, max_cost, MEMPOOL_MODE, args)
     }
@@ -356,8 +358,8 @@ impl Program {
         &self,
         py: Python<'a>,
         max_cost: u64,
-        args: &PyAny,
-    ) -> PyResult<(u64, &'a PyAny)> {
+        args: &Bound<'_, PyAny>,
+    ) -> PyResult<(u64, Bound<'a, PyAny>)> {
         self._run(py, max_cost, 0, args)
     }
 
@@ -366,12 +368,12 @@ impl Program {
         py: Python<'a>,
         max_cost: u64,
         flags: u32,
-        args: &PyAny,
-    ) -> PyResult<(u64, &'a PyAny)> {
+        args: &Bound<'_, PyAny>,
+    ) -> PyResult<(u64, Bound<'a, PyAny>)> {
         use clvmr::reduction::Response;
         use std::rc::Rc;
 
-        let mut a = Allocator::new_limited(500000000);
+        let mut a = Allocator::new_limited(500_000_000);
         // The python behavior here is a bit messy, and is best not emulated
         // on the rust side. We must be able to pass a Program as an argument,
         // and it being treated as the CLVM structure it represents. In python's
@@ -401,21 +403,21 @@ impl Program {
         }
     }
 
-    fn to_program<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
+    fn to_program<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
         use std::rc::Rc;
-        let mut a = Allocator::new_limited(500000000);
+        let mut a = Allocator::new_limited(500_000_000);
         let prg = node_from_bytes_backrefs(&mut a, self.0.as_ref())?;
         let prg = LazyNode::new(Rc::new(a), prg);
         to_program(py, prg)
     }
 
-    fn uncurry<'a>(&self, py: Python<'a>) -> PyResult<(&'a PyAny, &'a PyAny)> {
+    fn uncurry<'a>(&self, py: Python<'a>) -> PyResult<(Bound<'a, PyAny>, Bound<'a, PyAny>)> {
         use clvm_utils::CurriedProgram;
         use std::rc::Rc;
 
-        let mut a = Allocator::new_limited(500000000);
+        let mut a = Allocator::new_limited(500_000_000);
         let prg = node_from_bytes_backrefs(&mut a, self.0.as_ref())?;
-        let Ok(uncurried) = CurriedProgram::<NodePtr, NodePtr>::from_node_ptr(&a, prg) else {
+        let Ok(uncurried) = CurriedProgram::<NodePtr, NodePtr>::from_clvm(&a, prg) else {
             let a = Rc::new(a);
             let prg = LazyNode::new(a.clone(), prg);
             let ret = a.nil();
@@ -431,11 +433,11 @@ impl Program {
             }
             // the args of curried puzzles are in the form of:
             // (c . ((q . <arg1>) . (<rest> . ())))
-            let (_, ((_, arg), (rest, _))) =
+            let (_, ((_, arg), (rest, ()))) =
                 <(
                     clvm_traits::MatchByte<4>,
                     (clvm_traits::match_quote!(NodePtr), (NodePtr, ())),
-                ) as clvm_traits::FromNodePtr>::from_node_ptr(&a, args)
+                ) as FromClvm<Allocator>>::from_clvm(&a, args)
                 .map_err(|error| PyErr::new::<PyTypeError, _>(error.to_string()))?;
             curried_args.push(arg);
             args = rest;
@@ -480,14 +482,26 @@ impl Streamable for Program {
 
 #[cfg(feature = "py-bindings")]
 impl ToJsonDict for Program {
-    fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
+    fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
         self.0.to_json_dict(py)
     }
 }
 
 #[cfg(feature = "py-bindings")]
+#[pymethods]
+impl Program {
+    #[classmethod]
+    #[pyo3(name = "from_parent")]
+    pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: &Self) -> PyResult<PyObject> {
+        Err(PyNotImplementedError::new_err(
+            "This class does not support from_parent().",
+        ))
+    }
+}
+
+#[cfg(feature = "py-bindings")]
 impl FromJsonDict for Program {
-    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+    fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self> {
         let bytes = Bytes::from_json_dict(o)?;
         let len =
             serialized_length_from_bytes(bytes.as_slice()).map_err(|_e| Error::EndOfBuffer)?;
@@ -501,8 +515,8 @@ impl FromJsonDict for Program {
     }
 }
 
-impl FromNodePtr for Program {
-    fn from_node_ptr(a: &Allocator, node: NodePtr) -> std::result::Result<Self, FromClvmError> {
+impl FromClvm<Allocator> for Program {
+    fn from_clvm(a: &Allocator, node: NodePtr) -> std::result::Result<Self, FromClvmError> {
         Ok(Self(
             node_to_bytes(a, node)
                 .map_err(|error| FromClvmError::Custom(error.to_string()))?
@@ -511,8 +525,8 @@ impl FromNodePtr for Program {
     }
 }
 
-impl ToNodePtr for Program {
-    fn to_node_ptr(&self, a: &mut Allocator) -> std::result::Result<NodePtr, ToClvmError> {
+impl ToClvm<Allocator> for Program {
+    fn to_clvm(&self, a: &mut Allocator) -> std::result::Result<NodePtr, ToClvmError> {
         node_from_bytes(a, self.0.as_ref()).map_err(|error| ToClvmError::Custom(error.to_string()))
     }
 }
@@ -528,9 +542,9 @@ mod tests {
         let expected_bytes = hex::decode(expected).unwrap();
 
         let ptr = node_from_bytes(a, &expected_bytes).unwrap();
-        let program = Program::from_node_ptr(a, ptr).unwrap();
+        let program = Program::from_clvm(a, ptr).unwrap();
 
-        let round_trip = program.to_node_ptr(a).unwrap();
+        let round_trip = program.to_clvm(a).unwrap();
         assert_eq!(expected, hex::encode(node_to_bytes(a, round_trip).unwrap()));
     }
 

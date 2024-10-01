@@ -1,6 +1,6 @@
-use crate::{tree_hash_atom, tree_hash_pair};
+use crate::{tree_hash_atom, tree_hash_pair, TreeHash};
 
-pub fn curry_tree_hash(program_hash: [u8; 32], arg_hashes: &[[u8; 32]]) -> [u8; 32] {
+pub fn curry_tree_hash(program_hash: TreeHash, arg_hashes: &[TreeHash]) -> TreeHash {
     let nil = tree_hash_atom(&[]);
     let op_q = tree_hash_atom(&[1]);
     let op_a = tree_hash_atom(&[2]);
@@ -36,17 +36,17 @@ mod tests {
         let mut a = Allocator::new();
 
         let program = a.new_number(2.into()).unwrap();
-        let arg1 = a.new_number(5.into()).unwrap();
-        let arg2 = a.new_number(8.into()).unwrap();
+        let arg_1 = a.new_number(5.into()).unwrap();
+        let arg_2 = a.new_number(8.into()).unwrap();
         let args = clvm_curried_args!(5, 8).to_clvm(&mut a).unwrap();
         let curried = CurriedProgram { program, args }.to_clvm(&mut a).unwrap();
 
         let tree_hash_result = tree_hash(&a, curried);
 
         let program_hash = tree_hash(&a, program);
-        let arg1_hash = tree_hash(&a, arg1);
-        let arg2_hash = tree_hash(&a, arg2);
-        let curry_tree_hash_result = curry_tree_hash(program_hash, &[arg1_hash, arg2_hash]);
+        let arg_1_hash = tree_hash(&a, arg_1);
+        let arg_2_hash = tree_hash(&a, arg_2);
+        let curry_tree_hash_result = curry_tree_hash(program_hash, &[arg_1_hash, arg_2_hash]);
 
         assert_eq!(
             tree_hash_result.encode_hex::<String>(),

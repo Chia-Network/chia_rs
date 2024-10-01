@@ -1,6 +1,7 @@
-use super::conditions::{MempoolVisitor, NewCoin, Spend, SpendBundleConditions};
+use super::conditions::{NewCoin, SpendBundleConditions, SpendConditions};
 use super::run_block_generator::{run_block_generator, run_block_generator2};
 use crate::allocator::make_allocator;
+use crate::consensus_constants::TEST_CONSTANTS;
 use crate::gen::flags::{ALLOW_BACKREFS, MEMPOOL_MODE};
 use chia_protocol::{Bytes, Bytes48};
 use clvmr::allocator::NodePtr;
@@ -11,7 +12,7 @@ use text_diff::Difference;
 
 use rstest::rstest;
 
-fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
+pub(crate) fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
     let mut ret = String::new();
     if c.reserve_fee > 0 {
         ret += &format!("RESERVE_FEE: {}\n", c.reserve_fee);
@@ -31,10 +32,7 @@ fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
     }
     let mut agg_sigs = Vec::<(Bytes48, Bytes)>::new();
     for (pk, msg) in &c.agg_sig_unsafe {
-        agg_sigs.push((
-            a.atom(*pk).as_ref().try_into().unwrap(),
-            a.atom(*msg).as_ref().into(),
-        ));
+        agg_sigs.push((pk.to_bytes().into(), a.atom(*msg).as_ref().into()));
     }
     agg_sigs.sort();
     for (pk, msg) in agg_sigs {
@@ -46,7 +44,7 @@ fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
     }
     ret += "SPENDS:\n";
 
-    let mut spends: Vec<Spend> = c.spends.clone();
+    let mut spends: Vec<SpendConditions> = c.spends.clone();
     spends.sort_by_key(|s| *s.coin_id);
     for s in spends {
         ret += &format!(
@@ -70,36 +68,44 @@ fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
         let mut create_coin: Vec<&NewCoin> = s.create_coin.iter().collect();
         create_coin.sort_by_key(|cc| (cc.puzzle_hash, cc.amount));
         for cc in create_coin {
-            if cc.hint != NodePtr::NIL {
+            if cc.hint == NodePtr::NIL {
+                ret += &format!(
+                    "  CREATE_COIN: ph: {} amount: {}\n",
+                    hex::encode(cc.puzzle_hash),
+                    cc.amount
+                );
+            } else {
                 ret += &format!(
                     "  CREATE_COIN: ph: {} amount: {} hint: {}\n",
                     hex::encode(cc.puzzle_hash),
                     cc.amount,
                     hex::encode(a.atom(cc.hint))
                 );
-            } else {
-                ret += &format!(
-                    "  CREATE_COIN: ph: {} amount: {}\n",
-                    hex::encode(cc.puzzle_hash),
-                    cc.amount
-                );
             }
         }
 
-        let mut agg_sigs = Vec::<(Bytes48, Bytes)>::new();
-        for (pk, msg) in s.agg_sig_me {
-            agg_sigs.push((
-                a.atom(pk).as_ref().try_into().unwrap(),
-                a.atom(msg).as_ref().into(),
-            ));
-        }
-        agg_sigs.sort();
-        for (pk, msg) in agg_sigs {
-            ret += &format!(
-                "  AGG_SIG_ME pk: {} msg: {}\n",
-                hex::encode(pk),
-                hex::encode(msg)
-            );
+        for sig_conds in [
+            (&s.agg_sig_me, "AGG_SIG_ME"),
+            (&s.agg_sig_parent, "AGG_SIG_PARENT"),
+            (&s.agg_sig_puzzle, "AGG_SIG_PUZZLE"),
+            (&s.agg_sig_amount, "AGG_SIG_AMOUNT"),
+            (&s.agg_sig_puzzle_amount, "AGG_SIG_PUZZLE_AMOUNT"),
+            (&s.agg_sig_parent_amount, "AGG_SIG_PARENT_AMOUNT"),
+            (&s.agg_sig_parent_puzzle, "AGG_SIG_PARENT_PUZZLE"),
+        ] {
+            let mut agg_sigs = Vec::<(Bytes48, Bytes)>::new();
+            for (pk, msg) in sig_conds.0 {
+                agg_sigs.push((pk.to_bytes().into(), a.atom(*msg).as_ref().into()));
+            }
+            agg_sigs.sort();
+            for (pk, msg) in &agg_sigs {
+                ret += &format!(
+                    "  {} pk: {} msg: {}\n",
+                    sig_conds.1,
+                    hex::encode(pk),
+                    hex::encode(msg)
+                );
+            }
         }
     }
 
@@ -109,7 +115,7 @@ fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
     ret
 }
 
-fn print_diff(output: &str, expected: &str) {
+pub(crate) fn print_diff(output: &str, expected: &str) {
     println!("\x1b[102m \x1b[0m - output from test");
     println!("\x1b[101m \x1b[0m - expected output");
     for diff in diff(expected, output, "\n").1 {
@@ -149,6 +155,8 @@ fn print_diff(output: &str, expected: &str) {
 }
 
 #[rstest]
+#[case("new-agg-sigs")]
+#[case("infinity-g1")]
 #[case("block-1ee588dc")]
 #[case("block-6fe59b24")]
 #[case("block-b45268ac")]
@@ -196,6 +204,7 @@ fn print_diff(output: &str, expected: &str) {
 #[case("negative-reserve-fee")]
 #[case("recursion-pairs")]
 #[case("unknown-condition")]
+#[case("duplicate-messages")]
 fn run_generator(#[case] name: &str) {
     use std::fs::read_to_string;
 
@@ -213,20 +222,22 @@ fn run_generator(#[case] name: &str) {
     let mut block_refs = Vec::<Vec<u8>>::new();
 
     let filename = format!("../../generator-tests/{name}.env");
-    if let Ok(env_hex) = std::fs::read_to_string(&filename) {
+    if let Ok(env_hex) = read_to_string(&filename) {
         println!("block-ref file: {filename}");
         block_refs.push(hex::decode(env_hex).expect("hex decode env-file"));
     }
 
-    for (flags, expected) in zip(&[ALLOW_BACKREFS, ALLOW_BACKREFS | MEMPOOL_MODE], expected) {
-        println!("flags: {:x}", flags);
+    const DEFAULT_FLAGS: u32 = ALLOW_BACKREFS;
+    for (flags, expected) in zip(&[DEFAULT_FLAGS, DEFAULT_FLAGS | MEMPOOL_MODE], expected) {
+        println!("flags: {flags:x}");
         let mut a = make_allocator(*flags);
-        let conds = run_block_generator::<_, MempoolVisitor>(
+        let conds = run_block_generator(
             &mut a,
             &generator,
             &block_refs,
-            11000000000,
+            11_000_000_000,
             *flags,
+            &TEST_CONSTANTS,
         );
 
         let (expected_cost, output) = match conds {
@@ -235,12 +246,13 @@ fn run_generator(#[case] name: &str) {
         };
 
         let mut a = make_allocator(*flags);
-        let conds = run_block_generator2::<_, MempoolVisitor>(
+        let conds = run_block_generator2(
             &mut a,
             &generator,
             &block_refs,
-            11000000000,
+            11_000_000_000,
             *flags,
+            &TEST_CONSTANTS,
         );
         let output_hard_fork = match conds {
             Ok(mut conditions) => {

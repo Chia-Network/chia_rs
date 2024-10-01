@@ -1,38 +1,43 @@
-use crate::streamable_struct;
-use crate::{bytes::Bytes32, BytesImpl};
-use chia_streamable_macro::Streamable;
+use crate::{Bytes32, BytesImpl};
+use chia_sha2::Sha256;
+use chia_streamable_macro::streamable;
 use clvm_traits::{
     clvm_list, destructure_list, match_list, ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError,
     ToClvm, ToClvmError,
 };
-use sha2::{Digest, Sha256};
 
 #[cfg(feature = "py-bindings")]
+use pyo3::exceptions::PyNotImplementedError;
+#[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
+#[cfg(feature = "py-bindings")]
+use pyo3::types::PyType;
 
-streamable_struct!(Coin {
+#[streamable]
+#[derive(Copy)]
+pub struct Coin {
     parent_coin_info: Bytes32,
     puzzle_hash: Bytes32,
     amount: u64,
-});
+}
 
 impl Coin {
-    pub fn coin_id(&self) -> [u8; 32] {
+    pub fn coin_id(&self) -> Bytes32 {
         let mut hasher = Sha256::new();
         hasher.update(self.parent_coin_info);
         hasher.update(self.puzzle_hash);
 
         let amount_bytes = self.amount.to_be_bytes();
-        if self.amount >= 0x8000000000000000_u64 {
+        if self.amount >= 0x8000_0000_0000_0000_u64 {
             hasher.update([0_u8]);
             hasher.update(amount_bytes);
         } else {
             let start = match self.amount {
-                n if n >= 0x80000000000000_u64 => 0,
-                n if n >= 0x800000000000_u64 => 1,
-                n if n >= 0x8000000000_u64 => 2,
-                n if n >= 0x80000000_u64 => 3,
-                n if n >= 0x800000_u64 => 4,
+                n if n >= 0x0080_0000_0000_0000_u64 => 0,
+                n if n >= 0x8000_0000_0000_u64 => 1,
+                n if n >= 0x0080_0000_0000_u64 => 2,
+                n if n >= 0x8000_0000_u64 => 3,
+                n if n >= 0x0080_0000_u64 => 4,
                 n if n >= 0x8000_u64 => 5,
                 n if n >= 0x80_u64 => 6,
                 n if n > 0 => 7,
@@ -41,26 +46,39 @@ impl Coin {
             hasher.update(&amount_bytes[start..]);
         }
 
-        hasher.finalize().as_slice().try_into().unwrap()
+        let coin_id: [u8; 32] = hasher.finalize().as_slice().try_into().unwrap();
+        Bytes32::new(coin_id)
     }
 }
 
 #[cfg(feature = "py-bindings")]
 #[pymethods]
 impl Coin {
-    fn name<'p>(&self, py: pyo3::Python<'p>) -> pyo3::PyResult<&'p pyo3::types::PyBytes> {
-        Ok(pyo3::types::PyBytes::new(py, &self.coin_id()))
+    fn name<'p>(&self, py: Python<'p>) -> Bound<'p, pyo3::types::PyBytes> {
+        pyo3::types::PyBytes::new_bound(py, &self.coin_id())
     }
 }
 
-impl<N> ToClvm<N> for Coin {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+impl Coin {
+    #[classmethod]
+    #[pyo3(name = "from_parent")]
+    pub fn from_parent(_cls: &Bound<'_, PyType>, _coin: Self) -> PyResult<PyObject> {
+        Err(PyNotImplementedError::new_err(
+            "Coin does not support from_parent().",
+        ))
+    }
+}
+
+impl<N, E: ClvmEncoder<Node = N>> ToClvm<E> for Coin {
+    fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
         clvm_list!(self.parent_coin_info, self.puzzle_hash, self.amount).to_clvm(encoder)
     }
 }
 
-impl<N> FromClvm<N> for Coin {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+impl<N, D: ClvmDecoder<Node = N>> FromClvm<D> for Coin {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
         let destructure_list!(parent_coin_info, puzzle_hash, amount) =
             <match_list!(BytesImpl<32>, BytesImpl<32>, u64)>::from_clvm(decoder, node)?;
         Ok(Coin {
@@ -85,22 +103,22 @@ mod tests {
     #[case(1, &[1])]
     #[case(0xff, &[0, 0xff])]
     #[case(0xffff, &[0, 0xff, 0xff])]
-    #[case(0xffffff, &[0, 0xff, 0xff, 0xff])]
-    #[case(0xffffffff, &[0, 0xff, 0xff, 0xff, 0xff])]
-    #[case(0xffffffffff, &[0, 0xff, 0xff, 0xff, 0xff, 0xff])]
-    #[case(0xffffffffffffffff, &[0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff])]
+    #[case(0x00ff_ffff, &[0, 0xff, 0xff, 0xff])]
+    #[case(0xffff_ffff, &[0, 0xff, 0xff, 0xff, 0xff])]
+    #[case(0x00ff_ffff_ffff, &[0, 0xff, 0xff, 0xff, 0xff, 0xff])]
+    #[case(0xffff_ffff_ffff_ffff, &[0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff])]
     #[case(0x7f, &[0x7f])]
     #[case(0x7fff, &[0x7f, 0xff])]
-    #[case(0x7fffff, &[0x7f, 0xff, 0xff])]
-    #[case(0x7fffffff, &[0x7f, 0xff, 0xff, 0xff])]
-    #[case(0x7fffffffff, &[0x7f, 0xff, 0xff, 0xff, 0xff])]
-    #[case(0x7fffffffffffffff, &[0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff])]
+    #[case(0x007f_ffff, &[0x7f, 0xff, 0xff])]
+    #[case(0x7fff_ffff, &[0x7f, 0xff, 0xff, 0xff])]
+    #[case(0x007f_ffff_ffff, &[0x7f, 0xff, 0xff, 0xff, 0xff])]
+    #[case(0x7fff_ffff_ffff_ffff, &[0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff])]
     #[case(0x80, &[0, 0x80])]
     #[case(0x8000, &[0, 0x80, 0x00])]
-    #[case(0x800000, &[0, 0x80, 0x00, 0x00])]
-    #[case(0x80000000, &[0, 0x80, 0x00, 0x00, 0x00])]
-    #[case(0x8000000000, &[0, 0x80, 0x00, 0x00, 0x00, 0x00])]
-    #[case(0x8000000000000000, &[0, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])]
+    #[case(0x0080_0000, &[0, 0x80, 0x00, 0x00])]
+    #[case(0x8000_0000, &[0, 0x80, 0x00, 0x00, 0x00])]
+    #[case(0x0080_0000_0000, &[0, 0x80, 0x00, 0x00, 0x00, 0x00])]
+    #[case(0x8000_0000_0000_0000, &[0, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])]
     fn coin_id(#[case] amount: u64, #[case] bytes: &[u8]) {
         let parent_coin = b"---foo---                       ";
         let puzzle_hash = b"---bar---                       ";
@@ -110,7 +128,7 @@ mod tests {
         sha256.update(parent_coin);
         sha256.update(puzzle_hash);
         sha256.update(bytes);
-        assert_eq!(c.coin_id(), &sha256.finalize() as &[u8]);
+        assert_eq!(c.coin_id().to_bytes(), sha256.finalize().as_ref());
     }
 
     #[test]

@@ -1,9 +1,8 @@
 use crate::coin_spend::CoinSpend;
-use crate::streamable_struct;
 use crate::Bytes32;
 use crate::Coin;
 use chia_bls::G2Element;
-use chia_streamable_macro::Streamable;
+use chia_streamable_macro::streamable;
 use chia_traits::Streamable;
 use clvm_traits::FromClvm;
 use clvmr::allocator::{NodePtr, SExp};
@@ -14,11 +13,14 @@ use clvmr::Allocator;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
+#[cfg(feature = "py-bindings")]
+use pyo3::types::PyType;
 
-streamable_struct! (SpendBundle {
+#[streamable(subclass)]
+pub struct SpendBundle {
     coin_spends: Vec<CoinSpend>,
     aggregated_signature: G2Element,
-});
+}
 
 impl SpendBundle {
     pub fn aggregate(spend_bundles: &[SpendBundle]) -> SpendBundle {
@@ -39,25 +41,22 @@ impl SpendBundle {
     }
 
     pub fn additions(&self) -> Result<Vec<Coin>, EvalErr> {
-        const CREATE_COIN_COST: Cost = 1800000;
+        const CREATE_COIN_COST: Cost = 1_800_000;
         const CREATE_COIN: u8 = 51;
 
         let mut ret = Vec::<Coin>::new();
-        let mut cost_left = 11000000000;
+        let mut cost_left = 11_000_000_000;
         let mut a = Allocator::new();
         let checkpoint = a.checkpoint();
-        use clvmr::ENABLE_FIXED_DIV;
 
         for cs in &self.coin_spends {
             a.restore_checkpoint(&checkpoint);
-            let (cost, mut conds) =
-                cs.puzzle_reveal
-                    .run(&mut a, ENABLE_FIXED_DIV, cost_left, &cs.solution)?;
+            let (cost, mut conds) = cs.puzzle_reveal.run(&mut a, 0, cost_left, &cs.solution)?;
             if cost > cost_left {
                 return Err(EvalErr(a.nil(), "cost exceeded".to_string()));
             }
             cost_left -= cost;
-            let parent_coin_info: Bytes32 = cs.coin.coin_id().into();
+            let parent_coin_info: Bytes32 = cs.coin.coin_id();
 
             while let Some((c, tail)) = a.next(conds) {
                 conds = tail;
@@ -65,9 +64,7 @@ impl SpendBundle {
                 let c = rest(&a, c)?;
                 let buf = match a.sexp(op) {
                     SExp::Atom => a.atom(op),
-                    _ => {
-                        return Err(EvalErr(op, "invalid condition".to_string()));
-                    }
+                    SExp::Pair(..) => return Err(EvalErr(op, "invalid condition".to_string())),
                 };
                 let buf = buf.as_ref();
                 if buf.len() != 1 {
@@ -94,11 +91,38 @@ impl SpendBundle {
 
 #[cfg(feature = "py-bindings")]
 #[pymethods]
+#[allow(clippy::needless_pass_by_value)]
 impl SpendBundle {
-    #[staticmethod]
+    #[classmethod]
     #[pyo3(name = "aggregate")]
-    fn py_aggregate(spend_bundles: Vec<SpendBundle>) -> SpendBundle {
-        SpendBundle::aggregate(&spend_bundles)
+    fn py_aggregate(
+        cls: &Bound<'_, PyType>,
+        py: Python<'_>,
+        spend_bundles: Vec<Self>,
+    ) -> PyResult<PyObject> {
+        let aggregated = Bound::new(py, Self::aggregate(&spend_bundles))?;
+        if aggregated.is_exact_instance(cls) {
+            Ok(aggregated.into_py(py))
+        } else {
+            let instance = cls.call_method1("from_parent", (aggregated.into_py(py),))?;
+            Ok(instance.into_py(py))
+        }
+    }
+
+    #[classmethod]
+    #[pyo3(name = "from_parent")]
+    pub fn from_parent(
+        cls: &Bound<'_, PyType>,
+        py: Python<'_>,
+        spend_bundle: Self,
+    ) -> PyResult<PyObject> {
+        // Convert result into potential child class
+        let instance = cls.call(
+            (spend_bundle.coin_spends, spend_bundle.aggregated_signature),
+            None,
+        )?;
+
+        Ok(instance.into_py(py))
     }
 
     #[pyo3(name = "name")]
@@ -109,7 +133,7 @@ impl SpendBundle {
     fn removals(&self) -> Vec<Coin> {
         let mut ret = Vec::<Coin>::with_capacity(self.coin_spends.len());
         for cs in &self.coin_spends {
-            ret.push(cs.coin.clone());
+            ret.push(cs.coin);
         }
         ret
     }
@@ -118,18 +142,6 @@ impl SpendBundle {
     fn py_additions(&self) -> PyResult<Vec<Coin>> {
         self.additions()
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.1))
-    }
-
-    fn debug(&self, py: Python<'_>) -> PyResult<()> {
-        use pyo3::types::PyDict;
-        let ctx: &PyDict = PyDict::new(py);
-        ctx.set_item("self", self.clone().into_py(py))?;
-        py.run(
-            "from chia.wallet.util.debug_spend_bundle import debug_spend_bundle\n\
-            debug_spend_bundle(self)\n",
-            None,
-            Some(ctx),
-        )
     }
 }
 
@@ -189,7 +201,7 @@ mod tests {
             1,
         );
         let spend = CoinSpend::new(
-            test_coin.clone(),
+            test_coin,
             Program::new(vec![1_u8].into()),
             Program::new(solution.into()),
         );
@@ -215,7 +227,7 @@ ff01\
             let additions = bundle.additions().expect("additions");
 
             let new_coin = Coin::new(
-                test_coin.coin_id().into(),
+                test_coin.coin_id(),
                 hex::decode("2222222222222222222222222222222222222222222222222222222222222222")
                     .unwrap()
                     .try_into()

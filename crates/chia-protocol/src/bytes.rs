@@ -1,6 +1,8 @@
+use chia_sha2::Sha256;
 use chia_traits::{chia_error, read_bytes, Streamable};
 use clvm_traits::{ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError, ToClvm, ToClvmError};
-use sha2::{Digest, Sha256};
+use clvm_utils::TreeHash;
+use clvmr::Atom;
 use std::array::TryFromSliceError;
 use std::fmt;
 use std::io::Cursor;
@@ -18,7 +20,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 
 #[derive(Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[cfg_attr(fuzzing, derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Bytes(Vec<u8>);
 
 impl Bytes {
@@ -38,6 +40,10 @@ impl Bytes {
         self.0.as_slice()
     }
 
+    pub fn to_vec(&self) -> Vec<u8> {
+        self.0.clone()
+    }
+
     pub fn into_inner(self) -> Vec<u8> {
         self.0
     }
@@ -50,7 +56,7 @@ impl fmt::Debug for Bytes {
 }
 
 impl fmt::Display for Bytes {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&hex::encode(self))
     }
 }
@@ -79,14 +85,14 @@ impl Streamable for Bytes {
 
 #[cfg(feature = "py-bindings")]
 impl ToJsonDict for Bytes {
-    fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
+    fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
         Ok(format!("0x{self}").to_object(py))
     }
 }
 
 #[cfg(feature = "py-bindings")]
 impl FromJsonDict for Bytes {
-    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+    fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self> {
         let s: String = o.extract()?;
         if !s.starts_with("0x") {
             return Err(PyValueError::new_err(
@@ -104,14 +110,14 @@ impl FromJsonDict for Bytes {
     }
 }
 
-impl<N> ToClvm<N> for Bytes {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
-        encoder.encode_atom(self.0.as_slice())
+impl<N, E: ClvmEncoder<Node = N>> ToClvm<E> for Bytes {
+    fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
+        encoder.encode_atom(Atom::Borrowed(self.0.as_slice()))
     }
 }
 
-impl<N> FromClvm<N> for Bytes {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+impl<N, D: ClvmDecoder<Node = N>> FromClvm<D> for Bytes {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
         let bytes = decoder.decode_atom(&node)?;
         Ok(Self(bytes.as_ref().to_vec()))
     }
@@ -120,6 +126,12 @@ impl<N> FromClvm<N> for Bytes {
 impl From<&[u8]> for Bytes {
     fn from(value: &[u8]) -> Self {
         Self(value.to_vec())
+    }
+}
+
+impl<const N: usize> From<BytesImpl<N>> for Bytes {
+    fn from(value: BytesImpl<N>) -> Self {
+        Self(value.0.to_vec())
     }
 }
 
@@ -150,12 +162,20 @@ impl Deref for Bytes {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[cfg_attr(fuzzing, derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct BytesImpl<const N: usize>([u8; N]);
 
 impl<const N: usize> BytesImpl<N> {
-    pub fn new(bytes: [u8; N]) -> Self {
+    pub const fn new(bytes: [u8; N]) -> Self {
         Self(bytes)
+    }
+
+    pub const fn len(&self) -> usize {
+        N
+    }
+
+    pub const fn is_empty(&self) -> bool {
+        N == 0
     }
 
     pub fn as_slice(&self) -> &[u8] {
@@ -184,7 +204,7 @@ impl<const N: usize> fmt::Debug for BytesImpl<N> {
 }
 
 impl<const N: usize> fmt::Display for BytesImpl<N> {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&hex::encode(self))
     }
 }
@@ -205,14 +225,14 @@ impl<const N: usize> Streamable for BytesImpl<N> {
 
 #[cfg(feature = "py-bindings")]
 impl<const N: usize> ToJsonDict for BytesImpl<N> {
-    fn to_json_dict(&self, py: Python) -> PyResult<PyObject> {
+    fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
         Ok(format!("0x{self}").to_object(py))
     }
 }
 
 #[cfg(feature = "py-bindings")]
 impl<const N: usize> FromJsonDict for BytesImpl<N> {
-    fn from_json_dict(o: &PyAny) -> PyResult<Self> {
+    fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self> {
         let s: String = o.extract()?;
         if !s.starts_with("0x") {
             return Err(PyValueError::new_err(
@@ -237,14 +257,14 @@ impl<const N: usize> FromJsonDict for BytesImpl<N> {
     }
 }
 
-impl<N, const LEN: usize> ToClvm<N> for BytesImpl<LEN> {
-    fn to_clvm(&self, encoder: &mut impl ClvmEncoder<Node = N>) -> Result<N, ToClvmError> {
-        encoder.encode_atom(self.0.as_slice())
+impl<N, E: ClvmEncoder<Node = N>, const LEN: usize> ToClvm<E> for BytesImpl<LEN> {
+    fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
+        encoder.encode_atom(Atom::Borrowed(self.0.as_slice()))
     }
 }
 
-impl<N, const LEN: usize> FromClvm<N> for BytesImpl<LEN> {
-    fn from_clvm(decoder: &impl ClvmDecoder<Node = N>, node: N) -> Result<Self, FromClvmError> {
+impl<N, D: ClvmDecoder<Node = N>, const LEN: usize> FromClvm<D> for BytesImpl<LEN> {
+    fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
         let bytes = decoder.decode_atom(&node)?;
         if bytes.as_ref().len() != LEN {
             return Err(FromClvmError::WrongAtomLength {
@@ -277,6 +297,22 @@ impl<const N: usize> TryFrom<&Vec<u8>> for BytesImpl<N> {
 
     fn try_from(value: &Vec<u8>) -> Result<Self, TryFromSliceError> {
         value.as_slice().try_into()
+    }
+}
+
+impl<const N: usize> TryFrom<Bytes> for BytesImpl<N> {
+    type Error = TryFromSliceError;
+
+    fn try_from(value: Bytes) -> Result<Self, TryFromSliceError> {
+        value.0.as_slice().try_into()
+    }
+}
+
+impl<const N: usize> TryFrom<&Bytes> for BytesImpl<N> {
+    type Error = TryFromSliceError;
+
+    fn try_from(value: &Bytes) -> Result<Self, TryFromSliceError> {
+        value.0.as_slice().try_into()
     }
 }
 
@@ -341,29 +377,45 @@ pub type Bytes48 = BytesImpl<48>;
 pub type Bytes96 = BytesImpl<96>;
 pub type Bytes100 = BytesImpl<100>;
 
+impl From<Bytes32> for TreeHash {
+    fn from(value: Bytes32) -> Self {
+        Self::new(value.0)
+    }
+}
+
+impl From<TreeHash> for Bytes32 {
+    fn from(value: TreeHash) -> Self {
+        Self(value.to_bytes())
+    }
+}
+
 #[cfg(feature = "py-bindings")]
 impl<const N: usize> ToPyObject for BytesImpl<N> {
-    fn to_object(&self, py: Python) -> PyObject {
-        PyBytes::new(py, &self.0).into()
+    fn to_object(&self, py: Python<'_>) -> PyObject {
+        PyBytes::new_bound(py, &self.0).into()
     }
 }
 
 #[cfg(feature = "py-bindings")]
 impl<const N: usize> IntoPy<PyObject> for BytesImpl<N> {
-    fn into_py(self, py: Python) -> PyObject {
-        PyBytes::new(py, &self.0).into()
+    fn into_py(self, py: Python<'_>) -> PyObject {
+        PyBytes::new_bound(py, &self.0).into()
     }
 }
 
 #[cfg(feature = "py-bindings")]
 impl<const N: usize> ChiaToPython for BytesImpl<N> {
-    fn to_python<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
+    fn to_python<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
         if N == 32 {
-            let bytes_module = PyModule::import(py, "chia.types.blockchain_format.sized_bytes")?;
+            let bytes_module = PyModule::import_bound(py, "chia_rs.sized_bytes")?;
             let ty = bytes_module.getattr("bytes32")?;
             ty.call1((self.0.into_py(py),))
+        } else if N == 48 {
+            let bytes_module = PyModule::import_bound(py, "chia_rs.sized_bytes")?;
+            let ty = bytes_module.getattr("bytes48")?;
+            ty.call1((self.0.into_py(py),))
         } else {
-            Ok(PyBytes::new(py, &self.0).into())
+            Ok(PyBytes::new_bound(py, &self.0).into_any())
         }
     }
 }
@@ -371,7 +423,7 @@ impl<const N: usize> ChiaToPython for BytesImpl<N> {
 #[cfg(feature = "py-bindings")]
 impl<'py, const N: usize> FromPyObject<'py> for BytesImpl<N> {
     fn extract(obj: &'py PyAny) -> PyResult<Self> {
-        let b = <PyBytes as PyTryFrom>::try_from(obj)?;
+        let b = obj.downcast::<PyBytes>()?;
         let slice: &[u8] = b.as_bytes();
         let buf: [u8; N] = slice.try_into()?;
         Ok(BytesImpl::<N>(buf))
@@ -380,34 +432,35 @@ impl<'py, const N: usize> FromPyObject<'py> for BytesImpl<N> {
 
 #[cfg(feature = "py-bindings")]
 impl ToPyObject for Bytes {
-    fn to_object(&self, py: Python) -> PyObject {
-        PyBytes::new(py, &self.0).into()
+    fn to_object(&self, py: Python<'_>) -> PyObject {
+        PyBytes::new_bound(py, &self.0).into()
     }
 }
 
 #[cfg(feature = "py-bindings")]
 impl IntoPy<PyObject> for Bytes {
-    fn into_py(self, py: Python) -> PyObject {
-        PyBytes::new(py, &self.0).into()
+    fn into_py(self, py: Python<'_>) -> PyObject {
+        PyBytes::new_bound(py, &self.0).into()
     }
 }
 
 #[cfg(feature = "py-bindings")]
 impl ChiaToPython for Bytes {
-    fn to_python<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
-        Ok(PyBytes::new(py, &self.0).into())
+    fn to_python<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
+        Ok(PyBytes::new_bound(py, &self.0).into_any())
     }
 }
 
 #[cfg(feature = "py-bindings")]
 impl<'py> FromPyObject<'py> for Bytes {
     fn extract(obj: &'py PyAny) -> PyResult<Self> {
-        let b = <PyBytes as PyTryFrom>::try_from(obj)?;
+        let b = obj.downcast::<PyBytes>()?;
         Ok(Bytes(b.as_bytes().to_vec()))
     }
 }
 
 #[cfg(test)]
+#[allow(clippy::needless_pass_by_value)]
 mod tests {
     use super::*;
 
@@ -482,12 +535,12 @@ mod tests {
         }
     }
 
-    fn from_bytes<T: Streamable + std::fmt::Debug + std::cmp::PartialEq>(buf: &[u8], expected: T) {
+    fn from_bytes<T: Streamable + fmt::Debug + PartialEq>(buf: &[u8], expected: T) {
         let mut input = Cursor::<&[u8]>::new(buf);
         assert_eq!(T::parse::<false>(&mut input).unwrap(), expected);
     }
 
-    fn from_bytes_fail<T: Streamable + std::fmt::Debug + std::cmp::PartialEq>(
+    fn from_bytes_fail<T: Streamable + fmt::Debug + PartialEq>(
         buf: &[u8],
         expected: chia_error::Error,
     ) {
@@ -523,9 +576,9 @@ mod tests {
             24, 25, 26, 27, 28, 29, 30, 31, 32,
         ]
         .into();
-        println!("{:?}", val);
+        println!("{val:?}");
         let buf = stream(&val);
-        println!("buf: {:?}", buf);
+        println!("buf: {buf:?}");
         from_bytes(&buf, val);
     }
 

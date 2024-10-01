@@ -1,21 +1,20 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
+use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::gen::conditions::{
-    parse_conditions, MempoolVisitor, ParseState, Spend, SpendBundleConditions,
+    parse_conditions, MempoolVisitor, ParseState, SpendBundleConditions, SpendConditions,
 };
 use chia_consensus::gen::spend_visitor::SpendVisitor;
+use chia_fuzz::{make_list, BitCursor};
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
 use clvm_utils::tree_hash;
 use clvmr::{Allocator, NodePtr};
-use fuzzing_utils::{make_list, BitCursor};
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use chia_consensus::gen::flags::{
-    COND_ARGS_NIL, ENABLE_SOFTFORK_CONDITION, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
-};
+use chia_consensus::gen::flags::{NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
 
 fuzz_target!(|data: &[u8]| {
     let mut a = Allocator::new();
@@ -34,22 +33,15 @@ fuzz_target!(|data: &[u8]| {
             puzzle_hash: puzzle_hash.into(),
             amount,
         }
-        .coin_id()
-        .into(),
+        .coin_id(),
     );
     let parent_id = a.new_atom(&parent_id).expect("atom failed");
     let puzzle_hash = a.new_atom(&puzzle_hash).expect("atom failed");
 
     let mut state = ParseState::default();
 
-    for flags in &[
-        0,
-        COND_ARGS_NIL,
-        STRICT_ARGS_COUNT,
-        NO_UNKNOWN_CONDS,
-        ENABLE_SOFTFORK_CONDITION,
-    ] {
-        let mut coin_spend = Spend {
+    for flags in &[0, STRICT_ARGS_COUNT, NO_UNKNOWN_CONDS] {
+        let mut coin_spend = SpendConditions {
             parent_id,
             coin_amount: amount,
             puzzle_hash,
@@ -71,7 +63,7 @@ fuzz_target!(|data: &[u8]| {
             flags: 0_u32,
         };
         let mut visitor = MempoolVisitor::new_spend(&mut coin_spend);
-        let mut max_cost: u64 = 3300000000;
+        let mut max_cost = 3_300_000_000;
         let _ret = parse_conditions(
             &a,
             &mut ret,
@@ -80,6 +72,7 @@ fuzz_target!(|data: &[u8]| {
             input,
             *flags,
             &mut max_cost,
+            &TEST_CONSTANTS,
             &mut visitor,
         );
     }

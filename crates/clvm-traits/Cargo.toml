@@ -1,6 +1,6 @@
 [package]
 name = "clvm-traits"
-version = "0.5.2"
+version = "0.14.1"
 edition = "2021"
 license = "Apache-2.0"
 description = "Traits for encoding and decoding CLVM objects."
@@ -11,19 +11,22 @@ repository = "https://github.com/Chia-Network/chia_rs"
 [package.metadata.docs.rs]
 features = ["derive", "chia-bls"]
 
+[lints]
+workspace = true
+
 [features]
 derive = ["dep:clvm-derive"]
 chia-bls = ["dep:chia-bls"]
 py-bindings = ["dep:pyo3"]
 
 [dependencies]
-pyo3 = { version = ">=0.19.0", optional = true }
-clvmr = "0.6.0"
-clvm-derive = { version = "0.5.2", path = "../clvm-derive", optional = true }
-chia-bls = { version = "0.5.1", path = "../chia-bls", optional = true }
-num-bigint = "0.4.3"
-thiserror = "1.0.44"
+pyo3 = { workspace = true, optional = true }
+clvmr = { workspace = true }
+clvm-derive = { workspace = true, optional = true }
+chia-bls = { workspace = true, optional = true }
+num-bigint = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
-hex = "0.4.3"
-hex-literal = "0.4.1"
+hex = { workspace = true }
+hex-literal = { workspace = true }

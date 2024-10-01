@@ -2,12 +2,16 @@ name: Security audit
 on:
   pull_request:
     branches:
-      - '**'
+      - "**"
+
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('{0}-{1}', github.workflow_ref, github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   security_audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: cargo audit
         run: cargo audit --ignore RUSTSEC-2023-0071

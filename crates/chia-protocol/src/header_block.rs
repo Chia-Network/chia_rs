@@ -1,6 +1,6 @@
-use chia_streamable_macro::Streamable;
+use chia_streamable_macro::streamable;
 
-use crate::streamable_struct;
+use crate::unfinished_header_block::UnfinishedHeaderBlock;
 use crate::Bytes;
 use crate::Bytes32;
 use crate::EndOfSubSlotBundle;
@@ -9,7 +9,8 @@ use crate::VDFProof;
 use crate::{Foliage, FoliageTransactionBlock, TransactionsInfo};
 use chia_traits::Streamable;
 
-streamable_struct! (HeaderBlock {
+#[streamable]
+pub struct HeaderBlock {
     // If first sb
     finished_sub_slots: Vec<EndOfSubSlotBundle>,
     // Reward chain trunk data
@@ -30,7 +31,7 @@ streamable_struct! (HeaderBlock {
     transactions_filter: Bytes,
     // Reward chain foliage data (tx block additional)
     transactions_info: Option<TransactionsInfo>,
-});
+}
 
 impl HeaderBlock {
     pub fn prev_header_hash(&self) -> Bytes32 {
@@ -72,6 +73,18 @@ impl HeaderBlock {
     pub fn first_in_sub_slot(&self) -> bool {
         !self.finished_sub_slots.is_empty()
     }
+
+    pub fn into_unfinished_header_block(self) -> UnfinishedHeaderBlock {
+        UnfinishedHeaderBlock {
+            finished_sub_slots: self.finished_sub_slots,
+            reward_chain_block: self.reward_chain_block.get_unfinished(),
+            challenge_chain_sp_proof: self.challenge_chain_sp_proof,
+            reward_chain_sp_proof: self.reward_chain_sp_proof,
+            foliage: self.foliage,
+            foliage_transaction_block: self.foliage_transaction_block,
+            transactions_filter: self.transactions_filter,
+        }
+    }
 }
 
 #[cfg(feature = "py-bindings")]
@@ -96,13 +109,13 @@ impl HeaderBlock {
 
     #[getter]
     #[pyo3(name = "height")]
-    fn py_height<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
+    fn py_height<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
         ChiaToPython::to_python(&self.height(), py)
     }
 
     #[getter]
     #[pyo3(name = "weight")]
-    fn py_weight<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
+    fn py_weight<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
         ChiaToPython::to_python(&self.weight(), py)
     }
 
@@ -114,7 +127,7 @@ impl HeaderBlock {
 
     #[getter]
     #[pyo3(name = "total_iters")]
-    fn py_total_iters<'a>(&self, py: Python<'a>) -> PyResult<&'a PyAny> {
+    fn py_total_iters<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
         ChiaToPython::to_python(&self.total_iters(), py)
     }
 
