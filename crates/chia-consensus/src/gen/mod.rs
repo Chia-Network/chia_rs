@@ -8,7 +8,6 @@ pub mod messages;
 pub mod opcodes;
 pub mod owned_conditions;
 pub mod run_block_generator;
-pub mod run_puzzle;
 pub mod sanitize_int;
 pub mod solution_generator;
 pub mod spend_visitor;

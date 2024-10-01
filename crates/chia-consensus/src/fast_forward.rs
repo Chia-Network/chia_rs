@@ -155,16 +155,85 @@ pub fn fast_forward_singleton(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::consensus_constants::ConsensusConstants;
     use crate::consensus_constants::TEST_CONSTANTS;
     use crate::gen::conditions::MempoolVisitor;
-    use crate::gen::run_puzzle::run_puzzle;
+    use crate::gen::conditions::{
+        parse_conditions, ParseState, SpendBundleConditions, SpendConditions,
+    };
+    use crate::gen::spend_visitor::SpendVisitor;
+    use crate::gen::validation_error::ValidationErr;
+    use chia_protocol::Bytes32;
+    use chia_protocol::Coin;
     use chia_protocol::CoinSpend;
     use chia_traits::streamable::Streamable;
     use clvm_traits::ToClvm;
-    use clvmr::serde::{node_from_bytes, node_to_bytes};
+    use clvm_utils::tree_hash;
+    use clvmr::allocator::Allocator;
+    use clvmr::chia_dialect::ChiaDialect;
+    use clvmr::reduction::Reduction;
+    use clvmr::run_program::run_program;
+    use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs, node_to_bytes};
     use hex_literal::hex;
     use rstest::rstest;
     use std::fs;
+    use std::sync::Arc;
+
+    pub fn run_puzzle(
+        a: &mut Allocator,
+        puzzle: &[u8],
+        solution: &[u8],
+        parent_id: &[u8],
+        amount: u64,
+    ) -> core::result::Result<SpendBundleConditions, ValidationErr> {
+        let puzzle = node_from_bytes(a, puzzle)?;
+        let solution = node_from_bytes(a, solution)?;
+
+        let dialect = ChiaDialect::new(0);
+        let max_cost = 11_000_000_000;
+        let Reduction(clvm_cost, conditions) =
+            run_program(a, &dialect, puzzle, solution, max_cost)?;
+
+        let mut ret = SpendBundleConditions {
+            removal_amount: amount as u128,
+            ..Default::default()
+        };
+        let mut state = ParseState::default();
+
+        let puzzle_hash = tree_hash(a, puzzle);
+        let coin_id = Arc::<Bytes32>::new(
+            Coin {
+                parent_coin_info: parent_id.try_into().unwrap(),
+                puzzle_hash: puzzle_hash.into(),
+                amount,
+            }
+            .coin_id(),
+        );
+
+        let mut spend = SpendConditions::new(
+            a.new_atom(parent_id)?,
+            amount,
+            a.new_atom(&puzzle_hash)?,
+            coin_id,
+        );
+
+        let mut visitor = MempoolVisitor::new_spend(&mut spend);
+
+        let mut cost_left = max_cost - clvm_cost;
+        parse_conditions(
+            a,
+            &mut ret,
+            &mut state,
+            spend,
+            conditions,
+            0,
+            &mut cost_left,
+            &TEST_CONSTANTS,
+            &mut visitor,
+        )?;
+        ret.cost = max_cost - cost_left;
+        Ok(ret)
+    }
 
     // this test loads CoinSpends from file (Coin, puzzle, solution)-triples
     // and "fast-forwards" the spend onto a few different parent-parent coins
@@ -226,28 +295,22 @@ mod tests {
         let new_solution = node_to_bytes(&a, new_solution).expect("serialize new solution");
 
         // run original spend
-        let conditions1 = run_puzzle::<MempoolVisitor>(
+        let conditions1 = run_puzzle(
             &mut a,
             spend.puzzle_reveal.as_slice(),
             spend.solution.as_slice(),
             &spend.coin.parent_coin_info,
             spend.coin.amount,
-            11_000_000_000,
-            0,
-            &TEST_CONSTANTS,
         )
         .expect("run_puzzle");
 
         // run new spend
-        let conditions2 = run_puzzle::<MempoolVisitor>(
+        let conditions2 = run_puzzle(
             &mut a,
             spend.puzzle_reveal.as_slice(),
             new_solution.as_slice(),
             &new_coin.parent_coin_info,
             new_coin.amount,
-            11_000_000_000,
-            0,
-            &TEST_CONSTANTS,
         )
         .expect("run_puzzle");
 
