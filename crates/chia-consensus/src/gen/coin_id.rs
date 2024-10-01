@@ -1,6 +1,6 @@
 use chia_protocol::Bytes32;
+use chia_sha2::Sha256;
 use clvmr::allocator::{Allocator, NodePtr};
-use clvmr::sha2::Sha256;
 
 pub fn compute_coin_id(
     a: &Allocator,

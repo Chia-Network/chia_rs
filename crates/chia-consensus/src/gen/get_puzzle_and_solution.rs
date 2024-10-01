@@ -61,15 +61,15 @@ pub fn get_puzzle_and_solution_for_coin(
 mod test {
     use super::*;
     use crate::consensus_constants::TEST_CONSTANTS;
-    use crate::gen::conditions::{u64_to_bytes, MempoolVisitor};
     use crate::gen::flags::{ALLOW_BACKREFS, MEMPOOL_MODE};
+    use crate::gen::make_aggsig_final_message::u64_to_bytes;
     use crate::gen::run_block_generator::{run_block_generator2, setup_generator_args};
     use chia_protocol::Bytes32;
+    use chia_sha2::Sha256;
     use clvm_traits::FromClvm;
     use clvm_utils::tree_hash;
     use clvmr::reduction::Reduction;
     use clvmr::serde::node_from_bytes_backrefs;
-    use clvmr::sha2::Sha256;
     use clvmr::{run_program, ChiaDialect};
     use rstest::rstest;
     use std::collections::HashSet;
@@ -234,7 +234,7 @@ mod test {
 
         let mut a = Allocator::new();
         let blocks: &[&[u8]] = &[];
-        let conds = run_block_generator2::<_, MempoolVisitor, _>(
+        let conds = run_block_generator2(
             &mut a,
             &generator,
             blocks,

@@ -10,6 +10,10 @@ on:
     branches:
       - "**"
 
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('{0}-{1}', github.workflow_ref, github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   tests:
     name: Unit Tests
@@ -19,6 +23,9 @@ jobs:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
         python-version: ["3.8", "3.9", "3.10", "3.11"]
+
+    env:
+      stubtest_args: ${{ matrix.python-version == '3.11' && '--allowlist wheel/stubtest.allowlist.3-11-plus' || ''}}
 
     steps:
       - uses: actions/checkout@v4
@@ -58,7 +65,27 @@ jobs:
 
       - name: python mypy
         run: |
-          mypy --ignore-missing-imports tests
+          mypy tests
+
+      - name: python mypy stubtest
+        shell: bash
+        run: |
+          FAILURE=0
+          echo "::group::concise"
+          if ! stubtest ${{ env.stubtest_args }} --allowlist wheel/stubtest.allowlist --concise chia_rs
+          then
+            FAILURE=1
+          fi
+          echo "::endgroup::"
+
+          echo "::group::complete"
+          if ! stubtest ${{ env.stubtest_args }} --allowlist wheel/stubtest.allowlist chia_rs
+          then
+            FAILURE=1
+          fi
+          echo "::endgroup::"
+
+          exit ${FAILURE}
 
       - name: python black
         run: |

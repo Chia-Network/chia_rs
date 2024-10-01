@@ -1,6 +1,6 @@
 [package]
 name = "chia-bls"
-version = "0.13.0"
+version = "0.14.1"
 edition = "2021"
 license = "Apache-2.0"
 description = "BLS signature, verification and aggregation functions for the Chia blockchain"
@@ -17,10 +17,9 @@ arbitrary = ["dep:arbitrary"]
 
 [dependencies]
 chia-traits = { workspace = true }
+chia-sha2 = { workspace = true }
 chia_py_streamable_macro = { workspace = true, optional = true }
-anyhow = { workspace = true }
 sha2 = { workspace = true }
-clvmr = { workspace = true }
 hkdf = { workspace = true }
 blst = { workspace = true }
 hex = { workspace = true }

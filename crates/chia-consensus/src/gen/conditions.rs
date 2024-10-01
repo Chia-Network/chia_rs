@@ -17,15 +17,15 @@ use super::opcodes::{
 use super::sanitize_int::{sanitize_uint, SanitizedUint};
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
 use crate::consensus_constants::ConsensusConstants;
-use crate::gen::flags::{DISALLOW_INFINITY_G1, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
+use crate::gen::flags::{NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
 use crate::gen::messages::{Message, SpendId};
 use crate::gen::spend_visitor::SpendVisitor;
 use crate::gen::validation_error::check_nil;
 use chia_bls::PublicKey;
 use chia_protocol::Bytes32;
+use chia_sha2::Sha256;
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use clvmr::cost::Cost;
-use clvmr::sha2::Sha256;
 use std::cmp::{max, min};
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
@@ -867,17 +867,13 @@ fn decrement(cnt: &mut u32, n: NodePtr) -> Result<(), ValidationErr> {
     }
 }
 
-fn to_key(a: &Allocator, pk: NodePtr, flags: u32) -> Result<Option<PublicKey>, ValidationErr> {
+fn to_key(a: &Allocator, pk: NodePtr) -> Result<PublicKey, ValidationErr> {
     let key = PublicKey::from_bytes(a.atom(pk).as_ref().try_into().expect("internal error"))
         .map_err(|_| ValidationErr(pk, ErrorCode::InvalidPublicKey))?;
     if key.is_inf() {
-        if (flags & DISALLOW_INFINITY_G1) != 0 {
-            Err(ValidationErr(pk, ErrorCode::InvalidPublicKey))
-        } else {
-            Ok(None)
-        }
+        Err(ValidationErr(pk, ErrorCode::InvalidPublicKey))
     } else {
-        Ok(Some(key))
+        Ok(key)
     }
 }
 
@@ -1124,47 +1120,31 @@ pub fn parse_conditions<V: SpendVisitor>(
                 state.assert_concurrent_puzzle.insert(id);
             }
             Condition::AggSigMe(pk, msg) => {
-                if let Some(pk) = to_key(a, pk, flags)? {
-                    spend.agg_sig_me.push((pk, msg));
-                }
+                spend.agg_sig_me.push((to_key(a, pk)?, msg));
             }
             Condition::AggSigParent(pk, msg) => {
-                if let Some(pk) = to_key(a, pk, flags)? {
-                    spend.agg_sig_parent.push((pk, msg));
-                }
+                spend.agg_sig_parent.push((to_key(a, pk)?, msg));
             }
             Condition::AggSigPuzzle(pk, msg) => {
-                if let Some(pk) = to_key(a, pk, flags)? {
-                    spend.agg_sig_puzzle.push((pk, msg));
-                }
+                spend.agg_sig_puzzle.push((to_key(a, pk)?, msg));
             }
             Condition::AggSigAmount(pk, msg) => {
-                if let Some(pk) = to_key(a, pk, flags)? {
-                    spend.agg_sig_amount.push((pk, msg));
-                }
+                spend.agg_sig_amount.push((to_key(a, pk)?, msg));
             }
             Condition::AggSigPuzzleAmount(pk, msg) => {
-                if let Some(pk) = to_key(a, pk, flags)? {
-                    spend.agg_sig_puzzle_amount.push((pk, msg));
-                }
+                spend.agg_sig_puzzle_amount.push((to_key(a, pk)?, msg));
             }
             Condition::AggSigParentAmount(pk, msg) => {
-                if let Some(pk) = to_key(a, pk, flags)? {
-                    spend.agg_sig_parent_amount.push((pk, msg));
-                }
+                spend.agg_sig_parent_amount.push((to_key(a, pk)?, msg));
             }
             Condition::AggSigParentPuzzle(pk, msg) => {
-                if let Some(pk) = to_key(a, pk, flags)? {
-                    spend.agg_sig_parent_puzzle.push((pk, msg));
-                }
+                spend.agg_sig_parent_puzzle.push((to_key(a, pk)?, msg));
             }
             Condition::AggSigUnsafe(pk, msg) => {
                 // AGG_SIG_UNSAFE messages are not allowed to end with the
                 // suffix added to other AGG_SIG_* conditions
                 check_agg_sig_unsafe_message(a, msg, constants)?;
-                if let Some(pk) = to_key(a, pk, flags)? {
-                    ret.agg_sig_unsafe.push((pk, msg));
-                }
+                ret.agg_sig_unsafe.push((to_key(a, pk)?, msg));
             }
             Condition::Softfork(cost) => {
                 if *max_cost < cost {
@@ -1280,7 +1260,7 @@ pub fn parse_spends<V: SpendVisitor>(
         )?;
     }
 
-    validate_conditions(a, &ret, state, spends, flags)?;
+    validate_conditions(a, &ret, &state, spends, flags)?;
     ret.cost = max_cost - cost_left;
 
     Ok(ret)
@@ -1289,7 +1269,7 @@ pub fn parse_spends<V: SpendVisitor>(
 pub fn validate_conditions(
     a: &Allocator,
     ret: &SpendBundleConditions,
-    state: ParseState,
+    state: &ParseState,
     spends: NodePtr,
     _flags: u32,
 ) -> Result<(), ValidationErr> {
@@ -1329,13 +1309,13 @@ pub fn validate_conditions(
     }
 
     // check concurrent spent assertions
-    for coin_id in state.assert_concurrent_spend {
+    for coin_id in &state.assert_concurrent_spend {
         if !state
             .spent_coins
-            .contains_key(&Bytes32::try_from(a.atom(coin_id).as_ref()).unwrap())
+            .contains_key(&Bytes32::try_from(a.atom(*coin_id).as_ref()).unwrap())
         {
             return Err(ValidationErr(
-                coin_id,
+                *coin_id,
                 ErrorCode::AssertConcurrentSpendFailed,
             ));
         }
@@ -1346,14 +1326,14 @@ pub fn validate_conditions(
 
         // expand all the spent puzzle hashes into a set, to allow
         // fast lookups of all assertions
-        for ph in state.spent_puzzles {
-            spent_phs.insert(a.atom(ph).as_ref().try_into().unwrap());
+        for ph in &state.spent_puzzles {
+            spent_phs.insert(a.atom(*ph).as_ref().try_into().unwrap());
         }
 
-        for puzzle_assert in state.assert_concurrent_puzzle {
-            if !spent_phs.contains(&a.atom(puzzle_assert).as_ref().try_into().unwrap()) {
+        for puzzle_assert in &state.assert_concurrent_puzzle {
+            if !spent_phs.contains(&a.atom(*puzzle_assert).as_ref().try_into().unwrap()) {
                 return Err(ValidationErr(
-                    puzzle_assert,
+                    *puzzle_assert,
                     ErrorCode::AssertConcurrentPuzzleFailed,
                 ));
             }
@@ -1365,41 +1345,41 @@ pub fn validate_conditions(
     if !state.assert_coin.is_empty() {
         let mut announcements = HashSet::<Bytes32>::new();
 
-        for (coin_id, announce) in state.announce_coin {
+        for (coin_id, announce) in &state.announce_coin {
             let mut hasher = Sha256::new();
-            hasher.update(*coin_id);
-            hasher.update(a.atom(announce));
+            hasher.update(**coin_id);
+            hasher.update(a.atom(*announce));
             let announcement_id: [u8; 32] = hasher.finalize();
             announcements.insert(announcement_id.into());
         }
 
-        for coin_assert in state.assert_coin {
-            if !announcements.contains(&a.atom(coin_assert).as_ref().try_into().unwrap()) {
+        for coin_assert in &state.assert_coin {
+            if !announcements.contains(&a.atom(*coin_assert).as_ref().try_into().unwrap()) {
                 return Err(ValidationErr(
-                    coin_assert,
+                    *coin_assert,
                     ErrorCode::AssertCoinAnnouncementFailed,
                 ));
             }
         }
     }
 
-    for spend_idx in state.assert_ephemeral {
+    for spend_idx in &state.assert_ephemeral {
         // make sure this coin was created in this block
-        if !is_ephemeral(a, spend_idx, &state.spent_coins, &ret.spends) {
+        if !is_ephemeral(a, *spend_idx, &state.spent_coins, &ret.spends) {
             return Err(ValidationErr(
-                ret.spends[spend_idx].parent_id,
+                ret.spends[*spend_idx].parent_id,
                 ErrorCode::AssertEphemeralFailed,
             ));
         }
     }
 
-    for spend_idx in state.assert_not_ephemeral {
+    for spend_idx in &state.assert_not_ephemeral {
         // make sure this coin was NOT created in this block
         // because consensus rules do not allow relative conditions on
         // ephemeral spends
-        if is_ephemeral(a, spend_idx, &state.spent_coins, &ret.spends) {
+        if is_ephemeral(a, *spend_idx, &state.spent_coins, &ret.spends) {
             return Err(ValidationErr(
-                ret.spends[spend_idx].parent_id,
+                ret.spends[*spend_idx].parent_id,
                 ErrorCode::EphemeralRelativeCondition,
             ));
         }
@@ -1408,18 +1388,18 @@ pub fn validate_conditions(
     if !state.assert_puzzle.is_empty() {
         let mut announcements = HashSet::<Bytes32>::new();
 
-        for (puzzle_hash, announce) in state.announce_puzzle {
+        for (puzzle_hash, announce) in &state.announce_puzzle {
             let mut hasher = Sha256::new();
-            hasher.update(a.atom(puzzle_hash));
-            hasher.update(a.atom(announce));
+            hasher.update(a.atom(*puzzle_hash));
+            hasher.update(a.atom(*announce));
             let announcement_id: [u8; 32] = hasher.finalize();
             announcements.insert(announcement_id.into());
         }
 
-        for puzzle_assert in state.assert_puzzle {
-            if !announcements.contains(&a.atom(puzzle_assert).as_ref().try_into().unwrap()) {
+        for puzzle_assert in &state.assert_puzzle {
+            if !announcements.contains(&a.atom(*puzzle_assert).as_ref().try_into().unwrap()) {
                 return Err(ValidationErr(
-                    puzzle_assert,
+                    *puzzle_assert,
                     ErrorCode::AssertPuzzleAnnouncementFailed,
                 ));
             }
@@ -1454,19 +1434,6 @@ pub fn validate_conditions(
     Ok(())
 }
 
-#[cfg(test)]
-pub(crate) fn u64_to_bytes(n: u64) -> Vec<u8> {
-    let mut buf = Vec::<u8>::new();
-    buf.extend_from_slice(&n.to_be_bytes());
-    if (buf[0] & 0x80) != 0 {
-        buf.insert(0, 0);
-    } else {
-        while buf.len() > 1 && buf[0] == 0 && (buf[1] & 0x80) == 0 {
-            buf.remove(0);
-        }
-    }
-    buf
-}
 #[cfg(test)]
 use crate::consensus_constants::TEST_CONSTANTS;
 #[cfg(test)]
@@ -1540,6 +1507,9 @@ const LONGMSG: &[u8; 1025] = &[
     4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
     4,
 ];
+
+#[cfg(test)]
+use crate::gen::make_aggsig_final_message::u64_to_bytes;
 
 #[cfg(test)]
 fn hash_buf(b1: &[u8], b2: &[u8]) -> Vec<u8> {
@@ -3123,7 +3093,7 @@ fn test_agg_sig_invalid_pubkey(
 #[case(AGG_SIG_UNSAFE)]
 fn test_agg_sig_infinity_pubkey(
     #[case] condition: ConditionOpcode,
-    #[values(DISALLOW_INFINITY_G1, 0)] mempool: u32,
+    #[values(MEMPOOL_MODE, 0)] mempool: u32,
 ) {
     let ret = cond_test_flag(
         &format!(
@@ -3133,21 +3103,7 @@ fn test_agg_sig_infinity_pubkey(
             mempool
     );
 
-    if mempool != 0 {
-        assert_eq!(ret.unwrap_err().1, ErrorCode::InvalidPublicKey);
-    } else {
-        let ret = ret.expect("expected conditions to be valid").1;
-        assert!(ret.agg_sig_unsafe.is_empty());
-        for c in ret.spends {
-            assert!(c.agg_sig_me.is_empty());
-            assert!(c.agg_sig_parent.is_empty());
-            assert!(c.agg_sig_puzzle.is_empty());
-            assert!(c.agg_sig_amount.is_empty());
-            assert!(c.agg_sig_puzzle_amount.is_empty());
-            assert!(c.agg_sig_parent_amount.is_empty());
-            assert!(c.agg_sig_parent_puzzle.is_empty());
-        }
-    }
+    assert_eq!(ret.unwrap_err().1, ErrorCode::InvalidPublicKey);
 }
 
 #[cfg(test)]

@@ -1,8 +1,14 @@
 use crate::{DerivableKey, Error, PublicKey, Result};
 use blst::*;
+use chia_sha2::Sha256;
 use chia_traits::{read_bytes, Streamable};
-use clvmr::sha2::Sha256;
 use hkdf::HkdfExtract;
+#[cfg(feature = "py-bindings")]
+use pyo3::exceptions::PyNotImplementedError;
+#[cfg(feature = "py-bindings")]
+use pyo3::prelude::*;
+#[cfg(feature = "py-bindings")]
+use pyo3::types::PyType;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
@@ -266,6 +272,14 @@ impl SecretKey {
         hex::encode(self.to_bytes())
     }
 
+    #[classmethod]
+    #[pyo3(name = "from_parent")]
+    pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: &Self) -> PyResult<PyObject> {
+        Err(PyNotImplementedError::new_err(
+            "SecretKey does not support from_parent().",
+        ))
+    }
+
     #[pyo3(name = "derive_hardened")]
     #[must_use]
     pub fn py_derive_hardened(&self, idx: u32) -> Self {
@@ -292,7 +306,6 @@ mod pybindings {
     use crate::parse_hex::parse_hex_string;
 
     use chia_traits::{FromJsonDict, ToJsonDict};
-    use pyo3::prelude::*;
 
     impl ToJsonDict for SecretKey {
         fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
@@ -557,7 +570,11 @@ mod pytests {
             let sk = SecretKey::from_seed(&data);
             Python::with_gil(|py| {
                 let string = sk.to_json_dict(py).expect("to_json_dict");
-                let sk2 = SecretKey::from_json_dict(string.bind(py)).unwrap();
+                let py_class = py.get_type_bound::<SecretKey>();
+                let sk2 = SecretKey::from_json_dict(&py_class, py, string.bind(py))
+                    .unwrap()
+                    .extract(py)
+                    .unwrap();
                 assert_eq!(sk, sk2);
                 assert_eq!(sk.public_key(), sk2.public_key());
             });
@@ -588,8 +605,10 @@ mod pytests {
     fn test_json_dict(#[case] input: &str, #[case] msg: &str) {
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
+            let py_class = py.get_type_bound::<SecretKey>();
             let err =
-                SecretKey::from_json_dict(input.to_string().into_py(py).bind(py)).unwrap_err();
+                SecretKey::from_json_dict(&py_class, py, input.to_string().into_py(py).bind(py))
+                    .unwrap_err();
             assert_eq!(err.value_bound(py).to_string(), msg.to_string());
         });
     }

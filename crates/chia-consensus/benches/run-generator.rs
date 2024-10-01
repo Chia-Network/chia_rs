@@ -1,5 +1,4 @@
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
-use chia_consensus::gen::conditions::MempoolVisitor;
 use chia_consensus::gen::flags::ALLOW_BACKREFS;
 use chia_consensus::gen::run_block_generator::{run_block_generator, run_block_generator2};
 use clvmr::serde::{node_from_bytes, node_to_bytes_backrefs};
@@ -51,7 +50,7 @@ fn run(c: &mut Criterion) {
                     let mut a = Allocator::new();
                     let start = Instant::now();
 
-                    let conds = run_block_generator::<_, MempoolVisitor, _>(
+                    let conds = run_block_generator(
                         &mut a,
                         gen,
                         &block_refs,
@@ -69,7 +68,7 @@ fn run(c: &mut Criterion) {
                     let mut a = Allocator::new();
                     let start = Instant::now();
 
-                    let conds = run_block_generator2::<_, MempoolVisitor, _>(
+                    let conds = run_block_generator2(
                         &mut a,
                         gen,
                         &block_refs,

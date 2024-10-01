@@ -10,6 +10,10 @@ on:
     branches:
       - "**"
 
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('{0}-{1}', github.workflow_ref, github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   build_crate:
     name: Build crate
@@ -27,6 +31,12 @@ jobs:
 
       - name: Clippy
         run: cargo clippy --workspace --all-features --all-targets
+
+      - name: Install cargo-machete
+        run: cargo install cargo-machete
+
+      - name: Unused dependencies
+        run: cargo machete
 
       - name: Tests (debug)
         run: cargo test --workspace --all-features

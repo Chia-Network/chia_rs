@@ -14,6 +14,7 @@ workspace = true
 [dependencies]
 libfuzzer-sys = { workspace = true }
 clvmr = { workspace = true }
+chia-sha2 = { workspace = true }
 chia-traits = { workspace = true }
 clvm-traits = { workspace = true }
 chia-protocol = { workspace = true, features = ["arbitrary"] }

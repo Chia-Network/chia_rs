@@ -12,13 +12,12 @@ repository = "https://github.com/Chia-Network/chia_rs"
 workspace = true
 
 [features]
-py-bindings = ["dep:pyo3", "chia-traits/py-bindings"]
+py-bindings = ["dep:pyo3"]
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-chia-traits = { workspace = true }
 clvmr = { workspace = true }
 pyo3 = { workspace = true, optional = true }
 

@@ -1,9 +1,9 @@
 use crate::consensus_constants::ConsensusConstants;
 use crate::gen::conditions::{
-    parse_spends, process_single_spend, validate_conditions, ParseState, SpendBundleConditions,
+    parse_spends, process_single_spend, validate_conditions, EmptyVisitor, ParseState,
+    SpendBundleConditions,
 };
 use crate::gen::flags::ALLOW_BACKREFS;
-use crate::gen::spend_visitor::SpendVisitor;
 use crate::gen::validation_error::{first, ErrorCode, ValidationErr};
 use crate::generator_rom::{CLVM_DESERIALIZER, GENERATOR_ROM};
 use clvm_utils::{tree_hash_cached, TreeHash};
@@ -67,7 +67,7 @@ where
 // the only reason we need to pass in the allocator is because the returned
 // SpendBundleConditions contains NodePtr fields. If that's changed, we could
 // create the allocator inside this functions as well.
-pub fn run_block_generator<GenBuf: AsRef<[u8]>, V: SpendVisitor, I: IntoIterator<Item = GenBuf>>(
+pub fn run_block_generator<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
     a: &mut Allocator,
     program: &[u8],
     block_refs: I,
@@ -112,7 +112,8 @@ where
 
     // we pass in what's left of max_cost here, to fail early in case the
     // cost of a condition brings us over the cost limit
-    let mut result = parse_spends::<V>(a, generator_output, cost_left, flags, constants)?;
+    let mut result =
+        parse_spends::<EmptyVisitor>(a, generator_output, cost_left, flags, constants)?;
     result.cost += max_cost - cost_left;
     Ok(result)
 }
@@ -146,7 +147,7 @@ pub fn extract_n<const N: usize>(
 // you only pay cost for the generator, the puzzles and the conditions).
 // it also does not apply the stack depth or object allocation limits the same,
 // as each puzzle run in its own environment.
-pub fn run_block_generator2<GenBuf: AsRef<[u8]>, V: SpendVisitor, I: IntoIterator<Item = GenBuf>>(
+pub fn run_block_generator2<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
     a: &mut Allocator,
     program: &[u8],
     block_refs: I,
@@ -198,7 +199,7 @@ where
         let buf = tree_hash_cached(a, puzzle, &backrefs, &mut cache);
         let puzzle_hash = a.new_atom(&buf)?;
 
-        process_single_spend::<V>(
+        process_single_spend::<EmptyVisitor>(
             a,
             &mut ret,
             &mut state,
@@ -215,7 +216,7 @@ where
         return Err(ValidationErr(all_spends, ErrorCode::GeneratorRuntimeError));
     }
 
-    validate_conditions(a, &ret, state, a.nil(), flags)?;
+    validate_conditions(a, &ret, &state, a.nil(), flags)?;
 
     ret.cost = max_cost - cost_left;
     Ok(ret)

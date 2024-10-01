@@ -2,8 +2,14 @@ use crate::secret_key::is_all_zero;
 use crate::{DerivableKey, Error, Result};
 
 use blst::*;
+use chia_sha2::Sha256;
 use chia_traits::{read_bytes, Streamable};
-use clvmr::sha2::Sha256;
+#[cfg(feature = "py-bindings")]
+use pyo3::exceptions::PyNotImplementedError;
+#[cfg(feature = "py-bindings")]
+use pyo3::prelude::*;
+#[cfg(feature = "py-bindings")]
+use pyo3::types::PyType;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
@@ -321,6 +327,14 @@ impl PublicKey {
         other.pair(self)
     }
 
+    #[classmethod]
+    #[pyo3(name = "from_parent")]
+    pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: &Self) -> PyResult<PyObject> {
+        Err(PyNotImplementedError::new_err(
+            "PublicKey does not support from_parent().",
+        ))
+    }
+
     #[pyo3(name = "get_fingerprint")]
     pub fn py_get_fingerprint(&self) -> u32 {
         self.get_fingerprint()
@@ -353,7 +367,6 @@ mod pybindings {
     use crate::parse_hex::parse_hex_string;
 
     use chia_traits::{FromJsonDict, ToJsonDict};
-    use pyo3::prelude::*;
 
     impl ToJsonDict for PublicKey {
         fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
@@ -737,7 +750,11 @@ mod pytests {
             let pk = sk.public_key();
             Python::with_gil(|py| {
                 let string = pk.to_json_dict(py).expect("to_json_dict");
-                let pk2 = PublicKey::from_json_dict(string.bind(py)).unwrap();
+                let py_class = py.get_type_bound::<PublicKey>();
+                let pk2: PublicKey = PublicKey::from_json_dict(&py_class, py, string.bind(py))
+                    .unwrap()
+                    .extract(py)
+                    .unwrap();
                 assert_eq!(pk, pk2);
             });
         }
@@ -752,8 +769,10 @@ mod pytests {
     fn test_json_dict(#[case] input: &str, #[case] msg: &str) {
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
+            let py_class = py.get_type_bound::<PublicKey>();
             let err =
-                PublicKey::from_json_dict(input.to_string().into_py(py).bind(py)).unwrap_err();
+                PublicKey::from_json_dict(&py_class, py, input.to_string().into_py(py).bind(py))
+                    .unwrap_err();
             assert_eq!(err.value_bound(py).to_string(), msg.to_string());
         });
     }

@@ -1,9 +1,10 @@
 [package]
 name = "chia_rs"
-version = "0.13.0"
+version = "0.14.1"
 authors = ["Richard Kiss <him@richardkiss.com>"]
 edition = "2021"
 license = "Apache-2.0"
+license-file = "../LICENSE"
 description = "Code useful for implementing chia consensus."
 homepage = "https://github.com/Chia-Network/chia_rs"
 repository = "https://github.com/Chia-Network/chia_rs"
@@ -23,14 +24,9 @@ python-source = "python"
 [dependencies]
 clvmr = { workspace = true }
 hex = { workspace = true }
-
 pyo3 = { workspace = true, features = ["multiple-pymethods"] }
 chia-consensus = { workspace = true, features = ["py-bindings"] }
 chia-bls = { workspace = true, features = ["py-bindings"]  }
 chia-datalayer = { workspace = true, features = ["py-bindings"]  }
 chia-protocol = { workspace = true, features = ["py-bindings"]  }
-chia-traits = { workspace = true, features = ["py-bindings"]  }
-clvm-traits = { workspace = true, features = ["derive", "py-bindings"] }
 clvm-utils = { workspace = true }
-chia_py_streamable_macro = { workspace = true }
-chia_streamable_macro = { workspace = true }

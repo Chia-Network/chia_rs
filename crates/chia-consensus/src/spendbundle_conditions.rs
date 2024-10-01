@@ -4,7 +4,7 @@ use crate::gen::conditions::{
 };
 use crate::gen::flags::MEMPOOL_MODE;
 use crate::gen::run_block_generator::subtract_cost;
-use crate::gen::solution_generator::solution_generator;
+use crate::gen::solution_generator::calculate_generator_length;
 use crate::gen::validation_error::ValidationErr;
 use crate::spendbundle_validation::get_flags_for_height_and_constants;
 use chia_protocol::SpendBundle;
@@ -15,6 +15,8 @@ use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
 use clvmr::serde::node_from_bytes;
 
+const QUOTE_BYTES: usize = 2;
+
 pub fn get_conditions_from_spendbundle(
     a: &mut Allocator,
     spend_bundle: &SpendBundle,
@@ -22,8 +24,6 @@ pub fn get_conditions_from_spendbundle(
     height: u32,
     constants: &ConsensusConstants,
 ) -> Result<SpendBundleConditions, ValidationErr> {
-    const QUOTE_BYTES_COST: usize = 2;
-
     let flags = get_flags_for_height_and_constants(height, constants) | MEMPOOL_MODE;
 
     // below is an adapted version of the code from run_block_generators::run_block_generator2()
@@ -32,17 +32,11 @@ pub fn get_conditions_from_spendbundle(
     let dialect = ChiaDialect::new(flags);
     let mut ret = SpendBundleConditions::default();
     let mut state = ParseState::default();
-
-    let spends_info = spend_bundle.coin_spends.iter().map(|coin_spend| {
-        (
-            coin_spend.coin,
-            &coin_spend.puzzle_reveal,
-            &coin_spend.solution,
-        )
-    });
     // We don't pay the size cost (nor execution cost) of being wrapped by a
     // quote (in solution_generator).
-    let generator_length_without_quote = solution_generator(spends_info)?.len() - QUOTE_BYTES_COST;
+    let generator_length_without_quote =
+        calculate_generator_length(&spend_bundle.coin_spends) - QUOTE_BYTES;
+
     let byte_cost = generator_length_without_quote as u64 * constants.cost_per_byte;
     subtract_cost(a, &mut cost_left, byte_cost)?;
 
@@ -72,7 +66,7 @@ pub fn get_conditions_from_spendbundle(
         )?;
     }
 
-    validate_conditions(a, &ret, state, a.nil(), flags)?;
+    validate_conditions(a, &ret, &state, a.nil(), flags)?;
     assert!(max_cost >= cost_left);
     ret.cost = max_cost - cost_left;
     Ok(ret)
@@ -86,12 +80,16 @@ mod tests {
     use crate::allocator::make_allocator;
     use crate::gen::conditions::{ELIGIBLE_FOR_DEDUP, ELIGIBLE_FOR_FF};
     use crate::gen::run_block_generator::run_block_generator2;
+    use crate::gen::solution_generator::solution_generator;
     use chia_bls::Signature;
     use chia_protocol::CoinSpend;
     use chia_traits::Streamable;
     use clvmr::chia_dialect::LIMIT_HEAP;
     use rstest::rstest;
     use std::fs::read;
+
+    const QUOTE_EXECUTION_COST: u64 = 20;
+    const QUOTE_BYTES_COST: u64 = QUOTE_BYTES as u64 * TEST_CONSTANTS.cost_per_byte;
 
     #[rstest]
     #[case("3000253", 8, 2, 51_216_870)]
@@ -103,9 +101,6 @@ mod tests {
         #[values(0, 1, 1_000_000, 5_000_000)] height: u32,
         #[case] cost: u64,
     ) {
-        const QUOTE_EXECUTION_COST: u64 = 20;
-        const QUOTE_BYTE_COST: u64 = 2 * TEST_CONSTANTS.cost_per_byte;
-
         let bundle = SpendBundle::from_bytes(
             &read(format!("../../test-bundles/{filename}.bundle")).expect("read file"),
         )
@@ -133,7 +128,7 @@ mod tests {
         });
         let program = solution_generator(program_spends).expect("solution_generator failed");
         let blocks: &[&[u8]] = &[];
-        let block_conds = run_block_generator2::<_, MempoolVisitor, _>(
+        let block_conds = run_block_generator2(
             &mut a,
             program.as_slice(),
             blocks,
@@ -146,7 +141,7 @@ mod tests {
         // does not include the overhead to make a block.
         assert_eq!(
             conditions.cost,
-            block_conds.cost - QUOTE_EXECUTION_COST - QUOTE_BYTE_COST
+            block_conds.cost - QUOTE_EXECUTION_COST - QUOTE_BYTES_COST
         );
     }
 
@@ -312,7 +307,7 @@ mod tests {
         // of just the spend bundle will be lower
         let (block_cost, block_output) = {
             let mut a = make_allocator(DEFAULT_FLAGS);
-            let block_conds = run_block_generator::<_, MempoolVisitor, _>(
+            let block_conds = run_block_generator(
                 &mut a,
                 &generator_buffer,
                 &block_refs,
@@ -353,7 +348,6 @@ mod tests {
                         &coin_spend.solution,
                     )
                 });
-                const QUOTE_BYTES: usize = 2;
                 let generator_length_without_quote = solution_generator(program_spends)
                     .expect("solution_generator failed")
                     .len()

@@ -2,8 +2,8 @@
 use libfuzzer_sys::fuzz_target;
 
 use chia_consensus::gen::conditions::parse_args;
+use chia_fuzz::{make_list, BitCursor};
 use clvmr::allocator::Allocator;
-use fuzzing_utils::{make_list, BitCursor};
 
 use chia_consensus::gen::flags::STRICT_ARGS_COUNT;
 

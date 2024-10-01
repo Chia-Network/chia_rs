@@ -2,9 +2,9 @@
 use clvm_traits::{FromClvm, ToClvm};
 use libfuzzer_sys::fuzz_target;
 
+use chia_fuzz::{make_tree, BitCursor};
 use clvm_utils::CurriedProgram;
 use clvmr::allocator::{Allocator, NodePtr};
-use fuzzing_utils::{make_tree, BitCursor};
 
 fuzz_target!(|data: &[u8]| {
     let mut a = Allocator::new();
