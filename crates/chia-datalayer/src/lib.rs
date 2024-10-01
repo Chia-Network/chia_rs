@@ -1553,7 +1553,7 @@ mod tests {
     }
 
     #[test]
-    fn test_delete_root() {
+    fn test_delete_last() {
         let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
 
         let key_value_id: KvId = 1;
