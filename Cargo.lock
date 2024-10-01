@@ -377,6 +377,7 @@ dependencies = [
  "clvm-utils",
  "clvmr",
  "hex-literal",
+ "num-traits",
  "open",
  "percent-encoding",
  "pyo3",
