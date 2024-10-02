@@ -1697,6 +1697,59 @@ mod tests {
         assert_eq!(merkle_blob.key_to_index.len(), 1);
     }
 
+    #[rstest]
+    fn test_insert_second(#[values(Side::Left, Side::Right)] side: Side) {
+        let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
+
+        let key_value_id: KvId = 1;
+        // open_dot(&mut merkle_blob.to_dot().set_note("empty"));
+        merkle_blob
+            .insert(
+                key_value_id,
+                key_value_id,
+                &hash(&key_value_id),
+                InsertLocation::Auto,
+            )
+            .unwrap();
+        // open_dot(&mut merkle_blob.to_dot().set_note("first after"));
+        let key_value_id: KvId = 2;
+        merkle_blob
+            .insert(
+                key_value_id,
+                key_value_id,
+                &hash(&key_value_id),
+                InsertLocation::Leaf {
+                    index: 0,
+                    side: side.clone(),
+                },
+            )
+            .unwrap();
+        // open_dot(&mut merkle_blob.to_dot().set_note("first after"));
+
+        let root = merkle_blob.get_node(0).unwrap();
+        let NodeSpecific::Internal { left, right } = root.specific else {
+            panic!()
+        };
+
+        let NodeSpecific::Leaf { key: left_key, .. } = merkle_blob.get_node(left).unwrap().specific
+        else {
+            panic!()
+        };
+        let NodeSpecific::Leaf { key: right_key, .. } =
+            merkle_blob.get_node(right).unwrap().specific
+        else {
+            panic!()
+        };
+
+        let expected_keys: [KvId; 2] = match side {
+            Side::Left => [2, 1],
+            Side::Right => [1, 2],
+        };
+        assert_eq!([left_key, right_key], expected_keys);
+
+        merkle_blob.check();
+    }
+
     #[test]
     fn test_delete_last() {
         let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
