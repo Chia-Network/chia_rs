@@ -91,6 +91,20 @@ fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
     hasher.finalize()
 }
 
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+pub enum Side {
+    Left,
+    Right,
+}
+
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+pub enum InsertLocation {
+    Auto,
+    AsRoot,
+    Leaf { index: TreeIndex, side: Side },
+}
+
+// TODO: this should probably be test code?
 pub struct DotLines {
     nodes: Vec<String>,
     connections: Vec<String>,
@@ -467,22 +481,53 @@ impl MerkleBlob {
         })
     }
 
-    pub fn insert(&mut self, key: KvId, value: KvId, hash: &Hash) -> Result<(), String> {
-        // TODO: what about only unused providing a blob length?
-        if self.blob.is_empty() {
-            self.insert_first(key, value, hash);
-        } else {
-            let mut hasher = Sha256::new();
-            hasher.update(key.to_be_bytes());
-            let seed: Hash = hasher.finalize();
-            // TODO: make this a parameter so we have one insert call where you specify the location
-            let old_leaf = self.get_random_leaf_node(seed)?;
-            let internal_node_hash = internal_hash(&old_leaf.hash, hash);
+    pub fn insert(
+        &mut self,
+        key: KvId,
+        value: KvId,
+        hash: &Hash,
+        insert_location: InsertLocation,
+    ) -> Result<(), String> {
+        let insert_location = match insert_location {
+            InsertLocation::Auto => self.get_random_insert_location_by_kvid(key)?,
+            _ => insert_location,
+        };
 
-            if self.key_to_index.len() == 1 {
-                self.insert_second(key, value, hash, &old_leaf, &internal_node_hash);
-            } else {
-                self.insert_third_or_later(key, value, hash, &old_leaf, &internal_node_hash)?;
+        match insert_location {
+            InsertLocation::Auto => {
+                panic!("this should have been caught and processed above")
+            }
+            InsertLocation::AsRoot => {
+                // TODO: what about only unused blocks resulting in a non-empty blob?
+                assert!(self.blob.is_empty());
+                self.insert_first(key, value, hash);
+            }
+            InsertLocation::Leaf { index, side } => {
+                // TODO: what about only unused blocks resulting ia blob length?
+                assert!(!self.blob.is_empty());
+                let old_leaf = self.get_node(index)?;
+                match old_leaf.specific {
+                    NodeSpecific::Leaf { .. } => {}
+                    NodeSpecific::Internal { .. } => panic!(),
+                }
+                // let NodeSpecific::Leaf ( .. ) = old_leaf.specific else { panic!() };
+                let internal_node_hash = match side {
+                    Side::Left => internal_hash(hash, &old_leaf.hash),
+                    Side::Right => internal_hash(&old_leaf.hash, hash),
+                };
+
+                if self.key_to_index.len() == 1 {
+                    self.insert_second(key, value, hash, &old_leaf, &internal_node_hash, &side)?;
+                } else {
+                    self.insert_third_or_later(
+                        key,
+                        value,
+                        hash,
+                        &old_leaf,
+                        &internal_node_hash,
+                        &side,
+                    )?;
+                }
             }
         }
 
@@ -517,8 +562,11 @@ impl MerkleBlob {
         hash: &Hash,
         old_leaf: &Node,
         internal_node_hash: &Hash,
-    ) {
+        side: &Side,
+    ) -> Result<(), String> {
         self.blob.clear();
+        self.blob.resize(BLOCK_SIZE * 3, 0);
+        self.free_indexes.clear();
 
         let new_internal_block = Block {
             metadata: NodeMetadata {
@@ -533,50 +581,50 @@ impl MerkleBlob {
             },
         };
 
-        self.blob.extend(new_internal_block.to_bytes());
+        self.insert_entry_to_blob(0, new_internal_block.to_bytes())?;
 
         let (old_leaf_key, old_leaf_value) = old_leaf.key_value();
-
-        let left_leaf_block = Block {
-            metadata: NodeMetadata {
-                node_type: NodeType::Leaf,
-                dirty: false,
-            },
-            node: Node {
+        let nodes = [
+            Node {
                 parent: Some(0),
                 specific: NodeSpecific::Leaf {
                     key: old_leaf_key,
                     value: old_leaf_value,
                 },
                 hash: old_leaf.hash,
-                index: 1,
+                index: match side {
+                    Side::Left => 2,
+                    Side::Right => 1,
+                },
             },
-        };
-        self.blob.extend(left_leaf_block.to_bytes());
-        let (left_leaf_key, _) = left_leaf_block.node.key_value();
-        self.key_to_index
-            .insert(left_leaf_key, left_leaf_block.node.index);
-
-        let right_leaf_block = Block {
-            metadata: NodeMetadata {
-                node_type: NodeType::Leaf,
-                dirty: false,
-            },
-            node: Node {
+            Node {
                 parent: Some(0),
                 specific: NodeSpecific::Leaf { key, value },
                 hash: *hash,
-                index: 2,
+                index: match side {
+                    Side::Left => 1,
+                    Side::Right => 2,
+                },
             },
-        };
-        self.blob.extend(right_leaf_block.to_bytes());
-        self.key_to_index.insert(
-            right_leaf_block.node.key_value().0,
-            right_leaf_block.node.index,
-        );
+        ];
 
-        self.free_indexes.clear();
+        for node in nodes {
+            let block = Block {
+                metadata: NodeMetadata {
+                    node_type: NodeType::Leaf,
+                    dirty: false,
+                },
+                node,
+            };
+
+            self.insert_entry_to_blob(block.node.index, block.to_bytes())?;
+            self.key_to_index
+                .insert(block.node.key_value().0, block.node.index);
+        }
+
         self.last_allocated_index = 3;
+
+        Ok(())
     }
 
     fn insert_third_or_later(
@@ -586,6 +634,7 @@ impl MerkleBlob {
         hash: &Hash,
         old_leaf: &Node,
         internal_node_hash: &Hash,
+        side: &Side,
     ) -> Result<(), String> {
         let new_leaf_index = self.get_new_index();
         let new_internal_node_index = self.get_new_index();
@@ -604,6 +653,10 @@ impl MerkleBlob {
         };
         self.insert_entry_to_blob(new_leaf_index, new_leaf_block.to_bytes())?;
 
+        let (left_leaf_node, right_leaf_node) = match side {
+            Side::Left => (&new_leaf_block.node, old_leaf),
+            Side::Right => (old_leaf, &new_leaf_block.node),
+        };
         let new_internal_block = Block {
             metadata: NodeMetadata {
                 node_type: NodeType::Internal,
@@ -612,8 +665,8 @@ impl MerkleBlob {
             node: Node {
                 parent: old_leaf.parent,
                 specific: NodeSpecific::Internal {
-                    left: old_leaf.index,
-                    right: new_leaf_index,
+                    left: left_leaf_node.index,
+                    right: right_leaf_node.index,
                 },
                 hash: *internal_node_hash,
                 index: new_internal_node_index,
@@ -734,7 +787,7 @@ impl MerkleBlob {
 
     pub fn upsert(&mut self, key: KvId, value: KvId, new_hash: &Hash) -> Result<(), String> {
         let Some(leaf_index) = self.key_to_index.get(&key) else {
-            self.insert(key, value, new_hash)?;
+            self.insert(key, value, new_hash, InsertLocation::Auto)?;
             return Ok(());
         };
 
@@ -831,16 +884,31 @@ impl MerkleBlob {
         }
     }
 
-    fn get_random_leaf_node(&self, seed_bytes: Hash) -> Result<Node, String> {
-        let mut hasher = Sha256::new();
-        hasher.update(seed_bytes);
-        let seed: Hash = hasher.finalize();
+    fn get_random_insert_location_by_seed(
+        &self,
+        seed_bytes: &[u8],
+    ) -> Result<InsertLocation, String> {
+        if self.blob.is_empty() {
+            return Ok(InsertLocation::AsRoot);
+        }
 
+        let side = if (seed_bytes.last().unwrap() & 1 << 7) == 0 {
+            Side::Left
+        } else {
+            Side::Right
+        };
         let mut node = self.get_node(0)?;
-        for byte in seed {
+
+        // TODO: handle deeper depths than the seed
+        for byte in seed_bytes {
             for bit in 0..8 {
                 match node.specific {
-                    NodeSpecific::Leaf { .. } => return Ok(node),
+                    NodeSpecific::Leaf { .. } => {
+                        return Ok(InsertLocation::Leaf {
+                            index: node.index,
+                            side,
+                        })
+                    }
                     NodeSpecific::Internal { left, right, .. } => {
                         let next: TreeIndex = if byte & (1 << bit) != 0 { left } else { right };
                         node = self.get_node(next)?;
@@ -850,6 +918,14 @@ impl MerkleBlob {
         }
 
         Err("failed to find a node".to_string())
+    }
+
+    fn get_random_insert_location_by_kvid(&self, seed: KvId) -> Result<InsertLocation, String> {
+        let mut hasher = Sha256::new();
+        hasher.update(seed.to_be_bytes());
+        let seed: Hash = hasher.finalize();
+
+        self.get_random_insert_location_by_seed(&seed)
     }
 
     fn extend_index(&self) -> TreeIndex {
@@ -1103,7 +1179,9 @@ impl MerkleBlob {
     #[pyo3(name = "insert")]
     pub fn py_insert(&mut self, key: KvId, value: KvId, hash: Hash) -> PyResult<()> {
         // TODO: consider the error
-        self.insert(key, value, &hash).unwrap();
+        // TODO: expose insert location
+        self.insert(key, value, &hash, InsertLocation::Auto)
+            .unwrap();
 
         Ok(())
     }
@@ -1263,7 +1341,7 @@ impl Iterator for MerkleBlobBreadthFirstIterator<'_> {
 mod tests {
     use super::*;
     // use hex_literal::hex;
-    use num_traits;
+    // use num_traits;
     use rstest::{fixture, rstest};
     use std::time::{Duration, Instant};
 
@@ -1386,7 +1464,7 @@ mod tests {
     //
     //     merkle_blob.check();
     // }
-    fn hash<T: num_traits::ops::bytes::ToBytes>(i: T) -> Hash {
+    fn hash<T: num_traits::ops::bytes::ToBytes>(i: &T) -> Hash {
         let mut hasher = Sha256::new();
         hasher.update(i.to_be_bytes());
 
@@ -1397,11 +1475,21 @@ mod tests {
     fn small_blob() -> MerkleBlob {
         let mut blob = MerkleBlob::new(vec![]).unwrap();
 
-        blob.insert(0x0001_0203_0405_0607, 0x1011_1213_1415_1617, &hash(0x1020))
-            .unwrap();
+        blob.insert(
+            0x0001_0203_0405_0607,
+            0x1011_1213_1415_1617,
+            &hash(&0x1020),
+            InsertLocation::Auto,
+        )
+        .unwrap();
 
-        blob.insert(0x2021_2223_2425_2627, 0x3031_3233_3435_3637, &hash(0x2030))
-            .unwrap();
+        blob.insert(
+            0x2021_2223_2425_2627,
+            0x3031_3233_3435_3637,
+            &hash(&0x2030),
+            InsertLocation::Auto,
+        )
+        .unwrap();
 
         blob
     }
@@ -1420,16 +1508,25 @@ mod tests {
     }
 
     #[rstest]
-    #[case::right(0, 2)]
-    #[case::left(0xff, 1)]
-    fn test_get_random_leaf_node(
+    #[case::right(0, 2, Side::Left)]
+    #[case::left(0xff, 1, Side::Right)]
+    fn test_get_random_insert_location_by_seed(
         #[case] seed: u8,
-        #[case] index: TreeIndex,
-        // #[values((0, 2), (0xff, 1))] (seed, index): (u8, TreeIndex),
+        #[case] expected_index: TreeIndex,
+        #[case] expected_side: Side,
         small_blob: MerkleBlob,
     ) {
-        let leaf = small_blob.get_random_leaf_node([seed; 32]).unwrap();
-        assert_eq!(leaf.index, index);
+        let location = small_blob
+            .get_random_insert_location_by_seed(&[seed; 32])
+            .unwrap();
+
+        assert_eq!(
+            location,
+            InsertLocation::Leaf {
+                index: expected_index,
+                side: expected_side
+            },
+        );
 
         small_blob.check();
     }
@@ -1493,7 +1590,7 @@ mod tests {
             let start = Instant::now();
             merkle_blob
                 // TODO: yeah this hash is garbage
-                .insert(i as KvId, i as KvId, &hash(i))
+                .insert(i, i, &hash(&i), InsertLocation::Auto)
                 .unwrap();
             let end = Instant::now();
             total_time += end.duration_since(start);
@@ -1546,7 +1643,7 @@ mod tests {
             merkle_blob.calculate_lazy_hashes();
             reference_blobs.push(MerkleBlob::new(merkle_blob.blob.clone()).unwrap());
             merkle_blob
-                .insert(key_value_id, key_value_id, &hash)
+                .insert(key_value_id, key_value_id, &hash, InsertLocation::Auto)
                 .unwrap();
             dots.push(merkle_blob.to_dot().dump());
         }
@@ -1587,7 +1684,12 @@ mod tests {
         let key_value_id: KvId = 1;
         // open_dot(&mut merkle_blob.to_dot().set_note("empty"));
         merkle_blob
-            .insert(key_value_id, key_value_id, &hash(key_value_id))
+            .insert(
+                key_value_id,
+                key_value_id,
+                &hash(&key_value_id),
+                InsertLocation::Auto,
+            )
             .unwrap();
         // open_dot(&mut merkle_blob.to_dot().set_note("first after"));
 
@@ -1602,7 +1704,12 @@ mod tests {
         let key_value_id: KvId = 1;
         // open_dot(&mut merkle_blob.to_dot().set_note("empty"));
         merkle_blob
-            .insert(key_value_id, key_value_id, &hash(key_value_id))
+            .insert(
+                key_value_id,
+                key_value_id,
+                &hash(&key_value_id),
+                InsertLocation::Auto,
+            )
             .unwrap();
         // open_dot(&mut merkle_blob.to_dot().set_note("first after"));
         merkle_blob.check();
