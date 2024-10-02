@@ -1340,7 +1340,6 @@ impl Iterator for MerkleBlobBreadthFirstIterator<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hex;
     // use hex_literal::hex;
     // use num_traits;
     use rstest::{fixture, rstest};
