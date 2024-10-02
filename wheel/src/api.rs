@@ -292,12 +292,13 @@ impl AugSchemeMPL {
     }
 
     #[staticmethod]
-    pub fn verify(pk: &PublicKey, msg: &[u8], sig: &Signature) -> bool {
-        chia_bls::verify(sig, pk, msg)
+    pub fn verify(py: Python<'_>, pk: &PublicKey, msg: &[u8], sig: &Signature) -> bool {
+        py.allow_threads(|| chia_bls::verify(sig, pk, msg))
     }
 
     #[staticmethod]
     pub fn aggregate_verify(
+        py: Python<'_>,
         pks: &Bound<'_, PyList>,
         msgs: &Bound<'_, PyList>,
         sig: &Signature,
@@ -314,7 +315,7 @@ impl AugSchemeMPL {
             data.push((pk, msg));
         }
 
-        Ok(chia_bls::aggregate_verify(sig, data))
+        py.allow_threads(|| Ok(chia_bls::aggregate_verify(sig, data)))
     }
 
     #[staticmethod]
