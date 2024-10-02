@@ -4,6 +4,7 @@ from random import getrandbits
 import sys
 from typing import Any, Type
 import pytest
+from concurrent.futures import ThreadPoolExecutor
 
 
 def randbytes(n: int) -> bytes:
@@ -16,7 +17,8 @@ def randbytes(n: int) -> bytes:
 # make sure chia_rs counterpart behaves the same as blspy
 def test_bls() -> None:
     print()
-    for round in range(200):
+
+    def run_test_suite(round: int) -> None:
         sys.stdout.write(f"\r{round} ")
         sys.stdout.flush()
         seed = randbytes(32)
@@ -209,6 +211,11 @@ def test_bls() -> None:
             # too long
             with pytest.raises(ValueError, match="invalid length"):
                 obj2 = klass.from_json_dict(bytes(obj) + b"a")
+
+    pool = ThreadPoolExecutor(max_workers=8)
+    for round in range(200):
+        pool.submit(run_test_suite, round)
+    pool.shutdown()
 
 
 # ------------------------------------- 8< ----------------------------------
