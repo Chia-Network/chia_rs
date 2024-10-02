@@ -376,6 +376,7 @@ version = "0.1.0"
 dependencies = [
  "clvm-utils",
  "clvmr",
+ "hex",
  "hex-literal",
  "num-traits",
  "open",

@@ -1340,6 +1340,7 @@ impl Iterator for MerkleBlobBreadthFirstIterator<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use hex;
     // use hex_literal::hex;
     // use num_traits;
     use rstest::{fixture, rstest};
@@ -1777,5 +1778,10 @@ mod tests {
 
         merkle_blob.check();
         assert_eq!(merkle_blob.key_to_index.len(), 0);
+    }
+
+    #[rstest]
+    fn test_dump_small_blob_bytes(small_blob: MerkleBlob) {
+        println!("{}", hex::encode(small_blob.blob));
     }
 }
