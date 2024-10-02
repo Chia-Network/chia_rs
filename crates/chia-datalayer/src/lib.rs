@@ -1698,36 +1698,42 @@ mod tests {
     }
 
     #[rstest]
-    fn test_insert_second(#[values(Side::Left, Side::Right)] side: Side) {
+    fn test_insert_choosing_side(
+        #[values(Side::Left, Side::Right)] side: Side,
+        #[values(1, 2)] pre_count: usize,
+    ) {
         let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
 
-        let key_value_id: KvId = 1;
-        // open_dot(&mut merkle_blob.to_dot().set_note("empty"));
-        merkle_blob
-            .insert(
-                key_value_id,
-                key_value_id,
-                &hash(&key_value_id),
-                InsertLocation::Auto,
-            )
-            .unwrap();
+        let mut last_key: KvId = 0;
+        for i in 1..=pre_count {
+            let key: KvId = i as KvId;
+            // open_dot(&mut merkle_blob.to_dot().set_note("empty"));
+            merkle_blob
+                .insert(key, key, &hash(&key), InsertLocation::Auto)
+                .unwrap();
+            last_key = key;
+        }
+
+        let key_value_id: KvId = pre_count as KvId + 1;
         // open_dot(&mut merkle_blob.to_dot().set_note("first after"));
-        let key_value_id: KvId = 2;
         merkle_blob
             .insert(
                 key_value_id,
                 key_value_id,
                 &hash(&key_value_id),
                 InsertLocation::Leaf {
-                    index: 0,
+                    index: merkle_blob.key_to_index[&last_key],
                     side: side.clone(),
                 },
             )
             .unwrap();
         // open_dot(&mut merkle_blob.to_dot().set_note("first after"));
 
-        let root = merkle_blob.get_node(0).unwrap();
-        let NodeSpecific::Internal { left, right } = root.specific else {
+        let sibling = merkle_blob
+            .get_node(merkle_blob.key_to_index[&last_key])
+            .unwrap();
+        let parent = merkle_blob.get_node(sibling.parent.unwrap()).unwrap();
+        let NodeSpecific::Internal { left, right } = parent.specific else {
             panic!()
         };
 
@@ -1742,8 +1748,8 @@ mod tests {
         };
 
         let expected_keys: [KvId; 2] = match side {
-            Side::Left => [2, 1],
-            Side::Right => [1, 2],
+            Side::Left => [pre_count as KvId + 1, pre_count as KvId],
+            Side::Right => [pre_count as KvId, pre_count as KvId + 1],
         };
         assert_eq!([left_key, right_key], expected_keys);
 
