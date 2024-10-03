@@ -5,6 +5,8 @@ from chia_rs import (
     SpendBundleConditions,
     run_block_generator2,
     ConsensusConstants,
+    DONT_VALIDATE_SIGNATURE,
+    G2Element,
 )
 from chia_rs.sized_bytes import bytes32
 from chia_rs.sized_ints import uint8, uint16, uint32, uint64, uint128
@@ -107,7 +109,15 @@ def run_gen(
 
     start_time = perf_counter()
     try:
-        ret = block_runner(generator, block_refs, max_cost, flags, DEFAULT_CONSTANTS)
+        ret = block_runner(
+            generator,
+            block_refs,
+            max_cost,
+            flags | DONT_VALIDATE_SIGNATURE,
+            G2Element(),
+            None,
+            DEFAULT_CONSTANTS,
+        )
         run_time = perf_counter() - start_time
         return ret + (run_time,)
     except Exception as e:

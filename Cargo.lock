@@ -373,6 +373,7 @@ dependencies = [
 name = "chia-fuzz"
 version = "0.13.0"
 dependencies = [
+ "chia-bls 0.14.1",
  "chia-consensus",
  "chia-protocol",
  "chia-sha2",

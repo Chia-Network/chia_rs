@@ -188,9 +188,17 @@ fn main() {
                     } else {
                         0
                     };
-                let mut conditions =
-                    block_runner(&mut a, generator, &block_refs, ti.cost, flags, constants)
-                        .expect("failed to run block generator");
+                let mut conditions = block_runner(
+                    &mut a,
+                    generator,
+                    &block_refs,
+                    ti.cost,
+                    flags,
+                    &ti.aggregated_signature,
+                    None,
+                    constants,
+                )
+                .expect("failed to run block generator");
 
                 if args.original_generator && height < args.hard_fork_height {
                     // when running pre-hardfork blocks with the post-hard fork
@@ -214,6 +222,8 @@ fn main() {
                         &block_refs,
                         ti.cost,
                         flags,
+                        &ti.aggregated_signature,
+                        None,
                         constants,
                     )
                     .expect("run_block_generator()");

@@ -2,11 +2,12 @@ use crate::consensus_constants::ConsensusConstants;
 use crate::gen::conditions::{
     process_single_spend, validate_conditions, MempoolVisitor, ParseState, SpendBundleConditions,
 };
-use crate::gen::flags::MEMPOOL_MODE;
+use crate::gen::flags::{DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
 use crate::gen::run_block_generator::subtract_cost;
 use crate::gen::solution_generator::calculate_generator_length;
 use crate::gen::validation_error::ValidationErr;
 use crate::spendbundle_validation::get_flags_for_height_and_constants;
+use chia_bls::PublicKey;
 use chia_protocol::SpendBundle;
 use clvm_utils::tree_hash;
 use clvmr::allocator::Allocator;
@@ -24,7 +25,29 @@ pub fn get_conditions_from_spendbundle(
     height: u32,
     constants: &ConsensusConstants,
 ) -> Result<SpendBundleConditions, ValidationErr> {
-    let flags = get_flags_for_height_and_constants(height, constants) | MEMPOOL_MODE;
+    Ok(run_spendbundle(
+        a,
+        spend_bundle,
+        max_cost,
+        height,
+        DONT_VALIDATE_SIGNATURE,
+        constants,
+    )?
+    .0)
+}
+
+// returns the conditions for the spendbundle, along with the (public key,
+// message) pairs emitted by the spends (for validating the aggregate signature)
+#[allow(clippy::type_complexity)]
+pub fn run_spendbundle(
+    a: &mut Allocator,
+    spend_bundle: &SpendBundle,
+    max_cost: u64,
+    height: u32,
+    flags: u32,
+    constants: &ConsensusConstants,
+) -> Result<(SpendBundleConditions, Vec<(PublicKey, Vec<u8>)>), ValidationErr> {
+    let flags = get_flags_for_height_and_constants(height, constants) | flags | MEMPOOL_MODE;
 
     // below is an adapted version of the code from run_block_generators::run_block_generator2()
     // it assumes no block references are passed in
@@ -67,9 +90,10 @@ pub fn get_conditions_from_spendbundle(
     }
 
     validate_conditions(a, &ret, &state, a.nil(), flags)?;
+
     assert!(max_cost >= cost_left);
     ret.cost = max_cost - cost_left;
-    Ok(ret)
+    Ok((ret, state.pkm_pairs))
 }
 
 #[cfg(test)]
@@ -133,7 +157,9 @@ mod tests {
             program.as_slice(),
             blocks,
             11_000_000_000,
-            MEMPOOL_MODE,
+            MEMPOOL_MODE | DONT_VALIDATE_SIGNATURE,
+            &Signature::default(),
+            None,
             &TEST_CONSTANTS,
         )
         .expect("run_block_generator2 failed");
@@ -312,7 +338,9 @@ mod tests {
                 &generator_buffer,
                 &block_refs,
                 11_000_000_000,
-                DEFAULT_FLAGS,
+                DEFAULT_FLAGS | DONT_VALIDATE_SIGNATURE,
+                &Signature::default(),
+                None,
                 &TEST_CONSTANTS,
             );
             match block_conds {

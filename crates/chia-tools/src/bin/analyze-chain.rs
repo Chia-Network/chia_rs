@@ -81,6 +81,8 @@ fn main() {
                 &block_refs,
                 ti.cost,
                 flags,
+                &ti.aggregated_signature,
+                None,
                 &TEST_CONSTANTS,
             )
             .expect("failed to run block generator");

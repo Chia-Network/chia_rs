@@ -1,6 +1,7 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
+use chia_bls::Signature;
 use chia_consensus::gen::conditions::{parse_spends, MempoolVisitor};
 use chia_fuzz::{make_list, BitCursor};
 use clvmr::{Allocator, NodePtr};
@@ -14,7 +15,14 @@ fuzz_target!(|data: &[u8]| {
     // spends is a list of spends
     let input = a.new_pair(input, NodePtr::NIL).unwrap();
     for flags in &[0, STRICT_ARGS_COUNT, NO_UNKNOWN_CONDS] {
-        let _ret =
-            parse_spends::<MempoolVisitor>(&a, input, 33_000_000_000, *flags, &TEST_CONSTANTS);
+        let _ret = parse_spends::<MempoolVisitor>(
+            &a,
+            input,
+            33_000_000_000,
+            *flags,
+            &Signature::default(),
+            None,
+            &TEST_CONSTANTS,
+        );
     }
 });

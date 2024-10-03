@@ -2,7 +2,8 @@ use super::conditions::{NewCoin, SpendBundleConditions, SpendConditions};
 use super::run_block_generator::{run_block_generator, run_block_generator2};
 use crate::allocator::make_allocator;
 use crate::consensus_constants::TEST_CONSTANTS;
-use crate::gen::flags::{ALLOW_BACKREFS, MEMPOOL_MODE};
+use crate::gen::flags::{ALLOW_BACKREFS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
+use chia_bls::Signature;
 use chia_protocol::{Bytes, Bytes48};
 use clvmr::allocator::NodePtr;
 use clvmr::Allocator;
@@ -236,7 +237,9 @@ fn run_generator(#[case] name: &str) {
             &generator,
             &block_refs,
             11_000_000_000,
-            *flags,
+            *flags | DONT_VALIDATE_SIGNATURE,
+            &Signature::default(),
+            None,
             &TEST_CONSTANTS,
         );
 
@@ -251,7 +254,9 @@ fn run_generator(#[case] name: &str) {
             &generator,
             &block_refs,
             11_000_000_000,
-            *flags,
+            *flags | DONT_VALIDATE_SIGNATURE,
+            &Signature::default(),
+            None,
             &TEST_CONSTANTS,
         );
         let output_hard_fork = match conds {

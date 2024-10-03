@@ -67,6 +67,9 @@ pub struct OwnedSpendBundleConditions {
     pub removal_amount: u128,
     // the sum of all amounts of CREATE_COIN conditions
     pub addition_amount: u128,
+    // set if the aggregate signature of the block/spend bundle were
+    // successfully validated
+    pub validated_signature: bool,
 }
 
 impl OwnedSpendConditions {
@@ -140,6 +143,7 @@ impl OwnedSpendBundleConditions {
             cost: sb.cost,
             removal_amount: sb.removal_amount,
             addition_amount: sb.addition_amount,
+            validated_signature: sb.validated_signature,
         }
     }
 }
