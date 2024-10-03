@@ -53,7 +53,9 @@ impl BlsCache {
             // Hash pubkey + message
             let mut hasher = Sha256::new();
             hasher.update(pk.borrow().to_bytes());
-            hasher.update(msg.as_ref());
+            let mut aug_msg = pk.borrow().to_bytes().to_vec();
+            aug_msg.extend_from_slice(msg.as_ref());
+            hasher.update(&aug_msg);
             let hash: [u8; 32] = hasher.finalize();
 
             // If the pairing is in the cache, we don't need to recalculate it.
@@ -62,8 +64,6 @@ impl BlsCache {
             }
 
             // Otherwise, we need to calculate the pairing and add it to the cache.
-            let mut aug_msg = pk.borrow().to_bytes().to_vec();
-            aug_msg.extend_from_slice(msg.as_ref());
             let aug_hash = hash_to_g2(&aug_msg);
 
             let mut hasher = Sha256::new();

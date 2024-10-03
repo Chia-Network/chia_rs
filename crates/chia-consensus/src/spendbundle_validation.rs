@@ -38,7 +38,6 @@ pub fn validate_clvm_and_signature(
     let mut pairs = Vec::new();
 
     let mut aug_msg = Vec::<u8>::new();
-    let mut final_msg = Vec::<u8>::new();
 
     for spend in &conditions.spends {
         let condition_items_pairs = [
@@ -54,14 +53,12 @@ pub fn validate_clvm_and_signature(
         for (condition, items) in condition_items_pairs {
             for (pk, msg) in items {
                 aug_msg.clear();
-                final_msg.clear();
-                final_msg.extend_from_slice(msg.as_slice());
                 aug_msg.extend_from_slice(&pk.to_bytes());
-                make_aggsig_final_message(condition, &mut final_msg, spend, constants);
-                aug_msg.extend(&final_msg);
+                aug_msg.extend_from_slice(msg.as_slice());
+                make_aggsig_final_message(condition, &mut aug_msg, spend, constants);
                 let aug_hash = hash_to_g2(&aug_msg);
                 let pairing = aug_hash.pair(pk);
-                pairs.push((hash_pk_and_msg(&pk.to_bytes(), &final_msg), pairing));
+                pairs.push((hash_pk_and_msg(&pk.to_bytes(), &aug_msg), pairing));
             }
         }
     }
