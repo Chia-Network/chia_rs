@@ -2,11 +2,14 @@
 use pyo3::{buffer::PyBuffer, pyclass, pymethods, PyResult};
 
 use clvmr::sha2::Sha256;
+use dot::DotLines;
 use std::cmp::Ordering;
 use std::collections::{HashMap, VecDeque};
 use std::iter::{zip, IntoIterator};
 use std::mem::size_of;
 use std::ops::Range;
+
+mod dot;
 
 type TreeIndex = u32;
 type Parent = Option<TreeIndex>;
@@ -22,7 +25,8 @@ const fn range_by_length(start: usize, length: usize) -> Range<usize> {
 // common fields
 // TODO: better way to pick the max of key value and right range, until we move hash first
 const HASH_RANGE: Range<usize> = range_by_length(0, size_of::<Hash>());
-const PARENT_RANGE: Range<usize> = range_by_length(HASH_RANGE.end, size_of::<TreeIndex>());
+// const PARENT_RANGE: Range<usize> = range_by_length(HASH_RANGE.end, size_of::<TreeIndex>());
+const PARENT_RANGE: Range<usize> = HASH_RANGE.end..(HASH_RANGE.end + size_of::<TreeIndex>());
 // internal specific fields
 const LEFT_RANGE: Range<usize> = range_by_length(PARENT_RANGE.end, size_of::<TreeIndex>());
 const RIGHT_RANGE: Range<usize> = range_by_length(LEFT_RANGE.end, size_of::<TreeIndex>());
@@ -104,55 +108,6 @@ pub enum InsertLocation {
     Leaf { index: TreeIndex, side: Side },
 }
 
-// TODO: this should probably be test code?
-pub struct DotLines {
-    nodes: Vec<String>,
-    connections: Vec<String>,
-    pair_boxes: Vec<String>,
-    note: String,
-}
-
-impl Default for DotLines {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl DotLines {
-    pub fn new() -> Self {
-        Self {
-            nodes: vec![],
-            connections: vec![],
-            pair_boxes: vec![],
-            note: String::new(),
-        }
-    }
-
-    pub fn push(&mut self, mut other: DotLines) {
-        self.nodes.append(&mut other.nodes);
-        self.connections.append(&mut other.connections);
-        self.pair_boxes.append(&mut other.pair_boxes);
-    }
-
-    pub fn dump(&mut self) -> String {
-        // TODO: consuming itself, secretly
-        let note = &self.note;
-        let mut result = vec![format!("# {note}"), String::new(), "digraph {".to_string()];
-        result.append(&mut self.nodes);
-        result.append(&mut self.connections);
-        result.append(&mut self.pair_boxes);
-        result.push("}".to_string());
-
-        result.join("\n")
-    }
-
-    pub fn set_note(&mut self, note: &str) -> &mut Self {
-        self.note = String::from(note);
-
-        self
-    }
-}
-
 const NULL_PARENT: TreeIndex = 0xffff_ffffu32;
 
 #[derive(Debug, PartialEq)]
@@ -231,18 +186,16 @@ impl Node {
         Ok(Self {
             parent: Self::parent_from_bytes(&blob)?,
             index,
-            hash: <[u8; 32]>::try_from(&blob[HASH_RANGE]).unwrap(),
+            hash: blob[HASH_RANGE].try_into().unwrap(),
             specific: match metadata.node_type {
                 NodeType::Internal => NodeSpecific::Internal {
-                    left: TreeIndex::from_be_bytes(<[u8; 4]>::try_from(&blob[LEFT_RANGE]).unwrap()),
-                    right: TreeIndex::from_be_bytes(
-                        <[u8; 4]>::try_from(&blob[RIGHT_RANGE]).unwrap(),
-                    ),
+                    left: TreeIndex::from_be_bytes(blob[LEFT_RANGE].try_into().unwrap()),
+                    right: TreeIndex::from_be_bytes(blob[RIGHT_RANGE].try_into().unwrap()),
                 },
                 NodeType::Leaf => NodeSpecific::Leaf {
                     // TODO: this try from really right?
-                    key: KvId::from_be_bytes(<[u8; 8]>::try_from(&blob[KEY_RANGE]).unwrap()),
-                    value: KvId::from_be_bytes(<[u8; 8]>::try_from(&blob[VALUE_RANGE]).unwrap()),
+                    key: KvId::from_be_bytes(blob[KEY_RANGE].try_into().unwrap()),
+                    value: KvId::from_be_bytes(blob[VALUE_RANGE].try_into().unwrap()),
                 },
             },
         })
@@ -250,10 +203,7 @@ impl Node {
 
     fn parent_from_bytes(blob: &[u8; DATA_SIZE]) -> Result<Parent, String> {
         // TODO: a little setup here for pre-optimization to allow walking parents without processing entire nodes
-        let parent_integer = TreeIndex::from_be_bytes(
-            <[u8; 4]>::try_from(&blob[PARENT_RANGE])
-                .map_err(|e| format!("data blob wrong size: {e}"))?,
-        );
+        let parent_integer = TreeIndex::from_be_bytes(blob[PARENT_RANGE].try_into().unwrap());
         match parent_integer {
             NULL_PARENT => Ok(None),
             _ => Ok(Some(parent_integer)),
@@ -369,24 +319,14 @@ impl Block {
     pub fn from_bytes(blob: BlockBytes, index: TreeIndex) -> Result<Block, String> {
         // TODO: handle invalid indexes?
         // TODO: handle overflows?
-        let metadata_blob: [u8; METADATA_SIZE] = blob
-            .get(..METADATA_SIZE)
-            .ok_or(format!("metadata blob out of bounds: {}", blob.len(),))?
-            .try_into()
-            .map_err(|e| format!("metadata blob wrong size: {e}"))?;
-        let data_blob: [u8; DATA_SIZE] = blob
-            .get(METADATA_SIZE..)
-            .ok_or("data blob out of bounds".to_string())?
-            .try_into()
-            .map_err(|e| format!("data blob wrong size: {e}"))?;
-        let metadata = match NodeMetadata::from_bytes(metadata_blob) {
-            Ok(metadata) => metadata,
-            Err(message) => return Err(format!("failed loading metadata: {message})")),
-        };
-        Ok(match Node::from_bytes(&metadata, index, data_blob) {
-            Ok(node) => Block { metadata, node },
-            Err(message) => return Err(format!("failed loading node: {message}")),
-        })
+        let metadata_blob: [u8; METADATA_SIZE] = blob[..METADATA_SIZE].try_into().unwrap();
+        let data_blob: [u8; DATA_SIZE] = blob[METADATA_SIZE..].try_into().unwrap();
+        let metadata = NodeMetadata::from_bytes(metadata_blob)
+            .map_err(|message| format!("failed loading metadata: {message})"))?;
+        let node = Node::from_bytes(&metadata, index, data_blob)
+            .map_err(|message| format!("failed loading node: {message})"))?;
+
+        Ok(Block { metadata, node })
     }
 
     fn range(index: TreeIndex) -> Range<usize> {
@@ -717,10 +657,9 @@ impl MerkleBlob {
         let leaf = self.get_node(leaf_index).unwrap();
 
         // TODO: blech
-        if let NodeSpecific::Leaf { .. } = leaf.specific {
-        } else {
+        let NodeSpecific::Leaf { .. } = leaf.specific else {
             panic!()
-        }
+        };
         self.key_to_index.remove(&key);
 
         let Some(parent_index) = leaf.parent else {
@@ -877,6 +816,8 @@ impl MerkleBlob {
     fn get_new_index(&mut self) -> TreeIndex {
         match self.free_indexes.pop() {
             None => {
+                // TODO: should this extend...?
+                // TODO: should this update free indexes...?
                 self.last_allocated_index += 1;
                 self.last_allocated_index - 1
             }
@@ -980,24 +921,13 @@ impl MerkleBlob {
         // TODO: handle invalid indexes?
         // TODO: handle overflows?
         let block = self.get_block_bytes(index)?;
-        let metadata_blob: [u8; METADATA_SIZE] = block
-            .get(..METADATA_SIZE)
-            .ok_or(format!("metadata blob out of bounds: {}", block.len(),))?
-            .try_into()
-            .map_err(|e| format!("metadata blob wrong size: {e}"))?;
-        let data_blob: [u8; DATA_SIZE] = block
-            .get(METADATA_SIZE..)
-            .ok_or("data blob out of bounds".to_string())?
-            .try_into()
-            .map_err(|e| format!("data blob wrong size: {e}"))?;
-        let metadata = match NodeMetadata::from_bytes(metadata_blob) {
-            Ok(metadata) => metadata,
-            Err(message) => return Err(format!("failed loading metadata: {message})")),
-        };
-        Ok(match Node::from_bytes(&metadata, index, data_blob) {
-            Ok(node) => node,
-            Err(message) => return Err(format!("failed loading node: {message}")),
-        })
+        let metadata_blob: [u8; METADATA_SIZE] = block[..METADATA_SIZE].try_into().unwrap();
+        let data_blob: [u8; DATA_SIZE] = block[METADATA_SIZE..].try_into().unwrap();
+        let metadata = NodeMetadata::from_bytes(metadata_blob)
+            .map_err(|message| format!("failed loading metadata: {message})"))?;
+
+        Node::from_bytes(&metadata, index, data_blob)
+            .map_err(|message| format!("failed loading node: {message}"))
     }
 
     pub fn get_parent_index(&self, index: TreeIndex) -> Result<Parent, String> {
@@ -1130,6 +1060,19 @@ impl MerkleBlob {
         self.blob = new.blob;
 
         Ok(())
+    }
+
+    #[allow(unused)]
+    fn get_key_value_map(&self) -> HashMap<KvId, KvId> {
+        let mut key_value = HashMap::new();
+        for (key, index) in self.key_to_index.iter() {
+            let NodeSpecific::Leaf { value, .. } = self.get_node(*index).unwrap().specific else {
+                panic!()
+            };
+            key_value.insert(*key, value);
+        }
+
+        key_value
     }
 }
 
@@ -1780,7 +1723,133 @@ mod tests {
     }
 
     #[rstest]
+    // TODO: does this mut allow modifying the fixture value as used by other tests?
+    fn test_delete_frees_index(mut small_blob: MerkleBlob) {
+        let key = 0x0001_0203_0405_0607;
+        let index = small_blob.key_to_index[&key];
+        small_blob.delete(key).unwrap();
+
+        assert_eq!(small_blob.free_indexes, vec![index, 2]);
+    }
+
+    #[rstest]
+    // TODO: does this mut allow modifying the fixture value as used by other tests?
+    fn test_get_new_index_with_free_index(mut small_blob: MerkleBlob) {
+        let key = 0x0001_0203_0405_0607;
+        let _ = small_blob.key_to_index[&key];
+        small_blob.delete(key).unwrap();
+
+        // NOTE: both 1 and 2 are free per test_delete_frees_index
+        assert_eq!(small_blob.get_new_index(), 2);
+    }
+
+    #[rstest]
     fn test_dump_small_blob_bytes(small_blob: MerkleBlob) {
         println!("{}", hex::encode(small_blob.blob));
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_node_type_from_u8_invalid() {
+        let _ = NodeType::from_u8(2);
+    }
+
+    #[test]
+    fn test_node_metadata_dirty_from_bytes_invalid() {
+        NodeMetadata::dirty_from_bytes([0, 2]).expect_err("invalid value should fail");
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_node_specific_sibling_index_panics_for_leaf() {
+        let leaf = NodeSpecific::Leaf { key: 0, value: 0 };
+        leaf.sibling_index(0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_node_specific_sibling_index_panics_for_unknown_sibling() {
+        let node = NodeSpecific::Internal { left: 0, right: 1 };
+        node.sibling_index(2);
+    }
+
+    #[rstest]
+    fn test_get_free_indexes(small_blob: MerkleBlob) {
+        let mut blob = small_blob.blob.clone();
+        let expected_free_index = (blob.len() / BLOCK_SIZE) as TreeIndex;
+        blob.extend_from_slice(&[0; BLOCK_SIZE]);
+        assert_eq!(get_free_indexes(&blob).unwrap(), [expected_free_index]);
+    }
+
+    #[test]
+    fn test_merkle_blob_new_errs_for_nonmultiple_of_block_length() {
+        MerkleBlob::new(vec![1]).expect_err("invalid length should fail");
+    }
+
+    #[rstest]
+    fn test_upsert_inserts(small_blob: MerkleBlob) {
+        let key = 1234;
+        assert!(!small_blob.key_to_index.contains_key(&key));
+        let value = 5678;
+
+        let mut insert_blob = MerkleBlob::new(small_blob.blob.clone()).unwrap();
+        insert_blob
+            .insert(key, value, &hash(&key), InsertLocation::Auto)
+            .unwrap();
+        // open_dot(&mut insert_blob.to_dot().set_note("first after"));
+
+        let mut upsert_blob = MerkleBlob::new(small_blob.blob.clone()).unwrap();
+        upsert_blob.upsert(key, value, &hash(&key)).unwrap();
+        // open_dot(&mut upsert_blob.to_dot().set_note("first after"));
+
+        assert_eq!(insert_blob.blob, upsert_blob.blob);
+    }
+
+    #[rstest]
+    // TODO: does this mut allow modifying the fixture value as used by other tests?
+    fn test_upsert_upserts(mut small_blob: MerkleBlob) {
+        let before_blocks = Vec::from_iter(small_blob.iter());
+        let (key, index) = small_blob.key_to_index.iter().next().unwrap();
+        let node = small_blob.get_node(*index).unwrap();
+        let NodeSpecific::Leaf {
+            key: original_key,
+            value: original_value,
+            ..
+        } = node.specific
+        else {
+            panic!()
+        };
+        let new_value = original_value + 1;
+
+        small_blob.upsert(*key, new_value, &node.hash).unwrap();
+
+        let after_blocks = Vec::from_iter(small_blob.iter());
+
+        assert_eq!(before_blocks.len(), after_blocks.len());
+        for (before, after) in zip(before_blocks, after_blocks) {
+            assert_eq!(before.node.parent, after.node.parent);
+            assert_eq!(before.node.index, after.node.index);
+            let NodeSpecific::Leaf {
+                key: before_key,
+                value: before_value,
+            } = before.node.specific
+            else {
+                assert_eq!(before.node.specific, after.node.specific);
+                continue;
+            };
+            let NodeSpecific::Leaf {
+                key: after_key,
+                value: after_value,
+            } = after.node.specific
+            else {
+                panic!()
+            };
+            assert_eq!(before_key, after_key);
+            if before_key == original_key {
+                assert_eq!(after_value, new_value);
+            } else {
+                assert_eq!(before_value, after_value);
+            }
+        }
     }
 }
