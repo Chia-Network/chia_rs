@@ -161,13 +161,13 @@ pub enum NodeSpecific {
 impl NodeSpecific {
     pub fn sibling_index(&self, index: TreeIndex) -> TreeIndex {
         let NodeSpecific::Internal { right, left } = self else {
-            panic!()
+            panic!("unable to get sibling index from a leaf")
         };
 
         match index {
             x if (x == *right) => *left,
             x if (x == *left) => *right,
-            _ => panic!(),
+            _ => panic!("index not a child: {index}"),
         }
     }
 }
@@ -184,7 +184,7 @@ impl Node {
     ) -> Result<Self, String> {
         // TODO: add Err results
         Ok(Self {
-            parent: Self::parent_from_bytes(&blob)?,
+            parent: Self::parent_from_bytes(&blob),
             index,
             hash: blob[HASH_RANGE].try_into().unwrap(),
             specific: match metadata.node_type {
@@ -201,12 +201,12 @@ impl Node {
         })
     }
 
-    fn parent_from_bytes(blob: &[u8; DATA_SIZE]) -> Result<Parent, String> {
+    fn parent_from_bytes(blob: &[u8; DATA_SIZE]) -> Parent {
         // TODO: a little setup here for pre-optimization to allow walking parents without processing entire nodes
         let parent_integer = TreeIndex::from_be_bytes(blob[PARENT_RANGE].try_into().unwrap());
         match parent_integer {
-            NULL_PARENT => Ok(None),
-            _ => Ok(Some(parent_integer)),
+            NULL_PARENT => None,
+            _ => Some(parent_integer),
         }
     }
     pub fn to_bytes(&self) -> [u8; DATA_SIZE] {
@@ -930,14 +930,10 @@ impl MerkleBlob {
             .map_err(|message| format!("failed loading node: {message}"))
     }
 
-    pub fn get_parent_index(&self, index: TreeIndex) -> Result<Parent, String> {
+    pub fn get_parent_index(&self, index: TreeIndex) -> Parent {
         let block = self.get_block_bytes(index).unwrap();
 
-        Node::parent_from_bytes(
-            block[METADATA_SIZE..]
-                .try_into()
-                .map_err(|e| format!("data blob wrong size: {e}"))?,
-        )
+        Node::parent_from_bytes(block[METADATA_SIZE..].try_into().unwrap())
     }
 
     pub fn get_lineage(&self, index: TreeIndex) -> Result<Vec<Node>, String> {
@@ -963,7 +959,7 @@ impl MerkleBlob {
         while let Some(this_index) = next_index {
             lineage.push(this_index);
             let block = self.get_block_bytes(this_index)?;
-            next_index = Node::parent_from_bytes(block[METADATA_SIZE..].try_into().unwrap())?;
+            next_index = Node::parent_from_bytes(block[METADATA_SIZE..].try_into().unwrap());
         }
 
         Ok(lineage)
@@ -1065,7 +1061,7 @@ impl MerkleBlob {
     #[allow(unused)]
     fn get_key_value_map(&self) -> HashMap<KvId, KvId> {
         let mut key_value = HashMap::new();
-        for (key, index) in self.key_to_index.iter() {
+        for (key, index) in &self.key_to_index {
             let NodeSpecific::Leaf { value, .. } = self.get_node(*index).unwrap().specific else {
                 panic!()
             };
@@ -1749,7 +1745,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "unknown NodeType value: 2")]
     fn test_node_type_from_u8_invalid() {
         let _ = NodeType::from_u8(2);
     }
@@ -1760,14 +1756,14 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "unable to get sibling index from a leaf")]
     fn test_node_specific_sibling_index_panics_for_leaf() {
         let leaf = NodeSpecific::Leaf { key: 0, value: 0 };
         leaf.sibling_index(0);
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "index not a child: 2")]
     fn test_node_specific_sibling_index_panics_for_unknown_sibling() {
         let node = NodeSpecific::Internal { left: 0, right: 1 };
         node.sibling_index(2);
@@ -1808,7 +1804,7 @@ mod tests {
     #[rstest]
     // TODO: does this mut allow modifying the fixture value as used by other tests?
     fn test_upsert_upserts(mut small_blob: MerkleBlob) {
-        let before_blocks = Vec::from_iter(small_blob.iter());
+        let before_blocks = small_blob.iter().collect::<Vec<_>>();
         let (key, index) = small_blob.key_to_index.iter().next().unwrap();
         let node = small_blob.get_node(*index).unwrap();
         let NodeSpecific::Leaf {
@@ -1823,7 +1819,7 @@ mod tests {
 
         small_blob.upsert(*key, new_value, &node.hash).unwrap();
 
-        let after_blocks = Vec::from_iter(small_blob.iter());
+        let after_blocks = small_blob.iter().collect::<Vec<_>>();
 
         assert_eq!(before_blocks.len(), after_blocks.len());
         for (before, after) in zip(before_blocks, after_blocks) {
