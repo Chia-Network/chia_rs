@@ -288,6 +288,10 @@ def run_block_generator2(
     program: ReadableBuffer, block_refs: List[ReadableBuffer], max_cost: int, flags: int, signature: G2Element, bls_cache: Optional[BLSCache], constants: ConsensusConstants
 ) -> Tuple[Optional[int], Optional[SpendBundleConditions]]: ...
 
+def additions_and_removals(
+    program: ReadableBuffer, block_refs: List[ReadableBuffer], flags: int, constants: ConsensusConstants
+) -> Tuple[List[Tuple[Coin, Optional[bytes]]], List[Coin]]: ...
+
 def confirm_included_already_hashed(
     root: bytes32,
     item: bytes32,

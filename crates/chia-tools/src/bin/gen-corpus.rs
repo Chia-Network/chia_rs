@@ -27,6 +27,7 @@ use std::time::{Duration, Instant};
 /// Analyze the spends in a chia blockchain database
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
+#[allow(clippy::struct_excessive_bools)]
 struct Args {
     /// Path to blockchain database file to analyze
     file: String,
@@ -39,7 +40,7 @@ struct Args {
     #[arg(long, default_value_t = false)]
     spend_bundles: bool,
 
-    /// generate corpus for run_block_generator()
+    /// generate corpus for run_block_generator() and additions_and_removals()
     #[arg(long, default_value_t = false)]
     block_generators: bool,
 
@@ -96,6 +97,10 @@ fn main() {
 
                 if args.block_generators {
                     let directory = "../chia-protocol/fuzz/corpus/run-generator";
+                    let _ = std::fs::create_dir_all(directory);
+                    write(format!("{directory}/{height}.bundle"), generator).expect("write");
+
+                    let directory = "../chia-protocol/fuzz/corpus/additions-and-removals";
                     let _ = std::fs::create_dir_all(directory);
                     write(format!("{directory}/{height}.bundle"), generator).expect("write");
                     cnt.fetch_add(1, Ordering::Relaxed);
