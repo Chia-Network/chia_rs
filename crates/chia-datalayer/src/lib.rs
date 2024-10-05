@@ -829,6 +829,8 @@ impl MerkleBlob {
         &self,
         seed_bytes: &[u8],
     ) -> Result<InsertLocation, String> {
+        let mut seed_bytes = Vec::from(seed_bytes);
+
         if self.blob.is_empty() {
             return Ok(InsertLocation::AsRoot);
         }
@@ -840,25 +842,28 @@ impl MerkleBlob {
         };
         let mut node = self.get_node(0)?;
 
-        // TODO: handle deeper depths than the seed
-        for byte in seed_bytes {
-            for bit in 0..8 {
-                match node.specific {
-                    NodeSpecific::Leaf { .. } => {
-                        return Ok(InsertLocation::Leaf {
-                            index: node.index,
-                            side,
-                        })
-                    }
-                    NodeSpecific::Internal { left, right, .. } => {
-                        let next: TreeIndex = if byte & (1 << bit) != 0 { left } else { right };
-                        node = self.get_node(next)?;
+        loop {
+            for byte in &seed_bytes {
+                for bit in 0..8 {
+                    match node.specific {
+                        NodeSpecific::Leaf { .. } => {
+                            return Ok(InsertLocation::Leaf {
+                                index: node.index,
+                                side,
+                            })
+                        }
+                        NodeSpecific::Internal { left, right, .. } => {
+                            let next: TreeIndex = if byte & (1 << bit) != 0 { left } else { right };
+                            node = self.get_node(next)?;
+                        }
                     }
                 }
             }
-        }
 
-        Err("failed to find a node".to_string())
+            let mut hasher = Sha256::new();
+            hasher.update(seed_bytes);
+            seed_bytes = hasher.finalize().into();
+        }
     }
 
     fn get_random_insert_location_by_kvid(&self, seed: KvId) -> Result<InsertLocation, String> {
