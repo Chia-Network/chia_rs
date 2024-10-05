@@ -30,14 +30,17 @@ struct Args {
     #[arg(long, default_value_t = false)]
     mempool: bool,
 
-    /// re-serialize each generator using backrefs and ensure it still produces
-    /// the same output
-    #[arg(long, default_value_t = false)]
-    test_backrefs: bool,
-
-    /// Compare the output from the default ROM running in consensus mode.
+    /// Compare the output from the default ROM running in consensus mode
+    /// against the hard-fork rules for executing block generators. After the
+    /// hard fork, the CLVM ROM implementation is no longer expected to work, so
+    /// this option also implies max-height=hard-fork-height.
     #[arg(short, long, default_value_t = false)]
-    validate: bool,
+    original_generator: bool,
+
+    /// The hard fork block height. Defaults to mainnet (5,496,000). For
+    /// testnet11, set to 0.
+    #[arg(short, long, default_value_t = 5_496_000)]
+    hard_fork_height: u32,
 
     /// stop running block generators when reaching this height
     #[arg(short, long)]
@@ -124,11 +127,6 @@ fn main() {
     // TODO: Use the real consants here
     let constants = &TEST_CONSTANTS;
 
-    assert!(
-        args.validate && !args.mempool,
-        "it doesn't make sense to validate the output against identical runs. Specify --mempool"
-    );
-
     let num_cores = args
         .num_jobs
         .unwrap_or_else(|| available_parallelism().unwrap().into());
@@ -138,14 +136,35 @@ fn main() {
         .queue_len(num_cores + 5)
         .build();
 
-    let flags = if args.mempool { MEMPOOL_MODE } else { 0 } | ALLOW_BACKREFS;
+    let flags = if args.mempool { MEMPOOL_MODE } else { 0 };
+
+    // Blocks created after the hard fork are not expected to work with the
+    // original generator ROM. The cost will exceed the block cost. So when
+    // validating blocks using the old generator, we have to stop at the hard
+    // fork.
+    let max_height = if args.original_generator {
+        Some(args.hard_fork_height)
+    } else {
+        args.max_height
+    };
+
+    if let Some(h) = max_height {
+        if args.start_height >= h {
+            println!(
+                "start height ({}) is greater than max height {h})",
+                args.start_height
+            );
+            return;
+        }
+    }
 
     let mut last_height = args.start_height;
     let mut last_time = Instant::now();
+    println!("opening blockchain database file: {}", args.file);
     iterate_tx_blocks(
         &args.file,
         args.start_height,
-        args.max_height,
+        max_height,
         |height, block, block_refs| {
             pool.execute(move || {
                 let mut a = Allocator::new_limited(500_000_000);
@@ -158,17 +177,25 @@ fn main() {
 
                 // after the hard fork, we run blocks without paying for the
                 // CLVM generator ROM
-                let block_runner = if height >= 5_496_000 {
+                let block_runner = if args.original_generator || height >= args.hard_fork_height {
                     run_block_generator2
                 } else {
                     run_block_generator
                 };
-
+                let flags = flags
+                    | if height >= args.hard_fork_height {
+                        ALLOW_BACKREFS
+                    } else {
+                        0
+                    };
                 let mut conditions =
                     block_runner(&mut a, generator, &block_refs, ti.cost, flags, constants)
                         .expect("failed to run block generator");
 
-                if args.test_backrefs {
+                if args.original_generator && height < args.hard_fork_height {
+                    // when running pre-hardfork blocks with the post-hard fork
+                    // generator, we get a lower cost than what's recorded in
+                    // the block. Because the new generator is cheaper.
                     assert!(conditions.cost <= ti.cost);
                     assert!(conditions.cost > 0);
 
@@ -180,16 +207,16 @@ fn main() {
                     assert_eq!(conditions.cost, ti.cost);
                 }
 
-                if args.validate {
+                if args.original_generator {
                     let mut baseline = run_block_generator(
                         &mut a,
                         generator.as_ref(),
                         &block_refs,
                         ti.cost,
-                        ALLOW_BACKREFS,
+                        flags,
                         constants,
                     )
-                    .expect("failed to run block generator");
+                    .expect("run_block_generator()");
                     assert_eq!(baseline.cost, ti.cost);
 
                     baseline.spends.sort_by_key(|s| *s.coin_id);
@@ -201,7 +228,7 @@ fn main() {
             });
 
             assert_eq!(pool.panic_count(), 0);
-            if last_time.elapsed() > Duration::new(4, 0) {
+            if last_time.elapsed() > Duration::new(2, 0) {
                 let rate = f64::from(height - last_height) / last_time.elapsed().as_secs_f64();
                 print!("\rheight: {height} ({rate:0.1} blocks/s)   ");
                 let _ = std::io::stdout().flush();
@@ -210,7 +237,9 @@ fn main() {
             }
         },
     );
-    assert_eq!(pool.panic_count(), 0);
 
     pool.join();
+    assert_eq!(pool.panic_count(), 0);
+
+    println!("ALL DONE, success!");
 }
