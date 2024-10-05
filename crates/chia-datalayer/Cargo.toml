@@ -19,13 +19,13 @@ crate-type = ["rlib"]
 
 [dependencies]
 clvmr = { workspace = true }
+num-traits = { workspace = true }
 pyo3 = { workspace = true, optional = true }
 
 [dev-dependencies]
 clvm-utils = { workspace = true }
 hex = { workspace = true }
 hex-literal = { workspace = true }
-num-traits = { workspace = true }
 open = { workspace = true }
 percent-encoding = { workspace = true }
 rstest = { workspace = true }

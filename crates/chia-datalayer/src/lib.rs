@@ -86,6 +86,21 @@ impl NodeType {
 //     }
 // }
 
+#[allow(clippy::needless_pass_by_value)]
+fn sha256_num<T: num_traits::ops::bytes::ToBytes>(input: T) -> Hash {
+    let mut hasher = Sha256::new();
+    hasher.update(input.to_be_bytes());
+
+    hasher.finalize()
+}
+
+fn sha256_bytes(input: &[u8]) -> Hash {
+    let mut hasher = Sha256::new();
+    hasher.update(input);
+
+    hasher.finalize()
+}
+
 fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(b"\x02");
@@ -860,16 +875,12 @@ impl MerkleBlob {
                 }
             }
 
-            let mut hasher = Sha256::new();
-            hasher.update(seed_bytes);
-            seed_bytes = hasher.finalize().into();
+            seed_bytes = sha256_bytes(&seed_bytes).into();
         }
     }
 
     fn get_random_insert_location_by_kvid(&self, seed: KvId) -> Result<InsertLocation, String> {
-        let mut hasher = Sha256::new();
-        hasher.update(seed.to_be_bytes());
-        let seed: Hash = hasher.finalize();
+        let seed = sha256_num(seed);
 
         self.get_random_insert_location_by_seed(&seed)
     }
@@ -1285,7 +1296,6 @@ impl Iterator for MerkleBlobBreadthFirstIterator<'_> {
 mod tests {
     use super::*;
     // use hex_literal::hex;
-    // use num_traits;
     use rstest::{fixture, rstest};
     use std::time::{Duration, Instant};
 
@@ -1408,12 +1418,6 @@ mod tests {
     //
     //     merkle_blob.check();
     // }
-    fn hash<T: num_traits::ops::bytes::ToBytes>(i: &T) -> Hash {
-        let mut hasher = Sha256::new();
-        hasher.update(i.to_be_bytes());
-
-        hasher.finalize()
-    }
 
     #[fixture]
     fn small_blob() -> MerkleBlob {
@@ -1422,7 +1426,7 @@ mod tests {
         blob.insert(
             0x0001_0203_0405_0607,
             0x1011_1213_1415_1617,
-            &hash(&0x1020),
+            &sha256_num(0x1020),
             InsertLocation::Auto,
         )
         .unwrap();
@@ -1430,7 +1434,7 @@ mod tests {
         blob.insert(
             0x2021_2223_2425_2627,
             0x3031_3233_3435_3637,
-            &hash(&0x2030),
+            &sha256_num(0x2030),
             InsertLocation::Auto,
         )
         .unwrap();
@@ -1534,7 +1538,7 @@ mod tests {
             let start = Instant::now();
             merkle_blob
                 // TODO: yeah this hash is garbage
-                .insert(i, i, &hash(&i), InsertLocation::Auto)
+                .insert(i, i, &sha256_num(i), InsertLocation::Auto)
                 .unwrap();
             let end = Instant::now();
             total_time += end.duration_since(start);
@@ -1579,9 +1583,7 @@ mod tests {
         let key_value_ids: [KvId; COUNT] = core::array::from_fn(|i| i as KvId);
 
         for key_value_id in key_value_ids {
-            let mut hasher = Sha256::new();
-            hasher.update(key_value_id.to_be_bytes());
-            let hash: Hash = hasher.finalize();
+            let hash: Hash = sha256_num(key_value_id);
 
             println!("inserting: {key_value_id}");
             merkle_blob.calculate_lazy_hashes();
@@ -1631,7 +1633,7 @@ mod tests {
             .insert(
                 key_value_id,
                 key_value_id,
-                &hash(&key_value_id),
+                &sha256_num(key_value_id),
                 InsertLocation::Auto,
             )
             .unwrap();
@@ -1653,7 +1655,7 @@ mod tests {
             let key: KvId = i as KvId;
             // open_dot(&mut merkle_blob.to_dot().set_note("empty"));
             merkle_blob
-                .insert(key, key, &hash(&key), InsertLocation::Auto)
+                .insert(key, key, &sha256_num(key), InsertLocation::Auto)
                 .unwrap();
             last_key = key;
         }
@@ -1664,7 +1666,7 @@ mod tests {
             .insert(
                 key_value_id,
                 key_value_id,
-                &hash(&key_value_id),
+                &sha256_num(key_value_id),
                 InsertLocation::Leaf {
                     index: merkle_blob.key_to_index[&last_key],
                     side: side.clone(),
@@ -1710,7 +1712,7 @@ mod tests {
             .insert(
                 key_value_id,
                 key_value_id,
-                &hash(&key_value_id),
+                &sha256_num(key_value_id),
                 InsertLocation::Auto,
             )
             .unwrap();
@@ -1795,12 +1797,12 @@ mod tests {
 
         let mut insert_blob = MerkleBlob::new(small_blob.blob.clone()).unwrap();
         insert_blob
-            .insert(key, value, &hash(&key), InsertLocation::Auto)
+            .insert(key, value, &sha256_num(key), InsertLocation::Auto)
             .unwrap();
         // open_dot(&mut insert_blob.to_dot().set_note("first after"));
 
         let mut upsert_blob = MerkleBlob::new(small_blob.blob.clone()).unwrap();
-        upsert_blob.upsert(key, value, &hash(&key)).unwrap();
+        upsert_blob.upsert(key, value, &sha256_num(key)).unwrap();
         // open_dot(&mut upsert_blob.to_dot().set_note("first after"));
 
         assert_eq!(insert_blob.blob, upsert_blob.blob);
