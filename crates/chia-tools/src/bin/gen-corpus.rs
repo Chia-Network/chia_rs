@@ -39,6 +39,10 @@ struct Args {
     #[arg(long, default_value_t = false)]
     spend_bundles: bool,
 
+    /// generate corpus for run_block_generator()
+    #[arg(long, default_value_t = false)]
+    block_generators: bool,
+
     /// generate corpus for solution-generator
     #[arg(long, default_value_t = false)]
     coin_spends: bool,
@@ -90,68 +94,81 @@ fn main() {
 
                 let generator = prg.as_ref();
 
+                if args.block_generators {
+                    let directory = "../chia-protocol/fuzz/corpus/run-generator";
+                    let _ = std::fs::create_dir_all(directory);
+                    write(format!("{directory}/{height}.bundle"), generator).expect("write");
+                    cnt.fetch_add(1, Ordering::Relaxed);
+                }
                 let mut bundle = SpendBundle::new(vec![], G2Element::default());
 
-                visit_spends(
-                    &mut a,
-                    generator,
-                    &block_refs,
-                    max_cost,
-                    |a, parent_coin_info, amount, puzzle, solution| {
-                        let puzzle_hash = Bytes32::from(tree_hash(a, puzzle));
-                        let mod_hash =
-                            match CurriedProgram::<NodePtr, NodePtr>::from_clvm(a, puzzle) {
-                                Ok(uncurried) => Bytes32::from(tree_hash(a, uncurried.program)),
-                                _ => puzzle_hash,
+                if args.puzzles || args.spend_bundles || args.coin_spends {
+                    visit_spends(
+                        &mut a,
+                        generator,
+                        &block_refs,
+                        max_cost,
+                        |a, parent_coin_info, amount, puzzle, solution| {
+                            let puzzle_hash = Bytes32::from(tree_hash(a, puzzle));
+                            let mod_hash =
+                                match CurriedProgram::<NodePtr, NodePtr>::from_clvm(a, puzzle) {
+                                    Ok(uncurried) => Bytes32::from(tree_hash(a, uncurried.program)),
+                                    _ => puzzle_hash,
+                                };
+
+                            let seen_puzzle = seen_puzzles.lock().unwrap().insert(mod_hash);
+                            let run_puzzle = args.puzzles && seen_puzzle;
+                            let fast_forward = (mod_hash == SINGLETON_TOP_LAYER_PUZZLE_HASH.into())
+                                && seen_singletons.lock().unwrap().insert(puzzle_hash);
+
+                            if !run_puzzle
+                                && !fast_forward
+                                && !args.spend_bundles
+                                && !args.coin_spends
+                            {
+                                return;
+                            }
+                            let puzzle_reveal =
+                                Program::from_clvm(a, puzzle).expect("puzzle reveal");
+                            let solution = Program::from_clvm(a, solution).expect("solution");
+                            let coin = Coin {
+                                parent_coin_info,
+                                puzzle_hash,
+                                amount,
+                            };
+                            let spend = CoinSpend {
+                                coin,
+                                puzzle_reveal,
+                                solution,
                             };
 
-                        let seen_puzzle = seen_puzzles.lock().unwrap().insert(mod_hash);
-                        let run_puzzle = args.puzzles && seen_puzzle;
-                        let fast_forward = (mod_hash == SINGLETON_TOP_LAYER_PUZZLE_HASH.into())
-                            && seen_singletons.lock().unwrap().insert(puzzle_hash);
+                            if (args.spend_bundles || args.coin_spends) && !seen_puzzle {
+                                bundle.coin_spends.push(spend.clone());
+                            }
 
-                        if !run_puzzle && !fast_forward && !args.spend_bundles && !args.coin_spends
-                        {
-                            return;
-                        }
-                        let puzzle_reveal = Program::from_clvm(a, puzzle).expect("puzzle reveal");
-                        let solution = Program::from_clvm(a, solution).expect("solution");
-                        let coin = Coin {
-                            parent_coin_info,
-                            puzzle_hash,
-                            amount,
-                        };
-                        let spend = CoinSpend {
-                            coin,
-                            puzzle_reveal,
-                            solution,
-                        };
+                            if !run_puzzle && !fast_forward {
+                                return;
+                            }
+                            let bytes = spend.to_bytes().expect("stream CoinSpend");
+                            if run_puzzle {
+                                let directory = "../chia-consensus/fuzz/corpus/run-puzzle";
+                                let _ = std::fs::create_dir_all(directory);
+                                write(format!("{directory}/{mod_hash}.spend"), &bytes)
+                                    .expect("write");
+                                cnt.fetch_add(1, Ordering::Relaxed);
+                            }
 
-                        if (args.spend_bundles || args.coin_spends) && !seen_puzzle {
-                            bundle.coin_spends.push(spend.clone());
-                        }
-
-                        if !run_puzzle && !fast_forward {
-                            return;
-                        }
-                        let bytes = spend.to_bytes().expect("stream CoinSpend");
-                        if run_puzzle {
-                            let directory = "../chia-consensus/fuzz/corpus/run-puzzle";
-                            let _ = std::fs::create_dir_all(directory);
-                            write(format!("{directory}/{mod_hash}.spend"), &bytes).expect("write");
-                            cnt.fetch_add(1, Ordering::Relaxed);
-                        }
-
-                        if fast_forward {
-                            let directory = "../chia-consensus/fuzz/corpus/fast-forward";
-                            let _ = std::fs::create_dir_all(directory);
-                            write(format!("{directory}/{puzzle_hash}.spend"), &bytes)
-                                .expect("write");
-                            cnt.fetch_add(1, Ordering::Relaxed);
-                        }
-                    },
-                )
-                .expect("failed to run block generator");
+                            if fast_forward {
+                                let directory = "../chia-consensus/fuzz/corpus/fast-forward";
+                                let _ = std::fs::create_dir_all(directory);
+                                write(format!("{directory}/{puzzle_hash}.spend"), &bytes)
+                                    .expect("write");
+                                cnt.fetch_add(1, Ordering::Relaxed);
+                            }
+                        },
+                    )
+                    .expect("failed to run block generator");
+                }
 
                 if args.spend_bundles && !bundle.coin_spends.is_empty() {
                     let directory = "../chia-protocol/fuzz/corpus/spend-bundle";
