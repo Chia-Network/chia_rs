@@ -30,10 +30,6 @@ def run_block_generator2(
     program: ReadableBuffer, block_refs: List[ReadableBuffer], max_cost: int, flags: int, constants: ConsensusConstants
 ) -> Tuple[Optional[int], Optional[SpendBundleConditions]]: ...
 
-def run_puzzle(
-    puzzle: bytes, solution: bytes, parent_id: bytes32, amount: int, max_cost: int, flags: int, constants: ConsensusConstants
-) -> SpendBundleConditions: ...
-
 def confirm_included_already_hashed(
     root: bytes32,
     item: bytes32,

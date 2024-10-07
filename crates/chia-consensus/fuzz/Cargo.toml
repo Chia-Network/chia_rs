@@ -79,13 +79,6 @@ doc = false
 bench = false
 
 [[bin]]
-name = "run-puzzle"
-path = "fuzz_targets/run-puzzle.rs"
-test = false
-doc = false
-bench = false
-
-[[bin]]
 name = "fast-forward"
 path = "fuzz_targets/fast-forward.rs"
 test = false

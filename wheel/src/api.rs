@@ -1,13 +1,11 @@
 use crate::run_generator::{py_to_slice, run_block_generator, run_block_generator2};
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::consensus_constants::ConsensusConstants;
-use chia_consensus::gen::conditions::MempoolVisitor;
 use chia_consensus::gen::flags::{
     ALLOW_BACKREFS, MEMPOOL_MODE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
 };
 use chia_consensus::gen::owned_conditions::{OwnedSpendBundleConditions, OwnedSpendConditions};
 use chia_consensus::gen::run_block_generator::setup_generator_args;
-use chia_consensus::gen::run_puzzle::run_puzzle as native_run_puzzle;
 use chia_consensus::gen::solution_generator::solution_generator as native_solution_generator;
 use chia_consensus::gen::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
 use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
@@ -230,23 +228,6 @@ pub fn get_puzzle_and_solution_for_coin2<'a>(
     ))
 }
 
-#[pyfunction]
-fn run_puzzle(
-    puzzle: &[u8],
-    solution: &[u8],
-    parent_id: &[u8],
-    amount: u64,
-    max_cost: Cost,
-    flags: u32,
-    constants: &ConsensusConstants,
-) -> PyResult<OwnedSpendBundleConditions> {
-    let mut a = make_allocator(LIMIT_HEAP);
-    let conds = native_run_puzzle::<MempoolVisitor>(
-        &mut a, puzzle, solution, parent_id, amount, max_cost, flags, constants,
-    )?;
-    Ok(OwnedSpendBundleConditions::from(&a, conds))
-}
-
 // this is like a CoinSpend but with references to the puzzle and solution,
 // rather than owning them
 type CoinSpendRef = (Coin, PyBackedBytes, PyBackedBytes);
@@ -313,12 +294,13 @@ impl AugSchemeMPL {
     }
 
     #[staticmethod]
-    pub fn verify(pk: &PublicKey, msg: &[u8], sig: &Signature) -> bool {
-        chia_bls::verify(sig, pk, msg)
+    pub fn verify(py: Python<'_>, pk: &PublicKey, msg: &[u8], sig: &Signature) -> bool {
+        py.allow_threads(|| chia_bls::verify(sig, pk, msg))
     }
 
     #[staticmethod]
     pub fn aggregate_verify(
+        py: Python<'_>,
         pks: &Bound<'_, PyList>,
         msgs: &Bound<'_, PyList>,
         sig: &Signature,
@@ -335,7 +317,7 @@ impl AugSchemeMPL {
             data.push((pk, msg));
         }
 
-        Ok(chia_bls::aggregate_verify(sig, data))
+        py.allow_threads(|| Ok(chia_bls::aggregate_verify(sig, data)))
     }
 
     #[staticmethod]
@@ -471,7 +453,6 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // generator functions
     m.add_function(wrap_pyfunction!(run_block_generator, m)?)?;
     m.add_function(wrap_pyfunction!(run_block_generator2, m)?)?;
-    m.add_function(wrap_pyfunction!(run_puzzle, m)?)?;
     m.add_function(wrap_pyfunction!(solution_generator, m)?)?;
     m.add_function(wrap_pyfunction!(solution_generator_backrefs, m)?)?;
     m.add_function(wrap_pyfunction!(supports_fast_forward, m)?)?;

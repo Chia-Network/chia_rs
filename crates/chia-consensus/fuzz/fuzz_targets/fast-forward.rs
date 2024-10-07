@@ -1,8 +1,11 @@
 #![no_main]
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::fast_forward::fast_forward_singleton;
-use chia_consensus::gen::conditions::{MempoolVisitor, ELIGIBLE_FOR_FF};
-use chia_consensus::gen::run_puzzle::run_puzzle;
+use chia_consensus::gen::conditions::{
+    parse_conditions, MempoolVisitor, ParseState, SpendBundleConditions, SpendConditions,
+    ELIGIBLE_FOR_FF,
+};
+use chia_consensus::gen::spend_visitor::SpendVisitor;
 use chia_consensus::gen::validation_error::{ErrorCode, ValidationErr};
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
@@ -10,11 +13,16 @@ use chia_protocol::CoinSpend;
 use chia_traits::streamable::Streamable;
 use clvm_traits::ToClvm;
 use clvm_utils::tree_hash;
-use clvmr::serde::node_to_bytes;
+use clvmr::serde::{node_from_bytes, node_to_bytes};
 use clvmr::{Allocator, NodePtr};
 use hex_literal::hex;
 use libfuzzer_sys::fuzz_target;
 use std::io::Cursor;
+
+use clvmr::chia_dialect::ChiaDialect;
+use clvmr::reduction::Reduction;
+use clvmr::run_program::run_program;
+use std::sync::Arc;
 
 fuzz_target!(|data: &[u8]| {
     let Ok(spend) = CoinSpend::parse::<false>(&mut Cursor::new(data)) else {
@@ -66,6 +74,60 @@ fuzz_target!(|data: &[u8]| {
     }
 });
 
+fn run_puzzle(
+    a: &mut Allocator,
+    puzzle: &[u8],
+    solution: &[u8],
+    parent_id: &[u8],
+    amount: u64,
+) -> core::result::Result<SpendBundleConditions, ValidationErr> {
+    let puzzle = node_from_bytes(a, puzzle)?;
+    let solution = node_from_bytes(a, solution)?;
+
+    let dialect = ChiaDialect::new(0);
+    let max_cost = 11_000_000_000;
+    let Reduction(clvm_cost, conditions) = run_program(a, &dialect, puzzle, solution, max_cost)?;
+
+    let mut ret = SpendBundleConditions {
+        removal_amount: amount as u128,
+        ..Default::default()
+    };
+    let mut state = ParseState::default();
+
+    let puzzle_hash = tree_hash(a, puzzle);
+    let coin_id = Arc::<Bytes32>::new(
+        Coin {
+            parent_coin_info: parent_id.try_into().unwrap(),
+            puzzle_hash: puzzle_hash.into(),
+            amount,
+        }
+        .coin_id(),
+    );
+
+    let mut spend = SpendConditions::new(
+        a.new_atom(parent_id)?,
+        amount,
+        a.new_atom(&puzzle_hash)?,
+        coin_id,
+    );
+
+    let mut visitor = MempoolVisitor::new_spend(&mut spend);
+
+    let mut cost_left = max_cost - clvm_cost;
+    parse_conditions(
+        a,
+        &mut ret,
+        &mut state,
+        spend,
+        conditions,
+        0,
+        &mut cost_left,
+        &TEST_CONSTANTS,
+        &mut visitor,
+    )?;
+    ret.cost = max_cost - cost_left;
+    Ok(ret)
+}
 fn test_ff(
     a: &mut Allocator,
     spend: &CoinSpend,
@@ -83,27 +145,21 @@ fn test_ff(
     let new_solution = node_to_bytes(a, new_solution).expect("serialize new solution");
 
     // run original spend
-    let conditions1 = run_puzzle::<MempoolVisitor>(
+    let conditions1 = run_puzzle(
         a,
         spend.puzzle_reveal.as_slice(),
         spend.solution.as_slice(),
         &spend.coin.parent_coin_info,
         spend.coin.amount,
-        11_000_000_000,
-        0,
-        &TEST_CONSTANTS,
     );
 
     // run new spend
-    let conditions2 = run_puzzle::<MempoolVisitor>(
+    let conditions2 = run_puzzle(
         a,
         spend.puzzle_reveal.as_slice(),
         new_solution.as_slice(),
         &new_coin.parent_coin_info,
         new_coin.amount,
-        11_000_000_000,
-        0,
-        &TEST_CONSTANTS,
     );
 
     // These are the kinds of failures that can happen because of the
