@@ -24,6 +24,9 @@ const fn range_by_length(start: usize, length: usize) -> Range<usize> {
 // TODO: consider in more detail other serialization tools such as serde and streamable
 // common fields
 // TODO: better way to pick the max of key value and right range, until we move hash first
+// TODO: clearly shouldn't be hard coded
+const METADATA_SIZE: usize = 2;
+const METADATA_RANGE: Range<usize> = 0..METADATA_SIZE;
 const HASH_RANGE: Range<usize> = range_by_length(0, size_of::<Hash>());
 // const PARENT_RANGE: Range<usize> = range_by_length(HASH_RANGE.end, size_of::<TreeIndex>());
 const PARENT_RANGE: Range<usize> = HASH_RANGE.end..(HASH_RANGE.end + size_of::<TreeIndex>());
@@ -35,16 +38,17 @@ const KEY_RANGE: Range<usize> = range_by_length(PARENT_RANGE.end, size_of::<KvId
 const VALUE_RANGE: Range<usize> = range_by_length(KEY_RANGE.end, size_of::<KvId>());
 
 // TODO: clearly shouldn't be hard coded
-const METADATA_SIZE: usize = 2;
-// TODO: clearly shouldn't be hard coded
 // TODO: max of RIGHT_RANGE.end and VALUE_RANGE.end
 const DATA_SIZE: usize = VALUE_RANGE.end;
 const BLOCK_SIZE: usize = METADATA_SIZE + DATA_SIZE;
 type BlockBytes = [u8; BLOCK_SIZE];
 type MetadataBytes = [u8; METADATA_SIZE];
 type DataBytes = [u8; DATA_SIZE];
-const METADATA_RANGE: Range<usize> = 0..METADATA_SIZE;
-const DATA_RANGE: Range<usize> = METADATA_SIZE..DATA_SIZE;
+const DATA_RANGE: Range<usize> = METADATA_SIZE..METADATA_SIZE + DATA_SIZE;
+const INTERNAL_PADDING_RANGE: Range<usize> = RIGHT_RANGE.end..DATA_SIZE;
+const INTERNAL_PADDING_SIZE: usize = INTERNAL_PADDING_RANGE.end - INTERNAL_PADDING_RANGE.start;
+const LEAF_PADDING_RANGE: Range<usize> = VALUE_RANGE.end..DATA_SIZE;
+const LEAF_PADDING_SIZE: usize = LEAF_PADDING_RANGE.end - LEAF_PADDING_RANGE.start;
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 #[repr(u8)]
@@ -247,7 +251,7 @@ impl Node {
                 blob.extend(left.to_be_bytes());
                 blob.extend(right.to_be_bytes());
                 // TODO: not-yucky padding
-                blob.extend([0; DATA_SIZE - RIGHT_RANGE.end]);
+                blob.extend([0; INTERNAL_PADDING_SIZE]);
             }
             Node {
                 parent,
@@ -265,7 +269,7 @@ impl Node {
                 blob.extend(key.to_be_bytes());
                 blob.extend(value.to_be_bytes());
                 // TODO: not-yucky padding
-                blob.extend([0; DATA_SIZE - VALUE_RANGE.end]);
+                blob.extend([0; LEAF_PADDING_SIZE]);
             }
         }
 
@@ -349,16 +353,8 @@ impl Block {
     }
 
     fn range(index: TreeIndex) -> Range<usize> {
-        let metadata_start = index as usize * BLOCK_SIZE;
-        let data_start = metadata_start + METADATA_SIZE;
-        let end = data_start + DATA_SIZE;
-
-        // let range = metadata_start..end;
-        // // checking range validity
-        // self.blob.get(range.clone()).unwrap();
-        //
-        // range
-        metadata_start..end
+        let block_start = index as usize * BLOCK_SIZE;
+        block_start..block_start + BLOCK_SIZE
     }
 }
 
