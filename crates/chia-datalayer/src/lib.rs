@@ -41,6 +41,10 @@ const METADATA_SIZE: usize = 2;
 const DATA_SIZE: usize = VALUE_RANGE.end;
 const BLOCK_SIZE: usize = METADATA_SIZE + DATA_SIZE;
 type BlockBytes = [u8; BLOCK_SIZE];
+type MetadataBytes = [u8; METADATA_SIZE];
+type DataBytes = [u8; DATA_SIZE];
+const METADATA_RANGE: Range<usize> = 0..METADATA_SIZE;
+const DATA_RANGE: Range<usize> = METADATA_SIZE..DATA_SIZE;
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 #[repr(u8)]
@@ -132,7 +136,7 @@ pub struct NodeMetadata {
 }
 
 impl NodeMetadata {
-    pub fn from_bytes(blob: [u8; METADATA_SIZE]) -> Result<Self, String> {
+    pub fn from_bytes(blob: MetadataBytes) -> Result<Self, String> {
         // TODO: could save 1-2% of tree space by packing (and maybe don't do that)
         // TODO: identify some useful structured serialization tooling we use
         Ok(Self {
@@ -141,15 +145,15 @@ impl NodeMetadata {
         })
     }
 
-    pub fn to_bytes(&self) -> [u8; METADATA_SIZE] {
+    pub fn to_bytes(&self) -> MetadataBytes {
         [self.node_type.to_u8(), u8::from(self.dirty)]
     }
 
-    pub fn node_type_from_bytes(blob: [u8; METADATA_SIZE]) -> Result<NodeType, String> {
+    pub fn node_type_from_bytes(blob: MetadataBytes) -> Result<NodeType, String> {
         NodeType::from_u8(blob[0])
     }
 
-    pub fn dirty_from_bytes(blob: [u8; METADATA_SIZE]) -> Result<bool, String> {
+    pub fn dirty_from_bytes(blob: MetadataBytes) -> Result<bool, String> {
         match blob[1] {
             0 => Ok(false),
             1 => Ok(true),
@@ -195,7 +199,7 @@ impl Node {
     pub fn from_bytes(
         metadata: &NodeMetadata,
         index: TreeIndex,
-        blob: [u8; DATA_SIZE],
+        blob: DataBytes,
     ) -> Result<Self, String> {
         // TODO: add Err results
         Ok(Self {
@@ -216,7 +220,7 @@ impl Node {
         })
     }
 
-    fn parent_from_bytes(blob: &[u8; DATA_SIZE]) -> Parent {
+    fn parent_from_bytes(blob: &DataBytes) -> Parent {
         // TODO: a little setup here for pre-optimization to allow walking parents without processing entire nodes
         let parent_integer = TreeIndex::from_be_bytes(blob[PARENT_RANGE].try_into().unwrap());
         match parent_integer {
@@ -224,7 +228,7 @@ impl Node {
             _ => Some(parent_integer),
         }
     }
-    pub fn to_bytes(&self) -> [u8; DATA_SIZE] {
+    pub fn to_bytes(&self) -> DataBytes {
         let mut blob: Vec<u8> = Vec::new();
         match self {
             Node {
@@ -325,8 +329,8 @@ pub struct Block {
 impl Block {
     pub fn to_bytes(&self) -> BlockBytes {
         let mut blob: BlockBytes = [0; BLOCK_SIZE];
-        blob[..METADATA_SIZE].copy_from_slice(&self.metadata.to_bytes());
-        blob[METADATA_SIZE..].copy_from_slice(&self.node.to_bytes());
+        blob[METADATA_RANGE].copy_from_slice(&self.metadata.to_bytes());
+        blob[DATA_RANGE].copy_from_slice(&self.node.to_bytes());
 
         blob
     }
@@ -334,8 +338,8 @@ impl Block {
     pub fn from_bytes(blob: BlockBytes, index: TreeIndex) -> Result<Block, String> {
         // TODO: handle invalid indexes?
         // TODO: handle overflows?
-        let metadata_blob: [u8; METADATA_SIZE] = blob[..METADATA_SIZE].try_into().unwrap();
-        let data_blob: [u8; DATA_SIZE] = blob[METADATA_SIZE..].try_into().unwrap();
+        let metadata_blob: MetadataBytes = blob[METADATA_RANGE].try_into().unwrap();
+        let data_blob: DataBytes = blob[DATA_RANGE].try_into().unwrap();
         let metadata = NodeMetadata::from_bytes(metadata_blob)
             .map_err(|message| format!("failed loading metadata: {message})"))?;
         let node = Node::from_bytes(&metadata, index, data_blob)
@@ -937,8 +941,8 @@ impl MerkleBlob {
         // TODO: handle invalid indexes?
         // TODO: handle overflows?
         let block = self.get_block_bytes(index)?;
-        let metadata_blob: [u8; METADATA_SIZE] = block[..METADATA_SIZE].try_into().unwrap();
-        let data_blob: [u8; DATA_SIZE] = block[METADATA_SIZE..].try_into().unwrap();
+        let metadata_blob: MetadataBytes = block[METADATA_RANGE].try_into().unwrap();
+        let data_blob: DataBytes = block[DATA_RANGE].try_into().unwrap();
         let metadata = NodeMetadata::from_bytes(metadata_blob)
             .map_err(|message| format!("failed loading metadata: {message})"))?;
 
@@ -949,7 +953,7 @@ impl MerkleBlob {
     pub fn get_parent_index(&self, index: TreeIndex) -> Parent {
         let block = self.get_block_bytes(index).unwrap();
 
-        Node::parent_from_bytes(block[METADATA_SIZE..].try_into().unwrap())
+        Node::parent_from_bytes(block[DATA_RANGE].try_into().unwrap())
     }
 
     pub fn get_lineage(&self, index: TreeIndex) -> Result<Vec<Node>, String> {
@@ -975,7 +979,7 @@ impl MerkleBlob {
         while let Some(this_index) = next_index {
             lineage.push(this_index);
             let block = self.get_block_bytes(this_index)?;
-            next_index = Node::parent_from_bytes(block[METADATA_SIZE..].try_into().unwrap());
+            next_index = Node::parent_from_bytes(block[DATA_RANGE].try_into().unwrap());
         }
 
         Ok(lineage)
