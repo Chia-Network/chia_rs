@@ -3,6 +3,7 @@ use pyo3::{buffer::PyBuffer, pyclass, pymethods, PyResult};
 
 use clvmr::sha2::Sha256;
 use dot::DotLines;
+use num_traits::ToBytes;
 use std::cmp::Ordering;
 use std::collections::{HashMap, VecDeque};
 use std::iter::{zip, IntoIterator};
@@ -45,10 +46,10 @@ type BlockBytes = [u8; BLOCK_SIZE];
 type MetadataBytes = [u8; METADATA_SIZE];
 type DataBytes = [u8; DATA_SIZE];
 const DATA_RANGE: Range<usize> = METADATA_SIZE..METADATA_SIZE + DATA_SIZE;
-const INTERNAL_PADDING_RANGE: Range<usize> = RIGHT_RANGE.end..DATA_SIZE;
-const INTERNAL_PADDING_SIZE: usize = INTERNAL_PADDING_RANGE.end - INTERNAL_PADDING_RANGE.start;
-const LEAF_PADDING_RANGE: Range<usize> = VALUE_RANGE.end..DATA_SIZE;
-const LEAF_PADDING_SIZE: usize = LEAF_PADDING_RANGE.end - LEAF_PADDING_RANGE.start;
+// const INTERNAL_PADDING_RANGE: Range<usize> = RIGHT_RANGE.end..DATA_SIZE;
+// const INTERNAL_PADDING_SIZE: usize = INTERNAL_PADDING_RANGE.end - INTERNAL_PADDING_RANGE.start;
+// const LEAF_PADDING_RANGE: Range<usize> = VALUE_RANGE.end..DATA_SIZE;
+// const LEAF_PADDING_SIZE: usize = LEAF_PADDING_RANGE.end - LEAF_PADDING_RANGE.start;
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 #[repr(u8)]
@@ -199,7 +200,6 @@ impl Node {
     // }
 
     pub fn from_bytes(metadata: &NodeMetadata, blob: DataBytes) -> Result<Self, String> {
-        // TODO: add Err results
         Ok(Self {
             parent: Self::parent_from_bytes(&blob),
             hash: blob[HASH_RANGE].try_into().unwrap(),
@@ -209,7 +209,6 @@ impl Node {
                     right: TreeIndex::from_be_bytes(blob[RIGHT_RANGE].try_into().unwrap()),
                 },
                 NodeType::Leaf => NodeSpecific::Leaf {
-                    // TODO: this try from really right?
                     key: KvId::from_be_bytes(blob[KEY_RANGE].try_into().unwrap()),
                     value: KvId::from_be_bytes(blob[VALUE_RANGE].try_into().unwrap()),
                 },
@@ -226,7 +225,7 @@ impl Node {
         }
     }
     pub fn to_bytes(&self) -> DataBytes {
-        let mut blob: Vec<u8> = Vec::new();
+        let mut blob: DataBytes = [0; DATA_SIZE];
         match self {
             Node {
                 parent,
@@ -237,13 +236,10 @@ impl Node {
                     None => NULL_PARENT,
                     Some(parent) => *parent,
                 };
-                // TODO: insert per ranges
-                blob.extend(hash);
-                blob.extend(parent_integer.to_be_bytes());
-                blob.extend(left.to_be_bytes());
-                blob.extend(right.to_be_bytes());
-                // TODO: not-yucky padding
-                blob.extend([0; INTERNAL_PADDING_SIZE]);
+                blob[HASH_RANGE].copy_from_slice(hash);
+                blob[PARENT_RANGE].copy_from_slice(&parent_integer.to_be_bytes());
+                blob[LEFT_RANGE].copy_from_slice(&left.to_be_bytes());
+                blob[RIGHT_RANGE].copy_from_slice(&right.to_be_bytes());
             }
             Node {
                 parent,
@@ -254,17 +250,14 @@ impl Node {
                     None => NULL_PARENT,
                     Some(parent) => *parent,
                 };
-                // TODO: insert per ranges
-                blob.extend(hash);
-                blob.extend(parent_integer.to_be_bytes());
-                blob.extend(key.to_be_bytes());
-                blob.extend(value.to_be_bytes());
-                // TODO: not-yucky padding
-                blob.extend([0; LEAF_PADDING_SIZE]);
+                blob[HASH_RANGE].copy_from_slice(hash);
+                blob[PARENT_RANGE].copy_from_slice(&parent_integer.to_be_bytes());
+                blob[KEY_RANGE].copy_from_slice(&key.to_be_bytes());
+                blob[VALUE_RANGE].copy_from_slice(&value.to_be_bytes());
             }
         }
 
-        blob.try_into().unwrap()
+        blob
     }
 
     // TODO: yes i know i'm trying to write this code in a non-rusty way and i need to stop that
@@ -331,7 +324,6 @@ impl Block {
 
     pub fn from_bytes(blob: BlockBytes) -> Result<Block, String> {
         // TODO: handle invalid indexes?
-        // TODO: handle overflows?
         let metadata_blob: MetadataBytes = blob[METADATA_RANGE].try_into().unwrap();
         let data_blob: DataBytes = blob[DATA_RANGE].try_into().unwrap();
         let metadata = NodeMetadata::from_bytes(metadata_blob)
@@ -443,8 +435,7 @@ impl MerkleBlob {
                 panic!("this should have been caught and processed above")
             }
             InsertLocation::AsRoot => {
-                // TODO: what about only unused blocks resulting in a non-empty blob?
-                assert!(self.blob.is_empty());
+                assert!(self.key_to_index.is_empty());
                 self.insert_first(key, value, hash);
             }
             InsertLocation::Leaf { index, side } => {
