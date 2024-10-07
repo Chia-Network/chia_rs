@@ -458,14 +458,15 @@ impl MerkleBlob {
                 self.insert_first(key, value, hash);
             }
             InsertLocation::Leaf { index, side } => {
-                // TODO: what about only unused blocks resulting ia blob length?
-                assert!(!self.blob.is_empty());
                 let old_leaf = self.get_node(index)?;
-                match old_leaf.specific {
-                    NodeSpecific::Leaf { .. } => {}
-                    NodeSpecific::Internal { .. } => panic!(),
-                }
-                // let NodeSpecific::Leaf ( .. ) = old_leaf.specific else { panic!() };
+                let NodeSpecific::Leaf {
+                    key: old_leaf_key, ..
+                } = old_leaf.specific
+                else {
+                    panic!()
+                };
+                assert_eq!(self.key_to_index[&old_leaf_key], index);
+
                 let internal_node_hash = match side {
                     Side::Left => internal_hash(hash, &old_leaf.hash),
                     Side::Right => internal_hash(&old_leaf.hash, hash),
