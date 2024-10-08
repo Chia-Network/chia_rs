@@ -86,7 +86,7 @@ impl BlsCache {
         let mut hasher = Sha256::new();
         hasher.update(aug_msg.as_ref());
         let hash: [u8; 32] = hasher.finalize();
-        self.cache.put(hash, gt);
+        self.cache.lock().expect("cache").put(hash, gt);
     }
 }
 
