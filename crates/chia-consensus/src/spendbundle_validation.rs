@@ -38,7 +38,6 @@ pub fn validate_clvm_and_signature(
     let mut pairs = Vec::new();
 
     let mut aug_msg = Vec::<u8>::new();
-    let mut final_msg = Vec::<u8>::new();
 
     for spend in &conditions.spends {
         let condition_items_pairs = [
@@ -54,14 +53,15 @@ pub fn validate_clvm_and_signature(
         for (condition, items) in condition_items_pairs {
             for (pk, msg) in items {
                 aug_msg.clear();
-                final_msg.clear();
-                final_msg.extend_from_slice(msg.as_slice());
                 aug_msg.extend_from_slice(&pk.to_bytes());
-                make_aggsig_final_message(condition, &mut final_msg, spend, constants);
-                aug_msg.extend(&final_msg);
+                aug_msg.extend_from_slice(msg.as_slice());
+                make_aggsig_final_message(condition, &mut aug_msg, spend, constants);
                 let aug_hash = hash_to_g2(&aug_msg);
                 let pairing = aug_hash.pair(pk);
-                pairs.push((hash_pk_and_msg(&pk.to_bytes(), &final_msg), pairing));
+                let mut hasher = Sha256::new();
+                hasher.update(&aug_msg);
+                let aug_msg_hash = hasher.finalize();
+                pairs.push((aug_msg_hash, pairing));
             }
         }
     }
@@ -72,7 +72,10 @@ pub fn validate_clvm_and_signature(
         aug_msg.extend_from_slice(msg.as_ref());
         let aug_hash = hash_to_g2(&aug_msg);
         let pairing = aug_hash.pair(pk);
-        pairs.push((hash_pk_and_msg(&pk.to_bytes(), msg), pairing));
+        let mut hasher = Sha256::new();
+        hasher.update(&aug_msg);
+        let aug_msg_hash = hasher.finalize();
+        pairs.push((aug_msg_hash, pairing));
     }
 
     // Verify aggregated signature
@@ -86,13 +89,6 @@ pub fn validate_clvm_and_signature(
 
     // Collect results
     Ok((conditions, pairs, start_time.elapsed()))
-}
-
-fn hash_pk_and_msg(pk: &[u8], msg: &[u8]) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    hasher.update(pk);
-    hasher.update(msg);
-    hasher.finalize()
 }
 
 pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusConstants) -> u32 {
