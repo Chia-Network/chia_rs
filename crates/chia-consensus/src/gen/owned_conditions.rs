@@ -67,7 +67,7 @@ pub struct OwnedSpendBundleConditions {
     pub removal_amount: u128,
     // the sum of all amounts of CREATE_COIN conditions
     pub addition_amount: u128,
-    // set if the aggregate signature of the block/spend bundle were
+    // set if the aggregate signature of the block/spend bundle was
     // successfully validated
     pub validated_signature: bool,
 }
