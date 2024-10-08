@@ -325,17 +325,20 @@ impl Block {
     }
 }
 
-fn get_free_indexes(blob: &[u8]) -> Vec<TreeIndex> {
+fn get_free_indexes_and_keys_values_indexes(
+    blob: &[u8],
+) -> (Vec<TreeIndex>, HashMap<KvId, TreeIndex>) {
     let index_count = blob.len() / BLOCK_SIZE;
 
-    if index_count == 0 {
-        return vec![];
-    }
-
     let mut seen_indexes: Vec<bool> = vec![false; index_count];
+    let mut key_to_index: HashMap<KvId, TreeIndex> = HashMap::default();
 
-    for (index, _) in MerkleBlobLeftChildFirstIterator::new(blob) {
+    for (index, block) in MerkleBlobLeftChildFirstIterator::new(blob) {
         seen_indexes[index as usize] = true;
+
+        if let NodeSpecific::Leaf { key, .. } = block.node.specific {
+            key_to_index.insert(key, index);
+        }
     }
 
     let mut free_indexes: Vec<TreeIndex> = vec![];
@@ -345,25 +348,7 @@ fn get_free_indexes(blob: &[u8]) -> Vec<TreeIndex> {
         }
     }
 
-    free_indexes
-}
-
-fn get_keys_values_indexes(blob: &[u8]) -> HashMap<KvId, TreeIndex> {
-    let index_count = blob.len() / BLOCK_SIZE;
-
-    let mut key_to_index: HashMap<KvId, TreeIndex> = HashMap::default();
-
-    if index_count == 0 {
-        return key_to_index;
-    }
-
-    for (index, block) in MerkleBlobLeftChildFirstIterator::new(blob) {
-        if let NodeSpecific::Leaf { key, .. } = block.node.specific {
-            key_to_index.insert(key, index);
-        }
-    }
-
-    key_to_index
+    (free_indexes, key_to_index)
 }
 
 #[cfg_attr(feature = "py-bindings", pyclass(name = "MerkleBlob"))]
@@ -386,9 +371,7 @@ impl MerkleBlob {
             ));
         }
 
-        // TODO: stop double tree traversals here
-        let free_indexes = get_free_indexes(&blob);
-        let key_to_index = get_keys_values_indexes(&blob);
+        let (free_indexes, key_to_index) = get_free_indexes_and_keys_values_indexes(&blob);
 
         Ok(Self {
             blob,
@@ -1785,7 +1768,8 @@ mod tests {
         let mut blob = small_blob.blob.clone();
         let expected_free_index = (blob.len() / BLOCK_SIZE) as TreeIndex;
         blob.extend_from_slice(&[0; BLOCK_SIZE]);
-        assert_eq!(get_free_indexes(&blob), [expected_free_index]);
+        let (free_indexes, _) = get_free_indexes_and_keys_values_indexes(&blob);
+        assert_eq!(free_indexes, [expected_free_index]);
     }
 
     #[test]
