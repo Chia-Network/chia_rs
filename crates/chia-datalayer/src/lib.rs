@@ -334,6 +334,7 @@ impl Block {
         Ok(Block { metadata, node })
     }
 
+    // TODO: free function probably
     fn range(index: TreeIndex) -> Range<usize> {
         let block_start = index as usize * BLOCK_SIZE;
         block_start..block_start + BLOCK_SIZE
@@ -407,8 +408,8 @@ impl MerkleBlob {
         }
 
         // TODO: stop double tree traversals here
-        let free_indexes = get_free_indexes(&blob).unwrap();
-        let key_to_index = get_keys_values_indexes(&blob).unwrap();
+        let free_indexes = get_free_indexes(&blob)?;
+        let key_to_index = get_keys_values_indexes(&blob)?;
 
         Ok(Self {
             blob,
@@ -435,18 +436,16 @@ impl MerkleBlob {
                 panic!("this should have been caught and processed above")
             }
             InsertLocation::AsRoot => {
-                assert!(self.key_to_index.is_empty());
+                if !self.key_to_index.is_empty() {
+                    return Err("requested insertion at root but tree not empty".to_string());
+                };
                 self.insert_first(key, value, hash);
             }
             InsertLocation::Leaf { index, side } => {
                 let old_leaf = self.get_node(index)?;
-                let NodeSpecific::Leaf {
-                    key: old_leaf_key, ..
-                } = old_leaf.specific
-                else {
-                    panic!()
+                let NodeSpecific::Leaf { .. } = old_leaf.specific else {
+                    panic!("requested insertion at leaf but found internal node")
                 };
-                assert_eq!(self.key_to_index[&old_leaf_key], index);
 
                 let internal_node_hash = match side {
                     Side::Left => internal_hash(hash, &old_leaf.hash),
@@ -615,7 +614,7 @@ impl MerkleBlob {
         self.insert_entry_to_blob(new_internal_node_index, new_internal_block.to_bytes())?;
 
         let Some(old_parent_index) = old_leaf.parent else {
-            panic!("{key:?} {value:?} {hash:?}")
+            panic!("root found when not expected: {key:?} {value:?} {hash:?}")
         };
 
         let mut block = Block::from_bytes(self.get_block_bytes(old_leaf_index)?)?;
@@ -634,10 +633,10 @@ impl MerkleBlob {
             } else if old_leaf_index == *right {
                 *right = new_internal_node_index;
             } else {
-                panic!();
+                panic!("child not a child of its parent");
             }
         } else {
-            panic!();
+            panic!("expected internal node but found leaf");
         };
 
         self.insert_entry_to_blob(old_parent_index, old_parent_block.to_bytes())?;
@@ -649,12 +648,15 @@ impl MerkleBlob {
     }
 
     pub fn delete(&mut self, key: KvId) -> Result<(), String> {
-        let leaf_index = *self.key_to_index.get(&key).unwrap();
-        let leaf = self.get_node(leaf_index).unwrap();
+        let leaf_index = *self
+            .key_to_index
+            .get(&key)
+            .ok_or(format!("unknown key: {key}"))?;
+        let leaf = self.get_node(leaf_index)?;
 
-        // TODO: blech
+        // TODO: maybe some common way to indicate/perform sanity double checks?
         let NodeSpecific::Leaf { .. } = leaf.specific else {
-            panic!()
+            panic!("key to index cache resulted in internal node")
         };
         self.key_to_index.remove(&key);
 
@@ -666,7 +668,7 @@ impl MerkleBlob {
         };
 
         self.free_indexes.push(leaf_index);
-        let parent = self.get_node(parent_index).unwrap();
+        let parent = self.get_node(parent_index)?;
         // TODO: kinda implicit that we 'check' that parent is internal inside .sibling_index()
         let sibling_index = parent.specific.sibling_index(leaf_index);
         let mut sibling_block = self.get_block(sibling_index)?;
@@ -694,7 +696,7 @@ impl MerkleBlob {
         };
 
         self.free_indexes.push(parent_index);
-        let mut grandparent_block = self.get_block(grandparent_index).unwrap();
+        let mut grandparent_block = self.get_block(grandparent_index)?;
 
         sibling_block.node.parent = Some(grandparent_index);
         self.insert_entry_to_blob(sibling_index, sibling_block.to_bytes())?;
@@ -708,10 +710,10 @@ impl MerkleBlob {
             match parent_index {
                 x if x == *left => *left = sibling_index,
                 x if x == *right => *right = sibling_index,
-                _ => panic!(),
+                _ => panic!("parent not a child a grandparent"),
             }
         } else {
-            panic!()
+            panic!("grandparent not an internal node")
         }
         self.insert_entry_to_blob(grandparent_index, grandparent_block.to_bytes())?;
 
@@ -726,7 +728,7 @@ impl MerkleBlob {
             return Ok(());
         };
 
-        let mut block = self.get_block(*leaf_index).unwrap();
+        let mut block = self.get_block(*leaf_index)?;
         if let NodeSpecific::Leaf {
             value: ref mut inplace_value,
             ..
@@ -735,7 +737,7 @@ impl MerkleBlob {
             block.node.hash.clone_from(new_hash);
             *inplace_value = value;
         } else {
-            panic!()
+            panic!("expected internal node but found leaf");
         }
         self.insert_entry_to_blob(*leaf_index, block.to_bytes())?;
 
@@ -746,7 +748,7 @@ impl MerkleBlob {
         Ok(())
     }
 
-    pub fn check(&self) {
+    pub fn check(&self) -> Result<(), String> {
         let mut leaf_count: usize = 0;
         let mut internal_count: usize = 0;
 
@@ -755,19 +757,34 @@ impl MerkleBlob {
                 NodeSpecific::Internal { .. } => internal_count += 1,
                 NodeSpecific::Leaf { key, .. } => {
                     leaf_count += 1;
-                    assert!(self.key_to_index.contains_key(&key));
+                    let cached_index = self
+                        .key_to_index
+                        .get(&key)
+                        .ok_or(format!("key not in key to index cache: {key:?}"))?;
+                    assert_eq!(
+                        *cached_index, index,
+                        "key to index cache for {key:?} should be {index:?} got: {cached_index:?}"
+                    );
                     // TODO: consider what type free indexes should be
-                    assert!(!self.free_indexes.contains(&index));
+                    assert!(
+                        !self.free_indexes.contains(&index),
+                        "{}",
+                        format!("active index found in free index list: {index:?}")
+                    );
                 }
             }
         }
 
-        assert_eq!(leaf_count, self.key_to_index.len());
+        let key_to_index_cache_length = self.key_to_index.len();
+        assert_eq!(leaf_count, key_to_index_cache_length, "found {leaf_count:?} leaves but key to index cache length is: {key_to_index_cache_length:?}");
+        let total_count = leaf_count + internal_count + self.free_indexes.len();
+        let extend_index = self.extend_index();
         assert_eq!(
-            leaf_count + internal_count + self.free_indexes.len(),
-            self.extend_index() as usize,
+            total_count, extend_index as usize,
+            "expected total node count {extend_index:?} found: {total_count:?}",
         );
 
+        Ok(())
         // TODO: check parent/child bidirectional accuracy
     }
 
@@ -831,7 +848,12 @@ impl MerkleBlob {
             return Ok(InsertLocation::AsRoot);
         }
 
-        let side = if (seed_bytes.last().unwrap() & 1 << 7) == 0 {
+        let side = if (seed_bytes
+            .last()
+            .ok_or("zero-length seed bytes not allowed")?
+            & 1 << 7)
+            == 0
+        {
             Side::Left
         } else {
             Side::Right
@@ -868,7 +890,9 @@ impl MerkleBlob {
     }
 
     fn extend_index(&self) -> TreeIndex {
-        assert_eq!(self.blob.len() % BLOCK_SIZE, 0);
+        let blob_length = self.blob.len();
+        let remainder = blob_length % BLOCK_SIZE;
+        assert_eq!(remainder, 0, "blob length {blob_length:?} not a multiple of {BLOCK_SIZE:?}, remainder: {remainder:?}");
 
         (self.blob.len() / BLOCK_SIZE) as TreeIndex
     }
@@ -880,7 +904,7 @@ impl MerkleBlob {
     ) -> Result<(), String> {
         let extend_index = self.extend_index();
         match index.cmp(&extend_index) {
-            Ordering::Greater => return Err(format!("index out of range: {index}")),
+            Ordering::Greater => return Err(format!("block index out of range: {index}")),
             Ordering::Equal => self.blob.extend_from_slice(&block_bytes),
             Ordering::Less => {
                 self.blob[Block::range(index)].copy_from_slice(&block_bytes);
@@ -909,7 +933,7 @@ impl MerkleBlob {
     fn get_block_bytes(&self, index: TreeIndex) -> Result<BlockBytes, String> {
         self.blob
             .get(Block::range(index))
-            .ok_or(format!("index out of bounds: {index}"))?
+            .ok_or(format!("block index out of bounds: {index}"))?
             .try_into()
             .map_err(|e| format!("failed getting block {index}: {e}"))
     }
@@ -928,10 +952,12 @@ impl MerkleBlob {
             .map_err(|message| format!("failed loading node: {message}"))
     }
 
-    pub fn get_parent_index(&self, index: TreeIndex) -> Parent {
-        let block = self.get_block_bytes(index).unwrap();
+    pub fn get_parent_index(&self, index: TreeIndex) -> Result<Parent, String> {
+        let block = self.get_block_bytes(index)?;
 
-        Node::parent_from_bytes(block[DATA_RANGE].try_into().unwrap())
+        Ok(Node::parent_from_bytes(
+            block[DATA_RANGE].try_into().unwrap(),
+        ))
     }
 
     pub fn get_lineage(&self, index: TreeIndex) -> Result<Vec<Node>, String> {
@@ -976,7 +1002,7 @@ impl MerkleBlob {
         <&Self as IntoIterator>::into_iter(self)
     }
 
-    pub fn calculate_lazy_hashes(&mut self) {
+    pub fn calculate_lazy_hashes(&mut self) -> Result<(), String> {
         // TODO: really want a truncated traversal, not filter
         // TODO: yeah, storing the whole set of blocks via collect is not great
         for (index, mut block) in self
@@ -989,18 +1015,24 @@ impl MerkleBlob {
             };
             // TODO: obviously inefficient to re-get/deserialize these blocks inside
             //       an iteration that's already doing that
-            let left = self.get_block(left).unwrap();
-            let right = self.get_block(right).unwrap();
+            let left = self.get_block(left)?;
+            let right = self.get_block(right)?;
             // TODO: wrap this up in Block maybe? just to have 'control' of dirty being 'accurate'
             block.node.hash = internal_hash(&left.node.hash, &right.node.hash);
             block.metadata.dirty = false;
-            self.insert_entry_to_blob(index, block.to_bytes()).unwrap();
+            self.insert_entry_to_blob(index, block.to_bytes())?;
         }
+
+        Ok(())
     }
 
-    pub fn relocate_node(&mut self, source: TreeIndex, destination: TreeIndex) {
+    #[allow(unused)]
+    fn relocate_node(&mut self, source: TreeIndex, destination: TreeIndex) -> Result<(), String> {
         let extend_index = self.extend_index();
-        assert_ne!(source, 0);
+        // TODO: perhaps relocation of root should be allowed for some use
+        if source == 0 {
+            return Err("relocation of the root and index zero is not allowed".to_string());
+        };
         assert!(source < extend_index);
         assert!(!self.free_indexes.contains(&source));
         assert!(destination <= extend_index);
@@ -1039,6 +1071,8 @@ impl MerkleBlob {
         }
 
         self.free_indexes.push(source);
+
+        Ok(())
     }
 
     #[allow(unused)]
@@ -1399,7 +1433,7 @@ mod tests {
     //     let merkle_blob = example_merkle_blob();
     //     merkle_blob.get_node(0).unwrap();
     //
-    //     merkle_blob.check();
+    //     merkle_blob.check().unwrap();
     // }
 
     #[fixture]
@@ -1435,7 +1469,7 @@ mod tests {
         let last_node = lineage.last().unwrap();
         assert_eq!(last_node.parent, None);
 
-        small_blob.check();
+        small_blob.check().unwrap();
     }
 
     #[rstest]
@@ -1459,7 +1493,7 @@ mod tests {
             },
         );
 
-        small_blob.check();
+        small_blob.check().unwrap();
     }
 
     // #[test]
@@ -1481,7 +1515,7 @@ mod tests {
     //     assert_eq!(merkle_blob.get_node(1).unwrap(), EXAMPLE_LEFT_LEAF);
     //     assert_eq!(merkle_blob.get_node(2).unwrap(), EXAMPLE_RIGHT_LEAF);
     //
-    //     merkle_blob.check();
+    //     merkle_blob.check().unwrap();
     // }
 
     // #[test]
@@ -1508,7 +1542,7 @@ mod tests {
     //
     //     assert_eq!(merkle_blob.blob, Vec::from(EXAMPLE_BLOB));
     //
-    //     merkle_blob.check();
+    //     merkle_blob.check().unwrap();
     // }
 
     #[test]
@@ -1550,9 +1584,9 @@ mod tests {
         println!("total time: {total_time:?}");
         // TODO: check, well...  something
 
-        merkle_blob.calculate_lazy_hashes();
+        merkle_blob.calculate_lazy_hashes().unwrap();
 
-        merkle_blob.check();
+        merkle_blob.check().unwrap();
     }
 
     #[test]
@@ -1569,7 +1603,7 @@ mod tests {
             let hash: Hash = sha256_num(key_value_id);
 
             println!("inserting: {key_value_id}");
-            merkle_blob.calculate_lazy_hashes();
+            merkle_blob.calculate_lazy_hashes().unwrap();
             reference_blobs.push(MerkleBlob::new(merkle_blob.blob.clone()).unwrap());
             merkle_blob
                 .insert(key_value_id, key_value_id, &hash, InsertLocation::Auto)
@@ -1577,17 +1611,17 @@ mod tests {
             dots.push(merkle_blob.to_dot().dump());
         }
 
-        merkle_blob.check();
+        merkle_blob.check().unwrap();
 
         for key_value_id in key_value_ids.iter().rev() {
             println!("deleting: {key_value_id}");
             merkle_blob.delete(*key_value_id).unwrap();
-            merkle_blob.calculate_lazy_hashes();
+            merkle_blob.calculate_lazy_hashes().unwrap();
             assert_eq!(merkle_blob, reference_blobs[*key_value_id as usize]);
             dots.push(merkle_blob.to_dot().dump());
         }
 
-        merkle_blob.check();
+        merkle_blob.check().unwrap();
     }
 
     // TODO: better conditional execution than the commenting i'm doing now
@@ -1622,7 +1656,7 @@ mod tests {
             .unwrap();
         // open_dot(&mut merkle_blob.to_dot().set_note("first after"));
 
-        merkle_blob.check();
+        merkle_blob.check().unwrap();
         assert_eq!(merkle_blob.key_to_index.len(), 1);
     }
 
@@ -1682,7 +1716,7 @@ mod tests {
         };
         assert_eq!([left_key, right_key], expected_keys);
 
-        merkle_blob.check();
+        merkle_blob.check().unwrap();
     }
 
     #[test]
@@ -1700,11 +1734,11 @@ mod tests {
             )
             .unwrap();
         // open_dot(&mut merkle_blob.to_dot().set_note("first after"));
-        merkle_blob.check();
+        merkle_blob.check().unwrap();
 
         merkle_blob.delete(key_value_id).unwrap();
 
-        merkle_blob.check();
+        merkle_blob.check().unwrap();
         assert_eq!(merkle_blob.key_to_index.len(), 0);
     }
 
