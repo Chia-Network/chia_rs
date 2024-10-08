@@ -260,15 +260,6 @@ impl Node {
         blob
     }
 
-    // TODO: yes i know i'm trying to write this code in a non-rusty way and i need to stop that
-    pub fn key_value(&self) -> (KvId, KvId) {
-        let NodeSpecific::Leaf { key, value } = self.specific else {
-            panic!()
-        };
-
-        (key, value)
-    }
-
     pub fn to_dot(&self, index: TreeIndex) -> DotLines {
         match self.specific {
             NodeSpecific::Internal {left, right} => DotLines{
@@ -514,7 +505,13 @@ impl MerkleBlob {
 
         self.insert_entry_to_blob(0, new_internal_block.to_bytes())?;
 
-        let (old_leaf_key, old_leaf_value) = old_leaf.key_value();
+        let NodeSpecific::Leaf {
+            key: old_leaf_key,
+            value: old_leaf_value,
+        } = old_leaf.specific
+        else {
+            return Err("old leaf unexpectedly not a leaf".to_string());
+        };
         let nodes = [
             (
                 match side {
@@ -553,7 +550,10 @@ impl MerkleBlob {
             };
 
             self.insert_entry_to_blob(index, block.to_bytes())?;
-            self.key_to_index.insert(block.node.key_value().0, index);
+            let NodeSpecific::Leaf { key: this_key, .. } = block.node.specific else {
+                return Err("new block unexpectedly not a leaf".to_string());
+            };
+            self.key_to_index.insert(this_key, index);
         }
 
         self.last_allocated_index = 3;
