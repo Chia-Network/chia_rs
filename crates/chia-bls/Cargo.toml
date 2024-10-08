@@ -35,6 +35,7 @@ rstest = { workspace = true }
 
 [lib]
 crate-type = ["rlib"]
+bench = false
 
 [[bench]]
 name = "derive_key"
