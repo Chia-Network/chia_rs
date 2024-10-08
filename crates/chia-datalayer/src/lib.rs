@@ -261,6 +261,12 @@ impl Node {
     }
 
     pub fn to_dot(&self, index: TreeIndex) -> DotLines {
+        // TODO: can this be done without introducing a blank line?
+        let node_to_parent = match self.parent {
+            Some(parent) => format!("node_{index} -> node_{parent};"),
+            None => String::new(),
+        };
+
         match self.specific {
             NodeSpecific::Internal {left, right} => DotLines{
                 nodes: vec![
@@ -269,11 +275,7 @@ impl Node {
                 connections: vec![
                     format!("node_{index} -> node_{left};"),
                     format!("node_{index} -> node_{right};"),
-                    // TODO: can this be done without introducing a blank line?
-                    match self.parent{
-                        Some(parent) => format!("node_{index} -> node_{parent};"),
-                        None => String::new(),
-                    },
+                    node_to_parent,
                 ],
                 pair_boxes: vec![
                     format!("node [shape = box]; {{rank = same; node_{left}->node_{right}[style=invis]; rankdir = LR}}"),
@@ -284,18 +286,17 @@ impl Node {
                 nodes: vec![
                     format!("node_{index} [shape=box, label=\"{index}\\nvalue: {key}\\nvalue: {value}\"];"),
                 ],
-                connections: vec![
-                    // TODO: dedupe with above
-                    match self.parent{
-                        Some(parent) => format!("node_{index} -> node_{parent};"),
-                        None => String::new(),
-                    },
-                ],
+                connections: vec![node_to_parent],
                 pair_boxes: vec![],
                 note: String::new(),
             },
         }
     }
+}
+
+fn block_range(index: TreeIndex) -> Range<usize> {
+    let block_start = index as usize * BLOCK_SIZE;
+    block_start..block_start + BLOCK_SIZE
 }
 
 // TODO: does not enforce matching metadata node type and node enumeration type
@@ -314,7 +315,6 @@ impl Block {
     }
 
     pub fn from_bytes(blob: BlockBytes) -> Result<Block, String> {
-        // TODO: handle invalid indexes?
         let metadata_blob: MetadataBytes = blob[METADATA_RANGE].try_into().unwrap();
         let data_blob: DataBytes = blob[DATA_RANGE].try_into().unwrap();
         let metadata = NodeMetadata::from_bytes(metadata_blob)
@@ -323,12 +323,6 @@ impl Block {
             .map_err(|message| format!("failed loading node: {message})"))?;
 
         Ok(Block { metadata, node })
-    }
-
-    // TODO: free function probably
-    fn range(index: TreeIndex) -> Range<usize> {
-        let block_start = index as usize * BLOCK_SIZE;
-        block_start..block_start + BLOCK_SIZE
     }
 }
 
@@ -379,8 +373,7 @@ pub struct MerkleBlob {
     blob: Vec<u8>,
     free_indexes: Vec<TreeIndex>,
     key_to_index: HashMap<KvId, TreeIndex>,
-    // TODO: maybe name it next_index_to_allocate
-    last_allocated_index: TreeIndex,
+    next_index_to_allocate: TreeIndex,
 }
 
 impl MerkleBlob {
@@ -402,7 +395,7 @@ impl MerkleBlob {
             blob,
             free_indexes,
             key_to_index,
-            last_allocated_index: block_count as TreeIndex,
+            next_index_to_allocate: block_count as TreeIndex,
         })
     }
 
@@ -475,7 +468,7 @@ impl MerkleBlob {
 
         self.key_to_index.insert(key, 0);
         self.free_indexes.clear();
-        self.last_allocated_index = 1;
+        self.next_index_to_allocate = 1;
     }
 
     fn insert_second(
@@ -556,7 +549,7 @@ impl MerkleBlob {
             self.key_to_index.insert(this_key, index);
         }
 
-        self.last_allocated_index = 3;
+        self.next_index_to_allocate = 3;
 
         Ok(())
     }
@@ -658,7 +651,7 @@ impl MerkleBlob {
 
         let Some(parent_index) = leaf.parent else {
             self.free_indexes.clear();
-            self.last_allocated_index = 0;
+            self.next_index_to_allocate = 0;
             self.blob.clear();
             return Ok(());
         };
@@ -827,8 +820,8 @@ impl MerkleBlob {
             None => {
                 // TODO: should this extend...?
                 // TODO: should this update free indexes...?
-                self.last_allocated_index += 1;
-                self.last_allocated_index - 1
+                self.next_index_to_allocate += 1;
+                self.next_index_to_allocate - 1
             }
             Some(new_index) => new_index,
         }
@@ -903,7 +896,7 @@ impl MerkleBlob {
             Ordering::Greater => return Err(format!("block index out of range: {index}")),
             Ordering::Equal => self.blob.extend_from_slice(&block_bytes),
             Ordering::Less => {
-                self.blob[Block::range(index)].copy_from_slice(&block_bytes);
+                self.blob[block_range(index)].copy_from_slice(&block_bytes);
             }
         }
 
@@ -928,7 +921,7 @@ impl MerkleBlob {
 
     fn get_block_bytes(&self, index: TreeIndex) -> Result<BlockBytes, String> {
         self.blob
-            .get(Block::range(index))
+            .get(block_range(index))
             .ok_or(format!("block index out of bounds: {index}"))?
             .try_into()
             .map_err(|e| format!("failed getting block {index}: {e}"))
@@ -1200,7 +1193,7 @@ impl Iterator for MerkleBlobLeftChildFirstIterator<'_> {
 
         loop {
             let item = self.deque.pop_front()?;
-            let block_bytes: BlockBytes = self.blob[Block::range(item.index)].try_into().unwrap();
+            let block_bytes: BlockBytes = self.blob[block_range(item.index)].try_into().unwrap();
             let block = Block::from_bytes(block_bytes).unwrap();
 
             match block.node.specific {
@@ -1252,7 +1245,7 @@ impl Iterator for MerkleBlobParentFirstIterator<'_> {
 
         loop {
             let index = self.deque.pop_front()?;
-            let block_bytes: BlockBytes = self.blob[Block::range(index)].try_into().unwrap();
+            let block_bytes: BlockBytes = self.blob[block_range(index)].try_into().unwrap();
             let block = Block::from_bytes(block_bytes).unwrap();
 
             match block.node.specific {
@@ -1291,7 +1284,7 @@ impl Iterator for MerkleBlobBreadthFirstIterator<'_> {
 
         loop {
             let index = self.deque.pop_front()?;
-            let block_bytes: BlockBytes = self.blob[Block::range(index)].try_into().unwrap();
+            let block_bytes: BlockBytes = self.blob[block_range(index)].try_into().unwrap();
             let block = Block::from_bytes(block_bytes).unwrap();
 
             match block.node.specific {
