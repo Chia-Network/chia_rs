@@ -341,13 +341,11 @@ impl Block {
     }
 }
 
-// TODO: once error handling is well defined, remove allow and handle warning
-#[allow(clippy::unnecessary_wraps)]
-fn get_free_indexes(blob: &[u8]) -> Result<Vec<TreeIndex>, String> {
+fn get_free_indexes(blob: &[u8]) -> Vec<TreeIndex> {
     let index_count = blob.len() / BLOCK_SIZE;
 
     if index_count == 0 {
-        return Ok(vec![]);
+        return vec![];
     }
 
     let mut seen_indexes: Vec<bool> = vec![false; index_count];
@@ -363,18 +361,16 @@ fn get_free_indexes(blob: &[u8]) -> Result<Vec<TreeIndex>, String> {
         }
     }
 
-    Ok(free_indexes)
+    free_indexes
 }
 
-// TODO: once error handling is well defined, remove allow and handle warning
-#[allow(clippy::unnecessary_wraps)]
-fn get_keys_values_indexes(blob: &[u8]) -> Result<HashMap<KvId, TreeIndex>, String> {
+fn get_keys_values_indexes(blob: &[u8]) -> HashMap<KvId, TreeIndex> {
     let index_count = blob.len() / BLOCK_SIZE;
 
     let mut key_to_index: HashMap<KvId, TreeIndex> = HashMap::default();
 
     if index_count == 0 {
-        return Ok(key_to_index);
+        return key_to_index;
     }
 
     for (index, block) in MerkleBlobLeftChildFirstIterator::new(blob) {
@@ -383,7 +379,7 @@ fn get_keys_values_indexes(blob: &[u8]) -> Result<HashMap<KvId, TreeIndex>, Stri
         }
     }
 
-    Ok(key_to_index)
+    key_to_index
 }
 
 #[cfg_attr(feature = "py-bindings", pyclass(name = "MerkleBlob"))]
@@ -408,8 +404,8 @@ impl MerkleBlob {
         }
 
         // TODO: stop double tree traversals here
-        let free_indexes = get_free_indexes(&blob)?;
-        let key_to_index = get_keys_values_indexes(&blob)?;
+        let free_indexes = get_free_indexes(&blob);
+        let key_to_index = get_keys_values_indexes(&blob);
 
         Ok(Self {
             blob,
@@ -1798,7 +1794,7 @@ mod tests {
         let mut blob = small_blob.blob.clone();
         let expected_free_index = (blob.len() / BLOCK_SIZE) as TreeIndex;
         blob.extend_from_slice(&[0; BLOCK_SIZE]);
-        assert_eq!(get_free_indexes(&blob).unwrap(), [expected_free_index]);
+        assert_eq!(get_free_indexes(&blob), [expected_free_index]);
     }
 
     #[test]
