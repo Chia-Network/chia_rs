@@ -217,7 +217,6 @@ impl Node {
     }
 
     fn parent_from_bytes(blob: &DataBytes) -> Parent {
-        // TODO: a little setup here for pre-optimization to allow walking parents without processing entire nodes
         let parent_integer = TreeIndex::from_be_bytes(blob[PARENT_RANGE].try_into().unwrap());
         match parent_integer {
             NULL_PARENT => None,
@@ -971,8 +970,7 @@ impl MerkleBlob {
 
         while let Some(this_index) = next_index {
             lineage.push(this_index);
-            let block = self.get_block_bytes(this_index)?;
-            next_index = Node::parent_from_bytes(block[DATA_RANGE].try_into().unwrap());
+            next_index = self.get_parent_index(this_index)?;
         }
 
         Ok(lineage)
