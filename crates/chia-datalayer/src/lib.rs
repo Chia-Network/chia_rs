@@ -1713,7 +1713,6 @@ mod tests {
     }
 
     #[rstest]
-    // TODO: does this mut allow modifying the fixture value as used by other tests?
     fn test_delete_frees_index(mut small_blob: MerkleBlob) {
         let key = 0x0001_0203_0405_0607;
         let index = small_blob.key_to_index[&key];
@@ -1723,7 +1722,6 @@ mod tests {
     }
 
     #[rstest]
-    // TODO: does this mut allow modifying the fixture value as used by other tests?
     fn test_get_new_index_with_free_index(mut small_blob: MerkleBlob) {
         let key = 0x0001_0203_0405_0607;
         let _ = small_blob.key_to_index[&key];
@@ -1797,7 +1795,6 @@ mod tests {
     }
 
     #[rstest]
-    // TODO: does this mut allow modifying the fixture value as used by other tests?
     fn test_upsert_upserts(mut small_blob: MerkleBlob) {
         let before_blocks = small_blob.iter().collect::<Vec<_>>();
         let (key, index) = small_blob.key_to_index.iter().next().unwrap();
