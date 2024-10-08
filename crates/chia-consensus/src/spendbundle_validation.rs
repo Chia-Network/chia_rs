@@ -58,7 +58,10 @@ pub fn validate_clvm_and_signature(
                 make_aggsig_final_message(condition, &mut aug_msg, spend, constants);
                 let aug_hash = hash_to_g2(&aug_msg);
                 let pairing = aug_hash.pair(pk);
-                pairs.push((hash_pk_and_msg(&pk.to_bytes(), &aug_msg), pairing));
+                let mut hasher = Sha256::new();
+                hasher.update(&aug_msg);
+                let aug_msg_hash = hasher.finalize();
+                pairs.push((aug_msg_hash, pairing));
             }
         }
     }
@@ -69,7 +72,10 @@ pub fn validate_clvm_and_signature(
         aug_msg.extend_from_slice(msg.as_ref());
         let aug_hash = hash_to_g2(&aug_msg);
         let pairing = aug_hash.pair(pk);
-        pairs.push((hash_pk_and_msg(&pk.to_bytes(), msg), pairing));
+        let mut hasher = Sha256::new();
+        hasher.update(&aug_msg);
+        let aug_msg_hash = hasher.finalize();
+        pairs.push((aug_msg_hash, pairing));
     }
 
     // Verify aggregated signature
@@ -83,13 +89,6 @@ pub fn validate_clvm_and_signature(
 
     // Collect results
     Ok((conditions, pairs, start_time.elapsed()))
-}
-
-fn hash_pk_and_msg(pk: &[u8], msg: &[u8]) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    hasher.update(pk);
-    hasher.update(msg);
-    hasher.finalize()
 }
 
 pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusConstants) -> u32 {
