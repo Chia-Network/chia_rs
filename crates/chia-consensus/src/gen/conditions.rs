@@ -23,7 +23,7 @@ use crate::gen::messages::{Message, SpendId};
 use crate::gen::spend_visitor::SpendVisitor;
 use crate::gen::validation_error::check_nil;
 use chia_bls::{aggregate_verify, BlsCache, PublicKey, Signature};
-use chia_protocol::Bytes32;
+use chia_protocol::{Bytes, Bytes32};
 use chia_sha2::Sha256;
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use clvmr::cost::Cost;
@@ -785,7 +785,7 @@ pub struct ParseState {
     // DONT_VALIDATE_SIGNATURE flag is set
     // TODO: We would probably save heap allocations by turning this into a
     // blst_pairing object.
-    pub pkm_pairs: Vec<(PublicKey, Vec<u8>)>,
+    pub pkm_pairs: Vec<(PublicKey, Bytes)>,
 }
 
 // returns (parent-id, puzzle-hash, amount, condition-list)
@@ -1136,7 +1136,7 @@ pub fn parse_conditions<V: SpendVisitor>(
                     let mut msg = a.atom(msg).as_ref().to_vec();
                     msg.extend((*spend.coin_id).as_slice());
                     msg.extend(constants.agg_sig_me_additional_data.as_slice());
-                    state.pkm_pairs.push((to_key(a, pk)?, msg));
+                    state.pkm_pairs.push((to_key(a, pk)?, msg.into()));
                 }
             }
             Condition::AggSigParent(pk, msg) => {
@@ -1145,7 +1145,7 @@ pub fn parse_conditions<V: SpendVisitor>(
                     let mut msg = a.atom(msg).as_ref().to_vec();
                     msg.extend(a.atom(spend.parent_id).as_ref());
                     msg.extend(constants.agg_sig_parent_additional_data.as_slice());
-                    state.pkm_pairs.push((to_key(a, pk)?, msg));
+                    state.pkm_pairs.push((to_key(a, pk)?, msg.into()));
                 }
             }
             Condition::AggSigPuzzle(pk, msg) => {
@@ -1154,7 +1154,7 @@ pub fn parse_conditions<V: SpendVisitor>(
                     let mut msg = a.atom(msg).as_ref().to_vec();
                     msg.extend(a.atom(spend.puzzle_hash).as_ref());
                     msg.extend(constants.agg_sig_puzzle_additional_data.as_slice());
-                    state.pkm_pairs.push((to_key(a, pk)?, msg));
+                    state.pkm_pairs.push((to_key(a, pk)?, msg.into()));
                 }
             }
             Condition::AggSigAmount(pk, msg) => {
@@ -1163,7 +1163,7 @@ pub fn parse_conditions<V: SpendVisitor>(
                     let mut msg = a.atom(msg).as_ref().to_vec();
                     msg.extend(u64_to_bytes(spend.coin_amount).as_slice());
                     msg.extend(constants.agg_sig_amount_additional_data.as_slice());
-                    state.pkm_pairs.push((to_key(a, pk)?, msg));
+                    state.pkm_pairs.push((to_key(a, pk)?, msg.into()));
                 }
             }
             Condition::AggSigPuzzleAmount(pk, msg) => {
@@ -1173,7 +1173,7 @@ pub fn parse_conditions<V: SpendVisitor>(
                     msg.extend(a.atom(spend.puzzle_hash).as_ref());
                     msg.extend(u64_to_bytes(spend.coin_amount).as_slice());
                     msg.extend(constants.agg_sig_puzzle_amount_additional_data.as_slice());
-                    state.pkm_pairs.push((to_key(a, pk)?, msg));
+                    state.pkm_pairs.push((to_key(a, pk)?, msg.into()));
                 }
             }
             Condition::AggSigParentAmount(pk, msg) => {
@@ -1183,7 +1183,7 @@ pub fn parse_conditions<V: SpendVisitor>(
                     msg.extend(a.atom(spend.parent_id).as_ref());
                     msg.extend(u64_to_bytes(spend.coin_amount).as_slice());
                     msg.extend(constants.agg_sig_parent_amount_additional_data.as_slice());
-                    state.pkm_pairs.push((to_key(a, pk)?, msg));
+                    state.pkm_pairs.push((to_key(a, pk)?, msg.into()));
                 }
             }
             Condition::AggSigParentPuzzle(pk, msg) => {
@@ -1193,7 +1193,7 @@ pub fn parse_conditions<V: SpendVisitor>(
                     msg.extend(a.atom(spend.parent_id).as_ref());
                     msg.extend(a.atom(spend.puzzle_hash).as_ref());
                     msg.extend(constants.agg_sig_parent_puzzle_additional_data.as_slice());
-                    state.pkm_pairs.push((to_key(a, pk)?, msg));
+                    state.pkm_pairs.push((to_key(a, pk)?, msg.into()));
                 }
             }
             Condition::AggSigUnsafe(pk, msg) => {
@@ -1204,7 +1204,7 @@ pub fn parse_conditions<V: SpendVisitor>(
                 if (flags & DONT_VALIDATE_SIGNATURE) == 0 {
                     state
                         .pkm_pairs
-                        .push((to_key(a, pk)?, a.atom(msg).as_ref().to_vec()));
+                        .push((to_key(a, pk)?, a.atom(msg).as_ref().to_vec().into()));
                 }
             }
             Condition::Softfork(cost) => {
@@ -4760,14 +4760,10 @@ fn test_agg_sig(
             b"foobar",
         ));
     }
-    match cond_test_sig(puzzle.as_str(), &signature, cache, 0) {
-        Ok(..) => {
-            assert!(expect_pass);
-        }
-        Err(..) => {
-            assert!(!expect_pass);
-        }
-    }
+    assert_eq!(
+        expect_pass,
+        cond_test_sig(puzzle.as_str(), &signature, cache, 0).is_ok()
+    );
 }
 
 // the message condition takes a mode-parameter. This is a 6-bit integer that

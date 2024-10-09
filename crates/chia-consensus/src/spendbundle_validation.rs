@@ -37,7 +37,7 @@ pub fn validate_clvm_and_signature(
     for (pk, msg) in pkm_pairs {
         aug_msg.clear();
         aug_msg.extend_from_slice(&pk.to_bytes());
-        aug_msg.extend(&msg);
+        aug_msg.extend(&*msg);
         let aug_hash = hash_to_g2(&aug_msg);
         let pairing = aug_hash.pair(&pk);
 

@@ -8,7 +8,7 @@ use crate::gen::solution_generator::calculate_generator_length;
 use crate::gen::validation_error::ValidationErr;
 use crate::spendbundle_validation::get_flags_for_height_and_constants;
 use chia_bls::PublicKey;
-use chia_protocol::SpendBundle;
+use chia_protocol::{Bytes, SpendBundle};
 use clvm_utils::tree_hash;
 use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
@@ -46,7 +46,7 @@ pub fn run_spendbundle(
     height: u32,
     flags: u32,
     constants: &ConsensusConstants,
-) -> Result<(SpendBundleConditions, Vec<(PublicKey, Vec<u8>)>), ValidationErr> {
+) -> Result<(SpendBundleConditions, Vec<(PublicKey, Bytes)>), ValidationErr> {
     let flags = get_flags_for_height_and_constants(height, constants) | flags | MEMPOOL_MODE;
 
     // below is an adapted version of the code from run_block_generators::run_block_generator2()
