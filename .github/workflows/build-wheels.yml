@@ -262,7 +262,7 @@ jobs:
           dirname=`basename chia_rs*.tar.gz .tar.gz`
           echo $dirname
           mkdir $dirname
-          cp -r ./src/ $dirname/src/
+          cp -r ../../src/ $dirname/src/
           gunzip chia_rs*.tar.gz
           tar rvf chia_rs*.tar $dirname/src
           gzip chia_rs*.tar
