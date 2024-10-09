@@ -113,3 +113,10 @@ path = "fuzz_targets/solution-generator.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "additions-and-removals"
+path = "fuzz_targets/additions-and-removals.rs"
+test = false
+doc = false
+bench = false

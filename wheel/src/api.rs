@@ -1,4 +1,6 @@
-use crate::run_generator::{py_to_slice, run_block_generator, run_block_generator2};
+use crate::run_generator::{
+    additions_and_removals, py_to_slice, run_block_generator, run_block_generator2,
+};
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::gen::flags::{
@@ -451,6 +453,7 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // generator functions
     m.add_function(wrap_pyfunction!(run_block_generator, m)?)?;
     m.add_function(wrap_pyfunction!(run_block_generator2, m)?)?;
+    m.add_function(wrap_pyfunction!(additions_and_removals, m)?)?;
     m.add_function(wrap_pyfunction!(solution_generator, m)?)?;
     m.add_function(wrap_pyfunction!(solution_generator_backrefs, m)?)?;
     m.add_function(wrap_pyfunction!(supports_fast_forward, m)?)?;
