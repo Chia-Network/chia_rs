@@ -259,7 +259,6 @@ jobs:
           pip install maturin
           maturin sdist -m wheel/Cargo.toml
           cd target/wheels
-          ls -l
           dirname=`basename chia_rs*.tar.gz .tar.gz`
           echo $dirname
           mkdir $dirname
@@ -267,8 +266,7 @@ jobs:
           gunzip chia_rs*.tar.gz
           tar rvf chia_rs*.tar $dirname/src
           gzip chia_rs*.tar
-          ls -l
-          tar tzvf chia_rs*.tar.gz
+          rm -rf $dirname
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
