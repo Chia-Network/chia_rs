@@ -1,4 +1,5 @@
 #![no_main]
+use chia_bls::Signature;
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::gen::flags::ALLOW_BACKREFS;
@@ -15,6 +16,8 @@ fuzz_target!(|data: &[u8]| {
         [],
         110_000_000,
         ALLOW_BACKREFS,
+        &Signature::default(),
+        None,
         &TEST_CONSTANTS,
     );
     drop(a1);
@@ -26,6 +29,8 @@ fuzz_target!(|data: &[u8]| {
         [],
         110_000_000,
         ALLOW_BACKREFS,
+        &Signature::default(),
+        None,
         &TEST_CONSTANTS,
     );
     drop(a2);

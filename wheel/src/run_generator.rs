@@ -1,3 +1,4 @@
+use chia_bls::{BlsCache, Signature};
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::gen::owned_conditions::OwnedSpendBundleConditions;
@@ -17,12 +18,16 @@ pub fn py_to_slice<'a>(buf: PyBuffer<u8>) -> &'a [u8] {
 }
 
 #[pyfunction]
+#[pyo3(signature = (program, block_refs, max_cost, flags, signature, bls_cache, constants))]
+#[allow(clippy::too_many_arguments)]
 pub fn run_block_generator<'a>(
     py: Python<'a>,
     program: PyBuffer<u8>,
     block_refs: &Bound<'_, PyList>,
     max_cost: Cost,
     flags: u32,
+    signature: &Signature,
+    bls_cache: Option<&mut BlsCache>,
     constants: &ConsensusConstants,
 ) -> (Option<u32>, Option<OwnedSpendBundleConditions>) {
     let mut allocator = make_allocator(flags);
@@ -39,8 +44,16 @@ pub fn run_block_generator<'a>(
     let program = py_to_slice::<'a>(program);
 
     py.allow_threads(|| {
-        match native_run_block_generator(&mut allocator, program, refs, max_cost, flags, constants)
-        {
+        match native_run_block_generator(
+            &mut allocator,
+            program,
+            refs,
+            max_cost,
+            flags,
+            signature,
+            bls_cache,
+            constants,
+        ) {
             Ok(spend_bundle_conds) => (
                 None,
                 Some(OwnedSpendBundleConditions::from(
@@ -57,12 +70,16 @@ pub fn run_block_generator<'a>(
 }
 
 #[pyfunction]
+#[pyo3(signature = (program, block_refs, max_cost, flags, signature, bls_cache, constants))]
+#[allow(clippy::too_many_arguments)]
 pub fn run_block_generator2<'a>(
     py: Python<'a>,
     program: PyBuffer<u8>,
     block_refs: &Bound<'_, PyList>,
     max_cost: Cost,
     flags: u32,
+    signature: &Signature,
+    bls_cache: Option<&mut BlsCache>,
     constants: &ConsensusConstants,
 ) -> (Option<u32>, Option<OwnedSpendBundleConditions>) {
     let mut allocator = make_allocator(flags);
@@ -80,8 +97,16 @@ pub fn run_block_generator2<'a>(
     let program = py_to_slice::<'a>(program);
 
     py.allow_threads(|| {
-        match native_run_block_generator2(&mut allocator, program, refs, max_cost, flags, constants)
-        {
+        match native_run_block_generator2(
+            &mut allocator,
+            program,
+            refs,
+            max_cost,
+            flags,
+            signature,
+            bls_cache,
+            constants,
+        ) {
             Ok(spend_bundle_conds) => (
                 None,
                 Some(OwnedSpendBundleConditions::from(

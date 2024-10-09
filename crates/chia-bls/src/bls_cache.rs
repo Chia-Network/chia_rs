@@ -81,6 +81,13 @@ impl BlsCache {
 
         aggregate_verify_gt(sig, iter)
     }
+
+    pub fn update(&mut self, aug_msg: &[u8], gt: GTElement) {
+        let mut hasher = Sha256::new();
+        hasher.update(aug_msg.as_ref());
+        let hash: [u8; 32] = hasher.finalize();
+        self.cache.lock().expect("cache").put(hash, gt);
+    }
 }
 
 #[cfg(feature = "py-bindings")]
