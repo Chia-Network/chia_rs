@@ -3,7 +3,7 @@ use clap::Parser;
 use chia_bls::PublicKey;
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::gen::conditions::{NewCoin, SpendBundleConditions, SpendConditions};
-use chia_consensus::gen::flags::{ALLOW_BACKREFS, MEMPOOL_MODE};
+use chia_consensus::gen::flags::{ALLOW_BACKREFS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
 use chia_consensus::gen::run_block_generator::{run_block_generator, run_block_generator2};
 use chia_tools::iterate_tx_blocks;
 use clvmr::allocator::NodePtr;
@@ -29,6 +29,10 @@ struct Args {
     /// Run all block generators in mempool mode
     #[arg(long, default_value_t = false)]
     mempool: bool,
+
+    /// Don't validate block signatures (saves time)
+    #[arg(long, default_value_t = false)]
+    skip_signature_validation: bool,
 
     /// Compare the output from the default ROM running in consensus mode
     /// against the hard-fork rules for executing block generators. After the
@@ -185,6 +189,11 @@ fn main() {
                 let flags = flags
                     | if height >= args.hard_fork_height {
                         ALLOW_BACKREFS
+                    } else {
+                        0
+                    }
+                    | if args.skip_signature_validation {
+                        DONT_VALIDATE_SIGNATURE
                     } else {
                         0
                     };
