@@ -4,7 +4,6 @@ version = "0.14.1"
 authors = ["Richard Kiss <him@richardkiss.com>"]
 edition = "2021"
 license = "Apache-2.0"
-license-file = "../LICENSE"
 description = "Code useful for implementing chia consensus."
 homepage = "https://github.com/Chia-Network/chia_rs"
 repository = "https://github.com/Chia-Network/chia_rs"
@@ -21,6 +20,11 @@ path = "src/lib.rs"
 [package.metadata.maturin]
 python-source = "python"
 
+# chia-client and chia-ssl are needed for the wheel sdist to work correctly
+# ignore any errors from machete about unused dependencies
+[package.metadata.cargo-machete]
+ignored = ["chia-client", "chia-ssl"]
+
 [dependencies]
 clvmr = { workspace = true }
 hex = { workspace = true }
@@ -29,3 +33,5 @@ chia-consensus = { workspace = true, features = ["py-bindings"] }
 chia-bls = { workspace = true, features = ["py-bindings"]  }
 chia-protocol = { workspace = true, features = ["py-bindings"]  }
 clvm-utils = { workspace = true }
+chia-ssl = { workspace = true }
+chia-client = { workspace = true }
