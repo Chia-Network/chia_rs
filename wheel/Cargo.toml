@@ -20,6 +20,11 @@ path = "src/lib.rs"
 [package.metadata.maturin]
 python-source = "python"
 
+# chia-client and chia-ssl are needed for the wheel sdist to work correctly
+# ignore any errors from machete about unused dependencies
+[package.metadata.cargo-machete]
+ignored = ["chia-client", "chia-ssl"]
+
 [dependencies]
 clvmr = { workspace = true }
 hex = { workspace = true }
