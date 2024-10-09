@@ -1197,11 +1197,11 @@ pub fn parse_conditions<V: SpendVisitor>(
                 }
             }
             Condition::AggSigUnsafe(pk, msg) => {
+                // AGG_SIG_UNSAFE messages are not allowed to end with the
+                // suffix added to other AGG_SIG_* conditions
+                check_agg_sig_unsafe_message(a, msg, constants)?;
                 ret.agg_sig_unsafe.push((to_key(a, pk)?, msg));
                 if (flags & DONT_VALIDATE_SIGNATURE) == 0 {
-                    // AGG_SIG_UNSAFE messages are not allowed to end with the
-                    // suffix added to other AGG_SIG_* conditions
-                    check_agg_sig_unsafe_message(a, msg, constants)?;
                     state
                         .pkm_pairs
                         .push((to_key(a, pk)?, a.atom(msg).as_ref().to_vec()));
