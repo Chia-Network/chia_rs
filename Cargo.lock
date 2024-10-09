@@ -517,8 +517,10 @@ name = "chia_rs"
 version = "0.14.1"
 dependencies = [
  "chia-bls 0.14.1",
+ "chia-client",
  "chia-consensus",
  "chia-protocol",
+ "chia-ssl",
  "clvm-utils",
  "clvmr",
  "hex",
