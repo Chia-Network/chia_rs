@@ -97,6 +97,7 @@ impl MerkleBlob {
 }
 
 // TODO: better conditional execution than the commenting i'm doing now
+#[allow(unused)]
 pub fn open_dot(lines: &mut DotLines) {
     let mut url = Url::parse("http://edotor.net").unwrap();
     // https://edotor.net/?engine=dot#graph%20%7B%7D%0A -> graph {}
