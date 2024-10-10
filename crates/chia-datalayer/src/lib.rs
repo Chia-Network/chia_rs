@@ -1273,6 +1273,7 @@ mod dot;
 mod tests {
     use super::*;
     // use hex_literal::hex;
+    // use dot::open_dot;
     use rstest::{fixture, rstest};
     use std::time::{Duration, Instant};
 
@@ -1751,7 +1752,6 @@ mod tests {
 
     #[rstest]
     fn test_upsert_inserts(small_blob: MerkleBlob) {
-        use dot::open_dot;
         let key = 1234;
         assert!(!small_blob.key_to_index.contains_key(&key));
         let value = 5678;
@@ -1760,11 +1760,11 @@ mod tests {
         insert_blob
             .insert(key, value, &sha256_num(key), InsertLocation::Auto)
             .unwrap();
-        open_dot(insert_blob.to_dot().set_note("first after"));
+        // open_dot(insert_blob.to_dot().set_note("first after"));
 
         let mut upsert_blob = MerkleBlob::new(small_blob.blob.clone()).unwrap();
         upsert_blob.upsert(key, value, &sha256_num(key)).unwrap();
-        open_dot(upsert_blob.to_dot().set_note("first after"));
+        // open_dot(upsert_blob.to_dot().set_note("first after"));
 
         assert_eq!(insert_blob.blob, upsert_blob.blob);
     }
