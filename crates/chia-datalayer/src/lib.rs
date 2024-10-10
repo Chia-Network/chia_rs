@@ -375,6 +375,12 @@ impl MerkleBlob {
         })
     }
 
+    fn clear(&mut self) {
+        self.blob.clear();
+        self.key_to_index.clear();
+        self.free_indexes.clear();
+    }
+
     pub fn insert(
         &mut self,
         key: KvId,
@@ -440,10 +446,13 @@ impl MerkleBlob {
             },
         };
 
-        self.blob.extend(new_leaf_block.to_bytes());
+        self.clear();
+        // TODO: unwrap, ack, review
+        self.insert_entry_to_blob(self.extend_index(), new_leaf_block.to_bytes())
+            .unwrap();
 
+        // TODO: put this in insert_entry_to_blob()?
         self.key_to_index.insert(key, 0);
-        self.free_indexes.clear();
     }
 
     fn insert_second(
@@ -455,9 +464,9 @@ impl MerkleBlob {
         internal_node_hash: &Hash,
         side: &Side,
     ) -> Result<(), String> {
-        self.blob.clear();
+        self.clear();
+        // TODO: just handling the nodes below being out of order.  this all still smells a bit
         self.blob.resize(BLOCK_SIZE * 3, 0);
-        self.free_indexes.clear();
 
         let new_internal_block = Block {
             metadata: NodeMetadata {
@@ -521,6 +530,7 @@ impl MerkleBlob {
             let NodeSpecific::Leaf { key: this_key, .. } = block.node.specific else {
                 return Err("new block unexpectedly not a leaf".to_string());
             };
+            // TODO: put this in insert_entry_to_blob()?
             self.key_to_index.insert(this_key, index);
         }
 
@@ -604,6 +614,7 @@ impl MerkleBlob {
         self.insert_entry_to_blob(old_parent_index, old_parent_block.to_bytes())?;
 
         self.mark_lineage_as_dirty(old_parent_index)?;
+        // TODO: put this in insert_entry_to_blob()?
         self.key_to_index.insert(key, new_leaf_index);
 
         Ok(())
@@ -623,8 +634,7 @@ impl MerkleBlob {
         self.key_to_index.remove(&key);
 
         let Some(parent_index) = leaf.parent else {
-            self.free_indexes.clear();
-            self.blob.clear();
+            self.clear();
             return Ok(());
         };
 
@@ -640,6 +650,7 @@ impl MerkleBlob {
 
             match sibling_block.node.specific {
                 NodeSpecific::Leaf { key, .. } => {
+                    // TODO: put this in insert_entry_to_blob()?
                     self.key_to_index.insert(key, 0);
                 }
                 NodeSpecific::Internal { left, right } => {
