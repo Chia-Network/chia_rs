@@ -354,13 +354,11 @@ pub struct MerkleBlob {
     blob: Vec<u8>,
     free_indexes: Vec<TreeIndex>,
     key_to_index: HashMap<KvId, TreeIndex>,
-    next_index_to_allocate: TreeIndex,
 }
 
 impl MerkleBlob {
     pub fn new(blob: Vec<u8>) -> Result<Self, String> {
         let length = blob.len();
-        let block_count = length / BLOCK_SIZE;
         let remainder = length % BLOCK_SIZE;
         if remainder != 0 {
             return Err(format!(
@@ -374,7 +372,6 @@ impl MerkleBlob {
             blob,
             free_indexes,
             key_to_index,
-            next_index_to_allocate: block_count as TreeIndex,
         })
     }
 
@@ -447,7 +444,6 @@ impl MerkleBlob {
 
         self.key_to_index.insert(key, 0);
         self.free_indexes.clear();
-        self.next_index_to_allocate = 1;
     }
 
     fn insert_second(
@@ -527,8 +523,6 @@ impl MerkleBlob {
             };
             self.key_to_index.insert(this_key, index);
         }
-
-        self.next_index_to_allocate = 3;
 
         Ok(())
     }
@@ -630,7 +624,6 @@ impl MerkleBlob {
 
         let Some(parent_index) = leaf.parent else {
             self.free_indexes.clear();
-            self.next_index_to_allocate = 0;
             self.blob.clear();
             return Ok(());
         };
@@ -799,8 +792,9 @@ impl MerkleBlob {
             None => {
                 // TODO: should this extend...?
                 // TODO: should this update free indexes...?
-                self.next_index_to_allocate += 1;
-                self.next_index_to_allocate - 1
+                let index = self.extend_index();
+                self.blob.extend_from_slice(&[0; BLOCK_SIZE]);
+                index
             }
             Some(new_index) => new_index,
         }
