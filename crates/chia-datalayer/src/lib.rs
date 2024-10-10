@@ -859,10 +859,11 @@ impl MerkleBlob {
 
     fn extend_index(&self) -> TreeIndex {
         let blob_length = self.blob.len();
+        let index: TreeIndex = (blob_length / BLOCK_SIZE) as TreeIndex;
         let remainder = blob_length % BLOCK_SIZE;
         assert_eq!(remainder, 0, "blob length {blob_length:?} not a multiple of {BLOCK_SIZE:?}, remainder: {remainder:?}");
 
-        (self.blob.len() / BLOCK_SIZE) as TreeIndex
+        index
     }
 
     fn insert_entry_to_blob(
