@@ -2,15 +2,12 @@
 use pyo3::{buffer::PyBuffer, pyclass, pymethods, PyResult};
 
 use clvmr::sha2::Sha256;
-use dot::DotLines;
 use num_traits::ToBytes;
 use std::cmp::Ordering;
 use std::collections::{HashMap, VecDeque};
 use std::iter::{zip, IntoIterator};
 use std::mem::size_of;
 use std::ops::Range;
-
-mod dot;
 
 type TreeIndex = u32;
 type Parent = Option<TreeIndex>;
@@ -259,38 +256,38 @@ impl Node {
         blob
     }
 
-    pub fn to_dot(&self, index: TreeIndex) -> DotLines {
-        // TODO: can this be done without introducing a blank line?
-        let node_to_parent = match self.parent {
-            Some(parent) => format!("node_{index} -> node_{parent};"),
-            None => String::new(),
-        };
-
-        match self.specific {
-            NodeSpecific::Internal {left, right} => DotLines{
-                nodes: vec![
-                    format!("node_{index} [label=\"{index}\"]"),
-                ],
-                connections: vec![
-                    format!("node_{index} -> node_{left};"),
-                    format!("node_{index} -> node_{right};"),
-                    node_to_parent,
-                ],
-                pair_boxes: vec![
-                    format!("node [shape = box]; {{rank = same; node_{left}->node_{right}[style=invis]; rankdir = LR}}"),
-                ],
-                note: String::new(),
-            },
-            NodeSpecific::Leaf {key, value} => DotLines{
-                nodes: vec![
-                    format!("node_{index} [shape=box, label=\"{index}\\nvalue: {key}\\nvalue: {value}\"];"),
-                ],
-                connections: vec![node_to_parent],
-                pair_boxes: vec![],
-                note: String::new(),
-            },
-        }
-    }
+    // pub fn to_dot(&self, index: TreeIndex) -> DotLines {
+    //     // TODO: can this be done without introducing a blank line?
+    //     let node_to_parent = match self.parent {
+    //         Some(parent) => format!("node_{index} -> node_{parent};"),
+    //         None => String::new(),
+    //     };
+    //
+    //     match self.specific {
+    //         NodeSpecific::Internal {left, right} => DotLines{
+    //             nodes: vec![
+    //                 format!("node_{index} [label=\"{index}\"]"),
+    //             ],
+    //             connections: vec![
+    //                 format!("node_{index} -> node_{left};"),
+    //                 format!("node_{index} -> node_{right};"),
+    //                 node_to_parent,
+    //             ],
+    //             pair_boxes: vec![
+    //                 format!("node [shape = box]; {{rank = same; node_{left}->node_{right}[style=invis]; rankdir = LR}}"),
+    //             ],
+    //             note: String::new(),
+    //         },
+    //         NodeSpecific::Leaf {key, value} => DotLines{
+    //             nodes: vec![
+    //                 format!("node_{index} [shape=box, label=\"{index}\\nvalue: {key}\\nvalue: {value}\"];"),
+    //             ],
+    //             connections: vec![node_to_parent],
+    //             pair_boxes: vec![],
+    //             note: String::new(),
+    //         },
+    //     }
+    // }
 }
 
 fn block_range(index: TreeIndex) -> Range<usize> {
@@ -959,15 +956,6 @@ impl MerkleBlob {
         Ok(lineage)
     }
 
-    pub fn to_dot(&self) -> DotLines {
-        let mut result = DotLines::new();
-        for (index, block) in self {
-            result.push(block.node.to_dot(index));
-        }
-
-        result
-    }
-
     pub fn iter(&self) -> MerkleBlobLeftChildFirstIterator<'_> {
         <&Self as IntoIterator>::into_iter(self)
     }
@@ -1279,6 +1267,8 @@ impl Iterator for MerkleBlobBreadthFirstIterator<'_> {
     }
 }
 
+#[cfg(test)]
+mod dot;
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1594,22 +1584,6 @@ mod tests {
         merkle_blob.check().unwrap();
     }
 
-    // TODO: better conditional execution than the commenting i'm doing now
-    #[allow(dead_code)]
-    fn open_dot(lines: &mut DotLines) {
-        use open;
-        use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
-        use url::Url;
-
-        let mut url = Url::parse("http://edotor.net").unwrap();
-        // https://edotor.net/?engine=dot#graph%20%7B%7D%0A -> graph {}
-        url.query_pairs_mut().append_pair("engine", "dot");
-        url.set_fragment(Some(
-            &utf8_percent_encode(&lines.dump(), NON_ALPHANUMERIC).to_string(),
-        ));
-        open::that(url.as_str()).unwrap();
-    }
-
     #[test]
     fn test_insert_first() {
         let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
@@ -1777,6 +1751,7 @@ mod tests {
 
     #[rstest]
     fn test_upsert_inserts(small_blob: MerkleBlob) {
+        use dot::open_dot;
         let key = 1234;
         assert!(!small_blob.key_to_index.contains_key(&key));
         let value = 5678;
@@ -1785,11 +1760,11 @@ mod tests {
         insert_blob
             .insert(key, value, &sha256_num(key), InsertLocation::Auto)
             .unwrap();
-        // open_dot(&mut insert_blob.to_dot().set_note("first after"));
+        open_dot(insert_blob.to_dot().set_note("first after"));
 
         let mut upsert_blob = MerkleBlob::new(small_blob.blob.clone()).unwrap();
         upsert_blob.upsert(key, value, &sha256_num(key)).unwrap();
-        // open_dot(&mut upsert_blob.to_dot().set_note("first after"));
+        open_dot(upsert_blob.to_dot().set_note("first after"));
 
         assert_eq!(insert_blob.blob, upsert_blob.blob);
     }
