@@ -4,7 +4,7 @@ use pyo3::{buffer::PyBuffer, pyclass, pymethods, PyResult};
 use clvmr::sha2::Sha256;
 use num_traits::ToBytes;
 use std::cmp::Ordering;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::iter::{zip, IntoIterator};
 use std::mem::size_of;
 use std::ops::Range;
@@ -324,7 +324,7 @@ impl Block {
 
 fn get_free_indexes_and_keys_values_indexes(
     blob: &[u8],
-) -> (Vec<TreeIndex>, HashMap<KvId, TreeIndex>) {
+) -> (HashSet<TreeIndex>, HashMap<KvId, TreeIndex>) {
     let index_count = blob.len() / BLOCK_SIZE;
 
     let mut seen_indexes: Vec<bool> = vec![false; index_count];
@@ -338,10 +338,10 @@ fn get_free_indexes_and_keys_values_indexes(
         }
     }
 
-    let mut free_indexes: Vec<TreeIndex> = vec![];
+    let mut free_indexes: HashSet<TreeIndex> = HashSet::new();
     for (index, seen) in seen_indexes.iter().enumerate() {
         if !seen {
-            free_indexes.push(index as TreeIndex);
+            free_indexes.insert(index as TreeIndex);
         }
     }
 
@@ -353,7 +353,7 @@ fn get_free_indexes_and_keys_values_indexes(
 pub struct MerkleBlob {
     blob: Vec<u8>,
     // TODO: should this be a set for fast lookups?
-    free_indexes: Vec<TreeIndex>,
+    free_indexes: HashSet<TreeIndex>,
     key_to_index: HashMap<KvId, TreeIndex>,
 }
 
@@ -629,7 +629,7 @@ impl MerkleBlob {
             return Ok(());
         };
 
-        self.free_indexes.push(leaf_index);
+        self.free_indexes.insert(leaf_index);
         let parent = self.get_node(parent_index)?;
         // TODO: kinda implicit that we 'check' that parent is internal inside .sibling_index()
         let sibling_index = parent.specific.sibling_index(leaf_index);
@@ -647,12 +647,12 @@ impl MerkleBlob {
                 }
             };
 
-            self.free_indexes.push(sibling_index);
+            self.free_indexes.insert(sibling_index);
 
             return Ok(());
         };
 
-        self.free_indexes.push(parent_index);
+        self.free_indexes.insert(parent_index);
         let mut grandparent_block = self.get_block(grandparent_index)?;
 
         sibling_block.node.parent = Some(grandparent_index);
@@ -784,7 +784,7 @@ impl MerkleBlob {
     }
 
     fn get_new_index(&mut self) -> TreeIndex {
-        match self.free_indexes.pop() {
+        match self.free_indexes.iter().next().copied() {
             None => {
                 // TODO: should this extend...?
                 // TODO: should this update free indexes...?
@@ -792,7 +792,10 @@ impl MerkleBlob {
                 self.blob.extend_from_slice(&[0; BLOCK_SIZE]);
                 index
             }
-            Some(new_index) => new_index,
+            Some(new_index) => {
+                self.free_indexes.remove(&new_index);
+                new_index
+            }
         }
     }
 
@@ -884,9 +887,7 @@ impl MerkleBlob {
             self.key_to_index.insert(key, index);
         };
 
-        if let Some(free_index_index) = self.free_indexes.iter().find(|i| **i == index) {
-            self.free_indexes.remove(*free_index_index as usize);
-        }
+        self.free_indexes.take(&index);
 
         Ok(())
     }
@@ -1031,7 +1032,7 @@ impl MerkleBlob {
             }
         }
 
-        self.free_indexes.push(source);
+        self.free_indexes.insert(source);
 
         Ok(())
     }
@@ -1696,7 +1697,7 @@ mod tests {
         let index = small_blob.key_to_index[&key];
         small_blob.delete(key).unwrap();
 
-        assert_eq!(small_blob.free_indexes, vec![index, 2]);
+        assert_eq!(small_blob.free_indexes, HashSet::from([index, 2]));
     }
 
     #[rstest]
@@ -1705,8 +1706,10 @@ mod tests {
         let _ = small_blob.key_to_index[&key];
         small_blob.delete(key).unwrap();
 
+        let expected = HashSet::from([1, 2]);
+        assert_eq!(small_blob.free_indexes, expected);
         // NOTE: both 1 and 2 are free per test_delete_frees_index
-        assert_eq!(small_blob.get_new_index(), 2);
+        assert!(expected.contains(&small_blob.get_new_index()));
     }
 
     #[rstest]
@@ -1745,7 +1748,7 @@ mod tests {
         let expected_free_index = (blob.len() / BLOCK_SIZE) as TreeIndex;
         blob.extend_from_slice(&[0; BLOCK_SIZE]);
         let (free_indexes, _) = get_free_indexes_and_keys_values_indexes(&blob);
-        assert_eq!(free_indexes, [expected_free_index]);
+        assert_eq!(free_indexes, HashSet::from([expected_free_index]));
     }
 
     #[test]
