@@ -1,4 +1,4 @@
-use crate::{MerkleBlob, Node, NodeSpecific, TreeIndex};
+use crate::merkle::{MerkleBlob, Node, NodeSpecific, TreeIndex};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use url::Url;
 
