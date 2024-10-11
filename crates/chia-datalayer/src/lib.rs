@@ -524,9 +524,6 @@ impl MerkleBlob {
                 node,
             };
 
-            let NodeSpecific::Leaf { key: this_key, .. } = block.node.specific else {
-                return Err("new block unexpectedly not a leaf".to_string());
-            };
             self.insert_entry_to_blob(index, &block)?;
         }
 
