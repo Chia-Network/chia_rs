@@ -352,6 +352,7 @@ fn get_free_indexes_and_keys_values_indexes(
 #[derive(Debug)]
 pub struct MerkleBlob {
     blob: Vec<u8>,
+    // TODO: should this be a set for fast lookups?
     free_indexes: Vec<TreeIndex>,
     key_to_index: HashMap<KvId, TreeIndex>,
 }
@@ -448,11 +449,8 @@ impl MerkleBlob {
 
         self.clear();
         // TODO: unwrap, ack, review
-        self.insert_entry_to_blob(self.extend_index(), new_leaf_block.to_bytes())
+        self.insert_entry_to_blob(self.extend_index(), &new_leaf_block)
             .unwrap();
-
-        // TODO: put this in insert_entry_to_blob()?
-        self.key_to_index.insert(key, 0);
     }
 
     fn insert_second(
@@ -480,7 +478,7 @@ impl MerkleBlob {
             },
         };
 
-        self.insert_entry_to_blob(0, new_internal_block.to_bytes())?;
+        self.insert_entry_to_blob(0, &new_internal_block)?;
 
         let NodeSpecific::Leaf {
             key: old_leaf_key,
@@ -526,12 +524,10 @@ impl MerkleBlob {
                 node,
             };
 
-            self.insert_entry_to_blob(index, block.to_bytes())?;
             let NodeSpecific::Leaf { key: this_key, .. } = block.node.specific else {
                 return Err("new block unexpectedly not a leaf".to_string());
             };
-            // TODO: put this in insert_entry_to_blob()?
-            self.key_to_index.insert(this_key, index);
+            self.insert_entry_to_blob(index, &block)?;
         }
 
         Ok(())
@@ -563,7 +559,7 @@ impl MerkleBlob {
                 hash: *hash,
             },
         };
-        self.insert_entry_to_blob(new_leaf_index, new_leaf_block.to_bytes())?;
+        self.insert_entry_to_blob(new_leaf_index, &new_leaf_block)?;
 
         let (left_index, right_index) = match side {
             Side::Left => (new_leaf_index, old_leaf_index),
@@ -583,7 +579,7 @@ impl MerkleBlob {
                 hash: *internal_node_hash,
             },
         };
-        self.insert_entry_to_blob(new_internal_node_index, new_internal_block.to_bytes())?;
+        self.insert_entry_to_blob(new_internal_node_index, &new_internal_block)?;
 
         let Some(old_parent_index) = old_leaf.parent else {
             panic!("root found when not expected: {key:?} {value:?} {hash:?}")
@@ -591,7 +587,7 @@ impl MerkleBlob {
 
         let mut block = Block::from_bytes(self.get_block_bytes(old_leaf_index)?)?;
         block.node.parent = Some(new_internal_node_index);
-        self.insert_entry_to_blob(old_leaf_index, block.to_bytes())?;
+        self.insert_entry_to_blob(old_leaf_index, &block)?;
 
         let mut old_parent_block = Block::from_bytes(self.get_block_bytes(old_parent_index)?)?;
         if let NodeSpecific::Internal {
@@ -611,11 +607,9 @@ impl MerkleBlob {
             panic!("expected internal node but found leaf");
         };
 
-        self.insert_entry_to_blob(old_parent_index, old_parent_block.to_bytes())?;
+        self.insert_entry_to_blob(old_parent_index, &old_parent_block)?;
 
         self.mark_lineage_as_dirty(old_parent_index)?;
-        // TODO: put this in insert_entry_to_blob()?
-        self.key_to_index.insert(key, new_leaf_index);
 
         Ok(())
     }
@@ -646,19 +640,13 @@ impl MerkleBlob {
 
         let Some(grandparent_index) = parent.parent else {
             sibling_block.node.parent = None;
-            self.insert_entry_to_blob(0, sibling_block.to_bytes())?;
+            self.insert_entry_to_blob(0, &sibling_block)?;
 
-            match sibling_block.node.specific {
-                NodeSpecific::Leaf { key, .. } => {
-                    // TODO: put this in insert_entry_to_blob()?
-                    self.key_to_index.insert(key, 0);
-                }
-                NodeSpecific::Internal { left, right } => {
-                    for child_index in [left, right] {
-                        let mut block = self.get_block(child_index)?;
-                        block.node.parent = Some(0);
-                        self.insert_entry_to_blob(child_index, block.to_bytes())?;
-                    }
+            if let NodeSpecific::Internal { left, right } = sibling_block.node.specific {
+                for child_index in [left, right] {
+                    let mut block = self.get_block(child_index)?;
+                    block.node.parent = Some(0);
+                    self.insert_entry_to_blob(child_index, &block)?;
                 }
             };
 
@@ -671,7 +659,7 @@ impl MerkleBlob {
         let mut grandparent_block = self.get_block(grandparent_index)?;
 
         sibling_block.node.parent = Some(grandparent_index);
-        self.insert_entry_to_blob(sibling_index, sibling_block.to_bytes())?;
+        self.insert_entry_to_blob(sibling_index, &sibling_block)?;
 
         if let NodeSpecific::Internal {
             ref mut left,
@@ -687,7 +675,7 @@ impl MerkleBlob {
         } else {
             panic!("grandparent not an internal node")
         }
-        self.insert_entry_to_blob(grandparent_index, grandparent_block.to_bytes())?;
+        self.insert_entry_to_blob(grandparent_index, &grandparent_block)?;
 
         self.mark_lineage_as_dirty(grandparent_index)?;
 
@@ -711,7 +699,7 @@ impl MerkleBlob {
         } else {
             panic!("expected internal node but found leaf");
         }
-        self.insert_entry_to_blob(*leaf_index, block.to_bytes())?;
+        self.insert_entry_to_blob(*leaf_index, &block)?;
 
         if let Some(parent) = block.node.parent {
             self.mark_lineage_as_dirty(parent)?;
@@ -791,7 +779,7 @@ impl MerkleBlob {
             }
 
             block.metadata.dirty = true;
-            self.insert_entry_to_blob(this_index, block.to_bytes())?;
+            self.insert_entry_to_blob(this_index, &block)?;
             next_index = block.node.parent;
         }
 
@@ -871,19 +859,33 @@ impl MerkleBlob {
         index
     }
 
-    fn insert_entry_to_blob(
-        &mut self,
-        index: TreeIndex,
-        block_bytes: BlockBytes,
-    ) -> Result<(), String> {
+    fn insert_entry_to_blob(&mut self, index: TreeIndex, block: &Block) -> Result<(), String> {
+        let new_block_bytes = block.to_bytes();
         let extend_index = self.extend_index();
         match index.cmp(&extend_index) {
             Ordering::Greater => return Err(format!("block index out of range: {index}")),
-            Ordering::Equal => self.blob.extend_from_slice(&block_bytes),
+            Ordering::Equal => self.blob.extend_from_slice(&new_block_bytes),
             Ordering::Less => {
-                self.blob[block_range(index)].copy_from_slice(&block_bytes);
+                // TODO: lots of deserialization here for just the key
+                let old_block = self.get_block(index)?;
+                if !self.free_indexes.contains(&index)
+                    && old_block.metadata.node_type == NodeType::Leaf
+                {
+                    // TODO: sort of repeating the leaf check above and below.  smells a little
+                    if let NodeSpecific::Leaf {
+                        key: old_block_key, ..
+                    } = old_block.node.specific
+                    {
+                        self.key_to_index.remove(&old_block_key);
+                    };
+                };
+                self.blob[block_range(index)].copy_from_slice(&new_block_bytes);
             }
         }
+
+        if let NodeSpecific::Leaf { key, .. } = block.node.specific {
+            self.key_to_index.insert(key, index);
+        };
 
         Ok(())
     }
@@ -984,7 +986,7 @@ impl MerkleBlob {
             // TODO: wrap this up in Block maybe? just to have 'control' of dirty being 'accurate'
             block.node.hash = internal_hash(&left.node.hash, &right.node.hash);
             block.metadata.dirty = false;
-            self.insert_entry_to_blob(index, block.to_bytes())?;
+            self.insert_entry_to_blob(index, &block)?;
         }
 
         Ok(())
@@ -1017,8 +1019,7 @@ impl MerkleBlob {
                 x if x == *right => *right = destination,
                 _ => panic!(),
             }
-            self.insert_entry_to_blob(parent, parent_block.to_bytes())
-                .unwrap();
+            self.insert_entry_to_blob(parent, &parent_block).unwrap();
         }
 
         match source_block.node.specific {
@@ -1029,7 +1030,7 @@ impl MerkleBlob {
                 for child in [left, right] {
                     let mut block = self.get_block(child).unwrap();
                     block.node.parent = Some(destination);
-                    self.insert_entry_to_blob(child, block.to_bytes()).unwrap();
+                    self.insert_entry_to_blob(child, &block).unwrap();
                 }
             }
         }
