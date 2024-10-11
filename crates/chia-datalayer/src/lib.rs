@@ -887,6 +887,10 @@ impl MerkleBlob {
             self.key_to_index.insert(key, index);
         };
 
+        if let Some(free_index_index) = self.free_indexes.iter().find(|i| **i == index) {
+            self.free_indexes.remove(*free_index_index as usize);
+        }
+
         Ok(())
     }
 
@@ -1022,16 +1026,11 @@ impl MerkleBlob {
             self.insert_entry_to_blob(parent, &parent_block).unwrap();
         }
 
-        match source_block.node.specific {
-            NodeSpecific::Leaf { key, .. } => {
-                self.key_to_index.insert(key, destination);
-            }
-            NodeSpecific::Internal { left, right, .. } => {
-                for child in [left, right] {
-                    let mut block = self.get_block(child).unwrap();
-                    block.node.parent = Some(destination);
-                    self.insert_entry_to_blob(child, &block).unwrap();
-                }
+        if let NodeSpecific::Internal { left, right, .. } = source_block.node.specific {
+            for child in [left, right] {
+                let mut block = self.get_block(child).unwrap();
+                block.node.parent = Some(destination);
+                self.insert_entry_to_blob(child, &block).unwrap();
             }
         }
 
