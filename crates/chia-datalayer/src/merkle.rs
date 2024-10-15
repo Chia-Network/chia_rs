@@ -63,7 +63,7 @@ impl NodeType {
             // ha!  feel free to laugh at this
             x if (NodeType::Internal as u8 == x) => Ok(NodeType::Internal),
             x if (NodeType::Leaf as u8 == x) => Ok(NodeType::Leaf),
-            other => panic!("unknown NodeType value: {other}"),
+            other => Err(format!("unknown NodeType value: {other}")),
         }
     }
 
@@ -196,6 +196,9 @@ impl Node {
     //     unsafe { *(self as *const Self as *const u8) }
     // }
 
+    // TODO: talk through whether this is good practice.  being prepared for an error even though
+    //       presently it won't happen
+    #[allow(clippy::unnecessary_wraps)]
     pub fn from_bytes(metadata: &NodeMetadata, blob: DataBytes) -> Result<Self, String> {
         Ok(Self {
             parent: Self::parent_from_bytes(&blob),
@@ -1235,7 +1238,7 @@ mod tests {
     use rstest::{fixture, rstest};
     use std::time::{Duration, Instant};
 
-    fn open_dot(lines: &mut DotLines) {
+    fn open_dot(_lines: &mut DotLines) {
         // crate::merkle::dot::open_dot(lines);
     }
 
@@ -1477,7 +1480,7 @@ mod tests {
         let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
 
         let key_value_id: KvId = 1;
-        open_dot(&mut merkle_blob.to_dot().set_note("empty"));
+        open_dot(merkle_blob.to_dot().set_note("empty"));
         merkle_blob
             .insert(
                 key_value_id,
@@ -1486,7 +1489,7 @@ mod tests {
                 InsertLocation::Auto,
             )
             .unwrap();
-        open_dot(&mut merkle_blob.to_dot().set_note("first after"));
+        open_dot(merkle_blob.to_dot().set_note("first after"));
 
         merkle_blob.check().unwrap();
         assert_eq!(merkle_blob.key_to_index.len(), 1);
@@ -1502,7 +1505,7 @@ mod tests {
         let mut last_key: KvId = 0;
         for i in 1..=pre_count {
             let key: KvId = i as KvId;
-            open_dot(&mut merkle_blob.to_dot().set_note("empty"));
+            open_dot(merkle_blob.to_dot().set_note("empty"));
             merkle_blob
                 .insert(key, key, &sha256_num(key), InsertLocation::Auto)
                 .unwrap();
@@ -1510,7 +1513,7 @@ mod tests {
         }
 
         let key_value_id: KvId = pre_count as KvId + 1;
-        open_dot(&mut merkle_blob.to_dot().set_note("first after"));
+        open_dot(merkle_blob.to_dot().set_note("first after"));
         merkle_blob
             .insert(
                 key_value_id,
@@ -1522,7 +1525,7 @@ mod tests {
                 },
             )
             .unwrap();
-        open_dot(&mut merkle_blob.to_dot().set_note("first after"));
+        open_dot(merkle_blob.to_dot().set_note("first after"));
 
         let sibling = merkle_blob
             .get_node(merkle_blob.key_to_index[&last_key])
@@ -1556,7 +1559,7 @@ mod tests {
         let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
 
         let key_value_id: KvId = 1;
-        open_dot(&mut merkle_blob.to_dot().set_note("empty"));
+        open_dot(merkle_blob.to_dot().set_note("empty"));
         merkle_blob
             .insert(
                 key_value_id,
@@ -1565,7 +1568,7 @@ mod tests {
                 InsertLocation::Auto,
             )
             .unwrap();
-        open_dot(&mut merkle_blob.to_dot().set_note("first after"));
+        open_dot(merkle_blob.to_dot().set_note("first after"));
         merkle_blob.check().unwrap();
 
         merkle_blob.delete(key_value_id).unwrap();
