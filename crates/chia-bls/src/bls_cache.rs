@@ -3,6 +3,7 @@ use std::num::NonZeroUsize;
 
 use chia_sha2::Sha256;
 use lru::LruCache;
+use std::sync::Mutex;
 
 use crate::{aggregate_verify_gt, hash_to_g2};
 use crate::{GTElement, PublicKey, Signature};
@@ -17,10 +18,10 @@ use crate::{GTElement, PublicKey, Signature};
 /// aggregate_verify() primitive is faster. When long-syncing, that's
 /// preferable.
 #[cfg_attr(feature = "py-bindings", pyo3::pyclass(name = "BLSCache"))]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct BlsCache {
     // sha256(pubkey + message) -> GTElement
-    cache: LruCache<[u8; 32], GTElement>,
+    cache: Mutex<LruCache<[u8; 32], GTElement>>,
 }
 
 impl Default for BlsCache {
@@ -29,19 +30,27 @@ impl Default for BlsCache {
     }
 }
 
+impl Clone for BlsCache {
+    fn clone(&self) -> Self {
+        Self {
+            cache: Mutex::new(self.cache.lock().expect("cache").clone()),
+        }
+    }
+}
+
 impl BlsCache {
     pub fn new(cache_size: NonZeroUsize) -> Self {
         Self {
-            cache: LruCache::new(cache_size),
+            cache: Mutex::new(LruCache::new(cache_size)),
         }
     }
 
     pub fn len(&self) -> usize {
-        self.cache.len()
+        self.cache.lock().expect("cache").len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.cache.is_empty()
+        self.cache.lock().expect("cache").is_empty()
     }
 
     pub fn aggregate_verify<Pk: Borrow<PublicKey>, Msg: AsRef<[u8]>>(
@@ -52,30 +61,32 @@ impl BlsCache {
         let iter = pks_msgs.into_iter().map(|(pk, msg)| -> GTElement {
             // Hash pubkey + message
             let mut hasher = Sha256::new();
-            hasher.update(pk.borrow().to_bytes());
-            hasher.update(msg.as_ref());
+            let mut aug_msg = pk.borrow().to_bytes().to_vec();
+            aug_msg.extend_from_slice(msg.as_ref());
+            hasher.update(&aug_msg);
             let hash: [u8; 32] = hasher.finalize();
 
             // If the pairing is in the cache, we don't need to recalculate it.
-            if let Some(pairing) = self.cache.get(&hash).cloned() {
+            if let Some(pairing) = self.cache.lock().expect("cache").get(&hash).cloned() {
                 return pairing;
             }
 
             // Otherwise, we need to calculate the pairing and add it to the cache.
-            let mut aug_msg = pk.borrow().to_bytes().to_vec();
-            aug_msg.extend_from_slice(msg.as_ref());
             let aug_hash = hash_to_g2(&aug_msg);
 
-            let mut hasher = Sha256::new();
-            hasher.update(&aug_msg);
-            let hash: [u8; 32] = hasher.finalize();
-
             let pairing = aug_hash.pair(pk.borrow());
-            self.cache.put(hash, pairing.clone());
+            self.cache.lock().expect("cache").put(hash, pairing.clone());
             pairing
         });
 
         aggregate_verify_gt(sig, iter)
+    }
+
+    pub fn update(&mut self, aug_msg: &[u8], gt: GTElement) {
+        let mut hasher = Sha256::new();
+        hasher.update(aug_msg.as_ref());
+        let hash: [u8; 32] = hasher.finalize();
+        self.cache.lock().expect("cache").put(hash, gt);
     }
 }
 
@@ -136,7 +147,8 @@ impl BlsCache {
         use pyo3::prelude::*;
         use pyo3::types::PyBytes;
         let ret = PyList::empty_bound(py);
-        for (key, value) in &self.cache {
+        let c = self.cache.lock().expect("cache");
+        for (key, value) in &*c {
             ret.append((PyBytes::new_bound(py, key), value.clone().into_py(py)))?;
         }
         Ok(ret.into())
@@ -144,9 +156,10 @@ impl BlsCache {
 
     #[pyo3(name = "update")]
     pub fn py_update(&mut self, other: &Bound<'_, PySequence>) -> PyResult<()> {
+        let mut c = self.cache.lock().expect("cache");
         for item in other.borrow().iter()? {
             let (key, value): (Vec<u8>, GTElement) = item?.extract()?;
-            self.cache.put(
+            c.put(
                 key.try_into()
                     .map_err(|_| PyValueError::new_err("invalid key"))?,
                 value,
@@ -248,7 +261,7 @@ pub mod tests {
         }
 
         // The cache should be full now.
-        assert_eq!(bls_cache.cache.len(), 3);
+        assert_eq!(bls_cache.cache.lock().expect("cache").len(), 3);
 
         // Recreate first key.
         let sk = SecretKey::from_seed(&[1; 32]);
@@ -262,7 +275,7 @@ pub mod tests {
         let hash: [u8; 32] = hasher.finalize();
 
         // The first key should have been removed, since it's the oldest that's been accessed.
-        assert!(!bls_cache.cache.contains(&hash));
+        assert!(!bls_cache.cache.lock().expect("cache").contains(&hash));
     }
 
     #[test]

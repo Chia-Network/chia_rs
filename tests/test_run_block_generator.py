@@ -1,4 +1,9 @@
-from chia_rs import run_block_generator, run_block_generator2
+from chia_rs import (
+    run_block_generator,
+    run_block_generator2,
+    G2Element,
+    DONT_VALIDATE_SIGNATURE,
+)
 from run_gen import print_spend_bundle_conditions, DEFAULT_CONSTANTS
 
 
@@ -14,13 +19,25 @@ def test_run_block_generator_cost() -> None:
         open("generator-tests/block-834768.txt", "r").read().split("\n")[0]
     )
     err, conds = run_block_generator(
-        generator, [], original_consensus_cost, 0, DEFAULT_CONSTANTS
+        generator,
+        [],
+        original_consensus_cost,
+        DONT_VALIDATE_SIGNATURE,
+        G2Element(),
+        None,
+        DEFAULT_CONSTANTS,
     )
     assert err is None
     assert conds is not None
 
     err2, conds2 = run_block_generator2(
-        generator, [], hard_fork_consensus_cost, 0, DEFAULT_CONSTANTS
+        generator,
+        [],
+        hard_fork_consensus_cost,
+        DONT_VALIDATE_SIGNATURE,
+        G2Element(),
+        None,
+        DEFAULT_CONSTANTS,
     )
     assert err2 is None
     assert conds2 is not None
@@ -35,14 +52,26 @@ def test_run_block_generator_cost() -> None:
 
     # we exceed the cost limit by 1
     err, conds = run_block_generator(
-        generator, [], original_consensus_cost - 1, 0, DEFAULT_CONSTANTS
+        generator,
+        [],
+        original_consensus_cost - 1,
+        DONT_VALIDATE_SIGNATURE,
+        G2Element(),
+        None,
+        DEFAULT_CONSTANTS,
     )
     # BLOCK_COST_EXCEEDS_MAX = 23
     assert err == 23
     assert conds is None
 
     err, conds = run_block_generator2(
-        generator, [], hard_fork_consensus_cost - 1, 0, DEFAULT_CONSTANTS
+        generator,
+        [],
+        hard_fork_consensus_cost - 1,
+        DONT_VALIDATE_SIGNATURE,
+        G2Element(),
+        None,
+        DEFAULT_CONSTANTS,
     )
     # BLOCK_COST_EXCEEDS_MAX = 23
     assert err == 23
@@ -50,7 +79,13 @@ def test_run_block_generator_cost() -> None:
 
     # the byte cost alone exceeds the limit by 1
     err, conds = run_block_generator(
-        generator, [], len(generator) * 12000 - 1, 0, DEFAULT_CONSTANTS
+        generator,
+        [],
+        len(generator) * 12000 - 1,
+        DONT_VALIDATE_SIGNATURE,
+        G2Element(),
+        None,
+        DEFAULT_CONSTANTS,
     )
     # BLOCK_COST_EXCEEDS_MAX = 23
     assert err == 23
@@ -58,7 +93,13 @@ def test_run_block_generator_cost() -> None:
 
     # the byte cost alone exceeds the limit by 1
     err, conds = run_block_generator2(
-        generator, [], len(generator) * 12000 - 1, 0, DEFAULT_CONSTANTS
+        generator,
+        [],
+        len(generator) * 12000 - 1,
+        DONT_VALIDATE_SIGNATURE,
+        G2Element(),
+        None,
+        DEFAULT_CONSTANTS,
     )
     # BLOCK_COST_EXCEEDS_MAX = 23
     assert err == 23

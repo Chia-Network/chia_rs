@@ -1,5 +1,7 @@
+use chia_bls::Signature;
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
-use chia_consensus::gen::flags::ALLOW_BACKREFS;
+use chia_consensus::gen::additions_and_removals::additions_and_removals;
+use chia_consensus::gen::flags::{ALLOW_BACKREFS, DONT_VALIDATE_SIGNATURE};
 use chia_consensus::gen::run_block_generator::{run_block_generator, run_block_generator2};
 use clvmr::serde::{node_from_bytes, node_to_bytes_backrefs};
 use clvmr::Allocator;
@@ -55,7 +57,9 @@ fn run(c: &mut Criterion) {
                         gen,
                         &block_refs,
                         11_000_000_000,
-                        ALLOW_BACKREFS,
+                        ALLOW_BACKREFS | DONT_VALIDATE_SIGNATURE,
+                        &Signature::default(),
+                        None,
                         &TEST_CONSTANTS,
                     );
                     let _ = black_box(conds);
@@ -74,9 +78,20 @@ fn run(c: &mut Criterion) {
                         &block_refs,
                         11_000_000_000,
                         ALLOW_BACKREFS,
+                        &Signature::default(),
+                        None,
                         &TEST_CONSTANTS,
                     );
                     let _ = black_box(conds);
+                    start.elapsed()
+                });
+            });
+
+            group.bench_function(format!("additions_and_removals {name}{name_suffix}"), |b| {
+                b.iter(|| {
+                    let start = Instant::now();
+                    let results = additions_and_removals(gen, &block_refs, 0, &TEST_CONSTANTS);
+                    let _ = black_box(results);
                     start.elapsed()
                 });
             });

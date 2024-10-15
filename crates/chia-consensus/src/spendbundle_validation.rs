@@ -1,14 +1,9 @@
 use crate::allocator::make_allocator;
 use crate::consensus_constants::ConsensusConstants;
 use crate::gen::flags::ALLOW_BACKREFS;
-use crate::gen::make_aggsig_final_message::make_aggsig_final_message;
-use crate::gen::opcodes::{
-    AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT, AGG_SIG_PARENT_PUZZLE,
-    AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT,
-};
 use crate::gen::owned_conditions::OwnedSpendBundleConditions;
 use crate::gen::validation_error::ErrorCode;
-use crate::spendbundle_conditions::get_conditions_from_spendbundle;
+use crate::spendbundle_conditions::run_spendbundle;
 use chia_bls::GTElement;
 use chia_bls::{aggregate_verify_gt, hash_to_g2};
 use chia_protocol::SpendBundle;
@@ -30,51 +25,26 @@ pub fn validate_clvm_and_signature(
 ) -> Result<(OwnedSpendBundleConditions, Vec<ValidationPair>, Duration), ErrorCode> {
     let start_time = Instant::now();
     let mut a = make_allocator(LIMIT_HEAP);
-    let sbc = get_conditions_from_spendbundle(&mut a, spend_bundle, max_cost, height, constants)
-        .map_err(|e| e.1)?;
+    let (sbc, pkm_pairs) =
+        run_spendbundle(&mut a, spend_bundle, max_cost, height, 0, constants).map_err(|e| e.1)?;
     let conditions = OwnedSpendBundleConditions::from(&a, sbc);
 
     // Collect all pairs in a single vector to avoid multiple iterations
     let mut pairs = Vec::new();
 
     let mut aug_msg = Vec::<u8>::new();
-    let mut final_msg = Vec::<u8>::new();
 
-    for spend in &conditions.spends {
-        let condition_items_pairs = [
-            (AGG_SIG_PARENT, &spend.agg_sig_parent),
-            (AGG_SIG_PUZZLE, &spend.agg_sig_puzzle),
-            (AGG_SIG_AMOUNT, &spend.agg_sig_amount),
-            (AGG_SIG_PUZZLE_AMOUNT, &spend.agg_sig_puzzle_amount),
-            (AGG_SIG_PARENT_AMOUNT, &spend.agg_sig_parent_amount),
-            (AGG_SIG_PARENT_PUZZLE, &spend.agg_sig_parent_puzzle),
-            (AGG_SIG_ME, &spend.agg_sig_me),
-        ];
-
-        for (condition, items) in condition_items_pairs {
-            for (pk, msg) in items {
-                aug_msg.clear();
-                final_msg.clear();
-                final_msg.extend_from_slice(msg.as_slice());
-                aug_msg.extend_from_slice(&pk.to_bytes());
-                make_aggsig_final_message(condition, &mut final_msg, spend, constants);
-                aug_msg.extend(&final_msg);
-                let aug_hash = hash_to_g2(&aug_msg);
-                let pairing = aug_hash.pair(pk);
-                pairs.push((hash_pk_and_msg(&pk.to_bytes(), &final_msg), pairing));
-            }
-        }
-    }
-
-    // Adding unsafe items
-    for (pk, msg) in &conditions.agg_sig_unsafe {
-        let mut aug_msg = pk.to_bytes().to_vec();
-        aug_msg.extend_from_slice(msg.as_ref());
+    for (pk, msg) in pkm_pairs {
+        aug_msg.clear();
+        aug_msg.extend_from_slice(&pk.to_bytes());
+        aug_msg.extend(&*msg);
         let aug_hash = hash_to_g2(&aug_msg);
-        let pairing = aug_hash.pair(pk);
-        pairs.push((hash_pk_and_msg(&pk.to_bytes(), msg), pairing));
-    }
+        let pairing = aug_hash.pair(&pk);
 
+        let mut key = Sha256::new();
+        key.update(&aug_msg);
+        pairs.push((key.finalize(), pairing));
+    }
     // Verify aggregated signature
     let result = aggregate_verify_gt(
         &spend_bundle.aggregated_signature,
@@ -86,13 +56,6 @@ pub fn validate_clvm_and_signature(
 
     // Collect results
     Ok((conditions, pairs, start_time.elapsed()))
-}
-
-fn hash_pk_and_msg(pk: &[u8], msg: &[u8]) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    hasher.update(pk);
-    hasher.update(msg);
-    hasher.finalize()
 }
 
 pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusConstants) -> u32 {

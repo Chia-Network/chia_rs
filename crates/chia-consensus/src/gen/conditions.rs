@@ -17,12 +17,13 @@ use super::opcodes::{
 use super::sanitize_int::{sanitize_uint, SanitizedUint};
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
 use crate::consensus_constants::ConsensusConstants;
-use crate::gen::flags::{NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
+use crate::gen::flags::{DONT_VALIDATE_SIGNATURE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
+use crate::gen::make_aggsig_final_message::u64_to_bytes;
 use crate::gen::messages::{Message, SpendId};
 use crate::gen::spend_visitor::SpendVisitor;
 use crate::gen::validation_error::check_nil;
-use chia_bls::PublicKey;
-use chia_protocol::Bytes32;
+use chia_bls::{aggregate_verify, BlsCache, PublicKey, Signature};
+use chia_protocol::{Bytes, Bytes32};
 use chia_sha2::Sha256;
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use clvmr::cost::Cost;
@@ -719,6 +720,9 @@ pub struct SpendBundleConditions {
 
     // the sum of all amounts of CREATE_COIN conditions
     pub addition_amount: u128,
+
+    // true if the block/spend bundle aggregate signature was validated
+    pub validated_signature: bool,
 }
 
 #[derive(Default)]
@@ -775,6 +779,13 @@ pub struct ParseState {
     // ASSERT_MY_BIRTH_HEIGHT
     // each item is the index into the SpendBundleConditions::spends vector
     assert_not_ephemeral: HashSet<usize>,
+
+    // All public keys and messages emitted by the generator. We'll validate
+    // these against the aggregate signature at the end, unless the
+    // DONT_VALIDATE_SIGNATURE flag is set
+    // TODO: We would probably save heap allocations by turning this into a
+    // blst_pairing object.
+    pub pkm_pairs: Vec<(PublicKey, Bytes)>,
 }
 
 // returns (parent-id, puzzle-hash, amount, condition-list)
@@ -1121,30 +1132,80 @@ pub fn parse_conditions<V: SpendVisitor>(
             }
             Condition::AggSigMe(pk, msg) => {
                 spend.agg_sig_me.push((to_key(a, pk)?, msg));
+                if (flags & DONT_VALIDATE_SIGNATURE) == 0 {
+                    let mut msg = a.atom(msg).as_ref().to_vec();
+                    msg.extend((*spend.coin_id).as_slice());
+                    msg.extend(constants.agg_sig_me_additional_data.as_slice());
+                    state.pkm_pairs.push((to_key(a, pk)?, msg.into()));
+                }
             }
             Condition::AggSigParent(pk, msg) => {
                 spend.agg_sig_parent.push((to_key(a, pk)?, msg));
+                if (flags & DONT_VALIDATE_SIGNATURE) == 0 {
+                    let mut msg = a.atom(msg).as_ref().to_vec();
+                    msg.extend(a.atom(spend.parent_id).as_ref());
+                    msg.extend(constants.agg_sig_parent_additional_data.as_slice());
+                    state.pkm_pairs.push((to_key(a, pk)?, msg.into()));
+                }
             }
             Condition::AggSigPuzzle(pk, msg) => {
                 spend.agg_sig_puzzle.push((to_key(a, pk)?, msg));
+                if (flags & DONT_VALIDATE_SIGNATURE) == 0 {
+                    let mut msg = a.atom(msg).as_ref().to_vec();
+                    msg.extend(a.atom(spend.puzzle_hash).as_ref());
+                    msg.extend(constants.agg_sig_puzzle_additional_data.as_slice());
+                    state.pkm_pairs.push((to_key(a, pk)?, msg.into()));
+                }
             }
             Condition::AggSigAmount(pk, msg) => {
                 spend.agg_sig_amount.push((to_key(a, pk)?, msg));
+                if (flags & DONT_VALIDATE_SIGNATURE) == 0 {
+                    let mut msg = a.atom(msg).as_ref().to_vec();
+                    msg.extend(u64_to_bytes(spend.coin_amount).as_slice());
+                    msg.extend(constants.agg_sig_amount_additional_data.as_slice());
+                    state.pkm_pairs.push((to_key(a, pk)?, msg.into()));
+                }
             }
             Condition::AggSigPuzzleAmount(pk, msg) => {
                 spend.agg_sig_puzzle_amount.push((to_key(a, pk)?, msg));
+                if (flags & DONT_VALIDATE_SIGNATURE) == 0 {
+                    let mut msg = a.atom(msg).as_ref().to_vec();
+                    msg.extend(a.atom(spend.puzzle_hash).as_ref());
+                    msg.extend(u64_to_bytes(spend.coin_amount).as_slice());
+                    msg.extend(constants.agg_sig_puzzle_amount_additional_data.as_slice());
+                    state.pkm_pairs.push((to_key(a, pk)?, msg.into()));
+                }
             }
             Condition::AggSigParentAmount(pk, msg) => {
                 spend.agg_sig_parent_amount.push((to_key(a, pk)?, msg));
+                if (flags & DONT_VALIDATE_SIGNATURE) == 0 {
+                    let mut msg = a.atom(msg).as_ref().to_vec();
+                    msg.extend(a.atom(spend.parent_id).as_ref());
+                    msg.extend(u64_to_bytes(spend.coin_amount).as_slice());
+                    msg.extend(constants.agg_sig_parent_amount_additional_data.as_slice());
+                    state.pkm_pairs.push((to_key(a, pk)?, msg.into()));
+                }
             }
             Condition::AggSigParentPuzzle(pk, msg) => {
                 spend.agg_sig_parent_puzzle.push((to_key(a, pk)?, msg));
+                if (flags & DONT_VALIDATE_SIGNATURE) == 0 {
+                    let mut msg = a.atom(msg).as_ref().to_vec();
+                    msg.extend(a.atom(spend.parent_id).as_ref());
+                    msg.extend(a.atom(spend.puzzle_hash).as_ref());
+                    msg.extend(constants.agg_sig_parent_puzzle_additional_data.as_slice());
+                    state.pkm_pairs.push((to_key(a, pk)?, msg.into()));
+                }
             }
             Condition::AggSigUnsafe(pk, msg) => {
                 // AGG_SIG_UNSAFE messages are not allowed to end with the
                 // suffix added to other AGG_SIG_* conditions
                 check_agg_sig_unsafe_message(a, msg, constants)?;
                 ret.agg_sig_unsafe.push((to_key(a, pk)?, msg));
+                if (flags & DONT_VALIDATE_SIGNATURE) == 0 {
+                    state
+                        .pkm_pairs
+                        .push((to_key(a, pk)?, a.atom(msg).as_ref().to_vec().into()));
+                }
             }
             Condition::Softfork(cost) => {
                 if *max_cost < cost {
@@ -1229,6 +1290,8 @@ pub fn parse_spends<V: SpendVisitor>(
     spends: NodePtr,
     max_cost: Cost,
     flags: u32,
+    aggregate_signature: &Signature,
+    bls_cache: Option<&mut BlsCache>,
     constants: &ConsensusConstants,
 ) -> Result<SpendBundleConditions, ValidationErr> {
     let mut ret = SpendBundleConditions::default();
@@ -1261,8 +1324,10 @@ pub fn parse_spends<V: SpendVisitor>(
     }
 
     validate_conditions(a, &ret, &state, spends, flags)?;
-    ret.cost = max_cost - cost_left;
+    validate_signature(&state, aggregate_signature, flags, bls_cache)?;
+    ret.validated_signature = (flags & DONT_VALIDATE_SIGNATURE) == 0;
 
+    ret.cost = max_cost - cost_left;
     Ok(ret)
 }
 
@@ -1434,6 +1499,38 @@ pub fn validate_conditions(
     Ok(())
 }
 
+pub fn validate_signature(
+    state: &ParseState,
+    signature: &Signature,
+    flags: u32,
+    bls_cache: Option<&mut BlsCache>,
+) -> Result<(), ValidationErr> {
+    if (flags & DONT_VALIDATE_SIGNATURE) != 0 {
+        return Ok(());
+    }
+
+    if let Some(bls_cache) = bls_cache {
+        if !bls_cache.aggregate_verify(
+            state.pkm_pairs.iter().map(|(pk, msg)| (pk, msg.as_slice())),
+            signature,
+        ) {
+            return Err(ValidationErr(
+                NodePtr::NIL,
+                ErrorCode::BadAggregateSignature,
+            ));
+        }
+    } else if !aggregate_verify(
+        signature,
+        state.pkm_pairs.iter().map(|(pk, msg)| (pk, msg.as_slice())),
+    ) {
+        return Err(ValidationErr(
+            NodePtr::NIL,
+            ErrorCode::BadAggregateSignature,
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 use crate::consensus_constants::TEST_CONSTANTS;
 #[cfg(test)]
@@ -1465,7 +1562,10 @@ const LONG_VEC: &[u8; 33] = &[
 ];
 
 #[cfg(test)]
-const PUBKEY: &[u8; 48] = &hex!("97f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb");
+const PUBKEY: &[u8; 48] = &hex!("aefe1789d6476f60439e1168f588ea16652dc321279f05a805fbc63933e88ae9c175d6c6ab182e54af562e1a0dce41bb");
+#[cfg(test)]
+const SECRET_KEY: &[u8; 32] =
+    &hex!("6fc9d9a2b05fd1f0e51bc91041a03be8657081f272ec281aff731624f0d1c220");
 #[cfg(test)]
 const MSG1: &[u8; 13] = &[3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
 #[cfg(test)]
@@ -1507,9 +1607,6 @@ const LONGMSG: &[u8; 1025] = &[
     4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
     4,
 ];
-
-#[cfg(test)]
-use crate::gen::make_aggsig_final_message::u64_to_bytes;
 
 #[cfg(test)]
 fn hash_buf(b1: &[u8], b2: &[u8]) -> Vec<u8> {
@@ -1668,6 +1765,8 @@ fn cond_test_cb(
     input: &str,
     flags: u32,
     callback: Callback,
+    signature: &Signature,
+    bls_cache: Option<&mut BlsCache>,
 ) -> Result<(Allocator, SpendBundleConditions), ValidationErr> {
     let mut a = Allocator::new();
 
@@ -1678,7 +1777,15 @@ fn cond_test_cb(
         print!("{c:02x}");
     }
     println!();
-    match parse_spends::<MempoolVisitor>(&a, n, 11_000_000_000, flags, &TEST_CONSTANTS) {
+    match parse_spends::<MempoolVisitor>(
+        &a,
+        n,
+        11_000_000_000,
+        flags,
+        signature,
+        bls_cache,
+        &TEST_CONSTANTS,
+    ) {
         Ok(list) => {
             for n in &list.spends {
                 println!("{n:?}");
@@ -1695,7 +1802,7 @@ use crate::gen::flags::MEMPOOL_MODE;
 #[cfg(test)]
 fn cond_test(input: &str) -> Result<(Allocator, SpendBundleConditions), ValidationErr> {
     // by default, run all tests in strict mempool mode
-    cond_test_cb(input, MEMPOOL_MODE, None)
+    cond_test_cb(input, MEMPOOL_MODE, None, &Signature::default(), None)
 }
 
 #[cfg(test)]
@@ -1703,7 +1810,17 @@ fn cond_test_flag(
     input: &str,
     flags: u32,
 ) -> Result<(Allocator, SpendBundleConditions), ValidationErr> {
-    cond_test_cb(input, flags, None)
+    cond_test_cb(input, flags, None, &Signature::default(), None)
+}
+
+#[cfg(test)]
+fn cond_test_sig(
+    input: &str,
+    signature: &Signature,
+    bls_cache: Option<&mut BlsCache>,
+    flags: u32,
+) -> Result<(Allocator, SpendBundleConditions), ValidationErr> {
+    cond_test_cb(input, flags, None, signature, bls_cache)
 }
 
 #[test]
@@ -1853,7 +1970,7 @@ fn test_strict_args_count(
             "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 )))))",
             condition as u8, arg
         ),
-        flags,
+        flags | DONT_VALIDATE_SIGNATURE,
     );
     if flags == 0 {
         // two of the cases won't pass, even when garbage at the end is allowed.
@@ -1898,7 +2015,7 @@ fn test_message_strict_args_count(
         &format!(
             "((({{h1}} ({{h2}} (123 (((66 ({mode} ({msg} {arg} {extra1} ) ((67 ({mode} ({msg} {extra2} ) ))))"
         ),
-        flags,
+        flags | DONT_VALIDATE_SIGNATURE,
     );
     if flags == 0 {
         ret.unwrap();
@@ -1942,14 +2059,26 @@ fn test_extra_arg(
     #[case] extra_cond: &str,
     #[case] test: impl Fn(&SpendBundleConditions, &SpendConditions),
 ) {
+    let signature = match condition {
+        AGG_SIG_PARENT
+        | AGG_SIG_PUZZLE
+        | AGG_SIG_AMOUNT
+        | AGG_SIG_PUZZLE_AMOUNT
+        | AGG_SIG_PARENT_PUZZLE
+        | AGG_SIG_PARENT_AMOUNT => sign_tx(H1, H2, 123, condition, MSG1),
+        _ => Signature::default(),
+    };
+
     // extra args are ignored in consensus mode
     // and a failure in mempool mode
     assert_eq!(
-        cond_test_flag(
+        cond_test_sig(
             &format!(
                 "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 ) {} ))))",
                 condition as u8, arg, extra_cond
             ),
+            &signature,
+            None,
             MEMPOOL_MODE,
         )
         .unwrap_err()
@@ -1957,11 +2086,13 @@ fn test_extra_arg(
         ErrorCode::InvalidCondition
     );
 
-    let (a, conds) = cond_test_flag(
+    let (a, conds) = cond_test_sig(
         &format!(
             "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 ) {} ))))",
             condition as u8, arg, extra_cond
         ),
+        &signature,
+        None,
         0,
     )
     .unwrap();
@@ -2934,7 +3065,9 @@ fn test_create_coin_exceed_cost() {
                     rest = a.new_pair(coin, rest).unwrap();
                 }
                 rest
-            }))
+            })),
+            &Signature::default(),
+            None,
         )
         .unwrap_err()
         .1,
@@ -2993,8 +3126,11 @@ fn test_single_agg_sig_me(
     #[case] condition: ConditionOpcode,
     #[values(MEMPOOL_MODE, 0)] mempool: u32,
 ) {
-    let (a, conds) = cond_test_flag(
+    let signature = sign_tx(H1, H2, 123, condition, MSG1);
+    let (a, conds) = cond_test_sig(
         &format!("((({{h1}} ({{h2}} (123 ((({condition} ({{pubkey}} ({{msg1}} )))))"),
+        &signature,
+        None,
         mempool,
     )
     .unwrap();
@@ -3033,7 +3169,7 @@ fn test_duplicate_agg_sig(
     // aggregated, and so must all copies of the public keys
     let (a, conds) =
         cond_test_flag(&format!("((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{msg1}} ) (({} ({{pubkey}} ({{msg1}} ) ))))", condition as u8, condition as u8),
-            mempool)
+            mempool | DONT_VALIDATE_SIGNATURE)
             .unwrap();
 
     assert_eq!(conds.cost, AGG_SIG_COST * 2);
@@ -3073,7 +3209,7 @@ fn test_agg_sig_invalid_pubkey(
                 "((({{h1}} ({{h2}} (123 ((({} ({{h2}} ({{msg1}} )))))",
                 condition as u8
             ),
-            mempool
+            mempool | DONT_VALIDATE_SIGNATURE
         )
         .unwrap_err()
         .1,
@@ -3166,7 +3302,9 @@ fn test_agg_sig_exceed_cost(#[case] condition: ConditionOpcode) {
                     rest = a.new_pair(aggsig, rest).unwrap();
                 }
                 rest
-            }))
+            })),
+            &Signature::default(),
+            None,
         )
         .unwrap_err()
         .1,
@@ -3177,7 +3315,15 @@ fn test_agg_sig_exceed_cost(#[case] condition: ConditionOpcode) {
 #[test]
 fn test_single_agg_sig_unsafe() {
     // AGG_SIG_UNSAFE
-    let (a, conds) = cond_test("((({h1} ({h2} (123 (((49 ({pubkey} ({msg1} )))))").unwrap();
+    let signature = sign_tx(H1, H2, 123, 49, MSG1);
+
+    let (a, conds) = cond_test_sig(
+        "((({h1} ({h2} (123 (((49 ({pubkey} ({msg1} )))))",
+        &signature,
+        None,
+        0,
+    )
+    .unwrap();
 
     assert_eq!(conds.cost, AGG_SIG_COST);
     assert_eq!(conds.spends.len(), 1);
@@ -3211,7 +3357,7 @@ fn test_agg_sig_extra_arg(#[case] condition: ConditionOpcode) {
             "((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{msg1}} ( 1337 ) ))))",
             condition as u8
         ),
-        0,
+        DONT_VALIDATE_SIGNATURE,
     )
     .unwrap();
 
@@ -3246,8 +3392,14 @@ fn test_agg_sig_extra_arg(#[case] condition: ConditionOpcode) {
 fn test_agg_sig_unsafe_invalid_terminator() {
     // AGG_SIG_UNSAFE
     // in non-mempool mode, even an invalid terminator is allowed
-    let (a, conds) =
-        cond_test_flag("((({h1} ({h2} (123 (((49 ({pubkey} ({msg1} 456 ))))", 0).unwrap();
+    let signature = sign_tx(H1, H2, 123, 49, MSG1);
+    let (a, conds) = cond_test_sig(
+        "((({h1} ({h2} (123 (((49 ({pubkey} ({msg1} 456 ))))",
+        &signature,
+        None,
+        0,
+    )
+    .unwrap();
 
     assert_eq!(conds.cost, AGG_SIG_COST);
     assert_eq!(conds.spends.len(), 1);
@@ -3269,8 +3421,14 @@ fn test_agg_sig_me_invalid_terminator() {
     // AGG_SIG_ME
     // this has an invalid list terminator of the argument list. This is OK
     // according to the original consensus rules
-    let (a, conds) =
-        cond_test_flag("((({h1} ({h2} (123 (((50 ({pubkey} ({msg1} 456 ))))", 0).unwrap();
+    let signature = sign_tx(H1, H2, 123, 50, MSG1);
+    let (a, conds) = cond_test_sig(
+        "((({h1} ({h2} (123 (((50 ({pubkey} ({msg1} 456 ))))",
+        &signature,
+        None,
+        0,
+    )
+    .unwrap();
 
     assert_eq!(conds.cost, AGG_SIG_COST);
     assert_eq!(conds.spends.len(), 1);
@@ -3291,9 +3449,15 @@ fn test_agg_sig_me_invalid_terminator() {
 fn test_duplicate_agg_sig_unsafe() {
     // AGG_SIG_UNSAFE
     // these conditions may not be deduplicated
-    let (a, conds) =
-        cond_test("((({h1} ({h2} (123 (((49 ({pubkey} ({msg1} ) ((49 ({pubkey} ({msg1} ) ))))")
-            .unwrap();
+    let mut signature = sign_tx(H1, H2, 123, 49, MSG1);
+    signature.aggregate(&sign_tx(H1, H2, 123, 49, MSG1));
+    let (a, conds) = cond_test_sig(
+        "((({h1} ({h2} (123 (((49 ({pubkey} ({msg1} ) ((49 ({pubkey} ({msg1} ) ))))",
+        &signature,
+        None,
+        0,
+    )
+    .unwrap();
 
     assert_eq!(conds.cost, AGG_SIG_COST * 2);
     assert_eq!(conds.spends.len(), 1);
@@ -3333,6 +3497,51 @@ fn test_agg_sig_unsafe_long_msg() {
 }
 
 #[cfg(test)]
+fn final_message(
+    parent: &[u8; 32],
+    puzzle: &[u8; 32],
+    amount: u64,
+    opcode: u16,
+    msg: &[u8],
+) -> Vec<u8> {
+    use crate::allocator::make_allocator;
+    use crate::gen::make_aggsig_final_message::make_aggsig_final_message;
+    use crate::gen::owned_conditions::OwnedSpendConditions;
+    use chia_protocol::Coin;
+    use clvmr::LIMIT_HEAP;
+
+    let coin = Coin::new(Bytes32::from(parent), Bytes32::from(puzzle), amount);
+
+    let mut a: Allocator = make_allocator(LIMIT_HEAP);
+    let spend = SpendConditions::new(
+        a.new_atom(parent.as_slice()).expect("should pass"),
+        amount,
+        a.new_atom(puzzle.as_slice()).expect("test should pass"),
+        Arc::new(Bytes32::try_from(coin.coin_id()).expect("test should pass")),
+    );
+
+    let spend = OwnedSpendConditions::from(&a, spend);
+
+    let mut final_msg = msg.to_vec();
+    make_aggsig_final_message(opcode, &mut final_msg, &spend, &TEST_CONSTANTS);
+    final_msg
+}
+
+#[cfg(test)]
+fn sign_tx(
+    parent: &[u8; 32],
+    puzzle: &[u8; 32],
+    amount: u64,
+    opcode: u16,
+    msg: &[u8],
+) -> Signature {
+    use chia_bls::{sign, SecretKey};
+
+    let final_msg = final_message(parent, puzzle, amount, opcode, msg);
+    sign(&SecretKey::from_bytes(SECRET_KEY).unwrap(), final_msg)
+}
+
+#[cfg(test)]
 #[rstest]
 // these are the suffixes used for AGG_SIG_* conditions (other than
 // AGG_SIG_UNSAFE)
@@ -3355,8 +3564,18 @@ fn test_agg_sig_unsafe_invalid_msg(
     #[case] msg: &str,
     #[values(43, 44, 45, 46, 47, 48, 49, 50)] opcode: u16,
 ) {
-    let ret = cond_test_flag(
+    let signature = sign_tx(
+        H1,
+        H2,
+        123,
+        opcode,
+        &hex::decode(&msg[2..]).expect("msg not hex"),
+    );
+
+    let ret = cond_test_sig(
         format!("((({{h1}} ({{h2}} (123 ((({opcode} ({{pubkey}} ({msg} )))))").as_str(),
+        &signature,
+        None,
         0,
     );
     if opcode == AGG_SIG_UNSAFE {
@@ -3394,7 +3613,9 @@ fn test_agg_sig_unsafe_exceed_cost() {
                     rest = a.new_pair(aggsig, rest).unwrap();
                 }
                 rest
-            }))
+            })),
+            &Signature::default(),
+            None,
         )
         .unwrap_err()
         .1,
@@ -4321,6 +4542,8 @@ fn test_limit_announcements(
             }
             rest
         })),
+        &Signature::default(),
+        None,
     );
 
     if expect_err.is_some() {
@@ -4346,7 +4569,7 @@ fn test_eligible_for_ff_assert_parent() {
            ))\
        ))";
 
-    let (_a, cond) = cond_test(test).expect("cond_test");
+    let (_a, cond) = cond_test_flag(test, DONT_VALIDATE_SIGNATURE).expect("cond_test");
     assert!(cond.spends.len() == 1);
     assert!((cond.spends[0].flags & ELIGIBLE_FOR_FF) != 0);
 }
@@ -4441,6 +4664,8 @@ fn test_eligible_for_ff_invalid_agg_sig_me(
     #[case] condition: ConditionOpcode,
     #[case] eligible: bool,
 ) {
+    let signature = sign_tx(H1, H2, 1, condition, MSG1);
+
     // 51=CREATE_COIN
     let test: &str = &format!(
         "(\
@@ -4451,7 +4676,7 @@ fn test_eligible_for_ff_invalid_agg_sig_me(
        ))"
     );
 
-    let (_a, cond) = cond_test_flag(test, 0).expect("cond_test");
+    let (_a, cond) = cond_test_sig(test, &signature, None, 0).expect("cond_test");
     assert!(cond.spends.len() == 1);
     let flags = cond.spends[0].flags;
     if eligible {
@@ -4459,6 +4684,86 @@ fn test_eligible_for_ff_invalid_agg_sig_me(
     } else {
         assert!((flags & ELIGIBLE_FOR_FF) == 0);
     }
+}
+
+// test aggregate signature validation. Both positive and negative cases
+
+#[cfg(test)]
+fn add_signature(sig: &mut Signature, puzzle: &mut String, opcode: ConditionOpcode) {
+    if opcode == 0 {
+        return;
+    }
+    sig.aggregate(&sign_tx(H1, H2, 123, opcode, MSG1));
+    puzzle.push_str(format!("(({opcode} ({{pubkey}} ({{msg1}} )").as_str());
+}
+
+#[cfg(test)]
+fn populate_cache(opcode: ConditionOpcode, bls_cache: &mut BlsCache) {
+    use chia_bls::hash_to_g2;
+    let msg = final_message(H1, H2, 123, opcode, MSG1);
+    // Otherwise, we need to calculate the pairing and add it to the cache.
+    let mut aug_msg = PUBKEY.to_vec();
+    aug_msg.extend_from_slice(msg.as_ref());
+    let aug_hash = hash_to_g2(&aug_msg);
+
+    let gt = aug_hash.pair(&PublicKey::from_bytes(PUBKEY).unwrap());
+    bls_cache.update(&aug_msg, gt);
+}
+
+#[cfg(test)]
+#[rstest]
+fn test_agg_sig(
+    #[values(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)] a: u32,
+    #[values(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)] b: u32,
+    #[values(true, false)] expect_pass: bool,
+    #[values(true, false)] with_cache: bool,
+) {
+    use chia_bls::{sign, SecretKey};
+    let mut signature = Signature::default();
+    let mut bls_cache = BlsCache::default();
+    let cache: Option<&mut BlsCache> = if with_cache {
+        populate_cache(43, &mut bls_cache);
+        populate_cache(44, &mut bls_cache);
+        populate_cache(45, &mut bls_cache);
+        populate_cache(46, &mut bls_cache);
+        populate_cache(47, &mut bls_cache);
+        populate_cache(48, &mut bls_cache);
+        populate_cache(49, &mut bls_cache);
+        populate_cache(50, &mut bls_cache);
+        Some(&mut bls_cache)
+    } else {
+        None
+    };
+
+    let combination = (a << 4) | b;
+    let mut puzzle: String = "((({h1} ({h2} (123 (".into();
+    let opcodes: &[ConditionOpcode] = &[
+        AGG_SIG_PARENT,
+        AGG_SIG_PUZZLE,
+        AGG_SIG_AMOUNT,
+        AGG_SIG_PUZZLE_AMOUNT,
+        AGG_SIG_PARENT_AMOUNT,
+        AGG_SIG_PARENT_PUZZLE,
+        AGG_SIG_UNSAFE,
+        AGG_SIG_ME,
+    ];
+    for (i, opcode) in opcodes.iter().enumerate() {
+        if (combination & (1 << i)) == 0 {
+            continue;
+        }
+        add_signature(&mut signature, &mut puzzle, *opcode);
+    }
+    puzzle.push_str("))))");
+    if !expect_pass {
+        signature.aggregate(&sign(
+            &SecretKey::from_bytes(SECRET_KEY).unwrap(),
+            b"foobar",
+        ));
+    }
+    assert_eq!(
+        expect_pass,
+        cond_test_sig(puzzle.as_str(), &signature, cache, 0).is_ok()
+    );
 }
 
 // the message condition takes a mode-parameter. This is a 6-bit integer that
@@ -4697,6 +5002,8 @@ fn test_limit_messages(#[case] count: i32, #[case] expect_err: Option<ErrorCode>
             }
             rest
         })),
+        &Signature::default(),
+        None,
     );
 
     if expect_err.is_some() {

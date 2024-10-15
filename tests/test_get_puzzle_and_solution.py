@@ -6,6 +6,8 @@ from chia_rs import (
     run_chia_program,
     Program,
     Coin,
+    G2Element,
+    DONT_VALIDATE_SIGNATURE,
 )
 from run_gen import DEFAULT_CONSTANTS
 from chia_rs.sized_bytes import bytes32
@@ -43,7 +45,13 @@ def test_get_puzzle_and_solution_for_coin(input_file: str) -> None:
 
     # first, run the block generator just to list all the spends
     err, conds = run_block_generator2(
-        block, [], MAX_COST, ALLOW_BACKREFS, DEFAULT_CONSTANTS
+        block,
+        [],
+        MAX_COST,
+        ALLOW_BACKREFS | DONT_VALIDATE_SIGNATURE,
+        G2Element(),
+        None,
+        DEFAULT_CONSTANTS,
     )
     assert err is None
     assert conds is not None

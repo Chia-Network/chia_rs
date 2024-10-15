@@ -155,7 +155,6 @@ pub fn fast_forward_singleton(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consensus_constants::ConsensusConstants;
     use crate::consensus_constants::TEST_CONSTANTS;
     use crate::gen::conditions::MempoolVisitor;
     use crate::gen::conditions::{
@@ -173,7 +172,7 @@ mod tests {
     use clvmr::chia_dialect::ChiaDialect;
     use clvmr::reduction::Reduction;
     use clvmr::run_program::run_program;
-    use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs, node_to_bytes};
+    use clvmr::serde::{node_from_bytes, node_to_bytes};
     use hex_literal::hex;
     use rstest::rstest;
     use std::fs;

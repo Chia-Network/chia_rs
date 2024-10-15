@@ -1,6 +1,6 @@
 [package]
 name = "chia-fuzz"
-version = "0.13.0"
+version = "0.15.0"
 authors = ["Automatically generated"]
 publish = false
 edition = "2021"
@@ -20,6 +20,7 @@ chia-protocol = { workspace = true }
 chia-sha2 = { workspace = true }
 chia-traits = { workspace = true }
 chia-consensus = { workspace = true }
+chia-bls = { workspace = true }
 hex-literal = { workspace = true }
 
 [[bin]]
@@ -109,6 +110,13 @@ bench = false
 [[bin]]
 name = "solution-generator"
 path = "fuzz_targets/solution-generator.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "additions-and-removals"
+path = "fuzz_targets/additions-and-removals.rs"
 test = false
 doc = false
 bench = false
