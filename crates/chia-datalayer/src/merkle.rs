@@ -58,7 +58,7 @@ pub enum NodeType {
 impl NodeType {
     pub fn from_u8(value: u8) -> Result<Self, String> {
         // TODO: identify some useful structured serialization tooling we use
-        // TODO: find a better way to tie serialization values to enumerators
+        // TODO: find a better way to tie serialization values to enumerator variants
         match value {
             // ha!  feel free to laugh at this
             x if (NodeType::Internal as u8 == x) => Ok(NodeType::Internal),
@@ -255,39 +255,6 @@ impl Node {
 
         blob
     }
-
-    // pub fn to_dot(&self, index: TreeIndex) -> DotLines {
-    //     // TODO: can this be done without introducing a blank line?
-    //     let node_to_parent = match self.parent {
-    //         Some(parent) => format!("node_{index} -> node_{parent};"),
-    //         None => String::new(),
-    //     };
-    //
-    //     match self.specific {
-    //         NodeSpecific::Internal {left, right} => DotLines{
-    //             nodes: vec![
-    //                 format!("node_{index} [label=\"{index}\"]"),
-    //             ],
-    //             connections: vec![
-    //                 format!("node_{index} -> node_{left};"),
-    //                 format!("node_{index} -> node_{right};"),
-    //                 node_to_parent,
-    //             ],
-    //             pair_boxes: vec![
-    //                 format!("node [shape = box]; {{rank = same; node_{left}->node_{right}[style=invis]; rankdir = LR}}"),
-    //             ],
-    //             note: String::new(),
-    //         },
-    //         NodeSpecific::Leaf {key, value} => DotLines{
-    //             nodes: vec![
-    //                 format!("node_{index} [shape=box, label=\"{index}\\nvalue: {key}\\nvalue: {value}\"];"),
-    //             ],
-    //             connections: vec![node_to_parent],
-    //             pair_boxes: vec![],
-    //             note: String::new(),
-    //         },
-    //     }
-    // }
 }
 
 fn block_range(index: TreeIndex) -> Range<usize> {
@@ -896,18 +863,6 @@ impl MerkleBlob {
         Block::from_bytes(self.get_block_bytes(index)?)
     }
 
-    // fn get_block_slice(&self, index: TreeIndex) -> Result<&mut BlockBytes, String> {
-    //     let metadata_start = index as usize * BLOCK_SIZE;
-    //     let data_start = metadata_start + METADATA_SIZE;
-    //     let end = data_start + DATA_SIZE;
-    //
-    //     self.blob
-    //         .get(metadata_start..end)
-    //         .ok_or(format!("index out of bounds: {index}"))?
-    //         .try_into()
-    //         .map_err(|e| format!("failed getting block {index}: {e}"))
-    // }
-
     fn get_block_bytes(&self, index: TreeIndex) -> Result<BlockBytes, String> {
         self.blob
             .get(block_range(index))
@@ -1276,57 +1231,13 @@ mod dot;
 #[cfg(test)]
 mod tests {
     use super::*;
-    // use hex_literal::hex;
-    // use dot::open_dot;
+    use crate::merkle::dot::DotLines;
     use rstest::{fixture, rstest};
     use std::time::{Duration, Instant};
 
-    // const EXAMPLE_BLOB: [u8; 138] = hex!("0001ffffffff00000001000000020c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b0100000000000405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b0100000000001415161718191a1b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b");
-    // const HASH: Hash = [
-    //     12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34,
-    //     35, 36, 37, 38, 39, 40, 41, 42, 43,
-    // ];
-    //
-    // const EXAMPLE_ROOT: Node = Node {
-    //     parent: None,
-    //     specific: NodeSpecific::Internal { left: 1, right: 2 },
-    //     hash: HASH,
-    //     index: 0,
-    // };
-    // const EXAMPLE_ROOT_METADATA: NodeMetadata = NodeMetadata {
-    //     node_type: NodeType::Internal,
-    //     dirty: true,
-    // };
-    // const EXAMPLE_LEFT_LEAF: Node = Node {
-    //     parent: Some(0),
-    //     specific: NodeSpecific::Leaf {
-    //         key: 0x0405_0607_0809_0A0B,
-    //         value: 0x1415_1617_1819_1A1B,
-    //     },
-    //     hash: HASH,
-    //     index: 1,
-    // };
-    // const EXAMPLE_LEFT_LEAF_METADATA: NodeMetadata = NodeMetadata {
-    //     node_type: NodeType::Leaf,
-    //     dirty: false,
-    // };
-    // const EXAMPLE_RIGHT_LEAF: Node = Node {
-    //     parent: Some(0),
-    //     specific: NodeSpecific::Leaf {
-    //         key: 0x2425_2627_2829_2A2B,
-    //         value: 0x3435_3637_3839_3A3B,
-    //     },
-    //     hash: HASH,
-    //     index: 2,
-    // };
-    // const EXAMPLE_RIGHT_LEAF_METADATA: NodeMetadata = NodeMetadata {
-    //     node_type: NodeType::Leaf,
-    //     dirty: false,
-    // };
-
-    // fn example_merkle_blob() -> MerkleBlob {
-    //     MerkleBlob::new(Vec::from(EXAMPLE_BLOB)).unwrap()
-    // }
+    fn open_dot(lines: &mut DotLines) {
+        // crate::merkle::dot::open_dot(lines);
+    }
 
     #[allow(unused)]
     fn normalized_blob(merkle_blob: &MerkleBlob) -> Vec<u8> {
@@ -1392,14 +1303,6 @@ mod tests {
         );
         assert_eq!(NodeMetadata::dirty_from_bytes(bytes).unwrap(), object.dirty);
     }
-
-    // #[test]
-    // fn test_load_a_python_dump() {
-    //     let merkle_blob = example_merkle_blob();
-    //     merkle_blob.get_node(0).unwrap();
-    //
-    //     merkle_blob.check().unwrap();
-    // }
 
     #[fixture]
     fn small_blob() -> MerkleBlob {
@@ -1524,27 +1427,7 @@ mod tests {
                 .unwrap();
             let end = Instant::now();
             total_time += end.duration_since(start);
-
-            // match i + 1 {
-            //     2 => assert_eq!(merkle_blob.blob.len(), 3 * BLOCK_SIZE),
-            //     3 => assert_eq!(merkle_blob.blob.len(), 5 * BLOCK_SIZE),
-            //     _ => (),
-            // }
-
-            // let file = fs::File::create(format!("/home/altendky/tmp/mbt/rs/{i:0>4}")).unwrap();
-            // let mut file = io::LineWriter::new(file);
-            // for block in merkle_blob.blob.chunks(BLOCK_SIZE) {
-            //     let mut s = String::new();
-            //     for byte in block {
-            //         s.push_str(&format!("{:02x}", byte));
-            //     }
-            //     s.push_str("\n");
-            //     file.write_all(s.as_bytes()).unwrap();
-            // }
-
-            // fs::write(format!("/home/altendky/tmp/mbt/rs/{i:0>4}"), &merkle_blob.blob).unwrap();
         }
-        // println!("{:?}", merkle_blob.blob)
 
         println!("total time: {total_time:?}");
         // TODO: check, well...  something
@@ -1594,7 +1477,7 @@ mod tests {
         let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
 
         let key_value_id: KvId = 1;
-        // open_dot(&mut merkle_blob.to_dot().set_note("empty"));
+        open_dot(&mut merkle_blob.to_dot().set_note("empty"));
         merkle_blob
             .insert(
                 key_value_id,
@@ -1603,7 +1486,7 @@ mod tests {
                 InsertLocation::Auto,
             )
             .unwrap();
-        // open_dot(&mut merkle_blob.to_dot().set_note("first after"));
+        open_dot(&mut merkle_blob.to_dot().set_note("first after"));
 
         merkle_blob.check().unwrap();
         assert_eq!(merkle_blob.key_to_index.len(), 1);
@@ -1619,7 +1502,7 @@ mod tests {
         let mut last_key: KvId = 0;
         for i in 1..=pre_count {
             let key: KvId = i as KvId;
-            // open_dot(&mut merkle_blob.to_dot().set_note("empty"));
+            open_dot(&mut merkle_blob.to_dot().set_note("empty"));
             merkle_blob
                 .insert(key, key, &sha256_num(key), InsertLocation::Auto)
                 .unwrap();
@@ -1627,7 +1510,7 @@ mod tests {
         }
 
         let key_value_id: KvId = pre_count as KvId + 1;
-        // open_dot(&mut merkle_blob.to_dot().set_note("first after"));
+        open_dot(&mut merkle_blob.to_dot().set_note("first after"));
         merkle_blob
             .insert(
                 key_value_id,
@@ -1639,7 +1522,7 @@ mod tests {
                 },
             )
             .unwrap();
-        // open_dot(&mut merkle_blob.to_dot().set_note("first after"));
+        open_dot(&mut merkle_blob.to_dot().set_note("first after"));
 
         let sibling = merkle_blob
             .get_node(merkle_blob.key_to_index[&last_key])
@@ -1673,7 +1556,7 @@ mod tests {
         let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
 
         let key_value_id: KvId = 1;
-        // open_dot(&mut merkle_blob.to_dot().set_note("empty"));
+        open_dot(&mut merkle_blob.to_dot().set_note("empty"));
         merkle_blob
             .insert(
                 key_value_id,
@@ -1682,7 +1565,7 @@ mod tests {
                 InsertLocation::Auto,
             )
             .unwrap();
-        // open_dot(&mut merkle_blob.to_dot().set_note("first after"));
+        open_dot(&mut merkle_blob.to_dot().set_note("first after"));
         merkle_blob.check().unwrap();
 
         merkle_blob.delete(key_value_id).unwrap();
@@ -1766,11 +1649,11 @@ mod tests {
         insert_blob
             .insert(key, value, &sha256_num(key), InsertLocation::Auto)
             .unwrap();
-        // open_dot(insert_blob.to_dot().set_note("first after"));
+        open_dot(insert_blob.to_dot().set_note("first after"));
 
         let mut upsert_blob = MerkleBlob::new(small_blob.blob.clone()).unwrap();
         upsert_blob.upsert(key, value, &sha256_num(key)).unwrap();
-        // open_dot(upsert_blob.to_dot().set_note("first after"));
+        open_dot(upsert_blob.to_dot().set_note("first after"));
 
         assert_eq!(insert_blob.blob, upsert_blob.blob);
     }
