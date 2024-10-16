@@ -1604,9 +1604,11 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "unknown NodeType value: 2")]
     fn test_node_type_from_u8_invalid() {
-        let _ = NodeType::from_u8(2);
+        let invalid_value = 2;
+        let expected = format!("unknown NodeType value: {invalid_value}");
+        let actual = NodeType::from_u8(invalid_value);
+        actual.expect_err(&expected);
     }
 
     #[test]
