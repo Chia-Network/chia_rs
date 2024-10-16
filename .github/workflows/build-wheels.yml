@@ -152,7 +152,7 @@ jobs:
           python${{ matrix.python.major-dot-minor }} -m venv venv
           . venv/bin/activate
           pip install build
-          python -m build --wheel --outdir . extracted/*
+          python -m build --wheel --outdir ../../ extracted/*
 
       - name: Build Linux with maturin on Python ${{ matrix.python }}
         if: matrix.os.matrix == 'ubuntu'
@@ -167,7 +167,7 @@ jobs:
               python${{ matrix.python.major-dot-minor }} -m venv /venv && \
               . /venv/bin/activate && \
               pip install build && \
-              CC=gcc python -m build --wheel --outdir . extracted/* \
+              CC=gcc python -m build --wheel --outdir ../../ extracted/* \
             '
 
       - name: Build Windows with maturin on Python ${{ matrix.python }}
@@ -179,7 +179,7 @@ jobs:
           py -${{ matrix.python.major-dot-minor }} -m venv venv
           . .\venv\Scripts\Activate.ps1
           pip install build
-          python -m build --wheel --outdir . extracted/*
+          python -m build --wheel --outdir ../../ extracted/*
 
       - uses: Chia-Network/actions/create-venv@main
         id: create-venv
