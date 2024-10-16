@@ -132,6 +132,7 @@ jobs:
           path: ./target/wheels/
 
       - name: extract
+        shell: bash
         run: |
           mkdir extracted
           cd extracted
