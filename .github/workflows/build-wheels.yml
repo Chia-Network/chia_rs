@@ -175,17 +175,14 @@ jobs:
 
       - name: Build Windows with maturin on Python ${{ matrix.python }}
         if: matrix.os.matrix == 'windows'
+        shell: bash
         env:
           CC: "clang"
           CFLAGS: "-D__BLST_PORTABLE__"
         run: |
           py -${{ matrix.python.major-dot-minor }} -m venv venv
-          . .\venv\Scripts\Activate.ps1
+          . .\venv\Scripts\activate
           pip install build
-          pwd
-          dir
-          dir extracted
-          dir extracted/chia_rs-*/
           python -m build --wheel extracted/chia_rs-*/
 
       - name: copy the wheel
