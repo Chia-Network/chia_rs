@@ -136,6 +136,7 @@ jobs:
           mkdir extracted
           cd extracted
           tar -xvzf ../target/wheels/*.tar.gz
+          ls -la
 
       - uses: Chia-Network/actions/setup-python@main
         with:
