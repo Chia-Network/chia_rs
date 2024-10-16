@@ -131,6 +131,12 @@ jobs:
           name: packages-sdist
           path: ./target/wheels/
 
+      - name: extract
+        run: |
+          mkdir extracted
+          cd extracted
+          tar -xvzf ../target/wheels/*.tar.gz
+
       - uses: Chia-Network/actions/setup-python@main
         with:
           python-version: ${{ matrix.python.major-dot-minor }}
@@ -146,7 +152,7 @@ jobs:
           python${{ matrix.python.major-dot-minor }} -m venv venv
           . venv/bin/activate
           pip install build
-          python -m build target/wheels/*.tar.gz
+          python -m build extracted/*
 
       - name: Build Linux with maturin on Python ${{ matrix.python }}
         if: matrix.os.matrix == 'ubuntu'
@@ -161,7 +167,7 @@ jobs:
               python${{ matrix.python.major-dot-minor }} -m venv /venv && \
               . /venv/bin/activate && \
               pip install build && \
-              CC=gcc python -m build target/wheels/*.tar.gz \
+              CC=gcc python -m build extracted/* \
             '
 
       - name: Build Windows with maturin on Python ${{ matrix.python }}
@@ -173,7 +179,7 @@ jobs:
           py -${{ matrix.python.major-dot-minor }} -m venv venv
           . .\venv\Scripts\Activate.ps1
           pip install build
-          python -m build target/wheels/*.tar.gz
+          python -m build extracted/*
 
       - uses: Chia-Network/actions/create-venv@main
         id: create-venv
