@@ -136,6 +136,7 @@ jobs:
         run: |
           mkdir extracted
           cd extracted
+          ls -la ../target/wheels/
           tar -xvzf ../target/wheels/*.tar.gz
           ls -la
 
