@@ -181,7 +181,7 @@ jobs:
           CFLAGS: "-D__BLST_PORTABLE__"
         run: |
           py -${{ matrix.python.major-dot-minor }} -m venv venv
-          . .\venv\Scripts\activate
+          .  venv/Scripts/activate
           pip install build
           python -m build --wheel extracted/chia_rs-*/
 
