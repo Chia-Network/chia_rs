@@ -1,0 +1,32 @@
+[package]
+name = "chia-puzzles"
+version = "0.15.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Chia primitives needed for building wallets."
+authors = ["Brandon Haggstrom <b.haggstrom@chia.net>"]
+homepage = "https://github.com/Chia-Network/chia_rs"
+repository = "https://github.com/Chia-Network/chia_rs"
+
+[lints]
+workspace = true
+
+[features]
+arbitrary = ["dep:arbitrary", "chia-protocol/arbitrary"]
+
+[dependencies]
+clvmr = { workspace = true }
+num-bigint = { workspace = true }
+hex-literal = { workspace = true }
+clvm-utils = { workspace = true }
+clvm-traits = { workspace = true, features = ["chia-bls"] }
+chia-sha2 = { workspace = true }
+chia-bls = { workspace = true }
+chia-protocol = { workspace = true }
+arbitrary = { workspace = true, features = ["derive"], optional = true }
+
+[dev-dependencies]
+hex = { workspace = true }
+
+[lib]
+crate-type = ["rlib"]

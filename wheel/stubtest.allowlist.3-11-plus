@@ -1,0 +1,10 @@
+# TODO: ask stubtest/mypy about these as they seem unlikely to be our doing
+chia_rs\.sized_byte_class\.TypeVar\.__bound__
+chia_rs\.sized_byte_class\.TypeVar\.__constraints__
+chia_rs\.sized_byte_class\.TypeVar\.__contravariant__
+chia_rs\.sized_byte_class\.TypeVar\.__covariant__
+
+chia_rs\.struct_stream\.TypeVar\.__bound__
+chia_rs\.struct_stream\.TypeVar\.__constraints__
+chia_rs\.struct_stream\.TypeVar\.__contravariant__
+chia_rs\.struct_stream\.TypeVar\.__covariant__

@@ -1,33 +1,37 @@
 [package]
 name = "chia_rs"
-version = "0.4.0"
+version = "0.15.0"
 authors = ["Richard Kiss <him@richardkiss.com>"]
 edition = "2021"
 license = "Apache-2.0"
 description = "Code useful for implementing chia consensus."
-homepage = "https://github.com/Chia-Network/chia_rs/"
-repository = "https://github.com/Chia-Network/chia_rs/"
+homepage = "https://github.com/Chia-Network/chia_rs"
+repository = "https://github.com/Chia-Network/chia_rs"
 readme = "README.md"
+
+[lints]
+workspace = true
 
 [lib]
 name = "chia_rs"
 crate-type = ["cdylib"]
 path = "src/lib.rs"
 
-[dependencies]
-clvmr = "0.4.0"
-hex = "0.4.3"
-sha2 = "0.10.8"
-pyo3 = { version = "=0.19.0", features = ["extension-module", "multiple-pymethods"] }
-chia = { version = "=0.4.0", path = "..", features = ["py-bindings"] }
-chia-bls = { version = "=0.4.0", path = "../chia-bls", features = ["py-bindings"]  }
-chia-protocol = { version = "=0.4.0", path = "../chia-protocol", features = ["py-bindings"]  }
-chia-traits = { version = "=0.3.3", path = "../chia-traits", features = ["py-bindings"]  }
-clvm-traits = { version = "=0.3.3", path = "../clvm-traits", features = ["derive", "py-bindings"] }
-chia_py_streamable_macro = { version = "=0.3.0", path = "../chia_py_streamable_macro" }
-chia_streamable_macro = { version = "=0.3.0", path = "../chia_streamable_macro" }
+[package.metadata.maturin]
+python-source = "python"
 
-# See `../Cargo.toml` for more information on why this is necessary.
-[patch.crates-io]
-clvm-traits = { path = "../clvm-traits" }
-blst = { git = "https://github.com/supranational/blst.git", rev = "0d46eefa45fc1e57aceb42bba0e84eab3a7a9725" }
+# chia-client and chia-ssl are needed for the wheel sdist to work correctly
+# ignore any errors from machete about unused dependencies
+[package.metadata.cargo-machete]
+ignored = ["chia-client", "chia-ssl"]
+
+[dependencies]
+clvmr = { workspace = true }
+hex = { workspace = true }
+pyo3 = { workspace = true, features = ["multiple-pymethods"] }
+chia-consensus = { workspace = true, features = ["py-bindings"] }
+chia-bls = { workspace = true, features = ["py-bindings"]  }
+chia-protocol = { workspace = true, features = ["py-bindings"]  }
+clvm-utils = { workspace = true }
+chia-ssl = { workspace = true }
+chia-client = { workspace = true }

@@ -1,0 +1,35 @@
+[package]
+name = "chia-protocol"
+version = "0.15.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Chia network protocol message types"
+authors = ["Arvid Norberg <arvid@chia.net>"]
+homepage = "https://github.com/Chia-Network/chia_rs"
+repository = "https://github.com/Chia-Network/chia_rs"
+
+[lints]
+workspace = true
+
+[features]
+py-bindings = ["dep:pyo3", "dep:chia_py_streamable_macro", "chia-traits/py-bindings", "chia-bls/py-bindings"]
+arbitrary = ["dep:arbitrary", "chia-bls/arbitrary"]
+
+[dependencies]
+pyo3 = { workspace = true, features = ["multiple-pymethods", "num-bigint"], optional = true }
+hex = { workspace = true }
+chia_streamable_macro = { workspace = true }
+chia_py_streamable_macro = { workspace = true, optional = true }
+clvmr = { workspace = true }
+chia-traits = { workspace = true }
+chia-sha2 = { workspace = true }
+clvm-traits = { workspace = true, features = ["derive"] }
+clvm-utils = { workspace = true }
+chia-bls = { workspace = true }
+arbitrary = { workspace = true, features = ["derive"], optional = true }
+
+[dev-dependencies]
+rstest = { workspace = true }
+
+[lib]
+crate-type = ["rlib"]

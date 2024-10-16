@@ -1,0 +1,19 @@
+[package]
+name = "chia-sha2"
+version = "0.15.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "A common wrapper around OpenSSL and sha2 implementations of sha256."
+authors = ["Brandon Haggstrom <b.haggstrom@chia.net>"]
+homepage = "https://github.com/Chia-Network/chia_rs"
+repository = "https://github.com/Chia-Network/chia_rs"
+
+[lints]
+workspace = true
+
+[features]
+openssl = ["dep:openssl"]
+
+[dependencies]
+sha2 = { workspace = true }
+openssl = { workspace = true, optional = true }

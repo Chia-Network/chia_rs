@@ -2,6 +2,7 @@ from chia_rs import Coin
 from hashlib import sha256
 import copy
 import pytest
+from chia_rs.sized_ints import uint64
 
 parent_coin = b"---foo---                       "
 puzzle_hash = b"---bar---                       "
@@ -10,28 +11,28 @@ puzzle_hash2 = b"---bar--- 2                     "
 
 def test_coin_name() -> None:
 
-    c = Coin(parent_coin, puzzle_hash, 0)
+    c = Coin(parent_coin, puzzle_hash, uint64(0))
     assert c.name() == sha256(parent_coin + puzzle_hash).digest()
 
-    c = Coin(parent_coin, puzzle_hash, 1)
+    c = Coin(parent_coin, puzzle_hash, uint64(1))
     assert c.name() == sha256(parent_coin + puzzle_hash + bytes([1])).digest()
 
     # 0xFF prefix
-    c = Coin(parent_coin, puzzle_hash, 0xFF)
+    c = Coin(parent_coin, puzzle_hash, uint64(0xFF))
     assert c.name() == sha256(parent_coin + puzzle_hash + bytes([0, 0xFF])).digest()
 
-    c = Coin(parent_coin, puzzle_hash, 0xFFFF)
+    c = Coin(parent_coin, puzzle_hash, uint64(0xFFFF))
     assert (
         c.name() == sha256(parent_coin + puzzle_hash + bytes([0, 0xFF, 0xFF])).digest()
     )
 
-    c = Coin(parent_coin, puzzle_hash, 0xFFFFFF)
+    c = Coin(parent_coin, puzzle_hash, uint64(0xFFFFFF))
     assert (
         c.name()
         == sha256(parent_coin + puzzle_hash + bytes([0, 0xFF, 0xFF, 0xFF])).digest()
     )
 
-    c = Coin(parent_coin, puzzle_hash, 0xFFFFFFFF)
+    c = Coin(parent_coin, puzzle_hash, uint64(0xFFFFFFFF))
     assert (
         c.name()
         == sha256(
@@ -39,7 +40,7 @@ def test_coin_name() -> None:
         ).digest()
     )
 
-    c = Coin(parent_coin, puzzle_hash, 0xFFFFFFFFFF)
+    c = Coin(parent_coin, puzzle_hash, uint64(0xFFFFFFFFFF))
     assert (
         c.name()
         == sha256(
@@ -47,7 +48,7 @@ def test_coin_name() -> None:
         ).digest()
     )
 
-    c = Coin(parent_coin, puzzle_hash, 0xFFFFFFFFFFFF)
+    c = Coin(parent_coin, puzzle_hash, uint64(0xFFFFFFFFFFFF))
     assert (
         c.name()
         == sha256(
@@ -55,7 +56,7 @@ def test_coin_name() -> None:
         ).digest()
     )
 
-    c = Coin(parent_coin, puzzle_hash, 0xFFFFFFFFFFFFFF)
+    c = Coin(parent_coin, puzzle_hash, uint64(0xFFFFFFFFFFFFFF))
     assert (
         c.name()
         == sha256(
@@ -65,7 +66,7 @@ def test_coin_name() -> None:
         ).digest()
     )
 
-    c = Coin(parent_coin, puzzle_hash, 0xFFFFFFFFFFFFFFFF)
+    c = Coin(parent_coin, puzzle_hash, uint64(0xFFFFFFFFFFFFFFFF))
     assert (
         c.name()
         == sha256(
@@ -76,25 +77,25 @@ def test_coin_name() -> None:
     )
 
     # 0x7F prefix
-    c = Coin(parent_coin, puzzle_hash, 0x7F)
+    c = Coin(parent_coin, puzzle_hash, uint64(0x7F))
     assert c.name() == sha256(parent_coin + puzzle_hash + bytes([0x7F])).digest()
 
-    c = Coin(parent_coin, puzzle_hash, 0x7FFF)
+    c = Coin(parent_coin, puzzle_hash, uint64(0x7FFF))
     assert c.name() == sha256(parent_coin + puzzle_hash + bytes([0x7F, 0xFF])).digest()
 
-    c = Coin(parent_coin, puzzle_hash, 0x7FFFFF)
+    c = Coin(parent_coin, puzzle_hash, uint64(0x7FFFFF))
     assert (
         c.name()
         == sha256(parent_coin + puzzle_hash + bytes([0x7F, 0xFF, 0xFF])).digest()
     )
 
-    c = Coin(parent_coin, puzzle_hash, 0x7FFFFFFF)
+    c = Coin(parent_coin, puzzle_hash, uint64(0x7FFFFFFF))
     assert (
         c.name()
         == sha256(parent_coin + puzzle_hash + bytes([0x7F, 0xFF, 0xFF, 0xFF])).digest()
     )
 
-    c = Coin(parent_coin, puzzle_hash, 0x7FFFFFFFFF)
+    c = Coin(parent_coin, puzzle_hash, uint64(0x7FFFFFFFFF))
     assert (
         c.name()
         == sha256(
@@ -102,7 +103,7 @@ def test_coin_name() -> None:
         ).digest()
     )
 
-    c = Coin(parent_coin, puzzle_hash, 0x7FFFFFFFFFFF)
+    c = Coin(parent_coin, puzzle_hash, uint64(0x7FFFFFFFFFFF))
     assert (
         c.name()
         == sha256(
@@ -110,7 +111,7 @@ def test_coin_name() -> None:
         ).digest()
     )
 
-    c = Coin(parent_coin, puzzle_hash, 0x7FFFFFFFFFFFFF)
+    c = Coin(parent_coin, puzzle_hash, uint64(0x7FFFFFFFFFFFFF))
     assert (
         c.name()
         == sha256(
@@ -119,7 +120,7 @@ def test_coin_name() -> None:
             + bytes([0x7F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
         ).digest()
     )
-    c = Coin(parent_coin, puzzle_hash, 0x7FFFFFFFFFFFFFFF)
+    c = Coin(parent_coin, puzzle_hash, uint64(0x7FFFFFFFFFFFFFFF))
     assert (
         c.name()
         == sha256(
@@ -130,68 +131,55 @@ def test_coin_name() -> None:
     )
 
     # 0x80 prefix
-    c = Coin(parent_coin, puzzle_hash, 0x80)
+    c = Coin(parent_coin, puzzle_hash, uint64(0x80))
     assert c.name() == sha256(parent_coin + puzzle_hash + bytes([0, 0x80])).digest()
 
-    c = Coin(parent_coin, puzzle_hash, 0x8000)
+    c = Coin(parent_coin, puzzle_hash, uint64(0x8000))
+    assert c.name() == sha256(parent_coin + puzzle_hash + bytes([0, 0x80, 0])).digest()
+
+    c = Coin(parent_coin, puzzle_hash, uint64(0x800000))
     assert (
-        c.name() == sha256(parent_coin + puzzle_hash + bytes([0, 0x80, 0])).digest()
+        c.name() == sha256(parent_coin + puzzle_hash + bytes([0, 0x80, 0, 0])).digest()
     )
 
-    c = Coin(parent_coin, puzzle_hash, 0x800000)
+    c = Coin(parent_coin, puzzle_hash, uint64(0x80000000))
     assert (
         c.name()
-        == sha256(parent_coin + puzzle_hash + bytes([0, 0x80, 0, 0])).digest()
+        == sha256(parent_coin + puzzle_hash + bytes([0, 0x80, 0, 0, 0])).digest()
     )
 
-    c = Coin(parent_coin, puzzle_hash, 0x80000000)
+    c = Coin(parent_coin, puzzle_hash, uint64(0x8000000000))
+    assert (
+        c.name()
+        == sha256(parent_coin + puzzle_hash + bytes([0, 0x80, 0, 0, 0, 0])).digest()
+    )
+
+    c = Coin(parent_coin, puzzle_hash, uint64(0x800000000000))
+    assert (
+        c.name()
+        == sha256(parent_coin + puzzle_hash + bytes([0, 0x80, 0, 0, 0, 0, 0])).digest()
+    )
+
+    c = Coin(parent_coin, puzzle_hash, uint64(0x80000000000000))
     assert (
         c.name()
         == sha256(
-            parent_coin + puzzle_hash + bytes([0, 0x80, 0, 0, 0])
+            parent_coin + puzzle_hash + bytes([0, 0x80, 0, 0, 0, 0, 0, 0])
         ).digest()
     )
 
-    c = Coin(parent_coin, puzzle_hash, 0x8000000000)
+    c = Coin(parent_coin, puzzle_hash, uint64(0x8000000000000000))
     assert (
         c.name()
         == sha256(
-            parent_coin + puzzle_hash + bytes([0, 0x80, 0, 0, 0, 0])
-        ).digest()
-    )
-
-    c = Coin(parent_coin, puzzle_hash, 0x800000000000)
-    assert (
-        c.name()
-        == sha256(
-            parent_coin + puzzle_hash + bytes([0, 0x80, 0, 0, 0, 0, 0])
-        ).digest()
-    )
-
-    c = Coin(parent_coin, puzzle_hash, 0x80000000000000)
-    assert (
-        c.name()
-        == sha256(
-            parent_coin
-            + puzzle_hash
-            + bytes([0, 0x80, 0, 0, 0, 0, 0, 0])
-        ).digest()
-    )
-
-    c = Coin(parent_coin, puzzle_hash, 0x8000000000000000)
-    assert (
-        c.name()
-        == sha256(
-            parent_coin
-            + puzzle_hash
-            + bytes([0, 0x80, 0, 0, 0, 0, 0, 0, 0])
+            parent_coin + puzzle_hash + bytes([0, 0x80, 0, 0, 0, 0, 0, 0, 0])
         ).digest()
     )
 
 
 def test_coin_copy() -> None:
 
-    c1 = Coin(parent_coin, puzzle_hash, 1000000)
+    c1 = Coin(parent_coin, puzzle_hash, uint64(1000000))
     c2 = copy.copy(c1)
 
     assert c1 == c2
@@ -200,7 +188,7 @@ def test_coin_copy() -> None:
 
 def test_coin_deepcopy() -> None:
 
-    c1 = Coin(parent_coin, puzzle_hash, 1000000)
+    c1 = Coin(parent_coin, puzzle_hash, uint64(1000000))
     c2 = copy.deepcopy(c1)
 
     assert c1 == c2
@@ -215,7 +203,7 @@ def coin_json_roundtrip(c: Coin) -> bool:
 
 def test_coin_to_json() -> None:
 
-    c1 = Coin(parent_coin, puzzle_hash, 1000000)
+    c1 = Coin(parent_coin, puzzle_hash, uint64(1000000))
     assert c1.to_json_dict() == {
         "parent_coin_info": "0x" + parent_coin.hex(),
         "puzzle_hash": "0x" + puzzle_hash.hex(),
@@ -223,7 +211,7 @@ def test_coin_to_json() -> None:
     }
     assert coin_json_roundtrip(c1)
 
-    c2 = Coin(parent_coin, puzzle_hash2, 0)
+    c2 = Coin(parent_coin, puzzle_hash2, uint64(0))
     assert c2.to_json_dict() == {
         "parent_coin_info": "0x" + parent_coin.hex(),
         "puzzle_hash": "0x" + puzzle_hash2.hex(),
@@ -231,7 +219,7 @@ def test_coin_to_json() -> None:
     }
     assert coin_json_roundtrip(c2)
 
-    c3 = Coin(parent_coin, puzzle_hash2, 0xFFFFFFFFFFFFFFFF)
+    c3 = Coin(parent_coin, puzzle_hash2, uint64(0xFFFFFFFFFFFFFFFF))
     assert c3.to_json_dict() == {
         "parent_coin_info": "0x" + parent_coin.hex(),
         "puzzle_hash": "0x" + puzzle_hash2.hex(),
@@ -247,7 +235,7 @@ def test_coin_from_json() -> None:
         "puzzle_hash": "0x" + puzzle_hash2.hex(),
         "amount": 12345678,
     }
-    assert Coin.from_json_dict(c) == Coin(parent_coin, puzzle_hash2, 12345678)
+    assert Coin.from_json_dict(c) == Coin(parent_coin, puzzle_hash2, uint64(12345678))
 
 
 def test_coin_from_json_upper_hex() -> None:
@@ -257,7 +245,7 @@ def test_coin_from_json_upper_hex() -> None:
         "puzzle_hash": "0x" + puzzle_hash2.hex().upper(),
         "amount": 12345678,
     }
-    assert Coin.from_json_dict(c) == Coin(parent_coin, puzzle_hash2, 12345678)
+    assert Coin.from_json_dict(c) == Coin(parent_coin, puzzle_hash2, uint64(12345678))
 
 
 def test_coin_from_json_lower_hex() -> None:
@@ -267,7 +255,7 @@ def test_coin_from_json_lower_hex() -> None:
         "puzzle_hash": "0x" + puzzle_hash2.hex().lower(),
         "amount": 12345678,
     }
-    assert Coin.from_json_dict(c) == Coin(parent_coin, puzzle_hash2, 12345678)
+    assert Coin.from_json_dict(c) == Coin(parent_coin, puzzle_hash2, uint64(12345678))
 
 
 def test_coin_from_json_invalid_hex_prefix() -> None:
@@ -306,7 +294,7 @@ def test_coin_from_json_hex_digit() -> None:
             "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
         ),
         puzzle_hash2,
-        12345678,
+        uint64(12345678),
     )
 
 
@@ -378,10 +366,10 @@ def test_coin_from_json_missing_field3() -> None:
 
 def test_coin_hash() -> None:
 
-    c1 = Coin(parent_coin, puzzle_hash, 1000000)
-    c2 = Coin(parent_coin, puzzle_hash2, 1000000)
-    c3 = Coin(parent_coin, puzzle_hash, 2000000)
-    c4 = Coin(parent_coin, puzzle_hash, 1000000)
+    c1 = Coin(parent_coin, puzzle_hash, uint64(1000000))
+    c2 = Coin(parent_coin, puzzle_hash2, uint64(1000000))
+    c3 = Coin(parent_coin, puzzle_hash, uint64(2000000))
+    c4 = Coin(parent_coin, puzzle_hash, uint64(1000000))
 
     assert hash(c1) != hash(c2)
     assert hash(c1) != hash(c3)
@@ -390,9 +378,10 @@ def test_coin_hash() -> None:
     assert hash(c1) == hash(c4)
     assert type(hash(c1)) is int
 
+
 def test_coin_fields() -> None:
 
-    c1 = Coin(parent_coin, puzzle_hash, 1000000)
+    c1 = Coin(parent_coin, puzzle_hash, uint64(1000000))
     assert c1.parent_coin_info == parent_coin
     assert c1.puzzle_hash == puzzle_hash
     assert c1.amount == 1000000

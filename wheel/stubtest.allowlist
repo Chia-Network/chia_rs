@@ -1,0 +1,52 @@
+# just ignore all of the private path of chia_rs.chia_rs
+# TODO: consider making the extension module private
+#       https://github.com/Chia-Network/chia_rs/pull/731
+chia_rs\.chia_rs\..*
+
+# this is offered to help with hinting only and is not intended to be
+# runtime accessible.  is there a better option for handling this?
+chia_rs\.ReadableBuffer
+
+# TODO: perhaps these should be private as _*
+chia_rs\.BlockRecord\.ip_iters_impl
+chia_rs\.BlockRecord\.ip_sub_slot_total_iters_impl
+chia_rs\.BlockRecord\.sp_iters_impl
+chia_rs\.BlockRecord\.sp_sub_slot_total_iters_impl
+chia_rs\.BlockRecord\.sp_total_iters_impl
+
+# TODO: G1Element->PublicKey expects *args
+chia_rs\.G1Element\.__init__
+
+# TODO: G2Element->Signature expects *args
+chia_rs\.G2Element\.__init__
+
+# TODO: expects *args
+chia_rs\.GTElement\.__init__
+
+# TODO: PrivateKey->SecretKey expects *args
+chia_rs\.PrivateKey\.__init__
+
+# TODO: expects *args
+chia_rs\.RequestPeers\.__init__
+
+# TODO: ask stubtest/mypy about these as they seem unlikely to be our doing
+chia_rs\.sized_byte_class\.Iterable
+chia_rs\.sized_byte_class\.BinaryIO\.write
+chia_rs\.struct_stream\.BinaryIO\.write
+
+# these raise unimplemented
+chia_rs\.G1Element\.from_parent
+chia_rs\.G2Element\.from_parent
+chia_rs\.GTElement\.from_parent
+chia_rs\.PrivateKey\.from_parent
+chia_rs\.Program\.from_parent
+chia_rs\.Spend\.from_parent
+chia_rs\.SpendBundleConditions\.from_parent
+chia_rs\.SpendConditions\.from_parent
+chia_rs\.spend\.Spend\.from_parent
+chia_rs\.spend\.SpendConditions\.from_parent
+
+# these are implemented but not intended to be called from python
+chia_rs\.Coin\.from_parent
+chia_rs\.CoinSpend\.from_parent
+chia_rs\.SpendBundle\.from_parent

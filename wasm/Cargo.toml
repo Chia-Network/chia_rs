@@ -1,13 +1,16 @@
 [package]
 name = "chia_wasm"
-version = "0.2.7"
+version = "0.11.0"
 authors = ["Richard Kiss <him@richardkiss.com>"]
 edition = "2021"
 license = "Apache-2.0"
 description = "Code useful for implementing chia consensus."
-homepage = "https://github.com/Chia-Network/chia_rs/"
-repository = "https://github.com/Chia-Network/chia_rs/"
+homepage = "https://github.com/Chia-Network/chia_rs"
+repository = "https://github.com/Chia-Network/chia_rs"
 readme = "README.md"
+
+[lints]
+workspace = true
 
 [lib]
 name = "chia_wasm"
@@ -15,8 +18,4 @@ crate-type = ["cdylib"]
 path = "src/lib.rs"
 
 [dependencies]
-chia = { path = ".." }
-wasm-bindgen = "=0.2.87"
-wasm-bindgen-test = "=0.3.37"
-js-sys = "=0.3.64"
-getrandom = { version = "0.2.9", features = ["js"] }
+wasm-bindgen = { workspace = true }

@@ -1,0 +1,122 @@
+[package]
+name = "chia-fuzz"
+version = "0.15.0"
+authors = ["Automatically generated"]
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[lints]
+workspace = true
+
+[dependencies]
+libfuzzer-sys = { workspace = true }
+clvmr = { workspace = true }
+clvm-utils = { workspace = true }
+clvm-traits = { workspace = true }
+chia-protocol = { workspace = true }
+chia-sha2 = { workspace = true }
+chia-traits = { workspace = true }
+chia-consensus = { workspace = true }
+chia-bls = { workspace = true }
+hex-literal = { workspace = true }
+
+[[bin]]
+name = "puzzle-coin-solution"
+path = "fuzz_targets/puzzle-coin-solution.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parse-spend"
+path = "fuzz_targets/parse-spend.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parse-cond-args"
+path = "fuzz_targets/parse-cond-args.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parse-conditions"
+path = "fuzz_targets/parse-conditions.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parse-spends"
+path = "fuzz_targets/parse-spends.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "sanitize-uint"
+path = "fuzz_targets/sanitize-uint.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "process-spend"
+path = "fuzz_targets/process-spend.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "run-generator"
+path = "fuzz_targets/run-generator.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fast-forward"
+path = "fuzz_targets/fast-forward.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parse-spend-id"
+path = "fuzz_targets/parse-spend-id.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "deserialize-proof"
+path = "fuzz_targets/deserialize-proof.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "merkle-set"
+path = "fuzz_targets/merkle-set.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "solution-generator"
+path = "fuzz_targets/solution-generator.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "additions-and-removals"
+path = "fuzz_targets/additions-and-removals.rs"
+test = false
+doc = false
+bench = false

@@ -1,0 +1,20 @@
+[package]
+name = "clvm-derive"
+version = "0.13.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Derive macros for implementing CLVM traits."
+authors = ["Brandon Haggstrom <b.haggstrom@chia.net>"]
+homepage = "https://github.com/Chia-Network/chia_rs"
+repository = "https://github.com/Chia-Network/chia_rs"
+
+[lints]
+workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true }

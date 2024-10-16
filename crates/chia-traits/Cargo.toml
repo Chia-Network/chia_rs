@@ -1,0 +1,19 @@
+[package]
+name = "chia-traits"
+version = "0.15.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Chia traits for Streamable types (chia's serialization format)"
+authors = ["Arvid Norberg <arvid@chia.net>"]
+
+[lints]
+workspace = true
+
+[features]
+py-bindings = ["dep:pyo3"]
+
+[dependencies]
+chia-sha2 = { workspace = true }
+pyo3 = { workspace = true, features = ["multiple-pymethods"], optional = true }
+chia_streamable_macro = { workspace = true }
+thiserror = { workspace = true }

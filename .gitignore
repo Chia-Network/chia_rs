@@ -1,2 +1,14 @@
 target/
 .idea/
+__pycache__/
+venv/
+*.so
+*.pyd
+node_modules/
+.mypy_cache/
+.pytest_cache/
+crates/chia-bls/fuzz/corpus
+crates/chia-consensus/fuzz/corpus
+crates/chia-protocol/fuzz/corpus
+crates/chia-traits/fuzz/corpus
+crates/chia-utils/fuzz/corpus

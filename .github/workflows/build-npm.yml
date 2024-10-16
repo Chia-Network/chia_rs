@@ -1,0 +1,47 @@
+name: NPM package
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "**"
+  pull_request:
+    branches:
+      - "**"
+
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('{0}-{1}', github.workflow_ref, github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  build_npm:
+    name: Build npm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked
+
+      - name: WASM build and pack
+        run: |
+          cd wasm
+          wasm-pack build
+          wasm-pack pack
+
+      - name: Upload NPM pkg artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-pkg
+          path: ./wasm/pkg/*-*.tgz
+
+      - name: Publish (npmjs.com)
+        if: startsWith(github.event.ref, 'refs/tags')
+        uses: JS-DevTools/npm-publish@v3
+        with:
+          token: ${{ secrets.node_auth_token }}
+          package: wasm/pkg/package.json

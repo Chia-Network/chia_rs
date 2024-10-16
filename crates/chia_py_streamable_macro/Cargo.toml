@@ -1,0 +1,21 @@
+[package]
+name = "chia_py_streamable_macro"
+version = "0.15.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Derive macro to create python bindings for Chia types"
+authors = ["Arvid Norberg <arvid@libtorrent.org>"]
+homepage = "https://github.com/Chia-Network/chia_rs"
+repository = "https://github.com/Chia-Network/chia_rs"
+
+[lints]
+workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { workspace = true }
+quote = { workspace = true }
+proc-macro2 = { workspace = true }
+proc-macro-crate = { workspace = true }
