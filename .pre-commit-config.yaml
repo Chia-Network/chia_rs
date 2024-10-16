@@ -43,8 +43,8 @@ repos:
         pass_filenames: false
       - id: wheel
         name: build wheel
-        description: run maturin develop on the wheel
+        description: build python wheel
         stages: [pre-push]
-        entry: sh -c "cd wheel && maturin develop"
+        entry: python -m build --wheel wheel/
         language: system
         pass_filenames: false
