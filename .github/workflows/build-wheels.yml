@@ -153,7 +153,7 @@ jobs:
           python${{ matrix.python.major-dot-minor }} -m venv venv
           . venv/bin/activate
           pip install build
-          python -m build --wheel --outdir ../../ extracted/*
+          python -m build --wheel extracted/*
 
       - name: Build Linux with maturin on Python ${{ matrix.python }}
         if: matrix.os.matrix == 'ubuntu'
@@ -168,7 +168,7 @@ jobs:
               python${{ matrix.python.major-dot-minor }} -m venv /venv && \
               . /venv/bin/activate && \
               pip install build && \
-              CC=gcc python -m build --wheel --outdir ../../ extracted/* \
+              CC=gcc python -m build --wheel extracted/* \
             '
 
       - name: Build Windows with maturin on Python ${{ matrix.python }}
@@ -180,7 +180,13 @@ jobs:
           py -${{ matrix.python.major-dot-minor }} -m venv venv
           . .\venv\Scripts\Activate.ps1
           pip install build
-          python -m build --wheel --outdir ../../ extracted/*
+          python -m build --wheel extracted/*
+
+      - name: move the wheel
+        run: |
+          # TODO: maturin seems to entirely ignore python -m build --outdir
+          mkdir dist/
+          mv extracted/*/target/wheels/*.whl dist/
 
       - uses: Chia-Network/actions/create-venv@main
         id: create-venv
