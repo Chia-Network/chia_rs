@@ -184,11 +184,11 @@ jobs:
           pip install build
           python -m build --wheel extracted/chia_rs-*/
 
-      - name: move the wheel
+      - name: copy the wheel
         run: |
           # TODO: maturin seems to entirely ignore python -m build --outdir
           mkdir dist/
-          mv extracted/*/target/wheels/*.whl dist/
+          cp extracted/*/target/wheels/*.whl dist/
 
       - uses: Chia-Network/actions/create-venv@main
         id: create-venv
