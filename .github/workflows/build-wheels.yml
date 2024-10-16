@@ -182,6 +182,10 @@ jobs:
           py -${{ matrix.python.major-dot-minor }} -m venv venv
           . .\venv\Scripts\Activate.ps1
           pip install build
+          pwd
+          dir
+          dir extracted
+          dir extracted/chia_rs-*/
           python -m build --wheel extracted/chia_rs-*/
 
       - name: copy the wheel
