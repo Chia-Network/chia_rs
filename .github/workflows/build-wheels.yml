@@ -192,7 +192,7 @@ jobs:
         shell: bash
         run: |
           TMP_DEST=$(mktemp -d)
-          pip download --no-index --no-deps --only-binary :all: --find-links target/wheels/ --dest "${TMP_DEST}" chia_rs
+          pip download --no-index --no-deps --only-binary :all: --find-links dist/ --dest "${TMP_DEST}" chia_rs
           echo ====
           ls -l "${TMP_DEST}"
           echo ====
