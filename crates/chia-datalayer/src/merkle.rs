@@ -55,7 +55,6 @@ pub enum NodeType {
 impl NodeType {
     pub fn from_u8(value: u8) -> Result<Self, String> {
         // TODO: identify some useful structured serialization tooling we use
-        // TODO: find a better way to tie serialization values to enumerator variants
         match value {
             // ha!  feel free to laugh at this
             x if (NodeType::Internal as u8 == x) => Ok(NodeType::Internal),
@@ -752,7 +751,6 @@ impl MerkleBlob {
     fn get_new_index(&mut self) -> TreeIndex {
         match self.free_indexes.iter().next().copied() {
             None => {
-                // TODO: should this extend...?
                 // TODO: should this update free indexes...?
                 let index = self.extend_index();
                 self.blob.extend_from_slice(&[0; BLOCK_SIZE]);
