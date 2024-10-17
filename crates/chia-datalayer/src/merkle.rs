@@ -657,20 +657,17 @@ impl MerkleBlob {
     pub fn check(&self) -> Result<(), String> {
         let mut leaf_count: usize = 0;
         let mut internal_count: usize = 0;
-        // TODO: either fix this check, or fix the bug it exposes
-        // let mut child_to_parent: HashMap<TreeIndex, TreeIndex> = HashMap::new();
+        let mut child_to_parent: HashMap<TreeIndex, TreeIndex> = HashMap::new();
 
-        // for (index, block) in MerkleBlobParentFirstIterator::new(&self.blob) {
-        for (index, block) in self {
-            // if let Some(parent) = block.node.parent {
-            //     assert_eq!(child_to_parent.remove(&index), Some(parent));
-            // }
+        for (index, block) in MerkleBlobParentFirstIterator::new(&self.blob) {
+            if let Some(parent) = block.node.parent {
+                assert_eq!(child_to_parent.remove(&index), Some(parent));
+            }
             match block.node.specific {
-                // NodeSpecific::Internal { left, right } => {
-                NodeSpecific::Internal { .. } => {
+                NodeSpecific::Internal { left, right } => {
                     internal_count += 1;
-                    // child_to_parent.insert(left, index);
-                    // child_to_parent.insert(right, index);
+                    child_to_parent.insert(left, index);
+                    child_to_parent.insert(right, index);
                 }
                 NodeSpecific::Leaf { key, .. } => {
                     leaf_count += 1;
@@ -699,6 +696,7 @@ impl MerkleBlob {
             total_count, extend_index as usize,
             "expected total node count {extend_index:?} found: {total_count:?}",
         );
+        assert_eq!(child_to_parent.len(), 0);
 
         Ok(())
     }
@@ -1162,19 +1160,16 @@ impl Iterator for MerkleBlobParentFirstIterator<'_> {
     fn next(&mut self) -> Option<Self::Item> {
         // left sibling first, parents before children
 
-        loop {
-            let index = self.deque.pop_front()?;
-            let block_bytes: BlockBytes = self.blob[block_range(index)].try_into().unwrap();
-            let block = Block::from_bytes(block_bytes).unwrap();
+        let index = self.deque.pop_front()?;
+        let block_bytes: BlockBytes = self.blob[block_range(index)].try_into().unwrap();
+        let block = Block::from_bytes(block_bytes).unwrap();
 
-            match block.node.specific {
-                NodeSpecific::Leaf { .. } => return Some((index, block)),
-                NodeSpecific::Internal { left, right } => {
-                    self.deque.push_front(right);
-                    self.deque.push_front(left);
-                }
-            }
+        if let NodeSpecific::Internal { left, right } = block.node.specific {
+            self.deque.push_back(left);
+            self.deque.push_back(right);
         }
+
+        Some((index, block))
     }
 }
 
