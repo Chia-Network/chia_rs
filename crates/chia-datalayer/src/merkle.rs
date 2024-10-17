@@ -183,7 +183,7 @@ impl Node {
     pub fn from_bytes(metadata: &NodeMetadata, blob: DataBytes) -> Result<Self, String> {
         Ok(Self {
             parent: Self::parent_from_bytes(&blob),
-            hash: blob[HASH_RANGE].try_into().unwrap(),
+            hash: Self::hash_from_bytes(&blob),
             specific: match metadata.node_type {
                 NodeType::Internal => NodeSpecific::Internal {
                     left: TreeIndex::from_be_bytes(blob[LEFT_RANGE].try_into().unwrap()),
@@ -204,6 +204,11 @@ impl Node {
             _ => Some(parent_integer),
         }
     }
+
+    fn hash_from_bytes(blob: &DataBytes) -> Hash {
+        blob[HASH_RANGE].try_into().unwrap()
+    }
+
     pub fn to_bytes(&self) -> DataBytes {
         let mut blob: DataBytes = [0; DATA_SIZE];
         match self {
@@ -270,6 +275,11 @@ impl Block {
             .map_err(|message| format!("failed loading node: {message})"))?;
 
         Ok(Block { metadata, node })
+    }
+
+    pub fn update_hash(&mut self, left: &Hash, right: &Hash) {
+        self.node.hash = internal_hash(&left, &right);
+        self.metadata.dirty = false;
     }
 }
 
@@ -852,6 +862,13 @@ impl MerkleBlob {
         Block::from_bytes(self.get_block_bytes(index)?)
     }
 
+    fn get_hash(&self, index: TreeIndex) -> Result<Hash, String> {
+        let block_bytes = self.get_block_bytes(index)?;
+        let data_bytes: DataBytes = block_bytes[DATA_RANGE].try_into().unwrap();
+
+        Ok(Node::hash_from_bytes(&data_bytes))
+    }
+
     fn get_block_bytes(&self, index: TreeIndex) -> Result<BlockBytes, String> {
         self.blob
             .get(block_range(index))
@@ -927,11 +944,10 @@ impl MerkleBlob {
             };
             // TODO: obviously inefficient to re-get/deserialize these blocks inside
             //       an iteration that's already doing that
-            let left = self.get_block(left)?;
-            let right = self.get_block(right)?;
+            let left_hash = self.get_hash(left)?;
+            let right_hash = self.get_hash(right)?;
             // TODO: wrap this up in Block maybe? just to have 'control' of dirty being 'accurate'
-            block.node.hash = internal_hash(&left.node.hash, &right.node.hash);
-            block.metadata.dirty = false;
+            block.update_hash(&left_hash, &right_hash);
             self.insert_entry_to_blob(index, &block)?;
         }
 
@@ -1027,7 +1043,6 @@ impl PartialEq for MerkleBlob {
 }
 
 impl<'a> IntoIterator for &'a MerkleBlob {
-    // TODO: review efficiency in whatever use cases we end up with, vs Item = Node etc
     type Item = (TreeIndex, Block);
     type IntoIter = MerkleBlobLeftChildFirstIterator<'a>;
 
