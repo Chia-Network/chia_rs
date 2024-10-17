@@ -278,7 +278,7 @@ impl Block {
     }
 
     pub fn update_hash(&mut self, left: &Hash, right: &Hash) {
-        self.node.hash = internal_hash(&left, &right);
+        self.node.hash = internal_hash(left, right);
         self.metadata.dirty = false;
     }
 }
@@ -1267,17 +1267,11 @@ mod tests {
 
     #[test]
     fn test_internal_hash() {
-        // TODO: yeah, various questions around this and how to express 'this is dl internal hash'
-        //       without silly repetition.  maybe just a use as.
         // in Python: Program.to((left_hash, right_hash)).get_tree_hash_precalc(left_hash, right_hash)
-        let left: Hash = [
-            0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
-            24, 25, 26, 27, 28, 29, 30, 31,
-        ];
-        let right: Hash = [
-            32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53,
-            54, 55, 56, 57, 58, 59, 60, 61, 62, 63,
-        ];
+
+        let left: Hash = (0u8..32).collect::<Vec<_>>().try_into().unwrap();
+        let right: Hash = (32u8..64).collect::<Vec<_>>().try_into().unwrap();
+
         assert_eq!(
             internal_hash(&left, &right),
             clvm_utils::tree_hash_pair(
