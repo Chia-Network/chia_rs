@@ -108,9 +108,10 @@ def test_instantiation() -> None:
     result = bls_cache.aggregate_verify(pks, msgs, sig)
     assert result
     assert bls_cache.len() == 1
+    # Now that it's cached, if we hit it, it gets removed.
     result = bls_cache.aggregate_verify(pks, msgs, sig)
     assert result
-    assert bls_cache.len() == 1
+    assert bls_cache.len() == 0
     pks.append(pk)
 
     msg = b"world"

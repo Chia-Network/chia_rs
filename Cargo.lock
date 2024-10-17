@@ -314,7 +314,6 @@ dependencies = [
  "criterion",
  "hex",
  "hkdf",
- "lru",
  "pyo3",
  "rand",
  "rstest",
