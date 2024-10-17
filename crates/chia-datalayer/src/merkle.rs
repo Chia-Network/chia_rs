@@ -250,7 +250,6 @@ fn block_range(index: TreeIndex) -> Range<usize> {
     block_start..block_start + BLOCK_SIZE
 }
 
-// TODO: does not enforce matching metadata node type and node enumeration variant
 pub struct Block {
     metadata: NodeMetadata,
     node: Node,
@@ -265,7 +264,7 @@ impl Block {
         blob
     }
 
-    pub fn from_bytes(blob: BlockBytes) -> Result<Block, String> {
+    pub fn from_bytes(blob: BlockBytes) -> Result<Self, String> {
         let metadata_blob: MetadataBytes = blob[METADATA_RANGE].try_into().unwrap();
         let data_blob: DataBytes = blob[DATA_RANGE].try_into().unwrap();
         let metadata = NodeMetadata::from_bytes(metadata_blob)
@@ -374,18 +373,16 @@ impl MerkleBlob {
                     Side::Right => internal_hash(&old_leaf.hash, hash),
                 };
 
+                let node = Node {
+                    parent: None,
+                    hash: *hash,
+                    specific: NodeSpecific::Leaf { key, value },
+                };
+
                 if self.key_to_index.len() == 1 {
-                    self.insert_second(key, value, hash, &old_leaf, &internal_node_hash, &side)?;
+                    self.insert_second(node, &old_leaf, &internal_node_hash, &side)?;
                 } else {
-                    self.insert_third_or_later(
-                        key,
-                        value,
-                        hash,
-                        &old_leaf,
-                        index,
-                        &internal_node_hash,
-                        &side,
-                    )?;
+                    self.insert_third_or_later(node, &old_leaf, index, &internal_node_hash, &side)?;
                 }
             }
         }
@@ -414,9 +411,7 @@ impl MerkleBlob {
 
     fn insert_second(
         &mut self,
-        key: KvId,
-        value: KvId,
-        hash: &Hash,
+        mut node: Node,
         old_leaf: &Node,
         internal_node_hash: &Hash,
         side: &Side,
@@ -446,6 +441,9 @@ impl MerkleBlob {
         else {
             return Err("old leaf unexpectedly not a leaf".to_string());
         };
+
+        node.parent = Some(0);
+
         let nodes = [
             (
                 match side {
@@ -466,11 +464,7 @@ impl MerkleBlob {
                     Side::Left => 1,
                     Side::Right => 2,
                 },
-                Node {
-                    parent: Some(0),
-                    specific: NodeSpecific::Leaf { key, value },
-                    hash: *hash,
-                },
+                node,
             ),
         ];
 
@@ -489,13 +483,9 @@ impl MerkleBlob {
         Ok(())
     }
 
-    // TODO: no really, actually consider the too many arguments complaint
-    #[allow(clippy::too_many_arguments)]
     fn insert_third_or_later(
         &mut self,
-        key: KvId,
-        value: KvId,
-        hash: &Hash,
+        mut node: Node,
         old_leaf: &Node,
         old_leaf_index: TreeIndex,
         internal_node_hash: &Hash,
@@ -504,16 +494,14 @@ impl MerkleBlob {
         let new_leaf_index = self.get_new_index();
         let new_internal_node_index = self.get_new_index();
 
+        node.parent = Some(new_internal_node_index);
+
         let new_leaf_block = Block {
             metadata: NodeMetadata {
                 node_type: NodeType::Leaf,
                 dirty: false,
             },
-            node: Node {
-                parent: Some(new_internal_node_index),
-                specific: NodeSpecific::Leaf { key, value },
-                hash: *hash,
-            },
+            node,
         };
         self.insert_entry_to_blob(new_leaf_index, &new_leaf_block)?;
 
@@ -538,7 +526,7 @@ impl MerkleBlob {
         self.insert_entry_to_blob(new_internal_node_index, &new_internal_block)?;
 
         let Some(old_parent_index) = old_leaf.parent else {
-            panic!("root found when not expected: {key:?} {value:?} {hash:?}")
+            panic!("root found when not expected")
         };
 
         let mut block = Block::from_bytes(self.get_block_bytes(old_leaf_index)?)?;
