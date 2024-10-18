@@ -78,10 +78,11 @@ use chia_bls::{
 #[pyfunction]
 pub fn compute_merkle_set_root<'p>(
     py: Python<'p>,
-    values: Vec<&'p PyBytes>,
+    values: Vec<Bound<'p, PyBytes>>,
 ) -> PyResult<Bound<'p, PyBytes>> {
     let mut buffer = Vec::<[u8; 32]>::with_capacity(values.len());
     for b in values {
+        use pyo3::types::PyBytesMethods;
         buffer.push(b.as_bytes().try_into()?);
     }
     Ok(PyBytes::new_bound(

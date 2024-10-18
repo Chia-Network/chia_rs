@@ -248,6 +248,7 @@ impl SecretKey {
     #[classattr]
     pub const PRIVATE_KEY_SIZE: usize = 32;
 
+    #[pyo3(signature = (msg, final_pk=None))]
     pub fn sign(&self, msg: &[u8], final_pk: Option<PublicKey>) -> crate::Signature {
         match final_pk {
             Some(prefix) => {
