@@ -1099,7 +1099,7 @@ impl MerkleBlob {
         let slice =
             unsafe { std::slice::from_raw_parts(blob.buf_ptr() as *const u8, blob.len_bytes()) };
 
-        Self::new(Vec::from(slice)).map_err(|e| PyValueError::new_err(e))
+        Self::new(Vec::from(slice)).map_err(PyValueError::new_err)
     }
 
     #[pyo3(name = "insert", signature = (key, value, hash, reference_kid = None, side = None))]
@@ -1133,33 +1133,29 @@ impl MerkleBlob {
             }
         };
         self.insert(key, value, &hash, insert_location)
-            .map_err(|e| PyValueError::new_err(e))
+            .map_err(PyValueError::new_err)
     }
 
     #[pyo3(name = "delete")]
     pub fn py_delete(&mut self, key: KvId) -> PyResult<()> {
-        self.delete(key).map_err(|e| PyValueError::new_err(e))
+        self.delete(key).map_err(PyValueError::new_err)
     }
 
     #[pyo3(name = "get_raw_node")]
     pub fn py_get_raw_node(&mut self, index: TreeIndex) -> PyResult<Node> {
-        self.get_node(index).map_err(|e| PyValueError::new_err(e))
+        self.get_node(index).map_err(PyValueError::new_err)
     }
 
     #[pyo3(name = "calculate_lazy_hashes")]
     pub fn py_calculate_lazy_hashes(&mut self) -> PyResult<()> {
-        self.calculate_lazy_hashes()
-            .map_err(|e| PyValueError::new_err(e))
+        self.calculate_lazy_hashes().map_err(PyValueError::new_err)
     }
 
     #[pyo3(name = "get_lineage")]
     pub fn py_get_lineage(&self, index: TreeIndex, py: Python<'_>) -> PyResult<pyo3::PyObject> {
         let list = pyo3::types::PyList::empty_bound(py);
 
-        for node in self
-            .get_lineage(index)
-            .map_err(|e| PyValueError::new_err(e))?
-        {
+        for node in self.get_lineage(index).map_err(PyValueError::new_err)? {
             use pyo3::conversion::IntoPy;
             use pyo3::types::PyListMethods;
             list.append(node.into_py(py))?;
