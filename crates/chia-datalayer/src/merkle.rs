@@ -1,11 +1,8 @@
 #[cfg(feature = "py-bindings")]
-use pyo3::{buffer::PyBuffer, exceptions::PyValueError, pyclass, pymethods, PyResult};
+use pyo3::{buffer::PyBuffer, exceptions::PyValueError, pyclass, pymethods, PyResult, Python};
 
 use clvmr::sha2::Sha256;
-use clvmr::SExp;
 use num_traits::ToBytes;
-use pyo3::types::PyTuple;
-use pyo3::{PyObject, Python};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::iter::{zip, IntoIterator};
@@ -156,28 +153,19 @@ impl NodeMetadata {
     }
 }
 
-#[cfg_attr(feature = "py-bindings", pyclass(name = "Node"))]
+#[cfg_attr(feature = "py-bindings", pyclass(name = "Node", get_all))]
 #[derive(Debug, PartialEq)]
 pub struct Node {
-    // #[cfg_attr(feature = "py-bindings", pyo3(get))]
-    #[pyo3(get)]
     parent: Parent,
-    // #[cfg_attr(feature = "py-bindings", pyo3(get))]
-    #[pyo3(get)]
     hash: Hash,
-    // #[cfg_attr(feature = "py-bindings", pyo3(get))]
-    #[pyo3(get)]
     specific: NodeSpecific,
 }
 
 // #[cfg_attr(feature = "py-bindings", pyclass(name = "NodeSpecific"))]
-#[cfg_attr(feature = "py-bindings", pyclass(name = "NodeSpecific"))]
+#[cfg_attr(feature = "py-bindings", pyclass(name = "NodeSpecific", get_all))]
 #[derive(Clone, Debug, PartialEq)]
 pub enum NodeSpecific {
-    // #[cfg_attr(feature = "py-bindings", pyo3(constructor = (left, right)))]
-    #[pyo3(constructor = (left, right))]
     Internal { left: TreeIndex, right: TreeIndex },
-    #[pyo3(constructor = (key, value))]
     Leaf { key: KvId, value: KvId },
 }
 
@@ -366,13 +354,11 @@ fn get_free_indexes_and_keys_values_indexes(
     (free_indexes, key_to_index)
 }
 
-#[cfg_attr(feature = "py-bindings", pyclass(name = "MerkleBlob"))]
+#[cfg_attr(feature = "py-bindings", pyclass(name = "MerkleBlob", get_all))]
 #[derive(Debug)]
 pub struct MerkleBlob {
     blob: Vec<u8>,
     free_indexes: HashSet<TreeIndex>,
-    #[pyo3(get)]
-    // #[cfg_attr(feature = "py-bindings", pyo3(get))]
     key_to_index: HashMap<KvId, TreeIndex>,
 }
 
@@ -1182,10 +1168,8 @@ impl MerkleBlob {
         Ok(list.into())
     }
 
-    #[pyo3(name = "get_nodes", signature=(index=0))]
-    pub fn py_get_nodes(&self, py: Python<'_>, index: TreeIndex) -> PyResult<pyo3::PyObject> {
-        // TODO: use the index parameter
-
+    #[pyo3(name = "get_nodes")]
+    pub fn py_get_nodes(&self, py: Python<'_>) -> PyResult<pyo3::PyObject> {
         let list = pyo3::types::PyList::empty_bound(py);
 
         for (_, block) in self {
