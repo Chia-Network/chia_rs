@@ -306,7 +306,7 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 self.py_to_bytes(py)
             }
 
-            pub fn __deepcopy__<'p>(&self, memo: &pyo3::PyAny) -> pyo3::PyResult<Self> {
+            pub fn __deepcopy__<'p>(&self, memo: &pyo3::Bound<pyo3::PyAny>) -> pyo3::PyResult<Self> {
                 Ok(self.clone())
             }
 
