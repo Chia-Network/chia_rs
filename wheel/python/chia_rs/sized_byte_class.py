@@ -78,6 +78,27 @@ class SizedBytes(bytes):
     def secret(cls: Type[_T_SizedBytes]) -> _T_SizedBytes:
         return cls.random(r=system_random)
 
+    @classmethod
+    def fill(cls: Type[_T_SizedBytes], blob: bytes, fill: bytes, align: Literal["<", ">"] = ">") -> _T_SizedBytes:
+        if len(blob) == cls._size:
+            return cls(blob)
+
+        fill_length = len(fill)
+        if fill_length == 0:
+            raise ValueError("fill required but length is zero")
+
+        div, mod = divmod(cls._size - len(blob), fill_length)
+        if mod != 0:
+            raise ValueError("invalid fill value, range to be filled must be multiple of fil size")
+
+        all_fill = fill * div
+        if align == "<":
+            return cls(blob + all_fill)
+        elif align == ">":
+            return cls(all_fill + blob)
+
+        raise ValueError(f"invalid alignment: {align!r}")
+
     def __str__(self) -> str:
         return self.hex()
 
