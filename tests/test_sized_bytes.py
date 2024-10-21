@@ -29,8 +29,12 @@ def test_fill_not_multiple_raises() -> None:
     with pytest.raises(ValueError):
         bytes8.fill(b"\x00", fill=b"\x01\x01")
 
+
 def test_align_left() -> None:
-    assert bytes8.fill(b"\x01", fill=b"\x02", align="<") == bytes8([1, 2, 2, 2, 2, 2, 2, 2])
+    assert bytes8.fill(b"\x01", fill=b"\x02", align="<") == bytes8(
+        [1, 2, 2, 2, 2, 2, 2, 2]
+    )
+
 
 def test_invalid_alignment() -> None:
     with pytest.raises(ValueError):
