@@ -34,4 +34,5 @@ def test_align_left() -> None:
 
 def test_invalid_alignment() -> None:
     with pytest.raises(ValueError):
-        bytes8.fill(b"", fill=b"\x00", align="|")
+        # type ignore since we are intentionally testing a bad case
+        bytes8.fill(b"", fill=b"\x00", align="|")  # type: ignore[arg-type]
