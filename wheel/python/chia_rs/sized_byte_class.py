@@ -5,6 +5,7 @@ import secrets
 from typing import (
     BinaryIO,
     Iterable,
+    Literal,
     Optional,
     SupportsBytes,
     SupportsIndex,
