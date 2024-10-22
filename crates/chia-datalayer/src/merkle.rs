@@ -1,5 +1,9 @@
 #[cfg(feature = "py-bindings")]
-use pyo3::{buffer::PyBuffer, exceptions::PyValueError, pyclass, pymethods, PyResult, Python};
+use pyo3::{
+    buffer::PyBuffer,
+    exceptions::{PyAttributeError, PyValueError},
+    pyclass, pymethods, PyResult, Python,
+};
 
 use clvmr::sha2::Sha256;
 use num_traits::ToBytes;
@@ -256,39 +260,47 @@ impl Node {
 #[pymethods]
 impl Node {
     #[getter(left)]
-    pub fn left(&self) -> TreeIndex {
+    pub fn py_property_left(&self) -> PyResult<TreeIndex> {
         let NodeSpecific::Internal { left, .. } = self.specific else {
-            panic!();
+            return Err(PyAttributeError::new_err(
+                "Attribute 'left' not present for leaf nodes".to_string(),
+            ));
         };
 
-        left
+        Ok(left)
     }
 
     #[getter(right)]
-    pub fn right(&self) -> TreeIndex {
+    pub fn py_property_right(&self) -> PyResult<TreeIndex> {
         let NodeSpecific::Internal { right, .. } = self.specific else {
-            panic!();
+            return Err(PyAttributeError::new_err(
+                "Attribute 'right' not present for leaf nodes".to_string(),
+            ));
         };
 
-        right
+        Ok(right)
     }
 
     #[getter(key)]
-    pub fn key(&self) -> KvId {
+    pub fn py_property_key(&self) -> PyResult<KvId> {
         let NodeSpecific::Leaf { key, .. } = self.specific else {
-            panic!();
+            return Err(PyAttributeError::new_err(
+                "Attribute 'key' not present for internal nodes".to_string(),
+            ));
         };
 
-        key
+        Ok(key)
     }
 
     #[getter(value)]
-    pub fn value(&self) -> KvId {
+    pub fn py_property_value(&self) -> PyResult<KvId> {
         let NodeSpecific::Leaf { value, .. } = self.specific else {
-            panic!();
+            return Err(PyAttributeError::new_err(
+                "Attribute 'value' not present for internal nodes".to_string(),
+            ));
         };
 
-        value
+        Ok(value)
     }
 }
 
@@ -613,6 +625,161 @@ impl MerkleBlob {
         Ok(())
     }
 
+    fn batch_insert<I>(&mut self, mut keys_values_hashes: I) -> Result<(), String>
+    where
+        I: Iterator<Item = ((KvId, KvId), Hash)>,
+    {
+        // TODO: would it be worthwhile to hold the entire blocks?
+        let mut indexes = vec![];
+
+        if self.key_to_index.len() <= 1 {
+            for _ in 0..2 {
+                let Some(((key, value), hash)) = keys_values_hashes.next() else {
+                    return Ok(());
+                };
+                self.insert(key, value, &hash, InsertLocation::Auto {})?;
+            }
+        }
+
+        for ((key, value), hash) in keys_values_hashes {
+            let new_leaf_index = self.get_new_index();
+            let new_block = Block {
+                metadata: NodeMetadata {
+                    node_type: NodeType::Leaf,
+                    dirty: false,
+                },
+                node: Node {
+                    parent: None,
+                    hash,
+                    specific: NodeSpecific::Leaf { key, value },
+                },
+            };
+            self.insert_entry_to_blob(new_leaf_index, &new_block)
+                .unwrap();
+            indexes.push(new_leaf_index);
+        }
+
+        // TODO: can we insert the top node first?  maybe more efficient to update it's children
+        //       than to update the parents of the children when traversing leaf to sub-root?
+        while !indexes.is_empty() {
+            let mut new_indexes = vec![];
+
+            for chunk in indexes.chunks(2) {
+                let [index_1, index_2] = match chunk {
+                    [index] => {
+                        new_indexes.push(*index);
+                        continue;
+                    }
+                    [index_1, index_2] => [*index_1, *index_2],
+                    _ => unreachable!(
+                        "chunk should always be either one or two long and be handled above"
+                    ),
+                };
+
+                let block_1 = self.get_block(index_1)?;
+                let block_2 = self.get_block(index_2)?;
+
+                let new_internal_node_index = self.get_new_index();
+
+                let new_block = Block {
+                    metadata: NodeMetadata {
+                        node_type: NodeType::Internal,
+                        dirty: false,
+                    },
+                    node: Node {
+                        parent: None,
+                        hash: internal_hash(&block_1.node.hash, &block_2.node.hash),
+                        specific: NodeSpecific::Internal {
+                            left: index_1,
+                            right: index_2,
+                        },
+                    },
+                };
+
+                self.insert_entry_to_blob(new_internal_node_index, &new_block)?;
+                for (child_index, mut child_block) in [(index_1, block_1), (index_2, block_2)] {
+                    child_block.node.parent = Some(new_internal_node_index);
+                    self.insert_entry_to_blob(child_index, &child_block)?;
+                }
+                new_indexes.push(new_internal_node_index);
+            }
+
+            indexes = new_indexes;
+        }
+
+        if indexes.len() == 1 {
+            // TODO: can we avoid this extra min height leaf traversal?
+            let min_height_leaf = self.get_min_height_leaf()?;
+            let NodeSpecific::Leaf { key, .. } = min_height_leaf.node.specific else {
+                panic!()
+            };
+            self.insert_from_leaf(self.key_to_index[&key], indexes[0], &Side::Left)?;
+        };
+
+        Ok(())
+    }
+
+    fn insert_from_leaf(
+        &mut self,
+        old_leaf_index: TreeIndex,
+        new_index: TreeIndex,
+        side: &Side,
+    ) -> Result<(), String> {
+        // TODO: consider name, we're inserting a subtree at a leaf
+        // TODO: seems like this ought to be fairly similar to regular insert
+
+        struct Stuff {
+            index: TreeIndex,
+            hash: Hash,
+        }
+
+        let new_internal_node_index = self.get_new_index();
+        let old_leaf = self.get_node(old_leaf_index)?;
+        let new_node = self.get_node(new_index)?;
+
+        let new_stuff = Stuff {
+            index: new_index,
+            hash: new_node.hash,
+        };
+        let old_stuff = Stuff {
+            index: old_leaf_index,
+            hash: old_leaf.hash,
+        };
+        let (left, right) = match side {
+            Side::Left => (new_stuff, old_stuff),
+            Side::Right => (old_stuff, new_stuff),
+        };
+        let internal_node_hash = internal_hash(&left.hash, &right.hash);
+
+        let block = Block {
+            metadata: NodeMetadata {
+                node_type: NodeType::Internal,
+                dirty: false,
+            },
+            node: Node {
+                parent: old_leaf.parent,
+                hash: internal_node_hash,
+                specific: NodeSpecific::Internal {
+                    left: left.index,
+                    right: right.index,
+                },
+            },
+        };
+        self.insert_entry_to_blob(new_internal_node_index, &block)?;
+        // TODO: yeah, doing this a fair bit, dedupe.  probably
+        let mut block = self.get_block(new_index)?;
+        block.node.parent = Some(new_internal_node_index);
+        self.insert_entry_to_blob(new_index, &block)?;
+
+        Ok(())
+    }
+
+    fn get_min_height_leaf(&self) -> Result<Block, String> {
+        MerkleBlobBreadthFirstIterator::new(&self.blob)
+            .next()
+            .ok_or("unable to find a leaf".to_string())
+    }
+
     pub fn delete(&mut self, key: KvId) -> Result<(), String> {
         let leaf_index = *self
             .key_to_index
@@ -877,6 +1044,8 @@ impl MerkleBlob {
             Ordering::Less => {
                 // TODO: lots of deserialization here for just the key
                 let old_block = self.get_block(index)?;
+                // TODO: should we be more careful about accidentally reading garbage like
+                //       from a freshly gotten index
                 if !self.free_indexes.contains(&index)
                     && old_block.metadata.node_type == NodeType::Leaf
                 {
@@ -932,14 +1101,17 @@ impl MerkleBlob {
         ))
     }
 
-    pub fn get_lineage(&self, index: TreeIndex) -> Result<Vec<Node>, String> {
+    pub fn get_lineage_with_indexes(
+        &self,
+        index: TreeIndex,
+    ) -> Result<Vec<(TreeIndex, Node)>, String> {
         let mut next_index = Some(index);
         let mut lineage = vec![];
 
         while let Some(this_index) = next_index {
             let node = self.get_node(this_index)?;
             next_index = node.parent;
-            lineage.push(node);
+            lineage.push((index, node));
         }
 
         Ok(lineage)
@@ -1026,19 +1198,19 @@ impl MerkleBlob {
         Ok(())
     }
 
-    #[allow(unused)]
-    fn rebuild(&mut self) -> Result<(), String> {
-        panic!();
-        // TODO: could make insert_entry_to_blob a free function and not need to make
-        //       a merkle blob here?  maybe?
-        let mut new = Self::new(Vec::new())?;
-        for (index, block) in MerkleBlobParentFirstIterator::new(&self.blob).enumerate() {
-            // new.insert_entry_to_blob(index, )?
-        }
-        self.blob = new.blob;
-
-        Ok(())
-    }
+    // #[allow(unused)]
+    // fn rebuild(&mut self) -> Result<(), String> {
+    //     panic!();
+    //     // TODO: could make insert_entry_to_blob a free function and not need to make
+    //     //       a merkle blob here?  maybe?
+    //     // let mut new = Self::new(Vec::new())?;
+    //     // for (index, block) in MerkleBlobParentFirstIterator::new(&self.blob).enumerate() {
+    //     //     // new.insert_entry_to_blob(index, )?
+    //     // }
+    //     // self.blob = new.blob;
+    //
+    //     Ok(())
+    // }
 
     #[allow(unused)]
     fn get_key_value_map(&self) -> HashMap<KvId, KvId> {
@@ -1151,30 +1323,79 @@ impl MerkleBlob {
         self.calculate_lazy_hashes().map_err(PyValueError::new_err)
     }
 
-    #[pyo3(name = "get_lineage")]
-    pub fn py_get_lineage(&self, index: TreeIndex, py: Python<'_>) -> PyResult<pyo3::PyObject> {
+    #[pyo3(name = "get_lineage_with_indexes")]
+    pub fn py_get_lineage_with_indexes(
+        &self,
+        index: TreeIndex,
+        py: Python<'_>,
+    ) -> PyResult<pyo3::PyObject> {
         let list = pyo3::types::PyList::empty_bound(py);
 
-        for node in self.get_lineage(index).map_err(PyValueError::new_err)? {
+        for (index, node) in self
+            .get_lineage_with_indexes(index)
+            .map_err(PyValueError::new_err)?
+        {
             use pyo3::conversion::IntoPy;
             use pyo3::types::PyListMethods;
-            list.append(node.into_py(py))?;
+            list.append((index, node.into_py(py)))?;
         }
 
         Ok(list.into())
     }
 
-    #[pyo3(name = "get_nodes")]
-    pub fn py_get_nodes(&self, py: Python<'_>) -> PyResult<pyo3::PyObject> {
+    #[pyo3(name = "get_nodes_with_indexes")]
+    pub fn py_get_nodes_with_indexes(&self, py: Python<'_>) -> PyResult<pyo3::PyObject> {
         let list = pyo3::types::PyList::empty_bound(py);
 
-        for (_, block) in self {
+        for (index, block) in MerkleBlobParentFirstIterator::new(&self.blob) {
             use pyo3::conversion::IntoPy;
             use pyo3::types::PyListMethods;
-            list.append(block.node.into_py(py))?;
+            list.append((index, block.node.into_py(py)))?;
         }
 
         Ok(list.into())
+    }
+
+    #[pyo3(name = "empty")]
+    pub fn py_empty(&self) -> PyResult<bool> {
+        Ok(self.key_to_index.is_empty())
+    }
+
+    #[pyo3(name = "get_root_hash")]
+    pub fn py_get_root_hash(&self) -> PyResult<Option<Hash>> {
+        self.py_get_hash_at_index(0)
+    }
+
+    #[pyo3(name = "get_hash_at_index")]
+    pub fn py_get_hash_at_index(&self, index: TreeIndex) -> PyResult<Option<Hash>> {
+        if self.key_to_index.is_empty() {
+            return Ok(None);
+        }
+
+        let block = self.get_block(index).map_err(PyValueError::new_err)?;
+        if block.metadata.dirty {
+            return Err(PyValueError::new_err("root hash is dirty"));
+        }
+
+        Ok(Some(block.node.hash))
+    }
+
+    #[pyo3(name = "batch_insert")]
+    fn py_batch_insert(
+        &mut self,
+        keys_values: Vec<(KvId, KvId)>,
+        hashes: Vec<Hash>,
+    ) -> PyResult<()> {
+        if keys_values.len() != hashes.len() {
+            return Err(PyValueError::new_err(
+                "key/value and hash collection lengths must match",
+            ));
+        }
+
+        self.batch_insert(&mut zip(keys_values, hashes))
+            .map_err(PyValueError::new_err)?;
+
+        Ok(())
     }
 
     #[pyo3(name = "__len__")]
@@ -1330,15 +1551,15 @@ mod tests {
         // crate::merkle::dot::open_dot(lines);
     }
 
-    #[allow(unused)]
-    fn normalized_blob(merkle_blob: &MerkleBlob) -> Vec<u8> {
-        let mut new = MerkleBlob::new(merkle_blob.blob.clone()).unwrap();
-
-        new.calculate_lazy_hashes();
-        new.rebuild();
-
-        new.blob
-    }
+    // #[allow(unused)]
+    // fn normalized_blob(merkle_blob: &MerkleBlob) -> Vec<u8> {
+    //     let mut new = MerkleBlob::new(merkle_blob.blob.clone()).unwrap();
+    //
+    //     new.calculate_lazy_hashes();
+    //     new.rebuild();
+    //
+    //     new.blob
+    // }
 
     #[test]
     fn test_node_type_serialized_values() {
@@ -1412,12 +1633,12 @@ mod tests {
 
     #[rstest]
     fn test_get_lineage(small_blob: MerkleBlob) {
-        let lineage = small_blob.get_lineage(2).unwrap();
-        for node in &lineage {
+        let lineage = small_blob.get_lineage_with_indexes(2).unwrap();
+        for (_, node) in &lineage {
             println!("{node:?}");
         }
         assert_eq!(lineage.len(), 2);
-        let last_node = lineage.last().unwrap();
+        let (_, last_node) = lineage.last().unwrap();
         assert_eq!(last_node.parent, None);
 
         small_blob.check().unwrap();
