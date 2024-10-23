@@ -120,7 +120,7 @@ chia-traits-fuzz = { path = "./crates/chia-traits/fuzz", version = "0.15.0" }
 chia-utils-fuzz = { path = "./crates/chia-utils/fuzz", version = "0.15.0" }
 blst = { version = "0.3.12", features = ["portable"] }
 clvmr = "0.9.0"
-syn = "2.0.75"
+syn = "2.0.82"
 quote = "1.0.32"
 proc-macro2 = "1.0.84"
 proc-macro-crate = "1.3.1"

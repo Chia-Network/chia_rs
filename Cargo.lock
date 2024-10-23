@@ -648,15 +648,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "clvm-traits-fuzz"
-version = "0.15.0"
-dependencies = [
- "clvm-traits",
- "clvmr",
- "libfuzzer-sys",
-]
-
-[[package]]
 name = "clvm-utils"
 version = "0.15.0"
 dependencies = [
@@ -665,17 +656,6 @@ dependencies = [
  "clvmr",
  "hex",
  "rstest",
-]
-
-[[package]]
-name = "clvm-utils-fuzz"
-version = "0.15.0"
-dependencies = [
- "chia-fuzz",
- "clvm-traits",
- "clvm-utils",
- "clvmr",
- "libfuzzer-sys",
 ]
 
 [[package]]
@@ -2200,9 +2180,9 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "syn"
-version = "2.0.75"
+version = "2.0.82"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6af063034fc1935ede7be0122941bafa9bacb949334d090b77ca98b5817c7d9"
+checksum = "83540f837a8afc019423a8edb95b52a8effe46957ee402287f4292fae35be021"
 dependencies = [
  "proc-macro2",
  "quote",
