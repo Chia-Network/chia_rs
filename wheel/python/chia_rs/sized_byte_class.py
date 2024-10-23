@@ -90,7 +90,7 @@ class SizedBytes(bytes):
 
         div, mod = divmod(cls._size - len(blob), fill_length)
         if mod != 0:
-            raise ValueError("invalid fill value, range to be filled must be multiple of fil size")
+            raise ValueError("invalid fill value, range to be filled must be multiple of fill size")
 
         all_fill = fill * div
         if align == "<":
