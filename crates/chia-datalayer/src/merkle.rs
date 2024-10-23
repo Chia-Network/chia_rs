@@ -417,7 +417,7 @@ impl MerkleBlob {
 
         match insert_location {
             InsertLocation::Auto {} => {
-                panic!("this should have been caught and processed above")
+                unreachable!("this should have been caught and processed above")
             }
             InsertLocation::AsRoot {} => {
                 if !self.key_to_index.is_empty() {
