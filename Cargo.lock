@@ -680,9 +680,9 @@ dependencies = [
 
 [[package]]
 name = "clvmr"
-version = "0.9.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ffccd9116f36edbf02dad718a2fece269d05492fb31278423883ef464444bbb6"
+checksum = "cd48d84ed6eac4638131341402f30476c9f6c6970ed3ed6984bdf125c5a09538"
 dependencies = [
  "chia-bls 0.10.0",
  "hex-literal",
@@ -1308,9 +1308,9 @@ dependencies = [
 
 [[package]]
 name = "k256"
-version = "0.13.3"
+version = "0.13.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "956ff9b67e26e1a6a866cb758f12c6f8746208489e3e4a4b5580802f2f0a587b"
+checksum = "f6e3919bbaa2945715f0bb6d3934a173d1e9a59ac23767fbaaef277265a7411b"
 dependencies = [
  "cfg-if",
  "ecdsa",
