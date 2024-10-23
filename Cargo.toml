@@ -116,8 +116,8 @@ chia-fuzz = { path = "./crates/chia-consensus/fuzz", version = "0.15.0" }
 chia-bls-fuzz = { path = "./crates/chia-bls/fuzz", version = "0.15.0" }
 chia-protocol-fuzz = { path = "./crates/chia-protocol/fuzz", version = "0.15.0" }
 chia-puzzles-fuzz = { path = "./crates/chia-puzzles/fuzz", version = "0.15.0" }
-chia-traits-fuzz = { path = "./crates/chia-traits/fuzz", version = "0.15.0" }
-chia-utils-fuzz = { path = "./crates/chia-utils/fuzz", version = "0.15.0" }
+clvm-traits-fuzz = { path = "./crates/clvm-traits/fuzz", version = "0.15.0" }
+clvm-utils-fuzz = { path = "./crates/clvm-utils/fuzz", version = "0.15.0" }
 blst = { version = "0.3.12", features = ["portable"] }
 clvmr = "0.9.0"
 syn = "2.0.75"
