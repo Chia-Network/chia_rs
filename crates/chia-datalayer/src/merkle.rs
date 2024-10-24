@@ -661,7 +661,7 @@ impl MerkleBlob {
 
         // TODO: can we insert the top node first?  maybe more efficient to update it's children
         //       than to update the parents of the children when traversing leaf to sub-root?
-        while !indexes.is_empty() {
+        while indexes.len() > 1 {
             let mut new_indexes = vec![];
 
             for chunk in indexes.chunks(2) {
@@ -2018,5 +2018,16 @@ mod tests {
             .unwrap();
         blob.insert(0, 0, &[0u8; 32], InsertLocation::Auto {})
             .expect_err("");
+    }
+
+    #[rstest]
+    fn test_batch_insert_with_odd_count_does_not_hang(mut small_blob: MerkleBlob) {
+        let mut batch: Vec<((KvId, KvId), Hash)> = vec![];
+
+        for i in 0..9 {
+            batch.push(((i, i), sha256_num(i)));
+        }
+
+        small_blob.batch_insert(batch.into_iter()).unwrap();
     }
 }
