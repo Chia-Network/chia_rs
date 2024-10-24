@@ -1381,7 +1381,7 @@ impl MerkleBlob {
     }
 
     #[pyo3(name = "batch_insert")]
-    fn py_batch_insert(
+    pub fn py_batch_insert(
         &mut self,
         keys_values: Vec<(KvId, KvId)>,
         hashes: Vec<Hash>,
