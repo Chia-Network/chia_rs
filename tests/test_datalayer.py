@@ -28,6 +28,6 @@ def test_just_insert_a_bunch() -> None:
     total_time = 0.0
     for i in range(100000):
         start = time.monotonic()
-        merkle_blob.insert(uint64(i), uint64(i), HASH)
+        merkle_blob.insert(int64(i), int64(i), HASH)
         end = time.monotonic()
         total_time += end - start
