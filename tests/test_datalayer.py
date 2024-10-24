@@ -1,6 +1,6 @@
 from chia_rs import MerkleBlob
 from chia_rs.sized_bytes import bytes32
-from chia_rs.sized_ints import uint64
+from chia_rs.sized_ints import int64
 
 
 def test_merkle_blob():
