@@ -625,7 +625,7 @@ impl MerkleBlob {
         Ok(())
     }
 
-    fn batch_insert<I>(&mut self, mut keys_values_hashes: I) -> Result<(), String>
+    pub fn batch_insert<I>(&mut self, mut keys_values_hashes: I) -> Result<(), String>
     where
         I: Iterator<Item = ((KvId, KvId), Hash)>,
     {
