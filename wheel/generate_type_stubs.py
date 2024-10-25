@@ -22,10 +22,21 @@ def transform_type(m: str) -> str:
 
 
 def print_class(
-    file: TextIO, name: str, members: list[str], extra: Optional[list[str]] = None
+    file: TextIO,
+    name: str,
+    members: list[str],
+    extra: Optional[list[str]] = None,
+    martial_for_json_hint: Optional[str] = None,
+    unmartial_from_json_hint: Optional[str] = None,
 ):
     def add_indent(x: str):
         return "\n    " + x
+
+    if martial_for_json_hint is None:
+        martial_for_json_hint = "dict[str, Any]"
+
+    if unmartial_from_json_hint is None:
+        unmartial_from_json_hint = martial_for_json_hint
 
     init_args = "".join([(",\n        " + transform_type(x)) for x in members])
 
@@ -67,9 +78,9 @@ class {name}:{"".join(map(add_indent, members))}
     def __bytes__(self) -> bytes: ...
     def stream_to_bytes(self) -> bytes: ...
     def get_hash(self) -> bytes32: ...
-    def to_json_dict(self) -> Any: ...
+    def to_json_dict(self) -> {martial_for_json_hint}: ...
     @classmethod
-    def from_json_dict(cls, json_dict: Any) -> Self: ...
+    def from_json_dict(cls, json_dict: {unmartial_from_json_hint}) -> Self: ...
 """
     )
 
@@ -407,6 +418,8 @@ class MerkleSet:
             "def __iadd__(self, other: G1Element) -> G1Element: ...",
             "def derive_unhardened(self, idx: int) -> G1Element: ...",
         ],
+        martial_for_json_hint="str",
+        unmartial_from_json_hint="Union[str, bytes]",
     )
     print_class(
         file,
@@ -422,6 +435,8 @@ class MerkleSet:
             "def __add__(self, other: G2Element) -> G2Element: ...",
             "def __iadd__(self, other: G2Element) -> G2Element: ...",
         ],
+        martial_for_json_hint="str",
+        unmartial_from_json_hint="Union[str, bytes]",
     )
     print_class(
         file,
@@ -433,6 +448,7 @@ class MerkleSet:
             "def __mul__(self, rhs: GTElement) -> GTElement: ...",
             "def __imul__(self, rhs: GTElement) -> GTElement : ...",
         ],
+        martial_for_json_hint="str",
     )
     print_class(
         file,
@@ -449,6 +465,7 @@ class MerkleSet:
             "@staticmethod",
             "def from_seed(seed: bytes) -> PrivateKey: ...",
         ],
+        martial_for_json_hint="str",
     )
 
     print_class(
@@ -496,4 +513,15 @@ class MerkleSet:
     )
 
     for item in classes:
-        print_class(file, item[0], item[1], extra_members.get(item[0]))
+        # TODO: adjust the system to provide this control via more paths
+        martial_for_json_hint = None
+        if item[0] == "Program":
+            martial_for_json_hint = "str"
+
+        print_class(
+            file,
+            item[0],
+            item[1],
+            extra_members.get(item[0]),
+            martial_for_json_hint=martial_for_json_hint,
+        )
