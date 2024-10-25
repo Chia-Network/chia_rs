@@ -18,6 +18,10 @@ type Parent = Option<TreeIndex>;
 type Hash = [u8; 32];
 type KvId = i64;
 
+// assumptions
+// - root is at index 0
+// - any case with no keys will have a zero length blob
+
 const fn range_by_length(start: usize, length: usize) -> Range<usize> {
     start..start + length
 }
@@ -129,7 +133,7 @@ pub struct NodeMetadata {
 
 impl NodeMetadata {
     pub fn from_bytes(blob: MetadataBytes) -> Result<Self, String> {
-        // TODO: could save 1-2% of tree space by packing (and maybe don't do that)
+        // OPT: could save 1-2% of tree space by packing (and maybe don't do that)
         Ok(Self {
             node_type: Self::node_type_from_bytes(blob)?,
             dirty: Self::dirty_from_bytes(blob)?,
@@ -629,7 +633,7 @@ impl MerkleBlob {
     where
         I: Iterator<Item = ((KvId, KvId), Hash)>,
     {
-        // TODO: would it be worthwhile to hold the entire blocks?
+        // OPT: would it be worthwhile to hold the entire blocks?
         let mut indexes = vec![];
 
         if self.key_to_index.len() <= 1 {
@@ -659,8 +663,8 @@ impl MerkleBlob {
             indexes.push(new_leaf_index);
         }
 
-        // TODO: can we insert the top node first?  maybe more efficient to update it's children
-        //       than to update the parents of the children when traversing leaf to sub-root?
+        // OPT: can we insert the top node first?  maybe more efficient to update it's children
+        //      than to update the parents of the children when traversing leaf to sub-root?
         while indexes.len() > 1 {
             let mut new_indexes = vec![];
 
@@ -708,7 +712,7 @@ impl MerkleBlob {
         }
 
         if indexes.len() == 1 {
-            // TODO: can we avoid this extra min height leaf traversal?
+            // OPT: can we avoid this extra min height leaf traversal?
             let min_height_leaf = self.get_min_height_leaf()?;
             let NodeSpecific::Leaf { key, .. } = min_height_leaf.node.specific else {
                 panic!()
@@ -725,7 +729,7 @@ impl MerkleBlob {
         new_index: TreeIndex,
         side: &Side,
     ) -> Result<(), String> {
-        // TODO: consider name, we're inserting a subtree at a leaf
+        // NAME: consider name, we're inserting a subtree at a leaf
         // TODO: seems like this ought to be fairly similar to regular insert
 
         struct Stuff {
@@ -1134,7 +1138,7 @@ impl MerkleBlob {
     }
 
     pub fn calculate_lazy_hashes(&mut self) -> Result<(), String> {
-        // TODO: really want a truncated traversal, not filter
+        // OPT: really want a truncated traversal, not filter
         // TODO: yeah, storing the whole set of blocks via collect is not great
         for (index, mut block) in self
             .iter()
@@ -1158,7 +1162,6 @@ impl MerkleBlob {
     #[allow(unused)]
     fn relocate_node(&mut self, source: TreeIndex, destination: TreeIndex) -> Result<(), String> {
         let extend_index = self.extend_index();
-        // TODO: perhaps relocation of root should be allowed for some use
         if source == 0 {
             return Err("relocation of the root and index zero is not allowed".to_string());
         };
@@ -1197,20 +1200,6 @@ impl MerkleBlob {
 
         Ok(())
     }
-
-    // #[allow(unused)]
-    // fn rebuild(&mut self) -> Result<(), String> {
-    //     panic!();
-    //     // TODO: could make insert_entry_to_blob a free function and not need to make
-    //     //       a merkle blob here?  maybe?
-    //     // let mut new = Self::new(Vec::new())?;
-    //     // for (index, block) in MerkleBlobParentFirstIterator::new(&self.blob).enumerate() {
-    //     //     // new.insert_entry_to_blob(index, )?
-    //     // }
-    //     // self.blob = new.blob;
-    //
-    //     Ok(())
-    // }
 
     #[allow(unused)]
     fn get_key_value_map(&self) -> HashMap<KvId, KvId> {
@@ -1667,55 +1656,6 @@ mod tests {
 
         small_blob.check().unwrap();
     }
-
-    // #[test]
-    // fn test_build_blob_and_read() {
-    //     let mut blob: Vec<u8> = Vec::new();
-    //
-    //     blob.extend(EXAMPLE_ROOT_METADATA.to_bytes());
-    //     blob.extend(EXAMPLE_ROOT.to_bytes());
-    //     blob.extend(EXAMPLE_LEFT_LEAF_METADATA.to_bytes());
-    //     blob.extend(EXAMPLE_LEFT_LEAF.to_bytes());
-    //     blob.extend(EXAMPLE_RIGHT_LEAF_METADATA.to_bytes());
-    //     blob.extend(EXAMPLE_RIGHT_LEAF.to_bytes());
-    //
-    //     assert_eq!(blob, Vec::from(EXAMPLE_BLOB));
-    //
-    //     let merkle_blob = MerkleBlob::new(Vec::from(EXAMPLE_BLOB)).unwrap();
-    //
-    //     assert_eq!(merkle_blob.get_node(0).unwrap(), EXAMPLE_ROOT);
-    //     assert_eq!(merkle_blob.get_node(1).unwrap(), EXAMPLE_LEFT_LEAF);
-    //     assert_eq!(merkle_blob.get_node(2).unwrap(), EXAMPLE_RIGHT_LEAF);
-    //
-    //     merkle_blob.check().unwrap();
-    // }
-
-    // #[test]
-    // fn test_build_merkle() {
-    //     let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
-    //
-    //     let (key, value) = EXAMPLE_LEFT_LEAF.key_value();
-    //     merkle_blob
-    //         .insert(key, value, &EXAMPLE_LEFT_LEAF.hash)
-    //         .unwrap();
-    //     let (key, value) = EXAMPLE_RIGHT_LEAF.key_value();
-    //     merkle_blob
-    //         .insert(key, value, &EXAMPLE_RIGHT_LEAF.hash)
-    //         .unwrap();
-    //
-    //     // TODO: just hacking here to compare with the ~wrong~ simplified reference
-    //     let mut root = Block::from_bytes(merkle_blob.get_block_bytes(0).unwrap(), 0).unwrap();
-    //     root.metadata.dirty = true;
-    //     root.node.hash = HASH;
-    //     assert_eq!(root.metadata.node_type, NodeType::Internal);
-    //     merkle_blob
-    //         .insert_entry_to_blob(0, root.to_bytes())
-    //         .unwrap();
-    //
-    //     assert_eq!(merkle_blob.blob, Vec::from(EXAMPLE_BLOB));
-    //
-    //     merkle_blob.check().unwrap();
-    // }
 
     #[rstest]
     fn test_just_insert_a_bunch(
