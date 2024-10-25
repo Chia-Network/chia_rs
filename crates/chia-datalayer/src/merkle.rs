@@ -1717,13 +1717,18 @@ mod tests {
     //     merkle_blob.check().unwrap();
     // }
 
-    #[test]
-    fn test_just_insert_a_bunch() {
+    #[rstest]
+    fn test_just_insert_a_bunch(
+        // just allowing parallelism of testing 100,000 inserts total
+        #[values(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)] n: i64,
+    ) {
         let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
 
         let mut total_time = Duration::new(0, 0);
 
-        for i in 0..100_000 {
+        let count = 10_000;
+        let m: KvId = count * n;
+        for i in m..(m + count) {
             let start = Instant::now();
             merkle_blob
                 // NOTE: yeah this hash is garbage
