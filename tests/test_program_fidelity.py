@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Optional
 
 import string
 import chia_rs
@@ -24,7 +24,7 @@ def rand_int(rnd: Random) -> int:
     return rnd.randint(0, 100000000000000)
 
 
-def rand_list(rnd: Random) -> List:
+def rand_list(rnd: Random) -> list:
     size = rnd.randint(0, 3)
     ret = []
     for _ in range(size):

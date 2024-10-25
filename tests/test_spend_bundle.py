@@ -1,6 +1,5 @@
 from chia_rs import SpendBundle
 import pytest
-from typing import Type
 
 expected_add1 = """\
 [Coin { parent_coin_info: a48e6325fee4948d0703d1d722416331890e068d095a05049dd516ee7eab7f4b, \
@@ -197,7 +196,7 @@ amount: 1232500000000 }]"
     ],
 )
 def test_spend_bundle(
-    ty: Type, input_file: str, expected_add: str, expected_rem: str
+    ty: type, input_file: str, expected_add: str, expected_rem: str
 ) -> None:
     buf = open(f"test-bundles/{input_file}.bundle", "rb").read()
     bundle = ty.from_bytes(buf)

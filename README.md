@@ -16,7 +16,7 @@ A collection of Rust crates for working with the Chia blockchain. There are also
 
 ## Prerequisites
 
-- [Python](https://www.python.org/downloads/) 3.8 or higher installed.
+- [Python](https://www.python.org/downloads/) 3.9 or higher installed.
 - The [Rust toolchain](https://rustup.rs/) must be installed.
 
 ## Unit Tests

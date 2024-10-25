@@ -13,7 +13,7 @@ from chia_rs.sized_ints import uint8, uint16, uint32, uint64, uint128
 from time import time
 import sys
 from time import perf_counter
-from typing import Optional, Tuple
+from typing import Optional
 
 DEFAULT_CONSTANTS = ConsensusConstants(
     SLOT_BLOCKS_TARGET=uint32(32),
@@ -87,7 +87,7 @@ DEFAULT_CONSTANTS = ConsensusConstants(
 
 def run_gen(
     fn: str, flags: int = 0, args: Optional[str] = None, version: int = 1
-) -> Tuple[Optional[int], Optional[SpendBundleConditions], float]:
+) -> tuple[Optional[int], Optional[SpendBundleConditions], float]:
 
     # constants from the main chia blockchain:
     # https://github.com/Chia-Network/chia-blockchain/blob/main/chia/consensus/default_constants.py
