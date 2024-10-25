@@ -1,4 +1,4 @@
-from typing import List, Optional, Any, Callable, Protocol, Tuple
+from typing import Optional, Any, Callable, Protocol
 from hashlib import sha256
 
 import sys
@@ -35,7 +35,7 @@ def check_proof(
         assert confirm_not_included_already_hashed(root, item, proof)
 
 
-def check_tree(leafs: List[bytes32]) -> None:
+def check_tree(leafs: list[bytes32]) -> None:
     ru_tree = RustMerkleSet(leafs)
     py_tree = PythonMerkleSet(leafs)
 
@@ -118,14 +118,14 @@ def h2(a: bytes, b: bytes) -> bytes32:
     return bytes32(sha256(a + b).digest())
 
 
-def hashdown(t: List[int], buf: bytes) -> bytes32:
+def hashdown(t: list[int], buf: bytes) -> bytes32:
     return bytes32(sha256(bytes([0] * 30) + bytes(t) + buf).digest())
 
 
 BLANK = h("0000000000000000000000000000000000000000000000000000000000000000")
 
 
-def merkle_tree_5() -> Tuple[bytes32, List[bytes32]]:
+def merkle_tree_5() -> tuple[bytes32, list[bytes32]]:
     a = h("5800000000000000000000000000000000000000000000000000000000000000")
     b = h("2300000000000000000000000000000000000000000000000000000000000000")
     c = h("2100000000000000000000000000000000000000000000000000000000000000")
@@ -164,7 +164,7 @@ def merkle_tree_5() -> Tuple[bytes32, List[bytes32]]:
     # e   c
 
 
-def merkle_tree_left_edge() -> Tuple[bytes32, List[bytes32]]:
+def merkle_tree_left_edge() -> tuple[bytes32, list[bytes32]]:
     a = h("8000000000000000000000000000000000000000000000000000000000000000")
     b = h("0000000000000000000000000000000000000000000000000000000000000001")
     c = h("0000000000000000000000000000000000000000000000000000000000000002")
@@ -196,7 +196,7 @@ def merkle_tree_left_edge() -> Tuple[bytes32, List[bytes32]]:
     #   c   d
 
 
-def merkle_tree_left_edge_duplicates() -> Tuple[bytes32, List[bytes32]]:
+def merkle_tree_left_edge_duplicates() -> tuple[bytes32, list[bytes32]]:
     a = h("8000000000000000000000000000000000000000000000000000000000000000")
     b = h("0000000000000000000000000000000000000000000000000000000000000001")
     c = h("0000000000000000000000000000000000000000000000000000000000000002")
@@ -230,7 +230,7 @@ def merkle_tree_left_edge_duplicates() -> Tuple[bytes32, List[bytes32]]:
     #   c   d
 
 
-def merkle_tree_right_edge() -> Tuple[bytes32, List[bytes32]]:
+def merkle_tree_right_edge() -> tuple[bytes32, list[bytes32]]:
     a = h("4000000000000000000000000000000000000000000000000000000000000000")
     b = h("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
     c = h("fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe")
@@ -262,7 +262,7 @@ def merkle_tree_right_edge() -> Tuple[bytes32, List[bytes32]]:
     #                 c   b
 
 
-def merkle_set_test_cases() -> List[Tuple[bytes32, List[bytes32]]]:
+def merkle_set_test_cases() -> list[tuple[bytes32, list[bytes32]]]:
     a = h("7000000000000000000000000000000000000000000000000000000000000000")
     b = h("7100000000000000000000000000000000000000000000000000000000000000")
     c = h("8000000000000000000000000000000000000000000000000000000000000000")

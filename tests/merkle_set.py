@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 from hashlib import sha256
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Iterable, Optional
 
 from chia_rs.sized_bytes import bytes32
 
@@ -47,7 +47,7 @@ TRUNCATED = bytes([3])
 
 BLANK = bytes32([0] * 32)
 
-prehashed: Dict[bytes, _Hash] = {}
+prehashed: dict[bytes, _Hash] = {}
 
 
 def init_prehashed() -> None:
@@ -105,17 +105,17 @@ class Node(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def is_included(self, tocheck: bytes, depth: int, p: List[bytes]) -> bool:
+    def is_included(self, tocheck: bytes, depth: int, p: list[bytes]) -> bool:
         pass
 
     @abstractmethod
     def other_included(
-        self, tocheck: bytes, depth: int, p: List[bytes], collapse: bool
+        self, tocheck: bytes, depth: int, p: list[bytes], collapse: bool
     ) -> None:
         pass
 
     @abstractmethod
-    def _audit(self, hashes: List[bytes], bits: List[int]) -> None:
+    def _audit(self, hashes: list[bytes], bits: list[int]) -> None:
         pass
 
 
@@ -133,13 +133,13 @@ class MerkleSet:
     def add_already_hashed(self, toadd: bytes) -> None:
         self.root = self.root.add(toadd, 0)
 
-    def is_included_already_hashed(self, tocheck: bytes) -> Tuple[bool, bytes]:
-        proof: List[bytes] = []
+    def is_included_already_hashed(self, tocheck: bytes) -> tuple[bool, bytes]:
+        proof: list[bytes] = []
         r = self.root.is_included(tocheck, 0, proof)
         return r, b"".join(proof)
 
-    def _audit(self, hashes: List[bytes]) -> None:
-        newhashes: List[bytes] = []
+    def _audit(self, hashes: list[bytes]) -> None:
+        newhashes: list[bytes] = []
         self.root._audit(newhashes, [])
         assert newhashes == sorted(newhashes)
 
@@ -169,16 +169,16 @@ class EmptyNode(Node):
     def add(self, toadd: bytes, depth: int) -> Node:
         return TerminalNode(toadd)
 
-    def is_included(self, tocheck: bytes, depth: int, p: List[bytes]) -> bool:
+    def is_included(self, tocheck: bytes, depth: int, p: list[bytes]) -> bool:
         p.append(EMPTY)
         return False
 
     def other_included(
-        self, tocheck: bytes, depth: int, p: List[bytes], collapse: bool
+        self, tocheck: bytes, depth: int, p: list[bytes], collapse: bool
     ) -> None:
         p.append(EMPTY)
 
-    def _audit(self, hashes: List[bytes], bits: List[int]) -> None:
+    def _audit(self, hashes: list[bytes], bits: list[int]) -> None:
         pass
 
 
@@ -189,14 +189,14 @@ def _make_middle(children: Any, depth: int) -> Node:
     cbits = [get_bit(child.hash, depth) for child in children]
     if cbits[0] != cbits[1]:
         return MiddleNode(children)
-    nextvals: List[Node] = [_empty, _empty]
+    nextvals: list[Node] = [_empty, _empty]
     nextvals[cbits[0] ^ 1] = _empty
     nextvals[cbits[0]] = _make_middle(children, depth + 1)
     return MiddleNode(nextvals)
 
 
 class TerminalNode(Node):
-    def __init__(self, hash: bytes, bits: Optional[List[int]] = None) -> None:
+    def __init__(self, hash: bytes, bits: Optional[list[int]] = None) -> None:
         assert len(hash) == 32
         self.hash = hash
         if bits is not None:
@@ -222,23 +222,23 @@ class TerminalNode(Node):
         else:
             return _make_middle([TerminalNode(toadd), self], depth)
 
-    def is_included(self, tocheck: bytes, depth: int, p: List[bytes]) -> bool:
+    def is_included(self, tocheck: bytes, depth: int, p: list[bytes]) -> bool:
         p.append(TERMINAL + self.hash)
         return tocheck == self.hash
 
     def other_included(
-        self, tocheck: bytes, depth: int, p: List[bytes], collapse: bool
+        self, tocheck: bytes, depth: int, p: list[bytes], collapse: bool
     ) -> None:
         p.append(TERMINAL + self.hash)
 
-    def _audit(self, hashes: List[bytes], bits: List[int]) -> None:
+    def _audit(self, hashes: list[bytes], bits: list[int]) -> None:
         hashes.append(self.hash)
         for pos, v in enumerate(bits):
             assert get_bit(self.hash, pos) == v
 
 
 class MiddleNode(Node):
-    def __init__(self, children: List[Node]):
+    def __init__(self, children: list[Node]):
         self.children = children
         if children[0].is_empty() and children[1].is_double():
             self.hash = children[1].hash
@@ -285,7 +285,7 @@ class MiddleNode(Node):
         newvals[bit] = newchild
         return MiddleNode(newvals)
 
-    def is_included(self, tocheck: bytes, depth: int, p: List[bytes]) -> bool:
+    def is_included(self, tocheck: bytes, depth: int, p: list[bytes]) -> bool:
         p.append(MIDDLE)
         if get_bit(tocheck, depth) == 0:
             r = self.children[0].is_included(tocheck, depth + 1, p)
@@ -300,14 +300,14 @@ class MiddleNode(Node):
             return self.children[1].is_included(tocheck, depth + 1, p)
 
     def other_included(
-        self, tocheck: bytes, depth: int, p: List[bytes], collapse: bool
+        self, tocheck: bytes, depth: int, p: list[bytes], collapse: bool
     ) -> None:
         if collapse or not self.is_double():
             p.append(TRUNCATED + self.hash)
         else:
             self.is_included(tocheck, depth, p)
 
-    def _audit(self, hashes: List[bytes], bits: List[int]) -> None:
+    def _audit(self, hashes: list[bytes], bits: list[int]) -> None:
         self.children[0]._audit(hashes, bits + [0])
         self.children[1]._audit(hashes, bits + [1])
 
@@ -331,15 +331,15 @@ class TruncatedNode(Node):
     def add(self, toadd: bytes, depth: int) -> Node:
         return self
 
-    def is_included(self, tocheck: bytes, depth: int, p: List[bytes]) -> bool:
+    def is_included(self, tocheck: bytes, depth: int, p: list[bytes]) -> bool:
         raise SetError()
 
     def other_included(
-        self, tocheck: bytes, depth: int, p: List[bytes], collapse: bool
+        self, tocheck: bytes, depth: int, p: list[bytes], collapse: bool
     ) -> None:
         p.append(TRUNCATED + self.hash)
 
-    def _audit(self, hashes: List[bytes], bits: List[int]) -> None:
+    def _audit(self, hashes: list[bytes], bits: list[int]) -> None:
         pass
 
 
@@ -378,7 +378,7 @@ def deserialize_proof(proof: bytes) -> MerkleSet:
         raise SetError()
 
 
-def _deserialize(proof: bytes, pos: int, bits: List[int]) -> Tuple[Node, int]:
+def _deserialize(proof: bytes, pos: int, bits: list[int]) -> tuple[Node, int]:
     t = proof[pos : pos + 1]  # flake8: noqa
     if t == EMPTY:
         return _empty, pos + 1

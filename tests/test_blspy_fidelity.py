@@ -2,7 +2,7 @@ import blspy
 import chia_rs
 from random import getrandbits
 import sys
-from typing import Any, Type
+from typing import Any
 import pytest
 from concurrent.futures import ThreadPoolExecutor
 

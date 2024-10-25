@@ -1,4 +1,4 @@
-from typing import Set, Optional, Tuple
+from typing import Optional
 from chia_rs import (
     additions_and_removals,
     ALLOW_BACKREFS,
@@ -39,8 +39,8 @@ def test_additions_and_removals() -> None:
             if "FAILED: " in test_file:
                 continue
 
-            expected_additions: Set[Tuple[str, str, str, Optional[str]]] = set()
-            expected_removals: Set[Tuple[str, str]] = set()
+            expected_additions: set[tuple[str, str, str, Optional[str]]] = set()
+            expected_removals: set[tuple[str, str]] = set()
             last_coin_id = ""
             for l in test_file.splitlines():
                 if "- coin id: " in l:
@@ -62,7 +62,7 @@ def test_additions_and_removals() -> None:
             assert len(removals) == len(expected_removals)
 
             for add in additions:
-                addition: Tuple[str, str, str, Optional[str]]
+                addition: tuple[str, str, str, Optional[str]]
                 if add[1] is not None:
                     addition = (
                         f"{add[0].parent_coin_info}",
