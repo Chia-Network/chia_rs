@@ -22,7 +22,12 @@ def transform_type(m: str) -> str:
 
 
 def print_class(
-    file: TextIO, name: str, members: list[str], extra: Optional[list[str]] = None, martial_for_json_hint: Optional[str] = None, unmartial_from_json_hint: Optional[str] = None,
+    file: TextIO,
+    name: str,
+    members: list[str],
+    extra: Optional[list[str]] = None,
+    martial_for_json_hint: Optional[str] = None,
+    unmartial_from_json_hint: Optional[str] = None,
 ):
     def add_indent(x: str):
         return "\n    " + x
@@ -508,5 +513,9 @@ class MerkleSet:
     )
 
     for item in classes:
-        # TODO: yeah...  nope, don't do it this way
-        print_class(file, item[0], item[1], extra_members.get(item[0]), martial_for_json_hint=None if item[0] != "Program" else "str")
+        # TODO: adjust the system to provide this control via more paths
+        martial_for_json_hint = None
+        if item[0] == "Program":
+            martial_for_json_hint = "str"
+
+        print_class(file, item[0], item[1], extra_members.get(item[0]), martial_for_json_hint=martial_for_json_hint)
