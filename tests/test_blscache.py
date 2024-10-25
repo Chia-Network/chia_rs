@@ -14,7 +14,6 @@ from chia_rs import (
 )
 from chia_rs.sized_bytes import bytes32
 from chia_rs.sized_ints import uint8, uint16, uint32, uint64, uint128
-from typing import List
 from chia.util.hash import std_hash
 from chia.util.lru_cache import LRUCache
 from chia.types.blockchain_format.program import Program as ChiaProgram
@@ -103,8 +102,8 @@ def test_instantiation() -> None:
     pk: G1Element = sk.get_g1()
     msg = b"hello"
     sig: G2Element = AugSchemeMPL.sign(sk, msg)
-    pks: List[G1Element] = [pk]
-    msgs: List[bytes] = [msg]
+    pks: list[G1Element] = [pk]
+    msgs: list[bytes] = [msg]
     result = bls_cache.aggregate_verify(pks, msgs, sig)
     assert result
     assert bls_cache.len() == 1
@@ -131,9 +130,9 @@ def test_cache_limit() -> None:
 
     sk: PrivateKey = AugSchemeMPL.key_gen(seed)
     pk: G1Element = sk.get_g1()
-    pks: List[G1Element] = []
-    msgs: List[bytes] = []
-    sigs: List[G2Element] = []
+    pks: list[G1Element] = []
+    msgs: list[bytes] = []
+    sigs: list[G2Element] = []
     for i in [0xCAFE, 0xF00D, 0xABCD, 0x1234]:
         msgs.append(i.to_bytes(8, byteorder="little"))
         pks.append(pk)

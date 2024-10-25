@@ -5,7 +5,7 @@ import io
 import struct
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Iterable, List, Optional, Type
+from typing import Iterable, Optional
 
 import pytest
 
@@ -37,7 +37,7 @@ def dataclass_parameter(instance: object) -> ParameterSet:
     )
 
 
-def dataclass_parameters(instances: Iterable[object]) -> List[ParameterSet]:
+def dataclass_parameters(instances: Iterable[object]) -> list[ParameterSet]:
     return [dataclass_parameter(instance) for instance in instances]
 
 
@@ -58,7 +58,7 @@ class BadName:
 @dataclass(frozen=True)
 class Good:
     name: str
-    cls: Type[StructStream]
+    cls: type[StructStream]
     size: int
     bits: int
     signed: bool
@@ -74,7 +74,7 @@ class Good:
         maximum: int,
         minimum: int,
     ) -> Good:
-        raw_class: Type[StructStream] = type(name, (StructStream,), {})
+        raw_class: type[StructStream] = type(name, (StructStream,), {})
         parsed_cls = parse_metadata_from_name(raw_class)
         return cls(
             name=name,
@@ -122,7 +122,7 @@ def good_fixture(request: SubRequest) -> Good:
 class TestStructStream:
     def _test_impl(
         self,
-        cls: Type[StructStream],
+        cls: type[StructStream],
         upper_boundary: int,
         lower_boundary: int,
         length: int,
