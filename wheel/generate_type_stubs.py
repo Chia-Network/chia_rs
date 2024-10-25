@@ -22,7 +22,7 @@ def transform_type(m: str) -> str:
 
 
 def print_class(
-    file: TextIO, name: str, members: list[str], extra: Optional[list[str]] = None
+    file: TextIO, name: str, members: list[str], extra: Optional[list[str]] = None, martialed_for_json_hint: str = "dict[str, Any]",
 ):
     def add_indent(x: str):
         return "\n    " + x
@@ -67,9 +67,9 @@ class {name}:{"".join(map(add_indent, members))}
     def __bytes__(self) -> bytes: ...
     def stream_to_bytes(self) -> bytes: ...
     def get_hash(self) -> bytes32: ...
-    def to_json_dict(self) -> dict[str, Any]: ...
+    def to_json_dict(self) -> {martialed_for_json_hint}: ...
     @classmethod
-    def from_json_dict(cls, json_dict: dict[str, Any]) -> Self: ...
+    def from_json_dict(cls, json_dict: {martialed_for_json_hint}) -> Self: ...
 """
     )
 
@@ -407,6 +407,7 @@ class MerkleSet:
             "def __iadd__(self, other: G1Element) -> G1Element: ...",
             "def derive_unhardened(self, idx: int) -> G1Element: ...",
         ],
+        martialed_for_json_hint="str",
     )
     print_class(
         file,
@@ -422,6 +423,7 @@ class MerkleSet:
             "def __add__(self, other: G2Element) -> G2Element: ...",
             "def __iadd__(self, other: G2Element) -> G2Element: ...",
         ],
+        martialed_for_json_hint="str",
     )
     print_class(
         file,
@@ -433,6 +435,7 @@ class MerkleSet:
             "def __mul__(self, rhs: GTElement) -> GTElement: ...",
             "def __imul__(self, rhs: GTElement) -> GTElement : ...",
         ],
+        martialed_for_json_hint="str",
     )
     print_class(
         file,
@@ -449,6 +452,7 @@ class MerkleSet:
             "@staticmethod",
             "def from_seed(seed: bytes) -> PrivateKey: ...",
         ],
+        martialed_for_json_hint="str",
     )
 
     print_class(
