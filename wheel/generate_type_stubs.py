@@ -22,10 +22,13 @@ def transform_type(m: str) -> str:
 
 
 def print_class(
-    file: TextIO, name: str, members: list[str], extra: Optional[list[str]] = None, martialed_for_json_hint: str = "dict[str, Any]",
+    file: TextIO, name: str, members: list[str], extra: Optional[list[str]] = None, martialed_for_json_hint: Optional[str] = None,
 ):
     def add_indent(x: str):
         return "\n    " + x
+
+    if martialed_for_json_hint is None:
+        martialed_for_json_hint = "dict[str, Any]"
 
     init_args = "".join([(",\n        " + transform_type(x)) for x in members])
 
@@ -500,4 +503,5 @@ class MerkleSet:
     )
 
     for item in classes:
-        print_class(file, item[0], item[1], extra_members.get(item[0]))
+        # TODO: yeah...  nope, don't do it this way
+        print_class(file, item[0], item[1], extra_members.get(item[0]), martialed_for_json_hint=None if item[0] != "Program" else "str")
