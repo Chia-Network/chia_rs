@@ -518,4 +518,10 @@ class MerkleSet:
         if item[0] == "Program":
             martial_for_json_hint = "str"
 
-        print_class(file, item[0], item[1], extra_members.get(item[0]), martial_for_json_hint=martial_for_json_hint)
+        print_class(
+            file,
+            item[0],
+            item[1],
+            extra_members.get(item[0]),
+            martial_for_json_hint=martial_for_json_hint,
+        )
