@@ -1,3 +1,4 @@
+from typing import Any
 from chia_rs import SpendBundle
 import pytest
 
@@ -196,7 +197,7 @@ amount: 1232500000000 }]"
     ],
 )
 def test_spend_bundle(
-    ty: type, input_file: str, expected_add: str, expected_rem: str
+    ty: type[Any], input_file: str, expected_add: str, expected_rem: str
 ) -> None:
     buf = open(f"test-bundles/{input_file}.bundle", "rb").read()
     bundle = ty.from_bytes(buf)
