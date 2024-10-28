@@ -1532,6 +1532,13 @@ impl Iterator for MerkleBlobBreadthFirstIterator<'_> {
     }
 }
 
+#[cfg(any(test, debug_assertions))]
+impl Drop for MerkleBlob {
+    fn drop(&mut self) {
+        self.check().unwrap();
+    }
+}
+
 #[cfg(test)]
 mod dot;
 #[cfg(test)]
@@ -1540,12 +1547,6 @@ mod tests {
     use crate::merkle::dot::DotLines;
     use rstest::{fixture, rstest};
     use std::time::{Duration, Instant};
-
-    impl Drop for MerkleBlob {
-        fn drop(&mut self) {
-            self.check().unwrap();
-        }
-    }
 
     fn open_dot(_lines: &mut DotLines) {
         // crate::merkle::dot::open_dot(_lines);
