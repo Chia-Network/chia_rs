@@ -1,4 +1,4 @@
-use crate::merkle::{MerkleBlob, Node, NodeSpecific, TreeIndex};
+use crate::merkle::{MerkleBlob, MerkleBlobLeftChildFirstIterator, Node, NodeSpecific, TreeIndex};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use url::Url;
 
@@ -88,7 +88,7 @@ impl Node {
 impl MerkleBlob {
     pub fn to_dot(&self) -> DotLines {
         let mut result = DotLines::new();
-        for (index, block) in self {
+        for (index, block) in MerkleBlobLeftChildFirstIterator::new(&self.blob) {
             result.push(block.node.to_dot(index));
         }
 

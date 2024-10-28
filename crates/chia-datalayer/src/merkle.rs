@@ -9,7 +9,7 @@ use clvmr::sha2::Sha256;
 use num_traits::ToBytes;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::iter::{zip, IntoIterator};
+use std::iter::zip;
 use std::mem::size_of;
 use std::ops::Range;
 
@@ -1140,15 +1140,14 @@ impl MerkleBlob {
         Ok(lineage)
     }
 
-    pub fn iter(&self) -> MerkleBlobLeftChildFirstIterator<'_> {
-        <&Self as IntoIterator>::into_iter(self)
-    }
+    // pub fn iter(&self) -> MerkleBlobLeftChildFirstIterator<'_> {
+    //     <&Self as IntoIterator>::into_iter(self)
+    // }
 
     pub fn calculate_lazy_hashes(&mut self) -> Result<(), String> {
         // OPT: really want a truncated traversal, not filter
         // TODO: yeah, storing the whole set of blocks via collect is not great
-        for (index, mut block) in self
-            .iter()
+        for (index, mut block) in MerkleBlobLeftChildFirstIterator::new(&self.blob)
             .filter(|(_, block)| block.metadata.dirty)
             .collect::<Vec<_>>()
         {
@@ -1223,7 +1222,10 @@ impl MerkleBlob {
 impl PartialEq for MerkleBlob {
     fn eq(&self, other: &Self) -> bool {
         // NOTE: this is checking tree structure equality, not serialized bytes equality
-        for ((_, self_block), (_, other_block)) in zip(self, other) {
+        for ((_, self_block), (_, other_block)) in zip(
+            MerkleBlobLeftChildFirstIterator::new(&self.blob),
+            MerkleBlobLeftChildFirstIterator::new(&other.blob),
+        ) {
             if (self_block.metadata.dirty || other_block.metadata.dirty)
                 || self_block.node.hash != other_block.node.hash
             {
@@ -1242,14 +1244,14 @@ impl PartialEq for MerkleBlob {
     }
 }
 
-impl<'a> IntoIterator for &'a MerkleBlob {
-    type Item = (TreeIndex, Block);
-    type IntoIter = MerkleBlobLeftChildFirstIterator<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        MerkleBlobLeftChildFirstIterator::new(&self.blob)
-    }
-}
+// impl<'a> IntoIterator for &'a MerkleBlob {
+//     type Item = (TreeIndex, Block);
+//     type IntoIter = MerkleBlobLeftChildFirstIterator<'a>;
+//
+//     fn into_iter(self) -> Self::IntoIter {
+//         MerkleBlobLeftChildFirstIterator::new(&self.blob)
+//     }
+// }
 
 #[cfg(feature = "py-bindings")]
 #[pymethods]
@@ -1901,7 +1903,8 @@ mod tests {
 
     #[rstest]
     fn test_upsert_upserts(mut small_blob: MerkleBlob) {
-        let before_blocks = small_blob.iter().collect::<Vec<_>>();
+        let before_blocks =
+            MerkleBlobLeftChildFirstIterator::new(&small_blob.blob).collect::<Vec<_>>();
         let (key, index) = small_blob.key_to_index.iter().next().unwrap();
         let node = small_blob.get_node(*index).unwrap();
         let NodeSpecific::Leaf {
@@ -1916,7 +1919,8 @@ mod tests {
 
         small_blob.upsert(*key, new_value, &node.hash).unwrap();
 
-        let after_blocks = small_blob.iter().collect::<Vec<_>>();
+        let after_blocks =
+            MerkleBlobLeftChildFirstIterator::new(&small_blob.blob).collect::<Vec<_>>();
 
         assert_eq!(before_blocks.len(), after_blocks.len());
         for ((before_index, before), (after_index, after)) in zip(before_blocks, after_blocks) {
