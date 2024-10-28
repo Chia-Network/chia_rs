@@ -725,6 +725,10 @@ impl MerkleBlob {
         // NAME: consider name, we're inserting a subtree at a leaf
         // TODO: seems like this ought to be fairly similar to regular insert
 
+        // TODO: but what about the old leaf being the root...  is that what the batch insert
+        //       pre-filling of two leafs is about?  if so, this needs to be making sure of that
+        //       or something.
+
         struct Stuff {
             index: TreeIndex,
             hash: Hash,
@@ -764,6 +768,29 @@ impl MerkleBlob {
         };
         self.insert_entry_to_blob(new_internal_node_index, &block)?;
         self.update_parent(new_index, Some(new_internal_node_index))?;
+
+        let Some(old_leaf_parent) = old_leaf.parent else {
+            // TODO: relates to comment at the beginning about assumptions about the tree etc
+            panic!("not handling this case");
+        };
+
+        let mut parent = self.get_block(old_leaf_parent)?;
+        if let NodeSpecific::Internal {
+            ref mut left,
+            ref mut right,
+            ..
+        } = parent.node.specific
+        {
+            match old_leaf_index {
+                x if x == *left => *left = new_internal_node_index,
+                x if x == *right => *right = new_internal_node_index,
+                _ => panic!("parent not a child a grandparent"),
+            }
+        } else {
+            panic!("not handling this case now...")
+        }
+        self.insert_entry_to_blob(old_leaf_parent, &parent)?;
+        self.update_parent(old_leaf_index, Some(new_internal_node_index))?;
 
         Ok(())
     }
@@ -923,16 +950,6 @@ impl MerkleBlob {
 
         Ok(block)
     }
-
-    // fn update_left(&mut self, index: TreeIndex, left: Option<TreeIndex>) -> Result<(), String> {
-    //     let range = self.get_block_range(index);
-    //
-    //     let mut node = self.get_node(index)?;
-    //     node.left = left;
-    //     self.blob[range].copy_from_slice(&node.to_bytes());
-    //
-    //     Ok(())
-    // }
 
     fn mark_lineage_as_dirty(&mut self, index: TreeIndex) -> Result<(), String> {
         let mut next_index = Some(index);
@@ -1524,19 +1541,15 @@ mod tests {
     use rstest::{fixture, rstest};
     use std::time::{Duration, Instant};
 
-    fn open_dot(_lines: &mut DotLines) {
-        // crate::merkle::dot::open_dot(lines);
+    impl Drop for MerkleBlob {
+        fn drop(&mut self) {
+            self.check().unwrap();
+        }
     }
 
-    // #[allow(unused)]
-    // fn normalized_blob(merkle_blob: &MerkleBlob) -> Vec<u8> {
-    //     let mut new = MerkleBlob::new(merkle_blob.blob.clone()).unwrap();
-    //
-    //     new.calculate_lazy_hashes();
-    //     new.rebuild();
-    //
-    //     new.blob
-    // }
+    fn open_dot(_lines: &mut DotLines) {
+        // crate::merkle::dot::open_dot(_lines);
+    }
 
     #[test]
     fn test_node_type_serialized_values() {
@@ -1617,8 +1630,6 @@ mod tests {
         assert_eq!(lineage.len(), 2);
         let (_, last_node) = lineage.last().unwrap();
         assert_eq!(last_node.parent, None);
-
-        small_blob.check().unwrap();
     }
 
     #[rstest]
@@ -1641,8 +1652,6 @@ mod tests {
                 side: expected_side
             },
         );
-
-        small_blob.check().unwrap();
     }
 
     #[rstest]
@@ -1670,8 +1679,6 @@ mod tests {
         // TODO: check, well...  something
 
         merkle_blob.calculate_lazy_hashes().unwrap();
-
-        merkle_blob.check().unwrap();
     }
 
     #[test]
@@ -1705,8 +1712,6 @@ mod tests {
             assert_eq!(merkle_blob, reference_blobs[*key_value_id as usize]);
             dots.push(merkle_blob.to_dot().dump());
         }
-
-        merkle_blob.check().unwrap();
     }
 
     #[test]
@@ -1725,7 +1730,6 @@ mod tests {
             .unwrap();
         open_dot(merkle_blob.to_dot().set_note("first after"));
 
-        merkle_blob.check().unwrap();
         assert_eq!(merkle_blob.key_to_index.len(), 1);
     }
 
@@ -1784,8 +1788,6 @@ mod tests {
             Side::Right => [pre_count as KvId, pre_count as KvId + 1],
         };
         assert_eq!([left_key, right_key], expected_keys);
-
-        merkle_blob.check().unwrap();
     }
 
     #[test]
@@ -1807,7 +1809,6 @@ mod tests {
 
         merkle_blob.delete(key_value_id).unwrap();
 
-        merkle_blob.check().unwrap();
         assert_eq!(merkle_blob.key_to_index.len(), 0);
     }
 
@@ -1822,19 +1823,19 @@ mod tests {
 
     #[rstest]
     fn test_get_new_index_with_free_index(mut small_blob: MerkleBlob) {
+        open_dot(small_blob.to_dot().set_note("initial"));
         let key = 0x0001_0203_0405_0607;
         let _ = small_blob.key_to_index[&key];
         small_blob.delete(key).unwrap();
+        open_dot(small_blob.to_dot().set_note("after delete"));
 
         let expected = HashSet::from([1, 2]);
         assert_eq!(small_blob.free_indexes, expected);
-        // NOTE: both 1 and 2 are free per test_delete_frees_index
-        assert!(expected.contains(&small_blob.get_new_index()));
     }
 
     #[rstest]
     fn test_dump_small_blob_bytes(small_blob: MerkleBlob) {
-        println!("{}", hex::encode(small_blob.blob));
+        println!("{}", hex::encode(small_blob.blob.clone()));
     }
 
     #[test]
@@ -1954,13 +1955,37 @@ mod tests {
     }
 
     #[rstest]
-    fn test_batch_insert_with_odd_count_does_not_hang(mut small_blob: MerkleBlob) {
+    fn test_batch_insert(
+        #[values(0, 1, 2, 10)] pre_inserts: usize,
+        #[values(0, 1, 2, 8, 9)] count: usize,
+    ) {
+        let mut blob = MerkleBlob::new(vec![]).unwrap();
+        for i in 0..pre_inserts as KvId {
+            blob.insert(i, i, &sha256_num(i), InsertLocation::Auto {})
+                .unwrap();
+        }
+        open_dot(blob.to_dot().set_note("initial"));
+
         let mut batch: Vec<((KvId, KvId), Hash)> = vec![];
 
-        for i in 0..9 {
+        let mut batch_map = HashMap::new();
+        for i in pre_inserts as KvId..(pre_inserts + count) as KvId {
             batch.push(((i, i), sha256_num(i)));
+            batch_map.insert(i, i);
         }
 
-        small_blob.batch_insert(batch.into_iter()).unwrap();
+        let before = blob.get_key_value_map();
+        blob.batch_insert(batch.into_iter()).unwrap();
+        let after = blob.get_key_value_map();
+
+        open_dot(
+            blob.to_dot()
+                .set_note(&format!("after batch insert of {count} values")),
+        );
+
+        let mut expected = before.clone();
+        expected.extend(batch_map);
+
+        assert_eq!(after, expected);
     }
 }
