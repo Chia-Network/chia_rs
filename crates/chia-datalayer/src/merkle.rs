@@ -600,11 +600,9 @@ impl MerkleBlob {
             panic!("root found when not expected")
         };
 
-        let mut block = Block::from_bytes(self.get_block_bytes(old_leaf_index)?)?;
-        block.node.parent = Some(new_internal_node_index);
-        self.insert_entry_to_blob(old_leaf_index, &block)?;
+        self.update_parent(old_leaf_index, Some(new_internal_node_index))?;
 
-        let mut old_parent_block = Block::from_bytes(self.get_block_bytes(old_parent_index)?)?;
+        let mut old_parent_block = self.get_block(old_parent_index)?;
         if let NodeSpecific::Internal {
             ref mut left,
             ref mut right,
@@ -658,8 +656,7 @@ impl MerkleBlob {
                     specific: NodeSpecific::Leaf { key, value },
                 },
             };
-            self.insert_entry_to_blob(new_leaf_index, &new_block)
-                .unwrap();
+            self.insert_entry_to_blob(new_leaf_index, &new_block)?;
             indexes.push(new_leaf_index);
         }
 
@@ -680,10 +677,10 @@ impl MerkleBlob {
                     ),
                 };
 
-                let block_1 = self.get_block(index_1)?;
-                let block_2 = self.get_block(index_2)?;
-
                 let new_internal_node_index = self.get_new_index();
+
+                let block_1 = self.update_parent(index_1, Some(new_internal_node_index))?;
+                let block_2 = self.update_parent(index_2, Some(new_internal_node_index))?;
 
                 let new_block = Block {
                     metadata: NodeMetadata {
@@ -701,10 +698,6 @@ impl MerkleBlob {
                 };
 
                 self.insert_entry_to_blob(new_internal_node_index, &new_block)?;
-                for (child_index, mut child_block) in [(index_1, block_1), (index_2, block_2)] {
-                    child_block.node.parent = Some(new_internal_node_index);
-                    self.insert_entry_to_blob(child_index, &child_block)?;
-                }
                 new_indexes.push(new_internal_node_index);
             }
 
@@ -770,10 +763,7 @@ impl MerkleBlob {
             },
         };
         self.insert_entry_to_blob(new_internal_node_index, &block)?;
-        // TODO: yeah, doing this a fair bit, dedupe.  probably
-        let mut block = self.get_block(new_index)?;
-        block.node.parent = Some(new_internal_node_index);
-        self.insert_entry_to_blob(new_index, &block)?;
+        self.update_parent(new_index, Some(new_internal_node_index))?;
 
         Ok(())
     }
@@ -813,9 +803,7 @@ impl MerkleBlob {
 
             if let NodeSpecific::Internal { left, right } = sibling_block.node.specific {
                 for child_index in [left, right] {
-                    let mut block = self.get_block(child_index)?;
-                    block.node.parent = Some(0);
-                    self.insert_entry_to_blob(child_index, &block)?;
+                    self.update_parent(child_index, Some(0))?;
                 }
             };
 
@@ -924,15 +912,17 @@ impl MerkleBlob {
         Ok(())
     }
 
-    // fn update_parent(&mut self, index: TreeIndex, parent: Option<TreeIndex>) -> Result<(), String> {
-    //     let range = self.get_block_range(index);
-    //
-    //     let mut node = self.get_node(index)?;
-    //     node.parent = parent;
-    //     self.blob[range].copy_from_slice(&node.to_bytes());
-    //
-    //     Ok(())
-    // }
+    fn update_parent(
+        &mut self,
+        index: TreeIndex,
+        parent: Option<TreeIndex>,
+    ) -> Result<Block, String> {
+        let mut block = self.get_block(index)?;
+        block.node.parent = parent;
+        self.insert_entry_to_blob(index, &block)?;
+
+        Ok(block)
+    }
 
     // fn update_left(&mut self, index: TreeIndex, left: Option<TreeIndex>) -> Result<(), String> {
     //     let range = self.get_block_range(index);
@@ -1190,9 +1180,7 @@ impl MerkleBlob {
 
         if let NodeSpecific::Internal { left, right, .. } = source_block.node.specific {
             for child in [left, right] {
-                let mut block = self.get_block(child).unwrap();
-                block.node.parent = Some(destination);
-                self.insert_entry_to_blob(child, &block).unwrap();
+                self.update_parent(child, Some(destination)).unwrap();
             }
         }
 
