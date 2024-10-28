@@ -809,6 +809,7 @@ impl MerkleBlob {
         let leaf = self.get_node(leaf_index)?;
 
         // TODO: maybe some common way to indicate/perform sanity double checks?
+        //       maybe this disappears with unit variants and structs for the data
         let NodeSpecific::Leaf { .. } = leaf.specific else {
             panic!("key to index cache resulted in internal node")
         };
@@ -1053,7 +1054,7 @@ impl MerkleBlob {
             Ordering::Greater => return Err(format!("block index out of range: {index}")),
             Ordering::Equal => self.blob.extend_from_slice(&new_block_bytes),
             Ordering::Less => {
-                // TODO: lots of deserialization here for just the key
+                // OPT: lots of deserialization here for just the key
                 let old_block = self.get_block(index)?;
                 // TODO: should we be more careful about accidentally reading garbage like
                 //       from a freshly gotten index
@@ -1146,7 +1147,7 @@ impl MerkleBlob {
 
     pub fn calculate_lazy_hashes(&mut self) -> Result<(), String> {
         // OPT: really want a truncated traversal, not filter
-        // TODO: yeah, storing the whole set of blocks via collect is not great
+        // OPT: yeah, storing the whole set of blocks via collect is not great
         for (index, mut block) in MerkleBlobLeftChildFirstIterator::new(&self.blob)
             .filter(|(_, block)| block.metadata.dirty)
             .collect::<Vec<_>>()
@@ -1154,8 +1155,8 @@ impl MerkleBlob {
             let NodeSpecific::Internal { left, right } = block.node.specific else {
                 panic!("leaves should not be dirty")
             };
-            // TODO: obviously inefficient to re-get/deserialize these blocks inside
-            //       an iteration that's already doing that
+            // OPT: obviously inefficient to re-get/deserialize these blocks inside
+            //      an iteration that's already doing that
             let left_hash = self.get_hash(left)?;
             let right_hash = self.get_hash(right)?;
             block.update_hash(&left_hash, &right_hash);
