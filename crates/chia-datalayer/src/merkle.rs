@@ -892,7 +892,7 @@ impl MerkleBlob {
         Ok(())
     }
 
-    pub fn check(&self) -> Result<(), String> {
+    pub fn check_integrity(&self) -> Result<(), String> {
         let mut leaf_count: usize = 0;
         let mut internal_count: usize = 0;
         let mut child_to_parent: HashMap<TreeIndex, TreeIndex> = HashMap::new();
@@ -1535,7 +1535,7 @@ impl Iterator for MerkleBlobBreadthFirstIterator<'_> {
 #[cfg(any(test, debug_assertions))]
 impl Drop for MerkleBlob {
     fn drop(&mut self) {
-        self.check().unwrap();
+        self.check_integrity().unwrap();
     }
 }
 
@@ -1704,7 +1704,7 @@ mod tests {
             dots.push(merkle_blob.to_dot().dump());
         }
 
-        merkle_blob.check().unwrap();
+        merkle_blob.check_integrity().unwrap();
 
         for key_value_id in key_value_ids.iter().rev() {
             println!("deleting: {key_value_id}");
@@ -1806,7 +1806,7 @@ mod tests {
             )
             .unwrap();
         open_dot(merkle_blob.to_dot().set_note("first after"));
-        merkle_blob.check().unwrap();
+        merkle_blob.check_integrity().unwrap();
 
         merkle_blob.delete(key_value_id).unwrap();
 
