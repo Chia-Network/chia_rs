@@ -16,6 +16,9 @@ use std::ops::Range;
 type TreeIndex = u32;
 type Parent = Option<TreeIndex>;
 type Hash = [u8; 32];
+// key and value ids are provided from outside of this code and are implemented as
+// the row id from sqlite which is a signed 8 byte integer.  the actually key and
+// value data bytes will not be handled within this code, only outside.
 type KvId = i64;
 
 // assumptions
