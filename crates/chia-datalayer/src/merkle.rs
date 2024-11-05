@@ -7,6 +7,7 @@ use pyo3::{
 
 use clvmr::sha2::Sha256;
 use num_traits::ToBytes;
+use pyo3::{IntoPy, PyObject};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::iter::zip;
@@ -14,13 +15,95 @@ use std::mem::size_of;
 use std::ops::Range;
 use thiserror::Error;
 
-type TreeIndex = u32;
-type Parent = Option<TreeIndex>;
-type Hash = [u8; 32];
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct TreeIndex(u32);
+// impl From<u32> for TreeIndex {
+//     fn from(value: u32) -> Self {
+//         Self(value)
+//     }
+// }
+impl pyo3::IntoPy<pyo3::PyObject> for TreeIndex {
+    fn into_py(self, py: Python<'_>) -> pyo3::PyObject {
+        self.0.into_py(py)
+    }
+}
+impl<'py> pyo3::FromPyObject<'py> for TreeIndex {
+    // Required method
+    fn extract_bound(ob: &pyo3::Bound<'py, pyo3::PyAny>) -> PyResult<Self> {
+        use pyo3::types::PyAnyMethods;
+        let v: u32 = ob.extract()?;
+
+        Ok(Self(v))
+    }
+}
+impl pyo3::ToPyObject for TreeIndex {
+    fn to_object(&self, py: Python<'_>) -> PyObject {
+        self.into_py(py)
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Parent(Option<TreeIndex>);
+// impl From<Option<TreeIndex>> for Parent {
+//     fn from(value: Option<TreeIndex>) -> Self {
+//         Self(value)
+//     }
+// }
+impl pyo3::IntoPy<pyo3::PyObject> for Parent {
+    fn into_py(self, py: Python<'_>) -> pyo3::PyObject {
+        self.0.into_py(py)
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Hash([u8; 32]);
+impl From<[u8; 32]> for Hash {
+    fn from(value: [u8; 32]) -> Self {
+        Self(value)
+    }
+}
+impl pyo3::IntoPy<pyo3::PyObject> for Hash {
+    fn into_py(self, py: Python<'_>) -> pyo3::PyObject {
+        self.0.into_py(py)
+    }
+}
+impl<'py> pyo3::FromPyObject<'py> for Hash {
+    // Required method
+    fn extract_bound(ob: &pyo3::Bound<'py, pyo3::PyAny>) -> PyResult<Self> {
+        use pyo3::types::PyAnyMethods;
+        let v: [u8; 32] = ob.extract()?;
+
+        Ok(Self(v))
+    }
+}
+// impl pyo3::ToPyObject for Hash {
+//     fn to_object(&self, py: Python<'_>) -> PyObject {
+//         self.into_py(py)
+//     }
+// }
+
 // key and value ids are provided from outside of this code and are implemented as
 // the row id from sqlite which is a signed 8 byte integer.  the actually key and
 // value data bytes will not be handled within this code, only outside.
-type KvId = i64;
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
+pub struct KvId(i64);
+impl pyo3::IntoPy<pyo3::PyObject> for KvId {
+    fn into_py(self, py: Python<'_>) -> pyo3::PyObject {
+        self.0.into_py(py)
+    }
+}
+impl<'py> pyo3::FromPyObject<'py> for KvId {
+    // Required method
+    fn extract_bound(ob: &pyo3::Bound<'py, pyo3::PyAny>) -> PyResult<Self> {
+        use pyo3::types::PyAnyMethods;
+        let v: i64 = ob.extract()?;
+
+        Ok(Self(v))
+    }
+}
+// impl From<[u8; 32]> for KvId {
+//     fn from(value: [u8; 32]) -> Self {
+//         Self(i64::from_be_bytes(value))
+//     }
+// }
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -99,9 +182,10 @@ const VALUE_RANGE: Range<usize> = range_by_length(KEY_RANGE.end, size_of::<KvId>
 
 const DATA_SIZE: usize = max(RIGHT_RANGE.end, VALUE_RANGE.end);
 const BLOCK_SIZE: usize = METADATA_SIZE + DATA_SIZE;
-type BlockBytes = [u8; BLOCK_SIZE];
-type MetadataBytes = [u8; METADATA_SIZE];
-type DataBytes = [u8; DATA_SIZE];
+pub struct BlockBytes([u8; BLOCK_SIZE]);
+#[derive(Debug)]
+pub struct MetadataBytes([u8; METADATA_SIZE]);
+pub struct DataBytes([u8; DATA_SIZE]);
 const DATA_RANGE: Range<usize> = METADATA_SIZE..METADATA_SIZE + DATA_SIZE;
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
@@ -134,23 +218,23 @@ fn sha256_num<T: ToBytes>(input: T) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(input.to_be_bytes());
 
-    hasher.finalize()
+    hasher.finalize().into()
 }
 
 fn sha256_bytes(input: &[u8]) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(input);
 
-    hasher.finalize()
+    hasher.finalize().into()
 }
 
 fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(b"\x02");
-    hasher.update(left_hash);
-    hasher.update(right_hash);
+    hasher.update(left_hash.0);
+    hasher.update(right_hash.0);
 
-    hasher.finalize()
+    hasher.finalize().into()
 }
 
 #[cfg_attr(feature = "py-bindings", pyclass(name = "Side", eq, eq_int))]
@@ -171,7 +255,7 @@ pub enum InsertLocation {
     Leaf { index: TreeIndex, side: Side },
 }
 
-const NULL_PARENT: TreeIndex = 0xffff_ffffu32;
+const NULL_PARENT: TreeIndex = TreeIndex(0xffff_ffffu32);
 
 #[derive(Debug, PartialEq)]
 pub struct NodeMetadata {
@@ -183,25 +267,25 @@ impl NodeMetadata {
     pub fn from_bytes(blob: MetadataBytes) -> Result<Self, Error> {
         // OPT: could save 1-2% of tree space by packing (and maybe don't do that)
         Ok(Self {
-            node_type: Self::node_type_from_bytes(blob)?,
-            dirty: Self::dirty_from_bytes(blob)?,
+            node_type: Self::node_type_from_bytes(&blob)?,
+            dirty: Self::dirty_from_bytes(&blob)?,
         })
     }
 
     pub fn to_bytes(&self) -> MetadataBytes {
-        let mut bytes = [0u8; METADATA_SIZE];
-        bytes[TYPE_RANGE].copy_from_slice(&[self.node_type.to_u8()]);
-        bytes[DIRTY_RANGE].copy_from_slice(&[u8::from(self.dirty)]);
+        let mut bytes = MetadataBytes([0u8; METADATA_SIZE]);
+        bytes.0[TYPE_RANGE].copy_from_slice(&[self.node_type.to_u8()]);
+        bytes.0[DIRTY_RANGE].copy_from_slice(&[u8::from(self.dirty)]);
 
         bytes
     }
 
-    pub fn node_type_from_bytes(blob: MetadataBytes) -> Result<NodeType, Error> {
-        NodeType::from_u8(u8::from_be_bytes(blob[TYPE_RANGE].try_into().unwrap()))
+    pub fn node_type_from_bytes(blob: &MetadataBytes) -> Result<NodeType, Error> {
+        NodeType::from_u8(u8::from_be_bytes(blob.0[TYPE_RANGE].try_into().unwrap()))
     }
 
-    pub fn dirty_from_bytes(blob: MetadataBytes) -> Result<bool, Error> {
-        match u8::from_be_bytes(blob[DIRTY_RANGE].try_into().unwrap()) {
+    pub fn dirty_from_bytes(blob: &MetadataBytes) -> Result<bool, Error> {
+        match u8::from_be_bytes(blob.0[DIRTY_RANGE].try_into().unwrap()) {
             0 => Ok(false),
             1 => Ok(true),
             other => Err(Error::UnknownDirtyValue(other)),
@@ -210,7 +294,7 @@ impl NodeMetadata {
 }
 
 #[cfg_attr(feature = "py-bindings", pyclass(name = "Node", get_all))]
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Node {
     parent: Parent,
     hash: Hash,
@@ -237,7 +321,7 @@ impl NodeSpecific {
         } else if index == *left {
             *right
         } else {
-            panic!("index not a child: {index}")
+            panic!("index not a child: {index:?}")
         }
     }
 }
@@ -250,59 +334,60 @@ impl Node {
             hash: Self::hash_from_bytes(&blob),
             specific: match metadata.node_type {
                 NodeType::Internal => NodeSpecific::Internal {
-                    left: TreeIndex::from_be_bytes(blob[LEFT_RANGE].try_into().unwrap()),
-                    right: TreeIndex::from_be_bytes(blob[RIGHT_RANGE].try_into().unwrap()),
+                    left: TreeIndex(u32::from_be_bytes(blob.0[LEFT_RANGE].try_into().unwrap())),
+                    right: TreeIndex(u32::from_be_bytes(blob.0[RIGHT_RANGE].try_into().unwrap())),
                 },
                 NodeType::Leaf => NodeSpecific::Leaf {
-                    key: KvId::from_be_bytes(blob[KEY_RANGE].try_into().unwrap()),
-                    value: KvId::from_be_bytes(blob[VALUE_RANGE].try_into().unwrap()),
+                    key: KvId(i64::from_be_bytes(blob.0[KEY_RANGE].try_into().unwrap())),
+                    value: KvId(i64::from_be_bytes(blob.0[VALUE_RANGE].try_into().unwrap())),
                 },
             },
         })
     }
 
     fn parent_from_bytes(blob: &DataBytes) -> Parent {
-        let parent_integer = TreeIndex::from_be_bytes(blob[PARENT_RANGE].try_into().unwrap());
+        let parent_integer =
+            TreeIndex(u32::from_be_bytes(blob.0[PARENT_RANGE].try_into().unwrap()));
         match parent_integer {
-            NULL_PARENT => None,
-            _ => Some(parent_integer),
+            NULL_PARENT => Parent(None),
+            _ => Parent(Some(parent_integer)),
         }
     }
 
     fn hash_from_bytes(blob: &DataBytes) -> Hash {
-        blob[HASH_RANGE].try_into().unwrap()
+        Hash(blob.0[HASH_RANGE].try_into().unwrap())
     }
 
     pub fn to_bytes(&self) -> DataBytes {
-        let mut blob: DataBytes = [0; DATA_SIZE];
+        let mut blob = DataBytes([0; DATA_SIZE]);
         match self {
             Node {
                 parent,
                 specific: NodeSpecific::Internal { left, right },
                 hash,
             } => {
-                let parent_integer = match parent {
-                    None => NULL_PARENT,
-                    Some(parent) => *parent,
+                let parent_integer = match parent.0 {
+                    None => NULL_PARENT.0,
+                    Some(parent) => parent.0,
                 };
-                blob[HASH_RANGE].copy_from_slice(hash);
-                blob[PARENT_RANGE].copy_from_slice(&parent_integer.to_be_bytes());
-                blob[LEFT_RANGE].copy_from_slice(&left.to_be_bytes());
-                blob[RIGHT_RANGE].copy_from_slice(&right.to_be_bytes());
+                blob.0[HASH_RANGE].copy_from_slice(&hash.0);
+                blob.0[PARENT_RANGE].copy_from_slice(&parent_integer.to_be_bytes());
+                blob.0[LEFT_RANGE].copy_from_slice(&left.0.to_be_bytes());
+                blob.0[RIGHT_RANGE].copy_from_slice(&right.0.to_be_bytes());
             }
             Node {
                 parent,
                 specific: NodeSpecific::Leaf { key, value },
                 hash,
             } => {
-                let parent_integer = match parent {
-                    None => NULL_PARENT,
-                    Some(parent) => *parent,
+                let parent_integer = match parent.0 {
+                    None => NULL_PARENT.0,
+                    Some(parent) => parent.0,
                 };
-                blob[HASH_RANGE].copy_from_slice(hash);
-                blob[PARENT_RANGE].copy_from_slice(&parent_integer.to_be_bytes());
-                blob[KEY_RANGE].copy_from_slice(&key.to_be_bytes());
-                blob[VALUE_RANGE].copy_from_slice(&value.to_be_bytes());
+                blob.0[HASH_RANGE].copy_from_slice(&hash.0);
+                blob.0[PARENT_RANGE].copy_from_slice(&parent_integer.to_be_bytes());
+                blob.0[KEY_RANGE].copy_from_slice(&key.0.to_be_bytes());
+                blob.0[VALUE_RANGE].copy_from_slice(&value.0.to_be_bytes());
             }
         }
 
@@ -337,29 +422,29 @@ impl Node {
 
     #[getter(key)]
     pub fn py_property_key(&self) -> PyResult<KvId> {
-        let NodeSpecific::Leaf { key, .. } = self.specific else {
+        let NodeSpecific::Leaf { ref key, .. } = self.specific else {
             return Err(PyAttributeError::new_err(
                 "Attribute 'key' not present for internal nodes".to_string(),
             ));
         };
 
-        Ok(key)
+        Ok(key.clone())
     }
 
     #[getter(value)]
     pub fn py_property_value(&self) -> PyResult<KvId> {
-        let NodeSpecific::Leaf { value, .. } = self.specific else {
+        let NodeSpecific::Leaf { ref value, .. } = self.specific else {
             return Err(PyAttributeError::new_err(
                 "Attribute 'value' not present for internal nodes".to_string(),
             ));
         };
 
-        Ok(value)
+        Ok(value.clone())
     }
 }
 
 fn block_range(index: TreeIndex) -> Range<usize> {
-    let block_start = index as usize * BLOCK_SIZE;
+    let block_start = index.0 as usize * BLOCK_SIZE;
     block_start..block_start + BLOCK_SIZE
 }
 
@@ -370,16 +455,16 @@ pub struct Block {
 
 impl Block {
     pub fn to_bytes(&self) -> BlockBytes {
-        let mut blob: BlockBytes = [0; BLOCK_SIZE];
-        blob[METADATA_RANGE].copy_from_slice(&self.metadata.to_bytes());
-        blob[DATA_RANGE].copy_from_slice(&self.node.to_bytes());
+        let mut blob = BlockBytes([0; BLOCK_SIZE]);
+        blob.0[METADATA_RANGE].copy_from_slice(&self.metadata.to_bytes().0);
+        blob.0[DATA_RANGE].copy_from_slice(&self.node.to_bytes().0);
 
         blob
     }
 
     pub fn from_bytes(blob: BlockBytes) -> Result<Self, Error> {
-        let metadata_blob: MetadataBytes = blob[METADATA_RANGE].try_into().unwrap();
-        let data_blob: DataBytes = blob[DATA_RANGE].try_into().unwrap();
+        let metadata_blob = MetadataBytes(blob.0[METADATA_RANGE].try_into().unwrap());
+        let data_blob = DataBytes(blob.0[DATA_RANGE].try_into().unwrap());
         let metadata = NodeMetadata::from_bytes(metadata_blob)
             .map_err(|message| Error::FailedLoadingMetadata(message.to_string()))?;
         let node = Node::from_bytes(&metadata, data_blob)
@@ -403,7 +488,7 @@ fn get_free_indexes_and_keys_values_indexes(
     let mut key_to_index: HashMap<KvId, TreeIndex> = HashMap::default();
 
     for (index, block) in MerkleBlobLeftChildFirstIterator::new(blob) {
-        seen_indexes[index as usize] = true;
+        seen_indexes[index.0 as usize] = true;
 
         if let NodeSpecific::Leaf { key, .. } = block.node.specific {
             key_to_index.insert(key, index);
@@ -413,7 +498,7 @@ fn get_free_indexes_and_keys_values_indexes(
     let mut free_indexes: HashSet<TreeIndex> = HashSet::new();
     for (index, seen) in seen_indexes.iter().enumerate() {
         if !seen {
-            free_indexes.insert(index as TreeIndex);
+            free_indexes.insert(TreeIndex(index as u32));
         }
     }
 
@@ -463,7 +548,7 @@ impl MerkleBlob {
         }
 
         let insert_location = match insert_location {
-            InsertLocation::Auto {} => self.get_random_insert_location_by_kvid(key)?,
+            InsertLocation::Auto {} => self.get_random_insert_location_by_kvid(key.clone())?,
             _ => insert_location,
         };
 
@@ -489,7 +574,7 @@ impl MerkleBlob {
                 };
 
                 let node = Node {
-                    parent: None,
+                    parent: Parent(None),
                     hash: *hash,
                     specific: NodeSpecific::Leaf { key, value },
                 };
@@ -512,7 +597,7 @@ impl MerkleBlob {
                 dirty: false,
             },
             node: Node {
-                parent: None,
+                parent: Parent(None),
                 specific: NodeSpecific::Leaf { key, value },
                 hash: *hash,
             },
@@ -542,7 +627,7 @@ impl MerkleBlob {
                 dirty: false,
             },
             node: Node {
-                parent: None,
+                parent: Parent(None),
                 specific: NodeSpecific::Internal {
                     left: left_index,
                     right: right_index,
@@ -561,7 +646,7 @@ impl MerkleBlob {
             return Err(Error::OldLeafUnexpectedlyNotALeaf);
         };
 
-        node.parent = Some(0);
+        node.parent = Parent(Some(TreeIndex(0)));
 
         let nodes = [
             (
@@ -570,7 +655,7 @@ impl MerkleBlob {
                     Side::Right => left_index,
                 },
                 Node {
-                    parent: Some(0),
+                    parent: Parent(Some(TreeIndex(0))),
                     specific: NodeSpecific::Leaf {
                         key: old_leaf_key,
                         value: old_leaf_value,
@@ -613,7 +698,7 @@ impl MerkleBlob {
         let new_leaf_index = self.get_new_index();
         let new_internal_node_index = self.get_new_index();
 
-        node.parent = Some(new_internal_node_index);
+        node.parent = Parent(Some(new_internal_node_index));
 
         let new_leaf_block = Block {
             metadata: NodeMetadata {
@@ -634,7 +719,7 @@ impl MerkleBlob {
                 dirty: false,
             },
             node: Node {
-                parent: old_leaf.parent,
+                parent: old_leaf.parent.clone(),
                 specific: NodeSpecific::Internal {
                     left: left_index,
                     right: right_index,
@@ -644,11 +729,11 @@ impl MerkleBlob {
         };
         self.insert_entry_to_blob(new_internal_node_index, &new_internal_block)?;
 
-        let Some(old_parent_index) = old_leaf.parent else {
+        let Parent(Some(old_parent_index)) = old_leaf.parent else {
             panic!("root found when not expected")
         };
 
-        self.update_parent(old_leaf_index, Some(new_internal_node_index))?;
+        self.update_parent(old_leaf_index, Parent(Some(new_internal_node_index)))?;
 
         let mut old_parent_block = self.get_block(old_parent_index)?;
         if let NodeSpecific::Internal {
@@ -699,7 +784,7 @@ impl MerkleBlob {
                     dirty: false,
                 },
                 node: Node {
-                    parent: None,
+                    parent: Parent(None),
                     hash,
                     specific: NodeSpecific::Leaf { key, value },
                 },
@@ -727,8 +812,8 @@ impl MerkleBlob {
 
                 let new_internal_node_index = self.get_new_index();
 
-                let block_1 = self.update_parent(index_1, Some(new_internal_node_index))?;
-                let block_2 = self.update_parent(index_2, Some(new_internal_node_index))?;
+                let block_1 = self.update_parent(index_1, Parent(Some(new_internal_node_index)))?;
+                let block_2 = self.update_parent(index_2, Parent(Some(new_internal_node_index)))?;
 
                 let new_block = Block {
                     metadata: NodeMetadata {
@@ -736,7 +821,7 @@ impl MerkleBlob {
                         dirty: false,
                     },
                     node: Node {
-                        parent: None,
+                        parent: Parent(None),
                         hash: internal_hash(&block_1.node.hash, &block_2.node.hash),
                         specific: NodeSpecific::Internal {
                             left: index_1,
@@ -815,9 +900,9 @@ impl MerkleBlob {
             },
         };
         self.insert_entry_to_blob(new_internal_node_index, &block)?;
-        self.update_parent(new_index, Some(new_internal_node_index))?;
+        self.update_parent(new_index, Parent(Some(new_internal_node_index)))?;
 
-        let Some(old_leaf_parent) = old_leaf.parent else {
+        let Parent(Some(old_leaf_parent)) = old_leaf.parent else {
             // TODO: relates to comment at the beginning about assumptions about the tree etc
             panic!("not handling this case");
         };
@@ -838,7 +923,7 @@ impl MerkleBlob {
             panic!("not handling this case now...")
         }
         self.insert_entry_to_blob(old_leaf_parent, &parent)?;
-        self.update_parent(old_leaf_index, Some(new_internal_node_index))?;
+        self.update_parent(old_leaf_index, Parent(Some(new_internal_node_index)))?;
 
         Ok(())
     }
@@ -860,7 +945,7 @@ impl MerkleBlob {
         };
         self.key_to_index.remove(&key);
 
-        let Some(parent_index) = leaf.parent else {
+        let Parent(Some(parent_index)) = leaf.parent else {
             self.clear();
             return Ok(());
         };
@@ -870,13 +955,13 @@ impl MerkleBlob {
         let sibling_index = parent.specific.sibling_index(leaf_index);
         let mut sibling_block = self.get_block(sibling_index)?;
 
-        let Some(grandparent_index) = parent.parent else {
-            sibling_block.node.parent = None;
-            self.insert_entry_to_blob(0, &sibling_block)?;
+        let Parent(Some(grandparent_index)) = parent.parent else {
+            sibling_block.node.parent = Parent(None);
+            self.insert_entry_to_blob(TreeIndex(0), &sibling_block)?;
 
             if let NodeSpecific::Internal { left, right } = sibling_block.node.specific {
                 for child_index in [left, right] {
-                    self.update_parent(child_index, Some(0))?;
+                    self.update_parent(child_index, Parent(Some(TreeIndex(0))))?;
                 }
             };
 
@@ -888,7 +973,7 @@ impl MerkleBlob {
         self.free_indexes.insert(parent_index);
         let mut grandparent_block = self.get_block(grandparent_index)?;
 
-        sibling_block.node.parent = Some(grandparent_index);
+        sibling_block.node.parent = Parent(Some(grandparent_index));
         self.insert_entry_to_blob(sibling_index, &sibling_block)?;
 
         if let NodeSpecific::Internal {
@@ -931,7 +1016,7 @@ impl MerkleBlob {
         }
         self.insert_entry_to_blob(*leaf_index, &block)?;
 
-        if let Some(parent) = block.node.parent {
+        if let Parent(Some(parent)) = block.node.parent {
             self.mark_lineage_as_dirty(parent)?;
         }
 
@@ -944,7 +1029,7 @@ impl MerkleBlob {
         let mut child_to_parent: HashMap<TreeIndex, TreeIndex> = HashMap::new();
 
         for (index, block) in MerkleBlobParentFirstIterator::new(&self.blob) {
-            if let Some(parent) = block.node.parent {
+            if let Parent(Some(parent)) = block.node.parent {
                 assert_eq!(child_to_parent.remove(&index), Some(parent));
             }
             match block.node.specific {
@@ -977,7 +1062,7 @@ impl MerkleBlob {
         let total_count = leaf_count + internal_count + self.free_indexes.len();
         let extend_index = self.extend_index();
         assert_eq!(
-            total_count, extend_index as usize,
+            total_count, extend_index.0 as usize,
             "expected total node count {extend_index:?} found: {total_count:?}",
         );
         assert_eq!(child_to_parent.len(), 0);
@@ -985,11 +1070,7 @@ impl MerkleBlob {
         Ok(())
     }
 
-    fn update_parent(
-        &mut self,
-        index: TreeIndex,
-        parent: Option<TreeIndex>,
-    ) -> Result<Block, Error> {
+    fn update_parent(&mut self, index: TreeIndex, parent: Parent) -> Result<Block, Error> {
         let mut block = self.get_block(index)?;
         block.node.parent = parent;
         self.insert_entry_to_blob(index, &block)?;
@@ -1009,7 +1090,7 @@ impl MerkleBlob {
 
             block.metadata.dirty = true;
             self.insert_entry_to_blob(this_index, &block)?;
-            next_index = block.node.parent;
+            next_index = block.node.parent.0;
         }
 
         Ok(())
@@ -1047,7 +1128,7 @@ impl MerkleBlob {
         } else {
             Side::Right
         };
-        let mut next_index: TreeIndex = 0;
+        let mut next_index = TreeIndex(0);
         let mut node = self.get_node(next_index)?;
 
         loop {
@@ -1068,19 +1149,19 @@ impl MerkleBlob {
                 }
             }
 
-            seed_bytes = sha256_bytes(&seed_bytes).into();
+            seed_bytes = sha256_bytes(&seed_bytes).0.into();
         }
     }
 
     fn get_random_insert_location_by_kvid(&self, seed: KvId) -> Result<InsertLocation, Error> {
-        let seed = sha256_num(seed);
+        let seed = sha256_num(seed.0);
 
-        self.get_random_insert_location_by_seed(&seed)
+        self.get_random_insert_location_by_seed(&seed.0)
     }
 
     fn extend_index(&self) -> TreeIndex {
         let blob_length = self.blob.len();
-        let index: TreeIndex = (blob_length / BLOCK_SIZE) as TreeIndex;
+        let index: TreeIndex = TreeIndex((blob_length / BLOCK_SIZE) as u32);
         let remainder = blob_length % BLOCK_SIZE;
         assert_eq!(remainder, 0, "blob length {blob_length:?} not a multiple of {BLOCK_SIZE:?}, remainder: {remainder:?}");
 
@@ -1092,7 +1173,7 @@ impl MerkleBlob {
         let extend_index = self.extend_index();
         match index.cmp(&extend_index) {
             Ordering::Greater => return Err(Error::BlockIndexOutOfRange(index)),
-            Ordering::Equal => self.blob.extend_from_slice(&new_block_bytes),
+            Ordering::Equal => self.blob.extend_from_slice(&new_block_bytes.0),
             Ordering::Less => {
                 // OPT: lots of deserialization here for just the key
                 let old_block = self.get_block(index)?;
@@ -1109,7 +1190,7 @@ impl MerkleBlob {
                         self.key_to_index.remove(&old_block_key);
                     };
                 };
-                self.blob[block_range(index)].copy_from_slice(&new_block_bytes);
+                self.blob[block_range(index)].copy_from_slice(&new_block_bytes.0);
             }
         }
 
@@ -1128,18 +1209,19 @@ impl MerkleBlob {
 
     fn get_hash(&self, index: TreeIndex) -> Result<Hash, Error> {
         let block_bytes = self.get_block_bytes(index)?;
-        let data_bytes: DataBytes = block_bytes[DATA_RANGE].try_into().unwrap();
+        let data_bytes = DataBytes(block_bytes.0[DATA_RANGE].try_into().unwrap());
 
         Ok(Node::hash_from_bytes(&data_bytes))
     }
 
     fn get_block_bytes(&self, index: TreeIndex) -> Result<BlockBytes, Error> {
-        Ok(self
-            .blob
-            .get(block_range(index))
-            .ok_or(Error::BlockIndexOutOfRange(index))?
-            .try_into()
-            .unwrap_or_else(|e| panic!("failed getting block {index}: {e}")))
+        Ok(BlockBytes(
+            self.blob
+                .get(block_range(index))
+                .ok_or(Error::BlockIndexOutOfRange(index))?
+                .try_into()
+                .unwrap_or_else(|e| panic!("failed getting block {index:?}: {e}")),
+        ))
     }
 
     pub fn get_node(&self, index: TreeIndex) -> Result<Node, Error> {
@@ -1149,9 +1231,9 @@ impl MerkleBlob {
     pub fn get_parent_index(&self, index: TreeIndex) -> Result<Parent, Error> {
         let block = self.get_block_bytes(index)?;
 
-        Ok(Node::parent_from_bytes(
-            block[DATA_RANGE].try_into().unwrap(),
-        ))
+        Ok(Node::parent_from_bytes(&DataBytes(
+            block.0[DATA_RANGE].try_into().unwrap(),
+        )))
     }
 
     pub fn get_lineage_with_indexes(
@@ -1163,7 +1245,7 @@ impl MerkleBlob {
 
         while let Some(this_index) = next_index {
             let node = self.get_node(this_index)?;
-            next_index = node.parent;
+            next_index = node.parent.0;
             lineage.push((index, node));
         }
 
@@ -1176,7 +1258,7 @@ impl MerkleBlob {
 
         while let Some(this_index) = next_index {
             lineage.push(this_index);
-            next_index = self.get_parent_index(this_index)?;
+            next_index = self.get_parent_index(this_index)?.0;
         }
 
         Ok(lineage)
@@ -1378,7 +1460,7 @@ impl MerkleBlob {
         {
             use pyo3::conversion::IntoPy;
             use pyo3::types::PyListMethods;
-            list.append((index, node.into_py(py)))?;
+            list.append((index.into_py(py), node.into_py(py)))?;
         }
 
         Ok(list.into())
@@ -1404,7 +1486,7 @@ impl MerkleBlob {
 
     #[pyo3(name = "get_root_hash")]
     pub fn py_get_root_hash(&self) -> PyResult<Option<Hash>> {
-        self.py_get_hash_at_index(0)
+        self.py_get_hash_at_index(TreeIndex(0))
     }
 
     #[pyo3(name = "get_hash_at_index")]
@@ -1463,7 +1545,7 @@ impl<'a> MerkleBlobLeftChildFirstIterator<'a> {
         if blob.len() / BLOCK_SIZE > 0 {
             deque.push_back(MerkleBlobLeftChildFirstIteratorItem {
                 visited: false,
-                index: 0,
+                index: TreeIndex(0),
             });
         }
 
@@ -1479,7 +1561,7 @@ impl Iterator for MerkleBlobLeftChildFirstIterator<'_> {
 
         loop {
             let item = self.deque.pop_front()?;
-            let block_bytes: BlockBytes = self.blob[block_range(item.index)].try_into().unwrap();
+            let block_bytes = BlockBytes(self.blob[block_range(item.index)].try_into().unwrap());
             let block = Block::from_bytes(block_bytes).unwrap();
 
             match block.node.specific {
@@ -1516,7 +1598,7 @@ impl<'a> MerkleBlobParentFirstIterator<'a> {
     fn new(blob: &'a [u8]) -> Self {
         let mut deque = VecDeque::new();
         if blob.len() / BLOCK_SIZE > 0 {
-            deque.push_back(0);
+            deque.push_back(TreeIndex(0));
         }
 
         Self { blob, deque }
@@ -1530,7 +1612,7 @@ impl Iterator for MerkleBlobParentFirstIterator<'_> {
         // left sibling first, parents before children
 
         let index = self.deque.pop_front()?;
-        let block_bytes: BlockBytes = self.blob[block_range(index)].try_into().unwrap();
+        let block_bytes = BlockBytes(self.blob[block_range(index)].try_into().unwrap());
         let block = Block::from_bytes(block_bytes).unwrap();
 
         if let NodeSpecific::Internal { left, right } = block.node.specific {
@@ -1552,7 +1634,7 @@ impl<'a> MerkleBlobBreadthFirstIterator<'a> {
     fn new(blob: &'a [u8]) -> Self {
         let mut deque = VecDeque::new();
         if blob.len() / BLOCK_SIZE > 0 {
-            deque.push_back(0);
+            deque.push_back(TreeIndex(0));
         }
 
         Self { blob, deque }
@@ -1567,7 +1649,7 @@ impl Iterator for MerkleBlobBreadthFirstIterator<'_> {
 
         loop {
             let index = self.deque.pop_front()?;
-            let block_bytes: BlockBytes = self.blob[block_range(index)].try_into().unwrap();
+            let block_bytes = BlockBytes(self.blob[block_range(index)].try_into().unwrap());
             let block = Block::from_bytes(block_bytes).unwrap();
 
             match block.node.specific {
@@ -1619,14 +1701,14 @@ mod tests {
     fn test_internal_hash() {
         // in Python: Program.to((left_hash, right_hash)).get_tree_hash_precalc(left_hash, right_hash)
 
-        let left: Hash = (0u8..32).collect::<Vec<_>>().try_into().unwrap();
-        let right: Hash = (32u8..64).collect::<Vec<_>>().try_into().unwrap();
+        let left: Hash = Hash((0u8..32).collect::<Vec<_>>().try_into().unwrap());
+        let right: Hash = Hash((32u8..64).collect::<Vec<_>>().try_into().unwrap());
 
         assert_eq!(
             internal_hash(&left, &right),
             clvm_utils::tree_hash_pair(
-                clvm_utils::TreeHash::new(left),
-                clvm_utils::TreeHash::new(right)
+                clvm_utils::TreeHash::new(left.0),
+                clvm_utils::TreeHash::new(right.0)
             )
             .to_bytes(),
         );
@@ -1637,15 +1719,18 @@ mod tests {
         #[values(false, true)] dirty: bool,
         #[values(NodeType::Internal, NodeType::Leaf)] node_type: NodeType,
     ) {
-        let bytes: [u8; 2] = [node_type.to_u8(), dirty as u8];
+        let bytes = MetadataBytes([node_type.to_u8(), dirty as u8]);
         let object = NodeMetadata::from_bytes(bytes).unwrap();
         assert_eq!(object, NodeMetadata { node_type, dirty },);
-        assert_eq!(object.to_bytes(), bytes);
+        assert_eq!(object.to_bytes(), bytes.0);
         assert_eq!(
-            NodeMetadata::node_type_from_bytes(bytes).unwrap(),
+            NodeMetadata::node_type_from_bytes(&bytes).unwrap(),
             object.node_type
         );
-        assert_eq!(NodeMetadata::dirty_from_bytes(bytes).unwrap(), object.dirty);
+        assert_eq!(
+            NodeMetadata::dirty_from_bytes(&bytes).unwrap(),
+            object.dirty
+        );
     }
 
     #[fixture]

@@ -53,29 +53,29 @@ impl DotLines {
 impl Node {
     pub fn to_dot(&self, index: TreeIndex) -> DotLines {
         // TODO: can this be done without introducing a blank line?
-        let node_to_parent = match self.parent {
-            Some(parent) => format!("node_{index} -> node_{parent};"),
+        let node_to_parent = match self.parent.0 {
+            Some(parent) => format!("node_{} -> node_{};", index.0, parent.0),
             None => String::new(),
         };
 
         match self.specific {
             NodeSpecific::Internal {left, right} => DotLines{
                 nodes: vec![
-                    format!("node_{index} [label=\"{index}\"]"),
+                    format!("node_{} [label=\"{}\"]", index.0, index.0),
                 ],
                 connections: vec![
-                    format!("node_{index} -> node_{left};"),
-                    format!("node_{index} -> node_{right};"),
+                    format!("node_{} -> node_{};", index.0, left.0),
+                    format!("node_{} -> node_{};", index.0, right.0),
                     node_to_parent,
                 ],
                 pair_boxes: vec![
-                    format!("node [shape = box]; {{rank = same; node_{left}->node_{right}[style=invis]; rankdir = LR}}"),
+                    format!("node [shape = box]; {{rank = same; node_{}->node_{}[style=invis]; rankdir = LR}}", left.0, right.0),
                 ],
                 note: String::new(),
             },
             NodeSpecific::Leaf {key, value} => DotLines{
                 nodes: vec![
-                    format!("node_{index} [shape=box, label=\"{index}\\nvalue: {key}\\nvalue: {value}\"];"),
+                    format!("node_{} [shape=box, label=\"{}\\nvalue: {}\\nvalue: {}\"];", index.0, index.0, key.0, value.0),
                 ],
                 connections: vec![node_to_parent],
                 pair_boxes: vec![],
