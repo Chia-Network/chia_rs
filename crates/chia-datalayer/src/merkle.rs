@@ -184,10 +184,12 @@ impl NodeSpecific {
             panic!("unable to get sibling index from a leaf")
         };
 
-        match index {
-            x if (x == *right) => *left,
-            x if (x == *left) => *right,
-            _ => panic!("index not a child: {index}"),
+        if index == *right {
+            *left
+        } else if index == *left {
+            *right
+        } else {
+            panic!("index not a child: {index}")
         }
     }
 }
