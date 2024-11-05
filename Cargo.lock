@@ -383,6 +383,7 @@ dependencies = [
  "percent-encoding",
  "pyo3",
  "rstest",
+ "thiserror",
  "url",
 ]
 
