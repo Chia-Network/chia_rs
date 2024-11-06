@@ -19,11 +19,11 @@ use thiserror::Error;
 pub struct TreeIndex(u32);
 
 impl TreeIndex {
-    fn from_be_bytes(bytes: &[u8]) -> Self {
+    fn from_bytes(bytes: &[u8]) -> Self {
         Self(u32::from_be_bytes(bytes.try_into().unwrap()))
     }
 
-    fn to_be_bytes(self) -> [u8; 4] {
+    fn to_bytes(self) -> [u8; 4] {
         self.0.to_be_bytes()
     }
 }
@@ -276,8 +276,8 @@ impl Node {
             hash: Self::hash_from_bytes(&blob),
             specific: match metadata.node_type {
                 NodeType::Internal => NodeSpecific::Internal {
-                    left: TreeIndex::from_be_bytes(&blob[LEFT_RANGE]),
-                    right: TreeIndex::from_be_bytes(&blob[RIGHT_RANGE]),
+                    left: TreeIndex::from_bytes(&blob[LEFT_RANGE]),
+                    right: TreeIndex::from_bytes(&blob[RIGHT_RANGE]),
                 },
                 NodeType::Leaf => NodeSpecific::Leaf {
                     key: KvId::from_be_bytes(blob[KEY_RANGE].try_into().unwrap()),
@@ -288,7 +288,7 @@ impl Node {
     }
 
     fn parent_from_bytes(blob: &DataBytes) -> Parent {
-        let parent_integer = TreeIndex::from_be_bytes(&blob[PARENT_RANGE]);
+        let parent_integer = TreeIndex::from_bytes(&blob[PARENT_RANGE]);
         match parent_integer {
             NULL_PARENT => None,
             _ => Some(parent_integer),
@@ -312,9 +312,9 @@ impl Node {
                     Some(parent) => *parent,
                 };
                 blob[HASH_RANGE].copy_from_slice(hash);
-                blob[PARENT_RANGE].copy_from_slice(&parent_integer.to_be_bytes());
-                blob[LEFT_RANGE].copy_from_slice(&left.to_be_bytes());
-                blob[RIGHT_RANGE].copy_from_slice(&right.to_be_bytes());
+                blob[PARENT_RANGE].copy_from_slice(&parent_integer.to_bytes());
+                blob[LEFT_RANGE].copy_from_slice(&left.to_bytes());
+                blob[RIGHT_RANGE].copy_from_slice(&right.to_bytes());
             }
             Node {
                 parent,
@@ -326,7 +326,7 @@ impl Node {
                     Some(parent) => *parent,
                 };
                 blob[HASH_RANGE].copy_from_slice(hash);
-                blob[PARENT_RANGE].copy_from_slice(&parent_integer.to_be_bytes());
+                blob[PARENT_RANGE].copy_from_slice(&parent_integer.to_bytes());
                 blob[KEY_RANGE].copy_from_slice(&key.to_be_bytes());
                 blob[VALUE_RANGE].copy_from_slice(&value.to_be_bytes());
             }
