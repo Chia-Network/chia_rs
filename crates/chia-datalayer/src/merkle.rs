@@ -18,14 +18,12 @@ use thiserror::Error;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TreeIndex(u32);
 
-type TreeIndexBytes = [u8; size_of::<TreeIndex>()];
-
 impl TreeIndex {
-    fn from_be_bytes(bytes: TreeIndexBytes) -> Self {
-        Self(u32::from_be_bytes(bytes))
+    fn from_be_bytes(bytes: &[u8]) -> Self {
+        Self(u32::from_be_bytes(bytes.try_into().unwrap()))
     }
 
-    fn to_be_bytes(self) -> TreeIndexBytes {
+    fn to_be_bytes(self) -> [u8; 4] {
         self.0.to_be_bytes()
     }
 }
@@ -278,8 +276,8 @@ impl Node {
             hash: Self::hash_from_bytes(&blob),
             specific: match metadata.node_type {
                 NodeType::Internal => NodeSpecific::Internal {
-                    left: TreeIndex::from_be_bytes(blob[LEFT_RANGE].try_into().unwrap()),
-                    right: TreeIndex::from_be_bytes(blob[RIGHT_RANGE].try_into().unwrap()),
+                    left: TreeIndex::from_be_bytes(&blob[LEFT_RANGE]),
+                    right: TreeIndex::from_be_bytes(&blob[RIGHT_RANGE]),
                 },
                 NodeType::Leaf => NodeSpecific::Leaf {
                     key: KvId::from_be_bytes(blob[KEY_RANGE].try_into().unwrap()),
@@ -290,7 +288,7 @@ impl Node {
     }
 
     fn parent_from_bytes(blob: &DataBytes) -> Parent {
-        let parent_integer = TreeIndex::from_be_bytes(blob[PARENT_RANGE].try_into().unwrap());
+        let parent_integer = TreeIndex::from_be_bytes(&blob[PARENT_RANGE]);
         match parent_integer {
             NULL_PARENT => None,
             _ => Some(parent_integer),
