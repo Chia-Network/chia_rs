@@ -18,8 +18,21 @@ use thiserror::Error;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TreeIndex(u32);
 
+type TreeIndexBytes = [u8; size_of::<TreeIndex>()];
+
+impl TreeIndex {
+    fn from_be_bytes(bytes: TreeIndexBytes) -> Self {
+        Self(u32::from_be_bytes(bytes))
+    }
+
+    fn to_be_bytes(self) -> TreeIndexBytes {
+        self.0.to_be_bytes()
+    }
+}
+
+#[cfg(feature = "py-bindings")]
 impl IntoPy<PyObject> for TreeIndex {
-    fn into_py(self, py: Python<'_>) -> pyo3::PyObject {
+    fn into_py(self, py: Python<'_>) -> PyObject {
         self.0.into_py(py)
     }
 }
@@ -265,8 +278,8 @@ impl Node {
             hash: Self::hash_from_bytes(&blob),
             specific: match metadata.node_type {
                 NodeType::Internal => NodeSpecific::Internal {
-                    left: TreeIndex(u32::from_be_bytes(blob[LEFT_RANGE].try_into().unwrap())),
-                    right: TreeIndex(u32::from_be_bytes(blob[RIGHT_RANGE].try_into().unwrap())),
+                    left: TreeIndex::from_be_bytes(blob[LEFT_RANGE].try_into().unwrap()),
+                    right: TreeIndex::from_be_bytes(blob[RIGHT_RANGE].try_into().unwrap()),
                 },
                 NodeType::Leaf => NodeSpecific::Leaf {
                     key: KvId::from_be_bytes(blob[KEY_RANGE].try_into().unwrap()),
@@ -277,7 +290,7 @@ impl Node {
     }
 
     fn parent_from_bytes(blob: &DataBytes) -> Parent {
-        let parent_integer = TreeIndex(u32::from_be_bytes(blob[PARENT_RANGE].try_into().unwrap()));
+        let parent_integer = TreeIndex::from_be_bytes(blob[PARENT_RANGE].try_into().unwrap());
         match parent_integer {
             NULL_PARENT => None,
             _ => Some(parent_integer),
@@ -301,9 +314,9 @@ impl Node {
                     Some(parent) => *parent,
                 };
                 blob[HASH_RANGE].copy_from_slice(hash);
-                blob[PARENT_RANGE].copy_from_slice(&parent_integer.0.to_be_bytes());
-                blob[LEFT_RANGE].copy_from_slice(&left.0.to_be_bytes());
-                blob[RIGHT_RANGE].copy_from_slice(&right.0.to_be_bytes());
+                blob[PARENT_RANGE].copy_from_slice(&parent_integer.to_be_bytes());
+                blob[LEFT_RANGE].copy_from_slice(&left.to_be_bytes());
+                blob[RIGHT_RANGE].copy_from_slice(&right.to_be_bytes());
             }
             Node {
                 parent,
@@ -315,7 +328,7 @@ impl Node {
                     Some(parent) => *parent,
                 };
                 blob[HASH_RANGE].copy_from_slice(hash);
-                blob[PARENT_RANGE].copy_from_slice(&parent_integer.0.to_be_bytes());
+                blob[PARENT_RANGE].copy_from_slice(&parent_integer.to_be_bytes());
                 blob[KEY_RANGE].copy_from_slice(&key.to_be_bytes());
                 blob[VALUE_RANGE].copy_from_slice(&value.to_be_bytes());
             }
