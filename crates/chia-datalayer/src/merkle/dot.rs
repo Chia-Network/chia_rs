@@ -1,4 +1,6 @@
-use crate::merkle::{MerkleBlob, MerkleBlobLeftChildFirstIterator, Node, NodeSpecific, TreeIndex};
+use crate::merkle::{
+    InternalNode, LeafNode, MerkleBlob, MerkleBlobLeftChildFirstIterator, Node, TreeIndex,
+};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use url::Url;
 
@@ -53,13 +55,13 @@ impl DotLines {
 impl Node {
     pub fn to_dot(&self, index: TreeIndex) -> DotLines {
         // TODO: can this be done without introducing a blank line?
-        let node_to_parent = match self.parent {
+        let node_to_parent = match self.parent() {
             Some(parent) => format!("node_{index} -> node_{parent};"),
             None => String::new(),
         };
 
-        match self.specific {
-            NodeSpecific::Internal {left, right} => DotLines{
+        match self {
+            Node::Internal ( InternalNode {left, right, ..}) => DotLines{
                 nodes: vec![
                     format!("node_{index} [label=\"{index}\"]"),
                 ],
@@ -73,7 +75,7 @@ impl Node {
                 ],
                 note: String::new(),
             },
-            NodeSpecific::Leaf {key, value} => DotLines{
+            Node::Leaf (LeafNode{key, value, ..}) => DotLines{
                 nodes: vec![
                     format!("node_{index} [shape=box, label=\"{index}\\nvalue: {key}\\nvalue: {value}\"];"),
                 ],
