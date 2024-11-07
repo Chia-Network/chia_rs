@@ -86,6 +86,9 @@ pub enum Error {
 
     #[error("block index out of range: {0:?}")]
     BlockIndexOutOfRange(TreeIndex),
+
+    #[error("node not a leaf: {0:?}")]
+    NodeNotALeaf(InternalNode),
 }
 
 // assumptions
@@ -373,6 +376,13 @@ impl Node {
 
         leaf
     }
+
+    fn try_into_leaf(self) -> Result<LeafNode, Error> {
+        match self {
+            Node::Leaf(leaf) => Ok(leaf),
+            Node::Internal(internal) => Err(Error::NodeNotALeaf(internal)),
+        }
+    }
 }
 
 #[cfg(feature = "py-bindings")]
@@ -505,9 +515,7 @@ impl MerkleBlob {
                 self.insert_first(key, value, hash)?;
             }
             InsertLocation::Leaf { index, side } => {
-                let old_leaf = self
-                    .get_node(index)?
-                    .expect_leaf("requested insertion at leaf but found internal node: <<self>>");
+                let old_leaf = self.get_node(index)?.try_into_leaf()?;
 
                 let internal_node_hash = match side {
                     Side::Left => internal_hash(hash, &old_leaf.hash),
