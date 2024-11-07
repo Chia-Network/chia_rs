@@ -364,6 +364,15 @@ impl Node {
             Node::Leaf(node) => node.to_bytes(),
         }
     }
+
+    fn expect_leaf(self, message: &str) -> LeafNode {
+        let Node::Leaf(leaf) = self else {
+            let message = message.replace("<<self>>", &format!("{self:?}"));
+            panic!("{}", message)
+        };
+
+        leaf
+    }
 }
 
 #[cfg(feature = "py-bindings")]
@@ -496,9 +505,9 @@ impl MerkleBlob {
                 self.insert_first(key, value, hash)?;
             }
             InsertLocation::Leaf { index, side } => {
-                let Node::Leaf(old_leaf) = self.get_node(index)? else {
-                    panic!("requested insertion at leaf but found internal node")
-                };
+                let old_leaf = self
+                    .get_node(index)?
+                    .expect_leaf("requested insertion at leaf but found internal node");
 
                 let internal_node_hash = match side {
                     Side::Left => internal_hash(hash, &old_leaf.hash),
@@ -757,19 +766,15 @@ impl MerkleBlob {
         if indexes.len() == 1 {
             // OPT: can we avoid this extra min height leaf traversal?
             let min_height_leaf = self.get_min_height_leaf()?;
-            self.insert_from_leaf(
-                self.key_to_index[&min_height_leaf.key],
-                indexes[0],
-                &Side::Left,
-            )?;
+            self.insert_from_key(min_height_leaf.key, indexes[0], &Side::Left)?;
         };
 
         Ok(())
     }
 
-    fn insert_from_leaf(
+    fn insert_from_key(
         &mut self,
-        old_leaf_index: TreeIndex,
+        old_leaf_key: KvId,
         new_index: TreeIndex,
         side: &Side,
     ) -> Result<(), Error> {
@@ -786,9 +791,7 @@ impl MerkleBlob {
         }
 
         let new_internal_node_index = self.get_new_index();
-        let Node::Leaf(old_leaf) = self.get_node(old_leaf_index)? else {
-            panic!();
-        };
+        let (old_leaf_index, old_leaf) = self.get_leaf_by_key(old_leaf_key)?;
         let new_node = self.get_node(new_index)?;
 
         let new_stuff = Stuff {
@@ -855,9 +858,9 @@ impl MerkleBlob {
     pub fn delete(&mut self, key: KvId) -> Result<(), Error> {
         let leaf_index = *self.key_to_index.get(&key).ok_or(Error::UnknownKey(key))?;
 
-        let Node::Leaf(leaf) = self.get_node(leaf_index)? else {
-            panic!("key to index cache resulted in internal node")
-        };
+        let leaf = self
+            .get_node(leaf_index)?
+            .expect_leaf("key to index cache resulted in internal node");
         self.key_to_index.remove(&key);
 
         let Some(parent_index) = leaf.parent else {
@@ -1142,6 +1145,15 @@ impl MerkleBlob {
         Ok(self.get_block(index)?.node)
     }
 
+    pub fn get_leaf_by_key(&self, key: KvId) -> Result<(TreeIndex, LeafNode), Error> {
+        let index = self.key_to_index[&key];
+        let leaf = self
+            .get_node(index)?
+            .expect_leaf("expected leaf for index from key cache: {index} -> <<self>>");
+
+        Ok((index, leaf))
+    }
+
     pub fn get_parent_index(&self, index: TreeIndex) -> Result<Parent, Error> {
         let block = self.get_block_bytes(index)?;
 
@@ -1241,13 +1253,13 @@ impl MerkleBlob {
     //     Ok(())
     // }
 
+    // TODO: really this is test, not unused
     #[allow(unused)]
     fn get_key_value_map(&self) -> HashMap<KvId, KvId> {
         let mut key_value = HashMap::new();
         for (key, index) in &self.key_to_index {
-            let Node::Leaf(leaf) = self.get_node(*index).unwrap() else {
-                panic!()
-            };
+            // silly waste of having the index, but test code and type narrowing so, ok i guess
+            let (_, leaf) = self.get_leaf_by_key(*key).unwrap();
             key_value.insert(*key, leaf.value);
         }
 
@@ -1815,12 +1827,14 @@ mod tests {
             panic!()
         };
 
-        let Node::Leaf(left) = merkle_blob.get_node(internal.left).unwrap() else {
-            panic!()
-        };
-        let Node::Leaf(right) = merkle_blob.get_node(internal.right).unwrap() else {
-            panic!()
-        };
+        let left = merkle_blob
+            .get_node(internal.left)
+            .unwrap()
+            .expect_leaf("<<self>>");
+        let right = merkle_blob
+            .get_node(internal.right)
+            .unwrap()
+            .expect_leaf("<<self>>");
 
         let expected_keys: [KvId; 2] = match side {
             Side::Left => [pre_count as KvId + 1, pre_count as KvId],
@@ -1945,9 +1959,7 @@ mod tests {
         let before_blocks =
             MerkleBlobLeftChildFirstIterator::new(&small_blob.blob).collect::<Vec<_>>();
         let (key, index) = small_blob.key_to_index.iter().next().unwrap();
-        let Node::Leaf(original) = small_blob.get_node(*index).unwrap() else {
-            panic!()
-        };
+        let original = small_blob.get_node(*index).unwrap().expect_leaf("<<self>>");
         let new_value = original.value + 1;
 
         small_blob.upsert(*key, new_value, &original.hash).unwrap();
