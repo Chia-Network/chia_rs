@@ -507,7 +507,7 @@ impl MerkleBlob {
             InsertLocation::Leaf { index, side } => {
                 let old_leaf = self
                     .get_node(index)?
-                    .expect_leaf("requested insertion at leaf but found internal node");
+                    .expect_leaf("requested insertion at leaf but found internal node: <<self>>");
 
                 let internal_node_hash = match side {
                     Side::Left => internal_hash(hash, &old_leaf.hash),
@@ -856,11 +856,7 @@ impl MerkleBlob {
     }
 
     pub fn delete(&mut self, key: KvId) -> Result<(), Error> {
-        let leaf_index = *self.key_to_index.get(&key).ok_or(Error::UnknownKey(key))?;
-
-        let leaf = self
-            .get_node(leaf_index)?
-            .expect_leaf("key to index cache resulted in internal node");
+        let (leaf_index, leaf) = self.get_leaf_by_key(key)?;
         self.key_to_index.remove(&key);
 
         let Some(parent_index) = leaf.parent else {
@@ -1146,7 +1142,7 @@ impl MerkleBlob {
     }
 
     pub fn get_leaf_by_key(&self, key: KvId) -> Result<(TreeIndex, LeafNode), Error> {
-        let index = self.key_to_index[&key];
+        let index = *self.key_to_index.get(&key).ok_or(Error::UnknownKey(key))?;
         let leaf = self
             .get_node(index)?
             .expect_leaf("expected leaf for index from key cache: {index} -> <<self>>");
