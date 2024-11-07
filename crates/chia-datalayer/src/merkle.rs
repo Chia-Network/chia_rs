@@ -344,6 +344,13 @@ impl Node {
         }
     }
 
+    fn set_hash(&mut self, hash: &Hash) {
+        match self {
+            Node::Internal(ref mut node) => node.hash = *hash,
+            Node::Leaf(ref mut node) => node.hash = *hash,
+        }
+    }
+
     pub fn from_bytes(metadata: &NodeMetadata, blob: &DataBytes) -> Result<Self, Error> {
         Ok(match metadata.node_type {
             NodeType::Internal => Node::Internal(InternalNode::from_bytes(blob)?),
@@ -400,11 +407,7 @@ impl Block {
     }
 
     pub fn update_hash(&mut self, left: &Hash, right: &Hash) {
-        let hash = internal_hash(left, right);
-        match self.node {
-            Node::Internal(ref mut node) => node.hash = hash,
-            Node::Leaf(ref mut node) => node.hash = hash,
-        }
+        self.node.set_hash(&internal_hash(left, right));
         self.metadata.dirty = false;
     }
 }
@@ -528,9 +531,9 @@ impl MerkleBlob {
             },
             node: Node::Leaf(LeafNode {
                 parent: None,
-                hash: *hash,
                 key,
                 value,
+                hash: *hash,
             }),
         };
 
@@ -1958,9 +1961,16 @@ mod tests {
         {
             assert_eq!(before_block.node.parent(), after_block.node.parent());
             assert_eq!(before_index, after_index);
-            let Node::Leaf(before) = before_block.node else {
-                // TODO: assert equality of the left and right in the internal case
-                continue;
+            let before: LeafNode = match before_block.node {
+                Node::Leaf(leaf) => leaf,
+                Node::Internal(internal) => {
+                    let Node::Internal(after) = after_block.node else {
+                        panic!()
+                    };
+                    assert_eq!(internal.left, after.left);
+                    assert_eq!(internal.right, after.right);
+                    continue;
+                }
             };
             let Node::Leaf(after) = after_block.node else {
                 panic!()
