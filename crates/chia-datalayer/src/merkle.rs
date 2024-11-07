@@ -247,7 +247,7 @@ fn hash_from_bytes(blob: &DataBytes) -> Hash {
 }
 
 #[cfg_attr(feature = "py-bindings", pyclass(name = "InternalNode", get_all))]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InternalNode {
     parent: Parent,
     hash: Hash,
@@ -288,7 +288,7 @@ impl InternalNode {
 }
 
 #[cfg_attr(feature = "py-bindings", pyclass(name = "LeafNode", get_all))]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LeafNode {
     parent: Parent,
     hash: Hash,
@@ -319,7 +319,7 @@ impl LeafNode {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Node {
     Internal(InternalNode),
     Leaf(LeafNode),
@@ -857,10 +857,9 @@ impl MerkleBlob {
             .next()
             .ok_or(Error::UnableToFindALeaf)?;
 
-        match block.node {
-            Node::Leaf(node) => Ok(node),
-            Node::Internal(node) => panic!("unexpectedly found internal node first: {node:?}"),
-        }
+        Ok(block
+            .node
+            .expect_leaf("unexpectedly found internal node first: <<self>>"))
     }
 
     pub fn delete(&mut self, key: KvId) -> Result<(), Error> {
@@ -924,12 +923,13 @@ impl MerkleBlob {
         };
 
         let mut block = self.get_block(*leaf_index)?;
-        if let Node::Leaf(ref mut leaf) = block.node {
-            leaf.hash.clone_from(new_hash);
-            leaf.value = value;
-        } else {
-            panic!("expected internal node but found leaf");
-        }
+        // TODO: repeated message
+        let mut leaf = block.node.clone().expect_leaf(&format!(
+            "expected leaf for index from key cache: {leaf_index} -> <<self>>"
+        ));
+        leaf.hash.clone_from(new_hash);
+        leaf.value = value;
+        block.node = Node::Leaf(leaf);
         self.insert_entry_to_blob(*leaf_index, &block)?;
 
         if let Some(parent) = block.node.parent() {
@@ -1151,9 +1151,9 @@ impl MerkleBlob {
 
     pub fn get_leaf_by_key(&self, key: KvId) -> Result<(TreeIndex, LeafNode), Error> {
         let index = *self.key_to_index.get(&key).ok_or(Error::UnknownKey(key))?;
-        let leaf = self
-            .get_node(index)?
-            .expect_leaf("expected leaf for index from key cache: {index} -> <<self>>");
+        let leaf = self.get_node(index)?.expect_leaf(&format!(
+            "expected leaf for index from key cache: {index} -> <<self>>"
+        ));
 
         Ok((index, leaf))
     }
@@ -1901,9 +1901,8 @@ mod tests {
     #[test]
     fn test_node_type_from_u8_invalid() {
         let invalid_value = 2;
-        let expected = format!("unknown NodeType value: {invalid_value}");
         let actual = NodeType::from_u8(invalid_value);
-        actual.expect_err(&expected);
+        actual.expect_err("invalid node type value should fail");
     }
 
     #[test]
