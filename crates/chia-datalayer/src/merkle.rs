@@ -158,30 +158,33 @@ type MetadataBytes = [u8; METADATA_SIZE];
 type DataBytes = [u8; DATA_SIZE];
 const DATA_RANGE: Range<usize> = METADATA_SIZE..METADATA_SIZE + DATA_SIZE;
 
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
-#[repr(u8)]
-pub enum NodeType {
-    Internal = 0,
-    Leaf = 1,
+macro_rules! u8_enum {
+    ($enum_name:ident, $error_name:expr, {$($variant_name:ident = $variant_value:literal),*}) => {
+        #[derive(Clone, Debug, Hash, Eq, PartialEq)]
+        #[repr(u8)]
+        pub enum $enum_name {
+            $( $variant_name = $variant_value, )*
+        }
+
+        impl $enum_name {
+            pub fn from_u8(value: u8) -> Result<Self, Error> {
+                match value {
+                    $( $variant_value => Ok(Self::$variant_name), )*
+                    other => Err($error_name(other)),
+                }
+            }
+
+            pub fn to_u8(&self) -> u8 {
+                match self {
+                    $( Self::$variant_name => $variant_value, )*
+                }
+            }
+        }
+
+    };
 }
 
-impl NodeType {
-    pub fn from_u8(value: u8) -> Result<Self, Error> {
-        match value {
-            // ha!  feel free to laugh at this
-            x if (NodeType::Internal as u8 == x) => Ok(NodeType::Internal),
-            x if (NodeType::Leaf as u8 == x) => Ok(NodeType::Leaf),
-            other => Err(Error::UnknownNodeTypeValue(other)),
-        }
-    }
-
-    pub fn to_u8(&self) -> u8 {
-        match self {
-            NodeType::Internal => NodeType::Internal as u8,
-            NodeType::Leaf => NodeType::Leaf as u8,
-        }
-    }
-}
+u8_enum!(NodeType, Error::UnknownNodeTypeValue, {Internal = 0, Leaf = 1});
 
 #[allow(clippy::needless_pass_by_value)]
 fn sha256_num<T: ToBytes>(input: T) -> Hash {
