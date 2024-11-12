@@ -43,9 +43,9 @@ impl std::fmt::Display for TreeIndex {
 type Parent = Option<TreeIndex>;
 type Hash = [u8; 32];
 type KvIdBytes = [u8; size_of::<i64>()];
-// key and value ids are provided from outside of this code and are implemented as
-// the row id from sqlite which is a signed 8 byte integer.  the actually key and
-// value data bytes will not be handled within this code, only outside.
+/// Key and value ids are provided from outside of this code and are implemented as
+/// the row id from sqlite which is a signed 8 byte integer.  The actual key and
+/// value data bytes will not be handled within this code, only outside.
 #[cfg_attr(feature = "py-bindings", derive(FromPyObject), pyo3(transparent))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct KvId(i64);
