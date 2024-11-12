@@ -4,6 +4,8 @@ use pyo3::{
     PyResult, Python,
 };
 
+use chia_streamable_macro::Streamable;
+use chia_traits::Streamable;
 use clvmr::sha2::Sha256;
 use num_traits::ToBytes;
 use std::cmp::Ordering;
@@ -133,7 +135,6 @@ const fn max(left: usize, right: usize) -> usize {
 // TODO: once not experimental...  something closer to this
 // const fn max<T: ~const std::cmp::PartialOrd>(left: T, right: T) -> T { if left < right {right} else {left} }
 
-// TODO: consider in more detail other serialization tools such as serde and streamable
 // define the serialized block format
 const METADATA_RANGE: Range<usize> = 0..METADATA_SIZE;
 const TYPE_RANGE: Range<usize> = range_by_length(0, size_of::<u8>());
@@ -158,33 +159,23 @@ type MetadataBytes = [u8; METADATA_SIZE];
 type DataBytes = [u8; DATA_SIZE];
 const DATA_RANGE: Range<usize> = METADATA_SIZE..METADATA_SIZE + DATA_SIZE;
 
-macro_rules! u8_enum {
-    ($enum_name:ident, $error_name:expr, {$($variant_name:ident = $variant_value:literal),*}) => {
-        #[derive(Clone, Debug, Hash, Eq, PartialEq)]
-        #[repr(u8)]
-        pub enum $enum_name {
-            $( $variant_name = $variant_value, )*
-        }
-
-        impl $enum_name {
-            pub fn from_u8(value: u8) -> Result<Self, Error> {
-                match value {
-                    $( $variant_value => Ok(Self::$variant_name), )*
-                    other => Err($error_name(other)),
-                }
-            }
-
-            pub fn to_u8(&self) -> u8 {
-                match self {
-                    $( Self::$variant_name => $variant_value, )*
-                }
-            }
-        }
-
-    };
+#[repr(u8)]
+#[derive(Streamable, Hash, Debug, Copy, Clone, Eq, PartialEq)]
+pub enum NodeType {
+    Internal = 0,
+    Leaf = 1,
 }
 
-u8_enum!(NodeType, Error::UnknownNodeTypeValue, {Internal = 0, Leaf = 1});
+impl NodeType {
+    pub fn from_u8(value: u8) -> Result<Self, Error> {
+        Streamable::from_bytes(&[value]).map_err(|_| Error::ZeroLengthSeedNotAllowed)
+    }
+
+    #[allow(clippy::wrong_self_convention, clippy::trivially_copy_pass_by_ref)]
+    pub fn to_u8(&self) -> u8 {
+        Streamable::to_bytes(self).unwrap()[0]
+    }
+}
 
 #[allow(clippy::needless_pass_by_value)]
 fn sha256_num<T: ToBytes>(input: T) -> Hash {
@@ -230,7 +221,7 @@ pub enum InsertLocation {
 
 const NULL_PARENT: TreeIndex = TreeIndex(0xffff_ffffu32);
 
-#[derive(Debug, PartialEq)]
+#[derive(Streamable, Hash, Debug, Copy, Clone, Eq, PartialEq)]
 pub struct NodeMetadata {
     pub node_type: NodeType,
     pub dirty: bool,
@@ -239,30 +230,18 @@ pub struct NodeMetadata {
 impl NodeMetadata {
     pub fn from_bytes(blob: MetadataBytes) -> Result<Self, Error> {
         // OPT: could save 1-2% of tree space by packing (and maybe don't do that)
-        Ok(Self {
-            node_type: Self::node_type_from_bytes(blob)?,
-            dirty: Self::dirty_from_bytes(blob)?,
-        })
+        // TODO: real error processing, recheck all ZeroLengthSeedNotAllowed
+        Streamable::from_bytes(&blob).map_err(|_| Error::ZeroLengthSeedNotAllowed)
     }
 
+    #[allow(clippy::wrong_self_convention, clippy::trivially_copy_pass_by_ref)]
     pub fn to_bytes(&self) -> MetadataBytes {
-        let mut bytes = [0u8; METADATA_SIZE];
-        bytes[TYPE_RANGE].copy_from_slice(&[self.node_type.to_u8()]);
-        bytes[DIRTY_RANGE].copy_from_slice(&[u8::from(self.dirty)]);
-
-        bytes
-    }
-
-    pub fn node_type_from_bytes(blob: MetadataBytes) -> Result<NodeType, Error> {
-        NodeType::from_u8(u8::from_be_bytes(blob[TYPE_RANGE].try_into().unwrap()))
-    }
-
-    pub fn dirty_from_bytes(blob: MetadataBytes) -> Result<bool, Error> {
-        match u8::from_be_bytes(blob[DIRTY_RANGE].try_into().unwrap()) {
-            0 => Ok(false),
-            1 => Ok(true),
-            other => Err(Error::UnknownDirtyValue(other)),
-        }
+        // TODO: stop panicking
+        Streamable::to_bytes(self)
+            .unwrap()
+            .as_slice()
+            .try_into()
+            .unwrap()
     }
 }
 
@@ -386,6 +365,7 @@ impl Node {
         }
     }
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn from_bytes(metadata: &NodeMetadata, blob: &DataBytes) -> Result<Self, Error> {
         Ok(match metadata.node_type {
             NodeType::Internal => Node::Internal(InternalNode::from_bytes(blob)?),
@@ -1647,11 +1627,8 @@ mod tests {
         assert_eq!(NodeType::Leaf as u8, 1);
 
         for node_type in [NodeType::Internal, NodeType::Leaf] {
-            assert_eq!(node_type.to_u8(), node_type.clone() as u8,);
-            assert_eq!(
-                NodeType::from_u8(node_type.clone() as u8).unwrap(),
-                node_type,
-            );
+            assert_eq!(node_type.to_u8(), node_type as u8,);
+            assert_eq!(NodeType::from_u8(node_type as u8).unwrap(), node_type,);
         }
     }
 
@@ -1681,11 +1658,6 @@ mod tests {
         let object = NodeMetadata::from_bytes(bytes).unwrap();
         assert_eq!(object, NodeMetadata { node_type, dirty },);
         assert_eq!(object.to_bytes(), bytes);
-        assert_eq!(
-            NodeMetadata::node_type_from_bytes(bytes).unwrap(),
-            object.node_type
-        );
-        assert_eq!(NodeMetadata::dirty_from_bytes(bytes).unwrap(), object.dirty);
     }
 
     #[fixture]
@@ -1935,11 +1907,6 @@ mod tests {
         let invalid_value = 2;
         let actual = NodeType::from_u8(invalid_value);
         actual.expect_err("invalid node type value should fail");
-    }
-
-    #[test]
-    fn test_node_metadata_dirty_from_bytes_invalid() {
-        NodeMetadata::dirty_from_bytes([0, 2]).expect_err("invalid value should fail");
     }
 
     #[test]
