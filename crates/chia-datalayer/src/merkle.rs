@@ -42,10 +42,39 @@ impl std::fmt::Display for TreeIndex {
 
 type Parent = Option<TreeIndex>;
 type Hash = [u8; 32];
-// key and value ids are provided from outside of this code and are implemented as
-// the row id from sqlite which is a signed 8 byte integer.  the actually key and
-// value data bytes will not be handled within this code, only outside.
-type KvId = i64;
+type KvIdBytes = [u8; size_of::<i64>()];
+/// Key and value ids are provided from outside of this code and are implemented as
+/// the row id from sqlite which is a signed 8 byte integer.  The actual key and
+/// value data bytes will not be handled within this code, only outside.
+#[cfg_attr(feature = "py-bindings", derive(FromPyObject), pyo3(transparent))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct KvId(i64);
+
+impl KvId {
+    #[allow(clippy::unnecessary_wraps)]
+    pub fn from_bytes(blob: KvIdBytes) -> Result<Self, Error> {
+        Ok(Self(i64::from_be_bytes(blob)))
+    }
+
+    // TODO: consider the self convention more compared with other cases
+    #[allow(clippy::trivially_copy_pass_by_ref, clippy::wrong_self_convention)]
+    pub fn to_bytes(&self) -> KvIdBytes {
+        self.0.to_be_bytes()
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+impl IntoPy<PyObject> for KvId {
+    fn into_py(self, py: Python<'_>) -> PyObject {
+        self.0.into_py(py)
+    }
+}
+
+impl std::fmt::Display for KvId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -302,8 +331,8 @@ impl LeafNode {
         Ok(Self {
             parent: parent_from_bytes(blob),
             hash: hash_from_bytes(blob),
-            key: KvId::from_be_bytes(blob[KEY_RANGE].try_into().unwrap()),
-            value: KvId::from_be_bytes(blob[VALUE_RANGE].try_into().unwrap()),
+            key: KvId::from_bytes(blob[KEY_RANGE].try_into().unwrap())?,
+            value: KvId::from_bytes(blob[VALUE_RANGE].try_into().unwrap())?,
         })
     }
 
@@ -312,8 +341,8 @@ impl LeafNode {
         let parent_integer = self.parent.unwrap_or(NULL_PARENT);
         blob[HASH_RANGE].copy_from_slice(&self.hash);
         blob[PARENT_RANGE].copy_from_slice(&parent_integer.to_bytes());
-        blob[KEY_RANGE].copy_from_slice(&self.key.to_be_bytes());
-        blob[VALUE_RANGE].copy_from_slice(&self.value.to_be_bytes());
+        blob[KEY_RANGE].copy_from_slice(&self.key.to_bytes());
+        blob[VALUE_RANGE].copy_from_slice(&self.value.to_bytes());
 
         blob
     }
@@ -1079,7 +1108,7 @@ impl MerkleBlob {
     }
 
     fn get_random_insert_location_by_kvid(&self, seed: KvId) -> Result<InsertLocation, Error> {
-        let seed = sha256_num(seed);
+        let seed = sha256_num(seed.0);
 
         self.get_random_insert_location_by_seed(&seed)
     }
@@ -1661,16 +1690,16 @@ mod tests {
         let mut blob = MerkleBlob::new(vec![]).unwrap();
 
         blob.insert(
-            0x0001_0203_0405_0607,
-            0x1011_1213_1415_1617,
+            KvId(0x0001_0203_0405_0607),
+            KvId(0x1011_1213_1415_1617),
             &sha256_num(0x1020),
             InsertLocation::Auto {},
         )
         .unwrap();
 
         blob.insert(
-            0x2021_2223_2425_2627,
-            0x3031_3233_3435_3637,
+            KvId(0x2021_2223_2425_2627),
+            KvId(0x3031_3233_3435_3637),
             &sha256_num(0x2030),
             InsertLocation::Auto {},
         )
@@ -1722,12 +1751,12 @@ mod tests {
         let mut total_time = Duration::new(0, 0);
 
         let count = 10_000;
-        let m: KvId = count * n;
+        let m = count * n;
         for i in m..(m + count) {
             let start = Instant::now();
             merkle_blob
                 // NOTE: yeah this hash is garbage
-                .insert(i, i, &sha256_num(i), InsertLocation::Auto {})
+                .insert(KvId(i), KvId(i), &sha256_num(i), InsertLocation::Auto {})
                 .unwrap();
             let end = Instant::now();
             total_time += end.duration_since(start);
@@ -1747,10 +1776,10 @@ mod tests {
         let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
         let mut reference_blobs = vec![];
 
-        let key_value_ids: [KvId; COUNT] = core::array::from_fn(|i| i as KvId);
+        let key_value_ids: [KvId; COUNT] = core::array::from_fn(|i| KvId(i as i64));
 
         for key_value_id in key_value_ids {
-            let hash: Hash = sha256_num(key_value_id);
+            let hash: Hash = sha256_num(key_value_id.0);
 
             println!("inserting: {key_value_id}");
             merkle_blob.calculate_lazy_hashes().unwrap();
@@ -1767,7 +1796,7 @@ mod tests {
             println!("deleting: {key_value_id}");
             merkle_blob.delete(*key_value_id).unwrap();
             merkle_blob.calculate_lazy_hashes().unwrap();
-            assert_eq!(merkle_blob, reference_blobs[*key_value_id as usize]);
+            assert_eq!(merkle_blob, reference_blobs[key_value_id.0 as usize]);
             dots.push(merkle_blob.to_dot().dump());
         }
     }
@@ -1776,13 +1805,13 @@ mod tests {
     fn test_insert_first() {
         let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
 
-        let key_value_id: KvId = 1;
+        let key_value_id = KvId(1);
         open_dot(merkle_blob.to_dot().set_note("empty"));
         merkle_blob
             .insert(
                 key_value_id,
                 key_value_id,
-                &sha256_num(key_value_id),
+                &sha256_num(key_value_id.0),
                 InsertLocation::Auto {},
             )
             .unwrap();
@@ -1798,23 +1827,23 @@ mod tests {
     ) {
         let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
 
-        let mut last_key: KvId = 0;
+        let mut last_key: KvId = KvId(0);
         for i in 1..=pre_count {
-            let key: KvId = i as KvId;
+            let key = KvId(i as i64);
             open_dot(merkle_blob.to_dot().set_note("empty"));
             merkle_blob
-                .insert(key, key, &sha256_num(key), InsertLocation::Auto {})
+                .insert(key, key, &sha256_num(key.0), InsertLocation::Auto {})
                 .unwrap();
             last_key = key;
         }
 
-        let key_value_id: KvId = pre_count as KvId + 1;
+        let key_value_id: KvId = KvId((pre_count + 1) as i64);
         open_dot(merkle_blob.to_dot().set_note("first after"));
         merkle_blob
             .insert(
                 key_value_id,
                 key_value_id,
-                &sha256_num(key_value_id),
+                &sha256_num(key_value_id.0),
                 InsertLocation::Leaf {
                     index: merkle_blob.key_to_index[&last_key],
                     side: side.clone(),
@@ -1841,8 +1870,8 @@ mod tests {
             .expect_leaf("<<self>>");
 
         let expected_keys: [KvId; 2] = match side {
-            Side::Left => [pre_count as KvId + 1, pre_count as KvId],
-            Side::Right => [pre_count as KvId, pre_count as KvId + 1],
+            Side::Left => [KvId(pre_count as i64 + 1), KvId(pre_count as i64)],
+            Side::Right => [KvId(pre_count as i64), KvId(pre_count as i64 + 1)],
         };
         assert_eq!([left.key, right.key], expected_keys);
     }
@@ -1851,13 +1880,13 @@ mod tests {
     fn test_delete_last() {
         let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
 
-        let key_value_id: KvId = 1;
+        let key_value_id = KvId(1);
         open_dot(merkle_blob.to_dot().set_note("empty"));
         merkle_blob
             .insert(
                 key_value_id,
                 key_value_id,
-                &sha256_num(key_value_id),
+                &sha256_num(key_value_id.0),
                 InsertLocation::Auto {},
             )
             .unwrap();
@@ -1871,7 +1900,7 @@ mod tests {
 
     #[rstest]
     fn test_delete_frees_index(mut small_blob: MerkleBlob) {
-        let key = 0x0001_0203_0405_0607;
+        let key = KvId(0x0001_0203_0405_0607);
         let index = small_blob.key_to_index[&key];
         small_blob.delete(key).unwrap();
 
@@ -1884,7 +1913,7 @@ mod tests {
     #[rstest]
     fn test_get_new_index_with_free_index(mut small_blob: MerkleBlob) {
         open_dot(small_blob.to_dot().set_note("initial"));
-        let key = 0x0001_0203_0405_0607;
+        let key = KvId(0x0001_0203_0405_0607);
         let _ = small_blob.key_to_index[&key];
         small_blob.delete(key).unwrap();
         open_dot(small_blob.to_dot().set_note("after delete"));
@@ -1940,18 +1969,18 @@ mod tests {
 
     #[rstest]
     fn test_upsert_inserts(small_blob: MerkleBlob) {
-        let key = 1234;
+        let key = KvId(1234);
         assert!(!small_blob.key_to_index.contains_key(&key));
-        let value = 5678;
+        let value = KvId(5678);
 
         let mut insert_blob = MerkleBlob::new(small_blob.blob.clone()).unwrap();
         insert_blob
-            .insert(key, value, &sha256_num(key), InsertLocation::Auto {})
+            .insert(key, value, &sha256_num(key.0), InsertLocation::Auto {})
             .unwrap();
         open_dot(insert_blob.to_dot().set_note("first after"));
 
         let mut upsert_blob = MerkleBlob::new(small_blob.blob.clone()).unwrap();
-        upsert_blob.upsert(key, value, &sha256_num(key)).unwrap();
+        upsert_blob.upsert(key, value, &sha256_num(key.0)).unwrap();
         open_dot(upsert_blob.to_dot().set_note("first after"));
 
         assert_eq!(insert_blob.blob, upsert_blob.blob);
@@ -1963,7 +1992,7 @@ mod tests {
             MerkleBlobLeftChildFirstIterator::new(&small_blob.blob).collect::<Vec<_>>();
         let (key, index) = small_blob.key_to_index.iter().next().unwrap();
         let original = small_blob.get_node(*index).unwrap().expect_leaf("<<self>>");
-        let new_value = original.value + 1;
+        let new_value = KvId(original.value.0 + 1);
 
         small_blob.upsert(*key, new_value, &original.hash).unwrap();
 
@@ -2002,9 +2031,10 @@ mod tests {
     #[test]
     fn test_double_insert_fails() {
         let mut blob = MerkleBlob::new(vec![]).unwrap();
-        blob.insert(0, 0, &[0u8; 32], InsertLocation::Auto {})
+        let kv = KvId(0);
+        blob.insert(kv, kv, &[0u8; 32], InsertLocation::Auto {})
             .unwrap();
-        blob.insert(0, 0, &[0u8; 32], InsertLocation::Auto {})
+        blob.insert(kv, kv, &[0u8; 32], InsertLocation::Auto {})
             .expect_err("");
     }
 
@@ -2014,8 +2044,9 @@ mod tests {
         #[values(0, 1, 2, 8, 9)] count: usize,
     ) {
         let mut blob = MerkleBlob::new(vec![]).unwrap();
-        for i in 0..pre_inserts as KvId {
-            blob.insert(i, i, &sha256_num(i), InsertLocation::Auto {})
+        for i in 0..pre_inserts {
+            let i = KvId(i as i64);
+            blob.insert(i, i, &sha256_num(i.0), InsertLocation::Auto {})
                 .unwrap();
         }
         open_dot(blob.to_dot().set_note("initial"));
@@ -2023,8 +2054,9 @@ mod tests {
         let mut batch: Vec<((KvId, KvId), Hash)> = vec![];
 
         let mut batch_map = HashMap::new();
-        for i in pre_inserts as KvId..(pre_inserts + count) as KvId {
-            batch.push(((i, i), sha256_num(i)));
+        for i in pre_inserts..(pre_inserts + count) {
+            let i = KvId(i as i64);
+            batch.push(((i, i), sha256_num(i.0)));
             batch_map.insert(i, i);
         }
 
