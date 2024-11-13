@@ -108,8 +108,8 @@ pub enum Error {
 // define the serialized block format
 const METADATA_RANGE: Range<usize> = 0..METADATA_SIZE;
 const METADATA_SIZE: usize = 2;
-// TODO: figure out the real max
-const DATA_SIZE: usize = 100;
+// TODO: figure out the real max better than trial and error?
+const DATA_SIZE: usize = 53;
 const BLOCK_SIZE: usize = METADATA_SIZE + DATA_SIZE;
 type BlockBytes = [u8; BLOCK_SIZE];
 type MetadataBytes = [u8; METADATA_SIZE];
