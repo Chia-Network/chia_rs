@@ -16,7 +16,7 @@ use std::ops::Range;
 use thiserror::Error;
 
 #[cfg_attr(feature = "py-bindings", derive(FromPyObject), pyo3(transparent))]
-#[derive(Streamable, Hash, Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 pub struct TreeIndex(u32);
 
 #[cfg(feature = "py-bindings")]
@@ -38,7 +38,7 @@ type Hash = Bytes32;
 /// the row id from sqlite which is a signed 8 byte integer.  The actual key and
 /// value data bytes will not be handled within this code, only outside.
 #[cfg_attr(feature = "py-bindings", derive(FromPyObject), pyo3(transparent))]
-#[derive(Streamable, Hash, Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 pub struct KvId(i64);
 
 #[cfg(feature = "py-bindings")]
@@ -117,7 +117,7 @@ type DataBytes = [u8; DATA_SIZE];
 const DATA_RANGE: Range<usize> = METADATA_SIZE..METADATA_SIZE + DATA_SIZE;
 
 #[repr(u8)]
-#[derive(Streamable, Hash, Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, Streamable)]
 pub enum NodeType {
     Internal = 0,
     Leaf = 1,
@@ -140,6 +140,7 @@ fn sha256_num<T: ToBytes>(input: T) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(input.to_be_bytes());
 
+    // TODO: propagate?
     hasher.finalize().into()
 }
 
@@ -147,6 +148,7 @@ fn sha256_bytes(input: &[u8]) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(input);
 
+    // TODO: propagate?
     hasher.finalize().into()
 }
 
@@ -156,6 +158,7 @@ fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
     hasher.update(left_hash);
     hasher.update(right_hash);
 
+    // TODO: propagate?
     hasher.finalize().into()
 }
 
@@ -177,9 +180,7 @@ pub enum InsertLocation {
     Leaf { index: TreeIndex, side: Side },
 }
 
-// const NULL_PARENT: TreeIndex = TreeIndex(0xffff_ffffu32);
-
-#[derive(Streamable, Hash, Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, Streamable)]
 pub struct NodeMetadata {
     // OPT: could save 1-2% of tree space by packing (and maybe don't do that)
     pub node_type: NodeType,
@@ -187,7 +188,7 @@ pub struct NodeMetadata {
 }
 
 #[cfg_attr(feature = "py-bindings", pyclass(name = "InternalNode", get_all))]
-#[derive(Streamable, Hash, Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Streamable)]
 pub struct InternalNode {
     parent: Parent,
     hash: Hash,
@@ -208,7 +209,7 @@ impl InternalNode {
 }
 
 #[cfg_attr(feature = "py-bindings", pyclass(name = "LeafNode", get_all))]
-#[derive(Streamable, Hash, Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Streamable)]
 pub struct LeafNode {
     parent: Parent,
     hash: Hash,
@@ -263,18 +264,19 @@ impl Node {
         })
     }
 
-    pub fn to_bytes(&self) -> DataBytes {
-        // TODO: handle the error
+    pub fn to_bytes(&self) -> Result<DataBytes, Error> {
         let mut base = match self {
             Node::Internal(node) => node.to_bytes(),
             Node::Leaf(node) => node.to_bytes(),
         }
-        .unwrap();
+        .map_err(|e| Error::Streaming(e))?;
         for _ in base.len()..DATA_SIZE {
             base.push(0);
         }
-        // TODO: handle the error
-        base.as_slice().try_into().unwrap()
+        Ok(base
+            .as_slice()
+            .try_into()
+            .expect("padding was added above, might be too large"))
     }
 
     fn expect_leaf(self, message: &str) -> LeafNode {
@@ -315,19 +317,13 @@ pub struct Block {
 }
 
 impl Block {
-    pub fn to_bytes(&self) -> BlockBytes {
+    pub fn to_bytes(&self) -> Result<BlockBytes, Error> {
         let mut blob: BlockBytes = [0; BLOCK_SIZE];
-        // TODO: probably propagate the error
-        blob[METADATA_RANGE].copy_from_slice(
-            &self
-                .metadata
-                .to_bytes()
-                .map_err(|e| Error::Streaming(e))
-                .unwrap(),
-        );
-        blob[DATA_RANGE].copy_from_slice(&self.node.to_bytes());
+        blob[METADATA_RANGE]
+            .copy_from_slice(&self.metadata.to_bytes().map_err(|e| Error::Streaming(e))?);
+        blob[DATA_RANGE].copy_from_slice(&self.node.to_bytes()?);
 
-        blob
+        Ok(blob)
     }
 
     pub fn from_bytes(blob: BlockBytes) -> Result<Self, Error> {
@@ -1010,7 +1006,7 @@ impl MerkleBlob {
     }
 
     fn insert_entry_to_blob(&mut self, index: TreeIndex, block: &Block) -> Result<(), Error> {
-        let new_block_bytes = block.to_bytes();
+        let new_block_bytes = block.to_bytes()?;
         let extend_index = self.extend_index();
         match index.cmp(&extend_index) {
             Ordering::Greater => return Err(Error::BlockIndexOutOfRange(index)),
@@ -1174,8 +1170,7 @@ impl MerkleBlob {
         let mut key_value = HashMap::new();
         for (key, index) in &self.key_to_index {
             // silly waste of having the index, but test code and type narrowing so, ok i guess
-            let x = self.get_leaf_by_key(*key);
-            let (_, leaf) = x.unwrap();
+            let (_, leaf) = self.get_leaf_by_key(*key).unwrap();
             key_value.insert(*key, leaf.value);
         }
 
@@ -1932,8 +1927,7 @@ mod tests {
         }
 
         let before = blob.get_key_value_map();
-        blob.batch_insert(batch.into_iter())
-            .expect("here ---asdfasdf");
+        blob.batch_insert(batch.into_iter()).unwrap();
         let after = blob.get_key_value_map();
 
         open_dot(
