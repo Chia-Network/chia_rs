@@ -296,6 +296,7 @@ jobs:
   unit_tests:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
     name: Unit tests
