@@ -478,6 +478,7 @@ dependencies = [
  "clvm-utils",
  "clvmr",
  "hex",
+ "hex-literal",
  "rusqlite",
  "zstd",
 ]
