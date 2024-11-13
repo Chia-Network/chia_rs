@@ -374,6 +374,7 @@ dependencies = [
 name = "chia-datalayer"
 version = "0.1.0"
 dependencies = [
+ "chia-protocol",
  "chia-sha2",
  "chia-traits 0.15.0",
  "chia_streamable_macro 0.15.0",

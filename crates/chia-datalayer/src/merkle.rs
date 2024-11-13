@@ -4,6 +4,7 @@ use pyo3::{
     PyResult, Python,
 };
 
+use chia_protocol::Bytes32;
 use chia_streamable_macro::Streamable;
 use chia_traits::Streamable;
 use clvmr::sha2::Sha256;
@@ -16,17 +17,25 @@ use std::ops::Range;
 use thiserror::Error;
 
 #[cfg_attr(feature = "py-bindings", derive(FromPyObject), pyo3(transparent))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Streamable, Hash, Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub struct TreeIndex(u32);
 
 impl TreeIndex {
-    fn from_bytes(bytes: &[u8]) -> Self {
-        Self(u32::from_be_bytes(bytes.try_into().unwrap()))
-    }
+    // fn from_bytes(bytes: &[u8]) -> Self {
+    //     // OPT: could save 1-2% of tree space by packing (and maybe don't do that)
+    //     // TODO: real error processing, recheck all ZeroLengthSeedNotAllowed
+    //     Streamable::from_bytes_ignore_extra_bytes(bytes).unwrap()
+    // }
 
-    fn to_bytes(self) -> [u8; 4] {
-        self.0.to_be_bytes()
-    }
+    // #[allow(clippy::wrong_self_convention, clippy::trivially_copy_pass_by_ref)]
+    // fn to_bytes(self) -> [u8; 4] {
+    //     // TODO: stop panicking
+    //     Streamable::to_bytes(&self)
+    //         .unwrap()
+    //         .as_slice()
+    //         .try_into()
+    //         .unwrap()
+    // }
 }
 
 #[cfg(feature = "py-bindings")]
@@ -43,25 +52,32 @@ impl std::fmt::Display for TreeIndex {
 }
 
 type Parent = Option<TreeIndex>;
-type Hash = [u8; 32];
+type Hash = Bytes32;
 type KvIdBytes = [u8; size_of::<i64>()];
 /// Key and value ids are provided from outside of this code and are implemented as
 /// the row id from sqlite which is a signed 8 byte integer.  The actual key and
 /// value data bytes will not be handled within this code, only outside.
 #[cfg_attr(feature = "py-bindings", derive(FromPyObject), pyo3(transparent))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Streamable, Hash, Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub struct KvId(i64);
 
 impl KvId {
     #[allow(clippy::unnecessary_wraps)]
     pub fn from_bytes(blob: KvIdBytes) -> Result<Self, Error> {
-        Ok(Self(i64::from_be_bytes(blob)))
+        // TODO: real error processing, recheck all ZeroLengthSeedNotAllowed
+        Streamable::from_bytes_ignore_extra_bytes(&blob)
+            .map_err(|_| Error::FailedLoadingNode("aaa".to_string()))
     }
 
     // TODO: consider the self convention more compared with other cases
     #[allow(clippy::trivially_copy_pass_by_ref, clippy::wrong_self_convention)]
     pub fn to_bytes(&self) -> KvIdBytes {
-        self.0.to_be_bytes()
+        // TODO: stop panicking
+        let mut x = Streamable::to_bytes(self).unwrap();
+        for _ in x.len()..DATA_SIZE {
+            x.push(0);
+        }
+        x.as_slice().try_into().unwrap()
     }
 }
 
@@ -126,33 +142,37 @@ pub enum Error {
 // - root is at index 0
 // - any case with no keys will have a zero length blob
 
-const fn range_by_length(start: usize, length: usize) -> Range<usize> {
-    start..start + length
-}
-const fn max(left: usize, right: usize) -> usize {
-    [left, right][(left < right) as usize]
-}
+// const fn range_by_length(start: usize, length: usize) -> Range<usize> {
+//     start..start + length
+// }
+// const fn max(left: usize, right: usize) -> usize {
+//     [left, right][(left < right) as usize]
+// }
 // TODO: once not experimental...  something closer to this
 // const fn max<T: ~const std::cmp::PartialOrd>(left: T, right: T) -> T { if left < right {right} else {left} }
 
 // define the serialized block format
 const METADATA_RANGE: Range<usize> = 0..METADATA_SIZE;
-const TYPE_RANGE: Range<usize> = range_by_length(0, size_of::<u8>());
-const DIRTY_RANGE: Range<usize> = range_by_length(TYPE_RANGE.end, size_of::<u8>());
-const METADATA_SIZE: usize = DIRTY_RANGE.end;
+// const TYPE_RANGE: Range<usize> = range_by_length(0, size_of::<u8>());
+// const DIRTY_RANGE: Range<usize> = range_by_length(TYPE_RANGE.end, size_of::<u8>());
+// const METADATA_SIZE: usize = DIRTY_RANGE.end;
+// TODO: figure out the real max
+const METADATA_SIZE: usize = 2;
 
 // common fields
-const HASH_RANGE: Range<usize> = range_by_length(0, size_of::<Hash>());
+// const HASH_RANGE: Range<usize> = range_by_length(0, size_of::<Hash>());
 // const PARENT_RANGE: Range<usize> = range_by_length(HASH_RANGE.end, size_of::<TreeIndex>());
-const PARENT_RANGE: Range<usize> = range_by_length(HASH_RANGE.end, size_of::<TreeIndex>());
+// const PARENT_RANGE: Range<usize> = range_by_length(HASH_RANGE.end, size_of::<TreeIndex>());
 // internal specific fields
-const LEFT_RANGE: Range<usize> = range_by_length(PARENT_RANGE.end, size_of::<TreeIndex>());
-const RIGHT_RANGE: Range<usize> = range_by_length(LEFT_RANGE.end, size_of::<TreeIndex>());
+// const LEFT_RANGE: Range<usize> = range_by_length(PARENT_RANGE.end, size_of::<TreeIndex>());
+// const RIGHT_RANGE: Range<usize> = range_by_length(LEFT_RANGE.end, size_of::<TreeIndex>());
 // leaf specific fields
-const KEY_RANGE: Range<usize> = range_by_length(PARENT_RANGE.end, size_of::<KvId>());
-const VALUE_RANGE: Range<usize> = range_by_length(KEY_RANGE.end, size_of::<KvId>());
+// const KEY_RANGE: Range<usize> = range_by_length(PARENT_RANGE.end, size_of::<KvId>());
+// const VALUE_RANGE: Range<usize> = range_by_length(KEY_RANGE.end, size_of::<KvId>());
 
-const DATA_SIZE: usize = max(RIGHT_RANGE.end, VALUE_RANGE.end);
+// const DATA_SIZE: usize = max(RIGHT_RANGE.end, VALUE_RANGE.end);
+// TODO: figure out the real max
+const DATA_SIZE: usize = 100;
 const BLOCK_SIZE: usize = METADATA_SIZE + DATA_SIZE;
 type BlockBytes = [u8; BLOCK_SIZE];
 type MetadataBytes = [u8; METADATA_SIZE];
@@ -168,7 +188,8 @@ pub enum NodeType {
 
 impl NodeType {
     pub fn from_u8(value: u8) -> Result<Self, Error> {
-        Streamable::from_bytes(&[value]).map_err(|_| Error::ZeroLengthSeedNotAllowed)
+        Streamable::from_bytes_ignore_extra_bytes(&[value])
+            .map_err(|_| Error::FailedLoadingNode("bbb".to_string()))
     }
 
     #[allow(clippy::wrong_self_convention, clippy::trivially_copy_pass_by_ref)]
@@ -182,14 +203,14 @@ fn sha256_num<T: ToBytes>(input: T) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(input.to_be_bytes());
 
-    hasher.finalize()
+    hasher.finalize().into()
 }
 
 fn sha256_bytes(input: &[u8]) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(input);
 
-    hasher.finalize()
+    hasher.finalize().into()
 }
 
 fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
@@ -198,7 +219,7 @@ fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
     hasher.update(left_hash);
     hasher.update(right_hash);
 
-    hasher.finalize()
+    hasher.finalize().into()
 }
 
 #[cfg_attr(feature = "py-bindings", pyclass(name = "Side", eq, eq_int))]
@@ -219,7 +240,7 @@ pub enum InsertLocation {
     Leaf { index: TreeIndex, side: Side },
 }
 
-const NULL_PARENT: TreeIndex = TreeIndex(0xffff_ffffu32);
+// const NULL_PARENT: TreeIndex = TreeIndex(0xffff_ffffu32);
 
 #[derive(Streamable, Hash, Debug, Copy, Clone, Eq, PartialEq)]
 pub struct NodeMetadata {
@@ -231,34 +252,34 @@ impl NodeMetadata {
     pub fn from_bytes(blob: MetadataBytes) -> Result<Self, Error> {
         // OPT: could save 1-2% of tree space by packing (and maybe don't do that)
         // TODO: real error processing, recheck all ZeroLengthSeedNotAllowed
-        Streamable::from_bytes(&blob).map_err(|_| Error::ZeroLengthSeedNotAllowed)
+        Streamable::from_bytes_ignore_extra_bytes(&blob)
+            .map_err(|_| Error::FailedLoadingNode("ccc".to_string()))
     }
 
     #[allow(clippy::wrong_self_convention, clippy::trivially_copy_pass_by_ref)]
     pub fn to_bytes(&self) -> MetadataBytes {
         // TODO: stop panicking
-        Streamable::to_bytes(self)
-            .unwrap()
-            .as_slice()
+        let mut x = Streamable::to_bytes(self).unwrap();
+        for _ in x.len()..METADATA_SIZE {
+            x.push(0);
+        }
+        let l = x.len();
+        x.as_slice()
             .try_into()
-            .unwrap()
+            .expect(format!("length is: {l} of {DATA_SIZE}").as_str())
     }
 }
 
-fn parent_from_bytes(blob: &DataBytes) -> Parent {
-    let parent_integer = TreeIndex::from_bytes(&blob[PARENT_RANGE]);
-    match parent_integer {
-        NULL_PARENT => None,
-        _ => Some(parent_integer),
-    }
-}
-
-fn hash_from_bytes(blob: &DataBytes) -> Hash {
-    blob[HASH_RANGE].try_into().unwrap()
-}
+// fn parent_from_bytes(blob: &DataBytes) -> Parent {
+//     Node::from_bytes(blob).unwrap().parent()
+// }
+//
+// fn hash_from_bytes(blob: &DataBytes) -> Hash {
+//     Node::from_bytes(blob).unwrap().hash()
+// }
 
 #[cfg_attr(feature = "py-bindings", pyclass(name = "InternalNode", get_all))]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Streamable, Hash, Debug, Copy, Clone, Eq, PartialEq)]
 pub struct InternalNode {
     parent: Parent,
     hash: Hash,
@@ -267,24 +288,23 @@ pub struct InternalNode {
 }
 
 impl InternalNode {
-    #[allow(clippy::unnecessary_wraps)]
     pub fn from_bytes(blob: &DataBytes) -> Result<Self, Error> {
-        Ok(Self {
-            parent: parent_from_bytes(blob),
-            hash: hash_from_bytes(blob),
-            left: TreeIndex::from_bytes(&blob[LEFT_RANGE]),
-            right: TreeIndex::from_bytes(&blob[RIGHT_RANGE]),
-        })
+        // OPT: could save 1-2% of tree space by packing (and maybe don't do that)
+        // TODO: real error processing, recheck all ZeroLengthSeedNotAllowed
+        Streamable::from_bytes_ignore_extra_bytes(blob)
+            .map_err(|_| Error::FailedLoadingNode("ddd".to_string()))
     }
-    pub fn to_bytes(&self) -> DataBytes {
-        let mut blob: DataBytes = [0; DATA_SIZE];
-        let parent_integer = self.parent.unwrap_or(NULL_PARENT);
-        blob[HASH_RANGE].copy_from_slice(&self.hash);
-        blob[PARENT_RANGE].copy_from_slice(&parent_integer.to_bytes());
-        blob[LEFT_RANGE].copy_from_slice(&self.left.to_bytes());
-        blob[RIGHT_RANGE].copy_from_slice(&self.right.to_bytes());
 
-        blob
+    #[allow(clippy::wrong_self_convention, clippy::trivially_copy_pass_by_ref)]
+    pub fn to_bytes(&self) -> DataBytes {
+        // TODO: stop panicking
+        let mut x = Streamable::to_bytes(self).expect(format!("aaaaa = {DATA_SIZE}").as_str());
+        for _ in x.len()..DATA_SIZE {
+            x.push(0);
+        }
+        x.as_slice()
+            .try_into()
+            .expect(format!("bbbbb = {DATA_SIZE}").as_str())
     }
 
     pub fn sibling_index(&self, index: TreeIndex) -> TreeIndex {
@@ -299,7 +319,7 @@ impl InternalNode {
 }
 
 #[cfg_attr(feature = "py-bindings", pyclass(name = "LeafNode", get_all))]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Streamable, Hash, Debug, Copy, Clone, Eq, PartialEq)]
 pub struct LeafNode {
     parent: Parent,
     hash: Hash,
@@ -308,25 +328,25 @@ pub struct LeafNode {
 }
 
 impl LeafNode {
-    #[allow(clippy::unnecessary_wraps)]
     pub fn from_bytes(blob: &DataBytes) -> Result<Self, Error> {
-        Ok(Self {
-            parent: parent_from_bytes(blob),
-            hash: hash_from_bytes(blob),
-            key: KvId::from_bytes(blob[KEY_RANGE].try_into().unwrap())?,
-            value: KvId::from_bytes(blob[VALUE_RANGE].try_into().unwrap())?,
-        })
+        // OPT: could save 1-2% of tree space by packing (and maybe don't do that)
+        // TODO: real error processing, recheck all ZeroLengthSeedNotAllowed
+        // TODO: more structured padding handling
+        Streamable::from_bytes_ignore_extra_bytes(blob)
+            .map_err(|e| Error::FailedLoadingNode(format!("eee {e}").to_string()))
     }
 
+    #[allow(clippy::wrong_self_convention, clippy::trivially_copy_pass_by_ref)]
     pub fn to_bytes(&self) -> DataBytes {
-        let mut blob: DataBytes = [0; DATA_SIZE];
-        let parent_integer = self.parent.unwrap_or(NULL_PARENT);
-        blob[HASH_RANGE].copy_from_slice(&self.hash);
-        blob[PARENT_RANGE].copy_from_slice(&parent_integer.to_bytes());
-        blob[KEY_RANGE].copy_from_slice(&self.key.to_bytes());
-        blob[VALUE_RANGE].copy_from_slice(&self.value.to_bytes());
-
-        blob
+        // TODO: stop panicking
+        let mut x = Streamable::to_bytes(self).unwrap();
+        for _ in x.len()..DATA_SIZE {
+            x.push(0);
+        }
+        let l = x.len();
+        x.as_slice()
+            .try_into()
+            .expect(format!("length is: {l} of {DATA_SIZE}").as_str())
     }
 }
 
@@ -1142,10 +1162,7 @@ impl MerkleBlob {
     }
 
     fn get_hash(&self, index: TreeIndex) -> Result<Hash, Error> {
-        let block_bytes = self.get_block_bytes(index)?;
-        let data_bytes: DataBytes = block_bytes[DATA_RANGE].try_into().unwrap();
-
-        Ok(hash_from_bytes(&data_bytes))
+        Ok(self.get_block(index)?.node.hash())
     }
 
     fn get_block_bytes(&self, index: TreeIndex) -> Result<BlockBytes, Error> {
@@ -1171,9 +1188,7 @@ impl MerkleBlob {
     }
 
     pub fn get_parent_index(&self, index: TreeIndex) -> Result<Parent, Error> {
-        let block = self.get_block_bytes(index)?;
-
-        Ok(parent_from_bytes(block[DATA_RANGE].try_into().unwrap()))
+        Ok(self.get_block(index)?.node.parent())
     }
 
     pub fn get_lineage_with_indexes(
@@ -1275,7 +1290,8 @@ impl MerkleBlob {
         let mut key_value = HashMap::new();
         for (key, index) in &self.key_to_index {
             // silly waste of having the index, but test code and type narrowing so, ok i guess
-            let (_, leaf) = self.get_leaf_by_key(*key).unwrap();
+            let x = self.get_leaf_by_key(*key);
+            let (_, leaf) = x.unwrap();
             key_value.insert(*key, leaf.value);
         }
 
@@ -1642,10 +1658,11 @@ mod tests {
         assert_eq!(
             internal_hash(&left, &right),
             clvm_utils::tree_hash_pair(
-                clvm_utils::TreeHash::new(left),
-                clvm_utils::TreeHash::new(right)
+                clvm_utils::TreeHash::new(left.into()),
+                clvm_utils::TreeHash::new(right.into())
             )
-            .to_bytes(),
+            .to_bytes()
+            .into(),
         );
     }
 
@@ -2002,9 +2019,9 @@ mod tests {
     fn test_double_insert_fails() {
         let mut blob = MerkleBlob::new(vec![]).unwrap();
         let kv = KvId(0);
-        blob.insert(kv, kv, &[0u8; 32], InsertLocation::Auto {})
+        blob.insert(kv, kv, &[0u8; 32].into(), InsertLocation::Auto {})
             .unwrap();
-        blob.insert(kv, kv, &[0u8; 32], InsertLocation::Auto {})
+        blob.insert(kv, kv, &[0u8; 32].into(), InsertLocation::Auto {})
             .expect_err("");
     }
 
@@ -2031,7 +2048,8 @@ mod tests {
         }
 
         let before = blob.get_key_value_map();
-        blob.batch_insert(batch.into_iter()).unwrap();
+        blob.batch_insert(batch.into_iter())
+            .expect("here ---asdfasdf");
         let after = blob.get_key_value_map();
 
         open_dot(
