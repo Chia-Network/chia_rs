@@ -256,10 +256,10 @@ impl Node {
     pub fn from_bytes(metadata: &NodeMetadata, blob: &DataBytes) -> Result<Self, Error> {
         Ok(match metadata.node_type {
             NodeType::Internal => Node::Internal(
-                Streamable::from_bytes_ignore_extra_bytes(blob).map_err(|e| Error::Streaming(e))?,
+                Streamable::from_bytes_ignore_extra_bytes(blob).map_err(Error::Streaming)?,
             ),
             NodeType::Leaf => Node::Leaf(
-                Streamable::from_bytes_ignore_extra_bytes(blob).map_err(|e| Error::Streaming(e))?,
+                Streamable::from_bytes_ignore_extra_bytes(blob).map_err(Error::Streaming)?,
             ),
         })
     }
@@ -269,10 +269,9 @@ impl Node {
             Node::Internal(node) => node.to_bytes(),
             Node::Leaf(node) => node.to_bytes(),
         }
-        .map_err(|e| Error::Streaming(e))?;
-        for _ in base.len()..DATA_SIZE {
-            base.push(0);
-        }
+        .map_err(Error::Streaming)?;
+        assert!(base.len() <= DATA_SIZE);
+        base.resize(DATA_SIZE, 0);
         Ok(base
             .as_slice()
             .try_into()
@@ -319,8 +318,7 @@ pub struct Block {
 impl Block {
     pub fn to_bytes(&self) -> Result<BlockBytes, Error> {
         let mut blob: BlockBytes = [0; BLOCK_SIZE];
-        blob[METADATA_RANGE]
-            .copy_from_slice(&self.metadata.to_bytes().map_err(|e| Error::Streaming(e))?);
+        blob[METADATA_RANGE].copy_from_slice(&self.metadata.to_bytes().map_err(Error::Streaming)?);
         blob[DATA_RANGE].copy_from_slice(&self.node.to_bytes()?);
 
         Ok(blob)
