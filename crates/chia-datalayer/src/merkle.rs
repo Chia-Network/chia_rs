@@ -148,16 +148,14 @@ fn sha256_num<T: ToBytes>(input: T) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(input.to_be_bytes());
 
-    // TODO: propagate?
-    hasher.finalize().into()
+    Bytes32::new(hasher.finalize())
 }
 
 fn sha256_bytes(input: &[u8]) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(input);
 
-    // TODO: propagate?
-    hasher.finalize().into()
+    Bytes32::new(hasher.finalize())
 }
 
 fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
@@ -166,8 +164,7 @@ fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
     hasher.update(left_hash);
     hasher.update(right_hash);
 
-    // TODO: propagate?
-    hasher.finalize().into()
+    Bytes32::new(hasher.finalize())
 }
 
 #[cfg_attr(feature = "py-bindings", pyclass(name = "Side", eq, eq_int))]
@@ -1538,12 +1535,13 @@ mod tests {
 
         assert_eq!(
             internal_hash(&left, &right),
-            clvm_utils::tree_hash_pair(
-                clvm_utils::TreeHash::new(left.into()),
-                clvm_utils::TreeHash::new(right.into())
-            )
-            .to_bytes()
-            .into(),
+            Bytes32::new(
+                clvm_utils::tree_hash_pair(
+                    clvm_utils::TreeHash::new(left.to_bytes()),
+                    clvm_utils::TreeHash::new(right.to_bytes()),
+                )
+                .to_bytes()
+            ),
         );
     }
 
@@ -1900,9 +1898,9 @@ mod tests {
     fn test_double_insert_fails() {
         let mut blob = MerkleBlob::new(vec![]).unwrap();
         let kv = KvId(0);
-        blob.insert(kv, kv, &[0u8; 32].into(), InsertLocation::Auto {})
+        blob.insert(kv, kv, &Bytes32::new([0u8; 32]), InsertLocation::Auto {})
             .unwrap();
-        blob.insert(kv, kv, &[0u8; 32].into(), InsertLocation::Auto {})
+        blob.insert(kv, kv, &Bytes32::new([0u8; 32]), InsertLocation::Auto {})
             .expect_err("");
     }
 
