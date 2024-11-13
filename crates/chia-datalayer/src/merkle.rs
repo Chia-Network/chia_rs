@@ -116,6 +116,15 @@ type MetadataBytes = [u8; METADATA_SIZE];
 type DataBytes = [u8; DATA_SIZE];
 const DATA_RANGE: Range<usize> = METADATA_SIZE..METADATA_SIZE + DATA_SIZE;
 
+fn streamable_from_bytes_ignore_extra_bytes<T>(bytes: &[u8]) -> Result<T, Error>
+where
+    T: Streamable,
+{
+    let mut cursor = std::io::Cursor::new(bytes);
+    // TODO: consider trusted mode?
+    T::parse::<false>(&mut cursor).map_err(Error::Streaming)
+}
+
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, Streamable)]
 pub enum NodeType {
@@ -125,8 +134,7 @@ pub enum NodeType {
 
 impl NodeType {
     pub fn from_u8(value: u8) -> Result<Self, Error> {
-        Streamable::from_bytes_ignore_extra_bytes(&[value])
-            .map_err(|_| Error::FailedLoadingNode("bbb".to_string()))
+        streamable_from_bytes_ignore_extra_bytes(&[value])
     }
 
     #[allow(clippy::wrong_self_convention, clippy::trivially_copy_pass_by_ref)]
@@ -255,12 +263,8 @@ impl Node {
     #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn from_bytes(metadata: &NodeMetadata, blob: &DataBytes) -> Result<Self, Error> {
         Ok(match metadata.node_type {
-            NodeType::Internal => Node::Internal(
-                Streamable::from_bytes_ignore_extra_bytes(blob).map_err(Error::Streaming)?,
-            ),
-            NodeType::Leaf => Node::Leaf(
-                Streamable::from_bytes_ignore_extra_bytes(blob).map_err(Error::Streaming)?,
-            ),
+            NodeType::Internal => Node::Internal(streamable_from_bytes_ignore_extra_bytes(blob)?),
+            NodeType::Leaf => Node::Leaf(streamable_from_bytes_ignore_extra_bytes(blob)?),
         })
     }
 

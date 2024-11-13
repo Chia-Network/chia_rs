@@ -54,14 +54,6 @@ pub trait Streamable {
             Err(Error::InputTooLarge)
         }
     }
-    fn from_bytes_ignore_extra_bytes(bytes: &[u8]) -> Result<Self>
-    where
-        Self: Sized,
-    {
-        let mut cursor = Cursor::new(bytes);
-        let ret = Self::parse::<false>(&mut cursor)?;
-        Ok(ret)
-    }
     fn from_bytes_unchecked(bytes: &[u8]) -> Result<Self>
     where
         Self: Sized,
