@@ -4,28 +4,20 @@ use pyo3::{
     PyResult, Python,
 };
 
+use chia_protocol::Bytes32;
+use chia_streamable_macro::Streamable;
+use chia_traits::Streamable;
 use clvmr::sha2::Sha256;
 use num_traits::ToBytes;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::iter::zip;
-use std::mem::size_of;
 use std::ops::Range;
 use thiserror::Error;
 
 #[cfg_attr(feature = "py-bindings", derive(FromPyObject), pyo3(transparent))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 pub struct TreeIndex(u32);
-
-impl TreeIndex {
-    fn from_bytes(bytes: &[u8]) -> Self {
-        Self(u32::from_be_bytes(bytes.try_into().unwrap()))
-    }
-
-    fn to_bytes(self) -> [u8; 4] {
-        self.0.to_be_bytes()
-    }
-}
 
 #[cfg(feature = "py-bindings")]
 impl IntoPy<PyObject> for TreeIndex {
@@ -41,27 +33,13 @@ impl std::fmt::Display for TreeIndex {
 }
 
 type Parent = Option<TreeIndex>;
-type Hash = [u8; 32];
-type KvIdBytes = [u8; size_of::<i64>()];
+type Hash = Bytes32;
 /// Key and value ids are provided from outside of this code and are implemented as
 /// the row id from sqlite which is a signed 8 byte integer.  The actual key and
 /// value data bytes will not be handled within this code, only outside.
 #[cfg_attr(feature = "py-bindings", derive(FromPyObject), pyo3(transparent))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 pub struct KvId(i64);
-
-impl KvId {
-    #[allow(clippy::unnecessary_wraps)]
-    pub fn from_bytes(blob: KvIdBytes) -> Result<Self, Error> {
-        Ok(Self(i64::from_be_bytes(blob)))
-    }
-
-    // TODO: consider the self convention more compared with other cases
-    #[allow(clippy::trivially_copy_pass_by_ref, clippy::wrong_self_convention)]
-    pub fn to_bytes(&self) -> KvIdBytes {
-        self.0.to_be_bytes()
-    }
-}
 
 #[cfg(feature = "py-bindings")]
 impl IntoPy<PyObject> for KvId {
@@ -118,87 +96,66 @@ pub enum Error {
 
     #[error("node not a leaf: {0:?}")]
     NodeNotALeaf(InternalNode),
+
+    #[error("from streamable: {0:?}")]
+    Streaming(chia_traits::chia_error::Error),
 }
 
 // assumptions
 // - root is at index 0
 // - any case with no keys will have a zero length blob
 
-const fn range_by_length(start: usize, length: usize) -> Range<usize> {
-    start..start + length
-}
-const fn max(left: usize, right: usize) -> usize {
-    [left, right][(left < right) as usize]
-}
-// TODO: once not experimental...  something closer to this
-// const fn max<T: ~const std::cmp::PartialOrd>(left: T, right: T) -> T { if left < right {right} else {left} }
-
-// TODO: consider in more detail other serialization tools such as serde and streamable
 // define the serialized block format
 const METADATA_RANGE: Range<usize> = 0..METADATA_SIZE;
-const TYPE_RANGE: Range<usize> = range_by_length(0, size_of::<u8>());
-const DIRTY_RANGE: Range<usize> = range_by_length(TYPE_RANGE.end, size_of::<u8>());
-const METADATA_SIZE: usize = DIRTY_RANGE.end;
-
-// common fields
-const HASH_RANGE: Range<usize> = range_by_length(0, size_of::<Hash>());
-// const PARENT_RANGE: Range<usize> = range_by_length(HASH_RANGE.end, size_of::<TreeIndex>());
-const PARENT_RANGE: Range<usize> = range_by_length(HASH_RANGE.end, size_of::<TreeIndex>());
-// internal specific fields
-const LEFT_RANGE: Range<usize> = range_by_length(PARENT_RANGE.end, size_of::<TreeIndex>());
-const RIGHT_RANGE: Range<usize> = range_by_length(LEFT_RANGE.end, size_of::<TreeIndex>());
-// leaf specific fields
-const KEY_RANGE: Range<usize> = range_by_length(PARENT_RANGE.end, size_of::<KvId>());
-const VALUE_RANGE: Range<usize> = range_by_length(KEY_RANGE.end, size_of::<KvId>());
-
-const DATA_SIZE: usize = max(RIGHT_RANGE.end, VALUE_RANGE.end);
+const METADATA_SIZE: usize = 2;
+// TODO: figure out the real max better than trial and error?
+const DATA_SIZE: usize = 53;
 const BLOCK_SIZE: usize = METADATA_SIZE + DATA_SIZE;
 type BlockBytes = [u8; BLOCK_SIZE];
 type MetadataBytes = [u8; METADATA_SIZE];
 type DataBytes = [u8; DATA_SIZE];
 const DATA_RANGE: Range<usize> = METADATA_SIZE..METADATA_SIZE + DATA_SIZE;
 
-macro_rules! u8_enum {
-    ($enum_name:ident, $error_name:expr, {$($variant_name:ident = $variant_value:literal),*}) => {
-        #[derive(Clone, Debug, Hash, Eq, PartialEq)]
-        #[repr(u8)]
-        pub enum $enum_name {
-            $( $variant_name = $variant_value, )*
-        }
-
-        impl $enum_name {
-            pub fn from_u8(value: u8) -> Result<Self, Error> {
-                match value {
-                    $( $variant_value => Ok(Self::$variant_name), )*
-                    other => Err($error_name(other)),
-                }
-            }
-
-            pub fn to_u8(&self) -> u8 {
-                match self {
-                    $( Self::$variant_name => $variant_value, )*
-                }
-            }
-        }
-
-    };
+fn streamable_from_bytes_ignore_extra_bytes<T>(bytes: &[u8]) -> Result<T, Error>
+where
+    T: Streamable,
+{
+    let mut cursor = std::io::Cursor::new(bytes);
+    // TODO: consider trusted mode?
+    T::parse::<false>(&mut cursor).map_err(Error::Streaming)
 }
 
-u8_enum!(NodeType, Error::UnknownNodeTypeValue, {Internal = 0, Leaf = 1});
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, Streamable)]
+pub enum NodeType {
+    Internal = 0,
+    Leaf = 1,
+}
+
+impl NodeType {
+    pub fn from_u8(value: u8) -> Result<Self, Error> {
+        streamable_from_bytes_ignore_extra_bytes(&[value])
+    }
+
+    #[allow(clippy::wrong_self_convention, clippy::trivially_copy_pass_by_ref)]
+    pub fn to_u8(&self) -> u8 {
+        Streamable::to_bytes(self).unwrap()[0]
+    }
+}
 
 #[allow(clippy::needless_pass_by_value)]
 fn sha256_num<T: ToBytes>(input: T) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(input.to_be_bytes());
 
-    hasher.finalize()
+    Bytes32::new(hasher.finalize())
 }
 
 fn sha256_bytes(input: &[u8]) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(input);
 
-    hasher.finalize()
+    Bytes32::new(hasher.finalize())
 }
 
 fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
@@ -207,7 +164,7 @@ fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
     hasher.update(left_hash);
     hasher.update(right_hash);
 
-    hasher.finalize()
+    Bytes32::new(hasher.finalize())
 }
 
 #[cfg_attr(feature = "py-bindings", pyclass(name = "Side", eq, eq_int))]
@@ -228,58 +185,15 @@ pub enum InsertLocation {
     Leaf { index: TreeIndex, side: Side },
 }
 
-const NULL_PARENT: TreeIndex = TreeIndex(0xffff_ffffu32);
-
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, Streamable)]
 pub struct NodeMetadata {
+    // OPT: could save 1-2% of tree space by packing (and maybe don't do that)
     pub node_type: NodeType,
     pub dirty: bool,
 }
 
-impl NodeMetadata {
-    pub fn from_bytes(blob: MetadataBytes) -> Result<Self, Error> {
-        // OPT: could save 1-2% of tree space by packing (and maybe don't do that)
-        Ok(Self {
-            node_type: Self::node_type_from_bytes(blob)?,
-            dirty: Self::dirty_from_bytes(blob)?,
-        })
-    }
-
-    pub fn to_bytes(&self) -> MetadataBytes {
-        let mut bytes = [0u8; METADATA_SIZE];
-        bytes[TYPE_RANGE].copy_from_slice(&[self.node_type.to_u8()]);
-        bytes[DIRTY_RANGE].copy_from_slice(&[u8::from(self.dirty)]);
-
-        bytes
-    }
-
-    pub fn node_type_from_bytes(blob: MetadataBytes) -> Result<NodeType, Error> {
-        NodeType::from_u8(u8::from_be_bytes(blob[TYPE_RANGE].try_into().unwrap()))
-    }
-
-    pub fn dirty_from_bytes(blob: MetadataBytes) -> Result<bool, Error> {
-        match u8::from_be_bytes(blob[DIRTY_RANGE].try_into().unwrap()) {
-            0 => Ok(false),
-            1 => Ok(true),
-            other => Err(Error::UnknownDirtyValue(other)),
-        }
-    }
-}
-
-fn parent_from_bytes(blob: &DataBytes) -> Parent {
-    let parent_integer = TreeIndex::from_bytes(&blob[PARENT_RANGE]);
-    match parent_integer {
-        NULL_PARENT => None,
-        _ => Some(parent_integer),
-    }
-}
-
-fn hash_from_bytes(blob: &DataBytes) -> Hash {
-    blob[HASH_RANGE].try_into().unwrap()
-}
-
 #[cfg_attr(feature = "py-bindings", pyclass(name = "InternalNode", get_all))]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Streamable)]
 pub struct InternalNode {
     parent: Parent,
     hash: Hash,
@@ -288,26 +202,6 @@ pub struct InternalNode {
 }
 
 impl InternalNode {
-    #[allow(clippy::unnecessary_wraps)]
-    pub fn from_bytes(blob: &DataBytes) -> Result<Self, Error> {
-        Ok(Self {
-            parent: parent_from_bytes(blob),
-            hash: hash_from_bytes(blob),
-            left: TreeIndex::from_bytes(&blob[LEFT_RANGE]),
-            right: TreeIndex::from_bytes(&blob[RIGHT_RANGE]),
-        })
-    }
-    pub fn to_bytes(&self) -> DataBytes {
-        let mut blob: DataBytes = [0; DATA_SIZE];
-        let parent_integer = self.parent.unwrap_or(NULL_PARENT);
-        blob[HASH_RANGE].copy_from_slice(&self.hash);
-        blob[PARENT_RANGE].copy_from_slice(&parent_integer.to_bytes());
-        blob[LEFT_RANGE].copy_from_slice(&self.left.to_bytes());
-        blob[RIGHT_RANGE].copy_from_slice(&self.right.to_bytes());
-
-        blob
-    }
-
     pub fn sibling_index(&self, index: TreeIndex) -> TreeIndex {
         if index == self.right {
             self.left
@@ -320,35 +214,12 @@ impl InternalNode {
 }
 
 #[cfg_attr(feature = "py-bindings", pyclass(name = "LeafNode", get_all))]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Streamable)]
 pub struct LeafNode {
     parent: Parent,
     hash: Hash,
     key: KvId,
     value: KvId,
-}
-
-impl LeafNode {
-    #[allow(clippy::unnecessary_wraps)]
-    pub fn from_bytes(blob: &DataBytes) -> Result<Self, Error> {
-        Ok(Self {
-            parent: parent_from_bytes(blob),
-            hash: hash_from_bytes(blob),
-            key: KvId::from_bytes(blob[KEY_RANGE].try_into().unwrap())?,
-            value: KvId::from_bytes(blob[VALUE_RANGE].try_into().unwrap())?,
-        })
-    }
-
-    pub fn to_bytes(&self) -> DataBytes {
-        let mut blob: DataBytes = [0; DATA_SIZE];
-        let parent_integer = self.parent.unwrap_or(NULL_PARENT);
-        blob[HASH_RANGE].copy_from_slice(&self.hash);
-        blob[PARENT_RANGE].copy_from_slice(&parent_integer.to_bytes());
-        blob[KEY_RANGE].copy_from_slice(&self.key.to_bytes());
-        blob[VALUE_RANGE].copy_from_slice(&self.value.to_bytes());
-
-        blob
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -386,18 +257,26 @@ impl Node {
         }
     }
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn from_bytes(metadata: &NodeMetadata, blob: &DataBytes) -> Result<Self, Error> {
         Ok(match metadata.node_type {
-            NodeType::Internal => Node::Internal(InternalNode::from_bytes(blob)?),
-            NodeType::Leaf => Node::Leaf(LeafNode::from_bytes(blob)?),
+            NodeType::Internal => Node::Internal(streamable_from_bytes_ignore_extra_bytes(blob)?),
+            NodeType::Leaf => Node::Leaf(streamable_from_bytes_ignore_extra_bytes(blob)?),
         })
     }
 
-    pub fn to_bytes(&self) -> DataBytes {
-        match self {
+    pub fn to_bytes(&self) -> Result<DataBytes, Error> {
+        let mut base = match self {
             Node::Internal(node) => node.to_bytes(),
             Node::Leaf(node) => node.to_bytes(),
         }
+        .map_err(Error::Streaming)?;
+        assert!(base.len() <= DATA_SIZE);
+        base.resize(DATA_SIZE, 0);
+        Ok(base
+            .as_slice()
+            .try_into()
+            .expect("padding was added above, might be too large"))
     }
 
     fn expect_leaf(self, message: &str) -> LeafNode {
@@ -438,18 +317,18 @@ pub struct Block {
 }
 
 impl Block {
-    pub fn to_bytes(&self) -> BlockBytes {
+    pub fn to_bytes(&self) -> Result<BlockBytes, Error> {
         let mut blob: BlockBytes = [0; BLOCK_SIZE];
-        blob[METADATA_RANGE].copy_from_slice(&self.metadata.to_bytes());
-        blob[DATA_RANGE].copy_from_slice(&self.node.to_bytes());
+        blob[METADATA_RANGE].copy_from_slice(&self.metadata.to_bytes().map_err(Error::Streaming)?);
+        blob[DATA_RANGE].copy_from_slice(&self.node.to_bytes()?);
 
-        blob
+        Ok(blob)
     }
 
     pub fn from_bytes(blob: BlockBytes) -> Result<Self, Error> {
         let metadata_blob: MetadataBytes = blob[METADATA_RANGE].try_into().unwrap();
         let data_blob: DataBytes = blob[DATA_RANGE].try_into().unwrap();
-        let metadata = NodeMetadata::from_bytes(metadata_blob)
+        let metadata = NodeMetadata::from_bytes(&metadata_blob)
             .map_err(|message| Error::FailedLoadingMetadata(message.to_string()))?;
         let node = Node::from_bytes(&metadata, &data_blob)
             .map_err(|message| Error::FailedLoadingNode(message.to_string()))?;
@@ -1126,7 +1005,7 @@ impl MerkleBlob {
     }
 
     fn insert_entry_to_blob(&mut self, index: TreeIndex, block: &Block) -> Result<(), Error> {
-        let new_block_bytes = block.to_bytes();
+        let new_block_bytes = block.to_bytes()?;
         let extend_index = self.extend_index();
         match index.cmp(&extend_index) {
             Ordering::Greater => return Err(Error::BlockIndexOutOfRange(index)),
@@ -1162,10 +1041,7 @@ impl MerkleBlob {
     }
 
     fn get_hash(&self, index: TreeIndex) -> Result<Hash, Error> {
-        let block_bytes = self.get_block_bytes(index)?;
-        let data_bytes: DataBytes = block_bytes[DATA_RANGE].try_into().unwrap();
-
-        Ok(hash_from_bytes(&data_bytes))
+        Ok(self.get_block(index)?.node.hash())
     }
 
     fn get_block_bytes(&self, index: TreeIndex) -> Result<BlockBytes, Error> {
@@ -1191,9 +1067,7 @@ impl MerkleBlob {
     }
 
     pub fn get_parent_index(&self, index: TreeIndex) -> Result<Parent, Error> {
-        let block = self.get_block_bytes(index)?;
-
-        Ok(parent_from_bytes(block[DATA_RANGE].try_into().unwrap()))
+        Ok(self.get_block(index)?.node.parent())
     }
 
     pub fn get_lineage_with_indexes(
@@ -1647,11 +1521,8 @@ mod tests {
         assert_eq!(NodeType::Leaf as u8, 1);
 
         for node_type in [NodeType::Internal, NodeType::Leaf] {
-            assert_eq!(node_type.to_u8(), node_type.clone() as u8,);
-            assert_eq!(
-                NodeType::from_u8(node_type.clone() as u8).unwrap(),
-                node_type,
-            );
+            assert_eq!(node_type.to_u8(), node_type as u8,);
+            assert_eq!(NodeType::from_u8(node_type as u8).unwrap(), node_type,);
         }
     }
 
@@ -1664,11 +1535,13 @@ mod tests {
 
         assert_eq!(
             internal_hash(&left, &right),
-            clvm_utils::tree_hash_pair(
-                clvm_utils::TreeHash::new(left),
-                clvm_utils::TreeHash::new(right)
-            )
-            .to_bytes(),
+            Bytes32::new(
+                clvm_utils::tree_hash_pair(
+                    clvm_utils::TreeHash::new(left.to_bytes()),
+                    clvm_utils::TreeHash::new(right.to_bytes()),
+                )
+                .to_bytes()
+            ),
         );
     }
 
@@ -1678,14 +1551,9 @@ mod tests {
         #[values(NodeType::Internal, NodeType::Leaf)] node_type: NodeType,
     ) {
         let bytes: [u8; 2] = [node_type.to_u8(), dirty as u8];
-        let object = NodeMetadata::from_bytes(bytes).unwrap();
+        let object = NodeMetadata::from_bytes(&bytes).unwrap();
         assert_eq!(object, NodeMetadata { node_type, dirty },);
-        assert_eq!(object.to_bytes(), bytes);
-        assert_eq!(
-            NodeMetadata::node_type_from_bytes(bytes).unwrap(),
-            object.node_type
-        );
-        assert_eq!(NodeMetadata::dirty_from_bytes(bytes).unwrap(), object.dirty);
+        assert_eq!(object.to_bytes().unwrap(), bytes);
     }
 
     #[fixture]
@@ -1938,11 +1806,6 @@ mod tests {
     }
 
     #[test]
-    fn test_node_metadata_dirty_from_bytes_invalid() {
-        NodeMetadata::dirty_from_bytes([0, 2]).expect_err("invalid value should fail");
-    }
-
-    #[test]
     #[should_panic(expected = "index not a child: 2")]
     fn test_node_specific_sibling_index_panics_for_unknown_sibling() {
         // TODO: this probably shouldn't be a panic?
@@ -2035,9 +1898,9 @@ mod tests {
     fn test_double_insert_fails() {
         let mut blob = MerkleBlob::new(vec![]).unwrap();
         let kv = KvId(0);
-        blob.insert(kv, kv, &[0u8; 32], InsertLocation::Auto {})
+        blob.insert(kv, kv, &Bytes32::new([0u8; 32]), InsertLocation::Auto {})
             .unwrap();
-        blob.insert(kv, kv, &[0u8; 32], InsertLocation::Auto {})
+        blob.insert(kv, kv, &Bytes32::new([0u8; 32]), InsertLocation::Auto {})
             .expect_err("");
     }
 
