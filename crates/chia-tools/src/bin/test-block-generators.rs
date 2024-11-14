@@ -5,7 +5,7 @@ use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::gen::conditions::{NewCoin, SpendBundleConditions, SpendConditions};
 use chia_consensus::gen::flags::{ALLOW_BACKREFS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
 use chia_consensus::gen::run_block_generator::{run_block_generator, run_block_generator2};
-use chia_tools::iterate_tx_blocks;
+use chia_tools::iterate_blocks;
 use clvmr::allocator::NodePtr;
 use clvmr::Allocator;
 use std::collections::HashSet;
@@ -165,11 +165,14 @@ fn main() {
     let mut last_height = args.start_height;
     let mut last_time = Instant::now();
     println!("opening blockchain database file: {}", args.file);
-    iterate_tx_blocks(
+    iterate_blocks(
         &args.file,
         args.start_height,
         max_height,
         |height, block, block_refs| {
+            if block.transactions_generator.is_none() {
+                return;
+            }
             pool.execute(move || {
                 let mut a = Allocator::new_limited(500_000_000);
 

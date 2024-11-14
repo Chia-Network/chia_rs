@@ -5,7 +5,7 @@
 
 use clap::Parser;
 
-use chia_tools::{iterate_tx_blocks, visit_spends};
+use chia_tools::{iterate_blocks, visit_spends};
 use chia_traits::streamable::Streamable;
 
 use chia_bls::G2Element;
@@ -78,11 +78,14 @@ fn main() {
     let mut last_height = 0;
     let mut last_time = Instant::now();
     let corpus_counter = Arc::new(AtomicUsize::new(0));
-    iterate_tx_blocks(
+    iterate_blocks(
         &args.file,
         args.start_height,
         args.max_height,
         |height, block, block_refs| {
+            if block.transactions_generator.is_none() {
+                return;
+            }
             // this is called for each transaction block
             let max_cost = block.transactions_info.unwrap().cost;
             let prg = block.transactions_generator.unwrap();

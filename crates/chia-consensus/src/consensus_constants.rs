@@ -157,7 +157,7 @@ pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
     max_future_time2: 2 * 60,
     number_of_timestamps: 11,
     genesis_challenge: Bytes32::new(hex!(
-        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        "ccd5bb71183532bff220ba46c268991a3ff07eb358e8255a65c30a2dce0e5fbb"
     )),
     agg_sig_me_additional_data: Bytes32::new(hex!(
         "ccd5bb71183532bff220ba46c268991a3ff07eb358e8255a65c30a2dce0e5fbb"

@@ -25,6 +25,7 @@ clap = { workspace = true, features = ["derive"] }
 zstd = { workspace = true }
 blocking-threadpool = { workspace = true }
 hex = { workspace = true }
+hex-literal = { workspace = true }
 
 [lib]
 name = "chia_tools"
@@ -67,5 +68,10 @@ bench = false
 
 [[bin]]
 name = "get-generator"
+test = false
+bench = false
+
+[[bin]]
+name = "validate-blockchain-db"
 test = false
 bench = false
