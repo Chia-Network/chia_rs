@@ -141,7 +141,6 @@ features that are validated:
             prev_hash = block.prev_header_hash();
         }
 
-        // this is not a transaction block
         assert_eq!(
             block.prev_header_hash(),
             prev_hash,
@@ -160,15 +159,16 @@ features that are validated:
             "at height {height} the the block height did not increment by 1, from previous block (at height {prev_height})");
         prev_hash = block.header_hash();
         prev_height = height as i64;
-        if block.transactions_generator.is_none() {
-            return;
-        }
-        let mut removals_rows = select_spends
-            .query([height])
-            .expect("failed to query spent coins");
         let mut removals = HashSet::<[u8; 32]>::new();
-        while let Ok(Some(row)) = removals_rows.next() {
-            removals.insert(row.get::<_, [u8; 32]>(0).expect("missing coin_name"));
+        // height 0 is not a transaction block so unspent coins have a
+        // spent_index of 0 to indicate that they have not been spent.
+        if height != 0 {
+            let mut removals_rows = select_spends
+                .query([height])
+                .expect("failed to query spent coins");
+            while let Ok(Some(row)) = removals_rows.next() {
+                removals.insert(row.get::<_, [u8; 32]>(0).expect("missing coin_name"));
+            }
         }
         let mut additions_rows = select_created
             .query([height])
@@ -182,6 +182,54 @@ features that are validated:
             let parent = row.get::<_, [u8; 32]>(3).expect("missing parent");
             let amount = u64::from_be_bytes(row.get::<_, [u8; 8]>(4).expect("missing amount"));
             additions.insert(coin_name, (ph, parent, amount, reward));
+        }
+
+        // first ensure that the reward coins for this block are all included in
+        // the coin record table.
+        let rewards = block.get_included_reward_coins();
+        for add in &rewards {
+            let new_coin_id = add.coin_id();
+            let Some((ph, _parent, amount, coin_base)) = additions.get(new_coin_id.as_slice())
+            else {
+                panic!("at height {height} the block created a reward coin {new_coin_id} that's not in the coin_record table");
+            };
+            // TODO: ensure the parent coin ID is set correctly
+            assert_eq!(ph, add.puzzle_hash.as_slice(),
+                "at height {height} the reward coin {new_coin_id} has an incorrect puzzle hash in the coin_record table {} expected {}",
+                hex::encode(ph),
+                add.puzzle_hash
+            );
+            // ensure the parent hash has the expected look
+            assert_eq!(*amount, add.amount, "at height {height} reward coin {new_coin_id} has amount {} in coin_record table, but the block has amount {}", amount, add.amount);
+            // this is a reward coin
+            assert!(coin_base, "at height {height} the reward coin {new_coin_id} is not marked as coin-base in the database");
+            additions.remove(new_coin_id.as_slice());
+        }
+        if block.transactions_generator.is_none() {
+            // this is not a transaction block
+            // there should be no coins in the coin table spent at this height.
+            if !removals.is_empty() {
+                println!("block at height {height} is not a transaction block, but the coin_record table has coins spent at this block height");
+                for coin_id in removals {
+                    println!("  id: {}", hex::encode(coin_id));
+                }
+                panic!();
+            }
+            // there should not be any non-reward coins created in this block
+            if !additions.is_empty() {
+                println!("block at height {height} is not a transaction block, but the coin_record table has coins created at this block height");
+                for (coin_id, (ph, parent, amount, reward)) in additions {
+                    println!(
+                        "  id: {} - {} {} {amount} {}",
+                        hex::encode(coin_id),
+                        hex::encode(ph),
+                        hex::encode(parent),
+                        if reward { "(coinbase)" } else { "" }
+                    );
+                }
+                panic!();
+            }
+            return;
         }
         pool.execute(move || {
                 let mut a = Allocator::new_limited(500_000_000);
@@ -225,14 +273,14 @@ features that are validated:
                         "could not find coin {coin_name} in coin_record table, which is being spent at height {height}");
                     for add in &spend.create_coin {
                         let new_coin_id = Coin::new(coin_name, add.puzzle_hash, add.amount).coin_id();
-                        let Some(new_db_coin) = additions.get(new_coin_id.as_slice()) else {
+                        let Some((ph, parent, amount, coin_base)) = additions.get(new_coin_id.as_slice()) else {
                             panic!("at height {height} the block created a coin {new_coin_id} that's not in the coin_record table");
                         };
-                        assert_eq!(new_db_coin.0, add.puzzle_hash.as_slice());
-                        assert_eq!(new_db_coin.1, coin_name.as_slice());
-                        assert_eq!(new_db_coin.2, add.amount);
+                        assert_eq!(ph, add.puzzle_hash.as_slice(), "at height {height} the spent coin with id {new_coin_id} has a mismatching puzzle hash");
+                        assert_eq!(parent, coin_name.as_slice(), "at height {height} the spent coin with id {new_coin_id} has a mismatching parent");
+                        assert_eq!(*amount, add.amount, "at height {height} the spent coin with id {new_coin_id} has a mismatching amount");
                         // this is not a reward coin
-                        assert!(!new_db_coin.3, "at height {height}, the created coin {new_coin_id} is incorrectly marked as coin-base in the database");
+                        assert!(!coin_base, "at height {height}, the created coin {new_coin_id} is incorrectly marked as coin-base in the database");
                         additions.remove(new_coin_id.as_slice());
                     }
                 }
@@ -244,25 +292,6 @@ features that are validated:
                     panic!();
                 }
 
-                // at this point, the only additions left from the DB should be
-                // rewards. Ensure that's the case
-                let rewards = block.get_included_reward_coins();
-                for add in &rewards {
-                    let new_coin_id = add.coin_id();
-                    let Some(new_db_coin) = additions.get(new_coin_id.as_slice()) else {
-                        panic!("at height {height} the block created a coin {new_coin_id} that's not in the coin_record table");
-                    };
-                    assert_eq!(new_db_coin.0, add.puzzle_hash.as_slice(),
-                        "at height {height} the coin {new_coin_id} has an incorrect puzzle hash in the coin_record table {} expected {}",
-                        hex::encode(new_db_coin.0),
-                        add.puzzle_hash
-                    );
-                    // ensure the parent hash has the expected look
-                    assert_eq!(new_db_coin.2, add.amount, "at height {height} reward coin {new_coin_id} has amount {} in coin_record table, but the block has amount {}", new_db_coin.2, add.amount);
-                    // this is a reward coin
-                    assert!(new_db_coin.3, "at height {height} the reward coin {new_coin_id} is not marked as coin-base in the database");
-                    additions.remove(new_coin_id.as_slice());
-                }
                 if !additions.is_empty() {
                     println!("at height {height} the coin_table has {} extra coin additions", additions.len());
                     for (coin_id, (ph, parent, amount, reward)) in additions {
