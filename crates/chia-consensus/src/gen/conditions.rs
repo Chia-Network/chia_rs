@@ -1291,7 +1291,7 @@ pub fn parse_spends<V: SpendVisitor>(
     max_cost: Cost,
     flags: u32,
     aggregate_signature: &Signature,
-    bls_cache: Option<&mut BlsCache>,
+    bls_cache: Option<&BlsCache>,
     constants: &ConsensusConstants,
 ) -> Result<SpendBundleConditions, ValidationErr> {
     let mut ret = SpendBundleConditions::default();
@@ -1503,7 +1503,7 @@ pub fn validate_signature(
     state: &ParseState,
     signature: &Signature,
     flags: u32,
-    bls_cache: Option<&mut BlsCache>,
+    bls_cache: Option<&BlsCache>,
 ) -> Result<(), ValidationErr> {
     if (flags & DONT_VALIDATE_SIGNATURE) != 0 {
         return Ok(());
@@ -1766,7 +1766,7 @@ fn cond_test_cb(
     flags: u32,
     callback: Callback,
     signature: &Signature,
-    bls_cache: Option<&mut BlsCache>,
+    bls_cache: Option<&BlsCache>,
 ) -> Result<(Allocator, SpendBundleConditions), ValidationErr> {
     let mut a = Allocator::new();
 
@@ -1817,7 +1817,7 @@ fn cond_test_flag(
 fn cond_test_sig(
     input: &str,
     signature: &Signature,
-    bls_cache: Option<&mut BlsCache>,
+    bls_cache: Option<&BlsCache>,
     flags: u32,
 ) -> Result<(Allocator, SpendBundleConditions), ValidationErr> {
     cond_test_cb(input, flags, None, signature, bls_cache)
@@ -4698,7 +4698,7 @@ fn add_signature(sig: &mut Signature, puzzle: &mut String, opcode: ConditionOpco
 }
 
 #[cfg(test)]
-fn populate_cache(opcode: ConditionOpcode, bls_cache: &mut BlsCache) {
+fn populate_cache(opcode: ConditionOpcode, bls_cache: &BlsCache) {
     use chia_bls::hash_to_g2;
     let msg = final_message(H1, H2, 123, opcode, MSG1);
     // Otherwise, we need to calculate the pairing and add it to the cache.
@@ -4720,17 +4720,17 @@ fn test_agg_sig(
 ) {
     use chia_bls::{sign, SecretKey};
     let mut signature = Signature::default();
-    let mut bls_cache = BlsCache::default();
-    let cache: Option<&mut BlsCache> = if with_cache {
-        populate_cache(43, &mut bls_cache);
-        populate_cache(44, &mut bls_cache);
-        populate_cache(45, &mut bls_cache);
-        populate_cache(46, &mut bls_cache);
-        populate_cache(47, &mut bls_cache);
-        populate_cache(48, &mut bls_cache);
-        populate_cache(49, &mut bls_cache);
-        populate_cache(50, &mut bls_cache);
-        Some(&mut bls_cache)
+    let bls_cache = BlsCache::default();
+    let cache: Option<&BlsCache> = if with_cache {
+        populate_cache(43, &bls_cache);
+        populate_cache(44, &bls_cache);
+        populate_cache(45, &bls_cache);
+        populate_cache(46, &bls_cache);
+        populate_cache(47, &bls_cache);
+        populate_cache(48, &bls_cache);
+        populate_cache(49, &bls_cache);
+        populate_cache(50, &bls_cache);
+        Some(&bls_cache)
     } else {
         None
     };

@@ -76,7 +76,7 @@ pub fn run_block_generator<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
     max_cost: u64,
     flags: u32,
     signature: &Signature,
-    bls_cache: Option<&mut BlsCache>,
+    bls_cache: Option<&BlsCache>,
     constants: &ConsensusConstants,
 ) -> Result<SpendBundleConditions, ValidationErr>
 where
@@ -166,7 +166,7 @@ pub fn run_block_generator2<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>
     max_cost: u64,
     flags: u32,
     signature: &Signature,
-    bls_cache: Option<&mut BlsCache>,
+    bls_cache: Option<&BlsCache>,
     constants: &ConsensusConstants,
 ) -> Result<SpendBundleConditions, ValidationErr>
 where

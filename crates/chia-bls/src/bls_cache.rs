@@ -54,7 +54,7 @@ impl BlsCache {
     }
 
     pub fn aggregate_verify<Pk: Borrow<PublicKey>, Msg: AsRef<[u8]>>(
-        &mut self,
+        &self,
         pks_msgs: impl IntoIterator<Item = (Pk, Msg)>,
         sig: &Signature,
     ) -> bool {
@@ -82,7 +82,7 @@ impl BlsCache {
         aggregate_verify_gt(sig, iter)
     }
 
-    pub fn update(&mut self, aug_msg: &[u8], gt: GTElement) {
+    pub fn update(&self, aug_msg: &[u8], gt: GTElement) {
         let mut hasher = Sha256::new();
         hasher.update(aug_msg.as_ref());
         let hash: [u8; 32] = hasher.finalize();
@@ -119,7 +119,7 @@ impl BlsCache {
 
     #[pyo3(name = "aggregate_verify")]
     pub fn py_aggregate_verify(
-        &mut self,
+        &self,
         pks: &Bound<'_, PyList>,
         msgs: &Bound<'_, PyList>,
         sig: &Signature,
@@ -155,7 +155,7 @@ impl BlsCache {
     }
 
     #[pyo3(name = "update")]
-    pub fn py_update(&mut self, other: &Bound<'_, PySequence>) -> PyResult<()> {
+    pub fn py_update(&self, other: &Bound<'_, PySequence>) -> PyResult<()> {
         let mut c = self.cache.lock().expect("cache");
         for item in other.borrow().iter()? {
             let (key, value): (Vec<u8>, GTElement) = item?.extract()?;
@@ -178,7 +178,7 @@ pub mod tests {
 
     #[test]
     fn test_aggregate_verify() {
-        let mut bls_cache = BlsCache::default();
+        let bls_cache = BlsCache::default();
 
         let sk = SecretKey::from_seed(&[0; 32]);
         let pk = sk.public_key();
@@ -201,7 +201,7 @@ pub mod tests {
 
     #[test]
     fn test_cache() {
-        let mut bls_cache = BlsCache::default();
+        let bls_cache = BlsCache::default();
 
         let sk1 = SecretKey::from_seed(&[0; 32]);
         let pk1 = sk1.public_key();
@@ -242,7 +242,7 @@ pub mod tests {
     #[test]
     fn test_cache_limit() {
         // The cache is limited to only 3 items.
-        let mut bls_cache = BlsCache::new(NonZeroUsize::new(3).unwrap());
+        let bls_cache = BlsCache::new(NonZeroUsize::new(3).unwrap());
 
         // Before we cache anything, it should be empty.
         assert!(bls_cache.is_empty());
@@ -280,7 +280,7 @@ pub mod tests {
 
     #[test]
     fn test_empty_sig() {
-        let mut bls_cache = BlsCache::default();
+        let bls_cache = BlsCache::default();
 
         let pks_msgs: [(&PublicKey, &[u8]); 0] = [];
 
