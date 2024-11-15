@@ -2,7 +2,7 @@ use std::borrow::Borrow;
 use std::num::NonZeroUsize;
 
 use chia_sha2::Sha256;
-use lru::LruCache;
+use linked_hash_map::LinkedHashMap;
 use std::sync::Mutex;
 
 use crate::{aggregate_verify_gt, hash_to_g2};
@@ -17,16 +17,35 @@ use crate::{GTElement, PublicKey, Signature};
 /// However, validating a signature where we have no cached GT elements, the
 /// aggregate_verify() primitive is faster. When long-syncing, that's
 /// preferable.
+
+#[derive(Debug, Clone)]
+struct BlsCacheData {
+    // sha256(pubkey + message) -> GTElement
+    items: LinkedHashMap<[u8; 32], GTElement>,
+    capacity: NonZeroUsize,
+}
+
+impl BlsCacheData {
+    pub fn put(&mut self, hash: [u8; 32], pairing: GTElement) {
+        // If the cache is full, remove the oldest item.
+        if self.items.len() == self.capacity.get() {
+            if let Some((oldest_key, _)) = self.items.pop_front() {
+                self.items.remove(&oldest_key);
+            }
+        }
+        self.items.insert(hash, pairing);
+    }
+}
+
 #[cfg_attr(feature = "py-bindings", pyo3::pyclass(name = "BLSCache"))]
 #[derive(Debug)]
 pub struct BlsCache {
-    // sha256(pubkey + message) -> GTElement
-    cache: Mutex<LruCache<[u8; 32], GTElement>>,
+    cache: Mutex<BlsCacheData>,
 }
 
 impl Default for BlsCache {
     fn default() -> Self {
-        Self::new(NonZeroUsize::new(50000).unwrap())
+        Self::new(NonZeroUsize::new(50_000).unwrap())
     }
 }
 
@@ -39,18 +58,21 @@ impl Clone for BlsCache {
 }
 
 impl BlsCache {
-    pub fn new(cache_size: NonZeroUsize) -> Self {
+    pub fn new(capacity: NonZeroUsize) -> Self {
         Self {
-            cache: Mutex::new(LruCache::new(cache_size)),
+            cache: Mutex::new(BlsCacheData {
+                items: LinkedHashMap::new(),
+                capacity,
+            }),
         }
     }
 
     pub fn len(&self) -> usize {
-        self.cache.lock().expect("cache").len()
+        self.cache.lock().expect("cache").items.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.cache.lock().expect("cache").is_empty()
+        self.cache.lock().expect("cache").items.is_empty()
     }
 
     pub fn aggregate_verify<Pk: Borrow<PublicKey>, Msg: AsRef<[u8]>>(
@@ -67,7 +89,7 @@ impl BlsCache {
             let hash: [u8; 32] = hasher.finalize();
 
             // If the pairing is in the cache, we don't need to recalculate it.
-            if let Some(pairing) = self.cache.lock().expect("cache").get(&hash).cloned() {
+            if let Some(pairing) = self.cache.lock().expect("cache").items.get(&hash).cloned() {
                 return pairing;
             }
 
@@ -87,6 +109,22 @@ impl BlsCache {
         hasher.update(aug_msg.as_ref());
         let hash: [u8; 32] = hasher.finalize();
         self.cache.lock().expect("cache").put(hash, gt);
+    }
+
+    pub fn evict<Pk, Msg>(&self, pks_msgs: impl IntoIterator<Item = (Pk, Msg)>)
+    where
+        Pk: Borrow<PublicKey>,
+        Msg: AsRef<[u8]>,
+    {
+        let mut c = self.cache.lock().expect("cache");
+        for (pk, msg) in pks_msgs {
+            let mut hasher = Sha256::new();
+            let mut aug_msg = pk.borrow().to_bytes().to_vec();
+            aug_msg.extend_from_slice(msg.as_ref());
+            hasher.update(&aug_msg);
+            let hash: [u8; 32] = hasher.finalize();
+            c.items.remove(&hash);
+        }
     }
 }
 
@@ -148,7 +186,7 @@ impl BlsCache {
         use pyo3::types::PyBytes;
         let ret = PyList::empty_bound(py);
         let c = self.cache.lock().expect("cache");
-        for (key, value) in &*c {
+        for (key, value) in &c.items {
             ret.append((PyBytes::new_bound(py, key), value.clone().into_py(py)))?;
         }
         Ok(ret.into())
@@ -165,6 +203,20 @@ impl BlsCache {
                 value,
             );
         }
+        Ok(())
+    }
+
+    #[pyo3(name = "evict")]
+    pub fn py_evict(&self, pks: &Bound<'_, PyList>, msgs: &Bound<'_, PyList>) -> PyResult<()> {
+        let pks = pks
+            .iter()?
+            .map(|item| item?.extract())
+            .collect::<PyResult<Vec<PublicKey>>>()?;
+        let msgs = msgs
+            .iter()?
+            .map(|item| item?.extract())
+            .collect::<PyResult<Vec<PyBackedBytes>>>()?;
+        self.evict(pks.into_iter().zip(msgs));
         Ok(())
     }
 }
@@ -261,21 +313,24 @@ pub mod tests {
         }
 
         // The cache should be full now.
-        assert_eq!(bls_cache.cache.lock().expect("cache").len(), 3);
+        assert_eq!(bls_cache.len(), 3);
 
-        // Recreate first key.
-        let sk = SecretKey::from_seed(&[1; 32]);
-        let pk = sk.public_key();
-        let msg = [106; 32];
-
-        let aug_msg = [&pk.to_bytes(), msg.as_ref()].concat();
-
-        let mut hasher = Sha256::new();
-        hasher.update(aug_msg);
-        let hash: [u8; 32] = hasher.finalize();
-
-        // The first key should have been removed, since it's the oldest that's been accessed.
-        assert!(!bls_cache.cache.lock().expect("cache").contains(&hash));
+        // Recreate first two keys and make sure they got removed.
+        for i in 1..=2 {
+            let sk = SecretKey::from_seed(&[i; 32]);
+            let pk = sk.public_key();
+            let msg = [106; 32];
+            let aug_msg = [&pk.to_bytes(), msg.as_ref()].concat();
+            let mut hasher = Sha256::new();
+            hasher.update(aug_msg);
+            let hash: [u8; 32] = hasher.finalize();
+            assert!(!bls_cache
+                .cache
+                .lock()
+                .expect("cache")
+                .items
+                .contains_key(&hash));
+        }
     }
 
     #[test]
@@ -285,5 +340,52 @@ pub mod tests {
         let pks_msgs: [(&PublicKey, &[u8]); 0] = [];
 
         assert!(bls_cache.aggregate_verify(pks_msgs, &Signature::default()));
+    }
+
+    #[test]
+    fn test_evict() {
+        let mut bls_cache = BlsCache::new(NonZeroUsize::new(5).unwrap());
+        // Create 5 pk msg pairs and add them to the cache.
+        let mut pks_msgs = Vec::new();
+        for i in 1..=5 {
+            let sk = SecretKey::from_seed(&[i; 32]);
+            let pk = sk.public_key();
+            let msg = [42; 32];
+            let sig = sign(&sk, msg);
+            pks_msgs.push((pk, msg));
+            assert!(bls_cache.aggregate_verify([(pk, msg)], &sig));
+        }
+        assert_eq!(bls_cache.len(), 5);
+        // Evict the first and third entries.
+        let pks_msgs_to_evict = vec![pks_msgs[0], pks_msgs[2]];
+        bls_cache.evict(pks_msgs_to_evict.iter().copied());
+        // The cache should have 3 items now.
+        assert_eq!(bls_cache.len(), 3);
+        // Check that the evicted entries are no longer in the cache.
+        for (pk, msg) in &pks_msgs_to_evict {
+            let aug_msg = [&pk.to_bytes(), msg.as_ref()].concat();
+            let mut hasher = Sha256::new();
+            hasher.update(aug_msg);
+            let hash: [u8; 32] = hasher.finalize();
+            assert!(!bls_cache
+                .cache
+                .lock()
+                .expect("cache")
+                .items
+                .contains_key(&hash));
+        }
+        // Check that the remaining entries are still in the cache.
+        for (pk, msg) in &[pks_msgs[1], pks_msgs[3], pks_msgs[4]] {
+            let aug_msg = [&pk.to_bytes(), msg.as_ref()].concat();
+            let mut hasher = Sha256::new();
+            hasher.update(aug_msg);
+            let hash: [u8; 32] = hasher.finalize();
+            assert!(bls_cache
+                .cache
+                .lock()
+                .expect("cache")
+                .items
+                .contains_key(&hash));
+        }
     }
 }
