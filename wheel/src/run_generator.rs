@@ -31,7 +31,7 @@ pub fn run_block_generator<'a>(
     max_cost: Cost,
     flags: u32,
     signature: &Signature,
-    bls_cache: Option<&mut BlsCache>,
+    bls_cache: Option<&BlsCache>,
     constants: &ConsensusConstants,
 ) -> (Option<u32>, Option<OwnedSpendBundleConditions>) {
     let mut allocator = make_allocator(flags);
@@ -83,7 +83,7 @@ pub fn run_block_generator2<'a>(
     max_cost: Cost,
     flags: u32,
     signature: &Signature,
-    bls_cache: Option<&mut BlsCache>,
+    bls_cache: Option<&BlsCache>,
     constants: &ConsensusConstants,
 ) -> (Option<u32>, Option<OwnedSpendBundleConditions>) {
     let mut allocator = make_allocator(flags);
