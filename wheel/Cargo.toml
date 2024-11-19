@@ -35,3 +35,4 @@ chia-protocol = { workspace = true, features = ["py-bindings"]  }
 clvm-utils = { workspace = true }
 chia-ssl = { workspace = true }
 chia-client = { workspace = true }
+chia-traits = { workspace = true }

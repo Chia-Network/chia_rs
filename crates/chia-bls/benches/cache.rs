@@ -91,7 +91,7 @@ fn cache_benchmark(c: &mut Criterion) {
     );
 
     c.bench_function("bls_cache.evict 5% of the items", |b| {
-        let mut cache = bls_cache.clone();
+        let cache = bls_cache.clone();
         let mut pks_shuffled = pks.clone();
         pks_shuffled.shuffle(&mut rng);
         b.iter(|| {
@@ -103,7 +103,7 @@ fn cache_benchmark(c: &mut Criterion) {
     });
 
     c.bench_function("bls_cache.evict 100% of the items", |b| {
-        let mut cache = bls_cache.clone();
+        let cache = bls_cache.clone();
         let mut pks_shuffled = pks.clone();
         pks_shuffled.shuffle(&mut rng);
         b.iter(|| {
