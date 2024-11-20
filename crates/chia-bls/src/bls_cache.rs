@@ -344,7 +344,7 @@ pub mod tests {
 
     #[test]
     fn test_evict() {
-        let mut bls_cache = BlsCache::new(NonZeroUsize::new(5).unwrap());
+        let bls_cache = BlsCache::new(NonZeroUsize::new(5).unwrap());
         // Create 5 pk msg pairs and add them to the cache.
         let mut pks_msgs = Vec::new();
         for i in 1..=5 {

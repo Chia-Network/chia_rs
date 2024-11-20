@@ -54,8 +54,8 @@ impl Coin {
 #[cfg(feature = "py-bindings")]
 #[pymethods]
 impl Coin {
-    fn name<'p>(&self, py: Python<'p>) -> Bound<'p, pyo3::types::PyBytes> {
-        pyo3::types::PyBytes::new_bound(py, &self.coin_id())
+    fn name(&self) -> Bytes32 {
+        self.coin_id()
     }
 }
 

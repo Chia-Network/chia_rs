@@ -43,6 +43,7 @@ use chia_protocol::{
     SubSlotProofs, TimestampedPeerInfo, TransactionAck, TransactionsInfo, UnfinishedBlock,
     UnfinishedHeaderBlock, VDFInfo, VDFProof, WeightProof,
 };
+use chia_traits::ChiaToPython;
 use clvm_utils::tree_hash_from_bytes;
 use clvmr::{LIMIT_HEAP, NO_UNKNOWN_OPS};
 use pyo3::buffer::PyBuffer;
@@ -113,9 +114,9 @@ pub fn confirm_not_included_already_hashed(
 }
 
 #[pyfunction]
-pub fn tree_hash<'a>(py: Python<'a>, blob: PyBuffer<u8>) -> PyResult<Bound<'_, PyBytes>> {
+pub fn tree_hash<'a>(py: Python<'a>, blob: PyBuffer<u8>) -> PyResult<Bound<'a, PyAny>> {
     let slice = py_to_slice::<'a>(blob);
-    Ok(PyBytes::new_bound(py, &tree_hash_from_bytes(slice)?))
+    ChiaToPython::to_python(&Bytes32::from(&tree_hash_from_bytes(slice)?.into()), py)
 }
 
 // there is an updated version of this function that doesn't require serializing
