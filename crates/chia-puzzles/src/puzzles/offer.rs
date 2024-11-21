@@ -25,6 +25,8 @@ pub struct NotarizedPayment {
 pub struct Payment {
     pub puzzle_hash: Bytes32,
     pub amount: u64,
+    /// The memos should usually be set to [`None`] instead of an empty list.
+    /// This is for compatibility with the way the reference wallet encodes offers.
     #[clvm(rest)]
     pub memos: Option<Memos>,
 }
@@ -43,11 +45,11 @@ impl Payment {
         }
     }
 
-    pub fn with_memos(puzzle_hash: Bytes32, amount: u64, memos: Memos) -> Self {
+    pub fn with_memos(puzzle_hash: Bytes32, amount: u64, memos: Vec<Bytes>) -> Self {
         Self {
             puzzle_hash,
             amount,
-            memos: Some(memos),
+            memos: Some(Memos(memos)),
         }
     }
 }
@@ -145,7 +147,7 @@ mod tests {
             "2a5cbc6f5076e0517bdb1e4664b3c26e64d27178b65aaa1ae97267eee629113b"
         ));
         let amount = 20_000_000_000;
-        let memos = Memos(Vec::new());
+        let memos = Vec::new();
 
         let payment = Payment::with_memos(puzzle_hash, amount, memos);
         let notarized_payment = SettlementPaymentsSolution {
