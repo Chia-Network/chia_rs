@@ -421,6 +421,7 @@ dependencies = [
 name = "chia-puzzles"
 version = "0.16.0"
 dependencies = [
+ "anyhow",
  "arbitrary",
  "chia-bls 0.16.0",
  "chia-protocol",
