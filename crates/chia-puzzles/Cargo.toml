@@ -27,6 +27,7 @@ arbitrary = { workspace = true, features = ["derive"], optional = true }
 
 [dev-dependencies]
 hex = { workspace = true }
+anyhow = { workspace = true }
 
 [lib]
 crate-type = ["rlib"]
