@@ -33,6 +33,10 @@ struct Args {
     #[arg(short, long, default_value_t = 0)]
     start: u32,
 
+    /// Validate blockchain against a height-to-hash file
+    #[arg(long)]
+    height_to_hash: Option<String>,
+
     /// Don't validate block signatures (saves time)
     #[arg(long, default_value_t = false)]
     skip_signature_validation: bool,
@@ -133,6 +137,14 @@ features that are validated:
     let mut prev_hash = constants.genesis_challenge;
     let mut prev_height: i64 = args.start as i64 - 1;
 
+    let height_to_hash: Option<Vec<Bytes32>> = args.height_to_hash.map(|hth| {
+        std::fs::read(hth)
+            .expect("failed to read height-to-hash")
+            .chunks(32)
+            .map(|v| -> Bytes32 { v.try_into().unwrap() })
+            .collect()
+    });
+
     println!("iterating over blocks starting at height {}", args.start);
     iterate_blocks(&args.file, args.start, None, |height, block, block_refs| {
         // If we don't start validation from height 0, we need to initialize the
@@ -159,6 +171,11 @@ features that are validated:
             "at height {height} the the block height did not increment by 1, from previous block (at height {prev_height})");
         prev_hash = block.header_hash();
         prev_height = height as i64;
+        if let Some(hth) = &height_to_hash {
+            if hth.len() > height as usize {
+                assert_eq!(hth[height as usize], prev_hash, "at height {height} the block hash ({prev_hash}) does not match the height-to-hash file ({})", hth[height as usize]);
+            }
+        }
         let mut removals = HashSet::<[u8; 32]>::new();
         // height 0 is not a transaction block so unspent coins have a
         // spent_index of 0 to indicate that they have not been spent.
