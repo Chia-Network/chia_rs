@@ -133,6 +133,17 @@ features that are validated:
             "SELECT coin_name, coinbase, puzzle_hash, coin_parent, amount FROM coin_record WHERE confirmed_index == ?;",
         )
         .expect("failed to prepare SQL statement finding created coins");
+    let mut select_peak = connection
+        .prepare("SELECT hash FROM current_peak WHERE key == 0;")
+        .expect("failed to prepare SQL statement finding peak");
+
+    let mut peak_row = select_peak.query([]).expect("failed to query current peak");
+    let peak_hash = peak_row
+        .next()
+        .expect("missing peak")
+        .expect("missing peak")
+        .get::<_, [u8; 32]>(0)
+        .expect("missing peak");
 
     let mut prev_hash = constants.genesis_challenge;
     let mut prev_height: i64 = args.start as i64 - 1;
@@ -336,5 +347,6 @@ features that are validated:
     pool.join();
     assert_eq!(pool.panic_count(), 0);
 
+    assert_eq!(peak_hash, prev_hash.as_slice());
     println!("\nALL DONE, success!");
 }
