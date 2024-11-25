@@ -172,7 +172,7 @@ fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
 
 #[cfg_attr(feature = "py-bindings", pyclass(name = "Side", eq, eq_int))]
 #[repr(u8)]
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Streamable)]
 pub enum Side {
     Left = 0,
     Right = 1,
@@ -446,9 +446,9 @@ impl MerkleBlob {
                 };
 
                 if self.key_to_index.len() == 1 {
-                    self.insert_second(node, &old_leaf, &internal_node_hash, &side)?;
+                    self.insert_second(node, &old_leaf, &internal_node_hash, side)?;
                 } else {
-                    self.insert_third_or_later(node, &old_leaf, index, &internal_node_hash, &side)?;
+                    self.insert_third_or_later(node, &old_leaf, index, &internal_node_hash, side)?;
                 }
             }
         }
@@ -481,7 +481,7 @@ impl MerkleBlob {
         mut node: LeafNode,
         old_leaf: &LeafNode,
         internal_node_hash: &Hash,
-        side: &Side,
+        side: Side,
     ) -> Result<(), Error> {
         self.clear();
         let root_index = self.get_new_index();
@@ -548,7 +548,7 @@ impl MerkleBlob {
         old_leaf: &LeafNode,
         old_leaf_index: TreeIndex,
         internal_node_hash: &Hash,
-        side: &Side,
+        side: Side,
     ) -> Result<(), Error> {
         let new_leaf_index = self.get_new_index();
         let new_internal_node_index = self.get_new_index();
@@ -690,7 +690,7 @@ impl MerkleBlob {
         if indexes.len() == 1 {
             // OPT: can we avoid this extra min height leaf traversal?
             let min_height_leaf = self.get_min_height_leaf()?;
-            self.insert_from_key(min_height_leaf.key, indexes[0], &Side::Left)?;
+            self.insert_from_key(min_height_leaf.key, indexes[0], Side::Left)?;
         };
 
         Ok(())
@@ -700,7 +700,7 @@ impl MerkleBlob {
         &mut self,
         old_leaf_key: KvId,
         new_index: TreeIndex,
-        side: &Side,
+        side: Side,
     ) -> Result<(), Error> {
         // NAME: consider name, we're inserting a subtree at a leaf
         // TODO: seems like this ought to be fairly similar to regular insert
@@ -1193,11 +1193,7 @@ impl MerkleBlob {
                     .ok_or(PyValueError::new_err(format!(
                         "unknown key id passed as insert location reference: {key}"
                     )))?,
-                side: match side {
-                    x if x == (Side::Left as u8) => Side::Left,
-                    x if x == (Side::Right as u8) => Side::Right,
-                    _ => panic!(),
-                },
+                side: Side::from_bytes(&[side])?,
             },
             _ => {
                 return Err(PyValueError::new_err(
@@ -1679,7 +1675,7 @@ mod tests {
                 &sha256_num(key_value_id.0),
                 InsertLocation::Leaf {
                     index: merkle_blob.key_to_index[&last_key],
-                    side: side.clone(),
+                    side,
                 },
             )
             .unwrap();
