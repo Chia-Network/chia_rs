@@ -478,8 +478,6 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // datalayer
     m.add_class::<MerkleBlob>()?;
-    // m.add_class::<InsertLocation>()?;
-    // m.add_class::<Side>()?;
     m.add_class::<InternalNode>()?;
     m.add_class::<LeafNode>()?;
 

@@ -54,7 +54,7 @@ impl std::fmt::Display for KvId {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub enum Error {
     #[error("unknown NodeType value: {0:?}")]
     UnknownNodeTypeValue(u8),
@@ -99,6 +99,9 @@ pub enum Error {
 
     #[error("from streamable: {0:?}")]
     Streaming(chia_traits::chia_error::Error),
+
+    #[error("index not a child: {0}")]
+    IndexIsNotAChild(TreeIndex),
 }
 
 // assumptions
@@ -168,10 +171,11 @@ fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
 }
 
 #[cfg_attr(feature = "py-bindings", pyclass(name = "Side", eq, eq_int))]
+#[repr(u8)]
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub enum Side {
-    Left,
-    Right,
+    Left = 0,
+    Right = 1,
 }
 
 #[cfg_attr(feature = "py-bindings", pyclass(name = "InsertLocation"))]
@@ -202,13 +206,13 @@ pub struct InternalNode {
 }
 
 impl InternalNode {
-    pub fn sibling_index(&self, index: TreeIndex) -> TreeIndex {
+    pub fn sibling_index(&self, index: TreeIndex) -> Result<TreeIndex, Error> {
         if index == self.right {
-            self.left
+            Ok(self.left)
         } else if index == self.left {
-            self.right
+            Ok(self.right)
         } else {
-            panic!("index not a child: {index}")
+            Err(Error::IndexIsNotAChild(index))
         }
     }
 }
@@ -279,13 +283,13 @@ impl Node {
             .expect("padding was added above, might be too large"))
     }
 
-    fn expect_leaf(self, message: &str) -> LeafNode {
+    fn expect_leaf(&self, message: &str) -> LeafNode {
         let Node::Leaf(leaf) = self else {
             let message = message.replace("<<self>>", &format!("{self:?}"));
             panic!("{}", message)
         };
 
-        leaf
+        *leaf
     }
 
     fn try_into_leaf(self) -> Result<LeafNode, Error> {
@@ -312,6 +316,7 @@ fn block_range(index: TreeIndex) -> Range<usize> {
 }
 
 pub struct Block {
+    // TODO: metadata node type and node's type not verified for agreement
     metadata: NodeMetadata,
     node: Node,
 }
@@ -710,7 +715,7 @@ impl MerkleBlob {
         }
 
         let new_internal_node_index = self.get_new_index();
-        let (old_leaf_index, old_leaf) = self.get_leaf_by_key(old_leaf_key)?;
+        let (old_leaf_index, old_leaf, _old_block) = self.get_leaf_by_key(old_leaf_key)?;
         let new_node = self.get_node(new_index)?;
 
         let new_stuff = Stuff {
@@ -774,7 +779,7 @@ impl MerkleBlob {
     }
 
     pub fn delete(&mut self, key: KvId) -> Result<(), Error> {
-        let (leaf_index, leaf) = self.get_leaf_by_key(key)?;
+        let (leaf_index, leaf, _leaf_block) = self.get_leaf_by_key(key)?;
         self.key_to_index.remove(&key);
 
         let Some(parent_index) = leaf.parent else {
@@ -787,7 +792,7 @@ impl MerkleBlob {
         let Node::Internal(parent) = maybe_parent else {
             panic!("parent node not internal: {maybe_parent:?}")
         };
-        let sibling_index = parent.sibling_index(leaf_index);
+        let sibling_index = parent.sibling_index(leaf_index)?;
         let mut sibling_block = self.get_block(sibling_index)?;
 
         let Some(grandparent_index) = parent.parent else {
@@ -828,20 +833,16 @@ impl MerkleBlob {
     }
 
     pub fn upsert(&mut self, key: KvId, value: KvId, new_hash: &Hash) -> Result<(), Error> {
-        let Some(leaf_index) = self.key_to_index.get(&key) else {
+        let Ok((leaf_index, mut leaf, mut block)) = self.get_leaf_by_key(key) else {
             self.insert(key, value, new_hash, InsertLocation::Auto {})?;
             return Ok(());
         };
 
-        let mut block = self.get_block(*leaf_index)?;
-        // TODO: repeated message
-        let mut leaf = block.node.clone().expect_leaf(&format!(
-            "expected leaf for index from key cache: {leaf_index} -> <<self>>"
-        ));
         leaf.hash.clone_from(new_hash);
         leaf.value = value;
+        // OPT: maybe just edit in place?
         block.node = Node::Leaf(leaf);
-        self.insert_entry_to_blob(*leaf_index, &block)?;
+        self.insert_entry_to_blob(leaf_index, &block)?;
 
         if let Some(parent) = block.node.parent() {
             self.mark_lineage_as_dirty(parent)?;
@@ -1018,7 +1019,6 @@ impl MerkleBlob {
                 if !self.free_indexes.contains(&index)
                     && old_block.metadata.node_type == NodeType::Leaf
                 {
-                    // TODO: sort of repeating the leaf check above and below.  smells a little
                     if let Node::Leaf(old_node) = old_block.node {
                         self.key_to_index.remove(&old_node.key);
                     };
@@ -1057,13 +1057,14 @@ impl MerkleBlob {
         Ok(self.get_block(index)?.node)
     }
 
-    pub fn get_leaf_by_key(&self, key: KvId) -> Result<(TreeIndex, LeafNode), Error> {
+    pub fn get_leaf_by_key(&self, key: KvId) -> Result<(TreeIndex, LeafNode, Block), Error> {
         let index = *self.key_to_index.get(&key).ok_or(Error::UnknownKey(key))?;
-        let leaf = self.get_node(index)?.expect_leaf(&format!(
+        let block = self.get_block(index)?;
+        let leaf = block.node.expect_leaf(&format!(
             "expected leaf for index from key cache: {index} -> <<self>>"
         ));
 
-        Ok((index, leaf))
+        Ok((index, leaf, block))
     }
 
     pub fn get_parent_index(&self, index: TreeIndex) -> Result<Parent, Error> {
@@ -1121,59 +1122,6 @@ impl MerkleBlob {
         }
 
         Ok(())
-    }
-
-    // #[allow(unused)]
-    // fn relocate_node(&mut self, source: TreeIndex, destination: TreeIndex) -> Result<(), Error> {
-    //     let extend_index = self.extend_index();
-    //     if source == 0 {
-    //         return Err("relocation of the root and index zero is not allowed".to_string());
-    //     };
-    //     assert!(source < extend_index);
-    //     assert!(!self.free_indexes.contains(&source));
-    //     assert!(destination <= extend_index);
-    //     assert!(destination == extend_index || self.free_indexes.contains(&destination));
-    //
-    //     let source_block = self.get_block(source).unwrap();
-    //     if let Some(parent) = source_block.node.parent {
-    //         let mut parent_block = self.get_block(parent).unwrap();
-    //         let NodeSpecific::Internal {
-    //             ref mut left,
-    //             ref mut right,
-    //         } = parent_block.node.specific
-    //         else {
-    //             panic!();
-    //         };
-    //         match source {
-    //             x if x == *left => *left = destination,
-    //             x if x == *right => *right = destination,
-    //             _ => panic!(),
-    //         }
-    //         self.insert_entry_to_blob(parent, &parent_block).unwrap();
-    //     }
-    //
-    //     if let NodeSpecific::Internal { left, right, .. } = source_block.node.specific {
-    //         for child in [left, right] {
-    //             self.update_parent(child, Some(destination)).unwrap();
-    //         }
-    //     }
-    //
-    //     self.free_indexes.insert(source);
-    //
-    //     Ok(())
-    // }
-
-    // TODO: really this is test, not unused
-    #[allow(unused)]
-    fn get_key_value_map(&self) -> HashMap<KvId, KvId> {
-        let mut key_value = HashMap::new();
-        for (key, index) in &self.key_to_index {
-            // silly waste of having the index, but test code and type narrowing so, ok i guess
-            let (_, leaf) = self.get_leaf_by_key(*key).unwrap();
-            key_value.insert(*key, leaf.value);
-        }
-
-        key_value
     }
 }
 
@@ -1242,11 +1190,12 @@ impl MerkleBlob {
                 index: *self
                     .key_to_index
                     .get(&key)
-                    .ok_or(PyValueError::new_err("TODO: better message here"))?,
+                    .ok_or(PyValueError::new_err(format!(
+                        "unknown key id passed as insert location reference: {key}"
+                    )))?,
                 side: match side {
-                    // TODO: if this sticks around, we gotta get more formal about the mapping
-                    0 => Side::Left,
-                    1 => Side::Right,
+                    x if x == (Side::Left as u8) => Side::Left,
+                    x if x == (Side::Right as u8) => Side::Right,
                     _ => panic!(),
                 },
             },
@@ -1513,6 +1462,19 @@ mod tests {
 
     fn open_dot(_lines: &mut DotLines) {
         // crate::merkle::dot::open_dot(_lines);
+    }
+
+    impl MerkleBlob {
+        fn get_key_value_map(&self) -> HashMap<KvId, KvId> {
+            let mut key_value = HashMap::new();
+            for key in self.key_to_index.keys() {
+                // silly waste of having the index, but test code and type narrowing so, ok i guess
+                let (_leaf_index, leaf, _leaf_block) = self.get_leaf_by_key(*key).unwrap();
+                key_value.insert(*key, leaf.value);
+            }
+
+            key_value
+        }
     }
 
     #[test]
@@ -1806,17 +1768,18 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "index not a child: 2")]
     fn test_node_specific_sibling_index_panics_for_unknown_sibling() {
-        // TODO: this probably shouldn't be a panic?
-        //       maybe depends if it is exported or private?
         let node = InternalNode {
             parent: None,
             hash: sha256_num(0),
             left: TreeIndex(0),
             right: TreeIndex(1),
         };
-        node.sibling_index(TreeIndex(2));
+        let index = TreeIndex(2);
+        assert_eq!(
+            node.sibling_index(TreeIndex(2)),
+            Err(Error::IndexIsNotAChild(index))
+        );
     }
 
     #[rstest]
