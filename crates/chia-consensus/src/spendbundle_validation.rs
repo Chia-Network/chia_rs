@@ -177,24 +177,28 @@ ff01\
             236,
         )
         .expect("SpendBundle should be valid for this test");
-        
+
         // test wrong message
         let solution = hex!("ffff31ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080").to_vec();
         // ((49 0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2 "hello"))
         let spend = CoinSpend::new(test_coin, Program::new(vec![1_u8].into()), solution.into());
-        let msg = b"goodbye";  // bad message
+        let msg = b"goodbye"; // bad message
         let sig = sign(&sk, msg);
         let coin_spends: Vec<CoinSpend> = vec![spend];
         let spend_bundle = SpendBundle {
             coin_spends,
             aggregated_signature: sig,
         };
-        let result =
-            validate_clvm_and_signature(&spend_bundle, TEST_CONSTANTS.max_block_cost_clvm, &TEST_CONSTANTS, 246);
+        let result = validate_clvm_and_signature(
+            &spend_bundle,
+            TEST_CONSTANTS.max_block_cost_clvm,
+            &TEST_CONSTANTS,
+            246,
+        );
         assert!(matches!(result, Err(ErrorCode::BadAggregateSignature)));
 
         // test sk message
-        let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efc";  // bad key
+        let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efc"; // bad key
         let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
         let solution = hex!("ffff31ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080").to_vec();
         // ((49 0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2 "hello"))
@@ -206,8 +210,12 @@ ff01\
             coin_spends,
             aggregated_signature: sig,
         };
-        let result =
-            validate_clvm_and_signature(&spend_bundle, TEST_CONSTANTS.max_block_cost_clvm, &TEST_CONSTANTS, 246);
+        let result = validate_clvm_and_signature(
+            &spend_bundle,
+            TEST_CONSTANTS.max_block_cost_clvm,
+            &TEST_CONSTANTS,
+            246,
+        );
         assert!(matches!(result, Err(ErrorCode::BadAggregateSignature)));
     }
 
@@ -288,7 +296,7 @@ ff01\
         let solution = hex!("ffff32ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080").to_vec();
         // ((50 0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2 "hello"))
         let spend = CoinSpend::new(test_coin, Program::new(vec![1_u8].into()), solution.into());
-        let msg = b"goodbye";  // bad message
+        let msg = b"goodbye"; // bad message
         let mut result = msg.to_vec();
         result.extend(
             [
@@ -303,12 +311,16 @@ ff01\
             coin_spends,
             aggregated_signature: sig,
         };
-        let result =
-            validate_clvm_and_signature(&spend_bundle, TEST_CONSTANTS.max_block_cost_clvm, &TEST_CONSTANTS, 246);
+        let result = validate_clvm_and_signature(
+            &spend_bundle,
+            TEST_CONSTANTS.max_block_cost_clvm,
+            &TEST_CONSTANTS,
+            246,
+        );
         assert!(matches!(result, Err(ErrorCode::BadAggregateSignature)));
 
         // test sk message
-        let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efc";  // bad key
+        let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efc"; // bad key
         let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
         let solution = hex!("ffff32ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080").to_vec();
         // ((50 0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2 "hello"))
@@ -328,8 +340,12 @@ ff01\
             coin_spends,
             aggregated_signature: sig,
         };
-        let result =
-            validate_clvm_and_signature(&spend_bundle, TEST_CONSTANTS.max_block_cost_clvm, &TEST_CONSTANTS, 246);
+        let result = validate_clvm_and_signature(
+            &spend_bundle,
+            TEST_CONSTANTS.max_block_cost_clvm,
+            &TEST_CONSTANTS,
+            246,
+        );
         assert!(matches!(result, Err(ErrorCode::BadAggregateSignature)));
     }
 
@@ -384,7 +400,7 @@ ff01\
         let solution = hex!("ffff30ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080").to_vec();
         // ((48 0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2 "hello"))
         let spend = CoinSpend::new(test_coin, Program::new(vec![1_u8].into()), solution.into());
-        let msg = b"goodbye";  // bad message
+        let msg = b"goodbye"; // bad message
         let mut result = msg.to_vec();
         result.extend(
             [
@@ -402,12 +418,16 @@ ff01\
             coin_spends,
             aggregated_signature: sig,
         };
-        let result =
-            validate_clvm_and_signature(&spend_bundle, TEST_CONSTANTS.max_block_cost_clvm, &TEST_CONSTANTS, 246);
+        let result = validate_clvm_and_signature(
+            &spend_bundle,
+            TEST_CONSTANTS.max_block_cost_clvm,
+            &TEST_CONSTANTS,
+            246,
+        );
         assert!(matches!(result, Err(ErrorCode::BadAggregateSignature)));
 
         // test sk message
-        let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efc";  // bad key
+        let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efc"; // bad key
         let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
         let solution = hex!("ffff30ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080").to_vec();
         // ((48 0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2 "hello"))
@@ -427,8 +447,12 @@ ff01\
             coin_spends,
             aggregated_signature: sig,
         };
-        let result =
-            validate_clvm_and_signature(&spend_bundle, TEST_CONSTANTS.max_block_cost_clvm, &TEST_CONSTANTS, 246);
+        let result = validate_clvm_and_signature(
+            &spend_bundle,
+            TEST_CONSTANTS.max_block_cost_clvm,
+            &TEST_CONSTANTS,
+            246,
+        );
         assert!(matches!(result, Err(ErrorCode::BadAggregateSignature)));
     }
 
@@ -479,7 +503,7 @@ ff01\
         // ((47 0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2 "hello"))
 
         let spend = CoinSpend::new(test_coin, Program::new(vec![1_u8].into()), solution.into());
-        let msg = b"goodbye";  // bad message
+        let msg = b"goodbye"; // bad message
         let mut result = msg.to_vec();
         result.extend(
             [
@@ -497,12 +521,16 @@ ff01\
             coin_spends,
             aggregated_signature: sig,
         };
-        let result =
-            validate_clvm_and_signature(&spend_bundle, TEST_CONSTANTS.max_block_cost_clvm, &TEST_CONSTANTS, 246);
+        let result = validate_clvm_and_signature(
+            &spend_bundle,
+            TEST_CONSTANTS.max_block_cost_clvm,
+            &TEST_CONSTANTS,
+            246,
+        );
         assert!(matches!(result, Err(ErrorCode::BadAggregateSignature)));
 
         // test sk message
-        let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efc";  // bad key
+        let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efc"; // bad key
         let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
         let solution = hex!("ffff2fffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080").to_vec();
         // ((47 0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2 "hello"))
@@ -525,8 +553,12 @@ ff01\
             coin_spends,
             aggregated_signature: sig,
         };
-        let result =
-            validate_clvm_and_signature(&spend_bundle, TEST_CONSTANTS.max_block_cost_clvm, &TEST_CONSTANTS, 246);
+        let result = validate_clvm_and_signature(
+            &spend_bundle,
+            TEST_CONSTANTS.max_block_cost_clvm,
+            &TEST_CONSTANTS,
+            246,
+        );
         assert!(matches!(result, Err(ErrorCode::BadAggregateSignature)));
     }
 
@@ -577,7 +609,7 @@ ff01\
         // ((46 0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2 "hello"))
 
         let spend = CoinSpend::new(test_coin, Program::new(vec![1_u8].into()), solution.into());
-        let msg = b"goodbye";  // bad message
+        let msg = b"goodbye"; // bad message
         let mut result = msg.to_vec();
         result.extend(
             [
@@ -595,12 +627,16 @@ ff01\
             coin_spends,
             aggregated_signature: sig,
         };
-        let result =
-            validate_clvm_and_signature(&spend_bundle, TEST_CONSTANTS.max_block_cost_clvm, &TEST_CONSTANTS, 246);
+        let result = validate_clvm_and_signature(
+            &spend_bundle,
+            TEST_CONSTANTS.max_block_cost_clvm,
+            &TEST_CONSTANTS,
+            246,
+        );
         assert!(matches!(result, Err(ErrorCode::BadAggregateSignature)));
 
         // test sk message
-        let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efc";  // bad key
+        let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efc"; // bad key
         let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
         let solution = hex!("ffff2effb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080").to_vec();
         // ((46 0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2 "hello"))
@@ -623,8 +659,12 @@ ff01\
             coin_spends,
             aggregated_signature: sig,
         };
-        let result =
-            validate_clvm_and_signature(&spend_bundle, TEST_CONSTANTS.max_block_cost_clvm, &TEST_CONSTANTS, 246);
+        let result = validate_clvm_and_signature(
+            &spend_bundle,
+            TEST_CONSTANTS.max_block_cost_clvm,
+            &TEST_CONSTANTS,
+            246,
+        );
         assert!(matches!(result, Err(ErrorCode::BadAggregateSignature)));
     }
 }
