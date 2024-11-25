@@ -66,7 +66,7 @@ const TESTNET11_CONSTANTS: ConsensusConstants = ConsensusConstants {
     agg_sig_parent_puzzle_additional_data: Bytes32::new(hex!(
         "54c3ed8017f77354acca4000b40424396a369740e5a504467784f392b961ab37"
     )),
-    difficulty_constant_factor: 10052721566054,
+    difficulty_constant_factor: 10_052_721_566_054,
     difficulty_starting: 30,
     epoch_blocks: 768,
     genesis_challenge: Bytes32::new(hex!(
@@ -80,12 +80,12 @@ const TESTNET11_CONSTANTS: ConsensusConstants = ConsensusConstants {
     )),
     mempool_block_buffer: 10,
     min_plot_size: 18,
-    sub_slot_iters_starting: 67108864,
+    sub_slot_iters_starting: 67_108_864,
     // forks activated from the beginning on testnet11
     hard_fork_height: 0,
-    plot_filter_128_height: 6029568,
-    plot_filter_64_height: 11075328,
-    plot_filter_32_height: 16121088,
+    plot_filter_128_height: 6_029_568,
+    plot_filter_64_height: 11_075_328,
+    plot_filter_32_height: 16_121_088,
     ..MAINNET_CONSTANTS
 };
 
