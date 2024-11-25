@@ -1,4 +1,5 @@
 from chia_rs import run_chia_program, Program
+from chia_rs.sized_bytes import bytes32
 
 
 def test_raise() -> None:
@@ -34,3 +35,12 @@ def test_repr() -> None:
         assert False
     except ValueError as e:
         assert f"{e}" == "('clvm raise', '83666f6f')"
+
+
+def test_print() -> None:
+    temp = Program.to([8, (1, "foo")])
+    assert type(temp.get_tree_hash()) is bytes32
+    assert (
+        f"{temp.get_tree_hash()}"
+        == "a200d6417c8fdc7c7937382c1b61e219854e1efd8f2e15d6c88e6571bc29ed1a"
+    )

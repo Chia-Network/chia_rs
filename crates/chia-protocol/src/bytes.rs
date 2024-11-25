@@ -392,14 +392,14 @@ impl From<TreeHash> for Bytes32 {
 #[cfg(feature = "py-bindings")]
 impl<const N: usize> ToPyObject for BytesImpl<N> {
     fn to_object(&self, py: Python<'_>) -> PyObject {
-        PyBytes::new_bound(py, &self.0).into()
+        ChiaToPython::to_python(self, py).unwrap().into()
     }
 }
 
 #[cfg(feature = "py-bindings")]
 impl<const N: usize> IntoPy<PyObject> for BytesImpl<N> {
     fn into_py(self, py: Python<'_>) -> PyObject {
-        PyBytes::new_bound(py, &self.0).into()
+        ChiaToPython::to_python(&self, py).unwrap().into()
     }
 }
 

@@ -1,6 +1,6 @@
 [package]
 name = "chia-puzzles"
-version = "0.15.0"
+version = "0.16.0"
 edition = "2021"
 license = "Apache-2.0"
 description = "Chia primitives needed for building wallets."
@@ -27,6 +27,7 @@ arbitrary = { workspace = true, features = ["derive"], optional = true }
 
 [dev-dependencies]
 hex = { workspace = true }
+anyhow = { workspace = true }
 
 [lib]
 crate-type = ["rlib"]

@@ -3,6 +3,7 @@ from hashlib import sha256
 import copy
 import pytest
 from chia_rs.sized_ints import uint64
+from chia_rs.sized_bytes import bytes32
 
 parent_coin = b"---foo---                       "
 puzzle_hash = b"---bar---                       "
@@ -385,3 +386,12 @@ def test_coin_fields() -> None:
     assert c1.parent_coin_info == parent_coin
     assert c1.puzzle_hash == puzzle_hash
     assert c1.amount == 1000000
+
+
+def test_coin_print() -> None:
+    c1 = Coin(parent_coin, puzzle_hash, uint64(1000000))
+    assert type(c1.name()) is bytes32
+    assert (
+        f"{c1.name()}"
+        == "e1838c5c7ebb472e310600ce9c03c09b5e4bb77dde53f3427f6e8cc67dede32d"
+    )

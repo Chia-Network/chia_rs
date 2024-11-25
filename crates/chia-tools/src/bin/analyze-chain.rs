@@ -6,7 +6,7 @@ use std::time::SystemTime;
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::gen::flags::{ALLOW_BACKREFS, MEMPOOL_MODE};
 use chia_consensus::gen::run_block_generator::{run_block_generator, run_block_generator2};
-use chia_tools::iterate_tx_blocks;
+use chia_tools::iterate_blocks;
 use clvmr::Allocator;
 
 /// Analyze the blocks in a chia blockchain database
@@ -42,11 +42,14 @@ fn main() {
     let mut a = Allocator::new_limited(500_000_000);
     let allocator_checkpoint = a.checkpoint();
     let mut prev_timestamp = 0;
-    iterate_tx_blocks(
+    iterate_blocks(
         &args.file,
         args.start,
         Some(args.end),
         |height, block, block_refs| {
+            if block.transactions_generator.is_none() {
+                return;
+            }
             // after the hard fork, we run blocks without paying for the
             // CLVM generator ROM
             let block_runner = if height >= 5_496_000 {
