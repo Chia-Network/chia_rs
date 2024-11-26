@@ -135,17 +135,6 @@ pub enum NodeType {
     Leaf = 1,
 }
 
-impl NodeType {
-    pub fn from_u8(value: u8) -> Result<Self, Error> {
-        streamable_from_bytes_ignore_extra_bytes(&[value])
-    }
-
-    #[allow(clippy::wrong_self_convention, clippy::trivially_copy_pass_by_ref)]
-    pub fn to_u8(&self) -> u8 {
-        Streamable::to_bytes(self).unwrap()[0]
-    }
-}
-
 #[allow(clippy::needless_pass_by_value)]
 fn sha256_num<T: ToBytes>(input: T) -> Hash {
     let mut hasher = Sha256::new();
@@ -1479,8 +1468,14 @@ mod tests {
         assert_eq!(NodeType::Leaf as u8, 1);
 
         for node_type in [NodeType::Internal, NodeType::Leaf] {
-            assert_eq!(node_type.to_u8(), node_type as u8,);
-            assert_eq!(NodeType::from_u8(node_type as u8).unwrap(), node_type,);
+            assert_eq!(
+                Streamable::to_bytes(&node_type).unwrap()[0],
+                node_type as u8,
+            );
+            assert_eq!(
+                streamable_from_bytes_ignore_extra_bytes::<NodeType>(&[node_type as u8]).unwrap(),
+                node_type,
+            );
         }
     }
 
@@ -1508,7 +1503,7 @@ mod tests {
         #[values(false, true)] dirty: bool,
         #[values(NodeType::Internal, NodeType::Leaf)] node_type: NodeType,
     ) {
-        let bytes: [u8; 2] = [node_type.to_u8(), dirty as u8];
+        let bytes: [u8; 2] = [Streamable::to_bytes(&node_type).unwrap()[0], dirty as u8];
         let object = NodeMetadata::from_bytes(&bytes).unwrap();
         assert_eq!(object, NodeMetadata { node_type, dirty },);
         assert_eq!(object.to_bytes().unwrap(), bytes);
@@ -1759,7 +1754,7 @@ mod tests {
     #[test]
     fn test_node_type_from_u8_invalid() {
         let invalid_value = 2;
-        let actual = NodeType::from_u8(invalid_value);
+        let actual = streamable_from_bytes_ignore_extra_bytes::<NodeType>(&[invalid_value as u8]);
         actual.expect_err("invalid node type value should fail");
     }
 
