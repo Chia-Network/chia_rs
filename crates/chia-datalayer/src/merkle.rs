@@ -159,7 +159,7 @@ fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
     Bytes32::new(hasher.finalize())
 }
 
-#[cfg_attr(feature = "py-bindings", pyclass(name = "Side", eq, eq_int))]
+#[cfg_attr(feature = "py-bindings", pyclass(eq, eq_int))]
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Streamable)]
 pub enum Side {
@@ -167,7 +167,7 @@ pub enum Side {
     Right = 1,
 }
 
-#[cfg_attr(feature = "py-bindings", pyclass(name = "InsertLocation"))]
+#[cfg_attr(feature = "py-bindings", pyclass)]
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub enum InsertLocation {
     // error: Unit variant `Auto` is not yet supported in a complex enum
@@ -185,7 +185,7 @@ pub struct NodeMetadata {
     pub dirty: bool,
 }
 
-#[cfg_attr(feature = "py-bindings", pyclass(name = "InternalNode", get_all))]
+#[cfg_attr(feature = "py-bindings", pyclass(get_all))]
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Streamable)]
 pub struct InternalNode {
     parent: Parent,
@@ -206,7 +206,7 @@ impl InternalNode {
     }
 }
 
-#[cfg_attr(feature = "py-bindings", pyclass(name = "LeafNode", get_all))]
+#[cfg_attr(feature = "py-bindings", pyclass(get_all))]
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Streamable)]
 pub struct LeafNode {
     parent: Parent,
@@ -362,7 +362,7 @@ fn get_free_indexes_and_keys_values_indexes(
     (free_indexes, key_to_index)
 }
 
-#[cfg_attr(feature = "py-bindings", pyclass(name = "MerkleBlob", get_all))]
+#[cfg_attr(feature = "py-bindings", pyclass(get_all))]
 #[derive(Debug)]
 pub struct MerkleBlob {
     blob: Vec<u8>,
