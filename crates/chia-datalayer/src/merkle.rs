@@ -243,10 +243,10 @@ impl Node {
         }
     }
 
-    fn set_hash(&mut self, hash: &Hash) {
+    fn set_hash(&mut self, hash: Hash) {
         match self {
-            Node::Internal(ref mut node) => node.hash = *hash,
-            Node::Leaf(ref mut node) => node.hash = *hash,
+            Node::Internal(ref mut node) => node.hash = hash,
+            Node::Leaf(ref mut node) => node.hash = hash,
         }
     }
 
@@ -331,7 +331,7 @@ impl Block {
     }
 
     pub fn update_hash(&mut self, left: &Hash, right: &Hash) {
-        self.node.set_hash(&internal_hash(left, right));
+        self.node.set_hash(internal_hash(left, right));
         self.metadata.dirty = false;
     }
 }
