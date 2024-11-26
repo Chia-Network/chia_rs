@@ -188,10 +188,10 @@ pub struct NodeMetadata {
 #[cfg_attr(feature = "py-bindings", pyclass(get_all))]
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Streamable)]
 pub struct InternalNode {
-    parent: Parent,
-    hash: Hash,
-    left: TreeIndex,
-    right: TreeIndex,
+    pub parent: Parent,
+    pub hash: Hash,
+    pub left: TreeIndex,
+    pub right: TreeIndex,
 }
 
 impl InternalNode {
@@ -209,10 +209,10 @@ impl InternalNode {
 #[cfg_attr(feature = "py-bindings", pyclass(get_all))]
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Streamable)]
 pub struct LeafNode {
-    parent: Parent,
-    hash: Hash,
-    key: KvId,
-    value: KvId,
+    pub parent: Parent,
+    pub hash: Hash,
+    pub key: KvId,
+    pub value: KvId,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
