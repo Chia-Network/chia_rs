@@ -258,7 +258,6 @@ ff01\
         let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
         let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
         //let pk: PublicKey = sk.public_key(); //0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2
-        // panic!("{:?}", pk);
 
         let full_puz = Bytes32::new(tree_hash_atom(&[1_u8]).to_bytes());
         let test_coin = Coin::new(
@@ -386,5 +385,97 @@ ff01\
             TEST_CONSTANTS.hard_fork_height + 1,
         )
         .expect("SpendBundle should be valid for this test");
+    }
+
+    #[rstest]
+    #[case("ffff2effb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080", 46, b"goodbye", "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb")] // wrong message
+    #[case("ffff2effb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080", 46, b"hello", "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efc")] // wrong key
+    #[case("ffff2fffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080", 47, b"goodbye", "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb")] // wrong message
+    #[case("ffff2fffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080", 47, b"hello", "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efc")] // wrong key
+    #[case("ffff30ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080", 48, b"goodbye", "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb")] //wrong message
+    #[case("ffff30ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080", 48, b"hello", "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efc")] // wrong key
+    #[case("ffff31ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080", 49, b"goodbye", "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb")] //wrong message
+    #[case("ffff31ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080", 49, b"hello", "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efc")] // wrong key
+    #[case("ffff32ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080", 50, b"goodbye", "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb")] // wrong message
+    #[case("ffff32ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080", 50, b"hello", "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efc")] // wrong key
+    fn test_failures(
+        #[case] solution: &str,
+        #[case] condition_code: u8,
+        #[case] msg: &[u8],
+        #[case] sk_hex: &str,
+    ) {
+        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+        let sol_bytes: Vec<u8> = hex::decode(solution).unwrap().to_vec();
+        let full_puz = Bytes32::new(tree_hash_atom(&[1_u8]).to_bytes());
+        let test_coin = Coin::new(
+            hex!("4444444444444444444444444444444444444444444444444444444444444444").into(),
+            full_puz,
+            1,
+        );
+        let spend = CoinSpend::new(test_coin, Program::new(vec![1_u8].into()), sol_bytes.into());
+        let mut result = msg.to_vec();
+        match condition_code {
+            46 => {
+                result.extend(
+                    [
+                        test_coin.puzzle_hash.as_slice(),
+                        u64_to_bytes(test_coin.amount).as_slice(),
+                        TEST_CONSTANTS
+                            .agg_sig_puzzle_amount_additional_data
+                            .as_slice(),
+                    ]
+                    .concat(),
+                );
+            }
+            47 => {
+                result.extend(
+                    [
+                        test_coin.parent_coin_info.as_slice(),
+                        u64_to_bytes(test_coin.amount).as_slice(),
+                        TEST_CONSTANTS
+                            .agg_sig_parent_amount_additional_data
+                            .as_slice(),
+                    ]
+                    .concat(),
+                );
+            }
+            48 => {
+                result.extend(
+                    [
+                        test_coin.parent_coin_info.as_slice(),
+                        test_coin.puzzle_hash.as_slice(),
+                        TEST_CONSTANTS
+                            .agg_sig_parent_puzzle_additional_data
+                            .as_slice(),
+                    ]
+                    .concat(),
+                );
+            }
+            49 => {}
+            50 => {
+                result.extend(
+                    [
+                        test_coin.coin_id().as_slice(),
+                        TEST_CONSTANTS.agg_sig_me_additional_data.as_slice(),
+                    ]
+                    .concat(),
+                );
+            }
+            _ => panic!("Invalid case"),
+        }
+
+        let sig = sign(&sk, result.as_slice());
+        let coin_spends: Vec<CoinSpend> = vec![spend];
+        let spend_bundle = SpendBundle {
+            coin_spends,
+            aggregated_signature: sig,
+        };
+        let result = validate_clvm_and_signature(
+            &spend_bundle,
+            TEST_CONSTANTS.max_block_cost_clvm,
+            &TEST_CONSTANTS,
+            246,
+        );
+        assert!(matches!(result, Err(ErrorCode::BadAggregateSignature)));
     }
 }
