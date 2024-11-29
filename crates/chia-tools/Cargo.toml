@@ -75,3 +75,8 @@ bench = false
 name = "validate-blockchain-db"
 test = false
 bench = false
+
+[[bin]]
+name = "rollback-blockchain-db"
+test = false
+bench = false
