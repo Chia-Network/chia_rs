@@ -20,20 +20,21 @@ use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
     CoinSpend, CoinState, CoinStateFilters, CoinStateUpdate, EndOfSubSlotBundle, FeeEstimate,
     FeeEstimateGroup, FeeRate, Foliage, FoliageBlockData, FoliageTransactionBlock, FullBlock,
-    Handshake, HeaderBlock, InfusedChallengeChainSubSlot, LazyNode, Message, NewCompactVDF,
-    NewPeak, NewPeakWallet, NewSignagePointOrEndOfSubSlot, NewTransaction, NewUnfinishedBlock,
-    NewUnfinishedBlock2, PoolTarget, Program, ProofBlockHeader, ProofOfSpace,
-    PuzzleSolutionResponse, RecentChainData, RegisterForCoinUpdates, RegisterForPhUpdates,
-    RejectAdditionsRequest, RejectBlock, RejectBlockHeaders, RejectBlocks, RejectCoinState,
-    RejectHeaderBlocks, RejectHeaderRequest, RejectPuzzleSolution, RejectPuzzleState,
-    RejectRemovalsRequest, RequestAdditions, RequestBlock, RequestBlockHeader, RequestBlockHeaders,
-    RequestBlocks, RequestChildren, RequestCoinState, RequestCompactVDF, RequestFeeEstimates,
+    Handshake, HeaderBlock, InfusedChallengeChainSubSlot, LazyNode, MempoolItemsAdded,
+    MempoolItemsRemoved, Message, NewCompactVDF, NewPeak, NewPeakWallet,
+    NewSignagePointOrEndOfSubSlot, NewTransaction, NewUnfinishedBlock, NewUnfinishedBlock2,
+    PoolTarget, Program, ProofBlockHeader, ProofOfSpace, PuzzleSolutionResponse, RecentChainData,
+    RegisterForCoinUpdates, RegisterForPhUpdates, RejectAdditionsRequest, RejectBlock,
+    RejectBlockHeaders, RejectBlocks, RejectCoinState, RejectHeaderBlocks, RejectHeaderRequest,
+    RejectPuzzleSolution, RejectPuzzleState, RejectRemovalsRequest, RemovedMempoolItem,
+    RequestAdditions, RequestBlock, RequestBlockHeader, RequestBlockHeaders, RequestBlocks,
+    RequestChildren, RequestCoinState, RequestCompactVDF, RequestCostInfo, RequestFeeEstimates,
     RequestHeaderBlocks, RequestMempoolTransactions, RequestPeers, RequestProofOfWeight,
     RequestPuzzleSolution, RequestPuzzleState, RequestRemovals, RequestRemoveCoinSubscriptions,
     RequestRemovePuzzleSubscriptions, RequestSesInfo, RequestSignagePointOrEndOfSubSlot,
     RequestTransaction, RequestUnfinishedBlock, RequestUnfinishedBlock2, RespondAdditions,
     RespondBlock, RespondBlockHeader, RespondBlockHeaders, RespondBlocks, RespondChildren,
-    RespondCoinState, RespondCompactVDF, RespondEndOfSubSlot, RespondFeeEstimates,
+    RespondCoinState, RespondCompactVDF, RespondCostInfo, RespondEndOfSubSlot, RespondFeeEstimates,
     RespondHeaderBlocks, RespondPeers, RespondProofOfWeight, RespondPuzzleSolution,
     RespondPuzzleState, RespondRemovals, RespondRemoveCoinSubscriptions,
     RespondRemovePuzzleSubscriptions, RespondSesInfo, RespondSignagePoint, RespondToCoinUpdates,
@@ -574,6 +575,11 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<RequestCoinState>()?;
     m.add_class::<RespondCoinState>()?;
     m.add_class::<RejectCoinState>()?;
+    m.add_class::<MempoolItemsAdded>()?;
+    m.add_class::<MempoolItemsRemoved>()?;
+    m.add_class::<RemovedMempoolItem>()?;
+    m.add_class::<RequestCostInfo>()?;
+    m.add_class::<RespondCostInfo>()?;
 
     // full node protocol
     m.add_class::<NewPeak>()?;
