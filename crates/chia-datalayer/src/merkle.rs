@@ -1951,19 +1951,16 @@ mod tests {
 
     #[rstest]
     #[case::left_child_first(MerkleBlobLeftChildFirstIterator::new)]
-    fn test_iterators<'a, T>(
-        #[case] iterator_new: impl Fn(&'a [u8]) -> T + 'a,
-        traversal_blob: MerkleBlob,
-    ) where
-        T: Iterator<Item = (TreeIndex, Block)>,
+    fn test_iterators<'a, F, I>(#[case] iterator_new: F, #[by_ref] traversal_blob: &'a MerkleBlob)
+    where
+        F: Fn(&'a [u8]) -> I,
+        I: Iterator<Item = (TreeIndex, Block)>,
     {
         let mut dot_actual = traversal_blob.to_dot();
         dot_actual.set_note("left child first iterator");
         let mut actual = vec![];
-        // let b = Box::new(iterator_new(&traversal_blob.blob));
         {
-            let iter = iterator_new(&traversal_blob.blob).into_iter();
-            for (index, block) in iter {
+            for (index, block) in iterator_new(&traversal_blob.blob) {
                 actual.push(iterator_test_reference(index, &block));
                 dot_actual.push_traversal(index);
             }
