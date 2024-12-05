@@ -29,6 +29,7 @@ chia-protocol = { workspace = true }
 
 [dev-dependencies]
 clvm-utils = { workspace = true }
+expect-test = { workspace = true }
 hex = { workspace = true }
 hex-literal = { workspace = true }
 open = { workspace = true }

@@ -304,6 +304,7 @@ fn block_range(index: TreeIndex) -> Range<usize> {
     block_start..block_start + BLOCK_SIZE
 }
 
+#[derive(Debug)]
 pub struct Block {
     // TODO: metadata node type and node's type not verified for agreement
     metadata: NodeMetadata,
@@ -1443,6 +1444,7 @@ mod dot;
 mod tests {
     use super::*;
     use crate::merkle::dot::DotLines;
+    use expect_test::expect;
     use rstest::{fixture, rstest};
     use std::time::{Duration, Instant};
 
@@ -1531,6 +1533,34 @@ mod tests {
         .unwrap();
 
         blob
+    }
+
+    #[fixture]
+    fn traversal_blob(mut small_blob: MerkleBlob) -> MerkleBlob {
+        small_blob
+            .insert(
+                KvId(103),
+                KvId(204),
+                &sha256_num(0x1324),
+                InsertLocation::Leaf {
+                    index: TreeIndex(1),
+                    side: Side::Right,
+                },
+            )
+            .unwrap();
+        small_blob
+            .insert(
+                KvId(307),
+                KvId(404),
+                &sha256_num(0x9183),
+                InsertLocation::Leaf {
+                    index: TreeIndex(3),
+                    side: Side::Right,
+                },
+            )
+            .unwrap();
+
+        small_blob
     }
 
     #[rstest]
@@ -1894,5 +1924,108 @@ mod tests {
         expected.extend(batch_map);
 
         assert_eq!(after, expected);
+    }
+
+    fn iterator_test_reference(index: TreeIndex, block: &Block) -> (u32, NodeType, i64, i64, Hash) {
+        match block.node {
+            Node::Leaf(leaf) => (
+                index.0,
+                block.metadata.node_type,
+                leaf.key.0,
+                leaf.value.0,
+                block.node.hash(),
+            ),
+            Node::Internal(internal) => (
+                index.0,
+                block.metadata.node_type,
+                internal.left.0 as i64,
+                internal.right.0 as i64,
+                block.node.hash(),
+            ),
+        }
+    }
+
+    // type X = impl Fn(&[u8]) -> u8;
+    // type Y = impl Fn(&[u8]) -> impl Iterator<Item = (TreeIndex, Block)>;
+    // type Z<T> = impl Fn(&[u8]) -> T where T: Iterator<Item = (TreeIndex, Block)>;
+
+    #[rstest]
+    #[case::left_child_first(MerkleBlobLeftChildFirstIterator::new)]
+    fn test_iterators<'a, T>(
+        #[case] iterator_new: impl Fn(&'a [u8]) -> T + 'a,
+        traversal_blob: MerkleBlob,
+    ) where
+        T: Iterator<Item = (TreeIndex, Block)>,
+    {
+        let mut dot_actual = traversal_blob.to_dot();
+        dot_actual.set_note("left child first iterator");
+        let mut actual = vec![];
+        // let b = Box::new(iterator_new(&traversal_blob.blob));
+        {
+            let iter = iterator_new(&traversal_blob.blob).into_iter();
+            for (index, block) in iter {
+                actual.push(iterator_test_reference(index, &block));
+                dot_actual.push_traversal(index);
+            }
+        }
+
+        open_dot(&mut dot_actual);
+
+        // expect-test is adding them back
+        #[allow(clippy::needless_raw_string_hashes)]
+        let expected = expect![[r#"
+            [
+                (
+                    1,
+                    Leaf,
+                    283686952306183,
+                    1157726452361532951,
+                    d8ddfc94e7201527a6a93ee04aed8c5c122ac38af6dbf6e5f1caefba2597230d,
+                ),
+                (
+                    3,
+                    Leaf,
+                    103,
+                    204,
+                    2d47301cff01acc863faa5f57e8fbc632114f1dc764772852ed0c29c0f248bd3,
+                ),
+                (
+                    5,
+                    Leaf,
+                    307,
+                    404,
+                    97148f80dd9289a1b67527c045fd47662d575ccdb594701a56c2255ac84f6113,
+                ),
+                (
+                    6,
+                    Internal,
+                    3,
+                    5,
+                    b946284149e4f4a0e767ef2feb397533fb112bf4d99c887348cec4438e38c1ce,
+                ),
+                (
+                    4,
+                    Internal,
+                    1,
+                    6,
+                    eee0c40977ba1c0e16a467f30f64d9c2579ff25dd01913e33962c3f1db86c2ea,
+                ),
+                (
+                    2,
+                    Leaf,
+                    2315169217770759719,
+                    3472611983179986487,
+                    0f980325ebe9426fa295f3f69cc38ef8fe6ce8f3b9f083556c0f927e67e56651,
+                ),
+                (
+                    0,
+                    Internal,
+                    4,
+                    2,
+                    0e4a8b1ecee43f457bbe2b30e94ac2afc0d3a6536f891a2ced5e96ce07fe9932,
+                ),
+            ]
+        "#]];
+        expected.assert_debug_eq(&actual);
     }
 }
