@@ -1,5 +1,5 @@
 use crate::merkle::{
-    InternalNode, LeafNode, MerkleBlob, MerkleBlobLeftChildFirstIterator, Node, TreeIndex,
+    Error, InternalNode, LeafNode, MerkleBlob, MerkleBlobLeftChildFirstIterator, Node, TreeIndex,
 };
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use url::Url;
@@ -110,13 +110,14 @@ impl Node {
 }
 
 impl MerkleBlob {
-    pub fn to_dot(&self) -> DotLines {
+    pub fn to_dot(&self) -> Result<DotLines, Error> {
         let mut result = DotLines::new();
-        for (index, block) in MerkleBlobLeftChildFirstIterator::new(&self.blob) {
+        for item in MerkleBlobLeftChildFirstIterator::new(&self.blob) {
+            let (index, block) = item?;
             result.push(block.node.to_dot(index));
         }
 
-        result
+        Ok(result)
     }
 }
 

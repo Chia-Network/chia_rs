@@ -82,6 +82,9 @@ pub enum Error {
     #[error("unable to find a leaf")]
     UnableToFindALeaf,
 
+    #[error("error while finding a leaf: {0:?}")]
+    FailedWhileFindingALeaf(String),
+
     #[error("unknown key: {0:?}")]
     UnknownKey(KvId),
 
@@ -338,13 +341,14 @@ impl Block {
 
 fn get_free_indexes_and_keys_values_indexes(
     blob: &Vec<u8>,
-) -> (HashSet<TreeIndex>, HashMap<KvId, TreeIndex>) {
+) -> Result<(HashSet<TreeIndex>, HashMap<KvId, TreeIndex>), Error> {
     let index_count = blob.len() / BLOCK_SIZE;
 
     let mut seen_indexes: Vec<bool> = vec![false; index_count];
     let mut key_to_index: HashMap<KvId, TreeIndex> = HashMap::default();
 
-    for (index, block) in MerkleBlobLeftChildFirstIterator::new(blob) {
+    for item in MerkleBlobLeftChildFirstIterator::new(blob) {
+        let (index, block) = item?;
         seen_indexes[index.0 as usize] = true;
 
         if let Node::Leaf(leaf) = block.node {
@@ -359,7 +363,7 @@ fn get_free_indexes_and_keys_values_indexes(
         }
     }
 
-    (free_indexes, key_to_index)
+    Ok((free_indexes, key_to_index))
 }
 
 /// Stores a DataLayer merkle tree in bytes and provides serialization on each access so that only
@@ -385,7 +389,7 @@ impl MerkleBlob {
             return Err(Error::InvalidBlobLength(remainder));
         }
 
-        let (free_indexes, key_to_index) = get_free_indexes_and_keys_values_indexes(&blob);
+        let (free_indexes, key_to_index) = get_free_indexes_and_keys_values_indexes(&blob)?;
 
         Ok(Self {
             blob,
@@ -766,7 +770,7 @@ impl MerkleBlob {
     fn get_min_height_leaf(&self) -> Result<LeafNode, Error> {
         let (_index, block) = MerkleBlobBreadthFirstIterator::new(&self.blob)
             .next()
-            .ok_or(Error::UnableToFindALeaf)?;
+            .ok_or(Error::UnableToFindALeaf)??;
 
         Ok(block
             .node
@@ -851,7 +855,8 @@ impl MerkleBlob {
         let mut internal_count: usize = 0;
         let mut child_to_parent: HashMap<TreeIndex, TreeIndex> = HashMap::new();
 
-        for (index, block) in MerkleBlobParentFirstIterator::new(&self.blob) {
+        for item in MerkleBlobParentFirstIterator::new(&self.blob) {
+            let (index, block) = item?;
             if let Some(parent) = block.node.parent() {
                 assert_eq!(child_to_parent.remove(&index), Some(parent));
             }
@@ -1099,12 +1104,14 @@ impl MerkleBlob {
     // }
 
     pub fn calculate_lazy_hashes(&mut self) -> Result<(), Error> {
-        // OPT: really want a truncated traversal, not filter
         // OPT: yeah, storing the whole set of blocks via collect is not great
-        for (index, mut block) in MerkleBlobLeftChildFirstIterator::new(&self.blob)
-            .filter(|(_, block)| block.metadata.dirty)
-            .collect::<Vec<_>>()
-        {
+        for item in MerkleBlobLeftChildFirstIterator::new(&self.blob).collect::<Vec<_>>() {
+            let (index, mut block) = item?;
+            // OPT: really want a pruned traversal, not filter
+            if !block.metadata.dirty {
+                continue;
+            }
+
             let Node::Internal(ref leaf) = block.node else {
                 panic!("leaves should not be dirty")
             };
@@ -1123,10 +1130,14 @@ impl MerkleBlob {
 impl PartialEq for MerkleBlob {
     fn eq(&self, other: &Self) -> bool {
         // NOTE: this is checking tree structure equality, not serialized bytes equality
-        for ((_, self_block), (_, other_block)) in zip(
+        for item in zip(
             MerkleBlobLeftChildFirstIterator::new(&self.blob),
             MerkleBlobLeftChildFirstIterator::new(&other.blob),
         ) {
+            let (Ok((_, self_block)), Ok((_, other_block))) = item else {
+                // TODO: it's an error though, hmm
+                return false;
+            };
             if (self_block.metadata.dirty || other_block.metadata.dirty)
                 || self_block.node.hash() != other_block.node.hash()
             {
@@ -1242,9 +1253,10 @@ impl MerkleBlob {
     pub fn py_get_nodes_with_indexes(&self, py: Python<'_>) -> PyResult<pyo3::PyObject> {
         let list = pyo3::types::PyList::empty_bound(py);
 
-        for (index, block) in MerkleBlobParentFirstIterator::new(&self.blob) {
+        for item in MerkleBlobParentFirstIterator::new(&self.blob) {
             use pyo3::conversion::IntoPy;
             use pyo3::types::PyListMethods;
+            let (index, block) = item.map_err(|e| PyValueError::new_err(e.to_string()))?;
             list.append((index.into_py(py), block.node.into_py(py)))?;
         }
 
@@ -1326,7 +1338,7 @@ impl<'a> MerkleBlobLeftChildFirstIterator<'a> {
 }
 
 impl Iterator for MerkleBlobLeftChildFirstIterator<'_> {
-    type Item = (TreeIndex, Block);
+    type Item = Result<(TreeIndex, Block), Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         // left sibling first, children before parents
@@ -1334,13 +1346,17 @@ impl Iterator for MerkleBlobLeftChildFirstIterator<'_> {
         loop {
             let item = self.deque.pop_front()?;
             let block_bytes: BlockBytes = self.blob[block_range(item.index)].try_into().unwrap();
-            let block = Block::from_bytes(block_bytes).unwrap();
+
+            let block = match Block::from_bytes(block_bytes) {
+                Ok(block) => block,
+                Err(e) => return Some(Err(e)),
+            };
 
             match block.node {
-                Node::Leaf(..) => return Some((item.index, block)),
+                Node::Leaf(..) => return Some(Ok((item.index, block))),
                 Node::Internal(ref node) => {
                     if item.visited {
-                        return Some((item.index, block));
+                        return Some(Ok((item.index, block)));
                     };
 
                     self.deque.push_front(MerkleBlobLeftChildFirstIteratorItem {
@@ -1378,7 +1394,7 @@ impl<'a> MerkleBlobParentFirstIterator<'a> {
 }
 
 impl Iterator for MerkleBlobParentFirstIterator<'_> {
-    type Item = (TreeIndex, Block);
+    type Item = Result<(TreeIndex, Block), Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         // left sibling first, parents before children
@@ -1392,7 +1408,7 @@ impl Iterator for MerkleBlobParentFirstIterator<'_> {
             self.deque.push_back(node.right);
         }
 
-        Some((index, block))
+        Some(Ok((index, block)))
     }
 }
 
@@ -1414,7 +1430,7 @@ impl<'a> MerkleBlobBreadthFirstIterator<'a> {
 }
 
 impl Iterator for MerkleBlobBreadthFirstIterator<'_> {
-    type Item = (TreeIndex, Block);
+    type Item = Result<(TreeIndex, Block), Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         // left sibling first, parent depth before child depth
@@ -1425,7 +1441,7 @@ impl Iterator for MerkleBlobBreadthFirstIterator<'_> {
             let block = Block::from_bytes(block_bytes).unwrap();
 
             match block.node {
-                Node::Leaf(..) => return Some((index, block)),
+                Node::Leaf(..) => return Some(Ok((index, block))),
                 Node::Internal(node) => {
                     self.deque.push_back(node.left);
                     self.deque.push_back(node.right);
@@ -1647,7 +1663,7 @@ mod tests {
             merkle_blob
                 .insert(key_value_id, key_value_id, &hash, InsertLocation::Auto {})
                 .unwrap();
-            dots.push(merkle_blob.to_dot().dump());
+            dots.push(merkle_blob.to_dot().unwrap().dump());
         }
 
         merkle_blob.check_integrity().unwrap();
@@ -1657,7 +1673,7 @@ mod tests {
             merkle_blob.delete(*key_value_id).unwrap();
             merkle_blob.calculate_lazy_hashes().unwrap();
             assert_eq!(merkle_blob, reference_blobs[key_value_id.0 as usize]);
-            dots.push(merkle_blob.to_dot().dump());
+            dots.push(merkle_blob.to_dot().unwrap().dump());
         }
     }
 
@@ -1666,7 +1682,7 @@ mod tests {
         let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
 
         let key_value_id = KvId(1);
-        open_dot(merkle_blob.to_dot().set_note("empty"));
+        open_dot(merkle_blob.to_dot().unwrap().set_note("empty"));
         merkle_blob
             .insert(
                 key_value_id,
@@ -1675,7 +1691,7 @@ mod tests {
                 InsertLocation::Auto {},
             )
             .unwrap();
-        open_dot(merkle_blob.to_dot().set_note("first after"));
+        open_dot(merkle_blob.to_dot().unwrap().set_note("first after"));
 
         assert_eq!(merkle_blob.key_to_index.len(), 1);
     }
@@ -1690,7 +1706,7 @@ mod tests {
         let mut last_key: KvId = KvId(0);
         for i in 1..=pre_count {
             let key = KvId(i as i64);
-            open_dot(merkle_blob.to_dot().set_note("empty"));
+            open_dot(merkle_blob.to_dot().unwrap().set_note("empty"));
             merkle_blob
                 .insert(key, key, &sha256_num(key.0), InsertLocation::Auto {})
                 .unwrap();
@@ -1698,7 +1714,7 @@ mod tests {
         }
 
         let key_value_id: KvId = KvId((pre_count + 1) as i64);
-        open_dot(merkle_blob.to_dot().set_note("first after"));
+        open_dot(merkle_blob.to_dot().unwrap().set_note("first after"));
         merkle_blob
             .insert(
                 key_value_id,
@@ -1710,7 +1726,7 @@ mod tests {
                 },
             )
             .unwrap();
-        open_dot(merkle_blob.to_dot().set_note("first after"));
+        open_dot(merkle_blob.to_dot().unwrap().set_note("first after"));
 
         let sibling = merkle_blob
             .get_node(merkle_blob.key_to_index[&last_key])
@@ -1741,7 +1757,7 @@ mod tests {
         let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
 
         let key_value_id = KvId(1);
-        open_dot(merkle_blob.to_dot().set_note("empty"));
+        open_dot(merkle_blob.to_dot().unwrap().set_note("empty"));
         merkle_blob
             .insert(
                 key_value_id,
@@ -1750,7 +1766,7 @@ mod tests {
                 InsertLocation::Auto {},
             )
             .unwrap();
-        open_dot(merkle_blob.to_dot().set_note("first after"));
+        open_dot(merkle_blob.to_dot().unwrap().set_note("first after"));
         merkle_blob.check_integrity().unwrap();
 
         merkle_blob.delete(key_value_id).unwrap();
@@ -1772,11 +1788,11 @@ mod tests {
 
     #[rstest]
     fn test_get_new_index_with_free_index(mut small_blob: MerkleBlob) {
-        open_dot(small_blob.to_dot().set_note("initial"));
+        open_dot(small_blob.to_dot().unwrap().set_note("initial"));
         let key = KvId(0x0001_0203_0405_0607);
         let _ = small_blob.key_to_index[&key];
         small_blob.delete(key).unwrap();
-        open_dot(small_blob.to_dot().set_note("after delete"));
+        open_dot(small_blob.to_dot().unwrap().set_note("after delete"));
 
         let expected = HashSet::from([TreeIndex(1), TreeIndex(2)]);
         assert_eq!(small_blob.free_indexes, expected);
@@ -1814,7 +1830,7 @@ mod tests {
         let mut blob = small_blob.blob.clone();
         let expected_free_index = TreeIndex((blob.len() / BLOCK_SIZE) as u32);
         blob.extend_from_slice(&[0; BLOCK_SIZE]);
-        let (free_indexes, _) = get_free_indexes_and_keys_values_indexes(&blob);
+        let (free_indexes, _) = get_free_indexes_and_keys_values_indexes(&blob).unwrap();
         assert_eq!(free_indexes, HashSet::from([expected_free_index]));
     }
 
@@ -1833,11 +1849,11 @@ mod tests {
         insert_blob
             .insert(key, value, &sha256_num(key.0), InsertLocation::Auto {})
             .unwrap();
-        open_dot(insert_blob.to_dot().set_note("first after"));
+        open_dot(insert_blob.to_dot().unwrap().set_note("first after"));
 
         let mut upsert_blob = MerkleBlob::new(small_blob.blob.clone()).unwrap();
         upsert_blob.upsert(key, value, &sha256_num(key.0)).unwrap();
-        open_dot(upsert_blob.to_dot().set_note("first after"));
+        open_dot(upsert_blob.to_dot().unwrap().set_note("first after"));
 
         assert_eq!(insert_blob.blob, upsert_blob.blob);
     }
@@ -1856,9 +1872,9 @@ mod tests {
             MerkleBlobLeftChildFirstIterator::new(&small_blob.blob).collect::<Vec<_>>();
 
         assert_eq!(before_blocks.len(), after_blocks.len());
-        for ((before_index, before_block), (after_index, after_block)) in
-            zip(before_blocks, after_blocks)
-        {
+        for item in zip(before_blocks, after_blocks) {
+            let ((before_index, before_block), (after_index, after_block)) =
+                (item.0.unwrap(), item.1.unwrap());
             assert_eq!(before_block.node.parent(), after_block.node.parent());
             assert_eq!(before_index, after_index);
             let before: LeafNode = match before_block.node {
@@ -1905,7 +1921,7 @@ mod tests {
             blob.insert(i, i, &sha256_num(i.0), InsertLocation::Auto {})
                 .unwrap();
         }
-        open_dot(blob.to_dot().set_note("initial"));
+        open_dot(blob.to_dot().unwrap().set_note("initial"));
 
         let mut batch: Vec<((KvId, KvId), Hash)> = vec![];
 
@@ -1922,6 +1938,7 @@ mod tests {
 
         open_dot(
             blob.to_dot()
+                .unwrap()
                 .set_note(&format!("after batch insert of {count} values")),
         );
 
@@ -2112,21 +2129,22 @@ mod tests {
         #[by_ref] traversal_blob: &'a MerkleBlob,
     ) where
         F: Fn(&'a Vec<u8>) -> T,
-        T: Iterator<Item = (TreeIndex, Block)>,
+        T: Iterator<Item = Result<(TreeIndex, Block), Error>>,
     {
-        let mut dot_actual = traversal_blob.to_dot();
+        let mut dot_actual = traversal_blob.to_dot().unwrap();
         dot_actual.set_note(note);
 
         let mut actual = vec![];
         {
             let blob: &Vec<u8> = &traversal_blob.blob;
-            for (index, block) in iterator_new(blob) {
+            for item in iterator_new(blob) {
+                let (index, block) = item.unwrap();
                 actual.push(iterator_test_reference(index, &block));
                 dot_actual.push_traversal(index);
             }
         }
 
-        traversal_blob.to_dot();
+        traversal_blob.to_dot().unwrap();
 
         open_dot(&mut dot_actual);
 

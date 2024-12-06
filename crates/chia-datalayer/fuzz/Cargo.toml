@@ -1,0 +1,21 @@
+[package]
+name = "chia-datalayer-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.chia-datalayer]
+path = ".."
+
+[[bin]]
+name = "merkle_blob_new"
+path = "fuzz_targets/merkle_blob_new.rs"
+test = false
+doc = false
+bench = false
