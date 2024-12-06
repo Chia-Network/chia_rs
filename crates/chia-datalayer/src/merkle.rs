@@ -337,7 +337,7 @@ impl Block {
 }
 
 fn get_free_indexes_and_keys_values_indexes(
-    blob: &[u8],
+    blob: &Vec<u8>,
 ) -> (HashSet<TreeIndex>, HashMap<KvId, TreeIndex>) {
     let index_count = blob.len() / BLOCK_SIZE;
 
@@ -758,7 +758,7 @@ impl MerkleBlob {
     }
 
     fn get_min_height_leaf(&self) -> Result<LeafNode, Error> {
-        let block = MerkleBlobBreadthFirstIterator::new(&self.blob)
+        let (_index, block) = MerkleBlobBreadthFirstIterator::new(&self.blob)
             .next()
             .ok_or(Error::UnableToFindALeaf)?;
 
@@ -1301,12 +1301,12 @@ struct MerkleBlobLeftChildFirstIteratorItem {
 }
 
 pub struct MerkleBlobLeftChildFirstIterator<'a> {
-    blob: &'a [u8],
+    blob: &'a Vec<u8>,
     deque: VecDeque<MerkleBlobLeftChildFirstIteratorItem>,
 }
 
 impl<'a> MerkleBlobLeftChildFirstIterator<'a> {
-    fn new(blob: &'a [u8]) -> Self {
+    fn new(blob: &'a Vec<u8>) -> Self {
         let mut deque = VecDeque::new();
         if blob.len() / BLOCK_SIZE > 0 {
             deque.push_back(MerkleBlobLeftChildFirstIteratorItem {
@@ -1356,12 +1356,12 @@ impl Iterator for MerkleBlobLeftChildFirstIterator<'_> {
 }
 
 pub struct MerkleBlobParentFirstIterator<'a> {
-    blob: &'a [u8],
+    blob: &'a Vec<u8>,
     deque: VecDeque<TreeIndex>,
 }
 
 impl<'a> MerkleBlobParentFirstIterator<'a> {
-    fn new(blob: &'a [u8]) -> Self {
+    fn new(blob: &'a Vec<u8>) -> Self {
         let mut deque = VecDeque::new();
         if blob.len() / BLOCK_SIZE > 0 {
             deque.push_back(TreeIndex(0));
@@ -1391,13 +1391,13 @@ impl Iterator for MerkleBlobParentFirstIterator<'_> {
 }
 
 pub struct MerkleBlobBreadthFirstIterator<'a> {
-    blob: &'a [u8],
+    blob: &'a Vec<u8>,
     deque: VecDeque<TreeIndex>,
 }
 
 impl<'a> MerkleBlobBreadthFirstIterator<'a> {
     #[allow(unused)]
-    fn new(blob: &'a [u8]) -> Self {
+    fn new(blob: &'a Vec<u8>) -> Self {
         let mut deque = VecDeque::new();
         if blob.len() / BLOCK_SIZE > 0 {
             deque.push_back(TreeIndex(0));
@@ -1408,7 +1408,7 @@ impl<'a> MerkleBlobBreadthFirstIterator<'a> {
 }
 
 impl Iterator for MerkleBlobBreadthFirstIterator<'_> {
-    type Item = Block;
+    type Item = (TreeIndex, Block);
 
     fn next(&mut self) -> Option<Self::Item> {
         // left sibling first, parent depth before child depth
@@ -1419,7 +1419,7 @@ impl Iterator for MerkleBlobBreadthFirstIterator<'_> {
             let block = Block::from_bytes(block_bytes).unwrap();
 
             match block.node {
-                Node::Leaf(..) => return Some(block),
+                Node::Leaf(..) => return Some((index, block)),
                 Node::Internal(node) => {
                     self.deque.push_back(node.left);
                     self.deque.push_back(node.right);
@@ -1443,6 +1443,7 @@ mod dot;
 mod tests {
     use super::*;
     use crate::merkle::dot::DotLines;
+    use expect_test::{expect, Expect};
     use rstest::{fixture, rstest};
     use std::time::{Duration, Instant};
 
@@ -1531,6 +1532,34 @@ mod tests {
         .unwrap();
 
         blob
+    }
+
+    #[fixture]
+    fn traversal_blob(mut small_blob: MerkleBlob) -> MerkleBlob {
+        small_blob
+            .insert(
+                KvId(103),
+                KvId(204),
+                &sha256_num(0x1324),
+                InsertLocation::Leaf {
+                    index: TreeIndex(1),
+                    side: Side::Right,
+                },
+            )
+            .unwrap();
+        small_blob
+            .insert(
+                KvId(307),
+                KvId(404),
+                &sha256_num(0x9183),
+                InsertLocation::Leaf {
+                    index: TreeIndex(3),
+                    side: Side::Right,
+                },
+            )
+            .unwrap();
+
+        small_blob
     }
 
     #[rstest]
@@ -1894,5 +1923,207 @@ mod tests {
         expected.extend(batch_map);
 
         assert_eq!(after, expected);
+    }
+
+    fn iterator_test_reference(index: TreeIndex, block: &Block) -> (u32, NodeType, i64, i64, Hash) {
+        match block.node {
+            Node::Leaf(leaf) => (
+                index.0,
+                block.metadata.node_type,
+                leaf.key.0,
+                leaf.value.0,
+                block.node.hash(),
+            ),
+            Node::Internal(internal) => (
+                index.0,
+                block.metadata.node_type,
+                internal.left.0 as i64,
+                internal.right.0 as i64,
+                block.node.hash(),
+            ),
+        }
+    }
+
+    #[rstest]
+    // expect-test is adding them back
+    #[allow(clippy::needless_raw_string_hashes)]
+    #[case::left_child_first(
+        "left child first",
+        MerkleBlobLeftChildFirstIterator::new,
+        expect![[r#"
+            [
+                (
+                    1,
+                    Leaf,
+                    283686952306183,
+                    1157726452361532951,
+                    d8ddfc94e7201527a6a93ee04aed8c5c122ac38af6dbf6e5f1caefba2597230d,
+                ),
+                (
+                    3,
+                    Leaf,
+                    103,
+                    204,
+                    2d47301cff01acc863faa5f57e8fbc632114f1dc764772852ed0c29c0f248bd3,
+                ),
+                (
+                    5,
+                    Leaf,
+                    307,
+                    404,
+                    97148f80dd9289a1b67527c045fd47662d575ccdb594701a56c2255ac84f6113,
+                ),
+                (
+                    6,
+                    Internal,
+                    3,
+                    5,
+                    b946284149e4f4a0e767ef2feb397533fb112bf4d99c887348cec4438e38c1ce,
+                ),
+                (
+                    4,
+                    Internal,
+                    1,
+                    6,
+                    eee0c40977ba1c0e16a467f30f64d9c2579ff25dd01913e33962c3f1db86c2ea,
+                ),
+                (
+                    2,
+                    Leaf,
+                    2315169217770759719,
+                    3472611983179986487,
+                    0f980325ebe9426fa295f3f69cc38ef8fe6ce8f3b9f083556c0f927e67e56651,
+                ),
+                (
+                    0,
+                    Internal,
+                    4,
+                    2,
+                    0e4a8b1ecee43f457bbe2b30e94ac2afc0d3a6536f891a2ced5e96ce07fe9932,
+                ),
+            ]
+        "#]],
+    )]
+    // expect-test is adding them back
+    #[allow(clippy::needless_raw_string_hashes)]
+    #[case::parent_first(
+        "parent first",
+        MerkleBlobParentFirstIterator::new,
+        expect![[r#"
+            [
+                (
+                    0,
+                    Internal,
+                    4,
+                    2,
+                    0e4a8b1ecee43f457bbe2b30e94ac2afc0d3a6536f891a2ced5e96ce07fe9932,
+                ),
+                (
+                    4,
+                    Internal,
+                    1,
+                    6,
+                    eee0c40977ba1c0e16a467f30f64d9c2579ff25dd01913e33962c3f1db86c2ea,
+                ),
+                (
+                    2,
+                    Leaf,
+                    2315169217770759719,
+                    3472611983179986487,
+                    0f980325ebe9426fa295f3f69cc38ef8fe6ce8f3b9f083556c0f927e67e56651,
+                ),
+                (
+                    1,
+                    Leaf,
+                    283686952306183,
+                    1157726452361532951,
+                    d8ddfc94e7201527a6a93ee04aed8c5c122ac38af6dbf6e5f1caefba2597230d,
+                ),
+                (
+                    6,
+                    Internal,
+                    3,
+                    5,
+                    b946284149e4f4a0e767ef2feb397533fb112bf4d99c887348cec4438e38c1ce,
+                ),
+                (
+                    3,
+                    Leaf,
+                    103,
+                    204,
+                    2d47301cff01acc863faa5f57e8fbc632114f1dc764772852ed0c29c0f248bd3,
+                ),
+                (
+                    5,
+                    Leaf,
+                    307,
+                    404,
+                    97148f80dd9289a1b67527c045fd47662d575ccdb594701a56c2255ac84f6113,
+                ),
+            ]
+        "#]])]
+    // expect-test is adding them back
+    #[allow(clippy::needless_raw_string_hashes)]
+    #[case::breadth_first(
+        "breadth first",
+        MerkleBlobBreadthFirstIterator::new,
+        expect![[r#"
+            [
+                (
+                    2,
+                    Leaf,
+                    2315169217770759719,
+                    3472611983179986487,
+                    0f980325ebe9426fa295f3f69cc38ef8fe6ce8f3b9f083556c0f927e67e56651,
+                ),
+                (
+                    1,
+                    Leaf,
+                    283686952306183,
+                    1157726452361532951,
+                    d8ddfc94e7201527a6a93ee04aed8c5c122ac38af6dbf6e5f1caefba2597230d,
+                ),
+                (
+                    3,
+                    Leaf,
+                    103,
+                    204,
+                    2d47301cff01acc863faa5f57e8fbc632114f1dc764772852ed0c29c0f248bd3,
+                ),
+                (
+                    5,
+                    Leaf,
+                    307,
+                    404,
+                    97148f80dd9289a1b67527c045fd47662d575ccdb594701a56c2255ac84f6113,
+                ),
+            ]
+        "#]])]
+    fn test_iterators<'a, F, T>(
+        #[case] note: &str,
+        #[case] iterator_new: F,
+        #[case] expected: Expect,
+        #[by_ref] traversal_blob: &'a MerkleBlob,
+    ) where
+        F: Fn(&'a Vec<u8>) -> T,
+        T: Iterator<Item = (TreeIndex, Block)>,
+    {
+        let mut dot_actual = traversal_blob.to_dot();
+        dot_actual.set_note(note);
+
+        let mut actual = vec![];
+        {
+            let blob: &Vec<u8> = &traversal_blob.blob;
+            for (index, block) in iterator_new(blob) {
+                actual.push(iterator_test_reference(index, &block));
+                dot_actual.push_traversal(index);
+            }
+        }
+
+        traversal_blob.to_dot();
+
+        open_dot(&mut dot_actual);
+
+        expected.assert_debug_eq(&actual);
     }
 }
