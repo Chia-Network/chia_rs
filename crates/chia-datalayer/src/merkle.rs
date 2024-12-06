@@ -459,7 +459,6 @@ impl MerkleBlob {
             }),
         };
 
-        self.clear();
         self.insert_entry_to_blob(self.extend_index(), &new_leaf_block)?;
 
         Ok(())
