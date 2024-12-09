@@ -416,7 +416,7 @@ impl MerkleBlob {
         value: KvId,
         hash: &Hash,
         insert_location: InsertLocation,
-    ) -> Result<(), Error> {
+    ) -> Result<TreeIndex, Error> {
         if self.key_to_index.contains_key(&key) {
             return Err(Error::KeyAlreadyPresent);
         }
@@ -434,7 +434,7 @@ impl MerkleBlob {
                 if !self.key_to_index.is_empty() {
                     return Err(Error::UnableToInsertAsRootOfNonEmptyTree);
                 };
-                self.insert_first(key, value, hash)?;
+                self.insert_first(key, value, hash)
             }
             InsertLocation::Leaf { index, side } => {
                 let old_leaf = self.get_node(index)?.try_into_leaf()?;
@@ -452,17 +452,15 @@ impl MerkleBlob {
                 };
 
                 if self.key_to_index.len() == 1 {
-                    self.insert_second(node, &old_leaf, &internal_node_hash, side)?;
+                    self.insert_second(node, &old_leaf, &internal_node_hash, side)
                 } else {
-                    self.insert_third_or_later(node, &old_leaf, index, &internal_node_hash, side)?;
+                    self.insert_third_or_later(node, &old_leaf, index, &internal_node_hash, side)
                 }
             }
         }
-
-        Ok(())
     }
 
-    fn insert_first(&mut self, key: KvId, value: KvId, hash: &Hash) -> Result<(), Error> {
+    fn insert_first(&mut self, key: KvId, value: KvId, hash: &Hash) -> Result<TreeIndex, Error> {
         let new_leaf_block = Block {
             metadata: NodeMetadata {
                 node_type: NodeType::Leaf,
@@ -476,9 +474,10 @@ impl MerkleBlob {
             }),
         };
 
-        self.insert_entry_to_blob(self.extend_index(), &new_leaf_block)?;
+        let index = self.extend_index();
+        self.insert_entry_to_blob(index, &new_leaf_block)?;
 
-        Ok(())
+        Ok(index)
     }
 
     fn insert_second(
@@ -487,7 +486,7 @@ impl MerkleBlob {
         old_leaf: &LeafNode,
         internal_node_hash: &Hash,
         side: Side,
-    ) -> Result<(), Error> {
+    ) -> Result<TreeIndex, Error> {
         self.clear();
         let root_index = self.get_new_index();
         let left_index = self.get_new_index();
@@ -544,7 +543,7 @@ impl MerkleBlob {
             self.insert_entry_to_blob(index, &block)?;
         }
 
-        Ok(())
+        Ok(nodes[1].0)
     }
 
     fn insert_third_or_later(
@@ -554,7 +553,7 @@ impl MerkleBlob {
         old_leaf_index: TreeIndex,
         internal_node_hash: &Hash,
         side: Side,
-    ) -> Result<(), Error> {
+    ) -> Result<TreeIndex, Error> {
         let new_leaf_index = self.get_new_index();
         let new_internal_node_index = self.get_new_index();
 
@@ -610,7 +609,7 @@ impl MerkleBlob {
 
         self.mark_lineage_as_dirty(old_parent_index)?;
 
-        Ok(())
+        Ok(new_leaf_index)
     }
 
     pub fn batch_insert<I>(&mut self, mut keys_values_hashes: I) -> Result<(), Error>
@@ -952,6 +951,7 @@ impl MerkleBlob {
         }
     }
 
+    // TODO: not really that random
     fn get_random_insert_location_by_seed(
         &self,
         seed_bytes: &[u8],
@@ -962,6 +962,7 @@ impl MerkleBlob {
             return Ok(InsertLocation::AsRoot {});
         }
 
+        // TODO: zero means left here but right below?
         let side = if (seed_bytes.last().ok_or(Error::ZeroLengthSeedNotAllowed)? & 1 << 7) == 0 {
             Side::Left
         } else {
@@ -1214,7 +1215,9 @@ impl MerkleBlob {
             }
         };
         self.insert(key, value, &hash, insert_location)
-            .map_err(|e| PyValueError::new_err(e.to_string()))
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+
+        Ok(())
     }
 
     #[pyo3(name = "delete")]
@@ -1665,6 +1668,31 @@ mod tests {
                 side: expected_side
             },
         );
+    }
+
+    #[test]
+    fn test_get_random_insert_location_by_seed_with_seed_too_short() {
+        let mut blob = MerkleBlob::new(vec![]).unwrap();
+        let seed = [0xff];
+        let layer_count = 8 * seed.len() + 10;
+
+        for n in 0..layer_count {
+            let key = KvId((n + 100) as i64);
+            let value = KvId((n + 100) as i64);
+            let hash = sha256_num(key.0);
+            let insert_location = blob.get_random_insert_location_by_seed(&seed).unwrap();
+            blob.insert(key, value, &hash, insert_location).unwrap();
+        }
+
+        let location = blob.get_random_insert_location_by_seed(&seed).unwrap();
+
+        let InsertLocation::Leaf { index, .. } = location else {
+            panic!()
+        };
+        let lineage = blob.get_lineage_indexes(index).unwrap();
+
+        assert_eq!(lineage.len(), layer_count);
+        assert!(lineage.len() > seed.len() * 8);
     }
 
     #[rstest]

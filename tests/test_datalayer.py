@@ -26,8 +26,19 @@ def test_just_insert_a_bunch() -> None:
     import time
 
     total_time = 0.0
-    for i in range(100000):
+    for i in range(100_000):
         start = time.monotonic()
         merkle_blob.insert(int64(i), int64(i), HASH)
         end = time.monotonic()
         total_time += end - start
+
+
+# TODO: make this a real test
+def test_checking coverage() -> None:
+    count = 100
+
+    merkle_blob = MerkleBlob(blob=bytearray())
+    for i in range(count):
+        merkle_blob.insert(int64(i), int64(i), HASH)
+
+    assert len(merkle_blob.get_nodes_with_indexes()) == count
