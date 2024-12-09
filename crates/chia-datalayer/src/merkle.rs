@@ -105,6 +105,12 @@ pub enum Error {
 
     #[error("index not a child: {0}")]
     IndexIsNotAChild(TreeIndex),
+
+    #[error("cycle found")]
+    CycleFound,
+
+    #[error("block index out of bounds: {0}")]
+    BlockIndexOutOfBounds(TreeIndex),
 }
 
 // assumptions
@@ -1313,6 +1319,18 @@ impl MerkleBlob {
     }
 }
 
+fn try_get_block(blob: &[u8], index: TreeIndex) -> Result<Block, Error> {
+    // TODO: check limits and return error
+    let range = block_range(index);
+    let block_bytes: BlockBytes = blob
+        .get(range)
+        .ok_or(Error::BlockIndexOutOfBounds(index))?
+        .try_into()
+        .unwrap();
+
+    Block::from_bytes(block_bytes)
+}
+
 struct MerkleBlobLeftChildFirstIteratorItem {
     visited: bool,
     index: TreeIndex,
@@ -1321,6 +1339,7 @@ struct MerkleBlobLeftChildFirstIteratorItem {
 pub struct MerkleBlobLeftChildFirstIterator<'a> {
     blob: &'a Vec<u8>,
     deque: VecDeque<MerkleBlobLeftChildFirstIteratorItem>,
+    already_queued: HashSet<TreeIndex>,
 }
 
 impl<'a> MerkleBlobLeftChildFirstIterator<'a> {
@@ -1333,7 +1352,11 @@ impl<'a> MerkleBlobLeftChildFirstIterator<'a> {
             });
         }
 
-        Self { blob, deque }
+        Self {
+            blob,
+            deque,
+            already_queued: HashSet::new(),
+        }
     }
 }
 
@@ -1345,9 +1368,7 @@ impl Iterator for MerkleBlobLeftChildFirstIterator<'_> {
 
         loop {
             let item = self.deque.pop_front()?;
-            let block_bytes: BlockBytes = self.blob[block_range(item.index)].try_into().unwrap();
-
-            let block = match Block::from_bytes(block_bytes) {
+            let block = match try_get_block(self.blob, item.index) {
                 Ok(block) => block,
                 Err(e) => return Some(Err(e)),
             };
@@ -1358,6 +1379,11 @@ impl Iterator for MerkleBlobLeftChildFirstIterator<'_> {
                     if item.visited {
                         return Some(Ok((item.index, block)));
                     };
+
+                    if self.already_queued.contains(&item.index) {
+                        return Some(Err(Error::CycleFound));
+                    }
+                    self.already_queued.insert(item.index);
 
                     self.deque.push_front(MerkleBlobLeftChildFirstIteratorItem {
                         visited: true,
@@ -1380,6 +1406,7 @@ impl Iterator for MerkleBlobLeftChildFirstIterator<'_> {
 pub struct MerkleBlobParentFirstIterator<'a> {
     blob: &'a Vec<u8>,
     deque: VecDeque<TreeIndex>,
+    already_queued: HashSet<TreeIndex>,
 }
 
 impl<'a> MerkleBlobParentFirstIterator<'a> {
@@ -1389,7 +1416,11 @@ impl<'a> MerkleBlobParentFirstIterator<'a> {
             deque.push_back(TreeIndex(0));
         }
 
-        Self { blob, deque }
+        Self {
+            blob,
+            deque,
+            already_queued: HashSet::new(),
+        }
     }
 }
 
@@ -1400,10 +1431,17 @@ impl Iterator for MerkleBlobParentFirstIterator<'_> {
         // left sibling first, parents before children
 
         let index = self.deque.pop_front()?;
-        let block_bytes: BlockBytes = self.blob[block_range(index)].try_into().unwrap();
-        let block = Block::from_bytes(block_bytes).unwrap();
+        let block = match try_get_block(self.blob, index) {
+            Ok(block) => block,
+            Err(e) => return Some(Err(e)),
+        };
 
         if let Node::Internal(ref node) = block.node {
+            if self.already_queued.contains(&index) {
+                return Some(Err(Error::CycleFound));
+            }
+            self.already_queued.insert(index);
+
             self.deque.push_back(node.left);
             self.deque.push_back(node.right);
         }
@@ -1415,6 +1453,7 @@ impl Iterator for MerkleBlobParentFirstIterator<'_> {
 pub struct MerkleBlobBreadthFirstIterator<'a> {
     blob: &'a Vec<u8>,
     deque: VecDeque<TreeIndex>,
+    already_queued: HashSet<TreeIndex>,
 }
 
 impl<'a> MerkleBlobBreadthFirstIterator<'a> {
@@ -1425,7 +1464,11 @@ impl<'a> MerkleBlobBreadthFirstIterator<'a> {
             deque.push_back(TreeIndex(0));
         }
 
-        Self { blob, deque }
+        Self {
+            blob,
+            deque,
+            already_queued: HashSet::new(),
+        }
     }
 }
 
@@ -1437,12 +1480,19 @@ impl Iterator for MerkleBlobBreadthFirstIterator<'_> {
 
         loop {
             let index = self.deque.pop_front()?;
-            let block_bytes: BlockBytes = self.blob[block_range(index)].try_into().unwrap();
-            let block = Block::from_bytes(block_bytes).unwrap();
+            let block = match try_get_block(self.blob, index) {
+                Ok(block) => block,
+                Err(e) => return Some(Err(e)),
+            };
 
             match block.node {
                 Node::Leaf(..) => return Some(Ok((index, block))),
                 Node::Internal(node) => {
+                    if self.already_queued.contains(&index) {
+                        return Some(Err(Error::CycleFound));
+                    }
+                    self.already_queued.insert(index);
+
                     self.deque.push_back(node.left);
                     self.deque.push_back(node.right);
                 }
