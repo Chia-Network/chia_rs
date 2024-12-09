@@ -34,11 +34,11 @@ def test_just_insert_a_bunch() -> None:
 
 
 # TODO: make this a real test
-def test_checking coverage() -> None:
+def test_checking_coverage() -> None:
     count = 100
 
     merkle_blob = MerkleBlob(blob=bytearray())
     for i in range(count):
-        merkle_blob.insert(int64(i), int64(i), HASH)
+        merkle_blob.insert(int64(i), int64(i), bytes32.zeros)
 
     assert len(merkle_blob.get_nodes_with_indexes()) == count
