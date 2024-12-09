@@ -1,4 +1,4 @@
-from chia_rs import MerkleBlob
+from chia_rs import MerkleBlob, LeafNode
 from chia_rs.sized_bytes import bytes32
 from chia_rs.sized_ints import int64
 
@@ -41,4 +41,5 @@ def test_checking_coverage() -> None:
     for i in range(count):
         merkle_blob.insert(int64(i), int64(i), bytes32.zeros)
 
-    assert len(merkle_blob.get_nodes_with_indexes()) == count
+    leaves = [node for index, node in merkle_blob.get_nodes_with_indexes() if isinstance(node, LeafNode)]
+    assert len(leaves) == count
