@@ -1,6 +1,6 @@
 from chia_rs import LeafNode, MerkleBlob
 from chia_rs.sized_bytes import bytes32
-from chia_rs.sized_ints import int64
+from chia_rs.sized_ints import int64, uint8
 
 
 def test_merkle_blob():
@@ -42,7 +42,7 @@ def test_checking_coverage() -> None:
         if i % 2 == 0:
             merkle_blob.insert(int64(i), int64(i), bytes32.zeros)
         else:
-            merkle_blob.insert(int64(i), int64(i), bytes32.zeros, int64(i - 1), 0)
+            merkle_blob.insert(int64(i), int64(i), bytes32.zeros, int64(i - 1), uint8(0))
 
     keys = {
         node.key
