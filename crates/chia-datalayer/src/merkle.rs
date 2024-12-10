@@ -2272,6 +2272,12 @@ mod tests {
 
     #[rstest]
     fn test_free_index_reused(mut small_blob: MerkleBlob) {
+        // there must be enough nodes to avoid the few-node insertion methods that clear the blob
+        for n in 0..5 {
+            small_blob
+                .insert(KvId(n), KvId(n), &sha256_num(n), InsertLocation::Auto {})
+                .unwrap();
+        }
         let (key, index) = {
             let (key, index) = small_blob.key_to_index.iter().next().unwrap();
             (*key, *index)
