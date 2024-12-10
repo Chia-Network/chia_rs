@@ -421,7 +421,6 @@ impl MerkleBlob {
             blob,
             free_indexes,
             key_to_index,
-            #[cfg(any(test, debug_assertions))]
             check_integrity_on_drop: true,
         };
 
