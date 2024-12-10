@@ -394,7 +394,7 @@ dependencies = [
 
 [[package]]
 name = "chia-datalayer-fuzz"
-version = "0.0.0"
+version = "0.16.0"
 dependencies = [
  "chia-datalayer",
  "libfuzzer-sys",

@@ -402,6 +402,7 @@ pub struct MerkleBlob {
     free_indexes: HashSet<TreeIndex>,
     key_to_index: HashMap<KvId, TreeIndex>,
     // TODO: used by fuzzing, some cleaner way?
+    #[cfg(any(test, debug_assertions))]
     pub check_integrity_on_drop: bool,
 }
 
@@ -420,6 +421,7 @@ impl MerkleBlob {
             blob,
             free_indexes,
             key_to_index,
+            #[cfg(any(test, debug_assertions))]
             check_integrity_on_drop: true,
         };
 
