@@ -1,4 +1,4 @@
-from chia_rs import LeafNode, MerkleBlob, Side
+from chia_rs import LeafNode, MerkleBlob
 from chia_rs.sized_bytes import bytes32
 from chia_rs.sized_ints import int64
 
