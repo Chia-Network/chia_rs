@@ -1,9 +1,18 @@
 #![no_main]
 
-use libfuzzer_sys::fuzz_target;
+use libfuzzer_sys::{arbitrary::Unstructured, fuzz_target};
 
-use chia_datalayer::MerkleBlob;
+use chia_datalayer::{MerkleBlob, BLOCK_SIZE};
 
 fuzz_target!(|data: &[u8]| {
-    let _ = MerkleBlob::new(data.to_vec());
+    let mut unstructured = Unstructured::new(data);
+    let block_count = unstructured.int_in_range(0..=1000).unwrap();
+    let mut bytes = vec![0u8; block_count * BLOCK_SIZE];
+    unstructured.fill_buffer(&mut bytes).unwrap();
+
+    let Ok(mut blob) = MerkleBlob::new(bytes) else {
+        return;
+    };
+    blob.check_integrity_on_drop = false;
+    let _ = blob.check_integrity();
 });
