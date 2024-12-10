@@ -401,8 +401,8 @@ pub struct MerkleBlob {
     // TODO: would be nice for this to be deterministic ala a fifo set
     free_indexes: HashSet<TreeIndex>,
     key_to_index: HashMap<KvId, TreeIndex>,
-    // TODO: used by fuzzing, some cleaner way?
-    #[cfg(any(test, debug_assertions))]
+    // TODO: used by fuzzing, some cleaner way?  making it cfg-dependent is annoying with
+    //       the type stubs
     pub check_integrity_on_drop: bool,
 }
 
