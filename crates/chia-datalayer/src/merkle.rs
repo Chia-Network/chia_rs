@@ -2273,7 +2273,8 @@ mod tests {
     #[rstest]
     fn test_free_index_reused(mut small_blob: MerkleBlob) {
         // there must be enough nodes to avoid the few-node insertion methods that clear the blob
-        for n in 0..5 {
+        let count = 5;
+        for n in 0..count {
             small_blob
                 .insert(KvId(n), KvId(n), &sha256_num(n), InsertLocation::Auto {})
                 .unwrap();
@@ -2287,7 +2288,12 @@ mod tests {
         small_blob.delete(key).unwrap();
         assert!(small_blob.free_indexes.contains(&index));
         let new_index = small_blob
-            .insert(KvId(0), KvId(0), &sha256_num(0), InsertLocation::Auto {})
+            .insert(
+                KvId(count),
+                KvId(count),
+                &sha256_num(count),
+                InsertLocation::Auto {},
+            )
             .unwrap();
         assert_eq!(small_blob.blob.len(), expected_length);
         assert_eq!(new_index, index);
