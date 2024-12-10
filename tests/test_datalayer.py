@@ -41,9 +41,9 @@ def test_checking_coverage() -> None:
     for i in range(count):
         merkle_blob.insert(int64(i), int64(i), bytes32.zeros)
 
-    leaves = [
-        node
+    keys = {
+        node.key
         for index, node in merkle_blob.get_nodes_with_indexes()
         if isinstance(node, LeafNode)
-    ]
-    assert len(leaves) == count
+    }
+    assert keys == set(range(count))
