@@ -29,6 +29,9 @@ chia_rs\.PrivateKey\.__init__
 # TODO: expects *args
 chia_rs\.RequestPeers\.__init__
 
+# TODO: expects *args
+chia_rs\.RequestCostInfo\.__init__
+
 # TODO: ask stubtest/mypy about these as they seem unlikely to be our doing
 chia_rs\.sized_byte_class\.Iterable
 chia_rs\.sized_byte_class\.BinaryIO\.write

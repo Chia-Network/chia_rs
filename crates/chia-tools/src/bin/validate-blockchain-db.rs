@@ -11,6 +11,9 @@ use rusqlite::Connection;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::io::Write;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use std::thread::available_parallelism;
 use std::time::{Duration, Instant};
 
@@ -111,7 +114,8 @@ fn main() {
         .queue_len(num_cores + 5)
         .build();
 
-    let mut last_height = 0;
+    let error_count = Arc::new(AtomicUsize::new(0));
+    let mut last_height = args.start;
     let mut last_time = Instant::now();
     println!(
         r"THIS TOOL DOES NOT VALIDATE ALL ASPECTS OF A BLOCKCHAIN DATABASE
@@ -164,27 +168,31 @@ features that are validated:
             prev_hash = block.prev_header_hash();
         }
 
-        assert_eq!(
-            block.prev_header_hash(),
-            prev_hash,
-            "at height {height} the previous header hash mismatches. {} expected {} from height {}",
-            block.prev_header_hash(),
-            prev_hash,
-            prev_height,
-        );
-        assert_eq!(
-            block.height(),
-            height,
-            "at height {height} the height recorded in the block mismatches, {}",
-            block.height(),
-        );
-        assert_eq!(height, (prev_height + 1) as u32,
-            "at height {height} the the block height did not increment by 1, from previous block (at height {prev_height})");
+        if block.prev_header_hash() != prev_hash {
+            println!("at height {height} the previous header hash mismatches. {} expected {} from height {}",
+                block.prev_header_hash(),
+                prev_hash,
+                prev_height,
+            );
+            error_count.fetch_add(1, Ordering::Relaxed);
+        }
+        if block.height() != height {
+            println!(
+                "at height {height} the height recorded in the block mismatches, {}",
+                block.height(),
+            );
+            error_count.fetch_add(1, Ordering::Relaxed);
+        }
+        if height != (prev_height + 1) as u32 {
+            println!("at height {height} the the block height did not increment by 1, from previous block (at height {prev_height})");
+            error_count.fetch_add(1, Ordering::Relaxed);
+        }
         prev_hash = block.header_hash();
         prev_height = height as i64;
         if let Some(hth) = &height_to_hash {
-            if hth.len() > height as usize {
-                assert_eq!(hth[height as usize], prev_hash, "at height {height} the block hash ({prev_hash}) does not match the height-to-hash file ({})", hth[height as usize]);
+            if hth.len() > height as usize && hth[height as usize] != prev_hash {
+                println!("at height {height} the block hash ({prev_hash}) does not match the height-to-hash file ({})", hth[height as usize]);
+                error_count.fetch_add(1, Ordering::Relaxed);
             }
         }
         let mut removals = HashSet::<[u8; 32]>::new();
@@ -219,18 +227,28 @@ features that are validated:
             let new_coin_id = add.coin_id();
             let Some((ph, _parent, amount, coin_base)) = additions.get(new_coin_id.as_slice())
             else {
-                panic!("at height {height} the block created a reward coin {new_coin_id} that's not in the coin_record table");
+                println!("at height {height} the block created a reward coin {new_coin_id} that's not in the coin_record table");
+                error_count.fetch_add(1, Ordering::Relaxed);
+                continue;
             };
             // TODO: ensure the parent coin ID is set correctly
-            assert_eq!(ph, add.puzzle_hash.as_slice(),
-                "at height {height} the reward coin {new_coin_id} has an incorrect puzzle hash in the coin_record table {} expected {}",
-                hex::encode(ph),
-                add.puzzle_hash
-            );
+            if ph != add.puzzle_hash.as_slice() {
+                println!("at height {height} the reward coin {new_coin_id} has an incorrect puzzle hash in the coin_record table {} expected {}",
+                    hex::encode(ph),
+                    add.puzzle_hash
+                );
+                error_count.fetch_add(1, Ordering::Relaxed);
+            }
             // ensure the parent hash has the expected look
-            assert_eq!(*amount, add.amount, "at height {height} reward coin {new_coin_id} has amount {} in coin_record table, but the block has amount {}", amount, add.amount);
+            if *amount != add.amount {
+                println!("at height {height} reward coin {new_coin_id} has amount {} in coin_record table, but the block has amount {}", amount, add.amount);
+                error_count.fetch_add(1, Ordering::Relaxed);
+            }
             // this is a reward coin
-            assert!(coin_base, "at height {height} the reward coin {new_coin_id} is not marked as coin-base in the database");
+            if !coin_base {
+                println!("at height {height} the reward coin {new_coin_id} is not marked as coin-base in the database");
+                error_count.fetch_add(1, Ordering::Relaxed);
+            }
             additions.remove(new_coin_id.as_slice());
         }
         if block.transactions_generator.is_none() {
@@ -241,7 +259,7 @@ features that are validated:
                 for coin_id in removals {
                     println!("  id: {}", hex::encode(coin_id));
                 }
-                panic!();
+                error_count.fetch_add(1, Ordering::Relaxed);
             }
             // there should not be any non-reward coins created in this block
             if !additions.is_empty() {
@@ -255,10 +273,11 @@ features that are validated:
                         if reward { "(coinbase)" } else { "" }
                     );
                 }
-                panic!();
+                error_count.fetch_add(1, Ordering::Relaxed);
             }
             return;
         }
+        let cnt = error_count.clone();
         pool.execute(move || {
                 let mut a = Allocator::new_limited(500_000_000);
 
@@ -293,22 +312,41 @@ features that are validated:
                 )
                 .expect("failed to run block generator");
 
-                assert_eq!(conditions.cost, ti.cost);
+                if conditions.cost != ti.cost {
+                    println!("at height {height} block header has cost of {}, expected {}", ti.cost, conditions.cost);
+                    cnt.fetch_add(1, Ordering::Relaxed);
+                }
 
                 for spend in &conditions.spends {
                     let coin_name = *spend.coin_id;
-                    assert!(removals.remove(coin_name.as_slice()),
-                        "could not find coin {coin_name} in coin_record table, which is being spent at height {height}");
+                    if !removals.remove(coin_name.as_slice()) {
+                        println!("at height {height} could not find coin {coin_name} in coin_record table, which is being spent at height {height}");
+                        cnt.fetch_add(1, Ordering::Relaxed);
+                    }
                     for add in &spend.create_coin {
                         let new_coin_id = Coin::new(coin_name, add.puzzle_hash, add.amount).coin_id();
                         let Some((ph, parent, amount, coin_base)) = additions.get(new_coin_id.as_slice()) else {
-                            panic!("at height {height} the block created a coin {new_coin_id} that's not in the coin_record table");
+                            println!("at height {height} the block created a coin {new_coin_id} that's not in the coin_record table");
+                            cnt.fetch_add(1, Ordering::Relaxed);
+                            continue;
                         };
-                        assert_eq!(ph, add.puzzle_hash.as_slice(), "at height {height} the spent coin with id {new_coin_id} has a mismatching puzzle hash");
-                        assert_eq!(parent, coin_name.as_slice(), "at height {height} the spent coin with id {new_coin_id} has a mismatching parent");
-                        assert_eq!(*amount, add.amount, "at height {height} the spent coin with id {new_coin_id} has a mismatching amount");
+                        if ph != add.puzzle_hash.as_slice() {
+                            println!("at height {height} the spent coin with id {new_coin_id} has a mismatching puzzle hash {} expected {}", add.puzzle_hash, Bytes32::from(ph));
+                            cnt.fetch_add(1, Ordering::Relaxed);
+                        }
+                        if parent != coin_name.as_slice() {
+                            println!("at height {height} the spent coin with id {new_coin_id} has a mismatching parent {} expected {}", coin_name, Bytes32::from(parent));
+                            cnt.fetch_add(1, Ordering::Relaxed);
+                        }
+                        if *amount != add.amount {
+                            println!("at height {height} the spent coin with id {new_coin_id} has a mismatching amount {} expected {}", *amount, add.amount);
+                            cnt.fetch_add(1, Ordering::Relaxed);
+                        }
                         // this is not a reward coin
-                        assert!(!coin_base, "at height {height}, the created coin {new_coin_id} is incorrectly marked as coin-base in the database");
+                        if *coin_base {
+                            println!("at height {height}, the created coin {new_coin_id} is incorrectly marked as coin-base in the database");
+                            cnt.fetch_add(1, Ordering::Relaxed);
+                        }
                         additions.remove(new_coin_id.as_slice());
                     }
                 }
@@ -317,7 +355,7 @@ features that are validated:
                     for coin_id in removals {
                         println!("  id: {}", hex::encode(coin_id));
                     }
-                    panic!();
+                    cnt.fetch_add(1, Ordering::Relaxed);
                 }
 
                 if !additions.is_empty() {
@@ -330,7 +368,7 @@ features that are validated:
                             if reward { "(coinbase)" } else {""}
                         );
                     }
-                    panic!();
+                    cnt.fetch_add(1, Ordering::Relaxed);
                 }
             });
 
@@ -347,6 +385,20 @@ features that are validated:
     pool.join();
     assert_eq!(pool.panic_count(), 0);
 
-    assert_eq!(peak_hash, prev_hash.as_slice());
+    if peak_hash != prev_hash.as_slice() {
+        println!(
+            "peak hash (in database) does not match the chain {}, expected {}",
+            Bytes32::from(peak_hash),
+            prev_hash
+        );
+        error_count.fetch_add(1, Ordering::Relaxed);
+    }
+
+    assert_eq!(
+        error_count.load(Ordering::Relaxed),
+        0,
+        "exiting with failures"
+    );
+
     println!("\nALL DONE, success!");
 }
