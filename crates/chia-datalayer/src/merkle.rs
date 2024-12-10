@@ -398,6 +398,7 @@ fn get_free_indexes_and_keys_values_indexes(
 #[derive(Debug)]
 pub struct MerkleBlob {
     blob: Vec<u8>,
+    // TODO: would be nice for this to be deterministic ala a fifo set
     free_indexes: HashSet<TreeIndex>,
     key_to_index: HashMap<KvId, TreeIndex>,
 }
@@ -2287,6 +2288,8 @@ mod tests {
         assert!(!small_blob.free_indexes.contains(&index));
         small_blob.delete(key).unwrap();
         assert!(small_blob.free_indexes.contains(&index));
+        let free_indexes = small_blob.free_indexes.clone();
+        assert_eq!(free_indexes.len(), 2);
         let new_index = small_blob
             .insert(
                 KvId(count),
@@ -2296,7 +2299,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(small_blob.blob.len(), expected_length);
-        assert_eq!(new_index, index);
+        assert!(free_indexes.contains(&new_index));
         assert!(small_blob.free_indexes.is_empty());
     }
 }
