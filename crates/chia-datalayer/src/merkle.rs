@@ -872,7 +872,7 @@ impl MerkleBlob {
 
         if let Some(parent) = block.node.parent() {
             self.mark_lineage_as_dirty(parent)?;
-        }
+        };
 
         Ok(())
     }
@@ -2261,5 +2261,30 @@ mod tests {
         open_dot(&mut dot_actual);
 
         expected.assert_debug_eq(&actual);
+    }
+
+    #[rstest]
+    fn test_root_insert_location_when_not_empty(mut small_blob: MerkleBlob) {
+        small_blob
+            .insert(KvId(0), KvId(0), &sha256_num(0), InsertLocation::AsRoot {})
+            .expect_err("tree not empty so inserting to root should fail");
+    }
+
+    #[rstest]
+    fn test_free_index_reused(mut small_blob: MerkleBlob) {
+        let (key, index) = {
+            let (key, index) = small_blob.key_to_index.iter().next().unwrap();
+            (*key, *index)
+        };
+        let expected_length = small_blob.blob.len();
+        assert!(!small_blob.free_indexes.contains(&index));
+        small_blob.delete(key).unwrap();
+        assert!(small_blob.free_indexes.contains(&index));
+        let new_index = small_blob
+            .insert(KvId(0), KvId(0), &sha256_num(0), InsertLocation::Auto {})
+            .unwrap();
+        assert_eq!(small_blob.blob.len(), expected_length);
+        assert_eq!(new_index, index);
+        assert!(small_blob.free_indexes.is_empty());
     }
 }
