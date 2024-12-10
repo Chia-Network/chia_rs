@@ -91,6 +91,21 @@ pub enum Error {
     #[error("key not in key to index cache: {0:?}")]
     IntegrityKeyNotInCache(KvId),
 
+    #[error("key to index cache for {0:?} should be {1:?} got: {2:?}")]
+    IntegrityKeyToIndexCacheIndex(KvId, TreeIndex, TreeIndex),
+
+    #[error("parent and child relationship mismatched: {0:?}")]
+    IntegrityParentChildMismatch(TreeIndex),
+
+    #[error("found {0:?} leaves but key to index cache length is: {1}")]
+    IntegrityKeyToIndexCacheLength(usize, usize),
+
+    #[error("unmatched parent -> child references found: {0}")]
+    IntegrityUnmatchedChildParentRelationships(usize),
+
+    #[error("expected total node count {0:?} found: {1:?}")]
+    IntegrityTotalNodeCount(TreeIndex, usize),
+
     #[error("zero-length seed bytes not allowed")]
     ZeroLengthSeedNotAllowed,
 
@@ -397,11 +412,18 @@ impl MerkleBlob {
 
         let (free_indexes, key_to_index) = get_free_indexes_and_keys_values_indexes(&blob)?;
 
-        Ok(Self {
+        let self_ = Self {
             blob,
             free_indexes,
             key_to_index,
-        })
+        };
+
+        // NOTE: not checked at runtime
+        // TODO: should it be checked at runtime?
+        #[cfg(fuzzing)]
+        self_.check_integrity()?;
+
+        Ok(self_)
     }
 
     fn clear(&mut self) {
@@ -863,7 +885,9 @@ impl MerkleBlob {
         for item in MerkleBlobParentFirstIterator::new(&self.blob) {
             let (index, block) = item?;
             if let Some(parent) = block.node.parent() {
-                assert_eq!(child_to_parent.remove(&index), Some(parent));
+                if child_to_parent.remove(&index) != Some(parent) {
+                    return Err(Error::IntegrityParentChildMismatch(index));
+                }
             }
             match block.node {
                 Node::Internal(node) => {
@@ -877,11 +901,13 @@ impl MerkleBlob {
                         .key_to_index
                         .get(&node.key)
                         .ok_or(Error::IntegrityKeyNotInCache(node.key))?;
-                    let key = node.key;
-                    assert_eq!(
-                        *cached_index, index,
-                        "key to index cache for {key:?} should be {index:?} got: {cached_index:?}"
-                    );
+                    if *cached_index != index {
+                        return Err(Error::IntegrityKeyToIndexCacheIndex(
+                            node.key,
+                            index,
+                            *cached_index,
+                        ));
+                    };
                     assert!(
                         !self.free_indexes.contains(&index),
                         "{}",
@@ -892,14 +918,22 @@ impl MerkleBlob {
         }
 
         let key_to_index_cache_length = self.key_to_index.len();
-        assert_eq!(leaf_count, key_to_index_cache_length, "found {leaf_count:?} leaves but key to index cache length is: {key_to_index_cache_length:?}");
+        if leaf_count != key_to_index_cache_length {
+            return Err(Error::IntegrityKeyToIndexCacheLength(
+                leaf_count,
+                key_to_index_cache_length,
+            ));
+        }
         let total_count = leaf_count + internal_count + self.free_indexes.len();
         let extend_index = self.extend_index();
-        assert_eq!(
-            total_count, extend_index.0 as usize,
-            "expected total node count {extend_index:?} found: {total_count:?}",
-        );
-        assert_eq!(child_to_parent.len(), 0);
+        if total_count != extend_index.0 as usize {
+            return Err(Error::IntegrityTotalNodeCount(extend_index, total_count));
+        };
+        if !child_to_parent.is_empty() {
+            return Err(Error::IntegrityUnmatchedChildParentRelationships(
+                child_to_parent.len(),
+            ));
+        }
 
         Ok(())
     }
@@ -1504,7 +1538,7 @@ impl Iterator for MerkleBlobBreadthFirstIterator<'_> {
     }
 }
 
-#[cfg(any(test, debug_assertions))]
+#[cfg(all(not(fuzzing), any(test, debug_assertions)))]
 impl Drop for MerkleBlob {
     fn drop(&mut self) {
         self.check_integrity()
