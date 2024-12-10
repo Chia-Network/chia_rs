@@ -42,7 +42,9 @@ def test_checking_coverage() -> None:
         if i % 2 == 0:
             merkle_blob.insert(int64(i), int64(i), bytes32.zeros)
         else:
-            merkle_blob.insert(int64(i), int64(i), bytes32.zeros, int64(i - 1), uint8(0))
+            merkle_blob.insert(
+                int64(i), int64(i), bytes32.zeros, int64(i - 1), uint8(0)
+            )
 
     keys = {
         node.key
