@@ -405,7 +405,7 @@ ff01\
         #[case] sk_hex: &str,
     ) {
         let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
-        let sol_bytes: Vec<u8> = hex::decode(solution).unwrap().to_vec();
+        let sol_bytes = hex::decode(solution).unwrap();
         let full_puz = Bytes32::new(tree_hash_atom(&[1_u8]).to_bytes());
         let test_coin = Coin::new(
             hex!("4444444444444444444444444444444444444444444444444444444444444444").into(),
