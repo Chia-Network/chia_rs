@@ -174,7 +174,7 @@ impl<N, E: ClvmEncoder<Node = N>> ToClvm<E> for chia_bls::Signature {
 }
 
 #[cfg(feature = "chia-secp")]
-impl<E> ToClvm<E> for chia_secp::Secp256k1PublicKey
+impl<E> ToClvm<E> for chia_secp::K1PublicKey
 where
     E: ClvmEncoder,
 {
@@ -184,7 +184,7 @@ where
 }
 
 #[cfg(feature = "chia-secp")]
-impl<E> ToClvm<E> for chia_secp::Secp256k1Signature
+impl<E> ToClvm<E> for chia_secp::K1Signature
 where
     E: ClvmEncoder,
 {
@@ -194,7 +194,7 @@ where
 }
 
 #[cfg(feature = "chia-secp")]
-impl<E> ToClvm<E> for chia_secp::Secp256r1PublicKey
+impl<E> ToClvm<E> for chia_secp::R1PublicKey
 where
     E: ClvmEncoder,
 {
@@ -204,7 +204,7 @@ where
 }
 
 #[cfg(feature = "chia-secp")]
-impl<E> ToClvm<E> for chia_secp::Secp256r1Signature
+impl<E> ToClvm<E> for chia_secp::R1Signature
 where
     E: ClvmEncoder,
 {
@@ -389,12 +389,12 @@ mod tests {
     #[cfg(feature = "chia-secp")]
     #[test]
     fn test_secp_public_key() {
-        use chia_secp::{Secp256k1PublicKey, Secp256r1PublicKey};
+        use chia_secp::{K1PublicKey, R1PublicKey};
         use hex_literal::hex;
 
         let a = &mut Allocator::new();
 
-        let k1_pk = Secp256k1PublicKey::from_bytes(hex!(
+        let k1_pk = K1PublicKey::from_bytes(hex!(
             "02827cdbbed87e45683d448be2ea15fb72ba3732247bda18474868cf5456123fb4"
         ))
         .unwrap();
@@ -403,7 +403,7 @@ mod tests {
             Ok("a102827cdbbed87e45683d448be2ea15fb72ba3732247bda18474868cf5456123fb4".to_string())
         );
 
-        let r1_pk = Secp256r1PublicKey::from_bytes(hex!(
+        let r1_pk = R1PublicKey::from_bytes(hex!(
             "037dc85102f5eb7867b9580fea8b242c774173e1a47db320c798242d3a7a7579e4"
         ))
         .unwrap();
@@ -416,12 +416,12 @@ mod tests {
     #[cfg(feature = "chia-secp")]
     #[test]
     fn test_secp_signature() {
-        use chia_secp::{Secp256k1Signature, Secp256r1Signature};
+        use chia_secp::{K1Signature, R1Signature};
         use hex_literal::hex;
 
         let a = &mut Allocator::new();
 
-        let k1_sig = Secp256k1Signature::from_bytes(hex!(
+        let k1_sig = K1Signature::from_bytes(hex!(
             "6f07897d1d28b8698af5dec5ca06907b1304b227dc9f740b8c4065cf04d5e8653ae66aa17063e7120ee7f22fae54373b35230e259244b90400b65cf00d86c591"
         ))
         .unwrap();
@@ -430,7 +430,7 @@ mod tests {
             Ok("c0406f07897d1d28b8698af5dec5ca06907b1304b227dc9f740b8c4065cf04d5e8653ae66aa17063e7120ee7f22fae54373b35230e259244b90400b65cf00d86c591".to_string())
         );
 
-        let r1_sig = Secp256r1Signature::from_bytes(hex!(
+        let r1_sig = R1Signature::from_bytes(hex!(
             "550e83da8cf9b2d407ed093ae213869ebd7ceaea603920f87d535690e52b40537915d8fe3d5a96c87e700c56dc638c32f7a2954f2ba409367d1a132000cc2228"
         ))
         .unwrap();

@@ -15,7 +15,7 @@ mod tests {
     fn test_secp256k1_key() -> anyhow::Result<()> {
         let mut rng = ChaCha8Rng::seed_from_u64(1337);
 
-        let sk = Secp256k1SecretKey::from_bytes(rng.gen())?;
+        let sk = K1SecretKey::from_bytes(rng.gen())?;
         assert_eq!(
             hex::encode(sk.to_bytes()),
             "ae491886341a539a1ccfaffcc9c78650ad1adc6270620c882b8d29bf6b9bc4cd"
@@ -43,7 +43,7 @@ mod tests {
     fn test_secp256r1_key() -> anyhow::Result<()> {
         let mut rng = ChaCha8Rng::seed_from_u64(1337);
 
-        let sk = Secp256r1SecretKey::from_bytes(rng.gen())?;
+        let sk = R1SecretKey::from_bytes(rng.gen())?;
         assert_eq!(
             hex::encode(sk.to_bytes()),
             "ae491886341a539a1ccfaffcc9c78650ad1adc6270620c882b8d29bf6b9bc4cd"

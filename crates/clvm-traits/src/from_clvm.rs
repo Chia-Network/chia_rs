@@ -221,7 +221,7 @@ impl<N, D: ClvmDecoder<Node = N>> FromClvm<D> for chia_bls::Signature {
 }
 
 #[cfg(feature = "chia-secp")]
-impl<D> FromClvm<D> for chia_secp::Secp256k1PublicKey
+impl<D> FromClvm<D> for chia_secp::K1PublicKey
 where
     D: ClvmDecoder,
 {
@@ -239,7 +239,7 @@ where
 }
 
 #[cfg(feature = "chia-secp")]
-impl<D> FromClvm<D> for chia_secp::Secp256k1Signature
+impl<D> FromClvm<D> for chia_secp::K1Signature
 where
     D: ClvmDecoder,
 {
@@ -257,7 +257,7 @@ where
 }
 
 #[cfg(feature = "chia-secp")]
-impl<D> FromClvm<D> for chia_secp::Secp256r1PublicKey
+impl<D> FromClvm<D> for chia_secp::R1PublicKey
 where
     D: ClvmDecoder,
 {
@@ -275,7 +275,7 @@ where
 }
 
 #[cfg(feature = "chia-secp")]
-impl<D> FromClvm<D> for chia_secp::Secp256r1Signature
+impl<D> FromClvm<D> for chia_secp::R1Signature
 where
     D: ClvmDecoder,
 {
@@ -449,7 +449,7 @@ mod tests {
     #[cfg(feature = "chia-secp")]
     #[test]
     fn test_secp_public_key() {
-        use chia_secp::Secp256k1PublicKey;
+        use chia_secp::{K1PublicKey, R1PublicKey};
         use hex_literal::hex;
 
         let a = &mut Allocator::new();
@@ -461,10 +461,27 @@ mod tests {
                 a,
                 "a102827cdbbed87e45683d448be2ea15fb72ba3732247bda18474868cf5456123fb4"
             ),
-            Ok(Secp256k1PublicKey::from_bytes(bytes).unwrap())
+            Ok(K1PublicKey::from_bytes(bytes).unwrap())
         );
         assert_eq!(
-            decode::<Secp256k1PublicKey>(a, "8568656c6c6f"),
+            decode::<K1PublicKey>(a, "8568656c6c6f"),
+            Err(FromClvmError::WrongAtomLength {
+                expected: 33,
+                found: 5
+            })
+        );
+
+        let bytes = hex!("037dc85102f5eb7867b9580fea8b242c774173e1a47db320c798242d3a7a7579e4");
+
+        assert_eq!(
+            decode(
+                a,
+                "a1037dc85102f5eb7867b9580fea8b242c774173e1a47db320c798242d3a7a7579e4"
+            ),
+            Ok(R1PublicKey::from_bytes(bytes).unwrap())
+        );
+        assert_eq!(
+            decode::<R1PublicKey>(a, "8568656c6c6f"),
             Err(FromClvmError::WrongAtomLength {
                 expected: 33,
                 found: 5
@@ -475,7 +492,7 @@ mod tests {
     #[cfg(feature = "chia-secp")]
     #[test]
     fn test_secp_signature() {
-        use chia_secp::Secp256k1Signature;
+        use chia_secp::K1Signature;
         use hex_literal::hex;
 
         let a = &mut Allocator::new();
@@ -489,10 +506,29 @@ mod tests {
 
         assert_eq!(
             decode(a, "c0406f07897d1d28b8698af5dec5ca06907b1304b227dc9f740b8c4065cf04d5e8653ae66aa17063e7120ee7f22fae54373b35230e259244b90400b65cf00d86c591"),
-            Ok(Secp256k1Signature::from_bytes(bytes).unwrap())
+            Ok(K1Signature::from_bytes(bytes).unwrap())
         );
         assert_eq!(
-            decode::<Secp256k1Signature>(a, "8568656c6c6f"),
+            decode::<K1Signature>(a, "8568656c6c6f"),
+            Err(FromClvmError::WrongAtomLength {
+                expected: 64,
+                found: 5
+            })
+        );
+
+        let bytes = hex!(
+            "
+            550e83da8cf9b2d407ed093ae213869ebd7ceaea603920f87d535690e52b4053
+            7915d8fe3d5a96c87e700c56dc638c32f7a2954f2ba409367d1a132000cc2228
+            "
+        );
+
+        assert_eq!(
+            decode(a, "c040550e83da8cf9b2d407ed093ae213869ebd7ceaea603920f87d535690e52b40537915d8fe3d5a96c87e700c56dc638c32f7a2954f2ba409367d1a132000cc2228"),
+            Ok(K1Signature::from_bytes(bytes).unwrap())
+        );
+        assert_eq!(
+            decode::<K1Signature>(a, "8568656c6c6f"),
             Err(FromClvmError::WrongAtomLength {
                 expected: 64,
                 found: 5
