@@ -30,7 +30,7 @@ jobs:
         run: cargo fmt --all -- --files-with-diff --check
 
       - name: Clippy
-        run: cargo clippy --workspace --all-features --all-targets
+        run: cargo clippy --workspace --all-features --all-targets -- -D warnings
 
       - name: Install cargo-machete
         run: cargo install cargo-machete
