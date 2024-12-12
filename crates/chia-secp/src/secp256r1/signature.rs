@@ -29,7 +29,7 @@ impl fmt::Display for R1Signature {
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for R1Signature {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Self::from_bytes(u.arbitrary()?).map_err(|_| arbitrary::Error::IncorrectFormat)
+        Self::from_bytes(&u.arbitrary()?).map_err(|_| arbitrary::Error::IncorrectFormat)
     }
 }
 
@@ -40,7 +40,7 @@ impl R1Signature {
         self.0.to_bytes().into()
     }
 
-    pub fn from_bytes(bytes: [u8; Self::SIZE]) -> Result<Self, Error> {
-        Ok(Self(Signature::from_slice(&bytes)?))
+    pub fn from_bytes(bytes: &[u8; Self::SIZE]) -> Result<Self, Error> {
+        Ok(Self(Signature::from_slice(bytes)?))
     }
 }

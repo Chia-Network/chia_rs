@@ -31,7 +31,7 @@ impl fmt::Display for R1PublicKey {
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for R1PublicKey {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Self::from_bytes(u.arbitrary()?).map_err(|_| arbitrary::Error::IncorrectFormat)
+        Self::from_bytes(&u.arbitrary()?).map_err(|_| arbitrary::Error::IncorrectFormat)
     }
 }
 
@@ -42,12 +42,12 @@ impl R1PublicKey {
         self.0.to_encoded_point(true).as_ref().try_into().unwrap()
     }
 
-    pub fn from_bytes(bytes: [u8; Self::SIZE]) -> Result<Self, Error> {
-        Ok(Self(VerifyingKey::from_sec1_bytes(&bytes)?))
+    pub fn from_bytes(bytes: &[u8; Self::SIZE]) -> Result<Self, Error> {
+        Ok(Self(VerifyingKey::from_sec1_bytes(bytes)?))
     }
 
-    pub fn verify_prehashed(&self, message_hash: [u8; 32], signature: R1Signature) -> bool {
-        self.0.verify_prehash(&message_hash, &signature.0).is_ok()
+    pub fn verify_prehashed(&self, message_hash: &[u8; 32], signature: &R1Signature) -> bool {
+        self.0.verify_prehash(message_hash, &signature.0).is_ok()
     }
 
     pub fn fingerprint(&self) -> u32 {
