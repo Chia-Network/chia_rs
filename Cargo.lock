@@ -278,6 +278,7 @@ dependencies = [
  "chia-consensus",
  "chia-protocol",
  "chia-puzzles",
+ "chia-secp",
  "chia-sha2",
  "chia-ssl",
  "chia-traits 0.15.0",
@@ -442,6 +443,20 @@ dependencies = [
  "clvm-traits",
  "clvmr",
  "libfuzzer-sys",
+]
+
+[[package]]
+name = "chia-secp"
+version = "0.16.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "chia-sha2",
+ "hex",
+ "k256",
+ "p256",
+ "rand",
+ "rand_chacha",
 ]
 
 [[package]]
@@ -641,6 +656,7 @@ name = "clvm-traits"
 version = "0.16.0"
 dependencies = [
  "chia-bls 0.16.0",
+ "chia-secp",
  "clvm-derive",
  "clvmr",
  "hex",

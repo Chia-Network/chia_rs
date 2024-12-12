@@ -173,6 +173,46 @@ impl<N, E: ClvmEncoder<Node = N>> ToClvm<E> for chia_bls::Signature {
     }
 }
 
+#[cfg(feature = "chia-secp")]
+impl<E> ToClvm<E> for chia_secp::Secp256k1PublicKey
+where
+    E: ClvmEncoder,
+{
+    fn to_clvm(&self, encoder: &mut E) -> Result<E::Node, ToClvmError> {
+        encoder.encode_atom(Atom::Borrowed(&self.to_bytes()))
+    }
+}
+
+#[cfg(feature = "chia-secp")]
+impl<E> ToClvm<E> for chia_secp::Secp256k1Signature
+where
+    E: ClvmEncoder,
+{
+    fn to_clvm(&self, encoder: &mut E) -> Result<E::Node, ToClvmError> {
+        encoder.encode_atom(Atom::Borrowed(&self.to_bytes()))
+    }
+}
+
+#[cfg(feature = "chia-secp")]
+impl<E> ToClvm<E> for chia_secp::Secp256r1PublicKey
+where
+    E: ClvmEncoder,
+{
+    fn to_clvm(&self, encoder: &mut E) -> Result<E::Node, ToClvmError> {
+        encoder.encode_atom(Atom::Borrowed(&self.to_bytes()))
+    }
+}
+
+#[cfg(feature = "chia-secp")]
+impl<E> ToClvm<E> for chia_secp::Secp256r1Signature
+where
+    E: ClvmEncoder,
+{
+    fn to_clvm(&self, encoder: &mut E) -> Result<E::Node, ToClvmError> {
+        encoder.encode_atom(Atom::Borrowed(&self.to_bytes()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use clvmr::{serde::node_to_bytes, Allocator};
@@ -343,6 +383,60 @@ mod tests {
         assert_eq!(
             encode(a, Signature::from_bytes(&bytes).unwrap()),
             Ok("c060a3994dc9c0ef41a903d3335f0afe42ba16c88e7881706798492da4a1653cd10c69c841eeb56f44ae005e2bad27fb7ebb16ce8bbfbd708ea91dd4ff24f030497b50e694a8270eccd07dbc206b8ffe0c34a9ea81291785299fae8206a1e1bbc1d1".to_string())
+        );
+    }
+
+    #[cfg(feature = "chia-secp")]
+    #[test]
+    fn test_secp_public_key() {
+        use chia_secp::{Secp256k1PublicKey, Secp256r1PublicKey};
+        use hex_literal::hex;
+
+        let a = &mut Allocator::new();
+
+        let k1_pk = Secp256k1PublicKey::from_bytes(hex!(
+            "02827cdbbed87e45683d448be2ea15fb72ba3732247bda18474868cf5456123fb4"
+        ))
+        .unwrap();
+        assert_eq!(
+            encode(a, k1_pk),
+            Ok("a102827cdbbed87e45683d448be2ea15fb72ba3732247bda18474868cf5456123fb4".to_string())
+        );
+
+        let r1_pk = Secp256r1PublicKey::from_bytes(hex!(
+            "037dc85102f5eb7867b9580fea8b242c774173e1a47db320c798242d3a7a7579e4"
+        ))
+        .unwrap();
+        assert_eq!(
+            encode(a, r1_pk),
+            Ok("a1037dc85102f5eb7867b9580fea8b242c774173e1a47db320c798242d3a7a7579e4".to_string())
+        );
+    }
+
+    #[cfg(feature = "chia-secp")]
+    #[test]
+    fn test_secp_signature() {
+        use chia_secp::{Secp256k1Signature, Secp256r1Signature};
+        use hex_literal::hex;
+
+        let a = &mut Allocator::new();
+
+        let k1_sig = Secp256k1Signature::from_bytes(hex!(
+            "6f07897d1d28b8698af5dec5ca06907b1304b227dc9f740b8c4065cf04d5e8653ae66aa17063e7120ee7f22fae54373b35230e259244b90400b65cf00d86c591"
+        ))
+        .unwrap();
+        assert_eq!(
+            encode(a, k1_sig),
+            Ok("c0406f07897d1d28b8698af5dec5ca06907b1304b227dc9f740b8c4065cf04d5e8653ae66aa17063e7120ee7f22fae54373b35230e259244b90400b65cf00d86c591".to_string())
+        );
+
+        let r1_sig = Secp256r1Signature::from_bytes(hex!(
+            "550e83da8cf9b2d407ed093ae213869ebd7ceaea603920f87d535690e52b40537915d8fe3d5a96c87e700c56dc638c32f7a2954f2ba409367d1a132000cc2228"
+        ))
+        .unwrap();
+        assert_eq!(
+            encode(a, r1_sig),
+            Ok("c040550e83da8cf9b2d407ed093ae213869ebd7ceaea603920f87d535690e52b40537915d8fe3d5a96c87e700c56dc638c32f7a2954f2ba409367d1a132000cc2228".to_string())
         );
     }
 }

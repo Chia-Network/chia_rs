@@ -1,0 +1,27 @@
+[package]
+name = "chia-secp"
+version = "0.16.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Secp256k1 and secp256r1 types for Chia"
+authors = ["Brandon Haggstrom <b.haggstrom@chia.net>"]
+homepage = "https://github.com/Chia-Network/chia_rs"
+repository = "https://github.com/Chia-Network/chia_rs"
+
+[lints]
+workspace = true
+
+[features]
+arbitrary = ["dep:arbitrary"]
+
+[dependencies]
+arbitrary = { workspace = true, optional = true }
+k256 = { workspace = true }
+p256 = { workspace = true }
+hex = { workspace = true }
+chia-sha2= { workspace = true }
+
+[dev-dependencies]
+rand = { workspace = true }
+rand_chacha = { workspace = true }
+anyhow = { workspace = true }
