@@ -325,7 +325,7 @@ dependencies = [
 
 [[package]]
 name = "chia-bls-fuzz"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "chia-bls 0.17.0",
  "libfuzzer-sys",
@@ -372,7 +372,7 @@ dependencies = [
 
 [[package]]
 name = "chia-fuzz"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "chia-bls 0.17.0",
  "chia-consensus",
@@ -406,7 +406,7 @@ dependencies = [
 
 [[package]]
 name = "chia-protocol-fuzz"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "arbitrary",
  "chia-protocol",
@@ -437,7 +437,7 @@ dependencies = [
 
 [[package]]
 name = "chia-puzzles-fuzz"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "chia-puzzles",
  "clvm-traits",
@@ -668,7 +668,7 @@ dependencies = [
 
 [[package]]
 name = "clvm-traits-fuzz"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "clvm-traits",
  "clvmr",
@@ -688,7 +688,7 @@ dependencies = [
 
 [[package]]
 name = "clvm-utils-fuzz"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "chia-fuzz",
  "clvm-traits",
