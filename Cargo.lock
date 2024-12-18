@@ -361,6 +361,7 @@ dependencies = [
 name = "chia-consensus"
 version = "0.18.0"
 dependencies = [
+ "blocking-threadpool",
  "chia-bls 0.18.0",
  "chia-protocol",
  "chia-puzzle-types",
