@@ -52,6 +52,7 @@ implicit_hasher = "allow"
 
 [dependencies]
 chia-bls = { workspace = true, optional = true }
+chia-secp = { workspace = true, optional = true }
 chia-client = { workspace = true, optional = true }
 chia-consensus = { workspace = true, optional = true }
 chia-datalayer = { workspace = true, optional = true }
@@ -72,6 +73,7 @@ ignored = ["clvmr"]
 [features]
 default = [
     "bls",
+    "secp",
     "client",
     "consensus",
     "datalayer",
@@ -84,7 +86,8 @@ default = [
     "clvm-utils"
 ]
 
-bls = ["dep:chia-bls"]
+bls = ["dep:chia-bls", "clvm-traits/chia-bls"]
+secp = ["dep:chia-secp", "clvm-traits/chia-secp"]
 client = ["dep:chia-client"]
 consensus = ["dep:chia-consensus"]
 datalayer = ["dep:chia-datalayer"]
@@ -109,6 +112,7 @@ chia-client = { path = "./crates/chia-client", version = "0.16.0" }
 chia-consensus = { path = "./crates/chia-consensus", version = "0.16.0" }
 chia-datalayer = { path = "./crates/chia-datalayer", version = "0.16.0" }
 chia-protocol = { path = "./crates/chia-protocol", version = "0.16.0" }
+chia-secp = { path = "./crates/chia-secp", version = "0.16.0" }
 chia-ssl = { path = "./crates/chia-ssl", version = "0.11.0" }
 chia-traits = { path = "./crates/chia-traits", version = "0.15.0" }
 chia-puzzles = { path = "./crates/chia-puzzles", version = "0.16.0" }
@@ -159,6 +163,9 @@ blocking-threadpool = "1.0.1"
 libfuzzer-sys = "0.4"
 wasm-bindgen = "0.2.95"
 openssl = "0.10.68"
+k256 = "0.13.4"
+p256 = "0.13.2"
+rand_chacha = "0.3.1"
 open = "5.3.0"
 url = "2.5.2"
 percent-encoding = "2.3.1"
