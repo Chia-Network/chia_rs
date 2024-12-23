@@ -1,15 +1,100 @@
 use crate::error::{Error, Result};
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
-use chia_puzzles::singleton::{
-    SingletonArgs, SingletonSolution, SingletonStruct, SINGLETON_TOP_LAYER_PUZZLE_HASH,
-};
-use chia_puzzles::Proof;
+use chia_puzzles::SINGLETON_LAUNCHER_HASH;
+use chia_puzzles::SINGLETON_TOP_LAYER_V1_1_HASH;
 use clvm_traits::{FromClvm, ToClvm};
 use clvm_utils::CurriedProgram;
+use clvm_utils::ToTreeHash;
 use clvm_utils::TreeHash;
 use clvm_utils::{tree_hash, tree_hash_atom, tree_hash_pair};
 use clvmr::allocator::{Allocator, NodePtr};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
+#[clvm(curry)]
+pub struct SingletonArgs<I> {
+    pub singleton_struct: SingletonStruct,
+    pub inner_puzzle: I,
+}
+
+impl<I> SingletonArgs<I> {
+    pub fn new(launcher_id: Bytes32, inner_puzzle: I) -> Self {
+        Self {
+            singleton_struct: SingletonStruct::new(launcher_id),
+            inner_puzzle,
+        }
+    }
+}
+
+impl SingletonArgs<TreeHash> {
+    pub fn curry_tree_hash(launcher_id: Bytes32, inner_puzzle: TreeHash) -> TreeHash {
+        CurriedProgram {
+            program: TreeHash::new(SINGLETON_TOP_LAYER_V1_1_HASH),
+            args: SingletonArgs {
+                singleton_struct: SingletonStruct::new(launcher_id),
+                inner_puzzle,
+            },
+        }
+        .tree_hash()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
+#[clvm(list)]
+pub struct SingletonStruct {
+    pub mod_hash: Bytes32,
+    pub launcher_id: Bytes32,
+    #[clvm(rest)]
+    pub launcher_puzzle_hash: Bytes32,
+}
+
+impl SingletonStruct {
+    pub fn new(launcher_id: Bytes32) -> Self {
+        Self {
+            mod_hash: SINGLETON_TOP_LAYER_V1_1_HASH.into(),
+            launcher_id,
+            launcher_puzzle_hash: SINGLETON_LAUNCHER_HASH.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
+#[clvm(solution)]
+pub struct SingletonSolution<I> {
+    pub lineage_proof: Proof,
+    pub amount: u64,
+    pub inner_solution: I,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
+#[clvm(solution)]
+pub struct LauncherSolution<T> {
+    pub singleton_puzzle_hash: Bytes32,
+    pub amount: u64,
+    pub key_value_list: T,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
+#[clvm(transparent)]
+pub enum Proof {
+    Lineage(LineageProof),
+    Eve(EveProof),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
+#[clvm(list)]
+pub struct LineageProof {
+    pub parent_parent_coin_info: Bytes32,
+    pub parent_inner_puzzle_hash: Bytes32,
+    pub parent_amount: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
+#[clvm(list)]
+pub struct EveProof {
+    pub parent_parent_coin_info: Bytes32,
+    pub parent_amount: u64,
+}
 
 // TODO: replace this with a generic function to compute the hash of curried
 // puzzles
@@ -86,16 +171,14 @@ pub fn fast_forward_singleton(
 
     // this is the tree hash of the singleton top layer puzzle
     // the tree hash of singleton_top_layer_v1_1.clsp
-    if singleton.args.singleton_struct.mod_hash.as_ref()
-        != SINGLETON_TOP_LAYER_PUZZLE_HASH.to_bytes()
-    {
+    if singleton.args.singleton_struct.mod_hash.as_ref() != SINGLETON_TOP_LAYER_V1_1_HASH {
         return Err(Error::NotSingletonModHash);
     }
 
     // also make sure the actual mod-hash of this puzzle matches the
     // singleton_top_layer_v1_1.clsp
     let mod_hash = tree_hash(a, singleton.program);
-    if mod_hash != SINGLETON_TOP_LAYER_PUZZLE_HASH {
+    if mod_hash != SINGLETON_TOP_LAYER_V1_1_HASH.into() {
         return Err(Error::NotSingletonModHash);
     }
 

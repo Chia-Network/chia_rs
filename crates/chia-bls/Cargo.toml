@@ -26,6 +26,8 @@ hex = { workspace = true }
 thiserror = { workspace = true }
 pyo3 = { workspace = true, features = ["multiple-pymethods"], optional = true }
 arbitrary = { workspace = true, optional = true }
+hex-literal = { workspace = true }
+num-bigint = { workspace = true }
 linked-hash-map = "0.5.6"
 
 [dev-dependencies]

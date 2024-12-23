@@ -2,6 +2,7 @@
 
 mod bls_cache;
 mod derive_keys;
+mod derive_synthetic;
 mod error;
 mod gtelement;
 mod public_key;
@@ -13,6 +14,7 @@ mod parse_hex;
 
 pub use bls_cache::BlsCache;
 pub use derive_keys::*;
+pub use derive_synthetic::*;
 pub use error::{Error, Result};
 pub use gtelement::GTElement;
 pub use public_key::{hash_to_g1, hash_to_g1_with_dst, PublicKey};

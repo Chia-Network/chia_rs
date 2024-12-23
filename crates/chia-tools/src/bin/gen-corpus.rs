@@ -10,7 +10,7 @@ use chia_traits::streamable::Streamable;
 
 use chia_bls::G2Element;
 use chia_protocol::{Bytes32, Coin, CoinSpend, Program, SpendBundle};
-use chia_puzzles::singleton::SINGLETON_TOP_LAYER_PUZZLE_HASH;
+use chia_puzzles::SINGLETON_TOP_LAYER_V1_1_HASH;
 use clvm_traits::FromClvm;
 use clvm_utils::{tree_hash, CurriedProgram};
 use clvmr::allocator::NodePtr;
@@ -126,7 +126,7 @@ fn main() {
 
                             let seen_puzzle = seen_puzzles.lock().unwrap().insert(mod_hash);
                             let run_puzzle = args.puzzles && seen_puzzle;
-                            let fast_forward = (mod_hash == SINGLETON_TOP_LAYER_PUZZLE_HASH.into())
+                            let fast_forward = (mod_hash == SINGLETON_TOP_LAYER_V1_1_HASH.into())
                                 && seen_singletons.lock().unwrap().insert(puzzle_hash);
 
                             if !run_puzzle

@@ -314,8 +314,10 @@ dependencies = [
  "chia_py_streamable_macro",
  "criterion",
  "hex",
+ "hex-literal",
  "hkdf",
  "linked-hash-map",
+ "num-bigint",
  "pyo3",
  "rand",
  "rstest",
@@ -420,29 +422,12 @@ dependencies = [
 
 [[package]]
 name = "chia-puzzles"
-version = "0.17.0"
+version = "0.19.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b35f3772cc16bb33521f0f9dcc2e9b27e86cd5bc306fce25355f571f4388b3d"
 dependencies = [
- "anyhow",
- "arbitrary",
- "chia-bls 0.17.0",
- "chia-protocol",
- "chia-sha2",
- "clvm-traits",
- "clvm-utils",
- "clvmr",
  "hex",
  "hex-literal",
- "num-bigint",
-]
-
-[[package]]
-name = "chia-puzzles-fuzz"
-version = "0.16.0"
-dependencies = [
- "chia-puzzles",
- "clvm-traits",
- "clvmr",
- "libfuzzer-sys",
 ]
 
 [[package]]
