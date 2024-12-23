@@ -111,7 +111,6 @@ chia-protocol = { path = "./crates/chia-protocol", version = "0.17.0" }
 chia-secp = { path = "./crates/chia-secp", version = "0.17.0" }
 chia-ssl = { path = "./crates/chia-ssl", version = "0.17.0" }
 chia-traits = { path = "./crates/chia-traits", version = "0.17.0" }
-chia-puzzles = { path = "./crates/chia-puzzles", version = "0.17.0" }
 chia-sha2 = { path = "./crates/chia-sha2", version = "0.17.0" }
 clvm-traits = { path = "./crates/clvm-traits", version = "0.17.0" }
 clvm-utils = { path = "./crates/clvm-utils", version = "0.17.0" }
@@ -122,6 +121,7 @@ chia-protocol-fuzz = { path = "./crates/chia-protocol/fuzz", version = "0.16.0" 
 chia-puzzles-fuzz = { path = "./crates/chia-puzzles/fuzz", version = "0.16.0" }
 clvm-traits-fuzz = { path = "./crates/clvm-traits/fuzz", version = "0.16.0" }
 clvm-utils-fuzz = { path = "./crates/clvm-utils/fuzz", version = "0.16.0" }
+chia-puzzles = "0.19.1"
 blst = { version = "0.3.12", features = ["portable"] }
 clvmr = "0.10.0"
 syn = "2.0.90"

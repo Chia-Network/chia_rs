@@ -1,9 +1,18 @@
-use chia_bls::{PublicKey, SecretKey};
 use chia_sha2::Sha256;
 use hex_literal::hex;
 use num_bigint::BigInt;
 
-use crate::standard::DEFAULT_HIDDEN_PUZZLE_HASH;
+use crate::{PublicKey, SecretKey};
+
+/// This is the puzzle reveal of the [default hidden puzzle](https://chialisp.com/standard-transactions#default-hidden-puzzle).
+pub const DEFAULT_HIDDEN_PUZZLE: [u8; 3] = hex!("ff0980");
+
+/// This is the puzzle hash of the [default hidden puzzle](https://chialisp.com/standard-transactions#default-hidden-puzzle).
+pub const DEFAULT_HIDDEN_PUZZLE_HASH: [u8; 32] = hex!(
+    "
+    711d6c4e32c92e53179b199484cf8c897542bc57f2b22582799f9d657eec4699
+    "
+);
 
 const GROUP_ORDER_BYTES: [u8; 32] =
     hex!("73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001");
@@ -20,7 +29,7 @@ pub trait DeriveSynthetic {
     where
         Self: Sized,
     {
-        self.derive_synthetic_hidden(&DEFAULT_HIDDEN_PUZZLE_HASH.to_bytes())
+        self.derive_synthetic_hidden(&DEFAULT_HIDDEN_PUZZLE_HASH)
     }
 }
 
@@ -60,9 +69,9 @@ fn synthetic_offset(public_key: &PublicKey, hidden_puzzle_hash: &[u8; 32]) -> Se
 mod tests {
     use super::*;
 
-    use chia_bls::{master_to_wallet_unhardened_intermediate, DerivableKey};
     use hex::ToHex;
-    use hex_literal::hex;
+
+    use crate::{master_to_wallet_unhardened_intermediate, DerivableKey};
 
     #[test]
     fn test_synthetic_public_keys() {
