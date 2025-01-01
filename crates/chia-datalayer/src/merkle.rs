@@ -73,7 +73,8 @@ pub enum Error {
     #[error("blob length must be a multiple of block count, found extra bytes: {0}")]
     InvalidBlobLength(usize),
 
-    #[error("key already present")]
+    // TODO: presently capitalized to match the python implementation, fix with more specific exception types
+    #[error("Key already present")]
     KeyAlreadyPresent,
 
     #[error("requested insertion at root but tree not empty")]
