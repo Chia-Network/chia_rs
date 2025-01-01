@@ -10,3 +10,4 @@ python-source = "python"
 [project]
 name = "chia_rs"
 dependencies = ["typing_extensions"]
+dynamic = ["version"]
