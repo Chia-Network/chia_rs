@@ -80,3 +80,8 @@ bench = false
 name = "rollback-blockchain-db"
 test = false
 bench = false
+
+[[bin]]
+name = "analyze-clvm"
+test = false
+bench = false
