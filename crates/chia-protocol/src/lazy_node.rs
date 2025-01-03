@@ -10,9 +10,15 @@ pub struct LazyNode {
     node: NodePtr,
 }
 
-impl ToPyObject for LazyNode {
-    fn to_object(&self, py: Python<'_>) -> PyObject {
-        Bound::new(py, self.clone()).unwrap().to_object(py)
+// TODO: does not explicitly implementing the non-ref IntoPyObject do we lose the .clone() maybe?
+// TODO: let's really review the lifetimes here
+impl<'py> IntoPyObject<'py> for &'py LazyNode {
+    type Target = LazyNode; // the Python type
+    type Output = Bound<'py, Self::Target>; // in most cases this will be `Bound`
+    type Error = PyErr;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
+        self.clone().into_pyobject(py)
     }
 }
 
@@ -24,7 +30,8 @@ impl LazyNode {
             SExp::Pair(p1, p2) => {
                 let r1 = Self::new(self.allocator.clone(), *p1);
                 let r2 = Self::new(self.allocator.clone(), *p2);
-                let v = PyTuple::new_bound(py, &[r1, r2]);
+                let elements = &[r1, r2];
+                let v = PyTuple::new(py, elements)?;
                 Ok(Some(v.into()))
             }
             SExp::Atom => Ok(None),
@@ -34,9 +41,7 @@ impl LazyNode {
     #[getter(atom)]
     pub fn atom(&self, py: Python<'_>) -> Option<PyObject> {
         match &self.allocator.sexp(self.node) {
-            SExp::Atom => {
-                Some(PyBytes::new_bound(py, self.allocator.atom(self.node).as_ref()).into())
-            }
+            SExp::Atom => Some(PyBytes::new(py, self.allocator.atom(self.node).as_ref()).into()),
             SExp::Pair(..) => None,
         }
     }

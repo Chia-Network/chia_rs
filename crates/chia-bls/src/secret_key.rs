@@ -311,7 +311,11 @@ mod pybindings {
     impl ToJsonDict for SecretKey {
         fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
             let bytes = self.to_bytes();
-            Ok(("0x".to_string() + &hex::encode(bytes)).into_py(py))
+            // TODO: is this basically defeating the new IntoPyObject lifetime and type awareness?
+            Ok(("0x".to_string() + &hex::encode(bytes))
+                .into_pyobject(py)?
+                .into_any()
+                .unbind())
         }
     }
 
@@ -556,7 +560,7 @@ mod tests {
 #[cfg(feature = "py-bindings")]
 mod pytests {
     use super::*;
-    use pyo3::{IntoPy, Python};
+    use pyo3::Python;
     use rand::rngs::StdRng;
     use rand::{Rng, SeedableRng};
     use rstest::rstest;
@@ -571,7 +575,7 @@ mod pytests {
             let sk = SecretKey::from_seed(&data);
             Python::with_gil(|py| {
                 let string = sk.to_json_dict(py).expect("to_json_dict");
-                let py_class = py.get_type_bound::<SecretKey>();
+                let py_class = py.get_type::<SecretKey>();
                 let sk2 = SecretKey::from_json_dict(&py_class, py, string.bind(py))
                     .unwrap()
                     .extract(py)
@@ -606,11 +610,12 @@ mod pytests {
     fn test_json_dict(#[case] input: &str, #[case] msg: &str) {
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
-            let py_class = py.get_type_bound::<SecretKey>();
+            let py_class = py.get_type::<SecretKey>();
             let err =
-                SecretKey::from_json_dict(&py_class, py, input.to_string().into_py(py).bind(py))
+                // TODO: is this basically defeating the new IntoPyObject lifetime and type awareness?
+                SecretKey::from_json_dict(&py_class, py, &input.to_string().into_pyobject(py).unwrap().into_any())
                     .unwrap_err();
-            assert_eq!(err.value_bound(py).to_string(), msg.to_string());
+            assert_eq!(err.value(py).to_string(), msg.to_string());
         });
     }
 }

@@ -10,9 +10,10 @@ macro_rules! primitive_int {
     ($t:ty, $name:expr) => {
         impl ChiaToPython for $t {
             fn to_python<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
-                let int_module = PyModule::import_bound(py, "chia_rs.sized_ints")?;
+                let int_module = PyModule::import(py, "chia_rs.sized_ints")?;
                 let ty = int_module.getattr($name)?;
-                ty.call1((self.into_py(py),))
+                // TODO: is this basically defeating the new IntoPyObject lifetime and type awareness?
+                ty.call1((self.into_pyobject(py)?.into_any().unbind(),))
             }
         }
     };
@@ -40,7 +41,7 @@ impl<T: ChiaToPython> ChiaToPython for Option<T> {
 
 impl<T: ChiaToPython> ChiaToPython for Vec<T> {
     fn to_python<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
-        let ret = PyList::empty_bound(py);
+        let ret = PyList::empty(py);
         for v in self {
             ret.append(v.to_python(py)?)?;
         }
@@ -50,32 +51,32 @@ impl<T: ChiaToPython> ChiaToPython for Vec<T> {
 
 impl ChiaToPython for bool {
     fn to_python<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
-        Ok(PyBool::new_bound(py, *self).as_any().clone())
+        Ok(PyBool::new(py, *self).as_any().clone())
     }
 }
 
 impl ChiaToPython for String {
     fn to_python<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
-        Ok(PyString::new_bound(py, self.as_str()).into_any())
+        Ok(PyString::new(py, self.as_str()).into_any())
     }
 }
 
 impl<T: ChiaToPython, U: ChiaToPython> ChiaToPython for (T, U) {
     fn to_python<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
-        Ok(PyTuple::new_bound(py, [self.0.to_python(py)?, self.1.to_python(py)?]).into_any())
+        Ok(PyTuple::new(py, [self.0.to_python(py)?, self.1.to_python(py)?])?.into_any())
     }
 }
 
 impl<T: ChiaToPython, U: ChiaToPython, V: ChiaToPython> ChiaToPython for (T, U, V) {
     fn to_python<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
-        Ok(PyTuple::new_bound(
+        Ok(PyTuple::new(
             py,
             [
                 self.0.to_python(py)?,
                 self.1.to_python(py)?,
                 self.2.to_python(py)?,
             ],
-        )
+        )?
         .into_any())
     }
 }

@@ -1,15 +1,34 @@
 use pyo3::prelude::*;
 use pyo3::types::PyList;
+use pyo3::BoundObject;
+
+// pub trait ToJsonDict<'a, T, U>
+// where
+//     U: BoundObject<'a, T, Any = T>,
+// {
+//     fn to_json_dict(&self, py: Python<'_>) -> PyResult<U>;
+// }
 
 pub trait ToJsonDict {
     fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject>;
 }
 
+// macro_rules! to_json_primitive {
+//     ($t:ty, $pt:ty) => {
+//         impl $crate::to_json_dict::ToJsonDict<'_> for $t {
+//             fn to_json_dict(&self, py: Python<'_>) -> pyo3::PyResult<BoundObject<'_, $pt, Any = $pt>> {
+//                 Ok(self.into_pyobject(py)?)
+//             }
+//         }
+//     };
+// }
+
 macro_rules! to_json_primitive {
     ($t:ty) => {
         impl $crate::to_json_dict::ToJsonDict for $t {
             fn to_json_dict(&self, py: Python<'_>) -> pyo3::PyResult<PyObject> {
-                Ok(self.to_object(py))
+                // TODO: is this basically defeating the new IntoPyObject lifetime and type awareness?
+                Ok(self.into_pyobject(py)?.into_any().unbind())
             }
         }
     };
@@ -28,9 +47,22 @@ to_json_primitive!(u128);
 to_json_primitive!(i128);
 to_json_primitive!(String);
 
+// to_json_primitive!(bool, PyBool);
+// to_json_primitive!(u8, PyInt);
+// to_json_primitive!(i8, PyInt);
+// to_json_primitive!(u16, PyInt);
+// to_json_primitive!(i16, PyInt);
+// to_json_primitive!(u32, PyInt);
+// to_json_primitive!(i32, PyInt);
+// to_json_primitive!(u64, PyInt);
+// to_json_primitive!(i64, PyInt);
+// to_json_primitive!(u128, PyInt);
+// to_json_primitive!(i128, PyInt);
+// to_json_primitive!(String, PyString);
+
 impl<T: ToJsonDict> ToJsonDict for Vec<T> {
     fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let list = PyList::empty_bound(py);
+        let list = PyList::empty(py);
         for v in self {
             list.append(v.to_json_dict(py)?)?;
         }
@@ -50,7 +82,7 @@ impl<T: ToJsonDict> ToJsonDict for Option<T> {
 // if we need more of these, we should probably make a macro
 impl<T: ToJsonDict, U: ToJsonDict> ToJsonDict for (T, U) {
     fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let list = PyList::empty_bound(py);
+        let list = PyList::empty(py);
         list.append(self.0.to_json_dict(py)?)?;
         list.append(self.1.to_json_dict(py)?)?;
         Ok(list.into())
@@ -59,7 +91,7 @@ impl<T: ToJsonDict, U: ToJsonDict> ToJsonDict for (T, U) {
 
 impl<T: ToJsonDict, U: ToJsonDict, W: ToJsonDict> ToJsonDict for (T, U, W) {
     fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let list = PyList::empty_bound(py);
+        let list = PyList::empty(py);
         list.append(self.0.to_json_dict(py)?)?;
         list.append(self.1.to_json_dict(py)?)?;
         list.append(self.2.to_json_dict(py)?)?;
