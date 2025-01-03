@@ -150,6 +150,9 @@ class LeafNode:
     @property
     def value(self) -> int64: ...
 
+DATA_SIZE: int
+BLOCK_SIZE: int
+METADATA_SIZE: int
 
 @final
 class MerkleBlob:
