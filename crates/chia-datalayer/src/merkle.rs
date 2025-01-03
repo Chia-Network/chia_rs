@@ -56,12 +56,6 @@ impl std::fmt::Display for KvId {
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum Error {
-    #[error("unknown NodeType value: {0:?}")]
-    UnknownNodeTypeValue(u8),
-
-    #[error("unknown dirty value: {0:?}")]
-    UnknownDirtyValue(u8),
-
     // TODO: don't use String here
     #[error("failed loading metadata: {0}")]
     FailedLoadingMetadata(String),
@@ -81,9 +75,6 @@ pub enum Error {
 
     #[error("unable to find a leaf")]
     UnableToFindALeaf,
-
-    #[error("error while finding a leaf: {0:?}")]
-    FailedWhileFindingALeaf(String),
 
     #[error("unknown key: {0:?}")]
     UnknownKey(KvId),
