@@ -51,7 +51,7 @@ where
 {
     fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self> {
         let mut ret = Vec::<T>::new();
-        for v in o.iter()? {
+        for v in o.try_iter()? {
             ret.push(<T as FromJsonDict>::from_json_dict(&v?)?);
         }
         Ok(ret)

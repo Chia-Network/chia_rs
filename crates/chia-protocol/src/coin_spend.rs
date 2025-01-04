@@ -23,6 +23,6 @@ impl CoinSpend {
         // Convert result into potential child class
         let instance = cls.call1((cs.coin, cs.puzzle_reveal, cs.solution))?;
 
-        Ok(instance.into_py(py))
+        Ok(instance.into_pyobject(py)?.unbind())
     }
 }

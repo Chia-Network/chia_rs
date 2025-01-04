@@ -300,7 +300,9 @@ pub enum RejectStateReason {
 #[cfg(feature = "py-bindings")]
 impl chia_traits::ChiaToPython for RejectStateReason {
     fn to_python<'a>(&self, py: pyo3::Python<'a>) -> pyo3::PyResult<pyo3::Bound<'a, pyo3::PyAny>> {
-        Ok(pyo3::IntoPy::into_py(*self, py).bind(py).clone())
+        Ok(pyo3::IntoPyObject::into_pyobject(*self as u8, py)?
+            .clone()
+            .into_any())
     }
 }
 
@@ -318,7 +320,9 @@ pub enum MempoolRemoveReason {
 #[cfg(feature = "py-bindings")]
 impl chia_traits::ChiaToPython for MempoolRemoveReason {
     fn to_python<'a>(&self, py: pyo3::Python<'a>) -> pyo3::PyResult<pyo3::Bound<'a, pyo3::PyAny>> {
-        Ok(pyo3::IntoPy::into_py(*self, py).bind(py).clone())
+        Ok(pyo3::IntoPyObject::into_pyobject(*self as u8, py)?
+            .clone()
+            .into_any())
     }
 }
 

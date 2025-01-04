@@ -163,12 +163,12 @@ impl BlsCache {
         sig: &Signature,
     ) -> PyResult<bool> {
         let pks = pks
-            .iter()?
+            .try_iter()?
             .map(|item| item?.extract())
             .collect::<PyResult<Vec<PublicKey>>>()?;
 
         let msgs = msgs
-            .iter()?
+            .try_iter()?
             .map(|item| item?.extract())
             .collect::<PyResult<Vec<PyBackedBytes>>>()?;
 
@@ -184,10 +184,13 @@ impl BlsCache {
     pub fn py_items(&self, py: pyo3::Python<'_>) -> PyResult<PyObject> {
         use pyo3::prelude::*;
         use pyo3::types::PyBytes;
-        let ret = PyList::empty_bound(py);
+        let ret = PyList::empty(py);
         let c = self.cache.lock().expect("cache");
         for (key, value) in &c.items {
-            ret.append((PyBytes::new_bound(py, key), value.clone().into_py(py)))?;
+            ret.append((
+                PyBytes::new(py, key),
+                value.clone().into_pyobject(py)?.into_any(),
+            ))?;
         }
         Ok(ret.into())
     }
@@ -195,7 +198,7 @@ impl BlsCache {
     #[pyo3(name = "update")]
     pub fn py_update(&self, other: &Bound<'_, PySequence>) -> PyResult<()> {
         let mut c = self.cache.lock().expect("cache");
-        for item in other.borrow().iter()? {
+        for item in other.borrow().try_iter()? {
             let (key, value): (Vec<u8>, GTElement) = item?.extract()?;
             c.put(
                 key.try_into()
@@ -209,11 +212,11 @@ impl BlsCache {
     #[pyo3(name = "evict")]
     pub fn py_evict(&self, pks: &Bound<'_, PyList>, msgs: &Bound<'_, PyList>) -> PyResult<()> {
         let pks = pks
-            .iter()?
+            .try_iter()?
             .map(|item| item?.extract())
             .collect::<PyResult<Vec<PublicKey>>>()?;
         let msgs = msgs
-            .iter()?
+            .try_iter()?
             .map(|item| item?.extract())
             .collect::<PyResult<Vec<PyBackedBytes>>>()?;
         self.evict(pks.into_iter().zip(msgs));
