@@ -1,6 +1,6 @@
 use clvmr::{allocator::NodePtr, allocator::SExp, Allocator};
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyTuple};
+use pyo3::types::PyBytes;
 use std::rc::Rc;
 
 #[pyclass(subclass, unsendable, frozen)]
@@ -8,18 +8,6 @@ use std::rc::Rc;
 pub struct LazyNode {
     allocator: Rc<Allocator>,
     node: NodePtr,
-}
-
-// TODO: does not explicitly implementing the non-ref IntoPyObject do we lose the .clone() maybe?
-// TODO: let's really review the lifetimes here
-impl<'py> IntoPyObject<'py> for &'py LazyNode {
-    type Target = PyAny;
-    type Output = Bound<'py, Self::Target>;
-    type Error = PyErr;
-
-    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
-        Ok(self.clone().into_pyobject(py)?.into_any())
-    }
 }
 
 #[pymethods]
@@ -30,8 +18,7 @@ impl LazyNode {
             SExp::Pair(p1, p2) => {
                 let r1 = Self::new(self.allocator.clone(), *p1);
                 let r2 = Self::new(self.allocator.clone(), *p2);
-                let elements = &[r1, r2];
-                let v = PyTuple::new(py, elements)?;
+                let v = (r1, r2).into_pyobject(py)?;
                 Ok(Some(v.into()))
             }
             SExp::Atom => Ok(None),
