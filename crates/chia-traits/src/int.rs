@@ -12,8 +12,7 @@ macro_rules! primitive_int {
             fn to_python<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
                 let int_module = PyModule::import(py, "chia_rs.sized_ints")?;
                 let ty = int_module.getattr($name)?;
-                // TODO: is this basically defeating the new IntoPyObject lifetime and type awareness?
-                ty.call1((self.into_pyobject(py)?.into_any().unbind(),))
+                ty.call1((self.into_pyobject(py)?.into_any(),))
             }
         }
     };

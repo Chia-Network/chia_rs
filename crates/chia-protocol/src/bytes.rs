@@ -86,7 +86,6 @@ impl Streamable for Bytes {
 #[cfg(feature = "py-bindings")]
 impl ToJsonDict for Bytes {
     fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
-        // TODO: is this basically defeating the new IntoPyObject lifetime and type awareness?
         Ok(format!("0x{self}").into_pyobject(py)?.into_any().unbind())
     }
 }
@@ -227,7 +226,6 @@ impl<const N: usize> Streamable for BytesImpl<N> {
 #[cfg(feature = "py-bindings")]
 impl<const N: usize> ToJsonDict for BytesImpl<N> {
     fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
-        // TODO: is this basically defeating the new IntoPyObject lifetime and type awareness?
         Ok(format!("0x{self}").into_pyobject(py)?.into_any().unbind())
     }
 }
@@ -393,9 +391,8 @@ impl From<TreeHash> for Bytes32 {
 
 #[cfg(feature = "py-bindings")]
 impl<'py, const N: usize> IntoPyObject<'py> for BytesImpl<N> {
-    // TODO: is this basically defeating the new IntoPyObject lifetime and type awareness?
-    type Target = PyAny; // the Python type
-    type Output = Bound<'py, Self::Target>; // in most cases this will be `Bound`
+    type Target = PyAny;
+    type Output = Bound<'py, Self::Target>;
     type Error = PyErr;
 
     fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
@@ -432,9 +429,8 @@ impl<'py, const N: usize> FromPyObject<'py> for BytesImpl<N> {
 
 #[cfg(feature = "py-bindings")]
 impl<'py> IntoPyObject<'py> for Bytes {
-    // TODO: is this basically defeating the new IntoPyObject lifetime and type awareness?
-    type Target = PyAny; // the Python type
-    type Output = Bound<'py, Self::Target>; // in most cases this will be `Bound`
+    type Target = PyAny;
+    type Output = Bound<'py, Self::Target>;
     type Error = std::convert::Infallible;
 
     fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {

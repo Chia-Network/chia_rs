@@ -68,7 +68,6 @@ fuzz_target!(|data: &[u8]| {
                 "derive_child_sk_unhardened",
                 PyTuple::new(
                     py,
-                    // TODO: is this basically defeating the new IntoPyObject lifetime and type awareness?
                     [
                         py_sk.clone(),
                         idx.into_pyobject(py).unwrap().clone().into_any(),
@@ -83,7 +82,6 @@ fuzz_target!(|data: &[u8]| {
         let py_pk1 = aug
             .call_method1(
                 "derive_child_pk_unhardened",
-                // TODO: is this basically defeating the new IntoPyObject lifetime and type awareness?
                 PyTuple::new(
                     py,
                     [py_pk, idx.into_pyobject(py).unwrap().clone().into_any()],
@@ -98,7 +96,6 @@ fuzz_target!(|data: &[u8]| {
         let py_sig1 = aug
             .call_method1(
                 "sign",
-                // TODO: is this basically defeating the new IntoPyObject lifetime and type awareness?
                 PyTuple::new(py, [py_sk1, PyBytes::new(py, data).into_any()]).unwrap(),
             )
             .unwrap();
@@ -110,7 +107,6 @@ fuzz_target!(|data: &[u8]| {
         let py_sk2 = aug
             .call_method1(
                 "derive_child_sk",
-                // TODO: is this basically defeating the new IntoPyObject lifetime and type awareness?
                 PyTuple::new(
                     py,
                     [py_sk, idx.into_pyobject(py).unwrap().clone().into_any()],

@@ -187,10 +187,9 @@ impl BlsCache {
         let ret = PyList::empty(py);
         let c = self.cache.lock().expect("cache");
         for (key, value) in &c.items {
-            // TODO: is this basically defeating the new IntoPyObject lifetime and type awareness?
             ret.append((
                 PyBytes::new(py, key),
-                value.clone().into_pyobject(py)?.into_any().unbind(),
+                value.clone().into_pyobject(py)?.into_any(),
             ))?;
         }
         Ok(ret.into())

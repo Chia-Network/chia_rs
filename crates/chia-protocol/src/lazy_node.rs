@@ -13,12 +13,12 @@ pub struct LazyNode {
 // TODO: does not explicitly implementing the non-ref IntoPyObject do we lose the .clone() maybe?
 // TODO: let's really review the lifetimes here
 impl<'py> IntoPyObject<'py> for &'py LazyNode {
-    type Target = LazyNode; // the Python type
-    type Output = Bound<'py, Self::Target>; // in most cases this will be `Bound`
+    type Target = PyAny;
+    type Output = Bound<'py, Self::Target>;
     type Error = PyErr;
 
     fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
-        self.clone().into_pyobject(py)
+        Ok(self.clone().into_pyobject(py)?.into_any())
     }
 }
 

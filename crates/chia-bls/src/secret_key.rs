@@ -311,7 +311,6 @@ mod pybindings {
     impl ToJsonDict for SecretKey {
         fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
             let bytes = self.to_bytes();
-            // TODO: is this basically defeating the new IntoPyObject lifetime and type awareness?
             Ok(("0x".to_string() + &hex::encode(bytes))
                 .into_pyobject(py)?
                 .into_any()
@@ -611,10 +610,12 @@ mod pytests {
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
             let py_class = py.get_type::<SecretKey>();
-            let err =
-                // TODO: is this basically defeating the new IntoPyObject lifetime and type awareness?
-                SecretKey::from_json_dict(&py_class, py, &input.to_string().into_pyobject(py).unwrap().into_any())
-                    .unwrap_err();
+            let err = SecretKey::from_json_dict(
+                &py_class,
+                py,
+                &input.to_string().into_pyobject(py).unwrap().into_any(),
+            )
+            .unwrap_err();
             assert_eq!(err.value(py).to_string(), msg.to_string());
         });
     }

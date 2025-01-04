@@ -104,8 +104,7 @@ impl SpendBundle {
         if aggregated.is_exact_instance(cls) {
             Ok(aggregated.into_pyobject(py)?.unbind().into_any())
         } else {
-            let instance =
-                cls.call_method1("from_parent", (aggregated.into_pyobject(py)?.unbind(),))?;
+            let instance = cls.call_method1("from_parent", (aggregated.into_pyobject(py)?,))?;
             Ok(instance.into_pyobject(py)?.unbind().into_any())
         }
     }
