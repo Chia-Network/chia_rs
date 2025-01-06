@@ -86,7 +86,7 @@ impl Streamable for Bytes {
 #[cfg(feature = "py-bindings")]
 impl ToJsonDict for Bytes {
     fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
-        Ok(format!("0x{self}").to_object(py))
+        Ok(format!("0x{self}").into_pyobject(py)?.into_any().unbind())
     }
 }
 
@@ -226,7 +226,7 @@ impl<const N: usize> Streamable for BytesImpl<N> {
 #[cfg(feature = "py-bindings")]
 impl<const N: usize> ToJsonDict for BytesImpl<N> {
     fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
-        Ok(format!("0x{self}").to_object(py))
+        Ok(format!("0x{self}").into_pyobject(py)?.into_any().unbind())
     }
 }
 
@@ -390,16 +390,13 @@ impl From<TreeHash> for Bytes32 {
 }
 
 #[cfg(feature = "py-bindings")]
-impl<const N: usize> ToPyObject for BytesImpl<N> {
-    fn to_object(&self, py: Python<'_>) -> PyObject {
-        ChiaToPython::to_python(self, py).unwrap().into()
-    }
-}
+impl<'py, const N: usize> IntoPyObject<'py> for BytesImpl<N> {
+    type Target = PyAny;
+    type Output = Bound<'py, Self::Target>;
+    type Error = PyErr;
 
-#[cfg(feature = "py-bindings")]
-impl<const N: usize> IntoPy<PyObject> for BytesImpl<N> {
-    fn into_py(self, py: Python<'_>) -> PyObject {
-        ChiaToPython::to_python(&self, py).unwrap().into()
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
+        ChiaToPython::to_python(&self, py)
     }
 }
 
@@ -407,15 +404,15 @@ impl<const N: usize> IntoPy<PyObject> for BytesImpl<N> {
 impl<const N: usize> ChiaToPython for BytesImpl<N> {
     fn to_python<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
         if N == 32 {
-            let bytes_module = PyModule::import_bound(py, "chia_rs.sized_bytes")?;
+            let bytes_module = PyModule::import(py, "chia_rs.sized_bytes")?;
             let ty = bytes_module.getattr("bytes32")?;
-            ty.call1((self.0.into_py(py),))
+            ty.call1((self.0.into_pyobject(py)?,))
         } else if N == 48 {
-            let bytes_module = PyModule::import_bound(py, "chia_rs.sized_bytes")?;
+            let bytes_module = PyModule::import(py, "chia_rs.sized_bytes")?;
             let ty = bytes_module.getattr("bytes48")?;
-            ty.call1((self.0.into_py(py),))
+            ty.call1((self.0.into_pyobject(py)?,))
         } else {
-            Ok(PyBytes::new_bound(py, &self.0).into_any())
+            Ok(PyBytes::new(py, &self.0).into_any())
         }
     }
 }
@@ -431,23 +428,20 @@ impl<'py, const N: usize> FromPyObject<'py> for BytesImpl<N> {
 }
 
 #[cfg(feature = "py-bindings")]
-impl ToPyObject for Bytes {
-    fn to_object(&self, py: Python<'_>) -> PyObject {
-        PyBytes::new_bound(py, &self.0).into()
-    }
-}
+impl<'py> IntoPyObject<'py> for Bytes {
+    type Target = PyAny;
+    type Output = Bound<'py, Self::Target>;
+    type Error = std::convert::Infallible;
 
-#[cfg(feature = "py-bindings")]
-impl IntoPy<PyObject> for Bytes {
-    fn into_py(self, py: Python<'_>) -> PyObject {
-        PyBytes::new_bound(py, &self.0).into()
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
+        Ok(PyBytes::new(py, &self.0).into_any())
     }
 }
 
 #[cfg(feature = "py-bindings")]
 impl ChiaToPython for Bytes {
     fn to_python<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
-        Ok(PyBytes::new_bound(py, &self.0).into_any())
+        Ok(PyBytes::new(py, &self.0).into_any())
     }
 }
 
