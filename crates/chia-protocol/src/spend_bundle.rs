@@ -102,10 +102,10 @@ impl SpendBundle {
     ) -> PyResult<PyObject> {
         let aggregated = Bound::new(py, Self::aggregate(&spend_bundles))?;
         if aggregated.is_exact_instance(cls) {
-            Ok(aggregated.into_py(py))
+            Ok(aggregated.into_pyobject(py)?.unbind().into_any())
         } else {
-            let instance = cls.call_method1("from_parent", (aggregated.into_py(py),))?;
-            Ok(instance.into_py(py))
+            let instance = cls.call_method1("from_parent", (aggregated.into_pyobject(py)?,))?;
+            Ok(instance.into_pyobject(py)?.unbind().into_any())
         }
     }
 
@@ -122,7 +122,7 @@ impl SpendBundle {
             None,
         )?;
 
-        Ok(instance.into_py(py))
+        Ok(instance.into_pyobject(py)?.unbind())
     }
 
     #[pyo3(name = "name")]
