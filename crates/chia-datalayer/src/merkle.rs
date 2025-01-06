@@ -1,7 +1,7 @@
 #[cfg(feature = "py-bindings")]
 use pyo3::{
-    buffer::PyBuffer, exceptions::PyValueError, pyclass, pymethods, FromPyObject, IntoPy, PyObject,
-    PyResult, Python,
+    buffer::PyBuffer, exceptions::PyValueError, pyclass, pymethods, types::PyInt, Bound,
+    FromPyObject, IntoPyObject, PyAny, PyErr, PyResult, Python,
 };
 
 use chia_protocol::Bytes32;
@@ -20,9 +20,13 @@ use thiserror::Error;
 pub struct TreeIndex(u32);
 
 #[cfg(feature = "py-bindings")]
-impl IntoPy<PyObject> for TreeIndex {
-    fn into_py(self, py: Python<'_>) -> PyObject {
-        self.0.into_py(py)
+impl<'py> IntoPyObject<'py> for TreeIndex {
+    type Target = PyInt;
+    type Output = Bound<'py, Self::Target>;
+    type Error = std::convert::Infallible;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
+        self.0.into_pyobject(py)
     }
 }
 
@@ -42,9 +46,13 @@ type Hash = Bytes32;
 pub struct KvId(i64);
 
 #[cfg(feature = "py-bindings")]
-impl IntoPy<PyObject> for KvId {
-    fn into_py(self, py: Python<'_>) -> PyObject {
-        self.0.into_py(py)
+impl<'py> IntoPyObject<'py> for KvId {
+    type Target = PyInt;
+    type Output = Bound<'py, Self::Target>;
+    type Error = std::convert::Infallible;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
+        self.0.into_pyobject(py)
     }
 }
 
@@ -314,11 +322,15 @@ impl Node {
 }
 
 #[cfg(feature = "py-bindings")]
-impl IntoPy<PyObject> for Node {
-    fn into_py(self, py: Python<'_>) -> PyObject {
+impl<'py> IntoPyObject<'py> for Node {
+    type Target = PyAny;
+    type Output = Bound<'py, Self::Target>;
+    type Error = PyErr;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
         match self {
-            Node::Internal(node) => node.into_py(py),
-            Node::Leaf(node) => node.into_py(py),
+            Node::Internal(node) => Ok(node.into_pyobject(py)?.into_any()),
+            Node::Leaf(node) => Ok(node.into_pyobject(py)?.into_any()),
         }
     }
 }
@@ -1279,15 +1291,14 @@ impl MerkleBlob {
         index: TreeIndex,
         py: Python<'_>,
     ) -> PyResult<pyo3::PyObject> {
-        let list = pyo3::types::PyList::empty_bound(py);
+        let list = pyo3::types::PyList::empty(py);
 
         for (index, node) in self
             .get_lineage_with_indexes(index)
             .map_err(|e| PyValueError::new_err(e.to_string()))?
         {
-            use pyo3::conversion::IntoPy;
             use pyo3::types::PyListMethods;
-            list.append((index.into_py(py), node.into_py(py)))?;
+            list.append((index.into_pyobject(py)?, node.into_pyobject(py)?))?;
         }
 
         Ok(list.into())
@@ -1295,13 +1306,12 @@ impl MerkleBlob {
 
     #[pyo3(name = "get_nodes_with_indexes")]
     pub fn py_get_nodes_with_indexes(&self, py: Python<'_>) -> PyResult<pyo3::PyObject> {
-        let list = pyo3::types::PyList::empty_bound(py);
+        let list = pyo3::types::PyList::empty(py);
 
         for item in MerkleBlobParentFirstIterator::new(&self.blob) {
-            use pyo3::conversion::IntoPy;
             use pyo3::types::PyListMethods;
             let (index, block) = item.map_err(|e| PyValueError::new_err(e.to_string()))?;
-            list.append((index.into_py(py), block.node.into_py(py)))?;
+            list.append((index.into_pyobject(py)?, block.node.into_pyobject(py)?))?;
         }
 
         Ok(list.into())
