@@ -59,3 +59,5 @@ class MerkleBlob:
 
     def __len__(self) -> int: ...
 
+# TODO: i would rather not specify this at all
+__all__: Sequence[str] = ["InternalNode", "LeafNode", "MerkleBlob"]
