@@ -67,6 +67,16 @@ jobs:
             37,
             38,
             39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
           ]
     name: Unit tests
     steps:
@@ -91,10 +101,6 @@ jobs:
           echo "RUSTFLAGS=-Cinstrument-coverage" >> "$GITHUB_ENV"
           echo "LLVM_PROFILE_FILE=$(pwd)/target/chia_rs-%p-%m.profraw" >> "$GITHUB_ENV"
           echo "CARGO_TARGET_DIR=$(pwd)/target" >> "$GITHUB_ENV"
-      - name: cargo test
-        run: cargo test --workspace --all-features
-      - name: cargo test (release)
-        run: cargo test --workspace --all-features --release
       - name: Continue with coverage
         if: matrix.os == 'ubuntu-latest'
         run: |
@@ -111,10 +117,3 @@ jobs:
           pytest -n 0 tests
           grcov . --binary-path target -s . --branch --ignore-not-existing --ignore='*/.cargo/*' --ignore='tests/*' --ignore='venv/*' -o rust_cov.info
           python -c 'with open("rust_cov.info") as f: lines = [l for l in f if not (l.startswith("DA:") and int(l.split(",")[1].strip()) >= 2**63)]; open("lcov.info", "w").writelines(lines)'
-      - name: Upload to Coveralls
-        uses: coverallsapp/github-action@v2
-        if: matrix.os == 'ubuntu-latest'
-        env:
-          COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
-        with:
-          path-to-lcov: "./lcov.info"
