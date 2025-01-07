@@ -55,7 +55,7 @@ use pyo3::pybacked::PyBackedBytes;
 use pyo3::types::PyBytes;
 use pyo3::types::PyList;
 use pyo3::types::PyTuple;
-use pyo3::{py_run, wrap_pyfunction, wrap_pymodule};
+use pyo3::wrap_pyfunction;
 use std::collections::HashSet;
 use std::iter::zip;
 
