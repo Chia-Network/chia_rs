@@ -19,286 +19,55 @@ permissions:
   contents: read
 
 jobs:
-  build-wheels:
-    name: Wheel - ${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }}
-    runs-on: ${{ matrix.os.runs-on[matrix.arch.matrix] }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - name: macOS
-            matrix: macos
-            runs-on:
-              arm: [macOS, ARM64]
-              intel: [macos-13]
-          - name: Ubuntu
-            matrix: ubuntu
-            runs-on:
-              arm: [Linux, ARM64]
-              intel: [ubuntu-latest]
-          - name: Windows
-            matrix: windows
-            runs-on:
-              intel: [windows-latest]
-        python:
-          - major-dot-minor: "3.9"
-            cibw-build: "cp39-*"
-            by-arch:
-              arm:
-                manylinux-version: 2_28
-                docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-aarch64
-                rustup-target: aarch64-unknown-linux-musl
-              intel:
-                manylinux-version: 2_28
-                docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-x86_64
-                rustup-target: x86_64-unknown-linux-musl
-            matrix: "3.9"
-          - major-dot-minor: "3.10"
-            cibw-build: "cp310-*"
-            by-arch:
-              arm:
-                manylinux-version: 2_28
-                docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-aarch64
-                rustup-target: aarch64-unknown-linux-musl
-              intel:
-                manylinux-version: 2_28
-                docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-x86_64
-                rustup-target: x86_64-unknown-linux-musl
-            matrix: "3.10"
-          - major-dot-minor: "3.11"
-            cibw-build: "cp311-*"
-            by-arch:
-              arm:
-                manylinux-version: 2_28
-                docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-aarch64
-                rustup-target: aarch64-unknown-linux-musl
-              intel:
-                manylinux-version: 2_28
-                docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-x86_64
-                rustup-target: x86_64-unknown-linux-musl
-            matrix: "3.11"
-          - major-dot-minor: "3.12"
-            cibw-build: "cp312-*"
-            by-arch:
-              arm:
-                manylinux-version: 2_28
-                docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-aarch64
-                rustup-target: aarch64-unknown-linux-musl
-              intel:
-                manylinux-version: 2_28
-                docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-x86_64
-                rustup-target: x86_64-unknown-linux-musl
-            matrix: "3.12"
-
-        arch:
-          - name: ARM
-            matrix: arm
-          - name: Intel
-            matrix: intel
-        exclude:
-          # Only partial entries are required here by GitHub Actions so generally I
-          # only specify the `matrix:` entry.  The super linter complains so for now
-          # all entries are included to avoid that.  Reported at
-          # https://github.com/github/super-linter/issues/3016
-          - os:
-              name: Windows
-              matrix: windows
-              runs-on:
-                intel: [windows-latest]
-            arch:
-              name: ARM
-              matrix: arm
-
-    steps:
-      - name: Clean workspace
-        uses: Chia-Network/actions/clean-workspace@main
-
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: Chia-Network/actions/setup-python@main
-        with:
-          python-version: ${{ matrix.python.major-dot-minor }}
-
-      - name: Update pip
-        run: |
-          python -m pip install --upgrade pip
-
-      - name: Set up rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install dependencies
-        run: |
-          python -m pip install maturin
-
-      - name: Build MacOs with maturin on Python ${{ matrix.python }}
-        if: matrix.os.matrix == 'macos'
-        env:
-          MACOSX_DEPLOYMENT_TARGET: "13.0"
-        run: |
-          python${{ matrix.python.major-dot-minor }} -m venv venv
-          . venv/bin/activate
-          maturin build -i python --release -m wheel/Cargo.toml
-
-      - name: Build Linux with maturin on Python ${{ matrix.python }}
-        if: matrix.os.matrix == 'ubuntu'
-        run: |
-          docker run --rm --pull always \
-            -v ${{ github.workspace }}:/ws --workdir=/ws \
-            ${{ matrix.python.by-arch[matrix.arch.matrix].docker-url }} \
-            bash -exc '\
-              yum -y install openssl-devel && \
-              source $HOME/.cargo/env && \
-              rustup target add ${{ matrix.python.by-arch[matrix.arch.matrix].rustup-target }} && \
-              python${{ matrix.python.major-dot-minor }} -m venv /venv && \
-              . /venv/bin/activate && \
-              pip install --upgrade pip && \
-              pip install maturin && \
-              CC=gcc maturin build --release --manylinux ${{ matrix.python.by-arch[matrix.arch.matrix].manylinux-version }} -m wheel/Cargo.toml \
-            '
-
-      - name: Build Windows with maturin on Python ${{ matrix.python }}
-        if: matrix.os.matrix == 'windows'
-        env:
-          CC: "clang"
-          CFLAGS: "-D__BLST_PORTABLE__"
-        run: |
-          py -${{ matrix.python.major-dot-minor }} -m venv venv
-          . .\venv\Scripts\Activate.ps1
-          maturin build -i python --release -m wheel/Cargo.toml
-
-      - uses: Chia-Network/actions/create-venv@main
-        id: create-venv
-
-      - uses: Chia-Network/actions/activate-venv@main
-        with:
-          directories: ${{ steps.create-venv.outputs.activate-venv-directories }}
-
-      - name: Install chia_rs wheel
-        shell: bash
-        run: |
-          TMP_DEST=$(mktemp -d)
-          pip download --no-index --no-deps --only-binary :all: --find-links target/wheels/ --dest "${TMP_DEST}" chia_rs
-          echo ====
-          ls -l "${TMP_DEST}"
-          echo ====
-          pip install "${TMP_DEST}"/*
-          rm -rf "${TMP_DEST}"
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: packages-${{ matrix.os.name }}-${{ matrix.python.major-dot-minor }}-${{ matrix.arch.name }}
-          path: ./target/wheels/
-
-  check-typestubs:
-    name: Check chia_rs.pyi
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: Chia-Network/actions/setup-python@main
-
-      - name: check generated chia_rs.pyi
-        run: |
-          python wheel/generate_type_stubs.py
-          git diff --exit-code
-
-  build-sdist:
-    name: sdist - ${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }}
-    runs-on: ${{ matrix.os.runs-on[matrix.arch.matrix] }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - name: Ubuntu
-            matrix: ubuntu
-            runs-on:
-              arm: [Linux, ARM64]
-              intel: [ubuntu-latest]
-        python:
-          - major-dot-minor: "3.9"
-            matrix: "3.9"
-        arch:
-          - name: Intel
-            matrix: intel
-
-    steps:
-      - name: Clean workspace
-        uses: Chia-Network/actions/clean-workspace@main
-
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: Chia-Network/actions/setup-python@main
-        with:
-          python-version: ${{ matrix.python.major-dot-minor }}
-
-      - name: Build source distribution
-        run: |
-          pip install maturin
-          maturin sdist -m wheel/Cargo.toml
-          cd target/wheels
-          dirname=`basename chia_rs*.tar.gz .tar.gz`
-          echo $dirname
-          mkdir $dirname
-          cp -r ../../src/ $dirname/src/
-          gunzip chia_rs*.tar.gz
-          tar rvf chia_rs*.tar $dirname/src
-          gzip chia_rs*.tar
-          rm -rf $dirname
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: packages-sdist-${{ matrix.os.name }}-${{ matrix.python.major-dot-minor }}-${{ matrix.arch.name }}
-          path: ./target/wheels/
-
-  fmt:
-    runs-on: ubuntu-latest
-    name: cargo fmt
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Install rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - name: fmt
-        run: |
-          cargo fmt --all -- --files-with-diff --check
-          cd wheel
-          cargo fmt -- --files-with-diff --check
-
-  clippy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-
-      - name: workspace
-        run: |
-          cargo clippy --workspace --all-features --all-targets
-
   unit_tests:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        os: [ubuntu-latest]
+        repeats:
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+          ]
     name: Unit tests
     steps:
       # the test files are read verbatim, making it problematic if git is
@@ -349,68 +118,3 @@ jobs:
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         with:
           path-to-lcov: "./lcov.info"
-
-  upload:
-    name: Upload to PyPI - ${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }}
-    runs-on: ${{ matrix.os.runs-on[matrix.arch.matrix] }}
-    needs:
-      - build-wheels
-      - build-sdist
-      - fmt
-      - clippy
-      - unit_tests
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - name: Ubuntu
-            matrix: ubuntu
-            runs-on:
-              arm: [Linux, ARM64]
-              intel: [ubuntu-latest]
-        python:
-          - major-dot-minor: "3.9"
-            matrix: "3.9"
-        arch:
-          - name: Intel
-            matrix: intel
-
-    steps:
-      - name: Clean workspace
-        uses: Chia-Network/actions/clean-workspace@main
-
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: Chia-Network/actions/setup-python@main
-        with:
-          python-version: ${{ matrix.python.major-dot-minor }}
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          merge-multiple: true
-          pattern: packages-*
-          path: ./dist
-
-      - name: Set Env
-        uses: Chia-Network/actions/setjobenv@main
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: publish (PyPi)
-        if: env.RELEASE == 'true'
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          packages-dir: dist/
-          skip-existing: true
-
-      - name: publish (Test PyPi)
-        if: env.PRE_RELEASE == 'true'
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: https://test.pypi.org/legacy/
-          packages-dir: dist/
-          skip-existing: true
