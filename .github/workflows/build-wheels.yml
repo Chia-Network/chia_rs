@@ -311,6 +311,10 @@ jobs:
         with:
           fetch-depth: 1
       - uses: dtolnay/rust-toolchain@stable
+      - run: echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
+        if: runner.os == 'Windows'
+      - run: vcpkg install openssl:x64-windows-static-md
+        if: runner.os == 'Windows'
       - name: Prepare for coverage
         if: matrix.os == 'ubuntu-latest'
         run: |
