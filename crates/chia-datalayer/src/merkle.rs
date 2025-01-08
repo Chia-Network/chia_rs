@@ -1539,18 +1539,11 @@ impl Drop for MerkleBlob {
 }
 
 #[cfg(test)]
-mod dot;
-#[cfg(test)]
 mod tests {
     use super::*;
-    use crate::merkle::dot::DotLines;
     use expect_test::{expect, Expect};
     use rstest::{fixture, rstest};
     use std::time::{Duration, Instant};
-
-    fn open_dot(_lines: &mut DotLines) {
-        // crate::merkle::dot::open_dot(_lines);
-    }
 
     impl MerkleBlob {
         fn get_key_value_map(&self) -> HashMap<KvId, KvId> {
@@ -1751,7 +1744,6 @@ mod tests {
     #[test]
     fn test_delete_in_reverse_creates_matching_trees() {
         const COUNT: usize = 10;
-        let mut dots = vec![];
 
         let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
         let mut reference_blobs = vec![];
@@ -1767,7 +1759,6 @@ mod tests {
             merkle_blob
                 .insert(key_value_id, key_value_id, &hash, InsertLocation::Auto {})
                 .unwrap();
-            dots.push(merkle_blob.to_dot().unwrap().dump());
         }
 
         merkle_blob.check_integrity().unwrap();
@@ -1777,7 +1768,6 @@ mod tests {
             merkle_blob.delete(*key_value_id).unwrap();
             merkle_blob.calculate_lazy_hashes().unwrap();
             assert_eq!(merkle_blob, reference_blobs[key_value_id.0 as usize]);
-            dots.push(merkle_blob.to_dot().unwrap().dump());
         }
     }
 
@@ -1786,7 +1776,6 @@ mod tests {
         let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
 
         let key_value_id = KvId(1);
-        open_dot(merkle_blob.to_dot().unwrap().set_note("empty"));
         merkle_blob
             .insert(
                 key_value_id,
@@ -1795,7 +1784,6 @@ mod tests {
                 InsertLocation::Auto {},
             )
             .unwrap();
-        open_dot(merkle_blob.to_dot().unwrap().set_note("first after"));
 
         assert_eq!(merkle_blob.key_to_index.len(), 1);
     }
@@ -1810,7 +1798,6 @@ mod tests {
         let mut last_key: KvId = KvId(0);
         for i in 1..=pre_count {
             let key = KvId(i as i64);
-            open_dot(merkle_blob.to_dot().unwrap().set_note("empty"));
             merkle_blob
                 .insert(key, key, &sha256_num(key.0), InsertLocation::Auto {})
                 .unwrap();
@@ -1818,7 +1805,6 @@ mod tests {
         }
 
         let key_value_id: KvId = KvId((pre_count + 1) as i64);
-        open_dot(merkle_blob.to_dot().unwrap().set_note("first after"));
         merkle_blob
             .insert(
                 key_value_id,
@@ -1830,7 +1816,6 @@ mod tests {
                 },
             )
             .unwrap();
-        open_dot(merkle_blob.to_dot().unwrap().set_note("first after"));
 
         let sibling = merkle_blob
             .get_node(merkle_blob.key_to_index[&last_key])
@@ -1861,7 +1846,6 @@ mod tests {
         let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
 
         let key_value_id = KvId(1);
-        open_dot(merkle_blob.to_dot().unwrap().set_note("empty"));
         merkle_blob
             .insert(
                 key_value_id,
@@ -1870,7 +1854,6 @@ mod tests {
                 InsertLocation::Auto {},
             )
             .unwrap();
-        open_dot(merkle_blob.to_dot().unwrap().set_note("first after"));
         merkle_blob.check_integrity().unwrap();
 
         merkle_blob.delete(key_value_id).unwrap();
@@ -1892,11 +1875,9 @@ mod tests {
 
     #[rstest]
     fn test_get_new_index_with_free_index(mut small_blob: MerkleBlob) {
-        open_dot(small_blob.to_dot().unwrap().set_note("initial"));
         let key = KvId(0x0001_0203_0405_0607);
         let _ = small_blob.key_to_index[&key];
         small_blob.delete(key).unwrap();
-        open_dot(small_blob.to_dot().unwrap().set_note("after delete"));
 
         let expected = HashSet::from([TreeIndex(1), TreeIndex(2)]);
         assert_eq!(small_blob.free_indexes, expected);
@@ -1953,11 +1934,9 @@ mod tests {
         insert_blob
             .insert(key, value, &sha256_num(key.0), InsertLocation::Auto {})
             .unwrap();
-        open_dot(insert_blob.to_dot().unwrap().set_note("first after"));
 
         let mut upsert_blob = MerkleBlob::new(small_blob.blob.clone()).unwrap();
         upsert_blob.upsert(key, value, &sha256_num(key.0)).unwrap();
-        open_dot(upsert_blob.to_dot().unwrap().set_note("first after"));
 
         assert_eq!(insert_blob.blob, upsert_blob.blob);
     }
@@ -2025,7 +2004,6 @@ mod tests {
             blob.insert(i, i, &sha256_num(i.0), InsertLocation::Auto {})
                 .unwrap();
         }
-        open_dot(blob.to_dot().unwrap().set_note("initial"));
 
         let mut batch: Vec<((KvId, KvId), Hash)> = vec![];
 
@@ -2039,12 +2017,6 @@ mod tests {
         let before = blob.get_key_value_map();
         blob.batch_insert(batch.into_iter()).unwrap();
         let after = blob.get_key_value_map();
-
-        open_dot(
-            blob.to_dot()
-                .unwrap()
-                .set_note(&format!("after batch insert of {count} values")),
-        );
 
         let mut expected = before.clone();
         expected.extend(batch_map);
@@ -2075,7 +2047,6 @@ mod tests {
     // expect-test is adding them back
     #[allow(clippy::needless_raw_string_hashes)]
     #[case::left_child_first(
-        "left child first",
         MerkleBlobLeftChildFirstIterator::new,
         expect![[r#"
             [
@@ -2134,7 +2105,6 @@ mod tests {
     // expect-test is adding them back
     #[allow(clippy::needless_raw_string_hashes)]
     #[case::parent_first(
-        "parent first",
         MerkleBlobParentFirstIterator::new,
         expect![[r#"
             [
@@ -2192,7 +2162,6 @@ mod tests {
     // expect-test is adding them back
     #[allow(clippy::needless_raw_string_hashes)]
     #[case::breadth_first(
-        "breadth first",
         MerkleBlobBreadthFirstIterator::new,
         expect![[r#"
             [
@@ -2227,7 +2196,6 @@ mod tests {
             ]
         "#]])]
     fn test_iterators<'a, F, T>(
-        #[case] note: &str,
         #[case] iterator_new: F,
         #[case] expected: Expect,
         #[by_ref] traversal_blob: &'a MerkleBlob,
@@ -2235,22 +2203,14 @@ mod tests {
         F: Fn(&'a Vec<u8>) -> T,
         T: Iterator<Item = Result<(TreeIndex, Block), Error>>,
     {
-        let mut dot_actual = traversal_blob.to_dot().unwrap();
-        dot_actual.set_note(note);
-
         let mut actual = vec![];
         {
             let blob: &Vec<u8> = &traversal_blob.blob;
             for item in iterator_new(blob) {
                 let (index, block) = item.unwrap();
                 actual.push(iterator_test_reference(index, &block));
-                dot_actual.push_traversal(index);
             }
         }
-
-        traversal_blob.to_dot().unwrap();
-
-        open_dot(&mut dot_actual);
 
         expected.assert_debug_eq(&actual);
     }
