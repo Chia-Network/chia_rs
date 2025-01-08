@@ -384,31 +384,11 @@ pub fn get_free_indexes_and_keys_values_indexes(
 #[derive(Debug)]
 pub struct MerkleBlob {
     pub blob: Vec<u8>,
-    // TODO: would be nice for this to be deterministic ala a fifo set
-    pub free_indexes: HashSet<TreeIndex>,
-    pub key_to_index: HashMap<KvId, TreeIndex>,
-    // TODO: used by fuzzing, some cleaner way?  making it cfg-dependent is annoying with
-    //       the type stubs
-    pub check_integrity_on_drop: bool,
 }
 
 impl MerkleBlob {
     pub fn new(blob: Vec<u8>) -> Result<Self, Error> {
-        let length = blob.len();
-        let remainder = length % BLOCK_SIZE;
-        if remainder != 0 {
-            return Err(Error::InvalidBlobLength(remainder));
-        }
-
-        // TODO: maybe integrate integrity check here if quick enough
-        let (free_indexes, key_to_index) = get_free_indexes_and_keys_values_indexes(&blob)?;
-
-        let self_ = Self {
-            blob,
-            free_indexes,
-            key_to_index,
-            check_integrity_on_drop: true,
-        };
+        let self_ = Self { blob };
 
         Ok(self_)
     }
