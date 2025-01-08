@@ -1,7 +1,7 @@
 #[cfg(feature = "py-bindings")]
 use pyo3::{
-    buffer::PyBuffer, exceptions::PyValueError, pyclass, pymethods, FromPyObject, IntoPy, PyObject,
-    PyResult, Python,
+    buffer::PyBuffer, exceptions::PyValueError, pyclass, pymethods, types::PyInt, Bound,
+    FromPyObject, IntoPy, IntoPyObject, PyObject, PyResult, Python,
 };
 
 use chia_protocol::Bytes32;
@@ -20,9 +20,13 @@ use thiserror::Error;
 pub struct TreeIndex(u32);
 
 #[cfg(feature = "py-bindings")]
-impl IntoPy<PyObject> for TreeIndex {
-    fn into_py(self, py: Python<'_>) -> PyObject {
-        self.0.into_py(py)
+impl<'py> IntoPyObject<'py> for TreeIndex {
+    type Target = PyInt;
+    type Output = Bound<'py, Self::Target>;
+    type Error = std::convert::Infallible;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
+        self.0.into_pyobject(py)
     }
 }
 
@@ -42,12 +46,15 @@ type Hash = Bytes32;
 pub struct KvId(i64);
 
 #[cfg(feature = "py-bindings")]
-impl IntoPy<PyObject> for KvId {
-    fn into_py(self, py: Python<'_>) -> PyObject {
-        self.0.into_py(py)
+impl<'py> IntoPyObject<'py> for KvId {
+    type Target = PyInt;
+    type Output = Bound<'py, Self::Target>;
+    type Error = std::convert::Infallible;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
+        self.0.into_pyobject(py)
     }
 }
-
 impl std::fmt::Display for KvId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
@@ -1278,7 +1285,7 @@ impl MerkleBlob {
         {
             use pyo3::conversion::IntoPy;
             use pyo3::types::PyListMethods;
-            list.append((index.into_py(py), node.into_py(py)))?;
+            list.append((index.into_pyobject(py)?, node.into_py(py)))?;
         }
 
         Ok(list.into())
@@ -1292,7 +1299,7 @@ impl MerkleBlob {
             use pyo3::conversion::IntoPy;
             use pyo3::types::PyListMethods;
             let (index, block) = item.map_err(|e| PyValueError::new_err(e.to_string()))?;
-            list.append((index.into_py(py), block.node.into_py(py)))?;
+            list.append((index.into_pyobject(py)?, block.node.into_py(py)))?;
         }
 
         Ok(list.into())
