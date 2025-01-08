@@ -109,9 +109,9 @@ jobs:
           pip install ./clvm_tools
           pip install colorama maturin pytest pytest-xdist chia-blockchain==2.1.2 clvm==0.9.8
           maturin develop -m wheel/Cargo.toml
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: executable
+          name: executable-${{ matrix.repeats }}
           path: |
             venv/bin/python
             wheel/python/chia_rs/*.so
@@ -128,10 +128,10 @@ jobs:
           ulimit -c unlimited
           # run pytest in a single process to avoid a race writing the coverage report
           pytest -n 0 tests
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: ${{ failure() }} # Run only if something went wrong
         with:
-          name: cores
+          name: cores-${{ matrix.repeats }}
           path: /cores
       - name: the rest
         run: |
