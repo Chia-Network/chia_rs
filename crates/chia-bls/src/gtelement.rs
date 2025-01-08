@@ -148,10 +148,7 @@ mod pybindings {
     impl ToJsonDict for GTElement {
         fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
             let bytes = self.to_bytes();
-            Ok(("0x".to_string() + &hex::encode(bytes))
-                .into_pyobject(py)?
-                .into_any()
-                .unbind())
+            Ok(("0x".to_string() + &hex::encode(bytes)).into_py(py))
         }
     }
 

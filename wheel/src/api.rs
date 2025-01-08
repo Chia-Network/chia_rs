@@ -90,7 +90,10 @@ pub fn compute_merkle_set_root<'p>(
         use pyo3::types::PyBytesMethods;
         buffer.push(b.as_bytes().try_into()?);
     }
-    Ok(PyBytes::new(py, &compute_merkle_root_impl(&mut buffer)))
+    Ok(PyBytes::new_bound(
+        py,
+        &compute_merkle_root_impl(&mut buffer),
+    ))
 }
 
 #[pyfunction]
@@ -177,8 +180,8 @@ pub fn get_puzzle_and_solution_for_coin<'a>(
         };
     */
     Ok((
-        PyBytes::new(py, &serialize(&allocator, puzzle)?),
-        PyBytes::new(py, &serialize(&allocator, solution)?),
+        PyBytes::new_bound(py, &serialize(&allocator, puzzle)?),
+        PyBytes::new_bound(py, &serialize(&allocator, solution)?),
     ))
 }
 
@@ -237,7 +240,7 @@ type CoinSpendRef = (Coin, PyBackedBytes, PyBackedBytes);
 
 fn convert_list_of_tuples(spends: &Bound<'_, PyAny>) -> PyResult<Vec<CoinSpendRef>> {
     let mut native_spends = Vec::<CoinSpendRef>::new();
-    for s in spends.try_iter()? {
+    for s in spends.iter()? {
         let s = s?;
         let tuple = s.downcast::<PyTuple>()?;
         let coin = tuple.get_item(0)?.extract::<Coin>()?;
@@ -254,7 +257,7 @@ fn solution_generator<'p>(
     spends: &Bound<'_, PyAny>,
 ) -> PyResult<Bound<'p, PyBytes>> {
     let spends = convert_list_of_tuples(spends)?;
-    Ok(PyBytes::new(py, &native_solution_generator(spends)?))
+    Ok(PyBytes::new_bound(py, &native_solution_generator(spends)?))
 }
 
 #[pyfunction]
@@ -263,7 +266,7 @@ fn solution_generator_backrefs<'p>(
     spends: &Bound<'_, PyAny>,
 ) -> PyResult<Bound<'p, PyBytes>> {
     let spends = convert_list_of_tuples(spends)?;
-    Ok(PyBytes::new(
+    Ok(PyBytes::new_bound(
         py,
         &native_solution_generator_backrefs(spends)?,
     ))
@@ -399,7 +402,7 @@ fn fast_forward_singleton<'p>(
     let solution = node_from_bytes(&mut a, spend.solution.as_slice())?;
 
     let new_solution = native_ff(&mut a, puzzle, solution, &spend.coin, new_coin, new_parent)?;
-    Ok(PyBytes::new(
+    Ok(PyBytes::new_bound(
         py,
         node_to_bytes(&a, new_solution)?.as_slice(),
     ))
