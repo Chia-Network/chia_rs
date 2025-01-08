@@ -108,7 +108,7 @@ jobs:
           git clone https://github.com/Chia-Network/clvm_tools.git --branch=main --single-branch
           pip install ./clvm_tools
           pip install colorama maturin pytest pytest-xdist chia-blockchain==2.1.2 clvm==0.9.8
-          maturin develop -m wheel/Cargo.toml
+          maturin develop --release -m wheel/Cargo.toml
       - uses: actions/upload-artifact@v4
         with:
           name: executable-${{ matrix.repeats }}
