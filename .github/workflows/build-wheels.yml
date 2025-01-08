@@ -140,7 +140,7 @@ jobs:
         run: |
           python${{ matrix.python.major-dot-minor }} -m venv venv
           . venv/bin/activate
-          maturin build -i python --release -m wheel/Cargo.toml
+          maturin build -i python --release -m wheel/Cargo.toml --features=openssl,pyo3/extension-module
 
       - name: Build Linux with maturin on Python ${{ matrix.python }}
         if: matrix.os.matrix == 'ubuntu'
@@ -150,13 +150,14 @@ jobs:
             ${{ matrix.python.by-arch[matrix.arch.matrix].docker-url }} \
             bash -exc '\
               yum -y install openssl-devel && \
+              yum -y install perl-IPC-Cmd && \
               source $HOME/.cargo/env && \
               rustup target add ${{ matrix.python.by-arch[matrix.arch.matrix].rustup-target }} && \
               python${{ matrix.python.major-dot-minor }} -m venv /venv && \
               . /venv/bin/activate && \
               pip install --upgrade pip && \
               pip install maturin && \
-              CC=gcc maturin build --release --manylinux ${{ matrix.python.by-arch[matrix.arch.matrix].manylinux-version }} -m wheel/Cargo.toml \
+              CC=gcc maturin build --release --manylinux ${{ matrix.python.by-arch[matrix.arch.matrix].manylinux-version }} -m wheel/Cargo.toml --features=openssl,pyo3/extension-module \
             '
 
       - name: Build Windows with maturin on Python ${{ matrix.python }}
