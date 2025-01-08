@@ -1528,16 +1528,6 @@ impl Iterator for MerkleBlobBreadthFirstIterator<'_> {
     }
 }
 
-#[cfg(any(test, debug_assertions))]
-impl Drop for MerkleBlob {
-    fn drop(&mut self) {
-        if self.check_integrity_on_drop {
-            self.check_integrity()
-                .expect("integrity check failed while dropping merkle blob");
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
