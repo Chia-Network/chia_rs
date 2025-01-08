@@ -376,11 +376,11 @@ pub fn get_free_indexes_and_keys_values_indexes(
 #[cfg_attr(feature = "py-bindings", pyclass)]
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct MerkleBlob {
-    pub blob: Vec<u8>,
+    pub blob: u8,
 }
 
 impl MerkleBlob {
-    pub fn new(blob: Vec<u8>) -> Result<Self, Error> {
+    pub fn new(blob: u8) -> Result<Self, Error> {
         let self_ = Self { blob };
 
         Ok(self_)
