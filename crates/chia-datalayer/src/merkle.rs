@@ -1,7 +1,7 @@
 #[cfg(feature = "py-bindings")]
 use pyo3::{
-    buffer::PyBuffer, exceptions::PyValueError, pyclass, pymethods, types::PyInt, Bound,
-    FromPyObject, IntoPy, IntoPyObject, PyObject, PyResult, Python,
+    buffer::PyBuffer, exceptions::PyValueError, pyclass, pymethods, FromPyObject, IntoPy,
+    IntoPyObject, PyObject, PyResult, Python,
 };
 
 use chia_protocol::Bytes32;
@@ -15,20 +15,14 @@ use std::iter::zip;
 use std::ops::Range;
 use thiserror::Error;
 
-#[cfg_attr(feature = "py-bindings", derive(FromPyObject), pyo3(transparent))]
+#[cfg_attr(
+    feature = "py-bindings",
+    derive(FromPyObject),
+    derive(IntoPyObject),
+    pyo3(transparent)
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 pub struct TreeIndex(u32);
-
-#[cfg(feature = "py-bindings")]
-impl<'py> IntoPyObject<'py> for TreeIndex {
-    type Target = PyInt;
-    type Output = Bound<'py, Self::Target>;
-    type Error = std::convert::Infallible;
-
-    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
-        self.0.into_pyobject(py)
-    }
-}
 
 impl std::fmt::Display for TreeIndex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -41,20 +35,15 @@ type Hash = Bytes32;
 /// Key and value ids are provided from outside of this code and are implemented as
 /// the row id from sqlite which is a signed 8 byte integer.  The actual key and
 /// value data bytes will not be handled within this code, only outside.
-#[cfg_attr(feature = "py-bindings", derive(FromPyObject), pyo3(transparent))]
+#[cfg_attr(
+    feature = "py-bindings",
+    derive(FromPyObject),
+    derive(IntoPyObject),
+    pyo3(transparent)
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 pub struct KvId(i64);
 
-#[cfg(feature = "py-bindings")]
-impl<'py> IntoPyObject<'py> for KvId {
-    type Target = PyInt;
-    type Output = Bound<'py, Self::Target>;
-    type Error = std::convert::Infallible;
-
-    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
-        self.0.into_pyobject(py)
-    }
-}
 impl std::fmt::Display for KvId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
