@@ -105,21 +105,21 @@ openssl = ["chia-sha2/openssl", "clvmr/openssl"]
 lto = "thin"
 
 [workspace.dependencies]
-chia_py_streamable_macro = { path = "./crates/chia_py_streamable_macro", version = "0.17.0" }
-chia_streamable_macro = { path = "./crates/chia_streamable_macro", version = "0.17.0" }
-chia-bls = { path = "./crates/chia-bls", version = "0.17.0" }
-chia-client = { path = "./crates/chia-client", version = "0.17.0" }
-chia-consensus = { path = "./crates/chia-consensus", version = "0.17.0" }
+chia_py_streamable_macro = { path = "./crates/chia_py_streamable_macro", version = "0.16.0" }
+chia_streamable_macro = { path = "./crates/chia_streamable_macro", version = "0.15.0" }
+chia-bls = { path = "./crates/chia-bls", version = "0.16.0" }
+chia-client = { path = "./crates/chia-client", version = "0.16.0" }
+chia-consensus = { path = "./crates/chia-consensus", version = "0.16.0" }
 chia-datalayer = { path = "./crates/chia-datalayer", version = "0.16.0" }
-chia-protocol = { path = "./crates/chia-protocol", version = "0.17.0" }
-chia-secp = { path = "./crates/chia-secp", version = "0.17.0" }
-chia-ssl = { path = "./crates/chia-ssl", version = "0.17.0" }
-chia-traits = { path = "./crates/chia-traits", version = "0.17.0" }
-chia-puzzles = { path = "./crates/chia-puzzles", version = "0.17.0" }
-chia-sha2 = { path = "./crates/chia-sha2", version = "0.17.0" }
-clvm-traits = { path = "./crates/clvm-traits", version = "0.17.0" }
-clvm-utils = { path = "./crates/clvm-utils", version = "0.17.0" }
-clvm-derive = { path = "./crates/clvm-derive", version = "0.17.0" }
+chia-protocol = { path = "./crates/chia-protocol", version = "0.16.0" }
+chia-secp = { path = "./crates/chia-secp", version = "0.16.0" }
+chia-ssl = { path = "./crates/chia-ssl", version = "0.11.0" }
+chia-traits = { path = "./crates/chia-traits", version = "0.15.0" }
+chia-puzzles = { path = "./crates/chia-puzzles", version = "0.16.0" }
+chia-sha2 = { path = "./crates/chia-sha2", version = "0.15.0" }
+clvm-traits = { path = "./crates/clvm-traits", version = "0.16.0" }
+clvm-utils = { path = "./crates/clvm-utils", version = "0.16.0" }
+clvm-derive = { path = "./crates/clvm-derive", version = "0.13.0" }
 chia-fuzz = { path = "./crates/chia-consensus/fuzz", version = "0.16.0" }
 chia-bls-fuzz = { path = "./crates/chia-bls/fuzz", version = "0.16.0" }
 chia-datalayer-fuzz = { path = "./crates/chia-datalayer/fuzz", version = "0.16.0" }
