@@ -373,13 +373,6 @@ pub fn get_free_indexes_and_keys_values_indexes(
     Ok((free_indexes, key_to_index))
 }
 
-/// Stores a DataLayer merkle tree in bytes and provides serialization on each access so that only
-/// the parts presently in use are stored in active objects.  The bytes are grouped as blocks of
-/// equal size regardless of being internal vs. external nodes so that block indexes can be used
-/// for references to particular nodes and readily converted to byte indexes.  The leaf nodes
-/// do not hold the DataLayer key and value data but instead an id for each of the key and value
-/// such that the code using a merkle blob can store the key and value as they see fit.  Each node
-/// stores the hash for the merkle aspect of the tree.
 #[cfg_attr(feature = "py-bindings", pyclass)]
 #[derive(Debug)]
 pub struct MerkleBlob {
