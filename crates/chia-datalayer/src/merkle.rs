@@ -373,6 +373,47 @@ pub fn get_free_indexes_and_keys_values_indexes(
     Ok((free_indexes, key_to_index))
 }
 
+/// Stores a DataLayer merkle tree in bytes and provides serialization on each access so that only
+/// the parts presently in use are stored in active objects.  The bytes are grouped as blocks of
+/// equal size regardless of being internal vs. external nodes so that block indexes can be used
+/// for references to particular nodes and readily converted to byte indexes.  The leaf nodes
+/// do not hold the DataLayer key and value data but instead an id for each of the key and value
+/// such that the code using a merkle blob can store the key and value as they see fit.  Each node
+/// stores the hash for the merkle aspect of the tree.
+#[cfg_attr(feature = "py-bindings", pyclass(get_all))]
+#[derive(Debug)]
+pub struct MerkleBlob {
+    blob: Vec<u8>,
+    // TODO: would be nice for this to be deterministic ala a fifo set
+    free_indexes: HashSet<TreeIndex>,
+    key_to_index: HashMap<KvId, TreeIndex>,
+    // TODO: used by fuzzing, some cleaner way?  making it cfg-dependent is annoying with
+    //       the type stubs
+    pub check_integrity_on_drop: bool,
+}
+
+impl MerkleBlob {
+    pub fn new(blob: Vec<u8>) -> Result<Self, Error> {
+        let length = blob.len();
+        let remainder = length % BLOCK_SIZE;
+        if remainder != 0 {
+            return Err(Error::InvalidBlobLength(remainder));
+        }
+
+        // TODO: maybe integrate integrity check here if quick enough
+        let (free_indexes, key_to_index) = get_free_indexes_and_keys_values_indexes(&blob)?;
+
+        let self_ = Self {
+            blob,
+            free_indexes,
+            key_to_index,
+            check_integrity_on_drop: true,
+        };
+
+        Ok(self_)
+    }
+}
+
 // impl<'a> IntoIterator for &'a MerkleBlob {
 //     type Item = (TreeIndex, Block);
 //     type IntoIter = MerkleBlobLeftChildFirstIterator<'a>;
