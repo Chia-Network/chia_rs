@@ -374,7 +374,7 @@ pub fn get_free_indexes_and_keys_values_indexes(
 }
 
 #[cfg_attr(feature = "py-bindings", pyclass)]
-#[derive(Debug)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct MerkleBlob {
     pub blob: Vec<u8>,
 }
