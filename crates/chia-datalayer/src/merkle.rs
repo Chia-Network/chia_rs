@@ -380,13 +380,13 @@ pub fn get_free_indexes_and_keys_values_indexes(
 /// do not hold the DataLayer key and value data but instead an id for each of the key and value
 /// such that the code using a merkle blob can store the key and value as they see fit.  Each node
 /// stores the hash for the merkle aspect of the tree.
-#[cfg_attr(feature = "py-bindings", pyclass(get_all))]
+#[cfg_attr(feature = "py-bindings", pyclass)]
 #[derive(Debug)]
 pub struct MerkleBlob {
-    blob: Vec<u8>,
+    pub blob: Vec<u8>,
     // TODO: would be nice for this to be deterministic ala a fifo set
-    free_indexes: HashSet<TreeIndex>,
-    key_to_index: HashMap<KvId, TreeIndex>,
+    pub free_indexes: HashSet<TreeIndex>,
+    pub key_to_index: HashMap<KvId, TreeIndex>,
     // TODO: used by fuzzing, some cleaner way?  making it cfg-dependent is annoying with
     //       the type stubs
     pub check_integrity_on_drop: bool,
