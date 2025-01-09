@@ -379,14 +379,6 @@ pub struct MerkleBlob {
     pub blob: u8,
 }
 
-impl MerkleBlob {
-    pub fn new(blob: u8) -> Result<Self, Error> {
-        let self_ = Self { blob };
-
-        Ok(self_)
-    }
-}
-
 // impl<'a> IntoIterator for &'a MerkleBlob {
 //     type Item = (TreeIndex, Block);
 //     type IntoIter = MerkleBlobLeftChildFirstIterator<'a>;
