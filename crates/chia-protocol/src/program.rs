@@ -351,6 +351,7 @@ impl Program {
         args: &Bound<'_, PyAny>,
     ) -> PyResult<(u64, Bound<'a, PyAny>)> {
         use clvmr::MEMPOOL_MODE;
+        #[allow(clippy::used_underscore_items)]
         self._run(py, max_cost, MEMPOOL_MODE, args)
     }
 
@@ -360,9 +361,11 @@ impl Program {
         max_cost: u64,
         args: &Bound<'_, PyAny>,
     ) -> PyResult<(u64, Bound<'a, PyAny>)> {
+        #[allow(clippy::used_underscore_items)]
         self._run(py, max_cost, 0, args)
     }
 
+    // exposed to python so allowing use of the python private indicator leading underscore
     fn _run<'a>(
         &self,
         py: Python<'a>,

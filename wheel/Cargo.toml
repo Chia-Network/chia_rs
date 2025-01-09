@@ -25,6 +25,9 @@ python-source = "python"
 [package.metadata.cargo-machete]
 ignored = ["chia-client", "chia-ssl"]
 
+[features]
+openssl = ["clvmr/openssl"]
+
 [dependencies]
 clvmr = { workspace = true }
 hex = { workspace = true }
