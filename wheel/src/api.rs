@@ -131,7 +131,7 @@ pub fn get_puzzle_and_solution_for_coin<'a>(
     find_amount: u64,
     find_ph: Bytes32,
     flags: u32,
-) -> PyResult<(Bound<'_, PyBytes>, Bound<'_, PyBytes>)> {
+) -> PyResult<(Bound<'a, PyBytes>, Bound<'a, PyBytes>)> {
     let mut allocator = make_allocator(LIMIT_HEAP);
 
     let program = py_to_slice::<'a>(program);
