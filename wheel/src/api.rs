@@ -452,7 +452,7 @@ pub fn py_get_flags_for_height_and_constants(height: u32, constants: &ConsensusC
 }
 
 #[pymodule]
-pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // generator functions
     m.add_function(wrap_pyfunction!(run_block_generator, m)?)?;
     m.add_function(wrap_pyfunction!(run_block_generator2, m)?)?;
@@ -474,11 +474,6 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // constants
     m.add_class::<ConsensusConstants>()?;
-
-    // datalayer
-    m.add_class::<MerkleBlob>()?;
-    m.add_class::<InternalNode>()?;
-    m.add_class::<LeafNode>()?;
 
     // merkle tree
     m.add_class::<MerkleSet>()?;
@@ -646,6 +641,25 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<SecretKey>()?;
     m.add_class::<AugSchemeMPL>()?;
     m.add_class::<BlsCache>()?;
+
+    add_datalayer_submodule(py, m)?;
+
+    Ok(())
+}
+
+pub fn add_datalayer_submodule(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
+    let datalayer = PyModule::new(py, "datalayer")?;
+    parent.add_submodule(&datalayer)?;
+
+    datalayer.add_class::<MerkleBlob>()?;
+    datalayer.add_class::<InternalNode>()?;
+    datalayer.add_class::<LeafNode>()?;
+
+    // https://github.com/PyO3/pyo3/issues/1517#issuecomment-808664021
+    // https://github.com/PyO3/pyo3/issues/759
+    py.import("sys")?
+        .getattr("modules")?
+        .set_item("chia_rs.datalayer", datalayer)?;
 
     Ok(())
 }
