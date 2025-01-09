@@ -111,5 +111,6 @@ jobs:
           maturin develop --release -m wheel/Cargo.toml
           # run pytest in a single process to avoid a race writing the coverage report
           pytest -n 0 tests
-          grcov . --binary-path target -s . --branch --ignore-not-existing --ignore='*/.cargo/*' --ignore='tests/*' --ignore='venv/*' -o rust_cov.info
-          python -c 'with open("rust_cov.info") as f: lines = [l for l in f if not (l.startswith("DA:") and int(l.split(",")[1].strip()) >= 2**63)]; open("lcov.info", "w").writelines(lines)'
+
+#          grcov . --binary-path target -s . --branch --ignore-not-existing --ignore='*/.cargo/*' --ignore='tests/*' --ignore='venv/*' -o rust_cov.info
+#          python -c 'with open("rust_cov.info") as f: lines = [l for l in f if not (l.startswith("DA:") and int(l.split(",")[1].strip()) >= 2**63)]; open("lcov.info", "w").writelines(lines)'
