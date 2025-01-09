@@ -373,6 +373,7 @@ pub fn get_free_indexes_and_keys_values_indexes(
     Ok((free_indexes, key_to_index))
 }
 
+#[cfg_attr(feature = "py-bindings", pyclass)]
 pub struct MerkleBlob {
     pub blob: u8,
 }
