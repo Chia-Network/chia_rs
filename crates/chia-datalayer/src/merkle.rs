@@ -374,7 +374,6 @@ pub fn get_free_indexes_and_keys_values_indexes(
 }
 
 #[cfg_attr(feature = "py-bindings", pyclass)]
-#[derive(Clone, Debug, Hash, PartialEq, Eq, Streamable)]
 pub struct MerkleBlob {
     pub blob: u8,
 }
