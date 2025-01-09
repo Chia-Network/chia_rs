@@ -319,10 +319,18 @@ jobs:
           echo "RUSTFLAGS=-Cinstrument-coverage" >> "$GITHUB_ENV"
           echo "LLVM_PROFILE_FILE=$(pwd)/target/chia_rs-%p-%m.profraw" >> "$GITHUB_ENV"
           echo "CARGO_TARGET_DIR=$(pwd)/target" >> "$GITHUB_ENV"
-      - name: cargo test
+      - name: cargo test (not windows)
+        if: matrix.os != 'windows-latest'
         run: cargo test --workspace --all-features
-      - name: cargo test (release)
+      - name: cargo test (release) (not windows)
+        if: matrix.os != 'windows-latest'
         run: cargo test --workspace --all-features --release
+      - name: cargo test (windows)
+        if: matrix.os == 'windows-latest'
+        run: cargo test --workspace
+      - name: cargo test (release) (windows)
+        if: matrix.os == 'windows-latest'
+        run: cargo test --workspace --release
       - name: Continue with coverage
         if: matrix.os == 'ubuntu-latest'
         run: |
