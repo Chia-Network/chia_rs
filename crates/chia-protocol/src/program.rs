@@ -351,7 +351,7 @@ impl Program {
         args: &Bound<'_, PyAny>,
     ) -> PyResult<(u64, Bound<'a, PyAny>)> {
         use clvmr::MEMPOOL_MODE;
-        self._run(py, max_cost, MEMPOOL_MODE, args)
+        self.py_run(py, max_cost, MEMPOOL_MODE, args)
     }
 
     fn run_with_cost<'a>(
@@ -360,10 +360,10 @@ impl Program {
         max_cost: u64,
         args: &Bound<'_, PyAny>,
     ) -> PyResult<(u64, Bound<'a, PyAny>)> {
-        self._run(py, max_cost, 0, args)
+        self.py_run(py, max_cost, 0, args)
     }
 
-    fn _run<'a>(
+    fn py_run<'a>(
         &self,
         py: Python<'a>,
         max_cost: u64,
