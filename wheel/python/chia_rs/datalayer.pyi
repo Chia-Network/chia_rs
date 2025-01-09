@@ -4,6 +4,12 @@ from .sized_ints import uint8, uint16, uint32, uint64, uint128, int8, int16, int
 from typing_extensions import Self
 from chia.types.blockchain_format.program import Program as ChiaProgram
 
+
+DATA_SIZE: int
+BLOCK_SIZE: int
+METADATA_SIZE: int
+
+
 @final
 class InternalNode:
     @property
@@ -60,4 +66,11 @@ class MerkleBlob:
     def __len__(self) -> int: ...
 
 # TODO: i would rather not specify this at all
-__all__: Sequence[str] = ["InternalNode", "LeafNode", "MerkleBlob"]
+__all__: Sequence[str] = [
+    "DATA_SIZE",
+    "BLOCK_SIZE",
+    "METADATA_SIZE",
+    "InternalNode",
+    "LeafNode",
+    "MerkleBlob",
+]
