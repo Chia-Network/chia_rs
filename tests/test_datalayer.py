@@ -1,7 +1,8 @@
-from chia_rs.datalayer import LeafNode, MerkleBlob
+import pytest
+
+from chia_rs.datalayer import InvalidBlobLengthError, LeafNode, MerkleBlob
 from chia_rs.sized_bytes import bytes32
 from chia_rs.sized_ints import int64, uint8
-
 
 def test_merkle_blob():
     blob = bytes.fromhex(
@@ -52,3 +53,9 @@ def test_checking_coverage() -> None:
         if isinstance(node, LeafNode)
     }
     assert keys == set(range(count))
+
+
+def test_invalid_blob_length_raised() -> None:
+    """Mostly verifying that the exceptions are available and raise."""
+    with pytest.raises(InvalidBlobLengthError):
+        MerkleBlob(blob=b"\x00")

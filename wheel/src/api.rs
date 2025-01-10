@@ -78,8 +78,6 @@ use chia_bls::{
     Signature,
 };
 
-use chia_datalayer::{InternalNode, LeafNode, MerkleBlob};
-
 #[pyfunction]
 pub fn compute_merkle_set_root<'p>(
     py: Python<'p>,
@@ -648,12 +646,16 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 
 pub fn add_datalayer_submodule(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
+    use chia_datalayer::*;
+
     let datalayer = PyModule::new(py, "datalayer")?;
     parent.add_submodule(&datalayer)?;
 
     datalayer.add_class::<MerkleBlob>()?;
     datalayer.add_class::<InternalNode>()?;
     datalayer.add_class::<LeafNode>()?;
+
+    python_exceptions::add_to_module(py, &datalayer)?;
 
     // https://github.com/PyO3/pyo3/issues/1517#issuecomment-808664021
     // https://github.com/PyO3/pyo3/issues/759
