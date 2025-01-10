@@ -53,3 +53,6 @@ chia_rs\.spend\.SpendConditions\.from_parent
 chia_rs\.Coin\.from_parent
 chia_rs\.CoinSpend\.from_parent
 chia_rs\.SpendBundle\.from_parent
+
+# banning * imports
+chia_rs\.datalayer\.__all__
