@@ -2,7 +2,6 @@ from chia_rs import (
     get_puzzle_and_solution_for_coin,
     get_puzzle_and_solution_for_coin2,
     run_block_generator2,
-    ALLOW_BACKREFS,
     run_chia_program,
     Program,
     Coin,
@@ -48,7 +47,7 @@ def test_get_puzzle_and_solution_for_coin(input_file: str) -> None:
         block,
         [],
         MAX_COST,
-        ALLOW_BACKREFS | DONT_VALIDATE_SIGNATURE,
+        DONT_VALIDATE_SIGNATURE,
         G2Element(),
         None,
         DEFAULT_CONSTANTS,
@@ -71,14 +70,14 @@ def test_get_puzzle_and_solution_for_coin(input_file: str) -> None:
             bytes32(s.parent_id),
             s.coin_amount,
             bytes32(s.puzzle_hash),
-            ALLOW_BACKREFS,
+            0,
         )
         puzzle2, solution2 = get_puzzle_and_solution_for_coin2(
             Program.from_bytes(block),
             [],
             11000000000,
             Coin(bytes32(s.parent_id), bytes32(s.puzzle_hash), uint64(s.coin_amount)),
-            ALLOW_BACKREFS,
+            0,
         )
         assert puzzle == bytes(puzzle2)
         assert solution == bytes(solution2)

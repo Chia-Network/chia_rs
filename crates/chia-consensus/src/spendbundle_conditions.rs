@@ -198,10 +198,7 @@ mod tests {
     }
 
     #[cfg(not(debug_assertions))]
-    use crate::gen::flags::ALLOW_BACKREFS;
-
-    #[cfg(not(debug_assertions))]
-    const DEFAULT_FLAGS: u32 = ALLOW_BACKREFS | MEMPOOL_MODE;
+    const DEFAULT_FLAGS: u32 = MEMPOOL_MODE;
 
     // given a block generator and block-refs, convert run the generator to
     // produce the SpendBundle for the block without runningi, or validating,
