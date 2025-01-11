@@ -228,8 +228,7 @@ fn run_generator(#[case] name: &str) {
         block_refs.push(hex::decode(env_hex).expect("hex decode env-file"));
     }
 
-    const DEFAULT_FLAGS: u32 = 0;
-    for (flags, expected) in zip(&[DEFAULT_FLAGS, DEFAULT_FLAGS | MEMPOOL_MODE], expected) {
+    for (flags, expected) in zip(&[0, MEMPOOL_MODE], expected) {
         println!("flags: {flags:x}");
         let mut a = make_allocator(*flags);
         let conds = run_block_generator(

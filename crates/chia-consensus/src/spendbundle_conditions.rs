@@ -204,9 +204,6 @@ mod tests {
         assert_eq!(conditions.cost, cost);
     }
 
-    #[cfg(not(debug_assertions))]
-    const DEFAULT_FLAGS: u32 = MEMPOOL_MODE;
-
     // given a block generator and block-refs, convert run the generator to
     // produce the SpendBundle for the block without runningi, or validating,
     // the puzzles.
@@ -220,11 +217,11 @@ mod tests {
         use clvmr::serde::node_from_bytes_backrefs;
         use clvmr::serde::node_to_bytes;
 
-        let mut a = make_allocator(DEFAULT_FLAGS);
+        let mut a = make_allocator(MEMPOOL_MODE);
 
         let generator = node_from_bytes_backrefs(&mut a, generator).expect("node_from_bytes");
         let args = setup_generator_args(&mut a, block_refs).expect("setup_generator_args");
-        let dialect = ChiaDialect::new(DEFAULT_FLAGS);
+        let dialect = ChiaDialect::new(MEMPOOL_MODE);
         let Reduction(_, mut all_spends) =
             run_program(&mut a, &dialect, generator, args, 11_000_000_000).expect("run_program");
 
@@ -336,13 +333,13 @@ mod tests {
         // output conditions match and update the cost. The cost
         // of just the spend bundle will be lower
         let (block_cost, block_output) = {
-            let mut a = make_allocator(DEFAULT_FLAGS);
+            let mut a = make_allocator(MEMPOOL_MODE);
             let block_conds = run_block_generator(
                 &mut a,
                 &generator_buffer,
                 &block_refs,
                 11_000_000_000,
-                DEFAULT_FLAGS | DONT_VALIDATE_SIGNATURE,
+                MEMPOOL_MODE | DONT_VALIDATE_SIGNATURE,
                 &Signature::default(),
                 None,
                 &TEST_CONSTANTS,
