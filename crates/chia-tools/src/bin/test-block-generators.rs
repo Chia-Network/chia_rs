@@ -19,7 +19,6 @@ use std::time::{Duration, Instant};
 #[allow(clippy::struct_excessive_bools)]
 struct Args {
     /// Path to blockchain database file to analyze
-    #[arg(short, long)]
     file: String,
 
     /// The number of paralell thread to run block generators in
@@ -43,7 +42,7 @@ struct Args {
 
     /// The hard fork block height. Defaults to mainnet (5,496,000). For
     /// testnet11, set to 0.
-    #[arg(short, long, default_value_t = 5_496_000)]
+    #[arg(long, default_value_t = 5_496_000)]
     hard_fork_height: u32,
 
     /// stop running block generators when reaching this height
