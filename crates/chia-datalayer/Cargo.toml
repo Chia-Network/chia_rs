@@ -12,7 +12,7 @@ repository = "https://github.com/Chia-Network/chia_rs"
 workspace = true
 
 [features]
-py-bindings = ["dep:pyo3"]
+py-bindings = ["dep:pyo3", "chia-protocol/py-bindings"]
 
 [lib]
 crate-type = ["rlib"]
