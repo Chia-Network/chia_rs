@@ -62,6 +62,7 @@ impl std::fmt::Display for KvId {
     }
 }
 
+// consider https://github.com/Chia-Network/chia_rs/pull/872 when altendky is less of a noob
 macro_rules! create_errors {
     (
         $enum:ident,
@@ -204,12 +205,6 @@ create_errors!(
             ZeroLengthSeedNotAllowedError,
             "zero-length seed bytes not allowed",
             ()
-        ),
-        (
-            BlockIndexOutOfRange,
-            BlockIndexOutOfRangeError,
-            "block index out of range: {0:?}",
-            (TreeIndex)
         ),
         (
             NodeNotALeaf,
@@ -1166,7 +1161,7 @@ impl MerkleBlob {
         let new_block_bytes = block.to_bytes()?;
         let extend_index = self.extend_index();
         match index.cmp(&extend_index) {
-            Ordering::Greater => return Err(Error::BlockIndexOutOfRange(index)),
+            Ordering::Greater => return Err(Error::BlockIndexOutOfBounds(index)),
             Ordering::Equal => self.blob.extend_from_slice(&new_block_bytes),
             Ordering::Less => {
                 // OPT: lots of deserialization here for just the key
@@ -1205,7 +1200,7 @@ impl MerkleBlob {
         Ok(self
             .blob
             .get(block_range(index))
-            .ok_or(Error::BlockIndexOutOfRange(index))?
+            .ok_or(Error::BlockIndexOutOfBounds(index))?
             .try_into()
             .unwrap_or_else(|e| panic!("failed getting block {index}: {e}")))
     }
@@ -1377,7 +1372,11 @@ impl MerkleBlob {
     }
 
     #[pyo3(name = "get_raw_node")]
-    pub fn py_get_raw_node(&mut self, index: TreeIndex) -> PyResult<Node> {
+    pub fn py_get_raw_node(&mut self, index: &Bound<'_, PyInt>) -> PyResult<Node> {
+        use pyo3::prelude::PyAnyMethods;
+        let index = TreeIndex(index.extract::<u32>().or(Err(
+            python_exceptions::BlockIndexOutOfBoundsError::new_err(index.to_string()),
+        ))?);
         Ok(self.get_node(index)?)
     }
 
