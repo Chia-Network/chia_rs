@@ -3,7 +3,7 @@ use crate::gen::conditions::{
     parse_spends, process_single_spend, validate_conditions, validate_signature, EmptyVisitor,
     ParseState, SpendBundleConditions,
 };
-use crate::gen::flags::{ALLOW_BACKREFS, DONT_VALIDATE_SIGNATURE};
+use crate::gen::flags::DONT_VALIDATE_SIGNATURE;
 use crate::gen::validation_error::{first, ErrorCode, ValidationErr};
 use crate::generator_rom::{CLVM_DESERIALIZER, GENERATOR_ROM};
 use chia_bls::{BlsCache, Signature};
@@ -14,7 +14,7 @@ use clvmr::cost::Cost;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
 use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs, node_from_bytes_backrefs_record};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 pub fn subtract_cost(
     a: &Allocator,
@@ -88,11 +88,7 @@ where
     subtract_cost(a, &mut cost_left, byte_cost)?;
 
     let generator_rom = node_from_bytes(a, &GENERATOR_ROM)?;
-    let program = if (flags & ALLOW_BACKREFS) != 0 {
-        node_from_bytes_backrefs(a, program)?
-    } else {
-        node_from_bytes(a, program)?
-    };
+    let program = node_from_bytes_backrefs(a, program)?;
 
     // this is setting up the arguments to be passed to the generator ROM,
     // not the actual generator (the ROM does that).
@@ -178,11 +174,7 @@ where
     let mut cost_left = max_cost;
     subtract_cost(a, &mut cost_left, byte_cost)?;
 
-    let (program, backrefs) = if (flags & ALLOW_BACKREFS) != 0 {
-        node_from_bytes_backrefs_record(a, program)?
-    } else {
-        (node_from_bytes(a, program)?, HashSet::<NodePtr>::new())
-    };
+    let (program, backrefs) = node_from_bytes_backrefs_record(a, program)?;
 
     let args = setup_generator_args(a, block_refs)?;
     let dialect = ChiaDialect::new(flags);
