@@ -65,12 +65,5 @@ class MerkleBlob:
 
     def __len__(self) -> int: ...
 
-# TODO: i would rather not specify this at all
-__all__: Sequence[str] = [
-    "DATA_SIZE",
-    "BLOCK_SIZE",
-    "METADATA_SIZE",
-    "InternalNode",
-    "LeafNode",
-    "MerkleBlob",
-]
+# just disallow * importing so we don't have to maintain this repetitive list
+__all__: Sequence[str] = []
