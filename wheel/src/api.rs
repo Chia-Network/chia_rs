@@ -78,7 +78,7 @@ use chia_bls::{
     Signature,
 };
 
-use chia_datalayer::{InternalNode, LeafNode, MerkleBlob};
+use chia_datalayer::{InternalNode, LeafNode, MerkleBlob, BLOCK_SIZE, DATA_SIZE, METADATA_SIZE};
 
 #[pyfunction]
 pub fn compute_merkle_set_root<'p>(
@@ -654,6 +654,10 @@ pub fn add_datalayer_submodule(py: Python<'_>, parent: &Bound<'_, PyModule>) -> 
     datalayer.add_class::<MerkleBlob>()?;
     datalayer.add_class::<InternalNode>()?;
     datalayer.add_class::<LeafNode>()?;
+
+    datalayer.add("BLOCK_SIZE", BLOCK_SIZE)?;
+    datalayer.add("DATA_SIZE", DATA_SIZE)?;
+    datalayer.add("METADATA_SIZE", METADATA_SIZE)?;
 
     // https://github.com/PyO3/pyo3/issues/1517#issuecomment-808664021
     // https://github.com/PyO3/pyo3/issues/759
