@@ -65,28 +65,18 @@ impl std::fmt::Display for KvId {
 macro_rules! create_errors {
     (
         $enum:ident,
-        (
-            $(
-                (
-                    $name:ident,
-                    $python_name:ident,
-                    $string:literal,
-                    (
-                        $(
-                            $type_:path
-                        ),
-                        *
-                    )
-                )
-            ),
-            *
-        )
+        $( (
+            $name:ident,
+            $python_name:ident,
+            $string:literal
+            $( , ( $( $type_:path ),* ) )?
+        ) ),*
     ) => {
         #[derive(Debug, Error, PartialEq, Eq)]
         pub enum $enum {
             $(
                 #[error($string)]
-                $name($($type_,)*),
+                $name $( ( $( $type_, )* ) )?,
             )*
         }
 
@@ -113,129 +103,131 @@ macro_rules! create_errors {
                 let message = err.to_string();
                 match err {
                     $(
-                        Error::$name(..) => python_exceptions::$python_name::new_err(message),
+                        create_errors!( impl $name $( ( $( $type_ ),* ) )? ) => python_exceptions::$python_name::new_err(message),
                     )*
                 }
             }
         }
-    }
+    };
+
+    ( impl $name:ident ( $( $type_:path ),* ) ) => {
+        Error::$name( .. )
+    };
+
+    ( impl $name:ident ) => {
+        Error::$name
+    };
 }
 
 create_errors!(
     Error,
+    // TODO: don't use String here
     (
-        // TODO: don't use String here
-        (
-            FailedLoadingMetadata,
-            FailedLoadingMetadataError,
-            "failed loading metadata: {0}",
-            (String)
-        ),
-        // TODO: don't use String here
-        (
-            FailedLoadingNode,
-            FailedLoadingNodeError,
-            "failed loading node: {0}",
-            (String)
-        ),
-        (
-            InvalidBlobLength,
-            InvalidBlobLengthError,
-            "blob length must be a multiple of block count, found extra bytes: {0}",
-            (usize)
-        ),
-        (
-            KeyAlreadyPresent,
-            KeyAlreadyPresentError,
-            "key already present",
-            ()
-        ),
-        (
-            UnableToInsertAsRootOfNonEmptyTree,
-            UnableToInsertAsRootOfNonEmptyTreeError,
-            "requested insertion at root but tree not empty",
-            ()
-        ),
-        (
-            UnableToFindALeaf,
-            UnableToFindALeafError,
-            "unable to find a leaf",
-            ()
-        ),
-        (UnknownKey, UnknownKeyError, "unknown key: {0:?}", (KvId)),
-        (
-            IntegrityKeyNotInCache,
-            IntegrityKeyNotInCacheError,
-            "key not in key to index cache: {0:?}",
-            (KvId)
-        ),
-        (
-            IntegrityKeyToIndexCacheIndex,
-            IntegrityKeyToIndexCacheIndexError,
-            "key to index cache for {0:?} should be {1:?} got: {2:?}",
-            (KvId, TreeIndex, TreeIndex)
-        ),
-        (
-            IntegrityParentChildMismatch,
-            IntegrityParentChildMismatchError,
-            "parent and child relationship mismatched: {0:?}",
-            (TreeIndex)
-        ),
-        (
-            IntegrityKeyToIndexCacheLength,
-            IntegrityKeyToIndexCacheLengthError,
-            "found {0:?} leaves but key to index cache length is: {1}",
-            (usize, usize)
-        ),
-        (
-            IntegrityUnmatchedChildParentRelationships,
-            IntegrityUnmatchedChildParentRelationshipsError,
-            "unmatched parent -> child references found: {0}",
-            (usize)
-        ),
-        (
-            IntegrityTotalNodeCount,
-            IntegrityTotalNodeCountError,
-            "expected total node count {0:?} found: {1:?}",
-            (TreeIndex, usize)
-        ),
-        (
-            ZeroLengthSeedNotAllowed,
-            ZeroLengthSeedNotAllowedError,
-            "zero-length seed bytes not allowed",
-            ()
-        ),
-        (
-            BlockIndexOutOfRange,
-            BlockIndexOutOfRangeError,
-            "block index out of range: {0:?}",
-            (TreeIndex)
-        ),
-        (
-            NodeNotALeaf,
-            NodeNotALeafError,
-            "node not a leaf: {0:?}",
-            (InternalNode)
-        ),
-        (
-            Streaming,
-            StreamingError,
-            "from streamable: {0:?}",
-            (chia_traits::chia_error::Error)
-        ),
-        (
-            IndexIsNotAChild,
-            IndexIsNotAChildError,
-            "index not a child: {0}",
-            (TreeIndex)
-        ),
-        (CycleFound, CycleFoundError, "cycle found", ()),
-        (
-            BlockIndexOutOfBounds,
-            BlockIndexOutOfBoundsError,
-            "block index out of bounds: {0}",
-            (TreeIndex)
-        )
+        FailedLoadingMetadata,
+        FailedLoadingMetadataError,
+        "failed loading metadata: {0}",
+        (String)
+    ),
+    // TODO: don't use String here
+    (
+        FailedLoadingNode,
+        FailedLoadingNodeError,
+        "failed loading node: {0}",
+        (String)
+    ),
+    (
+        InvalidBlobLength,
+        InvalidBlobLengthError,
+        "blob length must be a multiple of block count, found extra bytes: {0}",
+        (usize)
+    ),
+    (
+        KeyAlreadyPresent,
+        KeyAlreadyPresentError,
+        "key already present"
+    ),
+    (
+        UnableToInsertAsRootOfNonEmptyTree,
+        UnableToInsertAsRootOfNonEmptyTreeError,
+        "requested insertion at root but tree not empty"
+    ),
+    (
+        UnableToFindALeaf,
+        UnableToFindALeafError,
+        "unable to find a leaf"
+    ),
+    (UnknownKey, UnknownKeyError, "unknown key: {0:?}", (KvId)),
+    (
+        IntegrityKeyNotInCache,
+        IntegrityKeyNotInCacheError,
+        "key not in key to index cache: {0:?}",
+        (KvId)
+    ),
+    (
+        IntegrityKeyToIndexCacheIndex,
+        IntegrityKeyToIndexCacheIndexError,
+        "key to index cache for {0:?} should be {1:?} got: {2:?}",
+        (KvId, TreeIndex, TreeIndex)
+    ),
+    (
+        IntegrityParentChildMismatch,
+        IntegrityParentChildMismatchError,
+        "parent and child relationship mismatched: {0:?}",
+        (TreeIndex)
+    ),
+    (
+        IntegrityKeyToIndexCacheLength,
+        IntegrityKeyToIndexCacheLengthError,
+        "found {0:?} leaves but key to index cache length is: {1}",
+        (usize, usize)
+    ),
+    (
+        IntegrityUnmatchedChildParentRelationships,
+        IntegrityUnmatchedChildParentRelationshipsError,
+        "unmatched parent -> child references found: {0}",
+        (usize)
+    ),
+    (
+        IntegrityTotalNodeCount,
+        IntegrityTotalNodeCountError,
+        "expected total node count {0:?} found: {1:?}",
+        (TreeIndex, usize)
+    ),
+    (
+        ZeroLengthSeedNotAllowed,
+        ZeroLengthSeedNotAllowedError,
+        "zero-length seed bytes not allowed"
+    ),
+    (
+        BlockIndexOutOfRange,
+        BlockIndexOutOfRangeError,
+        "block index out of range: {0:?}",
+        (TreeIndex)
+    ),
+    (
+        NodeNotALeaf,
+        NodeNotALeafError,
+        "node not a leaf: {0:?}",
+        (InternalNode)
+    ),
+    (
+        Streaming,
+        StreamingError,
+        "from streamable: {0:?}",
+        (chia_traits::chia_error::Error)
+    ),
+    (
+        IndexIsNotAChild,
+        IndexIsNotAChildError,
+        "index not a child: {0}",
+        (TreeIndex)
+    ),
+    (CycleFound, CycleFoundError, "cycle found", ()),
+    (
+        BlockIndexOutOfBounds,
+        BlockIndexOutOfBoundsError,
+        "block index out of bounds: {0}",
+        (TreeIndex)
     )
 );
 
@@ -556,7 +548,7 @@ impl MerkleBlob {
         insert_location: InsertLocation,
     ) -> Result<TreeIndex, Error> {
         if self.key_to_index.contains_key(&key) {
-            return Err(Error::KeyAlreadyPresent());
+            return Err(Error::KeyAlreadyPresent);
         }
 
         let insert_location = match insert_location {
@@ -570,7 +562,7 @@ impl MerkleBlob {
             }
             InsertLocation::AsRoot {} => {
                 if !self.key_to_index.is_empty() {
-                    return Err(Error::UnableToInsertAsRootOfNonEmptyTree());
+                    return Err(Error::UnableToInsertAsRootOfNonEmptyTree);
                 };
                 self.insert_first(key, value, hash)
             }
@@ -913,7 +905,7 @@ impl MerkleBlob {
     fn get_min_height_leaf(&self) -> Result<LeafNode, Error> {
         let (_index, block) = MerkleBlobBreadthFirstIterator::new(&self.blob)
             .next()
-            .ok_or(Error::UnableToFindALeaf())??;
+            .ok_or(Error::UnableToFindALeaf)??;
 
         Ok(block
             .node
@@ -1113,7 +1105,7 @@ impl MerkleBlob {
         }
 
         // TODO: zero means left here but right below?
-        let side = if (seed_bytes.last().ok_or(Error::ZeroLengthSeedNotAllowed())? & 1 << 7) == 0 {
+        let side = if (seed_bytes.last().ok_or(Error::ZeroLengthSeedNotAllowed)? & 1 << 7) == 0 {
             Side::Left
         } else {
             Side::Right
