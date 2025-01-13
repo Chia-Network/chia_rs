@@ -70,6 +70,8 @@ pub struct OwnedSpendBundleConditions {
     // set if the aggregate signature of the block/spend bundle was
     // successfully validated
     pub validated_signature: bool,
+    pub execution_cost: u64,
+    pub condition_cost: u64,
 }
 
 impl OwnedSpendConditions {
@@ -144,6 +146,8 @@ impl OwnedSpendBundleConditions {
             removal_amount: sb.removal_amount,
             addition_amount: sb.addition_amount,
             validated_signature: sb.validated_signature,
+            execution_cost: sb.execution_cost,
+            condition_cost: sb.condition_cost,
         }
     }
 }

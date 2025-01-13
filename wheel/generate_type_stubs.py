@@ -514,6 +514,8 @@ class MerkleSet:
             "removal_amount: int",
             "addition_amount: int",
             "validated_signature: bool",
+            "execution_cost: int",
+            "condition_cost: int",
         ],
     )
 

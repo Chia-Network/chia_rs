@@ -49,6 +49,8 @@ fuzz_target!(|data: &[u8]| {
         }
         (Ok(a), Ok(b)) => {
             assert!(a.cost >= b.cost);
+            assert!(a.execution_cost > b.execution_cost);
+            assert_eq!(a.condition_cost, b.condition_cost);
             assert_eq!(a.reserve_fee, b.reserve_fee);
             assert_eq!(a.removal_amount, b.removal_amount);
             assert_eq!(a.addition_amount, b.addition_amount);

@@ -85,10 +85,34 @@ def test_hash_spend() -> None:
 def test_hash_spend_bundle_conditions() -> None:
 
     a1 = SpendBundleConditions(
-        [], 1000, 1337, 42, None, None, [(pk, b"msg")], 12345678, 123, 456, False
+        [],
+        1000,
+        1337,
+        42,
+        None,
+        None,
+        [(pk, b"msg")],
+        12345678,
+        123,
+        456,
+        False,
+        4321,
+        8765,
     )
     a2 = SpendBundleConditions(
-        [], 1001, 1337, 42, None, None, [(pk, b"msg")], 12345678, 123, 456, False
+        [],
+        1001,
+        1337,
+        42,
+        None,
+        None,
+        [(pk, b"msg")],
+        12345678,
+        123,
+        456,
+        False,
+        4321,
+        8765,
     )
     b = hash(a1)
     c = hash(a2)
@@ -391,7 +415,19 @@ def test_missing_field() -> None:
 def test_json_spend_bundle_conditions() -> None:
 
     a = SpendBundleConditions(
-        [], 1000, 1337, 42, None, None, [(pk, b"msg")], 12345678, 123, 456, False
+        [],
+        1000,
+        1337,
+        42,
+        None,
+        None,
+        [(pk, b"msg")],
+        12345678,
+        123,
+        456,
+        False,
+        4321,
+        8765,
     )
 
     assert a.to_json_dict() == {
@@ -406,13 +442,27 @@ def test_json_spend_bundle_conditions() -> None:
         "removal_amount": 123,
         "addition_amount": 456,
         "validated_signature": False,
+        "execution_cost": 4321,
+        "condition_cost": 8765,
     }
 
 
 def test_from_json_spend_bundle_conditions() -> None:
 
     a = SpendBundleConditions(
-        [], 1000, 1337, 42, None, None, [(pk, b"msg")], 12345678, 123, 456, False
+        [],
+        1000,
+        1337,
+        42,
+        None,
+        None,
+        [(pk, b"msg")],
+        12345678,
+        123,
+        456,
+        False,
+        4321,
+        8765,
     )
     b = SpendBundleConditions.from_json_dict(
         {
@@ -427,6 +477,8 @@ def test_from_json_spend_bundle_conditions() -> None:
             "removal_amount": 123,
             "addition_amount": 456,
             "validated_signature": False,
+            "execution_cost": 4321,
+            "condition_cost": 8765,
         }
     )
     assert a == b
@@ -468,7 +520,19 @@ def test_copy_spend() -> None:
 def test_copy_spend_bundle_conditions() -> None:
 
     a = SpendBundleConditions(
-        [], 1000, 1337, 42, None, None, [(pk, b"msg")], 12345678, 123, 456, False
+        [],
+        1000,
+        1337,
+        42,
+        None,
+        None,
+        [(pk, b"msg")],
+        12345678,
+        123,
+        456,
+        False,
+        4321,
+        8765,
     )
     b = copy.copy(a)
 

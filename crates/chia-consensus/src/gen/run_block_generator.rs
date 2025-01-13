@@ -126,6 +126,7 @@ where
         constants,
     )?;
     result.cost += max_cost - cost_left;
+    result.execution_cost = clvm_cost;
     Ok(result)
 }
 
@@ -189,13 +190,16 @@ where
     let Reduction(clvm_cost, mut all_spends) = run_program(a, &dialect, program, args, cost_left)?;
 
     subtract_cost(a, &mut cost_left, clvm_cost)?;
+
+    let mut ret = SpendBundleConditions::default();
+
     all_spends = first(a, all_spends)?;
+    ret.execution_cost += clvm_cost;
 
     // at this point all_spends is a list of:
     // (parent-coin-id puzzle-reveal amount solution . extra)
     // where extra may be nil, or additional extension data
 
-    let mut ret = SpendBundleConditions::default();
     let mut state = ParseState::default();
     let mut cache = HashMap::<NodePtr, TreeHash>::new();
 
@@ -209,6 +213,7 @@ where
             run_program(a, &dialect, puzzle, solution, cost_left)?;
 
         subtract_cost(a, &mut cost_left, clvm_cost)?;
+        ret.execution_cost += clvm_cost;
 
         let buf = tree_hash_cached(a, puzzle, &backrefs, &mut cache);
         let puzzle_hash = a.new_atom(&buf)?;
