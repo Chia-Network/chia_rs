@@ -4,6 +4,12 @@ from .sized_ints import uint8, uint16, uint32, uint64, uint128, int8, int16, int
 from typing_extensions import Self
 from chia.types.blockchain_format.program import Program as ChiaProgram
 
+
+DATA_SIZE: int
+BLOCK_SIZE: int
+METADATA_SIZE: int
+
+
 class FailedLoadingMetadataError(Exception): ...
 class FailedLoadingNodeError(Exception): ...
 class InvalidBlobLengthError(Exception): ...
