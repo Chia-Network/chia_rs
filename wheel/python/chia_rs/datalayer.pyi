@@ -81,29 +81,5 @@ class MerkleBlob:
 
     def __len__(self) -> int: ...
 
-# TODO: i would rather not specify this at all
-__all__: Sequence[str] = [
-    "InternalNode",
-    "LeafNode",
-    "MerkleBlob",
-    "FailedLoadingMetadataError",
-    "FailedLoadingNodeError",
-    "InvalidBlobLengthError",
-    "KeyAlreadyPresentError",
-    "UnableToInsertAsRootOfNonEmptyTreeError",
-    "UnableToFindALeafError",
-    "UnknownKeyError",
-    "IntegrityKeyNotInCacheError",
-    "IntegrityKeyToIndexCacheIndexError",
-    "IntegrityParentChildMismatchError",
-    "IntegrityKeyToIndexCacheLengthError",
-    "IntegrityUnmatchedChildParentRelationshipsError",
-    "IntegrityTotalNodeCountError",
-    "ZeroLengthSeedNotAllowedError",
-    "BlockIndexOutOfRangeError",
-    "NodeNotALeafError",
-    "StreamingError",
-    "IndexIsNotAChildError",
-    "CycleFoundError",
-    "BlockIndexOutOfBoundsError",
-]
+# just disallow * importing so we don't have to maintain this repetitive list
+__all__: Sequence[str] = []
