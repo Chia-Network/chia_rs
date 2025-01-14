@@ -1,5 +1,5 @@
 use chia_consensus::gen::conditions::Condition;
-use chia_puzzles::Proof;
+use chia_puzzle_types::Proof;
 use chia_traits::Streamable;
 use clap::Parser;
 use clvm_traits::{FromClvm, ToClvm};
@@ -7,10 +7,12 @@ use clvm_utils::tree_hash;
 use clvm_utils::CurriedProgram;
 use clvmr::{allocator::NodePtr, Allocator};
 
-use chia_puzzles::cat::{CatArgs, CatSolution, CAT_PUZZLE_HASH};
-use chia_puzzles::did::{DidArgs, DidSolution, DID_INNER_PUZZLE_HASH};
-use chia_puzzles::singleton::{SingletonArgs, SingletonSolution, SINGLETON_TOP_LAYER_PUZZLE_HASH};
-use chia_puzzles::standard::{StandardArgs, StandardSolution, STANDARD_PUZZLE_HASH};
+use chia_puzzle_types::cat::{CatArgs, CatSolution, CAT_PUZZLE_HASH};
+use chia_puzzle_types::did::{DidArgs, DidSolution, DID_INNER_PUZZLE_HASH};
+use chia_puzzle_types::singleton::{
+    SingletonArgs, SingletonSolution, SINGLETON_TOP_LAYER_PUZZLE_HASH,
+};
+use chia_puzzle_types::standard::{StandardArgs, StandardSolution, STANDARD_PUZZLE_HASH};
 
 /// Run a puzzle given a solution and print the resulting conditions
 #[derive(Parser, Debug)]

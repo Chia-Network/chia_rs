@@ -289,7 +289,7 @@ dependencies = [
  "chia-client",
  "chia-consensus",
  "chia-protocol",
- "chia-puzzles",
+ "chia-puzzle-types",
  "chia-secp",
  "chia-sha2 0.17.0",
  "chia-ssl",
@@ -363,7 +363,7 @@ version = "0.18.0"
 dependencies = [
  "chia-bls 0.18.0",
  "chia-protocol",
- "chia-puzzles",
+ "chia-puzzle-types",
  "chia-sha2 0.17.0",
  "chia-traits 0.18.0",
  "chia_py_streamable_macro",
@@ -431,7 +431,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "chia-puzzles"
+name = "chia-puzzle-types"
 version = "0.18.0"
 dependencies = [
  "anyhow",
@@ -448,10 +448,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "chia-puzzles-fuzz"
+name = "chia-puzzle-types-fuzz"
 version = "0.16.0"
 dependencies = [
- "chia-puzzles",
+ "chia-puzzle-types",
  "clvm-traits",
  "clvmr",
  "libfuzzer-sys",
@@ -509,7 +509,7 @@ dependencies = [
  "chia-bls 0.18.0",
  "chia-consensus",
  "chia-protocol",
- "chia-puzzles",
+ "chia-puzzle-types",
  "chia-traits 0.18.0",
  "clap",
  "clvm-traits",
