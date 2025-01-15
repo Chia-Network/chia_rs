@@ -73,14 +73,16 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: nightly-2025-01-12
 
       - name: Install cargo-fuzz
-        run: cargo +nightly install cargo-fuzz
+        run: cargo +nightly-2025-01-12 install cargo-fuzz
 
       - name: Fuzz (chia-consensus)
         run: |
           cd crates/chia-consensus
-          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=20 || exit 255"
+          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly-2025-01-12 fuzz run % -- -max_total_time=20 || exit 255"
 
       - name: Fuzz (chia-bls)
         env:
@@ -91,24 +93,24 @@ jobs:
         run: |
           cd crates/chia-bls
           python -m pip install blspy
-          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=10 || exit 255"
+          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly-2025-01-12 fuzz run % -- -max_total_time=10 || exit 255"
 
       - name: Fuzz (clvm-utils)
         run: |
           cd crates/clvm-utils
-          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=20 || exit 255"
+          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly-2025-01-12 fuzz run % -- -max_total_time=20 || exit 255"
 
       - name: Fuzz (chia-protocol)
         run: |
           cd crates/chia-protocol
-          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=20 || exit 255"
+          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly-2025-01-12 fuzz run % -- -max_total_time=20 || exit 255"
 
       - name: Fuzz (chia-puzzle-types)
         run: |
           cd crates/chia-puzzle-types
-          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=20 || exit 255"
+          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly-2025-01-12 fuzz run % -- -max_total_time=20 || exit 255"
 
       - name: Fuzz (clvm-traits)
         run: |
           cd crates/clvm-traits
-          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly fuzz run % -- -max_total_time=20 || exit 255"
+          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly-2025-01-12 fuzz run % -- -max_total_time=20 || exit 255"
