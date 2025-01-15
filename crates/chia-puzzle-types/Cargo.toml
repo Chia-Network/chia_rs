@@ -1,9 +1,9 @@
 [package]
-name = "chia-puzzles"
+name = "chia-puzzle-types"
 version = "0.18.0"
 edition = "2021"
 license = "Apache-2.0"
-description = "Chia primitives needed for building wallets."
+description = "CLVM types for standard Chia puzzles."
 authors = ["Brandon Haggstrom <b.haggstrom@chia.net>"]
 homepage = "https://github.com/Chia-Network/chia_rs"
 repository = "https://github.com/Chia-Network/chia_rs"
@@ -28,6 +28,3 @@ arbitrary = { workspace = true, features = ["derive"], optional = true }
 [dev-dependencies]
 hex = { workspace = true }
 anyhow = { workspace = true }
-
-[lib]
-crate-type = ["rlib"]

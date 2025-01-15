@@ -10,7 +10,7 @@ use chia_traits::streamable::Streamable;
 
 use chia_bls::G2Element;
 use chia_protocol::{Bytes32, Coin, CoinSpend, Program, SpendBundle};
-use chia_puzzles::singleton::SINGLETON_TOP_LAYER_PUZZLE_HASH;
+use chia_puzzle_types::singleton::SINGLETON_TOP_LAYER_PUZZLE_HASH;
 use clvm_traits::FromClvm;
 use clvm_utils::{tree_hash, CurriedProgram};
 use clvmr::allocator::NodePtr;
