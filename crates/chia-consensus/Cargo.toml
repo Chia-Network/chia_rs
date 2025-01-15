@@ -31,6 +31,7 @@ chia-traits = { workspace = true }
 clvm-traits = { workspace = true }
 chia-protocol = { workspace = true }
 chia-puzzle-types = { workspace = true }
+chia-puzzles = { workspace = true }
 chia-bls = { workspace = true }
 hex-literal = { workspace = true }
 thiserror = { workspace = true }
