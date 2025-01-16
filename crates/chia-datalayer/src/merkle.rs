@@ -229,6 +229,25 @@ impl InternalNode {
     }
 }
 
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+impl InternalNode {
+    #[new]
+    pub fn py_init(
+        parent: Parent,
+        hash: Hash,
+        left: TreeIndex,
+        right: TreeIndex,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            parent,
+            hash,
+            left,
+            right,
+        })
+    }
+}
+
 #[cfg_attr(feature = "py-bindings", pyclass(get_all))]
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Streamable)]
 pub struct LeafNode {
@@ -236,6 +255,20 @@ pub struct LeafNode {
     pub hash: Hash,
     pub key: KvId,
     pub value: KvId,
+}
+
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+impl LeafNode {
+    #[new]
+    pub fn py_init(parent: Parent, hash: Hash, key: KvId, value: KvId) -> PyResult<Self> {
+        Ok(Self {
+            parent,
+            hash,
+            key,
+            value,
+        })
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
