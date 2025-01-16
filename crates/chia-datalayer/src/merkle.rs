@@ -1258,6 +1258,13 @@ impl MerkleBlob {
         Ok(())
     }
 
+    #[pyo3(name = "upsert")]
+    pub fn py_upsert(&mut self, key: KvId, value: KvId, new_hash: Hash) -> PyResult<()> {
+        // TODO: use auto exception handling
+        self.upsert(key, value, &new_hash)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
     #[pyo3(name = "delete")]
     pub fn py_delete(&mut self, key: KvId) -> PyResult<()> {
         self.delete(key)
