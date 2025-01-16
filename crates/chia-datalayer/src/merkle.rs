@@ -1170,6 +1170,10 @@ impl MerkleBlob {
 
         Ok(())
     }
+
+    pub fn get_key_index(&self, key: KvId) -> Result<TreeIndex, Error> {
+        Ok(*self.key_to_index.get(&key).ok_or(Error::UnknownKey(key))?)
+    }
 }
 
 impl PartialEq for MerkleBlob {
@@ -1355,6 +1359,13 @@ impl MerkleBlob {
     #[pyo3(name = "__len__")]
     pub fn py_len(&self) -> PyResult<usize> {
         Ok(self.blob.len())
+    }
+
+    #[pyo3(name = "get_key_index")]
+    pub fn py_get_key_index(&self, key: KvId) -> PyResult<TreeIndex> {
+        // TODO: update to use From<Error>
+        self.get_key_index(key)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 }
 
