@@ -297,11 +297,7 @@ def test_validate_clvm_and_sig():
     )
     sig = AugSchemeMPL.sign(
         sk,
-        (
-            b'hello'
-            + coin.name()
-            + DEFAULT_CONSTANTS.AGG_SIG_ME_ADDITIONAL_DATA
-        ),  # noqa
+        (b"hello" + coin.name() + DEFAULT_CONSTANTS.AGG_SIG_ME_ADDITIONAL_DATA),  # noqa
     )
 
     new_spend = SpendBundle(coin_spends, sig)
