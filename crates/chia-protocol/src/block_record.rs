@@ -1,5 +1,6 @@
 use crate::{Bytes32, ClassgroupElement, Coin, SubEpochSummary};
 use chia_streamable_macro::streamable;
+use pyo3::exceptions::PyValueError;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
@@ -108,9 +109,6 @@ impl BlockRecord {
         )
     }
 }
-
-#[cfg(feature = "py-bindings")]
-use pyo3::exceptions::PyValueError;
 
 #[cfg(feature = "py-bindings")]
 use chia_traits::ChiaToPython;
