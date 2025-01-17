@@ -87,7 +87,8 @@ impl BlockBuilder {
             allocator: a,
             signature: Signature::default(),
             sentinel,
-            // TODO: where does this cost overhead come from?
+            // This is the cost of executing a quote. we quote the list of
+            // spends
             block_cost: 20,
             byte_cost: 0,
             num_skipped: 0,
@@ -141,8 +142,8 @@ impl BlockBuilder {
         let (done, state) = self.ser.add(a, spend_list)?;
         assert!(!done);
 
-        self.byte_cost = (self.ser.size() + 2) * constants.cost_per_byte;
         // closing the lists at the end needs 2 extra bytes
+        self.byte_cost = (self.ser.size() + 2) * constants.cost_per_byte;
         if self.byte_cost + self.block_cost + cost > constants.max_block_cost_clvm {
             // undo the last add() call
             self.ser.restore(state);
