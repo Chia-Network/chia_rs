@@ -71,6 +71,7 @@ pub fn run_spendbundle(
         let amount = a.new_number(coin_spend.coin.amount.into())?;
         let Reduction(clvm_cost, conditions) = run_program(a, &dialect, puz, sol, cost_left)?;
 
+        ret.execution_cost += clvm_cost;
         subtract_cost(a, &mut cost_left, clvm_cost)?;
 
         let buf = tree_hash(a, puz);
@@ -169,6 +170,12 @@ mod tests {
             conditions.cost,
             block_conds.cost - QUOTE_EXECUTION_COST - QUOTE_BYTES_COST
         );
+
+        assert_eq!(
+            conditions.execution_cost,
+            block_conds.execution_cost - QUOTE_EXECUTION_COST
+        );
+        assert_eq!(conditions.condition_cost, block_conds.condition_cost);
     }
 
     #[rstest]
@@ -197,12 +204,6 @@ mod tests {
         assert_eq!(conditions.cost, cost);
     }
 
-    #[cfg(not(debug_assertions))]
-    use crate::gen::flags::ALLOW_BACKREFS;
-
-    #[cfg(not(debug_assertions))]
-    const DEFAULT_FLAGS: u32 = ALLOW_BACKREFS | MEMPOOL_MODE;
-
     // given a block generator and block-refs, convert run the generator to
     // produce the SpendBundle for the block without runningi, or validating,
     // the puzzles.
@@ -216,11 +217,11 @@ mod tests {
         use clvmr::serde::node_from_bytes_backrefs;
         use clvmr::serde::node_to_bytes;
 
-        let mut a = make_allocator(DEFAULT_FLAGS);
+        let mut a = make_allocator(MEMPOOL_MODE);
 
         let generator = node_from_bytes_backrefs(&mut a, generator).expect("node_from_bytes");
         let args = setup_generator_args(&mut a, block_refs).expect("setup_generator_args");
-        let dialect = ChiaDialect::new(DEFAULT_FLAGS);
+        let dialect = ChiaDialect::new(MEMPOOL_MODE);
         let Reduction(_, mut all_spends) =
             run_program(&mut a, &dialect, generator, args, 11_000_000_000).expect("run_program");
 
@@ -332,13 +333,13 @@ mod tests {
         // output conditions match and update the cost. The cost
         // of just the spend bundle will be lower
         let (block_cost, block_output) = {
-            let mut a = make_allocator(DEFAULT_FLAGS);
+            let mut a = make_allocator(MEMPOOL_MODE);
             let block_conds = run_block_generator(
                 &mut a,
                 &generator_buffer,
                 &block_refs,
                 11_000_000_000,
-                DEFAULT_FLAGS | DONT_VALIDATE_SIGNATURE,
+                MEMPOOL_MODE | DONT_VALIDATE_SIGNATURE,
                 &Signature::default(),
                 None,
                 &TEST_CONSTANTS,
@@ -382,10 +383,17 @@ mod tests {
                     - QUOTE_BYTES;
                 let bundle_byte_cost =
                     generator_length_without_quote as u64 * TEST_CONSTANTS.cost_per_byte;
-                println!("block_cost: {block_cost} bytes: {block_byte_cost}");
+                println!(" block_cost: {block_cost} bytes: {block_byte_cost}");
                 println!("bundle_cost: {} bytes: {bundle_byte_cost}", conditions.cost);
+                println!("execution_cost: {}", conditions.execution_cost);
+                println!("condition_cost: {}", conditions.condition_cost);
                 assert!(conditions.cost - bundle_byte_cost <= block_cost - block_byte_cost);
                 assert!(conditions.cost > 0);
+                assert!(conditions.execution_cost > 0);
+                assert_eq!(
+                    conditions.cost,
+                    conditions.condition_cost + conditions.execution_cost + bundle_byte_cost
+                );
                 // update the cost we print here, just to be compatible with
                 // the test cases we have. We've already ensured the cost is
                 // lower

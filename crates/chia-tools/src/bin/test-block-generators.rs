@@ -3,7 +3,7 @@ use clap::Parser;
 use chia_bls::PublicKey;
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::gen::conditions::{NewCoin, SpendBundleConditions, SpendConditions};
-use chia_consensus::gen::flags::{ALLOW_BACKREFS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
+use chia_consensus::gen::flags::{DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
 use chia_consensus::gen::run_block_generator::{run_block_generator, run_block_generator2};
 use chia_tools::iterate_blocks;
 use clvmr::allocator::NodePtr;
@@ -19,7 +19,6 @@ use std::time::{Duration, Instant};
 #[allow(clippy::struct_excessive_bools)]
 struct Args {
     /// Path to blockchain database file to analyze
-    #[arg(short, long)]
     file: String,
 
     /// The number of paralell thread to run block generators in
@@ -43,7 +42,7 @@ struct Args {
 
     /// The hard fork block height. Defaults to mainnet (5,496,000). For
     /// testnet11, set to 0.
-    #[arg(short, long, default_value_t = 5_496_000)]
+    #[arg(long, default_value_t = 5_496_000)]
     hard_fork_height: u32,
 
     /// stop running block generators when reaching this height
@@ -190,11 +189,6 @@ fn main() {
                     run_block_generator
                 };
                 let flags = flags
-                    | if height >= args.hard_fork_height {
-                        ALLOW_BACKREFS
-                    } else {
-                        0
-                    }
                     | if args.skip_signature_validation {
                         DONT_VALIDATE_SIGNATURE
                     } else {

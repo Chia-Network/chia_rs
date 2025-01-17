@@ -715,6 +715,12 @@ pub struct SpendBundleConditions {
     // the total cost)
     pub cost: u64,
 
+    // the cost of executing the Chialisp
+    pub execution_cost: u64,
+
+    // the cost of the conditions
+    pub condition_cost: u64,
+
     // the sum of all values of all spent coins
     pub removal_amount: u128,
 
@@ -921,6 +927,7 @@ pub fn parse_conditions<V: SpendVisitor>(
                     return Err(ValidationErr(c, ErrorCode::CostExceeded));
                 }
                 *max_cost -= CREATE_COIN_COST;
+                ret.condition_cost += CREATE_COIN_COST;
             }
             AGG_SIG_UNSAFE
             | AGG_SIG_ME
@@ -934,6 +941,7 @@ pub fn parse_conditions<V: SpendVisitor>(
                     return Err(ValidationErr(c, ErrorCode::CostExceeded));
                 }
                 *max_cost -= AGG_SIG_COST;
+                ret.condition_cost += AGG_SIG_COST;
             }
             _ => (),
         }
@@ -1212,6 +1220,7 @@ pub fn parse_conditions<V: SpendVisitor>(
                     return Err(ValidationErr(c, ErrorCode::CostExceeded));
                 }
                 *max_cost -= cost;
+                ret.condition_cost += cost;
             }
             Condition::SendMessage(src_mode, dst, msg) => {
                 decrement(&mut announce_countdown, msg)?;
