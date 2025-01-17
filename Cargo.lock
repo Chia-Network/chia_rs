@@ -392,7 +392,6 @@ dependencies = [
  "chia-traits 0.18.0",
  "chia_streamable_macro 0.17.0",
  "clvm-utils",
- "clvmr",
  "expect-test",
  "hex",
  "hex-literal",

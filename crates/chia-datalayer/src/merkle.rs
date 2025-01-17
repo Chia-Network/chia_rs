@@ -5,9 +5,9 @@ use pyo3::{
 };
 
 use chia_protocol::Bytes32;
+use chia_sha2::Sha256;
 use chia_streamable_macro::Streamable;
 use chia_traits::Streamable;
-use clvmr::sha2::Sha256;
 use num_traits::ToBytes;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet, VecDeque};
