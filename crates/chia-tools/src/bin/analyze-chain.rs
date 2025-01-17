@@ -4,7 +4,7 @@ use std::io::Write;
 use std::time::SystemTime;
 
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
-use chia_consensus::gen::flags::{ALLOW_BACKREFS, MEMPOOL_MODE};
+use chia_consensus::gen::flags::MEMPOOL_MODE;
 use chia_consensus::gen::run_block_generator::{run_block_generator, run_block_generator2};
 use chia_tools::iterate_blocks;
 use clvmr::Allocator;
@@ -33,7 +33,7 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    let flags = if args.mempool_mode { MEMPOOL_MODE } else { 0 } | ALLOW_BACKREFS;
+    let flags = if args.mempool_mode { MEMPOOL_MODE } else { 0 };
 
     let mut output =
         std::fs::File::create("chain-resource-usage.log").expect("failed to open output file");

@@ -130,7 +130,7 @@ The following crates have fuzzers:
 - chia-bls
 - chia-consensus
 - chia-protocol
-- chia-puzzles
+- chia-puzzle-types
 - clvm-utils
 
 To list and run fuzzers:

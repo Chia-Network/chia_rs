@@ -4,7 +4,7 @@ use crate::run_generator::{
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::gen::flags::{
-    ALLOW_BACKREFS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
+    DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
 };
 use chia_consensus::gen::owned_conditions::{OwnedSpendBundleConditions, OwnedSpendConditions};
 use chia_consensus::gen::run_block_generator::setup_generator_args;
@@ -139,13 +139,8 @@ pub fn get_puzzle_and_solution_for_coin<'a>(
     let program = py_to_slice::<'a>(program);
     let args = py_to_slice::<'a>(args);
 
-    let deserialize = if (flags & ALLOW_BACKREFS) != 0 {
-        node_from_bytes_backrefs
-    } else {
-        node_from_bytes
-    };
-    let program = deserialize(&mut allocator, program)?;
-    let args = deserialize(&mut allocator, args)?;
+    let program = node_from_bytes_backrefs(&mut allocator, program)?;
+    let args = node_from_bytes_backrefs(&mut allocator, args)?;
     let dialect = &ChiaDialect::new(flags);
 
     let (puzzle, solution) = py
@@ -169,13 +164,6 @@ pub fn get_puzzle_and_solution_for_coin<'a>(
 
     // keep serializing normally, until wallets support backrefs
     let serialize = node_to_bytes;
-    /*
-        let serialize = if (flags & ALLOW_BACKREFS) != 0 {
-            node_to_bytes_backrefs
-        } else {
-            node_to_bytes
-        };
-    */
     Ok((
         PyBytes::new(py, &serialize(&allocator, puzzle)?),
         PyBytes::new(py, &serialize(&allocator, solution)?),
@@ -489,8 +477,10 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;
     m.add("STRICT_ARGS_COUNT", STRICT_ARGS_COUNT)?;
     m.add("MEMPOOL_MODE", MEMPOOL_MODE)?;
-    m.add("ALLOW_BACKREFS", ALLOW_BACKREFS)?;
     m.add("DONT_VALIDATE_SIGNATURE", DONT_VALIDATE_SIGNATURE)?;
+
+    // for backwards compatibility
+    m.add("ALLOW_BACKREFS", 0)?;
 
     // Chia classes
     m.add_class::<Coin>()?;

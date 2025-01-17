@@ -1,10 +1,10 @@
 use crate::error::{Error, Result};
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
-use chia_puzzles::singleton::{
+use chia_puzzle_types::singleton::{
     SingletonArgs, SingletonSolution, SingletonStruct, SINGLETON_TOP_LAYER_PUZZLE_HASH,
 };
-use chia_puzzles::Proof;
+use chia_puzzle_types::Proof;
 use clvm_traits::{FromClvm, ToClvm};
 use clvm_utils::CurriedProgram;
 use clvm_utils::TreeHash;
