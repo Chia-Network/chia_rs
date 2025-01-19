@@ -109,12 +109,12 @@ impl BlockBuilder {
     ) -> io::Result<(bool, BuildBlockResult)> {
         // if we're very close to a full block, we're done. It's very unlikely
         // any transaction will be smallar than MIN_COST_THRESHOLD
-        if self.byte_cost + self.block_cost + MIN_COST_THRESHOLD >= constants.max_block_cost_clvm {
+        if self.byte_cost + self.block_cost + MIN_COST_THRESHOLD > constants.max_block_cost_clvm {
             self.num_skipped += 1;
             return Ok((false, BuildBlockResult::Done));
         }
 
-        if self.byte_cost + self.block_cost + cost >= constants.max_block_cost_clvm {
+        if self.byte_cost + self.block_cost + cost > constants.max_block_cost_clvm {
             self.num_skipped += 1;
             return Ok((false, result(self.num_skipped)));
         }
@@ -157,7 +157,7 @@ impl BlockBuilder {
         // if we're very close to a full block, we're done. It's very unlikely
         // any transaction will be smallar than MIN_COST_THRESHOLD
         let result = if self.byte_cost + self.block_cost + MIN_COST_THRESHOLD
-            >= constants.max_block_cost_clvm
+            > constants.max_block_cost_clvm
         {
             BuildBlockResult::Done
         } else {
