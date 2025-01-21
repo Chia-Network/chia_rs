@@ -20,7 +20,7 @@ pub trait DeriveSynthetic {
     where
         Self: Sized,
     {
-        self.derive_synthetic_hidden(&DEFAULT_HIDDEN_PUZZLE_HASH.to_bytes())
+        self.derive_synthetic_hidden(&DEFAULT_HIDDEN_PUZZLE_HASH)
     }
 }
 
