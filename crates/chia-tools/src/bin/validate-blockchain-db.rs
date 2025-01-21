@@ -2,7 +2,7 @@ use clap::Parser;
 
 use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
-use chia_consensus::gen::flags::{ALLOW_BACKREFS, DONT_VALIDATE_SIGNATURE};
+use chia_consensus::gen::flags::DONT_VALIDATE_SIGNATURE;
 use chia_consensus::gen::run_block_generator::{run_block_generator, run_block_generator2};
 use chia_protocol::{Bytes32, Coin};
 use chia_tools::iterate_blocks;
@@ -294,8 +294,7 @@ features that are validated:
                 } else {
                     run_block_generator
                 };
-                let flags = ALLOW_BACKREFS
-                    | if args.skip_signature_validation {
+                let flags = if args.skip_signature_validation {
                         DONT_VALIDATE_SIGNATURE
                     } else {
                         0

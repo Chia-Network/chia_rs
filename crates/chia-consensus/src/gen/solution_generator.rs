@@ -418,28 +418,27 @@ mod tests {
 
                 b78080
 
-                fe81f6
+                ff0180
 
                 ffff04ffff01ff32ff02ffff03ffff07ff0580ffff01ff0bffff0102ffff02ff
                 06ffff04ff02ffff04ff09ff80808080ffff02ff06ffff04ff02ffff04ff0dff
                 8080808080ffff01ff0bffff0101
 
-                fe6f
+                ff0580
 
                 80ff0180
 
-                fe3e
+                ff0180
 
                 80ffff04ffff01b08cf5533a94afae0f4613d3ea565e47abc5373415967ef582
                 4fd009c602cb629e259908ce533c21de7fd7a68eb96c52d0
 
-                fe7f
+                ff0180
 
                 80ff8601977420dc00ffff80ffff01ffff3dffa080115c1c71035a2cd60a4949
                 9fb9e5cb55be8d6e25e8680bfc0409b7acaeffd48080ff8080808080"
             )
         );
-
         let generator_output = run_generator(&result);
         assert_eq!(generator_output, EXPECTED_GENERATOR_OUTPUT);
     }

@@ -2,7 +2,6 @@
 use chia_bls::Signature;
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
-use chia_consensus::gen::flags::ALLOW_BACKREFS;
 use chia_consensus::gen::run_block_generator::{run_block_generator, run_block_generator2};
 use chia_consensus::gen::validation_error::{ErrorCode, ValidationErr};
 use clvmr::chia_dialect::LIMIT_HEAP;
@@ -15,7 +14,7 @@ fuzz_target!(|data: &[u8]| {
         data,
         [],
         110_000_000,
-        ALLOW_BACKREFS,
+        0,
         &Signature::default(),
         None,
         &TEST_CONSTANTS,
@@ -28,7 +27,7 @@ fuzz_target!(|data: &[u8]| {
         data,
         [],
         110_000_000,
-        ALLOW_BACKREFS,
+        0,
         &Signature::default(),
         None,
         &TEST_CONSTANTS,
@@ -49,6 +48,8 @@ fuzz_target!(|data: &[u8]| {
         }
         (Ok(a), Ok(b)) => {
             assert!(a.cost >= b.cost);
+            assert!(a.execution_cost > b.execution_cost);
+            assert_eq!(a.condition_cost, b.condition_cost);
             assert_eq!(a.reserve_fee, b.reserve_fee);
             assert_eq!(a.removal_amount, b.removal_amount);
             assert_eq!(a.addition_amount, b.addition_amount);
