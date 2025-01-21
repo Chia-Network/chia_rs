@@ -62,70 +62,177 @@ impl std::fmt::Display for KvId {
     }
 }
 
-#[derive(Debug, Error, PartialEq, Eq)]
-pub enum Error {
-    // TODO: don't use String here
-    #[error("failed loading metadata: {0}")]
-    FailedLoadingMetadata(String),
+// consider https://github.com/Chia-Network/chia_rs/pull/872 when altendky is less of a noob
+macro_rules! create_errors {
+    (
+        $enum:ident,
+        (
+            $(
+                (
+                    $name:ident,
+                    $python_name:ident,
+                    $string:literal,
+                    (
+                        $(
+                            $type_:path
+                        ),
+                        *
+                    )
+                )
+            ),
+            *
+        )
+    ) => {
+        #[derive(Debug, Error, PartialEq, Eq)]
+        pub enum $enum {
+            $(
+                #[error($string)]
+                $name($($type_,)*),
+            )*
+        }
 
-    // TODO: don't use String here
-    #[error("failed loading node: {0}")]
-    FailedLoadingNode(String),
+        #[cfg(feature = "py-bindings")]
+        pub mod python_exceptions {
+            use pyo3::prelude::*;
 
-    #[error("blob length must be a multiple of block count, found extra bytes: {0}")]
-    InvalidBlobLength(usize),
+            $(
+                pyo3::create_exception!(chia_rs.chia_rs.datalayer, $python_name, pyo3::exceptions::PyException);
+            )*
 
-    #[error("key already present")]
-    KeyAlreadyPresent,
+            pub fn add_to_module(py: Python<'_>, module: &Bound<'_, PyModule>) -> PyResult<()> {
+                $(
+                    module.add(stringify!($python_name), py.get_type::<$python_name>())?;
+                )*
 
-    #[error("requested insertion at root but tree not empty")]
-    UnableToInsertAsRootOfNonEmptyTree,
+                Ok(())
+            }
+        }
 
-    #[error("unable to find a leaf")]
-    UnableToFindALeaf,
-
-    #[error("unknown key: {0:?}")]
-    UnknownKey(KvId),
-
-    #[error("key not in key to index cache: {0:?}")]
-    IntegrityKeyNotInCache(KvId),
-
-    #[error("key to index cache for {0:?} should be {1:?} got: {2:?}")]
-    IntegrityKeyToIndexCacheIndex(KvId, TreeIndex, TreeIndex),
-
-    #[error("parent and child relationship mismatched: {0:?}")]
-    IntegrityParentChildMismatch(TreeIndex),
-
-    #[error("found {0:?} leaves but key to index cache length is: {1}")]
-    IntegrityKeyToIndexCacheLength(usize, usize),
-
-    #[error("unmatched parent -> child references found: {0}")]
-    IntegrityUnmatchedChildParentRelationships(usize),
-
-    #[error("expected total node count {0:?} found: {1:?}")]
-    IntegrityTotalNodeCount(TreeIndex, usize),
-
-    #[error("zero-length seed bytes not allowed")]
-    ZeroLengthSeedNotAllowed,
-
-    #[error("block index out of range: {0:?}")]
-    BlockIndexOutOfRange(TreeIndex),
-
-    #[error("node not a leaf: {0:?}")]
-    NodeNotALeaf(InternalNode),
-
-    #[error("from streamable: {0:?}")]
-    Streaming(chia_traits::chia_error::Error),
-
-    #[error("index not a child: {0}")]
-    IndexIsNotAChild(TreeIndex),
-
-    #[error("cycle found")]
-    CycleFound,
-
-    #[error("block index out of bounds: {0}")]
-    BlockIndexOutOfBounds(TreeIndex),
+        #[cfg(feature = "py-bindings")]
+        impl From<Error> for pyo3::PyErr {
+            fn from(err: Error) -> pyo3::PyErr {
+                let message = err.to_string();
+                match err {
+                    $(
+                        Error::$name(..) => python_exceptions::$python_name::new_err(message),
+                    )*
+                }
+            }
+        }
+    }
 }
+
+create_errors!(
+    Error,
+    (
+        // TODO: don't use String here
+        (
+            FailedLoadingMetadata,
+            FailedLoadingMetadataError,
+            "failed loading metadata: {0}",
+            (String)
+        ),
+        // TODO: don't use String here
+        (
+            FailedLoadingNode,
+            FailedLoadingNodeError,
+            "failed loading node: {0}",
+            (String)
+        ),
+        (
+            InvalidBlobLength,
+            InvalidBlobLengthError,
+            "blob length must be a multiple of block count, found extra bytes: {0}",
+            (usize)
+        ),
+        (
+            KeyAlreadyPresent,
+            KeyAlreadyPresentError,
+            "key already present",
+            ()
+        ),
+        (
+            UnableToInsertAsRootOfNonEmptyTree,
+            UnableToInsertAsRootOfNonEmptyTreeError,
+            "requested insertion at root but tree not empty",
+            ()
+        ),
+        (
+            UnableToFindALeaf,
+            UnableToFindALeafError,
+            "unable to find a leaf",
+            ()
+        ),
+        (UnknownKey, UnknownKeyError, "unknown key: {0:?}", (KvId)),
+        (
+            IntegrityKeyNotInCache,
+            IntegrityKeyNotInCacheError,
+            "key not in key to index cache: {0:?}",
+            (KvId)
+        ),
+        (
+            IntegrityKeyToIndexCacheIndex,
+            IntegrityKeyToIndexCacheIndexError,
+            "key to index cache for {0:?} should be {1:?} got: {2:?}",
+            (KvId, TreeIndex, TreeIndex)
+        ),
+        (
+            IntegrityParentChildMismatch,
+            IntegrityParentChildMismatchError,
+            "parent and child relationship mismatched: {0:?}",
+            (TreeIndex)
+        ),
+        (
+            IntegrityKeyToIndexCacheLength,
+            IntegrityKeyToIndexCacheLengthError,
+            "found {0:?} leaves but key to index cache length is: {1}",
+            (usize, usize)
+        ),
+        (
+            IntegrityUnmatchedChildParentRelationships,
+            IntegrityUnmatchedChildParentRelationshipsError,
+            "unmatched parent -> child references found: {0}",
+            (usize)
+        ),
+        (
+            IntegrityTotalNodeCount,
+            IntegrityTotalNodeCountError,
+            "expected total node count {0:?} found: {1:?}",
+            (TreeIndex, usize)
+        ),
+        (
+            ZeroLengthSeedNotAllowed,
+            ZeroLengthSeedNotAllowedError,
+            "zero-length seed bytes not allowed",
+            ()
+        ),
+        (
+            NodeNotALeaf,
+            NodeNotALeafError,
+            "node not a leaf: {0:?}",
+            (InternalNode)
+        ),
+        (
+            Streaming,
+            StreamingError,
+            "from streamable: {0:?}",
+            (chia_traits::chia_error::Error)
+        ),
+        (
+            IndexIsNotAChild,
+            IndexIsNotAChildError,
+            "index not a child: {0}",
+            (TreeIndex)
+        ),
+        (CycleFound, CycleFoundError, "cycle found", ()),
+        (
+            BlockIndexOutOfBounds,
+            BlockIndexOutOfBoundsError,
+            "block index out of bounds: {0}",
+            (TreeIndex)
+        )
+    )
+);
 
 // assumptions
 // - root is at index 0
@@ -444,7 +551,7 @@ impl MerkleBlob {
         insert_location: InsertLocation,
     ) -> Result<TreeIndex, Error> {
         if self.key_to_index.contains_key(&key) {
-            return Err(Error::KeyAlreadyPresent);
+            return Err(Error::KeyAlreadyPresent());
         }
 
         let insert_location = match insert_location {
@@ -458,7 +565,7 @@ impl MerkleBlob {
             }
             InsertLocation::AsRoot {} => {
                 if !self.key_to_index.is_empty() {
-                    return Err(Error::UnableToInsertAsRootOfNonEmptyTree);
+                    return Err(Error::UnableToInsertAsRootOfNonEmptyTree());
                 };
                 self.insert_first(key, value, hash)
             }
@@ -801,7 +908,7 @@ impl MerkleBlob {
     fn get_min_height_leaf(&self) -> Result<LeafNode, Error> {
         let (_index, block) = MerkleBlobBreadthFirstIterator::new(&self.blob)
             .next()
-            .ok_or(Error::UnableToFindALeaf)??;
+            .ok_or(Error::UnableToFindALeaf())??;
 
         Ok(block
             .node
@@ -1001,7 +1108,7 @@ impl MerkleBlob {
         }
 
         // TODO: zero means left here but right below?
-        let side = if (seed_bytes.last().ok_or(Error::ZeroLengthSeedNotAllowed)? & 1 << 7) == 0 {
+        let side = if (seed_bytes.last().ok_or(Error::ZeroLengthSeedNotAllowed())? & 1 << 7) == 0 {
             Side::Left
         } else {
             Side::Right
@@ -1054,7 +1161,7 @@ impl MerkleBlob {
         let new_block_bytes = block.to_bytes()?;
         let extend_index = self.extend_index();
         match index.cmp(&extend_index) {
-            Ordering::Greater => return Err(Error::BlockIndexOutOfRange(index)),
+            Ordering::Greater => return Err(Error::BlockIndexOutOfBounds(index)),
             Ordering::Equal => self.blob.extend_from_slice(&new_block_bytes),
             Ordering::Less => {
                 // OPT: lots of deserialization here for just the key
@@ -1093,7 +1200,7 @@ impl MerkleBlob {
         Ok(self
             .blob
             .get(block_range(index))
-            .ok_or(Error::BlockIndexOutOfRange(index))?
+            .ok_or(Error::BlockIndexOutOfBounds(index))?
             .try_into()
             .unwrap_or_else(|e| panic!("failed getting block {index}: {e}")))
     }
@@ -1222,7 +1329,7 @@ impl MerkleBlob {
         let slice =
             unsafe { std::slice::from_raw_parts(blob.buf_ptr() as *const u8, blob.len_bytes()) };
 
-        Self::new(Vec::from(slice)).map_err(|e| PyValueError::new_err(e.to_string()))
+        Ok(Self::new(Vec::from(slice))?)
     }
 
     #[pyo3(name = "insert", signature = (key, value, hash, reference_kid = None, side = None))]
@@ -1241,39 +1348,41 @@ impl MerkleBlob {
                 index: *self
                     .key_to_index
                     .get(&key)
+                    // TODO: use a specific error
                     .ok_or(PyValueError::new_err(format!(
                         "unknown key id passed as insert location reference: {key}"
                     )))?,
                 side: Side::from_bytes(&[side])?,
             },
             _ => {
+                // TODO: use a specific error
                 return Err(PyValueError::new_err(
                     "must specify neither or both of reference_kid and side",
                 ));
             }
         };
-        self.insert(key, value, &hash, insert_location)
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        self.insert(key, value, &hash, insert_location)?;
 
         Ok(())
     }
 
     #[pyo3(name = "delete")]
     pub fn py_delete(&mut self, key: KvId) -> PyResult<()> {
-        self.delete(key)
-            .map_err(|e| PyValueError::new_err(e.to_string()))
+        Ok(self.delete(key)?)
     }
 
     #[pyo3(name = "get_raw_node")]
-    pub fn py_get_raw_node(&mut self, index: TreeIndex) -> PyResult<Node> {
-        self.get_node(index)
-            .map_err(|e| PyValueError::new_err(e.to_string()))
+    pub fn py_get_raw_node(&mut self, index: &Bound<'_, PyInt>) -> PyResult<Node> {
+        use pyo3::prelude::PyAnyMethods;
+        let index = TreeIndex(index.extract::<u32>().or(Err(
+            python_exceptions::BlockIndexOutOfBoundsError::new_err(index.to_string()),
+        ))?);
+        Ok(self.get_node(index)?)
     }
 
     #[pyo3(name = "calculate_lazy_hashes")]
     pub fn py_calculate_lazy_hashes(&mut self) -> PyResult<()> {
-        self.calculate_lazy_hashes()
-            .map_err(|e| PyValueError::new_err(e.to_string()))
+        Ok(self.calculate_lazy_hashes()?)
     }
 
     #[pyo3(name = "get_lineage_with_indexes")]
@@ -1284,10 +1393,7 @@ impl MerkleBlob {
     ) -> PyResult<pyo3::PyObject> {
         let list = pyo3::types::PyList::empty(py);
 
-        for (index, node) in self
-            .get_lineage_with_indexes(index)
-            .map_err(|e| PyValueError::new_err(e.to_string()))?
-        {
+        for (index, node) in self.get_lineage_with_indexes(index)? {
             use pyo3::types::PyListMethods;
             list.append((index.into_pyobject(py)?, node.into_pyobject(py)?))?;
         }
@@ -1301,7 +1407,7 @@ impl MerkleBlob {
 
         for item in MerkleBlobParentFirstIterator::new(&self.blob) {
             use pyo3::types::PyListMethods;
-            let (index, block) = item.map_err(|e| PyValueError::new_err(e.to_string()))?;
+            let (index, block) = item?;
             list.append((index.into_pyobject(py)?, block.node.into_pyobject(py)?))?;
         }
 
@@ -1324,10 +1430,9 @@ impl MerkleBlob {
             return Ok(None);
         }
 
-        let block = self
-            .get_block(index)
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let block = self.get_block(index)?;
         if block.metadata.dirty {
+            // TODO: use a specific error
             return Err(PyValueError::new_err("root hash is dirty"));
         }
 
@@ -1341,13 +1446,13 @@ impl MerkleBlob {
         hashes: Vec<Hash>,
     ) -> PyResult<()> {
         if keys_values.len() != hashes.len() {
+            // TODO: use a specific error
             return Err(PyValueError::new_err(
                 "key/value and hash collection lengths must match",
             ));
         }
 
-        self.batch_insert(&mut zip(keys_values, hashes))
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        self.batch_insert(&mut zip(keys_values, hashes))?;
 
         Ok(())
     }
@@ -1420,7 +1525,7 @@ impl Iterator for MerkleBlobLeftChildFirstIterator<'_> {
                     };
 
                     if self.already_queued.contains(&item.index) {
-                        return Some(Err(Error::CycleFound));
+                        return Some(Err(Error::CycleFound()));
                     }
                     self.already_queued.insert(item.index);
 
@@ -1477,7 +1582,7 @@ impl Iterator for MerkleBlobParentFirstIterator<'_> {
 
         if let Node::Internal(ref node) = block.node {
             if self.already_queued.contains(&index) {
-                return Some(Err(Error::CycleFound));
+                return Some(Err(Error::CycleFound()));
             }
             self.already_queued.insert(index);
 
@@ -1528,7 +1633,7 @@ impl Iterator for MerkleBlobBreadthFirstIterator<'_> {
                 Node::Leaf(..) => return Some(Ok((index, block))),
                 Node::Internal(node) => {
                     if self.already_queued.contains(&index) {
-                        return Some(Err(Error::CycleFound));
+                        return Some(Err(Error::CycleFound()));
                     }
                     self.already_queued.insert(index);
 
