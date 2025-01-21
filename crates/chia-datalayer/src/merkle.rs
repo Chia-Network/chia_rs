@@ -1480,10 +1480,7 @@ impl MerkleBlob {
 
     #[pyo3(name = "get_keys_values")]
     pub fn py_get_keys_values(&self, py: Python<'_>) -> PyResult<pyo3::PyObject> {
-        // TODO: update to use From<Error>
-        let map = self
-            .get_keys_values()
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let map = self.get_keys_values()?;
         let dict = PyDict::new(py);
         for (key, value) in map {
             use pyo3::types::PyDictMethods;
@@ -1492,16 +1489,6 @@ impl MerkleBlob {
 
         Ok(dict.into())
     }
-    // fn get_keys_values(&self) -> HashMap<KvId, KvId> {
-    //     let mut key_value = HashMap::new();
-    //     for key in self.key_to_index.keys() {
-    //         // silly waste of having the index, but test code and type narrowing so, ok i guess
-    //         let (_leaf_index, leaf, _leaf_block) = self.get_leaf_by_key(*key).unwrap();
-    //         key_value.insert(*key, leaf.value);
-    //     }
-    //
-    //     key_value
-    // }
 }
 
 fn try_get_block(blob: &[u8], index: TreeIndex) -> Result<Block, Error> {
