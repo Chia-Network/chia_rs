@@ -41,6 +41,7 @@ rstest = { workspace = true }
 text-diff = { workspace = true }
 criterion = { workspace = true }
 rand = { workspace = true, features = [ "small_rng" ] }
+blocking-threadpool = { workspace = true }
 
 [lib]
 bench = false
