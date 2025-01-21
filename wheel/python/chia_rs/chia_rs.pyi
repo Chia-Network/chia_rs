@@ -72,7 +72,6 @@ LIMIT_HEAP: int = ...
 ENABLE_KECCAK: int = ...
 ENABLE_KECCAK_OPS_OUTSIDE_GUARD: int = ...
 MEMPOOL_MODE: int = ...
-ALLOW_BACKREFS: int = ...
 DONT_VALIDATE_SIGNATURE: int = ...
 
 ELIGIBLE_FOR_DEDUP: int = ...
@@ -124,6 +123,11 @@ class AugSchemeMPL:
     @staticmethod
     def derive_child_pk_unhardened(pk: G1Element, index: int) -> G1Element: ...
 
+
+@final
+class BlockBuilder:
+    def add_spend_bundle(self, bundle: SpendBundle, cost: uint64, constants: ConsensusConstants) -> tuple[bool, bool]: ...
+    def finalize(self, constants: ConsensusConstants) -> tuple[bytes, G2Element, uint64]: ...
 
 @final
 class MerkleSet:
@@ -351,6 +355,8 @@ class SpendBundleConditions:
     removal_amount: int
     addition_amount: int
     validated_signature: bool
+    execution_cost: int
+    condition_cost: int
     def __init__(
         self,
         spends: Sequence[SpendConditions],
@@ -363,7 +369,9 @@ class SpendBundleConditions:
         cost: int,
         removal_amount: int,
         addition_amount: int,
-        validated_signature: bool
+        validated_signature: bool,
+        execution_cost: int,
+        condition_cost: int
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -392,7 +400,9 @@ class SpendBundleConditions:
         cost: Union[ int, _Unspec] = _Unspec(),
         removal_amount: Union[ int, _Unspec] = _Unspec(),
         addition_amount: Union[ int, _Unspec] = _Unspec(),
-        validated_signature: Union[ bool, _Unspec] = _Unspec()) -> SpendBundleConditions: ...
+        validated_signature: Union[ bool, _Unspec] = _Unspec(),
+        execution_cost: Union[ int, _Unspec] = _Unspec(),
+        condition_cost: Union[ int, _Unspec] = _Unspec()) -> SpendBundleConditions: ...
 
 @final
 class BlockRecord:

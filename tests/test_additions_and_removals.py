@@ -1,8 +1,5 @@
 from typing import Optional
-from chia_rs import (
-    additions_and_removals,
-    ALLOW_BACKREFS,
-)
+from chia_rs import additions_and_removals
 from run_gen import DEFAULT_CONSTANTS
 from pathlib import Path
 import glob
@@ -31,7 +28,7 @@ def test_additions_and_removals() -> None:
 
         try:
             additions, removals = additions_and_removals(
-                generator, block_refs, ALLOW_BACKREFS, DEFAULT_CONSTANTS
+                generator, block_refs, 0, DEFAULT_CONSTANTS
             )
 
             # if this was an invalid block, it wasn't OK to pass it to

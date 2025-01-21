@@ -4,7 +4,6 @@ from typing import Optional
 from run_gen import run_gen, print_spend_bundle_conditions
 from chia_rs import (
     MEMPOOL_MODE,
-    ALLOW_BACKREFS,
     SpendBundleConditions,
 )
 from dataclasses import dataclass
@@ -65,7 +64,7 @@ for g in sorted(glob.glob("../generator-tests/*.txt")):
     stdout.flush()
     consensus = run_generator(
         g,
-        ALLOW_BACKREFS,
+        0,
         version=1,
     )
 
@@ -73,7 +72,7 @@ for g in sorted(glob.glob("../generator-tests/*.txt")):
     stdout.flush()
     consensus2 = run_generator(
         g,
-        ALLOW_BACKREFS,
+        0,
         version=2,
     )
     validate_except_cost(consensus.output, consensus2.output)
@@ -82,7 +81,7 @@ for g in sorted(glob.glob("../generator-tests/*.txt")):
     stdout.flush()
     mempool = run_generator(
         g,
-        ALLOW_BACKREFS | MEMPOOL_MODE,
+        MEMPOOL_MODE,
         version=1,
     )
 
@@ -90,7 +89,7 @@ for g in sorted(glob.glob("../generator-tests/*.txt")):
     stdout.flush()
     mempool2 = run_generator(
         g,
-        ALLOW_BACKREFS | MEMPOOL_MODE,
+        MEMPOOL_MODE,
         version=2,
     )
     validate_except_cost(mempool.output, mempool2.output)

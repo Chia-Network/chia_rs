@@ -13,5 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: install cargo audit
+        run: cargo install cargo-audit
       - name: cargo audit
         run: cargo audit --ignore RUSTSEC-2023-0071
