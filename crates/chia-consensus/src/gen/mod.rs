@@ -1,4 +1,5 @@
 pub mod additions_and_removals;
+pub mod build_compressed_block;
 mod coin_id;
 mod condition_sanitizers;
 pub mod conditions;
