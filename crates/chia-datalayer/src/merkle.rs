@@ -1328,7 +1328,10 @@ impl MerkleBlob {
     }
 
     pub fn get_key_index(&self, key: KvId) -> Result<TreeIndex, Error> {
-        Ok(*self.key_to_index.get(&key).ok_or(Error::UnknownKey(key))?)
+        self.key_to_index
+            .get(&key)
+            .copied()
+            .ok_or(Error::UnknownKey(key))
     }
 }
 
