@@ -121,7 +121,7 @@ where
 mod test {
     use super::*;
     use crate::consensus_constants::TEST_CONSTANTS;
-    use crate::gen::flags::{ALLOW_BACKREFS, DONT_VALIDATE_SIGNATURE};
+    use crate::gen::flags::DONT_VALIDATE_SIGNATURE;
     use crate::gen::run_block_generator::run_block_generator2;
     use chia_bls::Signature;
     use rstest::rstest;
@@ -180,7 +180,7 @@ mod test {
             &generator,
             &block_refs,
             11_000_000_000,
-            ALLOW_BACKREFS | DONT_VALIDATE_SIGNATURE,
+            DONT_VALIDATE_SIGNATURE,
             &Signature::default(),
             None,
             &TEST_CONSTANTS,
@@ -216,7 +216,7 @@ mod test {
 
         // now run the function under test
         let (additions, removals) =
-            additions_and_removals(&generator, &block_refs, ALLOW_BACKREFS, &TEST_CONSTANTS)
+            additions_and_removals(&generator, &block_refs, 0, &TEST_CONSTANTS)
                 .expect("additions_and_removals()");
 
         assert_eq!(expect_additions.len(), additions.len());

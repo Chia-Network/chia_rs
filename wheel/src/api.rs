@@ -3,8 +3,9 @@ use crate::run_generator::{
 };
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::consensus_constants::ConsensusConstants;
+use chia_consensus::gen::build_compressed_block::BlockBuilder;
 use chia_consensus::gen::flags::{
-    ALLOW_BACKREFS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
+    DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
 };
 use chia_consensus::gen::owned_conditions::{OwnedSpendBundleConditions, OwnedSpendConditions};
 use chia_consensus::gen::run_block_generator::setup_generator_args;
@@ -78,8 +79,6 @@ use chia_bls::{
     Signature,
 };
 
-use chia_datalayer::{InternalNode, LeafNode, MerkleBlob, BLOCK_SIZE, DATA_SIZE, METADATA_SIZE};
-
 #[pyfunction]
 pub fn compute_merkle_set_root<'p>(
     py: Python<'p>,
@@ -139,13 +138,8 @@ pub fn get_puzzle_and_solution_for_coin<'a>(
     let program = py_to_slice::<'a>(program);
     let args = py_to_slice::<'a>(args);
 
-    let deserialize = if (flags & ALLOW_BACKREFS) != 0 {
-        node_from_bytes_backrefs
-    } else {
-        node_from_bytes
-    };
-    let program = deserialize(&mut allocator, program)?;
-    let args = deserialize(&mut allocator, args)?;
+    let program = node_from_bytes_backrefs(&mut allocator, program)?;
+    let args = node_from_bytes_backrefs(&mut allocator, args)?;
     let dialect = &ChiaDialect::new(flags);
 
     let (puzzle, solution) = py
@@ -169,13 +163,6 @@ pub fn get_puzzle_and_solution_for_coin<'a>(
 
     // keep serializing normally, until wallets support backrefs
     let serialize = node_to_bytes;
-    /*
-        let serialize = if (flags & ALLOW_BACKREFS) != 0 {
-            node_to_bytes_backrefs
-        } else {
-            node_to_bytes
-        };
-    */
     Ok((
         PyBytes::new(py, &serialize(&allocator, puzzle)?),
         PyBytes::new(py, &serialize(&allocator, solution)?),
@@ -462,6 +449,7 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(supports_fast_forward, m)?)?;
     m.add_function(wrap_pyfunction!(fast_forward_singleton, m)?)?;
     m.add_class::<OwnedSpendBundleConditions>()?;
+    m.add_class::<BlockBuilder>()?;
     m.add(
         "ELIGIBLE_FOR_DEDUP",
         chia_consensus::gen::conditions::ELIGIBLE_FOR_DEDUP,
@@ -489,8 +477,10 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;
     m.add("STRICT_ARGS_COUNT", STRICT_ARGS_COUNT)?;
     m.add("MEMPOOL_MODE", MEMPOOL_MODE)?;
-    m.add("ALLOW_BACKREFS", ALLOW_BACKREFS)?;
     m.add("DONT_VALIDATE_SIGNATURE", DONT_VALIDATE_SIGNATURE)?;
+
+    // for backwards compatibility
+    m.add("ALLOW_BACKREFS", 0)?;
 
     // Chia classes
     m.add_class::<Coin>()?;
@@ -648,6 +638,8 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 
 pub fn add_datalayer_submodule(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
+    use chia_datalayer::*;
+
     let datalayer = PyModule::new(py, "datalayer")?;
     parent.add_submodule(&datalayer)?;
 
@@ -658,6 +650,8 @@ pub fn add_datalayer_submodule(py: Python<'_>, parent: &Bound<'_, PyModule>) -> 
     datalayer.add("BLOCK_SIZE", BLOCK_SIZE)?;
     datalayer.add("DATA_SIZE", DATA_SIZE)?;
     datalayer.add("METADATA_SIZE", METADATA_SIZE)?;
+
+    python_exceptions::add_to_module(py, &datalayer)?;
 
     // https://github.com/PyO3/pyo3/issues/1517#issuecomment-808664021
     // https://github.com/PyO3/pyo3/issues/759

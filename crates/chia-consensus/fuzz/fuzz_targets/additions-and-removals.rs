@@ -3,7 +3,7 @@ use chia_bls::Signature;
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::gen::additions_and_removals::additions_and_removals;
-use chia_consensus::gen::flags::{ALLOW_BACKREFS, DONT_VALIDATE_SIGNATURE};
+use chia_consensus::gen::flags::DONT_VALIDATE_SIGNATURE;
 use chia_consensus::gen::run_block_generator::run_block_generator2;
 use chia_protocol::{Bytes, Coin};
 use libfuzzer_sys::fuzz_target;
@@ -12,7 +12,7 @@ use std::collections::HashSet;
 fuzz_target!(|data: &[u8]| {
     // additions_and_removals only work on trusted blocks, so if
     // run_block_generator2() fails, we can call additions_and_removals() on it.
-    let results = additions_and_removals::<&[u8], _>(data, [], ALLOW_BACKREFS, &TEST_CONSTANTS);
+    let results = additions_and_removals::<&[u8], _>(data, [], 0, &TEST_CONSTANTS);
 
     let mut a1 = make_allocator(0);
     let Ok(r1) = run_block_generator2::<&[u8], _>(
@@ -20,7 +20,7 @@ fuzz_target!(|data: &[u8]| {
         data,
         [],
         110_000_000,
-        ALLOW_BACKREFS | DONT_VALIDATE_SIGNATURE,
+        DONT_VALIDATE_SIGNATURE,
         &Signature::default(),
         None,
         &TEST_CONSTANTS,

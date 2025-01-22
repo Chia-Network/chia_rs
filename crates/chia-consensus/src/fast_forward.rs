@@ -1,10 +1,9 @@
 use crate::error::{Error, Result};
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
-use chia_puzzles::singleton::{
-    SingletonArgs, SingletonSolution, SingletonStruct, SINGLETON_TOP_LAYER_PUZZLE_HASH,
-};
-use chia_puzzles::Proof;
+use chia_puzzle_types::singleton::{SingletonArgs, SingletonSolution, SingletonStruct};
+use chia_puzzle_types::Proof;
+use chia_puzzles::SINGLETON_TOP_LAYER_V1_1_HASH;
 use clvm_traits::{FromClvm, ToClvm};
 use clvm_utils::CurriedProgram;
 use clvm_utils::TreeHash;
@@ -86,16 +85,14 @@ pub fn fast_forward_singleton(
 
     // this is the tree hash of the singleton top layer puzzle
     // the tree hash of singleton_top_layer_v1_1.clsp
-    if singleton.args.singleton_struct.mod_hash.as_ref()
-        != SINGLETON_TOP_LAYER_PUZZLE_HASH.to_bytes()
-    {
+    if singleton.args.singleton_struct.mod_hash.as_ref() != SINGLETON_TOP_LAYER_V1_1_HASH {
         return Err(Error::NotSingletonModHash);
     }
 
     // also make sure the actual mod-hash of this puzzle matches the
     // singleton_top_layer_v1_1.clsp
     let mod_hash = tree_hash(a, singleton.program);
-    if mod_hash != SINGLETON_TOP_LAYER_PUZZLE_HASH {
+    if mod_hash != SINGLETON_TOP_LAYER_V1_1_HASH.into() {
         return Err(Error::NotSingletonModHash);
     }
 
