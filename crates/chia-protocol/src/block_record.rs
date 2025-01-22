@@ -1,6 +1,6 @@
 use crate::{Bytes32, ClassgroupElement, Coin, SubEpochSummary};
 use chia_streamable_macro::streamable;
-use chia_consensus::pot_iterations::{calculate_sp_iters, calculate_ip_iters};
+use crate::pot_iterations::{calculate_sp_iters, calculate_ip_iters};
 use pyo3::exceptions::PyValueError;
 
 #[cfg(feature = "py-bindings")]

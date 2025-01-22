@@ -24,6 +24,8 @@ mod unfinished_header_block;
 mod vdf;
 mod wallet_protocol;
 mod weight_proof;
+mod pot_iterations;
+mod pos_quality;
 
 #[cfg(feature = "py-bindings")]
 mod lazy_node;
@@ -55,6 +57,8 @@ pub use crate::unfinished_header_block::*;
 pub use crate::vdf::*;
 pub use crate::wallet_protocol::*;
 pub use crate::weight_proof::*;
+pub use crate::pot_iterations::*;
+pub use crate::pos_quality::*;
 
 #[cfg(feature = "py-bindings")]
 pub use crate::lazy_node::*;
