@@ -1,4 +1,3 @@
-
 // use crate::Bytes32;
 // use chia_sha2::Sha256;
 // use std::convert::TryInto;
@@ -6,26 +5,38 @@
 
 #[cfg(feature = "py-bindings")]
 #[pyo3::pyfunction]
-pub fn is_overflow_block(num_sps_sub_slot: u32, num_sp_intervals_extra: u8, signage_point_index: u8) -> pyo3::PyResult<bool> {
+pub fn is_overflow_block(
+    num_sps_sub_slot: u32,
+    num_sp_intervals_extra: u8,
+    signage_point_index: u8,
+) -> pyo3::PyResult<bool> {
     if signage_point_index as u32 >= num_sps_sub_slot {
         return Err(pyo3::exceptions::PyValueError::new_err("SP index too high"));
-    } else {
-        return Ok(signage_point_index as u32 >= num_sps_sub_slot - num_sp_intervals_extra as u32)
     }
+    Ok(signage_point_index as u32 >= num_sps_sub_slot - num_sp_intervals_extra as u32)
 }
 
 #[cfg(feature = "py-bindings")]
 #[pyo3::pyfunction]
-pub fn calculate_sp_interval_iters(num_sps_sub_slot: u32, sub_slot_iters: u64) -> pyo3::PyResult<u64> {
+pub fn calculate_sp_interval_iters(
+    num_sps_sub_slot: u32,
+    sub_slot_iters: u64,
+) -> pyo3::PyResult<u64> {
     if sub_slot_iters % num_sps_sub_slot as u64 == 0 {
-        return Err(pyo3::exceptions::PyValueError::new_err("ssi % num_sps_sub_slot == 0"));
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "ssi % num_sps_sub_slot == 0",
+        ));
     }
     Ok(sub_slot_iters / num_sps_sub_slot as u64)
 }
 
 #[cfg(feature = "py-bindings")]
 #[pyo3::pyfunction]
-pub fn calculate_sp_iters(num_sps_sub_slot: u32, signage_point_index: u8, sub_slot_iters: u64) -> pyo3::PyResult<u64> {
+pub fn calculate_sp_iters(
+    num_sps_sub_slot: u32,
+    signage_point_index: u8,
+    sub_slot_iters: u64,
+) -> pyo3::PyResult<u64> {
     if signage_point_index as u32 >= num_sps_sub_slot {
         return Err(pyo3::exceptions::PyValueError::new_err("SP index too high"));
     }
@@ -49,8 +60,7 @@ pub fn calculate_ip_iters(
         )));
     } else if required_iters >= sp_interval_iters || required_iters == 0 {
         return Err(pyo3::exceptions::PyValueError::new_err(format!(
-            "Required iters {} is not below the sp interval iters {} {} or not >=0",
-            required_iters, sp_interval_iters, sub_slot_iters
+            "Required iters {required_iters} is not below the sp interval iters {sp_interval_iters} {sub_slot_iters} or not >=0",
         )));
     }
     Ok(
@@ -75,7 +85,7 @@ pub fn calculate_ip_iters(
 //     hasher.update(quality_string);
 //     hasher.update(cc_sp_output_hash);
 //     let sp_quality_string = hasher.finalize();
-    
+
 //     // Convert the hash bytes to a big-endian u128 integer
 //     let sp_quality_value = u128::from_be_bytes(sp_quality_string[..16]);
 

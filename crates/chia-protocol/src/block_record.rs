@@ -1,7 +1,7 @@
+#[cfg(feature = "py-bindings")]
+use crate::pot_iterations::{calculate_ip_iters, calculate_sp_iters};
 use crate::{Bytes32, ClassgroupElement, Coin, SubEpochSummary};
 use chia_streamable_macro::streamable;
-#[cfg(feature = "py-bindings")]
-use crate::pot_iterations::{calculate_sp_iters, calculate_ip_iters};
 #[cfg(feature = "py-bindings")]
 use pyo3::exceptions::PyValueError;
 
@@ -162,7 +162,11 @@ impl BlockRecord {
 
     fn sp_iters_impl(&self, constants: &Bound<'_, PyAny>) -> PyResult<u64> {
         let num_sps_sub_slot = constants.get_item("NUM_SPS_SUB_SLOT")?.extract::<u32>()?;
-        calculate_sp_iters(num_sps_sub_slot, self.signage_point_index, self.sub_slot_iters)
+        calculate_sp_iters(
+            num_sps_sub_slot,
+            self.signage_point_index,
+            self.sub_slot_iters,
+        )
     }
 
     fn ip_iters_impl(&self, constants: &Bound<'_, PyAny>) -> PyResult<u64> {
@@ -170,7 +174,13 @@ impl BlockRecord {
         let num_sp_intervals_extra = constants
             .get_item("NUM_SP_INTERVALS_EXTRA")?
             .extract::<u8>()?;
-        calculate_ip_iters(num_sps_sub_slot, self.signage_point_index, num_sp_intervals_extra, self.sub_slot_iters, self.required_iters)
+        calculate_ip_iters(
+            num_sps_sub_slot,
+            self.signage_point_index,
+            num_sp_intervals_extra,
+            self.sub_slot_iters,
+            self.required_iters,
+        )
     }
 
     fn sp_total_iters_impl(&self, constants: &Bound<'_, PyAny>) -> PyResult<u128> {

@@ -14,6 +14,6 @@ pub fn expected_plot_size(k: u32) -> pyo3::PyResult<u64> {
     // necessarily get more rewards per byte. The +1 is added to give half a bit more space per entry, which
     // is necessary to store the entries in the plot.
     // """
-    
+
     Ok((2 * k as u64 + 1) * (1_u64 << (k - 1)))
 }
