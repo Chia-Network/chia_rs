@@ -33,6 +33,8 @@ class BlockIndexOutOfBoundsError(Exception): ...
 
 @final
 class InternalNode:
+    def __init__(self, parent: Optional[uint32], hash: bytes32, left: uint32, right: uint32) -> None: ...
+
     @property
     def parent(self) -> Optional[uint32]: ...
     @property
@@ -46,6 +48,8 @@ class InternalNode:
 
 @final
 class LeafNode:
+    def __init__(self, parent: Optional[uint32], hash: bytes32, key: int64, value: int64) -> None: ...
+
     @property
     def parent(self) -> Optional[uint32]: ...
     @property
