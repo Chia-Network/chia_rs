@@ -4,7 +4,6 @@
 // use std::convert::TryInto;
 // use crate::pos_quality::expected_plot_size;
 
-
 #[cfg(feature = "py-bindings")]
 #[pyo3::pyfunction]
 pub fn is_overflow_block(num_sps_sub_slot: u32, num_sp_intervals_extra: u8, signage_point_index: u8) -> pyo3::PyResult<bool> {
