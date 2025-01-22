@@ -1326,6 +1326,13 @@ impl MerkleBlob {
 
         Ok(map)
     }
+
+    pub fn get_key_index(&self, key: KvId) -> Result<TreeIndex, Error> {
+        self.key_to_index
+            .get(&key)
+            .copied()
+            .ok_or(Error::UnknownKey(key))
+    }
 }
 
 impl PartialEq for MerkleBlob {
@@ -1528,6 +1535,11 @@ impl MerkleBlob {
         }
 
         Ok(dict.into())
+    }
+
+    #[pyo3(name = "get_key_index")]
+    pub fn py_get_key_index(&self, key: KvId) -> PyResult<TreeIndex> {
+        Ok(self.get_key_index(key)?)
     }
 }
 
