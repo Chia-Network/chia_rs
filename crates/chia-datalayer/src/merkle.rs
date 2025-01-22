@@ -1,7 +1,10 @@
 #[cfg(feature = "py-bindings")]
 use pyo3::{
-    buffer::PyBuffer, exceptions::PyValueError, pyclass, pymethods, types::PyInt, Bound,
-    FromPyObject, IntoPyObject, PyAny, PyErr, PyResult, Python,
+    buffer::PyBuffer,
+    exceptions::PyValueError,
+    pyclass, pymethods,
+    types::{PyDict, PyInt},
+    Bound, FromPyObject, IntoPyObject, PyAny, PyErr, PyResult, Python,
 };
 
 use chia_protocol::Bytes32;
@@ -1310,6 +1313,19 @@ impl MerkleBlob {
 
         Ok(())
     }
+
+    pub fn get_keys_values(&self) -> Result<HashMap<KvId, KvId>, Error> {
+        let mut map = HashMap::new();
+        for (key, index) in &self.key_to_index {
+            let node = self.get_node(*index)?;
+            let leaf = node.expect_leaf(
+                "key was just retrieved from the key to index mapping, must be a leaf",
+            );
+            map.insert(*key, leaf.value);
+        }
+
+        Ok(map)
+    }
 }
 
 impl PartialEq for MerkleBlob {
@@ -1500,6 +1516,18 @@ impl MerkleBlob {
     #[pyo3(name = "__len__")]
     pub fn py_len(&self) -> PyResult<usize> {
         Ok(self.blob.len())
+    }
+
+    #[pyo3(name = "get_keys_values")]
+    pub fn py_get_keys_values(&self, py: Python<'_>) -> PyResult<pyo3::PyObject> {
+        let map = self.get_keys_values()?;
+        let dict = PyDict::new(py);
+        for (key, value) in map {
+            use pyo3::types::PyDictMethods;
+            dict.set_item(key, value)?;
+        }
+
+        Ok(dict.into())
     }
 }
 
@@ -1707,19 +1735,6 @@ mod tests {
 
     fn open_dot(_lines: &mut DotLines) {
         // crate::merkle::dot::open_dot(_lines);
-    }
-
-    impl MerkleBlob {
-        fn get_key_value_map(&self) -> HashMap<KvId, KvId> {
-            let mut key_value = HashMap::new();
-            for key in self.key_to_index.keys() {
-                // silly waste of having the index, but test code and type narrowing so, ok i guess
-                let (_leaf_index, leaf, _leaf_block) = self.get_leaf_by_key(*key).unwrap();
-                key_value.insert(*key, leaf.value);
-            }
-
-            key_value
-        }
     }
 
     #[test]
@@ -2193,9 +2208,9 @@ mod tests {
             batch_map.insert(i, i);
         }
 
-        let before = blob.get_key_value_map();
+        let before = blob.get_keys_values().unwrap();
         blob.batch_insert(batch.into_iter()).unwrap();
-        let after = blob.get_key_value_map();
+        let after = blob.get_keys_values().unwrap();
 
         open_dot(
             blob.to_dot()
