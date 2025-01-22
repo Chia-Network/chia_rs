@@ -1399,6 +1399,13 @@ impl MerkleBlob {
         Ok(())
     }
 
+    #[pyo3(name = "upsert")]
+    pub fn py_upsert(&mut self, key: KvId, value: KvId, new_hash: Hash) -> PyResult<()> {
+        self.upsert(key, value, &new_hash)?;
+
+        Ok(())
+    }
+
     #[pyo3(name = "delete")]
     pub fn py_delete(&mut self, key: KvId) -> PyResult<()> {
         Ok(self.delete(key)?)
