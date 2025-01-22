@@ -11,3 +11,5 @@ pub mod merkle_set;
 pub mod merkle_tree;
 pub mod spendbundle_conditions;
 pub mod spendbundle_validation;
+pub mod pot_iterations;
+pub mod pos_quality;

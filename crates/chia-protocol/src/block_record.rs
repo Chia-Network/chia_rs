@@ -1,5 +1,6 @@
 use crate::{Bytes32, ClassgroupElement, Coin, SubEpochSummary};
 use chia_streamable_macro::streamable;
+use chia_consensus::pot_iterations::{calculate_sp_iters, calculate_ip_iters};
 use pyo3::exceptions::PyValueError;
 
 #[cfg(feature = "py-bindings")]
@@ -68,46 +69,46 @@ impl BlockRecord {
         self.deficit == min_blocks_per_challenge_block - 1
     }
 
-    fn calculate_sp_interval_iters(&self, num_sps_sub_slot: u64) -> PyResult<u64> {
-        if self.sub_slot_iters % num_sps_sub_slot != 0 {
-            return Err(PyValueError::new_err(
-                "sub_slot_iters % constants.NUM_SPS_SUB_SLOT != 0",
-            ));
-        }
-        Ok(self.sub_slot_iters / num_sps_sub_slot)
-    }
+    // fn calculate_sp_interval_iters(&self, num_sps_sub_slot: u64) -> PyResult<u64> {
+    //     if self.sub_slot_iters % num_sps_sub_slot != 0 {
+    //         return Err(PyValueError::new_err(
+    //             "sub_slot_iters % constants.NUM_SPS_SUB_SLOT != 0",
+    //         ));
+    //     }
+    //     Ok(self.sub_slot_iters / num_sps_sub_slot)
+    // }
 
-    fn calculate_sp_iters(&self, num_sps_sub_slot: u32) -> PyResult<u64> {
-        if self.signage_point_index as u32 >= num_sps_sub_slot {
-            return Err(PyValueError::new_err("SP index too high"));
-        }
-        Ok(self.calculate_sp_interval_iters(num_sps_sub_slot as u64)?
-            * self.signage_point_index as u64)
-    }
+    // fn calculate_sp_iters(&self, num_sps_sub_slot: u32) -> PyResult<u64> {
+    //     if self.signage_point_index as u32 >= num_sps_sub_slot {
+    //         return Err(PyValueError::new_err("SP index too high"));
+    //     }
+    //     Ok(self.calculate_sp_interval_iters(num_sps_sub_slot as u64)?
+    //         * self.signage_point_index as u64)
+    // }
 
-    fn calculate_ip_iters(
-        &self,
-        num_sps_sub_slot: u32,
-        num_sp_intervals_extra: u8,
-    ) -> PyResult<u64> {
-        let sp_iters = self.calculate_sp_iters(num_sps_sub_slot)?;
-        let sp_interval_iters = self.calculate_sp_interval_iters(num_sps_sub_slot as u64)?;
-        if sp_iters % sp_interval_iters != 0 || sp_iters >= self.sub_slot_iters {
-            return Err(PyValueError::new_err(format!(
-                "Invalid sp iters {sp_iters} for this ssi {}",
-                self.sub_slot_iters
-            )));
-        } else if self.required_iters >= sp_interval_iters || self.required_iters == 0 {
-            return Err(PyValueError::new_err(format!(
-                "Required iters {} is not below the sp interval iters {} {} or not >=0",
-                self.required_iters, sp_interval_iters, self.sub_slot_iters
-            )));
-        }
-        Ok(
-            (sp_iters + num_sp_intervals_extra as u64 * sp_interval_iters + self.required_iters)
-                % self.sub_slot_iters,
-        )
-    }
+    // fn calculate_ip_iters(
+    //     &self,
+    //     num_sps_sub_slot: u32,
+    //     num_sp_intervals_extra: u8,
+    // ) -> PyResult<u64> {
+    //     let sp_iters = self.calculate_sp_iters(num_sps_sub_slot)?;
+    //     let sp_interval_iters = self.calculate_sp_interval_iters(num_sps_sub_slot as u64)?;
+    //     if sp_iters % sp_interval_iters != 0 || sp_iters >= self.sub_slot_iters {
+    //         return Err(PyValueError::new_err(format!(
+    //             "Invalid sp iters {sp_iters} for this ssi {}",
+    //             self.sub_slot_iters
+    //         )));
+    //     } else if self.required_iters >= sp_interval_iters || self.required_iters == 0 {
+    //         return Err(PyValueError::new_err(format!(
+    //             "Required iters {} is not below the sp interval iters {} {} or not >=0",
+    //             self.required_iters, sp_interval_iters, self.sub_slot_iters
+    //         )));
+    //     }
+    //     Ok(
+    //         (sp_iters + num_sp_intervals_extra as u64 * sp_interval_iters + self.required_iters)
+    //             % self.sub_slot_iters,
+    //     )
+    // }
 }
 
 #[cfg(feature = "py-bindings")]
@@ -159,7 +160,7 @@ impl BlockRecord {
 
     fn sp_iters_impl(&self, constants: &Bound<'_, PyAny>) -> PyResult<u64> {
         let num_sps_sub_slot = constants.get_item("NUM_SPS_SUB_SLOT")?.extract::<u32>()?;
-        self.calculate_sp_iters(num_sps_sub_slot)
+        calculate_sp_iters(num_sps_sub_slot, self.signage_point_index, self.sub_slot_iters)
     }
 
     fn ip_iters_impl(&self, constants: &Bound<'_, PyAny>) -> PyResult<u64> {
@@ -167,7 +168,7 @@ impl BlockRecord {
         let num_sp_intervals_extra = constants
             .get_item("NUM_SP_INTERVALS_EXTRA")?
             .extract::<u8>()?;
-        self.calculate_ip_iters(num_sps_sub_slot, num_sp_intervals_extra)
+        calculate_ip_iters(num_sps_sub_slot, self.signage_point_index, num_sp_intervals_extra, self.sub_slot_iters, self.required_iters)
     }
 
     fn sp_total_iters_impl(&self, constants: &Bound<'_, PyAny>) -> PyResult<u128> {
