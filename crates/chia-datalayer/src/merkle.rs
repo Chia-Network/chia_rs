@@ -46,10 +46,13 @@ type Hash = Bytes32;
 /// value data bytes will not be handled within this code, only outside.
 #[cfg_attr(feature = "py-bindings", derive(FromPyObject), pyo3(transparent))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
-pub struct KvId(i64);
+pub struct KeyId(i64);
+#[cfg_attr(feature = "py-bindings", derive(FromPyObject), pyo3(transparent))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
+pub struct ValueId(i64);
 
 #[cfg(feature = "py-bindings")]
-impl<'py> IntoPyObject<'py> for KvId {
+impl<'py> IntoPyObject<'py> for KeyId {
     type Target = PyInt;
     type Output = Bound<'py, Self::Target>;
     type Error = std::convert::Infallible;
@@ -59,7 +62,24 @@ impl<'py> IntoPyObject<'py> for KvId {
     }
 }
 
-impl std::fmt::Display for KvId {
+impl std::fmt::Display for ValueId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+impl<'py> IntoPyObject<'py> for ValueId {
+    type Target = PyInt;
+    type Output = Bound<'py, Self::Target>;
+    type Error = std::convert::Infallible;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
+        self.0.into_pyobject(py)
+    }
+}
+
+impl std::fmt::Display for KeyId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
     }
@@ -166,18 +186,18 @@ create_errors!(
             "unable to find a leaf",
             ()
         ),
-        (UnknownKey, UnknownKeyError, "unknown key: {0:?}", (KvId)),
+        (UnknownKey, UnknownKeyError, "unknown key: {0:?}", (KeyId)),
         (
             IntegrityKeyNotInCache,
             IntegrityKeyNotInCacheError,
             "key not in key to index cache: {0:?}",
-            (KvId)
+            (KeyId)
         ),
         (
             IntegrityKeyToIndexCacheIndex,
             IntegrityKeyToIndexCacheIndexError,
             "key to index cache for {0:?} should be {1:?} got: {2:?}",
-            (KvId, TreeIndex, TreeIndex)
+            (KeyId, TreeIndex, TreeIndex)
         ),
         (
             IntegrityParentChildMismatch,
@@ -363,15 +383,15 @@ impl InternalNode {
 pub struct LeafNode {
     pub parent: Parent,
     pub hash: Hash,
-    pub key: KvId,
-    pub value: KvId,
+    pub key: KeyId,
+    pub value: ValueId,
 }
 
 #[cfg(feature = "py-bindings")]
 #[pymethods]
 impl LeafNode {
     #[new]
-    pub fn py_init(parent: Parent, hash: Hash, key: KvId, value: KvId) -> PyResult<Self> {
+    pub fn py_init(parent: Parent, hash: Hash, key: KeyId, value: ValueId) -> PyResult<Self> {
         Ok(Self {
             parent,
             hash,
@@ -508,11 +528,11 @@ impl Block {
 
 fn get_free_indexes_and_keys_values_indexes(
     blob: &Vec<u8>,
-) -> Result<(HashSet<TreeIndex>, HashMap<KvId, TreeIndex>), Error> {
+) -> Result<(HashSet<TreeIndex>, HashMap<KeyId, TreeIndex>), Error> {
     let index_count = blob.len() / BLOCK_SIZE;
 
     let mut seen_indexes: Vec<bool> = vec![false; index_count];
-    let mut key_to_index: HashMap<KvId, TreeIndex> = HashMap::default();
+    let mut key_to_index: HashMap<KeyId, TreeIndex> = HashMap::default();
 
     for item in MerkleBlobLeftChildFirstIterator::new(blob) {
         let (index, block) = item?;
@@ -546,7 +566,7 @@ pub struct MerkleBlob {
     blob: Vec<u8>,
     // TODO: would be nice for this to be deterministic ala a fifo set
     free_indexes: HashSet<TreeIndex>,
-    key_to_index: HashMap<KvId, TreeIndex>,
+    key_to_index: HashMap<KeyId, TreeIndex>,
     // TODO: used by fuzzing, some cleaner way?  making it cfg-dependent is annoying with
     //       the type stubs
     pub check_integrity_on_drop: bool,
@@ -581,8 +601,8 @@ impl MerkleBlob {
 
     pub fn insert(
         &mut self,
-        key: KvId,
-        value: KvId,
+        key: KeyId,
+        value: ValueId,
         hash: &Hash,
         insert_location: InsertLocation,
     ) -> Result<TreeIndex, Error> {
@@ -591,7 +611,7 @@ impl MerkleBlob {
         }
 
         let insert_location = match insert_location {
-            InsertLocation::Auto {} => self.get_random_insert_location_by_kvid(key)?,
+            InsertLocation::Auto {} => self.get_random_insert_location_by_key_id(key)?,
             _ => insert_location,
         };
 
@@ -629,7 +649,12 @@ impl MerkleBlob {
         }
     }
 
-    fn insert_first(&mut self, key: KvId, value: KvId, hash: &Hash) -> Result<TreeIndex, Error> {
+    fn insert_first(
+        &mut self,
+        key: KeyId,
+        value: ValueId,
+        hash: &Hash,
+    ) -> Result<TreeIndex, Error> {
         let new_leaf_block = Block {
             metadata: NodeMetadata {
                 node_type: NodeType::Leaf,
@@ -783,7 +808,7 @@ impl MerkleBlob {
 
     pub fn batch_insert<I>(&mut self, mut keys_values_hashes: I) -> Result<(), Error>
     where
-        I: Iterator<Item = ((KvId, KvId), Hash)>,
+        I: Iterator<Item = ((KeyId, ValueId), Hash)>,
     {
         // OPT: would it be worthwhile to hold the entire blocks?
         let mut indexes = vec![];
@@ -871,7 +896,7 @@ impl MerkleBlob {
 
     fn insert_from_key(
         &mut self,
-        old_leaf_key: KvId,
+        old_leaf_key: KeyId,
         new_index: TreeIndex,
         side: Side,
     ) -> Result<(), Error> {
@@ -951,7 +976,7 @@ impl MerkleBlob {
             .expect_leaf("unexpectedly found internal node first: <<self>>"))
     }
 
-    pub fn delete(&mut self, key: KvId) -> Result<(), Error> {
+    pub fn delete(&mut self, key: KeyId) -> Result<(), Error> {
         let (leaf_index, leaf, _leaf_block) = self.get_leaf_by_key(key)?;
         self.key_to_index.remove(&key);
 
@@ -1005,7 +1030,7 @@ impl MerkleBlob {
         Ok(())
     }
 
-    pub fn upsert(&mut self, key: KvId, value: KvId, new_hash: &Hash) -> Result<(), Error> {
+    pub fn upsert(&mut self, key: KeyId, value: ValueId, new_hash: &Hash) -> Result<(), Error> {
         let Ok((leaf_index, mut leaf, mut block)) = self.get_leaf_by_key(key) else {
             self.insert(key, value, new_hash, InsertLocation::Auto {})?;
             return Ok(());
@@ -1178,7 +1203,7 @@ impl MerkleBlob {
         }
     }
 
-    fn get_random_insert_location_by_kvid(&self, seed: KvId) -> Result<InsertLocation, Error> {
+    fn get_random_insert_location_by_key_id(&self, seed: KeyId) -> Result<InsertLocation, Error> {
         let seed = sha256_num(seed.0);
 
         self.get_random_insert_location_by_seed(&seed)
@@ -1245,7 +1270,7 @@ impl MerkleBlob {
         Ok(self.get_block(index)?.node)
     }
 
-    pub fn get_leaf_by_key(&self, key: KvId) -> Result<(TreeIndex, LeafNode, Block), Error> {
+    pub fn get_leaf_by_key(&self, key: KeyId) -> Result<(TreeIndex, LeafNode, Block), Error> {
         let index = *self.key_to_index.get(&key).ok_or(Error::UnknownKey(key))?;
         let block = self.get_block(index)?;
         let leaf = block.node.expect_leaf(&format!(
@@ -1314,7 +1339,7 @@ impl MerkleBlob {
         Ok(())
     }
 
-    pub fn get_keys_values(&self) -> Result<HashMap<KvId, KvId>, Error> {
+    pub fn get_keys_values(&self) -> Result<HashMap<KeyId, ValueId>, Error> {
         let mut map = HashMap::new();
         for (key, index) in &self.key_to_index {
             let node = self.get_node(*index)?;
@@ -1327,7 +1352,7 @@ impl MerkleBlob {
         Ok(map)
     }
 
-    pub fn get_key_index(&self, key: KvId) -> Result<TreeIndex, Error> {
+    pub fn get_key_index(&self, key: KeyId) -> Result<TreeIndex, Error> {
         self.key_to_index
             .get(&key)
             .copied()
@@ -1391,10 +1416,10 @@ impl MerkleBlob {
     #[pyo3(name = "insert", signature = (key, value, hash, reference_kid = None, side = None))]
     pub fn py_insert(
         &mut self,
-        key: KvId,
-        value: KvId,
+        key: KeyId,
+        value: ValueId,
         hash: Hash,
-        reference_kid: Option<KvId>,
+        reference_kid: Option<KeyId>,
         // TODO: should be a Side, but python has a different Side right now
         side: Option<u8>,
     ) -> PyResult<()> {
@@ -1423,14 +1448,14 @@ impl MerkleBlob {
     }
 
     #[pyo3(name = "upsert")]
-    pub fn py_upsert(&mut self, key: KvId, value: KvId, new_hash: Hash) -> PyResult<()> {
+    pub fn py_upsert(&mut self, key: KeyId, value: ValueId, new_hash: Hash) -> PyResult<()> {
         self.upsert(key, value, &new_hash)?;
 
         Ok(())
     }
 
     #[pyo3(name = "delete")]
-    pub fn py_delete(&mut self, key: KvId) -> PyResult<()> {
+    pub fn py_delete(&mut self, key: KeyId) -> PyResult<()> {
         Ok(self.delete(key)?)
     }
 
@@ -1505,7 +1530,7 @@ impl MerkleBlob {
     #[pyo3(name = "batch_insert")]
     pub fn py_batch_insert(
         &mut self,
-        keys_values: Vec<(KvId, KvId)>,
+        keys_values: Vec<(KeyId, ValueId)>,
         hashes: Vec<Hash>,
     ) -> PyResult<()> {
         if keys_values.len() != hashes.len() {
@@ -1538,7 +1563,7 @@ impl MerkleBlob {
     }
 
     #[pyo3(name = "get_key_index")]
-    pub fn py_get_key_index(&self, key: KvId) -> PyResult<TreeIndex> {
+    pub fn py_get_key_index(&self, key: KeyId) -> PyResult<TreeIndex> {
         Ok(self.get_key_index(key)?)
     }
 }
@@ -1801,16 +1826,16 @@ mod tests {
         let mut blob = MerkleBlob::new(vec![]).unwrap();
 
         blob.insert(
-            KvId(0x0001_0203_0405_0607),
-            KvId(0x1011_1213_1415_1617),
+            KeyId(0x0001_0203_0405_0607),
+            ValueId(0x1011_1213_1415_1617),
             &sha256_num(0x1020),
             InsertLocation::Auto {},
         )
         .unwrap();
 
         blob.insert(
-            KvId(0x2021_2223_2425_2627),
-            KvId(0x3031_3233_3435_3637),
+            KeyId(0x2021_2223_2425_2627),
+            ValueId(0x3031_3233_3435_3637),
             &sha256_num(0x2030),
             InsertLocation::Auto {},
         )
@@ -1823,8 +1848,8 @@ mod tests {
     fn traversal_blob(mut small_blob: MerkleBlob) -> MerkleBlob {
         small_blob
             .insert(
-                KvId(103),
-                KvId(204),
+                KeyId(103),
+                ValueId(204),
                 &sha256_num(0x1324),
                 InsertLocation::Leaf {
                     index: TreeIndex(1),
@@ -1834,8 +1859,8 @@ mod tests {
             .unwrap();
         small_blob
             .insert(
-                KvId(307),
-                KvId(404),
+                KeyId(307),
+                ValueId(404),
                 &sha256_num(0x9183),
                 InsertLocation::Leaf {
                     index: TreeIndex(3),
@@ -1887,8 +1912,9 @@ mod tests {
         let layer_count = 8 * seed.len() + 10;
 
         for n in 0..layer_count {
-            let key = KvId((n + 100) as i64);
-            let value = KvId((n + 100) as i64);
+            let n = (n + 100) as i64;
+            let key = KeyId(n);
+            let value = ValueId(n);
             let hash = sha256_num(key.0);
             let insert_location = blob.get_random_insert_location_by_seed(&seed).unwrap();
             blob.insert(key, value, &hash, insert_location).unwrap();
@@ -1920,7 +1946,12 @@ mod tests {
             let start = Instant::now();
             merkle_blob
                 // NOTE: yeah this hash is garbage
-                .insert(KvId(i), KvId(i), &sha256_num(i), InsertLocation::Auto {})
+                .insert(
+                    KeyId(i),
+                    ValueId(i),
+                    &sha256_num(i),
+                    InsertLocation::Auto {},
+                )
                 .unwrap();
             let end = Instant::now();
             total_time += end.duration_since(start);
@@ -1940,16 +1971,21 @@ mod tests {
         let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
         let mut reference_blobs = vec![];
 
-        let key_value_ids: [KvId; COUNT] = core::array::from_fn(|i| KvId(i as i64));
+        let key_value_ids: [i64; COUNT] = core::array::from_fn(|i| i as i64);
 
         for key_value_id in key_value_ids {
-            let hash: Hash = sha256_num(key_value_id.0);
+            let hash: Hash = sha256_num(key_value_id);
 
             println!("inserting: {key_value_id}");
             merkle_blob.calculate_lazy_hashes().unwrap();
             reference_blobs.push(MerkleBlob::new(merkle_blob.blob.clone()).unwrap());
             merkle_blob
-                .insert(key_value_id, key_value_id, &hash, InsertLocation::Auto {})
+                .insert(
+                    KeyId(key_value_id),
+                    ValueId(key_value_id),
+                    &hash,
+                    InsertLocation::Auto {},
+                )
                 .unwrap();
             dots.push(merkle_blob.to_dot().unwrap().dump());
         }
@@ -1958,9 +1994,9 @@ mod tests {
 
         for key_value_id in key_value_ids.iter().rev() {
             println!("deleting: {key_value_id}");
-            merkle_blob.delete(*key_value_id).unwrap();
+            merkle_blob.delete(KeyId(*key_value_id)).unwrap();
             merkle_blob.calculate_lazy_hashes().unwrap();
-            assert_eq!(merkle_blob, reference_blobs[key_value_id.0 as usize]);
+            assert_eq!(merkle_blob, reference_blobs[*key_value_id as usize]);
             dots.push(merkle_blob.to_dot().unwrap().dump());
         }
     }
@@ -1969,13 +2005,13 @@ mod tests {
     fn test_insert_first() {
         let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
 
-        let key_value_id = KvId(1);
+        let key_value_id = 1;
         open_dot(merkle_blob.to_dot().unwrap().set_note("empty"));
         merkle_blob
             .insert(
-                key_value_id,
-                key_value_id,
-                &sha256_num(key_value_id.0),
+                KeyId(key_value_id),
+                ValueId(key_value_id),
+                &sha256_num(key_value_id),
                 InsertLocation::Auto {},
             )
             .unwrap();
@@ -1991,23 +2027,28 @@ mod tests {
     ) {
         let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
 
-        let mut last_key: KvId = KvId(0);
+        let mut last_key: KeyId = KeyId(0);
         for i in 1..=pre_count {
-            let key = KvId(i as i64);
+            let key_value = i as i64;
             open_dot(merkle_blob.to_dot().unwrap().set_note("empty"));
             merkle_blob
-                .insert(key, key, &sha256_num(key.0), InsertLocation::Auto {})
+                .insert(
+                    KeyId(key_value),
+                    ValueId(key_value),
+                    &sha256_num(key_value),
+                    InsertLocation::Auto {},
+                )
                 .unwrap();
-            last_key = key;
+            last_key = KeyId(key_value);
         }
 
-        let key_value_id: KvId = KvId((pre_count + 1) as i64);
+        let key_value_id = (pre_count + 1) as i64;
         open_dot(merkle_blob.to_dot().unwrap().set_note("first after"));
         merkle_blob
             .insert(
-                key_value_id,
-                key_value_id,
-                &sha256_num(key_value_id.0),
+                KeyId(key_value_id),
+                ValueId(key_value_id),
+                &sha256_num(key_value_id),
                 InsertLocation::Leaf {
                     index: merkle_blob.key_to_index[&last_key],
                     side,
@@ -2033,9 +2074,9 @@ mod tests {
             .unwrap()
             .expect_leaf("<<self>>");
 
-        let expected_keys: [KvId; 2] = match side {
-            Side::Left => [KvId(pre_count as i64 + 1), KvId(pre_count as i64)],
-            Side::Right => [KvId(pre_count as i64), KvId(pre_count as i64 + 1)],
+        let expected_keys: [KeyId; 2] = match side {
+            Side::Left => [KeyId(pre_count as i64 + 1), KeyId(pre_count as i64)],
+            Side::Right => [KeyId(pre_count as i64), KeyId(pre_count as i64 + 1)],
         };
         assert_eq!([left.key, right.key], expected_keys);
     }
@@ -2044,27 +2085,27 @@ mod tests {
     fn test_delete_last() {
         let mut merkle_blob = MerkleBlob::new(vec![]).unwrap();
 
-        let key_value_id = KvId(1);
+        let key_value_id = 1;
         open_dot(merkle_blob.to_dot().unwrap().set_note("empty"));
         merkle_blob
             .insert(
-                key_value_id,
-                key_value_id,
-                &sha256_num(key_value_id.0),
+                KeyId(key_value_id),
+                ValueId(key_value_id),
+                &sha256_num(key_value_id),
                 InsertLocation::Auto {},
             )
             .unwrap();
         open_dot(merkle_blob.to_dot().unwrap().set_note("first after"));
         merkle_blob.check_integrity().unwrap();
 
-        merkle_blob.delete(key_value_id).unwrap();
+        merkle_blob.delete(KeyId(key_value_id)).unwrap();
 
         assert_eq!(merkle_blob.key_to_index.len(), 0);
     }
 
     #[rstest]
     fn test_delete_frees_index(mut small_blob: MerkleBlob) {
-        let key = KvId(0x0001_0203_0405_0607);
+        let key = KeyId(0x0001_0203_0405_0607);
         let index = small_blob.key_to_index[&key];
         small_blob.delete(key).unwrap();
 
@@ -2077,7 +2118,7 @@ mod tests {
     #[rstest]
     fn test_get_new_index_with_free_index(mut small_blob: MerkleBlob) {
         open_dot(small_blob.to_dot().unwrap().set_note("initial"));
-        let key = KvId(0x0001_0203_0405_0607);
+        let key = KeyId(0x0001_0203_0405_0607);
         let _ = small_blob.key_to_index[&key];
         small_blob.delete(key).unwrap();
         open_dot(small_blob.to_dot().unwrap().set_note("after delete"));
@@ -2129,9 +2170,9 @@ mod tests {
 
     #[rstest]
     fn test_upsert_inserts(small_blob: MerkleBlob) {
-        let key = KvId(1234);
+        let key = KeyId(1234);
         assert!(!small_blob.key_to_index.contains_key(&key));
-        let value = KvId(5678);
+        let value = ValueId(5678);
 
         let mut insert_blob = MerkleBlob::new(small_blob.blob.clone()).unwrap();
         insert_blob
@@ -2152,7 +2193,7 @@ mod tests {
             MerkleBlobLeftChildFirstIterator::new(&small_blob.blob).collect::<Vec<_>>();
         let (key, index) = small_blob.key_to_index.iter().next().unwrap();
         let original = small_blob.get_node(*index).unwrap().expect_leaf("<<self>>");
-        let new_value = KvId(original.value.0 + 1);
+        let new_value = ValueId(original.value.0 + 1);
 
         small_blob.upsert(*key, new_value, &original.hash).unwrap();
 
@@ -2191,11 +2232,21 @@ mod tests {
     #[test]
     fn test_double_insert_fails() {
         let mut blob = MerkleBlob::new(vec![]).unwrap();
-        let kv = KvId(0);
-        blob.insert(kv, kv, &Bytes32::new([0u8; 32]), InsertLocation::Auto {})
-            .unwrap();
-        blob.insert(kv, kv, &Bytes32::new([0u8; 32]), InsertLocation::Auto {})
-            .expect_err("");
+        let kv = 0;
+        blob.insert(
+            KeyId(kv),
+            ValueId(kv),
+            &Bytes32::new([0u8; 32]),
+            InsertLocation::Auto {},
+        )
+        .unwrap();
+        blob.insert(
+            KeyId(kv),
+            ValueId(kv),
+            &Bytes32::new([0u8; 32]),
+            InsertLocation::Auto {},
+        )
+        .expect_err("");
     }
 
     #[rstest]
@@ -2205,19 +2256,24 @@ mod tests {
     ) {
         let mut blob = MerkleBlob::new(vec![]).unwrap();
         for i in 0..pre_inserts {
-            let i = KvId(i as i64);
-            blob.insert(i, i, &sha256_num(i.0), InsertLocation::Auto {})
-                .unwrap();
+            let i = i as i64;
+            blob.insert(
+                KeyId(i),
+                ValueId(i),
+                &sha256_num(i),
+                InsertLocation::Auto {},
+            )
+            .unwrap();
         }
         open_dot(blob.to_dot().unwrap().set_note("initial"));
 
-        let mut batch: Vec<((KvId, KvId), Hash)> = vec![];
+        let mut batch: Vec<((KeyId, ValueId), Hash)> = vec![];
 
-        let mut batch_map = HashMap::new();
+        let mut batch_map: HashMap<KeyId, ValueId> = HashMap::new();
         for i in pre_inserts..(pre_inserts + count) {
-            let i = KvId(i as i64);
-            batch.push(((i, i), sha256_num(i.0)));
-            batch_map.insert(i, i);
+            let i = i as i64;
+            batch.push(((KeyId(i), ValueId(i)), sha256_num(i)));
+            batch_map.insert(KeyId(i), ValueId(i));
         }
 
         let before = blob.get_keys_values().unwrap();
@@ -2442,7 +2498,12 @@ mod tests {
     #[rstest]
     fn test_root_insert_location_when_not_empty(mut small_blob: MerkleBlob) {
         small_blob
-            .insert(KvId(0), KvId(0), &sha256_num(0), InsertLocation::AsRoot {})
+            .insert(
+                KeyId(0),
+                ValueId(0),
+                &sha256_num(0),
+                InsertLocation::AsRoot {},
+            )
             .expect_err("tree not empty so inserting to root should fail");
     }
 
@@ -2452,7 +2513,12 @@ mod tests {
         let count = 5;
         for n in 0..count {
             small_blob
-                .insert(KvId(n), KvId(n), &sha256_num(n), InsertLocation::Auto {})
+                .insert(
+                    KeyId(n),
+                    ValueId(n),
+                    &sha256_num(n),
+                    InsertLocation::Auto {},
+                )
                 .unwrap();
         }
         let (key, index) = {
@@ -2467,8 +2533,8 @@ mod tests {
         assert_eq!(free_indexes.len(), 2);
         let new_index = small_blob
             .insert(
-                KvId(count),
-                KvId(count),
+                KeyId(count),
+                ValueId(count),
                 &sha256_num(count),
                 InsertLocation::Auto {},
             )
