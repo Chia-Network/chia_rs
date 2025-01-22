@@ -1352,7 +1352,7 @@ impl MerkleBlob {
         Ok(map)
     }
 
-    pub fn get_key_index(&self, key: KvId) -> Result<TreeIndex, Error> {
+    pub fn get_key_index(&self, key: KeyId) -> Result<TreeIndex, Error> {
         self.key_to_index
             .get(&key)
             .copied()
@@ -1563,7 +1563,7 @@ impl MerkleBlob {
     }
 
     #[pyo3(name = "get_key_index")]
-    pub fn py_get_key_index(&self, key: KvId) -> PyResult<TreeIndex> {
+    pub fn py_get_key_index(&self, key: KeyId) -> PyResult<TreeIndex> {
         Ok(self.get_key_index(key)?)
     }
 }
