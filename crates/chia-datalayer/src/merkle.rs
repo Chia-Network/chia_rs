@@ -2,8 +2,9 @@
 use pyo3::{
     buffer::PyBuffer,
     exceptions::PyValueError,
+    prelude::*,
     pyclass, pymethods,
-    types::{PyDict, PyInt},
+    types::{PyDict, PyDictMethods, PyInt, PyListMethods},
     Bound, FromPyObject, IntoPyObject, PyAny, PyErr, PyResult, Python,
 };
 
@@ -96,7 +97,7 @@ macro_rules! create_errors {
 
         #[cfg(feature = "py-bindings")]
         pub mod python_exceptions {
-            use pyo3::prelude::*;
+            use super::*;
 
             $(
                 pyo3::create_exception!(chia_rs.chia_rs.datalayer, $python_name, pyo3::exceptions::PyException);
@@ -1429,7 +1430,6 @@ impl MerkleBlob {
 
     #[pyo3(name = "get_raw_node")]
     pub fn py_get_raw_node(&mut self, index: &Bound<'_, PyInt>) -> PyResult<Node> {
-        use pyo3::prelude::PyAnyMethods;
         let index = TreeIndex(index.extract::<u32>().or(Err(
             python_exceptions::BlockIndexOutOfBoundsError::new_err(index.to_string()),
         ))?);
@@ -1450,7 +1450,6 @@ impl MerkleBlob {
         let list = pyo3::types::PyList::empty(py);
 
         for (index, node) in self.get_lineage_with_indexes(index)? {
-            use pyo3::types::PyListMethods;
             list.append((index.into_pyobject(py)?, node.into_pyobject(py)?))?;
         }
 
@@ -1462,7 +1461,6 @@ impl MerkleBlob {
         let list = pyo3::types::PyList::empty(py);
 
         for item in MerkleBlobParentFirstIterator::new(&self.blob) {
-            use pyo3::types::PyListMethods;
             let (index, block) = item?;
             list.append((index.into_pyobject(py)?, block.node.into_pyobject(py)?))?;
         }
@@ -1523,7 +1521,6 @@ impl MerkleBlob {
         let map = self.get_keys_values()?;
         let dict = PyDict::new(py);
         for (key, value) in map {
-            use pyo3::types::PyDictMethods;
             dict.set_item(key, value)?;
         }
 
