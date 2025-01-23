@@ -767,9 +767,7 @@ impl MerkleBlob {
         };
         self.insert_entry_to_blob(new_internal_node_index, &new_internal_block)?;
 
-        let Some(old_parent_index) = old_leaf.parent.0 else {
-            panic!("root found when not expected")
-        };
+        let old_parent_index = old_leaf.parent.0.expect("root found when not expected");
 
         self.update_parent(old_leaf_index, Some(new_internal_node_index))?;
 
@@ -932,10 +930,8 @@ impl MerkleBlob {
         self.insert_entry_to_blob(new_internal_node_index, &block)?;
         self.update_parent(new_index, Some(new_internal_node_index))?;
 
-        let Some(old_leaf_parent) = old_leaf.parent.0 else {
-            // TODO: relates to comment at the beginning about assumptions about the tree etc
-            panic!("not handling this case");
-        };
+        // TODO: expect relates to comment at the beginning about assumptions about the tree etc
+        let old_leaf_parent = old_leaf.parent.0.expect("not handling this case");
 
         let mut parent = self.get_block(old_leaf_parent)?;
         if let Node::Internal(ref mut internal) = parent.node {
