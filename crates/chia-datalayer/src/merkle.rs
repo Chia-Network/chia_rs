@@ -9,9 +9,10 @@ use pyo3::{
 };
 
 use chia_protocol::Bytes32;
+use chia_py_streamable_macro::{PyJsonDict, PyStreamable};
 use chia_sha2::Sha256;
 use chia_streamable_macro::Streamable;
-use chia_traits::Streamable;
+use chia_traits::{Streamable, ToJsonDict};
 use num_traits::ToBytes;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -34,13 +35,42 @@ impl<'py> IntoPyObject<'py> for TreeIndex {
     }
 }
 
+#[cfg(feature = "py-bindings")]
+impl ToJsonDict for TreeIndex {
+    fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
+        Ok(self.into_pyobject(py)?.unbind().into_any())
+    }
+}
+
 impl std::fmt::Display for TreeIndex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
     }
 }
 
-type Parent = Option<TreeIndex>;
+#[cfg_attr(feature = "py-bindings", derive(FromPyObject), pyo3(transparent))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
+struct Parent(Option<TreeIndex>);
+
+#[cfg(feature = "py-bindings")]
+impl<'py> IntoPyObject<'py> for Parent {
+    // TODO: can we describe this optional int better?
+    type Target = PyAny;
+    type Output = Bound<'py, Self::Target>;
+    type Error = std::convert::Infallible;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
+        self.0.into_pyobject(py)
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+impl ToJsonDict for Parent {
+    fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
+        Ok(self.into_pyobject(py)?.unbind().into_any())
+    }
+}
+
 type Hash = Bytes32;
 /// Key and value ids are provided from outside of this code and are implemented as
 /// the row id from sqlite which is a signed 8 byte integer.  The actual key and
@@ -339,7 +369,7 @@ pub struct NodeMetadata {
     pub dirty: bool,
 }
 
-#[cfg_attr(feature = "py-bindings", pyclass(get_all))]
+#[cfg_attr(feature = "py-bindings", pyclass, derive(PyJsonDict, PyStreamable))]
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Streamable)]
 pub struct InternalNode {
     pub parent: Parent,
@@ -360,25 +390,6 @@ impl InternalNode {
     }
 }
 
-#[cfg(feature = "py-bindings")]
-#[pymethods]
-impl InternalNode {
-    #[new]
-    pub fn py_init(
-        parent: Parent,
-        hash: Hash,
-        left: TreeIndex,
-        right: TreeIndex,
-    ) -> PyResult<Self> {
-        Ok(Self {
-            parent,
-            hash,
-            left,
-            right,
-        })
-    }
-}
-
 #[cfg_attr(feature = "py-bindings", pyclass(get_all))]
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Streamable)]
 pub struct LeafNode {
@@ -386,20 +397,6 @@ pub struct LeafNode {
     pub hash: Hash,
     pub key: KeyId,
     pub value: ValueId,
-}
-
-#[cfg(feature = "py-bindings")]
-#[pymethods]
-impl LeafNode {
-    #[new]
-    pub fn py_init(parent: Parent, hash: Hash, key: KeyId, value: ValueId) -> PyResult<Self> {
-        Ok(Self {
-            parent,
-            hash,
-            key,
-            value,
-        })
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
