@@ -41,7 +41,15 @@ impl std::fmt::Display for TreeIndex {
 }
 
 type Parent = Option<TreeIndex>;
-type Hash = Bytes32;
+
+#[cfg_attr(
+    feature = "py-bindings",
+    derive(FromPyObject, IntoPyObject),
+    pyo3(transparent)
+)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
+pub struct Hash(Bytes32);
+
 /// Key and value ids are provided from outside of this code and are implemented as
 /// the row id from sqlite which is a signed 8 byte integer.  The actual key and
 /// value data bytes will not be handled within this code, only outside.
@@ -294,23 +302,23 @@ fn sha256_num<T: ToBytes>(input: T) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(input.to_be_bytes());
 
-    Bytes32::new(hasher.finalize())
+    Hash(Bytes32::new(hasher.finalize()))
 }
 
 fn sha256_bytes(input: &[u8]) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(input);
 
-    Bytes32::new(hasher.finalize())
+    Hash(Bytes32::new(hasher.finalize()))
 }
 
 fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(b"\x02");
-    hasher.update(left_hash);
-    hasher.update(right_hash);
+    hasher.update(left_hash.0);
+    hasher.update(right_hash.0);
 
-    Bytes32::new(hasher.finalize())
+    Hash(Bytes32::new(hasher.finalize()))
 }
 
 #[cfg_attr(feature = "py-bindings", pyclass(eq, eq_int))]
@@ -1200,14 +1208,14 @@ impl MerkleBlob {
                 }
             }
 
-            seed_bytes = sha256_bytes(&seed_bytes).into();
+            seed_bytes = sha256_bytes(&seed_bytes).0.into();
         }
     }
 
     fn get_random_insert_location_by_key_id(&self, seed: KeyId) -> Result<InsertLocation, Error> {
         let seed = sha256_num(seed.0);
 
-        self.get_random_insert_location_by_seed(&seed)
+        self.get_random_insert_location_by_seed(&seed.0)
     }
 
     fn extend_index(&self) -> TreeIndex {
@@ -1792,18 +1800,18 @@ mod tests {
     fn test_internal_hash() {
         // in Python: Program.to((left_hash, right_hash)).get_tree_hash_precalc(left_hash, right_hash)
 
-        let left: Hash = (0u8..32).collect::<Vec<_>>().try_into().unwrap();
-        let right: Hash = (32u8..64).collect::<Vec<_>>().try_into().unwrap();
+        let left = Hash((0u8..32).collect::<Vec<_>>().try_into().unwrap());
+        let right = Hash((32u8..64).collect::<Vec<_>>().try_into().unwrap());
 
         assert_eq!(
             internal_hash(&left, &right),
-            Bytes32::new(
+            Hash(Bytes32::new(
                 clvm_utils::tree_hash_pair(
-                    clvm_utils::TreeHash::new(left.to_bytes()),
-                    clvm_utils::TreeHash::new(right.to_bytes()),
+                    clvm_utils::TreeHash::new(left.0.to_bytes()),
+                    clvm_utils::TreeHash::new(right.0.to_bytes()),
                 )
                 .to_bytes()
-            ),
+            )),
         );
     }
 
@@ -2233,14 +2241,14 @@ mod tests {
         blob.insert(
             KeyId(kv),
             ValueId(kv),
-            &Bytes32::new([0u8; 32]),
+            &Hash(Bytes32::new([0u8; 32])),
             InsertLocation::Auto {},
         )
         .unwrap();
         blob.insert(
             KeyId(kv),
             ValueId(kv),
-            &Bytes32::new([0u8; 32]),
+            &Hash(Bytes32::new([0u8; 32])),
             InsertLocation::Auto {},
         )
         .expect_err("");
