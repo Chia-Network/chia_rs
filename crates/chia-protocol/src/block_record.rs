@@ -161,7 +161,7 @@ impl BlockRecord {
     }
 
     fn sp_iters_impl(&self, constants: &Bound<'_, PyAny>) -> PyResult<u64> {
-        let num_sps_sub_slot = constants.get_item("NUM_SPS_SUB_SLOT")?.extract::<u32>()?;
+        let num_sps_sub_slot = constants.getattr("NUM_SPS_SUB_SLOT")?.extract::<u32>()?;
         calculate_sp_iters(
             num_sps_sub_slot,
             self.signage_point_index,
@@ -170,9 +170,9 @@ impl BlockRecord {
     }
 
     fn ip_iters_impl(&self, constants: &Bound<'_, PyAny>) -> PyResult<u64> {
-        let num_sps_sub_slot = constants.get_item("NUM_SPS_SUB_SLOT")?.extract::<u32>()?;
+        let num_sps_sub_slot = constants.getattr("NUM_SPS_SUB_SLOT")?.extract::<u32>()?;
         let num_sp_intervals_extra = constants
-            .get_item("NUM_SP_INTERVALS_EXTRA")?
+            .getattr("NUM_SP_INTERVALS_EXTRA")?
             .extract::<u8>()?;
         calculate_ip_iters(
             num_sps_sub_slot,
