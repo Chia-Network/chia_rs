@@ -392,6 +392,7 @@ dependencies = [
  "chia-protocol",
  "chia-sha2 0.17.0",
  "chia-traits 0.18.0",
+ "chia_py_streamable_macro",
  "chia_streamable_macro 0.17.0",
  "clvm-utils",
  "expect-test",
