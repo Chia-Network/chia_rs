@@ -2329,49 +2329,63 @@ mod tests {
                     Leaf,
                     283686952306183,
                     1157726452361532951,
-                    d8ddfc94e7201527a6a93ee04aed8c5c122ac38af6dbf6e5f1caefba2597230d,
+                    Hash(
+                        d8ddfc94e7201527a6a93ee04aed8c5c122ac38af6dbf6e5f1caefba2597230d,
+                    ),
                 ),
                 (
                     3,
                     Leaf,
                     103,
                     204,
-                    2d47301cff01acc863faa5f57e8fbc632114f1dc764772852ed0c29c0f248bd3,
+                    Hash(
+                        2d47301cff01acc863faa5f57e8fbc632114f1dc764772852ed0c29c0f248bd3,
+                    ),
                 ),
                 (
                     5,
                     Leaf,
                     307,
                     404,
-                    97148f80dd9289a1b67527c045fd47662d575ccdb594701a56c2255ac84f6113,
+                    Hash(
+                        97148f80dd9289a1b67527c045fd47662d575ccdb594701a56c2255ac84f6113,
+                    ),
                 ),
                 (
                     6,
                     Internal,
                     3,
                     5,
-                    b946284149e4f4a0e767ef2feb397533fb112bf4d99c887348cec4438e38c1ce,
+                    Hash(
+                        b946284149e4f4a0e767ef2feb397533fb112bf4d99c887348cec4438e38c1ce,
+                    ),
                 ),
                 (
                     4,
                     Internal,
                     1,
                     6,
-                    eee0c40977ba1c0e16a467f30f64d9c2579ff25dd01913e33962c3f1db86c2ea,
+                    Hash(
+                        eee0c40977ba1c0e16a467f30f64d9c2579ff25dd01913e33962c3f1db86c2ea,
+                    ),
                 ),
                 (
                     2,
                     Leaf,
                     2315169217770759719,
                     3472611983179986487,
-                    0f980325ebe9426fa295f3f69cc38ef8fe6ce8f3b9f083556c0f927e67e56651,
+                    Hash(
+                        0f980325ebe9426fa295f3f69cc38ef8fe6ce8f3b9f083556c0f927e67e56651,
+                    ),
                 ),
                 (
                     0,
                     Internal,
                     4,
                     2,
-                    0e4a8b1ecee43f457bbe2b30e94ac2afc0d3a6536f891a2ced5e96ce07fe9932,
+                    Hash(
+                        0e4a8b1ecee43f457bbe2b30e94ac2afc0d3a6536f891a2ced5e96ce07fe9932,
+                    ),
                 ),
             ]
         "#]],
@@ -2388,49 +2402,63 @@ mod tests {
                     Internal,
                     4,
                     2,
-                    0e4a8b1ecee43f457bbe2b30e94ac2afc0d3a6536f891a2ced5e96ce07fe9932,
+                    Hash(
+                        0e4a8b1ecee43f457bbe2b30e94ac2afc0d3a6536f891a2ced5e96ce07fe9932,
+                    ),
                 ),
                 (
                     4,
                     Internal,
                     1,
                     6,
-                    eee0c40977ba1c0e16a467f30f64d9c2579ff25dd01913e33962c3f1db86c2ea,
+                    Hash(
+                        eee0c40977ba1c0e16a467f30f64d9c2579ff25dd01913e33962c3f1db86c2ea,
+                    ),
                 ),
                 (
                     2,
                     Leaf,
                     2315169217770759719,
                     3472611983179986487,
-                    0f980325ebe9426fa295f3f69cc38ef8fe6ce8f3b9f083556c0f927e67e56651,
+                    Hash(
+                        0f980325ebe9426fa295f3f69cc38ef8fe6ce8f3b9f083556c0f927e67e56651,
+                    ),
                 ),
                 (
                     1,
                     Leaf,
                     283686952306183,
                     1157726452361532951,
-                    d8ddfc94e7201527a6a93ee04aed8c5c122ac38af6dbf6e5f1caefba2597230d,
+                    Hash(
+                        d8ddfc94e7201527a6a93ee04aed8c5c122ac38af6dbf6e5f1caefba2597230d,
+                    ),
                 ),
                 (
                     6,
                     Internal,
                     3,
                     5,
-                    b946284149e4f4a0e767ef2feb397533fb112bf4d99c887348cec4438e38c1ce,
+                    Hash(
+                        b946284149e4f4a0e767ef2feb397533fb112bf4d99c887348cec4438e38c1ce,
+                    ),
                 ),
                 (
                     3,
                     Leaf,
                     103,
                     204,
-                    2d47301cff01acc863faa5f57e8fbc632114f1dc764772852ed0c29c0f248bd3,
+                    Hash(
+                        2d47301cff01acc863faa5f57e8fbc632114f1dc764772852ed0c29c0f248bd3,
+                    ),
                 ),
                 (
                     5,
                     Leaf,
                     307,
                     404,
-                    97148f80dd9289a1b67527c045fd47662d575ccdb594701a56c2255ac84f6113,
+                    Hash(
+                        97148f80dd9289a1b67527c045fd47662d575ccdb594701a56c2255ac84f6113,
+                    ),
                 ),
             ]
         "#]])]
@@ -2446,28 +2474,36 @@ mod tests {
                     Leaf,
                     2315169217770759719,
                     3472611983179986487,
-                    0f980325ebe9426fa295f3f69cc38ef8fe6ce8f3b9f083556c0f927e67e56651,
+                    Hash(
+                        0f980325ebe9426fa295f3f69cc38ef8fe6ce8f3b9f083556c0f927e67e56651,
+                    ),
                 ),
                 (
                     1,
                     Leaf,
                     283686952306183,
                     1157726452361532951,
-                    d8ddfc94e7201527a6a93ee04aed8c5c122ac38af6dbf6e5f1caefba2597230d,
+                    Hash(
+                        d8ddfc94e7201527a6a93ee04aed8c5c122ac38af6dbf6e5f1caefba2597230d,
+                    ),
                 ),
                 (
                     3,
                     Leaf,
                     103,
                     204,
-                    2d47301cff01acc863faa5f57e8fbc632114f1dc764772852ed0c29c0f248bd3,
+                    Hash(
+                        2d47301cff01acc863faa5f57e8fbc632114f1dc764772852ed0c29c0f248bd3,
+                    ),
                 ),
                 (
                     5,
                     Leaf,
                     307,
                     404,
-                    97148f80dd9289a1b67527c045fd47662d575ccdb594701a56c2255ac84f6113,
+                    Hash(
+                        97148f80dd9289a1b67527c045fd47662d575ccdb594701a56c2255ac84f6113,
+                    ),
                 ),
             ]
         "#]])]
