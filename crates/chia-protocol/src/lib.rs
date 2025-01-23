@@ -1,3 +1,5 @@
+#![allow(clippy::unsafe_derive_deserialize)]
+
 mod block_record;
 mod bytes;
 mod chia_protocol;

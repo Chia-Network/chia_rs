@@ -61,6 +61,26 @@ impl fmt::Display for Bytes {
     }
 }
 
+#[cfg(feature = "serde")]
+impl serde::Serialize for Bytes {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        chia_serde::ser_bytes(self, serializer, false)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Bytes {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        chia_serde::de_bytes(deserializer)
+    }
+}
+
 impl Streamable for Bytes {
     fn update_digest(&self, digest: &mut Sha256) {
         (self.0.len() as u32).update_digest(digest);
@@ -206,6 +226,26 @@ impl<const N: usize> fmt::Debug for BytesImpl<N> {
 impl<const N: usize> fmt::Display for BytesImpl<N> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&hex::encode(self))
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<const N: usize> serde::Serialize for BytesImpl<N> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        chia_serde::ser_bytes(self, serializer, true)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, const N: usize> serde::Deserialize<'de> for BytesImpl<N> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        chia_serde::de_bytes(deserializer)
     }
 }
 

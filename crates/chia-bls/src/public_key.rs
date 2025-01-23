@@ -161,6 +161,26 @@ impl PartialEq for PublicKey {
 }
 impl Eq for PublicKey {}
 
+#[cfg(feature = "serde")]
+impl serde::Serialize for PublicKey {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        chia_serde::ser_bytes(&self.to_bytes(), serializer, true)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for PublicKey {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Self::from_bytes(&chia_serde::de_bytes(deserializer)?).map_err(serde::de::Error::custom)
+    }
+}
+
 impl Streamable for PublicKey {
     fn update_digest(&self, digest: &mut Sha256) {
         digest.update(self.to_bytes());
