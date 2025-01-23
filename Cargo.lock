@@ -416,6 +416,7 @@ dependencies = [
 name = "chia-protocol"
 version = "0.19.0"
 dependencies = [
+ "anyhow",
  "arbitrary",
  "chia-bls 0.19.0",
  "chia-serde",
@@ -427,9 +428,11 @@ dependencies = [
  "clvm-utils",
  "clvmr",
  "hex",
+ "indoc",
  "pyo3",
  "rstest",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

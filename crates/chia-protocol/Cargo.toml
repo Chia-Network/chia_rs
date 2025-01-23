@@ -14,7 +14,7 @@ workspace = true
 [features]
 py-bindings = ["dep:pyo3", "dep:chia_py_streamable_macro", "chia-traits/py-bindings", "chia-bls/py-bindings"]
 arbitrary = ["dep:arbitrary", "chia-bls/arbitrary"]
-serde = ["dep:serde", "dep:chia-serde"]
+serde = ["dep:serde", "dep:chia-serde", "chia-bls/serde"]
 
 [dependencies]
 pyo3 = { workspace = true, features = ["multiple-pymethods", "num-bigint"], optional = true }
@@ -33,6 +33,9 @@ chia-serde = { workspace = true, optional = true }
 
 [dev-dependencies]
 rstest = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+indoc = { workspace = true }
 
 [lib]
 crate-type = ["rlib"]
