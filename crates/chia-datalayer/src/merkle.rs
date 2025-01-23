@@ -19,20 +19,13 @@ use std::iter::zip;
 use std::ops::Range;
 use thiserror::Error;
 
-#[cfg_attr(feature = "py-bindings", derive(FromPyObject), pyo3(transparent))]
+#[cfg_attr(
+    feature = "py-bindings",
+    derive(FromPyObject, IntoPyObject),
+    pyo3(transparent)
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 pub struct TreeIndex(u32);
-
-#[cfg(feature = "py-bindings")]
-impl<'py> IntoPyObject<'py> for TreeIndex {
-    type Target = PyInt;
-    type Output = Bound<'py, Self::Target>;
-    type Error = std::convert::Infallible;
-
-    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
-        self.0.into_pyobject(py)
-    }
-}
 
 impl std::fmt::Display for TreeIndex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -45,38 +38,24 @@ type Hash = Bytes32;
 /// Key and value ids are provided from outside of this code and are implemented as
 /// the row id from sqlite which is a signed 8 byte integer.  The actual key and
 /// value data bytes will not be handled within this code, only outside.
-#[cfg_attr(feature = "py-bindings", derive(FromPyObject), pyo3(transparent))]
+#[cfg_attr(
+    feature = "py-bindings",
+    derive(FromPyObject, IntoPyObject),
+    pyo3(transparent)
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 pub struct KeyId(i64);
-#[cfg_attr(feature = "py-bindings", derive(FromPyObject), pyo3(transparent))]
+#[cfg_attr(
+    feature = "py-bindings",
+    derive(FromPyObject, IntoPyObject),
+    pyo3(transparent)
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 pub struct ValueId(i64);
-
-#[cfg(feature = "py-bindings")]
-impl<'py> IntoPyObject<'py> for KeyId {
-    type Target = PyInt;
-    type Output = Bound<'py, Self::Target>;
-    type Error = std::convert::Infallible;
-
-    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
-        self.0.into_pyobject(py)
-    }
-}
 
 impl std::fmt::Display for ValueId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
-    }
-}
-
-#[cfg(feature = "py-bindings")]
-impl<'py> IntoPyObject<'py> for ValueId {
-    type Target = PyInt;
-    type Output = Bound<'py, Self::Target>;
-    type Error = std::convert::Infallible;
-
-    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
-        self.0.into_pyobject(py)
     }
 }
 
