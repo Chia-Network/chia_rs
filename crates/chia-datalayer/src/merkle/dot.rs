@@ -76,7 +76,7 @@ impl DotLines {
 impl Node {
     pub fn to_dot(&self, index: TreeIndex) -> DotLines {
         // TODO: can this be done without introducing a blank line?
-        let node_to_parent = match self.parent() {
+        let node_to_parent = match self.parent().0 {
             Some(parent) => format!("node_{index} -> node_{parent} [constraint=false]"),
             None => String::new(),
         };

@@ -40,7 +40,14 @@ impl std::fmt::Display for TreeIndex {
     }
 }
 
-type Parent = Option<TreeIndex>;
+#[cfg_attr(
+    feature = "py-bindings",
+    derive(FromPyObject, IntoPyObject),
+    pyo3(transparent)
+)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
+pub struct Parent(Option<TreeIndex>);
+
 type Hash = Bytes32;
 /// Key and value ids are provided from outside of this code and are implemented as
 /// the row id from sqlite which is a signed 8 byte integer.  The actual key and
@@ -635,7 +642,7 @@ impl MerkleBlob {
                 };
 
                 let node = LeafNode {
-                    parent: None,
+                    parent: Parent(None),
                     hash: *hash,
                     key,
                     value,
@@ -662,7 +669,7 @@ impl MerkleBlob {
                 dirty: false,
             },
             node: Node::Leaf(LeafNode {
-                parent: None,
+                parent: Parent(None),
                 key,
                 value,
                 hash: *hash,
@@ -693,7 +700,7 @@ impl MerkleBlob {
                 dirty: false,
             },
             node: Node::Internal(InternalNode {
-                parent: None,
+                parent: Parent(None),
                 left: left_index,
                 right: right_index,
                 hash: *internal_node_hash,
@@ -702,7 +709,7 @@ impl MerkleBlob {
 
         self.insert_entry_to_blob(root_index, &new_internal_block)?;
 
-        node.parent = Some(TreeIndex(0));
+        node.parent = Parent(Some(TreeIndex(0)));
 
         let nodes = [
             (
@@ -711,7 +718,7 @@ impl MerkleBlob {
                     Side::Right => left_index,
                 },
                 LeafNode {
-                    parent: Some(TreeIndex(0)),
+                    parent: Parent(Some(TreeIndex(0))),
                     key: old_leaf.key,
                     value: old_leaf.value,
                     hash: old_leaf.hash,
@@ -752,7 +759,7 @@ impl MerkleBlob {
         let new_leaf_index = self.get_new_index();
         let new_internal_node_index = self.get_new_index();
 
-        node.parent = Some(new_internal_node_index);
+        node.parent = Parent(Some(new_internal_node_index));
 
         let new_leaf_block = Block {
             metadata: NodeMetadata {
@@ -781,7 +788,7 @@ impl MerkleBlob {
         };
         self.insert_entry_to_blob(new_internal_node_index, &new_internal_block)?;
 
-        let Some(old_parent_index) = old_leaf.parent else {
+        let Some(old_parent_index) = old_leaf.parent.0 else {
             panic!("root found when not expected")
         };
 
@@ -831,7 +838,7 @@ impl MerkleBlob {
                     dirty: false,
                 },
                 node: Node::Leaf(LeafNode {
-                    parent: None,
+                    parent: Parent(None),
                     hash,
                     key,
                     value,
@@ -872,7 +879,7 @@ impl MerkleBlob {
                         dirty: false,
                     },
                     node: Node::Internal(InternalNode {
-                        parent: None,
+                        parent: Parent(None),
                         hash: internal_hash(&hashes[0], &hashes[1]),
                         left: index_1,
                         right: index_2,
@@ -946,7 +953,7 @@ impl MerkleBlob {
         self.insert_entry_to_blob(new_internal_node_index, &block)?;
         self.update_parent(new_index, Some(new_internal_node_index))?;
 
-        let Some(old_leaf_parent) = old_leaf.parent else {
+        let Some(old_leaf_parent) = old_leaf.parent.0 else {
             // TODO: relates to comment at the beginning about assumptions about the tree etc
             panic!("not handling this case");
         };
@@ -981,7 +988,7 @@ impl MerkleBlob {
         let (leaf_index, leaf, _leaf_block) = self.get_leaf_by_key(key)?;
         self.key_to_index.remove(&key);
 
-        let Some(parent_index) = leaf.parent else {
+        let Some(parent_index) = leaf.parent.0 else {
             self.clear();
             return Ok(());
         };
@@ -994,8 +1001,8 @@ impl MerkleBlob {
         let sibling_index = parent.sibling_index(leaf_index)?;
         let mut sibling_block = self.get_block(sibling_index)?;
 
-        let Some(grandparent_index) = parent.parent else {
-            sibling_block.node.set_parent(None);
+        let Some(grandparent_index) = parent.parent.0 else {
+            sibling_block.node.set_parent(Parent(None));
             self.insert_entry_to_blob(TreeIndex(0), &sibling_block)?;
 
             if let Node::Internal(node) = sibling_block.node {
@@ -1012,7 +1019,9 @@ impl MerkleBlob {
         self.free_indexes.insert(parent_index);
         let mut grandparent_block = self.get_block(grandparent_index)?;
 
-        sibling_block.node.set_parent(Some(grandparent_index));
+        sibling_block
+            .node
+            .set_parent(Parent(Some(grandparent_index)));
         self.insert_entry_to_blob(sibling_index, &sibling_block)?;
 
         if let Node::Internal(ref mut internal) = grandparent_block.node {
@@ -1043,7 +1052,7 @@ impl MerkleBlob {
         block.node = Node::Leaf(leaf);
         self.insert_entry_to_blob(leaf_index, &block)?;
 
-        if let Some(parent) = block.node.parent() {
+        if let Some(parent) = block.node.parent().0 {
             self.mark_lineage_as_dirty(parent)?;
         };
 
@@ -1057,7 +1066,7 @@ impl MerkleBlob {
 
         for item in MerkleBlobParentFirstIterator::new(&self.blob) {
             let (index, block) = item?;
-            if let Some(parent) = block.node.parent() {
+            if let Some(parent) = block.node.parent().0 {
                 if child_to_parent.remove(&index) != Some(parent) {
                     return Err(Error::IntegrityParentChildMismatch(index));
                 }
@@ -1117,7 +1126,7 @@ impl MerkleBlob {
         parent: Option<TreeIndex>,
     ) -> Result<Block, Error> {
         let mut block = self.get_block(index)?;
-        block.node.set_parent(parent);
+        block.node.set_parent(Parent(parent));
         self.insert_entry_to_blob(index, &block)?;
 
         Ok(block)
@@ -1135,7 +1144,7 @@ impl MerkleBlob {
 
             block.metadata.dirty = true;
             self.insert_entry_to_blob(this_index, &block)?;
-            next_index = block.node.parent();
+            next_index = block.node.parent().0;
         }
 
         Ok(())
@@ -1294,7 +1303,7 @@ impl MerkleBlob {
 
         while let Some(this_index) = next_index {
             let node = self.get_node(this_index)?;
-            next_index = node.parent();
+            next_index = node.parent().0;
             lineage.push((index, node));
         }
 
@@ -1307,7 +1316,7 @@ impl MerkleBlob {
 
         while let Some(this_index) = next_index {
             lineage.push(this_index);
-            next_index = self.get_parent_index(this_index)?;
+            next_index = self.get_parent_index(this_index)?.0;
         }
 
         Ok(lineage)
@@ -1877,7 +1886,7 @@ mod tests {
         }
         assert_eq!(lineage.len(), 2);
         let (_, last_node) = lineage.last().unwrap();
-        assert_eq!(last_node.parent(), None);
+        assert_eq!(last_node.parent(), Parent(None));
     }
 
     #[rstest]
@@ -2057,7 +2066,7 @@ mod tests {
         let sibling = merkle_blob
             .get_node(merkle_blob.key_to_index[&last_key])
             .unwrap();
-        let parent = merkle_blob.get_node(sibling.parent().unwrap()).unwrap();
+        let parent = merkle_blob.get_node(sibling.parent().0.unwrap()).unwrap();
         let Node::Internal(internal) = parent else {
             panic!()
         };
@@ -2139,7 +2148,7 @@ mod tests {
     #[test]
     fn test_node_specific_sibling_index_panics_for_unknown_sibling() {
         let node = InternalNode {
-            parent: None,
+            parent: Parent(None),
             hash: sha256_num(0),
             left: TreeIndex(0),
             right: TreeIndex(1),
