@@ -41,7 +41,14 @@ impl std::fmt::Display for TreeIndex {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 pub struct Parent(Option<TreeIndex>);
 
-type Hash = Bytes32;
+#[cfg_attr(
+    feature = "py-bindings",
+    derive(FromPyObject, IntoPyObject),
+    pyo3(transparent)
+)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
+pub struct Hash(Bytes32);
+
 /// Key and value ids are provided from outside of this code and are implemented as
 /// the row id from sqlite which is a signed 8 byte integer.  The actual key and
 /// value data bytes will not be handled within this code, only outside.
@@ -280,23 +287,23 @@ fn sha256_num<T: ToBytes>(input: T) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(input.to_be_bytes());
 
-    Bytes32::new(hasher.finalize())
+    Hash(Bytes32::new(hasher.finalize()))
 }
 
 fn sha256_bytes(input: &[u8]) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(input);
 
-    Bytes32::new(hasher.finalize())
+    Hash(Bytes32::new(hasher.finalize()))
 }
 
 fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(b"\x02");
-    hasher.update(left_hash);
-    hasher.update(right_hash);
+    hasher.update(left_hash.0);
+    hasher.update(right_hash.0);
 
-    Bytes32::new(hasher.finalize())
+    Hash(Bytes32::new(hasher.finalize()))
 }
 
 #[cfg_attr(feature = "py-bindings", pyclass(eq, eq_int))]
@@ -1184,14 +1191,14 @@ impl MerkleBlob {
                 }
             }
 
-            seed_bytes = sha256_bytes(&seed_bytes).into();
+            seed_bytes = sha256_bytes(&seed_bytes).0.into();
         }
     }
 
     fn get_random_insert_location_by_key_id(&self, seed: KeyId) -> Result<InsertLocation, Error> {
         let seed = sha256_num(seed.0);
 
-        self.get_random_insert_location_by_seed(&seed)
+        self.get_random_insert_location_by_seed(&seed.0)
     }
 
     fn extend_index(&self) -> TreeIndex {
@@ -1776,18 +1783,18 @@ mod tests {
     fn test_internal_hash() {
         // in Python: Program.to((left_hash, right_hash)).get_tree_hash_precalc(left_hash, right_hash)
 
-        let left: Hash = (0u8..32).collect::<Vec<_>>().try_into().unwrap();
-        let right: Hash = (32u8..64).collect::<Vec<_>>().try_into().unwrap();
+        let left = Hash((0u8..32).collect::<Vec<_>>().try_into().unwrap());
+        let right = Hash((32u8..64).collect::<Vec<_>>().try_into().unwrap());
 
         assert_eq!(
             internal_hash(&left, &right),
-            Bytes32::new(
+            Hash(Bytes32::new(
                 clvm_utils::tree_hash_pair(
-                    clvm_utils::TreeHash::new(left.to_bytes()),
-                    clvm_utils::TreeHash::new(right.to_bytes()),
+                    clvm_utils::TreeHash::new(left.0.to_bytes()),
+                    clvm_utils::TreeHash::new(right.0.to_bytes()),
                 )
                 .to_bytes()
-            ),
+            )),
         );
     }
 
@@ -2217,14 +2224,14 @@ mod tests {
         blob.insert(
             KeyId(kv),
             ValueId(kv),
-            &Bytes32::new([0u8; 32]),
+            &Hash(Bytes32::new([0u8; 32])),
             InsertLocation::Auto {},
         )
         .unwrap();
         blob.insert(
             KeyId(kv),
             ValueId(kv),
-            &Bytes32::new([0u8; 32]),
+            &Hash(Bytes32::new([0u8; 32])),
             InsertLocation::Auto {},
         )
         .expect_err("");
@@ -2305,49 +2312,63 @@ mod tests {
                     Leaf,
                     283686952306183,
                     1157726452361532951,
-                    d8ddfc94e7201527a6a93ee04aed8c5c122ac38af6dbf6e5f1caefba2597230d,
+                    Hash(
+                        d8ddfc94e7201527a6a93ee04aed8c5c122ac38af6dbf6e5f1caefba2597230d,
+                    ),
                 ),
                 (
                     3,
                     Leaf,
                     103,
                     204,
-                    2d47301cff01acc863faa5f57e8fbc632114f1dc764772852ed0c29c0f248bd3,
+                    Hash(
+                        2d47301cff01acc863faa5f57e8fbc632114f1dc764772852ed0c29c0f248bd3,
+                    ),
                 ),
                 (
                     5,
                     Leaf,
                     307,
                     404,
-                    97148f80dd9289a1b67527c045fd47662d575ccdb594701a56c2255ac84f6113,
+                    Hash(
+                        97148f80dd9289a1b67527c045fd47662d575ccdb594701a56c2255ac84f6113,
+                    ),
                 ),
                 (
                     6,
                     Internal,
                     3,
                     5,
-                    b946284149e4f4a0e767ef2feb397533fb112bf4d99c887348cec4438e38c1ce,
+                    Hash(
+                        b946284149e4f4a0e767ef2feb397533fb112bf4d99c887348cec4438e38c1ce,
+                    ),
                 ),
                 (
                     4,
                     Internal,
                     1,
                     6,
-                    eee0c40977ba1c0e16a467f30f64d9c2579ff25dd01913e33962c3f1db86c2ea,
+                    Hash(
+                        eee0c40977ba1c0e16a467f30f64d9c2579ff25dd01913e33962c3f1db86c2ea,
+                    ),
                 ),
                 (
                     2,
                     Leaf,
                     2315169217770759719,
                     3472611983179986487,
-                    0f980325ebe9426fa295f3f69cc38ef8fe6ce8f3b9f083556c0f927e67e56651,
+                    Hash(
+                        0f980325ebe9426fa295f3f69cc38ef8fe6ce8f3b9f083556c0f927e67e56651,
+                    ),
                 ),
                 (
                     0,
                     Internal,
                     4,
                     2,
-                    0e4a8b1ecee43f457bbe2b30e94ac2afc0d3a6536f891a2ced5e96ce07fe9932,
+                    Hash(
+                        0e4a8b1ecee43f457bbe2b30e94ac2afc0d3a6536f891a2ced5e96ce07fe9932,
+                    ),
                 ),
             ]
         "#]],
@@ -2364,49 +2385,63 @@ mod tests {
                     Internal,
                     4,
                     2,
-                    0e4a8b1ecee43f457bbe2b30e94ac2afc0d3a6536f891a2ced5e96ce07fe9932,
+                    Hash(
+                        0e4a8b1ecee43f457bbe2b30e94ac2afc0d3a6536f891a2ced5e96ce07fe9932,
+                    ),
                 ),
                 (
                     4,
                     Internal,
                     1,
                     6,
-                    eee0c40977ba1c0e16a467f30f64d9c2579ff25dd01913e33962c3f1db86c2ea,
+                    Hash(
+                        eee0c40977ba1c0e16a467f30f64d9c2579ff25dd01913e33962c3f1db86c2ea,
+                    ),
                 ),
                 (
                     2,
                     Leaf,
                     2315169217770759719,
                     3472611983179986487,
-                    0f980325ebe9426fa295f3f69cc38ef8fe6ce8f3b9f083556c0f927e67e56651,
+                    Hash(
+                        0f980325ebe9426fa295f3f69cc38ef8fe6ce8f3b9f083556c0f927e67e56651,
+                    ),
                 ),
                 (
                     1,
                     Leaf,
                     283686952306183,
                     1157726452361532951,
-                    d8ddfc94e7201527a6a93ee04aed8c5c122ac38af6dbf6e5f1caefba2597230d,
+                    Hash(
+                        d8ddfc94e7201527a6a93ee04aed8c5c122ac38af6dbf6e5f1caefba2597230d,
+                    ),
                 ),
                 (
                     6,
                     Internal,
                     3,
                     5,
-                    b946284149e4f4a0e767ef2feb397533fb112bf4d99c887348cec4438e38c1ce,
+                    Hash(
+                        b946284149e4f4a0e767ef2feb397533fb112bf4d99c887348cec4438e38c1ce,
+                    ),
                 ),
                 (
                     3,
                     Leaf,
                     103,
                     204,
-                    2d47301cff01acc863faa5f57e8fbc632114f1dc764772852ed0c29c0f248bd3,
+                    Hash(
+                        2d47301cff01acc863faa5f57e8fbc632114f1dc764772852ed0c29c0f248bd3,
+                    ),
                 ),
                 (
                     5,
                     Leaf,
                     307,
                     404,
-                    97148f80dd9289a1b67527c045fd47662d575ccdb594701a56c2255ac84f6113,
+                    Hash(
+                        97148f80dd9289a1b67527c045fd47662d575ccdb594701a56c2255ac84f6113,
+                    ),
                 ),
             ]
         "#]])]
@@ -2422,28 +2457,36 @@ mod tests {
                     Leaf,
                     2315169217770759719,
                     3472611983179986487,
-                    0f980325ebe9426fa295f3f69cc38ef8fe6ce8f3b9f083556c0f927e67e56651,
+                    Hash(
+                        0f980325ebe9426fa295f3f69cc38ef8fe6ce8f3b9f083556c0f927e67e56651,
+                    ),
                 ),
                 (
                     1,
                     Leaf,
                     283686952306183,
                     1157726452361532951,
-                    d8ddfc94e7201527a6a93ee04aed8c5c122ac38af6dbf6e5f1caefba2597230d,
+                    Hash(
+                        d8ddfc94e7201527a6a93ee04aed8c5c122ac38af6dbf6e5f1caefba2597230d,
+                    ),
                 ),
                 (
                     3,
                     Leaf,
                     103,
                     204,
-                    2d47301cff01acc863faa5f57e8fbc632114f1dc764772852ed0c29c0f248bd3,
+                    Hash(
+                        2d47301cff01acc863faa5f57e8fbc632114f1dc764772852ed0c29c0f248bd3,
+                    ),
                 ),
                 (
                     5,
                     Leaf,
                     307,
                     404,
-                    97148f80dd9289a1b67527c045fd47662d575ccdb594701a56c2255ac84f6113,
+                    Hash(
+                        97148f80dd9289a1b67527c045fd47662d575ccdb594701a56c2255ac84f6113,
+                    ),
                 ),
             ]
         "#]])]
