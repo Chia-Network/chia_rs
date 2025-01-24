@@ -1,0 +1,21 @@
+[package]
+name = "chia-serde"
+version = "0.19.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Serialization and deserialization helpers for Chia types"
+authors = ["Brandon Haggstrom <b.haggstrom@chia.net>"]
+homepage = "https://github.com/Chia-Network/chia_rs"
+repository = "https://github.com/Chia-Network/chia_rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true }
+hex = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+bincode = { workspace = true }

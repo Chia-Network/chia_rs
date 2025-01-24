@@ -272,3 +272,44 @@ ffff0101\
         });
     }
 }
+
+#[cfg(all(test, feature = "serde"))]
+mod serde_tests {
+    use chia_bls::Signature;
+    use indoc::indoc;
+
+    use crate::Program;
+
+    use super::*;
+
+    #[test]
+    fn test_json_spend_bundle() -> anyhow::Result<()> {
+        let json = serde_json::to_string_pretty(&SpendBundle::new(
+            vec![CoinSpend::new(
+                Coin::new([0; 32].into(), [1; 32].into(), 42),
+                Program::from(b"abc".to_vec()),
+                Program::from(b"xyz".to_vec()),
+            )],
+            Signature::default(),
+        ))?;
+
+        let output = indoc! {r#"{
+          "coin_spends": [
+            {
+              "coin": {
+                "parent_coin_info": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                "puzzle_hash": "0x0101010101010101010101010101010101010101010101010101010101010101",
+                "amount": 42
+              },
+              "puzzle_reveal": "616263",
+              "solution": "78797a"
+            }
+          ],
+          "aggregated_signature": "0xc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+        }"#};
+
+        assert_eq!(json, output);
+
+        Ok(())
+    }
+}
