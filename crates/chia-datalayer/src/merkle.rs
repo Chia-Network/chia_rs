@@ -310,6 +310,46 @@ pub struct ProofOfInclusion {
     pub layers: Vec<ProofOfInclusionLayer>,
 }
 
+impl ProofOfInclusion {
+    pub fn root_hash(&self) -> Hash {
+        if let Some(last) = self.layers.last() {
+            last.combined_hash
+        } else {
+            self.node_hash
+        }
+    }
+
+    pub fn valid(&self) -> bool {
+        let mut existing_hash = self.node_hash;
+
+        for layer in &self.layers {
+            let calculated_hash =
+                calculate_internal_hash(&existing_hash, layer.other_hash_side, &layer.other_hash);
+
+            if calculated_hash != layer.combined_hash {
+                return false;
+            }
+
+            existing_hash = calculated_hash;
+        }
+
+        existing_hash == self.root_hash()
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+impl ProofOfInclusion {
+    #[pyo3(name = "root_hash")]
+    pub fn py_root_hash(&self) -> Hash {
+        self.root_hash()
+    }
+    #[pyo3(name = "valid")]
+    pub fn py_valid(&self) -> bool {
+        self.valid()
+    }
+}
+
 #[allow(clippy::needless_pass_by_value)]
 fn sha256_num<T: ToBytes>(input: T) -> Hash {
     let mut hasher = Sha256::new();
@@ -332,6 +372,13 @@ fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
     hasher.update(right_hash.0);
 
     Hash(Bytes32::new(hasher.finalize()))
+}
+
+pub fn calculate_internal_hash(hash: &Hash, other_hash_side: Side, other_hash: &Hash) -> Hash {
+    match other_hash_side {
+        Side::Left => internal_hash(other_hash, hash),
+        Side::Right => internal_hash(hash, other_hash),
+    }
 }
 
 #[cfg_attr(feature = "py-bindings", pyclass(eq, eq_int))]
@@ -1630,6 +1677,11 @@ impl MerkleBlob {
     #[pyo3(name = "get_key_index")]
     pub fn py_get_key_index(&self, key: KeyId) -> PyResult<TreeIndex> {
         Ok(self.get_key_index(key)?)
+    }
+
+    #[pyo3(name = "get_proof_of_inclusion")]
+    pub fn py_get_proof_of_inclusion(&self, key: KeyId) -> PyResult<ProofOfInclusion> {
+        Ok(self.get_proof_of_inclusion(key)?)
     }
 }
 
