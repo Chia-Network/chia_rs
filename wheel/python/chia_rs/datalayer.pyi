@@ -62,6 +62,19 @@ class LeafNode:
 
 
 @final
+class ProofOfInclusionLayer:
+    def __init__(self, parent: Optional[uint32], hash: bytes32, left: uint32, right: uint32) -> None: ...
+    other_hash_side: uint8
+    other_hash: bytes32
+    combined_hash: bytes32
+
+@final
+class ProofOfInclusion:
+    node_hash: bytes32
+    # children before parents
+    layers: list[ProofOfInclusionLayer]
+
+@final
 class MerkleBlob:
     @property
     def blob(self) -> bytearray: ...

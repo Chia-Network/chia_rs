@@ -282,6 +282,34 @@ pub enum NodeType {
     Leaf = 1,
 }
 
+#[cfg_attr(feature = "py-bindings", pyclass(get_all))]
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+pub struct ProofOfInclusionLayer {
+    pub other_hash_side: Side,
+    pub other_hash: Hash,
+    pub combined_hash: Hash,
+}
+
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+impl ProofOfInclusionLayer {
+    #[new]
+    pub fn py_init(other_hash_side: Side, other_hash: Hash, combined_hash: Hash) -> PyResult<Self> {
+        Ok(Self {
+            other_hash_side,
+            other_hash,
+            combined_hash,
+        })
+    }
+}
+
+#[cfg_attr(feature = "py-bindings", pyclass(get_all))]
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+pub struct ProofOfInclusion {
+    pub node_hash: Hash,
+    pub layers: Vec<ProofOfInclusionLayer>,
+}
+
 #[allow(clippy::needless_pass_by_value)]
 fn sha256_num<T: ToBytes>(input: T) -> Hash {
     let mut hasher = Sha256::new();
@@ -347,6 +375,16 @@ impl InternalNode {
             Ok(self.left)
         } else if index == self.left {
             Ok(self.right)
+        } else {
+            Err(Error::IndexIsNotAChild(index))
+        }
+    }
+
+    pub fn get_sibling_side(&self, index: TreeIndex) -> Result<Side, Error> {
+        if self.left == index {
+            Ok(Side::Right)
+        } else if self.right == index {
+            Ok(Side::Left)
         } else {
             Err(Error::IndexIsNotAChild(index))
         }
@@ -459,6 +497,15 @@ impl Node {
         };
 
         *leaf
+    }
+
+    fn expect_internal(&self, message: &str) -> InternalNode {
+        let Node::Internal(internal) = self else {
+            let message = message.replace("<<self>>", &format!("{self:?}"));
+            panic!("{}", message)
+        };
+
+        *internal
     }
 
     fn try_into_leaf(self) -> Result<LeafNode, Error> {
@@ -1349,6 +1396,36 @@ impl MerkleBlob {
             .get(&key)
             .copied()
             .ok_or(Error::UnknownKey(key))
+    }
+
+    pub fn get_proof_of_inclusion(&self, key: KeyId) -> Result<ProofOfInclusion, Error> {
+        let mut index = *self.key_to_index.get(&key).ok_or(Error::UnknownKey(key))?;
+
+        // TODO: message
+        let node = self.get_node(index)?.expect_leaf("");
+
+        let parents = self.get_lineage_with_indexes(index)?;
+        let mut layers: Vec<ProofOfInclusionLayer> = Vec::new();
+        let mut parents_iter = parents[1..].iter();
+        parents_iter.next();
+        for (next_index, parent) in parents_iter {
+            // TODO: message
+            let parent = parent.expect_internal("");
+            let sibling_index = parent.sibling_index(index)?;
+            let sibling = self.get_node(sibling_index)?;
+            let layer = ProofOfInclusionLayer {
+                other_hash_side: parent.get_sibling_side(index)?,
+                other_hash: sibling.hash(),
+                combined_hash: parent.hash,
+            };
+            layers.push(layer);
+            index = *next_index;
+        }
+
+        Ok(ProofOfInclusion {
+            node_hash: node.hash,
+            layers,
+        })
     }
 }
 
