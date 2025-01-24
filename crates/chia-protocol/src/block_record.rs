@@ -164,8 +164,8 @@ impl BlockRecord {
         let num_sps_sub_slot = constants.getattr("NUM_SPS_SUB_SLOT")?.extract::<u32>()?;
         calculate_sp_iters(
             num_sps_sub_slot,
-            self.signage_point_index,
             self.sub_slot_iters,
+            self.signage_point_index,
         )
     }
 
@@ -176,9 +176,9 @@ impl BlockRecord {
             .extract::<u8>()?;
         calculate_ip_iters(
             num_sps_sub_slot,
-            self.signage_point_index,
             num_sp_intervals_extra,
             self.sub_slot_iters,
+            self.signage_point_index,
             self.required_iters,
         )
     }
