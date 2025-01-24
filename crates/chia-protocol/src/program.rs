@@ -564,3 +564,21 @@ mod tests {
         assert_eq!(a.number(result), 1337.into());
     }
 }
+
+#[cfg(all(test, feature = "serde"))]
+mod serde_tests {
+    use super::*;
+
+    #[test]
+    fn test_program_is_bytes() -> anyhow::Result<()> {
+        let bytes = Bytes::new(vec![1, 2, 3]);
+        let program = Program::new(bytes.clone());
+
+        let bytes_json = serde_json::to_string(&bytes)?;
+        let program_json = serde_json::to_string(&program)?;
+
+        assert_eq!(program_json, bytes_json);
+
+        Ok(())
+    }
+}

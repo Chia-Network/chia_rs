@@ -1,3 +1,7 @@
+// The Python bindings have unsafe methods so if you derive Deserialize,
+// Rust assumes that you may not be upholding invariants, and therefore
+// Deserialize (which is a safe trait) may not be safe to implement for the type.
+// We know that the Python bindings are safe with arbitrary values, so we can suppress this warning.
 #![allow(clippy::unsafe_derive_deserialize)]
 
 mod block_record;
