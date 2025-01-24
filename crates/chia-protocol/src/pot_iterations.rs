@@ -34,8 +34,8 @@ pub fn calculate_sp_interval_iters(
 #[pyo3::pyfunction]
 pub fn calculate_sp_iters(
     num_sps_sub_slot: u32,
-    signage_point_index: u8,
     sub_slot_iters: u64,
+    signage_point_index: u8,
 ) -> pyo3::PyResult<u64> {
     if signage_point_index as u32 >= num_sps_sub_slot {
         return Err(pyo3::exceptions::PyValueError::new_err("SP index too high"));
@@ -47,13 +47,13 @@ pub fn calculate_sp_iters(
 #[pyo3::pyfunction]
 pub fn calculate_ip_iters(
     num_sps_sub_slot: u32,
-    signage_point_index: u8,
     num_sp_intervals_extra: u8,
     sub_slot_iters: u64,
+    signage_point_index: u8,
     required_iters: u64,
 ) -> pyo3::PyResult<u64> {
     let sp_interval_iters = calculate_sp_interval_iters(num_sps_sub_slot, sub_slot_iters)?;
-    let sp_iters = calculate_sp_iters(num_sps_sub_slot, signage_point_index, sub_slot_iters)?;
+    let sp_iters = calculate_sp_iters(num_sps_sub_slot, sub_slot_iters, signage_point_index)?;
     if sp_iters % sp_interval_iters != 0 || sp_iters > sub_slot_iters {
         return Err(pyo3::exceptions::PyValueError::new_err(format!(
             "Invalid sp iters {sp_iters} for this ssi {sub_slot_iters}",

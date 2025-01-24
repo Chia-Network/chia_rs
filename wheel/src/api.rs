@@ -44,6 +44,9 @@ use chia_protocol::{
     SubSlotProofs, TimestampedPeerInfo, TransactionAck, TransactionsInfo, UnfinishedBlock,
     UnfinishedHeaderBlock, VDFInfo, VDFProof, WeightProof,
 };
+use chia_protocol::{
+    calculate_ip_iters, calculate_sp_interval_iters, is_overflow_block, calculate_sp_iters
+};
 use chia_traits::ChiaToPython;
 use clvm_utils::tree_hash_from_bytes;
 use clvmr::chia_dialect::{ENABLE_KECCAK, ENABLE_KECCAK_OPS_OUTSIDE_GUARD};
@@ -457,6 +460,12 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
         chia_consensus::gen::conditions::ELIGIBLE_FOR_FF,
     )?;
     m.add_class::<OwnedSpendConditions>()?;
+
+    // pot functions
+    m.add_function(wrap_pyfunction!(calculate_sp_interval_iters, m)?)?;
+    m.add_function(wrap_pyfunction!(calculate_sp_iters, m)?)?;
+    m.add_function(wrap_pyfunction!(calculate_ip_iters, m)?)?;
+    m.add_function(wrap_pyfunction!(is_overflow_block, m)?)?;
 
     // constants
     m.add_class::<ConsensusConstants>()?;
