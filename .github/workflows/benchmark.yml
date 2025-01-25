@@ -104,7 +104,7 @@ jobs:
 
   generator-benchmarks:
     name: Generator performance
-    runs-on: benchmark
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -152,7 +152,7 @@ jobs:
 
   benchmarks:
     name: rust benchmarks
-    runs-on: benchmark
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
 

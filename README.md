@@ -37,7 +37,7 @@ cargo test --workspace --release
 
 You may need a Python virtual environment activated for the tests to link properly, due to the `pyo3` dependency in `wheel`.
 
-You can setup a virtual environment with the following command:
+You can set up a virtual environment with the following command:
 
 ```bash
 python3 -m venv venv
@@ -154,4 +154,4 @@ To bump the versions of all relevant crates:
 cargo ws version --force "**" --all --no-git-commit
 ```
 
-Select "minor update" if there has not been any incompatible API changes, otherwise "major update".
+Select 'minor update' if there have not been any incompatible API changes; otherwise, select 'major update'.
