@@ -142,7 +142,13 @@ class TestPotIterations:
         )
 
         required_iters = uint64(int(ssi * 4 / 300))
-        ip_iters = calculate_ip_iters(test_constants, ssi, uint8(13), required_iters)
+        ip_iters = calculate_ip_iters(
+            test_constants.NUM_SPS_SUB_SLOT,
+            test_constants.NUM_SP_INTERVALS_EXTRA,
+            ssi, 
+            uint8(13), 
+            required_iters
+        )
         assert (
             ip_iters
             == sp_iters
