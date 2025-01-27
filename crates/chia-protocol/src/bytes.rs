@@ -390,13 +390,9 @@ impl From<TreeHash> for Bytes32 {
 }
 
 #[cfg(feature = "py-bindings")]
-impl<'py, const N: usize> IntoPyObject<'py> for BytesImpl<N> {
-    type Target = PyAny;
-    type Output = Bound<'py, Self::Target>;
-    type Error = PyErr;
-
-    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
-        ChiaToPython::to_python(&self, py)
+impl<const N: usize> ToPyObject for BytesImpl<N> {
+    fn to_object(&self, py: Python<'_>) -> PyObject {
+        ChiaToPython::to_python(self, py).unwrap().into()
     }
 }
 
