@@ -336,6 +336,33 @@ def get_flags_for_height_and_constants(
     constants: ConsensusConstants
 ) -> int: ...
 
+def calculate_ip_iters(
+    num_sps_sub_slot: int,
+    num_sp_intervals_extra: int,
+    sub_slot_iters: int,
+    signage_point_index: int,
+    required_iters: int,
+) -> int: ...
+
+def calculate_sp_iters(
+    num_sps_sub_slot: int,
+    sub_slot_iters: int,
+    signage_point_index: int,
+) -> int: ...
+
+def calculate_sp_interval_iters(
+    num_sps_sub_slot: int,
+    sub_slot_iters: int,
+) -> int: ...
+
+def is_overflow_block(
+    num_sps_sub_slot: int,
+    num_sp_intervals_extra: int,
+    signage_point_index: int,
+) -> bool: ...
+
+def expected_plot_size(k: int) -> int:
+
 
 NO_UNKNOWN_CONDS: int = ...
 STRICT_ARGS_COUNT: int = ...
