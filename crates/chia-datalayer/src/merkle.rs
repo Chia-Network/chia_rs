@@ -52,20 +52,31 @@ pub struct Hash(Bytes32);
 /// Key and value ids are provided from outside of this code and are implemented as
 /// the row id from sqlite which is a signed 8 byte integer.  The actual key and
 /// value data bytes will not be handled within this code, only outside.
-#[cfg_attr(
-    feature = "py-bindings",
-    derive(FromPyObject, IntoPyObject),
-    pyo3(transparent)
-)]
+#[cfg_attr(feature = "py-bindings", pyclass)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
-pub struct KeyId(i64);
-#[cfg_attr(
-    feature = "py-bindings",
-    derive(FromPyObject, IntoPyObject),
-    pyo3(transparent)
-)]
+pub struct KeyId(#[pyo3(get, name = "raw")] i64);
+
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+impl KeyId {
+    #[new]
+    pub fn py_new(raw: i64) -> Self {
+        Self(raw)
+    }
+}
+
+#[cfg_attr(feature = "py-bindings", pyclass)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
-pub struct ValueId(i64);
+pub struct ValueId(#[pyo3(get, name = "raw")] i64);
+
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+impl ValueId {
+    #[new]
+    pub fn py_new(raw: i64) -> Self {
+        Self(raw)
+    }
+}
 
 impl std::fmt::Display for ValueId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

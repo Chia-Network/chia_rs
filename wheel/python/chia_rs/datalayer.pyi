@@ -30,6 +30,17 @@ class IndexIsNotAChildError(Exception): ...
 class CycleFoundError(Exception): ...
 class BlockIndexOutOfBoundsError(Exception): ...
 
+@final
+class KeyId:
+    raw: int64
+
+    def __init__(self, raw: int64) -> None: ...
+
+@final
+class ValueId:
+    raw: int64
+
+    def __init__(self, raw: int64) -> None: ...
 
 @final
 class InternalNode:
