@@ -78,11 +78,26 @@ mod tests {
 
     #[test]
     fn test_is_overflow_block() {
-        assert!(!is_overflow_block(NUM_SPS_SUB_SLOT, NUM_SP_INTERVALS_EXTRA, 27).expect("valid SP index"));
-        assert!(!is_overflow_block(NUM_SPS_SUB_SLOT, NUM_SP_INTERVALS_EXTRA, 28).expect("valid SP index"));
-        assert!(is_overflow_block(NUM_SPS_SUB_SLOT, NUM_SP_INTERVALS_EXTRA, 29).expect("valid SP index"));
-        assert!(is_overflow_block(NUM_SPS_SUB_SLOT, NUM_SP_INTERVALS_EXTRA, 30).expect("valid SP index"));
-        assert!(is_overflow_block(NUM_SPS_SUB_SLOT, NUM_SP_INTERVALS_EXTRA, 31).expect("valid SP index"));
+        assert!(
+            !is_overflow_block(NUM_SPS_SUB_SLOT, NUM_SP_INTERVALS_EXTRA, 27)
+                .expect("valid SP index")
+        );
+        assert!(
+            !is_overflow_block(NUM_SPS_SUB_SLOT, NUM_SP_INTERVALS_EXTRA, 28)
+                .expect("valid SP index")
+        );
+        assert!(
+            is_overflow_block(NUM_SPS_SUB_SLOT, NUM_SP_INTERVALS_EXTRA, 29)
+                .expect("valid SP index")
+        );
+        assert!(
+            is_overflow_block(NUM_SPS_SUB_SLOT, NUM_SP_INTERVALS_EXTRA, 30)
+                .expect("valid SP index")
+        );
+        assert!(
+            is_overflow_block(NUM_SPS_SUB_SLOT, NUM_SP_INTERVALS_EXTRA, 31)
+                .expect("valid SP index")
+        );
         assert!(matches!(
             is_overflow_block(NUM_SPS_SUB_SLOT, NUM_SP_INTERVALS_EXTRA, 32),
             Err(_)
@@ -100,7 +115,7 @@ mod tests {
     }
 
     #[test]
-    fn test_calculate_ip_iters(){
+    fn test_calculate_ip_iters() {
         // # num_sps_sub_slot: u32,
         // # num_sp_intervals_extra: u8,
         // # sub_slot_iters: u64,
@@ -111,9 +126,7 @@ mod tests {
 
         // Invalid signage point index
         assert!(matches!(
-            calculate_ip_iters(
-                NUM_SPS_SUB_SLOT, NUM_SP_INTERVALS_EXTRA, ssi, 123, 100000
-            ),
+            calculate_ip_iters(NUM_SPS_SUB_SLOT, NUM_SP_INTERVALS_EXTRA, ssi, 123, 100000),
             Err(_)
         ));
 
@@ -143,32 +156,64 @@ mod tests {
         // ));
 
         let required_iters = sp_interval_iters - 1;
-        let ip_iters = calculate_ip_iters(NUM_SPS_SUB_SLOT, NUM_SP_INTERVALS_EXTRA, ssi, 13, required_iters).expect("should be valid");
-        assert_eq!(ip_iters, sp_iters + (NUM_SP_INTERVALS_EXTRA as u64 * sp_interval_iters) + required_iters);
+        let ip_iters = calculate_ip_iters(
+            NUM_SPS_SUB_SLOT,
+            NUM_SP_INTERVALS_EXTRA,
+            ssi,
+            13,
+            required_iters,
+        )
+        .expect("should be valid");
+        assert_eq!(
+            ip_iters,
+            sp_iters + (NUM_SP_INTERVALS_EXTRA as u64 * sp_interval_iters) + required_iters
+        );
 
         let required_iters = 1_u64;
-        let ip_iters = calculate_ip_iters(NUM_SPS_SUB_SLOT, NUM_SP_INTERVALS_EXTRA, ssi, 13, required_iters).expect("valid");
-        assert_eq!(ip_iters, sp_iters + (NUM_SP_INTERVALS_EXTRA as u64 * sp_interval_iters) + required_iters);
+        let ip_iters = calculate_ip_iters(
+            NUM_SPS_SUB_SLOT,
+            NUM_SP_INTERVALS_EXTRA,
+            ssi,
+            13,
+            required_iters,
+        )
+        .expect("valid");
+        assert_eq!(
+            ip_iters,
+            sp_iters + (NUM_SP_INTERVALS_EXTRA as u64 * sp_interval_iters) + required_iters
+        );
 
         let required_iters: u64 = ssi * 4 / 300;
-        let ip_iters = calculate_ip_iters(NUM_SPS_SUB_SLOT, NUM_SP_INTERVALS_EXTRA, ssi, 13, required_iters).expect("valid");
-        assert_eq!(ip_iters, sp_iters + (NUM_SP_INTERVALS_EXTRA as u64 * sp_interval_iters) + required_iters);
+        let ip_iters = calculate_ip_iters(
+            NUM_SPS_SUB_SLOT,
+            NUM_SP_INTERVALS_EXTRA,
+            ssi,
+            13,
+            required_iters,
+        )
+        .expect("valid");
+        assert_eq!(
+            ip_iters,
+            sp_iters + (NUM_SP_INTERVALS_EXTRA as u64 * sp_interval_iters) + required_iters
+        );
         assert!(sp_iters < ip_iters);
 
         // Overflow
         let sp_iters = sp_interval_iters * (NUM_SPS_SUB_SLOT - 1) as u64;
         let ip_iters = calculate_ip_iters(
-            NUM_SPS_SUB_SLOT, 
+            NUM_SPS_SUB_SLOT,
             NUM_SP_INTERVALS_EXTRA,
             ssi,
             NUM_SPS_SUB_SLOT_U8 - 1_u8,
             required_iters,
-        ).expect("valid");
-        assert_eq!(ip_iters, (sp_iters + (NUM_SP_INTERVALS_EXTRA as u64 * sp_interval_iters) + required_iters) % ssi);
+        )
+        .expect("valid");
+        assert_eq!(
+            ip_iters,
+            (sp_iters + (NUM_SP_INTERVALS_EXTRA as u64 * sp_interval_iters) + required_iters) % ssi
+        );
         assert!(sp_iters > ip_iters)
     }
-    
-
 }
 
 // TODO: enable and fix below

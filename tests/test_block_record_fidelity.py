@@ -130,6 +130,7 @@ def wrap_call(expr: str, br: Any) -> str:
     except Exception as e:
         return f"E:{e}"
 
+
 # TODO: more thoroughly check these new functions which use self
 def test_calculate_sp_iters():
     ssi: uint64 = uint64(100001 * 64 * 4)
@@ -138,4 +139,3 @@ def test_calculate_sp_iters():
     br = get_block_record(rng, ssi=ssi, spi=31)
     res = br.sp_iters_impl(DEFAULT_CONSTANTS)
     assert res is not None
-
