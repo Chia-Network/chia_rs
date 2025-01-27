@@ -62,14 +62,14 @@ def get_hash(rng: Random) -> bytes32:
     return bytes32.random(rng)
 
 
-def get_block_record(rng: Random) -> BlockRecord:
+def get_block_record(rng: Random, ssi=None, ri=None, spi=None) -> BlockRecord:
     height = get_u32(rng)
     weight = get_u128(rng)
     iters = get_u128(rng)
-    sp_index = get_u4(rng)
+    sp_index = spi if spi is not None else get_u4(rng)
     vdf_out = get_classgroup_element(rng)
     infused_challenge = get_optional(rng, get_classgroup_element)
-    sub_slot_iters = get_ssi(rng)
+    sub_slot_iters = ssi if ssi is not None else get_ssi(rng)
     required_iters = get_u64(rng)
     deficit = get_u8(rng)
     overflow = get_bool(rng)
@@ -135,6 +135,7 @@ def test_calculate_sp_iters():
     ssi: uint64 = uint64(100001 * 64 * 4)
     rng = Random()
     rng.seed(1337)
-    br = get_block_record(rng)
+    br = get_block_record(rng, ssi=ssi, spi=31)
     res = br.sp_iters_impl(DEFAULT_CONSTANTS)
+    assert res is not None
 

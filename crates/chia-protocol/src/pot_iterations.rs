@@ -24,7 +24,7 @@ pub fn calculate_sp_interval_iters(
 ) -> pyo3::PyResult<u64> {
     if sub_slot_iters % num_sps_sub_slot as u64 != 0 {
         return Err(pyo3::exceptions::PyValueError::new_err(
-            "ssi % num_sps_sub_slot == 0",
+            "ssi % num_sps_sub_slot != 0",
         ));
     }
     Ok(sub_slot_iters / num_sps_sub_slot as u64)
