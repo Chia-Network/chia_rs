@@ -361,7 +361,9 @@ def is_overflow_block(
     signage_point_index: int,
 ) -> bool: ...
 
-def expected_plot_size(k: int) -> int:
+def expected_plot_size(
+    k: int
+) -> int: ...
 
 
 NO_UNKNOWN_CONDS: int = ...
