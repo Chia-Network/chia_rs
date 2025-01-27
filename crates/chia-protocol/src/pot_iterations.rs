@@ -98,19 +98,13 @@ mod tests {
             is_overflow_block(NUM_SPS_SUB_SLOT, NUM_SP_INTERVALS_EXTRA, 31)
                 .expect("valid SP index")
         );
-        assert!(matches!(
-            is_overflow_block(NUM_SPS_SUB_SLOT, NUM_SP_INTERVALS_EXTRA, 32),
-            Err(_)
-        ));
+        assert!(is_overflow_block(NUM_SPS_SUB_SLOT, NUM_SP_INTERVALS_EXTRA, 32).is_err());
     }
 
     #[test]
     fn test_calculate_sp_iters() {
-        let ssi: u64 = 100001 * 64 * 4;
-        assert!(matches!(
-            calculate_sp_iters(NUM_SPS_SUB_SLOT, ssi, 32),
-            Err(_)
-        ));
+        let ssi: u64 = 100_001 * 64 * 4;
+        assert!(calculate_sp_iters(NUM_SPS_SUB_SLOT, ssi, 32).is_err());
         calculate_sp_iters(NUM_SPS_SUB_SLOT, ssi, 31).expect("valid_result");
     }
 
@@ -121,14 +115,14 @@ mod tests {
         // # sub_slot_iters: u64,
         // # signage_point_index: u8,
         // # required_iters: u64,
-        let ssi: u64 = 100001 * 64 * 4;
+        let ssi: u64 = 100_001 * 64 * 4;
         let sp_interval_iters = ssi / NUM_SPS_SUB_SLOT as u64;
 
         // Invalid signage point index
-        assert!(matches!(
-            calculate_ip_iters(NUM_SPS_SUB_SLOT, NUM_SP_INTERVALS_EXTRA, ssi, 123, 100000),
-            Err(_)
-        ));
+        assert!(
+            calculate_ip_iters(NUM_SPS_SUB_SLOT, NUM_SP_INTERVALS_EXTRA, ssi, 123, 100_000)
+                .is_err()
+        );
 
         let sp_iters = sp_interval_iters * 13;
 
@@ -212,7 +206,7 @@ mod tests {
             ip_iters,
             (sp_iters + (NUM_SP_INTERVALS_EXTRA as u64 * sp_interval_iters) + required_iters) % ssi
         );
-        assert!(sp_iters > ip_iters)
+        assert!(sp_iters > ip_iters);
     }
 }
 
