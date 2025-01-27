@@ -132,12 +132,12 @@ impl BlockRecord {
     }
 
     fn sp_iters_impl(&self, py: Python<'_>, constants: &Bound<'_, PyAny>) -> PyResult<u64> {
-        let ctx = PyDict::new(py);
+        let ctx = PyDict::new_bound(py);
         ctx.set_item("sub_slot_iters", self.sub_slot_iters)?;
         ctx.set_item("signage_point_index", self.signage_point_index)?;
         ctx.set_item("constants", constants)?;
-        py.run(
-            c"from chia.consensus.pot_iterations import calculate_ip_iters, calculate_sp_iters\n\
+        py.run_bound(
+            "from chia.consensus.pot_iterations import calculate_ip_iters, calculate_sp_iters\n\
             ret = calculate_sp_iters(constants, sub_slot_iters, signage_point_index)\n",
             None,
             Some(&ctx),
@@ -146,13 +146,13 @@ impl BlockRecord {
     }
 
     fn ip_iters_impl(&self, py: Python<'_>, constants: &Bound<'_, PyAny>) -> PyResult<u64> {
-        let ctx = PyDict::new(py);
+        let ctx = PyDict::new_bound(py);
         ctx.set_item("sub_slot_iters", self.sub_slot_iters)?;
         ctx.set_item("signage_point_index", self.signage_point_index)?;
         ctx.set_item("required_iters", self.required_iters)?;
         ctx.set_item("constants", constants)?;
-        py.run(
-            c"from chia.consensus.pot_iterations import calculate_ip_iters, calculate_sp_iters\n\
+        py.run_bound(
+            "from chia.consensus.pot_iterations import calculate_ip_iters, calculate_sp_iters\n\
             ret = calculate_ip_iters(constants, sub_slot_iters, signage_point_index, required_iters)\n",
             None,
             Some(&ctx),
