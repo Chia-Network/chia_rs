@@ -17,7 +17,8 @@ use chia_consensus::spendbundle_validation::{
     get_flags_for_height_and_constants, validate_clvm_and_signature,
 };
 use chia_protocol::{
-    calculate_ip_iters, calculate_sp_interval_iters, calculate_sp_iters, is_overflow_block,
+    calculate_ip_iters, calculate_sp_interval_iters, calculate_sp_iters, expected_plot_size,
+    is_overflow_block,
 };
 use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
@@ -466,6 +467,7 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(calculate_sp_iters, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_ip_iters, m)?)?;
     m.add_function(wrap_pyfunction!(is_overflow_block, m)?)?;
+    m.add_function(wrap_pyfunction!(expected_plot_size, m)?)?;
 
     // constants
     m.add_class::<ConsensusConstants>()?;
