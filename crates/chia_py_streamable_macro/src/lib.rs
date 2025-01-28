@@ -76,10 +76,6 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
     let mut py_protocol = quote! {
         #[pyo3::pymethods]
         impl #ident {
-            fn __repr__(&self) -> pyo3::PyResult<String> {
-                Ok(format!("{self:?}"))
-            }
-
             fn __richcmp__(&self, other: pyo3::PyRef<Self>, op: pyo3::class::basic::CompareOp) -> pyo3::Py<pyo3::PyAny> {
                 use pyo3::class::basic::CompareOp;
                 let py = other.py();
@@ -128,6 +124,26 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 }
             });
 
+            if py_uppercase {
+                py_protocol.extend(quote! {
+                    #[pyo3::pymethods]
+                    impl #ident {
+                        fn __repr__(&self) -> pyo3::PyResult<String> {
+                            Ok(format!(concat!(stringify!(#ident), " {{ ", #(stringify!(#fnames_maybe_upper), ": {:?}, ",)* "}}"), #(self.#fnames,)*))
+                        }
+                    }
+                });
+            } else {
+                py_protocol.extend(quote! {
+                    #[pyo3::pymethods]
+                    impl #ident {
+                        fn __repr__(&self) -> pyo3::PyResult<String> {
+                            Ok(format!("{self:?}"))
+                        }
+                    }
+                });
+            }
+
             if !named.is_empty() {
                 py_protocol.extend(quote! {
                     #[pyo3::pymethods]
@@ -155,7 +171,16 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 });
             }
         }
-        syn::Fields::Unnamed(FieldsUnnamed { .. }) => {}
+        syn::Fields::Unnamed(FieldsUnnamed { .. }) => {
+            py_protocol.extend(quote! {
+                #[pyo3::pymethods]
+                impl #ident {
+                    fn __repr__(&self) -> pyo3::PyResult<String> {
+                        Ok(format!("{self:?}"))
+                    }
+                }
+            });
+        }
         syn::Fields::Unit => {
             panic!("PyStreamable does not support the unit type");
         }
