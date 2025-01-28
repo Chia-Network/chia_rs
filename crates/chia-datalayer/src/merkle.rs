@@ -1440,7 +1440,7 @@ impl MerkleBlob {
                     .ok_or(PyValueError::new_err(format!(
                         "unknown key id passed as insert location reference: {key}"
                     )))?,
-                side: side,
+                side,
             },
             _ => {
                 // TODO: use a specific error
