@@ -1,6 +1,6 @@
 import pytest
 
-from chia_rs.datalayer import InvalidBlobLengthError, LeafNode, MerkleBlob, KeyId, ValueId, Side
+from chia_rs.datalayer import InvalidBlobLengthError, LeafNode, MerkleBlob, KeyId, ValueId
 from chia_rs.sized_bytes import bytes32
 from chia_rs.sized_ints import int64, uint8
 
@@ -45,7 +45,7 @@ def test_checking_coverage() -> None:
             merkle_blob.insert(KeyId(int64(i)), ValueId(int64(i)), bytes32.zeros)
         else:
             merkle_blob.insert(
-                KeyId(int64(i)), ValueId(int64(i)), bytes32.zeros, KeyId(int64(i - 1)), Side.Left
+                KeyId(int64(i)), ValueId(int64(i)), bytes32.zeros, KeyId(int64(i - 1)), uint8(0)
             )
 
     keys = {

@@ -16,7 +16,7 @@ fn maybe_upper_fields(py_uppercase: bool, fnames: Vec<Ident>) -> Vec<Ident> {
     }
 }
 
-#[proc_macro_derive(PyStreamable, attributes(py_uppercase, py_pickle, py_enum))]
+#[proc_macro_derive(PyStreamable, attributes(py_uppercase, py_pickle))]
 pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let found_crate = crate_name("chia-traits").expect("chia-traits is present in `Cargo.toml`");
 
@@ -34,14 +34,11 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
 
     let mut py_uppercase = false;
     let mut py_pickle = false;
-    let mut py_enum = false;
     for attr in &attrs {
         if attr.path().is_ident("py_uppercase") {
             py_uppercase = true;
         } else if attr.path().is_ident("py_pickle") {
             py_pickle = true;
-        } else if attr.path().is_ident("py_enum") {
-            py_enum = true;
         }
     }
 

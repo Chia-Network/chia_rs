@@ -12,7 +12,7 @@ use chia_protocol::Bytes32;
 use chia_py_streamable_macro::{PyJsonDict, PyStreamable};
 use chia_sha2::Sha256;
 use chia_streamable_macro::Streamable;
-use chia_traits::{FromJsonDict, Streamable, ToJsonDict};
+use chia_traits::Streamable;
 use num_traits::ToBytes;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -337,7 +337,7 @@ fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
 
 #[cfg_attr(
     feature = "py-bindings",
-    pyclass(eq, eq_int, frozen),
+    // pyclass(eq, eq_int, frozen),
     derive(PyJsonDict, PyStreamable)
 )]
 #[repr(u8)]
@@ -346,20 +346,6 @@ pub enum Side {
     Left = 0,
     Right = 1,
 }
-
-// #[cfg(feature = "py-bindings")]
-// impl FromJsonDict for Side {
-//     fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self> {
-//         o.extract::<Side>()
-//     }
-// }
-//
-// #[cfg(feature = "py-bindings")]
-// impl ToJsonDict for Side {
-//     fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
-//         Ok((*self as u8).into_pyobject(py)?.unbind().into_any())
-//     }
-// }
 
 #[cfg_attr(feature = "py-bindings", pyclass)]
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
@@ -1459,7 +1445,7 @@ impl MerkleBlob {
         value: ValueId,
         hash: Hash,
         reference_kid: Option<KeyId>,
-        side: Option<Side>,
+        side: Option<u8>,
     ) -> PyResult<()> {
         let insert_location = match (reference_kid, side) {
             (None, None) => InsertLocation::Auto {},
@@ -1471,7 +1457,7 @@ impl MerkleBlob {
                     .ok_or(PyValueError::new_err(format!(
                         "unknown key id passed as insert location reference: {key}"
                     )))?,
-                side,
+                side: Side::from_bytes(&[side])?,
             },
             _ => {
                 // TODO: use a specific error
