@@ -57,15 +57,15 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                     }
                 }
 
-                impl pyo3::conversion::ToPyObject for #ident {
-                    fn to_object(&self, py: pyo3::Python<'_>) -> pyo3::PyObject {
-                        pyo3::conversion::ToPyObject::to_object(&(*self as u8), py)
-                    }
-                }
+                impl<'py> pyo3::conversion::IntoPyObject<'py> for #ident {
+                    type Target = pyo3::PyAny;
+                    type Output = pyo3::Bound<'py, Self::Target>;
+                    type Error = std::convert::Infallible;
 
-                impl pyo3::conversion::IntoPy<pyo3::PyObject> for #ident {
-                    fn into_py(self, py: pyo3::Python<'_>) -> pyo3::PyObject {
-                        pyo3::conversion::ToPyObject::to_object(&(self as u8), py)
+                    fn into_pyobject(self, py: pyo3::Python<'py>) -> Result<Self::Output, Self::Error> {
+                        Ok(pyo3::IntoPyObject::into_pyobject(self as u8, py)?
+                            .clone()
+                            .into_any())
                     }
                 }
             }
