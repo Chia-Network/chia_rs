@@ -16,7 +16,7 @@ fn maybe_upper_fields(py_uppercase: bool, fnames: Vec<Ident>) -> Vec<Ident> {
     }
 }
 
-#[proc_macro_derive(PyStreamable, attributes(py_uppercase, py_pickle))]
+#[proc_macro_derive(PyStreamable, attributes(py_uppercase, py_pickle, py_enum))]
 pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let found_crate = crate_name("chia-traits").expect("chia-traits is present in `Cargo.toml`");
 
@@ -34,11 +34,14 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
 
     let mut py_uppercase = false;
     let mut py_pickle = false;
+    let mut py_enum = false;
     for attr in &attrs {
         if attr.path().is_ident("py_uppercase") {
             py_uppercase = true;
         } else if attr.path().is_ident("py_pickle") {
             py_pickle = true;
+        } else if attr.path().is_ident("py_enum") {
+            py_enum = true;
         }
     }
 
@@ -437,8 +440,32 @@ pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenSt
                 }
             });
         }
+        syn::Fields::Unnamed(FieldsUnnamed { unnamed, .. }) if unnamed.len() == 1 => {
+            let ftype: syn::Type = unnamed
+                .first()
+                .expect("match arm if requires 1 item")
+                .ty
+                .clone();
+
+            py_protocol.extend( quote! {
+
+                impl #crate_name::to_json_dict::ToJsonDict for #ident {
+                    fn to_json_dict(&self, py: pyo3::Python) -> pyo3::PyResult<pyo3::PyObject> {
+                        Ok(self.0.to_json_dict(py)?.into())
+                    }
+                }
+
+                impl #crate_name::from_json_dict::FromJsonDict for #ident {
+                    fn from_json_dict(o: &pyo3::Bound<pyo3::PyAny>) -> pyo3::PyResult<Self> {
+                        Ok(Self(
+                            <#ftype as #crate_name::from_json_dict::FromJsonDict>::from_json_dict(&o)?
+                        ))
+                    }
+                }
+            });
+        }
         _ => {
-            panic!("PyJsonDict only supports structs");
+            panic!("PyJsonDict only supports named structs and single field unnamed structs");
         }
     }
 

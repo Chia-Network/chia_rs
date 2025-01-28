@@ -9,9 +9,10 @@ use pyo3::{
 };
 
 use chia_protocol::Bytes32;
+use chia_py_streamable_macro::{PyJsonDict, PyStreamable};
 use chia_sha2::Sha256;
 use chia_streamable_macro::Streamable;
-use chia_traits::Streamable;
+use chia_traits::{FromJsonDict, Streamable, ToJsonDict};
 use num_traits::ToBytes;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -19,7 +20,11 @@ use std::iter::zip;
 use std::ops::Range;
 use thiserror::Error;
 
-#[cfg_attr(feature = "py-bindings", pyclass(eq, frozen, hash))]
+#[cfg_attr(
+    feature = "py-bindings",
+    pyclass(frozen),
+    derive(PyJsonDict, PyStreamable)
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 pub struct TreeIndex(#[pyo3(get, name = "raw")] u32);
 
@@ -57,7 +62,11 @@ pub struct Hash(Bytes32);
 /// Key and value ids are provided from outside of this code and are implemented as
 /// the row id from sqlite which is a signed 8 byte integer.  The actual key and
 /// value data bytes will not be handled within this code, only outside.
-#[cfg_attr(feature = "py-bindings", pyclass(eq, frozen, hash))]
+#[cfg_attr(
+    feature = "py-bindings",
+    pyclass(frozen),
+    derive(PyJsonDict, PyStreamable)
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 pub struct KeyId(#[pyo3(get, name = "raw")] i64);
 
@@ -70,7 +79,11 @@ impl KeyId {
     }
 }
 
-#[cfg_attr(feature = "py-bindings", pyclass(eq, frozen, hash))]
+#[cfg_attr(
+    feature = "py-bindings",
+    pyclass(frozen),
+    derive(PyJsonDict, PyStreamable)
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 pub struct ValueId(#[pyo3(get, name = "raw")] i64);
 
@@ -322,13 +335,31 @@ fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
     Hash(Bytes32::new(hasher.finalize()))
 }
 
-#[cfg_attr(feature = "py-bindings", pyclass(eq, eq_int, frozen, hash))]
+#[cfg_attr(
+    feature = "py-bindings",
+    pyclass(eq, eq_int, frozen),
+    derive(PyJsonDict, PyStreamable)
+)]
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Streamable)]
 pub enum Side {
     Left = 0,
     Right = 1,
 }
+
+// #[cfg(feature = "py-bindings")]
+// impl FromJsonDict for Side {
+//     fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self> {
+//         o.extract::<Side>()
+//     }
+// }
+//
+// #[cfg(feature = "py-bindings")]
+// impl ToJsonDict for Side {
+//     fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
+//         Ok((*self as u8).into_pyobject(py)?.unbind().into_any())
+//     }
+// }
 
 #[cfg_attr(feature = "py-bindings", pyclass)]
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
