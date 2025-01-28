@@ -1,6 +1,6 @@
 import pytest
 
-from chia_rs.datalayer import InvalidBlobLengthError, LeafNode, MerkleBlob, KeyId, ValueId
+from chia_rs.datalayer import InvalidBlobLengthError, LeafNode, MerkleBlob, KeyId, ValueId, Side
 from chia_rs.sized_bytes import bytes32
 from chia_rs.sized_ints import int64, uint8
 
@@ -30,7 +30,7 @@ def test_just_insert_a_bunch() -> None:
     total_time = 0.0
     for i in range(100_000):
         start = time.monotonic()
-        merkle_blob.insert(KeyId(i), ValueId(i), HASH)
+        merkle_blob.insert(KeyId(int64(i)), ValueId(int64(i)), HASH)
         end = time.monotonic()
         total_time += end - start
 
@@ -42,10 +42,10 @@ def test_checking_coverage() -> None:
     merkle_blob = MerkleBlob(blob=bytearray())
     for i in range(count):
         if i % 2 == 0:
-            merkle_blob.insert(KeyId(i), ValueId(i), bytes32.zeros)
+            merkle_blob.insert(KeyId(int64(i)), ValueId(int64(i)), bytes32.zeros)
         else:
             merkle_blob.insert(
-                KeyId(i), ValueId(i), bytes32.zeros, KeyId(i - 1), uint8(0)
+                KeyId(int64(i)), ValueId(int64(i)), bytes32.zeros, KeyId(int64(i - 1)), Side.Left
             )
 
     keys = {
@@ -53,7 +53,7 @@ def test_checking_coverage() -> None:
         for index, node in merkle_blob.get_nodes_with_indexes()
         if isinstance(node, LeafNode)
     }
-    assert keys == set(KeyId(n) for n in range(count))
+    assert keys == set(KeyId(int64(n)) for n in range(count))
 
 
 def test_invalid_blob_length_raised() -> None:

@@ -648,6 +648,8 @@ pub fn add_datalayer_submodule(py: Python<'_>, parent: &Bound<'_, PyModule>) -> 
     datalayer.add_class::<LeafNode>()?;
     datalayer.add_class::<KeyId>()?;
     datalayer.add_class::<ValueId>()?;
+    datalayer.add_class::<Side>()?;
+    datalayer.add_class::<TreeIndex>()?;
 
     datalayer.add("BLOCK_SIZE", BLOCK_SIZE)?;
     datalayer.add("DATA_SIZE", DATA_SIZE)?;

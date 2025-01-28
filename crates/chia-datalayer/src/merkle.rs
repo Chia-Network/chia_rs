@@ -19,13 +19,18 @@ use std::iter::zip;
 use std::ops::Range;
 use thiserror::Error;
 
-#[cfg_attr(
-    feature = "py-bindings",
-    derive(FromPyObject, IntoPyObject),
-    pyo3(transparent)
-)]
+#[cfg_attr(feature = "py-bindings", pyclass(eq, frozen, hash))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
-pub struct TreeIndex(u32);
+pub struct TreeIndex(#[pyo3(get, name = "raw")] u32);
+
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+impl TreeIndex {
+    #[new]
+    pub fn py_new(raw: u32) -> Self {
+        Self(raw)
+    }
+}
 
 impl std::fmt::Display for TreeIndex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -317,7 +322,7 @@ fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
     Hash(Bytes32::new(hasher.finalize()))
 }
 
-#[cfg_attr(feature = "py-bindings", pyclass(eq, eq_int))]
+#[cfg_attr(feature = "py-bindings", pyclass(eq, eq_int, frozen, hash))]
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Streamable)]
 pub enum Side {
@@ -1423,8 +1428,7 @@ impl MerkleBlob {
         value: ValueId,
         hash: Hash,
         reference_kid: Option<KeyId>,
-        // TODO: should be a Side, but python has a different Side right now
-        side: Option<u8>,
+        side: Option<Side>,
     ) -> PyResult<()> {
         let insert_location = match (reference_kid, side) {
             (None, None) => InsertLocation::Auto {},
@@ -1436,7 +1440,7 @@ impl MerkleBlob {
                     .ok_or(PyValueError::new_err(format!(
                         "unknown key id passed as insert location reference: {key}"
                     )))?,
-                side: Side::from_bytes(&[side])?,
+                side: side,
             },
             _ => {
                 // TODO: use a specific error
