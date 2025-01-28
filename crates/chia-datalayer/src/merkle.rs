@@ -1,4 +1,6 @@
 #[cfg(feature = "py-bindings")]
+use chia_py_streamable_macro::{PyJsonDict, PyStreamable};
+#[cfg(feature = "py-bindings")]
 use pyo3::{
     buffer::PyBuffer,
     exceptions::PyValueError,
@@ -9,7 +11,6 @@ use pyo3::{
 };
 
 use chia_protocol::Bytes32;
-use chia_py_streamable_macro::{PyJsonDict, PyStreamable};
 use chia_sha2::Sha256;
 use chia_streamable_macro::Streamable;
 use chia_traits::Streamable;
@@ -26,7 +27,12 @@ use thiserror::Error;
     derive(PyJsonDict, PyStreamable)
 )]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
+// TODO: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
+//       being found with a cfg_attr
+#[cfg(feature = "py-bindings")]
 pub struct TreeIndex(#[pyo3(get, name = "raw")] u32);
+#[cfg(not(feature = "py-bindings"))]
+pub struct TreeIndex(u32);
 
 #[cfg(feature = "py-bindings")]
 #[pymethods]
@@ -68,7 +74,12 @@ pub struct Hash(Bytes32);
     derive(PyJsonDict, PyStreamable)
 )]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
+// TODO: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
+//       being found with a cfg_attr
+#[cfg(feature = "py-bindings")]
 pub struct KeyId(#[pyo3(get, name = "raw")] i64);
+#[cfg(not(feature = "py-bindings"))]
+pub struct KeyId(i64);
 
 #[cfg(feature = "py-bindings")]
 #[pymethods]
@@ -85,7 +96,12 @@ impl KeyId {
     derive(PyJsonDict, PyStreamable)
 )]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
+// TODO: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
+//       being found with a cfg_attr
+#[cfg(feature = "py-bindings")]
 pub struct ValueId(#[pyo3(get, name = "raw")] i64);
+#[cfg(not(feature = "py-bindings"))]
+pub struct ValueId(i64);
 
 #[cfg(feature = "py-bindings")]
 #[pymethods]
