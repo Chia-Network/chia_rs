@@ -52,7 +52,7 @@ pub struct Hash(Bytes32);
 /// Key and value ids are provided from outside of this code and are implemented as
 /// the row id from sqlite which is a signed 8 byte integer.  The actual key and
 /// value data bytes will not be handled within this code, only outside.
-#[cfg_attr(feature = "py-bindings", pyclass)]
+#[cfg_attr(feature = "py-bindings", pyclass(eq, frozen, hash))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 pub struct KeyId(#[pyo3(get, name = "raw")] i64);
 
@@ -65,7 +65,7 @@ impl KeyId {
     }
 }
 
-#[cfg_attr(feature = "py-bindings", pyclass)]
+#[cfg_attr(feature = "py-bindings", pyclass(eq, frozen, hash))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 pub struct ValueId(#[pyo3(get, name = "raw")] i64);
 
