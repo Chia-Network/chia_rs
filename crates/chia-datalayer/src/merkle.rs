@@ -6,7 +6,7 @@ use pyo3::{
     exceptions::PyValueError,
     prelude::*,
     pyclass, pymethods,
-    types::{PyDict, PyDictMethods, PyInt, PyListMethods},
+    types::{PyDict, PyDictMethods, PyListMethods},
     Bound, FromPyObject, IntoPyObject, PyAny, PyErr, PyResult, Python,
 };
 
@@ -21,6 +21,8 @@ use std::iter::zip;
 use std::ops::Range;
 use thiserror::Error;
 
+type TreeIndexType = u32;
+// type TreeIndexMathSignedType = i64;
 #[cfg_attr(
     feature = "py-bindings",
     pyclass(frozen),
@@ -30,17 +32,74 @@ use thiserror::Error;
 // TODO: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
 //       being found with a cfg_attr
 #[cfg(feature = "py-bindings")]
-pub struct TreeIndex(#[pyo3(get, name = "raw")] u32);
+pub struct TreeIndex(#[pyo3(get, name = "raw")] TreeIndexType);
 #[cfg(not(feature = "py-bindings"))]
-pub struct TreeIndex(u32);
+pub struct TreeIndex(TreeIndexType);
+
+// #[cfg(feature = "py-bindings")]
+// impl TreeIndex {
+//     fn py_extract(object: &Bound<'_, PyAny>) -> PyResult<TreeIndexType> {
+//         if object.call_method1("__gt__", (TreeIndexType::MAX,))?.is_truthy()? {
+//             Err(PyOverflowError::new_err(format!("would overflow the {} upper limit", std::any::type_name::<TreeIndexType>())))
+//         } else if object.call_method1("__lt__", (TreeIndexType::MIN,))?.is_truthy()? {
+//             Err(PyOverflowError::new_err(format!("would underflow the {} lower limit", std::any::type_name::<TreeIndexType>())))
+//         } else {
+//             object.extract()
+//         }
+//     }
+// }
 
 #[cfg(feature = "py-bindings")]
 #[pymethods]
 impl TreeIndex {
     #[new]
-    pub fn py_new(raw: u32) -> Self {
+    pub fn py_new(raw: TreeIndexType) -> Self {
         Self(raw)
     }
+
+    // #[pyo3(name = "__add__")]
+    // #[allow(clippy::trivially_copy_pass_by_ref)]
+    // fn py_add(&self, other: &Bound<'_, PyInt>) -> PyResult<Self> {
+    //     // this is the smelly using python option
+    //     Ok(Self(Self::py_extract(&other.call_method1("__add__", (self.0,))?)?))
+    //
+    //     // this is the icky reimplementation of bounds checks before doing math option
+    //     // if other.gt(TreeIndexType::MAX - self.0)? {
+    //     //     Err(PyOverflowError::new_err(format!("would overflow the {} upper limit", std::any::type_name::<TreeIndexType>())))
+    //     // } else if other.lt(-(self.0 as TreeIndexMathSignedType))? {
+    //     //     Err(PyOverflowError::new_err(format!("would underflow the {} lower limit", std::any::type_name::<TreeIndexType>())))
+    //     // } else {
+    //     //     let other: TreeIndexMathSignedType = other.extract()?;
+    //     //     Ok(Self((self.0 as i64 + other) as TreeIndexType))
+    //     // }
+    // }
+    //
+    // #[pyo3(name = "__sub__")]
+    // #[allow(clippy::trivially_copy_pass_by_ref)]
+    // fn py_sub(&self, other: &Bound<'_, PyInt>) -> PyResult<Self> {
+    //     Ok(Self(Self::py_extract(&other.call_method1("__sub__", (self.0,))?)?))
+    //
+    //     // if other.gt(self.0)? {
+    //     //     Err(PyOverflowError::new_err(format!("would underflow the {} lower limit", std::any::type_name::<TreeIndexType>())))
+    //     // } else if other.lt(-((TreeIndexType::MAX - self.0) as TreeIndexMathSignedType))? {
+    //     //     Err(PyOverflowError::new_err(format!("would overflow the {} upper limit", std::any::type_name::<TreeIndexType>())))
+    //     // } else {
+    //     //     let other: TreeIndexMathSignedType = other.extract()?;
+    //     //     Ok(Self((self.0 as i64 - other) as TreeIndexType))
+    //     // }
+    // }
+
+    // #[pyo3(name = "__lt__")]
+    // #[allow(clippy::trivially_copy_pass_by_ref)]
+    // fn py_gt(&self, other: &Bound<'_, PyInt>) -> PyResult<bool> {
+    //     other.lt(self.0)
+    // }
+    //
+    // #[pyo3(name = "__gt__")]
+    // #[allow(clippy::trivially_copy_pass_by_ref)]
+    // fn py_gt(&self, other: &Bound<'_, PyInt>) -> PyResult<bool> {
+    //     other.gt(self.0)
+    // }
 }
 
 impl std::fmt::Display for TreeIndex {
@@ -1500,10 +1559,7 @@ impl MerkleBlob {
     }
 
     #[pyo3(name = "get_raw_node")]
-    pub fn py_get_raw_node(&mut self, index: &Bound<'_, PyInt>) -> PyResult<Node> {
-        let index = TreeIndex(index.extract::<u32>().or(Err(
-            python_exceptions::BlockIndexOutOfBoundsError::new_err(index.to_string()),
-        ))?);
+    pub fn py_get_raw_node(&mut self, index: TreeIndex) -> PyResult<Node> {
         Ok(self.get_node(index)?)
     }
 
