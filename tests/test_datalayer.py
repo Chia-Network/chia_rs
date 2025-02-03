@@ -5,6 +5,7 @@ from chia_rs.datalayer import (
     LeafNode,
     MerkleBlob,
     KeyId,
+    TreeIndex,
     ValueId,
 )
 from chia_rs.sized_bytes import bytes32
@@ -70,3 +71,11 @@ def test_invalid_blob_length_raised() -> None:
     """Mostly verifying that the exceptions are available and raise."""
     with pytest.raises(InvalidBlobLengthError):
         MerkleBlob(blob=b"\x00")
+
+
+@pytest.mark.parametrize(argnames="value", argvalues=[-1, 2**32])
+def test_tree_index_out_of_range_raises(value: int) -> None:
+    """Making sure that it doesn't over or underflow"""
+
+    with pytest.raises(OverflowError):
+        TreeIndex(value)
