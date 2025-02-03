@@ -1,7 +1,7 @@
 #![allow(clippy::missing_panics_doc)]
 
 use proc_macro::TokenStream;
-use proc_macro2::{Ident, Span};
+use proc_macro2::{Ident, Span, TokenStream as TokenStream2};
 use proc_macro_crate::{crate_name, FoundCrate};
 use quote::quote;
 use syn::token::Pub;
@@ -25,6 +25,7 @@ pub fn streamable(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let is_message = &attr.to_string() == "message";
     let is_subclass = &attr.to_string() == "subclass";
+    let no_serde = &attr.to_string() == "no_serde";
 
     let mut input: DeriveInput = parse_macro_input!(item);
     let name = input.ident.clone();
@@ -103,6 +104,14 @@ pub fn streamable(attr: TokenStream, item: TokenStream) -> TokenStream {
     // Otherwise, you're calling it from an external crate which doesn't have this infrastructure setup.
     // In that case, the caller can add these macros manually if they want to.
     let attrs = if matches!(found_crate, FoundCrate::Itself) {
+        let serde = if is_message || no_serde {
+            TokenStream2::default()
+        } else {
+            quote! {
+                #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+            }
+        };
+
         quote! {
             #[cfg_attr(
                 feature = "py-bindings", pyo3::pyclass(#class_attrs), derive(
@@ -113,6 +122,7 @@ pub fn streamable(attr: TokenStream, item: TokenStream) -> TokenStream {
             )]
             #main_derives
             #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+            #serde
         }
     } else {
         main_derives

@@ -21,6 +21,7 @@ use std::ops::Deref;
 
 #[cfg_attr(feature = "py-bindings", pyclass, derive(PyStreamable))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Program(Bytes);
 
 impl Default for Program {
@@ -561,5 +562,23 @@ mod tests {
         let (cost, result) = prg.run(a, 0, 1000, &[1300, 37]).expect("run");
         assert_eq!(cost, 869);
         assert_eq!(a.number(result), 1337.into());
+    }
+}
+
+#[cfg(all(test, feature = "serde"))]
+mod serde_tests {
+    use super::*;
+
+    #[test]
+    fn test_program_is_bytes() -> anyhow::Result<()> {
+        let bytes = Bytes::new(vec![1, 2, 3]);
+        let program = Program::new(bytes.clone());
+
+        let bytes_json = serde_json::to_string(&bytes)?;
+        let program_json = serde_json::to_string(&program)?;
+
+        assert_eq!(program_json, bytes_json);
+
+        Ok(())
     }
 }

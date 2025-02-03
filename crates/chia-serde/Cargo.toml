@@ -1,9 +1,9 @@
 [package]
-name = "chia-sha2"
+name = "chia-serde"
 version = "0.19.1"
 edition = "2021"
 license = "Apache-2.0"
-description = "A common wrapper around OpenSSL and sha2 implementations of sha256."
+description = "Serialization and deserialization helpers for Chia types"
 authors = ["Brandon Haggstrom <b.haggstrom@chia.net>"]
 homepage = "https://github.com/Chia-Network/chia_rs"
 repository = "https://github.com/Chia-Network/chia_rs"
@@ -11,9 +11,11 @@ repository = "https://github.com/Chia-Network/chia_rs"
 [lints]
 workspace = true
 
-[features]
-openssl = ["dep:openssl"]
-
 [dependencies]
-sha2 = { workspace = true }
-openssl = { workspace = true, optional = true }
+serde = { workspace = true }
+hex = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+bincode = { workspace = true }

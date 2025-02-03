@@ -179,7 +179,7 @@ impl chia_traits::ChiaToPython for NodeType {
     }
 }
 
-#[streamable]
+#[streamable(no_serde)]
 pub struct Message {
     msg_type: ProtocolMessageTypes,
     id: Option<u16>,
