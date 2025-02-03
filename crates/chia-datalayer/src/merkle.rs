@@ -282,6 +282,74 @@ pub enum NodeType {
     Leaf = 1,
 }
 
+#[cfg_attr(feature = "py-bindings", pyclass(get_all))]
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+pub struct ProofOfInclusionLayer {
+    pub other_hash_side: Side,
+    pub other_hash: Hash,
+    pub combined_hash: Hash,
+}
+
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+impl ProofOfInclusionLayer {
+    #[new]
+    pub fn py_init(other_hash_side: Side, other_hash: Hash, combined_hash: Hash) -> PyResult<Self> {
+        Ok(Self {
+            other_hash_side,
+            other_hash,
+            combined_hash,
+        })
+    }
+}
+
+#[cfg_attr(feature = "py-bindings", pyclass(get_all))]
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+pub struct ProofOfInclusion {
+    pub node_hash: Hash,
+    pub layers: Vec<ProofOfInclusionLayer>,
+}
+
+impl ProofOfInclusion {
+    pub fn root_hash(&self) -> Hash {
+        if let Some(last) = self.layers.last() {
+            last.combined_hash
+        } else {
+            self.node_hash
+        }
+    }
+
+    pub fn valid(&self) -> bool {
+        let mut existing_hash = self.node_hash;
+
+        for layer in &self.layers {
+            let calculated_hash =
+                calculate_internal_hash(&existing_hash, layer.other_hash_side, &layer.other_hash);
+
+            if calculated_hash != layer.combined_hash {
+                return false;
+            }
+
+            existing_hash = calculated_hash;
+        }
+
+        existing_hash == self.root_hash()
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+impl ProofOfInclusion {
+    #[pyo3(name = "root_hash")]
+    pub fn py_root_hash(&self) -> Hash {
+        self.root_hash()
+    }
+    #[pyo3(name = "valid")]
+    pub fn py_valid(&self) -> bool {
+        self.valid()
+    }
+}
+
 #[allow(clippy::needless_pass_by_value)]
 fn sha256_num<T: ToBytes>(input: T) -> Hash {
     let mut hasher = Sha256::new();
@@ -304,6 +372,13 @@ fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
     hasher.update(right_hash.0);
 
     Hash(Bytes32::new(hasher.finalize()))
+}
+
+pub fn calculate_internal_hash(hash: &Hash, other_hash_side: Side, other_hash: &Hash) -> Hash {
+    match other_hash_side {
+        Side::Left => internal_hash(other_hash, hash),
+        Side::Right => internal_hash(hash, other_hash),
+    }
 }
 
 #[cfg_attr(feature = "py-bindings", pyclass(eq, eq_int))]
@@ -347,6 +422,16 @@ impl InternalNode {
             Ok(self.left)
         } else if index == self.left {
             Ok(self.right)
+        } else {
+            Err(Error::IndexIsNotAChild(index))
+        }
+    }
+
+    pub fn get_sibling_side(&self, index: TreeIndex) -> Result<Side, Error> {
+        if self.left == index {
+            Ok(Side::Right)
+        } else if self.right == index {
+            Ok(Side::Left)
         } else {
             Err(Error::IndexIsNotAChild(index))
         }
@@ -459,6 +544,15 @@ impl Node {
         };
 
         *leaf
+    }
+
+    fn expect_internal(&self, message: &str) -> InternalNode {
+        let Node::Internal(internal) = self else {
+            let message = message.replace("<<self>>", &format!("{self:?}"));
+            panic!("{}", message)
+        };
+
+        *internal
     }
 
     fn try_into_leaf(self) -> Result<LeafNode, Error> {
@@ -1350,6 +1444,36 @@ impl MerkleBlob {
             .copied()
             .ok_or(Error::UnknownKey(key))
     }
+
+    pub fn get_proof_of_inclusion(&self, key: KeyId) -> Result<ProofOfInclusion, Error> {
+        let mut index = *self.key_to_index.get(&key).ok_or(Error::UnknownKey(key))?;
+
+        // TODO: message
+        let node = self.get_node(index)?.expect_leaf("");
+
+        let parents = self.get_lineage_with_indexes(index)?;
+        let mut layers: Vec<ProofOfInclusionLayer> = Vec::new();
+        let mut parents_iter = parents[1..].iter();
+        parents_iter.next();
+        for (next_index, parent) in parents_iter {
+            // TODO: message
+            let parent = parent.expect_internal("");
+            let sibling_index = parent.sibling_index(index)?;
+            let sibling = self.get_node(sibling_index)?;
+            let layer = ProofOfInclusionLayer {
+                other_hash_side: parent.get_sibling_side(index)?,
+                other_hash: sibling.hash(),
+                combined_hash: parent.hash,
+            };
+            layers.push(layer);
+            index = *next_index;
+        }
+
+        Ok(ProofOfInclusion {
+            node_hash: node.hash,
+            layers,
+        })
+    }
 }
 
 impl PartialEq for MerkleBlob {
@@ -1553,6 +1677,11 @@ impl MerkleBlob {
     #[pyo3(name = "get_key_index")]
     pub fn py_get_key_index(&self, key: KeyId) -> PyResult<TreeIndex> {
         Ok(self.get_key_index(key)?)
+    }
+
+    #[pyo3(name = "get_proof_of_inclusion")]
+    pub fn py_get_proof_of_inclusion(&self, key: KeyId) -> PyResult<ProofOfInclusion> {
+        Ok(self.get_proof_of_inclusion(key)?)
     }
 }
 

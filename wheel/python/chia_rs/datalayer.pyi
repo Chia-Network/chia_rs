@@ -62,6 +62,22 @@ class LeafNode:
 
 
 @final
+class ProofOfInclusionLayer:
+    def __init__(self, parent: Optional[uint32], hash: bytes32, left: uint32, right: uint32) -> None: ...
+    other_hash_side: uint8
+    other_hash: bytes32
+    combined_hash: bytes32
+
+@final
+class ProofOfInclusion:
+    node_hash: bytes32
+    # children before parents
+    layers: list[ProofOfInclusionLayer]
+
+    def root_hash(self) -> bytes32: ...
+    def valid(self) -> bool: ...
+
+@final
 class MerkleBlob:
     @property
     def blob(self) -> bytearray: ...
@@ -90,6 +106,7 @@ class MerkleBlob:
     def get_hash_at_index(self, index: uint32): ...
     def get_keys_values(self) -> dict[int64, int64]: ...
     def get_key_index(self, key: int64) -> uint32: ...
+    def get_proof_of_inclusion(self, key: int64) -> ProofOfInclusion: ...
 
     def __len__(self) -> int: ...
 
