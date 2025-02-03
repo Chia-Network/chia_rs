@@ -32,6 +32,8 @@ type TreeIndexType = u32;
 //       being found with a cfg_attr
 #[cfg(feature = "py-bindings")]
 pub struct TreeIndex(#[pyo3(get, name = "raw")] TreeIndexType);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 #[cfg(not(feature = "py-bindings"))]
 pub struct TreeIndex(TreeIndexType);
 
@@ -79,6 +81,8 @@ pub struct Hash(Bytes32);
 //       being found with a cfg_attr
 #[cfg(feature = "py-bindings")]
 pub struct KeyId(#[pyo3(get, name = "raw")] i64);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 #[cfg(not(feature = "py-bindings"))]
 pub struct KeyId(i64);
 
@@ -101,6 +105,8 @@ impl KeyId {
 //       being found with a cfg_attr
 #[cfg(feature = "py-bindings")]
 pub struct ValueId(#[pyo3(get, name = "raw")] i64);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 #[cfg(not(feature = "py-bindings"))]
 pub struct ValueId(i64);
 
