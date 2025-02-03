@@ -21,7 +21,7 @@ use std::iter::zip;
 use std::ops::Range;
 use thiserror::Error;
 
-type TreeIndexType = uint32;
+type TreeIndexType = u32;
 #[cfg_attr(
     feature = "py-bindings",
     pyclass(frozen),
