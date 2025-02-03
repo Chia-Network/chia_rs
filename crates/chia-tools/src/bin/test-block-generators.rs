@@ -5,8 +5,11 @@ use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::gen::conditions::{NewCoin, SpendBundleConditions, SpendConditions};
 use chia_consensus::gen::flags::{DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
 use chia_consensus::gen::run_block_generator::{run_block_generator, run_block_generator2};
+use chia_protocol::Program;
 use chia_tools::iterate_blocks;
 use clvmr::allocator::NodePtr;
+use clvmr::serde::node_from_bytes_backrefs;
+use clvmr::serde::Serializer;
 use clvmr::Allocator;
 use std::collections::HashSet;
 use std::io::Write;
@@ -32,6 +35,11 @@ struct Args {
     /// Don't validate block signatures (saves time)
     #[arg(long, default_value_t = false)]
     skip_signature_validation: bool,
+
+    /// recompress generators with Serializer class and report any discrepancy.
+    /// This cannot be combined with --original-generator
+    #[arg(long, default_value_t = false)]
+    test_serializer: bool,
 
     /// Compare the output from the default ROM running in consensus mode
     /// against the hard-fork rules for executing block generators. After the
@@ -205,6 +213,59 @@ fn main() {
                     constants,
                 )
                 .expect("failed to run block generator");
+
+                if args.test_serializer {
+                    let new_gen = {
+                        // this is a temporary (local) allocator, just for the
+                        // purposes of re-serializing the block
+                        let mut a = Allocator::new();
+                        let gen = node_from_bytes_backrefs(&mut a, generator)
+                            .expect("deserialize generator");
+                        let mut ser = Serializer::new(None);
+                        let (done, _) = ser.add(&a, gen).expect("serialize");
+                        assert!(done);
+                        let new_gen = ser.into_inner();
+                        if new_gen.len() > generator.len() + 4 {
+                            println!(
+                                "height: {height} orig: {} new: {} ratio: {:0.6} diff: {}",
+                                generator.len(),
+                                new_gen.len(),
+                                new_gen.len() as f64 / generator.len() as f64,
+                                new_gen.len() as i64 - generator.len() as i64
+                            );
+                        }
+                        new_gen
+                    };
+
+                    let cost_offset = (new_gen.len() as i64 - generator.len() as i64)
+                        * constants.cost_per_byte as i64;
+                    let new_cost = (ti.cost as i64 + cost_offset) as u64;
+                    // since we just compressed the block, we have to run it
+                    // with the new run_block_generator
+                    let mut recompressed_conditions = run_block_generator2(
+                        &mut a,
+                        &Program::new(new_gen.into()),
+                        &block_refs,
+                        new_cost,
+                        flags,
+                        &ti.aggregated_signature,
+                        None,
+                        constants,
+                    )
+                    .expect("failed to run block generator");
+
+                    recompressed_conditions.spends.sort_by_key(|s| *s.coin_id);
+                    conditions.spends.sort_by_key(|s| *s.coin_id);
+
+                    // in order for the comparison below the hold, we need to
+                    // patch up the cost of the rust generator to look like the
+                    // baseline
+                    recompressed_conditions.cost = ti.cost;
+
+                    // now ensure the outputs are the same
+                    compare(&a, &recompressed_conditions, &conditions);
+                    return;
+                }
 
                 if args.original_generator && height < args.hard_fork_height {
                     // when running pre-hardfork blocks with the post-hard fork
