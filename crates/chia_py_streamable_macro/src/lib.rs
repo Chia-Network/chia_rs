@@ -463,7 +463,11 @@ pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenSt
             });
         }
         syn::Fields::Unnamed(FieldsUnnamed { unnamed, .. }) if unnamed.len() == 1 => {
-            let ftype: syn::Type = unnamed.first().expect("match arm if requires 1 item").ty.clone();
+            let ftype: syn::Type = unnamed
+                .first()
+                .expect("match arm if requires 1 item")
+                .ty
+                .clone();
 
             py_protocol.extend( quote! {
 
