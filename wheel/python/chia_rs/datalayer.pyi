@@ -5,9 +5,8 @@ from .sized_ints import uint8, uint16, uint32, uint64, uint128, int8, int16, int
 from typing_extensions import Self
 from chia.types.blockchain_format.program import Program as ChiaProgram
 
+from chia_rs import ReadableBuffer
 
-# TODO: don't duplicate
-ReadableBuffer = Union[bytes, bytearray, memoryview]
 
 DATA_SIZE: int
 BLOCK_SIZE: int

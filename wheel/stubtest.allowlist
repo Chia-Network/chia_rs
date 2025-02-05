@@ -6,7 +6,6 @@ chia_rs\.chia_rs\..*
 # this is offered to help with hinting only and is not intended to be
 # runtime accessible.  is there a better option for handling this?
 chia_rs\.ReadableBuffer
-chia_rs\.datalayer\.ReadableBuffer
 
 # TODO: perhaps these should be private as _*
 chia_rs\.BlockRecord\.ip_iters_impl
