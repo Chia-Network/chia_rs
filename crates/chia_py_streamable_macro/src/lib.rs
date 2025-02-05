@@ -462,8 +462,32 @@ pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenSt
                 }
             });
         }
+        syn::Fields::Unnamed(FieldsUnnamed { unnamed, .. }) if unnamed.len() == 1 => {
+            let ftype: syn::Type = unnamed
+                .first()
+                .expect("match arm if requires 1 item")
+                .ty
+                .clone();
+
+            py_protocol.extend( quote! {
+
+                impl #crate_name::to_json_dict::ToJsonDict for #ident {
+                    fn to_json_dict(&self, py: pyo3::Python) -> pyo3::PyResult<pyo3::PyObject> {
+                        Ok(self.0.to_json_dict(py)?.into())
+                    }
+                }
+
+                impl #crate_name::from_json_dict::FromJsonDict for #ident {
+                    fn from_json_dict(o: &pyo3::Bound<pyo3::PyAny>) -> pyo3::PyResult<Self> {
+                        Ok(Self(
+                            <#ftype as #crate_name::from_json_dict::FromJsonDict>::from_json_dict(&o)?
+                        ))
+                    }
+                }
+            });
+        }
         _ => {
-            panic!("PyJsonDict only supports structs");
+            panic!("PyJsonDict only supports named structs and single field unnamed structs");
         }
     }
 
