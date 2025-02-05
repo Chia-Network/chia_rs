@@ -35,7 +35,7 @@ fuzz_target!(|data: &[u8]| {
         print(sys.executable)
         "#, None, None).unwrap();
         */
-        let blspy = py.import("blspy").unwrap();
+        let blspy = py.import_bound("blspy").unwrap();
         let aug = blspy.getattr("AugSchemeMPL").unwrap();
 
         // Generate key pair from seed
@@ -43,7 +43,7 @@ fuzz_target!(|data: &[u8]| {
         let py_sk = aug
             .call_method1(
                 "key_gen",
-                PyTuple::new(py, [PyBytes::new(py, data)]).unwrap(),
+                PyTuple::new_bound(py, [PyBytes::new_bound(py, data)]),
             )
             .unwrap();
 
@@ -66,14 +66,10 @@ fuzz_target!(|data: &[u8]| {
         let py_sk1 = aug
             .call_method1(
                 "derive_child_sk_unhardened",
-                PyTuple::new(
+                PyTuple::new_bound(
                     py,
-                    [
-                        py_sk.clone(),
-                        idx.into_pyobject(py).unwrap().clone().into_any(),
-                    ],
-                )
-                .unwrap(),
+                    [py_sk.clone(), idx.to_object(py).bind(py).clone().into_any()],
+                ),
             )
             .unwrap();
         assert_eq!(to_bytes(&py_sk1), rust_sk1.to_bytes());
@@ -82,11 +78,7 @@ fuzz_target!(|data: &[u8]| {
         let py_pk1 = aug
             .call_method1(
                 "derive_child_pk_unhardened",
-                PyTuple::new(
-                    py,
-                    [py_pk, idx.into_pyobject(py).unwrap().clone().into_any()],
-                )
-                .unwrap(),
+                PyTuple::new_bound(py, [py_pk, idx.to_object(py).bind(py).clone().into_any()]),
             )
             .unwrap();
         assert_eq!(to_bytes(&py_pk1), rust_pk1.to_bytes());
@@ -96,7 +88,7 @@ fuzz_target!(|data: &[u8]| {
         let py_sig1 = aug
             .call_method1(
                 "sign",
-                PyTuple::new(py, [py_sk1, PyBytes::new(py, data).into_any()]).unwrap(),
+                PyTuple::new_bound(py, [py_sk1, PyBytes::new_bound(py, data).into_any()]),
             )
             .unwrap();
         assert_eq!(to_bytes(&py_sig1), rust_sig1.to_bytes());
@@ -107,11 +99,7 @@ fuzz_target!(|data: &[u8]| {
         let py_sk2 = aug
             .call_method1(
                 "derive_child_sk",
-                PyTuple::new(
-                    py,
-                    [py_sk, idx.into_pyobject(py).unwrap().clone().into_any()],
-                )
-                .unwrap(),
+                PyTuple::new_bound(py, [py_sk, idx.to_object(py).bind(py).clone().into_any()]),
             )
             .unwrap();
         assert_eq!(to_bytes(&py_sk2), rust_sk2.to_bytes());
@@ -121,7 +109,7 @@ fuzz_target!(|data: &[u8]| {
         let py_sig2 = aug
             .call_method1(
                 "sign",
-                PyTuple::new(py, [py_sk2, PyBytes::new(py, data).into_any()]).unwrap(),
+                PyTuple::new_bound(py, [py_sk2, PyBytes::new_bound(py, data).into_any()]),
             )
             .unwrap();
         assert_eq!(to_bytes(&py_sig2), rust_sig2.to_bytes());
@@ -131,7 +119,7 @@ fuzz_target!(|data: &[u8]| {
         let py_agg = aug
             .call_method1(
                 "aggregate",
-                PyTuple::new(py, [PyList::new(py, [py_sig1, py_sig2]).unwrap()]).unwrap(),
+                PyTuple::new_bound(py, [PyList::new_bound(py, [py_sig1, py_sig2])]),
             )
             .unwrap();
         assert_eq!(to_bytes(&py_agg), rust_agg.to_bytes());
