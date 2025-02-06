@@ -1,6 +1,13 @@
 import pytest
 
-from chia_rs.datalayer import InvalidBlobLengthError, LeafNode, MerkleBlob
+from chia_rs.datalayer import (
+    InvalidBlobLengthError,
+    LeafNode,
+    MerkleBlob,
+    KeyId,
+    TreeIndex,
+    ValueId,
+)
 from chia_rs.sized_bytes import bytes32
 from chia_rs.sized_ints import int64, uint8
 
@@ -30,7 +37,7 @@ def test_just_insert_a_bunch() -> None:
     total_time = 0.0
     for i in range(100_000):
         start = time.monotonic()
-        merkle_blob.insert(int64(i), int64(i), HASH)
+        merkle_blob.insert(KeyId(int64(i)), ValueId(int64(i)), HASH)
         end = time.monotonic()
         total_time += end - start
 
@@ -42,10 +49,14 @@ def test_checking_coverage() -> None:
     merkle_blob = MerkleBlob(blob=bytearray())
     for i in range(count):
         if i % 2 == 0:
-            merkle_blob.insert(int64(i), int64(i), bytes32.zeros)
+            merkle_blob.insert(KeyId(int64(i)), ValueId(int64(i)), bytes32.zeros)
         else:
             merkle_blob.insert(
-                int64(i), int64(i), bytes32.zeros, int64(i - 1), uint8(0)
+                KeyId(int64(i)),
+                ValueId(int64(i)),
+                bytes32.zeros,
+                KeyId(int64(i - 1)),
+                uint8(0),
             )
 
     keys = {
@@ -53,10 +64,18 @@ def test_checking_coverage() -> None:
         for index, node in merkle_blob.get_nodes_with_indexes()
         if isinstance(node, LeafNode)
     }
-    assert keys == set(range(count))
+    assert keys == set(KeyId(int64(n)) for n in range(count))
 
 
 def test_invalid_blob_length_raised() -> None:
     """Mostly verifying that the exceptions are available and raise."""
     with pytest.raises(InvalidBlobLengthError):
         MerkleBlob(blob=b"\x00")
+
+
+@pytest.mark.parametrize(argnames="value", argvalues=[-1, 2**32])
+def test_tree_index_out_of_range_raises(value: int) -> None:
+    """Making sure that it doesn't over or underflow"""
+
+    with pytest.raises(OverflowError):
+        TreeIndex(value)

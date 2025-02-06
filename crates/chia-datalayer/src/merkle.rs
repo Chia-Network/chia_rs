@@ -1,10 +1,12 @@
 #[cfg(feature = "py-bindings")]
+use chia_py_streamable_macro::{PyJsonDict, PyStreamable};
+#[cfg(feature = "py-bindings")]
 use pyo3::{
     buffer::PyBuffer,
     exceptions::PyValueError,
     prelude::*,
     pyclass, pymethods,
-    types::{PyDict, PyDictMethods, PyInt, PyListMethods},
+    types::{PyDict, PyDictMethods, PyListMethods},
     Bound, FromPyObject, IntoPyObject, PyAny, PyErr, PyResult, Python,
 };
 
@@ -19,13 +21,30 @@ use std::iter::zip;
 use std::ops::Range;
 use thiserror::Error;
 
+type TreeIndexType = u32;
 #[cfg_attr(
     feature = "py-bindings",
-    derive(FromPyObject, IntoPyObject),
-    pyo3(transparent)
+    pyclass(frozen),
+    derive(PyJsonDict, PyStreamable)
 )]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
-pub struct TreeIndex(u32);
+// TODO: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
+//       being found with a cfg_attr
+#[cfg(feature = "py-bindings")]
+pub struct TreeIndex(#[pyo3(get, name = "raw")] TreeIndexType);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
+#[cfg(not(feature = "py-bindings"))]
+pub struct TreeIndex(TreeIndexType);
+
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+impl TreeIndex {
+    #[new]
+    pub fn py_new(raw: TreeIndexType) -> Self {
+        Self(raw)
+    }
+}
 
 impl std::fmt::Display for TreeIndex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -54,18 +73,51 @@ pub struct Hash(Bytes32);
 /// value data bytes will not be handled within this code, only outside.
 #[cfg_attr(
     feature = "py-bindings",
-    derive(FromPyObject, IntoPyObject),
-    pyo3(transparent)
+    pyclass(frozen),
+    derive(PyJsonDict, PyStreamable)
 )]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
+// TODO: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
+//       being found with a cfg_attr
+#[cfg(feature = "py-bindings")]
+pub struct KeyId(#[pyo3(get, name = "raw")] i64);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
+#[cfg(not(feature = "py-bindings"))]
 pub struct KeyId(i64);
+
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+impl KeyId {
+    #[new]
+    pub fn py_new(raw: i64) -> Self {
+        Self(raw)
+    }
+}
+
 #[cfg_attr(
     feature = "py-bindings",
-    derive(FromPyObject, IntoPyObject),
-    pyo3(transparent)
+    pyclass(frozen),
+    derive(PyJsonDict, PyStreamable)
 )]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
+// TODO: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
+//       being found with a cfg_attr
+#[cfg(feature = "py-bindings")]
+pub struct ValueId(#[pyo3(get, name = "raw")] i64);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
+#[cfg(not(feature = "py-bindings"))]
 pub struct ValueId(i64);
+
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+impl ValueId {
+    #[new]
+    pub fn py_new(raw: i64) -> Self {
+        Self(raw)
+    }
+}
 
 impl std::fmt::Display for ValueId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -306,7 +358,7 @@ fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
     Hash(Bytes32::new(hasher.finalize()))
 }
 
-#[cfg_attr(feature = "py-bindings", pyclass(eq, eq_int))]
+#[cfg_attr(feature = "py-bindings", derive(PyJsonDict, PyStreamable))]
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Streamable)]
 pub enum Side {
@@ -1452,10 +1504,7 @@ impl MerkleBlob {
     }
 
     #[pyo3(name = "get_raw_node")]
-    pub fn py_get_raw_node(&mut self, index: &Bound<'_, PyInt>) -> PyResult<Node> {
-        let index = TreeIndex(index.extract::<u32>().or(Err(
-            python_exceptions::BlockIndexOutOfBoundsError::new_err(index.to_string()),
-        ))?);
+    pub fn py_get_raw_node(&mut self, index: TreeIndex) -> PyResult<Node> {
         Ok(self.get_node(index)?)
     }
 
