@@ -360,7 +360,6 @@ fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
 
 #[cfg_attr(
     feature = "py-bindings",
-    // pyclass(eq, eq_int, frozen),
     derive(PyJsonDict, PyStreamable)
 )]
 #[repr(u8)]
