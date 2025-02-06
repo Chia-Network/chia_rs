@@ -358,10 +358,7 @@ fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
     Hash(Bytes32::new(hasher.finalize()))
 }
 
-#[cfg_attr(
-    feature = "py-bindings",
-    derive(PyJsonDict, PyStreamable)
-)]
+#[cfg_attr(feature = "py-bindings", derive(PyJsonDict, PyStreamable))]
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Streamable)]
 pub enum Side {
