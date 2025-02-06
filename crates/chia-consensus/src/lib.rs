@@ -11,3 +11,9 @@ pub mod merkle_set;
 pub mod merkle_tree;
 pub mod spendbundle_conditions;
 pub mod spendbundle_validation;
+
+#[cfg(feature = "chiavdf")]
+pub mod vdf;
+
+#[cfg(feature = "chiapos")]
+pub mod proof_of_space;

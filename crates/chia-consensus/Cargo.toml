@@ -18,6 +18,8 @@ py-bindings = [
     "chia-traits/py-bindings",
     "chia-protocol/py-bindings"
 ]
+chiavdf = ["dep:chiavdf"]
+chiapos = ["dep:chiapos"]
 
 [dependencies]
 clvmr = { workspace = true }
@@ -35,6 +37,8 @@ chia-puzzles = { workspace = true }
 chia-bls = { workspace = true }
 hex-literal = { workspace = true }
 thiserror = { workspace = true }
+chiavdf = { workspace = true, optional = true }
+chiapos = { workspace = true, optional = true }
 
 [dev-dependencies]
 num-traits = { workspace = true }
