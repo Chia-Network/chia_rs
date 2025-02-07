@@ -19,6 +19,10 @@ mod fullblock;
 mod header_block;
 mod peer_info;
 mod pool_target;
+#[cfg(feature = "py-bindings")]
+mod pos_quality;
+#[cfg(feature = "py-bindings")]
+mod pot_iterations;
 mod program;
 mod proof_of_space;
 mod reward_chain_block;
@@ -50,6 +54,10 @@ pub use crate::fullblock::*;
 pub use crate::header_block::*;
 pub use crate::peer_info::*;
 pub use crate::pool_target::*;
+#[cfg(feature = "py-bindings")]
+pub use crate::pos_quality::*;
+#[cfg(feature = "py-bindings")]
+pub use crate::pot_iterations::*;
 pub use crate::program::*;
 pub use crate::proof_of_space::*;
 pub use crate::reward_chain_block::*;
