@@ -66,28 +66,28 @@ def get_flags_for_height_and_constants(
 ) -> int: ...
 
 def calculate_ip_iters(
-    num_sps_sub_slot: int,
-    num_sp_intervals_extra: int,
-    sub_slot_iters: int,
-    signage_point_index: int,
-    required_iters: int,
-) -> int: ...
+    num_sps_sub_slot: uint32,
+    num_sp_intervals_extra: uint8,
+    sub_slot_iters: uint64,
+    signage_point_index: uint32,
+    required_iters: uint64,
+) -> uint64: ...
 
 def calculate_sp_iters(
-    num_sps_sub_slot: int,
-    sub_slot_iters: int,
-    signage_point_index: int,
-) -> int: ...
+    num_sps_sub_slot: uint32,
+    sub_slot_iters: uint64,
+    signage_point_index: uint32,
+) -> uint64: ...
 
 def calculate_sp_interval_iters(
-    num_sps_sub_slot: int,
-    sub_slot_iters: int,
-) -> int: ...
+    num_sps_sub_slot: uint32,
+    sub_slot_iters: uint64,
+) -> uint64: ...
 
 def is_overflow_block(
-    num_sps_sub_slot: int,
-    num_sp_intervals_extra: int,
-    signage_point_index: int,
+    num_sps_sub_slot: uint32,
+    num_sp_intervals_extra: uint8,
+    signage_point_index: uint32,
 ) -> bool: ...
 
 def expected_plot_size(
