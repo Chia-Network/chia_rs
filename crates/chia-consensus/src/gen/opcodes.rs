@@ -55,6 +55,8 @@ pub const ASSERT_BEFORE_SECONDS_ABSOLUTE: ConditionOpcode = 85;
 pub const ASSERT_BEFORE_HEIGHT_RELATIVE: ConditionOpcode = 86;
 pub const ASSERT_BEFORE_HEIGHT_ABSOLUTE: ConditionOpcode = 87;
 
+pub const ASSERT_SHA256_TREE: ConditionOpcode = 91;
+
 // no-op condition
 pub const REMARK: ConditionOpcode = 1;
 

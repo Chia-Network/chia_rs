@@ -12,12 +12,12 @@ use super::opcodes::{
     ASSERT_MY_BIRTH_SECONDS, ASSERT_MY_COIN_ID, ASSERT_MY_PARENT_ID, ASSERT_MY_PUZZLEHASH,
     ASSERT_PUZZLE_ANNOUNCEMENT, ASSERT_SECONDS_ABSOLUTE, ASSERT_SECONDS_RELATIVE, CREATE_COIN,
     CREATE_COIN_ANNOUNCEMENT, CREATE_COIN_COST, CREATE_PUZZLE_ANNOUNCEMENT, RECEIVE_MESSAGE,
-    REMARK, RESERVE_FEE, SEND_MESSAGE, SOFTFORK,
+    REMARK, RESERVE_FEE, SEND_MESSAGE, SOFTFORK, ASSERT_SHA256_TREE
 };
 use super::sanitize_int::{sanitize_uint, SanitizedUint};
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
 use crate::consensus_constants::ConsensusConstants;
-use crate::gen::flags::{DONT_VALIDATE_SIGNATURE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
+use crate::gen::flags::{DONT_VALIDATE_SIGNATURE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT, ENABLE_SHA256TREE_CONDITIONS};
 use crate::gen::make_aggsig_final_message::u64_to_bytes;
 use crate::gen::messages::{Message, SpendId};
 use crate::gen::spend_visitor::SpendVisitor;
@@ -235,6 +235,9 @@ pub enum Condition {
     // this means the condition is unconditionally true and can be skipped
     Skip,
     SkipRelativeCondition,
+
+    // assert sha256tree (SExp, 32 bytes)
+    AssertSha256Tree(NodePtr, NodePtr),
 }
 
 fn check_agg_sig_unsafe_message(
@@ -580,6 +583,12 @@ pub fn parse_args(
         REMARK => {
             // this condition is always true, we always ignore arguments
             Ok(Condition::Skip)
+        }
+        ASSERT_SHA256_TREE => {
+            maybe_check_args_terminator(a, c, flags)?;
+            let sexp = first(a, c)?;
+            let id = sanitize_hash(a, first(a, c)?, 32, ErrorCode::AssertConcurrentPuzzleFailed)?;
+            Ok(Condition::AssertSha256Tree(sexp, id))
         }
         _ => Err(ValidationErr(c, ErrorCode::InvalidConditionOpcode)),
     }
@@ -1256,6 +1265,15 @@ pub fn parse_conditions<V: SpendVisitor>(
             }
             Condition::SkipRelativeCondition => {
                 assert_not_ephemeral(&mut spend.flags, state, ret.spends.len());
+            }
+            Condition::AssertSha256Tree(sexp, hash) => {
+                if flags & ENABLE_SHA256TREE_CONDITIONS == 1{
+                    // for now we can validate this here
+                    // in the future we might want to store the jobs and validate them more efficiently
+                    if clvm_utils::tree_hash(&a, sexp).to_bytes() != a.atom(hash).as_ref() {
+                        return Err(ValidationErr(c, ErrorCode::AssertSha256TreeFailed));
+                    }
+                }
             }
             Condition::Skip => {}
         }
