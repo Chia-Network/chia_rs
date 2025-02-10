@@ -54,7 +54,7 @@ impl std::fmt::Display for TreeIndex {
 
 #[cfg_attr(
     feature = "py-bindings",
-    derive(FromPyObject, IntoPyObject),
+    derive(FromPyObject, IntoPyObject, PyJsonDict),
     pyo3(transparent)
 )]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
@@ -62,7 +62,7 @@ pub struct Parent(Option<TreeIndex>);
 
 #[cfg_attr(
     feature = "py-bindings",
-    derive(FromPyObject, IntoPyObject),
+    derive(FromPyObject, IntoPyObject, PyJsonDict),
     pyo3(transparent)
 )]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
@@ -384,7 +384,11 @@ pub struct NodeMetadata {
     pub dirty: bool,
 }
 
-#[cfg_attr(feature = "py-bindings", pyclass(get_all))]
+#[cfg_attr(
+    feature = "py-bindings",
+    pyclass(get_all),
+    derive(PyJsonDict, PyStreamable)
+)]
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Streamable)]
 pub struct InternalNode {
     pub parent: Parent,
@@ -405,46 +409,17 @@ impl InternalNode {
     }
 }
 
-#[cfg(feature = "py-bindings")]
-#[pymethods]
-impl InternalNode {
-    #[new]
-    pub fn py_init(
-        parent: Parent,
-        hash: Hash,
-        left: TreeIndex,
-        right: TreeIndex,
-    ) -> PyResult<Self> {
-        Ok(Self {
-            parent,
-            hash,
-            left,
-            right,
-        })
-    }
-}
-
-#[cfg_attr(feature = "py-bindings", pyclass(get_all))]
+#[cfg_attr(
+    feature = "py-bindings",
+    pyclass(get_all),
+    derive(PyJsonDict, PyStreamable)
+)]
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Streamable)]
 pub struct LeafNode {
     pub parent: Parent,
     pub hash: Hash,
     pub key: KeyId,
     pub value: ValueId,
-}
-
-#[cfg(feature = "py-bindings")]
-#[pymethods]
-impl LeafNode {
-    #[new]
-    pub fn py_init(parent: Parent, hash: Hash, key: KeyId, value: ValueId) -> PyResult<Self> {
-        Ok(Self {
-            parent,
-            hash,
-            key,
-            value,
-        })
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1338,7 +1313,7 @@ impl MerkleBlob {
         while let Some(this_index) = next_index {
             let node = self.get_node(this_index)?;
             next_index = node.parent().0;
-            lineage.push((index, node));
+            lineage.push((this_index, node));
         }
 
         Ok(lineage)
