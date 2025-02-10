@@ -10,14 +10,16 @@ use super::opcodes::{
     ASSERT_COIN_ANNOUNCEMENT, ASSERT_CONCURRENT_PUZZLE, ASSERT_CONCURRENT_SPEND, ASSERT_EPHEMERAL,
     ASSERT_HEIGHT_ABSOLUTE, ASSERT_HEIGHT_RELATIVE, ASSERT_MY_AMOUNT, ASSERT_MY_BIRTH_HEIGHT,
     ASSERT_MY_BIRTH_SECONDS, ASSERT_MY_COIN_ID, ASSERT_MY_PARENT_ID, ASSERT_MY_PUZZLEHASH,
-    ASSERT_PUZZLE_ANNOUNCEMENT, ASSERT_SECONDS_ABSOLUTE, ASSERT_SECONDS_RELATIVE, CREATE_COIN,
-    CREATE_COIN_ANNOUNCEMENT, CREATE_COIN_COST, CREATE_PUZZLE_ANNOUNCEMENT, RECEIVE_MESSAGE,
-    REMARK, RESERVE_FEE, SEND_MESSAGE, SOFTFORK, ASSERT_SHA256_TREE
+    ASSERT_PUZZLE_ANNOUNCEMENT, ASSERT_SECONDS_ABSOLUTE, ASSERT_SECONDS_RELATIVE,
+    ASSERT_SHA256_TREE, CREATE_COIN, CREATE_COIN_ANNOUNCEMENT, CREATE_COIN_COST,
+    CREATE_PUZZLE_ANNOUNCEMENT, RECEIVE_MESSAGE, REMARK, RESERVE_FEE, SEND_MESSAGE, SOFTFORK,
 };
 use super::sanitize_int::{sanitize_uint, SanitizedUint};
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
 use crate::consensus_constants::ConsensusConstants;
-use crate::gen::flags::{DONT_VALIDATE_SIGNATURE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT, ENABLE_SHA256TREE_CONDITIONS};
+use crate::gen::flags::{
+    DONT_VALIDATE_SIGNATURE, ENABLE_SHA256TREE_CONDITIONS, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
+};
 use crate::gen::make_aggsig_final_message::u64_to_bytes;
 use crate::gen::messages::{Message, SpendId};
 use crate::gen::spend_visitor::SpendVisitor;
@@ -1267,7 +1269,7 @@ pub fn parse_conditions<V: SpendVisitor>(
                 assert_not_ephemeral(&mut spend.flags, state, ret.spends.len());
             }
             Condition::AssertSha256Tree(sexp, hash) => {
-                if flags & ENABLE_SHA256TREE_CONDITIONS == 1{
+                if flags & ENABLE_SHA256TREE_CONDITIONS == 1 {
                     // for now we can validate this here
                     // in the future we might want to store the jobs and validate them more efficiently
                     if clvm_utils::tree_hash(&a, sexp).to_bytes() != a.atom(hash).as_ref() {
@@ -1866,6 +1868,11 @@ fn test_invalid_condition_list2() {
     );
 }
 
+// #[test]
+// fn test_shatree_condition() {
+//     cond_test("()")
+// }
+
 #[test]
 fn test_invalid_condition_args_terminator() {
     // we only look at the condition arguments the condition expects, any
@@ -2370,12 +2377,13 @@ fn test_multiple_conditions(
 #[case(AGG_SIG_PARENT_AMOUNT)]
 #[case(ASSERT_CONCURRENT_SPEND)]
 #[case(ASSERT_CONCURRENT_PUZZLE)]
+#[case(ASSERT_SHA256_TREE)]
 fn test_missing_arg(#[case] condition: ConditionOpcode) {
     // extra args are disallowed in mempool mode
     assert_eq!(
         cond_test_flag(
             &format!("((({{h1}} ({{h2}} (123 ((({} )))))", condition as u8),
-            0
+            ENABLE_SHA256TREE_CONDITIONS
         )
         .unwrap_err()
         .1,
