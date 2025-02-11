@@ -44,6 +44,13 @@ jobs:
       - name: Set up rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install gmp (MacOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install gmp
+          echo "LIBRARY_PATH=/opt/homebrew/lib:$LIBRARY_PATH" >> $GITHUB_ENV
+          echo "CPATH=/opt/homebrew/include:$CPATH" >> $GITHUB_ENV
+
       - name: setup venv
         run: |
           python -m venv venv
