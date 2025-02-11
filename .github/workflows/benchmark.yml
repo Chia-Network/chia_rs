@@ -44,6 +44,11 @@ jobs:
       - name: Set up rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install gmp (MacOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install gmp
+
       - name: setup venv
         run: |
           python -m venv venv
