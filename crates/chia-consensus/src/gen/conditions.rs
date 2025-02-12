@@ -3979,19 +3979,55 @@ fn test_concurrent_puzzle_fail() {
     }
 }
 
-#[test]
-fn test_sha256tree() {
-    let input = "(\
-        (({h1} ({h2} (123 (((91 (0x1000 (0x21df504fc8e0a0c53f8da8728a6ce0b2c6911db03184ee59eda9a6a108b008e4 )))\
-        ))";
-    let _res = cond_test_cb(
-        input,
-        MEMPOOL_MODE | ENABLE_SHA256TREE_CONDITIONS,
-        None,
-        &Signature::default(),
-        None,
-    )
-    .unwrap();
+#[cfg(test)]
+#[rstest]
+#[case(
+    "0x1000",
+    "0x21df504fc8e0a0c53f8da8728a6ce0b2c6911db03184ee59eda9a6a108b008e4",
+    true
+)]
+#[case(
+    "0x1000",
+    "0x21df504fc8e0a0c53f8da8728a6ce0b2c6911db03184ee59eda9a6a108b008e5",
+    false
+)]
+#[case(
+    "(0x1000 0x2000 ",
+    "0x52beefa879dfaab96e4e42d202da06853e0f64f07e5144fcb1e46cb2de3eb7dc",
+    true
+)] // (0x1000 . 0x2000)
+#[case(
+    "(0x1000 0x2000 ",
+    "0x52beefa879dfaab96e4e42d202da06853e0f64f07e5144fcb1e46cb2de3eb7dd",
+    false
+)] // (0x1000 . 0x2000)
+#[case(
+    "(0x1000 (0x2000 (0x3000 ) ",
+    "0x02fa79e6a347b47ddd95a785b045de89f87d9c0f0cafec012d127ae4ebc1dc9b",
+    true
+)] // (0x1000 0x2000 0x300)
+#[case(
+    "(0x1000 (0x2000 (0x3000 ) ",
+    "0x02fa79e6a347b47ddd95a785b045de89f87d9c0f0cafec012d127ae4ebc1dc9c",
+    false
+)] // (0x1000 0x2000 0x300)
+fn test_sha256tree(#[case] sexp: &str, #[case] hash: &str, #[case] expected: bool) {
+    let input = format!(
+        "(\
+        (({{h1}} ({{h2}} (123 (((91 ({sexp} ({hash} )))\
+        ))"
+    );
+    assert_eq!(
+        cond_test_cb(
+            &input,
+            MEMPOOL_MODE | ENABLE_SHA256TREE_CONDITIONS,
+            None,
+            &Signature::default(),
+            None,
+        )
+        .is_ok(),
+        expected
+    );
 }
 
 #[test]
