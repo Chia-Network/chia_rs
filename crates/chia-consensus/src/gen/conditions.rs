@@ -590,9 +590,9 @@ pub fn parse_args(
             if flags & ENABLE_SHA256TREE_CONDITIONS == 0 {
                 return Err(ValidationErr(c, ErrorCode::InvalidConditionOpcode));
             }
-            // maybe_check_args_terminator(a, c, flags)?;
             let sexp = first(a, c)?;
             c = rest(a, c)?;
+            maybe_check_args_terminator(a, c, flags)?;
             let id = sanitize_hash(a, first(a, c)?, 32, ErrorCode::InvalidHashValue)?;
             Ok(Condition::AssertSha256Tree(sexp, id))
         }
@@ -2004,7 +2004,7 @@ fn test_strict_args_count(
             "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 )))))",
             condition as u8, arg
         ),
-        flags | DONT_VALIDATE_SIGNATURE,
+        flags | DONT_VALIDATE_SIGNATURE | ENABLE_SHA256TREE_CONDITIONS,
     );
     if flags == 0 {
         // two of the cases won't pass, even when garbage at the end is allowed.
