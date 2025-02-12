@@ -157,7 +157,8 @@ pub fn parse_opcode(a: &Allocator, op: NodePtr, _flags: u32) -> Option<Condition
             | AGG_SIG_PARENT_AMOUNT
             | AGG_SIG_PARENT_PUZZLE
             | SEND_MESSAGE
-            | RECEIVE_MESSAGE => Some(b0),
+            | RECEIVE_MESSAGE
+            | ASSERT_SHA256_TREE => Some(b0),
             _ => None,
         }
     } else {

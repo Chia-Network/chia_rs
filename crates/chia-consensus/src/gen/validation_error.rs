@@ -164,6 +164,7 @@ pub enum ErrorCode {
     InvalidCoinId,
     MessageNotSentOrReceived,
     AssertSha256TreeFailed,
+    InvalidHashValue,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
@@ -361,6 +362,7 @@ impl From<ErrorCode> for u32 {
             ErrorCode::InvalidCoinId => 146,
             ErrorCode::MessageNotSentOrReceived => 147,
             ErrorCode::AssertSha256TreeFailed => 148,
+            ErrorCode::InvalidHashValue => 149,
         }
     }
 }

@@ -587,9 +587,13 @@ pub fn parse_args(
             Ok(Condition::Skip)
         }
         ASSERT_SHA256_TREE => {
-            maybe_check_args_terminator(a, c, flags)?;
+            if flags & ENABLE_SHA256TREE_CONDITIONS == 0 {
+                return Err(ValidationErr(c, ErrorCode::InvalidConditionOpcode));
+            }
+            // maybe_check_args_terminator(a, c, flags)?;
             let sexp = first(a, c)?;
-            let id = sanitize_hash(a, first(a, c)?, 32, ErrorCode::AssertConcurrentPuzzleFailed)?;
+            c = rest(a, c)?;
+            let id = sanitize_hash(a, first(a, c)?, 32, ErrorCode::InvalidHashValue)?;
             Ok(Condition::AssertSha256Tree(sexp, id))
         }
         _ => Err(ValidationErr(c, ErrorCode::InvalidConditionOpcode)),
@@ -1316,7 +1320,7 @@ fn is_ephemeral(
 // condition op-code
 pub fn parse_spends<V: SpendVisitor>(
     a: &Allocator,
-    spends: NodePtr,
+    spends: NodePtr, // list of ((parent_id, puzzle_hash, amount, conditions)... )
     max_cost: Cost,
     flags: u32,
     aggregate_signature: &Signature,
@@ -1868,11 +1872,6 @@ fn test_invalid_condition_list2() {
     );
 }
 
-// #[test]
-// fn test_shatree_condition() {
-//     cond_test("()")
-// }
-
 #[test]
 fn test_invalid_condition_args_terminator() {
     // we only look at the condition arguments the condition expects, any
@@ -1993,6 +1992,7 @@ fn test_invalid_spend_list_terminator() {
 #[case(AGG_SIG_PARENT_AMOUNT, "{pubkey} ({msg1}")]
 #[case(ASSERT_CONCURRENT_SPEND, "{coin12}")]
 #[case(ASSERT_CONCURRENT_PUZZLE, "{h2}")]
+#[case(ASSERT_SHA256_TREE, "{h1} ({h2}")]
 fn test_strict_args_count(
     #[case] condition: ConditionOpcode,
     #[case] arg: &str,
@@ -3975,6 +3975,21 @@ fn test_concurrent_puzzle_fail() {
             ErrorCode::AssertConcurrentPuzzleFailed
         );
     }
+}
+
+#[test]
+fn test_sha256tree() {
+    let input = "(\
+        (({h1} ({h2} (123 (((91 (0x1000 (0x21df504fc8e0a0c53f8da8728a6ce0b2c6911db03184ee59eda9a6a108b008e4 )))\
+        ))";
+    let _res = cond_test_cb(
+        input,
+        MEMPOOL_MODE | ENABLE_SHA256TREE_CONDITIONS,
+        None,
+        &Signature::default(),
+        None,
+    )
+    .unwrap();
 }
 
 #[test]
