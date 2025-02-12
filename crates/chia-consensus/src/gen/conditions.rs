@@ -1273,10 +1273,10 @@ pub fn parse_conditions<V: SpendVisitor>(
                 assert_not_ephemeral(&mut spend.flags, state, ret.spends.len());
             }
             Condition::AssertSha256Tree(sexp, hash) => {
-                if flags & ENABLE_SHA256TREE_CONDITIONS == 1 {
+                if flags & ENABLE_SHA256TREE_CONDITIONS != 0 {
                     // for now we can validate this here
                     // in the future we might want to store the jobs and validate them more efficiently
-                    if clvm_utils::tree_hash(&a, sexp).to_bytes() != a.atom(hash).as_ref() {
+                    if clvm_utils::tree_hash(a, sexp).to_bytes() != a.atom(hash).as_ref() {
                         return Err(ValidationErr(c, ErrorCode::AssertSha256TreeFailed));
                     }
                 }
@@ -2007,7 +2007,7 @@ fn test_strict_args_count(
         flags | DONT_VALIDATE_SIGNATURE | ENABLE_SHA256TREE_CONDITIONS,
     );
     if flags == 0 {
-        // two of the cases won't pass, even when garbage at the end is allowed.
+        // three of the cases won't pass, even when garbage at the end is allowed.
         if condition == ASSERT_COIN_ANNOUNCEMENT {
             assert_eq!(ret.unwrap_err().1, ErrorCode::AssertCoinAnnouncementFailed,);
         } else if condition == ASSERT_PUZZLE_ANNOUNCEMENT {
@@ -2015,6 +2015,8 @@ fn test_strict_args_count(
                 ret.unwrap_err().1,
                 ErrorCode::AssertPuzzleAnnouncementFailed,
             );
+        } else if condition == ASSERT_SHA256_TREE {
+            assert_eq!(ret.unwrap_err().1, ErrorCode::AssertSha256TreeFailed,);
         } else {
             assert!(ret.is_ok());
         }
