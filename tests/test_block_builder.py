@@ -41,14 +41,21 @@ def test_block_builder() -> None:
     all_bundles.sort(key=lambda x: x[1])
 
     for seed in range(50):
+        batch_size = (seed % 9) + 1
         rng = random.Random(seed)
         random.shuffle(all_bundles)
 
         start = time.monotonic()
         builder = BlockBuilder()
         skipped = 0
-        for sb, cost in all_bundles:
-            added, done = builder.add_spend_bundle(sb, cost, DEFAULT_CONSTANTS)
+        for sbs in (
+            all_bundles[i : i + batch_size]
+            for i in range(0, len(all_bundles), batch_size)
+        ):
+            cost = uint64(sum([i[1] for i in sbs]))
+            added, done = builder.add_spend_bundles(
+                [i[0] for i in sbs], cost, DEFAULT_CONSTANTS
+            )
             if not added:
                 skipped += 1
             if done:
@@ -61,7 +68,7 @@ def test_block_builder() -> None:
 
         start = time.monotonic()
         err, conds2 = run_block_generator2(
-            generator, [], 11200000000, MEMPOOL_MODE, signature, None, DEFAULT_CONSTANTS
+            generator, [], 11000000000, MEMPOOL_MODE, signature, None, DEFAULT_CONSTANTS
         )
         end = time.monotonic()
         run_time = end - start
