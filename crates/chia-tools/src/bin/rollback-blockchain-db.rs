@@ -44,7 +44,7 @@ fn main() {
 
     let peak_height = select_block_by_hash
         .query([peak_hash])
-        .expect("failed to query block {peak_hash}")
+        .expect("failed to query block")
         .next()
         .expect("missing peak block")
         .expect("missing peak block")
@@ -73,7 +73,7 @@ fn main() {
 
         let new_peak_hash = select_block_by_height
             .query([rollback])
-            .expect("block missing at height {rollback}")
+            .expect("block missing at height")
             .next()
             .expect("missing block")
             .expect("missing block")
