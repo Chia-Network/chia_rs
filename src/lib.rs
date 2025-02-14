@@ -5,6 +5,7 @@ pub use chia_datalayer as datalayer;
 pub use chia_protocol as protocol;
 pub use chia_puzzle_types as puzzles;
 pub use chia_secp as secp;
+pub use chia_serde as serde;
 pub use chia_sha2 as sha2;
 pub use chia_ssl as ssl;
 pub use chia_traits as traits;

@@ -54,15 +54,15 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                     }
                 }
 
-                impl pyo3::conversion::ToPyObject for #ident {
-                    fn to_object(&self, py: pyo3::Python<'_>) -> pyo3::PyObject {
-                        pyo3::conversion::ToPyObject::to_object(&(*self as u8), py)
-                    }
-                }
+                impl<'py> pyo3::conversion::IntoPyObject<'py> for #ident {
+                    type Target = pyo3::PyAny;
+                    type Output = pyo3::Bound<'py, Self::Target>;
+                    type Error = std::convert::Infallible;
 
-                impl pyo3::conversion::IntoPy<pyo3::PyObject> for #ident {
-                    fn into_py(self, py: pyo3::Python<'_>) -> pyo3::PyObject {
-                        pyo3::conversion::ToPyObject::to_object(&(self as u8), py)
+                    fn into_pyobject(self, py: pyo3::Python<'py>) -> Result<Self::Output, Self::Error> {
+                        Ok(pyo3::IntoPyObject::into_pyobject(self as u8, py)?
+                            .clone()
+                            .into_any())
                     }
                 }
             }
@@ -76,10 +76,6 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
     let mut py_protocol = quote! {
         #[pyo3::pymethods]
         impl #ident {
-            fn __repr__(&self) -> pyo3::PyResult<String> {
-                Ok(format!("{self:?}"))
-            }
-
             fn __richcmp__(&self, other: pyo3::PyRef<Self>, op: pyo3::class::basic::CompareOp) -> pyo3::Py<pyo3::PyAny> {
                 use pyo3::class::basic::CompareOp;
                 let py = other.py();
@@ -128,6 +124,26 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 }
             });
 
+            if py_uppercase {
+                py_protocol.extend(quote! {
+                    #[pyo3::pymethods]
+                    impl #ident {
+                        fn __repr__(&self) -> pyo3::PyResult<String> {
+                            Ok(format!(concat!(stringify!(#ident), " {{ ", #(stringify!(#fnames_maybe_upper), ": {:?}, ",)* "}}"), #(self.#fnames,)*))
+                        }
+                    }
+                });
+            } else {
+                py_protocol.extend(quote! {
+                    #[pyo3::pymethods]
+                    impl #ident {
+                        fn __repr__(&self) -> pyo3::PyResult<String> {
+                            Ok(format!("{self:?}"))
+                        }
+                    }
+                });
+            }
+
             if !named.is_empty() {
                 py_protocol.extend(quote! {
                     #[pyo3::pymethods]
@@ -155,7 +171,16 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 });
             }
         }
-        syn::Fields::Unnamed(FieldsUnnamed { .. }) => {}
+        syn::Fields::Unnamed(FieldsUnnamed { .. }) => {
+            py_protocol.extend(quote! {
+                #[pyo3::pymethods]
+                impl #ident {
+                    fn __repr__(&self) -> pyo3::PyResult<String> {
+                        Ok(format!("{self:?}"))
+                    }
+                }
+            });
+        }
         syn::Fields::Unit => {
             panic!("PyStreamable does not support the unit type");
         }
@@ -437,8 +462,32 @@ pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenSt
                 }
             });
         }
+        syn::Fields::Unnamed(FieldsUnnamed { unnamed, .. }) if unnamed.len() == 1 => {
+            let ftype: syn::Type = unnamed
+                .first()
+                .expect("match arm if requires 1 item")
+                .ty
+                .clone();
+
+            py_protocol.extend( quote! {
+
+                impl #crate_name::to_json_dict::ToJsonDict for #ident {
+                    fn to_json_dict(&self, py: pyo3::Python) -> pyo3::PyResult<pyo3::PyObject> {
+                        Ok(self.0.to_json_dict(py)?.into())
+                    }
+                }
+
+                impl #crate_name::from_json_dict::FromJsonDict for #ident {
+                    fn from_json_dict(o: &pyo3::Bound<pyo3::PyAny>) -> pyo3::PyResult<Self> {
+                        Ok(Self(
+                            <#ftype as #crate_name::from_json_dict::FromJsonDict>::from_json_dict(&o)?
+                        ))
+                    }
+                }
+            });
+        }
         _ => {
-            panic!("PyJsonDict only supports structs");
+            panic!("PyJsonDict only supports named structs and single field unnamed structs");
         }
     }
 

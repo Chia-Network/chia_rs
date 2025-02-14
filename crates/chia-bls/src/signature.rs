@@ -228,6 +228,26 @@ impl Add<&Signature> for &Signature {
     }
 }
 
+#[cfg(feature = "serde")]
+impl serde::Serialize for Signature {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        chia_serde::ser_bytes(&self.to_bytes(), serializer, true)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Signature {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Self::from_bytes(&chia_serde::de_bytes(deserializer)?).map_err(serde::de::Error::custom)
+    }
+}
+
 // validate a series of public keys (G1 points) and G2 points. These points are
 // paired and the resulting GT points are multiplied. If the resulting GT point
 // is the identity, the function returns true, otherwise false. To validate an
