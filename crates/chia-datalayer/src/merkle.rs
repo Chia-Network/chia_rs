@@ -1477,8 +1477,9 @@ impl MerkleBlob {
     pub fn get_proof_of_inclusion(&self, key: KeyId) -> Result<ProofOfInclusion, Error> {
         let mut index = *self.key_to_index.get(&key).ok_or(Error::UnknownKey(key))?;
 
-        // TODO: message
-        let node = self.get_node(index)?.expect_leaf("");
+        let node = self
+            .get_node(index)?
+            .expect_leaf("key to index mapping should only have leaves");
 
         let parents = self.get_lineage_with_indexes(index)?;
         let mut layers: Vec<ProofOfInclusionLayer> = Vec::new();
@@ -1486,8 +1487,7 @@ impl MerkleBlob {
         // first in the lineage is the index itself, second is the first parent
         parents_iter.next();
         for (next_index, parent) in parents_iter {
-            // TODO: message
-            let parent = parent.expect_internal("");
+            let parent = parent.expect_internal("all nodes after the first should be internal");
             let sibling_index = parent.sibling_index(index)?;
             let sibling_block = self.get_block(sibling_index)?;
             assert!(!sibling_block.metadata.dirty);
