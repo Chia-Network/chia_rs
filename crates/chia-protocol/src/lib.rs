@@ -48,9 +48,7 @@ pub use crate::fullblock::*;
 pub use crate::header_block::*;
 pub use crate::peer_info::*;
 pub use crate::pool_target::*;
-#[cfg(feature = "py-bindings")]
 pub use crate::pos_quality::*;
-#[cfg(feature = "py-bindings")]
 pub use crate::pot_iterations::*;
 pub use crate::program::*;
 pub use crate::proof_of_space::*;

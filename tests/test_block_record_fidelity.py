@@ -153,4 +153,4 @@ def test_calculate_ip_iters():
 
     br = get_block_record(rng, ssi=ssi, spi=13, ri=1)
     res = br.ip_iters_impl(DEFAULT_CONSTANTS)
-    assert res is not None
+    assert res == 6400065

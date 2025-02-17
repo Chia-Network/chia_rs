@@ -2,6 +2,7 @@
 use crate::pot_iterations::{calculate_ip_iters, calculate_sp_iters};
 use crate::{Bytes32, ClassgroupElement, Coin, SubEpochSummary};
 use chia_streamable_macro::streamable;
+use chia_traits::chia_error::Result;
 #[cfg(feature = "py-bindings")]
 use pyo3::exceptions::PyValueError;
 
@@ -71,46 +72,23 @@ impl BlockRecord {
         self.deficit == min_blocks_per_challenge_block - 1
     }
 
-    // fn calculate_sp_interval_iters(&self, num_sps_sub_slot: u64) -> PyResult<u64> {
-    //     if self.sub_slot_iters % num_sps_sub_slot != 0 {
-    //         return Err(PyValueError::new_err(
-    //             "sub_slot_iters % constants.NUM_SPS_SUB_SLOT != 0",
-    //         ));
-    //     }
-    //     Ok(self.sub_slot_iters / num_sps_sub_slot)
-    // }
+    pub fn sp_iters_impl(&self, num_sps_sub_slot: u32) -> Result<u64> {
+        calculate_sp_iters(
+            num_sps_sub_slot,
+            self.sub_slot_iters,
+            self.signage_point_index as u32,
+        )
+    }
 
-    // fn calculate_sp_iters(&self, num_sps_sub_slot: u32) -> PyResult<u64> {
-    //     if self.signage_point_index as u32 >= num_sps_sub_slot {
-    //         return Err(PyValueError::new_err("SP index too high"));
-    //     }
-    //     Ok(self.calculate_sp_interval_iters(num_sps_sub_slot as u64)?
-    //         * self.signage_point_index as u64)
-    // }
-
-    // fn calculate_ip_iters(
-    //     &self,
-    //     num_sps_sub_slot: u32,
-    //     num_sp_intervals_extra: u8,
-    // ) -> PyResult<u64> {
-    //     let sp_iters = self.calculate_sp_iters(num_sps_sub_slot)?;
-    //     let sp_interval_iters = self.calculate_sp_interval_iters(num_sps_sub_slot as u64)?;
-    //     if sp_iters % sp_interval_iters != 0 || sp_iters >= self.sub_slot_iters {
-    //         return Err(PyValueError::new_err(format!(
-    //             "Invalid sp iters {sp_iters} for this ssi {}",
-    //             self.sub_slot_iters
-    //         )));
-    //     } else if self.required_iters >= sp_interval_iters || self.required_iters == 0 {
-    //         return Err(PyValueError::new_err(format!(
-    //             "Required iters {} is not below the sp interval iters {} {} or not >=0",
-    //             self.required_iters, sp_interval_iters, self.sub_slot_iters
-    //         )));
-    //     }
-    //     Ok(
-    //         (sp_iters + num_sp_intervals_extra as u64 * sp_interval_iters + self.required_iters)
-    //             % self.sub_slot_iters,
-    //     )
-    // }
+    pub fn ip_iters_impl(&self, num_sps_sub_slot: u32, num_sp_intervals_extra: u8) -> Result<u64> {
+        calculate_ip_iters(
+            num_sps_sub_slot,
+            num_sp_intervals_extra,
+            self.sub_slot_iters,
+            self.signage_point_index as u32,
+            self.required_iters,
+        )
+    }
 }
 
 #[cfg(feature = "py-bindings")]
@@ -144,7 +122,7 @@ impl BlockRecord {
     fn sp_sub_slot_total_iters_impl(&self, constants: &Bound<'_, PyAny>) -> PyResult<u128> {
         let ret = self
             .total_iters
-            .checked_sub(self.ip_iters_impl(constants)? as u128)
+            .checked_sub(self.py_ip_iters_impl(constants)? as u128)
             .ok_or(PyValueError::new_err("uint128 overflow"))?;
         if self.overflow {
             ret.checked_sub(self.sub_slot_iters as u128)
@@ -156,36 +134,29 @@ impl BlockRecord {
 
     fn ip_sub_slot_total_iters_impl(&self, constants: &Bound<'_, PyAny>) -> PyResult<u128> {
         self.total_iters
-            .checked_sub(self.ip_iters_impl(constants)? as u128)
+            .checked_sub(self.py_ip_iters_impl(constants)? as u128)
             .ok_or(PyValueError::new_err("uint128 overflow"))
     }
 
-    fn sp_iters_impl(&self, constants: &Bound<'_, PyAny>) -> PyResult<u64> {
+    #[pyo3(name = "sp_iters_impl")]
+    fn py_sp_iters_impl(&self, constants: &Bound<'_, PyAny>) -> PyResult<u64> {
         let num_sps_sub_slot = constants.getattr("NUM_SPS_SUB_SLOT")?.extract::<u32>()?;
-        calculate_sp_iters(
-            num_sps_sub_slot,
-            self.sub_slot_iters,
-            self.signage_point_index as u32,
-        )
+        self.sp_iters_impl(num_sps_sub_slot).map_err(Into::into)
     }
 
-    fn ip_iters_impl(&self, constants: &Bound<'_, PyAny>) -> PyResult<u64> {
+    #[pyo3(name = "ip_iters_impl")]
+    fn py_ip_iters_impl(&self, constants: &Bound<'_, PyAny>) -> PyResult<u64> {
         let num_sps_sub_slot = constants.getattr("NUM_SPS_SUB_SLOT")?.extract::<u32>()?;
         let num_sp_intervals_extra = constants
             .getattr("NUM_SP_INTERVALS_EXTRA")?
             .extract::<u8>()?;
-        calculate_ip_iters(
-            num_sps_sub_slot,
-            num_sp_intervals_extra,
-            self.sub_slot_iters,
-            self.signage_point_index as u32,
-            self.required_iters,
-        )
+        self.ip_iters_impl(num_sps_sub_slot, num_sp_intervals_extra)
+            .map_err(Into::into)
     }
 
     fn sp_total_iters_impl(&self, constants: &Bound<'_, PyAny>) -> PyResult<u128> {
         self.sp_sub_slot_total_iters_impl(constants)?
-            .checked_add(self.sp_iters_impl(constants)? as u128)
+            .checked_add(self.py_sp_iters_impl(constants)? as u128)
             .ok_or(PyValueError::new_err("uint128 overflow"))
     }
 
@@ -210,7 +181,7 @@ impl BlockRecord {
         py: Python<'a>,
         constants: &Bound<'_, PyAny>,
     ) -> PyResult<Bound<'a, PyAny>> {
-        ChiaToPython::to_python(&self.sp_iters_impl(constants)?, py)
+        ChiaToPython::to_python(&self.py_sp_iters_impl(constants)?, py)
     }
 
     fn ip_iters<'a>(
@@ -218,7 +189,7 @@ impl BlockRecord {
         py: Python<'a>,
         constants: &Bound<'_, PyAny>,
     ) -> PyResult<Bound<'a, PyAny>> {
-        ChiaToPython::to_python(&self.ip_iters_impl(constants)?, py)
+        ChiaToPython::to_python(&self.py_ip_iters_impl(constants)?, py)
     }
 
     fn sp_total_iters<'a>(
