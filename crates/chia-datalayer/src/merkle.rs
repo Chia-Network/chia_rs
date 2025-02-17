@@ -299,6 +299,12 @@ create_errors!(
             BlockIndexOutOfBoundsError,
             "block index out of bounds: {0}",
             (TreeIndex)
+        ),
+        (
+            Debug,
+            DebugError,
+            "Debug error: {1} -> {0:?}",
+            (InternalNode, TreeIndex)
         )
     )
 );
@@ -378,14 +384,33 @@ impl ProofOfInclusion {
             let calculated_hash =
                 calculate_internal_hash(&existing_hash, layer.other_hash_side, &layer.other_hash);
 
+            let ohs = layer.other_hash_side;
+            let oh = layer.other_hash;
+            println!(
+                "ProofOfInclusion.valid() {:?} {:?} {} {:?}",
+                calculated_hash.0,
+                existing_hash.0,
+                format!("{ohs:?}").to_uppercase(),
+                oh.0
+            );
+
             if calculated_hash != layer.combined_hash {
+                println!(
+                    "layer hash mismatch {} {}",
+                    calculated_hash.0, layer.combined_hash.0
+                );
                 return false;
             }
 
             existing_hash = calculated_hash;
         }
 
-        existing_hash == self.root_hash()
+        if existing_hash == self.root_hash() {
+            true
+        } else {
+            println!("root hash mismatch");
+            false
+        }
     }
 }
 
@@ -914,21 +939,29 @@ impl MerkleBlob {
 
         self.insert_entry_to_blob(old_parent_index, &old_parent_block)?;
 
+        println!(
+            ".insert_third_or_later() about to mark lineage dirty: {}",
+            old_parent_index.0
+        );
         self.mark_lineage_as_dirty(old_parent_index)?;
 
         Ok(new_leaf_index)
     }
 
-    pub fn batch_insert<I>(&mut self, mut keys_values_hashes: I) -> Result<(), Error>
-    where
-        I: Iterator<Item = ((KeyId, ValueId), Hash)>,
-    {
+    // pub fn batch_insert<I>(&mut self, mut keys_values_hashes: I) -> Result<(), Error>
+    // where
+    //     I: Iterator<Item = ((KeyId, ValueId), Hash)>,
+    // {
+    pub fn batch_insert(
+        &mut self,
+        mut keys_values_hashes: Vec<((KeyId, ValueId), Hash)>,
+    ) -> Result<(), Error> {
         // OPT: would it be worthwhile to hold the entire blocks?
         let mut indexes = vec![];
 
         if self.key_to_index.len() <= 1 {
             for _ in 0..2 {
-                let Some(((key, value), hash)) = keys_values_hashes.next() else {
+                let Some(((key, value), hash)) = keys_values_hashes.pop() else {
                     return Ok(());
                 };
                 self.insert(key, value, &hash, InsertLocation::Auto {})?;
@@ -1072,6 +1105,8 @@ impl MerkleBlob {
             panic!("not handling this case now...")
         }
         self.insert_entry_to_blob(old_leaf_parent, &parent)?;
+        println!(".insert_from_key() about to mark lineage dirty: {old_leaf_parent}");
+        self.mark_lineage_as_dirty(old_leaf_parent)?;
         self.update_parent(old_leaf_index, Some(new_internal_node_index))?;
 
         Ok(())
@@ -1106,6 +1141,7 @@ impl MerkleBlob {
 
         let Some(grandparent_index) = parent.parent.0 else {
             sibling_block.node.set_parent(Parent(None));
+            sibling_block.metadata.dirty = true;
             self.insert_entry_to_blob(TreeIndex(0), &sibling_block)?;
 
             if let Node::Internal(node) = sibling_block.node {
@@ -1138,6 +1174,10 @@ impl MerkleBlob {
         }
         self.insert_entry_to_blob(grandparent_index, &grandparent_block)?;
 
+        println!(
+            ".delete() about to mark lineage dirty: {}",
+            grandparent_index.0
+        );
         self.mark_lineage_as_dirty(grandparent_index)?;
 
         Ok(())
@@ -1156,6 +1196,7 @@ impl MerkleBlob {
         self.insert_entry_to_blob(leaf_index, &block)?;
 
         if let Some(parent) = block.node.parent().0 {
+            println!(".upsert() about to mark lineage dirty: {}", parent.0);
             self.mark_lineage_as_dirty(parent)?;
         };
 
@@ -1242,10 +1283,14 @@ impl MerkleBlob {
             let mut block = Block::from_bytes(self.get_block_bytes(this_index)?)?;
 
             if block.metadata.dirty {
-                return Ok(());
+                break;
             }
 
             block.metadata.dirty = true;
+            println!(
+                ".mark_lineage_as_dirty() marking as dirty: {}",
+                this_index.0
+            );
             self.insert_entry_to_blob(this_index, &block)?;
             next_index = block.node.parent().0;
         }
@@ -1437,6 +1482,10 @@ impl MerkleBlob {
             if !block.metadata.dirty {
                 continue;
             }
+            // yep this below avoids the issue
+            // if block.metadata.node_type == NodeType::Leaf {
+            //     continue;
+            // }
 
             let Node::Internal(ref leaf) = block.node else {
                 panic!("leaves should not be dirty")
@@ -1473,6 +1522,7 @@ impl MerkleBlob {
     }
 
     pub fn get_proof_of_inclusion(&self, key: KeyId) -> Result<ProofOfInclusion, Error> {
+        println!("==== entering .get_proof_of_inclusion(key_id=KeyId({key}))");
         let mut index = *self.key_to_index.get(&key).ok_or(Error::UnknownKey(key))?;
 
         // TODO: message
@@ -1480,13 +1530,19 @@ impl MerkleBlob {
 
         let parents = self.get_lineage_with_indexes(index)?;
         let mut layers: Vec<ProofOfInclusionLayer> = Vec::new();
-        let mut parents_iter = parents[1..].iter();
+        let mut parents_iter = parents.iter();
+        // first in the lineage is the index itself, second is the first parent
         parents_iter.next();
         for (next_index, parent) in parents_iter {
+            println!("==== .get_proof_of_inclusion() next_index={next_index:?} parent={parent:?}");
             // TODO: message
             let parent = parent.expect_internal("");
-            let sibling_index = parent.sibling_index(index)?;
-            let sibling = self.get_node(sibling_index)?;
+            let Ok(sibling_index) = parent.sibling_index(index) else {
+                return Err(Error::Debug(parent, index));
+            };
+            let sibling_block = self.get_block(sibling_index)?;
+            assert!(!sibling_block.metadata.dirty);
+            let sibling = sibling_block.node;
             let layer = ProofOfInclusionLayer {
                 other_hash_side: parent.get_sibling_side(index)?,
                 other_hash: sibling.hash(),
@@ -1677,7 +1733,7 @@ impl MerkleBlob {
             ));
         }
 
-        self.batch_insert(&mut zip(keys_values, hashes))?;
+        self.batch_insert(zip(keys_values, hashes).collect())?;
 
         Ok(())
     }
@@ -2418,7 +2474,7 @@ mod tests {
         }
 
         let before = blob.get_keys_values().unwrap();
-        blob.batch_insert(batch.into_iter()).unwrap();
+        blob.batch_insert(batch).unwrap();
         let after = blob.get_keys_values().unwrap();
 
         open_dot(
@@ -2719,5 +2775,107 @@ mod tests {
         assert_eq!(small_blob.blob.len(), expected_length);
         assert!(free_indexes.contains(&new_index));
         assert!(small_blob.free_indexes.is_empty());
+    }
+
+    fn generate_kvid(seed: i64) -> (KeyId, ValueId) {
+        let mut kv_ids: Vec<i64> = Vec::new();
+
+        for offset in 0..2 {
+            let seed_int = 2i64 * seed + offset;
+            let seed_bytes = seed_int.to_be_bytes();
+            let hash = sha256_bytes(&seed_bytes);
+            let hash_int = i64::from_be_bytes(hash.0[0..8].try_into().unwrap());
+            kv_ids.push(hash_int);
+        }
+
+        (KeyId(kv_ids[0]), ValueId(kv_ids[1]))
+    }
+
+    fn generate_hash(seed: i64) -> Hash {
+        let seed_bytes = seed.to_be_bytes();
+        sha256_bytes(&seed_bytes)
+    }
+
+    #[test]
+    fn test_stuff() {
+        use rand::rngs::StdRng;
+        use rand::seq::SliceRandom;
+        use rand::SeedableRng;
+
+        let num_repeats = 2; //10;
+        let mut seed = 0;
+
+        let mut random = StdRng::seed_from_u64(37);
+
+        let mut merkle_blob = MerkleBlob::new(Vec::new()).unwrap();
+        let mut keys_values: HashMap<KeyId, ValueId> = HashMap::new();
+
+        for repeats in 0..num_repeats {
+            let num_inserts = 1 + repeats * 100;
+            let num_deletes = 1 + repeats * 10;
+
+            let mut kv_ids: Vec<(KeyId, ValueId)> = Vec::new();
+            let mut hashes: Vec<Hash> = Vec::new();
+            for _ in 0..num_inserts {
+                seed += 1;
+                let (key, value) = generate_kvid(seed);
+                kv_ids.push((key, value));
+                hashes.push(generate_hash(seed));
+                keys_values.insert(key, value);
+            }
+
+            merkle_blob
+                .batch_insert(zip(kv_ids, hashes).collect())
+                .unwrap();
+            merkle_blob.calculate_lazy_hashes().unwrap();
+            for i in 0..(merkle_blob.blob.len() / BLOCK_SIZE) {
+                let node = merkle_blob.get_node(TreeIndex(i as u32)).unwrap();
+                println!("{i:05}: {node:?}");
+            }
+
+            for kv_id in keys_values.keys().copied() {
+                let proof_of_inclusion = match merkle_blob.get_proof_of_inclusion(kv_id) {
+                    Ok(proof_of_inclusion) => proof_of_inclusion,
+                    Err(error) => {
+                        open_dot(merkle_blob.to_dot().unwrap().set_note(&error.to_string()));
+                        panic!("here");
+                    }
+                };
+                assert!(proof_of_inclusion.valid());
+            }
+
+            let mut delete_ordering: Vec<KeyId> = keys_values.keys().copied().collect();
+            delete_ordering.shuffle(&mut random);
+            delete_ordering = delete_ordering[0..num_deletes].to_vec();
+            for kv_id in delete_ordering.iter().copied() {
+                merkle_blob.delete(kv_id).unwrap();
+                keys_values.remove(&kv_id);
+            }
+
+            for kv_id in delete_ordering {
+                // with pytest.raises(Exception, match = f"unknown key: {re.escape(str(kv_id))}"):
+                merkle_blob
+                    .get_proof_of_inclusion(kv_id)
+                    .expect_err("stuff");
+            }
+
+            let mut new_keys_values: HashMap<KeyId, ValueId> = HashMap::new();
+            for old_kv in keys_values.keys().copied() {
+                seed += 1;
+                let (_, value) = generate_kvid(seed);
+                let hash = generate_hash(seed);
+                merkle_blob.upsert(old_kv, value, &hash).unwrap();
+                new_keys_values.insert(old_kv, value);
+            }
+            if !merkle_blob.blob.is_empty() {
+                merkle_blob.calculate_lazy_hashes().unwrap();
+            }
+
+            keys_values = new_keys_values;
+            for kv_id in keys_values.keys().copied() {
+                let proof_of_inclusion = merkle_blob.get_proof_of_inclusion(kv_id).unwrap();
+                assert!(proof_of_inclusion.valid());
+            }
+        }
     }
 }

@@ -414,6 +414,7 @@ dependencies = [
  "open",
  "percent-encoding",
  "pyo3",
+ "rand",
  "rstest",
  "thiserror",
  "url",
