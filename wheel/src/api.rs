@@ -17,8 +17,8 @@ use chia_consensus::spendbundle_validation::{
     get_flags_for_height_and_constants, validate_clvm_and_signature,
 };
 use chia_protocol::{
-    py_expected_plot_size, py_calculate_ip_iters, py_calculate_sp_interval_iters,
-    py_calculate_sp_iters, py_is_overflow_block,
+    py_calculate_ip_iters, py_calculate_sp_interval_iters, py_calculate_sp_iters,
+    py_expected_plot_size, py_is_overflow_block,
 };
 use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
