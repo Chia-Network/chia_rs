@@ -239,7 +239,7 @@ pub enum Condition {
     SkipRelativeCondition,
 
     // assert sha256tree (SExp, 32 bytes)
-    AssertSha256Tree(NodePtr, NodePtr),
+    AssertSha256Tree(NodePtr, [u8; 32]),
 }
 
 fn check_agg_sig_unsafe_message(
@@ -594,7 +594,12 @@ pub fn parse_args(
             c = rest(a, c)?;
             maybe_check_args_terminator(a, c, flags)?;
             let id = sanitize_hash(a, first(a, c)?, 32, ErrorCode::InvalidHashValue)?;
-            Ok(Condition::AssertSha256Tree(sexp, id))
+            let hash: [u8; 32] = a
+                .atom(id)
+                .as_ref()
+                .try_into()
+                .expect("we already sanitised this");
+            Ok(Condition::AssertSha256Tree(sexp, hash))
         }
         _ => Err(ValidationErr(c, ErrorCode::InvalidConditionOpcode)),
     }
@@ -807,6 +812,9 @@ pub struct ParseState {
     // TODO: We would probably save heap allocations by turning this into a
     // blst_pairing object.
     pub pkm_pairs: Vec<(PublicKey, Bytes)>,
+
+    // shatree asserts
+    sha256tree_asserts: Vec<(NodePtr, [u8; 32])>,
 }
 
 // returns (parent-id, puzzle-hash, amount, condition-list)
@@ -1274,11 +1282,11 @@ pub fn parse_conditions<V: SpendVisitor>(
             }
             Condition::AssertSha256Tree(sexp, hash) => {
                 if flags & ENABLE_SHA256TREE_CONDITIONS != 0 {
-                    // for now we can validate this here
-                    // in the future we might want to store the jobs and validate them more efficiently
-                    if clvm_utils::tree_hash(a, sexp).to_bytes() != a.atom(hash).as_ref() {
-                        return Err(ValidationErr(c, ErrorCode::AssertSha256TreeFailed));
-                    }
+                    // the raison d'etre for this condition is to pay extra for guaranteed caching, to make it cheaper overall
+                    //     if clvm_utils::tree_hash(a, sexp).to_bytes() != a.atom(hash).as_ref() {
+                    //         return Err(ValidationErr(c, ErrorCode::AssertSha256TreeFailed));
+                    //     }
+                    state.sha256tree_asserts.push((sexp, hash));
                 }
             }
             Condition::Skip => {}
@@ -1480,6 +1488,13 @@ pub fn validate_conditions(
                 ret.spends[*spend_idx].parent_id,
                 ErrorCode::EphemeralRelativeCondition,
             ));
+        }
+    }
+
+    for (sexp, hash) in &state.sha256tree_asserts {
+        // TODO: add caching here
+        if clvm_utils::tree_hash(a, *sexp).to_bytes() != *hash {
+            return Err(ValidationErr(*sexp, ErrorCode::AssertSha256TreeFailed));
         }
     }
 
