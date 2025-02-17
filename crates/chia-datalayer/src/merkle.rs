@@ -299,12 +299,6 @@ create_errors!(
             BlockIndexOutOfBoundsError,
             "block index out of bounds: {0}",
             (TreeIndex)
-        ),
-        (
-            Debug,
-            DebugError,
-            "Debug error: {1} -> {0:?}",
-            (InternalNode, TreeIndex)
         )
     )
 );
@@ -384,33 +378,14 @@ impl ProofOfInclusion {
             let calculated_hash =
                 calculate_internal_hash(&existing_hash, layer.other_hash_side, &layer.other_hash);
 
-            let ohs = layer.other_hash_side;
-            let oh = layer.other_hash;
-            println!(
-                "ProofOfInclusion.valid() {:?} {:?} {} {:?}",
-                calculated_hash.0,
-                existing_hash.0,
-                format!("{ohs:?}").to_uppercase(),
-                oh.0
-            );
-
             if calculated_hash != layer.combined_hash {
-                println!(
-                    "layer hash mismatch {} {}",
-                    calculated_hash.0, layer.combined_hash.0
-                );
                 return false;
             }
 
             existing_hash = calculated_hash;
         }
 
-        if existing_hash == self.root_hash() {
-            true
-        } else {
-            println!("root hash mismatch");
-            false
-        }
+        existing_hash == self.root_hash()
     }
 }
 
@@ -939,23 +914,16 @@ impl MerkleBlob {
 
         self.insert_entry_to_blob(old_parent_index, &old_parent_block)?;
 
-        println!(
-            ".insert_third_or_later() about to mark lineage dirty: {}",
-            old_parent_index.0
-        );
         self.mark_lineage_as_dirty(old_parent_index)?;
 
         Ok(new_leaf_index)
     }
 
-    // pub fn batch_insert<I>(&mut self, mut keys_values_hashes: I) -> Result<(), Error>
-    // where
-    //     I: Iterator<Item = ((KeyId, ValueId), Hash)>,
-    // {
     pub fn batch_insert(
         &mut self,
         mut keys_values_hashes: Vec<((KeyId, ValueId), Hash)>,
     ) -> Result<(), Error> {
+        // OPT: perhaps go back to taking an iterator?
         // OPT: would it be worthwhile to hold the entire blocks?
         let mut indexes = vec![];
 
@@ -1105,7 +1073,6 @@ impl MerkleBlob {
             panic!("not handling this case now...")
         }
         self.insert_entry_to_blob(old_leaf_parent, &parent)?;
-        println!(".insert_from_key() about to mark lineage dirty: {old_leaf_parent}");
         self.mark_lineage_as_dirty(old_leaf_parent)?;
         self.update_parent(old_leaf_index, Some(new_internal_node_index))?;
 
@@ -1174,10 +1141,6 @@ impl MerkleBlob {
         }
         self.insert_entry_to_blob(grandparent_index, &grandparent_block)?;
 
-        println!(
-            ".delete() about to mark lineage dirty: {}",
-            grandparent_index.0
-        );
         self.mark_lineage_as_dirty(grandparent_index)?;
 
         Ok(())
@@ -1196,7 +1159,6 @@ impl MerkleBlob {
         self.insert_entry_to_blob(leaf_index, &block)?;
 
         if let Some(parent) = block.node.parent().0 {
-            println!(".upsert() about to mark lineage dirty: {}", parent.0);
             self.mark_lineage_as_dirty(parent)?;
         };
 
@@ -1287,10 +1249,6 @@ impl MerkleBlob {
             }
 
             block.metadata.dirty = true;
-            println!(
-                ".mark_lineage_as_dirty() marking as dirty: {}",
-                this_index.0
-            );
             self.insert_entry_to_blob(this_index, &block)?;
             next_index = block.node.parent().0;
         }
@@ -1482,10 +1440,6 @@ impl MerkleBlob {
             if !block.metadata.dirty {
                 continue;
             }
-            // yep this below avoids the issue
-            // if block.metadata.node_type == NodeType::Leaf {
-            //     continue;
-            // }
 
             let Node::Internal(ref leaf) = block.node else {
                 panic!("leaves should not be dirty")
@@ -1522,7 +1476,6 @@ impl MerkleBlob {
     }
 
     pub fn get_proof_of_inclusion(&self, key: KeyId) -> Result<ProofOfInclusion, Error> {
-        println!("==== entering .get_proof_of_inclusion(key_id=KeyId({key}))");
         let mut index = *self.key_to_index.get(&key).ok_or(Error::UnknownKey(key))?;
 
         // TODO: message
@@ -1534,12 +1487,9 @@ impl MerkleBlob {
         // first in the lineage is the index itself, second is the first parent
         parents_iter.next();
         for (next_index, parent) in parents_iter {
-            println!("==== .get_proof_of_inclusion() next_index={next_index:?} parent={parent:?}");
             // TODO: message
             let parent = parent.expect_internal("");
-            let Ok(sibling_index) = parent.sibling_index(index) else {
-                return Err(Error::Debug(parent, index));
-            };
+            let sibling_index = parent.sibling_index(index)?;
             let sibling_block = self.get_block(sibling_index)?;
             assert!(!sibling_block.metadata.dirty);
             let sibling = sibling_block.node;

@@ -127,10 +127,8 @@ pub fn open_dot(lines: &mut DotLines) {
     let mut url = Url::parse("http://edotor.net").unwrap();
     // https://edotor.net/?engine=dot#graph%20%7B%7D%0A -> graph {}
     url.query_pairs_mut().append_pair("engine", "dot");
-    let dumped = lines.dump();
-    print!("{dumped}");
     url.set_fragment(Some(
-        &utf8_percent_encode(&dumped, NON_ALPHANUMERIC).to_string(),
+        &utf8_percent_encode(&lines.dump(), NON_ALPHANUMERIC).to_string(),
     ));
     open::that(url.as_str()).unwrap();
 }
