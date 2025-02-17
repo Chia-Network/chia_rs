@@ -1913,6 +1913,9 @@ mod tests {
     use super::*;
     use crate::merkle::dot::DotLines;
     use expect_test::{expect, Expect};
+    use rand::rngs::StdRng;
+    use rand::seq::SliceRandom;
+    use rand::SeedableRng;
     use rstest::{fixture, rstest};
     use std::time::{Duration, Instant};
 
@@ -2746,11 +2749,7 @@ mod tests {
     }
 
     #[test]
-    fn test_stuff() {
-        use rand::rngs::StdRng;
-        use rand::seq::SliceRandom;
-        use rand::SeedableRng;
-
+    fn test_proof_of_inclusion() {
         let num_repeats = 2; //10;
         let mut seed = 0;
 
