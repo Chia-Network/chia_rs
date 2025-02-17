@@ -1108,15 +1108,14 @@ impl MerkleBlob {
 
         let Some(grandparent_index) = parent.parent.0 else {
             sibling_block.node.set_parent(Parent(None));
-            sibling_block.metadata.dirty = true;
-            self.insert_entry_to_blob(TreeIndex(0), &sibling_block)?;
-
             if let Node::Internal(node) = sibling_block.node {
+                sibling_block.metadata.dirty = true;
                 for child_index in [node.left, node.right] {
                     self.update_parent(child_index, Some(TreeIndex(0)))?;
                 }
             };
 
+            self.insert_entry_to_blob(TreeIndex(0), &sibling_block)?;
             self.free_indexes.insert(sibling_index);
 
             return Ok(());
