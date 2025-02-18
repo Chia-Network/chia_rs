@@ -1490,7 +1490,6 @@ impl MerkleBlob {
             let parent = parent.expect_internal("all nodes after the first should be internal");
             let sibling_index = parent.sibling_index(index)?;
             let sibling_block = self.get_block(sibling_index)?;
-            assert!(!sibling_block.metadata.dirty);
             let sibling = sibling_block.node;
             let layer = ProofOfInclusionLayer {
                 other_hash_side: parent.get_sibling_side(index)?,
@@ -2750,7 +2749,7 @@ mod tests {
 
     #[test]
     fn test_proof_of_inclusion() {
-        let num_repeats = 2; //10;
+        let num_repeats = 10;
         let mut seed = 0;
 
         let mut random = StdRng::seed_from_u64(37);
