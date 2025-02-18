@@ -13,9 +13,7 @@ mod fullblock;
 mod header_block;
 mod peer_info;
 mod pool_target;
-#[cfg(feature = "py-bindings")]
 mod pos_quality;
-#[cfg(feature = "py-bindings")]
 mod pot_iterations;
 mod program;
 mod proof_of_space;

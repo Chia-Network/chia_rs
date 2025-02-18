@@ -1,5 +1,4 @@
-#[cfg(feature = "py-bindings")]
-use crate::pot_iterations::{calculate_ip_iters, calculate_sp_iters};
+use crate::{calculate_ip_iters, calculate_sp_iters};
 use crate::{Bytes32, ClassgroupElement, Coin, SubEpochSummary};
 use chia_streamable_macro::streamable;
 use chia_traits::chia_error::Result;
