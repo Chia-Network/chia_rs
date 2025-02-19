@@ -1305,30 +1305,34 @@ impl MerkleBlob {
         }
 
         // TODO: zero means left here but right below?
-        let side = if (seed_bytes.last().ok_or(Error::ZeroLengthSeedNotAllowed())? & 1 << 7) == 0 {
+        let final_side = if (seed_bytes
+            .first()
+            .ok_or(Error::ZeroLengthSeedNotAllowed())?
+            & 1 << 7)
+            == 0
+        {
             Side::Left
         } else {
             Side::Right
         };
+
         let mut next_index = TreeIndex(0);
         let mut node = self.get_node(next_index)?;
 
+        seed_bytes.reverse();
         loop {
             for byte in &seed_bytes {
-                for bit in 0..8 {
+                for bit_index in 0..8 {
                     match node {
                         Node::Leaf { .. } => {
                             return Ok(InsertLocation::Leaf {
                                 index: next_index,
-                                side,
+                                side: final_side,
                             })
                         }
                         Node::Internal(internal) => {
-                            next_index = if byte & (1 << bit) != 0 {
-                                internal.left
-                            } else {
-                                internal.right
-                            };
+                            let bit = byte & (1 << bit_index) != 0;
+                            next_index = if bit { internal.right } else { internal.left };
                             node = self.get_node(next_index)?;
                         }
                     }
@@ -2113,8 +2117,8 @@ mod tests {
     }
 
     #[rstest]
-    #[case::right(0, TreeIndex(2), Side::Left)]
-    #[case::left(0xff, TreeIndex(1), Side::Right)]
+    #[case::right(0, TreeIndex(1), Side::Left)]
+    #[case::left(0xff, TreeIndex(2), Side::Right)]
     fn test_get_random_insert_location_by_seed(
         #[case] seed: u8,
         #[case] expected_index: TreeIndex,
@@ -2340,7 +2344,7 @@ mod tests {
 
         assert_eq!(
             small_blob.free_indexes,
-            HashSet::from([index, TreeIndex(2)])
+            HashSet::from([index, TreeIndex(1)])
         );
     }
 
@@ -2551,10 +2555,10 @@ mod tests {
                 (
                     1,
                     Leaf,
-                    283686952306183,
-                    1157726452361532951,
+                    2315169217770759719,
+                    3472611983179986487,
                     Hash(
-                        d8ddfc94e7201527a6a93ee04aed8c5c122ac38af6dbf6e5f1caefba2597230d,
+                        0f980325ebe9426fa295f3f69cc38ef8fe6ce8f3b9f083556c0f927e67e56651,
                     ),
                 ),
                 (
@@ -2590,16 +2594,16 @@ mod tests {
                     1,
                     6,
                     Hash(
-                        eee0c40977ba1c0e16a467f30f64d9c2579ff25dd01913e33962c3f1db86c2ea,
+                        326ab98d7766e8a48e3ad28d1667cff22d294f741ce4bbc386a761658ae1c36d,
                     ),
                 ),
                 (
                     2,
                     Leaf,
-                    2315169217770759719,
-                    3472611983179986487,
+                    283686952306183,
+                    1157726452361532951,
                     Hash(
-                        0f980325ebe9426fa295f3f69cc38ef8fe6ce8f3b9f083556c0f927e67e56651,
+                        d8ddfc94e7201527a6a93ee04aed8c5c122ac38af6dbf6e5f1caefba2597230d,
                     ),
                 ),
                 (
@@ -2608,7 +2612,7 @@ mod tests {
                     4,
                     2,
                     Hash(
-                        0e4a8b1ecee43f457bbe2b30e94ac2afc0d3a6536f891a2ced5e96ce07fe9932,
+                        343384ed794d339da6c1ff33cc59d48b5f48494d92d9d4bd6c00147304bb2371,
                     ),
                 ),
             ]
@@ -2627,7 +2631,7 @@ mod tests {
                     4,
                     2,
                     Hash(
-                        0e4a8b1ecee43f457bbe2b30e94ac2afc0d3a6536f891a2ced5e96ce07fe9932,
+                        343384ed794d339da6c1ff33cc59d48b5f48494d92d9d4bd6c00147304bb2371,
                     ),
                 ),
                 (
@@ -2636,25 +2640,25 @@ mod tests {
                     1,
                     6,
                     Hash(
-                        eee0c40977ba1c0e16a467f30f64d9c2579ff25dd01913e33962c3f1db86c2ea,
+                        326ab98d7766e8a48e3ad28d1667cff22d294f741ce4bbc386a761658ae1c36d,
                     ),
                 ),
                 (
                     2,
                     Leaf,
-                    2315169217770759719,
-                    3472611983179986487,
+                    283686952306183,
+                    1157726452361532951,
                     Hash(
-                        0f980325ebe9426fa295f3f69cc38ef8fe6ce8f3b9f083556c0f927e67e56651,
+                        d8ddfc94e7201527a6a93ee04aed8c5c122ac38af6dbf6e5f1caefba2597230d,
                     ),
                 ),
                 (
                     1,
                     Leaf,
-                    283686952306183,
-                    1157726452361532951,
+                    2315169217770759719,
+                    3472611983179986487,
                     Hash(
-                        d8ddfc94e7201527a6a93ee04aed8c5c122ac38af6dbf6e5f1caefba2597230d,
+                        0f980325ebe9426fa295f3f69cc38ef8fe6ce8f3b9f083556c0f927e67e56651,
                     ),
                 ),
                 (
@@ -2696,19 +2700,19 @@ mod tests {
                 (
                     2,
                     Leaf,
-                    2315169217770759719,
-                    3472611983179986487,
+                    283686952306183,
+                    1157726452361532951,
                     Hash(
-                        0f980325ebe9426fa295f3f69cc38ef8fe6ce8f3b9f083556c0f927e67e56651,
+                        d8ddfc94e7201527a6a93ee04aed8c5c122ac38af6dbf6e5f1caefba2597230d,
                     ),
                 ),
                 (
                     1,
                     Leaf,
-                    283686952306183,
-                    1157726452361532951,
+                    2315169217770759719,
+                    3472611983179986487,
                     Hash(
-                        d8ddfc94e7201527a6a93ee04aed8c5c122ac38af6dbf6e5f1caefba2597230d,
+                        0f980325ebe9426fa295f3f69cc38ef8fe6ce8f3b9f083556c0f927e67e56651,
                     ),
                 ),
                 (
