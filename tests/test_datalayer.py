@@ -38,10 +38,10 @@ def test_just_insert_a_bunch() -> None:
     for i in range(100_000):
         start = time.monotonic()
         merkle_blob.insert(KeyId(int64(i)), ValueId(int64(i)), HASH)
-        if i == 4:
-            print(merkle_blob.blob.hex())
         end = time.monotonic()
         total_time += end - start
+        if i == 4:
+            print(merkle_blob.blob.hex())
 
 
 # TODO: make this a real test
