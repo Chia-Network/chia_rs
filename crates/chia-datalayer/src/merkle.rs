@@ -299,6 +299,12 @@ create_errors!(
             BlockIndexOutOfBoundsError,
             "block index out of bounds: {0}",
             (TreeIndex)
+        ),
+        (
+            LeafHashNotFound,
+            LeafHashNotFoundError,
+            "leaf hash not found: {0:?}",
+            (Hash)
         )
     )
 );
@@ -641,20 +647,31 @@ impl Block {
     }
 }
 
+// TODO: take the encouragement to clean up and make clippy happy again
+#[allow(clippy::type_complexity)]
 fn get_free_indexes_and_keys_values_indexes(
     blob: &Vec<u8>,
-) -> Result<(HashSet<TreeIndex>, HashMap<KeyId, TreeIndex>), Error> {
+) -> Result<
+    (
+        HashSet<TreeIndex>,
+        HashMap<KeyId, TreeIndex>,
+        HashMap<Hash, TreeIndex>,
+    ),
+    Error,
+> {
     let index_count = blob.len() / BLOCK_SIZE;
 
     let mut seen_indexes: Vec<bool> = vec![false; index_count];
     let mut key_to_index: HashMap<KeyId, TreeIndex> = HashMap::default();
+    let mut leaf_hash_to_index: HashMap<Hash, TreeIndex> = HashMap::default();
 
-    for item in MerkleBlobLeftChildFirstIterator::new(blob) {
+    for item in MerkleBlobLeftChildFirstIterator::new(blob, None) {
         let (index, block) = item?;
         seen_indexes[index.0 as usize] = true;
 
         if let Node::Leaf(leaf) = block.node {
             key_to_index.insert(leaf.key, index);
+            leaf_hash_to_index.insert(leaf.hash, index);
         }
     }
 
@@ -665,7 +682,7 @@ fn get_free_indexes_and_keys_values_indexes(
         }
     }
 
-    Ok((free_indexes, key_to_index))
+    Ok((free_indexes, key_to_index, leaf_hash_to_index))
 }
 
 /// Stores a DataLayer merkle tree in bytes and provides serialization on each access so that only
@@ -682,6 +699,7 @@ pub struct MerkleBlob {
     // TODO: would be nice for this to be deterministic ala a fifo set
     free_indexes: HashSet<TreeIndex>,
     key_to_index: HashMap<KeyId, TreeIndex>,
+    leaf_hash_to_index: HashMap<Hash, TreeIndex>,
     // TODO: used by fuzzing, some cleaner way?  making it cfg-dependent is annoying with
     //       the type stubs
     pub check_integrity_on_drop: bool,
@@ -696,12 +714,14 @@ impl MerkleBlob {
         }
 
         // TODO: maybe integrate integrity check here if quick enough
-        let (free_indexes, key_to_index) = get_free_indexes_and_keys_values_indexes(&blob)?;
+        let (free_indexes, key_to_index, leaf_hash_to_index) =
+            get_free_indexes_and_keys_values_indexes(&blob)?;
 
         let self_ = Self {
             blob,
             free_indexes,
             key_to_index,
+            leaf_hash_to_index,
             check_integrity_on_drop: true,
         };
 
@@ -712,6 +732,7 @@ impl MerkleBlob {
         self.blob.clear();
         self.key_to_index.clear();
         self.free_indexes.clear();
+        self.leaf_hash_to_index.clear();
     }
 
     pub fn insert(
@@ -1080,7 +1101,7 @@ impl MerkleBlob {
     }
 
     fn get_min_height_leaf(&self) -> Result<LeafNode, Error> {
-        let (_index, block) = MerkleBlobBreadthFirstIterator::new(&self.blob)
+        let (_index, block) = MerkleBlobBreadthFirstIterator::new(&self.blob, None)
             .next()
             .ok_or(Error::UnableToFindALeaf())??;
 
@@ -1169,7 +1190,7 @@ impl MerkleBlob {
         let mut internal_count: usize = 0;
         let mut child_to_parent: HashMap<TreeIndex, TreeIndex> = HashMap::new();
 
-        for item in MerkleBlobParentFirstIterator::new(&self.blob) {
+        for item in MerkleBlobParentFirstIterator::new(&self.blob, None) {
             let (index, block) = item?;
             if let Some(parent) = block.node.parent().0 {
                 if child_to_parent.remove(&index) != Some(parent) {
@@ -1433,7 +1454,7 @@ impl MerkleBlob {
 
     pub fn calculate_lazy_hashes(&mut self) -> Result<(), Error> {
         // OPT: yeah, storing the whole set of blocks via collect is not great
-        for item in MerkleBlobLeftChildFirstIterator::new(&self.blob).collect::<Vec<_>>() {
+        for item in MerkleBlobLeftChildFirstIterator::new(&self.blob, None).collect::<Vec<_>>() {
             let (index, mut block) = item?;
             // OPT: really want a pruned traversal, not filter
             if !block.metadata.dirty {
@@ -1505,14 +1526,46 @@ impl MerkleBlob {
             layers,
         })
     }
+
+    fn get_node_by_hash(&self, node_hash: Hash) -> Result<(KeyId, ValueId), Error> {
+        let Some(index) = self.leaf_hash_to_index.get(&node_hash) else {
+            return Err(Error::LeafHashNotFound(node_hash));
+        };
+
+        let node = self
+            .get_node(*index)?
+            .expect_leaf("should only have leaves in the leaf hash to index cache");
+
+        Ok((node.key, node.value))
+    }
+
+    fn get_hashes_indexes(&self, leafs_only: bool) -> Result<HashMap<Hash, TreeIndex>, Error> {
+        let mut hash_to_index = HashMap::new();
+
+        if self.blob.is_empty() {
+            return Ok(hash_to_index);
+        }
+
+        for item in MerkleBlobParentFirstIterator::new(&self.blob, None) {
+            let (index, block) = item?;
+
+            if leafs_only && block.metadata.node_type != NodeType::Leaf {
+                continue;
+            }
+
+            hash_to_index.insert(block.node.hash(), index);
+        }
+
+        Ok(hash_to_index)
+    }
 }
 
 impl PartialEq for MerkleBlob {
     fn eq(&self, other: &Self) -> bool {
         // NOTE: this is checking tree structure equality, not serialized bytes equality
         for item in zip(
-            MerkleBlobLeftChildFirstIterator::new(&self.blob),
-            MerkleBlobLeftChildFirstIterator::new(&other.blob),
+            MerkleBlobLeftChildFirstIterator::new(&self.blob, None),
+            MerkleBlobLeftChildFirstIterator::new(&other.blob, None),
         ) {
             let (Ok((_, self_block)), Ok((_, other_block))) = item else {
                 // TODO: it's an error though, hmm
@@ -1631,11 +1684,15 @@ impl MerkleBlob {
         Ok(list.into())
     }
 
-    #[pyo3(name = "get_nodes_with_indexes")]
-    pub fn py_get_nodes_with_indexes(&self, py: Python<'_>) -> PyResult<pyo3::PyObject> {
+    #[pyo3(name = "get_nodes_with_indexes", signature = (index=None))]
+    pub fn py_get_nodes_with_indexes(
+        &self,
+        index: Option<TreeIndex>,
+        py: Python<'_>,
+    ) -> PyResult<pyo3::PyObject> {
         let list = pyo3::types::PyList::empty(py);
 
-        for item in MerkleBlobParentFirstIterator::new(&self.blob) {
+        for item in MerkleBlobParentFirstIterator::new(&self.blob, index) {
             let (index, block) = item?;
             list.append((index.into_pyobject(py)?, block.node.into_pyobject(py)?))?;
         }
@@ -1711,6 +1768,27 @@ impl MerkleBlob {
     pub fn py_get_proof_of_inclusion(&self, key: KeyId) -> PyResult<ProofOfInclusion> {
         Ok(self.get_proof_of_inclusion(key)?)
     }
+
+    #[pyo3(name = "get_node_by_hash")]
+    pub fn py_get_node_by_hash(&self, node_hash: Hash) -> PyResult<(KeyId, ValueId)> {
+        Ok(self.get_node_by_hash(node_hash)?)
+    }
+
+    #[pyo3(name = "get_hashes_indexes", signature = (leafs_only=false))]
+    pub fn py_get_hashes_indexes(&self, leafs_only: bool) -> PyResult<HashMap<Hash, TreeIndex>> {
+        Ok(self.get_hashes_indexes(leafs_only)?)
+    }
+
+    #[pyo3(name = "get_random_leaf_node")]
+    pub fn py_get_random_leaf_node(&self, seed: &[u8]) -> PyResult<LeafNode> {
+        let insert_location = self.get_random_insert_location_by_seed(seed)?;
+        let InsertLocation::Leaf { index, side: _ } = insert_location else {
+            // TODO: real error
+            return Err(PyValueError::new_err(""));
+        };
+
+        Ok(self.get_node(index)?.expect_leaf("matched leaf above"))
+    }
 }
 
 fn try_get_block(blob: &[u8], index: TreeIndex) -> Result<Block, Error> {
@@ -1737,12 +1815,16 @@ pub struct MerkleBlobLeftChildFirstIterator<'a> {
 }
 
 impl<'a> MerkleBlobLeftChildFirstIterator<'a> {
-    fn new(blob: &'a Vec<u8>) -> Self {
+    fn new(blob: &'a Vec<u8>, from_index: Option<TreeIndex>) -> Self {
         let mut deque = VecDeque::new();
+        let from_index = match from_index {
+            Some(index) => index,
+            None => TreeIndex(0),
+        };
         if blob.len() / BLOCK_SIZE > 0 {
             deque.push_back(MerkleBlobLeftChildFirstIteratorItem {
                 visited: false,
-                index: TreeIndex(0),
+                index: from_index,
             });
         }
 
@@ -1804,10 +1886,14 @@ pub struct MerkleBlobParentFirstIterator<'a> {
 }
 
 impl<'a> MerkleBlobParentFirstIterator<'a> {
-    fn new(blob: &'a Vec<u8>) -> Self {
+    fn new(blob: &'a Vec<u8>, from_index: Option<TreeIndex>) -> Self {
         let mut deque = VecDeque::new();
+        let from_index = match from_index {
+            Some(index) => index,
+            None => TreeIndex(0),
+        };
         if blob.len() / BLOCK_SIZE > 0 {
-            deque.push_back(TreeIndex(0));
+            deque.push_back(from_index);
         }
 
         Self {
@@ -1852,10 +1938,14 @@ pub struct MerkleBlobBreadthFirstIterator<'a> {
 
 impl<'a> MerkleBlobBreadthFirstIterator<'a> {
     #[allow(unused)]
-    fn new(blob: &'a Vec<u8>) -> Self {
+    fn new(blob: &'a Vec<u8>, from_index: Option<TreeIndex>) -> Self {
         let mut deque = VecDeque::new();
+        let from_index = match from_index {
+            Some(index) => index,
+            None => TreeIndex(0),
+        };
         if blob.len() / BLOCK_SIZE > 0 {
-            deque.push_back(TreeIndex(0));
+            deque.push_back(from_index);
         }
 
         Self {
@@ -2307,7 +2397,7 @@ mod tests {
         let mut blob = small_blob.blob.clone();
         let expected_free_index = TreeIndex((blob.len() / BLOCK_SIZE) as u32);
         blob.extend_from_slice(&[0; BLOCK_SIZE]);
-        let (free_indexes, _) = get_free_indexes_and_keys_values_indexes(&blob).unwrap();
+        let (free_indexes, _, _) = get_free_indexes_and_keys_values_indexes(&blob).unwrap();
         assert_eq!(free_indexes, HashSet::from([expected_free_index]));
     }
 
@@ -2338,7 +2428,7 @@ mod tests {
     #[rstest]
     fn test_upsert_upserts(mut small_blob: MerkleBlob) {
         let before_blocks =
-            MerkleBlobLeftChildFirstIterator::new(&small_blob.blob).collect::<Vec<_>>();
+            MerkleBlobLeftChildFirstIterator::new(&small_blob.blob, None).collect::<Vec<_>>();
         let (key, index) = small_blob.key_to_index.iter().next().unwrap();
         let original = small_blob.get_node(*index).unwrap().expect_leaf("<<self>>");
         let new_value = ValueId(original.value.0 + 1);
@@ -2346,7 +2436,7 @@ mod tests {
         small_blob.upsert(*key, new_value, &original.hash).unwrap();
 
         let after_blocks =
-            MerkleBlobLeftChildFirstIterator::new(&small_blob.blob).collect::<Vec<_>>();
+            MerkleBlobLeftChildFirstIterator::new(&small_blob.blob, None).collect::<Vec<_>>();
 
         assert_eq!(before_blocks.len(), after_blocks.len());
         for item in zip(before_blocks, after_blocks) {
@@ -2656,7 +2746,7 @@ mod tests {
         #[case] expected: Expect,
         #[by_ref] traversal_blob: &'a MerkleBlob,
     ) where
-        F: Fn(&'a Vec<u8>) -> T,
+        F: Fn(&'a Vec<u8>, Option<TreeIndex>) -> T,
         T: Iterator<Item = Result<(TreeIndex, Block), Error>>,
     {
         let mut dot_actual = traversal_blob.to_dot().unwrap();
@@ -2665,7 +2755,7 @@ mod tests {
         let mut actual = vec![];
         {
             let blob: &Vec<u8> = &traversal_blob.blob;
-            for item in iterator_new(blob) {
+            for item in iterator_new(blob, None) {
                 let (index, block) = item.unwrap();
                 actual.push(iterator_test_reference(index, &block));
                 dot_actual.push_traversal(index);
