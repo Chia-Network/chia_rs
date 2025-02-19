@@ -1284,30 +1284,34 @@ impl MerkleBlob {
         }
 
         // TODO: zero means left here but right below?
-        let side = if (seed_bytes.last().ok_or(Error::ZeroLengthSeedNotAllowed())? & 1 << 7) == 0 {
+        let final_side = if (seed_bytes
+            .first()
+            .ok_or(Error::ZeroLengthSeedNotAllowed())?
+            & 1 << 7)
+            == 0
+        {
             Side::Left
         } else {
             Side::Right
         };
+
         let mut next_index = TreeIndex(0);
         let mut node = self.get_node(next_index)?;
 
+        seed_bytes.reverse();
         loop {
             for byte in &seed_bytes {
-                for bit in 0..8 {
+                for bit_index in 0..8 {
                     match node {
                         Node::Leaf { .. } => {
                             return Ok(InsertLocation::Leaf {
                                 index: next_index,
-                                side,
+                                side: final_side,
                             })
                         }
                         Node::Internal(internal) => {
-                            next_index = if byte & (1 << bit) != 0 {
-                                internal.left
-                            } else {
-                                internal.right
-                            };
+                            let bit = byte & (1 << bit_index) != 0;
+                            next_index = if !bit { internal.left } else { internal.right };
                             node = self.get_node(next_index)?;
                         }
                     }
