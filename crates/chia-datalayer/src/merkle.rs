@@ -466,8 +466,8 @@ pub struct NodeMetadata {
 )]
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Streamable)]
 pub struct InternalNode {
-    pub parent: Parent,
     pub hash: Hash,
+    pub parent: Parent,
     pub left: TreeIndex,
     pub right: TreeIndex,
 }
@@ -501,8 +501,8 @@ impl InternalNode {
 )]
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Streamable)]
 pub struct LeafNode {
-    pub parent: Parent,
     pub hash: Hash,
+    pub parent: Parent,
     pub key: KeyId,
     pub value: ValueId,
 }
