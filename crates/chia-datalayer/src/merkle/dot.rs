@@ -112,7 +112,7 @@ impl Node {
 impl MerkleBlob {
     pub fn to_dot(&self) -> Result<DotLines, Error> {
         let mut result = DotLines::new();
-        for item in MerkleBlobLeftChildFirstIterator::new(&self.blob) {
+        for item in MerkleBlobLeftChildFirstIterator::new(&self.blob, None) {
             let (index, block) = item?;
             result.push(block.node.to_dot(index));
         }
