@@ -10,14 +10,14 @@ pub fn is_overflow_block(
     signage_point_index: u32,
 ) -> Result<bool> {
     if signage_point_index >= num_sps_sub_slot {
-        return Err(Error::Custom("SP index too high".to_string()));
+        return Err(Error::InvalidPotIteration);
     }
     Ok(signage_point_index >= num_sps_sub_slot - num_sp_intervals_extra as u32)
 }
 
 pub fn calculate_sp_interval_iters(num_sps_sub_slot: u32, sub_slot_iters: u64) -> Result<u64> {
     if sub_slot_iters % num_sps_sub_slot as u64 != 0 {
-        return Err(Error::Custom("ssi % num_sps_sub_slot != 0".to_string()));
+        return Err(Error::InvalidPotIteration);
     }
     Ok(sub_slot_iters / num_sps_sub_slot as u64)
 }
@@ -28,7 +28,7 @@ pub fn calculate_sp_iters(
     signage_point_index: u32,
 ) -> Result<u64> {
     if signage_point_index >= num_sps_sub_slot {
-        return Err(Error::Custom("SP index too high".to_string()));
+        return Err(Error::InvalidPotIteration);
     }
     Ok(calculate_sp_interval_iters(num_sps_sub_slot, sub_slot_iters)? * signage_point_index as u64)
 }
@@ -43,13 +43,9 @@ pub fn calculate_ip_iters(
     let sp_interval_iters = calculate_sp_interval_iters(num_sps_sub_slot, sub_slot_iters)?;
     let sp_iters = calculate_sp_iters(num_sps_sub_slot, sub_slot_iters, signage_point_index)?;
     if sp_iters % sp_interval_iters != 0 || sp_iters > sub_slot_iters {
-        return Err(Error::Custom(format!(
-            "Invalid sp iters {sp_iters} for this ssi {sub_slot_iters}"
-        )));
+        return Err(Error::InvalidPotIteration);
     } else if required_iters >= sp_interval_iters || required_iters == 0 {
-        return Err(Error::Custom(
-            format!("Required iters {required_iters} is not below the sp interval iters {sp_interval_iters} {sub_slot_iters} or not >=0")
-        ));
+        return Err(Error::InvalidPotIteration);
     }
     Ok(
         (sp_iters + num_sp_intervals_extra as u64 * sp_interval_iters + required_iters)
@@ -65,12 +61,11 @@ pub fn py_is_overflow_block(
     num_sp_intervals_extra: u8,
     signage_point_index: u32,
 ) -> pyo3::PyResult<bool> {
-    is_overflow_block(
+    Ok(is_overflow_block(
         num_sps_sub_slot,
         num_sp_intervals_extra,
         signage_point_index,
-    )
-    .map_err(Into::into)
+    )?)
 }
 
 #[cfg(feature = "py-bindings")]
@@ -80,7 +75,10 @@ pub fn py_calculate_sp_interval_iters(
     num_sps_sub_slot: u32,
     sub_slot_iters: u64,
 ) -> pyo3::PyResult<u64> {
-    calculate_sp_interval_iters(num_sps_sub_slot, sub_slot_iters).map_err(Into::into)
+    Ok(calculate_sp_interval_iters(
+        num_sps_sub_slot,
+        sub_slot_iters,
+    )?)
 }
 
 #[cfg(feature = "py-bindings")]
@@ -91,7 +89,11 @@ pub fn py_calculate_sp_iters(
     sub_slot_iters: u64,
     signage_point_index: u32,
 ) -> pyo3::PyResult<u64> {
-    calculate_sp_iters(num_sps_sub_slot, sub_slot_iters, signage_point_index).map_err(Into::into)
+    Ok(calculate_sp_iters(
+        num_sps_sub_slot,
+        sub_slot_iters,
+        signage_point_index,
+    )?)
 }
 
 #[cfg(feature = "py-bindings")]
@@ -104,14 +106,13 @@ pub fn py_calculate_ip_iters(
     signage_point_index: u32,
     required_iters: u64,
 ) -> pyo3::PyResult<u64> {
-    calculate_ip_iters(
+    Ok(calculate_ip_iters(
         num_sps_sub_slot,
         num_sp_intervals_extra,
         sub_slot_iters,
         signage_point_index,
         required_iters,
-    )
-    .map_err(Into::into)
+    )?)
 }
 
 #[cfg(test)]
