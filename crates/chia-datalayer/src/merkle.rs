@@ -1527,8 +1527,7 @@ impl MerkleBlob {
         })
     }
 
-    #[allow(unused)]
-    fn get_node_by_hash(&self, node_hash: Hash) -> Result<(KeyId, ValueId), Error> {
+    pub fn get_node_by_hash(&self, node_hash: Hash) -> Result<(KeyId, ValueId), Error> {
         let Some(index) = self.leaf_hash_to_index.get(&node_hash) else {
             return Err(Error::LeafHashNotFound(node_hash));
         };
@@ -1540,8 +1539,7 @@ impl MerkleBlob {
         Ok((node.key, node.value))
     }
 
-    #[allow(unused)]
-    fn get_hashes_indexes(&self, leafs_only: bool) -> Result<HashMap<Hash, TreeIndex>, Error> {
+    pub fn get_hashes_indexes(&self, leafs_only: bool) -> Result<HashMap<Hash, TreeIndex>, Error> {
         let mut hash_to_index = HashMap::new();
 
         if self.blob.is_empty() {
