@@ -165,7 +165,7 @@ macro_rules! create_errors {
             use super::*;
 
             $(
-                pyo3::create_exception!(chia_rs.chia_rs.datalayer, $python_name, pyo3::exceptions::PyException);
+                pyo3::create_exception!(chia_rs.datalayer, $python_name, pyo3::exceptions::PyException);
             )*
 
             pub fn add_to_module(py: Python<'_>, module: &Bound<'_, PyModule>) -> PyResult<()> {
