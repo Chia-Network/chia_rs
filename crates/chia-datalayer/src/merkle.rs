@@ -1819,10 +1819,7 @@ pub struct MerkleBlobLeftChildFirstIterator<'a> {
 impl<'a> MerkleBlobLeftChildFirstIterator<'a> {
     fn new(blob: &'a Vec<u8>, from_index: Option<TreeIndex>) -> Self {
         let mut deque = VecDeque::new();
-        let from_index = match from_index {
-            Some(index) => index,
-            None => TreeIndex(0),
-        };
+        let from_index = from_index.unwrap_or(TreeIndex(0));
         if blob.len() / BLOCK_SIZE > 0 {
             deque.push_back(MerkleBlobLeftChildFirstIteratorItem {
                 visited: false,
@@ -1890,10 +1887,7 @@ pub struct MerkleBlobParentFirstIterator<'a> {
 impl<'a> MerkleBlobParentFirstIterator<'a> {
     fn new(blob: &'a Vec<u8>, from_index: Option<TreeIndex>) -> Self {
         let mut deque = VecDeque::new();
-        let from_index = match from_index {
-            Some(index) => index,
-            None => TreeIndex(0),
-        };
+        let from_index = from_index.unwrap_or(TreeIndex(0));
         if blob.len() / BLOCK_SIZE > 0 {
             deque.push_back(from_index);
         }
@@ -1942,10 +1936,7 @@ impl<'a> MerkleBlobBreadthFirstIterator<'a> {
     #[allow(unused)]
     fn new(blob: &'a Vec<u8>, from_index: Option<TreeIndex>) -> Self {
         let mut deque = VecDeque::new();
-        let from_index = match from_index {
-            Some(index) => index,
-            None => TreeIndex(0),
-        };
+        let from_index = from_index.unwrap_or(TreeIndex(0));
         if blob.len() / BLOCK_SIZE > 0 {
             deque.push_back(from_index);
         }
