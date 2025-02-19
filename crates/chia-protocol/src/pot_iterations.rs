@@ -42,9 +42,11 @@ pub fn calculate_ip_iters(
 ) -> Result<u64> {
     let sp_interval_iters = calculate_sp_interval_iters(num_sps_sub_slot, sub_slot_iters)?;
     let sp_iters = calculate_sp_iters(num_sps_sub_slot, sub_slot_iters, signage_point_index)?;
-    if sp_iters % sp_interval_iters != 0 || sp_iters > sub_slot_iters {
-        return Err(Error::InvalidPotIteration);
-    } else if required_iters >= sp_interval_iters || required_iters == 0 {
+    if sp_iters % sp_interval_iters != 0
+        || sp_iters > sub_slot_iters
+        || required_iters >= sp_interval_iters
+        || required_iters == 0
+    {
         return Err(Error::InvalidPotIteration);
     }
     Ok(
