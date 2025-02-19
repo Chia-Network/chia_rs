@@ -1311,7 +1311,7 @@ impl MerkleBlob {
                         }
                         Node::Internal(internal) => {
                             let bit = byte & (1 << bit_index) != 0;
-                            next_index = if !bit { internal.left } else { internal.right };
+                            next_index = if bit { internal.right } else { internal.left };
                             node = self.get_node(next_index)?;
                         }
                     }
