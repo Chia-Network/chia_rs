@@ -1609,7 +1609,7 @@ impl MerkleBlob {
                     index,
                     &Block {
                         metadata: NodeMetadata {
-                            node_type: NodeType::Leaf,
+                            node_type: NodeType::Internal,
                             dirty: false,
                         },
                         node: Node::Internal(InternalNode {
