@@ -1570,7 +1570,7 @@ impl MerkleBlob {
         Ok(hash_to_index)
     }
 
-    fn build_blob_from_node_list(
+    pub fn build_blob_from_node_list(
         &mut self,
         internal_nodes: &HashMap<Hash, (Hash, Hash)>,
         terminal_nodes: &HashMap<Hash, (KeyId, ValueId)>,
