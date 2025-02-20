@@ -340,29 +340,24 @@ pub enum NodeType {
     Leaf = 1,
 }
 
-#[cfg_attr(feature = "py-bindings", pyclass(get_all))]
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+#[cfg_attr(
+    feature = "py-bindings",
+    pyclass(get_all),
+    derive(PyJsonDict, PyStreamable)
+)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Streamable)]
 pub struct ProofOfInclusionLayer {
     pub other_hash_side: Side,
     pub other_hash: Hash,
     pub combined_hash: Hash,
 }
 
-#[cfg(feature = "py-bindings")]
-#[pymethods]
-impl ProofOfInclusionLayer {
-    #[new]
-    pub fn py_init(other_hash_side: Side, other_hash: Hash, combined_hash: Hash) -> PyResult<Self> {
-        Ok(Self {
-            other_hash_side,
-            other_hash,
-            combined_hash,
-        })
-    }
-}
-
-#[cfg_attr(feature = "py-bindings", pyclass(get_all))]
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+#[cfg_attr(
+    feature = "py-bindings",
+    pyclass(get_all),
+    derive(PyJsonDict, PyStreamable)
+)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Streamable)]
 pub struct ProofOfInclusion {
     pub node_hash: Hash,
     pub layers: Vec<ProofOfInclusionLayer>,
