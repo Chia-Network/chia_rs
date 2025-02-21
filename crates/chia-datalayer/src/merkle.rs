@@ -305,6 +305,18 @@ create_errors!(
             LeafHashNotFoundError,
             "leaf hash not found: {0:?}",
             (Hash)
+        ),
+        (
+            RootHashAndNodeListDisagreement,
+            RootHashAndNodeListDisagreementError,
+            "root hash and node list disagreement",
+            ()
+        ),
+        (
+            NodeHashNotInNodeMaps,
+            NodeHashNotInNodeMapsError,
+            "node hash not in nodes: {0:?}",
+            (Hash)
         )
     )
 );
@@ -1557,6 +1569,69 @@ impl MerkleBlob {
 
         Ok(hash_to_index)
     }
+
+    pub fn build_blob_from_node_list(
+        &mut self,
+        internal_nodes: &HashMap<Hash, (Hash, Hash)>,
+        terminal_nodes: &HashMap<Hash, (KeyId, ValueId)>,
+        node_hash: Hash,
+    ) -> Result<TreeIndex, Error> {
+        match (
+            internal_nodes.get(&node_hash),
+            terminal_nodes.get(&node_hash),
+        ) {
+            (None, None) => Err(Error::NodeHashNotInNodeMaps(node_hash)),
+            (_, Some((key, value))) => {
+                let index = self.get_new_index();
+                self.insert_entry_to_blob(
+                    index,
+                    &Block {
+                        metadata: NodeMetadata {
+                            node_type: NodeType::Leaf,
+                            dirty: false,
+                        },
+                        node: Node::Leaf(LeafNode {
+                            hash: node_hash,
+                            parent: Parent(None),
+                            key: *key,
+                            value: *value,
+                        }),
+                    },
+                )?;
+
+                Ok(index)
+            }
+            (Some((left, right)), _) => {
+                let index = self.get_new_index();
+                // TODO: certainly belongs elswehere
+                // let undefined_index = TreeIndex(u32::MAX - 1);
+
+                let left_index =
+                    self.build_blob_from_node_list(internal_nodes, terminal_nodes, *left)?;
+                let right_index =
+                    self.build_blob_from_node_list(internal_nodes, terminal_nodes, *right)?;
+
+                for child_index in [left_index, right_index] {
+                    self.update_parent(child_index, Some(index))?;
+                }
+                let block = Block {
+                    metadata: NodeMetadata {
+                        node_type: NodeType::Internal,
+                        dirty: false,
+                    },
+                    node: Node::Internal(InternalNode {
+                        hash: node_hash,
+                        parent: Parent(None),
+                        left: left_index,
+                        right: right_index,
+                    }),
+                };
+                self.insert_entry_to_blob(index, &block)?;
+
+                Ok(index)
+            }
+        }
+    }
 }
 
 impl PartialEq for MerkleBlob {
@@ -1610,6 +1685,33 @@ impl MerkleBlob {
             unsafe { std::slice::from_raw_parts(blob.buf_ptr() as *const u8, blob.len_bytes()) };
 
         Ok(Self::new(Vec::from(slice))?)
+    }
+
+    #[allow(clippy::needless_pass_by_value)]
+    #[staticmethod]
+    #[pyo3(name = "from_node_list", signature = (internal_nodes, terminal_nodes, root_hash))]
+    fn py_from_node_list(
+        internal_nodes: HashMap<Hash, (Hash, Hash)>,
+        terminal_nodes: HashMap<Hash, (KeyId, ValueId)>,
+        root_hash: Option<Hash>,
+    ) -> PyResult<Self> {
+        let mut merkle_blob = Self::new(Vec::new())?;
+
+        match (
+            root_hash,
+            !internal_nodes.is_empty() || !terminal_nodes.is_empty(),
+        ) {
+            (None, true) => Err(Error::RootHashAndNodeListDisagreement())?,
+            (None, _) => Ok(merkle_blob),
+            (Some(root_hash), _) => {
+                merkle_blob.build_blob_from_node_list(
+                    &internal_nodes,
+                    &terminal_nodes,
+                    root_hash,
+                )?;
+                Ok(merkle_blob)
+            }
+        }
     }
 
     #[pyo3(name = "insert", signature = (key, value, hash, reference_kid = None, side = None))]
