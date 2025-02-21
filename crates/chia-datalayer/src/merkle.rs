@@ -1604,22 +1604,7 @@ impl MerkleBlob {
             (Some((left, right)), _) => {
                 let index = self.get_new_index();
                 // TODO: certainly belongs elswehere
-                let undefined_index = TreeIndex(u32::MAX - 1);
-                self.insert_entry_to_blob(
-                    index,
-                    &Block {
-                        metadata: NodeMetadata {
-                            node_type: NodeType::Internal,
-                            dirty: false,
-                        },
-                        node: Node::Internal(InternalNode {
-                            hash: node_hash,
-                            parent: Parent(None),
-                            left: undefined_index,
-                            right: undefined_index,
-                        }),
-                    },
-                )?;
+                // let undefined_index = TreeIndex(u32::MAX - 1);
 
                 let left_index =
                     self.build_blob_from_node_list(internal_nodes, terminal_nodes, *left)?;
@@ -1629,13 +1614,18 @@ impl MerkleBlob {
                 for child_index in [left_index, right_index] {
                     self.update_parent(child_index, Some(index))?;
                 }
-                let block = self.get_block(index)?;
-                let Node::Internal(mut node) = block.node else {
-                    // TODO: error
-                    panic!();
+                let block = Block {
+                    metadata: NodeMetadata {
+                        node_type: NodeType::Internal,
+                        dirty: false,
+                    },
+                    node: Node::Internal(InternalNode {
+                        hash: node_hash,
+                        parent: Parent(None),
+                        left: left_index,
+                        right: right_index,
+                    }),
                 };
-                node.left = left_index;
-                node.right = right_index;
                 self.insert_entry_to_blob(index, &block)?;
 
                 Ok(index)
