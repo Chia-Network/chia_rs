@@ -115,8 +115,7 @@ impl SpendVisitor for MempoolVisitor {
             | Condition::AggSigAmount(_, _)
             | Condition::AggSigPuzzleAmount(_, _)
             | Condition::AssertHeightRelative(_)
-            | Condition::AssertSecondsRelative(_)
-             => {
+            | Condition::AssertSecondsRelative(_) => {
                 spend.flags &= !ELIGIBLE_FOR_DEDUP;
                 spend.flags &= !ELIGIBLE_FOR_FF;
             }
@@ -2130,14 +2129,15 @@ fn test_extra_arg(
     ]
     .contains(&condition);
 
-    let banned_ff = [
-        ASSERT_SECONDS_RELATIVE,
-        ASSERT_HEIGHT_RELATIVE,    
-    ].contains(&condition);
+    let banned_ff = [ASSERT_SECONDS_RELATIVE, ASSERT_HEIGHT_RELATIVE].contains(&condition);
 
     let expected_cost = if has_agg_sig { 1_200_000 } else { 0 };
 
-    let expected_flags = if has_agg_sig || banned_ff { 0 } else { ELIGIBLE_FOR_DEDUP };
+    let expected_flags = if has_agg_sig || banned_ff {
+        0
+    } else {
+        ELIGIBLE_FOR_DEDUP
+    };
 
     assert_eq!(conds.cost, expected_cost);
     assert_eq!(conds.spends.len(), 1);
@@ -2187,10 +2187,7 @@ fn test_single_condition(
         condition as u8, arg
     ))
     .unwrap();
-    let banned_ff = [
-        ASSERT_SECONDS_RELATIVE,
-        ASSERT_HEIGHT_RELATIVE,    
-    ].contains(&condition);
+    let banned_ff = [ASSERT_SECONDS_RELATIVE, ASSERT_HEIGHT_RELATIVE].contains(&condition);
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
@@ -2335,16 +2332,13 @@ fn test_multiple_conditions(
         "((({{h1}} ({{h2}} (1234 ((({val} (100 ) (({val} (503 ) (({val} (90 )))))"
     ))
     .unwrap();
-    let banned_ff = [
-        ASSERT_SECONDS_RELATIVE,
-        ASSERT_HEIGHT_RELATIVE,    
-    ].contains(&condition);
+    let banned_ff = [ASSERT_SECONDS_RELATIVE, ASSERT_HEIGHT_RELATIVE].contains(&condition);
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 1234));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    if !banned_ff{
+    if !banned_ff {
         assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
     }
     test(&conds, spend);
@@ -4097,10 +4091,7 @@ fn test_impossible_constraints_single_spend(
     } else {
         // we don't expect any error
         let (a, conds) = cond_test(test).unwrap();
-        let banned_list = [
-            ASSERT_SECONDS_RELATIVE,
-            ASSERT_HEIGHT_RELATIVE,    
-        ];
+        let banned_list = [ASSERT_SECONDS_RELATIVE, ASSERT_HEIGHT_RELATIVE];
         let banned_ff = banned_list.contains(&cond1) || banned_list.contains(&cond2);
         // just make sure there are no constraints
         assert_eq!(conds.agg_sig_unsafe.len(), 0);
@@ -4201,10 +4192,7 @@ fn test_impossible_constraints_separate_spends(
     } else {
         // we don't expect any error
         let (a, conds) = cond_test(test).unwrap();
-        let banned_list = [
-            ASSERT_SECONDS_RELATIVE,
-            ASSERT_HEIGHT_RELATIVE,    
-        ];
+        let banned_list = [ASSERT_SECONDS_RELATIVE, ASSERT_HEIGHT_RELATIVE];
         let banned_ff = banned_list.contains(&cond1) || banned_list.contains(&cond2);
         // just make sure there are no constraints
         assert_eq!(conds.agg_sig_unsafe.len(), 0);
@@ -4221,7 +4209,6 @@ fn test_impossible_constraints_separate_spends(
         if !banned_ff {
             assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
         }
-        
 
         let spend = &conds.spends[1];
         assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
