@@ -48,6 +48,7 @@ pub const HAS_RELATIVE_CONDITION: u32 = 2;
 // 3. No ASSERT_MY_COIN_ID condition, no more than one ASSERT_MY_PARENT_ID condition
 //    (as the second condition)
 // 4. it has an output coin with the same puzzle hash as the spend itself
+// 5. there are no ASSERT_MY_COIN_AMOUNT or AGGSIG_*_AMOUNT conditions
 pub const ELIGIBLE_FOR_FF: u32 = 4;
 
 pub struct EmptyVisitor {}
@@ -85,6 +86,11 @@ impl SpendVisitor for MempoolVisitor {
             Condition::AssertMyCoinId(_) => {
                 spend.flags &= !ELIGIBLE_FOR_FF;
             }
+            Condition::AssertMyAmount(_) => {
+                if self.condition_counter != 0 {
+                    spend.flags &= !ELIGIBLE_FOR_FF;
+                }
+            }
             Condition::AssertMyParentId(_) => {
                 // the singleton_top_layer_v1_1.clsp will only emit two
                 // conditions, ASSERT_MY_AMOUNT and ASSERT_MY_PARENT_ID (in that
@@ -99,14 +105,13 @@ impl SpendVisitor for MempoolVisitor {
             Condition::AggSigMe(_, _)
             | Condition::AggSigParent(_, _)
             | Condition::AggSigParentAmount(_, _)
-            | Condition::AggSigParentPuzzle(_, _) => {
+            | Condition::AggSigParentPuzzle(_, _)
+            | Condition::AggSigAmount(_, _)
+            | Condition::AggSigPuzzleAmount(_, _) => {
                 spend.flags &= !ELIGIBLE_FOR_DEDUP;
                 spend.flags &= !ELIGIBLE_FOR_FF;
             }
-            Condition::AggSigPuzzle(_, _)
-            | Condition::AggSigAmount(_, _)
-            | Condition::AggSigPuzzleAmount(_, _)
-            | Condition::AggSigUnsafe(_, _) => {
+            Condition::AggSigPuzzle(_, _) | Condition::AggSigUnsafe(_, _) => {
                 spend.flags &= !ELIGIBLE_FOR_DEDUP;
             }
             Condition::SendMessage(src_mode, _dst, _msg) => {
@@ -4667,8 +4672,8 @@ fn test_eligible_for_ff_invalid_assert_parent(
 #[case(AGG_SIG_PARENT_PUZZLE, false)]
 #[case(AGG_SIG_UNSAFE, true)]
 #[case(AGG_SIG_PUZZLE, true)]
-#[case(AGG_SIG_AMOUNT, true)]
-#[case(AGG_SIG_PUZZLE_AMOUNT, true)]
+#[case(AGG_SIG_AMOUNT, false)]
+#[case(AGG_SIG_PUZZLE_AMOUNT, false)]
 fn test_eligible_for_ff_invalid_agg_sig_me(
     #[case] condition: ConditionOpcode,
     #[case] eligible: bool,
