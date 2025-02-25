@@ -48,6 +48,7 @@ pub const HAS_RELATIVE_CONDITION: u32 = 2;
 // 3. No ASSERT_MY_COIN_ID condition, no more than one ASSERT_MY_PARENT_ID condition
 //    (as the second condition)
 // 4. it has an output coin with the same puzzle hash as the spend itself
+// 5. there are no ASSERT_MY_COIN_AMOUNT or AGGSIG_*_AMOUNT conditions
 pub const ELIGIBLE_FOR_FF: u32 = 4;
 
 pub struct EmptyVisitor {}
@@ -82,8 +83,27 @@ impl SpendVisitor for MempoolVisitor {
 
     fn condition(&mut self, spend: &mut SpendConditions, c: &Condition) {
         match c {
-            Condition::AssertMyCoinId(_) => {
+            Condition::AssertMyCoinId(_)
+            | Condition::AssertHeightRelative(_)
+            | Condition::AssertSecondsRelative(_)
+            | Condition::AssertMyBirthHeight(_)
+            | Condition::AssertMyBirthSeconds(_) => {
+                // fastforwards will change the birth time
+                // previously passing timelocks will most likely fail
+                // the coin ID will also change
+                // for these reasons the associated conditions are not eligible for FF
                 spend.flags &= !ELIGIBLE_FOR_FF;
+            }
+            Condition::AssertMyAmount(_) => {
+                // the singleton_top_layer_v1_1.clsp will only emit two
+                // conditions, ASSERT_MY_AMOUNT and ASSERT_MY_PARENT_ID (in that
+                // order). So we expect this conditon as the first in the list.
+                // Any other conditions of this kind have to have been produced
+                // by the inner puzzle, which we don't have control over. So in
+                // that case this spend is not eligible for fast-forward.
+                if self.condition_counter != 0 {
+                    spend.flags &= !ELIGIBLE_FOR_FF;
+                }
             }
             Condition::AssertMyParentId(_) => {
                 // the singleton_top_layer_v1_1.clsp will only emit two
@@ -99,14 +119,14 @@ impl SpendVisitor for MempoolVisitor {
             Condition::AggSigMe(_, _)
             | Condition::AggSigParent(_, _)
             | Condition::AggSigParentAmount(_, _)
-            | Condition::AggSigParentPuzzle(_, _) => {
+            | Condition::AggSigParentPuzzle(_, _)
+            | Condition::AggSigAmount(_, _)
+            | Condition::AggSigPuzzleAmount(_, _) => {
+                // references to your parent and references will not successfully fastforward
                 spend.flags &= !ELIGIBLE_FOR_DEDUP;
                 spend.flags &= !ELIGIBLE_FOR_FF;
             }
-            Condition::AggSigPuzzle(_, _)
-            | Condition::AggSigAmount(_, _)
-            | Condition::AggSigPuzzleAmount(_, _)
-            | Condition::AggSigUnsafe(_, _) => {
+            Condition::AggSigPuzzle(_, _) | Condition::AggSigUnsafe(_, _) => {
                 spend.flags &= !ELIGIBLE_FOR_DEDUP;
             }
             Condition::SendMessage(src_mode, _dst, _msg) => {
@@ -2168,7 +2188,6 @@ fn test_single_condition(
         condition as u8, arg
     ))
     .unwrap();
-
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
@@ -2312,12 +2331,12 @@ fn test_multiple_conditions(
         "((({{h1}} ({{h2}} (1234 ((({val} (100 ) (({val} (503 ) (({val} (90 )))))"
     ))
     .unwrap();
-
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 1234));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
+
     assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
 
     test(&conds, spend);
@@ -4070,7 +4089,6 @@ fn test_impossible_constraints_single_spend(
     } else {
         // we don't expect any error
         let (a, conds) = cond_test(test).unwrap();
-
         // just make sure there are no constraints
         assert_eq!(conds.agg_sig_unsafe.len(), 0);
         assert_eq!(conds.reserve_fee, 0);
@@ -4168,7 +4186,6 @@ fn test_impossible_constraints_separate_spends(
     } else {
         // we don't expect any error
         let (a, conds) = cond_test(test).unwrap();
-
         // just make sure there are no constraints
         assert_eq!(conds.agg_sig_unsafe.len(), 0);
         assert_eq!(conds.reserve_fee, 0);
@@ -4636,6 +4653,11 @@ fn test_eligible_for_ff_output_coin(#[case] amount: u64, #[case] ph: &str, #[cas
 #[rstest]
 #[case(ASSERT_MY_PARENT_ID, "{h1}")]
 #[case(ASSERT_MY_COIN_ID, "{coin12}")]
+#[case(ASSERT_MY_AMOUNT, "123")]
+#[case(ASSERT_HEIGHT_RELATIVE, "0")]
+#[case(ASSERT_SECONDS_RELATIVE, "0")]
+#[case(ASSERT_MY_BIRTH_HEIGHT, "0")]
+#[case(ASSERT_MY_BIRTH_SECONDS, "0")]
 fn test_eligible_for_ff_invalid_assert_parent(
     #[case] condition: ConditionOpcode,
     #[case] arg: &str,
@@ -4667,8 +4689,8 @@ fn test_eligible_for_ff_invalid_assert_parent(
 #[case(AGG_SIG_PARENT_PUZZLE, false)]
 #[case(AGG_SIG_UNSAFE, true)]
 #[case(AGG_SIG_PUZZLE, true)]
-#[case(AGG_SIG_AMOUNT, true)]
-#[case(AGG_SIG_PUZZLE_AMOUNT, true)]
+#[case(AGG_SIG_AMOUNT, false)]
+#[case(AGG_SIG_PUZZLE_AMOUNT, false)]
 fn test_eligible_for_ff_invalid_agg_sig_me(
     #[case] condition: ConditionOpcode,
     #[case] eligible: bool,
