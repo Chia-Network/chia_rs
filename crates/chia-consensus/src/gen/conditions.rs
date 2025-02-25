@@ -4656,6 +4656,8 @@ fn test_eligible_for_ff_output_coin(#[case] amount: u64, #[case] ph: &str, #[cas
 #[case(ASSERT_MY_AMOUNT, "123")]
 #[case(ASSERT_HEIGHT_RELATIVE, "0")]
 #[case(ASSERT_SECONDS_RELATIVE, "0")]
+#[case(ASSERT_MY_BIRTH_HEIGHT, "0")]
+#[case(ASSERT_MY_BIRTH_SECONDS, "0")]
 fn test_eligible_for_ff_invalid_assert_parent(
     #[case] condition: ConditionOpcode,
     #[case] arg: &str,
