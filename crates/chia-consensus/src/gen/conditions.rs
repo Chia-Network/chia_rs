@@ -83,7 +83,15 @@ impl SpendVisitor for MempoolVisitor {
 
     fn condition(&mut self, spend: &mut SpendConditions, c: &Condition) {
         match c {
-            Condition::AssertMyCoinId(_) => {
+            Condition::AssertMyCoinId(_)
+            | Condition::AssertHeightRelative(_)
+            | Condition::AssertSecondsRelative(_)
+            | Condition::AssertMyBirthHeight(_)
+            | Condition::AssertMyBirthSeconds(_) => {
+                // fastforwards will change the birth time
+                // previously passing timelocks will most likely fail
+                // the coin ID will also change
+                // for these reasons the associated conditions are not eligible for FF
                 spend.flags &= !ELIGIBLE_FOR_FF;
             }
             Condition::AssertMyAmount(_) => {
@@ -113,9 +121,8 @@ impl SpendVisitor for MempoolVisitor {
             | Condition::AggSigParentAmount(_, _)
             | Condition::AggSigParentPuzzle(_, _)
             | Condition::AggSigAmount(_, _)
-            | Condition::AggSigPuzzleAmount(_, _)
-            | Condition::AssertHeightRelative(_)
-            | Condition::AssertSecondsRelative(_) => {
+            | Condition::AggSigPuzzleAmount(_, _) => {
+                // references to your parent and references will not successfully fastforward
                 spend.flags &= !ELIGIBLE_FOR_DEDUP;
                 spend.flags &= !ELIGIBLE_FOR_FF;
             }
@@ -1873,7 +1880,7 @@ fn test_invalid_condition_args_terminator() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert_eq!(spend.flags, HAS_RELATIVE_CONDITION);
+    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP | HAS_RELATIVE_CONDITION);
 
     assert_eq!(spend.seconds_relative, Some(50));
 }
@@ -1900,7 +1907,7 @@ fn test_invalid_condition_list_terminator() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert_eq!(spend.flags, HAS_RELATIVE_CONDITION);
+    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP | HAS_RELATIVE_CONDITION);
 
     assert_eq!(spend.seconds_relative, Some(50));
 }
@@ -2129,15 +2136,9 @@ fn test_extra_arg(
     ]
     .contains(&condition);
 
-    let banned_ff = [ASSERT_SECONDS_RELATIVE, ASSERT_HEIGHT_RELATIVE].contains(&condition);
-
     let expected_cost = if has_agg_sig { 1_200_000 } else { 0 };
 
-    let expected_flags = if has_agg_sig || banned_ff {
-        0
-    } else {
-        ELIGIBLE_FOR_DEDUP
-    };
+    let expected_flags = if has_agg_sig { 0 } else { ELIGIBLE_FOR_DEDUP };
 
     assert_eq!(conds.cost, expected_cost);
     assert_eq!(conds.spends.len(), 1);
@@ -2187,15 +2188,13 @@ fn test_single_condition(
         condition as u8, arg
     ))
     .unwrap();
-    let banned_ff = [ASSERT_SECONDS_RELATIVE, ASSERT_HEIGHT_RELATIVE].contains(&condition);
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    if !banned_ff {
-        assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
-    }
+    assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
+
     test(&conds, spend);
 }
 
@@ -2332,15 +2331,14 @@ fn test_multiple_conditions(
         "((({{h1}} ({{h2}} (1234 ((({val} (100 ) (({val} (503 ) (({val} (90 )))))"
     ))
     .unwrap();
-    let banned_ff = [ASSERT_SECONDS_RELATIVE, ASSERT_HEIGHT_RELATIVE].contains(&condition);
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 1234));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    if !banned_ff {
-        assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
-    }
+
+    assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
+
     test(&conds, spend);
 }
 
@@ -2396,7 +2394,7 @@ fn test_single_height_relative_zero() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert_eq!(spend.flags, HAS_RELATIVE_CONDITION);
+    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP | HAS_RELATIVE_CONDITION);
 
     assert_eq!(spend.height_relative, Some(0));
 }
@@ -4091,8 +4089,6 @@ fn test_impossible_constraints_single_spend(
     } else {
         // we don't expect any error
         let (a, conds) = cond_test(test).unwrap();
-        let banned_list = [ASSERT_SECONDS_RELATIVE, ASSERT_HEIGHT_RELATIVE];
-        let banned_ff = banned_list.contains(&cond1) || banned_list.contains(&cond2);
         // just make sure there are no constraints
         assert_eq!(conds.agg_sig_unsafe.len(), 0);
         assert_eq!(conds.reserve_fee, 0);
@@ -4105,9 +4101,7 @@ fn test_impossible_constraints_single_spend(
         assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
         assert_eq!(spend.agg_sig_me.len(), 0);
-        if !banned_ff {
-            assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
-        }
+        assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
     }
 }
 
@@ -4192,8 +4186,6 @@ fn test_impossible_constraints_separate_spends(
     } else {
         // we don't expect any error
         let (a, conds) = cond_test(test).unwrap();
-        let banned_list = [ASSERT_SECONDS_RELATIVE, ASSERT_HEIGHT_RELATIVE];
-        let banned_ff = banned_list.contains(&cond1) || banned_list.contains(&cond2);
         // just make sure there are no constraints
         assert_eq!(conds.agg_sig_unsafe.len(), 0);
         assert_eq!(conds.reserve_fee, 0);
@@ -4206,17 +4198,13 @@ fn test_impossible_constraints_separate_spends(
         assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
         assert_eq!(spend.agg_sig_me.len(), 0);
-        if !banned_ff {
-            assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
-        }
+        assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
 
         let spend = &conds.spends[1];
         assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
         assert_eq!(spend.agg_sig_me.len(), 0);
-        if !banned_ff {
-            assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
-        }
+        assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
     }
 }
 
