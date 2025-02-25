@@ -3,10 +3,13 @@ use chia_bls::Signature;
 use chia_protocol::SpendBundle;
 use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::serde::{node_from_bytes_backrefs, Serializer};
+use std::borrow::Borrow;
 use std::io;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
+#[cfg(feature = "py-bindings")]
+use pyo3::types::PyList;
 
 /// Maximum number of mempool items that can be skipped (not considered) during
 /// the creation of a block bundle. An item is skipped if it won't fit in the
@@ -96,17 +99,24 @@ impl BlockBuilder {
         })
     }
 
-    /// add a spend bundle to the generator. The cost must be *only* the CLVM
-    /// execution cost + the cost of the conditions. It must not include the byte cost
-    /// of the bundle. The byte cost is unpredictible as the generator is being
-    /// compressed. The true byte cost is computed by this function.
-    /// returns true if this bundle could be added to the generator, false otherwise
-    pub fn add_spend_bundle(
+    /// add a batch of spend bundles to the generator. The cost for each bundle
+    /// must be *only* the CLVM execution cost + the cost of the conditions.
+    /// It must not include the byte cost of the bundle. The byte cost is
+    /// unpredictible as the generator is being / compressed. The true byte cost
+    /// is computed by this function. / returns true if the bundles could be added
+    /// to the generator, false otherwise. Note that either all bundles are
+    /// added, or none of them. If the resulting block exceeds the cost limit,
+    /// none of the bundles are added
+    pub fn add_spend_bundles<T, S>(
         &mut self,
-        bundle: &SpendBundle,
+        bundles: T,
         cost: u64,
         constants: &ConsensusConstants,
-    ) -> io::Result<(bool, BuildBlockResult)> {
+    ) -> io::Result<(bool, BuildBlockResult)>
+    where
+        T: IntoIterator<Item = S>,
+        S: Borrow<SpendBundle>,
+    {
         // if we're very close to a full block, we're done. It's very unlikely
         // any transaction will be smallar than MIN_COST_THRESHOLD
         if self.byte_cost + self.block_cost + MIN_COST_THRESHOLD > constants.max_block_cost_clvm {
@@ -122,48 +132,60 @@ impl BlockBuilder {
         let a = &mut self.allocator;
 
         let mut spend_list = self.sentinel;
-        for spend in &bundle.coin_spends {
-            // solution
-            let solution = node_from_bytes_backrefs(a, spend.solution.as_ref())?;
-            let item = a.new_pair(solution, NodePtr::NIL)?;
-            // amount
-            let amount = a.new_number(spend.coin.amount.into())?;
-            let item = a.new_pair(amount, item)?;
-            // puzzle reveal
-            let puzzle = node_from_bytes_backrefs(a, spend.puzzle_reveal.as_ref())?;
-            let item = a.new_pair(puzzle, item)?;
-            // parent-id
-            let parent_id = a.new_atom(&spend.coin.parent_coin_info)?;
-            let item = a.new_pair(parent_id, item)?;
+        let mut cumulative_signature = Signature::default();
+        for bundle in bundles {
+            for spend in &bundle.borrow().coin_spends {
+                // solution
+                let solution = node_from_bytes_backrefs(a, spend.solution.as_ref())?;
+                let item = a.new_pair(solution, NodePtr::NIL)?;
+                // amount
+                let amount = a.new_number(spend.coin.amount.into())?;
+                let item = a.new_pair(amount, item)?;
+                // puzzle reveal
+                let puzzle = node_from_bytes_backrefs(a, spend.puzzle_reveal.as_ref())?;
+                let item = a.new_pair(puzzle, item)?;
+                // parent-id
+                let parent_id = a.new_atom(&spend.coin.parent_coin_info)?;
+                let item = a.new_pair(parent_id, item)?;
 
-            spend_list = a.new_pair(item, spend_list)?;
+                spend_list = a.new_pair(item, spend_list)?;
+            }
+            cumulative_signature.aggregate(&bundle.borrow().aggregated_signature);
         }
 
         let (done, state) = self.ser.add(a, spend_list)?;
-        assert!(!done);
 
         // closing the lists at the end needs 2 extra bytes
         self.byte_cost = (self.ser.size() + 2) * constants.cost_per_byte;
         if self.byte_cost + self.block_cost + cost > constants.max_block_cost_clvm {
-            // undo the last add() call
+            // Undo the last add() call.
+            // It might be tempting to reset the allocator as well, however,
+            // the incremental serializer will have already cached the tree we
+            // just added and it will remain cached when we restore the
+            // serializer state. It's more expensive to reset this cache, so we
+            // leave the Allocator untouched instead.
             self.ser.restore(state);
             self.byte_cost = (self.ser.size() + 2) * constants.cost_per_byte;
             self.num_skipped += 1;
             return Ok((false, result(self.num_skipped)));
         }
         self.block_cost += cost;
-        self.signature.aggregate(&bundle.aggregated_signature);
+        self.signature.aggregate(&cumulative_signature);
 
         // if we're very close to a full block, we're done. It's very unlikely
         // any transaction will be smallar than MIN_COST_THRESHOLD
-        let result = if self.byte_cost + self.block_cost + MIN_COST_THRESHOLD
-            > constants.max_block_cost_clvm
+        let result = if done
+            || self.byte_cost + self.block_cost + MIN_COST_THRESHOLD > constants.max_block_cost_clvm
         {
             BuildBlockResult::Done
         } else {
             BuildBlockResult::KeepGoing
         };
         Ok((true, result))
+    }
+
+    pub fn cost(&self) -> u64 {
+        self.byte_cost + self.block_cost
     }
 
     pub fn finalize(
@@ -191,19 +213,35 @@ impl BlockBuilder {
 
     /// the first bool indicates whether the bundles was added.
     /// the second bool indicates whether we're done
-    #[pyo3(name = "add_spend_bundle")]
+    #[pyo3(name = "add_spend_bundles")]
     pub fn py_add_spend_bundle(
         &mut self,
-        bundle: &SpendBundle,
+        bundles: &Bound<'_, PyList>,
         cost: u64,
         constants: &ConsensusConstants,
     ) -> PyResult<(bool, bool)> {
-        let (added, result) = self.add_spend_bundle(bundle, cost, constants)?;
-        let done = match result {
-            BuildBlockResult::Done => true,
-            BuildBlockResult::KeepGoing => false,
-        };
+        let (added, result) = self.add_spend_bundles(
+            bundles.iter().map(|item| {
+                // ideally, the failures in here would be reported back as python
+                // exceptions, but map() is infallible, so it's not so easy to
+                // propagate errors back
+                // TODO: It would be nice to not have to clone the SpendBundle
+                // here
+                item.extract::<Bound<'_, SpendBundle>>()
+                    .expect("spend bundle")
+                    .get()
+                    .clone()
+            }),
+            cost,
+            constants,
+        )?;
+        let done = matches!(result, BuildBlockResult::Done);
         Ok((added, done))
+    }
+
+    #[pyo3(name = "cost")]
+    pub fn py_cost(&self) -> u64 {
+        self.cost()
     }
 
     /// generate the block generator
@@ -220,7 +258,7 @@ impl BlockBuilder {
 }
 
 // this test is expensive and takes forever in debug builds
-#[cfg(not(debug_assertions))]
+//#[cfg(not(debug_assertions))]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -249,7 +287,7 @@ mod tests {
                 continue;
             }
             // only use 32 byte hex encoded filenames
-            if file.file_stem().map(|s| s.len()) != Some(64_usize) {
+            if file.file_stem().map(std::ffi::OsStr::len) != Some(64_usize) {
                 continue;
             }
             let buf = fs::read(file.clone()).expect("read bundle file");
@@ -312,11 +350,11 @@ mod tests {
                     * TEST_CONSTANTS.cost_per_byte;
 
             let mut conds = OwnedSpendBundleConditions::from(&a, conds);
-            // when running a block in consensus mode, we don't bother
-            // establishing whether a spend is eligible for dedup or not.
-            // So, to compare with the generator output later, we need to clear
-            // this field
             for s in &mut conds.spends {
+                // when running a block in consensus mode, we don't bother
+                // establishing whether a spend is eligible for dedup or not.
+                // So, to compare with the generator output later, we need to clear
+                // this field
                 s.flags = 0;
                 // when parsing conditions, create coin conditions are stored in
                 // a hash set to cheaply check for double spends. This means the
@@ -363,14 +401,15 @@ mod tests {
                     let (bundle, cost, conds) = entry.as_ref();
                     let start_call = Instant::now();
                     let (added, result) = builder
-                        .add_spend_bundle(bundle, *cost, &TEST_CONSTANTS)
+                        .add_spend_bundles([bundle].into_iter(), *cost, &TEST_CONSTANTS)
                         .expect("add_spend_bundle");
+
                     max_call_time = f32::max(max_call_time, start_call.elapsed().as_secs_f32());
-                    if !added {
-                        skipped += 1
-                    } else {
+                    if added {
                         num_tx += 1;
                         spends.extend(conds.spends.iter());
+                    } else {
+                        skipped += 1;
                     }
                     if result == BuildBlockResult::Done {
                         break;
@@ -407,6 +446,7 @@ mod tests {
                 spends.sort_by_key(|s| s.coin_id);
                 for (mut gen, tx) in conds.spends.into_iter().zip(spends) {
                     gen.create_coin.sort();
+                    gen.flags = 0;
                     assert_eq!(&gen, tx);
                 }
             });
