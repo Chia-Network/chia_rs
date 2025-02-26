@@ -86,6 +86,7 @@ def test_tree_index_out_of_range_raises(value: int) -> None:
     with pytest.raises(OverflowError):
         TreeIndex(value)
 
+
 def test_deep_copy() -> None:
     original = MerkleBlob(blob)
     duplicate = copy.deepcopy(original)
