@@ -91,6 +91,6 @@ def test_deep_copy() -> None:
     duplicate = copy.deepcopy(original)
     assert duplicate.blob == original.blob
     assert duplicate is not original
-    original.insert(KeyId(37), ValueId(38), bytes32([39] * 32))
+    original.insert(KeyId(int64(37)), ValueId(int64(38)), bytes32([39] * 32))
     assert duplicate.blob != original.blob
     assert duplicate.blob == blob
