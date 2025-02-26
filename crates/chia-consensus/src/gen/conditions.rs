@@ -1336,6 +1336,8 @@ pub fn parse_spends<V: SpendVisitor>(
     validate_signature(&state, aggregate_signature, flags, bls_cache)?;
     ret.validated_signature = (flags & DONT_VALIDATE_SIGNATURE) == 0;
 
+    check_deduplication(&mut ret);
+
     ret.cost = max_cost - cost_left;
     Ok(ret)
 }
@@ -1538,6 +1540,33 @@ pub fn validate_signature(
         ));
     }
     Ok(())
+}
+
+pub fn check_deduplication(ret: &mut SpendBundleConditions) {
+    let mut non_dedup_removal_amount = 0;
+    let mut non_dedup_addition_amount = 0;
+
+    for spend in &ret.spends {
+        if (spend.flags & ELIGIBLE_FOR_DEDUP) == 0 {
+            continue;
+        }
+
+        non_dedup_removal_amount += spend.coin_amount;
+        non_dedup_addition_amount += spend
+            .create_coin
+            .iter()
+            .fold(0, |acc, coin| acc + coin.amount);
+    }
+
+    let non_dedup_fees = non_dedup_addition_amount - non_dedup_removal_amount;
+
+    if non_dedup_fees >= ret.reserve_fee {
+        return;
+    }
+
+    ret.spends.iter_mut().for_each(|spend| {
+        spend.flags &= !ELIGIBLE_FOR_DEDUP;
+    });
 }
 
 #[cfg(test)]
