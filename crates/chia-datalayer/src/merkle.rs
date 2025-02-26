@@ -364,6 +364,28 @@ pub struct ProofOfInclusionLayer {
     pub combined_hash: Hash,
 }
 
+impl ProofOfInclusionLayer {
+    pub fn from_hashes(primary_hash: &Hash, other_hash_side: Side, other_hash: Hash) -> Self {
+        let combined_hash = calculate_internal_hash(primary_hash, other_hash_side, &other_hash);
+
+        ProofOfInclusionLayer {
+            other_hash_side,
+            other_hash,
+            combined_hash,
+        }
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+impl ProofOfInclusionLayer {
+    #[staticmethod]
+    #[pyo3(name = "from_hashes")]
+    pub fn py_from_hashes(primary_hash: Hash, other_hash_side: Side, other_hash: Hash) -> Self {
+        ProofOfInclusionLayer::from_hashes(&primary_hash, other_hash_side, other_hash)
+    }
+}
+
 #[cfg_attr(
     feature = "py-bindings",
     pyclass(get_all),
