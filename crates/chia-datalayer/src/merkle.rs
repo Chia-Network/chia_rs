@@ -1315,7 +1315,7 @@ impl MerkleBlob {
         let final_side = if (seed_bytes
             .first()
             .ok_or(Error::ZeroLengthSeedNotAllowed())?
-            & 1 << 7)
+            & (1 << 7))
             == 0
         {
             Side::Left
