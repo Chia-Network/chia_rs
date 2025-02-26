@@ -86,8 +86,11 @@ impl SpendVisitor for MempoolVisitor {
             Condition::AssertMyCoinId(_)
             | Condition::AssertHeightRelative(_)
             | Condition::AssertSecondsRelative(_)
+            | Condition::AssertBeforeHeightRelative(_)
+            | Condition::AssertBeforeSecondsRelative(_)
             | Condition::AssertMyBirthHeight(_)
-            | Condition::AssertMyBirthSeconds(_) => {
+            | Condition::AssertMyBirthSeconds(_)
+            | Condition::AssertEphemeral => {
                 // fastforwards will change the birth time
                 // previously passing timelocks will most likely fail
                 // the coin ID will also change
