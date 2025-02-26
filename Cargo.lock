@@ -402,10 +402,10 @@ name = "chia-datalayer"
 version = "0.18.0"
 dependencies = [
  "chia-protocol",
- "chia-sha2 0.19.1",
- "chia-traits 0.19.1",
+ "chia-sha2 0.20.0",
+ "chia-traits 0.20.0",
  "chia_py_streamable_macro",
- "chia_streamable_macro 0.19.1",
+ "chia_streamable_macro 0.20.0",
  "clvm-utils",
  "expect-test",
  "hex",
