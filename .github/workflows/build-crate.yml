@@ -33,7 +33,7 @@ jobs:
         run: cargo clippy --workspace --all-features --all-targets -- -D warnings
 
       - name: Install cargo-machete
-        run: cargo install cargo-machete@0.7.0 --locked
+        run: cargo install cargo-machete
 
       - name: Unused dependencies
         run: cargo machete
