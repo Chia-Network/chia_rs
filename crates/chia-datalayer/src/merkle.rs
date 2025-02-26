@@ -700,7 +700,7 @@ fn get_free_indexes_and_keys_values_indexes(
 /// such that the code using a merkle blob can store the key and value as they see fit.  Each node
 /// stores the hash for the merkle aspect of the tree.
 #[cfg_attr(feature = "py-bindings", pyclass(get_all))]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct MerkleBlob {
     blob: Vec<u8>,
     // TODO: would be nice for this to be deterministic ala a fifo set
@@ -1685,6 +1685,14 @@ impl MerkleBlob {
             unsafe { std::slice::from_raw_parts(blob.buf_ptr() as *const u8, blob.len_bytes()) };
 
         Ok(Self::new(Vec::from(slice))?)
+    }
+
+    // it is known that memo is unused here, but is part of the interface of deepcopy
+    #[allow(unused_variables)]
+    #[must_use]
+    #[pyo3(name = "__deepcopy__")]
+    pub fn py_deepcopy(&self, memo: &pyo3::Bound<'_, pyo3::PyAny>) -> Self {
+        self.clone()
     }
 
     #[allow(clippy::needless_pass_by_value)]
