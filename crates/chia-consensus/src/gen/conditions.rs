@@ -123,8 +123,7 @@ impl SpendVisitor for MempoolVisitor {
                 spend.flags &= !ELIGIBLE_FOR_DEDUP;
             }
             Condition::SendMessage(src_mode, _dst, _msg) => {
-                if (src_mode & super::messages::PARENT) != 0
-                {
+                if (src_mode & super::messages::PARENT) != 0 {
                     spend.flags &= !ELIGIBLE_FOR_FF;
                 }
                 // de-duplicating a coin spend that's sending a message may
@@ -132,8 +131,7 @@ impl SpendVisitor for MempoolVisitor {
                 spend.flags &= !ELIGIBLE_FOR_DEDUP;
             }
             Condition::ReceiveMessage(_src, dst_mode, _msg) => {
-                if (dst_mode & super::messages::PARENT) != 0
-                {
+                if (dst_mode & super::messages::PARENT) != 0 {
                     spend.flags &= !ELIGIBLE_FOR_FF;
                 }
                 // de-duplicating a coin spend that's receiving a message may
