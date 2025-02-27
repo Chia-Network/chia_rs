@@ -23,7 +23,7 @@ use crate::gen::messages::{Message, SpendId};
 use crate::gen::spend_visitor::SpendVisitor;
 use crate::gen::validation_error::check_nil;
 use chia_bls::{aggregate_verify, BlsCache, PublicKey, Signature};
-use chia_protocol::{Bytes, Bytes32};
+use chia_protocol::{Bytes, Bytes32, Coin};
 use chia_sha2::Sha256;
 use clvmr::allocator::{Allocator, NodePtr, SExp};
 use clvmr::cost::Cost;
@@ -48,7 +48,11 @@ pub const HAS_RELATIVE_CONDITION: u32 = 2;
 // 3. No ASSERT_MY_COIN_ID condition, no more than one ASSERT_MY_PARENT_ID condition
 //    (as the second condition)
 // 4. it has an output coin with the same puzzle hash as the spend itself
-// 5. there are no timelocks
+
+// 5. None of the coin's outputs are spent by the same SpendBundle (which locks
+//    down the specific coin being spent). Even though an ephemeral FF spend
+//    wouldn't lock down the coin, it's expensive to check for this.
+// 6. there are no timelocks - ASSERT_*_RELATIVE / ASSERT_MY_BIRTH_*
 pub const ELIGIBLE_FOR_FF: u32 = 4;
 
 pub struct EmptyVisitor {}
@@ -59,6 +63,14 @@ impl SpendVisitor for EmptyVisitor {
     }
     fn condition(&mut self, _spend: &mut SpendConditions, _c: &Condition) {}
     fn post_spend(&mut self, _a: &Allocator, _spend: &mut SpendConditions) {}
+
+    fn post_process(
+        _a: &Allocator,
+        _state: &ParseState,
+        _bundle: &mut SpendBundleConditions,
+    ) -> Result<(), ValidationErr> {
+        Ok(())
+    }
 }
 
 pub struct MempoolVisitor {
@@ -155,6 +167,47 @@ impl SpendVisitor for MempoolVisitor {
         {
             spend.flags &= !ELIGIBLE_FOR_FF;
         }
+    }
+
+    fn post_process(
+        _a: &Allocator,
+        state: &ParseState,
+        bundle: &mut SpendBundleConditions,
+    ) -> Result<(), ValidationErr> {
+        // any spend whose output is being spent in the same bundle is not
+        // eligible for fast forward. Spending an output is a form of
+        // committment to the specific coin.
+        // If the ephemeral coin is spent by an FF spend, it can also be
+        // updated, and isn't a comitment. That could technically be allowed,
+        // but it's more expensive to check. Imagine a chain of FF spends,
+        // spending the same coin. The last output in this chain is spent by a
+        // non-FF spend. Clearing the FF-flag on all spends would require
+        // multiple passes over the spends.
+
+        for s in &mut bundle.spends {
+            if (s.flags & ELIGIBLE_FOR_FF) == 0 {
+                continue;
+            }
+
+            // this spend (s) is currently considered eligible for FF
+            // check to see if any of its outputs are spent by this bundle
+            // (i.e. any output is ephemeral), if so there is effectively a
+            // committment to its coin ID and it cannot be fast forwarded.
+            for cc in &s.create_coin {
+                let new_coin = Coin {
+                    parent_coin_info: *s.coin_id,
+                    puzzle_hash: cc.puzzle_hash,
+                    amount: cc.amount,
+                }
+                .coin_id();
+
+                if state.spent_coins.contains_key(&new_coin) {
+                    s.flags &= !ELIGIBLE_FOR_FF;
+                    break;
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -1345,6 +1398,7 @@ pub fn parse_spends<V: SpendVisitor>(
         )?;
     }
 
+    V::post_process(a, &state, &mut ret)?;
     validate_conditions(a, &ret, &state, spends, flags)?;
     validate_signature(&state, aggregate_signature, flags, bls_cache)?;
     ret.validated_signature = (flags & DONT_VALIDATE_SIGNATURE) == 0;
@@ -4242,6 +4296,54 @@ fn test_multiple_my_birth_assertions(
     assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
 
     test(spend);
+}
+
+#[test]
+fn test_ephemeral_non_ff_spend() {
+    // make sure the first spend is not considered ELIGIBLE_FOR_FF, since its
+    // output is being spent by a non-FF spend.
+    // the coin11 value is the coinID computed from (H1, H1, 123).
+    // coin11 is the first coin we spend in this case.
+    // 73=ASSERT_MY_AMOUNT
+    // 71=ASSERT_MY_PARENT_ID
+    // 51=CREATE_COIN
+    let test = "(\
+       (({h1} ({h1} (123 (\
+           ((73 (123 ) \
+           ((71 ({h1} ) \
+           ((51 ({h1} (123 ) \
+           ))\
+       (({coin11} ({h1} (123 (\
+           ))\
+       ))";
+    // we don't expect any error
+    let (a, conds) = cond_test(test).unwrap();
+
+    // our spends don't add any additional constraints
+    assert_eq!(conds.agg_sig_unsafe.len(), 0);
+    assert_eq!(conds.reserve_fee, 0);
+    assert_eq!(conds.cost, CREATE_COIN_COST);
+    // we spend a coin worth 123, into a new coin worth 123
+    // then we spend that coin burning the value. i.e. we spend 123 * 2 and only
+    // add 123. the net is a removal of 123
+    assert_eq!(conds.removal_amount, 246);
+    assert_eq!(conds.addition_amount, 123);
+
+    assert_eq!(conds.spends.len(), 2);
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
+    assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
+    assert_eq!(spend.agg_sig_me.len(), 0);
+    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+
+    let spend = &conds.spends[1];
+    assert_eq!(
+        *spend.coin_id,
+        test_coin_id((&(*conds.spends[0].coin_id)).into(), H1, 123)
+    );
+    assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
+    assert_eq!(spend.agg_sig_me.len(), 0);
+    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
 }
 
 #[test]
