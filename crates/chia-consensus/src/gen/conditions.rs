@@ -4621,8 +4621,8 @@ fn test_eligible_for_ff_different_amount() {
     // 71=ASSERT_MY_PARENT_ID
     // 51=CREATE_COIN
     let test = "(\
-       (({h1} ({h2} (122 (\
-           ((73 (122 ) \
+       (({h1} ({h2} (123 (\
+           ((73 (123 ) \
            ((71 ({h1} ) \
            ((51 ({h2} (1 ) \
            ))\
