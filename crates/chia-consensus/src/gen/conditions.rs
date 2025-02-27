@@ -48,7 +48,7 @@ pub const HAS_RELATIVE_CONDITION: u32 = 2;
 // 3. No ASSERT_MY_COIN_ID condition, no more than one ASSERT_MY_PARENT_ID condition
 //    (as the second condition)
 // 4. it has an output coin with the same puzzle hash as the spend itself
-// 5. there are no ASSERT_MY_COIN_AMOUNT or AGGSIG_*_AMOUNT conditions
+// 5. there are no timelocks
 pub const ELIGIBLE_FOR_FF: u32 = 4;
 
 pub struct EmptyVisitor {}
@@ -97,17 +97,6 @@ impl SpendVisitor for MempoolVisitor {
                 // for these reasons the associated conditions are not eligible for FF
                 spend.flags &= !ELIGIBLE_FOR_FF;
             }
-            Condition::AssertMyAmount(_) => {
-                // the singleton_top_layer_v1_1.clsp will only emit two
-                // conditions, ASSERT_MY_AMOUNT and ASSERT_MY_PARENT_ID (in that
-                // order). So we expect this conditon as the first in the list.
-                // Any other conditions of this kind have to have been produced
-                // by the inner puzzle, which we don't have control over. So in
-                // that case this spend is not eligible for fast-forward.
-                if self.condition_counter != 0 {
-                    spend.flags &= !ELIGIBLE_FOR_FF;
-                }
-            }
             Condition::AssertMyParentId(_) => {
                 // the singleton_top_layer_v1_1.clsp will only emit two
                 // conditions, ASSERT_MY_AMOUNT and ASSERT_MY_PARENT_ID (in that
@@ -122,14 +111,15 @@ impl SpendVisitor for MempoolVisitor {
             Condition::AggSigMe(_, _)
             | Condition::AggSigParent(_, _)
             | Condition::AggSigParentAmount(_, _)
-            | Condition::AggSigParentPuzzle(_, _)
-            | Condition::AggSigAmount(_, _)
-            | Condition::AggSigPuzzleAmount(_, _) => {
+            | Condition::AggSigParentPuzzle(_, _) => {
                 // references to your parent and references will not successfully fastforward
                 spend.flags &= !ELIGIBLE_FOR_DEDUP;
                 spend.flags &= !ELIGIBLE_FOR_FF;
             }
-            Condition::AggSigPuzzle(_, _) | Condition::AggSigUnsafe(_, _) => {
+            Condition::AggSigPuzzle(_, _)
+            | Condition::AggSigAmount(_, _)
+            | Condition::AggSigPuzzleAmount(_, _)
+            | Condition::AggSigUnsafe(_, _) => {
                 spend.flags &= !ELIGIBLE_FOR_DEDUP;
             }
             Condition::SendMessage(src_mode, _dst, _msg) => {
@@ -4660,7 +4650,6 @@ fn test_eligible_for_ff_output_coin(#[case] amount: u64, #[case] ph: &str, #[cas
 #[rstest]
 #[case(ASSERT_MY_PARENT_ID, "{h1}")]
 #[case(ASSERT_MY_COIN_ID, "{coin12}")]
-#[case(ASSERT_MY_AMOUNT, "123")]
 #[case(ASSERT_HEIGHT_RELATIVE, "0")]
 #[case(ASSERT_SECONDS_RELATIVE, "0")]
 #[case(ASSERT_MY_BIRTH_HEIGHT, "0")]
@@ -4696,8 +4685,6 @@ fn test_eligible_for_ff_invalid_assert_parent(
 #[case(AGG_SIG_PARENT_PUZZLE, false)]
 #[case(AGG_SIG_UNSAFE, true)]
 #[case(AGG_SIG_PUZZLE, true)]
-#[case(AGG_SIG_AMOUNT, false)]
-#[case(AGG_SIG_PUZZLE_AMOUNT, false)]
 fn test_eligible_for_ff_invalid_agg_sig_me(
     #[case] condition: ConditionOpcode,
     #[case] eligible: bool,
