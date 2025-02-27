@@ -5540,7 +5540,7 @@ fn test_message_eligible_for_ff() {
         assert!(cond.spends.len() == 2);
         assert_eq!(
             (cond.spends[0].flags & ELIGIBLE_FOR_FF) != 0,
-            (mode & 0b10_1000) == 0
+            (mode & 0b10_0000) == 0
         );
         assert_eq!((cond.spends[1].flags & ELIGIBLE_FOR_FF), 0);
 
@@ -5564,7 +5564,7 @@ fn test_message_eligible_for_ff() {
         assert!(cond.spends.len() == 2);
         assert_eq!(
             (cond.spends[0].flags & ELIGIBLE_FOR_FF) != 0,
-            (mode & 0b101) == 0
+            (mode & 0b100) == 0
         );
         assert_eq!((cond.spends[1].flags & ELIGIBLE_FOR_FF), 0);
     }
