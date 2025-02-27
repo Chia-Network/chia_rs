@@ -4378,7 +4378,7 @@ fn test_assert_ephemeral() {
     assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
     assert_eq!(spend.agg_sig_me.len(), 0);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP); // not ELIGIBLE_FOR_FF
 
     let spend = &conds.spends[1];
     assert_eq!(
@@ -4768,10 +4768,7 @@ fn test_eligible_for_ff_output_coin(#[case] amount: u64, #[case] ph: &str, #[cas
 #[rstest]
 #[case(ASSERT_MY_PARENT_ID, "{h1}")]
 #[case(ASSERT_MY_COIN_ID, "{coin12}")]
-#[case(ASSERT_HEIGHT_RELATIVE, "0")]
-#[case(ASSERT_SECONDS_RELATIVE, "0")]
-#[case(ASSERT_MY_BIRTH_HEIGHT, "0")]
-#[case(ASSERT_MY_BIRTH_SECONDS, "0")]
+
 fn test_eligible_for_ff_invalid_assert_parent(
     #[case] condition: ConditionOpcode,
     #[case] arg: &str,
@@ -4793,6 +4790,44 @@ fn test_eligible_for_ff_invalid_assert_parent(
     let (_a, cond) = cond_test(test).expect("cond_test");
     assert!(cond.spends.len() == 1);
     assert!((cond.spends[0].flags & ELIGIBLE_FOR_FF) == 0);
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(ASSERT_HEIGHT_RELATIVE, "0", false)]
+#[case(ASSERT_SECONDS_RELATIVE, "0", false)]
+#[case(ASSERT_BEFORE_HEIGHT_RELATIVE, "0", false)]
+#[case(ASSERT_BEFORE_SECONDS_RELATIVE, "0", false)]
+#[case(ASSERT_MY_BIRTH_HEIGHT, "0", false)]
+#[case(ASSERT_MY_BIRTH_SECONDS, "0", false)]
+#[case(ASSERT_MY_AMOUNT, "123", true)]
+fn test_eligible_for_ff_timelocks(
+    #[case] condition: ConditionOpcode,
+    #[case] arg: &str,
+    #[case] eligible: bool,
+) {
+    // 73=ASSERT_MY_AMOUNT
+    // 71=ASSERT_MY_PARENT_ID
+    // 51=CREATE_COIN
+    // then test condition after
+    let test = &format!(
+        "(\
+       (({{h1}} ({{h2}} (123 (\
+           ((73 (123 ) \
+           ((71 ({{h1}} ) \
+           ((51 ({{h2}} (123 ) \
+           (({condition} ({arg} ) \
+           ))\
+       ))"
+    );
+
+    let (_a, cond) = cond_test_flag(test, DONT_VALIDATE_SIGNATURE).expect("cond_test");
+    assert!(cond.spends.len() == 1);
+    assert!(if eligible {
+        (cond.spends[0].flags & ELIGIBLE_FOR_FF) != 0
+    } else {
+        (cond.spends[0].flags & ELIGIBLE_FOR_FF) == 0
+    });
 }
 
 #[cfg(test)]
