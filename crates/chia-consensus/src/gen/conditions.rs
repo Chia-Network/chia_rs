@@ -153,8 +153,8 @@ impl SpendVisitor for MempoolVisitor {
         // puzzle hash as our input coin
         if (spend.flags & ELIGIBLE_FOR_FF) != 0
             && !spend.create_coin.iter().any(|c| {
-                (c.amount & 1) == 1
-                    && a.atom(spend.puzzle_hash).as_ref() == c.puzzle_hash.as_slice()
+                a.atom(spend.puzzle_hash).as_ref() == c.puzzle_hash.as_slice()
+                    && spend.coin_amount == c.amount
             })
         {
             spend.flags &= !ELIGIBLE_FOR_FF;
@@ -3061,7 +3061,7 @@ fn test_multiple_create_coin() {
         amount: 43_u64,
         hint: a.nil()
     }));
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP | ELIGIBLE_FOR_FF);
+    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
 }
 
 #[test]
@@ -4617,16 +4617,36 @@ fn test_eligible_for_ff_even_amount() {
     assert!((cond.spends[0].flags & ELIGIBLE_FOR_FF) == 0);
 }
 
+#[test]
+fn test_eligible_for_ff_different_amount() {
+    // coins with even amounts cannot be singletons, even if all other
+    // conditions are met
+    // 73=ASSERT_MY_AMOUNT
+    // 71=ASSERT_MY_PARENT_ID
+    // 51=CREATE_COIN
+    let test = "(\
+       (({h1} ({h2} (122 (\
+           ((73 (122 ) \
+           ((71 ({h1} ) \
+           ((51 ({h2} (1 ) \
+           ))\
+       ))";
+
+    let (_a, cond) = cond_test(test).expect("cond_test");
+    assert!(cond.spends.len() == 1);
+    assert!((cond.spends[0].flags & ELIGIBLE_FOR_FF) == 0);
+}
+
 #[cfg(test)]
 #[rstest]
 #[case(123, "{h2}", true)]
-#[case(121, "{h2}", true)]
+#[case(121, "{h2}", false)]
 #[case(122, "{h1}", false)]
 #[case(1, "{h1}", false)]
 #[case(123, "{h1}", false)]
 fn test_eligible_for_ff_output_coin(#[case] amount: u64, #[case] ph: &str, #[case] eligible: bool) {
     // in order to be elgibible for fast forward, there needs to be an output
-    // coin with the same puzzle hash
+    // coin with the same puzzle hash and same amount
     // 51=CREATE_COIN
     let test: &str = &format!(
         "(\
