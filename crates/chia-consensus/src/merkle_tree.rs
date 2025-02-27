@@ -266,7 +266,7 @@ impl MerkleSet {
                     Ok(r)
                 }
             }
-            ArrayTypes::Truncated {} => Err(SetError),
+            ArrayTypes::Truncated => Err(SetError),
         }
     }
 
@@ -591,7 +591,7 @@ mod tests {
                     &self.get_partial_hash_recurse(left),
                     &self.get_partial_hash_recurse(right),
                 ),
-                ArrayTypes::Empty { .. } => BLANK,
+                ArrayTypes::Empty => BLANK,
             }
         }
     }
