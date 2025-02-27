@@ -4391,6 +4391,46 @@ fn test_assert_ephemeral() {
 }
 
 #[test]
+fn test_assert_ephemeral_no_ff() {
+    // ASSERT_EPHEMERAL
+    // the coin11 value is the coinID computed from (H1, H1, 123).
+    // coin11 is the first coin we spend in this case.
+    // 51 is CREATE_COIN, 76 is ASSERT_EPHEMERAL
+    let test = "(\
+       (({h1} ({h1} (123 (\
+           ((73 (123 ) \
+           ((71 ({h1} ) \
+           ((51 ({h2} (123 ) \
+           ))\
+       (({coin11} ({h2} (123 (\
+           ((73 (123 ) \
+           ((71 ({coin11} ) \
+           ((51 ({h2} (123 ) \
+           ((76 ) \
+           ))\
+       ))";
+    // we don't expect any error
+    let (a, conds) = cond_test(test).unwrap();
+
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
+    assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
+    assert_eq!(spend.agg_sig_me.len(), 0);
+    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP); // not ELIGIBLE_FOR_FF
+    assert!((spend.flags & ELIGIBLE_FOR_FF) == 0);
+
+    let spend = &conds.spends[1];
+    assert_eq!(
+        *spend.coin_id,
+        test_coin_id((&(*conds.spends[0].coin_id)).into(), H2, 123)
+    );
+    assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
+    assert_eq!(spend.agg_sig_me.len(), 0);
+    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP); // not ELIGIBLE_FOR_FF
+    assert!((spend.flags & ELIGIBLE_FOR_FF) == 0);
+}
+
+#[test]
 fn test_assert_ephemeral_wrong_ph() {
     // ASSERT_EPHEMERAL
     // the coin11 value is the coinID computed from (H1, H1, 123). The first
