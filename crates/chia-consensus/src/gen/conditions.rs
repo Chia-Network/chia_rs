@@ -48,9 +48,11 @@ pub const HAS_RELATIVE_CONDITION: u32 = 2;
 // 3. No ASSERT_MY_COIN_ID condition, no more than one ASSERT_MY_PARENT_ID condition
 //    (as the second condition)
 // 4. it has an output coin with the same puzzle hash as the spend itself
+
 // 5. None of the coin's outputs are spent by the same SpendBundle (which locks
 //    down the specific coin being spent). Even though an ephemeral FF spend
 //    wouldn't lock down the coin, it's expensive to check for this.
+// 6. there are no timelocks - ASSERT_*_RELATIVE / ASSERT_MY_BIRTH_*
 pub const ELIGIBLE_FOR_FF: u32 = 4;
 
 pub struct EmptyVisitor {}
@@ -93,7 +95,18 @@ impl SpendVisitor for MempoolVisitor {
 
     fn condition(&mut self, spend: &mut SpendConditions, c: &Condition) {
         match c {
-            Condition::AssertMyCoinId(_) => {
+            Condition::AssertMyCoinId(_)
+            | Condition::AssertHeightRelative(_)
+            | Condition::AssertSecondsRelative(_)
+            | Condition::AssertBeforeHeightRelative(_)
+            | Condition::AssertBeforeSecondsRelative(_)
+            | Condition::AssertMyBirthHeight(_)
+            | Condition::AssertMyBirthSeconds(_)
+            | Condition::AssertEphemeral => {
+                // fastforwards will change the birth time
+                // previously passing timelocks will most likely fail
+                // the coin ID will also change
+                // for these reasons the associated conditions are not eligible for FF
                 spend.flags &= !ELIGIBLE_FOR_FF;
             }
             Condition::AssertMyParentId(_) => {
@@ -111,6 +124,7 @@ impl SpendVisitor for MempoolVisitor {
             | Condition::AggSigParent(_, _)
             | Condition::AggSigParentAmount(_, _)
             | Condition::AggSigParentPuzzle(_, _) => {
+                // references to your parent and references will not successfully fastforward
                 spend.flags &= !ELIGIBLE_FOR_DEDUP;
                 spend.flags &= !ELIGIBLE_FOR_FF;
             }
@@ -147,8 +161,8 @@ impl SpendVisitor for MempoolVisitor {
         // puzzle hash as our input coin
         if (spend.flags & ELIGIBLE_FOR_FF) != 0
             && !spend.create_coin.iter().any(|c| {
-                (c.amount & 1) == 1
-                    && a.atom(spend.puzzle_hash).as_ref() == c.puzzle_hash.as_slice()
+                a.atom(spend.puzzle_hash).as_ref() == c.puzzle_hash.as_slice()
+                    && spend.coin_amount == c.amount
             })
         {
             spend.flags &= !ELIGIBLE_FOR_FF;
@@ -2221,7 +2235,6 @@ fn test_single_condition(
         condition as u8, arg
     ))
     .unwrap();
-
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
@@ -2365,12 +2378,12 @@ fn test_multiple_conditions(
         "((({{h1}} ({{h2}} (1234 ((({val} (100 ) (({val} (503 ) (({val} (90 )))))"
     ))
     .unwrap();
-
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 1234));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
+
     assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
 
     test(&conds, spend);
@@ -3098,7 +3111,7 @@ fn test_multiple_create_coin() {
         amount: 43_u64,
         hint: a.nil()
     }));
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP | ELIGIBLE_FOR_FF);
+    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
 }
 
 #[test]
@@ -4123,7 +4136,6 @@ fn test_impossible_constraints_single_spend(
     } else {
         // we don't expect any error
         let (a, conds) = cond_test(test).unwrap();
-
         // just make sure there are no constraints
         assert_eq!(conds.agg_sig_unsafe.len(), 0);
         assert_eq!(conds.reserve_fee, 0);
@@ -4221,7 +4233,6 @@ fn test_impossible_constraints_separate_spends(
     } else {
         // we don't expect any error
         let (a, conds) = cond_test(test).unwrap();
-
         // just make sure there are no constraints
         assert_eq!(conds.agg_sig_unsafe.len(), 0);
         assert_eq!(conds.reserve_fee, 0);
@@ -4367,7 +4378,7 @@ fn test_assert_ephemeral() {
     assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
     assert_eq!(spend.agg_sig_me.len(), 0);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP); // not ELIGIBLE_FOR_FF
 
     let spend = &conds.spends[1];
     assert_eq!(
@@ -4377,6 +4388,46 @@ fn test_assert_ephemeral() {
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.agg_sig_me.len(), 0);
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+}
+
+#[test]
+fn test_assert_ephemeral_no_ff() {
+    // ASSERT_EPHEMERAL
+    // the coin11 value is the coinID computed from (H1, H1, 123).
+    // coin11 is the first coin we spend in this case.
+    // 51 is CREATE_COIN, 76 is ASSERT_EPHEMERAL
+    let test = "(\
+       (({h1} ({h1} (123 (\
+           ((73 (123 ) \
+           ((71 ({h1} ) \
+           ((51 ({h2} (123 ) \
+           ))\
+       (({coin11} ({h2} (123 (\
+           ((73 (123 ) \
+           ((71 ({coin11} ) \
+           ((51 ({h2} (123 ) \
+           ((76 ) \
+           ))\
+       ))";
+    // we don't expect any error
+    let (a, conds) = cond_test(test).unwrap();
+
+    let spend = &conds.spends[0];
+    assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
+    assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
+    assert_eq!(spend.agg_sig_me.len(), 0);
+    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP); // not ELIGIBLE_FOR_FF
+    assert!((spend.flags & ELIGIBLE_FOR_FF) == 0);
+
+    let spend = &conds.spends[1];
+    assert_eq!(
+        *spend.coin_id,
+        test_coin_id((&(*conds.spends[0].coin_id)).into(), H2, 123)
+    );
+    assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
+    assert_eq!(spend.agg_sig_me.len(), 0);
+    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP); // not ELIGIBLE_FOR_FF
+    assert!((spend.flags & ELIGIBLE_FOR_FF) == 0);
 }
 
 #[test]
@@ -4704,16 +4755,36 @@ fn test_eligible_for_ff_even_amount() {
     assert!((cond.spends[0].flags & ELIGIBLE_FOR_FF) == 0);
 }
 
+#[test]
+fn test_eligible_for_ff_different_amount() {
+    // coins with even amounts cannot be singletons, even if all other
+    // conditions are met
+    // 73=ASSERT_MY_AMOUNT
+    // 71=ASSERT_MY_PARENT_ID
+    // 51=CREATE_COIN
+    let test = "(\
+       (({h1} ({h2} (123 (\
+           ((73 (123 ) \
+           ((71 ({h1} ) \
+           ((51 ({h2} (1 ) \
+           ))\
+       ))";
+
+    let (_a, cond) = cond_test(test).expect("cond_test");
+    assert!(cond.spends.len() == 1);
+    assert!((cond.spends[0].flags & ELIGIBLE_FOR_FF) == 0);
+}
+
 #[cfg(test)]
 #[rstest]
 #[case(123, "{h2}", true)]
-#[case(121, "{h2}", true)]
+#[case(121, "{h2}", false)]
 #[case(122, "{h1}", false)]
 #[case(1, "{h1}", false)]
 #[case(123, "{h1}", false)]
 fn test_eligible_for_ff_output_coin(#[case] amount: u64, #[case] ph: &str, #[case] eligible: bool) {
     // in order to be elgibible for fast forward, there needs to be an output
-    // coin with the same puzzle hash
+    // coin with the same puzzle hash and same amount
     // 51=CREATE_COIN
     let test: &str = &format!(
         "(\
@@ -4737,6 +4808,7 @@ fn test_eligible_for_ff_output_coin(#[case] amount: u64, #[case] ph: &str, #[cas
 #[rstest]
 #[case(ASSERT_MY_PARENT_ID, "{h1}")]
 #[case(ASSERT_MY_COIN_ID, "{coin12}")]
+
 fn test_eligible_for_ff_invalid_assert_parent(
     #[case] condition: ConditionOpcode,
     #[case] arg: &str,
@@ -4758,6 +4830,44 @@ fn test_eligible_for_ff_invalid_assert_parent(
     let (_a, cond) = cond_test(test).expect("cond_test");
     assert!(cond.spends.len() == 1);
     assert!((cond.spends[0].flags & ELIGIBLE_FOR_FF) == 0);
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(ASSERT_HEIGHT_RELATIVE, "0", false)]
+#[case(ASSERT_SECONDS_RELATIVE, "0", false)]
+#[case(ASSERT_BEFORE_HEIGHT_RELATIVE, "0", false)]
+#[case(ASSERT_BEFORE_SECONDS_RELATIVE, "0", false)]
+#[case(ASSERT_MY_BIRTH_HEIGHT, "0", false)]
+#[case(ASSERT_MY_BIRTH_SECONDS, "0", false)]
+#[case(ASSERT_MY_AMOUNT, "123", true)]
+fn test_eligible_for_ff_timelocks(
+    #[case] condition: ConditionOpcode,
+    #[case] arg: &str,
+    #[case] eligible: bool,
+) {
+    // 73=ASSERT_MY_AMOUNT
+    // 71=ASSERT_MY_PARENT_ID
+    // 51=CREATE_COIN
+    // then test condition after
+    let test = &format!(
+        "(\
+       (({{h1}} ({{h2}} (123 (\
+           ((73 (123 ) \
+           ((71 ({{h1}} ) \
+           ((51 ({{h2}} (123 ) \
+           (({condition} ({arg} ) \
+           ))\
+       ))"
+    );
+
+    let (_a, cond) = cond_test_flag(test, DONT_VALIDATE_SIGNATURE).expect("cond_test");
+    assert!(cond.spends.len() == 1);
+    assert!(if eligible {
+        (cond.spends[0].flags & ELIGIBLE_FOR_FF) != 0
+    } else {
+        (cond.spends[0].flags & ELIGIBLE_FOR_FF) == 0
+    });
 }
 
 #[cfg(test)]
