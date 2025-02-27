@@ -534,7 +534,6 @@ dependencies = [
 name = "chia-ssl"
 version = "0.20.0"
 dependencies = [
- "lazy_static",
  "rand",
  "rcgen",
  "rsa",

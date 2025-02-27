@@ -171,7 +171,7 @@ mod tests {
                 expected_result.extend(TEST_CONSTANTS.agg_sig_me_additional_data.as_slice());
             }
             _ => {}
-        };
+        }
         let mut a: Allocator = make_allocator(LIMIT_HEAP);
         let spend = SpendConditions::new(
             a.new_atom(parent_id.as_slice()).expect("should pass"),
