@@ -227,7 +227,7 @@ where
         return Err(ValidationErr(all_spends, ErrorCode::GeneratorRuntimeError));
     }
 
-    validate_conditions(a, &ret, &state, a.nil(), flags)?;
+    validate_conditions(a, &ret, &mut state, a.nil(), flags)?;
     validate_signature(&state, signature, flags, bls_cache)?;
     ret.validated_signature = (flags & DONT_VALIDATE_SIGNATURE) == 0;
 

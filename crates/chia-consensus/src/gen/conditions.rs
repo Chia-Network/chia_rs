@@ -53,6 +53,7 @@ pub const HAS_RELATIVE_CONDITION: u32 = 2;
 //    down the specific coin being spent). Even though an ephemeral FF spend
 //    wouldn't lock down the coin, it's expensive to check for this.
 // 6. there are no timelocks - ASSERT_*_RELATIVE / ASSERT_MY_BIRTH_*
+// 7. The coin is not referenced by an ASSERT_CONCURRENT_SPEND condition
 pub const ELIGIBLE_FOR_FF: u32 = 4;
 
 pub struct EmptyVisitor {}
@@ -170,7 +171,7 @@ impl SpendVisitor for MempoolVisitor {
     }
 
     fn post_process(
-        _a: &Allocator,
+        a: &Allocator,
         state: &ParseState,
         bundle: &mut SpendBundleConditions,
     ) -> Result<(), ValidationErr> {
@@ -183,6 +184,14 @@ impl SpendVisitor for MempoolVisitor {
         // spending the same coin. The last output in this chain is spent by a
         // non-FF spend. Clearing the FF-flag on all spends would require
         // multiple passes over the spends.
+
+        for &coin_id in &state.assert_concurrent_spend {
+            let coin_id = Bytes32::try_from(a.atom(coin_id).as_ref()).unwrap();
+
+            if let Some(index) = state.spent_coins.get(&coin_id) {
+                bundle.spends[*index].flags &= !ELIGIBLE_FOR_FF;
+            }
+        }
 
         for s in &mut bundle.spends {
             if (s.flags & ELIGIBLE_FOR_FF) == 0 {
@@ -207,6 +216,7 @@ impl SpendVisitor for MempoolVisitor {
                 }
             }
         }
+
         Ok(())
     }
 }
