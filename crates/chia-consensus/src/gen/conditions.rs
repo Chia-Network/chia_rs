@@ -170,6 +170,8 @@ impl SpendVisitor for MempoolVisitor {
         // non-FF spend. Clearing the FF-flag on all spends would require
         // multiple passes over the spends.
 
+        let mut children = HashSet::new();
+
         for s in &mut bundle.spends {
             if (s.flags & ELIGIBLE_FOR_FF) == 0 {
                 continue;
@@ -189,10 +191,22 @@ impl SpendVisitor for MempoolVisitor {
 
                 if state.spent_coins.contains_key(&new_coin) {
                     s.flags &= !ELIGIBLE_FOR_FF;
+                    children.insert(new_coin);
                     break;
                 }
             }
         }
+
+        for spend in &mut bundle.spends {
+            if (spend.flags & ELIGIBLE_FOR_FF) == 0 {
+                continue;
+            }
+
+            if children.contains(&spend.coin_id) {
+                spend.flags &= !ELIGIBLE_FOR_FF;
+            }
+        }
+
         Ok(())
     }
 }
