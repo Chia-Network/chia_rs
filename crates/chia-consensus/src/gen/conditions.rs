@@ -4878,6 +4878,8 @@ fn test_eligible_for_ff_timelocks(
 #[case(AGG_SIG_PARENT_PUZZLE, false)]
 #[case(AGG_SIG_UNSAFE, true)]
 #[case(AGG_SIG_PUZZLE, true)]
+#[case(AGG_SIG_AMOUNT, true)]
+#[case(AGG_SIG_PUZZLE_AMOUNT, true)]
 fn test_eligible_for_ff_invalid_agg_sig_me(
     #[case] condition: ConditionOpcode,
     #[case] eligible: bool,
