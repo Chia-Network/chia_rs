@@ -5756,3 +5756,26 @@ fn test_message_eligible_for_ff() {
         assert_eq!((cond.spends[1].flags & ELIGIBLE_FOR_FF), 0);
     }
 }
+
+#[cfg(test)]
+#[rstest]
+fn test_assert_concurrent_spend_ff(#[values(true, false)] is_dedup_id: bool) {
+    let test = format!(
+        "(\
+       (({{h1}} ({{h2}} (123 (\
+           ((51 ({{h2}} (123 ) \
+           ((73 (123 ) \
+           ))\
+       (({{h2}} ({{h1}} (123 (\
+           ((64 ({} ) \
+           ((86 (1000 ) \
+           ))\
+       ))",
+        if is_dedup_id { "{coin12}" } else { "{coin21}" }
+    );
+
+    let (_a, cond) = cond_test_flag(&test, 0).expect("cond_test");
+    assert!(cond.spends.len() == 2);
+    assert_ne!((cond.spends[0].flags & ELIGIBLE_FOR_FF), is_dedup_id as u32);
+    assert_eq!((cond.spends[1].flags & ELIGIBLE_FOR_FF), 0);
+}
