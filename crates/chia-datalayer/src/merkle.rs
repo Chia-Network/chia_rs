@@ -258,6 +258,12 @@ create_errors!(
             (usize, usize)
         ),
         (
+            IntegrityLeafHashToIndexCacheLength,
+            IntegrityLeafHashToIndexCacheLengthError,
+            "found {0:?} leaves but leaf hash to index cache length is: {1}",
+            (usize, usize)
+        ),
+        (
             IntegrityUnmatchedChildParentRelationships,
             IntegrityUnmatchedChildParentRelationshipsError,
             "unmatched parent -> child references found: {0}",
@@ -1142,6 +1148,7 @@ impl MerkleBlob {
     pub fn delete(&mut self, key: KeyId) -> Result<(), Error> {
         let (leaf_index, leaf, _leaf_block) = self.get_leaf_by_key(key)?;
         self.key_to_index.remove(&key);
+        self.leaf_hash_to_index.remove(&leaf.hash);
 
         let Some(parent_index) = leaf.parent.0 else {
             self.clear();
@@ -1259,6 +1266,13 @@ impl MerkleBlob {
             return Err(Error::IntegrityKeyToIndexCacheLength(
                 leaf_count,
                 key_to_index_cache_length,
+            ));
+        }
+        let leaf_hash_to_index_cache_length = self.leaf_hash_to_index.len();
+        if leaf_count != leaf_hash_to_index_cache_length {
+            return Err(Error::IntegrityLeafHashToIndexCacheLength(
+                leaf_count,
+                leaf_hash_to_index_cache_length,
             ));
         }
         let total_count = leaf_count + internal_count + self.free_indexes.len();
@@ -1403,6 +1417,7 @@ impl MerkleBlob {
                 {
                     if let Node::Leaf(old_node) = old_block.node {
                         self.key_to_index.remove(&old_node.key);
+                        self.leaf_hash_to_index.remove(&old_node.hash);
                     };
                 };
                 self.blob[block_range(index)].copy_from_slice(&new_block_bytes);
@@ -1411,6 +1426,7 @@ impl MerkleBlob {
 
         if let Node::Leaf(ref node) = block.node {
             self.key_to_index.insert(node.key, index);
+            self.leaf_hash_to_index.insert(node.hash, index);
         };
 
         self.free_indexes.take(&index);
