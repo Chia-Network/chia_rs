@@ -1936,6 +1936,11 @@ impl MerkleBlob {
 
         Ok(self.get_node(index)?.expect_leaf("matched leaf above"))
     }
+
+    #[pyo3(name = "check_integrity")]
+    pub fn py_check_integrity(&self) -> PyResult<()> {
+        Ok(self.check_integrity()?)
+    }
 }
 
 fn try_get_block(blob: &[u8], index: TreeIndex) -> Result<Block, Error> {
