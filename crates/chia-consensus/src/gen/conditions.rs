@@ -180,9 +180,7 @@ impl SpendVisitor for MempoolVisitor {
                 .map(|c| c.amount as u128)
                 .sum::<u128>();
 
-            let spend_commitments = spend_additions + spend.reserve_fee as u128;
-
-            if spend.coin_amount as u128 > spend_commitments {
+            if spend.coin_amount as u128 > spend_additions {
                 spend.flags &= !ELIGIBLE_FOR_DEDUP;
             }
         }
@@ -744,7 +742,6 @@ pub struct SpendConditions {
     pub agg_sig_puzzle_amount: Vec<(PublicKey, NodePtr)>,
     pub agg_sig_parent_amount: Vec<(PublicKey, NodePtr)>,
     pub agg_sig_parent_puzzle: Vec<(PublicKey, NodePtr)>,
-    pub reserve_fee: u64,
     // Flags describing properties of this spend. See flags above
     pub flags: u32,
 }
@@ -775,7 +772,6 @@ impl SpendConditions {
             agg_sig_puzzle_amount: Vec::new(),
             agg_sig_parent_amount: Vec::new(),
             agg_sig_parent_puzzle: Vec::new(),
-            reserve_fee: 0,
             flags: 0,
         }
     }
@@ -1048,11 +1044,6 @@ pub fn parse_conditions<V: SpendVisitor>(
             Condition::ReserveFee(limit) => {
                 // reserve fees are accumulated
                 ret.reserve_fee = ret
-                    .reserve_fee
-                    .checked_add(limit)
-                    .ok_or(ValidationErr(c, ErrorCode::ReserveFeeConditionFailed))?;
-
-                spend.reserve_fee = spend
                     .reserve_fee
                     .checked_add(limit)
                     .ok_or(ValidationErr(c, ErrorCode::ReserveFeeConditionFailed))?;
@@ -5863,25 +5854,7 @@ fn test_dedup_absorb_amount() {
 }
 
 #[test]
-fn test_dedup_same_amount_with_fee() {
-    let test = "(\
-       (({h1} ({h2} (123 (\
-           ((51 ({h2} (100 ) \
-           ((52 (23 ) \
-           ))\
-       ))";
-
-    let (_a, cond) = cond_test_flag(test, 0).expect("cond_test");
-    assert!(cond.spends.len() == 1);
-
-    // Eligible for dedup because there is a commitment to paying the full coin amount
-    // Even though the output is less than the input, the excess can't be used by other spends
-    // And therefore no double spend of the value is possible, it's up to the farmer to take it
-    assert_eq!(cond.spends[0].flags & ELIGIBLE_FOR_DEDUP, 1);
-}
-
-#[test]
-fn test_dedup_absorb_fee() {
+fn test_dedup_reserve_and_pay_fee() {
     let test = "(\
        (({h1} ({h2} (123 (\
            ((52 (246 ) \
@@ -5893,9 +5866,30 @@ fn test_dedup_absorb_fee() {
     let (_a, cond) = cond_test_flag(test, 0).expect("cond_test");
     assert!(cond.spends.len() == 2);
 
-    // Eligible for dedup because there is a commitment to paying the full coin amount
-    // Even though the output is less than the input, the excess can't be used by other spends
-    // And therefore no double spend of the value is possible, it's up to the farmer to take it
+    // Not eligible for dedup because the output is less than the input
+    // This would mean the fee for the transaction is misleading due to deduplication
+    assert_eq!(cond.spends[0].flags & ELIGIBLE_FOR_DEDUP, 0);
+
+    // Not eligible for dedup because the output is less than the input
+    assert_eq!(cond.spends[1].flags & ELIGIBLE_FOR_DEDUP, 0);
+}
+
+#[test]
+fn test_dedup_reserve_fee_without_paying() {
+    let test = "(\
+       (({h1} ({h2} (123 (\
+           ((51 ({h2} (123 ) \
+           ((52 (123 ) \
+           ))\
+       (({h2} ({h1} (123 (\
+           ))\
+       ))";
+
+    let (_a, cond) = cond_test_flag(test, 0).expect("cond_test");
+    assert!(cond.spends.len() == 2);
+
+    // Eligible for dedup because the output is equal to the input
+    // And a dedup spend can still reserve a fee as long as it doesn't pay it
     assert_eq!(cond.spends[0].flags & ELIGIBLE_FOR_DEDUP, 1);
 
     // Not eligible for dedup because the output is less than the input
