@@ -5760,6 +5760,10 @@ fn test_message_eligible_for_ff() {
 #[cfg(test)]
 #[rstest]
 fn test_assert_concurrent_spend_ff(#[values(true, false)] is_dedup_id: bool) {
+    // 51=CREATE_COIN
+    // 73=ASSERT_MY_AMOUNT
+    // 64=ASSERT_CONCURRENT_SPEND
+    // 86=ASSERT_BEFORE_HEIGHT_RELATIVE
     let test = format!(
         "(\
        (({{h1}} ({{h2}} (123 (\
