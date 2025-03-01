@@ -5829,7 +5829,7 @@ fn test_dedup_same_amount() {
     assert!(cond.spends.len() == 1);
 
     // Eligible for dedup because the output is equal to the input
-    assert_eq!(cond.spends[0].flags & ELIGIBLE_FOR_DEDUP, 1);
+    assert!((cond.spends[0].flags & ELIGIBLE_FOR_DEDUP) != 0);
 }
 
 #[test]
@@ -5847,7 +5847,7 @@ fn test_dedup_absorb_amount() {
 
     // Eligible for dedup because the output is greater than the input
     // It's fine to pay for this multiple times from different spends, since the excess goes to the farmer
-    assert_eq!(cond.spends[0].flags & ELIGIBLE_FOR_DEDUP, 1);
+    assert!((cond.spends[0].flags & ELIGIBLE_FOR_DEDUP) != 0);
 
     // Not eligible for dedup because the output is less than the input
     assert_eq!(cond.spends[1].flags & ELIGIBLE_FOR_DEDUP, 0);
@@ -5890,7 +5890,7 @@ fn test_dedup_reserve_fee_without_paying() {
 
     // Eligible for dedup because the output is equal to the input
     // And a dedup spend can still reserve a fee as long as it doesn't pay it
-    assert_eq!(cond.spends[0].flags & ELIGIBLE_FOR_DEDUP, 1);
+    assert!((cond.spends[0].flags & ELIGIBLE_FOR_DEDUP) != 0);
 
     // Not eligible for dedup because the output is less than the input
     assert_eq!(cond.spends[1].flags & ELIGIBLE_FOR_DEDUP, 0);
