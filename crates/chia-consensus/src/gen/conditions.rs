@@ -53,6 +53,7 @@ pub const HAS_RELATIVE_CONDITION: u32 = 2;
 //    down the specific coin being spent). Even though an ephemeral FF spend
 //    wouldn't lock down the coin, it's expensive to check for this.
 // 6. there are no timelocks - ASSERT_*_RELATIVE / ASSERT_MY_BIRTH_*
+// 7. The coin is not referenced by an ASSERT_CONCURRENT_SPEND condition
 pub const ELIGIBLE_FOR_FF: u32 = 4;
 
 pub struct EmptyVisitor {}
@@ -170,7 +171,7 @@ impl SpendVisitor for MempoolVisitor {
     }
 
     fn post_process(
-        _a: &Allocator,
+        a: &Allocator,
         state: &ParseState,
         bundle: &mut SpendBundleConditions,
     ) -> Result<(), ValidationErr> {
@@ -183,6 +184,14 @@ impl SpendVisitor for MempoolVisitor {
         // spending the same coin. The last output in this chain is spent by a
         // non-FF spend. Clearing the FF-flag on all spends would require
         // multiple passes over the spends.
+
+        for &coin_id in &state.assert_concurrent_spend {
+            let coin_id = Bytes32::try_from(a.atom(coin_id).as_ref()).unwrap();
+
+            if let Some(index) = state.spent_coins.get(&coin_id) {
+                bundle.spends[*index].flags &= !ELIGIBLE_FOR_FF;
+            }
+        }
 
         for s in &mut bundle.spends {
             if (s.flags & ELIGIBLE_FOR_FF) == 0 {
@@ -207,6 +216,7 @@ impl SpendVisitor for MempoolVisitor {
                 }
             }
         }
+
         Ok(())
     }
 }
@@ -5745,4 +5755,35 @@ fn test_message_eligible_for_ff() {
         );
         assert_eq!((cond.spends[1].flags & ELIGIBLE_FOR_FF), 0);
     }
+}
+
+#[cfg(test)]
+#[rstest]
+fn test_assert_concurrent_spend_ff(#[values(true, false)] is_dedup_id: bool) {
+    // 51=CREATE_COIN
+    // 73=ASSERT_MY_AMOUNT
+    // 64=ASSERT_CONCURRENT_SPEND
+    // 86=ASSERT_BEFORE_HEIGHT_RELATIVE
+    let test = format!(
+        "(\
+       (({{h1}} ({{h2}} (123 (\
+           ((51 ({{h2}} (123 ) \
+           ((73 (123 ) \
+           ))\
+       (({{h2}} ({{h1}} (123 (\
+           ((64 ({} ) \
+           ((86 (1000 ) \
+           ))\
+       ))",
+        if is_dedup_id { "{coin12}" } else { "{coin21}" }
+    );
+
+    let (_a, cond) = cond_test_flag(&test, 0).expect("cond_test");
+    assert!(cond.spends.len() == 2);
+
+    // If the spend is referenced by ASSERT_CONCURRENT_SPEND, it's not eligible for FF
+    assert_eq!((cond.spends[0].flags & ELIGIBLE_FOR_FF) == 0, is_dedup_id);
+
+    // To simplify the test, the other spend is never eligible for FF because we include a relative timelock
+    assert_eq!((cond.spends[1].flags & ELIGIBLE_FOR_FF), 0);
 }
