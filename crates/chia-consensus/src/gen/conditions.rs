@@ -5776,6 +5776,10 @@ fn test_assert_concurrent_spend_ff(#[values(true, false)] is_dedup_id: bool) {
 
     let (_a, cond) = cond_test_flag(&test, 0).expect("cond_test");
     assert!(cond.spends.len() == 2);
-    assert_ne!((cond.spends[0].flags & ELIGIBLE_FOR_FF), is_dedup_id as u32);
+
+    // If the spend is referenced by ASSERT_CONCURRENT_SPEND, it's not eligible for FF
+    assert_eq!((cond.spends[0].flags & ELIGIBLE_FOR_FF) == 0, is_dedup_id);
+
+    // To simplify the test, the other spend is never eligible for FF because we include a relative timelock
     assert_eq!((cond.spends[1].flags & ELIGIBLE_FOR_FF), 0);
 }
