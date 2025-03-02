@@ -34,8 +34,11 @@ use std::sync::Arc;
 
 // spend flags
 
-// a spend is eligible for deduplication if it does not have any AGG_SIG_ME
-// nor AGG_SIG_UNSAFE
+// If the CoinSpend is eligible for deduplication, this flag is set. A spend is
+// eligible if:
+// 1. There are no AGG_SIG_* conditions
+// 2. There are no message conditions
+// 3. The coin amount is less than or equal to its own outputs (to prevent paying for something multiple times)
 pub const ELIGIBLE_FOR_DEDUP: u32 = 1;
 
 // If the spend bundle contained *any* relative seconds or height condition, this flag is set
@@ -167,6 +170,19 @@ impl SpendVisitor for MempoolVisitor {
             })
         {
             spend.flags &= !ELIGIBLE_FOR_FF;
+        }
+
+        // A spend cannot be eligible for dedup if it has an excess amount
+        if (spend.flags & ELIGIBLE_FOR_DEDUP) != 0 {
+            let spend_additions = spend
+                .create_coin
+                .iter()
+                .map(|c| c.amount as u128)
+                .sum::<u128>();
+
+            if spend.coin_amount as u128 > spend_additions {
+                spend.flags &= !ELIGIBLE_FOR_DEDUP;
+            }
         }
     }
 
@@ -1937,7 +1953,7 @@ fn test_invalid_condition_args_terminator() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP | HAS_RELATIVE_CONDITION);
+    assert_eq!(spend.flags, HAS_RELATIVE_CONDITION);
 
     assert_eq!(spend.seconds_relative, Some(50));
 }
@@ -1964,7 +1980,7 @@ fn test_invalid_condition_list_terminator() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP | HAS_RELATIVE_CONDITION);
+    assert_eq!(spend.flags, HAS_RELATIVE_CONDITION);
 
     assert_eq!(spend.seconds_relative, Some(50));
 }
@@ -2195,14 +2211,12 @@ fn test_extra_arg(
 
     let expected_cost = if has_agg_sig { 1_200_000 } else { 0 };
 
-    let expected_flags = if has_agg_sig { 0 } else { ELIGIBLE_FOR_DEDUP };
-
     assert_eq!(conds.cost, expected_cost);
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert_eq!((spend.flags & ELIGIBLE_FOR_DEDUP), expected_flags);
+    assert!((spend.flags & ELIGIBLE_FOR_DEDUP) == 0);
 
     test(&conds, spend);
 }
@@ -2250,7 +2264,7 @@ fn test_single_condition(
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
+    assert!((spend.flags & ELIGIBLE_FOR_DEDUP) == 0);
 
     test(&conds, spend);
 }
@@ -2393,8 +2407,7 @@ fn test_multiple_conditions(
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 1234));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-
-    assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
+    assert!((spend.flags & ELIGIBLE_FOR_DEDUP) == 0);
 
     test(&conds, spend);
 }
@@ -2451,7 +2464,7 @@ fn test_single_height_relative_zero() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP | HAS_RELATIVE_CONDITION);
+    assert_eq!(spend.flags, HAS_RELATIVE_CONDITION);
 
     assert_eq!(spend.height_relative, Some(0));
 }
@@ -2509,7 +2522,7 @@ fn test_coin_announces_consume() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, 0);
 }
 
 #[test]
@@ -2562,7 +2575,7 @@ fn test_puzzle_announces_consume() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, 0);
 }
 
 #[test]
@@ -2649,7 +2662,7 @@ fn test_multiple_assert_my_amount() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, 0);
 }
 
 #[test]
@@ -2697,7 +2710,7 @@ fn test_multiple_assert_my_coin_id() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, 0);
 }
 
 #[test]
@@ -2734,7 +2747,7 @@ fn test_multiple_assert_my_parent_coin_id() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, 0);
 }
 
 #[test]
@@ -2772,7 +2785,7 @@ fn test_multiple_assert_my_puzzle_hash() {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, 0);
 }
 
 #[test]
@@ -2816,7 +2829,7 @@ fn test_single_create_coin() {
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.nil());
     }
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, 0);
 }
 
 #[test]
@@ -2905,7 +2918,7 @@ fn test_create_coin_with_hint() {
         assert!(c.amount == 42_u64);
         assert!(a.atom(c.hint).as_ref() == H1.to_vec());
     }
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, 0);
 }
 
 #[test]
@@ -2928,7 +2941,7 @@ fn test_create_coin_extra_arg() {
         assert!(c.amount == 42_u64);
         assert!(a.atom(c.hint).as_ref() == H1.to_vec());
     }
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, 0);
 }
 
 #[test]
@@ -2949,7 +2962,7 @@ fn test_create_coin_with_multiple_hints() {
         assert!(c.amount == 42_u64);
         assert!(a.atom(c.hint).as_ref() == H1.to_vec());
     }
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, 0);
 }
 
 #[test]
@@ -2971,7 +2984,7 @@ fn test_create_coin_with_hint_as_atom() {
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.nil());
     }
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, 0);
 }
 
 #[test]
@@ -2992,7 +3005,7 @@ fn test_create_coin_with_invalid_hint_as_terminator() {
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.nil());
     }
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, 0);
 }
 
 #[test]
@@ -3026,7 +3039,7 @@ fn test_create_coin_with_short_hint() {
         assert!(c.amount == 42_u64);
         assert!(a.atom(c.hint).as_ref() == MSG1.to_vec());
     }
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, 0);
 }
 
 #[test]
@@ -3048,7 +3061,7 @@ fn test_create_coin_with_long_hint() {
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.nil());
     }
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, 0);
 }
 
 #[test]
@@ -3071,7 +3084,7 @@ fn test_create_coin_with_pair_hint() {
         assert_eq!(c.amount, 42_u64);
         assert_eq!(a.atom(c.hint).as_ref(), H1.to_vec());
     }
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, 0);
 }
 
 #[test]
@@ -3093,7 +3106,7 @@ fn test_create_coin_with_cons_hint() {
         assert_eq!(c.amount, 42_u64);
         assert_eq!(c.hint, a.nil());
     }
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, 0);
 }
 
 #[test]
@@ -3121,7 +3134,7 @@ fn test_multiple_create_coin() {
         amount: 43_u64,
         hint: a.nil()
     }));
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, 0);
 }
 
 #[test]
@@ -3777,7 +3790,7 @@ fn test_remark() {
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.agg_sig_me.len(), 0);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, 0);
 }
 
 #[test]
@@ -3801,7 +3814,7 @@ fn test_remark_with_arg() {
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.agg_sig_me.len(), 0);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, 0);
 }
 
 #[test]
@@ -3849,13 +3862,13 @@ fn test_concurrent_spend() {
         assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
         assert_eq!(spend.agg_sig_me.len(), 0);
-        assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+        assert_eq!(spend.flags, 0);
 
         let spend = &conds.spends[1];
         assert_eq!(*spend.coin_id, test_coin_id(H2, H2, 123));
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
         assert_eq!(spend.agg_sig_me.len(), 0);
-        assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+        assert_eq!(spend.flags, 0);
     }
 }
 
@@ -3928,7 +3941,7 @@ fn test_assert_concurrent_spend_self() {
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.agg_sig_me.len(), 0);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, 0);
 }
 
 #[test]
@@ -3976,13 +3989,13 @@ fn test_concurrent_puzzle() {
         assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
         assert_eq!(spend.agg_sig_me.len(), 0);
-        assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+        assert_eq!(spend.flags, 0);
 
         let spend = &conds.spends[1];
         assert_eq!(*spend.coin_id, test_coin_id(H2, H2, 123));
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
         assert_eq!(spend.agg_sig_me.len(), 0);
-        assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+        assert_eq!(spend.flags, 0);
     }
 }
 
@@ -4054,7 +4067,7 @@ fn test_assert_concurrent_puzzle_self() {
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.agg_sig_me.len(), 0);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, 0);
 }
 
 // the relative constraints clash because they are on the same coin spend
@@ -4158,7 +4171,7 @@ fn test_impossible_constraints_single_spend(
         assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
         assert_eq!(spend.agg_sig_me.len(), 0);
-        assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
+        assert!((spend.flags & ELIGIBLE_FOR_DEDUP) == 0);
     }
 }
 
@@ -4255,13 +4268,13 @@ fn test_impossible_constraints_separate_spends(
         assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
         assert_eq!(spend.agg_sig_me.len(), 0);
-        assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
+        assert!((spend.flags & ELIGIBLE_FOR_DEDUP) == 0);
 
         let spend = &conds.spends[1];
         assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
         assert_eq!(spend.agg_sig_me.len(), 0);
-        assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
+        assert!((spend.flags & ELIGIBLE_FOR_DEDUP) == 0);
     }
 }
 
@@ -4303,7 +4316,7 @@ fn test_multiple_my_birth_assertions(
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 1234));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
+    assert!((spend.flags & ELIGIBLE_FOR_DEDUP) == 0);
 
     test(spend);
 }
@@ -4353,7 +4366,7 @@ fn test_ephemeral_non_ff_spend() {
     );
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
     assert_eq!(spend.agg_sig_me.len(), 0);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, 0);
 }
 
 #[test]
@@ -4397,7 +4410,7 @@ fn test_assert_ephemeral() {
     );
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.agg_sig_me.len(), 0);
-    assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
+    assert_eq!(spend.flags, 0);
 }
 
 #[test]
@@ -4581,7 +4594,7 @@ fn test_relative_condition_on_ephemeral(
         );
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
         assert_eq!(spend.agg_sig_me.len(), 0);
-        assert!((spend.flags & ELIGIBLE_FOR_DEDUP) != 0);
+        assert!((spend.flags & ELIGIBLE_FOR_DEDUP) == 0);
     }
 }
 
@@ -5786,4 +5799,99 @@ fn test_assert_concurrent_spend_ff(#[values(true, false)] is_dedup_id: bool) {
 
     // To simplify the test, the other spend is never eligible for FF because we include a relative timelock
     assert_eq!((cond.spends[1].flags & ELIGIBLE_FOR_FF), 0);
+}
+
+#[test]
+fn test_dedup_excess_amount() {
+    let test = "(\
+       (({h1} ({h2} (123 (\
+           ((51 ({h2} (100 ) \
+           ))\
+       ))";
+
+    let (_a, cond) = cond_test_flag(test, 0).expect("cond_test");
+    assert!(cond.spends.len() == 1);
+
+    // Not eligible for dedup because the output is less than the input
+    // This would essentially result in double spends of the value across deduped transactions
+    assert_eq!(cond.spends[0].flags & ELIGIBLE_FOR_DEDUP, 0);
+}
+
+#[test]
+fn test_dedup_same_amount() {
+    let test = "(\
+       (({h1} ({h2} (123 (\
+           ((51 ({h2} (123 ) \
+           ))\
+       ))";
+
+    let (_a, cond) = cond_test_flag(test, 0).expect("cond_test");
+    assert!(cond.spends.len() == 1);
+
+    // Eligible for dedup because the output is equal to the input
+    assert!((cond.spends[0].flags & ELIGIBLE_FOR_DEDUP) != 0);
+}
+
+#[test]
+fn test_dedup_absorb_amount() {
+    let test = "(\
+       (({h1} ({h2} (123 (\
+           ((51 ({h2} (200 ) \
+           ))\
+       (({h2} ({h1} (123 (\
+           ))\
+       ))";
+
+    let (_a, cond) = cond_test_flag(test, 0).expect("cond_test");
+    assert!(cond.spends.len() == 2);
+
+    // Eligible for dedup because the output is greater than the input
+    // It's fine to pay for this multiple times from different spends, since the excess goes to the farmer
+    assert!((cond.spends[0].flags & ELIGIBLE_FOR_DEDUP) != 0);
+
+    // Not eligible for dedup because the output is less than the input
+    assert_eq!(cond.spends[1].flags & ELIGIBLE_FOR_DEDUP, 0);
+}
+
+#[test]
+fn test_dedup_reserve_and_pay_fee() {
+    let test = "(\
+       (({h1} ({h2} (123 (\
+           ((52 (246 ) \
+           ))\
+       (({h2} ({h1} (123 (\
+           ))\
+       ))";
+
+    let (_a, cond) = cond_test_flag(test, 0).expect("cond_test");
+    assert!(cond.spends.len() == 2);
+
+    // Not eligible for dedup because the output is less than the input
+    // This would mean the fee for the transaction is misleading due to deduplication
+    assert_eq!(cond.spends[0].flags & ELIGIBLE_FOR_DEDUP, 0);
+
+    // Not eligible for dedup because the output is less than the input
+    assert_eq!(cond.spends[1].flags & ELIGIBLE_FOR_DEDUP, 0);
+}
+
+#[test]
+fn test_dedup_reserve_fee_without_paying() {
+    let test = "(\
+       (({h1} ({h2} (123 (\
+           ((51 ({h2} (123 ) \
+           ((52 (123 ) \
+           ))\
+       (({h2} ({h1} (123 (\
+           ))\
+       ))";
+
+    let (_a, cond) = cond_test_flag(test, 0).expect("cond_test");
+    assert!(cond.spends.len() == 2);
+
+    // Eligible for dedup because the output is equal to the input
+    // And a dedup spend can still reserve a fee as long as it doesn't pay it
+    assert!((cond.spends[0].flags & ELIGIBLE_FOR_DEDUP) != 0);
+
+    // Not eligible for dedup because the output is less than the input
+    assert_eq!(cond.spends[1].flags & ELIGIBLE_FOR_DEDUP, 0);
 }
