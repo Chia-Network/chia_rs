@@ -175,6 +175,11 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
 
+      - name: Poke
+        run: |
+          rustc --version
+          rustup toolchain list
+
       - name: cargo bench
         run: |
           cargo bench --workspace --exclude chia_rs
