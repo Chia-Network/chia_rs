@@ -3067,10 +3067,10 @@ mod tests {
     #[rstest]
     fn test_unwritten_nonfree_indexes(small_blob: MerkleBlob) {
         let key = KeyId(0x0001_0203_0405_0607);
-        let Some(index) = small_blob.key_to_index.get(&key).cloned() else {
+        let Some(index) = small_blob.key_to_index.get(&key).copied() else {
             panic!("maybe the test key needs to be updated?")
         };
-        let mut prepared_bytes = small_blob.blob.to_vec();
+        let mut prepared_bytes = small_blob.blob.clone();
         prepared_bytes.extend_from_slice(&small_blob.get_block_bytes(index).unwrap());
         let mut prepared_blob = MerkleBlob::new(prepared_bytes).unwrap();
         prepared_blob.check_integrity().unwrap();
