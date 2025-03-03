@@ -127,7 +127,7 @@ jobs:
           python -m pip install --upgrade pip
 
       - name: Set up rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.85.0
 
       - name: Install dependencies
         run: |
