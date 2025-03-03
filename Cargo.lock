@@ -459,6 +459,8 @@ dependencies = [
  "chia-protocol",
  "chia-puzzles",
  "chia-sha2 0.20.0",
+ "chia-traits 0.20.0",
+ "chia_streamable_macro 0.20.0",
  "clvm-traits",
  "clvm-utils",
  "clvmr",
