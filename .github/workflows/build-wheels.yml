@@ -128,16 +128,16 @@ jobs:
 
       - name: Pre setup
         run: |
-          rustc --version
           rustup toolchain list
+          rustc --version
 
       - name: Set up rust
         uses: dtolnay/rust-toolchain@stable
 
       - name: Post setup
         run: |
-          rustc --version
           rustup toolchain list
+          rustc --version
 
       - name: Install dependencies
         run: |
