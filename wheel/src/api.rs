@@ -18,6 +18,10 @@ use chia_consensus::spendbundle_validation::{
     get_flags_for_height_and_constants, validate_clvm_and_signature,
 };
 use chia_protocol::{
+    py_calculate_ip_iters, py_calculate_sp_interval_iters, py_calculate_sp_iters,
+    py_expected_plot_size, py_is_overflow_block,
+};
+use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
     CoinSpend, CoinState, CoinStateFilters, CoinStateUpdate, EndOfSubSlotBundle, FeeEstimate,
     FeeEstimateGroup, FeeRate, Foliage, FoliageBlockData, FoliageTransactionBlock, FullBlock,
@@ -459,6 +463,13 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
         chia_consensus::gen::conditions::ELIGIBLE_FOR_FF,
     )?;
     m.add_class::<OwnedSpendConditions>()?;
+
+    // pot functions
+    m.add_function(wrap_pyfunction!(py_calculate_sp_interval_iters, m)?)?;
+    m.add_function(wrap_pyfunction!(py_calculate_sp_iters, m)?)?;
+    m.add_function(wrap_pyfunction!(py_calculate_ip_iters, m)?)?;
+    m.add_function(wrap_pyfunction!(py_is_overflow_block, m)?)?;
+    m.add_function(wrap_pyfunction!(py_expected_plot_size, m)?)?;
 
     // constants
     m.add_class::<ConsensusConstants>()?;
