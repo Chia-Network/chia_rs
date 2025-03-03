@@ -129,6 +129,10 @@ jobs:
       - name: Set up rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Update stable Rust
+        run: |
+          rustup update stable
+
       - name: Install dependencies
         run: |
           python -m pip install maturin
