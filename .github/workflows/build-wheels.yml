@@ -126,8 +126,18 @@ jobs:
         run: |
           python -m pip install --upgrade pip
 
+      - name: Pre setup
+        run: |
+          rustc --version
+          rustup toolchain list
+
       - name: Set up rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Post setup
+        run: |
+          rustc --version
+          rustup toolchain list
 
       - name: Install dependencies
         run: |
