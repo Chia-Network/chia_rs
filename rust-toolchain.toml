@@ -1,4 +1,3 @@
 [toolchain]
 channel = "1.85.0"
 components = ["rustfmt", "clippy"]
-targets = ["aarch64-apple-darwin"]
