@@ -25,6 +25,8 @@ chia-bls = { workspace = true }
 chia-protocol = { workspace = true }
 chia-puzzles = { workspace = true }
 arbitrary = { workspace = true, features = ["derive"], optional = true }
+chia_streamable_macro.workspace = true
+chia-traits.workspace = true
 
 [dev-dependencies]
 hex = { workspace = true }
