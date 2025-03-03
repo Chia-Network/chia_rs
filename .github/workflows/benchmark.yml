@@ -121,7 +121,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Set up rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.85.0
 
       - name: setup venv
         run: |
@@ -162,7 +162,7 @@ jobs:
           fetch-depth: 1
 
       - name: Set up rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.85.0
 
       - name: cargo bench
         run: |
