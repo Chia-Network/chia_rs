@@ -122,8 +122,18 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - run: |
+          type cargo || true
+          type rustc || true
+          type rustup || true
+
       - name: Set up rust
         uses: dtolnay/rust-toolchain@stable
+
+      - run: |
+          type cargo || true
+          type rustc || true
+          type rustup || true
 
       - name: setup venv
         run: |
