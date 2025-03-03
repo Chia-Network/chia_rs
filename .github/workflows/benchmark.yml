@@ -177,6 +177,7 @@ jobs:
 
       - name: Poke
         run: |
+          rustup override unset
           # Force rustup to read the toolchain file and install the required version
           rustup show active-toolchain || rustup update
 
