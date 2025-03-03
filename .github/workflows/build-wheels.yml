@@ -132,6 +132,7 @@ jobs:
       - name: Print where Rust is on the path
         run: |
           which rustc
+          rustup toolchain list
           rustc --version
 
       - name: Install dependencies
