@@ -55,6 +55,8 @@ pub const ASSERT_BEFORE_SECONDS_ABSOLUTE: ConditionOpcode = 85;
 pub const ASSERT_BEFORE_HEIGHT_RELATIVE: ConditionOpcode = 86;
 pub const ASSERT_BEFORE_HEIGHT_ABSOLUTE: ConditionOpcode = 87;
 
+pub const ASSERT_SHA256_TREE: ConditionOpcode = 91;
+
 // no-op condition
 pub const REMARK: ConditionOpcode = 1;
 
@@ -155,7 +157,8 @@ pub fn parse_opcode(a: &Allocator, op: NodePtr, _flags: u32) -> Option<Condition
             | AGG_SIG_PARENT_AMOUNT
             | AGG_SIG_PARENT_PUZZLE
             | SEND_MESSAGE
-            | RECEIVE_MESSAGE => Some(b0),
+            | RECEIVE_MESSAGE
+            | ASSERT_SHA256_TREE => Some(b0),
             _ => None,
         }
     } else {
