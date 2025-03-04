@@ -210,7 +210,7 @@ pub fn chia_streamable_macro(input: TokenStream) -> TokenStream {
                 }
             }
         },
-    };
+    }
 
     if !fnames.is_empty() {
         let ret = quote! {

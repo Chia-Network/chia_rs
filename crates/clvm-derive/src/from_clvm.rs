@@ -352,7 +352,7 @@ fn enum_variant_parsers(
                     })
                 });
             }
-        };
+        }
 
         // Generate a function that parses the variant's fields and returns the variant or an error.
         // It takes a `node` so that you can pass it a clone of the original `node` to parse from.
