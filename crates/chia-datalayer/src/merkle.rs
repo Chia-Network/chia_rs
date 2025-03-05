@@ -733,6 +733,7 @@ pub struct MerkleBlob {
     blob: Vec<u8>,
     // TODO: would be nice for this to be deterministic ala a fifo set
     free_indexes: HashSet<TreeIndex>,
+    unwritten_nonfree_indexes: HashSet<TreeIndex>,
     key_to_index: HashMap<KeyId, TreeIndex>,
     leaf_hash_to_index: HashMap<Hash, TreeIndex>,
     // TODO: used by fuzzing, some cleaner way?  making it cfg-dependent is annoying with
@@ -755,6 +756,7 @@ impl MerkleBlob {
         let self_ = Self {
             blob,
             free_indexes,
+            unwritten_nonfree_indexes: HashSet::new(),
             key_to_index,
             leaf_hash_to_index,
             check_integrity_on_drop: true,
@@ -1331,6 +1333,7 @@ impl MerkleBlob {
             }
             Some(new_index) => {
                 self.free_indexes.remove(&new_index);
+                self.unwritten_nonfree_indexes.insert(new_index);
                 new_index
             }
         }
@@ -1413,6 +1416,7 @@ impl MerkleBlob {
                 // TODO: should we be more careful about accidentally reading garbage like
                 //       from a freshly gotten index
                 if !self.free_indexes.contains(&index)
+                    && !self.unwritten_nonfree_indexes.contains(&index)
                     && old_block.metadata.node_type == NodeType::Leaf
                 {
                     if let Node::Leaf(old_node) = old_block.node {
@@ -1430,6 +1434,7 @@ impl MerkleBlob {
         };
 
         self.free_indexes.take(&index);
+        self.unwritten_nonfree_indexes.take(&index);
 
         Ok(())
     }
@@ -3057,5 +3062,26 @@ mod tests {
                 assert!(proof_of_inclusion.valid());
             }
         }
+    }
+
+    #[rstest]
+    fn test_unwritten_nonfree_indexes(small_blob: MerkleBlob) {
+        let key = KeyId(0x0001_0203_0405_0607);
+        let Some(index) = small_blob.key_to_index.get(&key).copied() else {
+            panic!("maybe the test key needs to be updated?")
+        };
+        let mut prepared_bytes = small_blob.blob.clone();
+        prepared_bytes.extend_from_slice(&small_blob.get_block_bytes(index).unwrap());
+        let mut prepared_blob = MerkleBlob::new(prepared_bytes).unwrap();
+        prepared_blob.check_integrity().unwrap();
+        prepared_blob
+            .insert(
+                KeyId(1),
+                ValueId(2),
+                &generate_hash(3),
+                InsertLocation::Auto {},
+            )
+            .unwrap();
+        assert!(prepared_blob.key_to_index.contains_key(&key));
     }
 }
