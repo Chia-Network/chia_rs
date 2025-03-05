@@ -722,7 +722,7 @@ fn get_free_indexes_and_keys_values_indexes(
 
 #[cfg_attr(feature = "py-bindings", pyclass)]
 #[derive(Clone, Debug)]
-struct BlockStatusCache {
+pub struct BlockStatusCache {
     // TODO: would be nice for this to be deterministic ala a fifo set
     free_indexes: HashSet<TreeIndex>,
     unwritten_nonfree_indexes: HashSet<TreeIndex>,
