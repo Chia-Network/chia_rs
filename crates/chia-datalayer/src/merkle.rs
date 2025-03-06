@@ -733,7 +733,6 @@ pub struct MerkleBlob {
     blob: Vec<u8>,
     // TODO: would be nice for this to be deterministic ala a fifo set
     free_indexes: HashSet<TreeIndex>,
-    unwritten_nonfree_indexes: HashSet<TreeIndex>,
     key_to_index: HashMap<KeyId, TreeIndex>,
     leaf_hash_to_index: HashMap<Hash, TreeIndex>,
     // TODO: used by fuzzing, some cleaner way?  making it cfg-dependent is annoying with
@@ -756,7 +755,6 @@ impl MerkleBlob {
         let self_ = Self {
             blob,
             free_indexes,
-            unwritten_nonfree_indexes: HashSet::new(),
             key_to_index,
             leaf_hash_to_index,
             check_integrity_on_drop: true,
@@ -1210,6 +1208,7 @@ impl MerkleBlob {
             return Ok(());
         };
 
+        self.leaf_hash_to_index.remove(&leaf.hash);
         leaf.hash.clone_from(new_hash);
         leaf.value = value;
         // OPT: maybe just edit in place?
@@ -1333,7 +1332,6 @@ impl MerkleBlob {
             }
             Some(new_index) => {
                 self.free_indexes.remove(&new_index);
-                self.unwritten_nonfree_indexes.insert(new_index);
                 new_index
             }
         }
@@ -1411,19 +1409,6 @@ impl MerkleBlob {
             Ordering::Greater => return Err(Error::BlockIndexOutOfBounds(index)),
             Ordering::Equal => self.blob.extend_from_slice(&new_block_bytes),
             Ordering::Less => {
-                // OPT: lots of deserialization here for just the key
-                let old_block = self.get_block(index)?;
-                // TODO: should we be more careful about accidentally reading garbage like
-                //       from a freshly gotten index
-                if !self.free_indexes.contains(&index)
-                    && !self.unwritten_nonfree_indexes.contains(&index)
-                    && old_block.metadata.node_type == NodeType::Leaf
-                {
-                    if let Node::Leaf(old_node) = old_block.node {
-                        self.key_to_index.remove(&old_node.key);
-                        self.leaf_hash_to_index.remove(&old_node.hash);
-                    };
-                };
                 self.blob[block_range(index)].copy_from_slice(&new_block_bytes);
             }
         }
@@ -1434,7 +1419,6 @@ impl MerkleBlob {
         };
 
         self.free_indexes.take(&index);
-        self.unwritten_nonfree_indexes.take(&index);
 
         Ok(())
     }
