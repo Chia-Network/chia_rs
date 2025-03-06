@@ -3049,7 +3049,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_unwritten_nonfree_indexes(small_blob: MerkleBlob) {
+    fn test_writing_to_free_block_that_contained_an_active_key(small_blob: MerkleBlob) {
         let key = KeyId(0x0001_0203_0405_0607);
         let Some(index) = small_blob.key_to_index.get(&key).copied() else {
             panic!("maybe the test key needs to be updated?")
