@@ -725,7 +725,6 @@ fn get_free_indexes_and_keys_values_indexes(
 pub struct BlockStatusCache {
     // TODO: would be nice for this to be deterministic ala a fifo set
     free_indexes: HashSet<TreeIndex>,
-    unwritten_nonfree_indexes: HashSet<TreeIndex>,
     key_to_index: HashMap<KeyId, TreeIndex>,
     leaf_hash_to_index: HashMap<Hash, TreeIndex>,
 }
@@ -739,7 +738,6 @@ impl BlockStatusCache {
         let maybe_index = self.free_indexes.iter().next().copied();
         if let Some(index) = maybe_index {
             self.free_indexes.remove(&index);
-            self.unwritten_nonfree_indexes.insert(index);
         }
 
         maybe_index
@@ -755,11 +753,6 @@ impl BlockStatusCache {
 
     fn index_is_free(&self, index: TreeIndex) -> bool {
         self.free_indexes.contains(&index)
-    }
-
-    fn index_is_unwritten(&self, index: TreeIndex) -> bool {
-        // TODO: check to make sure it is non-free, otherwise this doesn't mean much
-        self.unwritten_nonfree_indexes.contains(&index)
     }
 
     fn key_count(&self) -> usize {
@@ -790,12 +783,10 @@ impl BlockStatusCache {
 
     fn add_internal(&mut self, index: TreeIndex) {
         self.free_indexes.remove(&index);
-        self.unwritten_nonfree_indexes.take(&index);
     }
 
     fn add_leaf(&mut self, index: TreeIndex, leaf: LeafNode) {
         self.free_indexes.remove(&index);
-        self.unwritten_nonfree_indexes.take(&index);
 
         self.key_to_index.insert(leaf.key, index);
         self.leaf_hash_to_index.insert(leaf.hash, index);
@@ -847,7 +838,7 @@ impl MerkleBlob {
             blob,
             block_status_cache: BlockStatusCache {
                 free_indexes,
-                unwritten_nonfree_indexes: HashSet::new(),
+
                 key_to_index,
                 leaf_hash_to_index,
             },
@@ -1299,6 +1290,8 @@ impl MerkleBlob {
             return Ok(());
         };
 
+        // TODO: discuss the overhead vs abstraction tradeoff here
+        self.block_status_cache.remove_leaf(&leaf);
         leaf.hash.clone_from(new_hash);
         leaf.value = value;
         // OPT: maybe just edit in place?
@@ -1496,18 +1489,6 @@ impl MerkleBlob {
             Ordering::Greater => return Err(Error::BlockIndexOutOfBounds(index)),
             Ordering::Equal => self.blob.extend_from_slice(&new_block_bytes),
             Ordering::Less => {
-                // OPT: lots of deserialization here for just the key
-                let old_block = self.get_block(index)?;
-                // TODO: should we be more careful about accidentally reading garbage like
-                //       from a freshly gotten index
-                if !self.block_status_cache.index_is_free(index)
-                    && !self.block_status_cache.index_is_unwritten(index)
-                    && old_block.metadata.node_type == NodeType::Leaf
-                {
-                    if let Node::Leaf(old_node) = old_block.node {
-                        self.block_status_cache.remove_leaf(&old_node);
-                    };
-                };
                 self.blob[block_range(index)].copy_from_slice(&new_block_bytes);
             }
         }
@@ -3168,7 +3149,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_unwritten_nonfree_indexes(small_blob: MerkleBlob) {
+    fn test_writing_to_free_block_that_contained_an_active_key(small_blob: MerkleBlob) {
         let key = KeyId(0x0001_0203_0405_0607);
         let Some(index) = small_blob.block_status_cache.get_index_by_key(key).copied() else {
             panic!("maybe the test key needs to be updated?")
