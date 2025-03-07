@@ -682,44 +682,6 @@ impl Block {
     }
 }
 
-// TODO: take the encouragement to clean up and make clippy happy again
-#[allow(clippy::type_complexity)]
-fn get_free_indexes_and_keys_values_indexes(
-    blob: &Vec<u8>,
-) -> Result<
-    (
-        HashSet<TreeIndex>,
-        HashMap<KeyId, TreeIndex>,
-        HashMap<Hash, TreeIndex>,
-    ),
-    Error,
-> {
-    let index_count = blob.len() / BLOCK_SIZE;
-
-    let mut seen_indexes: Vec<bool> = vec![false; index_count];
-    let mut key_to_index: HashMap<KeyId, TreeIndex> = HashMap::default();
-    let mut leaf_hash_to_index: HashMap<Hash, TreeIndex> = HashMap::default();
-
-    for item in MerkleBlobLeftChildFirstIterator::new(blob, None) {
-        let (index, block) = item?;
-        seen_indexes[index.0 as usize] = true;
-
-        if let Node::Leaf(leaf) = block.node {
-            key_to_index.insert(leaf.key, index);
-            leaf_hash_to_index.insert(leaf.hash, index);
-        }
-    }
-
-    let mut free_indexes: HashSet<TreeIndex> = HashSet::new();
-    for (index, seen) in seen_indexes.iter().enumerate() {
-        if !seen {
-            free_indexes.insert(TreeIndex(index as u32));
-        }
-    }
-
-    Ok((free_indexes, key_to_index, leaf_hash_to_index))
-}
-
 #[cfg_attr(feature = "py-bindings", pyclass)]
 #[derive(Clone, Debug)]
 pub struct BlockStatusCache {
@@ -730,6 +692,39 @@ pub struct BlockStatusCache {
 }
 
 impl BlockStatusCache {
+    // TODO: take the encouragement to clean up and make clippy happy again
+    #[allow(clippy::type_complexity)]
+    fn new(blob: &Vec<u8>) -> Result<Self, Error> {
+        let index_count = blob.len() / BLOCK_SIZE;
+
+        let mut seen_indexes: Vec<bool> = vec![false; index_count];
+        let mut key_to_index: HashMap<KeyId, TreeIndex> = HashMap::default();
+        let mut leaf_hash_to_index: HashMap<Hash, TreeIndex> = HashMap::default();
+
+        for item in MerkleBlobLeftChildFirstIterator::new(blob, None) {
+            let (index, block) = item?;
+            seen_indexes[index.0 as usize] = true;
+
+            if let Node::Leaf(leaf) = block.node {
+                key_to_index.insert(leaf.key, index);
+                leaf_hash_to_index.insert(leaf.hash, index);
+            }
+        }
+
+        let mut free_indexes: HashSet<TreeIndex> = HashSet::new();
+        for (index, seen) in seen_indexes.iter().enumerate() {
+            if !seen {
+                free_indexes.insert(TreeIndex(index as u32));
+            }
+        }
+
+        Ok(Self {
+            free_indexes,
+            key_to_index,
+            leaf_hash_to_index,
+        })
+    }
+
     fn iter_keys_indexes(&self) -> impl Iterator<Item = (&KeyId, &TreeIndex)> {
         self.key_to_index.iter()
     }
@@ -831,17 +826,11 @@ impl MerkleBlob {
         }
 
         // TODO: maybe integrate integrity check here if quick enough
-        let (free_indexes, key_to_index, leaf_hash_to_index) =
-            get_free_indexes_and_keys_values_indexes(&blob)?;
+        let block_status_cache = BlockStatusCache::new(&blob)?;
 
         let self_ = Self {
             blob,
-            block_status_cache: BlockStatusCache {
-                free_indexes,
-
-                key_to_index,
-                leaf_hash_to_index,
-            },
+            block_status_cache,
             check_integrity_on_drop: true,
         };
 
@@ -2621,8 +2610,11 @@ mod tests {
         let mut blob = small_blob.blob.clone();
         let expected_free_index = TreeIndex((blob.len() / BLOCK_SIZE) as u32);
         blob.extend_from_slice(&[0; BLOCK_SIZE]);
-        let (free_indexes, _, _) = get_free_indexes_and_keys_values_indexes(&blob).unwrap();
-        assert_eq!(free_indexes, HashSet::from([expected_free_index]));
+        let block_status_cache = BlockStatusCache::new(&blob).unwrap();
+        assert_eq!(
+            block_status_cache.free_indexes,
+            HashSet::from([expected_free_index])
+        );
     }
 
     #[test]
