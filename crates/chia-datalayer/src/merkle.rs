@@ -2997,10 +2997,6 @@ mod tests {
                 .batch_insert(zip(kv_ids, hashes).collect())
                 .unwrap();
             merkle_blob.calculate_lazy_hashes().unwrap();
-            for i in 0..(merkle_blob.blob.len() / BLOCK_SIZE) {
-                let node = merkle_blob.get_node(TreeIndex(i as u32)).unwrap();
-                println!("{i:05}: {node:?}");
-            }
 
             for kv_id in keys_values.keys().copied() {
                 let proof_of_inclusion = match merkle_blob.get_proof_of_inclusion(kv_id) {
