@@ -798,6 +798,10 @@ impl BlockStatusCache {
 
         self.free_indexes.insert(index);
     }
+
+    fn release_index(&mut self, index: TreeIndex) {
+        self.free_indexes.insert(index);
+    }
 }
 
 /// Stores a DataLayer merkle tree in bytes and provides serialization on each access so that only
@@ -1243,8 +1247,7 @@ impl MerkleBlob {
             };
 
             self.insert_entry_to_blob(TreeIndex(0), &sibling_block)?;
-            // TODO: this is reaching inside the cache, stop doing this
-            self.block_status_cache.free_indexes.insert(sibling_index);
+            self.block_status_cache.release_index(sibling_index);
 
             return Ok(());
         };
