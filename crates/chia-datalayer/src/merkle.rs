@@ -323,6 +323,18 @@ create_errors!(
             NodeHashNotInNodeMapsError,
             "node hash not in nodes: {0:?}",
             (Hash)
+        ),
+        (
+            MoveSourceIndexNotInUse,
+            MoveSourceIndexNotInUseError,
+            "move source index not in use: {0:?}",
+            (TreeIndex)
+        ),
+        (
+            MoveDestinationIndexNotInUse,
+            MoveDestinationIndexNotInUseError,
+            "move destination index not in use: {0:?}",
+            (TreeIndex)
         )
     )
 );
@@ -798,8 +810,19 @@ impl BlockStatusCache {
         Ok(())
     }
 
-    fn release_index(&mut self, index: TreeIndex) {
-        self.free_indexes.insert(index);
+    fn move_index(&mut self, source: TreeIndex, destination: TreeIndex) -> Result<(), Error> {
+        // to be called _after_ having written to the destination index including
+        // having set it to be free
+        if self.free_indexes.contains(&source) {
+            return Err(Error::MoveSourceIndexNotInUse(source));
+        };
+        if self.free_indexes.contains(&destination) {
+            return Err(Error::MoveDestinationIndexNotInUse(source));
+        };
+
+        self.free_indexes.insert(source);
+
+        Ok(())
     }
 }
 
@@ -1245,8 +1268,10 @@ impl MerkleBlob {
                 }
             };
 
-            self.insert_entry_to_blob(TreeIndex(0), &sibling_block)?;
-            self.block_status_cache.release_index(sibling_index);
+            let destination = TreeIndex(0);
+            self.insert_entry_to_blob(destination, &sibling_block)?;
+            self.block_status_cache
+                .move_index(sibling_index, destination)?;
 
             return Ok(());
         };
