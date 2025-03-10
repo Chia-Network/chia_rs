@@ -7,7 +7,7 @@ from run_gen import DEFAULT_CONSTANTS
 # from chia.consensus.pos_quality import _expected_plot_size
 from chia_rs import (
     calculate_ip_iters,
-    # calculate_iterations_quality,
+    expected_plot_size,
     calculate_sp_iters,
     is_overflow_block,
 )
@@ -59,6 +59,13 @@ class TestPotIterations:
         with raises(ValueError):
             calculate_sp_iters(test_constants.NUM_SPS_SUB_SLOT, ssi, uint8(32))
         calculate_sp_iters(test_constants.NUM_SPS_SUB_SLOT, ssi, uint8(31))
+
+    def test_expected_plot_size(self):
+        assert expected_plot_size(32) == 139586437120  # number retrieved from old implementation
+        assert expected_plot_size(33) == 287762808832  # number retrieved from old implementation
+        assert expected_plot_size(34) == 592705486848  # number retrieved from old implementation
+        assert expected_plot_size(35) == 1219770712064  # number retrieved from old implementation
+        assert expected_plot_size(36) == 2508260900864  # number retrieved from old implementation
 
     def test_calculate_ip_iters(self):
         # num_sps_sub_slot: u32,
