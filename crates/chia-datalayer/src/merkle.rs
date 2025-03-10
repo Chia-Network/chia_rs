@@ -750,11 +750,7 @@ impl BlockStatusCache {
         self.free_indexes.contains(&index)
     }
 
-    fn key_count(&self) -> usize {
-        self.key_to_index.len()
-    }
-
-    fn leaf_hash_count(&self) -> usize {
+    fn leaf_count(&self) -> usize {
         self.key_to_index.len()
     }
 
@@ -890,7 +886,7 @@ impl MerkleBlob {
                     value,
                 };
 
-                if self.block_status_cache.key_count() == 1 {
+                if self.block_status_cache.leaf_count() == 1 {
                     self.insert_second(node, &old_leaf, &internal_node_hash, side)
                 } else {
                     self.insert_third_or_later(node, &old_leaf, index, &internal_node_hash, side)
@@ -1062,7 +1058,7 @@ impl MerkleBlob {
         // OPT: would it be worthwhile to hold the entire blocks?
         let mut indexes = vec![];
 
-        if self.block_status_cache.key_count() <= 1 {
+        if self.block_status_cache.leaf_count() <= 1 {
             for _ in 0..2 {
                 let Some(((key, value), hash)) = keys_values_hashes.pop() else {
                     return Ok(());
@@ -1339,14 +1335,14 @@ impl MerkleBlob {
             }
         }
 
-        let key_to_index_cache_length = self.block_status_cache.key_count();
+        let key_to_index_cache_length = self.block_status_cache.key_to_index.len();
         if leaf_count != key_to_index_cache_length {
             return Err(Error::IntegrityKeyToIndexCacheLength(
                 leaf_count,
                 key_to_index_cache_length,
             ));
         }
-        let leaf_hash_to_index_cache_length = self.block_status_cache.leaf_hash_count();
+        let leaf_hash_to_index_cache_length = self.block_status_cache.leaf_hash_to_index.len();
         if leaf_count != leaf_hash_to_index_cache_length {
             return Err(Error::IntegrityLeafHashToIndexCacheLength(
                 leaf_count,
@@ -2465,7 +2461,7 @@ mod tests {
             .unwrap();
         open_dot(merkle_blob.to_dot().unwrap().set_note("first after"));
 
-        assert_eq!(merkle_blob.block_status_cache.key_count(), 1);
+        assert_eq!(merkle_blob.block_status_cache.leaf_count(), 1);
     }
 
     #[rstest]
@@ -2556,7 +2552,7 @@ mod tests {
 
         merkle_blob.delete(KeyId(key_value_id)).unwrap();
 
-        assert_eq!(merkle_blob.block_status_cache.key_count(), 0);
+        assert_eq!(merkle_blob.block_status_cache.leaf_count(), 0);
     }
 
     #[rstest]
