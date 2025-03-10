@@ -16,6 +16,14 @@ fn sub_catch_underflow(a: u32, b: u32) -> Result<u32> {
     a.checked_sub(b).ok_or(Error::InvalidPotIteration)
 }
 
+fn mod_catch_error(a: u64, b: u64) -> Result<u64> {
+    a.checked_rem(b).ok_or(Error::InvalidPotIteration)
+}
+
+fn div_catch_error(a: u64, b: u64) -> Result<u64> {
+    a.checked_div(b).ok_or(Error::InvalidPotIteration)
+}
+
 pub fn is_overflow_block(
     num_sps_sub_slot: u32,
     num_sp_intervals_extra: u8,
@@ -31,10 +39,10 @@ pub fn is_overflow_block(
 }
 
 pub fn calculate_sp_interval_iters(num_sps_sub_slot: u32, sub_slot_iters: u64) -> Result<u64> {
-    if sub_slot_iters % num_sps_sub_slot as u64 != 0 {
+    if mod_catch_error(sub_slot_iters, num_sps_sub_slot as u64)? != 0 {
         return Err(Error::InvalidPotIteration);
     }
-    Ok(sub_slot_iters / num_sps_sub_slot as u64)
+    Ok(div_catch_error(sub_slot_iters, num_sps_sub_slot as u64)?)
 }
 
 pub fn calculate_sp_iters(
@@ -60,20 +68,23 @@ pub fn calculate_ip_iters(
 ) -> Result<u64> {
     let sp_interval_iters = calculate_sp_interval_iters(num_sps_sub_slot, sub_slot_iters)?;
     let sp_iters = calculate_sp_iters(num_sps_sub_slot, sub_slot_iters, signage_point_index)?;
-    if sp_iters % sp_interval_iters != 0
+    if mod_catch_error(sp_iters, sp_interval_iters)? != 0
         || sp_iters > sub_slot_iters
         || required_iters >= sp_interval_iters
         || required_iters == 0
     {
         return Err(Error::InvalidPotIteration);
     }
-    Ok((add_catch_overflow(
+    Ok(mod_catch_error(
         add_catch_overflow(
-            sp_iters,
-            mult_catch_overflow(num_sp_intervals_extra as u64, sp_interval_iters)?,
+            add_catch_overflow(
+                sp_iters,
+                mult_catch_overflow(num_sp_intervals_extra as u64, sp_interval_iters)?,
+            )?,
+            required_iters,
         )?,
-        required_iters,
-    )?) % sub_slot_iters)
+        sub_slot_iters,
+    )?)
 }
 
 #[cfg(feature = "py-bindings")]
