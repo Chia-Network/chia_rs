@@ -18,7 +18,8 @@ pub fn expected_plot_size(k: u32) -> Result<u64> {
 }
 
 // TODO: Update this when new plot format releases
-#[cfg_attr(feature = "py-bindings", pyo3::pyfunction)]
+#[cfg(feature = "py-bindings")]
+#[pyo3::pyfunction]
 #[pyo3(name = "expected_plot_size")]
 pub fn py_expected_plot_size(k: u32) -> pyo3::PyResult<u64> {
     // """
