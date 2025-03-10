@@ -30,5 +30,5 @@ pub fn py_expected_plot_size(k: u32) -> pyo3::PyResult<u64> {
     // is necessary to store the entries in the plot.
     // """
 
-    expected_plot_size(k).map_err(Into::into)
+    Ok(expected_plot_size(k)?)
 }
