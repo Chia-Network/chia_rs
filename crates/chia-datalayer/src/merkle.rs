@@ -791,12 +791,15 @@ impl BlockStatusCache {
         self.free_indexes.insert(index);
     }
 
-    fn remove_leaf(&mut self, node: &LeafNode) {
-        // TODO: error instead of panic
-        let index = self.key_to_index.remove(&node.key).unwrap();
+    fn remove_leaf(&mut self, node: &LeafNode) -> Result<(), Error> {
+        let Some(index) = self.key_to_index.remove(&node.key) else {
+            return Err(Error::UnknownKey(node.key));
+        };
         self.leaf_hash_to_index.remove(&node.hash);
 
         self.free_indexes.insert(index);
+
+        Ok(())
     }
 
     fn release_index(&mut self, index: TreeIndex) {
@@ -1223,7 +1226,7 @@ impl MerkleBlob {
 
     pub fn delete(&mut self, key: KeyId) -> Result<(), Error> {
         let (leaf_index, leaf, _leaf_block) = self.get_leaf_by_key(key)?;
-        self.block_status_cache.remove_leaf(&leaf);
+        self.block_status_cache.remove_leaf(&leaf)?;
 
         let Some(parent_index) = leaf.parent.0 else {
             self.clear();
@@ -1282,7 +1285,7 @@ impl MerkleBlob {
             return Ok(());
         };
 
-        self.block_status_cache.remove_leaf(&leaf);
+        self.block_status_cache.remove_leaf(&leaf)?;
         leaf.hash.clone_from(new_hash);
         leaf.value = value;
         // OPT: maybe just edit in place?
