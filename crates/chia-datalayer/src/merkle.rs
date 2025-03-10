@@ -1282,7 +1282,6 @@ impl MerkleBlob {
             return Ok(());
         };
 
-        // TODO: discuss the overhead vs abstraction tradeoff here
         self.block_status_cache.remove_leaf(&leaf);
         leaf.hash.clone_from(new_hash);
         leaf.value = value;
