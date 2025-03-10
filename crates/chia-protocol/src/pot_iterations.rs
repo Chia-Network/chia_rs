@@ -4,6 +4,18 @@
 // use crate::pos_quality::expected_plot_size;
 use chia_traits::chia_error::{Error, Result};
 
+fn add_catch_overflow(a: u64, b: u64) -> Result<u64> {
+    a.checked_add(b).ok_or(Error::InvalidPotIteration)
+}
+
+fn mult_catch_overflow(a: u64, b: u64) -> Result<u64> {
+    a.checked_mul(b).ok_or(Error::InvalidPotIteration)
+}
+
+fn sub_catch_underflow(a: u32, b: u32) -> Result<u32> {
+    a.checked_sub(b).ok_or(Error::InvalidPotIteration)
+}
+
 pub fn is_overflow_block(
     num_sps_sub_slot: u32,
     num_sp_intervals_extra: u8,
@@ -12,7 +24,10 @@ pub fn is_overflow_block(
     if signage_point_index >= num_sps_sub_slot {
         return Err(Error::InvalidPotIteration);
     }
-    Ok(signage_point_index >= num_sps_sub_slot - num_sp_intervals_extra as u32)
+    Ok(
+        signage_point_index
+            >= sub_catch_underflow(num_sps_sub_slot, num_sp_intervals_extra as u32)?,
+    )
 }
 
 pub fn calculate_sp_interval_iters(num_sps_sub_slot: u32, sub_slot_iters: u64) -> Result<u64> {
@@ -30,7 +45,10 @@ pub fn calculate_sp_iters(
     if signage_point_index >= num_sps_sub_slot {
         return Err(Error::InvalidPotIteration);
     }
-    Ok(calculate_sp_interval_iters(num_sps_sub_slot, sub_slot_iters)? * signage_point_index as u64)
+    Ok(mult_catch_overflow(
+        calculate_sp_interval_iters(num_sps_sub_slot, sub_slot_iters)?,
+        signage_point_index as u64,
+    )?)
 }
 
 pub fn calculate_ip_iters(
@@ -49,10 +67,13 @@ pub fn calculate_ip_iters(
     {
         return Err(Error::InvalidPotIteration);
     }
-    Ok(
-        (sp_iters + num_sp_intervals_extra as u64 * sp_interval_iters + required_iters)
-            % sub_slot_iters,
-    )
+    Ok((add_catch_overflow(
+        add_catch_overflow(
+            sp_iters,
+            mult_catch_overflow(num_sp_intervals_extra as u64, sp_interval_iters)?,
+        )?,
+        required_iters,
+    )?) % sub_slot_iters)
 }
 
 #[cfg(feature = "py-bindings")]
