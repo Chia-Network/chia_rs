@@ -10,14 +10,16 @@ use super::opcodes::{
     ASSERT_COIN_ANNOUNCEMENT, ASSERT_CONCURRENT_PUZZLE, ASSERT_CONCURRENT_SPEND, ASSERT_EPHEMERAL,
     ASSERT_HEIGHT_ABSOLUTE, ASSERT_HEIGHT_RELATIVE, ASSERT_MY_AMOUNT, ASSERT_MY_BIRTH_HEIGHT,
     ASSERT_MY_BIRTH_SECONDS, ASSERT_MY_COIN_ID, ASSERT_MY_PARENT_ID, ASSERT_MY_PUZZLEHASH,
-    ASSERT_PUZZLE_ANNOUNCEMENT, ASSERT_SECONDS_ABSOLUTE, ASSERT_SECONDS_RELATIVE, CREATE_COIN,
-    CREATE_COIN_ANNOUNCEMENT, CREATE_COIN_COST, CREATE_PUZZLE_ANNOUNCEMENT, RECEIVE_MESSAGE,
-    REMARK, RESERVE_FEE, SEND_MESSAGE, SOFTFORK,
+    ASSERT_PUZZLE_ANNOUNCEMENT, ASSERT_SECONDS_ABSOLUTE, ASSERT_SECONDS_RELATIVE,
+    ASSERT_SHA256_TREE, CREATE_COIN, CREATE_COIN_ANNOUNCEMENT, CREATE_COIN_COST,
+    CREATE_PUZZLE_ANNOUNCEMENT, RECEIVE_MESSAGE, REMARK, RESERVE_FEE, SEND_MESSAGE, SOFTFORK,
 };
 use super::sanitize_int::{sanitize_uint, SanitizedUint};
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
 use crate::consensus_constants::ConsensusConstants;
-use crate::gen::flags::{DONT_VALIDATE_SIGNATURE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
+use crate::gen::flags::{
+    DONT_VALIDATE_SIGNATURE, ENABLE_SHA256TREE_CONDITIONS, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
+};
 use crate::gen::make_aggsig_final_message::u64_to_bytes;
 use crate::gen::messages::{Message, SpendId};
 use crate::gen::spend_visitor::SpendVisitor;
@@ -331,6 +333,9 @@ pub enum Condition {
     // this means the condition is unconditionally true and can be skipped
     Skip,
     SkipRelativeCondition,
+
+    // assert sha256tree (SExp, 32 bytes)
+    AssertSha256Tree(NodePtr, [u8; 32]),
 }
 
 fn check_agg_sig_unsafe_message(
@@ -677,6 +682,21 @@ pub fn parse_args(
             // this condition is always true, we always ignore arguments
             Ok(Condition::Skip)
         }
+        ASSERT_SHA256_TREE => {
+            if flags & ENABLE_SHA256TREE_CONDITIONS == 0 {
+                return Err(ValidationErr(c, ErrorCode::InvalidConditionOpcode));
+            }
+            let sexp = first(a, c)?;
+            c = rest(a, c)?;
+            maybe_check_args_terminator(a, c, flags)?;
+            let id = sanitize_hash(a, first(a, c)?, 32, ErrorCode::InvalidHashValue)?;
+            let hash: [u8; 32] = a
+                .atom(id)
+                .as_ref()
+                .try_into()
+                .expect("we already sanitised this");
+            Ok(Condition::AssertSha256Tree(sexp, hash))
+        }
         _ => Err(ValidationErr(c, ErrorCode::InvalidConditionOpcode)),
     }
 }
@@ -888,6 +908,9 @@ pub struct ParseState {
     // TODO: We would probably save heap allocations by turning this into a
     // blst_pairing object.
     pub pkm_pairs: Vec<(PublicKey, Bytes)>,
+
+    // shatree asserts
+    sha256tree_asserts: Vec<(NodePtr, [u8; 32])>,
 }
 
 // returns (parent-id, puzzle-hash, amount, condition-list)
@@ -1353,6 +1376,15 @@ pub fn parse_conditions<V: SpendVisitor>(
             Condition::SkipRelativeCondition => {
                 assert_not_ephemeral(&mut spend.flags, state, ret.spends.len());
             }
+            Condition::AssertSha256Tree(sexp, hash) => {
+                if flags & ENABLE_SHA256TREE_CONDITIONS != 0 {
+                    // the raison d'etre for this condition is to pay extra for guaranteed caching, to make it cheaper overall
+                    //     if clvm_utils::tree_hash(a, sexp).to_bytes() != a.atom(hash).as_ref() {
+                    //         return Err(ValidationErr(c, ErrorCode::AssertSha256TreeFailed));
+                    //     }
+                    state.sha256tree_asserts.push((sexp, hash));
+                }
+            }
             Condition::Skip => {}
         }
     }
@@ -1392,7 +1424,7 @@ fn is_ephemeral(
 // condition op-code
 pub fn parse_spends<V: SpendVisitor>(
     a: &Allocator,
-    spends: NodePtr,
+    spends: NodePtr, // list of ((parent_id, puzzle_hash, amount, conditions)... )
     max_cost: Cost,
     flags: u32,
     aggregate_signature: &Signature,
@@ -1553,6 +1585,13 @@ pub fn validate_conditions(
                 ret.spends[*spend_idx].parent_id,
                 ErrorCode::EphemeralRelativeCondition,
             ));
+        }
+    }
+
+    for (sexp, hash) in &state.sha256tree_asserts {
+        // TODO: add caching here
+        if clvm_utils::tree_hash(a, *sexp).to_bytes() != *hash {
+            return Err(ValidationErr(*sexp, ErrorCode::AssertSha256TreeFailed));
         }
     }
 
@@ -2065,6 +2104,7 @@ fn test_invalid_spend_list_terminator() {
 #[case(AGG_SIG_PARENT_AMOUNT, "{pubkey} ({msg1}")]
 #[case(ASSERT_CONCURRENT_SPEND, "{coin12}")]
 #[case(ASSERT_CONCURRENT_PUZZLE, "{h2}")]
+#[case(ASSERT_SHA256_TREE, "{h1} ({h2}")]
 fn test_strict_args_count(
     #[case] condition: ConditionOpcode,
     #[case] arg: &str,
@@ -2076,10 +2116,10 @@ fn test_strict_args_count(
             "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 )))))",
             condition as u8, arg
         ),
-        flags | DONT_VALIDATE_SIGNATURE,
+        flags | DONT_VALIDATE_SIGNATURE | ENABLE_SHA256TREE_CONDITIONS,
     );
     if flags == 0 {
-        // two of the cases won't pass, even when garbage at the end is allowed.
+        // three of the cases won't pass, even when garbage at the end is allowed.
         if condition == ASSERT_COIN_ANNOUNCEMENT {
             assert_eq!(ret.unwrap_err().1, ErrorCode::AssertCoinAnnouncementFailed,);
         } else if condition == ASSERT_PUZZLE_ANNOUNCEMENT {
@@ -2087,6 +2127,8 @@ fn test_strict_args_count(
                 ret.unwrap_err().1,
                 ErrorCode::AssertPuzzleAnnouncementFailed,
             );
+        } else if condition == ASSERT_SHA256_TREE {
+            assert_eq!(ret.unwrap_err().1, ErrorCode::AssertSha256TreeFailed,);
         } else {
             assert!(ret.is_ok());
         }
@@ -2445,12 +2487,13 @@ fn test_multiple_conditions(
 #[case(AGG_SIG_PARENT_AMOUNT)]
 #[case(ASSERT_CONCURRENT_SPEND)]
 #[case(ASSERT_CONCURRENT_PUZZLE)]
+#[case(ASSERT_SHA256_TREE)]
 fn test_missing_arg(#[case] condition: ConditionOpcode) {
     // extra args are disallowed in mempool mode
     assert_eq!(
         cond_test_flag(
             &format!("((({{h1}} ({{h2}} (123 ((({} )))))", condition as u8),
-            0
+            ENABLE_SHA256TREE_CONDITIONS
         )
         .unwrap_err()
         .1,
@@ -4042,6 +4085,57 @@ fn test_concurrent_puzzle_fail() {
             ErrorCode::AssertConcurrentPuzzleFailed
         );
     }
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(
+    "0x1000",
+    "0x21df504fc8e0a0c53f8da8728a6ce0b2c6911db03184ee59eda9a6a108b008e4",
+    true
+)]
+#[case(
+    "0x1000",
+    "0x21df504fc8e0a0c53f8da8728a6ce0b2c6911db03184ee59eda9a6a108b008e5",
+    false
+)]
+#[case(
+    "(0x1000 0x2000 ",
+    "0x52beefa879dfaab96e4e42d202da06853e0f64f07e5144fcb1e46cb2de3eb7dc",
+    true
+)] // (0x1000 . 0x2000)
+#[case(
+    "(0x1000 0x2000 ",
+    "0x52beefa879dfaab96e4e42d202da06853e0f64f07e5144fcb1e46cb2de3eb7dd",
+    false
+)] // (0x1000 . 0x2000)
+#[case(
+    "(0x1000 (0x2000 (0x3000 ) ",
+    "0x02fa79e6a347b47ddd95a785b045de89f87d9c0f0cafec012d127ae4ebc1dc9b",
+    true
+)] // (0x1000 0x2000 0x300)
+#[case(
+    "(0x1000 (0x2000 (0x3000 ) ",
+    "0x02fa79e6a347b47ddd95a785b045de89f87d9c0f0cafec012d127ae4ebc1dc9c",
+    false
+)] // (0x1000 0x2000 0x300)
+fn test_sha256tree(#[case] sexp: &str, #[case] hash: &str, #[case] expected: bool) {
+    let input = format!(
+        "(\
+        (({{h1}} ({{h2}} (123 (((91 ({sexp} ({hash} )))\
+        ))"
+    );
+    assert_eq!(
+        cond_test_cb(
+            &input,
+            MEMPOOL_MODE | ENABLE_SHA256TREE_CONDITIONS,
+            None,
+            &Signature::default(),
+            None,
+        )
+        .is_ok(),
+        expected
+    );
 }
 
 #[test]
