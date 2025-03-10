@@ -57,6 +57,7 @@ pub const HAS_RELATIVE_CONDITION: u32 = 2;
 //    wouldn't lock down the coin, it's expensive to check for this.
 // 6. there are no timelocks - ASSERT_*_RELATIVE / ASSERT_MY_BIRTH_*
 // 7. The coin is not referenced by an ASSERT_CONCURRENT_SPEND condition
+// 8. The coin does not issue an CREATE_COIN_ANNOUNCEMENT condition
 pub const ELIGIBLE_FOR_FF: u32 = 4;
 
 pub struct EmptyVisitor {}
@@ -153,6 +154,9 @@ impl SpendVisitor for MempoolVisitor {
                 // de-duplicating a coin spend that's receiving a message may
                 // leave a sent-message un-received, which is a failure
                 spend.flags &= !ELIGIBLE_FOR_DEDUP;
+            }
+            Condition::CreateCoinAnnouncement(_msg) => {
+                spend.flags &= !ELIGIBLE_FOR_FF;
             }
             _ => {}
         }
@@ -4831,7 +4835,6 @@ fn test_eligible_for_ff_output_coin(#[case] amount: u64, #[case] ph: &str, #[cas
 #[rstest]
 #[case(ASSERT_MY_PARENT_ID, "{h1}")]
 #[case(ASSERT_MY_COIN_ID, "{coin12}")]
-
 fn test_eligible_for_ff_invalid_assert_parent(
     #[case] condition: ConditionOpcode,
     #[case] arg: &str,
@@ -4864,6 +4867,7 @@ fn test_eligible_for_ff_invalid_assert_parent(
 #[case(ASSERT_MY_BIRTH_HEIGHT, "0", false)]
 #[case(ASSERT_MY_BIRTH_SECONDS, "0", false)]
 #[case(ASSERT_MY_AMOUNT, "123", true)]
+#[case(CREATE_COIN_ANNOUNCEMENT, "123", false)]
 fn test_eligible_for_ff_timelocks(
     #[case] condition: ConditionOpcode,
     #[case] arg: &str,
