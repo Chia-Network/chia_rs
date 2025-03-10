@@ -42,7 +42,7 @@ pub fn calculate_sp_interval_iters(num_sps_sub_slot: u32, sub_slot_iters: u64) -
     if mod_catch_error(sub_slot_iters, num_sps_sub_slot as u64)? != 0 {
         return Err(Error::InvalidPotIteration);
     }
-    Ok(div_catch_error(sub_slot_iters, num_sps_sub_slot as u64)?)
+    div_catch_error(sub_slot_iters, num_sps_sub_slot as u64)
 }
 
 pub fn calculate_sp_iters(
@@ -53,10 +53,10 @@ pub fn calculate_sp_iters(
     if signage_point_index >= num_sps_sub_slot {
         return Err(Error::InvalidPotIteration);
     }
-    Ok(mult_catch_overflow(
+    mult_catch_overflow(
         calculate_sp_interval_iters(num_sps_sub_slot, sub_slot_iters)?,
         signage_point_index as u64,
-    )?)
+    )
 }
 
 pub fn calculate_ip_iters(
@@ -75,7 +75,7 @@ pub fn calculate_ip_iters(
     {
         return Err(Error::InvalidPotIteration);
     }
-    Ok(mod_catch_error(
+    mod_catch_error(
         add_catch_overflow(
             add_catch_overflow(
                 sp_iters,
@@ -84,7 +84,7 @@ pub fn calculate_ip_iters(
             required_iters,
         )?,
         sub_slot_iters,
-    )?)
+    )
 }
 
 #[cfg(feature = "py-bindings")]
