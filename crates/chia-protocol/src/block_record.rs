@@ -91,9 +91,6 @@ impl BlockRecord {
 }
 
 #[cfg(feature = "py-bindings")]
-use chia_traits::ChiaToPython;
-
-#[cfg(feature = "py-bindings")]
 #[pymethods]
 impl BlockRecord {
     #[getter]
