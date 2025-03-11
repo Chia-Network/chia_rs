@@ -1,7 +1,3 @@
-// use crate::Bytes32;
-// use chia_sha2::Sha256;
-// use std::convert::TryInto;
-// use crate::pos_quality::expected_plot_size;
 use chia_traits::chia_error::{Error, Result};
 
 fn add_catch_overflow(a: u64, b: u64) -> Result<u64> {
@@ -295,33 +291,3 @@ mod tests {
         assert!(sp_iters > ip_iters);
     }
 }
-
-// TODO: enable and fix below
-
-// #[cfg(feature = "py-bindings")]
-// #[pyo3::pyfunction]
-// pub fn calculate_iterations_quality(
-//     difficulty_constant_factor: u128,
-//     quality_string: Bytes32,
-//     size: u32,
-//     difficulty: u64,
-//     cc_sp_output_hash: Bytes32,
-// ) -> pyo3::PyResult<u64> {
-//     // Hash the concatenation of `quality_string` and `cc_sp_output_hash`
-//     let mut hasher = Sha256::new();
-//     hasher.update(quality_string);
-//     hasher.update(cc_sp_output_hash);
-//     let sp_quality_string = hasher.finalize();
-
-//     // Convert the hash bytes to a big-endian u128 integer
-//     let sp_quality_value = u128::from_be_bytes(sp_quality_string[..16]);
-
-//     // Expected plot size calculation function
-//     let plot_size = expected_plot_size(size);
-
-//     // Calculate the number of iterations
-//     let iters = (difficulty as u128 * difficulty_constant_factor * sp_quality_value)
-//         / ((1_u128 << 256) * plot_size as u128);
-
-//     Ok(iters.max(1) as u64)
-// }

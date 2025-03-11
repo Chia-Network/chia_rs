@@ -117,7 +117,6 @@ impl BlockRecord {
         ))
     }
 
-    // TODO: these could be implemented as a total port of pot iterations
     fn sp_sub_slot_total_iters_impl(&self, constants: &Bound<'_, PyAny>) -> PyResult<u128> {
         let ret = self
             .total_iters
@@ -131,6 +130,7 @@ impl BlockRecord {
         }
     }
 
+    #[pyo3(name = "ip_sub_slot_total_iters")]
     fn ip_sub_slot_total_iters_impl(&self, constants: &Bound<'_, PyAny>) -> PyResult<u128> {
         self.total_iters
             .checked_sub(self.py_ip_iters_impl(constants)? as u128)
@@ -153,49 +153,10 @@ impl BlockRecord {
             .map_err(Into::into)
     }
 
+    #[pyo3(name = "sp_sub_slot_total_iters")]
     fn sp_total_iters_impl(&self, constants: &Bound<'_, PyAny>) -> PyResult<u128> {
         self.sp_sub_slot_total_iters_impl(constants)?
             .checked_add(self.py_sp_iters_impl(constants)? as u128)
             .ok_or(PyValueError::new_err("uint128 overflow"))
-    }
-
-    fn sp_sub_slot_total_iters<'a>(
-        &self,
-        py: Python<'a>,
-        constants: &Bound<'_, PyAny>,
-    ) -> PyResult<Bound<'a, PyAny>> {
-        ChiaToPython::to_python(&self.sp_sub_slot_total_iters_impl(constants)?, py)
-    }
-
-    fn ip_sub_slot_total_iters<'a>(
-        &self,
-        py: Python<'a>,
-        constants: &Bound<'_, PyAny>,
-    ) -> PyResult<Bound<'a, PyAny>> {
-        ChiaToPython::to_python(&self.ip_sub_slot_total_iters_impl(constants)?, py)
-    }
-
-    fn sp_iters<'a>(
-        &self,
-        py: Python<'a>,
-        constants: &Bound<'_, PyAny>,
-    ) -> PyResult<Bound<'a, PyAny>> {
-        ChiaToPython::to_python(&self.py_sp_iters_impl(constants)?, py)
-    }
-
-    fn ip_iters<'a>(
-        &self,
-        py: Python<'a>,
-        constants: &Bound<'_, PyAny>,
-    ) -> PyResult<Bound<'a, PyAny>> {
-        ChiaToPython::to_python(&self.py_ip_iters_impl(constants)?, py)
-    }
-
-    fn sp_total_iters<'a>(
-        &self,
-        py: Python<'a>,
-        constants: &Bound<'_, PyAny>,
-    ) -> PyResult<Bound<'a, PyAny>> {
-        ChiaToPython::to_python(&self.sp_total_iters_impl(constants)?, py)
     }
 }
