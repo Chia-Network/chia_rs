@@ -249,6 +249,7 @@ extra_members = {
         "def ip_sub_slot_total_iters(self, constants: ConsensusConstants) -> uint128: ...",
         "def sp_iters(self, constants: ConsensusConstants) -> uint64: ...",
         "def ip_iters(self, constants: ConsensusConstants) -> uint64: ...",
+        "def sp_sub_slot_total_iters(self, constants: ConsensusConstants) -> uint128: ...",
         "def sp_total_iters(self, constants: ConsensusConstants) -> uint128: ...",
     ],
 }

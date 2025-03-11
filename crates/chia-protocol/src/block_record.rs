@@ -114,6 +114,30 @@ impl BlockRecord {
         ))
     }
 
+    #[pyo3(name = "ip_sub_slot_total_iters")]
+    fn ip_sub_slot_total_iters_impl(&self, constants: &Bound<'_, PyAny>) -> PyResult<u128> {
+        self.total_iters
+            .checked_sub(self.py_ip_iters_impl(constants)? as u128)
+            .ok_or(PyValueError::new_err("uint128 overflow"))
+    }
+
+    #[pyo3(name = "sp_iters")]
+    fn py_sp_iters_impl(&self, constants: &Bound<'_, PyAny>) -> PyResult<u64> {
+        let num_sps_sub_slot = constants.getattr("NUM_SPS_SUB_SLOT")?.extract::<u32>()?;
+        self.sp_iters_impl(num_sps_sub_slot).map_err(Into::into)
+    }
+
+    #[pyo3(name = "ip_iters")]
+    fn py_ip_iters_impl(&self, constants: &Bound<'_, PyAny>) -> PyResult<u64> {
+        let num_sps_sub_slot = constants.getattr("NUM_SPS_SUB_SLOT")?.extract::<u32>()?;
+        let num_sp_intervals_extra = constants
+            .getattr("NUM_SP_INTERVALS_EXTRA")?
+            .extract::<u8>()?;
+        self.ip_iters_impl(num_sps_sub_slot, num_sp_intervals_extra)
+            .map_err(Into::into)
+    }
+
+    #[pyo3(name = "sp_sub_slot_total_iters")]
     fn sp_sub_slot_total_iters_impl(&self, constants: &Bound<'_, PyAny>) -> PyResult<u128> {
         let ret = self
             .total_iters
@@ -125,29 +149,6 @@ impl BlockRecord {
         } else {
             Ok(ret)
         }
-    }
-
-    #[pyo3(name = "ip_sub_slot_total_iters")]
-    fn ip_sub_slot_total_iters_impl(&self, constants: &Bound<'_, PyAny>) -> PyResult<u128> {
-        self.total_iters
-            .checked_sub(self.py_ip_iters_impl(constants)? as u128)
-            .ok_or(PyValueError::new_err("uint128 overflow"))
-    }
-
-    #[pyo3(name = "sp_iters_impl")]
-    fn py_sp_iters_impl(&self, constants: &Bound<'_, PyAny>) -> PyResult<u64> {
-        let num_sps_sub_slot = constants.getattr("NUM_SPS_SUB_SLOT")?.extract::<u32>()?;
-        self.sp_iters_impl(num_sps_sub_slot).map_err(Into::into)
-    }
-
-    #[pyo3(name = "ip_iters_impl")]
-    fn py_ip_iters_impl(&self, constants: &Bound<'_, PyAny>) -> PyResult<u64> {
-        let num_sps_sub_slot = constants.getattr("NUM_SPS_SUB_SLOT")?.extract::<u32>()?;
-        let num_sp_intervals_extra = constants
-            .getattr("NUM_SP_INTERVALS_EXTRA")?
-            .extract::<u8>()?;
-        self.ip_iters_impl(num_sps_sub_slot, num_sp_intervals_extra)
-            .map_err(Into::into)
     }
 
     #[pyo3(name = "sp_total_iters")]
