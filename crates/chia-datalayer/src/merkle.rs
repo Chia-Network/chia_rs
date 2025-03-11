@@ -1588,12 +1588,15 @@ impl MerkleBlob {
 
     pub fn calculate_lazy_hashes(&mut self) -> Result<(), Error> {
         // OPT: yeah, storing the whole set of blocks via collect is not great
-        for item in MerkleBlobLeftChildFirstIterator::new(&self.blob, None).collect::<Vec<_>>() {
+        for item in MerkleBlobLeftChildFirstIterator::new_with_block_predicate(
+            &self.blob,
+            None,
+            Some(|block: &Block| block.metadata.dirty),
+        )
+        .collect::<Vec<_>>()
+        {
             let (index, mut block) = item?;
-            // OPT: really want a pruned traversal, not filter
-            if !block.metadata.dirty {
-                continue;
-            }
+            assert!(block.metadata.dirty);
 
             let Node::Internal(ref leaf) = block.node else {
                 panic!("leaves should not be dirty")
@@ -2052,10 +2055,19 @@ pub struct MerkleBlobLeftChildFirstIterator<'a> {
     blob: &'a Vec<u8>,
     deque: VecDeque<MerkleBlobLeftChildFirstIteratorItem>,
     already_queued: HashSet<TreeIndex>,
+    predicate: Option<fn(&Block) -> bool>,
 }
 
 impl<'a> MerkleBlobLeftChildFirstIterator<'a> {
     fn new(blob: &'a Vec<u8>, from_index: Option<TreeIndex>) -> Self {
+        Self::new_with_block_predicate(blob, from_index, None)
+    }
+
+    fn new_with_block_predicate(
+        blob: &'a Vec<u8>,
+        from_index: Option<TreeIndex>,
+        predicate: Option<fn(&Block) -> bool>,
+    ) -> Self {
         let mut deque = VecDeque::new();
         let from_index = from_index.unwrap_or(TreeIndex(0));
         if blob.len() / BLOCK_SIZE > 0 {
@@ -2069,6 +2081,7 @@ impl<'a> MerkleBlobLeftChildFirstIterator<'a> {
             blob,
             deque,
             already_queued: HashSet::new(),
+            predicate,
         }
     }
 }
@@ -2085,6 +2098,12 @@ impl Iterator for MerkleBlobLeftChildFirstIterator<'_> {
                 Ok(block) => block,
                 Err(e) => return Some(Err(e)),
             };
+
+            if let Some(predicate) = self.predicate {
+                if !predicate(&block) {
+                    continue;
+                }
+            }
 
             match block.node {
                 Node::Leaf(..) => return Some(Ok((item.index, block))),
