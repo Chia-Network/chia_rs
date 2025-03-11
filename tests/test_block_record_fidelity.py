@@ -137,7 +137,7 @@ def test_calculate_sp_iters():
     rng = Random()
     rng.seed(1337)
     br = get_block_record(rng, ssi=ssi, spi=31)
-    res = br.sp_iters_impl(DEFAULT_CONSTANTS)
+    res = br.sp_iters(DEFAULT_CONSTANTS)
     assert res is not None
 
 
@@ -149,8 +149,8 @@ def test_calculate_ip_iters():
     rng.seed(1337)
     br = get_block_record(rng, ssi=ssi, spi=31, ri=ri)
     with raises(ValueError):
-        res = br.ip_iters_impl(DEFAULT_CONSTANTS)
+        res = br.ip_iters(DEFAULT_CONSTANTS)
 
     br = get_block_record(rng, ssi=ssi, spi=13, ri=1)
-    res = br.ip_iters_impl(DEFAULT_CONSTANTS)
+    res = br.ip_iters(DEFAULT_CONSTANTS)
     assert res == 6400065
