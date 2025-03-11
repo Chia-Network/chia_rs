@@ -150,7 +150,7 @@ impl BlockRecord {
             .map_err(Into::into)
     }
 
-    #[pyo3(name = "sp_sub_slot_total_iters")]
+    #[pyo3(name = "sp_total_iters")]
     fn sp_total_iters_impl(&self, constants: &Bound<'_, PyAny>) -> PyResult<u128> {
         self.sp_sub_slot_total_iters_impl(constants)?
             .checked_add(self.py_sp_iters_impl(constants)? as u128)

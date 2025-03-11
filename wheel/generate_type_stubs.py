@@ -246,7 +246,6 @@ extra_members = {
         "is_transaction_block: bool",
         "first_in_sub_slot: bool",
         "def is_challenge_block(self, constants: ConsensusConstants) -> bool: ...",
-        "def sp_sub_slot_total_iters(self, constants: ConsensusConstants) -> uint128: ...",
         "def ip_sub_slot_total_iters(self, constants: ConsensusConstants) -> uint128: ...",
         "def sp_iters(self, constants: ConsensusConstants) -> uint64: ...",
         "def ip_iters(self, constants: ConsensusConstants) -> uint64: ...",
