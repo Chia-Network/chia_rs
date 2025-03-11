@@ -323,6 +323,18 @@ create_errors!(
             NodeHashNotInNodeMapsError,
             "node hash not in nodes: {0:?}",
             (Hash)
+        ),
+        (
+            MoveSourceIndexNotInUse,
+            MoveSourceIndexNotInUseError,
+            "move source index not in use: {0:?}",
+            (TreeIndex)
+        ),
+        (
+            MoveDestinationIndexNotInUse,
+            MoveDestinationIndexNotInUseError,
+            "move destination index not in use: {0:?}",
+            (TreeIndex)
         )
     )
 );
@@ -682,42 +694,136 @@ impl Block {
     }
 }
 
-// TODO: take the encouragement to clean up and make clippy happy again
-#[allow(clippy::type_complexity)]
-fn get_free_indexes_and_keys_values_indexes(
-    blob: &Vec<u8>,
-) -> Result<
-    (
-        HashSet<TreeIndex>,
-        HashMap<KeyId, TreeIndex>,
-        HashMap<Hash, TreeIndex>,
-    ),
-    Error,
-> {
-    let index_count = blob.len() / BLOCK_SIZE;
+#[cfg_attr(feature = "py-bindings", pyclass)]
+#[derive(Clone, Debug)]
+pub struct BlockStatusCache {
+    // TODO: would be nice for this to be deterministic ala a fifo set
+    free_indexes: HashSet<TreeIndex>,
+    key_to_index: HashMap<KeyId, TreeIndex>,
+    leaf_hash_to_index: HashMap<Hash, TreeIndex>,
+}
 
-    let mut seen_indexes: Vec<bool> = vec![false; index_count];
-    let mut key_to_index: HashMap<KeyId, TreeIndex> = HashMap::default();
-    let mut leaf_hash_to_index: HashMap<Hash, TreeIndex> = HashMap::default();
+impl BlockStatusCache {
+    // TODO: take the encouragement to clean up and make clippy happy again
+    #[allow(clippy::type_complexity)]
+    fn new(blob: &Vec<u8>) -> Result<Self, Error> {
+        let index_count = blob.len() / BLOCK_SIZE;
 
-    for item in MerkleBlobLeftChildFirstIterator::new(blob, None) {
-        let (index, block) = item?;
-        seen_indexes[index.0 as usize] = true;
+        let mut seen_indexes: Vec<bool> = vec![false; index_count];
+        let mut key_to_index: HashMap<KeyId, TreeIndex> = HashMap::default();
+        let mut leaf_hash_to_index: HashMap<Hash, TreeIndex> = HashMap::default();
 
-        if let Node::Leaf(leaf) = block.node {
-            key_to_index.insert(leaf.key, index);
-            leaf_hash_to_index.insert(leaf.hash, index);
+        for item in MerkleBlobLeftChildFirstIterator::new(blob, None) {
+            let (index, block) = item?;
+            seen_indexes[index.0 as usize] = true;
+
+            if let Node::Leaf(leaf) = block.node {
+                key_to_index.insert(leaf.key, index);
+                leaf_hash_to_index.insert(leaf.hash, index);
+            }
         }
+
+        let mut free_indexes: HashSet<TreeIndex> = HashSet::new();
+        for (index, seen) in seen_indexes.iter().enumerate() {
+            if !seen {
+                free_indexes.insert(TreeIndex(index as u32));
+            }
+        }
+
+        Ok(Self {
+            free_indexes,
+            key_to_index,
+            leaf_hash_to_index,
+        })
     }
 
-    let mut free_indexes: HashSet<TreeIndex> = HashSet::new();
-    for (index, seen) in seen_indexes.iter().enumerate() {
-        if !seen {
-            free_indexes.insert(TreeIndex(index as u32));
-        }
+    fn iter_keys_indexes(&self) -> impl Iterator<Item = (&KeyId, &TreeIndex)> {
+        self.key_to_index.iter()
     }
 
-    Ok((free_indexes, key_to_index, leaf_hash_to_index))
+    fn get_free_index(&mut self) -> Option<TreeIndex> {
+        let maybe_index = self.free_indexes.iter().next().copied();
+        if let Some(index) = maybe_index {
+            self.free_indexes.remove(&index);
+        }
+
+        maybe_index
+    }
+
+    fn get_index_by_key(&self, key: KeyId) -> Option<&TreeIndex> {
+        self.key_to_index.get(&key)
+    }
+
+    fn get_index_by_leaf_hash(&self, hash: &Hash) -> Option<&TreeIndex> {
+        self.leaf_hash_to_index.get(hash)
+    }
+
+    fn index_is_free(&self, index: TreeIndex) -> bool {
+        self.free_indexes.contains(&index)
+    }
+
+    fn leaf_count(&self) -> usize {
+        self.key_to_index.len()
+    }
+
+    fn free_index_count(&self) -> usize {
+        self.free_indexes.len()
+    }
+
+    fn no_keys(&self) -> bool {
+        self.key_to_index.is_empty()
+    }
+
+    fn contains_key(&self, key: KeyId) -> bool {
+        self.key_to_index.contains_key(&key)
+    }
+
+    fn clear(&mut self) {
+        self.key_to_index.clear();
+        self.free_indexes.clear();
+        self.leaf_hash_to_index.clear();
+    }
+
+    fn add_internal(&mut self, index: TreeIndex) {
+        self.free_indexes.remove(&index);
+    }
+
+    fn add_leaf(&mut self, index: TreeIndex, leaf: LeafNode) {
+        self.free_indexes.remove(&index);
+
+        self.key_to_index.insert(leaf.key, index);
+        self.leaf_hash_to_index.insert(leaf.hash, index);
+    }
+
+    fn remove_internal(&mut self, index: TreeIndex) {
+        self.free_indexes.insert(index);
+    }
+
+    fn remove_leaf(&mut self, node: &LeafNode) -> Result<(), Error> {
+        let Some(index) = self.key_to_index.remove(&node.key) else {
+            return Err(Error::UnknownKey(node.key));
+        };
+        self.leaf_hash_to_index.remove(&node.hash);
+
+        self.free_indexes.insert(index);
+
+        Ok(())
+    }
+
+    fn move_index(&mut self, source: TreeIndex, destination: TreeIndex) -> Result<(), Error> {
+        // to be called _after_ having written to the destination index including
+        // having set it to be free
+        if self.free_indexes.contains(&source) {
+            return Err(Error::MoveSourceIndexNotInUse(source));
+        };
+        if self.free_indexes.contains(&destination) {
+            return Err(Error::MoveDestinationIndexNotInUse(source));
+        };
+
+        self.free_indexes.insert(source);
+
+        Ok(())
+    }
 }
 
 /// Stores a DataLayer merkle tree in bytes and provides serialization on each access so that only
@@ -731,10 +837,7 @@ fn get_free_indexes_and_keys_values_indexes(
 #[derive(Clone, Debug)]
 pub struct MerkleBlob {
     blob: Vec<u8>,
-    // TODO: would be nice for this to be deterministic ala a fifo set
-    free_indexes: HashSet<TreeIndex>,
-    key_to_index: HashMap<KeyId, TreeIndex>,
-    leaf_hash_to_index: HashMap<Hash, TreeIndex>,
+    block_status_cache: BlockStatusCache,
     // TODO: used by fuzzing, some cleaner way?  making it cfg-dependent is annoying with
     //       the type stubs
     pub check_integrity_on_drop: bool,
@@ -749,14 +852,11 @@ impl MerkleBlob {
         }
 
         // TODO: maybe integrate integrity check here if quick enough
-        let (free_indexes, key_to_index, leaf_hash_to_index) =
-            get_free_indexes_and_keys_values_indexes(&blob)?;
+        let block_status_cache = BlockStatusCache::new(&blob)?;
 
         let self_ = Self {
             blob,
-            free_indexes,
-            key_to_index,
-            leaf_hash_to_index,
+            block_status_cache,
             check_integrity_on_drop: true,
         };
 
@@ -765,9 +865,7 @@ impl MerkleBlob {
 
     fn clear(&mut self) {
         self.blob.clear();
-        self.key_to_index.clear();
-        self.free_indexes.clear();
-        self.leaf_hash_to_index.clear();
+        self.block_status_cache.clear();
     }
 
     pub fn insert(
@@ -777,7 +875,7 @@ impl MerkleBlob {
         hash: &Hash,
         insert_location: InsertLocation,
     ) -> Result<TreeIndex, Error> {
-        if self.key_to_index.contains_key(&key) {
+        if self.block_status_cache.contains_key(key) {
             return Err(Error::KeyAlreadyPresent());
         }
 
@@ -791,7 +889,7 @@ impl MerkleBlob {
                 unreachable!("this should have been caught and processed above")
             }
             InsertLocation::AsRoot {} => {
-                if !self.key_to_index.is_empty() {
+                if !self.block_status_cache.no_keys() {
                     return Err(Error::UnableToInsertAsRootOfNonEmptyTree());
                 };
                 self.insert_first(key, value, hash)
@@ -811,7 +909,7 @@ impl MerkleBlob {
                     value,
                 };
 
-                if self.key_to_index.len() == 1 {
+                if self.block_status_cache.leaf_count() == 1 {
                     self.insert_second(node, &old_leaf, &internal_node_hash, side)
                 } else {
                     self.insert_third_or_later(node, &old_leaf, index, &internal_node_hash, side)
@@ -983,7 +1081,7 @@ impl MerkleBlob {
         // OPT: would it be worthwhile to hold the entire blocks?
         let mut indexes = vec![];
 
-        if self.key_to_index.len() <= 1 {
+        if self.block_status_cache.leaf_count() <= 1 {
             for _ in 0..2 {
                 let Some(((key, value), hash)) = keys_values_hashes.pop() else {
                     return Ok(());
@@ -1147,15 +1245,13 @@ impl MerkleBlob {
 
     pub fn delete(&mut self, key: KeyId) -> Result<(), Error> {
         let (leaf_index, leaf, _leaf_block) = self.get_leaf_by_key(key)?;
-        self.key_to_index.remove(&key);
-        self.leaf_hash_to_index.remove(&leaf.hash);
+        self.block_status_cache.remove_leaf(&leaf)?;
 
         let Some(parent_index) = leaf.parent.0 else {
             self.clear();
             return Ok(());
         };
 
-        self.free_indexes.insert(leaf_index);
         let maybe_parent = self.get_node(parent_index)?;
         let Node::Internal(parent) = maybe_parent else {
             panic!("parent node not internal: {maybe_parent:?}")
@@ -1172,13 +1268,15 @@ impl MerkleBlob {
                 }
             };
 
-            self.insert_entry_to_blob(TreeIndex(0), &sibling_block)?;
-            self.free_indexes.insert(sibling_index);
+            let destination = TreeIndex(0);
+            self.insert_entry_to_blob(destination, &sibling_block)?;
+            self.block_status_cache
+                .move_index(sibling_index, destination)?;
 
             return Ok(());
         };
 
-        self.free_indexes.insert(parent_index);
+        self.block_status_cache.remove_internal(parent_index);
         let mut grandparent_block = self.get_block(grandparent_index)?;
 
         sibling_block
@@ -1208,7 +1306,7 @@ impl MerkleBlob {
             return Ok(());
         };
 
-        self.leaf_hash_to_index.remove(&leaf.hash);
+        self.block_status_cache.remove_leaf(&leaf)?;
         leaf.hash.clone_from(new_hash);
         leaf.value = value;
         // OPT: maybe just edit in place?
@@ -1243,8 +1341,8 @@ impl MerkleBlob {
                 Node::Leaf(node) => {
                     leaf_count += 1;
                     let cached_index = self
-                        .key_to_index
-                        .get(&node.key)
+                        .block_status_cache
+                        .get_index_by_key(node.key)
                         .ok_or(Error::IntegrityKeyNotInCache(node.key))?;
                     if *cached_index != index {
                         return Err(Error::IntegrityKeyToIndexCacheIndex(
@@ -1254,7 +1352,7 @@ impl MerkleBlob {
                         ));
                     };
                     assert!(
-                        !self.free_indexes.contains(&index),
+                        !self.block_status_cache.index_is_free(index),
                         "{}",
                         format!("active index found in free index list: {index:?}")
                     );
@@ -1262,21 +1360,21 @@ impl MerkleBlob {
             }
         }
 
-        let key_to_index_cache_length = self.key_to_index.len();
+        let key_to_index_cache_length = self.block_status_cache.key_to_index.len();
         if leaf_count != key_to_index_cache_length {
             return Err(Error::IntegrityKeyToIndexCacheLength(
                 leaf_count,
                 key_to_index_cache_length,
             ));
         }
-        let leaf_hash_to_index_cache_length = self.leaf_hash_to_index.len();
+        let leaf_hash_to_index_cache_length = self.block_status_cache.leaf_hash_to_index.len();
         if leaf_count != leaf_hash_to_index_cache_length {
             return Err(Error::IntegrityLeafHashToIndexCacheLength(
                 leaf_count,
                 leaf_hash_to_index_cache_length,
             ));
         }
-        let total_count = leaf_count + internal_count + self.free_indexes.len();
+        let total_count = leaf_count + internal_count + self.block_status_cache.free_index_count();
         let extend_index = self.extend_index();
         if total_count != extend_index.0 as usize {
             return Err(Error::IntegrityTotalNodeCount(extend_index, total_count));
@@ -1321,7 +1419,7 @@ impl MerkleBlob {
     }
 
     fn get_new_index(&mut self) -> TreeIndex {
-        match self.free_indexes.iter().next().copied() {
+        match self.block_status_cache.get_free_index() {
             None => {
                 let index = self.extend_index();
                 self.blob.extend_from_slice(&[0; BLOCK_SIZE]);
@@ -1330,10 +1428,7 @@ impl MerkleBlob {
                 //       the same index
                 index
             }
-            Some(new_index) => {
-                self.free_indexes.remove(&new_index);
-                new_index
-            }
+            Some(new_index) => new_index,
         }
     }
 
@@ -1413,12 +1508,10 @@ impl MerkleBlob {
             }
         }
 
-        if let Node::Leaf(ref node) = block.node {
-            self.key_to_index.insert(node.key, index);
-            self.leaf_hash_to_index.insert(node.hash, index);
-        };
-
-        self.free_indexes.take(&index);
+        match block.node {
+            Node::Leaf(leaf) => self.block_status_cache.add_leaf(index, leaf),
+            Node::Internal(..) => self.block_status_cache.add_internal(index),
+        }
 
         Ok(())
     }
@@ -1445,7 +1538,10 @@ impl MerkleBlob {
     }
 
     pub fn get_leaf_by_key(&self, key: KeyId) -> Result<(TreeIndex, LeafNode, Block), Error> {
-        let index = *self.key_to_index.get(&key).ok_or(Error::UnknownKey(key))?;
+        let index = *self
+            .block_status_cache
+            .get_index_by_key(key)
+            .ok_or(Error::UnknownKey(key))?;
         let block = self.get_block(index)?;
         let leaf = block.node.expect_leaf(&format!(
             "expected leaf for index from key cache: {index} -> <<self>>"
@@ -1515,7 +1611,7 @@ impl MerkleBlob {
 
     pub fn get_keys_values(&self) -> Result<HashMap<KeyId, ValueId>, Error> {
         let mut map = HashMap::new();
-        for (key, index) in &self.key_to_index {
+        for (key, index) in self.block_status_cache.iter_keys_indexes() {
             let node = self.get_node(*index)?;
             let leaf = node.expect_leaf(
                 "key was just retrieved from the key to index mapping, must be a leaf",
@@ -1527,14 +1623,17 @@ impl MerkleBlob {
     }
 
     pub fn get_key_index(&self, key: KeyId) -> Result<TreeIndex, Error> {
-        self.key_to_index
-            .get(&key)
+        self.block_status_cache
+            .get_index_by_key(key)
             .copied()
             .ok_or(Error::UnknownKey(key))
     }
 
     pub fn get_proof_of_inclusion(&self, key: KeyId) -> Result<ProofOfInclusion, Error> {
-        let mut index = *self.key_to_index.get(&key).ok_or(Error::UnknownKey(key))?;
+        let mut index = *self
+            .block_status_cache
+            .get_index_by_key(key)
+            .ok_or(Error::UnknownKey(key))?;
 
         let node = self
             .get_node(index)?
@@ -1566,7 +1665,7 @@ impl MerkleBlob {
     }
 
     pub fn get_node_by_hash(&self, node_hash: Hash) -> Result<(KeyId, ValueId), Error> {
-        let Some(index) = self.leaf_hash_to_index.get(&node_hash) else {
+        let Some(index) = self.block_status_cache.get_index_by_leaf_hash(&node_hash) else {
             return Err(Error::LeafHashNotFound(node_hash));
         };
 
@@ -1763,8 +1862,8 @@ impl MerkleBlob {
             (None, None) => InsertLocation::Auto {},
             (Some(key), Some(side)) => InsertLocation::Leaf {
                 index: *self
-                    .key_to_index
-                    .get(&key)
+                    .block_status_cache
+                    .get_index_by_key(key)
                     // TODO: use a specific error
                     .ok_or(PyValueError::new_err(format!(
                         "unknown key id passed as insert location reference: {key}"
@@ -1838,7 +1937,7 @@ impl MerkleBlob {
 
     #[pyo3(name = "empty")]
     pub fn py_empty(&self) -> PyResult<bool> {
-        Ok(self.key_to_index.is_empty())
+        Ok(self.block_status_cache.no_keys())
     }
 
     #[pyo3(name = "get_root_hash")]
@@ -1848,7 +1947,7 @@ impl MerkleBlob {
 
     #[pyo3(name = "get_hash_at_index")]
     pub fn py_get_hash_at_index(&self, index: TreeIndex) -> PyResult<Option<Hash>> {
-        if self.key_to_index.is_empty() {
+        if self.block_status_cache.no_keys() {
             return Ok(None);
         }
 
@@ -2387,7 +2486,7 @@ mod tests {
             .unwrap();
         open_dot(merkle_blob.to_dot().unwrap().set_note("first after"));
 
-        assert_eq!(merkle_blob.key_to_index.len(), 1);
+        assert_eq!(merkle_blob.block_status_cache.leaf_count(), 1);
     }
 
     #[rstest]
@@ -2420,7 +2519,10 @@ mod tests {
                 ValueId(key_value_id),
                 &sha256_num(key_value_id),
                 InsertLocation::Leaf {
-                    index: merkle_blob.key_to_index[&last_key],
+                    index: *merkle_blob
+                        .block_status_cache
+                        .get_index_by_key(last_key)
+                        .unwrap(),
                     side,
                 },
             )
@@ -2428,7 +2530,12 @@ mod tests {
         open_dot(merkle_blob.to_dot().unwrap().set_note("first after"));
 
         let sibling = merkle_blob
-            .get_node(merkle_blob.key_to_index[&last_key])
+            .get_node(
+                *merkle_blob
+                    .block_status_cache
+                    .get_index_by_key(last_key)
+                    .unwrap(),
+            )
             .unwrap();
         let parent = merkle_blob.get_node(sibling.parent().0.unwrap()).unwrap();
         let Node::Internal(internal) = parent else {
@@ -2470,17 +2577,17 @@ mod tests {
 
         merkle_blob.delete(KeyId(key_value_id)).unwrap();
 
-        assert_eq!(merkle_blob.key_to_index.len(), 0);
+        assert_eq!(merkle_blob.block_status_cache.leaf_count(), 0);
     }
 
     #[rstest]
     fn test_delete_frees_index(mut small_blob: MerkleBlob) {
         let key = KeyId(0x0001_0203_0405_0607);
-        let index = small_blob.key_to_index[&key];
+        let index = *small_blob.block_status_cache.get_index_by_key(key).unwrap();
         small_blob.delete(key).unwrap();
 
         assert_eq!(
-            small_blob.free_indexes,
+            small_blob.block_status_cache.free_indexes,
             HashSet::from([index, TreeIndex(1)])
         );
     }
@@ -2489,12 +2596,12 @@ mod tests {
     fn test_get_new_index_with_free_index(mut small_blob: MerkleBlob) {
         open_dot(small_blob.to_dot().unwrap().set_note("initial"));
         let key = KeyId(0x0001_0203_0405_0607);
-        let _ = small_blob.key_to_index[&key];
+        let _ = small_blob.block_status_cache.get_index_by_key(key).unwrap();
         small_blob.delete(key).unwrap();
         open_dot(small_blob.to_dot().unwrap().set_note("after delete"));
 
         let expected = HashSet::from([TreeIndex(1), TreeIndex(2)]);
-        assert_eq!(small_blob.free_indexes, expected);
+        assert_eq!(small_blob.block_status_cache.free_indexes, expected);
     }
 
     #[rstest]
@@ -2529,8 +2636,11 @@ mod tests {
         let mut blob = small_blob.blob.clone();
         let expected_free_index = TreeIndex((blob.len() / BLOCK_SIZE) as u32);
         blob.extend_from_slice(&[0; BLOCK_SIZE]);
-        let (free_indexes, _, _) = get_free_indexes_and_keys_values_indexes(&blob).unwrap();
-        assert_eq!(free_indexes, HashSet::from([expected_free_index]));
+        let block_status_cache = BlockStatusCache::new(&blob).unwrap();
+        assert_eq!(
+            block_status_cache.free_indexes,
+            HashSet::from([expected_free_index])
+        );
     }
 
     #[test]
@@ -2541,7 +2651,7 @@ mod tests {
     #[rstest]
     fn test_upsert_inserts(small_blob: MerkleBlob) {
         let key = KeyId(1234);
-        assert!(!small_blob.key_to_index.contains_key(&key));
+        assert!(!small_blob.block_status_cache.contains_key(key));
         let value = ValueId(5678);
 
         let mut insert_blob = MerkleBlob::new(small_blob.blob.clone()).unwrap();
@@ -2561,7 +2671,11 @@ mod tests {
     fn test_upsert_upserts(mut small_blob: MerkleBlob) {
         let before_blocks =
             MerkleBlobLeftChildFirstIterator::new(&small_blob.blob, None).collect::<Vec<_>>();
-        let (key, index) = small_blob.key_to_index.iter().next().unwrap();
+        let (key, index) = small_blob
+            .block_status_cache
+            .iter_keys_indexes()
+            .next()
+            .unwrap();
         let original = small_blob.get_node(*index).unwrap().expect_leaf("<<self>>");
         let new_value = ValueId(original.value.0 + 1);
 
@@ -2928,14 +3042,18 @@ mod tests {
                 .unwrap();
         }
         let (key, index) = {
-            let (key, index) = small_blob.key_to_index.iter().next().unwrap();
+            let (key, index) = small_blob
+                .block_status_cache
+                .iter_keys_indexes()
+                .next()
+                .unwrap();
             (*key, *index)
         };
         let expected_length = small_blob.blob.len();
-        assert!(!small_blob.free_indexes.contains(&index));
+        assert!(!small_blob.block_status_cache.index_is_free(index));
         small_blob.delete(key).unwrap();
-        assert!(small_blob.free_indexes.contains(&index));
-        let free_indexes = small_blob.free_indexes.clone();
+        assert!(small_blob.block_status_cache.index_is_free(index));
+        let free_indexes = small_blob.block_status_cache.free_indexes.clone();
         assert_eq!(free_indexes.len(), 2);
         let new_index = small_blob
             .insert(
@@ -2947,7 +3065,7 @@ mod tests {
             .unwrap();
         assert_eq!(small_blob.blob.len(), expected_length);
         assert!(free_indexes.contains(&new_index));
-        assert!(small_blob.free_indexes.is_empty());
+        assert_eq!(small_blob.block_status_cache.free_index_count(), 0);
     }
 
     fn generate_kvid(seed: i64) -> (KeyId, ValueId) {
@@ -3047,7 +3165,7 @@ mod tests {
     #[rstest]
     fn test_writing_to_free_block_that_contained_an_active_key(small_blob: MerkleBlob) {
         let key = KeyId(0x0001_0203_0405_0607);
-        let Some(index) = small_blob.key_to_index.get(&key).copied() else {
+        let Some(index) = small_blob.block_status_cache.get_index_by_key(key).copied() else {
             panic!("maybe the test key needs to be updated?")
         };
         let mut prepared_bytes = small_blob.blob.clone();
@@ -3062,6 +3180,6 @@ mod tests {
                 InsertLocation::Auto {},
             )
             .unwrap();
-        assert!(prepared_blob.key_to_index.contains_key(&key));
+        assert!(prepared_blob.block_status_cache.contains_key(key));
     }
 }
