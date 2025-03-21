@@ -2032,6 +2032,11 @@ impl MerkleBlob {
     pub fn py_check_integrity(&self) -> PyResult<()> {
         Ok(self.check_integrity()?)
     }
+
+    #[pyo3(name = "memory_size")]
+    pub fn py_memory_size(&self) -> usize {
+        std::mem::size_of_val(self)
+    }
 }
 
 fn try_get_block(blob: &[u8], index: TreeIndex) -> Result<Block, Error> {

@@ -489,3 +489,23 @@ def test_get_nodes() -> None:
         seen_indexes.add(index)
 
     assert keys == seen_keys
+
+def test_memory_size() -> None:
+    merkle_blob = MerkleBlob(blob=bytearray())
+    pre_size = merkle_blob.memory_size()
+    pre_len = len(merkle_blob)
+    print(f"{pre_size=}")
+    print(f"{pre_len=}")
+
+    n = 1_000
+
+    HASH = bytes32(range(12, 12 + 32))
+    for i in range(n):
+        merkle_blob.insert(KeyId(int64(i)), ValueId(int64(i)), HASH)
+
+    post_size = merkle_blob.memory_size()
+    post_len = len(merkle_blob)
+    print(f"{pre_size=}")
+    print(f"{post_len=}")
+
+    assert post_size - pre_size > n * BLOCK_SIZE
