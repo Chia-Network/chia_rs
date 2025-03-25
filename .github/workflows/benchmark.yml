@@ -117,7 +117,7 @@ jobs:
         with:
           fetch-depth: 1
 
-      - uses: chia-network/actions/setup-python@main
+      - uses: chia-network/actions/setup-python@altendky-patch-4
         name: Install Python ${{ matrix.python-version }}
         with:
           python-version: ${{ matrix.python-version }}
