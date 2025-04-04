@@ -1,5 +1,5 @@
 from typing import Optional, Any, Callable
-
+from pytest import raises
 import sys
 import time
 from chia_rs import BlockRecord, ClassgroupElement
@@ -62,15 +62,15 @@ def get_hash(rng: Random) -> bytes32:
     return bytes32.random(rng)
 
 
-def get_block_record(rng: Random) -> BlockRecord:
+def get_block_record(rng: Random, ssi=None, ri=None, spi=None) -> BlockRecord:
     height = get_u32(rng)
     weight = get_u128(rng)
     iters = get_u128(rng)
-    sp_index = get_u4(rng)
+    sp_index = spi if spi is not None else get_u4(rng)
     vdf_out = get_classgroup_element(rng)
     infused_challenge = get_optional(rng, get_classgroup_element)
-    sub_slot_iters = get_ssi(rng)
-    required_iters = get_u64(rng)
+    sub_slot_iters = ssi if ssi is not None else get_ssi(rng)
+    required_iters = ri if ri is not None else get_u64(rng)
     deficit = get_u8(rng)
     overflow = get_bool(rng)
     prev_tx_height = get_u32(rng)
@@ -129,3 +129,28 @@ def wrap_call(expr: str, br: Any) -> str:
         return f"V:{ret}"
     except Exception as e:
         return f"E:{e}"
+
+
+# TODO: more thoroughly check these new functions which use self
+def test_calculate_sp_iters():
+    ssi: uint64 = uint64(100001 * 64 * 4)
+    rng = Random()
+    rng.seed(1337)
+    br = get_block_record(rng, ssi=ssi, spi=31)
+    res = br.sp_iters(DEFAULT_CONSTANTS)
+    assert res is not None
+
+
+def test_calculate_ip_iters():
+    ssi: uint64 = uint64(100001 * 64 * 4)
+    sp_interval_iters = ssi // 32
+    ri = sp_interval_iters - 1
+    rng = Random()
+    rng.seed(1337)
+    br = get_block_record(rng, ssi=ssi, spi=31, ri=ri)
+    with raises(ValueError):
+        res = br.ip_iters(DEFAULT_CONSTANTS)
+
+    br = get_block_record(rng, ssi=ssi, spi=13, ri=1)
+    res = br.ip_iters(DEFAULT_CONSTANTS)
+    assert res == 6400065
