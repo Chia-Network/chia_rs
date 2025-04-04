@@ -7,13 +7,6 @@ chia_rs\.chia_rs\..*
 # runtime accessible.  is there a better option for handling this?
 chia_rs\.ReadableBuffer
 
-# TODO: perhaps these should be private as _*
-chia_rs\.BlockRecord\.ip_iters_impl
-chia_rs\.BlockRecord\.ip_sub_slot_total_iters_impl
-chia_rs\.BlockRecord\.sp_iters_impl
-chia_rs\.BlockRecord\.sp_sub_slot_total_iters_impl
-chia_rs\.BlockRecord\.sp_total_iters_impl
-
 # TODO: G1Element->PublicKey expects *args
 chia_rs\.G1Element\.__init__
 
