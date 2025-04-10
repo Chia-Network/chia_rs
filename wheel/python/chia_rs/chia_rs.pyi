@@ -98,7 +98,6 @@ def expected_plot_size(
 NO_UNKNOWN_CONDS: int = ...
 STRICT_ARGS_COUNT: int = ...
 LIMIT_HEAP: int = ...
-ENABLE_KECCAK: int = ...
 ENABLE_KECCAK_OPS_OUTSIDE_GUARD: int = ...
 MEMPOOL_MODE: int = ...
 DONT_VALIDATE_SIGNATURE: int = ...
@@ -4364,7 +4363,6 @@ class ConsensusConstants:
     MAX_GENERATOR_SIZE: uint32
     MAX_GENERATOR_REF_LIST_SIZE: uint32
     POOL_SUB_SLOT_ITERS: uint64
-    SOFT_FORK6_HEIGHT: uint32
     HARD_FORK_HEIGHT: uint32
     PLOT_FILTER_128_HEIGHT: uint32
     PLOT_FILTER_64_HEIGHT: uint32
@@ -4412,7 +4410,6 @@ class ConsensusConstants:
         MAX_GENERATOR_SIZE: uint32,
         MAX_GENERATOR_REF_LIST_SIZE: uint32,
         POOL_SUB_SLOT_ITERS: uint64,
-        SOFT_FORK6_HEIGHT: uint32,
         HARD_FORK_HEIGHT: uint32,
         PLOT_FILTER_128_HEIGHT: uint32,
         PLOT_FILTER_64_HEIGHT: uint32,
@@ -4476,7 +4473,6 @@ class ConsensusConstants:
         MAX_GENERATOR_SIZE: Union[ uint32, _Unspec] = _Unspec(),
         MAX_GENERATOR_REF_LIST_SIZE: Union[ uint32, _Unspec] = _Unspec(),
         POOL_SUB_SLOT_ITERS: Union[ uint64, _Unspec] = _Unspec(),
-        SOFT_FORK6_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         HARD_FORK_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_FILTER_128_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_FILTER_64_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),

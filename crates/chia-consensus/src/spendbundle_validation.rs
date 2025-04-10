@@ -7,7 +7,6 @@ use chia_bls::GTElement;
 use chia_bls::{aggregate_verify_gt, hash_to_g2};
 use chia_protocol::SpendBundle;
 use chia_sha2::Sha256;
-use clvmr::chia_dialect::ENABLE_KECCAK;
 use clvmr::LIMIT_HEAP;
 use std::time::{Duration, Instant};
 
@@ -58,9 +57,7 @@ pub fn validate_clvm_and_signature(
     Ok((conditions, pairs, start_time.elapsed()))
 }
 
-pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusConstants) -> u32 {
-    let mut flags: u32 = 0;
-
+pub fn get_flags_for_height_and_constants(_height: u32, _constants: &ConsensusConstants) -> u32 {
     //  the hard-fork initiated with 2.0. To activate June 2024
     //  * costs are ascribed to some unknown condition codes, to allow for
     // soft-forking in new conditions with cost
@@ -79,11 +76,8 @@ pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusCons
     // The soft fork initiated with 2.5.0. The activation date is still TBD.
     // Adds a new keccak256 operator under the softfork guard with extension 1.
     // This operator can be hard forked in later, but is not included in a hard fork yet.
-    if height >= constants.soft_fork6_height {
-        flags |= ENABLE_KECCAK;
-    }
 
-    flags
+    0
 }
 
 #[cfg(test)]
