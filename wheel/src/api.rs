@@ -644,6 +644,7 @@ pub fn add_datalayer_submodule(py: Python<'_>, parent: &Bound<'_, PyModule>) -> 
     parent.add_submodule(&datalayer)?;
 
     datalayer.add_class::<BlockStatusCache>()?;
+    datalayer.add_class::<DeltaReader>()?;
     datalayer.add_class::<MerkleBlob>()?;
     datalayer.add_class::<InternalNode>()?;
     datalayer.add_class::<LeafNode>()?;

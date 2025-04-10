@@ -6,7 +6,7 @@ use pyo3::{
     exceptions::PyValueError,
     prelude::*,
     pyclass, pymethods,
-    types::{PyDict, PyDictMethods, PyListMethods},
+    types::{PyAnyMethods, PyDict, PyDictMethods, PyListMethods, PyTuple},
     Bound, FromPyObject, IntoPyObject, PyAny, PyErr, PyResult, Python,
 };
 
@@ -15,10 +15,13 @@ use chia_sha2::Sha256;
 use chia_streamable_macro::Streamable;
 use chia_traits::Streamable;
 use num_traits::ToBytes;
+use pyo3::types::PyType;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::io::{Read, Write};
 use std::iter::zip;
 use std::ops::Range;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 type TreeIndexType = u32;
@@ -826,6 +829,111 @@ impl BlockStatusCache {
     }
 }
 
+type InternalNodesMap = HashMap<Hash, (Hash, Hash)>;
+type LeafNodesMap = HashMap<Hash, (KeyId, ValueId)>;
+
+#[cfg_attr(feature = "py-bindings", pyclass)]
+pub struct DeltaReader {
+    internal_nodes: InternalNodesMap,
+    leaf_nodes: LeafNodesMap,
+}
+
+impl DeltaReader {
+    pub fn new(internal_nodes: InternalNodesMap, leaf_nodes: LeafNodesMap) -> Result<Self, Error> {
+        let instance = Self {
+            internal_nodes,
+            leaf_nodes,
+        };
+        Ok(instance)
+    }
+
+    // fn get_used_key_and_value_ids(&self) -> Result<(HashSet<KeyId>, HashSet<ValueId>), Error> {
+    //     let mut keys: HashSet<KeyId> = HashSet::new();
+    //     let mut values: HashSet<ValueId> = HashSet::new();
+    //
+    //     for (key, value) in self.leaf_nodes.values() {
+    //         keys.insert(*key);
+    //         values.insert(*value);
+    //     };
+    //
+    //     Ok((keys, values))
+    // }
+
+    fn get_missing_hashes(&self) -> HashSet<Hash> {
+        let mut missing_hashes: HashSet<Hash> = HashSet::new();
+
+        for (_, (left, right)) in self.internal_nodes.iter() {
+            for hash in [left, right] {
+                if !self.internal_nodes.contains_key(hash) && !self.leaf_nodes.contains_key(hash) {
+                    missing_hashes.insert(*hash);
+                }
+            }
+        }
+
+        missing_hashes
+    }
+
+    fn collect_from_merkle_blob(
+        &mut self,
+        path: &PathBuf,
+        indexes: &Vec<TreeIndex>,
+    ) -> Result<(), Error> {
+        // TODO: CAMPid 09t09509809us09u09u32r0u3joijasjod32
+        // TODO: errors not panics
+        let file = std::fs::File::open(path).unwrap();
+        let mut decoder = zstd::Decoder::new(file).unwrap();
+
+        let mut vector: Vec<u8> = Vec::new();
+        decoder.read_to_end(&mut vector).unwrap();
+
+        get_internal_terminal(
+            &vector,
+            indexes,
+            &mut self.internal_nodes,
+            &mut self.leaf_nodes,
+        )?;
+
+        Ok(())
+    }
+
+    pub fn create_merkle_blob(&self, root_hash: Hash) -> Result<MerkleBlob, Error> {
+        let mut merkle_blob = MerkleBlob::new(Vec::new())?;
+        merkle_blob.build_blob_from_node_list(&self.internal_nodes, &self.leaf_nodes, root_hash)?;
+
+        Ok(merkle_blob)
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+impl DeltaReader {
+    #[new]
+    pub fn py_init(internal_nodes: InternalNodesMap, leaf_nodes: LeafNodesMap) -> PyResult<Self> {
+        Ok(Self::new(internal_nodes, leaf_nodes)?)
+    }
+
+    #[pyo3(name = "get_missing_hashes")]
+    pub fn py_get_missing_hashes(&self) -> PyResult<HashSet<Hash>> {
+        Ok(self.get_missing_hashes())
+    }
+
+    #[pyo3(name = "collect_from_merkle_blob")]
+    pub fn py_collect_from_merkle_blob(
+        &mut self,
+        path: PathBuf,
+        indexes: Vec<TreeIndex>,
+    ) -> PyResult<()> {
+        self.collect_from_merkle_blob(&path, &indexes)?;
+
+        Ok(())
+    }
+
+    #[pyo3(name = "create_merkle_blob")]
+    pub fn py_create_merkle_blob(&self, root_hash: Hash) -> Result<MerkleBlob, Error> {
+        Ok(self.create_merkle_blob(root_hash)?)
+    }
+}
+
 /// Stores a DataLayer merkle tree in bytes and provides serialization on each access so that only
 /// the parts presently in use are stored in active objects.  The bytes are grouped as blocks of
 /// equal size regardless of being internal vs. external nodes so that block indexes can be used
@@ -861,6 +969,56 @@ impl MerkleBlob {
         };
 
         Ok(self_)
+    }
+
+    pub fn from_path(path: &Path) -> Result<Self, Error> {
+        // TODO: CAMPid 09t09509809us09u09u32r0u3joijasjod32
+        // TODO: errors not panics
+        let file = std::fs::File::open(path).unwrap();
+        let mut decoder = zstd::Decoder::new(file).unwrap();
+
+        let mut vector: Vec<u8> = Vec::new();
+        decoder.read_to_end(&mut vector).unwrap();
+
+        Self::new(vector)
+    }
+
+    pub fn from_many(
+        root_hash: Hash,
+        sources: &HashMap<PathBuf, Vec<TreeIndex>>,
+        mut internal: InternalNodesMap,
+        mut leafs: LeafNodesMap,
+    ) -> Result<Self, Error> {
+        // let mut internal: HashMap<Hash, (Hash, Hash)> = HashMap::new();
+        // let mut leafs: HashMap<Hash, (KeyId, ValueId)> = HashMap::new();
+
+        for (path, indexes) in sources {
+            // TODO: CAMPid 09t09509809us09u09u32r0u3joijasjod32
+            // TODO: errors not panics
+            let file = std::fs::File::open(path).unwrap();
+            let mut decoder = zstd::Decoder::new(file).unwrap();
+
+            let mut vector: Vec<u8> = Vec::new();
+            decoder.read_to_end(&mut vector).unwrap();
+
+            get_internal_terminal(&vector, indexes, &mut internal, &mut leafs)?;
+        }
+        let mut merkle_blob = Self::new(Vec::new())?;
+
+        merkle_blob.build_blob_from_node_list(&internal, &leafs, root_hash)?;
+
+        Ok(merkle_blob)
+    }
+
+    pub fn to_path(&self, path: &Path) -> Result<(), Error> {
+        // TODO: errors not panics
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let file = std::fs::File::create(path).unwrap();
+        let mut encoder = zstd::Encoder::new(file, 0).unwrap();
+        encoder.write_all(&self.blob).unwrap();
+        encoder.finish().unwrap();
+
+        Ok(())
     }
 
     fn clear(&mut self) {
@@ -1816,6 +1974,45 @@ impl MerkleBlob {
         Ok(Self::new(Vec::from(slice))?)
     }
 
+    #[classmethod]
+    #[pyo3(name = "from_path")]
+    pub fn py_from_path(_cls: &Bound<'_, PyType>, path: &str) -> PyResult<Self> {
+        let path = Path::new(&path);
+        Ok(Self::from_path(path)?)
+    }
+
+    #[classmethod]
+    #[pyo3(name = "from_many")]
+    pub fn py_from_many(
+        _cls: &Bound<'_, PyType>,
+        root_hash: Hash,
+        sources: &Bound<'_, PyDict>,
+        internal: HashMap<Hash, (Hash, Hash)>,
+        leafs: HashMap<Hash, (KeyId, ValueId)>,
+    ) -> Result<Self, Error> {
+        let mut x: HashMap<PathBuf, Vec<TreeIndex>> = HashMap::new();
+        for (py_path, py_indexes) in sources.iter() {
+            // TODO: no unwrap
+            let s: String = String::from(py_path.extract::<&str>().unwrap());
+            let path: PathBuf = PathBuf::from(s);
+            // let path: Path = py_path.extract().unwrap();
+            let mut indexes: Vec<TreeIndex> = Vec::new();
+            let py_indexes = py_indexes.downcast::<pyo3::types::PyList>().unwrap();
+            for index in py_indexes {
+                // indexes.push(TreeIndex(index.extract::<u32>().unwrap()));
+                indexes.push(index.extract().unwrap());
+            }
+            x.insert(path, indexes);
+        }
+        Self::from_many(root_hash, &x, internal, leafs)
+    }
+
+    #[pyo3(name = "to_path")]
+    pub fn py_to_path(&self, path: &str) -> PyResult<()> {
+        let path = Path::new(&path);
+        Ok(self.to_path(path)?)
+    }
+
     // it is known that memo is unused here, but is part of the interface of deepcopy
     #[allow(unused_variables)]
     #[must_use]
@@ -2032,6 +2229,46 @@ impl MerkleBlob {
     pub fn py_check_integrity(&self) -> PyResult<()> {
         Ok(self.check_integrity()?)
     }
+
+    // TODO: but yeah, don't allow it...
+    #[allow(clippy::type_complexity)]
+    #[pyo3(name = "get_internal_terminal")]
+    // TODO: describe HashMap<Hash, (Hash, Hash)>, HashMap<Hash, (KeyId, ValueId)>
+    pub fn py_get_internal_terminal(
+        &self,
+        indexes: Vec<TreeIndex>,
+        py: Python<'_>,
+    ) -> PyResult<PyObject> {
+        // let mut internal: HashMap<Hash, (Hash, Hash)> = HashMap::new();
+        // let mut leafs: HashMap<Hash, (KeyId, ValueId)> = HashMap::new();
+        let internal = PyDict::new(py);
+        let leafs = PyDict::new(py);
+        let mut index_to_hash: HashMap<TreeIndex, Hash> = HashMap::new();
+
+        for index in indexes {
+            for item in MerkleBlobLeftChildFirstIterator::new(&self.blob, Some(index)) {
+                let (index, block) = item?;
+                match block.node {
+                    Node::Internal(node) => {
+                        index_to_hash.insert(index, node.hash);
+                        internal.set_item(
+                            node.hash,
+                            (
+                                *index_to_hash.get(&node.left).unwrap(),
+                                *index_to_hash.get(&node.right).unwrap(),
+                            ),
+                        )?;
+                    }
+                    Node::Leaf(node) => {
+                        index_to_hash.insert(index, node.hash);
+                        leafs.set_item(node.hash, (node.key, node.value))?;
+                    }
+                }
+            }
+        }
+
+        Ok(PyTuple::new(py, [internal, leafs])?.unbind().into())
+    }
 }
 
 fn try_get_block(blob: &[u8], index: TreeIndex) -> Result<Block, Error> {
@@ -2046,6 +2283,41 @@ fn try_get_block(blob: &[u8], index: TreeIndex) -> Result<Block, Error> {
     Block::from_bytes(block_bytes)
 }
 
+#[allow(clippy::type_complexity)]
+pub fn get_internal_terminal(
+    // TODO: should be &[u8] i think?
+    blob: &Vec<u8>,
+    indexes: &Vec<TreeIndex>,
+    internal: &mut InternalNodesMap,
+    leafs: &mut LeafNodesMap,
+) -> Result<(), Error> {
+    let mut index_to_hash: HashMap<TreeIndex, Hash> = HashMap::new();
+
+    for subroot_index in indexes {
+        for item in MerkleBlobLeftChildFirstIterator::new(blob, Some(*subroot_index)) {
+            let (index, block) = item?;
+            match block.node {
+                Node::Internal(node) => {
+                    index_to_hash.insert(index, node.hash);
+                    internal.insert(
+                        node.hash,
+                        (
+                            *index_to_hash.get(&node.left).unwrap(),
+                            *index_to_hash.get(&node.right).unwrap(),
+                        ),
+                    );
+                }
+                Node::Leaf(node) => {
+                    index_to_hash.insert(index, node.hash);
+                    leafs.insert(node.hash, (node.key, node.value));
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
 struct MerkleBlobLeftChildFirstIteratorItem {
     visited: bool,
     index: TreeIndex,
@@ -2053,7 +2325,7 @@ struct MerkleBlobLeftChildFirstIteratorItem {
 
 pub struct MerkleBlobLeftChildFirstIterator<'a> {
     blob: &'a Vec<u8>,
-    deque: VecDeque<MerkleBlobLeftChildFirstIteratorItem>,
+    deque: Vec<MerkleBlobLeftChildFirstIteratorItem>,
     already_queued: HashSet<TreeIndex>,
     predicate: Option<fn(&Block) -> bool>,
 }
@@ -2068,10 +2340,10 @@ impl<'a> MerkleBlobLeftChildFirstIterator<'a> {
         from_index: Option<TreeIndex>,
         predicate: Option<fn(&Block) -> bool>,
     ) -> Self {
-        let mut deque = VecDeque::new();
+        let mut deque = Vec::new();
         let from_index = from_index.unwrap_or(TreeIndex(0));
         if blob.len() / BLOCK_SIZE > 0 {
-            deque.push_back(MerkleBlobLeftChildFirstIteratorItem {
+            deque.push(MerkleBlobLeftChildFirstIteratorItem {
                 visited: false,
                 index: from_index,
             });
@@ -2093,7 +2365,7 @@ impl Iterator for MerkleBlobLeftChildFirstIterator<'_> {
         // left sibling first, children before parents
 
         loop {
-            let item = self.deque.pop_front()?;
+            let item = self.deque.pop()?;
             let block = match try_get_block(self.blob, item.index) {
                 Ok(block) => block,
                 Err(e) => return Some(Err(e)),
@@ -2117,15 +2389,15 @@ impl Iterator for MerkleBlobLeftChildFirstIterator<'_> {
                     }
                     self.already_queued.insert(item.index);
 
-                    self.deque.push_front(MerkleBlobLeftChildFirstIteratorItem {
+                    self.deque.push(MerkleBlobLeftChildFirstIteratorItem {
                         visited: true,
                         index: item.index,
                     });
-                    self.deque.push_front(MerkleBlobLeftChildFirstIteratorItem {
+                    self.deque.push(MerkleBlobLeftChildFirstIteratorItem {
                         visited: false,
                         index: node.right,
                     });
-                    self.deque.push_front(MerkleBlobLeftChildFirstIteratorItem {
+                    self.deque.push(MerkleBlobLeftChildFirstIteratorItem {
                         visited: false,
                         index: node.left,
                     });
