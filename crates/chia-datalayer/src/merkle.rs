@@ -6,7 +6,7 @@ use pyo3::{
     exceptions::PyValueError,
     prelude::*,
     pyclass, pymethods,
-    types::{PyDict, PyDictMethods, PyListMethods},
+    types::{PyDict, PyDictMethods, PyListMethods, PyType},
     Bound, FromPyObject, IntoPyObject, PyAny, PyErr, PyResult, Python,
 };
 
@@ -17,8 +17,10 @@ use chia_traits::Streamable;
 use num_traits::ToBytes;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::io::{Read, Write};
 use std::iter::zip;
 use std::ops::Range;
+use std::path::Path;
 use thiserror::Error;
 
 type TreeIndexType = u32;
@@ -143,6 +145,7 @@ macro_rules! create_errors {
                     $string:literal,
                     (
                         $(
+                            $( #[ $attr:meta ] )?
                             $type_:path
                         ),
                         *
@@ -152,11 +155,11 @@ macro_rules! create_errors {
             *
         )
     ) => {
-        #[derive(Debug, Error, PartialEq, Eq)]
+        #[derive(Debug, Error)]
         pub enum $enum {
             $(
                 #[error($string)]
-                $name($($type_,)*),
+                $name($($(#[$attr])? $type_,)*),
             )*
         }
 
@@ -194,6 +197,13 @@ macro_rules! create_errors {
 create_errors!(
     Error,
     (
+        (
+            Io,
+            IoError,
+            "IO error: {0}",
+            (#[from]
+            std::io::Error)
+        ),
         // TODO: don't use String here
         (
             FailedLoadingMetadata,
@@ -861,6 +871,28 @@ impl MerkleBlob {
         };
 
         Ok(self_)
+    }
+
+    pub fn from_path(path: &Path) -> Result<Self, Error> {
+        // TODO: errors not panics
+        let file = std::fs::File::open(path)?;
+        let mut decoder = zstd::Decoder::new(file)?;
+
+        let mut vector: Vec<u8> = Vec::new();
+        decoder.read_to_end(&mut vector)?;
+
+        Self::new(vector)
+    }
+
+    pub fn to_path(&self, path: &Path) -> Result<(), Error> {
+        // TODO: errors not panics
+        std::fs::create_dir_all(path.parent().unwrap())?;
+        let file = std::fs::File::create(path)?;
+        let mut encoder = zstd::Encoder::new(file, 0)?;
+        encoder.write_all(&self.blob)?;
+        encoder.finish()?;
+
+        Ok(())
     }
 
     fn clear(&mut self) {
@@ -1816,6 +1848,19 @@ impl MerkleBlob {
         Ok(Self::new(Vec::from(slice))?)
     }
 
+    #[classmethod]
+    #[pyo3(name = "from_path")]
+    pub fn py_from_path(_cls: &Bound<'_, PyType>, path: &str) -> PyResult<Self> {
+        let path = Path::new(&path);
+        Ok(Self::from_path(path)?)
+    }
+
+    #[pyo3(name = "to_path")]
+    pub fn py_to_path(&self, path: &str) -> PyResult<()> {
+        let path = Path::new(&path);
+        Ok(self.to_path(path)?)
+    }
+
     // it is known that memo is unused here, but is part of the interface of deepcopy
     #[allow(unused_variables)]
     #[must_use]
@@ -2644,10 +2689,8 @@ mod tests {
             right: TreeIndex(1),
         };
         let index = TreeIndex(2);
-        assert_eq!(
-            node.sibling_index(TreeIndex(2)),
-            Err(Error::IndexIsNotAChild(index))
-        );
+        node.sibling_index(TreeIndex(2))
+            .expect_err(&Error::IndexIsNotAChild(index).to_string());
     }
 
     #[rstest]
