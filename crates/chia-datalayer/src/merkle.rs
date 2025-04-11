@@ -874,7 +874,6 @@ impl MerkleBlob {
     }
 
     pub fn from_path(path: &Path) -> Result<Self, Error> {
-        // TODO: errors not panics
         let file = std::fs::File::open(path)?;
         let mut decoder = zstd::Decoder::new(file)?;
 
@@ -885,7 +884,6 @@ impl MerkleBlob {
     }
 
     pub fn to_path(&self, path: &Path) -> Result<(), Error> {
-        // TODO: errors not panics
         std::fs::create_dir_all(path.parent().unwrap())?;
         let file = std::fs::File::create(path)?;
         let mut encoder = zstd::Encoder::new(file, 0)?;
