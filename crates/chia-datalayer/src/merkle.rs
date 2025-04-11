@@ -896,11 +896,22 @@ impl DeltaReader {
         Ok(())
     }
 
-    pub fn create_merkle_blob(&self, root_hash: Hash) -> Result<MerkleBlob, Error> {
+    pub fn create_merkle_blob(
+        &self,
+        root_hash: Hash,
+        interested_hashes: &HashSet<Hash>,
+    ) -> Result<(MerkleBlob, Vec<(Hash, TreeIndex)>), Error> {
         let mut merkle_blob = MerkleBlob::new(Vec::new())?;
-        merkle_blob.build_blob_from_node_list(&self.internal_nodes, &self.leaf_nodes, root_hash)?;
+        let mut hashes_and_indexes: Vec<(Hash, TreeIndex)> = Vec::new();
+        merkle_blob.build_blob_from_node_list(
+            &self.internal_nodes,
+            &self.leaf_nodes,
+            root_hash,
+            interested_hashes,
+            &mut hashes_and_indexes,
+        )?;
 
-        Ok(merkle_blob)
+        Ok((merkle_blob, hashes_and_indexes))
     }
 }
 
@@ -929,8 +940,12 @@ impl DeltaReader {
     }
 
     #[pyo3(name = "create_merkle_blob")]
-    pub fn py_create_merkle_blob(&self, root_hash: Hash) -> Result<MerkleBlob, Error> {
-        Ok(self.create_merkle_blob(root_hash)?)
+    pub fn py_create_merkle_blob(
+        &self,
+        root_hash: Hash,
+        interested_hashes: HashSet<Hash>,
+    ) -> Result<(MerkleBlob, Vec<(Hash, TreeIndex)>), Error> {
+        self.create_merkle_blob(root_hash, &interested_hashes)
     }
 }
 
@@ -983,32 +998,32 @@ impl MerkleBlob {
         Self::new(vector)
     }
 
-    pub fn from_many(
-        root_hash: Hash,
-        sources: &HashMap<PathBuf, Vec<TreeIndex>>,
-        mut internal: InternalNodesMap,
-        mut leafs: LeafNodesMap,
-    ) -> Result<Self, Error> {
-        // let mut internal: HashMap<Hash, (Hash, Hash)> = HashMap::new();
-        // let mut leafs: HashMap<Hash, (KeyId, ValueId)> = HashMap::new();
-
-        for (path, indexes) in sources {
-            // TODO: CAMPid 09t09509809us09u09u32r0u3joijasjod32
-            // TODO: errors not panics
-            let file = std::fs::File::open(path).unwrap();
-            let mut decoder = zstd::Decoder::new(file).unwrap();
-
-            let mut vector: Vec<u8> = Vec::new();
-            decoder.read_to_end(&mut vector).unwrap();
-
-            get_internal_terminal(&vector, indexes, &mut internal, &mut leafs)?;
-        }
-        let mut merkle_blob = Self::new(Vec::new())?;
-
-        merkle_blob.build_blob_from_node_list(&internal, &leafs, root_hash)?;
-
-        Ok(merkle_blob)
-    }
+    // pub fn from_many(
+    //     root_hash: Hash,
+    //     sources: &HashMap<PathBuf, Vec<TreeIndex>>,
+    //     mut internal: InternalNodesMap,
+    //     mut leafs: LeafNodesMap,
+    // ) -> Result<Self, Error> {
+    //     // let mut internal: HashMap<Hash, (Hash, Hash)> = HashMap::new();
+    //     // let mut leafs: HashMap<Hash, (KeyId, ValueId)> = HashMap::new();
+    //
+    //     for (path, indexes) in sources {
+    //         // TODO: CAMPid 09t09509809us09u09u32r0u3joijasjod32
+    //         // TODO: errors not panics
+    //         let file = std::fs::File::open(path).unwrap();
+    //         let mut decoder = zstd::Decoder::new(file).unwrap();
+    //
+    //         let mut vector: Vec<u8> = Vec::new();
+    //         decoder.read_to_end(&mut vector).unwrap();
+    //
+    //         get_internal_terminal(&vector, indexes, &mut internal, &mut leafs)?;
+    //     }
+    //     let mut merkle_blob = Self::new(Vec::new())?;
+    //
+    //     merkle_blob.build_blob_from_node_list(&internal, &leafs, &root_hash)?;
+    //
+    //     Ok(merkle_blob)
+    // }
 
     pub fn to_path(&self, path: &Path) -> Result<(), Error> {
         // TODO: errors not panics
@@ -1862,6 +1877,8 @@ impl MerkleBlob {
         internal_nodes: &HashMap<Hash, (Hash, Hash)>,
         terminal_nodes: &HashMap<Hash, (KeyId, ValueId)>,
         node_hash: Hash,
+        interested_hashes: &HashSet<Hash>,
+        hashes_and_indexes: &mut Vec<(Hash, TreeIndex)>,
     ) -> Result<TreeIndex, Error> {
         match (
             internal_nodes.get(&node_hash),
@@ -1886,6 +1903,10 @@ impl MerkleBlob {
                     },
                 )?;
 
+                if interested_hashes.contains(&node_hash) {
+                    hashes_and_indexes.push((node_hash, index));
+                }
+
                 Ok(index)
             }
             (Some((left, right)), _) => {
@@ -1893,10 +1914,20 @@ impl MerkleBlob {
                 // TODO: certainly belongs elswehere
                 // let undefined_index = TreeIndex(u32::MAX - 1);
 
-                let left_index =
-                    self.build_blob_from_node_list(internal_nodes, terminal_nodes, *left)?;
-                let right_index =
-                    self.build_blob_from_node_list(internal_nodes, terminal_nodes, *right)?;
+                let left_index = self.build_blob_from_node_list(
+                    internal_nodes,
+                    terminal_nodes,
+                    *left,
+                    interested_hashes,
+                    hashes_and_indexes,
+                )?;
+                let right_index = self.build_blob_from_node_list(
+                    internal_nodes,
+                    terminal_nodes,
+                    *right,
+                    interested_hashes,
+                    hashes_and_indexes,
+                )?;
 
                 for child_index in [left_index, right_index] {
                     self.update_parent(child_index, Some(index))?;
@@ -1914,6 +1945,10 @@ impl MerkleBlob {
                     }),
                 };
                 self.insert_entry_to_blob(index, &block)?;
+
+                if interested_hashes.contains(&node_hash) {
+                    hashes_and_indexes.push((node_hash, index));
+                }
 
                 Ok(index)
             }
@@ -1981,31 +2016,31 @@ impl MerkleBlob {
         Ok(Self::from_path(path)?)
     }
 
-    #[classmethod]
-    #[pyo3(name = "from_many")]
-    pub fn py_from_many(
-        _cls: &Bound<'_, PyType>,
-        root_hash: Hash,
-        sources: &Bound<'_, PyDict>,
-        internal: HashMap<Hash, (Hash, Hash)>,
-        leafs: HashMap<Hash, (KeyId, ValueId)>,
-    ) -> Result<Self, Error> {
-        let mut x: HashMap<PathBuf, Vec<TreeIndex>> = HashMap::new();
-        for (py_path, py_indexes) in sources.iter() {
-            // TODO: no unwrap
-            let s: String = String::from(py_path.extract::<&str>().unwrap());
-            let path: PathBuf = PathBuf::from(s);
-            // let path: Path = py_path.extract().unwrap();
-            let mut indexes: Vec<TreeIndex> = Vec::new();
-            let py_indexes = py_indexes.downcast::<pyo3::types::PyList>().unwrap();
-            for index in py_indexes {
-                // indexes.push(TreeIndex(index.extract::<u32>().unwrap()));
-                indexes.push(index.extract().unwrap());
-            }
-            x.insert(path, indexes);
-        }
-        Self::from_many(root_hash, &x, internal, leafs)
-    }
+    // #[classmethod]
+    // #[pyo3(name = "from_many")]
+    // pub fn py_from_many(
+    //     _cls: &Bound<'_, PyType>,
+    //     root_hash: Hash,
+    //     sources: &Bound<'_, PyDict>,
+    //     internal: HashMap<Hash, (Hash, Hash)>,
+    //     leafs: HashMap<Hash, (KeyId, ValueId)>,
+    // ) -> Result<Self, Error> {
+    //     let mut x: HashMap<PathBuf, Vec<TreeIndex>> = HashMap::new();
+    //     for (py_path, py_indexes) in sources.iter() {
+    //         // TODO: no unwrap
+    //         let s: String = String::from(py_path.extract::<&str>().unwrap());
+    //         let path: PathBuf = PathBuf::from(s);
+    //         // let path: Path = py_path.extract().unwrap();
+    //         let mut indexes: Vec<TreeIndex> = Vec::new();
+    //         let py_indexes = py_indexes.downcast::<pyo3::types::PyList>().unwrap();
+    //         for index in py_indexes {
+    //             // indexes.push(TreeIndex(index.extract::<u32>().unwrap()));
+    //             indexes.push(index.extract().unwrap());
+    //         }
+    //         x.insert(path, indexes);
+    //     }
+    //     Self::from_many(root_hash, &x, internal, leafs)
+    // }
 
     #[pyo3(name = "to_path")]
     pub fn py_to_path(&self, path: &str) -> PyResult<()> {
@@ -2021,32 +2056,32 @@ impl MerkleBlob {
         self.clone()
     }
 
-    #[allow(clippy::needless_pass_by_value)]
-    #[staticmethod]
-    #[pyo3(name = "from_node_list", signature = (internal_nodes, terminal_nodes, root_hash))]
-    fn py_from_node_list(
-        internal_nodes: HashMap<Hash, (Hash, Hash)>,
-        terminal_nodes: HashMap<Hash, (KeyId, ValueId)>,
-        root_hash: Option<Hash>,
-    ) -> PyResult<Self> {
-        let mut merkle_blob = Self::new(Vec::new())?;
-
-        match (
-            root_hash,
-            !internal_nodes.is_empty() || !terminal_nodes.is_empty(),
-        ) {
-            (None, true) => Err(Error::RootHashAndNodeListDisagreement())?,
-            (None, _) => Ok(merkle_blob),
-            (Some(root_hash), _) => {
-                merkle_blob.build_blob_from_node_list(
-                    &internal_nodes,
-                    &terminal_nodes,
-                    root_hash,
-                )?;
-                Ok(merkle_blob)
-            }
-        }
-    }
+    // #[allow(clippy::needless_pass_by_value)]
+    // #[staticmethod]
+    // #[pyo3(name = "from_node_list", signature = (internal_nodes, terminal_nodes, root_hash))]
+    // fn py_from_node_list(
+    //     internal_nodes: HashMap<Hash, (Hash, Hash)>,
+    //     terminal_nodes: HashMap<Hash, (KeyId, ValueId)>,
+    //     root_hash: Option<Hash>,
+    // ) -> PyResult<Self> {
+    //     let mut merkle_blob = Self::new(Vec::new())?;
+    //
+    //     match (
+    //         root_hash,
+    //         !internal_nodes.is_empty() || !terminal_nodes.is_empty(),
+    //     ) {
+    //         (None, true) => Err(Error::RootHashAndNodeListDisagreement())?,
+    //         (None, _) => Ok(merkle_blob),
+    //         (Some(root_hash), _) => {
+    //             merkle_blob.build_blob_from_node_list(
+    //                 &internal_nodes,
+    //                 &terminal_nodes,
+    //                 root_hash, interested_hashes, hashes_and_indexes,
+    //             )?;
+    //             Ok(merkle_blob)
+    //         }
+    //     }
+    // }
 
     #[pyo3(name = "insert", signature = (key, value, hash, reference_kid = None, side = None))]
     pub fn py_insert(
