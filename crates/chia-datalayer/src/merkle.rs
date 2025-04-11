@@ -2079,7 +2079,7 @@ impl<'a> MerkleBlobLeftChildFirstIterator<'a> {
 
         Self {
             blob,
-            deque,
+            stack,
             already_queued: HashSet::new(),
             predicate,
         }
