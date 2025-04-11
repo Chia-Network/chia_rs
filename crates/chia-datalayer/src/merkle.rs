@@ -884,7 +884,15 @@ impl MerkleBlob {
     }
 
     pub fn to_path(&self, path: &Path) -> Result<(), Error> {
-        std::fs::create_dir_all(path.parent().unwrap())?;
+        let canonicalized = path.canonicalize()?;
+        let directory = canonicalized.parent().ok_or(std::io::Error::new(
+            std::io::ErrorKind::IsADirectory,
+            format!(
+                "path must be a file, root directory given: {}",
+                path.display()
+            ),
+        ))?;
+        std::fs::create_dir_all(directory)?;
         let file = std::fs::File::create(path)?;
         let mut encoder = zstd::Encoder::new(file, 0)?;
         encoder.write_all(&self.blob)?;
