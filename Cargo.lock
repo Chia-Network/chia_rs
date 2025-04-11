@@ -419,6 +419,7 @@ dependencies = [
  "rstest",
  "thiserror",
  "url",
+ "zstd",
 ]
 
 [[package]]
