@@ -6,7 +6,7 @@ use pyo3::{
     exceptions::PyValueError,
     prelude::*,
     pyclass, pymethods,
-    types::{PyAnyMethods, PyDict, PyDictMethods, PyListMethods, PyTuple, PyType},
+    types::{PyDict, PyDictMethods, PyListMethods, PyType},
     Bound, FromPyObject, IntoPyObject, PyAny, PyErr, PyResult, Python,
 };
 
@@ -20,7 +20,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::io::{Read, Write};
 use std::iter::zip;
 use std::ops::Range;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 type TreeIndexType = u32;
@@ -857,7 +857,7 @@ impl DeltaReader {
     fn get_missing_hashes(&self) -> HashSet<Hash> {
         let mut missing_hashes: HashSet<Hash> = HashSet::new();
 
-        for (_, (left, right)) in self.internal_nodes.iter() {
+        for (left, right) in self.internal_nodes.values() {
             for hash in [left, right] {
                 if !self.internal_nodes.contains_key(hash) && !self.leaf_nodes.contains_key(hash) {
                     missing_hashes.insert(*hash);
@@ -910,6 +910,7 @@ impl DeltaReader {
     }
 }
 
+#[allow(clippy::needless_pass_by_value)]
 #[cfg(feature = "py-bindings")]
 #[pymethods]
 impl DeltaReader {
