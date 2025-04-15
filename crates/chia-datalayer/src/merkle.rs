@@ -20,7 +20,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::io::{Read, Write};
 use std::iter::zip;
 use std::ops::Range;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use thiserror::Error;
 
 type TreeIndexType = u32;
@@ -373,7 +373,7 @@ where
     T::parse::<false>(&mut cursor).map_err(Error::Streaming)
 }
 
-fn zstd_decode_path(path: &Path) -> Result<Vec<u8>, Error> {
+fn zstd_decode_path(path: &PathBuf) -> Result<Vec<u8>, Error> {
     let mut vector: Vec<u8> = Vec::new();
     let file = std::fs::File::open(path)?;
     let mut decoder = zstd::Decoder::new(file)?;
@@ -863,7 +863,7 @@ impl DeltaReader {
         Ok(instance)
     }
 
-    fn get_missing_hashes(&self) -> HashSet<Hash> {
+    pub fn get_missing_hashes(&self) -> HashSet<Hash> {
         let mut missing_hashes: HashSet<Hash> = HashSet::new();
 
         for (left, right) in self.internal_nodes.values() {
@@ -877,9 +877,9 @@ impl DeltaReader {
         missing_hashes
     }
 
-    fn collect_from_merkle_blob(
+    pub fn collect_from_merkle_blob(
         &mut self,
-        path: &Path,
+        path: &PathBuf,
         indexes: &Vec<TreeIndex>,
     ) -> Result<(), Error> {
         let vector = zstd_decode_path(path)?;
@@ -985,13 +985,13 @@ impl MerkleBlob {
         Ok(self_)
     }
 
-    pub fn from_path(path: &Path) -> Result<Self, Error> {
+    pub fn from_path(path: &PathBuf) -> Result<Self, Error> {
         let vector = zstd_decode_path(path)?;
 
         Self::new(vector)
     }
 
-    pub fn to_path(&self, path: &Path) -> Result<(), Error> {
+    pub fn to_path(&self, path: &PathBuf) -> Result<(), Error> {
         let canonicalized = path.canonicalize()?;
         let directory = canonicalized.parent().ok_or(std::io::Error::new(
             std::io::ErrorKind::IsADirectory,
@@ -1985,14 +1985,14 @@ impl MerkleBlob {
     #[classmethod]
     #[pyo3(name = "from_path")]
     pub fn py_from_path(_cls: &Bound<'_, PyType>, path: &str) -> PyResult<Self> {
-        let path = Path::new(&path);
-        Ok(Self::from_path(path)?)
+        let path = PathBuf::from(path);
+        Ok(Self::from_path(&path)?)
     }
 
     #[pyo3(name = "to_path")]
     pub fn py_to_path(&self, path: &str) -> PyResult<()> {
-        let path = Path::new(&path);
-        Ok(self.to_path(path)?)
+        let path = PathBuf::from(path);
+        Ok(self.to_path(&path)?)
     }
 
     // it is known that memo is unused here, but is part of the interface of deepcopy
