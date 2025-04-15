@@ -2003,6 +2003,33 @@ impl MerkleBlob {
         self.clone()
     }
 
+    #[allow(clippy::needless_pass_by_value)]
+    #[staticmethod]
+    #[pyo3(name = "from_node_list", signature = (internal_nodes, terminal_nodes, root_hash))]
+    fn py_from_node_list(
+        internal_nodes: HashMap<Hash, (Hash, Hash)>,
+        terminal_nodes: HashMap<Hash, (KeyId, ValueId)>,
+        root_hash: Option<Hash>,
+    ) -> PyResult<Self> {
+        let mut merkle_blob = Self::new(Vec::new())?;
+
+        match (
+            root_hash,
+            !internal_nodes.is_empty() || !terminal_nodes.is_empty(),
+        ) {
+            (None, true) => Err(Error::RootHashAndNodeListDisagreement())?,
+            (None, _) => Ok(merkle_blob),
+            (Some(root_hash), _) => {
+                merkle_blob.build_blob_from_node_list(
+                    &internal_nodes,
+                    &terminal_nodes,
+                    root_hash,
+                )?;
+                Ok(merkle_blob)
+            }
+        }
+    }
+
     #[pyo3(name = "insert", signature = (key, value, hash, reference_kid = None, side = None))]
     pub fn py_insert(
         &mut self,
