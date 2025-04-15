@@ -373,6 +373,15 @@ where
     T::parse::<false>(&mut cursor).map_err(Error::Streaming)
 }
 
+fn zstd_decode_path(path: &Path) -> Result<Vec<u8>, Error> {
+    let mut vector: Vec<u8> = Vec::new();
+    let file = std::fs::File::open(path)?;
+    let mut decoder = zstd::Decoder::new(file)?;
+    decoder.read_to_end(&mut vector)?;
+
+    Ok(vector)
+}
+
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, Streamable)]
 pub enum NodeType {
@@ -870,16 +879,10 @@ impl DeltaReader {
 
     fn collect_from_merkle_blob(
         &mut self,
-        path: &PathBuf,
+        path: &Path,
         indexes: &Vec<TreeIndex>,
     ) -> Result<(), Error> {
-        // TODO: CAMPid 09t09509809us09u09u32r0u3joijasjod32
-        // TODO: errors not panics
-        let file = std::fs::File::open(path).unwrap();
-        let mut decoder = zstd::Decoder::new(file).unwrap();
-
-        let mut vector: Vec<u8> = Vec::new();
-        decoder.read_to_end(&mut vector).unwrap();
+        let vector = zstd_decode_path(path)?;
 
         get_internal_terminal(
             &vector,
@@ -983,11 +986,7 @@ impl MerkleBlob {
     }
 
     pub fn from_path(path: &Path) -> Result<Self, Error> {
-        let file = std::fs::File::open(path)?;
-        let mut decoder = zstd::Decoder::new(file)?;
-
-        let mut vector: Vec<u8> = Vec::new();
-        decoder.read_to_end(&mut vector)?;
+        let vector = zstd_decode_path(path)?;
 
         Self::new(vector)
     }
