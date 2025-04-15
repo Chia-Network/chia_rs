@@ -2024,6 +2024,8 @@ impl MerkleBlob {
                     &internal_nodes,
                     &terminal_nodes,
                     root_hash,
+                    &HashSet::new(),
+                    &mut Vec::new(),
                 )?;
                 Ok(merkle_blob)
             }
