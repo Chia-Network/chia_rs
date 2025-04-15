@@ -65,11 +65,39 @@ def get_flags_for_height_and_constants(
     constants: ConsensusConstants
 ) -> int: ...
 
+def calculate_ip_iters(
+    num_sps_sub_slot: uint32,
+    num_sp_intervals_extra: uint8,
+    sub_slot_iters: uint64,
+    signage_point_index: uint32,
+    required_iters: uint64,
+) -> uint64: ...
+
+def calculate_sp_iters(
+    num_sps_sub_slot: uint32,
+    sub_slot_iters: uint64,
+    signage_point_index: uint32,
+) -> uint64: ...
+
+def calculate_sp_interval_iters(
+    num_sps_sub_slot: uint32,
+    sub_slot_iters: uint64,
+) -> uint64: ...
+
+def is_overflow_block(
+    num_sps_sub_slot: uint32,
+    num_sp_intervals_extra: uint8,
+    signage_point_index: uint32,
+) -> bool: ...
+
+def expected_plot_size(
+    k: int
+) -> int: ...
+
 
 NO_UNKNOWN_CONDS: int = ...
 STRICT_ARGS_COUNT: int = ...
 LIMIT_HEAP: int = ...
-ENABLE_KECCAK: int = ...
 ENABLE_KECCAK_OPS_OUTSIDE_GUARD: int = ...
 MEMPOOL_MODE: int = ...
 DONT_VALIDATE_SIGNATURE: int = ...
@@ -435,10 +463,10 @@ class BlockRecord:
     is_transaction_block: bool
     first_in_sub_slot: bool
     def is_challenge_block(self, constants: ConsensusConstants) -> bool: ...
-    def sp_sub_slot_total_iters(self, constants: ConsensusConstants) -> uint128: ...
     def ip_sub_slot_total_iters(self, constants: ConsensusConstants) -> uint128: ...
     def sp_iters(self, constants: ConsensusConstants) -> uint64: ...
     def ip_iters(self, constants: ConsensusConstants) -> uint64: ...
+    def sp_sub_slot_total_iters(self, constants: ConsensusConstants) -> uint128: ...
     def sp_total_iters(self, constants: ConsensusConstants) -> uint128: ...
     def __init__(
         self,
@@ -4336,7 +4364,6 @@ class ConsensusConstants:
     MAX_GENERATOR_SIZE: uint32
     MAX_GENERATOR_REF_LIST_SIZE: uint32
     POOL_SUB_SLOT_ITERS: uint64
-    SOFT_FORK6_HEIGHT: uint32
     HARD_FORK_HEIGHT: uint32
     PLOT_FILTER_128_HEIGHT: uint32
     PLOT_FILTER_64_HEIGHT: uint32
@@ -4384,7 +4411,6 @@ class ConsensusConstants:
         MAX_GENERATOR_SIZE: uint32,
         MAX_GENERATOR_REF_LIST_SIZE: uint32,
         POOL_SUB_SLOT_ITERS: uint64,
-        SOFT_FORK6_HEIGHT: uint32,
         HARD_FORK_HEIGHT: uint32,
         PLOT_FILTER_128_HEIGHT: uint32,
         PLOT_FILTER_64_HEIGHT: uint32,
@@ -4448,7 +4474,6 @@ class ConsensusConstants:
         MAX_GENERATOR_SIZE: Union[ uint32, _Unspec] = _Unspec(),
         MAX_GENERATOR_REF_LIST_SIZE: Union[ uint32, _Unspec] = _Unspec(),
         POOL_SUB_SLOT_ITERS: Union[ uint64, _Unspec] = _Unspec(),
-        SOFT_FORK6_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         HARD_FORK_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_FILTER_128_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_FILTER_64_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),

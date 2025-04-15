@@ -2241,7 +2241,7 @@ struct MerkleBlobLeftChildFirstIteratorItem {
 
 pub struct MerkleBlobLeftChildFirstIterator<'a> {
     blob: &'a Vec<u8>,
-    deque: VecDeque<MerkleBlobLeftChildFirstIteratorItem>,
+    stack: Vec<MerkleBlobLeftChildFirstIteratorItem>,
     already_queued: HashSet<TreeIndex>,
     predicate: Option<fn(&Block) -> bool>,
 }
@@ -2256,10 +2256,10 @@ impl<'a> MerkleBlobLeftChildFirstIterator<'a> {
         from_index: Option<TreeIndex>,
         predicate: Option<fn(&Block) -> bool>,
     ) -> Self {
-        let mut deque = VecDeque::new();
+        let mut stack = Vec::new();
         let from_index = from_index.unwrap_or(TreeIndex(0));
         if blob.len() / BLOCK_SIZE > 0 {
-            deque.push_back(MerkleBlobLeftChildFirstIteratorItem {
+            stack.push(MerkleBlobLeftChildFirstIteratorItem {
                 visited: false,
                 index: from_index,
             });
@@ -2267,7 +2267,7 @@ impl<'a> MerkleBlobLeftChildFirstIterator<'a> {
 
         Self {
             blob,
-            deque,
+            stack,
             already_queued: HashSet::new(),
             predicate,
         }
@@ -2281,7 +2281,7 @@ impl Iterator for MerkleBlobLeftChildFirstIterator<'_> {
         // left sibling first, children before parents
 
         loop {
-            let item = self.deque.pop_front()?;
+            let item = self.stack.pop()?;
             let block = match try_get_block(self.blob, item.index) {
                 Ok(block) => block,
                 Err(e) => return Some(Err(e)),
@@ -2305,15 +2305,15 @@ impl Iterator for MerkleBlobLeftChildFirstIterator<'_> {
                     }
                     self.already_queued.insert(item.index);
 
-                    self.deque.push_front(MerkleBlobLeftChildFirstIteratorItem {
+                    self.stack.push(MerkleBlobLeftChildFirstIteratorItem {
                         visited: true,
                         index: item.index,
                     });
-                    self.deque.push_front(MerkleBlobLeftChildFirstIteratorItem {
+                    self.stack.push(MerkleBlobLeftChildFirstIteratorItem {
                         visited: false,
                         index: node.right,
                     });
-                    self.deque.push_front(MerkleBlobLeftChildFirstIteratorItem {
+                    self.stack.push(MerkleBlobLeftChildFirstIteratorItem {
                         visited: false,
                         index: node.left,
                     });

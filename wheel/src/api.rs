@@ -18,6 +18,10 @@ use chia_consensus::spendbundle_validation::{
     get_flags_for_height_and_constants, validate_clvm_and_signature,
 };
 use chia_protocol::{
+    py_calculate_ip_iters, py_calculate_sp_interval_iters, py_calculate_sp_iters,
+    py_expected_plot_size, py_is_overflow_block,
+};
+use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
     CoinSpend, CoinState, CoinStateFilters, CoinStateUpdate, EndOfSubSlotBundle, FeeEstimate,
     FeeEstimateGroup, FeeRate, Foliage, FoliageBlockData, FoliageTransactionBlock, FullBlock,
@@ -47,7 +51,7 @@ use chia_protocol::{
 };
 use chia_traits::ChiaToPython;
 use clvm_utils::tree_hash_from_bytes;
-use clvmr::chia_dialect::{ENABLE_KECCAK, ENABLE_KECCAK_OPS_OUTSIDE_GUARD};
+use clvmr::chia_dialect::ENABLE_KECCAK_OPS_OUTSIDE_GUARD;
 use clvmr::{LIMIT_HEAP, NO_UNKNOWN_OPS};
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
@@ -460,6 +464,13 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
     m.add_class::<OwnedSpendConditions>()?;
 
+    // pot functions
+    m.add_function(wrap_pyfunction!(py_calculate_sp_interval_iters, m)?)?;
+    m.add_function(wrap_pyfunction!(py_calculate_sp_iters, m)?)?;
+    m.add_function(wrap_pyfunction!(py_calculate_ip_iters, m)?)?;
+    m.add_function(wrap_pyfunction!(py_is_overflow_block, m)?)?;
+    m.add_function(wrap_pyfunction!(py_expected_plot_size, m)?)?;
+
     // constants
     m.add_class::<ConsensusConstants>()?;
 
@@ -611,7 +622,6 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(run_chia_program, m)?)?;
     m.add("NO_UNKNOWN_OPS", NO_UNKNOWN_OPS)?;
     m.add("LIMIT_HEAP", LIMIT_HEAP)?;
-    m.add("ENABLE_KECCAK", ENABLE_KECCAK)?;
     m.add(
         "ENABLE_KECCAK_OPS_OUTSIDE_GUARD",
         ENABLE_KECCAK_OPS_OUTSIDE_GUARD,

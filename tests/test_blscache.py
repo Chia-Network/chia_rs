@@ -14,9 +14,6 @@ from chia_rs import (
 )
 from chia_rs.sized_bytes import bytes32
 from chia_rs.sized_ints import uint8, uint16, uint32, uint64, uint128
-from chia.util.hash import std_hash
-from chia.util.lru_cache import LRUCache
-from chia.types.blockchain_format.program import Program as ChiaProgram
 import pytest
 
 
@@ -82,7 +79,6 @@ DEFAULT_CONSTANTS = ConsensusConstants(
     MAX_GENERATOR_SIZE=uint32(1000000),
     MAX_GENERATOR_REF_LIST_SIZE=uint32(512),
     POOL_SUB_SLOT_ITERS=uint64(37600000000),
-    SOFT_FORK6_HEIGHT=uint32(0),
     HARD_FORK_HEIGHT=uint32(5496000),
     PLOT_FILTER_128_HEIGHT=uint32(10542000),
     PLOT_FILTER_64_HEIGHT=uint32(15592000),
@@ -174,7 +170,6 @@ def test_cached_bls():
 
     # Use a small cache which can not accommodate all pairings
     bls_cache = BLSCache(n_keys // 2)
-    local_cache = LRUCache(n_keys // 2)
     # Verify signatures and cache pairings one at a time
     for pk, msg, sig in zip(pks_half, msgs_half, sigs_half):
         assert bls_cache.aggregate_verify([pk], [msg], sig)
@@ -221,13 +216,10 @@ def test_cached_bls_repeat_pk():
     cached_bls = BLSCache()
     n_keys = 400
     seed = b"a" * 32
-    sks = [AugSchemeMPL.key_gen(seed) for i in range(n_keys)] + [
-        AugSchemeMPL.key_gen(std_hash(seed))
-    ]
+    sks = [AugSchemeMPL.key_gen(seed) for _ in range(n_keys)]
     pks = [sk.get_g1() for sk in sks]
-    pks_bytes = [bytes(sk.get_g1()) for sk in sks]
 
-    msgs = [("msg-%d" % (i,)).encode() for i in range(n_keys + 1)]
+    msgs = [("msg-%d" % (i,)).encode() for i in range(n_keys)]
     sigs = [AugSchemeMPL.sign(sk, msg) for sk, msg in zip(sks, msgs)]
     agg_sig = AugSchemeMPL.aggregate(sigs)
 
@@ -304,11 +296,7 @@ def test_validate_clvm_and_sig():
     )
     sig = AugSchemeMPL.sign(
         sk,
-        (
-            ChiaProgram.to("hello").as_atom()
-            + coin.name()
-            + DEFAULT_CONSTANTS.AGG_SIG_ME_ADDITIONAL_DATA
-        ),  # noqa
+        (b"hello" + coin.name() + DEFAULT_CONSTANTS.AGG_SIG_ME_ADDITIONAL_DATA),  # noqa
     )
 
     new_spend = SpendBundle(coin_spends, sig)

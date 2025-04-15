@@ -246,10 +246,10 @@ extra_members = {
         "is_transaction_block: bool",
         "first_in_sub_slot: bool",
         "def is_challenge_block(self, constants: ConsensusConstants) -> bool: ...",
-        "def sp_sub_slot_total_iters(self, constants: ConsensusConstants) -> uint128: ...",
         "def ip_sub_slot_total_iters(self, constants: ConsensusConstants) -> uint128: ...",
         "def sp_iters(self, constants: ConsensusConstants) -> uint64: ...",
         "def ip_iters(self, constants: ConsensusConstants) -> uint64: ...",
+        "def sp_sub_slot_total_iters(self, constants: ConsensusConstants) -> uint128: ...",
         "def sp_total_iters(self, constants: ConsensusConstants) -> uint128: ...",
     ],
 }
@@ -336,11 +336,39 @@ def get_flags_for_height_and_constants(
     constants: ConsensusConstants
 ) -> int: ...
 
+def calculate_ip_iters(
+    num_sps_sub_slot: uint32,
+    num_sp_intervals_extra: uint8,
+    sub_slot_iters: uint64,
+    signage_point_index: uint32,
+    required_iters: uint64,
+) -> uint64: ...
+
+def calculate_sp_iters(
+    num_sps_sub_slot: uint32,
+    sub_slot_iters: uint64,
+    signage_point_index: uint32,
+) -> uint64: ...
+
+def calculate_sp_interval_iters(
+    num_sps_sub_slot: uint32,
+    sub_slot_iters: uint64,
+) -> uint64: ...
+
+def is_overflow_block(
+    num_sps_sub_slot: uint32,
+    num_sp_intervals_extra: uint8,
+    signage_point_index: uint32,
+) -> bool: ...
+
+def expected_plot_size(
+    k: int
+) -> int: ...
+
 
 NO_UNKNOWN_CONDS: int = ...
 STRICT_ARGS_COUNT: int = ...
 LIMIT_HEAP: int = ...
-ENABLE_KECCAK: int = ...
 ENABLE_KECCAK_OPS_OUTSIDE_GUARD: int = ...
 MEMPOOL_MODE: int = ...
 DONT_VALIDATE_SIGNATURE: int = ...
