@@ -253,6 +253,19 @@ class BlockStatusCache:
 
 
 @final
+class DeltaReader:
+    def __init__(
+        self,
+        internal_nodes: Mapping[bytes32, tuple[bytes32, bytes32]],
+        leaf_nodes: Mapping[bytes32, tuple[KeyId, ValueId]],
+    ) -> None: ...
+
+    def get_missing_hashes(self) -> set[bytes32]: ...
+    def collect_from_merkle_blob(self, path: Path, indexes: list[TreeIndex]) -> None: ...
+    def create_merkle_blob(self, root_hash: bytes32, interested_hashes: set[bytes32]) -> tuple[MerkleBlob, list[tuple[bytes32, TreeIndex]]]: ...
+
+
+@final
 class MerkleBlob:
     @property
     def blob(self) -> bytearray: ...
