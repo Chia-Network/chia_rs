@@ -992,8 +992,7 @@ impl MerkleBlob {
     }
 
     pub fn to_path(&self, path: &PathBuf) -> Result<(), Error> {
-        let canonicalized = path.canonicalize()?;
-        let directory = canonicalized.parent().ok_or(std::io::Error::new(
+        let directory = path.parent().ok_or(std::io::Error::new(
             std::io::ErrorKind::IsADirectory,
             format!(
                 "path must be a file, root directory given: {}",
