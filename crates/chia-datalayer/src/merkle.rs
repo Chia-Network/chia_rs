@@ -1981,16 +1981,16 @@ impl MerkleBlob {
         Ok(Self::new(Vec::from(slice))?)
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     #[classmethod]
     #[pyo3(name = "from_path")]
-    pub fn py_from_path(_cls: &Bound<'_, PyType>, path: &str) -> PyResult<Self> {
-        let path = PathBuf::from(path);
+    pub fn py_from_path(_cls: &Bound<'_, PyType>, path: PathBuf) -> PyResult<Self> {
         Ok(Self::from_path(&path)?)
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     #[pyo3(name = "to_path")]
-    pub fn py_to_path(&self, path: &str) -> PyResult<()> {
-        let path = PathBuf::from(path);
+    pub fn py_to_path(&self, path: PathBuf) -> PyResult<()> {
         Ok(self.to_path(&path)?)
     }
 
