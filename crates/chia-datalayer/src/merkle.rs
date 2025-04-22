@@ -930,9 +930,11 @@ impl DeltaReader {
     #[pyo3(name = "collect_from_merkle_blob")]
     pub fn py_collect_from_merkle_blob(
         &mut self,
-        path: PathBuf,
+        py: Python<'_>,
+        path: PyObject,
         indexes: Vec<TreeIndex>,
     ) -> PyResult<()> {
+        let path: PathBuf = path.extract(py)?;
         self.collect_from_merkle_blob(&path, &indexes)?;
 
         Ok(())
@@ -1981,16 +1983,22 @@ impl MerkleBlob {
         Ok(Self::new(Vec::from(slice))?)
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     #[classmethod]
     #[pyo3(name = "from_path")]
-    pub fn py_from_path(_cls: &Bound<'_, PyType>, path: &str) -> PyResult<Self> {
-        let path = PathBuf::from(path);
+    pub fn py_from_path(
+        _cls: &Bound<'_, PyType>,
+        py: Python<'_>,
+        path: PyObject,
+    ) -> PyResult<Self> {
+        let path: PathBuf = path.extract(py)?;
         Ok(Self::from_path(&path)?)
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     #[pyo3(name = "to_path")]
-    pub fn py_to_path(&self, path: &str) -> PyResult<()> {
-        let path = PathBuf::from(path);
+    pub fn py_to_path(&self, py: Python<'_>, path: PyObject) -> PyResult<()> {
+        let path: PathBuf = path.extract(py)?;
         Ok(self.to_path(&path)?)
     }
 
