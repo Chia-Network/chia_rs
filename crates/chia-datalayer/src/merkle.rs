@@ -1987,8 +1987,8 @@ impl MerkleBlob {
     #[classmethod]
     #[pyo3(name = "from_path")]
     pub fn py_from_path(
-        py: Python<'_>,
         _cls: &Bound<'_, PyType>,
+        py: Python<'_>,
         path: PyObject,
     ) -> PyResult<Self> {
         let path: PathBuf = path.extract(py)?;
