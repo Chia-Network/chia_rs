@@ -12,7 +12,7 @@ use super::opcodes::{
     ASSERT_MY_BIRTH_SECONDS, ASSERT_MY_COIN_ID, ASSERT_MY_PARENT_ID, ASSERT_MY_PUZZLEHASH,
     ASSERT_PUZZLE_ANNOUNCEMENT, ASSERT_SECONDS_ABSOLUTE, ASSERT_SECONDS_RELATIVE, CREATE_COIN,
     CREATE_COIN_ANNOUNCEMENT, CREATE_COIN_COST, CREATE_PUZZLE_ANNOUNCEMENT, RECEIVE_MESSAGE,
-    REMARK, RESERVE_FEE, SEND_MESSAGE, SOFTFORK,
+    REMARK, RESERVE_FEE, SEND_MESSAGE, SOFTFORK, GENERIC_CONDITION_COST
 };
 use super::sanitize_int::{sanitize_uint, SanitizedUint};
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
@@ -1008,6 +1008,15 @@ pub fn parse_conditions<V: SpendVisitor>(
 
     while let Some((mut c, next)) = next(a, iter)? {
         iter = next;
+
+        // add cost for looking at any condition
+        if flags & COST_CONDITIONS == COST_CONDITIONS {
+            if *max_cost < GENERIC_CONDITION_COST {
+                return Err(ValidationErr(c, ErrorCode::CostExceeded));
+            }
+            *max_cost -= GENERIC_CONDITION_COST;
+        }
+
         let Some(op) = parse_opcode(a, first(a, c)?, flags) else {
             // in strict mode we don't allow unknown conditions
             if (flags & NO_UNKNOWN_CONDS) != 0 {
