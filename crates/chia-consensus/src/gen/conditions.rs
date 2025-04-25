@@ -17,7 +17,9 @@ use super::opcodes::{
 use super::sanitize_int::{sanitize_uint, SanitizedUint};
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
 use crate::consensus_constants::ConsensusConstants;
-use crate::gen::flags::{DONT_VALIDATE_SIGNATURE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
+use crate::gen::flags::{
+    COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
+};
 use crate::gen::make_aggsig_final_message::u64_to_bytes;
 use crate::gen::messages::{Message, SpendId};
 use crate::gen::spend_visitor::SpendVisitor;
@@ -1211,27 +1213,39 @@ pub fn parse_conditions<V: SpendVisitor>(
                 }
             }
             Condition::CreateCoinAnnouncement(msg) => {
-                decrement(&mut announce_countdown, msg)?;
+                if flags & COST_CONDITIONS != COST_CONDITIONS {
+                    decrement(&mut announce_countdown, msg)?;
+                };
                 state.announce_coin.insert((spend.coin_id.clone(), msg));
             }
             Condition::CreatePuzzleAnnouncement(msg) => {
-                decrement(&mut announce_countdown, msg)?;
+                if flags & COST_CONDITIONS != COST_CONDITIONS {
+                    decrement(&mut announce_countdown, msg)?;
+                };
                 state.announce_puzzle.insert((spend.puzzle_hash, msg));
             }
             Condition::AssertCoinAnnouncement(msg) => {
-                decrement(&mut announce_countdown, msg)?;
+                if flags & COST_CONDITIONS != COST_CONDITIONS {
+                    decrement(&mut announce_countdown, msg)?;
+                };
                 state.assert_coin.insert(msg);
             }
             Condition::AssertPuzzleAnnouncement(msg) => {
-                decrement(&mut announce_countdown, msg)?;
+                if flags & COST_CONDITIONS != COST_CONDITIONS {
+                    decrement(&mut announce_countdown, msg)?;
+                };
                 state.assert_puzzle.insert(msg);
             }
             Condition::AssertConcurrentSpend(id) => {
-                decrement(&mut announce_countdown, id)?;
+                if flags & COST_CONDITIONS != COST_CONDITIONS {
+                    decrement(&mut announce_countdown, id)?;
+                };
                 state.assert_concurrent_spend.insert(id);
             }
             Condition::AssertConcurrentPuzzle(id) => {
-                decrement(&mut announce_countdown, id)?;
+                if flags & COST_CONDITIONS != COST_CONDITIONS {
+                    decrement(&mut announce_countdown, id)?;
+                };
                 state.assert_concurrent_puzzle.insert(id);
             }
             Condition::AggSigMe(pk, msg) => {
@@ -1319,7 +1333,9 @@ pub fn parse_conditions<V: SpendVisitor>(
                 ret.condition_cost += cost;
             }
             Condition::SendMessage(src_mode, dst, msg) => {
-                decrement(&mut announce_countdown, msg)?;
+                if flags & COST_CONDITIONS != COST_CONDITIONS {
+                    decrement(&mut announce_countdown, msg)?;
+                };
                 let src = SpendId::from_self(
                     src_mode,
                     spend.parent_id,
@@ -1335,7 +1351,9 @@ pub fn parse_conditions<V: SpendVisitor>(
                 });
             }
             Condition::ReceiveMessage(src, dst_mode, msg) => {
-                decrement(&mut announce_countdown, msg)?;
+                if flags & COST_CONDITIONS != COST_CONDITIONS {
+                    decrement(&mut announce_countdown, msg)?;
+                };
                 let dst = SpendId::from_self(
                     dst_mode,
                     spend.parent_id,
