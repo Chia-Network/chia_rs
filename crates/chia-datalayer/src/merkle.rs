@@ -848,27 +848,53 @@ impl BlockStatusCache {
 type InternalNodesMap = HashMap<Hash, (Hash, Hash)>;
 type LeafNodesMap = HashMap<Hash, (KeyId, ValueId)>;
 
+pub enum DeltaReaderNode {
+    Internal { left: Hash, right: Hash },
+    Leaf { key: KeyId, value: ValueId },
+}
+
 #[cfg_attr(feature = "py-bindings", pyclass)]
 pub struct DeltaReader {
-    internal_nodes: InternalNodesMap,
-    leaf_nodes: LeafNodesMap,
+    nodes: HashMap<Hash, DeltaReaderNode>,
 }
 
 impl DeltaReader {
     pub fn new(internal_nodes: InternalNodesMap, leaf_nodes: LeafNodesMap) -> Result<Self, Error> {
-        let instance = Self {
-            internal_nodes,
-            leaf_nodes,
-        };
+        let mut nodes: HashMap<Hash, DeltaReaderNode> = HashMap::new();
+
+        for (hash, internal) in internal_nodes {
+            nodes.insert(
+                hash,
+                DeltaReaderNode::Internal {
+                    left: internal.0,
+                    right: internal.1,
+                },
+            );
+        }
+        for (hash, leaf) in leaf_nodes {
+            nodes.insert(
+                hash,
+                DeltaReaderNode::Leaf {
+                    key: leaf.0,
+                    value: leaf.1,
+                },
+            );
+        }
+
+        let instance = Self { nodes };
         Ok(instance)
     }
 
     pub fn get_missing_hashes(&self) -> HashSet<Hash> {
         let mut missing_hashes: HashSet<Hash> = HashSet::new();
 
-        for (left, right) in self.internal_nodes.values() {
+        for node in self.nodes.values() {
+            let DeltaReaderNode::Internal { left, right } = node else {
+                continue;
+            };
+
             for hash in [left, right] {
-                if !self.internal_nodes.contains_key(hash) && !self.leaf_nodes.contains_key(hash) {
+                if !self.nodes.contains_key(hash) {
                     missing_hashes.insert(*hash);
                 }
             }
@@ -884,12 +910,7 @@ impl DeltaReader {
     ) -> Result<(), Error> {
         let vector = zstd_decode_path(path)?;
 
-        get_internal_terminal(
-            &vector,
-            indexes,
-            &mut self.internal_nodes,
-            &mut self.leaf_nodes,
-        )?;
+        get_internal_terminal(&vector, indexes, &mut self.nodes)?;
 
         Ok(())
     }
@@ -902,8 +923,7 @@ impl DeltaReader {
         let mut merkle_blob = MerkleBlob::new(Vec::new())?;
         let mut hashes_and_indexes: Vec<(Hash, TreeIndex)> = Vec::new();
         merkle_blob.build_blob_from_node_list(
-            &self.internal_nodes,
-            &self.leaf_nodes,
+            &self.nodes,
             root_hash,
             interested_hashes,
             &mut hashes_and_indexes,
@@ -1848,18 +1868,14 @@ impl MerkleBlob {
 
     pub fn build_blob_from_node_list(
         &mut self,
-        internal_nodes: &HashMap<Hash, (Hash, Hash)>,
-        terminal_nodes: &HashMap<Hash, (KeyId, ValueId)>,
+        nodes: &HashMap<Hash, DeltaReaderNode>,
         node_hash: Hash,
         interested_hashes: &HashSet<Hash>,
         hashes_and_indexes: &mut Vec<(Hash, TreeIndex)>,
     ) -> Result<TreeIndex, Error> {
-        match (
-            internal_nodes.get(&node_hash),
-            terminal_nodes.get(&node_hash),
-        ) {
-            (None, None) => Err(Error::NodeHashNotInNodeMaps(node_hash)),
-            (_, Some((key, value))) => {
+        match nodes.get(&node_hash) {
+            None => Err(Error::NodeHashNotInNodeMaps(node_hash)),
+            Some(DeltaReaderNode::Leaf { key, value }) => {
                 let index = self.get_new_index();
                 self.insert_entry_to_blob(
                     index,
@@ -1883,21 +1899,19 @@ impl MerkleBlob {
 
                 Ok(index)
             }
-            (Some((left, right)), _) => {
+            Some(DeltaReaderNode::Internal { left, right }) => {
                 let index = self.get_new_index();
                 // TODO: certainly belongs elswehere
                 // let undefined_index = TreeIndex(u32::MAX - 1);
 
                 let left_index = self.build_blob_from_node_list(
-                    internal_nodes,
-                    terminal_nodes,
+                    nodes,
                     *left,
                     interested_hashes,
                     hashes_and_indexes,
                 )?;
                 let right_index = self.build_blob_from_node_list(
-                    internal_nodes,
-                    terminal_nodes,
+                    nodes,
                     *right,
                     interested_hashes,
                     hashes_and_indexes,
@@ -2019,17 +2033,33 @@ impl MerkleBlob {
         root_hash: Option<Hash>,
     ) -> PyResult<Self> {
         let mut merkle_blob = Self::new(Vec::new())?;
+        let mut nodes: HashMap<Hash, DeltaReaderNode> = HashMap::new();
 
-        match (
-            root_hash,
-            !internal_nodes.is_empty() || !terminal_nodes.is_empty(),
-        ) {
+        for (hash, internal) in internal_nodes {
+            nodes.insert(
+                hash,
+                DeltaReaderNode::Internal {
+                    left: internal.0,
+                    right: internal.1,
+                },
+            );
+        }
+        for (hash, leaf) in terminal_nodes {
+            nodes.insert(
+                hash,
+                DeltaReaderNode::Leaf {
+                    key: leaf.0,
+                    value: leaf.1,
+                },
+            );
+        }
+
+        match (root_hash, !nodes.is_empty()) {
             (None, true) => Err(Error::RootHashAndNodeListDisagreement())?,
             (None, _) => Ok(merkle_blob),
             (Some(root_hash), _) => {
                 merkle_blob.build_blob_from_node_list(
-                    &internal_nodes,
-                    &terminal_nodes,
+                    &nodes,
                     root_hash,
                     &HashSet::new(),
                     &mut Vec::new(),
@@ -2239,8 +2269,7 @@ pub fn get_internal_terminal(
     // TODO: should be &[u8] i think?
     blob: &Vec<u8>,
     indexes: &Vec<TreeIndex>,
-    internal: &mut InternalNodesMap,
-    leafs: &mut LeafNodesMap,
+    nodes: &mut HashMap<Hash, DeltaReaderNode>,
 ) -> Result<(), Error> {
     let mut index_to_hash: HashMap<TreeIndex, Hash> = HashMap::new();
 
@@ -2250,17 +2279,23 @@ pub fn get_internal_terminal(
             match block.node {
                 Node::Internal(node) => {
                     index_to_hash.insert(index, node.hash);
-                    internal.insert(
+                    nodes.insert(
                         node.hash,
-                        (
-                            *index_to_hash.get(&node.left).unwrap(),
-                            *index_to_hash.get(&node.right).unwrap(),
-                        ),
+                        DeltaReaderNode::Internal {
+                            left: *index_to_hash.get(&node.left).unwrap(),
+                            right: *index_to_hash.get(&node.right).unwrap(),
+                        },
                     );
                 }
                 Node::Leaf(node) => {
                     index_to_hash.insert(index, node.hash);
-                    leafs.insert(node.hash, (node.key, node.value));
+                    nodes.insert(
+                        node.hash,
+                        DeltaReaderNode::Leaf {
+                            key: node.key,
+                            value: node.value,
+                        },
+                    );
                 }
             }
         }

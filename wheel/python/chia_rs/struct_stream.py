@@ -106,6 +106,9 @@ class StructStream(int):
             )
         return cls(int.from_bytes(blob, "big", signed=cls.SIGNED))
 
+    def stream(self, f: BinaryIO) -> None:
+        f.write(self.stream_to_bytes())
+
     def stream_to_bytes(self) -> bytes:
         return super().to_bytes(length=self.SIZE, byteorder="big", signed=self.SIGNED)
 
