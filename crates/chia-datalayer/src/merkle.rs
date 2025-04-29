@@ -15,6 +15,7 @@ use chia_sha2::Sha256;
 use chia_streamable_macro::Streamable;
 use chia_traits::Streamable;
 use num_traits::ToBytes;
+use rayon::prelude::*;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::io::{Read, Write};
@@ -910,7 +911,28 @@ impl DeltaReader {
     ) -> Result<(), Error> {
         let vector = zstd_decode_path(path)?;
 
-        get_internal_terminal(&vector, indexes, &mut self.nodes)?;
+        self.nodes.extend(get_internal_terminal(&vector, indexes)?);
+
+        Ok(())
+    }
+
+    pub fn collect_from_merkle_blobs(
+        &mut self,
+        jobs: &Vec<(PathBuf, Vec<TreeIndex>)>,
+    ) -> Result<(), Error> {
+        let mut results: Vec<Result<HashMap<Hash, DeltaReaderNode>, Error>> = Vec::new();
+
+        results.par_extend(jobs.into_par_iter().map(
+            |job| -> Result<HashMap<Hash, DeltaReaderNode>, Error> {
+                let vector = zstd_decode_path(&job.0)?;
+                get_internal_terminal(&vector, &job.1)
+            },
+        ));
+
+        for result in results {
+            // admittedly just spitting out the first error here
+            self.nodes.extend(result?);
+        }
 
         Ok(())
     }
@@ -956,6 +978,21 @@ impl DeltaReader {
     ) -> PyResult<()> {
         let path: PathBuf = path.extract(py)?;
         self.collect_from_merkle_blob(&path, &indexes)?;
+
+        Ok(())
+    }
+
+    #[pyo3(name = "collect_from_merkle_blobs")]
+    pub fn py_collect_from_merkle_blobs(
+        &mut self,
+        py: Python<'_>,
+        jobs: Vec<(PyObject, Vec<TreeIndex>)>,
+    ) -> PyResult<()> {
+        let mut pathed_jobs: Vec<(PathBuf, Vec<TreeIndex>)> = Vec::new();
+        for job in jobs {
+            pathed_jobs.push((job.0.extract(py)?, job.1));
+        }
+        self.collect_from_merkle_blobs(&pathed_jobs)?;
 
         Ok(())
     }
@@ -2269,8 +2306,8 @@ pub fn get_internal_terminal(
     // TODO: should be &[u8] i think?
     blob: &Vec<u8>,
     indexes: &Vec<TreeIndex>,
-    nodes: &mut HashMap<Hash, DeltaReaderNode>,
-) -> Result<(), Error> {
+) -> Result<HashMap<Hash, DeltaReaderNode>, Error> {
+    let mut nodes: HashMap<Hash, DeltaReaderNode> = HashMap::new();
     let mut index_to_hash: HashMap<TreeIndex, Hash> = HashMap::new();
 
     for subroot_index in indexes {
@@ -2301,7 +2338,7 @@ pub fn get_internal_terminal(
         }
     }
 
-    Ok(())
+    Ok(nodes)
 }
 
 struct MerkleBlobLeftChildFirstIteratorItem {
