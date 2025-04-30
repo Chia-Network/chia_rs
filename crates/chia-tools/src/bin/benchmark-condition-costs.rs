@@ -44,7 +44,16 @@ const MSG1: &[u8; 13] = &[3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
 
 // this function takes a NodePtr of (q . ((CONDITION ARG ARG)...))
 // and add another (CONDITION ARG ARG) to the list
-// fn cons_condition(allocator: &mut Allocator, current_ptr: NodePtr) -> NodePtr {}
+fn cons_condition(allocator: &mut Allocator, current_ptr: NodePtr) -> Result<NodePtr, EvalErr> {
+    let Some((q, conds)) = allocator.next(current_ptr) else {
+        return Err(EvalErr(current_ptr, "not a pair".into()));
+    };
+    let Some((cond, rest)) = allocator.next(conds) else {
+        return Err(EvalErr(current_ptr, "not a pair".into()));
+    };
+    let added_new_cond = allocator.new_pair(cond, conds)?;
+    allocator.new_pair(q, added_new_cond)
+}
 
 // this function generates (q . ((CONDITION ARG ARG)))
 fn create_conditions(
@@ -109,22 +118,28 @@ pub fn main() {
         let conditions = create_conditions(&mut allocator, &cond).expect("create_conditions");
 
         let mut cost = TEST_CONSTANTS.max_block_cost_clvm.clone();
-        // Parse the conditions
-        parse_conditions(
-            &allocator,
-            &mut ret,
-            &mut state,
-            spend,
-            conditions,
-            flags,
-            &mut cost,
-            &TEST_CONSTANTS,
-            &mut v,
-        )
-        .expect("parse_conditions");
+        // Parse the conditions and then make the list longer
+        for _ in 0..100 {
+            parse_conditions(
+                &allocator,
+                &mut ret,
+                &mut state,
+                spend.clone(),
+                conditions,
+                flags,
+                &mut cost,
+                &TEST_CONSTANTS,
+                &mut v,
+            )
+            .expect("parse_conditions");
 
-        total_cost += ret.execution_cost;
-        total_count += 1;
+            // add costs to tally
+            total_cost += ret.execution_cost;
+            total_count += 1;
+
+            // make the conditions list longer
+            cons_condition(&mut allocator, conditions).expect("cons_condition");
+        }
     }
 
     println!("Total Cost: {}", total_cost);
