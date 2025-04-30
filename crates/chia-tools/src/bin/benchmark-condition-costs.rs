@@ -1,15 +1,15 @@
 use std::sync::Arc;
 
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
+use chia_consensus::gen::conditions::parse_conditions;
 use chia_consensus::gen::conditions::{MempoolVisitor, SpendBundleConditions};
 use chia_consensus::gen::flags::COST_CONDITIONS; // DONT_VALIDATE_SIGNATURE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
 use chia_consensus::gen::opcodes;
-use chia_consensus::gen::conditions::parse_conditions;
 use chia_consensus::r#gen::conditions::{ParseState, SpendConditions};
 use chia_consensus::r#gen::opcodes::ConditionOpcode;
 use chia_consensus::r#gen::spend_visitor::SpendVisitor;
-use chia_protocol::Coin;
 use chia_protocol::Bytes32;
+use chia_protocol::Coin;
 use clvmr::{
     allocator::{Allocator, NodePtr},
     reduction::EvalErr,
@@ -18,7 +18,7 @@ struct ConditionTest {
     opcode: ConditionOpcode,
     args: Vec<NodePtr>,
 }
-// use hex_literal::hex;
+use hex_literal::hex;
 
 const H1: &[u8; 32] = &[
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -33,12 +33,12 @@ const H1: &[u8; 32] = &[
 //     3,
 // ];
 
-// const PUBKEY: &[u8; 48] = &hex!("aefe1789d6476f60439e1168f588ea16652dc321279f05a805fbc63933e88ae9c175d6c6ab182e54af562e1a0dce41bb");
+const PUBKEY: &[u8; 48] = &hex!("aefe1789d6476f60439e1168f588ea16652dc321279f05a805fbc63933e88ae9c175d6c6ab182e54af562e1a0dce41bb");
 
 // const SECRET_KEY: &[u8; 32] =
 //     &hex!("6fc9d9a2b05fd1f0e51bc91041a03be8657081f272ec281aff731624f0d1c220");
 
-// const MSG1: &[u8; 13] = &[3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
+const MSG1: &[u8; 13] = &[3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
 
 // const MSG2: &[u8; 19] = &[4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4];
 
@@ -74,23 +74,35 @@ pub fn main() {
     let cond_tests = [
         ConditionTest {
             opcode: opcodes::AGG_SIG_UNSAFE,
-            args: vec![allocator.new_small_number(1).expect("number")],
+            args: vec![
+                allocator.new_atom(PUBKEY).expect("pubkey"),
+                allocator.new_atom(MSG1).expect("msg"),
+            ],
         },
         ConditionTest {
             opcode: opcodes::CREATE_COIN,
-            args: vec![allocator.new_small_number(1).expect("number")],
+            args: vec![
+                allocator.new_atom(H1).expect("atom"),
+                allocator.new_small_number(1).expect("number"),
+            ],
         },
     ];
     for cond in cond_tests.iter() {
         let parent_id = allocator.new_atom(H1).expect("atom");
-        let puzzle_hash = Bytes32::from(clvm_utils::tree_hash_from_bytes(&[1_u8]).expect("tree_hash"));
+        let puzzle_hash =
+            Bytes32::from(clvm_utils::tree_hash_from_bytes(&[1_u8]).expect("tree_hash"));
         let puz_hash_node_ptr = allocator.new_atom(puzzle_hash.as_slice()).expect("bytes");
         let coin = Coin {
             parent_coin_info: H1.into(),
             puzzle_hash: puzzle_hash,
             amount: 1,
         };
-        let mut spend = SpendConditions::new(parent_id, 1_u64, puz_hash_node_ptr, Arc::new(coin.coin_id()));
+        let mut spend = SpendConditions::new(
+            parent_id,
+            1_u64,
+            puz_hash_node_ptr,
+            Arc::new(coin.coin_id()),
+        );
         let mut v = MempoolVisitor::new_spend(&mut spend);
 
         // Create the conditions
@@ -108,7 +120,8 @@ pub fn main() {
             &mut cost,
             &TEST_CONSTANTS,
             &mut v,
-        ).expect("parse_conditions");
+        )
+        .expect("parse_conditions");
 
         total_cost += ret.execution_cost;
         total_count += 1;
