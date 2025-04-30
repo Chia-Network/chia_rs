@@ -127,6 +127,13 @@ impl DebugPrint for Condition {
             }
             Self::Skip => "[Skip] REMARK ...".to_string(),
             Self::SkipRelativeCondition => "[SkipRelativeCondition]".to_string(),
+            Self::AssertSha256Tree(sexp, hash) => {
+                format!(
+                    "ASSERT_SHA256_TREE {} {}",
+                    sexp.debug_print(a),
+                    hash.debug_print(a)
+                )
+            }
         }
     }
 }
