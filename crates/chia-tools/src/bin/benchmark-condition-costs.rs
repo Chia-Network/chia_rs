@@ -1,11 +1,14 @@
 use std::sync::Arc;
 
+use chia_bls::Signature;
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::gen::conditions::parse_conditions;
 use chia_consensus::gen::conditions::{MempoolVisitor, SpendBundleConditions};
 use chia_consensus::gen::flags::COST_CONDITIONS; // DONT_VALIDATE_SIGNATURE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
 use chia_consensus::gen::opcodes;
-use chia_consensus::r#gen::conditions::{ParseState, SpendConditions};
+use chia_consensus::r#gen::conditions::{
+    validate_conditions, validate_signature, ParseState, SpendConditions,
+};
 use chia_consensus::r#gen::opcodes::ConditionOpcode;
 use chia_consensus::r#gen::spend_visitor::SpendVisitor;
 use chia_protocol::Bytes32;
@@ -17,6 +20,7 @@ use clvmr::{
 struct ConditionTest {
     opcode: ConditionOpcode,
     args: Vec<NodePtr>,
+    aggregate_signature: Signature,
 }
 use hex_literal::hex;
 
@@ -48,7 +52,7 @@ fn cons_condition(allocator: &mut Allocator, current_ptr: NodePtr) -> Result<Nod
     let Some((q, conds)) = allocator.next(current_ptr) else {
         return Err(EvalErr(current_ptr, "not a pair".into()));
     };
-    let Some((cond, rest)) = allocator.next(conds) else {
+    let Some((cond, _rest)) = allocator.next(conds) else {
         return Err(EvalErr(current_ptr, "not a pair".into()));
     };
     let added_new_cond = allocator.new_pair(cond, conds)?;
@@ -79,6 +83,7 @@ pub fn main() {
     let flags: u32 = COST_CONDITIONS;
     let mut ret = SpendBundleConditions::default();
     let mut state = ParseState::default();
+    let one = allocator.new_small_number(1).expect("number");
 
     let cond_tests = [
         ConditionTest {
@@ -87,25 +92,25 @@ pub fn main() {
                 allocator.new_atom(PUBKEY).expect("pubkey"),
                 allocator.new_atom(MSG1).expect("msg"),
             ],
+            aggregate_signature: Signature::default(),
         },
         ConditionTest {
             opcode: opcodes::CREATE_COIN,
-            args: vec![
-                allocator.new_atom(H1).expect("atom"),
-                allocator.new_small_number(1).expect("number"),
-            ],
+            args: vec![allocator.new_atom(H1).expect("atom"), one],
+            aggregate_signature: Signature::default(),
         },
     ];
+
+    let parent_id = allocator.new_atom(H1).expect("atom");
+    let puzzle_hash = Bytes32::from(clvm_utils::tree_hash_from_bytes(&[1_u8]).expect("tree_hash"));
+    let puz_hash_node_ptr = allocator.new_atom(puzzle_hash.as_slice()).expect("bytes");
+    let coin = Coin {
+        parent_coin_info: H1.into(),
+        puzzle_hash: puzzle_hash,
+        amount: 1,
+    };
+    let cp = allocator.checkpoint();
     for cond in cond_tests.iter() {
-        let parent_id = allocator.new_atom(H1).expect("atom");
-        let puzzle_hash =
-            Bytes32::from(clvm_utils::tree_hash_from_bytes(&[1_u8]).expect("tree_hash"));
-        let puz_hash_node_ptr = allocator.new_atom(puzzle_hash.as_slice()).expect("bytes");
-        let coin = Coin {
-            parent_coin_info: H1.into(),
-            puzzle_hash: puzzle_hash,
-            amount: 1,
-        };
         let mut spend = SpendConditions::new(
             parent_id,
             1_u64,
@@ -116,10 +121,15 @@ pub fn main() {
 
         // Create the conditions
         let conditions = create_conditions(&mut allocator, &cond).expect("create_conditions");
-
+        // let (parent_id, puzzle_hash, amount, conds) = parse_single_spend(a, spend)?;
+        let spend_list = [parent_id, puz_hash_node_ptr, one, conditions];
+        let mut spends = allocator.nil();
+        for arg in spend_list.iter().rev() {
+            spends = allocator.new_pair(*arg, spends).expect("new_pair");
+        }
         let mut cost = TEST_CONSTANTS.max_block_cost_clvm.clone();
         // Parse the conditions and then make the list longer
-        for _ in 0..100 {
+        for _ in 0..1000 {
             parse_conditions(
                 &allocator,
                 &mut ret,
@@ -133,6 +143,12 @@ pub fn main() {
             )
             .expect("parse_conditions");
 
+            MempoolVisitor::post_process(&allocator, &state, &mut ret).expect("post_process");
+            validate_conditions(&allocator, &ret, &state, spends, flags)
+                .expect("validate_conditions");
+            validate_signature(&state, &cond.aggregate_signature, flags, None)
+                .expect("validate_signature");
+
             // add costs to tally
             total_cost += ret.execution_cost;
             total_count += 1;
@@ -140,6 +156,8 @@ pub fn main() {
             // make the conditions list longer
             cons_condition(&mut allocator, conditions).expect("cons_condition");
         }
+        // reset allocator before next condition test
+        allocator.restore_checkpoint(&cp);
     }
 
     println!("Total Cost: {}", total_cost);
