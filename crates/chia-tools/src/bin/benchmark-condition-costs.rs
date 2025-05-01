@@ -49,14 +49,14 @@ const MSG1: &[u8; 13] = &[3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
 // this function takes a NodePtr of (q . ((CONDITION ARG ARG)...))
 // and add another (CONDITION ARG ARG) to the list
 fn cons_condition(allocator: &mut Allocator, current_ptr: NodePtr) -> Result<NodePtr, EvalErr> {
-    let Some((q, conds)) = allocator.next(current_ptr) else {
+    // let Some((q, conds)) = allocator.next(current_ptr) else {
+    //     return Err(EvalErr(current_ptr, "not a pair".into()));
+    // };
+    let Some((cond, _rest)) = allocator.next(current_ptr) else {
         return Err(EvalErr(current_ptr, "not a pair".into()));
     };
-    let Some((cond, _rest)) = allocator.next(conds) else {
-        return Err(EvalErr(current_ptr, "not a pair".into()));
-    };
-    let added_new_cond = allocator.new_pair(cond, conds)?;
-    allocator.new_pair(q, added_new_cond)
+    allocator.new_pair(cond, current_ptr)
+    // allocator.new_pair(q, added_new_cond)
 }
 
 // this function generates (q . ((CONDITION ARG ARG)))
@@ -70,9 +70,7 @@ fn create_conditions(
     }
     let opcode = allocator.new_small_number(condition.opcode as u32)?;
     let cond_list = allocator.new_pair(opcode, rest)?;
-    let q = allocator.new_small_number(1)?;
-    let cond_list = allocator.new_pair(cond_list, allocator.nil())?;
-    allocator.new_pair(q, cond_list)
+    allocator.new_pair(cond_list, allocator.nil())
 }
 
 pub fn main() {
