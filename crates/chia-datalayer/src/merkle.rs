@@ -846,6 +846,50 @@ impl BlockStatusCache {
     }
 }
 
+type NodeHashToIndex = HashMap<Hash, TreeIndex>;
+type NodeHashToDeltaReaderNode = HashMap<Hash, DeltaReaderNode>;
+
+pub fn collect_and_return_from_merkle_blob(
+    path: &PathBuf,
+) -> Result<(NodeHashToDeltaReaderNode, NodeHashToIndex), Error> {
+    let mut nodes: NodeHashToDeltaReaderNode = HashMap::new();
+    let blob = zstd_decode_path(path)?;
+    let mut node_hash_to_index: NodeHashToIndex = HashMap::new();
+
+    let mut index_to_hash: HashMap<TreeIndex, Hash> = HashMap::new();
+
+    // TODO: still collecting way more into self.nodes than we need generally
+    for item in MerkleBlobLeftChildFirstIterator::new(&blob, Some(TreeIndex(0))) {
+        let (index, block) = item?;
+        match block.node {
+            Node::Internal(node) => {
+                node_hash_to_index.insert(node.hash, index);
+                index_to_hash.insert(index, node.hash);
+                nodes.insert(
+                    node.hash,
+                    DeltaReaderNode::Internal {
+                        left: *index_to_hash.get(&node.left).unwrap(),
+                        right: *index_to_hash.get(&node.right).unwrap(),
+                    },
+                );
+            }
+            Node::Leaf(node) => {
+                node_hash_to_index.insert(node.hash, index);
+                index_to_hash.insert(index, node.hash);
+                nodes.insert(
+                    node.hash,
+                    DeltaReaderNode::Leaf {
+                        key: node.key,
+                        value: node.value,
+                    },
+                );
+            }
+        }
+    }
+
+    Ok((nodes, node_hash_to_index))
+}
+
 type InternalNodesMap = HashMap<Hash, (Hash, Hash)>;
 type LeafNodesMap = HashMap<Hash, (KeyId, ValueId)>;
 
@@ -856,12 +900,12 @@ pub enum DeltaReaderNode {
 
 #[cfg_attr(feature = "py-bindings", pyclass)]
 pub struct DeltaReader {
-    nodes: HashMap<Hash, DeltaReaderNode>,
+    nodes: NodeHashToDeltaReaderNode,
 }
 
 impl DeltaReader {
     pub fn new(internal_nodes: InternalNodesMap, leaf_nodes: LeafNodesMap) -> Result<Self, Error> {
-        let mut nodes: HashMap<Hash, DeltaReaderNode> = HashMap::new();
+        let mut nodes: NodeHashToDeltaReaderNode = HashMap::new();
 
         for (hash, internal) in internal_nodes {
             nodes.insert(
@@ -911,19 +955,42 @@ impl DeltaReader {
     ) -> Result<(), Error> {
         let vector = zstd_decode_path(path)?;
 
-        self.nodes.extend(get_internal_terminal(&vector, indexes)?);
+        for (hash, (_index, node)) in get_internal_terminal(&vector, indexes)? {
+            self.nodes.insert(hash, node);
+        }
 
         Ok(())
+    }
+
+    pub fn collect_and_return_from_merkle_blobs(
+        &mut self,
+        jobs: &Vec<(Hash, PathBuf)>,
+    ) -> Result<Vec<(Hash, NodeHashToIndex)>, Error> {
+        let mut grouped_results = Vec::new();
+        grouped_results.par_extend(jobs.into_par_iter().map(
+            |job| -> Result<(Hash, (NodeHashToDeltaReaderNode, NodeHashToIndex)), Error> {
+                Ok((job.0, collect_and_return_from_merkle_blob(&job.1)?))
+            },
+        ));
+
+        let mut results: Vec<(Hash, NodeHashToIndex)> = Vec::new();
+        for result in grouped_results {
+            let (hash, (nodes, node_hash_to_index)) = result?;
+            self.nodes.extend(nodes);
+            results.push((hash, node_hash_to_index));
+        }
+
+        Ok(results)
     }
 
     pub fn collect_from_merkle_blobs(
         &mut self,
         jobs: &Vec<(PathBuf, Vec<TreeIndex>)>,
     ) -> Result<(), Error> {
-        let mut results: Vec<Result<HashMap<Hash, DeltaReaderNode>, Error>> = Vec::new();
+        let mut results = Vec::new();
 
         results.par_extend(jobs.into_par_iter().map(
-            |job| -> Result<HashMap<Hash, DeltaReaderNode>, Error> {
+            |job| -> Result<HashMap<Hash, (TreeIndex, DeltaReaderNode)>, Error> {
                 let vector = zstd_decode_path(&job.0)?;
                 get_internal_terminal(&vector, &job.1)
             },
@@ -931,7 +998,9 @@ impl DeltaReader {
 
         for result in results {
             // admittedly just spitting out the first error here
-            self.nodes.extend(result?);
+            for (hash, (_index, node)) in result? {
+                self.nodes.insert(hash, node);
+            }
         }
 
         Ok(())
@@ -982,6 +1051,22 @@ impl DeltaReader {
         Ok(())
     }
 
+    #[pyo3(name = "collect_and_return_from_merkle_blobs")]
+    pub fn py_collect_and_return_from_merkle_blobs(
+        &mut self,
+        py: Python<'_>,
+        jobs: Vec<(Hash, PyObject)>,
+        // hashes: Vec<Hash>,
+    ) -> PyResult<Vec<(Hash, NodeHashToIndex)>> {
+        let mut extracted_jobs: Vec<(Hash, PathBuf)> = Vec::new();
+        for (hash, path) in jobs {
+            let path: PathBuf = path.extract(py)?;
+            extracted_jobs.push((hash, path));
+        }
+
+        Ok(py.allow_threads(|| self.collect_and_return_from_merkle_blobs(&extracted_jobs))?)
+    }
+
     #[pyo3(name = "collect_from_merkle_blobs")]
     pub fn py_collect_from_merkle_blobs(
         &mut self,
@@ -992,7 +1077,7 @@ impl DeltaReader {
         for job in jobs {
             pathed_jobs.push((job.0.extract(py)?, job.1));
         }
-        self.collect_from_merkle_blobs(&pathed_jobs)?;
+        py.allow_threads(|| self.collect_from_merkle_blobs(&pathed_jobs))?;
 
         Ok(())
     }
@@ -1905,7 +1990,7 @@ impl MerkleBlob {
 
     pub fn build_blob_from_node_list(
         &mut self,
-        nodes: &HashMap<Hash, DeltaReaderNode>,
+        nodes: &NodeHashToDeltaReaderNode,
         node_hash: Hash,
         interested_hashes: &HashSet<Hash>,
         hashes_and_indexes: &mut Vec<(Hash, TreeIndex)>,
@@ -2070,7 +2155,7 @@ impl MerkleBlob {
         root_hash: Option<Hash>,
     ) -> PyResult<Self> {
         let mut merkle_blob = Self::new(Vec::new())?;
-        let mut nodes: HashMap<Hash, DeltaReaderNode> = HashMap::new();
+        let mut nodes: NodeHashToDeltaReaderNode = HashMap::new();
 
         for (hash, internal) in internal_nodes {
             nodes.insert(
@@ -2306,8 +2391,8 @@ pub fn get_internal_terminal(
     // TODO: should be &[u8] i think?
     blob: &Vec<u8>,
     indexes: &Vec<TreeIndex>,
-) -> Result<HashMap<Hash, DeltaReaderNode>, Error> {
-    let mut nodes: HashMap<Hash, DeltaReaderNode> = HashMap::new();
+) -> Result<HashMap<Hash, (TreeIndex, DeltaReaderNode)>, Error> {
+    let mut nodes: HashMap<Hash, (TreeIndex, DeltaReaderNode)> = HashMap::new();
     let mut index_to_hash: HashMap<TreeIndex, Hash> = HashMap::new();
 
     for subroot_index in indexes {
@@ -2318,20 +2403,26 @@ pub fn get_internal_terminal(
                     index_to_hash.insert(index, node.hash);
                     nodes.insert(
                         node.hash,
-                        DeltaReaderNode::Internal {
-                            left: *index_to_hash.get(&node.left).unwrap(),
-                            right: *index_to_hash.get(&node.right).unwrap(),
-                        },
+                        (
+                            index,
+                            DeltaReaderNode::Internal {
+                                left: *index_to_hash.get(&node.left).unwrap(),
+                                right: *index_to_hash.get(&node.right).unwrap(),
+                            },
+                        ),
                     );
                 }
                 Node::Leaf(node) => {
                     index_to_hash.insert(index, node.hash);
                     nodes.insert(
                         node.hash,
-                        DeltaReaderNode::Leaf {
-                            key: node.key,
-                            value: node.value,
-                        },
+                        (
+                            index,
+                            DeltaReaderNode::Leaf {
+                                key: node.key,
+                                value: node.value,
+                            },
+                        ),
                     );
                 }
             }
