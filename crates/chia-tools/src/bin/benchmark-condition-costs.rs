@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use chia_bls::Signature;
+use chia_bls::{sign_raw, SecretKey, Signature};
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::gen::conditions::parse_conditions;
 use chia_consensus::gen::conditions::{MempoolVisitor, SpendBundleConditions};
@@ -37,10 +37,10 @@ const H1: &[u8; 32] = &[
 //     3,
 // ];
 
-const PUBKEY: &[u8; 48] = &hex!("aefe1789d6476f60439e1168f588ea16652dc321279f05a805fbc63933e88ae9c175d6c6ab182e54af562e1a0dce41bb");
+// const PUBKEY: &[u8; 48] = &hex!("aefe1789d6476f60439e1168f588ea16652dc321279f05a805fbc63933e88ae9c175d6c6ab182e54af562e1a0dce41bb");
 
-// const SECRET_KEY: &[u8; 32] =
-//     &hex!("6fc9d9a2b05fd1f0e51bc91041a03be8657081f272ec281aff731624f0d1c220");
+const SECRET_KEY: &[u8; 32] =
+    &hex!("6fc9d9a2b05fd1f0e51bc91041a03be8657081f272ec281aff731624f0d1c220");
 
 const MSG1: &[u8; 13] = &[3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
 
@@ -82,15 +82,18 @@ pub fn main() {
     let mut ret = SpendBundleConditions::default();
     let mut state = ParseState::default();
     let one = allocator.new_small_number(1).expect("number");
+    let sk = SecretKey::from_bytes(SECRET_KEY).expect("secret key");
+    let pk = sk.public_key();
 
+    // this is the list of conditions to test
     let cond_tests = [
         ConditionTest {
             opcode: opcodes::AGG_SIG_UNSAFE,
             args: vec![
-                allocator.new_atom(PUBKEY).expect("pubkey"),
+                allocator.new_atom(&pk.to_bytes()).expect("pubkey"),
                 allocator.new_atom(MSG1).expect("msg"),
             ],
-            aggregate_signature: Signature::default(),
+            aggregate_signature: sign_raw(&sk, &MSG1),
         },
         ConditionTest {
             opcode: opcodes::CREATE_COIN,
@@ -119,7 +122,7 @@ pub fn main() {
 
         // Create the conditions
         let conditions = create_conditions(&mut allocator, &cond).expect("create_conditions");
-        // let (parent_id, puzzle_hash, amount, conds) = parse_single_spend(a, spend)?;
+        // a "spend" is the following list
         let spend_list = [parent_id, puz_hash_node_ptr, one, conditions];
         let mut spends = allocator.nil();
         for arg in spend_list.iter().rev() {
