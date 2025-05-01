@@ -1222,7 +1222,7 @@ pub fn parse_conditions<V: SpendVisitor>(
                 }
             }
             Condition::CreateCoinAnnouncement(msg) => {
-                if flags & COST_CONDITIONS != COST_CONDITIONS {
+                if (flags & COST_CONDITIONS) == 0 {
                     decrement(&mut announce_countdown, msg)?;
                 };
                 state.announce_coin.insert((spend.coin_id.clone(), msg));
