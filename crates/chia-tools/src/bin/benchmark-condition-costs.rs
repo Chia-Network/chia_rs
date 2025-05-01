@@ -93,7 +93,7 @@ pub fn main() {
                 allocator.new_atom(&pk.to_bytes()).expect("pubkey"),
                 allocator.new_atom(MSG1).expect("msg"),
             ],
-            aggregate_signature: sign_raw(&sk, &MSG1),
+            aggregate_signature: sign_raw(&sk, MSG1),
         },
         ConditionTest {
             opcode: opcodes::CREATE_COIN,
@@ -107,11 +107,11 @@ pub fn main() {
     let puz_hash_node_ptr = allocator.new_atom(puzzle_hash.as_slice()).expect("bytes");
     let coin = Coin {
         parent_coin_info: H1.into(),
-        puzzle_hash: puzzle_hash,
+        puzzle_hash,
         amount: 1,
     };
     let cp = allocator.checkpoint();
-    for cond in cond_tests.iter() {
+    for cond in cond_tests {
         let mut spend = SpendConditions::new(
             parent_id,
             1_u64,
@@ -128,7 +128,7 @@ pub fn main() {
         for arg in spend_list.iter().rev() {
             spends = allocator.new_pair(*arg, spends).expect("new_pair");
         }
-        let mut cost = TEST_CONSTANTS.max_block_cost_clvm.clone();
+        let mut cost = TEST_CONSTANTS.max_block_cost_clvm;
         // Parse the conditions and then make the list longer
         for _ in 0..1000 {
             parse_conditions(
@@ -161,6 +161,6 @@ pub fn main() {
         allocator.restore_checkpoint(&cp);
     }
 
-    println!("Total Cost: {}", total_cost);
-    println!("Total Count: {}", total_count);
+    println!("Total Cost: {total_cost}");
+    println!("Total Count: {total_count}");
 }
