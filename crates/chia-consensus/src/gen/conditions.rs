@@ -1010,7 +1010,7 @@ pub fn parse_conditions<V: SpendVisitor>(
         iter = next;
 
         // add cost for looking at any condition
-        if flags & COST_CONDITIONS == COST_CONDITIONS {
+        if (flags & COST_CONDITIONS) != 0 {
             if *max_cost < GENERIC_CONDITION_COST {
                 return Err(ValidationErr(c, ErrorCode::CostExceeded));
             }
