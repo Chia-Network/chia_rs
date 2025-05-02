@@ -1,4 +1,4 @@
-use chia_bls::{sign_raw, SecretKey, Signature};
+use chia_bls::{sign, SecretKey, Signature};
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 // use chia_consensus::gen::conditions::parse_conditions;
 use chia_consensus::gen::conditions::{MempoolVisitor, SpendBundleConditions};
@@ -98,7 +98,7 @@ pub fn main() {
                 allocator.new_atom(&pk.to_bytes()).expect("pubkey"),
                 allocator.new_atom(MSG1).expect("msg"),
             ],
-            aggregate_signature: sign_raw(&sk, MSG1),
+            aggregate_signature: sign(&sk, MSG1),
         },
     ];
 
