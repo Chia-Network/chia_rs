@@ -80,8 +80,6 @@ pub fn main() {
     let mut total_count = 0;
     // let puzzle = allocator.new_small_number(1).expect("number");
     let flags: u32 = COST_CONDITIONS;
-    let mut ret = SpendBundleConditions::default();
-    let mut state = ParseState::default();
     let one = allocator.new_small_number(1).expect("number");
     let hundred = allocator.new_small_number(100).expect("number");
     let sk = SecretKey::from_bytes(SECRET_KEY).expect("secret key");
@@ -132,6 +130,9 @@ pub fn main() {
         let mut cost = TEST_CONSTANTS.max_block_cost_clvm;
         // Parse the conditions and then make the list longer
         for _ in 0..1000 {
+            // need to reset state or we get a double spend
+            let mut ret = SpendBundleConditions::default();
+            let mut state = ParseState::default();
             process_single_spend::<MempoolVisitor>(
                 &allocator,
                 &mut ret,
