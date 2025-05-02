@@ -106,9 +106,10 @@ mod tests {
 
     #[test]
     fn test_validate_no_pks() {
+        let full_puz = Bytes32::new(tree_hash_atom(&[1_u8]).to_bytes());
         let test_coin = Coin::new(
             hex!("4444444444444444444444444444444444444444444444444444444444444444").into(),
-            hex!("3333333333333333333333333333333333333333333333333333333333333333").into(),
+            full_puz,
             1,
         );
 
@@ -143,9 +144,10 @@ ff01\
         let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
         let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
 
+        let full_puz = Bytes32::new(tree_hash_atom(&[1_u8]).to_bytes());
         let test_coin = Coin::new(
             hex!("4444444444444444444444444444444444444444444444444444444444444444").into(),
-            hex!("3333333333333333333333333333333333333333333333333333333333333333").into(),
+            full_puz,
             1,
         );
 
