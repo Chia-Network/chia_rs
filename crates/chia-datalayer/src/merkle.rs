@@ -870,44 +870,42 @@ pub fn collect_and_return_from_merkle_blob(
         let block = try_get_block(&blob, index)?;
 
         match block.node {
-            Node::Internal(node) => {
+            Node::Internal(InternalNode {
+                hash, left, right, ..
+            }) => {
                 if visited {
-                    node_hash_to_index.insert(node.hash, index);
-                    index_to_hash.insert(index, node.hash);
+                    node_hash_to_index.insert(hash, index);
+                    index_to_hash.insert(index, hash);
                     if !in_subtree.is_empty() {
                         nodes.insert(
-                            node.hash,
+                            hash,
                             DeltaReaderNode::Internal {
-                                left: *index_to_hash.get(&node.left).unwrap(),
-                                right: *index_to_hash.get(&node.right).unwrap(),
+                                left: *index_to_hash.get(&left).unwrap(),
+                                right: *index_to_hash.get(&right).unwrap(),
                             },
                         );
                     }
 
-                    in_subtree.remove(&node.hash);
+                    in_subtree.remove(&hash);
                 } else {
-                    if hashes.contains(&node.hash) {
-                        in_subtree.insert(node.hash);
+                    if hashes.contains(&hash) {
+                        in_subtree.insert(hash);
                     }
 
                     index_stack.push((index, true));
-                    index_stack.push((node.right, false));
-                    index_stack.push((node.left, false));
+                    index_stack.push((right, false));
+                    index_stack.push((left, false));
                 }
             }
-            Node::Leaf(node) => {
-                if !in_subtree.is_empty() || hashes.contains(&node.hash) {
-                    nodes.insert(
-                        node.hash,
-                        DeltaReaderNode::Leaf {
-                            key: node.key,
-                            value: node.value,
-                        },
-                    );
+            Node::Leaf(LeafNode {
+                hash, key, value, ..
+            }) => {
+                if !in_subtree.is_empty() || hashes.contains(&hash) {
+                    nodes.insert(hash, DeltaReaderNode::Leaf { key, value });
                 }
 
-                node_hash_to_index.insert(node.hash, index);
-                index_to_hash.insert(index, node.hash);
+                node_hash_to_index.insert(hash, index);
+                index_to_hash.insert(index, hash);
             }
         }
     }
@@ -932,23 +930,11 @@ impl DeltaReader {
     pub fn new(internal_nodes: InternalNodesMap, leaf_nodes: LeafNodesMap) -> Result<Self, Error> {
         let mut nodes: NodeHashToDeltaReaderNode = HashMap::new();
 
-        for (hash, internal) in internal_nodes {
-            nodes.insert(
-                hash,
-                DeltaReaderNode::Internal {
-                    left: internal.0,
-                    right: internal.1,
-                },
-            );
+        for (hash, (left, right)) in internal_nodes {
+            nodes.insert(hash, DeltaReaderNode::Internal { left, right });
         }
-        for (hash, leaf) in leaf_nodes {
-            nodes.insert(
-                hash,
-                DeltaReaderNode::Leaf {
-                    key: leaf.0,
-                    value: leaf.1,
-                },
-            );
+        for (hash, (key, value)) in leaf_nodes {
+            nodes.insert(hash, DeltaReaderNode::Leaf { key, value });
         }
 
         let instance = Self { nodes };
