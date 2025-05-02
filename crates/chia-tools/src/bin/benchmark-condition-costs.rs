@@ -1,18 +1,19 @@
-use std::sync::Arc;
-
 use chia_bls::{sign_raw, SecretKey, Signature};
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
-use chia_consensus::gen::conditions::parse_conditions;
+// use chia_consensus::gen::conditions::parse_conditions;
 use chia_consensus::gen::conditions::{MempoolVisitor, SpendBundleConditions};
 use chia_consensus::gen::flags::COST_CONDITIONS; // DONT_VALIDATE_SIGNATURE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
 use chia_consensus::gen::opcodes;
 use chia_consensus::r#gen::conditions::{
-    validate_conditions, validate_signature, ParseState, SpendConditions,
+    process_single_spend,
+    validate_conditions,
+    validate_signature,
+    ParseState, // SpendConditions,
 };
 use chia_consensus::r#gen::opcodes::ConditionOpcode;
 use chia_consensus::r#gen::spend_visitor::SpendVisitor;
 use chia_protocol::Bytes32;
-use chia_protocol::Coin;
+// use chia_protocol::Coin;
 use clvmr::{
     allocator::{Allocator, NodePtr},
     reduction::EvalErr,
@@ -82,11 +83,17 @@ pub fn main() {
     let mut ret = SpendBundleConditions::default();
     let mut state = ParseState::default();
     let one = allocator.new_small_number(1).expect("number");
+    let hundred = allocator.new_small_number(100).expect("number");
     let sk = SecretKey::from_bytes(SECRET_KEY).expect("secret key");
     let pk = sk.public_key();
 
     // this is the list of conditions to test
     let cond_tests = [
+        ConditionTest {
+            opcode: opcodes::CREATE_COIN,
+            args: vec![allocator.new_atom(H1).expect("atom"), one],
+            aggregate_signature: Signature::default(),
+        },
         ConditionTest {
             opcode: opcodes::AGG_SIG_UNSAFE,
             args: vec![
@@ -95,35 +102,29 @@ pub fn main() {
             ],
             aggregate_signature: sign_raw(&sk, MSG1),
         },
-        ConditionTest {
-            opcode: opcodes::CREATE_COIN,
-            args: vec![allocator.new_atom(H1).expect("atom"), one],
-            aggregate_signature: Signature::default(),
-        },
     ];
 
     let parent_id = allocator.new_atom(H1).expect("atom");
     let puzzle_hash = Bytes32::from(clvm_utils::tree_hash_from_bytes(&[1_u8]).expect("tree_hash"));
     let puz_hash_node_ptr = allocator.new_atom(puzzle_hash.as_slice()).expect("bytes");
-    let coin = Coin {
-        parent_coin_info: H1.into(),
-        puzzle_hash,
-        amount: 1,
-    };
+    // let coin = Coin {
+    //     parent_coin_info: H1.into(),
+    //     puzzle_hash,
+    //     amount: 100,
+    // };
     let cp = allocator.checkpoint();
     for cond in cond_tests {
-        let mut spend = SpendConditions::new(
-            parent_id,
-            1_u64,
-            puz_hash_node_ptr,
-            Arc::new(coin.coin_id()),
-        );
-        let mut v = MempoolVisitor::new_spend(&mut spend);
+        // let mut spend = SpendConditions::new(
+        //     parent_id,
+        //     100_u64,
+        //     puz_hash_node_ptr,
+        //     Arc::new(coin.coin_id()),
+        // );
 
         // Create the conditions
         let conditions = create_conditions(&mut allocator, &cond).expect("create_conditions");
-        // a "spend" is the following list
-        let spend_list = [parent_id, puz_hash_node_ptr, one, conditions];
+        // a "spend" is the following list (parent puzhash amount conditions)
+        let spend_list = [parent_id, puz_hash_node_ptr, hundred, conditions];
         let mut spends = allocator.nil();
         for arg in spend_list.iter().rev() {
             spends = allocator.new_pair(*arg, spends).expect("new_pair");
@@ -131,18 +132,19 @@ pub fn main() {
         let mut cost = TEST_CONSTANTS.max_block_cost_clvm;
         // Parse the conditions and then make the list longer
         for _ in 0..1000 {
-            parse_conditions(
+            process_single_spend::<MempoolVisitor>(
                 &allocator,
                 &mut ret,
                 &mut state,
-                spend.clone(),
+                parent_id,
+                puz_hash_node_ptr,
+                hundred,
                 conditions,
                 flags,
                 &mut cost,
                 &TEST_CONSTANTS,
-                &mut v,
             )
-            .expect("parse_conditions");
+            .expect("process_single_spend");
 
             MempoolVisitor::post_process(&allocator, &state, &mut ret).expect("post_process");
             validate_conditions(&allocator, &ret, &state, spends, flags)
