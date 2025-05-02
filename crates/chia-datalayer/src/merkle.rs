@@ -852,6 +852,7 @@ type NodeHashToDeltaReaderNode = HashMap<Hash, DeltaReaderNode>;
 pub fn collect_and_return_from_merkle_blob(
     path: &PathBuf,
     hashes: &HashSet<Hash>,
+    known: impl Fn(&Hash) -> bool,
 ) -> Result<(NodeHashToDeltaReaderNode, NodeHashToIndex), Error> {
     let mut nodes: NodeHashToDeltaReaderNode = HashMap::new();
     let blob = zstd_decode_path(path)?;
@@ -869,13 +870,18 @@ pub fn collect_and_return_from_merkle_blob(
 
         let block = try_get_block(&blob, index)?;
 
+        let node_hash = block.node.hash();
+        index_to_hash.insert(index, node_hash);
+        if known(&node_hash) {
+            continue;
+        }
+
         match block.node {
             Node::Internal(InternalNode {
                 hash, left, right, ..
             }) => {
                 if visited {
                     node_hash_to_index.insert(hash, index);
-                    index_to_hash.insert(index, hash);
                     if !in_subtree.is_empty() {
                         nodes.insert(
                             hash,
@@ -905,7 +911,6 @@ pub fn collect_and_return_from_merkle_blob(
                 }
 
                 node_hash_to_index.insert(hash, index);
-                index_to_hash.insert(index, hash);
             }
         }
     }
@@ -981,7 +986,12 @@ impl DeltaReader {
         let mut grouped_results = Vec::new();
         grouped_results.par_extend(jobs.into_par_iter().map(
             |job| -> Result<(Hash, (NodeHashToDeltaReaderNode, NodeHashToIndex)), Error> {
-                Ok((job.0, collect_and_return_from_merkle_blob(&job.1, hashes)?))
+                Ok((
+                    job.0,
+                    collect_and_return_from_merkle_blob(&job.1, hashes, |key| {
+                        self.nodes.contains_key(key)
+                    })?,
+                ))
             },
         ));
 
