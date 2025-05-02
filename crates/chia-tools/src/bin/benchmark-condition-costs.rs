@@ -1,7 +1,7 @@
-use std::time::Instant;
-use linreg::linear_regression_of;
 use chia_bls::{sign, SecretKey, Signature};
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
+use linreg::linear_regression_of;
+use std::time::Instant;
 // use chia_consensus::gen::conditions::parse_conditions;
 use chia_consensus::gen::conditions::{MempoolVisitor, SpendBundleConditions};
 use chia_consensus::gen::flags::COST_CONDITIONS; // DONT_VALIDATE_SIGNATURE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
@@ -113,6 +113,7 @@ pub fn main() {
     //     amount: 100,
     // };
     let cp = allocator.checkpoint();
+    let mut slopes = Vec::<f64>::new();
     for cond in cond_tests {
         // let mut spend = SpendConditions::new(
         //     parent_id,
@@ -130,7 +131,6 @@ pub fn main() {
             spends = allocator.new_pair(*arg, spends).expect("new_pair");
         }
         let mut cost = TEST_CONSTANTS.max_block_cost_clvm;
-        let mut slopes = Vec::<f64>::new();
         let mut samples = Vec::<(f64, f64)>::new();
         // Parse the conditions and then make the list longer
         for i in 0..1000 {
@@ -175,6 +175,7 @@ pub fn main() {
         allocator.restore_checkpoint(&cp);
     }
 
+    println!("Slopes: {slopes:?}");
     println!("Total Cost: {total_cost}");
     println!("Total Count: {total_count}");
 }
