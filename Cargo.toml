@@ -64,6 +64,7 @@ chia-sha2 = { workspace = true, optional = true }
 clvm-traits = { workspace = true, optional = true }
 clvm-utils = { workspace = true, optional = true }
 clvmr = { workspace = true }
+linreg = "0.2.0"
 
 # This is required since clvmr is only added here to provide the openssl feature conditionally.
 # In the future we could pass the openssl feature to each of the relevant workspace crates instead.

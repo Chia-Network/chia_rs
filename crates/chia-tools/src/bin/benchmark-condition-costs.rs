@@ -1,3 +1,5 @@
+use std::time::Instant;
+use linreg::linear_regression_of;
 use chia_bls::{sign, SecretKey, Signature};
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 // use chia_consensus::gen::conditions::parse_conditions;
@@ -128,11 +130,16 @@ pub fn main() {
             spends = allocator.new_pair(*arg, spends).expect("new_pair");
         }
         let mut cost = TEST_CONSTANTS.max_block_cost_clvm;
+        let mut slopes = Vec::<f64>::new();
+        let mut samples = Vec::<(f64, f64)>::new();
         // Parse the conditions and then make the list longer
-        for _ in 0..1000 {
+        for i in 0..1000 {
+            samples = Vec::<(f64, f64)>::new();
             // need to reset state or we get a double spend
             let mut ret = SpendBundleConditions::default();
             let mut state = ParseState::default();
+
+            let start = Instant::now();
             process_single_spend::<MempoolVisitor>(
                 &allocator,
                 &mut ret,
@@ -153,6 +160,8 @@ pub fn main() {
             validate_signature(&state, &cond.aggregate_signature, flags, None)
                 .expect("validate_signature");
 
+            let elapsed = start.elapsed();
+            samples.push((i as f64, elapsed.as_nanos() as f64));
             // add costs to tally
             total_cost += ret.execution_cost;
             total_count += 1;
@@ -161,6 +170,8 @@ pub fn main() {
             cons_condition(&mut allocator, conditions).expect("cons_condition");
         }
         // reset allocator before next condition test
+        let (slope, _): (f64, f64) = linear_regression_of(&samples).expect("linreg failed");
+        slopes.push(slope);
         allocator.restore_checkpoint(&cp);
     }
 
