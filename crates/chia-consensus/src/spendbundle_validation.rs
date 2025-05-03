@@ -120,6 +120,47 @@ mod tests {
         .concat()
     }
 
+    fn mk_agg_sig(cond: u8, sk: &SecretKey, spend: &CoinSpend, msg: &[u8]) -> Signature {
+        let msg = match cond {
+            46 => [
+                msg,
+                spend.coin.puzzle_hash.as_slice(),
+                u64_to_bytes(spend.coin.amount).as_slice(),
+                TEST_CONSTANTS
+                    .agg_sig_puzzle_amount_additional_data
+                    .as_slice(),
+            ]
+            .concat(),
+            47 => [
+                msg,
+                spend.coin.parent_coin_info.as_slice(),
+                u64_to_bytes(spend.coin.amount).as_slice(),
+                TEST_CONSTANTS
+                    .agg_sig_parent_amount_additional_data
+                    .as_slice(),
+            ]
+            .concat(),
+            48 => [
+                msg,
+                spend.coin.parent_coin_info.as_slice(),
+                spend.coin.puzzle_hash.as_slice(),
+                TEST_CONSTANTS
+                    .agg_sig_parent_puzzle_additional_data
+                    .as_slice(),
+            ]
+            .concat(),
+            49 => msg.to_vec(),
+            50 => [
+                msg,
+                spend.coin.coin_id().as_slice(),
+                TEST_CONSTANTS.agg_sig_me_additional_data.as_slice(),
+            ]
+            .concat(),
+            _ => panic!("unexpected"),
+        };
+        sign(&sk, msg.as_slice())
+    }
+
     #[rstest]
     #[case(0, 0)]
     #[case(TEST_CONSTANTS.hard_fork_height, 0)]
@@ -190,44 +231,7 @@ ff01\
         let solution = mk_agg_sig_solution(cond, &pk);
 
         let spend = mk_spend(&[1_u8], &solution);
-        let msg = match cond {
-            46 => [
-                b"hello",
-                spend.coin.puzzle_hash.as_slice(),
-                u64_to_bytes(spend.coin.amount).as_slice(),
-                TEST_CONSTANTS
-                    .agg_sig_puzzle_amount_additional_data
-                    .as_slice(),
-            ]
-            .concat(),
-            47 => [
-                b"hello",
-                spend.coin.parent_coin_info.as_slice(),
-                u64_to_bytes(spend.coin.amount).as_slice(),
-                TEST_CONSTANTS
-                    .agg_sig_parent_amount_additional_data
-                    .as_slice(),
-            ]
-            .concat(),
-            48 => [
-                b"hello",
-                spend.coin.parent_coin_info.as_slice(),
-                spend.coin.puzzle_hash.as_slice(),
-                TEST_CONSTANTS
-                    .agg_sig_parent_puzzle_additional_data
-                    .as_slice(),
-            ]
-            .concat(),
-            49 => b"hello".to_vec(),
-            50 => [
-                b"hello",
-                spend.coin.coin_id().as_slice(),
-                TEST_CONSTANTS.agg_sig_me_additional_data.as_slice(),
-            ]
-            .concat(),
-            _ => panic!("unexpected"),
-        };
-        let sig = sign(&sk, msg.as_slice());
+        let sig = mk_agg_sig(cond, &sk, &spend, b"hello");
         let spend_bundle = SpendBundle {
             coin_spends: vec![spend],
             aggregated_signature: sig,
@@ -242,67 +246,32 @@ ff01\
     }
 
     #[rstest]
-    #[case("ffff2effb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080", 46, b"goodbye", "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb")] // wrong message
-    #[case("ffff2effb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080", 46, b"hello", "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efc")] // wrong key
-    #[case("ffff2fffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080", 47, b"goodbye", "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb")] // wrong message
-    #[case("ffff2fffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080", 47, b"hello", "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efc")] // wrong key
-    #[case("ffff30ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080", 48, b"goodbye", "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb")] //wrong message
-    #[case("ffff30ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080", 48, b"hello", "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efc")] // wrong key
-    #[case("ffff31ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080", 49, b"goodbye", "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb")] //wrong message
-    #[case("ffff31ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080", 49, b"hello", "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efc")] // wrong key
-    #[case("ffff32ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080", 50, b"goodbye", "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb")] // wrong message
-    #[case("ffff32ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080", 50, b"hello", "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efc")] // wrong key
     fn test_failures(
-        #[case] solution: &str,
-        #[case] condition_code: u8,
-        #[case] msg: &[u8],
-        #[case] sk_hex: &str,
+        #[values(46, 47, 48, 49, 50)] condition_code: u8,
+        #[values(0, 1)] whats_wrong: u8,
     ) {
-        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
-        let sol_bytes = hex::decode(solution).unwrap();
-        let spend = mk_spend(&[1_u8], &sol_bytes);
-        let result = match condition_code {
-            46 => [
-                msg,
-                spend.coin.puzzle_hash.as_slice(),
-                u64_to_bytes(spend.coin.amount).as_slice(),
-                TEST_CONSTANTS
-                    .agg_sig_puzzle_amount_additional_data
-                    .as_slice(),
-            ]
-            .concat(),
-            47 => [
-                msg,
-                spend.coin.parent_coin_info.as_slice(),
-                u64_to_bytes(spend.coin.amount).as_slice(),
-                TEST_CONSTANTS
-                    .agg_sig_parent_amount_additional_data
-                    .as_slice(),
-            ]
-            .concat(),
-            48 => [
-                msg,
-                spend.coin.parent_coin_info.as_slice(),
-                spend.coin.puzzle_hash.as_slice(),
-                TEST_CONSTANTS
-                    .agg_sig_parent_puzzle_additional_data
-                    .as_slice(),
-            ]
-            .concat(),
-            49 => msg.to_vec(),
-            50 => [
-                msg,
-                spend.coin.coin_id().as_slice(),
-                TEST_CONSTANTS.agg_sig_me_additional_data.as_slice(),
-            ]
-            .concat(),
-            _ => panic!("Invalid case"),
+        let (pk, sk) = keys();
+        let solution = mk_agg_sig_solution(condition_code, &pk);
+        let msg = if whats_wrong == 0 {
+            b"goodbye".as_slice()
+        } else {
+            b"hello".as_slice()
         };
-
-        let sig = sign(&sk, result.as_slice());
-        let coin_spends: Vec<CoinSpend> = vec![spend];
+        let sk = if whats_wrong == 1 {
+            SecretKey::from_bytes(
+                &<[u8; 32]>::from_hex(
+                    "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efc",
+                )
+                .unwrap(),
+            )
+            .unwrap()
+        } else {
+            sk
+        };
+        let spend = mk_spend(&[1_u8], &solution);
+        let sig = mk_agg_sig(condition_code, &sk, &spend, msg);
         let spend_bundle = SpendBundle {
-            coin_spends,
+            coin_spends: vec![spend],
             aggregated_signature: sig,
         };
         let result = validate_clvm_and_signature(
