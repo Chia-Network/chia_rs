@@ -363,56 +363,43 @@ ff01\
         let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
         let sol_bytes = hex::decode(solution).unwrap();
         let spend = mk_spend(&[1_u8], &sol_bytes);
-        let mut result = msg.to_vec();
-        match condition_code {
-            46 => {
-                result.extend(
-                    [
-                        spend.coin.puzzle_hash.as_slice(),
-                        u64_to_bytes(spend.coin.amount).as_slice(),
-                        TEST_CONSTANTS
-                            .agg_sig_puzzle_amount_additional_data
-                            .as_slice(),
-                    ]
-                    .concat(),
-                );
-            }
-            47 => {
-                result.extend(
-                    [
-                        spend.coin.parent_coin_info.as_slice(),
-                        u64_to_bytes(spend.coin.amount).as_slice(),
-                        TEST_CONSTANTS
-                            .agg_sig_parent_amount_additional_data
-                            .as_slice(),
-                    ]
-                    .concat(),
-                );
-            }
-            48 => {
-                result.extend(
-                    [
-                        spend.coin.parent_coin_info.as_slice(),
-                        spend.coin.puzzle_hash.as_slice(),
-                        TEST_CONSTANTS
-                            .agg_sig_parent_puzzle_additional_data
-                            .as_slice(),
-                    ]
-                    .concat(),
-                );
-            }
-            49 => {}
-            50 => {
-                result.extend(
-                    [
-                        spend.coin.coin_id().as_slice(),
-                        TEST_CONSTANTS.agg_sig_me_additional_data.as_slice(),
-                    ]
-                    .concat(),
-                );
-            }
+        let result = match condition_code {
+            46 => [
+                msg,
+                spend.coin.puzzle_hash.as_slice(),
+                u64_to_bytes(spend.coin.amount).as_slice(),
+                TEST_CONSTANTS
+                    .agg_sig_puzzle_amount_additional_data
+                    .as_slice(),
+            ]
+            .concat(),
+            47 => [
+                msg,
+                spend.coin.parent_coin_info.as_slice(),
+                u64_to_bytes(spend.coin.amount).as_slice(),
+                TEST_CONSTANTS
+                    .agg_sig_parent_amount_additional_data
+                    .as_slice(),
+            ]
+            .concat(),
+            48 => [
+                msg,
+                spend.coin.parent_coin_info.as_slice(),
+                spend.coin.puzzle_hash.as_slice(),
+                TEST_CONSTANTS
+                    .agg_sig_parent_puzzle_additional_data
+                    .as_slice(),
+            ]
+            .concat(),
+            49 => msg.to_vec(),
+            50 => [
+                msg,
+                spend.coin.coin_id().as_slice(),
+                TEST_CONSTANTS.agg_sig_me_additional_data.as_slice(),
+            ]
+            .concat(),
             _ => panic!("Invalid case"),
-        }
+        };
 
         let sig = sign(&sk, result.as_slice());
         let coin_spends: Vec<CoinSpend> = vec![spend];
