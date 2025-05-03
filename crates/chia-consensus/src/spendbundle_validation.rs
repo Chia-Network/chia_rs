@@ -85,13 +85,40 @@ mod tests {
     use super::*;
     use crate::consensus_constants::TEST_CONSTANTS;
     use crate::gen::make_aggsig_final_message::u64_to_bytes;
-    use chia_bls::{sign, G2Element, SecretKey, Signature};
-    use chia_protocol::{Bytes, Bytes32};
+    use chia_bls::{sign, G2Element, PublicKey, SecretKey, Signature};
     use chia_protocol::{Coin, CoinSpend, Program};
     use clvm_utils::tree_hash_atom;
     use hex::FromHex;
     use hex_literal::hex;
     use rstest::rstest;
+
+    fn mk_spend(puzzle: &[u8], solution: &[u8]) -> CoinSpend {
+        let ph = tree_hash_atom(puzzle).to_bytes();
+        let test_coin = Coin::new(
+            hex!("4444444444444444444444444444444444444444444444444444444444444444").into(),
+            ph.into(),
+            1_000_000_000,
+        );
+        CoinSpend::new(test_coin, Program::new(puzzle.into()), solution.into())
+    }
+
+    fn keys() -> (PublicKey, SecretKey) {
+        let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
+        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+        (sk.public_key(), sk)
+    }
+
+    fn mk_agg_sig_solution(cond: u8, pk: &PublicKey) -> Vec<u8> {
+        // ((<cond> <pk> "hello"))
+        [
+            hex!("ffff").as_slice(),
+            &cond.to_be_bytes(),
+            hex!("ffb0").as_slice(),
+            pk.to_bytes().as_slice(),
+            hex!("ff8568656c6c6f8080").as_slice(),
+        ]
+        .concat()
+    }
 
     #[rstest]
     #[case(0, 0)]
@@ -106,28 +133,17 @@ mod tests {
 
     #[test]
     fn test_validate_no_pks() {
-        let full_puz = Bytes32::new(tree_hash_atom(&[1_u8]).to_bytes());
-        let test_coin = Coin::new(
-            hex!("4444444444444444444444444444444444444444444444444444444444444444").into(),
-            full_puz,
-            1,
-        );
-
-        let solution = Bytes::new(
-            hex!(
-                "ff\
+        let solution = hex!(
+            "ff\
 ff33\
 ffa02222222222222222222222222222222222222222222222222222222222222222\
 ff01\
 80\
 80"
-            )
-            .to_vec(),
         );
-        let spend = CoinSpend::new(test_coin, Program::new(vec![1_u8].into()), solution.into());
-        let coin_spends: Vec<CoinSpend> = vec![spend];
+        let spend = mk_spend(&[1_u8], &solution);
         let spend_bundle = SpendBundle {
-            coin_spends,
+            coin_spends: vec![spend],
             aggregated_signature: Signature::default(),
         };
         validate_clvm_and_signature(
@@ -141,20 +157,12 @@ ff01\
 
     #[test]
     fn test_validate_unsafe() {
-        let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
-        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+        let (pk, sk) = keys();
 
-        let full_puz = Bytes32::new(tree_hash_atom(&[1_u8]).to_bytes());
-        let test_coin = Coin::new(
-            hex!("4444444444444444444444444444444444444444444444444444444444444444").into(),
-            full_puz,
-            1,
-        );
+        // ((49 <pk> "hello"))
+        let solution = mk_agg_sig_solution(49, &pk);
 
-        let solution = hex!("ffff31ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080").to_vec();
-        // ((49 0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2 "hello"))
-
-        let spend = CoinSpend::new(test_coin, Program::new(vec![1_u8].into()), solution.into());
+        let spend = mk_spend(&[1_u8], &solution);
         let msg = b"hello";
         let sig = sign(&sk, msg);
         let coin_spends: Vec<CoinSpend> = vec![spend];
@@ -174,23 +182,16 @@ ff01\
     #[test]
     fn test_go_over_cost() {
         use std::fs::read_to_string;
-        let test_coin = Coin::new(
-            hex!("9dcf97a184f32623d11a73124ceb99a5709b083721e878a16d78f596718ba7b2").into(),
-            hex!("9dcf97a184f32623d11a73124ceb99a5709b083721e878a16d78f596718ba7b2").into(),
-            1_000_000_000,
-        );
         let my_str =
             read_to_string("../../generator-tests/large_spendbundle_validation_test.clsp.hex")
                 .expect("test file not found");
         let solution = hex::decode(my_str).expect("parsing hex");
         // this solution makes 2400 CREATE_COIN conditions
 
-        let spend = CoinSpend::new(test_coin, Program::new(vec![1_u8].into()), solution.into());
-
-        let coin_spends: Vec<CoinSpend> = vec![spend.clone()];
+        let spend = mk_spend(&[1_u8], &solution);
 
         let spend_bundle = SpendBundle {
-            coin_spends,
+            coin_spends: vec![spend],
             aggregated_signature: G2Element::default(),
         };
         let expected_cost = 5_527_116_044;
@@ -207,25 +208,17 @@ ff01\
 
     #[test]
     fn test_validate_aggsig_me() {
-        let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
-        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+        let (pk, sk) = keys();
 
-        let full_puz = Bytes32::new(tree_hash_atom(&[1_u8]).to_bytes());
-        let test_coin = Coin::new(
-            hex!("4444444444444444444444444444444444444444444444444444444444444444").into(),
-            full_puz,
-            1,
-        );
+        // ((50 <pk> "hello"))
+        let solution = mk_agg_sig_solution(50, &pk);
 
-        let solution = hex!("ffff32ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080").to_vec();
-        // ((50 0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2 "hello"))
-
-        let spend = CoinSpend::new(test_coin, Program::new(vec![1_u8].into()), solution.into());
+        let spend = mk_spend(&[1_u8], &solution);
         let msg = b"hello";
         let mut result = msg.to_vec();
         result.extend(
             [
-                test_coin.coin_id().as_slice(),
+                spend.coin.coin_id().as_slice(),
                 TEST_CONSTANTS.agg_sig_me_additional_data.as_slice(),
             ]
             .concat(),
@@ -247,31 +240,18 @@ ff01\
 
     #[test]
     fn test_validate_aggsig_parent_puzzle() {
-        let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
-        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
-        //let pk: PublicKey = sk.public_key(); //0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2
+        let (pk, sk) = keys();
 
-        let full_puz = Bytes32::new(tree_hash_atom(&[1_u8]).to_bytes());
-        let test_coin = Coin::new(
-            hex!("4444444444444444444444444444444444444444444444444444444444444444").into(),
-            full_puz,
-            1,
-        );
+        // ((48 <pk> "hello"))
+        let solution = mk_agg_sig_solution(48, &pk);
 
-        let solution = hex!("ffff30ffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080").to_vec();
-        // ((48 0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2 "hello"))
-
-        let spend = CoinSpend::new(
-            test_coin,
-            Program::new(vec![1_u8].into()),
-            Program::new(solution.into()),
-        );
+        let spend = mk_spend(&[1_u8], &solution);
         let msg = b"hello";
         let mut result = msg.to_vec();
         result.extend(
             [
-                test_coin.parent_coin_info.as_slice(),
-                test_coin.puzzle_hash.as_slice(),
+                spend.coin.parent_coin_info.as_slice(),
+                spend.coin.puzzle_hash.as_slice(),
                 TEST_CONSTANTS
                     .agg_sig_parent_puzzle_additional_data
                     .as_slice(),
@@ -295,26 +275,18 @@ ff01\
 
     #[test]
     fn test_validate_aggsig_parent_amount() {
-        let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
-        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+        let (pk, sk) = keys();
 
-        let full_puz = Bytes32::new(tree_hash_atom(&[1_u8]).to_bytes());
-        let test_coin = Coin::new(
-            hex!("4444444444444444444444444444444444444444444444444444444444444444").into(),
-            full_puz,
-            1,
-        );
+        // ((47 <pk> "hello"))
+        let solution = mk_agg_sig_solution(47, &pk);
 
-        let solution = hex!("ffff2fffb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080").to_vec();
-        // ((47 0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2 "hello"))
-
-        let spend = CoinSpend::new(test_coin, Program::new(vec![1_u8].into()), solution.into());
+        let spend = mk_spend(&[1_u8], &solution);
         let msg = b"hello";
         let mut result = msg.to_vec();
         result.extend(
             [
-                test_coin.parent_coin_info.as_slice(),
-                u64_to_bytes(test_coin.amount).as_slice(),
+                spend.coin.parent_coin_info.as_slice(),
+                u64_to_bytes(spend.coin.amount).as_slice(),
                 TEST_CONSTANTS
                     .agg_sig_parent_amount_additional_data
                     .as_slice(),
@@ -338,26 +310,18 @@ ff01\
 
     #[test]
     fn test_validate_aggsig_puzzle_amount() {
-        let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
-        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+        let (pk, sk) = keys();
 
-        let full_puz = Bytes32::new(tree_hash_atom(&[1_u8]).to_bytes());
-        let test_coin = Coin::new(
-            hex!("4444444444444444444444444444444444444444444444444444444444444444").into(),
-            full_puz,
-            1,
-        );
+        // ((46 <pk> "hello"))
+        let solution = mk_agg_sig_solution(46, &pk);
 
-        let solution = hex!("ffff2effb0997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2ff8568656c6c6f8080").to_vec();
-        // ((46 0x997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2 "hello"))
-
-        let spend = CoinSpend::new(test_coin, Program::new(vec![1_u8].into()), solution.into());
+        let spend = mk_spend(&[1_u8], &solution);
         let msg = b"hello";
         let mut result = msg.to_vec();
         result.extend(
             [
-                test_coin.puzzle_hash.as_slice(),
-                u64_to_bytes(test_coin.amount).as_slice(),
+                spend.coin.puzzle_hash.as_slice(),
+                u64_to_bytes(spend.coin.amount).as_slice(),
                 TEST_CONSTANTS
                     .agg_sig_puzzle_amount_additional_data
                     .as_slice(),
@@ -398,20 +362,14 @@ ff01\
     ) {
         let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
         let sol_bytes = hex::decode(solution).unwrap();
-        let full_puz = Bytes32::new(tree_hash_atom(&[1_u8]).to_bytes());
-        let test_coin = Coin::new(
-            hex!("4444444444444444444444444444444444444444444444444444444444444444").into(),
-            full_puz,
-            1,
-        );
-        let spend = CoinSpend::new(test_coin, Program::new(vec![1_u8].into()), sol_bytes.into());
+        let spend = mk_spend(&[1_u8], &sol_bytes);
         let mut result = msg.to_vec();
         match condition_code {
             46 => {
                 result.extend(
                     [
-                        test_coin.puzzle_hash.as_slice(),
-                        u64_to_bytes(test_coin.amount).as_slice(),
+                        spend.coin.puzzle_hash.as_slice(),
+                        u64_to_bytes(spend.coin.amount).as_slice(),
                         TEST_CONSTANTS
                             .agg_sig_puzzle_amount_additional_data
                             .as_slice(),
@@ -422,8 +380,8 @@ ff01\
             47 => {
                 result.extend(
                     [
-                        test_coin.parent_coin_info.as_slice(),
-                        u64_to_bytes(test_coin.amount).as_slice(),
+                        spend.coin.parent_coin_info.as_slice(),
+                        u64_to_bytes(spend.coin.amount).as_slice(),
                         TEST_CONSTANTS
                             .agg_sig_parent_amount_additional_data
                             .as_slice(),
@@ -434,8 +392,8 @@ ff01\
             48 => {
                 result.extend(
                     [
-                        test_coin.parent_coin_info.as_slice(),
-                        test_coin.puzzle_hash.as_slice(),
+                        spend.coin.parent_coin_info.as_slice(),
+                        spend.coin.puzzle_hash.as_slice(),
                         TEST_CONSTANTS
                             .agg_sig_parent_puzzle_additional_data
                             .as_slice(),
@@ -447,7 +405,7 @@ ff01\
             50 => {
                 result.extend(
                     [
-                        test_coin.coin_id().as_slice(),
+                        spend.coin.coin_id().as_slice(),
                         TEST_CONSTANTS.agg_sig_me_additional_data.as_slice(),
                     ]
                     .concat(),
