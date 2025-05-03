@@ -200,6 +200,42 @@ mod tests {
     }
 
     #[test]
+    fn test_invalid_puzzle_hash() {
+        let solution = hex!(
+            "ff\
+ff33\
+ffa02222222222222222222222222222222222222222222222222222222222222222\
+ff01\
+80\
+80"
+        );
+        let test_coin = Coin::new(
+            hex!("4444444444444444444444444444444444444444444444444444444444444444").into(),
+            hex!("4444444444444444444444444444444444444444444444444444444444444444").into(),
+            1_000_000_000,
+        );
+        let spend = CoinSpend::new(
+            test_coin,
+            Program::new([1_u8].as_slice().into()),
+            solution.as_slice().into(),
+        );
+        let spend_bundle = SpendBundle {
+            coin_spends: vec![spend],
+            aggregated_signature: Signature::default(),
+        };
+        assert_eq!(
+            validate_clvm_and_signature(
+                &spend_bundle,
+                TEST_CONSTANTS.max_block_cost_clvm,
+                &TEST_CONSTANTS,
+                236,
+            )
+            .err(),
+            Some(ErrorCode::WrongPuzzleHash)
+        );
+    }
+
+    #[test]
     fn test_validate_no_pks() {
         let solution = hex!(
             "ff\
