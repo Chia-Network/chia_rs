@@ -156,30 +156,6 @@ ff01\
     }
 
     #[test]
-    fn test_validate_unsafe() {
-        let (pk, sk) = keys();
-
-        // ((49 <pk> "hello"))
-        let solution = mk_agg_sig_solution(49, &pk);
-
-        let spend = mk_spend(&[1_u8], &solution);
-        let msg = b"hello";
-        let sig = sign(&sk, msg);
-        let coin_spends: Vec<CoinSpend> = vec![spend];
-        let spend_bundle = SpendBundle {
-            coin_spends,
-            aggregated_signature: sig,
-        };
-        validate_clvm_and_signature(
-            &spend_bundle,
-            TEST_CONSTANTS.max_block_cost_clvm,
-            &TEST_CONSTANTS,
-            236,
-        )
-        .expect("SpendBundle should be valid for this test");
-    }
-
-    #[test]
     fn test_go_over_cost() {
         use std::fs::read_to_string;
         let my_str =
@@ -206,120 +182,17 @@ ff01\
         assert!(matches!(result, Err(ErrorCode::CostExceeded)));
     }
 
-    #[test]
-    fn test_validate_aggsig_me() {
+    #[rstest]
+    fn test_validate_agg_sig(#[values(46, 47, 48, 49, 50)] cond: u8) {
         let (pk, sk) = keys();
 
-        // ((50 <pk> "hello"))
-        let solution = mk_agg_sig_solution(50, &pk);
+        // ((<cond> <pk> "hello"))
+        let solution = mk_agg_sig_solution(cond, &pk);
 
         let spend = mk_spend(&[1_u8], &solution);
-        let msg = b"hello";
-        let mut result = msg.to_vec();
-        result.extend(
-            [
-                spend.coin.coin_id().as_slice(),
-                TEST_CONSTANTS.agg_sig_me_additional_data.as_slice(),
-            ]
-            .concat(),
-        );
-        let sig = sign(&sk, result.as_slice());
-        let coin_spends: Vec<CoinSpend> = vec![spend];
-        let spend_bundle = SpendBundle {
-            coin_spends,
-            aggregated_signature: sig,
-        };
-        validate_clvm_and_signature(
-            &spend_bundle,
-            TEST_CONSTANTS.max_block_cost_clvm,
-            &TEST_CONSTANTS,
-            1,
-        )
-        .expect("SpendBundle should be valid for this test");
-    }
-
-    #[test]
-    fn test_validate_aggsig_parent_puzzle() {
-        let (pk, sk) = keys();
-
-        // ((48 <pk> "hello"))
-        let solution = mk_agg_sig_solution(48, &pk);
-
-        let spend = mk_spend(&[1_u8], &solution);
-        let msg = b"hello";
-        let mut result = msg.to_vec();
-        result.extend(
-            [
-                spend.coin.parent_coin_info.as_slice(),
-                spend.coin.puzzle_hash.as_slice(),
-                TEST_CONSTANTS
-                    .agg_sig_parent_puzzle_additional_data
-                    .as_slice(),
-            ]
-            .concat(),
-        );
-        let sig = sign(&sk, result.as_slice());
-        let coin_spends: Vec<CoinSpend> = vec![spend];
-        let spend_bundle = SpendBundle {
-            coin_spends,
-            aggregated_signature: sig,
-        };
-        validate_clvm_and_signature(
-            &spend_bundle,
-            TEST_CONSTANTS.max_block_cost_clvm,
-            &TEST_CONSTANTS,
-            TEST_CONSTANTS.hard_fork_height + 1,
-        )
-        .expect("SpendBundle should be valid for this test");
-    }
-
-    #[test]
-    fn test_validate_aggsig_parent_amount() {
-        let (pk, sk) = keys();
-
-        // ((47 <pk> "hello"))
-        let solution = mk_agg_sig_solution(47, &pk);
-
-        let spend = mk_spend(&[1_u8], &solution);
-        let msg = b"hello";
-        let mut result = msg.to_vec();
-        result.extend(
-            [
-                spend.coin.parent_coin_info.as_slice(),
-                u64_to_bytes(spend.coin.amount).as_slice(),
-                TEST_CONSTANTS
-                    .agg_sig_parent_amount_additional_data
-                    .as_slice(),
-            ]
-            .concat(),
-        );
-        let sig = sign(&sk, result.as_slice());
-        let coin_spends: Vec<CoinSpend> = vec![spend];
-        let spend_bundle = SpendBundle {
-            coin_spends,
-            aggregated_signature: sig,
-        };
-        validate_clvm_and_signature(
-            &spend_bundle,
-            TEST_CONSTANTS.max_block_cost_clvm,
-            &TEST_CONSTANTS,
-            TEST_CONSTANTS.hard_fork_height + 1,
-        )
-        .expect("SpendBundle should be valid for this test");
-    }
-
-    #[test]
-    fn test_validate_aggsig_puzzle_amount() {
-        let (pk, sk) = keys();
-
-        // ((46 <pk> "hello"))
-        let solution = mk_agg_sig_solution(46, &pk);
-
-        let spend = mk_spend(&[1_u8], &solution);
-        let msg = b"hello";
-        let mut result = msg.to_vec();
-        result.extend(
-            [
+        let msg = match cond {
+            46 => [
+                b"hello",
                 spend.coin.puzzle_hash.as_slice(),
                 u64_to_bytes(spend.coin.amount).as_slice(),
                 TEST_CONSTANTS
@@ -327,18 +200,43 @@ ff01\
                     .as_slice(),
             ]
             .concat(),
-        );
-        let sig = sign(&sk, result.as_slice());
-        let coin_spends: Vec<CoinSpend> = vec![spend];
+            47 => [
+                b"hello",
+                spend.coin.parent_coin_info.as_slice(),
+                u64_to_bytes(spend.coin.amount).as_slice(),
+                TEST_CONSTANTS
+                    .agg_sig_parent_amount_additional_data
+                    .as_slice(),
+            ]
+            .concat(),
+            48 => [
+                b"hello",
+                spend.coin.parent_coin_info.as_slice(),
+                spend.coin.puzzle_hash.as_slice(),
+                TEST_CONSTANTS
+                    .agg_sig_parent_puzzle_additional_data
+                    .as_slice(),
+            ]
+            .concat(),
+            49 => b"hello".to_vec(),
+            50 => [
+                b"hello",
+                spend.coin.coin_id().as_slice(),
+                TEST_CONSTANTS.agg_sig_me_additional_data.as_slice(),
+            ]
+            .concat(),
+            _ => panic!("unexpected"),
+        };
+        let sig = sign(&sk, msg.as_slice());
         let spend_bundle = SpendBundle {
-            coin_spends,
+            coin_spends: vec![spend],
             aggregated_signature: sig,
         };
         validate_clvm_and_signature(
             &spend_bundle,
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
-            TEST_CONSTANTS.hard_fork_height + 1,
+            236,
         )
         .expect("SpendBundle should be valid for this test");
     }
