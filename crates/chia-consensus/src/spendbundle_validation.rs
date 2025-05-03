@@ -85,6 +85,10 @@ mod tests {
     use super::*;
     use crate::consensus_constants::TEST_CONSTANTS;
     use crate::gen::make_aggsig_final_message::u64_to_bytes;
+    use crate::gen::opcodes::{
+        ConditionOpcode, AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT,
+        AGG_SIG_PARENT_PUZZLE, AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT, AGG_SIG_UNSAFE,
+    };
     use chia_bls::{sign, G2Element, PublicKey, SecretKey, Signature};
     use chia_protocol::{Coin, CoinSpend, Program};
     use clvm_utils::tree_hash_atom;
@@ -108,11 +112,11 @@ mod tests {
         (sk.public_key(), sk)
     }
 
-    fn mk_agg_sig_solution(cond: u8, pk: &PublicKey) -> Vec<u8> {
+    fn mk_agg_sig_solution(cond: ConditionOpcode, pk: &PublicKey) -> Vec<u8> {
         // ((<cond> <pk> "hello"))
         [
             hex!("ffff").as_slice(),
-            &cond.to_be_bytes(),
+            &(cond as u8).to_be_bytes(),
             hex!("ffb0").as_slice(),
             pk.to_bytes().as_slice(),
             hex!("ff8568656c6c6f8080").as_slice(),
@@ -120,9 +124,32 @@ mod tests {
         .concat()
     }
 
-    fn mk_agg_sig(cond: u8, sk: &SecretKey, spend: &CoinSpend, msg: &[u8]) -> Signature {
+    fn mk_agg_sig(
+        cond: ConditionOpcode,
+        sk: &SecretKey,
+        spend: &CoinSpend,
+        msg: &[u8],
+    ) -> Signature {
         let msg = match cond {
-            46 => [
+            AGG_SIG_AMOUNT => [
+                msg,
+                u64_to_bytes(spend.coin.amount).as_slice(),
+                TEST_CONSTANTS.agg_sig_amount_additional_data.as_slice(),
+            ]
+            .concat(),
+            AGG_SIG_PARENT => [
+                msg,
+                spend.coin.parent_coin_info.as_slice(),
+                TEST_CONSTANTS.agg_sig_parent_additional_data.as_slice(),
+            ]
+            .concat(),
+            AGG_SIG_PUZZLE => [
+                msg,
+                spend.coin.puzzle_hash.as_slice(),
+                TEST_CONSTANTS.agg_sig_puzzle_additional_data.as_slice(),
+            ]
+            .concat(),
+            AGG_SIG_PUZZLE_AMOUNT => [
                 msg,
                 spend.coin.puzzle_hash.as_slice(),
                 u64_to_bytes(spend.coin.amount).as_slice(),
@@ -131,7 +158,7 @@ mod tests {
                     .as_slice(),
             ]
             .concat(),
-            47 => [
+            AGG_SIG_PARENT_AMOUNT => [
                 msg,
                 spend.coin.parent_coin_info.as_slice(),
                 u64_to_bytes(spend.coin.amount).as_slice(),
@@ -140,7 +167,7 @@ mod tests {
                     .as_slice(),
             ]
             .concat(),
-            48 => [
+            AGG_SIG_PARENT_PUZZLE => [
                 msg,
                 spend.coin.parent_coin_info.as_slice(),
                 spend.coin.puzzle_hash.as_slice(),
@@ -149,8 +176,8 @@ mod tests {
                     .as_slice(),
             ]
             .concat(),
-            49 => msg.to_vec(),
-            50 => [
+            AGG_SIG_UNSAFE => msg.to_vec(),
+            AGG_SIG_ME => [
                 msg,
                 spend.coin.coin_id().as_slice(),
                 TEST_CONSTANTS.agg_sig_me_additional_data.as_slice(),
@@ -158,7 +185,7 @@ mod tests {
             .concat(),
             _ => panic!("unexpected"),
         };
-        sign(&sk, msg.as_slice())
+        sign(sk, msg.as_slice())
     }
 
     #[rstest]
@@ -224,7 +251,19 @@ ff01\
     }
 
     #[rstest]
-    fn test_validate_agg_sig(#[values(46, 47, 48, 49, 50)] cond: u8) {
+    fn test_validate_agg_sig(
+        #[values(
+            AGG_SIG_AMOUNT,
+            AGG_SIG_PARENT,
+            AGG_SIG_PUZZLE,
+            AGG_SIG_PUZZLE_AMOUNT,
+            AGG_SIG_PARENT_AMOUNT,
+            AGG_SIG_PARENT_PUZZLE,
+            AGG_SIG_UNSAFE,
+            AGG_SIG_ME
+        )]
+        cond: ConditionOpcode,
+    ) {
         let (pk, sk) = keys();
 
         // ((<cond> <pk> "hello"))
@@ -247,7 +286,17 @@ ff01\
 
     #[rstest]
     fn test_failures(
-        #[values(46, 47, 48, 49, 50)] condition_code: u8,
+        #[values(
+            AGG_SIG_AMOUNT,
+            AGG_SIG_PARENT,
+            AGG_SIG_PUZZLE,
+            AGG_SIG_PUZZLE_AMOUNT,
+            AGG_SIG_PARENT_AMOUNT,
+            AGG_SIG_PARENT_PUZZLE,
+            AGG_SIG_UNSAFE,
+            AGG_SIG_ME
+        )]
+        condition_code: ConditionOpcode,
         #[values(0, 1)] whats_wrong: u8,
     ) {
         let (pk, sk) = keys();
