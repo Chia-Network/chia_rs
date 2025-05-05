@@ -986,9 +986,10 @@ impl DeltaReader {
         let mut grouped_results = Vec::new();
         grouped_results.par_extend(jobs.into_par_iter().map(
             |job| -> Result<(Hash, (NodeHashToDeltaReaderNode, NodeHashToIndex)), Error> {
+                let (hash, path) = job;
                 Ok((
-                    job.0,
-                    collect_and_return_from_merkle_blob(&job.1, hashes, |key| {
+                    *hash,
+                    collect_and_return_from_merkle_blob(path, hashes, |key| {
                         self.nodes.contains_key(key)
                     })?,
                 ))
@@ -1020,8 +1021,9 @@ impl DeltaReader {
 
         results.par_extend(jobs.into_par_iter().map(
             |job| -> Result<HashMap<Hash, (TreeIndex, DeltaReaderNode)>, Error> {
-                let vector = zstd_decode_path(&job.0)?;
-                get_internal_terminal(&vector, &job.1)
+                let (path, indexes) = job;
+                let vector = zstd_decode_path(path)?;
+                get_internal_terminal(&vector, indexes)
             },
         ));
 
@@ -1105,8 +1107,8 @@ impl DeltaReader {
         jobs: Vec<(PyObject, Vec<TreeIndex>)>,
     ) -> PyResult<()> {
         let mut pathed_jobs: Vec<(PathBuf, Vec<TreeIndex>)> = Vec::new();
-        for job in jobs {
-            pathed_jobs.push((job.0.extract(py)?, job.1));
+        for (path, indexes) in jobs {
+            pathed_jobs.push((path.extract(py)?, indexes));
         }
         py.allow_threads(|| self.collect_from_merkle_blobs(&pathed_jobs))?;
 
