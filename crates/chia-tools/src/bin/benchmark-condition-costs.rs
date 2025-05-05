@@ -15,7 +15,7 @@ use chia_consensus::r#gen::conditions::{
 use chia_consensus::r#gen::opcodes::ConditionOpcode;
 use chia_consensus::r#gen::spend_visitor::SpendVisitor;
 use chia_protocol::Bytes32;
-// use chia_protocol::Coin;
+use chia_protocol::Coin;
 use clvmr::{
     allocator::{Allocator, NodePtr},
     reduction::EvalErr,
@@ -86,6 +86,14 @@ pub fn main() {
     let hundred = allocator.new_small_number(100).expect("number");
     let sk = SecretKey::from_bytes(SECRET_KEY).expect("secret key");
     let pk = sk.public_key();
+    let parent_id = allocator.new_atom(H1).expect("atom");
+    let puzzle_hash = Bytes32::from(clvm_utils::tree_hash_from_bytes(&[1_u8]).expect("tree_hash"));
+    let puz_hash_node_ptr = allocator.new_atom(puzzle_hash.as_slice()).expect("bytes");
+    let coin = Coin {
+        parent_coin_info: H1.into(),
+        puzzle_hash,
+        amount: 100,
+    };
 
     // this is the list of conditions to test
     let cond_tests = [
@@ -102,16 +110,28 @@ pub fn main() {
             ],
             aggregate_signature: sign(&sk, MSG1),
         },
+        ConditionTest {
+            opcode: opcodes::RESERVE_FEE,
+            args: vec![hundred],
+            aggregate_signature: Signature::default(),
+        },
+        ConditionTest {
+            opcode: opcodes::CREATE_COIN_ANNOUNCEMENT,
+            args: vec![allocator.new_atom(H1).expect("atom")],
+            aggregate_signature: Signature::default(),
+        },
+        ConditionTest {
+            opcode: opcodes::CREATE_PUZZLE_ANNOUNCEMENT,
+            args: vec![allocator.new_atom(H1).expect("atom")],
+            aggregate_signature: Signature::default(),
+        },
+        ConditionTest {
+            opcode: opcodes::ASSERT_MY_COIN_ID,
+            args: vec![allocator.new_atom(coin.coin_id().as_slice()).expect("atom")],
+            aggregate_signature: Signature::default(),
+        },
     ];
-
-    let parent_id = allocator.new_atom(H1).expect("atom");
-    let puzzle_hash = Bytes32::from(clvm_utils::tree_hash_from_bytes(&[1_u8]).expect("tree_hash"));
-    let puz_hash_node_ptr = allocator.new_atom(puzzle_hash.as_slice()).expect("bytes");
-    // let coin = Coin {
-    //     parent_coin_info: H1.into(),
-    //     puzzle_hash,
-    //     amount: 100,
-    // };
+    
     let cp = allocator.checkpoint();
     let mut slopes = Vec::<f64>::new();
     for cond in cond_tests {
