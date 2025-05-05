@@ -134,7 +134,6 @@ pub fn main() {
         let mut samples = Vec::<(f64, f64)>::new();
         // Parse the conditions and then make the list longer
         for i in 0..1000 {
-            samples = Vec::<(f64, f64)>::new();
             // need to reset state or we get a double spend
             let mut ret = SpendBundleConditions::default();
             let mut state = ParseState::default();
