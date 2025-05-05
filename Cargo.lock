@@ -560,6 +560,7 @@ dependencies = [
  "clvmr",
  "hex",
  "hex-literal",
+ "linreg",
  "rusqlite",
  "zstd",
 ]

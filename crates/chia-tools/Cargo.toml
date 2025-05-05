@@ -27,6 +27,7 @@ zstd = { workspace = true }
 blocking-threadpool = { workspace = true }
 hex = { workspace = true }
 hex-literal = { workspace = true }
+linreg = "0.2.0"
 
 [lib]
 name = "chia_tools"
