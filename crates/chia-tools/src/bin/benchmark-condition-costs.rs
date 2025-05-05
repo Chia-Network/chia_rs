@@ -131,7 +131,7 @@ pub fn main() {
             aggregate_signature: Signature::default(),
         },
     ];
-    
+
     let cp = allocator.checkpoint();
     let mut slopes = Vec::<f64>::new();
     for cond in cond_tests {
