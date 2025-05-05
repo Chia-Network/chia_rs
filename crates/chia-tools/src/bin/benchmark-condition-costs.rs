@@ -94,12 +94,13 @@ pub fn main() {
         puzzle_hash,
         amount: 100,
     };
+    let h1_pointer = allocator.new_atom(H1).expect("atom");
 
     // this is the list of conditions to test
     let cond_tests = [
         ConditionTest {
             opcode: opcodes::CREATE_COIN,
-            args: vec![allocator.new_atom(H1).expect("atom"), one],
+            args: vec![h1_pointer, one],
             aggregate_signature: Signature::default(),
         },
         ConditionTest {
@@ -117,17 +118,87 @@ pub fn main() {
         },
         ConditionTest {
             opcode: opcodes::CREATE_COIN_ANNOUNCEMENT,
-            args: vec![allocator.new_atom(H1).expect("atom")],
+            args: vec![h1_pointer],
             aggregate_signature: Signature::default(),
         },
         ConditionTest {
             opcode: opcodes::CREATE_PUZZLE_ANNOUNCEMENT,
-            args: vec![allocator.new_atom(H1).expect("atom")],
+            args: vec![h1_pointer],
             aggregate_signature: Signature::default(),
         },
         ConditionTest {
             opcode: opcodes::ASSERT_MY_COIN_ID,
             args: vec![allocator.new_atom(coin.coin_id().as_slice()).expect("atom")],
+            aggregate_signature: Signature::default(),
+        },
+        ConditionTest {
+            opcode: opcodes::ASSERT_MY_PARENT_ID,
+            args: vec![h1_pointer],
+            aggregate_signature: Signature::default(),
+        },
+        ConditionTest {
+            opcode: opcodes::ASSERT_MY_PUZZLEHASH,
+            args: vec![puz_hash_node_ptr],
+            aggregate_signature: Signature::default(),
+        },
+        ConditionTest {
+            opcode: opcodes::ASSERT_MY_AMOUNT,
+            args: vec![hundred],
+            aggregate_signature: Signature::default(),
+        },
+        ConditionTest {
+            opcode: opcodes::ASSERT_MY_BIRTH_HEIGHT,
+            args: vec![hundred],
+            aggregate_signature: Signature::default(),
+        },
+        ConditionTest {
+            opcode: opcodes::ASSERT_MY_BIRTH_SECONDS,
+            args: vec![hundred],
+            aggregate_signature: Signature::default(),
+        },
+        // ConditionTest {
+        //     opcode: opcodes::ASSERT_EPHEMERAL,
+        //     args: vec![],
+        //     aggregate_signature: Signature::default(),
+        // },
+        ConditionTest {
+            opcode: opcodes::ASSERT_SECONDS_RELATIVE,
+            args: vec![one],
+            aggregate_signature: Signature::default(),
+        },
+        ConditionTest {
+            opcode: opcodes::ASSERT_SECONDS_ABSOLUTE,
+            args: vec![one],
+            aggregate_signature: Signature::default(),
+        },
+        ConditionTest {
+            opcode: opcodes::ASSERT_HEIGHT_RELATIVE,
+            args: vec![one],
+            aggregate_signature: Signature::default(),
+        },
+        ConditionTest {
+            opcode: opcodes::ASSERT_HEIGHT_ABSOLUTE,
+            args: vec![one],
+            aggregate_signature: Signature::default(),
+        },
+        ConditionTest {
+            opcode: opcodes::ASSERT_BEFORE_SECONDS_RELATIVE,
+            args: vec![one],
+            aggregate_signature: Signature::default(),
+        },
+        ConditionTest {
+            opcode: opcodes::ASSERT_BEFORE_SECONDS_ABSOLUTE,
+            args: vec![one],
+            aggregate_signature: Signature::default(),
+        },
+        ConditionTest {
+            opcode: opcodes::ASSERT_BEFORE_HEIGHT_RELATIVE,
+            args: vec![one],
+            aggregate_signature: Signature::default(),
+        },
+        ConditionTest {
+            opcode: opcodes::ASSERT_BEFORE_HEIGHT_ABSOLUTE,
+            args: vec![one],
             aggregate_signature: Signature::default(),
         },
     ];
@@ -141,7 +212,6 @@ pub fn main() {
         //     puz_hash_node_ptr,
         //     Arc::new(coin.coin_id()),
         // );
-
         // Create the conditions
         let conditions = create_conditions(&mut allocator, &cond).expect("create_conditions");
         // a "spend" is the following list (parent puzhash amount conditions)
@@ -182,7 +252,7 @@ pub fn main() {
             let elapsed = start.elapsed();
             samples.push((i as f64, elapsed.as_nanos() as f64));
             // add costs to tally
-            total_cost += ret.execution_cost;
+            total_cost += ret.cost;
             total_count += 1;
 
             // make the conditions list longer
