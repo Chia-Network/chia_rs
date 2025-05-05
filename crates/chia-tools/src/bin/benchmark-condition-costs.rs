@@ -181,30 +181,63 @@ pub fn main() {
                 .concat(),
             ),
         },
-        // ConditionTest {
-        //     opcode: opcodes::AGG_SIG_PARENT_AMOUNT,
-        //     args: vec![
-        //         allocator.new_atom(&pk.to_bytes()).expect("pubkey"),
-        //         allocator.new_atom(MSG1).expect("msg"),
-        //     ],
-        //     aggregate_signature: sign(&sk, MSG1),
-        // },
-        // ConditionTest {
-        //     opcode: opcodes::AGG_SIG_PARENT_PUZZLE,
-        //     args: vec![
-        //         allocator.new_atom(&pk.to_bytes()).expect("pubkey"),
-        //         allocator.new_atom(MSG1).expect("msg"),
-        //     ],
-        //     aggregate_signature: sign(&sk, MSG1),
-        // },
-        // ConditionTest {
-        //     opcode: opcodes::AGG_SIG_PUZZLE_AMOUNT,
-        //     args: vec![
-        //         allocator.new_atom(&pk.to_bytes()).expect("pubkey"),
-        //         allocator.new_atom(MSG1).expect("msg"),
-        //     ],
-        //     aggregate_signature: sign(&sk, MSG1),
-        // },
+        ConditionTest {
+            opcode: opcodes::AGG_SIG_PARENT_AMOUNT,
+            args: vec![
+                allocator.new_atom(&pk.to_bytes()).expect("pubkey"),
+                allocator.new_atom(MSG1).expect("msg"),
+            ],
+            aggregate_signature: sign(
+                &sk,
+                [
+                    MSG1,
+                    H1.as_slice(),
+                    u64_to_bytes(100_u64).as_slice(),
+                    TEST_CONSTANTS
+                        .agg_sig_parent_amount_additional_data
+                        .as_slice(),
+                ]
+                .concat(),
+            ),
+        },
+        ConditionTest {
+            opcode: opcodes::AGG_SIG_PARENT_PUZZLE,
+            args: vec![
+                allocator.new_atom(&pk.to_bytes()).expect("pubkey"),
+                allocator.new_atom(MSG1).expect("msg"),
+            ],
+            aggregate_signature: sign(
+                &sk,
+                [
+                    MSG1,
+                    H1.as_slice(),
+                    puzzle_hash.as_slice(),
+                    TEST_CONSTANTS
+                        .agg_sig_parent_puzzle_additional_data
+                        .as_slice(),
+                ]
+                .concat(),
+            ),
+        },
+        ConditionTest {
+            opcode: opcodes::AGG_SIG_PUZZLE_AMOUNT,
+            args: vec![
+                allocator.new_atom(&pk.to_bytes()).expect("pubkey"),
+                allocator.new_atom(MSG1).expect("msg"),
+            ],
+            aggregate_signature: sign(
+                &sk,
+                [
+                    MSG1,
+                    puzzle_hash.as_slice(),
+                    u64_to_bytes(100_u64).as_slice(),
+                    TEST_CONSTANTS
+                        .agg_sig_puzzle_amount_additional_data
+                        .as_slice(),
+                ]
+                .concat(),
+            ),
+        },
         ConditionTest {
             opcode: opcodes::RESERVE_FEE,
             args: vec![hundred],
