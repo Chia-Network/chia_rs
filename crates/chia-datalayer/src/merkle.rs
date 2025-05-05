@@ -1002,8 +1002,7 @@ impl DeltaReader {
             self.nodes.extend(nodes);
             let mut filtered = HashMap::new();
             for (hash, index) in node_hash_to_index {
-                if !seen_hashes.contains(&hash) {
-                    seen_hashes.insert(hash);
+                if seen_hashes.insert(hash) {
                     filtered.insert(hash, index);
                 }
             }
