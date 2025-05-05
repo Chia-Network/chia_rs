@@ -942,8 +942,7 @@ impl DeltaReader {
             nodes.insert(hash, DeltaReaderNode::Leaf { key, value });
         }
 
-        let instance = Self { nodes };
-        Ok(instance)
+        Ok(Self { nodes })
     }
 
     pub fn get_missing_hashes(&self) -> HashSet<Hash> {
@@ -985,8 +984,7 @@ impl DeltaReader {
     ) -> Result<Vec<(Hash, NodeHashToIndex)>, Error> {
         let mut grouped_results = Vec::new();
         grouped_results.par_extend(jobs.into_par_iter().map(
-            |job| -> Result<(Hash, (NodeHashToDeltaReaderNode, NodeHashToIndex)), Error> {
-                let (hash, path) = job;
+            |(hash, path)| -> Result<(Hash, (NodeHashToDeltaReaderNode, NodeHashToIndex)), Error> {
                 Ok((
                     *hash,
                     collect_and_return_from_merkle_blob(path, hashes, |key| {
@@ -1020,8 +1018,7 @@ impl DeltaReader {
         let mut results = Vec::new();
 
         results.par_extend(jobs.into_par_iter().map(
-            |job| -> Result<HashMap<Hash, (TreeIndex, DeltaReaderNode)>, Error> {
-                let (path, indexes) = job;
+            |(path, indexes)| -> Result<HashMap<Hash, (TreeIndex, DeltaReaderNode)>, Error> {
                 let vector = zstd_decode_path(path)?;
                 get_internal_terminal(&vector, indexes)
             },
@@ -2190,23 +2187,11 @@ impl MerkleBlob {
         let mut merkle_blob = Self::new(Vec::new())?;
         let mut nodes: NodeHashToDeltaReaderNode = HashMap::new();
 
-        for (hash, internal) in internal_nodes {
-            nodes.insert(
-                hash,
-                DeltaReaderNode::Internal {
-                    left: internal.0,
-                    right: internal.1,
-                },
-            );
+        for (hash, (left, right)) in internal_nodes {
+            nodes.insert(hash, DeltaReaderNode::Internal { left, right });
         }
-        for (hash, leaf) in terminal_nodes {
-            nodes.insert(
-                hash,
-                DeltaReaderNode::Leaf {
-                    key: leaf.0,
-                    value: leaf.1,
-                },
-            );
+        for (hash, (key, value)) in terminal_nodes {
+            nodes.insert(hash, DeltaReaderNode::Leaf { key, value });
         }
 
         match (root_hash, !nodes.is_empty()) {
