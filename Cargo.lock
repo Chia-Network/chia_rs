@@ -308,7 +308,6 @@ dependencies = [
  "clvm-traits",
  "clvm-utils",
  "clvmr",
- "linreg",
 ]
 
 [[package]]
