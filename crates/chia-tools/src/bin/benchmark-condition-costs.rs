@@ -67,6 +67,7 @@ fn cons_condition(allocator: &mut Allocator, current_ptr: NodePtr) -> Result<Nod
 fn create_conditions(
     allocator: &mut Allocator,
     condition: &ConditionTest,
+    reps: u32,
 ) -> Result<NodePtr, EvalErr> {
     let mut rest = allocator.nil();
     for arg in condition.args.iter().rev() {
@@ -74,7 +75,12 @@ fn create_conditions(
     }
     let opcode = allocator.new_small_number(condition.opcode as u32)?;
     let cond_list = allocator.new_pair(opcode, rest)?;
-    allocator.new_pair(cond_list, allocator.nil())
+
+    let mut ret = NodePtr::NIL;
+    for _ in 0..reps {
+        ret = allocator.new_pair(cond_list, ret)?;
+    }
+    Ok(ret)
 }
 
 pub fn main() {
@@ -104,11 +110,11 @@ pub fn main() {
             args: vec![h1_pointer],
             aggregate_signature: Signature::default(),
         },
-        ConditionTest {
-            opcode: opcodes::CREATE_COIN,
-            args: vec![h1_pointer, one],
-            aggregate_signature: Signature::default(),
-        },
+        //        ConditionTest {
+        //            opcode: opcodes::CREATE_COIN,
+        //            args: vec![h1_pointer, one],
+        //            aggregate_signature: Signature::default(),
+        //        },
         ConditionTest {
             opcode: opcodes::AGG_SIG_UNSAFE,
             args: vec![
@@ -238,11 +244,11 @@ pub fn main() {
                 .concat(),
             ),
         },
-        ConditionTest {
-            opcode: opcodes::RESERVE_FEE,
-            args: vec![hundred],
-            aggregate_signature: Signature::default(),
-        },
+        //        ConditionTest {
+        //            opcode: opcodes::RESERVE_FEE,
+        //            args: vec![hundred],
+        //            aggregate_signature: Signature::default(),
+        //        },
         ConditionTest {
             opcode: opcodes::CREATE_COIN_ANNOUNCEMENT,
             args: vec![h1_pointer],
@@ -335,7 +341,6 @@ pub fn main() {
         },
     ];
 
-    let cp = allocator.checkpoint();
     let mut slopes = Vec::<f64>::new();
     for cond in cond_tests {
         // let mut spend = SpendConditions::new(
@@ -344,18 +349,21 @@ pub fn main() {
         //     puz_hash_node_ptr,
         //     Arc::new(coin.coin_id()),
         // );
-        // Create the conditions
-        let conditions = create_conditions(&mut allocator, &cond).expect("create_conditions");
-        // a "spend" is the following list (parent puzhash amount conditions)
-        let spend_list = [parent_id, puz_hash_node_ptr, hundred, conditions];
-        let mut spends = allocator.nil();
-        for arg in spend_list.iter().rev() {
-            spends = allocator.new_pair(*arg, spends).expect("new_pair");
-        }
-        let mut cost = TEST_CONSTANTS.max_block_cost_clvm;
+        let mut cost = u64::MAX;
         let mut samples = Vec::<(f64, f64)>::new();
+        let mut signature = Signature::default();
+        let cp = allocator.checkpoint();
         // Parse the conditions and then make the list longer
-        for i in 0..1000 {
+        let mut conditions =
+            create_conditions(&mut allocator, &cond, 1).expect("create_conditions");
+        for i in 1..500 {
+            signature += &cond.aggregate_signature;
+            let mut spends = allocator.nil();
+            // a "spend" is the following list (parent puzhash amount conditions)
+            let spend_list = [parent_id, puz_hash_node_ptr, hundred, conditions];
+            for arg in spend_list.iter().rev() {
+                spends = allocator.new_pair(*arg, spends).expect("new_pair");
+            }
             // need to reset state or we get a double spend
             let mut ret = SpendBundleConditions::default();
             let mut state = ParseState::default();
@@ -378,20 +386,23 @@ pub fn main() {
             MempoolVisitor::post_process(&allocator, &state, &mut ret).expect("post_process");
             validate_conditions(&allocator, &ret, &state, spends, flags)
                 .expect("validate_conditions");
-            validate_signature(&state, &cond.aggregate_signature, flags, None)
-                .expect("validate_signature");
+            validate_signature(&state, &signature, flags, None).expect("validate_signature");
 
             let elapsed = start.elapsed();
-            samples.push((i as f64, elapsed.as_nanos() as f64));
+            // the first run is a warmup
+            if i > 1 {
+                samples.push((i as f64, elapsed.as_nanos() as f64));
+            }
             // add costs to tally
             total_cost += ret.cost;
             total_count += 1;
 
             // make the conditions list longer
-            cons_condition(&mut allocator, conditions).expect("cons_condition");
+            conditions = cons_condition(&mut allocator, conditions).expect("cons_condition");
         }
         // reset allocator before next condition test
         let (slope, _): (f64, f64) = linear_regression_of(&samples).expect("linreg failed");
+        println!("condition: {} slope: {slope}", cond.opcode);
         slopes.push(slope);
         allocator.restore_checkpoint(&cp);
     }
