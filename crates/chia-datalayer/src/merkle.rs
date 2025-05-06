@@ -15,6 +15,7 @@ use chia_sha2::Sha256;
 use chia_streamable_macro::Streamable;
 use chia_traits::Streamable;
 use num_traits::ToBytes;
+use rayon::prelude::*;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::io::{Read, Write};
@@ -845,30 +846,115 @@ impl BlockStatusCache {
     }
 }
 
+type NodeHashToIndex = HashMap<Hash, TreeIndex>;
+type NodeHashToDeltaReaderNode = HashMap<Hash, DeltaReaderNode>;
+
+pub fn collect_and_return_from_merkle_blob(
+    path: &PathBuf,
+    hashes: &HashSet<Hash>,
+    known: impl Fn(&Hash) -> bool,
+) -> Result<(NodeHashToDeltaReaderNode, NodeHashToIndex), Error> {
+    let mut nodes: NodeHashToDeltaReaderNode = HashMap::new();
+    let blob = zstd_decode_path(path)?;
+    let mut node_hash_to_index: NodeHashToIndex = HashMap::new();
+
+    let mut index_to_hash: HashMap<TreeIndex, Hash> = HashMap::new();
+
+    let mut in_subtree: HashSet<Hash> = HashSet::new();
+    let mut index_stack: Vec<(TreeIndex, bool)> = Vec::new();
+    index_stack.push((TreeIndex(0), false));
+    loop {
+        let Some((index, visited)) = index_stack.pop() else {
+            break;
+        };
+
+        let block = try_get_block(&blob, index)?;
+
+        let node_hash = block.node.hash();
+        index_to_hash.insert(index, node_hash);
+        if known(&node_hash) {
+            continue;
+        }
+
+        match block.node {
+            Node::Internal(InternalNode {
+                hash, left, right, ..
+            }) => {
+                if visited {
+                    node_hash_to_index.insert(hash, index);
+                    if !in_subtree.is_empty() {
+                        nodes.insert(
+                            hash,
+                            DeltaReaderNode::Internal {
+                                left: *index_to_hash.get(&left).unwrap(),
+                                right: *index_to_hash.get(&right).unwrap(),
+                            },
+                        );
+                    }
+
+                    in_subtree.remove(&hash);
+                } else {
+                    if hashes.contains(&hash) {
+                        in_subtree.insert(hash);
+                    }
+
+                    index_stack.push((index, true));
+                    index_stack.push((right, false));
+                    index_stack.push((left, false));
+                }
+            }
+            Node::Leaf(LeafNode {
+                hash, key, value, ..
+            }) => {
+                if !in_subtree.is_empty() || hashes.contains(&hash) {
+                    nodes.insert(hash, DeltaReaderNode::Leaf { key, value });
+                }
+
+                node_hash_to_index.insert(hash, index);
+            }
+        }
+    }
+
+    Ok((nodes, node_hash_to_index))
+}
+
 type InternalNodesMap = HashMap<Hash, (Hash, Hash)>;
 type LeafNodesMap = HashMap<Hash, (KeyId, ValueId)>;
 
+pub enum DeltaReaderNode {
+    Internal { left: Hash, right: Hash },
+    Leaf { key: KeyId, value: ValueId },
+}
+
 #[cfg_attr(feature = "py-bindings", pyclass)]
 pub struct DeltaReader {
-    internal_nodes: InternalNodesMap,
-    leaf_nodes: LeafNodesMap,
+    nodes: NodeHashToDeltaReaderNode,
 }
 
 impl DeltaReader {
     pub fn new(internal_nodes: InternalNodesMap, leaf_nodes: LeafNodesMap) -> Result<Self, Error> {
-        let instance = Self {
-            internal_nodes,
-            leaf_nodes,
-        };
-        Ok(instance)
+        let mut nodes: NodeHashToDeltaReaderNode = HashMap::new();
+
+        for (hash, (left, right)) in internal_nodes {
+            nodes.insert(hash, DeltaReaderNode::Internal { left, right });
+        }
+        for (hash, (key, value)) in leaf_nodes {
+            nodes.insert(hash, DeltaReaderNode::Leaf { key, value });
+        }
+
+        Ok(Self { nodes })
     }
 
     pub fn get_missing_hashes(&self) -> HashSet<Hash> {
         let mut missing_hashes: HashSet<Hash> = HashSet::new();
 
-        for (left, right) in self.internal_nodes.values() {
+        for node in self.nodes.values() {
+            let DeltaReaderNode::Internal { left, right } = node else {
+                continue;
+            };
+
             for hash in [left, right] {
-                if !self.internal_nodes.contains_key(hash) && !self.leaf_nodes.contains_key(hash) {
+                if !self.nodes.contains_key(hash) {
                     missing_hashes.insert(*hash);
                 }
             }
@@ -884,12 +970,66 @@ impl DeltaReader {
     ) -> Result<(), Error> {
         let vector = zstd_decode_path(path)?;
 
-        get_internal_terminal(
-            &vector,
-            indexes,
-            &mut self.internal_nodes,
-            &mut self.leaf_nodes,
-        )?;
+        for (hash, (_index, node)) in get_internal_terminal(&vector, indexes)? {
+            self.nodes.insert(hash, node);
+        }
+
+        Ok(())
+    }
+
+    pub fn collect_and_return_from_merkle_blobs(
+        &mut self,
+        jobs: &Vec<(Hash, PathBuf)>,
+        hashes: &HashSet<Hash>,
+    ) -> Result<Vec<(Hash, NodeHashToIndex)>, Error> {
+        let mut grouped_results = Vec::new();
+        grouped_results.par_extend(jobs.into_par_iter().map(
+            |(hash, path)| -> Result<(Hash, (NodeHashToDeltaReaderNode, NodeHashToIndex)), Error> {
+                Ok((
+                    *hash,
+                    collect_and_return_from_merkle_blob(path, hashes, |key| {
+                        self.nodes.contains_key(key)
+                    })?,
+                ))
+            },
+        ));
+
+        let mut results: Vec<(Hash, NodeHashToIndex)> = Vec::new();
+        let mut seen_hashes: HashSet<Hash> = HashSet::new();
+        for result in grouped_results {
+            let (hash, (nodes, node_hash_to_index)) = result?;
+            self.nodes.extend(nodes);
+            let mut filtered = HashMap::new();
+            for (hash, index) in node_hash_to_index {
+                if seen_hashes.insert(hash) {
+                    filtered.insert(hash, index);
+                }
+            }
+            results.push((hash, filtered));
+        }
+
+        Ok(results)
+    }
+
+    pub fn collect_from_merkle_blobs(
+        &mut self,
+        jobs: &Vec<(PathBuf, Vec<TreeIndex>)>,
+    ) -> Result<(), Error> {
+        let mut results = Vec::new();
+
+        results.par_extend(jobs.into_par_iter().map(
+            |(path, indexes)| -> Result<HashMap<Hash, (TreeIndex, DeltaReaderNode)>, Error> {
+                let vector = zstd_decode_path(path)?;
+                get_internal_terminal(&vector, indexes)
+            },
+        ));
+
+        for result in results {
+            // admittedly just spitting out the first error here
+            for (hash, (_index, node)) in result? {
+                self.nodes.insert(hash, node);
+            }
+        }
 
         Ok(())
     }
@@ -902,8 +1042,7 @@ impl DeltaReader {
         let mut merkle_blob = MerkleBlob::new(Vec::new())?;
         let mut hashes_and_indexes: Vec<(Hash, TreeIndex)> = Vec::new();
         merkle_blob.build_blob_from_node_list(
-            &self.internal_nodes,
-            &self.leaf_nodes,
+            &self.nodes,
             root_hash,
             interested_hashes,
             &mut hashes_and_indexes,
@@ -936,6 +1075,39 @@ impl DeltaReader {
     ) -> PyResult<()> {
         let path: PathBuf = path.extract(py)?;
         self.collect_from_merkle_blob(&path, &indexes)?;
+
+        Ok(())
+    }
+
+    #[pyo3(name = "collect_and_return_from_merkle_blobs")]
+    pub fn py_collect_and_return_from_merkle_blobs(
+        &mut self,
+        py: Python<'_>,
+        jobs: Vec<(Hash, PyObject)>,
+        hashes: HashSet<Hash>,
+    ) -> PyResult<Vec<(Hash, NodeHashToIndex)>> {
+        let mut extracted_jobs: Vec<(Hash, PathBuf)> = Vec::new();
+        for (hash, path) in jobs {
+            let path: PathBuf = path.extract(py)?;
+            extracted_jobs.push((hash, path));
+        }
+
+        Ok(py.allow_threads(|| {
+            self.collect_and_return_from_merkle_blobs(&extracted_jobs, &hashes)
+        })?)
+    }
+
+    #[pyo3(name = "collect_from_merkle_blobs")]
+    pub fn py_collect_from_merkle_blobs(
+        &mut self,
+        py: Python<'_>,
+        jobs: Vec<(PyObject, Vec<TreeIndex>)>,
+    ) -> PyResult<()> {
+        let mut pathed_jobs: Vec<(PathBuf, Vec<TreeIndex>)> = Vec::new();
+        for (path, indexes) in jobs {
+            pathed_jobs.push((path.extract(py)?, indexes));
+        }
+        py.allow_threads(|| self.collect_from_merkle_blobs(&pathed_jobs))?;
 
         Ok(())
     }
@@ -1848,18 +2020,14 @@ impl MerkleBlob {
 
     pub fn build_blob_from_node_list(
         &mut self,
-        internal_nodes: &HashMap<Hash, (Hash, Hash)>,
-        terminal_nodes: &HashMap<Hash, (KeyId, ValueId)>,
+        nodes: &NodeHashToDeltaReaderNode,
         node_hash: Hash,
         interested_hashes: &HashSet<Hash>,
         hashes_and_indexes: &mut Vec<(Hash, TreeIndex)>,
     ) -> Result<TreeIndex, Error> {
-        match (
-            internal_nodes.get(&node_hash),
-            terminal_nodes.get(&node_hash),
-        ) {
-            (None, None) => Err(Error::NodeHashNotInNodeMaps(node_hash)),
-            (_, Some((key, value))) => {
+        match nodes.get(&node_hash) {
+            None => Err(Error::NodeHashNotInNodeMaps(node_hash)),
+            Some(DeltaReaderNode::Leaf { key, value }) => {
                 let index = self.get_new_index();
                 self.insert_entry_to_blob(
                     index,
@@ -1883,21 +2051,19 @@ impl MerkleBlob {
 
                 Ok(index)
             }
-            (Some((left, right)), _) => {
+            Some(DeltaReaderNode::Internal { left, right }) => {
                 let index = self.get_new_index();
                 // TODO: certainly belongs elswehere
                 // let undefined_index = TreeIndex(u32::MAX - 1);
 
                 let left_index = self.build_blob_from_node_list(
-                    internal_nodes,
-                    terminal_nodes,
+                    nodes,
                     *left,
                     interested_hashes,
                     hashes_and_indexes,
                 )?;
                 let right_index = self.build_blob_from_node_list(
-                    internal_nodes,
-                    terminal_nodes,
+                    nodes,
                     *right,
                     interested_hashes,
                     hashes_and_indexes,
@@ -2019,17 +2185,21 @@ impl MerkleBlob {
         root_hash: Option<Hash>,
     ) -> PyResult<Self> {
         let mut merkle_blob = Self::new(Vec::new())?;
+        let mut nodes: NodeHashToDeltaReaderNode = HashMap::new();
 
-        match (
-            root_hash,
-            !internal_nodes.is_empty() || !terminal_nodes.is_empty(),
-        ) {
+        for (hash, (left, right)) in internal_nodes {
+            nodes.insert(hash, DeltaReaderNode::Internal { left, right });
+        }
+        for (hash, (key, value)) in terminal_nodes {
+            nodes.insert(hash, DeltaReaderNode::Leaf { key, value });
+        }
+
+        match (root_hash, !nodes.is_empty()) {
             (None, true) => Err(Error::RootHashAndNodeListDisagreement())?,
             (None, _) => Ok(merkle_blob),
             (Some(root_hash), _) => {
                 merkle_blob.build_blob_from_node_list(
-                    &internal_nodes,
-                    &terminal_nodes,
+                    &nodes,
                     root_hash,
                     &HashSet::new(),
                     &mut Vec::new(),
@@ -2239,9 +2409,8 @@ pub fn get_internal_terminal(
     // TODO: should be &[u8] i think?
     blob: &Vec<u8>,
     indexes: &Vec<TreeIndex>,
-    internal: &mut InternalNodesMap,
-    leafs: &mut LeafNodesMap,
-) -> Result<(), Error> {
+) -> Result<HashMap<Hash, (TreeIndex, DeltaReaderNode)>, Error> {
+    let mut nodes: HashMap<Hash, (TreeIndex, DeltaReaderNode)> = HashMap::new();
     let mut index_to_hash: HashMap<TreeIndex, Hash> = HashMap::new();
 
     for subroot_index in indexes {
@@ -2250,23 +2419,35 @@ pub fn get_internal_terminal(
             match block.node {
                 Node::Internal(node) => {
                     index_to_hash.insert(index, node.hash);
-                    internal.insert(
+                    nodes.insert(
                         node.hash,
                         (
-                            *index_to_hash.get(&node.left).unwrap(),
-                            *index_to_hash.get(&node.right).unwrap(),
+                            index,
+                            DeltaReaderNode::Internal {
+                                left: *index_to_hash.get(&node.left).unwrap(),
+                                right: *index_to_hash.get(&node.right).unwrap(),
+                            },
                         ),
                     );
                 }
                 Node::Leaf(node) => {
                     index_to_hash.insert(index, node.hash);
-                    leafs.insert(node.hash, (node.key, node.value));
+                    nodes.insert(
+                        node.hash,
+                        (
+                            index,
+                            DeltaReaderNode::Leaf {
+                                key: node.key,
+                                value: node.value,
+                            },
+                        ),
+                    );
                 }
             }
         }
     }
 
-    Ok(())
+    Ok(nodes)
 }
 
 struct MerkleBlobLeftChildFirstIteratorItem {
