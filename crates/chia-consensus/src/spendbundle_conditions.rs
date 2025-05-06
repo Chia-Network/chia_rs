@@ -5,6 +5,7 @@ use crate::gen::conditions::{
 use crate::gen::flags::{DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
 use crate::gen::run_block_generator::subtract_cost;
 use crate::gen::solution_generator::calculate_generator_length;
+use crate::gen::validation_error::ErrorCode;
 use crate::gen::validation_error::ValidationErr;
 use crate::spendbundle_validation::get_flags_for_height_and_constants;
 use chia_bls::PublicKey;
@@ -75,6 +76,9 @@ pub fn run_spendbundle(
         subtract_cost(a, &mut cost_left, clvm_cost)?;
 
         let buf = tree_hash(a, puz);
+        if coin_spend.coin.puzzle_hash != buf.into() {
+            return Err(ValidationErr(puz, ErrorCode::WrongPuzzleHash));
+        }
         let puzzle_hash = a.new_atom(&buf)?;
         process_single_spend::<MempoolVisitor>(
             a,
