@@ -498,6 +498,7 @@ pub fn main() {
                     | opcodes::ASSERT_PUZZLE_ANNOUNCEMENT
                     | opcodes::ASSERT_COIN_ANNOUNCEMENT
             ) {
+                let slope = slope / 2_f64;
                 println!(
                     "condition: {} slope: {slope} computed-cost: {}",
                     cond.opcode,
