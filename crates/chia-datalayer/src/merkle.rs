@@ -1138,7 +1138,7 @@ impl DeltaReader {
         root_hash: Hash,
         interested_hashes: HashSet<Hash>,
     ) -> Result<(MerkleBlob, Vec<(Hash, TreeIndex)>), Error> {
-        self.create_merkle_blob_and_filter_unused_nodes(root_hash, &interested_hashes)?
+        self.create_merkle_blob_and_filter_unused_nodes(root_hash, &interested_hashes)
     }
 }
 
