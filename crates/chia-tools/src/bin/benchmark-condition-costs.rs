@@ -419,17 +419,24 @@ pub fn main() {
         let cp = allocator.checkpoint();
         // Parse the conditions and then make the list longer
 
-        let mut conditions = match cond.opcode {
-            opcodes::SEND_MESSAGE => {
-                create_two_conditions(&mut allocator, &cond, &receive_message).expect("two set")
-            }
-            opcodes::ASSERT_PUZZLE_ANNOUNCEMENT => {
-                create_two_conditions(&mut allocator, &cond, &puzzle_announcement).expect("two set")
-            }
-            opcodes::ASSERT_COIN_ANNOUNCEMENT => {
-                create_two_conditions(&mut allocator, &cond, &coin_announcement).expect("two set")
-            }
-            _ => create_conditions(&mut allocator, &cond).expect("create_conditions"),
+        let (mut conditions, multiplier) = match cond.opcode {
+            opcodes::SEND_MESSAGE => (
+                create_two_conditions(&mut allocator, &cond, &receive_message).expect("two set"),
+                2,
+            ),
+            opcodes::ASSERT_PUZZLE_ANNOUNCEMENT => (
+                create_two_conditions(&mut allocator, &cond, &puzzle_announcement)
+                    .expect("two set"),
+                2,
+            ),
+            opcodes::ASSERT_COIN_ANNOUNCEMENT => (
+                create_two_conditions(&mut allocator, &cond, &coin_announcement).expect("two set"),
+                2,
+            ),
+            _ => (
+                create_conditions(&mut allocator, &cond).expect("create_conditions"),
+                1,
+            ),
         };
 
         for i in 1..REPS {
@@ -467,7 +474,7 @@ pub fn main() {
             let elapsed = start.elapsed();
             // the first run is a warmup
             if i > 1 {
-                samples.push((i as f64, elapsed.as_nanos() as f64));
+                samples.push(((i * multiplier) as f64, elapsed.as_nanos() as f64));
             }
             // add costs to tally
             total_cost += ret.cost;
@@ -496,25 +503,11 @@ pub fn main() {
             );
         } else {
             let cost_per_ns = cost_factors.iter().sum::<f64>() / cost_factors.len() as f64;
-            if matches!(
+            println!(
+                "condition: {} slope: {slope} computed-cost: {}",
                 cond.opcode,
-                opcodes::SEND_MESSAGE
-                    | opcodes::ASSERT_PUZZLE_ANNOUNCEMENT
-                    | opcodes::ASSERT_COIN_ANNOUNCEMENT
-            ) {
-                let slope = slope / 2_f64;
-                println!(
-                    "condition: {} slope: {slope} computed-cost: {}",
-                    cond.opcode,
-                    (slope * cost_per_ns) / 2_f64
-                );
-            } else {
-                println!(
-                    "condition: {} slope: {slope} computed-cost: {}",
-                    cond.opcode,
-                    slope * cost_per_ns
-                );
-            }
+                slope * cost_per_ns
+            );
         };
         let mut plot = Figure::new();
         plot.axes2d()
@@ -525,7 +518,11 @@ pub fn main() {
                 samples.iter().map(|v| v.1),
                 &[PlotOption::PointSymbol('o')],
             )
-            .lines([0, REPS], [offset, offset + slope * (REPS as f64)], &[]);
+            .lines(
+                [0, REPS * multiplier],
+                [offset, offset + slope * ((REPS * multiplier) as f64)],
+                &[],
+            );
         plot.save_to_png(format!("condition-{}.png", cond.opcode), 1024, 768)
             .expect("save svg");
         plot.close();
