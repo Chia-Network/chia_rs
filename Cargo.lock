@@ -532,6 +532,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "chia-sha2"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f7b37c5362dfb1c9449902139e94a91bbd8d3773c13939972fd88e4f14c4f9d"
+dependencies = [
+ "sha2",
+]
+
+[[package]]
 name = "chia-ssl"
 version = "0.22.0"
 dependencies = [
@@ -552,6 +561,7 @@ dependencies = [
  "chia-protocol",
  "chia-puzzle-types",
  "chia-puzzles",
+ "chia-sha2 0.22.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "chia-traits 0.22.0",
  "clap",
  "clvm-traits",

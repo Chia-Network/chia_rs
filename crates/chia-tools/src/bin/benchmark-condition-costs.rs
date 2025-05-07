@@ -3,6 +3,7 @@ use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::r#gen::make_aggsig_final_message::u64_to_bytes;
 use linreg::linear_regression_of;
 use std::time::Instant;
+use chia_sha2::Sha256;
 // use chia_consensus::gen::conditions::parse_conditions;
 use chia_consensus::gen::conditions::{MempoolVisitor, SpendBundleConditions};
 use chia_consensus::gen::flags::COST_CONDITIONS; // DONT_VALIDATE_SIGNATURE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
@@ -55,21 +56,30 @@ const MSG1: &[u8; 13] = &[3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
 // this function takes a NodePtr of (q . ((CONDITION ARG ARG)...))
 // and add another (CONDITION ARG ARG) to the list
 fn cons_condition(allocator: &mut Allocator, current_ptr: NodePtr) -> Result<NodePtr, EvalErr> {
-    // let Some((q, conds)) = allocator.next(current_ptr) else {
-    //     return Err(EvalErr(current_ptr, "not a pair".into()));
-    // };
     let Some((cond, _rest)) = allocator.next(current_ptr) else {
         return Err(EvalErr(current_ptr, "not a pair".into()));
     };
     allocator.new_pair(cond, current_ptr)
-    // allocator.new_pair(q, added_new_cond)
+}
+
+fn cons_two_conditions(
+    allocator: &mut Allocator,
+    current_ptr: NodePtr,
+) -> Result<NodePtr, EvalErr> {
+    let Some((cond_one, rest)) = allocator.next(current_ptr) else {
+        return Err(EvalErr(current_ptr, "not a pair".into()));
+    };
+    let Some((cond_two, _rest)) = allocator.next(rest) else {
+        return Err(EvalErr(current_ptr, "not a pair".into()));
+    };
+    let temp = allocator.new_pair(cond_one, current_ptr)?;
+    allocator.new_pair(cond_two, temp)
 }
 
 // this function generates (q . ((CONDITION ARG ARG)))
 fn create_conditions(
     allocator: &mut Allocator,
     condition: &ConditionTest<'_>,
-    reps: u32,
 ) -> Result<NodePtr, EvalErr> {
     let mut rest = allocator.nil();
     for arg in condition.args.iter().rev() {
@@ -77,12 +87,24 @@ fn create_conditions(
     }
     let opcode = allocator.new_small_number(condition.opcode as u32)?;
     let cond_list = allocator.new_pair(opcode, rest)?;
+    allocator.new_pair(cond_list, allocator.nil())
+}
 
-    let mut ret = NodePtr::NIL;
-    for _ in 0..reps {
-        ret = allocator.new_pair(cond_list, ret)?;
+fn create_two_conditions(
+    allocator: &mut Allocator,
+    cond_one: &ConditionTest<'_>,
+    cond_two: &ConditionTest<'_>,
+) -> Result<NodePtr, EvalErr> {
+    let temp = create_conditions(allocator, cond_one).expect("create_conditions");
+    let mut rest = allocator.nil();
+    for arg in cond_two.args.iter().rev() {
+        rest = allocator.new_pair(*arg, rest).expect("create_conditions");
     }
-    Ok(ret)
+    let opcode = allocator
+        .new_small_number(cond_two.opcode as u32)
+        .expect("create_conditions");
+    let cond_list = allocator.new_pair(opcode, rest).expect("create_conditions");
+    allocator.new_pair(cond_list, temp)
 }
 
 pub fn main() {
@@ -93,6 +115,7 @@ pub fn main() {
     let flags: u32 = COST_CONDITIONS;
     let one = allocator.new_small_number(1).expect("number");
     let hundred = allocator.new_small_number(100).expect("number");
+    let sixty_three = allocator.new_small_number(63).expect("number");
     let sk = SecretKey::from_bytes(SECRET_KEY).expect("secret key");
     let pk = sk.public_key();
     let parent_id = allocator.new_atom(H1).expect("atom");
@@ -103,9 +126,17 @@ pub fn main() {
         puzzle_hash,
         amount: 100,
     };
+    let coin_id = allocator.new_atom(coin.coin_id().as_slice()).expect("atom");
     let h1_pointer = allocator.new_atom(H1).expect("atom");
     let pk_ptr = allocator.new_atom(&pk.to_bytes()).expect("pubkey");
     let msg_ptr = allocator.new_atom(MSG1).expect("msg");
+
+    let mut hasher = Sha256::new();
+    hasher.update([coin.coin_id().as_slice(), MSG1].concat());
+    let coin_announce_msg: [u8; 32] = hasher.finalize();
+    hasher = Sha256::new();
+    hasher.update([puzzle_hash.as_slice(), MSG1].concat());
+    let puzzle_announce_msg: [u8; 32] = hasher.finalize();
 
     // this is the list of conditions to test
     let cond_tests = [
@@ -235,20 +266,8 @@ pub fn main() {
         //            cost: 0,
         //        },
         ConditionTest {
-            opcode: opcodes::CREATE_COIN_ANNOUNCEMENT,
-            args: &[h1_pointer],
-            aggregate_signature: Signature::default(),
-            cost: 0,
-        },
-        ConditionTest {
-            opcode: opcodes::CREATE_PUZZLE_ANNOUNCEMENT,
-            args: &[h1_pointer],
-            aggregate_signature: Signature::default(),
-            cost: 0,
-        },
-        ConditionTest {
             opcode: opcodes::ASSERT_MY_COIN_ID,
-            args: &[allocator.new_atom(coin.coin_id().as_slice()).expect("atom")],
+            args: &[coin_id],
             aggregate_signature: Signature::default(),
             cost: 0,
         },
@@ -342,7 +361,45 @@ pub fn main() {
             aggregate_signature: Signature::default(),
             cost: 0,
         },
+        ConditionTest {
+            opcode: opcodes::SEND_MESSAGE,
+            args: &[sixty_three, h1_pointer, coin_id],
+            aggregate_signature: Signature::default(),
+            cost: 0,
+        },
+        ConditionTest {
+            opcode: opcodes::ASSERT_COIN_ANNOUNCEMENT,
+            args: &[allocator.new_atom(&coin_announce_msg).expect("msg")],
+            aggregate_signature: Signature::default(),
+            cost: 0,
+        },
+        ConditionTest {
+            opcode: opcodes::ASSERT_PUZZLE_ANNOUNCEMENT,
+            args: &[allocator.new_atom(&puzzle_announce_msg).expect("msg")],
+            aggregate_signature: Signature::default(),
+            cost: 0,
+        },
     ];
+
+    let receive_message = ConditionTest {
+        opcode: opcodes::RECEIVE_MESSAGE,
+        args: &[sixty_three, h1_pointer, coin_id],
+        aggregate_signature: Signature::default(),
+        cost: 0,
+    };
+
+    let coin_announcement = ConditionTest {
+        opcode: opcodes::CREATE_COIN_ANNOUNCEMENT,
+        args: &[msg_ptr],
+        aggregate_signature: Signature::default(),
+        cost: 0,
+    };
+    let puzzle_announcement = ConditionTest {
+        opcode: opcodes::CREATE_PUZZLE_ANNOUNCEMENT,
+        args: &[msg_ptr],
+        aggregate_signature: Signature::default(),
+        cost: 0,
+    };
 
     let mut cost_factors = Vec::<f64>::new();
     for cond in cond_tests {
@@ -357,8 +414,20 @@ pub fn main() {
         let mut signature = Signature::default();
         let cp = allocator.checkpoint();
         // Parse the conditions and then make the list longer
-        let mut conditions =
-            create_conditions(&mut allocator, &cond, 1).expect("create_conditions");
+
+        let mut conditions = match cond.opcode {
+            opcodes::SEND_MESSAGE => {
+                create_two_conditions(&mut allocator, &cond, &receive_message).expect("two set")
+            }
+            opcodes::ASSERT_PUZZLE_ANNOUNCEMENT => {
+                create_two_conditions(&mut allocator, &cond, &puzzle_announcement).expect("two set")
+            }
+            opcodes::ASSERT_COIN_ANNOUNCEMENT => {
+                create_two_conditions(&mut allocator, &cond, &coin_announcement).expect("two set")
+            }
+            _ => create_conditions(&mut allocator, &cond).expect("create_conditions"),
+        };
+
         for i in 1..500 {
             signature += &cond.aggregate_signature;
             let mut spends = allocator.nil();
@@ -401,7 +470,16 @@ pub fn main() {
             total_count += 1;
 
             // make the conditions list longer
-            conditions = cons_condition(&mut allocator, conditions).expect("cons_condition");
+            conditions = if matches!(
+                cond.opcode,
+                opcodes::SEND_MESSAGE
+                    | opcodes::ASSERT_PUZZLE_ANNOUNCEMENT
+                    | opcodes::ASSERT_COIN_ANNOUNCEMENT
+            ) {
+                cons_two_conditions(&mut allocator, conditions).expect("cons_condition")
+            } else {
+                cons_condition(&mut allocator, conditions).expect("cons_condition")
+            };
         }
         // reset allocator before next condition test
         let (slope, _): (f64, f64) = linear_regression_of(&samples).expect("linreg failed");
@@ -414,11 +492,24 @@ pub fn main() {
             );
         } else {
             let cost_per_ns = cost_factors.iter().sum::<f64>() / cost_factors.len() as f64;
-            println!(
-                "condition: {} slope: {slope} computed-cost: {}",
+            if matches!(
                 cond.opcode,
-                slope * cost_per_ns
-            );
+                opcodes::SEND_MESSAGE
+                    | opcodes::ASSERT_PUZZLE_ANNOUNCEMENT
+                    | opcodes::ASSERT_COIN_ANNOUNCEMENT
+            ) {
+                println!(
+                    "condition: {} slope: {slope} computed-cost: {}",
+                    cond.opcode,
+                    (slope * cost_per_ns) / 2 as f64
+                );
+            } else {
+                println!(
+                    "condition: {} slope: {slope} computed-cost: {}",
+                    cond.opcode,
+                    slope * cost_per_ns
+                );
+            }
         };
         allocator.restore_checkpoint(&cp);
     }

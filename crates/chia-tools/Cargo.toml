@@ -28,6 +28,7 @@ blocking-threadpool = { workspace = true }
 hex = { workspace = true }
 hex-literal = { workspace = true }
 linreg = { workspace = true }
+chia-sha2 = "0.22.0"
 
 [lib]
 name = "chia_tools"
