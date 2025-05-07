@@ -21,9 +21,9 @@ use clvmr::{
     allocator::{Allocator, NodePtr},
     reduction::EvalErr,
 };
-struct ConditionTest {
+struct ConditionTest<'a> {
     opcode: ConditionOpcode,
-    args: Vec<NodePtr>,
+    args: &'a [NodePtr],
     aggregate_signature: Signature,
 }
 use hex_literal::hex;
@@ -66,7 +66,7 @@ fn cons_condition(allocator: &mut Allocator, current_ptr: NodePtr) -> Result<Nod
 // this function generates (q . ((CONDITION ARG ARG)))
 fn create_conditions(
     allocator: &mut Allocator,
-    condition: &ConditionTest,
+    condition: &ConditionTest<'_>,
     reps: u32,
 ) -> Result<NodePtr, EvalErr> {
     let mut rest = allocator.nil();
@@ -102,12 +102,14 @@ pub fn main() {
         amount: 100,
     };
     let h1_pointer = allocator.new_atom(H1).expect("atom");
+    let pk_ptr = allocator.new_atom(&pk.to_bytes()).expect("pubkey");
+    let msg_ptr = allocator.new_atom(MSG1).expect("msg");
 
     // this is the list of conditions to test
     let cond_tests = [
         ConditionTest {
             opcode: opcodes::REMARK,
-            args: vec![h1_pointer],
+            args: &[h1_pointer],
             aggregate_signature: Signature::default(),
         },
         //        ConditionTest {
@@ -117,18 +119,12 @@ pub fn main() {
         //        },
         ConditionTest {
             opcode: opcodes::AGG_SIG_UNSAFE,
-            args: vec![
-                allocator.new_atom(&pk.to_bytes()).expect("pubkey"),
-                allocator.new_atom(MSG1).expect("msg"),
-            ],
+            args: &[pk_ptr, msg_ptr],
             aggregate_signature: sign(&sk, MSG1),
         },
         ConditionTest {
             opcode: opcodes::AGG_SIG_ME,
-            args: vec![
-                allocator.new_atom(&pk.to_bytes()).expect("pubkey"),
-                allocator.new_atom(MSG1).expect("msg"),
-            ],
+            args: &[pk_ptr, msg_ptr],
             aggregate_signature: sign(
                 &sk,
                 [
@@ -141,10 +137,7 @@ pub fn main() {
         },
         ConditionTest {
             opcode: opcodes::AGG_SIG_PARENT,
-            args: vec![
-                allocator.new_atom(&pk.to_bytes()).expect("pubkey"),
-                allocator.new_atom(MSG1).expect("msg"),
-            ],
+            args: &[pk_ptr, msg_ptr],
             aggregate_signature: sign(
                 &sk,
                 [
@@ -157,10 +150,7 @@ pub fn main() {
         },
         ConditionTest {
             opcode: opcodes::AGG_SIG_PUZZLE,
-            args: vec![
-                allocator.new_atom(&pk.to_bytes()).expect("pubkey"),
-                allocator.new_atom(MSG1).expect("msg"),
-            ],
+            args: &[pk_ptr, msg_ptr],
             aggregate_signature: sign(
                 &sk,
                 [
@@ -173,10 +163,7 @@ pub fn main() {
         },
         ConditionTest {
             opcode: opcodes::AGG_SIG_AMOUNT,
-            args: vec![
-                allocator.new_atom(&pk.to_bytes()).expect("pubkey"),
-                allocator.new_atom(MSG1).expect("msg"),
-            ],
+            args: &[pk_ptr, msg_ptr],
             aggregate_signature: sign(
                 &sk,
                 [
@@ -189,10 +176,7 @@ pub fn main() {
         },
         ConditionTest {
             opcode: opcodes::AGG_SIG_PARENT_AMOUNT,
-            args: vec![
-                allocator.new_atom(&pk.to_bytes()).expect("pubkey"),
-                allocator.new_atom(MSG1).expect("msg"),
-            ],
+            args: &[pk_ptr, msg_ptr],
             aggregate_signature: sign(
                 &sk,
                 [
@@ -208,10 +192,7 @@ pub fn main() {
         },
         ConditionTest {
             opcode: opcodes::AGG_SIG_PARENT_PUZZLE,
-            args: vec![
-                allocator.new_atom(&pk.to_bytes()).expect("pubkey"),
-                allocator.new_atom(MSG1).expect("msg"),
-            ],
+            args: &[pk_ptr, msg_ptr],
             aggregate_signature: sign(
                 &sk,
                 [
@@ -227,10 +208,7 @@ pub fn main() {
         },
         ConditionTest {
             opcode: opcodes::AGG_SIG_PUZZLE_AMOUNT,
-            args: vec![
-                allocator.new_atom(&pk.to_bytes()).expect("pubkey"),
-                allocator.new_atom(MSG1).expect("msg"),
-            ],
+            args: &[pk_ptr, msg_ptr],
             aggregate_signature: sign(
                 &sk,
                 [
@@ -246,97 +224,97 @@ pub fn main() {
         },
         //        ConditionTest {
         //            opcode: opcodes::RESERVE_FEE,
-        //            args: vec![hundred],
+        //            args: &[hundred],
         //            aggregate_signature: Signature::default(),
         //        },
         ConditionTest {
             opcode: opcodes::CREATE_COIN_ANNOUNCEMENT,
-            args: vec![h1_pointer],
+            args: &[h1_pointer],
             aggregate_signature: Signature::default(),
         },
         ConditionTest {
             opcode: opcodes::CREATE_PUZZLE_ANNOUNCEMENT,
-            args: vec![h1_pointer],
+            args: &[h1_pointer],
             aggregate_signature: Signature::default(),
         },
         ConditionTest {
             opcode: opcodes::ASSERT_MY_COIN_ID,
-            args: vec![allocator.new_atom(coin.coin_id().as_slice()).expect("atom")],
+            args: &[allocator.new_atom(coin.coin_id().as_slice()).expect("atom")],
             aggregate_signature: Signature::default(),
         },
         ConditionTest {
             opcode: opcodes::ASSERT_MY_PARENT_ID,
-            args: vec![h1_pointer],
+            args: &[h1_pointer],
             aggregate_signature: Signature::default(),
         },
         ConditionTest {
             opcode: opcodes::ASSERT_MY_PUZZLEHASH,
-            args: vec![puz_hash_node_ptr],
+            args: &[puz_hash_node_ptr],
             aggregate_signature: Signature::default(),
         },
         ConditionTest {
             opcode: opcodes::ASSERT_MY_AMOUNT,
-            args: vec![hundred],
+            args: &[hundred],
             aggregate_signature: Signature::default(),
         },
         ConditionTest {
             opcode: opcodes::ASSERT_MY_BIRTH_HEIGHT,
-            args: vec![hundred],
+            args: &[hundred],
             aggregate_signature: Signature::default(),
         },
         ConditionTest {
             opcode: opcodes::ASSERT_MY_BIRTH_SECONDS,
-            args: vec![hundred],
+            args: &[hundred],
             aggregate_signature: Signature::default(),
         },
         // ConditionTest {
         //     opcode: opcodes::ASSERT_EPHEMERAL,
-        //     args: vec![],
+        //     args: &[],
         //     aggregate_signature: Signature::default(),
         // },
         ConditionTest {
             opcode: opcodes::ASSERT_SECONDS_RELATIVE,
-            args: vec![one],
+            args: &[one],
             aggregate_signature: Signature::default(),
         },
         ConditionTest {
             opcode: opcodes::ASSERT_SECONDS_ABSOLUTE,
-            args: vec![one],
+            args: &[one],
             aggregate_signature: Signature::default(),
         },
         ConditionTest {
             opcode: opcodes::ASSERT_HEIGHT_RELATIVE,
-            args: vec![one],
+            args: &[one],
             aggregate_signature: Signature::default(),
         },
         ConditionTest {
             opcode: opcodes::ASSERT_HEIGHT_ABSOLUTE,
-            args: vec![one],
+            args: &[one],
             aggregate_signature: Signature::default(),
         },
         ConditionTest {
             opcode: opcodes::ASSERT_BEFORE_SECONDS_RELATIVE,
-            args: vec![one],
+            args: &[one],
             aggregate_signature: Signature::default(),
         },
         ConditionTest {
             opcode: opcodes::ASSERT_BEFORE_SECONDS_ABSOLUTE,
-            args: vec![one],
+            args: &[one],
             aggregate_signature: Signature::default(),
         },
         ConditionTest {
             opcode: opcodes::ASSERT_BEFORE_HEIGHT_RELATIVE,
-            args: vec![one],
+            args: &[one],
             aggregate_signature: Signature::default(),
         },
         ConditionTest {
             opcode: opcodes::ASSERT_BEFORE_HEIGHT_ABSOLUTE,
-            args: vec![one],
+            args: &[one],
             aggregate_signature: Signature::default(),
         },
         ConditionTest {
             opcode: opcodes::SOFTFORK,
-            args: vec![hundred, h1_pointer],
+            args: &[hundred, h1_pointer],
             aggregate_signature: Signature::default(),
         },
     ];
