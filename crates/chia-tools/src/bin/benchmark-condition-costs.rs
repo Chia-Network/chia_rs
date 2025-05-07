@@ -501,7 +501,7 @@ pub fn main() {
                 println!(
                     "condition: {} slope: {slope} computed-cost: {}",
                     cond.opcode,
-                    (slope * cost_per_ns) / 2 as f64
+                    (slope * cost_per_ns) / 2_f64
                 );
             } else {
                 println!(
