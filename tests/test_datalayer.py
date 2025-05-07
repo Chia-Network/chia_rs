@@ -4,6 +4,7 @@ import copy
 import hashlib
 import itertools
 from dataclasses import dataclass
+from enum import Enum
 from random import Random
 from typing import Generic, TypeVar, Union, final
 
@@ -398,9 +399,6 @@ def test_insert_with_reference_key_and_side() -> None:
     reference_kid = None
     side = None
 
-    # TODO: don't copy this here
-    from enum import Enum
-
     @final
     class Side(uint8, Enum):
         LEFT = uint8(0)
@@ -444,7 +442,6 @@ def test_double_insert_fails() -> None:
     key, value = generate_kvid(0)
     hash = generate_hash(0)
     merkle_blob.insert(key, value, hash)
-    # TODO: this exception should just be more specific to avoid the case sensitivity concerns
     with pytest.raises(KeyAlreadyPresentError):
         merkle_blob.insert(key, value, hash)
 
