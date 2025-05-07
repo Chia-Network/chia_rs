@@ -113,7 +113,7 @@ pub fn main() {
             opcode: opcodes::AGG_SIG_UNSAFE,
             args: &[pk_ptr, msg_ptr],
             aggregate_signature: sign(&sk, MSG1),
-            cost: 1200000,
+            cost: 1_200_000,
         },
         ConditionTest {
             opcode: opcodes::AGG_SIG_ME,
@@ -127,7 +127,7 @@ pub fn main() {
                 ]
                 .concat(),
             ),
-            cost: 1200000,
+            cost: 1_200_000,
         },
         ConditionTest {
             opcode: opcodes::AGG_SIG_PARENT,
@@ -141,7 +141,7 @@ pub fn main() {
                 ]
                 .concat(),
             ),
-            cost: 1200000,
+            cost: 1_200_000,
         },
         ConditionTest {
             opcode: opcodes::AGG_SIG_PUZZLE,
@@ -155,7 +155,7 @@ pub fn main() {
                 ]
                 .concat(),
             ),
-            cost: 1200000,
+            cost: 1_200_000,
         },
         ConditionTest {
             opcode: opcodes::AGG_SIG_AMOUNT,
@@ -169,7 +169,7 @@ pub fn main() {
                 ]
                 .concat(),
             ),
-            cost: 1200000,
+            cost: 1_200_000,
         },
         ConditionTest {
             opcode: opcodes::AGG_SIG_PARENT_AMOUNT,
@@ -186,7 +186,7 @@ pub fn main() {
                 ]
                 .concat(),
             ),
-            cost: 1200000,
+            cost: 1_200_000,
         },
         ConditionTest {
             opcode: opcodes::AGG_SIG_PARENT_PUZZLE,
@@ -203,7 +203,7 @@ pub fn main() {
                 ]
                 .concat(),
             ),
-            cost: 1200000,
+            cost: 1_200_000,
         },
         ConditionTest {
             opcode: opcodes::AGG_SIG_PUZZLE_AMOUNT,
@@ -220,7 +220,7 @@ pub fn main() {
                 ]
                 .concat(),
             ),
-            cost: 1200000,
+            cost: 1_200_000,
         },
         ConditionTest {
             opcode: opcodes::REMARK,
