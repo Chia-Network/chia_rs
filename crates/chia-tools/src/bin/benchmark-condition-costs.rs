@@ -108,6 +108,10 @@ fn create_two_conditions(
 }
 
 pub fn main() {
+    use gnuplot::{AxesCommon, Figure, PlotOption};
+
+    const REPS: u32 = 500;
+
     let mut allocator = Allocator::new();
     let mut total_cost = 0;
     let mut total_count = 0;
@@ -428,7 +432,7 @@ pub fn main() {
             _ => create_conditions(&mut allocator, &cond).expect("create_conditions"),
         };
 
-        for i in 1..500 {
+        for i in 1..REPS {
             signature += &cond.aggregate_signature;
             let mut spends = allocator.nil();
             // a "spend" is the following list (parent puzhash amount conditions)
@@ -482,7 +486,7 @@ pub fn main() {
             };
         }
         // reset allocator before next condition test
-        let (slope, _): (f64, f64) = linear_regression_of(&samples).expect("linreg failed");
+        let (slope, offset): (f64, f64) = linear_regression_of(&samples).expect("linreg failed");
         if cond.cost > 0 {
             let cost_per_ns = cond.cost as f64 / slope;
             cost_factors.push(cost_per_ns);
@@ -512,6 +516,19 @@ pub fn main() {
                 );
             }
         };
+        let mut plot = Figure::new();
+        plot.axes2d()
+            .set_x_label("number of conditions", &[])
+            .set_y_label("nanoseconds", &[])
+            .points(
+                samples.iter().map(|v| v.0),
+                samples.iter().map(|v| v.1),
+                &[PlotOption::PointSymbol('o')],
+            )
+            .lines([0, REPS], [offset, offset + slope * (REPS as f64)], &[]);
+        plot.save_to_png(format!("condition-{}.png", cond.opcode), 1024, 768)
+            .expect("save svg");
+        plot.close();
         allocator.restore_checkpoint(&cp);
     }
 
