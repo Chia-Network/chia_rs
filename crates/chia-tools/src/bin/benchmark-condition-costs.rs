@@ -25,6 +25,8 @@ struct ConditionTest<'a> {
     opcode: ConditionOpcode,
     args: &'a [NodePtr],
     aggregate_signature: Signature,
+    // 0 means we want to estimate a reasonable cost
+    cost: u64,
 }
 use hex_literal::hex;
 
@@ -108,19 +110,10 @@ pub fn main() {
     // this is the list of conditions to test
     let cond_tests = [
         ConditionTest {
-            opcode: opcodes::REMARK,
-            args: &[h1_pointer],
-            aggregate_signature: Signature::default(),
-        },
-        //        ConditionTest {
-        //            opcode: opcodes::CREATE_COIN,
-        //            args: vec![h1_pointer, one],
-        //            aggregate_signature: Signature::default(),
-        //        },
-        ConditionTest {
             opcode: opcodes::AGG_SIG_UNSAFE,
             args: &[pk_ptr, msg_ptr],
             aggregate_signature: sign(&sk, MSG1),
+            cost: 1200000,
         },
         ConditionTest {
             opcode: opcodes::AGG_SIG_ME,
@@ -134,6 +127,7 @@ pub fn main() {
                 ]
                 .concat(),
             ),
+            cost: 1200000,
         },
         ConditionTest {
             opcode: opcodes::AGG_SIG_PARENT,
@@ -147,6 +141,7 @@ pub fn main() {
                 ]
                 .concat(),
             ),
+            cost: 1200000,
         },
         ConditionTest {
             opcode: opcodes::AGG_SIG_PUZZLE,
@@ -160,6 +155,7 @@ pub fn main() {
                 ]
                 .concat(),
             ),
+            cost: 1200000,
         },
         ConditionTest {
             opcode: opcodes::AGG_SIG_AMOUNT,
@@ -173,6 +169,7 @@ pub fn main() {
                 ]
                 .concat(),
             ),
+            cost: 1200000,
         },
         ConditionTest {
             opcode: opcodes::AGG_SIG_PARENT_AMOUNT,
@@ -189,6 +186,7 @@ pub fn main() {
                 ]
                 .concat(),
             ),
+            cost: 1200000,
         },
         ConditionTest {
             opcode: opcodes::AGG_SIG_PARENT_PUZZLE,
@@ -205,6 +203,7 @@ pub fn main() {
                 ]
                 .concat(),
             ),
+            cost: 1200000,
         },
         ConditionTest {
             opcode: opcodes::AGG_SIG_PUZZLE_AMOUNT,
@@ -221,105 +220,131 @@ pub fn main() {
                 ]
                 .concat(),
             ),
+            cost: 1200000,
+        },
+        ConditionTest {
+            opcode: opcodes::REMARK,
+            args: &[h1_pointer],
+            aggregate_signature: Signature::default(),
+            cost: 0,
         },
         //        ConditionTest {
         //            opcode: opcodes::RESERVE_FEE,
         //            args: &[hundred],
         //            aggregate_signature: Signature::default(),
+        //            cost: 0,
         //        },
         ConditionTest {
             opcode: opcodes::CREATE_COIN_ANNOUNCEMENT,
             args: &[h1_pointer],
             aggregate_signature: Signature::default(),
+            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::CREATE_PUZZLE_ANNOUNCEMENT,
             args: &[h1_pointer],
             aggregate_signature: Signature::default(),
+            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::ASSERT_MY_COIN_ID,
             args: &[allocator.new_atom(coin.coin_id().as_slice()).expect("atom")],
             aggregate_signature: Signature::default(),
+            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::ASSERT_MY_PARENT_ID,
             args: &[h1_pointer],
             aggregate_signature: Signature::default(),
+            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::ASSERT_MY_PUZZLEHASH,
             args: &[puz_hash_node_ptr],
             aggregate_signature: Signature::default(),
+            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::ASSERT_MY_AMOUNT,
             args: &[hundred],
             aggregate_signature: Signature::default(),
+            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::ASSERT_MY_BIRTH_HEIGHT,
             args: &[hundred],
             aggregate_signature: Signature::default(),
+            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::ASSERT_MY_BIRTH_SECONDS,
             args: &[hundred],
             aggregate_signature: Signature::default(),
+            cost: 0,
         },
         // ConditionTest {
         //     opcode: opcodes::ASSERT_EPHEMERAL,
         //     args: &[],
         //     aggregate_signature: Signature::default(),
+        //     cost: 0,
         // },
         ConditionTest {
             opcode: opcodes::ASSERT_SECONDS_RELATIVE,
             args: &[one],
             aggregate_signature: Signature::default(),
+            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::ASSERT_SECONDS_ABSOLUTE,
             args: &[one],
             aggregate_signature: Signature::default(),
+            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::ASSERT_HEIGHT_RELATIVE,
             args: &[one],
             aggregate_signature: Signature::default(),
+            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::ASSERT_HEIGHT_ABSOLUTE,
             args: &[one],
             aggregate_signature: Signature::default(),
+            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::ASSERT_BEFORE_SECONDS_RELATIVE,
             args: &[one],
             aggregate_signature: Signature::default(),
+            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::ASSERT_BEFORE_SECONDS_ABSOLUTE,
             args: &[one],
             aggregate_signature: Signature::default(),
+            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::ASSERT_BEFORE_HEIGHT_RELATIVE,
             args: &[one],
             aggregate_signature: Signature::default(),
+            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::ASSERT_BEFORE_HEIGHT_ABSOLUTE,
             args: &[one],
             aggregate_signature: Signature::default(),
+            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::SOFTFORK,
             args: &[hundred, h1_pointer],
             aggregate_signature: Signature::default(),
+            cost: 0,
         },
     ];
 
-    let mut slopes = Vec::<f64>::new();
+    let mut cost_factors = Vec::<f64>::new();
     for cond in cond_tests {
         // let mut spend = SpendConditions::new(
         //     parent_id,
@@ -380,12 +405,24 @@ pub fn main() {
         }
         // reset allocator before next condition test
         let (slope, _): (f64, f64) = linear_regression_of(&samples).expect("linreg failed");
-        println!("condition: {} slope: {slope}", cond.opcode);
-        slopes.push(slope);
+        if cond.cost > 0 {
+            let cost_per_ns = cond.cost as f64 / slope;
+            cost_factors.push(cost_per_ns);
+            println!(
+                "condition: {} slope: {slope} cost-per-nanosecond: {cost_per_ns}",
+                cond.opcode
+            );
+        } else {
+            let cost_per_ns = cost_factors.iter().sum::<f64>() / cost_factors.len() as f64;
+            println!(
+                "condition: {} slope: {slope} computed-cost: {}",
+                cond.opcode,
+                slope * cost_per_ns
+            );
+        };
         allocator.restore_checkpoint(&cp);
     }
 
-    println!("Slopes: {slopes:?}");
     println!("Total Cost: {total_cost}");
     println!("Total Count: {total_count}");
 }
