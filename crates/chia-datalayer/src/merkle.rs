@@ -373,7 +373,6 @@ where
     T: Streamable,
 {
     let mut cursor = std::io::Cursor::new(bytes);
-    // TODO: consider trusted mode?
     T::parse::<false>(&mut cursor)
 }
 
