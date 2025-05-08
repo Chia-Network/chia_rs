@@ -724,8 +724,6 @@ pub struct BlockStatusCache {
 }
 
 impl BlockStatusCache {
-    // TODO: take the encouragement to clean up and make clippy happy again
-    #[allow(clippy::type_complexity)]
     fn new(blob: &Vec<u8>) -> Result<Self, Error> {
         let index_count = blob.len() / BLOCK_SIZE;
 
@@ -2053,8 +2051,6 @@ impl MerkleBlob {
             }
             Some(DeltaReaderNode::Internal { left, right }) => {
                 let index = self.get_new_index();
-                // TODO: certainly belongs elswehere
-                // let undefined_index = TreeIndex(u32::MAX - 1);
 
                 let left_index = self.build_blob_from_node_list(
                     nodes,
@@ -2404,7 +2400,6 @@ fn try_get_block(blob: &[u8], index: TreeIndex) -> Result<Block, Error> {
     Block::from_bytes(block_bytes)
 }
 
-#[allow(clippy::type_complexity)]
 pub fn get_internal_terminal(
     // TODO: should be &[u8] i think?
     blob: &Vec<u8>,
