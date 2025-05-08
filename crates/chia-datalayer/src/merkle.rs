@@ -1149,7 +1149,6 @@ impl MerkleBlob {
             return Err(Error::InvalidBlobLength(remainder));
         }
 
-        // TODO: maybe integrate integrity check here if quick enough
         let block_status_cache = BlockStatusCache::new(&blob)?;
 
         let self_ = Self {
@@ -1753,7 +1752,6 @@ impl MerkleBlob {
         }
     }
 
-    // TODO: not really that random
     fn get_random_insert_location_by_seed(
         &self,
         seed_bytes: &[u8],
@@ -1764,7 +1762,7 @@ impl MerkleBlob {
             return Ok(InsertLocation::AsRoot {});
         }
 
-        // TODO: zero means left here but right below?
+        // NOTE: zero means left here but right below
         let final_side = if (seed_bytes
             .first()
             .ok_or(Error::ZeroLengthSeedNotAllowed())?
@@ -2104,7 +2102,6 @@ impl PartialEq for MerkleBlob {
             MerkleBlobLeftChildFirstIterator::new(&other.blob, None),
         ) {
             let (Ok((_, self_block)), Ok((_, other_block))) = item else {
-                // TODO: it's an error though, hmm
                 return false;
             };
             if (self_block.metadata.dirty || other_block.metadata.dirty)
@@ -2379,7 +2376,7 @@ impl MerkleBlob {
     pub fn py_get_random_leaf_node(&self, seed: &[u8]) -> PyResult<LeafNode> {
         let insert_location = self.get_random_insert_location_by_seed(seed)?;
         let InsertLocation::Leaf { index, side: _ } = insert_location else {
-            // TODO: real error
+            // TODO: use a specific error
             return Err(PyValueError::new_err(""));
         };
 
