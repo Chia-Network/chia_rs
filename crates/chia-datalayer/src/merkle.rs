@@ -3,7 +3,6 @@ use chia_py_streamable_macro::{PyJsonDict, PyStreamable};
 #[cfg(feature = "py-bindings")]
 use pyo3::{
     buffer::PyBuffer,
-    exceptions::PyValueError,
     prelude::*,
     pyclass, pymethods,
     types::{PyDict, PyDictMethods, PyListMethods, PyType},
@@ -347,6 +346,24 @@ create_errors!(
             MoveDestinationIndexNotInUseError,
             "move destination index not in use: {0:?}",
             (TreeIndex)
+        ),
+        (
+            IncompleteInsertLocationParameters,
+            IncompleteInsertLocationParametersError,
+            "must specify neither or both of reference_kid and side",
+            ()
+        ),
+        (
+            Dirty,
+            DirtyError,
+            "hash is dirty for index: {0:?}",
+            (TreeIndex)
+        ),
+        (
+            UnmatchedKeysAndValues,
+            UnmatchedKeysAndValuesError,
+            "key/value and hash collection lengths must match: {0:?} keys/values, {0:?} hashes",
+            (usize, usize)
         )
     )
 );
@@ -2221,18 +2238,10 @@ impl MerkleBlob {
                 index: *self
                     .block_status_cache
                     .get_index_by_key(key)
-                    // TODO: use a specific error
-                    .ok_or(PyValueError::new_err(format!(
-                        "unknown key id passed as insert location reference: {key}"
-                    )))?,
+                    .ok_or(Error::UnknownKey(key))?,
                 side: Side::from_bytes(&[side])?,
             },
-            _ => {
-                // TODO: use a specific error
-                return Err(PyValueError::new_err(
-                    "must specify neither or both of reference_kid and side",
-                ));
-            }
+            _ => Err(Error::IncompleteInsertLocationParameters())?,
         };
         self.insert(key, value, &hash, insert_location)?;
 
@@ -2310,8 +2319,7 @@ impl MerkleBlob {
 
         let block = self.get_block(index)?;
         if block.metadata.dirty {
-            // TODO: use a specific error
-            return Err(PyValueError::new_err("root hash is dirty"));
+            Err(Error::Dirty(index))?;
         }
 
         Ok(Some(block.node.hash()))
@@ -2324,10 +2332,10 @@ impl MerkleBlob {
         hashes: Vec<Hash>,
     ) -> PyResult<()> {
         if keys_values.len() != hashes.len() {
-            // TODO: use a specific error
-            return Err(PyValueError::new_err(
-                "key/value and hash collection lengths must match",
-            ));
+            Err(Error::UnmatchedKeysAndValues(
+                keys_values.len(),
+                hashes.len(),
+            ))?;
         }
 
         self.batch_insert(zip(keys_values, hashes).collect())?;
@@ -2375,8 +2383,7 @@ impl MerkleBlob {
     pub fn py_get_random_leaf_node(&self, seed: &[u8]) -> PyResult<LeafNode> {
         let insert_location = self.get_random_insert_location_by_seed(seed)?;
         let InsertLocation::Leaf { index, side: _ } = insert_location else {
-            // TODO: use a specific error
-            return Err(PyValueError::new_err(""));
+            Err(Error::UnableToFindALeaf())?
         };
 
         Ok(self.get_node(index)?.expect_leaf("matched leaf above"))
