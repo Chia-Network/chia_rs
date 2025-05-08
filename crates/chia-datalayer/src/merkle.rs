@@ -688,7 +688,7 @@ fn block_range(index: TreeIndex) -> Range<usize> {
 }
 
 pub struct Block {
-    // TODO: metadata node type and node's type not verified for agreement
+    // NOTE: metadata node type and node's type not verified for agreement
     metadata: NodeMetadata,
     node: Node,
 }
@@ -1476,19 +1476,18 @@ impl MerkleBlob {
         if indexes.len() == 1 {
             // OPT: can we avoid this extra min height leaf traversal?
             let min_height_leaf = self.get_min_height_leaf()?;
-            self.insert_from_key(min_height_leaf.key, indexes[0], Side::Left)?;
+            self.insert_subtree_at_key(min_height_leaf.key, indexes[0], Side::Left)?;
         };
 
         Ok(())
     }
 
-    fn insert_from_key(
+    fn insert_subtree_at_key(
         &mut self,
         old_leaf_key: KeyId,
         new_index: TreeIndex,
         side: Side,
     ) -> Result<(), Error> {
-        // NAME: consider name, we're inserting a subtree at a leaf
         // TODO: seems like this ought to be fairly similar to regular insert
 
         // TODO: but what about the old leaf being the root...  is that what the batch insert
