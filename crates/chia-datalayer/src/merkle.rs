@@ -208,19 +208,17 @@ create_errors!(
             (#[from]
             std::io::Error)
         ),
-        // TODO: don't use String here
         (
             FailedLoadingMetadata,
             FailedLoadingMetadataError,
             "failed loading metadata: {0}",
-            (String)
+            (chia_traits::chia_error::Error)
         ),
-        // TODO: don't use String here
         (
             FailedLoadingNode,
             FailedLoadingNodeError,
             "failed loading node: {0}",
-            (String)
+            (chia_traits::chia_error::Error)
         ),
         (
             InvalidBlobLength,
@@ -368,13 +366,15 @@ type MetadataBytes = [u8; METADATA_SIZE];
 type DataBytes = [u8; DATA_SIZE];
 const DATA_RANGE: Range<usize> = METADATA_SIZE..METADATA_SIZE + DATA_SIZE;
 
-fn streamable_from_bytes_ignore_extra_bytes<T>(bytes: &[u8]) -> Result<T, Error>
+fn streamable_from_bytes_ignore_extra_bytes<T>(
+    bytes: &[u8],
+) -> Result<T, chia_traits::chia_error::Error>
 where
     T: Streamable,
 {
     let mut cursor = std::io::Cursor::new(bytes);
     // TODO: consider trusted mode?
-    T::parse::<false>(&mut cursor).map_err(Error::Streaming)
+    T::parse::<false>(&mut cursor)
 }
 
 fn zstd_decode_path(path: &PathBuf) -> Result<Vec<u8>, Error> {
@@ -619,7 +619,10 @@ impl Node {
     }
 
     #[allow(clippy::trivially_copy_pass_by_ref)]
-    pub fn from_bytes(metadata: &NodeMetadata, blob: &DataBytes) -> Result<Self, Error> {
+    pub fn from_bytes(
+        metadata: &NodeMetadata,
+        blob: &DataBytes,
+    ) -> Result<Self, chia_traits::chia_error::Error> {
         Ok(match metadata.node_type {
             NodeType::Internal => Node::Internal(streamable_from_bytes_ignore_extra_bytes(blob)?),
             NodeType::Leaf => Node::Leaf(streamable_from_bytes_ignore_extra_bytes(blob)?),
@@ -703,10 +706,9 @@ impl Block {
     pub fn from_bytes(blob: BlockBytes) -> Result<Self, Error> {
         let metadata_blob: MetadataBytes = blob[METADATA_RANGE].try_into().unwrap();
         let data_blob: DataBytes = blob[DATA_RANGE].try_into().unwrap();
-        let metadata = NodeMetadata::from_bytes(&metadata_blob)
-            .map_err(|message| Error::FailedLoadingMetadata(message.to_string()))?;
-        let node = Node::from_bytes(&metadata, &data_blob)
-            .map_err(|message| Error::FailedLoadingNode(message.to_string()))?;
+        let metadata =
+            NodeMetadata::from_bytes(&metadata_blob).map_err(Error::FailedLoadingMetadata)?;
+        let node = Node::from_bytes(&metadata, &data_blob).map_err(Error::FailedLoadingNode)?;
 
         Ok(Block { metadata, node })
     }
