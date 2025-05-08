@@ -113,6 +113,9 @@ jobs:
         python-version: ["3.10", "3.11"]
 
     steps:
+      - run: |
+          ls -l .cargo/bin/
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
@@ -124,6 +127,9 @@ jobs:
 
       - name: Set up rust
         uses: dtolnay/rust-toolchain@1.85.0
+
+      - run: |
+          ls -l .cargo/bin/
 
       - name: setup venv
         run: |
