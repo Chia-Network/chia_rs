@@ -115,6 +115,8 @@ jobs:
     steps:
       - run: |
           ls -la .cargo/bin/ || true
+          echo CARGO_HOME=${CARGO_HOME} || true
+          ls -la "${CARGO_HOME}"/bin/ || true
 
       - uses: actions/checkout@v4
         with:
@@ -130,6 +132,8 @@ jobs:
 
       - run: |
           ls -la .cargo/bin/ || true
+          echo CARGO_HOME=${CARGO_HOME} || true
+          ls -la "${CARGO_HOME}"/bin/ || true
 
       - name: setup venv
         run: |
