@@ -18,4 +18,6 @@ pub const STRICT_ARGS_COUNT: u32 = 0x8_0000;
 // re-run it to compute additions and removals.
 pub const DONT_VALIDATE_SIGNATURE: u32 = 0x1_0000;
 
+pub const COST_CONDITIONS: u32 = 0x80_0000;
+
 pub const MEMPOOL_MODE: u32 = CLVM_MEMPOOL_MODE | NO_UNKNOWN_CONDS | STRICT_ARGS_COUNT;
