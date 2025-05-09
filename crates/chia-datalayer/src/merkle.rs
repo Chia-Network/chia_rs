@@ -3,7 +3,6 @@ use chia_py_streamable_macro::{PyJsonDict, PyStreamable};
 #[cfg(feature = "py-bindings")]
 use pyo3::{
     buffer::PyBuffer,
-    exceptions::PyValueError,
     prelude::*,
     pyclass, pymethods,
     types::{PyDict, PyDictMethods, PyListMethods, PyType},
@@ -33,6 +32,7 @@ type TreeIndexType = u32;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 // TODO: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
 //       being found with a cfg_attr
+//       https://github.com/PyO3/pyo3/issues/5125
 #[cfg(feature = "py-bindings")]
 pub struct TreeIndex(#[pyo3(get, name = "raw")] TreeIndexType);
 
@@ -82,6 +82,7 @@ pub struct Hash(Bytes32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 // TODO: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
 //       being found with a cfg_attr
+//       https://github.com/PyO3/pyo3/issues/5125
 #[cfg(feature = "py-bindings")]
 pub struct KeyId(#[pyo3(get, name = "raw")] i64);
 
@@ -106,6 +107,7 @@ impl KeyId {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 // TODO: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
 //       being found with a cfg_attr
+//       https://github.com/PyO3/pyo3/issues/5125
 #[cfg(feature = "py-bindings")]
 pub struct ValueId(#[pyo3(get, name = "raw")] i64);
 
@@ -205,19 +207,17 @@ create_errors!(
             (#[from]
             std::io::Error)
         ),
-        // TODO: don't use String here
         (
             FailedLoadingMetadata,
             FailedLoadingMetadataError,
             "failed loading metadata: {0}",
-            (String)
+            (chia_traits::chia_error::Error)
         ),
-        // TODO: don't use String here
         (
             FailedLoadingNode,
             FailedLoadingNodeError,
             "failed loading node: {0}",
-            (String)
+            (chia_traits::chia_error::Error)
         ),
         (
             InvalidBlobLength,
@@ -346,6 +346,24 @@ create_errors!(
             MoveDestinationIndexNotInUseError,
             "move destination index not in use: {0:?}",
             (TreeIndex)
+        ),
+        (
+            IncompleteInsertLocationParameters,
+            IncompleteInsertLocationParametersError,
+            "must specify neither or both of reference_kid and side",
+            ()
+        ),
+        (
+            Dirty,
+            DirtyError,
+            "hash is dirty for index: {0:?}",
+            (TreeIndex)
+        ),
+        (
+            UnmatchedKeysAndValues,
+            UnmatchedKeysAndValuesError,
+            "key/value and hash collection lengths must match: {0:?} keys/values, {0:?} hashes",
+            (usize, usize)
         )
     )
 );
@@ -365,13 +383,14 @@ type MetadataBytes = [u8; METADATA_SIZE];
 type DataBytes = [u8; DATA_SIZE];
 const DATA_RANGE: Range<usize> = METADATA_SIZE..METADATA_SIZE + DATA_SIZE;
 
-fn streamable_from_bytes_ignore_extra_bytes<T>(bytes: &[u8]) -> Result<T, Error>
+fn streamable_from_bytes_ignore_extra_bytes<T>(
+    bytes: &[u8],
+) -> Result<T, chia_traits::chia_error::Error>
 where
     T: Streamable,
 {
     let mut cursor = std::io::Cursor::new(bytes);
-    // TODO: consider trusted mode?
-    T::parse::<false>(&mut cursor).map_err(Error::Streaming)
+    T::parse::<false>(&mut cursor)
 }
 
 fn zstd_decode_path(path: &PathBuf) -> Result<Vec<u8>, Error> {
@@ -616,7 +635,10 @@ impl Node {
     }
 
     #[allow(clippy::trivially_copy_pass_by_ref)]
-    pub fn from_bytes(metadata: &NodeMetadata, blob: &DataBytes) -> Result<Self, Error> {
+    pub fn from_bytes(
+        metadata: &NodeMetadata,
+        blob: &DataBytes,
+    ) -> Result<Self, chia_traits::chia_error::Error> {
         Ok(match metadata.node_type {
             NodeType::Internal => Node::Internal(streamable_from_bytes_ignore_extra_bytes(blob)?),
             NodeType::Leaf => Node::Leaf(streamable_from_bytes_ignore_extra_bytes(blob)?),
@@ -683,7 +705,7 @@ fn block_range(index: TreeIndex) -> Range<usize> {
 }
 
 pub struct Block {
-    // TODO: metadata node type and node's type not verified for agreement
+    // NOTE: metadata node type and node's type not verified for agreement
     metadata: NodeMetadata,
     node: Node,
 }
@@ -700,10 +722,9 @@ impl Block {
     pub fn from_bytes(blob: BlockBytes) -> Result<Self, Error> {
         let metadata_blob: MetadataBytes = blob[METADATA_RANGE].try_into().unwrap();
         let data_blob: DataBytes = blob[DATA_RANGE].try_into().unwrap();
-        let metadata = NodeMetadata::from_bytes(&metadata_blob)
-            .map_err(|message| Error::FailedLoadingMetadata(message.to_string()))?;
-        let node = Node::from_bytes(&metadata, &data_blob)
-            .map_err(|message| Error::FailedLoadingNode(message.to_string()))?;
+        let metadata =
+            NodeMetadata::from_bytes(&metadata_blob).map_err(Error::FailedLoadingMetadata)?;
+        let node = Node::from_bytes(&metadata, &data_blob).map_err(Error::FailedLoadingNode)?;
 
         Ok(Block { metadata, node })
     }
@@ -1145,7 +1166,6 @@ impl MerkleBlob {
             return Err(Error::InvalidBlobLength(remainder));
         }
 
-        // TODO: maybe integrate integrity check here if quick enough
         let block_status_cache = BlockStatusCache::new(&blob)?;
 
         let self_ = Self {
@@ -1473,19 +1493,18 @@ impl MerkleBlob {
         if indexes.len() == 1 {
             // OPT: can we avoid this extra min height leaf traversal?
             let min_height_leaf = self.get_min_height_leaf()?;
-            self.insert_from_key(min_height_leaf.key, indexes[0], Side::Left)?;
+            self.insert_subtree_at_key(min_height_leaf.key, indexes[0], Side::Left)?;
         };
 
         Ok(())
     }
 
-    fn insert_from_key(
+    fn insert_subtree_at_key(
         &mut self,
         old_leaf_key: KeyId,
         new_index: TreeIndex,
         side: Side,
     ) -> Result<(), Error> {
-        // NAME: consider name, we're inserting a subtree at a leaf
         // TODO: seems like this ought to be fairly similar to regular insert
 
         // TODO: but what about the old leaf being the root...  is that what the batch insert
@@ -1749,7 +1768,6 @@ impl MerkleBlob {
         }
     }
 
-    // TODO: not really that random
     fn get_random_insert_location_by_seed(
         &self,
         seed_bytes: &[u8],
@@ -1760,7 +1778,7 @@ impl MerkleBlob {
             return Ok(InsertLocation::AsRoot {});
         }
 
-        // TODO: zero means left here but right below?
+        // NOTE: zero means left here but right below
         let final_side = if (seed_bytes
             .first()
             .ok_or(Error::ZeroLengthSeedNotAllowed())?
@@ -2100,7 +2118,6 @@ impl PartialEq for MerkleBlob {
             MerkleBlobLeftChildFirstIterator::new(&other.blob, None),
         ) {
             let (Ok((_, self_block)), Ok((_, other_block))) = item else {
-                // TODO: it's an error though, hmm
                 return false;
             };
             if (self_block.metadata.dirty || other_block.metadata.dirty)
@@ -2221,18 +2238,10 @@ impl MerkleBlob {
                 index: *self
                     .block_status_cache
                     .get_index_by_key(key)
-                    // TODO: use a specific error
-                    .ok_or(PyValueError::new_err(format!(
-                        "unknown key id passed as insert location reference: {key}"
-                    )))?,
+                    .ok_or(Error::UnknownKey(key))?,
                 side: Side::from_bytes(&[side])?,
             },
-            _ => {
-                // TODO: use a specific error
-                return Err(PyValueError::new_err(
-                    "must specify neither or both of reference_kid and side",
-                ));
-            }
+            _ => Err(Error::IncompleteInsertLocationParameters())?,
         };
         self.insert(key, value, &hash, insert_location)?;
 
@@ -2310,8 +2319,7 @@ impl MerkleBlob {
 
         let block = self.get_block(index)?;
         if block.metadata.dirty {
-            // TODO: use a specific error
-            return Err(PyValueError::new_err("root hash is dirty"));
+            Err(Error::Dirty(index))?;
         }
 
         Ok(Some(block.node.hash()))
@@ -2324,10 +2332,10 @@ impl MerkleBlob {
         hashes: Vec<Hash>,
     ) -> PyResult<()> {
         if keys_values.len() != hashes.len() {
-            // TODO: use a specific error
-            return Err(PyValueError::new_err(
-                "key/value and hash collection lengths must match",
-            ));
+            Err(Error::UnmatchedKeysAndValues(
+                keys_values.len(),
+                hashes.len(),
+            ))?;
         }
 
         self.batch_insert(zip(keys_values, hashes).collect())?;
@@ -2375,8 +2383,7 @@ impl MerkleBlob {
     pub fn py_get_random_leaf_node(&self, seed: &[u8]) -> PyResult<LeafNode> {
         let insert_location = self.get_random_insert_location_by_seed(seed)?;
         let InsertLocation::Leaf { index, side: _ } = insert_location else {
-            // TODO: real error
-            return Err(PyValueError::new_err(""));
+            Err(Error::UnableToFindALeaf())?
         };
 
         Ok(self.get_node(index)?.expect_leaf("matched leaf above"))
