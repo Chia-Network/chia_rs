@@ -1,4 +1,5 @@
 use chia_bls::{sign, SecretKey, Signature};
+use chia_consensus::gen::flags::MEMPOOL_MODE;
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::r#gen::make_aggsig_final_message::u64_to_bytes;
 use chia_sha2::Sha256;
@@ -6,7 +7,6 @@ use linreg::linear_regression_of;
 use std::time::Instant;
 // use chia_consensus::gen::conditions::parse_conditions;
 use chia_consensus::gen::conditions::{MempoolVisitor, SpendBundleConditions};
-use chia_consensus::gen::flags::COST_CONDITIONS; // DONT_VALIDATE_SIGNATURE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
 use chia_consensus::gen::opcodes;
 use chia_consensus::r#gen::conditions::{
     process_single_spend,
@@ -116,7 +116,7 @@ pub fn main() {
     let mut total_cost = 0;
     let mut total_count = 0;
     // let puzzle = allocator.new_small_number(1).expect("number");
-    let flags: u32 = COST_CONDITIONS;
+    let flags: u32 = MEMPOOL_MODE;
     let one = allocator.new_small_number(1).expect("number");
     let hundred = allocator.new_small_number(100).expect("number");
     let sixty_three = allocator.new_small_number(63).expect("number");
