@@ -113,6 +113,11 @@ jobs:
         python-version: ["3.10", "3.11"]
 
     steps:
+      - run: |
+          ls -la .cargo/bin/ || true
+          echo CARGO_HOME=${CARGO_HOME} || true
+          ls -la "${CARGO_HOME}"/bin/ || true
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
@@ -125,6 +130,11 @@ jobs:
       - name: Set up rust
         uses: dtolnay/rust-toolchain@1.85.0
 
+      - run: |
+          ls -la .cargo/bin/ || true
+          echo CARGO_HOME=${CARGO_HOME} || true
+          ls -la "${CARGO_HOME}"/bin/ || true
+
       - name: setup venv
         run: |
           python -m venv venv
@@ -135,7 +145,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install maturin colorama clvm_tools
-          rustup target add x86_64-unknown-linux-musl
 
       - name: Build
         run: |
