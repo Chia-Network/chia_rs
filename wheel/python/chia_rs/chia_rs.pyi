@@ -4334,7 +4334,8 @@ class ConsensusConstants:
     EPOCH_BLOCKS: uint32
     SIGNIFICANT_BITS: uint8
     DISCRIMINANT_SIZE_BITS: uint16
-    NUMBER_ZERO_BITS_PLOT_FILTER: uint8
+    NUMBER_ZERO_BITS_PLOT_FILTER_OLD: uint8
+    NUMBER_ZERO_BITS_PLOT_FILTER_NEW: uint8
     MIN_PLOT_SIZE: uint8
     MAX_PLOT_SIZE: uint8
     SUB_SLOT_TIME_TARGET: uint16
@@ -4364,6 +4365,7 @@ class ConsensusConstants:
     MAX_GENERATOR_REF_LIST_SIZE: uint32
     POOL_SUB_SLOT_ITERS: uint64
     HARD_FORK_HEIGHT: uint32
+    HARD_FORK2_HEIGHT: uint32
     PLOT_FILTER_128_HEIGHT: uint32
     PLOT_FILTER_64_HEIGHT: uint32
     PLOT_FILTER_32_HEIGHT: uint32
@@ -4381,7 +4383,8 @@ class ConsensusConstants:
         EPOCH_BLOCKS: uint32,
         SIGNIFICANT_BITS: uint8,
         DISCRIMINANT_SIZE_BITS: uint16,
-        NUMBER_ZERO_BITS_PLOT_FILTER: uint8,
+        NUMBER_ZERO_BITS_PLOT_FILTER_OLD: uint8,
+        NUMBER_ZERO_BITS_PLOT_FILTER_NEW: uint8,
         MIN_PLOT_SIZE: uint8,
         MAX_PLOT_SIZE: uint8,
         SUB_SLOT_TIME_TARGET: uint16,
@@ -4411,6 +4414,7 @@ class ConsensusConstants:
         MAX_GENERATOR_REF_LIST_SIZE: uint32,
         POOL_SUB_SLOT_ITERS: uint64,
         HARD_FORK_HEIGHT: uint32,
+        HARD_FORK2_HEIGHT: uint32,
         PLOT_FILTER_128_HEIGHT: uint32,
         PLOT_FILTER_64_HEIGHT: uint32,
         PLOT_FILTER_32_HEIGHT: uint32
@@ -4444,7 +4448,8 @@ class ConsensusConstants:
         EPOCH_BLOCKS: Union[ uint32, _Unspec] = _Unspec(),
         SIGNIFICANT_BITS: Union[ uint8, _Unspec] = _Unspec(),
         DISCRIMINANT_SIZE_BITS: Union[ uint16, _Unspec] = _Unspec(),
-        NUMBER_ZERO_BITS_PLOT_FILTER: Union[ uint8, _Unspec] = _Unspec(),
+        NUMBER_ZERO_BITS_PLOT_FILTER_OLD: Union[ uint8, _Unspec] = _Unspec(),
+        NUMBER_ZERO_BITS_PLOT_FILTER_NEW: Union[ uint8, _Unspec] = _Unspec(),
         MIN_PLOT_SIZE: Union[ uint8, _Unspec] = _Unspec(),
         MAX_PLOT_SIZE: Union[ uint8, _Unspec] = _Unspec(),
         SUB_SLOT_TIME_TARGET: Union[ uint16, _Unspec] = _Unspec(),
@@ -4474,6 +4479,7 @@ class ConsensusConstants:
         MAX_GENERATOR_REF_LIST_SIZE: Union[ uint32, _Unspec] = _Unspec(),
         POOL_SUB_SLOT_ITERS: Union[ uint64, _Unspec] = _Unspec(),
         HARD_FORK_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
+        HARD_FORK2_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_FILTER_128_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_FILTER_64_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_FILTER_32_HEIGHT: Union[ uint32, _Unspec] = _Unspec()) -> ConsensusConstants: ...
