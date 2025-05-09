@@ -11,15 +11,13 @@ use super::opcodes::{
     ASSERT_HEIGHT_ABSOLUTE, ASSERT_HEIGHT_RELATIVE, ASSERT_MY_AMOUNT, ASSERT_MY_BIRTH_HEIGHT,
     ASSERT_MY_BIRTH_SECONDS, ASSERT_MY_COIN_ID, ASSERT_MY_PARENT_ID, ASSERT_MY_PUZZLEHASH,
     ASSERT_PUZZLE_ANNOUNCEMENT, ASSERT_SECONDS_ABSOLUTE, ASSERT_SECONDS_RELATIVE, CREATE_COIN,
-    CREATE_COIN_ANNOUNCEMENT, CREATE_COIN_COST, CREATE_PUZZLE_ANNOUNCEMENT, FREE_CONDITIONS,
-    GENERIC_CONDITION_COST, RECEIVE_MESSAGE, REMARK, RESERVE_FEE, SEND_MESSAGE, SOFTFORK,
+    CREATE_COIN_ANNOUNCEMENT, CREATE_COIN_COST, CREATE_PUZZLE_ANNOUNCEMENT, RECEIVE_MESSAGE,
+    REMARK, RESERVE_FEE, SEND_MESSAGE, SOFTFORK,
 };
 use super::sanitize_int::{sanitize_uint, SanitizedUint};
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
 use crate::consensus_constants::ConsensusConstants;
-use crate::gen::flags::{
-    COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
-};
+use crate::gen::flags::{DONT_VALIDATE_SIGNATURE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
 use crate::gen::make_aggsig_final_message::u64_to_bytes;
 use crate::gen::messages::{Message, SpendId};
 use crate::gen::spend_visitor::SpendVisitor;
@@ -1005,22 +1003,9 @@ pub fn parse_conditions<V: SpendVisitor>(
     visitor: &mut V,
 ) -> Result<(), ValidationErr> {
     let mut announce_countdown: u32 = 1024;
-    let mut free_condition_countdown: usize = FREE_CONDITIONS;
 
     while let Some((mut c, next)) = next(a, iter)? {
         iter = next;
-
-        // add cost for looking at any condition
-        if (flags & COST_CONDITIONS) != 0 {
-            if free_condition_countdown == 0 {
-                if *max_cost < GENERIC_CONDITION_COST {
-                    return Err(ValidationErr(c, ErrorCode::CostExceeded));
-                }
-                *max_cost -= GENERIC_CONDITION_COST;
-            }
-            free_condition_countdown -= 1;
-        }
-
         let Some(op) = parse_opcode(a, first(a, c)?, flags) else {
             // in strict mode we don't allow unknown conditions
             if (flags & NO_UNKNOWN_CONDS) != 0 {
@@ -1226,39 +1211,27 @@ pub fn parse_conditions<V: SpendVisitor>(
                 }
             }
             Condition::CreateCoinAnnouncement(msg) => {
-                if (flags & COST_CONDITIONS) == 0 {
-                    decrement(&mut announce_countdown, msg)?;
-                };
+                decrement(&mut announce_countdown, msg)?;
                 state.announce_coin.insert((spend.coin_id.clone(), msg));
             }
             Condition::CreatePuzzleAnnouncement(msg) => {
-                if flags & COST_CONDITIONS != COST_CONDITIONS {
-                    decrement(&mut announce_countdown, msg)?;
-                };
+                decrement(&mut announce_countdown, msg)?;
                 state.announce_puzzle.insert((spend.puzzle_hash, msg));
             }
             Condition::AssertCoinAnnouncement(msg) => {
-                if flags & COST_CONDITIONS != COST_CONDITIONS {
-                    decrement(&mut announce_countdown, msg)?;
-                };
+                decrement(&mut announce_countdown, msg)?;
                 state.assert_coin.insert(msg);
             }
             Condition::AssertPuzzleAnnouncement(msg) => {
-                if flags & COST_CONDITIONS != COST_CONDITIONS {
-                    decrement(&mut announce_countdown, msg)?;
-                };
+                decrement(&mut announce_countdown, msg)?;
                 state.assert_puzzle.insert(msg);
             }
             Condition::AssertConcurrentSpend(id) => {
-                if flags & COST_CONDITIONS != COST_CONDITIONS {
-                    decrement(&mut announce_countdown, id)?;
-                };
+                decrement(&mut announce_countdown, id)?;
                 state.assert_concurrent_spend.insert(id);
             }
             Condition::AssertConcurrentPuzzle(id) => {
-                if flags & COST_CONDITIONS != COST_CONDITIONS {
-                    decrement(&mut announce_countdown, id)?;
-                };
+                decrement(&mut announce_countdown, id)?;
                 state.assert_concurrent_puzzle.insert(id);
             }
             Condition::AggSigMe(pk, msg) => {
@@ -1346,9 +1319,7 @@ pub fn parse_conditions<V: SpendVisitor>(
                 ret.condition_cost += cost;
             }
             Condition::SendMessage(src_mode, dst, msg) => {
-                if flags & COST_CONDITIONS != COST_CONDITIONS {
-                    decrement(&mut announce_countdown, msg)?;
-                };
+                decrement(&mut announce_countdown, msg)?;
                 let src = SpendId::from_self(
                     src_mode,
                     spend.parent_id,
@@ -1364,9 +1335,7 @@ pub fn parse_conditions<V: SpendVisitor>(
                 });
             }
             Condition::ReceiveMessage(src, dst_mode, msg) => {
-                if flags & COST_CONDITIONS != COST_CONDITIONS {
-                    decrement(&mut announce_countdown, msg)?;
-                };
+                decrement(&mut announce_countdown, msg)?;
                 let dst = SpendId::from_self(
                     dst_mode,
                     spend.parent_id,
