@@ -745,7 +745,7 @@ pub struct BlockStatusCache {
 }
 
 impl BlockStatusCache {
-    fn new(blob: &Vec<u8>) -> Result<Self, Error> {
+    fn new(blob: &[u8]) -> Result<Self, Error> {
         let index_count = blob.len() / BLOCK_SIZE;
 
         let mut seen_indexes: Vec<bool> = vec![false; index_count];
@@ -2408,8 +2408,7 @@ fn try_get_block(blob: &[u8], index: TreeIndex) -> Result<Block, Error> {
 }
 
 pub fn get_internal_terminal(
-    // TODO: should be &[u8] i think?
-    blob: &Vec<u8>,
+    blob: &[u8],
     indexes: &Vec<TreeIndex>,
 ) -> Result<HashMap<Hash, (TreeIndex, DeltaReaderNode)>, Error> {
     let mut nodes: HashMap<Hash, (TreeIndex, DeltaReaderNode)> = HashMap::new();
@@ -2458,19 +2457,19 @@ struct MerkleBlobLeftChildFirstIteratorItem {
 }
 
 pub struct MerkleBlobLeftChildFirstIterator<'a> {
-    blob: &'a Vec<u8>,
+    blob: &'a [u8],
     stack: Vec<MerkleBlobLeftChildFirstIteratorItem>,
     already_queued: HashSet<TreeIndex>,
     predicate: Option<fn(&Block) -> bool>,
 }
 
 impl<'a> MerkleBlobLeftChildFirstIterator<'a> {
-    fn new(blob: &'a Vec<u8>, from_index: Option<TreeIndex>) -> Self {
+    fn new(blob: &'a [u8], from_index: Option<TreeIndex>) -> Self {
         Self::new_with_block_predicate(blob, from_index, None)
     }
 
     fn new_with_block_predicate(
-        blob: &'a Vec<u8>,
+        blob: &'a [u8],
         from_index: Option<TreeIndex>,
         predicate: Option<fn(&Block) -> bool>,
     ) -> Self {
@@ -2542,13 +2541,13 @@ impl Iterator for MerkleBlobLeftChildFirstIterator<'_> {
 }
 
 pub struct MerkleBlobParentFirstIterator<'a> {
-    blob: &'a Vec<u8>,
+    blob: &'a [u8],
     deque: VecDeque<TreeIndex>,
     already_queued: HashSet<TreeIndex>,
 }
 
 impl<'a> MerkleBlobParentFirstIterator<'a> {
-    fn new(blob: &'a Vec<u8>, from_index: Option<TreeIndex>) -> Self {
+    fn new(blob: &'a [u8], from_index: Option<TreeIndex>) -> Self {
         let mut deque = VecDeque::new();
         let from_index = from_index.unwrap_or(TreeIndex(0));
         if blob.len() / BLOCK_SIZE > 0 {
@@ -2590,14 +2589,14 @@ impl Iterator for MerkleBlobParentFirstIterator<'_> {
 }
 
 pub struct MerkleBlobBreadthFirstIterator<'a> {
-    blob: &'a Vec<u8>,
+    blob: &'a [u8],
     deque: VecDeque<TreeIndex>,
     already_queued: HashSet<TreeIndex>,
 }
 
 impl<'a> MerkleBlobBreadthFirstIterator<'a> {
     #[allow(unused)]
-    fn new(blob: &'a Vec<u8>, from_index: Option<TreeIndex>) -> Self {
+    fn new(blob: &'a [u8], from_index: Option<TreeIndex>) -> Self {
         let mut deque = VecDeque::new();
         let from_index = from_index.unwrap_or(TreeIndex(0));
         if blob.len() / BLOCK_SIZE > 0 {
@@ -3415,7 +3414,7 @@ mod tests {
         #[case] expected: Expect,
         #[by_ref] traversal_blob: &'a MerkleBlob,
     ) where
-        F: Fn(&'a Vec<u8>, Option<TreeIndex>) -> T,
+        F: Fn(&'a [u8], Option<TreeIndex>) -> T,
         T: Iterator<Item = Result<(TreeIndex, Block), Error>>,
     {
         let mut dot_actual = traversal_blob.to_dot().unwrap();
@@ -3423,7 +3422,7 @@ mod tests {
 
         let mut actual = vec![];
         {
-            let blob: &Vec<u8> = &traversal_blob.blob;
+            let blob: &[u8] = &traversal_blob.blob;
             for item in iterator_new(blob, None) {
                 let (index, block) = item.unwrap();
                 actual.push(iterator_test_reference(index, &block));
