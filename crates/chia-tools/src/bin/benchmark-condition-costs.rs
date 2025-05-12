@@ -1,6 +1,6 @@
 use chia_bls::{sign, SecretKey, Signature};
-use chia_consensus::gen::flags::MEMPOOL_MODE;
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
+use chia_consensus::gen::flags::MEMPOOL_MODE;
 use chia_consensus::r#gen::make_aggsig_final_message::u64_to_bytes;
 use chia_sha2::Sha256;
 use linreg::linear_regression_of;
