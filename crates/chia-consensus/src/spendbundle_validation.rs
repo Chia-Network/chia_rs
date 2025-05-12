@@ -1,5 +1,6 @@
 use crate::allocator::make_allocator;
 use crate::consensus_constants::ConsensusConstants;
+use crate::r#gen::flags::COST_CONDITIONS;
 use crate::gen::owned_conditions::OwnedSpendBundleConditions;
 use crate::gen::validation_error::ErrorCode;
 use crate::spendbundle_conditions::run_spendbundle;
@@ -81,7 +82,7 @@ pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusCons
     // In hard fork 2, we enable the keccak operator outside the softfork guard
     let mut flags: u32 = 0;
     if height >= constants.hard_fork2_height {
-        flags |= ENABLE_KECCAK_OPS_OUTSIDE_GUARD;
+        flags |= ENABLE_KECCAK_OPS_OUTSIDE_GUARD | COST_CONDITIONS;
     }
     flags
 }
