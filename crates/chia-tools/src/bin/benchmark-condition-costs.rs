@@ -114,7 +114,6 @@ pub fn main() {
 
     let mut allocator = Allocator::new();
     let mut total_cost = 0;
-    let mut total_count = 0;
     // let puzzle = allocator.new_small_number(1).expect("number");
     let flags: u32 = MEMPOOL_MODE;
     let one = allocator.new_small_number(1).expect("number");
@@ -263,12 +262,6 @@ pub fn main() {
             aggregate_signature: Signature::default(),
             cost: 0,
         },
-        //        ConditionTest {
-        //            opcode: opcodes::RESERVE_FEE,
-        //            args: &[hundred],
-        //            aggregate_signature: Signature::default(),
-        //            cost: 0,
-        //        },
         ConditionTest {
             opcode: opcodes::ASSERT_MY_COIN_ID,
             args: &[coin_id],
@@ -305,12 +298,6 @@ pub fn main() {
             aggregate_signature: Signature::default(),
             cost: 0,
         },
-        // ConditionTest {
-        //     opcode: opcodes::ASSERT_EPHEMERAL,
-        //     args: &[],
-        //     aggregate_signature: Signature::default(),
-        //     cost: 0,
-        // },
         ConditionTest {
             opcode: opcodes::ASSERT_SECONDS_RELATIVE,
             args: &[one],
@@ -407,12 +394,6 @@ pub fn main() {
 
     let mut cost_factors = Vec::<f64>::new();
     for cond in cond_tests {
-        // let mut spend = SpendConditions::new(
-        //     parent_id,
-        //     100_u64,
-        //     puz_hash_node_ptr,
-        //     Arc::new(coin.coin_id()),
-        // );
         let mut cost = u64::MAX;
         let mut samples = Vec::<(f64, f64)>::new();
         let mut signature = Signature::default();
@@ -478,7 +459,6 @@ pub fn main() {
             }
             // add costs to tally
             total_cost += ret.cost;
-            total_count += 1;
 
             // make the conditions list longer
             conditions = if matches!(
@@ -530,5 +510,4 @@ pub fn main() {
     }
 
     println!("Total Cost: {total_cost}");
-    println!("Total Count: {total_count}");
 }
