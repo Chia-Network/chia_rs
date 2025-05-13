@@ -1010,18 +1010,6 @@ pub fn parse_conditions<V: SpendVisitor>(
     while let Some((mut c, next)) = next(a, iter)? {
         iter = next;
 
-        // add cost for looking at any condition
-        if (flags & COST_CONDITIONS) != 0 {
-            if free_condition_countdown == 0 {
-                if *max_cost < GENERIC_CONDITION_COST {
-                    return Err(ValidationErr(c, ErrorCode::CostExceeded));
-                }
-                *max_cost -= GENERIC_CONDITION_COST;
-            } else {
-                free_condition_countdown -= 1;
-            }
-        }
-
         let Some(op) = parse_opcode(a, first(a, c)?, flags) else {
             // in strict mode we don't allow unknown conditions
             if (flags & NO_UNKNOWN_CONDS) != 0 {
@@ -1055,7 +1043,19 @@ pub fn parse_conditions<V: SpendVisitor>(
                 *max_cost -= AGG_SIG_COST;
                 ret.condition_cost += AGG_SIG_COST;
             }
-            _ => (),
+            _ => {
+                if (flags & COST_CONDITIONS) != 0 {
+                    if free_condition_countdown == 0 {
+                        if *max_cost < GENERIC_CONDITION_COST {
+                            return Err(ValidationErr(c, ErrorCode::CostExceeded));
+                        }
+                        *max_cost -= GENERIC_CONDITION_COST;
+                        ret.condition_cost += GENERIC_CONDITION_COST;
+                    } else {
+                        free_condition_countdown -= 1;
+                    }
+                }
+            }
         }
         c = rest(a, c)?;
         let cva = parse_args(a, c, op, flags)?;
@@ -4106,6 +4106,43 @@ fn test_assert_concurrent_puzzle_self() {
     assert_eq!(spend.flags, 0);
 }
 
+#[cfg(test)]
+#[rstest]
+#[case(101)]
+fn test_cost_all_conds_after_free(#[case] count: usize) {
+    let r = cond_test_cb(
+        "((({h1} ({h2} (123 ({} )))",
+        0,
+        Some(Box::new(move |a: &mut Allocator| -> NodePtr {
+            let mut rest: NodePtr = a.nil();
+
+            // generate a lot of announcements
+            for _ in 0..count {
+                // this builds one condition
+                // borrow-rules prevent this from being succint
+                let ann = a.nil();
+                let val = a.new_atom(&test_coin_id(H1, H2, 123)).unwrap();
+                let ann = a.new_pair(val, ann).unwrap();
+                let val = a
+                    .new_atom(&u64_to_bytes(u64::from(ASSERT_MY_COIN_ID)))
+                    .unwrap();
+                let ann = a.new_pair(val, ann).unwrap();
+
+                // add the condition to the list
+                rest = a.new_pair(ann, rest).unwrap();
+            }
+            rest
+        })),
+        &Signature::default(),
+        None,
+    );
+    assert!(r.is_ok());
+    assert_eq!(
+        r.unwrap().1.condition_cost,
+        (count as u64 - 100) * GENERIC_CONDITION_COST
+    );
+}
+
 // the relative constraints clash because they are on the same coin spend
 #[cfg(test)]
 #[rstest]
@@ -4802,6 +4839,7 @@ fn test_limit_announcements(
                         Err(ValidationErr(_, ErrorCode::AssertPuzzleAnnouncementFailed))
                             | Err(ValidationErr(_, ErrorCode::AssertCoinAnnouncementFailed))
                             | Err(ValidationErr(_, ErrorCode::AssertConcurrentSpendFailed))
+                            | Err(ValidationErr(_, ErrorCode::AssertConcurrentPuzzleFailed))
                             | Err(ValidationErr(_, ErrorCode::CostExceeded))
                     )
             );
