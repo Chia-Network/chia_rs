@@ -1017,8 +1017,9 @@ pub fn parse_conditions<V: SpendVisitor>(
                     return Err(ValidationErr(c, ErrorCode::CostExceeded));
                 }
                 *max_cost -= GENERIC_CONDITION_COST;
+            } else {
+                free_condition_countdown -= 1;
             }
-            free_condition_countdown -= 1;
         }
 
         let Some(op) = parse_opcode(a, first(a, c)?, flags) else {
@@ -4767,6 +4768,44 @@ fn test_limit_announcements(
 
     if expect_err.is_some() {
         assert_eq!(r.unwrap_err().1, expect_err.unwrap());
+        if matches!(expect_err, Some(ErrorCode::TooManyAnnouncements)) {
+            // rerun the test with COST_CONDITIONS flag enabled
+            let r = cond_test_cb(
+                "((({h1} ({h1} (123 ({} )))",
+                COST_CONDITIONS,
+                Some(Box::new(move |a: &mut Allocator| -> NodePtr {
+                    let mut rest: NodePtr = a.nil();
+
+                    // generate a lot of announcements
+                    for _ in 0..count {
+                        // this builds one condition
+                        // borrow-rules prevent this from being succint
+                        let ann = a.nil();
+                        let val = a.new_atom(H2).unwrap();
+                        let ann = a.new_pair(val, ann).unwrap();
+                        let val = a.new_atom(&u64_to_bytes(u64::from(cond))).unwrap();
+                        let ann = a.new_pair(val, ann).unwrap();
+
+                        // add the condition to the list
+                        rest = a.new_pair(ann, rest).unwrap();
+                    }
+                    rest
+                })),
+                &Signature::default(),
+                None,
+            );
+            // could be OK or assert announcement failed or CostExceeded
+            assert!(
+                r.is_ok()
+                    || matches!(
+                        r,
+                        Err(ValidationErr(_, ErrorCode::AssertPuzzleAnnouncementFailed))
+                            | Err(ValidationErr(_, ErrorCode::AssertCoinAnnouncementFailed))
+                            | Err(ValidationErr(_, ErrorCode::AssertConcurrentSpendFailed))
+                            | Err(ValidationErr(_, ErrorCode::CostExceeded))
+                    )
+            );
+        }
     } else {
         r.unwrap();
     }
