@@ -1525,7 +1525,7 @@ pub fn validate_conditions(
     }
 
     if !state.assert_concurrent_puzzle.is_empty() {
-        let mut spent_phs = HashSet::<Bytes32>::new();
+        let mut spent_phs = HashSet::<Bytes32>::with_capacity(state.spent_puzzles.len());
 
         // expand all the spent puzzle hashes into a set, to allow
         // fast lookups of all assertions
@@ -1546,7 +1546,7 @@ pub fn validate_conditions(
     // check all the assert announcements
     // if there are no asserts, there is no need to hash all the announcements
     if !state.assert_coin.is_empty() {
-        let mut announcements = HashSet::<Bytes32>::new();
+        let mut announcements = HashSet::<Bytes32>::with_capacity(state.spent_puzzles.len());
 
         for (coin_id, announce) in &state.announce_coin {
             let mut hasher = Sha256::new();
@@ -1589,7 +1589,7 @@ pub fn validate_conditions(
     }
 
     if !state.assert_puzzle.is_empty() {
-        let mut announcements = HashSet::<Bytes32>::new();
+        let mut announcements = HashSet::<Bytes32>::with_capacity(state.spent_puzzles.len());
 
         for (puzzle_hash, announce) in &state.announce_puzzle {
             let mut hasher = Sha256::new();
@@ -1614,7 +1614,7 @@ pub fn validate_conditions(
         // minus the number of times it's been received. At the end we ensure
         // all counters are 0, otherwise some message wasn't received or sent
         // the right number of times.
-        let mut messages = HashMap::<Vec<u8>, i32>::new();
+        let mut messages = HashMap::<Vec<u8>, i32>::with_capacity(state.spent_puzzles.len());
 
         for msg in &state.messages {
             *messages.entry(msg.make_key(a)).or_insert(0) += i32::from(msg.counter);
