@@ -100,7 +100,6 @@ pub fn main() {
     const REPS: u32 = 500;
 
     let mut allocator = Allocator::new();
-    let mut total_cost = 0;
     // let puzzle = allocator.new_small_number(1).expect("number");
     let flags: u32 = MEMPOOL_MODE;
     let one = allocator.new_small_number(1).expect("number");
@@ -444,8 +443,6 @@ pub fn main() {
             if i > 1 {
                 samples.push(((i * multiplier) as f64, elapsed.as_nanos() as f64));
             }
-            // add costs to tally
-            total_cost += ret.cost;
 
             // make the conditions list longer
             conditions = if matches!(
@@ -495,6 +492,4 @@ pub fn main() {
         plot.close();
         allocator.restore_checkpoint(&cp);
     }
-
-    println!("Total Cost: {total_cost}");
 }
