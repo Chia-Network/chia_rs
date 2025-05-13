@@ -4109,10 +4109,13 @@ fn test_assert_concurrent_puzzle_self() {
 #[cfg(test)]
 #[rstest]
 #[case(101)]
+#[case(1001)]
+#[case(5001)]
+#[case(99)]
 fn test_cost_all_conds_after_free(#[case] count: usize) {
     let r = cond_test_cb(
         "((({h1} ({h2} (123 ({} )))",
-        0,
+        COST_CONDITIONS,
         Some(Box::new(move |a: &mut Allocator| -> NodePtr {
             let mut rest: NodePtr = a.nil();
 
@@ -4139,7 +4142,11 @@ fn test_cost_all_conds_after_free(#[case] count: usize) {
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap().1.condition_cost,
-        (count as u64 - 100) * GENERIC_CONDITION_COST
+        if count > 100 {
+            (count as u64 - 100) * GENERIC_CONDITION_COST
+        } else {
+            0
+        }
     );
 }
 
