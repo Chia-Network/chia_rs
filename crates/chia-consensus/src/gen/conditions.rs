@@ -4744,50 +4744,104 @@ fn test_softfork_condition_failures(#[case] conditions: &str, #[case] expected_e
 
 #[cfg(test)]
 #[rstest]
-#[case(CREATE_PUZZLE_ANNOUNCEMENT, 1000, None)]
+#[case(CREATE_PUZZLE_ANNOUNCEMENT, 1000, 0, None)]
 #[case(
     CREATE_PUZZLE_ANNOUNCEMENT,
     1025,
+    0,
     Some(ErrorCode::TooManyAnnouncements)
 )]
 #[case(
     ASSERT_PUZZLE_ANNOUNCEMENT,
     1024,
+    0,
     Some(ErrorCode::AssertPuzzleAnnouncementFailed)
 )]
 #[case(
     ASSERT_PUZZLE_ANNOUNCEMENT,
     1025,
+    0,
     Some(ErrorCode::TooManyAnnouncements)
 )]
-#[case(CREATE_COIN_ANNOUNCEMENT, 1000, None)]
-#[case(CREATE_COIN_ANNOUNCEMENT, 1025, Some(ErrorCode::TooManyAnnouncements))]
+#[case(CREATE_COIN_ANNOUNCEMENT, 1000, 0, None)]
+#[case(
+    CREATE_COIN_ANNOUNCEMENT,
+    1025,
+    0,
+    Some(ErrorCode::TooManyAnnouncements)
+)]
 #[case(
     ASSERT_COIN_ANNOUNCEMENT,
     1024,
+    0,
     Some(ErrorCode::AssertCoinAnnouncementFailed)
 )]
-#[case(ASSERT_COIN_ANNOUNCEMENT, 1025, Some(ErrorCode::TooManyAnnouncements))]
+#[case(
+    ASSERT_COIN_ANNOUNCEMENT,
+    1025,
+    0,
+    Some(ErrorCode::TooManyAnnouncements)
+)]
 #[case(
     ASSERT_CONCURRENT_SPEND,
     1024,
+    0,
     Some(ErrorCode::AssertConcurrentSpendFailed)
 )]
-#[case(ASSERT_CONCURRENT_SPEND, 1025, Some(ErrorCode::TooManyAnnouncements))]
+#[case(
+    ASSERT_CONCURRENT_SPEND,
+    1025,
+    0,
+    Some(ErrorCode::TooManyAnnouncements)
+)]
 #[case(
     ASSERT_CONCURRENT_PUZZLE,
     1024,
+    0,
     Some(ErrorCode::AssertConcurrentPuzzleFailed)
 )]
-#[case(ASSERT_CONCURRENT_PUZZLE, 1025, Some(ErrorCode::TooManyAnnouncements))]
+#[case(
+    ASSERT_CONCURRENT_PUZZLE,
+    1025,
+    0,
+    Some(ErrorCode::TooManyAnnouncements)
+)]
+// new flag tests
+#[case(CREATE_PUZZLE_ANNOUNCEMENT, 1025, COST_CONDITIONS, None)]
+#[case(
+    ASSERT_PUZZLE_ANNOUNCEMENT,
+    1025,
+    COST_CONDITIONS,
+    Some(ErrorCode::AssertPuzzleAnnouncementFailed)
+)]
+#[case(CREATE_COIN_ANNOUNCEMENT, 1025, COST_CONDITIONS, None)]
+#[case(
+    ASSERT_COIN_ANNOUNCEMENT,
+    1025,
+    COST_CONDITIONS,
+    Some(ErrorCode::AssertCoinAnnouncementFailed)
+)]
+#[case(
+    ASSERT_CONCURRENT_SPEND,
+    1025,
+    COST_CONDITIONS,
+    Some(ErrorCode::AssertConcurrentSpendFailed)
+)]
+#[case(
+    ASSERT_CONCURRENT_PUZZLE,
+    1025,
+    COST_CONDITIONS,
+    Some(ErrorCode::AssertConcurrentPuzzleFailed)
+)]
 fn test_limit_announcements(
     #[case] cond: ConditionOpcode,
     #[case] count: i32,
+    #[case] flag: u32,
     #[case] expect_err: Option<ErrorCode>,
 ) {
     let r = cond_test_cb(
         "((({h1} ({h1} (123 ({} )))",
-        0,
+        flag,
         Some(Box::new(move |a: &mut Allocator| -> NodePtr {
             let mut rest: NodePtr = a.nil();
 
@@ -4812,45 +4866,6 @@ fn test_limit_announcements(
 
     if expect_err.is_some() {
         assert_eq!(r.unwrap_err().1, expect_err.unwrap());
-        if matches!(expect_err, Some(ErrorCode::TooManyAnnouncements)) {
-            // rerun the test with COST_CONDITIONS flag enabled
-            let r = cond_test_cb(
-                "((({h1} ({h1} (123 ({} )))",
-                COST_CONDITIONS,
-                Some(Box::new(move |a: &mut Allocator| -> NodePtr {
-                    let mut rest: NodePtr = a.nil();
-
-                    // generate a lot of announcements
-                    for _ in 0..count {
-                        // this builds one condition
-                        // borrow-rules prevent this from being succint
-                        let ann = a.nil();
-                        let val = a.new_atom(H2).unwrap();
-                        let ann = a.new_pair(val, ann).unwrap();
-                        let val = a.new_atom(&u64_to_bytes(u64::from(cond))).unwrap();
-                        let ann = a.new_pair(val, ann).unwrap();
-
-                        // add the condition to the list
-                        rest = a.new_pair(ann, rest).unwrap();
-                    }
-                    rest
-                })),
-                &Signature::default(),
-                None,
-            );
-            // could be OK or assert announcement failed or CostExceeded
-            assert!(
-                r.is_ok()
-                    || matches!(
-                        r,
-                        Err(ValidationErr(_, ErrorCode::AssertPuzzleAnnouncementFailed))
-                            | Err(ValidationErr(_, ErrorCode::AssertCoinAnnouncementFailed))
-                            | Err(ValidationErr(_, ErrorCode::AssertConcurrentSpendFailed))
-                            | Err(ValidationErr(_, ErrorCode::AssertConcurrentPuzzleFailed))
-                            | Err(ValidationErr(_, ErrorCode::CostExceeded))
-                    )
-            );
-        }
     } else {
         r.unwrap();
     }
