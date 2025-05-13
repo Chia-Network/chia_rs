@@ -5278,12 +5278,17 @@ fn test_message_conditions_single_spend(#[case] test_case: &str, #[case] expect:
 
 #[cfg(test)]
 #[rstest]
-#[case(512, None)]
-#[case(513, Some(ErrorCode::TooManyAnnouncements))]
-fn test_limit_messages(#[case] count: i32, #[case] expect_err: Option<ErrorCode>) {
+#[case(512, 0, None)]
+#[case(513, 0, Some(ErrorCode::TooManyAnnouncements))]
+#[case(513, COST_CONDITIONS, None)]
+fn test_limit_messages(
+    #[case] count: i32,
+    #[case] flags: u32,
+    #[case] expect_err: Option<ErrorCode>,
+) {
     let r = cond_test_cb(
         "((({h1} ({h1} (123 ({} )))",
-        0,
+        flags,
         Some(Box::new(move |a: &mut Allocator| -> NodePtr {
             let mut rest: NodePtr = a.nil();
 
