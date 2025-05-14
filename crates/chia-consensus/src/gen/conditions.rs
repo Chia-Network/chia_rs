@@ -1232,31 +1232,31 @@ pub fn parse_conditions<V: SpendVisitor>(
                 state.announce_coin.insert((spend.coin_id.clone(), msg));
             }
             Condition::CreatePuzzleAnnouncement(msg) => {
-                if flags & COST_CONDITIONS != COST_CONDITIONS {
+                if flags & COST_CONDITIONS == 0 {
                     decrement(&mut announce_countdown, msg)?;
                 };
                 state.announce_puzzle.insert((spend.puzzle_hash, msg));
             }
             Condition::AssertCoinAnnouncement(msg) => {
-                if flags & COST_CONDITIONS != COST_CONDITIONS {
+                if flags & COST_CONDITIONS == 0 {
                     decrement(&mut announce_countdown, msg)?;
                 };
                 state.assert_coin.insert(msg);
             }
             Condition::AssertPuzzleAnnouncement(msg) => {
-                if flags & COST_CONDITIONS != COST_CONDITIONS {
+                if flags & COST_CONDITIONS == 0 {
                     decrement(&mut announce_countdown, msg)?;
                 };
                 state.assert_puzzle.insert(msg);
             }
             Condition::AssertConcurrentSpend(id) => {
-                if flags & COST_CONDITIONS != COST_CONDITIONS {
+                if flags & COST_CONDITIONS == 0 {
                     decrement(&mut announce_countdown, id)?;
                 };
                 state.assert_concurrent_spend.insert(id);
             }
             Condition::AssertConcurrentPuzzle(id) => {
-                if flags & COST_CONDITIONS != COST_CONDITIONS {
+                if flags & COST_CONDITIONS == 0 {
                     decrement(&mut announce_countdown, id)?;
                 };
                 state.assert_concurrent_puzzle.insert(id);
@@ -1346,7 +1346,7 @@ pub fn parse_conditions<V: SpendVisitor>(
                 ret.condition_cost += cost;
             }
             Condition::SendMessage(src_mode, dst, msg) => {
-                if flags & COST_CONDITIONS != COST_CONDITIONS {
+                if flags & COST_CONDITIONS == 0 {
                     decrement(&mut announce_countdown, msg)?;
                 };
                 let src = SpendId::from_self(
@@ -1364,7 +1364,7 @@ pub fn parse_conditions<V: SpendVisitor>(
                 });
             }
             Condition::ReceiveMessage(src, dst_mode, msg) => {
-                if flags & COST_CONDITIONS != COST_CONDITIONS {
+                if flags & COST_CONDITIONS == 0 {
                     decrement(&mut announce_countdown, msg)?;
                 };
                 let dst = SpendId::from_self(
