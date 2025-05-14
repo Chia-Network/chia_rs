@@ -1191,7 +1191,7 @@ impl MerkleBlob {
         let self_ = Self {
             blob,
             block_status_cache,
-            check_integrity_on_drop: true,
+            check_integrity_on_drop: cfg!(test),
         };
 
         Ok(self_)
