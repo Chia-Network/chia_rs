@@ -252,6 +252,10 @@ extra_members = {
         "def sp_sub_slot_total_iters(self, constants: ConsensusConstants) -> uint128: ...",
         "def sp_total_iters(self, constants: ConsensusConstants) -> uint128: ...",
     ],
+    "ProofOfSpace": [
+        "def size_v1(self) -> Optional[uint8]: ...",
+        "def size_v2(self) -> Optional[uint8]: ...",
+    ],
 }
 
 classes = []

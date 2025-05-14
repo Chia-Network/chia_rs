@@ -2065,15 +2065,17 @@ class ProofOfSpace:
     pool_public_key: Optional[G1Element]
     pool_contract_puzzle_hash: Optional[bytes32]
     plot_public_key: G1Element
-    size: uint8
+    version_and_size: uint8
     proof: bytes
+    def size_v1(self) -> Optional[uint8]: ...
+    def size_v2(self) -> Optional[uint8]: ...
     def __init__(
         self,
         challenge: bytes,
         pool_public_key: Optional[G1Element],
         pool_contract_puzzle_hash: Optional[bytes32],
         plot_public_key: G1Element,
-        size: uint8,
+        version_and_size: uint8,
         proof: bytes
     ) -> None: ...
     def __hash__(self) -> int: ...
@@ -2097,7 +2099,7 @@ class ProofOfSpace:
         pool_public_key: Union[ Optional[G1Element], _Unspec] = _Unspec(),
         pool_contract_puzzle_hash: Union[ Optional[bytes32], _Unspec] = _Unspec(),
         plot_public_key: Union[ G1Element, _Unspec] = _Unspec(),
-        size: Union[ uint8, _Unspec] = _Unspec(),
+        version_and_size: Union[ uint8, _Unspec] = _Unspec(),
         proof: Union[ bytes, _Unspec] = _Unspec()) -> ProofOfSpace: ...
 
 @final
