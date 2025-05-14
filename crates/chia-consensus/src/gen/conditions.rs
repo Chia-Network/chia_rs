@@ -4149,6 +4149,50 @@ fn test_cost_all_conds_after_free(#[case] count: usize) {
     );
 }
 
+#[cfg(test)]
+#[rstest]
+#[case(101)]
+#[case(1001)]
+#[case(5001)]
+#[case(99)]
+fn test_cost_create_coins_conds_after_free(#[case] count: usize) {
+    let r = cond_test_cb(
+        "((({h1} ({h2} (1230000000000 ({} )))",
+        COST_CONDITIONS,
+        Some(Box::new(move |a: &mut Allocator| -> NodePtr {
+            let mut rest: NodePtr = a.nil();
+
+            // generate a lot of announcements
+            for i in 0..count {
+                // this builds one condition
+                // borrow-rules prevent this from being succint
+                let ann = a.nil();
+                let val = a.new_small_number(i as u32).unwrap();
+                let ann = a.new_pair(val, ann).unwrap();
+                let val = a.new_atom(H1).unwrap();
+                let ann = a.new_pair(val, ann).unwrap();
+                let val = a.new_atom(&u64_to_bytes(u64::from(CREATE_COIN))).unwrap();
+                let ann = a.new_pair(val, ann).unwrap();
+
+                // add the condition to the list
+                rest = a.new_pair(ann, rest).unwrap();
+            }
+            rest
+        })),
+        &Signature::default(),
+        None,
+    );
+    assert!(r.is_ok());
+    assert_eq!(
+        r.unwrap().1.condition_cost,
+        if count > 100 {
+            ((count as u64 - 100) * GENERIC_CONDITION_COST) + (CREATE_COIN_COST * count as u64)
+        } else {
+            CREATE_COIN_COST * count as u64
+        }
+    );
+}
+
 // the relative constraints clash because they are on the same coin spend
 #[cfg(test)]
 #[rstest]
