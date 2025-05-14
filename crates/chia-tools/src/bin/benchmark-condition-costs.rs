@@ -458,13 +458,13 @@ pub fn main() {
             let cost_per_ns = cond.cost as f64 / slope;
             cost_factors.push(cost_per_ns);
             println!(
-                "condition: {} slope: {slope} cost-per-nanosecond: {cost_per_ns}",
+                "condition: {:2} nano-per-cond: {slope:6.3} cost-per-nanosecond: {cost_per_ns:0.3}",
                 cond.opcode
             );
         } else {
             let cost_per_ns = cost_factors.iter().sum::<f64>() / cost_factors.len() as f64;
             println!(
-                "condition: {} slope: {slope} computed-cost: {}",
+                "condition: {:2} nano-per-cond: {slope:6.3} computed-cost: {:0.2}",
                 cond.opcode,
                 slope * cost_per_ns
             );
