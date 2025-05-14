@@ -1,6 +1,5 @@
 use chia_bls::{sign, SecretKey, Signature};
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
-use chia_consensus::gen::flags::MEMPOOL_MODE;
 use chia_consensus::r#gen::make_aggsig_final_message::u64_to_bytes;
 use chia_sha2::Sha256;
 use linreg::linear_regression_of;
@@ -100,8 +99,6 @@ pub fn main() {
     const REPS: u32 = 500;
 
     let mut allocator = Allocator::new();
-    // let puzzle = allocator.new_small_number(1).expect("number");
-    let flags: u32 = MEMPOOL_MODE;
     let one = allocator.new_small_number(1).expect("number");
     let hundred = allocator.new_small_number(100).expect("number");
     let sixty_three = allocator.new_small_number(63).expect("number");
@@ -427,16 +424,15 @@ pub fn main() {
                 puz_hash_node_ptr,
                 hundred,
                 conditions,
-                flags,
+                0,
                 &mut cost,
                 &TEST_CONSTANTS,
             )
             .expect("process_single_spend");
 
             MempoolVisitor::post_process(&allocator, &state, &mut ret).expect("post_process");
-            validate_conditions(&allocator, &ret, &state, spends, flags)
-                .expect("validate_conditions");
-            validate_signature(&state, &signature, flags, None).expect("validate_signature");
+            validate_conditions(&allocator, &ret, &state, spends, 0).expect("validate_conditions");
+            validate_signature(&state, &signature, 0, None).expect("validate_signature");
 
             let elapsed = start.elapsed();
             // the first run is a warmup
