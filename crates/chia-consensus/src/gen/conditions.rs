@@ -1043,18 +1043,17 @@ pub fn parse_conditions<V: SpendVisitor>(
                 *max_cost -= AGG_SIG_COST;
                 ret.condition_cost += AGG_SIG_COST;
             }
-            _ => {
-                if (flags & COST_CONDITIONS) != 0 {
-                    if free_condition_countdown == 0 {
-                        if *max_cost < GENERIC_CONDITION_COST {
-                            return Err(ValidationErr(c, ErrorCode::CostExceeded));
-                        }
-                        *max_cost -= GENERIC_CONDITION_COST;
-                        ret.condition_cost += GENERIC_CONDITION_COST;
-                    } else {
-                        free_condition_countdown -= 1;
-                    }
+            _ => {}
+        }
+        if (flags & COST_CONDITIONS) != 0 {
+            if free_condition_countdown == 0 {
+                if *max_cost < GENERIC_CONDITION_COST {
+                    return Err(ValidationErr(c, ErrorCode::CostExceeded));
                 }
+                *max_cost -= GENERIC_CONDITION_COST;
+                ret.condition_cost += GENERIC_CONDITION_COST;
+            } else {
+                free_condition_countdown -= 1;
             }
         }
         c = rest(a, c)?;
