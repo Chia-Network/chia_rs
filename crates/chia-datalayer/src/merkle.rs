@@ -30,9 +30,9 @@ type TreeIndexType = u32;
     derive(PyJsonDict, PyStreamable)
 )]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
-// TODO: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
-//       being found with a cfg_attr
-//       https://github.com/PyO3/pyo3/issues/5125
+// ISSUE: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
+//        being found with a cfg_attr
+//        https://github.com/PyO3/pyo3/issues/5125
 #[cfg(feature = "py-bindings")]
 pub struct TreeIndex(#[pyo3(get, name = "raw")] TreeIndexType);
 
@@ -80,9 +80,9 @@ pub struct Hash(Bytes32);
     derive(PyJsonDict, PyStreamable)
 )]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
-// TODO: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
-//       being found with a cfg_attr
-//       https://github.com/PyO3/pyo3/issues/5125
+// ISSUE: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
+//        being found with a cfg_attr
+//        https://github.com/PyO3/pyo3/issues/5125
 #[cfg(feature = "py-bindings")]
 pub struct KeyId(#[pyo3(get, name = "raw")] i64);
 
@@ -105,9 +105,9 @@ impl KeyId {
     derive(PyJsonDict, PyStreamable)
 )]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
-// TODO: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
-//       being found with a cfg_attr
-//       https://github.com/PyO3/pyo3/issues/5125
+// ISSUE: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
+//        being found with a cfg_attr
+//        https://github.com/PyO3/pyo3/issues/5125
 #[cfg(feature = "py-bindings")]
 pub struct ValueId(#[pyo3(get, name = "raw")] i64);
 
@@ -2396,13 +2396,12 @@ impl MerkleBlob {
 }
 
 fn try_get_block(blob: &[u8], index: TreeIndex) -> Result<Block, Error> {
-    // TODO: check limits and return error
     let range = block_range(index);
     let block_bytes: BlockBytes = blob
         .get(range)
         .ok_or(Error::BlockIndexOutOfBounds(index))?
         .try_into()
-        .unwrap();
+        .expect("used block_range() so should be correct length");
 
     Block::from_bytes(block_bytes)
 }
@@ -2851,7 +2850,6 @@ mod tests {
         }
 
         println!("total time: {total_time:?}");
-        // TODO: check, well...  something
 
         merkle_blob.calculate_lazy_hashes().unwrap();
     }
