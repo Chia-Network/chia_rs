@@ -4141,8 +4141,8 @@ fn test_cost_all_conds_after_free(#[case] count: usize) {
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap().1.condition_cost,
-        if count > 100 {
-            (count as u64 - 100) * GENERIC_CONDITION_COST
+        if count > FREE_CONDITIONS {
+            (count as u64 - FREE_CONDITIONS as u64) * GENERIC_CONDITION_COST
         } else {
             0
         }
@@ -4185,10 +4185,67 @@ fn test_cost_create_coins_conds_after_free(#[case] count: usize) {
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap().1.condition_cost,
-        if count > 100 {
-            ((count as u64 - 100) * GENERIC_CONDITION_COST) + (CREATE_COIN_COST * count as u64)
+        if count > FREE_CONDITIONS {
+            ((count as u64 - FREE_CONDITIONS as u64) * GENERIC_CONDITION_COST)
+                + (CREATE_COIN_COST * count as u64)
         } else {
             CREATE_COIN_COST * count as u64
+        }
+    );
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(101)]
+#[case(1001)]
+#[case(5001)]
+#[case(99)]
+fn test_cost_aggsig_conds_after_free(#[case] count: usize) {
+    use chia_bls::{sign, SecretKey};
+
+    let sk = SecretKey::from_bytes(SECRET_KEY).expect("secret key");
+    let pk = sk.public_key();
+    let mut sig = Signature::default();
+    for _ in 0..count {
+        let new_sig = sign(&sk, H1);
+        sig.aggregate(&new_sig);
+    }
+    let r = cond_test_cb(
+        "((({h1} ({h2} (1230000000000 ({} )))",
+        COST_CONDITIONS,
+        Some(Box::new(move |a: &mut Allocator| -> NodePtr {
+            let mut rest: NodePtr = a.nil();
+
+            // generate a lot of announcements
+            for _ in 0..count {
+                // this builds one condition
+                // borrow-rules prevent this from being succint
+                let ann = a.nil();
+                let val = a.new_atom(H1).unwrap();
+                let ann = a.new_pair(val, ann).unwrap();
+                let val = a.new_atom(&pk.to_bytes()).expect("pubkey");
+                let ann = a.new_pair(val, ann).unwrap();
+                let val = a
+                    .new_atom(&u64_to_bytes(u64::from(AGG_SIG_UNSAFE)))
+                    .unwrap();
+                let ann = a.new_pair(val, ann).unwrap();
+
+                // add the condition to the list
+                rest = a.new_pair(ann, rest).unwrap();
+            }
+            rest
+        })),
+        &sig,
+        None,
+    );
+    assert!(r.is_ok());
+    assert_eq!(
+        r.unwrap().1.condition_cost,
+        if count > FREE_CONDITIONS {
+            ((count as u64 - FREE_CONDITIONS as u64) * GENERIC_CONDITION_COST)
+                + (AGG_SIG_COST * count as u64)
+        } else {
+            AGG_SIG_COST * count as u64
         }
     );
 }
