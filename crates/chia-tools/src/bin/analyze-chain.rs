@@ -4,8 +4,8 @@ use std::io::Write;
 use std::time::SystemTime;
 
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
-use chia_consensus::general::flags::MEMPOOL_MODE;
-use chia_consensus::general::run_block_generator::{run_block_generator, run_block_generator2};
+use chia_consensus::flags::MEMPOOL_MODE;
+use chia_consensus::run_block_generator::{run_block_generator, run_block_generator2};
 use chia_tools::iterate_blocks;
 use clvmr::Allocator;
 

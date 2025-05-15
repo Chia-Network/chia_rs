@@ -1,9 +1,9 @@
 #![no_main]
-use chia_consensus::consensus_constants::TEST_CONSTANTS;
-use chia_consensus::general::conditions::{
+use chia_consensus::conditions::{
     process_single_spend, MempoolVisitor, ParseState, SpendBundleConditions,
 };
-use chia_consensus::general::flags::{NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
+use chia_consensus::consensus_constants::TEST_CONSTANTS;
+use chia_consensus::flags::{NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
 use chia_fuzz::{make_tree, BitCursor};
 use clvmr::allocator::Allocator;
 use libfuzzer_sys::fuzz_target;

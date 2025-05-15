@@ -1,10 +1,10 @@
 #![no_main]
 use chia_bls::Signature;
+use chia_consensus::additions_and_removals::additions_and_removals;
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
-use chia_consensus::general::additions_and_removals::additions_and_removals;
-use chia_consensus::general::flags::DONT_VALIDATE_SIGNATURE;
-use chia_consensus::general::run_block_generator::run_block_generator2;
+use chia_consensus::flags::DONT_VALIDATE_SIGNATURE;
+use chia_consensus::run_block_generator::run_block_generator2;
 use chia_protocol::{Bytes, Coin};
 use libfuzzer_sys::fuzz_target;
 use std::collections::HashSet;

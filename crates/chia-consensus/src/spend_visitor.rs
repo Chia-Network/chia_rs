@@ -1,5 +1,5 @@
-use crate::general::conditions::{Condition, ParseState, SpendBundleConditions, SpendConditions};
-use crate::general::validation_error::ValidationErr;
+use crate::conditions::{Condition, ParseState, SpendBundleConditions, SpendConditions};
+use crate::validation_error::ValidationErr;
 use clvmr::allocator::Allocator;
 
 // These are customization points for the condition parsing and validation. The

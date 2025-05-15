@@ -152,13 +152,11 @@ pub fn fast_forward_singleton(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::conditions::MempoolVisitor;
+    use crate::conditions::{parse_conditions, ParseState, SpendBundleConditions, SpendConditions};
     use crate::consensus_constants::TEST_CONSTANTS;
-    use crate::general::conditions::MempoolVisitor;
-    use crate::general::conditions::{
-        parse_conditions, ParseState, SpendBundleConditions, SpendConditions,
-    };
-    use crate::general::spend_visitor::SpendVisitor;
-    use crate::general::validation_error::ValidationErr;
+    use crate::spend_visitor::SpendVisitor;
+    use crate::validation_error::ValidationErr;
     use chia_protocol::Bytes32;
     use chia_protocol::Coin;
     use chia_protocol::CoinSpend;

@@ -1,12 +1,12 @@
 #![no_main]
-use chia_consensus::consensus_constants::TEST_CONSTANTS;
-use chia_consensus::fast_forward::fast_forward_singleton;
-use chia_consensus::general::conditions::{
+use chia_consensus::conditions::{
     parse_conditions, MempoolVisitor, ParseState, SpendBundleConditions, SpendConditions,
     ELIGIBLE_FOR_FF,
 };
-use chia_consensus::general::spend_visitor::SpendVisitor;
-use chia_consensus::general::validation_error::{ErrorCode, ValidationErr};
+use chia_consensus::consensus_constants::TEST_CONSTANTS;
+use chia_consensus::fast_forward::fast_forward_singleton;
+use chia_consensus::spend_visitor::SpendVisitor;
+use chia_consensus::validation_error::{ErrorCode, ValidationErr};
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
 use chia_protocol::CoinSpend;

@@ -1,6 +1,6 @@
-use crate::general::condition_sanitizers::sanitize_hash;
-use crate::general::sanitize_int::{sanitize_uint, SanitizedUint};
-use crate::general::validation_error::{first, rest, ErrorCode, ValidationErr};
+use crate::condition_sanitizers::sanitize_hash;
+use crate::sanitize_int::{sanitize_uint, SanitizedUint};
+use crate::validation_error::{first, rest, ErrorCode, ValidationErr};
 use chia_protocol::Bytes32;
 use clvmr::{Allocator, NodePtr};
 use std::sync::Arc;

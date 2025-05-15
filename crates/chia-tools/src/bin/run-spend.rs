@@ -1,4 +1,4 @@
-use chia_consensus::general::conditions::Condition;
+use chia_consensus::conditions::Condition;
 use chia_puzzle_types::Proof;
 use chia_puzzles::CAT_PUZZLE_HASH;
 use chia_puzzles::DID_INNERPUZ_HASH;
@@ -263,9 +263,9 @@ fn print_puzzle_info(a: &Allocator, puzzle: NodePtr, solution: NodePtr) {
     }
 }
 fn main() {
-    use chia_consensus::general::conditions::parse_args;
-    use chia_consensus::general::opcodes::parse_opcode;
-    use chia_consensus::general::validation_error::{first, rest};
+    use chia_consensus::conditions::parse_args;
+    use chia_consensus::opcodes::parse_opcode;
+    use chia_consensus::validation_error::{first, rest};
     use chia_protocol::CoinSpend;
     use clvmr::reduction::{EvalErr, Reduction};
     use clvmr::{run_program, ChiaDialect};

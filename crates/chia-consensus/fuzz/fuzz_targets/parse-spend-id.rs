@@ -1,7 +1,7 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
-use chia_consensus::general::messages::SpendId;
+use chia_consensus::messages::SpendId;
 use chia_fuzz::{make_list, BitCursor};
 use clvmr::allocator::Allocator;
 

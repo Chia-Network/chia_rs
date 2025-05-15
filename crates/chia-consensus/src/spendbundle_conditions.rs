@@ -1,13 +1,13 @@
-use crate::consensus_constants::ConsensusConstants;
-use crate::general::conditions::{
+use crate::conditions::{
     process_single_spend, validate_conditions, MempoolVisitor, ParseState, SpendBundleConditions,
 };
-use crate::general::flags::{DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
-use crate::general::run_block_generator::subtract_cost;
-use crate::general::solution_generator::calculate_generator_length;
-use crate::general::validation_error::ErrorCode;
-use crate::general::validation_error::ValidationErr;
+use crate::consensus_constants::ConsensusConstants;
+use crate::flags::{DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
+use crate::run_block_generator::subtract_cost;
+use crate::solution_generator::calculate_generator_length;
 use crate::spendbundle_validation::get_flags_for_height_and_constants;
+use crate::validation_error::ErrorCode;
+use crate::validation_error::ValidationErr;
 use chia_bls::PublicKey;
 use chia_protocol::{Bytes, SpendBundle};
 use clvm_utils::tree_hash;
@@ -107,9 +107,9 @@ mod tests {
 
     use super::*;
     use crate::allocator::make_allocator;
-    use crate::general::conditions::{ELIGIBLE_FOR_DEDUP, ELIGIBLE_FOR_FF};
-    use crate::general::run_block_generator::run_block_generator2;
-    use crate::general::solution_generator::solution_generator;
+    use crate::conditions::{ELIGIBLE_FOR_DEDUP, ELIGIBLE_FOR_FF};
+    use crate::run_block_generator::run_block_generator2;
+    use crate::solution_generator::solution_generator;
     use chia_bls::Signature;
     use chia_protocol::CoinSpend;
     use chia_traits::Streamable;
@@ -213,9 +213,9 @@ mod tests {
     // the puzzles.
     #[cfg(not(debug_assertions))]
     fn convert_block_to_bundle(generator: &[u8], block_refs: &[Vec<u8>]) -> SpendBundle {
-        use crate::general::run_block_generator::extract_n;
-        use crate::general::run_block_generator::setup_generator_args;
-        use crate::general::validation_error::ErrorCode;
+        use crate::run_block_generator::extract_n;
+        use crate::run_block_generator::setup_generator_args;
+        use crate::validation_error::ErrorCode;
         use chia_protocol::Coin;
         use clvmr::op_utils::first;
         use clvmr::serde::node_from_bytes_backrefs;
@@ -308,8 +308,8 @@ mod tests {
     #[case("unknown-condition")]
     #[case("duplicate-messages")]
     fn run_generator(#[case] name: &str) {
-        use crate::general::run_block_generator::run_block_generator;
-        use crate::general::test_generators::{print_conditions, print_diff};
+        use crate::run_block_generator::run_block_generator;
+        use crate::test_generators::{print_conditions, print_diff};
         use std::fs::read_to_string;
 
         let filename = format!("../../generator-tests/{name}.txt");

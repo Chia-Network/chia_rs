@@ -1,9 +1,10 @@
 use crate::allocator::make_allocator;
 use crate::consensus_constants::ConsensusConstants;
-use crate::general::flags::COST_CONDITIONS;
-use crate::general::owned_conditions::OwnedSpendBundleConditions;
-use crate::general::validation_error::ErrorCode;
+use crate::flags::COST_CONDITIONS;
+use crate::owned_conditions::OwnedSpendBundleConditions;
+use crate::validation_error::ErrorCode;
 use crate::spendbundle_conditions::run_spendbundle;
+use crate::validation_error::ErrorCode;
 use chia_bls::GTElement;
 use chia_bls::{aggregate_verify_gt, hash_to_g2};
 use chia_protocol::SpendBundle;
@@ -91,8 +92,8 @@ pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusCons
 mod tests {
     use super::*;
     use crate::consensus_constants::TEST_CONSTANTS;
-    use crate::general::make_aggsig_final_message::u64_to_bytes;
-    use crate::general::opcodes::{
+    use crate::make_aggsig_final_message::u64_to_bytes;
+    use crate::opcodes::{
         ConditionOpcode, AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT,
         AGG_SIG_PARENT_PUZZLE, AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT, AGG_SIG_UNSAFE,
     };
