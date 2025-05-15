@@ -1,4 +1,6 @@
-use crate::general::validation_error::{atom, check_nil, first, next, rest, ErrorCode, ValidationErr};
+use crate::general::validation_error::{
+    atom, check_nil, first, next, rest, ErrorCode, ValidationErr,
+};
 use chia_protocol::Coin;
 use clvm_utils::{tree_hash_cached, TreeHash};
 use clvmr::allocator::{Allocator, Atom, NodePtr};

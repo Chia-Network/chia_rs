@@ -5,14 +5,14 @@ use chia_sha2::Sha256;
 use linreg::linear_regression_of;
 use std::time::Instant;
 // use chia_consensus::gen::conditions::parse_conditions;
-use chia_consensus::general::conditions::{MempoolVisitor, SpendBundleConditions};
-use chia_consensus::general::opcodes;
 use chia_consensus::general::conditions::{
     process_single_spend,
     validate_conditions,
     validate_signature,
     ParseState, // SpendConditions,
 };
+use chia_consensus::general::conditions::{MempoolVisitor, SpendBundleConditions};
+use chia_consensus::general::opcodes;
 use chia_consensus::general::opcodes::ConditionOpcode;
 use chia_consensus::general::spend_visitor::SpendVisitor;
 use chia_protocol::Bytes32;
