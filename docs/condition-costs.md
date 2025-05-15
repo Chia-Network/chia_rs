@@ -53,6 +53,38 @@ condition: 61 nano-per-cond: 46.482 computed-cost: 82.98
 condition: 63 nano-per-cond: 92.362 computed-cost: 164.88
 ```
 
+## MacBook M1
+
+```
+condition: 49 nano-per-cond: 454014.196 cost-per-nanosecond: 2.643
+condition: 50 nano-per-cond: 456755.449 cost-per-nanosecond: 2.627
+condition: 43 nano-per-cond: 473450.296 cost-per-nanosecond: 2.535
+condition: 44 nano-per-cond: 449283.602 cost-per-nanosecond: 2.671
+condition: 45 nano-per-cond: 447728.869 cost-per-nanosecond: 2.680
+condition: 47 nano-per-cond: 457000.927 cost-per-nanosecond: 2.626
+condition: 48 nano-per-cond: 451901.076 cost-per-nanosecond: 2.655
+condition: 46 nano-per-cond: 467285.682 cost-per-nanosecond: 2.568
+condition:  1 nano-per-cond:  9.712 computed-cost: 25.50
+condition: 70 nano-per-cond: 17.911 computed-cost: 47.03
+condition: 71 nano-per-cond: 20.092 computed-cost: 52.76
+condition: 72 nano-per-cond: 20.667 computed-cost: 54.26
+condition: 73 nano-per-cond: 18.802 computed-cost: 49.37
+condition: 75 nano-per-cond: 16.816 computed-cost: 44.15
+condition: 74 nano-per-cond: 17.290 computed-cost: 45.40
+condition: 80 nano-per-cond: 17.972 computed-cost: 47.19
+condition: 81 nano-per-cond: 16.962 computed-cost: 44.54
+condition: 82 nano-per-cond: 20.250 computed-cost: 53.17
+condition: 83 nano-per-cond: 16.390 computed-cost: 43.03
+condition: 84 nano-per-cond: 17.378 computed-cost: 45.63
+condition: 85 nano-per-cond: 22.856 computed-cost: 60.01
+condition: 86 nano-per-cond: 16.739 computed-cost: 43.95
+condition: 87 nano-per-cond: 17.353 computed-cost: 45.56
+condition: 90 nano-per-cond: 18.558 computed-cost: 48.73
+condition: 66 nano-per-cond: 203.020 computed-cost: 533.06
+condition: 61 nano-per-cond: 30.418 computed-cost: 79.87
+condition: 63 nano-per-cond: 26.608 computed-cost: 69.86
+```
+
 ## Linear cost
 
 To validate that the cost increase is in fact linear to the number of
