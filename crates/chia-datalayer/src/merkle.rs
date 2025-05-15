@@ -30,9 +30,9 @@ type TreeIndexType = u32;
     derive(PyJsonDict, PyStreamable)
 )]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
-// TODO: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
-//       being found with a cfg_attr
-//       https://github.com/PyO3/pyo3/issues/5125
+// ISSUE: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
+//        being found with a cfg_attr
+//        https://github.com/PyO3/pyo3/issues/5125
 #[cfg(feature = "py-bindings")]
 pub struct TreeIndex(#[pyo3(get, name = "raw")] TreeIndexType);
 
@@ -80,9 +80,9 @@ pub struct Hash(Bytes32);
     derive(PyJsonDict, PyStreamable)
 )]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
-// TODO: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
-//       being found with a cfg_attr
-//       https://github.com/PyO3/pyo3/issues/5125
+// ISSUE: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
+//        being found with a cfg_attr
+//        https://github.com/PyO3/pyo3/issues/5125
 #[cfg(feature = "py-bindings")]
 pub struct KeyId(#[pyo3(get, name = "raw")] i64);
 
@@ -105,9 +105,9 @@ impl KeyId {
     derive(PyJsonDict, PyStreamable)
 )]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
-// TODO: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
-//       being found with a cfg_attr
-//       https://github.com/PyO3/pyo3/issues/5125
+// ISSUE: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
+//        being found with a cfg_attr
+//        https://github.com/PyO3/pyo3/issues/5125
 #[cfg(feature = "py-bindings")]
 pub struct ValueId(#[pyo3(get, name = "raw")] i64);
 
@@ -1031,19 +1031,23 @@ impl DeltaReader {
         Ok(())
     }
 
-    pub fn create_merkle_blob(
-        &self,
+    pub fn create_merkle_blob_and_filter_unused_nodes(
+        &mut self,
         root_hash: Hash,
         interested_hashes: &HashSet<Hash>,
     ) -> Result<(MerkleBlob, Vec<(Hash, TreeIndex)>), Error> {
         let mut merkle_blob = MerkleBlob::new(Vec::new())?;
         let mut hashes_and_indexes: Vec<(Hash, TreeIndex)> = Vec::new();
+        let mut all_used_hashes: HashSet<Hash> = HashSet::new();
         merkle_blob.build_blob_from_node_list(
             &self.nodes,
             root_hash,
             interested_hashes,
             &mut hashes_and_indexes,
+            &mut all_used_hashes,
         )?;
+
+        self.nodes.retain(|k, _v| all_used_hashes.contains(k));
 
         Ok((merkle_blob, hashes_and_indexes))
     }
@@ -1061,6 +1065,22 @@ impl DeltaReader {
     #[pyo3(name = "get_missing_hashes")]
     pub fn py_get_missing_hashes(&self) -> PyResult<HashSet<Hash>> {
         Ok(self.get_missing_hashes())
+    }
+
+    #[pyo3(name = "add_internal_nodes")]
+    pub fn py_add_internal_nodes(&mut self, internal_nodes: InternalNodesMap) {
+        for (hash, (left, right)) in internal_nodes {
+            self.nodes
+                .insert(hash, DeltaReaderNode::Internal { left, right });
+        }
+    }
+
+    #[pyo3(name = "add_leaf_nodes")]
+    pub fn py_add_leaf_nodes(&mut self, leaf_nodes: LeafNodesMap) {
+        for (hash, (key, value)) in leaf_nodes {
+            self.nodes
+                .insert(hash, DeltaReaderNode::Leaf { key, value });
+        }
     }
 
     #[pyo3(name = "collect_from_merkle_blob")]
@@ -1109,13 +1129,13 @@ impl DeltaReader {
         Ok(())
     }
 
-    #[pyo3(name = "create_merkle_blob")]
-    pub fn py_create_merkle_blob(
-        &self,
+    #[pyo3(name = "create_merkle_blob_and_filter_unused_nodes")]
+    pub fn py_create_merkle_blob_and_filter_unused_nodes(
+        &mut self,
         root_hash: Hash,
         interested_hashes: HashSet<Hash>,
     ) -> Result<(MerkleBlob, Vec<(Hash, TreeIndex)>), Error> {
-        self.create_merkle_blob(root_hash, &interested_hashes)
+        self.create_merkle_blob_and_filter_unused_nodes(root_hash, &interested_hashes)
     }
 }
 
@@ -2018,6 +2038,7 @@ impl MerkleBlob {
         node_hash: Hash,
         interested_hashes: &HashSet<Hash>,
         hashes_and_indexes: &mut Vec<(Hash, TreeIndex)>,
+        all_used_hashes: &mut HashSet<Hash>,
     ) -> Result<TreeIndex, Error> {
         match nodes.get(&node_hash) {
             None => Err(Error::NodeHashNotInNodeMaps(node_hash)),
@@ -2042,6 +2063,7 @@ impl MerkleBlob {
                 if interested_hashes.contains(&node_hash) {
                     hashes_and_indexes.push((node_hash, index));
                 }
+                all_used_hashes.insert(node_hash);
 
                 Ok(index)
             }
@@ -2053,12 +2075,14 @@ impl MerkleBlob {
                     *left,
                     interested_hashes,
                     hashes_and_indexes,
+                    all_used_hashes,
                 )?;
                 let right_index = self.build_blob_from_node_list(
                     nodes,
                     *right,
                     interested_hashes,
                     hashes_and_indexes,
+                    all_used_hashes,
                 )?;
 
                 for child_index in [left_index, right_index] {
@@ -2081,6 +2105,7 @@ impl MerkleBlob {
                 if interested_hashes.contains(&node_hash) {
                     hashes_and_indexes.push((node_hash, index));
                 }
+                all_used_hashes.insert(node_hash);
 
                 Ok(index)
             }
@@ -2194,6 +2219,7 @@ impl MerkleBlob {
                     root_hash,
                     &HashSet::new(),
                     &mut Vec::new(),
+                    &mut HashSet::new(),
                 )?;
                 Ok(merkle_blob)
             }
@@ -2374,13 +2400,12 @@ impl MerkleBlob {
 }
 
 fn try_get_block(blob: &[u8], index: TreeIndex) -> Result<Block, Error> {
-    // TODO: check limits and return error
     let range = block_range(index);
     let block_bytes: BlockBytes = blob
         .get(range)
         .ok_or(Error::BlockIndexOutOfBounds(index))?
         .try_into()
-        .unwrap();
+        .expect("used block_range() so should be correct length");
 
     Block::from_bytes(block_bytes)
 }
@@ -2856,7 +2881,6 @@ mod tests {
         }
 
         println!("total time: {total_time:?}");
-        // TODO: check, well...  something
 
         merkle_blob.calculate_lazy_hashes().unwrap();
     }
