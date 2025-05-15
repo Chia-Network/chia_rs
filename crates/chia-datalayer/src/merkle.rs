@@ -3746,19 +3746,19 @@ mod tests {
     #[test]
     #[should_panic(expected = "integrity check failed while dropping merkle blob: CycleFound")]
     fn test_delta_reader_create_merkle_blob_incomplete_fails() {
-        let delta_reader = incomplete_delta_reader();
+        let mut delta_reader = incomplete_delta_reader();
 
         delta_reader
-            .create_merkle_blob(HASH_ZERO, &HashSet::new())
+            .create_merkle_blob_and_filter_unused_nodes(HASH_ZERO, &HashSet::new())
             .expect_err("incomplete so should fail");
     }
 
     #[test]
     fn test_delta_reader_create_merkle_blob_works() {
-        let delta_reader = complete_delta_reader();
+        let mut delta_reader = complete_delta_reader();
 
         let (complete_blob, _) = delta_reader
-            .create_merkle_blob(HASH_ZERO, &HashSet::new())
+            .create_merkle_blob_and_filter_unused_nodes(HASH_ZERO, &HashSet::new())
             .unwrap();
         complete_blob.check_integrity().unwrap();
     }
