@@ -2,7 +2,6 @@ use crate::allocator::make_allocator;
 use crate::consensus_constants::ConsensusConstants;
 use crate::flags::COST_CONDITIONS;
 use crate::owned_conditions::OwnedSpendBundleConditions;
-use crate::validation_error::ErrorCode;
 use crate::spendbundle_conditions::run_spendbundle;
 use crate::validation_error::ErrorCode;
 use chia_bls::GTElement;
