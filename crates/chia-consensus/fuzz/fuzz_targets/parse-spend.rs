@@ -1,7 +1,7 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
-use chia_consensus::gen::get_puzzle_and_solution::parse_coin_spend;
+use chia_consensus::get_puzzle_and_solution::parse_coin_spend;
 use chia_fuzz::{make_list, BitCursor};
 use clvmr::allocator::Allocator;
 

@@ -2,8 +2,8 @@
 use chia_bls::Signature;
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
-use chia_consensus::gen::run_block_generator::{run_block_generator, run_block_generator2};
-use chia_consensus::gen::validation_error::{ErrorCode, ValidationErr};
+use chia_consensus::run_block_generator::{run_block_generator, run_block_generator2};
+use chia_consensus::validation_error::{ErrorCode, ValidationErr};
 use clvmr::chia_dialect::LIMIT_HEAP;
 use libfuzzer_sys::fuzz_target;
 
