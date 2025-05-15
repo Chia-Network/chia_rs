@@ -468,7 +468,7 @@ pub fn main() {
                 cond.opcode,
                 slope * cost_per_ns
             );
-        };
+        }
         let mut plot = Figure::new();
         plot.axes2d()
             .set_x_label("number of conditions", &[])
