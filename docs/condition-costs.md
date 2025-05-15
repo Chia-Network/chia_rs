@@ -85,6 +85,38 @@ condition: 61 nano-per-cond: 30.418 computed-cost: 79.87
 condition: 63 nano-per-cond: 26.608 computed-cost: 69.86
 ```
 
+## RaspberryPI 5
+
+```
+condition: 49 nano-per-cond: 2685105.966 cost-per-nanosecond: 0.447
+condition: 50 nano-per-cond: 2685827.649 cost-per-nanosecond: 0.447
+condition: 43 nano-per-cond: 2685499.354 cost-per-nanosecond: 0.447
+condition: 44 nano-per-cond: 2685505.557 cost-per-nanosecond: 0.447
+condition: 45 nano-per-cond: 2685482.575 cost-per-nanosecond: 0.447
+condition: 47 nano-per-cond: 2685539.063 cost-per-nanosecond: 0.447
+condition: 48 nano-per-cond: 2685623.201 cost-per-nanosecond: 0.447
+condition: 46 nano-per-cond: 2685648.551 cost-per-nanosecond: 0.447
+condition:  1 nano-per-cond: 21.042 computed-cost: 9.40
+condition: 70 nano-per-cond: 37.302 computed-cost: 16.67
+condition: 71 nano-per-cond: 43.307 computed-cost: 19.35
+condition: 72 nano-per-cond: 43.621 computed-cost: 19.49
+condition: 73 nano-per-cond: 59.459 computed-cost: 26.57
+condition: 75 nano-per-cond: 53.030 computed-cost: 23.70
+condition: 74 nano-per-cond: 60.699 computed-cost: 27.12
+condition: 80 nano-per-cond: 60.826 computed-cost: 27.18
+condition: 81 nano-per-cond: 59.639 computed-cost: 26.65
+condition: 82 nano-per-cond: 53.410 computed-cost: 23.87
+condition: 83 nano-per-cond: 52.470 computed-cost: 23.45
+condition: 84 nano-per-cond: 60.478 computed-cost: 27.02
+condition: 85 nano-per-cond: 59.610 computed-cost: 26.64
+condition: 86 nano-per-cond: 53.261 computed-cost: 23.80
+condition: 87 nano-per-cond: 52.935 computed-cost: 23.65
+condition: 90 nano-per-cond: 59.988 computed-cost: 26.81
+condition: 66 nano-per-cond: 399.152 computed-cost: 178.36
+condition: 61 nano-per-cond: 71.930 computed-cost: 32.14
+condition: 63 nano-per-cond: 61.307 computed-cost: 27.39
+```
+
 ## Linear cost
 
 To validate that the cost increase is in fact linear to the number of
