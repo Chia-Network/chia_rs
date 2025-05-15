@@ -1,8 +1,8 @@
 use crate::allocator::make_allocator;
 use crate::consensus_constants::ConsensusConstants;
+use crate::gen::flags::COST_CONDITIONS;
 use crate::gen::owned_conditions::OwnedSpendBundleConditions;
 use crate::gen::validation_error::ErrorCode;
-use crate::gen::flags::COST_CONDITIONS;
 use crate::spendbundle_conditions::run_spendbundle;
 use chia_bls::GTElement;
 use chia_bls::{aggregate_verify_gt, hash_to_g2};
