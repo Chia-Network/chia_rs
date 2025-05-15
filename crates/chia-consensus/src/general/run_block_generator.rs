@@ -1,10 +1,10 @@
 use crate::consensus_constants::ConsensusConstants;
-use crate::gen::conditions::{
+use crate::general::conditions::{
     parse_spends, process_single_spend, validate_conditions, validate_signature, EmptyVisitor,
     ParseState, SpendBundleConditions,
 };
-use crate::gen::flags::DONT_VALIDATE_SIGNATURE;
-use crate::gen::validation_error::{first, ErrorCode, ValidationErr};
+use crate::general::flags::DONT_VALIDATE_SIGNATURE;
+use crate::general::validation_error::{first, ErrorCode, ValidationErr};
 use crate::generator_rom::{CLVM_DESERIALIZER, GENERATOR_ROM};
 use chia_bls::{BlsCache, Signature};
 use clvm_utils::{tree_hash_cached, TreeHash};

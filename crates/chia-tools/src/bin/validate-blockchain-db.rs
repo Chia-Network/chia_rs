@@ -2,8 +2,8 @@ use clap::Parser;
 
 use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
-use chia_consensus::gen::flags::DONT_VALIDATE_SIGNATURE;
-use chia_consensus::gen::run_block_generator::{run_block_generator, run_block_generator2};
+use chia_consensus::general::flags::DONT_VALIDATE_SIGNATURE;
+use chia_consensus::general::run_block_generator::{run_block_generator, run_block_generator2};
 use chia_protocol::{Bytes32, Coin};
 use chia_tools::iterate_blocks;
 use clvmr::Allocator;

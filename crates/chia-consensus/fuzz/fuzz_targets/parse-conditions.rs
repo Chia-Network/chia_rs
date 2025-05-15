@@ -2,10 +2,10 @@
 use libfuzzer_sys::fuzz_target;
 
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
-use chia_consensus::gen::conditions::{
+use chia_consensus::general::conditions::{
     parse_conditions, MempoolVisitor, ParseState, SpendBundleConditions, SpendConditions,
 };
-use chia_consensus::gen::spend_visitor::SpendVisitor;
+use chia_consensus::general::spend_visitor::SpendVisitor;
 use chia_fuzz::{make_list, BitCursor};
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
@@ -14,7 +14,7 @@ use clvmr::{Allocator, NodePtr};
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use chia_consensus::gen::flags::{NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
+use chia_consensus::general::flags::{NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
 
 fuzz_target!(|data: &[u8]| {
     let mut a = Allocator::new();

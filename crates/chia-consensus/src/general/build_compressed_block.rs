@@ -263,10 +263,10 @@ impl BlockBuilder {
 mod tests {
     use super::*;
     use crate::consensus_constants::TEST_CONSTANTS;
-    use crate::gen::flags::MEMPOOL_MODE;
-    use crate::gen::owned_conditions::OwnedSpendBundleConditions;
-    use crate::gen::run_block_generator::run_block_generator2;
-    use crate::gen::solution_generator::calculate_generator_length;
+    use crate::general::flags::MEMPOOL_MODE;
+    use crate::general::owned_conditions::OwnedSpendBundleConditions;
+    use crate::general::run_block_generator::run_block_generator2;
+    use crate::general::solution_generator::calculate_generator_length;
     use crate::spendbundle_conditions::run_spendbundle;
     use chia_protocol::Coin;
     use chia_traits::Streamable;

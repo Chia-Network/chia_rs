@@ -1,20 +1,20 @@
 use chia_bls::{sign, SecretKey, Signature};
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
-use chia_consensus::r#gen::make_aggsig_final_message::u64_to_bytes;
+use chia_consensus::general::make_aggsig_final_message::u64_to_bytes;
 use chia_sha2::Sha256;
 use linreg::linear_regression_of;
 use std::time::Instant;
 // use chia_consensus::gen::conditions::parse_conditions;
-use chia_consensus::gen::conditions::{MempoolVisitor, SpendBundleConditions};
-use chia_consensus::gen::opcodes;
-use chia_consensus::r#gen::conditions::{
+use chia_consensus::general::conditions::{MempoolVisitor, SpendBundleConditions};
+use chia_consensus::general::opcodes;
+use chia_consensus::general::conditions::{
     process_single_spend,
     validate_conditions,
     validate_signature,
     ParseState, // SpendConditions,
 };
-use chia_consensus::r#gen::opcodes::ConditionOpcode;
-use chia_consensus::r#gen::spend_visitor::SpendVisitor;
+use chia_consensus::general::opcodes::ConditionOpcode;
+use chia_consensus::general::spend_visitor::SpendVisitor;
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
 use clvmr::{

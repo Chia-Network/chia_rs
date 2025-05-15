@@ -17,13 +17,13 @@ use super::opcodes::{
 use super::sanitize_int::{sanitize_uint, SanitizedUint};
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
 use crate::consensus_constants::ConsensusConstants;
-use crate::gen::flags::{
+use crate::general::flags::{
     COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
 };
-use crate::gen::make_aggsig_final_message::u64_to_bytes;
-use crate::gen::messages::{Message, SpendId};
-use crate::gen::spend_visitor::SpendVisitor;
-use crate::gen::validation_error::check_nil;
+use crate::general::make_aggsig_final_message::u64_to_bytes;
+use crate::general::messages::{Message, SpendId};
+use crate::general::spend_visitor::SpendVisitor;
+use crate::general::validation_error::check_nil;
 use chia_bls::{aggregate_verify, BlsCache, PublicKey, Signature};
 use chia_protocol::{Bytes, Bytes32, Coin};
 use chia_sha2::Sha256;
@@ -1934,7 +1934,7 @@ fn cond_test_cb(
 }
 
 #[cfg(test)]
-use crate::gen::flags::MEMPOOL_MODE;
+use crate::general::flags::MEMPOOL_MODE;
 
 #[cfg(test)]
 fn cond_test(input: &str) -> Result<(Allocator, SpendBundleConditions), ValidationErr> {
@@ -3638,8 +3638,8 @@ fn final_message(
     msg: &[u8],
 ) -> Vec<u8> {
     use crate::allocator::make_allocator;
-    use crate::gen::make_aggsig_final_message::make_aggsig_final_message;
-    use crate::gen::owned_conditions::OwnedSpendConditions;
+    use crate::general::make_aggsig_final_message::make_aggsig_final_message;
+    use crate::general::owned_conditions::OwnedSpendConditions;
     use chia_protocol::Coin;
     use clvmr::LIMIT_HEAP;
 

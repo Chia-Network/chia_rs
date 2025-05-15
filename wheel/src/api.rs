@@ -3,14 +3,14 @@ use crate::run_generator::{
 };
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::consensus_constants::ConsensusConstants;
-use chia_consensus::gen::build_compressed_block::BlockBuilder;
-use chia_consensus::gen::flags::{
+use chia_consensus::general::build_compressed_block::BlockBuilder;
+use chia_consensus::general::flags::{
     DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
 };
-use chia_consensus::gen::owned_conditions::{OwnedSpendBundleConditions, OwnedSpendConditions};
-use chia_consensus::gen::run_block_generator::setup_generator_args;
-use chia_consensus::gen::solution_generator::solution_generator as native_solution_generator;
-use chia_consensus::gen::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
+use chia_consensus::general::owned_conditions::{OwnedSpendBundleConditions, OwnedSpendConditions};
+use chia_consensus::general::run_block_generator::setup_generator_args;
+use chia_consensus::general::solution_generator::solution_generator as native_solution_generator;
+use chia_consensus::general::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
 use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
 use chia_consensus::spendbundle_conditions::get_conditions_from_spendbundle;
@@ -67,8 +67,8 @@ use std::iter::zip;
 use crate::run_program::{run_chia_program, serialized_length};
 
 use chia_consensus::fast_forward::fast_forward_singleton as native_ff;
-use chia_consensus::gen::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
-use chia_consensus::gen::validation_error::ValidationErr;
+use chia_consensus::general::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
+use chia_consensus::general::validation_error::ValidationErr;
 use clvmr::allocator::NodePtr;
 use clvmr::cost::Cost;
 use clvmr::reduction::EvalErr;
@@ -425,7 +425,7 @@ pub fn py_get_conditions_from_spendbundle(
     height: u32,
 ) -> PyResult<OwnedSpendBundleConditions> {
     use chia_consensus::allocator::make_allocator;
-    use chia_consensus::gen::owned_conditions::OwnedSpendBundleConditions;
+    use chia_consensus::general::owned_conditions::OwnedSpendBundleConditions;
     let mut a = make_allocator(LIMIT_HEAP);
     let conditions =
         get_conditions_from_spendbundle(&mut a, spend_bundle, max_cost, height, constants)
@@ -456,11 +456,11 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<BlockBuilder>()?;
     m.add(
         "ELIGIBLE_FOR_DEDUP",
-        chia_consensus::gen::conditions::ELIGIBLE_FOR_DEDUP,
+        chia_consensus::general::conditions::ELIGIBLE_FOR_DEDUP,
     )?;
     m.add(
         "ELIGIBLE_FOR_FF",
-        chia_consensus::gen::conditions::ELIGIBLE_FOR_FF,
+        chia_consensus::general::conditions::ELIGIBLE_FOR_FF,
     )?;
     m.add_class::<OwnedSpendConditions>()?;
 
