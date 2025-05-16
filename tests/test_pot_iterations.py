@@ -19,7 +19,7 @@ test_constants = DEFAULT_CONSTANTS.replace(
 
 
 class TestPotIterations:
-    def test_is_overflow_block(self):
+    def test_is_overflow_block(self) -> None:
         assert not is_overflow_block(
             test_constants.NUM_SPS_SUB_SLOT,
             test_constants.NUM_SP_INTERVALS_EXTRA,
@@ -52,13 +52,13 @@ class TestPotIterations:
                 uint8(32),
             )
 
-    def test_calculate_sp_iters(self):
+    def test_calculate_sp_iters(self) -> None:
         ssi: uint64 = uint64(100001 * 64 * 4)
         with raises(ValueError):
             calculate_sp_iters(test_constants.NUM_SPS_SUB_SLOT, ssi, uint8(32))
         calculate_sp_iters(test_constants.NUM_SPS_SUB_SLOT, ssi, uint8(31))
 
-    def test_expected_plot_size(self):
+    def test_expected_plot_size(self) -> None:
         assert (
             expected_plot_size(32) == 139586437120
         )  # number retrieved from old implementation
@@ -75,14 +75,14 @@ class TestPotIterations:
             expected_plot_size(36) == 2508260900864
         )  # number retrieved from old implementation
 
-    def test_calculate_ip_iters(self):
+    def test_calculate_ip_iters(self) -> None:
         # num_sps_sub_slot: u32,
         # num_sp_intervals_extra: u8,
         # sub_slot_iters: u64,
         # signage_point_index: u8,
         # required_iters: u64,
         ssi: uint64 = uint64(100001 * 64 * 4)
-        sp_interval_iters = ssi // test_constants.NUM_SPS_SUB_SLOT
+        sp_interval_iters = uint64(ssi // test_constants.NUM_SPS_SUB_SLOT)
 
         with raises(ValueError):
             # Invalid signage point index
@@ -102,7 +102,7 @@ class TestPotIterations:
                 test_constants.NUM_SPS_SUB_SLOT,
                 test_constants.NUM_SP_INTERVALS_EXTRA,
                 ssi,
-                sp_interval_iters,
+                uint8(255),
                 sp_interval_iters,
             )
 
@@ -112,8 +112,8 @@ class TestPotIterations:
                 test_constants.NUM_SPS_SUB_SLOT,
                 test_constants.NUM_SP_INTERVALS_EXTRA,
                 ssi,
-                sp_interval_iters,
-                sp_interval_iters * 12,
+                uint8(255),
+                uint64(sp_interval_iters * 12),
             )
 
         with raises(ValueError):
@@ -122,11 +122,11 @@ class TestPotIterations:
                 test_constants.NUM_SPS_SUB_SLOT,
                 test_constants.NUM_SP_INTERVALS_EXTRA,
                 ssi,
-                sp_interval_iters,
+                uint8(255),
                 uint64(0),
             )
 
-        required_iters = sp_interval_iters - 1
+        required_iters = uint64(sp_interval_iters - 1)
         ip_iters = calculate_ip_iters(
             test_constants.NUM_SPS_SUB_SLOT,
             test_constants.NUM_SP_INTERVALS_EXTRA,

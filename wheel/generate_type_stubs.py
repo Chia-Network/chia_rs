@@ -344,14 +344,14 @@ def calculate_ip_iters(
     num_sps_sub_slot: uint32,
     num_sp_intervals_extra: uint8,
     sub_slot_iters: uint64,
-    signage_point_index: uint32,
+    signage_point_index: uint8,
     required_iters: uint64,
 ) -> uint64: ...
 
 def calculate_sp_iters(
     num_sps_sub_slot: uint32,
     sub_slot_iters: uint64,
-    signage_point_index: uint32,
+    signage_point_index: uint8,
 ) -> uint64: ...
 
 def calculate_sp_interval_iters(
@@ -362,7 +362,7 @@ def calculate_sp_interval_iters(
 def is_overflow_block(
     num_sps_sub_slot: uint32,
     num_sp_intervals_extra: uint8,
-    signage_point_index: uint32,
+    signage_point_index: uint8,
 ) -> bool: ...
 
 def expected_plot_size(
