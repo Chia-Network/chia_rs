@@ -39,6 +39,7 @@ percent-encoding = { workspace = true }
 rand = { workspace = true }
 rstest = { workspace = true }
 url = { workspace = true }
+tempfile = { workspace = true }
 
 [package.metadata.cargo-machete]
 ignored = ["chia-sha2"]

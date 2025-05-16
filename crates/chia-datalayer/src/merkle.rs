@@ -421,28 +421,6 @@ pub struct ProofOfInclusionLayer {
     pub combined_hash: Hash,
 }
 
-impl ProofOfInclusionLayer {
-    pub fn from_hashes(primary_hash: &Hash, other_hash_side: Side, other_hash: Hash) -> Self {
-        let combined_hash = calculate_internal_hash(primary_hash, other_hash_side, &other_hash);
-
-        ProofOfInclusionLayer {
-            other_hash_side,
-            other_hash,
-            combined_hash,
-        }
-    }
-}
-
-#[cfg(feature = "py-bindings")]
-#[pymethods]
-impl ProofOfInclusionLayer {
-    #[staticmethod]
-    #[pyo3(name = "from_hashes")]
-    pub fn py_from_hashes(primary_hash: Hash, other_hash_side: Side, other_hash: Hash) -> Self {
-        ProofOfInclusionLayer::from_hashes(&primary_hash, other_hash_side, other_hash)
-    }
-}
-
 #[cfg_attr(
     feature = "py-bindings",
     pyclass(get_all),
@@ -2688,8 +2666,35 @@ mod tests {
     use rstest::{fixture, rstest};
     use std::time::{Duration, Instant};
 
+    const HASH_ZERO: Hash = Hash(Bytes32::new([0; 32]));
+    const HASH_ONE: Hash = Hash(Bytes32::new([1; 32]));
+    const HASH_TWO: Hash = Hash(Bytes32::new([2; 32]));
+
     fn open_dot(_lines: &mut DotLines) {
         // crate::merkle::dot::open_dot(_lines);
+    }
+
+    fn incomplete_delta_reader() -> DeltaReader {
+        let mut internal_nodes_map: InternalNodesMap = HashMap::new();
+        let mut leaf_nodes_map: LeafNodesMap = HashMap::new();
+
+        internal_nodes_map.insert(HASH_ZERO, (HASH_ONE, HASH_TWO));
+        leaf_nodes_map.insert(HASH_ONE, (KeyId(0), ValueId(1)));
+
+        DeltaReader::new(internal_nodes_map, leaf_nodes_map).unwrap()
+    }
+
+    fn complete_delta_reader() -> DeltaReader {
+        let mut delta_reader = incomplete_delta_reader();
+        delta_reader.nodes.insert(
+            HASH_TWO,
+            DeltaReaderNode::Leaf {
+                key: KeyId(2),
+                value: ValueId(3),
+            },
+        );
+
+        delta_reader
     }
 
     #[test]
@@ -3627,5 +3632,168 @@ mod tests {
             )
             .unwrap();
         assert!(prepared_blob.block_status_cache.contains_key(key));
+    }
+
+    #[test]
+    fn test_node_expect_leaf_passes() {
+        Node::Leaf(LeafNode {
+            hash: Hash(Bytes32::default()),
+            parent: Parent(None),
+            key: KeyId(0),
+            value: ValueId(0),
+        })
+        .expect_leaf("panic message");
+    }
+
+    #[test]
+    #[should_panic(expected = "panic message")]
+    fn test_node_expect_leaf_panics() {
+        Node::Internal(InternalNode {
+            hash: Hash(Bytes32::default()),
+            parent: Parent(None),
+            left: TreeIndex(0),
+            right: TreeIndex(0),
+        })
+        .expect_leaf("panic message");
+    }
+
+    #[test]
+    fn test_node_expect_internal_passes() {
+        Node::Internal(InternalNode {
+            hash: Hash(Bytes32::default()),
+            parent: Parent(None),
+            left: TreeIndex(0),
+            right: TreeIndex(0),
+        })
+        .expect_internal("panic message");
+    }
+
+    #[test]
+    #[should_panic(expected = "panic message")]
+    fn test_node_expect_leaf_internal() {
+        Node::Leaf(LeafNode {
+            hash: Hash(Bytes32::default()),
+            parent: Parent(None),
+            key: KeyId(0),
+            value: ValueId(0),
+        })
+        .expect_internal("panic message");
+    }
+
+    #[test]
+    fn test_delta_reader_get_missing_hashes_one_known_one_unknown() {
+        let delta_reader = incomplete_delta_reader();
+        let missing = delta_reader.get_missing_hashes();
+
+        let expected = expect![[r"
+            {
+                Hash(
+                    0202020202020202020202020202020202020202020202020202020202020202,
+                ),
+            }
+        "]];
+        expected.assert_debug_eq(&missing);
+    }
+
+    #[test]
+    fn test_delta_reader_collect_from_merkle_blob() {
+        let mut delta_reader = incomplete_delta_reader();
+        let mut merkle_blob = MerkleBlob::new(Vec::new()).unwrap();
+        merkle_blob
+            .insert(KeyId(2), ValueId(3), &HASH_TWO, InsertLocation::AsRoot {})
+            .unwrap();
+
+        let dir_path = tempfile::tempdir().unwrap();
+        let leaf_blob_path = dir_path.path().join("merkle_blob");
+        merkle_blob.to_path(&leaf_blob_path).unwrap();
+        delta_reader
+            .collect_from_merkle_blob(&leaf_blob_path, &vec![TreeIndex(0)])
+            .unwrap();
+
+        let missing = delta_reader.get_missing_hashes();
+
+        #[allow(clippy::needless_raw_string_hashes)]
+        let expected = expect![[r#"
+            {}
+        "#]];
+        expected.assert_debug_eq(&missing);
+    }
+
+    #[test]
+    fn test_delta_reader_collect_from_merkle_blobs() {
+        let mut delta_reader = incomplete_delta_reader();
+        let mut merkle_blob = MerkleBlob::new(Vec::new()).unwrap();
+        merkle_blob
+            .insert(KeyId(2), ValueId(3), &HASH_TWO, InsertLocation::AsRoot {})
+            .unwrap();
+
+        let dir_path = tempfile::tempdir().unwrap();
+        let leaf_blob_path = dir_path.path().join("merkle_blob");
+        merkle_blob.to_path(&leaf_blob_path).unwrap();
+        delta_reader
+            .collect_from_merkle_blobs(&vec![(leaf_blob_path, vec![TreeIndex(0)])])
+            .unwrap();
+
+        let missing = delta_reader.get_missing_hashes();
+
+        #[allow(clippy::needless_raw_string_hashes)]
+        let expected = expect![[r#"
+            {}
+        "#]];
+        expected.assert_debug_eq(&missing);
+    }
+
+    #[test]
+    #[should_panic(expected = "integrity check failed while dropping merkle blob: CycleFound")]
+    fn test_delta_reader_create_merkle_blob_incomplete_fails() {
+        let mut delta_reader = incomplete_delta_reader();
+
+        delta_reader
+            .create_merkle_blob_and_filter_unused_nodes(HASH_ZERO, &HashSet::new())
+            .expect_err("incomplete so should fail");
+    }
+
+    #[test]
+    fn test_delta_reader_create_merkle_blob_works() {
+        let mut delta_reader = complete_delta_reader();
+
+        let (complete_blob, _) = delta_reader
+            .create_merkle_blob_and_filter_unused_nodes(HASH_ZERO, &HashSet::new())
+            .unwrap();
+        complete_blob.check_integrity().unwrap();
+    }
+
+    #[rstest]
+    fn test_get_node_by_hash(small_blob: MerkleBlob) {
+        let node = small_blob.get_node_by_hash(sha256_num(0x1020)).unwrap();
+
+        #[allow(clippy::needless_raw_string_hashes)]
+        let expected = expect![[r#"
+            (
+                KeyId(
+                    283686952306183,
+                ),
+                ValueId(
+                    1157726452361532951,
+                ),
+            )
+        "#]];
+
+        expected.assert_debug_eq(&node);
+    }
+
+    #[rstest]
+    fn test_get_hashes_indexes(small_blob: MerkleBlob) {
+        let hashes_indexes = small_blob.get_hashes_indexes(false).unwrap();
+
+        let mut expected = HashMap::new();
+        let one = sha256_num(0x2030);
+        let two = sha256_num(0x1020);
+        let zero = internal_hash(&one, &two);
+        expected.insert(zero, TreeIndex(0));
+        expected.insert(one, TreeIndex(1));
+        expected.insert(two, TreeIndex(2));
+
+        assert_eq!(hashes_indexes, expected);
     }
 }
