@@ -4337,8 +4337,8 @@ class ConsensusConstants:
     EPOCH_BLOCKS: uint32
     SIGNIFICANT_BITS: uint8
     DISCRIMINANT_SIZE_BITS: uint16
-    NUMBER_ZERO_BITS_PLOT_FILTER_OLD: uint8
-    NUMBER_ZERO_BITS_PLOT_FILTER_NEW: uint8
+    NUMBER_ZERO_BITS_PLOT_FILTER_V1: uint8
+    NUMBER_ZERO_BITS_PLOT_FILTER_V2: uint8
     MIN_PLOT_SIZE: uint8
     MAX_PLOT_SIZE: uint8
     SUB_SLOT_TIME_TARGET: uint16
@@ -4372,6 +4372,11 @@ class ConsensusConstants:
     PLOT_FILTER_128_HEIGHT: uint32
     PLOT_FILTER_64_HEIGHT: uint32
     PLOT_FILTER_32_HEIGHT: uint32
+    PLOT_DIFFICULTY_4_HEIGHT: uint32
+    PLOT_DIFFICULTY_5_HEIGHT: uint32
+    PLOT_DIFFICULTY_6_HEIGHT: uint32
+    PLOT_DIFFICULTY_7_HEIGHT: uint32
+    PLOT_DIFFICULTY_8_HEIGHT: uint32
     def __init__(
         self,
         SLOT_BLOCKS_TARGET: uint32,
@@ -4386,8 +4391,8 @@ class ConsensusConstants:
         EPOCH_BLOCKS: uint32,
         SIGNIFICANT_BITS: uint8,
         DISCRIMINANT_SIZE_BITS: uint16,
-        NUMBER_ZERO_BITS_PLOT_FILTER_OLD: uint8,
-        NUMBER_ZERO_BITS_PLOT_FILTER_NEW: uint8,
+        NUMBER_ZERO_BITS_PLOT_FILTER_V1: uint8,
+        NUMBER_ZERO_BITS_PLOT_FILTER_V2: uint8,
         MIN_PLOT_SIZE: uint8,
         MAX_PLOT_SIZE: uint8,
         SUB_SLOT_TIME_TARGET: uint16,
@@ -4420,7 +4425,12 @@ class ConsensusConstants:
         HARD_FORK2_HEIGHT: uint32,
         PLOT_FILTER_128_HEIGHT: uint32,
         PLOT_FILTER_64_HEIGHT: uint32,
-        PLOT_FILTER_32_HEIGHT: uint32
+        PLOT_FILTER_32_HEIGHT: uint32,
+        PLOT_DIFFICULTY_4_HEIGHT: uint32,
+        PLOT_DIFFICULTY_5_HEIGHT: uint32,
+        PLOT_DIFFICULTY_6_HEIGHT: uint32,
+        PLOT_DIFFICULTY_7_HEIGHT: uint32,
+        PLOT_DIFFICULTY_8_HEIGHT: uint32
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -4451,8 +4461,8 @@ class ConsensusConstants:
         EPOCH_BLOCKS: Union[ uint32, _Unspec] = _Unspec(),
         SIGNIFICANT_BITS: Union[ uint8, _Unspec] = _Unspec(),
         DISCRIMINANT_SIZE_BITS: Union[ uint16, _Unspec] = _Unspec(),
-        NUMBER_ZERO_BITS_PLOT_FILTER_OLD: Union[ uint8, _Unspec] = _Unspec(),
-        NUMBER_ZERO_BITS_PLOT_FILTER_NEW: Union[ uint8, _Unspec] = _Unspec(),
+        NUMBER_ZERO_BITS_PLOT_FILTER_V1: Union[ uint8, _Unspec] = _Unspec(),
+        NUMBER_ZERO_BITS_PLOT_FILTER_V2: Union[ uint8, _Unspec] = _Unspec(),
         MIN_PLOT_SIZE: Union[ uint8, _Unspec] = _Unspec(),
         MAX_PLOT_SIZE: Union[ uint8, _Unspec] = _Unspec(),
         SUB_SLOT_TIME_TARGET: Union[ uint16, _Unspec] = _Unspec(),
@@ -4485,4 +4495,9 @@ class ConsensusConstants:
         HARD_FORK2_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_FILTER_128_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_FILTER_64_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
-        PLOT_FILTER_32_HEIGHT: Union[ uint32, _Unspec] = _Unspec()) -> ConsensusConstants: ...
+        PLOT_FILTER_32_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
+        PLOT_DIFFICULTY_4_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
+        PLOT_DIFFICULTY_5_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
+        PLOT_DIFFICULTY_6_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
+        PLOT_DIFFICULTY_7_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
+        PLOT_DIFFICULTY_8_HEIGHT: Union[ uint32, _Unspec] = _Unspec()) -> ConsensusConstants: ...
