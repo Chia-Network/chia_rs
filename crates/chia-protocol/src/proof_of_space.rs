@@ -8,6 +8,10 @@ pub struct ProofOfSpace {
     pool_public_key: Option<G1Element>,
     pool_contract_puzzle_hash: Option<Bytes32>,
     plot_public_key: G1Element,
+    // this field was renamed when adding support for v2 plots since the top
+    // bit now means whether it's v1 or v2. To stay backwards compabible with
+    // JSON serialization, we still serialize this as its original name
+    #[serde(rename = "size", alias = "version_and_size")]
     version_and_size: u8,
     proof: Bytes,
 }
