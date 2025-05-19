@@ -9,14 +9,14 @@ fn cache_benchmark(c: &mut Criterion) {
     let mut data = [0u8; 32];
     rng.fill(data.as_mut_slice());
 
-    let sk = SecretKey::from_seed(&data);
+    let sk = SecretKey::from_seed(&data).unwrap();
     let msg = b"The quick brown fox jumps over the lazy dog";
 
     let mut pks = Vec::new();
 
     let mut agg_sig = Signature::default();
     for i in 0..1000 {
-        let derived = sk.derive_hardened(i);
+        let derived = sk.derive_hardened(i).unwrap();
         let pk = derived.public_key();
         let sig = sign(&derived, msg);
         agg_sig.aggregate(&sig);
@@ -79,7 +79,7 @@ fn cache_benchmark(c: &mut Criterion) {
 
     // Add more pairs to the cache so we can evict a relatively larger number
     for i in 1_000..20_000 {
-        let derived = sk.derive_hardened(i);
+        let derived = sk.derive_hardened(i).unwrap();
         let pk = derived.public_key();
         let sig = sign(&derived, msg);
         agg_sig.aggregate(&sig);
