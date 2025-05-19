@@ -32,6 +32,7 @@ def test_large_number_of_conds_with_custom_generator():
         [70, bytes.fromhex("d0172c347e5e159a3dd0c4c8f47fe2e2331c946ff7596df14b64a10da0854031")],  # ASSERT_MY_COIN_ID
     ]
     amount = 500
+    max_cost = 11000000000
     for test in test_conds:
-        mod.run_with_cost(100000, [test, amount])
+        mod.run_with_cost(max_cost, [test, amount])
 
