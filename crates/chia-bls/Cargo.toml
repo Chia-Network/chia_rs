@@ -35,6 +35,7 @@ chia-serde = { workspace = true, optional = true }
 rand = { workspace = true }
 criterion = { workspace = true }
 rstest = { workspace = true }
+anyhow = { workspace = true }
 
 [lib]
 crate-type = ["rlib"]

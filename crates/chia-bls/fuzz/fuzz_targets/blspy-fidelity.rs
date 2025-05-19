@@ -39,7 +39,7 @@ fuzz_target!(|data: &[u8]| {
         let aug = blspy.getattr("AugSchemeMPL").unwrap();
 
         // Generate key pair from seed
-        let rust_sk = SecretKey::from_seed(data);
+        let rust_sk = SecretKey::from_seed(data).unwrap();
         let py_sk = aug
             .call_method1(
                 "key_gen",
@@ -103,7 +103,7 @@ fuzz_target!(|data: &[u8]| {
 
         // derive hardened
         let idx = u32::from_be_bytes(<[u8; 4]>::try_from(&data[4..8]).unwrap());
-        let rust_sk2 = rust_sk.derive_hardened(idx);
+        let rust_sk2 = rust_sk.derive_hardened(idx).unwrap();
         let py_sk2 = aug
             .call_method1(
                 "derive_child_sk",

@@ -5,14 +5,22 @@ use thiserror::Error;
 pub enum Error {
     #[error("SecretKey byte data must be less than the group order")]
     SecretKeyGroupOrder,
+
+    #[error("Seed must be at least 32 bytes")]
+    InvalidSeedLength,
+
     #[error("Given G1 infinity element must be canonical")]
     G1NotCanonical,
+
     #[error("Given G1 non-infinity element must start with 0b10")]
     G1InfinityInvalidBits,
+
     #[error("G1 non-infinity element can't have only zeros")]
     G1InfinityNotZero,
+
     #[error("PublicKey is invalid (BLST ERROR: {0:?})")]
     InvalidPublicKey(BLST_ERROR),
+
     #[error("Signature is invalid (BLST ERROR: {0:?})")]
     InvalidSignature(BLST_ERROR),
 }

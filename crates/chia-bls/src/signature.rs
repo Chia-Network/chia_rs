@@ -1,7 +1,7 @@
 use crate::{Error, GTElement, PublicKey, Result, SecretKey};
 use blst::*;
 use chia_sha2::Sha256;
-use chia_traits::{read_bytes, Streamable};
+use chia_traits::{chia_error, read_bytes, Streamable};
 #[cfg(feature = "py-bindings")]
 use pyo3::exceptions::PyNotImplementedError;
 #[cfg(feature = "py-bindings")]
@@ -132,15 +132,15 @@ impl Streamable for Signature {
         digest.update(self.to_bytes());
     }
 
-    fn stream(&self, out: &mut Vec<u8>) -> chia_traits::chia_error::Result<()> {
+    fn stream(&self, out: &mut Vec<u8>) -> chia_error::Result<()> {
         out.extend_from_slice(&self.to_bytes());
         Ok(())
     }
 
-    fn parse<const TRUSTED: bool>(
-        input: &mut Cursor<&[u8]>,
-    ) -> chia_traits::chia_error::Result<Self> {
-        let input = read_bytes(input, 96)?.try_into().unwrap();
+    fn parse<const TRUSTED: bool>(input: &mut Cursor<&[u8]>) -> chia_error::Result<Self> {
+        let input = read_bytes(input, 96)?
+            .try_into()
+            .expect("length already checked");
         if TRUSTED {
             Ok(Self::from_bytes_unchecked(input)?)
         } else {
@@ -568,8 +568,7 @@ mod pybindings {
             Ok(Self::from_bytes(
                 parse_hex_string(o, 96, "Signature")?
                     .as_slice()
-                    .try_into()
-                    .unwrap(),
+                    .try_into()?,
             )?)
         }
     }
@@ -615,63 +614,73 @@ mod tests {
     }
 
     #[test]
-    fn test_infinity_is_valid() {
+    fn test_infinity_is_valid() -> anyhow::Result<()> {
         let mut data = [0u8; 96];
         data[0] = 0xc0;
-        let sig = Signature::from_bytes(&data).unwrap();
+        let sig = Signature::from_bytes(&data)?;
         assert!(sig.is_valid());
+        Ok(())
     }
 
     #[test]
-    fn test_is_valid() {
+    fn test_is_valid() -> anyhow::Result<()> {
         let mut rng = StdRng::seed_from_u64(1337);
         let mut data = [0u8; 32];
         let msg = [0u8; 32];
+
         for _i in 0..50 {
             rng.fill(data.as_mut_slice());
-            let sk = SecretKey::from_seed(&data);
+            let sk = SecretKey::from_seed(&data)?;
             let sig = sign(&sk, msg);
             assert!(sig.is_valid());
         }
+
+        Ok(())
     }
 
     #[test]
-    fn test_roundtrip() {
+    fn test_roundtrip() -> anyhow::Result<()> {
         let mut rng = StdRng::seed_from_u64(1337);
         let mut data = [0u8; 32];
         let mut msg = [0u8; 32];
         rng.fill(msg.as_mut_slice());
+
         for _i in 0..50 {
             rng.fill(data.as_mut_slice());
-            let sk = SecretKey::from_seed(&data);
+            let sk = SecretKey::from_seed(&data)?;
             let sig = sign(&sk, msg);
             let bytes = sig.to_bytes();
-            let sig2 = Signature::from_bytes(&bytes).unwrap();
+            let sig2 = Signature::from_bytes(&bytes)?;
             assert_eq!(sig, sig2);
         }
+
+        Ok(())
     }
 
     #[test]
-    fn test_random_verify() {
+    fn test_random_verify() -> anyhow::Result<()> {
         let mut rng = StdRng::seed_from_u64(1337);
         let mut data = [0u8; 32];
         let mut msg = [0u8; 32];
         rng.fill(msg.as_mut_slice());
+
         for _i in 0..20 {
             rng.fill(data.as_mut_slice());
-            let sk = SecretKey::from_seed(&data);
+            let sk = SecretKey::from_seed(&data)?;
             let pk = sk.public_key();
             let sig = sign(&sk, msg);
             assert!(verify(&sig, &pk, msg));
 
             let bytes = sig.to_bytes();
-            let sig2 = Signature::from_bytes(&bytes).unwrap();
+            let sig2 = Signature::from_bytes(&bytes)?;
             assert!(verify(&sig2, &pk, msg));
         }
+
+        Ok(())
     }
 
     #[test]
-    fn test_verify() {
+    fn test_verify() -> anyhow::Result<()> {
         // test case from:
         // from blspy import PrivateKey
         // from blspy import AugSchemeMPL
@@ -679,18 +688,16 @@ mod tests {
         // data = b"foobar"
         // print(AugSchemeMPL.sign(sk, data))
         let msg = b"foobar";
-        let sk = SecretKey::from_bytes(
-            &<[u8; 32]>::from_hex(
-                "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb",
-            )
-            .unwrap(),
-        )
-        .unwrap();
+        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(
+            "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb",
+        )?)?;
 
         let sig = sign(&sk, msg);
         assert!(verify(&sig, &sk.public_key(), msg));
 
-        assert_eq!(sig.to_bytes(), <[u8; 96]>::from_hex("b45825c0ee7759945c0189b4c38b7e54231ebadc83a851bec3bb7cf954a124ae0cc8e8e5146558332ea152f63bf8846e04826185ef60e817f271f8d500126561319203f9acb95809ed20c193757233454be1562a5870570941a84605bd2c9c9a").unwrap());
+        assert_eq!(sig.to_bytes(), <[u8; 96]>::from_hex("b45825c0ee7759945c0189b4c38b7e54231ebadc83a851bec3bb7cf954a124ae0cc8e8e5146558332ea152f63bf8846e04826185ef60e817f271f8d500126561319203f9acb95809ed20c193757233454be1562a5870570941a84605bd2c9c9a")?);
+
+        Ok(())
     }
 
     fn aug_msg_to_g2(pk: &PublicKey, msg: &[u8]) -> Signature {
@@ -700,7 +707,7 @@ mod tests {
     }
 
     #[test]
-    fn test_aggregate_signature() {
+    fn test_aggregate_signature() -> anyhow::Result<()> {
         // from blspy import PrivateKey
         // from blspy import AugSchemeMPL
         // sk = PrivateKey.from_bytes(bytes.fromhex("52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb"))
@@ -720,15 +727,16 @@ mod tests {
         // 87bce2c588f4257e2792d929834548c7d3af679272cb4f8e1d24cf4bf584dd287aa1d9f5e53a86f288190db45e1d100d0a5e936079a66a709b5f35394cf7d52f49dd963284cb5241055d54f8cf48f61bc1037d21cae6c025a7ea5e9f4d289a18
 
         let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
-        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex)?)?;
         let msg = b"foobar";
         let mut agg1 = Signature::default();
         let mut agg2 = Signature::default();
         let mut sigs = Vec::<Signature>::new();
         let mut data = Vec::<(PublicKey, &[u8])>::new();
         let mut pairs = Vec::<(PublicKey, Signature)>::new();
+
         for idx in 0..4 {
-            let derived = sk.derive_hardened(idx as u32);
+            let derived = sk.derive_hardened(idx)?;
             let pk = derived.public_key();
             data.push((pk, msg));
             let sig = sign(&derived, msg);
@@ -737,10 +745,11 @@ mod tests {
             sigs.push(sig);
             pairs.push((pk, aug_msg_to_g2(&pk, msg)));
         }
+
         let agg3 = aggregate(&sigs);
         let agg4 = &sigs[0] + &sigs[1] + &sigs[2] + &sigs[3];
 
-        assert_eq!(agg1.to_bytes(), <[u8; 96]>::from_hex("87bce2c588f4257e2792d929834548c7d3af679272cb4f8e1d24cf4bf584dd287aa1d9f5e53a86f288190db45e1d100d0a5e936079a66a709b5f35394cf7d52f49dd963284cb5241055d54f8cf48f61bc1037d21cae6c025a7ea5e9f4d289a18").unwrap());
+        assert_eq!(agg1.to_bytes(), <[u8; 96]>::from_hex("87bce2c588f4257e2792d929834548c7d3af679272cb4f8e1d24cf4bf584dd287aa1d9f5e53a86f288190db45e1d100d0a5e936079a66a709b5f35394cf7d52f49dd963284cb5241055d54f8cf48f61bc1037d21cae6c025a7ea5e9f4d289a18")?);
         assert_eq!(agg1, agg2);
         assert_eq!(agg1, agg3);
         assert_eq!(agg1, agg4);
@@ -755,18 +764,23 @@ mod tests {
         assert!(aggregate_pairing(pairs.clone()));
         // order does not matter
         assert!(aggregate_pairing(pairs.into_iter().rev()));
+
+        Ok(())
     }
 
     #[rstest]
-    fn test_aggregate_gt_signature(#[values(0, 1, 2, 3, 4, 5, 100)] num_keys: usize) {
+    fn test_aggregate_gt_signature(
+        #[values(0, 1, 2, 3, 4, 5, 100)] num_keys: usize,
+    ) -> anyhow::Result<()> {
         let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
-        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex)?)?;
         let msg = b"foobar";
         let mut agg = Signature::default();
         let mut gts = Vec::<GTElement>::new();
         let mut pks = Vec::<PublicKey>::new();
+
         for idx in 0..num_keys {
-            let derived = sk.derive_hardened(idx as u32);
+            let derived = sk.derive_hardened(idx as u32)?;
             let pk = derived.public_key();
             let sig = sign(&derived, msg);
             agg.aggregate(&sig);
@@ -784,6 +798,7 @@ mod tests {
             assert!(aggregate_verify_gt(&agg, &gts));
             assert!(aggregate_verify(&agg, pks.iter().map(|pk| (pk, &msg[..]))));
         }
+
         for _ in 0..num_keys {
             gts.rotate_right(1);
             pks.rotate_right(1);
@@ -793,12 +808,14 @@ mod tests {
                 pks[1..].iter().map(|pk| (pk, &msg[..]))
             ));
         }
+
+        Ok(())
     }
 
     #[test]
-    fn test_aggregate_duplicate_signature() {
+    fn test_aggregate_duplicate_signature() -> anyhow::Result<()> {
         let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
-        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex)?)?;
         let msg = b"foobar";
         let mut agg = Signature::default();
         let mut data = Vec::<(PublicKey, &[u8])>::new();
@@ -811,7 +828,7 @@ mod tests {
             pairs.push((pk, aug_msg_to_g2(&pk, msg)));
         }
 
-        assert_eq!(agg.to_bytes(), <[u8; 96]>::from_hex("a1cca6540a4a06d096cb5b5fc76af5fd099476e70b623b8c6e4cf02ffde94fc0f75f4e17c67a9e350940893306798a3519368b02dc3464b7270ea4ca233cfa85a38da9e25c9314e81270b54d1e773a2ec5c3e14c62dac7abdebe52f4688310d3").unwrap());
+        assert_eq!(agg.to_bytes(), <[u8; 96]>::from_hex("a1cca6540a4a06d096cb5b5fc76af5fd099476e70b623b8c6e4cf02ffde94fc0f75f4e17c67a9e350940893306798a3519368b02dc3464b7270ea4ca233cfa85a38da9e25c9314e81270b54d1e773a2ec5c3e14c62dac7abdebe52f4688310d3")?);
 
         assert!(aggregate_verify(&agg, data));
 
@@ -819,13 +836,15 @@ mod tests {
         assert!(aggregate_pairing(pairs.clone()));
         // order does not matter
         assert!(aggregate_pairing(pairs.into_iter().rev()));
+
+        Ok(())
     }
 
     #[cfg(test)]
     fn random_sk<R: Rng>(rng: &mut R) -> SecretKey {
         let mut data = [0u8; 64];
         rng.fill(data.as_mut_slice());
-        SecretKey::from_seed(&data)
+        SecretKey::from_seed(&data).expect("failed to create secret key")
     }
 
     #[test]
@@ -901,7 +920,7 @@ mod tests {
     }
 
     #[test]
-    fn test_vector_2_aggregate_of_aggregates() {
+    fn test_vector_2_aggregate_of_aggregates() -> anyhow::Result<()> {
         // test case from: bls-signatures/src/test.cpp
         // "Chia test vector 2 (Augmented, aggregate of aggregates)"
         let message1 = [1_u8, 2, 3, 40];
@@ -909,8 +928,8 @@ mod tests {
         let message3 = [9_u8, 10, 11, 12, 13];
         let message4 = [15_u8, 63, 244, 92, 0, 1];
 
-        let sk1 = SecretKey::from_seed(&[2_u8; 32]);
-        let sk2 = SecretKey::from_seed(&[3_u8; 32]);
+        let sk1 = SecretKey::from_seed(&[2_u8; 32])?;
+        let sk2 = SecretKey::from_seed(&[3_u8; 32])?;
 
         let pk1 = sk1.public_key();
         let pk2 = sk2.public_key();
@@ -944,17 +963,20 @@ mod tests {
                 "a1d5360dcb418d33b29b90b912b4accde535cf0e52caf467a005dc632d9f7af44b6c4e9acd4\
             6eac218b28cdb07a3e3bc087df1cd1e3213aa4e11322a3ff3847bbba0b2fd19ddc25ca964871\
             997b9bceeab37a4c2565876da19382ea32a962200"
-            )
-            .unwrap()
+            )?
         );
+
+        Ok(())
     }
 
     #[test]
-    fn test_signature_zero_key() {
+    fn test_signature_zero_key() -> anyhow::Result<()> {
         // test case from: bls-signatures/src/test.cpp
         // "Should sign with the zero key"
-        let sk = SecretKey::from_bytes(&[0; 32]).unwrap();
+        let sk = SecretKey::from_bytes(&[0; 32])?;
         assert_eq!(sign(&sk, [1_u8, 2, 3]), Signature::default());
+
+        Ok(())
     }
 
     #[test]
@@ -1053,14 +1075,14 @@ mod tests {
     }
 
     #[test]
-    fn test_aug_scheme() {
+    fn test_aug_scheme() -> anyhow::Result<()> {
         // test case from: bls-signatures/src/test.cpp
         // "Aug Scheme"
 
         let msg1 = [7_u8, 8, 9];
         let msg2 = [10_u8, 11, 12];
 
-        let sk1 = SecretKey::from_seed(&[4_u8; 32]);
+        let sk1 = SecretKey::from_seed(&[4_u8; 32])?;
         let pk1 = sk1.public_key();
         let pk1v = pk1.to_bytes();
         let sig1 = sign(&sk1, msg1);
@@ -1068,12 +1090,12 @@ mod tests {
 
         assert!(verify(&sig1, &pk1, msg1));
         assert!(verify(
-            &Signature::from_bytes(&sig1v).unwrap(),
-            &PublicKey::from_bytes(&pk1v).unwrap(),
+            &Signature::from_bytes(&sig1v)?,
+            &PublicKey::from_bytes(&pk1v)?,
             msg1
         ));
 
-        let sk2 = SecretKey::from_seed(&[5_u8; 32]);
+        let sk2 = SecretKey::from_seed(&[5_u8; 32])?;
         let pk2 = sk2.public_key();
         let pk2v = pk2.to_bytes();
         let sig2 = sign(&sk2, msg2);
@@ -1081,30 +1103,30 @@ mod tests {
 
         assert!(verify(&sig2, &pk2, msg2));
         assert!(verify(
-            &Signature::from_bytes(&sig2v).unwrap(),
-            &PublicKey::from_bytes(&pk2v).unwrap(),
+            &Signature::from_bytes(&sig2v)?,
+            &PublicKey::from_bytes(&pk2v)?,
             msg2
         ));
 
         // Wrong G2Element
         assert!(!verify(&sig2, &pk1, msg1));
         assert!(!verify(
-            &Signature::from_bytes(&sig2v).unwrap(),
-            &PublicKey::from_bytes(&pk1v).unwrap(),
+            &Signature::from_bytes(&sig2v)?,
+            &PublicKey::from_bytes(&pk1v)?,
             msg1
         ));
         // Wrong msg
         assert!(!verify(&sig1, &pk1, msg2));
         assert!(!verify(
-            &Signature::from_bytes(&sig1v).unwrap(),
-            &PublicKey::from_bytes(&pk1v).unwrap(),
+            &Signature::from_bytes(&sig1v)?,
+            &PublicKey::from_bytes(&pk1v)?,
             msg2
         ));
         // Wrong pk
         assert!(!verify(&sig1, &pk2, msg1));
         assert!(!verify(
-            &Signature::from_bytes(&sig1v).unwrap(),
-            &PublicKey::from_bytes(&pk2v).unwrap(),
+            &Signature::from_bytes(&sig1v)?,
+            &PublicKey::from_bytes(&pk2v)?,
             msg1
         ));
 
@@ -1112,14 +1134,13 @@ mod tests {
         let aggsigv = aggsig.to_bytes();
         let pairs: [(&PublicKey, &[u8]); 2] = [(&pk1, &msg1), (&pk2, &msg2)];
         assert!(aggregate_verify(&aggsig, pairs));
-        assert!(aggregate_verify(
-            &Signature::from_bytes(&aggsigv).unwrap(),
-            pairs
-        ));
+        assert!(aggregate_verify(&Signature::from_bytes(&aggsigv)?, pairs));
+
+        Ok(())
     }
 
     #[test]
-    fn test_hash() {
+    fn test_hash() -> anyhow::Result<()> {
         fn hash<T: Hash>(v: T) -> u64 {
             use std::collections::hash_map::DefaultHasher;
             let mut h = DefaultHasher::new();
@@ -1130,23 +1151,26 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(1337);
         let mut data = [0u8; 32];
         rng.fill(data.as_mut_slice());
-        let sk = SecretKey::from_seed(&data);
+        let sk = SecretKey::from_seed(&data)?;
         let sig1 = sign(&sk, [0, 1, 2]);
         let sig2 = sign(&sk, [0, 1, 2, 3]);
 
         assert!(hash(sig1) != hash(sig2));
         assert_eq!(hash(sign(&sk, [0, 1, 2])), hash(sign(&sk, [0, 1, 2])));
+
+        Ok(())
     }
 
     #[test]
-    fn test_debug() {
+    fn test_debug() -> anyhow::Result<()> {
         let mut data = [0u8; 96];
         data[0] = 0xc0;
-        let sig = Signature::from_bytes(&data).unwrap();
+        let sig = Signature::from_bytes(&data)?;
         assert_eq!(
             format!("{sig:?}"),
             format!("<G2Element {}>", hex::encode(data))
         );
+        Ok(())
     }
 
     #[test]
@@ -1162,22 +1186,25 @@ mod tests {
     #[case("0a7ecb9c6d6f0af8d922c9b348d686f7f827c5f5d7a53036e5dd6c4cfe088806375d730251df57c03b0eaa41ca2a9cc51817cfd6118c065e9b337e42a6b66621e2ffa79f576ae57dcb4916459b0131d42383b790a4f60c5aeb339b61a78d85a808b73e0701084dc16b5d7aa8c2f5385f83a217bc29934d0d02c51365410232e3c0288438e3110aa6e8cdef7bd32c46d60d0104952aaa0f0545cbe1548b70eed8b543ce19ede34cc51a387d092221417db0253f4651666b17303e225eac706107", "8a7ecb9c6d6f0af8d922c9b348d686f7f827c5f5d7a53036e5dd6c4cfe088806375d730251df57c03b0eaa41ca2a9cc51817cfd6118c065e9b337e42a6b66621e2ffa79f576ae57dcb4916459b0131d42383b790a4f60c5aeb339b61a78d85a8")]
     #[case("13e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb80606c4a02ea734cc32acd2b02bc28b99cb3e287e85a763af267492ab572e99ab3f370d275cec1da1aaa9075ff05f79be0ce5d527727d6e118cc9cdc6da2e351aadfd9baa8cbdd3a76d429a695160d12c923ac9cc3baca289e193548608b82801", "93e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb8")]
     #[case("140acf170629d78244fb753f05fb79578add9217add53996d5de7c3005880c0dea903f851d6be749ebfb81c9721871370ef60428444d76f4ff81515628a4eb63e72c3cd7651a23c4eca109d1d88fec5a53626b36c76407926f308366b5ded1b219a481d87c6f87a4021fa8aa32851874f01b3eb011f6ed69c7884717fb0f5239bdc7310c2bc287659cd4a93976deaac20f4a21f0b004c767be4a21f36861616a5399b3e27431dc8133f325603230eaf1debdce8077105ab46baafa4836842305", "b40acf170629d78244fb753f05fb79578add9217add53996d5de7c3005880c0dea903f851d6be749ebfb81c9721871370ef60428444d76f4ff81515628a4eb63e72c3cd7651a23c4eca109d1d88fec5a53626b36c76407926f308366b5ded1b2")]
-    fn test_from_uncompressed(#[case] input: &str, #[case] expect: &str) {
-        let input = hex::decode(input).unwrap();
-        let g2 = Signature::from_uncompressed(input.as_slice().try_into().unwrap()).unwrap();
+    fn test_from_uncompressed(#[case] input: &str, #[case] expect: &str) -> anyhow::Result<()> {
+        let input = hex::decode(input)?;
+        let g2 = Signature::from_uncompressed(input.as_slice().try_into()?)?;
         let compressed = g2.to_bytes();
         assert_eq!(hex::encode(compressed), expect);
+
+        Ok(())
     }
 
     #[test]
-    fn test_negate_roundtrip() {
+    fn test_negate_roundtrip() -> anyhow::Result<()> {
         let mut rng = StdRng::seed_from_u64(1337);
         let mut data = [0u8; 32];
         let mut msg = [0u8; 32];
         rng.fill(msg.as_mut_slice());
+
         for _i in 0..50 {
             rng.fill(data.as_mut_slice());
-            let sk = SecretKey::from_seed(&data);
+            let sk = SecretKey::from_seed(&data)?;
             let g2 = sign(&sk, msg);
 
             let mut g2_neg = g2.clone();
@@ -1187,6 +1214,8 @@ mod tests {
             g2_neg.negate();
             assert!(g2_neg == g2);
         }
+
+        Ok(())
     }
 
     #[test]
@@ -1199,14 +1228,15 @@ mod tests {
     }
 
     #[test]
-    fn test_negate() {
+    fn test_negate() -> anyhow::Result<()> {
         let mut rng = StdRng::seed_from_u64(1337);
         let mut data = [0u8; 32];
         let mut msg = [0u8; 32];
         rng.fill(msg.as_mut_slice());
+
         for _i in 0..50 {
             rng.fill(data.as_mut_slice());
-            let sk = SecretKey::from_seed(&data);
+            let sk = SecretKey::from_seed(&data)?;
             let g2 = sign(&sk, msg);
             let mut g2_neg = g2.clone();
             g2_neg.negate();
@@ -1218,17 +1248,20 @@ mod tests {
             g2_double += &g2_neg;
             assert!(g2_double == g2);
         }
+
+        Ok(())
     }
 
     #[test]
-    fn test_scalar_multiply() {
+    fn test_scalar_multiply() -> anyhow::Result<()> {
         let mut rng = StdRng::seed_from_u64(1337);
         let mut data = [0u8; 32];
         let mut msg = [0u8; 32];
         rng.fill(msg.as_mut_slice());
+
         for _i in 0..50 {
             rng.fill(data.as_mut_slice());
-            let sk = SecretKey::from_seed(&data);
+            let sk = SecretKey::from_seed(&data)?;
             let mut g2 = sign(&sk, msg);
             let mut g2_double = g2.clone();
             g2_double += &g2;
@@ -1237,6 +1270,8 @@ mod tests {
             g2.scalar_multiply(&[2]);
             assert!(g2_double == g2);
         }
+
+        Ok(())
     }
 
     #[test]
@@ -1283,26 +1318,30 @@ mod pytests {
     use rstest::rstest;
 
     #[test]
-    fn test_json_dict_roundtrip() {
+    fn test_json_dict_roundtrip() -> anyhow::Result<()> {
         pyo3::prepare_freethreaded_python();
         let mut rng = StdRng::seed_from_u64(1337);
         let mut data = [0u8; 32];
         let mut msg = [0u8; 10];
+
         for _i in 0..50 {
             rng.fill(data.as_mut_slice());
             rng.fill(msg.as_mut_slice());
-            let sk = SecretKey::from_seed(&data);
+            let sk = SecretKey::from_seed(&data)?;
             let sig = sign(&sk, msg);
+
             Python::with_gil(|py| {
                 let string = sig.to_json_dict(py).expect("to_json_dict");
                 let py_class = py.get_type::<Signature>();
-                let sig2 = Signature::from_json_dict(&py_class, py, string.bind(py))
-                    .unwrap()
-                    .extract(py)
-                    .unwrap();
+                let sig2 =
+                    Signature::from_json_dict(&py_class, py, string.bind(py))?.extract(py)?;
                 assert_eq!(sig, sig2);
-            });
+
+                anyhow::Ok(())
+            })?;
         }
+
+        Ok(())
     }
 
     #[rstest]
@@ -1315,6 +1354,7 @@ mod pytests {
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
             let py_class = py.get_type::<Signature>();
+            #[allow(clippy::unwrap_used)]
             let err = Signature::from_json_dict(
                 &py_class,
                 py,

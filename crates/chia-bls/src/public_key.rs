@@ -150,7 +150,7 @@ impl PublicKey {
         let mut hasher = Sha256::new();
         hasher.update(self.to_bytes());
         let hash: [u8; 32] = hasher.finalize();
-        u32::from_be_bytes(hash[0..4].try_into().unwrap())
+        u32::from_be_bytes(hash[0..4].try_into().expect("length is known"))
     }
 }
 
@@ -192,7 +192,9 @@ impl Streamable for PublicKey {
     }
 
     fn parse<const TRUSTED: bool>(input: &mut Cursor<&[u8]>) -> chia_traits::Result<Self> {
-        let input = read_bytes(input, 48)?.try_into().unwrap();
+        let input = read_bytes(input, 48)?
+            .try_into()
+            .expect("length already checked");
         if TRUSTED {
             Ok(Self::from_bytes_unchecked(input)?)
         } else {
@@ -403,8 +405,7 @@ mod pybindings {
             Ok(Self::from_bytes(
                 parse_hex_string(o, 48, "PublicKey")?
                     .as_slice()
-                    .try_into()
-                    .unwrap(),
+                    .try_into()?,
             )?)
         }
     }
@@ -420,9 +421,9 @@ mod tests {
     use rstest::rstest;
 
     #[test]
-    fn test_derive_unhardened() {
+    fn test_derive_unhardened() -> anyhow::Result<()> {
         let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
-        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex)?)?;
         let pk = sk.public_key();
 
         // make sure deriving the secret keys produce the same public keys as
@@ -432,6 +433,8 @@ mod tests {
             let derived_pk = pk.derive_unhardened(idx as u32);
             assert_eq!(derived_pk.to_bytes(), derived_sk.public_key().to_bytes());
         }
+
+        Ok(())
     }
 
     #[test]
@@ -469,31 +472,38 @@ mod tests {
     #[case("d00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", Error::G1NotCanonical)]
     #[case("800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", Error::G1InfinityNotZero)]
     #[case("400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", Error::G1InfinityInvalidBits)]
-    fn test_from_bytes_failures(#[case] input: &str, #[case()] error: Error) {
-        let bytes: [u8; 48] = hex::decode(input).unwrap().try_into().unwrap();
-        assert_eq!(PublicKey::from_bytes(&bytes).unwrap_err(), error);
+    fn test_from_bytes_failures(#[case] input: &str, #[case()] error: Error) -> anyhow::Result<()> {
+        let bytes: [u8; 48] = hex::decode(input)?.as_slice().try_into()?;
+
+        #[allow(clippy::unwrap_used)]
+        let actual = PublicKey::from_bytes(&bytes).unwrap_err();
+
+        assert_eq!(actual, error);
+
+        Ok(())
     }
 
     #[test]
-    fn test_from_bytes_infinity() {
-        let bytes: [u8; 48] = hex::decode("c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000").unwrap().try_into().unwrap();
-        let pk = PublicKey::from_bytes(&bytes).unwrap();
+    fn test_from_bytes_infinity() -> anyhow::Result<()> {
+        let bytes: [u8; 48] = hex::decode("c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")?.as_slice().try_into()?;
+        let pk = PublicKey::from_bytes(&bytes)?;
         assert_eq!(pk, PublicKey::default());
+        Ok(())
     }
 
     #[test]
-    fn test_get_fingerprint() {
-        let bytes: [u8; 48] = hex::decode("997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2")
-        .unwrap()
-        .as_slice()
-        .try_into()
-        .unwrap();
-        let pk = PublicKey::from_bytes(&bytes).unwrap();
+    fn test_get_fingerprint() -> anyhow::Result<()> {
+        let bytes: [u8; 48] = hex::decode("997cc43ed8788f841fcf3071f6f212b89ba494b6ebaf1bda88c3f9de9d968a61f3b7284a5ee13889399ca71a026549a2")?
+            .as_slice()
+            .try_into()?;
+        let pk = PublicKey::from_bytes(&bytes)?;
         assert_eq!(pk.get_fingerprint(), 651_010_559);
+
+        Ok(())
     }
 
     #[test]
-    fn test_aggregate_pubkey() {
+    fn test_aggregate_pubkey() -> anyhow::Result<()> {
         // from blspy import PrivateKey
         // from blspy import AugSchemeMPL
         // sk = PrivateKey.from_bytes(bytes.fromhex("52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb"))
@@ -504,27 +514,32 @@ mod tests {
         // <G1Element a8bc2047d90c04a12e8c38050ec0feb4417b4d5689165cd2cea8a7903aad1778e36548a46d427b5ec571364515e456d6>
 
         let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
-        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex)?)?;
         let pk = sk.public_key();
         let pk2 = &pk + &pk;
         let pk3 = &pk + &pk + &pk;
 
-        assert_eq!(pk2, PublicKey::from_bytes(&<[u8; 48]>::from_hex("b1b8033286299e7f238aede0d3fea48d133a1e233139085f72c102c2e6cc1f8a4ea64ed2838c10bbd2ef8f78ef271bf3").unwrap()).unwrap());
-        assert_eq!(pk3, PublicKey::from_bytes(&<[u8; 48]>::from_hex("a8bc2047d90c04a12e8c38050ec0feb4417b4d5689165cd2cea8a7903aad1778e36548a46d427b5ec571364515e456d6").unwrap()).unwrap());
+        assert_eq!(pk2, PublicKey::from_bytes(&<[u8; 48]>::from_hex("b1b8033286299e7f238aede0d3fea48d133a1e233139085f72c102c2e6cc1f8a4ea64ed2838c10bbd2ef8f78ef271bf3")?)?);
+        assert_eq!(pk3, PublicKey::from_bytes(&<[u8; 48]>::from_hex("a8bc2047d90c04a12e8c38050ec0feb4417b4d5689165cd2cea8a7903aad1778e36548a46d427b5ec571364515e456d6")?)?);
+
+        Ok(())
     }
 
     #[test]
-    fn test_roundtrip() {
+    fn test_roundtrip() -> anyhow::Result<()> {
         let mut rng = StdRng::seed_from_u64(1337);
         let mut data = [0u8; 32];
+
         for _i in 0..50 {
             rng.fill(data.as_mut_slice());
-            let sk = SecretKey::from_seed(&data);
+            let sk = SecretKey::from_seed(&data)?;
             let pk = sk.public_key();
             let bytes = pk.to_bytes();
-            let pk2 = PublicKey::from_bytes(&bytes).unwrap();
+            let pk2 = PublicKey::from_bytes(&bytes)?;
             assert_eq!(pk, pk2);
         }
+
+        Ok(())
     }
 
     #[test]
@@ -534,23 +549,28 @@ mod tests {
     }
 
     #[test]
-    fn test_infinity_is_valid() {
+    fn test_infinity_is_valid() -> anyhow::Result<()> {
         let mut data = [0u8; 48];
         data[0] = 0xc0;
-        let pk = PublicKey::from_bytes(&data).unwrap();
+        let pk = PublicKey::from_bytes(&data)?;
         assert!(pk.is_valid());
+
+        Ok(())
     }
 
     #[test]
-    fn test_is_valid() {
+    fn test_is_valid() -> anyhow::Result<()> {
         let mut rng = StdRng::seed_from_u64(1337);
         let mut data = [0u8; 32];
+
         for _i in 0..50 {
             rng.fill(data.as_mut_slice());
-            let sk = SecretKey::from_seed(&data);
+            let sk = SecretKey::from_seed(&data)?;
             let pk = sk.public_key();
             assert!(pk.is_valid());
         }
+
+        Ok(())
     }
 
     #[test]
@@ -560,27 +580,32 @@ mod tests {
     }
 
     #[test]
-    fn test_infinity() {
+    fn test_infinity() -> anyhow::Result<()> {
         let mut data = [0u8; 48];
         data[0] = 0xc0;
-        let pk = PublicKey::from_bytes(&data).unwrap();
+        let pk = PublicKey::from_bytes(&data)?;
         assert!(pk.is_inf());
+
+        Ok(())
     }
 
     #[test]
-    fn test_is_inf() {
+    fn test_is_inf() -> anyhow::Result<()> {
         let mut rng = StdRng::seed_from_u64(1337);
         let mut data = [0u8; 32];
+
         for _i in 0..500 {
             rng.fill(data.as_mut_slice());
-            let sk = SecretKey::from_seed(&data);
+            let sk = SecretKey::from_seed(&data)?;
             let pk = sk.public_key();
             assert!(!pk.is_inf());
         }
+
+        Ok(())
     }
 
     #[test]
-    fn test_hash() {
+    fn test_hash() -> anyhow::Result<()> {
         fn hash<T: Hash>(v: T) -> u64 {
             use std::collections::hash_map::DefaultHasher;
             let mut h = DefaultHasher::new();
@@ -592,24 +617,29 @@ mod tests {
         let mut data = [0u8; 32];
         rng.fill(data.as_mut_slice());
 
-        let sk = SecretKey::from_seed(&data);
+        let sk = SecretKey::from_seed(&data)?;
         let pk1 = sk.public_key();
         let pk2 = pk1.derive_unhardened(1);
         let pk3 = pk1.derive_unhardened(2);
 
         assert!(hash(pk2) != hash(pk3));
         assert!(hash(pk1.derive_unhardened(42)) == hash(pk1.derive_unhardened(42)));
+
+        Ok(())
     }
 
     #[test]
-    fn test_debug() {
+    fn test_debug() -> anyhow::Result<()> {
         let mut data = [0u8; 48];
         data[0] = 0xc0;
-        let pk = PublicKey::from_bytes(&data).unwrap();
+        let pk = PublicKey::from_bytes(&data)?;
+
         assert_eq!(
             format!("{pk:?}"),
             format!("<G1Element {}>", hex::encode(data))
         );
+
+        Ok(())
     }
 
     #[test]
@@ -643,11 +673,13 @@ mod tests {
     #[case("127271e81a1cb5c08a68694fcd5bd52f475d545edd4fbd49b9f6ec402ee1973f9f4102bf3bfccdcbf1b2f862af89a1340d40795c1c09d1e10b1acfa0f3a97a71bf29c11665743fa8d30e57e450b8762959571d6f6d253b236931b93cf634e7cf", "b27271e81a1cb5c08a68694fcd5bd52f475d545edd4fbd49b9f6ec402ee1973f9f4102bf3bfccdcbf1b2f862af89a134")]
     #[case("0fe94ac2d68d39d9207ea0cae4bb2177f7352bd754173ed27bd13b4c156f77f8885458886ee9fbd212719f27a96397c110fa7b4f898b1c45c2e82c5d46b52bdad95cae8299d4fd4556ae02baf20a5ec989fc62f28c8b6b3df6dc696f2afb6e20", "afe94ac2d68d39d9207ea0cae4bb2177f7352bd754173ed27bd13b4c156f77f8885458886ee9fbd212719f27a96397c1")]
     #[case("13aedc305adfdbc854aa105c41085618484858e6baa276b176fd89415021f7a0c75ff4f9ec39f482f142f1b54c11144815e519df6f71b1db46c83b1d2bdf381fc974059f3ccd87ed5259221dc37c50c3be407b58990d14b6d5bb79dad9ab8c42", "b3aedc305adfdbc854aa105c41085618484858e6baa276b176fd89415021f7a0c75ff4f9ec39f482f142f1b54c111448")]
-    fn test_from_uncompressed(#[case] input: &str, #[case] expect: &str) {
-        let input = hex::decode(input).unwrap();
-        let g1 = PublicKey::from_uncompressed(input.as_slice().try_into().unwrap()).unwrap();
+    fn test_from_uncompressed(#[case] input: &str, #[case] expect: &str) -> anyhow::Result<()> {
+        let input = hex::decode(input)?;
+        let g1 = PublicKey::from_uncompressed(input.as_slice().try_into()?)?;
         let compressed = g1.to_bytes();
         assert_eq!(hex::encode(compressed), expect);
+
+        Ok(())
     }
 
     #[test]
@@ -763,24 +795,26 @@ mod pytests {
     use rstest::rstest;
 
     #[test]
-    fn test_json_dict_roundtrip() {
+    fn test_json_dict_roundtrip() -> anyhow::Result<()> {
         pyo3::prepare_freethreaded_python();
         let mut rng = StdRng::seed_from_u64(1337);
         let mut data = [0u8; 32];
         for _i in 0..50 {
             rng.fill(data.as_mut_slice());
-            let sk = SecretKey::from_seed(&data);
+            let sk = SecretKey::from_seed(&data)?;
             let pk = sk.public_key();
+
             Python::with_gil(|py| {
                 let string = pk.to_json_dict(py).expect("to_json_dict");
                 let py_class = py.get_type::<PublicKey>();
-                let pk2: PublicKey = PublicKey::from_json_dict(&py_class, py, string.bind(py))
-                    .unwrap()
-                    .extract(py)
-                    .unwrap();
+                let pk2: PublicKey =
+                    PublicKey::from_json_dict(&py_class, py, string.bind(py))?.extract(py)?;
                 assert_eq!(pk, pk2);
-            });
+                anyhow::Ok(())
+            })?;
         }
+
+        Ok(())
     }
 
     #[rstest]
@@ -793,6 +827,7 @@ mod pytests {
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
             let py_class = py.get_type::<PublicKey>();
+            #[allow(clippy::unwrap_used)]
             let err = PublicKey::from_json_dict(
                 &py_class,
                 py,

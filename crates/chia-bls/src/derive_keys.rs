@@ -1,4 +1,4 @@
-use crate::secret_key::SecretKey;
+use crate::{secret_key::SecretKey, Result};
 
 pub trait DerivableKey {
     #[must_use]
@@ -13,12 +13,12 @@ fn derive_path_unhardened<Key: DerivableKey>(key: &Key, path: &[u32]) -> Key {
     derived
 }
 
-fn derive_path_hardened(key: &SecretKey, path: &[u32]) -> SecretKey {
-    let mut derived = key.derive_hardened(path[0]);
+fn derive_path_hardened(key: &SecretKey, path: &[u32]) -> Result<SecretKey> {
+    let mut derived = key.derive_hardened(path[0])?;
     for idx in &path[1..] {
-        derived = derived.derive_hardened(*idx);
+        derived = derived.derive_hardened(*idx)?;
     }
-    derived
+    Ok(derived)
 }
 
 pub fn master_to_wallet_unhardened_intermediate<Key: DerivableKey>(key: &Key) -> Key {
@@ -29,22 +29,26 @@ pub fn master_to_wallet_unhardened<Key: DerivableKey>(key: &Key, idx: u32) -> Ke
     derive_path_unhardened(key, &[12381_u32, 8444, 2, idx])
 }
 
-pub fn master_to_wallet_hardened_intermediate(key: &SecretKey) -> SecretKey {
+pub fn master_to_wallet_hardened_intermediate(key: &SecretKey) -> Result<SecretKey> {
     derive_path_hardened(key, &[12381_u32, 8444, 2])
 }
 
-pub fn master_to_wallet_hardened(key: &SecretKey, idx: u32) -> SecretKey {
+pub fn master_to_wallet_hardened(key: &SecretKey, idx: u32) -> Result<SecretKey> {
     derive_path_hardened(key, &[12381_u32, 8444, 2, idx])
 }
 
-pub fn master_to_pool_singleton(key: &SecretKey, pool_wallet_idx: u32) -> SecretKey {
+pub fn master_to_pool_singleton(key: &SecretKey, pool_wallet_idx: u32) -> Result<SecretKey> {
     derive_path_hardened(key, &[12381_u32, 8444, 5, pool_wallet_idx])
 }
 
 /// # Panics
 ///
 /// Panics if `pool_wallet_idx` or `idx` is greater than or equal to 10000.
-pub fn master_to_pool_authentication(key: &SecretKey, pool_wallet_idx: u32, idx: u32) -> SecretKey {
+pub fn master_to_pool_authentication(
+    key: &SecretKey,
+    pool_wallet_idx: u32,
+    idx: u32,
+) -> Result<SecretKey> {
     assert!(pool_wallet_idx < 10000);
     assert!(idx < 10000);
     derive_path_hardened(key, &[12381_u32, 8444, 6, pool_wallet_idx * 10000 + idx])

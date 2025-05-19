@@ -45,7 +45,7 @@ pub struct BlsCache {
 
 impl Default for BlsCache {
     fn default() -> Self {
-        Self::new(NonZeroUsize::new(50_000).unwrap())
+        Self::new(NonZeroUsize::new(50_000).expect("non-zero"))
     }
 }
 
@@ -232,10 +232,10 @@ pub mod tests {
     use crate::SecretKey;
 
     #[test]
-    fn test_aggregate_verify() {
+    fn test_aggregate_verify() -> anyhow::Result<()> {
         let bls_cache = BlsCache::default();
 
-        let sk = SecretKey::from_seed(&[0; 32]);
+        let sk = SecretKey::from_seed(&[0; 32])?;
         let pk = sk.public_key();
         let msg = [106; 32];
 
@@ -252,13 +252,15 @@ pub mod tests {
         // Now that it's cached, it shouldn't cache it again.
         assert!(bls_cache.aggregate_verify(pks_msgs, &sig));
         assert_eq!(bls_cache.len(), 1);
+
+        Ok(())
     }
 
     #[test]
-    fn test_cache() {
+    fn test_cache() -> anyhow::Result<()> {
         let bls_cache = BlsCache::default();
 
-        let sk1 = SecretKey::from_seed(&[0; 32]);
+        let sk1 = SecretKey::from_seed(&[0; 32])?;
         let pk1 = sk1.public_key();
         let msg1 = [106; 32];
 
@@ -273,7 +275,7 @@ pub mod tests {
         assert_eq!(bls_cache.len(), 1);
 
         // Try with the first key message pair in the cache but not the second.
-        let sk2 = SecretKey::from_seed(&[1; 32]);
+        let sk2 = SecretKey::from_seed(&[1; 32])?;
         let pk2 = sk2.public_key();
         let msg2 = [107; 32];
 
@@ -292,19 +294,21 @@ pub mod tests {
         // Verify this signature and add to the cache as well (since it's still a different aggregate).
         assert!(bls_cache.aggregate_verify(pks_msgs, &agg_sig));
         assert_eq!(bls_cache.len(), 3);
+
+        Ok(())
     }
 
     #[test]
-    fn test_cache_limit() {
+    fn test_cache_limit() -> anyhow::Result<()> {
         // The cache is limited to only 3 items.
-        let bls_cache = BlsCache::new(NonZeroUsize::new(3).unwrap());
+        let bls_cache = BlsCache::new(NonZeroUsize::new(3).expect("non-zero"));
 
         // Before we cache anything, it should be empty.
         assert!(bls_cache.is_empty());
 
         // Create 5 pubkey message pairs.
         for i in 1..=5 {
-            let sk = SecretKey::from_seed(&[i; 32]);
+            let sk = SecretKey::from_seed(&[i; 32])?;
             let pk = sk.public_key();
             let msg = [106; 32];
 
@@ -320,7 +324,7 @@ pub mod tests {
 
         // Recreate first two keys and make sure they got removed.
         for i in 1..=2 {
-            let sk = SecretKey::from_seed(&[i; 32]);
+            let sk = SecretKey::from_seed(&[i; 32])?;
             let pk = sk.public_key();
             let msg = [106; 32];
             let aug_msg = [&pk.to_bytes(), msg.as_ref()].concat();
@@ -334,6 +338,8 @@ pub mod tests {
                 .items
                 .contains_key(&hash));
         }
+
+        Ok(())
     }
 
     #[test]
@@ -346,12 +352,12 @@ pub mod tests {
     }
 
     #[test]
-    fn test_evict() {
-        let bls_cache = BlsCache::new(NonZeroUsize::new(5).unwrap());
+    fn test_evict() -> anyhow::Result<()> {
+        let bls_cache = BlsCache::new(NonZeroUsize::new(5).expect("non-zero"));
         // Create 5 pk msg pairs and add them to the cache.
         let mut pks_msgs = Vec::new();
         for i in 1..=5 {
-            let sk = SecretKey::from_seed(&[i; 32]);
+            let sk = SecretKey::from_seed(&[i; 32])?;
             let pk = sk.public_key();
             let msg = [42; 32];
             let sig = sign(&sk, msg);
@@ -390,5 +396,7 @@ pub mod tests {
                 .items
                 .contains_key(&hash));
         }
+
+        Ok(())
     }
 }

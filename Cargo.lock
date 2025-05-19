@@ -330,6 +330,7 @@ dependencies = [
 name = "chia-bls"
 version = "0.23.0"
 dependencies = [
+ "anyhow",
  "arbitrary",
  "blst",
  "chia-serde",
