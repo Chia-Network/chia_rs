@@ -81,68 +81,6 @@ pub fn calculate_ip_iters(
     )
 }
 
-#[cfg(feature = "py-bindings")]
-#[pyo3::pyfunction]
-#[pyo3(name = "is_overflow_block")]
-pub fn py_is_overflow_block(
-    num_sps_sub_slot: u32,
-    num_sp_intervals_extra: u8,
-    signage_point_index: u8,
-) -> pyo3::PyResult<bool> {
-    Ok(is_overflow_block(
-        num_sps_sub_slot,
-        num_sp_intervals_extra,
-        signage_point_index,
-    )?)
-}
-
-#[cfg(feature = "py-bindings")]
-#[pyo3::pyfunction]
-#[pyo3(name = "calculate_sp_interval_iters")]
-pub fn py_calculate_sp_interval_iters(
-    num_sps_sub_slot: u32,
-    sub_slot_iters: u64,
-) -> pyo3::PyResult<u64> {
-    Ok(calculate_sp_interval_iters(
-        num_sps_sub_slot,
-        sub_slot_iters,
-    )?)
-}
-
-#[cfg(feature = "py-bindings")]
-#[pyo3::pyfunction]
-#[pyo3(name = "calculate_sp_iters")]
-pub fn py_calculate_sp_iters(
-    num_sps_sub_slot: u32,
-    sub_slot_iters: u64,
-    signage_point_index: u8,
-) -> pyo3::PyResult<u64> {
-    Ok(calculate_sp_iters(
-        num_sps_sub_slot,
-        sub_slot_iters,
-        signage_point_index,
-    )?)
-}
-
-#[cfg(feature = "py-bindings")]
-#[pyo3::pyfunction]
-#[pyo3(name = "calculate_ip_iters")]
-pub fn py_calculate_ip_iters(
-    num_sps_sub_slot: u32,
-    num_sp_intervals_extra: u8,
-    sub_slot_iters: u64,
-    signage_point_index: u8,
-    required_iters: u64,
-) -> pyo3::PyResult<u64> {
-    Ok(calculate_ip_iters(
-        num_sps_sub_slot,
-        num_sp_intervals_extra,
-        sub_slot_iters,
-        signage_point_index,
-        required_iters,
-    )?)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
