@@ -828,8 +828,7 @@ impl BlockStatusCache {
     }
 
     fn move_index(&mut self, source: TreeIndex, destination: TreeIndex) -> Result<(), Error> {
-        // to be called _after_ having written to the destination index including
-        // having set it to be free
+        // to be called _after_ having written to the destination index
         if self.free_indexes.contains(&source) {
             return Err(Error::MoveSourceIndexNotInUse(source));
         };
@@ -1595,14 +1594,15 @@ impl MerkleBlob {
 
         let Some(grandparent_index) = parent.parent.0 else {
             sibling_block.node.set_parent(Parent(None));
+            let destination = TreeIndex(0);
             if let Node::Internal(node) = sibling_block.node {
+                // TODO: is the sibling really dirty?
                 sibling_block.metadata.dirty = true;
                 for child_index in [node.left, node.right] {
-                    self.update_parent(child_index, Some(TreeIndex(0)))?;
+                    self.update_parent(child_index, Some(destination))?;
                 }
             };
 
-            let destination = TreeIndex(0);
             self.insert_entry_to_blob(destination, &sibling_block)?;
             self.block_status_cache
                 .move_index(sibling_index, destination)?;
@@ -3046,6 +3046,52 @@ mod tests {
     }
 
     #[rstest]
+    fn test_delete_with_internal_sibling(mut small_blob: MerkleBlob) {
+        let key_to_delete = KeyId(0x0001_0203_0405_0607);
+        let (other_key_index, _, _) = small_blob.get_leaf_by_key(key_to_delete).unwrap();
+
+        small_blob
+            .insert(
+                KeyId(0x4041_4243_4445_4647),
+                ValueId(0x5051_5253_5455_5657),
+                &sha256_num(0x4050),
+                InsertLocation::Leaf {
+                    index: other_key_index,
+                    side: Side::Left,
+                },
+            )
+            .unwrap();
+
+        small_blob.delete(key_to_delete).unwrap();
+
+        let keys_values = small_blob.get_keys_values().unwrap();
+        #[allow(clippy::needless_raw_string_hashes)]
+        let expected = expect![[r#"
+            [
+                (
+                    KeyId(
+                        2315169217770759719,
+                    ),
+                    ValueId(
+                        3472611983179986487,
+                    ),
+                ),
+                (
+                    KeyId(
+                        4630054748589213255,
+                    ),
+                    ValueId(
+                        5787497513998440023,
+                    ),
+                ),
+            ]
+        "#]];
+        let mut keys_values = keys_values.iter().collect::<Vec<_>>();
+        keys_values.sort();
+        expected.assert_debug_eq(&keys_values);
+    }
+
+    #[rstest]
     fn test_get_new_index_with_free_index(mut small_blob: MerkleBlob) {
         open_dot(small_blob.to_dot().unwrap().set_note("initial"));
         let key = KeyId(0x0001_0203_0405_0607);
@@ -3658,6 +3704,30 @@ mod tests {
     }
 
     #[test]
+    fn test_node_try_into_leaf_passes() {
+        Node::Leaf(LeafNode {
+            hash: Hash(Bytes32::default()),
+            parent: Parent(None),
+            key: KeyId(0),
+            value: ValueId(0),
+        })
+        .try_into_leaf()
+        .expect("should pass since it is a leaf");
+    }
+
+    #[test]
+    fn test_node_try_into_leaf_fails() {
+        Node::Internal(InternalNode {
+            hash: Hash(Bytes32::default()),
+            parent: Parent(None),
+            left: TreeIndex(0),
+            right: TreeIndex(0),
+        })
+        .try_into_leaf()
+        .expect_err("should fail since it is not a leaf");
+    }
+
+    #[test]
     fn test_node_expect_internal_passes() {
         Node::Internal(InternalNode {
             hash: Hash(Bytes32::default()),
@@ -3670,7 +3740,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "panic message")]
-    fn test_node_expect_leaf_internal() {
+    fn test_node_expect_internal_panics() {
         Node::Leaf(LeafNode {
             hash: Hash(Bytes32::default()),
             parent: Parent(None),
@@ -3678,6 +3748,18 @@ mod tests {
             value: ValueId(0),
         })
         .expect_internal("panic message");
+    }
+
+    #[test]
+    fn test_internal_node_get_sibling_side_fails_for_non_sibling() {
+        let node = InternalNode {
+            hash: HASH_ZERO,
+            parent: Parent(None),
+            left: TreeIndex(1),
+            right: TreeIndex(2),
+        };
+        node.get_sibling_side(TreeIndex(0))
+            .expect_err("should fail");
     }
 
     #[test]
@@ -3783,6 +3865,24 @@ mod tests {
     }
 
     #[rstest]
+    fn test_get_node_by_hash_fails_not_found(small_blob: MerkleBlob) {
+        let result = small_blob.get_node_by_hash(sha256_num(27));
+
+        #[allow(clippy::needless_raw_string_hashes)]
+        let expected = expect![[r#"
+            Err(
+                LeafHashNotFound(
+                    Hash(
+                        688e94a51ee508a95e761294afb7a6004b432c15d9890c80ddf23bde8caa4c26,
+                    ),
+                ),
+            )
+        "#]];
+
+        expected.assert_debug_eq(&result);
+    }
+
+    #[rstest]
     fn test_get_hashes_indexes(small_blob: MerkleBlob) {
         let hashes_indexes = small_blob.get_hashes_indexes(false).unwrap();
 
@@ -3795,5 +3895,101 @@ mod tests {
         expected.insert(two, TreeIndex(2));
 
         assert_eq!(hashes_indexes, expected);
+    }
+
+    #[rstest]
+    fn test_get_hashes_indexes_leafs_only(small_blob: MerkleBlob) {
+        let hashes_indexes = small_blob.get_hashes_indexes(true).unwrap();
+
+        let mut expected = HashMap::new();
+        let one = sha256_num(0x2030);
+        let two = sha256_num(0x1020);
+        expected.insert(one, TreeIndex(1));
+        expected.insert(two, TreeIndex(2));
+
+        assert_eq!(hashes_indexes, expected);
+    }
+
+    #[rstest]
+    fn test_get_hashes_indexes_empty() {
+        let blob = MerkleBlob::new(Vec::new()).unwrap();
+        let result = blob.get_hashes_indexes(false).unwrap();
+
+        assert_eq!(result, HashMap::new());
+    }
+
+    #[rstest]
+    fn test_node_set_hash(
+        #[values(
+            Node::Internal(InternalNode{hash: HASH_ZERO, parent: Parent(None), left: TreeIndex(0), right: TreeIndex(1)}),
+            Node::Leaf(LeafNode{hash:HASH_ZERO, parent: Parent(None), key: KeyId(0), value: ValueId(0)}),
+        )]
+        mut node: Node,
+    ) {
+        assert_eq!(node.hash(), HASH_ZERO);
+        node.set_hash(HASH_ONE);
+        assert_eq!(node.hash(), HASH_ONE);
+    }
+
+    #[rstest]
+    fn test_remove_not_present_leaf_from_block_status_cache(mut small_blob: MerkleBlob) {
+        let key = KeyId(10948);
+        let leaf = LeafNode {
+            hash: HASH_ZERO,
+            parent: Parent(None),
+            key,
+            value: ValueId(0),
+        };
+        let result = small_blob.block_status_cache.remove_leaf(&leaf);
+
+        #[allow(clippy::needless_raw_string_hashes)]
+        let expected = expect![[r#"
+            Err(
+                UnknownKey(
+                    KeyId(
+                        10948,
+                    ),
+                ),
+            )
+        "#]];
+
+        expected.assert_debug_eq(&result);
+    }
+
+    #[rstest]
+    fn test_insert_past_extend_entry_fails(mut small_blob: MerkleBlob) {
+        let index = TreeIndex(small_blob.extend_index().0 + 1);
+        let block = Block {
+            metadata: NodeMetadata {
+                node_type: NodeType::Leaf,
+                dirty: true,
+            },
+            node: Node::Internal(InternalNode {
+                hash: HASH_ZERO,
+                parent: Parent(None),
+                left: TreeIndex(0),
+                right: TreeIndex(0),
+            }),
+        };
+        let error = small_blob.insert_entry_to_blob(index, &block);
+
+        #[allow(clippy::needless_raw_string_hashes)]
+        let expected = expect![[r#"
+            Err(
+                BlockIndexOutOfBounds(
+                    TreeIndex(
+                        4,
+                    ),
+                ),
+            )
+        "#]];
+        expected.assert_debug_eq(&error);
+    }
+
+    #[rstest]
+    fn test_get_key_index(small_blob: MerkleBlob) {
+        let key = KeyId(0x0001_0203_0405_0607);
+        let index = small_blob.get_key_index(key).unwrap();
+        assert_eq!(index, TreeIndex(2));
     }
 }
