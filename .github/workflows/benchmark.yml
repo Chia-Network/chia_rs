@@ -29,6 +29,7 @@ jobs:
       - run: |
           echo CARGO_HOME=${CARGO_HOME} || true
           echo RUSTUP_HOME=${RUSTUP_HOME} || true
+          df
           echo -- ${PATH}
           bash -c 'type --all cargo || true'
           bash -c 'type --all cargo-clippy || true'
@@ -51,6 +52,7 @@ jobs:
       - run: |
           echo CARGO_HOME=${CARGO_HOME} || true
           echo RUSTUP_HOME=${RUSTUP_HOME} || true
+          df
           echo -- ${PATH}
           bash -c 'type --all cargo || true'
           bash -c 'type --all cargo-clippy || true'
