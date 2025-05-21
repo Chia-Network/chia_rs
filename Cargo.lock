@@ -122,7 +122,7 @@ checksum = "22ad1373757efa0f70ec53939aabc7152e1591cb485208052993070ac8d2429d"
 dependencies = [
  "asn1-rs-derive",
  "asn1-rs-impl",
- "displaydoc",
+ "displaydoc 0.2.5",
  "nom",
  "num-traits",
  "rusticata-macros",
@@ -138,7 +138,7 @@ checksum = "7378575ff571966e99a744addeff0bff98b8ada0dedf1956d59e634db95eaac1"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.100",
  "synstructure",
 ]
 
@@ -150,7 +150,7 @@ checksum = "7b18050c2cd6fe86c3a76584ef5e0baf286d038cda203eb6223df2cc413565f7"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -293,9 +293,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chia"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
- "chia-bls 0.22.0",
+ "chia-bls 0.23.0",
  "chia-client",
  "chia-consensus",
  "chia-datalayer",
@@ -303,9 +303,9 @@ dependencies = [
  "chia-puzzle-types",
  "chia-secp",
  "chia-serde",
- "chia-sha2 0.22.0",
+ "chia-sha2 0.23.0",
  "chia-ssl",
- "chia-traits 0.22.0",
+ "chia-traits 0.23.0",
  "clvm-traits",
  "clvm-utils",
  "clvmr",
@@ -329,13 +329,13 @@ dependencies = [
 
 [[package]]
 name = "chia-bls"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "arbitrary",
  "blst",
  "chia-serde",
- "chia-sha2 0.22.0",
- "chia-traits 0.22.0",
+ "chia-sha2 0.23.0",
+ "chia-traits 0.23.0",
  "chia_py_streamable_macro",
  "criterion",
  "hex",
@@ -351,19 +351,19 @@ dependencies = [
 
 [[package]]
 name = "chia-bls-fuzz"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
- "chia-bls 0.22.0",
+ "chia-bls 0.23.0",
  "libfuzzer-sys",
  "pyo3",
 ]
 
 [[package]]
 name = "chia-client"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "chia-protocol",
- "chia-traits 0.22.0",
+ "chia-traits 0.23.0",
  "futures-util",
  "thiserror",
  "tokio",
@@ -373,17 +373,17 @@ dependencies = [
 
 [[package]]
 name = "chia-consensus"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "blocking-threadpool",
- "chia-bls 0.22.0",
+ "chia-bls 0.23.0",
  "chia-protocol",
  "chia-puzzle-types",
  "chia-puzzles",
- "chia-sha2 0.22.0",
- "chia-traits 0.22.0",
+ "chia-sha2 0.23.0",
+ "chia-traits 0.23.0",
  "chia_py_streamable_macro",
- "chia_streamable_macro 0.22.0",
+ "chia_streamable_macro 0.23.0",
  "clvm-traits",
  "clvm-utils",
  "clvmr",
@@ -403,10 +403,10 @@ name = "chia-datalayer"
 version = "0.18.0"
 dependencies = [
  "chia-protocol",
- "chia-sha2 0.22.0",
- "chia-traits 0.22.0",
+ "chia-sha2 0.23.0",
+ "chia-traits 0.23.0",
  "chia_py_streamable_macro",
- "chia_streamable_macro 0.22.0",
+ "chia_streamable_macro 0.23.0",
  "clvm-utils",
  "expect-test",
  "hex",
@@ -434,13 +434,13 @@ dependencies = [
 
 [[package]]
 name = "chia-fuzz"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
- "chia-bls 0.22.0",
+ "chia-bls 0.23.0",
  "chia-consensus",
  "chia-protocol",
- "chia-sha2 0.22.0",
- "chia-traits 0.22.0",
+ "chia-sha2 0.23.0",
+ "chia-traits 0.23.0",
  "clvm-traits",
  "clvm-utils",
  "clvmr",
@@ -450,16 +450,16 @@ dependencies = [
 
 [[package]]
 name = "chia-protocol"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "anyhow",
  "arbitrary",
- "chia-bls 0.22.0",
+ "chia-bls 0.23.0",
  "chia-serde",
- "chia-sha2 0.22.0",
- "chia-traits 0.22.0",
+ "chia-sha2 0.23.0",
+ "chia-traits 0.23.0",
  "chia_py_streamable_macro",
- "chia_streamable_macro 0.22.0",
+ "chia_streamable_macro 0.23.0",
  "clvm-traits",
  "clvm-utils",
  "clvmr",
@@ -473,12 +473,12 @@ dependencies = [
 
 [[package]]
 name = "chia-protocol-fuzz"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "arbitrary",
  "chia-protocol",
- "chia-sha2 0.22.0",
- "chia-traits 0.22.0",
+ "chia-sha2 0.23.0",
+ "chia-traits 0.23.0",
  "clvm-traits",
  "clvmr",
  "hex",
@@ -487,14 +487,14 @@ dependencies = [
 
 [[package]]
 name = "chia-puzzle-types"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "anyhow",
  "arbitrary",
- "chia-bls 0.22.0",
+ "chia-bls 0.23.0",
  "chia-protocol",
  "chia-puzzles",
- "chia-sha2 0.22.0",
+ "chia-sha2 0.23.0",
  "clvm-traits",
  "clvm-utils",
  "clvmr",
@@ -505,7 +505,7 @@ dependencies = [
 
 [[package]]
 name = "chia-puzzle-types-fuzz"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "chia-puzzle-types",
  "clvm-traits",
@@ -525,11 +525,11 @@ dependencies = [
 
 [[package]]
 name = "chia-secp"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "anyhow",
  "arbitrary",
- "chia-sha2 0.22.0",
+ "chia-sha2 0.23.0",
  "hex",
  "k256",
  "p256",
@@ -539,7 +539,7 @@ dependencies = [
 
 [[package]]
 name = "chia-serde"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "anyhow",
  "bincode",
@@ -560,7 +560,7 @@ dependencies = [
 
 [[package]]
 name = "chia-sha2"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "openssl",
  "sha2",
@@ -568,7 +568,7 @@ dependencies = [
 
 [[package]]
 name = "chia-ssl"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "rand",
  "rcgen",
@@ -579,21 +579,24 @@ dependencies = [
 
 [[package]]
 name = "chia-tools"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "blocking-threadpool",
- "chia-bls 0.22.0",
+ "chia-bls 0.23.0",
  "chia-consensus",
  "chia-protocol",
  "chia-puzzle-types",
  "chia-puzzles",
- "chia-traits 0.22.0",
+ "chia-sha2 0.23.0",
+ "chia-traits 0.23.0",
  "clap",
  "clvm-traits",
  "clvm-utils",
  "clvmr",
+ "gnuplot",
  "hex",
  "hex-literal",
+ "linreg",
  "rusqlite",
  "zstd",
 ]
@@ -611,35 +614,35 @@ dependencies = [
 
 [[package]]
 name = "chia-traits"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
- "chia-sha2 0.22.0",
- "chia_streamable_macro 0.22.0",
+ "chia-sha2 0.23.0",
+ "chia_streamable_macro 0.23.0",
  "pyo3",
  "thiserror",
 ]
 
 [[package]]
 name = "chia_py_streamable_macro"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "proc-macro-crate 1.3.1",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.100",
 ]
 
 [[package]]
 name = "chia_rs"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
- "chia-bls 0.22.0",
+ "chia-bls 0.23.0",
  "chia-client",
  "chia-consensus",
  "chia-datalayer",
  "chia-protocol",
  "chia-ssl",
- "chia-traits 0.22.0",
+ "chia-traits 0.23.0",
  "clvm-utils",
  "clvmr",
  "hex",
@@ -655,22 +658,22 @@ dependencies = [
  "proc-macro-crate 1.3.1",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.100",
 ]
 
 [[package]]
 name = "chia_streamable_macro"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "proc-macro-crate 1.3.1",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.100",
 ]
 
 [[package]]
 name = "chia_wasm"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "wasm-bindgen",
 ]
@@ -733,7 +736,7 @@ dependencies = [
  "heck",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -744,18 +747,18 @@ checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
 
 [[package]]
 name = "clvm-derive"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.100",
 ]
 
 [[package]]
 name = "clvm-traits"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
- "chia-bls 0.22.0",
+ "chia-bls 0.23.0",
  "chia-secp",
  "clvm-derive",
  "clvmr",
@@ -768,7 +771,7 @@ dependencies = [
 
 [[package]]
 name = "clvm-traits-fuzz"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "clvm-traits",
  "clvmr",
@@ -777,9 +780,9 @@ dependencies = [
 
 [[package]]
 name = "clvm-utils"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
- "chia-sha2 0.22.0",
+ "chia-sha2 0.23.0",
  "clvm-traits",
  "clvmr",
  "hex",
@@ -788,7 +791,7 @@ dependencies = [
 
 [[package]]
 name = "clvm-utils-fuzz"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "chia-fuzz",
  "clvm-traits",
@@ -963,7 +966,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5cd0a5c643689626bec213c4d8bd4d96acc8ffdb4ad4bb6bc16abf27d5f4b553"
 dependencies = [
  "asn1-rs",
- "displaydoc",
+ "displaydoc 0.2.5",
  "nom",
  "num-bigint",
  "num-traits",
@@ -987,7 +990,7 @@ checksum = "30542c1ad912e0e3d22a1935c290e12e8a29d704a420177a31faad4a601a0800"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -1004,13 +1007,24 @@ dependencies = [
 
 [[package]]
 name = "displaydoc"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "adc2ab4d5a16117f9029e9a6b5e4e79f4c67f6519bc134210d4d4a04ba31f41b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
+name = "displaydoc"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97369cbbc041bc366949bc74d34658d6cda5621039731c6310521892a3a20ae0"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -1211,7 +1225,7 @@ checksum = "162ee34ebcb7c64a8abebc059ce0fee27c2262618d7b60ed8faf72fef13c3650"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -1304,6 +1318,16 @@ name = "glob"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2fabcfbdc87f4758337ca535fb41a6d701b65693ce38287d856d1674551ec9b"
+
+[[package]]
+name = "gnuplot"
+version = "0.0.46"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca6d93295d3f751f0cb4055953bfd5c55b50a1c83b10f105c2c8e616d011f252"
+dependencies = [
+ "byteorder",
+ "tempfile",
+]
 
 [[package]]
 name = "group"
@@ -1420,7 +1444,7 @@ version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db2fa452206ebee18c4b5c2274dbf1de17008e874b4dc4f0aea9d01ca79e4526"
 dependencies = [
- "displaydoc",
+ "displaydoc 0.2.5",
  "yoke",
  "zerofrom",
  "zerovec",
@@ -1432,7 +1456,7 @@ version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13acbb8371917fc971be86fc8057c41a64b521c184808a698c02acc242dbf637"
 dependencies = [
- "displaydoc",
+ "displaydoc 0.2.5",
  "litemap",
  "tinystr",
  "writeable",
@@ -1445,7 +1469,7 @@ version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "01d11ac35de8e40fdeda00d9e1e9d92525f3f9d887cdd7aa81d727596788b54e"
 dependencies = [
- "displaydoc",
+ "displaydoc 0.2.5",
  "icu_locid",
  "icu_locid_transform_data",
  "icu_provider",
@@ -1465,7 +1489,7 @@ version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19ce3e0da2ec68599d193c93d088142efd7f9c5d6fc9b803774855747dc6a84f"
 dependencies = [
- "displaydoc",
+ "displaydoc 0.2.5",
  "icu_collections",
  "icu_normalizer_data",
  "icu_properties",
@@ -1489,7 +1513,7 @@ version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93d6020766cfc6302c15dbbc9c8778c37e62c14427cb7f6e601d849e092aeef5"
 dependencies = [
- "displaydoc",
+ "displaydoc 0.2.5",
  "icu_collections",
  "icu_locid_transform",
  "icu_properties_data",
@@ -1510,7 +1534,7 @@ version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ed421c8a8ef78d3e2dbc98a973be2f3770cb42b606e3ab18d6237c4dfde68d9"
 dependencies = [
- "displaydoc",
+ "displaydoc 0.2.5",
  "icu_locid",
  "icu_provider_macros",
  "stable_deref_trait",
@@ -1529,7 +1553,7 @@ checksum = "1ec89e9337638ecdc08744df490b221a7399bf8d164eb52a665454e60e075ad6"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -1724,6 +1748,16 @@ name = "linked-hash-map"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0717cef1bc8b636c6e1c1bbdefc09e6322da8a9321966e8928ef80d20f7f770f"
+
+[[package]]
+name = "linreg"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f8c6fd2f0b9338b6d298dbcee4b4ec2a6ec2e88dc0a5f6f92d5cecd65afdf445"
+dependencies = [
+ "displaydoc 0.1.7",
+ "num-traits",
+]
 
 [[package]]
 name = "linux-raw-sys"
@@ -1941,7 +1975,7 @@ checksum = "a948666b637a0f465e8564c73e89d4dde00d72d4d473cc972f390fc3dcee7d9c"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -2174,7 +2208,7 @@ dependencies = [
  "proc-macro2",
  "pyo3-macros-backend",
  "quote",
- "syn",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -2187,7 +2221,7 @@ dependencies = [
  "proc-macro2",
  "pyo3-build-config",
  "quote",
- "syn",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -2380,7 +2414,7 @@ dependencies = [
  "regex",
  "relative-path",
  "rustc_version",
- "syn",
+ "syn 2.0.100",
  "unicode-ident",
 ]
 
@@ -2499,7 +2533,7 @@ checksum = "5b0276cf7f2c73365f7157c8123c21cd9a50fbbd844757af28ca1f5925fc2a00"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -2623,6 +2657,17 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "syn"
+version = "1.0.109"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72b64191b275b66ffe2469e8af2c1cfe3bafa67b529ead792a6d0160888b4237"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "unicode-ident",
+]
+
+[[package]]
+name = "syn"
 version = "2.0.100"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b09a44accad81e1ba1cd74a32461ba89dee89095ba17b32f5d03683b1b1fc2a0"
@@ -2640,7 +2685,7 @@ checksum = "c8af7666ab7b6390ab78131fb5b0fce11d6b7a6951602017c35fa82800708971"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -2705,7 +2750,7 @@ checksum = "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -2754,7 +2799,7 @@ version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9117f5d4db391c1cf6927e7bea3db74b9a1c1add8f7eda9ffd5364f40f57b82f"
 dependencies = [
- "displaydoc",
+ "displaydoc 0.2.5",
  "zerovec",
 ]
 
@@ -2965,7 +3010,7 @@ dependencies = [
  "log",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.100",
  "wasm-bindgen-shared",
 ]
 
@@ -2987,7 +3032,7 @@ checksum = "8ae87ea40c9f689fc23f209965b6fb8a99ad69aeeb0231408be24920604395de"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.100",
  "wasm-bindgen-backend",
  "wasm-bindgen-shared",
 ]
@@ -3200,7 +3245,7 @@ checksum = "2380878cad4ac9aac1e2435f3eb4020e8374b5f13c296cb75b4620ff8e229154"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.100",
  "synstructure",
 ]
 
@@ -3222,7 +3267,7 @@ checksum = "fa4f8080344d4671fb4e831a13ad1e68092748387dfc4f55e356242fae12ce3e"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -3242,7 +3287,7 @@ checksum = "595eed982f7d355beb85837f651fa22e90b3c044842dc7f2c2842c086f295808"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.100",
  "synstructure",
 ]
 
@@ -3263,7 +3308,7 @@ checksum = "ce36e65b0d2999d2aafac989fb249189a141aee1f53c612c1f37d72631959f69"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -3285,7 +3330,7 @@ checksum = "6eafa6dfb17584ea3e2bd6e76e0cc15ad7af12b09abdd1ca55961bed9b1063c6"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.100",
 ]
 
 [[package]]
