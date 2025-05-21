@@ -30,9 +30,6 @@ jobs:
           ls -la /__w/
 
       - run: |
-          tree /__w/
-
-      - run: |
           echo CARGO_HOME=${CARGO_HOME} || true
           echo RUSTUP_HOME=${RUSTUP_HOME} || true
           df
@@ -57,9 +54,6 @@ jobs:
 
       - run: |
           ls -la /__w/
-
-      - run: |
-          tree /__w/
 
       - run: |
           echo CARGO_HOME=${CARGO_HOME} || true
