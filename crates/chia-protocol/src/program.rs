@@ -149,9 +149,6 @@ impl<'a> arbitrary::Arbitrary<'a> for Program {
 }
 
 #[cfg(feature = "py-bindings")]
-use crate::lazy_node::LazyNode;
-
-#[cfg(feature = "py-bindings")]
 use chia_traits::{FromJsonDict, ToJsonDict};
 
 #[cfg(feature = "py-bindings")]
@@ -159,9 +156,6 @@ use chia_py_streamable_macro::PyStreamable;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::types::{PyList, PyTuple};
-
-#[cfg(feature = "py-bindings")]
-use clvmr::allocator::SExp;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::exceptions::*;
