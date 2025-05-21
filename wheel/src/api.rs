@@ -18,8 +18,8 @@ use chia_consensus::spendbundle_validation::{
     get_flags_for_height_and_constants, validate_clvm_and_signature,
 };
 use chia_protocol::{
-    py_calculate_ip_iters, py_calculate_sp_interval_iters, py_calculate_sp_iters,
-    py_expected_plot_size, py_is_overflow_block,
+    calculate_ip_iters, calculate_sp_interval_iters, calculate_sp_iters, is_overflow_block,
+    py_expected_plot_size,
 };
 use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
@@ -442,6 +442,61 @@ pub fn py_get_flags_for_height_and_constants(height: u32, constants: &ConsensusC
     get_flags_for_height_and_constants(height, constants)
 }
 
+#[pyo3::pyfunction]
+#[pyo3(name = "is_overflow_block")]
+pub fn py_is_overflow_block(
+    constants: &ConsensusConstants,
+    signage_point_index: u8,
+) -> pyo3::PyResult<bool> {
+    Ok(is_overflow_block(
+        constants.num_sps_sub_slot,
+        constants.num_sp_intervals_extra,
+        signage_point_index,
+    )?)
+}
+
+#[pyo3::pyfunction]
+#[pyo3(name = "calculate_sp_interval_iters")]
+pub fn py_calculate_sp_interval_iters(
+    constants: &ConsensusConstants,
+    sub_slot_iters: u64,
+) -> pyo3::PyResult<u64> {
+    Ok(calculate_sp_interval_iters(
+        constants.num_sps_sub_slot,
+        sub_slot_iters,
+    )?)
+}
+
+#[pyo3::pyfunction]
+#[pyo3(name = "calculate_sp_iters")]
+pub fn py_calculate_sp_iters(
+    constants: &ConsensusConstants,
+    sub_slot_iters: u64,
+    signage_point_index: u8,
+) -> pyo3::PyResult<u64> {
+    Ok(calculate_sp_iters(
+        constants.num_sps_sub_slot,
+        sub_slot_iters,
+        signage_point_index,
+    )?)
+}
+
+#[pyo3::pyfunction]
+#[pyo3(name = "calculate_ip_iters")]
+pub fn py_calculate_ip_iters(
+    constants: &ConsensusConstants,
+    sub_slot_iters: u64,
+    signage_point_index: u8,
+    required_iters: u64,
+) -> pyo3::PyResult<u64> {
+    Ok(calculate_ip_iters(
+        constants.num_sps_sub_slot,
+        constants.num_sp_intervals_extra,
+        sub_slot_iters,
+        signage_point_index,
+        required_iters,
+    )?)
+}
 #[pymodule]
 pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // generator functions

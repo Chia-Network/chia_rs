@@ -23,15 +23,13 @@ fn div_catch_error(a: u64, b: u64) -> Result<u64> {
 pub fn is_overflow_block(
     num_sps_sub_slot: u32,
     num_sp_intervals_extra: u8,
-    signage_point_index: u32,
+    signage_point_index: u8,
 ) -> Result<bool> {
-    if signage_point_index >= num_sps_sub_slot {
+    if u32::from(signage_point_index) >= num_sps_sub_slot {
         return Err(Error::InvalidPotIteration);
     }
-    Ok(
-        signage_point_index
-            >= sub_catch_underflow(num_sps_sub_slot, num_sp_intervals_extra as u32)?,
-    )
+    Ok(u32::from(signage_point_index)
+        >= sub_catch_underflow(num_sps_sub_slot, num_sp_intervals_extra as u32)?)
 }
 
 pub fn calculate_sp_interval_iters(num_sps_sub_slot: u32, sub_slot_iters: u64) -> Result<u64> {
@@ -44,9 +42,9 @@ pub fn calculate_sp_interval_iters(num_sps_sub_slot: u32, sub_slot_iters: u64) -
 pub fn calculate_sp_iters(
     num_sps_sub_slot: u32,
     sub_slot_iters: u64,
-    signage_point_index: u32,
+    signage_point_index: u8,
 ) -> Result<u64> {
-    if signage_point_index >= num_sps_sub_slot {
+    if u32::from(signage_point_index) >= num_sps_sub_slot {
         return Err(Error::InvalidPotIteration);
     }
     mult_catch_overflow(
@@ -59,7 +57,7 @@ pub fn calculate_ip_iters(
     num_sps_sub_slot: u32,
     num_sp_intervals_extra: u8,
     sub_slot_iters: u64,
-    signage_point_index: u32,
+    signage_point_index: u8,
     required_iters: u64,
 ) -> Result<u64> {
     let sp_interval_iters = calculate_sp_interval_iters(num_sps_sub_slot, sub_slot_iters)?;
@@ -81,68 +79,6 @@ pub fn calculate_ip_iters(
         )?,
         sub_slot_iters,
     )
-}
-
-#[cfg(feature = "py-bindings")]
-#[pyo3::pyfunction]
-#[pyo3(name = "is_overflow_block")]
-pub fn py_is_overflow_block(
-    num_sps_sub_slot: u32,
-    num_sp_intervals_extra: u8,
-    signage_point_index: u32,
-) -> pyo3::PyResult<bool> {
-    Ok(is_overflow_block(
-        num_sps_sub_slot,
-        num_sp_intervals_extra,
-        signage_point_index,
-    )?)
-}
-
-#[cfg(feature = "py-bindings")]
-#[pyo3::pyfunction]
-#[pyo3(name = "calculate_sp_interval_iters")]
-pub fn py_calculate_sp_interval_iters(
-    num_sps_sub_slot: u32,
-    sub_slot_iters: u64,
-) -> pyo3::PyResult<u64> {
-    Ok(calculate_sp_interval_iters(
-        num_sps_sub_slot,
-        sub_slot_iters,
-    )?)
-}
-
-#[cfg(feature = "py-bindings")]
-#[pyo3::pyfunction]
-#[pyo3(name = "calculate_sp_iters")]
-pub fn py_calculate_sp_iters(
-    num_sps_sub_slot: u32,
-    sub_slot_iters: u64,
-    signage_point_index: u32,
-) -> pyo3::PyResult<u64> {
-    Ok(calculate_sp_iters(
-        num_sps_sub_slot,
-        sub_slot_iters,
-        signage_point_index,
-    )?)
-}
-
-#[cfg(feature = "py-bindings")]
-#[pyo3::pyfunction]
-#[pyo3(name = "calculate_ip_iters")]
-pub fn py_calculate_ip_iters(
-    num_sps_sub_slot: u32,
-    num_sp_intervals_extra: u8,
-    sub_slot_iters: u64,
-    signage_point_index: u32,
-    required_iters: u64,
-) -> pyo3::PyResult<u64> {
-    Ok(calculate_ip_iters(
-        num_sps_sub_slot,
-        num_sp_intervals_extra,
-        sub_slot_iters,
-        signage_point_index,
-        required_iters,
-    )?)
 }
 
 #[cfg(test)]
@@ -194,42 +130,45 @@ mod tests {
         let sp_interval_iters = ssi / NUM_SPS_SUB_SLOT as u64;
 
         // Invalid signage point index
-        assert!(
+        assert_eq!(
             calculate_ip_iters(NUM_SPS_SUB_SLOT, NUM_SP_INTERVALS_EXTRA, ssi, 123, 100_000)
-                .is_err()
+                .unwrap_err(),
+            Error::InvalidPotIteration
         );
 
         let sp_iters = sp_interval_iters * 13;
 
         // required_iters too high
-        assert!(calculate_ip_iters(
-            NUM_SPS_SUB_SLOT,
-            NUM_SP_INTERVALS_EXTRA,
-            ssi,
-            sp_interval_iters.try_into().unwrap(),
-            sp_interval_iters
-        )
-        .is_err());
+        assert_eq!(
+            calculate_ip_iters(
+                NUM_SPS_SUB_SLOT,
+                NUM_SP_INTERVALS_EXTRA,
+                ssi,
+                13,
+                sp_interval_iters
+            )
+            .unwrap_err(),
+            Error::InvalidPotIteration
+        );
 
         // required_iters too high
-        assert!(calculate_ip_iters(
-            NUM_SPS_SUB_SLOT,
-            NUM_SP_INTERVALS_EXTRA,
-            ssi,
-            sp_interval_iters.try_into().unwrap(),
-            sp_interval_iters * 12
-        )
-        .is_err());
+        assert_eq!(
+            calculate_ip_iters(
+                NUM_SPS_SUB_SLOT,
+                NUM_SP_INTERVALS_EXTRA,
+                ssi,
+                13,
+                sp_interval_iters * 12
+            )
+            .unwrap_err(),
+            Error::InvalidPotIteration
+        );
 
         // required_iters too low (0)
-        assert!(calculate_ip_iters(
-            NUM_SPS_SUB_SLOT,
-            NUM_SP_INTERVALS_EXTRA,
-            ssi,
-            sp_interval_iters.try_into().unwrap(),
-            0
-        )
-        .is_err());
+        assert_eq!(
+            calculate_ip_iters(NUM_SPS_SUB_SLOT, NUM_SP_INTERVALS_EXTRA, ssi, 255, 0).unwrap_err(),
+            Error::InvalidPotIteration
+        );
 
         let required_iters = sp_interval_iters - 1;
         let ip_iters = calculate_ip_iters(
@@ -280,7 +219,7 @@ mod tests {
             NUM_SPS_SUB_SLOT,
             NUM_SP_INTERVALS_EXTRA,
             ssi,
-            NUM_SPS_SUB_SLOT - 1_u32,
+            (NUM_SPS_SUB_SLOT - 1_u32) as u8,
             required_iters,
         )
         .expect("valid");
