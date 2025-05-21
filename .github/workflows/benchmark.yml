@@ -114,6 +114,7 @@ jobs:
 
     steps:
       - run: |
+          echo -- ${PATH}
           ls -la .cargo/bin/ || true
           echo CARGO_HOME=${CARGO_HOME} || true
           ls -la "${CARGO_HOME}"/bin/ || true
@@ -131,6 +132,7 @@ jobs:
         uses: dtolnay/rust-toolchain@1.85.0
 
       - run: |
+          echo -- ${PATH}
           ls -la .cargo/bin/ || true
           echo CARGO_HOME=${CARGO_HOME} || true
           ls -la "${CARGO_HOME}"/bin/ || true
