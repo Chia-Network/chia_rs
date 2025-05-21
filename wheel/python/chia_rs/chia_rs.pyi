@@ -7,7 +7,6 @@ from typing import Optional, Sequence, Union, Any, ClassVar, final
 from .sized_bytes import bytes32, bytes100
 from .sized_ints import uint8, uint16, uint32, uint64, uint128, int8, int16, int32, int64
 from typing_extensions import Self
-from chia.types.blockchain_format.program import Program as ChiaProgram
 
 ReadableBuffer = Union[bytes, bytearray, memoryview]
 
