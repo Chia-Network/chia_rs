@@ -228,13 +228,7 @@ extra_members = {
         "def get_tree_hash(self) -> bytes32: ...",
         "@staticmethod\n    def default() -> Program: ...",
         "@staticmethod\n    def fromhex(h: str) -> Program: ...",
-        "def run_mempool_with_cost(self, max_cost: int, args: object) -> tuple[int, ChiaProgram]: ...",
-        "def run_with_cost(self, max_cost: int, args: object) -> tuple[int, ChiaProgram]: ...",
-        "def _run(self, max_cost: int, flags: int, args: object) -> tuple[int, ChiaProgram]: ...",
         "@staticmethod\n    def to(o: object) -> Program: ...",
-        "@staticmethod\n    def from_program(p: ChiaProgram) -> Program: ...",
-        "def to_program(self) -> ChiaProgram: ...",
-        "def uncurry(self) -> tuple[ChiaProgram, ChiaProgram]: ...",
     ],
     "SpendBundle": [
         "@classmethod\n    def aggregate(cls, spend_bundles: list[SpendBundle]) -> Self: ...",
