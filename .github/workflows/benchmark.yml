@@ -30,6 +30,7 @@ jobs:
           echo -- ${PATH}
           bash -c 'type --all cargo || true'
           bash -c 'type --all cargo-clippy || true'
+          ls -la "${HOME}/.rustup/bin/" || true
           ls -la .cargo/bin/ || true
           echo CARGO_HOME=${CARGO_HOME} || true
           ls -la "${CARGO_HOME}"/bin/ || true
@@ -50,6 +51,7 @@ jobs:
           echo -- ${PATH}
           bash -c 'type --all cargo || true'
           bash -c 'type --all cargo-clippy || true'
+          ls -la "${HOME}/.rustup/bin/" || true
           ls -la .cargo/bin/ || true
           echo CARGO_HOME=${CARGO_HOME} || true
           ls -la "${CARGO_HOME}"/bin/ || true
