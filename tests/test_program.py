@@ -14,18 +14,6 @@ def test_raise() -> None:
         assert f"{e}" == "('clvm raise', '86666f6f626172')"
 
 
-def test_raise_program() -> None:
-    try:
-        # (x (q . "foobar"))
-        prg = Program.fromhex("ff08ffff0186666f6f62617280")
-
-        prg.run_with_cost(100000, [])
-        # We expect this to throw
-        assert False
-    except ValueError as e:
-        assert f"{e}" == "('clvm raise', '86666f6f626172')"
-
-
 def test_repr() -> None:
     temp = Program.to([8, (1, "foo")])
     assert f"{temp}" == "Program(ff08ffff0183666f6f80)"
