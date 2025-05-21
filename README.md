@@ -58,7 +58,7 @@ It's built with `maturin`, so you need to have activated a python virtual enviro
 The bindings are tested with `pytest`. Before you run them, install the following dependencies:
 
 ```bash
-pip install pytest maturin typing-extensions chia-blockchain==2.1.2
+pip install pytest maturin typing-extensions blspy
 ```
 
 And build the Python wheel:
