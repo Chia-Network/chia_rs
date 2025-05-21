@@ -2020,7 +2020,7 @@ class PoolTarget:
     def replace(self, *, puzzle_hash: Union[ bytes32, _Unspec] = _Unspec(),
         max_height: Union[ uint32, _Unspec] = _Unspec()) -> PoolTarget: ...
 
-@final
+
 class Program:
     a0: bytes
     def get_tree_hash(self) -> bytes32: ...

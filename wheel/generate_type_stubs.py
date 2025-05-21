@@ -55,7 +55,7 @@ def print_class(
         members.extend(extra)
 
     # TODO: could theoretically be detected from the use of #[streamable(subclass)]
-    inheritable = name in ["SpendBundle"]
+    inheritable = name in ["SpendBundle", "Program"]
 
     # TODO: is __richcmp__ ever actually present?
     # def __richcmp__(self) -> Any: ...
