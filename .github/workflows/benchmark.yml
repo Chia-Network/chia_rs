@@ -28,8 +28,8 @@ jobs:
     steps:
       - run: |
           echo -- ${PATH}
-          bash -c 'type --all cargo'
-          bash -c 'type --all cargo-clippy'
+          bash -c 'type --all cargo || true'
+          bash -c 'type --all cargo-clippy || true'
           ls -la .cargo/bin/ || true
           echo CARGO_HOME=${CARGO_HOME} || true
           ls -la "${CARGO_HOME}"/bin/ || true
@@ -48,8 +48,8 @@ jobs:
 
       - run: |
           echo -- ${PATH}
-          bash -c 'type --all cargo'
-          bash -c 'type --all cargo-clippy'
+          bash -c 'type --all cargo || true'
+          bash -c 'type --all cargo-clippy || true'
           ls -la .cargo/bin/ || true
           echo CARGO_HOME=${CARGO_HOME} || true
           ls -la "${CARGO_HOME}"/bin/ || true
