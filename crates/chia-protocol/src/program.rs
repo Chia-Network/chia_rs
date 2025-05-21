@@ -251,59 +251,6 @@ fn clvm_convert(a: &mut Allocator, o: &Bound<'_, PyAny>) -> PyResult<NodePtr> {
 }
 
 #[cfg(feature = "py-bindings")]
-fn clvm_serialize(a: &mut Allocator, o: &Bound<'_, PyAny>) -> PyResult<NodePtr> {
-    /*
-    When passing arguments to run(), there's some special treatment, before falling
-    back on the regular python -> CLVM conversion (implemented by clvm_convert
-    above). This function mimics the _serialize() function in python:
-
-       def _serialize(node: object) -> bytes:
-           if isinstance(node, list):
-               serialized_list = bytearray()
-               for a in node:
-                   serialized_list += b"\xff"
-                   serialized_list += _serialize(a)
-               serialized_list += b"\x80"
-               return bytes(serialized_list)
-           if type(node) is SerializedProgram:
-               return bytes(node)
-           if type(node) is Program:
-               return bytes(node)
-           else:
-               ret: bytes = SExp.to(node).as_bin()
-               return ret
-    */
-
-    // List
-    if let Ok(list) = o.downcast::<PyList>() {
-        let mut rev = Vec::new();
-        for py_item in list.iter() {
-            rev.push(py_item);
-        }
-        let mut ret = a.nil();
-        for py_item in rev.into_iter().rev() {
-            let item = clvm_serialize(a, &py_item)?;
-            ret = a
-                .new_pair(item, ret)
-                .map_err(|e| PyMemoryError::new_err(e.to_string()))?;
-        }
-        Ok(ret)
-    // Program itself
-    } else if let Ok(prg) = o.extract::<Program>() {
-        Ok(node_from_bytes_backrefs(a, prg.0.as_slice())?)
-    } else {
-        clvm_convert(a, o)
-    }
-}
-
-#[cfg(feature = "py-bindings")]
-fn to_program(py: Python<'_>, node: LazyNode) -> PyResult<Bound<'_, PyAny>> {
-    let int_module = PyModule::import(py, "chia.types.blockchain_format.program")?;
-    let ty = int_module.getattr("Program")?;
-    ty.call1((node.into_pyobject(py)?,))
-}
-
-#[cfg(feature = "py-bindings")]
 #[allow(clippy::needless_pass_by_value)]
 #[pymethods]
 impl Program {
@@ -329,13 +276,6 @@ impl Program {
     }
 
     #[staticmethod]
-    fn from_program(py: Python<'_>, p: PyObject) -> PyResult<Self> {
-        let buf = p.getattr(py, "__bytes__")?.call0(py)?;
-        let buf = buf.extract::<&[u8]>(py)?;
-        Ok(Self(buf.into()))
-    }
-
-    #[staticmethod]
     fn fromhex(h: String) -> Result<Self> {
         let s = if let Some(st) = h.strip_prefix("0x") {
             st
@@ -343,117 +283,6 @@ impl Program {
             &h[..]
         };
         Self::from_bytes(hex::decode(s).map_err(|_| Error::InvalidString)?.as_slice())
-    }
-
-    fn run_mempool_with_cost<'a>(
-        &self,
-        py: Python<'a>,
-        max_cost: u64,
-        args: &Bound<'_, PyAny>,
-    ) -> PyResult<(u64, Bound<'a, PyAny>)> {
-        use clvmr::MEMPOOL_MODE;
-        #[allow(clippy::used_underscore_items)]
-        self._run(py, max_cost, MEMPOOL_MODE, args)
-    }
-
-    fn run_with_cost<'a>(
-        &self,
-        py: Python<'a>,
-        max_cost: u64,
-        args: &Bound<'_, PyAny>,
-    ) -> PyResult<(u64, Bound<'a, PyAny>)> {
-        #[allow(clippy::used_underscore_items)]
-        self._run(py, max_cost, 0, args)
-    }
-
-    // exposed to python so allowing use of the python private indicator leading underscore
-    fn _run<'a>(
-        &self,
-        py: Python<'a>,
-        max_cost: u64,
-        flags: u32,
-        args: &Bound<'_, PyAny>,
-    ) -> PyResult<(u64, Bound<'a, PyAny>)> {
-        use clvmr::reduction::Response;
-        use std::rc::Rc;
-
-        let mut a = Allocator::new_limited(500_000_000);
-        // The python behavior here is a bit messy, and is best not emulated
-        // on the rust side. We must be able to pass a Program as an argument,
-        // and it being treated as the CLVM structure it represents. In python's
-        // SerializedProgram, we have a hack where we interpret the first
-        // "layer" of SerializedProgram, or lists of SerializedProgram this way.
-        // But if we encounter an Optional or tuple, we defer to the clvm
-        // wheel's conversion function to SExp. This level does not have any
-        // special treatment for SerializedProgram (as that would cause a
-        // circular dependency).
-        let clvm_args = clvm_serialize(&mut a, args)?;
-
-        let r: Response = (|| -> PyResult<Response> {
-            let program = node_from_bytes_backrefs(&mut a, self.0.as_ref())?;
-            let dialect = ChiaDialect::new(flags);
-
-            Ok(py.allow_threads(|| run_program(&mut a, &dialect, program, clvm_args, max_cost)))
-        })()?;
-        match r {
-            Ok(reduction) => {
-                let val = LazyNode::new(Rc::new(a), reduction.1);
-                Ok((reduction.0, to_program(py, val)?))
-            }
-            Err(eval_err) => {
-                let blob = node_to_bytes(&a, eval_err.0).ok().map(hex::encode);
-                Err(PyValueError::new_err((eval_err.1, blob)))
-            }
-        }
-    }
-
-    fn to_program<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
-        use std::rc::Rc;
-        let mut a = Allocator::new_limited(500_000_000);
-        let prg = node_from_bytes_backrefs(&mut a, self.0.as_ref())?;
-        let prg = LazyNode::new(Rc::new(a), prg);
-        to_program(py, prg)
-    }
-
-    fn uncurry<'a>(&self, py: Python<'a>) -> PyResult<(Bound<'a, PyAny>, Bound<'a, PyAny>)> {
-        use clvm_utils::CurriedProgram;
-        use std::rc::Rc;
-
-        let mut a = Allocator::new_limited(500_000_000);
-        let prg = node_from_bytes_backrefs(&mut a, self.0.as_ref())?;
-        let Ok(uncurried) = CurriedProgram::<NodePtr, NodePtr>::from_clvm(&a, prg) else {
-            let a = Rc::new(a);
-            let prg = LazyNode::new(a.clone(), prg);
-            let ret = a.nil();
-            let ret = LazyNode::new(a, ret);
-            return Ok((to_program(py, prg)?, to_program(py, ret)?));
-        };
-
-        let mut curried_args = Vec::<NodePtr>::new();
-        let mut args = uncurried.args;
-        loop {
-            if let SExp::Atom = a.sexp(args) {
-                break;
-            }
-            // the args of curried puzzles are in the form of:
-            // (c . ((q . <arg1>) . (<rest> . ())))
-            let (_, ((_, arg), (rest, ()))) =
-                <(
-                    clvm_traits::MatchByte<4>,
-                    (clvm_traits::match_quote!(NodePtr), (NodePtr, ())),
-                ) as FromClvm<Allocator>>::from_clvm(&a, args)
-                .map_err(|error| PyErr::new::<PyTypeError, _>(error.to_string()))?;
-            curried_args.push(arg);
-            args = rest;
-        }
-        let mut ret = a.nil();
-        for item in curried_args.into_iter().rev() {
-            ret = a.new_pair(item, ret).map_err(|_e| Error::EndOfBuffer)?;
-        }
-        let a = Rc::new(a);
-        let prg = LazyNode::new(a.clone(), uncurried.program);
-        let ret = LazyNode::new(a, ret);
-        Ok((to_program(py, prg)?, to_program(py, ret)?))
     }
 }
 
