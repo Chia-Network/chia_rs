@@ -28,6 +28,8 @@ jobs:
     steps:
       - run: |
           echo -- ${PATH}
+          type --all cargo
+          type --all cargo-clippy
           ls -la .cargo/bin/ || true
           echo CARGO_HOME=${CARGO_HOME} || true
           ls -la "${CARGO_HOME}"/bin/ || true
@@ -46,6 +48,8 @@ jobs:
 
       - run: |
           echo -- ${PATH}
+          type --all cargo
+          type --all cargo-clippy
           ls -la .cargo/bin/ || true
           echo CARGO_HOME=${CARGO_HOME} || true
           ls -la "${CARGO_HOME}"/bin/ || true
