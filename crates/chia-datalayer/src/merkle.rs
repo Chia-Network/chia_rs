@@ -933,13 +933,13 @@ impl DeltaFileCache {
     pub fn load_hash_to_index(&mut self, path: &PathBuf) -> Result<(), Error> {
         let blob = MerkleBlob::from_path(path)?;
         self.hash_to_index = blob.get_hashes_indexes(false)?;
-        Ok()
+        Ok(())
     }
 
     pub fn load_previous_hashes(&mut self, path: &PathBuf) -> Result<(), Error> {
         let blob = MerkleBlob::from_path(path)?;
         self.previous_hashes = blob.get_hashes()?;
-        Ok()
+        Ok(())
     }
 }
 
@@ -2515,8 +2515,11 @@ impl DeltaFileCache {
     }
 
     #[pyo3(name = "get_index")]
-    pub fn py_get_index(&self, hash: &Hash) -> Option<TreeIndex> {
-        self.hash_to_index.get(hash).copied()
+    pub fn py_get_index(&self, hash: &Hash) -> PyResult<TreeIndex> {
+        self.hash_to_index
+            .get(hash)
+            .copied()
+            .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("Hash not found"))
     }
 
     #[pyo3(name = "seen_previous_hash")]
