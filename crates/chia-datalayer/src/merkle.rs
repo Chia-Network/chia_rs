@@ -943,6 +943,12 @@ impl DeltaFileCache {
     }
 }
 
+impl Default for DeltaFileCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg_attr(feature = "py-bindings", pyclass)]
 pub struct DeltaReader {
     nodes: NodeHashToDeltaReaderNode,
@@ -2492,14 +2498,6 @@ pub fn get_internal_terminal(
 
 #[cfg_attr(feature = "py-bindings", pymethods)]
 impl DeltaFileCache {
-    #[new]
-    pub fn new() -> Self {
-        Self {
-            hash_to_index: NodeHashToIndex::new(),
-            previous_hashes: HashesDictionary::new(),
-        }
-    }
-
     #[allow(clippy::needless_pass_by_value)]
     #[pyo3(name = "load_hash_to_index")]
     pub fn py_load_hash_to_index(&mut self, py: Python<'_>, path: PyObject) -> PyResult<()> {
