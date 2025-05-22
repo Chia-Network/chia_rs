@@ -66,28 +66,26 @@ def get_flags_for_height_and_constants(
 ) -> int: ...
 
 def calculate_ip_iters(
-    num_sps_sub_slot: uint32,
-    num_sp_intervals_extra: uint8,
+    constants: ConsensusConstants,
     sub_slot_iters: uint64,
-    signage_point_index: uint32,
+    signage_point_index: uint8,
     required_iters: uint64,
 ) -> uint64: ...
 
 def calculate_sp_iters(
-    num_sps_sub_slot: uint32,
+    constants: ConsensusConstants,
     sub_slot_iters: uint64,
-    signage_point_index: uint32,
+    signage_point_index: uint8,
 ) -> uint64: ...
 
 def calculate_sp_interval_iters(
-    num_sps_sub_slot: uint32,
+    constants: ConsensusConstants,
     sub_slot_iters: uint64,
 ) -> uint64: ...
 
 def is_overflow_block(
-    num_sps_sub_slot: uint32,
-    num_sp_intervals_extra: uint8,
-    signage_point_index: uint32,
+    constants: ConsensusConstants,
+    signage_point_index: uint8,
 ) -> bool: ...
 
 def expected_plot_size(
@@ -101,6 +99,7 @@ LIMIT_HEAP: int = ...
 ENABLE_KECCAK_OPS_OUTSIDE_GUARD: int = ...
 MEMPOOL_MODE: int = ...
 DONT_VALIDATE_SIGNATURE: int = ...
+COST_CONDITIONS: int = ...
 
 ELIGIBLE_FOR_DEDUP: int = ...
 ELIGIBLE_FOR_FF: int = ...
@@ -2066,15 +2065,17 @@ class ProofOfSpace:
     pool_public_key: Optional[G1Element]
     pool_contract_puzzle_hash: Optional[bytes32]
     plot_public_key: G1Element
-    size: uint8
+    version_and_size: uint8
     proof: bytes
+    def size_v1(self) -> Optional[uint8]: ...
+    def size_v2(self) -> Optional[uint8]: ...
     def __init__(
         self,
         challenge: bytes,
         pool_public_key: Optional[G1Element],
         pool_contract_puzzle_hash: Optional[bytes32],
         plot_public_key: G1Element,
-        size: uint8,
+        version_and_size: uint8,
         proof: bytes
     ) -> None: ...
     def __hash__(self) -> int: ...
@@ -2098,7 +2099,7 @@ class ProofOfSpace:
         pool_public_key: Union[ Optional[G1Element], _Unspec] = _Unspec(),
         pool_contract_puzzle_hash: Union[ Optional[bytes32], _Unspec] = _Unspec(),
         plot_public_key: Union[ G1Element, _Unspec] = _Unspec(),
-        size: Union[ uint8, _Unspec] = _Unspec(),
+        version_and_size: Union[ uint8, _Unspec] = _Unspec(),
         proof: Union[ bytes, _Unspec] = _Unspec()) -> ProofOfSpace: ...
 
 @final
@@ -4335,7 +4336,8 @@ class ConsensusConstants:
     EPOCH_BLOCKS: uint32
     SIGNIFICANT_BITS: uint8
     DISCRIMINANT_SIZE_BITS: uint16
-    NUMBER_ZERO_BITS_PLOT_FILTER: uint8
+    NUMBER_ZERO_BITS_PLOT_FILTER_V1: uint8
+    NUMBER_ZERO_BITS_PLOT_FILTER_V2: uint8
     MIN_PLOT_SIZE: uint8
     MAX_PLOT_SIZE: uint8
     SUB_SLOT_TIME_TARGET: uint16
@@ -4365,9 +4367,15 @@ class ConsensusConstants:
     MAX_GENERATOR_REF_LIST_SIZE: uint32
     POOL_SUB_SLOT_ITERS: uint64
     HARD_FORK_HEIGHT: uint32
+    HARD_FORK2_HEIGHT: uint32
     PLOT_FILTER_128_HEIGHT: uint32
     PLOT_FILTER_64_HEIGHT: uint32
     PLOT_FILTER_32_HEIGHT: uint32
+    PLOT_DIFFICULTY_4_HEIGHT: uint32
+    PLOT_DIFFICULTY_5_HEIGHT: uint32
+    PLOT_DIFFICULTY_6_HEIGHT: uint32
+    PLOT_DIFFICULTY_7_HEIGHT: uint32
+    PLOT_DIFFICULTY_8_HEIGHT: uint32
     def __init__(
         self,
         SLOT_BLOCKS_TARGET: uint32,
@@ -4382,7 +4390,8 @@ class ConsensusConstants:
         EPOCH_BLOCKS: uint32,
         SIGNIFICANT_BITS: uint8,
         DISCRIMINANT_SIZE_BITS: uint16,
-        NUMBER_ZERO_BITS_PLOT_FILTER: uint8,
+        NUMBER_ZERO_BITS_PLOT_FILTER_V1: uint8,
+        NUMBER_ZERO_BITS_PLOT_FILTER_V2: uint8,
         MIN_PLOT_SIZE: uint8,
         MAX_PLOT_SIZE: uint8,
         SUB_SLOT_TIME_TARGET: uint16,
@@ -4412,9 +4421,15 @@ class ConsensusConstants:
         MAX_GENERATOR_REF_LIST_SIZE: uint32,
         POOL_SUB_SLOT_ITERS: uint64,
         HARD_FORK_HEIGHT: uint32,
+        HARD_FORK2_HEIGHT: uint32,
         PLOT_FILTER_128_HEIGHT: uint32,
         PLOT_FILTER_64_HEIGHT: uint32,
-        PLOT_FILTER_32_HEIGHT: uint32
+        PLOT_FILTER_32_HEIGHT: uint32,
+        PLOT_DIFFICULTY_4_HEIGHT: uint32,
+        PLOT_DIFFICULTY_5_HEIGHT: uint32,
+        PLOT_DIFFICULTY_6_HEIGHT: uint32,
+        PLOT_DIFFICULTY_7_HEIGHT: uint32,
+        PLOT_DIFFICULTY_8_HEIGHT: uint32
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -4445,7 +4460,8 @@ class ConsensusConstants:
         EPOCH_BLOCKS: Union[ uint32, _Unspec] = _Unspec(),
         SIGNIFICANT_BITS: Union[ uint8, _Unspec] = _Unspec(),
         DISCRIMINANT_SIZE_BITS: Union[ uint16, _Unspec] = _Unspec(),
-        NUMBER_ZERO_BITS_PLOT_FILTER: Union[ uint8, _Unspec] = _Unspec(),
+        NUMBER_ZERO_BITS_PLOT_FILTER_V1: Union[ uint8, _Unspec] = _Unspec(),
+        NUMBER_ZERO_BITS_PLOT_FILTER_V2: Union[ uint8, _Unspec] = _Unspec(),
         MIN_PLOT_SIZE: Union[ uint8, _Unspec] = _Unspec(),
         MAX_PLOT_SIZE: Union[ uint8, _Unspec] = _Unspec(),
         SUB_SLOT_TIME_TARGET: Union[ uint16, _Unspec] = _Unspec(),
@@ -4475,6 +4491,12 @@ class ConsensusConstants:
         MAX_GENERATOR_REF_LIST_SIZE: Union[ uint32, _Unspec] = _Unspec(),
         POOL_SUB_SLOT_ITERS: Union[ uint64, _Unspec] = _Unspec(),
         HARD_FORK_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
+        HARD_FORK2_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_FILTER_128_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_FILTER_64_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
-        PLOT_FILTER_32_HEIGHT: Union[ uint32, _Unspec] = _Unspec()) -> ConsensusConstants: ...
+        PLOT_FILTER_32_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
+        PLOT_DIFFICULTY_4_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
+        PLOT_DIFFICULTY_5_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
+        PLOT_DIFFICULTY_6_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
+        PLOT_DIFFICULTY_7_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
+        PLOT_DIFFICULTY_8_HEIGHT: Union[ uint32, _Unspec] = _Unspec()) -> ConsensusConstants: ...

@@ -1,7 +1,7 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
-use chia_consensus::gen::get_puzzle_and_solution::get_puzzle_and_solution_for_coin;
+use chia_consensus::get_puzzle_and_solution::get_puzzle_and_solution_for_coin;
 use chia_fuzz::{make_tree, BitCursor};
 use chia_protocol::Coin;
 use clvmr::allocator::Allocator;

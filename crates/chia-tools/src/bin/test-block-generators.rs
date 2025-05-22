@@ -1,10 +1,10 @@
 use clap::Parser;
 
 use chia_bls::PublicKey;
+use chia_consensus::conditions::{NewCoin, SpendBundleConditions, SpendConditions};
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
-use chia_consensus::gen::conditions::{NewCoin, SpendBundleConditions, SpendConditions};
-use chia_consensus::gen::flags::{DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
-use chia_consensus::gen::run_block_generator::{run_block_generator, run_block_generator2};
+use chia_consensus::flags::{DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
+use chia_consensus::run_block_generator::{run_block_generator, run_block_generator2};
 use chia_protocol::Program;
 use chia_tools::iterate_blocks;
 use clvmr::allocator::NodePtr;

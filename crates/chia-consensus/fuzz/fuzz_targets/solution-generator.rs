@@ -1,5 +1,5 @@
 #![no_main]
-use chia_consensus::gen::solution_generator::{calculate_generator_length, solution_generator};
+use chia_consensus::solution_generator::{calculate_generator_length, solution_generator};
 use chia_protocol::{Coin, CoinSpend};
 use chia_traits::Streamable;
 use clvmr::{

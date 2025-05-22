@@ -2,7 +2,7 @@ use super::conditions::{NewCoin, SpendBundleConditions, SpendConditions};
 use super::run_block_generator::{run_block_generator, run_block_generator2};
 use crate::allocator::make_allocator;
 use crate::consensus_constants::TEST_CONSTANTS;
-use crate::gen::flags::{DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
+use crate::flags::{DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
 use chia_bls::Signature;
 use chia_protocol::{Bytes, Bytes48};
 use clvmr::allocator::NodePtr;

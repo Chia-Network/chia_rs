@@ -52,7 +52,12 @@ pub struct ConsensusConstants {
     discriminant_size_bits: u16,
 
     /// H(plot id + challenge hash + signage point) must start with these many zeroes.
-    number_zero_bits_plot_filter: u8,
+    /// This applies to original plots, and proof-of-space format
+    number_zero_bits_plot_filter_v1: u8,
+
+    /// H(plot id + challenge hash + signage point) must start with these many zeroes.
+    /// This applies to the new plot format, and proof-of-space format
+    number_zero_bits_plot_filter_v2: u8,
 
     min_plot_size: u8,
 
@@ -123,14 +128,38 @@ pub struct ConsensusConstants {
     /// This is the block with the first plot filter adjustment.
     hard_fork_height: u32,
 
+    /// The hard fork planned with the 3.0 release.
+    /// This is the first block where the new plot format and proof-of-space
+    /// is valid
+    hard_fork2_height: u32,
+
     /// The 128 plot filter adjustment height.
+    /// This affects the plot filter for original plots
     plot_filter_128_height: u32,
 
     /// The 64 plot filter adjustment height.
+    /// This affects the plot filter for original plots
     plot_filter_64_height: u32,
 
     /// The 32 plot filter adjustment height.
+    /// This affects the plot filter for original plots
     plot_filter_32_height: u32,
+
+    /// Plot difficulty is a feature of the new plot format (introduced in Chia 3.0)
+    /// The plot difficulty will increase to 4 at this block height
+    plot_difficulty_4_height: u32,
+
+    /// The plot difficulty will increase to 5 at this block height
+    plot_difficulty_5_height: u32,
+
+    /// The plot difficulty will increase to 6 at this block height
+    plot_difficulty_6_height: u32,
+
+    /// The plot difficulty will increase to 7 at this block height
+    plot_difficulty_7_height: u32,
+
+    /// The plot difficulty will increase to 8 at this block height
+    plot_difficulty_8_height: u32,
 }
 
 pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
@@ -146,7 +175,8 @@ pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
     epoch_blocks: 4608,
     significant_bits: 8,
     discriminant_size_bits: 1024,
-    number_zero_bits_plot_filter: 9,
+    number_zero_bits_plot_filter_v1: 9,
+    number_zero_bits_plot_filter_v2: 9, // placeholder
     min_plot_size: 32,
     max_plot_size: 50,
     sub_slot_time_target: 600,
@@ -196,7 +226,15 @@ pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
     max_generator_ref_list_size: 512,
     pool_sub_slot_iters: 37_600_000_000,
     hard_fork_height: 5_496_000,
+    hard_fork2_height: 0xffff_ffff, // placeholder
     plot_filter_128_height: 10_542_000,
     plot_filter_64_height: 15_592_000,
     plot_filter_32_height: 20_643_000,
+
+    // placeholder values
+    plot_difficulty_4_height: 0xffff_ffff,
+    plot_difficulty_5_height: 0xffff_ffff,
+    plot_difficulty_6_height: 0xffff_ffff,
+    plot_difficulty_7_height: 0xffff_ffff,
+    plot_difficulty_8_height: 0xffff_ffff,
 };

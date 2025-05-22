@@ -2,12 +2,12 @@
 use libfuzzer_sys::fuzz_target;
 
 use chia_bls::Signature;
-use chia_consensus::gen::conditions::{parse_spends, MempoolVisitor};
+use chia_consensus::conditions::{parse_spends, MempoolVisitor};
 use chia_fuzz::{make_list, BitCursor};
 use clvmr::{Allocator, NodePtr};
 
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
-use chia_consensus::gen::flags::{NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
+use chia_consensus::flags::{NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
 
 fuzz_target!(|data: &[u8]| {
     let mut a = Allocator::new();
