@@ -2496,7 +2496,8 @@ pub fn get_internal_terminal(
     Ok(nodes)
 }
 
-#[cfg_attr(feature = "py-bindings", pymethods)]
+#[cfg(feature = "py-bindings")]
+#[pymethods]
 impl DeltaFileCache {
     #[new]
     pub fn new() -> Self {
