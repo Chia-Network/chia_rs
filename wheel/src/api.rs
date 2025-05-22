@@ -320,8 +320,8 @@ impl AugSchemeMPL {
     }
 
     #[staticmethod]
-    pub fn derive_child_sk(sk: &SecretKey, index: u32) -> SecretKey {
-        sk.derive_hardened(index)
+    pub fn derive_child_sk(sk: &SecretKey, index: u32) -> PyResult<SecretKey> {
+        Ok(sk.derive_hardened(index)?)
     }
 
     #[staticmethod]
@@ -341,7 +341,7 @@ impl AugSchemeMPL {
                 "Seed size must be at leat 32 bytes",
             ));
         }
-        Ok(SecretKey::from_seed(seed))
+        Ok(SecretKey::from_seed(seed)?)
     }
 }
 

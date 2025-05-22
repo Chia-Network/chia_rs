@@ -29,3 +29,10 @@ path = "fuzz_targets/blspy-fidelity.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "invalid-bytes"
+path = "fuzz_targets/invalid-bytes.rs"
+test = false
+doc = false
+bench = false

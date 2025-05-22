@@ -11,7 +11,7 @@ fn verify_benchmark(c: &mut Criterion) {
     let mut data = [0u8; 32];
     rng.fill(data.as_mut_slice());
 
-    let sk = SecretKey::from_seed(&data);
+    let sk = SecretKey::from_seed(&data).unwrap();
     let pk = sk.public_key();
     let msg_small = b"The quick brown fox jumps over the lazy dog";
     let msg_large = [42_u8; 4096];
@@ -22,7 +22,7 @@ fn verify_benchmark(c: &mut Criterion) {
     let mut gts = Vec::<GTElement>::new();
     let mut pks = Vec::<PublicKey>::new();
     for idx in 0..1000 {
-        let derived = sk.derive_hardened(idx as u32);
+        let derived = sk.derive_hardened(idx as u32).unwrap();
         let pk = derived.public_key();
         let sig = sign(&derived, msg_small);
         agg_sig.aggregate(&sig);

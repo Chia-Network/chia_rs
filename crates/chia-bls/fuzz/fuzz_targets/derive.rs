@@ -9,7 +9,7 @@ fuzz_target!(|data: &[u8]| {
         return;
     }
 
-    let sk = SecretKey::from_seed(data);
+    let sk = SecretKey::from_seed(data).unwrap();
     let pk = sk.public_key();
 
     // round-trip SecretKey

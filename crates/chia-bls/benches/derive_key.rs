@@ -9,7 +9,7 @@ fn key_derivation_benchmark(c: &mut Criterion) {
     let mut data = [0u8; 32];
     rng.fill(data.as_mut_slice());
 
-    let sk = SecretKey::from_seed(&data);
+    let sk = SecretKey::from_seed(&data).unwrap();
     let pk = sk.public_key();
 
     c.bench_function("secret key, unhardened", |b| {
@@ -25,7 +25,7 @@ fn key_derivation_benchmark(c: &mut Criterion) {
         b.iter_custom(|iters| {
             let start = Instant::now();
             for i in 0..iters {
-                black_box(sk.derive_hardened(i as u32));
+                black_box(sk.derive_hardened(i as u32).unwrap());
             }
             start.elapsed()
         });

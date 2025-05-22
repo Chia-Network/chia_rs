@@ -10,7 +10,7 @@ fn parse_benchmark(c: &mut Criterion) {
     let mut data = [0u8; 32];
     rng.fill(data.as_mut_slice());
 
-    let sk = SecretKey::from_seed(&data);
+    let sk = SecretKey::from_seed(&data).unwrap();
     let pk = sk.public_key();
     let msg = b"The quick brown fox jumps over the lazy dog";
     let sig = sign(&sk, msg);

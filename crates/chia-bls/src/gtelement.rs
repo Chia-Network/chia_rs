@@ -102,7 +102,9 @@ impl Streamable for GTElement {
 
     fn parse<const TRUSTED: bool>(input: &mut Cursor<&[u8]>) -> Result<Self> {
         Ok(GTElement::from_bytes(
-            read_bytes(input, Self::SIZE)?.try_into().unwrap(),
+            read_bytes(input, Self::SIZE)?
+                .try_into()
+                .expect("length already checked"),
         ))
     }
 }
@@ -161,7 +163,7 @@ mod pybindings {
                 parse_hex_string(o, Self::SIZE, "GTElement")?
                     .as_slice()
                     .try_into()
-                    .unwrap(),
+                    .expect("length already checked"),
             ))
         }
     }

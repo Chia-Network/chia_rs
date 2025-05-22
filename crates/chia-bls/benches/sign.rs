@@ -8,7 +8,7 @@ fn sign_benchmark(c: &mut Criterion) {
     let mut data = [0u8; 32];
     rng.fill(data.as_mut_slice());
 
-    let sk = SecretKey::from_seed(&data);
+    let sk = SecretKey::from_seed(&data).unwrap();
     let small_msg = b"The quick brown fox jumps over the lazy dog";
     let large_msg = [42_u8; 4096];
 

@@ -1,7 +1,7 @@
 use crate::{DerivableKey, Error, PublicKey, Result};
 use blst::*;
 use chia_sha2::Sha256;
-use chia_traits::{read_bytes, Streamable};
+use chia_traits::{chia_error, read_bytes, Streamable};
 use hkdf::HkdfExtract;
 #[cfg(feature = "py-bindings")]
 use pyo3::exceptions::PyNotImplementedError;
@@ -28,7 +28,7 @@ impl<'a> arbitrary::Arbitrary<'a> for SecretKey {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let mut seed = [0_u8; 32];
         let _ = u.fill_buffer(seed.as_mut_slice());
-        Ok(Self::from_seed(&seed))
+        Ok(Self::from_seed(&seed).expect("invalid seed"))
     }
 }
 
@@ -46,7 +46,7 @@ fn ikm_to_lamport_sk(ikm: &[u8; 32], salt: [u8; 4]) -> [u8; 255 * 32] {
     let (_, h) = extracter.finalize();
 
     let mut output = [0_u8; 255 * 32];
-    h.expand(&[], &mut output).unwrap();
+    h.expand(&[], &mut output).expect("expand failed");
     output
 }
 
@@ -90,11 +90,12 @@ impl SecretKey {
     /// # Panics
     ///
     /// Panics if the seed produces an invalid SecretKey.
-    #[must_use]
-    pub fn from_seed(seed: &[u8]) -> Self {
+    pub fn from_seed(seed: &[u8]) -> Result<Self> {
         // described here:
         // https://eips.ethereum.org/EIPS/eip-2333#derive_master_sk
-        assert!(seed.len() >= 32);
+        if seed.len() < 32 {
+            return Err(Error::InvalidSeedLength);
+        }
 
         let bytes = unsafe {
             let mut scalar = MaybeUninit::<blst_scalar>::uninit();
@@ -109,7 +110,8 @@ impl SecretKey {
             blst_bendian_from_scalar(bytes.as_mut_ptr().cast::<u8>(), &scalar.assume_init());
             bytes.assume_init()
         };
-        Self::from_bytes(&bytes).expect("from_seed")
+
+        Self::from_bytes(&bytes)
     }
 
     pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self> {
@@ -148,8 +150,7 @@ impl SecretKey {
         PublicKey(p1)
     }
 
-    #[must_use]
-    pub fn derive_hardened(&self, idx: u32) -> SecretKey {
+    pub fn derive_hardened(&self, idx: u32) -> Result<SecretKey> {
         // described here:
         // https://eips.ethereum.org/EIPS/eip-2333#derive_child_sk
         SecretKey::from_seed(to_lamport_pk(self.to_bytes(), idx).as_slice())
@@ -166,11 +167,11 @@ impl Streamable for SecretKey {
         Ok(())
     }
 
-    fn parse<const TRUSTED: bool>(
-        input: &mut Cursor<&[u8]>,
-    ) -> chia_traits::chia_error::Result<Self> {
+    fn parse<const TRUSTED: bool>(input: &mut Cursor<&[u8]>) -> chia_error::Result<Self> {
         Ok(Self::from_bytes(
-            read_bytes(input, 32)?.try_into().unwrap(),
+            read_bytes(input, 32)?
+                .try_into()
+                .expect("length already checked"),
         )?)
     }
 }
@@ -282,9 +283,8 @@ impl SecretKey {
     }
 
     #[pyo3(name = "derive_hardened")]
-    #[must_use]
-    pub fn py_derive_hardened(&self, idx: u32) -> Self {
-        self.derive_hardened(idx)
+    pub fn py_derive_hardened(&self, idx: u32) -> PyResult<Self> {
+        self.derive_hardened(idx).map_err(PyErr::from)
     }
 
     #[pyo3(name = "derive_unhardened")]
@@ -295,8 +295,8 @@ impl SecretKey {
 
     #[pyo3(name = "from_seed")]
     #[staticmethod]
-    pub fn py_from_seed(seed: &[u8]) -> Self {
-        Self::from_seed(seed)
+    pub fn py_from_seed(seed: &[u8]) -> PyResult<Self> {
+        Self::from_seed(seed).map_err(PyErr::from)
     }
 }
 
@@ -323,8 +323,7 @@ mod pybindings {
             Ok(Self::from_bytes(
                 parse_hex_string(o, 32, "PrivateKey")?
                     .as_slice()
-                    .try_into()
-                    .unwrap(),
+                    .try_into()?,
             )?)
         }
     }
@@ -338,7 +337,7 @@ mod tests {
     use rand::{Rng, SeedableRng};
 
     #[test]
-    fn test_make_key() {
+    fn test_make_key() -> anyhow::Result<()> {
         // test vectors from:
         // from chia.util.keychain import KeyDataSecrets
         // print(KeyDataSecrets.from_mnemonic(phrase)["privatekey"])
@@ -355,16 +354,18 @@ mod tests {
 
         for (seed, sk) in test_cases {
             assert_eq!(
-                SecretKey::from_seed(&<[u8; 64]>::from_hex(seed).unwrap())
+                SecretKey::from_seed(&<[u8; 64]>::from_hex(seed)?)?
                     .to_bytes()
                     .to_vec(),
-                Vec::<u8>::from_hex(sk).unwrap()
+                Vec::<u8>::from_hex(sk)?
             );
         }
+
+        Ok(())
     }
 
     #[test]
-    fn test_derive_unhardened() {
+    fn test_derive_unhardened() -> anyhow::Result<()> {
         // test vectors from:
         // from blspy import AugSchemeMPL
         // from blspy import PrivateKey
@@ -385,16 +386,18 @@ mod tests {
             "13115c8fb68a3d667938dac2ffc6b867a4a0f216bbb228aa43d6bdde14245575",
             "52e7e9f2fb51f2c5705aea8e11ac82737b95e664ae578f015af22031d956f92b",
         ];
-        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex)?)?;
 
         for (i, hex) in derived_hex.iter().enumerate() {
             let derived = sk.derive_unhardened(i as u32);
-            assert_eq!(derived.to_bytes(), <[u8; 32]>::from_hex(hex).unwrap());
+            assert_eq!(derived.to_bytes(), <[u8; 32]>::from_hex(hex)?);
         }
+
+        Ok(())
     }
 
     #[test]
-    fn test_public_key() {
+    fn test_public_key() -> anyhow::Result<()> {
         // test vectors from:
         // from blspy import PrivateKey
         // from blspy import AugSchemeMPL
@@ -419,17 +422,16 @@ mod tests {
         ];
 
         for (sk_hex, pk_hex) in test_cases {
-            let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+            let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex)?)?;
             let pk = sk.public_key();
-            assert_eq!(
-                pk,
-                PublicKey::from_bytes(&<[u8; 48]>::from_hex(pk_hex).unwrap()).unwrap()
-            );
+            assert_eq!(pk, PublicKey::from_bytes(&<[u8; 48]>::from_hex(pk_hex)?)?);
         }
+
+        Ok(())
     }
 
     #[test]
-    fn test_derive_hardened() {
+    fn test_derive_hardened() -> anyhow::Result<()> {
         // test vectors from:
         // from blspy import AugSchemeMPL
         // from blspy import PrivateKey
@@ -450,23 +452,27 @@ mod tests {
             "5df14a0a34fd6c30a80136d4103f0a93422ce82d5c537bebbecbc56e19fee5b9",
             "3ea55db88d9a6bf5f1d9c9de072e3c9a56b13f4156d72fca7880cd39b4bd4fdc",
         ];
-        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex)?)?;
 
         for (i, hex) in derived_hex.iter().enumerate() {
-            let derived = sk.derive_hardened(i as u32);
-            assert_eq!(derived.to_bytes(), <[u8; 32]>::from_hex(hex).unwrap());
+            let derived = sk.derive_hardened(i as u32)?;
+            assert_eq!(derived.to_bytes(), <[u8; 32]>::from_hex(hex)?);
         }
+
+        Ok(())
     }
 
     #[test]
-    fn test_debug() {
+    fn test_debug() -> anyhow::Result<()> {
         let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
-        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex)?)?;
         assert_eq!(format!("{sk:?}"), format!("<PrivateKey {sk_hex}>"));
+
+        Ok(())
     }
 
     #[test]
-    fn test_hash() {
+    fn test_hash() -> anyhow::Result<()> {
         fn hash<T: Hash>(v: &T) -> u64 {
             use std::collections::hash_map::DefaultHasher;
             let mut h = DefaultHasher::new();
@@ -478,14 +484,16 @@ mod tests {
         let mut data = [0u8; 32];
         rng.fill(data.as_mut_slice());
 
-        let sk1 = SecretKey::from_seed(&data);
-        let sk2 = SecretKey::from_seed(&data);
+        let sk1 = SecretKey::from_seed(&data)?;
+        let sk2 = SecretKey::from_seed(&data)?;
 
         rng.fill(data.as_mut_slice());
-        let sk3 = SecretKey::from_seed(&data);
+        let sk3 = SecretKey::from_seed(&data)?;
 
         assert!(hash(&sk1) == hash(&sk2));
         assert!(hash(&sk1) != hash(&sk3));
+
+        Ok(())
     }
 
     #[test]
@@ -497,61 +505,58 @@ mod tests {
             // make the bytes exceed q
             data[0] |= 0x80;
             // just any random bytes are not a valid key and should fail
-            assert_eq!(
-                SecretKey::from_bytes(&data).unwrap_err(),
-                Error::SecretKeyGroupOrder
-            );
+            #[allow(clippy::unwrap_used)]
+            let error = SecretKey::from_bytes(&data).unwrap_err();
+            assert_eq!(error, Error::SecretKeyGroupOrder);
         }
     }
 
     #[test]
-    fn test_from_bytes_zero() {
+    fn test_from_bytes_zero() -> anyhow::Result<()> {
         let data = [0u8; 32];
-        let _sk = SecretKey::from_bytes(&data).unwrap();
+        let _sk = SecretKey::from_bytes(&data)?;
+        Ok(())
     }
 
     #[test]
-    fn test_aggregate_secret_key() {
+    fn test_aggregate_secret_key() -> anyhow::Result<()> {
         let sk_hex = "5aac8405befe4cb3748a67177c56df26355f1f98d979afdb0b2f97858d2f71c3";
-        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
+        let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex)?)?;
         let sk2 = &sk + &sk;
         let sk3 = &sk + &sk + &sk;
 
         assert_eq!(
             sk2,
-            SecretKey::from_bytes(
-                &<[u8; 32]>::from_hex(
-                    "416b60b8545f1c1eb5daf626ef0be64717009b2eb2f503b7165f2f0c1a5ee385"
-                )
-                .unwrap()
-            )
-            .unwrap()
+            SecretKey::from_bytes(&<[u8; 32]>::from_hex(
+                "416b60b8545f1c1eb5daf626ef0be64717009b2eb2f503b7165f2f0c1a5ee385"
+            )?)?
         );
 
         assert_eq!(
             sk3,
-            SecretKey::from_bytes(
-                &<[u8; 32]>::from_hex(
-                    "282a3d6ae9bfeb89f72b853661c0ed67f8a216c48c705793218ec692a78e5547"
-                )
-                .unwrap()
-            )
-            .unwrap()
+            SecretKey::from_bytes(&<[u8; 32]>::from_hex(
+                "282a3d6ae9bfeb89f72b853661c0ed67f8a216c48c705793218ec692a78e5547"
+            )?)?
         );
+
+        Ok(())
     }
 
     #[test]
-    fn test_roundtrip() {
+    fn test_roundtrip() -> anyhow::Result<()> {
         let mut rng = StdRng::seed_from_u64(1337);
         let mut data = [0u8; 32];
+
         for _i in 0..50 {
             rng.fill(data.as_mut_slice());
-            let sk = SecretKey::from_seed(&data);
+            let sk = SecretKey::from_seed(&data)?;
             let bytes = sk.to_bytes();
-            let sk2 = SecretKey::from_bytes(&bytes).unwrap();
+            let sk2 = SecretKey::from_bytes(&bytes)?;
             assert_eq!(sk, sk2);
             assert_eq!(sk.public_key(), sk2.public_key());
         }
+
+        Ok(())
     }
 }
 
@@ -565,24 +570,26 @@ mod pytests {
     use rstest::rstest;
 
     #[test]
-    fn test_json_dict_roundtrip() {
+    fn test_json_dict_roundtrip() -> anyhow::Result<()> {
         pyo3::prepare_freethreaded_python();
+
         let mut rng = StdRng::seed_from_u64(1337);
         let mut data = [0u8; 32];
+
         for _i in 0..50 {
             rng.fill(data.as_mut_slice());
-            let sk = SecretKey::from_seed(&data);
+            let sk = SecretKey::from_seed(&data)?;
             Python::with_gil(|py| {
-                let string = sk.to_json_dict(py).expect("to_json_dict");
+                let string = sk.to_json_dict(py)?;
                 let py_class = py.get_type::<SecretKey>();
-                let sk2 = SecretKey::from_json_dict(&py_class, py, string.bind(py))
-                    .unwrap()
-                    .extract(py)
-                    .unwrap();
+                let sk2 = SecretKey::from_json_dict(&py_class, py, string.bind(py))?.extract(py)?;
                 assert_eq!(sk, sk2);
                 assert_eq!(sk.public_key(), sk2.public_key());
-            });
+                anyhow::Ok(())
+            })?;
         }
+
+        Ok(())
     }
 
     #[rstest]
@@ -606,17 +613,22 @@ mod pytests {
         "0r0102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f",
         "invalid hex"
     )]
-    fn test_json_dict(#[case] input: &str, #[case] msg: &str) {
+    fn test_json_dict(#[case] input: &str, #[case] msg: &str) -> anyhow::Result<()> {
         pyo3::prepare_freethreaded_python();
+
         Python::with_gil(|py| {
             let py_class = py.get_type::<SecretKey>();
+            #[allow(clippy::unwrap_used)]
             let err = SecretKey::from_json_dict(
                 &py_class,
                 py,
-                &input.to_string().into_pyobject(py).unwrap().into_any(),
+                &input.to_string().into_pyobject(py)?.into_any(),
             )
             .unwrap_err();
             assert_eq!(err.value(py).to_string(), msg.to_string());
-        });
+            anyhow::Ok(())
+        })?;
+
+        Ok(())
     }
 }

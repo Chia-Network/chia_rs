@@ -1,4 +1,5 @@
 #![allow(unsafe_code)]
+#![deny(clippy::unwrap_used)]
 
 mod bls_cache;
 mod derive_keys;
