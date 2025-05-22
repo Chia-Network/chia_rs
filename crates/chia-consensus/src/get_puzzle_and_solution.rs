@@ -1,4 +1,4 @@
-use crate::gen::validation_error::{atom, check_nil, first, next, rest, ErrorCode, ValidationErr};
+use crate::validation_error::{atom, check_nil, first, next, rest, ErrorCode, ValidationErr};
 use chia_protocol::Coin;
 use clvm_utils::{tree_hash_cached, TreeHash};
 use clvmr::allocator::{Allocator, Atom, NodePtr};
@@ -61,9 +61,9 @@ pub fn get_puzzle_and_solution_for_coin(
 mod test {
     use super::*;
     use crate::consensus_constants::TEST_CONSTANTS;
-    use crate::gen::flags::{DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
-    use crate::gen::make_aggsig_final_message::u64_to_bytes;
-    use crate::gen::run_block_generator::{run_block_generator2, setup_generator_args};
+    use crate::flags::{DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
+    use crate::make_aggsig_final_message::u64_to_bytes;
+    use crate::run_block_generator::{run_block_generator2, setup_generator_args};
     use chia_bls::Signature;
     use chia_protocol::Bytes32;
     use chia_sha2::Sha256;

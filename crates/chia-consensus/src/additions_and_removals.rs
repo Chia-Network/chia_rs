@@ -1,10 +1,10 @@
-use crate::gen::run_block_generator::setup_generator_args;
-use crate::gen::run_block_generator::subtract_cost;
+use crate::run_block_generator::setup_generator_args;
+use crate::run_block_generator::subtract_cost;
 use chia_protocol::Coin;
 
 use crate::allocator::make_allocator;
 use crate::consensus_constants::ConsensusConstants;
-use crate::gen::validation_error::{atom, first, next, rest, ErrorCode, ValidationErr};
+use crate::validation_error::{atom, first, next, rest, ErrorCode, ValidationErr};
 use chia_protocol::{Bytes, Bytes32};
 use clvm_traits::FromClvm;
 use clvm_utils::{tree_hash_cached, TreeHash};
@@ -121,8 +121,8 @@ where
 mod test {
     use super::*;
     use crate::consensus_constants::TEST_CONSTANTS;
-    use crate::gen::flags::DONT_VALIDATE_SIGNATURE;
-    use crate::gen::run_block_generator::run_block_generator2;
+    use crate::flags::DONT_VALIDATE_SIGNATURE;
+    use crate::run_block_generator::run_block_generator2;
     use chia_bls::Signature;
     use rstest::rstest;
     use std::collections::HashSet;

@@ -2,24 +2,24 @@ use crate::run_generator::{
     additions_and_removals, py_to_slice, run_block_generator, run_block_generator2,
 };
 use chia_consensus::allocator::make_allocator;
+use chia_consensus::build_compressed_block::BlockBuilder;
 use chia_consensus::consensus_constants::ConsensusConstants;
-use chia_consensus::gen::build_compressed_block::BlockBuilder;
-use chia_consensus::gen::flags::{
-    DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
+use chia_consensus::flags::{
+    COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
 };
-use chia_consensus::gen::owned_conditions::{OwnedSpendBundleConditions, OwnedSpendConditions};
-use chia_consensus::gen::run_block_generator::setup_generator_args;
-use chia_consensus::gen::solution_generator::solution_generator as native_solution_generator;
-use chia_consensus::gen::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
 use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
+use chia_consensus::owned_conditions::{OwnedSpendBundleConditions, OwnedSpendConditions};
+use chia_consensus::run_block_generator::setup_generator_args;
+use chia_consensus::solution_generator::solution_generator as native_solution_generator;
+use chia_consensus::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
 use chia_consensus::spendbundle_conditions::get_conditions_from_spendbundle;
 use chia_consensus::spendbundle_validation::{
     get_flags_for_height_and_constants, validate_clvm_and_signature,
 };
 use chia_protocol::{
-    py_calculate_ip_iters, py_calculate_sp_interval_iters, py_calculate_sp_iters,
-    py_expected_plot_size, py_is_overflow_block,
+    calculate_ip_iters, calculate_sp_interval_iters, calculate_sp_iters, is_overflow_block,
+    py_expected_plot_size,
 };
 use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
@@ -67,8 +67,8 @@ use std::iter::zip;
 use crate::run_program::{run_chia_program, serialized_length};
 
 use chia_consensus::fast_forward::fast_forward_singleton as native_ff;
-use chia_consensus::gen::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
-use chia_consensus::gen::validation_error::ValidationErr;
+use chia_consensus::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
+use chia_consensus::validation_error::ValidationErr;
 use clvmr::allocator::NodePtr;
 use clvmr::cost::Cost;
 use clvmr::reduction::EvalErr;
@@ -425,7 +425,7 @@ pub fn py_get_conditions_from_spendbundle(
     height: u32,
 ) -> PyResult<OwnedSpendBundleConditions> {
     use chia_consensus::allocator::make_allocator;
-    use chia_consensus::gen::owned_conditions::OwnedSpendBundleConditions;
+    use chia_consensus::owned_conditions::OwnedSpendBundleConditions;
     let mut a = make_allocator(LIMIT_HEAP);
     let conditions =
         get_conditions_from_spendbundle(&mut a, spend_bundle, max_cost, height, constants)
@@ -442,6 +442,61 @@ pub fn py_get_flags_for_height_and_constants(height: u32, constants: &ConsensusC
     get_flags_for_height_and_constants(height, constants)
 }
 
+#[pyo3::pyfunction]
+#[pyo3(name = "is_overflow_block")]
+pub fn py_is_overflow_block(
+    constants: &ConsensusConstants,
+    signage_point_index: u8,
+) -> pyo3::PyResult<bool> {
+    Ok(is_overflow_block(
+        constants.num_sps_sub_slot,
+        constants.num_sp_intervals_extra,
+        signage_point_index,
+    )?)
+}
+
+#[pyo3::pyfunction]
+#[pyo3(name = "calculate_sp_interval_iters")]
+pub fn py_calculate_sp_interval_iters(
+    constants: &ConsensusConstants,
+    sub_slot_iters: u64,
+) -> pyo3::PyResult<u64> {
+    Ok(calculate_sp_interval_iters(
+        constants.num_sps_sub_slot,
+        sub_slot_iters,
+    )?)
+}
+
+#[pyo3::pyfunction]
+#[pyo3(name = "calculate_sp_iters")]
+pub fn py_calculate_sp_iters(
+    constants: &ConsensusConstants,
+    sub_slot_iters: u64,
+    signage_point_index: u8,
+) -> pyo3::PyResult<u64> {
+    Ok(calculate_sp_iters(
+        constants.num_sps_sub_slot,
+        sub_slot_iters,
+        signage_point_index,
+    )?)
+}
+
+#[pyo3::pyfunction]
+#[pyo3(name = "calculate_ip_iters")]
+pub fn py_calculate_ip_iters(
+    constants: &ConsensusConstants,
+    sub_slot_iters: u64,
+    signage_point_index: u8,
+    required_iters: u64,
+) -> pyo3::PyResult<u64> {
+    Ok(calculate_ip_iters(
+        constants.num_sps_sub_slot,
+        constants.num_sp_intervals_extra,
+        sub_slot_iters,
+        signage_point_index,
+        required_iters,
+    )?)
+}
 #[pymodule]
 pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // generator functions
@@ -456,11 +511,11 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<BlockBuilder>()?;
     m.add(
         "ELIGIBLE_FOR_DEDUP",
-        chia_consensus::gen::conditions::ELIGIBLE_FOR_DEDUP,
+        chia_consensus::conditions::ELIGIBLE_FOR_DEDUP,
     )?;
     m.add(
         "ELIGIBLE_FOR_FF",
-        chia_consensus::gen::conditions::ELIGIBLE_FOR_FF,
+        chia_consensus::conditions::ELIGIBLE_FOR_FF,
     )?;
     m.add_class::<OwnedSpendConditions>()?;
 
@@ -489,6 +544,7 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("STRICT_ARGS_COUNT", STRICT_ARGS_COUNT)?;
     m.add("MEMPOOL_MODE", MEMPOOL_MODE)?;
     m.add("DONT_VALIDATE_SIGNATURE", DONT_VALIDATE_SIGNATURE)?;
+    m.add("COST_CONDITIONS", COST_CONDITIONS)?;
 
     // for backwards compatibility
     m.add("ALLOW_BACKREFS", 0)?;
