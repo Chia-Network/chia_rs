@@ -15,11 +15,13 @@ use clvmr::serde::{
 use clvmr::{Allocator, ChiaDialect};
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
+#[cfg(feature = "py-bindings")]
 use pyo3::types::PyBytes;
 #[cfg(feature = "py-bindings")]
 use pyo3::types::PyType;
 use std::io::Cursor;
 use std::ops::Deref;
+#[cfg(feature = "py-bindings")]
 use std::rc::Rc;
 
 #[cfg_attr(feature = "py-bindings", pyclass(subclass), derive(PyStreamable))]
