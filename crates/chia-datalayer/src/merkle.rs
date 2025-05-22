@@ -943,7 +943,6 @@ impl DeltaFileCache {
     }
 }
 
-
 #[cfg_attr(feature = "py-bindings", pyclass)]
 pub struct DeltaReader {
     nodes: NodeHashToDeltaReaderNode,
@@ -2525,7 +2524,6 @@ impl DeltaFileCache {
         self.previous_hashes.contains(hash)
     }
 }
-
 
 struct MerkleBlobLeftChildFirstIteratorItem {
     visited: bool,
