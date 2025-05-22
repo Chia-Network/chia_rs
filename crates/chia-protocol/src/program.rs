@@ -1,4 +1,5 @@
 use crate::bytes::Bytes;
+#[cfg(feature = "py-bindings")]
 use crate::LazyNode;
 use chia_sha2::Sha256;
 use chia_traits::chia_error::{Error, Result};
