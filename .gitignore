@@ -12,3 +12,4 @@ crates/chia-consensus/fuzz/corpus
 crates/chia-protocol/fuzz/corpus
 crates/chia-traits/fuzz/corpus
 crates/chia-utils/fuzz/corpus
+*.png

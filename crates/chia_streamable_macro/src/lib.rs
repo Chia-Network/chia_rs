@@ -26,6 +26,7 @@ pub fn streamable(attr: TokenStream, item: TokenStream) -> TokenStream {
     let is_message = &attr.to_string() == "message";
     let is_subclass = &attr.to_string() == "subclass";
     let no_serde = &attr.to_string() == "no_serde";
+    let no_json = &attr.to_string() == "no_json";
 
     let mut input: DeriveInput = parse_macro_input!(item);
     let name = input.ident.clone();
@@ -112,14 +113,22 @@ pub fn streamable(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
         };
 
+        let json_dict = if no_json {
+            TokenStream2::default()
+        } else {
+            quote! {
+                #[cfg_attr(feature = "py-bindings", derive(chia_py_streamable_macro::PyJsonDict))]
+            }
+        };
+
         quote! {
             #[cfg_attr(
                 feature = "py-bindings", pyo3::pyclass(#class_attrs), derive(
-                    chia_py_streamable_macro::PyJsonDict,
                     chia_py_streamable_macro::PyStreamable,
                     chia_py_streamable_macro::PyGetters
                 )
             )]
+            #json_dict
             #main_derives
             #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
             #serde

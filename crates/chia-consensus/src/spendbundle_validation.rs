@@ -1,12 +1,14 @@
 use crate::allocator::make_allocator;
 use crate::consensus_constants::ConsensusConstants;
-use crate::gen::owned_conditions::OwnedSpendBundleConditions;
-use crate::gen::validation_error::ErrorCode;
+use crate::flags::COST_CONDITIONS;
+use crate::owned_conditions::OwnedSpendBundleConditions;
 use crate::spendbundle_conditions::run_spendbundle;
+use crate::validation_error::ErrorCode;
 use chia_bls::GTElement;
 use chia_bls::{aggregate_verify_gt, hash_to_g2};
 use chia_protocol::SpendBundle;
 use chia_sha2::Sha256;
+use clvmr::chia_dialect::ENABLE_KECCAK_OPS_OUTSIDE_GUARD;
 use clvmr::LIMIT_HEAP;
 use std::time::{Duration, Instant};
 
@@ -57,7 +59,7 @@ pub fn validate_clvm_and_signature(
     Ok((conditions, pairs, start_time.elapsed()))
 }
 
-pub fn get_flags_for_height_and_constants(_height: u32, _constants: &ConsensusConstants) -> u32 {
+pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusConstants) -> u32 {
     //  the hard-fork initiated with 2.0. To activate June 2024
     //  * costs are ascribed to some unknown condition codes, to allow for
     // soft-forking in new conditions with cost
@@ -77,15 +79,20 @@ pub fn get_flags_for_height_and_constants(_height: u32, _constants: &ConsensusCo
     // Adds a new keccak256 operator under the softfork guard with extension 1.
     // This operator can be hard forked in later, but is not included in a hard fork yet.
 
-    0
+    // In hard fork 2, we enable the keccak operator outside the softfork guard
+    let mut flags: u32 = 0;
+    if height >= constants.hard_fork2_height {
+        flags |= ENABLE_KECCAK_OPS_OUTSIDE_GUARD | COST_CONDITIONS;
+    }
+    flags
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::consensus_constants::TEST_CONSTANTS;
-    use crate::gen::make_aggsig_final_message::u64_to_bytes;
-    use crate::gen::opcodes::{
+    use crate::make_aggsig_final_message::u64_to_bytes;
+    use crate::opcodes::{
         ConditionOpcode, AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT,
         AGG_SIG_PARENT_PUZZLE, AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT, AGG_SIG_UNSAFE,
     };
