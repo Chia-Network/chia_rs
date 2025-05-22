@@ -1,4 +1,5 @@
 use crate::bytes::Bytes;
+use crate::LazyNode;
 use chia_sha2::Sha256;
 use chia_traits::chia_error::{Error, Result};
 use chia_traits::Streamable;
@@ -14,10 +15,12 @@ use clvmr::serde::{
 use clvmr::{Allocator, ChiaDialect};
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
+use pyo3::types::PyBytes;
 #[cfg(feature = "py-bindings")]
 use pyo3::types::PyType;
 use std::io::Cursor;
 use std::ops::Deref;
+use std::rc::Rc;
 
 #[cfg_attr(feature = "py-bindings", pyclass(subclass), derive(PyStreamable))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -245,6 +248,52 @@ fn clvm_convert(a: &mut Allocator, o: &Bound<'_, PyAny>) -> PyResult<NodePtr> {
 }
 
 #[cfg(feature = "py-bindings")]
+fn clvm_serialize(a: &mut Allocator, o: &Bound<'_, PyAny>) -> PyResult<NodePtr> {
+    /*
+    When passing arguments to run(), there's some special treatment, before falling
+    back on the regular python -> CLVM conversion (implemented by clvm_convert
+    above). This function mimics the _serialize() function in python:
+
+       def _serialize(node: object) -> bytes:
+           if isinstance(node, list):
+               serialized_list = bytearray()
+               for a in node:
+                   serialized_list += b"\xff"
+                   serialized_list += _serialize(a)
+               serialized_list += b"\x80"
+               return bytes(serialized_list)
+           if type(node) is SerializedProgram:
+               return bytes(node)
+           if type(node) is Program:
+               return bytes(node)
+           else:
+               ret: bytes = SExp.to(node).as_bin()
+               return ret
+    */
+
+    // List
+    if let Ok(list) = o.downcast::<PyList>() {
+        let mut rev = Vec::new();
+        for py_item in list.iter() {
+            rev.push(py_item);
+        }
+        let mut ret = a.nil();
+        for py_item in rev.into_iter().rev() {
+            let item = clvm_serialize(a, &py_item)?;
+            ret = a
+                .new_pair(item, ret)
+                .map_err(|e| PyMemoryError::new_err(e.to_string()))?;
+        }
+        Ok(ret)
+    // Program itself
+    } else if let Ok(prg) = o.extract::<Program>() {
+        Ok(node_from_bytes_backrefs(a, prg.0.as_slice())?)
+    } else {
+        clvm_convert(a, o)
+    }
+}
+
+#[cfg(feature = "py-bindings")]
 #[allow(clippy::needless_pass_by_value)]
 #[pymethods]
 impl Program {
@@ -277,6 +326,88 @@ impl Program {
             &h[..]
         };
         Self::from_bytes(hex::decode(s).map_err(|_| Error::InvalidString)?.as_slice())
+    }
+
+    // exposed to python so allowing use of the python private indicator leading underscore
+    fn _run_to_bytes<'a>(
+        &self,
+        py: Python<'a>,
+        max_cost: u64,
+        flags: u32,
+        args: &Bound<'_, PyAny>,
+    ) -> PyResult<(u64, Bound<'a, PyBytes>)> {
+        use clvmr::reduction::Response;
+
+        let mut a = Allocator::new_limited(500_000_000);
+        // The python behavior here is a bit messy, and is best not emulated
+        // on the rust side. We must be able to pass a Program as an argument,
+        // and it being treated as the CLVM structure it represents. In python's
+        // SerializedProgram, we have a hack where we interpret the first
+        // "layer" of SerializedProgram, or lists of SerializedProgram this way.
+        // But if we encounter an Optional or tuple, we defer to the clvm
+        // wheel's conversion function to SExp. This level does not have any
+        // special treatment for SerializedProgram (as that would cause a
+        // circular dependency).
+        let clvm_args = clvm_serialize(&mut a, args)?;
+
+        let r: Response = (|| -> PyResult<Response> {
+            let program = node_from_bytes_backrefs(&mut a, self.0.as_ref())?;
+            let dialect = ChiaDialect::new(flags);
+
+            Ok(py.allow_threads(|| run_program(&mut a, &dialect, program, clvm_args, max_cost)))
+        })()?;
+        match r {
+            Ok(reduction) => {
+                let Ok(bytes) = node_to_bytes(&a, reduction.1) else {
+                    return Err(PyValueError::new_err("failed to convert to bytes"));
+                };
+                Ok((reduction.0, PyBytes::new(py, &bytes)))
+            }
+            Err(eval_err) => {
+                let blob = node_to_bytes(&a, eval_err.0).ok().map(hex::encode);
+                Err(PyValueError::new_err((eval_err.1, blob)))
+            }
+        }
+    }
+
+    // exposed to python so allowing use of the python private indicator leading underscore
+    fn _run_to_lazynode(
+        &self,
+        py: Python<'_>,
+        max_cost: u64,
+        flags: u32,
+        args: &Bound<'_, PyAny>,
+    ) -> PyResult<(u64, LazyNode)> {
+        use clvmr::reduction::Response;
+
+        let mut a = Allocator::new_limited(500_000_000);
+        // The python behavior here is a bit messy, and is best not emulated
+        // on the rust side. We must be able to pass a Program as an argument,
+        // and it being treated as the CLVM structure it represents. In python's
+        // SerializedProgram, we have a hack where we interpret the first
+        // "layer" of SerializedProgram, or lists of SerializedProgram this way.
+        // But if we encounter an Optional or tuple, we defer to the clvm
+        // wheel's conversion function to SExp. This level does not have any
+        // special treatment for SerializedProgram (as that would cause a
+        // circular dependency).
+        let clvm_args = clvm_serialize(&mut a, args)?;
+
+        let r: Response = (|| -> PyResult<Response> {
+            let program = node_from_bytes_backrefs(&mut a, self.0.as_ref())?;
+            let dialect = ChiaDialect::new(flags);
+
+            Ok(py.allow_threads(|| run_program(&mut a, &dialect, program, clvm_args, max_cost)))
+        })()?;
+        match r {
+            Ok(reduction) => {
+                let val = LazyNode::new(Rc::new(a), reduction.1);
+                Ok((reduction.0, val))
+            }
+            Err(eval_err) => {
+                let blob = node_to_bytes(&a, eval_err.0).ok().map(hex::encode);
+                Err(PyValueError::new_err((eval_err.1, blob)))
+            }
+        }
     }
 }
 
