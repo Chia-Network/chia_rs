@@ -2517,14 +2517,14 @@ impl DeltaFileCache {
     #[pyo3(name = "get_index")]
     pub fn py_get_index(&self, hash: Hash) -> PyResult<TreeIndex> {
         self.hash_to_index
-            .get(hash)
+            .get(&hash)
             .copied()
             .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("Hash not found"))
     }
 
     #[pyo3(name = "seen_previous_hash")]
     pub fn py_seen_previous_hash(&self, hash: Hash) -> bool {
-        self.previous_hashes.contains(hash)
+        self.previous_hashes.contains(&hash)
     }
 }
 
