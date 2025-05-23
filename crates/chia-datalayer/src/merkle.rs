@@ -829,11 +829,13 @@ impl BlockStatusCache {
 
     fn move_index(&mut self, source: TreeIndex, destination: TreeIndex) -> Result<(), Error> {
         // to be called _after_ having written to the destination index
+        // TODO: not checking it is within bounds of the present blob
         if self.free_indexes.contains(&source) {
             return Err(Error::MoveSourceIndexNotInUse(source));
         };
+        // TODO: not checking it is within bounds of the present blob
         if self.free_indexes.contains(&destination) {
-            return Err(Error::MoveDestinationIndexNotInUse(source));
+            return Err(Error::MoveDestinationIndexNotInUse(destination));
         };
 
         self.free_indexes.insert(source);
@@ -2792,6 +2794,7 @@ mod tests {
             )
             .unwrap();
 
+        small_blob.calculate_lazy_hashes().unwrap();
         small_blob
     }
 
@@ -3342,7 +3345,7 @@ mod tests {
                     1,
                     6,
                     Hash(
-                        326ab98d7766e8a48e3ad28d1667cff22d294f741ce4bbc386a761658ae1c36d,
+                        547b5bd537270427e570df6e43dda7c4ef23e6c3bec72cf19d912c3fe864f549,
                     ),
                 ),
                 (
@@ -3360,7 +3363,7 @@ mod tests {
                     4,
                     2,
                     Hash(
-                        343384ed794d339da6c1ff33cc59d48b5f48494d92d9d4bd6c00147304bb2371,
+                        cc7f12227cc5d96a631963804544872d67aef8b3a86ef9fbc798f7c5dfdbac2b,
                     ),
                 ),
             ]
@@ -3379,7 +3382,7 @@ mod tests {
                     4,
                     2,
                     Hash(
-                        343384ed794d339da6c1ff33cc59d48b5f48494d92d9d4bd6c00147304bb2371,
+                        cc7f12227cc5d96a631963804544872d67aef8b3a86ef9fbc798f7c5dfdbac2b,
                     ),
                 ),
                 (
@@ -3388,7 +3391,7 @@ mod tests {
                     1,
                     6,
                     Hash(
-                        326ab98d7766e8a48e3ad28d1667cff22d294f741ce4bbc386a761658ae1c36d,
+                        547b5bd537270427e570df6e43dda7c4ef23e6c3bec72cf19d912c3fe864f549,
                     ),
                 ),
                 (
@@ -3660,6 +3663,14 @@ mod tests {
     }
 
     #[rstest]
+    fn test_proof_of_inclusion_invalid_identified(traversal_blob: MerkleBlob) {
+        let mut proof_of_inclusion = traversal_blob.get_proof_of_inclusion(KeyId(307)).unwrap();
+        assert!(proof_of_inclusion.valid());
+        proof_of_inclusion.layers[1].combined_hash = HASH_ONE;
+        assert!(!proof_of_inclusion.valid());
+    }
+
+    #[rstest]
     fn test_writing_to_free_block_that_contained_an_active_key(small_blob: MerkleBlob) {
         let key = KeyId(0x0001_0203_0405_0607);
         let Some(index) = small_blob.block_status_cache.get_index_by_key(key).copied() else {
@@ -3823,6 +3834,17 @@ mod tests {
             {}
         "#]];
         expected.assert_debug_eq(&missing);
+    }
+
+    #[rstest]
+    fn test_merkle_blob_to_from_path(traversal_blob: MerkleBlob) {
+        let dir_path = tempfile::tempdir().unwrap();
+        let file_path = dir_path.path().join("blob");
+        traversal_blob.to_path(&file_path).unwrap();
+        let loaded = MerkleBlob::from_path(&file_path).unwrap();
+
+        assert_eq!(traversal_blob, loaded);
+        assert_eq!(traversal_blob.blob, loaded.blob);
     }
 
     #[test]
@@ -3991,5 +4013,55 @@ mod tests {
         let key = KeyId(0x0001_0203_0405_0607);
         let index = small_blob.get_key_index(key).unwrap();
         assert_eq!(index, TreeIndex(2));
+    }
+
+    #[rstest]
+    fn test_block_status_cache_move_index_invalid_source(mut traversal_blob: MerkleBlob) {
+        let key = KeyId(307);
+        let index = traversal_blob.get_key_index(key).unwrap();
+        traversal_blob.delete(key).unwrap();
+        assert!(traversal_blob
+            .block_status_cache
+            .free_indexes
+            .contains(&index));
+        let result = traversal_blob.block_status_cache.move_index(index, index);
+        #[allow(clippy::needless_raw_string_hashes)]
+        let expected = expect![[r#"
+            Err(
+                MoveSourceIndexNotInUse(
+                    TreeIndex(
+                        5,
+                    ),
+                ),
+            )
+        "#]];
+
+        expected.assert_debug_eq(&result);
+    }
+
+    #[rstest]
+    fn test_block_status_cache_move_index_invalid_destination(mut traversal_blob: MerkleBlob) {
+        let key = KeyId(307);
+        let index = traversal_blob.get_key_index(key).unwrap();
+        traversal_blob.delete(key).unwrap();
+        assert!(traversal_blob
+            .block_status_cache
+            .free_indexes
+            .contains(&index));
+        let result = traversal_blob
+            .block_status_cache
+            .move_index(TreeIndex(0), index);
+        #[allow(clippy::needless_raw_string_hashes)]
+        let expected = expect![[r#"
+            Err(
+                MoveDestinationIndexNotInUse(
+                    TreeIndex(
+                        5,
+                    ),
+                ),
+            )
+        "#]];
+
+        expected.assert_debug_eq(&result);
     }
 }
