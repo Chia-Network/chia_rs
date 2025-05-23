@@ -19,8 +19,6 @@ use clvmr::{Allocator, ChiaDialect};
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
 #[cfg(feature = "py-bindings")]
-use pyo3::types::PyBytes;
-#[cfg(feature = "py-bindings")]
 use pyo3::types::PyType;
 use std::io::Cursor;
 use std::ops::Deref;
@@ -331,48 +329,6 @@ impl Program {
             &h[..]
         };
         Self::from_bytes(hex::decode(s).map_err(|_| Error::InvalidString)?.as_slice())
-    }
-
-    // exposed to python so allowing use of the python private indicator leading underscore
-    fn _run_to_bytes<'a>(
-        &self,
-        py: Python<'a>,
-        max_cost: u64,
-        flags: u32,
-        args: &Bound<'_, PyAny>,
-    ) -> PyResult<(u64, Bound<'a, PyBytes>)> {
-        use clvmr::reduction::Response;
-
-        let mut a = Allocator::new_limited(500_000_000);
-        // The python behavior here is a bit messy, and is best not emulated
-        // on the rust side. We must be able to pass a Program as an argument,
-        // and it being treated as the CLVM structure it represents. In python's
-        // SerializedProgram, we have a hack where we interpret the first
-        // "layer" of SerializedProgram, or lists of SerializedProgram this way.
-        // But if we encounter an Optional or tuple, we defer to the clvm
-        // wheel's conversion function to SExp. This level does not have any
-        // special treatment for SerializedProgram (as that would cause a
-        // circular dependency).
-        let clvm_args = clvm_serialize(&mut a, args)?;
-
-        let r: Response = (|| -> PyResult<Response> {
-            let program = node_from_bytes_backrefs(&mut a, self.0.as_ref())?;
-            let dialect = ChiaDialect::new(flags);
-
-            Ok(py.allow_threads(|| run_program(&mut a, &dialect, program, clvm_args, max_cost)))
-        })()?;
-        match r {
-            Ok(reduction) => {
-                let Ok(bytes) = node_to_bytes(&a, reduction.1) else {
-                    return Err(PyValueError::new_err("failed to convert to bytes"));
-                };
-                Ok((reduction.0, PyBytes::new(py, &bytes)))
-            }
-            Err(eval_err) => {
-                let blob = node_to_bytes(&a, eval_err.0).ok().map(hex::encode);
-                Err(PyValueError::new_err((eval_err.1, blob)))
-            }
-        }
     }
 
     // exposed to python so allowing use of the python private indicator leading underscore

@@ -229,7 +229,6 @@ extra_members = {
         "@staticmethod\n    def default() -> Program: ...",
         "@staticmethod\n    def fromhex(h: str) -> Program: ...",
         "@staticmethod\n    def to(o: object) -> Program: ...",
-        "def _run_to_bytes(self, max_cost: int, flags: int, args: object) -> tuple[int, bytes]: ...",
         "def _run_to_lazynode(self, max_cost: int, flags: int, args: object) -> tuple[int, LazyNode]: ...",
         "def uncurry_to_lazynode(self) -> tuple[LazyNode, LazyNode]: ...",
     ],
