@@ -13,6 +13,7 @@ def test_raise() -> None:
     except ValueError as e:
         assert f"{e}" == "('clvm raise', '86666f6f626172')"
 
+
 def test_raise_program() -> None:
     try:
         # (x (q . "foobar"))
@@ -23,6 +24,7 @@ def test_raise_program() -> None:
         assert False
     except ValueError as e:
         assert f"{e}" == "('clvm raise', '86666f6f626172')"
+
 
 def test_repr() -> None:
     temp = Program.to([8, (1, "foo")])
