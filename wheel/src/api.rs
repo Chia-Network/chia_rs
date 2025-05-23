@@ -74,8 +74,10 @@ use clvmr::cost::Cost;
 use clvmr::reduction::EvalErr;
 use clvmr::reduction::Reduction;
 use clvmr::run_program;
-use clvmr::serde::node_to_bytes;
-use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs, node_from_bytes_backrefs_record};
+use clvmr::serde::is_canonical_serialization;
+use clvmr::serde::{
+    node_from_bytes, node_from_bytes_backrefs, node_from_bytes_backrefs_record, node_to_bytes,
+};
 use clvmr::ChiaDialect;
 
 use chia_bls::{
@@ -497,6 +499,13 @@ pub fn py_calculate_ip_iters(
         required_iters,
     )?)
 }
+
+#[pyo3::pyfunction]
+#[pyo3(name = "is_canonical_serialization")]
+pub fn py_is_canonical_serialization(buf: &[u8]) -> bool {
+    is_canonical_serialization(buf)
+}
+
 #[pymodule]
 pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // generator functions
@@ -525,6 +534,9 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_calculate_ip_iters, m)?)?;
     m.add_function(wrap_pyfunction!(py_is_overflow_block, m)?)?;
     m.add_function(wrap_pyfunction!(py_expected_plot_size, m)?)?;
+
+    // CLVM validation
+    m.add_function(wrap_pyfunction!(py_is_canonical_serialization, m)?)?;
 
     // constants
     m.add_class::<ConsensusConstants>()?;
