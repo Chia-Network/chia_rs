@@ -6,7 +6,7 @@ import itertools
 from dataclasses import dataclass
 from enum import Enum
 from random import Random
-from typing import Generic, TypeVar, Union, final
+from typing import Generic, TypeVar, Union, final, Protocol
 
 import pytest
 
@@ -486,3 +486,44 @@ def test_get_nodes() -> None:
         seen_indexes.add(index)
 
     assert keys == seen_keys
+
+
+T = TypeVar("T")
+U = TypeVar("U")
+class CT(Protocol[T, U]):
+    def __new__(self, _arg: U) -> T: ...
+
+@dataclass
+class SimpleTypeInstancesCase(Generic[T, U]):
+    type: type[T]
+    value: U
+    fail: bool = False
+
+@pytest.mark.parametrize(
+    argnames="case",
+    argvalues=[
+        SimpleTypeInstancesCase(TreeIndex, -1, fail=True),
+        SimpleTypeInstancesCase(TreeIndex, 0),
+        SimpleTypeInstancesCase(TreeIndex, 2**32 - 1),
+        SimpleTypeInstancesCase(TreeIndex, 2**32, fail=True),
+#         Case(Parent, None),
+#         Case(Parent, TreeIndex(0)),
+        *(
+            case
+            for type_ in [KeyId, ValueId]
+            for case in [
+                    SimpleTypeInstancesCase(type_, -(2**63) - 1, fail=True),
+                    SimpleTypeInstancesCase(type_, -(2**63)),
+                    SimpleTypeInstancesCase(type_, 2**63 - 1),
+                    SimpleTypeInstancesCase(type_, 2**63, fail=True),
+            ]
+        ),
+    ],
+    ids=lambda case: f"{case.type.__name__} - {case.value}" + (" - fail" if case.fail else ""),
+)
+def test_simple_type_instances(case: SimpleTypeInstancesCase) -> None:
+    if case.fail:
+        with pytest.raises(Exception):
+            instance = case.type(case.value)
+    else:
+        instance = case.type(case.value)
