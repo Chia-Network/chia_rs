@@ -930,6 +930,13 @@ pub struct DeltaFileCache {
 }
 
 impl DeltaFileCache {
+    pub fn new() -> Self {
+        Self {
+            hash_to_index: NodeHashToIndex::new(),
+            previous_hashes: HashesDictionary::new(),
+        }
+    }
+
     pub fn load_hash_to_index(&mut self, path: &PathBuf) -> Result<(), Error> {
         let blob = MerkleBlob::from_path(path)?;
         self.hash_to_index = blob.get_hashes_indexes(false)?;
@@ -2500,11 +2507,8 @@ pub fn get_internal_terminal(
 #[pymethods]
 impl DeltaFileCache {
     #[new]
-    pub fn new() -> Self {
-        Self {
-            hash_to_index: NodeHashToIndex::new(),
-            previous_hashes: HashesDictionary::new(),
-        }
+    fn py_new() -> Self {
+        Self::new()
     }
 
     #[allow(clippy::needless_pass_by_value)]
