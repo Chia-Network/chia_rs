@@ -33,7 +33,6 @@ zstd = { workspace = true }
 clvm-utils = { workspace = true }
 expect-test = { workspace = true }
 hex = { workspace = true }
-hex-literal = { workspace = true }
 open = { workspace = true }
 percent-encoding = { workspace = true }
 rand = { workspace = true }
