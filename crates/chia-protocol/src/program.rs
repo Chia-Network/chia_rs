@@ -415,7 +415,7 @@ impl Program {
         }
     }
 
-    fn uncurry_to_lazynode<'a>(&self) -> PyResult<(LazyNode, LazyNode)> {
+    fn uncurry_to_lazynode(&self) -> PyResult<(LazyNode, LazyNode)> {
         use clvm_utils::CurriedProgram;
         use std::rc::Rc;
 
