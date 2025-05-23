@@ -229,8 +229,8 @@ extra_members = {
         "@staticmethod\n    def default() -> Program: ...",
         "@staticmethod\n    def fromhex(h: str) -> Program: ...",
         "@staticmethod\n    def to(o: object) -> Program: ...",
-        "def _run_to_lazynode(self, max_cost: int, flags: int, args: object) -> tuple[int, LazyNode]: ...",
-        "def uncurry_to_lazynode(self) -> tuple[LazyNode, LazyNode]: ...",
+        "def run_rust(self, max_cost: int, flags: int, args: object) -> tuple[int, LazyNode]: ...",
+        "def uncurry_rust(self) -> tuple[LazyNode, LazyNode]: ...",
     ],
     "SpendBundle": [
         "@classmethod\n    def aggregate(cls, spend_bundles: list[SpendBundle]) -> Self: ...",

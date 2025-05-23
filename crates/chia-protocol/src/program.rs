@@ -331,8 +331,7 @@ impl Program {
         Self::from_bytes(hex::decode(s).map_err(|_| Error::InvalidString)?.as_slice())
     }
 
-    // exposed to python so allowing use of the python private indicator leading underscore
-    fn _run_to_lazynode(
+    fn run_rust(
         &self,
         py: Python<'_>,
         max_cost: u64,
@@ -371,7 +370,7 @@ impl Program {
         }
     }
 
-    fn uncurry_to_lazynode(&self) -> PyResult<(LazyNode, LazyNode)> {
+    fn uncurry_rust(&self) -> PyResult<(LazyNode, LazyNode)> {
         use clvm_utils::CurriedProgram;
         use std::rc::Rc;
 
