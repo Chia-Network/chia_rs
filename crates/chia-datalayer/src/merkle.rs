@@ -843,6 +843,7 @@ impl BlockStatusCache {
 }
 
 type NodeHashToIndex = HashMap<Hash, TreeIndex>;
+type HashesDictionary = HashSet<Hash>;
 type NodeHashToDeltaReaderNode = HashMap<Hash, DeltaReaderNode>;
 
 pub fn collect_and_return_from_merkle_blob(
@@ -920,6 +921,39 @@ type LeafNodesMap = HashMap<Hash, (KeyId, ValueId)>;
 pub enum DeltaReaderNode {
     Internal { left: Hash, right: Hash },
     Leaf { key: KeyId, value: ValueId },
+}
+
+#[cfg_attr(feature = "py-bindings", pyclass)]
+pub struct DeltaFileCache {
+    hash_to_index: NodeHashToIndex,
+    previous_hashes: HashesDictionary,
+}
+
+impl DeltaFileCache {
+    pub fn new() -> Self {
+        Self {
+            hash_to_index: NodeHashToIndex::new(),
+            previous_hashes: HashesDictionary::new(),
+        }
+    }
+
+    pub fn load_hash_to_index(&mut self, path: &PathBuf) -> Result<(), Error> {
+        let blob = MerkleBlob::from_path(path)?;
+        self.hash_to_index = blob.get_hashes_indexes(false)?;
+        Ok(())
+    }
+
+    pub fn load_previous_hashes(&mut self, path: &PathBuf) -> Result<(), Error> {
+        let blob = MerkleBlob::from_path(path)?;
+        self.previous_hashes = blob.get_hashes()?;
+        Ok(())
+    }
+}
+
+impl Default for DeltaFileCache {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg_attr(feature = "py-bindings", pyclass)]
@@ -2012,6 +2046,21 @@ impl MerkleBlob {
         Ok((node.key, node.value))
     }
 
+    pub fn get_hashes(&self) -> Result<HashesDictionary, Error> {
+        let mut hashes = HashesDictionary::new();
+
+        if self.blob.is_empty() {
+            return Ok(hashes);
+        }
+
+        for item in MerkleBlobParentFirstIterator::new(&self.blob, None) {
+            let (_, block) = item?;
+            hashes.insert(block.node.hash());
+        }
+
+        Ok(hashes)
+    }
+
     pub fn get_hashes_indexes(&self, leafs_only: bool) -> Result<HashMap<Hash, TreeIndex>, Error> {
         let mut hash_to_index = HashMap::new();
 
@@ -2452,6 +2501,42 @@ pub fn get_internal_terminal(
     }
 
     Ok(nodes)
+}
+
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+impl DeltaFileCache {
+    #[new]
+    fn py_new() -> Self {
+        Self::new()
+    }
+
+    #[allow(clippy::needless_pass_by_value)]
+    #[pyo3(name = "load_hash_to_index")]
+    pub fn py_load_hash_to_index(&mut self, py: Python<'_>, path: PyObject) -> PyResult<()> {
+        let path: PathBuf = path.extract(py)?;
+        Ok(self.load_hash_to_index(&path)?)
+    }
+
+    #[allow(clippy::needless_pass_by_value)]
+    #[pyo3(name = "load_previous_hashes")]
+    pub fn py_load_previous_hashes(&mut self, py: Python<'_>, path: PyObject) -> PyResult<()> {
+        let path: PathBuf = path.extract(py)?;
+        Ok(self.load_previous_hashes(&path)?)
+    }
+
+    #[pyo3(name = "get_index")]
+    pub fn py_get_index(&self, hash: Hash) -> PyResult<TreeIndex> {
+        self.hash_to_index
+            .get(&hash)
+            .copied()
+            .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("Hash not found"))
+    }
+
+    #[pyo3(name = "seen_previous_hash")]
+    pub fn py_seen_previous_hash(&self, hash: Hash) -> bool {
+        self.previous_hashes.contains(&hash)
+    }
 }
 
 struct MerkleBlobLeftChildFirstIteratorItem {
