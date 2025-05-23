@@ -13,6 +13,8 @@ use clvmr::serde::{
     node_from_bytes, node_from_bytes_backrefs, node_to_bytes, serialized_length_from_bytes,
     serialized_length_from_bytes_trusted,
 };
+#[cfg(feature = "py-bindings")]
+use clvmr::SExp;
 use clvmr::{Allocator, ChiaDialect};
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
@@ -411,6 +413,47 @@ impl Program {
                 Err(PyValueError::new_err((eval_err.1, blob)))
             }
         }
+    }
+
+    fn uncurry_to_lazynode<'a>(&self) -> PyResult<(LazyNode, LazyNode)> {
+        use clvm_utils::CurriedProgram;
+        use std::rc::Rc;
+
+        let mut a = Allocator::new_limited(500_000_000);
+        let prg = node_from_bytes_backrefs(&mut a, self.0.as_ref())?;
+        let Ok(uncurried) = CurriedProgram::<NodePtr, NodePtr>::from_clvm(&a, prg) else {
+            let a = Rc::new(a);
+            let prg = LazyNode::new(a.clone(), prg);
+            let ret = a.nil();
+            let ret = LazyNode::new(a, ret);
+            return Ok((prg, ret));
+        };
+
+        let mut curried_args = Vec::<NodePtr>::new();
+        let mut args = uncurried.args;
+        loop {
+            if let SExp::Atom = a.sexp(args) {
+                break;
+            }
+            // the args of curried puzzles are in the form of:
+            // (c . ((q . <arg1>) . (<rest> . ())))
+            let (_, ((_, arg), (rest, ()))) =
+                <(
+                    clvm_traits::MatchByte<4>,
+                    (clvm_traits::match_quote!(NodePtr), (NodePtr, ())),
+                ) as FromClvm<Allocator>>::from_clvm(&a, args)
+                .map_err(|error| PyErr::new::<PyTypeError, _>(error.to_string()))?;
+            curried_args.push(arg);
+            args = rest;
+        }
+        let mut ret = a.nil();
+        for item in curried_args.into_iter().rev() {
+            ret = a.new_pair(item, ret).map_err(|_e| Error::EndOfBuffer)?;
+        }
+        let a = Rc::new(a);
+        let prg = LazyNode::new(a.clone(), uncurried.program);
+        let ret = LazyNode::new(a, ret);
+        Ok((prg, ret))
     }
 }
 
