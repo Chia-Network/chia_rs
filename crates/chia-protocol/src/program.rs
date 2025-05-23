@@ -25,6 +25,9 @@ use std::ops::Deref;
 #[cfg(feature = "py-bindings")]
 use std::rc::Rc;
 
+#[cfg(feature = "py-bindings")]
+use clvm_utils::CurriedProgram;
+
 #[cfg_attr(feature = "py-bindings", pyclass(subclass), derive(PyStreamable))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -371,9 +374,6 @@ impl Program {
     }
 
     fn uncurry_rust(&self) -> PyResult<(LazyNode, LazyNode)> {
-        use clvm_utils::CurriedProgram;
-        use std::rc::Rc;
-
         let mut a = Allocator::new_limited(500_000_000);
         let prg = node_from_bytes_backrefs(&mut a, self.0.as_ref())?;
         let Ok(uncurried) = CurriedProgram::<NodePtr, NodePtr>::from_clvm(&a, prg) else {
