@@ -55,7 +55,7 @@ def print_class(
         members.extend(extra)
 
     # TODO: could theoretically be detected from the use of #[streamable(subclass)]
-    inheritable = name in ["SpendBundle"]
+    inheritable = name in ["SpendBundle", "Program"]
 
     # TODO: is __richcmp__ ever actually present?
     # def __richcmp__(self) -> Any: ...
@@ -228,13 +228,9 @@ extra_members = {
         "def get_tree_hash(self) -> bytes32: ...",
         "@staticmethod\n    def default() -> Program: ...",
         "@staticmethod\n    def fromhex(h: str) -> Program: ...",
-        "def run_mempool_with_cost(self, max_cost: int, args: object) -> tuple[int, ChiaProgram]: ...",
-        "def run_with_cost(self, max_cost: int, args: object) -> tuple[int, ChiaProgram]: ...",
-        "def _run(self, max_cost: int, flags: int, args: object) -> tuple[int, ChiaProgram]: ...",
         "@staticmethod\n    def to(o: object) -> Program: ...",
-        "@staticmethod\n    def from_program(p: ChiaProgram) -> Program: ...",
-        "def to_program(self) -> ChiaProgram: ...",
-        "def uncurry(self) -> tuple[ChiaProgram, ChiaProgram]: ...",
+        "def run_rust(self, max_cost: int, flags: int, args: object) -> tuple[int, LazyNode]: ...",
+        "def uncurry_rust(self) -> tuple[LazyNode, LazyNode]: ...",
     ],
     "SpendBundle": [
         "@classmethod\n    def aggregate(cls, spend_bundles: list[SpendBundle]) -> Self: ...",
@@ -282,7 +278,6 @@ from typing import Optional, Sequence, Union, Any, ClassVar, final
 from .sized_bytes import bytes32, bytes100
 from .sized_ints import uint8, uint16, uint32, uint64, uint128, int8, int16, int32, int64
 from typing_extensions import Self
-from chia.types.blockchain_format.program import Program as ChiaProgram
 
 ReadableBuffer = Union[bytes, bytearray, memoryview]
 
