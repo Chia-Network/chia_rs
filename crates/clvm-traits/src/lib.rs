@@ -307,8 +307,9 @@ mod derive_tests {
 
     #[test]
     fn test_untagged_enum() {
+        // This has to be a proper list, since it's too ambiguous if extraneous parameters are parsed
         #[derive(Debug, ToClvm, FromClvm, PartialEq)]
-        #[clvm(list, untagged)]
+        #[clvm(proper_list, untagged)]
         enum Enum {
             A(i32),
             B {
