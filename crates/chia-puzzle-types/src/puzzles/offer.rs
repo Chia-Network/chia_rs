@@ -1,59 +1,57 @@
-use chia_protocol::{Bytes, Bytes32};
+use chia_protocol::Bytes32;
 use clvm_traits::{FromClvm, ToClvm};
+use clvmr::NodePtr;
+
+use crate::Memos;
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(transparent)]
-pub struct SettlementPaymentsSolution {
-    pub notarized_payments: Vec<NotarizedPayment>,
+pub struct SettlementPaymentsSolution<T = NodePtr> {
+    pub notarized_payments: Vec<NotarizedPayment<T>>,
+}
+
+impl SettlementPaymentsSolution {
+    pub fn new(notarized_payments: Vec<NotarizedPayment>) -> Self {
+        Self { notarized_payments }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(list)]
-pub struct NotarizedPayment {
+pub struct NotarizedPayment<T = NodePtr> {
     pub nonce: Bytes32,
     #[clvm(rest)]
-    pub payments: Vec<Payment>,
+    pub payments: Vec<Payment<T>>,
+}
+
+impl NotarizedPayment {
+    pub fn new(nonce: Bytes32, payments: Vec<Payment>) -> Self {
+        Self { nonce, payments }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(list)]
-pub struct Payment {
+pub struct Payment<T = NodePtr> {
     pub puzzle_hash: Bytes32,
     pub amount: u64,
-    /// The memos should usually be set to [`None`] instead of an empty list.
-    /// This is for compatibility with the way the reference wallet encodes offers.
     #[clvm(rest)]
-    pub memos: Option<Memos>,
+    pub memos: Memos<T>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[clvm(list)]
-pub struct Memos(pub Vec<Bytes>);
-
-impl Payment {
-    pub fn new(puzzle_hash: Bytes32, amount: u64) -> Self {
+impl<T> Payment<T> {
+    pub fn new(puzzle_hash: Bytes32, amount: u64, memos: Memos<T>) -> Self {
         Self {
             puzzle_hash,
             amount,
-            memos: None,
-        }
-    }
-
-    pub fn with_memos(puzzle_hash: Bytes32, amount: u64, memos: Vec<Bytes>) -> Self {
-        Self {
-            puzzle_hash,
-            amount,
-            memos: Some(Memos(memos)),
+            memos,
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use chia_protocol::Bytes;
     use clvm_utils::tree_hash;
     use clvmr::{serde::node_from_bytes, Allocator};
     use hex_literal::hex;
@@ -87,9 +85,9 @@ mod tests {
             "2a5cbc6f5076e0517bdb1e4664b3c26e64d27178b65aaa1ae97267eee629113b"
         ));
         let amount = 20_000_000_000;
-        let memos = Vec::new();
+        let memos = Vec::<Bytes>::new();
 
-        let payment = Payment::with_memos(puzzle_hash, amount, memos);
+        let payment = Payment::new(puzzle_hash, amount, Memos::Some(memos));
         let notarized_payment = SettlementPaymentsSolution {
             notarized_payments: vec![NotarizedPayment {
                 nonce,
@@ -134,7 +132,7 @@ mod tests {
         ));
         let amount = 20_000_000_000;
 
-        let payment = Payment::new(puzzle_hash, amount);
+        let payment = Payment::new(puzzle_hash, amount, Memos::<NodePtr>::None);
         let notarized_payment = SettlementPaymentsSolution {
             notarized_payments: vec![NotarizedPayment {
                 nonce,
