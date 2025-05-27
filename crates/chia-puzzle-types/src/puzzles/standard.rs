@@ -27,7 +27,7 @@ impl StandardArgs {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[clvm(solution)]
+#[clvm(list)]
 pub struct StandardSolution<P, S> {
     pub original_public_key: Option<PublicKey>,
     pub delegated_puzzle: P,

@@ -66,7 +66,7 @@ pub fn parse_enum(mut options: ClvmOptions, data_enum: &DataEnum) -> EnumInfo {
             );
 
             variant_info.fields[0].rest = true;
-            variant_info.repr = Some(Repr::List);
+            variant_info.repr = Some(Repr::ProperList);
         }
 
         variants.push(variant_info);

@@ -12,9 +12,9 @@ Pick whichever representation fits your use-case the best.
 Note that the syntax `(A . B)` represents a cons-pair with two values, `A` and `B`.
 This is how non-atomic values are structured in CLVM.
 
-### List
+### Proper List
 
-This represents values in a nil terminated series of nested cons-pairs, also known as a proper list.
+This represents values in a nil terminated series of nested cons-pairs.
 
 Note that if you mark the last field to [consume the rest of the list](#consume-the-rest), there is no nil terminator.
 
@@ -30,7 +30,7 @@ use clvmr::Allocator;
 use clvm_traits::{ToClvm, FromClvm};
 
 #[derive(Debug, PartialEq, Eq, ToClvm, FromClvm)]
-#[clvm(list)]
+#[clvm(proper_list)]
 struct Tiers {
     high: u8,
     medium: u8,
@@ -50,11 +50,13 @@ let ptr = value.to_clvm(a).unwrap();
 assert_eq!(Tiers::from_clvm(a, ptr).unwrap(), value);
 ```
 
-### Solution
+### List
 
-The solution representation is the same as list, except it does not check the nil terminator when parsing.
-This allows it to be lenient to additional parameters that are in the CLVM object, since they don't affect anything.
-If you want your solution to be parsed strictly, you can use list instead.
+The list representation is the same as proper list, except it does not check the nil terminator when parsing.
+This allows it to be lenient to additional parameters that are in the CLVM object, which is especially useful
+for preventing errors when parsing on-chain solutions and output conditions, where you wouldn't want strictness.
+This is because puzzles often don't enforce additional solution parameters, and consensus allows additional
+parameters to leave the door open for soft forks in the future.
 
 ### Curry
 

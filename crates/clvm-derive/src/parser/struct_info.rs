@@ -55,7 +55,7 @@ pub fn parse_struct(options: ClvmOptions, data_struct: &DataStruct) -> StructInf
         );
 
         fields[0].rest = true;
-        repr = Repr::List;
+        repr = Repr::ProperList;
     }
 
     StructInfo {

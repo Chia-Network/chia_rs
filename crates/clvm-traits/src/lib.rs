@@ -96,7 +96,7 @@ mod derive_tests {
     #[test]
     fn test_solution_struct() {
         #[derive(Debug, ToClvm, FromClvm, PartialEq)]
-        #[clvm(solution)]
+        #[clvm(list)]
         struct Struct {
             a: u64,
             b: i32,
@@ -124,7 +124,7 @@ mod derive_tests {
     #[test]
     fn test_solution_struct_with_rest() {
         #[derive(Debug, ToClvm, FromClvm, PartialEq)]
-        #[clvm(solution)]
+        #[clvm(list)]
         struct Struct {
             a: u64,
             #[clvm(rest)]
@@ -307,8 +307,9 @@ mod derive_tests {
 
     #[test]
     fn test_untagged_enum() {
+        // This has to be a proper list, since it's too ambiguous if extraneous parameters are parsed
         #[derive(Debug, ToClvm, FromClvm, PartialEq)]
-        #[clvm(list, untagged)]
+        #[clvm(proper_list, untagged)]
         enum Enum {
             A(i32),
             B {

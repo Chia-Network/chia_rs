@@ -83,7 +83,7 @@ impl GenesisByCoinIdTailArgs {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[clvm(solution)]
+#[clvm(list)]
 pub struct CatSolution<I> {
     pub inner_puzzle_solution: I,
     pub lineage_proof: Option<LineageProof>,
