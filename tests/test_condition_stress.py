@@ -34,5 +34,5 @@ def test_large_number_of_conds_with_custom_generator():
     amount = 500
     max_cost = 11000000000
     for test in test_conds:
-        mod.run_with_cost(max_cost, [test, amount])
+        mod.run_rust(max_cost, 0, [test, amount])
 
