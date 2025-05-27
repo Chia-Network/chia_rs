@@ -1,6 +1,6 @@
 [package]
 name = "chia-datalayer"
-version = "0.18.0"
+version = "0.23.0"
 edition = "2021"
 license = "Apache-2.0"
 description = "DataLayer modules for Chia blockchain"
@@ -33,7 +33,6 @@ zstd = { workspace = true }
 clvm-utils = { workspace = true }
 expect-test = { workspace = true }
 hex = { workspace = true }
-hex-literal = { workspace = true }
 open = { workspace = true }
 percent-encoding = { workspace = true }
 rand = { workspace = true }
