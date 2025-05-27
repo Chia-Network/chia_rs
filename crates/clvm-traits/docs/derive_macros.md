@@ -55,6 +55,8 @@ assert_eq!(Tiers::from_clvm(a, ptr).unwrap(), value);
 The list representation is the same as proper list, except it does not check the nil terminator when parsing.
 This allows it to be lenient to additional parameters that are in the CLVM object, which is especially useful
 for preventing errors when parsing on-chain solutions and output conditions, where you wouldn't want strictness.
+This is because puzzles often don't enforce additional solution parameters, and consensus allows additional
+parameters to leave the door open for soft forks in the future.
 
 ### Curry
 
