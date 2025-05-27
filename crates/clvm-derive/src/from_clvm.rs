@@ -150,7 +150,9 @@ fn field_parser_fn_body(
 fn check_rest_value(crate_name: &Ident, repr: Repr) -> TokenStream {
     match repr {
         Repr::Atom | Repr::Transparent => unreachable!(),
-        // We don't need to check the terminator of a solution.
+        // It's preferable in most cases to ignore extraneous arguments, because input to
+        // solutions and thus the output conditions may contain arguments that aren't required.
+        // This is not a consensus error, so we can safely ignore them and only parse what we need.
         Repr::List => quote! {},
         Repr::ProperList => {
             // If the last field is not `rest`, we need to check that the `node` is nil.
