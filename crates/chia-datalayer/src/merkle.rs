@@ -4080,15 +4080,13 @@ mod tests {
         let mut delta_reader = DeltaReader {
             nodes: HashMap::new(),
         };
-        let root_hash_to_node_hash_to_index = delta_reader
+        let mut root_hash_to_node_hash_to_index = delta_reader
             .collect_and_return_from_merkle_blobs(&vec![(root_hash, file_path)], &hashes)
             .unwrap();
 
-        assert_eq!(root_hash_to_node_hash_to_index.len(), 1);
-        // TODO: can we do this without cloning?  consume but only take one element?
         let (collected_root_hash, collected_node_hash_to_index) =
-            root_hash_to_node_hash_to_index[0].clone();
-        let collected_node_hash_to_index = HashMap::from(collected_node_hash_to_index);
+            root_hash_to_node_hash_to_index.pop().unwrap();
+        assert_eq!(root_hash_to_node_hash_to_index.len(), 0);
 
         assert_eq!(collected_root_hash, root_hash);
         assert_eq!(
