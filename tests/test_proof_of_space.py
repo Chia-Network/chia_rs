@@ -16,6 +16,8 @@ def test_proof_of_space() -> None:
 
     assert pos.size_v1() == 5
     assert pos.size_v2() is None
+    assert pos.size().size_v1 == 5
+    assert pos.size().size_v2 is None
 
     pos = ProofOfSpace(
         challenge, None, None, G1Element(), uint8(0x85), bytes.fromhex("80")
@@ -23,3 +25,5 @@ def test_proof_of_space() -> None:
 
     assert pos.size_v1() is None
     assert pos.size_v2() == 5
+    assert pos.size().size_v1 is None
+    assert pos.size().size_v2 == 5

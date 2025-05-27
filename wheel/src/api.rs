@@ -28,26 +28,26 @@ use chia_protocol::{
     Handshake, HeaderBlock, InfusedChallengeChainSubSlot, LazyNode, MempoolItemsAdded,
     MempoolItemsRemoved, Message, NewCompactVDF, NewPeak, NewPeakWallet,
     NewSignagePointOrEndOfSubSlot, NewTransaction, NewUnfinishedBlock, NewUnfinishedBlock2,
-    PoolTarget, Program, ProofBlockHeader, ProofOfSpace, PuzzleSolutionResponse, RecentChainData,
-    RegisterForCoinUpdates, RegisterForPhUpdates, RejectAdditionsRequest, RejectBlock,
-    RejectBlockHeaders, RejectBlocks, RejectCoinState, RejectHeaderBlocks, RejectHeaderRequest,
-    RejectPuzzleSolution, RejectPuzzleState, RejectRemovalsRequest, RemovedMempoolItem,
-    RequestAdditions, RequestBlock, RequestBlockHeader, RequestBlockHeaders, RequestBlocks,
-    RequestChildren, RequestCoinState, RequestCompactVDF, RequestCostInfo, RequestFeeEstimates,
-    RequestHeaderBlocks, RequestMempoolTransactions, RequestPeers, RequestProofOfWeight,
-    RequestPuzzleSolution, RequestPuzzleState, RequestRemovals, RequestRemoveCoinSubscriptions,
-    RequestRemovePuzzleSubscriptions, RequestSesInfo, RequestSignagePointOrEndOfSubSlot,
-    RequestTransaction, RequestUnfinishedBlock, RequestUnfinishedBlock2, RespondAdditions,
-    RespondBlock, RespondBlockHeader, RespondBlockHeaders, RespondBlocks, RespondChildren,
-    RespondCoinState, RespondCompactVDF, RespondCostInfo, RespondEndOfSubSlot, RespondFeeEstimates,
-    RespondHeaderBlocks, RespondPeers, RespondProofOfWeight, RespondPuzzleSolution,
-    RespondPuzzleState, RespondRemovals, RespondRemoveCoinSubscriptions,
-    RespondRemovePuzzleSubscriptions, RespondSesInfo, RespondSignagePoint, RespondToCoinUpdates,
-    RespondToPhUpdates, RespondTransaction, RespondUnfinishedBlock, RewardChainBlock,
-    RewardChainBlockUnfinished, RewardChainSubSlot, SendTransaction, SpendBundle,
-    SubEpochChallengeSegment, SubEpochData, SubEpochSegments, SubEpochSummary, SubSlotData,
-    SubSlotProofs, TimestampedPeerInfo, TransactionAck, TransactionsInfo, UnfinishedBlock,
-    UnfinishedHeaderBlock, VDFInfo, VDFProof, WeightProof,
+    PoolTarget, Program, ProofBlockHeader, ProofOfSpace, PuzzleSolutionResponse, PyPlotSize,
+    RecentChainData, RegisterForCoinUpdates, RegisterForPhUpdates, RejectAdditionsRequest,
+    RejectBlock, RejectBlockHeaders, RejectBlocks, RejectCoinState, RejectHeaderBlocks,
+    RejectHeaderRequest, RejectPuzzleSolution, RejectPuzzleState, RejectRemovalsRequest,
+    RemovedMempoolItem, RequestAdditions, RequestBlock, RequestBlockHeader, RequestBlockHeaders,
+    RequestBlocks, RequestChildren, RequestCoinState, RequestCompactVDF, RequestCostInfo,
+    RequestFeeEstimates, RequestHeaderBlocks, RequestMempoolTransactions, RequestPeers,
+    RequestProofOfWeight, RequestPuzzleSolution, RequestPuzzleState, RequestRemovals,
+    RequestRemoveCoinSubscriptions, RequestRemovePuzzleSubscriptions, RequestSesInfo,
+    RequestSignagePointOrEndOfSubSlot, RequestTransaction, RequestUnfinishedBlock,
+    RequestUnfinishedBlock2, RespondAdditions, RespondBlock, RespondBlockHeader,
+    RespondBlockHeaders, RespondBlocks, RespondChildren, RespondCoinState, RespondCompactVDF,
+    RespondCostInfo, RespondEndOfSubSlot, RespondFeeEstimates, RespondHeaderBlocks, RespondPeers,
+    RespondProofOfWeight, RespondPuzzleSolution, RespondPuzzleState, RespondRemovals,
+    RespondRemoveCoinSubscriptions, RespondRemovePuzzleSubscriptions, RespondSesInfo,
+    RespondSignagePoint, RespondToCoinUpdates, RespondToPhUpdates, RespondTransaction,
+    RespondUnfinishedBlock, RewardChainBlock, RewardChainBlockUnfinished, RewardChainSubSlot,
+    SendTransaction, SpendBundle, SubEpochChallengeSegment, SubEpochData, SubEpochSegments,
+    SubEpochSummary, SubSlotData, SubSlotProofs, TimestampedPeerInfo, TransactionAck,
+    TransactionsInfo, UnfinishedBlock, UnfinishedHeaderBlock, VDFInfo, VDFProof, WeightProof,
 };
 use chia_traits::ChiaToPython;
 use clvm_utils::tree_hash_from_bytes;
@@ -74,8 +74,10 @@ use clvmr::cost::Cost;
 use clvmr::reduction::EvalErr;
 use clvmr::reduction::Reduction;
 use clvmr::run_program;
-use clvmr::serde::node_to_bytes;
-use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs, node_from_bytes_backrefs_record};
+use clvmr::serde::is_canonical_serialization;
+use clvmr::serde::{
+    node_from_bytes, node_from_bytes_backrefs, node_from_bytes_backrefs_record, node_to_bytes,
+};
 use clvmr::ChiaDialect;
 
 use chia_bls::{
@@ -497,6 +499,13 @@ pub fn py_calculate_ip_iters(
         required_iters,
     )?)
 }
+
+#[pyo3::pyfunction]
+#[pyo3(name = "is_canonical_serialization")]
+pub fn py_is_canonical_serialization(buf: &[u8]) -> bool {
+    is_canonical_serialization(buf)
+}
+
 #[pymodule]
 pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // generator functions
@@ -526,6 +535,9 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_is_overflow_block, m)?)?;
     m.add_function(wrap_pyfunction!(py_expected_plot_size, m)?)?;
 
+    // CLVM validation
+    m.add_function(wrap_pyfunction!(py_is_canonical_serialization, m)?)?;
+
     // constants
     m.add_class::<ConsensusConstants>()?;
 
@@ -548,6 +560,8 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // for backwards compatibility
     m.add("ALLOW_BACKREFS", 0)?;
+
+    m.add_class::<PyPlotSize>()?;
 
     // Chia classes
     m.add_class::<Coin>()?;
