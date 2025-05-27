@@ -490,8 +490,6 @@ def test_get_nodes() -> None:
 
 T = TypeVar("T")
 U = TypeVar("U")
-class CT(Protocol[T, U]):
-    def __new__(self, _arg: U) -> T: ...
 
 @dataclass
 class SimpleTypeInstancesCase(Generic[T, U]):
