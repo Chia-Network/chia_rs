@@ -4064,4 +4064,36 @@ mod tests {
 
         expected.assert_debug_eq(&result);
     }
+
+    #[rstest]
+    fn test_collect_and_return(traversal_blob: MerkleBlob) {
+        let dir_path = tempfile::tempdir().unwrap();
+        let file_path = dir_path.path().join("blob");
+        traversal_blob.to_path(&file_path).unwrap();
+        let hashes = traversal_blob
+            .get_hashes_indexes(false)
+            .unwrap()
+            .into_keys()
+            .collect::<HashSet<Hash>>();
+        let root_hash = traversal_blob.get_hash(TreeIndex(0)).unwrap();
+
+        let mut delta_reader = DeltaReader {
+            nodes: HashMap::new(),
+        };
+        let root_hash_to_node_hash_to_index = delta_reader
+            .collect_and_return_from_merkle_blobs(&vec![(root_hash, file_path)], &hashes)
+            .unwrap();
+
+        assert_eq!(root_hash_to_node_hash_to_index.len(), 1);
+        // TODO: can we do this without cloning?  consume but only take one element?
+        let (collected_root_hash, collected_node_hash_to_index) =
+            root_hash_to_node_hash_to_index[0].clone();
+        let collected_node_hash_to_index = HashMap::from(collected_node_hash_to_index);
+
+        assert_eq!(collected_root_hash, root_hash);
+        assert_eq!(
+            collected_node_hash_to_index,
+            traversal_blob.get_hashes_indexes(false).unwrap()
+        );
+    }
 }
