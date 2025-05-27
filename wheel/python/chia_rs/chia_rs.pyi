@@ -167,6 +167,11 @@ class MerkleSet:
     ) -> None: ...
 
 @final
+class PlotSize:
+    size_v1: Optional[uint8]
+    size_v2: Optional[uint8]
+
+@final
 class G1Element:
     SIZE: ClassVar[int] = ...
     def __new__(cls) -> G1Element: ...
@@ -2064,6 +2069,7 @@ class ProofOfSpace:
     proof: bytes
     def size_v1(self) -> Optional[uint8]: ...
     def size_v2(self) -> Optional[uint8]: ...
+    def size(self) -> PlotSize: ...
     def __init__(
         self,
         challenge: bytes,

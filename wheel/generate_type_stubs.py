@@ -6,6 +6,8 @@ output_file = Path(__file__).parent.resolve() / "python" / "chia_rs" / "chia_rs.
 crates_dir = Path(__file__).parent.parent.resolve() / "crates"
 input_dir = crates_dir / "chia-protocol" / "src"
 
+ignore_structs = ["PyPlotSize"]
+
 # enums are exposed to python as int
 enums = set(
     ["NodeType", "ProtocolMessageTypes", "RejectStateReason", "MempoolRemoveReason"]
@@ -167,7 +169,8 @@ def parse_rust_source(filename: str, upper_case: bool) -> list[tuple[str, list[s
 
             # did we reach the end?
             if "}" in line:
-                ret.append((in_struct, members))
+                if in_struct not in ignore_structs:
+                    ret.append((in_struct, members))
                 members = []
                 in_struct = None
                 continue
@@ -251,6 +254,7 @@ extra_members = {
     "ProofOfSpace": [
         "def size_v1(self) -> Optional[uint8]: ...",
         "def size_v2(self) -> Optional[uint8]: ...",
+        "def size(self) -> PlotSize: ...",
     ],
 }
 
@@ -436,6 +440,11 @@ class MerkleSet:
         self,
         leafs: list[bytes32],
     ) -> None: ...
+
+@final
+class PlotSize:
+    size_v1: Optional[uint8]
+    size_v2: Optional[uint8]
 """
     )
 
