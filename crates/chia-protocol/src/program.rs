@@ -1,4 +1,6 @@
 use crate::bytes::Bytes;
+#[cfg(feature = "py-bindings")]
+use crate::LazyNode;
 use chia_sha2::Sha256;
 use chia_traits::chia_error::{Error, Result};
 use chia_traits::Streamable;
@@ -11,6 +13,8 @@ use clvmr::serde::{
     node_from_bytes, node_from_bytes_backrefs, node_to_bytes, serialized_length_from_bytes,
     serialized_length_from_bytes_trusted,
 };
+#[cfg(feature = "py-bindings")]
+use clvmr::SExp;
 use clvmr::{Allocator, ChiaDialect};
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
@@ -18,8 +22,13 @@ use pyo3::prelude::*;
 use pyo3::types::PyType;
 use std::io::Cursor;
 use std::ops::Deref;
+#[cfg(feature = "py-bindings")]
+use std::rc::Rc;
 
-#[cfg_attr(feature = "py-bindings", pyclass, derive(PyStreamable))]
+#[cfg(feature = "py-bindings")]
+use clvm_utils::CurriedProgram;
+
+#[cfg_attr(feature = "py-bindings", pyclass(subclass), derive(PyStreamable))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Program(Bytes);
@@ -149,9 +158,6 @@ impl<'a> arbitrary::Arbitrary<'a> for Program {
 }
 
 #[cfg(feature = "py-bindings")]
-use crate::lazy_node::LazyNode;
-
-#[cfg(feature = "py-bindings")]
 use chia_traits::{FromJsonDict, ToJsonDict};
 
 #[cfg(feature = "py-bindings")]
@@ -159,9 +165,6 @@ use chia_py_streamable_macro::PyStreamable;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::types::{PyList, PyTuple};
-
-#[cfg(feature = "py-bindings")]
-use clvmr::allocator::SExp;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::exceptions::*;
@@ -297,13 +300,6 @@ fn clvm_serialize(a: &mut Allocator, o: &Bound<'_, PyAny>) -> PyResult<NodePtr> 
 }
 
 #[cfg(feature = "py-bindings")]
-fn to_program(py: Python<'_>, node: LazyNode) -> PyResult<Bound<'_, PyAny>> {
-    let int_module = PyModule::import(py, "chia.types.blockchain_format.program")?;
-    let ty = int_module.getattr("Program")?;
-    ty.call1((node.into_pyobject(py)?,))
-}
-
-#[cfg(feature = "py-bindings")]
 #[allow(clippy::needless_pass_by_value)]
 #[pymethods]
 impl Program {
@@ -329,13 +325,6 @@ impl Program {
     }
 
     #[staticmethod]
-    fn from_program(py: Python<'_>, p: PyObject) -> PyResult<Self> {
-        let buf = p.getattr(py, "__bytes__")?.call0(py)?;
-        let buf = buf.extract::<&[u8]>(py)?;
-        Ok(Self(buf.into()))
-    }
-
-    #[staticmethod]
     fn fromhex(h: String) -> Result<Self> {
         let s = if let Some(st) = h.strip_prefix("0x") {
             st
@@ -345,37 +334,14 @@ impl Program {
         Self::from_bytes(hex::decode(s).map_err(|_| Error::InvalidString)?.as_slice())
     }
 
-    fn run_mempool_with_cost<'a>(
+    fn run_rust(
         &self,
-        py: Python<'a>,
-        max_cost: u64,
-        args: &Bound<'_, PyAny>,
-    ) -> PyResult<(u64, Bound<'a, PyAny>)> {
-        use clvmr::MEMPOOL_MODE;
-        #[allow(clippy::used_underscore_items)]
-        self._run(py, max_cost, MEMPOOL_MODE, args)
-    }
-
-    fn run_with_cost<'a>(
-        &self,
-        py: Python<'a>,
-        max_cost: u64,
-        args: &Bound<'_, PyAny>,
-    ) -> PyResult<(u64, Bound<'a, PyAny>)> {
-        #[allow(clippy::used_underscore_items)]
-        self._run(py, max_cost, 0, args)
-    }
-
-    // exposed to python so allowing use of the python private indicator leading underscore
-    fn _run<'a>(
-        &self,
-        py: Python<'a>,
+        py: Python<'_>,
         max_cost: u64,
         flags: u32,
         args: &Bound<'_, PyAny>,
-    ) -> PyResult<(u64, Bound<'a, PyAny>)> {
+    ) -> PyResult<(u64, LazyNode)> {
         use clvmr::reduction::Response;
-        use std::rc::Rc;
 
         let mut a = Allocator::new_limited(500_000_000);
         // The python behavior here is a bit messy, and is best not emulated
@@ -398,7 +364,7 @@ impl Program {
         match r {
             Ok(reduction) => {
                 let val = LazyNode::new(Rc::new(a), reduction.1);
-                Ok((reduction.0, to_program(py, val)?))
+                Ok((reduction.0, val))
             }
             Err(eval_err) => {
                 let blob = node_to_bytes(&a, eval_err.0).ok().map(hex::encode);
@@ -407,18 +373,7 @@ impl Program {
         }
     }
 
-    fn to_program<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
-        use std::rc::Rc;
-        let mut a = Allocator::new_limited(500_000_000);
-        let prg = node_from_bytes_backrefs(&mut a, self.0.as_ref())?;
-        let prg = LazyNode::new(Rc::new(a), prg);
-        to_program(py, prg)
-    }
-
-    fn uncurry<'a>(&self, py: Python<'a>) -> PyResult<(Bound<'a, PyAny>, Bound<'a, PyAny>)> {
-        use clvm_utils::CurriedProgram;
-        use std::rc::Rc;
-
+    fn uncurry_rust(&self) -> PyResult<(LazyNode, LazyNode)> {
         let mut a = Allocator::new_limited(500_000_000);
         let prg = node_from_bytes_backrefs(&mut a, self.0.as_ref())?;
         let Ok(uncurried) = CurriedProgram::<NodePtr, NodePtr>::from_clvm(&a, prg) else {
@@ -426,7 +381,7 @@ impl Program {
             let prg = LazyNode::new(a.clone(), prg);
             let ret = a.nil();
             let ret = LazyNode::new(a, ret);
-            return Ok((to_program(py, prg)?, to_program(py, ret)?));
+            return Ok((prg, ret));
         };
 
         let mut curried_args = Vec::<NodePtr>::new();
@@ -453,7 +408,7 @@ impl Program {
         let a = Rc::new(a);
         let prg = LazyNode::new(a.clone(), uncurried.program);
         let ret = LazyNode::new(a, ret);
-        Ok((to_program(py, prg)?, to_program(py, ret)?))
+        Ok((prg, ret))
     }
 }
 

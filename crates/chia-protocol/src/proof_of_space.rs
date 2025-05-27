@@ -38,6 +38,15 @@ use chia_traits::{FromJsonDict, ToJsonDict};
 use pyo3::prelude::*;
 
 #[cfg(feature = "py-bindings")]
+#[pyclass(name = "PlotSize")]
+pub struct PyPlotSize {
+    #[pyo3(get)]
+    pub size_v1: Option<u8>,
+    #[pyo3(get)]
+    pub size_v2: Option<u8>,
+}
+
+#[cfg(feature = "py-bindings")]
 #[pymethods]
 impl ProofOfSpace {
     fn size_v1(&self) -> Option<u8> {
@@ -51,6 +60,14 @@ impl ProofOfSpace {
         match self.size() {
             PlotSize::V1(_) => None,
             PlotSize::V2(s) => Some(s),
+        }
+    }
+
+    #[pyo3(name = "size")]
+    fn py_size(&self) -> PyPlotSize {
+        PyPlotSize {
+            size_v1: self.size_v1(),
+            size_v2: self.size_v2(),
         }
     }
 }
