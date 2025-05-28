@@ -34,6 +34,7 @@ hex = { workspace = true }
 pyo3 = { workspace = true, features = ["multiple-pymethods"] }
 chia-consensus = { workspace = true, features = ["py-bindings"] }
 chia-bls = { workspace = true, features = ["py-bindings"]  }
+chia-datalayer = { workspace = true, features = ["py-bindings"]  }
 chia-protocol = { workspace = true, features = ["py-bindings"]  }
 clvm-utils = { workspace = true }
 chia-ssl = { workspace = true }
