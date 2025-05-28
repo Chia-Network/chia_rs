@@ -4,6 +4,7 @@ from typing import Optional
 from run_gen import run_gen, print_spend_bundle_conditions
 from chia_rs import (
     MEMPOOL_MODE,
+    COST_CONDITIONS,
     SpendBundleConditions,
 )
 from dataclasses import dataclass
@@ -61,13 +62,19 @@ def validate_except_cost(output1: str, output2: str) -> None:
 
 
 print(f"{'test name':43s}   consensus | mempool")
-for g in sorted(glob.glob("../generator-tests/*.txt")):
+test_list = sorted(glob.glob("../generator-tests/*.txt"))
+if len(test_list) == 0:
+    print("No tests found. Are you in the tests directory?")
+for g in test_list:
     name = f"{Path(g).name:43s}"
     stdout.write(f"{name} running generator...\r")
     stdout.flush()
+    flags = 0
+    if "two-thousand-messages.txt" in g:
+        flags = COST_CONDITIONS
     consensus = run_generator(
         g,
-        0,
+        flags,
         version=1,
     )
 
@@ -75,7 +82,7 @@ for g in sorted(glob.glob("../generator-tests/*.txt")):
     stdout.flush()
     consensus2 = run_generator(
         g,
-        0,
+        flags,
         version=2,
     )
     validate_except_cost(consensus.output, consensus2.output)
@@ -84,7 +91,7 @@ for g in sorted(glob.glob("../generator-tests/*.txt")):
     stdout.flush()
     mempool = run_generator(
         g,
-        MEMPOOL_MODE,
+        MEMPOOL_MODE | flags,
         version=1,
     )
 
@@ -92,7 +99,7 @@ for g in sorted(glob.glob("../generator-tests/*.txt")):
     stdout.flush()
     mempool2 = run_generator(
         g,
-        MEMPOOL_MODE,
+        MEMPOOL_MODE | flags,
         version=2,
     )
     validate_except_cost(mempool.output, mempool2.output)
