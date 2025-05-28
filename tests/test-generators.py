@@ -67,7 +67,7 @@ for g in test_list:
     stdout.write(f"{name} running generator...\r")
     stdout.flush()
     flags = 0
-    if "two-thousand-messages.txt" in g:
+    if "two-thousand-messages.txt" in g or "ten-thousand-messages.txt" in g:
         flags = COST_CONDITIONS
     consensus = run_generator(
         g,
