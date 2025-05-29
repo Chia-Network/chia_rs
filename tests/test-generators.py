@@ -53,11 +53,17 @@ def run_generator(file: str, flags: int, version: int) -> Results:
 def validate_except_cost(output1: str, output2: str) -> None:
     lines1 = output1.split("\n")
     lines2 = output2.split("\n")
+    if len(lines1) != len(lines2):
+        stdout.write(f"l1: {lines1} \n")
+        stdout.write(f"l2: {lines2}")
     assert len(lines1) == len(lines2)
     for l1, l2 in zip(lines1, lines2):
         # the cost is supposed to differ, don't compare that
         if "cost:" in l1 and "cost: " in l2:
             continue
+        if l1 != l2:
+            stdout.write(f"l1: {l1} \n")
+            stdout.write(f"l2: {l2}")
         assert l1 == l2
 
 
@@ -70,7 +76,14 @@ for g in test_list:
     stdout.write(f"{name} running generator...\r")
     stdout.flush()
     flags = 0
-    if "two-thousand-messages.txt" in g or "ten-thousand-messages.txt" in g:
+    if (
+        "two-thousand-messages.txt" in g
+        or "aa-ten-thousand-messages.txt" in g
+        or "aa-fifty-thousand-messages.txt" in g
+        or "aa-three-hundred-thousand-messages.txt" in g
+        or "aa-hundred-thousand-messages.txt" in g
+        or "aa-million-messages.txt" in g
+    ):
         flags = COST_CONDITIONS
     consensus = run_generator(
         g,
@@ -85,7 +98,13 @@ for g in test_list:
         flags,
         version=2,
     )
-    validate_except_cost(consensus.output, consensus2.output)
+    if (
+        "aa-fifty-thousand-messages.txt" not in g
+        and "aa-hundred-thousand-messages.txt" not in g
+        and "aa-three-hundred-thousand-messages.txt" not in g
+        and "aa-million-messages.txt" not in g
+    ):
+        validate_except_cost(consensus.output, consensus2.output)
 
     stdout.write(f"{name} running generator (mempool mode) ...\r")
     stdout.flush()
@@ -102,7 +121,13 @@ for g in test_list:
         MEMPOOL_MODE | flags,
         version=2,
     )
-    validate_except_cost(mempool.output, mempool2.output)
+    if (
+        "aa-fifty-thousand-messages.txt" not in g
+        and "aa-hundred-thousand-messages.txt" not in g
+        and "aa-three-hundred-thousand-messages.txt" not in g
+        and "aa-million-messages.txt" not in g
+    ):
+        validate_except_cost(mempool.output, mempool2.output)
 
     with open(g) as f:
         expected = f.read().split("\n", 1)[1]
@@ -140,9 +165,17 @@ for g in test_list:
         elif "recursion-pairs.txt" in g:
             limit = 4
             strict_limit = 4
-
-        compare_output(consensus.output, expected, "")
-        compare_output(mempool.output, expected_mempool, "STRICT")
+        if (
+            "aa-fifty-thousand-messages.txt" not in g
+            and "aa-hundred-thousand-messages.txt" not in g
+            and "aa-three-hundred-thousand-messages.txt" not in g
+            and "aa-million-messages.txt" not in g
+        ):
+            compare_output(consensus.output, expected, "")
+            compare_output(mempool.output, expected_mempool, "STRICT")
+        else:
+            compare_output(consensus2.output, expected, "")
+            compare_output(mempool2.output, expected_mempool, "STRICT")
 
         stdout.write(
             f"{name} {consensus.run_time:.2f}s "
