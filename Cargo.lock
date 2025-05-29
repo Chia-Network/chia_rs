@@ -460,6 +460,7 @@ dependencies = [
  "hex",
  "hex-literal",
  "num-bigint",
+ "rstest",
 ]
 
 [[package]]
