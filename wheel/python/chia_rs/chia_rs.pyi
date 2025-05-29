@@ -168,6 +168,11 @@ class MerkleSet:
 
 @final
 class PlotSize:
+    @staticmethod
+    def make_v1(s: int) -> PlotSize: ...
+    @staticmethod
+    def make_v2(s: int) -> PlotSize: ...
+
     size_v1: Optional[uint8]
     size_v2: Optional[uint8]
 
@@ -2067,8 +2072,6 @@ class ProofOfSpace:
     plot_public_key: G1Element
     version_and_size: uint8
     proof: bytes
-    def size_v1(self) -> Optional[uint8]: ...
-    def size_v2(self) -> Optional[uint8]: ...
     def size(self) -> PlotSize: ...
     def __init__(
         self,
