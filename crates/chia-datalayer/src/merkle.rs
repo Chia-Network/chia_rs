@@ -1598,8 +1598,6 @@ impl MerkleBlob {
             sibling_block.node.set_parent(Parent(None));
             let destination = TreeIndex(0);
             if let Node::Internal(node) = sibling_block.node {
-                // TODO: is the sibling really dirty?
-                sibling_block.metadata.dirty = true;
                 for child_index in [node.left, node.right] {
                     self.update_parent(child_index, Some(destination))?;
                 }
@@ -2140,15 +2138,6 @@ impl PartialEq for MerkleBlob {
         true
     }
 }
-
-// impl<'a> IntoIterator for &'a MerkleBlob {
-//     type Item = (TreeIndex, Block);
-//     type IntoIter = MerkleBlobLeftChildFirstIterator<'a>;
-//
-//     fn into_iter(self) -> Self::IntoIter {
-//         MerkleBlobLeftChildFirstIterator::new(&self.blob)
-//     }
-// }
 
 #[cfg(feature = "py-bindings")]
 #[pymethods]
@@ -3789,7 +3778,7 @@ mod tests {
     }
 
     #[test]
-    fn test_delta_reader_collect_from_merkle_blob() {
+    fn test_delta_reader_collect_from_merkle_blob_completes_incomplete() {
         let mut delta_reader = incomplete_delta_reader();
         let mut merkle_blob = MerkleBlob::new(Vec::new()).unwrap();
         merkle_blob
@@ -3801,6 +3790,27 @@ mod tests {
         merkle_blob.to_path(&leaf_blob_path).unwrap();
         delta_reader
             .collect_from_merkle_blob(&leaf_blob_path, &vec![TreeIndex(0)])
+            .unwrap();
+
+        let missing = delta_reader.get_missing_hashes();
+
+        #[allow(clippy::needless_raw_string_hashes)]
+        let expected = expect![[r#"
+            {}
+        "#]];
+        expected.assert_debug_eq(&missing);
+    }
+
+    #[rstest]
+    fn test_delta_reader_collect_from_merkle_blob_is_complete(traversal_blob: MerkleBlob) {
+        let mut delta_reader = DeltaReader {
+            nodes: HashMap::new(),
+        };
+        let dir_path = tempfile::tempdir().unwrap();
+        let blob_path = dir_path.path().join("merkle_blob");
+        traversal_blob.to_path(&blob_path).unwrap();
+        delta_reader
+            .collect_from_merkle_blob(&blob_path, &vec![TreeIndex(0)])
             .unwrap();
 
         let missing = delta_reader.get_missing_hashes();
@@ -3860,9 +3870,10 @@ mod tests {
     #[test]
     fn test_delta_reader_create_merkle_blob_works() {
         let mut delta_reader = complete_delta_reader();
+        let interested_hashes: HashSet<Hash> = delta_reader.nodes.keys().copied().collect();
 
         let (complete_blob, _) = delta_reader
-            .create_merkle_blob_and_filter_unused_nodes(HASH_ZERO, &HashSet::new())
+            .create_merkle_blob_and_filter_unused_nodes(HASH_ZERO, &interested_hashes)
             .unwrap();
         complete_blob.check_integrity().unwrap();
     }
@@ -4093,5 +4104,14 @@ mod tests {
             collected_node_hash_to_index,
             traversal_blob.get_hashes_indexes(false).unwrap()
         );
+    }
+
+    #[rstest]
+    fn test_moved_sibling_retains_hash(mut small_blob: MerkleBlob) {
+        let key_to_delete = KeyId(0x0001_0203_0405_0607);
+        let remaining_hash = sha256_num(0x2030);
+        assert_ne!(small_blob.get_hash(TreeIndex(0)).unwrap(), remaining_hash);
+        small_blob.delete(key_to_delete).unwrap();
+        assert_eq!(small_blob.get_hash(TreeIndex(0)).unwrap(), remaining_hash);
     }
 }
