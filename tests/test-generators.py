@@ -83,6 +83,7 @@ for g in test_list:
         or "aa-three-hundred-thousand-messages.txt" in g
         or "aa-hundred-thousand-messages.txt" in g
         or "aa-million-messages.txt" in g
+        or "aa-four-million-messages.txt" in g
     ):
         flags = COST_CONDITIONS
     consensus = run_generator(
@@ -103,6 +104,7 @@ for g in test_list:
         and "aa-hundred-thousand-messages.txt" not in g
         and "aa-three-hundred-thousand-messages.txt" not in g
         and "aa-million-messages.txt" not in g
+        and "aa-four-million-messages.txt" not in g
     ):
         validate_except_cost(consensus.output, consensus2.output)
 
@@ -126,6 +128,7 @@ for g in test_list:
         and "aa-hundred-thousand-messages.txt" not in g
         and "aa-three-hundred-thousand-messages.txt" not in g
         and "aa-million-messages.txt" not in g
+        and "aa-four-million-messages.txt" not in g
     ):
         validate_except_cost(mempool.output, mempool2.output)
 
@@ -170,6 +173,7 @@ for g in test_list:
             and "aa-hundred-thousand-messages.txt" not in g
             and "aa-three-hundred-thousand-messages.txt" not in g
             and "aa-million-messages.txt" not in g
+            and "aa-four-million-messages.txt" not in g
         ):
             compare_output(consensus.output, expected, "")
             compare_output(mempool.output, expected_mempool, "STRICT")
