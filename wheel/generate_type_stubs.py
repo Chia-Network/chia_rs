@@ -6,6 +6,8 @@ output_file = Path(__file__).parent.resolve() / "python" / "chia_rs" / "chia_rs.
 crates_dir = Path(__file__).parent.parent.resolve() / "crates"
 input_dir = crates_dir / "chia-protocol" / "src"
 
+ignore_structs = ["PyPlotSize"]
+
 # enums are exposed to python as int
 enums = set(
     ["NodeType", "ProtocolMessageTypes", "RejectStateReason", "MempoolRemoveReason"]
@@ -55,7 +57,7 @@ def print_class(
         members.extend(extra)
 
     # TODO: could theoretically be detected from the use of #[streamable(subclass)]
-    inheritable = name in ["SpendBundle"]
+    inheritable = name in ["SpendBundle", "Program"]
 
     # TODO: is __richcmp__ ever actually present?
     # def __richcmp__(self) -> Any: ...
@@ -167,7 +169,8 @@ def parse_rust_source(filename: str, upper_case: bool) -> list[tuple[str, list[s
 
             # did we reach the end?
             if "}" in line:
-                ret.append((in_struct, members))
+                if in_struct not in ignore_structs:
+                    ret.append((in_struct, members))
                 members = []
                 in_struct = None
                 continue
@@ -228,13 +231,9 @@ extra_members = {
         "def get_tree_hash(self) -> bytes32: ...",
         "@staticmethod\n    def default() -> Program: ...",
         "@staticmethod\n    def fromhex(h: str) -> Program: ...",
-        "def run_mempool_with_cost(self, max_cost: int, args: object) -> tuple[int, ChiaProgram]: ...",
-        "def run_with_cost(self, max_cost: int, args: object) -> tuple[int, ChiaProgram]: ...",
-        "def _run(self, max_cost: int, flags: int, args: object) -> tuple[int, ChiaProgram]: ...",
         "@staticmethod\n    def to(o: object) -> Program: ...",
-        "@staticmethod\n    def from_program(p: ChiaProgram) -> Program: ...",
-        "def to_program(self) -> ChiaProgram: ...",
-        "def uncurry(self) -> tuple[ChiaProgram, ChiaProgram]: ...",
+        "def run_rust(self, max_cost: int, flags: int, args: object) -> tuple[int, LazyNode]: ...",
+        "def uncurry_rust(self) -> tuple[LazyNode, LazyNode]: ...",
     ],
     "SpendBundle": [
         "@classmethod\n    def aggregate(cls, spend_bundles: list[SpendBundle]) -> Self: ...",
@@ -251,6 +250,11 @@ extra_members = {
         "def ip_iters(self, constants: ConsensusConstants) -> uint64: ...",
         "def sp_sub_slot_total_iters(self, constants: ConsensusConstants) -> uint128: ...",
         "def sp_total_iters(self, constants: ConsensusConstants) -> uint128: ...",
+    ],
+    "ProofOfSpace": [
+        "def size_v1(self) -> Optional[uint8]: ...",
+        "def size_v2(self) -> Optional[uint8]: ...",
+        "def size(self) -> PlotSize: ...",
     ],
 }
 
@@ -278,7 +282,6 @@ from typing import Mapping, Optional, Sequence, Union, Any, ClassVar, final
 from .sized_bytes import bytes32, bytes100
 from .sized_ints import uint8, uint16, uint32, uint64, uint128, int8, int16, int32, int64
 from typing_extensions import Self
-from chia.types.blockchain_format.program import Program as ChiaProgram
 
 ReadableBuffer = Union[bytes, bytearray, memoryview]
 
@@ -287,6 +290,8 @@ class _Unspec:
 
 def solution_generator(spends: Sequence[tuple[Coin, bytes, bytes]]) -> bytes: ...
 def solution_generator_backrefs(spends: Sequence[tuple[Coin, bytes, bytes]]) -> bytes: ...
+
+def is_canonical_serialization(buf: bytes) -> bool: ...
 
 def compute_merkle_set_root(values: Sequence[bytes]) -> bytes: ...
 
@@ -337,28 +342,26 @@ def get_flags_for_height_and_constants(
 ) -> int: ...
 
 def calculate_ip_iters(
-    num_sps_sub_slot: uint32,
-    num_sp_intervals_extra: uint8,
+    constants: ConsensusConstants,
     sub_slot_iters: uint64,
-    signage_point_index: uint32,
+    signage_point_index: uint8,
     required_iters: uint64,
 ) -> uint64: ...
 
 def calculate_sp_iters(
-    num_sps_sub_slot: uint32,
+    constants: ConsensusConstants,
     sub_slot_iters: uint64,
-    signage_point_index: uint32,
+    signage_point_index: uint8,
 ) -> uint64: ...
 
 def calculate_sp_interval_iters(
-    num_sps_sub_slot: uint32,
+    constants: ConsensusConstants,
     sub_slot_iters: uint64,
 ) -> uint64: ...
 
 def is_overflow_block(
-    num_sps_sub_slot: uint32,
-    num_sp_intervals_extra: uint8,
-    signage_point_index: uint32,
+    constants: ConsensusConstants,
+    signage_point_index: uint8,
 ) -> bool: ...
 
 def expected_plot_size(
@@ -372,6 +375,7 @@ LIMIT_HEAP: int = ...
 ENABLE_KECCAK_OPS_OUTSIDE_GUARD: int = ...
 MEMPOOL_MODE: int = ...
 DONT_VALIDATE_SIGNATURE: int = ...
+COST_CONDITIONS: int = ...
 
 ELIGIBLE_FOR_DEDUP: int = ...
 ELIGIBLE_FOR_FF: int = ...
@@ -437,6 +441,11 @@ class MerkleSet:
         self,
         leafs: list[bytes32],
     ) -> None: ...
+
+@final
+class PlotSize:
+    size_v1: Optional[uint8]
+    size_v2: Optional[uint8]
 """
     )
 

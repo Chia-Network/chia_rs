@@ -1,53 +1,53 @@
-use chia_protocol::{Bytes, Bytes32};
+use chia_protocol::Bytes32;
 use clvm_traits::{FromClvm, ToClvm};
+use clvmr::NodePtr;
+
+use crate::Memos;
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(transparent)]
-pub struct SettlementPaymentsSolution {
-    pub notarized_payments: Vec<NotarizedPayment>,
+pub struct SettlementPaymentsSolution<T = NodePtr> {
+    pub notarized_payments: Vec<NotarizedPayment<T>>,
+}
+
+impl SettlementPaymentsSolution {
+    pub fn new(notarized_payments: Vec<NotarizedPayment>) -> Self {
+        Self { notarized_payments }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(list)]
-pub struct NotarizedPayment {
+pub struct NotarizedPayment<T = NodePtr> {
     pub nonce: Bytes32,
     #[clvm(rest)]
-    pub payments: Vec<Payment>,
+    pub payments: Vec<Payment<T>>,
+}
+
+impl NotarizedPayment {
+    pub fn new(nonce: Bytes32, payments: Vec<Payment>) -> Self {
+        Self { nonce, payments }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(list)]
-pub struct Payment {
+pub struct Payment<T = NodePtr> {
     pub puzzle_hash: Bytes32,
     pub amount: u64,
-    /// The memos should usually be set to [`None`] instead of an empty list.
-    /// This is for compatibility with the way the reference wallet encodes offers.
     #[clvm(rest)]
-    pub memos: Option<Memos>,
+    pub memos: Memos<T>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, ToClvm, FromClvm)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[clvm(list)]
-pub struct Memos(pub Vec<Bytes>);
-
 impl Payment {
-    pub fn new(puzzle_hash: Bytes32, amount: u64) -> Self {
+    pub fn new(puzzle_hash: Bytes32, amount: u64, memos: Memos) -> Self {
         Self {
             puzzle_hash,
             amount,
-            memos: None,
-        }
-    }
-
-    pub fn with_memos(puzzle_hash: Bytes32, amount: u64, memos: Vec<Bytes>) -> Self {
-        Self {
-            puzzle_hash,
-            amount,
-            memos: Some(Memos(memos)),
+            memos,
         }
     }
 }
@@ -69,7 +69,7 @@ mod tests {
             (0x2a5cbc6f5076e0517bdb1e4664b3c26e64d27178b65aaa1ae97267eee629113b 0x04a817c800 ())
         ))
         */
-        let expected_payment = node_from_bytes(
+        let expected_solution = node_from_bytes(
             &mut allocator,
             &hex!(
                 "
@@ -87,20 +87,17 @@ mod tests {
             "2a5cbc6f5076e0517bdb1e4664b3c26e64d27178b65aaa1ae97267eee629113b"
         ));
         let amount = 20_000_000_000;
-        let memos = Vec::new();
 
-        let payment = Payment::with_memos(puzzle_hash, amount, memos);
-        let notarized_payment = SettlementPaymentsSolution {
-            notarized_payments: vec![NotarizedPayment {
-                nonce,
-                payments: vec![payment],
-            }],
-        }
+        let payment = Payment::new(puzzle_hash, amount, Memos::Some(NodePtr::NIL));
+        let solution = SettlementPaymentsSolution::new(vec![NotarizedPayment {
+            nonce,
+            payments: vec![payment],
+        }])
         .to_clvm(&mut allocator)?;
 
         assert_eq!(
-            tree_hash(&allocator, notarized_payment),
-            tree_hash(&allocator, expected_payment)
+            tree_hash(&allocator, solution),
+            tree_hash(&allocator, expected_solution)
         );
 
         Ok(())
@@ -115,7 +112,7 @@ mod tests {
             (0x2a5cbc6f5076e0517bdb1e4664b3c26e64d27178b65aaa1ae97267eee629113b 0x04a817c800)
         ))
         */
-        let expected_payment = node_from_bytes(
+        let expected_solution = node_from_bytes(
             &mut allocator,
             &hex!(
                 "
@@ -134,18 +131,16 @@ mod tests {
         ));
         let amount = 20_000_000_000;
 
-        let payment = Payment::new(puzzle_hash, amount);
-        let notarized_payment = SettlementPaymentsSolution {
-            notarized_payments: vec![NotarizedPayment {
-                nonce,
-                payments: vec![payment],
-            }],
-        }
+        let payment = Payment::new(puzzle_hash, amount, Memos::<NodePtr>::None);
+        let solution = SettlementPaymentsSolution::new(vec![NotarizedPayment {
+            nonce,
+            payments: vec![payment],
+        }])
         .to_clvm(&mut allocator)?;
 
         assert_eq!(
-            tree_hash(&allocator, notarized_payment),
-            tree_hash(&allocator, expected_payment)
+            tree_hash(&allocator, solution),
+            tree_hash(&allocator, expected_solution)
         );
 
         Ok(())

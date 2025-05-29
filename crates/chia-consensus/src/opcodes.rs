@@ -65,6 +65,9 @@ pub const SOFTFORK: ConditionOpcode = 90;
 pub const CREATE_COIN_COST: Cost = 1_800_000;
 pub const AGG_SIG_COST: Cost = 1_200_000;
 
+pub const GENERIC_CONDITION_COST: Cost = 500;
+pub const FREE_CONDITIONS: usize = 100;
+
 // 2-byte condition opcodes have costs according to this table:
 
 // the values `100 * (17 ** idx)/(16 ** idx)` rounded to three significant decimal figures

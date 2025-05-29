@@ -11,17 +11,17 @@ use super::opcodes::{
     ASSERT_HEIGHT_ABSOLUTE, ASSERT_HEIGHT_RELATIVE, ASSERT_MY_AMOUNT, ASSERT_MY_BIRTH_HEIGHT,
     ASSERT_MY_BIRTH_SECONDS, ASSERT_MY_COIN_ID, ASSERT_MY_PARENT_ID, ASSERT_MY_PUZZLEHASH,
     ASSERT_PUZZLE_ANNOUNCEMENT, ASSERT_SECONDS_ABSOLUTE, ASSERT_SECONDS_RELATIVE, CREATE_COIN,
-    CREATE_COIN_ANNOUNCEMENT, CREATE_COIN_COST, CREATE_PUZZLE_ANNOUNCEMENT, RECEIVE_MESSAGE,
-    REMARK, RESERVE_FEE, SEND_MESSAGE, SOFTFORK,
+    CREATE_COIN_ANNOUNCEMENT, CREATE_COIN_COST, CREATE_PUZZLE_ANNOUNCEMENT, FREE_CONDITIONS,
+    GENERIC_CONDITION_COST, RECEIVE_MESSAGE, REMARK, RESERVE_FEE, SEND_MESSAGE, SOFTFORK,
 };
 use super::sanitize_int::{sanitize_uint, SanitizedUint};
 use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
 use crate::consensus_constants::ConsensusConstants;
-use crate::gen::flags::{DONT_VALIDATE_SIGNATURE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
-use crate::gen::make_aggsig_final_message::u64_to_bytes;
-use crate::gen::messages::{Message, SpendId};
-use crate::gen::spend_visitor::SpendVisitor;
-use crate::gen::validation_error::check_nil;
+use crate::flags::{COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
+use crate::make_aggsig_final_message::u64_to_bytes;
+use crate::messages::{Message, SpendId};
+use crate::spend_visitor::SpendVisitor;
+use crate::validation_error::check_nil;
 use chia_bls::{aggregate_verify, BlsCache, PublicKey, Signature};
 use chia_protocol::{Bytes, Bytes32, Coin};
 use chia_sha2::Sha256;
@@ -1003,9 +1003,11 @@ pub fn parse_conditions<V: SpendVisitor>(
     visitor: &mut V,
 ) -> Result<(), ValidationErr> {
     let mut announce_countdown: u32 = 1024;
+    let mut free_condition_countdown: usize = FREE_CONDITIONS;
 
     while let Some((mut c, next)) = next(a, iter)? {
         iter = next;
+
         let Some(op) = parse_opcode(a, first(a, c)?, flags) else {
             // in strict mode we don't allow unknown conditions
             if (flags & NO_UNKNOWN_CONDS) != 0 {
@@ -1039,7 +1041,18 @@ pub fn parse_conditions<V: SpendVisitor>(
                 *max_cost -= AGG_SIG_COST;
                 ret.condition_cost += AGG_SIG_COST;
             }
-            _ => (),
+            _ => {}
+        }
+        if (flags & COST_CONDITIONS) != 0 {
+            if free_condition_countdown == 0 {
+                if *max_cost < GENERIC_CONDITION_COST {
+                    return Err(ValidationErr(c, ErrorCode::CostExceeded));
+                }
+                *max_cost -= GENERIC_CONDITION_COST;
+                ret.condition_cost += GENERIC_CONDITION_COST;
+            } else {
+                free_condition_countdown -= 1;
+            }
         }
         c = rest(a, c)?;
         let cva = parse_args(a, c, op, flags)?;
@@ -1211,27 +1224,39 @@ pub fn parse_conditions<V: SpendVisitor>(
                 }
             }
             Condition::CreateCoinAnnouncement(msg) => {
-                decrement(&mut announce_countdown, msg)?;
+                if (flags & COST_CONDITIONS) == 0 {
+                    decrement(&mut announce_countdown, msg)?;
+                }
                 state.announce_coin.insert((spend.coin_id.clone(), msg));
             }
             Condition::CreatePuzzleAnnouncement(msg) => {
-                decrement(&mut announce_countdown, msg)?;
+                if flags & COST_CONDITIONS == 0 {
+                    decrement(&mut announce_countdown, msg)?;
+                }
                 state.announce_puzzle.insert((spend.puzzle_hash, msg));
             }
             Condition::AssertCoinAnnouncement(msg) => {
-                decrement(&mut announce_countdown, msg)?;
+                if flags & COST_CONDITIONS == 0 {
+                    decrement(&mut announce_countdown, msg)?;
+                }
                 state.assert_coin.insert(msg);
             }
             Condition::AssertPuzzleAnnouncement(msg) => {
-                decrement(&mut announce_countdown, msg)?;
+                if flags & COST_CONDITIONS == 0 {
+                    decrement(&mut announce_countdown, msg)?;
+                }
                 state.assert_puzzle.insert(msg);
             }
             Condition::AssertConcurrentSpend(id) => {
-                decrement(&mut announce_countdown, id)?;
+                if flags & COST_CONDITIONS == 0 {
+                    decrement(&mut announce_countdown, id)?;
+                }
                 state.assert_concurrent_spend.insert(id);
             }
             Condition::AssertConcurrentPuzzle(id) => {
-                decrement(&mut announce_countdown, id)?;
+                if flags & COST_CONDITIONS == 0 {
+                    decrement(&mut announce_countdown, id)?;
+                }
                 state.assert_concurrent_puzzle.insert(id);
             }
             Condition::AggSigMe(pk, msg) => {
@@ -1319,7 +1344,9 @@ pub fn parse_conditions<V: SpendVisitor>(
                 ret.condition_cost += cost;
             }
             Condition::SendMessage(src_mode, dst, msg) => {
-                decrement(&mut announce_countdown, msg)?;
+                if flags & COST_CONDITIONS == 0 {
+                    decrement(&mut announce_countdown, msg)?;
+                }
                 let src = SpendId::from_self(
                     src_mode,
                     spend.parent_id,
@@ -1335,7 +1362,9 @@ pub fn parse_conditions<V: SpendVisitor>(
                 });
             }
             Condition::ReceiveMessage(src, dst_mode, msg) => {
-                decrement(&mut announce_countdown, msg)?;
+                if flags & COST_CONDITIONS == 0 {
+                    decrement(&mut announce_countdown, msg)?;
+                }
                 let dst = SpendId::from_self(
                     dst_mode,
                     spend.parent_id,
@@ -1493,7 +1522,7 @@ pub fn validate_conditions(
     }
 
     if !state.assert_concurrent_puzzle.is_empty() {
-        let mut spent_phs = HashSet::<Bytes32>::new();
+        let mut spent_phs = HashSet::<Bytes32>::with_capacity(state.spent_puzzles.len());
 
         // expand all the spent puzzle hashes into a set, to allow
         // fast lookups of all assertions
@@ -1514,7 +1543,7 @@ pub fn validate_conditions(
     // check all the assert announcements
     // if there are no asserts, there is no need to hash all the announcements
     if !state.assert_coin.is_empty() {
-        let mut announcements = HashSet::<Bytes32>::new();
+        let mut announcements = HashSet::<Bytes32>::with_capacity(state.announce_coin.len());
 
         for (coin_id, announce) in &state.announce_coin {
             let mut hasher = Sha256::new();
@@ -1557,7 +1586,7 @@ pub fn validate_conditions(
     }
 
     if !state.assert_puzzle.is_empty() {
-        let mut announcements = HashSet::<Bytes32>::new();
+        let mut announcements = HashSet::<Bytes32>::with_capacity(state.announce_puzzle.len());
 
         for (puzzle_hash, announce) in &state.announce_puzzle {
             let mut hasher = Sha256::new();
@@ -1582,7 +1611,7 @@ pub fn validate_conditions(
         // minus the number of times it's been received. At the end we ensure
         // all counters are 0, otherwise some message wasn't received or sent
         // the right number of times.
-        let mut messages = HashMap::<Vec<u8>, i32>::new();
+        let mut messages = HashMap::<Vec<u8>, i32>::with_capacity(state.messages.len());
 
         for msg in &state.messages {
             *messages.entry(msg.make_key(a)).or_insert(0) += i32::from(msg.counter);
@@ -1639,6 +1668,8 @@ pub fn validate_signature(
 
 #[cfg(test)]
 use crate::consensus_constants::TEST_CONSTANTS;
+#[cfg(test)]
+use chia_protocol::Bytes48;
 #[cfg(test)]
 use clvmr::number::Number;
 #[cfg(test)]
@@ -1903,7 +1934,10 @@ fn cond_test_cb(
 }
 
 #[cfg(test)]
-use crate::gen::flags::MEMPOOL_MODE;
+use crate::flags::MEMPOOL_MODE;
+
+#[cfg(test)]
+use clvm_traits::ToClvm;
 
 #[cfg(test)]
 fn cond_test(input: &str) -> Result<(Allocator, SpendBundleConditions), ValidationErr> {
@@ -3154,14 +3188,9 @@ fn test_create_coin_exceed_cost() {
 
                 for i in 0..6500 {
                     // this builds one CREATE_COIN condition
-                    // borrow-rules prevent this from being succint
-                    let coin = a.nil();
-                    let val = a.new_atom(&u64_to_bytes(i)).unwrap();
-                    let coin = a.new_pair(val, coin).unwrap();
-                    let val = a.new_atom(H2).unwrap();
-                    let coin = a.new_pair(val, coin).unwrap();
-                    let val = a.new_atom(&u64_to_bytes(u64::from(CREATE_COIN))).unwrap();
-                    let coin = a.new_pair(val, coin).unwrap();
+                    let coin = (CREATE_COIN, (Bytes32::from(H2), (i, 0)))
+                        .to_clvm(a)
+                        .unwrap();
 
                     // add the CREATE_COIN condition to the list (called rest)
                     rest = a.new_pair(coin, rest).unwrap();
@@ -3391,14 +3420,12 @@ fn test_agg_sig_exceed_cost(#[case] condition: ConditionOpcode) {
 
                 for _i in 0..9167 {
                     // this builds one AGG_SIG_* condition
-                    // borrow-rules prevent this from being succint
-                    let aggsig = a.nil();
-                    let val = a.new_atom(MSG1).unwrap();
-                    let aggsig = a.new_pair(val, aggsig).unwrap();
-                    let val = a.new_atom(PUBKEY).unwrap();
-                    let aggsig = a.new_pair(val, aggsig).unwrap();
-                    let val = a.new_atom(&u64_to_bytes(u64::from(condition))).unwrap();
-                    let aggsig = a.new_pair(val, aggsig).unwrap();
+                    let aggsig = (
+                        condition,
+                        (Bytes48::from(PUBKEY), (Bytes::from(MSG1.as_slice()), 0)),
+                    )
+                        .to_clvm(a)
+                        .unwrap();
 
                     // add the condition to the list (called rest)
                     rest = a.new_pair(aggsig, rest).unwrap();
@@ -3607,8 +3634,8 @@ fn final_message(
     msg: &[u8],
 ) -> Vec<u8> {
     use crate::allocator::make_allocator;
-    use crate::gen::make_aggsig_final_message::make_aggsig_final_message;
-    use crate::gen::owned_conditions::OwnedSpendConditions;
+    use crate::make_aggsig_final_message::make_aggsig_final_message;
+    use crate::owned_conditions::OwnedSpendConditions;
     use chia_protocol::Coin;
     use clvmr::LIMIT_HEAP;
 
@@ -3700,16 +3727,12 @@ fn test_agg_sig_unsafe_exceed_cost() {
 
                 for _i in 0..9167 {
                     // this builds one AGG_SIG_UNSAFE condition
-                    // borrow-rules prevent this from being succint
-                    let aggsig = a.nil();
-                    let val = a.new_atom(MSG1).unwrap();
-                    let aggsig = a.new_pair(val, aggsig).unwrap();
-                    let val = a.new_atom(PUBKEY).unwrap();
-                    let aggsig = a.new_pair(val, aggsig).unwrap();
-                    let val = a
-                        .new_atom(&u64_to_bytes(u64::from(AGG_SIG_UNSAFE)))
+                    let aggsig = (
+                        AGG_SIG_UNSAFE,
+                        (Bytes48::from(PUBKEY), (Bytes::from(MSG1.as_slice()), 0)),
+                    )
+                        .to_clvm(a)
                         .unwrap();
-                    let aggsig = a.new_pair(val, aggsig).unwrap();
 
                     // add the AGG_SIG_UNSAFE condition to the list (called rest)
                     rest = a.new_pair(aggsig, rest).unwrap();
@@ -4072,6 +4095,134 @@ fn test_assert_concurrent_puzzle_self() {
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.agg_sig_me.len(), 0);
     assert_eq!(spend.flags, 0);
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(101)]
+#[case(1001)]
+#[case(5001)]
+#[case(99)]
+fn test_cost_all_conds_after_free(#[case] count: usize) {
+    let r = cond_test_cb(
+        "((({h1} ({h2} (123 ({} )))",
+        COST_CONDITIONS,
+        Some(Box::new(move |a: &mut Allocator| -> NodePtr {
+            let mut rest: NodePtr = a.nil();
+
+            // generate a lot of announcements
+            for _ in 0..count {
+                // this builds one condition
+                let ann = (ASSERT_MY_COIN_ID, (test_coin_id(H1, H2, 123), 0))
+                    .to_clvm(a)
+                    .unwrap();
+
+                // add the condition to the list
+                rest = a.new_pair(ann, rest).unwrap();
+            }
+            rest
+        })),
+        &Signature::default(),
+        None,
+    );
+    assert!(r.is_ok());
+    assert_eq!(
+        r.unwrap().1.condition_cost,
+        if count > FREE_CONDITIONS {
+            (count as u64 - FREE_CONDITIONS as u64) * GENERIC_CONDITION_COST
+        } else {
+            0
+        }
+    );
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(101)]
+#[case(1001)]
+#[case(5001)]
+#[case(99)]
+fn test_cost_create_coins_conds_after_free(#[case] count: usize) {
+    let r = cond_test_cb(
+        "((({h1} ({h2} (1230000000000 ({} )))",
+        COST_CONDITIONS,
+        Some(Box::new(move |a: &mut Allocator| -> NodePtr {
+            let mut rest: NodePtr = a.nil();
+
+            // generate a lot of announcements
+            for i in 0..count {
+                // this builds one condition
+                let ann = (CREATE_COIN, (Bytes32::from(H1), (i, 0)))
+                    .to_clvm(a)
+                    .unwrap();
+
+                // add the condition to the list
+                rest = a.new_pair(ann, rest).unwrap();
+            }
+            rest
+        })),
+        &Signature::default(),
+        None,
+    );
+    assert!(r.is_ok());
+    assert_eq!(
+        r.unwrap().1.condition_cost,
+        if count > FREE_CONDITIONS {
+            ((count as u64 - FREE_CONDITIONS as u64) * GENERIC_CONDITION_COST)
+                + (CREATE_COIN_COST * count as u64)
+        } else {
+            CREATE_COIN_COST * count as u64
+        }
+    );
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(101)]
+#[case(1001)]
+#[case(5001)]
+#[case(99)]
+fn test_cost_aggsig_conds_after_free(#[case] count: usize) {
+    use chia_bls::{sign, SecretKey};
+
+    let sk = SecretKey::from_bytes(SECRET_KEY).expect("secret key");
+    let pk = sk.public_key();
+    let mut sig = Signature::default();
+    for _ in 0..count {
+        let new_sig = sign(&sk, H1);
+        sig.aggregate(&new_sig);
+    }
+    let r = cond_test_cb(
+        "((({h1} ({h2} (1230000000000 ({} )))",
+        COST_CONDITIONS,
+        Some(Box::new(move |a: &mut Allocator| -> NodePtr {
+            let mut rest: NodePtr = a.nil();
+
+            // generate a lot of announcements
+            for _ in 0..count {
+                // this builds one condition
+                let ann = (AGG_SIG_UNSAFE, (&pk, (Bytes::from(H1.as_slice()), 0)))
+                    .to_clvm(a)
+                    .unwrap();
+
+                // add the condition to the list
+                rest = a.new_pair(ann, rest).unwrap();
+            }
+            rest
+        })),
+        &sig,
+        None,
+    );
+    assert!(r.is_ok());
+    assert_eq!(
+        r.unwrap().1.condition_cost,
+        if count > FREE_CONDITIONS {
+            ((count as u64 - FREE_CONDITIONS as u64) * GENERIC_CONDITION_COST)
+                + (AGG_SIG_COST * count as u64)
+        } else {
+            AGG_SIG_COST * count as u64
+        }
+    );
 }
 
 // the relative constraints clash because they are on the same coin spend
@@ -4668,62 +4819,111 @@ fn test_softfork_condition_failures(#[case] conditions: &str, #[case] expected_e
 
 #[cfg(test)]
 #[rstest]
-#[case(CREATE_PUZZLE_ANNOUNCEMENT, 1000, None)]
+#[case(CREATE_PUZZLE_ANNOUNCEMENT, 1000, 0, None)]
 #[case(
     CREATE_PUZZLE_ANNOUNCEMENT,
     1025,
+    0,
     Some(ErrorCode::TooManyAnnouncements)
 )]
 #[case(
     ASSERT_PUZZLE_ANNOUNCEMENT,
     1024,
+    0,
     Some(ErrorCode::AssertPuzzleAnnouncementFailed)
 )]
 #[case(
     ASSERT_PUZZLE_ANNOUNCEMENT,
     1025,
+    0,
     Some(ErrorCode::TooManyAnnouncements)
 )]
-#[case(CREATE_COIN_ANNOUNCEMENT, 1000, None)]
-#[case(CREATE_COIN_ANNOUNCEMENT, 1025, Some(ErrorCode::TooManyAnnouncements))]
+#[case(CREATE_COIN_ANNOUNCEMENT, 1000, 0, None)]
+#[case(
+    CREATE_COIN_ANNOUNCEMENT,
+    1025,
+    0,
+    Some(ErrorCode::TooManyAnnouncements)
+)]
 #[case(
     ASSERT_COIN_ANNOUNCEMENT,
     1024,
+    0,
     Some(ErrorCode::AssertCoinAnnouncementFailed)
 )]
-#[case(ASSERT_COIN_ANNOUNCEMENT, 1025, Some(ErrorCode::TooManyAnnouncements))]
+#[case(
+    ASSERT_COIN_ANNOUNCEMENT,
+    1025,
+    0,
+    Some(ErrorCode::TooManyAnnouncements)
+)]
 #[case(
     ASSERT_CONCURRENT_SPEND,
     1024,
+    0,
     Some(ErrorCode::AssertConcurrentSpendFailed)
 )]
-#[case(ASSERT_CONCURRENT_SPEND, 1025, Some(ErrorCode::TooManyAnnouncements))]
+#[case(
+    ASSERT_CONCURRENT_SPEND,
+    1025,
+    0,
+    Some(ErrorCode::TooManyAnnouncements)
+)]
 #[case(
     ASSERT_CONCURRENT_PUZZLE,
     1024,
+    0,
     Some(ErrorCode::AssertConcurrentPuzzleFailed)
 )]
-#[case(ASSERT_CONCURRENT_PUZZLE, 1025, Some(ErrorCode::TooManyAnnouncements))]
+#[case(
+    ASSERT_CONCURRENT_PUZZLE,
+    1025,
+    0,
+    Some(ErrorCode::TooManyAnnouncements)
+)]
+// new flag tests
+#[case(CREATE_PUZZLE_ANNOUNCEMENT, 1025, COST_CONDITIONS, None)]
+#[case(
+    ASSERT_PUZZLE_ANNOUNCEMENT,
+    1025,
+    COST_CONDITIONS,
+    Some(ErrorCode::AssertPuzzleAnnouncementFailed)
+)]
+#[case(CREATE_COIN_ANNOUNCEMENT, 1025, COST_CONDITIONS, None)]
+#[case(
+    ASSERT_COIN_ANNOUNCEMENT,
+    1025,
+    COST_CONDITIONS,
+    Some(ErrorCode::AssertCoinAnnouncementFailed)
+)]
+#[case(
+    ASSERT_CONCURRENT_SPEND,
+    1025,
+    COST_CONDITIONS,
+    Some(ErrorCode::AssertConcurrentSpendFailed)
+)]
+#[case(
+    ASSERT_CONCURRENT_PUZZLE,
+    1025,
+    COST_CONDITIONS,
+    Some(ErrorCode::AssertConcurrentPuzzleFailed)
+)]
 fn test_limit_announcements(
     #[case] cond: ConditionOpcode,
     #[case] count: i32,
+    #[case] flag: u32,
     #[case] expect_err: Option<ErrorCode>,
 ) {
     let r = cond_test_cb(
         "((({h1} ({h1} (123 ({} )))",
-        0,
+        flag,
         Some(Box::new(move |a: &mut Allocator| -> NodePtr {
             let mut rest: NodePtr = a.nil();
 
             // generate a lot of announcements
             for _ in 0..count {
                 // this builds one condition
-                // borrow-rules prevent this from being succint
-                let ann = a.nil();
-                let val = a.new_atom(H2).unwrap();
-                let ann = a.new_pair(val, ann).unwrap();
-                let val = a.new_atom(&u64_to_bytes(u64::from(cond))).unwrap();
-                let ann = a.new_pair(val, ann).unwrap();
+                let ann = (cond, (Bytes32::from(H2), 0)).to_clvm(a).unwrap();
 
                 // add the condition to the list
                 rest = a.new_pair(ann, rest).unwrap();
@@ -5208,39 +5408,42 @@ fn test_message_conditions_single_spend(#[case] test_case: &str, #[case] expect:
 
 #[cfg(test)]
 #[rstest]
-#[case(512, None)]
-#[case(513, Some(ErrorCode::TooManyAnnouncements))]
-fn test_limit_messages(#[case] count: i32, #[case] expect_err: Option<ErrorCode>) {
+#[case(512, 0, None)]
+#[case(513, 0, Some(ErrorCode::TooManyAnnouncements))]
+#[case(513, COST_CONDITIONS, None)]
+fn test_limit_messages(
+    #[case] count: i32,
+    #[case] flags: u32,
+    #[case] expect_err: Option<ErrorCode>,
+) {
     let r = cond_test_cb(
         "((({h1} ({h1} (123 ({} )))",
-        0,
+        flags,
         Some(Box::new(move |a: &mut Allocator| -> NodePtr {
             let mut rest: NodePtr = a.nil();
 
             // generate a lot of announcements
-            // this builds one condition
-            // borrow-rules prevent this from being succint
             // (66 0x3f {msg1} {coin12})
-            let send = a.nil();
-            let val = a.new_atom(&test_coin_id(H1, H1, 123)).unwrap();
-            let send = a.new_pair(val, send).unwrap();
-            let val = a.new_atom(MSG1).unwrap();
-            let send = a.new_pair(val, send).unwrap();
-            let val = a.new_small_number(0x3f).unwrap();
-            let send = a.new_pair(val, send).unwrap();
-            let val = a.new_small_number(SEND_MESSAGE.into()).unwrap();
-            let send = a.new_pair(val, send).unwrap();
+            let send = (
+                SEND_MESSAGE,
+                (
+                    0x3f,
+                    (Bytes::from(MSG1.as_slice()), (test_coin_id(H1, H1, 123), 0)),
+                ),
+            )
+                .to_clvm(a)
+                .unwrap();
 
             // (67 0x3f {msg1} {coin12})
-            let recv = a.nil();
-            let val = a.new_atom(&test_coin_id(H1, H1, 123)).unwrap();
-            let recv = a.new_pair(val, recv).unwrap();
-            let val = a.new_atom(MSG1).unwrap();
-            let recv = a.new_pair(val, recv).unwrap();
-            let val = a.new_small_number(0x3f).unwrap();
-            let recv = a.new_pair(val, recv).unwrap();
-            let val = a.new_small_number(RECEIVE_MESSAGE.into()).unwrap();
-            let recv = a.new_pair(val, recv).unwrap();
+            let recv = (
+                RECEIVE_MESSAGE,
+                (
+                    0x3f,
+                    (Bytes::from(MSG1.as_slice()), (test_coin_id(H1, H1, 123), 0)),
+                ),
+            )
+                .to_clvm(a)
+                .unwrap();
 
             for _ in 0..count {
                 // add the condition to the list

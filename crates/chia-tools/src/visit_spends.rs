@@ -1,6 +1,6 @@
-use chia_consensus::gen::run_block_generator::extract_n;
-use chia_consensus::gen::validation_error::{first, ErrorCode, ValidationErr};
 use chia_consensus::generator_rom::CLVM_DESERIALIZER;
+use chia_consensus::run_block_generator::extract_n;
+use chia_consensus::validation_error::{first, ErrorCode, ValidationErr};
 use chia_protocol::Bytes32;
 use chia_protocol::FullBlock;
 use chia_traits::streamable::Streamable;

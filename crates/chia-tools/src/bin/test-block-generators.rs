@@ -1,15 +1,15 @@
 use clap::Parser;
 
 use chia_bls::PublicKey;
+use chia_consensus::conditions::{NewCoin, SpendBundleConditions, SpendConditions};
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
-use chia_consensus::gen::conditions::{NewCoin, SpendBundleConditions, SpendConditions};
-use chia_consensus::gen::flags::{DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
-use chia_consensus::gen::run_block_generator::{run_block_generator, run_block_generator2};
+use chia_consensus::flags::{DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
+use chia_consensus::run_block_generator::{run_block_generator, run_block_generator2};
 use chia_protocol::Program;
 use chia_tools::iterate_blocks;
 use clvmr::allocator::NodePtr;
-use clvmr::serde::node_from_bytes_backrefs;
 use clvmr::serde::Serializer;
+use clvmr::serde::{is_canonical_serialization, node_from_bytes_backrefs};
 use clvmr::Allocator;
 use std::collections::HashSet;
 use std::io::Write;
@@ -40,6 +40,10 @@ struct Args {
     /// This cannot be combined with --original-generator
     #[arg(long, default_value_t = false)]
     test_serializer: bool,
+
+    /// check all block generators to see if any is using overlong encoding
+    #[arg(long, default_value_t = false)]
+    test_canonical_encoding: bool,
 
     /// Compare the output from the default ROM running in consensus mode
     /// against the hard-fork rules for executing block generators. After the
@@ -188,6 +192,13 @@ fn main() {
                     .transactions_generator
                     .as_ref()
                     .expect("transactions_generator");
+
+                if args.test_canonical_encoding {
+                    if !is_canonical_serialization(generator) {
+                        println!("generator at height {height} uses overlong CLVM encoding");
+                    }
+                    return;
+                }
 
                 // after the hard fork, we run blocks without paying for the
                 // CLVM generator ROM

@@ -75,7 +75,7 @@ impl BlockRecord {
         calculate_sp_iters(
             num_sps_sub_slot,
             self.sub_slot_iters,
-            self.signage_point_index as u32,
+            self.signage_point_index,
         )
     }
 
@@ -84,7 +84,7 @@ impl BlockRecord {
             num_sps_sub_slot,
             num_sp_intervals_extra,
             self.sub_slot_iters,
-            self.signage_point_index as u32,
+            self.signage_point_index,
             self.required_iters,
         )
     }

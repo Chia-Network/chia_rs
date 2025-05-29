@@ -19,7 +19,7 @@ def test_raise_program() -> None:
         # (x (q . "foobar"))
         prg = Program.fromhex("ff08ffff0186666f6f62617280")
 
-        prg.run_with_cost(100000, [])
+        prg.run_rust(100000, 0, [])
         # We expect this to throw
         assert False
     except ValueError as e:

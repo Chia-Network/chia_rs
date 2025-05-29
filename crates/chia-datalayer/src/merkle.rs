@@ -829,11 +829,13 @@ impl BlockStatusCache {
 
     fn move_index(&mut self, source: TreeIndex, destination: TreeIndex) -> Result<(), Error> {
         // to be called _after_ having written to the destination index
+        // TODO: not checking it is within bounds of the present blob
         if self.free_indexes.contains(&source) {
             return Err(Error::MoveSourceIndexNotInUse(source));
         };
+        // TODO: not checking it is within bounds of the present blob
         if self.free_indexes.contains(&destination) {
-            return Err(Error::MoveDestinationIndexNotInUse(source));
+            return Err(Error::MoveDestinationIndexNotInUse(destination));
         };
 
         self.free_indexes.insert(source);
@@ -1630,8 +1632,6 @@ impl MerkleBlob {
             sibling_block.node.set_parent(Parent(None));
             let destination = TreeIndex(0);
             if let Node::Internal(node) = sibling_block.node {
-                // TODO: is the sibling really dirty?
-                sibling_block.metadata.dirty = true;
                 for child_index in [node.left, node.right] {
                     self.update_parent(child_index, Some(destination))?;
                 }
@@ -2187,15 +2187,6 @@ impl PartialEq for MerkleBlob {
         true
     }
 }
-
-// impl<'a> IntoIterator for &'a MerkleBlob {
-//     type Item = (TreeIndex, Block);
-//     type IntoIter = MerkleBlobLeftChildFirstIterator<'a>;
-//
-//     fn into_iter(self) -> Self::IntoIter {
-//         MerkleBlobLeftChildFirstIterator::new(&self.blob)
-//     }
-// }
 
 #[cfg(feature = "py-bindings")]
 #[pymethods]
@@ -2877,6 +2868,7 @@ mod tests {
             )
             .unwrap();
 
+        small_blob.calculate_lazy_hashes().unwrap();
         small_blob
     }
 
@@ -3427,7 +3419,7 @@ mod tests {
                     1,
                     6,
                     Hash(
-                        326ab98d7766e8a48e3ad28d1667cff22d294f741ce4bbc386a761658ae1c36d,
+                        547b5bd537270427e570df6e43dda7c4ef23e6c3bec72cf19d912c3fe864f549,
                     ),
                 ),
                 (
@@ -3445,7 +3437,7 @@ mod tests {
                     4,
                     2,
                     Hash(
-                        343384ed794d339da6c1ff33cc59d48b5f48494d92d9d4bd6c00147304bb2371,
+                        cc7f12227cc5d96a631963804544872d67aef8b3a86ef9fbc798f7c5dfdbac2b,
                     ),
                 ),
             ]
@@ -3464,7 +3456,7 @@ mod tests {
                     4,
                     2,
                     Hash(
-                        343384ed794d339da6c1ff33cc59d48b5f48494d92d9d4bd6c00147304bb2371,
+                        cc7f12227cc5d96a631963804544872d67aef8b3a86ef9fbc798f7c5dfdbac2b,
                     ),
                 ),
                 (
@@ -3473,7 +3465,7 @@ mod tests {
                     1,
                     6,
                     Hash(
-                        326ab98d7766e8a48e3ad28d1667cff22d294f741ce4bbc386a761658ae1c36d,
+                        547b5bd537270427e570df6e43dda7c4ef23e6c3bec72cf19d912c3fe864f549,
                     ),
                 ),
                 (
@@ -3745,6 +3737,14 @@ mod tests {
     }
 
     #[rstest]
+    fn test_proof_of_inclusion_invalid_identified(traversal_blob: MerkleBlob) {
+        let mut proof_of_inclusion = traversal_blob.get_proof_of_inclusion(KeyId(307)).unwrap();
+        assert!(proof_of_inclusion.valid());
+        proof_of_inclusion.layers[1].combined_hash = HASH_ONE;
+        assert!(!proof_of_inclusion.valid());
+    }
+
+    #[rstest]
     fn test_writing_to_free_block_that_contained_an_active_key(small_blob: MerkleBlob) {
         let key = KeyId(0x0001_0203_0405_0607);
         let Some(index) = small_blob.block_status_cache.get_index_by_key(key).copied() else {
@@ -3863,7 +3863,7 @@ mod tests {
     }
 
     #[test]
-    fn test_delta_reader_collect_from_merkle_blob() {
+    fn test_delta_reader_collect_from_merkle_blob_completes_incomplete() {
         let mut delta_reader = incomplete_delta_reader();
         let mut merkle_blob = MerkleBlob::new(Vec::new()).unwrap();
         merkle_blob
@@ -3875,6 +3875,27 @@ mod tests {
         merkle_blob.to_path(&leaf_blob_path).unwrap();
         delta_reader
             .collect_from_merkle_blob(&leaf_blob_path, &vec![TreeIndex(0)])
+            .unwrap();
+
+        let missing = delta_reader.get_missing_hashes();
+
+        #[allow(clippy::needless_raw_string_hashes)]
+        let expected = expect![[r#"
+            {}
+        "#]];
+        expected.assert_debug_eq(&missing);
+    }
+
+    #[rstest]
+    fn test_delta_reader_collect_from_merkle_blob_is_complete(traversal_blob: MerkleBlob) {
+        let mut delta_reader = DeltaReader {
+            nodes: HashMap::new(),
+        };
+        let dir_path = tempfile::tempdir().unwrap();
+        let blob_path = dir_path.path().join("merkle_blob");
+        traversal_blob.to_path(&blob_path).unwrap();
+        delta_reader
+            .collect_from_merkle_blob(&blob_path, &vec![TreeIndex(0)])
             .unwrap();
 
         let missing = delta_reader.get_missing_hashes();
@@ -3910,6 +3931,17 @@ mod tests {
         expected.assert_debug_eq(&missing);
     }
 
+    #[rstest]
+    fn test_merkle_blob_to_from_path(traversal_blob: MerkleBlob) {
+        let dir_path = tempfile::tempdir().unwrap();
+        let file_path = dir_path.path().join("blob");
+        traversal_blob.to_path(&file_path).unwrap();
+        let loaded = MerkleBlob::from_path(&file_path).unwrap();
+
+        assert_eq!(traversal_blob, loaded);
+        assert_eq!(traversal_blob.blob, loaded.blob);
+    }
+
     #[test]
     #[should_panic(expected = "integrity check failed while dropping merkle blob: CycleFound")]
     fn test_delta_reader_create_merkle_blob_incomplete_fails() {
@@ -3923,9 +3955,10 @@ mod tests {
     #[test]
     fn test_delta_reader_create_merkle_blob_works() {
         let mut delta_reader = complete_delta_reader();
+        let interested_hashes: HashSet<Hash> = delta_reader.nodes.keys().copied().collect();
 
         let (complete_blob, _) = delta_reader
-            .create_merkle_blob_and_filter_unused_nodes(HASH_ZERO, &HashSet::new())
+            .create_merkle_blob_and_filter_unused_nodes(HASH_ZERO, &interested_hashes)
             .unwrap();
         complete_blob.check_integrity().unwrap();
     }
@@ -4076,5 +4109,94 @@ mod tests {
         let key = KeyId(0x0001_0203_0405_0607);
         let index = small_blob.get_key_index(key).unwrap();
         assert_eq!(index, TreeIndex(2));
+    }
+
+    #[rstest]
+    fn test_block_status_cache_move_index_invalid_source(mut traversal_blob: MerkleBlob) {
+        let key = KeyId(307);
+        let index = traversal_blob.get_key_index(key).unwrap();
+        traversal_blob.delete(key).unwrap();
+        assert!(traversal_blob
+            .block_status_cache
+            .free_indexes
+            .contains(&index));
+        let result = traversal_blob.block_status_cache.move_index(index, index);
+        #[allow(clippy::needless_raw_string_hashes)]
+        let expected = expect![[r#"
+            Err(
+                MoveSourceIndexNotInUse(
+                    TreeIndex(
+                        5,
+                    ),
+                ),
+            )
+        "#]];
+
+        expected.assert_debug_eq(&result);
+    }
+
+    #[rstest]
+    fn test_block_status_cache_move_index_invalid_destination(mut traversal_blob: MerkleBlob) {
+        let key = KeyId(307);
+        let index = traversal_blob.get_key_index(key).unwrap();
+        traversal_blob.delete(key).unwrap();
+        assert!(traversal_blob
+            .block_status_cache
+            .free_indexes
+            .contains(&index));
+        let result = traversal_blob
+            .block_status_cache
+            .move_index(TreeIndex(0), index);
+        #[allow(clippy::needless_raw_string_hashes)]
+        let expected = expect![[r#"
+            Err(
+                MoveDestinationIndexNotInUse(
+                    TreeIndex(
+                        5,
+                    ),
+                ),
+            )
+        "#]];
+
+        expected.assert_debug_eq(&result);
+    }
+
+    #[rstest]
+    fn test_collect_and_return(traversal_blob: MerkleBlob) {
+        let dir_path = tempfile::tempdir().unwrap();
+        let file_path = dir_path.path().join("blob");
+        traversal_blob.to_path(&file_path).unwrap();
+        let hashes = traversal_blob
+            .get_hashes_indexes(false)
+            .unwrap()
+            .into_keys()
+            .collect::<HashSet<Hash>>();
+        let root_hash = traversal_blob.get_hash(TreeIndex(0)).unwrap();
+
+        let mut delta_reader = DeltaReader {
+            nodes: HashMap::new(),
+        };
+        let mut root_hash_to_node_hash_to_index = delta_reader
+            .collect_and_return_from_merkle_blobs(&vec![(root_hash, file_path)], &hashes)
+            .unwrap();
+
+        let (collected_root_hash, collected_node_hash_to_index) =
+            root_hash_to_node_hash_to_index.pop().unwrap();
+        assert_eq!(root_hash_to_node_hash_to_index.len(), 0);
+
+        assert_eq!(collected_root_hash, root_hash);
+        assert_eq!(
+            collected_node_hash_to_index,
+            traversal_blob.get_hashes_indexes(false).unwrap()
+        );
+    }
+
+    #[rstest]
+    fn test_moved_sibling_retains_hash(mut small_blob: MerkleBlob) {
+        let key_to_delete = KeyId(0x0001_0203_0405_0607);
+        let remaining_hash = sha256_num(0x2030);
+        assert_ne!(small_blob.get_hash(TreeIndex(0)).unwrap(), remaining_hash);
+        small_blob.delete(key_to_delete).unwrap();
+        assert_eq!(small_blob.get_hash(TreeIndex(0)).unwrap(), remaining_hash);
     }
 }
