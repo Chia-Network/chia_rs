@@ -4105,4 +4105,13 @@ mod tests {
             traversal_blob.get_hashes_indexes(false).unwrap()
         );
     }
+
+    #[rstest]
+    fn test_moved_sibling_retains_hash(mut small_blob: MerkleBlob) {
+        let key_to_delete = KeyId(0x0001_0203_0405_0607);
+        let remaining_hash = sha256_num(0x2030);
+        assert_ne!(small_blob.get_hash(TreeIndex(0)).unwrap(), remaining_hash);
+        small_blob.delete(key_to_delete).unwrap();
+        assert_eq!(small_blob.get_hash(TreeIndex(0)).unwrap(), remaining_hash);
+    }
 }
