@@ -2498,7 +2498,6 @@ pub fn get_internal_terminal(
 #[pymethods]
 impl DeltaFileCache {
     #[new]
-    #[pyo3(signature = ())]
     fn py_new() -> Self {
         Self::new()
     }
