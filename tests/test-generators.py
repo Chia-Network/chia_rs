@@ -154,6 +154,8 @@ for g in test_list:
             compare_output(consensus.output, expected, "")
             compare_output(mempool.output, expected_mempool, "STRICT")
         else:
+            limit = 3
+            strict_limit = 3
             compare_output(consensus2.output, expected, "")
             compare_output(mempool2.output, expected_mempool, "STRICT")
 
