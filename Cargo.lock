@@ -396,6 +396,7 @@ dependencies = [
 name = "chia-datalayer"
 version = "0.23.0"
 dependencies = [
+ "chia-datalayer-macro",
  "chia-protocol",
  "chia-sha2 0.24.0",
  "chia-traits 0.24.0",
@@ -423,6 +424,15 @@ version = "0.18.0"
 dependencies = [
  "chia-datalayer",
  "libfuzzer-sys",
+]
+
+[[package]]
+name = "chia-datalayer-macro"
+version = "0.23.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.101",
 ]
 
 [[package]]
