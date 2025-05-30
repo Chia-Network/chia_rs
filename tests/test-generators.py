@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 from typing import Optional
 from run_gen import run_gen, print_spend_bundle_conditions
 from chia_rs import (
@@ -68,9 +69,10 @@ def validate_except_cost(output1: str, output2: str) -> None:
 
 
 print(f"{'test name':43s}   consensus | mempool")
-test_list = sorted(glob.glob("../generator-tests/*.txt"))
+base_dir = os.path.dirname(os.path.abspath(__file__))
+test_list = sorted(glob.glob(os.path.join(base_dir, "../generator-tests/*.txt")))
 if len(test_list) == 0:
-    print("No tests found. Are you in the tests directory?")
+    print("No tests found.")
 for g in test_list:
     name = f"{Path(g).name:43s}"
     stdout.write(f"{name} running generator...\r")
