@@ -71,7 +71,7 @@ jobs:
 
       - name: python mypy
         run: |
-          mypy tests
+          mypy tests --check-untyped-defs
 
       - name: python mypy stubtest
         shell: bash
