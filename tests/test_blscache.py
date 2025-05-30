@@ -287,7 +287,7 @@ def test_validate_clvm_and_sig():
             "4444444444444444444444444444444444444444444444444444444444444444"
         ),
         puz_reveal.get_tree_hash(),
-        200,
+        uint64(200),
     )
 
     sol_bytes = bytes.fromhex(

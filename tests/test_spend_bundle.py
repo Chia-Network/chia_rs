@@ -241,4 +241,4 @@ def test_derive_class():
     assert test.test_bool
     assert test.new_function()
 
-    test = NewAndImprovedSpendBundle.parse_rust(obj_bytes)
+    test = NewAndImprovedSpendBundle.parse_rust(obj_bytes)[0]

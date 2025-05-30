@@ -1,5 +1,6 @@
 from chia_rs import validate_clvm_and_signature
 from chia_rs import SpendBundle, CoinSpend, Coin, Program, PrivateKey, AugSchemeMPL
+from chia_rs.sized_ints import uint64
 from run_gen import DEFAULT_CONSTANTS
 import pytest
 
@@ -16,7 +17,7 @@ def test_validate_clvm_and_signature():
             "4444444444444444444444444444444444444444444444444444444444444444"
         ),
         full_puz,
-        1,
+        uint64(1),
     )
 
     # Solution
