@@ -76,15 +76,7 @@ for g in test_list:
     stdout.write(f"{name} running generator...\r")
     stdout.flush()
     flags = 0
-    if (
-        "two-thousand-messages.txt" in g
-        or "aa-ten-thousand-messages.txt" in g
-        or "aa-fifty-thousand-messages.txt" in g
-        or "aa-three-hundred-thousand-messages.txt" in g
-        or "aa-hundred-thousand-messages.txt" in g
-        or "aa-million-messages.txt" in g
-        or "aa-four-million-messages.txt" in g
-    ):
+    if "aa-million-messages.txt" in g or "aa-four-million-messages.txt" in g:
         flags = COST_CONDITIONS
     consensus = run_generator(
         g,
@@ -99,13 +91,7 @@ for g in test_list:
         flags,
         version=2,
     )
-    if (
-        "aa-fifty-thousand-messages.txt" not in g
-        and "aa-hundred-thousand-messages.txt" not in g
-        and "aa-three-hundred-thousand-messages.txt" not in g
-        and "aa-million-messages.txt" not in g
-        and "aa-four-million-messages.txt" not in g
-    ):
+    if "aa-million-messages.txt" not in g and "aa-four-million-messages.txt" not in g:
         validate_except_cost(consensus.output, consensus2.output)
 
     stdout.write(f"{name} running generator (mempool mode) ...\r")
@@ -123,13 +109,7 @@ for g in test_list:
         MEMPOOL_MODE | flags,
         version=2,
     )
-    if (
-        "aa-fifty-thousand-messages.txt" not in g
-        and "aa-hundred-thousand-messages.txt" not in g
-        and "aa-three-hundred-thousand-messages.txt" not in g
-        and "aa-million-messages.txt" not in g
-        and "aa-four-million-messages.txt" not in g
-    ):
+    if "aa-million-messages.txt" not in g and "aa-four-million-messages.txt" not in g:
         validate_except_cost(mempool.output, mempool2.output)
 
     with open(g) as f:
@@ -169,10 +149,7 @@ for g in test_list:
             limit = 4
             strict_limit = 4
         if (
-            "aa-fifty-thousand-messages.txt" not in g
-            and "aa-hundred-thousand-messages.txt" not in g
-            and "aa-three-hundred-thousand-messages.txt" not in g
-            and "aa-million-messages.txt" not in g
+            "aa-million-messages.txt" not in g
             and "aa-four-million-messages.txt" not in g
         ):
             compare_output(consensus.output, expected, "")
