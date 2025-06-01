@@ -86,7 +86,7 @@ const TESTNET11_CONSTANTS: ConsensusConstants = ConsensusConstants {
         "3ef7c233fc0785f3c0cae5992c1d35e7c955ca37a423571c1607ba392a9d12f7"
     )),
     mempool_block_buffer: 10,
-    min_plot_size: 18,
+    min_plot_size_v1: 18,
     sub_slot_iters_starting: 67_108_864,
     // forks activated from the beginning on testnet11
     hard_fork_height: 0,
