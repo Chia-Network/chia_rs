@@ -852,9 +852,9 @@ pub fn collect_and_return_from_merkle_blob(
     hashes: &HashSet<Hash>,
     known: impl Fn(&Hash) -> bool,
 ) -> Result<(NodeHashToDeltaReaderNode, NodeHashToIndex), Error> {
-    let mut nodes: NodeHashToDeltaReaderNode = HashMap::new();
+    let mut nodes = NodeHashToDeltaReaderNode::new();
     let blob = zstd_decode_path(path)?;
-    let mut node_hash_to_index: NodeHashToIndex = HashMap::new();
+    let mut node_hash_to_index = NodeHashToIndex::new();
 
     let mut index_to_hash: HashMap<TreeIndex, Hash> = HashMap::new();
 
@@ -931,7 +931,7 @@ pub struct DeltaReader {
 
 impl DeltaReader {
     pub fn new(internal_nodes: InternalNodesMap, leaf_nodes: LeafNodesMap) -> Result<Self, Error> {
-        let mut nodes: NodeHashToDeltaReaderNode = HashMap::new();
+        let mut nodes = NodeHashToDeltaReaderNode::new();
 
         for (hash, (left, right)) in internal_nodes {
             nodes.insert(hash, DeltaReaderNode::Internal { left, right });
@@ -2192,7 +2192,7 @@ impl MerkleBlob {
         root_hash: Option<Hash>,
     ) -> PyResult<Self> {
         let mut merkle_blob = Self::new(Vec::new())?;
-        let mut nodes: NodeHashToDeltaReaderNode = HashMap::new();
+        let mut nodes = NodeHashToDeltaReaderNode::new();
 
         for (hash, (left, right)) in internal_nodes {
             nodes.insert(hash, DeltaReaderNode::Internal { left, right });
@@ -2666,8 +2666,8 @@ mod tests {
     }
 
     fn incomplete_delta_reader() -> DeltaReader {
-        let mut internal_nodes_map: InternalNodesMap = HashMap::new();
-        let mut leaf_nodes_map: LeafNodesMap = HashMap::new();
+        let mut internal_nodes_map = InternalNodesMap::new();
+        let mut leaf_nodes_map = LeafNodesMap::new();
 
         internal_nodes_map.insert(HASH_ZERO, (HASH_ONE, HASH_TWO));
         leaf_nodes_map.insert(HASH_ONE, (KeyId(0), ValueId(1)));
