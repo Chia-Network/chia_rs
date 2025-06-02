@@ -5,7 +5,7 @@ from run_gen import DEFAULT_CONSTANTS
 import pytest
 
 
-def test_validate_clvm_and_signature():
+def test_validate_clvm_and_signature() -> None:
     # Initial secret key
     sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb"
     sk = PrivateKey.from_bytes(bytes.fromhex(sk_hex))

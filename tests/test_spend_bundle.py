@@ -219,7 +219,7 @@ class NewAndImprovedSpendBundle(SpendBundle):
         return self.test_bool
 
 
-def test_derive_class():
+def test_derive_class() -> None:
     # Test if aggregate() supports class inheritance
     test = SpendBundle.aggregate([])
     assert isinstance(test, SpendBundle)
