@@ -25,7 +25,7 @@ pub struct ConsensusConstants {
     max_sub_slot_blocks: u32,
 
     /// The number of signage points per sub-slot (including the 0th sp at the sub-slot start).
-    num_sps_sub_slot: u32,
+    num_sps_sub_slot: u8,
 
     /// The sub_slot_iters for the first epoch.
     sub_slot_iters_starting: u64,

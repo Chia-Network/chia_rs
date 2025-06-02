@@ -4331,7 +4331,7 @@ class ConsensusConstants:
     SLOT_BLOCKS_TARGET: uint32
     MIN_BLOCKS_PER_CHALLENGE_BLOCK: uint8
     MAX_SUB_SLOT_BLOCKS: uint32
-    NUM_SPS_SUB_SLOT: uint32
+    NUM_SPS_SUB_SLOT: uint8
     SUB_SLOT_ITERS_STARTING: uint64
     DIFFICULTY_CONSTANT_FACTOR: uint128
     DIFFICULTY_STARTING: uint64
@@ -4388,7 +4388,7 @@ class ConsensusConstants:
         SLOT_BLOCKS_TARGET: uint32,
         MIN_BLOCKS_PER_CHALLENGE_BLOCK: uint8,
         MAX_SUB_SLOT_BLOCKS: uint32,
-        NUM_SPS_SUB_SLOT: uint32,
+        NUM_SPS_SUB_SLOT: uint8,
         SUB_SLOT_ITERS_STARTING: uint64,
         DIFFICULTY_CONSTANT_FACTOR: uint128,
         DIFFICULTY_STARTING: uint64,
@@ -4461,7 +4461,7 @@ class ConsensusConstants:
     def replace(self, *, SLOT_BLOCKS_TARGET: Union[ uint32, _Unspec] = _Unspec(),
         MIN_BLOCKS_PER_CHALLENGE_BLOCK: Union[ uint8, _Unspec] = _Unspec(),
         MAX_SUB_SLOT_BLOCKS: Union[ uint32, _Unspec] = _Unspec(),
-        NUM_SPS_SUB_SLOT: Union[ uint32, _Unspec] = _Unspec(),
+        NUM_SPS_SUB_SLOT: Union[ uint8, _Unspec] = _Unspec(),
         SUB_SLOT_ITERS_STARTING: Union[ uint64, _Unspec] = _Unspec(),
         DIFFICULTY_CONSTANT_FACTOR: Union[ uint128, _Unspec] = _Unspec(),
         DIFFICULTY_STARTING: Union[ uint64, _Unspec] = _Unspec(),
