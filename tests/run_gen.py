@@ -135,7 +135,7 @@ def run_gen(
         return (117, None, run_time)
 
 
-def print_spend_bundle_conditions(result) -> str:
+def print_spend_bundle_conditions(result: SpendBundleConditions) -> str:
     ret = ""
     if result.reserve_fee > 0:
         ret += f"RESERVE_FEE: {result.reserve_fee}\n"
@@ -161,25 +161,25 @@ def print_spend_bundle_conditions(result) -> str:
             ret += f"  ASSERT_BEFORE_HEIGHT_RELATIVE {s.before_height_relative}\n"
         if s.before_seconds_relative is not None:
             ret += f"  ASSERT_BEFORE_SECONDS_RELATIVE {s.before_seconds_relative}\n"
-        for a in sorted(s.create_coin):
-            if a[2] is not None and len(a[2]) > 0:
-                ret += f"  CREATE_COIN: ph: {a[0].hex()} amount: {a[1]} hint: {a[2].hex()}\n"
+        for c in sorted(s.create_coin):
+            if c[2] is not None and len(c[2]) > 0:
+                ret += f"  CREATE_COIN: ph: {c[0].hex()} amount: {c[1]} hint: {c[2].hex()}\n"
             else:
-                ret += f"  CREATE_COIN: ph: {a[0].hex()} amount: {a[1]}\n"
-        for a in sorted(s.agg_sig_me):
-            ret += f"  AGG_SIG_ME pk: {a[0]} msg: {a[1].hex()}\n"
-        for a in sorted(s.agg_sig_parent):
-            ret += f"  AGG_SIG_PARENT pk: {a[0]} msg: {a[1].hex()}\n"
-        for a in sorted(s.agg_sig_puzzle):
-            ret += f"  AGG_SIG_PUZZLE pk: {a[0]} msg: {a[1].hex()}\n"
-        for a in sorted(s.agg_sig_amount):
-            ret += f"  AGG_SIG_AMOUNT pk: {a[0]} msg: {a[1].hex()}\n"
-        for a in sorted(s.agg_sig_puzzle_amount):
-            ret += f"  AGG_SIG_PUZZLE_AMOUNT pk: {a[0]} msg: {a[1].hex()}\n"
-        for a in sorted(s.agg_sig_parent_amount):
-            ret += f"  AGG_SIG_PARENT_AMOUNT pk: {a[0]} msg: {a[1].hex()}\n"
-        for a in sorted(s.agg_sig_parent_puzzle):
-            ret += f"  AGG_SIG_PARENT_PUZZLE pk: {a[0]} msg: {a[1].hex()}\n"
+                ret += f"  CREATE_COIN: ph: {c[0].hex()} amount: {c[1]}\n"
+        for b in sorted(s.agg_sig_me):
+            ret += f"  AGG_SIG_ME pk: {b[0]} msg: {b[1].hex()}\n"
+        for d in sorted(s.agg_sig_parent):
+            ret += f"  AGG_SIG_PARENT pk: {d[0]} msg: {d[1].hex()}\n"
+        for e in sorted(s.agg_sig_puzzle):
+            ret += f"  AGG_SIG_PUZZLE pk: {e[0]} msg: {e[1].hex()}\n"
+        for f in sorted(s.agg_sig_amount):
+            ret += f"  AGG_SIG_AMOUNT pk: {f[0]} msg: {f[1].hex()}\n"
+        for g in sorted(s.agg_sig_puzzle_amount):
+            ret += f"  AGG_SIG_PUZZLE_AMOUNT pk: {g[0]} msg: {g[1].hex()}\n"
+        for h in sorted(s.agg_sig_parent_amount):
+            ret += f"  AGG_SIG_PARENT_AMOUNT pk: {h[0]} msg: {h[1].hex()}\n"
+        for i in sorted(s.agg_sig_parent_puzzle):
+            ret += f"  AGG_SIG_PARENT_PUZZLE pk: {i[0]} msg: {i[1].hex()}\n"
     ret += f"cost: {result.cost}\n"
     ret += f"removal_amount: {result.removal_amount}\n"
     ret += f"addition_amount: {result.addition_amount}\n"
@@ -198,6 +198,7 @@ if __name__ == "__main__":
             print(f"run-time: {run_time:.2f}s")
             sys.exit(1)
         start_time = time()
+        assert result is not None
         print("Spend bundle:")
         print(print_spend_bundle_conditions(result))
         print_time = time() - start_time

@@ -14,7 +14,7 @@ import glob
 failed = 0
 
 
-def compare_output(output, expected, title):
+def compare_output(output: str, expected: str, title: str) -> None:
     global failed
     if expected != output:
         print(f"{title} output:")
@@ -24,10 +24,13 @@ def compare_output(output, expected, title):
         failed = 1
 
 
-def parse_output(result, error_code) -> str:
-    if error_code:
+def parse_output(
+    result: Optional[SpendBundleConditions], error_code: Optional[int]
+) -> str:
+    if error_code is not None:
         return f"FAILED: {error_code}\n"
     else:
+        assert result is not None
         return print_spend_bundle_conditions(result)
 
 
@@ -46,7 +49,7 @@ def run_generator(file: str, flags: int, version: int) -> Results:
     return Results(output, result, run_time)
 
 
-def validate_except_cost(output1: str, output2: str):
+def validate_except_cost(output1: str, output2: str) -> None:
     lines1 = output1.split("\n")
     lines2 = output2.split("\n")
     assert len(lines1) == len(lines2)

@@ -149,7 +149,7 @@ def test_cache_limit() -> None:
 
 
 # old Python tests ported
-def test_cached_bls():
+def test_cached_bls() -> None:
     cached_bls = BLSCache()
     n_keys = 10
     seed = b"a" * 31
@@ -191,7 +191,7 @@ def test_cached_bls():
     assert bls_cache.aggregate_verify(pks, msgs, agg_sig)
 
 
-def test_cached_bls_flattening():
+def test_cached_bls_flattening() -> None:
     cached_bls = BLSCache()
     n_keys = 10
     seed = b"a" * 31
@@ -222,7 +222,7 @@ def test_cached_bls_flattening():
         gts.remove(value)
 
 
-def test_cached_bls_repeat_pk():
+def test_cached_bls_repeat_pk() -> None:
     cached_bls = BLSCache()
     n_keys = 400
     seed = b"a" * 32
@@ -238,13 +238,13 @@ def test_cached_bls_repeat_pk():
     assert cached_bls.aggregate_verify(pks, msgs, agg_sig)
 
 
-def test_empty_sig():
+def test_empty_sig() -> None:
     sig = AugSchemeMPL.aggregate([])
     cached_bls = BLSCache()
     assert cached_bls.aggregate_verify([], [], sig)
 
 
-def test_bad_cache_size():
+def test_bad_cache_size() -> None:
     with pytest.raises(ValueError):
         bls_cache = BLSCache(0)
 
@@ -282,7 +282,7 @@ def test_bad_cache_size():
     )
 
 
-def test_validate_clvm_and_sig():
+def test_validate_clvm_and_sig() -> None:
     cache = BLSCache()
     puz_reveal = Program.to(1)
     coin = Coin(
@@ -290,7 +290,7 @@ def test_validate_clvm_and_sig():
             "4444444444444444444444444444444444444444444444444444444444444444"
         ),
         puz_reveal.get_tree_hash(),
-        200,
+        uint64(200),
     )
 
     sol_bytes = bytes.fromhex(

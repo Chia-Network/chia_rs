@@ -341,7 +341,7 @@ def merkle_set_test_cases() -> list[tuple[bytes32, list[bytes32]]]:
     ]
 
 
-def test_merkle_set():
+def test_merkle_set() -> None:
     for root, leafs in merkle_set_test_cases():
         check_tree(leafs)
         ru_tree = RustMerkleSet(leafs)
