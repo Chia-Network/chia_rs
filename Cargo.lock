@@ -394,7 +394,7 @@ dependencies = [
 
 [[package]]
 name = "chia-datalayer"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "chia-protocol",
  "chia-sha2 0.24.0",
@@ -419,7 +419,7 @@ dependencies = [
 
 [[package]]
 name = "chia-datalayer-fuzz"
-version = "0.18.0"
+version = "0.24.0"
 dependencies = [
  "chia-datalayer",
  "libfuzzer-sys",

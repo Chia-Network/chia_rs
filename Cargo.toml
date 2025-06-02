@@ -113,7 +113,7 @@ chia_streamable_macro = { path = "./crates/chia_streamable_macro", version = "0.
 chia-bls = { path = "./crates/chia-bls", version = "0.24.0" }
 chia-client = { path = "./crates/chia-client", version = "0.24.0" }
 chia-consensus = { path = "./crates/chia-consensus", version = "0.24.0" }
-chia-datalayer = { path = "./crates/chia-datalayer", version = "0.23.0" }
+chia-datalayer = { path = "./crates/chia-datalayer", version = "0.24.0" }
 chia-protocol = { path = "./crates/chia-protocol", version = "0.24.0" }
 chia-secp = { path = "./crates/chia-secp", version = "0.24.0" }
 chia-ssl = { path = "./crates/chia-ssl", version = "0.24.0" }
@@ -125,7 +125,7 @@ clvm-traits = { path = "./crates/clvm-traits", version = "0.24.0" }
 clvm-utils = { path = "./crates/clvm-utils", version = "0.24.0" }
 clvm-derive = { path = "./crates/clvm-derive", version = "0.24.0" }
 chia-fuzz = { path = "./crates/chia-consensus/fuzz", version = "0.24.0" }
-chia-bls-fuzz = { path = "./crates/chia-bls/fuzz", version = "0.23.0" }
+chia-bls-fuzz = { path = "./crates/chia-bls/fuzz", version = "0.24.0" }
 chia-datalayer-fuzz = { path = "./crates/chia-datalayer/fuzz", version = "0.24.0" }
 chia-protocol-fuzz = { path = "./crates/chia-protocol/fuzz", version = "0.24.0" }
 chia-puzzle-types-fuzz = { path = "./crates/chia-puzzle-types/fuzz", version = "0.24.0" }
