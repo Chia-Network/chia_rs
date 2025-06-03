@@ -929,19 +929,20 @@ pub enum DeltaReaderNode {
 pub struct DeltaFileCache {
     hash_to_index: NodeHashToIndex,
     previous_hashes: HashesDictionary,
+    merkle_blob: MerkleBlob,
 }
 
 impl DeltaFileCache {
-    pub fn new() -> Self {
-        Self {
+    pub fn new(path: &PathBuf) -> Result<Self, Error> {
+        Ok(Self {
             hash_to_index: NodeHashToIndex::new(),
             previous_hashes: HashesDictionary::new(),
-        }
+            merkle_blob: MerkleBlob::from_path(path)?,
+        })
     }
 
     pub fn load_hash_to_index(&mut self, path: &PathBuf) -> Result<(), Error> {
-        let blob = MerkleBlob::from_path(path)?;
-        self.hash_to_index = blob.get_hashes_indexes(false)?;
+        self.hash_to_index = self.merkle_blob.get_hashes_indexes(false)?;
         Ok(())
     }
 
@@ -950,11 +951,13 @@ impl DeltaFileCache {
         self.previous_hashes = blob.get_hashes()?;
         Ok(())
     }
-}
 
-impl Default for DeltaFileCache {
-    fn default() -> Self {
-        Self::new()
+    pub fn get_raw_node(&self, index: TreeIndex) -> Result<Node, Error> {
+        self.merkle_blob.get_node(index)
+    }
+
+    pub fn get_hash_at_index(&self, index: TreeIndex) -> Result<Option<Hash>, Error> {
+        self.merkle_blob.get_hash_at_index(index)
     }
 }
 
@@ -1849,6 +1852,19 @@ impl MerkleBlob {
         }
     }
 
+    pub fn get_hash_at_index(&self, index: TreeIndex) -> Result<Option<Hash>, Error> {
+        if self.block_status_cache.no_keys() {
+            return Ok(None);
+        }
+
+        let block = self.get_block(index)?;
+        if block.metadata.dirty {
+            return Err(Error::Dirty(index))?;
+        }
+
+        Ok(Some(block.node.hash()))
+    }
+
     fn get_random_insert_location_by_key_id(&self, seed: KeyId) -> Result<InsertLocation, Error> {
         let seed = sha256_num(seed.0);
 
@@ -2357,16 +2373,7 @@ impl MerkleBlob {
 
     #[pyo3(name = "get_hash_at_index")]
     pub fn py_get_hash_at_index(&self, index: TreeIndex) -> PyResult<Option<Hash>> {
-        if self.block_status_cache.no_keys() {
-            return Ok(None);
-        }
-
-        let block = self.get_block(index)?;
-        if block.metadata.dirty {
-            Err(Error::Dirty(index))?;
-        }
-
-        Ok(Some(block.node.hash()))
+        Ok(self.get_hash_at_index(index)?)
     }
 
     #[pyo3(name = "batch_insert")]
@@ -2498,8 +2505,9 @@ pub fn get_internal_terminal(
 #[pymethods]
 impl DeltaFileCache {
     #[new]
-    fn py_new() -> Self {
-        Self::new()
+    fn py_new(&mut self, py: Python<'_>, path: PyObject) -> Self {
+        let path: PathBuf = path.extract(py)?;
+        Self::new(&path)
     }
 
     #[allow(clippy::needless_pass_by_value)]
@@ -2527,6 +2535,16 @@ impl DeltaFileCache {
     #[pyo3(name = "seen_previous_hash")]
     pub fn py_seen_previous_hash(&self, hash: Hash) -> bool {
         self.previous_hashes.contains(&hash)
+    }
+
+    #[pyo3(name = "get_raw_node")]
+    pub fn py_get_raw_node(&mut self, index: TreeIndex) -> PyResult<Node> {
+        Ok(self.get_raw_node(index)?)
+    }
+
+    #[pyo3(name = "get_hash_at_index")]
+    pub fn py_get_hash_at_index(&self, index: TreeIndex) -> PyResult<Option<Hash>> {
+        Ok(self.get_hash_at_index(index)?)
     }
 }
 
