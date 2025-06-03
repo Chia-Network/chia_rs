@@ -2505,9 +2505,9 @@ pub fn get_internal_terminal(
 #[pymethods]
 impl DeltaFileCache {
     #[new]
-    fn py_new(&mut self, py: Python<'_>, path: PyObject) -> Self {
+    fn py_new(py: Python<'_>, path: PyObject) -> PyResult<Self> {
         let path: PathBuf = path.extract(py)?;
-        Self::new(&path)
+        Ok(Self::new(&path)?)
     }
 
     #[allow(clippy::needless_pass_by_value)]
