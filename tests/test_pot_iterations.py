@@ -11,10 +11,10 @@ from chia_rs import (
     is_overflow_block,
 )
 
-from chia_rs.sized_ints import uint8, uint16, uint32, uint64  # , uint128
+from chia_rs.sized_ints import uint8, uint16, uint32, uint64
 
 test_constants = DEFAULT_CONSTANTS.replace(
-    NUM_SPS_SUB_SLOT=uint32(32), SUB_SLOT_TIME_TARGET=uint16(300)
+    NUM_SPS_SUB_SLOT=uint8(32), SUB_SLOT_TIME_TARGET=uint16(300)
 )
 
 
@@ -70,7 +70,7 @@ class TestPotIterations:
         )  # number retrieved from old implementation
 
     def test_calculate_ip_iters(self) -> None:
-        # num_sps_sub_slot: u32,
+        # num_sps_sub_slot: u8,
         # num_sp_intervals_extra: u8,
         # sub_slot_iters: u64,
         # signage_point_index: u8,
