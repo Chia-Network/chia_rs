@@ -2504,6 +2504,7 @@ pub fn get_internal_terminal(
 #[cfg(feature = "py-bindings")]
 #[pymethods]
 impl DeltaFileCache {
+    #[allow(clippy::needless_pass_by_value)]
     #[new]
     fn py_new(py: Python<'_>, path: PyObject) -> PyResult<Self> {
         let path: PathBuf = path.extract(py)?;
