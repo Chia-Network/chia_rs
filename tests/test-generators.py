@@ -54,17 +54,11 @@ def run_generator(file: str, flags: int, version: int) -> Results:
 def validate_except_cost(output1: str, output2: str) -> None:
     lines1 = output1.split("\n")
     lines2 = output2.split("\n")
-    if len(lines1) != len(lines2):
-        stdout.write(f"l1: {lines1} \n")
-        stdout.write(f"l2: {lines2}")
     assert len(lines1) == len(lines2)
     for l1, l2 in zip(lines1, lines2):
         # the cost is supposed to differ, don't compare that
         if "cost:" in l1 and "cost: " in l2:
             continue
-        if l1 != l2:
-            stdout.write(f"l1: {l1} \n")
-            stdout.write(f"l2: {l2}")
         assert l1 == l2
 
 
@@ -77,9 +71,12 @@ for g in test_list:
     name = f"{Path(g).name:43s}"
     stdout.write(f"{name} running generator...\r")
     stdout.flush()
-    flags = 0
-    if "aa-million-messages.txt" in g or "aa-four-million-messages.txt" in g:
+
+    if "aa-million-messages.txt" in g:
         flags = COST_CONDITIONS
+    else:
+        flags = 0
+
     consensus = run_generator(
         g,
         flags,
@@ -93,11 +90,11 @@ for g in test_list:
         flags,
         version=2,
     )
-    if "aa-million-messages.txt" not in g and "aa-four-million-messages.txt" not in g:
-        validate_except_cost(consensus.output, consensus2.output)
+    validate_except_cost(consensus.output, consensus2.output)
 
     stdout.write(f"{name} running generator (mempool mode) ...\r")
     stdout.flush()
+
     mempool = run_generator(
         g,
         MEMPOOL_MODE | flags,
@@ -111,8 +108,7 @@ for g in test_list:
         MEMPOOL_MODE | flags,
         version=2,
     )
-    if "aa-million-messages.txt" not in g and "aa-four-million-messages.txt" not in g:
-        validate_except_cost(mempool.output, mempool2.output)
+    validate_except_cost(mempool.output, mempool2.output)
 
     with open(g) as f:
         expected = f.read().split("\n", 1)[1]
@@ -150,17 +146,12 @@ for g in test_list:
         elif "recursion-pairs.txt" in g:
             limit = 4
             strict_limit = 4
-        if (
-            "aa-million-messages.txt" not in g
-            and "aa-four-million-messages.txt" not in g
-        ):
-            compare_output(consensus.output, expected, "")
-            compare_output(mempool.output, expected_mempool, "STRICT")
-        else:
+        elif "aa-million-messages.txt" in g:
             limit = 3
             strict_limit = 3
-            compare_output(consensus2.output, expected, "")
-            compare_output(mempool2.output, expected_mempool, "STRICT")
+
+        compare_output(consensus.output, expected, "")
+        compare_output(mempool.output, expected_mempool, "STRICT")
 
         stdout.write(
             f"{name} {consensus.run_time:.2f}s "

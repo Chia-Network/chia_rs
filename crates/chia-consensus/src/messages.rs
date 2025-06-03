@@ -162,7 +162,7 @@ pub struct Message {
 
 impl Message {
     pub fn make_key(&self, a: &Allocator) -> Vec<u8> {
-        let mut key = Vec::<u8>::new();
+        let mut key = Vec::<u8>::with_capacity((1 + 32 + 32) * 2 + 32);
         self.src.make_key(&mut key, a);
         self.dst.make_key(&mut key, a);
         key.extend_from_slice(a.atom(self.msg).as_ref());
