@@ -941,7 +941,7 @@ impl DeltaFileCache {
         })
     }
 
-    pub fn load_hash_to_index(&mut self, path: &PathBuf) -> Result<(), Error> {
+    pub fn load_hash_to_index(&mut self) -> Result<(), Error> {
         self.hash_to_index = self.merkle_blob.get_hashes_indexes(false)?;
         Ok(())
     }
@@ -2512,9 +2512,8 @@ impl DeltaFileCache {
 
     #[allow(clippy::needless_pass_by_value)]
     #[pyo3(name = "load_hash_to_index")]
-    pub fn py_load_hash_to_index(&mut self, py: Python<'_>, path: PyObject) -> PyResult<()> {
-        let path: PathBuf = path.extract(py)?;
-        Ok(self.load_hash_to_index(&path)?)
+    pub fn py_load_hash_to_index(&mut self) -> PyResult<()> {
+        Ok(self.load_hash_to_index()?)
     }
 
     #[allow(clippy::needless_pass_by_value)]
