@@ -935,7 +935,7 @@ impl DeltaFileCache {
     pub fn new(path: &PathBuf) -> Result<Self, Error> {
         Ok(Self {
             hash_to_index: NodeHashToIndex::new(),
-            previous_hashes: HashSet<Hash>::new(),
+            previous_hashes: HashSet::<Hash>::new(),
             merkle_blob: MerkleBlob::from_path(path)?,
         })
     }
