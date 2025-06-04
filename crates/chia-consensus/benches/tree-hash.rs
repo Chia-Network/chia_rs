@@ -1,6 +1,10 @@
-use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs, node_to_bytes_backrefs};
-use clvmr::Allocator;
+use clvmr::serde::{
+    node_from_bytes, node_from_bytes_backrefs, node_from_bytes_backrefs_record,
+    node_to_bytes_backrefs,
+};
+use clvmr::{Allocator, NodePtr};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use std::collections::HashMap;
 use std::fs::read_to_string;
 use std::time::Instant;
 
@@ -36,6 +40,21 @@ fn run(c: &mut Criterion) {
                 b.iter(|| {
                     let start = Instant::now();
                     let _ = black_box(clvm_utils::tree_hash(&a, gen));
+                    start.elapsed()
+                });
+            });
+        }
+
+        {
+            let mut a = Allocator::new();
+            let (gen, backrefs) = node_from_bytes_backrefs_record(&mut a, &compressed_generator)
+                .expect("parse generator");
+
+            group.bench_function(format!("tree-hash {name}-cached"), |b| {
+                b.iter(|| {
+                    let start = Instant::now();
+                    let mut cache = HashMap::<NodePtr, clvm_utils::TreeHash>::new();
+                    let _ = black_box(clvm_utils::tree_hash_cached(&a, gen, &backrefs, &mut cache));
                     start.elapsed()
                 });
             });
