@@ -4100,7 +4100,7 @@ mod tests {
 
         let mut delta_cache_file = DeltaFileCache::new(&blob_path).unwrap();
         delta_cache_file.load_hash_to_index().unwrap();
-        for hash in hashes.iter() {
+        for hash in &hashes {
             let index = delta_cache_file.get_index(*hash).unwrap();
             let received_hash = delta_cache_file.get_hash_at_index(index).unwrap();
             assert_eq!(received_hash, Some(*hash));
