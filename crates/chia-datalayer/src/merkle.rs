@@ -364,6 +364,12 @@ create_errors!(
             UnmatchedKeysAndValuesError,
             "key/value and hash collection lengths must match: {0:?} keys/values, {0:?} hashes",
             (usize, usize)
+        ),
+        (
+            HashNotFound,
+            HashNotFoundError,
+            "hash not found: {0:?}",
+            (Hash)
         )
     )
 );
@@ -957,6 +963,17 @@ impl DeltaFileCache {
 
     pub fn get_hash_at_index(&self, index: TreeIndex) -> Result<Option<Hash>, Error> {
         self.merkle_blob.get_hash_at_index(index)
+    }
+
+    pub fn seen_previous_hash(&self, hash: Hash) -> bool {
+        self.previous_hashes.contains(&hash)
+    }
+
+    pub fn get_index(&self, hash: Hash) -> Result<TreeIndex, Error> {
+        self.hash_to_index
+            .get(&hash)
+            .copied()
+            .ok_or_else(|| Error::HashNotFound(hash))
     }
 }
 
@@ -2525,15 +2542,12 @@ impl DeltaFileCache {
 
     #[pyo3(name = "get_index")]
     pub fn py_get_index(&self, hash: Hash) -> PyResult<TreeIndex> {
-        self.hash_to_index
-            .get(&hash)
-            .copied()
-            .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("Hash not found"))
+        Ok(self.get_index(hash)?)
     }
 
     #[pyo3(name = "seen_previous_hash")]
     pub fn py_seen_previous_hash(&self, hash: Hash) -> bool {
-        self.previous_hashes.contains(&hash)
+        self.seen_previous_hash(hash)
     }
 
     #[pyo3(name = "get_raw_node")]
@@ -4215,5 +4229,49 @@ mod tests {
         assert_ne!(small_blob.get_hash(TreeIndex(0)).unwrap(), remaining_hash);
         small_blob.delete(key_to_delete).unwrap();
         assert_eq!(small_blob.get_hash(TreeIndex(0)).unwrap(), remaining_hash);
+    }
+
+    #[rstest]
+    fn test_delta_file_cache() {
+        let mut seed = 0;
+        let mut random = StdRng::seed_from_u64(37);
+        let num_inserts = 500;
+
+        let mut merkle_blob = MerkleBlob::new(Vec::new()).unwrap();
+        let mut kv_ids: Vec<(KeyId, ValueId)> = Vec::new();
+        let mut hashes: Vec<Hash> = Vec::new();
+
+        let mut previous_merkle_blob = MerkleBlob::new(Vec::new()).unwrap();
+        let mut prev_kv_ids: Vec<(KeyId, ValueId)> = Vec::new();
+        let mut prev_hashes: Vec<Hash> = Vec::new();
+
+        for _ in 0..num_inserts {
+            seed += 1;
+            let (key, value) = generate_kvid(seed);
+            kv_ids.push((key, value));
+            hashes.push(generate_hash(seed));
+
+            let (key, value) = generate_kvid(num_inserts + seed);
+            prev_kv_ids.push((key, value));
+            prev_hashes.push(generate_hash(num_inserts + seed));
+        }
+
+        merkle_blob
+            .batch_insert(zip(kv_ids, hashes).collect())
+            .unwrap();
+        merkle_blob.calculate_lazy_hashes().unwrap();
+
+        previous_merkle_blob
+            .batch_insert(zip(prev_kv_ids, prev_hashes).collect())
+            .unwrap();
+        previous_merkle_blob.calculate_lazy_hashes().unwrap();
+
+        let dir_path = tempfile::tempdir().unwrap();
+        let blob_path = dir_path.path().join("merkle_blob");
+        merkle_blob.to_path(&blob_path).unwrap();
+        let previous_blob_path = dir_path.path().join("previous_merkle_blob");
+        previous_merkle_blob.to_path(&previous_blob_path).unwrap();
+
+        let delta_cache_file = DeltaFileCache::new(&blob_path);
     }
 }
