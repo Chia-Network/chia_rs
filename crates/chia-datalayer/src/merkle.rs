@@ -4107,5 +4107,11 @@ mod tests {
             let node = delta_cache_file.get_raw_node(index).unwrap();
             assert_eq!(node.hash(), *hash);
         }
+
+        delta_cache_file.load_previous_hashes(&previous_blob_path).unwrap();
+        for hash in &prev_hashes {
+            let exists = delta_cache_file.seen_previous_hash(*hash);
+            assert_eq!(exists, true);
+        }
     }
 }
