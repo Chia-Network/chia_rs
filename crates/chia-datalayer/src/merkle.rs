@@ -845,7 +845,6 @@ impl BlockStatusCache {
 }
 
 type NodeHashToIndex = HashMap<Hash, TreeIndex>;
-type HashesDictionary = HashSet<Hash>;
 type NodeHashToDeltaReaderNode = HashMap<Hash, DeltaReaderNode>;
 
 pub fn collect_and_return_from_merkle_blob(
@@ -928,7 +927,7 @@ pub enum DeltaReaderNode {
 #[cfg_attr(feature = "py-bindings", pyclass)]
 pub struct DeltaFileCache {
     hash_to_index: NodeHashToIndex,
-    previous_hashes: HashesDictionary,
+    previous_hashes: HashSet<Hash>,
     merkle_blob: MerkleBlob,
 }
 
@@ -936,7 +935,7 @@ impl DeltaFileCache {
     pub fn new(path: &PathBuf) -> Result<Self, Error> {
         Ok(Self {
             hash_to_index: NodeHashToIndex::new(),
-            previous_hashes: HashesDictionary::new(),
+            previous_hashes: HashSet<Hash>::new(),
             merkle_blob: MerkleBlob::from_path(path)?,
         })
     }
@@ -2062,8 +2061,8 @@ impl MerkleBlob {
         Ok((node.key, node.value))
     }
 
-    pub fn get_hashes(&self) -> Result<HashesDictionary, Error> {
-        let mut hashes = HashesDictionary::new();
+    pub fn get_hashes(&self) -> Result<HashSet<Hash>, Error> {
+        let mut hashes = HashSet<Hash>::new();
 
         if self.blob.is_empty() {
             return Ok(hashes);
