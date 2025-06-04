@@ -136,243 +136,70 @@ impl std::fmt::Display for KeyId {
     }
 }
 
-// consider https://github.com/Chia-Network/chia_rs/pull/872 when altendky is less of a noob
-macro_rules! create_errors {
-    (
-        $enum:ident,
-        (
-            $(
-                (
-                    $name:ident,
-                    $python_name:ident,
-                    $string:literal,
-                    (
-                        $(
-                            $( #[ $attr:meta ] )?
-                            $type_:path
-                        ),
-                        *
-                    )
-                )
-            ),
-            *
-        )
-    ) => {
-        #[derive(Debug, Error)]
-        pub enum $enum {
-            $(
-                #[error($string)]
-                $name($($(#[$attr])? $type_,)*),
-            )*
-        }
-
-        #[cfg(feature = "py-bindings")]
-        pub mod python_exceptions {
-            use super::*;
-
-            $(
-                pyo3::create_exception!(chia_rs.datalayer, $python_name, pyo3::exceptions::PyException);
-            )*
-
-            pub fn add_to_module(py: Python<'_>, module: &Bound<'_, PyModule>) -> PyResult<()> {
-                $(
-                    module.add(stringify!($python_name), py.get_type::<$python_name>())?;
-                )*
-
-                Ok(())
-            }
-        }
-
-        #[cfg(feature = "py-bindings")]
-        impl From<Error> for pyo3::PyErr {
-            fn from(err: Error) -> pyo3::PyErr {
-                let message = err.to_string();
-                match err {
-                    $(
-                        Error::$name(..) => python_exceptions::$python_name::new_err(message),
-                    )*
-                }
-            }
-        }
-    }
+#[cfg_attr(feature = "py-bindings", derive(chia_datalayer_macro::PythonError))]
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("failed loading metadata: {0}")]
+    FailedLoadingMetadata(chia_traits::chia_error::Error),
+    #[error("failed loading node: {0}")]
+    FailedLoadingNode(chia_traits::chia_error::Error),
+    #[error("blob length must be a multiple of block count, found extra bytes: {0}")]
+    InvalidBlobLength(usize),
+    #[error("key already present")]
+    KeyAlreadyPresent(),
+    #[error("requested insertion at root but tree not empty")]
+    UnableToInsertAsRootOfNonEmptyTree(),
+    #[error("unable to find a leaf")]
+    UnableToFindALeaf(),
+    #[error("unknown key: {0:?}")]
+    UnknownKey(KeyId),
+    #[error("key not in key to index cache: {0:?}")]
+    IntegrityKeyNotInCache(KeyId),
+    #[error("key to index cache for {0:?} should be {1:?} got: {2:?}")]
+    IntegrityKeyToIndexCacheIndex(KeyId, TreeIndex, TreeIndex),
+    #[error("parent and child relationship mismatched: {0:?}")]
+    IntegrityParentChildMismatch(TreeIndex),
+    #[error("found {0:?} leaves but key to index cache length is: {1}")]
+    IntegrityKeyToIndexCacheLength(usize, usize),
+    #[error("found {0:?} leaves but leaf hash to index cache length is: {1}")]
+    IntegrityLeafHashToIndexCacheLength(usize, usize),
+    #[error("unmatched parent -> child references found: {0}")]
+    IntegrityUnmatchedChildParentRelationships(usize),
+    #[error("expected total node count {0:?} found: {1:?}")]
+    IntegrityTotalNodeCount(TreeIndex, usize),
+    #[error("zero-length seed bytes not allowed")]
+    ZeroLengthSeedNotAllowed(),
+    #[error("node not a leaf: {0:?}")]
+    NodeNotALeaf(InternalNode),
+    #[error("from streamable: {0:?}")]
+    Streaming(chia_traits::chia_error::Error),
+    #[error("index not a child: {0}")]
+    IndexIsNotAChild(TreeIndex),
+    #[error("cycle found")]
+    CycleFound(),
+    #[error("block index out of bounds: {0}")]
+    BlockIndexOutOfBounds(TreeIndex),
+    #[error("leaf hash not found: {0:?}")]
+    LeafHashNotFound(Hash),
+    #[error("root hash and node list disagreement")]
+    RootHashAndNodeListDisagreement(),
+    #[error("node hash not in nodes: {0:?}")]
+    NodeHashNotInNodeMaps(Hash),
+    #[error("move source index not in use: {0:?}")]
+    MoveSourceIndexNotInUse(TreeIndex),
+    #[error("move destination index not in use: {0:?}")]
+    MoveDestinationIndexNotInUse(TreeIndex),
+    #[error("must specify neither or both of reference_kid and side")]
+    IncompleteInsertLocationParameters(),
+    #[error("hash is dirty for index: {0:?}")]
+    Dirty(TreeIndex),
+    #[error("key/value and hash collection lengths must match: {0:?} keys/values, {0:?} hashes")]
+    UnmatchedKeysAndValues(usize, usize),
+    #[error("hash not found: {0:?}")]
+    HashNotFound(Hash),
 }
-
-create_errors!(
-    Error,
-    (
-        (
-            Io,
-            IoError,
-            "IO error: {0}",
-            (#[from]
-            std::io::Error)
-        ),
-        (
-            FailedLoadingMetadata,
-            FailedLoadingMetadataError,
-            "failed loading metadata: {0}",
-            (chia_traits::chia_error::Error)
-        ),
-        (
-            FailedLoadingNode,
-            FailedLoadingNodeError,
-            "failed loading node: {0}",
-            (chia_traits::chia_error::Error)
-        ),
-        (
-            InvalidBlobLength,
-            InvalidBlobLengthError,
-            "blob length must be a multiple of block count, found extra bytes: {0}",
-            (usize)
-        ),
-        (
-            KeyAlreadyPresent,
-            KeyAlreadyPresentError,
-            "key already present",
-            ()
-        ),
-        (
-            UnableToInsertAsRootOfNonEmptyTree,
-            UnableToInsertAsRootOfNonEmptyTreeError,
-            "requested insertion at root but tree not empty",
-            ()
-        ),
-        (
-            UnableToFindALeaf,
-            UnableToFindALeafError,
-            "unable to find a leaf",
-            ()
-        ),
-        (UnknownKey, UnknownKeyError, "unknown key: {0:?}", (KeyId)),
-        (
-            IntegrityKeyNotInCache,
-            IntegrityKeyNotInCacheError,
-            "key not in key to index cache: {0:?}",
-            (KeyId)
-        ),
-        (
-            IntegrityKeyToIndexCacheIndex,
-            IntegrityKeyToIndexCacheIndexError,
-            "key to index cache for {0:?} should be {1:?} got: {2:?}",
-            (KeyId, TreeIndex, TreeIndex)
-        ),
-        (
-            IntegrityParentChildMismatch,
-            IntegrityParentChildMismatchError,
-            "parent and child relationship mismatched: {0:?}",
-            (TreeIndex)
-        ),
-        (
-            IntegrityKeyToIndexCacheLength,
-            IntegrityKeyToIndexCacheLengthError,
-            "found {0:?} leaves but key to index cache length is: {1}",
-            (usize, usize)
-        ),
-        (
-            IntegrityLeafHashToIndexCacheLength,
-            IntegrityLeafHashToIndexCacheLengthError,
-            "found {0:?} leaves but leaf hash to index cache length is: {1}",
-            (usize, usize)
-        ),
-        (
-            IntegrityUnmatchedChildParentRelationships,
-            IntegrityUnmatchedChildParentRelationshipsError,
-            "unmatched parent -> child references found: {0}",
-            (usize)
-        ),
-        (
-            IntegrityTotalNodeCount,
-            IntegrityTotalNodeCountError,
-            "expected total node count {0:?} found: {1:?}",
-            (TreeIndex, usize)
-        ),
-        (
-            ZeroLengthSeedNotAllowed,
-            ZeroLengthSeedNotAllowedError,
-            "zero-length seed bytes not allowed",
-            ()
-        ),
-        (
-            NodeNotALeaf,
-            NodeNotALeafError,
-            "node not a leaf: {0:?}",
-            (InternalNode)
-        ),
-        (
-            Streaming,
-            StreamingError,
-            "from streamable: {0:?}",
-            (chia_traits::chia_error::Error)
-        ),
-        (
-            IndexIsNotAChild,
-            IndexIsNotAChildError,
-            "index not a child: {0}",
-            (TreeIndex)
-        ),
-        (CycleFound, CycleFoundError, "cycle found", ()),
-        (
-            BlockIndexOutOfBounds,
-            BlockIndexOutOfBoundsError,
-            "block index out of bounds: {0}",
-            (TreeIndex)
-        ),
-        (
-            LeafHashNotFound,
-            LeafHashNotFoundError,
-            "leaf hash not found: {0:?}",
-            (Hash)
-        ),
-        (
-            RootHashAndNodeListDisagreement,
-            RootHashAndNodeListDisagreementError,
-            "root hash and node list disagreement",
-            ()
-        ),
-        (
-            NodeHashNotInNodeMaps,
-            NodeHashNotInNodeMapsError,
-            "node hash not in nodes: {0:?}",
-            (Hash)
-        ),
-        (
-            MoveSourceIndexNotInUse,
-            MoveSourceIndexNotInUseError,
-            "move source index not in use: {0:?}",
-            (TreeIndex)
-        ),
-        (
-            MoveDestinationIndexNotInUse,
-            MoveDestinationIndexNotInUseError,
-            "move destination index not in use: {0:?}",
-            (TreeIndex)
-        ),
-        (
-            IncompleteInsertLocationParameters,
-            IncompleteInsertLocationParametersError,
-            "must specify neither or both of reference_kid and side",
-            ()
-        ),
-        (
-            Dirty,
-            DirtyError,
-            "hash is dirty for index: {0:?}",
-            (TreeIndex)
-        ),
-        (
-            UnmatchedKeysAndValues,
-            UnmatchedKeysAndValuesError,
-            "key/value and hash collection lengths must match: {0:?} keys/values, {0:?} hashes",
-            (usize, usize)
-        ),
-        (
-            HashNotFound,
-            HashNotFoundError,
-            "hash not found: {0:?}",
-            (Hash)
-        )
-    )
-);
 
 // assumptions
 // - root is at index 0
@@ -858,9 +685,9 @@ pub fn collect_and_return_from_merkle_blob(
     hashes: &HashSet<Hash>,
     known: impl Fn(&Hash) -> bool,
 ) -> Result<(NodeHashToDeltaReaderNode, NodeHashToIndex), Error> {
-    let mut nodes: NodeHashToDeltaReaderNode = HashMap::new();
+    let mut nodes = NodeHashToDeltaReaderNode::new();
     let blob = zstd_decode_path(path)?;
-    let mut node_hash_to_index: NodeHashToIndex = HashMap::new();
+    let mut node_hash_to_index = NodeHashToIndex::new();
 
     let mut index_to_hash: HashMap<TreeIndex, Hash> = HashMap::new();
 
@@ -984,7 +811,7 @@ pub struct DeltaReader {
 
 impl DeltaReader {
     pub fn new(internal_nodes: InternalNodesMap, leaf_nodes: LeafNodesMap) -> Result<Self, Error> {
-        let mut nodes: NodeHashToDeltaReaderNode = HashMap::new();
+        let mut nodes = NodeHashToDeltaReaderNode::new();
 
         for (hash, (left, right)) in internal_nodes {
             nodes.insert(hash, DeltaReaderNode::Internal { left, right });
@@ -2273,7 +2100,7 @@ impl MerkleBlob {
         root_hash: Option<Hash>,
     ) -> PyResult<Self> {
         let mut merkle_blob = Self::new(Vec::new())?;
-        let mut nodes: NodeHashToDeltaReaderNode = HashMap::new();
+        let mut nodes = NodeHashToDeltaReaderNode::new();
 
         for (hash, (left, right)) in internal_nodes {
             nodes.insert(hash, DeltaReaderNode::Internal { left, right });
@@ -2782,8 +2609,8 @@ mod tests {
     }
 
     fn incomplete_delta_reader() -> DeltaReader {
-        let mut internal_nodes_map: InternalNodesMap = HashMap::new();
-        let mut leaf_nodes_map: LeafNodesMap = HashMap::new();
+        let mut internal_nodes_map = InternalNodesMap::new();
+        let mut leaf_nodes_map = LeafNodesMap::new();
 
         internal_nodes_map.insert(HASH_ZERO, (HASH_ONE, HASH_TWO));
         leaf_nodes_map.insert(HASH_ONE, (KeyId(0), ValueId(1)));
