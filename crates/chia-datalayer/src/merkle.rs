@@ -4061,7 +4061,6 @@ mod tests {
     #[rstest]
     fn test_delta_file_cache() {
         let mut seed = 0;
-        let mut random = StdRng::seed_from_u64(37);
         let num_inserts = 500;
 
         let mut merkle_blob = MerkleBlob::new(Vec::new()).unwrap();
@@ -4084,12 +4083,12 @@ mod tests {
         }
 
         merkle_blob
-            .batch_insert(zip(kv_ids, hashes).collect())
+            .batch_insert(zip(kv_ids, hashes.clone()).collect())
             .unwrap();
         merkle_blob.calculate_lazy_hashes().unwrap();
 
         previous_merkle_blob
-            .batch_insert(zip(prev_kv_ids, prev_hashes).collect())
+            .batch_insert(zip(prev_kv_ids, prev_hashes.clone()).collect())
             .unwrap();
         previous_merkle_blob.calculate_lazy_hashes().unwrap();
 
@@ -4099,6 +4098,14 @@ mod tests {
         let previous_blob_path = dir_path.path().join("previous_merkle_blob");
         previous_merkle_blob.to_path(&previous_blob_path).unwrap();
 
-        let delta_cache_file = DeltaFileCache::new(&blob_path);
+        let mut delta_cache_file = DeltaFileCache::new(&blob_path).unwrap();
+        delta_cache_file.load_hash_to_index().unwrap();
+        for hash in hashes.iter() {
+            let index = delta_cache_file.get_index(*hash).unwrap();
+            let received_hash = delta_cache_file.get_hash_at_index(index).unwrap();
+            assert_eq!(received_hash, Some(*hash));
+            let node = delta_cache_file.get_raw_node(index).unwrap();
+            assert_eq!(node.hash(), *hash);
+        }
     }
 }
