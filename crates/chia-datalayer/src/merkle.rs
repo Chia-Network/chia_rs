@@ -4113,7 +4113,7 @@ mod tests {
             .unwrap();
         for hash in &prev_hashes {
             let exists = delta_cache_file.seen_previous_hash(*hash);
-            assert_eq!(exists, true);
+            assert_eq!(exists);
         }
     }
 }
