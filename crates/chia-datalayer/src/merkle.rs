@@ -2062,7 +2062,7 @@ impl MerkleBlob {
     }
 
     pub fn get_hashes(&self) -> Result<HashSet<Hash>, Error> {
-        let mut hashes = HashSet<Hash>::new();
+        let mut hashes = HashSet::<Hash>::new();
 
         if self.blob.is_empty() {
             return Ok(hashes);
