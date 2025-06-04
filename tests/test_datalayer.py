@@ -3,6 +3,8 @@ from __future__ import annotations
 import copy
 import hashlib
 import itertools
+import pathlib
+import tmpdir
 from dataclasses import dataclass
 from enum import Enum
 from random import Random
@@ -51,9 +53,6 @@ def test_merkle_blob():
 
 def test_just_insert_a_bunch() -> None:
     HASH = bytes32(range(12, 12 + 32))
-
-    import pathlib
-
     path = pathlib.Path("~/tmp/mbt/").expanduser()
     path.joinpath("py").mkdir(parents=True, exist_ok=True)
     path.joinpath("rs").mkdir(parents=True, exist_ok=True)
@@ -486,6 +485,55 @@ def test_get_nodes() -> None:
         seen_indexes.add(index)
 
     assert keys == seen_keys
+
+
+def test_delta_file_cache() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        current_blob_path = pathlib.Path(tmpdir) / "merkle_blob"
+        previous_blob_path = pathlib.Path(tmpdir) / "previous_merkle_blob"
+
+        merkle_blob = MerkleBlob(blob=bytearray())
+        previous_merkle_blob = MerkleBlob(blob=bytearray())
+        num_inserts = 500
+
+        kv_ids = []
+        previous_kv_ids = []
+        hashes = []
+        previous_hashes = []
+
+        for operation in range(num_inserts):
+            key, value = generate_kvid(operation)
+            hash = generate_hash(operation)
+            kv_ids.append((key, value))
+            hashes.append(hash)
+
+            key, value = generate_kvid(num_inserts + operation)
+            hash = generate_hash(num_inserts + operation)
+            previous_kv_ids.append((key, value))
+            previous_hashes.append(hash)
+
+        merkle_blob.batch_insert(kv_ids, hashes)
+        previous_merkle_blob.batch_insert(previous_kv_ids, previous_hashes)
+
+        merkle_blob.calculate_lazy_hashes()
+        previous_merkle_blob.calculate_lazy_hashes()
+
+        merkle_blob.to_path(current_blob_path)
+        previous_merkle_blob.to_path(previous_blob_path)
+
+        delta_file_cache = DeltaFileCache(current_blob_path)
+        delta_file_cache.load_hash_to_index()
+        delta_file_cache.load_previous_hashes(previous_blob_path)
+
+        for hash in hashes:
+            index = delta_file_cache.get_index(hash)
+            received_hash = delta_file_cache.get_hash_at_index(index)
+            assert received_hash == hash
+            node = delta_file_cache.get_raw_node(index)
+            assert node.hash == hash
+
+        for hash in previous_hashes:
+            assert delta_file_cache.seen_previous_hash(hash)
 
 
 T = TypeVar("T")
