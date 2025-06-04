@@ -800,7 +800,7 @@ impl DeltaFileCache {
         self.hash_to_index
             .get(&hash)
             .copied()
-            .ok_or_else(|| Error::HashNotFound(hash))
+            .ok_or(Error::HashNotFound(hash))
     }
 }
 
