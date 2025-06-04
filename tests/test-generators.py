@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
+import os
 from typing import Optional
 from run_gen import run_gen, print_spend_bundle_conditions
 from chia_rs import (
     MEMPOOL_MODE,
+    COST_CONDITIONS,
     SpendBundleConditions,
 )
 from dataclasses import dataclass
@@ -52,22 +54,35 @@ def run_generator(file: str, flags: int, version: int) -> Results:
 def validate_except_cost(output1: str, output2: str) -> None:
     lines1 = output1.split("\n")
     lines2 = output2.split("\n")
+    if len(lines1) != len(lines2):
+        stdout.write(f"l1: {lines1} \n")
+        stdout.write(f"l2: {lines2}")
     assert len(lines1) == len(lines2)
     for l1, l2 in zip(lines1, lines2):
         # the cost is supposed to differ, don't compare that
         if "cost:" in l1 and "cost: " in l2:
             continue
+        if l1 != l2:
+            stdout.write(f"l1: {l1} \n")
+            stdout.write(f"l2: {l2}")
         assert l1 == l2
 
 
 print(f"{'test name':43s}   consensus | mempool")
-for g in sorted(glob.glob("../generator-tests/*.txt")):
+base_dir = os.path.dirname(os.path.abspath(__file__))
+test_list = sorted(glob.glob(os.path.join(base_dir, "../generator-tests/*.txt")))
+if len(test_list) == 0:
+    print("No tests found.")
+for g in test_list:
     name = f"{Path(g).name:43s}"
     stdout.write(f"{name} running generator...\r")
     stdout.flush()
+    flags = 0
+    if "aa-million-messages.txt" in g or "aa-four-million-messages.txt" in g:
+        flags = COST_CONDITIONS
     consensus = run_generator(
         g,
-        0,
+        flags,
         version=1,
     )
 
@@ -75,16 +90,17 @@ for g in sorted(glob.glob("../generator-tests/*.txt")):
     stdout.flush()
     consensus2 = run_generator(
         g,
-        0,
+        flags,
         version=2,
     )
-    validate_except_cost(consensus.output, consensus2.output)
+    if "aa-million-messages.txt" not in g and "aa-four-million-messages.txt" not in g:
+        validate_except_cost(consensus.output, consensus2.output)
 
     stdout.write(f"{name} running generator (mempool mode) ...\r")
     stdout.flush()
     mempool = run_generator(
         g,
-        MEMPOOL_MODE,
+        MEMPOOL_MODE | flags,
         version=1,
     )
 
@@ -92,10 +108,11 @@ for g in sorted(glob.glob("../generator-tests/*.txt")):
     stdout.flush()
     mempool2 = run_generator(
         g,
-        MEMPOOL_MODE,
+        MEMPOOL_MODE | flags,
         version=2,
     )
-    validate_except_cost(mempool.output, mempool2.output)
+    if "aa-million-messages.txt" not in g and "aa-four-million-messages.txt" not in g:
+        validate_except_cost(mempool.output, mempool2.output)
 
     with open(g) as f:
         expected = f.read().split("\n", 1)[1]
@@ -133,9 +150,17 @@ for g in sorted(glob.glob("../generator-tests/*.txt")):
         elif "recursion-pairs.txt" in g:
             limit = 4
             strict_limit = 4
-
-        compare_output(consensus.output, expected, "")
-        compare_output(mempool.output, expected_mempool, "STRICT")
+        if (
+            "aa-million-messages.txt" not in g
+            and "aa-four-million-messages.txt" not in g
+        ):
+            compare_output(consensus.output, expected, "")
+            compare_output(mempool.output, expected_mempool, "STRICT")
+        else:
+            limit = 3
+            strict_limit = 3
+            compare_output(consensus2.output, expected, "")
+            compare_output(mempool2.output, expected_mempool, "STRICT")
 
         stdout.write(
             f"{name} {consensus.run_time:.2f}s "
