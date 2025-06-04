@@ -126,11 +126,7 @@ where
         match op {
             TreeOp::SExp(node) => match a.sexp(node) {
                 SExp::Atom => {
-                    let hash = tree_hash_atom(a.atom(node).as_ref());
-                    if backrefs.contains(&node) {
-                        cache.insert(node, hash);
-                    }
-                    hashes.push(hash);
+                    hashes.push(tree_hash_atom(a.atom(node).as_ref()));
                 }
                 SExp::Pair(left, right) => {
                     if let Some(hash) = cache.get(&node) {
