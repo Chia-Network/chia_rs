@@ -42,7 +42,9 @@ rstest = { workspace = true }
 text-diff = { workspace = true }
 criterion = { workspace = true }
 rand = { workspace = true, features = [ "small_rng" ] }
+rand_chacha = { workspace = true }
 blocking-threadpool = { workspace = true }
+bip39 = { workspace = true }
 
 [lib]
 bench = false

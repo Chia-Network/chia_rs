@@ -1669,6 +1669,8 @@ pub fn validate_signature(
 #[cfg(test)]
 use crate::consensus_constants::TEST_CONSTANTS;
 #[cfg(test)]
+use chia_bls::SecretKey;
+#[cfg(test)]
 use chia_protocol::Bytes48;
 #[cfg(test)]
 use clvmr::number::Number;
@@ -1677,9 +1679,11 @@ use clvmr::serde::node_to_bytes;
 #[cfg(test)]
 use hex::FromHex;
 #[cfg(test)]
-use hex_literal::hex;
-#[cfg(test)]
 use num_traits::Num;
+#[cfg(test)]
+use rand::{Rng, SeedableRng};
+#[cfg(test)]
+use rand_chacha::ChaCha8Rng;
 #[cfg(test)]
 use rstest::rstest;
 
@@ -1698,11 +1702,6 @@ const LONG_VEC: &[u8; 33] = &[
     3,
 ];
 
-#[cfg(test)]
-const PUBKEY: &[u8; 48] = &hex!("aefe1789d6476f60439e1168f588ea16652dc321279f05a805fbc63933e88ae9c175d6c6ab182e54af562e1a0dce41bb");
-#[cfg(test)]
-const SECRET_KEY: &[u8; 32] =
-    &hex!("6fc9d9a2b05fd1f0e51bc91041a03be8657081f272ec281aff731624f0d1c220");
 #[cfg(test)]
 const MSG1: &[u8; 13] = &[3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
 #[cfg(test)]
@@ -1744,6 +1743,18 @@ const LONGMSG: &[u8; 1025] = &[
     4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
     4,
 ];
+
+#[cfg(test)]
+fn random_test_sk() -> SecretKey {
+    let mut rng = ChaCha8Rng::seed_from_u64(1337);
+    let mnemonic = bip39::Mnemonic::from_entropy(&rng.gen::<[u8; 32]>()).expect("invalid mnemonic");
+    SecretKey::from_seed(&mnemonic.to_seed(""))
+}
+
+#[cfg(test)]
+fn random_test_pk() -> [u8; 48] {
+    random_test_sk().public_key().to_bytes()
+}
 
 #[cfg(test)]
 fn hash_buf(b1: &[u8], b2: &[u8]) -> Vec<u8> {
@@ -1838,7 +1849,7 @@ fn parse_list(a: &mut Allocator, input: &str, callback: &Callback) -> NodePtr {
     subs.insert("h2", a.new_atom(H2).unwrap());
     subs.insert("long", a.new_atom(LONG_VEC).unwrap());
     // public key
-    subs.insert("pubkey", a.new_atom(PUBKEY).unwrap());
+    subs.insert("pubkey", a.new_atom(&random_test_pk()).unwrap());
     // announce/aggsig messages
     subs.insert("msg1", a.new_atom(MSG1).unwrap());
     subs.insert("msg2", a.new_atom(MSG2).unwrap());
@@ -3277,7 +3288,7 @@ fn test_single_agg_sig_me(
     let agg_sigs = agg_sig_vec(condition, spend);
     assert_eq!(agg_sigs.len(), 1);
     for c in agg_sigs {
-        assert_eq!(c.0, PublicKey::from_bytes(PUBKEY).unwrap());
+        assert_eq!(c.0, PublicKey::from_bytes(&random_test_pk()).unwrap());
         assert_eq!(a.atom(c.1).as_ref(), MSG1);
     }
     assert_eq!(spend.flags, 0);
@@ -3314,7 +3325,7 @@ fn test_duplicate_agg_sig(
     let agg_sigs = agg_sig_vec(condition, spend);
     assert_eq!(agg_sigs.len(), 2);
     for c in agg_sigs {
-        assert_eq!(c.0, PublicKey::from_bytes(PUBKEY).unwrap());
+        assert_eq!(c.0, PublicKey::from_bytes(&random_test_pk()).unwrap());
         assert_eq!(a.atom(c.1).as_ref(), MSG1);
     }
     assert_eq!(spend.flags, 0);
@@ -3422,7 +3433,10 @@ fn test_agg_sig_exceed_cost(#[case] condition: ConditionOpcode) {
                     // this builds one AGG_SIG_* condition
                     let aggsig = (
                         condition,
-                        (Bytes48::from(PUBKEY), (Bytes::from(MSG1.as_slice()), 0)),
+                        (
+                            Bytes48::from(random_test_pk()),
+                            (Bytes::from(MSG1.as_slice()), 0),
+                        ),
                     )
                         .to_clvm(a)
                         .unwrap();
@@ -3463,7 +3477,7 @@ fn test_single_agg_sig_unsafe() {
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(conds.agg_sig_unsafe.len(), 1);
     for (pk, msg) in &conds.agg_sig_unsafe {
-        assert_eq!(*pk, PublicKey::from_bytes(PUBKEY).unwrap());
+        assert_eq!(*pk, PublicKey::from_bytes(&random_test_pk()).unwrap());
         assert_eq!(a.atom(*msg).as_ref(), MSG1);
     }
     assert_eq!(spend.flags, 0);
@@ -3539,7 +3553,7 @@ fn test_agg_sig_unsafe_invalid_terminator() {
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(conds.agg_sig_unsafe.len(), 1);
     for (pk, msg) in &conds.agg_sig_unsafe {
-        assert_eq!(*pk, PublicKey::from_bytes(PUBKEY).unwrap());
+        assert_eq!(*pk, PublicKey::from_bytes(&random_test_pk()).unwrap());
         assert_eq!(a.atom(*msg).as_ref(), MSG1);
     }
     assert_eq!(spend.flags, 0);
@@ -3568,7 +3582,7 @@ fn test_agg_sig_me_invalid_terminator() {
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.agg_sig_me.len(), 1);
     for (pk, msg) in &conds.agg_sig_unsafe {
-        assert_eq!(*pk, PublicKey::from_bytes(PUBKEY).unwrap());
+        assert_eq!(*pk, PublicKey::from_bytes(&random_test_pk()).unwrap());
         assert_eq!(a.atom(*msg).as_ref(), MSG1);
     }
     assert_eq!(spend.flags, 0);
@@ -3597,7 +3611,7 @@ fn test_duplicate_agg_sig_unsafe() {
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(conds.agg_sig_unsafe.len(), 2);
     for (pk, msg) in &conds.agg_sig_unsafe {
-        assert_eq!(*pk, PublicKey::from_bytes(PUBKEY).unwrap());
+        assert_eq!(*pk, PublicKey::from_bytes(&random_test_pk()).unwrap());
         assert_eq!(a.atom(*msg).as_ref(), MSG1);
     }
     assert_eq!(spend.flags, 0);
@@ -3664,10 +3678,9 @@ fn sign_tx(
     opcode: u16,
     msg: &[u8],
 ) -> Signature {
-    use chia_bls::{sign, SecretKey};
-
     let final_msg = final_message(parent, puzzle, amount, opcode, msg);
-    sign(&SecretKey::from_bytes(SECRET_KEY).unwrap(), final_msg)
+
+    chia_bls::sign(&random_test_sk(), final_msg)
 }
 
 #[cfg(test)]
@@ -3729,7 +3742,10 @@ fn test_agg_sig_unsafe_exceed_cost() {
                     // this builds one AGG_SIG_UNSAFE condition
                     let aggsig = (
                         AGG_SIG_UNSAFE,
-                        (Bytes48::from(PUBKEY), (Bytes::from(MSG1.as_slice()), 0)),
+                        (
+                            Bytes48::from(random_test_pk()),
+                            (Bytes::from(MSG1.as_slice()), 0),
+                        ),
                     )
                         .to_clvm(a)
                         .unwrap();
@@ -4183,13 +4199,11 @@ fn test_cost_create_coins_conds_after_free(#[case] count: usize) {
 #[case(5001)]
 #[case(99)]
 fn test_cost_aggsig_conds_after_free(#[case] count: usize) {
-    use chia_bls::{sign, SecretKey};
-
-    let sk = SecretKey::from_bytes(SECRET_KEY).expect("secret key");
+    let sk = random_test_sk();
     let pk = sk.public_key();
     let mut sig = Signature::default();
     for _ in 0..count {
-        let new_sig = sign(&sk, H1);
+        let new_sig = chia_bls::sign(&sk, H1);
         sig.aggregate(&new_sig);
     }
     let r = cond_test_cb(
@@ -5149,11 +5163,11 @@ fn populate_cache(opcode: ConditionOpcode, bls_cache: &BlsCache) {
     use chia_bls::hash_to_g2;
     let msg = final_message(H1, H2, 123, opcode, MSG1);
     // Otherwise, we need to calculate the pairing and add it to the cache.
-    let mut aug_msg = PUBKEY.to_vec();
+    let mut aug_msg = random_test_pk().to_vec();
     aug_msg.extend_from_slice(msg.as_ref());
     let aug_hash = hash_to_g2(&aug_msg);
 
-    let gt = aug_hash.pair(&PublicKey::from_bytes(PUBKEY).unwrap());
+    let gt = aug_hash.pair(&PublicKey::from_bytes(&random_test_pk()).unwrap());
     bls_cache.update(&aug_msg, gt);
 }
 
@@ -5165,7 +5179,6 @@ fn test_agg_sig(
     #[values(true, false)] expect_pass: bool,
     #[values(true, false)] with_cache: bool,
 ) {
-    use chia_bls::{sign, SecretKey};
     let mut signature = Signature::default();
     let bls_cache = BlsCache::default();
     let cache: Option<&BlsCache> = if with_cache {
@@ -5202,10 +5215,7 @@ fn test_agg_sig(
     }
     puzzle.push_str("))))");
     if !expect_pass {
-        signature.aggregate(&sign(
-            &SecretKey::from_bytes(SECRET_KEY).unwrap(),
-            b"foobar",
-        ));
+        signature.aggregate(&chia_bls::sign(&random_test_sk(), b"foobar"));
     }
     assert_eq!(
         expect_pass,

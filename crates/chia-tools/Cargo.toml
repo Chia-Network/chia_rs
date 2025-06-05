@@ -30,6 +30,9 @@ hex-literal = { workspace = true }
 linreg = { workspace = true }
 chia-sha2 = { workspace = true }
 gnuplot = { workspace = true }
+rand = { workspace = true }
+rand_chacha = { workspace = true }
+bip39 = { workspace = true }
 
 [lib]
 name = "chia_tools"

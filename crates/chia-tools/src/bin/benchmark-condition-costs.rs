@@ -1,26 +1,24 @@
 use chia_bls::{sign, SecretKey, Signature};
-use chia_consensus::consensus_constants::TEST_CONSTANTS;
-use chia_consensus::make_aggsig_final_message::u64_to_bytes;
-use chia_sha2::Sha256;
-use linreg::linear_regression_of;
-use std::time::Instant;
-// use chia_consensus::gen::conditions::parse_conditions;
 use chia_consensus::conditions::{
-    process_single_spend,
-    validate_conditions,
-    validate_signature,
-    ParseState, // SpendConditions,
+    process_single_spend, validate_conditions, validate_signature, ParseState,
 };
 use chia_consensus::conditions::{MempoolVisitor, SpendBundleConditions};
+use chia_consensus::consensus_constants::TEST_CONSTANTS;
+use chia_consensus::make_aggsig_final_message::u64_to_bytes;
 use chia_consensus::opcodes;
 use chia_consensus::opcodes::ConditionOpcode;
 use chia_consensus::spend_visitor::SpendVisitor;
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
+use chia_sha2::Sha256;
 use clvmr::{
     allocator::{Allocator, NodePtr},
     reduction::EvalErr,
 };
+use linreg::linear_regression_of;
+use rand::{Rng, SeedableRng};
+use rand_chacha::ChaCha8Rng;
+use std::time::Instant;
 struct ConditionTest<'a> {
     opcode: ConditionOpcode,
     args: &'a [NodePtr],
@@ -28,14 +26,10 @@ struct ConditionTest<'a> {
     // 0 means we want to estimate a reasonable cost
     cost: u64,
 }
-use hex_literal::hex;
 
 const H1: &[u8; 32] = &[
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 ];
-
-const SECRET_KEY: &[u8; 32] =
-    &hex!("6fc9d9a2b05fd1f0e51bc91041a03be8657081f272ec281aff731624f0d1c220");
 
 const MSG1: &[u8; 13] = &[3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
 
@@ -98,11 +92,14 @@ pub fn main() {
 
     const REPS: u32 = 500;
 
+    let mut rng = ChaCha8Rng::seed_from_u64(1337);
+    let mnemonic = bip39::Mnemonic::from_entropy(&rng.gen::<[u8; 32]>()).expect("invalid mnemonic");
+
     let mut allocator = Allocator::new();
     let one = allocator.new_small_number(1).expect("number");
     let hundred = allocator.new_small_number(100).expect("number");
     let sixty_three = allocator.new_small_number(63).expect("number");
-    let sk = SecretKey::from_bytes(SECRET_KEY).expect("secret key");
+    let sk = SecretKey::from_seed(&mnemonic.to_seed(""));
     let pk = sk.public_key();
     let parent_id = allocator.new_atom(H1).expect("atom");
     let puzzle_hash = Bytes32::from(clvm_utils::tree_hash_from_bytes(&[1_u8]).expect("tree_hash"));
