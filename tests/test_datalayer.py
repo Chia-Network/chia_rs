@@ -4,7 +4,7 @@ import copy
 import hashlib
 import itertools
 import pathlib
-import tmpdir
+import tempfile
 from dataclasses import dataclass
 from enum import Enum
 from random import Random
@@ -16,6 +16,7 @@ import pytest
 from _pytest.fixtures import SubRequest
 
 from chia_rs.datalayer import (
+    DeltaFileCache,
     KeyId,
     TreeIndex,
     ValueId,
