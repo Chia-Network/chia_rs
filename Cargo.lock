@@ -745,6 +745,7 @@ dependencies = [
  "clvm-traits",
  "clvmr",
  "hex",
+ "hex-literal",
  "rstest",
 ]
 

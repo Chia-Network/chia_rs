@@ -84,3 +84,8 @@ bench = false
 name = "rollback-blockchain-db"
 test = false
 bench = false
+
+[[bin]]
+name = "puzzle-hash"
+test = false
+bench = false
