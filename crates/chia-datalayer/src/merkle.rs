@@ -779,9 +779,15 @@ impl DeltaFileCache {
     }
 
     pub fn load_previous_hashes(&mut self, path: &PathBuf) -> Result<(), Error> {
-        let blob = MerkleBlob::from_path(path)?;
-        self.previous_hashes = blob.get_hashes()?;
-        Ok(())
+        let blob = zstd_decode_path(path)?;
+        self.previous_hashes = HashSet::new();
+
+        if !blob.is_empty() {
+            for item in MerkleBlobParentFirstIterator::new(&blob, None) {
+                let (_, block) = item?;
+                self.previous_hashes.insert(block.node.hash());
+            }
+        }
     }
 
     pub fn get_raw_node(&self, index: TreeIndex) -> Result<Node, Error> {
@@ -1702,7 +1708,7 @@ impl MerkleBlob {
 
         let block = self.get_block(index)?;
         if block.metadata.dirty {
-            return Err(Error::Dirty(index))?;
+            return Err(Error::Dirty(index));
         }
 
         Ok(Some(block.node.hash()))
@@ -4071,8 +4077,7 @@ mod tests {
         let mut prev_kv_ids: Vec<(KeyId, ValueId)> = Vec::new();
         let mut prev_hashes: Vec<Hash> = Vec::new();
 
-        for _ in 0..num_inserts {
-            seed += 1;
+        for seed in 1..=num_inserts {
             let (key, value) = generate_kvid(seed);
             kv_ids.push((key, value));
             hashes.push(generate_hash(seed));
