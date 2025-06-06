@@ -788,6 +788,7 @@ impl DeltaFileCache {
                 self.previous_hashes.insert(block.node.hash());
             }
         }
+        Ok(())
     }
 
     pub fn get_raw_node(&self, index: TreeIndex) -> Result<Node, Error> {
