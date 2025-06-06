@@ -4067,7 +4067,6 @@ mod tests {
 
     #[rstest]
     fn test_delta_file_cache() {
-        let mut seed = 0;
         let num_inserts = 500;
 
         let mut merkle_blob = MerkleBlob::new(Vec::new()).unwrap();
