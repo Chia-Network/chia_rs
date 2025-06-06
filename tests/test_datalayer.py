@@ -523,7 +523,6 @@ def test_delta_file_cache() -> None:
         previous_merkle_blob.to_path(previous_blob_path)
 
         delta_file_cache = DeltaFileCache(current_blob_path)
-        delta_file_cache.load_hash_to_index()
         delta_file_cache.load_previous_hashes(previous_blob_path)
 
         for hash in hashes:

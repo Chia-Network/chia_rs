@@ -766,16 +766,13 @@ pub struct DeltaFileCache {
 
 impl DeltaFileCache {
     pub fn new(path: &PathBuf) -> Result<Self, Error> {
+        let merkle_blob = MerkleBlob::from_path(path)?;
+        let hash_to_index = merkle_blob.get_hashes_indexes(false)?;
         Ok(Self {
-            hash_to_index: NodeHashToIndex::new(),
-            previous_hashes: HashSet::<Hash>::new(),
-            merkle_blob: MerkleBlob::from_path(path)?,
+            hash_to_index,
+            previous_hashes: HashSet::new(),
+            merkle_blob,
         })
-    }
-
-    pub fn load_hash_to_index(&mut self) -> Result<(), Error> {
-        self.hash_to_index = self.merkle_blob.get_hashes_indexes(false)?;
-        Ok(())
     }
 
     pub fn load_previous_hashes(&mut self, path: &PathBuf) -> Result<(), Error> {
@@ -2359,12 +2356,6 @@ impl DeltaFileCache {
     fn py_new(py: Python<'_>, path: PyObject) -> PyResult<Self> {
         let path: PathBuf = path.extract(py)?;
         Ok(Self::new(&path)?)
-    }
-
-    #[allow(clippy::needless_pass_by_value)]
-    #[pyo3(name = "load_hash_to_index")]
-    pub fn py_load_hash_to_index(&mut self) -> PyResult<()> {
-        Ok(self.load_hash_to_index()?)
     }
 
     #[allow(clippy::needless_pass_by_value)]
@@ -4104,7 +4095,6 @@ mod tests {
         previous_merkle_blob.to_path(&previous_blob_path).unwrap();
 
         let mut delta_cache_file = DeltaFileCache::new(&blob_path).unwrap();
-        delta_cache_file.load_hash_to_index().unwrap();
         for hash in &hashes {
             let index = delta_cache_file.get_index(*hash).unwrap();
             let received_hash = delta_cache_file.get_hash_at_index(index).unwrap();
