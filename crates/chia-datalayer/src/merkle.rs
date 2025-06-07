@@ -197,6 +197,8 @@ pub enum Error {
     Dirty(TreeIndex),
     #[error("key/value and hash collection lengths must match: {0:?} keys/values, {0:?} hashes")]
     UnmatchedKeysAndValues(usize, usize),
+    #[error("hash not found: {0:?}")]
+    HashNotFound(Hash),
 }
 
 // assumptions
@@ -753,6 +755,57 @@ type LeafNodesMap = HashMap<Hash, (KeyId, ValueId)>;
 pub enum DeltaReaderNode {
     Internal { left: Hash, right: Hash },
     Leaf { key: KeyId, value: ValueId },
+}
+
+#[cfg_attr(feature = "py-bindings", pyclass)]
+pub struct DeltaFileCache {
+    hash_to_index: NodeHashToIndex,
+    previous_hashes: HashSet<Hash>,
+    merkle_blob: MerkleBlob,
+}
+
+impl DeltaFileCache {
+    pub fn new(path: &PathBuf) -> Result<Self, Error> {
+        let merkle_blob = MerkleBlob::from_path(path)?;
+        let hash_to_index = merkle_blob.get_hashes_indexes(false)?;
+        Ok(Self {
+            hash_to_index,
+            previous_hashes: HashSet::new(),
+            merkle_blob,
+        })
+    }
+
+    pub fn load_previous_hashes(&mut self, path: &PathBuf) -> Result<(), Error> {
+        let blob = zstd_decode_path(path)?;
+        self.previous_hashes = HashSet::new();
+
+        if !blob.is_empty() {
+            for item in MerkleBlobParentFirstIterator::new(&blob, None) {
+                let (_, block) = item?;
+                self.previous_hashes.insert(block.node.hash());
+            }
+        }
+        Ok(())
+    }
+
+    pub fn get_raw_node(&self, index: TreeIndex) -> Result<Node, Error> {
+        self.merkle_blob.get_node(index)
+    }
+
+    pub fn get_hash_at_index(&self, index: TreeIndex) -> Result<Option<Hash>, Error> {
+        self.merkle_blob.get_hash_at_index(index)
+    }
+
+    pub fn seen_previous_hash(&self, hash: Hash) -> bool {
+        self.previous_hashes.contains(&hash)
+    }
+
+    pub fn get_index(&self, hash: Hash) -> Result<TreeIndex, Error> {
+        self.hash_to_index
+            .get(&hash)
+            .copied()
+            .ok_or(Error::HashNotFound(hash))
+    }
 }
 
 #[cfg_attr(feature = "py-bindings", pyclass)]
@@ -1646,6 +1699,19 @@ impl MerkleBlob {
         }
     }
 
+    pub fn get_hash_at_index(&self, index: TreeIndex) -> Result<Option<Hash>, Error> {
+        if self.block_status_cache.no_keys() {
+            return Ok(None);
+        }
+
+        let block = self.get_block(index)?;
+        if block.metadata.dirty {
+            return Err(Error::Dirty(index));
+        }
+
+        Ok(Some(block.node.hash()))
+    }
+
     fn get_random_insert_location_by_key_id(&self, seed: KeyId) -> Result<InsertLocation, Error> {
         let seed = sha256_num(seed.0);
 
@@ -1841,6 +1907,21 @@ impl MerkleBlob {
             .expect_leaf("should only have leaves in the leaf hash to index cache");
 
         Ok((node.key, node.value))
+    }
+
+    pub fn get_hashes(&self) -> Result<HashSet<Hash>, Error> {
+        let mut hashes = HashSet::<Hash>::new();
+
+        if self.blob.is_empty() {
+            return Ok(hashes);
+        }
+
+        for item in MerkleBlobParentFirstIterator::new(&self.blob, None) {
+            let (_, block) = item?;
+            hashes.insert(block.node.hash());
+        }
+
+        Ok(hashes)
     }
 
     pub fn get_hashes_indexes(&self, leafs_only: bool) -> Result<HashMap<Hash, TreeIndex>, Error> {
@@ -2139,16 +2220,7 @@ impl MerkleBlob {
 
     #[pyo3(name = "get_hash_at_index")]
     pub fn py_get_hash_at_index(&self, index: TreeIndex) -> PyResult<Option<Hash>> {
-        if self.block_status_cache.no_keys() {
-            return Ok(None);
-        }
-
-        let block = self.get_block(index)?;
-        if block.metadata.dirty {
-            Err(Error::Dirty(index))?;
-        }
-
-        Ok(Some(block.node.hash()))
+        Ok(self.get_hash_at_index(index)?)
     }
 
     #[pyo3(name = "batch_insert")]
@@ -2274,6 +2346,44 @@ pub fn get_internal_terminal(
     }
 
     Ok(nodes)
+}
+
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+impl DeltaFileCache {
+    #[allow(clippy::needless_pass_by_value)]
+    #[new]
+    fn py_new(py: Python<'_>, path: PyObject) -> PyResult<Self> {
+        let path: PathBuf = path.extract(py)?;
+        Ok(Self::new(&path)?)
+    }
+
+    #[allow(clippy::needless_pass_by_value)]
+    #[pyo3(name = "load_previous_hashes")]
+    pub fn py_load_previous_hashes(&mut self, py: Python<'_>, path: PyObject) -> PyResult<()> {
+        let path: PathBuf = path.extract(py)?;
+        Ok(self.load_previous_hashes(&path)?)
+    }
+
+    #[pyo3(name = "get_index")]
+    pub fn py_get_index(&self, hash: Hash) -> PyResult<TreeIndex> {
+        Ok(self.get_index(hash)?)
+    }
+
+    #[pyo3(name = "seen_previous_hash")]
+    pub fn py_seen_previous_hash(&self, hash: Hash) -> bool {
+        self.seen_previous_hash(hash)
+    }
+
+    #[pyo3(name = "get_raw_node")]
+    pub fn py_get_raw_node(&mut self, index: TreeIndex) -> PyResult<Node> {
+        Ok(self.get_raw_node(index)?)
+    }
+
+    #[pyo3(name = "get_hash_at_index")]
+    pub fn py_get_hash_at_index(&self, index: TreeIndex) -> PyResult<Option<Hash>> {
+        Ok(self.get_hash_at_index(index)?)
+    }
 }
 
 struct MerkleBlobLeftChildFirstIteratorItem {
@@ -3944,5 +4054,61 @@ mod tests {
         assert_ne!(small_blob.get_hash(TreeIndex(0)).unwrap(), remaining_hash);
         small_blob.delete(key_to_delete).unwrap();
         assert_eq!(small_blob.get_hash(TreeIndex(0)).unwrap(), remaining_hash);
+    }
+
+    #[rstest]
+    fn test_delta_file_cache() {
+        let num_inserts = 500;
+
+        let mut merkle_blob = MerkleBlob::new(Vec::new()).unwrap();
+        let mut kv_ids: Vec<(KeyId, ValueId)> = Vec::new();
+        let mut hashes: Vec<Hash> = Vec::new();
+
+        let mut previous_merkle_blob = MerkleBlob::new(Vec::new()).unwrap();
+        let mut prev_kv_ids: Vec<(KeyId, ValueId)> = Vec::new();
+        let mut prev_hashes: Vec<Hash> = Vec::new();
+
+        for seed in 1..=num_inserts {
+            let (key, value) = generate_kvid(seed);
+            kv_ids.push((key, value));
+            hashes.push(generate_hash(seed));
+
+            let (key, value) = generate_kvid(num_inserts + seed);
+            prev_kv_ids.push((key, value));
+            prev_hashes.push(generate_hash(num_inserts + seed));
+        }
+
+        merkle_blob
+            .batch_insert(zip(kv_ids, hashes.clone()).collect())
+            .unwrap();
+        merkle_blob.calculate_lazy_hashes().unwrap();
+
+        previous_merkle_blob
+            .batch_insert(zip(prev_kv_ids, prev_hashes.clone()).collect())
+            .unwrap();
+        previous_merkle_blob.calculate_lazy_hashes().unwrap();
+
+        let dir_path = tempfile::tempdir().unwrap();
+        let blob_path = dir_path.path().join("merkle_blob");
+        merkle_blob.to_path(&blob_path).unwrap();
+        let previous_blob_path = dir_path.path().join("previous_merkle_blob");
+        previous_merkle_blob.to_path(&previous_blob_path).unwrap();
+
+        let mut delta_cache_file = DeltaFileCache::new(&blob_path).unwrap();
+        for hash in &hashes {
+            let index = delta_cache_file.get_index(*hash).unwrap();
+            let received_hash = delta_cache_file.get_hash_at_index(index).unwrap();
+            assert_eq!(received_hash, Some(*hash));
+            let node = delta_cache_file.get_raw_node(index).unwrap();
+            assert_eq!(node.hash(), *hash);
+        }
+
+        delta_cache_file
+            .load_previous_hashes(&previous_blob_path)
+            .unwrap();
+        for hash in &prev_hashes {
+            let exists = delta_cache_file.seen_previous_hash(*hash);
+            assert!(exists);
+        }
     }
 }
