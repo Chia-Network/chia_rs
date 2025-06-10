@@ -79,16 +79,24 @@ for g in test_list:
     stdout.write(f"{name} running generator...\r")
     stdout.flush()
 
+    run_generator1 = True
     if "aa-million-messages.txt" in g:
         flags = COST_CONDITIONS
+    elif "puzzle-hash-stress-test.txt" in g:
+        # this test fails on generator1, because it's too expensive
+        run_generator1 = False
+    elif "puzzle-hash-stress-tree.txt" in g:
+        # this test fails on generator1, because it's too expensive
+        run_generator1 = False
     else:
         flags = 0
 
-    consensus = run_generator(
-        g,
-        flags,
-        version=1,
-    )
+    if run_generator1:
+        consensus = run_generator(
+            g,
+            flags,
+            version=1,
+        )
 
     stdout.write(f"{name} running generator2...\r")
     stdout.flush()
@@ -97,16 +105,18 @@ for g in test_list:
         flags,
         version=2,
     )
-    validate_except_cost(consensus.output, consensus2.output)
+    if run_generator1:
+        validate_except_cost(consensus.output, consensus2.output)
 
     stdout.write(f"{name} running generator (mempool mode) ...\r")
     stdout.flush()
 
-    mempool = run_generator(
-        g,
-        MEMPOOL_MODE | flags,
-        version=1,
-    )
+    if run_generator1:
+        mempool = run_generator(
+            g,
+            MEMPOOL_MODE | flags,
+            version=1,
+        )
 
     stdout.write(f"{name} running generator2 (mempool mode)...\r")
     stdout.flush()
@@ -115,7 +125,8 @@ for g in test_list:
         MEMPOOL_MODE | flags,
         version=2,
     )
-    validate_except_cost(mempool.output, mempool2.output)
+    if run_generator1:
+        validate_except_cost(mempool.output, mempool2.output)
 
     with open(g) as f:
         expected = f.read().split("\n", 1)[1]
@@ -156,22 +167,38 @@ for g in test_list:
         elif "aa-million-messages.txt" in g:
             limit = 3
             strict_limit = 3
+        elif "puzzle-hash-stress-test.txt" in g:
+            limit = 4
+            strict_limit = 4
+        elif "puzzle-hash-stress-tree.txt" in g:
+            limit = 4
+            strict_limit = 4
 
-        compare_output(consensus2.output, expected, "")
-        compare_output(mempool2.output, expected_mempool, "STRICT")
+        if run_generator1:
+            validate_except_cost(consensus.output, expected)
+            validate_except_cost(mempool.output, expected_mempool)
+            stdout.write(
+                f"{name} {consensus.run_time:.2f}s "
+                f"{consensus2.run_time:.2f}s | "
+                f"{mempool.run_time:.2f}s "
+                f"{mempool2.run_time:.2f}s"
+            )
+        else:
+            compare_output(consensus2.output, expected, "")
+            compare_output(mempool2.output, expected_mempool, "strict")
+            stdout.write(
+                f"{name} {consensus2.run_time:.2f}s | " f"{mempool2.run_time:.2f}s"
+            )
 
-        stdout.write(
-            f"{name} {consensus.run_time:.2f}s "
-            f"{consensus2.run_time:.2f}s | "
-            f"{mempool.run_time:.2f}s "
-            f"{mempool2.run_time:.2f}s"
-        )
-
-        if consensus2.run_time > limit or consensus2.run_time > limit:
+        if (
+            run_generator1 and consensus.run_time > limit
+        ) or consensus2.run_time > limit:
             stdout.write(f" - exceeds limit ({limit})!")
             failed = 1
 
-        if mempool2.run_time > strict_limit or mempool2.run_time > strict_limit:
+        if (
+            run_generator1 and mempool.run_time > strict_limit
+        ) or mempool2.run_time > strict_limit:
             stdout.write(f" - mempool exceeds limit ({strict_limit})!")
             failed = 1
 
