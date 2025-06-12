@@ -104,6 +104,9 @@ openssl = ["chia-sha2/openssl", "clvmr/openssl"]
 [profile.release]
 lto = "thin"
 
+[lib]
+bench = false
+
 [workspace.dependencies]
 chia_py_streamable_macro = { path = "./crates/chia_py_streamable_macro", version = "0.26.0" }
 chia_streamable_macro = { path = "./crates/chia_streamable_macro", version = "0.26.0" }
