@@ -26,9 +26,9 @@ use std::ops::Range;
 use std::path::PathBuf;
 use thiserror::Error;
 
-mod iterators;
+pub mod iterators;
 
-pub type TreeIndexType = u32;
+type TreeIndexType = u32;
 #[cfg_attr(
     feature = "py-bindings",
     pyclass(frozen),
@@ -2516,7 +2516,7 @@ mod tests {
     }
 
     #[fixture]
-    pub fn traversal_blob(mut small_blob: MerkleBlob) -> MerkleBlob {
+    pub(crate) fn traversal_blob(mut small_blob: MerkleBlob) -> MerkleBlob {
         small_blob
             .insert(
                 KeyId(103),
