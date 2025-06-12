@@ -23,7 +23,7 @@ use std::ops::Range;
 use std::path::PathBuf;
 use thiserror::Error;
 
-type TreeIndexType = u32;
+pub type TreeIndexType = u32;
 #[cfg_attr(
     feature = "py-bindings",
     pyclass(frozen),
@@ -38,7 +38,7 @@ pub struct TreeIndex(#[pyo3(get, name = "raw")] TreeIndexType);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 #[cfg(not(feature = "py-bindings"))]
-pub struct TreeIndex(TreeIndexType);
+pub struct TreeIndex(pub TreeIndexType);
 
 #[cfg(feature = "py-bindings")]
 #[pymethods]
