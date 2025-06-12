@@ -34,7 +34,7 @@ pub type TreeIndexType = u32;
 //        being found with a cfg_attr
 //        https://github.com/PyO3/pyo3/issues/5125
 #[cfg(feature = "py-bindings")]
-pub struct TreeIndex(#[pyo3(get, name = "raw")] TreeIndexType);
+pub struct TreeIndex(#[pyo3(get, name = "raw")] pub TreeIndexType);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 #[cfg(not(feature = "py-bindings"))]
