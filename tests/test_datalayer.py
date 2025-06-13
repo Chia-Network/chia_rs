@@ -45,7 +45,7 @@ blob = bytes.fromhex(
 )
 
 
-def test_merkle_blob():
+def test_merkle_blob() -> None:
     merkle_blob = MerkleBlob(blob)
     print(merkle_blob)
     print(dir(merkle_blob))
