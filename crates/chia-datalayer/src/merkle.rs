@@ -6,15 +6,20 @@ use pyo3::{
     prelude::*,
     pyclass, pymethods,
     types::{PyDict, PyDictMethods, PyListMethods, PyType},
-    Bound, FromPyObject, IntoPyObject, PyAny, PyErr, PyResult, Python,
+    Bound, IntoPyObject, PyResult, Python,
 };
 
 use crate::merkle::iterators::{
     MerkleBlobBreadthFirstIterator, MerkleBlobLeftChildFirstIterator, MerkleBlobParentFirstIterator,
 };
+use crate::{
+    Block, BlockBytes, Hash, InternalNode, KeyId, LeafNode, Node, NodeMetadata, NodeType, Parent,
+    TreeIndex, ValueId, BLOCK_SIZE,
+};
 use chia_protocol::Bytes32;
 use chia_sha2::Sha256;
 use chia_streamable_macro::Streamable;
+#[cfg(feature = "py-bindings")]
 use chia_traits::Streamable;
 use num_traits::ToBytes;
 use rayon::prelude::*;
@@ -26,120 +31,8 @@ use std::ops::Range;
 use std::path::PathBuf;
 use thiserror::Error;
 
+pub mod format;
 pub mod iterators;
-
-pub type TreeIndexType = u32;
-#[cfg_attr(
-    feature = "py-bindings",
-    pyclass(frozen),
-    derive(PyJsonDict, PyStreamable)
-)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
-// ISSUE: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
-//        being found with a cfg_attr
-//        https://github.com/PyO3/pyo3/issues/5125
-#[cfg(feature = "py-bindings")]
-pub struct TreeIndex(#[pyo3(get, name = "raw")] pub TreeIndexType);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
-#[cfg(not(feature = "py-bindings"))]
-pub struct TreeIndex(pub TreeIndexType);
-
-#[cfg(feature = "py-bindings")]
-#[pymethods]
-impl TreeIndex {
-    #[new]
-    pub fn py_new(raw: TreeIndexType) -> Self {
-        Self(raw)
-    }
-}
-
-impl std::fmt::Display for TreeIndex {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-#[cfg_attr(
-    feature = "py-bindings",
-    derive(FromPyObject, IntoPyObject, PyJsonDict),
-    pyo3(transparent)
-)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
-pub struct Parent(Option<TreeIndex>);
-
-#[cfg_attr(
-    feature = "py-bindings",
-    derive(FromPyObject, IntoPyObject, PyJsonDict),
-    pyo3(transparent)
-)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
-pub struct Hash(Bytes32);
-
-/// Key and value ids are provided from outside of this code and are implemented as
-/// the row id from sqlite which is a signed 8 byte integer.  The actual key and
-/// value data bytes will not be handled within this code, only outside.
-#[cfg_attr(
-    feature = "py-bindings",
-    pyclass(frozen),
-    derive(PyJsonDict, PyStreamable)
-)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
-// ISSUE: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
-//        being found with a cfg_attr
-//        https://github.com/PyO3/pyo3/issues/5125
-#[cfg(feature = "py-bindings")]
-pub struct KeyId(#[pyo3(get, name = "raw")] i64);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
-#[cfg(not(feature = "py-bindings"))]
-pub struct KeyId(i64);
-
-#[cfg(feature = "py-bindings")]
-#[pymethods]
-impl KeyId {
-    #[new]
-    pub fn py_new(raw: i64) -> Self {
-        Self(raw)
-    }
-}
-
-#[cfg_attr(
-    feature = "py-bindings",
-    pyclass(frozen),
-    derive(PyJsonDict, PyStreamable)
-)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
-// ISSUE: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
-//        being found with a cfg_attr
-//        https://github.com/PyO3/pyo3/issues/5125
-#[cfg(feature = "py-bindings")]
-pub struct ValueId(#[pyo3(get, name = "raw")] i64);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
-#[cfg(not(feature = "py-bindings"))]
-pub struct ValueId(i64);
-
-#[cfg(feature = "py-bindings")]
-#[pymethods]
-impl ValueId {
-    #[new]
-    pub fn py_new(raw: i64) -> Self {
-        Self(raw)
-    }
-}
-
-impl std::fmt::Display for ValueId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl std::fmt::Display for KeyId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
 
 #[cfg_attr(feature = "py-bindings", derive(chia_datalayer_macro::PythonError))]
 #[derive(Debug, Error)]
@@ -210,27 +103,6 @@ pub enum Error {
 // - root is at index 0
 // - any case with no keys will have a zero length blob
 
-// define the serialized block format
-const METADATA_RANGE: Range<usize> = 0..METADATA_SIZE;
-pub const METADATA_SIZE: usize = 2;
-// TODO: figure out the real max better than trial and error?
-pub const DATA_SIZE: usize = 53;
-pub const BLOCK_SIZE: usize = METADATA_SIZE + DATA_SIZE;
-type BlockBytes = [u8; BLOCK_SIZE];
-type MetadataBytes = [u8; METADATA_SIZE];
-type DataBytes = [u8; DATA_SIZE];
-const DATA_RANGE: Range<usize> = METADATA_SIZE..METADATA_SIZE + DATA_SIZE;
-
-fn streamable_from_bytes_ignore_extra_bytes<T>(
-    bytes: &[u8],
-) -> Result<T, chia_traits::chia_error::Error>
-where
-    T: Streamable,
-{
-    let mut cursor = std::io::Cursor::new(bytes);
-    T::parse::<false>(&mut cursor)
-}
-
 fn zstd_decode_path(path: &PathBuf) -> Result<Vec<u8>, Error> {
     let mut vector: Vec<u8> = Vec::new();
     let file = std::fs::File::open(path)?;
@@ -238,13 +110,6 @@ fn zstd_decode_path(path: &PathBuf) -> Result<Vec<u8>, Error> {
     decoder.read_to_end(&mut vector)?;
 
     Ok(vector)
-}
-
-#[repr(u8)]
-#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, Streamable)]
-pub enum NodeType {
-    Internal = 0,
-    Leaf = 1,
 }
 
 #[cfg_attr(
@@ -325,7 +190,7 @@ fn sha256_bytes(input: &[u8]) -> Hash {
     Hash(Bytes32::new(hasher.finalize()))
 }
 
-fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
+pub(crate) fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(b"\x02");
     hasher.update(left_hash.0);
@@ -360,195 +225,9 @@ pub enum InsertLocation {
     Leaf { index: TreeIndex, side: Side },
 }
 
-#[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, Streamable)]
-pub struct NodeMetadata {
-    // OPT: could save 1-2% of tree space by packing (and maybe don't do that)
-    pub node_type: NodeType,
-    pub dirty: bool,
-}
-
-#[cfg_attr(
-    feature = "py-bindings",
-    pyclass(get_all),
-    derive(PyJsonDict, PyStreamable)
-)]
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Streamable)]
-pub struct InternalNode {
-    pub hash: Hash,
-    pub parent: Parent,
-    pub left: TreeIndex,
-    pub right: TreeIndex,
-}
-
-impl InternalNode {
-    pub fn sibling_index(&self, index: TreeIndex) -> Result<TreeIndex, Error> {
-        if index == self.right {
-            Ok(self.left)
-        } else if index == self.left {
-            Ok(self.right)
-        } else {
-            Err(Error::IndexIsNotAChild(index))
-        }
-    }
-
-    pub fn get_sibling_side(&self, index: TreeIndex) -> Result<Side, Error> {
-        if self.left == index {
-            Ok(Side::Right)
-        } else if self.right == index {
-            Ok(Side::Left)
-        } else {
-            Err(Error::IndexIsNotAChild(index))
-        }
-    }
-}
-
-#[cfg_attr(
-    feature = "py-bindings",
-    pyclass(get_all),
-    derive(PyJsonDict, PyStreamable)
-)]
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Streamable)]
-pub struct LeafNode {
-    pub hash: Hash,
-    pub parent: Parent,
-    pub key: KeyId,
-    pub value: ValueId,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Node {
-    Internal(InternalNode),
-    Leaf(LeafNode),
-}
-
-impl Node {
-    fn parent(&self) -> Parent {
-        match self {
-            Node::Internal(node) => node.parent,
-            Node::Leaf(node) => node.parent,
-        }
-    }
-
-    fn set_parent(&mut self, parent: Parent) {
-        match self {
-            Node::Internal(node) => node.parent = parent,
-            Node::Leaf(node) => node.parent = parent,
-        }
-    }
-
-    fn hash(&self) -> Hash {
-        match self {
-            Node::Internal(node) => node.hash,
-            Node::Leaf(node) => node.hash,
-        }
-    }
-
-    fn set_hash(&mut self, hash: Hash) {
-        match self {
-            Node::Internal(ref mut node) => node.hash = hash,
-            Node::Leaf(ref mut node) => node.hash = hash,
-        }
-    }
-
-    #[allow(clippy::trivially_copy_pass_by_ref)]
-    pub fn from_bytes(
-        metadata: &NodeMetadata,
-        blob: &DataBytes,
-    ) -> Result<Self, chia_traits::chia_error::Error> {
-        Ok(match metadata.node_type {
-            NodeType::Internal => Node::Internal(streamable_from_bytes_ignore_extra_bytes(blob)?),
-            NodeType::Leaf => Node::Leaf(streamable_from_bytes_ignore_extra_bytes(blob)?),
-        })
-    }
-
-    pub fn to_bytes(&self) -> Result<DataBytes, Error> {
-        let mut base = match self {
-            Node::Internal(node) => node.to_bytes(),
-            Node::Leaf(node) => node.to_bytes(),
-        }
-        .map_err(Error::Streaming)?;
-        assert!(base.len() <= DATA_SIZE);
-        base.resize(DATA_SIZE, 0);
-        Ok(base
-            .as_slice()
-            .try_into()
-            .expect("padding was added above, might be too large"))
-    }
-
-    fn expect_leaf(&self, message: &str) -> LeafNode {
-        let Node::Leaf(leaf) = self else {
-            let message = message.replace("<<self>>", &format!("{self:?}"));
-            panic!("{}", message)
-        };
-
-        *leaf
-    }
-
-    fn expect_internal(&self, message: &str) -> InternalNode {
-        let Node::Internal(internal) = self else {
-            let message = message.replace("<<self>>", &format!("{self:?}"));
-            panic!("{}", message)
-        };
-
-        *internal
-    }
-
-    fn try_into_leaf(self) -> Result<LeafNode, Error> {
-        match self {
-            Node::Leaf(leaf) => Ok(leaf),
-            Node::Internal(internal) => Err(Error::NodeNotALeaf(internal)),
-        }
-    }
-}
-
-#[cfg(feature = "py-bindings")]
-impl<'py> IntoPyObject<'py> for Node {
-    type Target = PyAny;
-    type Output = Bound<'py, Self::Target>;
-    type Error = PyErr;
-
-    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
-        match self {
-            Node::Internal(node) => Ok(node.into_pyobject(py)?.into_any()),
-            Node::Leaf(node) => Ok(node.into_pyobject(py)?.into_any()),
-        }
-    }
-}
-
-fn block_range(index: TreeIndex) -> Range<usize> {
+pub(crate) fn block_range(index: TreeIndex) -> Range<usize> {
     let block_start = index.0 as usize * BLOCK_SIZE;
     block_start..block_start + BLOCK_SIZE
-}
-
-pub struct Block {
-    // NOTE: metadata node type and node's type not verified for agreement
-    metadata: NodeMetadata,
-    node: Node,
-}
-
-impl Block {
-    pub fn to_bytes(&self) -> Result<BlockBytes, Error> {
-        let mut blob: BlockBytes = [0; BLOCK_SIZE];
-        blob[METADATA_RANGE].copy_from_slice(&self.metadata.to_bytes().map_err(Error::Streaming)?);
-        blob[DATA_RANGE].copy_from_slice(&self.node.to_bytes()?);
-
-        Ok(blob)
-    }
-
-    pub fn from_bytes(blob: BlockBytes) -> Result<Self, Error> {
-        let metadata_blob: MetadataBytes = blob[METADATA_RANGE].try_into().unwrap();
-        let data_blob: DataBytes = blob[DATA_RANGE].try_into().unwrap();
-        let metadata =
-            NodeMetadata::from_bytes(&metadata_blob).map_err(Error::FailedLoadingMetadata)?;
-        let node = Node::from_bytes(&metadata, &data_blob).map_err(Error::FailedLoadingNode)?;
-
-        Ok(Block { metadata, node })
-    }
-
-    pub fn update_hash(&mut self, left: &Hash, right: &Hash) {
-        self.node.set_hash(internal_hash(left, right));
-        self.metadata.dirty = false;
-    }
 }
 
 #[cfg_attr(feature = "py-bindings", pyclass)]
@@ -704,7 +383,7 @@ pub fn collect_and_return_from_merkle_blob(
             break;
         };
 
-        let block = try_get_block(&blob, index)?;
+        let block = format::try_get_block(&blob, index)?;
 
         let node_hash = block.node.hash();
         index_to_hash.insert(index, node_hash);
@@ -2298,17 +1977,6 @@ impl MerkleBlob {
     }
 }
 
-fn try_get_block(blob: &[u8], index: TreeIndex) -> Result<Block, Error> {
-    let range = block_range(index);
-    let block_bytes: BlockBytes = blob
-        .get(range)
-        .ok_or(Error::BlockIndexOutOfBounds(index))?
-        .try_into()
-        .expect("used block_range() so should be correct length");
-
-    Block::from_bytes(block_bytes)
-}
-
 pub fn get_internal_terminal(
     blob: &[u8],
     indexes: &Vec<TreeIndex>,
@@ -2403,10 +2071,12 @@ impl Drop for MerkleBlob {
 
 #[cfg(test)]
 mod dot;
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::merkle::dot::DotLines;
+    use chia_traits::Streamable;
     use expect_test::expect;
     use rand::rngs::StdRng;
     use rand::seq::SliceRandom;
@@ -2456,7 +2126,8 @@ mod tests {
                 node_type as u8,
             );
             assert_eq!(
-                streamable_from_bytes_ignore_extra_bytes::<NodeType>(&[node_type as u8]).unwrap(),
+                format::streamable_from_bytes_ignore_extra_bytes::<NodeType>(&[node_type as u8])
+                    .unwrap(),
                 node_type,
             );
         }
@@ -2860,7 +2531,8 @@ mod tests {
     #[test]
     fn test_node_type_from_u8_invalid() {
         let invalid_value = 2;
-        let actual = streamable_from_bytes_ignore_extra_bytes::<NodeType>(&[invalid_value as u8]);
+        let actual =
+            format::streamable_from_bytes_ignore_extra_bytes::<NodeType>(&[invalid_value as u8]);
         actual.expect_err("invalid node type value should fail");
     }
 

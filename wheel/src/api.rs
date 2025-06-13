@@ -719,6 +719,7 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
 pub fn add_datalayer_submodule(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     use chia_datalayer::*;
+    use chia_datalayer::{BLOCK_SIZE, DATA_SIZE, METADATA_SIZE};
 
     let datalayer = PyModule::new(py, "datalayer")?;
     parent.add_submodule(&datalayer)?;
