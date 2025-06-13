@@ -141,6 +141,10 @@ pub struct ConsensusConstants {
     /// is valid
     hard_fork2_height: u32,
 
+    /// Once hard fork 2 activates, we'll start phasing out v1 plots. This is
+    /// the number blocks they will be phased-out over
+    plot_v1_phase_out: u32,
+
     /// The 128 plot filter adjustment height.
     /// This affects the plot filter for original plots
     plot_filter_128_height: u32,
@@ -233,6 +237,7 @@ pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
     pool_sub_slot_iters: 37_600_000_000,
     hard_fork_height: 5_496_000,
     hard_fork2_height: 0xffff_ffff, // placeholder
+    plot_v1_phase_out: 920_000,
     plot_filter_128_height: 10_542_000,
     plot_filter_64_height: 15_592_000,
     plot_filter_32_height: 20_643_000,
