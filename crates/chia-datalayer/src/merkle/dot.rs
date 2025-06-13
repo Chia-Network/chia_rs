@@ -1,6 +1,5 @@
-use crate::merkle::{
-    Error, InternalNode, LeafNode, MerkleBlob, MerkleBlobLeftChildFirstIterator, Node, TreeIndex,
-};
+use crate::merkle::{Error, InternalNode, LeafNode, MerkleBlob, Node, TreeIndex};
+use crate::MerkleBlobLeftChildFirstIterator;
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use url::Url;
 
