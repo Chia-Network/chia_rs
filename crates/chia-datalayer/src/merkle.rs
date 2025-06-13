@@ -28,7 +28,7 @@ use thiserror::Error;
 
 pub mod iterators;
 
-type TreeIndexType = u32;
+pub type TreeIndexType = u32;
 #[cfg_attr(
     feature = "py-bindings",
     pyclass(frozen),
