@@ -1,0 +1,45 @@
+[package]
+name = "chia-datalayer"
+version = "0.24.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "DataLayer modules for Chia blockchain"
+authors = ["Chia Network, Inc. <hello@chia.net>"]
+homepage = "https://github.com/Chia-Network/chia_rs"
+repository = "https://github.com/Chia-Network/chia_rs"
+
+[lints]
+workspace = true
+
+[features]
+py-bindings = ["dep:pyo3", "dep:chia_py_streamable_macro", "chia-protocol/py-bindings"]
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+num-traits = { workspace = true }
+pyo3 = { workspace = true, optional = true }
+thiserror = { workspace = true }
+chia_py_streamable_macro = { workspace = true, optional = true }
+chia_streamable_macro = { workspace = true }
+chia-datalayer-macro = { workspace = true }
+chia-traits = { workspace = true }
+chia-sha2 = { workspace = true }
+chia-protocol = { workspace = true }
+rayon = { workspace = true }
+zstd = { workspace = true }
+
+[dev-dependencies]
+clvm-utils = { workspace = true }
+expect-test = { workspace = true }
+hex = { workspace = true }
+open = { workspace = true }
+percent-encoding = { workspace = true }
+rand = { workspace = true }
+rstest = { workspace = true }
+url = { workspace = true }
+tempfile = { workspace = true }
+
+[package.metadata.cargo-machete]
+ignored = ["chia-sha2"]
