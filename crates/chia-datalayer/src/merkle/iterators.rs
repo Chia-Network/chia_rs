@@ -1,4 +1,4 @@
-use crate::{merkle, Block, Error, Node, TreeIndex, BLOCK_SIZE};
+use crate::{try_get_block, Block, Error, Node, TreeIndex, BLOCK_SIZE};
 use std::collections::{HashSet, VecDeque};
 
 struct MerkleBlobLeftChildFirstIteratorItem {
@@ -49,7 +49,7 @@ impl Iterator for MerkleBlobLeftChildFirstIterator<'_> {
 
         loop {
             let item = self.stack.pop()?;
-            let block = match merkle::try_get_block(self.blob, item.index) {
+            let block = match try_get_block(self.blob, item.index) {
                 Ok(block) => block,
                 Err(e) => return Some(Err(e)),
             };
@@ -119,7 +119,7 @@ impl Iterator for MerkleBlobParentFirstIterator<'_> {
         // left sibling first, parents before children
 
         let index = self.deque.pop_front()?;
-        let block = match merkle::try_get_block(self.blob, index) {
+        let block = match try_get_block(self.blob, index) {
             Ok(block) => block,
             Err(e) => return Some(Err(e)),
         };
@@ -169,7 +169,7 @@ impl Iterator for MerkleBlobBreadthFirstIterator<'_> {
 
         loop {
             let index = self.deque.pop_front()?;
-            let block = match merkle::try_get_block(self.blob, index) {
+            let block = match try_get_block(self.blob, index) {
                 Ok(block) => block,
                 Err(e) => return Some(Err(e)),
             };
