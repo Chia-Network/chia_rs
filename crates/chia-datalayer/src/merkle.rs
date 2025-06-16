@@ -190,7 +190,7 @@ fn sha256_bytes(input: &[u8]) -> Hash {
     Hash(Bytes32::new(hasher.finalize()))
 }
 
-pub(crate) fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
+pub fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(b"\x02");
     hasher.update(left_hash.0);
@@ -225,7 +225,7 @@ pub enum InsertLocation {
     Leaf { index: TreeIndex, side: Side },
 }
 
-pub(crate) fn block_range(index: TreeIndex) -> Range<usize> {
+pub fn block_range(index: TreeIndex) -> Range<usize> {
     let block_start = index.0 as usize * BLOCK_SIZE;
     block_start..block_start + BLOCK_SIZE
 }
@@ -2071,7 +2071,6 @@ impl Drop for MerkleBlob {
 
 #[cfg(test)]
 mod dot;
-
 #[cfg(test)]
 mod tests {
     use super::*;

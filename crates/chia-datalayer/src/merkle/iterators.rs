@@ -1,5 +1,4 @@
-use crate::{try_get_block, Block, Node, BLOCK_SIZE};
-use crate::{Error, TreeIndex};
+use crate::{try_get_block, Block, Error, Node, TreeIndex, BLOCK_SIZE};
 use std::collections::{HashSet, VecDeque};
 
 struct MerkleBlobLeftChildFirstIteratorItem {
