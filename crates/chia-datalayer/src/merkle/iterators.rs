@@ -193,15 +193,11 @@ impl Iterator for MerkleBlobBreadthFirstIterator<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::merkle::dot::DotLines;
+    use crate::merkle::tests::open_dot;
     use crate::merkle::tests::traversal_blob;
     use crate::{Hash, MerkleBlob, NodeType};
     use expect_test::{expect, Expect};
     use rstest::rstest;
-
-    fn open_dot(_lines: &mut DotLines) {
-        // crate::merkle::dot::open_dot(_lines);
-    }
 
     fn iterator_test_reference(index: TreeIndex, block: &Block) -> (u32, NodeType, i64, i64, Hash) {
         match block.node {
