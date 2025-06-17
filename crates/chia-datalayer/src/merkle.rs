@@ -33,6 +33,7 @@ use thiserror::Error;
 
 pub mod format;
 pub mod iterators;
+pub mod proof_of_inclusion;
 
 #[cfg_attr(feature = "py-bindings", derive(chia_datalayer_macro::PythonError))]
 #[derive(Debug, Error)]
@@ -110,69 +111,6 @@ fn zstd_decode_path(path: &PathBuf) -> Result<Vec<u8>, Error> {
     decoder.read_to_end(&mut vector)?;
 
     Ok(vector)
-}
-
-#[cfg_attr(
-    feature = "py-bindings",
-    pyclass(get_all),
-    derive(PyJsonDict, PyStreamable)
-)]
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Streamable)]
-pub struct ProofOfInclusionLayer {
-    pub other_hash_side: Side,
-    pub other_hash: Hash,
-    pub combined_hash: Hash,
-}
-
-#[cfg_attr(
-    feature = "py-bindings",
-    pyclass(get_all),
-    derive(PyJsonDict, PyStreamable)
-)]
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Streamable)]
-pub struct ProofOfInclusion {
-    pub node_hash: Hash,
-    pub layers: Vec<ProofOfInclusionLayer>,
-}
-
-impl ProofOfInclusion {
-    pub fn root_hash(&self) -> Hash {
-        if let Some(last) = self.layers.last() {
-            last.combined_hash
-        } else {
-            self.node_hash
-        }
-    }
-
-    pub fn valid(&self) -> bool {
-        let mut existing_hash = self.node_hash;
-
-        for layer in &self.layers {
-            let calculated_hash =
-                calculate_internal_hash(&existing_hash, layer.other_hash_side, &layer.other_hash);
-
-            if calculated_hash != layer.combined_hash {
-                return false;
-            }
-
-            existing_hash = calculated_hash;
-        }
-
-        existing_hash == self.root_hash()
-    }
-}
-
-#[cfg(feature = "py-bindings")]
-#[pymethods]
-impl ProofOfInclusion {
-    #[pyo3(name = "root_hash")]
-    pub fn py_root_hash(&self) -> Hash {
-        self.root_hash()
-    }
-    #[pyo3(name = "valid")]
-    pub fn py_valid(&self) -> bool {
-        self.valid()
-    }
 }
 
 #[allow(clippy::needless_pass_by_value)]
@@ -1546,7 +1484,10 @@ impl MerkleBlob {
             .ok_or(Error::UnknownKey(key))
     }
 
-    pub fn get_proof_of_inclusion(&self, key: KeyId) -> Result<ProofOfInclusion, Error> {
+    pub fn get_proof_of_inclusion(
+        &self,
+        key: KeyId,
+    ) -> Result<proof_of_inclusion::ProofOfInclusion, Error> {
         let mut index = *self
             .block_status_cache
             .get_index_by_key(key)
@@ -1557,7 +1498,7 @@ impl MerkleBlob {
             .expect_leaf("key to index mapping should only have leaves");
 
         let parents = self.get_lineage_with_indexes(index)?;
-        let mut layers: Vec<ProofOfInclusionLayer> = Vec::new();
+        let mut layers: Vec<proof_of_inclusion::ProofOfInclusionLayer> = Vec::new();
         let mut parents_iter = parents.iter();
         // first in the lineage is the index itself, second is the first parent
         parents_iter.next();
@@ -1566,7 +1507,7 @@ impl MerkleBlob {
             let sibling_index = parent.sibling_index(index)?;
             let sibling_block = self.get_block(sibling_index)?;
             let sibling = sibling_block.node;
-            let layer = ProofOfInclusionLayer {
+            let layer = proof_of_inclusion::ProofOfInclusionLayer {
                 other_hash_side: parent.get_sibling_side(index)?,
                 other_hash: sibling.hash(),
                 combined_hash: parent.hash,
@@ -1575,7 +1516,7 @@ impl MerkleBlob {
             index = *next_index;
         }
 
-        Ok(ProofOfInclusion {
+        Ok(proof_of_inclusion::ProofOfInclusion {
             node_hash: node.hash,
             layers,
         })
@@ -1947,7 +1888,10 @@ impl MerkleBlob {
     }
 
     #[pyo3(name = "get_proof_of_inclusion")]
-    pub fn py_get_proof_of_inclusion(&self, key: KeyId) -> PyResult<ProofOfInclusion> {
+    pub fn py_get_proof_of_inclusion(
+        &self,
+        key: KeyId,
+    ) -> PyResult<proof_of_inclusion::ProofOfInclusion> {
         Ok(self.get_proof_of_inclusion(key)?)
     }
 
@@ -2077,17 +2021,14 @@ mod tests {
     use crate::merkle::dot::DotLines;
     use chia_traits::Streamable;
     use expect_test::expect;
-    use rand::rngs::StdRng;
-    use rand::seq::SliceRandom;
-    use rand::SeedableRng;
     use rstest::{fixture, rstest};
     use std::time::{Duration, Instant};
 
-    const HASH_ZERO: Hash = Hash(Bytes32::new([0; 32]));
-    const HASH_ONE: Hash = Hash(Bytes32::new([1; 32]));
-    const HASH_TWO: Hash = Hash(Bytes32::new([2; 32]));
+    pub const HASH_ZERO: Hash = Hash(Bytes32::new([0; 32]));
+    pub const HASH_ONE: Hash = Hash(Bytes32::new([1; 32]));
+    pub const HASH_TWO: Hash = Hash(Bytes32::new([2; 32]));
 
-    fn open_dot(_lines: &mut DotLines) {
+    pub fn open_dot(_lines: &mut DotLines) {
         // crate::merkle::dot::open_dot(_lines);
     }
 
@@ -2746,7 +2687,7 @@ mod tests {
         assert_eq!(small_blob.block_status_cache.free_index_count(), 0);
     }
 
-    fn generate_kvid(seed: i64) -> (KeyId, ValueId) {
+    pub fn generate_kvid(seed: i64) -> (KeyId, ValueId) {
         let mut kv_ids: Vec<i64> = Vec::new();
 
         for offset in 0..2 {
@@ -2760,92 +2701,9 @@ mod tests {
         (KeyId(kv_ids[0]), ValueId(kv_ids[1]))
     }
 
-    fn generate_hash(seed: i64) -> Hash {
+    pub fn generate_hash(seed: i64) -> Hash {
         let seed_bytes = seed.to_be_bytes();
         sha256_bytes(&seed_bytes)
-    }
-
-    #[test]
-    fn test_proof_of_inclusion() {
-        let num_repeats = 10;
-        let mut seed = 0;
-
-        let mut random = StdRng::seed_from_u64(37);
-
-        let mut merkle_blob = MerkleBlob::new(Vec::new()).unwrap();
-        let mut keys_values: HashMap<KeyId, ValueId> = HashMap::new();
-
-        for repeats in 0..num_repeats {
-            let num_inserts = 1 + repeats * 100;
-            let num_deletes = 1 + repeats * 10;
-
-            let mut kv_ids: Vec<(KeyId, ValueId)> = Vec::new();
-            let mut hashes: Vec<Hash> = Vec::new();
-            for _ in 0..num_inserts {
-                seed += 1;
-                let (key, value) = generate_kvid(seed);
-                kv_ids.push((key, value));
-                hashes.push(generate_hash(seed));
-                keys_values.insert(key, value);
-            }
-
-            merkle_blob
-                .batch_insert(zip(kv_ids, hashes).collect())
-                .unwrap();
-            merkle_blob.calculate_lazy_hashes().unwrap();
-
-            for kv_id in keys_values.keys().copied() {
-                let proof_of_inclusion = match merkle_blob.get_proof_of_inclusion(kv_id) {
-                    Ok(proof_of_inclusion) => proof_of_inclusion,
-                    Err(error) => {
-                        open_dot(merkle_blob.to_dot().unwrap().set_note(&error.to_string()));
-                        panic!("here");
-                    }
-                };
-                assert!(proof_of_inclusion.valid());
-            }
-
-            let mut delete_ordering: Vec<KeyId> = keys_values.keys().copied().collect();
-            delete_ordering.shuffle(&mut random);
-            delete_ordering = delete_ordering[0..num_deletes].to_vec();
-            for kv_id in delete_ordering.iter().copied() {
-                merkle_blob.delete(kv_id).unwrap();
-                keys_values.remove(&kv_id);
-            }
-
-            for kv_id in delete_ordering {
-                // with pytest.raises(Exception, match = f"unknown key: {re.escape(str(kv_id))}"):
-                merkle_blob
-                    .get_proof_of_inclusion(kv_id)
-                    .expect_err("stuff");
-            }
-
-            let mut new_keys_values: HashMap<KeyId, ValueId> = HashMap::new();
-            for old_kv in keys_values.keys().copied() {
-                seed += 1;
-                let (_, value) = generate_kvid(seed);
-                let hash = generate_hash(seed);
-                merkle_blob.upsert(old_kv, value, &hash).unwrap();
-                new_keys_values.insert(old_kv, value);
-            }
-            if !merkle_blob.blob.is_empty() {
-                merkle_blob.calculate_lazy_hashes().unwrap();
-            }
-
-            keys_values = new_keys_values;
-            for kv_id in keys_values.keys().copied() {
-                let proof_of_inclusion = merkle_blob.get_proof_of_inclusion(kv_id).unwrap();
-                assert!(proof_of_inclusion.valid());
-            }
-        }
-    }
-
-    #[rstest]
-    fn test_proof_of_inclusion_invalid_identified(traversal_blob: MerkleBlob) {
-        let mut proof_of_inclusion = traversal_blob.get_proof_of_inclusion(KeyId(307)).unwrap();
-        assert!(proof_of_inclusion.valid());
-        proof_of_inclusion.layers[1].combined_hash = HASH_ONE;
-        assert!(!proof_of_inclusion.valid());
     }
 
     #[rstest]
