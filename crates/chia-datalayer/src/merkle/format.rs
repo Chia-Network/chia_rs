@@ -1,4 +1,5 @@
-use crate::{block_range, internal_hash, Error, Side};
+use crate::merkle::error::Error;
+use crate::{block_range, internal_hash, Side};
 use chia_protocol::Bytes32;
 #[cfg(feature = "py-bindings")]
 use chia_py_streamable_macro::{PyJsonDict, PyStreamable};
