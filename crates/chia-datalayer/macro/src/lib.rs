@@ -29,7 +29,9 @@ pub fn python_error(input: TokenStream) -> TokenStream {
                 pyo3::create_exception!(chia_rs.datalayer, #python_names, pyo3::exceptions::PyException);
             )*
 
-            pub fn add_to_module(py: Python<'_>, module: &Bound<'_, PyModule>) -> PyResult<()> {
+            pub fn add_to_module(py: pyo3::marker::Python<'_>, module: &pyo3::Bound<'_, pyo3::types::PyModule>) -> pyo3::PyResult<()> {
+                use pyo3::prelude::PyModuleMethods;
+
                 #(
                     module.add(stringify!(#python_names), py.get_type::<#python_names>())?;
                 )*

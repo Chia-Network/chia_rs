@@ -1,6 +1,7 @@
+use crate::merkle::error::Error;
 use crate::merkle::{InternalNodesMap, LeafNodesMap, NodeHashToDeltaReaderNode, NodeHashToIndex};
 use crate::{
-    merkle, Error, Hash, KeyId, MerkleBlob, MerkleBlobParentFirstIterator, Node, TreeIndex, ValueId,
+    merkle, Hash, KeyId, MerkleBlob, MerkleBlobParentFirstIterator, Node, TreeIndex, ValueId,
 };
 #[cfg(feature = "py-bindings")]
 use pyo3::{pyclass, pymethods, PyObject, PyResult, Python};

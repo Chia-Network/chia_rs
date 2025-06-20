@@ -739,7 +739,7 @@ pub fn add_datalayer_submodule(py: Python<'_>, parent: &Bound<'_, PyModule>) -> 
     datalayer.add("DATA_SIZE", DATA_SIZE)?;
     datalayer.add("METADATA_SIZE", METADATA_SIZE)?;
 
-    python_exceptions::add_to_module(py, &datalayer)?;
+    error::python_exceptions::add_to_module(py, &datalayer)?;
 
     // https://github.com/PyO3/pyo3/issues/1517#issuecomment-808664021
     // https://github.com/PyO3/pyo3/issues/759
