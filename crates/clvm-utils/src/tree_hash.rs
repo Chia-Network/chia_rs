@@ -63,13 +63,15 @@ impl Deref for TreeHash {
 #[derive(Default)]
 pub struct TreeCache {
     hashes: Vec<TreeHash>,
-    // each entry is an index into hashes, or u16::MAX if the pair has not been
-    // cached
+    // each entry is an index into hashes, or one of 3 special values:
+    // u16::MAX if the pair has not been visited
+    // u16::MAX - 1 if the pair has been seen once
+    // u16::MAX - 2 if the pair has been seen at least twice (this makes it a
+    // candidate for memoization)
     pairs: Vec<u16>,
 }
 
 const NOT_VISITED: u16 = u16::MAX;
-#[allow(dead_code)]
 const SEEN_ONCE: u16 = u16::MAX - 1;
 const SEEN_MULTIPLE: u16 = u16::MAX - 2;
 
@@ -81,11 +83,7 @@ impl TreeCache {
         }
 
         let idx = n.index() as usize;
-        if idx >= self.pairs.len() {
-            return None;
-        }
-
-        let slot = self.pairs[idx];
+        let slot = *self.pairs.get(idx)?;
         if slot >= SEEN_MULTIPLE {
             return None;
         }
@@ -112,9 +110,8 @@ impl TreeCache {
         self.pairs[idx] = slot as u16;
     }
 
-    /// mark the node as being visited. Returns true if this is node has already
-    /// been visited. i.e. returns whether this node is a good candidate for
-    /// memoizing tree hash results.
+    /// mark the node as being visited. Returns true if we need to
+    /// traverse visitation down this node.
     fn visit(&mut self, n: NodePtr) -> bool {
         if !matches!(n.object_type(), ObjectType::Pair) {
             return false;
@@ -126,7 +123,7 @@ impl TreeCache {
         if self.pairs[idx] > SEEN_MULTIPLE {
             self.pairs[idx] -= 1;
         }
-        self.pairs[idx] == SEEN_MULTIPLE
+        self.pairs[idx] == SEEN_ONCE
     }
 
     pub fn should_memoize(&mut self, n: NodePtr) -> bool {
@@ -142,7 +139,7 @@ impl TreeCache {
     }
 
     pub fn visit_tree(&mut self, a: &Allocator, node: NodePtr) {
-        if self.visit(node) {
+        if !self.visit(node) {
             return;
         }
         let mut nodes = vec![node];
@@ -150,10 +147,10 @@ impl TreeCache {
             let SExp::Pair(left, right) = a.sexp(n) else {
                 continue;
             };
-            if matches!(a.sexp(left), SExp::Pair(..)) && !self.visit(left) {
+            if self.visit(left) {
                 nodes.push(left);
             }
-            if matches!(a.sexp(right), SExp::Pair(..)) && !self.visit(right) {
+            if self.visit(right) {
                 nodes.push(right);
             }
         }
@@ -537,4 +534,77 @@ fn test_precomputed_atoms() {
     for val in 1..(PRECOMPUTED_HASHES.len() as u8) {
         assert_eq!(tree_hash_atom(&[val]), PRECOMPUTED_HASHES[val as usize]);
     }
+}
+
+#[test]
+fn test_tree_cache_get() {
+    let mut allocator = Allocator::new();
+    let mut cache = TreeCache::default();
+
+    let a = allocator.nil();
+    let b = allocator.one();
+    let c = allocator.new_pair(a, b).expect("new_pair");
+
+    assert_eq!(cache.get(a), None);
+    assert_eq!(cache.get(b), None);
+    assert_eq!(cache.get(c), None);
+
+    // We don't cache atoms
+    cache.insert(a, &tree_hash(&allocator, a));
+    assert_eq!(cache.get(a), None);
+
+    cache.insert(b, &tree_hash(&allocator, b));
+    assert_eq!(cache.get(b), None);
+
+    // but pair is OK
+    cache.insert(c, &tree_hash(&allocator, c));
+    assert_eq!(cache.get(c), Some(&tree_hash(&allocator, c)));
+}
+
+#[test]
+fn test_tree_cache_size_limit() {
+    let mut allocator = Allocator::new();
+    let mut cache = TreeCache::default();
+
+    let mut list = allocator.nil();
+    let mut hash = tree_hash(&allocator, list);
+    cache.insert(list, &hash);
+
+    // we only fit 65k items in the cache
+    for i in 0..65540 {
+        let b = allocator.one();
+        list = allocator.new_pair(b, list).expect("new_pair");
+        hash = tree_hash_pair(tree_hash_atom(b"\x01"), hash);
+        cache.insert(list, &hash);
+
+        println!("{i}");
+        if i < 65533 {
+            assert_eq!(cache.get(list), Some(&hash));
+        } else {
+            assert_eq!(cache.get(list), None);
+        }
+    }
+    assert_eq!(cache.get(list), None);
+}
+
+#[test]
+fn test_tree_cache_should_memoize() {
+    let mut allocator = Allocator::new();
+    let mut cache = TreeCache::default();
+
+    let a = allocator.nil();
+    let b = allocator.one();
+    let c = allocator.new_pair(a, b).expect("new_pair");
+
+    assert!(!cache.should_memoize(a));
+    assert!(!cache.should_memoize(b));
+    assert!(!cache.should_memoize(c));
+
+    // we need to visit a node at least twice for it to be considered a
+    // candidate for memoization
+    assert!(cache.visit(c));
+    assert!(!cache.should_memoize(c));
+    assert!(!cache.visit(c));
+
+    assert!(cache.should_memoize(c));
 }

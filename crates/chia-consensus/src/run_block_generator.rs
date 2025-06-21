@@ -200,7 +200,7 @@ where
     let mut iter = all_spends;
     while let Some((spend, rest)) = a.next(iter) {
         iter = rest;
-        let [_, puzzle, _, _, _] = extract_n::<5>(a, spend, ErrorCode::InvalidCondition)?;
+        let [_, puzzle, _] = extract_n::<3>(a, spend, ErrorCode::InvalidCondition)?;
         cache.visit_tree(a, puzzle);
     }
 
