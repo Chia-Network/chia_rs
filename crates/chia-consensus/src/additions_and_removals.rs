@@ -38,19 +38,31 @@ where
     let args = setup_generator_args(&mut a, block_refs)?;
     let dialect = ChiaDialect::new(flags);
 
-    let Reduction(clvm_cost, mut all_spends) =
-        run_program(&mut a, &dialect, program, args, cost_left)?;
+    let Reduction(clvm_cost, all_spends) = run_program(&mut a, &dialect, program, args, cost_left)?;
 
     subtract_cost(&a, &mut cost_left, clvm_cost)?;
-    all_spends = first(&a, all_spends)?;
+    let all_spends = first(&a, all_spends)?;
 
     let mut cache = TreeCache::default();
     // at this point all_spends is a list of:
     // (parent-coin-id puzzle-reveal amount solution . extra)
     // where extra may be nil, or additional extension data
 
-    while let Some((spend, tail)) = a.next(all_spends) {
-        all_spends = tail;
+    // first iterate over all puzzle reveals to find duplicate nodes, to know
+    // what to memoize during tree hash computations. This is managed by
+    // TreeCache
+    let mut iter = all_spends;
+    while let Some((spend, rest)) = a.next(iter) {
+        iter = rest;
+        let (_parent_id, (puzzle, _rest)) =
+            <(Bytes32, (NodePtr, NodePtr))>::from_clvm(&a, spend)
+                .map_err(|_| ValidationErr(spend, ErrorCode::InvalidCondition))?;
+        cache.visit_tree(&a, puzzle);
+    }
+
+    let mut iter = all_spends;
+    while let Some((spend, tail)) = a.next(iter) {
+        iter = tail;
         // process the spend
         let (parent_id, (puzzle, (amount, (solution, _spend_level_extra)))) =
             <(Bytes32, (NodePtr, (u64, (NodePtr, NodePtr))))>::from_clvm(&a, spend)
