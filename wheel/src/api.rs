@@ -3,6 +3,7 @@ use crate::run_generator::{
 };
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::build_compressed_block::BlockBuilder;
+use chia_consensus::conditions;
 use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::flags::{
     COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
@@ -19,7 +20,7 @@ use chia_consensus::spendbundle_validation::{
 };
 use chia_protocol::{
     calculate_ip_iters, calculate_sp_interval_iters, calculate_sp_iters, is_overflow_block,
-    py_expected_plot_size,
+    py_expected_plot_size, BytesImpl,
 };
 use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
@@ -50,9 +51,14 @@ use chia_protocol::{
     TransactionsInfo, UnfinishedBlock, UnfinishedHeaderBlock, VDFInfo, VDFProof, WeightProof,
 };
 use chia_traits::ChiaToPython;
+use clvm_traits::{
+    clvm_list, destructure_list, match_list, ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError,
+    ToClvm, ToClvmError,
+};
+use clvm_traits::FromClvm;
 use clvm_utils::tree_hash_from_bytes;
 use clvmr::chia_dialect::ENABLE_KECCAK_OPS_OUTSIDE_GUARD;
-use clvmr::{LIMIT_HEAP, NO_UNKNOWN_OPS};
+use clvmr::{SExp, LIMIT_HEAP, NO_UNKNOWN_OPS};
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
@@ -498,6 +504,68 @@ pub fn py_calculate_ip_iters(
         signage_point_index,
         required_iters,
     )?)
+}
+
+#[pyo3::pyfunction]
+pub fn get_spends_for_block_with_conditions(
+    py: Python<'_>,
+    constants: &ConsensusConstants,
+    generator: Program,
+    args: Program,
+    flags: u32,
+) -> pyo3::PyResult<PyList> {
+    let mut a = make_allocator(LIMIT_HEAP);
+    let mut output = Vec::<(CoinSpend, Vec<(u32, Vec<&[u8]>)>)>::new();
+    let (_, res) = generator.run(&mut a, flags, constants.max_block_cost_clvm, &args).map_err(|e| {
+                // 117 = GeneratorRuntimeErrors
+                PyErr::new::<PyTypeError, _>(117)
+            })?;
+    let spends_list = Vec::<NodePtr>::from_clvm(&a, res).map_err(|e| {
+                // 117 = GeneratorRuntimeErrors
+                PyErr::new::<PyTypeError, _>(117)
+            })?;
+    for spend in spends_list{
+        let mut cond_output = Vec::<(u32, Vec<&[u8]>)>::new();
+        let destructure_list!(parent_coin_info, puzzle, amount, solution) =
+        <match_list!(BytesImpl<32>, Program, u64, Program)>::from_clvm(a, spend).map_err(|e| {
+                // 117 = GeneratorRuntimeErrors
+                PyErr::new::<PyTypeError, _>(117)
+            })?;
+        let puzhash = puzzle.get_tree_hash();
+        let coin = Coin::new(parent_coin_info, puzhash.into(), amount);
+        let coinspend = CoinSpend::new(coin, puzzle, solution);
+        let res = match puzzle.run(&mut a, flags, constants.max_block_cost_clvm, &solution) {
+            Ok((_, res)) => res,
+            Err(e) => {
+                continue; // Skip this spend on error
+            }
+        };
+        let conditions_list = Vec::<NodePtr>::from_clvm(&a, res).map_err(|e| {
+                // 117 = GeneratorRuntimeErrors
+                PyErr::new::<PyTypeError, _>(117)
+            })?;
+        for condition in conditions_list {
+            let conditions = Vec::<NodePtr>::from_clvm(&a, condition).map_err(|e| {
+                // 117 = GeneratorRuntimeErrors
+                PyErr::new::<PyTypeError, _>(117)
+            })?;
+            let mut bytes_vec = Vec::<&[u8]>::new();
+            for var in &conditions[1..] {
+                match a.decode_atom(var) {
+                    Ok(bytes) => {bytes_vec.push(&bytes)}
+                    Err(_) => continue
+                }
+            }
+            let num = match a.small_number(conditions[0]) {
+                Some(n) => n,
+                None => continue
+            };
+            cond_output.push((num, bytes_vec))
+        }
+        output.push((coinspend, cond_output));
+    }
+    let pylist = PyList::new(py, &output);
+    Ok(pylist.into())
 }
 
 #[pyo3::pyfunction]
