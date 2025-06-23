@@ -48,26 +48,38 @@ pub struct PyPlotSize {
 
 #[cfg(feature = "py-bindings")]
 #[pymethods]
+impl PyPlotSize {
+    #[staticmethod]
+    fn make_v1(s: u8) -> Self {
+        Self {
+            size_v1: Some(s),
+            size_v2: None,
+        }
+    }
+
+    #[staticmethod]
+    fn make_v2(s: u8) -> Self {
+        Self {
+            size_v1: None,
+            size_v2: Some(s),
+        }
+    }
+}
+
+#[cfg(feature = "py-bindings")]
+#[pymethods]
 impl ProofOfSpace {
-    fn size_v1(&self) -> Option<u8> {
-        match self.size() {
-            PlotSize::V1(s) => Some(s),
-            PlotSize::V2(_) => None,
-        }
-    }
-
-    fn size_v2(&self) -> Option<u8> {
-        match self.size() {
-            PlotSize::V1(_) => None,
-            PlotSize::V2(s) => Some(s),
-        }
-    }
-
     #[pyo3(name = "size")]
     fn py_size(&self) -> PyPlotSize {
-        PyPlotSize {
-            size_v1: self.size_v1(),
-            size_v2: self.size_v2(),
+        match self.size() {
+            PlotSize::V1(s) => PyPlotSize {
+                size_v1: Some(s),
+                size_v2: None,
+            },
+            PlotSize::V2(s) => PyPlotSize {
+                size_v1: None,
+                size_v2: Some(s),
+            },
         }
     }
 }

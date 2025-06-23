@@ -1,6 +1,6 @@
 [package]
 name = "chia-puzzle-types"
-version = "0.24.0"
+version = "0.25.0"
 edition = "2021"
 license = "Apache-2.0"
 description = "CLVM types for standard Chia puzzles."
@@ -29,3 +29,4 @@ arbitrary = { workspace = true, features = ["derive"], optional = true }
 [dev-dependencies]
 hex = { workspace = true }
 anyhow = { workspace = true }
+rstest = { workspace = true }

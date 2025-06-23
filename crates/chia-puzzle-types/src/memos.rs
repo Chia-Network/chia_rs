@@ -8,9 +8,32 @@ use clvmr::NodePtr;
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[clvm(untagged, list)]
 pub enum Memos<T = NodePtr> {
+    /// An arbitrary CLVM structure that represents the memos
+    Some(T),
     /// No memos specified
     #[default]
     None,
-    /// An arbitrary CLVM structure that represents the memos
-    Some(T),
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Result;
+    use clvmr::Allocator;
+    use rstest::rstest;
+
+    use super::*;
+
+    #[rstest]
+    fn test_memos_roundtrip(
+        #[values(Memos::None, Memos::Some(0), Memos::Some(100))] expected: Memos<u64>,
+    ) -> Result<()> {
+        let mut allocator = Allocator::new();
+
+        let ptr = expected.to_clvm(&mut allocator)?;
+        let memos = Memos::<u64>::from_clvm(&allocator, ptr)?;
+
+        assert_eq!(memos, expected);
+
+        Ok(())
+    }
 }
