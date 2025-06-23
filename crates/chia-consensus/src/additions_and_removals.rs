@@ -55,7 +55,7 @@ where
     while let Some((spend, rest)) = a.next(iter) {
         iter = rest;
         let (_parent_id, (puzzle, _rest)) =
-            <(Bytes32, (NodePtr, NodePtr))>::from_clvm(&a, spend)
+            <(NodePtr, (NodePtr, NodePtr))>::from_clvm(&a, spend)
                 .map_err(|_| ValidationErr(spend, ErrorCode::InvalidCondition))?;
         cache.visit_tree(&a, puzzle);
     }
