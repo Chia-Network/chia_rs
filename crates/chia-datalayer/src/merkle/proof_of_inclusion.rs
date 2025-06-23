@@ -1,4 +1,5 @@
-use crate::{Hash, Side};
+use super::format::Hash;
+use super::{calculate_internal_hash, Side};
 #[cfg(feature = "py-bindings")]
 use chia_py_streamable_macro::{PyJsonDict, PyStreamable};
 use chia_streamable_macro::Streamable;
@@ -41,11 +42,8 @@ impl ProofOfInclusion {
         let mut existing_hash = self.node_hash;
 
         for layer in &self.layers {
-            let calculated_hash = crate::calculate_internal_hash(
-                &existing_hash,
-                layer.other_hash_side,
-                &layer.other_hash,
-            );
+            let calculated_hash =
+                calculate_internal_hash(&existing_hash, layer.other_hash_side, &layer.other_hash);
 
             if calculated_hash != layer.combined_hash {
                 return false;
@@ -73,8 +71,9 @@ impl ProofOfInclusion {
 
 #[cfg(test)]
 mod tests {
-    use crate::merkle::tests::traversal_blob;
-    use crate::{Hash, KeyId, MerkleBlob, ValueId};
+    use super::super::format::{Hash, KeyId, ValueId};
+    use super::super::tests::traversal_blob;
+    use super::super::MerkleBlob;
     use rand::prelude::{SliceRandom, StdRng};
     use rand::SeedableRng;
     use rstest::rstest;

@@ -12,15 +12,16 @@ use pyo3::{
 use crate::merkle::iterators::{
     MerkleBlobBreadthFirstIterator, MerkleBlobLeftChildFirstIterator, MerkleBlobParentFirstIterator,
 };
-use crate::{
-    error::Error, Block, BlockBytes, Hash, InternalNode, KeyId, LeafNode, Node, NodeMetadata,
-    NodeType, Parent, TreeIndex, ValueId, BLOCK_SIZE,
-};
 use chia_protocol::Bytes32;
 use chia_sha2::Sha256;
 use chia_streamable_macro::Streamable;
 #[cfg(feature = "py-bindings")]
 use chia_traits::Streamable;
+use error::Error;
+use format::{
+    Block, BlockBytes, Hash, InternalNode, KeyId, LeafNode, Node, NodeMetadata, NodeType, Parent,
+    TreeIndex, ValueId, BLOCK_SIZE,
+};
 use num_traits::ToBytes;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
@@ -1639,7 +1640,7 @@ impl Drop for MerkleBlob {
 }
 
 #[cfg(test)]
-mod dot;
+pub mod dot;
 #[cfg(test)]
 mod tests {
     use super::*;

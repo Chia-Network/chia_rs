@@ -1,4 +1,4 @@
-use crate::{Hash, InternalNode, KeyId, TreeIndex};
+use super::format::{Hash, InternalNode, KeyId, TreeIndex};
 use thiserror::Error;
 
 #[cfg_attr(feature = "py-bindings", derive(chia_datalayer_macro::PythonError))]

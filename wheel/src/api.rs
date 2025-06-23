@@ -718,28 +718,28 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 
 pub fn add_datalayer_submodule(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    use chia_datalayer::*;
+    use chia_datalayer::merkle;
 
     let datalayer = PyModule::new(py, "datalayer")?;
     parent.add_submodule(&datalayer)?;
 
-    datalayer.add_class::<BlockStatusCache>()?;
-    datalayer.add_class::<DeltaReader>()?;
-    datalayer.add_class::<MerkleBlob>()?;
-    datalayer.add_class::<InternalNode>()?;
-    datalayer.add_class::<LeafNode>()?;
-    datalayer.add_class::<KeyId>()?;
-    datalayer.add_class::<ValueId>()?;
-    datalayer.add_class::<TreeIndex>()?;
-    datalayer.add_class::<ProofOfInclusionLayer>()?;
-    datalayer.add_class::<ProofOfInclusion>()?;
-    datalayer.add_class::<DeltaFileCache>()?;
+    datalayer.add_class::<merkle::BlockStatusCache>()?;
+    datalayer.add_class::<merkle::deltas::DeltaReader>()?;
+    datalayer.add_class::<merkle::MerkleBlob>()?;
+    datalayer.add_class::<merkle::format::InternalNode>()?;
+    datalayer.add_class::<merkle::format::LeafNode>()?;
+    datalayer.add_class::<merkle::format::KeyId>()?;
+    datalayer.add_class::<merkle::format::ValueId>()?;
+    datalayer.add_class::<merkle::format::TreeIndex>()?;
+    datalayer.add_class::<merkle::proof_of_inclusion::ProofOfInclusionLayer>()?;
+    datalayer.add_class::<merkle::proof_of_inclusion::ProofOfInclusion>()?;
+    datalayer.add_class::<merkle::deltas::DeltaFileCache>()?;
 
-    datalayer.add("BLOCK_SIZE", BLOCK_SIZE)?;
-    datalayer.add("DATA_SIZE", DATA_SIZE)?;
-    datalayer.add("METADATA_SIZE", METADATA_SIZE)?;
+    datalayer.add("BLOCK_SIZE", merkle::format::BLOCK_SIZE)?;
+    datalayer.add("DATA_SIZE", merkle::format::DATA_SIZE)?;
+    datalayer.add("METADATA_SIZE", merkle::format::METADATA_SIZE)?;
 
-    error::python_exceptions::add_to_module(py, &datalayer)?;
+    merkle::error::python_exceptions::add_to_module(py, &datalayer)?;
 
     // https://github.com/PyO3/pyo3/issues/1517#issuecomment-808664021
     // https://github.com/PyO3/pyo3/issues/759
