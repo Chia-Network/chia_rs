@@ -61,7 +61,6 @@ use pyo3::types::PyBytes;
 use pyo3::types::PyList;
 use pyo3::types::PyTuple;
 use pyo3::wrap_pyfunction;
-use std::collections::HashSet;
 use std::iter::zip;
 
 use crate::run_program::{run_chia_program, serialized_length};
@@ -75,9 +74,7 @@ use clvmr::reduction::EvalErr;
 use clvmr::reduction::Reduction;
 use clvmr::run_program;
 use clvmr::serde::is_canonical_serialization;
-use clvmr::serde::{
-    node_from_bytes, node_from_bytes_backrefs, node_from_bytes_backrefs_record, node_to_bytes,
-};
+use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs, node_to_bytes};
 use clvmr::ChiaDialect;
 
 use chia_bls::{
@@ -155,7 +152,6 @@ pub fn get_puzzle_and_solution_for_coin<'a>(
             match parse_puzzle_solution(
                 &allocator,
                 result,
-                &HashSet::new(),
                 &Coin::new(find_parent, find_ph, find_amount),
             ) {
                 Err(ValidationErr(n, _)) => Err(EvalErr(n, "coin not found".to_string())),
@@ -198,8 +194,7 @@ pub fn get_puzzle_and_solution_for_coin2<'a>(
         py_to_slice::<'a>(buf)
     });
 
-    let (generator, backrefs) =
-        node_from_bytes_backrefs_record(&mut allocator, generator.as_ref())?;
+    let generator = node_from_bytes_backrefs(&mut allocator, generator.as_ref())?;
     let args = setup_generator_args(&mut allocator, refs)?;
     let dialect = &ChiaDialect::new(flags);
 
@@ -207,7 +202,7 @@ pub fn get_puzzle_and_solution_for_coin2<'a>(
         .allow_threads(|| -> Result<(NodePtr, NodePtr), EvalErr> {
             let Reduction(_cost, result) =
                 run_program(&mut allocator, dialect, generator, args, max_cost)?;
-            match parse_puzzle_solution(&allocator, result, &backrefs, find_coin) {
+            match parse_puzzle_solution(&allocator, result, find_coin) {
                 Err(ValidationErr(n, _)) => Err(EvalErr(n, "coin not found".to_string())),
                 Ok(pair) => Ok(pair),
             }

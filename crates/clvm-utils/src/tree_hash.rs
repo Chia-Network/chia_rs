@@ -1,8 +1,7 @@
 use chia_sha2::Sha256;
-use clvmr::allocator::{Allocator, NodePtr, NodeVisitor};
-use clvmr::serde::node_from_bytes_backrefs_record;
+use clvmr::allocator::{Allocator, NodePtr, NodeVisitor, ObjectType, SExp};
+use clvmr::serde::node_from_bytes_backrefs;
 use hex_literal::hex;
-use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 use std::{fmt, io};
 
@@ -58,6 +57,103 @@ impl Deref for TreeHash {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+#[derive(Default)]
+pub struct TreeCache {
+    hashes: Vec<TreeHash>,
+    // each entry is an index into hashes, or one of 3 special values:
+    // u16::MAX if the pair has not been visited
+    // u16::MAX - 1 if the pair has been seen once
+    // u16::MAX - 2 if the pair has been seen at least twice (this makes it a
+    // candidate for memoization)
+    pairs: Vec<u16>,
+}
+
+const NOT_VISITED: u16 = u16::MAX;
+const SEEN_ONCE: u16 = u16::MAX - 1;
+const SEEN_MULTIPLE: u16 = u16::MAX - 2;
+
+impl TreeCache {
+    pub fn get(&self, n: NodePtr) -> Option<&TreeHash> {
+        // We only cache pairs (for now)
+        if !matches!(n.object_type(), ObjectType::Pair) {
+            return None;
+        }
+
+        let idx = n.index() as usize;
+        let slot = *self.pairs.get(idx)?;
+        if slot >= SEEN_MULTIPLE {
+            return None;
+        }
+        Some(&self.hashes[slot as usize])
+    }
+
+    pub fn insert(&mut self, n: NodePtr, hash: &TreeHash) {
+        // If we've reached the max size, just ignore new cache items
+        if self.hashes.len() == SEEN_MULTIPLE as usize {
+            return;
+        }
+
+        if !matches!(n.object_type(), ObjectType::Pair) {
+            return;
+        }
+
+        let idx = n.index() as usize;
+        if idx >= self.pairs.len() {
+            self.pairs.resize(idx + 1, NOT_VISITED);
+        }
+
+        let slot = self.hashes.len();
+        self.hashes.push(*hash);
+        self.pairs[idx] = slot as u16;
+    }
+
+    /// mark the node as being visited. Returns true if we need to
+    /// traverse visitation down this node.
+    fn visit(&mut self, n: NodePtr) -> bool {
+        if !matches!(n.object_type(), ObjectType::Pair) {
+            return false;
+        }
+        let idx = n.index() as usize;
+        if idx >= self.pairs.len() {
+            self.pairs.resize(idx + 1, NOT_VISITED);
+        }
+        if self.pairs[idx] > SEEN_MULTIPLE {
+            self.pairs[idx] -= 1;
+        }
+        self.pairs[idx] == SEEN_ONCE
+    }
+
+    pub fn should_memoize(&mut self, n: NodePtr) -> bool {
+        if !matches!(n.object_type(), ObjectType::Pair) {
+            return false;
+        }
+        let idx = n.index() as usize;
+        if idx >= self.pairs.len() {
+            false
+        } else {
+            self.pairs[idx] <= SEEN_MULTIPLE
+        }
+    }
+
+    pub fn visit_tree(&mut self, a: &Allocator, node: NodePtr) {
+        if !self.visit(node) {
+            return;
+        }
+        let mut nodes = vec![node];
+        while let Some(n) = nodes.pop() {
+            let SExp::Pair(left, right) = a.sexp(n) else {
+                continue;
+            };
+            if self.visit(left) {
+                nodes.push(left);
+            }
+            if self.visit(right) {
+                nodes.push(right);
+            }
+        }
     }
 }
 
@@ -157,22 +253,19 @@ pub fn tree_hash(a: &Allocator, node: NodePtr) -> TreeHash {
     hashes[0]
 }
 
-pub fn tree_hash_cached<S>(
-    a: &Allocator,
-    node: NodePtr,
-    backrefs: &HashSet<NodePtr, S>,
-    cache: &mut HashMap<NodePtr, TreeHash, S>,
-) -> TreeHash
-where
-    S: std::hash::BuildHasher,
-{
+pub fn tree_hash_cached(a: &Allocator, node: NodePtr, cache: &mut TreeCache) -> TreeHash {
+    cache.visit_tree(a, node);
+
     let mut hashes = Vec::new();
     let mut ops = vec![TreeOp::SExp(node)];
 
     while let Some(op) = ops.pop() {
         match op {
             TreeOp::SExp(node) => match a.node(node) {
-                NodeVisitor::Buffer(bytes) => hashes.push(tree_hash_atom(bytes)),
+                NodeVisitor::Buffer(bytes) => {
+                    let hash = tree_hash_atom(bytes);
+                    hashes.push(hash);
+                }
                 NodeVisitor::U32(val) => {
                     if (val as usize) < PRECOMPUTED_HASHES.len() {
                         hashes.push(PRECOMPUTED_HASHES[val as usize]);
@@ -181,10 +274,10 @@ where
                     }
                 }
                 NodeVisitor::Pair(left, right) => {
-                    if let Some(hash) = cache.get(&node) {
+                    if let Some(hash) = cache.get(node) {
                         hashes.push(*hash);
                     } else {
-                        if backrefs.contains(&node) {
+                        if cache.should_memoize(node) {
                             ops.push(TreeOp::ConsAddCache(node));
                         } else {
                             ops.push(TreeOp::Cons);
@@ -204,7 +297,7 @@ where
                 let rest = hashes.pop().unwrap();
                 let hash = tree_hash_pair(first, rest);
                 hashes.push(hash);
-                cache.insert(original_node, hash);
+                cache.insert(original_node, &hash);
             }
         }
     }
@@ -215,9 +308,9 @@ where
 
 pub fn tree_hash_from_bytes(buf: &[u8]) -> io::Result<TreeHash> {
     let mut a = Allocator::new();
-    let (node, backrefs) = node_from_bytes_backrefs_record(&mut a, buf)?;
-    let mut cache = HashMap::<NodePtr, TreeHash>::new();
-    Ok(tree_hash_cached(&a, node, &backrefs, &mut cache))
+    let node = node_from_bytes_backrefs(&mut a, buf)?;
+    let mut cache = TreeCache::default();
+    Ok(tree_hash_cached(&a, node, &mut cache))
 }
 
 #[test]
@@ -376,9 +469,7 @@ fn test_tree_hash_cached(
     #[case] expect: &str,
     #[values(true, false)] compressed: bool,
 ) {
-    use clvmr::serde::{
-        node_from_bytes_backrefs, node_from_bytes_backrefs_record, node_to_bytes_backrefs,
-    };
+    use clvmr::serde::{node_from_bytes_backrefs, node_to_bytes_backrefs};
     use std::fs::read_to_string;
 
     let filename = format!("../../generator-tests/{name}.txt");
@@ -396,18 +487,16 @@ fn test_tree_hash_cached(
     };
 
     let mut a = Allocator::new();
-    let mut cache = HashMap::<NodePtr, TreeHash>::new();
-    let (node, backrefs) = node_from_bytes_backrefs_record(&mut a, &generator)
-        .expect("node_from_bytes_backrefs_records");
+    let mut cache = TreeCache::default();
+    let node = node_from_bytes_backrefs(&mut a, &generator).expect("node_from_bytes_backrefs");
 
     let hash1 = tree_hash(&a, node);
-    let hash2 = tree_hash_cached(&a, node, &backrefs, &mut cache);
+    let hash2 = tree_hash_cached(&a, node, &mut cache);
     // for (key, value) in cache.iter() {
     //     println!("  {key:?}: {}", hex::encode(value));
     // }
     assert_eq!(hash1, hash2);
     assert_eq!(hash1.as_ref(), hex::decode(expect).unwrap().as_slice());
-    assert!(!compressed || !backrefs.is_empty());
 }
 
 #[cfg(test)]
@@ -445,4 +534,77 @@ fn test_precomputed_atoms() {
     for val in 1..(PRECOMPUTED_HASHES.len() as u8) {
         assert_eq!(tree_hash_atom(&[val]), PRECOMPUTED_HASHES[val as usize]);
     }
+}
+
+#[test]
+fn test_tree_cache_get() {
+    let mut allocator = Allocator::new();
+    let mut cache = TreeCache::default();
+
+    let a = allocator.nil();
+    let b = allocator.one();
+    let c = allocator.new_pair(a, b).expect("new_pair");
+
+    assert_eq!(cache.get(a), None);
+    assert_eq!(cache.get(b), None);
+    assert_eq!(cache.get(c), None);
+
+    // We don't cache atoms
+    cache.insert(a, &tree_hash(&allocator, a));
+    assert_eq!(cache.get(a), None);
+
+    cache.insert(b, &tree_hash(&allocator, b));
+    assert_eq!(cache.get(b), None);
+
+    // but pair is OK
+    cache.insert(c, &tree_hash(&allocator, c));
+    assert_eq!(cache.get(c), Some(&tree_hash(&allocator, c)));
+}
+
+#[test]
+fn test_tree_cache_size_limit() {
+    let mut allocator = Allocator::new();
+    let mut cache = TreeCache::default();
+
+    let mut list = allocator.nil();
+    let mut hash = tree_hash(&allocator, list);
+    cache.insert(list, &hash);
+
+    // we only fit 65k items in the cache
+    for i in 0..65540 {
+        let b = allocator.one();
+        list = allocator.new_pair(b, list).expect("new_pair");
+        hash = tree_hash_pair(tree_hash_atom(b"\x01"), hash);
+        cache.insert(list, &hash);
+
+        println!("{i}");
+        if i < 65533 {
+            assert_eq!(cache.get(list), Some(&hash));
+        } else {
+            assert_eq!(cache.get(list), None);
+        }
+    }
+    assert_eq!(cache.get(list), None);
+}
+
+#[test]
+fn test_tree_cache_should_memoize() {
+    let mut allocator = Allocator::new();
+    let mut cache = TreeCache::default();
+
+    let a = allocator.nil();
+    let b = allocator.one();
+    let c = allocator.new_pair(a, b).expect("new_pair");
+
+    assert!(!cache.should_memoize(a));
+    assert!(!cache.should_memoize(b));
+    assert!(!cache.should_memoize(c));
+
+    // we need to visit a node at least twice for it to be considered a
+    // candidate for memoization
+    assert!(cache.visit(c));
+    assert!(!cache.should_memoize(c));
+    assert!(!cache.visit(c));
+
+    assert!(cache.should_memoize(c));
 }

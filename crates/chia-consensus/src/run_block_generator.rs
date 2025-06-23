@@ -7,14 +7,13 @@ use crate::flags::DONT_VALIDATE_SIGNATURE;
 use crate::generator_rom::{CLVM_DESERIALIZER, GENERATOR_ROM};
 use crate::validation_error::{first, ErrorCode, ValidationErr};
 use chia_bls::{BlsCache, Signature};
-use clvm_utils::{tree_hash_cached, TreeHash};
+use clvm_utils::{tree_hash_cached, TreeCache};
 use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
-use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs, node_from_bytes_backrefs_record};
-use std::collections::HashMap;
+use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs};
 
 pub fn subtract_cost(
     a: &Allocator,
@@ -174,18 +173,18 @@ where
     let mut cost_left = max_cost;
     subtract_cost(a, &mut cost_left, byte_cost)?;
 
-    let (program, backrefs) = node_from_bytes_backrefs_record(a, program)?;
+    let program = node_from_bytes_backrefs(a, program)?;
 
     let args = setup_generator_args(a, block_refs)?;
     let dialect = ChiaDialect::new(flags);
 
-    let Reduction(clvm_cost, mut all_spends) = run_program(a, &dialect, program, args, cost_left)?;
+    let Reduction(clvm_cost, all_spends) = run_program(a, &dialect, program, args, cost_left)?;
 
     subtract_cost(a, &mut cost_left, clvm_cost)?;
 
     let mut ret = SpendBundleConditions::default();
 
-    all_spends = first(a, all_spends)?;
+    let all_spends = first(a, all_spends)?;
     ret.execution_cost += clvm_cost;
 
     // at this point all_spends is a list of:
@@ -193,10 +192,21 @@ where
     // where extra may be nil, or additional extension data
 
     let mut state = ParseState::default();
-    let mut cache = HashMap::<NodePtr, TreeHash>::new();
+    let mut cache = TreeCache::default();
 
-    while let Some((spend, rest)) = a.next(all_spends) {
-        all_spends = rest;
+    // first iterate over all puzzle reveals to find duplicate nodes, to know
+    // what to memoize during tree hash computations. This is managed by
+    // TreeCache
+    let mut iter = all_spends;
+    while let Some((spend, rest)) = a.next(iter) {
+        iter = rest;
+        let [_, puzzle, _] = extract_n::<3>(a, spend, ErrorCode::InvalidCondition)?;
+        cache.visit_tree(a, puzzle);
+    }
+
+    let mut iter = all_spends;
+    while let Some((spend, rest)) = a.next(iter) {
+        iter = rest;
         // process the spend
         let [parent_id, puzzle, amount, solution, _spend_level_extra] =
             extract_n::<5>(a, spend, ErrorCode::InvalidCondition)?;
@@ -207,7 +217,7 @@ where
         subtract_cost(a, &mut cost_left, clvm_cost)?;
         ret.execution_cost += clvm_cost;
 
-        let buf = tree_hash_cached(a, puzzle, &backrefs, &mut cache);
+        let buf = tree_hash_cached(a, puzzle, &mut cache);
         let puzzle_hash = a.new_atom(&buf)?;
 
         process_single_spend::<EmptyVisitor>(
@@ -223,8 +233,8 @@ where
             constants,
         )?;
     }
-    if a.atom_len(all_spends) != 0 {
-        return Err(ValidationErr(all_spends, ErrorCode::GeneratorRuntimeError));
+    if a.atom_len(iter) != 0 {
+        return Err(ValidationErr(iter, ErrorCode::GeneratorRuntimeError));
     }
 
     validate_conditions(a, &ret, &state, a.nil(), flags)?;
