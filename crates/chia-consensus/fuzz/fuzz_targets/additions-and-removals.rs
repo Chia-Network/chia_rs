@@ -11,7 +11,7 @@ use std::collections::HashSet;
 
 fuzz_target!(|data: &[u8]| {
     // additions_and_removals only work on trusted blocks, so if
-    // run_block_generator2() fails, we can call additions_and_removals() on it.
+    // run_block_generator2() fails, we can't call additions_and_removals() on it.
     let results = additions_and_removals::<&[u8], _>(data, [], 0, &TEST_CONSTANTS);
 
     let mut a1 = make_allocator(0);
