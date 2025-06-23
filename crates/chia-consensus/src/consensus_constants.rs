@@ -5,6 +5,8 @@ use chia_streamable_macro::streamable;
 use chia_py_streamable_macro::{PyGetters, PyJsonDict, PyStreamable};
 use hex_literal::hex;
 
+/// Constants determining behavior of the blockchain. This is altered for
+/// tests, simulations and testnets.
 #[cfg_attr(
     feature = "py-bindings",
     pyo3::pyclass(module = "chia_rs"),

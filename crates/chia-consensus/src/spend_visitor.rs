@@ -2,9 +2,9 @@ use crate::conditions::{Condition, ParseState, SpendBundleConditions, SpendCondi
 use crate::validation_error::ValidationErr;
 use clvmr::allocator::Allocator;
 
-// These are customization points for the condition parsing and validation. The
-// mempool wants to record additional information than plain consensus
-// validation, so it hooks into these.
+/// These are customization points for the condition parsing and validation. The
+/// mempool wants to record additional information than plain consensus
+/// validation, so it hooks into these.
 pub trait SpendVisitor {
     fn new_spend(spend: &mut SpendConditions) -> Self;
     fn condition(&mut self, spend: &mut SpendConditions, c: &Condition);
