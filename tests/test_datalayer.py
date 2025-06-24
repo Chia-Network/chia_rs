@@ -539,6 +539,7 @@ def test_delta_file_cache() -> None:
 class C(Protocol):
     def __init__(self, a: object, /) -> None: ...
 
+
 T = TypeVar("T", bound=C)
 U = TypeVar("U")
 
