@@ -45,9 +45,9 @@ pub(crate) fn hash(
 pub(crate) const BLANK: [u8; 32] =
     hex!("0000000000000000000000000000000000000000000000000000000000000000");
 
-// this function performs an in-place, recursive radix sort of the range.
-// as each level returns, values are hashed pair-wise and as a hash tree.
-// the return value is the merkle tree root that the values in the range form
+/// This function performs an in-place, recursive radix sort of the range.
+/// as each level returns, values are hashed pair-wise and as a hash tree.
+/// the return value is the merkle tree root that the values in the range form
 fn radix_sort(range: &mut [[u8; 32]], depth: u8) -> ([u8; 32], NodeType) {
     assert!(!range.is_empty());
 
@@ -151,6 +151,9 @@ fn radix_sort(range: &mut [[u8; 32]], depth: u8) -> ([u8; 32], NodeType) {
     }
 }
 
+/// Calculate the merkle set root hash for the tree containing all elements in
+/// leafs. The order of leafs does not affect the merkle tree (nor the root
+/// hash).
 pub fn compute_merkle_set_root(leafs: &mut [[u8; 32]]) -> [u8; 32] {
     // There's a special case for empty sets
     if leafs.is_empty() {

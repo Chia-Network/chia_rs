@@ -53,20 +53,20 @@ where
     Ok(a.new_pair(clvm_deserializer, args)?)
 }
 
-// Runs the generator ROM and passes in the program (transactions generator).
-// The program is expected to return a list of spends. Each item being:
-
-// (parent-coin-id puzzle-reveal amount solution)
-
-// The puzzle-reveals are then executed with the corresponding solution being
-// passed as the argument. The output from those puzzles are lists of
-// conditions. The conditions are parsed and returned in the
-// SpendBundleConditions. Some conditions are validated, and if invalid may
-// cause the function to return an error.
-
-// the only reason we need to pass in the allocator is because the returned
-// SpendBundleConditions contains NodePtr fields. If that's changed, we could
-// create the allocator inside this functions as well.
+/// Runs the generator ROM and passes in the program (transactions generator).
+/// The program is expected to return a list of spends. Each item being:
+///
+/// (parent-coin-id puzzle-reveal amount solution)
+///
+/// The puzzle-reveals are then executed with the corresponding solution being
+/// passed as the argument. The output from those puzzles are lists of
+/// conditions. The conditions are parsed and returned in the
+/// SpendBundleConditions. Some conditions are validated, and if invalid may
+/// cause the function to return an error.
+///
+/// the only reason we need to pass in the allocator is because the returned
+/// SpendBundleConditions contains NodePtr fields. If that's changed, we could
+/// create the allocator inside this functions as well.
 #[allow(clippy::too_many_arguments)]
 pub fn run_block_generator<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
     a: &mut Allocator,
@@ -148,12 +148,12 @@ pub fn extract_n<const N: usize>(
     Ok(ret)
 }
 
-// This has the same behavior as run_block_generator() but implements the
-// generator ROM in rust instead of using the CLVM implementation.
-// it is not backwards compatible in the CLVM cost computation (in this version
-// you only pay cost for the generator, the puzzles and the conditions).
-// it also does not apply the stack depth or object allocation limits the same,
-// as each puzzle run in its own environment.
+/// This has the same behavior as run_block_generator() but implements the
+/// generator ROM in rust instead of using the CLVM implementation.
+/// it is not backwards compatible in the CLVM cost computation (in this version
+/// you only pay cost for the generator, the puzzles and the conditions).
+/// it also does not apply the stack depth or object allocation limits the same,
+/// as each puzzle run in its own environment.
 #[allow(clippy::too_many_arguments)]
 pub fn run_block_generator2<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
     a: &mut Allocator,

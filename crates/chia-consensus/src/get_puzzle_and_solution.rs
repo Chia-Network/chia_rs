@@ -4,7 +4,7 @@ use clvm_utils::{tree_hash_cached, TreeCache};
 use clvmr::allocator::{Allocator, Atom, NodePtr};
 use clvmr::op_utils::u64_from_bytes;
 
-// returns parent-coin ID, amount, puzzle-reveal and solution
+/// returns parent-coin ID, amount, puzzle-reveal and solution
 pub fn parse_coin_spend(
     a: &Allocator,
     coin_spend: NodePtr,
