@@ -78,7 +78,7 @@ def test_additions_and_removals() -> None:
                 expected_additions.remove(addition)
 
             for rem, coin_id in removals:
-                removal = (f"{rem.name().hex()}", f"{rem.puzzle_hash.hex()}")
+                removal = (f"{coin_id.hex()}", f"{rem.puzzle_hash.hex()}")
                 assert removal in expected_removals
                 assert rem.name() == coin_id
                 expected_removals.remove(removal)
