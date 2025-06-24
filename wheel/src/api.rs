@@ -571,7 +571,7 @@ pub fn get_spends_for_block_with_conditions(
     let pylist = PyList::empty(py);
     for (coinspend, cond_output) in output {
         let dict = PyDict::new(py);
-        dict.set_item("coin_spend", coinspend)?; // Only if CoinSpend is #[pyclass]
+        dict.set_item("coin_spend", coinspend)?;
         dict.set_item("conditions", cond_output)?;
         pylist.append(dict)?;
     }
