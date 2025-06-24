@@ -51,11 +51,11 @@ use chia_protocol::{
     TransactionsInfo, UnfinishedBlock, UnfinishedHeaderBlock, VDFInfo, VDFProof, WeightProof,
 };
 use chia_traits::ChiaToPython;
+use clvm_traits::FromClvm;
 use clvm_traits::{
     clvm_list, destructure_list, match_list, ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError,
     ToClvm, ToClvmError,
 };
-use clvm_traits::FromClvm;
 use clvm_utils::tree_hash_from_bytes;
 use clvmr::chia_dialect::ENABLE_KECCAK_OPS_OUTSIDE_GUARD;
 use clvmr::{SExp, LIMIT_HEAP, NO_UNKNOWN_OPS};
@@ -63,9 +63,9 @@ use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::pybacked::PyBackedBytes;
-use pyo3::types::PyBytes;
 use pyo3::types::PyList;
 use pyo3::types::PyTuple;
+use pyo3::types::{PyBytes, PyDict};
 use pyo3::wrap_pyfunction;
 use std::collections::HashSet;
 use std::iter::zip;
@@ -513,24 +513,28 @@ pub fn get_spends_for_block_with_conditions(
     generator: Program,
     args: Program,
     flags: u32,
-) -> pyo3::PyResult<PyList> {
+) -> pyo3::PyResult<PyObject> {
     let mut a = make_allocator(LIMIT_HEAP);
     let mut output = Vec::<(CoinSpend, Vec<(u32, Vec<&[u8]>)>)>::new();
-    let (_, res) = generator.run(&mut a, flags, constants.max_block_cost_clvm, &args).map_err(|e| {
-                // 117 = GeneratorRuntimeErrors
-                PyErr::new::<PyTypeError, _>(117)
-            })?;
+    let (_, res) = generator
+        .run(&mut a, flags, constants.max_block_cost_clvm, &args)
+        .map_err(|e| {
+            // 117 = GeneratorRuntimeErrors
+            PyErr::new::<PyTypeError, _>(117)
+        })?;
     let spends_list = Vec::<NodePtr>::from_clvm(&a, res).map_err(|e| {
-                // 117 = GeneratorRuntimeErrors
-                PyErr::new::<PyTypeError, _>(117)
-            })?;
-    for spend in spends_list{
+        // 117 = GeneratorRuntimeErrors
+        PyErr::new::<PyTypeError, _>(117)
+    })?;
+    for spend in spends_list {
         let mut cond_output = Vec::<(u32, Vec<&[u8]>)>::new();
         let destructure_list!(parent_coin_info, puzzle, amount, solution) =
-        <match_list!(BytesImpl<32>, Program, u64, Program)>::from_clvm(a, spend).map_err(|e| {
-                // 117 = GeneratorRuntimeErrors
-                PyErr::new::<PyTypeError, _>(117)
-            })?;
+            <match_list!(BytesImpl<32>, Program, u64, Program)>::from_clvm(a, spend).map_err(
+                |e| {
+                    // 117 = GeneratorRuntimeErrors
+                    PyErr::new::<PyTypeError, _>(117)
+                },
+            )?;
         let puzhash = puzzle.get_tree_hash();
         let coin = Coin::new(parent_coin_info, puzhash.into(), amount);
         let coinspend = CoinSpend::new(coin, puzzle, solution);
@@ -541,9 +545,9 @@ pub fn get_spends_for_block_with_conditions(
             }
         };
         let conditions_list = Vec::<NodePtr>::from_clvm(&a, res).map_err(|e| {
-                // 117 = GeneratorRuntimeErrors
-                PyErr::new::<PyTypeError, _>(117)
-            })?;
+            // 117 = GeneratorRuntimeErrors
+            PyErr::new::<PyTypeError, _>(117)
+        })?;
         for condition in conditions_list {
             let conditions = Vec::<NodePtr>::from_clvm(&a, condition).map_err(|e| {
                 // 117 = GeneratorRuntimeErrors
@@ -552,19 +556,25 @@ pub fn get_spends_for_block_with_conditions(
             let mut bytes_vec = Vec::<&[u8]>::new();
             for var in &conditions[1..] {
                 match a.decode_atom(var) {
-                    Ok(bytes) => {bytes_vec.push(&bytes)}
-                    Err(_) => continue
+                    Ok(bytes) => bytes_vec.push(&bytes),
+                    Err(_) => continue,
                 }
             }
             let num = match a.small_number(conditions[0]) {
                 Some(n) => n,
-                None => continue
+                None => continue,
             };
             cond_output.push((num, bytes_vec))
         }
         output.push((coinspend, cond_output));
     }
-    let pylist = PyList::new(py, &output);
+    let pylist = PyList::empty(py);
+    for (coinspend, cond_output) in output {
+        let dict = PyDict::new(py);
+        dict.set_item("coin_spend", coinspend)?; // Only if CoinSpend is #[pyclass]
+        dict.set_item("conditions", cond_output)?;
+        pylist.append(dict)?;
+    }
     Ok(pylist.into())
 }
 
