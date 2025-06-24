@@ -1,11 +1,10 @@
 use crate::validation_error::{atom, check_nil, first, next, rest, ErrorCode, ValidationErr};
 use chia_protocol::Coin;
-use clvm_utils::{tree_hash_cached, TreeHash};
+use clvm_utils::{tree_hash_cached, TreeCache};
 use clvmr::allocator::{Allocator, Atom, NodePtr};
 use clvmr::op_utils::u64_from_bytes;
-use std::collections::{HashMap, HashSet};
 
-// returns parent-coin ID, amount, puzzle-reveal and solution
+/// returns parent-coin ID, amount, puzzle-reveal and solution
 pub fn parse_coin_spend(
     a: &Allocator,
     coin_spend: NodePtr,
@@ -25,7 +24,6 @@ pub fn parse_coin_spend(
 pub fn get_puzzle_and_solution_for_coin(
     a: &Allocator,
     generator_result: NodePtr,
-    backrefs: &HashSet<NodePtr>,
     find_coin: &Coin,
 ) -> Result<(NodePtr, NodePtr), ValidationErr> {
     // the output from the block generator is a list of CoinSpends
@@ -33,7 +31,7 @@ pub fn get_puzzle_and_solution_for_coin(
     // this function is given the generator output and a parent_coin_id, amount
     // and puzzle_hash and it will return the puzzle and solution for that given
     // coin spend, or fail if it cannot be found
-    let mut cache = HashMap::<NodePtr, TreeHash>::new();
+    let mut cache = TreeCache::default();
     let mut iter = first(a, generator_result)?;
     while let Some((coin_spend, next)) = next(a, iter)? {
         iter = next;
@@ -46,7 +44,7 @@ pub fn get_puzzle_and_solution_for_coin(
             continue;
         }
 
-        let puzzle_hash = tree_hash_cached(a, puzzle, backrefs, &mut cache);
+        let puzzle_hash = tree_hash_cached(a, puzzle, &mut cache);
         if puzzle_hash != find_coin.puzzle_hash.into() {
             continue;
         }
@@ -135,7 +133,6 @@ mod test {
             get_puzzle_and_solution_for_coin(
                 &a,
                 generator_output,
-                &HashSet::new(),
                 &Coin::new(parent, tree_hash(&a, puzzle1).into(), 1337),
             )
             .unwrap(),
@@ -147,7 +144,6 @@ mod test {
             get_puzzle_and_solution_for_coin(
                 &a,
                 generator_output,
-                &HashSet::new(),
                 &Coin::new(make_dummy_id(2), tree_hash(&a, puzzle1).into(), 1337),
             )
             .unwrap_err()
@@ -160,7 +156,6 @@ mod test {
             get_puzzle_and_solution_for_coin(
                 &a,
                 generator_output,
-                &HashSet::new(),
                 &Coin::new(parent, tree_hash(&a, puzzle1).into(), 42),
             )
             .unwrap_err()
@@ -173,7 +168,6 @@ mod test {
             get_puzzle_and_solution_for_coin(
                 &a,
                 generator_output,
-                &HashSet::new(),
                 &Coin::new(parent, make_dummy_id(4), 1337),
             )
             .unwrap_err()
@@ -268,7 +262,6 @@ mod test {
             let (puzzle, solution) = get_puzzle_and_solution_for_coin(
                 &a2,
                 result,
-                &HashSet::new(),
                 &Coin::new(
                     a.atom(s.parent_id).as_ref().try_into().unwrap(),
                     a.atom(s.puzzle_hash).as_ref().try_into().unwrap(),

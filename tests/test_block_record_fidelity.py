@@ -62,7 +62,12 @@ def get_hash(rng: Random) -> bytes32:
     return bytes32.random(rng)
 
 
-def get_block_record(rng: Random, ssi=None, ri=None, spi=None) -> BlockRecord:
+def get_block_record(
+    rng: Random,
+    ssi: Optional[uint64] = None,
+    ri: Optional[uint64] = None,
+    spi: Optional[uint8] = None,
+) -> BlockRecord:
     height = get_u32(rng)
     weight = get_u128(rng)
     iters = get_u128(rng)
@@ -107,7 +112,7 @@ def get_block_record(rng: Random, ssi=None, ri=None, spi=None) -> BlockRecord:
     )
 
 
-def test_bytes32():
+def test_bytes32() -> None:
     rng = Random()
     rng.seed(1337)
     br = get_block_record(rng)
@@ -132,25 +137,25 @@ def wrap_call(expr: str, br: Any) -> str:
 
 
 # TODO: more thoroughly check these new functions which use self
-def test_calculate_sp_iters():
+def test_calculate_sp_iters() -> None:
     ssi: uint64 = uint64(100001 * 64 * 4)
     rng = Random()
     rng.seed(1337)
-    br = get_block_record(rng, ssi=ssi, spi=31)
+    br = get_block_record(rng, ssi=ssi, spi=uint8(31))
     res = br.sp_iters(DEFAULT_CONSTANTS)
     assert res is not None
 
 
-def test_calculate_ip_iters():
+def test_calculate_ip_iters() -> None:
     ssi: uint64 = uint64(100001 * 64 * 4)
     sp_interval_iters = ssi // 32
-    ri = sp_interval_iters - 1
+    ri = uint64(sp_interval_iters - 1)
     rng = Random()
     rng.seed(1337)
-    br = get_block_record(rng, ssi=ssi, spi=31, ri=ri)
+    br = get_block_record(rng, ssi=ssi, spi=uint8(31), ri=ri)
     with raises(ValueError):
         res = br.ip_iters(DEFAULT_CONSTANTS)
 
-    br = get_block_record(rng, ssi=ssi, spi=13, ri=1)
+    br = get_block_record(rng, ssi=ssi, spi=uint8(13), ri=uint64(1))
     res = br.ip_iters(DEFAULT_CONSTANTS)
     assert res == 6400065

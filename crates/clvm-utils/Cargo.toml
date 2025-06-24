@@ -1,6 +1,6 @@
 [package]
 name = "clvm-utils"
-version = "0.25.0"
+version = "0.26.0"
 edition = "2021"
 license = "Apache-2.0"
 description = "Utility functions for processing clvm programs and structures"
@@ -16,6 +16,7 @@ chia-sha2 = { workspace = true }
 clvmr = { workspace = true }
 clvm-traits = { workspace = true }
 hex = { workspace = true }
+hex-literal = { workspace = true }
 
 [dev-dependencies]
 rstest = { workspace = true }

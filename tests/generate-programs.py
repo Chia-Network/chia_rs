@@ -4,7 +4,7 @@ import os
 from clvm import KEYWORD_TO_ATOM
 
 
-def recursive_cons(filename, num):
+def recursive_cons(filename: str, num: int) -> None:
     with open(filename, "w+") as f:
         f.write(
             """
@@ -23,7 +23,7 @@ def recursive_cons(filename, num):
         f.write("(%d)" % num)
 
 
-def many_args(filename, op, num):
+def many_args(filename: str, op: str, num: int) -> None:
     with open(filename + "-precompiled", "w+") as f:
         f.write(
             """
@@ -69,7 +69,7 @@ def many_args(filename, op, num):
         )
 
 
-def many_args_point(filename, op, num):
+def many_args_point(filename: str, op: str, num: int) -> None:
     with open(filename, "w+") as f:
         f.write(
             """;(mod (n)
@@ -92,7 +92,7 @@ def many_args_point(filename, op, num):
         f.write("(0)")
 
 
-def softfork_wrap(filename, val):
+def softfork_wrap(filename: str, val: str) -> None:
 
     with open(filename, "w+") as f:
         f.write(
@@ -112,7 +112,7 @@ def softfork_wrap(filename, val):
         f.write("(0xffffffff)")
 
 
-def binary_recurse(filename, op, val, count):
+def binary_recurse(filename: str, op: str, val: str, count: int) -> None:
 
     with open(filename, "w+") as f:
         f.write(
@@ -132,7 +132,7 @@ def binary_recurse(filename, op, val, count):
         f.write(f"({count})")
 
 
-def unary_recurse(filename, op, second, count):
+def unary_recurse(filename: str, op: str, second: str, count: int) -> None:
 
     if second != "":
         quoted_second = f" (q . {second})"
@@ -160,7 +160,7 @@ def unary_recurse(filename, op, second, count):
         f.write(f"({count})")
 
 
-def serialized_atom_overflow(filename, size):
+def serialized_atom_overflow(filename: str, size: int) -> None:
     with open(filename, "w+") as f:
         if size == 0:
             size_blob = b"\x80"
@@ -230,9 +230,9 @@ binary_recurse(
     "0x7ffffffffffffffffffffffffffffffffffffffffffffffff",
     5000000,
 )
-unary_recurse("programs/recursive-div.clvm", "/", 13, 1000000)
-unary_recurse("programs/recursive-lsh.clvm", "lsh", 65535, 10000)
-unary_recurse("programs/recursive-ash.clvm", "ash", 65535, 10000)
+unary_recurse("programs/recursive-div.clvm", "/", "13", 1000000)
+unary_recurse("programs/recursive-lsh.clvm", "lsh", "65535", 10000)
+unary_recurse("programs/recursive-ash.clvm", "ash", "65535", 10000)
 unary_recurse("programs/recursive-pubkey.clvm", "pubkey_for_exp", "", 10000)
 unary_recurse("programs/recursive-not.clvm", "lognot", "", 10000000)
 many_args("programs/args-mul.clvm", "*", 10000)

@@ -21,7 +21,7 @@ DEFAULT_CONSTANTS = ConsensusConstants(
     SLOT_BLOCKS_TARGET=uint32(32),
     MIN_BLOCKS_PER_CHALLENGE_BLOCK=uint8(16),
     MAX_SUB_SLOT_BLOCKS=uint32(128),
-    NUM_SPS_SUB_SLOT=uint32(64),
+    NUM_SPS_SUB_SLOT=uint8(64),
     SUB_SLOT_ITERS_STARTING=uint64(2**27),
     DIFFICULTY_CONSTANT_FACTOR=uint128(2**67),
     DIFFICULTY_STARTING=uint64(7),
@@ -32,8 +32,10 @@ DEFAULT_CONSTANTS = ConsensusConstants(
     DISCRIMINANT_SIZE_BITS=uint16(1024),
     NUMBER_ZERO_BITS_PLOT_FILTER_V1=uint8(9),
     NUMBER_ZERO_BITS_PLOT_FILTER_V2=uint8(9),
-    MIN_PLOT_SIZE=uint8(32),
-    MAX_PLOT_SIZE=uint8(50),
+    MIN_PLOT_SIZE_V1=uint8(32),
+    MAX_PLOT_SIZE_V1=uint8(50),
+    MIN_PLOT_SIZE_V2=uint8(28),
+    MAX_PLOT_SIZE_V2=uint8(32),
     SUB_SLOT_TIME_TARGET=uint16(600),
     NUM_SP_INTERVALS_EXTRA=uint8(3),
     MAX_FUTURE_TIME2=uint32(2 * 60),
@@ -82,9 +84,11 @@ DEFAULT_CONSTANTS = ConsensusConstants(
     POOL_SUB_SLOT_ITERS=uint64(37600000000),
     HARD_FORK_HEIGHT=uint32(5496000),
     HARD_FORK2_HEIGHT=uint32(0xFFFFFFFF),
+    PLOT_V1_PHASE_OUT=uint32(920000),
     PLOT_FILTER_128_HEIGHT=uint32(10542000),
     PLOT_FILTER_64_HEIGHT=uint32(15592000),
     PLOT_FILTER_32_HEIGHT=uint32(20643000),
+    PLOT_DIFFICULTY_INITIAL=uint8(2),
     PLOT_DIFFICULTY_4_HEIGHT=uint32(0xFFFFFFFF),
     PLOT_DIFFICULTY_5_HEIGHT=uint32(0xFFFFFFFF),
     PLOT_DIFFICULTY_6_HEIGHT=uint32(0xFFFFFFFF),
@@ -146,7 +150,7 @@ def test_cache_limit() -> None:
 
 
 # old Python tests ported
-def test_cached_bls():
+def test_cached_bls() -> None:
     cached_bls = BLSCache()
     n_keys = 10
     seed = b"a" * 31
@@ -188,7 +192,7 @@ def test_cached_bls():
     assert bls_cache.aggregate_verify(pks, msgs, agg_sig)
 
 
-def test_cached_bls_flattening():
+def test_cached_bls_flattening() -> None:
     cached_bls = BLSCache()
     n_keys = 10
     seed = b"a" * 31
@@ -219,7 +223,7 @@ def test_cached_bls_flattening():
         gts.remove(value)
 
 
-def test_cached_bls_repeat_pk():
+def test_cached_bls_repeat_pk() -> None:
     cached_bls = BLSCache()
     n_keys = 400
     seed = b"a" * 32
@@ -235,13 +239,13 @@ def test_cached_bls_repeat_pk():
     assert cached_bls.aggregate_verify(pks, msgs, agg_sig)
 
 
-def test_empty_sig():
+def test_empty_sig() -> None:
     sig = AugSchemeMPL.aggregate([])
     cached_bls = BLSCache()
     assert cached_bls.aggregate_verify([], [], sig)
 
 
-def test_bad_cache_size():
+def test_bad_cache_size() -> None:
     with pytest.raises(ValueError):
         bls_cache = BLSCache(0)
 
@@ -279,7 +283,7 @@ def test_bad_cache_size():
     )
 
 
-def test_validate_clvm_and_sig():
+def test_validate_clvm_and_sig() -> None:
     cache = BLSCache()
     puz_reveal = Program.to(1)
     coin = Coin(
@@ -287,7 +291,7 @@ def test_validate_clvm_and_sig():
             "4444444444444444444444444444444444444444444444444444444444444444"
         ),
         puz_reveal.get_tree_hash(),
-        200,
+        uint64(200),
     )
 
     sol_bytes = bytes.fromhex(

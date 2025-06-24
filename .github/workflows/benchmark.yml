@@ -170,4 +170,4 @@ jobs:
 
       - name: cargo bench
         run: |
-          cargo bench --workspace --exclude chia_rs
+          cargo bench --workspace
