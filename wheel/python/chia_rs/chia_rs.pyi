@@ -61,6 +61,13 @@ def get_conditions_from_spendbundle(
     height: int,
 ) -> SpendBundleConditions: ...
 
+def get_spends_for_block_with_conditions(
+    constants: ConsensusConstants,
+    generator: Program,
+    args: Program,
+    flags: int,
+) -> list[dict[str, Any]]
+
 def get_flags_for_height_and_constants(
     height: int,
     constants: ConsensusConstants
