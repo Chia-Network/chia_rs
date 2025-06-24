@@ -77,7 +77,7 @@ fn run(c: &mut Criterion) {
                         gen,
                         &block_refs,
                         11_000_000_000,
-                        0,
+                        DONT_VALIDATE_SIGNATURE,
                         &Signature::default(),
                         None,
                         &TEST_CONSTANTS,

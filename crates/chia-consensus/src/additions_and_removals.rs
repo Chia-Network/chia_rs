@@ -16,20 +16,21 @@ use clvmr::serde::node_from_bytes_backrefs;
 
 /// Run a *trusted* block generator and return its additions and removals. This
 /// function does not validate the block, it is assumed to be valid.
-/// The returned vectors are additions (with hints) and removals.
+/// The returned vectors are additions (with hints) and removals (with
+/// pre-computed coin IDs).
 #[allow(clippy::type_complexity)]
 pub fn additions_and_removals<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
     program: &[u8],
     block_refs: I,
     flags: u32,
     constants: &ConsensusConstants,
-) -> Result<(Vec<(Coin, Option<Bytes>)>, Vec<Coin>), ValidationErr>
+) -> Result<(Vec<(Coin, Option<Bytes>)>, Vec<(Coin, Bytes32)>), ValidationErr>
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
     let mut a = make_allocator(flags);
     let mut additions = Vec::<(Coin, Option<Bytes>)>::new();
-    let mut removals = Vec::<Coin>::new();
+    let mut removals = Vec::<(Coin, Bytes32)>::new();
 
     let mut cost_left = constants.max_block_cost_clvm;
 
@@ -81,8 +82,8 @@ where
             amount,
         };
 
-        removals.push(coin);
         let spend_id = coin.coin_id();
+        removals.push((coin, spend_id));
 
         while let Some((mut c, next)) = next(&a, iter)? {
             iter = next;
@@ -239,7 +240,7 @@ mod test {
         }
 
         for r in &removals {
-            assert!(expect_removals.contains(r));
+            assert!(expect_removals.contains(&r.0));
         }
     }
 }

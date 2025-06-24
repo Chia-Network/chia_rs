@@ -77,6 +77,6 @@ fuzz_target!(|data: &[u8]| {
     }
 
     for r in &removals {
-        assert!(expect_removals.contains(r));
+        assert!(expect_removals.contains(&r.0));
     }
 });

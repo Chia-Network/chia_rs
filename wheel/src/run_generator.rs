@@ -6,8 +6,7 @@ use chia_consensus::owned_conditions::OwnedSpendBundleConditions;
 use chia_consensus::run_block_generator::run_block_generator as native_run_block_generator;
 use chia_consensus::run_block_generator::run_block_generator2 as native_run_block_generator2;
 use chia_consensus::validation_error::ValidationErr;
-use chia_protocol::Bytes;
-use chia_protocol::Coin;
+use chia_protocol::{Bytes, Bytes32, Coin};
 
 use clvmr::cost::Cost;
 
@@ -134,7 +133,7 @@ pub fn additions_and_removals<'a>(
     block_refs: &Bound<'_, PyList>,
     flags: u32,
     constants: &ConsensusConstants,
-) -> PyResult<(Vec<(Coin, Option<Bytes>)>, Vec<Coin>)> {
+) -> PyResult<(Vec<(Coin, Option<Bytes>)>, Vec<(Coin, Bytes32)>)> {
     let refs = block_refs
         .into_iter()
         .map(|b| {
