@@ -1,7 +1,9 @@
-use crate::merkle::error::Error;
-use crate::merkle::{InternalNodesMap, LeafNodesMap, NodeHashToDeltaReaderNode, NodeHashToIndex};
-use crate::{
-    merkle, Hash, KeyId, MerkleBlob, MerkleBlobParentFirstIterator, Node, TreeIndex, ValueId,
+use super::error::Error;
+use super::format::{Hash, KeyId, Node, TreeIndex, ValueId};
+use super::{
+    collect_and_return_from_merkle_blob, get_internal_terminal, zstd_decode_path, InternalNodesMap,
+    LeafNodesMap, MerkleBlob, MerkleBlobParentFirstIterator, NodeHashToDeltaReaderNode,
+    NodeHashToIndex,
 };
 #[cfg(feature = "py-bindings")]
 use pyo3::{pyclass, pymethods, PyObject, PyResult, Python};
@@ -33,7 +35,7 @@ impl DeltaFileCache {
     }
 
     pub fn load_previous_hashes(&mut self, path: &PathBuf) -> Result<(), Error> {
-        let blob = merkle::zstd_decode_path(path)?;
+        let blob = zstd_decode_path(path)?;
         self.previous_hashes = HashSet::new();
 
         if !blob.is_empty() {
@@ -107,9 +109,9 @@ impl DeltaReader {
         path: &PathBuf,
         indexes: &Vec<TreeIndex>,
     ) -> Result<(), Error> {
-        let vector = merkle::zstd_decode_path(path)?;
+        let vector = zstd_decode_path(path)?;
 
-        for (hash, (_index, node)) in crate::get_internal_terminal(&vector, indexes)? {
+        for (hash, (_index, node)) in get_internal_terminal(&vector, indexes)? {
             self.nodes.insert(hash, node);
         }
 
@@ -126,7 +128,7 @@ impl DeltaReader {
             |(hash, path)| -> Result<(Hash, (NodeHashToDeltaReaderNode, NodeHashToIndex)), Error> {
                 Ok((
                     *hash,
-                    crate::collect_and_return_from_merkle_blob(path, hashes, |key| {
+                    collect_and_return_from_merkle_blob(path, hashes, |key| {
                         self.nodes.contains_key(key)
                     })?,
                 ))
@@ -158,8 +160,8 @@ impl DeltaReader {
 
         results.par_extend(jobs.into_par_iter().map(
             |(path, indexes)| -> Result<HashMap<Hash, (TreeIndex, DeltaReaderNode)>, Error> {
-                let vector = merkle::zstd_decode_path(path)?;
-                crate::get_internal_terminal(&vector, indexes)
+                let vector = zstd_decode_path(path)?;
+                get_internal_terminal(&vector, indexes)
             },
         ));
 

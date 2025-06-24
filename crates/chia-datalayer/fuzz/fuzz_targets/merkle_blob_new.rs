@@ -2,7 +2,8 @@
 
 use libfuzzer_sys::{arbitrary::Unstructured, fuzz_target};
 
-use chia_datalayer::{MerkleBlob, BLOCK_SIZE};
+use chia_datalayer::merkle::format::BLOCK_SIZE;
+use chia_datalayer::merkle::MerkleBlob;
 
 fuzz_target!(|data: &[u8]| {
     let mut unstructured = Unstructured::new(data);

@@ -1,5 +1,5 @@
-use crate::merkle::error::Error;
-use crate::{try_get_block, Block, Node, TreeIndex, BLOCK_SIZE};
+use super::error::Error;
+use super::format::{try_get_block, Block, Node, TreeIndex, BLOCK_SIZE};
 use std::collections::{HashSet, VecDeque};
 
 struct MerkleBlobLeftChildFirstIteratorItem {
@@ -193,10 +193,11 @@ impl Iterator for MerkleBlobBreadthFirstIterator<'_> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::format::{Hash, NodeType};
+    use super::super::MerkleBlob;
     use super::*;
     use crate::merkle::tests::open_dot;
     use crate::merkle::tests::traversal_blob;
-    use crate::{Hash, MerkleBlob, NodeType};
     use expect_test::{expect, Expect};
     use rstest::rstest;
 
