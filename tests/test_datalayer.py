@@ -536,7 +536,10 @@ def test_delta_file_cache() -> None:
             assert delta_file_cache.seen_previous_hash(hash)
 
 
-T = TypeVar("T")
+class C(Protocol):
+    def __init__(self, a: object, /) -> None: ...
+
+T = TypeVar("T", bound=C)
 U = TypeVar("U")
 
 
@@ -570,7 +573,7 @@ class SimpleTypeInstancesCase(Generic[T, U]):
     ids=lambda case: f"{case.type.__name__} - {case.value}"
     + (" - fail" if case.fail else ""),
 )
-def test_simple_type_instances(case: SimpleTypeInstancesCase) -> None:
+def test_simple_type_instances(case: SimpleTypeInstancesCase[C, object]) -> None:
     if case.fail:
         with pytest.raises(Exception):
             instance = case.type(case.value)
