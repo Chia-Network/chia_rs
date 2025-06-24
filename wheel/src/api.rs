@@ -524,7 +524,7 @@ pub fn get_spends_for_block_with_conditions(
         PyErr::new::<PyTypeError, _>(117)
     })?;
     for spend in spends_list {
-        let mut cond_output = Vec::<(u32, Vec<&[u8]>)>::new();
+        let mut cond_output = Vec::<(u32, Vec<PyBytes>)>::new();
         let destructure_list!(parent_coin_info, puzzle, amount, solution) =
             <match_list!(BytesImpl<32>, Program, u64, Program)>::from_clvm(&a, spend).map_err(
                 |_| {
@@ -550,11 +550,14 @@ pub fn get_spends_for_block_with_conditions(
                 // 117 = GeneratorRuntimeErrors
                 PyErr::new::<PyTypeError, _>(117)
             })?;
-            let mut bytes_vec = Vec::<&[u8]>::new();
+            let mut bytes_vec = Vec::<Py<PyBytes>>::new();
             for var in &conditions[1..] {
                 let decoded = a.decode_atom(var);
                 match decoded {
-                    Ok(bytes) => bytes_vec.push(bytes.as_ref()),
+                    Ok(bytes) => {
+                        let py_bytes = PyBytes::new(py, bytes.as_ref()).into();
+                        bytes_vec.push(py_bytes);
+                    },
                     Err(_) => continue,
                 }
             }
