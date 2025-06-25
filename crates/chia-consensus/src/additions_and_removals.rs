@@ -24,13 +24,13 @@ pub fn additions_and_removals<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf
     block_refs: I,
     flags: u32,
     constants: &ConsensusConstants,
-) -> Result<(Vec<(Coin, Option<Bytes>)>, Vec<(Coin, Bytes32)>), ValidationErr>
+) -> Result<(Vec<(Coin, Option<Bytes>)>, Vec<(Bytes32, Coin)>), ValidationErr>
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
     let mut a = make_allocator(flags);
     let mut additions = Vec::<(Coin, Option<Bytes>)>::new();
-    let mut removals = Vec::<(Coin, Bytes32)>::new();
+    let mut removals = Vec::<(Bytes32, Coin)>::new();
 
     let mut cost_left = constants.max_block_cost_clvm;
 
@@ -83,7 +83,7 @@ where
         };
 
         let spend_id = coin.coin_id();
-        removals.push((coin, spend_id));
+        removals.push((spend_id, coin));
 
         while let Some((mut c, next)) = next(&a, iter)? {
             iter = next;
@@ -240,7 +240,7 @@ mod test {
         }
 
         for r in &removals {
-            assert!(expect_removals.contains(&r.0));
+            assert!(expect_removals.contains(&r.1));
         }
     }
 }

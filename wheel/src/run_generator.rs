@@ -133,7 +133,7 @@ pub fn additions_and_removals<'a>(
     block_refs: &Bound<'_, PyList>,
     flags: u32,
     constants: &ConsensusConstants,
-) -> PyResult<(Vec<(Coin, Option<Bytes>)>, Vec<(Coin, Bytes32)>)> {
+) -> PyResult<(Vec<(Coin, Option<Bytes>)>, Vec<(Bytes32, Coin)>)> {
     let refs = block_refs
         .into_iter()
         .map(|b| {
