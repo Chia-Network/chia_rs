@@ -512,7 +512,7 @@ pub fn get_spends_for_block_with_conditions(
     flags: u32,
 ) -> pyo3::PyResult<PyObject> {
     let mut a = make_allocator(LIMIT_HEAP);
-    let mut output = Vec::<(CoinSpend, Vec<(u32, Vec<&[u8]>)>)>::new();
+    let mut output = Vec::<(CoinSpend, Vec<(u32, Vec<Py<PyBytes>>)>)>::new();
     let (_, res) = generator
         .run(&mut a, flags, constants.max_block_cost_clvm, &args)
         .map_err(|_| {
@@ -524,7 +524,7 @@ pub fn get_spends_for_block_with_conditions(
         PyErr::new::<PyTypeError, _>(117)
     })?;
     for spend in spends_list {
-        let mut cond_output = Vec::<(u32, Vec<PyBytes>)>::new();
+        let mut cond_output = Vec::<(u32, Vec<Py<PyBytes>>)>::new();
         let destructure_list!(parent_coin_info, puzzle, amount, solution) =
             <match_list!(BytesImpl<32>, Program, u64, Program)>::from_clvm(&a, spend).map_err(
                 |_| {
@@ -629,6 +629,9 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_validate_clvm_and_signature, m)?)?;
     m.add_function(wrap_pyfunction!(py_get_conditions_from_spendbundle, m)?)?;
     m.add_function(wrap_pyfunction!(py_get_flags_for_height_and_constants, m)?)?;
+
+    // get spends for generator
+    m.add_function(wrap_pyfunction!(get_spends_for_block_with_conditions, m)?)?;
 
     // clvm functions
     m.add("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;
