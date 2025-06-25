@@ -577,7 +577,8 @@ pub fn get_spends_for_block_with_conditions(
         let puzhash = puzzle.get_tree_hash();
         let coin = Coin::new(parent_coin_info, puzhash, amount);
         let coinspend = CoinSpend::new(coin, puzzle.clone(), solution.clone());
-        let Ok((_, res)) = puzzle.run(&mut a, flags, constants.max_block_cost_clvm, &solution) else {
+        let Ok((_, res)) = puzzle.run(&mut a, flags, constants.max_block_cost_clvm, &solution)
+        else {
             continue; // Skip this spend on error
         };
         let conditions_list = Vec::<NodePtr>::from_clvm(&a, res).map_err(|_| {
@@ -600,7 +601,9 @@ pub fn get_spends_for_block_with_conditions(
                     Err(_) => continue, // we skip lists as was the original behaviour
                 }
             }
-            let Some(num) = a.small_number(conditions[0]) else { continue };
+            let Some(num) = a.small_number(conditions[0]) else {
+                continue;
+            };
             cond_output.push((num, bytes_vec));
         }
         output.push((coinspend, cond_output));
