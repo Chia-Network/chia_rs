@@ -504,6 +504,47 @@ pub fn py_calculate_ip_iters(
 }
 
 #[pyo3::pyfunction]
+pub fn get_spends_for_block(
+    py: Python<'_>,
+    constants: &ConsensusConstants,
+    generator: Program,
+    args: Program,
+    flags: u32,
+) -> pyo3::PyResult<PyObject> {
+    let mut a = make_allocator(LIMIT_HEAP);
+    let mut output = Vec::<CoinSpend>::new();
+    let (_, res) = generator
+        .run(&mut a, flags, constants.max_block_cost_clvm, &args)
+        .map_err(|_| {
+            // 117 = GeneratorRuntimeErrors
+            PyErr::new::<PyTypeError, _>(117)
+        })?;
+    let (first, _rest) = a.next(res).ok_or_else(|| {
+            // 117 = GeneratorRuntimeErrors
+            PyErr::new::<PyTypeError, _>(117)
+        })?;
+    let spends_list = Vec::<NodePtr>::from_clvm(&a, first).map_err(|_| {
+        // 117 = GeneratorRuntimeErrors
+        PyErr::new::<PyTypeError, _>(117)
+    })?;
+    for spend in spends_list {
+        let Ok(destructure_list!(parent_coin_info, puzzle, amount, solution)) =
+        <match_list!(BytesImpl<32>, Program, u64, Program)>::from_clvm(&a, spend) else {
+            continue;  // if we fail at this step then maybe the puzzle was malicious - try other spends
+        };
+        let puzhash = puzzle.get_tree_hash();
+        let coin = Coin::new(parent_coin_info, puzhash.into(), amount);
+        let coinspend = CoinSpend::new(coin, puzzle.clone(), solution.clone());
+        output.push(coinspend);
+    }
+    let pylist = PyList::empty(py);
+    let dict = PyDict::new(py);
+    dict.set_item("block_spends", output)?;
+    pylist.append(dict)?;
+    Ok(pylist.into())
+}
+
+#[pyo3::pyfunction]
 pub fn get_spends_for_block_with_conditions(
     py: Python<'_>,
     constants: &ConsensusConstants,
@@ -531,8 +572,6 @@ pub fn get_spends_for_block_with_conditions(
         let mut cond_output = Vec::<(u32, Vec<Py<PyBytes>>)>::new();
         let Ok(destructure_list!(parent_coin_info, puzzle, amount, solution)) =
         <match_list!(BytesImpl<32>, Program, u64, Program)>::from_clvm(&a, spend) else {
-            // let hexes = hex::encode(node_to_bytes(&a, spend).expect("debug"));
-            // println!("DEBUG OUTPUT: {hexes}");
             continue;  // if we fail at this step then maybe the puzzle was malicious - try other spends
         };
         let puzhash = puzzle.get_tree_hash();
@@ -634,6 +673,7 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_get_flags_for_height_and_constants, m)?)?;
 
     // get spends for generator
+    m.add_function(wrap_pyfunction!(get_spends_for_block, m)?)?;
     m.add_function(wrap_pyfunction!(get_spends_for_block_with_conditions, m)?)?;
 
     // clvm functions
