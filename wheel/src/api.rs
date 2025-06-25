@@ -519,17 +519,23 @@ pub fn get_spends_for_block_with_conditions(
             // 117 = GeneratorRuntimeErrors
             PyErr::new::<PyTypeError, _>(117)
         })?;
-    let spends_list = Vec::<NodePtr>::from_clvm(&a, res).map_err(|_| {
+    let (first, _rest) = a.next(res).ok_or_else(|| {
+            // 117 = GeneratorRuntimeErrors
+            PyErr::new::<PyTypeError, _>(116)
+        })?;
+    let spends_list = Vec::<NodePtr>::from_clvm(&a, first).map_err(|_| {
         // 117 = GeneratorRuntimeErrors
-        PyErr::new::<PyTypeError, _>(117)
+        PyErr::new::<PyTypeError, _>(118)
     })?;
     for spend in spends_list {
         let mut cond_output = Vec::<(u32, Vec<Py<PyBytes>>)>::new();
         let destructure_list!(parent_coin_info, puzzle, amount, solution) =
             <match_list!(BytesImpl<32>, Program, u64, Program)>::from_clvm(&a, spend).map_err(
-                |_| {
+                |_e| {
                     // 117 = GeneratorRuntimeErrors
-                    PyErr::new::<PyTypeError, _>(117)
+                    let hexes = hex::encode(node_to_bytes(&a, spend).expect("debug"));
+                    println!("DEBUG OUTPUT: {hexes}");
+                    PyErr::new::<PyTypeError, _>(119)
                 },
             )?;
         let puzhash = puzzle.get_tree_hash();
@@ -543,12 +549,12 @@ pub fn get_spends_for_block_with_conditions(
         };
         let conditions_list = Vec::<NodePtr>::from_clvm(&mut a, res).map_err(|_| {
             // 117 = GeneratorRuntimeErrors
-            PyErr::new::<PyTypeError, _>(117)
+            PyErr::new::<PyTypeError, _>(120)
         })?;
         for condition in conditions_list {
             let conditions = Vec::<NodePtr>::from_clvm(&mut a, condition).map_err(|_| {
                 // 117 = GeneratorRuntimeErrors
-                PyErr::new::<PyTypeError, _>(117)
+                PyErr::new::<PyTypeError, _>(121)
             })?;
             let mut bytes_vec = Vec::<Py<PyBytes>>::new();
             for var in &conditions[1..] {
