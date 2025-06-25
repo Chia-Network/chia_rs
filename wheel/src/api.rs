@@ -521,23 +521,20 @@ pub fn get_spends_for_block_with_conditions(
         })?;
     let (first, _rest) = a.next(res).ok_or_else(|| {
             // 117 = GeneratorRuntimeErrors
-            PyErr::new::<PyTypeError, _>(116)
+            PyErr::new::<PyTypeError, _>(117)
         })?;
     let spends_list = Vec::<NodePtr>::from_clvm(&a, first).map_err(|_| {
         // 117 = GeneratorRuntimeErrors
-        PyErr::new::<PyTypeError, _>(118)
+        PyErr::new::<PyTypeError, _>(117)
     })?;
     for spend in spends_list {
         let mut cond_output = Vec::<(u32, Vec<Py<PyBytes>>)>::new();
-        let destructure_list!(parent_coin_info, puzzle, amount, solution) =
-            <match_list!(BytesImpl<32>, Program, u64, Program)>::from_clvm(&a, spend).map_err(
-                |_e| {
-                    // 117 = GeneratorRuntimeErrors
-                    let hexes = hex::encode(node_to_bytes(&a, spend).expect("debug"));
-                    println!("DEBUG OUTPUT: {hexes}");
-                    PyErr::new::<PyTypeError, _>(119)
-                },
-            )?;
+        let Ok(destructure_list!(parent_coin_info, puzzle, amount, solution)) =
+        <match_list!(BytesImpl<32>, Program, u64, Program)>::from_clvm(&a, spend) else {
+            // let hexes = hex::encode(node_to_bytes(&a, spend).expect("debug"));
+            // println!("DEBUG OUTPUT: {hexes}");
+            continue;  // if we fail at this step then maybe the puzzle was malicious - try other spends
+        };
         let puzhash = puzzle.get_tree_hash();
         let coin = Coin::new(parent_coin_info, puzhash.into(), amount);
         let coinspend = CoinSpend::new(coin, puzzle.clone(), solution.clone());
@@ -549,12 +546,12 @@ pub fn get_spends_for_block_with_conditions(
         };
         let conditions_list = Vec::<NodePtr>::from_clvm(&mut a, res).map_err(|_| {
             // 117 = GeneratorRuntimeErrors
-            PyErr::new::<PyTypeError, _>(120)
+            PyErr::new::<PyTypeError, _>(117)
         })?;
         for condition in conditions_list {
             let conditions = Vec::<NodePtr>::from_clvm(&mut a, condition).map_err(|_| {
                 // 117 = GeneratorRuntimeErrors
-                PyErr::new::<PyTypeError, _>(121)
+                PyErr::new::<PyTypeError, _>(117)
             })?;
             let mut bytes_vec = Vec::<Py<PyBytes>>::new();
             for var in &conditions[1..] {
@@ -564,7 +561,7 @@ pub fn get_spends_for_block_with_conditions(
                         let py_bytes = PyBytes::new(py, bytes.as_ref()).into();
                         bytes_vec.push(py_bytes);
                     },
-                    Err(_) => continue,
+                    Err(_) => continue,  // we skip lists as was the original behaviour
                 }
             }
             let num = match a.small_number(conditions[0]) {
