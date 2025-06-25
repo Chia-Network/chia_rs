@@ -5,7 +5,7 @@ from chia_rs import Program
 from run_gen import DEFAULT_CONSTANTS
 
 
-def test_generator_parsing():
+def test_generator_parsing() -> None:
     generator = bytes.fromhex(
         open("../generator-tests/create-coin-different-amounts.txt", "r")
         .read()
