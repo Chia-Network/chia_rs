@@ -71,7 +71,7 @@ impl BlockRecord {
         self.deficit == min_blocks_per_challenge_block - 1
     }
 
-    pub fn sp_iters_impl(&self, num_sps_sub_slot: u32) -> Result<u64> {
+    pub fn sp_iters_impl(&self, num_sps_sub_slot: u8) -> Result<u64> {
         calculate_sp_iters(
             num_sps_sub_slot,
             self.sub_slot_iters,
@@ -79,7 +79,7 @@ impl BlockRecord {
         )
     }
 
-    pub fn ip_iters_impl(&self, num_sps_sub_slot: u32, num_sp_intervals_extra: u8) -> Result<u64> {
+    pub fn ip_iters_impl(&self, num_sps_sub_slot: u8, num_sp_intervals_extra: u8) -> Result<u64> {
         calculate_ip_iters(
             num_sps_sub_slot,
             num_sp_intervals_extra,
@@ -123,13 +123,13 @@ impl BlockRecord {
 
     #[pyo3(name = "sp_iters")]
     fn py_sp_iters_impl(&self, constants: &Bound<'_, PyAny>) -> PyResult<u64> {
-        let num_sps_sub_slot = constants.getattr("NUM_SPS_SUB_SLOT")?.extract::<u32>()?;
+        let num_sps_sub_slot = constants.getattr("NUM_SPS_SUB_SLOT")?.extract::<u8>()?;
         self.sp_iters_impl(num_sps_sub_slot).map_err(Into::into)
     }
 
     #[pyo3(name = "ip_iters")]
     fn py_ip_iters_impl(&self, constants: &Bound<'_, PyAny>) -> PyResult<u64> {
-        let num_sps_sub_slot = constants.getattr("NUM_SPS_SUB_SLOT")?.extract::<u32>()?;
+        let num_sps_sub_slot = constants.getattr("NUM_SPS_SUB_SLOT")?.extract::<u8>()?;
         let num_sp_intervals_extra = constants
             .getattr("NUM_SP_INTERVALS_EXTRA")?
             .extract::<u8>()?;

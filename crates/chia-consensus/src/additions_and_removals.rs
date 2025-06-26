@@ -7,51 +7,63 @@ use crate::consensus_constants::ConsensusConstants;
 use crate::validation_error::{atom, first, next, rest, ErrorCode, ValidationErr};
 use chia_protocol::{Bytes, Bytes32};
 use clvm_traits::FromClvm;
-use clvm_utils::{tree_hash_cached, TreeHash};
+use clvm_utils::{tree_hash_cached, TreeCache};
 use clvmr::allocator::NodePtr;
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
-use clvmr::serde::node_from_bytes_backrefs_record;
-use std::collections::HashMap;
+use clvmr::serde::node_from_bytes_backrefs;
 
 /// Run a *trusted* block generator and return its additions and removals. This
 /// function does not validate the block, it is assumed to be valid.
-/// The returned vectors are additions (with hints) and removals.
+/// The returned vectors are additions (with hints) and removals (with
+/// pre-computed coin IDs).
 #[allow(clippy::type_complexity)]
 pub fn additions_and_removals<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
     program: &[u8],
     block_refs: I,
     flags: u32,
     constants: &ConsensusConstants,
-) -> Result<(Vec<(Coin, Option<Bytes>)>, Vec<Coin>), ValidationErr>
+) -> Result<(Vec<(Coin, Option<Bytes>)>, Vec<(Coin, Bytes32)>), ValidationErr>
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
     let mut a = make_allocator(flags);
     let mut additions = Vec::<(Coin, Option<Bytes>)>::new();
-    let mut removals = Vec::<Coin>::new();
+    let mut removals = Vec::<(Coin, Bytes32)>::new();
 
     let mut cost_left = constants.max_block_cost_clvm;
 
-    let (program, backrefs) = node_from_bytes_backrefs_record(&mut a, program)?;
+    let program = node_from_bytes_backrefs(&mut a, program)?;
 
     let args = setup_generator_args(&mut a, block_refs)?;
     let dialect = ChiaDialect::new(flags);
 
-    let Reduction(clvm_cost, mut all_spends) =
-        run_program(&mut a, &dialect, program, args, cost_left)?;
+    let Reduction(clvm_cost, all_spends) = run_program(&mut a, &dialect, program, args, cost_left)?;
 
     subtract_cost(&a, &mut cost_left, clvm_cost)?;
-    all_spends = first(&a, all_spends)?;
+    let all_spends = first(&a, all_spends)?;
 
-    let mut cache = HashMap::<NodePtr, TreeHash>::new();
+    let mut cache = TreeCache::default();
     // at this point all_spends is a list of:
     // (parent-coin-id puzzle-reveal amount solution . extra)
     // where extra may be nil, or additional extension data
 
-    while let Some((spend, tail)) = a.next(all_spends) {
-        all_spends = tail;
+    // first iterate over all puzzle reveals to find duplicate nodes, to know
+    // what to memoize during tree hash computations. This is managed by
+    // TreeCache
+    let mut iter = all_spends;
+    while let Some((spend, rest)) = a.next(iter) {
+        iter = rest;
+        let (_parent_id, (puzzle, _rest)) =
+            <(NodePtr, (NodePtr, NodePtr))>::from_clvm(&a, spend)
+                .map_err(|_| ValidationErr(spend, ErrorCode::InvalidCondition))?;
+        cache.visit_tree(&a, puzzle);
+    }
+
+    let mut iter = all_spends;
+    while let Some((spend, tail)) = a.next(iter) {
+        iter = tail;
         // process the spend
         let (parent_id, (puzzle, (amount, (solution, _spend_level_extra)))) =
             <(Bytes32, (NodePtr, (u64, (NodePtr, NodePtr))))>::from_clvm(&a, spend)
@@ -62,7 +74,7 @@ where
 
         subtract_cost(&a, &mut cost_left, clvm_cost)?;
 
-        let puzzle_hash = tree_hash_cached(&a, puzzle, &backrefs, &mut cache);
+        let puzzle_hash = tree_hash_cached(&a, puzzle, &mut cache);
 
         let coin = Coin {
             parent_coin_info: parent_id,
@@ -70,8 +82,8 @@ where
             amount,
         };
 
-        removals.push(coin);
         let spend_id = coin.coin_id();
+        removals.push((coin, spend_id));
 
         while let Some((mut c, next)) = next(&a, iter)? {
             iter = next;
@@ -228,7 +240,7 @@ mod test {
         }
 
         for r in &removals {
-            assert!(expect_removals.contains(r));
+            assert!(expect_removals.contains(&r.0));
         }
     }
 }

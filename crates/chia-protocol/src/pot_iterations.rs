@@ -8,10 +8,6 @@ fn mult_catch_overflow(a: u64, b: u64) -> Result<u64> {
     a.checked_mul(b).ok_or(Error::InvalidPotIteration)
 }
 
-fn sub_catch_underflow(a: u32, b: u32) -> Result<u32> {
-    a.checked_sub(b).ok_or(Error::InvalidPotIteration)
-}
-
 fn mod_catch_error(a: u64, b: u64) -> Result<u64> {
     a.checked_rem(b).ok_or(Error::InvalidPotIteration)
 }
@@ -21,18 +17,20 @@ fn div_catch_error(a: u64, b: u64) -> Result<u64> {
 }
 
 pub fn is_overflow_block(
-    num_sps_sub_slot: u32,
+    num_sps_sub_slot: u8,
     num_sp_intervals_extra: u8,
     signage_point_index: u8,
 ) -> Result<bool> {
-    if u32::from(signage_point_index) >= num_sps_sub_slot {
+    if signage_point_index >= num_sps_sub_slot {
         return Err(Error::InvalidPotIteration);
     }
-    Ok(u32::from(signage_point_index)
-        >= sub_catch_underflow(num_sps_sub_slot, num_sp_intervals_extra as u32)?)
+    Ok(signage_point_index
+        >= num_sps_sub_slot
+            .checked_sub(num_sp_intervals_extra)
+            .ok_or(Error::InvalidPotIteration)?)
 }
 
-pub fn calculate_sp_interval_iters(num_sps_sub_slot: u32, sub_slot_iters: u64) -> Result<u64> {
+pub fn calculate_sp_interval_iters(num_sps_sub_slot: u8, sub_slot_iters: u64) -> Result<u64> {
     if mod_catch_error(sub_slot_iters, num_sps_sub_slot as u64)? != 0 {
         return Err(Error::InvalidPotIteration);
     }
@@ -40,11 +38,11 @@ pub fn calculate_sp_interval_iters(num_sps_sub_slot: u32, sub_slot_iters: u64) -
 }
 
 pub fn calculate_sp_iters(
-    num_sps_sub_slot: u32,
+    num_sps_sub_slot: u8,
     sub_slot_iters: u64,
     signage_point_index: u8,
 ) -> Result<u64> {
-    if u32::from(signage_point_index) >= num_sps_sub_slot {
+    if signage_point_index >= num_sps_sub_slot {
         return Err(Error::InvalidPotIteration);
     }
     mult_catch_overflow(
@@ -54,7 +52,7 @@ pub fn calculate_sp_iters(
 }
 
 pub fn calculate_ip_iters(
-    num_sps_sub_slot: u32,
+    num_sps_sub_slot: u8,
     num_sp_intervals_extra: u8,
     sub_slot_iters: u64,
     signage_point_index: u8,
@@ -84,7 +82,7 @@ pub fn calculate_ip_iters(
 #[cfg(test)]
 mod tests {
     use super::*;
-    static NUM_SPS_SUB_SLOT: u32 = 32;
+    static NUM_SPS_SUB_SLOT: u8 = 32;
     static NUM_SP_INTERVALS_EXTRA: u8 = 3;
 
     #[test]
@@ -121,7 +119,7 @@ mod tests {
 
     #[test]
     fn test_calculate_ip_iters() {
-        // # num_sps_sub_slot: u32,
+        // # num_sps_sub_slot: u8,
         // # num_sp_intervals_extra: u8,
         // # sub_slot_iters: u64,
         // # signage_point_index: u8,
@@ -219,7 +217,7 @@ mod tests {
             NUM_SPS_SUB_SLOT,
             NUM_SP_INTERVALS_EXTRA,
             ssi,
-            (NUM_SPS_SUB_SLOT - 1_u32) as u8,
+            NUM_SPS_SUB_SLOT - 1,
             required_iters,
         )
         .expect("valid");

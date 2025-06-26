@@ -4,7 +4,7 @@ use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::serde::{node_from_bytes_backrefs, node_to_bytes, node_to_bytes_backrefs};
 use std::io;
 
-// the tuple has the Coin, puzzle-reveal and solution
+/// the tuple has the Coin, puzzle-reveal and solution
 fn build_generator<BufRef, I>(a: &mut Allocator, spends: I) -> io::Result<NodePtr>
 where
     BufRef: AsRef<[u8]>,
@@ -40,8 +40,8 @@ where
     Ok(quote)
 }
 
-// this function returns the number of bytes the specified
-// number is serialized to, in CLVM serialized form
+/// this function returns the number of bytes the specified
+/// number is serialized to, in CLVM serialized form
 fn clvm_bytes_len(val: u64) -> usize {
     if val < 0x80 {
         1
@@ -64,7 +64,7 @@ fn clvm_bytes_len(val: u64) -> usize {
     }
 }
 
-// calculate the size in bytes of a generator with no backref optimisations
+/// calculate the size in bytes of a generator with no backref optimisations
 pub fn calculate_generator_length<I>(spends: I) -> usize
 where
     I: AsRef<[CoinSpend]>,
@@ -85,7 +85,7 @@ where
     size
 }
 
-// the tuple has the Coin, puzzle-reveal and solution
+/// the tuple has the Coin, puzzle-reveal and solution
 pub fn solution_generator<BufRef, I>(spends: I) -> io::Result<Vec<u8>>
 where
     BufRef: AsRef<[u8]>,

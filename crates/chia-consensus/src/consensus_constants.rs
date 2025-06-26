@@ -5,6 +5,8 @@ use chia_streamable_macro::streamable;
 use chia_py_streamable_macro::{PyGetters, PyJsonDict, PyStreamable};
 use hex_literal::hex;
 
+/// Constants determining behavior of the blockchain. This is altered for
+/// tests, simulations and testnets.
 #[cfg_attr(
     feature = "py-bindings",
     pyo3::pyclass(module = "chia_rs"),
@@ -25,7 +27,7 @@ pub struct ConsensusConstants {
     max_sub_slot_blocks: u32,
 
     /// The number of signage points per sub-slot (including the 0th sp at the sub-slot start).
-    num_sps_sub_slot: u32,
+    num_sps_sub_slot: u8,
 
     /// The sub_slot_iters for the first epoch.
     sub_slot_iters_starting: u64,
@@ -59,9 +61,17 @@ pub struct ConsensusConstants {
     /// This applies to the new plot format, and proof-of-space format
     number_zero_bits_plot_filter_v2: u8,
 
-    min_plot_size: u8,
+    /// The smallest and largest allowed plot size for the original plot
+    /// format, v1. These are the K-values for the plots.
+    min_plot_size_v1: u8,
+    max_plot_size_v1: u8,
 
-    max_plot_size: u8,
+    /// The smallest and largest allowed plot size for the the new plot
+    /// format, v2. These are the K-values for the plots. In addition to these
+    /// constraints, v2 plot sizes must be even numbers. The new plot format
+    /// was introduced in Chia-3.0.
+    min_plot_size_v2: u8,
+    max_plot_size_v2: u8,
 
     /// The target number of seconds per sub-slot.
     sub_slot_time_target: u16,
@@ -133,6 +143,10 @@ pub struct ConsensusConstants {
     /// is valid
     hard_fork2_height: u32,
 
+    /// Once hard fork 2 activates, we'll start phasing out v1 plots. This is
+    /// the number blocks they will be phased-out over
+    plot_v1_phase_out: u32,
+
     /// The 128 plot filter adjustment height.
     /// This affects the plot filter for original plots
     plot_filter_128_height: u32,
@@ -145,20 +159,16 @@ pub struct ConsensusConstants {
     /// This affects the plot filter for original plots
     plot_filter_32_height: u32,
 
-    /// Plot difficulty is a feature of the new plot format (introduced in Chia 3.0)
-    /// The plot difficulty will increase to 4 at this block height
+    /// initial plot difficulty for the v2 plot format.
+    plot_difficulty_initial: u8,
+
+    /// Plot difficulty is a feature of the new plot format, v2 (introduced in Chia 3.0)
+    /// The plot difficulty will increase at these block heights. The new
+    /// difficulty will be 4, 5, 6, 7 and 8 respectively.
     plot_difficulty_4_height: u32,
-
-    /// The plot difficulty will increase to 5 at this block height
     plot_difficulty_5_height: u32,
-
-    /// The plot difficulty will increase to 6 at this block height
     plot_difficulty_6_height: u32,
-
-    /// The plot difficulty will increase to 7 at this block height
     plot_difficulty_7_height: u32,
-
-    /// The plot difficulty will increase to 8 at this block height
     plot_difficulty_8_height: u32,
 }
 
@@ -177,8 +187,10 @@ pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
     discriminant_size_bits: 1024,
     number_zero_bits_plot_filter_v1: 9,
     number_zero_bits_plot_filter_v2: 9, // placeholder
-    min_plot_size: 32,
-    max_plot_size: 50,
+    min_plot_size_v1: 32,
+    max_plot_size_v1: 50,
+    min_plot_size_v2: 28,
+    max_plot_size_v2: 32,
     sub_slot_time_target: 600,
     num_sp_intervals_extra: 3,
     max_future_time2: 2 * 60,
@@ -227,11 +239,13 @@ pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
     pool_sub_slot_iters: 37_600_000_000,
     hard_fork_height: 5_496_000,
     hard_fork2_height: 0xffff_ffff, // placeholder
+    plot_v1_phase_out: 920_000,
     plot_filter_128_height: 10_542_000,
     plot_filter_64_height: 15_592_000,
     plot_filter_32_height: 20_643_000,
 
     // placeholder values
+    plot_difficulty_initial: 2,
     plot_difficulty_4_height: 0xffff_ffff,
     plot_difficulty_5_height: 0xffff_ffff,
     plot_difficulty_6_height: 0xffff_ffff,
