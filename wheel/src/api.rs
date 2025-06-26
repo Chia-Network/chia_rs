@@ -529,7 +529,7 @@ pub fn get_spends_for_block(
         let Ok(destructure_list!(parent_coin_info, puzzle, amount, solution)) =
             <match_list!(BytesImpl<32>, Program, u64, Program)>::from_clvm(&a, spend)
         else {
-            continue; // if we fail at this step then maybe the puzzle was malicious - try other spends
+            continue; // if we fail at this step then maybe the generator was malicious - try other spends
         };
         let puzhash = puzzle.get_tree_hash();
         let coin = Coin::new(parent_coin_info, puzhash, amount);
