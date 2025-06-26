@@ -65,14 +65,14 @@ def get_spends_for_block(
     constants: ConsensusConstants,
     generator: Program,
     args: Program,
-    flags: int,
+    flags: uint32,
 ) -> list[dict[str, Any]]: ...
 
 def get_spends_for_block_with_conditions(
     constants: ConsensusConstants,
     generator: Program,
     args: Program,
-    flags: int,
+    flags: uint32,
 ) -> list[dict[str, Any]]: ...
 
 def get_flags_for_height_and_constants(
