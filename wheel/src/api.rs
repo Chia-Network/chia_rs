@@ -51,7 +51,7 @@ use chia_protocol::{
 };
 use chia_traits::ChiaToPython;
 use clvm_traits::{destructure_list, match_list, ClvmDecoder, FromClvm};
-use clvm_utils::{tree_hash_cached, tree_hash_from_bytes, TreeHash};
+use clvm_utils::{tree_hash_cached, tree_hash_from_bytes, TreeCache, TreeHash};
 use clvmr::chia_dialect::ENABLE_KECCAK_OPS_OUTSIDE_GUARD;
 use clvmr::{LIMIT_HEAP, NO_UNKNOWN_OPS};
 use pyo3::buffer::PyBuffer;
@@ -513,7 +513,7 @@ pub fn get_spends_for_block<'a>(
     let mut cost_left = constants.max_block_cost_clvm;
     subtract_cost(&a, &mut cost_left, byte_cost)?;
 
-    let (program, backrefs) = node_from_bytes_backrefs(&mut a, &generator)?;
+    let program = node_from_bytes_backrefs(&mut a, &generator)?;
     let refs = block_refs
         .into_iter()
         .map(|b| {
@@ -542,7 +542,7 @@ pub fn get_spends_for_block<'a>(
         // 117 = GeneratorRuntimeErrors
         PyErr::new::<PyTypeError, _>(117)
     })?;
-    let mut cache = HashMap::<NodePtr, TreeHash>::new();
+    let mut cache = TreeCache::default();
     for spend in spends_list {
         let Ok(destructure_list!(parent_coin_info, puzzle, amount, solution)) =
             <match_list!(BytesImpl<32>, Program, u64, Program)>::from_clvm(&a, spend)
@@ -577,7 +577,7 @@ pub fn get_spends_for_block_with_conditions<'a>(
     let mut cost_left = constants.max_block_cost_clvm;
     subtract_cost(&a, &mut cost_left, byte_cost)?;
 
-    let (program, backrefs) = node_from_bytes_backrefs(&mut a, &generator)?;
+    let program = node_from_bytes_backrefs(&mut a, &generator)?;
     let refs = block_refs
         .into_iter()
         .map(|b| {
@@ -606,7 +606,7 @@ pub fn get_spends_for_block_with_conditions<'a>(
         // 117 = GeneratorRuntimeErrors
         PyErr::new::<PyTypeError, _>(117)
     })?;
-    let mut cache = HashMap::<NodePtr, TreeHash>::new();
+    let mut cache = TreeCache::default();
     for spend in spends_list {
         let mut cond_output = Vec::<(u32, Vec<Py<PyBytes>>)>::new();
         let Ok(destructure_list!(parent_coin_info, puzzle, amount, solution)) =
