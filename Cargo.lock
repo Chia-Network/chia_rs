@@ -602,6 +602,7 @@ dependencies = [
  "chia-protocol",
  "chia-ssl",
  "chia-traits 0.26.0",
+ "clvm-traits",
  "clvm-utils",
  "clvmr",
  "hex",

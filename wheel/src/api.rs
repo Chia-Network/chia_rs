@@ -10,7 +10,7 @@ use chia_consensus::flags::{
 use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
 use chia_consensus::owned_conditions::{OwnedSpendBundleConditions, OwnedSpendConditions};
-use chia_consensus::run_block_generator::setup_generator_args;
+use chia_consensus::run_block_generator::{setup_generator_args, subtract_cost};
 use chia_consensus::solution_generator::solution_generator as native_solution_generator;
 use chia_consensus::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
 use chia_consensus::spendbundle_conditions::get_conditions_from_spendbundle;
@@ -19,7 +19,7 @@ use chia_consensus::spendbundle_validation::{
 };
 use chia_protocol::{
     calculate_ip_iters, calculate_sp_interval_iters, calculate_sp_iters, is_overflow_block,
-    py_expected_plot_size,
+    py_expected_plot_size, BytesImpl,
 };
 use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
@@ -50,17 +50,19 @@ use chia_protocol::{
     TransactionsInfo, UnfinishedBlock, UnfinishedHeaderBlock, VDFInfo, VDFProof, WeightProof,
 };
 use chia_traits::ChiaToPython;
-use clvm_utils::tree_hash_from_bytes;
+use clvm_traits::{destructure_list, match_list, ClvmDecoder, FromClvm};
+use clvm_utils::{tree_hash_cached, tree_hash_from_bytes, TreeCache};
 use clvmr::chia_dialect::ENABLE_KECCAK_OPS_OUTSIDE_GUARD;
 use clvmr::{LIMIT_HEAP, NO_UNKNOWN_OPS};
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::pybacked::PyBackedBytes;
-use pyo3::types::PyBytes;
 use pyo3::types::PyList;
 use pyo3::types::PyTuple;
+use pyo3::types::{PyBytes, PyDict};
 use pyo3::wrap_pyfunction;
+
 use std::iter::zip;
 
 use crate::run_program::{run_chia_program, serialized_length};
@@ -496,6 +498,167 @@ pub fn py_calculate_ip_iters(
 }
 
 #[pyo3::pyfunction]
+pub fn get_spends_for_block<'a>(
+    py: Python<'a>,
+    constants: &ConsensusConstants,
+    generator: Program,
+    block_refs: &Bound<'_, PyList>,
+    flags: u32,
+) -> pyo3::PyResult<PyObject> {
+    let mut a = make_allocator(LIMIT_HEAP);
+    let mut output = Vec::<CoinSpend>::new();
+    let byte_cost = generator.len() as u64 * constants.cost_per_byte;
+
+    let mut cost_left = constants.max_block_cost_clvm;
+    subtract_cost(&a, &mut cost_left, byte_cost)?;
+
+    let program = node_from_bytes_backrefs(&mut a, &generator)?;
+    let refs = block_refs
+        .into_iter()
+        .map(|b| {
+            let buf = b
+                .extract::<PyBuffer<u8>>()
+                .expect("block_refs must be list of buffers");
+            py_to_slice::<'a>(buf)
+        })
+        .collect::<Vec<&'a [u8]>>();
+    let args = setup_generator_args(&mut a, refs)?;
+    let dialect = ChiaDialect::new(flags);
+
+    let Reduction(clvm_cost, res) = run_program(&mut a, &dialect, program, args, cost_left)
+        .map_err(|_| {
+            // 117 = GeneratorRuntimeErrors
+            PyErr::new::<PyTypeError, _>(117)
+        })?;
+
+    subtract_cost(&a, &mut cost_left, clvm_cost)?;
+
+    let (first, _rest) = a.next(res).ok_or_else(|| {
+        // 117 = GeneratorRuntimeErrors
+        PyErr::new::<PyTypeError, _>(117)
+    })?;
+    let spends_list = Vec::<NodePtr>::from_clvm(&a, first).map_err(|_| {
+        // 117 = GeneratorRuntimeErrors
+        PyErr::new::<PyTypeError, _>(117)
+    })?;
+    let mut cache = TreeCache::default();
+    for spend in spends_list {
+        let Ok(destructure_list!(parent_coin_info, puzzle, amount, solution)) =
+            <match_list!(BytesImpl<32>, Program, u64, Program)>::from_clvm(&a, spend)
+        else {
+            continue; // if we fail at this step then maybe the generator was malicious - try other spends
+        };
+        let puz_ptr = node_from_bytes(&mut a, puzzle.as_slice())?;
+        let puzhash = tree_hash_cached(&a, puz_ptr, &mut cache);
+        let coin = Coin::new(parent_coin_info, puzhash.into(), amount);
+        let coinspend = CoinSpend::new(coin, puzzle.clone(), solution.clone());
+        output.push(coinspend);
+    }
+    let pylist = PyList::empty(py);
+    let dict = PyDict::new(py);
+    dict.set_item("block_spends", output)?;
+    pylist.append(dict)?;
+    Ok(pylist.into())
+}
+
+#[pyo3::pyfunction]
+pub fn get_spends_for_block_with_conditions<'a>(
+    py: Python<'a>,
+    constants: &ConsensusConstants,
+    generator: Program,
+    block_refs: &Bound<'a, PyList>,
+    flags: u32,
+) -> pyo3::PyResult<PyObject> {
+    let mut a = make_allocator(LIMIT_HEAP);
+    let mut output = Vec::<(CoinSpend, Vec<(u32, Vec<Py<PyBytes>>)>)>::new();
+    let byte_cost = generator.len() as u64 * constants.cost_per_byte;
+
+    let mut cost_left = constants.max_block_cost_clvm;
+    subtract_cost(&a, &mut cost_left, byte_cost)?;
+
+    let program = node_from_bytes_backrefs(&mut a, &generator)?;
+    let refs = block_refs
+        .into_iter()
+        .map(|b| {
+            let buf = b
+                .extract::<PyBuffer<u8>>()
+                .expect("block_refs must be list of buffers");
+            py_to_slice::<'a>(buf)
+        })
+        .collect::<Vec<&'a [u8]>>();
+    let args = setup_generator_args(&mut a, refs)?;
+    let dialect = ChiaDialect::new(flags);
+
+    let Reduction(clvm_cost, res) = run_program(&mut a, &dialect, program, args, cost_left)
+        .map_err(|_| {
+            // 117 = GeneratorRuntimeErrors
+            PyErr::new::<PyTypeError, _>(117)
+        })?;
+
+    subtract_cost(&a, &mut cost_left, clvm_cost)?;
+
+    let (first, _rest) = a.next(res).ok_or_else(|| {
+        // 117 = GeneratorRuntimeErrors
+        PyErr::new::<PyTypeError, _>(117)
+    })?;
+    let spends_list = Vec::<NodePtr>::from_clvm(&a, first).map_err(|_| {
+        // 117 = GeneratorRuntimeErrors
+        PyErr::new::<PyTypeError, _>(117)
+    })?;
+    let mut cache = TreeCache::default();
+    for spend in spends_list {
+        let mut cond_output = Vec::<(u32, Vec<Py<PyBytes>>)>::new();
+        let Ok(destructure_list!(parent_coin_info, puzzle, amount, solution)) =
+            <match_list!(BytesImpl<32>, Program, u64, Program)>::from_clvm(&a, spend)
+        else {
+            continue; // if we fail at this step then maybe the generator was malicious - try other spends
+        };
+        let puz_ptr = node_from_bytes(&mut a, puzzle.as_slice())?;
+        let puzhash = tree_hash_cached(&a, puz_ptr, &mut cache);
+        let coin = Coin::new(parent_coin_info, puzhash.into(), amount);
+        let coinspend = CoinSpend::new(coin, puzzle.clone(), solution.clone());
+        let Ok((_, res)) = puzzle.run(&mut a, flags, constants.max_block_cost_clvm, &solution)
+        else {
+            continue; // Skip this spend on error
+        };
+        let conditions_list = Vec::<NodePtr>::from_clvm(&a, res).map_err(|_| {
+            // 117 = GeneratorRuntimeErrors
+            PyErr::new::<PyTypeError, _>(117)
+        })?;
+        for condition in conditions_list {
+            let conditions = Vec::<NodePtr>::from_clvm(&a, condition).map_err(|_| {
+                // 117 = GeneratorRuntimeErrors
+                PyErr::new::<PyTypeError, _>(117)
+            })?;
+            let mut bytes_vec = Vec::<Py<PyBytes>>::new();
+            for var in &conditions[1..] {
+                let decoded = a.decode_atom(var);
+                match decoded {
+                    Ok(bytes) => {
+                        let py_bytes = PyBytes::new(py, bytes.as_ref()).into();
+                        bytes_vec.push(py_bytes);
+                    }
+                    Err(_) => continue, // we skip lists as was the original behaviour
+                }
+            }
+            let Some(num) = a.small_number(conditions[0]) else {
+                continue;
+            };
+            cond_output.push((num, bytes_vec));
+        }
+        output.push((coinspend, cond_output));
+    }
+    let pylist = PyList::empty(py);
+    for (coinspend, cond_output) in output {
+        let dict = PyDict::new(py);
+        dict.set_item("coin_spend", coinspend)?;
+        dict.set_item("conditions", cond_output)?;
+        pylist.append(dict)?;
+    }
+    Ok(pylist.into())
+}
+
+#[pyo3::pyfunction]
 #[pyo3(name = "is_canonical_serialization")]
 pub fn py_is_canonical_serialization(buf: &[u8]) -> bool {
     is_canonical_serialization(buf)
@@ -545,6 +708,10 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_validate_clvm_and_signature, m)?)?;
     m.add_function(wrap_pyfunction!(py_get_conditions_from_spendbundle, m)?)?;
     m.add_function(wrap_pyfunction!(py_get_flags_for_height_and_constants, m)?)?;
+
+    // get spends for generator
+    m.add_function(wrap_pyfunction!(get_spends_for_block, m)?)?;
+    m.add_function(wrap_pyfunction!(get_spends_for_block_with_conditions, m)?)?;
 
     // clvm functions
     m.add("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;
