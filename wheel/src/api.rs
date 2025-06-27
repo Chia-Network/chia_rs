@@ -51,7 +51,7 @@ use chia_protocol::{
 };
 use chia_traits::ChiaToPython;
 use clvm_traits::{destructure_list, match_list, ClvmDecoder, FromClvm};
-use clvm_utils::{tree_hash_cached, tree_hash_from_bytes, TreeCache, TreeHash};
+use clvm_utils::{tree_hash_cached, tree_hash_from_bytes, TreeCache};
 use clvmr::chia_dialect::ENABLE_KECCAK_OPS_OUTSIDE_GUARD;
 use clvmr::{LIMIT_HEAP, NO_UNKNOWN_OPS};
 use pyo3::buffer::PyBuffer;
@@ -63,7 +63,6 @@ use pyo3::types::PyTuple;
 use pyo3::types::{PyBytes, PyDict};
 use pyo3::wrap_pyfunction;
 
-use std::collections::{HashMap, HashSet};
 use std::iter::zip;
 
 use crate::run_program::{run_chia_program, serialized_length};
