@@ -499,7 +499,7 @@ pub fn py_calculate_ip_iters(
 
 #[pyo3::pyfunction]
 pub fn get_spends_for_block<'a>(
-    py: Python<'_>,
+    py: Python<'a>,
     constants: &ConsensusConstants,
     generator: Program,
     block_refs: &Bound<'_, PyList>,
@@ -563,10 +563,10 @@ pub fn get_spends_for_block<'a>(
 
 #[pyo3::pyfunction]
 pub fn get_spends_for_block_with_conditions<'a>(
-    py: Python<'_>,
+    py: Python<'a>,
     constants: &ConsensusConstants,
     generator: Program,
-    block_refs: &Bound<'_, PyList>,
+    block_refs: &Bound<'a, PyList>,
     flags: u32,
 ) -> pyo3::PyResult<PyObject> {
     let mut a = make_allocator(LIMIT_HEAP);
