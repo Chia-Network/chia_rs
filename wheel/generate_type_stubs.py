@@ -344,7 +344,7 @@ def get_spends_for_block(
 def get_spends_for_block_with_conditions(
     constants: ConsensusConstants,
     generator: Program,
-    generator_refs: list[bytes],,
+    generator_refs: list[bytes],
     flags: int,
 ) -> list[dict[str, Any]]: ...
 
