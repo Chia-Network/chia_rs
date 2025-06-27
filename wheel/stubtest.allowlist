@@ -50,3 +50,6 @@ chia_rs\.SpendBundle\.from_parent
 # these are here for backwards compatibility with the cyclical dependency on
 # chia-blockchain (for tests)
 chia_rs\.ALLOW_BACKREFS
+
+# banning * imports
+chia_rs\.datalayer\.__all__
