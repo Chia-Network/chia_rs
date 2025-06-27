@@ -12,9 +12,10 @@ use pyo3::{
 use crate::merkle::iterators::{
     MerkleBlobBreadthFirstIterator, MerkleBlobLeftChildFirstIterator, MerkleBlobParentFirstIterator,
 };
+use crate::merkle::{deltas, format, proof_of_inclusion};
 use crate::{
-    error::Error, Block, BlockBytes, Hash, InternalNode, KeyId, LeafNode, Node, NodeMetadata,
-    NodeType, Parent, TreeIndex, ValueId, BLOCK_SIZE,
+    merkle::error::Error, Block, BlockBytes, Hash, InternalNode, KeyId, LeafNode, Node,
+    NodeMetadata, NodeType, Parent, TreeIndex, ValueId, BLOCK_SIZE,
 };
 use chia_protocol::Bytes32;
 use chia_sha2::Sha256;
@@ -29,17 +30,11 @@ use std::iter::zip;
 use std::ops::Range;
 use std::path::PathBuf;
 
-pub mod deltas;
-pub mod error;
-pub mod format;
-pub mod iterators;
-pub mod proof_of_inclusion;
-
 // assumptions
 // - root is at index 0
 // - any case with no keys will have a zero length blob
 
-fn zstd_decode_path(path: &PathBuf) -> Result<Vec<u8>, Error> {
+pub fn zstd_decode_path(path: &PathBuf) -> Result<Vec<u8>, Error> {
     let mut vector: Vec<u8> = Vec::new();
     let file = std::fs::File::open(path)?;
     let mut decoder = zstd::Decoder::new(file)?;
@@ -234,8 +229,8 @@ impl BlockStatusCache {
     }
 }
 
-type NodeHashToIndex = HashMap<Hash, TreeIndex>;
-type NodeHashToDeltaReaderNode = HashMap<Hash, deltas::DeltaReaderNode>;
+pub type NodeHashToIndex = HashMap<Hash, TreeIndex>;
+pub type NodeHashToDeltaReaderNode = HashMap<Hash, deltas::DeltaReaderNode>;
 
 pub fn collect_and_return_from_merkle_blob(
     path: &PathBuf,
@@ -306,8 +301,8 @@ pub fn collect_and_return_from_merkle_blob(
     Ok((nodes, node_hash_to_index))
 }
 
-type InternalNodesMap = HashMap<Hash, (Hash, Hash)>;
-type LeafNodesMap = HashMap<Hash, (KeyId, ValueId)>;
+pub type InternalNodesMap = HashMap<Hash, (Hash, Hash)>;
+pub type LeafNodesMap = HashMap<Hash, (KeyId, ValueId)>;
 
 /// Stores a DataLayer merkle tree in bytes and provides serialization on each access so that only
 /// the parts presently in use are stored in active objects.  The bytes are grouped as blocks of
@@ -319,7 +314,7 @@ type LeafNodesMap = HashMap<Hash, (KeyId, ValueId)>;
 #[cfg_attr(feature = "py-bindings", pyclass(get_all))]
 #[derive(Clone, Debug)]
 pub struct MerkleBlob {
-    blob: Vec<u8>,
+    pub(crate) blob: Vec<u8>,
     block_status_cache: BlockStatusCache,
     // TODO: used by fuzzing, some cleaner way?  making it cfg-dependent is annoying with
     //       the type stubs
@@ -1035,7 +1030,7 @@ impl MerkleBlob {
         Block::from_bytes(self.get_block_bytes(index)?)
     }
 
-    fn get_hash(&self, index: TreeIndex) -> Result<Hash, Error> {
+    pub(crate) fn get_hash(&self, index: TreeIndex) -> Result<Hash, Error> {
         Ok(self.get_block(index)?.node.hash())
     }
 
@@ -1639,9 +1634,7 @@ impl Drop for MerkleBlob {
 }
 
 #[cfg(test)]
-mod dot;
-#[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::merkle::dot::DotLines;
     use chia_traits::Streamable;

@@ -1,7 +1,7 @@
 use crate::merkle::error::Error;
-use crate::merkle::{InternalNodesMap, LeafNodesMap, NodeHashToDeltaReaderNode, NodeHashToIndex};
 use crate::{
-    merkle, Hash, KeyId, MerkleBlob, MerkleBlobParentFirstIterator, Node, TreeIndex, ValueId,
+    Hash, InternalNodesMap, KeyId, LeafNodesMap, MerkleBlob, MerkleBlobParentFirstIterator, Node,
+    NodeHashToDeltaReaderNode, NodeHashToIndex, TreeIndex, ValueId,
 };
 #[cfg(feature = "py-bindings")]
 use pyo3::{pyclass, pymethods, PyObject, PyResult, Python};
@@ -33,7 +33,7 @@ impl DeltaFileCache {
     }
 
     pub fn load_previous_hashes(&mut self, path: &PathBuf) -> Result<(), Error> {
-        let blob = merkle::zstd_decode_path(path)?;
+        let blob = crate::zstd_decode_path(path)?;
         self.previous_hashes = HashSet::new();
 
         if !blob.is_empty() {
@@ -107,7 +107,7 @@ impl DeltaReader {
         path: &PathBuf,
         indexes: &Vec<TreeIndex>,
     ) -> Result<(), Error> {
-        let vector = merkle::zstd_decode_path(path)?;
+        let vector = crate::zstd_decode_path(path)?;
 
         for (hash, (_index, node)) in crate::get_internal_terminal(&vector, indexes)? {
             self.nodes.insert(hash, node);
@@ -158,7 +158,7 @@ impl DeltaReader {
 
         results.par_extend(jobs.into_par_iter().map(
             |(path, indexes)| -> Result<HashMap<Hash, (TreeIndex, DeltaReaderNode)>, Error> {
-                let vector = merkle::zstd_decode_path(path)?;
+                let vector = crate::zstd_decode_path(path)?;
                 crate::get_internal_terminal(&vector, indexes)
             },
         ));
@@ -322,9 +322,9 @@ impl DeltaFileCache {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::merkle::tests::traversal_blob;
-    use crate::merkle::tests::{generate_hash, generate_kvid, HASH_ONE, HASH_TWO, HASH_ZERO};
-    use crate::merkle::{InsertLocation, InternalNodesMap, LeafNodesMap};
+    use crate::merkle::blob::tests::traversal_blob;
+    use crate::merkle::blob::tests::{generate_hash, generate_kvid, HASH_ONE, HASH_TWO, HASH_ZERO};
+    use crate::{InsertLocation, InternalNodesMap, LeafNodesMap};
     use expect_test::expect;
     use rstest::rstest;
     use std::iter::zip;
