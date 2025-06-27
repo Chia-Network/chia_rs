@@ -12,7 +12,7 @@ def test_generator_parsing() -> None:
         .split("\n")[0]
     )
     gen_prog = Program.from_bytes(generator)
-    args = Program.from_bytes(b"\x80")
+    args = []
     out_dict = get_spends_for_block_with_conditions(
         DEFAULT_CONSTANTS, gen_prog, args, 0
     )
@@ -29,7 +29,7 @@ def test_generator_parsing() -> None:
         open("../generator-tests/create-coin-hint.txt", "r").read().split("\n")[0]
     )
     gen_prog = Program.from_bytes(generator)
-    args = Program.from_bytes(b"\x80")
+
     out_dict = get_spends_for_block_with_conditions(
         DEFAULT_CONSTANTS, gen_prog, args, 0
     )
@@ -46,7 +46,7 @@ def test_generator_parsing() -> None:
         open("../generator-tests/block-834768.txt", "r").read().split("\n")[0]
     )
     gen_prog = Program.from_bytes(generator)
-    args = Program.from_bytes(b"\x80")
+
     out_dict = get_spends_for_block_with_conditions(
         DEFAULT_CONSTANTS, gen_prog, args, 0
     )
