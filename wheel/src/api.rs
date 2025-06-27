@@ -10,7 +10,7 @@ use chia_consensus::flags::{
 use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
 use chia_consensus::owned_conditions::{OwnedSpendBundleConditions, OwnedSpendConditions};
-use chia_consensus::run_block_generator::setup_generator_args;
+use chia_consensus::run_block_generator::{setup_generator_args, subtract_cost};
 use chia_consensus::solution_generator::solution_generator as native_solution_generator;
 use chia_consensus::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
 use chia_consensus::spendbundle_conditions::get_conditions_from_spendbundle;
@@ -51,7 +51,7 @@ use chia_protocol::{
 };
 use chia_traits::ChiaToPython;
 use clvm_traits::{destructure_list, match_list, ClvmDecoder, FromClvm};
-use clvm_utils::tree_hash_from_bytes;
+use clvm_utils::{tree_hash_cached, tree_hash_from_bytes, TreeHash};
 use clvmr::chia_dialect::ENABLE_KECCAK_OPS_OUTSIDE_GUARD;
 use clvmr::{LIMIT_HEAP, NO_UNKNOWN_OPS};
 use pyo3::buffer::PyBuffer;
@@ -62,7 +62,7 @@ use pyo3::types::PyList;
 use pyo3::types::PyTuple;
 use pyo3::types::{PyBytes, PyDict};
 use pyo3::wrap_pyfunction;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::iter::zip;
 
 use crate::run_program::{run_chia_program, serialized_length};
@@ -502,21 +502,41 @@ pub fn py_calculate_ip_iters(
 }
 
 #[pyo3::pyfunction]
-pub fn get_spends_for_block(
+pub fn get_spends_for_block<'a>(
     py: Python<'_>,
     constants: &ConsensusConstants,
     generator: Program,
-    args: Program,
+    block_refs: &Bound<'_, PyList>,
     flags: u32,
 ) -> pyo3::PyResult<PyObject> {
     let mut a = make_allocator(LIMIT_HEAP);
     let mut output = Vec::<CoinSpend>::new();
-    let (_, res) = generator
-        .run(&mut a, flags, constants.max_block_cost_clvm, &args)
+    let byte_cost = generator.len() as u64 * constants.cost_per_byte;
+
+    let mut cost_left = constants.max_block_cost_clvm;
+    subtract_cost(&a, &mut cost_left, byte_cost)?;
+
+    let (program, backrefs) = node_from_bytes_backrefs_record(&mut a, &generator)?;
+    let refs = block_refs
+        .into_iter()
+        .map(|b| {
+            let buf = b
+                .extract::<PyBuffer<u8>>()
+                .expect("block_refs must be list of buffers");
+            py_to_slice::<'a>(buf)
+        })
+        .collect::<Vec<&'a [u8]>>();
+    let args = setup_generator_args(&mut a, refs)?;
+    let dialect = ChiaDialect::new(flags);
+
+    let Reduction(clvm_cost, res) = run_program(&mut a, &dialect, program, args, cost_left)
         .map_err(|_| {
             // 117 = GeneratorRuntimeErrors
             PyErr::new::<PyTypeError, _>(117)
         })?;
+
+    subtract_cost(&a, &mut cost_left, clvm_cost)?;
+
     let (first, _rest) = a.next(res).ok_or_else(|| {
         // 117 = GeneratorRuntimeErrors
         PyErr::new::<PyTypeError, _>(117)
@@ -525,14 +545,16 @@ pub fn get_spends_for_block(
         // 117 = GeneratorRuntimeErrors
         PyErr::new::<PyTypeError, _>(117)
     })?;
+    let mut cache = HashMap::<NodePtr, TreeHash>::new();
     for spend in spends_list {
         let Ok(destructure_list!(parent_coin_info, puzzle, amount, solution)) =
             <match_list!(BytesImpl<32>, Program, u64, Program)>::from_clvm(&a, spend)
         else {
             continue; // if we fail at this step then maybe the generator was malicious - try other spends
         };
-        let puzhash = puzzle.get_tree_hash();
-        let coin = Coin::new(parent_coin_info, puzhash, amount);
+        let puz_ptr = node_from_bytes(&mut a, puzzle.as_slice())?;
+        let puzhash = tree_hash_cached(&a, puz_ptr, &backrefs, &mut cache);
+        let coin = Coin::new(parent_coin_info, puzhash.into(), amount);
         let coinspend = CoinSpend::new(coin, puzzle.clone(), solution.clone());
         output.push(coinspend);
     }
@@ -544,21 +566,41 @@ pub fn get_spends_for_block(
 }
 
 #[pyo3::pyfunction]
-pub fn get_spends_for_block_with_conditions(
+pub fn get_spends_for_block_with_conditions<'a>(
     py: Python<'_>,
     constants: &ConsensusConstants,
     generator: Program,
-    args: Program,
+    block_refs: &Bound<'_, PyList>,
     flags: u32,
 ) -> pyo3::PyResult<PyObject> {
     let mut a = make_allocator(LIMIT_HEAP);
     let mut output = Vec::<(CoinSpend, Vec<(u32, Vec<Py<PyBytes>>)>)>::new();
-    let (_, res) = generator
-        .run(&mut a, flags, constants.max_block_cost_clvm, &args)
+    let byte_cost = generator.len() as u64 * constants.cost_per_byte;
+
+    let mut cost_left = constants.max_block_cost_clvm;
+    subtract_cost(&a, &mut cost_left, byte_cost)?;
+
+    let (program, backrefs) = node_from_bytes_backrefs_record(&mut a, &generator)?;
+    let refs = block_refs
+        .into_iter()
+        .map(|b| {
+            let buf = b
+                .extract::<PyBuffer<u8>>()
+                .expect("block_refs must be list of buffers");
+            py_to_slice::<'a>(buf)
+        })
+        .collect::<Vec<&'a [u8]>>();
+    let args = setup_generator_args(&mut a, refs)?;
+    let dialect = ChiaDialect::new(flags);
+
+    let Reduction(clvm_cost, res) = run_program(&mut a, &dialect, program, args, cost_left)
         .map_err(|_| {
             // 117 = GeneratorRuntimeErrors
             PyErr::new::<PyTypeError, _>(117)
         })?;
+
+    subtract_cost(&a, &mut cost_left, clvm_cost)?;
+
     let (first, _rest) = a.next(res).ok_or_else(|| {
         // 117 = GeneratorRuntimeErrors
         PyErr::new::<PyTypeError, _>(117)
@@ -567,15 +609,17 @@ pub fn get_spends_for_block_with_conditions(
         // 117 = GeneratorRuntimeErrors
         PyErr::new::<PyTypeError, _>(117)
     })?;
+    let mut cache = HashMap::<NodePtr, TreeHash>::new();
     for spend in spends_list {
         let mut cond_output = Vec::<(u32, Vec<Py<PyBytes>>)>::new();
         let Ok(destructure_list!(parent_coin_info, puzzle, amount, solution)) =
             <match_list!(BytesImpl<32>, Program, u64, Program)>::from_clvm(&a, spend)
         else {
-            continue; // if we fail at this step then maybe the puzzle was malicious - try other spends
+            continue; // if we fail at this step then maybe the generator was malicious - try other spends
         };
-        let puzhash = puzzle.get_tree_hash();
-        let coin = Coin::new(parent_coin_info, puzhash, amount);
+        let puz_ptr = node_from_bytes(&mut a, puzzle.as_slice())?;
+        let puzhash = tree_hash_cached(&a, puz_ptr, &backrefs, &mut cache);
+        let coin = Coin::new(parent_coin_info, puzhash.into(), amount);
         let coinspend = CoinSpend::new(coin, puzzle.clone(), solution.clone());
         let Ok((_, res)) = puzzle.run(&mut a, flags, constants.max_block_cost_clvm, &solution)
         else {
