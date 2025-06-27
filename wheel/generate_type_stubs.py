@@ -306,7 +306,7 @@ def run_block_generator2(
 
 def additions_and_removals(
     program: ReadableBuffer, block_refs: list[ReadableBuffer], flags: int, constants: ConsensusConstants
-) -> tuple[list[tuple[Coin, Optional[bytes]]], list[Coin]]: ...
+) -> tuple[list[tuple[Coin, Optional[bytes]]], list[tuple[bytes32, Coin]]]: ...
 
 def confirm_included_already_hashed(
     root: bytes32,

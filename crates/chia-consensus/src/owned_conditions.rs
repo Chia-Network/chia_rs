@@ -52,23 +52,23 @@ pub struct OwnedSpendConditions {
 pub struct OwnedSpendBundleConditions {
     pub spends: Vec<OwnedSpendConditions>,
     pub reserve_fee: u64,
-    // the highest height/time conditions (i.e. most strict)
+    /// the highest height/time conditions (i.e. most strict)
     pub height_absolute: u32,
     pub seconds_absolute: u64,
-    // when set, this is the lowest (i.e. most restrictive) of all
-    // ASSERT_BEFORE_HEIGHT_ABSOLUTE conditions
+    /// when set, this is the lowest (i.e. most restrictive) of all
+    /// ASSERT_BEFORE_HEIGHT_ABSOLUTE conditions
     pub before_height_absolute: Option<u32>,
-    // ASSERT_BEFORE_SECONDS_ABSOLUTE conditions
+    /// ASSERT_BEFORE_SECONDS_ABSOLUTE conditions
     pub before_seconds_absolute: Option<u64>,
-    // Unsafe Agg Sig conditions (i.e. not tied to the spend generating it)
+    /// Unsafe Agg Sig conditions (i.e. not tied to the spend generating it)
     pub agg_sig_unsafe: Vec<(PublicKey, Bytes)>,
     pub cost: u64,
-    // the sum of all values of all spent coins
+    /// the sum of all values of all spent coins
     pub removal_amount: u128,
-    // the sum of all amounts of CREATE_COIN conditions
+    /// the sum of all amounts of CREATE_COIN conditions
     pub addition_amount: u128,
-    // set if the aggregate signature of the block/spend bundle was
-    // successfully validated
+    /// set if the aggregate signature of the block/spend bundle was
+    /// successfully validated
     pub validated_signature: bool,
     pub execution_cost: u64,
     pub condition_cost: u64,
