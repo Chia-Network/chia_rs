@@ -12,7 +12,7 @@ def test_generator_parsing() -> None:
         .split("\n")[0]
     )
     gen_prog = Program.from_bytes(generator)
-    args = []
+    args: list[bytes] = []
     out_dict = get_spends_for_block_with_conditions(
         DEFAULT_CONSTANTS, gen_prog, args, 0
     )
