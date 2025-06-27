@@ -513,7 +513,7 @@ pub fn get_spends_for_block<'a>(
     let mut cost_left = constants.max_block_cost_clvm;
     subtract_cost(&a, &mut cost_left, byte_cost)?;
 
-    let (program, backrefs) = node_from_bytes_backrefs_record(&mut a, &generator)?;
+    let (program, backrefs) = node_from_bytes_backrefs(&mut a, &generator)?;
     let refs = block_refs
         .into_iter()
         .map(|b| {
@@ -550,7 +550,7 @@ pub fn get_spends_for_block<'a>(
             continue; // if we fail at this step then maybe the generator was malicious - try other spends
         };
         let puz_ptr = node_from_bytes(&mut a, puzzle.as_slice())?;
-        let puzhash = tree_hash_cached(&a, puz_ptr, &backrefs, &mut cache);
+        let puzhash = tree_hash_cached(&a, puz_ptr, &mut cache);
         let coin = Coin::new(parent_coin_info, puzhash.into(), amount);
         let coinspend = CoinSpend::new(coin, puzzle.clone(), solution.clone());
         output.push(coinspend);
@@ -577,7 +577,7 @@ pub fn get_spends_for_block_with_conditions<'a>(
     let mut cost_left = constants.max_block_cost_clvm;
     subtract_cost(&a, &mut cost_left, byte_cost)?;
 
-    let (program, backrefs) = node_from_bytes_backrefs_record(&mut a, &generator)?;
+    let (program, backrefs) = node_from_bytes_backrefs(&mut a, &generator)?;
     let refs = block_refs
         .into_iter()
         .map(|b| {
@@ -615,7 +615,7 @@ pub fn get_spends_for_block_with_conditions<'a>(
             continue; // if we fail at this step then maybe the generator was malicious - try other spends
         };
         let puz_ptr = node_from_bytes(&mut a, puzzle.as_slice())?;
-        let puzhash = tree_hash_cached(&a, puz_ptr, &backrefs, &mut cache);
+        let puzhash = tree_hash_cached(&a, puz_ptr, &mut cache);
         let coin = Coin::new(parent_coin_info, puzhash.into(), amount);
         let coinspend = CoinSpend::new(coin, puzzle.clone(), solution.clone());
         let Ok((_, res)) = puzzle.run(&mut a, flags, constants.max_block_cost_clvm, &solution)
