@@ -64,14 +64,14 @@ def get_conditions_from_spendbundle(
 def get_spends_for_block(
     constants: ConsensusConstants,
     generator: Program,
-    args: Program,
+    generator_refs: list[bytes],
     flags: int,
 ) -> list[dict[str, Any]]: ...
 
 def get_spends_for_block_with_conditions(
     constants: ConsensusConstants,
     generator: Program,
-    args: Program,
+    generator_refs: list[bytes],,
     flags: int,
 ) -> list[dict[str, Any]]: ...
 

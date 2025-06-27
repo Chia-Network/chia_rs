@@ -68,12 +68,6 @@ impl Program {
         self.0.into_inner()
     }
 
-    pub fn get_tree_hash(&self) -> crate::Bytes32 {
-        clvm_utils::tree_hash_from_bytes(self.0.as_ref())
-            .unwrap()
-            .into()
-    }
-
     pub fn run<A: ToClvm<Allocator>>(
         &self,
         a: &mut Allocator,
@@ -322,6 +316,12 @@ impl Program {
         let clvm = clvm_convert(&mut a, args)?;
         Program::from_clvm(&a, clvm)
             .map_err(|error| PyErr::new::<PyTypeError, _>(error.to_string()))
+    }
+
+    fn get_tree_hash(&self) -> crate::Bytes32 {
+        clvm_utils::tree_hash_from_bytes(self.0.as_ref())
+            .unwrap()
+            .into()
     }
 
     #[staticmethod]
