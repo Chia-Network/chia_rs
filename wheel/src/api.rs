@@ -526,18 +526,15 @@ pub fn get_spends_for_block<'a>(
     let dialect = ChiaDialect::new(flags);
 
     let Reduction(clvm_cost, res) = run_program(&mut a, &dialect, program, args, cost_left)
-        .map_err(|_| {
-            ValidationErr(program, ErrorCode::GeneratorRuntimeError)
-        })?;
+        .map_err(|_| ValidationErr(program, ErrorCode::GeneratorRuntimeError))?;
 
     subtract_cost(&a, &mut cost_left, clvm_cost)?;
 
-    let (first, _rest) = a.next(res).ok_or_else(|| {
-        ValidationErr(res, ErrorCode::GeneratorRuntimeError)
-    })?;
-    let spends_list = Vec::<NodePtr>::from_clvm(&a, first).map_err(|_| {
-        ValidationErr(first, ErrorCode::GeneratorRuntimeError)
-    })?;
+    let (first, _rest) = a
+        .next(res)
+        .ok_or(ValidationErr(res, ErrorCode::GeneratorRuntimeError))?;
+    let spends_list = Vec::<NodePtr>::from_clvm(&a, first)
+        .map_err(|_| ValidationErr(first, ErrorCode::GeneratorRuntimeError))?;
     let mut cache = TreeCache::default();
     for spend in spends_list {
         let Ok(destructure_list!(parent_coin_info, puzzle, amount, solution)) =
@@ -587,18 +584,15 @@ pub fn get_spends_for_block_with_conditions<'a>(
     let dialect = ChiaDialect::new(flags);
 
     let Reduction(clvm_cost, res) = run_program(&mut a, &dialect, program, args, cost_left)
-        .map_err(|_| {
-            ValidationErr(program, ErrorCode::GeneratorRuntimeError)
-        })?;
+        .map_err(|_| ValidationErr(program, ErrorCode::GeneratorRuntimeError))?;
 
     subtract_cost(&a, &mut cost_left, clvm_cost)?;
 
-    let (first, _rest) = a.next(res).ok_or_else(|| {
-        ValidationErr(res, ErrorCode::GeneratorRuntimeError)
-    })?;
-    let spends_list = Vec::<NodePtr>::from_clvm(&a, first).map_err(|_| {
-        ValidationErr(first, ErrorCode::GeneratorRuntimeError)
-    })?;
+    let (first, _rest) = a
+        .next(res)
+        .ok_or(ValidationErr(res, ErrorCode::GeneratorRuntimeError))?;
+    let spends_list = Vec::<NodePtr>::from_clvm(&a, first)
+        .map_err(|_| ValidationErr(first, ErrorCode::GeneratorRuntimeError))?;
     let mut cache = TreeCache::default();
     for spend in spends_list {
         let mut cond_output = Vec::<(u32, Vec<Py<PyBytes>>)>::new();
@@ -615,13 +609,11 @@ pub fn get_spends_for_block_with_conditions<'a>(
         else {
             continue; // Skip this spend on error
         };
-        let conditions_list = Vec::<NodePtr>::from_clvm(&a, res).map_err(|_| {
-            ValidationErr(res, ErrorCode::GeneratorRuntimeError)
-        })?;
+        let conditions_list = Vec::<NodePtr>::from_clvm(&a, res)
+            .map_err(|_| ValidationErr(res, ErrorCode::GeneratorRuntimeError))?;
         for condition in conditions_list {
-            let conditions = Vec::<NodePtr>::from_clvm(&a, condition).map_err(|_| {
-                ValidationErr(condition, ErrorCode::GeneratorRuntimeError)
-            })?;
+            let conditions = Vec::<NodePtr>::from_clvm(&a, condition)
+                .map_err(|_| ValidationErr(condition, ErrorCode::GeneratorRuntimeError))?;
             let mut bytes_vec = Vec::<Py<PyBytes>>::new();
             for var in &conditions[1..] {
                 let decoded = a.decode_atom(var);
