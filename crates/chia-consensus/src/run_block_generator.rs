@@ -250,7 +250,7 @@ where
     Ok(ret)
 }
 
-pub fn get_coinspends_for_block(
+pub fn get_coinspends_for_trusted_block(
     constants: &ConsensusConstants,
     generator: &Program,
     refs: Vec<&[u8]>,

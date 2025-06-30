@@ -10,7 +10,7 @@ use chia_consensus::flags::{
 use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
 use chia_consensus::owned_conditions::{OwnedSpendBundleConditions, OwnedSpendConditions};
-use chia_consensus::run_block_generator::{extract_n, get_coinspends_for_block};
+use chia_consensus::run_block_generator::{extract_n, get_coinspends_for_trusted_block};
 use chia_consensus::run_block_generator::setup_generator_args;
 use chia_consensus::solution_generator::solution_generator as native_solution_generator;
 use chia_consensus::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
@@ -516,7 +516,7 @@ pub fn get_spends_for_block<'a>(
         })
         .collect::<Vec<&'a [u8]>>();
 
-    let output = get_coinspends_for_block(constants, &generator, refs, flags)?;
+    let output = get_coinspends_for_trusted_block(constants, &generator, refs, flags)?;
 
     let pylist = PyList::empty(py);
     let dict = PyDict::new(py);
@@ -526,7 +526,7 @@ pub fn get_spends_for_block<'a>(
 }
 
 #[pyo3::pyfunction]
-pub fn get_spends_for_block_with_conditions<'a>(
+pub fn get_spends_for_trusted_block_with_conditions<'a>(
     py: Python<'a>,
     constants: &ConsensusConstants,
     generator: Program,
@@ -676,7 +676,7 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // get spends for generator
     m.add_function(wrap_pyfunction!(get_spends_for_block, m)?)?;
-    m.add_function(wrap_pyfunction!(get_spends_for_block_with_conditions, m)?)?;
+    m.add_function(wrap_pyfunction!(get_spends_for_trusted_block_with_conditions, m)?)?;
 
     // clvm functions
     m.add("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;
