@@ -1,5 +1,6 @@
 use crate::run_generator::{
-    additions_and_removals, py_to_slice, run_block_generator, run_block_generator2,
+    additions_and_removals, get_coinspends_for_block, get_coinspends_for_block_with_conditions,
+    py_to_slice, run_block_generator, run_block_generator2,
 };
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::build_compressed_block::BlockBuilder;
@@ -64,6 +65,7 @@ use pyo3::types::{PyBytes, PyDict};
 use pyo3::wrap_pyfunction;
 
 use std::iter::zip;
+use std::process::Output;
 
 use crate::run_program::{run_chia_program, serialized_length};
 
@@ -505,14 +507,6 @@ pub fn get_spends_for_block<'a>(
     block_refs: &Bound<'_, PyList>,
     flags: u32,
 ) -> pyo3::PyResult<PyObject> {
-    let mut a = make_allocator(LIMIT_HEAP);
-    let mut output = Vec::<CoinSpend>::new();
-    let byte_cost = generator.len() as u64 * constants.cost_per_byte;
-
-    let mut cost_left = constants.max_block_cost_clvm;
-    subtract_cost(&a, &mut cost_left, byte_cost)?;
-
-    let program = node_from_bytes_backrefs(&mut a, &generator)?;
     let refs = block_refs
         .into_iter()
         .map(|b| {
@@ -522,38 +516,9 @@ pub fn get_spends_for_block<'a>(
             py_to_slice::<'a>(buf)
         })
         .collect::<Vec<&'a [u8]>>();
-    let args = setup_generator_args(&mut a, refs)?;
-    let dialect = ChiaDialect::new(flags);
 
-    let Reduction(clvm_cost, res) = run_program(&mut a, &dialect, program, args, cost_left)
-        .map_err(|_| ValidationErr(program, ErrorCode::GeneratorRuntimeError))?;
+    let output = get_coinspends_for_block(constants, generator, refs, flags)?;
 
-    subtract_cost(&a, &mut cost_left, clvm_cost)?;
-
-    let (first, _rest) = a
-        .next(res)
-        .ok_or(ValidationErr(res, ErrorCode::GeneratorRuntimeError))?;
-    let spends_list = Vec::<NodePtr>::from_clvm(&a, first)
-        .map_err(|_| ValidationErr(first, ErrorCode::GeneratorRuntimeError))?;
-    let mut cache = TreeCache::default();
-    let mut iter = spends_list;
-    while let Some((spend, rest)) = a.next(iter) {
-        iter = rest;
-        let [_, puzzle, _] = extract_n::<3>(a, spend, ErrorCode::InvalidCondition)?;
-        cache.visit_tree(&a, puzzle);
-    }
-    for spend in spends_list {
-        let Ok(destructure_list!(parent_coin_info, puzzle, amount, solution)) =
-            <match_list!(BytesImpl<32>, Program, u64, Program)>::from_clvm(&a, spend)
-        else {
-            continue; // if we fail at this step then maybe the generator was malicious - try other spends
-        };
-        let puz_ptr = node_from_bytes(&mut a, puzzle.as_slice())?;
-        let puzhash = tree_hash_cached(&a, puz_ptr, &mut cache);
-        let coin = Coin::new(parent_coin_info, puzhash.into(), amount);
-        let coinspend = CoinSpend::new(coin, puzzle.clone(), solution.clone());
-        output.push(coinspend);
-    }
     let pylist = PyList::empty(py);
     let dict = PyDict::new(py);
     dict.set_item("block_spends", output)?;
@@ -569,14 +534,6 @@ pub fn get_spends_for_block_with_conditions<'a>(
     block_refs: &Bound<'a, PyList>,
     flags: u32,
 ) -> pyo3::PyResult<PyObject> {
-    let mut a = make_allocator(LIMIT_HEAP);
-    let mut output = Vec::<(CoinSpend, Vec<(u32, Vec<Py<PyBytes>>)>)>::new();
-    let byte_cost = generator.len() as u64 * constants.cost_per_byte;
-
-    let mut cost_left = constants.max_block_cost_clvm;
-    subtract_cost(&a, &mut cost_left, byte_cost)?;
-
-    let program = node_from_bytes_backrefs(&mut a, &generator)?;
     let refs = block_refs
         .into_iter()
         .map(|b| {
@@ -586,64 +543,9 @@ pub fn get_spends_for_block_with_conditions<'a>(
             py_to_slice::<'a>(buf)
         })
         .collect::<Vec<&'a [u8]>>();
-    let args = setup_generator_args(&mut a, refs)?;
-    let dialect = ChiaDialect::new(flags);
 
-    let Reduction(clvm_cost, res) = run_program(&mut a, &dialect, program, args, cost_left)
-        .map_err(|_| ValidationErr(program, ErrorCode::GeneratorRuntimeError))?;
+    let output = get_coinspends_for_block_with_conditions(constants, generator, refs, flags);
 
-    subtract_cost(&a, &mut cost_left, clvm_cost)?;
-
-    let (first, _rest) = a
-        .next(res)
-        .ok_or(ValidationErr(res, ErrorCode::GeneratorRuntimeError))?;
-    let spends_list = Vec::<NodePtr>::from_clvm(&a, first)
-        .map_err(|_| ValidationErr(first, ErrorCode::GeneratorRuntimeError))?;
-    let mut cache = TreeCache::default();
-    let mut iter = spends_list;
-    while let Some((spend, rest)) = a.next(iter) {
-        iter = rest;
-        let [_, puzzle, _] = extract_n::<3>(a, spend, ErrorCode::InvalidCondition)?;
-        cache.visit_tree(&a, puzzle);
-    }
-    for spend in spends_list {
-        let mut cond_output = Vec::<(u32, Vec<Py<PyBytes>>)>::new();
-        let Ok(destructure_list!(parent_coin_info, puzzle, amount, solution)) =
-            <match_list!(BytesImpl<32>, Program, u64, Program)>::from_clvm(&a, spend)
-        else {
-            continue; // if we fail at this step then maybe the generator was malicious - try other spends
-        };
-        let puz_ptr = node_from_bytes(&mut a, puzzle.as_slice())?;
-        let puzhash = tree_hash_cached(&a, puz_ptr, &mut cache);
-        let coin = Coin::new(parent_coin_info, puzhash.into(), amount);
-        let coinspend = CoinSpend::new(coin, puzzle.clone(), solution.clone());
-        let Ok((_, res)) = puzzle.run(&mut a, flags, constants.max_block_cost_clvm, &solution)
-        else {
-            continue; // Skip this spend on error
-        };
-        let conditions_list = Vec::<NodePtr>::from_clvm(&a, res)
-            .map_err(|_| ValidationErr(res, ErrorCode::GeneratorRuntimeError))?;
-        for condition in conditions_list {
-            let conditions = Vec::<NodePtr>::from_clvm(&a, condition)
-                .map_err(|_| ValidationErr(condition, ErrorCode::GeneratorRuntimeError))?;
-            let mut bytes_vec = Vec::<Py<PyBytes>>::new();
-            for var in &conditions[1..] {
-                let decoded = a.decode_atom(var);
-                match decoded {
-                    Ok(bytes) => {
-                        let py_bytes = PyBytes::new(py, bytes.as_ref()).into();
-                        bytes_vec.push(py_bytes);
-                    }
-                    Err(_) => continue, // we skip lists as was the original behaviour
-                }
-            }
-            let Some(num) = a.small_number(conditions[0]) else {
-                continue;
-            };
-            cond_output.push((num, bytes_vec));
-        }
-        output.push((coinspend, cond_output));
-    }
     let pylist = PyList::empty(py);
     for (coinspend, cond_output) in output {
         let dict = PyDict::new(py);
