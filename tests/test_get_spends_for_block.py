@@ -7,7 +7,7 @@ from run_gen import DEFAULT_CONSTANTS
 
 def test_generator_parsing() -> None:
     generator = bytes.fromhex(
-        open("../generator-tests/create-coin-different-amounts.txt", "r")
+        open("generator-tests/create-coin-different-amounts.txt", "r")
         .read()
         .split("\n")[0]
     )
@@ -26,7 +26,7 @@ def test_generator_parsing() -> None:
     assert str(out_dict) == expected_dict
 
     generator = bytes.fromhex(
-        open("../generator-tests/create-coin-hint.txt", "r").read().split("\n")[0]
+        open("generator-tests/create-coin-hint.txt", "r").read().split("\n")[0]
     )
     gen_prog = Program.from_bytes(generator)
 
@@ -43,7 +43,7 @@ def test_generator_parsing() -> None:
     assert str(out_dict) == expected_dict
 
     generator = bytes.fromhex(
-        open("../generator-tests/block-834768.txt", "r").read().split("\n")[0]
+        open("generator-tests/block-834768.txt", "r").read().split("\n")[0]
     )
     gen_prog = Program.from_bytes(generator)
 
