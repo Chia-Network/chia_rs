@@ -536,6 +536,12 @@ pub fn get_spends_for_block<'a>(
     let spends_list = Vec::<NodePtr>::from_clvm(&a, first)
         .map_err(|_| ValidationErr(first, ErrorCode::GeneratorRuntimeError))?;
     let mut cache = TreeCache::default();
+    let mut iter = spends_list;
+    while let Some((spend, rest)) = a.next(iter) {
+        iter = rest;
+        let [_, puzzle, _] = extract_n::<3>(a, spend, ErrorCode::InvalidCondition)?;
+        cache.visit_tree(&a, puzzle);
+    }
     for spend in spends_list {
         let Ok(destructure_list!(parent_coin_info, puzzle, amount, solution)) =
             <match_list!(BytesImpl<32>, Program, u64, Program)>::from_clvm(&a, spend)
@@ -594,6 +600,12 @@ pub fn get_spends_for_block_with_conditions<'a>(
     let spends_list = Vec::<NodePtr>::from_clvm(&a, first)
         .map_err(|_| ValidationErr(first, ErrorCode::GeneratorRuntimeError))?;
     let mut cache = TreeCache::default();
+    let mut iter = spends_list;
+    while let Some((spend, rest)) = a.next(iter) {
+        iter = rest;
+        let [_, puzzle, _] = extract_n::<3>(a, spend, ErrorCode::InvalidCondition)?;
+        cache.visit_tree(&a, puzzle);
+    }
     for spend in spends_list {
         let mut cond_output = Vec::<(u32, Vec<Py<PyBytes>>)>::new();
         let Ok(destructure_list!(parent_coin_info, puzzle, amount, solution)) =
