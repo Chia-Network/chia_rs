@@ -258,18 +258,12 @@ pub fn get_coinspends_for_block(
 ) -> Result<Vec<CoinSpend>, ValidationErr> {
     let mut a = make_allocator(LIMIT_HEAP);
     let mut output = Vec::<CoinSpend>::new();
-    let byte_cost = generator.len() as u64 * constants.cost_per_byte;
-
-    let mut cost_left = constants.max_block_cost_clvm;
-    subtract_cost(&a, &mut cost_left, byte_cost)?;
 
     let program = node_from_bytes_backrefs(&mut a, generator)?;
     let args = setup_generator_args(&mut a, refs)?;
     let dialect = ChiaDialect::new(flags);
 
-    let Reduction(clvm_cost, res) = run_program(&mut a, &dialect, program, args, cost_left)?;
-
-    subtract_cost(&a, &mut cost_left, clvm_cost)?;
+    let Reduction(_clvm_cost, res) = run_program(&mut a, &dialect, program, args, constants.max_block_cost_clvm)?;
 
     let (first, _rest) = a
         .next(res)

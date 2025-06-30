@@ -11,7 +11,7 @@ use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_i
 use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
 use chia_consensus::owned_conditions::{OwnedSpendBundleConditions, OwnedSpendConditions};
 use chia_consensus::run_block_generator::{extract_n, get_coinspends_for_block};
-use chia_consensus::run_block_generator::{setup_generator_args, subtract_cost};
+use chia_consensus::run_block_generator::setup_generator_args;
 use chia_consensus::solution_generator::solution_generator as native_solution_generator;
 use chia_consensus::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
 use chia_consensus::spendbundle_conditions::get_conditions_from_spendbundle;
@@ -535,10 +535,6 @@ pub fn get_spends_for_block_with_conditions<'a>(
 ) -> pyo3::PyResult<PyObject> {
     let mut a = make_allocator(LIMIT_HEAP);
     let mut output = Vec::<(CoinSpend, Vec<(u32, Vec<Py<PyBytes>>)>)>::new();
-    let byte_cost = generator.len() as u64 * constants.cost_per_byte;
-
-    let mut cost_left = constants.max_block_cost_clvm;
-    subtract_cost(&a, &mut cost_left, byte_cost)?;
 
     let program = node_from_bytes_backrefs(&mut a, &generator)?;
     let refs = block_refs
@@ -553,10 +549,8 @@ pub fn get_spends_for_block_with_conditions<'a>(
     let args = setup_generator_args(&mut a, refs)?;
     let dialect = ChiaDialect::new(flags);
 
-    let Reduction(clvm_cost, res) = run_program(&mut a, &dialect, program, args, cost_left)
+    let Reduction(_clvm_cost, res) = run_program(&mut a, &dialect, program, args, constants.max_block_cost_clvm)
         .map_err(|_| ValidationErr(program, ErrorCode::GeneratorRuntimeError))?;
-
-    subtract_cost(&a, &mut cost_left, clvm_cost)?;
 
     let (first, _rest) = a
         .next(res)
