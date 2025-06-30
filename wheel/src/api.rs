@@ -69,7 +69,7 @@ use crate::run_program::{run_chia_program, serialized_length};
 
 use chia_consensus::fast_forward::fast_forward_singleton as native_ff;
 use chia_consensus::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
-use chia_consensus::validation_error::ValidationErr;
+use chia_consensus::validation_error::{ErrorCode, ValidationErr};
 use clvmr::allocator::NodePtr;
 use clvmr::cost::Cost;
 use clvmr::reduction::EvalErr;
@@ -527,19 +527,16 @@ pub fn get_spends_for_block<'a>(
 
     let Reduction(clvm_cost, res) = run_program(&mut a, &dialect, program, args, cost_left)
         .map_err(|_| {
-            // 117 = GeneratorRuntimeErrors
-            PyErr::new::<PyTypeError, _>(117)
+            ValidationErr(program, ErrorCode::GeneratorRuntimeError)
         })?;
 
     subtract_cost(&a, &mut cost_left, clvm_cost)?;
 
     let (first, _rest) = a.next(res).ok_or_else(|| {
-        // 117 = GeneratorRuntimeErrors
-        PyErr::new::<PyTypeError, _>(117)
+        ValidationErr(res, ErrorCode::GeneratorRuntimeError)
     })?;
     let spends_list = Vec::<NodePtr>::from_clvm(&a, first).map_err(|_| {
-        // 117 = GeneratorRuntimeErrors
-        PyErr::new::<PyTypeError, _>(117)
+        ValidationErr(first, ErrorCode::GeneratorRuntimeError)
     })?;
     let mut cache = TreeCache::default();
     for spend in spends_list {
@@ -591,19 +588,16 @@ pub fn get_spends_for_block_with_conditions<'a>(
 
     let Reduction(clvm_cost, res) = run_program(&mut a, &dialect, program, args, cost_left)
         .map_err(|_| {
-            // 117 = GeneratorRuntimeErrors
-            PyErr::new::<PyTypeError, _>(117)
+            ValidationErr(program, ErrorCode::GeneratorRuntimeError)
         })?;
 
     subtract_cost(&a, &mut cost_left, clvm_cost)?;
 
     let (first, _rest) = a.next(res).ok_or_else(|| {
-        // 117 = GeneratorRuntimeErrors
-        PyErr::new::<PyTypeError, _>(117)
+        ValidationErr(res, ErrorCode::GeneratorRuntimeError)
     })?;
     let spends_list = Vec::<NodePtr>::from_clvm(&a, first).map_err(|_| {
-        // 117 = GeneratorRuntimeErrors
-        PyErr::new::<PyTypeError, _>(117)
+        ValidationErr(first, ErrorCode::GeneratorRuntimeError)
     })?;
     let mut cache = TreeCache::default();
     for spend in spends_list {
@@ -622,13 +616,11 @@ pub fn get_spends_for_block_with_conditions<'a>(
             continue; // Skip this spend on error
         };
         let conditions_list = Vec::<NodePtr>::from_clvm(&a, res).map_err(|_| {
-            // 117 = GeneratorRuntimeErrors
-            PyErr::new::<PyTypeError, _>(117)
+            ValidationErr(res, ErrorCode::GeneratorRuntimeError)
         })?;
         for condition in conditions_list {
             let conditions = Vec::<NodePtr>::from_clvm(&a, condition).map_err(|_| {
-                // 117 = GeneratorRuntimeErrors
-                PyErr::new::<PyTypeError, _>(117)
+                ValidationErr(condition, ErrorCode::GeneratorRuntimeError)
             })?;
             let mut bytes_vec = Vec::<Py<PyBytes>>::new();
             for var in &conditions[1..] {
