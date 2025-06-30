@@ -1,4 +1,5 @@
 use crate::allocator::make_allocator;
+use crate::condition_sanitizers::parse_amount;
 use crate::conditions::{
     parse_spends, process_single_spend, validate_conditions, validate_signature, EmptyVisitor,
     ParseState, SpendBundleConditions,
@@ -9,7 +10,7 @@ use crate::generator_rom::{CLVM_DESERIALIZER, GENERATOR_ROM};
 use crate::validation_error::{first, ErrorCode, ValidationErr};
 use chia_bls::{BlsCache, Signature};
 use chia_protocol::{BytesImpl, Coin, CoinSpend, Program};
-use clvm_traits::{destructure_list, match_list, FromClvm};
+use clvm_traits::FromClvm;
 use clvm_utils::{tree_hash_cached, TreeCache};
 use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::chia_dialect::ChiaDialect;
@@ -266,8 +267,7 @@ pub fn get_coinspends_for_block(
     let args = setup_generator_args(&mut a, refs)?;
     let dialect = ChiaDialect::new(flags);
 
-    let Reduction(clvm_cost, res) = run_program(&mut a, &dialect, program, args, cost_left)
-        .map_err(|_| ValidationErr(program, ErrorCode::GeneratorRuntimeError))?;
+    let Reduction(clvm_cost, res) = run_program(&mut a, &dialect, program, args, cost_left)?;
 
     subtract_cost(&a, &mut cost_left, clvm_cost)?;
 
@@ -284,15 +284,24 @@ pub fn get_coinspends_for_block(
         cache.visit_tree(&a, puzzle);
     }
     for spend in spends_list {
-        let Ok(destructure_list!(parent_coin_info, puzzle, amount, solution)) =
-            <match_list!(BytesImpl<32>, Program, u64, Program)>::from_clvm(&a, spend)
+        let Ok([parent_id, puzzle, amount, solution, _spend_level_extra]) =
+            extract_n::<5>(&a, spend, ErrorCode::InvalidCondition)
         else {
             continue; // if we fail at this step then maybe the generator was malicious - try other spends
         };
-        let puz_ptr = node_from_bytes(&mut a, puzzle.as_slice())?;
-        let puzhash = tree_hash_cached(&a, puz_ptr, &mut cache);
-        let coin = Coin::new(parent_coin_info, puzhash.into(), amount);
-        let coinspend = CoinSpend::new(coin, puzzle.clone(), solution.clone());
+        let puzhash = tree_hash_cached(&a, puzzle, &mut cache);
+        let parent_id = BytesImpl::<32>::from_clvm(&a, parent_id)
+            .map_err(|_| ValidationErr(first, ErrorCode::GeneratorRuntimeError))?;
+        let coin = Coin::new(
+            parent_id,
+            puzhash.into(),
+            parse_amount(&a, amount, ErrorCode::InvalidCoinAmount)?,
+        );
+        let puzzle_program: Program = Program::from_clvm(&a, puzzle)
+            .map_err(|_| ValidationErr(first, ErrorCode::GeneratorRuntimeError))?;
+        let solution_program = Program::from_clvm(&a, solution)
+            .map_err(|_| ValidationErr(first, ErrorCode::GeneratorRuntimeError))?;
+        let coinspend = CoinSpend::new(coin, puzzle_program, solution_program);
         output.push(coinspend);
     }
     Ok(output)

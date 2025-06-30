@@ -51,7 +51,7 @@ use chia_protocol::{
     TransactionsInfo, UnfinishedBlock, UnfinishedHeaderBlock, VDFInfo, VDFProof, WeightProof,
 };
 use chia_traits::ChiaToPython;
-use clvm_traits::{destructure_list, match_list, ClvmDecoder, FromClvm};
+use clvm_traits::{ClvmDecoder, FromClvm};
 use clvm_utils::{tree_hash_cached, tree_hash_from_bytes, TreeCache};
 use clvmr::chia_dialect::ENABLE_KECCAK_OPS_OUTSIDE_GUARD;
 use clvmr::{LIMIT_HEAP, NO_UNKNOWN_OPS};
@@ -572,16 +572,27 @@ pub fn get_spends_for_block_with_conditions<'a>(
     }
     for spend in spends_list {
         let mut cond_output = Vec::<(u32, Vec<Py<PyBytes>>)>::new();
-        let Ok(destructure_list!(parent_coin_info, puzzle, amount, solution)) =
-            <match_list!(BytesImpl<32>, Program, u64, Program)>::from_clvm(&a, spend)
+        let Ok([parent_id, puzzle, amount, solution, _spend_level_extra]) =
+            extract_n::<5>(&a, spend, ErrorCode::InvalidCondition)
         else {
             continue; // if we fail at this step then maybe the generator was malicious - try other spends
         };
-        let puz_ptr = node_from_bytes(&mut a, puzzle.as_slice())?;
-        let puzhash = tree_hash_cached(&a, puz_ptr, &mut cache);
-        let coin = Coin::new(parent_coin_info, puzhash.into(), amount);
-        let coinspend = CoinSpend::new(coin, puzzle.clone(), solution.clone());
-        let Ok((_, res)) = puzzle.run(&mut a, flags, constants.max_block_cost_clvm, &solution)
+        let puzhash = tree_hash_cached(&a, puzzle, &mut cache);
+        let parent_id = BytesImpl::<32>::from_clvm(&a, parent_id)
+            .map_err(|_| ValidationErr(first, ErrorCode::GeneratorRuntimeError))?;
+        let coin = Coin::new(
+            parent_id,
+            puzhash.into(),
+            u64::from_clvm(&a, amount)
+                .map_err(|_| ValidationErr(first, ErrorCode::GeneratorRuntimeError))?,
+        );
+        let puzzle_program: Program = Program::from_clvm(&a, puzzle)
+            .map_err(|_| ValidationErr(first, ErrorCode::GeneratorRuntimeError))?;
+        let solution_program = Program::from_clvm(&a, solution)
+            .map_err(|_| ValidationErr(first, ErrorCode::GeneratorRuntimeError))?;
+        let coinspend = CoinSpend::new(coin, puzzle_program.clone(), solution_program.clone());
+        let Ok((_, res)) =
+            puzzle_program.run(&mut a, flags, constants.max_block_cost_clvm, &solution)
         else {
             continue; // Skip this spend on error
         };
