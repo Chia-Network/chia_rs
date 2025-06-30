@@ -10,8 +10,8 @@ use chia_consensus::flags::{
 use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
 use chia_consensus::owned_conditions::{OwnedSpendBundleConditions, OwnedSpendConditions};
-use chia_consensus::run_block_generator::{extract_n, get_coinspends_for_trusted_block};
 use chia_consensus::run_block_generator::setup_generator_args;
+use chia_consensus::run_block_generator::{extract_n, get_coinspends_for_trusted_block};
 use chia_consensus::solution_generator::solution_generator as native_solution_generator;
 use chia_consensus::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
 use chia_consensus::spendbundle_conditions::get_conditions_from_spendbundle;
@@ -549,8 +549,14 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
     let args = setup_generator_args(&mut a, refs)?;
     let dialect = ChiaDialect::new(flags);
 
-    let Reduction(_clvm_cost, res) = run_program(&mut a, &dialect, program, args, constants.max_block_cost_clvm)
-        .map_err(|_| ValidationErr(program, ErrorCode::GeneratorRuntimeError))?;
+    let Reduction(_clvm_cost, res) = run_program(
+        &mut a,
+        &dialect,
+        program,
+        args,
+        constants.max_block_cost_clvm,
+    )
+    .map_err(|_| ValidationErr(program, ErrorCode::GeneratorRuntimeError))?;
 
     let (first, _rest) = a
         .next(res)
@@ -676,7 +682,10 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // get spends for generator
     m.add_function(wrap_pyfunction!(get_spends_for_block, m)?)?;
-    m.add_function(wrap_pyfunction!(get_spends_for_trusted_block_with_conditions, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        get_spends_for_trusted_block_with_conditions,
+        m
+    )?)?;
 
     // clvm functions
     m.add("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;

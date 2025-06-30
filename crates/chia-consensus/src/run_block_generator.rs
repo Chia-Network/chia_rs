@@ -263,7 +263,13 @@ pub fn get_coinspends_for_trusted_block(
     let args = setup_generator_args(&mut a, refs)?;
     let dialect = ChiaDialect::new(flags);
 
-    let Reduction(_clvm_cost, res) = run_program(&mut a, &dialect, program, args, constants.max_block_cost_clvm)?;
+    let Reduction(_clvm_cost, res) = run_program(
+        &mut a,
+        &dialect,
+        program,
+        args,
+        constants.max_block_cost_clvm,
+    )?;
 
     let (first, _rest) = a
         .next(res)
