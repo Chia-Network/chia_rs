@@ -605,12 +605,12 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
         // condition is each grouped list
         // (51 0xcafef00d 100)
         for condition in conditions_list {
-            let conditions = Vec::<NodePtr>::from_clvm(&a, condition)
+            let condition_values = Vec::<NodePtr>::from_clvm(&a, condition)
                 .map_err(|_| ValidationErr(condition, ErrorCode::InvalidCondition))?;
             let mut bytes_vec = Vec::<Py<PyBytes>>::new();
             // the first value in this list is the condition opcode
             // other values are the arguments - [0xcafef00d, 100]
-            for var in &conditions[1..] {
+            for var in &condition_values[1..] {
                 let decoded = a.decode_atom(var);
                 match decoded {
                     Ok(bytes) => {
@@ -622,7 +622,7 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
             }
             // convert the first value to a small number which is the condition opcode
             // In our above examples: 51
-            let Some(num) = a.small_number(conditions[0]) else {
+            let Some(num) = a.small_number(condition_values[0]) else {
                 continue;
             };
             cond_output.push((num, bytes_vec));
