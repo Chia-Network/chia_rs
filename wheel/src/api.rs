@@ -600,35 +600,39 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
         };
         // conditions_list is the full returned output of puzzle ran with solution
         // ((51 0xcafef00d 100) (51 0x1234 200) ...)
-        let conditions_list = Vec::<NodePtr>::from_clvm(&a, res)
-            .map_err(|_| ValidationErr(res, ErrorCode::InvalidCoinSolution))?;
+
         // condition is each grouped list
         // (51 0xcafef00d 100)
-        for condition in conditions_list {
-            let condition_values = Vec::<NodePtr>::from_clvm(&a, condition)
-                .map_err(|_| ValidationErr(condition, ErrorCode::InvalidCondition))?;
-            if condition_values.len() > 6 {
-                continue;
-            };
+        let mut num = 0;
+        let mut iter_two = res;
+        while let Some((condition, rest)) = a.next(iter_two) {
+            iter_two = rest;
+            let mut iter_three = condition;
+            let count: usize = 0;
             let mut bytes_vec = Vec::<Py<PyBytes>>::new();
-            // the first value in this list is the condition opcode
-            // other values are the arguments - [0xcafef00d, 100]
-            for var in &condition_values[1..] {
-                let decoded = node_to_bytes(&a, *var);
-                match decoded {
-                    Ok(bytes) => {
-                        let py_bytes = PyBytes::new(py, bytes.as_ref()).into();
-                        bytes_vec.push(py_bytes);
+            while let Some((condition_values, rest)) = a.next(iter_three) {
+                iter_three = rest;
+                if count == 0 {
+                    // convert the first value to a small number which is the condition opcode
+                    // In our above examples: 51
+                    let Some(n) = a.small_number(condition_values) else {
+                        continue;
+                    };
+                    num = n;
+                } else if count < 6 {
+                    let decoded = node_to_bytes(&a, condition_values);
+                    match decoded {
+                        Ok(bytes) => {
+                            let py_bytes = PyBytes::new(py, bytes.as_ref()).into();
+                            bytes_vec.push(py_bytes);
+                        }
+                        Err(_) => continue, // we skip args that are lists as was the original behaviour
                     }
-                    Err(_) => continue, // we skip args that are lists as was the original behaviour
+                } else {
+                    cond_output.push((num, bytes_vec));
+                    break; // we only care about the first 5 conditions
                 }
             }
-            // convert the first value to a small number which is the condition opcode
-            // In our above examples: 51
-            let Some(num) = a.small_number(condition_values[0]) else {
-                continue;
-            };
-            cond_output.push((num, bytes_vec));
         }
         output.push((coinspend, cond_output));
     }
