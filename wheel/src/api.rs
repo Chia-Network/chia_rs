@@ -584,7 +584,7 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
             parent_id,
             puzhash.into(),
             u64::from_clvm(&a, amount)
-                .map_err(|_| ValidationErr(first, ErrorCode::InvalidPuzzleHash))?,
+                .map_err(|_| ValidationErr(first, ErrorCode::InvalidCoinAmount))?,
         );
         let Ok(puzzle_program) = Program::from_clvm(&a, puzzle) else {
             continue;
