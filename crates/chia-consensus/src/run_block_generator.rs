@@ -291,16 +291,18 @@ pub fn get_coinspends_for_trusted_block(
         };
         let puzhash = tree_hash_cached(&a, puzzle, &mut cache);
         let parent_id = BytesImpl::<32>::from_clvm(&a, parent_id)
-            .map_err(|_| ValidationErr(first, ErrorCode::GeneratorRuntimeError))?;
+            .map_err(|_| ValidationErr(first, ErrorCode::InvalidParentId))?;
         let coin = Coin::new(
             parent_id,
             puzhash.into(),
             parse_amount(&a, amount, ErrorCode::InvalidCoinAmount)?,
         );
-        let puzzle_program: Program = Program::from_clvm(&a, puzzle)
-            .map_err(|_| ValidationErr(first, ErrorCode::GeneratorRuntimeError))?;
-        let solution_program = Program::from_clvm(&a, solution)
-            .map_err(|_| ValidationErr(first, ErrorCode::GeneratorRuntimeError))?;
+        let Ok(puzzle_program) = Program::from_clvm(&a, puzzle) else {
+            continue;
+        };
+        let Ok(solution_program) = Program::from_clvm(&a, solution) else {
+            continue;
+        };
         let coinspend = CoinSpend::new(coin, puzzle_program, solution_program);
         output.push(coinspend);
     }

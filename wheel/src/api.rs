@@ -579,17 +579,19 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
         };
         let puzhash = tree_hash_cached(&a, puzzle, &mut cache);
         let parent_id = BytesImpl::<32>::from_clvm(&a, parent_id)
-            .map_err(|_| ValidationErr(first, ErrorCode::GeneratorRuntimeError))?;
+            .map_err(|_| ValidationErr(first, ErrorCode::InvalidParentId))?;
         let coin = Coin::new(
             parent_id,
             puzhash.into(),
             u64::from_clvm(&a, amount)
-                .map_err(|_| ValidationErr(first, ErrorCode::GeneratorRuntimeError))?,
+                .map_err(|_| ValidationErr(first, ErrorCode::InvalidPuzzleHash))?,
         );
-        let puzzle_program: Program = Program::from_clvm(&a, puzzle)
-            .map_err(|_| ValidationErr(first, ErrorCode::GeneratorRuntimeError))?;
-        let solution_program = Program::from_clvm(&a, solution)
-            .map_err(|_| ValidationErr(first, ErrorCode::GeneratorRuntimeError))?;
+        let Ok(puzzle_program) = Program::from_clvm(&a, puzzle) else {
+            continue;
+        };
+        let Ok(solution_program) = Program::from_clvm(&a, solution) else {
+            continue;
+        };
         let coinspend = CoinSpend::new(coin, puzzle_program.clone(), solution_program.clone());
         let Ok((_, res)) =
             puzzle_program.run(&mut a, flags, constants.max_block_cost_clvm, &solution)
@@ -597,10 +599,10 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
             continue; // Skip this spend on error
         };
         let conditions_list = Vec::<NodePtr>::from_clvm(&a, res)
-            .map_err(|_| ValidationErr(res, ErrorCode::GeneratorRuntimeError))?;
+            .map_err(|_| ValidationErr(res, ErrorCode::InvalidCoinSolution))?;
         for condition in conditions_list {
             let conditions = Vec::<NodePtr>::from_clvm(&a, condition)
-                .map_err(|_| ValidationErr(condition, ErrorCode::GeneratorRuntimeError))?;
+                .map_err(|_| ValidationErr(condition, ErrorCode::InvalidCondition))?;
             let mut bytes_vec = Vec::<Py<PyBytes>>::new();
             for var in &conditions[1..] {
                 let decoded = a.decode_atom(var);
