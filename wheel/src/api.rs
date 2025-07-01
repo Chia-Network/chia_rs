@@ -598,12 +598,18 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
         else {
             continue; // Skip this spend on error
         };
+        // conditions_list is the full returned output of puzzle ran with solution
+        // ((51 0xcafef00d 100) (51 0x1234 200) ...)
         let conditions_list = Vec::<NodePtr>::from_clvm(&a, res)
             .map_err(|_| ValidationErr(res, ErrorCode::InvalidCoinSolution))?;
+        // condition is each grouped list
+        // (51 0xcafef00d 100)
         for condition in conditions_list {
             let conditions = Vec::<NodePtr>::from_clvm(&a, condition)
                 .map_err(|_| ValidationErr(condition, ErrorCode::InvalidCondition))?;
             let mut bytes_vec = Vec::<Py<PyBytes>>::new();
+            // the first value in this list is the condition opcode
+            // other values are the arguments - [0xcafef00d, 100]
             for var in &conditions[1..] {
                 let decoded = a.decode_atom(var);
                 match decoded {
@@ -611,9 +617,11 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
                         let py_bytes = PyBytes::new(py, bytes.as_ref()).into();
                         bytes_vec.push(py_bytes);
                     }
-                    Err(_) => continue, // we skip lists as was the original behaviour
+                    Err(_) => continue, // we skip args that are lists as was the original behaviour
                 }
             }
+            // convert the first value to a small number which is the condition opcode
+            // In our above examples: 51
             let Some(num) = a.small_number(conditions[0]) else {
                 continue;
             };
