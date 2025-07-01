@@ -51,7 +51,7 @@ use chia_protocol::{
     TransactionsInfo, UnfinishedBlock, UnfinishedHeaderBlock, VDFInfo, VDFProof, WeightProof,
 };
 use chia_traits::ChiaToPython;
-use clvm_traits::{ClvmDecoder, FromClvm};
+use clvm_traits::FromClvm;
 use clvm_utils::{tree_hash_cached, tree_hash_from_bytes, TreeCache};
 use clvmr::chia_dialect::ENABLE_KECCAK_OPS_OUTSIDE_GUARD;
 use clvmr::{LIMIT_HEAP, NO_UNKNOWN_OPS};
@@ -561,8 +561,6 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
     let (first, _rest) = a
         .next(res)
         .ok_or(ValidationErr(res, ErrorCode::GeneratorRuntimeError))?;
-    let spends_list = Vec::<NodePtr>::from_clvm(&a, first)
-        .map_err(|_| ValidationErr(first, ErrorCode::GeneratorRuntimeError))?;
     let mut cache = TreeCache::default();
     let mut iter = first;
     while let Some((spend, rest)) = a.next(iter) {
@@ -570,7 +568,9 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
         let [_, puzzle, _] = extract_n::<3>(&a, spend, ErrorCode::InvalidCondition)?;
         cache.visit_tree(&a, puzzle);
     }
-    for spend in spends_list {
+    iter = first;
+    while let Some((spend, rest)) = a.next(iter) {
+        iter = rest;
         let mut cond_output = Vec::<(u32, Vec<Py<PyBytes>>)>::new();
         let Ok([parent_id, puzzle, amount, solution, _spend_level_extra]) =
             extract_n::<5>(&a, spend, ErrorCode::InvalidCondition)
@@ -607,11 +607,14 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
         for condition in conditions_list {
             let condition_values = Vec::<NodePtr>::from_clvm(&a, condition)
                 .map_err(|_| ValidationErr(condition, ErrorCode::InvalidCondition))?;
+            if condition_values.len() > 6 {
+                continue;
+            };
             let mut bytes_vec = Vec::<Py<PyBytes>>::new();
             // the first value in this list is the condition opcode
             // other values are the arguments - [0xcafef00d, 100]
             for var in &condition_values[1..] {
-                let decoded = a.decode_atom(var);
+                let decoded = node_to_bytes(&a, *var);
                 match decoded {
                     Ok(bytes) => {
                         let py_bytes = PyBytes::new(py, bytes.as_ref()).into();

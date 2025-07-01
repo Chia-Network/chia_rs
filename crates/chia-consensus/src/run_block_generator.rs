@@ -274,8 +274,6 @@ pub fn get_coinspends_for_trusted_block(
     let (first, _rest) = a
         .next(res)
         .ok_or(ValidationErr(res, ErrorCode::GeneratorRuntimeError))?;
-    let spends_list = Vec::<NodePtr>::from_clvm(&a, first)
-        .map_err(|_| ValidationErr(first, ErrorCode::GeneratorRuntimeError))?;
     let mut cache = TreeCache::default();
     let mut iter = first;
     while let Some((spend, rest)) = a.next(iter) {
@@ -283,7 +281,9 @@ pub fn get_coinspends_for_trusted_block(
         let [_, puzzle, _] = extract_n::<3>(&a, spend, ErrorCode::InvalidCondition)?;
         cache.visit_tree(&a, puzzle);
     }
-    for spend in spends_list {
+    iter = first;
+    while let Some((spend, rest)) = a.next(iter) {
+        iter = rest;
         let Ok([parent_id, puzzle, amount, solution, _spend_level_extra]) =
             extract_n::<5>(&a, spend, ErrorCode::InvalidCondition)
         else {
