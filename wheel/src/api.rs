@@ -605,18 +605,18 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
         // (51 0xcafef00d 100)
         let mut num = 0;
         let mut iter_two = res;
-        while let Some((condition, rest)) = a.next(iter_two) {
-            iter_two = rest;
+        while let Some((condition, rest_two)) = a.next(iter_two) {
+            iter_two = rest_two;
             let mut iter_three = condition;
-            let count: usize = 0;
+            let mut count: usize = 0;
             let mut bytes_vec = Vec::<Py<PyBytes>>::new();
-            while let Some((condition_values, rest)) = a.next(iter_three) {
-                iter_three = rest;
+            while let Some((condition_values, rest_three)) = a.next(iter_three) {
+                iter_three = rest_three;
                 if count == 0 {
                     // convert the first value to a small number which is the condition opcode
                     // In our above examples: 51
                     let Some(n) = a.small_number(condition_values) else {
-                        continue;
+                        break;
                     };
                     num = n;
                 } else if count < 6 {
@@ -626,12 +626,19 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
                             let py_bytes = PyBytes::new(py, bytes.as_ref()).into();
                             bytes_vec.push(py_bytes);
                         }
-                        Err(_) => continue, // we skip args that are lists as was the original behaviour
+                        Err(_) => {
+                            count = 0;
+                            break;
+                        } // we skip args that are lists as was the original behaviour
                     }
                 } else {
-                    cond_output.push((num, bytes_vec));
                     break; // we only care about the first 5 conditions
                 }
+                count += 1;
+            }
+            if count > 0 {
+                // we have a valid condition
+                cond_output.push((num, bytes_vec));
             }
         }
         output.push((coinspend, cond_output));
