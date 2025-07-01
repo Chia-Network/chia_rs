@@ -499,7 +499,7 @@ pub fn py_calculate_ip_iters(
 }
 
 #[pyo3::pyfunction]
-pub fn get_spends_for_block<'a>(
+pub fn get_spends_for_trusted_block<'a>(
     py: Python<'a>,
     constants: &ConsensusConstants,
     generator: Program,
@@ -681,7 +681,7 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_get_flags_for_height_and_constants, m)?)?;
 
     // get spends for generator
-    m.add_function(wrap_pyfunction!(get_spends_for_block, m)?)?;
+    m.add_function(wrap_pyfunction!(get_spends_for_trusted_block, m)?)?;
     m.add_function(wrap_pyfunction!(
         get_spends_for_trusted_block_with_conditions,
         m
