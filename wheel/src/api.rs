@@ -54,7 +54,7 @@ use chia_traits::ChiaToPython;
 use clvm_traits::FromClvm;
 use clvm_utils::{tree_hash_cached, tree_hash_from_bytes, TreeCache};
 use clvmr::chia_dialect::ENABLE_KECCAK_OPS_OUTSIDE_GUARD;
-use clvmr::{LIMIT_HEAP, NO_UNKNOWN_OPS};
+use clvmr::{SExp, LIMIT_HEAP, NO_UNKNOWN_OPS};
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
@@ -620,17 +620,20 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
                     };
                     num = n;
                 } else if count < 6 {
-                    let decoded = node_to_bytes(&a, condition_values);
-                    match decoded {
-                        Ok(bytes) => {
-                            let py_bytes = PyBytes::new(py, bytes.as_ref()).into();
+                    match a.sexp(condition_values) {
+                        SExp::Atom => {
+                            // a reasonable max length of an atom is 1,500,000 bytes
+                            if a.atom_len(condition_values) >= 1_500_000 {
+                                // skip this condition
+                                count = 0;
+                                break;
+                            }
+                            let py_bytes =
+                                PyBytes::new(py, a.atom(condition_values).as_ref()).into();
                             bytes_vec.push(py_bytes);
                         }
-                        Err(_) => {
-                            count = 0;
-                            break;
-                        } // we skip args that are lists as was the original behaviour
-                    }
+                        SExp::Pair(..) => continue, // ignore lists in condition args
+                    };
                 } else {
                     break; // we only care about the first 5 conditions
                 }
