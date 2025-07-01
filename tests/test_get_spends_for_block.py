@@ -19,9 +19,7 @@ def test_generator_parsing() -> None:
 
     expected_dict = "[{'coin_spend': CoinSpend { coin: Coin { parent_coin_info: 0101010101010101010101010101010101010101010101010101010101010101, puzzle_hash: 549249cd4633a158169f04405ee11c74b6a6f21aa9e10b1c283ff687d4d644a0, amount: 123 }, puzzle_reveal: Program(ff01ffff33ffa06162616261626162616261626162616261626162616261626162616261626162ff0580ffff33ffa06162616261626162616261626162616261626162616261626162616261626162ff048080), solution: Program(ff80ffff018080) }, 'conditions': [(51, [b'abababababababababababababababab', b'\\x05']), (51, [b'abababababababababababababababab', b'\\x04'])]}]"
     assert str(out_dict) == expected_dict
-    out_dict = get_spends_for_trusted_block(
-        DEFAULT_CONSTANTS, gen_prog, args, 0
-    )
+    out_dict = get_spends_for_trusted_block(DEFAULT_CONSTANTS, gen_prog, args, 0)
     expected_dict = "[{'block_spends': [CoinSpend { coin: Coin { parent_coin_info: 0101010101010101010101010101010101010101010101010101010101010101, puzzle_hash: 549249cd4633a158169f04405ee11c74b6a6f21aa9e10b1c283ff687d4d644a0, amount: 123 }, puzzle_reveal: Program(ff01ffff33ffa06162616261626162616261626162616261626162616261626162616261626162ff0580ffff33ffa06162616261626162616261626162616261626162616261626162616261626162ff048080), solution: Program(ff80ffff018080) }]}]"
     assert str(out_dict) == expected_dict
 
@@ -36,9 +34,7 @@ def test_generator_parsing() -> None:
     # check we can handle hints (by ignoring them)
     expected_dict = "[{'coin_spend': CoinSpend { coin: Coin { parent_coin_info: 0101010101010101010101010101010101010101010101010101010101010101, puzzle_hash: e27a2d5ceae1f3d1598475250600cea0a15bf2e09d71a340abb544b926eff1a8, amount: 123 }, puzzle_reveal: Program(ff01ffff33ffa06162616261626162616261626162616261626162616261626162616261626162ff05ffffa031323132313231323132313231323132313231323132313231323132313231328080ffff33ffa06162616261626162616261626162616261626162616261626162616261626162ff048080), solution: Program(ff80ffff018080) }, 'conditions': [(51, [b'abababababababababababababababab', b'\\x05']), (51, [b'abababababababababababababababab', b'\\x04'])]}]"
     assert str(out_dict) == expected_dict
-    out_dict = get_spends_for_trusted_block(
-        DEFAULT_CONSTANTS, gen_prog, args, 0
-    )
+    out_dict = get_spends_for_trusted_block(DEFAULT_CONSTANTS, gen_prog, args, 0)
     expected_dict = "[{'block_spends': [CoinSpend { coin: Coin { parent_coin_info: 0101010101010101010101010101010101010101010101010101010101010101, puzzle_hash: e27a2d5ceae1f3d1598475250600cea0a15bf2e09d71a340abb544b926eff1a8, amount: 123 }, puzzle_reveal: Program(ff01ffff33ffa06162616261626162616261626162616261626162616261626162616261626162ff05ffffa031323132313231323132313231323132313231323132313231323132313231328080ffff33ffa06162616261626162616261626162616261626162616261626162616261626162ff048080), solution: Program(ff80ffff018080) }]}]"
     assert str(out_dict) == expected_dict
 
