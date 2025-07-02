@@ -278,7 +278,9 @@ pub fn get_coinspends_for_trusted_block(
     let mut iter = first;
     while let Some((spend, rest)) = a.next(iter) {
         iter = rest;
-        let [_, puzzle, _] = extract_n::<3>(&a, spend, ErrorCode::InvalidCondition)?;
+        let Ok([_, puzzle, _]) = extract_n::<3>(&a, spend, ErrorCode::InvalidCondition) else {
+            continue;
+        };
         cache.visit_tree(&a, puzzle);
     }
     iter = first;

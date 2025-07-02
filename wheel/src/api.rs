@@ -608,24 +608,23 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
         while let Some((condition, rest_two)) = a.next(iter_two) {
             iter_two = rest_two;
             let mut iter_three = condition;
-            let mut count: usize = 0;
             let mut bytes_vec = Vec::<Py<PyBytes>>::new();
             while let Some((condition_values, rest_three)) = a.next(iter_three) {
                 iter_three = rest_three;
-                if count == 0 {
+                if num == 0 {
                     // convert the first value to a small number which is the condition opcode
                     // In our above examples: 51
                     let Some(n) = a.small_number(condition_values) else {
                         break;
                     };
                     num = n;
-                } else if count < 6 {
+                } else if bytes_vec.len() < 6 {
                     match a.sexp(condition_values) {
                         SExp::Atom => {
                             // a reasonable max length of an atom is 1,500,000 bytes
                             if a.atom_len(condition_values) >= 1_500_000 {
                                 // skip this condition
-                                count = 0;
+                                bytes_vec.clear();
                                 break;
                             }
                             let py_bytes =
@@ -637,7 +636,6 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
                 } else {
                     break; // we only care about the first 5 conditions
                 }
-                count += 1;
             }
             if count > 0 {
                 // we have a valid condition
