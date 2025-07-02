@@ -637,7 +637,7 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
                     break; // we only care about the first 5 conditions
                 }
             }
-            if bytes_vec.len() > 0 {
+            if bytes_vec.is_empty() {
                 // we have a valid condition
                 cond_output.push((num, bytes_vec));
             }
