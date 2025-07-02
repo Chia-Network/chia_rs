@@ -1,5 +1,7 @@
 use super::conditions::{NewCoin, SpendBundleConditions, SpendConditions};
-use super::run_block_generator::{run_block_generator, run_block_generator2};
+use super::run_block_generator::{
+    get_coinspends_for_trusted_block, run_block_generator, run_block_generator2,
+};
 use crate::allocator::make_allocator;
 use crate::consensus_constants::TEST_CONSTANTS;
 use crate::flags::{DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
@@ -284,6 +286,22 @@ fn run_generator(#[case] name: &str) {
         if output != expected {
             print_diff(&output, expected);
             panic!("mismatching generator output");
+        }
+
+        // now lets check get_coinspends_for_trusted_block
+        let vec_of_slices: Vec<&[u8]> = block_refs.iter().map(std::vec::Vec::as_slice).collect();
+
+        let coinspends = get_coinspends_for_trusted_block(constants, prog, vec_of_slices, flags)
+            .expect("get_coinspends");
+        for (i, spend) in recompressed_conditions.spends.into_iter().enumerate() {
+            let parent_id = a.atom(spend.parent_id);
+            assert_eq!(
+                parent_id.as_ref(),
+                coinspends[i].coin.parent_coin_info.as_slice()
+            );
+            let puzhash = a.atom(spend.puzzle_hash);
+            assert_eq!(puzhash.as_ref(), coinspends[i].coin.puzzle_hash.as_slice());
+            assert_eq!(spend.coin_amount, coinspends[i].coin.amount);
         }
     }
 }
