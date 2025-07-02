@@ -292,14 +292,16 @@ fn run_generator(#[case] name: &str) {
         // now lets check get_coinspends_for_trusted_block
         let vec_of_slices: Vec<&[u8]> = block_refs.iter().map(std::vec::Vec::as_slice).collect();
 
-        let coinspends = get_coinspends_for_trusted_block(
+        let result = get_coinspends_for_trusted_block(
             &TEST_CONSTANTS,
             &Program::new(generator.clone().into()),
             vec_of_slices,
             *flags,
-        )
-        .expect("get_coinspends");
+        );
+
         if let Ok(conds) = conds {
+            // if run_block_generator2 is OK then check we're equal
+            let coinspends = result.expect("get_coinspends");
             for (i, spend) in conds.spends.into_iter().enumerate() {
                 let parent_id = a.atom(spend.parent_id);
                 assert_eq!(
