@@ -608,6 +608,7 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
         while let Some((condition, rest_two)) = a.next(iter_two) {
             iter_two = rest_two;
             let mut iter_three = condition;
+
             let mut bytes_vec = Vec::<Py<PyBytes>>::new();
             while let Some((condition_values, rest_three)) = a.next(iter_three) {
                 iter_three = rest_three;
@@ -640,6 +641,7 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
             if num != 0 {
                 // we have a valid condition
                 cond_output.push((num, bytes_vec));
+                num = 0;
             }
         }
         output.push((coinspend, cond_output));
