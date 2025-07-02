@@ -6,6 +6,7 @@ use crate::allocator::make_allocator;
 use crate::consensus_constants::TEST_CONSTANTS;
 use crate::flags::{DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
 use chia_bls::Signature;
+use chia_protocol::Program;
 use chia_protocol::{Bytes, Bytes48};
 use clvmr::allocator::NodePtr;
 use clvmr::Allocator;
@@ -250,7 +251,7 @@ fn run_generator(#[case] name: &str) {
         };
 
         let mut a = make_allocator(*flags);
-        let conds = run_block_generator2(
+        let mut conds = run_block_generator2(
             &mut a,
             &generator,
             &block_refs,
@@ -261,7 +262,7 @@ fn run_generator(#[case] name: &str) {
             &TEST_CONSTANTS,
         );
         let output_hard_fork = match conds {
-            Ok(mut conditions) => {
+            Ok(ref mut conditions) => {
                 // in the hard fork, the cost of running the genrator +
                 // puzzles should never be higher than before the hard-fork
                 // but it's likely less.
@@ -291,18 +292,24 @@ fn run_generator(#[case] name: &str) {
         // now lets check get_coinspends_for_trusted_block
         let vec_of_slices: Vec<&[u8]> = block_refs.iter().map(std::vec::Vec::as_slice).collect();
 
-        let coinspends =
-            get_coinspends_for_trusted_block(&TEST_CONSTANTS, &generator, vec_of_slices, *flags)
-                .expect("get_coinspends");
-        for (i, spend) in conds.spends.into_iter().enumerate() {
-            let parent_id = a.atom(spend.parent_id);
-            assert_eq!(
-                parent_id.as_ref(),
-                coinspends[i].coin.parent_coin_info.as_slice()
-            );
-            let puzhash = a.atom(spend.puzzle_hash);
-            assert_eq!(puzhash.as_ref(), coinspends[i].coin.puzzle_hash.as_slice());
-            assert_eq!(spend.coin_amount, coinspends[i].coin.amount);
+        let coinspends = get_coinspends_for_trusted_block(
+            &TEST_CONSTANTS,
+            &Program::new(generator.clone().into()),
+            vec_of_slices,
+            *flags,
+        )
+        .expect("get_coinspends");
+        if let Ok(conds) = conds {
+            for (i, spend) in conds.spends.into_iter().enumerate() {
+                let parent_id = a.atom(spend.parent_id);
+                assert_eq!(
+                    parent_id.as_ref(),
+                    coinspends[i].coin.parent_coin_info.as_slice()
+                );
+                let puzhash = a.atom(spend.puzzle_hash);
+                assert_eq!(puzhash.as_ref(), coinspends[i].coin.puzzle_hash.as_slice());
+                assert_eq!(spend.coin_amount, coinspends[i].coin.amount);
+            }
         }
     }
 }
