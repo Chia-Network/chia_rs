@@ -291,9 +291,10 @@ fn run_generator(#[case] name: &str) {
         // now lets check get_coinspends_for_trusted_block
         let vec_of_slices: Vec<&[u8]> = block_refs.iter().map(std::vec::Vec::as_slice).collect();
 
-        let coinspends = get_coinspends_for_trusted_block(constants, prog, vec_of_slices, flags)
-            .expect("get_coinspends");
-        for (i, spend) in recompressed_conditions.spends.into_iter().enumerate() {
+        let coinspends =
+            get_coinspends_for_trusted_block(&TEST_CONSTANTS, &generator, vec_of_slices, *flags)
+                .expect("get_coinspends");
+        for (i, spend) in conds.spends.into_iter().enumerate() {
             let parent_id = a.atom(spend.parent_id);
             assert_eq!(
                 parent_id.as_ref(),
