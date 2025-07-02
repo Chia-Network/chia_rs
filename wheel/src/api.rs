@@ -624,7 +624,7 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
                             // a reasonable max length of an atom is 1,500,000 bytes
                             if a.atom_len(condition_values) >= 1_500_000 {
                                 // skip this condition
-                                bytes_vec.clear();
+                                num = 0;
                                 break;
                             }
                             let py_bytes =
@@ -637,7 +637,7 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
                     break; // we only care about the first 5 conditions
                 }
             }
-            if !bytes_vec.is_empty() {
+            if num != 0 {
                 // we have a valid condition
                 cond_output.push((num, bytes_vec));
             }
