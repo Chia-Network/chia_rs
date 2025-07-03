@@ -47,13 +47,13 @@ fuzz_target!(|data: &[u8]| {
 
         // convert Fuzz into minimised form for comparison
         let node = node_from_bytes(&mut a, spend.puzzle_reveal.as_ref()).expect("node_from_byes");
-        let minimised_bytes = node_to_bytes(&mut a, node).expect("and back");
+        let minimised_bytes = node_to_bytes(&a, node).expect("and back");
         let prog = Program::new(minimised_bytes.into());
 
         assert_eq!(res.puzzle_reveal, prog);
 
         let node = node_from_bytes(&mut a, spend.solution.as_ref()).expect("node_from_byes");
-        let minimised_bytes = node_to_bytes(&mut a, node).expect("and back");
+        let minimised_bytes = node_to_bytes(&a, node).expect("and back");
         let prog = Program::new(minimised_bytes.into());
 
         assert_eq!(res.solution, prog);
