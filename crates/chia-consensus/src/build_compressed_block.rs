@@ -188,6 +188,7 @@ impl BlockBuilder {
         self.byte_cost + self.block_cost
     }
 
+    // returns generator, sig, cost
     pub fn finalize(
         mut self,
         constants: &ConsensusConstants,

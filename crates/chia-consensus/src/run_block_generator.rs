@@ -1,3 +1,5 @@
+use crate::allocator::make_allocator;
+use crate::condition_sanitizers::parse_amount;
 use crate::conditions::{
     parse_spends, process_single_spend, validate_conditions, validate_signature, EmptyVisitor,
     ParseState, SpendBundleConditions,
@@ -7,6 +9,8 @@ use crate::flags::DONT_VALIDATE_SIGNATURE;
 use crate::generator_rom::{CLVM_DESERIALIZER, GENERATOR_ROM};
 use crate::validation_error::{first, ErrorCode, ValidationErr};
 use chia_bls::{BlsCache, Signature};
+use chia_protocol::{BytesImpl, Coin, CoinSpend, Program};
+use clvm_traits::FromClvm;
 use clvm_utils::{tree_hash_cached, TreeCache};
 use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::chia_dialect::ChiaDialect;
@@ -14,6 +18,7 @@ use clvmr::cost::Cost;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
 use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs};
+use clvmr::LIMIT_HEAP;
 
 pub fn subtract_cost(
     a: &Allocator,
@@ -243,4 +248,65 @@ where
 
     ret.cost = max_cost - cost_left;
     Ok(ret)
+}
+
+pub fn get_coinspends_for_trusted_block(
+    constants: &ConsensusConstants,
+    generator: &Program,
+    refs: Vec<&[u8]>,
+    flags: u32,
+) -> Result<Vec<CoinSpend>, ValidationErr> {
+    let mut a = make_allocator(LIMIT_HEAP);
+    let mut output = Vec::<CoinSpend>::new();
+
+    let program = node_from_bytes_backrefs(&mut a, generator)?;
+    let args = setup_generator_args(&mut a, refs)?;
+    let dialect = ChiaDialect::new(flags);
+
+    let Reduction(_clvm_cost, res) = run_program(
+        &mut a,
+        &dialect,
+        program,
+        args,
+        constants.max_block_cost_clvm,
+    )?;
+
+    let (first, _rest) = a
+        .next(res)
+        .ok_or(ValidationErr(res, ErrorCode::GeneratorRuntimeError))?;
+    let mut cache = TreeCache::default();
+    let mut iter = first;
+    while let Some((spend, rest)) = a.next(iter) {
+        iter = rest;
+        let Ok([_, puzzle, _]) = extract_n::<3>(&a, spend, ErrorCode::InvalidCondition) else {
+            continue;
+        };
+        cache.visit_tree(&a, puzzle);
+    }
+    iter = first;
+    while let Some((spend, rest)) = a.next(iter) {
+        iter = rest;
+        let Ok([parent_id, puzzle, amount, solution, _spend_level_extra]) =
+            extract_n::<5>(&a, spend, ErrorCode::InvalidCondition)
+        else {
+            continue; // if we fail at this step then maybe the generator was malicious - try other spends
+        };
+        let puzhash = tree_hash_cached(&a, puzzle, &mut cache);
+        let parent_id = BytesImpl::<32>::from_clvm(&a, parent_id)
+            .map_err(|_| ValidationErr(first, ErrorCode::InvalidParentId))?;
+        let coin = Coin::new(
+            parent_id,
+            puzhash.into(),
+            parse_amount(&a, amount, ErrorCode::InvalidCoinAmount)?,
+        );
+        let Ok(puzzle_program) = Program::from_clvm(&a, puzzle) else {
+            continue;
+        };
+        let Ok(solution_program) = Program::from_clvm(&a, solution) else {
+            continue;
+        };
+        let coinspend = CoinSpend::new(coin, puzzle_program, solution_program);
+        output.push(coinspend);
+    }
+    Ok(output)
 }
