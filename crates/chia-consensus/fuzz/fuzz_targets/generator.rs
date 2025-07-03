@@ -6,12 +6,17 @@ use chia_consensus::{
 };
 use chia_protocol::{CoinSpend, Program, SpendBundle};
 use chia_traits::Streamable;
+use clvmr::{
+    serde::{node_from_bytes, node_to_bytes},
+    Allocator,
+};
 use libfuzzer_sys::fuzz_target;
 use std::io::Cursor;
 
 fuzz_target!(|data: &[u8]| {
     let mut spends = Vec::<CoinSpend>::new();
     let mut data = Cursor::new(data);
+    let mut a = Allocator::new();
     let mut blockbuilder = BlockBuilder::new().expect("default");
 
     while let Ok(spend) = CoinSpend::parse::<false>(&mut data) {
@@ -39,7 +44,18 @@ fuzz_target!(|data: &[u8]| {
         // puzzle hash is calculated from puzzle reveal
         // so skip that as fuzz generates reveals that don't allign with Coin
         assert_eq!(res.coin.amount, spend.coin.amount);
-        assert_eq!(res.puzzle_reveal, spend.puzzle_reveal);
-        assert_eq!(res.solution, spend.solution);
+
+        // convert Fuzz into minimised form for comparison
+        let node = node_from_bytes(&mut a, spend.puzzle_reveal.as_ref()).expect("node_from_byes");
+        let minimised_bytes = node_to_bytes(&mut a, node).expect("and back");
+        let prog = Program::new(minimised_bytes.into());
+
+        assert_eq!(res.puzzle_reveal, prog);
+
+        let node = node_from_bytes(&mut a, spend.solution.as_ref()).expect("node_from_byes");
+        let minimised_bytes = node_to_bytes(&mut a, node).expect("and back");
+        let prog = Program::new(minimised_bytes.into());
+
+        assert_eq!(res.solution, prog);
     }
 });
