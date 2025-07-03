@@ -46,7 +46,7 @@ fuzz_target!(|data: &[u8]| {
         assert_eq!(res.coin.amount, spend.coin.amount);
 
         // convert Fuzz into minimised form for comparison
-        // sometimes fuzz gibberish fails to convert to Node, if so don't compare 
+        // sometimes fuzz gibberish fails to convert to Node, if so don't compare
         if let Ok(node) = node_from_bytes(&mut a, spend.puzzle_reveal.as_ref()) {
             let minimised_bytes = node_to_bytes(&a, node).expect("node_to_bytes");
             let prog = Program::new(minimised_bytes.into());
