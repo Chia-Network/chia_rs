@@ -34,5 +34,12 @@ fuzz_target!(|data: &[u8]| {
     let result =
         get_coinspends_for_trusted_block(&TEST_CONSTANTS, gen_prog, vec![&[]], 0).expect("unwrap");
 
-    assert_eq!(result, spends);
+    for (spend, res) in spends.iter().zip(result) {
+        assert_eq!(res.coin.parent_coin_info, spend.coin.parent_coin_info);
+        // puzzle hash is calculated from puzzle reveal
+        // so skip that as fuzz generates reveals that don't allign with Coin
+        assert_eq!(res.coin.amount, spend.coin.amount);
+        assert_eq!(res.puzzle_reveal, spend.puzzle_reveal);
+        assert_eq!(res.solution, spend.solution);
+    }
 });

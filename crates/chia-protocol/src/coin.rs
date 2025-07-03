@@ -49,6 +49,8 @@ impl Coin {
         let coin_id: [u8; 32] = hasher.finalize().as_slice().try_into().unwrap();
         Bytes32::new(coin_id)
     }
+
+    
 }
 
 #[cfg(feature = "py-bindings")]
