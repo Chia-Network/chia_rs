@@ -33,7 +33,11 @@ def test_generator_parsing() -> None:
         DEFAULT_CONSTANTS, gen_prog, args, 0
     )
 
-    expected_dict = open("generator-tests/expected-dicts/create-coin-different-amounts.txt", "r").read().split("\n")
+    expected_dict = (
+        open("generator-tests/expected-dicts/create-coin-different-amounts.txt", "r")
+        .read()
+        .split("\n")
+    )
     assert str(out_dict) == expected_dict[0]
     out_dict = get_spends_for_trusted_block(DEFAULT_CONSTANTS, gen_prog, args, 0)
     assert str(out_dict) == expected_dict[1]
@@ -47,7 +51,11 @@ def test_generator_parsing() -> None:
         DEFAULT_CONSTANTS, gen_prog, args, 0
     )
     # check we can handle hints (by ignoring them)
-    expected_dict = open("generator-tests/expected-dicts/create-coin-hint.txt", "r").read().split("\n")
+    expected_dict = (
+        open("generator-tests/expected-dicts/create-coin-hint.txt", "r")
+        .read()
+        .split("\n")
+    )
     assert str(out_dict) == expected_dict[0]
     out_dict = get_spends_for_trusted_block(DEFAULT_CONSTANTS, gen_prog, args, 0)
     assert str(out_dict) == expected_dict[1]
@@ -62,6 +70,8 @@ def test_generator_parsing() -> None:
     )
     # check we can handle a big and real block
     # apologies for textdump
-    expected_dict = open("generator-tests/expected-dicts/block-834768.txt", "r").read().split("\n")
+    expected_dict = (
+        open("generator-tests/expected-dicts/block-834768.txt", "r").read().split("\n")
+    )
 
     assert str(out_dict) == expected_dict[0]
