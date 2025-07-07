@@ -143,7 +143,7 @@ impl BlockStatusCache {
         self.key_to_index.iter()
     }
 
-    fn get_free_index(&mut self) -> Option<TreeIndex> {
+    fn pop_free_index(&mut self) -> Option<TreeIndex> {
         let maybe_index = self.free_indexes.iter().next().copied();
         if let Some(index) = maybe_index {
             self.free_indexes.remove(&index);
@@ -917,7 +917,7 @@ impl MerkleBlob {
     }
 
     fn get_new_index(&mut self) -> TreeIndex {
-        match self.block_status_cache.get_free_index() {
+        match self.block_status_cache.pop_free_index() {
             None => {
                 let index = self.extend_index();
                 self.blob.extend_from_slice(&[0; BLOCK_SIZE]);
