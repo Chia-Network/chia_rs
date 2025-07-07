@@ -18,7 +18,7 @@ use clvmr::cost::Cost;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
 use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs};
-use clvmr::LIMIT_HEAP;
+use clvmr::{SExp, LIMIT_HEAP};
 
 pub fn subtract_cost(
     a: &Allocator,
@@ -307,6 +307,119 @@ pub fn get_coinspends_for_trusted_block(
         };
         let coinspend = CoinSpend::new(coin, puzzle_program, solution_program);
         output.push(coinspend);
+    }
+    Ok(output)
+}
+
+#[allow(clippy::type_complexity)]
+pub fn get_coinspends_with_conditions_for_trusted_block(
+    constants: &ConsensusConstants,
+    generator: &Program,
+    refs: Vec<&[u8]>,
+    flags: u32,
+) -> Result<Vec<(CoinSpend, Vec<(u32, Vec<Vec<u8>>)>)>, ValidationErr> {
+    let mut a = make_allocator(LIMIT_HEAP);
+    let mut output = Vec::<(CoinSpend, Vec<(u32, Vec<Vec<u8>>)>)>::new();
+
+    let program = node_from_bytes_backrefs(&mut a, generator)?;
+    let args = setup_generator_args(&mut a, refs)?;
+    let dialect = ChiaDialect::new(flags);
+
+    let Reduction(_clvm_cost, res) = run_program(
+        &mut a,
+        &dialect,
+        program,
+        args,
+        constants.max_block_cost_clvm,
+    )
+    .map_err(|_| ValidationErr(program, ErrorCode::GeneratorRuntimeError))?;
+
+    let (first, _rest) = a
+        .next(res)
+        .ok_or(ValidationErr(res, ErrorCode::GeneratorRuntimeError))?;
+    let mut cache = TreeCache::default();
+    let mut iter = first;
+    while let Some((spend, rest)) = a.next(iter) {
+        iter = rest;
+        let [_, puzzle, _] = extract_n::<3>(&a, spend, ErrorCode::InvalidCondition)?;
+        cache.visit_tree(&a, puzzle);
+    }
+    iter = first;
+    while let Some((spend, rest)) = a.next(iter) {
+        iter = rest;
+        let mut cond_output = Vec::<(u32, Vec<Vec<u8>>)>::new();
+        let Ok([parent_id, puzzle, amount, solution, _spend_level_extra]) =
+            extract_n::<5>(&a, spend, ErrorCode::InvalidCondition)
+        else {
+            continue; // if we fail at this step then maybe the generator was malicious - try other spends
+        };
+        let puzhash = tree_hash_cached(&a, puzzle, &mut cache);
+        let parent_id = BytesImpl::<32>::from_clvm(&a, parent_id)
+            .map_err(|_| ValidationErr(first, ErrorCode::InvalidParentId))?;
+        let coin = Coin::new(
+            parent_id,
+            puzhash.into(),
+            u64::from_clvm(&a, amount)
+                .map_err(|_| ValidationErr(first, ErrorCode::InvalidCoinAmount))?,
+        );
+        let Ok(puzzle_program) = Program::from_clvm(&a, puzzle) else {
+            continue;
+        };
+        let Ok(solution_program) = Program::from_clvm(&a, solution) else {
+            continue;
+        };
+        let coinspend = CoinSpend::new(coin, puzzle_program.clone(), solution_program.clone());
+        let Ok((_, res)) =
+            puzzle_program.run(&mut a, flags, constants.max_block_cost_clvm, &solution)
+        else {
+            continue; // Skip this spend on error
+        };
+        // conditions_list is the full returned output of puzzle ran with solution
+        // ((51 0xcafef00d 100) (51 0x1234 200) ...)
+
+        // condition is each grouped list
+        // (51 0xcafef00d 100)
+        let mut num = 0;
+        let mut iter_two = res;
+        while let Some((condition, rest_two)) = a.next(iter_two) {
+            iter_two = rest_two;
+            let mut iter_three = condition;
+
+            let mut bytes_vec = Vec::<Vec<u8>>::new();
+            while let Some((condition_values, rest_three)) = a.next(iter_three) {
+                iter_three = rest_three;
+                if num == 0 {
+                    // convert the first value to a small number which is the condition opcode
+                    // In our above examples: 51
+                    let Some(n) = a.small_number(condition_values) else {
+                        break;
+                    };
+                    num = n;
+                } else if bytes_vec.len() < 6 {
+                    match a.sexp(condition_values) {
+                        SExp::Atom => {
+                            // a reasonable max length of an atom is 1,500,000 bytes
+                            if a.atom_len(condition_values) >= 1_500_000 {
+                                // skip this condition
+                                num = 0;
+                                break;
+                            }
+                            let bytes = a.atom(condition_values).to_vec();
+                            bytes_vec.push(bytes);
+                        }
+                        SExp::Pair(..) => continue, // ignore lists in condition args
+                    };
+                } else {
+                    break; // we only care about the first 5 conditions
+                }
+            }
+            if num != 0 {
+                // we have a valid condition
+                cond_output.push((num, bytes_vec));
+                num = 0;
+            }
+        }
+        output.push((coinspend, cond_output));
     }
     Ok(output)
 }

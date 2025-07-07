@@ -11,7 +11,9 @@ use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_i
 use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
 use chia_consensus::owned_conditions::{OwnedSpendBundleConditions, OwnedSpendConditions};
 use chia_consensus::run_block_generator::setup_generator_args;
-use chia_consensus::run_block_generator::{extract_n, get_coinspends_for_trusted_block};
+use chia_consensus::run_block_generator::{
+    get_coinspends_for_trusted_block, get_coinspends_with_conditions_for_trusted_block,
+};
 use chia_consensus::solution_generator::solution_generator as native_solution_generator;
 use chia_consensus::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
 use chia_consensus::spendbundle_conditions::get_conditions_from_spendbundle;
@@ -20,7 +22,7 @@ use chia_consensus::spendbundle_validation::{
 };
 use chia_protocol::{
     calculate_ip_iters, calculate_sp_interval_iters, calculate_sp_iters, is_overflow_block,
-    py_expected_plot_size, BytesImpl,
+    py_expected_plot_size
 };
 use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
@@ -51,10 +53,9 @@ use chia_protocol::{
     TransactionsInfo, UnfinishedBlock, UnfinishedHeaderBlock, VDFInfo, VDFProof, WeightProof,
 };
 use chia_traits::ChiaToPython;
-use clvm_traits::FromClvm;
-use clvm_utils::{tree_hash_cached, tree_hash_from_bytes, TreeCache};
+use clvm_utils::tree_hash_from_bytes;
 use clvmr::chia_dialect::ENABLE_KECCAK_OPS_OUTSIDE_GUARD;
-use clvmr::{SExp, LIMIT_HEAP, NO_UNKNOWN_OPS};
+use clvmr::{LIMIT_HEAP, NO_UNKNOWN_OPS};
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
@@ -70,7 +71,7 @@ use crate::run_program::{run_chia_program, serialized_length};
 
 use chia_consensus::fast_forward::fast_forward_singleton as native_ff;
 use chia_consensus::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
-use chia_consensus::validation_error::{ErrorCode, ValidationErr};
+use chia_consensus::validation_error::ValidationErr;
 use clvmr::allocator::NodePtr;
 use clvmr::cost::Cost;
 use clvmr::reduction::EvalErr;
@@ -533,10 +534,6 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
     block_refs: &Bound<'a, PyList>,
     flags: u32,
 ) -> pyo3::PyResult<PyObject> {
-    let mut a = make_allocator(LIMIT_HEAP);
-    let mut output = Vec::<(CoinSpend, Vec<(u32, Vec<Py<PyBytes>>)>)>::new();
-
-    let program = node_from_bytes_backrefs(&mut a, &generator)?;
     let refs = block_refs
         .into_iter()
         .map(|b| {
@@ -546,111 +543,27 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
             py_to_slice::<'a>(buf)
         })
         .collect::<Vec<&'a [u8]>>();
-    let args = setup_generator_args(&mut a, refs)?;
-    let dialect = ChiaDialect::new(flags);
 
-    let Reduction(_clvm_cost, res) = run_program(
-        &mut a,
-        &dialect,
-        program,
-        args,
-        constants.max_block_cost_clvm,
-    )
-    .map_err(|_| ValidationErr(program, ErrorCode::GeneratorRuntimeError))?;
+    let output =
+        get_coinspends_with_conditions_for_trusted_block(constants, &generator, refs, flags)?;
 
-    let (first, _rest) = a
-        .next(res)
-        .ok_or(ValidationErr(res, ErrorCode::GeneratorRuntimeError))?;
-    let mut cache = TreeCache::default();
-    let mut iter = first;
-    while let Some((spend, rest)) = a.next(iter) {
-        iter = rest;
-        let [_, puzzle, _] = extract_n::<3>(&a, spend, ErrorCode::InvalidCondition)?;
-        cache.visit_tree(&a, puzzle);
-    }
-    iter = first;
-    while let Some((spend, rest)) = a.next(iter) {
-        iter = rest;
-        let mut cond_output = Vec::<(u32, Vec<Py<PyBytes>>)>::new();
-        let Ok([parent_id, puzzle, amount, solution, _spend_level_extra]) =
-            extract_n::<5>(&a, spend, ErrorCode::InvalidCondition)
-        else {
-            continue; // if we fail at this step then maybe the generator was malicious - try other spends
-        };
-        let puzhash = tree_hash_cached(&a, puzzle, &mut cache);
-        let parent_id = BytesImpl::<32>::from_clvm(&a, parent_id)
-            .map_err(|_| ValidationErr(first, ErrorCode::InvalidParentId))?;
-        let coin = Coin::new(
-            parent_id,
-            puzhash.into(),
-            u64::from_clvm(&a, amount)
-                .map_err(|_| ValidationErr(first, ErrorCode::InvalidCoinAmount))?,
-        );
-        let Ok(puzzle_program) = Program::from_clvm(&a, puzzle) else {
-            continue;
-        };
-        let Ok(solution_program) = Program::from_clvm(&a, solution) else {
-            continue;
-        };
-        let coinspend = CoinSpend::new(coin, puzzle_program.clone(), solution_program.clone());
-        let Ok((_, res)) =
-            puzzle_program.run(&mut a, flags, constants.max_block_cost_clvm, &solution)
-        else {
-            continue; // Skip this spend on error
-        };
-        // conditions_list is the full returned output of puzzle ran with solution
-        // ((51 0xcafef00d 100) (51 0x1234 200) ...)
-
-        // condition is each grouped list
-        // (51 0xcafef00d 100)
-        let mut num = 0;
-        let mut iter_two = res;
-        while let Some((condition, rest_two)) = a.next(iter_two) {
-            iter_two = rest_two;
-            let mut iter_three = condition;
-
-            let mut bytes_vec = Vec::<Py<PyBytes>>::new();
-            while let Some((condition_values, rest_three)) = a.next(iter_three) {
-                iter_three = rest_three;
-                if num == 0 {
-                    // convert the first value to a small number which is the condition opcode
-                    // In our above examples: 51
-                    let Some(n) = a.small_number(condition_values) else {
-                        break;
-                    };
-                    num = n;
-                } else if bytes_vec.len() < 6 {
-                    match a.sexp(condition_values) {
-                        SExp::Atom => {
-                            // a reasonable max length of an atom is 1,500,000 bytes
-                            if a.atom_len(condition_values) >= 1_500_000 {
-                                // skip this condition
-                                num = 0;
-                                break;
-                            }
-                            let py_bytes =
-                                PyBytes::new(py, a.atom(condition_values).as_ref()).into();
-                            bytes_vec.push(py_bytes);
-                        }
-                        SExp::Pair(..) => continue, // ignore lists in condition args
-                    };
-                } else {
-                    break; // we only care about the first 5 conditions
-                }
-            }
-            if num != 0 {
-                // we have a valid condition
-                cond_output.push((num, bytes_vec));
-                num = 0;
-            }
-        }
-        output.push((coinspend, cond_output));
-    }
     let pylist = PyList::empty(py);
     for (coinspend, cond_output) in output {
         let dict = PyDict::new(py);
         dict.set_item("coin_spend", coinspend)?;
-        dict.set_item("conditions", cond_output)?;
+        let cond_list = PyList::empty(py);
+        for (opcode, bytes_vec) in cond_output {
+            let arg_list = PyList::empty(py);
+            for bytes in bytes_vec {
+                let pybytes = PyBytes::new(py, bytes.as_slice());
+                arg_list.append(pybytes)?;
+            }
+
+            let tuple = (opcode, arg_list);
+            cond_list.append(tuple)?;
+        }
+
+        dict.set_item("conditions", cond_list)?;
         pylist.append(dict)?;
     }
     Ok(pylist.into())
