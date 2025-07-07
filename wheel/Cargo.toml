@@ -39,4 +39,3 @@ clvm-utils = { workspace = true }
 chia-ssl = { workspace = true }
 chia-client = { workspace = true }
 chia-traits = { workspace = true }
-clvm-traits = { workspace = true }

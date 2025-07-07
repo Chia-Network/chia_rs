@@ -124,11 +124,6 @@ clvm-traits = { path = "./crates/clvm-traits", version = "0.26.0" }
 clvm-utils = { path = "./crates/clvm-utils", version = "0.26.0" }
 clvm-derive = { path = "./crates/clvm-derive", version = "0.26.0" }
 chia-fuzz = { path = "./crates/chia-consensus/fuzz", version = "0.26.0" }
-chia-bls-fuzz = { path = "./crates/chia-bls/fuzz", version = "0.26.0" }
-chia-protocol-fuzz = { path = "./crates/chia-protocol/fuzz", version = "0.26.0" }
-chia-puzzle-types-fuzz = { path = "./crates/chia-puzzle-types/fuzz", version = "0.26.0" }
-clvm-traits-fuzz = { path = "./crates/clvm-traits/fuzz", version = "0.26.0" }
-clvm-utils-fuzz = { path = "./crates/clvm-utils/fuzz", version = "0.26.0" }
 blst = { version = "0.3.14", features = ["portable"] }
 clvmr = "0.15.0"
 syn = "2.0.101"
@@ -153,7 +148,6 @@ hex-literal = "0.4.1"
 num-traits = "0.2.15"
 num-bigint = "0.4.5"
 text-diff = "0.4.0"
-lazy_static = "1.4.0"
 rcgen = "0.13.2"
 rsa = "0.9.7"
 time = "0.3.41"
