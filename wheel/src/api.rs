@@ -22,7 +22,7 @@ use chia_consensus::spendbundle_validation::{
 };
 use chia_protocol::{
     calculate_ip_iters, calculate_sp_interval_iters, calculate_sp_iters, is_overflow_block,
-    py_expected_plot_size
+    py_expected_plot_size,
 };
 use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
