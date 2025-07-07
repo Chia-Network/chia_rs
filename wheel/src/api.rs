@@ -441,7 +441,7 @@ pub fn py_get_flags_for_height_and_constants(height: u32, constants: &ConsensusC
 }
 
 #[pyfunction]
-#[pyo3(name = "compute_puzzle_fingerprint")]
+#[pyo3(name = "compute_puzzle_fingerprint", signature = (puzzle, solution, *, max_cost, flags))]
 pub fn py_compute_puzzle_fingerprint(
     puzzle: &Program,
     solution: &Program,

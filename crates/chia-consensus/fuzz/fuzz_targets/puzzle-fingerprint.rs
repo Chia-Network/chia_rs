@@ -64,9 +64,7 @@ fuzz_target!(|data: &[u8]| {
     // if the spend is not eligible for dedup, compute_puzzle_fingerprint()
     // may or may not fail. It doesn't perform full validation
     if (block_conds.spends[0].flags & ELIGIBLE_FOR_DEDUP) != 0 {
-        let Ok((cost, _fingerprint)) = fingerprint_result else {
-            panic!("run_block_generator2() passed and is eligible for dedup, but compute_puzzle_fingerprint() failed");
-        };
+        let (cost, _fingerprint) = fingerprint_result.expect("run_block_generator2() passed and is eligible for dedup, but compute_puzzle_fingerprint() failed");
 
         // running the block has higher cost than the puzzle, because it includes
         // the cost of the quote, which is 20
