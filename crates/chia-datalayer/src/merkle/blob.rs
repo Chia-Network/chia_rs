@@ -160,7 +160,8 @@ impl BlockStatusCache {
         self.leaf_hash_to_index.get(hash)
     }
 
-    fn index_is_free(&self, index: TreeIndex) -> bool {
+    #[must_use]
+    fn is_index_free(&self, index: TreeIndex) -> bool {
         self.free_indexes.contains(&index)
     }
 
@@ -850,7 +851,7 @@ impl MerkleBlob {
                         ));
                     };
                     assert!(
-                        !self.block_status_cache.index_is_free(index),
+                        !self.block_status_cache.is_index_free(index),
                         "{}",
                         format!("active index found in free index list: {index:?}")
                     );
@@ -2264,9 +2265,9 @@ pub(crate) mod tests {
             (*key, *index)
         };
         let expected_length = small_blob.blob.len();
-        assert!(!small_blob.block_status_cache.index_is_free(index));
+        assert!(!small_blob.block_status_cache.is_index_free(index));
         small_blob.delete(key).unwrap();
-        assert!(small_blob.block_status_cache.index_is_free(index));
+        assert!(small_blob.block_status_cache.is_index_free(index));
         let free_indexes = small_blob.block_status_cache.free_indexes.clone();
         assert_eq!(free_indexes.len(), 2);
         let new_index = small_blob
