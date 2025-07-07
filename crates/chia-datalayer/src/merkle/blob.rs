@@ -9,9 +9,7 @@ use pyo3::{
     Bound, IntoPyObject, PyResult, Python,
 };
 
-use crate::merkle::iterators::{
-    MerkleBlobBreadthFirstIterator, MerkleBlobLeftChildFirstIterator, MerkleBlobParentFirstIterator,
-};
+use crate::merkle::iterators::{BreadthFirstIterator, LeftChildFirstIterator, ParentFirstIterator};
 use crate::merkle::{deltas, format, proof_of_inclusion};
 use crate::{
     merkle::error::Error, Block, BlockBytes, Hash, InternalNode, KeyId, LeafNode, Node,
@@ -115,7 +113,7 @@ impl BlockStatusCache {
         let mut key_to_index: HashMap<KeyId, TreeIndex> = HashMap::default();
         let mut leaf_hash_to_index: HashMap<Hash, TreeIndex> = HashMap::default();
 
-        for item in MerkleBlobLeftChildFirstIterator::new(blob, None) {
+        for item in LeftChildFirstIterator::new(blob, None) {
             let (index, block) = item?;
             seen_indexes[index.0 as usize] = true;
 
@@ -734,7 +732,7 @@ impl MerkleBlob {
     }
 
     fn get_min_height_leaf(&self) -> Result<LeafNode, Error> {
-        let (_index, block) = MerkleBlobBreadthFirstIterator::new(&self.blob, None)
+        let (_index, block) = BreadthFirstIterator::new(&self.blob, None)
             .next()
             .ok_or(Error::UnableToFindALeaf())??;
 
@@ -824,7 +822,7 @@ impl MerkleBlob {
         let mut internal_count: usize = 0;
         let mut child_to_parent: HashMap<TreeIndex, TreeIndex> = HashMap::new();
 
-        for item in MerkleBlobParentFirstIterator::new(&self.blob, None) {
+        for item in ParentFirstIterator::new(&self.blob, None) {
             let (index, block) = item?;
             if let Some(parent) = block.node.parent().0 {
                 if child_to_parent.remove(&index) != Some(parent) {
@@ -1099,7 +1097,7 @@ impl MerkleBlob {
 
     pub fn calculate_lazy_hashes(&mut self) -> Result<(), Error> {
         // OPT: yeah, storing the whole set of blocks via collect is not great
-        for item in MerkleBlobLeftChildFirstIterator::new_with_block_predicate(
+        for item in LeftChildFirstIterator::new_with_block_predicate(
             &self.blob,
             None,
             Some(|block: &Block| block.metadata.dirty),
@@ -1200,7 +1198,7 @@ impl MerkleBlob {
             return Ok(hashes);
         }
 
-        for item in MerkleBlobParentFirstIterator::new(&self.blob, None) {
+        for item in ParentFirstIterator::new(&self.blob, None) {
             let (_, block) = item?;
             hashes.insert(block.node.hash());
         }
@@ -1215,7 +1213,7 @@ impl MerkleBlob {
             return Ok(hash_to_index);
         }
 
-        for item in MerkleBlobParentFirstIterator::new(&self.blob, None) {
+        for item in ParentFirstIterator::new(&self.blob, None) {
             let (index, block) = item?;
 
             if leafs_only && block.metadata.node_type != NodeType::Leaf {
@@ -1313,8 +1311,8 @@ impl PartialEq for MerkleBlob {
     fn eq(&self, other: &Self) -> bool {
         // NOTE: this is checking tree structure equality, not serialized bytes equality
         for item in zip(
-            MerkleBlobLeftChildFirstIterator::new(&self.blob, None),
-            MerkleBlobLeftChildFirstIterator::new(&other.blob, None),
+            LeftChildFirstIterator::new(&self.blob, None),
+            LeftChildFirstIterator::new(&other.blob, None),
         ) {
             let (Ok((_, self_block)), Ok((_, other_block))) = item else {
                 return false;
@@ -1484,7 +1482,7 @@ impl MerkleBlob {
     ) -> PyResult<pyo3::PyObject> {
         let list = pyo3::types::PyList::empty(py);
 
-        for item in MerkleBlobParentFirstIterator::new(&self.blob, index) {
+        for item in ParentFirstIterator::new(&self.blob, index) {
             let (index, block) = item?;
             list.append((index.into_pyobject(py)?, block.node.into_pyobject(py)?))?;
         }
@@ -1588,7 +1586,7 @@ pub fn get_internal_terminal(
     let mut index_to_hash: HashMap<TreeIndex, Hash> = HashMap::new();
 
     for subroot_index in indexes {
-        for item in MerkleBlobLeftChildFirstIterator::new(blob, Some(*subroot_index)) {
+        for item in LeftChildFirstIterator::new(blob, Some(*subroot_index)) {
             let (index, block) = item?;
             match block.node {
                 Node::Internal(node) => {
@@ -2123,8 +2121,7 @@ pub(crate) mod tests {
 
     #[rstest]
     fn test_upsert_upserts(mut small_blob: MerkleBlob) {
-        let before_blocks =
-            MerkleBlobLeftChildFirstIterator::new(&small_blob.blob, None).collect::<Vec<_>>();
+        let before_blocks = LeftChildFirstIterator::new(&small_blob.blob, None).collect::<Vec<_>>();
         let (key, index) = small_blob
             .block_status_cache
             .iter_keys_indexes()
@@ -2135,8 +2132,7 @@ pub(crate) mod tests {
 
         small_blob.upsert(*key, new_value, &original.hash).unwrap();
 
-        let after_blocks =
-            MerkleBlobLeftChildFirstIterator::new(&small_blob.blob, None).collect::<Vec<_>>();
+        let after_blocks = LeftChildFirstIterator::new(&small_blob.blob, None).collect::<Vec<_>>();
 
         assert_eq!(before_blocks.len(), after_blocks.len());
         for item in zip(before_blocks, after_blocks) {
