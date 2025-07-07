@@ -1102,12 +1102,7 @@ impl MerkleBlob {
             None,
             Some(|block: &Block| block.metadata.dirty),
         )
-        .map(|item| -> Result<TreeIndex, Error> {
-            match item {
-                Err(error) => Err(error),
-                Ok((index, ..)) => Ok(index),
-            }
-        })
+        .map(|item| Ok(item?.0))
         .collect::<Result<Vec<TreeIndex>, Error>>()?;
 
         let mut hashes: HashMap<TreeIndex, Hash> = HashMap::new();
@@ -1117,16 +1112,15 @@ impl MerkleBlob {
                 panic!("leaves should not be dirty")
             };
 
-            let left_hash = match hashes.remove(&internal.left) {
-                Some(hash) => hash,
-                None => self.get_hash(internal.left)?,
+            let mut f = |child_index: TreeIndex| -> Result<Hash, Error> {
+                match hashes.remove(&child_index) {
+                    Some(hash) => Ok(hash),
+                    None => self.get_hash(child_index),
+                }
             };
-            let right_hash = match hashes.remove(&internal.right) {
-                Some(hash) => hash,
-                None => self.get_hash(internal.right)?,
-            };
+            let hash = block.update_hash(&f(internal.left)?, &f(internal.right)?);
 
-            block.update_hash(&left_hash, &right_hash);
+            hashes.insert(index, hash);
             self.insert_entry_to_blob(index, &block)?;
         }
 

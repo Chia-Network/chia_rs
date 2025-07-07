@@ -333,9 +333,12 @@ impl Block {
         Ok(Block { metadata, node })
     }
 
-    pub fn update_hash(&mut self, left: &Hash, right: &Hash) {
-        self.node.set_hash(internal_hash(left, right));
+    pub fn update_hash(&mut self, left: &Hash, right: &Hash) -> Hash {
+        let hash = internal_hash(left, right);
+        self.node.set_hash(hash);
         self.metadata.dirty = false;
+
+        hash
     }
 }
 
