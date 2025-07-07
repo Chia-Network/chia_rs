@@ -296,13 +296,6 @@ class MerkleBlob:
         blob: bytes,
     ) -> None: ...
 
-    @staticmethod
-    def from_node_list(
-        internal_nodes: dict[bytes32, tuple[bytes32, bytes32]],
-        terminal_nodes: dict[bytes32, tuple[KeyId, ValueId]],
-        root_hash: Optional[bytes32],
-    ) -> MerkleBlob: ...
-
     @classmethod
     def from_path(cls, path: os.PathLike) -> MerkleBlob: ...
 
