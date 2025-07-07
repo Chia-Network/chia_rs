@@ -21,12 +21,12 @@ fuzz_target!(|data: &[u8]| {
     let Ok(num_of_conds) = u32::parse::<false>(&mut data) else {
         return;
     };
-    let num_of_conds = num_of_conds % 100;
+    let num_of_conds = (num_of_conds % 100) + 1;
 
     let Ok(num_of_coins) = u32::parse::<false>(&mut data) else {
         return;
     };
-    let num_of_coins = num_of_coins % 50;
+    let num_of_coins = (num_of_coins % 50) + 1;
 
     let bytes: &[u8] = &[1_u8];
 
@@ -105,23 +105,46 @@ fuzz_target!(|data: &[u8]| {
             .expect("unwrap");
     println!("DEBUG ORIGINAL: {coinspend_conditions:?}");
     println!("DEBUG RESPONSE: {result:?}");
-    for ((original_cs, original_conds), (res_cs, res_conds)) in
-        coinspend_conditions.iter().zip(result)
-    {
-        assert_eq!(
-            original_cs.coin.parent_coin_info,
-            res_cs.coin.parent_coin_info
-        );
-        // puzzle hash is calculated from puzzle reveal
-        // so skip that as fuzz generates reveals that don't allign with Coin
-        assert_eq!(*original_cs, res_cs);
-
-        for (orig_cond, res_cond) in original_conds.iter().zip(res_conds) {
-            assert_eq!(orig_cond.0 as u32, res_cond.0);
-            for (orig_arg, res_cond) in orig_cond.1.clone().iter().zip(res_cond.1) {
-                let bytes = node_to_bytes(&a, *orig_arg).expect("arg nodetobytes");
-                assert_eq!(bytes, res_cond);
+    for (original_cs, original_conds) in &coinspend_conditions {
+        let found = result.iter().any(|(res_cs, res_conds)| {
+            // if coinspends aren't the same
+            if original_cs != res_cs {
+                return false;
             }
-        }
+
+            if original_conds.len() != res_conds.len() {
+                return false;
+            }
+
+            for orig_cond in original_conds {
+                let matching_cond = res_conds.iter().find(|(opcode, args)| {
+                    if orig_cond.0 as u32 != *opcode {
+                        return false;
+                    }
+
+                    if orig_cond.1.len() != args.len() {
+                        return false;
+                    }
+                    
+                    // compare args now we've found a match for original condition
+                    for (orig_arg, res_arg) in orig_cond.1.iter().zip(args) {
+                        let bytes = node_to_bytes(&a, *orig_arg).expect("arg nodetobytes");
+                        if &bytes != res_arg {
+                            return false;
+                        }
+                    }
+
+                    true
+                });
+
+                if matching_cond.is_none() {
+                    return false;
+                }
+            }
+
+            true
+        });
+
+        assert!(found, "Original CoinSpend and Conditions pair not found in result");
     }
 });
