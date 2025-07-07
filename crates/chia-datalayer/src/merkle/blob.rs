@@ -1097,24 +1097,35 @@ impl MerkleBlob {
     // }
 
     pub fn calculate_lazy_hashes(&mut self) -> Result<(), Error> {
-        // OPT: yeah, storing the whole set of blocks via collect is not great
-        for item in MerkleBlobLeftChildFirstIterator::new_with_block_predicate(
+        let indexes = MerkleBlobLeftChildFirstIterator::new_with_block_predicate(
             &self.blob,
             None,
             Some(|block: &Block| block.metadata.dirty),
         )
-        .collect::<Vec<_>>()
-        {
-            let (index, mut block) = item?;
-            assert!(block.metadata.dirty);
+        .map(|item| -> Result<TreeIndex, Error> {
+            match item {
+                Err(error) => Err(error),
+                Ok((index, ..)) => Ok(index),
+            }
+        })
+        .collect::<Result<Vec<TreeIndex>, Error>>()?;
 
-            let Node::Internal(ref leaf) = block.node else {
+        let mut hashes: HashMap<TreeIndex, Hash> = HashMap::new();
+        for index in indexes {
+            let mut block = self.get_block(index)?;
+            let Node::Internal(ref internal) = block.node else {
                 panic!("leaves should not be dirty")
             };
-            // OPT: obviously inefficient to re-get/deserialize these blocks inside
-            //      an iteration that's already doing that
-            let left_hash = self.get_hash(leaf.left)?;
-            let right_hash = self.get_hash(leaf.right)?;
+
+            let left_hash = match hashes.remove(&internal.left) {
+                Some(hash) => hash,
+                None => self.get_hash(internal.left)?,
+            };
+            let right_hash = match hashes.remove(&internal.right) {
+                Some(hash) => hash,
+                None => self.get_hash(internal.right)?,
+            };
+
             block.update_hash(&left_hash, &right_hash);
             self.insert_entry_to_blob(index, &block)?;
         }
