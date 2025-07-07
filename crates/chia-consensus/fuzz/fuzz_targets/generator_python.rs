@@ -60,7 +60,7 @@ fuzz_target!(|data: &[u8]| {
             let Ok(()) = data.read_exact(&mut buf) else {
                 return;
             };
-            let opcode: u8 = buf[0] % 100;
+            let opcode: u8 = (buf[0] % 100) + 1;
             cond_vec.push(opcode.to_clvm(&mut a).expect("opcode"));
             let mut arg_one = [0u8; 32];
             let mut arg_two = [0u8; 32];
