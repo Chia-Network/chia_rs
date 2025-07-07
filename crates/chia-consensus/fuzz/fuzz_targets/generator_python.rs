@@ -70,7 +70,8 @@ fuzz_target!(|data: &[u8]| {
             let Ok(()) = data.read_exact(&mut arg_two) else {
                 return;
             };
-            cond_vec.push(arg_one.to_clvm(&mut a).expect("arg one"));
+            cond_vec.push(a.new_atom(&arg_one).expect("arg one"));
+            cond_vec.push(a.new_atom(&arg_two).expect("arg one"));
             conds.push(cond_vec.clone());
             conds_for_later_comparison.push((opcode, cond_vec[1..].to_vec()));
         }
