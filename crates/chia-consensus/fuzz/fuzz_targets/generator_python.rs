@@ -120,10 +120,12 @@ fuzz_target!(|data: &[u8]| {
             for orig_cond in original_conds {
                 let matching_cond = res_conds.iter().find(|(opcode, args)| {
                     if orig_cond.0 as u32 != *opcode {
+                        println!("DEBUG ERROR: {orig_cond:?} != {opcode:?}");
                         return false;
                     }
 
                     if orig_cond.1.len() != args.len() {
+                        println!("DEBUG ERROR: wrong length");
                         return false;
                     }
 
@@ -131,6 +133,7 @@ fuzz_target!(|data: &[u8]| {
                     for (orig_arg, res_arg) in orig_cond.1.iter().zip(args) {
                         let bytes = node_to_bytes(&a, *orig_arg).expect("arg nodetobytes");
                         if &bytes != res_arg {
+                            println!("DEBUG ERROR: {bytes:?} != {res_arg:?}");
                             return false;
                         }
                     }
