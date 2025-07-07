@@ -103,6 +103,8 @@ fuzz_target!(|data: &[u8]| {
     let result =
         get_coinspends_with_conditions_for_trusted_block(&TEST_CONSTANTS, gen_prog, vec![&[]], 0)
             .expect("unwrap");
+    println!("DEBUG ORIGINAL: {coinspend_conditions:?}");
+    println!("DEBUG RESPONSE: {result:?}");
     for ((original_cs, original_conds), (res_cs, res_conds)) in
         coinspend_conditions.iter().zip(result)
     {
