@@ -131,8 +131,8 @@ fuzz_target!(|data: &[u8]| {
 
                     // compare args now we've found a match for original condition
                     for (orig_arg, res_arg) in orig_cond.1.iter().zip(args) {
-                        let bytes = node_to_bytes(&a, *orig_arg).expect("arg nodetobytes");
-                        if &bytes != res_arg {
+                        let bytes = a.atom(*orig_arg);
+                        if bytes.as_ref() != res_arg {
                             println!("DEBUG ERROR: {bytes:?} != {res_arg:?}");
                             return false;
                         }
