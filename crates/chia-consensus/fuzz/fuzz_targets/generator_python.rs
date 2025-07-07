@@ -125,7 +125,7 @@ fuzz_target!(|data: &[u8]| {
                     if orig_cond.1.len() != args.len() {
                         return false;
                     }
-                    
+
                     // compare args now we've found a match for original condition
                     for (orig_arg, res_arg) in orig_cond.1.iter().zip(args) {
                         let bytes = node_to_bytes(&a, *orig_arg).expect("arg nodetobytes");
@@ -145,6 +145,9 @@ fuzz_target!(|data: &[u8]| {
             true
         });
 
-        assert!(found, "Original CoinSpend and Conditions pair not found in result");
+        assert!(
+            found,
+            "Original CoinSpend and Conditions pair not found in result"
+        );
     }
 });
