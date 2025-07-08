@@ -115,8 +115,8 @@ doc = false
 bench = false
 
 [[bin]]
-name = "generator_python"
-path = "fuzz_targets/generator_python.rs"
+name = "generator_conditions"
+path = "fuzz_targets/generator_conditions.rs"
 test = false
 doc = false
 bench = false
