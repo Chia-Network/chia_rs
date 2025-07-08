@@ -1,7 +1,7 @@
 use crate::merkle::error::Error;
 use crate::{
-    Hash, InternalNodesMap, KeyId, LeafNodesMap, MerkleBlob, MerkleBlobParentFirstIterator, Node,
-    NodeHashToDeltaReaderNode, NodeHashToIndex, TreeIndex, ValueId,
+    Hash, InternalNodesMap, KeyId, LeafNodesMap, MerkleBlob, Node, NodeHashToDeltaReaderNode,
+    NodeHashToIndex, ParentFirstIterator, TreeIndex, ValueId,
 };
 #[cfg(feature = "py-bindings")]
 use pyo3::{pyclass, pymethods, PyObject, PyResult, Python};
@@ -37,7 +37,7 @@ impl DeltaFileCache {
         self.previous_hashes = HashSet::new();
 
         if !blob.is_empty() {
-            for item in MerkleBlobParentFirstIterator::new(&blob, None) {
+            for item in ParentFirstIterator::new(&blob, None) {
                 let (_, block) = item?;
                 self.previous_hashes.insert(block.node.hash());
             }
