@@ -9,8 +9,7 @@ use chia_traits::Streamable;
 use clvm_traits::ToClvm;
 use clvmr::{serde::node_to_bytes, Allocator, NodePtr};
 use libfuzzer_sys::fuzz_target;
-use std::io::Cursor;
-use std::io::Read;
+use std::io::{Cursor, Read};
 
 fuzz_target!(|data: &[u8]| {
     let mut spends = Vec::<CoinSpend>::new();
@@ -30,7 +29,7 @@ fuzz_target!(|data: &[u8]| {
 
     let bytes: &[u8] = &[1_u8];
 
-    // a puzzle of `1` will return the solution exactly
+    // A puzzle of `1` returns the solution exactly,
     // so we can make the solution a list of conditions
     let one_puz = Program::new(Bytes::from(bytes));
     let Ok(one_puzhash) = clvm_utils::tree_hash_from_bytes(&one_puz) else {
@@ -56,25 +55,33 @@ fuzz_target!(|data: &[u8]| {
 
         for _ in 0..num_of_conds {
             let mut cond_vec = Vec::<NodePtr>::new();
+
             let mut buf = [0u8; 1];
             let Ok(()) = data.read_exact(&mut buf) else {
                 return;
             };
             let opcode: u8 = (buf[0] % 100) + 1;
             cond_vec.push(opcode.to_clvm(&mut a).expect("opcode"));
-            let mut arg_one = [0u8; 32];
-            let mut arg_two = [0u8; 32];
-            let Ok(()) = data.read_exact(&mut arg_one) else {
+
+            let mut buf = [0u8; 1];
+            let Ok(()) = data.read_exact(&mut buf) else {
                 return;
             };
-            let Ok(()) = data.read_exact(&mut arg_two) else {
-                return;
-            };
-            cond_vec.push(a.new_atom(&arg_one).expect("arg one"));
-            cond_vec.push(a.new_atom(&arg_two).expect("arg one"));
+            let num_args = buf[0] % 6; // 0 to 5 inclusive
+
+            for _ in 0..num_args {
+                let mut arg_bytes = [0u8; 32];
+                let Ok(()) = data.read_exact(&mut arg_bytes) else {
+                    return;
+                };
+                let arg_node = a.new_atom(&arg_bytes).expect("arg atom");
+                cond_vec.push(arg_node);
+            }
+
             conds.push(cond_vec.clone());
             conds_for_later_comparison.push((opcode, cond_vec[1..].to_vec()));
         }
+
         let solution = conds.to_clvm(&mut a).expect("vec of nodes");
         let solution_bytes = node_to_bytes(&a, solution).expect("node to bytes");
 
@@ -90,25 +97,27 @@ fuzz_target!(|data: &[u8]| {
     if spends.is_empty() {
         return;
     }
+
     let spend_bundle = SpendBundle {
         coin_spends: spends.clone(),
         aggregated_signature: Signature::default(),
     };
+
     blockbuilder
         .add_spend_bundles([spend_bundle], 0, &TEST_CONSTANTS)
         .expect("add spend");
+
     let Ok((generator, _sig, _cost)) = blockbuilder.finalize(&TEST_CONSTANTS) else {
         return;
     };
+
     let gen_prog = &Program::new(generator.clone().into());
     let result =
         get_coinspends_with_conditions_for_trusted_block(&TEST_CONSTANTS, gen_prog, vec![&[]], 0)
             .expect("unwrap");
-    println!("DEBUG ORIGINAL: {coinspend_conditions:?}");
-    println!("DEBUG RESPONSE: {result:?}");
+
     for (original_cs, original_conds) in &coinspend_conditions {
         let found = result.iter().any(|(res_cs, res_conds)| {
-            // if coinspends aren't the same
             if original_cs != res_cs {
                 return false;
             }
@@ -129,7 +138,6 @@ fuzz_target!(|data: &[u8]| {
                         return false;
                     }
 
-                    // compare args now we've found a match for original condition
                     for (orig_arg, res_arg) in orig_cond.1.iter().zip(args) {
                         let bytes = a.atom(*orig_arg);
                         if bytes.as_ref() != res_arg {
