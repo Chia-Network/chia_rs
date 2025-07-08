@@ -15,6 +15,7 @@ use crate::{
     merkle::error::Error, Block, BlockBytes, Hash, InternalNode, KeyId, LeafNode, Node,
     NodeMetadata, NodeType, Parent, TreeIndex, ValueId, BLOCK_SIZE,
 };
+use bitvec::prelude::BitVec;
 use chia_protocol::Bytes32;
 use chia_sha2::Sha256;
 use chia_streamable_macro::Streamable;
@@ -109,13 +110,13 @@ impl BlockStatusCache {
     fn new(blob: &[u8]) -> Result<Self, Error> {
         let index_count = blob.len() / BLOCK_SIZE;
 
-        let mut seen_indexes: Vec<bool> = vec![false; index_count];
+        let mut seen_indexes: BitVec<u64, bitvec::order::Lsb0> = BitVec::repeat(false, index_count);
         let mut key_to_index: HashMap<KeyId, TreeIndex> = HashMap::default();
         let mut leaf_hash_to_index: HashMap<Hash, TreeIndex> = HashMap::default();
 
         for item in LeftChildFirstIterator::new(blob, None) {
             let (index, block) = item?;
-            seen_indexes[index.0 as usize] = true;
+            seen_indexes.set(index.0 as usize, true);
 
             if let Node::Leaf(leaf) = block.node {
                 key_to_index.insert(leaf.key, index);
