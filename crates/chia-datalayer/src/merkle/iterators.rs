@@ -2,19 +2,19 @@ use crate::merkle::error::Error;
 use crate::{try_get_block, Block, Node, TreeIndex, BLOCK_SIZE};
 use std::collections::{HashSet, VecDeque};
 
-struct MerkleBlobLeftChildFirstIteratorItem {
+struct LeftChildFirstIteratorItem {
     visited: bool,
     index: TreeIndex,
 }
 
-pub struct MerkleBlobLeftChildFirstIterator<'a> {
+pub struct LeftChildFirstIterator<'a> {
     blob: &'a [u8],
-    stack: Vec<MerkleBlobLeftChildFirstIteratorItem>,
+    stack: Vec<LeftChildFirstIteratorItem>,
     already_queued: HashSet<TreeIndex>,
     predicate: Option<fn(&Block) -> bool>,
 }
 
-impl<'a> MerkleBlobLeftChildFirstIterator<'a> {
+impl<'a> LeftChildFirstIterator<'a> {
     pub fn new(blob: &'a [u8], from_index: Option<TreeIndex>) -> Self {
         Self::new_with_block_predicate(blob, from_index, None)
     }
@@ -27,7 +27,7 @@ impl<'a> MerkleBlobLeftChildFirstIterator<'a> {
         let mut stack = Vec::new();
         let from_index = from_index.unwrap_or(TreeIndex(0));
         if blob.len() / BLOCK_SIZE > 0 {
-            stack.push(MerkleBlobLeftChildFirstIteratorItem {
+            stack.push(LeftChildFirstIteratorItem {
                 visited: false,
                 index: from_index,
             });
@@ -42,7 +42,7 @@ impl<'a> MerkleBlobLeftChildFirstIterator<'a> {
     }
 }
 
-impl Iterator for MerkleBlobLeftChildFirstIterator<'_> {
+impl Iterator for LeftChildFirstIterator<'_> {
     type Item = Result<(TreeIndex, Block), Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -73,15 +73,15 @@ impl Iterator for MerkleBlobLeftChildFirstIterator<'_> {
                     }
                     self.already_queued.insert(item.index);
 
-                    self.stack.push(MerkleBlobLeftChildFirstIteratorItem {
+                    self.stack.push(LeftChildFirstIteratorItem {
                         visited: true,
                         index: item.index,
                     });
-                    self.stack.push(MerkleBlobLeftChildFirstIteratorItem {
+                    self.stack.push(LeftChildFirstIteratorItem {
                         visited: false,
                         index: node.right,
                     });
-                    self.stack.push(MerkleBlobLeftChildFirstIteratorItem {
+                    self.stack.push(LeftChildFirstIteratorItem {
                         visited: false,
                         index: node.left,
                     });
@@ -91,13 +91,13 @@ impl Iterator for MerkleBlobLeftChildFirstIterator<'_> {
     }
 }
 
-pub struct MerkleBlobParentFirstIterator<'a> {
+pub struct ParentFirstIterator<'a> {
     blob: &'a [u8],
     deque: VecDeque<TreeIndex>,
     already_queued: HashSet<TreeIndex>,
 }
 
-impl<'a> MerkleBlobParentFirstIterator<'a> {
+impl<'a> ParentFirstIterator<'a> {
     pub fn new(blob: &'a [u8], from_index: Option<TreeIndex>) -> Self {
         let mut deque = VecDeque::new();
         let from_index = from_index.unwrap_or(TreeIndex(0));
@@ -113,7 +113,7 @@ impl<'a> MerkleBlobParentFirstIterator<'a> {
     }
 }
 
-impl Iterator for MerkleBlobParentFirstIterator<'_> {
+impl Iterator for ParentFirstIterator<'_> {
     type Item = Result<(TreeIndex, Block), Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -139,13 +139,13 @@ impl Iterator for MerkleBlobParentFirstIterator<'_> {
     }
 }
 
-pub struct MerkleBlobBreadthFirstIterator<'a> {
+pub struct BreadthFirstIterator<'a> {
     blob: &'a [u8],
     deque: VecDeque<TreeIndex>,
     already_queued: HashSet<TreeIndex>,
 }
 
-impl<'a> MerkleBlobBreadthFirstIterator<'a> {
+impl<'a> BreadthFirstIterator<'a> {
     #[allow(unused)]
     pub fn new(blob: &'a [u8], from_index: Option<TreeIndex>) -> Self {
         let mut deque = VecDeque::new();
@@ -162,7 +162,7 @@ impl<'a> MerkleBlobBreadthFirstIterator<'a> {
     }
 }
 
-impl Iterator for MerkleBlobBreadthFirstIterator<'_> {
+impl Iterator for BreadthFirstIterator<'_> {
     type Item = Result<(TreeIndex, Block), Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -194,8 +194,8 @@ impl Iterator for MerkleBlobBreadthFirstIterator<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::merkle::blob::tests::open_dot;
-    use crate::merkle::blob::tests::traversal_blob;
+    use crate::merkle::test_util::open_dot;
+    use crate::merkle::test_util::traversal_blob;
     use crate::{Hash, MerkleBlob, NodeType};
     use expect_test::{expect, Expect};
     use rstest::rstest;
@@ -224,7 +224,7 @@ mod tests {
     #[allow(clippy::needless_raw_string_hashes)]
     #[case::left_child_first(
         "left child first",
-        MerkleBlobLeftChildFirstIterator::new,
+        LeftChildFirstIterator::new,
         expect![[r#"
             [
                 (
@@ -297,7 +297,7 @@ mod tests {
     #[allow(clippy::needless_raw_string_hashes)]
     #[case::parent_first(
         "parent first",
-        MerkleBlobParentFirstIterator::new,
+        ParentFirstIterator::new,
         expect![[r#"
             [
                 (
@@ -369,7 +369,7 @@ mod tests {
     #[allow(clippy::needless_raw_string_hashes)]
     #[case::breadth_first(
         "breadth first",
-        MerkleBlobBreadthFirstIterator::new,
+        BreadthFirstIterator::new,
         expect![[r#"
             [
                 (
