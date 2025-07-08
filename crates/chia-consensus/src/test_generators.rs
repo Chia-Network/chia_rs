@@ -303,7 +303,7 @@ fn run_generator(#[case] name: &str) {
         let result2 = get_coinspends_with_conditions_for_trusted_block(
             &TEST_CONSTANTS,
             &Program::new(generator.clone().into()),
-            vec_of_slices,
+            &vec_of_slices,
             *flags,
         );
 
