@@ -398,8 +398,8 @@ pub fn get_coinspends_with_conditions_for_trusted_block(
                 } else if bytes_vec.len() < 6 {
                     match a.sexp(condition_values) {
                         SExp::Atom => {
-                            // a reasonable max length of an atom is 1,500,000 bytes
-                            if a.atom_len(condition_values) >= 1_500_000 {
+                            // a reasonable max length of an atom is 1,024 bytes
+                            if a.atom_len(condition_values) >= 1024 {
                                 // skip this condition
                                 num = 0;
                                 break;
