@@ -10,7 +10,10 @@ use pyo3::{
 };
 
 use crate::merkle::iterators::{BreadthFirstIterator, LeftChildFirstIterator, ParentFirstIterator};
-use crate::merkle::{deltas, format, proof_of_inclusion, util};
+use crate::merkle::{
+    deltas, format, proof_of_inclusion,
+    util::{sha256_bytes, sha256_num},
+};
 use crate::{
     merkle::error::Error, Block, BlockBytes, Hash, InternalNode, KeyId, LeafNode, Node,
     NodeMetadata, NodeType, Parent, TreeIndex, ValueId, BLOCK_SIZE,
@@ -959,7 +962,7 @@ impl MerkleBlob {
                 }
             }
 
-            seed_bytes = util::sha256_bytes(&seed_bytes).0.into();
+            seed_bytes = sha256_bytes(&seed_bytes).0.into();
         }
     }
 
@@ -977,7 +980,7 @@ impl MerkleBlob {
     }
 
     fn get_random_insert_location_by_key_id(&self, seed: KeyId) -> Result<InsertLocation, Error> {
-        let seed = util::sha256_num(seed.0);
+        let seed = sha256_num(seed.0);
 
         self.get_random_insert_location_by_seed(&seed.0)
     }
@@ -1586,8 +1589,9 @@ impl Drop for MerkleBlob {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::merkle::test_util;
-    use crate::merkle::test_util::{open_dot, small_blob, traversal_blob, HASH_ONE, HASH_ZERO};
+    use crate::merkle::test_util::{
+        generate_hash, open_dot, small_blob, traversal_blob, HASH_ONE, HASH_ZERO,
+    };
     use crate::merkle::util::sha256_num;
     use chia_traits::Streamable;
     use expect_test::expect;
@@ -2186,7 +2190,7 @@ mod tests {
             .insert(
                 KeyId(1),
                 ValueId(2),
-                &test_util::generate_hash(3),
+                &generate_hash(3),
                 InsertLocation::Auto {},
             )
             .unwrap();
