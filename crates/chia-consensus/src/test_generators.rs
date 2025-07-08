@@ -323,7 +323,10 @@ fn run_generator(#[case] name: &str) {
                 );
                 let puzhash = a.atom(spend.puzzle_hash);
                 assert_eq!(puzhash.as_ref(), coinspends[i].coin.puzzle_hash.as_slice());
-                assert_eq!(puzhash.as_ref(), coinspends2[i].0.coin.puzzle_hash.as_slice());
+                assert_eq!(
+                    puzhash.as_ref(),
+                    coinspends2[i].0.coin.puzzle_hash.as_slice()
+                );
                 assert_eq!(spend.coin_amount, coinspends[i].coin.amount);
                 assert_eq!(spend.coin_amount, coinspends2[i].0.coin.amount);
             }
