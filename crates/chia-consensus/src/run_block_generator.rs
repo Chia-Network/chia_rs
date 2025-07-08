@@ -311,6 +311,8 @@ pub fn get_coinspends_for_trusted_block(
     Ok(output)
 }
 
+// this function returns a list of tuples (coinspend, conditions)
+// conditions are formatted as a vec of tuples of (condition_opcode, args)
 #[allow(clippy::type_complexity)]
 pub fn get_coinspends_with_conditions_for_trusted_block(
     constants: &ConsensusConstants,
