@@ -6,3 +6,6 @@ pub mod error;
 pub mod format;
 pub mod iterators;
 pub mod proof_of_inclusion;
+#[cfg(test)]
+mod test_util;
+mod util;
