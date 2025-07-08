@@ -299,18 +299,32 @@ fn run_generator(#[case] name: &str) {
             *flags,
         );
 
+        let result2 = get_coinspends_with_conditions_for_trusted_block(
+            &TEST_CONSTANTS,
+            &Program::new(generator.clone().into()),
+            vec_of_slices,
+            *flags,
+        );
+
         if let Ok(conds) = conds {
             // if run_block_generator2 is OK then check we're equal
             let coinspends = result.expect("get_coinspends");
+            let coinspends2 = result2.expect("get_coinspends_with_conds");
             for (i, spend) in conds.spends.into_iter().enumerate() {
                 let parent_id = a.atom(spend.parent_id);
                 assert_eq!(
                     parent_id.as_ref(),
                     coinspends[i].coin.parent_coin_info.as_slice()
                 );
+                assert_eq!(
+                    parent_id.as_ref(),
+                    coinspends2[i].coin.parent_coin_info.as_slice()
+                );
                 let puzhash = a.atom(spend.puzzle_hash);
                 assert_eq!(puzhash.as_ref(), coinspends[i].coin.puzzle_hash.as_slice());
+                assert_eq!(puzhash.as_ref(), coinspends2[i].coin.puzzle_hash.as_slice());
                 assert_eq!(spend.coin_amount, coinspends[i].coin.amount);
+                assert_eq!(spend.coin_amount, coinspends2[i].coin.amount);
             }
         }
     }
