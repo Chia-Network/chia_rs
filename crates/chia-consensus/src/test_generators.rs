@@ -319,13 +319,13 @@ fn run_generator(#[case] name: &str) {
                 );
                 assert_eq!(
                     parent_id.as_ref(),
-                    coinspends2[i].coin.parent_coin_info.as_slice()
+                    coinspends2[i].0.coin.parent_coin_info.as_slice()
                 );
                 let puzhash = a.atom(spend.puzzle_hash);
                 assert_eq!(puzhash.as_ref(), coinspends[i].coin.puzzle_hash.as_slice());
-                assert_eq!(puzhash.as_ref(), coinspends2[i].coin.puzzle_hash.as_slice());
+                assert_eq!(puzhash.as_ref(), coinspends2[i].0.coin.puzzle_hash.as_slice());
                 assert_eq!(spend.coin_amount, coinspends[i].coin.amount);
-                assert_eq!(spend.coin_amount, coinspends2[i].coin.amount);
+                assert_eq!(spend.coin_amount, coinspends2[i].0.coin.amount);
             }
         }
     }
