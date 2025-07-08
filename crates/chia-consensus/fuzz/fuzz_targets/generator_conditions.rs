@@ -113,7 +113,7 @@ fuzz_target!(|data: &[u8]| {
 
     let gen_prog = &Program::new(generator.clone().into());
     let result =
-        get_coinspends_with_conditions_for_trusted_block(&TEST_CONSTANTS, gen_prog, vec![&[]], 0)
+        get_coinspends_with_conditions_for_trusted_block(&TEST_CONSTANTS, gen_prog, &vec![&[]], 0)
             .expect("unwrap");
 
     for (original_cs, original_conds) in &coinspend_conditions {

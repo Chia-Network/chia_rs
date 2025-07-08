@@ -317,7 +317,7 @@ pub fn get_coinspends_for_trusted_block(
 pub fn get_coinspends_with_conditions_for_trusted_block(
     constants: &ConsensusConstants,
     generator: &Program,
-    refs: Vec<&[u8]>,
+    refs: &Vec<&[u8]>,
     flags: u32,
 ) -> Result<Vec<(CoinSpend, Vec<(u32, Vec<Vec<u8>>)>)>, ValidationErr> {
     let mut a = make_allocator(LIMIT_HEAP);

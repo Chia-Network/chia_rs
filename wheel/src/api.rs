@@ -545,7 +545,7 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
         .collect::<Vec<&'a [u8]>>();
 
     let output =
-        get_coinspends_with_conditions_for_trusted_block(constants, &generator, refs, flags)?;
+        get_coinspends_with_conditions_for_trusted_block(constants, &generator, &refs, flags)?;
 
     let pylist = PyList::empty(py);
     for (coinspend, cond_output) in output {
