@@ -1,6 +1,7 @@
 use super::conditions::{NewCoin, SpendBundleConditions, SpendConditions};
 use super::run_block_generator::{
-    get_coinspends_for_trusted_block, run_block_generator, run_block_generator2,
+    get_coinspends_for_trusted_block, get_coinspends_with_conditions_for_trusted_block,
+    run_block_generator, run_block_generator2,
 };
 use crate::allocator::make_allocator;
 use crate::consensus_constants::TEST_CONSTANTS;
