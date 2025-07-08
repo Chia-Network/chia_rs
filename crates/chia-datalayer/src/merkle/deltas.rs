@@ -322,8 +322,8 @@ impl DeltaFileCache {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::merkle::blob::tests::traversal_blob;
-    use crate::merkle::blob::tests::{generate_hash, generate_kvid, HASH_ONE, HASH_TWO, HASH_ZERO};
+    use crate::merkle::test_util::traversal_blob;
+    use crate::merkle::test_util::{generate_hash, generate_kvid, HASH_ONE, HASH_TWO, HASH_ZERO};
     use crate::{InsertLocation, InternalNodesMap, LeafNodesMap};
     use expect_test::expect;
     use rstest::rstest;

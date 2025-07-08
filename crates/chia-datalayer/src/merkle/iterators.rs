@@ -194,8 +194,8 @@ impl Iterator for MerkleBlobBreadthFirstIterator<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::merkle::blob::tests::open_dot;
-    use crate::merkle::blob::tests::traversal_blob;
+    use crate::merkle::test_util::open_dot;
+    use crate::merkle::test_util::traversal_blob;
     use crate::{Hash, MerkleBlob, NodeType};
     use expect_test::{expect, Expect};
     use rstest::rstest;

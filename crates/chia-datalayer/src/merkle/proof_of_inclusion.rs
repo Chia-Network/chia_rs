@@ -73,7 +73,7 @@ impl ProofOfInclusion {
 
 #[cfg(test)]
 mod tests {
-    use crate::merkle::blob::tests::traversal_blob;
+    use crate::merkle::test_util::traversal_blob;
     use crate::{Hash, KeyId, MerkleBlob, ValueId};
     use rand::prelude::{SliceRandom, StdRng};
     use rand::SeedableRng;
@@ -99,9 +99,9 @@ mod tests {
             let mut hashes: Vec<Hash> = Vec::new();
             for _ in 0..num_inserts {
                 seed += 1;
-                let (key, value) = crate::merkle::blob::tests::generate_kvid(seed);
+                let (key, value) = crate::merkle::test_util::generate_kvid(seed);
                 kv_ids.push((key, value));
-                hashes.push(crate::merkle::blob::tests::generate_hash(seed));
+                hashes.push(crate::merkle::test_util::generate_hash(seed));
                 keys_values.insert(key, value);
             }
 
@@ -114,7 +114,7 @@ mod tests {
                 let proof_of_inclusion = match merkle_blob.get_proof_of_inclusion(kv_id) {
                     Ok(proof_of_inclusion) => proof_of_inclusion,
                     Err(error) => {
-                        crate::merkle::blob::tests::open_dot(
+                        crate::merkle::test_util::open_dot(
                             merkle_blob.to_dot().unwrap().set_note(&error.to_string()),
                         );
                         panic!("here");
@@ -141,8 +141,8 @@ mod tests {
             let mut new_keys_values: HashMap<KeyId, ValueId> = HashMap::new();
             for old_kv in keys_values.keys().copied() {
                 seed += 1;
-                let (_, value) = crate::merkle::blob::tests::generate_kvid(seed);
-                let hash = crate::merkle::blob::tests::generate_hash(seed);
+                let (_, value) = crate::merkle::test_util::generate_kvid(seed);
+                let hash = crate::merkle::test_util::generate_hash(seed);
                 merkle_blob.upsert(old_kv, value, &hash).unwrap();
                 new_keys_values.insert(old_kv, value);
             }
@@ -162,7 +162,7 @@ mod tests {
     fn test_proof_of_inclusion_invalid_identified(traversal_blob: MerkleBlob) {
         let mut proof_of_inclusion = traversal_blob.get_proof_of_inclusion(KeyId(307)).unwrap();
         assert!(proof_of_inclusion.valid());
-        proof_of_inclusion.layers[1].combined_hash = crate::merkle::blob::tests::HASH_ONE;
+        proof_of_inclusion.layers[1].combined_hash = crate::merkle::test_util::HASH_ONE;
         assert!(!proof_of_inclusion.valid());
     }
 }
