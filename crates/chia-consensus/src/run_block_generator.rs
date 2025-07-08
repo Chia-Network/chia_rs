@@ -410,7 +410,7 @@ pub fn get_coinspends_with_conditions_for_trusted_block(
                         SExp::Pair(..) => continue, // ignore lists in condition args
                     };
                 } else {
-                    break; // we only care about the first 5 conditions
+                    break; // we only care about the first 5 condition arguments
                 }
             }
             if num != 0 {
