@@ -408,8 +408,11 @@ mod tests {
             .collect_from_merkle_blob(&blob_path, &vec![TreeIndex(0)])
             .unwrap();
 
-        let missing = delta_reader
-            .get_missing_hashes(traversal_blob.get_hash_at_index(TreeIndex(0)).unwrap());
+        let missing = delta_reader.get_missing_hashes(
+            traversal_blob
+                .get_hash_at_index(TreeIndex(0))
+                .expect("Expected root hash"),
+        );
 
         #[allow(clippy::needless_raw_string_hashes)]
         let expected = expect![[r#"
@@ -433,8 +436,11 @@ mod tests {
             .collect_from_merkle_blobs(&vec![(leaf_blob_path, vec![TreeIndex(0)])])
             .unwrap();
 
-        let missing =
-            delta_reader.get_missing_hashes(merkle_blob.get_hash_at_index(TreeIndex(0)).unwrap());
+        let missing = delta_reader.get_missing_hashes(
+            merkle_blob
+                .get_hash_at_index(TreeIndex(0))
+                .expect("Expected root hash"),
+        );
 
         #[allow(clippy::needless_raw_string_hashes)]
         let expected = expect![[r#"
