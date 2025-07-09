@@ -321,6 +321,7 @@ fn run_generator(#[case] name: &str) {
                         &coinspends[i].solution,
                     )
                     .is_ok();
+                assert!(runnable);
                 let parent_id = a.atom(spend.parent_id);
                 assert_eq!(
                     parent_id.as_ref(),
