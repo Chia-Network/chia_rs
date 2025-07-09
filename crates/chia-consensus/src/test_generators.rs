@@ -331,7 +331,6 @@ fn run_generator(#[case] name: &str) {
                 assert_eq!(spend.coin_amount, coinspends[i].coin.amount);
 
                 // coinspends2 might fail in puzzle processing and then not add the coinspend at all
-                // TODO: maybe change this
                 if runnable {
                     assert_eq!(
                         parent_id.as_ref(),

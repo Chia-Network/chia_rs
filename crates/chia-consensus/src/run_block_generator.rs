@@ -399,10 +399,10 @@ where
             };
             iter_three = rest_three;
             let Some(opcode) = a.small_number(condition_values) else {
-                break;
+                continue;
             };
             let mut bytes_vec = Vec::<Vec<u8>>::new();
-            while let Some((condition_values, rest_three)) = a.next(iter_three) {
+            'inner: while let Some((condition_values, rest_three)) = a.next(iter_three) {
                 iter_three = rest_three;
                 if bytes_vec.len() < 6 {
                     match a.sexp(condition_values) {
@@ -418,7 +418,7 @@ where
                         SExp::Pair(..) => continue, // ignore lists in condition args
                     };
                 } else {
-                    break; // we only care about the first 5 condition arguments
+                    break 'inner; // we only care about the first 5 condition arguments
                 }
             }
 
