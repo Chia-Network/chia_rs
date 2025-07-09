@@ -19,6 +19,7 @@ pub mod merkle_tree;
 pub mod messages;
 pub mod opcodes;
 pub mod owned_conditions;
+pub mod puzzle_fingerprint;
 pub mod run_block_generator;
 pub mod sanitize_int;
 pub mod solution_generator;
