@@ -108,6 +108,20 @@ doc = false
 bench = false
 
 [[bin]]
+name = "generator"
+path = "fuzz_targets/generator.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "generator_conditions"
+path = "fuzz_targets/generator_conditions.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "solution-generator"
 path = "fuzz_targets/solution-generator.rs"
 test = false
