@@ -390,30 +390,27 @@ where
 
         // condition is each grouped list
         // (51 0xcafef00d 100)
-        let mut num = 0;
         let mut iter_two = res;
-        while let Some((condition, rest_two)) = a.next(iter_two) {
+        'outer: while let Some((condition, rest_two)) = a.next(iter_two) {
             iter_two = rest_two;
             let mut iter_three = condition;
-
+            let Some((condition_values, rest_three)) = a.next(iter_three) else {
+                continue;
+            };
+            iter_three = rest_three;
+            let Some(opcode) = a.small_number(condition_values) else {
+                break;
+            };
             let mut bytes_vec = Vec::<Vec<u8>>::new();
             while let Some((condition_values, rest_three)) = a.next(iter_three) {
                 iter_three = rest_three;
-                if num == 0 {
-                    // convert the first value to a small number which is the condition opcode
-                    // In our above examples: 51
-                    let Some(n) = a.small_number(condition_values) else {
-                        break;
-                    };
-                    num = n;
-                } else if bytes_vec.len() < 6 {
+                if bytes_vec.len() < 6 {
                     match a.sexp(condition_values) {
                         SExp::Atom => {
                             // a reasonable max length of an atom is 1,024 bytes
                             if a.atom_len(condition_values) >= 1024 {
                                 // skip this condition
-                                num = 0;
-                                break;
+                                continue 'outer;
                             }
                             let bytes = a.atom(condition_values).to_vec();
                             bytes_vec.push(bytes);
@@ -424,11 +421,9 @@ where
                     break; // we only care about the first 5 condition arguments
                 }
             }
-            if num != 0 {
-                // we have a valid condition
-                cond_output.push((num, bytes_vec));
-                num = 0;
-            }
+
+            // we have a valid condition
+            cond_output.push((opcode, bytes_vec));
         }
         output.push((coinspend, cond_output));
     }

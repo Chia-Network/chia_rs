@@ -312,6 +312,15 @@ fn run_generator(#[case] name: &str) {
             let coinspends = result.expect("get_coinspends");
             let coinspends2 = result2.expect("get_coinspends_with_conds");
             for (i, spend) in conds.spends.into_iter().enumerate() {
+                let runnable = coinspends[i]
+                    .puzzle_reveal
+                    .run(
+                        &mut a,
+                        *flags,
+                        TEST_CONSTANTS.max_block_cost_clvm,
+                        &coinspends[i].solution,
+                    )
+                    .is_ok();
                 let parent_id = a.atom(spend.parent_id);
                 assert_eq!(
                     parent_id.as_ref(),
@@ -323,7 +332,7 @@ fn run_generator(#[case] name: &str) {
 
                 // coinspends2 might fail in puzzle processing and then not add the coinspend at all
                 // TODO: maybe change this
-                if coinspends2.len() == coinspends.len() {
+                if runnable {
                     assert_eq!(
                         parent_id.as_ref(),
                         coinspends2[i].0.coin.parent_coin_info.as_slice()
