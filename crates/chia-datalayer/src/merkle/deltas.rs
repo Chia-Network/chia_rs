@@ -359,9 +359,9 @@ mod tests {
 
     #[test]
     fn test_root_hash_missing() {
-        let mut internal_nodes_map = InternalNodesMap::new();
-        let mut leaf_nodes_map = LeafNodesMap::new();
-        let mut delta_reader = DeltaReader::new(internal_nodes_map, leaf_nodes_map).unwrap();
+        let internal_nodes_map = InternalNodesMap::new();
+        let leaf_nodes_map = LeafNodesMap::new();
+        let delta_reader = DeltaReader::new(internal_nodes_map, leaf_nodes_map).unwrap();
         let missing = delta_reader.get_missing_hashes(HASH_ZERO);
         let expected = expect![[r"
             {
