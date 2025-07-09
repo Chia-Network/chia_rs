@@ -330,18 +330,16 @@ fn run_generator(#[case] name: &str) {
                 assert_eq!(puzhash.as_ref(), coinspends[i].coin.puzzle_hash.as_slice());
                 assert_eq!(spend.coin_amount, coinspends[i].coin.amount);
 
-                // coinspends2 might fail in puzzle processing and then not add the coinspend at all
-                if runnable {
-                    assert_eq!(
-                        parent_id.as_ref(),
-                        coinspends2[i].0.coin.parent_coin_info.as_slice()
-                    );
-                    assert_eq!(
-                        puzhash.as_ref(),
-                        coinspends2[i].0.coin.puzzle_hash.as_slice()
-                    );
-                    assert_eq!(spend.coin_amount, coinspends2[i].0.coin.amount);
-                }
+                // check that we're getting the same info from get_coinspends_with_conditions_for_trusted_block
+                assert_eq!(
+                    parent_id.as_ref(),
+                    coinspends2[i].0.coin.parent_coin_info.as_slice()
+                );
+                assert_eq!(
+                    puzhash.as_ref(),
+                    coinspends2[i].0.coin.puzzle_hash.as_slice()
+                );
+                assert_eq!(spend.coin_amount, coinspends2[i].0.coin.amount);
             }
         }
     }

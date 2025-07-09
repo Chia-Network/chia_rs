@@ -383,6 +383,7 @@ where
         let Ok((_, res)) =
             puzzle_program.run(&mut a, flags, constants.max_block_cost_clvm, &solution)
         else {
+            output.push((coinspend, cond_output));
             continue; // Skip this spend on error
         };
         // conditions_list is the full returned output of puzzle ran with solution
