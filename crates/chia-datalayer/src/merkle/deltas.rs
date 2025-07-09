@@ -411,6 +411,7 @@ mod tests {
         let missing = delta_reader.get_missing_hashes(
             traversal_blob
                 .get_hash_at_index(TreeIndex(0))
+                .unwrap()
                 .expect("Expected root hash"),
         );
 
@@ -439,6 +440,7 @@ mod tests {
         let missing = delta_reader.get_missing_hashes(
             merkle_blob
                 .get_hash_at_index(TreeIndex(0))
+                .unwrap()
                 .expect("Expected root hash"),
         );
 
