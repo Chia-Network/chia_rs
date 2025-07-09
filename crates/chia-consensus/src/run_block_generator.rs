@@ -250,12 +250,15 @@ where
     Ok(ret)
 }
 
-pub fn get_coinspends_for_trusted_block(
+pub fn get_coinspends_for_trusted_block<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
     constants: &ConsensusConstants,
     generator: &Program,
-    refs: &Vec<&[u8]>,
+    refs: I,
     flags: u32,
-) -> Result<Vec<CoinSpend>, ValidationErr> {
+) -> Result<Vec<CoinSpend>, ValidationErr>
+where
+    <I as IntoIterator>::IntoIter: DoubleEndedIterator,
+{
     let mut a = make_allocator(LIMIT_HEAP);
     let mut output = Vec::<CoinSpend>::new();
 
@@ -314,12 +317,18 @@ pub fn get_coinspends_for_trusted_block(
 // this function returns a list of tuples (coinspend, conditions)
 // conditions are formatted as a vec of tuples of (condition_opcode, args)
 #[allow(clippy::type_complexity)]
-pub fn get_coinspends_with_conditions_for_trusted_block(
+pub fn get_coinspends_with_conditions_for_trusted_block<
+    GenBuf: AsRef<[u8]>,
+    I: IntoIterator<Item = GenBuf>,
+>(
     constants: &ConsensusConstants,
     generator: &Program,
-    refs: &Vec<&[u8]>,
+    refs: I,
     flags: u32,
-) -> Result<Vec<(CoinSpend, Vec<(u32, Vec<Vec<u8>>)>)>, ValidationErr> {
+) -> Result<Vec<(CoinSpend, Vec<(u32, Vec<Vec<u8>>)>)>, ValidationErr>
+where
+    <I as IntoIterator>::IntoIter: DoubleEndedIterator,
+{
     let mut a = make_allocator(LIMIT_HEAP);
     let mut output = Vec::<(CoinSpend, Vec<(u32, Vec<Vec<u8>>)>)>::new();
 
