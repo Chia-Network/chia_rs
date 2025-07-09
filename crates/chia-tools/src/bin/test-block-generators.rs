@@ -284,7 +284,7 @@ fn main() {
                         block_refs.iter().map(std::vec::Vec::as_slice).collect();
 
                     let coinspends =
-                        get_coinspends_for_trusted_block(constants, prog, vec_of_slices, flags)
+                        get_coinspends_for_trusted_block(constants, prog, &vec_of_slices, flags)
                             .expect("get_coinspends");
                     for (i, spend) in recompressed_conditions.spends.into_iter().enumerate() {
                         let parent_id = a.atom(spend.parent_id);

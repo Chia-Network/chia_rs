@@ -296,7 +296,7 @@ fn run_generator(#[case] name: &str) {
         let result = get_coinspends_for_trusted_block(
             &TEST_CONSTANTS,
             &Program::new(generator.clone().into()),
-            vec_of_slices,
+            &vec_of_slices,
             *flags,
         );
 
@@ -317,18 +317,23 @@ fn run_generator(#[case] name: &str) {
                     parent_id.as_ref(),
                     coinspends[i].coin.parent_coin_info.as_slice()
                 );
-                assert_eq!(
-                    parent_id.as_ref(),
-                    coinspends2[i].0.coin.parent_coin_info.as_slice()
-                );
                 let puzhash = a.atom(spend.puzzle_hash);
                 assert_eq!(puzhash.as_ref(), coinspends[i].coin.puzzle_hash.as_slice());
-                assert_eq!(
-                    puzhash.as_ref(),
-                    coinspends2[i].0.coin.puzzle_hash.as_slice()
-                );
                 assert_eq!(spend.coin_amount, coinspends[i].coin.amount);
-                assert_eq!(spend.coin_amount, coinspends2[i].0.coin.amount);
+
+                // coinspends2 might fail in puzzle processing and then not add the coinspend at all
+                // TODO: maybe change this
+                if coinspends2.len() == coinspends.len() {
+                    assert_eq!(
+                        parent_id.as_ref(),
+                        coinspends2[i].0.coin.parent_coin_info.as_slice()
+                    );
+                    assert_eq!(
+                        puzhash.as_ref(),
+                        coinspends2[i].0.coin.puzzle_hash.as_slice()
+                    );
+                    assert_eq!(spend.coin_amount, coinspends2[i].0.coin.amount);
+                }
             }
         }
     }

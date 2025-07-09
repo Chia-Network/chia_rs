@@ -37,7 +37,7 @@ fuzz_target!(|data: &[u8]| {
     };
     let gen_prog = &Program::new(generator.clone().into());
     let result =
-        get_coinspends_for_trusted_block(&TEST_CONSTANTS, gen_prog, vec![&[]], 0).expect("unwrap");
+        get_coinspends_for_trusted_block(&TEST_CONSTANTS, gen_prog, &vec![&[]], 0).expect("unwrap");
 
     for (spend, res) in spends.iter().zip(result) {
         assert_eq!(res.coin.parent_coin_info, spend.coin.parent_coin_info);

@@ -517,7 +517,7 @@ pub fn get_spends_for_trusted_block<'a>(
         })
         .collect::<Vec<&'a [u8]>>();
 
-    let output = get_coinspends_for_trusted_block(constants, &generator, refs, flags)?;
+    let output = get_coinspends_for_trusted_block(constants, &generator, &refs, flags)?;
 
     let pylist = PyList::empty(py);
     let dict = PyDict::new(py);
