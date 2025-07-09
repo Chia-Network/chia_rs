@@ -10,6 +10,7 @@ use chia_consensus::flags::{
 use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
 use chia_consensus::owned_conditions::{OwnedSpendBundleConditions, OwnedSpendConditions};
+use chia_consensus::puzzle_fingerprint::compute_puzzle_fingerprint;
 use chia_consensus::run_block_generator::setup_generator_args;
 use chia_consensus::run_block_generator::{
     get_coinspends_for_trusted_block, get_coinspends_with_conditions_for_trusted_block,
@@ -443,6 +444,19 @@ pub fn py_get_flags_for_height_and_constants(height: u32, constants: &ConsensusC
     get_flags_for_height_and_constants(height, constants)
 }
 
+#[pyfunction]
+#[pyo3(name = "compute_puzzle_fingerprint", signature = (puzzle, solution, *, max_cost, flags))]
+pub fn py_compute_puzzle_fingerprint(
+    puzzle: &Program,
+    solution: &Program,
+    max_cost: u64,
+    flags: u32,
+) -> PyResult<(u64, [u8; 32])> {
+    Ok(compute_puzzle_fingerprint(
+        puzzle, solution, max_cost, flags,
+    )?)
+}
+
 #[pyo3::pyfunction]
 #[pyo3(name = "is_overflow_block")]
 pub fn py_is_overflow_block(
@@ -619,6 +633,8 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_validate_clvm_and_signature, m)?)?;
     m.add_function(wrap_pyfunction!(py_get_conditions_from_spendbundle, m)?)?;
     m.add_function(wrap_pyfunction!(py_get_flags_for_height_and_constants, m)?)?;
+
+    m.add_function(wrap_pyfunction!(py_compute_puzzle_fingerprint, m)?)?;
 
     // get spends for generator
     m.add_function(wrap_pyfunction!(get_spends_for_trusted_block, m)?)?;
