@@ -396,6 +396,7 @@ dependencies = [
 name = "chia-datalayer"
 version = "0.24.0"
 dependencies = [
+ "arbitrary",
  "bitvec",
  "chia-datalayer-macro",
  "chia-protocol",
@@ -424,6 +425,8 @@ name = "chia-datalayer-fuzz"
 version = "0.24.0"
 dependencies = [
  "chia-datalayer",
+ "chia-protocol",
+ "chia-sha2 0.26.0",
  "libfuzzer-sys",
 ]
 

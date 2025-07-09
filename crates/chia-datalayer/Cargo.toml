@@ -13,6 +13,7 @@ workspace = true
 
 [features]
 py-bindings = ["dep:pyo3", "dep:chia_py_streamable_macro", "chia-protocol/py-bindings"]
+arbitrary = ["dep:arbitrary", "chia-protocol/arbitrary"]
 
 [lib]
 crate-type = ["rlib"]
@@ -30,8 +31,9 @@ chia-sha2 = { workspace = true }
 chia-protocol = { workspace = true }
 rayon = { workspace = true }
 zstd = { workspace = true }
+arbitrary = { workspace = true, features = ["derive"], optional = true }
 
-[dev-dependencies]
+#[dev-dependencies]
 clvm-utils = { workspace = true }
 expect-test = { workspace = true }
 hex = { workspace = true }

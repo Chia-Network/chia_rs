@@ -55,6 +55,7 @@ pub struct Parent(pub Option<TreeIndex>);
     derive(FromPyObject, IntoPyObject, PyJsonDict),
     pyo3(transparent)
 )]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 pub struct Hash(pub Bytes32);
 
@@ -73,9 +74,17 @@ pub struct Hash(pub Bytes32);
 #[cfg(feature = "py-bindings")]
 pub struct KeyId(#[pyo3(get, name = "raw")] pub i64);
 
+// #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 #[cfg(not(feature = "py-bindings"))]
 pub struct KeyId(pub i64);
+
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for KeyId {
+    fn arbitrary(_u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(Self(i64::arbitrary(_u)?))
+    }
+}
 
 #[cfg(feature = "py-bindings")]
 #[pymethods]
@@ -98,6 +107,7 @@ impl KeyId {
 #[cfg(feature = "py-bindings")]
 pub struct ValueId(#[pyo3(get, name = "raw")] pub i64);
 
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 #[cfg(not(feature = "py-bindings"))]
 pub struct ValueId(pub i64);

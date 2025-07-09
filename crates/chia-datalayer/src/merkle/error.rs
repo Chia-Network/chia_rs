@@ -14,6 +14,8 @@ pub enum Error {
     InvalidBlobLength(usize),
     #[error("key already present")]
     KeyAlreadyPresent(),
+    #[error("hash already present")]
+    HashAlreadyPresent(),
     #[error("requested insertion at root but tree not empty")]
     UnableToInsertAsRootOfNonEmptyTree(),
     #[error("unable to find a leaf")]

@@ -119,8 +119,10 @@ impl BlockStatusCache {
             seen_indexes.set(index.0 as usize, true);
 
             if let Node::Leaf(leaf) = block.node {
+                // TODO: check for collisions here too
                 key_to_index.insert(leaf.key, index);
                 leaf_hash_to_index.insert(leaf.hash, index);
+                // self._insert_leaf(leaf, index);
             }
         }
 
@@ -180,6 +182,10 @@ impl BlockStatusCache {
         self.key_to_index.contains_key(&key)
     }
 
+    fn contains_leaf_hash(&self, hash: &Hash) -> bool {
+        self.leaf_hash_to_index.contains_key(hash)
+    }
+
     fn clear(&mut self) {
         self.key_to_index.clear();
         self.free_indexes.clear();
@@ -190,11 +196,26 @@ impl BlockStatusCache {
         self.free_indexes.remove(&index);
     }
 
-    fn add_leaf(&mut self, index: TreeIndex, leaf: LeafNode) {
+    fn add_leaf(&mut self, index: TreeIndex, leaf: LeafNode) -> Result<(), Error> {
         self.free_indexes.remove(&index);
 
         self.key_to_index.insert(leaf.key, index);
         self.leaf_hash_to_index.insert(leaf.hash, index);
+
+        // // TODO: atomicity
+        // if self.key_to_index.insert(leaf.key, index).is_some() {
+        //     self.free_indexes.insert(index);
+        //     // TODO: specific errors here
+        //     return Err(Error::KeyAlreadyPresent());
+        // };
+        // if self.leaf_hash_to_index.insert(leaf.hash, index).is_some() {
+        //     self.free_indexes.insert(index);
+        //     self.key_to_index.remove(&leaf.key);
+        //     // TODO: specific errors here
+        //     return Err(Error::HashAlreadyPresent());
+        // };
+
+        Ok(())
     }
 
     fn remove_internal(&mut self, index: TreeIndex) {
@@ -205,6 +226,7 @@ impl BlockStatusCache {
         let Some(index) = self.key_to_index.remove(&node.key) else {
             return Err(Error::UnknownKey(node.key));
         };
+        // TODO: consider consistency here
         self.leaf_hash_to_index.remove(&node.hash);
 
         self.free_indexes.insert(index);
@@ -377,6 +399,9 @@ impl MerkleBlob {
     ) -> Result<TreeIndex, Error> {
         if self.block_status_cache.contains_key(key) {
             return Err(Error::KeyAlreadyPresent());
+        }
+        if self.block_status_cache.contains_leaf_hash(hash) {
+            return Err(Error::HashAlreadyPresent());
         }
 
         let insert_location = match insert_location {
@@ -1019,7 +1044,8 @@ impl MerkleBlob {
         }
 
         match block.node {
-            Node::Leaf(leaf) => self.block_status_cache.add_leaf(index, leaf),
+            // TODO: cleanup/revert on error?
+            Node::Leaf(leaf) => self.block_status_cache.add_leaf(index, leaf)?,
             Node::Internal(..) => self.block_status_cache.add_internal(index),
         }
 

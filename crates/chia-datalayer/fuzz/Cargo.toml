@@ -9,13 +9,22 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-
-[dependencies.chia-datalayer]
-path = ".."
+chia-datalayer = { workspace = true, features = ["arbitrary"] }
+chia-protocol = { workspace = true, features = ["arbitrary"] }
+#
+chia-sha2 = { workspace = true }
+#num-traits = { workspace = true }
 
 [[bin]]
 name = "merkle_blob_new"
 path = "fuzz_targets/merkle_blob_new.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "merkle_blob_insert"
+path = "fuzz_targets/merkle_blob_insert.rs"
 test = false
 doc = false
 bench = false
