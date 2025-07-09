@@ -84,7 +84,7 @@ impl DeltaReader {
         Ok(Self { nodes })
     }
 
-    pub fn get_missing_hashes(&self) -> HashSet<Hash> {
+    pub fn get_missing_hashes(&self, root_hash: Hash) -> HashSet<Hash> {
         let mut missing_hashes: HashSet<Hash> = HashSet::new();
 
         for node in self.nodes.values() {
@@ -97,6 +97,10 @@ impl DeltaReader {
                     missing_hashes.insert(*hash);
                 }
             }
+        }
+
+        if !self.nodes.contains_key(&root_hash) {
+            missing_hashes.insert(root_hash);
         }
 
         missing_hashes
@@ -205,8 +209,8 @@ impl DeltaReader {
     }
 
     #[pyo3(name = "get_missing_hashes")]
-    pub fn py_get_missing_hashes(&self) -> PyResult<HashSet<Hash>> {
-        Ok(self.get_missing_hashes())
+    pub fn py_get_missing_hashes(&self, root_hash: Hash) -> PyResult<HashSet<Hash>> {
+        Ok(self.get_missing_hashes(root_hash))
     }
 
     #[pyo3(name = "add_internal_nodes")]
@@ -356,7 +360,7 @@ mod tests {
     #[test]
     fn test_delta_reader_get_missing_hashes_one_known_one_unknown() {
         let delta_reader = incomplete_delta_reader();
-        let missing = delta_reader.get_missing_hashes();
+        let missing = delta_reader.get_missing_hashes(HASH_ZERO);
 
         let expected = expect![[r"
             {
@@ -383,7 +387,7 @@ mod tests {
             .collect_from_merkle_blob(&leaf_blob_path, &vec![TreeIndex(0)])
             .unwrap();
 
-        let missing = delta_reader.get_missing_hashes();
+        let missing = delta_reader.get_missing_hashes(HASH_ZERO);
 
         #[allow(clippy::needless_raw_string_hashes)]
         let expected = expect![[r#"
@@ -404,7 +408,7 @@ mod tests {
             .collect_from_merkle_blob(&blob_path, &vec![TreeIndex(0)])
             .unwrap();
 
-        let missing = delta_reader.get_missing_hashes();
+        let missing = delta_reader.get_missing_hashes(traversal_blob.get_hash_at_index(TreeIndex(0)).unwrap());
 
         #[allow(clippy::needless_raw_string_hashes)]
         let expected = expect![[r#"
@@ -428,7 +432,7 @@ mod tests {
             .collect_from_merkle_blobs(&vec![(leaf_blob_path, vec![TreeIndex(0)])])
             .unwrap();
 
-        let missing = delta_reader.get_missing_hashes();
+        let missing = delta_reader.get_missing_hashes(merkle_blob.get_hash_at_index(TreeIndex(0)).unwrap());
 
         #[allow(clippy::needless_raw_string_hashes)]
         let expected = expect![[r#"
