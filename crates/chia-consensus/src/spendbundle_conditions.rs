@@ -257,6 +257,9 @@ mod tests {
 
     #[cfg(not(debug_assertions))]
     #[rstest]
+    // this test requires running after hard fork 2, where the COST_CONDITIONS
+    // flag is set
+    // #[case("aa-million-messages")]
     #[case("new-agg-sigs")]
     #[case("infinity-g1")]
     #[case("block-1ee588dc")]
@@ -308,7 +311,6 @@ mod tests {
     #[case("unknown-condition")]
     #[case("duplicate-messages")]
     fn run_generator(#[case] name: &str) {
-        use crate::run_block_generator::run_block_generator;
         use crate::test_generators::{print_conditions, print_diff};
         use std::fs::read_to_string;
 
@@ -333,12 +335,12 @@ mod tests {
 
         let bundle = convert_block_to_bundle(&generator_buffer, &block_refs);
 
-        // run the whole block through run_block_generator() to ensure the
+        // run the whole block through run_block_generator2() to ensure the
         // output conditions match and update the cost. The cost
         // of just the spend bundle will be lower
         let (block_cost, block_output) = {
             let mut a = make_allocator(MEMPOOL_MODE);
-            let block_conds = run_block_generator(
+            let block_conds = run_block_generator2(
                 &mut a,
                 &generator_buffer,
                 &block_refs,
@@ -412,7 +414,7 @@ mod tests {
 
         if output != block_output {
             print_diff(&output, &block_output);
-            panic!("run_block_generator produced a different result than get_conditions_from_spendbundle()");
+            panic!("run_block_generator2 produced a different result than get_conditions_from_spendbundle()");
         }
 
         if output != expected {

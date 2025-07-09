@@ -96,7 +96,7 @@ DEFAULT_CONSTANTS = ConsensusConstants(
 
 
 def run_gen(
-    fn: str, flags: int = 0, args: Optional[str] = None, version: int = 1
+    fn: str, flags: int = 0, args: Optional[str] = None, version: int = 2
 ) -> tuple[Optional[int], Optional[SpendBundleConditions], float]:
 
     # constants from the main chia blockchain:
