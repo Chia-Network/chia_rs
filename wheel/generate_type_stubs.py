@@ -557,6 +557,8 @@ class PlotSize:
             "agg_sig_parent_amount: list[tuple[G1Element, bytes]]",
             "agg_sig_parent_puzzle: list[tuple[G1Element, bytes]]",
             "flags: int",
+            "execution_cost: int",
+            "condition_cost: int",
         ],
     )
 

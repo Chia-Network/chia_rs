@@ -45,6 +45,8 @@ def test_hash_spend() -> None:
         [],
         [],
         False,
+        0,
+        0,
     )
     a2 = SpendConditions(
         coin,
@@ -66,6 +68,8 @@ def test_hash_spend() -> None:
         [],
         [],
         False,
+        0,
+        0,
     )
     b = hash(a1)
     c = hash(a2)
@@ -74,11 +78,11 @@ def test_hash_spend() -> None:
     assert b != c
 
     assert a1.get_hash() == bytes32.fromhex(
-        "2b72a6614da0368147fa6cb785445d6569603e38f2de230e5f30692bf6410245"
+        "aee5968a44ae4f1c01fe79c688a757121c61b9f3e6d2267610bda93a27aaa502"
     )
     assert (
         str(a1.get_hash())
-        == "2b72a6614da0368147fa6cb785445d6569603e38f2de230e5f30692bf6410245"
+        == "aee5968a44ae4f1c01fe79c688a757121c61b9f3e6d2267610bda93a27aaa502"
     )
 
 
@@ -143,6 +147,8 @@ def test_json_spend() -> None:
         [],
         [],
         False,
+        0,
+        0,
     )
 
     assert a.to_json_dict() == {
@@ -165,6 +171,8 @@ def test_json_spend() -> None:
         "agg_sig_parent_amount": [],
         "agg_sig_parent_puzzle": [],
         "flags": 0,
+        "execution_cost": 0,
+        "condition_cost": 0,
     }
 
 
@@ -190,6 +198,8 @@ def test_from_json_spend() -> None:
         [],
         [],
         False,
+        0,
+        0,
     )
 
     b = SpendConditions.from_json_dict(
@@ -213,6 +223,8 @@ def test_from_json_spend() -> None:
             "agg_sig_parent_amount": [],
             "agg_sig_parent_puzzle": [],
             "flags": 0,
+            "execution_cost": 0,
+            "condition_cost": 0,
         }
     )
     assert a == b
@@ -240,6 +252,8 @@ def test_from_json_spend_set_optional() -> None:
         [],
         [],
         False,
+        0,
+        0,
     )
 
     b = SpendConditions.from_json_dict(
@@ -263,6 +277,8 @@ def test_from_json_spend_set_optional() -> None:
             "agg_sig_parent_amount": [],
             "agg_sig_parent_puzzle": [],
             "flags": 0,
+            "execution_cost": 0,
+            "condition_cost": 0,
         }
     )
     assert a == b
@@ -506,6 +522,8 @@ def test_copy_spend() -> None:
         [],
         [],
         False,
+        0,
+        0,
     )
     b = copy.copy(a)
 

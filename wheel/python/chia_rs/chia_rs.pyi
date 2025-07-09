@@ -337,6 +337,8 @@ class SpendConditions:
     agg_sig_parent_amount: list[tuple[G1Element, bytes]]
     agg_sig_parent_puzzle: list[tuple[G1Element, bytes]]
     flags: int
+    execution_cost: int
+    condition_cost: int
     def __init__(
         self,
         coin_id: bytes,
@@ -357,7 +359,9 @@ class SpendConditions:
         agg_sig_puzzle_amount: Sequence[tuple[G1Element, bytes]],
         agg_sig_parent_amount: Sequence[tuple[G1Element, bytes]],
         agg_sig_parent_puzzle: Sequence[tuple[G1Element, bytes]],
-        flags: int
+        flags: int,
+        execution_cost: int,
+        condition_cost: int
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -394,7 +398,9 @@ class SpendConditions:
         agg_sig_puzzle_amount: Union[ list[tuple[G1Element, bytes]], _Unspec] = _Unspec(),
         agg_sig_parent_amount: Union[ list[tuple[G1Element, bytes]], _Unspec] = _Unspec(),
         agg_sig_parent_puzzle: Union[ list[tuple[G1Element, bytes]], _Unspec] = _Unspec(),
-        flags: Union[ int, _Unspec] = _Unspec()) -> SpendConditions: ...
+        flags: Union[ int, _Unspec] = _Unspec(),
+        execution_cost: Union[ int, _Unspec] = _Unspec(),
+        condition_cost: Union[ int, _Unspec] = _Unspec()) -> SpendConditions: ...
 
 @final
 class SpendBundleConditions:

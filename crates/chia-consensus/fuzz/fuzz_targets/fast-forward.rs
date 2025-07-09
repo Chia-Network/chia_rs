@@ -109,6 +109,7 @@ fn run_puzzle(
         amount,
         a.new_atom(&puzzle_hash)?,
         coin_id,
+        0,
     );
 
     let mut visitor = MempoolVisitor::new_spend(&mut spend);

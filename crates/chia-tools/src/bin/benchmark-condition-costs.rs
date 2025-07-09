@@ -426,6 +426,7 @@ pub fn main() {
                 conditions,
                 0,
                 &mut cost,
+                0, // clvm_cost
                 &TEST_CONSTANTS,
             )
             .expect("process_single_spend");

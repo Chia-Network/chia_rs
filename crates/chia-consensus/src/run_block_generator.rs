@@ -120,6 +120,7 @@ where
         a,
         generator_output,
         cost_left,
+        0, // clvm_cost is not known per puzzle pre-hard fork
         flags,
         signature,
         bls_cache,
@@ -235,6 +236,7 @@ where
             conditions,
             flags,
             &mut cost_left,
+            clvm_cost,
             constants,
         )?;
     }

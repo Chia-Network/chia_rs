@@ -31,6 +31,7 @@ fuzz_target!(|data: &[u8]| {
             conds,
             *flags,
             &mut cost_left,
+            0, // clvm_cost
             &TEST_CONSTANTS,
         );
     }

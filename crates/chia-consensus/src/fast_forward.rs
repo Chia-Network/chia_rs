@@ -209,6 +209,7 @@ mod tests {
             amount,
             a.new_atom(&puzzle_hash)?,
             coin_id,
+            clvm_cost,
         );
 
         let mut visitor = MempoolVisitor::new_spend(&mut spend);

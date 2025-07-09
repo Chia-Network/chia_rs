@@ -59,6 +59,13 @@ def validate_except_cost(output1: str, output2: str) -> None:
         # the cost is supposed to differ, don't compare that
         if l1.startswith("cost:") and l2.startswith("cost: "):
             continue
+        if l1.startswith("execution-cost:") and l2.startswith("execution-cost: "):
+            continue
+        if " exe-cost: 0 " in l1 and " exe-cost: " in l2:
+            columns = l2.split(" ")
+            idx = columns.index("exe-cost:")
+            columns[idx + 1] = "0"
+            l2 = " ".join(columns)
         assert l1 == l2
 
 
