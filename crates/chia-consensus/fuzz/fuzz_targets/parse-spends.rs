@@ -19,6 +19,7 @@ fuzz_target!(|data: &[u8]| {
             &a,
             input,
             33_000_000_000,
+            0, // clvm_cost
             *flags,
             &Signature::default(),
             None,

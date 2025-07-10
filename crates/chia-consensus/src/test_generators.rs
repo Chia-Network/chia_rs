@@ -53,9 +53,11 @@ pub(crate) fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> Stri
     spends.sort_by_key(|s| *s.coin_id);
     for s in spends {
         ret += &format!(
-            "- coin id: {} ph: {}\n",
+            "- coin id: {} ph: {} exe-cost: {} cond-cost: {}\n",
             hex::encode(*s.coin_id),
-            hex::encode(a.atom(s.puzzle_hash))
+            hex::encode(a.atom(s.puzzle_hash)),
+            s.execution_cost,
+            s.condition_cost,
         );
 
         if let Some(val) = s.height_relative {
@@ -115,6 +117,8 @@ pub(crate) fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> Stri
     }
 
     ret += &format!("cost: {}\n", c.cost);
+    ret += &format!("execution-cost: {}\n", c.execution_cost);
+    ret += &format!("condition-cost: {}\n", c.condition_cost);
     ret += &format!("removal_amount: {}\n", c.removal_amount);
     ret += &format!("addition_amount: {}\n", c.addition_amount);
     ret
@@ -250,9 +254,9 @@ fn run_generator(#[case] name: &str) {
         }
 
         println!("flags: {flags:x}");
-        let mut a = make_allocator(flags);
-        let conds = run_block_generator2(
-            &mut a,
+        let mut a2 = make_allocator(flags);
+        let conds2 = run_block_generator2(
+            &mut a2,
             &generator,
             &block_refs,
             11_000_000_000,
@@ -262,8 +266,16 @@ fn run_generator(#[case] name: &str) {
             &TEST_CONSTANTS,
         );
 
-        let (expected_cost, output) = match conds {
-            Ok(conditions) => (conditions.cost, print_conditions(&a, &conditions)),
+        let (expected_cost, output) = match conds2 {
+            Ok(ref conditions) => {
+                let cond_cost: u64 = conditions.spends.iter().map(|v| v.condition_cost).sum();
+                assert_eq!(cond_cost, conditions.condition_cost);
+                let exe_cost: u64 = conditions.spends.iter().map(|v| v.execution_cost).sum();
+                // the generator itself has execution cost. At least the cost of
+                // a quote
+                assert!(exe_cost <= conditions.execution_cost);
+                (conditions.cost, print_conditions(&a2, &conditions))
+            }
             Err(code) => (0, format!("FAILED: {}\n", u32::from(code.1))),
         };
 
@@ -278,9 +290,9 @@ fn run_generator(#[case] name: &str) {
             }
         }
 
-        let mut a = make_allocator(flags);
-        let mut conds = run_block_generator(
-            &mut a,
+        let mut a1 = make_allocator(flags);
+        let conds1 = run_block_generator(
+            &mut a1,
             &generator,
             &block_refs,
             11_000_000_000,
@@ -289,17 +301,32 @@ fn run_generator(#[case] name: &str) {
             None,
             &TEST_CONSTANTS,
         );
-        let output_pre_hard_fork = match conds {
-            Ok(ref mut conditions) => {
+        let output_pre_hard_fork = match conds1 {
+            Ok(mut conditions) => {
                 // before the hard fork, the cost of running the genrator +
                 // puzzles should never be lower than after the hard-fork
                 // but it's likely higher.
                 assert!(conditions.cost >= expected_cost);
-                // update the cost we print here, just to be compatible with
-                // the test cases we have. We've already ensured the cost is
-                // lower
-                conditions.cost = expected_cost;
-                print_conditions(&a, &conditions)
+                // pre-hard fork, we don't have access to per-puzzle costs, so
+                // set those to whatever run_block_generator2() produced, to
+                // make the check pass
+                if let Ok(ref conds2) = conds2 {
+                    // update the cost we print here, just to be compatible with
+                    // the test cases we have. We've already ensured the cost is
+                    // lower
+                    conditions.cost = conds2.cost;
+                    conditions.execution_cost = conds2.execution_cost;
+                    for s in &conds2.spends {
+                        for ms in conditions.spends.iter_mut() {
+                            if ms.coin_id == s.coin_id {
+                                ms.execution_cost = s.execution_cost;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                print_conditions(&a1, &conditions)
             }
             Err(code) => {
                 format!("FAILED: {}\n", u32::from(code.1))
@@ -337,11 +364,11 @@ fn run_generator(#[case] name: &str) {
             flags,
         );
 
-        if let Ok(conds) = conds {
+        if let Ok(ref conds) = conds2 {
             // if run_block_generator2 is OK then check we're equal
             let coinspends = result.expect("get_coinspends");
             let coinspends2 = result2.expect("get_coinspends_with_conds");
-            for (i, spend) in conds.spends.into_iter().enumerate() {
+            for (i, spend) in conds.spends.iter().enumerate() {
                 let runnable = {
                     let mut a = make_allocator(flags);
                     coinspends[i]
@@ -355,12 +382,12 @@ fn run_generator(#[case] name: &str) {
                         .is_ok()
                 };
                 assert!(runnable);
-                let parent_id = a.atom(spend.parent_id);
+                let parent_id = a2.atom(spend.parent_id);
                 assert_eq!(
                     parent_id.as_ref(),
                     coinspends[i].coin.parent_coin_info.as_slice()
                 );
-                let puzhash = a.atom(spend.puzzle_hash);
+                let puzhash = a2.atom(spend.puzzle_hash);
                 assert_eq!(puzhash.as_ref(), coinspends[i].coin.puzzle_hash.as_slice());
                 assert_eq!(spend.coin_amount, coinspends[i].coin.amount);
 
