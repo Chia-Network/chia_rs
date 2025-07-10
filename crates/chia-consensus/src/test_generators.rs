@@ -267,7 +267,15 @@ fn run_generator(#[case] name: &str) {
         );
 
         let (expected_cost, output) = match conds2 {
-            Ok(ref conditions) => (conditions.cost, print_conditions(&a2, &conditions)),
+            Ok(ref conditions) => {
+                let cond_cost: u64 = conditions.spends.iter().map(|v| v.condition_cost).sum();
+                assert_eq!(cond_cost, conditions.condition_cost);
+                let exe_cost: u64 = conditions.spends.iter().map(|v| v.execution_cost).sum();
+                // the generator itself has execution cost. At least the cost of
+                // a quote
+                assert!(exe_cost <= conditions.execution_cost);
+                (conditions.cost, print_conditions(&a2, &conditions))
+            }
             Err(code) => (0, format!("FAILED: {}\n", u32::from(code.1))),
         };
 
