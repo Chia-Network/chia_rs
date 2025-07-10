@@ -26,7 +26,6 @@ fuzz_target!(|data: &[u8]| {
                 // other errors should not be occurring
                 Err(error) => panic!("unexpected error while inserting: {:?}", error),
             };
-            println!("added");
         } else {
             let key = if unstructured.ratio(1, 10).unwrap() {
                 KeyId::arbitrary(&mut unstructured).unwrap()
@@ -46,7 +45,6 @@ fuzz_target!(|data: &[u8]| {
                 // other errors should not be occurring
                 Err(error) => panic!("unexpected error while deleting: {:?}", error),
             }
-            println!("deleted");
         }
     }
 
