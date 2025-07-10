@@ -425,8 +425,6 @@ name = "chia-datalayer-fuzz"
 version = "0.24.0"
 dependencies = [
  "chia-datalayer",
- "chia-protocol",
- "chia-sha2 0.26.0",
  "libfuzzer-sys",
 ]
 

@@ -67,6 +67,7 @@ pub struct Hash(pub Bytes32);
     pyclass(frozen),
     derive(PyJsonDict, PyStreamable)
 )]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 // ISSUE: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
 //        being found with a cfg_attr
@@ -74,17 +75,10 @@ pub struct Hash(pub Bytes32);
 #[cfg(feature = "py-bindings")]
 pub struct KeyId(#[pyo3(get, name = "raw")] pub i64);
 
-// #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 #[cfg(not(feature = "py-bindings"))]
 pub struct KeyId(pub i64);
-
-#[cfg(feature = "arbitrary")]
-impl<'a> arbitrary::Arbitrary<'a> for KeyId {
-    fn arbitrary(_u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(Self(i64::arbitrary(_u)?))
-    }
-}
 
 #[cfg(feature = "py-bindings")]
 #[pymethods]
@@ -100,6 +94,7 @@ impl KeyId {
     pyclass(frozen),
     derive(PyJsonDict, PyStreamable)
 )]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 // ISSUE: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
 //        being found with a cfg_attr

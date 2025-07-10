@@ -196,7 +196,7 @@ impl BlockStatusCache {
         self.free_indexes.remove(&index);
     }
 
-    fn add_leaf(&mut self, index: TreeIndex, leaf: LeafNode) -> Result<(), Error> {
+    fn add_leaf(&mut self, index: TreeIndex, leaf: LeafNode) {
         self.free_indexes.remove(&index);
 
         self.key_to_index.insert(leaf.key, index);
@@ -214,8 +214,6 @@ impl BlockStatusCache {
         //     // TODO: specific errors here
         //     return Err(Error::HashAlreadyPresent());
         // };
-
-        Ok(())
     }
 
     fn remove_internal(&mut self, index: TreeIndex) {
@@ -1045,7 +1043,7 @@ impl MerkleBlob {
 
         match block.node {
             // TODO: cleanup/revert on error?
-            Node::Leaf(leaf) => self.block_status_cache.add_leaf(index, leaf)?,
+            Node::Leaf(leaf) => self.block_status_cache.add_leaf(index, leaf),
             Node::Internal(..) => self.block_status_cache.add_internal(index),
         }
 
