@@ -34,7 +34,7 @@ impl<'a> LeftChildFirstIterator<'a> {
             });
         }
 
-        println!("-- create");
+        //         println!("-- create");
 
         Self {
             blob,
@@ -57,11 +57,11 @@ impl Iterator for LeftChildFirstIterator<'_> {
                 Ok(block) => block,
                 Err(e) => return Some(Err(e)),
             };
-            println!("block: {block:?}");
-            let x: HashSet<u32> = self.already_queued.iter().map(|index| index.0).collect();
-            println!("       {x:?}");
-            let x = &self.stack;
-            println!("       {x:?}");
+            //             println!("block: {block:?}");
+            //             let x: HashSet<u32> = self.already_queued.iter().map(|index| index.0).collect();
+            //             println!("       {x:?}");
+            //             let x = &self.stack;
+            //             println!("       {x:?}");
 
             if let Some(predicate) = self.predicate {
                 if !predicate(&block) {
