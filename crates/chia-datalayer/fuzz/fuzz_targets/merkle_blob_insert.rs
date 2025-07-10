@@ -11,7 +11,7 @@ use chia_datalayer::{
 
 fuzz_target!(|data: &[u8]| {
     let mut blob = MerkleBlob::new(Vec::new()).unwrap();
-    println!(" ===== fresh tree");
+    // println!(" ===== fresh tree");
     blob.check_integrity_on_drop = false;
 
     let max_count = 1000;
