@@ -62,6 +62,8 @@ pub enum Error {
     IncompleteInsertLocationParameters(),
     #[error("hash is dirty for index: {0:?}")]
     Dirty(TreeIndex),
+    #[error("hash is dirty for leaf index: {0:?}")]
+    DirtyLeaf(TreeIndex),
     #[error("key/value and hash collection lengths must match: {0:?} keys/values, {0:?} hashes")]
     UnmatchedKeysAndValues(usize, usize),
     #[error("hash not found: {0:?}")]

@@ -85,7 +85,12 @@ impl Iterator for LeftChildFirstIterator<'_> {
             }
 
             match block.node {
-                Node::Leaf(..) => return Some(Ok((item.index, block))),
+                Node::Leaf(..) => {
+                    if block.metadata.dirty {
+                        return Some(Err(Error::DirtyLeaf(item.index)));
+                    }
+                    return Some(Ok((item.index, block)));
+                }
                 Node::Internal(ref node) => {
                     if item.visited {
                         return Some(Ok((item.index, block)));

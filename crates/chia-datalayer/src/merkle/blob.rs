@@ -841,7 +841,14 @@ impl MerkleBlob {
         Ok(())
     }
 
-    pub fn check_integrity(&self) -> Result<(), Error> {
+    pub fn check_integrity(&mut self) -> Result<(), Error> {
+        self.check_just_integrity()?;
+        self.calculate_lazy_hashes()?;
+
+        self.check_just_integrity()
+    }
+
+    fn check_just_integrity(&self) -> Result<(), Error> {
         let mut leaf_count: usize = 0;
         let mut internal_count: usize = 0;
         let mut child_to_parent: HashMap<TreeIndex, TreeIndex> = HashMap::new();
@@ -1564,7 +1571,7 @@ impl MerkleBlob {
     }
 
     #[pyo3(name = "check_integrity")]
-    pub fn py_check_integrity(&self) -> PyResult<()> {
+    pub fn py_check_integrity(&mut self) -> PyResult<()> {
         Ok(self.check_integrity()?)
     }
 }
