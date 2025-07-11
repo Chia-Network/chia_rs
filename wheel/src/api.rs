@@ -535,7 +535,7 @@ pub fn get_spends_for_trusted_block<'a>(
 
     let dict = PyDict::new(py);
     dict.set_item("block_spends", output)?;
-    Ok(dict)
+    Ok(dict.into())
 }
 
 #[pyo3::pyfunction]
