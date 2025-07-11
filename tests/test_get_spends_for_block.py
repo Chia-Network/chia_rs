@@ -57,6 +57,7 @@ def test_generator_parsing() -> None:
         .split("\n")
     )
     assert str(out_dict_list) == expected_dict[0]
+
     out_dict = get_spends_for_trusted_block(DEFAULT_CONSTANTS, gen_prog, args, 0)
     assert str(out_dict) == expected_dict[1]
 
@@ -65,7 +66,7 @@ def test_generator_parsing() -> None:
     )
     gen_prog = Program.from_bytes(generator)
 
-    out_dict = get_spends_for_trusted_block_with_conditions(
+    out_dict_list = get_spends_for_trusted_block_with_conditions(
         DEFAULT_CONSTANTS, gen_prog, args, 0
     )
     # check we can handle a big and real block
@@ -74,4 +75,4 @@ def test_generator_parsing() -> None:
         open("generator-tests/expected-dicts/block-834768.txt", "r").read().split("\n")
     )
 
-    assert str(out_dict) == expected_dict[0]
+    assert str(out_dict_list) == expected_dict[0]
