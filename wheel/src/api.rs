@@ -10,7 +10,11 @@ use chia_consensus::flags::{
 use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
 use chia_consensus::owned_conditions::{OwnedSpendBundleConditions, OwnedSpendConditions};
+use chia_consensus::puzzle_fingerprint::compute_puzzle_fingerprint;
 use chia_consensus::run_block_generator::setup_generator_args;
+use chia_consensus::run_block_generator::{
+    get_coinspends_for_trusted_block, get_coinspends_with_conditions_for_trusted_block,
+};
 use chia_consensus::solution_generator::solution_generator as native_solution_generator;
 use chia_consensus::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
 use chia_consensus::spendbundle_conditions::get_conditions_from_spendbundle;
@@ -57,10 +61,11 @@ use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::pybacked::PyBackedBytes;
-use pyo3::types::PyBytes;
 use pyo3::types::PyList;
 use pyo3::types::PyTuple;
+use pyo3::types::{PyBytes, PyDict};
 use pyo3::wrap_pyfunction;
+
 use std::iter::zip;
 
 use crate::run_program::{run_chia_program, serialized_length};
@@ -439,6 +444,19 @@ pub fn py_get_flags_for_height_and_constants(height: u32, constants: &ConsensusC
     get_flags_for_height_and_constants(height, constants)
 }
 
+#[pyfunction]
+#[pyo3(name = "compute_puzzle_fingerprint", signature = (puzzle, solution, *, max_cost, flags))]
+pub fn py_compute_puzzle_fingerprint(
+    puzzle: &Program,
+    solution: &Program,
+    max_cost: u64,
+    flags: u32,
+) -> PyResult<(u64, [u8; 32])> {
+    Ok(compute_puzzle_fingerprint(
+        puzzle, solution, max_cost, flags,
+    )?)
+}
+
 #[pyo3::pyfunction]
 #[pyo3(name = "is_overflow_block")]
 pub fn py_is_overflow_block(
@@ -496,6 +514,76 @@ pub fn py_calculate_ip_iters(
 }
 
 #[pyo3::pyfunction]
+pub fn get_spends_for_trusted_block<'a>(
+    py: Python<'a>,
+    constants: &ConsensusConstants,
+    generator: Program,
+    block_refs: &Bound<'_, PyList>,
+    flags: u32,
+) -> pyo3::PyResult<PyObject> {
+    let refs = block_refs
+        .into_iter()
+        .map(|b| {
+            let buf = b
+                .extract::<PyBuffer<u8>>()
+                .expect("block_refs must be list of buffers");
+            py_to_slice::<'a>(buf)
+        })
+        .collect::<Vec<&'a [u8]>>();
+
+    let output = get_coinspends_for_trusted_block(constants, &generator, &refs, flags)?;
+
+    let pylist = PyList::empty(py);
+    let dict = PyDict::new(py);
+    dict.set_item("block_spends", output)?;
+    pylist.append(dict)?;
+    Ok(pylist.into())
+}
+
+#[pyo3::pyfunction]
+pub fn get_spends_for_trusted_block_with_conditions<'a>(
+    py: Python<'a>,
+    constants: &ConsensusConstants,
+    generator: Program,
+    block_refs: &Bound<'a, PyList>,
+    flags: u32,
+) -> pyo3::PyResult<PyObject> {
+    let refs = block_refs
+        .into_iter()
+        .map(|b| {
+            let buf = b
+                .extract::<PyBuffer<u8>>()
+                .expect("block_refs must be list of buffers");
+            py_to_slice::<'a>(buf)
+        })
+        .collect::<Vec<&'a [u8]>>();
+
+    let output =
+        get_coinspends_with_conditions_for_trusted_block(constants, &generator, &refs, flags)?;
+
+    let pylist = PyList::empty(py);
+    for (coinspend, cond_output) in output {
+        let dict = PyDict::new(py);
+        dict.set_item("coin_spend", coinspend)?;
+        let cond_list = PyList::empty(py);
+        for (opcode, bytes_vec) in cond_output {
+            let arg_list = PyList::empty(py);
+            for bytes in bytes_vec {
+                let pybytes = PyBytes::new(py, bytes.as_slice());
+                arg_list.append(pybytes)?;
+            }
+
+            let tuple = (opcode, arg_list);
+            cond_list.append(tuple)?;
+        }
+
+        dict.set_item("conditions", cond_list)?;
+        pylist.append(dict)?;
+    }
+    Ok(pylist.into())
+}
+
+#[pyo3::pyfunction]
 #[pyo3(name = "is_canonical_serialization")]
 pub fn py_is_canonical_serialization(buf: &[u8]) -> bool {
     is_canonical_serialization(buf)
@@ -545,6 +633,15 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_validate_clvm_and_signature, m)?)?;
     m.add_function(wrap_pyfunction!(py_get_conditions_from_spendbundle, m)?)?;
     m.add_function(wrap_pyfunction!(py_get_flags_for_height_and_constants, m)?)?;
+
+    m.add_function(wrap_pyfunction!(py_compute_puzzle_fingerprint, m)?)?;
+
+    // get spends for generator
+    m.add_function(wrap_pyfunction!(get_spends_for_trusted_block, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        get_spends_for_trusted_block_with_conditions,
+        m
+    )?)?;
 
     // clvm functions
     m.add("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;

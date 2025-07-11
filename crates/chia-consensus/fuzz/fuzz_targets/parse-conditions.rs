@@ -61,6 +61,8 @@ fuzz_target!(|data: &[u8]| {
             agg_sig_parent_amount: Vec::new(),
             agg_sig_parent_puzzle: Vec::new(),
             flags: 0_u32,
+            execution_cost: 0_u64,
+            condition_cost: 0_u64,
         };
         let mut visitor = MempoolVisitor::new_spend(&mut coin_spend);
         let mut max_cost = 3_300_000_000;
