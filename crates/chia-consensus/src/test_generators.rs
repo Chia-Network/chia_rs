@@ -1,9 +1,13 @@
 use super::conditions::{NewCoin, SpendBundleConditions, SpendConditions};
-use super::run_block_generator::{run_block_generator, run_block_generator2};
+use super::run_block_generator::{
+    get_coinspends_for_trusted_block, get_coinspends_with_conditions_for_trusted_block,
+    run_block_generator, run_block_generator2,
+};
 use crate::allocator::make_allocator;
 use crate::consensus_constants::TEST_CONSTANTS;
-use crate::flags::{DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
+use crate::flags::{COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
 use chia_bls::Signature;
+use chia_protocol::Program;
 use chia_protocol::{Bytes, Bytes48};
 use clvmr::allocator::NodePtr;
 use clvmr::Allocator;
@@ -49,9 +53,11 @@ pub(crate) fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> Stri
     spends.sort_by_key(|s| *s.coin_id);
     for s in spends {
         ret += &format!(
-            "- coin id: {} ph: {}\n",
+            "- coin id: {} ph: {} exe-cost: {} cond-cost: {}\n",
             hex::encode(*s.coin_id),
-            hex::encode(a.atom(s.puzzle_hash))
+            hex::encode(a.atom(s.puzzle_hash)),
+            s.execution_cost,
+            s.condition_cost,
         );
 
         if let Some(val) = s.height_relative {
@@ -111,6 +117,8 @@ pub(crate) fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> Stri
     }
 
     ret += &format!("cost: {}\n", c.cost);
+    ret += &format!("execution-cost: {}\n", c.execution_cost);
+    ret += &format!("condition-cost: {}\n", c.condition_cost);
     ret += &format!("removal_amount: {}\n", c.removal_amount);
     ret += &format!("addition_amount: {}\n", c.addition_amount);
     ret
@@ -156,6 +164,7 @@ pub(crate) fn print_diff(output: &str, expected: &str) {
 }
 
 #[rstest]
+#[case("aa-million-messages")]
 #[case("new-agg-sigs")]
 #[case("infinity-g1")]
 #[case("block-1ee588dc")]
@@ -207,11 +216,16 @@ pub(crate) fn print_diff(output: &str, expected: &str) {
 #[case("unknown-condition")]
 #[case("duplicate-messages")]
 fn run_generator(#[case] name: &str) {
-    use std::fs::read_to_string;
+    use std::fs::{read_to_string, write};
+
+    // When making changes to print_conditions() enabling this will update the
+    // test cases to match. Make sure to carefully review the diff before
+    // landing an automatic update of the test case.
+    const UPDATE_TESTS: bool = false;
 
     let filename = format!("../../generator-tests/{name}.txt");
     println!("file: {filename}");
-    let test_file = read_to_string(filename).expect("test file not found");
+    let test_file = read_to_string(&filename).expect("test file not found");
     let (generator, expected) = test_file.split_once('\n').expect("invalid test file");
     let generator = hex::decode(generator).expect("invalid hex encoded generator");
 
@@ -222,68 +236,176 @@ fn run_generator(#[case] name: &str) {
 
     let mut block_refs = Vec::<Vec<u8>>::new();
 
-    let filename = format!("../../generator-tests/{name}.env");
-    if let Ok(env_hex) = read_to_string(&filename) {
-        println!("block-ref file: {filename}");
+    let filename2 = format!("../../generator-tests/{name}.env");
+    if let Ok(env_hex) = read_to_string(&filename2) {
+        println!("block-ref file: {filename2}");
         block_refs.push(hex::decode(env_hex).expect("hex decode env-file"));
     }
 
+    let mut write_back = format!("{}\n", hex::encode(&generator));
+    let mut last_output = String::new();
+
     for (flags, expected) in zip(&[0, MEMPOOL_MODE], expected) {
+        let mut flags = *flags;
+        if name == "aa-million-messages" {
+            // this test requires running after hard fork 2, where the COST_CONDITIONS
+            // flag is set
+            flags |= COST_CONDITIONS;
+        }
+
         println!("flags: {flags:x}");
-        let mut a = make_allocator(*flags);
-        let conds = run_block_generator(
-            &mut a,
+        let mut a2 = make_allocator(flags);
+        let conds2 = run_block_generator2(
+            &mut a2,
             &generator,
             &block_refs,
             11_000_000_000,
-            *flags | DONT_VALIDATE_SIGNATURE,
+            flags | DONT_VALIDATE_SIGNATURE,
             &Signature::default(),
             None,
             &TEST_CONSTANTS,
         );
 
-        let (expected_cost, output) = match conds {
-            Ok(conditions) => (conditions.cost, print_conditions(&a, &conditions)),
+        let (expected_cost, output) = match conds2 {
+            Ok(ref conditions) => {
+                let cond_cost: u64 = conditions.spends.iter().map(|v| v.condition_cost).sum();
+                assert_eq!(cond_cost, conditions.condition_cost);
+                let exe_cost: u64 = conditions.spends.iter().map(|v| v.execution_cost).sum();
+                // the generator itself has execution cost. At least the cost of
+                // a quote
+                assert!(exe_cost <= conditions.execution_cost);
+                (conditions.cost, print_conditions(&a2, &conditions))
+            }
             Err(code) => (0, format!("FAILED: {}\n", u32::from(code.1))),
         };
 
-        let mut a = make_allocator(*flags);
-        let conds = run_block_generator2(
-            &mut a,
+        if UPDATE_TESTS {
+            if (flags & MEMPOOL_MODE) != 0 {
+                if output != last_output {
+                    write_back.push_str(&format!("STRICT:\n{output}"));
+                }
+            } else {
+                last_output = output.clone();
+                write_back.push_str(&format!("{output}"));
+            }
+        }
+
+        let mut a1 = make_allocator(flags);
+        let conds1 = run_block_generator(
+            &mut a1,
             &generator,
             &block_refs,
             11_000_000_000,
-            *flags | DONT_VALIDATE_SIGNATURE,
+            flags | DONT_VALIDATE_SIGNATURE,
             &Signature::default(),
             None,
             &TEST_CONSTANTS,
         );
-        let output_hard_fork = match conds {
+        let output_pre_hard_fork = match conds1 {
             Ok(mut conditions) => {
-                // in the hard fork, the cost of running the genrator +
-                // puzzles should never be higher than before the hard-fork
-                // but it's likely less.
-                assert!(conditions.cost <= expected_cost);
-                assert!(conditions.cost > 0);
-                // update the cost we print here, just to be compatible with
-                // the test cases we have. We've already ensured the cost is
-                // lower
-                conditions.cost = expected_cost;
-                print_conditions(&a, &conditions)
+                // before the hard fork, the cost of running the genrator +
+                // puzzles should never be lower than after the hard-fork
+                // but it's likely higher.
+                assert!(conditions.cost >= expected_cost);
+                // pre-hard fork, we don't have access to per-puzzle costs, so
+                // set those to whatever run_block_generator2() produced, to
+                // make the check pass
+                if let Ok(ref conds2) = conds2 {
+                    // update the cost we print here, just to be compatible with
+                    // the test cases we have. We've already ensured the cost is
+                    // lower
+                    conditions.cost = conds2.cost;
+                    conditions.execution_cost = conds2.execution_cost;
+                    for s in &conds2.spends {
+                        for ms in conditions.spends.iter_mut() {
+                            if ms.coin_id == s.coin_id {
+                                ms.execution_cost = s.execution_cost;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                print_conditions(&a1, &conditions)
             }
             Err(code) => {
                 format!("FAILED: {}\n", u32::from(code.1))
             }
         };
 
-        if output != output_hard_fork {
-            print_diff(&output, &output_hard_fork);
-            panic!("run_block_generator2 produced a different result!");
+        if output != output_pre_hard_fork {
+            print_diff(&output, &output_pre_hard_fork);
+            if !UPDATE_TESTS {
+                panic!("run_block_generator 1 and 2 produced a different result!");
+            }
         }
 
         if output != expected {
             print_diff(&output, expected);
-            panic!("mismatching generator output");
+            if !UPDATE_TESTS {
+                panic!("mismatching generator output");
+            }
         }
+
+        // now lets check get_coinspends_for_trusted_block
+        let vec_of_slices: Vec<&[u8]> = block_refs.iter().map(std::vec::Vec::as_slice).collect();
+
+        let result = get_coinspends_for_trusted_block(
+            &TEST_CONSTANTS,
+            &Program::new(generator.clone().into()),
+            &vec_of_slices,
+            flags,
+        );
+
+        let result2 = get_coinspends_with_conditions_for_trusted_block(
+            &TEST_CONSTANTS,
+            &Program::new(generator.clone().into()),
+            &vec_of_slices,
+            flags,
+        );
+
+        if let Ok(ref conds) = conds2 {
+            // if run_block_generator2 is OK then check we're equal
+            let coinspends = result.expect("get_coinspends");
+            let coinspends2 = result2.expect("get_coinspends_with_conds");
+            for (i, spend) in conds.spends.iter().enumerate() {
+                let runnable = {
+                    let mut a = make_allocator(flags);
+                    coinspends[i]
+                        .puzzle_reveal
+                        .run(
+                            &mut a,
+                            flags,
+                            TEST_CONSTANTS.max_block_cost_clvm,
+                            &coinspends[i].solution,
+                        )
+                        .is_ok()
+                };
+                assert!(runnable);
+                let parent_id = a2.atom(spend.parent_id);
+                assert_eq!(
+                    parent_id.as_ref(),
+                    coinspends[i].coin.parent_coin_info.as_slice()
+                );
+                let puzhash = a2.atom(spend.puzzle_hash);
+                assert_eq!(puzhash.as_ref(), coinspends[i].coin.puzzle_hash.as_slice());
+                assert_eq!(spend.coin_amount, coinspends[i].coin.amount);
+
+                // check that we're getting the same info from get_coinspends_with_conditions_for_trusted_block
+                assert_eq!(
+                    parent_id.as_ref(),
+                    coinspends2[i].0.coin.parent_coin_info.as_slice()
+                );
+                assert_eq!(
+                    puzhash.as_ref(),
+                    coinspends2[i].0.coin.puzzle_hash.as_slice()
+                );
+                assert_eq!(spend.coin_amount, coinspends2[i].0.coin.amount);
+            }
+        }
+    }
+
+    if UPDATE_TESTS {
+        write(&filename, write_back.into_bytes()).expect("write file");
     }
 }

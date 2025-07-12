@@ -41,6 +41,9 @@ pub struct OwnedSpendConditions {
     pub agg_sig_parent_amount: Vec<(PublicKey, Bytes)>,
     pub agg_sig_parent_puzzle: Vec<(PublicKey, Bytes)>,
     pub flags: u32,
+    /// per-spend execution and condition cost
+    pub execution_cost: u64,
+    pub condition_cost: u64,
 }
 
 #[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
@@ -118,6 +121,8 @@ impl OwnedSpendConditions {
             agg_sig_parent_amount: convert_agg_sigs(a, &spend.agg_sig_parent_amount),
             agg_sig_parent_puzzle: convert_agg_sigs(a, &spend.agg_sig_parent_puzzle),
             flags: spend.flags,
+            execution_cost: spend.execution_cost,
+            condition_cost: spend.condition_cost,
         }
     }
 }

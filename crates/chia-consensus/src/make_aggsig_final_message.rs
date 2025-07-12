@@ -179,6 +179,7 @@ mod tests {
             a.new_atom(puzzle_hash.as_slice())
                 .expect("test should pass"),
             Arc::new(Bytes32::try_from(coin.coin_id()).expect("test should pass")),
+            0,
         );
 
         let spend = OwnedSpendConditions::from(&a, spend);

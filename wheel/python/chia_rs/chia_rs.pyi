@@ -33,7 +33,7 @@ def run_block_generator2(
 
 def additions_and_removals(
     program: ReadableBuffer, block_refs: list[ReadableBuffer], flags: int, constants: ConsensusConstants
-) -> tuple[list[tuple[Coin, Optional[bytes]]], list[tuple[Coin, bytes32]]]: ...
+) -> tuple[list[tuple[Coin, Optional[bytes]]], list[tuple[bytes32, Coin]]]: ...
 
 def confirm_included_already_hashed(
     root: bytes32,
@@ -54,12 +54,28 @@ def validate_clvm_and_signature(
     peak_height: int,
 ) -> tuple[SpendBundleConditions, list[tuple[bytes32, GTElement]], float]: ...
 
+def compute_puzzle_fingerprint(puzzle: Program, solution: Program, *, max_cost: int, flags: int) -> tuple[int, bytes]: ...
+
 def get_conditions_from_spendbundle(
     spend_bundle: SpendBundle,
     max_cost: int,
     constants: ConsensusConstants,
     height: int,
 ) -> SpendBundleConditions: ...
+
+def get_spends_for_trusted_block(
+    constants: ConsensusConstants,
+    generator: Program,
+    block_refs: list[ReadableBuffer],
+    flags: int,
+) -> list[dict[str, Any]]: ...
+
+def get_spends_for_trusted_block_with_conditions(
+    constants: ConsensusConstants,
+    generator: Program,
+    block_refs: list[ReadableBuffer],
+    flags: int,
+) -> list[dict[str, Any]]: ...
 
 def get_flags_for_height_and_constants(
     height: int,
@@ -322,6 +338,8 @@ class SpendConditions:
     agg_sig_parent_amount: list[tuple[G1Element, bytes]]
     agg_sig_parent_puzzle: list[tuple[G1Element, bytes]]
     flags: int
+    execution_cost: int
+    condition_cost: int
     def __init__(
         self,
         coin_id: bytes,
@@ -342,7 +360,9 @@ class SpendConditions:
         agg_sig_puzzle_amount: Sequence[tuple[G1Element, bytes]],
         agg_sig_parent_amount: Sequence[tuple[G1Element, bytes]],
         agg_sig_parent_puzzle: Sequence[tuple[G1Element, bytes]],
-        flags: int
+        flags: int,
+        execution_cost: int,
+        condition_cost: int
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -379,7 +399,9 @@ class SpendConditions:
         agg_sig_puzzle_amount: Union[ list[tuple[G1Element, bytes]], _Unspec] = _Unspec(),
         agg_sig_parent_amount: Union[ list[tuple[G1Element, bytes]], _Unspec] = _Unspec(),
         agg_sig_parent_puzzle: Union[ list[tuple[G1Element, bytes]], _Unspec] = _Unspec(),
-        flags: Union[ int, _Unspec] = _Unspec()) -> SpendConditions: ...
+        flags: Union[ int, _Unspec] = _Unspec(),
+        execution_cost: Union[ int, _Unspec] = _Unspec(),
+        condition_cost: Union[ int, _Unspec] = _Unspec()) -> SpendConditions: ...
 
 @final
 class SpendBundleConditions:
