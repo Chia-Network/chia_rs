@@ -14,6 +14,5 @@ fuzz_target!(|data: &[u8]| {
         return;
     };
     blob.check_integrity_on_drop = false;
-
     blob.check_integrity().unwrap();
 });

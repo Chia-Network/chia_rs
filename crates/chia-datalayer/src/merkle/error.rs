@@ -68,10 +68,10 @@ pub enum Error {
     UnmatchedKeysAndValues(usize, usize),
     #[error("hash not found: {0:?}")]
     HashNotFound(Hash),
-    #[error("invalid parent while iterating A")]
-    InvalidParentWhileIteratingA(),
-    #[error("invalid parent while iterating B")]
-    InvalidParentWhileIteratingB(),
-    #[error("invalid children while iterating A")]
-    InvalidChildrenWhileIteratingA(),
+    #[error("reference to unknown parent")]
+    ReferenceToUnknownParent(),
+    #[error("unexpected parentless node")]
+    UnexpectedParentlessNode(),
+    #[error("invalid children")]
+    InvalidChildren(),
 }

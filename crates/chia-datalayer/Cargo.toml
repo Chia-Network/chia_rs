@@ -33,7 +33,7 @@ rayon = { workspace = true }
 zstd = { workspace = true }
 arbitrary = { workspace = true, features = ["derive"], optional = true }
 
-#[dev-dependencies]
+[dev-dependencies]
 clvm-utils = { workspace = true }
 expect-test = { workspace = true }
 hex = { workspace = true }

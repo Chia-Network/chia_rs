@@ -1,8 +1,7 @@
 pub mod blob;
 pub mod deltas;
-// #[cfg(test)]
-// mod dot;
-pub mod dot;
+#[cfg(test)]
+mod dot;
 pub mod error;
 pub mod format;
 pub mod iterators;

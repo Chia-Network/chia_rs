@@ -2,7 +2,6 @@ use crate::merkle::error::Error;
 use crate::{try_get_block, Block, Node, TreeIndex, BLOCK_SIZE};
 use std::collections::{HashSet, VecDeque};
 
-#[derive(Debug)]
 struct LeftChildFirstIteratorItem {
     visited: bool,
     index: TreeIndex,
@@ -34,8 +33,6 @@ impl<'a> LeftChildFirstIterator<'a> {
             });
         }
 
-        //         println!("-- create");
-
         Self {
             blob,
             stack,
@@ -57,11 +54,6 @@ impl Iterator for LeftChildFirstIterator<'_> {
                 Ok(block) => block,
                 Err(e) => return Some(Err(e)),
             };
-            //             println!("block: {block:?}");
-            //             let x: HashSet<u32> = self.already_queued.iter().map(|index| index.0).collect();
-            //             println!("       {x:?}");
-            //             let x = &self.stack;
-            //             println!("       {x:?}");
 
             if let Some(predicate) = self.predicate {
                 if !predicate(&block) {
@@ -70,16 +62,15 @@ impl Iterator for LeftChildFirstIterator<'_> {
             }
 
             match block.node.parent().0 {
-                // TODO: make specific errors
                 // TODO: maybe also check the parent considers this the child?
                 Some(index) => {
                     if !self.already_queued.contains(&index) {
-                        return Some(Err(Error::InvalidParentWhileIteratingA()));
+                        return Some(Err(Error::ReferenceToUnknownParent()));
                     }
                 }
                 None => {
                     if item.index.0 != 0 {
-                        return Some(Err(Error::InvalidParentWhileIteratingB()));
+                        return Some(Err(Error::UnexpectedParentlessNode()));
                     }
                 }
             }
@@ -100,7 +91,7 @@ impl Iterator for LeftChildFirstIterator<'_> {
                         || self.already_queued.contains(&node.left)
                         || self.already_queued.contains(&node.left)
                     {
-                        return Some(Err(Error::InvalidChildrenWhileIteratingA()));
+                        return Some(Err(Error::InvalidChildren()));
                     }
 
                     if self.already_queued.contains(&item.index) {

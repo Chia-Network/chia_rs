@@ -315,7 +315,6 @@ impl<'py> IntoPyObject<'py> for Node {
 }
 
 // TODO: consider forcing ::new() with validity checks
-#[derive(Debug)]
 pub struct Block {
     // NOTE: metadata node type and node's type not verified for agreement
     pub metadata: NodeMetadata,

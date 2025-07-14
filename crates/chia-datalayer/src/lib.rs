@@ -1,4 +1,4 @@
-pub mod merkle;
+mod merkle;
 
 pub use merkle::blob::*;
 pub use merkle::deltas::*;

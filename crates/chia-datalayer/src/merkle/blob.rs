@@ -106,10 +106,12 @@ impl BlockStatusCache {
             seen_indexes.set(index.0 as usize, true);
 
             if let Node::Leaf(leaf) = block.node {
-                // TODO: check for collisions here too
-                key_to_index.insert(leaf.key, index);
-                leaf_hash_to_index.insert(leaf.hash, index);
-                // self._insert_leaf(leaf, index);
+                if key_to_index.insert(leaf.key, index).is_some() {
+                    return Err(Error::KeyAlreadyPresent());
+                };
+                if leaf_hash_to_index.insert(leaf.hash, index).is_some() {
+                    return Err(Error::HashAlreadyPresent());
+                };
             }
         }
 
@@ -188,19 +190,6 @@ impl BlockStatusCache {
 
         self.key_to_index.insert(leaf.key, index);
         self.leaf_hash_to_index.insert(leaf.hash, index);
-
-        // // TODO: atomicity
-        // if self.key_to_index.insert(leaf.key, index).is_some() {
-        //     self.free_indexes.insert(index);
-        //     // TODO: specific errors here
-        //     return Err(Error::KeyAlreadyPresent());
-        // };
-        // if self.leaf_hash_to_index.insert(leaf.hash, index).is_some() {
-        //     self.free_indexes.insert(index);
-        //     self.key_to_index.remove(&leaf.key);
-        //     // TODO: specific errors here
-        //     return Err(Error::HashAlreadyPresent());
-        // };
     }
 
     fn remove_internal(&mut self, index: TreeIndex) {
@@ -211,7 +200,6 @@ impl BlockStatusCache {
         let Some(index) = self.key_to_index.remove(&node.key) else {
             return Err(Error::UnknownKey(node.key));
         };
-        // TODO: consider consistency here
         self.leaf_hash_to_index.remove(&node.hash);
 
         self.free_indexes.insert(index);
@@ -1036,7 +1024,6 @@ impl MerkleBlob {
         }
 
         match block.node {
-            // TODO: cleanup/revert on error?
             Node::Leaf(leaf) => self.block_status_cache.add_leaf(index, leaf),
             Node::Internal(..) => self.block_status_cache.add_internal(index),
         }
