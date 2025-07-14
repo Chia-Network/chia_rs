@@ -341,7 +341,7 @@ def get_spends_for_trusted_block(
     generator: Program,
     block_refs: list[ReadableBuffer],
     flags: int,
-) -> list[dict[str, Any]]: ...
+) -> dict[str, Any]: ...
 
 def get_spends_for_trusted_block_with_conditions(
     constants: ConsensusConstants,

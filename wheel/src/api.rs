@@ -533,11 +533,9 @@ pub fn get_spends_for_trusted_block<'a>(
 
     let output = get_coinspends_for_trusted_block(constants, &generator, &refs, flags)?;
 
-    let pylist = PyList::empty(py);
     let dict = PyDict::new(py);
     dict.set_item("block_spends", output)?;
-    pylist.append(dict)?;
-    Ok(pylist.into())
+    Ok(dict.into())
 }
 
 #[pyo3::pyfunction]

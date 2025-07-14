@@ -11,13 +11,13 @@ def test_recursion_depth() -> None:
     )
     gen_prog = Program.from_bytes(generator)
     args: list[bytes] = []
-    out_dict = get_spends_for_trusted_block_with_conditions(
+    out_dict_list = get_spends_for_trusted_block_with_conditions(
         DEFAULT_CONSTANTS, gen_prog, args, 0
     )
     expected_dict = "[]"
-    assert str(out_dict) == expected_dict
+    assert str(out_dict_list) == expected_dict
     out_dict = get_spends_for_trusted_block(DEFAULT_CONSTANTS, gen_prog, args, 0)
-    expected_dict = "[{'block_spends': []}]"
+    expected_dict = "{'block_spends': []}"
     assert str(out_dict) == expected_dict
 
 
@@ -29,7 +29,7 @@ def test_generator_parsing() -> None:
     )
     gen_prog = Program.from_bytes(generator)
     args: list[bytes] = []
-    out_dict = get_spends_for_trusted_block_with_conditions(
+    out_dict_list = get_spends_for_trusted_block_with_conditions(
         DEFAULT_CONSTANTS, gen_prog, args, 0
     )
 
@@ -38,7 +38,7 @@ def test_generator_parsing() -> None:
         .read()
         .split("\n")
     )
-    assert str(out_dict) == expected_dict[0]
+    assert str(out_dict_list) == expected_dict[0]
     out_dict = get_spends_for_trusted_block(DEFAULT_CONSTANTS, gen_prog, args, 0)
     assert str(out_dict) == expected_dict[1]
 
@@ -47,7 +47,7 @@ def test_generator_parsing() -> None:
     )
     gen_prog = Program.from_bytes(generator)
 
-    out_dict = get_spends_for_trusted_block_with_conditions(
+    out_dict_list = get_spends_for_trusted_block_with_conditions(
         DEFAULT_CONSTANTS, gen_prog, args, 0
     )
     # check we can handle hints (by ignoring them)
@@ -56,7 +56,8 @@ def test_generator_parsing() -> None:
         .read()
         .split("\n")
     )
-    assert str(out_dict) == expected_dict[0]
+    assert str(out_dict_list) == expected_dict[0]
+
     out_dict = get_spends_for_trusted_block(DEFAULT_CONSTANTS, gen_prog, args, 0)
     assert str(out_dict) == expected_dict[1]
 
@@ -65,7 +66,7 @@ def test_generator_parsing() -> None:
     )
     gen_prog = Program.from_bytes(generator)
 
-    out_dict = get_spends_for_trusted_block_with_conditions(
+    out_dict_list = get_spends_for_trusted_block_with_conditions(
         DEFAULT_CONSTANTS, gen_prog, args, 0
     )
     # check we can handle a big and real block
@@ -74,4 +75,4 @@ def test_generator_parsing() -> None:
         open("generator-tests/expected-dicts/block-834768.txt", "r").read().split("\n")
     )
 
-    assert str(out_dict) == expected_dict[0]
+    assert str(out_dict_list) == expected_dict[0]
