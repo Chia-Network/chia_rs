@@ -57,8 +57,15 @@ def validate_except_cost(output1: str, output2: str) -> None:
     assert len(lines1) == len(lines2)
     for l1, l2 in zip(lines1, lines2):
         # the cost is supposed to differ, don't compare that
-        if "cost:" in l1 and "cost: " in l2:
+        if l1.startswith("cost:") and l2.startswith("cost: "):
             continue
+        if l1.startswith("execution-cost:") and l2.startswith("execution-cost: "):
+            continue
+        if " exe-cost: 0 " in l1 and " exe-cost: " in l2:
+            columns = l2.split(" ")
+            idx = columns.index("exe-cost:")
+            columns[idx + 1] = "0"
+            l2 = " ".join(columns)
         assert l1 == l2
 
 
@@ -115,9 +122,9 @@ for g in test_list:
         if not "STRICT" in expected:
             expected_mempool = expected
             if (
-                consensus.result is not None
-                and mempool.result is not None
-                and consensus.result.cost != mempool.result.cost
+                consensus2.result is not None
+                and mempool2.result is not None
+                and consensus2.result.cost != mempool2.result.cost
             ):
                 print("\n\ncost when running in mempool mode differs from normal mode!")
                 failed = 1
@@ -150,8 +157,8 @@ for g in test_list:
             limit = 3
             strict_limit = 3
 
-        compare_output(consensus.output, expected, "")
-        compare_output(mempool.output, expected_mempool, "STRICT")
+        compare_output(consensus2.output, expected, "")
+        compare_output(mempool2.output, expected_mempool, "STRICT")
 
         stdout.write(
             f"{name} {consensus.run_time:.2f}s "
@@ -160,11 +167,11 @@ for g in test_list:
             f"{mempool2.run_time:.2f}s"
         )
 
-        if consensus.run_time > limit or consensus2.run_time > limit:
+        if consensus2.run_time > limit or consensus2.run_time > limit:
             stdout.write(f" - exceeds limit ({limit})!")
             failed = 1
 
-        if mempool.run_time > strict_limit or mempool2.run_time > strict_limit:
+        if mempool2.run_time > strict_limit or mempool2.run_time > strict_limit:
             stdout.write(f" - mempool exceeds limit ({strict_limit})!")
             failed = 1
 

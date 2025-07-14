@@ -10,7 +10,10 @@ use pyo3::{
 };
 
 use crate::merkle::iterators::{BreadthFirstIterator, LeftChildFirstIterator, ParentFirstIterator};
-use crate::merkle::{deltas, format, proof_of_inclusion};
+use crate::merkle::{
+    deltas, format, proof_of_inclusion,
+    util::{sha256_bytes, sha256_num},
+};
 use crate::{
     merkle::error::Error, Block, BlockBytes, Hash, InternalNode, KeyId, LeafNode, Node,
     NodeMetadata, NodeType, Parent, TreeIndex, ValueId, BLOCK_SIZE,
@@ -21,7 +24,6 @@ use chia_sha2::Sha256;
 use chia_streamable_macro::Streamable;
 #[cfg(feature = "py-bindings")]
 use chia_traits::Streamable;
-use num_traits::ToBytes;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::io::{Read, Write};
@@ -40,21 +42,6 @@ pub fn zstd_decode_path(path: &PathBuf) -> Result<Vec<u8>, Error> {
     decoder.read_to_end(&mut vector)?;
 
     Ok(vector)
-}
-
-#[allow(clippy::needless_pass_by_value)]
-fn sha256_num<T: ToBytes>(input: T) -> Hash {
-    let mut hasher = Sha256::new();
-    hasher.update(input.to_be_bytes());
-
-    Hash(Bytes32::new(hasher.finalize()))
-}
-
-fn sha256_bytes(input: &[u8]) -> Hash {
-    let mut hasher = Sha256::new();
-    hasher.update(input);
-
-    Hash(Bytes32::new(hasher.finalize()))
 }
 
 pub fn internal_hash(left_hash: &Hash, right_hash: &Hash) -> Hash {
@@ -1259,6 +1246,25 @@ impl MerkleBlob {
     }
 
     pub fn build_blob_from_node_list(
+        nodes: &NodeHashToDeltaReaderNode,
+        node_hash: Hash,
+        interested_hashes: &HashSet<Hash>,
+        all_used_hashes: &mut HashSet<Hash>,
+    ) -> Result<Self, Error> {
+        let mut hashes_and_indexes: Vec<(Hash, TreeIndex)> = Vec::new();
+        let mut merkle_blob = Self::new(Vec::new())?;
+        merkle_blob.inner_build_blob_from_node_list(
+            nodes,
+            node_hash,
+            interested_hashes,
+            &mut hashes_and_indexes,
+            all_used_hashes,
+        )?;
+
+        Ok(merkle_blob)
+    }
+
+    fn inner_build_blob_from_node_list(
         &mut self,
         nodes: &NodeHashToDeltaReaderNode,
         node_hash: Hash,
@@ -1296,14 +1302,14 @@ impl MerkleBlob {
             Some(deltas::DeltaReaderNode::Internal { left, right }) => {
                 let index = self.get_new_index();
 
-                let left_index = self.build_blob_from_node_list(
+                let left_index = self.inner_build_blob_from_node_list(
                     nodes,
                     *left,
                     interested_hashes,
                     hashes_and_indexes,
                     all_used_hashes,
                 )?;
-                let right_index = self.build_blob_from_node_list(
+                let right_index = self.inner_build_blob_from_node_list(
                     nodes,
                     *right,
                     interested_hashes,
@@ -1631,21 +1637,16 @@ impl Drop for MerkleBlob {
 }
 
 #[cfg(test)]
-pub(crate) mod tests {
+mod tests {
     use super::*;
-    use crate::merkle::dot::DotLines;
+    use crate::merkle::test_util::{
+        generate_hash, open_dot, small_blob, traversal_blob, HASH_ONE, HASH_ZERO,
+    };
+    use crate::merkle::util::sha256_num;
     use chia_traits::Streamable;
     use expect_test::expect;
-    use rstest::{fixture, rstest};
+    use rstest::rstest;
     use std::time::{Duration, Instant};
-
-    pub const HASH_ZERO: Hash = Hash(Bytes32::new([0; 32]));
-    pub const HASH_ONE: Hash = Hash(Bytes32::new([1; 32]));
-    pub const HASH_TWO: Hash = Hash(Bytes32::new([2; 32]));
-
-    pub fn open_dot(_lines: &mut DotLines) {
-        // crate::merkle::dot::open_dot(_lines);
-    }
 
     #[test]
     fn test_node_type_serialized_values() {
@@ -1693,58 +1694,6 @@ pub(crate) mod tests {
         let object = NodeMetadata::from_bytes(&bytes).unwrap();
         assert_eq!(object, NodeMetadata { node_type, dirty },);
         assert_eq!(object.to_bytes().unwrap(), bytes);
-    }
-
-    #[fixture]
-    fn small_blob() -> MerkleBlob {
-        let mut blob = MerkleBlob::new(vec![]).unwrap();
-
-        blob.insert(
-            KeyId(0x0001_0203_0405_0607),
-            ValueId(0x1011_1213_1415_1617),
-            &sha256_num(0x1020),
-            InsertLocation::Auto {},
-        )
-        .unwrap();
-
-        blob.insert(
-            KeyId(0x2021_2223_2425_2627),
-            ValueId(0x3031_3233_3435_3637),
-            &sha256_num(0x2030),
-            InsertLocation::Auto {},
-        )
-        .unwrap();
-
-        blob
-    }
-
-    #[fixture]
-    pub(crate) fn traversal_blob(mut small_blob: MerkleBlob) -> MerkleBlob {
-        small_blob
-            .insert(
-                KeyId(103),
-                ValueId(204),
-                &sha256_num(0x1324),
-                InsertLocation::Leaf {
-                    index: TreeIndex(1),
-                    side: Side::Right,
-                },
-            )
-            .unwrap();
-        small_blob
-            .insert(
-                KeyId(307),
-                ValueId(404),
-                &sha256_num(0x9183),
-                InsertLocation::Leaf {
-                    index: TreeIndex(3),
-                    side: Side::Right,
-                },
-            )
-            .unwrap();
-
-        small_blob.calculate_lazy_hashes().unwrap();
-        small_blob
     }
 
     #[rstest]
@@ -2275,25 +2224,6 @@ pub(crate) mod tests {
         assert_eq!(small_blob.blob.len(), expected_length);
         assert!(free_indexes.contains(&new_index));
         assert_eq!(small_blob.block_status_cache.free_index_count(), 0);
-    }
-
-    pub fn generate_kvid(seed: i64) -> (KeyId, ValueId) {
-        let mut kv_ids: Vec<i64> = Vec::new();
-
-        for offset in 0..2 {
-            let seed_int = 2i64 * seed + offset;
-            let seed_bytes = seed_int.to_be_bytes();
-            let hash = sha256_bytes(&seed_bytes);
-            let hash_int = i64::from_be_bytes(hash.0[0..8].try_into().unwrap());
-            kv_ids.push(hash_int);
-        }
-
-        (KeyId(kv_ids[0]), ValueId(kv_ids[1]))
-    }
-
-    pub fn generate_hash(seed: i64) -> Hash {
-        let seed_bytes = seed.to_be_bytes();
-        sha256_bytes(&seed_bytes)
     }
 
     #[rstest]
