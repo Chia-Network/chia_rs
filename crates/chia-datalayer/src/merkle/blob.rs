@@ -1215,6 +1215,25 @@ impl MerkleBlob {
     }
 
     pub fn build_blob_from_node_list(
+        nodes: &NodeHashToDeltaReaderNode,
+        node_hash: Hash,
+        interested_hashes: &HashSet<Hash>,
+        all_used_hashes: &mut HashSet<Hash>,
+    ) -> Result<Self, Error> {
+        let mut hashes_and_indexes: Vec<(Hash, TreeIndex)> = Vec::new();
+        let mut merkle_blob = Self::new(Vec::new())?;
+        merkle_blob.inner_build_blob_from_node_list(
+            nodes,
+            node_hash,
+            interested_hashes,
+            &mut hashes_and_indexes,
+            all_used_hashes,
+        )?;
+
+        Ok(merkle_blob)
+    }
+
+    fn inner_build_blob_from_node_list(
         &mut self,
         nodes: &NodeHashToDeltaReaderNode,
         node_hash: Hash,
@@ -1252,14 +1271,14 @@ impl MerkleBlob {
             Some(deltas::DeltaReaderNode::Internal { left, right }) => {
                 let index = self.get_new_index();
 
-                let left_index = self.build_blob_from_node_list(
+                let left_index = self.inner_build_blob_from_node_list(
                     nodes,
                     *left,
                     interested_hashes,
                     hashes_and_indexes,
                     all_used_hashes,
                 )?;
-                let right_index = self.build_blob_from_node_list(
+                let right_index = self.inner_build_blob_from_node_list(
                     nodes,
                     *right,
                     interested_hashes,

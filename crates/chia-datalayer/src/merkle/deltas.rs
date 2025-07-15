@@ -181,21 +181,18 @@ impl DeltaReader {
         &mut self,
         root_hash: Hash,
         interested_hashes: &HashSet<Hash>,
-    ) -> Result<(MerkleBlob, Vec<(Hash, TreeIndex)>), Error> {
-        let mut merkle_blob = MerkleBlob::new(Vec::new())?;
-        let mut hashes_and_indexes: Vec<(Hash, TreeIndex)> = Vec::new();
+    ) -> Result<MerkleBlob, Error> {
         let mut all_used_hashes: HashSet<Hash> = HashSet::new();
-        merkle_blob.build_blob_from_node_list(
+        let merkle_blob = MerkleBlob::build_blob_from_node_list(
             &self.nodes,
             root_hash,
             interested_hashes,
-            &mut hashes_and_indexes,
             &mut all_used_hashes,
         )?;
 
         self.nodes.retain(|k, _v| all_used_hashes.contains(k));
 
-        Ok((merkle_blob, hashes_and_indexes))
+        Ok(merkle_blob)
     }
 }
 
@@ -280,7 +277,7 @@ impl DeltaReader {
         &mut self,
         root_hash: Hash,
         interested_hashes: HashSet<Hash>,
-    ) -> Result<(MerkleBlob, Vec<(Hash, TreeIndex)>), Error> {
+    ) -> Result<MerkleBlob, Error> {
         self.create_merkle_blob_and_filter_unused_nodes(root_hash, &interested_hashes)
     }
 }
@@ -482,7 +479,7 @@ mod tests {
         let mut delta_reader = complete_delta_reader();
         let interested_hashes: HashSet<Hash> = delta_reader.nodes.keys().copied().collect();
 
-        let (complete_blob, _) = delta_reader
+        let complete_blob = delta_reader
             .create_merkle_blob_and_filter_unused_nodes(HASH_ZERO, &interested_hashes)
             .unwrap();
         complete_blob.check_integrity().unwrap();
