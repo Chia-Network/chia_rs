@@ -1,6 +1,6 @@
 [package]
 name = "chia-datalayer-fuzz"
-version = "0.24.0"
+version = "0.27.0"
 publish = false
 edition = "2021"
 
