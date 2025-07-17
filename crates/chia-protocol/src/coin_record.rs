@@ -17,7 +17,6 @@ pub struct CoinRecord {
 
 #[pymethods]
 impl CoinRecord {
-
     #[getter]
     pub fn spent(&self) -> bool {
         self.spent_block_index > 0
@@ -36,13 +35,12 @@ impl CoinRecord {
             None
         };
 
-        let confirmed_height =
-            if self.confirmed_block_index == 0_u32 && self.timestamp == 0_u64 {
-                None
-            } else {
-                Some(self.confirmed_block_index)
-            };
+        let confirmed_height = if self.confirmed_block_index == 0_u32 && self.timestamp == 0_u64 {
+            None
+        } else {
+            Some(self.confirmed_block_index)
+        };
 
-        CoinState::new(self.coin.clone(), spent_h, confirmed_height)
+        CoinState::new(self.coin, spent_h, confirmed_height)
     }
 }

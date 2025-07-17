@@ -3,6 +3,7 @@ use crate::run_generator::{
 };
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::build_compressed_block::BlockBuilder;
+use chia_consensus::check_time_locks::py_check_time_locks;
 use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::flags::{
     COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
@@ -615,6 +616,9 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_calculate_ip_iters, m)?)?;
     m.add_function(wrap_pyfunction!(py_is_overflow_block, m)?)?;
     m.add_function(wrap_pyfunction!(py_expected_plot_size, m)?)?;
+
+    // check time lock
+    m.add_function(wrap_pyfunction!(py_check_time_locks, m)?)?;
 
     // CLVM validation
     m.add_function(wrap_pyfunction!(py_is_canonical_serialization, m)?)?;

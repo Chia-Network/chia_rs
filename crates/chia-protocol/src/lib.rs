@@ -43,6 +43,7 @@ pub use crate::bytes::*;
 pub use crate::chia_protocol::*;
 pub use crate::classgroup::*;
 pub use crate::coin::*;
+pub use crate::coin_record::*;
 pub use crate::coin_spend::*;
 pub use crate::coin_state::*;
 pub use crate::end_of_sub_slot_bundle::*;
@@ -66,7 +67,6 @@ pub use crate::unfinished_header_block::*;
 pub use crate::vdf::*;
 pub use crate::wallet_protocol::*;
 pub use crate::weight_proof::*;
-pub use crate::coin_record::*;
 
 #[cfg(feature = "py-bindings")]
 pub use crate::lazy_node::*;

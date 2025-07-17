@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 
-use crate::conditions::SpendBundleConditions;
 use crate::owned_conditions::OwnedSpendBundleConditions;
 use crate::validation_error::ErrorCode;
 use chia_protocol::Bytes32;
 use chia_protocol::CoinRecord;
-use pyo3::{pyfunction, types::PyDict, Python};
-use pyo3::PyResult;
 use pyo3::prelude::*;
+use pyo3::PyResult;
+use pyo3::{pyfunction, types::PyDict};
 
 pub fn check_time_locks(
     removal_coin_records: &HashMap<Bytes32, CoinRecord>,
@@ -33,9 +32,8 @@ pub fn check_time_locks(
     }
 
     for spend in &bundle_conds.spends {
-        let unspent = match removal_coin_records.get(&Bytes32::from(spend.coin_id)) {
-            Some(coin) => coin,
-            None => continue, // Or handle missing record as an error if that’s appropriate
+        let Some(unspent) = removal_coin_records.get(&Bytes32::from(spend.coin_id)) else {
+            continue;
         };
 
         if let Some(birth_height) = spend.birth_height {
@@ -76,13 +74,15 @@ pub fn check_time_locks(
 }
 
 #[pyfunction]
+#[pyo3(name = "check_time_locks")]
 pub fn py_check_time_locks(
     py_removal_coin_records: &Bound<'_, PyDict>,
-    bundle_conds: OwnedSpendBundleConditions,
+    bundle_conds: &OwnedSpendBundleConditions,
     prev_transaction_block_height: u32,
     timestamp: u64,
 ) -> PyResult<Option<String>> {
-    let mut removal_coin_records: HashMap<chia_protocol::BytesImpl<32>, CoinRecord> = HashMap::new();
+    let mut removal_coin_records: HashMap<chia_protocol::BytesImpl<32>, CoinRecord> =
+        HashMap::new();
     for (k, v) in py_removal_coin_records.iter() {
         let key_bytes: Bytes32 = k.extract()?;
         let coin_record: CoinRecord = v.extract()?;
@@ -91,10 +91,10 @@ pub fn py_check_time_locks(
 
     let res = check_time_locks(
         &removal_coin_records,
-        &bundle_conds,
+        bundle_conds,
         prev_transaction_block_height,
         timestamp,
     );
 
-    Ok(res.map(|err| format!("{:?}", err)))
+    Ok(res.map(|err| format!("{err:?}")))
 }
