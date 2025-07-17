@@ -479,7 +479,7 @@ mod tests {
         let mut delta_reader = complete_delta_reader();
         let interested_hashes: HashSet<Hash> = delta_reader.nodes.keys().copied().collect();
 
-        let mut complete_blob = delta_reader
+        let complete_blob = delta_reader
             .create_merkle_blob_and_filter_unused_nodes(HASH_ZERO, &interested_hashes)
             .unwrap();
         complete_blob.check_integrity().unwrap();

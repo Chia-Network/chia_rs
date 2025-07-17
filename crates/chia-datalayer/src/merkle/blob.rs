@@ -816,11 +816,12 @@ impl MerkleBlob {
         Ok(())
     }
 
-    pub fn check_integrity(&mut self) -> Result<(), Error> {
+    pub fn check_integrity(&self) -> Result<(), Error> {
         self.check_just_integrity()?;
-        self.calculate_lazy_hashes()?;
 
-        self.check_just_integrity()
+        let mut clone = self.clone();
+        clone.calculate_lazy_hashes()?;
+        clone.check_just_integrity()
     }
 
     fn check_just_integrity(&self) -> Result<(), Error> {
