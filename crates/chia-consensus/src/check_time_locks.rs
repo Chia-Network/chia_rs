@@ -4,8 +4,11 @@ use crate::owned_conditions::OwnedSpendBundleConditions;
 use crate::validation_error::ErrorCode;
 use chia_protocol::Bytes32;
 use chia_protocol::CoinRecord;
+#[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
+#[cfg(feature = "py-bindings")]
 use pyo3::PyResult;
+#[cfg(feature = "py-bindings")]
 use pyo3::{pyfunction, types::PyDict};
 
 pub fn check_time_locks(
@@ -73,6 +76,7 @@ pub fn check_time_locks(
     None
 }
 
+#[cfg(feature = "py-bindings")]
 #[pyfunction]
 #[pyo3(name = "check_time_locks")]
 pub fn py_check_time_locks(
