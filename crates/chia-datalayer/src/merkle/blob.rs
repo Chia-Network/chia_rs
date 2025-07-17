@@ -820,6 +820,7 @@ impl MerkleBlob {
         self.check_just_integrity()?;
 
         let mut clone = self.clone();
+        clone.check_integrity_on_drop = false;
         clone.calculate_lazy_hashes()?;
         clone.check_just_integrity()
     }
