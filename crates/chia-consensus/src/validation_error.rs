@@ -1,5 +1,5 @@
 use clvmr::allocator::{Allocator, Atom, NodePtr, SExp};
-use clvmr::reduction::EvalErr;
+use clvmr::error::EvalErr;
 use thiserror::Error;
 
 #[cfg(feature = "py-bindings")]
@@ -171,10 +171,9 @@ pub struct ValidationErr(pub NodePtr, pub ErrorCode);
 
 impl From<EvalErr> for ValidationErr {
     fn from(v: EvalErr) -> Self {
-        if v.1 == "cost exceeded" {
-            ValidationErr(v.0, ErrorCode::CostExceeded)
-        } else {
-            ValidationErr(v.0, ErrorCode::GeneratorRuntimeError)
+        match v {
+            EvalErr::CostExceeded => ValidationErr(v.node_ptr(), ErrorCode::CostExceeded),
+            _ => ValidationErr(v.node_ptr(), ErrorCode::GeneratorRuntimeError),
         }
     }
 }

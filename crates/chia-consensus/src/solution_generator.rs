@@ -1,11 +1,11 @@
+use crate::error::Result;
 use chia_protocol::Coin;
 use chia_protocol::CoinSpend;
 use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::serde::{node_from_bytes_backrefs, node_to_bytes, node_to_bytes_backrefs};
-use std::io;
 
 /// the tuple has the Coin, puzzle-reveal and solution
-fn build_generator<BufRef, I>(a: &mut Allocator, spends: I) -> io::Result<NodePtr>
+fn build_generator<BufRef, I>(a: &mut Allocator, spends: I) -> Result<NodePtr>
 where
     BufRef: AsRef<[u8]>,
     I: IntoIterator<Item = (Coin, BufRef, BufRef)>,
@@ -86,24 +86,24 @@ where
 }
 
 /// the tuple has the Coin, puzzle-reveal and solution
-pub fn solution_generator<BufRef, I>(spends: I) -> io::Result<Vec<u8>>
+pub fn solution_generator<BufRef, I>(spends: I) -> Result<Vec<u8>>
 where
     BufRef: AsRef<[u8]>,
     I: IntoIterator<Item = (Coin, BufRef, BufRef)>,
 {
     let mut a = Allocator::new();
     let generator = build_generator(&mut a, spends)?;
-    node_to_bytes(&a, generator)
+    Ok(node_to_bytes(&a, generator)?)
 }
 
-pub fn solution_generator_backrefs<BufRef, I>(spends: I) -> io::Result<Vec<u8>>
+pub fn solution_generator_backrefs<BufRef, I>(spends: I) -> Result<Vec<u8>>
 where
     BufRef: AsRef<[u8]>,
     I: IntoIterator<Item = (Coin, BufRef, BufRef)>,
 {
     let mut a = Allocator::new();
     let generator = build_generator(&mut a, spends)?;
-    node_to_bytes_backrefs(&a, generator)
+    Ok(node_to_bytes_backrefs(&a, generator)?)
 }
 
 #[cfg(test)]
