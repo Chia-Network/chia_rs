@@ -1,4 +1,5 @@
 use chia_streamable_macro::streamable;
+#[cfg(feature = "py-bindings")]
 use pyo3::pymethods;
 
 use crate::{Bytes32, Coin, CoinState};
@@ -15,6 +16,7 @@ pub struct CoinRecord {
     timestamp: u64, // Timestamp of the block at height confirmed_block_index
 }
 
+#[cfg(feature = "py-bindings")]
 #[pymethods]
 impl CoinRecord {
     pub fn spent(&self) -> bool {
