@@ -35,6 +35,13 @@ def additions_and_removals(
     program: ReadableBuffer, block_refs: list[ReadableBuffer], flags: int, constants: ConsensusConstants
 ) -> tuple[list[tuple[Coin, Optional[bytes]]], list[tuple[bytes32, Coin]]]: ...
 
+def check_time_locks(
+    removal_coin_records: dict[bytes32, CoinRecord],
+    bundle_conds: &OwnedSpendBundleConditions,
+    prev_transaction_block_height: u32,
+    timestamp: u64,
+) -> option[]: ...
+
 def confirm_included_already_hashed(
     root: bytes32,
     item: bytes32,
@@ -707,6 +714,55 @@ class Coin:
     def replace(self, *, parent_coin_info: Union[ bytes32, _Unspec] = _Unspec(),
         puzzle_hash: Union[ bytes32, _Unspec] = _Unspec(),
         amount: Union[ uint64, _Unspec] = _Unspec()) -> Coin: ...
+
+@final
+class CoinRecord:
+    coin: Coin
+    confirmed_block_index: uint32
+    spent_block_index: uint32
+    coinbase: bool
+    timestamp: uint64
+    coin: Coin
+    confirmed_block_index: uint32
+    spent_block_index: uint32
+    coinbase: bool
+    timestamp: uint64
+    @property
+    def spent(self) -> bool: ...
+    @property
+    def name(self) -> bytes32: ...
+    @property
+    def coin_state(self) -> CoinState: ...
+    def __init__(
+        self,
+        coin: Coin,
+        confirmed_block_index: uint32,
+        spent_block_index: uint32,
+        coinbase: bool,
+        timestamp: uint64
+    ) -> None: ...
+    def __hash__(self) -> int: ...
+    def __repr__(self) -> str: ...
+    def __deepcopy__(self, memo: object) -> Self: ...
+    def __copy__(self) -> Self: ...
+    @classmethod
+    def from_bytes(cls, blob: bytes) -> Self: ...
+    @classmethod
+    def from_bytes_unchecked(cls, blob: bytes) -> Self: ...
+    @classmethod
+    def parse_rust(cls, blob: ReadableBuffer, trusted: bool = False) -> tuple[Self, int]: ...
+    def to_bytes(self) -> bytes: ...
+    def __bytes__(self) -> bytes: ...
+    def stream_to_bytes(self) -> bytes: ...
+    def get_hash(self) -> bytes32: ...
+    def to_json_dict(self) -> dict[str, Any]: ...
+    @classmethod
+    def from_json_dict(cls, json_dict: dict[str, Any]) -> Self: ...
+    def replace(self, *, coin: Union[ Coin, _Unspec] = _Unspec(),
+        confirmed_block_index: Union[ uint32, _Unspec] = _Unspec(),
+        spent_block_index: Union[ uint32, _Unspec] = _Unspec(),
+        coinbase: Union[ bool, _Unspec] = _Unspec(),
+        timestamp: Union[ uint64, _Unspec] = _Unspec()) -> CoinRecord: ...
 
 @final
 class CoinSpend:

@@ -28,9 +28,9 @@ use chia_protocol::{
 };
 use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
-    CoinSpend, CoinState, CoinStateFilters, CoinStateUpdate, EndOfSubSlotBundle, FeeEstimate,
-    FeeEstimateGroup, FeeRate, Foliage, FoliageBlockData, FoliageTransactionBlock, FullBlock,
-    Handshake, HeaderBlock, InfusedChallengeChainSubSlot, LazyNode, MempoolItemsAdded,
+    CoinRecord, CoinSpend, CoinState, CoinStateFilters, CoinStateUpdate, EndOfSubSlotBundle,
+    FeeEstimate, FeeEstimateGroup, FeeRate, Foliage, FoliageBlockData, FoliageTransactionBlock,
+    FullBlock, Handshake, HeaderBlock, InfusedChallengeChainSubSlot, LazyNode, MempoolItemsAdded,
     MempoolItemsRemoved, Message, NewCompactVDF, NewPeak, NewPeakWallet,
     NewSignagePointOrEndOfSubSlot, NewTransaction, NewUnfinishedBlock, NewUnfinishedBlock2,
     PoolTarget, Program, ProofBlockHeader, ProofOfSpace, PuzzleSolutionResponse, PyPlotSize,
@@ -659,6 +659,7 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // Chia classes
     m.add_class::<Coin>()?;
+    m.add_class::<CoinRecord>()?;
     m.add_class::<PoolTarget>()?;
     m.add_class::<ClassgroupElement>()?;
     m.add_class::<EndOfSubSlotBundle>()?;

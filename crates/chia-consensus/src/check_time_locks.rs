@@ -76,21 +76,20 @@ pub fn check_time_locks(
 #[pyfunction]
 #[pyo3(name = "check_time_locks")]
 pub fn py_check_time_locks(
-    py_removal_coin_records: &Bound<'_, PyDict>,
+    removal_coin_records: &Bound<'_, PyDict>,
     bundle_conds: &OwnedSpendBundleConditions,
     prev_transaction_block_height: u32,
     timestamp: u64,
 ) -> PyResult<Option<String>> {
-    let mut removal_coin_records: HashMap<chia_protocol::BytesImpl<32>, CoinRecord> =
-        HashMap::new();
-    for (k, v) in py_removal_coin_records.iter() {
+    let mut removals_hashmap: HashMap<chia_protocol::BytesImpl<32>, CoinRecord> = HashMap::new();
+    for (k, v) in removal_coin_records.iter() {
         let key_bytes: Bytes32 = k.extract()?;
         let coin_record: CoinRecord = v.extract()?;
-        removal_coin_records.insert(key_bytes, coin_record);
+        removals_hashmap.insert(key_bytes, coin_record);
     }
 
     let res = check_time_locks(
-        &removal_coin_records,
+        &removals_hashmap,
         bundle_conds,
         prev_transaction_block_height,
         timestamp,
