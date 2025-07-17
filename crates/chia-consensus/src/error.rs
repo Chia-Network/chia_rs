@@ -1,12 +1,12 @@
 use crate::validation_error::ValidationErr;
 use clvm_traits::{FromClvmError, ToClvmError};
-use clvmr::reduction::EvalErr;
+use clvmr::error::EvalErr;
 use thiserror::Error;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::PyErr;
 
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, PartialEq, Error)]
 pub enum Error {
     #[error("To CLVM {0}")]
     ToClvm(#[from] ToClvmError),

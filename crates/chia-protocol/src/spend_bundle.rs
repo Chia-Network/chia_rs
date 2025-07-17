@@ -7,8 +7,8 @@ use chia_traits::Streamable;
 use clvm_traits::FromClvm;
 use clvmr::allocator::{NodePtr, SExp};
 use clvmr::cost::Cost;
+use clvmr::error::EvalErr;
 use clvmr::op_utils::{first, rest};
-use clvmr::reduction::EvalErr;
 use clvmr::Allocator;
 
 #[cfg(feature = "py-bindings")]
@@ -53,7 +53,7 @@ impl SpendBundle {
             a.restore_checkpoint(&checkpoint);
             let (cost, mut conds) = cs.puzzle_reveal.run(&mut a, 0, cost_left, &cs.solution)?;
             if cost > cost_left {
-                return Err(EvalErr(a.nil(), "cost exceeded".to_string()));
+                return Err(EvalErr::CostExceeded);
             }
             cost_left -= cost;
             let parent_coin_info: Bytes32 = cs.coin.coin_id();
@@ -64,7 +64,9 @@ impl SpendBundle {
                 let c = rest(&a, c)?;
                 let buf = match a.sexp(op) {
                     SExp::Atom => a.atom(op),
-                    SExp::Pair(..) => return Err(EvalErr(op, "invalid condition".to_string())),
+                    SExp::Pair(..) => {
+                        return Err(EvalErr::InvalidOpArg(op, "invalid condition".to_string()))
+                    }
                 };
                 let buf = buf.as_ref();
                 if buf.len() != 1 {
@@ -72,14 +74,16 @@ impl SpendBundle {
                 }
                 if buf[0] == CREATE_COIN {
                     let (puzzle_hash, (amount, _)) = <(Bytes32, (u64, NodePtr))>::from_clvm(&a, c)
-                        .map_err(|_| EvalErr(c, "failed to parse spend".to_string()))?;
+                        .map_err(|_| {
+                            EvalErr::InvalidOpArg(c, "failed to parse spend".to_string())
+                        })?;
                     ret.push(Coin {
                         parent_coin_info,
                         puzzle_hash,
                         amount,
                     });
                     if CREATE_COIN_COST > cost_left {
-                        return Err(EvalErr(a.nil(), "cost exceeded".to_string()));
+                        return Err(EvalErr::CostExceeded);
                     }
                     cost_left -= CREATE_COIN_COST;
                 }
@@ -141,7 +145,7 @@ impl SpendBundle {
     #[pyo3(name = "additions")]
     fn py_additions(&self) -> PyResult<Vec<Coin>> {
         self.additions()
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.1))
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
     }
 }
 
@@ -251,7 +255,10 @@ ff01\
 80";
 
         test_impl(solution, |_test_coin, bundle: SpendBundle| {
-            assert_eq!(bundle.additions().unwrap_err().1, "invalid condition");
+            assert_eq!(
+                bundle.additions().unwrap_err().to_string(),
+                "InvalidOperatorArg: invalid condition"
+            );
         });
     }
 
@@ -268,7 +275,10 @@ ffff0101\
 80";
 
         test_impl(solution, |_test_coin, bundle: SpendBundle| {
-            assert_eq!(bundle.additions().unwrap_err().1, "failed to parse spend");
+            assert_eq!(
+                bundle.additions().unwrap_err().to_string(),
+                "InvalidOperatorArg: failed to parse spend"
+            );
         });
     }
 }
