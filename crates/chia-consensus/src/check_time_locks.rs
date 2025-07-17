@@ -95,5 +95,5 @@ pub fn py_check_time_locks(
         timestamp,
     );
 
-    Ok(res.map(|err| err.into()))
+    Ok(res.map(std::convert::Into::into))
 }
