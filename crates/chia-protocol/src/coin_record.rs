@@ -1,4 +1,5 @@
 use chia_streamable_macro::streamable;
+use pyo3::prelude::*;
 use pyo3::pymethods;
 
 use crate::{Bytes32, Coin, CoinState};
