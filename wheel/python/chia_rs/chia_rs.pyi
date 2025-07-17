@@ -40,7 +40,7 @@ def check_time_locks(
     bundle_conds: SpendBundleConditions,
     prev_transaction_block_height: uint32,
     timestamp: uint64,
-) -> option[]: ...
+) -> Optional[int]: ...
 
 def confirm_included_already_hashed(
     root: bytes32,
