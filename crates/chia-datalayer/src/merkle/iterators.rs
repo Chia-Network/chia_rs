@@ -12,6 +12,7 @@ pub struct LeftChildFirstIterator<'a> {
     stack: Vec<LeftChildFirstIteratorItem>,
     already_queued: HashSet<TreeIndex>,
     predicate: Option<fn(&Block) -> bool>,
+    from_index: TreeIndex,
 }
 
 impl<'a> LeftChildFirstIterator<'a> {
@@ -38,6 +39,7 @@ impl<'a> LeftChildFirstIterator<'a> {
             stack,
             already_queued: HashSet::new(),
             predicate,
+            from_index,
         }
     }
 }
@@ -61,12 +63,38 @@ impl Iterator for LeftChildFirstIterator<'_> {
                 }
             }
 
+            match block.node.parent().0 {
+                // TODO: maybe also check the parent considers this the child?
+                Some(index) => {
+                    if item.index != self.from_index && !self.already_queued.contains(&index) {
+                        return Some(Err(Error::ReferenceToUnknownParent()));
+                    }
+                }
+                None => {
+                    if item.index.0 != 0 {
+                        return Some(Err(Error::UnexpectedParentlessNode()));
+                    }
+                }
+            }
+
             match block.node {
-                Node::Leaf(..) => return Some(Ok((item.index, block))),
+                Node::Leaf(..) => {
+                    if block.metadata.dirty {
+                        return Some(Err(Error::DirtyLeaf(item.index)));
+                    }
+                    return Some(Ok((item.index, block)));
+                }
                 Node::Internal(ref node) => {
                     if item.visited {
                         return Some(Ok((item.index, block)));
                     };
+
+                    if node.left == node.right
+                        || self.already_queued.contains(&node.left)
+                        || self.already_queued.contains(&node.right)
+                    {
+                        return Some(Err(Error::InvalidChildren()));
+                    }
 
                     if self.already_queued.contains(&item.index) {
                         return Some(Err(Error::CycleFound()));
@@ -225,6 +253,7 @@ mod tests {
     #[case::left_child_first(
         "left child first",
         LeftChildFirstIterator::new,
+        Some(TreeIndex(0)),
         expect![[r#"
             [
                 (
@@ -293,11 +322,86 @@ mod tests {
             ]
         "#]],
     )]
+    #[allow(clippy::needless_raw_string_hashes)]
+    #[case::left_child_first(
+        "left child first - from non-root internal",
+        LeftChildFirstIterator::new,
+        Some(TreeIndex(4)),
+        expect![[r#"
+            [
+                (
+                    1,
+                    Leaf,
+                    2315169217770759719,
+                    3472611983179986487,
+                    Hash(
+                        0f980325ebe9426fa295f3f69cc38ef8fe6ce8f3b9f083556c0f927e67e56651,
+                    ),
+                ),
+                (
+                    3,
+                    Leaf,
+                    103,
+                    204,
+                    Hash(
+                        2d47301cff01acc863faa5f57e8fbc632114f1dc764772852ed0c29c0f248bd3,
+                    ),
+                ),
+                (
+                    5,
+                    Leaf,
+                    307,
+                    404,
+                    Hash(
+                        97148f80dd9289a1b67527c045fd47662d575ccdb594701a56c2255ac84f6113,
+                    ),
+                ),
+                (
+                    6,
+                    Internal,
+                    3,
+                    5,
+                    Hash(
+                        b946284149e4f4a0e767ef2feb397533fb112bf4d99c887348cec4438e38c1ce,
+                    ),
+                ),
+                (
+                    4,
+                    Internal,
+                    1,
+                    6,
+                    Hash(
+                        547b5bd537270427e570df6e43dda7c4ef23e6c3bec72cf19d912c3fe864f549,
+                    ),
+                ),
+            ]
+        "#]],
+    )]
+    #[allow(clippy::needless_raw_string_hashes)]
+    #[case::left_child_first(
+        "left child first - from non-root leaf",
+        LeftChildFirstIterator::new,
+        Some(TreeIndex(3)),
+        expect![[r#"
+            [
+                (
+                    3,
+                    Leaf,
+                    103,
+                    204,
+                    Hash(
+                        2d47301cff01acc863faa5f57e8fbc632114f1dc764772852ed0c29c0f248bd3,
+                    ),
+                ),
+            ]
+        "#]],
+    )]
     // expect-test is adding them back
     #[allow(clippy::needless_raw_string_hashes)]
     #[case::parent_first(
         "parent first",
         ParentFirstIterator::new,
+        Some(TreeIndex(0)),
         expect![[r#"
             [
                 (
@@ -370,6 +474,7 @@ mod tests {
     #[case::breadth_first(
         "breadth first",
         BreadthFirstIterator::new,
+        Some(TreeIndex(0)),
         expect![[r#"
             [
                 (
@@ -413,6 +518,7 @@ mod tests {
     fn test_iterators<'a, F, T>(
         #[case] note: &str,
         #[case] iterator_new: F,
+        #[case] from_index: Option<TreeIndex>,
         #[case] expected: Expect,
         #[by_ref] traversal_blob: &'a MerkleBlob,
     ) where
@@ -425,7 +531,7 @@ mod tests {
         let mut actual = vec![];
         {
             let blob: &[u8] = &traversal_blob.blob;
-            for item in iterator_new(blob, None) {
+            for item in iterator_new(blob, from_index) {
                 let (index, block) = item.unwrap();
                 actual.push(iterator_test_reference(index, &block));
                 dot_actual.push_traversal(index);

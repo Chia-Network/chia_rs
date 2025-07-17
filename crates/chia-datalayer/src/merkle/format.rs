@@ -55,6 +55,7 @@ pub struct Parent(pub Option<TreeIndex>);
     derive(FromPyObject, IntoPyObject, PyJsonDict),
     pyo3(transparent)
 )]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 pub struct Hash(pub Bytes32);
 
@@ -66,6 +67,7 @@ pub struct Hash(pub Bytes32);
     pyclass(frozen),
     derive(PyJsonDict, PyStreamable)
 )]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 // ISSUE: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
 //        being found with a cfg_attr
@@ -73,6 +75,7 @@ pub struct Hash(pub Bytes32);
 #[cfg(feature = "py-bindings")]
 pub struct KeyId(#[pyo3(get, name = "raw")] pub i64);
 
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 #[cfg(not(feature = "py-bindings"))]
 pub struct KeyId(pub i64);
@@ -91,6 +94,7 @@ impl KeyId {
     pyclass(frozen),
     derive(PyJsonDict, PyStreamable)
 )]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 // ISSUE: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
 //        being found with a cfg_attr
@@ -98,6 +102,7 @@ impl KeyId {
 #[cfg(feature = "py-bindings")]
 pub struct ValueId(#[pyo3(get, name = "raw")] pub i64);
 
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 #[cfg(not(feature = "py-bindings"))]
 pub struct ValueId(pub i64);
@@ -208,6 +213,7 @@ pub struct LeafNode {
     pub value: ValueId,
 }
 
+// TODO: consider forcing ::new() with validity checks
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Node {
     Internal(InternalNode),
@@ -308,6 +314,7 @@ impl<'py> IntoPyObject<'py> for Node {
     }
 }
 
+// TODO: consider forcing ::new() with validity checks
 pub struct Block {
     // NOTE: metadata node type and node's type not verified for agreement
     pub metadata: NodeMetadata,

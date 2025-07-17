@@ -396,6 +396,7 @@ dependencies = [
 name = "chia-datalayer"
 version = "0.27.0"
 dependencies = [
+ "arbitrary",
  "bitvec",
  "chia-datalayer-macro",
  "chia-protocol",

@@ -106,8 +106,12 @@ impl BlockStatusCache {
             seen_indexes.set(index.0 as usize, true);
 
             if let Node::Leaf(leaf) = block.node {
-                key_to_index.insert(leaf.key, index);
-                leaf_hash_to_index.insert(leaf.hash, index);
+                if key_to_index.insert(leaf.key, index).is_some() {
+                    return Err(Error::KeyAlreadyPresent());
+                };
+                if leaf_hash_to_index.insert(leaf.hash, index).is_some() {
+                    return Err(Error::HashAlreadyPresent());
+                };
             }
         }
 
@@ -165,6 +169,10 @@ impl BlockStatusCache {
 
     fn contains_key(&self, key: KeyId) -> bool {
         self.key_to_index.contains_key(&key)
+    }
+
+    fn contains_leaf_hash(&self, hash: &Hash) -> bool {
+        self.leaf_hash_to_index.contains_key(hash)
     }
 
     fn clear(&mut self) {
@@ -364,6 +372,9 @@ impl MerkleBlob {
     ) -> Result<TreeIndex, Error> {
         if self.block_status_cache.contains_key(key) {
             return Err(Error::KeyAlreadyPresent());
+        }
+        if self.block_status_cache.contains_leaf_hash(hash) {
+            return Err(Error::HashAlreadyPresent());
         }
 
         let insert_location = match insert_location {
@@ -806,6 +817,15 @@ impl MerkleBlob {
     }
 
     pub fn check_integrity(&self) -> Result<(), Error> {
+        self.check_just_integrity()?;
+
+        let mut clone = self.clone();
+        clone.check_integrity_on_drop = false;
+        clone.calculate_lazy_hashes()?;
+        clone.check_just_integrity()
+    }
+
+    fn check_just_integrity(&self) -> Result<(), Error> {
         let mut leaf_count: usize = 0;
         let mut internal_count: usize = 0;
         let mut child_to_parent: HashMap<TreeIndex, TreeIndex> = HashMap::new();
@@ -1546,7 +1566,7 @@ impl MerkleBlob {
     }
 
     #[pyo3(name = "check_integrity")]
-    pub fn py_check_integrity(&self) -> PyResult<()> {
+    pub fn py_check_integrity(&mut self) -> PyResult<()> {
         Ok(self.check_integrity()?)
     }
 }

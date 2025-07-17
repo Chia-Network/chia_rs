@@ -14,6 +14,8 @@ pub enum Error {
     InvalidBlobLength(usize),
     #[error("key already present")]
     KeyAlreadyPresent(),
+    #[error("hash already present")]
+    HashAlreadyPresent(),
     #[error("requested insertion at root but tree not empty")]
     UnableToInsertAsRootOfNonEmptyTree(),
     #[error("unable to find a leaf")]
@@ -60,8 +62,16 @@ pub enum Error {
     IncompleteInsertLocationParameters(),
     #[error("hash is dirty for index: {0:?}")]
     Dirty(TreeIndex),
+    #[error("hash is dirty for leaf index: {0:?}")]
+    DirtyLeaf(TreeIndex),
     #[error("key/value and hash collection lengths must match: {0:?} keys/values, {0:?} hashes")]
     UnmatchedKeysAndValues(usize, usize),
     #[error("hash not found: {0:?}")]
     HashNotFound(Hash),
+    #[error("reference to unknown parent")]
+    ReferenceToUnknownParent(),
+    #[error("unexpected parentless node")]
+    UnexpectedParentlessNode(),
+    #[error("invalid children")]
+    InvalidChildren(),
 }
