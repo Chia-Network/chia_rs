@@ -170,6 +170,8 @@ use pyo3::types::{PyList, PyTuple};
 use pyo3::exceptions::*;
 
 #[cfg(feature = "py-bindings")]
+#[allow(clippy::needless_pass_by_value)]
+// We use this for the map function, so using a reference here is not ideal.
 fn map_pyerr(err: EvalErr) -> PyErr {
     // Convert EvalErr to PyErr, so that it can be used in python bindings
     PyValueError::new_err(err.to_string())
