@@ -1,5 +1,4 @@
 use chia_streamable_macro::streamable;
-use pyo3::prelude::*;
 use pyo3::pymethods;
 
 use crate::{Bytes32, Coin, CoinState};
@@ -18,17 +17,14 @@ pub struct CoinRecord {
 
 #[pymethods]
 impl CoinRecord {
-    #[getter]
     pub fn spent(&self) -> bool {
         self.spent_block_index > 0
     }
 
-    #[getter]
     pub fn name(&self) -> Bytes32 {
         self.coin.coin_id()
     }
 
-    #[getter]
     pub fn coin_state(&self) -> CoinState {
         let spent_h = if self.spent() {
             Some(self.spent_block_index)

@@ -80,7 +80,7 @@ pub fn py_check_time_locks(
     bundle_conds: &OwnedSpendBundleConditions,
     prev_transaction_block_height: u32,
     timestamp: u64,
-) -> PyResult<Option<String>> {
+) -> PyResult<Option<u32>> {
     let mut removals_hashmap: HashMap<chia_protocol::BytesImpl<32>, CoinRecord> = HashMap::new();
     for (k, v) in removal_coin_records.iter() {
         let key_bytes: Bytes32 = k.extract()?;
@@ -95,5 +95,5 @@ pub fn py_check_time_locks(
         timestamp,
     );
 
-    Ok(res.map(|err| format!("{err:?}")))
+    Ok(res.map(|err| err.into()))
 }

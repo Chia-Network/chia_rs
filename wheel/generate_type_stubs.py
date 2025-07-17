@@ -260,9 +260,9 @@ extra_members = {
         "spent_block_index: uint32",
         "coinbase: bool",
         "timestamp: uint64",
-        "@property\n    def spent(self) -> bool: ...",
-        "@property\n    def name(self) -> bytes32: ...",
-        "@property\n    def coin_state(self) -> CoinState: ...",
+        "def spent(self) -> bool: ...",
+        "def name(self) -> bytes32: ...",
+        "def coin_state(self) -> CoinState: ...",
     ]
 }
 
@@ -320,10 +320,10 @@ def additions_and_removals(
 
 def check_time_locks(
     removal_coin_records: dict[bytes32, CoinRecord],
-    bundle_conds: &OwnedSpendBundleConditions,
-    prev_transaction_block_height: u32,
-    timestamp: u64,
-) -> option[]: ...
+    bundle_conds: SpendBundleConditions,
+    prev_transaction_block_height: uint32,
+    timestamp: uint64,
+) -> Optional[int]: ...
 
 def confirm_included_already_hashed(
     root: bytes32,

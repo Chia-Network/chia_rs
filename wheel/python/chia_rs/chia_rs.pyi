@@ -37,9 +37,9 @@ def additions_and_removals(
 
 def check_time_locks(
     removal_coin_records: dict[bytes32, CoinRecord],
-    bundle_conds: &OwnedSpendBundleConditions,
-    prev_transaction_block_height: u32,
-    timestamp: u64,
+    bundle_conds: SpendBundleConditions,
+    prev_transaction_block_height: uint32,
+    timestamp: uint64,
 ) -> option[]: ...
 
 def confirm_included_already_hashed(
@@ -727,11 +727,8 @@ class CoinRecord:
     spent_block_index: uint32
     coinbase: bool
     timestamp: uint64
-    @property
     def spent(self) -> bool: ...
-    @property
     def name(self) -> bytes32: ...
-    @property
     def coin_state(self) -> CoinState: ...
     def __init__(
         self,
