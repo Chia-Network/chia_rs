@@ -4,6 +4,7 @@
 pub mod additions_and_removals;
 pub mod allocator;
 pub mod build_compressed_block;
+pub mod check_time_locks;
 mod coin_id;
 mod condition_sanitizers;
 pub mod conditions;

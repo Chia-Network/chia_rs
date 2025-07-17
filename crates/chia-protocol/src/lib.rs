@@ -9,6 +9,7 @@ mod bytes;
 mod chia_protocol;
 mod classgroup;
 mod coin;
+mod coin_record;
 mod coin_spend;
 mod coin_state;
 mod end_of_sub_slot_bundle;
@@ -65,6 +66,7 @@ pub use crate::unfinished_header_block::*;
 pub use crate::vdf::*;
 pub use crate::wallet_protocol::*;
 pub use crate::weight_proof::*;
+pub use crate::coin_record::*;
 
 #[cfg(feature = "py-bindings")]
 pub use crate::lazy_node::*;
