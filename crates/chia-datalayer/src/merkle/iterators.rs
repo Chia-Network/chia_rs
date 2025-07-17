@@ -91,7 +91,7 @@ impl Iterator for LeftChildFirstIterator<'_> {
 
                     if node.left == node.right
                         || self.already_queued.contains(&node.left)
-                        || self.already_queued.contains(&node.left)
+                        || self.already_queued.contains(&node.right)
                     {
                         return Some(Err(Error::InvalidChildren()));
                     }
