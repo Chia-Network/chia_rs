@@ -36,7 +36,7 @@ pub fn check_time_locks(
 
     for spend in &bundle_conds.spends {
         let Some(unspent) = removal_coin_records.get(&Bytes32::from(spend.coin_id)) else {
-            continue;
+            return Some(ErrorCode::InvalidCoinId);
         };
 
         if let Some(birth_height) = spend.birth_height {
