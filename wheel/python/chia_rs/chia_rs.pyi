@@ -722,11 +722,6 @@ class CoinRecord:
     spent_block_index: uint32
     coinbase: bool
     timestamp: uint64
-    coin: Coin
-    confirmed_block_index: uint32
-    spent_block_index: uint32
-    coinbase: bool
-    timestamp: uint64
     def spent(self) -> bool: ...
     def name(self) -> bytes32: ...
     def coin_state(self) -> CoinState: ...
