@@ -408,18 +408,15 @@ where
             'inner: while let Some((condition_values, rest_three)) = a.next(iter_three) {
                 iter_three = rest_three;
                 if bytes_vec.len() < 6 {
-                    match a.sexp(condition_values) {
-                        SExp::Atom => {
-                            // a reasonable max length of an atom is 1,024 bytes
-                            if a.atom_len(condition_values) >= 1024 {
-                                // skip this condition
-                                continue 'outer;
-                            }
-                            let bytes = a.atom(condition_values).to_vec();
-                            bytes_vec.push(bytes);
+                    if let SExp::Atom = a.sexp(condition_values) {
+                        // a reasonable max length of an atom is 1,024 bytes
+                        if a.atom_len(condition_values) >= 1024 {
+                            // skip this condition
+                            continue 'outer;
                         }
-                        SExp::Pair(..) => continue, // ignore lists in condition args
-                    };
+                        let bytes = a.atom(condition_values).to_vec();
+                        bytes_vec.push(bytes);
+                    }
                 } else {
                     break 'inner; // we only care about the first 5 condition arguments
                 }
