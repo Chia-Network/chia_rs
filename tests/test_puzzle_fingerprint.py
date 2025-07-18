@@ -10,6 +10,7 @@ from os.path import join, splitext
 def test_puzzle_fingerprint() -> None:
 
     fingerprints = set()
+    salt = 1337
     for name in listdir("test-bundles"):
         base_name, extension = splitext(name)
         if extension != ".bundle" or len(base_name) != 64:
@@ -19,7 +20,10 @@ def test_puzzle_fingerprint() -> None:
             for cs in sb.coin_spends:
                 try:
                     cost, fingerprint = compute_puzzle_fingerprint(
-                        cs.puzzle_reveal, cs.solution, max_cost=11_000_000_000, flags=0
+                        cs.puzzle_reveal,
+                        cs.solution,
+                        max_cost=11_000_000_000,
+                        salt=salt,
                     )
                     assert fingerprint not in fingerprints
                     fingerprints.add(fingerprint)

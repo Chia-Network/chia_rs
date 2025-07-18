@@ -11,17 +11,17 @@ use crate::allocator::make_allocator;
 use crate::flags::MEMPOOL_MODE;
 use crate::validation_error::{first, ErrorCode, ValidationErr};
 use chia_protocol::Program;
-use chia_sha2::Sha256;
 use clvmr::chia_dialect::ENABLE_KECCAK_OPS_OUTSIDE_GUARD;
 use clvmr::cost::Cost;
 use clvmr::LIMIT_HEAP;
 use clvmr::{Allocator, NodePtr, SExp};
+use sha1::{Digest, Sha1};
 
 /// computes a hash of the atoms in a CLVM list. Only the `count` first items
 /// are considered. Returns the NodePtr to the remainder of the list (may be
 /// NIL)
 fn hash_atom_list(
-    fingerprint: &mut Sha256,
+    fingerprint: &mut Sha1,
     a: &Allocator,
     mut args: NodePtr,
     mut count: u32,
@@ -60,7 +60,8 @@ pub fn compute_puzzle_fingerprint(
     puzzle: &Program,
     solution: &Program,
     max_cost: Cost,
-) -> core::result::Result<[u8; 32], ValidationErr> {
+    salt: u64,
+) -> core::result::Result<[u8; 20], ValidationErr> {
     // keep in mind that the puzzle has already been validated by the mempool,
     // so it's trusted. It's OK to enable features that aren't available yet,
     // because if the puzzle would use them prematurely, the validation would
@@ -71,7 +72,8 @@ pub fn compute_puzzle_fingerprint(
     let (_, conditions) = puzzle.run(&mut a, flags, max_cost, solution)?;
     let mut iter = conditions;
 
-    let mut fingerprint = Sha256::new();
+    let mut fingerprint = Sha1::new();
+    fingerprint.update(salt.to_be_bytes());
 
     while let Some((c, next)) = a.next(iter) {
         iter = next;
@@ -148,7 +150,7 @@ pub fn compute_puzzle_fingerprint(
             }
         }
     }
-    Ok(fingerprint.finalize())
+    Ok(fingerprint.finalize().into())
 }
 
 #[cfg(test)]
@@ -164,11 +166,11 @@ mod tests {
         let val = a.new_atom(b"foobar").unwrap();
         let list = a.new_pair(val, NodePtr::NIL).unwrap();
 
-        let mut ctx1 = Sha256::new();
+        let mut ctx1 = Sha1::new();
         let rest = hash_atom_list(&mut ctx1, &a, list, 1).expect("hash_atom_list");
         assert_eq!(rest, a.nil());
 
-        let mut ctx2 = Sha256::new();
+        let mut ctx2 = Sha1::new();
         // length-prefix
         ctx2.update(b"\x00\x00\x00\x06");
         ctx2.update(b"foobar");
@@ -187,11 +189,11 @@ mod tests {
 
         // we just care about 1 element
         {
-            let mut ctx1 = Sha256::new();
+            let mut ctx1 = Sha1::new();
             let rest = hash_atom_list(&mut ctx1, &a, list2, 1).expect("hash_atom_list");
             assert_eq!(rest, list1);
 
-            let mut ctx2 = Sha256::new();
+            let mut ctx2 = Sha1::new();
             // length-prefix
             ctx2.update(b"\x00\x00\x00\x03");
             ctx2.update(b"foo");
@@ -201,11 +203,11 @@ mod tests {
 
         // we just care about 2 elements
         {
-            let mut ctx1 = Sha256::new();
+            let mut ctx1 = Sha1::new();
             let rest = hash_atom_list(&mut ctx1, &a, list2, 2).expect("hash_atom_list");
             assert_eq!(rest, a.nil());
 
-            let mut ctx2 = Sha256::new();
+            let mut ctx2 = Sha1::new();
             // length-prefix
             ctx2.update(b"\x00\x00\x00\x03");
             ctx2.update(b"foo");
@@ -222,7 +224,7 @@ mod tests {
         let val = a.new_atom(b"foobar").unwrap();
         let list = a.new_pair(val, NodePtr::NIL).unwrap();
 
-        let mut ctx1 = Sha256::new();
+        let mut ctx1 = Sha1::new();
 
         // we expect 2 elements, but there's only 1
         assert_eq!(
@@ -237,7 +239,7 @@ mod tests {
         let val = a.new_pair(NodePtr::NIL, NodePtr::NIL).unwrap();
         let list = a.new_pair(val, NodePtr::NIL).unwrap();
 
-        let mut ctx1 = Sha256::new();
+        let mut ctx1 = Sha1::new();
 
         // we expect all elements to be atoms, but we encountered a pair
         assert_eq!(
@@ -256,7 +258,9 @@ mod tests {
     fn test_compute_puzzle_fingerprint(#[case] condition: &[&[u8]], #[case] mut args: u32) {
         // build the puzzle as a quoted list with a single condition
         // as well as the expected fingerprint
-        let mut ctx = Sha256::new();
+        let mut ctx = Sha1::new();
+        // salt
+        ctx.update([0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab]);
 
         let mut a = Allocator::new();
         let mut cond = NodePtr::NIL;
@@ -282,12 +286,13 @@ mod tests {
         let puzzle = node_to_bytes(&a, puzzle).expect("node_to_bytes");
         let puzzle = Program::new(puzzle.into());
 
-        let expect_fingerprint = ctx.finalize();
+        let expect_fingerprint: [u8; 20] = ctx.finalize().into();
 
         let fingerprint = compute_puzzle_fingerprint(
             &puzzle,
             &Program::default(),
             TEST_CONSTANTS.max_block_cost_clvm,
+            0xabab_abab_abab_abab,
         )
         .expect("compute_puzzle_fingerprint");
 
@@ -325,7 +330,10 @@ mod tests {
         let puzzle = node_to_bytes(&a, puzzle).expect("node_to_bytes");
         let puzzle = Program::new(puzzle.into());
 
-        let mut ctx = Sha256::new();
+        let mut ctx = Sha1::new();
+        // salt
+        ctx.update([0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab]);
+
         ctx.update([0, 0, 0, 1]);
         ctx.update([51]);
         ctx.update([0, 0, 0, 32]);
@@ -339,12 +347,13 @@ mod tests {
             // If there is no hint, we encode it as an empty atom
             ctx.update([0, 0, 0, 0]);
         }
-        let expect_fingerprint = ctx.finalize();
+        let expect_fingerprint: [u8; 20] = ctx.finalize().into();
 
         let fingerprint = compute_puzzle_fingerprint(
             &puzzle,
             &Program::default(),
             TEST_CONSTANTS.max_block_cost_clvm,
+            0xabab_abab_abab_abab,
         )
         .expect("compute_puzzle_fingerprint");
 

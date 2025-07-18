@@ -21,6 +21,7 @@ py-bindings = [
 
 [dependencies]
 clvmr = { workspace = true }
+sha1 = { workspace = true }
 hex = { workspace = true }
 pyo3 = { workspace = true, optional = true }
 chia_streamable_macro = { workspace = true }
