@@ -2,7 +2,9 @@ use chia_streamable_macro::streamable;
 #[cfg(feature = "py-bindings")]
 use pyo3::pymethods;
 
-use crate::{Bytes32, Coin, CoinState};
+use crate::Coin;
+#[cfg(feature = "py-bindings")]
+use crate::{Bytes32, CoinState};
 
 #[streamable]
 #[derive(Copy)]
