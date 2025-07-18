@@ -258,7 +258,7 @@ extra_members = {
         "def spent(self) -> bool: ...",
         "def name(self) -> bytes32: ...",
         "def coin_state(self) -> CoinState: ...",
-    ]
+    ],
 }
 
 classes = []
