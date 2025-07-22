@@ -24,6 +24,7 @@ use chia_sha2::Sha256;
 use chia_streamable_macro::Streamable;
 #[cfg(feature = "py-bindings")]
 use chia_traits::Streamable;
+use indexmap::IndexSet;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::io::{Read, Write};
@@ -87,8 +88,7 @@ pub fn block_range(index: TreeIndex) -> Range<usize> {
 #[cfg_attr(feature = "py-bindings", pyclass)]
 #[derive(Clone, Debug)]
 pub struct BlockStatusCache {
-    // TODO: would be nice for this to be deterministic ala a fifo set
-    free_indexes: HashSet<TreeIndex>,
+    free_indexes: IndexSet<TreeIndex>,
     key_to_index: HashMap<KeyId, TreeIndex>,
     leaf_hash_to_index: HashMap<Hash, TreeIndex>,
 }
@@ -115,7 +115,7 @@ impl BlockStatusCache {
             }
         }
 
-        let mut free_indexes: HashSet<TreeIndex> = HashSet::new();
+        let mut free_indexes: IndexSet<TreeIndex> = IndexSet::new();
         for (index, seen) in seen_indexes.iter().enumerate() {
             if !seen {
                 free_indexes.insert(TreeIndex(index as u32));
@@ -136,7 +136,7 @@ impl BlockStatusCache {
     fn pop_free_index(&mut self) -> Option<TreeIndex> {
         let maybe_index = self.free_indexes.iter().next().copied();
         if let Some(index) = maybe_index {
-            self.free_indexes.remove(&index);
+            self.free_indexes.shift_remove(&index);
         }
 
         maybe_index
@@ -182,11 +182,11 @@ impl BlockStatusCache {
     }
 
     fn add_internal(&mut self, index: TreeIndex) {
-        self.free_indexes.remove(&index);
+        self.free_indexes.shift_remove(&index);
     }
 
     fn add_leaf(&mut self, index: TreeIndex, leaf: LeafNode) {
-        self.free_indexes.remove(&index);
+        self.free_indexes.shift_remove(&index);
 
         self.key_to_index.insert(leaf.key, index);
         self.leaf_hash_to_index.insert(leaf.hash, index);
@@ -1932,7 +1932,7 @@ mod tests {
 
         assert_eq!(
             small_blob.block_status_cache.free_indexes,
-            HashSet::from([index, TreeIndex(1)])
+            IndexSet::from([index, TreeIndex(1)])
         );
     }
 
@@ -1990,7 +1990,7 @@ mod tests {
         small_blob.delete(key).unwrap();
         open_dot(small_blob.to_dot().unwrap().set_note("after delete"));
 
-        let expected = HashSet::from([TreeIndex(1), TreeIndex(2)]);
+        let expected = IndexSet::from([TreeIndex(1), TreeIndex(2)]);
         assert_eq!(small_blob.block_status_cache.free_indexes, expected);
     }
 
@@ -2028,7 +2028,7 @@ mod tests {
         let block_status_cache = BlockStatusCache::new(&blob).unwrap();
         assert_eq!(
             block_status_cache.free_indexes,
-            HashSet::from([expected_free_index])
+            IndexSet::from([expected_free_index])
         );
     }
 
