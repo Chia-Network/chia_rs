@@ -1,10 +1,10 @@
 use crate::consensus_constants::ConsensusConstants;
+use crate::error::Result;
 use chia_bls::Signature;
 use chia_protocol::SpendBundle;
 use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::serde::{node_from_bytes_backrefs, Serializer};
 use std::borrow::Borrow;
-use std::io;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
@@ -68,7 +68,7 @@ fn result(num_skipped: u32) -> BuildBlockResult {
 }
 
 impl BlockBuilder {
-    pub fn new() -> io::Result<Self> {
+    pub fn new() -> Result<Self> {
         let mut a = Allocator::new();
 
         // the sentinel just needs to be a unique NodePtr. Since atoms may be
@@ -112,7 +112,7 @@ impl BlockBuilder {
         bundles: T,
         cost: u64,
         constants: &ConsensusConstants,
-    ) -> io::Result<(bool, BuildBlockResult)>
+    ) -> Result<(bool, BuildBlockResult)>
     where
         T: IntoIterator<Item = S>,
         S: Borrow<SpendBundle>,
@@ -189,10 +189,7 @@ impl BlockBuilder {
     }
 
     // returns generator, sig, cost
-    pub fn finalize(
-        mut self,
-        constants: &ConsensusConstants,
-    ) -> io::Result<(Vec<u8>, Signature, u64)> {
+    pub fn finalize(mut self, constants: &ConsensusConstants) -> Result<(Vec<u8>, Signature, u64)> {
         let (done, _) = self.ser.add(&self.allocator, self.allocator.nil())?;
         assert!(done);
 
