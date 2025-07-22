@@ -1334,32 +1334,6 @@ impl MerkleBlob {
     }
 }
 
-impl PartialEq for MerkleBlob {
-    fn eq(&self, other: &Self) -> bool {
-        // NOTE: this is checking tree structure equality, not serialized bytes equality
-        for item in zip(
-            LeftChildFirstIterator::new(&self.blob, None),
-            LeftChildFirstIterator::new(&other.blob, None),
-        ) {
-            let (Ok((_, self_block)), Ok((_, other_block))) = item else {
-                return false;
-            };
-            if (self_block.metadata.dirty || other_block.metadata.dirty)
-                || self_block.node.hash() != other_block.node.hash()
-            {
-                return false;
-            }
-            match self_block.node {
-                // NOTE: this is effectively checked by the controlled overall traversal
-                Node::Internal(..) => {}
-                Node::Leaf(..) => return self_block.node == other_block.node,
-            }
-        }
-
-        true
-    }
-}
-
 #[cfg(feature = "py-bindings")]
 #[pymethods]
 impl MerkleBlob {
@@ -1637,6 +1611,30 @@ mod tests {
     use rstest::rstest;
     use std::time::{Duration, Instant};
 
+    fn blob_tree_equality(this: &MerkleBlob, that: &MerkleBlob) -> bool {
+        // NOTE: this is checking tree structure equality, not serialized bytes equality
+        for item in zip(
+            LeftChildFirstIterator::new(&this.blob, None),
+            LeftChildFirstIterator::new(&that.blob, None),
+        ) {
+            let (Ok((_, self_block)), Ok((_, other_block))) = item else {
+                return false;
+            };
+            if (self_block.metadata.dirty || other_block.metadata.dirty)
+                || self_block.node.hash() != other_block.node.hash()
+            {
+                return false;
+            }
+            match self_block.node {
+                // NOTE: this is effectively checked by the controlled overall traversal
+                Node::Internal(..) => {}
+                Node::Leaf(..) => return self_block.node == other_block.node,
+            }
+        }
+
+        true
+    }
+
     #[test]
     fn test_node_type_serialized_values() {
         assert_eq!(NodeType::Internal as u8, 0);
@@ -1808,7 +1806,10 @@ mod tests {
             println!("deleting: {key_value_id}");
             merkle_blob.delete(KeyId(*key_value_id)).unwrap();
             merkle_blob.calculate_lazy_hashes().unwrap();
-            assert_eq!(merkle_blob, reference_blobs[*key_value_id as usize]);
+            assert!(blob_tree_equality(
+                &merkle_blob,
+                &reference_blobs[*key_value_id as usize]
+            ));
             dots.push(merkle_blob.to_dot().unwrap().dump());
         }
     }
@@ -2325,7 +2326,7 @@ mod tests {
         traversal_blob.to_path(&file_path).unwrap();
         let loaded = MerkleBlob::from_path(&file_path).unwrap();
 
-        assert_eq!(traversal_blob, loaded);
+        assert!(blob_tree_equality(&traversal_blob, &loaded));
         assert_eq!(traversal_blob.blob, loaded.blob);
     }
 
