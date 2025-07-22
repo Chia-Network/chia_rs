@@ -1,4 +1,8 @@
 use chia_consensus::conditions::Condition;
+use chia_puzzle_types::cat::{CatArgs, CatSolution};
+use chia_puzzle_types::did::{DidArgs, DidSolution};
+use chia_puzzle_types::singleton::{SingletonArgs, SingletonSolution};
+use chia_puzzle_types::standard::{StandardArgs, StandardSolution};
 use chia_puzzle_types::Proof;
 use chia_puzzles::CAT_PUZZLE_HASH;
 use chia_puzzles::DID_INNERPUZ_HASH;
@@ -10,11 +14,6 @@ use clvm_traits::{FromClvm, ToClvm};
 use clvm_utils::tree_hash;
 use clvm_utils::CurriedProgram;
 use clvmr::{allocator::NodePtr, Allocator};
-
-use chia_puzzle_types::cat::{CatArgs, CatSolution};
-use chia_puzzle_types::did::{DidArgs, DidSolution};
-use chia_puzzle_types::singleton::{SingletonArgs, SingletonSolution};
-use chia_puzzle_types::standard::{StandardArgs, StandardSolution};
 
 /// Run a puzzle given a solution and print the resulting conditions
 #[derive(Parser, Debug)]
@@ -267,7 +266,7 @@ fn main() {
     use chia_consensus::opcodes::parse_opcode;
     use chia_consensus::validation_error::{first, rest};
     use chia_protocol::CoinSpend;
-    use clvmr::reduction::{EvalErr, Reduction};
+    use clvmr::reduction::Reduction;
     use clvmr::{run_program, ChiaDialect};
     use std::fs::read;
 
@@ -292,8 +291,8 @@ fn main() {
     let Reduction(_clvm_cost, conditions) =
         match run_program(&mut a, &dialect, puzzle, solution, 11_000_000_000) {
             Ok(r) => r,
-            Err(EvalErr(_, e)) => {
-                println!("Eval Error: {e:?}");
+            Err(eval_err) => {
+                eprintln!("Error running program: {eval_err}");
                 return;
             }
         };

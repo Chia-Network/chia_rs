@@ -19,7 +19,7 @@ use chia_protocol::Bytes32;
 use chia_protocol::Coin;
 use clvmr::{
     allocator::{Allocator, NodePtr},
-    reduction::EvalErr,
+    error::EvalErr,
 };
 struct ConditionTest<'a> {
     opcode: ConditionOpcode,
@@ -43,7 +43,7 @@ const MSG1: &[u8; 13] = &[3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
 // and add another (CONDITION ARG ARG) to the list
 fn cons_condition(allocator: &mut Allocator, current_ptr: NodePtr) -> Result<NodePtr, EvalErr> {
     let Some((cond, _rest)) = allocator.next(current_ptr) else {
-        return Err(EvalErr(current_ptr, "not a pair".into()));
+        return Err(EvalErr::InvalidOpArg(current_ptr, "not a pair".into()));
     };
     allocator.new_pair(cond, current_ptr)
 }
@@ -53,10 +53,10 @@ fn cons_two_conditions(
     current_ptr: NodePtr,
 ) -> Result<NodePtr, EvalErr> {
     let Some((cond_one, rest)) = allocator.next(current_ptr) else {
-        return Err(EvalErr(current_ptr, "not a pair".into()));
+        return Err(EvalErr::InvalidOpArg(current_ptr, "not a pair".into()));
     };
     let Some((cond_two, _rest)) = allocator.next(rest) else {
-        return Err(EvalErr(current_ptr, "not a pair".into()));
+        return Err(EvalErr::InvalidOpArg(current_ptr, "not a pair".into()));
     };
     let temp = allocator.new_pair(cond_one, current_ptr)?;
     allocator.new_pair(cond_two, temp)
