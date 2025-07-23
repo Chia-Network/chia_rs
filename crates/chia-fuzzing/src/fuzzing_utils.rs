@@ -4,7 +4,7 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
 #[allow(dead_code)]
-fn hash_atom(buf: &[u8]) -> [u8; 32] {
+pub fn hash_atom(buf: &[u8]) -> [u8; 32] {
     let mut ctx = Sha256::new();
     ctx.update([1_u8]);
     ctx.update(buf);
@@ -12,7 +12,7 @@ fn hash_atom(buf: &[u8]) -> [u8; 32] {
 }
 
 #[allow(dead_code)]
-fn hash_pair(left: &[u8; 32], right: &[u8; 32]) -> [u8; 32] {
+pub fn hash_pair(left: &[u8; 32], right: &[u8; 32]) -> [u8; 32] {
     let mut ctx = Sha256::new();
     ctx.update([2_u8]);
     ctx.update(left);
