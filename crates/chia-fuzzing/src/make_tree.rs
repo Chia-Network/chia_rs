@@ -136,3 +136,49 @@ pub fn make_tree_limits(
         counter,
     )
 }
+
+pub fn make_list(a: &mut Allocator, unstructured: &mut Unstructured<'_>) -> NodePtr {
+    let mut ret = NodePtr::NIL;
+
+    let length = unstructured.arbitrary::<u8>().unwrap_or(0);
+    let nil_terminated = unstructured.arbitrary::<bool>().unwrap_or(false);
+
+    for _ in 0..length {
+        let value = match unstructured
+            .arbitrary::<NodeType>()
+            .unwrap_or(NodeType::Previous)
+        {
+            NodeType::U8 => a
+                .new_small_number(unstructured.arbitrary::<u8>().unwrap_or(0).into())
+                .unwrap(),
+
+            NodeType::U16 => a
+                .new_small_number(unstructured.arbitrary::<u16>().unwrap_or(0).into())
+                .unwrap(),
+
+            NodeType::U32 => a
+                .new_number(unstructured.arbitrary::<u32>().unwrap_or(0).into())
+                .unwrap(),
+
+            NodeType::Bytes => a
+                .new_atom(&unstructured.arbitrary::<Vec<u8>>().unwrap_or_default())
+                .unwrap(),
+
+            NodeType::Pair => {
+                let left = NodePtr::NIL;
+                let right = NodePtr::NIL;
+                a.new_pair(left, right).unwrap()
+            }
+
+            NodeType::Previous => NodePtr::NIL,
+        };
+
+        ret = if nil_terminated {
+            a.new_pair(value, ret).unwrap()
+        } else {
+            value
+        };
+    }
+
+    ret
+}
