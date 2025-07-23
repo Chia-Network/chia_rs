@@ -1,10 +1,10 @@
 #![no_main]
-use libfuzzer_sys::fuzz_target;
+use libfuzzer_sys::{arbitrary, fuzz_target};
 
-use chia_fuzz::{make_tree, BitCursor};
 use clvm_utils::{tree_hash, tree_hash_cached, TreeCache};
 use clvmr::{Allocator, NodePtr};
 
+use chia_fuzzing::make_tree;
 use clvmr::serde::{node_from_bytes_backrefs, node_to_bytes_backrefs};
 
 fn test_hash(a: &Allocator, node: NodePtr) {
@@ -17,7 +17,8 @@ fn test_hash(a: &Allocator, node: NodePtr) {
 
 fuzz_target!(|data: &[u8]| {
     let mut a = Allocator::new();
-    let input = make_tree(&mut a, &mut BitCursor::new(data), false);
+    let mut unstructured = arbitrary::Unstructured::new(data);
+    let (input, _) = make_tree(&mut a, &mut unstructured);
     test_hash(&a, input);
 
     let bytes = node_to_bytes_backrefs(&a, input).expect("node_to_bytes_backrefs");
