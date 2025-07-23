@@ -408,6 +408,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "chia-fuzzing"
+version = "0.27.0"
+dependencies = [
+ "arbitrary",
+ "chia-sha2 0.27.0",
+ "clvmr",
+]
+
+[[package]]
 name = "chia-protocol"
 version = "0.27.0"
 dependencies = [

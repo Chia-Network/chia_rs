@@ -1,0 +1,16 @@
+[package]
+name = "chia-fuzzing"
+version = "0.27.0"
+edition = "2021"
+
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+arbitrary = { workspace = true, features = ["derive"] }
+clvmr = { workspace = true, features = ["counters"] }
+chia-sha2 = { workspace = true }
+
+[lints]
+workspace = true
