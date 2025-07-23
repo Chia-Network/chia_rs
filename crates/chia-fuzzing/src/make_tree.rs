@@ -16,7 +16,6 @@ enum NodeType {
     Previous,
 }
 
-#[allow(dead_code)]
 pub fn make_tree(a: &mut Allocator, unstructured: &mut Unstructured<'_>) -> (NodePtr, u32) {
     make_tree_limits(a, unstructured, 600_000, true)
 }

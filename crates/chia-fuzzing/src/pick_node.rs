@@ -1,7 +1,6 @@
 use clvmr::{Allocator, NodePtr, SExp};
 use std::collections::HashSet;
 
-#[allow(dead_code)]
 pub fn pick_node(a: &Allocator, root: NodePtr, mut node_idx: i32) -> NodePtr {
     let mut stack = vec![root];
     let mut seen_node = HashSet::<NodePtr>::new();

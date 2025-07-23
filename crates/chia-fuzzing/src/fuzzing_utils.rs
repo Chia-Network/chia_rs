@@ -3,7 +3,6 @@ use clvmr::allocator::{Allocator, NodePtr, SExp};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
-#[allow(dead_code)]
 pub fn hash_atom(buf: &[u8]) -> [u8; 32] {
     let mut ctx = Sha256::new();
     ctx.update([1_u8]);
@@ -11,7 +10,6 @@ pub fn hash_atom(buf: &[u8]) -> [u8; 32] {
     ctx.finalize()
 }
 
-#[allow(dead_code)]
 pub fn hash_pair(left: &[u8; 32], right: &[u8; 32]) -> [u8; 32] {
     let mut ctx = Sha256::new();
     ctx.update([2_u8]);
@@ -20,13 +18,11 @@ pub fn hash_pair(left: &[u8; 32], right: &[u8; 32]) -> [u8; 32] {
     ctx.finalize()
 }
 
-#[allow(dead_code)]
 enum TreeOp {
     SExp(NodePtr),
     Cons(NodePtr),
 }
 
-#[allow(dead_code)]
 pub fn tree_hash(a: &Allocator, node: NodePtr) -> [u8; 32] {
     let mut hashes = Vec::<[u8; 32]>::new();
     let mut ops = vec![TreeOp::SExp(node)];
@@ -68,7 +64,6 @@ pub fn tree_hash(a: &Allocator, node: NodePtr) -> [u8; 32] {
     hashes[0]
 }
 
-#[allow(dead_code)]
 pub fn visit_tree(a: &Allocator, node: NodePtr, mut visit: impl FnMut(&Allocator, NodePtr)) {
     let mut nodes = vec![node];
     let mut visited_index = 0;

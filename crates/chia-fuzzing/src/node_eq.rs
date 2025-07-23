@@ -2,7 +2,6 @@ use clvmr::{Allocator, NodePtr, SExp};
 use std::collections::HashSet;
 
 /// compare two CLVM trees. Returns true if they are identical, false otherwise
-#[allow(dead_code)]
 pub fn node_eq(allocator: &Allocator, lhs: NodePtr, rhs: NodePtr) -> bool {
     let mut stack = vec![(lhs, rhs)];
     let mut visited = HashSet::<NodePtr>::new();
