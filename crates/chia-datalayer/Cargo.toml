@@ -23,6 +23,7 @@ num-traits = { workspace = true }
 pyo3 = { workspace = true, optional = true }
 thiserror = { workspace = true }
 bitvec = { workspace = true }
+indexmap = { workspace = true }
 chia_py_streamable_macro = { workspace = true, optional = true }
 chia_streamable_macro = { workspace = true }
 chia-datalayer-macro = { workspace = true }
