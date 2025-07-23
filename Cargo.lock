@@ -392,11 +392,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "chia-fuzz"
+name = "chia-consensus-fuzz"
 version = "0.27.0"
 dependencies = [
  "chia-bls 0.27.0",
  "chia-consensus",
+ "chia-fuzzing",
  "chia-protocol",
  "chia-sha2 0.27.0",
  "chia-traits 0.27.0",
@@ -411,6 +412,7 @@ dependencies = [
 name = "chia-fuzzing"
 version = "0.27.0"
 dependencies = [
+ "anyhow",
  "arbitrary",
  "chia-sha2 0.27.0",
  "clvmr",
@@ -762,7 +764,7 @@ dependencies = [
 name = "clvm-utils-fuzz"
 version = "0.27.0"
 dependencies = [
- "chia-fuzz",
+ "chia-fuzzing",
  "clvm-traits",
  "clvm-utils",
  "clvmr",
