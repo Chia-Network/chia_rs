@@ -14,7 +14,7 @@ workspace = true
 [dependencies]
 libfuzzer-sys = { workspace = true }
 clvmr ={ workspace = true }
-chia-fuzz = { workspace = true }
+chia-fuzzing = { workspace = true }
 clvm-utils = { workspace = true }
 clvm-traits = { workspace = true }
 
