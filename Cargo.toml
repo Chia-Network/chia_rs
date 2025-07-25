@@ -116,8 +116,8 @@ chia_streamable_macro = { path = "./crates/chia_streamable_macro", version = "0.
 chia-bls = { path = "./crates/chia-bls", version = "0.28.0" }
 chia-client = { path = "./crates/chia-client", version = "0.28.0" }
 chia-consensus = { path = "./crates/chia-consensus", version = "0.28.0" }
-chia-datalayer = { path = "./crates/chia-datalayer", version = "0.27.0" }
-chia-datalayer-macro = { path = "./crates/chia-datalayer/macro", version = "0.27.0" }
+chia-datalayer = { path = "./crates/chia-datalayer", version = "0.28.0" }
+chia-datalayer-macro = { path = "./crates/chia-datalayer/macro", version = "0.28.0" }
 chia-protocol = { path = "./crates/chia-protocol", version = "0.28.0" }
 chia-secp = { path = "./crates/chia-secp", version = "0.28.0" }
 chia-ssl = { path = "./crates/chia-ssl", version = "0.28.0" }
