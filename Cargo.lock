@@ -287,9 +287,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chia"
-version = "0.27.0"
+version = "0.28.0"
 dependencies = [
- "chia-bls 0.27.0",
+ "chia-bls 0.28.0",
  "chia-client",
  "chia-consensus",
  "chia-datalayer",
@@ -297,9 +297,9 @@ dependencies = [
  "chia-puzzle-types",
  "chia-secp",
  "chia-serde",
- "chia-sha2 0.27.0",
+ "chia-sha2 0.28.0",
  "chia-ssl",
- "chia-traits 0.27.0",
+ "chia-traits 0.28.0",
  "clvm-traits",
  "clvm-utils",
  "clvmr",
@@ -323,13 +323,13 @@ dependencies = [
 
 [[package]]
 name = "chia-bls"
-version = "0.27.0"
+version = "0.28.0"
 dependencies = [
  "arbitrary",
  "blst",
  "chia-serde",
- "chia-sha2 0.27.0",
- "chia-traits 0.27.0",
+ "chia-sha2 0.28.0",
+ "chia-traits 0.28.0",
  "chia_py_streamable_macro",
  "criterion",
  "hex",
@@ -345,19 +345,19 @@ dependencies = [
 
 [[package]]
 name = "chia-bls-fuzz"
-version = "0.27.0"
+version = "0.28.0"
 dependencies = [
- "chia-bls 0.27.0",
+ "chia-bls 0.28.0",
  "libfuzzer-sys",
  "pyo3",
 ]
 
 [[package]]
 name = "chia-client"
-version = "0.27.0"
+version = "0.28.0"
 dependencies = [
  "chia-protocol",
- "chia-traits 0.27.0",
+ "chia-traits 0.28.0",
  "futures-util",
  "thiserror",
  "tokio",
@@ -367,17 +367,17 @@ dependencies = [
 
 [[package]]
 name = "chia-consensus"
-version = "0.27.0"
+version = "0.28.0"
 dependencies = [
  "blocking-threadpool",
- "chia-bls 0.27.0",
+ "chia-bls 0.28.0",
  "chia-protocol",
  "chia-puzzle-types",
  "chia-puzzles",
- "chia-sha2 0.27.0",
- "chia-traits 0.27.0",
+ "chia-sha2 0.28.0",
+ "chia-traits 0.28.0",
  "chia_py_streamable_macro",
- "chia_streamable_macro 0.27.0",
+ "chia_streamable_macro 0.28.0",
  "clvm-traits",
  "clvm-utils",
  "clvmr",
@@ -393,6 +393,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "chia-consensus-fuzz"
+version = "0.28.0"
+dependencies = [
+ "chia-bls 0.28.0",
+ "chia-consensus",
+ "chia-fuzzing",
+ "chia-protocol",
+ "chia-sha2 0.28.0",
+ "chia-traits 0.28.0",
+ "clvm-traits",
+ "clvm-utils",
+ "clvmr",
+ "hex-literal",
+ "libfuzzer-sys",
+]
+
+[[package]]
 name = "chia-datalayer"
 version = "0.27.0"
 dependencies = [
@@ -400,10 +417,10 @@ dependencies = [
  "bitvec",
  "chia-datalayer-macro",
  "chia-protocol",
- "chia-sha2 0.27.0",
- "chia-traits 0.27.0",
+ "chia-sha2 0.28.0",
+ "chia-traits 0.28.0",
  "chia_py_streamable_macro",
- "chia_streamable_macro 0.27.0",
+ "chia_streamable_macro 0.28.0",
  "clvm-utils",
  "expect-test",
  "hex",
@@ -439,33 +456,27 @@ dependencies = [
 ]
 
 [[package]]
-name = "chia-fuzz"
-version = "0.27.0"
+name = "chia-fuzzing"
+version = "0.28.0"
 dependencies = [
- "chia-bls 0.27.0",
- "chia-consensus",
- "chia-protocol",
- "chia-sha2 0.27.0",
- "chia-traits 0.27.0",
- "clvm-traits",
- "clvm-utils",
+ "anyhow",
+ "arbitrary",
+ "chia-sha2 0.28.0",
  "clvmr",
- "hex-literal",
- "libfuzzer-sys",
 ]
 
 [[package]]
 name = "chia-protocol"
-version = "0.27.0"
+version = "0.28.0"
 dependencies = [
  "anyhow",
  "arbitrary",
- "chia-bls 0.27.0",
+ "chia-bls 0.28.0",
  "chia-serde",
- "chia-sha2 0.27.0",
- "chia-traits 0.27.0",
+ "chia-sha2 0.28.0",
+ "chia-traits 0.28.0",
  "chia_py_streamable_macro",
- "chia_streamable_macro 0.27.0",
+ "chia_streamable_macro 0.28.0",
  "clvm-traits",
  "clvm-utils",
  "clvmr",
@@ -479,12 +490,12 @@ dependencies = [
 
 [[package]]
 name = "chia-protocol-fuzz"
-version = "0.27.0"
+version = "0.28.0"
 dependencies = [
  "arbitrary",
  "chia-protocol",
- "chia-sha2 0.27.0",
- "chia-traits 0.27.0",
+ "chia-sha2 0.28.0",
+ "chia-traits 0.28.0",
  "clvm-traits",
  "clvmr",
  "hex",
@@ -493,14 +504,14 @@ dependencies = [
 
 [[package]]
 name = "chia-puzzle-types"
-version = "0.27.0"
+version = "0.28.0"
 dependencies = [
  "anyhow",
  "arbitrary",
- "chia-bls 0.27.0",
+ "chia-bls 0.28.0",
  "chia-protocol",
  "chia-puzzles",
- "chia-sha2 0.27.0",
+ "chia-sha2 0.28.0",
  "clvm-traits",
  "clvm-utils",
  "clvmr",
@@ -512,7 +523,7 @@ dependencies = [
 
 [[package]]
 name = "chia-puzzle-types-fuzz"
-version = "0.27.0"
+version = "0.28.0"
 dependencies = [
  "chia-puzzle-types",
  "clvm-traits",
@@ -532,11 +543,11 @@ dependencies = [
 
 [[package]]
 name = "chia-secp"
-version = "0.27.0"
+version = "0.28.0"
 dependencies = [
  "anyhow",
  "arbitrary",
- "chia-sha2 0.27.0",
+ "chia-sha2 0.28.0",
  "hex",
  "k256",
  "p256",
@@ -546,7 +557,7 @@ dependencies = [
 
 [[package]]
 name = "chia-serde"
-version = "0.27.0"
+version = "0.28.0"
 dependencies = [
  "anyhow",
  "bincode",
@@ -567,7 +578,7 @@ dependencies = [
 
 [[package]]
 name = "chia-sha2"
-version = "0.27.0"
+version = "0.28.0"
 dependencies = [
  "openssl",
  "sha2",
@@ -575,7 +586,7 @@ dependencies = [
 
 [[package]]
 name = "chia-ssl"
-version = "0.27.0"
+version = "0.28.0"
 dependencies = [
  "rand",
  "rcgen",
@@ -586,16 +597,16 @@ dependencies = [
 
 [[package]]
 name = "chia-tools"
-version = "0.27.0"
+version = "0.28.0"
 dependencies = [
  "blocking-threadpool",
- "chia-bls 0.27.0",
+ "chia-bls 0.28.0",
  "chia-consensus",
  "chia-protocol",
  "chia-puzzle-types",
  "chia-puzzles",
- "chia-sha2 0.27.0",
- "chia-traits 0.27.0",
+ "chia-sha2 0.28.0",
+ "chia-traits 0.28.0",
  "clap",
  "clvm-traits",
  "clvm-utils",
@@ -621,17 +632,17 @@ dependencies = [
 
 [[package]]
 name = "chia-traits"
-version = "0.27.0"
+version = "0.28.0"
 dependencies = [
- "chia-sha2 0.27.0",
- "chia_streamable_macro 0.27.0",
+ "chia-sha2 0.28.0",
+ "chia_streamable_macro 0.28.0",
  "pyo3",
  "thiserror",
 ]
 
 [[package]]
 name = "chia_py_streamable_macro"
-version = "0.27.0"
+version = "0.28.0"
 dependencies = [
  "proc-macro-crate 1.3.1",
  "proc-macro2",
@@ -641,15 +652,15 @@ dependencies = [
 
 [[package]]
 name = "chia_rs"
-version = "0.27.0"
+version = "0.28.0"
 dependencies = [
- "chia-bls 0.27.0",
+ "chia-bls 0.28.0",
  "chia-client",
  "chia-consensus",
  "chia-datalayer",
  "chia-protocol",
  "chia-ssl",
- "chia-traits 0.27.0",
+ "chia-traits 0.28.0",
  "clvm-utils",
  "clvmr",
  "hex",
@@ -670,7 +681,7 @@ dependencies = [
 
 [[package]]
 name = "chia_streamable_macro"
-version = "0.27.0"
+version = "0.28.0"
 dependencies = [
  "proc-macro-crate 1.3.1",
  "proc-macro2",
@@ -680,7 +691,7 @@ dependencies = [
 
 [[package]]
 name = "chia_wasm"
-version = "0.27.0"
+version = "0.28.0"
 dependencies = [
  "wasm-bindgen",
 ]
@@ -754,7 +765,7 @@ checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
 
 [[package]]
 name = "clvm-derive"
-version = "0.27.0"
+version = "0.28.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -763,9 +774,9 @@ dependencies = [
 
 [[package]]
 name = "clvm-traits"
-version = "0.27.0"
+version = "0.28.0"
 dependencies = [
- "chia-bls 0.27.0",
+ "chia-bls 0.28.0",
  "chia-secp",
  "clvm-derive",
  "clvmr",
@@ -778,7 +789,7 @@ dependencies = [
 
 [[package]]
 name = "clvm-traits-fuzz"
-version = "0.27.0"
+version = "0.28.0"
 dependencies = [
  "clvm-traits",
  "clvmr",
@@ -787,9 +798,9 @@ dependencies = [
 
 [[package]]
 name = "clvm-utils"
-version = "0.27.0"
+version = "0.28.0"
 dependencies = [
- "chia-sha2 0.27.0",
+ "chia-sha2 0.28.0",
  "clvm-traits",
  "clvmr",
  "hex",
@@ -799,9 +810,9 @@ dependencies = [
 
 [[package]]
 name = "clvm-utils-fuzz"
-version = "0.27.0"
+version = "0.28.0"
 dependencies = [
- "chia-fuzz",
+ "chia-fuzzing",
  "clvm-traits",
  "clvm-utils",
  "clvmr",

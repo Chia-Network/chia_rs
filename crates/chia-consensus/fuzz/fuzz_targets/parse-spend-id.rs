@@ -1,15 +1,15 @@
 #![no_main]
-use libfuzzer_sys::fuzz_target;
+use libfuzzer_sys::{arbitrary, fuzz_target};
 
 use chia_consensus::messages::SpendId;
-use chia_fuzz::{make_list, BitCursor};
+use chia_fuzzing::make_list;
 use clvmr::allocator::Allocator;
 
 fuzz_target!(|data: &[u8]| {
     let mut a = Allocator::new();
-    let mut cursor = BitCursor::new(data);
-    let mode = cursor.read_bits(3).unwrap_or(0);
-    let mut input = make_list(&mut a, &mut cursor);
+    let mut unstructured = arbitrary::Unstructured::new(data);
+    let mode: u8 = unstructured.arbitrary().unwrap_or(0);
+    let mut input = make_list(&mut a, &mut unstructured);
 
     let Ok(s) = SpendId::parse(&a, &mut input, mode) else {
         return;
