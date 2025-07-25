@@ -42,7 +42,7 @@ jobs:
         run: cargo test --workspace --all-features
 
       - name: Tests (release)
-        run: cargo test --workspace --all-features --release
+        run: cargo test --workspace --all-features --release --features=clvmr/allocator-debug
 
       - name: Build (release)
         run: cargo build --workspace --all-features --release
