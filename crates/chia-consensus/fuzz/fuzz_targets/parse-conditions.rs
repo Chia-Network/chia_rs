@@ -1,12 +1,12 @@
 #![no_main]
-use libfuzzer_sys::fuzz_target;
+use libfuzzer_sys::{arbitrary, fuzz_target};
 
 use chia_consensus::conditions::{
     parse_conditions, MempoolVisitor, ParseState, SpendBundleConditions, SpendConditions,
 };
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::spend_visitor::SpendVisitor;
-use chia_fuzz::{make_list, BitCursor};
+use chia_fuzzing::make_list;
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
 use clvm_utils::tree_hash;
@@ -18,7 +18,8 @@ use chia_consensus::flags::{NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
 
 fuzz_target!(|data: &[u8]| {
     let mut a = Allocator::new();
-    let input = make_list(&mut a, &mut BitCursor::new(data));
+    let mut unstructured = arbitrary::Unstructured::new(data);
+    let input = make_list(&mut a, &mut unstructured);
     // conditions are a list of lists
     let input = a.new_pair(input, NodePtr::NIL).unwrap();
 
