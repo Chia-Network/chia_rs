@@ -241,8 +241,8 @@ mod tests {
         while let Some((spend, rest)) = a.next(all_spends) {
             all_spends = rest;
             // process the spend
-            let destructure_list!(parent_id, puzzle, amount, solution, _spend_level_extra) =
-                <match_list!(BytesImpl<32>, Program, u64, Program, Program)>::from_clvm(&a, spend)
+            let destructure_list!(parent_id, puzzle, amount, solution) =
+                <match_list!(BytesImpl<32>, Program, u64, Program)>::from_clvm(&a, spend)
                     .expect("parsing CLVM");
             spends.push(CoinSpend::new(
                 Coin::new(
