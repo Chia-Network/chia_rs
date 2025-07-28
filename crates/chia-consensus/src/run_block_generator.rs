@@ -131,7 +131,7 @@ where
     Ok(result)
 }
 
-pub fn extract_n<const N: usize>(
+fn extract_n<const N: usize>(
     a: &Allocator,
     mut n: NodePtr,
     e: ErrorCode,

@@ -1,7 +1,7 @@
 use chia_consensus::generator_rom::CLVM_DESERIALIZER;
 use chia_consensus::validation_error::{first, ErrorCode, ValidationErr};
 use chia_protocol::FullBlock;
-use chia_protocol::{Bytes32, Program};
+use chia_protocol::Bytes32;
 use chia_traits::streamable::Streamable;
 use clvm_traits::{destructure_list, match_list, FromClvm};
 use clvmr::allocator::NodePtr;
@@ -129,7 +129,7 @@ pub fn visit_spends<
         // let [parent_id, puzzle, amount, solution, _spend_level_extra] =
         //     extract_n::<5>(a, spend, ErrorCode::InvalidCondition)?;
         let destructure_list!(parent_id, puzzle, amount, solution, _spend_level_extra) =
-            <match_list!(Bytes32, NodePtr, u64, NodePtr, NodePtr)>::from_clvm(&a, spend)
+            <match_list!(Bytes32, NodePtr, u64, NodePtr, NodePtr)>::from_clvm(a, spend)
                 .map_err(|_| ValidationErr(spend, ErrorCode::InvalidCondition))?;
         callback(a, parent_id, amount, puzzle, solution);
     }

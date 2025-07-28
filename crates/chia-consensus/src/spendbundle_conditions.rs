@@ -10,6 +10,7 @@ use crate::validation_error::ErrorCode;
 use crate::validation_error::ValidationErr;
 use chia_bls::PublicKey;
 use chia_protocol::{Bytes, SpendBundle};
+
 use clvm_utils::tree_hash;
 use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
@@ -214,13 +215,13 @@ mod tests {
     // the puzzles.
     #[cfg(not(debug_assertions))]
     fn convert_block_to_bundle(generator: &[u8], block_refs: &[Vec<u8>]) -> SpendBundle {
-        use crate::run_block_generator::extract_n;
         use crate::run_block_generator::setup_generator_args;
-        use crate::validation_error::ErrorCode;
         use chia_protocol::Coin;
         use clvmr::op_utils::first;
         use clvmr::serde::node_from_bytes_backrefs;
-        use clvmr::serde::node_to_bytes;
+        use chia_protocol::BytesImpl;
+        use chia_protocol::Program;
+        use clvm_traits::{destructure_list, match_list, FromClvm};
 
         let mut a = make_allocator(MEMPOOL_MODE);
 
@@ -240,17 +241,18 @@ mod tests {
         while let Some((spend, rest)) = a.next(all_spends) {
             all_spends = rest;
             // process the spend
-            let [parent_id, puzzle, amount, solution, _spend_level_extra] =
-                extract_n::<5>(&a, spend, ErrorCode::InvalidCondition).expect("extract_n");
-
+            // let [parent_id, puzzle, amount, solution, _spend_level_extra] =
+            //     extract_n::<5>(&a, spend, ErrorCode::InvalidCondition).expect("extract_n");
+            let destructure_list!(parent_id, puzzle, amount, solution, _spend_level_extra) =
+                <match_list!(BytesImpl<32>, Program, u64, Program, Program)>::from_clvm(&a, spend).expect("parsing CLVM");
             spends.push(CoinSpend::new(
                 Coin::new(
-                    a.atom(parent_id).as_ref().try_into().expect("parent_id"),
-                    tree_hash(&a, puzzle).into(),
-                    a.number(amount).try_into().expect("amount"),
+                    parent_id.try_into().expect("parent_id"),
+                     clvm_utils::tree_hash_from_bytes(puzzle.as_ref()).expect("hash").into(),
+                    amount,
                 ),
-                node_to_bytes(&a, puzzle).expect("node_to_bytes").into(),
-                node_to_bytes(&a, solution).expect("node_to_bytes").into(),
+                puzzle,
+                solution
             ));
         }
         SpendBundle::new(spends, Signature::default())
