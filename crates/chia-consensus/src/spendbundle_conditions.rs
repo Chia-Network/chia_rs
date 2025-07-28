@@ -216,12 +216,12 @@ mod tests {
     #[cfg(not(debug_assertions))]
     fn convert_block_to_bundle(generator: &[u8], block_refs: &[Vec<u8>]) -> SpendBundle {
         use crate::run_block_generator::setup_generator_args;
-        use chia_protocol::Coin;
-        use clvmr::op_utils::first;
-        use clvmr::serde::node_from_bytes_backrefs;
         use chia_protocol::BytesImpl;
+        use chia_protocol::Coin;
         use chia_protocol::Program;
         use clvm_traits::{destructure_list, match_list, FromClvm};
+        use clvmr::op_utils::first;
+        use clvmr::serde::node_from_bytes_backrefs;
 
         let mut a = make_allocator(MEMPOOL_MODE);
 
@@ -244,15 +244,18 @@ mod tests {
             // let [parent_id, puzzle, amount, solution, _spend_level_extra] =
             //     extract_n::<5>(&a, spend, ErrorCode::InvalidCondition).expect("extract_n");
             let destructure_list!(parent_id, puzzle, amount, solution, _spend_level_extra) =
-                <match_list!(BytesImpl<32>, Program, u64, Program, Program)>::from_clvm(&a, spend).expect("parsing CLVM");
+                <match_list!(BytesImpl<32>, Program, u64, Program, Program)>::from_clvm(&a, spend)
+                    .expect("parsing CLVM");
             spends.push(CoinSpend::new(
                 Coin::new(
                     parent_id.try_into().expect("parent_id"),
-                     clvm_utils::tree_hash_from_bytes(puzzle.as_ref()).expect("hash").into(),
+                    clvm_utils::tree_hash_from_bytes(puzzle.as_ref())
+                        .expect("hash")
+                        .into(),
                     amount,
                 ),
                 puzzle,
-                solution
+                solution,
             ));
         }
         SpendBundle::new(spends, Signature::default())

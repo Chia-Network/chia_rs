@@ -1,7 +1,7 @@
 use chia_consensus::generator_rom::CLVM_DESERIALIZER;
 use chia_consensus::validation_error::{first, ErrorCode, ValidationErr};
-use chia_protocol::FullBlock;
 use chia_protocol::Bytes32;
+use chia_protocol::FullBlock;
 use chia_traits::streamable::Streamable;
 use clvm_traits::{destructure_list, match_list, FromClvm};
 use clvmr::allocator::NodePtr;
