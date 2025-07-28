@@ -1,7 +1,12 @@
 [package]
 name = "chia-fuzzing"
-version = "0.28.0"
+version = "0.28.1"
 edition = "2021"
+license = "Apache-2.0"
+description = "Fuzzing tools for Chia Projects on Rust"
+authors = ["Jack Nelson <j.nelson@chia.net>"]
+homepage = "https://github.com/Chia-Network/chia_rs"
+repository = "https://github.com/Chia-Network/chia_rs"
 
 
 [package.metadata]
