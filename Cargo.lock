@@ -411,7 +411,7 @@ dependencies = [
 
 [[package]]
 name = "chia-datalayer"
-version = "0.28.0"
+version = "0.28.1"
 dependencies = [
  "arbitrary",
  "bitvec",
@@ -440,7 +440,7 @@ dependencies = [
 
 [[package]]
 name = "chia-datalayer-fuzz"
-version = "0.28.0"
+version = "0.28.1"
 dependencies = [
  "chia-datalayer",
  "libfuzzer-sys",
@@ -448,7 +448,7 @@ dependencies = [
 
 [[package]]
 name = "chia-datalayer-macro"
-version = "0.28.0"
+version = "0.28.1"
 dependencies = [
  "proc-macro2",
  "quote",
