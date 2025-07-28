@@ -241,8 +241,6 @@ mod tests {
         while let Some((spend, rest)) = a.next(all_spends) {
             all_spends = rest;
             // process the spend
-            // let [parent_id, puzzle, amount, solution, _spend_level_extra] =
-            //     extract_n::<5>(&a, spend, ErrorCode::InvalidCondition).expect("extract_n");
             let destructure_list!(parent_id, puzzle, amount, solution, _spend_level_extra) =
                 <match_list!(BytesImpl<32>, Program, u64, Program, Program)>::from_clvm(&a, spend)
                     .expect("parsing CLVM");

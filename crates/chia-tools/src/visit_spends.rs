@@ -126,8 +126,6 @@ pub fn visit_spends<
     while let Some((spend, rest)) = a.next(all_spends) {
         all_spends = rest;
         // process the spend
-        // let [parent_id, puzzle, amount, solution, _spend_level_extra] =
-        //     extract_n::<5>(a, spend, ErrorCode::InvalidCondition)?;
         let destructure_list!(parent_id, puzzle, amount, solution, _spend_level_extra) =
             <match_list!(Bytes32, NodePtr, u64, NodePtr, NodePtr)>::from_clvm(a, spend)
                 .map_err(|_| ValidationErr(spend, ErrorCode::InvalidCondition))?;
