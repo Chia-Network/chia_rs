@@ -219,7 +219,7 @@ mod tests {
         use chia_protocol::BytesImpl;
         use chia_protocol::Coin;
         use chia_protocol::Program;
-        use clvm_traits::{destructure_list, match_list, FromClvm};
+        use clvm_traits::{destructure_tuple, match_tuple, FromClvm};
         use clvm_utils::tree_hash_from_bytes;
         use clvmr::op_utils::first;
         use clvmr::serde::node_from_bytes_backrefs;
@@ -242,9 +242,8 @@ mod tests {
         while let Some((spend, rest)) = a.next(all_spends) {
             all_spends = rest;
             // process the spend
-            let destructure_list!(parent_id, puzzle, amount, solution) =
-                <match_list!(BytesImpl<32>, Program, u64, Program)>::from_clvm(&a, spend)
-                    .expect("parsing CLVM");
+            let destructure_tuple!(parent_id, puzzle, amount, solution, _) =
+                match_tuple!(BytesImpl<32>, Program, u64, Program, NodePtr).expect("parsing CLVM");
             spends.push(CoinSpend::new(
                 Coin::new(
                     parent_id.try_into().expect("parent_id"),
