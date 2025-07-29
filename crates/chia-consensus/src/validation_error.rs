@@ -3,9 +3,13 @@ use clvmr::error::EvalErr;
 use thiserror::Error;
 
 #[cfg(feature = "py-bindings")]
+use pyo3::prelude::*;
+#[cfg(feature = "py-bindings")]
 use pyo3::PyErr;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg(feature = "py-bindings")]
+#[pyclass(eq, eq_int)]
 pub enum ErrorCode {
     #[default]
     Unknown,

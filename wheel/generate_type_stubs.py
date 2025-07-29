@@ -280,6 +280,7 @@ from typing import Optional, Sequence, Union, Any, ClassVar, final
 from .sized_bytes import bytes32, bytes100
 from .sized_ints import uint8, uint16, uint32, uint64, uint128, int8, int16, int32, int64
 from typing_extensions import Self
+from enum import IntEnum
 
 ReadableBuffer = Union[bytes, bytearray, memoryview]
 
@@ -464,6 +465,165 @@ class PlotSize:
 
     size_v1: Optional[uint8]
     size_v2: Optional[uint8]
+
+class ErrorCode(IntEnum):
+    Unknown = 1
+    InvalidBlockSolution = 2
+    InvalidCoinSolution = 3
+    DuplicateOutput = 4
+    DoubleSpend = 5
+    UnknownUnspent = 6
+    BadAggregateSignature = 7
+    WrongPuzzleHash = 8
+    BadFarmerCoinAmount = 9
+    InvalidCondition = 10
+    InvalidConditionOpcode = 10
+    InvalidParentId = 10
+    InvalidPuzzleHash = 10
+    InvalidPublicKey = 10
+    InvalidMessage = 10
+    InvalidCoinAmount = 10
+    InvalidCoinAnnouncement = 10
+    InvalidPuzzleAnnouncement = 10
+    AssertMyCoinIdFailed = 11
+    AssertPuzzleAnnouncementFailed = 12
+    AssertCoinAnnouncementFailed = 12
+    AssertHeightRelativeFailed = 13
+    AssertHeightAbsoluteFailed = 14
+    AssertSecondsAbsoluteFailed = 15
+    CoinAmountExceedsMaximum = 16
+    SexpError = 17
+    InvalidFeeLowFee = 18
+    MempoolConflict = 19
+    MintingCoin = 20
+    ExtendsUnknownBlock = 21
+    CoinbaseNotYetSpendable = 22
+    CostExceeded = 23
+    BadAdditionRoot = 24
+    BadRemovalRoot = 25
+    InvalidPospaceHash = 26
+    InvalidCoinbaseSignature = 27
+    InvalidPlotSignature = 28
+    TimestampTooFarInPast = 29
+    TimestampTooFarInFuture = 30
+    InvalidTransactionsFilterHash = 31
+    InvalidPospaceChallenge = 32
+    InvalidPospace = 33
+    InvalidHeight = 34
+    InvalidCoinbaseAmount = 35
+    InvalidMerkleRoot = 36
+    InvalidBlockFeeAmount = 37
+    InvalidWeight = 38
+    InvalidTotalIters = 39
+    BlockIsNotFinished = 40
+    InvalidNumIterations = 41
+    InvalidPot = 42
+    InvalidPotChallenge = 43
+    InvalidTransactionsGeneratorHash = 44
+    InvalidPoolTarget = 45
+    InvalidCoinbaseParent = 46
+    InvalidFeesCoinParent = 47
+    ReserveFeeConditionFailed = 48
+    NotBlockButHasData = 49
+    IsTransactionBlockButNoData = 50
+    InvalidPrevBlockHash = 51
+    InvalidTransactionsInfoHash = 52
+    InvalidFoliageBlockHash = 53
+    InvalidRewardCoins = 54
+    InvalidBlockCost = 55
+    NoEndOfSlotInfo = 56
+    InvalidPrevChallengeSlotHash = 57
+    InvalidSubEpochSummaryHash = 58
+    NoSubEpochSummaryHash = 59
+    ShouldNotMakeChallengeBlock = 60
+    ShouldMakeChallengeBlock = 61
+    InvalidChallengeChainData = 62
+    InvalidCcEosVdf = 65
+    InvalidRcEosVdf = 66
+    InvalidChallengeSlotHashRc = 67
+    InvalidPriorPointRc = 68
+    InvalidDeficit = 69
+    InvalidSubEpochSummary = 70
+    InvalidPrevSubEpochSummaryHash = 71
+    InvalidRewardChainHash = 72
+    InvalidSubEpochOverflow = 73
+    InvalidNewDifficulty = 74
+    InvalidNewSubSlotIters = 75
+    InvalidCcSpVdf = 76
+    InvalidRcSpVdf = 77
+    InvalidCcSignature = 78
+    InvalidRcSignature = 79
+    CannotMakeCcBlock = 80
+    InvalidRcSpPrevIp = 81
+    InvalidRcIpPrevIp = 82
+    InvalidIsTransactionBlock = 83
+    InvalidUrsbHash = 84
+    OldPoolTarget = 85
+    InvalidPoolSignature = 86
+    InvalidFoliageBlockPresence = 87
+    InvalidCcIpVdf = 88
+    InvalidRcIpVdf = 89
+    IpShouldBeNone = 90
+    InvalidRewardBlockHash = 91
+    InvalidMadeNonOverflowInfusions = 92
+    NoOverflowsInFirstSubSlotNewEpoch = 93
+    MempoolNotInitialized = 94
+    ShouldNotHaveIcc = 95
+    ShouldHaveIcc = 96
+    InvalidIccVdf = 97
+    InvalidIccHashCc = 98
+    InvalidIccHashRc = 99
+    InvalidIccEosVdf = 100
+    InvalidSpIndex = 101
+    TooManyBlocks = 102
+    InvalidCcChallenge = 103
+    InvalidPrefarm = 104
+    AssertSecondsRelativeFailed = 105
+    BadCoinbaseSignature = 106
+    NoTransactionsWhileSyncing = 108
+    AlreadyIncludingTransaction = 109
+    IncompatibleNetworkId = 110
+    PreSoftForkMaxGeneratorSize = 111
+    InvalidRequiredIters = 112
+    TooManyGeneratorRefs = 113
+    AssertMyParentIdFailed = 114
+    AssertMyPuzzleHashFailed = 115
+    AssertMyAmountFailed = 116
+    GeneratorRuntimeError = 117
+    InvalidCostResult = 118
+    InvalidTransactionsGeneratorRefsRoot = 119
+    FutureGeneratorRefs = 120
+    GeneratorRefHasNoGenerator = 121
+    DoubleSpendInFork = 122
+    InvalidFeeTooCloseToZero = 123
+    CoinAmountNegative = 124
+    InternalProtocolError = 125
+    InvalidSpendBundle = 126
+    FailedGettingGeneratorMultiprocessing = 127
+    AssertBeforeSecondsAbsoluteFailed = 128
+    AssertBeforeSecondsRelativeFailed = 129
+    AssertBeforeHeightAbsoluteFailed = 130
+    AssertBeforeHeightRelativeFailed = 131
+    AssertConcurrentSpendFailed = 132
+    AssertConcurrentPuzzleFailed = 133
+    ImpossibleSecondsRelativeConstraints = 134
+    ImpossibleSecondsAbsoluteConstraints = 135
+    ImpossibleHeightRelativeConstraints = 136
+    ImpossibleHeightAbsoluteConstraints = 137
+    AssertMyBirthSecondsFailed = 138
+    AssertMyBirthHeightFailed = 139
+    AssertEphemeralFailed = 140
+    EphemeralRelativeCondition = 141
+    InvalidSoftforkCondition = 142
+    InvalidSoftforkCost = 143
+    TooManyAnnouncements = 144
+    InvalidMessageMode = 145
+    InvalidCoinId = 146
+    MessageNotSentOrReceived = 147
+
+    def __eq__(self, other: Any) -> bool: ...
+    def __int__(self) -> int: ...
+    def __hash__(self) -> int: ...
 """
     )
 
