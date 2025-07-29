@@ -220,6 +220,7 @@ mod tests {
         use chia_protocol::Coin;
         use chia_protocol::Program;
         use clvm_traits::{destructure_list, match_list, FromClvm};
+        use clvm_utils::tree_hash_from_bytes;
         use clvmr::op_utils::first;
         use clvmr::serde::node_from_bytes_backrefs;
 
@@ -247,9 +248,7 @@ mod tests {
             spends.push(CoinSpend::new(
                 Coin::new(
                     parent_id.try_into().expect("parent_id"),
-                    clvm_utils::tree_hash_from_bytes(puzzle.as_ref())
-                        .expect("hash")
-                        .into(),
+                    tree_hash_from_bytes(puzzle.as_ref()).expect("hash").into(),
                     amount,
                 ),
                 puzzle,
