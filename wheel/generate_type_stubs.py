@@ -255,9 +255,9 @@ extra_members = {
         "def size(self) -> PlotSize: ...",
     ],
     "CoinRecord": [
-        "def spent(self) -> bool: ...",
-        "def name(self) -> bytes32: ...",
-        "def coin_state(self) -> CoinState: ...",
+        "@property\n    def spent(self) -> bool: ...",
+        "@property\n    def name(self) -> bytes32: ...",
+        "@property\n    def coin_state(self) -> CoinState: ...",
     ],
 }
 

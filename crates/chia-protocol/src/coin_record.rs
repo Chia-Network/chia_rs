@@ -22,15 +22,18 @@ pub struct CoinRecord {
 #[pymethods]
 impl CoinRecord {
     #[inline]
+    #[getter]
     pub fn spent(&self) -> bool {
         self.spent_block_index > 0
     }
 
     #[inline]
+    #[getter]
     pub fn name(&self) -> Bytes32 {
         self.coin.coin_id()
     }
 
+    #[getter]
     pub fn coin_state(&self) -> CoinState {
         let spent_h = if self.spent_block_index > 0 {
             Some(self.spent_block_index)
