@@ -223,6 +223,7 @@ mod tests {
         use clvm_utils::tree_hash_from_bytes;
         use clvmr::op_utils::first;
         use clvmr::serde::node_from_bytes_backrefs;
+        use clvmr::NodePtr;
 
         let mut a = make_allocator(MEMPOOL_MODE);
 
