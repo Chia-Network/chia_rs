@@ -8,8 +8,6 @@ use pyo3::prelude::*;
 use pyo3::PyErr;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[cfg(feature = "py-bindings")]
-#[pyclass(eq, eq_int)]
 pub enum ErrorCode {
     #[default]
     Unknown,
@@ -168,6 +166,11 @@ pub enum ErrorCode {
     InvalidCoinId,
     MessageNotSentOrReceived,
 }
+
+#[cfg(feature = "py-bindings")]
+#[pyclass(name = "ErrorCode")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PyErrorCode(pub ErrorCode);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
 #[error("validation error: {1:?}")]

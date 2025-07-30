@@ -22,7 +22,7 @@ use chia_consensus::spendbundle_conditions::get_conditions_from_spendbundle;
 use chia_consensus::spendbundle_validation::{
     get_flags_for_height_and_constants, validate_clvm_and_signature,
 };
-use chia_consensus::validation_error::ErrorCode;
+use chia_consensus::validation_error::PyErrorCode;
 use chia_protocol::{
     calculate_ip_iters, calculate_sp_interval_iters, calculate_sp_iters, is_overflow_block,
     py_expected_plot_size,
@@ -642,7 +642,7 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<ConsensusConstants>()?;
 
     // error code
-    m.add_class::<ErrorCode>()?;
+    m.add_class::<PyErrorCode>()?;
 
     // merkle tree
     m.add_class::<MerkleSet>()?;
