@@ -466,6 +466,7 @@ class PlotSize:
     size_v1: Optional[uint8]
     size_v2: Optional[uint8]
 
+@final
 class ErrorCode(IntEnum):
     Unknown = 1
     InvalidBlockSolution = 2

@@ -172,6 +172,14 @@ pub enum ErrorCode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PyErrorCode(pub ErrorCode);
 
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+impl PyErrorCode {
+    pub fn __int__(&self) -> u16 {
+        self.0 as u16
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
 #[error("validation error: {1:?}")]
 pub struct ValidationErr(pub NodePtr, pub ErrorCode);
