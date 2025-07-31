@@ -14,7 +14,7 @@ cargo-fuzz = true
 
 [dependencies]
 arbitrary = { workspace = true, features = ["derive"] }
-clvmr = { version = "0.*", features = ["counters"] } # This is done to allow easier updates of clvmr
+clvmr = { workspace = true, features = ["counters"] }
 chia-sha2 = { workspace = true }
 anyhow = { workspace = true }
 
