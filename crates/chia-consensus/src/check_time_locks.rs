@@ -5,11 +5,9 @@ use crate::validation_error::ErrorCode;
 use chia_protocol::Bytes32;
 use chia_protocol::CoinRecord;
 #[cfg(feature = "py-bindings")]
-use pyo3::prelude::*;
-#[cfg(feature = "py-bindings")]
 use pyo3::PyResult;
 #[cfg(feature = "py-bindings")]
-use pyo3::{pyfunction, types::PyDict};
+use pyo3::pyfunction;
 
 pub fn check_time_locks(
     removal_coin_records: &HashMap<Bytes32, CoinRecord>,
@@ -79,6 +77,7 @@ pub fn check_time_locks(
 #[cfg(feature = "py-bindings")]
 #[pyfunction]
 #[pyo3(name = "check_time_locks")]
+#[allow(clippy::needless_pass_by_value)]  // pyo3 prefers pass_by_value
 pub fn py_check_time_locks(
     removal_coin_records: HashMap<chia_protocol::BytesImpl<32>, CoinRecord>,
     bundle_conds: &OwnedSpendBundleConditions,
