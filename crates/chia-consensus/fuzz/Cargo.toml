@@ -22,7 +22,7 @@ chia-traits = { workspace = true }
 chia-consensus = { workspace = true }
 chia-bls = { workspace = true }
 hex-literal = { workspace = true }
-chia-fuzzing = { workspace = true }
+clvm-fuzzing = { workspace = true }
 
 [[bin]]
 name = "puzzle-coin-solution"

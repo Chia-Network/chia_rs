@@ -2,7 +2,7 @@
 use libfuzzer_sys::{arbitrary, fuzz_target};
 
 use chia_consensus::get_puzzle_and_solution::get_puzzle_and_solution_for_coin;
-use chia_fuzzing::make_tree;
+use clvm_fuzzing::make_tree;
 use chia_protocol::Coin;
 use clvmr::allocator::Allocator;
 
