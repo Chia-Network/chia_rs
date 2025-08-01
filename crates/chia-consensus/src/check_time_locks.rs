@@ -79,7 +79,7 @@ pub fn check_time_locks(
 #[pyo3(name = "check_time_locks")]
 #[allow(clippy::needless_pass_by_value)] // pyo3 prefers pass_by_value
 pub fn py_check_time_locks(
-    removal_coin_records: HashMap<chia_protocol::BytesImpl<32>, CoinRecord>,
+    removal_coin_records: HashMap<Bytes32, CoinRecord>,
     bundle_conds: &OwnedSpendBundleConditions,
     prev_transaction_block_height: u32,
     timestamp: u64,
@@ -113,58 +113,6 @@ mod tests {
             spent_block_index: 0,
             coinbase: false,
             timestamp,
-        }
-    }
-
-    fn dummy_spend_conditions(
-        coin_id: Bytes32,
-        height_relative: Option<u32>,
-        seconds_relative: Option<u64>,
-        before_height_relative: Option<u32>,
-        before_seconds_relative: Option<u64>,
-        birth_height: Option<u32>,
-        birth_seconds: Option<u64>,
-    ) -> OwnedSpendConditions {
-        OwnedSpendConditions {
-            coin_id,
-            parent_id: Bytes32::default(),
-            puzzle_hash: Bytes32::default(),
-            coin_amount: 1,
-            height_relative,
-            seconds_relative,
-            before_height_relative,
-            before_seconds_relative,
-            birth_height,
-            birth_seconds,
-            create_coin: vec![],
-            agg_sig_me: vec![],
-            agg_sig_parent: vec![],
-            agg_sig_puzzle: vec![],
-            agg_sig_amount: vec![],
-            agg_sig_puzzle_amount: vec![],
-            agg_sig_parent_amount: vec![],
-            agg_sig_parent_puzzle: vec![],
-            flags: 0,
-            execution_cost: 0,
-            condition_cost: 0,
-        }
-    }
-
-    fn dummy_bundle(spends: Vec<OwnedSpendConditions>) -> OwnedSpendBundleConditions {
-        OwnedSpendBundleConditions {
-            spends,
-            reserve_fee: 0,
-            height_absolute: 0,
-            seconds_absolute: 0,
-            before_height_absolute: None,
-            before_seconds_absolute: None,
-            agg_sig_unsafe: vec![],
-            cost: 0,
-            removal_amount: 0,
-            addition_amount: 0,
-            validated_signature: true,
-            execution_cost: 0,
-            condition_cost: 0,
         }
     }
 
@@ -220,10 +168,9 @@ mod tests {
             seconds_absolute,
             before_height_absolute,
             before_seconds_absolute,
-            ..dummy_bundle(vec![])
+            ..Default::default()
         };
 
-        // no OwnedSpendConditions in vec so only check absolutes
         let result = check_time_locks(&HashMap::new(), &bundle, prev_height, timestamp);
         assert_eq!(result, expected);
     }
@@ -231,9 +178,14 @@ mod tests {
     #[test]
     fn test_invalid_coin_id() {
         let coin_id = Bytes32::from([1u8; 32]);
-        let spend = dummy_spend_conditions(coin_id, None, None, None, None, None, None);
-        let bundle = dummy_bundle(vec![spend]);
-        // coin_id not in HashMap
+        let spend = OwnedSpendConditions {
+            coin_id,
+            ..Default::default()
+        };
+        let bundle = OwnedSpendBundleConditions {
+            spends: vec![spend],
+            ..Default::default()
+        };
         let result = check_time_locks(&HashMap::new(), &bundle, 0, 0);
         assert_eq!(result, Some(ErrorCode::InvalidCoinId));
     }
@@ -243,25 +195,25 @@ mod tests {
         let coin_id = Bytes32::from([2u8; 32]);
         let coin_record = dummy_coin_record(10, 500);
 
-        let spend = dummy_spend_conditions(
+        let spend = OwnedSpendConditions {
             coin_id,
-            Some(5),
-            Some(100),
-            Some(100),
-            Some(1500),
-            Some(10),
-            Some(500),
-        );
+            height_relative: Some(5),
+            seconds_relative: Some(100),
+            before_height_relative: Some(100),
+            before_seconds_relative: Some(1500),
+            birth_height: Some(10),
+            birth_seconds: Some(500),
+            ..Default::default()
+        };
 
         let mut map = HashMap::new();
         map.insert(coin_id, coin_record);
 
         let bundle = OwnedSpendBundleConditions {
-            height_absolute: 0,
-            seconds_absolute: 0,
+            spends: vec![spend],
             before_height_absolute: Some(1000),
             before_seconds_absolute: Some(2000),
-            ..dummy_bundle(vec![spend])
+            ..Default::default()
         };
 
         let result = check_time_locks(&map, &bundle, 20, 700);
@@ -273,20 +225,24 @@ mod tests {
         let coin_id = Bytes32::from([3u8; 32]);
         let coin_record = dummy_coin_record(50, 1000);
 
-        let spend = dummy_spend_conditions(
+        let spend = OwnedSpendConditions {
             coin_id,
-            Some(100),  // height_relative (requires height >= 150)
-            Some(1000), // seconds_relative (requires timestamp >= 2000) -- will fail
-            Some(10),   // before_height_relative (fails if height >= 60)
-            Some(1000), // before_seconds_relative (fails if timestamp >= 2000)
-            Some(50),
-            Some(1000),
-        );
+            height_relative: Some(100),
+            seconds_relative: Some(1000),
+            before_height_relative: Some(10),
+            before_seconds_relative: Some(1000),
+            birth_height: Some(50),
+            birth_seconds: Some(1000),
+            ..Default::default()
+        };
 
         let mut map = HashMap::new();
         map.insert(coin_id, coin_record);
 
-        let bundle = dummy_bundle(vec![spend]);
+        let bundle = OwnedSpendBundleConditions {
+            spends: vec![spend],
+            ..Default::default()
+        };
 
         let result = check_time_locks(&map, &bundle, 160, 1600);
         assert_eq!(result, Some(ErrorCode::AssertSecondsRelativeFailed));
@@ -297,20 +253,21 @@ mod tests {
         let coin_id = Bytes32::from([4u8; 32]);
         let coin_record = dummy_coin_record(10, 500);
 
-        let spend = dummy_spend_conditions(
+        let spend = OwnedSpendConditions {
             coin_id,
-            None,
-            None,
-            None,
-            None,
-            Some(11), // wrong birth_height
-            Some(500),
-        );
+            birth_height: Some(11),
+            birth_seconds: Some(500),
+            ..Default::default()
+        };
 
         let mut map = HashMap::new();
         map.insert(coin_id, coin_record);
 
-        let bundle = dummy_bundle(vec![spend]);
+        let bundle = OwnedSpendBundleConditions {
+            spends: vec![spend],
+            ..Default::default()
+        };
+
         let result = check_time_locks(&map, &bundle, 100, 1000);
         assert_eq!(result, Some(ErrorCode::AssertMyBirthHeightFailed));
     }
@@ -320,20 +277,21 @@ mod tests {
         let coin_id = Bytes32::from([5u8; 32]);
         let coin_record = dummy_coin_record(10, 500);
 
-        let spend = dummy_spend_conditions(
+        let spend = OwnedSpendConditions {
             coin_id,
-            None,
-            None,
-            None,
-            None,
-            Some(10),
-            Some(600), // wrong birth_seconds
-        );
+            birth_height: Some(10),
+            birth_seconds: Some(600),
+            ..Default::default()
+        };
 
         let mut map = HashMap::new();
         map.insert(coin_id, coin_record);
 
-        let bundle = dummy_bundle(vec![spend]);
+        let bundle = OwnedSpendBundleConditions {
+            spends: vec![spend],
+            ..Default::default()
+        };
+
         let result = check_time_locks(&map, &bundle, 100, 1000);
         assert_eq!(result, Some(ErrorCode::AssertMyBirthSecondsFailed));
     }
