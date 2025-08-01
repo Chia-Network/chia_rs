@@ -254,6 +254,11 @@ extra_members = {
     "ProofOfSpace": [
         "def size(self) -> PlotSize: ...",
     ],
+    "CoinRecord": [
+        "@property\n    def spent(self) -> bool: ...",
+        "@property\n    def name(self) -> bytes32: ...",
+        "@property\n    def coin_state(self) -> CoinState: ...",
+    ],
 }
 
 classes = []
@@ -307,6 +312,13 @@ def run_block_generator2(
 def additions_and_removals(
     program: ReadableBuffer, block_refs: list[ReadableBuffer], flags: int, constants: ConsensusConstants
 ) -> tuple[list[tuple[Coin, Optional[bytes]]], list[tuple[bytes32, Coin]]]: ...
+
+def check_time_locks(
+    removal_coin_records: dict[bytes32, CoinRecord],
+    bundle_conds: SpendBundleConditions,
+    prev_transaction_block_height: uint32,
+    timestamp: uint64,
+) -> Optional[int]: ...
 
 def confirm_included_already_hashed(
     root: bytes32,
