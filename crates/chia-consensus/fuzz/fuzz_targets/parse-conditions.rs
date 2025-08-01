@@ -6,9 +6,9 @@ use chia_consensus::conditions::{
 };
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::spend_visitor::SpendVisitor;
-use clvm_fuzzing::make_list;
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
+use clvm_fuzzing::make_list;
 use clvm_utils::tree_hash;
 use clvmr::{Allocator, NodePtr};
 use std::collections::HashSet;

@@ -2,8 +2,8 @@
 use libfuzzer_sys::{arbitrary, fuzz_target};
 
 use chia_consensus::get_puzzle_and_solution::get_puzzle_and_solution_for_coin;
-use clvm_fuzzing::make_tree;
 use chia_protocol::Coin;
+use clvm_fuzzing::make_tree;
 use clvmr::allocator::Allocator;
 
 const HASH: [u8; 32] = [
