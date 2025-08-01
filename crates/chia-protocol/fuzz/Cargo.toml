@@ -1,6 +1,6 @@
 [package]
 name = "chia-protocol-fuzz"
-version = "0.28.2"
+version = "0.29.0"
 authors = ["Automatically generated"]
 publish = false
 edition = "2021"
