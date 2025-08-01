@@ -241,12 +241,10 @@ mod test {
         )
         .expect("run_block_generator2");
 
-        let mut a2 = Allocator::new();
-        let generator_node =
-            node_from_bytes_backrefs(&mut a2, &generator).expect("node_from_bytes_backrefs");
-        let checkpoint = a2.checkpoint();
         for s in &conds.spends {
-            a2.restore_checkpoint(&checkpoint);
+            let mut a2 = Allocator::new();
+            let generator_node =
+                node_from_bytes_backrefs(&mut a2, &generator).expect("node_from_bytes_backrefs");
             let mut expected_additions: HashSet<(Bytes32, u64)> = s
                 .create_coin
                 .iter()
