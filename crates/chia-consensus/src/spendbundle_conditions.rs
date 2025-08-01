@@ -244,7 +244,7 @@ mod tests {
             all_spends = rest;
             // process the spend
             let destructure_tuple!(parent_id, puzzle, amount, solution, _) =
-                <match_tuple!(BytesImpl<32>, Program, u64, Program, NodePtr)>::from_clvm(&a, spend)
+                <match_tuple!(Bytes32, Program, u64, Program, NodePtr)>::from_clvm(&a, spend)
                     .expect("parsing CLVM");
             spends.push(CoinSpend::new(
                 Coin::new(
