@@ -117,60 +117,42 @@ mod tests {
     }
 
     #[rstest]
-    #[case(0, 0, 10, 1000, None, None, None)]
     #[case(
-        20,
-        0,
+        OwnedSpendBundleConditions { ..Default::default() },
         10,
         1000,
-        Some(ErrorCode::AssertHeightAbsoluteFailed),
-        None,
         None
     )]
     #[case(
-        0,
-        2000,
+        OwnedSpendBundleConditions { height_absolute: 20, ..Default::default() },
         10,
         1000,
-        Some(ErrorCode::AssertSecondsAbsoluteFailed),
-        None,
-        None
+        Some(ErrorCode::AssertHeightAbsoluteFailed)
     )]
     #[case(
-        0,
-        0,
+        OwnedSpendBundleConditions { seconds_absolute: 2000, ..Default::default() },
         10,
         1000,
-        Some(ErrorCode::AssertBeforeHeightAbsoluteFailed),
-        Some(5),
-        None
+        Some(ErrorCode::AssertSecondsAbsoluteFailed)
     )]
     #[case(
-        0,
-        0,
+        OwnedSpendBundleConditions { before_height_absolute: Some(5), ..Default::default() },
         10,
-        2000,
-        Some(ErrorCode::AssertBeforeSecondsAbsoluteFailed),
-        None,
-        Some(1500)
+        1000,
+        Some(ErrorCode::AssertBeforeHeightAbsoluteFailed)
+    )]
+    #[case(
+        OwnedSpendBundleConditions { before_seconds_absolute: Some(900), ..Default::default() },
+        10,
+        1000,
+        Some(ErrorCode::AssertBeforeSecondsAbsoluteFailed)
     )]
     fn test_absolute_constraints(
-        #[case] height_absolute: u32,
-        #[case] seconds_absolute: u64,
+        #[case] bundle: OwnedSpendBundleConditions,
         #[case] prev_height: u32,
         #[case] timestamp: u64,
         #[case] expected: Option<ErrorCode>,
-        #[case] before_height_absolute: Option<u32>,
-        #[case] before_seconds_absolute: Option<u64>,
     ) {
-        let bundle = OwnedSpendBundleConditions {
-            height_absolute,
-            seconds_absolute,
-            before_height_absolute,
-            before_seconds_absolute,
-            ..Default::default()
-        };
-
         let result = check_time_locks(&HashMap::new(), &bundle, prev_height, timestamp);
         assert_eq!(result, expected);
     }
