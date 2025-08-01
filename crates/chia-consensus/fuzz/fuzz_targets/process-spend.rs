@@ -4,7 +4,7 @@ use chia_consensus::conditions::{
 };
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::flags::{NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
-use chia_fuzzing::make_tree;
+use clvm_fuzzing::make_tree;
 use clvmr::allocator::Allocator;
 use libfuzzer_sys::{arbitrary, fuzz_target};
 

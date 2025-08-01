@@ -4,7 +4,7 @@ use libfuzzer_sys::{arbitrary, fuzz_target};
 use clvm_utils::{tree_hash, tree_hash_cached, TreeCache};
 use clvmr::{Allocator, NodePtr};
 
-use chia_fuzzing::make_tree;
+use clvm_fuzzing::make_tree;
 use clvmr::serde::{node_from_bytes_backrefs, node_to_bytes_backrefs};
 
 fn test_hash(a: &Allocator, node: NodePtr) {

@@ -2,7 +2,7 @@
 use libfuzzer_sys::{arbitrary, fuzz_target};
 
 use chia_consensus::messages::SpendId;
-use chia_fuzzing::make_list;
+use clvm_fuzzing::make_list;
 use clvmr::allocator::Allocator;
 
 fuzz_target!(|data: &[u8]| {
