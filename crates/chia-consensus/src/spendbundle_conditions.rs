@@ -216,7 +216,7 @@ mod tests {
     #[cfg(not(debug_assertions))]
     fn convert_block_to_bundle(generator: &[u8], block_refs: &[Vec<u8>]) -> SpendBundle {
         use crate::run_block_generator::setup_generator_args;
-        use chia_protocol::BytesImpl;
+        use chia_protocol::Bytes32;
         use chia_protocol::Coin;
         use chia_protocol::Program;
         use clvm_traits::{destructure_tuple, match_tuple, FromClvm};
