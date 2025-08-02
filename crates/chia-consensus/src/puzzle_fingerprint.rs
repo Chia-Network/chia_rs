@@ -1,27 +1,27 @@
 use super::opcodes::{
-    parse_opcode, AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT,
-    AGG_SIG_PARENT_PUZZLE, AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT, AGG_SIG_UNSAFE,
-    ASSERT_BEFORE_HEIGHT_ABSOLUTE, ASSERT_BEFORE_HEIGHT_RELATIVE, ASSERT_BEFORE_SECONDS_ABSOLUTE,
-    ASSERT_BEFORE_SECONDS_RELATIVE, ASSERT_COIN_ANNOUNCEMENT, ASSERT_CONCURRENT_PUZZLE,
-    ASSERT_CONCURRENT_SPEND, ASSERT_EPHEMERAL, ASSERT_HEIGHT_ABSOLUTE, ASSERT_HEIGHT_RELATIVE,
-    ASSERT_MY_AMOUNT, ASSERT_MY_BIRTH_HEIGHT, ASSERT_MY_BIRTH_SECONDS, ASSERT_MY_COIN_ID,
-    ASSERT_MY_PARENT_ID, ASSERT_MY_PUZZLEHASH, ASSERT_PUZZLE_ANNOUNCEMENT, ASSERT_SECONDS_ABSOLUTE,
-    ASSERT_SECONDS_RELATIVE, CREATE_COIN, CREATE_COIN_ANNOUNCEMENT, CREATE_COIN_COST,
-    CREATE_PUZZLE_ANNOUNCEMENT, FREE_CONDITIONS, GENERIC_CONDITION_COST, RECEIVE_MESSAGE, REMARK,
-    RESERVE_FEE, SEND_MESSAGE,
+    parse_opcode, ASSERT_BEFORE_HEIGHT_ABSOLUTE, ASSERT_BEFORE_HEIGHT_RELATIVE,
+    ASSERT_BEFORE_SECONDS_ABSOLUTE, ASSERT_BEFORE_SECONDS_RELATIVE, ASSERT_COIN_ANNOUNCEMENT,
+    ASSERT_CONCURRENT_PUZZLE, ASSERT_CONCURRENT_SPEND, ASSERT_EPHEMERAL, ASSERT_HEIGHT_ABSOLUTE,
+    ASSERT_HEIGHT_RELATIVE, ASSERT_MY_AMOUNT, ASSERT_MY_BIRTH_HEIGHT, ASSERT_MY_BIRTH_SECONDS,
+    ASSERT_MY_COIN_ID, ASSERT_MY_PARENT_ID, ASSERT_MY_PUZZLEHASH, ASSERT_PUZZLE_ANNOUNCEMENT,
+    ASSERT_SECONDS_ABSOLUTE, ASSERT_SECONDS_RELATIVE, CREATE_COIN, CREATE_COIN_ANNOUNCEMENT,
+    CREATE_PUZZLE_ANNOUNCEMENT, REMARK, RESERVE_FEE,
 };
-use crate::flags::{COST_CONDITIONS, MEMPOOL_MODE};
+use crate::allocator::make_allocator;
+use crate::flags::MEMPOOL_MODE;
 use crate::validation_error::{first, ErrorCode, ValidationErr};
 use chia_protocol::Program;
-use chia_sha2::Sha256;
+use clvmr::chia_dialect::ENABLE_KECCAK_OPS_OUTSIDE_GUARD;
 use clvmr::cost::Cost;
+use clvmr::LIMIT_HEAP;
 use clvmr::{Allocator, NodePtr, SExp};
+use sha1::{Digest, Sha1};
 
 /// computes a hash of the atoms in a CLVM list. Only the `count` first items
 /// are considered. Returns the NodePtr to the remainder of the list (may be
 /// NIL)
 fn hash_atom_list(
-    fingerprint: &mut Sha256,
+    fingerprint: &mut Sha1,
     a: &Allocator,
     mut args: NodePtr,
     mut count: u32,
@@ -48,64 +48,49 @@ fn hash_atom_list(
 }
 
 /// This functions runs a *trusted*, *dedup* puzzles, i.e. one that has already
-/// been fully / validated in mempool mode, and returns the cost and the
-/// conditions / fingerprint for it. The conditions fingerprint is a hash of its
-/// known / condition outputs. This is used for identical spend deduplication to
-/// compare / whether two spends are identical and can be deduplicated. The
-/// condition / fingerprint should not be expected to be stable across different
-/// chia_rs versions.
-/// This function will fail if the puzzle returns a condition that's not
+/// been fully validated in mempool mode, and returns the conditions fingerprint
+/// for it. The conditions fingerprint is a hash of its
+/// condition outputs (but only known conditions). This is used for identical
+/// spend deduplication to compare whether two spends are identical and can be
+/// deduplicated. The condition fingerprint should not be expected to be stable
+/// across different chia_rs versions.
+/// This function may fail if the puzzle returns a condition that's not
 /// supported by DEDUP spends.
 pub fn compute_puzzle_fingerprint(
     puzzle: &Program,
     solution: &Program,
     max_cost: Cost,
-    flags: u32,
-) -> core::result::Result<(Cost, [u8; 32]), ValidationErr> {
-    let flags = flags | MEMPOOL_MODE;
+    salt: u64,
+) -> core::result::Result<[u8; 20], ValidationErr> {
+    // keep in mind that the puzzle has already been validated by the mempool,
+    // so it's trusted. It's OK to enable features that aren't available yet,
+    // because if the puzzle would use them prematurely, the validation would
+    // have failed.
+    let flags = MEMPOOL_MODE | ENABLE_KECCAK_OPS_OUTSIDE_GUARD;
 
-    let mut a = Allocator::new_limited(500_000_000);
-    let (mut cost, conditions) = puzzle.run(&mut a, flags, max_cost, solution)?;
+    let mut a = make_allocator(LIMIT_HEAP);
+    let (_, conditions) = puzzle.run(&mut a, flags, max_cost, solution)?;
     let mut iter = conditions;
-    let mut free_condition_countdown: usize = FREE_CONDITIONS;
 
-    let mut fingerprint = Sha256::new();
+    let mut fingerprint = Sha1::new();
+    fingerprint.update(salt.to_be_bytes());
 
     while let Some((c, next)) = a.next(iter) {
         iter = next;
 
+        // The fingerprint is internal to the mempool and should take all
+        // currently and future known conditions into account. i.e. conditions
+        // that will be enabled in future forks.
         let Some(op) = parse_opcode(&a, first(&a, c)?, flags) else {
             // we just ignore unknown conditions
             continue;
         };
 
-        if (flags & COST_CONDITIONS) != 0 {
-            if free_condition_countdown == 0 {
-                cost += GENERIC_CONDITION_COST;
-            } else {
-                free_condition_countdown -= 1;
-            }
-        }
-
         // since we only run in mempool mode, we don't need to take unknown
         // conditions into account, including the ones with cost. This puzzle is
         // expected to have already passed mempool-mode validation
         match op {
-            AGG_SIG_UNSAFE
-            | AGG_SIG_ME
-            | AGG_SIG_PUZZLE
-            | AGG_SIG_PUZZLE_AMOUNT
-            | AGG_SIG_PARENT
-            | AGG_SIG_AMOUNT
-            | AGG_SIG_PARENT_PUZZLE
-            | AGG_SIG_PARENT_AMOUNT
-            | SEND_MESSAGE
-            | RECEIVE_MESSAGE => {
-                return Err(ValidationErr(NodePtr::NIL, ErrorCode::InvalidCondition));
-            }
             CREATE_COIN => {
-                cost += CREATE_COIN_COST;
-
                 // CREATE_COIN, puzzle_hash, amount
                 let rest = hash_atom_list(&mut fingerprint, &a, c, 3)?;
 
@@ -165,19 +150,13 @@ pub fn compute_puzzle_fingerprint(
             }
         }
     }
-    Ok((cost, fingerprint.finalize()))
+    Ok(fingerprint.finalize().into())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::consensus_constants::TEST_CONSTANTS;
-    use crate::flags::DONT_VALIDATE_SIGNATURE;
-    use crate::run_block_generator::run_block_generator2;
-    use crate::solution_generator::solution_generator_backrefs;
-    use chia_bls::Signature;
-    use chia_protocol::Coin;
-    use clvm_utils::tree_hash_from_bytes;
     use clvmr::serde::node_to_bytes;
     use rstest::rstest;
 
@@ -187,11 +166,11 @@ mod tests {
         let val = a.new_atom(b"foobar").unwrap();
         let list = a.new_pair(val, NodePtr::NIL).unwrap();
 
-        let mut ctx1 = Sha256::new();
+        let mut ctx1 = Sha1::new();
         let rest = hash_atom_list(&mut ctx1, &a, list, 1).expect("hash_atom_list");
         assert_eq!(rest, a.nil());
 
-        let mut ctx2 = Sha256::new();
+        let mut ctx2 = Sha1::new();
         // length-prefix
         ctx2.update(b"\x00\x00\x00\x06");
         ctx2.update(b"foobar");
@@ -210,11 +189,11 @@ mod tests {
 
         // we just care about 1 element
         {
-            let mut ctx1 = Sha256::new();
+            let mut ctx1 = Sha1::new();
             let rest = hash_atom_list(&mut ctx1, &a, list2, 1).expect("hash_atom_list");
             assert_eq!(rest, list1);
 
-            let mut ctx2 = Sha256::new();
+            let mut ctx2 = Sha1::new();
             // length-prefix
             ctx2.update(b"\x00\x00\x00\x03");
             ctx2.update(b"foo");
@@ -224,11 +203,11 @@ mod tests {
 
         // we just care about 2 elements
         {
-            let mut ctx1 = Sha256::new();
+            let mut ctx1 = Sha1::new();
             let rest = hash_atom_list(&mut ctx1, &a, list2, 2).expect("hash_atom_list");
             assert_eq!(rest, a.nil());
 
-            let mut ctx2 = Sha256::new();
+            let mut ctx2 = Sha1::new();
             // length-prefix
             ctx2.update(b"\x00\x00\x00\x03");
             ctx2.update(b"foo");
@@ -245,7 +224,7 @@ mod tests {
         let val = a.new_atom(b"foobar").unwrap();
         let list = a.new_pair(val, NodePtr::NIL).unwrap();
 
-        let mut ctx1 = Sha256::new();
+        let mut ctx1 = Sha1::new();
 
         // we expect 2 elements, but there's only 1
         assert_eq!(
@@ -260,44 +239,13 @@ mod tests {
         let val = a.new_pair(NodePtr::NIL, NodePtr::NIL).unwrap();
         let list = a.new_pair(val, NodePtr::NIL).unwrap();
 
-        let mut ctx1 = Sha256::new();
+        let mut ctx1 = Sha1::new();
 
         // we expect all elements to be atoms, but we encountered a pair
         assert_eq!(
             hash_atom_list(&mut ctx1, &a, list, 1).unwrap_err().1,
             ErrorCode::InvalidCondition
         );
-    }
-
-    fn compute_puzzle_cost(puzzle: &Program) -> Cost {
-        // use run_block_generator2() to compute cost
-        let mut a = Allocator::new();
-        let dummy_coin = Coin {
-            parent_coin_info: b"00000000000000000000000000000000".into(),
-            puzzle_hash: tree_hash_from_bytes(puzzle.as_ref())
-                .expect("tree_hash")
-                .into(),
-            amount: 100,
-        };
-
-        let generator = solution_generator_backrefs([(dummy_coin, puzzle, &Program::default())])
-            .expect("solution_generator");
-        let blocks: &[&[u8]] = &[];
-        let block_conds = run_block_generator2(
-            &mut a,
-            &generator,
-            blocks,
-            11_000_000_000,
-            MEMPOOL_MODE | DONT_VALIDATE_SIGNATURE,
-            &Signature::default(),
-            None,
-            &TEST_CONSTANTS,
-        )
-        .expect("run_block_generator2");
-
-        // running the block has higher cost than the puzzle, because it includes
-        // the cost of the quote, which is 20
-        block_conds.execution_cost + block_conds.condition_cost - 20
     }
 
     #[rstest]
@@ -310,7 +258,9 @@ mod tests {
     fn test_compute_puzzle_fingerprint(#[case] condition: &[&[u8]], #[case] mut args: u32) {
         // build the puzzle as a quoted list with a single condition
         // as well as the expected fingerprint
-        let mut ctx = Sha256::new();
+        let mut ctx = Sha1::new();
+        // salt
+        ctx.update([0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab]);
 
         let mut a = Allocator::new();
         let mut cond = NodePtr::NIL;
@@ -336,20 +286,17 @@ mod tests {
         let puzzle = node_to_bytes(&a, puzzle).expect("node_to_bytes");
         let puzzle = Program::new(puzzle.into());
 
-        let expect_fingerprint = ctx.finalize();
+        let expect_fingerprint: [u8; 20] = ctx.finalize().into();
 
-        let (cost, fingerprint) = compute_puzzle_fingerprint(
+        let fingerprint = compute_puzzle_fingerprint(
             &puzzle,
             &Program::default(),
             TEST_CONSTANTS.max_block_cost_clvm,
-            0,
+            0xabab_abab_abab_abab,
         )
         .expect("compute_puzzle_fingerprint");
 
         assert_eq!(fingerprint, expect_fingerprint);
-
-        let expect_cost = compute_puzzle_cost(&puzzle);
-        assert_eq!(expect_cost, cost);
     }
 
     #[rstest]
@@ -383,7 +330,10 @@ mod tests {
         let puzzle = node_to_bytes(&a, puzzle).expect("node_to_bytes");
         let puzzle = Program::new(puzzle.into());
 
-        let mut ctx = Sha256::new();
+        let mut ctx = Sha1::new();
+        // salt
+        ctx.update([0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab]);
+
         ctx.update([0, 0, 0, 1]);
         ctx.update([51]);
         ctx.update([0, 0, 0, 32]);
@@ -397,13 +347,13 @@ mod tests {
             // If there is no hint, we encode it as an empty atom
             ctx.update([0, 0, 0, 0]);
         }
-        let expect_fingerprint = ctx.finalize();
+        let expect_fingerprint: [u8; 20] = ctx.finalize().into();
 
-        let (_cost, fingerprint) = compute_puzzle_fingerprint(
+        let fingerprint = compute_puzzle_fingerprint(
             &puzzle,
             &Program::default(),
             TEST_CONSTANTS.max_block_cost_clvm,
-            0,
+            0xabab_abab_abab_abab,
         )
         .expect("compute_puzzle_fingerprint");
 
