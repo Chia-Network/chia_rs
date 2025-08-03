@@ -7,7 +7,7 @@ use clvmr::{Allocator, NodePtr};
 
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::flags::{NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
-use chia_fuzzing::make_list;
+use clvm_fuzzing::make_list;
 
 fuzz_target!(|data: &[u8]| {
     let mut a = Allocator::new();

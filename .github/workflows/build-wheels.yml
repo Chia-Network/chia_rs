@@ -89,6 +89,18 @@ jobs:
                 docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-x86_64
                 rustup-target: x86_64-unknown-linux-musl
             matrix: "3.12"
+          - major-dot-minor: "3.13"
+            cibw-build: "cp313-*"
+            by-arch:
+              arm:
+                manylinux-version: 2_28
+                docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-aarch64
+                rustup-target: aarch64-unknown-linux-musl
+              intel:
+                manylinux-version: 2_28
+                docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-x86_64
+                rustup-target: x86_64-unknown-linux-musl
+            matrix: "3.13"
 
         arch:
           - name: ARM
@@ -341,7 +353,7 @@ jobs:
           python -m venv venv
           . venv/bin/activate
           pip install colorama maturin pytest pytest-xdist blspy clvm==0.9.8
-          maturin develop --release -m wheel/Cargo.toml
+          maturin develop --release -m wheel/Cargo.toml --features=clvmr/allocator-debug
           # run pytest in a single process to avoid a race writing the coverage report
           pytest -n 0 tests
           sudo apt-get update

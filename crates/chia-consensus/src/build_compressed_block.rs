@@ -256,7 +256,7 @@ impl BlockBuilder {
 }
 
 // this test is expensive and takes forever in debug builds
-//#[cfg(not(debug_assertions))]
+#[cfg(not(debug_assertions))]
 #[cfg(test)]
 mod tests {
     use super::*;

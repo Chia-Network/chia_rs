@@ -14,7 +14,7 @@ use chia_consensus::opcodes::{
     ASSERT_SECONDS_ABSOLUTE, ASSERT_SECONDS_RELATIVE, CREATE_COIN, CREATE_COIN_ANNOUNCEMENT,
     CREATE_PUZZLE_ANNOUNCEMENT, RECEIVE_MESSAGE, REMARK, RESERVE_FEE, SEND_MESSAGE,
 };
-use chia_fuzzing::make_list;
+use clvm_fuzzing::make_list;
 
 fuzz_target!(|data: &[u8]| {
     let mut a = Allocator::new();
