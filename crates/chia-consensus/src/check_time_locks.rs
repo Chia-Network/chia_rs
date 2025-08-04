@@ -117,34 +117,76 @@ mod tests {
     }
 
     #[rstest]
-    #[case(
-        OwnedSpendBundleConditions { ..Default::default() },
+    #[case::height_absolute_under(
+        OwnedSpendBundleConditions { height_absolute: 11, ..Default::default() },
         10,
-        1000,
-        None
-    )]
-    #[case(
-        OwnedSpendBundleConditions { height_absolute: 20, ..Default::default() },
-        10,
-        1000,
+        0,
         Some(ErrorCode::AssertHeightAbsoluteFailed)
     )]
-    #[case(
-        OwnedSpendBundleConditions { seconds_absolute: 2000, ..Default::default() },
+    #[case::height_absolute_exact(
+        OwnedSpendBundleConditions { height_absolute: 10, ..Default::default() },
         10,
+        0,
+        None
+    )]
+    #[case::height_absolute_over(
+        OwnedSpendBundleConditions { height_absolute: 9, ..Default::default() },
+        10,
+        0,
+        None
+    )]
+    #[case::seconds_absolute_under(
+        OwnedSpendBundleConditions { seconds_absolute: 1001, ..Default::default() },
+        0,
         1000,
         Some(ErrorCode::AssertSecondsAbsoluteFailed)
     )]
-    #[case(
-        OwnedSpendBundleConditions { before_height_absolute: Some(5), ..Default::default() },
-        10,
+    #[case::seconds_absolute_exact(
+        OwnedSpendBundleConditions { seconds_absolute: 1000, ..Default::default() },
+        0,
         1000,
+        None
+    )]
+    #[case::seconds_absolute_over(
+        OwnedSpendBundleConditions { seconds_absolute: 999, ..Default::default() },
+        0,
+        1000,
+        None
+    )]
+    #[case::before_height_absolute_under(
+        OwnedSpendBundleConditions { before_height_absolute: Some(10), ..Default::default() },
+        9,
+        0,
+        None
+    )]
+    #[case::before_height_absolute_exact(
+        OwnedSpendBundleConditions { before_height_absolute: Some(10), ..Default::default() },
+        10,
+        0,
         Some(ErrorCode::AssertBeforeHeightAbsoluteFailed)
     )]
-    #[case(
-        OwnedSpendBundleConditions { before_seconds_absolute: Some(900), ..Default::default() },
-        10,
+    #[case::before_height_absolute_over(
+        OwnedSpendBundleConditions { before_height_absolute: Some(10), ..Default::default() },
+        11,
+        0,
+        Some(ErrorCode::AssertBeforeHeightAbsoluteFailed)
+    )]
+    #[case::before_seconds_absolute_under(
+        OwnedSpendBundleConditions { before_seconds_absolute: Some(1000), ..Default::default() },
+        0,
+        999,
+        None
+    )]
+    #[case::before_seconds_absolute_exact(
+        OwnedSpendBundleConditions { before_seconds_absolute: Some(1000), ..Default::default() },
+        0,
         1000,
+        Some(ErrorCode::AssertBeforeSecondsAbsoluteFailed)
+    )]
+    #[case::before_seconds_absolute_over(
+        OwnedSpendBundleConditions { before_seconds_absolute: Some(1000), ..Default::default() },
+        0,
+        1001,
         Some(ErrorCode::AssertBeforeSecondsAbsoluteFailed)
     )]
     fn test_absolute_constraints(
@@ -154,6 +196,141 @@ mod tests {
         #[case] expected: Option<ErrorCode>,
     ) {
         let result = check_time_locks(&HashMap::new(), &bundle, prev_height, timestamp);
+        assert_eq!(result, expected);
+    }
+
+    #[rstest]
+    #[case::height_relative_under(
+        OwnedSpendConditions {
+            height_relative: Some(100),
+            ..Default::default()
+        },
+        149, // 50 + 99
+        2000,
+        Some(ErrorCode::AssertHeightRelativeFailed)
+    )]
+    #[case::height_relative_exact(
+        OwnedSpendConditions {
+            height_relative: Some(100),
+            ..Default::default()
+        },
+        150,
+        2000,
+        None
+    )]
+    #[case::height_relative_over(
+        OwnedSpendConditions {
+            height_relative: Some(100),
+            ..Default::default()
+        },
+        151,
+        2000,
+        None
+    )]
+    #[case::seconds_relative_under(
+        OwnedSpendConditions {
+            seconds_relative: Some(1000),
+            ..Default::default()
+        },
+        200,
+        1999, // 1000 + 999
+        Some(ErrorCode::AssertSecondsRelativeFailed)
+    )]
+    #[case::seconds_relative_exact(
+        OwnedSpendConditions {
+            seconds_relative: Some(1000),
+            ..Default::default()
+        },
+        200,
+        2000,
+        None
+    )]
+    #[case::seconds_relative_over(
+        OwnedSpendConditions {
+            seconds_relative: Some(1000),
+            ..Default::default()
+        },
+        200,
+        2001,
+        None
+    )]
+    #[case::before_height_relative_under(
+        OwnedSpendConditions {
+            before_height_relative: Some(10),
+            ..Default::default()
+        },
+        59,
+        1000,
+        None
+    )]
+    #[case::before_height_relative_exact(
+        OwnedSpendConditions {
+            before_height_relative: Some(10),
+            ..Default::default()
+        },
+        60,
+        1000,
+        Some(ErrorCode::AssertBeforeHeightRelativeFailed)
+    )]
+    #[case::before_height_relative_over(
+        OwnedSpendConditions {
+            before_height_relative: Some(10),
+            ..Default::default()
+        },
+        61,
+        1000,
+        Some(ErrorCode::AssertBeforeHeightRelativeFailed)
+    )]
+    #[case::before_seconds_relative_under(
+        OwnedSpendConditions {
+            before_seconds_relative: Some(1000),
+            ..Default::default()
+        },
+        100,
+        1999,
+        None
+    )]
+    #[case::before_seconds_relative_exact(
+        OwnedSpendConditions {
+            before_seconds_relative: Some(1000),
+            ..Default::default()
+        },
+        100,
+        2000,
+        Some(ErrorCode::AssertBeforeSecondsRelativeFailed)
+    )]
+    #[case::before_seconds_relative_over(
+        OwnedSpendConditions {
+            before_seconds_relative: Some(1000),
+            ..Default::default()
+        },
+        100,
+        2001,
+        Some(ErrorCode::AssertBeforeSecondsRelativeFailed)
+    )]
+    fn test_relative_constraints_failures(
+        #[case] spend: OwnedSpendConditions,
+        #[case] height: u32,
+        #[case] timestamp: u64,
+        #[case] expected: Option<ErrorCode>,
+    ) {
+        let coin_id = Bytes32::from([3u8; 32]);
+        let coin_record = dummy_coin_record(50, 1000);
+
+        let mut spend = spend;
+        spend.coin_id = coin_id;
+        spend.birth_height = Some(50);
+        spend.birth_seconds = Some(1000);
+
+        let mut map = HashMap::new();
+        map.insert(coin_id, coin_record);
+
+        let bundle = OwnedSpendBundleConditions {
+            spends: vec![spend],
+            ..Default::default()
+        };
+
+        let result = check_time_locks(&map, &bundle, height, timestamp);
         assert_eq!(result, expected);
     }
 
@@ -200,34 +377,6 @@ mod tests {
 
         let result = check_time_locks(&map, &bundle, 20, 700);
         assert_eq!(result, None);
-    }
-
-    #[rstest]
-    fn test_relative_constraints_failures() {
-        let coin_id = Bytes32::from([3u8; 32]);
-        let coin_record = dummy_coin_record(50, 1000);
-
-        let spend = OwnedSpendConditions {
-            coin_id,
-            height_relative: Some(100),
-            seconds_relative: Some(1000),
-            before_height_relative: Some(10),
-            before_seconds_relative: Some(1000),
-            birth_height: Some(50),
-            birth_seconds: Some(1000),
-            ..Default::default()
-        };
-
-        let mut map = HashMap::new();
-        map.insert(coin_id, coin_record);
-
-        let bundle = OwnedSpendBundleConditions {
-            spends: vec![spend],
-            ..Default::default()
-        };
-
-        let result = check_time_locks(&map, &bundle, 160, 1600);
-        assert_eq!(result, Some(ErrorCode::AssertSecondsRelativeFailed));
     }
 
     #[rstest]
