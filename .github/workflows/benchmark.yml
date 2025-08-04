@@ -44,9 +44,7 @@ jobs:
       - name: Set up rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: setup venv
-        run: |
-          python -m venv venv
+      - uses: chia-network/actions/create-venv@main
 
       - uses: chia-network/actions/activate-venv@main
 
@@ -125,9 +123,7 @@ jobs:
       - name: Set up rust
         uses: dtolnay/rust-toolchain@1.85.0
 
-      - name: setup venv
-        run: |
-          python -m venv venv
+      - uses: chia-network/actions/create-venv@main
 
       - uses: chia-network/actions/activate-venv@main
 
