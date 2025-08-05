@@ -138,6 +138,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - uses: chia-network/actions/create-venv@main
+        # these conditionals excluding ubuntu are related to the use of `docker run` to handle ubuntu at this point
         if: matrix.os.matrix != 'ubuntu'
         id: create-venv
 
