@@ -2,7 +2,7 @@
 use clvm_traits::{FromClvm, ToClvm};
 use libfuzzer_sys::{arbitrary, fuzz_target};
 
-use chia_fuzzing::make_tree;
+use clvm_fuzzing::make_tree;
 use clvm_utils::CurriedProgram;
 use clvmr::allocator::{Allocator, NodePtr};
 

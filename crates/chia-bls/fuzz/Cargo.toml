@@ -1,6 +1,6 @@
 [package]
 name = "chia-bls-fuzz"
-version = "0.28.1"
+version = "0.28.2"
 authors = ["Automatically generated"]
 publish = false
 edition = "2021"

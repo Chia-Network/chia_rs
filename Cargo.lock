@@ -287,9 +287,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chia"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
- "chia-bls 0.28.1",
+ "chia-bls 0.28.2",
  "chia-client",
  "chia-consensus",
  "chia-datalayer",
@@ -297,9 +297,9 @@ dependencies = [
  "chia-puzzle-types",
  "chia-secp",
  "chia-serde",
- "chia-sha2 0.28.1",
+ "chia-sha2 0.28.2",
  "chia-ssl",
- "chia-traits 0.28.1",
+ "chia-traits 0.28.2",
  "clvm-traits",
  "clvm-utils",
  "clvmr",
@@ -307,13 +307,13 @@ dependencies = [
 
 [[package]]
 name = "chia-bls"
-version = "0.22.0"
+version = "0.28.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d86eaaa00a83a7511e8eb74ccb1ebe4358d927f43e06d45da5350e19ef2df1ca"
+checksum = "cabdd13a5884c10ed6c445e8ae858d50e16152c9ab1eeddee5ff659fe70f0915"
 dependencies = [
  "blst",
- "chia-sha2 0.22.0",
- "chia-traits 0.22.0",
+ "chia-sha2 0.28.1",
+ "chia-traits 0.28.1",
  "hex",
  "hkdf",
  "linked-hash-map",
@@ -323,13 +323,13 @@ dependencies = [
 
 [[package]]
 name = "chia-bls"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
  "arbitrary",
  "blst",
  "chia-serde",
- "chia-sha2 0.28.1",
- "chia-traits 0.28.1",
+ "chia-sha2 0.28.2",
+ "chia-traits 0.28.2",
  "chia_py_streamable_macro",
  "criterion",
  "hex",
@@ -345,19 +345,19 @@ dependencies = [
 
 [[package]]
 name = "chia-bls-fuzz"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
- "chia-bls 0.28.1",
+ "chia-bls 0.28.2",
  "libfuzzer-sys",
  "pyo3",
 ]
 
 [[package]]
 name = "chia-client"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
  "chia-protocol",
- "chia-traits 0.28.1",
+ "chia-traits 0.28.2",
  "futures-util",
  "thiserror",
  "tokio",
@@ -367,17 +367,17 @@ dependencies = [
 
 [[package]]
 name = "chia-consensus"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
  "blocking-threadpool",
- "chia-bls 0.28.1",
+ "chia-bls 0.28.2",
  "chia-protocol",
  "chia-puzzle-types",
  "chia-puzzles",
- "chia-sha2 0.28.1",
- "chia-traits 0.28.1",
+ "chia-sha2 0.28.2",
+ "chia-traits 0.28.2",
  "chia_py_streamable_macro",
- "chia_streamable_macro 0.28.1",
+ "chia_streamable_macro 0.28.2",
  "clvm-traits",
  "clvm-utils",
  "clvmr",
@@ -394,14 +394,14 @@ dependencies = [
 
 [[package]]
 name = "chia-consensus-fuzz"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
- "chia-bls 0.28.1",
+ "chia-bls 0.28.2",
  "chia-consensus",
- "chia-fuzzing",
  "chia-protocol",
- "chia-sha2 0.28.1",
- "chia-traits 0.28.1",
+ "chia-sha2 0.28.2",
+ "chia-traits 0.28.2",
+ "clvm-fuzzing",
  "clvm-traits",
  "clvm-utils",
  "clvmr",
@@ -417,10 +417,10 @@ dependencies = [
  "bitvec",
  "chia-datalayer-macro",
  "chia-protocol",
- "chia-sha2 0.28.1",
- "chia-traits 0.28.1",
+ "chia-sha2 0.28.2",
+ "chia-traits 0.28.2",
  "chia_py_streamable_macro",
- "chia_streamable_macro 0.28.1",
+ "chia_streamable_macro 0.28.2",
  "clvm-utils",
  "expect-test",
  "hex",
@@ -456,27 +456,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "chia-fuzzing"
-version = "0.28.1"
-dependencies = [
- "anyhow",
- "arbitrary",
- "chia-sha2 0.28.1",
- "clvmr",
-]
-
-[[package]]
 name = "chia-protocol"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
  "anyhow",
  "arbitrary",
- "chia-bls 0.28.1",
+ "chia-bls 0.28.2",
  "chia-serde",
- "chia-sha2 0.28.1",
- "chia-traits 0.28.1",
+ "chia-sha2 0.28.2",
+ "chia-traits 0.28.2",
  "chia_py_streamable_macro",
- "chia_streamable_macro 0.28.1",
+ "chia_streamable_macro 0.28.2",
  "clvm-traits",
  "clvm-utils",
  "clvmr",
@@ -490,12 +480,12 @@ dependencies = [
 
 [[package]]
 name = "chia-protocol-fuzz"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
  "arbitrary",
  "chia-protocol",
- "chia-sha2 0.28.1",
- "chia-traits 0.28.1",
+ "chia-sha2 0.28.2",
+ "chia-traits 0.28.2",
  "clvm-traits",
  "clvmr",
  "hex",
@@ -504,14 +494,14 @@ dependencies = [
 
 [[package]]
 name = "chia-puzzle-types"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
  "anyhow",
  "arbitrary",
- "chia-bls 0.28.1",
+ "chia-bls 0.28.2",
  "chia-protocol",
  "chia-puzzles",
- "chia-sha2 0.28.1",
+ "chia-sha2 0.28.2",
  "clvm-traits",
  "clvm-utils",
  "clvmr",
@@ -523,7 +513,7 @@ dependencies = [
 
 [[package]]
 name = "chia-puzzle-types-fuzz"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
  "chia-puzzle-types",
  "clvm-traits",
@@ -543,11 +533,11 @@ dependencies = [
 
 [[package]]
 name = "chia-secp"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
  "anyhow",
  "arbitrary",
- "chia-sha2 0.28.1",
+ "chia-sha2 0.28.2",
  "hex",
  "k256",
  "p256",
@@ -557,7 +547,7 @@ dependencies = [
 
 [[package]]
 name = "chia-serde"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
  "anyhow",
  "bincode",
@@ -568,9 +558,9 @@ dependencies = [
 
 [[package]]
 name = "chia-sha2"
-version = "0.22.0"
+version = "0.28.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f7b37c5362dfb1c9449902139e94a91bbd8d3773c13939972fd88e4f14c4f9d"
+checksum = "4794753f68eee46d289e079b2e3fc63aee9a63d15a171b3ce47b0b98dee529a5"
 dependencies = [
  "openssl",
  "sha2",
@@ -578,7 +568,7 @@ dependencies = [
 
 [[package]]
 name = "chia-sha2"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
  "openssl",
  "sha2",
@@ -586,7 +576,7 @@ dependencies = [
 
 [[package]]
 name = "chia-ssl"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
  "rand",
  "rcgen",
@@ -597,16 +587,16 @@ dependencies = [
 
 [[package]]
 name = "chia-tools"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
  "blocking-threadpool",
- "chia-bls 0.28.1",
+ "chia-bls 0.28.2",
  "chia-consensus",
  "chia-protocol",
  "chia-puzzle-types",
  "chia-puzzles",
- "chia-sha2 0.28.1",
- "chia-traits 0.28.1",
+ "chia-sha2 0.28.2",
+ "chia-traits 0.28.2",
  "clap",
  "clvm-traits",
  "clvm-utils",
@@ -621,28 +611,28 @@ dependencies = [
 
 [[package]]
 name = "chia-traits"
-version = "0.22.0"
+version = "0.28.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "340ad823ef953d2ab9f937deae99b04bab73c0bf1a6aea1353331a5f875192e0"
+checksum = "af1849a64aecd0bfd22e6e735b08ac39dd07834ab7f05b621137498e75b6154c"
 dependencies = [
- "chia-sha2 0.22.0",
- "chia_streamable_macro 0.22.0",
+ "chia-sha2 0.28.1",
+ "chia_streamable_macro 0.28.1",
  "thiserror",
 ]
 
 [[package]]
 name = "chia-traits"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
- "chia-sha2 0.28.1",
- "chia_streamable_macro 0.28.1",
+ "chia-sha2 0.28.2",
+ "chia_streamable_macro 0.28.2",
  "pyo3",
  "thiserror",
 ]
 
 [[package]]
 name = "chia_py_streamable_macro"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
  "proc-macro-crate 1.3.1",
  "proc-macro2",
@@ -652,15 +642,15 @@ dependencies = [
 
 [[package]]
 name = "chia_rs"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
- "chia-bls 0.28.1",
+ "chia-bls 0.28.2",
  "chia-client",
  "chia-consensus",
  "chia-datalayer",
  "chia-protocol",
  "chia-ssl",
- "chia-traits 0.28.1",
+ "chia-traits 0.28.2",
  "clvm-utils",
  "clvmr",
  "hex",
@@ -669,9 +659,9 @@ dependencies = [
 
 [[package]]
 name = "chia_streamable_macro"
-version = "0.22.0"
+version = "0.28.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed16ee21f14ed878cfc23b0354c8c6703190a5565d03625ea44324a3f21717f1"
+checksum = "2857568ff869cdddbc5c069f290f44b115002cba7c63858f313273d9cab279fb"
 dependencies = [
  "proc-macro-crate 1.3.1",
  "proc-macro2",
@@ -681,7 +671,7 @@ dependencies = [
 
 [[package]]
 name = "chia_streamable_macro"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
  "proc-macro-crate 1.3.1",
  "proc-macro2",
@@ -691,7 +681,7 @@ dependencies = [
 
 [[package]]
 name = "chia_wasm"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
  "wasm-bindgen",
 ]
@@ -765,7 +755,7 @@ checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
 
 [[package]]
 name = "clvm-derive"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -773,10 +763,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "clvm-traits"
-version = "0.28.1"
+name = "clvm-fuzzing"
+version = "0.16.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa5a3c108dd1ef2ecc5a747cd62e533d27ebeb6bbd766cd5557951e504fbf372"
 dependencies = [
- "chia-bls 0.28.1",
+ "anyhow",
+ "arbitrary",
+ "chia-sha2 0.28.1",
+ "clvmr",
+]
+
+[[package]]
+name = "clvm-traits"
+version = "0.28.2"
+dependencies = [
+ "chia-bls 0.28.2",
  "chia-secp",
  "clvm-derive",
  "clvmr",
@@ -789,7 +791,7 @@ dependencies = [
 
 [[package]]
 name = "clvm-traits-fuzz"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
  "clvm-traits",
  "clvmr",
@@ -798,9 +800,9 @@ dependencies = [
 
 [[package]]
 name = "clvm-utils"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
- "chia-sha2 0.28.1",
+ "chia-sha2 0.28.2",
  "clvm-traits",
  "clvmr",
  "hex",
@@ -810,9 +812,9 @@ dependencies = [
 
 [[package]]
 name = "clvm-utils-fuzz"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
- "chia-fuzzing",
+ "clvm-fuzzing",
  "clvm-traits",
  "clvm-utils",
  "clvmr",
@@ -821,14 +823,14 @@ dependencies = [
 
 [[package]]
 name = "clvmr"
-version = "0.16.0"
+version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5267d46b9946d172db86048e88aab94be58de181c3e81bdc6e97d622b03a67ba"
+checksum = "880b88f21f052e70cd348f4d23fc2f0ea11669e29da2cf7234e02eb425f2c6c6"
 dependencies = [
  "bitvec",
  "bumpalo",
- "chia-bls 0.22.0",
- "chia-sha2 0.22.0",
+ "chia-bls 0.28.1",
+ "chia-sha2 0.28.1",
  "hex",
  "hex-literal",
  "k256",

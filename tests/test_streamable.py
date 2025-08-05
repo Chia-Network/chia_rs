@@ -17,10 +17,10 @@ rng = random.Random(1337)
 sk = AugSchemeMPL.key_gen(bytes32.random(rng))
 pk = sk.get_g1()
 
-coin = b"bcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc"
-parent = b"edededededededededededededededed"
-ph = b"abababababababababababababababab"
-ph2 = b"cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+coin = bytes32(b"bcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc")
+parent = bytes32(b"edededededededededededededededed")
+ph = bytes32(b"abababababababababababababababab")
+ph2 = bytes32(b"cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd")
 
 
 def test_hash_spend() -> None:

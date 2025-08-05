@@ -102,7 +102,7 @@ def test_get_puzzle_and_solution_for_coin(input_file: str) -> None:
                 assert arg.pair is not None
                 amount = arg.pair[0].atom
                 assert amount is not None
-                addition = (ph, int.from_bytes(amount, byteorder="big"))
+                addition = (bytes32(ph), int.from_bytes(amount, byteorder="big"))
                 assert addition in expected_additions
                 expected_additions.remove(addition)
 

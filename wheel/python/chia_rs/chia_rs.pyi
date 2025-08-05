@@ -318,9 +318,9 @@ class PrivateKey:
 
 @final
 class SpendConditions:
-    coin_id: bytes
-    parent_id: bytes
-    puzzle_hash: bytes
+    coin_id: bytes32
+    parent_id: bytes32
+    puzzle_hash: bytes32
     coin_amount: int
     height_relative: Optional[int]
     seconds_relative: Optional[int]
@@ -328,7 +328,7 @@ class SpendConditions:
     before_seconds_relative: Optional[int]
     birth_height: Optional[int]
     birth_seconds: Optional[int]
-    create_coin: list[tuple[bytes, int, Optional[bytes]]]
+    create_coin: list[tuple[bytes32, int, Optional[bytes]]]
     agg_sig_me: list[tuple[G1Element, bytes]]
     agg_sig_parent: list[tuple[G1Element, bytes]]
     agg_sig_puzzle: list[tuple[G1Element, bytes]]
@@ -351,7 +351,7 @@ class SpendConditions:
         before_seconds_relative: Optional[int],
         birth_height: Optional[int],
         birth_seconds: Optional[int],
-        create_coin: Sequence[tuple[bytes, int, Optional[bytes]]],
+        create_coin: Sequence[tuple[bytes32, int, Optional[bytes]]],
         agg_sig_me: Sequence[tuple[G1Element, bytes]],
         agg_sig_parent: Sequence[tuple[G1Element, bytes]],
         agg_sig_puzzle: Sequence[tuple[G1Element, bytes]],
@@ -380,9 +380,9 @@ class SpendConditions:
     def to_json_dict(self) -> dict[str, Any]: ...
     @classmethod
     def from_json_dict(cls, json_dict: dict[str, Any]) -> Self: ...
-    def replace(self, *, coin_id: Union[ bytes, _Unspec] = _Unspec(),
-        parent_id: Union[ bytes, _Unspec] = _Unspec(),
-        puzzle_hash: Union[ bytes, _Unspec] = _Unspec(),
+    def replace(self, *, coin_id: Union[ bytes32, _Unspec] = _Unspec(),
+        parent_id: Union[ bytes32, _Unspec] = _Unspec(),
+        puzzle_hash: Union[ bytes32, _Unspec] = _Unspec(),
         coin_amount: Union[ int, _Unspec] = _Unspec(),
         height_relative: Union[ Optional[int], _Unspec] = _Unspec(),
         seconds_relative: Union[ Optional[int], _Unspec] = _Unspec(),
@@ -390,7 +390,7 @@ class SpendConditions:
         before_seconds_relative: Union[ Optional[int], _Unspec] = _Unspec(),
         birth_height: Union[ Optional[int], _Unspec] = _Unspec(),
         birth_seconds: Union[ Optional[int], _Unspec] = _Unspec(),
-        create_coin: Union[ list[tuple[bytes, int, Optional[bytes]]], _Unspec] = _Unspec(),
+        create_coin: Union[ list[tuple[bytes32, int, Optional[bytes]]], _Unspec] = _Unspec(),
         agg_sig_me: Union[ list[tuple[G1Element, bytes]], _Unspec] = _Unspec(),
         agg_sig_parent: Union[ list[tuple[G1Element, bytes]], _Unspec] = _Unspec(),
         agg_sig_puzzle: Union[ list[tuple[G1Element, bytes]], _Unspec] = _Unspec(),
