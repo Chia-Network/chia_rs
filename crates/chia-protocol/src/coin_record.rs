@@ -41,6 +41,8 @@ impl CoinRecord {
             None
         };
 
+        // CoinRecord is sometimes used to represent coins that are *removed* as part of reorgs.
+        // Removed coins don't have a timestamp or confirmed_block_index.
         let confirmed_height = if self.confirmed_block_index == 0_u32 && self.timestamp == 0_u64 {
             None
         } else {
