@@ -200,12 +200,13 @@ mod tests {
     }
 
     #[rstest]
+    // the following cases are created with height 50, and time 1000
     #[case::height_relative_under(
         OwnedSpendConditions {
             height_relative: Some(100),
             ..Default::default()
         },
-        149, // 50 + 99
+        149, // initial height 50 + 99
         2000,
         Some(ErrorCode::AssertHeightRelativeFailed)
     )]
@@ -214,7 +215,7 @@ mod tests {
             height_relative: Some(100),
             ..Default::default()
         },
-        150,
+        150,  // initial height 50 + 100
         2000,
         None
     )]
@@ -223,7 +224,7 @@ mod tests {
             height_relative: Some(100),
             ..Default::default()
         },
-        151,
+        151,  // initial height 50 + 101
         2000,
         None
     )]
@@ -242,7 +243,7 @@ mod tests {
             ..Default::default()
         },
         200,
-        2000,
+        2000,  // initial 1000 + 1000
         None
     )]
     #[case::seconds_relative_over(
@@ -251,7 +252,7 @@ mod tests {
             ..Default::default()
         },
         200,
-        2001,
+        2001, // initial 1000 + 1001
         None
     )]
     #[case::before_height_relative_under(
@@ -259,7 +260,7 @@ mod tests {
             before_height_relative: Some(10),
             ..Default::default()
         },
-        59,
+        59,  // initial height 50 + 9
         1000,
         None
     )]
@@ -268,7 +269,7 @@ mod tests {
             before_height_relative: Some(10),
             ..Default::default()
         },
-        60,
+        60,  // initial height 50 + 10
         1000,
         Some(ErrorCode::AssertBeforeHeightRelativeFailed)
     )]
@@ -277,7 +278,7 @@ mod tests {
             before_height_relative: Some(10),
             ..Default::default()
         },
-        61,
+        61,  // initial height 50 + 11
         1000,
         Some(ErrorCode::AssertBeforeHeightRelativeFailed)
     )]
@@ -287,7 +288,7 @@ mod tests {
             ..Default::default()
         },
         100,
-        1999,
+        1999,  // initial time 1000 + 999
         None
     )]
     #[case::before_seconds_relative_exact(
@@ -296,7 +297,7 @@ mod tests {
             ..Default::default()
         },
         100,
-        2000,
+        2000,  // initial time 1000 + 1000
         Some(ErrorCode::AssertBeforeSecondsRelativeFailed)
     )]
     #[case::before_seconds_relative_over(
@@ -305,7 +306,7 @@ mod tests {
             ..Default::default()
         },
         100,
-        2001,
+        2001,  // initial time 1000 + 2001
         Some(ErrorCode::AssertBeforeSecondsRelativeFailed)
     )]
     fn test_relative_constraints_failures(
@@ -439,23 +440,23 @@ mod tests {
 
         let spend_valid = OwnedSpendConditions {
             coin_id: coin_id_1,
-            birth_height: Some(10),  // this assertion is correct
-            birth_seconds: Some(500),  // this assertion is correct
+            birth_height: Some(10),   // this assertion is correct
+            birth_seconds: Some(500), // this assertion is correct
             ..Default::default()
         };
 
         let spend_relative_fail = OwnedSpendConditions {
             coin_id: coin_id_2,
             height_relative: Some(50), // requires height >= 61
-            birth_height: Some(11),  // this assertion is correct
+            birth_height: Some(11),    // this assertion is correct
             birth_seconds: Some(560),  // this assertion is correct
             ..Default::default()
         };
 
         let spend_birth_fail = OwnedSpendConditions {
             coin_id: coin_id_3,
-            birth_height: Some(201), // this will fail
-            birth_seconds: Some(560),  // this assertion is correct
+            birth_height: Some(201),  // this will fail
+            birth_seconds: Some(560), // this assertion is correct
             ..Default::default()
         };
 
@@ -465,7 +466,11 @@ mod tests {
         map.insert(coin_id_3, coin_record_3);
 
         let bundle = OwnedSpendBundleConditions {
-            spends: vec![spend_valid.clone(), spend_relative_fail.clone(), spend_birth_fail.clone()],
+            spends: vec![
+                spend_valid.clone(),
+                spend_relative_fail.clone(),
+                spend_birth_fail.clone(),
+            ],
             ..Default::default()
         };
 
