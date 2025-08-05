@@ -310,8 +310,8 @@ mod tests {
     )]
     fn test_relative_constraints_failures(
         #[case] spend: OwnedSpendConditions,
-        #[case] height: u32,
-        #[case] timestamp: u64,
+        #[case] now_height: u32,
+        #[case] now_timestamp: u64,
         #[case] expected: Option<ErrorCode>,
     ) {
         let coin_id = Bytes32::from([3u8; 32]);
@@ -330,7 +330,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = check_time_locks(&map, &bundle, height, timestamp);
+        let result = check_time_locks(&map, &bundle, now_height, now_timestamp);
         assert_eq!(result, expected);
     }
 
@@ -425,5 +425,65 @@ mod tests {
 
         let result = check_time_locks(&map, &bundle, 100, 1000);
         assert_eq!(result, Some(ErrorCode::AssertMyBirthSecondsFailed));
+    }
+
+    #[test]
+    fn test_multiple_spends_in_bundle() {
+        let coin_id_1 = Bytes32::from([1u8; 32]);
+        let coin_id_2 = Bytes32::from([2u8; 32]);
+        let coin_id_3 = Bytes32::from([3u8; 32]);
+
+        let coin_record_1 = dummy_coin_record(10, 500);
+        let coin_record_2 = dummy_coin_record(11, 560);
+        let coin_record_3 = dummy_coin_record(200, 560);
+
+        let spend_valid = OwnedSpendConditions {
+            coin_id: coin_id_1,
+            birth_height: Some(10),  // this assertion is correct
+            birth_seconds: Some(500),  // this assertion is correct
+            ..Default::default()
+        };
+
+        let spend_relative_fail = OwnedSpendConditions {
+            coin_id: coin_id_2,
+            height_relative: Some(50), // requires height >= 61
+            birth_height: Some(11),  // this assertion is correct
+            birth_seconds: Some(560),  // this assertion is correct
+            ..Default::default()
+        };
+
+        let spend_birth_fail = OwnedSpendConditions {
+            coin_id: coin_id_3,
+            birth_height: Some(201), // this will fail
+            birth_seconds: Some(560),  // this assertion is correct
+            ..Default::default()
+        };
+
+        let mut map = HashMap::new();
+        map.insert(coin_id_1, coin_record_1);
+        map.insert(coin_id_2, coin_record_2);
+        map.insert(coin_id_3, coin_record_3);
+
+        let bundle = OwnedSpendBundleConditions {
+            spends: vec![spend_valid.clone(), spend_relative_fail.clone(), spend_birth_fail.clone()],
+            ..Default::default()
+        };
+
+        // spend_relative_fail should fail first as 59 is below required 61 height
+        let result = check_time_locks(&map, &bundle, 59, 600);
+        assert_eq!(result, Some(ErrorCode::AssertHeightRelativeFailed));
+
+        let mut map = HashMap::new();
+        map.insert(coin_id_1, coin_record_1);
+        map.insert(coin_id_3, coin_record_3);
+
+        let bundle = OwnedSpendBundleConditions {
+            spends: vec![spend_valid, spend_birth_fail],
+            ..Default::default()
+        };
+
+        // spend_birth_dail should now fail
+        let result = check_time_locks(&map, &bundle, 59, 600);
+        assert_eq!(result, Some(ErrorCode::AssertMyBirthHeightFailed));
     }
 }
