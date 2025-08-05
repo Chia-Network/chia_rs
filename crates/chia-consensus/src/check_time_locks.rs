@@ -323,8 +323,6 @@ mod tests {
 
         let mut spend = spend;
         spend.coin_id = coin_id;
-        spend.birth_height = Some(50);
-        spend.birth_seconds = Some(1000);
 
         let mut map = HashMap::new();
         map.insert(coin_id, coin_record);
