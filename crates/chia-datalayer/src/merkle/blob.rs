@@ -28,6 +28,7 @@ use indexmap::IndexSet;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::io::{Read, Write};
+#[cfg(feature = "py-bindings")]
 use std::iter::zip;
 use std::ops::Range;
 use std::path::PathBuf;
@@ -1610,6 +1611,7 @@ mod tests {
     use expect_test::expect;
     use rstest::rstest;
     use std::time::{Duration, Instant};
+    use std::iter::zip;
 
     fn blob_tree_equality(this: &MerkleBlob, that: &MerkleBlob) -> bool {
         // NOTE: this is checking tree structure equality, not serialized bytes equality
