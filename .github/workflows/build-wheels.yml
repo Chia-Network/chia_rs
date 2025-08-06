@@ -187,11 +187,11 @@ jobs:
           maturin build -i python --release -m wheel/Cargo.toml
 
       - uses: Chia-Network/actions/create-venv@main
-        id: create-venv
+        id: create-test-venv
 
       - uses: Chia-Network/actions/activate-venv@main
         with:
-          directories: ${{ steps.create-venv.outputs.activate-venv-directories }}
+          directories: ${{ steps.create-test-venv.outputs.activate-venv-directories }}
 
       - name: Install chia_rs wheel
         shell: bash
