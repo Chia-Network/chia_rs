@@ -134,14 +134,14 @@ jobs:
         run: |
           aws s3 ls s3://download.chia.net/simple/chia-rs/ > existing_wheel_list_raw
           cat existing_wheel_list_raw
-          tr -s ' ' < existing_wheel_list_raw | cut -d ' ' -f 4 > existing_wheel_list
+          cat existing_wheel_list_raw | tr -s ' ' | cut -d ' ' -f 4 > existing_wheel_list
 
       - name: List new wheels
         if: env.RELEASE == 'true'
         shell: sh
         run: |
           (cd target/wheels/; ls chia_rs-*.whl) > new_wheel_list
-          xargs -I % sh -c 'ls -l target/wheels/%' < new_wheel_list
+          cat new_wheel_list | xargs -I % sh -c 'ls -l target/wheels/%'
 
       - name: Choose wheels to upload
         if: env.RELEASE == 'true'
@@ -154,4 +154,4 @@ jobs:
         if: env.RELEASE == 'true'
         shell: sh
         run: |
-          xargs -I % sh -c 'aws s3 cp target/wheels/% s3://download.chia.net/simple/chia-rs/' < upload_wheel_list
+          cat upload_wheel_list | xargs -I % sh -c 'aws s3 cp target/wheels/% s3://download.chia.net/simple/chia-rs/'
