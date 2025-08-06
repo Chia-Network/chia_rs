@@ -264,13 +264,13 @@ jobs:
           pip install maturin
           maturin sdist -m wheel/Cargo.toml
           cd target/wheels
-          dirname=$(basename "chia_rs*.tar.gz" .tar.gz)
+          dirname=$(basename chia_rs*.tar.gz .tar.gz)
           echo "$dirname"
           mkdir "$dirname"
           cp -r ../../src/ "$dirname/src/"
-          gunzip "chia_rs*.tar.gz"
-          tar rvf "chia_rs*.tar" "$dirname/src"
-          gzip "chia_rs*.tar"
+          gunzip chia_rs*.tar.gz
+          tar rvf chia_rs*.tar "$dirname/src"
+          gzip chia_rs*.tar
           rm -rf "$dirname"
 
       - name: Upload artifacts
