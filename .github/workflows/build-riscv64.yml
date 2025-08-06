@@ -134,6 +134,7 @@ jobs:
         run: |
           aws s3 ls s3://download.chia.net/simple/chia-rs/ > existing_wheel_list_raw
           cat existing_wheel_list_raw
+          # shellcheck disable=SC2002
           cat existing_wheel_list_raw | tr -s ' ' | cut -d ' ' -f 4 > existing_wheel_list
 
       - name: List new wheels
@@ -141,6 +142,7 @@ jobs:
         shell: sh
         run: |
           (cd target/wheels/; ls chia_rs-*.whl) > new_wheel_list
+          # shellcheck disable=SC2002
           cat new_wheel_list | xargs -I % sh -c 'ls -l target/wheels/%'
 
       - name: Choose wheels to upload
@@ -154,4 +156,5 @@ jobs:
         if: env.RELEASE == 'true'
         shell: sh
         run: |
+          # shellcheck disable=SC2002
           cat upload_wheel_list | xargs -I % sh -c 'aws s3 cp target/wheels/% s3://download.chia.net/simple/chia-rs/'
