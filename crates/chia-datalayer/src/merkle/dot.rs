@@ -99,7 +99,7 @@ impl Node {
             },
             Node::Leaf (LeafNode{key, value, ..}) => DotLines{
                 nodes: vec![
-                    format!("node_{index} [shape=box, label=\"{index}\\nvalue: {key}\\nvalue: {value}\"];"),
+                    format!("node_{index} [shape=box, label=\"{index}\\nkey: {key}\\nvalue: {value}\"];"),
                 ],
                 connections: vec![node_to_parent],
                 note: String::new(),
