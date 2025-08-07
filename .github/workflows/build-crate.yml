@@ -66,7 +66,27 @@ jobs:
         run: cargo ws publish --publish-as-is
 
   fuzz_tests:
+    name: Fuzz (${{ matrix.package.name }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - name: chia-consensus
+          - name: chia-bls
+            env:
+              # We disable leak reports here because blspy appears to be allocating
+              # memory that's not freed. It might be a false positive since python is
+              # not unloaded before exiting.
+              LSAN_OPTIONS: detect_leaks=0
+          - name: clvm-utils
+          - name: chia-protocol
+          - name: chia-puzzle-types
+          - name: clvm-traits
+        toolchain:
+          - nightly-2025-01-12
+        max_total_time:
+          - 20
     env:
       CARGO_PROFILE_RELEASE_LTO: false
     steps:
@@ -74,43 +94,14 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@nightly
         with:
-          toolchain: nightly-2025-01-12
+          toolchain: ${{ matrix.toolchain }}
 
       - name: Install cargo-fuzz
-        run: cargo +nightly-2025-01-12 install cargo-fuzz
+        run: cargo +"${{ matrix.toolchain }}" install cargo-fuzz
 
-      - name: Fuzz (chia-consensus)
+      - name: Fuzz
+        env: ${{ matrix.package.env || fromJSON('{}') }}
         run: |
-          cd crates/chia-consensus
-          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly-2025-01-12 fuzz run % -- -max_total_time=20 || exit 255"
-
-      - name: Fuzz (chia-bls)
-        env:
-          # We disable leak reports here because blspy appears to be allocating
-          # memory that's not freed. It might be a false positive since python is
-          # not unloaded before exiting.
-          LSAN_OPTIONS: detect_leaks=0
-        run: |
-          cd crates/chia-bls
+          cd crates/"${{ matrix.package.name }}"
           python -m pip install blspy
-          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly-2025-01-12 fuzz run % -- -max_total_time=10 || exit 255"
-
-      - name: Fuzz (clvm-utils)
-        run: |
-          cd crates/clvm-utils
-          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly-2025-01-12 fuzz run % -- -max_total_time=20 || exit 255"
-
-      - name: Fuzz (chia-protocol)
-        run: |
-          cd crates/chia-protocol
-          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly-2025-01-12 fuzz run % -- -max_total_time=20 || exit 255"
-
-      - name: Fuzz (chia-puzzle-types)
-        run: |
-          cd crates/chia-puzzle-types
-          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly-2025-01-12 fuzz run % -- -max_total_time=20 || exit 255"
-
-      - name: Fuzz (clvm-traits)
-        run: |
-          cd crates/clvm-traits
-          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly-2025-01-12 fuzz run % -- -max_total_time=20 || exit 255"
+          cargo fuzz list | xargs -I "%" sh -c "cargo +"${{ matrix.toolchain }}" fuzz run % -- -max_total_time=${{ matrix.max_total_time}} || exit 255"
