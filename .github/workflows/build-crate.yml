@@ -73,12 +73,12 @@ jobs:
       matrix:
         package:
           - name: chia-consensus
+          - name: chia-bls
             env:
               # We disable leak reports here because blspy appears to be allocating
               # memory that's not freed. It might be a false positive since python is
               # not unloaded before exiting.
               LSAN_OPTIONS: detect_leaks=0
-          - name: chia-bls
           - name: clvm-utils
           - name: chia-protocol
           - name: chia-puzzle-types
