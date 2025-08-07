@@ -387,6 +387,7 @@ dependencies = [
  "pyo3",
  "rand",
  "rstest",
+ "sha1",
  "text-diff",
  "thiserror",
 ]
