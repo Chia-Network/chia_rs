@@ -63,7 +63,7 @@ Here's another programmatic generator which generates multiple spends:
 (mod (amount)
 
     (defun generate_conds (id)
-        (list (list 66 0x3F "hello" id) (list 67 0x3F "hello" id))
+        (list (list 66 36 "hello" id) (list 67 36 "hello" id))
     )
 
     (defun loop (id amount)
