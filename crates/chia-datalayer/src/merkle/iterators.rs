@@ -88,7 +88,7 @@ impl Iterator for LeftChildFirstIterator<'_> {
                             }
                             Err(e) => return Some(Err(e)),
                         };
-                    } else if item.index != self.from_index && !self.already_queued.contains(&index)
+                    } else if !self.already_queued.contains(&index)
                     {
                         return Some(Err(Error::ReferenceToUnknownParent()));
                     }
