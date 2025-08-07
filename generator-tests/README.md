@@ -75,7 +75,7 @@ Here's another programmatic generator which generates multiple spends:
         (if amount
             (c (list id (c 1 (generate_conds id 50)) 123 (list 0 (list 1))) (loop_coins (+ id 1) (- amount 1)))
             ()
-        )   
+        )
     )
     ; main
     (list (loop_coins 0x0101010101010101010101010101010101010101010101010101010101010101 amount))
