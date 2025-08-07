@@ -28,6 +28,7 @@ use indexmap::IndexSet;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::io::{Read, Write};
+#[cfg(feature = "py-bindings")]
 use std::iter::zip;
 use std::ops::Range;
 use std::path::PathBuf;
@@ -1609,6 +1610,7 @@ mod tests {
     use chia_traits::Streamable;
     use expect_test::expect;
     use rstest::rstest;
+    use std::iter::zip;
     use std::time::{Duration, Instant};
 
     fn blob_tree_equality(this: &MerkleBlob, that: &MerkleBlob) -> bool {
