@@ -114,3 +114,8 @@ jobs:
         run: |
           cd crates/clvm-traits
           cargo fuzz list | xargs -I "%" sh -c "cargo +nightly-2025-01-12 fuzz run % -- -max_total_time=20 || exit 255"
+
+      - name: Fuzz (chia-datalayer)
+        run: |
+          cd crates/chia-datalayer
+          cargo fuzz list | xargs -I "%" sh -c "cargo +nightly-2025-01-12 fuzz run % -- -max_total_time=20 || exit 255"
