@@ -64,17 +64,20 @@ Here's another programmatic generator which generates multiple spends:
 ```
 (mod (amount)
 
-    (defun generate_conds (id)
-        (list (list 66 36 "hello" id) (list 67 36 "hello" id))
-    )
-
-    (defun loop (id amount)
-        (if amount
-            (c (list id (c 1 (generate_conds id)) 123 (list 0 (list 1))) (loop (+ id 1) (- amount 1)))
-            ()
+    (defun generate_conds (id pair_count)
+        (if pair_count
+            (c (list 66 36 "hello" id) (c (list 67 36 "hello" id) (generate_conds id (- pair_count 1))))
+            0
         )
     )
+
+    (defun loop_coins (id amount)
+        (if amount
+            (c (list id (c 1 (generate_conds id 50)) 123 (list 0 (list 1))) (loop_coins (+ id 1) (- amount 1)))
+            ()
+        )   
+    )
     ; main
-    (list (loop 0x0101010101010101010101010101010101010101010101010101010101010101 amount))
+    (list (loop_coins 0x0101010101010101010101010101010101010101010101010101010101010101 amount))
 )
 ```
