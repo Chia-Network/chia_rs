@@ -84,8 +84,9 @@ jobs:
           - name: chia-puzzle-types
           - name: clvm-traits
         toolchain:
-          # single element, easy place to put a variable
           - nightly-2025-01-12
+        max_total_time:
+          - 20
     env:
       CARGO_PROFILE_RELEASE_LTO: false
     steps:
@@ -103,4 +104,4 @@ jobs:
         run: |
           cd crates/"${{ matrix.package.name }}"
           python -m pip install blspy
-          cargo fuzz list | xargs -I "%" sh -c "cargo +"${{ matrix.toolchain }}" fuzz run % -- -max_total_time=10 || exit 255"
+          cargo fuzz list | xargs -I "%" sh -c "cargo +"${{ matrix.toolchain }}" fuzz run % -- -max_total_time=${{ matrix.max_total_time}} || exit 255"
