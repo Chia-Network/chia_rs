@@ -64,9 +64,31 @@ impl Iterator for LeftChildFirstIterator<'_> {
             }
 
             match block.node.parent().0 {
-                // TODO: maybe also check the parent considers this the child?
                 Some(index) => {
-                    if item.index != self.from_index && !self.already_queued.contains(&index) {
+                    if item.index == TreeIndex(0) {
+                        return Some(Err(Error::RootHasParent()));
+                    } else if item.index == self.from_index {
+                        match try_get_block(self.blob, index) {
+                            Ok(Block {
+                                node: Node::Internal(node),
+                                ..
+                            }) => {
+                                if item.index != node.left && item.index != node.right {
+                                    return Some(Err(Error::ParentDisagreesWithChild()));
+                                }
+                            }
+                            Ok(Block {
+                                node: Node::Leaf(_),
+                                ..
+                            }) => {
+                                return Some(Err(Error::LeafCannotBeParent()));
+                            }
+                            Err(Error::BlockIndexOutOfBounds(_)) => {
+                                return Some(Err(Error::ReferenceToUnknownParent()))
+                            }
+                            Err(e) => return Some(Err(e)),
+                        };
+                    } else if !self.already_queued.contains(&index) {
                         return Some(Err(Error::ReferenceToUnknownParent()));
                     }
                 }

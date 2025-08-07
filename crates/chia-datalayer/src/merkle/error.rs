@@ -70,8 +70,14 @@ pub enum Error {
     HashNotFound(Hash),
     #[error("reference to unknown parent")]
     ReferenceToUnknownParent(),
+    #[error("root has parent")]
+    RootHasParent(),
     #[error("unexpected parentless node")]
     UnexpectedParentlessNode(),
+    #[error("child's parent disclaims the child")]
+    ParentDisagreesWithChild(),
+    #[error("leaf cannot be parent")]
+    LeafCannotBeParent(),
     #[error("invalid children")]
     InvalidChildren(),
 }
