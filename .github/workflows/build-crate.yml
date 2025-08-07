@@ -99,7 +99,7 @@ jobs:
         run: cargo +"${{ matrix.toolchain }}" install cargo-fuzz
 
       - name: Fuzz
-        env: ${{ (matrix.package.env != '') && 13 || 27 }}
+        env: ${{ matrix.package.env || fromJSON('{}') }}
         run: |
           cd crates/"${{ matrix.package.name }}"
           python -m pip install blspy
