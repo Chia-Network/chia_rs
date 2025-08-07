@@ -3,6 +3,8 @@ use clvmr::error::EvalErr;
 use thiserror::Error;
 
 #[cfg(feature = "py-bindings")]
+use pyo3::prelude::*;
+#[cfg(feature = "py-bindings")]
 use pyo3::PyErr;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -163,6 +165,19 @@ pub enum ErrorCode {
     InvalidMessageMode,
     InvalidCoinId,
     MessageNotSentOrReceived,
+}
+
+#[cfg(feature = "py-bindings")]
+#[pyclass(name = "ErrorCode")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PyErrorCode(pub ErrorCode);
+
+#[cfg(feature = "py-bindings")]
+#[pymethods]
+impl PyErrorCode {
+    pub fn __int__(&self) -> u16 {
+        self.0 as u16
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
