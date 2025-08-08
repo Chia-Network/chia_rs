@@ -224,7 +224,7 @@ fn run_generator(#[case] name: &str) {
     // When making changes to print_conditions() enabling this will update the
     // test cases to match. Make sure to carefully review the diff before
     // landing an automatic update of the test case.
-    const UPDATE_TESTS: bool = true;
+    const UPDATE_TESTS: bool = false;
 
     let filename = format!("../../generator-tests/{name}.txt");
     println!("file: {filename}");
