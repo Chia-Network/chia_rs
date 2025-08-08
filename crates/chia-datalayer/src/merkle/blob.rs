@@ -1072,32 +1072,39 @@ impl MerkleBlob {
         Ok(self.get_block(index)?.node.parent())
     }
 
-    pub fn get_lineage_with_indexes(
+    pub fn get_lineage_blocks_with_indexes(
         &self,
         index: TreeIndex,
-    ) -> Result<Vec<(TreeIndex, Node)>, Error> {
+    ) -> Result<Vec<(TreeIndex, Block)>, Error> {
         let mut next_index = Some(index);
         let mut lineage = vec![];
 
         while let Some(this_index) = next_index {
-            let node = self.get_node(this_index)?;
-            next_index = node.parent().0;
-            lineage.push((this_index, node));
+            let block = self.get_block(this_index)?;
+            next_index = block.node.parent().0;
+            lineage.push((this_index, block));
         }
 
         Ok(lineage)
     }
 
+    pub fn get_lineage_with_indexes(
+        &self,
+        index: TreeIndex,
+    ) -> Result<Vec<(TreeIndex, Node)>, Error> {
+        Ok(self
+            .get_lineage_blocks_with_indexes(index)?
+            .iter()
+            .map(|(index, block)| (*index, block.node))
+            .collect())
+    }
+
     pub fn get_lineage_indexes(&self, index: TreeIndex) -> Result<Vec<TreeIndex>, Error> {
-        let mut next_index = Some(index);
-        let mut lineage: Vec<TreeIndex> = vec![];
-
-        while let Some(this_index) = next_index {
-            lineage.push(this_index);
-            next_index = self.get_parent_index(this_index)?.0;
-        }
-
-        Ok(lineage)
+        Ok(self
+            .get_lineage_blocks_with_indexes(index)?
+            .iter()
+            .map(|(index, _block)| *index)
+            .collect())
     }
 
     // pub fn iter(&self) -> MerkleBlobLeftChildFirstIterator<'_> {
@@ -1163,13 +1170,18 @@ impl MerkleBlob {
             .get_node(index)?
             .expect_leaf("key to index mapping should only have leaves");
 
-        let parents = self.get_lineage_with_indexes(index)?;
+        let parents = self.get_lineage_blocks_with_indexes(index)?;
         let mut layers: Vec<proof_of_inclusion::ProofOfInclusionLayer> = Vec::new();
         let mut parents_iter = parents.iter();
         // first in the lineage is the index itself, second is the first parent
         parents_iter.next();
-        for (next_index, parent) in parents_iter {
-            let parent = parent.expect_internal("all nodes after the first should be internal");
+        for (next_index, block) in parents_iter {
+            if block.metadata.dirty {
+                return Err(Error::Dirty(*next_index));
+            }
+            let parent = block
+                .node
+                .expect_internal("all nodes after the first should be internal");
             let sibling_index = parent.sibling_index(index)?;
             let sibling_block = self.get_block(sibling_index)?;
             let sibling = sibling_block.node;
@@ -1332,6 +1344,10 @@ impl MerkleBlob {
                 Ok(index)
             }
         }
+    }
+
+    pub fn read_blob(&self) -> &Vec<u8> {
+        &self.blob
     }
 }
 

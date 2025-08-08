@@ -31,3 +31,17 @@ path = "fuzz_targets/merkle_blob_insert_and_delete.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "iterate_all_once"
+path = "fuzz_targets/iterate_all_once.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "proofs_of_inclusion"
+path = "fuzz_targets/proofs_of_inclusion.rs"
+test = false
+doc = false
+bench = false

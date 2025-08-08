@@ -214,7 +214,7 @@ pub struct LeafNode {
 }
 
 // TODO: consider forcing ::new() with validity checks
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Node {
     Internal(InternalNode),
     Leaf(LeafNode),
@@ -315,6 +315,7 @@ impl<'py> IntoPyObject<'py> for Node {
 }
 
 // TODO: consider forcing ::new() with validity checks
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Block {
     // NOTE: metadata node type and node's type not verified for agreement
     pub metadata: NodeMetadata,
