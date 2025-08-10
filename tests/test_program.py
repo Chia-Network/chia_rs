@@ -1,4 +1,9 @@
-from chia_rs import run_chia_program, Program
+from chia_rs import (
+    run_chia_program,
+    Program,
+    serialized_length,
+    serialized_length_trusted,
+)
 from chia_rs.sized_bytes import bytes32
 
 
@@ -44,3 +49,15 @@ def test_print() -> None:
         f"{temp.get_tree_hash()}"
         == "a200d6417c8fdc7c7937382c1b61e219854e1efd8f2e15d6c88e6571bc29ed1a"
     )
+
+
+def test_serialized_length() -> None:
+    temp = Program.to([8, (1, "foo")])
+    buf = bytes(temp)
+    expect = len(buf)
+    assert serialized_length(buf) == expect
+    assert serialized_length_trusted(buf) == expect
+
+    buf = buf + b"garbage"
+    assert serialized_length(buf) == expect
+    assert serialized_length_trusted(buf) == expect

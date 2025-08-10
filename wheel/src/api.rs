@@ -70,7 +70,7 @@ use pyo3::wrap_pyfunction;
 
 use std::iter::zip;
 
-use crate::run_program::{run_chia_program, serialized_length};
+use crate::run_program::{run_chia_program, serialized_length, serialized_length_trusted};
 
 use chia_consensus::fast_forward::fast_forward_singleton as native_ff;
 use chia_consensus::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
@@ -811,6 +811,7 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
 
     m.add_function(wrap_pyfunction!(serialized_length, m)?)?;
+    m.add_function(wrap_pyfunction!(serialized_length_trusted, m)?)?;
     m.add_function(wrap_pyfunction!(compute_merkle_set_root, m)?)?;
     m.add_function(wrap_pyfunction!(tree_hash, m)?)?;
     m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin, m)?)?;
