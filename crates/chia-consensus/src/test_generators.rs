@@ -250,7 +250,7 @@ fn run_generator(#[case] name: &str) {
 
     for (flags, expected) in zip(&[0, MEMPOOL_MODE], expected) {
         let mut flags = *flags;
-        if name == "aa-million-messages" {
+        if name == "aa-million-messages" || name == "aa-million-message-spends" {
             // this test requires running after hard fork 2, where the COST_CONDITIONS
             // flag is set
             flags |= COST_CONDITIONS;
