@@ -15,7 +15,7 @@ use pyo3::prelude::*;
 #[cfg(feature = "py-bindings")]
 use pyo3::types::PyType;
 
-#[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
+#[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq, Default)]
 #[cfg_attr(
     feature = "py-bindings",
     pyo3::pyclass(name = "SpendConditions", get_all, frozen),
@@ -46,7 +46,7 @@ pub struct OwnedSpendConditions {
     pub condition_cost: u64,
 }
 
-#[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq)]
+#[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq, Default)]
 #[cfg_attr(
     feature = "py-bindings",
     pyo3::pyclass(name = "SpendBundleConditions", get_all, frozen),

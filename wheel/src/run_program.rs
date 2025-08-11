@@ -5,7 +5,9 @@ use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;
 use clvmr::reduction::Response;
 use clvmr::run_program::run_program;
-use clvmr::serde::{node_from_bytes_backrefs, serialized_length_from_bytes};
+use clvmr::serde::{
+    node_from_bytes_backrefs, serialized_length_from_bytes, serialized_length_from_bytes_trusted,
+};
 use pyo3::buffer::PyBuffer;
 use pyo3::prelude::*;
 use std::rc::Rc;
@@ -17,6 +19,15 @@ pub fn serialized_length(program: PyBuffer<u8>) -> PyResult<u64> {
     let program =
         unsafe { std::slice::from_raw_parts(program.buf_ptr() as *const u8, program.len_bytes()) };
     serialized_length_from_bytes(program).map_err(map_pyerr)
+}
+
+#[allow(clippy::borrow_deref_ref)]
+#[pyfunction]
+pub fn serialized_length_trusted(program: PyBuffer<u8>) -> PyResult<u64> {
+    assert!(program.is_c_contiguous(), "program must be contiguous");
+    let program =
+        unsafe { std::slice::from_raw_parts(program.buf_ptr() as *const u8, program.len_bytes()) };
+    serialized_length_from_bytes_trusted(program).map_err(map_pyerr)
 }
 
 #[allow(clippy::borrow_deref_ref)]
