@@ -4,6 +4,7 @@ use crate::run_generator::{
 };
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::build_compressed_block::BlockBuilder;
+use chia_consensus::check_time_locks::py_check_time_locks;
 use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::flags::{
     COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
@@ -28,9 +29,9 @@ use chia_protocol::{
 };
 use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
-    CoinSpend, CoinState, CoinStateFilters, CoinStateUpdate, EndOfSubSlotBundle, FeeEstimate,
-    FeeEstimateGroup, FeeRate, Foliage, FoliageBlockData, FoliageTransactionBlock, FullBlock,
-    Handshake, HeaderBlock, InfusedChallengeChainSubSlot, LazyNode, MempoolItemsAdded,
+    CoinRecord, CoinSpend, CoinState, CoinStateFilters, CoinStateUpdate, EndOfSubSlotBundle,
+    FeeEstimate, FeeEstimateGroup, FeeRate, Foliage, FoliageBlockData, FoliageTransactionBlock,
+    FullBlock, Handshake, HeaderBlock, InfusedChallengeChainSubSlot, LazyNode, MempoolItemsAdded,
     MempoolItemsRemoved, Message, NewCompactVDF, NewPeak, NewPeakWallet,
     NewSignagePointOrEndOfSubSlot, NewTransaction, NewUnfinishedBlock, NewUnfinishedBlock2,
     PoolTarget, Program, ProofBlockHeader, ProofOfSpace, PuzzleSolutionResponse, PyPlotSize,
@@ -69,7 +70,7 @@ use pyo3::wrap_pyfunction;
 
 use std::iter::zip;
 
-use crate::run_program::{run_chia_program, serialized_length};
+use crate::run_program::{run_chia_program, serialized_length, serialized_length_trusted};
 
 use chia_consensus::fast_forward::fast_forward_singleton as native_ff;
 use chia_consensus::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
@@ -549,7 +550,8 @@ pub fn get_spends_for_trusted_block<'a>(
         })
         .collect::<Vec<&'a [u8]>>();
 
-    let output = get_coinspends_for_trusted_block(constants, &generator, &refs, flags)?;
+    let output =
+        py.allow_threads(|| get_coinspends_for_trusted_block(constants, &generator, &refs, flags))?;
 
     let dict = PyDict::new(py);
     dict.set_item("block_spends", output)?;
@@ -574,8 +576,9 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
         })
         .collect::<Vec<&'a [u8]>>();
 
-    let output =
-        get_coinspends_with_conditions_for_trusted_block(constants, &generator, &refs, flags)?;
+    let output = py.allow_threads(|| {
+        get_coinspends_with_conditions_for_trusted_block(constants, &generator, &refs, flags)
+    })?;
 
     let pylist = PyList::empty(py);
     for (coinspend, cond_output) in output {
@@ -634,6 +637,9 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_is_overflow_block, m)?)?;
     m.add_function(wrap_pyfunction!(py_expected_plot_size, m)?)?;
 
+    // check time lock
+    m.add_function(wrap_pyfunction!(py_check_time_locks, m)?)?;
+
     // CLVM validation
     m.add_function(wrap_pyfunction!(py_is_canonical_serialization, m)?)?;
 
@@ -673,6 +679,7 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // Chia classes
     m.add_class::<Coin>()?;
+    m.add_class::<CoinRecord>()?;
     m.add_class::<PoolTarget>()?;
     m.add_class::<ClassgroupElement>()?;
     m.add_class::<EndOfSubSlotBundle>()?;
@@ -806,6 +813,7 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
 
     m.add_function(wrap_pyfunction!(serialized_length, m)?)?;
+    m.add_function(wrap_pyfunction!(serialized_length_trusted, m)?)?;
     m.add_function(wrap_pyfunction!(compute_merkle_set_root, m)?)?;
     m.add_function(wrap_pyfunction!(tree_hash, m)?)?;
     m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin, m)?)?;
