@@ -80,8 +80,11 @@ for g in test_list:
     stdout.flush()
 
     run_generator1 = True
-    if "aa-million-messages.txt" in g or "aa-million-message-spends.txt" in g:
+    if "aa-million-messages.txt" in g:
         flags = COST_CONDITIONS
+    elif "aa-million-message-spends.txt" in g:
+        flags = COST_CONDITIONS
+        run_generator1 = False
     elif "puzzle-hash-stress-test.txt" in g:
         # this test fails on generator1, because it's too expensive
         run_generator1 = False

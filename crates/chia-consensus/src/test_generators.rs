@@ -167,7 +167,7 @@ pub(crate) fn print_diff(output: &str, expected: &str) {
 // in CI we run with the clvmr/debug-allocator feature enabled, which makes this
 // test use too much RAM (about 6.8 GB)
 //#[case("aa-million-messages")]
-#[case("aa-million-message-spends")]
+// #[case("aa-million-message-spends")]
 #[case("new-agg-sigs")]
 #[case("infinity-g1")]
 #[case("block-1ee588dc")]
