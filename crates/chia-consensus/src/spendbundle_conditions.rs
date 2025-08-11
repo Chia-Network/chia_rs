@@ -1,8 +1,10 @@
 use crate::conditions::{
     process_single_spend, validate_conditions, MempoolVisitor, ParseState, SpendBundleConditions,
+    ELIGIBLE_FOR_DEDUP,
 };
 use crate::consensus_constants::ConsensusConstants;
-use crate::flags::{DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
+use crate::flags::{COMPUTE_FINGERPRINT, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
+use crate::puzzle_fingerprint::compute_puzzle_fingerprint;
 use crate::run_block_generator::subtract_cost;
 use crate::solution_generator::calculate_generator_length;
 use crate::spendbundle_validation::get_flags_for_height_and_constants;
@@ -91,6 +93,13 @@ pub fn run_spendbundle(
             clvm_cost,
             constants,
         )?;
+
+        let Some(ref mut spend) = ret.spends.last_mut() else {
+            panic!("process_single_spend() failed to add a spend");
+        };
+        if (spend.flags & ELIGIBLE_FOR_DEDUP) != 0 && (flags & COMPUTE_FINGERPRINT) != 0 {
+            spend.fingerprint = compute_puzzle_fingerprint(a, conditions)?;
+        }
     }
 
     validate_conditions(a, &ret, &state, a.nil(), flags)?;

@@ -1,3 +1,4 @@
+use crate::conditions::ELIGIBLE_FOR_DEDUP;
 use chia_bls::PublicKey;
 use chia_protocol::{Bytes, Bytes32};
 use chia_streamable_macro::Streamable;
@@ -44,6 +45,7 @@ pub struct OwnedSpendConditions {
     /// per-spend execution and condition cost
     pub execution_cost: u64,
     pub condition_cost: u64,
+    pub fingerprint: Bytes,
 }
 
 #[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq, Default)]
@@ -93,6 +95,12 @@ impl OwnedSpendConditions {
             ));
         }
 
+        let fingerprint = if (spend.flags & ELIGIBLE_FOR_DEDUP) != 0 {
+            Bytes::from(spend.fingerprint.to_vec())
+        } else {
+            Bytes::default()
+        };
+
         Self {
             coin_id: *spend.coin_id,
             parent_id: a
@@ -123,6 +131,7 @@ impl OwnedSpendConditions {
             flags: spend.flags,
             execution_cost: spend.execution_cost,
             condition_cost: spend.condition_cost,
+            fingerprint,
         }
     }
 }

@@ -266,7 +266,7 @@ mod tests {
     use crate::run_block_generator::run_block_generator2;
     use crate::solution_generator::calculate_generator_length;
     use crate::spendbundle_conditions::run_spendbundle;
-    use chia_protocol::Coin;
+    use chia_protocol::{Bytes, Coin};
     use chia_traits::Streamable;
     use rand::rngs::StdRng;
     use rand::{prelude::SliceRandom, SeedableRng};
@@ -347,6 +347,7 @@ mod tests {
                 // So, to compare with the generator output later, we need to clear
                 // this field
                 s.flags = 0;
+                s.fingerprint = Bytes::default();
                 // when parsing conditions, create coin conditions are stored in
                 // a hash set to cheaply check for double spends. This means the
                 // order of this collection is not deterministic. In order to
@@ -438,6 +439,7 @@ mod tests {
                 for (mut gen, tx) in conds.spends.into_iter().zip(spends) {
                     gen.create_coin.sort();
                     gen.flags = 0;
+                    gen.fingerprint = Bytes::default();
                     assert_eq!(&gen, tx);
                 }
             });

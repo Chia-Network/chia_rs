@@ -91,15 +91,16 @@ pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusCons
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::conditions::ELIGIBLE_FOR_DEDUP;
     use crate::consensus_constants::TEST_CONSTANTS;
-    use crate::flags::MEMPOOL_MODE;
+    use crate::flags::{COMPUTE_FINGERPRINT, MEMPOOL_MODE};
     use crate::make_aggsig_final_message::u64_to_bytes;
     use crate::opcodes::{
         ConditionOpcode, AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT,
         AGG_SIG_PARENT_PUZZLE, AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT, AGG_SIG_UNSAFE,
     };
     use chia_bls::{sign, G2Element, PublicKey, SecretKey, Signature};
-    use chia_protocol::{Coin, CoinSpend, Program};
+    use chia_protocol::{Bytes, Coin, CoinSpend, Program};
     use clvm_utils::tree_hash_atom;
     use hex::FromHex;
     use hex_literal::hex;
@@ -266,6 +267,33 @@ ff01\
             MEMPOOL_MODE,
         )
         .expect("SpendBundle should be valid for this test");
+    }
+
+    #[test]
+    fn test_fingerprint() {
+        let solution = hex!(
+            "ff\
+ff33\
+ffa02222222222222222222222222222222222222222222222222222222222222222\
+ff843B9ACA00\
+80\
+80"
+        );
+        let spend = mk_spend(&[1_u8], &solution);
+        let spend_bundle = SpendBundle {
+            coin_spends: vec![spend],
+            aggregated_signature: Signature::default(),
+        };
+        let (conds, _pks, _timing) = validate_clvm_and_signature(
+            &spend_bundle,
+            TEST_CONSTANTS.max_block_cost_clvm,
+            &TEST_CONSTANTS,
+            MEMPOOL_MODE | COMPUTE_FINGERPRINT,
+        )
+        .expect("SpendBundle should be valid for this test");
+
+        assert!((conds.spends[0].flags & ELIGIBLE_FOR_DEDUP) != 0);
+        assert!(conds.spends[0].fingerprint != Bytes::default());
     }
 
     #[test]
