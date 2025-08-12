@@ -669,10 +669,6 @@ impl MerkleBlob {
     ) -> Result<(), Error> {
         // TODO: seems like this ought to be fairly similar to regular insert
 
-        // TODO: but what about the old leaf being the root...  is that what the batch insert
-        //       pre-filling of two leafs is about?  if so, this needs to be making sure of that
-        //       or something.
-
         struct Stuff {
             index: TreeIndex,
             hash: Hash,
@@ -711,8 +707,9 @@ impl MerkleBlob {
         self.insert_entry_to_blob(new_internal_node_index, &block)?;
         self.update_parent(new_index, Some(new_internal_node_index))?;
 
-        // TODO: expect relates to comment at the beginning about assumptions about the tree etc
-        let old_leaf_parent = old_leaf.parent.0.expect("not handling this case");
+        let Some(old_leaf_parent) = old_leaf.parent.0 else {
+            return Err(Error::LeafCannotBeRootWhenInsertingSubtree());
+        };
 
         let mut parent = self.get_block(old_leaf_parent)?;
         if let Node::Internal(ref mut internal) = parent.node {

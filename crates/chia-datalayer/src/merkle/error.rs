@@ -80,4 +80,6 @@ pub enum Error {
     LeafCannotBeParent(),
     #[error("invalid children")]
     InvalidChildren(),
+    #[error("insert subtree requires reference leaf is not root")]
+    LeafCannotBeRootWhenInsertingSubtree(),
 }
