@@ -11,6 +11,8 @@ from chia_rs import (
     Coin,
     ConsensusConstants,
     validate_clvm_and_signature,
+    ENABLE_KECCAK_OPS_OUTSIDE_GUARD,
+    COST_CONDITIONS,
 )
 from chia_rs.sized_bytes import bytes32
 from chia_rs.sized_ints import uint8, uint16, uint32, uint64, uint128
@@ -316,7 +318,7 @@ def test_validate_clvm_and_sig() -> None:
         new_spend,
         DEFAULT_CONSTANTS.MAX_BLOCK_COST_CLVM,
         DEFAULT_CONSTANTS,
-        DEFAULT_CONSTANTS.HARD_FORK_HEIGHT + 1,
+        ENABLE_KECCAK_OPS_OUTSIDE_GUARD | COST_CONDITIONS,
     )
 
     assert sbc is not None

@@ -7,12 +7,12 @@ use chia_consensus::build_compressed_block::BlockBuilder;
 use chia_consensus::check_time_locks::py_check_time_locks;
 use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::flags::{
-    COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT,
+    COMPUTE_FINGERPRINT, COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE, NO_UNKNOWN_CONDS,
+    STRICT_ARGS_COUNT,
 };
 use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
 use chia_consensus::owned_conditions::{OwnedSpendBundleConditions, OwnedSpendConditions};
-use chia_consensus::puzzle_fingerprint::compute_puzzle_fingerprint;
 use chia_consensus::run_block_generator::setup_generator_args;
 use chia_consensus::run_block_generator::{
     get_coinspends_for_trusted_block, get_coinspends_with_conditions_for_trusted_block,
@@ -425,10 +425,10 @@ pub fn py_validate_clvm_and_signature(
     new_spend: &SpendBundle,
     max_cost: u64,
     constants: &ConsensusConstants,
-    peak_height: u32,
+    flags: u32,
 ) -> PyResult<(OwnedSpendBundleConditions, Vec<([u8; 32], GTElement)>, f32)> {
     let (owned_conditions, additions, duration) = py
-        .allow_threads(|| validate_clvm_and_signature(new_spend, max_cost, constants, peak_height))
+        .allow_threads(|| validate_clvm_and_signature(new_spend, max_cost, constants, flags))
         .map_err(|e| {
             // cast validation error to int
             let error_code: u32 = e.into();
@@ -461,19 +461,6 @@ pub fn py_get_conditions_from_spendbundle(
 #[pyo3(name = "get_flags_for_height_and_constants")]
 pub fn py_get_flags_for_height_and_constants(height: u32, constants: &ConsensusConstants) -> u32 {
     get_flags_for_height_and_constants(height, constants)
-}
-
-#[pyfunction]
-#[pyo3(name = "compute_puzzle_fingerprint", signature = (puzzle, solution, *, max_cost, flags))]
-pub fn py_compute_puzzle_fingerprint(
-    puzzle: &Program,
-    solution: &Program,
-    max_cost: u64,
-    flags: u32,
-) -> PyResult<(u64, [u8; 32])> {
-    Ok(compute_puzzle_fingerprint(
-        puzzle, solution, max_cost, flags,
-    )?)
 }
 
 #[pyo3::pyfunction]
@@ -656,8 +643,6 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_get_conditions_from_spendbundle, m)?)?;
     m.add_function(wrap_pyfunction!(py_get_flags_for_height_and_constants, m)?)?;
 
-    m.add_function(wrap_pyfunction!(py_compute_puzzle_fingerprint, m)?)?;
-
     // get spends for generator
     m.add_function(wrap_pyfunction!(get_spends_for_trusted_block, m)?)?;
     m.add_function(wrap_pyfunction!(
@@ -670,6 +655,7 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("STRICT_ARGS_COUNT", STRICT_ARGS_COUNT)?;
     m.add("MEMPOOL_MODE", MEMPOOL_MODE)?;
     m.add("DONT_VALIDATE_SIGNATURE", DONT_VALIDATE_SIGNATURE)?;
+    m.add("COMPUTE_FINGERPRINT", COMPUTE_FINGERPRINT)?;
     m.add("COST_CONDITIONS", COST_CONDITIONS)?;
 
     // for backwards compatibility
