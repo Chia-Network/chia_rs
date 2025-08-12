@@ -27,12 +27,12 @@ pub fn get_conditions_from_spendbundle(
     height: u32,
     constants: &ConsensusConstants,
 ) -> Result<SpendBundleConditions, ValidationErr> {
+    let flags = get_flags_for_height_and_constants(height, constants);
     Ok(run_spendbundle(
         a,
         spend_bundle,
         max_cost,
-        height,
-        DONT_VALIDATE_SIGNATURE,
+        flags | MEMPOOL_MODE | DONT_VALIDATE_SIGNATURE,
         constants,
     )?
     .0)
@@ -45,12 +45,9 @@ pub fn run_spendbundle(
     a: &mut Allocator,
     spend_bundle: &SpendBundle,
     max_cost: u64,
-    height: u32,
     flags: u32,
     constants: &ConsensusConstants,
 ) -> Result<(SpendBundleConditions, Vec<(PublicKey, Bytes)>), ValidationErr> {
-    let flags = get_flags_for_height_and_constants(height, constants) | flags | MEMPOOL_MODE;
-
     // below is an adapted version of the code from run_block_generators::run_block_generator2()
     // it assumes no block references are passed in
     let mut cost_left = max_cost;

@@ -336,7 +336,7 @@ def validate_clvm_and_signature(
     new_spend: SpendBundle,
     max_cost: int,
     constants: ConsensusConstants,
-    peak_height: int,
+    flags: int,
 ) -> tuple[SpendBundleConditions, list[tuple[bytes32, GTElement]], float]: ...
 
 def compute_puzzle_fingerprint(puzzle: Program, solution: Program, *, max_cost: int, flags: int) -> tuple[int, bytes]: ...
