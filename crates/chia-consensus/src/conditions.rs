@@ -922,9 +922,9 @@ pub(crate) fn parse_single_spend(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn process_single_spend<V: SpendVisitor>(
+pub fn process_single_spend<'a, V: SpendVisitor>(
     a: &Allocator,
-    ret: &mut SpendBundleConditions,
+    ret: &'a mut SpendBundleConditions,
     state: &mut ParseState,
     parent_id: NodePtr,
     puzzle_hash: NodePtr,
@@ -934,7 +934,7 @@ pub fn process_single_spend<V: SpendVisitor>(
     max_cost: &mut Cost,
     clvm_cost: Cost,
     constants: &ConsensusConstants,
-) -> Result<(), ValidationErr> {
+) -> Result<&'a mut SpendConditions, ValidationErr> {
     let parent_id = sanitize_hash(a, parent_id, 32, ErrorCode::InvalidParentId)?;
     let puzzle_hash = sanitize_hash(a, puzzle_hash, 32, ErrorCode::InvalidPuzzleHash)?;
     let my_amount = parse_amount(a, amount, ErrorCode::InvalidCoinAmount)?;
@@ -1007,9 +1007,9 @@ fn to_key(a: &Allocator, pk: NodePtr) -> Result<PublicKey, ValidationErr> {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn parse_conditions<V: SpendVisitor>(
+pub fn parse_conditions<'a, V: SpendVisitor>(
     a: &Allocator,
-    ret: &mut SpendBundleConditions,
+    ret: &'a mut SpendBundleConditions,
     state: &mut ParseState,
     mut spend: SpendConditions,
     mut iter: NodePtr,
@@ -1017,7 +1017,7 @@ pub fn parse_conditions<V: SpendVisitor>(
     max_cost: &mut Cost,
     constants: &ConsensusConstants,
     visitor: &mut V,
-) -> Result<(), ValidationErr> {
+) -> Result<&'a mut SpendConditions, ValidationErr> {
     let mut announce_countdown: u32 = 1024;
     let mut free_condition_countdown: usize = FREE_CONDITIONS;
 
@@ -1409,7 +1409,7 @@ pub fn parse_conditions<V: SpendVisitor>(
     visitor.post_spend(a, &mut spend);
 
     ret.spends.push(spend);
-    Ok(())
+    Ok(ret.spends.last_mut().expect("internal error"))
 }
 
 fn is_ephemeral(

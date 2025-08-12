@@ -80,7 +80,7 @@ pub fn run_spendbundle(
             return Err(ValidationErr(puz, ErrorCode::WrongPuzzleHash));
         }
         let puzzle_hash = a.new_atom(&buf)?;
-        process_single_spend::<MempoolVisitor>(
+        let spend = process_single_spend::<MempoolVisitor>(
             a,
             &mut ret,
             &mut state,
@@ -94,9 +94,6 @@ pub fn run_spendbundle(
             constants,
         )?;
 
-        let Some(ref mut spend) = ret.spends.last_mut() else {
-            panic!("process_single_spend() failed to add a spend");
-        };
         if (spend.flags & ELIGIBLE_FOR_DEDUP) != 0 && (flags & COMPUTE_FINGERPRINT) != 0 {
             spend.fingerprint = compute_puzzle_fingerprint(a, conditions)?;
         }
