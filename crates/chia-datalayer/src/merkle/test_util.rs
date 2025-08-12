@@ -68,7 +68,7 @@ pub fn generate_kvid(seed: i32) -> (KeyId, ValueId) {
     let mut kv_ids: Vec<i64> = Vec::new();
 
     for offset in 0..2 {
-        let seed_int = 2i64 * seed as i64 + offset;
+        let seed_int = 2i64 * i64::from(seed) + offset;
         let seed_bytes = seed_int.to_be_bytes();
         let hash = sha256_bytes(&seed_bytes);
         let hash_int = i64::from_be_bytes(hash.0[0..8].try_into().unwrap());
