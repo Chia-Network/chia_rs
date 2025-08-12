@@ -64,11 +64,11 @@ pub fn traversal_blob(mut small_blob: MerkleBlob) -> MerkleBlob {
     small_blob
 }
 
-pub fn generate_kvid(seed: i64) -> (KeyId, ValueId) {
+pub fn generate_kvid(seed: i32) -> (KeyId, ValueId) {
     let mut kv_ids: Vec<i64> = Vec::new();
 
     for offset in 0..2 {
-        let seed_int = 2i64 * seed + offset;
+        let seed_int = 2i64 * seed as i64 + offset;
         let seed_bytes = seed_int.to_be_bytes();
         let hash = sha256_bytes(&seed_bytes);
         let hash_int = i64::from_be_bytes(hash.0[0..8].try_into().unwrap());
@@ -78,7 +78,7 @@ pub fn generate_kvid(seed: i64) -> (KeyId, ValueId) {
     (KeyId(kv_ids[0]), ValueId(kv_ids[1]))
 }
 
-pub fn generate_hash(seed: i64) -> Hash {
+pub fn generate_hash(seed: i32) -> Hash {
     let seed_bytes = seed.to_be_bytes();
     sha256_bytes(&seed_bytes)
 }
