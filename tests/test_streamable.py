@@ -47,6 +47,7 @@ def test_hash_spend() -> None:
         False,
         0,
         0,
+        b"",
     )
     a2 = SpendConditions(
         coin,
@@ -70,6 +71,7 @@ def test_hash_spend() -> None:
         False,
         0,
         0,
+        b"",
     )
     b = hash(a1)
     c = hash(a2)
@@ -78,11 +80,11 @@ def test_hash_spend() -> None:
     assert b != c
 
     assert a1.get_hash() == bytes32.fromhex(
-        "aee5968a44ae4f1c01fe79c688a757121c61b9f3e6d2267610bda93a27aaa502"
+        "7a3a98594db01c5130c442a03ada9d0b9d81a23f9a7d93a740c4de38f9d04b68"
     )
     assert (
         str(a1.get_hash())
-        == "aee5968a44ae4f1c01fe79c688a757121c61b9f3e6d2267610bda93a27aaa502"
+        == "7a3a98594db01c5130c442a03ada9d0b9d81a23f9a7d93a740c4de38f9d04b68"
     )
 
 
@@ -149,6 +151,7 @@ def test_json_spend() -> None:
         False,
         0,
         0,
+        b"",
     )
 
     assert a.to_json_dict() == {
@@ -173,6 +176,7 @@ def test_json_spend() -> None:
         "flags": 0,
         "execution_cost": 0,
         "condition_cost": 0,
+        "fingerprint": "",
     }
 
 
@@ -200,6 +204,7 @@ def test_from_json_spend() -> None:
         False,
         0,
         0,
+        b"\xaa\xbb",
     )
 
     b = SpendConditions.from_json_dict(
@@ -225,6 +230,7 @@ def test_from_json_spend() -> None:
             "flags": 0,
             "execution_cost": 0,
             "condition_cost": 0,
+            "fingerprint": "0xaabb",
         }
     )
     assert a == b
@@ -254,6 +260,7 @@ def test_from_json_spend_set_optional() -> None:
         False,
         0,
         0,
+        b"",
     )
 
     b = SpendConditions.from_json_dict(
@@ -279,6 +286,7 @@ def test_from_json_spend_set_optional() -> None:
             "flags": 0,
             "execution_cost": 0,
             "condition_cost": 0,
+            "fingerprint": "",
         }
     )
     assert a == b
@@ -309,6 +317,7 @@ def test_invalid_hex_prefix() -> None:
                 "agg_sig_parent_amount": [],
                 "agg_sig_parent_puzzle": [],
                 "flags": 0,
+                "fingerprint": b"",
             }
         )
 
@@ -338,6 +347,7 @@ def test_invalid_hex_prefix_bytes() -> None:
                 "agg_sig_parent_amount": [],
                 "agg_sig_parent_puzzle": [],
                 "flags": 0,
+                "fingerprint": b"",
             }
         )
 
@@ -367,6 +377,7 @@ def test_invalid_hex_digit() -> None:
                 "agg_sig_parent_amount": [],
                 "agg_sig_parent_puzzle": [],
                 "flags": 0,
+                "fingerprint": b"",
             }
         )
 
@@ -396,6 +407,7 @@ def test_invalid_hex_length() -> None:
                 "agg_sig_parent_amount": [],
                 "agg_sig_parent_puzzle": [],
                 "flags": 0,
+                "fingerprint": b"",
             }
         )
 
@@ -424,6 +436,7 @@ def test_missing_field() -> None:
                 "agg_sig_parent_amount": [],
                 "agg_sig_parent_puzzle": [],
                 "flags": 0,
+                "fingerprint": b"",
             }
         )
 
@@ -495,6 +508,7 @@ def test_from_json_spend_bundle_conditions() -> None:
             "validated_signature": False,
             "execution_cost": 4321,
             "condition_cost": 8765,
+            "fingerprint": b"",
         }
     )
     assert a == b
@@ -524,6 +538,7 @@ def test_copy_spend() -> None:
         False,
         0,
         0,
+        b"",
     )
     b = copy.copy(a)
 
