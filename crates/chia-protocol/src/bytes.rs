@@ -106,7 +106,11 @@ impl Streamable for Bytes {
 #[cfg(feature = "py-bindings")]
 impl ToJsonDict for Bytes {
     fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
-        Ok(format!("0x{self}").into_pyobject(py)?.into_any().unbind())
+        let prefix = if self.0.is_empty() { "" } else { "0x" };
+        Ok(format!("{prefix}{self}")
+            .into_pyobject(py)?
+            .into_any()
+            .unbind())
     }
 }
 
@@ -114,6 +118,9 @@ impl ToJsonDict for Bytes {
 impl FromJsonDict for Bytes {
     fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self> {
         let s: String = o.extract()?;
+        if s.is_empty() {
+            return Ok(Bytes::default());
+        }
         if !s.starts_with("0x") {
             return Err(PyValueError::new_err(
                 "bytes object is expected to start with 0x",

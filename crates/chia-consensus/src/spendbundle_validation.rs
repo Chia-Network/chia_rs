@@ -22,12 +22,13 @@ pub fn validate_clvm_and_signature(
     spend_bundle: &SpendBundle,
     max_cost: u64,
     constants: &ConsensusConstants,
-    height: u32,
+    flags: u32,
 ) -> Result<(OwnedSpendBundleConditions, Vec<ValidationPair>, Duration), ErrorCode> {
     let start_time = Instant::now();
+
     let mut a = make_allocator(LIMIT_HEAP);
     let (sbc, pkm_pairs) =
-        run_spendbundle(&mut a, spend_bundle, max_cost, height, 0, constants).map_err(|e| e.1)?;
+        run_spendbundle(&mut a, spend_bundle, max_cost, flags, constants).map_err(|e| e.1)?;
     let conditions = OwnedSpendBundleConditions::from(&a, sbc);
 
     // Collect all pairs in a single vector to avoid multiple iterations
@@ -90,14 +91,16 @@ pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusCons
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::conditions::ELIGIBLE_FOR_DEDUP;
     use crate::consensus_constants::TEST_CONSTANTS;
+    use crate::flags::{COMPUTE_FINGERPRINT, MEMPOOL_MODE};
     use crate::make_aggsig_final_message::u64_to_bytes;
     use crate::opcodes::{
         ConditionOpcode, AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT,
         AGG_SIG_PARENT_PUZZLE, AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT, AGG_SIG_UNSAFE,
     };
     use chia_bls::{sign, G2Element, PublicKey, SecretKey, Signature};
-    use chia_protocol::{Coin, CoinSpend, Program};
+    use chia_protocol::{Bytes, Coin, CoinSpend, Program};
     use clvm_utils::tree_hash_atom;
     use hex::FromHex;
     use hex_literal::hex;
@@ -235,7 +238,7 @@ ff01\
                 &spend_bundle,
                 TEST_CONSTANTS.max_block_cost_clvm,
                 &TEST_CONSTANTS,
-                236,
+                MEMPOOL_MODE,
             )
             .err(),
             Some(ErrorCode::WrongPuzzleHash)
@@ -261,9 +264,36 @@ ff01\
             &spend_bundle,
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
-            236,
+            MEMPOOL_MODE,
         )
         .expect("SpendBundle should be valid for this test");
+    }
+
+    #[test]
+    fn test_fingerprint() {
+        let solution = hex!(
+            "ff\
+ff33\
+ffa02222222222222222222222222222222222222222222222222222222222222222\
+ff843B9ACA00\
+80\
+80"
+        );
+        let spend = mk_spend(&[1_u8], &solution);
+        let spend_bundle = SpendBundle {
+            coin_spends: vec![spend],
+            aggregated_signature: Signature::default(),
+        };
+        let (conds, _pks, _timing) = validate_clvm_and_signature(
+            &spend_bundle,
+            TEST_CONSTANTS.max_block_cost_clvm,
+            &TEST_CONSTANTS,
+            MEMPOOL_MODE | COMPUTE_FINGERPRINT,
+        )
+        .expect("SpendBundle should be valid for this test");
+
+        assert!((conds.spends[0].flags & ELIGIBLE_FOR_DEDUP) != 0);
+        assert!(conds.spends[0].fingerprint != Bytes::default());
     }
 
     #[test]
@@ -283,13 +313,12 @@ ff01\
         };
         let expected_cost = 5_527_116_044;
         let max_cost = expected_cost;
-        let test_height = 236;
         let (conds, _, _) =
-            validate_clvm_and_signature(&spend_bundle, max_cost, &TEST_CONSTANTS, test_height)
+            validate_clvm_and_signature(&spend_bundle, max_cost, &TEST_CONSTANTS, MEMPOOL_MODE)
                 .expect("validate_clvm_and_signature failed");
         assert_eq!(conds.cost, expected_cost);
         let result =
-            validate_clvm_and_signature(&spend_bundle, max_cost - 1, &TEST_CONSTANTS, test_height);
+            validate_clvm_and_signature(&spend_bundle, max_cost - 1, &TEST_CONSTANTS, MEMPOOL_MODE);
         assert!(matches!(result, Err(ErrorCode::CostExceeded)));
     }
 
@@ -322,7 +351,7 @@ ff01\
             &spend_bundle,
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
-            236,
+            MEMPOOL_MODE,
         )
         .expect("SpendBundle should be valid for this test");
     }
@@ -370,7 +399,7 @@ ff01\
             &spend_bundle,
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
-            246,
+            MEMPOOL_MODE,
         );
         assert!(matches!(result, Err(ErrorCode::BadAggregateSignature)));
     }
