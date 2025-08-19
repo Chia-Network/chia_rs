@@ -63,13 +63,15 @@ impl Deref for TreeHash {
 
 #[derive(Default)]
 pub struct TreeCache {
-    hashes: Vec<TreeHash>,
+    pair_hashes: Vec<TreeHash>,
+    atom_hashes: Vec<TreeHash>,
     // each entry is an index into hashes, or one of 3 special values:
     // u16::MAX if the pair has not been visited
     // u16::MAX - 1 if the pair has been seen once
     // u16::MAX - 2 if the pair has been seen at least twice (this makes it a
     // candidate for memoization)
     pairs: Vec<u16>,
+    atoms: Vec<u16>,
 }
 
 const NOT_VISITED: u16 = u16::MAX;
@@ -78,7 +80,7 @@ const SEEN_MULTIPLE: u16 = u16::MAX - 2;
 
 impl TreeCache {
     pub fn get(&self, n: NodePtr) -> Option<&TreeHash> {
-        // We only cache pairs (for now)
+        // We only cache pairs (in this function)
         if !matches!(n.object_type(), ObjectType::Pair) {
             return None;
         }
@@ -88,12 +90,24 @@ impl TreeCache {
         if slot >= SEEN_MULTIPLE {
             return None;
         }
-        Some(&self.hashes[slot as usize])
+        Some(&self.pair_hashes[slot as usize])
+    }
+
+    pub fn get_atom(&self, n: NodePtr) -> Option<&TreeHash> {
+        if !matches!(n.object_type(), ObjectType::Bytes) {
+            return None;
+        }
+        let idx = n.index() as usize;
+        let slot = *self.atoms.get(idx)?;
+        if slot >= SEEN_MULTIPLE {
+            return None;
+        }
+        Some(&self.atom_hashes[slot as usize])
     }
 
     pub fn insert(&mut self, n: NodePtr, hash: &TreeHash) {
         // If we've reached the max size, just ignore new cache items
-        if self.hashes.len() == SEEN_MULTIPLE as usize {
+        if self.pair_hashes.len() == SEEN_MULTIPLE as usize {
             return;
         }
 
@@ -106,37 +120,71 @@ impl TreeCache {
             self.pairs.resize(idx + 1, NOT_VISITED);
         }
 
-        let slot = self.hashes.len();
-        self.hashes.push(*hash);
+        let slot = self.pair_hashes.len();
+        self.pair_hashes.push(*hash);
         self.pairs[idx] = slot as u16;
+    }
+
+    pub fn insert_atom(&mut self, n: NodePtr, hash: &TreeHash) {
+        // If we've reached the max size, just ignore new cache items
+        if self.atom_hashes.len() == SEEN_MULTIPLE as usize {
+            return;
+        }
+
+        if !matches!(n.object_type(), ObjectType::Bytes) {
+            return;
+        }
+
+        let idx = n.index() as usize;
+        if idx >= self.atoms.len() {
+            self.atoms.resize(idx + 1, NOT_VISITED);
+        }
+        let slot = self.atom_hashes.len();
+        self.atom_hashes.push(*hash);
+        self.atoms[idx] = slot as u16;
     }
 
     /// mark the node as being visited. Returns true if we need to
     /// traverse visitation down this node.
     fn visit(&mut self, n: NodePtr) -> bool {
-        if !matches!(n.object_type(), ObjectType::Pair) {
-            return false;
+        if matches!(n.object_type(), ObjectType::Pair) {
+            let idx = n.index() as usize;
+            if idx >= self.pairs.len() {
+                self.pairs.resize(idx + 1, NOT_VISITED);
+            }
+            if self.pairs[idx] > SEEN_MULTIPLE {
+                self.pairs[idx] -= 1;
+            }
+            return self.pairs[idx] == SEEN_ONCE
+        } else if matches!(n.object_type(), ObjectType::Bytes) {
+            let idx = n.index() as usize;
+            if idx >= self.atoms.len() {
+                self.atoms.resize(idx + 1, NOT_VISITED);
+            }
+            if self.atoms[idx] > SEEN_MULTIPLE {
+                self.atoms[idx] -= 1;
+            }
         }
-        let idx = n.index() as usize;
-        if idx >= self.pairs.len() {
-            self.pairs.resize(idx + 1, NOT_VISITED);
-        }
-        if self.pairs[idx] > SEEN_MULTIPLE {
-            self.pairs[idx] -= 1;
-        }
-        self.pairs[idx] == SEEN_ONCE
+        false
     }
 
     pub fn should_memoize(&mut self, n: NodePtr) -> bool {
-        if !matches!(n.object_type(), ObjectType::Pair) {
-            return false;
+        if matches!(n.object_type(), ObjectType::Pair) {
+            let idx = n.index() as usize;
+            if idx >= self.pairs.len() {
+                return false;
+            } else {
+                return self.pairs[idx] <= SEEN_MULTIPLE;
+            }
+        } else if matches!(n.object_type(), ObjectType::Bytes) {
+            let idx = n.index() as usize;
+            if idx >= self.atoms.len() {
+                return false;
+            } else {
+                return self.atoms[idx] <= SEEN_MULTIPLE;
+            }
         }
-        let idx = n.index() as usize;
-        if idx >= self.pairs.len() {
-            false
-        } else {
-            self.pairs[idx] <= SEEN_MULTIPLE
-        }
+        false
     }
 
     pub fn visit_tree(&mut self, a: &Allocator, node: NodePtr) {
@@ -264,8 +312,15 @@ pub fn tree_hash_cached(a: &Allocator, node: NodePtr, cache: &mut TreeCache) -> 
         match op {
             TreeOp::SExp(node) => match a.node(node) {
                 NodeVisitor::Buffer(bytes) => {
-                    let hash = tree_hash_atom(bytes);
-                    hashes.push(hash);
+                    if let Some(hash) = cache.get_atom(node) {
+                        hashes.push(*hash);
+                    } else {
+                        let hash = tree_hash_atom(bytes);
+                        hashes.push(hash);
+                        if cache.should_memoize(node) {
+                            cache.insert_atom(node, &hash);
+                        }
+                    }
                 }
                 NodeVisitor::U32(val) => {
                     if (val as usize) < PRECOMPUTED_HASHES.len() {
