@@ -155,7 +155,7 @@ impl TreeCache {
             if self.pairs[idx] > SEEN_MULTIPLE {
                 self.pairs[idx] -= 1;
             }
-            return self.pairs[idx] == SEEN_ONCE
+            return self.pairs[idx] == SEEN_ONCE;
         } else if matches!(n.object_type(), ObjectType::Bytes) {
             let idx = n.index() as usize;
             if idx >= self.atoms.len() {
@@ -173,16 +173,14 @@ impl TreeCache {
             let idx = n.index() as usize;
             if idx >= self.pairs.len() {
                 return false;
-            } else {
-                return self.pairs[idx] <= SEEN_MULTIPLE;
             }
+            return self.pairs[idx] <= SEEN_MULTIPLE;
         } else if matches!(n.object_type(), ObjectType::Bytes) {
             let idx = n.index() as usize;
             if idx >= self.atoms.len() {
                 return false;
-            } else {
-                return self.atoms[idx] <= SEEN_MULTIPLE;
             }
+            return self.atoms[idx] <= SEEN_MULTIPLE;
         }
         false
     }
