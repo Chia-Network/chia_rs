@@ -169,7 +169,7 @@ pub(crate) fn print_diff(output: &str, expected: &str) {
 //#[case("aa-million-messages")]
 #[case("aa-million-message-spends")]
 #[case("puzzle-hash-stress-test")]
-#[case("puzzle-hash-stress-tree")]  
+#[case("puzzle-hash-stress-tree")]
 #[case("new-agg-sigs")]
 #[case("infinity-g1")]
 #[case("block-1ee588dc")]
