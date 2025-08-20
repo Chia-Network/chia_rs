@@ -1,10 +1,16 @@
-import blspy
 import chia_rs
 from random import getrandbits
 import sys
 from typing import Any
 import pytest
 from concurrent.futures import ThreadPoolExecutor
+
+pytest.skipif(
+    sys.version_info > (3, 12),
+    allow_module_level=True,
+    reason="blspy is only available for <=3.12",
+)
+import blspy
 
 
 def randbytes(n: int) -> bytes:
