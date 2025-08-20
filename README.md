@@ -58,7 +58,7 @@ It's built with `maturin`, so you need to have activated a python virtual enviro
 The bindings are tested with `pytest`. Before you run them, install the following dependencies:
 
 ```bash
-pip install pytest pytest-xdist maturin typing-extensions blspy
+pip install pytest pytest-xdist maturin typing-extensions 'blspy; python_version <= "3.12"' 'clvm==0.9.8; python_version <= "3.12"' clvm
 ```
 
 And build the Python wheel:
