@@ -26,11 +26,11 @@ jobs:
           - major-dot-minor: "3.9"
           - major-dot-minor: "3.10"
           - major-dot-minor: "3.11"
-            stubtest-args: --allowlist wheel/stubtest.allowlist.3-11-plus
+            stubtest-args: --allowlist wheel/stubtest.allowlist.3-11
           - major-dot-minor: "3.12"
-            stubtest-args: --allowlist wheel/stubtest.allowlist.3-11-plus --allowlist wheel/stubtest.allowlist.3-12-plus
+            stubtest-args: --allowlist wheel/stubtest.allowlist.3-12
           - major-dot-minor: "3.13"
-            stubtest-args: --allowlist wheel/stubtest.allowlist.3-11-plus --allowlist wheel/stubtest.allowlist.3-12-plus
+            stubtest-args: --allowlist wheel/stubtest.allowlist.3-13
 
     steps:
       - uses: actions/checkout@v4
