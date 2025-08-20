@@ -80,92 +80,87 @@ const SEEN_MULTIPLE: u16 = u16::MAX - 2;
 
 impl TreeCache {
     pub fn get(&self, n: NodePtr) -> Option<&TreeHash> {
-        // We only cache pairs (in this function)
-        if !matches!(n.object_type(), ObjectType::Pair) {
-            return None;
-        }
-
         let idx = n.index() as usize;
-        let slot = *self.pairs.get(idx)?;
-        if slot >= SEEN_MULTIPLE {
-            return None;
-        }
-        Some(&self.pair_hashes[slot as usize])
-    }
 
-    pub fn get_atom(&self, n: NodePtr) -> Option<&TreeHash> {
-        if !matches!(n.object_type(), ObjectType::Bytes) {
-            return None;
+        match n.object_type() {
+            ObjectType::Pair => {
+                let slot = *self.pairs.get(idx)?;
+                if slot >= SEEN_MULTIPLE {
+                    return None;
+                }
+                Some(&self.pair_hashes[slot as usize])
+            }
+            ObjectType::Bytes => {
+                let slot = *self.atoms.get(idx)?;
+                if slot >= SEEN_MULTIPLE {
+                    return None;
+                }
+                Some(&self.atom_hashes[slot as usize])
+            }
+            ObjectType::SmallAtom => None,
         }
-        let idx = n.index() as usize;
-        let slot = *self.atoms.get(idx)?;
-        if slot >= SEEN_MULTIPLE {
-            return None;
-        }
-        Some(&self.atom_hashes[slot as usize])
     }
 
     pub fn insert(&mut self, n: NodePtr, hash: &TreeHash) {
-        // If we've reached the max size, just ignore new cache items
-        if self.pair_hashes.len() == SEEN_MULTIPLE as usize {
-            return;
-        }
+        match n.object_type() {
+            ObjectType::Pair => {
+                if self.pair_hashes.len() == SEEN_MULTIPLE as usize {
+                    return;
+                }
 
-        if !matches!(n.object_type(), ObjectType::Pair) {
-            return;
-        }
+                let idx = n.index() as usize;
+                if idx >= self.pairs.len() {
+                    self.pairs.resize(idx + 1, NOT_VISITED);
+                }
 
-        let idx = n.index() as usize;
-        if idx >= self.pairs.len() {
-            self.pairs.resize(idx + 1, NOT_VISITED);
-        }
+                let slot = self.pair_hashes.len();
+                self.pair_hashes.push(*hash);
+                self.pairs[idx] = slot as u16;
+            }
+            ObjectType::Bytes => {
+                if self.atom_hashes.len() == SEEN_MULTIPLE as usize {
+                    return;
+                }
 
-        let slot = self.pair_hashes.len();
-        self.pair_hashes.push(*hash);
-        self.pairs[idx] = slot as u16;
-    }
+                let idx = n.index() as usize;
+                if idx >= self.atoms.len() {
+                    self.atoms.resize(idx + 1, NOT_VISITED);
+                }
 
-    pub fn insert_atom(&mut self, n: NodePtr, hash: &TreeHash) {
-        // If we've reached the max size, just ignore new cache items
-        if self.atom_hashes.len() == SEEN_MULTIPLE as usize {
-            return;
+                let slot = self.atom_hashes.len();
+                self.atom_hashes.push(*hash);
+                self.atoms[idx] = slot as u16;
+            }
+            ObjectType::SmallAtom => {}
         }
-
-        if !matches!(n.object_type(), ObjectType::Bytes) {
-            return;
-        }
-
-        let idx = n.index() as usize;
-        if idx >= self.atoms.len() {
-            self.atoms.resize(idx + 1, NOT_VISITED);
-        }
-        let slot = self.atom_hashes.len();
-        self.atom_hashes.push(*hash);
-        self.atoms[idx] = slot as u16;
     }
 
     /// mark the node as being visited. Returns true if we need to
     /// traverse visitation down this node.
     fn visit(&mut self, n: NodePtr) -> bool {
-        if matches!(n.object_type(), ObjectType::Pair) {
-            let idx = n.index() as usize;
-            if idx >= self.pairs.len() {
-                self.pairs.resize(idx + 1, NOT_VISITED);
+        let idx = n.index() as usize;
+
+        match n.object_type() {
+            ObjectType::Pair => {
+                if idx >= self.pairs.len() {
+                    self.pairs.resize(idx + 1, NOT_VISITED);
+                }
+                if self.pairs[idx] > SEEN_MULTIPLE {
+                    self.pairs[idx] -= 1;
+                }
+                self.pairs[idx] == SEEN_ONCE
             }
-            if self.pairs[idx] > SEEN_MULTIPLE {
-                self.pairs[idx] -= 1;
+            ObjectType::Bytes => {
+                if idx >= self.atoms.len() {
+                    self.atoms.resize(idx + 1, NOT_VISITED);
+                }
+                if self.atoms[idx] > SEEN_MULTIPLE {
+                    self.atoms[idx] -= 1;
+                }
+                false
             }
-            return self.pairs[idx] == SEEN_ONCE;
-        } else if matches!(n.object_type(), ObjectType::Bytes) {
-            let idx = n.index() as usize;
-            if idx >= self.atoms.len() {
-                self.atoms.resize(idx + 1, NOT_VISITED);
-            }
-            if self.atoms[idx] > SEEN_MULTIPLE {
-                self.atoms[idx] -= 1;
-            }
+            ObjectType::SmallAtom => false,
         }
-        false
     }
 
     pub fn should_memoize(&mut self, n: NodePtr) -> bool {
@@ -310,13 +305,13 @@ pub fn tree_hash_cached(a: &Allocator, node: NodePtr, cache: &mut TreeCache) -> 
         match op {
             TreeOp::SExp(node) => match a.node(node) {
                 NodeVisitor::Buffer(bytes) => {
-                    if let Some(hash) = cache.get_atom(node) {
+                    if let Some(hash) = cache.get(node) {
                         hashes.push(*hash);
                     } else {
                         let hash = tree_hash_atom(bytes);
                         hashes.push(hash);
                         if cache.should_memoize(node) && bytes.len() >= 32 {
-                            cache.insert_atom(node, &hash);
+                            cache.insert(node, &hash);
                         }
                     }
                 }
