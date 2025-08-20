@@ -315,7 +315,7 @@ pub fn tree_hash_cached(a: &Allocator, node: NodePtr, cache: &mut TreeCache) -> 
                     } else {
                         let hash = tree_hash_atom(bytes);
                         hashes.push(hash);
-                        if cache.should_memoize(node) {
+                        if cache.should_memoize(node) && bytes.len() >= 32 {
                             cache.insert_atom(node, &hash);
                         }
                     }
