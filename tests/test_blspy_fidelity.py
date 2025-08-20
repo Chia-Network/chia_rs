@@ -5,11 +5,12 @@ from typing import Any
 import pytest
 from concurrent.futures import ThreadPoolExecutor
 
-pytest.skipif(
-    sys.version_info > (3, 12),
-    allow_module_level=True,
-    reason="blspy is only available for <=3.12",
-)
+if sys.version_info > (3, 12):
+    pytest.skip(
+        allow_module_level=True,
+        reason="blspy is only available for <=3.12",
+    )
+
 import blspy
 
 
