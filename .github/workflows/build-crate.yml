@@ -104,4 +104,4 @@ jobs:
         run: |
           cd crates/"${{ matrix.package.name }}"
           python -m pip install blspy
-          cargo fuzz list | xargs -I "%" sh -c "cargo +"${{ matrix.toolchain }}" fuzz run % -- -max_total_time=${{ matrix.max_total_time}} || exit 255"
+          cargo fuzz list | xargs -I "%" sh -c "cargo +'${{ matrix.toolchain }}' fuzz run % -- -max_total_time=${{ matrix.max_total_time}} || exit 255"
