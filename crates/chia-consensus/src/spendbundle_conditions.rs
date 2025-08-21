@@ -1,8 +1,10 @@
 use crate::conditions::{
     process_single_spend, validate_conditions, MempoolVisitor, ParseState, SpendBundleConditions,
+    ELIGIBLE_FOR_DEDUP,
 };
 use crate::consensus_constants::ConsensusConstants;
-use crate::flags::{DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
+use crate::flags::{COMPUTE_FINGERPRINT, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
+use crate::puzzle_fingerprint::compute_puzzle_fingerprint;
 use crate::run_block_generator::subtract_cost;
 use crate::solution_generator::calculate_generator_length;
 use crate::spendbundle_validation::get_flags_for_height_and_constants;
@@ -27,12 +29,12 @@ pub fn get_conditions_from_spendbundle(
     height: u32,
     constants: &ConsensusConstants,
 ) -> Result<SpendBundleConditions, ValidationErr> {
+    let flags = get_flags_for_height_and_constants(height, constants);
     Ok(run_spendbundle(
         a,
         spend_bundle,
         max_cost,
-        height,
-        DONT_VALIDATE_SIGNATURE,
+        flags | MEMPOOL_MODE | DONT_VALIDATE_SIGNATURE,
         constants,
     )?
     .0)
@@ -45,12 +47,9 @@ pub fn run_spendbundle(
     a: &mut Allocator,
     spend_bundle: &SpendBundle,
     max_cost: u64,
-    height: u32,
     flags: u32,
     constants: &ConsensusConstants,
 ) -> Result<(SpendBundleConditions, Vec<(PublicKey, Bytes)>), ValidationErr> {
-    let flags = get_flags_for_height_and_constants(height, constants) | flags | MEMPOOL_MODE;
-
     // below is an adapted version of the code from run_block_generators::run_block_generator2()
     // it assumes no block references are passed in
     let mut cost_left = max_cost;
@@ -81,7 +80,7 @@ pub fn run_spendbundle(
             return Err(ValidationErr(puz, ErrorCode::WrongPuzzleHash));
         }
         let puzzle_hash = a.new_atom(&buf)?;
-        process_single_spend::<MempoolVisitor>(
+        let spend = process_single_spend::<MempoolVisitor>(
             a,
             &mut ret,
             &mut state,
@@ -94,6 +93,10 @@ pub fn run_spendbundle(
             clvm_cost,
             constants,
         )?;
+
+        if (spend.flags & ELIGIBLE_FOR_DEDUP) != 0 && (flags & COMPUTE_FINGERPRINT) != 0 {
+            spend.fingerprint = compute_puzzle_fingerprint(a, conditions)?;
+        }
     }
 
     validate_conditions(a, &ret, &state, a.nil(), flags)?;

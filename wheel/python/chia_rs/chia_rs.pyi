@@ -58,10 +58,8 @@ def validate_clvm_and_signature(
     new_spend: SpendBundle,
     max_cost: int,
     constants: ConsensusConstants,
-    peak_height: int,
+    flags: int,
 ) -> tuple[SpendBundleConditions, list[tuple[bytes32, GTElement]], float]: ...
-
-def compute_puzzle_fingerprint(puzzle: Program, solution: Program, *, max_cost: int, flags: int) -> tuple[int, bytes]: ...
 
 def get_conditions_from_spendbundle(
     spend_bundle: SpendBundle,
@@ -123,6 +121,7 @@ LIMIT_HEAP: int = ...
 ENABLE_KECCAK_OPS_OUTSIDE_GUARD: int = ...
 MEMPOOL_MODE: int = ...
 DONT_VALIDATE_SIGNATURE: int = ...
+COMPUTE_FINGERPRINT: int = ...
 COST_CONDITIONS: int = ...
 
 ELIGIBLE_FOR_DEDUP: int = ...
@@ -140,6 +139,7 @@ class LazyNode:
     atom: Optional[bytes]
 
 def serialized_length(program: ReadableBuffer) -> int: ...
+def serialized_length_trusted(program: ReadableBuffer) -> int: ...
 def tree_hash(blob: ReadableBuffer) -> bytes32: ...
 def get_puzzle_and_solution_for_coin(program: ReadableBuffer, args: ReadableBuffer, max_cost: int, find_parent: bytes32, find_amount: int, find_ph: bytes32, flags: int) -> tuple[bytes, bytes]: ...
 def get_puzzle_and_solution_for_coin2(generator: Program, block_refs: list[ReadableBuffer], max_cost: int, find_coin: Coin, flags: int) -> tuple[Program, Program]: ...
@@ -346,6 +346,7 @@ class SpendConditions:
     flags: int
     execution_cost: int
     condition_cost: int
+    fingerprint: bytes
     def __init__(
         self,
         coin_id: bytes,
@@ -368,7 +369,8 @@ class SpendConditions:
         agg_sig_parent_puzzle: Sequence[tuple[G1Element, bytes]],
         flags: int,
         execution_cost: int,
-        condition_cost: int
+        condition_cost: int,
+        fingerprint: bytes
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -407,7 +409,8 @@ class SpendConditions:
         agg_sig_parent_puzzle: Union[ list[tuple[G1Element, bytes]], _Unspec] = _Unspec(),
         flags: Union[ int, _Unspec] = _Unspec(),
         execution_cost: Union[ int, _Unspec] = _Unspec(),
-        condition_cost: Union[ int, _Unspec] = _Unspec()) -> SpendConditions: ...
+        condition_cost: Union[ int, _Unspec] = _Unspec(),
+        fingerprint: Union[ bytes, _Unspec] = _Unspec()) -> SpendConditions: ...
 
 @final
 class SpendBundleConditions:
@@ -4451,12 +4454,12 @@ class ConsensusConstants:
     PLOT_FILTER_128_HEIGHT: uint32
     PLOT_FILTER_64_HEIGHT: uint32
     PLOT_FILTER_32_HEIGHT: uint32
-    PLOT_DIFFICULTY_INITIAL: uint8
-    PLOT_DIFFICULTY_4_HEIGHT: uint32
-    PLOT_DIFFICULTY_5_HEIGHT: uint32
-    PLOT_DIFFICULTY_6_HEIGHT: uint32
-    PLOT_DIFFICULTY_7_HEIGHT: uint32
-    PLOT_DIFFICULTY_8_HEIGHT: uint32
+    PLOT_STRENGTH_INITIAL: uint8
+    PLOT_STRENGTH_4_HEIGHT: uint32
+    PLOT_STRENGTH_5_HEIGHT: uint32
+    PLOT_STRENGTH_6_HEIGHT: uint32
+    PLOT_STRENGTH_7_HEIGHT: uint32
+    PLOT_STRENGTH_8_HEIGHT: uint32
     def __init__(
         self,
         SLOT_BLOCKS_TARGET: uint32,
@@ -4509,12 +4512,12 @@ class ConsensusConstants:
         PLOT_FILTER_128_HEIGHT: uint32,
         PLOT_FILTER_64_HEIGHT: uint32,
         PLOT_FILTER_32_HEIGHT: uint32,
-        PLOT_DIFFICULTY_INITIAL: uint8,
-        PLOT_DIFFICULTY_4_HEIGHT: uint32,
-        PLOT_DIFFICULTY_5_HEIGHT: uint32,
-        PLOT_DIFFICULTY_6_HEIGHT: uint32,
-        PLOT_DIFFICULTY_7_HEIGHT: uint32,
-        PLOT_DIFFICULTY_8_HEIGHT: uint32
+        PLOT_STRENGTH_INITIAL: uint8,
+        PLOT_STRENGTH_4_HEIGHT: uint32,
+        PLOT_STRENGTH_5_HEIGHT: uint32,
+        PLOT_STRENGTH_6_HEIGHT: uint32,
+        PLOT_STRENGTH_7_HEIGHT: uint32,
+        PLOT_STRENGTH_8_HEIGHT: uint32
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -4583,9 +4586,9 @@ class ConsensusConstants:
         PLOT_FILTER_128_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_FILTER_64_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_FILTER_32_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
-        PLOT_DIFFICULTY_INITIAL: Union[ uint8, _Unspec] = _Unspec(),
-        PLOT_DIFFICULTY_4_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
-        PLOT_DIFFICULTY_5_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
-        PLOT_DIFFICULTY_6_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
-        PLOT_DIFFICULTY_7_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
-        PLOT_DIFFICULTY_8_HEIGHT: Union[ uint32, _Unspec] = _Unspec()) -> ConsensusConstants: ...
+        PLOT_STRENGTH_INITIAL: Union[ uint8, _Unspec] = _Unspec(),
+        PLOT_STRENGTH_4_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
+        PLOT_STRENGTH_5_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
+        PLOT_STRENGTH_6_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
+        PLOT_STRENGTH_7_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
+        PLOT_STRENGTH_8_HEIGHT: Union[ uint32, _Unspec] = _Unspec()) -> ConsensusConstants: ...

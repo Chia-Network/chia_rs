@@ -11,6 +11,8 @@ from chia_rs import (
     Coin,
     ConsensusConstants,
     validate_clvm_and_signature,
+    ENABLE_KECCAK_OPS_OUTSIDE_GUARD,
+    COST_CONDITIONS,
 )
 from chia_rs.sized_bytes import bytes32
 from chia_rs.sized_ints import uint8, uint16, uint32, uint64, uint128
@@ -88,12 +90,12 @@ DEFAULT_CONSTANTS = ConsensusConstants(
     PLOT_FILTER_128_HEIGHT=uint32(10542000),
     PLOT_FILTER_64_HEIGHT=uint32(15592000),
     PLOT_FILTER_32_HEIGHT=uint32(20643000),
-    PLOT_DIFFICULTY_INITIAL=uint8(2),
-    PLOT_DIFFICULTY_4_HEIGHT=uint32(0xFFFFFFFF),
-    PLOT_DIFFICULTY_5_HEIGHT=uint32(0xFFFFFFFF),
-    PLOT_DIFFICULTY_6_HEIGHT=uint32(0xFFFFFFFF),
-    PLOT_DIFFICULTY_7_HEIGHT=uint32(0xFFFFFFFF),
-    PLOT_DIFFICULTY_8_HEIGHT=uint32(0xFFFFFFFF),
+    PLOT_STRENGTH_INITIAL=uint8(2),
+    PLOT_STRENGTH_4_HEIGHT=uint32(0xFFFFFFFF),
+    PLOT_STRENGTH_5_HEIGHT=uint32(0xFFFFFFFF),
+    PLOT_STRENGTH_6_HEIGHT=uint32(0xFFFFFFFF),
+    PLOT_STRENGTH_7_HEIGHT=uint32(0xFFFFFFFF),
+    PLOT_STRENGTH_8_HEIGHT=uint32(0xFFFFFFFF),
 )
 
 
@@ -316,7 +318,7 @@ def test_validate_clvm_and_sig() -> None:
         new_spend,
         DEFAULT_CONSTANTS.MAX_BLOCK_COST_CLVM,
         DEFAULT_CONSTANTS,
-        DEFAULT_CONSTANTS.HARD_FORK_HEIGHT + 1,
+        ENABLE_KECCAK_OPS_OUTSIDE_GUARD | COST_CONDITIONS,
     )
 
     assert sbc is not None
