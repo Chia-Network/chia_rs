@@ -312,6 +312,8 @@ jobs:
 
   actionlint:
     runs-on: ubuntu-latest
+    permissions:
+      contents: none
     steps:
       - uses: actions/checkout@v4
 
