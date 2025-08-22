@@ -167,6 +167,11 @@ pub(crate) fn print_diff(output: &str, expected: &str) {
 // in CI we run with the clvmr/debug-allocator feature enabled, which makes this
 // test use too much RAM (about 6.8 GB)
 //#[case("aa-million-messages")]
+#[case("100000-remarks-prefab")]
+#[case("29500-remarks-procedural")]
+#[case("aa-million-message-spends")]
+#[case("puzzle-hash-stress-test")]
+#[case("puzzle-hash-stress-tree")]
 #[case("new-agg-sigs")]
 #[case("infinity-g1")]
 #[case("block-1ee588dc")]
@@ -224,6 +229,15 @@ fn run_generator(#[case] name: &str) {
     // test cases to match. Make sure to carefully review the diff before
     // landing an automatic update of the test case.
     const UPDATE_TESTS: bool = false;
+
+    let run_generator_one: bool = ![
+        "puzzle-hash-stress-test",
+        "puzzle-hash-stress-tree",
+        "aa-million-message-spends",
+        "29500-remarks-procedural",
+        "100000-remarks-prefab",
+    ]
+    .contains(&name); // these could be stored in the case, but there's so few it's easier to look at here
 
     let filename = format!("../../generator-tests/{name}.txt");
     println!("file: {filename}");
