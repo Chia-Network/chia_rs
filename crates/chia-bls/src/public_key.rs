@@ -494,15 +494,6 @@ mod tests {
 
     #[test]
     fn test_aggregate_pubkey() {
-        // from blspy import PrivateKey
-        // from blspy import AugSchemeMPL
-        // sk = PrivateKey.from_bytes(bytes.fromhex("52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb"))
-        // pk = sk.get_g1()
-        // pk + pk
-        // <G1Element b1b8033286299e7f238aede0d3fea48d133a1e233139085f72c102c2e6cc1f8a4ea64ed2838c10bbd2ef8f78ef271bf3>
-        // pk + pk + pk
-        // <G1Element a8bc2047d90c04a12e8c38050ec0feb4417b4d5689165cd2cea8a7903aad1778e36548a46d427b5ec571364515e456d6>
-
         let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
         let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
         let pk = sk.public_key();

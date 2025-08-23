@@ -365,19 +365,6 @@ mod tests {
 
     #[test]
     fn test_derive_unhardened() {
-        // test vectors from:
-        // from blspy import AugSchemeMPL
-        // from blspy import PrivateKey
-        // sk = PrivateKey.from_bytes(bytes.fromhex("52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb"))
-        // AugSchemeMPL.derive_child_sk_unhardened(sk, 0)
-        // AugSchemeMPL.derive_child_sk_unhardened(sk, 1)
-        // AugSchemeMPL.derive_child_sk_unhardened(sk, 2)
-        // AugSchemeMPL.derive_child_sk_unhardened(sk, 3)
-        // <PrivateKey 399638f99d446500f3c3a363f24c2b0634ad7caf646f503455093f35f29290bd>
-        // <PrivateKey 3dcb4098ad925d8940e2f516d2d5a4dbab393db928a8c6cb06b93066a09a843a>
-        // <PrivateKey 13115c8fb68a3d667938dac2ffc6b867a4a0f216bbb228aa43d6bdde14245575>
-        // <PrivateKey 52e7e9f2fb51f2c5705aea8e11ac82737b95e664ae578f015af22031d956f92b>
-
         let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
         let derived_hex = [
             "399638f99d446500f3c3a363f24c2b0634ad7caf646f503455093f35f29290bd",
@@ -395,15 +382,6 @@ mod tests {
 
     #[test]
     fn test_public_key() {
-        // test vectors from:
-        // from blspy import PrivateKey
-        // from blspy import AugSchemeMPL
-        // sk = PrivateKey.from_bytes(bytes.fromhex("52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb"))
-        // for i in [100, 52312, 352350, 316]:
-        //         sk0 = AugSchemeMPL.derive_child_sk_unhardened(sk, i)
-        //         print(bytes(sk0).hex())
-        //         print(bytes(sk0.get_g1()).hex())
-
         // secret key, public key
         let test_cases = [
         ("5aac8405befe4cb3748a67177c56df26355f1f98d979afdb0b2f97858d2f71c3",
@@ -430,19 +408,6 @@ mod tests {
 
     #[test]
     fn test_derive_hardened() {
-        // test vectors from:
-        // from blspy import AugSchemeMPL
-        // from blspy import PrivateKey
-        // sk = PrivateKey.from_bytes(bytes.fromhex("52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb"))
-        // AugSchemeMPL.derive_child_sk(sk, 0)
-        // AugSchemeMPL.derive_child_sk(sk, 1)
-        // AugSchemeMPL.derive_child_sk(sk, 2)
-        // AugSchemeMPL.derive_child_sk(sk, 3)
-        // <PrivateKey 05eccb2d70e814f51a30d8b9965505605c677afa97228fa2419db583a8121db9>
-        // <PrivateKey 612ae96bdce2e9bc01693ac579918fbb559e04ec365cce9b66bb80e328f62c46>
-        // <PrivateKey 5df14a0a34fd6c30a80136d4103f0a93422ce82d5c537bebbecbc56e19fee5b9>
-        // <PrivateKey 3ea55db88d9a6bf5f1d9c9de072e3c9a56b13f4156d72fca7880cd39b4bd4fdc>
-
         let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
         let derived_hex = [
             "05eccb2d70e814f51a30d8b9965505605c677afa97228fa2419db583a8121db9",
