@@ -159,17 +159,17 @@ pub struct ConsensusConstants {
     /// This affects the plot filter for original plots
     plot_filter_32_height: u32,
 
-    /// initial plot difficulty for the v2 plot format.
-    plot_difficulty_initial: u8,
+    /// initial plot strength for the v2 plot format.
+    plot_strength_initial: u8,
 
-    /// Plot difficulty is a feature of the new plot format, v2 (introduced in Chia 3.0)
-    /// The plot difficulty will increase at these block heights. The new
-    /// difficulty will be 4, 5, 6, 7 and 8 respectively.
-    plot_difficulty_4_height: u32,
-    plot_difficulty_5_height: u32,
-    plot_difficulty_6_height: u32,
-    plot_difficulty_7_height: u32,
-    plot_difficulty_8_height: u32,
+    /// Plot strength is a feature of the new plot format, v2 (introduced in Chia 3.0)
+    /// The plot strength will increase at these block heights. The new
+    /// strength will be 4, 5, 6, 7 and 8 respectively.
+    plot_strength_4_height: u32,
+    plot_strength_5_height: u32,
+    plot_strength_6_height: u32,
+    plot_strength_7_height: u32,
+    plot_strength_8_height: u32,
 }
 
 pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
@@ -245,10 +245,10 @@ pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
     plot_filter_32_height: 20_643_000,
 
     // placeholder values
-    plot_difficulty_initial: 2,
-    plot_difficulty_4_height: 0xffff_ffff,
-    plot_difficulty_5_height: 0xffff_ffff,
-    plot_difficulty_6_height: 0xffff_ffff,
-    plot_difficulty_7_height: 0xffff_ffff,
-    plot_difficulty_8_height: 0xffff_ffff,
+    plot_strength_initial: 2,
+    plot_strength_4_height: 0xffff_ffff,
+    plot_strength_5_height: 0xffff_ffff,
+    plot_strength_6_height: 0xffff_ffff,
+    plot_strength_7_height: 0xffff_ffff,
+    plot_strength_8_height: 0xffff_ffff,
 };
