@@ -153,14 +153,14 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install maturin
 
-      - name: Build MacOs with maturin on Python ${{ matrix.python }}
+      - name: Build MacOs with maturin on Python ${{ matrix.python.major-dot-minor }}
         if: matrix.os.matrix == 'macos'
         env:
           MACOSX_DEPLOYMENT_TARGET: "13.0"
         run: |
           maturin build -i python --release -m wheel/Cargo.toml --features=openssl,pyo3/extension-module
 
-      - name: Build Linux with maturin on Python ${{ matrix.python }}
+      - name: Build Linux with maturin on Python ${{ matrix.python.major-dot-minor }}
         if: matrix.os.matrix == 'ubuntu'
         run: |
           docker run --rm --pull always \
@@ -178,7 +178,7 @@ jobs:
               CC=gcc maturin build --release --manylinux ${{ matrix.python.by-arch[matrix.arch.matrix].manylinux-version }} -m wheel/Cargo.toml --features=openssl,pyo3/extension-module \
             '
 
-      - name: Build Windows with maturin on Python ${{ matrix.python }}
+      - name: Build Windows with maturin on Python ${{ matrix.python.major-dot-minor }}
         if: matrix.os.matrix == 'windows'
         env:
           CC: "clang"
@@ -264,14 +264,14 @@ jobs:
           pip install maturin
           maturin sdist -m wheel/Cargo.toml
           cd target/wheels
-          dirname=`basename chia_rs*.tar.gz .tar.gz`
-          echo $dirname
-          mkdir $dirname
-          cp -r ../../src/ $dirname/src/
+          dirname=$(basename chia_rs*.tar.gz .tar.gz)
+          echo "$dirname"
+          mkdir "$dirname"
+          cp -r ../../src/ "$dirname/src/"
           gunzip chia_rs*.tar.gz
-          tar rvf chia_rs*.tar $dirname/src
+          tar rvf chia_rs*.tar "$dirname/src"
           gzip chia_rs*.tar
-          rm -rf $dirname
+          rm -rf "$dirname"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -310,6 +310,23 @@ jobs:
         run: |
           cargo clippy --workspace --all-features --all-targets
 
+  actionlint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: none
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: actionlint
+        run: |
+          bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          echo ==== shellcheck version
+          shellcheck --version
+          echo ==== actionlint version
+          ./actionlint --version
+          echo ==== running actionlint
+          ./actionlint -color -shellcheck shellcheck
+
   unit_tests:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -332,9 +349,11 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           cargo install grcov --locked
-          echo "RUSTFLAGS=-Cinstrument-coverage" >> "$GITHUB_ENV"
-          echo "LLVM_PROFILE_FILE=$(pwd)/target/chia_rs-%p-%m.profraw" >> "$GITHUB_ENV"
-          echo "CARGO_TARGET_DIR=$(pwd)/target" >> "$GITHUB_ENV"
+          {
+            echo "RUSTFLAGS=-Cinstrument-coverage"
+            echo "LLVM_PROFILE_FILE=$(pwd)/target/chia_rs-%p-%m.profraw"
+            echo "CARGO_TARGET_DIR=$(pwd)/target"
+          } >> "$GITHUB_ENV"
       - name: cargo test (not windows)
         if: matrix.os != 'windows-latest'
         run: cargo test --workspace --all-features
@@ -356,7 +375,7 @@ jobs:
         run: |
           python -m venv venv
           . venv/bin/activate
-          pip install colorama maturin pytest pytest-xdist clvm==0.9.8
+          pip install colorama maturin pytest pytest-xdist clvm
           maturin develop --release -m wheel/Cargo.toml --features=clvmr/allocator-debug
           # run pytest in a single process to avoid a race writing the coverage report
           pytest -n 0 tests
