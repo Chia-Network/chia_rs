@@ -672,6 +672,12 @@ mod tests {
 
     #[test]
     fn test_verify() {
+        // test case from:
+        // from blspy import PrivateKey
+        // from blspy import AugSchemeMPL
+        // sk = PrivateKey.from_bytes(bytes.fromhex("52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb"))
+        // data = b"foobar"
+        // print(AugSchemeMPL.sign(sk, data))
         let msg = b"foobar";
         let sk = SecretKey::from_bytes(
             &<[u8; 32]>::from_hex(
@@ -695,6 +701,24 @@ mod tests {
 
     #[test]
     fn test_aggregate_signature() {
+        // from blspy import PrivateKey
+        // from blspy import AugSchemeMPL
+        // sk = PrivateKey.from_bytes(bytes.fromhex("52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb"))
+        // data = b"foobar"
+        // sk0 = AugSchemeMPL.derive_child_sk(sk, 0)
+        // sk1 = AugSchemeMPL.derive_child_sk(sk, 1)
+        // sk2 = AugSchemeMPL.derive_child_sk(sk, 2)
+        // sk3 = AugSchemeMPL.derive_child_sk(sk, 3)
+
+        // sig0 = AugSchemeMPL.sign(sk0, data)
+        // sig1 = AugSchemeMPL.sign(sk1, data)
+        // sig2 = AugSchemeMPL.sign(sk2, data)
+        // sig3 = AugSchemeMPL.sign(sk3, data)
+
+        // agg = AugSchemeMPL.aggregate([sig0, sig1, sig2, sig3])
+
+        // 87bce2c588f4257e2792d929834548c7d3af679272cb4f8e1d24cf4bf584dd287aa1d9f5e53a86f288190db45e1d100d0a5e936079a66a709b5f35394cf7d52f49dd963284cb5241055d54f8cf48f61bc1037d21cae6c025a7ea5e9f4d289a18
+
         let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
         let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
         let msg = b"foobar";
