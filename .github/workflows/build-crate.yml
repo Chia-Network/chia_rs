@@ -74,11 +74,6 @@ jobs:
         package:
           - name: chia-consensus
           - name: chia-bls
-            env:
-              # We disable leak reports here because blspy appears to be allocating
-              # memory that's not freed. It might be a false positive since python is
-              # not unloaded before exiting.
-              LSAN_OPTIONS: detect_leaks=0
           - name: clvm-utils
           - name: chia-protocol
           - name: chia-puzzle-types
@@ -103,5 +98,4 @@ jobs:
         env: ${{ matrix.package.env || fromJSON('{}') }}
         run: |
           cd crates/"${{ matrix.package.name }}"
-          python -m pip install blspy
           cargo fuzz list | xargs -I "%" sh -c "cargo +'${{ matrix.toolchain }}' fuzz run % -- -max_total_time=${{ matrix.max_total_time}} || exit 255"
