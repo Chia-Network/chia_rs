@@ -1,0 +1,3 @@
+# TODO: ask stubtest/mypy about these as they seem unlikely to be our doing
+chia_rs\..*\.TypeVar\.__mro_entries__
+chia_rs\..*\.Protocol
