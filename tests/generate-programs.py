@@ -3,13 +3,7 @@
 import os
 import sys
 
-if sys.version_info >= (3, 13):
-    # TODO: this is clearly intended as a re-export.  ignoring until clvm
-    #       addresses this hinting.
-    #       https://github.com/Chia-Network/clvm/blob/9ec5959a4f9460709d76af53a528c69f94fef6af/clvm/__init__.py#L4
-    from clvm import KEYWORD_TO_ATOM  # type:ignore[attr-defined]
-else:
-    from clvm import KEYWORD_TO_ATOM
+from clvm.operators import KEYWORD_TO_ATOM
 
 
 def recursive_cons(filename: str, num: int) -> None:
