@@ -63,7 +63,7 @@ jobs:
           python -m pip install pytest pytest-xdist
           python -m pip install mypy
           python -m pip install black
-          python -m pip install clvm_tools colorama 'blspy; python_version <= "3.12"' 'clvm==0.9.8; python_version <= "3.12"' clvm
+          python -m pip install clvm_tools colorama clvm==0.9.8
 
       - name: Build (windows)
         if: matrix.os == 'windows-latest'
