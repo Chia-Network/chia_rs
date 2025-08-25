@@ -13,19 +13,11 @@ workspace = true
 
 [dependencies]
 libfuzzer-sys = { workspace = true }
-pyo3 = { workspace = true, features = ["auto-initialize"]}
 chia-bls = { workspace = true }
 
 [[bin]]
 name = "derive"
 path = "fuzz_targets/derive.rs"
-test = false
-doc = false
-bench = false
-
-[[bin]]
-name = "blspy-fidelity"
-path = "fuzz_targets/blspy-fidelity.rs"
 test = false
 doc = false
 bench = false
