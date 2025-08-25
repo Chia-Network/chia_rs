@@ -73,6 +73,9 @@ jobs:
       matrix:
         package:
           - name: chia-consensus
+            env:
+              # EXAMPLE_ as an example and to appease actionlint
+              EXAMPLE_LSAN_OPTIONS: detect_leaks=0
           - name: chia-bls
           - name: clvm-utils
           - name: chia-protocol
@@ -98,4 +101,4 @@ jobs:
         env: ${{ matrix.package.env || fromJSON('{}') }}
         run: |
           cd crates/"${{ matrix.package.name }}"
-          cargo fuzz list | xargs -I "%" sh -c "cargo +"${{ matrix.toolchain }}" fuzz run % -- -max_total_time=${{ matrix.max_total_time}} || exit 255"
+          cargo fuzz list | xargs -I "%" sh -c "cargo +'${{ matrix.toolchain }}' fuzz run % -- -max_total_time=${{ matrix.max_total_time}} || exit 255"
