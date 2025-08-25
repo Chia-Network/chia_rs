@@ -170,6 +170,9 @@ pub struct ConsensusConstants {
     plot_strength_6_height: u32,
     plot_strength_7_height: u32,
     plot_strength_8_height: u32,
+
+    // CoinSpends limit will in practice never get hit, but prevents funny business with generators
+    coinspends_block_limit: u32,
 }
 
 pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
@@ -251,4 +254,6 @@ pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
     plot_strength_6_height: 0xffff_ffff,
     plot_strength_7_height: 0xffff_ffff,
     plot_strength_8_height: 0xffff_ffff,
+
+    coinspends_block_limit: 6000,
 };

@@ -4460,6 +4460,7 @@ class ConsensusConstants:
     PLOT_STRENGTH_6_HEIGHT: uint32
     PLOT_STRENGTH_7_HEIGHT: uint32
     PLOT_STRENGTH_8_HEIGHT: uint32
+    COINSPENDS_BLOCK_LIMIT: uint32
     def __init__(
         self,
         SLOT_BLOCKS_TARGET: uint32,
@@ -4517,7 +4518,8 @@ class ConsensusConstants:
         PLOT_STRENGTH_5_HEIGHT: uint32,
         PLOT_STRENGTH_6_HEIGHT: uint32,
         PLOT_STRENGTH_7_HEIGHT: uint32,
-        PLOT_STRENGTH_8_HEIGHT: uint32
+        PLOT_STRENGTH_8_HEIGHT: uint32,
+        COINSPENDS_BLOCK_LIMIT: uint32
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -4591,4 +4593,5 @@ class ConsensusConstants:
         PLOT_STRENGTH_5_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_STRENGTH_6_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_STRENGTH_7_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
-        PLOT_STRENGTH_8_HEIGHT: Union[ uint32, _Unspec] = _Unspec()) -> ConsensusConstants: ...
+        PLOT_STRENGTH_8_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
+        COINSPENDS_BLOCK_LIMIT: Union[ uint32, _Unspec] = _Unspec()) -> ConsensusConstants: ...
