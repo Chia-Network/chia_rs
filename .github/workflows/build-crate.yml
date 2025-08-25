@@ -73,6 +73,9 @@ jobs:
       matrix:
         package:
           - name: chia-consensus
+            env:
+              # EXAMPLE_ as an example and to appease actionlint
+              EXAMPLE_LSAN_OPTIONS: detect_leaks=0
           - name: chia-bls
           - name: clvm-utils
           - name: chia-protocol
