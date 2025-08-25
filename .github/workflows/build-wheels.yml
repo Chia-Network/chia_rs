@@ -375,7 +375,7 @@ jobs:
         run: |
           python -m venv venv
           . venv/bin/activate
-          pip install colorama maturin pytest pytest-xdist clvm==0.9.8
+          pip install colorama maturin pytest pytest-xdist clvm
           maturin develop --release -m wheel/Cargo.toml --features=clvmr/allocator-debug
           # run pytest in a single process to avoid a race writing the coverage report
           pytest -n 0 tests

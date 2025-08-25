@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import os
-from clvm import KEYWORD_TO_ATOM
+from clvm.operators import KEYWORD_TO_ATOM
 
 
 def recursive_cons(filename: str, num: int) -> None:
