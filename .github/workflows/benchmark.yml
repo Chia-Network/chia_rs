@@ -22,10 +22,15 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
-        python-version: ["3.9", "3.10", "3.11"]
-
-    env:
-      stubtest_args: ${{ matrix.python-version == '3.11' && '--allowlist wheel/stubtest.allowlist.3-11-plus' || ''}}
+        python:
+          - major-dot-minor: "3.9"
+          - major-dot-minor: "3.10"
+          - major-dot-minor: "3.11"
+            stubtest-args: --allowlist wheel/stubtest.allowlist.3-11
+          - major-dot-minor: "3.12"
+            stubtest-args: --allowlist wheel/stubtest.allowlist.3-12
+          - major-dot-minor: "3.13"
+            stubtest-args: --allowlist wheel/stubtest.allowlist.3-13
 
     steps:
       - uses: actions/checkout@v4
@@ -33,9 +38,9 @@ jobs:
           fetch-depth: 1
 
       - uses: chia-network/actions/setup-python@main
-        name: Install Python ${{ matrix.python-version }}
+        name: Install Python ${{ matrix.python.major-dot-minor }}
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ matrix.python.major-dot-minor }}
 
       - name: Update pip
         run: |
@@ -79,14 +84,14 @@ jobs:
         run: |
           FAILURE=0
           echo "::group::concise"
-          if ! stubtest ${{ env.stubtest_args }} --allowlist wheel/stubtest.allowlist --concise chia_rs
+          if ! stubtest ${{ matrix.python.stubtest-args }} --allowlist wheel/stubtest.allowlist --concise chia_rs
           then
             FAILURE=1
           fi
           echo "::endgroup::"
 
           echo "::group::complete"
-          if ! stubtest ${{ env.stubtest_args }} --allowlist wheel/stubtest.allowlist chia_rs
+          if ! stubtest ${{ matrix.python.stubtest-args }} --allowlist wheel/stubtest.allowlist chia_rs
           then
             FAILURE=1
           fi
@@ -111,7 +116,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11"]
+        python-version: ["3.10", "3.13"]
 
     steps:
       - uses: actions/checkout@v4
