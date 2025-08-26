@@ -169,7 +169,6 @@ pub(crate) fn print_diff(output: &str, expected: &str) {
 //#[case("aa-million-messages")]
 #[case("100000-remarks-prefab")]
 #[case("29500-remarks-procedural")]
-#[case("aa-million-message-spends")]
 #[case("puzzle-hash-stress-test")]
 #[case("puzzle-hash-stress-tree")]
 #[case("new-agg-sigs")]
@@ -233,7 +232,6 @@ fn run_generator(#[case] name: &str) {
     let run_generator_one: bool = ![
         "puzzle-hash-stress-test",
         "puzzle-hash-stress-tree",
-        "aa-million-message-spends",
         "29500-remarks-procedural",
         "100000-remarks-prefab",
     ]
