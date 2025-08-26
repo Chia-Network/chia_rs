@@ -595,8 +595,24 @@ pub fn py_is_canonical_serialization(buf: &[u8]) -> bool {
     is_canonical_serialization(buf)
 }
 
+use pyo3::PyClass;
+fn add_class<T>(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()>
+where
+    T: PyClass,
+{
+    m.add_class::<T>()?;
+    let cls = m.getattr(T::NAME)?;
+    let mut name = m.name()?;
+    if name == "chia_rs.chia_rs" {
+        name = "chia_rs".into_pyobject(py)?;
+    }
+    cls.setattr("__module__", name);
+
+    Ok(())
+}
+
 #[pymodule]
-pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // generator functions
     m.add_function(wrap_pyfunction!(run_block_generator, m)?)?;
     m.add_function(wrap_pyfunction!(run_block_generator2, m)?)?;
@@ -606,7 +622,7 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(supports_fast_forward, m)?)?;
     m.add_function(wrap_pyfunction!(fast_forward_singleton, m)?)?;
     m.add_class::<OwnedSpendBundleConditions>()?;
-    m.add_class::<BlockBuilder>()?;
+    add_class::<BlockBuilder>(py, m)?;
     m.add(
         "ELIGIBLE_FOR_DEDUP",
         chia_consensus::conditions::ELIGIBLE_FOR_DEDUP,
