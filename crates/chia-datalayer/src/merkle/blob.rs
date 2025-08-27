@@ -3,7 +3,6 @@ use chia_py_streamable_macro::{PyJsonDict, PyStreamable};
 #[cfg(feature = "py-bindings")]
 use pyo3::{
     buffer::PyBuffer,
-    prelude::*,
     pyclass, pymethods,
     types::{PyDict, PyDictMethods, PyListMethods, PyType},
     Bound, IntoPyObject, PyResult, Python,
@@ -1368,19 +1367,13 @@ impl MerkleBlob {
     #[allow(clippy::needless_pass_by_value)]
     #[classmethod]
     #[pyo3(name = "from_path")]
-    pub fn py_from_path(
-        _cls: &Bound<'_, PyType>,
-        py: Python<'_>,
-        path: PyObject,
-    ) -> PyResult<Self> {
-        let path: PathBuf = path.extract(py)?;
+    pub fn py_from_path(_cls: &Bound<'_, PyType>, path: PathBuf) -> PyResult<Self> {
         Ok(Self::from_path(&path)?)
     }
 
     #[allow(clippy::needless_pass_by_value)]
     #[pyo3(name = "to_path")]
-    pub fn py_to_path(&self, py: Python<'_>, path: PyObject) -> PyResult<()> {
-        let path: PathBuf = path.extract(py)?;
+    pub fn py_to_path(&self, path: PathBuf) -> PyResult<()> {
         Ok(self.to_path(&path)?)
     }
 
