@@ -402,7 +402,7 @@ jobs:
         with:
           python-version: "3.9"
       - name: python test with coverage
-        if: matrix.os.coverage && matrix.test-runner.matrix == 'python'
+        if: matrix.os.coverage && matrix.test-runner.matrix == 'pytest'
         run: |
           python -m venv venv
           . venv/bin/activate
