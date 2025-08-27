@@ -1,0 +1,47 @@
+[package]
+name = "chia-datalayer-fuzz"
+version = "0.28.2"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+chia-datalayer = { workspace = true, features = ["arbitrary"] }
+
+[[bin]]
+name = "merkle_blob_new"
+path = "fuzz_targets/merkle_blob_new.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "merkle_blob_insert"
+path = "fuzz_targets/merkle_blob_insert.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "merkle_blob_insert_and_delete"
+path = "fuzz_targets/merkle_blob_insert_and_delete.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "iterate_all_once"
+path = "fuzz_targets/iterate_all_once.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "proofs_of_inclusion"
+path = "fuzz_targets/proofs_of_inclusion.rs"
+test = false
+doc = false
+bench = false

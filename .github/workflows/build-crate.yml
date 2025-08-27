@@ -81,6 +81,7 @@ jobs:
           - name: chia-protocol
           - name: chia-puzzle-types
           - name: clvm-traits
+          - name: chia-datalayer
         toolchain:
           - nightly-2025-01-12
         max_total_time:
