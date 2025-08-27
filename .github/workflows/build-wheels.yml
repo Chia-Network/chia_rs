@@ -350,8 +350,8 @@ jobs:
             coverage: false
             cargo-test-options: ""
         mode:
-          - name: not release
-            matrix: not-release
+          - name: dev
+            matrix: dev
             cargo-test-options: ""
           - name: release
             matrix: release
@@ -371,7 +371,7 @@ jobs:
             test-runner:
               matrix: pytest
           - mode:
-              matrix: not-release
+              matrix: dev
             test-runner:
               matrix: pytest
     steps:
@@ -398,7 +398,7 @@ jobs:
         if: matrix.test-runner.matrix == 'cargo'
         run: cargo test --workspace ${{ matrix.os.cargo-test-options }} ${{ matrix.mode.cargo-test-options }}
       - uses: Chia-Network/actions/setup-python@main
-        if: matrix.os.coverage && matrix.test-runner.matrix == 'python'
+        if: matrix.os.coverage
         with:
           python-version: "3.9"
       - name: python test with coverage
