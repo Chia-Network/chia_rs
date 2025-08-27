@@ -328,11 +328,42 @@ jobs:
           ./actionlint -color -shellcheck shellcheck
 
   unit_tests:
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.os.runs-on }}
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        os:
+          - runs-on: macos-latest
+            matrix: macos
+            coverage: false
+            cargo-test-options: --all-features
+          - runs-on: ubuntu-latest
+            matrix: linux
+            coverage: true
+            cargo-test-options: --all-features
+          - runs-on: windows-latest
+            matrix: windows
+            coverage: false
+            cargo-test-options: ""
+        mode:
+          - name: not release
+            matrix: not-release
+            cargo-test-options: ""
+          - name: release
+            matrix: release
+            cargo-test-options: --release
+        test-runner:
+          - matrix: cargo
+          - matrix: python
+        exclude:
+          - os:
+              matrix: macos
+            runner:
+              matrix: python
+          - os:
+              matrix: windows
+            runner:
+              matrix: python
     name: Unit tests
     steps:
       # the test files are read verbatim, making it problematic if git is
@@ -346,7 +377,7 @@ jobs:
           fetch-depth: 1
       - uses: dtolnay/rust-toolchain@stable
       - name: Prepare for coverage
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os.coverage
         run: |
           cargo install grcov --locked
           {
@@ -354,24 +385,15 @@ jobs:
             echo "LLVM_PROFILE_FILE=$(pwd)/target/chia_rs-%p-%m.profraw"
             echo "CARGO_TARGET_DIR=$(pwd)/target"
           } >> "$GITHUB_ENV"
-      - name: cargo test (not windows)
-        if: matrix.os != 'windows-latest'
-        run: cargo test --workspace --all-features
-      - name: cargo test (release) (not windows)
-        if: matrix.os != 'windows-latest'
-        run: cargo test --workspace --all-features --release
-      - name: cargo test (windows)
-        if: matrix.os == 'windows-latest'
-        run: cargo test --workspace
-      - name: cargo test (release) (windows)
-        if: matrix.os == 'windows-latest'
-        run: cargo test --workspace --release
+      - name: cargo test (${{ matrix.mode.name }})
+        if: matrix.test-runner.matrix == 'cargo'
+        run: cargo test --workspace ${{ matrix.os.cargo-test-options }} ${{ matrix.mode.cargo-test-options }}
       - uses: Chia-Network/actions/setup-python@main
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os.coverage && matrix.test-runner.matrix == 'python'
         with:
           python-version: "3.9"
       - name: test coverage
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os.coverage && matrix.test-runner.matrix == 'python'
         run: |
           python -m venv venv
           . venv/bin/activate
@@ -386,7 +408,7 @@ jobs:
           python -c 'with open("rust_cov.info") as f: lines = [l for l in f if not (l.startswith("DA:") and int(l.split(",")[1].strip()) >= 2**63)]; open("lcov.info", "w").writelines(lines)'
       - name: Upload to Coveralls
         uses: coverallsapp/github-action@v2
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os.coverage
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         with:
