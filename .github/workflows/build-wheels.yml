@@ -328,20 +328,24 @@ jobs:
           ./actionlint -color -shellcheck shellcheck
 
   unit_tests:
+    name: Unit Tests ${{ matrix.os.name }} ${{ matrix.mode.name }} ${{ matrix.test-runner.name }}
     runs-on: ${{ matrix.os.runs-on }}
     strategy:
       fail-fast: false
       matrix:
         os:
-          - runs-on: macos-latest
+          - name: macOS
+            runs-on: macos-latest
             matrix: macos
             coverage: false
             cargo-test-options: --all-features
-          - runs-on: ubuntu-latest
+          - name: Linux
+            runs-on: ubuntu-latest
             matrix: linux
             coverage: true
             cargo-test-options: --all-features
-          - runs-on: windows-latest
+          - name: Windows
+            runs-on: windows-latest
             matrix: windows
             coverage: false
             cargo-test-options: ""
@@ -353,8 +357,10 @@ jobs:
             matrix: release
             cargo-test-options: --release
         test-runner:
-          - matrix: cargo
-          - matrix: python
+          - name: Cargo
+            matrix: cargo
+          - name: Cargo
+            matrix: python
         exclude:
           - os:
               matrix: macos
@@ -364,7 +370,6 @@ jobs:
               matrix: windows
             test-runner:
               matrix: python
-    name: Unit tests
     steps:
       # the test files are read verbatim, making it problematic if git is
       # allowed to insert \r when checking out files
