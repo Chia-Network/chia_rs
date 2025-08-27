@@ -998,7 +998,7 @@ impl MerkleBlob {
     }
 
     fn get_random_insert_location_by_key_id(&self, seed: KeyId) -> Result<InsertLocation, Error> {
-        let seed = sha256_num(seed.0);
+        let seed = sha256_num(&seed.0);
 
         self.get_random_insert_location_by_seed(&seed.0)
     }
@@ -1741,7 +1741,7 @@ mod tests {
             let n = (n + 100) as i64;
             let key = KeyId(n);
             let value = ValueId(n);
-            let hash = sha256_num(key.0);
+            let hash = sha256_num(&key.0);
             let insert_location = blob.get_random_insert_location_by_seed(&seed).unwrap();
             blob.insert(key, value, &hash, insert_location).unwrap();
         }
@@ -1775,7 +1775,7 @@ mod tests {
                 .insert(
                     KeyId(i),
                     ValueId(i),
-                    &sha256_num(i),
+                    &sha256_num(&i),
                     InsertLocation::Auto {},
                 )
                 .unwrap();
@@ -1799,7 +1799,7 @@ mod tests {
         let key_value_ids: [i64; COUNT] = core::array::from_fn(|i| i as i64);
 
         for key_value_id in key_value_ids {
-            let hash: Hash = sha256_num(key_value_id);
+            let hash: Hash = sha256_num(&key_value_id);
 
             println!("inserting: {key_value_id}");
             merkle_blob.calculate_lazy_hashes().unwrap();
@@ -1839,7 +1839,7 @@ mod tests {
             .insert(
                 KeyId(key_value_id),
                 ValueId(key_value_id),
-                &sha256_num(key_value_id),
+                &sha256_num(&key_value_id),
                 InsertLocation::Auto {},
             )
             .unwrap();
@@ -1863,7 +1863,7 @@ mod tests {
                 .insert(
                     KeyId(key_value),
                     ValueId(key_value),
-                    &sha256_num(key_value),
+                    &sha256_num(&key_value),
                     InsertLocation::Auto {},
                 )
                 .unwrap();
@@ -1876,7 +1876,7 @@ mod tests {
             .insert(
                 KeyId(key_value_id),
                 ValueId(key_value_id),
-                &sha256_num(key_value_id),
+                &sha256_num(&key_value_id),
                 InsertLocation::Leaf {
                     index: *merkle_blob
                         .block_status_cache
@@ -1927,7 +1927,7 @@ mod tests {
             .insert(
                 KeyId(key_value_id),
                 ValueId(key_value_id),
-                &sha256_num(key_value_id),
+                &sha256_num(&key_value_id),
                 InsertLocation::Auto {},
             )
             .unwrap();
@@ -1960,7 +1960,7 @@ mod tests {
             .insert(
                 KeyId(0x4041_4243_4445_4647),
                 ValueId(0x5051_5253_5455_5657),
-                &sha256_num(0x4050),
+                &sha256_num(&0x4050),
                 InsertLocation::Leaf {
                     index: other_key_index,
                     side: Side::Left,
@@ -2026,7 +2026,7 @@ mod tests {
     fn test_node_specific_sibling_index_panics_for_unknown_sibling() {
         let node = InternalNode {
             parent: Parent(None),
-            hash: sha256_num(0),
+            hash: sha256_num(&0),
             left: TreeIndex(0),
             right: TreeIndex(1),
         };
@@ -2060,12 +2060,12 @@ mod tests {
 
         let mut insert_blob = MerkleBlob::new(small_blob.blob.clone()).unwrap();
         insert_blob
-            .insert(key, value, &sha256_num(key.0), InsertLocation::Auto {})
+            .insert(key, value, &sha256_num(&key.0), InsertLocation::Auto {})
             .unwrap();
         open_dot(insert_blob.to_dot().unwrap().set_note("first after"));
 
         let mut upsert_blob = MerkleBlob::new(small_blob.blob.clone()).unwrap();
-        upsert_blob.upsert(key, value, &sha256_num(key.0)).unwrap();
+        upsert_blob.upsert(key, value, &sha256_num(&key.0)).unwrap();
         open_dot(upsert_blob.to_dot().unwrap().set_note("first after"));
 
         assert_eq!(insert_blob.blob, upsert_blob.blob);
@@ -2146,7 +2146,7 @@ mod tests {
             blob.insert(
                 KeyId(i),
                 ValueId(i),
-                &sha256_num(i),
+                &sha256_num(&i),
                 InsertLocation::Auto {},
             )
             .unwrap();
@@ -2158,7 +2158,7 @@ mod tests {
         let mut batch_map: HashMap<KeyId, ValueId> = HashMap::new();
         for i in pre_inserts..(pre_inserts + count) {
             let i = i as i64;
-            batch.push(((KeyId(i), ValueId(i)), sha256_num(i)));
+            batch.push(((KeyId(i), ValueId(i)), sha256_num(&i)));
             batch_map.insert(KeyId(i), ValueId(i));
         }
 
@@ -2184,7 +2184,7 @@ mod tests {
             .insert(
                 KeyId(0),
                 ValueId(0),
-                &sha256_num(0),
+                &sha256_num(&0),
                 InsertLocation::AsRoot {},
             )
             .expect_err("tree not empty so inserting to root should fail");
@@ -2199,7 +2199,7 @@ mod tests {
                 .insert(
                     KeyId(n),
                     ValueId(n),
-                    &sha256_num(n),
+                    &sha256_num(&n),
                     InsertLocation::Auto {},
                 )
                 .unwrap();
@@ -2222,7 +2222,7 @@ mod tests {
             .insert(
                 KeyId(count),
                 ValueId(count),
-                &sha256_num(count),
+                &sha256_num(&count),
                 InsertLocation::Auto {},
             )
             .unwrap();
@@ -2347,7 +2347,7 @@ mod tests {
 
     #[rstest]
     fn test_get_node_by_hash(small_blob: MerkleBlob) {
-        let node = small_blob.get_node_by_hash(sha256_num(0x1020)).unwrap();
+        let node = small_blob.get_node_by_hash(sha256_num(&0x1020)).unwrap();
 
         #[allow(clippy::needless_raw_string_hashes)]
         let expected = expect![[r#"
@@ -2366,7 +2366,7 @@ mod tests {
 
     #[rstest]
     fn test_get_node_by_hash_fails_not_found(small_blob: MerkleBlob) {
-        let result = small_blob.get_node_by_hash(sha256_num(27));
+        let result = small_blob.get_node_by_hash(sha256_num(&27));
 
         #[allow(clippy::needless_raw_string_hashes)]
         let expected = expect![[r#"
@@ -2387,8 +2387,8 @@ mod tests {
         let hashes_indexes = small_blob.get_hashes_indexes(false).unwrap();
 
         let mut expected = HashMap::new();
-        let one = sha256_num(0x2030);
-        let two = sha256_num(0x1020);
+        let one = sha256_num(&0x2030);
+        let two = sha256_num(&0x1020);
         let zero = internal_hash(&one, &two);
         expected.insert(zero, TreeIndex(0));
         expected.insert(one, TreeIndex(1));
@@ -2402,8 +2402,8 @@ mod tests {
         let hashes_indexes = small_blob.get_hashes_indexes(true).unwrap();
 
         let mut expected = HashMap::new();
-        let one = sha256_num(0x2030);
-        let two = sha256_num(0x1020);
+        let one = sha256_num(&0x2030);
+        let two = sha256_num(&0x1020);
         expected.insert(one, TreeIndex(1));
         expected.insert(two, TreeIndex(2));
 
@@ -2546,7 +2546,7 @@ mod tests {
     #[rstest]
     fn test_moved_sibling_retains_hash(mut small_blob: MerkleBlob) {
         let key_to_delete = KeyId(0x0001_0203_0405_0607);
-        let remaining_hash = sha256_num(0x2030);
+        let remaining_hash = sha256_num(&0x2030);
         assert_ne!(small_blob.get_hash(TreeIndex(0)).unwrap(), remaining_hash);
         small_blob.delete(key_to_delete).unwrap();
         assert_eq!(small_blob.get_hash(TreeIndex(0)).unwrap(), remaining_hash);

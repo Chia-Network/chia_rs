@@ -249,7 +249,6 @@ impl Node {
         }
     }
 
-    #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn from_bytes(
         metadata: &NodeMetadata,
         blob: &DataBytes,

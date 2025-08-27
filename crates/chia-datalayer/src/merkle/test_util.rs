@@ -19,7 +19,7 @@ pub fn small_blob() -> MerkleBlob {
     blob.insert(
         KeyId(0x0001_0203_0405_0607),
         ValueId(0x1011_1213_1415_1617),
-        &sha256_num(0x1020),
+        &sha256_num(&0x1020),
         InsertLocation::Auto {},
     )
     .unwrap();
@@ -27,7 +27,7 @@ pub fn small_blob() -> MerkleBlob {
     blob.insert(
         KeyId(0x2021_2223_2425_2627),
         ValueId(0x3031_3233_3435_3637),
-        &sha256_num(0x2030),
+        &sha256_num(&0x2030),
         InsertLocation::Auto {},
     )
     .unwrap();
@@ -41,7 +41,7 @@ pub fn traversal_blob(mut small_blob: MerkleBlob) -> MerkleBlob {
         .insert(
             KeyId(103),
             ValueId(204),
-            &sha256_num(0x1324),
+            &sha256_num(&0x1324),
             InsertLocation::Leaf {
                 index: TreeIndex(1),
                 side: Side::Right,
@@ -52,7 +52,7 @@ pub fn traversal_blob(mut small_blob: MerkleBlob) -> MerkleBlob {
         .insert(
             KeyId(307),
             ValueId(404),
-            &sha256_num(0x9183),
+            &sha256_num(&0x9183),
             InsertLocation::Leaf {
                 index: TreeIndex(3),
                 side: Side::Right,
