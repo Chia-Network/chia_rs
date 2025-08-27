@@ -370,6 +370,10 @@ jobs:
               matrix: windows
             test-runner:
               matrix: pytest
+          - mode:
+              matrix: not-release
+            test-runner:
+              matrix: pytest
     steps:
       # the test files are read verbatim, making it problematic if git is
       # allowed to insert \r when checking out files
