@@ -328,7 +328,7 @@ jobs:
           ./actionlint -color -shellcheck shellcheck
 
   unit_tests:
-    name: Unit Tests ${{ matrix.os.name }} ${{ matrix.mode.name }} ${{ matrix.test-runner.name }}
+    name: Unit Tests ${{ matrix.os.name }} ${{ matrix.mode.name }} ${{ matrix.test-runner.name }} ${{ matrix.os.coverage && 'cov' || '' }}
     runs-on: ${{ matrix.os.runs-on }}
     strategy:
       fail-fast: false
