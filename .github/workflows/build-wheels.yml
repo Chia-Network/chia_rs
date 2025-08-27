@@ -358,11 +358,11 @@ jobs:
         exclude:
           - os:
               matrix: macos
-            runner:
+            test-runner:
               matrix: python
           - os:
               matrix: windows
-            runner:
+            test-runner:
               matrix: python
     name: Unit tests
     steps:
