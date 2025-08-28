@@ -3,8 +3,7 @@ use chia_protocol::Bytes32;
 use chia_sha2::Sha256;
 use num_traits::ToBytes;
 
-#[allow(clippy::needless_pass_by_value)]
-pub fn sha256_num<T: ToBytes>(input: T) -> Hash {
+pub fn sha256_num<T: ToBytes>(input: &T) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(input.to_be_bytes());
 
