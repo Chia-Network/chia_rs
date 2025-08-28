@@ -63,9 +63,9 @@ use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::pybacked::PyBackedBytes;
+use pyo3::types::PyList;
 use pyo3::types::PyTuple;
 use pyo3::types::{PyBytes, PyDict};
-use pyo3::types::{PyList, PySlice};
 use pyo3::wrap_pyfunction;
 
 use std::iter::zip;
