@@ -4,7 +4,7 @@ use crate::{
     NodeHashToIndex, ParentFirstIterator, TreeIndex, ValueId,
 };
 #[cfg(feature = "py-bindings")]
-use pyo3::{pyclass, pymethods, PyObject, PyResult, Python};
+use pyo3::{pyclass, pymethods, PyResult, Python};
 use rayon::iter::{IntoParallelIterator, ParallelExtend, ParallelIterator};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -196,7 +196,6 @@ impl DeltaReader {
     }
 }
 
-#[allow(clippy::needless_pass_by_value)]
 #[cfg(feature = "py-bindings")]
 #[pymethods]
 impl DeltaReader {
@@ -226,29 +225,28 @@ impl DeltaReader {
         }
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     #[pyo3(name = "collect_from_merkle_blob")]
     pub fn py_collect_from_merkle_blob(
         &mut self,
-        py: Python<'_>,
-        path: PyObject,
+        path: PathBuf,
         indexes: Vec<TreeIndex>,
     ) -> PyResult<()> {
-        let path: PathBuf = path.extract(py)?;
         self.collect_from_merkle_blob(&path, &indexes)?;
 
         Ok(())
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     #[pyo3(name = "collect_and_return_from_merkle_blobs")]
     pub fn py_collect_and_return_from_merkle_blobs(
         &mut self,
         py: Python<'_>,
-        jobs: Vec<(Hash, PyObject)>,
+        jobs: Vec<(Hash, PathBuf)>,
         hashes: HashSet<Hash>,
     ) -> PyResult<Vec<(Hash, NodeHashToIndex)>> {
         let mut extracted_jobs: Vec<(Hash, PathBuf)> = Vec::new();
         for (hash, path) in jobs {
-            let path: PathBuf = path.extract(py)?;
             extracted_jobs.push((hash, path));
         }
 
@@ -257,21 +255,23 @@ impl DeltaReader {
         })?)
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     #[pyo3(name = "collect_from_merkle_blobs")]
     pub fn py_collect_from_merkle_blobs(
         &mut self,
         py: Python<'_>,
-        jobs: Vec<(PyObject, Vec<TreeIndex>)>,
+        jobs: Vec<(PathBuf, Vec<TreeIndex>)>,
     ) -> PyResult<()> {
         let mut pathed_jobs: Vec<(PathBuf, Vec<TreeIndex>)> = Vec::new();
         for (path, indexes) in jobs {
-            pathed_jobs.push((path.extract(py)?, indexes));
+            pathed_jobs.push((path, indexes));
         }
         py.allow_threads(|| self.collect_from_merkle_blobs(&pathed_jobs))?;
 
         Ok(())
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     #[pyo3(name = "create_merkle_blob_and_filter_unused_nodes")]
     pub fn py_create_merkle_blob_and_filter_unused_nodes(
         &mut self,
@@ -287,15 +287,13 @@ impl DeltaReader {
 impl DeltaFileCache {
     #[allow(clippy::needless_pass_by_value)]
     #[new]
-    fn py_new(py: Python<'_>, path: PyObject) -> PyResult<Self> {
-        let path: PathBuf = path.extract(py)?;
+    fn py_new(path: PathBuf) -> PyResult<Self> {
         Ok(Self::new(&path)?)
     }
 
     #[allow(clippy::needless_pass_by_value)]
     #[pyo3(name = "load_previous_hashes")]
-    pub fn py_load_previous_hashes(&mut self, py: Python<'_>, path: PyObject) -> PyResult<()> {
-        let path: PathBuf = path.extract(py)?;
+    pub fn py_load_previous_hashes(&mut self, path: PathBuf) -> PyResult<()> {
         Ok(self.load_previous_hashes(&path)?)
     }
 
