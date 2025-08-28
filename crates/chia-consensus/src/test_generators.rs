@@ -167,6 +167,7 @@ pub(crate) fn print_diff(output: &str, expected: &str) {
 // in CI we run with the clvmr/debug-allocator feature enabled, which makes this
 // test use too much RAM (about 6.8 GB)
 //#[case("aa-million-messages")]
+#[case("3000000-conditions-single-coin")]
 #[case("100000-remarks-prefab")]
 #[case("29500-remarks-procedural")]
 #[case("aa-million-message-spends")]
@@ -236,6 +237,7 @@ fn run_generator(#[case] name: &str) {
         "aa-million-message-spends",
         "29500-remarks-procedural",
         "100000-remarks-prefab",
+        "3000000-conditions-single-coin",
     ]
     .contains(&name); // these could be stored in the case, but there's so few it's easier to look at here
 

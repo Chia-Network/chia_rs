@@ -86,6 +86,8 @@ for g in test_list:
     elif "aa-million-message-spends.txt" in g:
         flags = COST_CONDITIONS
         run_generator1 = False
+    elif "3000000-conditions-single-coin.txt" in g:
+        run_generator1 = False
     elif "29500-remarks-procedural.txt" in g:
         run_generator1 = False
     elif "100000-remarks-prefab.txt" in g:
