@@ -830,5 +830,40 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<AugSchemeMPL>()?;
     m.add_class::<BlsCache>()?;
 
+    add_datalayer_submodule(py, m)?;
+
+    Ok(())
+}
+
+pub fn add_datalayer_submodule(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
+    use chia_datalayer::*;
+
+    let datalayer = PyModule::new(py, "datalayer")?;
+    parent.add_submodule(&datalayer)?;
+
+    datalayer.add_class::<BlockStatusCache>()?;
+    datalayer.add_class::<DeltaReader>()?;
+    datalayer.add_class::<MerkleBlob>()?;
+    datalayer.add_class::<InternalNode>()?;
+    datalayer.add_class::<LeafNode>()?;
+    datalayer.add_class::<KeyId>()?;
+    datalayer.add_class::<ValueId>()?;
+    datalayer.add_class::<TreeIndex>()?;
+    datalayer.add_class::<ProofOfInclusionLayer>()?;
+    datalayer.add_class::<ProofOfInclusion>()?;
+    datalayer.add_class::<DeltaFileCache>()?;
+
+    datalayer.add("BLOCK_SIZE", BLOCK_SIZE)?;
+    datalayer.add("DATA_SIZE", DATA_SIZE)?;
+    datalayer.add("METADATA_SIZE", METADATA_SIZE)?;
+
+    python_exceptions::add_to_module(py, &datalayer)?;
+
+    // https://github.com/PyO3/pyo3/issues/1517#issuecomment-808664021
+    // https://github.com/PyO3/pyo3/issues/759
+    py.import("sys")?
+        .getattr("modules")?
+        .set_item("chia_rs.datalayer", datalayer)?;
+
     Ok(())
 }
