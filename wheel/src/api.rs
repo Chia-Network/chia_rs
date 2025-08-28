@@ -65,7 +65,7 @@ use pyo3::prelude::*;
 use pyo3::pybacked::PyBackedBytes;
 use pyo3::types::PyList;
 use pyo3::types::PyTuple;
-use pyo3::types::{PyBytes, PyDict};
+use pyo3::types::{PyBytes, PyCFunction, PyDict};
 use pyo3::wrap_pyfunction;
 use pyo3::PyClass;
 
@@ -611,10 +611,25 @@ where
     Ok(())
 }
 
+fn add_function(
+    py: Python<'_>,
+    m: &Bound<'_, PyModule>,
+    wrapped: Bound<'_, PyCFunction>,
+) -> PyResult<()> {
+    // remove the nested .chia_rs name since we re-export from the top
+    let name = m
+        .name()?
+        .call_method(pyo3::intern!(py, "replace"), (".chia_rs", ""), None)?;
+    wrapped.setattr("__module__", name)?;
+
+    m.add_function(wrapped)?;
+    Ok(())
+}
+
 #[pymodule]
 pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // generator functions
-    m.add_function(wrap_pyfunction!(run_block_generator, m)?)?;
+    add_function(py, m, wrap_pyfunction!(run_block_generator, m)?)?;
     m.add_function(wrap_pyfunction!(run_block_generator2, m)?)?;
     m.add_function(wrap_pyfunction!(additions_and_removals, m)?)?;
     m.add_function(wrap_pyfunction!(solution_generator, m)?)?;
