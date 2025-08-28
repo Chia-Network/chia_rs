@@ -67,6 +67,7 @@ use pyo3::types::PyList;
 use pyo3::types::PyTuple;
 use pyo3::types::{PyBytes, PyDict};
 use pyo3::wrap_pyfunction;
+use pyo3::PyClass;
 
 use std::iter::zip;
 
@@ -138,6 +139,7 @@ pub fn tree_hash<'a>(py: Python<'a>, blob: PyBuffer<u8>) -> PyResult<Bound<'a, P
 pub fn get_puzzle_and_solution_for_coin<'a>(
     py: Python<'a>,
     program: PyBuffer<u8>,
+    args: PyBuffer<u8>,
     max_cost: Cost,
     find_parent: Bytes32,
     find_amount: u64,
@@ -594,7 +596,6 @@ pub fn py_is_canonical_serialization(buf: &[u8]) -> bool {
     is_canonical_serialization(buf)
 }
 
-use pyo3::PyClass;
 fn add_class<T>(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()>
 where
     T: PyClass,
