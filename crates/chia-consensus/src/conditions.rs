@@ -1455,8 +1455,13 @@ pub fn parse_spends<V: SpendVisitor>(
 
     let mut cost_left = max_cost;
 
+    let mut spend_count: u32 = 0;
     let mut iter = first(a, spends)?;
     while let Some((spend, next)) = next(a, iter)? {
+        spend_count += 1;
+        if spend_count >= constants.coinspends_block_limit {
+            return Err(ValidationErr(iter, ErrorCode::CoinSpendLimitReached));
+        }
         iter = next;
         // cost_left is passed in as a mutable reference and decremented by the
         // cost of the condition (if it has a cost). This let us fail as early
