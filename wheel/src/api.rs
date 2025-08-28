@@ -63,9 +63,9 @@ use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::pybacked::PyBackedBytes;
-use pyo3::types::PyList;
 use pyo3::types::PyTuple;
 use pyo3::types::{PyBytes, PyDict};
+use pyo3::types::{PyList, PySlice};
 use pyo3::wrap_pyfunction;
 
 use std::iter::zip;
@@ -138,7 +138,6 @@ pub fn tree_hash<'a>(py: Python<'a>, blob: PyBuffer<u8>) -> PyResult<Bound<'a, P
 pub fn get_puzzle_and_solution_for_coin<'a>(
     py: Python<'a>,
     program: PyBuffer<u8>,
-    args: PyBuffer<u8>,
     max_cost: Cost,
     find_parent: Bytes32,
     find_amount: u64,
@@ -602,11 +601,11 @@ where
 {
     m.add_class::<T>()?;
     let cls = m.getattr(T::NAME)?;
-    let mut name = m.name()?;
-    if name == "chia_rs.chia_rs" {
-        name = "chia_rs".into_pyobject(py)?;
-    }
-    cls.setattr("__module__", name);
+    // remove the nested .chia_rs name since we re-export from the top
+    let name = m
+        .name()?
+        .call_method(pyo3::intern!(py, "replace"), (".chia_rs", ""), None)?;
+    cls.setattr("__module__", name)?;
 
     Ok(())
 }
@@ -838,7 +837,7 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 pub fn add_datalayer_submodule(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     use chia_datalayer::*;
 
-    let datalayer = PyModule::new(py, "datalayer")?;
+    let datalayer = PyModule::new(py, format!("{}.datalayer", parent.name()?).as_str())?;
     parent.add_submodule(&datalayer)?;
 
     datalayer.add_class::<BlockStatusCache>()?;
@@ -851,7 +850,7 @@ pub fn add_datalayer_submodule(py: Python<'_>, parent: &Bound<'_, PyModule>) -> 
     datalayer.add_class::<TreeIndex>()?;
     datalayer.add_class::<ProofOfInclusionLayer>()?;
     datalayer.add_class::<ProofOfInclusion>()?;
-    datalayer.add_class::<DeltaFileCache>()?;
+    add_class::<DeltaFileCache>(py, &datalayer)?;
 
     datalayer.add("BLOCK_SIZE", BLOCK_SIZE)?;
     datalayer.add("DATA_SIZE", DATA_SIZE)?;
