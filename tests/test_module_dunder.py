@@ -11,13 +11,14 @@ def recurse_module(
     module: ModuleType,
     ignore: set[str],
 ) -> Iterator[tuple[str, str, str]]:
-     yield from _recurse_module(
+    yield from _recurse_module(
         module=module,
         ignore=ignore,
         prefix=module.__name__,
         top_level=module,
         seen=[],
-     )
+    )
+
 
 def _recurse_module(
     module: ModuleType,
@@ -37,7 +38,7 @@ def _recurse_module(
         dunder_module = getattr(value, "__module__", None)
         if dunder_module is not None:
             yield (full_path, prefix, dunder_module)
-#         assert "datalayer" not in full_path, f"{value=}, {type(value)=}, {top_level.__name__=}, {isinstance(value, ModuleType)=}, {value.__name__.startswith(f"{top_level.__name__}.")=}, {module not in seen=}"
+        #         assert "datalayer" not in full_path, f"{value=}, {type(value)=}, {top_level.__name__=}, {isinstance(value, ModuleType)=}, {value.__name__.startswith(f"{top_level.__name__}.")=}, {module not in seen=}"
         if (
             isinstance(value, ModuleType)
             and value.__name__.startswith(f"{top_level.__name__}.")
@@ -45,7 +46,9 @@ def _recurse_module(
             and (
                 # TODO: this loader check might be bogus and related to the workaround with sys.modules for datalayer
                 value.__loader__ is None
-                or isinstance(value.__loader__, _frozen_importlib_external.ExtensionFileLoader)
+                or isinstance(
+                    value.__loader__, _frozen_importlib_external.ExtensionFileLoader
+                )
             )
         ):
             seen.append(value)
@@ -72,4 +75,12 @@ def test_enough() -> None:
 
 
 def test_some_datalayer() -> None:
-    assert sum(1 if prefix.endswith(".datalayer") else 0 for _, prefix, _ in recurse_module(module=chia_rs, ignore={"chia_rs.chia_rs"})) > 5
+    assert (
+        sum(
+            1 if prefix.endswith(".datalayer") else 0
+            for _, prefix, _ in recurse_module(
+                module=chia_rs, ignore={"chia_rs.chia_rs"}
+            )
+        )
+        > 5
+    )
