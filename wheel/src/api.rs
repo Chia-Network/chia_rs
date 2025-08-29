@@ -596,11 +596,15 @@ pub fn py_is_canonical_serialization(buf: &[u8]) -> bool {
     is_canonical_serialization(buf)
 }
 
-fn get_fixed_module_path<'a>(m: &Bound<'a, PyModule>) -> PyResult<Bound<'a, PyAny>> {
-    // remove the nested .chia_rs name since we re-export from the top
-    m.name()?.call_method("replace", (".chia_rs", ""), None)
+fn get_fixed_module_path(m: &Bound<'_, PyModule>) -> PyResult<String> {
+    let fixed = fix_import_path(m.name()?.extract::<String>()?.as_str());
+
+    Ok(fixed)
 }
 
+fn fix_import_path(path_string: &str) -> String {
+    path_string.replace(".chia_rs", "")
+}
 fn add_class<T>(m: &Bound<'_, PyModule>) -> PyResult<()>
 where
     T: PyClass,
@@ -869,11 +873,23 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 pub fn add_datalayer_submodule(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     use chia_datalayer::*;
 
-    let datalayer = PyModule::new(py, format!("{}.datalayer", parent.name()?).as_str())?;
-    parent.add_submodule(&datalayer)?;
+    let single_element_module_name = "datalayer";
+    let original_path = format!("{}.{}", parent.name()?, single_element_module_name);
+    let module_path = fix_import_path(&original_path);
+    let module = PyModule::new(py, &module_path)?;
+    parent.add_submodule(&module)?;
+
+    // https://github.com/PyO3/pyo3/pull/5375
+    // move attribute to proper name
+    parent.delattr(module.name()?)?;
+    parent.setattr(single_element_module_name, &module)?;
+    // update __all__ as well
+    let all = parent.getattr("__all__")?;
+    all.call_method1("remove", (module.name()?,))?;
+    all.call_method1("append", (single_element_module_name,))?;
 
     add_classes!(
-        &datalayer,
+        &module,
         BlockStatusCache,
         DeltaReader,
         MerkleBlob,
@@ -887,17 +903,19 @@ pub fn add_datalayer_submodule(py: Python<'_>, parent: &Bound<'_, PyModule>) -> 
         DeltaFileCache,
     );
 
-    datalayer.add("BLOCK_SIZE", BLOCK_SIZE)?;
-    datalayer.add("DATA_SIZE", DATA_SIZE)?;
-    datalayer.add("METADATA_SIZE", METADATA_SIZE)?;
+    module.add("BLOCK_SIZE", BLOCK_SIZE)?;
+    module.add("DATA_SIZE", DATA_SIZE)?;
+    module.add("METADATA_SIZE", METADATA_SIZE)?;
 
-    python_exceptions::add_to_module(py, &datalayer)?;
+    python_exceptions::add_to_module(py, &module)?;
 
     // https://github.com/PyO3/pyo3/issues/1517#issuecomment-808664021
     // https://github.com/PyO3/pyo3/issues/759
+    // needed for: import chia_rs.datalayer
+    // not needed for: from chia_rs import datalayer
     py.import("sys")?
         .getattr("modules")?
-        .set_item("chia_rs.datalayer", datalayer)?;
+        .set_item("chia_rs.datalayer", module)?;
 
     Ok(())
 }

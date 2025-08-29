@@ -1,3 +1,4 @@
+import _frozen_importlib_external
 from types import ModuleType
 from typing import Optional
 
@@ -6,38 +7,69 @@ import pytest
 import chia_rs
 
 
-def recurse_module(module: ModuleType, ignore: set[str], prefix: Optional[str] = None, top_level: Optional[ModuleType] = None):
-    if prefix is None:
-        prefix = module.__name__
-    if top_level is None:
-        top_level = module
+def recurse_module(
+    module: ModuleType,
+    ignore: set[str],
+):
+     yield from _recurse_module(
+        module=module,
+        ignore=ignore,
+        prefix=module.__name__,
+        top_level=module,
+        seen=[],
+     )
 
+def _recurse_module(
+    module: ModuleType,
+    ignore: set[str],
+    prefix: str,
+    top_level: ModuleType,
+    seen: list[ModuleType],
+):
     for name, value in vars(module).items():
         if name.startswith("_"):
             continue
 
-        full_name = f"{prefix}.{name}"
-        if full_name in ignore:
+        full_path = f"{prefix}.{name}"
+        if any(full_path.startswith(path) for path in ignore):
             continue
 
         dunder_module = getattr(value, "__module__", None)
         if dunder_module is not None:
-            yield (full_name, prefix, dunder_module)
+            yield (full_path, prefix, dunder_module)
+#         assert "datalayer" not in full_path, f"{value=}, {type(value)=}, {top_level.__name__=}, {isinstance(value, ModuleType)=}, {value.__name__.startswith(f"{top_level.__name__}.")=}, {module not in seen=}"
         if (
             isinstance(value, ModuleType)
-            and module.__name__.startswith(f"{top_level.__name__}.")
+            and value.__name__.startswith(f"{top_level.__name__}.")
+            and value not in seen
+            and (
+                # TODO: this loader check might be bogus and related to the workaround with sys.modules for datalayer
+                value.__loader__ is None
+                or isinstance(value.__loader__, _frozen_importlib_external.ExtensionFileLoader)
+            )
         ):
-            yield from f(module=module, ignore=ignore, prefix=full_name, top_level=top_level)
+            seen.append(value)
+            yield from _recurse_module(
+                module=value,
+                ignore=ignore,
+                prefix=full_path,
+                top_level=top_level,
+                seen=seen,
+            )
 
 
 @pytest.mark.parametrize(
-    argnames=["full_name", "prefix", "dunder_module"],
+    argnames=["full_path", "prefix", "dunder_module"],
     argvalues=recurse_module(module=chia_rs, ignore={"chia_rs.chia_rs"}),
 )
-def test_it(full_name, prefix, dunder_module) -> None:
-    assert dunder_module == prefix, f"failing for: {full_name}"
+def test_it(full_path, prefix, dunder_module) -> None:
+    assert dunder_module == prefix, f"failing for: {full_path}"
 
 
-def test_and_make_sure() -> None:
+def test_enough() -> None:
     count = sum(1 for _ in recurse_module(module=chia_rs, ignore={"chia_rs.chia_rs"}))
     assert count > 50
+
+
+def test_some_datalayer() -> None:
+    assert sum(1 if prefix.endswith(".datalayer") else 0 for _, prefix, _ in recurse_module(module=chia_rs, ignore={"chia_rs.chia_rs"})) > 5
