@@ -36,3 +36,8 @@ def recurse_module(module: ModuleType, ignore: set[str], prefix: Optional[str] =
 )
 def test_it(full_name, prefix, dunder_module) -> None:
     assert dunder_module == prefix, f"failing for: {full_name}"
+
+
+def test_and_make_sure() -> None:
+    count = sum(1 for _ in recurse_module(module=chia_rs, ignore={"chia_rs.chia_rs"}))
+    assert count > 50
