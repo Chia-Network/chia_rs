@@ -596,48 +596,59 @@ pub fn py_is_canonical_serialization(buf: &[u8]) -> bool {
     is_canonical_serialization(buf)
 }
 
-fn add_class<T>(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()>
+fn get_fixed_module_path<'a>(m: &Bound<'a, PyModule>) -> PyResult<Bound<'a, PyAny>> {
+    // remove the nested .chia_rs name since we re-export from the top
+    m.name()?.call_method("replace", (".chia_rs", ""), None)
+}
+
+fn add_class<T>(m: &Bound<'_, PyModule>) -> PyResult<()>
 where
     T: PyClass,
 {
     m.add_class::<T>()?;
     let cls = m.getattr(T::NAME)?;
-    // remove the nested .chia_rs name since we re-export from the top
-    let name = m
-        .name()?
-        .call_method(pyo3::intern!(py, "replace"), (".chia_rs", ""), None)?;
-    cls.setattr("__module__", name)?;
+    cls.setattr("__module__", get_fixed_module_path(m)?)?;
 
     Ok(())
 }
 
-fn add_function(
-    py: Python<'_>,
-    m: &Bound<'_, PyModule>,
-    wrapped: Bound<'_, PyCFunction>,
-) -> PyResult<()> {
-    // remove the nested .chia_rs name since we re-export from the top
-    let name = m
-        .name()?
-        .call_method(pyo3::intern!(py, "replace"), (".chia_rs", ""), None)?;
-    wrapped.setattr("__module__", name)?;
+fn add_function(m: &Bound<'_, PyModule>, wrapped: Bound<'_, PyCFunction>) -> PyResult<()> {
+    wrapped.setattr("__module__", get_fixed_module_path(m)?)?;
 
     m.add_function(wrapped)?;
     Ok(())
 }
 
+macro_rules! add_functions {
+    ($m:expr, $($func:ident),+ $(,)?) => {
+      $(
+          add_function($m, wrap_pyfunction!($func, $m)?)?;
+      )+
+    };
+}
+
+macro_rules! add_classes {
+    ($m:expr, $($class:ident),+ $(,)?) => {
+      $(
+          add_class::<$class>($m)?;
+      )+
+    };
+}
+
 #[pymodule]
 pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // generator functions
-    add_function(py, m, wrap_pyfunction!(run_block_generator, m)?)?;
-    m.add_function(wrap_pyfunction!(run_block_generator2, m)?)?;
-    m.add_function(wrap_pyfunction!(additions_and_removals, m)?)?;
-    m.add_function(wrap_pyfunction!(solution_generator, m)?)?;
-    m.add_function(wrap_pyfunction!(solution_generator_backrefs, m)?)?;
-    m.add_function(wrap_pyfunction!(supports_fast_forward, m)?)?;
-    m.add_function(wrap_pyfunction!(fast_forward_singleton, m)?)?;
-    m.add_class::<OwnedSpendBundleConditions>()?;
-    add_class::<BlockBuilder>(py, m)?;
+    add_functions!(
+        m,
+        run_block_generator,
+        run_block_generator2,
+        additions_and_removals,
+        solution_generator,
+        solution_generator_backrefs,
+        supports_fast_forward,
+        fast_forward_singleton,
+    );
+    add_classes!(m, OwnedSpendBundleConditions, BlockBuilder,);
     m.add(
         "ELIGIBLE_FOR_DEDUP",
         chia_consensus::conditions::ELIGIBLE_FOR_DEDUP,
@@ -646,40 +657,39 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
         "ELIGIBLE_FOR_FF",
         chia_consensus::conditions::ELIGIBLE_FOR_FF,
     )?;
-    m.add_class::<OwnedSpendConditions>()?;
+    add_classes!(m, OwnedSpendConditions,);
 
-    // pot functions
-    m.add_function(wrap_pyfunction!(py_calculate_sp_interval_iters, m)?)?;
-    m.add_function(wrap_pyfunction!(py_calculate_sp_iters, m)?)?;
-    m.add_function(wrap_pyfunction!(py_calculate_ip_iters, m)?)?;
-    m.add_function(wrap_pyfunction!(py_is_overflow_block, m)?)?;
-    m.add_function(wrap_pyfunction!(py_expected_plot_size, m)?)?;
-
-    // check time lock
-    m.add_function(wrap_pyfunction!(py_check_time_locks, m)?)?;
-
-    // CLVM validation
-    m.add_function(wrap_pyfunction!(py_is_canonical_serialization, m)?)?;
+    add_functions!(
+        m,
+        // pot functions
+        py_calculate_sp_interval_iters,
+        py_calculate_sp_iters,
+        py_calculate_ip_iters,
+        py_is_overflow_block,
+        py_expected_plot_size,
+        // check time lock
+        py_check_time_locks,
+        // CLVM validation
+        py_is_canonical_serialization,
+    );
 
     // constants
-    m.add_class::<ConsensusConstants>()?;
+    add_classes!(m, ConsensusConstants,);
 
     // merkle tree
-    m.add_class::<MerkleSet>()?;
-    m.add_function(wrap_pyfunction!(confirm_included_already_hashed, m)?)?;
-    m.add_function(wrap_pyfunction!(confirm_not_included_already_hashed, m)?)?;
-
-    // spendbundle validation
-    m.add_function(wrap_pyfunction!(py_validate_clvm_and_signature, m)?)?;
-    m.add_function(wrap_pyfunction!(py_get_conditions_from_spendbundle, m)?)?;
-    m.add_function(wrap_pyfunction!(py_get_flags_for_height_and_constants, m)?)?;
-
-    // get spends for generator
-    m.add_function(wrap_pyfunction!(get_spends_for_trusted_block, m)?)?;
-    m.add_function(wrap_pyfunction!(
+    add_classes!(m, MerkleSet,);
+    add_functions!(
+        m,
+        confirm_included_already_hashed,
+        confirm_not_included_already_hashed,
+        // spendbundle validation
+        py_validate_clvm_and_signature,
+        py_get_conditions_from_spendbundle,
+        py_get_flags_for_height_and_constants,
+        // get spends for generator
+        get_spends_for_trusted_block,
         get_spends_for_trusted_block_with_conditions,
-        m
-    )?)?;
+    );
 
     // clvm functions
     m.add("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;
@@ -692,136 +702,136 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // for backwards compatibility
     m.add("ALLOW_BACKREFS", 0)?;
 
-    m.add_class::<PyPlotSize>()?;
-
-    // Chia classes
-    m.add_class::<Coin>()?;
-    m.add_class::<CoinRecord>()?;
-    m.add_class::<PoolTarget>()?;
-    m.add_class::<ClassgroupElement>()?;
-    m.add_class::<EndOfSubSlotBundle>()?;
-    m.add_class::<TransactionsInfo>()?;
-    m.add_class::<FoliageTransactionBlock>()?;
-    m.add_class::<FoliageBlockData>()?;
-    m.add_class::<Foliage>()?;
-    m.add_class::<ProofOfSpace>()?;
-    m.add_class::<RewardChainBlockUnfinished>()?;
-    m.add_class::<RewardChainBlock>()?;
-    m.add_class::<ChallengeBlockInfo>()?;
-    m.add_class::<ChallengeChainSubSlot>()?;
-    m.add_class::<InfusedChallengeChainSubSlot>()?;
-    m.add_class::<RewardChainSubSlot>()?;
-    m.add_class::<SubSlotProofs>()?;
-    m.add_class::<SpendBundle>()?;
-    m.add_class::<Program>()?;
-    m.add_class::<CoinSpend>()?;
-    m.add_class::<VDFInfo>()?;
-    m.add_class::<VDFProof>()?;
-    m.add_class::<SubSlotData>()?;
-    m.add_class::<SubEpochData>()?;
-    m.add_class::<SubEpochChallengeSegment>()?;
-    m.add_class::<SubEpochSegments>()?;
-    m.add_class::<SubEpochSummary>()?;
-    m.add_class::<UnfinishedBlock>()?;
-    m.add_class::<FullBlock>()?;
-    m.add_class::<BlockRecord>()?;
-    m.add_class::<WeightProof>()?;
-    m.add_class::<RecentChainData>()?;
-    m.add_class::<ProofBlockHeader>()?;
-    m.add_class::<TimestampedPeerInfo>()?;
-
-    // wallet protocol
-    m.add_class::<RequestPuzzleSolution>()?;
-    m.add_class::<PuzzleSolutionResponse>()?;
-    m.add_class::<RespondPuzzleSolution>()?;
-    m.add_class::<RejectPuzzleSolution>()?;
-    m.add_class::<SendTransaction>()?;
-    m.add_class::<TransactionAck>()?;
-    m.add_class::<NewPeakWallet>()?;
-    m.add_class::<RequestBlockHeader>()?;
-    m.add_class::<RespondBlockHeader>()?;
-    m.add_class::<RejectHeaderRequest>()?;
-    m.add_class::<RequestRemovals>()?;
-    m.add_class::<RespondRemovals>()?;
-    m.add_class::<RejectRemovalsRequest>()?;
-    m.add_class::<RequestAdditions>()?;
-    m.add_class::<RespondAdditions>()?;
-    m.add_class::<RejectAdditionsRequest>()?;
-    m.add_class::<RespondBlockHeaders>()?;
-    m.add_class::<RejectBlockHeaders>()?;
-    m.add_class::<RequestBlockHeaders>()?;
-    m.add_class::<RequestHeaderBlocks>()?;
-    m.add_class::<RejectHeaderBlocks>()?;
-    m.add_class::<RespondHeaderBlocks>()?;
-    m.add_class::<HeaderBlock>()?;
-    m.add_class::<UnfinishedHeaderBlock>()?;
-    m.add_class::<CoinState>()?;
-    m.add_class::<RegisterForPhUpdates>()?;
-    m.add_class::<RespondToPhUpdates>()?;
-    m.add_class::<RegisterForCoinUpdates>()?;
-    m.add_class::<RespondToCoinUpdates>()?;
-    m.add_class::<CoinStateUpdate>()?;
-    m.add_class::<RequestChildren>()?;
-    m.add_class::<RespondChildren>()?;
-    m.add_class::<RequestSesInfo>()?;
-    m.add_class::<RespondSesInfo>()?;
-    m.add_class::<RequestFeeEstimates>()?;
-    m.add_class::<RespondFeeEstimates>()?;
-    m.add_class::<RequestRemovePuzzleSubscriptions>()?;
-    m.add_class::<RespondRemovePuzzleSubscriptions>()?;
-    m.add_class::<RequestRemoveCoinSubscriptions>()?;
-    m.add_class::<RespondRemoveCoinSubscriptions>()?;
-    m.add_class::<CoinStateFilters>()?;
-    m.add_class::<RequestPuzzleState>()?;
-    m.add_class::<RespondPuzzleState>()?;
-    m.add_class::<RejectPuzzleState>()?;
-    m.add_class::<RequestCoinState>()?;
-    m.add_class::<RespondCoinState>()?;
-    m.add_class::<RejectCoinState>()?;
-    m.add_class::<MempoolItemsAdded>()?;
-    m.add_class::<MempoolItemsRemoved>()?;
-    m.add_class::<RemovedMempoolItem>()?;
-    m.add_class::<RequestCostInfo>()?;
-    m.add_class::<RespondCostInfo>()?;
-
-    // full node protocol
-    m.add_class::<NewPeak>()?;
-    m.add_class::<NewTransaction>()?;
-    m.add_class::<RequestTransaction>()?;
-    m.add_class::<RespondTransaction>()?;
-    m.add_class::<RequestProofOfWeight>()?;
-    m.add_class::<RespondProofOfWeight>()?;
-    m.add_class::<RequestBlock>()?;
-    m.add_class::<RejectBlock>()?;
-    m.add_class::<RequestBlocks>()?;
-    m.add_class::<RespondBlocks>()?;
-    m.add_class::<RejectBlocks>()?;
-    m.add_class::<RespondBlock>()?;
-    m.add_class::<NewUnfinishedBlock>()?;
-    m.add_class::<RequestUnfinishedBlock>()?;
-    m.add_class::<RespondUnfinishedBlock>()?;
-    m.add_class::<NewSignagePointOrEndOfSubSlot>()?;
-    m.add_class::<RequestSignagePointOrEndOfSubSlot>()?;
-    m.add_class::<RespondSignagePoint>()?;
-    m.add_class::<RespondEndOfSubSlot>()?;
-    m.add_class::<RequestMempoolTransactions>()?;
-    m.add_class::<NewCompactVDF>()?;
-    m.add_class::<RequestCompactVDF>()?;
-    m.add_class::<RespondCompactVDF>()?;
-    m.add_class::<RequestPeers>()?;
-    m.add_class::<RespondPeers>()?;
-    m.add_class::<NewUnfinishedBlock2>()?;
-    m.add_class::<RequestUnfinishedBlock2>()?;
-    m.add_class::<Handshake>()?;
-    m.add_class::<FeeEstimate>()?;
-    m.add_class::<FeeEstimateGroup>()?;
-    m.add_class::<FeeRate>()?;
-    m.add_class::<LazyNode>()?;
-    m.add_class::<Message>()?;
+    add_classes!(
+        m,
+        PyPlotSize,
+        // Chia classes
+        Coin,
+        CoinRecord,
+        PoolTarget,
+        ClassgroupElement,
+        EndOfSubSlotBundle,
+        TransactionsInfo,
+        FoliageTransactionBlock,
+        FoliageBlockData,
+        Foliage,
+        ProofOfSpace,
+        RewardChainBlockUnfinished,
+        RewardChainBlock,
+        ChallengeBlockInfo,
+        ChallengeChainSubSlot,
+        InfusedChallengeChainSubSlot,
+        RewardChainSubSlot,
+        SubSlotProofs,
+        SpendBundle,
+        Program,
+        CoinSpend,
+        VDFInfo,
+        VDFProof,
+        SubSlotData,
+        SubEpochData,
+        SubEpochChallengeSegment,
+        SubEpochSegments,
+        SubEpochSummary,
+        UnfinishedBlock,
+        FullBlock,
+        BlockRecord,
+        WeightProof,
+        RecentChainData,
+        ProofBlockHeader,
+        TimestampedPeerInfo,
+        // wallet protocol
+        RequestPuzzleSolution,
+        PuzzleSolutionResponse,
+        RespondPuzzleSolution,
+        RejectPuzzleSolution,
+        SendTransaction,
+        TransactionAck,
+        NewPeakWallet,
+        RequestBlockHeader,
+        RespondBlockHeader,
+        RejectHeaderRequest,
+        RequestRemovals,
+        RespondRemovals,
+        RejectRemovalsRequest,
+        RequestAdditions,
+        RespondAdditions,
+        RejectAdditionsRequest,
+        RespondBlockHeaders,
+        RejectBlockHeaders,
+        RequestBlockHeaders,
+        RequestHeaderBlocks,
+        RejectHeaderBlocks,
+        RespondHeaderBlocks,
+        HeaderBlock,
+        UnfinishedHeaderBlock,
+        CoinState,
+        RegisterForPhUpdates,
+        RespondToPhUpdates,
+        RegisterForCoinUpdates,
+        RespondToCoinUpdates,
+        CoinStateUpdate,
+        RequestChildren,
+        RespondChildren,
+        RequestSesInfo,
+        RespondSesInfo,
+        RequestFeeEstimates,
+        RespondFeeEstimates,
+        RequestRemovePuzzleSubscriptions,
+        RespondRemovePuzzleSubscriptions,
+        RequestRemoveCoinSubscriptions,
+        RespondRemoveCoinSubscriptions,
+        CoinStateFilters,
+        RequestPuzzleState,
+        RespondPuzzleState,
+        RejectPuzzleState,
+        RequestCoinState,
+        RespondCoinState,
+        RejectCoinState,
+        MempoolItemsAdded,
+        MempoolItemsRemoved,
+        RemovedMempoolItem,
+        RequestCostInfo,
+        RespondCostInfo,
+        // full node protocol
+        NewPeak,
+        NewTransaction,
+        RequestTransaction,
+        RespondTransaction,
+        RequestProofOfWeight,
+        RespondProofOfWeight,
+        RequestBlock,
+        RejectBlock,
+        RequestBlocks,
+        RespondBlocks,
+        RejectBlocks,
+        RespondBlock,
+        NewUnfinishedBlock,
+        RequestUnfinishedBlock,
+        RespondUnfinishedBlock,
+        NewSignagePointOrEndOfSubSlot,
+        RequestSignagePointOrEndOfSubSlot,
+        RespondSignagePoint,
+        RespondEndOfSubSlot,
+        RequestMempoolTransactions,
+        NewCompactVDF,
+        RequestCompactVDF,
+        RespondCompactVDF,
+        RequestPeers,
+        RespondPeers,
+        NewUnfinishedBlock2,
+        RequestUnfinishedBlock2,
+        Handshake,
+        FeeEstimate,
+        FeeEstimateGroup,
+        FeeRate,
+        LazyNode,
+        Message,
+    );
 
     // facilities from clvm_rs
 
-    m.add_function(wrap_pyfunction!(run_chia_program, m)?)?;
+    add_functions!(m, run_chia_program,);
     m.add("NO_UNKNOWN_OPS", NO_UNKNOWN_OPS)?;
     m.add("LIMIT_HEAP", LIMIT_HEAP)?;
     m.add(
@@ -829,21 +839,27 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
         ENABLE_KECCAK_OPS_OUTSIDE_GUARD,
     )?;
 
-    m.add_function(wrap_pyfunction!(serialized_length, m)?)?;
-    m.add_function(wrap_pyfunction!(serialized_length_trusted, m)?)?;
-    m.add_function(wrap_pyfunction!(compute_merkle_set_root, m)?)?;
-    m.add_function(wrap_pyfunction!(tree_hash, m)?)?;
-    m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin, m)?)?;
-    m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin2, m)?)?;
+    add_functions!(
+        m,
+        serialized_length,
+        serialized_length_trusted,
+        compute_merkle_set_root,
+        tree_hash,
+        get_puzzle_and_solution_for_coin,
+        get_puzzle_and_solution_for_coin2,
+    );
 
     // facilities from chia-bls
 
-    m.add_class::<PublicKey>()?;
-    m.add_class::<Signature>()?;
-    m.add_class::<GTElement>()?;
-    m.add_class::<SecretKey>()?;
-    m.add_class::<AugSchemeMPL>()?;
-    m.add_class::<BlsCache>()?;
+    add_classes!(
+        m,
+        PublicKey,
+        Signature,
+        GTElement,
+        SecretKey,
+        AugSchemeMPL,
+        BlsCache,
+    );
 
     add_datalayer_submodule(py, m)?;
 
@@ -856,17 +872,20 @@ pub fn add_datalayer_submodule(py: Python<'_>, parent: &Bound<'_, PyModule>) -> 
     let datalayer = PyModule::new(py, format!("{}.datalayer", parent.name()?).as_str())?;
     parent.add_submodule(&datalayer)?;
 
-    datalayer.add_class::<BlockStatusCache>()?;
-    datalayer.add_class::<DeltaReader>()?;
-    datalayer.add_class::<MerkleBlob>()?;
-    datalayer.add_class::<InternalNode>()?;
-    datalayer.add_class::<LeafNode>()?;
-    datalayer.add_class::<KeyId>()?;
-    datalayer.add_class::<ValueId>()?;
-    datalayer.add_class::<TreeIndex>()?;
-    datalayer.add_class::<ProofOfInclusionLayer>()?;
-    datalayer.add_class::<ProofOfInclusion>()?;
-    add_class::<DeltaFileCache>(py, &datalayer)?;
+    add_classes!(
+        &datalayer,
+        BlockStatusCache,
+        DeltaReader,
+        MerkleBlob,
+        InternalNode,
+        LeafNode,
+        KeyId,
+        ValueId,
+        TreeIndex,
+        ProofOfInclusionLayer,
+        ProofOfInclusion,
+        DeltaFileCache,
+    );
 
     datalayer.add("BLOCK_SIZE", BLOCK_SIZE)?;
     datalayer.add("DATA_SIZE", DATA_SIZE)?;
