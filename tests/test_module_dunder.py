@@ -1,6 +1,6 @@
 import _frozen_importlib_external
 from types import ModuleType
-from typing import Optional
+from typing import Iterator, Optional
 
 import pytest
 
@@ -10,7 +10,7 @@ import chia_rs
 def recurse_module(
     module: ModuleType,
     ignore: set[str],
-):
+) -> Iterator[tuple[str, str, str]]:
      yield from _recurse_module(
         module=module,
         ignore=ignore,
@@ -25,7 +25,7 @@ def _recurse_module(
     prefix: str,
     top_level: ModuleType,
     seen: list[ModuleType],
-):
+) -> Iterator[tuple[str, str, str]]:
     for name, value in vars(module).items():
         if name.startswith("_"):
             continue
@@ -62,7 +62,7 @@ def _recurse_module(
     argnames=["full_path", "prefix", "dunder_module"],
     argvalues=recurse_module(module=chia_rs, ignore={"chia_rs.chia_rs"}),
 )
-def test_it(full_path, prefix, dunder_module) -> None:
+def test_it(full_path: str, prefix: str, dunder_module: str) -> None:
     assert dunder_module == prefix, f"failing for: {full_path}"
 
 
