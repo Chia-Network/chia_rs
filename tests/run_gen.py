@@ -186,6 +186,9 @@ def print_spend_bundle_conditions(result: SpendBundleConditions) -> str:
     ret += f"condition-cost: {result.condition_cost}\n"
     ret += f"removal_amount: {result.removal_amount}\n"
     ret += f"addition_amount: {result.addition_amount}\n"
+    ret += f"atoms: {result.num_atoms}\n"
+    ret += f"pairs: {result.num_pairs}\n"
+    ret += f"heap: {result.heap_size}\n"
     return ret
 
 

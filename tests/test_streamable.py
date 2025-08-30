@@ -104,6 +104,9 @@ def test_hash_spend_bundle_conditions() -> None:
         False,
         4321,
         8765,
+        555,
+        666,
+        999999,
     )
     a2 = SpendBundleConditions(
         [],
@@ -119,6 +122,9 @@ def test_hash_spend_bundle_conditions() -> None:
         False,
         4321,
         8765,
+        333,
+        444,
+        888888,
     )
     b = hash(a1)
     c = hash(a2)
@@ -457,6 +463,9 @@ def test_json_spend_bundle_conditions() -> None:
         False,
         4321,
         8765,
+        555,
+        666,
+        999999,
     )
 
     assert a.to_json_dict() == {
@@ -473,6 +482,9 @@ def test_json_spend_bundle_conditions() -> None:
         "validated_signature": False,
         "execution_cost": 4321,
         "condition_cost": 8765,
+        "num_atoms": 555,
+        "num_pairs": 666,
+        "heap_size": 999999,
     }
 
 
@@ -492,6 +504,9 @@ def test_from_json_spend_bundle_conditions() -> None:
         False,
         4321,
         8765,
+        555,
+        666,
+        999999,
     )
     b = SpendBundleConditions.from_json_dict(
         {
@@ -509,6 +524,9 @@ def test_from_json_spend_bundle_conditions() -> None:
             "execution_cost": 4321,
             "condition_cost": 8765,
             "fingerprint": b"",
+            "num_atoms": 555,
+            "num_pairs": 666,
+            "heap_size": 999999,
         }
     )
     assert a == b
@@ -566,6 +584,9 @@ def test_copy_spend_bundle_conditions() -> None:
         False,
         4321,
         8765,
+        555,
+        666,
+        999999,
     )
     b = copy.copy(a)
 

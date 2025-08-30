@@ -63,6 +63,12 @@ def test_run_block_generator_cost() -> None:
         # the cost is supposed to differ, don't compare that
         if "cost:" in l1 and "cost: " in l2:
             continue
+        if "atoms: " in l1 and "atoms: " in l2:
+            continue
+        if "pairs: " in l1 and "pairs: " in l2:
+            continue
+        if "heap: " in l1 and "heap: " in l2:
+            continue
         assert l1 == l2
 
     # we exceed the cost limit by 1
