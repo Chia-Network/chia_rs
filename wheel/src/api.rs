@@ -60,7 +60,7 @@ use clvm_utils::tree_hash_from_bytes;
 use clvmr::chia_dialect::ENABLE_KECCAK_OPS_OUTSIDE_GUARD;
 use clvmr::{LIMIT_HEAP, NO_UNKNOWN_OPS};
 use pyo3::buffer::PyBuffer;
-use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
+use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::pybacked::PyBackedBytes;
 use pyo3::types::PyList;
@@ -427,13 +427,8 @@ pub fn py_validate_clvm_and_signature(
     constants: &ConsensusConstants,
     flags: u32,
 ) -> PyResult<(OwnedSpendBundleConditions, Vec<([u8; 32], GTElement)>, f32)> {
-    let (owned_conditions, additions, duration) = py
-        .allow_threads(|| validate_clvm_and_signature(new_spend, max_cost, constants, flags))
-        .map_err(|e| {
-            // cast validation error to int
-            let error_code: u32 = e.into();
-            PyErr::new::<PyTypeError, _>(error_code)
-        })?;
+    let (owned_conditions, additions, duration) =
+        py.allow_threads(|| validate_clvm_and_signature(new_spend, max_cost, constants, flags))?;
     Ok((owned_conditions, additions, duration.as_secs_f32()))
 }
 
@@ -449,11 +444,7 @@ pub fn py_get_conditions_from_spendbundle(
     use chia_consensus::owned_conditions::OwnedSpendBundleConditions;
     let mut a = make_allocator(LIMIT_HEAP);
     let conditions =
-        get_conditions_from_spendbundle(&mut a, spend_bundle, max_cost, height, constants)
-            .map_err(|e| {
-                let error_code: u32 = e.1.into();
-                PyErr::new::<PyTypeError, _>(error_code)
-            })?;
+        get_conditions_from_spendbundle(&mut a, spend_bundle, max_cost, height, constants)?;
     Ok(OwnedSpendBundleConditions::from(&a, conditions))
 }
 
