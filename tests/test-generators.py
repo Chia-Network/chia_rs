@@ -88,6 +88,8 @@ for g in test_list:
         run_generator1 = False
     elif "3000000-conditions-single-coin.txt" in g:
         run_generator1 = False
+    elif "single-coin-only-garbage" in g:
+        run_generator1 = False
     elif "many-coins-announcement-cap.txt" in g:
         run_generator1 = False
     elif "29500-remarks-procedural.txt" in g:
