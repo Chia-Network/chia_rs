@@ -57,14 +57,14 @@ def test_validate_clvm_and_signature() -> None:
     sig = AugSchemeMPL.sign(sk, result)
     spend_bundle = SpendBundle([spend], sig)
 
-    with pytest.raises(TypeError) as excinfo:
+    with pytest.raises(ValueError) as excinfo:
         validate_clvm_and_signature(
             spend_bundle,
             DEFAULT_CONSTANTS.MAX_BLOCK_COST_CLVM,
             DEFAULT_CONSTANTS,
             MEMPOOL_MODE,
         )
-    error_code = excinfo.value.args[0]
+    error_code = excinfo.value.args[1]
     assert error_code == 7  # 7 = BadAggregateSignature
 
     # Invalid key
@@ -77,12 +77,12 @@ def test_validate_clvm_and_signature() -> None:
     sig = AugSchemeMPL.sign(sk, result)
     spend_bundle = SpendBundle([spend], sig)
 
-    with pytest.raises(TypeError) as excinfo:
+    with pytest.raises(ValueError) as excinfo:
         validate_clvm_and_signature(
             spend_bundle,
             DEFAULT_CONSTANTS.MAX_BLOCK_COST_CLVM,
             DEFAULT_CONSTANTS,
             MEMPOOL_MODE,
         )
-    error_code = excinfo.value.args[0]
+    error_code = excinfo.value.args[1]
     assert error_code == 7  # 7 = BadAggregateSignature
