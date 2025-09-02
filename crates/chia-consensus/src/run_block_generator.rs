@@ -211,7 +211,13 @@ where
     }
 
     let mut iter = all_spends;
+    let mut spend_count: u32 = 0;
+
     while let Some((spend, rest)) = a.next(iter) {
+        spend_count += 1;
+        if spend_count >= constants.coinspends_block_limit {
+            return Err(ValidationErr(iter, ErrorCode::CoinSpendLimitReached));
+        }
         iter = rest;
         // process the spend
         let [parent_id, puzzle, amount, solution, _spend_level_extra] =
