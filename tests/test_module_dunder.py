@@ -1,6 +1,6 @@
 import _frozen_importlib_external
 from types import ModuleType
-from typing import Iterator, Optional
+from typing import Iterator
 
 import pytest
 
@@ -38,7 +38,6 @@ def _recurse_module(
         dunder_module = getattr(value, "__module__", None)
         if dunder_module is not None:
             yield (full_path, prefix, dunder_module)
-        #         assert "datalayer" not in full_path, f"{value=}, {type(value)=}, {top_level.__name__=}, {isinstance(value, ModuleType)=}, {value.__name__.startswith(f"{top_level.__name__}.")=}, {module not in seen=}"
         if (
             isinstance(value, ModuleType)
             and value.__name__.startswith(f"{top_level.__name__}.")
