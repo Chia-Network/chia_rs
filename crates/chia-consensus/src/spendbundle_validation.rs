@@ -3,13 +3,13 @@ use crate::consensus_constants::ConsensusConstants;
 use crate::flags::COST_CONDITIONS;
 use crate::owned_conditions::OwnedSpendBundleConditions;
 use crate::spendbundle_conditions::run_spendbundle;
-use crate::validation_error::ErrorCode;
+use crate::validation_error::{ErrorCode, ValidationErr};
 use chia_bls::GTElement;
 use chia_bls::{aggregate_verify_gt, hash_to_g2};
 use chia_protocol::SpendBundle;
 use chia_sha2::Sha256;
 use clvmr::chia_dialect::ENABLE_KECCAK_OPS_OUTSIDE_GUARD;
-use clvmr::LIMIT_HEAP;
+use clvmr::{NodePtr, LIMIT_HEAP};
 use std::time::{Duration, Instant};
 
 // type definition makes clippy happy
@@ -23,12 +23,11 @@ pub fn validate_clvm_and_signature(
     max_cost: u64,
     constants: &ConsensusConstants,
     flags: u32,
-) -> Result<(OwnedSpendBundleConditions, Vec<ValidationPair>, Duration), ErrorCode> {
+) -> Result<(OwnedSpendBundleConditions, Vec<ValidationPair>, Duration), ValidationErr> {
     let start_time = Instant::now();
 
     let mut a = make_allocator(LIMIT_HEAP);
-    let (sbc, pkm_pairs) =
-        run_spendbundle(&mut a, spend_bundle, max_cost, flags, constants).map_err(|e| e.1)?;
+    let (sbc, pkm_pairs) = run_spendbundle(&mut a, spend_bundle, max_cost, flags, constants)?;
     let conditions = OwnedSpendBundleConditions::from(&a, sbc);
 
     // Collect all pairs in a single vector to avoid multiple iterations
@@ -53,7 +52,10 @@ pub fn validate_clvm_and_signature(
         pairs.iter().map(|tuple| &tuple.1),
     );
     if !result {
-        return Err(ErrorCode::BadAggregateSignature);
+        return Err(ValidationErr(
+            NodePtr::NIL,
+            ErrorCode::BadAggregateSignature,
+        ));
     }
 
     // Collect results
@@ -240,8 +242,9 @@ ff01\
                 &TEST_CONSTANTS,
                 MEMPOOL_MODE,
             )
-            .err(),
-            Some(ErrorCode::WrongPuzzleHash)
+            .unwrap_err()
+            .1,
+            ErrorCode::WrongPuzzleHash
         );
     }
 
@@ -319,7 +322,10 @@ ff843B9ACA00\
         assert_eq!(conds.cost, expected_cost);
         let result =
             validate_clvm_and_signature(&spend_bundle, max_cost - 1, &TEST_CONSTANTS, MEMPOOL_MODE);
-        assert!(matches!(result, Err(ErrorCode::CostExceeded)));
+        assert!(matches!(
+            result,
+            Err(ValidationErr(_, ErrorCode::CostExceeded))
+        ));
     }
 
     #[rstest]
@@ -401,6 +407,9 @@ ff843B9ACA00\
             &TEST_CONSTANTS,
             MEMPOOL_MODE,
         );
-        assert!(matches!(result, Err(ErrorCode::BadAggregateSignature)));
+        assert!(matches!(
+            result,
+            Err(ValidationErr(_, ErrorCode::BadAggregateSignature))
+        ));
     }
 }
