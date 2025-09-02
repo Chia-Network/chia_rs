@@ -592,6 +592,9 @@ class PlotSize:
             "validated_signature: bool",
             "execution_cost: int",
             "condition_cost: int",
+            "num_atoms: int",
+            "num_pairs: int",
+            "heap_size: int",
         ],
     )
 

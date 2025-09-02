@@ -173,3 +173,6 @@ execution-cost: 5018808
 condition-cost: 122400000
 removal_amount: 3896940415815
 addition_amount: 3896940415815
+atoms: 10344
+pairs: 98952
+heap: 107351

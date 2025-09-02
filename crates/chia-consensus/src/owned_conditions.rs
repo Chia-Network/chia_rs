@@ -77,6 +77,10 @@ pub struct OwnedSpendBundleConditions {
     pub validated_signature: bool,
     pub execution_cost: u64,
     pub condition_cost: u64,
+    /// the number of atoms and pairs allocated by the spend bundle
+    pub num_atoms: u32,
+    pub num_pairs: u32,
+    pub heap_size: u32,
 }
 
 impl OwnedSpendConditions {
@@ -162,6 +166,9 @@ impl OwnedSpendBundleConditions {
             validated_signature: sb.validated_signature,
             execution_cost: sb.execution_cost,
             condition_cost: sb.condition_cost,
+            num_atoms: (a.atom_count() + a.small_atom_count()) as u32,
+            num_pairs: a.pair_count() as u32,
+            heap_size: a.heap_size() as u32,
         }
     }
 }

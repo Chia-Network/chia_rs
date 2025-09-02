@@ -8,3 +8,6 @@ execution-cost: 40
 condition-cost: 3600000
 removal_amount: 123
 addition_amount: 9
+atoms: 133
+pairs: 305
+heap: 172

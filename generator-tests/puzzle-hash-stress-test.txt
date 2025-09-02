@@ -6,3 +6,6 @@ execution-cost: 5091473584
 condition-cost: 0
 removal_amount: 123
 addition_amount: 0
+atoms: 3300151
+pairs: 59400473
+heap: 68
