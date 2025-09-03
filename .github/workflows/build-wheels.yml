@@ -424,7 +424,7 @@ jobs:
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         with:
-          flag-name: ${{ github.run_id }}-${{ github.run_attempt }}
+          flag-name: ${{ github.run_id }}-${{ github.job }}-${{ strategy.job-index }}-${{ github.run_attempt }}
           parallel: true
           path-to-lcov: "./lcov.info"
 
