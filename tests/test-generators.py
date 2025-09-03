@@ -191,6 +191,21 @@ for g in test_list:
         elif "puzzle-hash-stress-tree.txt" in g:
             limit = 4
             strict_limit = 4
+        elif "aa-million-message-spends.txt" in g:
+            limit = 9
+            strict_limit = 9
+        elif "many-coins-announcement-cap.txt" in g:
+            limit = 4
+            strict_limit = 4
+        elif "3000000-conditions-single-coin.txt" in g:
+            limit = 7
+            strict_limit = 7
+        elif "29500-remarks-procedural.txt" in g:
+            limit = 7
+            strict_limit = 7
+        elif "single-coin-only-garbage.txt" in g:
+            limit = 8
+            strict_limit = 8
 
         if run_generator1:
             validate_except_cost(consensus.output, expected)
