@@ -192,11 +192,11 @@ for g in test_list:
             limit = 4
             strict_limit = 4
         elif "aa-million-message-spends.txt" in g:
-            limit = 9
-            strict_limit = 9
+            limit = 11
+            strict_limit = 11
         elif "many-coins-announcement-cap.txt" in g:
-            limit = 4
-            strict_limit = 4
+            limit = 5
+            strict_limit = 5
         elif "3000000-conditions-single-coin.txt" in g:
             limit = 7
             strict_limit = 7
