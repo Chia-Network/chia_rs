@@ -153,14 +153,14 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install maturin
 
-      - name: Build MacOs with maturin on Python ${{ matrix.python }}
+      - name: Build MacOs with maturin on Python ${{ matrix.python.major-dot-minor }}
         if: matrix.os.matrix == 'macos'
         env:
           MACOSX_DEPLOYMENT_TARGET: "13.0"
         run: |
           maturin build -i python --release -m wheel/Cargo.toml --features=openssl,pyo3/extension-module
 
-      - name: Build Linux with maturin on Python ${{ matrix.python }}
+      - name: Build Linux with maturin on Python ${{ matrix.python.major-dot-minor }}
         if: matrix.os.matrix == 'ubuntu'
         run: |
           docker run --rm --pull always \
@@ -178,7 +178,7 @@ jobs:
               CC=gcc maturin build --release --manylinux ${{ matrix.python.by-arch[matrix.arch.matrix].manylinux-version }} -m wheel/Cargo.toml --features=openssl,pyo3/extension-module \
             '
 
-      - name: Build Windows with maturin on Python ${{ matrix.python }}
+      - name: Build Windows with maturin on Python ${{ matrix.python.major-dot-minor }}
         if: matrix.os.matrix == 'windows'
         env:
           CC: "clang"
@@ -264,14 +264,14 @@ jobs:
           pip install maturin
           maturin sdist -m wheel/Cargo.toml
           cd target/wheels
-          dirname=`basename chia_rs*.tar.gz .tar.gz`
-          echo $dirname
-          mkdir $dirname
-          cp -r ../../src/ $dirname/src/
+          dirname=$(basename chia_rs*.tar.gz .tar.gz)
+          echo "$dirname"
+          mkdir "$dirname"
+          cp -r ../../src/ "$dirname/src/"
           gunzip chia_rs*.tar.gz
-          tar rvf chia_rs*.tar $dirname/src
+          tar rvf chia_rs*.tar "$dirname/src"
           gzip chia_rs*.tar
-          rm -rf $dirname
+          rm -rf "$dirname"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -310,13 +310,70 @@ jobs:
         run: |
           cargo clippy --workspace --all-features --all-targets
 
+  actionlint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: none
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: actionlint
+        run: |
+          bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          echo ==== shellcheck version
+          shellcheck --version
+          echo ==== actionlint version
+          ./actionlint --version
+          echo ==== running actionlint
+          ./actionlint -color -shellcheck shellcheck
+
   unit_tests:
-    runs-on: ${{ matrix.os }}
+    name: Unit Tests ${{ matrix.os.name }} ${{ matrix.mode.name }} ${{ matrix.test-runner.name }} ${{ matrix.os.coverage && 'cov' || '' }}
+    runs-on: ${{ matrix.os.runs-on }}
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
-    name: Unit tests
+        os:
+          - name: macOS
+            runs-on: macos-latest
+            matrix: macos
+            coverage: false
+            cargo-test-options: --all-features
+          - name: Linux
+            runs-on: ubuntu-latest
+            matrix: linux
+            coverage: true
+            cargo-test-options: --all-features
+          - name: Windows
+            runs-on: windows-latest
+            matrix: windows
+            coverage: false
+            cargo-test-options: ""
+        mode:
+          - name: dev
+            matrix: dev
+            cargo-test-options: ""
+          - name: release
+            matrix: release
+            cargo-test-options: --release
+        test-runner:
+          - name: Cargo
+            matrix: cargo
+          - name: pytest
+            matrix: pytest
+        exclude:
+          - os:
+              matrix: macos
+            test-runner:
+              matrix: pytest
+          - os:
+              matrix: windows
+            test-runner:
+              matrix: pytest
+          - mode:
+              matrix: dev
+            test-runner:
+              matrix: pytest
     steps:
       # the test files are read verbatim, making it problematic if git is
       # allowed to insert \r when checking out files
@@ -329,37 +386,33 @@ jobs:
           fetch-depth: 1
       - uses: dtolnay/rust-toolchain@stable
       - name: Prepare for coverage
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os.coverage
         run: |
           cargo install grcov --locked
-          echo "RUSTFLAGS=-Cinstrument-coverage" >> "$GITHUB_ENV"
-          echo "LLVM_PROFILE_FILE=$(pwd)/target/chia_rs-%p-%m.profraw" >> "$GITHUB_ENV"
-          echo "CARGO_TARGET_DIR=$(pwd)/target" >> "$GITHUB_ENV"
-      - name: cargo test (not windows)
-        if: matrix.os != 'windows-latest'
-        run: cargo test --workspace --all-features
-      - name: cargo test (release) (not windows)
-        if: matrix.os != 'windows-latest'
-        run: cargo test --workspace --all-features --release
-      - name: cargo test (windows)
-        if: matrix.os == 'windows-latest'
-        run: cargo test --workspace
-      - name: cargo test (release) (windows)
-        if: matrix.os == 'windows-latest'
-        run: cargo test --workspace --release
+          {
+            echo "RUSTFLAGS=-Cinstrument-coverage"
+            echo "LLVM_PROFILE_FILE=$(pwd)/target/chia_rs-%p-%m.profraw"
+            echo "CARGO_TARGET_DIR=$(pwd)/target"
+          } >> "$GITHUB_ENV"
+      - name: cargo test (${{ matrix.mode.name }})
+        if: matrix.test-runner.matrix == 'cargo'
+        run: cargo test --workspace ${{ matrix.os.cargo-test-options }} ${{ matrix.mode.cargo-test-options }}
       - uses: Chia-Network/actions/setup-python@main
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os.coverage || matrix.test-runner.matrix == 'pytest'
         with:
           python-version: "3.9"
-      - name: test coverage
-        if: matrix.os == 'ubuntu-latest'
+      - name: python test with coverage
+        if: matrix.os.coverage && matrix.test-runner.matrix == 'pytest'
         run: |
           python -m venv venv
           . venv/bin/activate
-          pip install colorama maturin pytest pytest-xdist blspy clvm==0.9.8
+          pip install colorama maturin pytest pytest-xdist clvm
           maturin develop --release -m wheel/Cargo.toml --features=clvmr/allocator-debug
           # run pytest in a single process to avoid a race writing the coverage report
           pytest -n 0 tests
+      - name: prep coverage
+        if: matrix.os.coverage
+        run: |
           sudo apt-get update
           sudo apt-get install lcov -y
           rustup component add llvm-tools-preview
@@ -367,11 +420,25 @@ jobs:
           python -c 'with open("rust_cov.info") as f: lines = [l for l in f if not (l.startswith("DA:") and int(l.split(",")[1].strip()) >= 2**63)]; open("lcov.info", "w").writelines(lines)'
       - name: Upload to Coveralls
         uses: coverallsapp/github-action@v2
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os.coverage
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         with:
+          flag-name: ${{ github.job }}-${{ github.run_attempt }}
+          parallel: true
           path-to-lcov: "./lcov.info"
+
+  unit_tests_done:
+    name: Unit Tests - Done
+    runs-on: ubuntu-latest
+    needs: unit_tests
+    steps:
+      - name: Upload to Coveralls
+        uses: coverallsapp/github-action@v2
+        env:
+          COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
+        with:
+          parallel-finished: true
 
   upload:
     name: Upload to PyPI - ${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }}

@@ -33,7 +33,7 @@ jobs:
         run: cargo clippy --workspace --all-features --all-targets -- -D warnings
 
       - name: Install cargo-machete
-        run: cargo install cargo-machete
+        run: cargo install cargo-machete@0.8.0
 
       - name: Unused dependencies
         run: cargo machete
@@ -73,16 +73,15 @@ jobs:
       matrix:
         package:
           - name: chia-consensus
-          - name: chia-bls
             env:
-              # We disable leak reports here because blspy appears to be allocating
-              # memory that's not freed. It might be a false positive since python is
-              # not unloaded before exiting.
-              LSAN_OPTIONS: detect_leaks=0
+              # EXAMPLE_ as an example and to appease actionlint
+              EXAMPLE_LSAN_OPTIONS: detect_leaks=0
+          - name: chia-bls
           - name: clvm-utils
           - name: chia-protocol
           - name: chia-puzzle-types
           - name: clvm-traits
+          - name: chia-datalayer
         toolchain:
           - nightly-2025-01-12
         max_total_time:
@@ -103,5 +102,4 @@ jobs:
         env: ${{ matrix.package.env || fromJSON('{}') }}
         run: |
           cd crates/"${{ matrix.package.name }}"
-          python -m pip install blspy
-          cargo fuzz list | xargs -I "%" sh -c "cargo +"${{ matrix.toolchain }}" fuzz run % -- -max_total_time=${{ matrix.max_total_time}} || exit 255"
+          cargo fuzz list | xargs -I "%" sh -c "cargo +'${{ matrix.toolchain }}' fuzz run % -- -max_total_time=${{ matrix.max_total_time}} || exit 255"

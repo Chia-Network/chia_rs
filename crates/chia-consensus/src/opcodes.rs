@@ -208,18 +208,6 @@ use rstest::rstest;
 #[case(&[ASSERT_BEFORE_HEIGHT_RELATIVE as u8], Some(ASSERT_BEFORE_HEIGHT_RELATIVE))]
 #[case(&[ASSERT_BEFORE_HEIGHT_ABSOLUTE as u8], Some(ASSERT_BEFORE_HEIGHT_ABSOLUTE))]
 #[case(&[REMARK as u8], Some(REMARK))]
-fn test_parse_opcode(#[case] input: &[u8], #[case] expected: Option<ConditionOpcode>) {
-    let mut a = Allocator::new();
-    assert_eq!(opcode_tester(&mut a, input, 0), expected);
-    assert_eq!(opcode_tester(&mut a, input, 0), expected);
-}
-
-#[cfg(test)]
-#[rstest]
-#[case(&[AGG_SIG_UNSAFE as u8], Some(AGG_SIG_UNSAFE))]
-#[case(&[AGG_SIG_ME as u8], Some(AGG_SIG_ME))]
-#[case(&[CREATE_COIN as u8], Some(CREATE_COIN))]
-// the SOFTOFORK and new AGG_SIG_* condition is only recognized when the flag is set
 #[case(&[SOFTFORK as u8], Some(SOFTFORK))]
 #[case(&[AGG_SIG_PARENT as u8], Some(AGG_SIG_PARENT))]
 #[case(&[AGG_SIG_PUZZLE as u8], Some(AGG_SIG_PUZZLE))]
@@ -227,11 +215,9 @@ fn test_parse_opcode(#[case] input: &[u8], #[case] expected: Option<ConditionOpc
 #[case(&[AGG_SIG_PUZZLE_AMOUNT as u8], Some(AGG_SIG_PUZZLE_AMOUNT))]
 #[case(&[AGG_SIG_PARENT_AMOUNT as u8], Some(AGG_SIG_PARENT_AMOUNT))]
 #[case(&[AGG_SIG_PARENT_PUZZLE as u8], Some(AGG_SIG_PARENT_PUZZLE))]
-#[case(&[ASSERT_EPHEMERAL as u8], Some(ASSERT_EPHEMERAL))]
-#[case(&[ASSERT_BEFORE_SECONDS_RELATIVE as u8], Some(ASSERT_BEFORE_SECONDS_RELATIVE))]
 #[case(&[SEND_MESSAGE as u8], Some(SEND_MESSAGE))]
 #[case(&[RECEIVE_MESSAGE as u8], Some(RECEIVE_MESSAGE))]
-fn test_parse_opcode_softfork(#[case] input: &[u8], #[case] expected: Option<ConditionOpcode>) {
+fn test_parse_opcode(#[case] input: &[u8], #[case] expected: Option<ConditionOpcode>) {
     let mut a = Allocator::new();
     assert_eq!(opcode_tester(&mut a, input, 0), expected);
 }

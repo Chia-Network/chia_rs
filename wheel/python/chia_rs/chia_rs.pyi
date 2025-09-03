@@ -427,6 +427,9 @@ class SpendBundleConditions:
     validated_signature: bool
     execution_cost: int
     condition_cost: int
+    num_atoms: int
+    num_pairs: int
+    heap_size: int
     def __init__(
         self,
         spends: Sequence[SpendConditions],
@@ -441,7 +444,10 @@ class SpendBundleConditions:
         addition_amount: int,
         validated_signature: bool,
         execution_cost: int,
-        condition_cost: int
+        condition_cost: int,
+        num_atoms: int,
+        num_pairs: int,
+        heap_size: int
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -472,7 +478,10 @@ class SpendBundleConditions:
         addition_amount: Union[ int, _Unspec] = _Unspec(),
         validated_signature: Union[ bool, _Unspec] = _Unspec(),
         execution_cost: Union[ int, _Unspec] = _Unspec(),
-        condition_cost: Union[ int, _Unspec] = _Unspec()) -> SpendBundleConditions: ...
+        condition_cost: Union[ int, _Unspec] = _Unspec(),
+        num_atoms: Union[ int, _Unspec] = _Unspec(),
+        num_pairs: Union[ int, _Unspec] = _Unspec(),
+        heap_size: Union[ int, _Unspec] = _Unspec()) -> SpendBundleConditions: ...
 
 @final
 class BlockRecord:
@@ -4454,12 +4463,12 @@ class ConsensusConstants:
     PLOT_FILTER_128_HEIGHT: uint32
     PLOT_FILTER_64_HEIGHT: uint32
     PLOT_FILTER_32_HEIGHT: uint32
-    PLOT_DIFFICULTY_INITIAL: uint8
-    PLOT_DIFFICULTY_4_HEIGHT: uint32
-    PLOT_DIFFICULTY_5_HEIGHT: uint32
-    PLOT_DIFFICULTY_6_HEIGHT: uint32
-    PLOT_DIFFICULTY_7_HEIGHT: uint32
-    PLOT_DIFFICULTY_8_HEIGHT: uint32
+    PLOT_STRENGTH_INITIAL: uint8
+    PLOT_STRENGTH_4_HEIGHT: uint32
+    PLOT_STRENGTH_5_HEIGHT: uint32
+    PLOT_STRENGTH_6_HEIGHT: uint32
+    PLOT_STRENGTH_7_HEIGHT: uint32
+    PLOT_STRENGTH_8_HEIGHT: uint32
     def __init__(
         self,
         SLOT_BLOCKS_TARGET: uint32,
@@ -4512,12 +4521,12 @@ class ConsensusConstants:
         PLOT_FILTER_128_HEIGHT: uint32,
         PLOT_FILTER_64_HEIGHT: uint32,
         PLOT_FILTER_32_HEIGHT: uint32,
-        PLOT_DIFFICULTY_INITIAL: uint8,
-        PLOT_DIFFICULTY_4_HEIGHT: uint32,
-        PLOT_DIFFICULTY_5_HEIGHT: uint32,
-        PLOT_DIFFICULTY_6_HEIGHT: uint32,
-        PLOT_DIFFICULTY_7_HEIGHT: uint32,
-        PLOT_DIFFICULTY_8_HEIGHT: uint32
+        PLOT_STRENGTH_INITIAL: uint8,
+        PLOT_STRENGTH_4_HEIGHT: uint32,
+        PLOT_STRENGTH_5_HEIGHT: uint32,
+        PLOT_STRENGTH_6_HEIGHT: uint32,
+        PLOT_STRENGTH_7_HEIGHT: uint32,
+        PLOT_STRENGTH_8_HEIGHT: uint32
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -4586,9 +4595,9 @@ class ConsensusConstants:
         PLOT_FILTER_128_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_FILTER_64_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_FILTER_32_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
-        PLOT_DIFFICULTY_INITIAL: Union[ uint8, _Unspec] = _Unspec(),
-        PLOT_DIFFICULTY_4_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
-        PLOT_DIFFICULTY_5_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
-        PLOT_DIFFICULTY_6_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
-        PLOT_DIFFICULTY_7_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
-        PLOT_DIFFICULTY_8_HEIGHT: Union[ uint32, _Unspec] = _Unspec()) -> ConsensusConstants: ...
+        PLOT_STRENGTH_INITIAL: Union[ uint8, _Unspec] = _Unspec(),
+        PLOT_STRENGTH_4_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
+        PLOT_STRENGTH_5_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
+        PLOT_STRENGTH_6_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
+        PLOT_STRENGTH_7_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
+        PLOT_STRENGTH_8_HEIGHT: Union[ uint32, _Unspec] = _Unspec()) -> ConsensusConstants: ...

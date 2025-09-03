@@ -60,7 +60,7 @@ use clvm_utils::tree_hash_from_bytes;
 use clvmr::chia_dialect::ENABLE_KECCAK_OPS_OUTSIDE_GUARD;
 use clvmr::{LIMIT_HEAP, NO_UNKNOWN_OPS};
 use pyo3::buffer::PyBuffer;
-use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
+use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::pybacked::PyBackedBytes;
 use pyo3::types::PyList;
@@ -427,13 +427,8 @@ pub fn py_validate_clvm_and_signature(
     constants: &ConsensusConstants,
     flags: u32,
 ) -> PyResult<(OwnedSpendBundleConditions, Vec<([u8; 32], GTElement)>, f32)> {
-    let (owned_conditions, additions, duration) = py
-        .allow_threads(|| validate_clvm_and_signature(new_spend, max_cost, constants, flags))
-        .map_err(|e| {
-            // cast validation error to int
-            let error_code: u32 = e.into();
-            PyErr::new::<PyTypeError, _>(error_code)
-        })?;
+    let (owned_conditions, additions, duration) =
+        py.allow_threads(|| validate_clvm_and_signature(new_spend, max_cost, constants, flags))?;
     Ok((owned_conditions, additions, duration.as_secs_f32()))
 }
 
@@ -449,11 +444,7 @@ pub fn py_get_conditions_from_spendbundle(
     use chia_consensus::owned_conditions::OwnedSpendBundleConditions;
     let mut a = make_allocator(LIMIT_HEAP);
     let conditions =
-        get_conditions_from_spendbundle(&mut a, spend_bundle, max_cost, height, constants)
-            .map_err(|e| {
-                let error_code: u32 = e.1.into();
-                PyErr::new::<PyTypeError, _>(error_code)
-            })?;
+        get_conditions_from_spendbundle(&mut a, spend_bundle, max_cost, height, constants)?;
     Ok(OwnedSpendBundleConditions::from(&a, conditions))
 }
 
@@ -596,7 +587,7 @@ pub fn py_is_canonical_serialization(buf: &[u8]) -> bool {
 }
 
 #[pymodule]
-pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // generator functions
     m.add_function(wrap_pyfunction!(run_block_generator, m)?)?;
     m.add_function(wrap_pyfunction!(run_block_generator2, m)?)?;
@@ -813,6 +804,41 @@ pub fn chia_rs(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<SecretKey>()?;
     m.add_class::<AugSchemeMPL>()?;
     m.add_class::<BlsCache>()?;
+
+    add_datalayer_submodule(py, m)?;
+
+    Ok(())
+}
+
+pub fn add_datalayer_submodule(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
+    use chia_datalayer::*;
+
+    let datalayer = PyModule::new(py, "datalayer")?;
+    parent.add_submodule(&datalayer)?;
+
+    datalayer.add_class::<BlockStatusCache>()?;
+    datalayer.add_class::<DeltaReader>()?;
+    datalayer.add_class::<MerkleBlob>()?;
+    datalayer.add_class::<InternalNode>()?;
+    datalayer.add_class::<LeafNode>()?;
+    datalayer.add_class::<KeyId>()?;
+    datalayer.add_class::<ValueId>()?;
+    datalayer.add_class::<TreeIndex>()?;
+    datalayer.add_class::<ProofOfInclusionLayer>()?;
+    datalayer.add_class::<ProofOfInclusion>()?;
+    datalayer.add_class::<DeltaFileCache>()?;
+
+    datalayer.add("BLOCK_SIZE", BLOCK_SIZE)?;
+    datalayer.add("DATA_SIZE", DATA_SIZE)?;
+    datalayer.add("METADATA_SIZE", METADATA_SIZE)?;
+
+    python_exceptions::add_to_module(py, &datalayer)?;
+
+    // https://github.com/PyO3/pyo3/issues/1517#issuecomment-808664021
+    // https://github.com/PyO3/pyo3/issues/759
+    py.import("sys")?
+        .getattr("modules")?
+        .set_item("chia_rs.datalayer", datalayer)?;
 
     Ok(())
 }

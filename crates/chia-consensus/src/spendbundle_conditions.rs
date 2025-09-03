@@ -345,10 +345,10 @@ mod tests {
         // run the whole block through run_block_generator2() to ensure the
         // output conditions match and update the cost. The cost
         // of just the spend bundle will be lower
+        let mut a2 = make_allocator(MEMPOOL_MODE);
         let (execution_cost, block_cost, block_output) = {
-            let mut a = make_allocator(MEMPOOL_MODE);
             let block_conds = run_block_generator2(
-                &mut a,
+                &mut a2,
                 &generator_buffer,
                 &block_refs,
                 11_000_000_000,
@@ -361,7 +361,7 @@ mod tests {
                 Ok(ref conditions) => (
                     conditions.execution_cost,
                     conditions.cost,
-                    print_conditions(&a, &conditions),
+                    print_conditions(&a2, &conditions, &a2),
                 ),
                 Err(code) => {
                     println!("error: {code:?}");
@@ -370,9 +370,9 @@ mod tests {
             }
         };
 
-        let mut a = make_allocator(LIMIT_HEAP);
+        let mut a1 = make_allocator(MEMPOOL_MODE);
         let conds = get_conditions_from_spendbundle(
-            &mut a,
+            &mut a1,
             &bundle,
             11_000_000_000,
             5_000_000,
@@ -418,7 +418,7 @@ mod tests {
                 // lower
                 conditions.cost = block_cost;
                 conditions.execution_cost = execution_cost;
-                print_conditions(&a, &conditions)
+                print_conditions(&a1, &conditions, &a2)
             }
             Err(code) => {
                 println!("error: {code:?}");

@@ -86,12 +86,12 @@ DEFAULT_CONSTANTS = ConsensusConstants(
     PLOT_FILTER_128_HEIGHT=uint32(10542000),
     PLOT_FILTER_64_HEIGHT=uint32(15592000),
     PLOT_FILTER_32_HEIGHT=uint32(20643000),
-    PLOT_DIFFICULTY_INITIAL=uint8(2),
-    PLOT_DIFFICULTY_4_HEIGHT=uint32(0xFFFFFFFF),
-    PLOT_DIFFICULTY_5_HEIGHT=uint32(0xFFFFFFFF),
-    PLOT_DIFFICULTY_6_HEIGHT=uint32(0xFFFFFFFF),
-    PLOT_DIFFICULTY_7_HEIGHT=uint32(0xFFFFFFFF),
-    PLOT_DIFFICULTY_8_HEIGHT=uint32(0xFFFFFFFF),
+    PLOT_STRENGTH_INITIAL=uint8(2),
+    PLOT_STRENGTH_4_HEIGHT=uint32(0xFFFFFFFF),
+    PLOT_STRENGTH_5_HEIGHT=uint32(0xFFFFFFFF),
+    PLOT_STRENGTH_6_HEIGHT=uint32(0xFFFFFFFF),
+    PLOT_STRENGTH_7_HEIGHT=uint32(0xFFFFFFFF),
+    PLOT_STRENGTH_8_HEIGHT=uint32(0xFFFFFFFF),
 )
 
 
@@ -186,6 +186,9 @@ def print_spend_bundle_conditions(result: SpendBundleConditions) -> str:
     ret += f"condition-cost: {result.condition_cost}\n"
     ret += f"removal_amount: {result.removal_amount}\n"
     ret += f"addition_amount: {result.addition_amount}\n"
+    ret += f"atoms: {result.num_atoms}\n"
+    ret += f"pairs: {result.num_pairs}\n"
+    ret += f"heap: {result.heap_size}\n"
     return ret
 
 

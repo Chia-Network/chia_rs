@@ -6,5 +6,8 @@ execution-cost: 40
 condition-cost: 0
 removal_amount: 123
 addition_amount: 0
+atoms: 128
+pairs: 284
+heap: 68
 STRICT:
 FAILED: 10

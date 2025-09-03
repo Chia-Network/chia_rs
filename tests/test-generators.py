@@ -59,6 +59,12 @@ def validate_except_cost(output1: str, output2: str) -> None:
         # the cost is supposed to differ, don't compare that
         if l1.startswith("cost:") and l2.startswith("cost: "):
             continue
+        if l1.startswith("atoms: ") and l2.startswith("atoms: "):
+            continue
+        if l1.startswith("pairs: ") and l2.startswith("pairs: "):
+            continue
+        if l1.startswith("heap: ") and l2.startswith("heap: "):
+            continue
         if l1.startswith("execution-cost:") and l2.startswith("execution-cost: "):
             continue
         if " exe-cost: 0 " in l1 and " exe-cost: " in l2:
