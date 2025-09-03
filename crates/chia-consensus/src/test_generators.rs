@@ -373,7 +373,7 @@ fn run_generator(#[case] name: &str) {
         }
 
         // now lets check get_coinspends_for_trusted_block
-        // TODO: why do our more challenging generators fail in these calls?
+        // but only if we trust it not to do shenanigans
         if run_generator_one {
             let vec_of_slices: Vec<&[u8]> =
                 block_refs.iter().map(std::vec::Vec::as_slice).collect();

@@ -1,4 +1,3 @@
-
 use chia_sha2::Sha256;
 use clvmr::allocator::{Allocator, NodePtr, NodeVisitor, ObjectType, SExp};
 use clvmr::error::EvalErr;
