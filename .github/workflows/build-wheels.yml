@@ -328,7 +328,7 @@ jobs:
           ./actionlint -color -shellcheck shellcheck
 
   unit_tests:
-    name: Unit Tests ${{ matrix.os.name }} ${{ matrix.mode.name }} ${{ matrix.test-runner.name }} ${{ matrix.os.coverage && 'cov' || '' }}
+    name: Unit Tests ${{ join(matrix.*.name, ' ') }} ${{ matrix.os.coverage && 'cov' || '' }}
     runs-on: ${{ matrix.os.runs-on }}
     strategy:
       fail-fast: false
@@ -424,7 +424,7 @@ jobs:
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         with:
-          flag-name: ${{ github.run_id }}-${{ github.job }}-${{ strategy.job-index }}-${{ github.run_attempt }}
+          flag-name: ${{ join(matrix.*.name, ' ') }}
           parallel: true
           path-to-lcov: "./lcov.info"
 
