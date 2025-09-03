@@ -424,7 +424,7 @@ jobs:
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         with:
-          flag-name: ${{ github.job }}-${{ github.run_attempt }}
+          flag-name: run ${{ join(matrix.*, ' - ') }}
           parallel: true
           path-to-lcov: "./lcov.info"
 
