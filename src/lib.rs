@@ -11,3 +11,8 @@ pub use chia_ssl as ssl;
 pub use chia_traits as traits;
 pub use clvm_traits;
 pub use clvm_utils;
+
+use tikv_jemallocator::Jemalloc;
+
+#[global_allocator]
+static GLOBAL: Jemalloc = Jemalloc;
