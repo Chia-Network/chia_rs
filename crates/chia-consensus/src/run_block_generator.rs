@@ -6,10 +6,10 @@ use crate::conditions::{
 };
 use crate::consensus_constants::ConsensusConstants;
 use crate::flags::DONT_VALIDATE_SIGNATURE;
-use chia_puzzles::{CHIALISP_DESERIALISATION, ROM_BOOTSTRAP_GENERATOR};
 use crate::validation_error::{first, ErrorCode, ValidationErr};
 use chia_bls::{BlsCache, Signature};
 use chia_protocol::{BytesImpl, Coin, CoinSpend, Program};
+use chia_puzzles::{CHIALISP_DESERIALISATION, ROM_BOOTSTRAP_GENERATOR};
 use clvm_traits::FromClvm;
 use clvm_utils::{tree_hash_cached, TreeCache};
 use clvmr::allocator::{Allocator, NodePtr};
