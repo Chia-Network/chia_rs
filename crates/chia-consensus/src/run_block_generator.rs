@@ -6,7 +6,7 @@ use crate::conditions::{
 };
 use crate::consensus_constants::ConsensusConstants;
 use crate::flags::DONT_VALIDATE_SIGNATURE;
-use crate::generator_rom::{CLVM_DESERIALIZER, GENERATOR_ROM};
+use chia_puzzles::{CHIALISP_DESERIALISATION, ROM_BOOTSTRAP_GENERATOR};
 use crate::validation_error::{first, ErrorCode, ValidationErr};
 use chia_bls::{BlsCache, Signature};
 use chia_protocol::{BytesImpl, Coin, CoinSpend, Program};
@@ -42,7 +42,7 @@ pub fn setup_generator_args<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
-    let clvm_deserializer = node_from_bytes(a, &CLVM_DESERIALIZER)?;
+    let clvm_deserializer = node_from_bytes(a, &CHIALISP_DESERIALISATION)?;
 
     // iterate in reverse order since we're building a linked list from
     // the tail
@@ -91,7 +91,7 @@ where
 
     subtract_cost(a, &mut cost_left, byte_cost)?;
 
-    let generator_rom = node_from_bytes(a, &GENERATOR_ROM)?;
+    let rom_generator = node_from_bytes(a, &ROM_BOOTSTRAP_GENERATOR)?;
     let program = node_from_bytes_backrefs(a, program)?;
 
     // this is setting up the arguments to be passed to the generator ROM,
@@ -110,7 +110,7 @@ where
 
     let dialect = ChiaDialect::new(flags);
     let Reduction(clvm_cost, generator_output) =
-        run_program(a, &dialect, generator_rom, args, cost_left)?;
+        run_program(a, &dialect, rom_generator, args, cost_left)?;
 
     subtract_cost(a, &mut cost_left, clvm_cost)?;
 
