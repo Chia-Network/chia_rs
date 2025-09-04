@@ -1,7 +1,7 @@
-use chia_consensus::generator_rom::CLVM_DESERIALIZER;
 use chia_consensus::validation_error::{first, ErrorCode, ValidationErr};
 use chia_protocol::Bytes32;
 use chia_protocol::FullBlock;
+use chia_puzzles::CHIALISP_DESERIALISATION;
 use chia_traits::streamable::Streamable;
 use clvm_traits::{destructure_list, match_list, FromClvm};
 use clvmr::allocator::NodePtr;
@@ -97,7 +97,7 @@ pub fn visit_spends<
     max_cost: u64,
     mut callback: F,
 ) -> Result<(), ValidationErr> {
-    let clvm_deserializer = node_from_bytes(a, &CLVM_DESERIALIZER)?;
+    let clvm_deserializer = node_from_bytes(a, &CHIALISP_DESERIALISATION)?;
     let program = node_from_bytes_backrefs(a, program)?;
 
     // iterate in reverse order since we're building a linked list from
