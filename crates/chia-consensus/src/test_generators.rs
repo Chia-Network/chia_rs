@@ -234,7 +234,7 @@ fn run_generator(#[case] name: &str) {
     // When making changes to print_conditions() enabling this will update the
     // test cases to match. Make sure to carefully review the diff before
     // landing an automatic update of the test case.
-    const UPDATE_TESTS: bool = false;
+    const UPDATE_TESTS: bool = true;
 
     let run_generator_one: bool = ![
         "single-coin-only-garbage",
@@ -388,6 +388,14 @@ fn run_generator(#[case] name: &str) {
             if let Ok(ref conds) = conds2 {
                 // if run_block_generator2 is OK then check we're equal
                 let coinspends = result.expect("get_coinspends");
+                // check that we're getting the same info from get_coinspends_with_conditions_for_trusted_block
+                let result2 = get_coinspends_with_conditions_for_trusted_block(
+                    &TEST_CONSTANTS,
+                    &Program::new(generator.clone().into()),
+                    &vec_of_slices,
+                    flags,
+                );
+                let coinspends2 = result2.expect("get_coinspends_with_conds");
 
                 for (i, spend) in conds.spends.iter().enumerate() {
                     let runnable = {
@@ -412,14 +420,6 @@ fn run_generator(#[case] name: &str) {
                     assert_eq!(puzhash.as_ref(), coinspends[i].coin.puzzle_hash.as_slice());
                     assert_eq!(spend.coin_amount, coinspends[i].coin.amount);
 
-                    // check that we're getting the same info from get_coinspends_with_conditions_for_trusted_block
-                    let result2 = get_coinspends_with_conditions_for_trusted_block(
-                        &TEST_CONSTANTS,
-                        &Program::new(generator.clone().into()),
-                        &vec_of_slices,
-                        flags,
-                    );
-                    let coinspends2 = result2.expect("get_coinspends_with_conds");
                     assert_eq!(
                         parent_id.as_ref(),
                         coinspends2[i].0.coin.parent_coin_info.as_slice()
