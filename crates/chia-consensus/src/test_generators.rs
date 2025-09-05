@@ -381,9 +381,6 @@ fn run_generator(#[case] name: &str) {
             flags,
         );
 
-        // preserve this var through two different if code blocks
-        let mut coinspends2 = Vec::<(CoinSpend, Vec<(u32, Vec<Vec<u8>>)>)>::new();
-
         // now lets check get_coinspends_for_trusted_block
         // but only if we trust it not to do shenanigans
         if let Ok(ref conds) = conds2 {
@@ -391,17 +388,13 @@ fn run_generator(#[case] name: &str) {
             let coinspends = result.expect("get_coinspends");
 
             // check that we're getting the same info from get_coinspends_with_conditions_for_trusted_block
-            if run_generator_one {
-                // get_coinspends_with_conditions_for_trusted_block() will run out of atoms/pairs in the same
-                // way that generator one does so the tests that push this limit will fail
-                let result2 = get_coinspends_with_conditions_for_trusted_block(
-                    &TEST_CONSTANTS,
-                    &Program::new(generator.clone().into()),
-                    &vec_of_slices,
-                    flags,
-                );
-                coinspends2 = result2.expect("get_coinspends_with_conds");
-            }
+            let result2 = get_coinspends_with_conditions_for_trusted_block(
+                &TEST_CONSTANTS,
+                &Program::new(generator.clone().into()),
+                &vec_of_slices,
+                flags,
+            );
+            let coinspends2 = result2.expect("get_coinspends_with_conds");
 
             // as get_coinspends_for_trusted_block is exposed to the RPC it returns empty on fail
             if !coinspends.is_empty() {
@@ -428,18 +421,16 @@ fn run_generator(#[case] name: &str) {
                     assert_eq!(puzhash.as_ref(), coinspends[i].coin.puzzle_hash.as_slice());
                     assert_eq!(spend.coin_amount, coinspends[i].coin.amount);
 
-                    // if we're using get_coinspends_with_conds then test that here
-                    if run_generator_one {
-                        assert_eq!(
-                            parent_id.as_ref(),
-                            coinspends2[i].0.coin.parent_coin_info.as_slice()
-                        );
-                        assert_eq!(
-                            puzhash.as_ref(),
-                            coinspends2[i].0.coin.puzzle_hash.as_slice()
-                        );
-                        assert_eq!(spend.coin_amount, coinspends2[i].0.coin.amount);
-                    }
+                    // test with_conditions
+                    assert_eq!(
+                        parent_id.as_ref(),
+                        coinspends2[i].0.coin.parent_coin_info.as_slice()
+                    );
+                    assert_eq!(
+                        puzhash.as_ref(),
+                        coinspends2[i].0.coin.puzzle_hash.as_slice()
+                    );
+                    assert_eq!(spend.coin_amount, coinspends2[i].0.coin.amount);
                 }
             }
         }
