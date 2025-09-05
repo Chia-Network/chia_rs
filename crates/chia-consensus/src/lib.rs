@@ -12,7 +12,6 @@ pub mod consensus_constants;
 pub mod error;
 pub mod fast_forward;
 pub mod flags;
-pub mod generator_rom;
 pub mod get_puzzle_and_solution;
 pub mod make_aggsig_final_message;
 pub mod merkle_set;
