@@ -18,7 +18,7 @@ use clvmr::cost::Cost;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
 use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs};
-use clvmr::{SExp, LIMIT_HEAP};
+use clvmr::SExp;
 
 pub fn subtract_cost(
     a: &Allocator,
@@ -261,7 +261,7 @@ pub fn get_coinspends_for_trusted_block<GenBuf: AsRef<[u8]>, I: IntoIterator<Ite
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
-    let mut a = make_allocator(LIMIT_HEAP);
+    let mut a = make_allocator(flags);
     let mut output = Vec::<CoinSpend>::new();
 
     let program = node_from_bytes_backrefs(&mut a, generator)?;
@@ -331,7 +331,7 @@ pub fn get_coinspends_with_conditions_for_trusted_block<
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
-    let mut a = make_allocator(LIMIT_HEAP);
+    let mut a = make_allocator(flags);
     let mut output = Vec::<(CoinSpend, Vec<(u32, Vec<Vec<u8>>)>)>::new();
 
     let program = node_from_bytes_backrefs(&mut a, generator)?;
@@ -382,12 +382,14 @@ where
             continue;
         };
         let coinspend = CoinSpend::new(coin, puzzle_program.clone(), solution_program.clone());
-        let Ok((_, res)) =
-            puzzle_program.run(&mut a, flags, constants.max_block_cost_clvm, &solution)
-        else {
-            output.push((coinspend, cond_output));
-            continue; // Skip this spend on error
-        };
+        let Reduction(_clvm_cost, res) = run_program(
+            &mut a,
+            &dialect,
+            puzzle,
+            solution,
+            constants.max_block_cost_clvm,
+        )
+        .map_err(|_| ValidationErr(program, ErrorCode::GeneratorRuntimeError))?;
         // conditions_list is the full returned output of puzzle ran with solution
         // ((51 0xcafef00d 100) (51 0x1234 200) ...)
 

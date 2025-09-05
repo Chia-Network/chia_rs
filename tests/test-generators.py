@@ -86,16 +86,28 @@ for g in test_list:
     stdout.flush()
 
     run_generator1 = True
+    flags = 0
     if "aa-million-messages.txt" in g:
         flags = COST_CONDITIONS
+    elif "aa-million-message-spends.txt" in g:
+        flags = COST_CONDITIONS
+        run_generator1 = False
+    elif "3000000-conditions-single-coin.txt" in g:
+        run_generator1 = False
+    elif "single-coin-only-garbage" in g:
+        run_generator1 = False
+    elif "many-coins-announcement-cap.txt" in g:
+        run_generator1 = False
+    elif "29500-remarks-procedural.txt" in g:
+        run_generator1 = False
+    elif "100000-remarks-prefab.txt" in g:
+        run_generator1 = False
     elif "puzzle-hash-stress-test.txt" in g:
         # this test fails on generator1, because it's too expensive
         run_generator1 = False
     elif "puzzle-hash-stress-tree.txt" in g:
         # this test fails on generator1, because it's too expensive
         run_generator1 = False
-    else:
-        flags = 0
 
     if run_generator1:
         consensus = run_generator(
@@ -179,6 +191,21 @@ for g in test_list:
         elif "puzzle-hash-stress-tree.txt" in g:
             limit = 4
             strict_limit = 4
+        elif "aa-million-message-spends.txt" in g:
+            limit = 11
+            strict_limit = 11
+        elif "many-coins-announcement-cap.txt" in g:
+            limit = 5
+            strict_limit = 5
+        elif "3000000-conditions-single-coin.txt" in g:
+            limit = 8
+            strict_limit = 8
+        elif "29500-remarks-procedural.txt" in g:
+            limit = 9
+            strict_limit = 9
+        elif "single-coin-only-garbage.txt" in g:
+            limit = 10
+            strict_limit = 10
 
         if run_generator1:
             validate_except_cost(consensus.output, expected)
