@@ -7,7 +7,6 @@ use crate::allocator::make_allocator;
 use crate::consensus_constants::TEST_CONSTANTS;
 use crate::flags::{COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
 use chia_bls::Signature;
-use chia_protocol::CoinSpend;
 use chia_protocol::Program;
 use chia_protocol::{Bytes, Bytes48};
 use clvmr::allocator::NodePtr;
@@ -396,8 +395,10 @@ fn run_generator(#[case] name: &str) {
             );
             let coinspends2 = result2.expect("get_coinspends_with_conds");
 
-            // as get_coinspends_for_trusted_block is exposed to the RPC it returns empty on fail
-            if !coinspends.is_empty() {
+            // get_coinspends_for_trusted_block skips certain attacking spends as it is exposed to
+            // the RPC in chia-blockchain and must handle a wide variety of spends
+            // we can ignore the comparison if it has skipped a spend for this reason
+            if coinspends.len() == conds.spends.len() {
                 for (i, spend) in conds.spends.iter().enumerate() {
                     let runnable = {
                         let mut a = make_allocator(flags);
