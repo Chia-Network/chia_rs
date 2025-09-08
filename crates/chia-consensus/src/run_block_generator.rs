@@ -386,7 +386,7 @@ where
         let Ok(solution_program) = Program::from_clvm(&a, solution) else {
             continue;
         };
-        let coinspend = CoinSpend::new(coin, puzzle_program.clone(), solution_program.clone());
+
         let Reduction(_clvm_cost, res) = run_program(
             &mut a,
             &dialect,
@@ -432,7 +432,10 @@ where
             // we have a valid condition
             cond_output.push((opcode, bytes_vec));
         }
-        output.push((coinspend, cond_output));
+        output.push((
+            CoinSpend::new(coin, puzzle_program.clone(), solution_program.clone()),
+            cond_output,
+        ));
     }
     Ok(output)
 }
