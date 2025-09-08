@@ -252,6 +252,8 @@ where
     Ok(ret)
 }
 
+// this function is less capable of handling problematic generators as they are
+// exposed to the RPC in chia-blockchain. They will simply ignore many of the bad cases.
 pub fn get_coinspends_for_trusted_block<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
     constants: &ConsensusConstants,
     generator: &Program,
@@ -315,6 +317,9 @@ where
     }
     Ok(output)
 }
+
+// this function is less capable of handling problematic generators as they are
+// exposed to the RPC in chia-blockchain. They will simply ignore many of the bad cases.
 
 // this function returns a list of tuples (coinspend, conditions)
 // conditions are formatted as a vec of tuples of (condition_opcode, args)
