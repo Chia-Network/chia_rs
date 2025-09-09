@@ -395,9 +395,9 @@ fn run_generator(#[case] name: &str) {
             );
             let coinspends2 = result2.expect("get_coinspends_with_conds");
 
-            // get_coinspends_for_trusted_block skips certain attacking spends as it is exposed to
-            // the RPC in chia-blockchain and must handle a wide variety of spends
-            // we can ignore the comparison if it has skipped a spend for this reason
+            // get_coinspends_for_trusted_block skips certain attacking spends as it is required to
+            // return serialized puzzles, which may not be possible. We can ignore the comparison
+            // if it has skipped a spend for this reason
             if coinspends.len() == conds.spends.len() {
                 for (i, spend) in conds.spends.iter().enumerate() {
                     let runnable = {
