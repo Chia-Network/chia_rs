@@ -319,7 +319,7 @@ where
 }
 
 // this function is less capable of handling problematic generators as they are
-// exposed to the RPC in chia-blockchain. They will simply ignore many of the bad cases.
+// returning serialized puzzles, which may not be possible. They will simply ignore many of the bad cases.
 
 // this function returns a list of tuples (coinspend, conditions)
 // conditions are formatted as a vec of tuples of (condition_opcode, args)
