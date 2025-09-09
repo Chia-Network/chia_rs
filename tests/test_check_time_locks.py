@@ -128,6 +128,9 @@ def make_test_conds(
         False,
         0,
         0,
+        555,
+        666,
+        999999,
     )
 
 

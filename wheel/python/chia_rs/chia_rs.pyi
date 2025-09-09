@@ -427,6 +427,9 @@ class SpendBundleConditions:
     validated_signature: bool
     execution_cost: int
     condition_cost: int
+    num_atoms: int
+    num_pairs: int
+    heap_size: int
     def __init__(
         self,
         spends: Sequence[SpendConditions],
@@ -441,7 +444,10 @@ class SpendBundleConditions:
         addition_amount: int,
         validated_signature: bool,
         execution_cost: int,
-        condition_cost: int
+        condition_cost: int,
+        num_atoms: int,
+        num_pairs: int,
+        heap_size: int
     ) -> None: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -472,7 +478,10 @@ class SpendBundleConditions:
         addition_amount: Union[ int, _Unspec] = _Unspec(),
         validated_signature: Union[ bool, _Unspec] = _Unspec(),
         execution_cost: Union[ int, _Unspec] = _Unspec(),
-        condition_cost: Union[ int, _Unspec] = _Unspec()) -> SpendBundleConditions: ...
+        condition_cost: Union[ int, _Unspec] = _Unspec(),
+        num_atoms: Union[ int, _Unspec] = _Unspec(),
+        num_pairs: Union[ int, _Unspec] = _Unspec(),
+        heap_size: Union[ int, _Unspec] = _Unspec()) -> SpendBundleConditions: ...
 
 @final
 class BlockRecord:

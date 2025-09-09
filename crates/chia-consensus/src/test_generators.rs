@@ -17,7 +17,7 @@ use text_diff::Difference;
 
 use rstest::rstest;
 
-pub(crate) fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> String {
+pub(crate) fn print_conditions(a: &Allocator, c: &SpendBundleConditions, a2: &Allocator) -> String {
     let mut ret = String::new();
     if c.reserve_fee > 0 {
         ret += &format!("RESERVE_FEE: {}\n", c.reserve_fee);
@@ -121,6 +121,9 @@ pub(crate) fn print_conditions(a: &Allocator, c: &SpendBundleConditions) -> Stri
     ret += &format!("condition-cost: {}\n", c.condition_cost);
     ret += &format!("removal_amount: {}\n", c.removal_amount);
     ret += &format!("addition_amount: {}\n", c.addition_amount);
+    ret += &format!("atoms: {}\n", a2.atom_count() + a2.small_atom_count());
+    ret += &format!("pairs: {}\n", a2.pair_count());
+    ret += &format!("heap: {}\n", a2.heap_size());
     ret
 }
 
@@ -276,7 +279,7 @@ fn run_generator(#[case] name: &str) {
                 // the generator itself has execution cost. At least the cost of
                 // a quote
                 assert!(exe_cost <= conditions.execution_cost);
-                (conditions.cost, print_conditions(&a2, &conditions))
+                (conditions.cost, print_conditions(&a2, &conditions, &a2))
             }
             Err(code) => (0, format!("FAILED: {}\n", u32::from(code.1))),
         };
@@ -328,7 +331,7 @@ fn run_generator(#[case] name: &str) {
                     }
                 }
 
-                print_conditions(&a1, &conditions)
+                print_conditions(&a1, &conditions, &a2)
             }
             Err(code) => {
                 format!("FAILED: {}\n", u32::from(code.1))
