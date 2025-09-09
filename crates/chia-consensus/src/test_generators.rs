@@ -442,3 +442,12 @@ fn run_generator(#[case] name: &str) {
         write(&filename, write_back.into_bytes()).expect("write file");
     }
 }
+
+#[rstest]
+#[case(
+    "ff02ffff01ff04ffff02ff06ffff04ff02ffff04ffff01a00101010101010101010101010101010101010101010101010101010101010101ffff04ffff0101ffff04ff03ff808080808080ff8080ffff04ffff01ffff04ffff04ffff0101ffff04ff09ff808080ffff02ff04ffff04ff02ffff04ff0dff8080808080ff02ffff03ff0bffff01ff04ffff04ff05ffff04ffff02ff04ffff04ff02ffff01ff8a626c6f636b5f72656673808080ffff01ff7bffff80ffff018080808080ffff02ff06ffff04ff02ffff04ffff10ff05ffff010180ffff04ffff11ff0bffff010180ff808080808080ff8080ff0180ff018080",
+    []
+)]
+fn test_backrefs(#[case] generator: str, #[case] refs: Vec<Vec<u8>>) {
+    let generator = hex::decode(generator);
+}
