@@ -380,6 +380,13 @@ fn run_generator(#[case] name: &str) {
             flags,
         );
 
+        let result2 = get_coinspends_with_conditions_for_trusted_block(
+            &TEST_CONSTANTS,
+            &Program::new(generator.clone().into()),
+            &vec_of_slices,
+            flags,
+        );
+
         // now lets check get_coinspends_for_trusted_block
         // but only if we trust it not to do shenanigans
         if let Ok(ref conds) = conds2 {
@@ -387,12 +394,6 @@ fn run_generator(#[case] name: &str) {
             let coinspends = result.expect("get_coinspends");
 
             // check that we're getting the same info from get_coinspends_with_conditions_for_trusted_block
-            let result2 = get_coinspends_with_conditions_for_trusted_block(
-                &TEST_CONSTANTS,
-                &Program::new(generator.clone().into()),
-                &vec_of_slices,
-                flags,
-            );
             let coinspends2 = result2.expect("get_coinspends_with_conds");
 
             // get_coinspends_for_trusted_block skips certain attacking spends as it is required to
