@@ -253,7 +253,7 @@ where
 }
 
 // this function is less capable of handling problematic generators as they are
-// exposed to the RPC in chia-blockchain. They will simply ignore many of the bad cases.
+// returning serialized puzzles, which may not be possible. They will simply ignore many of the bad cases.
 pub fn get_coinspends_for_trusted_block<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
     constants: &ConsensusConstants,
     generator: &Program,
