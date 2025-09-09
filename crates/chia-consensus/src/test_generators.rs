@@ -423,7 +423,7 @@ fn run_generator(#[case] name: &str) {
                     assert_eq!(puzhash.as_ref(), coinspends[i].coin.puzzle_hash.as_slice());
                     assert_eq!(spend.coin_amount, coinspends[i].coin.amount);
 
-                    // test with_conditions
+                    // test get_coinspends_with_conditions_for_trusted_block()
                     assert_eq!(
                         parent_id.as_ref(),
                         coinspends2[i].0.coin.parent_coin_info.as_slice()
