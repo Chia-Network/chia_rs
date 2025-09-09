@@ -170,6 +170,7 @@ pub(crate) fn print_diff(output: &str, expected: &str) {
 // in CI we run with the clvmr/debug-allocator feature enabled, which makes this
 // test use too much RAM (about 6.8 GB)
 //#[case("aa-million-messages")]
+#[case("aaa-really-large-atom")]
 #[case("single-coin-only-garbage")]
 #[case("many-coins-announcement-cap")]
 #[case("3000000-conditions-single-coin")]
@@ -443,18 +444,18 @@ fn run_generator(#[case] name: &str) {
     }
 }
 
-#[rstest]
-#[case(
-    "ff02ffff01ff04ffff02ff06ffff04ff02ffff04ffff01a00101010101010101010101010101010101010101010101010101010101010101ffff04ffff0101ffff04ff03ff808080808080ff8080ffff04ffff01ffff04ffff04ffff0101ffff04ff09ff808080ffff02ff04ffff04ff02ffff04ff0dff8080808080ff02ffff03ff0bffff01ff04ffff04ff05ffff04ffff02ff04ffff04ff02ffff01ff8a626c6f636b5f72656673808080ffff01ff7bffff80ffff018080808080ffff02ff06ffff04ff02ffff04ffff10ff05ffff010180ffff04ffff11ff0bffff010180ff808080808080ff8080ff0180ff018080",
-    []
-)]
-fn test_backrefs(#[case] generator: str, #[case] refs: Vec<Vec<u8>>) {
-    // the hypothetical biggest block is 916,666 bytes
-    // lets remove 66 for running cost and adding a (q) and so on
-    // we can make an atom of size 916,600
-    let generator = hex::decode(generator).expect("invalid generator");
-    let filename = "../../generator-tests/largest_atom.txt";
-    println!("file: {filename}");
-    let atom_file = read_to_string(&filename).expect("test file not found");
-    let atom = hex::decode(atom_file).expect("invalid hex file");
-}
+// #[rstest]
+// #[case(
+//     "ff02ffff01ff04ffff02ff06ffff04ff02ffff04ffff01a00101010101010101010101010101010101010101010101010101010101010101ffff04ffff0101ffff04ff03ff808080808080ff8080ffff04ffff01ffff04ffff04ffff0101ffff04ff09ff808080ffff02ff04ffff04ff02ffff04ff0dff8080808080ff02ffff03ff0bffff01ff04ffff04ff05ffff04ffff02ff04ffff04ff02ffff01ff8a626c6f636b5f72656673808080ffff01ff7bffff80ffff018080808080ffff02ff06ffff04ff02ffff04ffff10ff05ffff010180ffff04ffff11ff0bffff010180ff808080808080ff8080ff0180ff018080",
+//     []
+// )]
+// fn test_backrefs(#[case] generator: str, #[case] refs: Vec<Vec<u8>>) {
+//     // the hypothetical biggest block is 916,666 bytes
+//     // lets remove 66 for running cost and adding a (q) and so on
+//     // we can make an atom of size 916,600
+//     let generator = hex::decode(generator).expect("invalid generator");
+//     let filename = "../../generator-tests/largest_atom.txt";
+//     println!("file: {filename}");
+//     let atom_file = read_to_string(&filename).expect("test file not found");
+//     let atom = hex::decode(atom_file).expect("invalid hex file");
+// }
