@@ -40,10 +40,11 @@ The complete generator becomes:
 123 (1024))))
 ```
 
-This is an example of a generator that _generates_ the puzzles programmatically:
+This is an example of a generator that _generates_ the puzzles programmatically
+(NOTE that the all caps values must be curryed in)
 
 ```
-(mod (condition condition_two amount)
+(mod (CONDITION CONDITION_TWO AMOUNT)
 
     (defun loop (condition condition_two amount)
         (if amount
@@ -53,16 +54,16 @@ This is an example of a generator that _generates_ the puzzles programmatically:
     )
 
     ; main
-    (list (list (list (q . 0x0101010101010101010101010101010101010101010101010101010101010101) (c 1 (loop condition condition_two amount)) 123 (list 0 (list 1)))))
+    (list (list (list (q . 0x0101010101010101010101010101010101010101010101010101010101010101) (c 1 (loop CONDITION CONDITION_TWO AMOUNT)) 123 (list 0 (list 1)))))
 )
 ```
 
-Though it would need to be curried as generators are not run with solutions.
 
+Though it would need to be curried as generators are not run with solutions.
 Here's another programmatic generator which generates multiple spends:
 
 ```
-(mod (amount)
+(mod (AMOUNT)
 
     (defun generate_conds (id pair_count)
         (if pair_count
@@ -79,5 +80,28 @@ Here's another programmatic generator which generates multiple spends:
     )
     ; main
     (list (loop_coins 0x0101010101010101010101010101010101010101010101010101010101010101 amount))
+)
+```
+
+For generators which take backreferences the solution format looks like this
+(NOTE that the )
+
+```
+(mod (deserializer_mod (block1 block2 block3 ... ))
+
+    (defun generate_conds (big_atom amount)
+        (if amount
+            (c (list 1 (+ big_atom amount)) (generate_conds big_atom (- amount 1)))
+            0
+        )
+    )
+    (defun loop_coins (id coins amount big_atom)
+        (if coins
+            (c (list id (c 1 (generate_conds big_atom amount)) 123 (list 0 (list 1))) (loop_coins (+ id 1) (- coins 1)))
+            ()
+        )   
+    )
+    ; main
+    (list (loop_coins 0x0101010101010101010101010101010101010101010101010101010101010101 1 50 block1))
 )
 ```

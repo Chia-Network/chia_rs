@@ -517,6 +517,63 @@ fn test_backrefs(#[case] generator_name: &str, #[case] refs: &[&str]) {
                 write_back.push_str(&format!("{output}"));
             }
         }
+
+        let mut a1 = make_allocator(flags);
+        let conds1 = run_block_generator(
+            &mut a1,
+            &generator,
+            &block_refs,
+            11_000_000_000,
+            flags | DONT_VALIDATE_SIGNATURE,
+            &Signature::default(),
+            None,
+            &TEST_CONSTANTS,
+        );
+        let output_pre_hard_fork = match conds1 {
+            Ok(mut conditions) => {
+                // before the hard fork, the cost of running the genrator +
+                // puzzles should never be lower than after the hard-fork
+                // but it's likely higher.
+                assert!(conditions.cost >= expected_cost);
+                // pre-hard fork, we don't have access to per-puzzle costs, so
+                // set those to whatever run_block_generator2() produced, to
+                // make the check pass
+                if let Ok(ref conds2) = conds2 {
+                    // update the cost we print here, just to be compatible with
+                    // the test cases we have. We've already ensured the cost is
+                    // lower
+                    conditions.cost = conds2.cost;
+                    conditions.execution_cost = conds2.execution_cost;
+                    for s in &conds2.spends {
+                        for ms in conditions.spends.iter_mut() {
+                            if ms.coin_id == s.coin_id {
+                                ms.execution_cost = s.execution_cost;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                print_conditions(&a1, &conditions, &a2)
+            }
+            Err(code) => {
+                format!("FAILED: {}\n", u32::from(code.1))
+            }
+        };
+
+        if output != output_pre_hard_fork {
+            print_diff(&output, &output_pre_hard_fork);
+            if !UPDATE_TESTS {
+                panic!("run_block_generator 1 and 2 produced a different result!");
+            }
+        }
+
+        if output != expected {
+            print_diff(&output, expected);
+            if !UPDATE_TESTS {
+                panic!("mismatching generator output");
+            }
+        }
     }
     if UPDATE_TESTS {
         write(&filename, write_back.into_bytes()).expect("write file");
