@@ -11,6 +11,7 @@ use chia_protocol::Program;
 use chia_protocol::{Bytes, Bytes48};
 use clvmr::allocator::NodePtr;
 use clvmr::Allocator;
+use std::fs::{read_to_string, write};
 use std::iter::zip;
 use text_diff::diff;
 use text_diff::Difference;
@@ -230,8 +231,6 @@ pub(crate) fn print_diff(output: &str, expected: &str) {
 #[case("unknown-condition")]
 #[case("duplicate-messages")]
 fn run_generator(#[case] name: &str) {
-    use std::fs::{read_to_string, write};
-
     // When making changes to print_conditions() enabling this will update the
     // test cases to match. Make sure to carefully review the diff before
     // landing an automatic update of the test case.
@@ -444,18 +443,82 @@ fn run_generator(#[case] name: &str) {
     }
 }
 
-// #[rstest]
-// #[case(
-//     "ff02ffff01ff04ffff02ff06ffff04ff02ffff04ffff01a00101010101010101010101010101010101010101010101010101010101010101ffff04ffff0101ffff04ff03ff808080808080ff8080ffff04ffff01ffff04ffff04ffff0101ffff04ff09ff808080ffff02ff04ffff04ff02ffff04ff0dff8080808080ff02ffff03ff0bffff01ff04ffff04ff05ffff04ffff02ff04ffff04ff02ffff01ff8a626c6f636b5f72656673808080ffff01ff7bffff80ffff018080808080ffff02ff06ffff04ff02ffff04ffff10ff05ffff010180ffff04ffff11ff0bffff010180ff808080808080ff8080ff0180ff018080",
-//     []
-// )]
-// fn test_backrefs(#[case] generator: str, #[case] refs: Vec<Vec<u8>>) {
-//     // the hypothetical biggest block is 916,666 bytes
-//     // lets remove 66 for running cost and adding a (q) and so on
-//     // we can make an atom of size 916,600
-//     let generator = hex::decode(generator).expect("invalid generator");
-//     let filename = "../../generator-tests/largest_atom.txt";
-//     println!("file: {filename}");
-//     let atom_file = read_to_string(&filename).expect("test file not found");
-//     let atom = hex::decode(atom_file).expect("invalid hex file");
-// }
+#[rstest]
+#[case(
+    "50-remark-first-ref",  // this makes 50 unique remarks derived from the backref atom in a single coinspend
+    &["aaa-really-large-atom"]
+)]
+fn test_backrefs(#[case] generator_name: &str, #[case] refs: &[&str]) {
+    // the hypothetical biggest block is 916,666 bytes
+    // lets remove 66 for running cost and adding a (q) and so on
+    // we can make an atom of size 916,600
+    let filename = format!("../../generator-tests/backref-generators/{generator_name}.txt");
+    println!("file: {filename}");
+
+    const UPDATE_TESTS: bool = true;
+
+    let test_file = read_to_string(&filename).expect("test file not found");
+    let (generator, expected) = test_file.split_once('\n').expect("invalid test file");
+    let generator = hex::decode(generator).expect("invalid hex encoded generator");
+    let mut block_refs = Vec::<Vec<u8>>::new();
+    for backref in refs {
+        let filename = format!("../../generator-tests/{backref}.txt");
+        println!("file: {filename}");
+        let test_file = read_to_string(&filename).expect("test file not found");
+        let (generator, _expected) = test_file.split_once('\n').expect("invalid test file");
+        let generator = hex::decode(generator).expect("invalid hex encoded generator");
+        block_refs.push(generator);
+    }
+
+    let mut write_back = format!("{}\n", hex::encode(&generator));
+    let mut last_output = String::new();
+
+    let expected = match expected.split_once("STRICT:\n") {
+        Some((c, m)) => [c, m],
+        None => [expected, expected],
+    };
+
+    for (flags, expected) in zip(&[0, MEMPOOL_MODE], expected) {
+        let mut flags = *flags;
+
+        println!("flags: {flags:x}");
+        let mut a2 = make_allocator(flags);
+        let conds2 = run_block_generator2(
+            &mut a2,
+            &generator,
+            &block_refs,
+            11_000_000_000,
+            flags | DONT_VALIDATE_SIGNATURE,
+            &Signature::default(),
+            None,
+            &TEST_CONSTANTS,
+        );
+
+        let (expected_cost, output) = match conds2 {
+            Ok(ref conditions) => {
+                let cond_cost: u64 = conditions.spends.iter().map(|v| v.condition_cost).sum();
+                assert_eq!(cond_cost, conditions.condition_cost);
+                let exe_cost: u64 = conditions.spends.iter().map(|v| v.execution_cost).sum();
+                // the generator itself has execution cost. At least the cost of
+                // a quote
+                assert!(exe_cost <= conditions.execution_cost);
+                (conditions.cost, print_conditions(&a2, &conditions, &a2))
+            }
+            Err(code) => (0, format!("FAILED: {}\n", u32::from(code.1))),
+        };
+
+        if UPDATE_TESTS {
+            if (flags & MEMPOOL_MODE) != 0 {
+                if output != last_output {
+                    write_back.push_str(&format!("STRICT:\n{output}"));
+                }
+            } else {
+                last_output = output.clone();
+                write_back.push_str(&format!("{output}"));
+            }
+        }
+    }
+    if UPDATE_TESTS {
+        write(&filename, write_back.into_bytes()).expect("write file");
+    }
+}
