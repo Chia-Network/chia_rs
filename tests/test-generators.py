@@ -78,6 +78,7 @@ def validate_except_cost(output1: str, output2: str) -> None:
 print(f"{'test name':43s}   consensus | mempool")
 base_dir = os.path.dirname(os.path.abspath(__file__))
 test_list = sorted(glob.glob(os.path.join(base_dir, "../generator-tests/*.txt")))
+test_list.append(sorted(glob.glob(os.path.join(base_dir, "../generator-tests/backref-generators/*.txt"))))
 if len(test_list) == 0:
     print("No tests found.")
 for g in test_list:
@@ -87,6 +88,9 @@ for g in test_list:
 
     run_generator1 = True
     flags = 0
+    if "50-remark-first-ref.txt" in g:
+        print("TODO: load blockrefs")
+
     if "aa-million-messages.txt" in g:
         flags = COST_CONDITIONS
     elif "aa-million-message-spends.txt" in g:
