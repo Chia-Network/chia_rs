@@ -56,3 +56,28 @@ This is an example of a generator that _generates_ the puzzles programmatically:
     (list (list (list (q . 0x0101010101010101010101010101010101010101010101010101010101010101) (c 1 (loop condition condition_two amount)) 123 (list 0 (list 1)))))
 )
 ```
+
+Though it would need to be curried as generators are not run with solutions.
+
+Here's another programmatic generator which generates multiple spends:
+
+```
+(mod (amount)
+
+    (defun generate_conds (id pair_count)
+        (if pair_count
+            (c (list 66 36 "hello" id) (c (list 67 36 "hello" id) (generate_conds id (- pair_count 1))))
+            0
+        )
+    )
+
+    (defun loop_coins (id amount)
+        (if amount
+            (c (list id (c 1 (generate_conds id 50)) 123 (list 0 (list 1))) (loop_coins (+ id 1) (- amount 1)))
+            ()
+        )
+    )
+    ; main
+    (list (loop_coins 0x0101010101010101010101010101010101010101010101010101010101010101 amount))
+)
+```
