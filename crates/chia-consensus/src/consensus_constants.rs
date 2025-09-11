@@ -128,8 +128,6 @@ pub struct ConsensusConstants {
 
     blocks_cache_size: u32,
 
-    max_generator_size: u32,
-
     max_generator_ref_list_size: u32,
 
     pool_sub_slot_iters: u64,
@@ -234,7 +232,6 @@ pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
     blocks_cache_size: 4608 + (128 * 4),
     weight_proof_recent_blocks: 1000,
     max_block_count_per_requests: 32,
-    max_generator_size: 1_000_000,
     max_generator_ref_list_size: 512,
     pool_sub_slot_iters: 37_600_000_000,
     hard_fork_height: 5_496_000,

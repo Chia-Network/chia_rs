@@ -4454,7 +4454,6 @@ class ConsensusConstants:
     WEIGHT_PROOF_RECENT_BLOCKS: uint32
     MAX_BLOCK_COUNT_PER_REQUESTS: uint32
     BLOCKS_CACHE_SIZE: uint32
-    MAX_GENERATOR_SIZE: uint32
     MAX_GENERATOR_REF_LIST_SIZE: uint32
     POOL_SUB_SLOT_ITERS: uint64
     HARD_FORK_HEIGHT: uint32
@@ -4512,7 +4511,6 @@ class ConsensusConstants:
         WEIGHT_PROOF_RECENT_BLOCKS: uint32,
         MAX_BLOCK_COUNT_PER_REQUESTS: uint32,
         BLOCKS_CACHE_SIZE: uint32,
-        MAX_GENERATOR_SIZE: uint32,
         MAX_GENERATOR_REF_LIST_SIZE: uint32,
         POOL_SUB_SLOT_ITERS: uint64,
         HARD_FORK_HEIGHT: uint32,
@@ -4586,7 +4584,6 @@ class ConsensusConstants:
         WEIGHT_PROOF_RECENT_BLOCKS: Union[ uint32, _Unspec] = _Unspec(),
         MAX_BLOCK_COUNT_PER_REQUESTS: Union[ uint32, _Unspec] = _Unspec(),
         BLOCKS_CACHE_SIZE: Union[ uint32, _Unspec] = _Unspec(),
-        MAX_GENERATOR_SIZE: Union[ uint32, _Unspec] = _Unspec(),
         MAX_GENERATOR_REF_LIST_SIZE: Union[ uint32, _Unspec] = _Unspec(),
         POOL_SUB_SLOT_ITERS: Union[ uint64, _Unspec] = _Unspec(),
         HARD_FORK_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
