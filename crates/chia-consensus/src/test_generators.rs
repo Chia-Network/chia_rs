@@ -171,6 +171,7 @@ pub(crate) fn print_diff(output: &str, expected: &str) {
 // in CI we run with the clvmr/debug-allocator feature enabled, which makes this
 // test use too much RAM (about 6.8 GB)
 //#[case("aa-million-messages")]
+#[case("aaaa-single-coin-1-remark-20-ladder")]
 #[case("aaaa-single-coin-100-remark-12-ladder")]
 #[case("aaa-really-large-atom")]
 #[case("single-coin-only-garbage")]
@@ -235,9 +236,11 @@ fn run_generator(#[case] name: &str) {
     // When making changes to print_conditions() enabling this will update the
     // test cases to match. Make sure to carefully review the diff before
     // landing an automatic update of the test case.
-    const UPDATE_TESTS: bool = false;
+    const UPDATE_TESTS: bool = true;
 
     let run_generator_one: bool = ![
+        "aaaa-single-coin-1-remark-20-ladder",
+        "aaaa-single-coin-100-remark-12-ladder",
         "single-coin-only-garbage",
         "many-coins-announcement-cap",
         "puzzle-hash-stress-test",

@@ -105,3 +105,13 @@ For generators which take backreferences the solution format looks like this
     (list (loop_coins 0x0101010101010101010101010101010101010101010101010101010101010101 1 50 block1))
 )
 ```
+
+Ladders are generated with the following function:
+```
+    (defun ladder_maker (depth a b)
+        (if depth
+            (c (ladder_maker (- depth 1) a b) (ladder_maker (- depth 1) b a))
+            (c a b)
+        )
+    )
+```

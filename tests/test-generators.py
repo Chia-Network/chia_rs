@@ -96,6 +96,10 @@ for g in test_list:
     elif "aa-million-message-spends.txt" in g:
         flags = COST_CONDITIONS
         run_generator1 = False
+    elif "aaaa-single-coin-100-remark-12-ladder.txt" in g:
+        run_generator1 = False
+    elif "aaaa-single-coin-1-remark-20-ladder.txt" in g:
+        run_generator1 = False
     elif "3000000-conditions-single-coin.txt" in g:
         run_generator1 = False
     elif "single-coin-only-garbage" in g:
