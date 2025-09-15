@@ -43,10 +43,17 @@ class Results:
     run_time: float
 
 
-def run_generator(file: str, flags: int, version: int) -> Results:
-    error_code, result, run_time = run_gen(
-        file, flags, file.replace(".txt", ".env"), version
-    )
+def run_generator(
+    file: str, flags: int, version: int, block_refs: list[str] = []
+) -> Results:
+    if len(block_refs) >= 1:
+        error_code, result, run_time = run_gen(
+            file, flags, file.replace(".txt", ".env"), version
+        )
+    else:
+        error_code, result, run_time = run_gen(
+            file, flags, file.replace(".txt", ".env"), version
+        )
     output = parse_output(result, error_code)
     return Results(output, result, run_time)
 
@@ -78,7 +85,9 @@ def validate_except_cost(output1: str, output2: str) -> None:
 print(f"{'test name':43s}   consensus | mempool")
 base_dir = os.path.dirname(os.path.abspath(__file__))
 test_list = sorted(glob.glob(os.path.join(base_dir, "../generator-tests/*.txt")))
-test_list.append(sorted(glob.glob(os.path.join(base_dir, "../generator-tests/backref-generators/*.txt"))))
+test_list = test_list + sorted(
+    glob.glob(os.path.join(base_dir, "../generator-tests/backref-generators/*.txt"))
+)
 if len(test_list) == 0:
     print("No tests found.")
 for g in test_list:
@@ -88,8 +97,10 @@ for g in test_list:
 
     run_generator1 = True
     flags = 0
+    back_refs = []
     if "50-remark-first-ref.txt" in g:
-        print("TODO: load blockrefs")
+        back_refs = ["aaa-really-large-atom.txt"]
+        run_generator1 = False
 
     if "aa-million-messages.txt" in g:
         flags = COST_CONDITIONS
@@ -126,11 +137,7 @@ for g in test_list:
 
     stdout.write(f"{name} running generator2...\r")
     stdout.flush()
-    consensus2 = run_generator(
-        g,
-        flags,
-        version=2,
-    )
+    consensus2 = run_generator(g, flags, version=2, block_refs=back_refs)
     if run_generator1:
         validate_except_cost(consensus.output, consensus2.output)
 
@@ -139,18 +146,12 @@ for g in test_list:
 
     if run_generator1:
         mempool = run_generator(
-            g,
-            MEMPOOL_MODE | flags,
-            version=1,
+            g, MEMPOOL_MODE | flags, version=1, block_refs=back_refs
         )
 
     stdout.write(f"{name} running generator2 (mempool mode)...\r")
     stdout.flush()
-    mempool2 = run_generator(
-        g,
-        MEMPOOL_MODE | flags,
-        version=2,
-    )
+    mempool2 = run_generator(g, MEMPOOL_MODE | flags, version=2, block_refs=back_refs)
     if run_generator1:
         validate_except_cost(mempool.output, mempool2.output)
 

@@ -95,7 +95,7 @@ DEFAULT_CONSTANTS = ConsensusConstants(
 
 
 def run_gen(
-    fn: str, flags: int = 0, args: Optional[str] = None, version: int = 2
+    fn: str, flags: int = 0, args: Optional[str] = None, version: int = 2, ref_list=[]
 ) -> tuple[Optional[int], Optional[SpendBundleConditions], float]:
 
     # constants from the main chia blockchain:
@@ -107,7 +107,13 @@ def run_gen(
 
     # add the block program arguments
     block_refs = []
-    if args and args != "":
+    if len(ref_list) > 0:
+        try:
+            with open(args, "r") as f:
+                block_refs.append(bytes.fromhex(f.read()))
+        except OSError as e:
+            pass
+    elif args and args != "":
         try:
             with open(args, "r") as f:
                 block_refs = [bytes.fromhex(f.read())]
