@@ -41,7 +41,7 @@ jobs:
 
       - name: Publish (npmjs.com)
         if: startsWith(github.event.ref, 'refs/tags')
-        uses: JS-DevTools/npm-publish@v3
+        uses: JS-DevTools/npm-publish@v4
         with:
           token: ${{ secrets.node_auth_token }}
           package: wasm/pkg/package.json
