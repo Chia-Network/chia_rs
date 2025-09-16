@@ -1,0 +1,6 @@
+# We get: X is a disjoint base at runtime, but isn't marked with @disjoint_base in the stub
+# or .__disjoint_base__ is not present in stub when adding the decorator
+chia_rs\.sized_byte_class\.SizedBytes
+chia_rs\.sized_bytes\.SizedBytes
+chia_rs\.sized_ints\.StructStream
+chia_rs\.struct_stream\.StructStream
