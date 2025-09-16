@@ -63,11 +63,11 @@ def print_class(
     # def __richcmp__(self) -> Any: ...
     file.write(
         f"""
-{"" if inheritable else "@final"}
+{"@disjoint_base" if inheritable else "@final"}
 class {name}:{"".join(map(add_indent, members))}
-    def __init__(
-        self{init_args}
-    ) -> None: ...
+    def __new__(
+        cls{init_args}
+    ) -> {name}: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
     def __deepcopy__(self, memo: object) -> Self: ...
@@ -284,7 +284,7 @@ with open(output_file, "w") as file:
 from typing import Optional, Sequence, Union, Any, ClassVar, final
 from .sized_bytes import bytes32, bytes100
 from .sized_ints import uint8, uint16, uint32, uint64, uint128, int8, int16, int32, int64
-from typing_extensions import Self
+from typing_extensions import Self, disjoint_base
 
 ReadableBuffer = Union[bytes, bytearray, memoryview]
 
@@ -424,7 +424,7 @@ def get_puzzle_and_solution_for_coin2(generator: Program, block_refs: list[Reada
 
 @final
 class BLSCache:
-    def __init__(self, cache_size: Optional[int] = 50000) -> None: ...
+    def __new__(cls, cache_size: Optional[int] = None) -> BLSCache: ...
     def len(self) -> int: ...
     def aggregate_verify(self, pks: list[G1Element], msgs: list[bytes], sig: G2Element) -> bool: ...
     def items(self) -> list[tuple[bytes, GTElement]]: ...
@@ -462,10 +462,10 @@ class BlockBuilder:
 class MerkleSet:
     def get_root(self) -> bytes32: ...
     def is_included_already_hashed(self, included_leaf: bytes32) -> tuple[bool, bytes]: ...
-    def __init__(
-        self,
+    def __new__(
+        cls,
         leafs: list[bytes32],
-    ) -> None: ...
+    ) -> MerkleSet: ...
 
 @final
 class PlotSize:
@@ -485,7 +485,6 @@ class PlotSize:
         [],
         [
             "SIZE: ClassVar[int] = ...",
-            "def __new__(cls) -> G1Element: ...",
             "def get_fingerprint(self) -> int: ...",
             "def verify(self, signature: G2Element, msg: bytes) -> bool: ...",
             "def pair(self, other: G2Element) -> GTElement: ...",
@@ -505,7 +504,6 @@ class PlotSize:
         [],
         [
             "SIZE: ClassVar[int] = ...",
-            "def __new__(cls) -> G2Element: ...",
             "def pair(self, other: G1Element) -> GTElement: ...",
             "@staticmethod",
             "def generator() -> G2Element: ...",

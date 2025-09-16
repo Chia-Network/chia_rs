@@ -140,9 +140,9 @@ use pyo3::{
 #[pyo3::pymethods]
 impl BlsCache {
     #[new]
-    #[pyo3(signature = (size=None))]
-    pub fn init(size: Option<u32>) -> PyResult<Self> {
-        let Some(size) = size else {
+    #[pyo3(signature = (cache_size=None))]
+    pub fn init(cache_size: Option<u32>) -> PyResult<Self> {
+        let Some(size) = cache_size else {
             return Ok(Self::default());
         };
 
