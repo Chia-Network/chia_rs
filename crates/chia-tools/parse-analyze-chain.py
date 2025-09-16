@@ -8,7 +8,6 @@ keys = ["atoms:",
      "block_cost:",
      "execute_time:",
      "timestamp:",
-     "time_delta:",
 ]
 
 def to_int(value: str) -> int:
