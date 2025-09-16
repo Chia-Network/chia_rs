@@ -6,7 +6,7 @@ use std::thread::available_parallelism;
 use std::time::Instant;
 
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
-use chia_consensus::flags::MEMPOOL_MODE;
+use chia_consensus::flags::{DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
 use chia_consensus::run_block_generator::{run_block_generator, run_block_generator2};
 use chia_tools::iterate_blocks;
 use clvmr::Allocator;
@@ -39,7 +39,7 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    let flags = if args.mempool_mode { MEMPOOL_MODE } else { 0 };
+    let flags = if args.mempool_mode { MEMPOOL_MODE } else { 0 } | DONT_VALIDATE_SIGNATURE;
 
     let num_cores = args
         .num_jobs
@@ -47,7 +47,7 @@ fn main() {
 
     let pool = blocking_threadpool::Builder::new()
         .num_threads(num_cores)
-        .queue_len(num_cores + 5)
+        .queue_len(num_cores * 2)
         .build();
 
     let output = Arc::new(Mutex::new(
