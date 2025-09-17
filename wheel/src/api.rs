@@ -649,9 +649,6 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("COMPUTE_FINGERPRINT", COMPUTE_FINGERPRINT)?;
     m.add("COST_CONDITIONS", COST_CONDITIONS)?;
 
-    // for backwards compatibility
-    m.add("ALLOW_BACKREFS", 0)?;
-
     m.add_class::<PyPlotSize>()?;
 
     // Chia classes

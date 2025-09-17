@@ -24,9 +24,11 @@ jobs:
         os: [macos-latest, ubuntu-latest, windows-latest]
         python:
           - major-dot-minor: "3.9"
+            stubtest-args: --allowlist wheel/stubtest.allowlist.disjoint-base
           - major-dot-minor: "3.10"
+            stubtest-args: --allowlist wheel/stubtest.allowlist.disjoint-base
           - major-dot-minor: "3.11"
-            stubtest-args: --allowlist wheel/stubtest.allowlist.3-11
+            stubtest-args: --allowlist wheel/stubtest.allowlist.3-11 --allowlist wheel/stubtest.allowlist.disjoint-base
           - major-dot-minor: "3.12"
             stubtest-args: --allowlist wheel/stubtest.allowlist.3-12
           - major-dot-minor: "3.13"
