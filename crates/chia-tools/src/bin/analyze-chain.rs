@@ -73,7 +73,7 @@ fn main() {
             pool.execute(move || {
                 // after the hard fork, we run blocks without paying for the
                 // CLVM generator ROM
-                let block_runner = if height >= 5_496_000 {
+                let block_runner = if height >= TEST_CONSTANTS.hard_fork_height {
                     run_block_generator2
                 } else {
                     run_block_generator
