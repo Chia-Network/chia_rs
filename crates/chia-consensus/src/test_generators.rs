@@ -234,7 +234,7 @@ fn run_generator(#[case] name: &str) {
     // When making changes to print_conditions() enabling this will update the
     // test cases to match. Make sure to carefully review the diff before
     // landing an automatic update of the test case.
-    const UPDATE_TESTS: bool = false;
+    const UPDATE_TESTS: bool = true;
 
     let run_generator_one: bool = ![
         "single-coin-only-garbage",
@@ -315,7 +315,13 @@ fn run_generator(#[case] name: &str) {
         };
 
         if UPDATE_TESTS {
-            if (flags & MEMPOOL_MODE) != 0 {
+            if flags & COST_SHATREE != 0 {
+                if output != last_output {
+                    last_output = output.clone();
+                    write_back.push_str(&format!("COSTED_SHA:\n{output}"));
+                }
+            }
+            else if (flags & MEMPOOL_MODE) != 0 {
                 if output != last_output {
                     write_back.push_str(&format!("STRICT:\n{output}"));
                 }
