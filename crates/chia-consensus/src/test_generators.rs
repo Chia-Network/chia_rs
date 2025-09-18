@@ -323,6 +323,7 @@ fn run_generator(#[case] name: &str) {
             }
             else if (flags & MEMPOOL_MODE) != 0 {
                 if output != last_output {
+                    last_output = output.clone();
                     write_back.push_str(&format!("STRICT:\n{output}"));
                 }
             } else {
