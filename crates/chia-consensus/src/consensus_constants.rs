@@ -171,6 +171,11 @@ pub struct ConsensusConstants {
 
     /// The quality proof scan filter for v2 plots
     quality_proof_scan_filter: u8,
+
+    // How much one call of shatree costs when processing the puzzle reveals
+    // that are revealed from running the generator.
+    shatree_recurse_cost: u32,
+    shatree_cost_per_byte: u32,
 }
 
 pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
@@ -253,4 +258,7 @@ pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
     plot_strength_8_height: 0xffff_ffff,
 
     quality_proof_scan_filter: 16, // placeholder
+
+    shatree_recurse_cost: 100,
+    shatree_cost_per_byte: 50,
 };
