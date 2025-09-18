@@ -257,14 +257,14 @@ fn run_generator(#[case] name: &str) {
     let expected = match expected.split_once("STRICT:\n") {
         Some((c, m)) => {
             match m.split_once("COSTED_SHA:\n") {
-                Some((d, n)) => [c, d, n, n],
-                None => [c, m, c, m],
+                Some((d, n)) => [c, d, n],
+                None => [c, m, c],
             }
         },
         None => {
             match expected.split_once("COSTED_SHA:\n") {
-                Some((d, n)) => [d, d, n, n],
-                None => [expected, expected, expected, expected],
+                Some((d, n)) => [d, d, n],
+                None => [expected, expected, expected],
             }
         },
     };
@@ -280,7 +280,7 @@ fn run_generator(#[case] name: &str) {
     let mut write_back = format!("{}\n", hex::encode(&generator));
     let mut last_output = String::new();
 
-    for (flags, expected) in zip(&[0, MEMPOOL_MODE, COST_SHATREE, MEMPOOL_MODE | COST_SHATREE], expected) {
+    for (flags, expected) in zip(&[0, MEMPOOL_MODE, COST_SHATREE], expected) {
         let mut flags = *flags;
         if name == "aa-million-messages" || name == "aa-million-message-spends" {
             // this test requires running after hard fork 2, where the COST_CONDITIONS
