@@ -1,5 +1,6 @@
 use chia_sha2::Sha256;
 use clvmr::allocator::{Allocator, NodePtr, NodeVisitor, ObjectType, SExp};
+use clvmr::cost::Cost;
 use clvmr::error::EvalErr;
 use clvmr::serde::node_from_bytes_backrefs;
 use hex_literal::hex;
@@ -305,6 +306,79 @@ pub fn tree_hash_cached(a: &Allocator, node: NodePtr, cache: &mut TreeCache) -> 
 
     assert!(hashes.len() == 1);
     hashes[0]
+}
+
+fn subtract_cost(cost_left: &mut Cost, subtract: Cost) -> Result<(), usize> {
+    if subtract > *cost_left {
+        Err(0)
+    } else {
+        *cost_left -= subtract;
+        Ok(())
+    }
+}
+
+pub fn tree_hash_cached_costed(
+    a: &Allocator,
+    node: NodePtr,
+    cache: &mut TreeCache,
+    cost_left: &mut u64,
+    cost_per_call: u32,
+    cost_per_byte: u32,
+) -> Result<TreeHash, usize> {
+    cache.visit_tree(a, node);
+
+    let mut hashes = Vec::new();
+    let mut ops = vec![TreeOp::SExp(node)];
+
+    while let Some(op) = ops.pop() {
+        subtract_cost(cost_left, cost_per_call.into())?;
+        match op {
+            TreeOp::SExp(node) => match a.node(node) {
+                NodeVisitor::Buffer(bytes) => {
+                    subtract_cost(cost_left, (cost_per_byte * bytes.len() as u32).into())?;
+                    let hash = tree_hash_atom(bytes);
+                    hashes.push(hash);
+                }
+                NodeVisitor::U32(val) => {
+                    subtract_cost(cost_left, (cost_per_byte * 4).into())?; // 4 bytes in u32
+                    if (val as usize) < PRECOMPUTED_HASHES.len() {
+                        hashes.push(PRECOMPUTED_HASHES[val as usize]);
+                    } else {
+                        hashes.push(tree_hash_atom(a.atom(node).as_ref()));
+                    }
+                }
+                NodeVisitor::Pair(left, right) => {
+                    subtract_cost(cost_left, cost_per_byte.into())?;
+                    if let Some(hash) = cache.get(node) {
+                        hashes.push(*hash);
+                    } else {
+                        if cache.should_memoize(node) {
+                            ops.push(TreeOp::ConsAddCache(node));
+                        } else {
+                            ops.push(TreeOp::Cons);
+                        }
+                        ops.push(TreeOp::SExp(left));
+                        ops.push(TreeOp::SExp(right));
+                    }
+                }
+            },
+            TreeOp::Cons => {
+                let first = hashes.pop().unwrap();
+                let rest = hashes.pop().unwrap();
+                hashes.push(tree_hash_pair(first, rest));
+            }
+            TreeOp::ConsAddCache(original_node) => {
+                let first = hashes.pop().unwrap();
+                let rest = hashes.pop().unwrap();
+                let hash = tree_hash_pair(first, rest);
+                hashes.push(hash);
+                cache.insert(original_node, &hash);
+            }
+        }
+    }
+
+    assert!(hashes.len() == 1);
+    Ok(hashes[0])
 }
 
 pub fn tree_hash_from_bytes(buf: &[u8]) -> Result<TreeHash, EvalErr> {

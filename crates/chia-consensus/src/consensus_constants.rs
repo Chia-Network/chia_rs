@@ -166,6 +166,9 @@ pub struct ConsensusConstants {
     plot_filter_v2_first_adjustment_height: u32,
     plot_filter_v2_second_adjustment_height: u32,
     plot_filter_v2_third_adjustment_height: u32,
+    
+    shatree_recurse_cost: u32,
+    shatree_cost_per_byte: u32,
 }
 
 pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
@@ -246,4 +249,7 @@ pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
     plot_filter_v2_first_adjustment_height: 0xffff_ffff, // placeholder
     plot_filter_v2_second_adjustment_height: 0xffff_ffff, // placeholder
     plot_filter_v2_third_adjustment_height: 0xffff_ffff, // placeholder
+
+    shatree_recurse_cost: 100,
+    shatree_cost_per_byte: 50,
 };
