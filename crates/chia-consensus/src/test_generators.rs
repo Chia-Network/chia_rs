@@ -5,7 +5,7 @@ use super::run_block_generator::{
 };
 use crate::allocator::make_allocator;
 use crate::consensus_constants::TEST_CONSTANTS;
-use crate::flags::{COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
+use crate::flags::{COST_CONDITIONS, COST_SHATREE, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
 use chia_bls::Signature;
 use chia_protocol::Program;
 use chia_protocol::{Bytes, Bytes48};
@@ -255,8 +255,18 @@ fn run_generator(#[case] name: &str) {
     let generator = hex::decode(generator).expect("invalid hex encoded generator");
 
     let expected = match expected.split_once("STRICT:\n") {
-        Some((c, m)) => [c, m],
-        None => [expected, expected],
+        Some((c, m)) => {
+            match m.split_once("COSTED_SHA:\n") {
+                Some((d, n)) => [c, d, n, n],
+                None => [c, m, c, m],
+            }
+        },
+        None => {
+            match expected.split_once("COSTED_SHA:\n") {
+                Some((d, n)) => [d, d, n, n],
+                None => [expected, expected, expected, expected],
+            }
+        },
     };
 
     let mut block_refs = Vec::<Vec<u8>>::new();
@@ -270,7 +280,7 @@ fn run_generator(#[case] name: &str) {
     let mut write_back = format!("{}\n", hex::encode(&generator));
     let mut last_output = String::new();
 
-    for (flags, expected) in zip(&[0, MEMPOOL_MODE], expected) {
+    for (flags, expected) in zip(&[0, MEMPOOL_MODE, COST_SHATREE, MEMPOOL_MODE | COST_SHATREE], expected) {
         let mut flags = *flags;
         if name == "aa-million-messages" || name == "aa-million-message-spends" {
             // this test requires running after hard fork 2, where the COST_CONDITIONS
