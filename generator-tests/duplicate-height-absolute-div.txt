@@ -10,3 +10,15 @@ addition_amount: 0
 atoms: 163
 pairs: 677
 heap: 68
+COSTED_SHA:
+ASSERT_HEIGHT_ABSOLUTE 100
+SPENDS:
+- coin id: 8d5d355cdc9d9870cd3fa54ecf2ca98aea33e55891c2a22e7400a303de7f98b5 ph: d335736825c159890968ff4918b4bb384ac162fb5714212682fbf1692094b093 exe-cost: 22048 cond-cost: 0
+cost: 1982968
+execution-cost: 22068
+condition-cost: 0
+removal_amount: 123
+addition_amount: 0
+atoms: 163
+pairs: 677
+heap: 68

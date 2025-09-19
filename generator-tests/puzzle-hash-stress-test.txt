@@ -9,3 +9,14 @@ addition_amount: 0
 atoms: 3300151
 pairs: 59400473
 heap: 68
+COSTED_SHA:
+SPENDS:
+- coin id: f89d4e0c8aecf335ac33206f074fa7092e762b30ed5e3e5cb91179c203b004ea ph: 59249531a8efd43a610f4e06ac5bb9d40c65d768b8fcc46302594cc6962c7632 exe-cost: 20 cond-cost: 0
+cost: 6413565334
+execution-cost: 5091473584
+condition-cost: 0
+removal_amount: 123
+addition_amount: 0
+atoms: 3300151
+pairs: 59400473
+heap: 68
