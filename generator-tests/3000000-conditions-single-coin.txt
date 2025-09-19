@@ -9,3 +9,14 @@ addition_amount: 0
 atoms: 4500188
 pairs: 55500751
 heap: 16500111
+COSTED_SHA:
+SPENDS:
+- coin id: 07b613b839fc63c74f5ea9c3f0e53e20b2e6caa03cca22c3ec6c535d448b2c52 ph: 5f00588bafb0824e1cb6dca266fa9c90c28cbe5326669471499bb331da883680 exe-cost: 20 cond-cost: 0
+cost: 10720925128
+execution-cost: 5541880278
+condition-cost: 0
+removal_amount: 123
+addition_amount: 0
+atoms: 4500188
+pairs: 55500751
+heap: 16500111
