@@ -154,14 +154,26 @@ for g in test_list:
 
             if "COSTED_SHA:\n" in rest:
                 mempool_part, sha_part = rest.split("COSTED_SHA:\n", 1)
-                expected, expected_mempool, expected_sha = consensus_part, mempool_part, sha_part
+                expected, expected_mempool, expected_sha = (
+                    consensus_part,
+                    mempool_part,
+                    sha_part,
+                )
             else:
-                expected, expected_mempool, expected_sha = consensus_part, rest, consensus_part
+                expected, expected_mempool, expected_sha = (
+                    consensus_part,
+                    rest,
+                    consensus_part,
+                )
         else:
             # no STRICT
             if "COSTED_SHA:\n" in expected:
                 mempool_part, sha_part = expected.split("COSTED_SHA:\n", 1)
-                expected, expected_mempool, expected_sha = mempool_part, mempool_part, sha_part
+                expected, expected_mempool, expected_sha = (
+                    mempool_part,
+                    mempool_part,
+                    sha_part,
+                )
             else:
                 expected, expected_mempool, expected_sha = expected, expected, expected
 
