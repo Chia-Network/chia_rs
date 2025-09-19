@@ -343,7 +343,9 @@ fn run_generator(#[case] name: &str) {
                     // before the hard fork, the cost of running the genrator +
                     // puzzles should never be lower than after the hard-fork
                     // but it's likely higher.
-                    if flags & COST_SHATREE == 0 {assert!(conditions.cost >= expected_cost);};
+                    if flags & COST_SHATREE == 0 {
+                        assert!(conditions.cost >= expected_cost);
+                    };
                     // pre-hard fork, we don't have access to per-puzzle costs, so
                     // set those to whatever run_block_generator2() produced, to
                     // make the check pass
