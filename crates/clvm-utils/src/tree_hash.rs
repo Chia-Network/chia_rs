@@ -308,9 +308,9 @@ pub fn tree_hash_cached(a: &Allocator, node: NodePtr, cache: &mut TreeCache) -> 
     hashes[0]
 }
 
-fn subtract_cost(cost_left: &mut Cost, subtract: Cost) -> Result<(), usize> {
+fn subtract_cost(cost_left: &mut Cost, subtract: Cost) -> Result<(), ()> {
     if subtract > *cost_left {
-        Err(0)
+        Err(())
     } else {
         *cost_left -= subtract;
         Ok(())
