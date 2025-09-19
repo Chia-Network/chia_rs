@@ -27,5 +27,9 @@ pub const COMPUTE_FINGERPRINT: u32 = 0x4_0000;
 /// processing them in in chia_rs. It is set to activate after hard fork 2.
 pub const COST_CONDITIONS: u32 = 0x80_0000;
 
+// This flag controls whether we are adding the cost of the sha_trees for
+// the puzzle reveals in a generator into the generators cost
+pub const COST_SHATREE: u32 = 0x100_000;
+
 /// A combination of flags suitable for mempool-mode, with stricter checking
 pub const MEMPOOL_MODE: u32 = CLVM_MEMPOOL_MODE | NO_UNKNOWN_CONDS | STRICT_ARGS_COUNT;

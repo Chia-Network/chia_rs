@@ -5,7 +5,7 @@ use super::run_block_generator::{
 };
 use crate::allocator::make_allocator;
 use crate::consensus_constants::TEST_CONSTANTS;
-use crate::flags::{COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
+use crate::flags::{COST_CONDITIONS, COST_SHATREE, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
 use chia_bls::Signature;
 use chia_protocol::Program;
 use chia_protocol::{Bytes, Bytes48};
@@ -234,7 +234,7 @@ fn run_generator(#[case] name: &str) {
     // When making changes to print_conditions() enabling this will update the
     // test cases to match. Make sure to carefully review the diff before
     // landing an automatic update of the test case.
-    const UPDATE_TESTS: bool = false;
+    const UPDATE_TESTS: bool = true;
 
     let run_generator_one: bool = ![
         "single-coin-only-garbage",
@@ -255,8 +255,14 @@ fn run_generator(#[case] name: &str) {
     let generator = hex::decode(generator).expect("invalid hex encoded generator");
 
     let expected = match expected.split_once("STRICT:\n") {
-        Some((c, m)) => [c, m],
-        None => [expected, expected],
+        Some((c, m)) => match m.split_once("COSTED_SHA:\n") {
+            Some((d, n)) => [c, d, n],
+            None => [c, m, c],
+        },
+        None => match expected.split_once("COSTED_SHA:\n") {
+            Some((d, n)) => [d, d, n],
+            None => [expected, expected, expected],
+        },
     };
 
     let mut block_refs = Vec::<Vec<u8>>::new();
@@ -270,7 +276,7 @@ fn run_generator(#[case] name: &str) {
     let mut write_back = format!("{}\n", hex::encode(&generator));
     let mut last_output = String::new();
 
-    for (flags, expected) in zip(&[0, MEMPOOL_MODE], expected) {
+    for (flags, expected) in zip(&[0, MEMPOOL_MODE, COST_SHATREE], expected) {
         let mut flags = *flags;
         if name == "aa-million-messages" || name == "aa-million-message-spends" {
             // this test requires running after hard fork 2, where the COST_CONDITIONS
@@ -305,8 +311,14 @@ fn run_generator(#[case] name: &str) {
         };
 
         if UPDATE_TESTS {
-            if (flags & MEMPOOL_MODE) != 0 {
+            if (flags & COST_SHATREE) != 0 {
                 if output != last_output {
+                    last_output = output.clone();
+                    write_back.push_str(&format!("COSTED_SHA:\n{output}"));
+                }
+            } else if (flags & MEMPOOL_MODE) != 0 {
+                if output != last_output {
+                    last_output = output.clone();
                     write_back.push_str(&format!("STRICT:\n{output}"));
                 }
             } else {
@@ -331,7 +343,9 @@ fn run_generator(#[case] name: &str) {
                     // before the hard fork, the cost of running the genrator +
                     // puzzles should never be lower than after the hard-fork
                     // but it's likely higher.
-                    assert!(conditions.cost >= expected_cost);
+                    if (flags & COST_SHATREE) == 0 {
+                        assert!(conditions.cost >= expected_cost);
+                    };
                     // pre-hard fork, we don't have access to per-puzzle costs, so
                     // set those to whatever run_block_generator2() produced, to
                     // make the check pass
