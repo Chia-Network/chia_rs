@@ -324,7 +324,7 @@ pub fn tree_hash_cached_costed(
     cost_left: &mut u64,
     cost_per_call: u32,
     cost_per_byte: u32,
-) -> Result<TreeHash, usize> {
+) -> Result<TreeHash, ()> {
     cache.visit_tree(a, node);
 
     let mut hashes = Vec::new();
