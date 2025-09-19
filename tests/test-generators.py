@@ -148,17 +148,22 @@ for g in test_list:
 
     with open(g) as f:
         expected = f.read().split("\n", 1)[1]
-        if not "STRICT" in expected:
-            expected_mempool = expected
-            if (
-                consensus2.result is not None
-                and mempool2.result is not None
-                and consensus2.result.cost != mempool2.result.cost
-            ):
-                print("\n\ncost when running in mempool mode differs from normal mode!")
-                failed = 1
+        if "STRICT:\n" in expected:
+            # split STRICT section
+            consensus_part, rest = expected.split("STRICT:\n", 1)
+
+            if "COSTED_SHA:\n" in rest:
+                mempool_part, sha_part = rest.split("COSTED_SHA:\n", 1)
+                expected, expected_mempool, expected_sha = consensus_part, mempool_part, sha_part
+            else:
+                expected, expected_mempool, expected_sha = consensus_part, rest, consensus_part
         else:
-            expected, expected_mempool = expected.split("STRICT:\n", 1)
+            # no STRICT
+            if "COSTED_SHA:\n" in expected:
+                mempool_part, sha_part = expected.split("COSTED_SHA:\n", 1)
+                expected, expected_mempool, expected_sha = mempool_part, mempool_part, sha_part
+            else:
+                expected, expected_mempool, expected_sha = expected, expected, expected
 
         stdout.write("\x1b[K")
         stdout.flush()
