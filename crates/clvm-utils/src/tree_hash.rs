@@ -335,7 +335,7 @@ pub fn tree_hash_cached_costed(
         match op {
             TreeOp::SExp(node) => match a.node(node) {
                 NodeVisitor::Buffer(bytes) => {
-                    subtract_cost(cost_left, (cost_per_byte * bytes.len() as u32).into())?;
+                    subtract_cost(cost_left, u64::from(cost_per_byte) * u64::from(bytes.len()))?;
                     let hash = tree_hash_atom(bytes);
                     hashes.push(hash);
                 }
