@@ -255,17 +255,13 @@ fn run_generator(#[case] name: &str) {
     let generator = hex::decode(generator).expect("invalid hex encoded generator");
 
     let expected = match expected.split_once("STRICT:\n") {
-        Some((c, m)) => {
-            match m.split_once("COSTED_SHA:\n") {
-                Some((d, n)) => [c, d, n],
-                None => [c, m, c],
-            }
+        Some((c, m)) => match m.split_once("COSTED_SHA:\n") {
+            Some((d, n)) => [c, d, n],
+            None => [c, m, c],
         },
-        None => {
-            match expected.split_once("COSTED_SHA:\n") {
-                Some((d, n)) => [d, d, n],
-                None => [expected, expected, expected],
-            }
+        None => match expected.split_once("COSTED_SHA:\n") {
+            Some((d, n)) => [d, d, n],
+            None => [expected, expected, expected],
         },
     };
 
@@ -320,8 +316,7 @@ fn run_generator(#[case] name: &str) {
                     last_output = output.clone();
                     write_back.push_str(&format!("COSTED_SHA:\n{output}"));
                 }
-            }
-            else if (flags & MEMPOOL_MODE) != 0 {
+            } else if (flags & MEMPOOL_MODE) != 0 {
                 if output != last_output {
                     last_output = output.clone();
                     write_back.push_str(&format!("STRICT:\n{output}"));

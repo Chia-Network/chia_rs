@@ -4467,6 +4467,8 @@ class ConsensusConstants:
     PLOT_STRENGTH_7_HEIGHT: uint32
     PLOT_STRENGTH_8_HEIGHT: uint32
     QUALITY_PROOF_SCAN_FILTER: uint8
+    SHATREE_RECURSE_COST: uint32
+    SHATREE_COST_PER_BYTE: uint32
     def __new__(
         cls,
         SLOT_BLOCKS_TARGET: uint32,
@@ -4524,7 +4526,9 @@ class ConsensusConstants:
         PLOT_STRENGTH_6_HEIGHT: uint32,
         PLOT_STRENGTH_7_HEIGHT: uint32,
         PLOT_STRENGTH_8_HEIGHT: uint32,
-        QUALITY_PROOF_SCAN_FILTER: uint8
+        QUALITY_PROOF_SCAN_FILTER: uint8,
+        SHATREE_RECURSE_COST: uint32,
+        SHATREE_COST_PER_BYTE: uint32
     ) -> ConsensusConstants: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -4598,4 +4602,6 @@ class ConsensusConstants:
         PLOT_STRENGTH_6_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_STRENGTH_7_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_STRENGTH_8_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
-        QUALITY_PROOF_SCAN_FILTER: Union[ uint8, _Unspec] = _Unspec()) -> ConsensusConstants: ...
+        QUALITY_PROOF_SCAN_FILTER: Union[ uint8, _Unspec] = _Unspec(),
+        SHATREE_RECURSE_COST: Union[ uint32, _Unspec] = _Unspec(),
+        SHATREE_COST_PER_BYTE: Union[ uint32, _Unspec] = _Unspec()) -> ConsensusConstants: ...
