@@ -311,7 +311,7 @@ fn run_generator(#[case] name: &str) {
         };
 
         if UPDATE_TESTS {
-            if flags & COST_SHATREE != 0 {
+            if (flags & COST_SHATREE) != 0 {
                 if output != last_output {
                     last_output = output.clone();
                     write_back.push_str(&format!("COSTED_SHA:\n{output}"));
