@@ -327,9 +327,16 @@ mod tests {
         let (generator, expected) = test_file.split_once('\n').expect("invalid test file");
         let generator_buffer = hex::decode(generator).expect("invalid hex encoded generator");
 
+        // we only want the strict case
         let expected = match expected.split_once("STRICT:\n") {
-            Some((_, m)) => m,
-            None => expected,
+            Some((c, m)) => match m.split_once("COSTED_SHA:\n") {
+                Some((d, n)) => d,
+                None => m,
+            },
+            None => match expected.split_once("COSTED_SHA:\n") {
+                Some((d, n)) => d,
+                None => expected,
+            },
         };
 
         let mut block_refs = Vec::<Vec<u8>>::new();
