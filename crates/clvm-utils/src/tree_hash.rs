@@ -322,8 +322,8 @@ pub fn tree_hash_cached_costed(
     node: NodePtr,
     cache: &mut TreeCache,
     cost_left: &mut u64,
-    cost_per_call: u32,
-    cost_per_byte: u32,
+    cost_per_call: Cost,
+    cost_per_byte: Cost,
 ) -> Result<TreeHash, ()> {
     cache.visit_tree(a, node);
 
