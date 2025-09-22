@@ -174,8 +174,8 @@ pub struct ConsensusConstants {
 
     // How much one call of shatree costs when processing the puzzle reveals
     // that are revealed from running the generator.
-    shatree_recurse_cost: u32,
-    shatree_cost_per_byte: u32,
+    shatree_recurse_cost: u64,
+    shatree_cost_per_byte: u64,
 }
 
 pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
@@ -259,6 +259,6 @@ pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
 
     quality_proof_scan_filter: 16, // placeholder
 
-    shatree_recurse_cost: 700,
-    shatree_cost_per_byte: 350,
+    shatree_recurse_cost: 1500,
+    shatree_cost_per_byte: 750,
 };

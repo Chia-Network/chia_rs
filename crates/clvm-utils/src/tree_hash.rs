@@ -317,6 +317,7 @@ fn subtract_cost(cost_left: &mut Cost, subtract: Cost) -> Result<(), ()> {
     }
 }
 
+#[allow(clippy::result_unit_err)]
 pub fn tree_hash_cached_costed(
     a: &Allocator,
     node: NodePtr,
@@ -331,16 +332,16 @@ pub fn tree_hash_cached_costed(
     let mut ops = vec![TreeOp::SExp(node)];
 
     while let Some(op) = ops.pop() {
-        subtract_cost(cost_left, cost_per_call.into())?;
+        subtract_cost(cost_left, cost_per_call)?;
         match op {
             TreeOp::SExp(node) => match a.node(node) {
                 NodeVisitor::Buffer(bytes) => {
-                    subtract_cost(cost_left, u64::from(cost_per_byte) * u64::from(bytes.len()))?;
+                    subtract_cost(cost_left, cost_per_byte * bytes.len() as u64)?;
                     let hash = tree_hash_atom(bytes);
                     hashes.push(hash);
                 }
                 NodeVisitor::U32(val) => {
-                    subtract_cost(cost_left, (cost_per_byte * 4).into())?; // 4 bytes in u32
+                    subtract_cost(cost_left, cost_per_byte * a.atom_len(node) as u64)?;
                     if (val as usize) < PRECOMPUTED_HASHES.len() {
                         hashes.push(PRECOMPUTED_HASHES[val as usize]);
                     } else {
@@ -348,7 +349,7 @@ pub fn tree_hash_cached_costed(
                     }
                 }
                 NodeVisitor::Pair(left, right) => {
-                    subtract_cost(cost_left, cost_per_byte.into())?;
+                    subtract_cost(cost_left, cost_per_byte * 65_u64)?;
                     if let Some(hash) = cache.get(node) {
                         hashes.push(*hash);
                     } else {
