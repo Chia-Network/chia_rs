@@ -193,7 +193,7 @@ for g in test_list:
         # this is the ambition with future optimizations
         limit = 1
         strict_limit = 1
-        sha_limit = 2
+        sha_limit = 3
 
         # temporary higher limits until this is optimized
         if "duplicate-coin-announce.txt" in g:
