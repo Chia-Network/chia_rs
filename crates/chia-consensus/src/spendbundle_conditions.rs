@@ -329,12 +329,12 @@ mod tests {
 
         // we only want the strict case
         let expected = match expected.split_once("STRICT:\n") {
-            Some((c, m)) => match m.split_once("COSTED_SHA:\n") {
-                Some((d, n)) => d,
+            Some((_c, m)) => match m.split_once("COSTED_SHA:\n") {
+                Some((d, _n)) => d,
                 None => m,
             },
             None => match expected.split_once("COSTED_SHA:\n") {
-                Some((d, n)) => d,
+                Some((d, _n)) => d,
                 None => expected,
             },
         };
