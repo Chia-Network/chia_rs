@@ -14,7 +14,7 @@ FAILED: 117
 COSTED_SHA:
 SPENDS:
 - coin id: 8bdc2ac9ec247e66ee9722169d4e4f617369baf28fe277aac20f566d82cc749b ph: ef802af59c2cb937fcd0669330f4d8e14f39af61390ad356691109aeb29567ce exe-cost: 7497204218 cond-cost: 0
-cost: 7500849438
+cost: 7506674488
 execution-cost: 7497204238
 condition-cost: 0
 removal_amount: 123
