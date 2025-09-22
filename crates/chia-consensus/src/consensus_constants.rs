@@ -250,6 +250,6 @@ pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
     plot_filter_v2_second_adjustment_height: 0xffff_ffff, // placeholder
     plot_filter_v2_third_adjustment_height: 0xffff_ffff, // placeholder
 
-    shatree_recurse_cost: 1500,
-    shatree_cost_per_byte: 750,
+    shatree_recurse_cost: 2000,
+    shatree_cost_per_byte: 1000,
 };
