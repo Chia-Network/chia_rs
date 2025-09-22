@@ -259,6 +259,6 @@ pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
 
     quality_proof_scan_filter: 16, // placeholder
 
-    shatree_recurse_cost: 1500,
-    shatree_cost_per_byte: 750,
+    shatree_recurse_cost: 2000,
+    shatree_cost_per_byte: 1000,
 };
