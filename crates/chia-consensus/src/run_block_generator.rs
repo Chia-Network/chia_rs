@@ -232,7 +232,7 @@ where
                 constants.shatree_recurse_cost,
                 constants.shatree_cost_per_byte,
             )
-            .map_err(|_| ValidationErr(a.nil(), ErrorCode::CostExceeded))?
+            .map_err(|()| ValidationErr(a.nil(), ErrorCode::CostExceeded))?
         } else {
             tree_hash_cached(a, puzzle, &mut cache)
         };

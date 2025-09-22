@@ -238,6 +238,7 @@ for g in test_list:
         if run_generator1:
             validate_except_cost(consensus.output, expected)
             validate_except_cost(mempool.output, expected_mempool)
+            validate_except_cost(costed2.output, expected_sha)
             stdout.write(
                 f"{name} {consensus.run_time:.2f}s "
                 f"{consensus2.run_time:.2f}s | "

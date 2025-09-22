@@ -4466,8 +4466,8 @@ class ConsensusConstants:
     PLOT_FILTER_V2_FIRST_ADJUSTMENT_HEIGHT: uint32
     PLOT_FILTER_V2_SECOND_ADJUSTMENT_HEIGHT: uint32
     PLOT_FILTER_V2_THIRD_ADJUSTMENT_HEIGHT: uint32
-    SHATREE_RECURSE_COST: uint32
-    SHATREE_COST_PER_BYTE: uint32
+    SHATREE_RECURSE_COST: uint64
+    SHATREE_COST_PER_BYTE: uint64
     def __new__(
         cls,
         SLOT_BLOCKS_TARGET: uint32,
@@ -4524,8 +4524,8 @@ class ConsensusConstants:
         PLOT_FILTER_V2_FIRST_ADJUSTMENT_HEIGHT: uint32,
         PLOT_FILTER_V2_SECOND_ADJUSTMENT_HEIGHT: uint32,
         PLOT_FILTER_V2_THIRD_ADJUSTMENT_HEIGHT: uint32
-        SHATREE_RECURSE_COST: uint32,
-        SHATREE_COST_PER_BYTE: uint32
+        SHATREE_RECURSE_COST: uint64,
+        SHATREE_COST_PER_BYTE: uint64
     ) -> ConsensusConstants: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -4598,5 +4598,5 @@ class ConsensusConstants:
         PLOT_FILTER_V2_FIRST_ADJUSTMENT_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_FILTER_V2_SECOND_ADJUSTMENT_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_FILTER_V2_THIRD_ADJUSTMENT_HEIGHT: Union[ uint32, _Unspec] = _Unspec()) -> ConsensusConstants: ...,
-        SHATREE_RECURSE_COST: Union[ uint32, _Unspec] = _Unspec(),
-        SHATREE_COST_PER_BYTE: Union[ uint32, _Unspec] = _Unspec()) -> ConsensusConstants: ...
+        SHATREE_RECURSE_COST: Union[ uint64, _Unspec] = _Unspec(),
+        SHATREE_COST_PER_BYTE: Union[ uint64, _Unspec] = _Unspec()) -> ConsensusConstants: ...
