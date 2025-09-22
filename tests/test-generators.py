@@ -243,7 +243,8 @@ for g in test_list:
                 f"{name} {consensus.run_time:.2f}s "
                 f"{consensus2.run_time:.2f}s | "
                 f"{mempool.run_time:.2f}s "
-                f"{mempool2.run_time:.2f}s"
+                f"{mempool2.run_time:.2f}s | "
+                f"{costed2.run_time:.2f}s "
             )
         else:
             compare_output(consensus2.output, expected, "")
