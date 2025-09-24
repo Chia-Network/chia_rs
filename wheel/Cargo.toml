@@ -40,3 +40,4 @@ clvm-utils = { workspace = true }
 chia-ssl = { workspace = true }
 chia-client = { workspace = true }
 chia-traits = { workspace = true }
+tikv-jemallocator = "0.5.4"
