@@ -3,7 +3,7 @@ use crate::conditions::{
     ELIGIBLE_FOR_DEDUP,
 };
 use crate::consensus_constants::ConsensusConstants;
-use crate::flags::{COMPUTE_FINGERPRINT, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
+use crate::flags::{COMPUTE_FINGERPRINT, COST_SHATREE, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
 use crate::puzzle_fingerprint::compute_puzzle_fingerprint;
 use crate::run_block_generator::subtract_cost;
 use crate::solution_generator::calculate_generator_length;
@@ -13,7 +13,7 @@ use crate::validation_error::ValidationErr;
 use chia_bls::PublicKey;
 use chia_protocol::{Bytes, SpendBundle};
 
-use clvm_utils::tree_hash;
+use clvm_utils::{tree_hash_cached, tree_hash_cached_costed, TreeCache};
 use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::reduction::Reduction;
@@ -63,9 +63,11 @@ pub fn run_spendbundle(
 
     let byte_cost = generator_length_without_quote as u64 * constants.cost_per_byte;
     subtract_cost(a, &mut cost_left, byte_cost)?;
+    let mut cache = TreeCache::default();
 
     for coin_spend in &spend_bundle.coin_spends {
         // process the spend
+
         let puz = node_from_bytes(a, coin_spend.puzzle_reveal.as_slice())?;
         let sol = node_from_bytes(a, coin_spend.solution.as_slice())?;
         let parent = a.new_atom(coin_spend.coin.parent_coin_info.as_slice())?;
@@ -75,7 +77,20 @@ pub fn run_spendbundle(
         ret.execution_cost += clvm_cost;
         subtract_cost(a, &mut cost_left, clvm_cost)?;
 
-        let buf = tree_hash(a, puz);
+        cache.visit_tree(a, puz);
+        let buf = if flags & COST_SHATREE != 0 {
+            tree_hash_cached_costed(
+                a,
+                puz,
+                &mut cache,
+                &mut cost_left,
+                constants.shatree_recurse_cost,
+                constants.shatree_cost_per_byte,
+            )
+            .map_err(|()| ValidationErr(a.nil(), ErrorCode::CostExceeded))?
+        } else {
+            tree_hash_cached(a, puz, &mut cache)
+        };
         if coin_spend.coin.puzzle_hash != buf.into() {
             return Err(ValidationErr(puz, ErrorCode::WrongPuzzleHash));
         }
