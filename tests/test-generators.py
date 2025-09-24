@@ -6,6 +6,7 @@ from run_gen import run_gen, print_spend_bundle_conditions
 from chia_rs import (
     MEMPOOL_MODE,
     COST_CONDITIONS,
+    COST_SHATREE,
     SpendBundleConditions,
 )
 from dataclasses import dataclass
@@ -75,7 +76,7 @@ def validate_except_cost(output1: str, output2: str) -> None:
         assert l1 == l2
 
 
-print(f"{'test name':43s}   consensus | mempool")
+print(f"{'test name':43s}   consensus | mempool | costed")
 base_dir = os.path.dirname(os.path.abspath(__file__))
 test_list = sorted(glob.glob(os.path.join(base_dir, "../generator-tests/*.txt")))
 if len(test_list) == 0:
@@ -143,22 +144,48 @@ for g in test_list:
         MEMPOOL_MODE | flags,
         version=2,
     )
+
+    stdout.write(f"{name} running generator2 (costed)...\r")
+    stdout.flush()
+    costed2 = run_generator(
+        g,
+        COST_SHATREE | flags,
+        version=2,
+    )
+
     if run_generator1:
         validate_except_cost(mempool.output, mempool2.output)
 
     with open(g) as f:
         expected = f.read().split("\n", 1)[1]
-        if not "STRICT" in expected:
-            expected_mempool = expected
-            if (
-                consensus2.result is not None
-                and mempool2.result is not None
-                and consensus2.result.cost != mempool2.result.cost
-            ):
-                print("\n\ncost when running in mempool mode differs from normal mode!")
-                failed = 1
+        if "STRICT:\n" in expected:
+            # split STRICT section
+            consensus_part, rest = expected.split("STRICT:\n", 1)
+
+            if "COSTED_SHA:\n" in rest:
+                mempool_part, sha_part = rest.split("COSTED_SHA:\n", 1)
+                expected, expected_mempool, expected_sha = (
+                    consensus_part,
+                    mempool_part,
+                    sha_part,
+                )
+            else:
+                expected, expected_mempool, expected_sha = (
+                    consensus_part,
+                    rest,
+                    consensus_part,
+                )
         else:
-            expected, expected_mempool = expected.split("STRICT:\n", 1)
+            # no STRICT
+            if "COSTED_SHA:\n" in expected:
+                mempool_part, sha_part = expected.split("COSTED_SHA:\n", 1)
+                expected, expected_mempool, expected_sha = (
+                    mempool_part,
+                    mempool_part,
+                    sha_part,
+                )
+            else:
+                expected, expected_mempool, expected_sha = expected, expected, expected
 
         stdout.write("\x1b[K")
         stdout.flush()
@@ -166,6 +193,7 @@ for g in test_list:
         # this is the ambition with future optimizations
         limit = 1
         strict_limit = 1
+        sha_limit = 3
 
         # temporary higher limits until this is optimized
         if "duplicate-coin-announce.txt" in g:
@@ -210,17 +238,22 @@ for g in test_list:
         if run_generator1:
             validate_except_cost(consensus.output, expected)
             validate_except_cost(mempool.output, expected_mempool)
+            validate_except_cost(costed2.output, expected_sha)
             stdout.write(
                 f"{name} {consensus.run_time:.2f}s "
                 f"{consensus2.run_time:.2f}s | "
                 f"{mempool.run_time:.2f}s "
-                f"{mempool2.run_time:.2f}s"
+                f"{mempool2.run_time:.2f}s | "
+                f"{costed2.run_time:.2f}s "
             )
         else:
             compare_output(consensus2.output, expected, "")
             compare_output(mempool2.output, expected_mempool, "strict")
+            compare_output(costed2.output, expected_sha, "costed")
             stdout.write(
-                f"{name} {consensus2.run_time:.2f}s | " f"{mempool2.run_time:.2f}s"
+                f"{name} {consensus2.run_time:.2f}s | "
+                f"{mempool2.run_time:.2f}s | "
+                f"{costed2.run_time:.2f}s"
             )
 
         if (
@@ -233,6 +266,10 @@ for g in test_list:
             run_generator1 and mempool.run_time > strict_limit
         ) or mempool2.run_time > strict_limit:
             stdout.write(f" - mempool exceeds limit ({strict_limit})!")
+            failed = 1
+
+        if costed2.run_time > sha_limit:
+            stdout.write(f" - costed exceeds limit ({sha_limit})!")
             failed = 1
 
         stdout.write("\n")
