@@ -4461,12 +4461,10 @@ class ConsensusConstants:
     PLOT_FILTER_64_HEIGHT: uint32
     PLOT_FILTER_32_HEIGHT: uint32
     PLOT_STRENGTH_INITIAL: uint8
-    PLOT_STRENGTH_4_HEIGHT: uint32
-    PLOT_STRENGTH_5_HEIGHT: uint32
-    PLOT_STRENGTH_6_HEIGHT: uint32
-    PLOT_STRENGTH_7_HEIGHT: uint32
-    PLOT_STRENGTH_8_HEIGHT: uint32
     QUALITY_PROOF_SCAN_FILTER: uint8
+    PLOT_FILTER_V2_FIRST_ADJUSTMENT_HEIGHT: uint32
+    PLOT_FILTER_V2_SECOND_ADJUSTMENT_HEIGHT: uint32
+    PLOT_FILTER_V2_THIRD_ADJUSTMENT_HEIGHT: uint32
     def __new__(
         cls,
         SLOT_BLOCKS_TARGET: uint32,
@@ -4519,12 +4517,10 @@ class ConsensusConstants:
         PLOT_FILTER_64_HEIGHT: uint32,
         PLOT_FILTER_32_HEIGHT: uint32,
         PLOT_STRENGTH_INITIAL: uint8,
-        PLOT_STRENGTH_4_HEIGHT: uint32,
-        PLOT_STRENGTH_5_HEIGHT: uint32,
-        PLOT_STRENGTH_6_HEIGHT: uint32,
-        PLOT_STRENGTH_7_HEIGHT: uint32,
-        PLOT_STRENGTH_8_HEIGHT: uint32,
-        QUALITY_PROOF_SCAN_FILTER: uint8
+        QUALITY_PROOF_SCAN_FILTER: uint8,
+        PLOT_FILTER_V2_FIRST_ADJUSTMENT_HEIGHT: uint32,
+        PLOT_FILTER_V2_SECOND_ADJUSTMENT_HEIGHT: uint32,
+        PLOT_FILTER_V2_THIRD_ADJUSTMENT_HEIGHT: uint32
     ) -> ConsensusConstants: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -4593,9 +4589,7 @@ class ConsensusConstants:
         PLOT_FILTER_64_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_FILTER_32_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_STRENGTH_INITIAL: Union[ uint8, _Unspec] = _Unspec(),
-        PLOT_STRENGTH_4_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
-        PLOT_STRENGTH_5_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
-        PLOT_STRENGTH_6_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
-        PLOT_STRENGTH_7_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
-        PLOT_STRENGTH_8_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
-        QUALITY_PROOF_SCAN_FILTER: Union[ uint8, _Unspec] = _Unspec()) -> ConsensusConstants: ...
+        QUALITY_PROOF_SCAN_FILTER: Union[ uint8, _Unspec] = _Unspec(),
+        PLOT_FILTER_V2_FIRST_ADJUSTMENT_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
+        PLOT_FILTER_V2_SECOND_ADJUSTMENT_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
+        PLOT_FILTER_V2_THIRD_ADJUSTMENT_HEIGHT: Union[ uint32, _Unspec] = _Unspec()) -> ConsensusConstants: ...
