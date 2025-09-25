@@ -79,7 +79,7 @@ jobs:
       - name: Get fuzz crates
         id: get_fuzz_crates
         run: |
-          fuzz_crates=$(cargo metadata --format-version 1 | jq -c '[.packages[] | select(.metadata."cargo-fuzz" == true) | .name | sub("-fuzz$"; "")]')
+          fuzz_crates=$(cargo metadata --format-version 1 | jq -c '[.packages[] | select(.metadata."cargo-fuzz" == true) | select(.source == null) | .name | sub("-fuzz$"; "")]')
           echo "fuzz_crates=$fuzz_crates" >> $GITHUB_OUTPUT
 
   fuzz_tests:
