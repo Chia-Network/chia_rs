@@ -278,6 +278,85 @@ mod tests {
     }
 
     #[cfg(not(debug_assertions))]
+    fn check_output(
+    conds: Result<SpendBundleConditions, ValidationErr>,
+    block_output: String,
+    block_cost: u64,
+    execution_cost: u64,
+    generator_buffer: &[u8],
+    bundle: &SpendBundle,
+    constants: &ConsensusConstants,
+    a1: &mut Allocator,
+    a2: &mut Allocator,
+    expected: &str,
+) {
+    use crate::test_generators::{print_conditions, print_diff};
+
+    let output = match conds {
+        Ok(mut conditions) => {
+            // Byte-cost comparison between bundle and block.
+            let block_byte_cost = generator_buffer.len() as u64 * constants.cost_per_byte;
+            let program_spends = bundle.coin_spends.iter().map(|coin_spend| {
+                (
+                    coin_spend.coin,
+                    &coin_spend.puzzle_reveal,
+                    &coin_spend.solution,
+                )
+            });
+
+            let generator_length_without_quote =
+                solution_generator(program_spends).expect("solution_generator failed").len()
+                    - QUOTE_BYTES;
+            let bundle_byte_cost =
+                generator_length_without_quote as u64 * constants.cost_per_byte;
+
+            println!(
+                " block_cost: {block_cost} bytes: {block_byte_cost} exe-cost: {execution_cost}"
+            );
+            println!("bundle_cost: {} bytes: {bundle_byte_cost}", conditions.cost);
+            println!("execution_cost: {}", conditions.execution_cost);
+            println!("condition_cost: {}", conditions.condition_cost);
+
+            // Logical consistency checks.
+            assert!(
+                conditions.cost - bundle_byte_cost <= block_cost - block_byte_cost,
+                "bundle cost must not exceed block cost"
+            );
+            assert!(conditions.cost > 0, "bundle cost must be positive");
+            assert!(conditions.execution_cost > 0, "execution cost must be positive");
+            assert_eq!(
+                conditions.cost,
+                conditions.condition_cost + conditions.execution_cost + bundle_byte_cost,
+                "cost must equal sum of parts"
+            );
+
+            // Adjust cost/execution_cost to match printed output compatibility.
+            conditions.cost = block_cost;
+            conditions.execution_cost = execution_cost;
+
+            print_conditions(a1, &conditions, a2)
+        }
+        Err(code) => {
+            println!("error: {code:?}");
+            format!("FAILED: {}\n", u32::from(code.1))
+        }
+    };
+
+    if output != block_output {
+        print_diff(&output, &block_output);
+        panic!(
+            "run_block_generator2 produced a different result than get_conditions_from_spendbundle()"
+        );
+    }
+
+    if output != expected {
+        print_diff(&output, expected);
+        panic!("mismatching condition output");
+    }
+}
+
+
+    #[cfg(not(debug_assertions))]
     #[rstest]
     // this test requires running after hard fork 2, where the COST_CONDITIONS
     // flag is set
@@ -342,15 +421,15 @@ mod tests {
         let (generator, expected) = test_file.split_once('\n').expect("invalid test file");
         let generator_buffer = hex::decode(generator).expect("invalid hex encoded generator");
 
-        // we only want the strict case
-        let expected = match expected.split_once("STRICT:\n") {
+        // we only want the strict case and costed case
+        let (expected, costed) = match expected.split_once("STRICT:\n") {
             Some((_c, m)) => match m.split_once("COSTED_SHA:\n") {
-                Some((d, _n)) => d,
-                None => m,
+                Some((d, n)) => (d, n),
+                None => (m, m),
             },
             None => match expected.split_once("COSTED_SHA:\n") {
-                Some((d, _n)) => d,
-                None => expected,
+                Some((d, n)) => (d, n),
+                None => (expected, expected),
             },
         };
 
@@ -400,62 +479,63 @@ mod tests {
             5_000_000,
             &TEST_CONSTANTS,
         );
+        check_output(
+            conds.map(|(c, _)| c),
+            block_output,
+            block_cost,
+            execution_cost,
+            &generator_buffer,
+            &bundle,
+            &TEST_CONSTANTS,
+            &mut a1,
+            &mut a2,
+            expected,
+        );
 
-        let output = match conds {
-            Ok(mut conditions) => {
-                // the cost of running the spend bundle should never be higher
-                // than the whole block but it's likely less.
-                // but only if the byte cost is not taken into account. The
-                // block will likely be smaller because the compression makes it
-                // smaller.
-                let block_byte_cost = generator_buffer.len() as u64 * TEST_CONSTANTS.cost_per_byte;
-                let program_spends = bundle.coin_spends.iter().map(|coin_spend| {
-                    (
-                        coin_spend.coin,
-                        &coin_spend.puzzle_reveal,
-                        &coin_spend.solution,
-                    )
-                });
-                let generator_length_without_quote = solution_generator(program_spends)
-                    .expect("solution_generator failed")
-                    .len()
-                    - QUOTE_BYTES;
-                let bundle_byte_cost =
-                    generator_length_without_quote as u64 * TEST_CONSTANTS.cost_per_byte;
-                println!(
-                    " block_cost: {block_cost} bytes: {block_byte_cost} exe-cost: {execution_cost}"
-                );
-                println!("bundle_cost: {} bytes: {bundle_byte_cost}", conditions.cost);
-                println!("execution_cost: {}", conditions.execution_cost);
-                println!("condition_cost: {}", conditions.condition_cost);
-                assert!(conditions.cost - bundle_byte_cost <= block_cost - block_byte_cost);
-                assert!(conditions.cost > 0);
-                assert!(conditions.execution_cost > 0);
-                assert_eq!(
+        let a2_costed = make_allocator(MEMPOOL_MODE);
+
+        let conds = run_spendbundle(
+            a2_costed,
+            &bundle,
+            11_000_000_000,
+            flags | MEMPOOL_MODE | DONT_VALIDATE_SIGNATURE | COST_SHATREE,
+            &TEST_CONSTANTS,
+        )?
+        .0;
+        let (execution_cost, block_cost, block_output) = {
+            let block_conds = run_block_generator2(
+                &mut a2,
+                &generator_buffer,
+                &block_refs,
+                11_000_000_000,
+                MEMPOOL_MODE | DONT_VALIDATE_SIGNATURE | COST_SHATREE,
+                &Signature::default(),
+                None,
+                &TEST_CONSTANTS,
+            );
+            match block_conds {
+                Ok(ref conditions) => (
+                    conditions.execution_cost,
                     conditions.cost,
-                    conditions.condition_cost + conditions.execution_cost + bundle_byte_cost
-                );
-                // update the cost we print here, just to be compatible with
-                // the test cases we have. We've already ensured the cost is
-                // lower
-                conditions.cost = block_cost;
-                conditions.execution_cost = execution_cost;
-                print_conditions(&a1, &conditions, &a2)
-            }
-            Err(code) => {
-                println!("error: {code:?}");
-                format!("FAILED: {}\n", u32::from(code.1))
+                    print_conditions(&a2, &conditions, &a2),
+                ),
+                Err(code) => {
+                    println!("error: {code:?}");
+                    (0, 0, format!("FAILED: {}\n", u32::from(code.1)))
+                }
             }
         };
-
-        if output != block_output {
-            print_diff(&output, &block_output);
-            panic!("run_block_generator2 produced a different result than get_conditions_from_spendbundle()");
-        }
-
-        if output != expected {
-            print_diff(&output, expected);
-            panic!("mismatching condition output");
-        }
+        check_output(
+            conds.map(|(c, _)| c),
+            block_output,
+            block_cost,
+            execution_cost,
+            &generator_buffer,
+            &bundle,
+            &TEST_CONSTANTS,
+            &mut a1,
+            &mut a2,
+            expected,
+        );
     }
 }
