@@ -65,6 +65,8 @@ impl Deref for TreeHash {
 #[derive(Default)]
 pub struct TreeCache {
     hashes: Vec<TreeHash>,
+    // parallel vector holding the cost used to compute the corresponding hash
+    costs: Vec<Cost>,
     // each entry is an index into hashes, or one of 3 special values:
     // u16::MAX if the pair has not been visited
     // u16::MAX - 1 if the pair has been seen once
@@ -78,7 +80,8 @@ const SEEN_ONCE: u16 = u16::MAX - 1;
 const SEEN_MULTIPLE: u16 = u16::MAX - 2;
 
 impl TreeCache {
-    pub fn get(&self, n: NodePtr) -> Option<&TreeHash> {
+    /// Get cached hash and its associated cost (if present).
+    pub fn get(&self, n: NodePtr) -> Option<(&TreeHash, Cost)> {
         // We only cache pairs (for now)
         if !matches!(n.object_type(), ObjectType::Pair) {
             return None;
@@ -89,10 +92,12 @@ impl TreeCache {
         if slot >= SEEN_MULTIPLE {
             return None;
         }
-        Some(&self.hashes[slot as usize])
+        Some((&self.hashes[slot as usize], self.costs[slot as usize]))
     }
 
-    pub fn insert(&mut self, n: NodePtr, hash: &TreeHash) {
+    /// Insert a cached hash with its associated cost. If the cache is full we
+    /// ignore the insertion.
+    pub fn insert(&mut self, n: NodePtr, hash: &TreeHash, cost: Cost) {
         // If we've reached the max size, just ignore new cache items
         if self.hashes.len() == SEEN_MULTIPLE as usize {
             return;
@@ -109,6 +114,7 @@ impl TreeCache {
 
         let slot = self.hashes.len();
         self.hashes.push(*hash);
+        self.costs.push(cost);
         self.pairs[idx] = slot as u16;
     }
 
@@ -163,6 +169,10 @@ enum TreeOp {
     SExp(NodePtr),
     Cons,
     ConsAddCache(NodePtr),
+    /// Used by the costed walker to record the cost-left value before
+    /// traversing the pair, so we can compute how much cost was consumed
+    /// while computing that subtree.
+    ConsAddCacheCost(NodePtr, Cost),
 }
 
 // contains SHA256(1 .. x), where x is the index into the array and .. is
@@ -247,7 +257,7 @@ pub fn tree_hash(a: &Allocator, node: NodePtr) -> TreeHash {
                 let rest = hashes.pop().unwrap();
                 hashes.push(tree_hash_pair(first, rest));
             }
-            TreeOp::ConsAddCache(_) => unreachable!(),
+            TreeOp::ConsAddCache(_) | TreeOp::ConsAddCacheCost(_, _) => unreachable!(),
         }
     }
 
@@ -276,7 +286,7 @@ pub fn tree_hash_cached(a: &Allocator, node: NodePtr, cache: &mut TreeCache) -> 
                     }
                 }
                 NodeVisitor::Pair(left, right) => {
-                    if let Some(hash) = cache.get(node) {
+                    if let Some((hash, _cost)) = cache.get(node) {
                         hashes.push(*hash);
                     } else {
                         if cache.should_memoize(node) {
@@ -299,8 +309,10 @@ pub fn tree_hash_cached(a: &Allocator, node: NodePtr, cache: &mut TreeCache) -> 
                 let rest = hashes.pop().unwrap();
                 let hash = tree_hash_pair(first, rest);
                 hashes.push(hash);
-                cache.insert(original_node, &hash);
+                // non-costed path: store zero cost for this cached entry
+                cache.insert(original_node, &hash, 0);
             }
+            TreeOp::ConsAddCacheCost(_, _) => unreachable!(),
         }
     }
 
@@ -322,7 +334,7 @@ pub fn tree_hash_cached_costed(
     a: &Allocator,
     node: NodePtr,
     cache: &mut TreeCache,
-    cost_left: &mut u64,
+    cost_left: &mut Cost,
     cost_per_call: Cost,
     cost_per_byte: Cost,
 ) -> Result<TreeHash, ()> {
@@ -332,6 +344,7 @@ pub fn tree_hash_cached_costed(
     let mut ops = vec![TreeOp::SExp(node)];
 
     while let Some(op) = ops.pop() {
+        // charge a call cost for processing this op
         subtract_cost(cost_left, cost_per_call)?;
         match op {
             TreeOp::SExp(node) => match a.node(node) {
@@ -349,12 +362,16 @@ pub fn tree_hash_cached_costed(
                     }
                 }
                 NodeVisitor::Pair(left, right) => {
+                    // pair cost (65 bytes as before)
                     subtract_cost(cost_left, cost_per_byte * 65_u64)?;
-                    if let Some(hash) = cache.get(node) {
+                    if let Some((hash, cached_cost)) = cache.get(node) {
+                        // when reusing a cached subtree, charge its cached cost
+                        subtract_cost(cost_left, cached_cost)?;
                         hashes.push(*hash);
                     } else {
                         if cache.should_memoize(node) {
-                            ops.push(TreeOp::ConsAddCache(node));
+                            // record the cost_left before traversing this subtree
+                            ops.push(TreeOp::ConsAddCacheCost(node, *cost_left));
                         } else {
                             ops.push(TreeOp::Cons);
                         }
@@ -373,7 +390,18 @@ pub fn tree_hash_cached_costed(
                 let rest = hashes.pop().unwrap();
                 let hash = tree_hash_pair(first, rest);
                 hashes.push(hash);
-                cache.insert(original_node, &hash);
+                cache.insert(original_node, &hash, 0);
+            }
+            TreeOp::ConsAddCacheCost(original_node, cost_before) => {
+                let first = hashes.pop().unwrap();
+                let rest = hashes.pop().unwrap();
+                let hash = tree_hash_pair(first, rest);
+                hashes.push(hash);
+                // cost_before is the remaining cost before we computed this subtree
+                // cost_left is the remaining after computing it
+                // the cost of this subtree = before - after
+                let used = cost_before - *cost_left;
+                cache.insert(original_node, &hash, used);
             }
         }
     }
@@ -626,15 +654,16 @@ fn test_tree_cache_get() {
     assert_eq!(cache.get(c), None);
 
     // We don't cache atoms
-    cache.insert(a, &tree_hash(&allocator, a));
+    cache.insert(a, &tree_hash(&allocator, a), 0);
     assert_eq!(cache.get(a), None);
 
-    cache.insert(b, &tree_hash(&allocator, b));
+    cache.insert(b, &tree_hash(&allocator, b), 0);
     assert_eq!(cache.get(b), None);
 
     // but pair is OK
-    cache.insert(c, &tree_hash(&allocator, c));
-    assert_eq!(cache.get(c), Some(&tree_hash(&allocator, c)));
+    cache.insert(c, &tree_hash(&allocator, c), 0);
+    let (h, _c) = cache.get(c).expect("expected cached pair");
+    assert_eq!(h, &tree_hash(&allocator, c));
 }
 
 #[test]
@@ -644,18 +673,19 @@ fn test_tree_cache_size_limit() {
 
     let mut list = allocator.nil();
     let mut hash = tree_hash(&allocator, list);
-    cache.insert(list, &hash);
+    cache.insert(list, &hash, 0);
 
     // we only fit 65k items in the cache
     for i in 0..65540 {
         let b = allocator.one();
         list = allocator.new_pair(b, list).expect("new_pair");
         hash = tree_hash_pair(tree_hash_atom(b"\x01"), hash);
-        cache.insert(list, &hash);
+        cache.insert(list, &hash, 0);
 
         println!("{i}");
         if i < 65533 {
-            assert_eq!(cache.get(list), Some(&hash));
+            let (h, _c) = cache.get(list).expect("expected cached");
+            assert_eq!(h, &hash);
         } else {
             assert_eq!(cache.get(list), None);
         }
