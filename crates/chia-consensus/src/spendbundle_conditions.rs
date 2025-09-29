@@ -279,82 +279,85 @@ mod tests {
 
     #[cfg(not(debug_assertions))]
     fn check_output(
-    conds: Result<SpendBundleConditions, ValidationErr>,
-    block_output: String,
-    block_cost: u64,
-    execution_cost: u64,
-    generator_buffer: &[u8],
-    bundle: &SpendBundle,
-    constants: &ConsensusConstants,
-    a1: &mut Allocator,
-    a2: &mut Allocator,
-    expected: &str,
-) {
-    use crate::test_generators::{print_conditions, print_diff};
+        conds: Result<SpendBundleConditions, ValidationErr>,
+        block_output: String,
+        block_cost: u64,
+        execution_cost: u64,
+        generator_buffer: &[u8],
+        bundle: &SpendBundle,
+        constants: &ConsensusConstants,
+        a1: &mut Allocator,
+        a2: &mut Allocator,
+        expected: &str,
+    ) {
+        use crate::test_generators::{print_conditions, print_diff};
 
-    let output = match conds {
-        Ok(mut conditions) => {
-            // Byte-cost comparison between bundle and block.
-            let block_byte_cost = generator_buffer.len() as u64 * constants.cost_per_byte;
-            let program_spends = bundle.coin_spends.iter().map(|coin_spend| {
-                (
-                    coin_spend.coin,
-                    &coin_spend.puzzle_reveal,
-                    &coin_spend.solution,
-                )
-            });
+        let output = match conds {
+            Ok(mut conditions) => {
+                // Byte-cost comparison between bundle and block.
+                let block_byte_cost = generator_buffer.len() as u64 * constants.cost_per_byte;
+                let program_spends = bundle.coin_spends.iter().map(|coin_spend| {
+                    (
+                        coin_spend.coin,
+                        &coin_spend.puzzle_reveal,
+                        &coin_spend.solution,
+                    )
+                });
 
-            let generator_length_without_quote =
-                solution_generator(program_spends).expect("solution_generator failed").len()
+                let generator_length_without_quote = solution_generator(program_spends)
+                    .expect("solution_generator failed")
+                    .len()
                     - QUOTE_BYTES;
-            let bundle_byte_cost =
-                generator_length_without_quote as u64 * constants.cost_per_byte;
+                let bundle_byte_cost =
+                    generator_length_without_quote as u64 * constants.cost_per_byte;
 
-            println!(
-                " block_cost: {block_cost} bytes: {block_byte_cost} exe-cost: {execution_cost}"
-            );
-            println!("bundle_cost: {} bytes: {bundle_byte_cost}", conditions.cost);
-            println!("execution_cost: {}", conditions.execution_cost);
-            println!("condition_cost: {}", conditions.condition_cost);
+                println!(
+                    " block_cost: {block_cost} bytes: {block_byte_cost} exe-cost: {execution_cost}"
+                );
+                println!("bundle_cost: {} bytes: {bundle_byte_cost}", conditions.cost);
+                println!("execution_cost: {}", conditions.execution_cost);
+                println!("condition_cost: {}", conditions.condition_cost);
 
-            // Logical consistency checks.
-            assert!(
-                conditions.cost - bundle_byte_cost <= block_cost - block_byte_cost,
-                "bundle cost must not exceed block cost"
-            );
-            assert!(conditions.cost > 0, "bundle cost must be positive");
-            assert!(conditions.execution_cost > 0, "execution cost must be positive");
-            assert_eq!(
-                conditions.cost,
-                conditions.condition_cost + conditions.execution_cost + bundle_byte_cost,
-                "cost must equal sum of parts"
-            );
+                // Logical consistency checks.
+                assert!(
+                    conditions.cost - bundle_byte_cost <= block_cost - block_byte_cost,
+                    "bundle cost must not exceed block cost"
+                );
+                assert!(conditions.cost > 0, "bundle cost must be positive");
+                assert!(
+                    conditions.execution_cost > 0,
+                    "execution cost must be positive"
+                );
+                assert_eq!(
+                    conditions.cost,
+                    conditions.condition_cost + conditions.execution_cost + bundle_byte_cost,
+                    "cost must equal sum of parts"
+                );
 
-            // Adjust cost/execution_cost to match printed output compatibility.
-            conditions.cost = block_cost;
-            conditions.execution_cost = execution_cost;
+                // Adjust cost/execution_cost to match printed output compatibility.
+                conditions.cost = block_cost;
+                conditions.execution_cost = execution_cost;
 
-            print_conditions(a1, &conditions, a2)
-        }
-        Err(code) => {
-            println!("error: {code:?}");
-            format!("FAILED: {}\n", u32::from(code.1))
-        }
-    };
+                print_conditions(a1, &conditions, a2)
+            }
+            Err(code) => {
+                println!("error: {code:?}");
+                format!("FAILED: {}\n", u32::from(code.1))
+            }
+        };
 
-    if output != block_output {
-        print_diff(&output, &block_output);
-        panic!(
+        if output != block_output {
+            print_diff(&output, &block_output);
+            panic!(
             "run_block_generator2 produced a different result than get_conditions_from_spendbundle()"
         );
-    }
+        }
 
-    if output != expected {
-        print_diff(&output, expected);
-        panic!("mismatching condition output");
+        if output != expected {
+            print_diff(&output, expected);
+            panic!("mismatching condition output");
+        }
     }
-}
-
 
     #[cfg(not(debug_assertions))]
     #[rstest]
