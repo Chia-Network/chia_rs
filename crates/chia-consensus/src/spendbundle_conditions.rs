@@ -495,10 +495,11 @@ mod tests {
             expected,
         );
 
-        let mut a2_costed = make_allocator(MEMPOOL_MODE);
+        let mut a2_costed = make_allocator(MEMPOOL_MODE | COST_SHATREE);
+        let mut a1_costed = make_allocator(MEMPOOL_MODE | COST_SHATREE);
 
         let conds_res = run_spendbundle(
-            &mut a2_costed,
+            &mut a1_costed,
             &bundle,
             11_000_000_000,
             MEMPOOL_MODE | DONT_VALIDATE_SIGNATURE | COST_SHATREE,
@@ -510,7 +511,7 @@ mod tests {
         };
         let (execution_cost, block_cost, block_output) = {
             let block_conds = run_block_generator2(
-                &mut a2,
+                &mut a2_costed,
                 &generator_buffer,
                 &block_refs,
                 11_000_000_000,
@@ -539,8 +540,8 @@ mod tests {
             &generator_buffer,
             &bundle,
             &TEST_CONSTANTS,
-            &mut a1,
-            &mut a2,
+            &mut a1_costed,
+            &mut a2_costed,
             expected,
         );
     }
