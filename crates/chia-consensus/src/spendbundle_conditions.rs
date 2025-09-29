@@ -415,7 +415,7 @@ mod tests {
     #[case("unknown-condition")]
     #[case("duplicate-messages")]
     fn run_generator(#[case] name: &str) {
-        use crate::test_generators::{print_conditions, print_diff};
+        use crate::test_generators::print_conditions;
         use std::fs::read_to_string;
 
         let filename = format!("../../generator-tests/{name}.txt");
@@ -483,7 +483,7 @@ mod tests {
             &TEST_CONSTANTS,
         );
         check_output(
-            conds.map(|(c, _)| c),
+            conds,
             block_output,
             block_cost,
             execution_cost,
@@ -495,15 +495,15 @@ mod tests {
             expected,
         );
 
-        let a2_costed = make_allocator(MEMPOOL_MODE);
+        let mut a2_costed = make_allocator(MEMPOOL_MODE);
 
         let conds = run_spendbundle(
-            a2_costed,
+            &mut a2_costed,
             &bundle,
             11_000_000_000,
-            flags | MEMPOOL_MODE | DONT_VALIDATE_SIGNATURE | COST_SHATREE,
+            MEMPOOL_MODE | DONT_VALIDATE_SIGNATURE | COST_SHATREE,
             &TEST_CONSTANTS,
-        )?
+        )
         .0;
         let (execution_cost, block_cost, block_output) = {
             let block_conds = run_block_generator2(
@@ -529,7 +529,7 @@ mod tests {
             }
         };
         check_output(
-            conds.map(|(c, _)| c),
+            conds,
             block_output,
             block_cost,
             execution_cost,
