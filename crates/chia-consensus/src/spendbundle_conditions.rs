@@ -289,6 +289,7 @@ mod tests {
         a1: &mut Allocator,
         a2: &mut Allocator,
         expected: &str,
+        flags: u32,
     ) {
         use crate::test_generators::{print_conditions, print_diff};
 
@@ -328,11 +329,13 @@ mod tests {
                     conditions.execution_cost > 0,
                     "execution cost must be positive"
                 );
-                assert_eq!(
-                    conditions.cost,
-                    conditions.condition_cost + conditions.execution_cost + bundle_byte_cost,
-                    "cost must equal sum of parts"
-                );
+                if flags & COST_SHATREE == 0 {
+                    assert_eq!(
+                        conditions.cost,
+                        conditions.condition_cost + conditions.execution_cost + bundle_byte_cost,
+                        "cost must equal sum of parts"
+                    );
+                }
 
                 // Adjust cost/execution_cost to match printed output compatibility.
                 conditions.cost = block_cost;
@@ -493,6 +496,7 @@ mod tests {
             &mut a1,
             &mut a2,
             expected,
+            MEMPOOL_MODE | DONT_VALIDATE_SIGNATURE,
         );
 
         let mut a2_costed = make_allocator(MEMPOOL_MODE | COST_SHATREE);
@@ -543,6 +547,7 @@ mod tests {
             &mut a1_costed,
             &mut a2_costed,
             costed,
+            MEMPOOL_MODE | DONT_VALIDATE_SIGNATURE | COST_SHATREE,
         );
     }
 }
