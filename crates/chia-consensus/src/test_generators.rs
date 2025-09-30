@@ -373,7 +373,7 @@ fn run_generator(#[case] name: &str) {
             };
             if output != output_pre_hard_fork {
                 print_diff(&output, &output_pre_hard_fork);
-                if !UPDATE_TESTS & !COST_SHATREE {
+                if !UPDATE_TESTS && !COST_SHATREE {
                     panic!("run_block_generator 1 and 2 produced a different result!");
                 }
             }
@@ -381,7 +381,7 @@ fn run_generator(#[case] name: &str) {
 
         if output != expected {
             print_diff(&output, expected);
-            if !UPDATE_TESTS & !COST_SHATREE {
+            if !UPDATE_TESTS && !COST_SHATREE {
                 panic!("mismatching generator output");
             }
         }
