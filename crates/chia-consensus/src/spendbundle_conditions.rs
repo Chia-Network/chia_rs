@@ -542,7 +542,7 @@ mod tests {
             &TEST_CONSTANTS,
             &mut a1_costed,
             &mut a2_costed,
-            expected,
+            costed,
         );
     }
 }
