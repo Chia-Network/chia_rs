@@ -524,7 +524,7 @@ mod tests {
                 Ok(ref conditions) => (
                     conditions.execution_cost,
                     conditions.cost,
-                    print_conditions(&a2, &conditions, &a2),
+                    print_conditions(&a2_costed, &conditions, &a2_costed),
                 ),
                 Err(code) => {
                     println!("error: {code:?}");
