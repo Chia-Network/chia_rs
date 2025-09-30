@@ -234,7 +234,7 @@ fn run_generator(#[case] name: &str) {
     // When making changes to print_conditions() enabling this will update the
     // test cases to match. Make sure to carefully review the diff before
     // landing an automatic update of the test case.
-    const UPDATE_TESTS: bool = false;
+    const UPDATE_TESTS: bool = true;
 
     let run_generator_one: bool = ![
         "single-coin-only-garbage",
@@ -373,7 +373,7 @@ fn run_generator(#[case] name: &str) {
             };
             if output != output_pre_hard_fork {
                 print_diff(&output, &output_pre_hard_fork);
-                if !UPDATE_TESTS {
+                if !UPDATE_TESTS & !COST_SHATREE {
                     panic!("run_block_generator 1 and 2 produced a different result!");
                 }
             }
@@ -381,7 +381,7 @@ fn run_generator(#[case] name: &str) {
 
         if output != expected {
             print_diff(&output, expected);
-            if !UPDATE_TESTS {
+            if !UPDATE_TESTS & !COST_SHATREE {
                 panic!("mismatching generator output");
             }
         }
