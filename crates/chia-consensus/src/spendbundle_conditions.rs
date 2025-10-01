@@ -508,7 +508,7 @@ mod tests {
             &mut a1_costed,
             &bundle,
             11_000_000_000,
-            MEMPOOL_MODE | DONT_VALIDATE_SIGNATURE | COST_SHATREE,
+            DONT_VALIDATE_SIGNATURE | COST_SHATREE,
             &TEST_CONSTANTS,
         );
         let conds = match conds_res {
@@ -521,7 +521,7 @@ mod tests {
                 &generator_buffer,
                 &block_refs,
                 11_000_000_000,
-                MEMPOOL_MODE | DONT_VALIDATE_SIGNATURE | COST_SHATREE,
+                DONT_VALIDATE_SIGNATURE | COST_SHATREE,
                 &Signature::default(),
                 None,
                 &TEST_CONSTANTS,
@@ -549,7 +549,7 @@ mod tests {
             &mut a1_costed,
             &mut a2_costed,
             costed,
-            MEMPOOL_MODE | DONT_VALIDATE_SIGNATURE | COST_SHATREE,
+            DONT_VALIDATE_SIGNATURE | COST_SHATREE,
         );
     }
 }
