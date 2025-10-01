@@ -499,8 +499,10 @@ mod tests {
             MEMPOOL_MODE | DONT_VALIDATE_SIGNATURE,
         );
 
-        let mut a2_costed = make_allocator(MEMPOOL_MODE | COST_SHATREE);
-        let mut a1_costed = make_allocator(MEMPOOL_MODE | COST_SHATREE);
+        // Now lets test that it works as expected with costed shatree
+
+        let mut a2_costed = make_allocator(COST_SHATREE);
+        let mut a1_costed = make_allocator(COST_SHATREE);
 
         let conds_res = run_spendbundle(
             &mut a1_costed,
