@@ -884,8 +884,6 @@ mod tests {
         let mut cache = TreeCache::default();
         cache.visit_tree(&a, root);
 
-        
-
         let cached = tree_hash_cached_costed(
             &a,
             root,
