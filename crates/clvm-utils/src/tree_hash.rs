@@ -469,9 +469,6 @@ pub fn tree_hash_from_bytes(buf: &[u8]) -> Result<TreeHash, EvalErr> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use clvmr::allocator::{Allocator, NodePtr};
-    use clvmr::cost::Cost;
-    use std::collections::HashMap;
 
     #[test]
     fn test_tree_hash() {
