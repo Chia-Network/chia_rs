@@ -265,6 +265,7 @@ pub fn tree_hash(a: &Allocator, node: NodePtr) -> TreeHash {
     hashes[0]
 }
 
+#[allow(clippy::result_unit_err)]
 pub fn tree_hash_costed(
     a: &Allocator,
     node: NodePtr,
