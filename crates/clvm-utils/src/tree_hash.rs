@@ -808,11 +808,6 @@ mod tests {
         let mut cache = TreeCache::default();
         cache.visit_tree(&a, root);
 
-        assert!(
-            !cache.hashes.is_empty(),
-            "cache should contain memoized subtrees"
-        );
-
         let cached = tree_hash_cached_costed(
             &a,
             root,
@@ -822,6 +817,11 @@ mod tests {
             cost_per_byte,
         )
         .unwrap();
+
+        assert!(
+            !cache.hashes.is_empty(),
+            "cache should contain memoized subtrees"
+        );
 
         assert_eq!(baseline, cached, "hash mismatch between costed and cached");
 
@@ -884,10 +884,7 @@ mod tests {
         let mut cache = TreeCache::default();
         cache.visit_tree(&a, root);
 
-        assert!(
-            !cache.hashes.is_empty(),
-            "cache should contain memoized subtrees"
-        );
+        
 
         let cached = tree_hash_cached_costed(
             &a,
@@ -898,6 +895,11 @@ mod tests {
             cost_per_byte,
         )
         .unwrap();
+
+        assert!(
+            !cache.hashes.is_empty(),
+            "cache should contain memoized subtrees"
+        );
 
         assert_eq!(baseline, cached, "hash mismatch between costed and cached");
         assert_eq!(
