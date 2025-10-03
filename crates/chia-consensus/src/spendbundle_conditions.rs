@@ -270,6 +270,7 @@ mod tests {
         SpendBundle::new(spends, Signature::default())
     }
 
+    // this function compares the expected and actual outputs
     #[cfg(not(debug_assertions))]
     fn check_output(
         conds: Result<SpendBundleConditions, ValidationErr>,
@@ -478,6 +479,7 @@ mod tests {
             5_000_000,
             &TEST_CONSTANTS,
         );
+        // check_output is comparing the expected and actual outputs
         check_output(
             conds,
             block_output,
@@ -531,6 +533,7 @@ mod tests {
                 }
             }
         };
+        // compare the expected and actual outputs
         check_output(
             conds,
             block_output,
