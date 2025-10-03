@@ -224,15 +224,8 @@ where
         ret.execution_cost += clvm_cost;
 
         let buf = if flags & COST_SHATREE != 0 {
-            tree_hash_cached_costed(
-                a,
-                puzzle,
-                &mut cache,
-                &mut cost_left,
-                constants.shatree_recurse_cost,
-                constants.shatree_cost_per_byte,
-            )
-            .map_err(|()| ValidationErr(a.nil(), ErrorCode::CostExceeded))?
+            tree_hash_cached_costed(a, puzzle, &mut cache, &mut cost_left)
+                .map_err(|()| ValidationErr(a.nil(), ErrorCode::CostExceeded))?
         } else {
             tree_hash_cached(a, puzzle, &mut cache)
         };
