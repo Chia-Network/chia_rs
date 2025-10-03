@@ -268,27 +268,23 @@ pub fn tree_hash(a: &Allocator, node: NodePtr) -> TreeHash {
     hashes[0]
 }
 
-#[allow(clippy::result_unit_err)]
-pub fn tree_hash_costed(
-    a: &Allocator,
-    node: NodePtr,
-    cost_left: &mut Cost,
-) -> Result<TreeHash, ()> {
+pub fn tree_hash_costed(a: &Allocator, node: NodePtr, cost_left: &mut Cost) -> Option<TreeHash> {
     let mut hashes = Vec::new();
     let mut ops = vec![TreeOp::SExp(node)];
 
     while let Some(op) = ops.pop() {
-        subtract_cost(cost_left, SHATREE_RECURSE_COST)?;
+        subtract_cost(cost_left, SHATREE_RECURSE_COST).ok()?;
 
         match op {
             TreeOp::SExp(node) => match a.node(node) {
                 NodeVisitor::Buffer(bytes) => {
-                    subtract_cost(cost_left, SHATREE_COST_PER_BYTE * bytes.len() as u64)?;
+                    subtract_cost(cost_left, SHATREE_COST_PER_BYTE * bytes.len() as u64).ok()?;
                     let hash = tree_hash_atom(bytes);
                     hashes.push(hash);
                 }
                 NodeVisitor::U32(val) => {
-                    subtract_cost(cost_left, SHATREE_COST_PER_BYTE * a.atom_len(node) as u64)?;
+                    subtract_cost(cost_left, SHATREE_COST_PER_BYTE * a.atom_len(node) as u64)
+                        .ok()?;
                     if (val as usize) < PRECOMPUTED_HASHES.len() {
                         hashes.push(PRECOMPUTED_HASHES[val as usize]);
                     } else {
@@ -296,7 +292,7 @@ pub fn tree_hash_costed(
                     }
                 }
                 NodeVisitor::Pair(left, right) => {
-                    subtract_cost(cost_left, SHATREE_COST_PER_BYTE * 65_u64)?;
+                    subtract_cost(cost_left, SHATREE_COST_PER_BYTE * 65_u64).ok()?;
                     ops.push(TreeOp::Cons);
                     ops.push(TreeOp::SExp(left));
                     ops.push(TreeOp::SExp(right));
@@ -312,7 +308,7 @@ pub fn tree_hash_costed(
     }
 
     assert!(hashes.len() == 1);
-    Ok(hashes[0])
+    Some(hashes[0])
 }
 
 pub fn tree_hash_cached(a: &Allocator, node: NodePtr, cache: &mut TreeCache) -> TreeHash {
@@ -379,13 +375,12 @@ fn subtract_cost(cost_left: &mut Cost, subtract: Cost) -> Result<(), ()> {
     }
 }
 
-#[allow(clippy::result_unit_err)]
 pub fn tree_hash_cached_costed(
     a: &Allocator,
     node: NodePtr,
     cache: &mut TreeCache,
     cost_left: &mut Cost,
-) -> Result<TreeHash, ()> {
+) -> Option<TreeHash> {
     cache.visit_tree(a, node);
 
     let mut hashes = Vec::new();
@@ -393,16 +388,17 @@ pub fn tree_hash_cached_costed(
 
     while let Some(op) = ops.pop() {
         // charge a call cost for processing this op
-        subtract_cost(cost_left, SHATREE_RECURSE_COST)?;
+        subtract_cost(cost_left, SHATREE_RECURSE_COST).ok()?;
         match op {
             TreeOp::SExp(node) => match a.node(node) {
                 NodeVisitor::Buffer(bytes) => {
-                    subtract_cost(cost_left, SHATREE_COST_PER_BYTE * bytes.len() as u64)?;
+                    subtract_cost(cost_left, SHATREE_COST_PER_BYTE * bytes.len() as u64).ok()?;
                     let hash = tree_hash_atom(bytes);
                     hashes.push(hash);
                 }
                 NodeVisitor::U32(val) => {
-                    subtract_cost(cost_left, SHATREE_COST_PER_BYTE * a.atom_len(node) as u64)?;
+                    subtract_cost(cost_left, SHATREE_COST_PER_BYTE * a.atom_len(node) as u64)
+                        .ok()?;
                     if (val as usize) < PRECOMPUTED_HASHES.len() {
                         hashes.push(PRECOMPUTED_HASHES[val as usize]);
                     } else {
@@ -411,10 +407,10 @@ pub fn tree_hash_cached_costed(
                 }
                 NodeVisitor::Pair(left, right) => {
                     // pair cost (65 bytes as before)
-                    subtract_cost(cost_left, SHATREE_COST_PER_BYTE * 65_u64)?;
+                    subtract_cost(cost_left, SHATREE_COST_PER_BYTE * 65_u64).ok()?;
                     if let Some((hash, cached_cost)) = cache.get(node) {
                         // when reusing a cached subtree, charge its cached cost
-                        subtract_cost(cost_left, cached_cost)?;
+                        subtract_cost(cost_left, cached_cost).ok()?;
                         hashes.push(*hash);
                     } else {
                         if cache.should_memoize(node) {
@@ -455,7 +451,7 @@ pub fn tree_hash_cached_costed(
     }
 
     assert!(hashes.len() == 1);
-    Ok(hashes[0])
+    Some(hashes[0])
 }
 
 pub fn tree_hash_from_bytes(buf: &[u8]) -> Result<TreeHash, EvalErr> {

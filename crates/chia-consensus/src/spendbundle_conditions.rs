@@ -80,7 +80,7 @@ pub fn run_spendbundle(
         cache.visit_tree(a, puz);
         let buf = if flags & COST_SHATREE != 0 {
             tree_hash_cached_costed(a, puz, &mut cache, &mut cost_left)
-                .map_err(|()| ValidationErr(a.nil(), ErrorCode::CostExceeded))?
+                .ok_or_else(|| ValidationErr(a.nil(), ErrorCode::CostExceeded))?
         } else {
             tree_hash_cached(a, puz, &mut cache)
         };
