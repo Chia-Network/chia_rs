@@ -323,13 +323,14 @@ mod tests {
                     conditions.execution_cost > 0,
                     "execution cost must be positive"
                 );
-                if flags & COST_SHATREE == 0 {
-                    assert_eq!(
-                        conditions.cost,
-                        conditions.condition_cost + conditions.execution_cost + bundle_byte_cost,
-                        "cost must equal sum of parts"
-                    );
-                }
+                assert_eq!(
+                    conditions.cost,
+                    conditions.condition_cost
+                        + conditions.execution_cost
+                        + conditions.shatree_cost
+                        + bundle_byte_cost,
+                    "cost must equal sum of parts"
+                );
 
                 // Adjust cost/execution_cost to match printed output compatibility.
                 conditions.cost = block_cost;

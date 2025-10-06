@@ -223,12 +223,14 @@ where
         subtract_cost(a, &mut cost_left, clvm_cost)?;
         ret.execution_cost += clvm_cost;
 
+        let cost_before = cost_left;
         let buf = if flags & COST_SHATREE != 0 {
             tree_hash_cached_costed(a, puzzle, &mut cache, &mut cost_left)
                 .ok_or_else(|| ValidationErr(a.nil(), ErrorCode::CostExceeded))?
         } else {
             tree_hash_cached(a, puzzle, &mut cache)
         };
+        ret.shatree_cost += cost_before - cost_left;
         let puzzle_hash = a.new_atom(&buf)?;
 
         process_single_spend::<EmptyVisitor>(
