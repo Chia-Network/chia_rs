@@ -69,7 +69,7 @@ def validate_except_cost(output1: str, output2: str) -> None:
         assert l1 == l2, f"Line mismatch:\n{l1}\n{l2}"
 
 
-def normalize_expected_sections(expected_text: str):
+def normalize_expected_sections(expected_text: str) -> tuple[str, str, str]:
     consensus = mempool = costed = expected_text
     if "STRICT:\n" in expected_text:
         consensus, rest = expected_text.split("STRICT:\n", 1)
@@ -88,7 +88,8 @@ def match_costed_output(actual: str, expected: str) -> bool:
     if expected.startswith("FAILED:"):
         return actual.startswith("FAILED:")
     if expected.startswith("cost:"):
-        def get_cost(text: str):
+
+        def get_cost(text: str) -> Optional[int]:
             for line in text.splitlines():
                 if line.startswith("cost:"):
                     try:
@@ -96,6 +97,7 @@ def match_costed_output(actual: str, expected: str) -> bool:
                     except Exception:
                         pass
             return None
+
         return get_cost(expected) == get_cost(actual)
     return expected == actual
 
@@ -180,9 +182,9 @@ for g in test_list:
     if run_generator1:
         validate_except_cost(consensus.output, expected)
         validate_except_cost(mempool.output, expected_mempool)
-        assert match_costed_output(costed2.output, expected_sha), (
-            f"{name} costed section mismatch:\nGot:\n{costed2.output}\nExpected:\n{expected_sha}"
-        )
+        assert match_costed_output(
+            costed2.output, expected_sha
+        ), f"{name} costed section mismatch:\nGot:\n{costed2.output}\nExpected:\n{expected_sha}"
         stdout.write(
             f"{name} {consensus.run_time:.2f}s {consensus2.run_time:.2f}s | "
             f"{mempool.run_time:.2f}s {mempool2.run_time:.2f}s | "
@@ -206,7 +208,9 @@ for g in test_list:
     if (run_generator1 and consensus.run_time > limit) or consensus2.run_time > limit:
         stdout.write(f" - exceeds limit ({limit})!")
         failed = 1
-    if (run_generator1 and mempool.run_time > strict_limit) or mempool2.run_time > strict_limit:
+    if (
+        run_generator1 and mempool.run_time > strict_limit
+    ) or mempool2.run_time > strict_limit:
         stdout.write(f" - mempool exceeds limit ({strict_limit})!")
         failed = 1
     if costed2.run_time > sha_limit:
