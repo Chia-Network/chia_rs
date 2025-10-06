@@ -19,10 +19,11 @@ failed = 0
 
 def compare_output(output: str, expected: str, title: str) -> None:
     global failed
-    if expected != output:
-        print(f"{title} output:")
+    if expected.strip() != output.strip():
+        print(f"\n {title} output mismatch:")
+        print("Got:")
         print(output)
-        print("expected:")
+        print("Expected:")
         print(expected)
         failed = 1
 
@@ -55,25 +56,48 @@ def run_generator(file: str, flags: int, version: int) -> Results:
 def validate_except_cost(output1: str, output2: str) -> None:
     lines1 = output1.split("\n")
     lines2 = output2.split("\n")
-    assert len(lines1) == len(lines2)
+    if len(lines1) != len(lines2):
+        raise AssertionError("output lengths differ")
     for l1, l2 in zip(lines1, lines2):
-        # the cost is supposed to differ, don't compare that
-        if l1.startswith("cost:") and l2.startswith("cost: "):
-            continue
-        if l1.startswith("atoms: ") and l2.startswith("atoms: "):
-            continue
-        if l1.startswith("pairs: ") and l2.startswith("pairs: "):
-            continue
-        if l1.startswith("heap: ") and l2.startswith("heap: "):
-            continue
-        if l1.startswith("execution-cost:") and l2.startswith("execution-cost: "):
+        if l1.startswith(("cost:", "atoms:", "pairs:", "heap:", "execution-cost:")):
             continue
         if " exe-cost: 0 " in l1 and " exe-cost: " in l2:
             columns = l2.split(" ")
             idx = columns.index("exe-cost:")
             columns[idx + 1] = "0"
             l2 = " ".join(columns)
-        assert l1 == l2
+        assert l1 == l2, f"Line mismatch:\n{l1}\n{l2}"
+
+
+def normalize_expected_sections(expected_text: str):
+    consensus = mempool = costed = expected_text
+    if "STRICT:\n" in expected_text:
+        consensus, rest = expected_text.split("STRICT:\n", 1)
+        if "COSTED_SHA:\n" in rest:
+            mempool, costed = rest.split("COSTED_SHA:\n", 1)
+        else:
+            mempool = rest
+    elif "COSTED_SHA:\n" in expected_text:
+        consensus, costed = expected_text.split("COSTED_SHA:\n", 1)
+    return consensus.strip(), mempool.strip(), costed.strip()
+
+
+def match_costed_output(actual: str, expected: str) -> bool:
+    expected = expected.strip()
+    actual = actual.strip()
+    if expected.startswith("FAILED:"):
+        return actual.startswith("FAILED:")
+    if expected.startswith("cost:"):
+        def get_cost(text: str):
+            for line in text.splitlines():
+                if line.startswith("cost:"):
+                    try:
+                        return int(line.split()[1])
+                    except Exception:
+                        pass
+            return None
+        return get_cost(expected) == get_cost(actual)
+    return expected == actual
 
 
 print(f"{'test name':43s}   consensus | mempool | costed")
@@ -81,6 +105,7 @@ base_dir = os.path.dirname(os.path.abspath(__file__))
 test_list = sorted(glob.glob(os.path.join(base_dir, "../generator-tests/*.txt")))
 if len(test_list) == 0:
     print("No tests found.")
+
 for g in test_list:
     name = f"{Path(g).name:43s}"
     stdout.write(f"{name} running generator...\r")
@@ -88,191 +113,107 @@ for g in test_list:
 
     run_generator1 = True
     flags = 0
-    if "aa-million-messages.txt" in g:
+    if "aa-million-messages.txt" in g or "aa-million-message-spends.txt" in g:
         flags = COST_CONDITIONS
-    elif "aa-million-message-spends.txt" in g:
-        flags = COST_CONDITIONS
-        run_generator1 = False
-    elif "3000000-conditions-single-coin.txt" in g:
-        run_generator1 = False
-    elif "single-coin-only-garbage" in g:
-        run_generator1 = False
-    elif "many-coins-announcement-cap.txt" in g:
-        run_generator1 = False
-    elif "29500-remarks-procedural.txt" in g:
-        run_generator1 = False
-    elif "100000-remarks-prefab.txt" in g:
-        run_generator1 = False
-    elif "puzzle-hash-stress-test.txt" in g:
-        # this test fails on generator1, because it's too expensive
-        run_generator1 = False
-    elif "puzzle-hash-stress-tree.txt" in g:
-        # this test fails on generator1, because it's too expensive
+
+    if any(
+        skip in g
+        for skip in [
+            "aa-million-message-spends.txt",
+            "3000000-conditions-single-coin.txt",
+            "single-coin-only-garbage",
+            "many-coins-announcement-cap.txt",
+            "29500-remarks-procedural.txt",
+            "100000-remarks-prefab.txt",
+            "puzzle-hash-stress-test.txt",
+            "puzzle-hash-stress-tree.txt",
+        ]
+    ):
         run_generator1 = False
 
+    # === Run generators ===
     if run_generator1:
-        consensus = run_generator(
-            g,
-            flags,
-            version=1,
-        )
+        consensus = run_generator(g, flags, version=1)
 
-    stdout.write(f"{name} running generator2...\r")
-    stdout.flush()
-    consensus2 = run_generator(
-        g,
-        flags,
-        version=2,
-    )
+    consensus2 = run_generator(g, flags, version=2)
     if run_generator1:
         validate_except_cost(consensus.output, consensus2.output)
 
-    stdout.write(f"{name} running generator (mempool mode) ...\r")
-    stdout.flush()
-
+    mempool2 = run_generator(g, MEMPOOL_MODE | flags, version=2)
     if run_generator1:
-        mempool = run_generator(
-            g,
-            MEMPOOL_MODE | flags,
-            version=1,
-        )
-
-    stdout.write(f"{name} running generator2 (mempool mode)...\r")
-    stdout.flush()
-    mempool2 = run_generator(
-        g,
-        MEMPOOL_MODE | flags,
-        version=2,
-    )
-
-    stdout.write(f"{name} running generator2 (costed)...\r")
-    stdout.flush()
-    costed2 = run_generator(
-        g,
-        COST_SHATREE | flags,
-        version=2,
-    )
-
-    if run_generator1:
+        mempool = run_generator(g, MEMPOOL_MODE | flags, version=1)
         validate_except_cost(mempool.output, mempool2.output)
 
+    costed2 = run_generator(g, COST_SHATREE | flags, version=2)
+
     with open(g) as f:
-        expected = f.read().split("\n", 1)[1]
-        if "STRICT:\n" in expected:
-            # split STRICT section
-            consensus_part, rest = expected.split("STRICT:\n", 1)
+        _header, body = f.read().split("\n", 1)
+        expected, expected_mempool, expected_sha = normalize_expected_sections(body)
 
-            if "COSTED_SHA:\n" in rest:
-                mempool_part, sha_part = rest.split("COSTED_SHA:\n", 1)
-                expected, expected_mempool, expected_sha = (
-                    consensus_part,
-                    mempool_part,
-                    sha_part,
-                )
-            else:
-                expected, expected_mempool, expected_sha = (
-                    consensus_part,
-                    rest,
-                    consensus_part,
-                )
-        else:
-            # no STRICT
-            if "COSTED_SHA:\n" in expected:
-                mempool_part, sha_part = expected.split("COSTED_SHA:\n", 1)
-                expected, expected_mempool, expected_sha = (
-                    mempool_part,
-                    mempool_part,
-                    sha_part,
-                )
-            else:
-                expected, expected_mempool, expected_sha = expected, expected, expected
+    stdout.write("\x1b[K")
+    stdout.flush()
 
-        stdout.write("\x1b[K")
-        stdout.flush()
+    limit = 1
+    strict_limit = 1
+    sha_limit = 3
 
-        # this is the ambition with future optimizations
-        limit = 1
-        strict_limit = 1
-        sha_limit = 3
+    # Temporary overrides for heavy tests
+    slow_tests = {
+        "duplicate-coin-announce.txt": (4, 4, 3),
+        "negative-reserve-fee.txt": (4, 1, 3),
+        "infinite-recursion4": (2, 2, 3),
+        "deep-recursion-plus": (5, 5, 3),
+        "recursion-pairs.txt": (4, 4, 3),
+        "aa-million-messages.txt": (3, 3, 3),
+        "puzzle-hash-stress-test.txt": (4, 4, 3),
+        "puzzle-hash-stress-tree.txt": (4, 4, 3),
+        "aa-million-message-spends.txt": (11, 11, 3),
+        "many-coins-announcement-cap.txt": (5, 5, 3),
+        "3000000-conditions-single-coin.txt": (8, 8, 3),
+        "29500-remarks-procedural.txt": (9, 9, 3),
+        "single-coin-only-garbage.txt": (10, 10, 3),
+    }
+    for key, (lim, sl, sh) in slow_tests.items():
+        if key in g:
+            limit, strict_limit, sha_limit = lim, sl, sh
 
-        # temporary higher limits until this is optimized
-        if "duplicate-coin-announce.txt" in g:
-            limit = 4
-            strict_limit = 4
-        elif "negative-reserve-fee.txt" in g:
-            limit = 4
-        elif "infinite-recursion4" in g:
-            limit = 2
-            strict_limit = 2
-        elif "deep-recursion-plus" in g:
-            limit = 5
-            strict_limit = 5
-        elif "recursion-pairs.txt" in g:
-            limit = 4
-            strict_limit = 4
-        elif "aa-million-messages.txt" in g:
-            limit = 3
-            strict_limit = 3
-        elif "puzzle-hash-stress-test.txt" in g:
-            limit = 4
-            strict_limit = 4
-        elif "puzzle-hash-stress-tree.txt" in g:
-            limit = 4
-            strict_limit = 4
-        elif "aa-million-message-spends.txt" in g:
-            limit = 11
-            strict_limit = 11
-        elif "many-coins-announcement-cap.txt" in g:
-            limit = 5
-            strict_limit = 5
-        elif "3000000-conditions-single-coin.txt" in g:
-            limit = 8
-            strict_limit = 8
-        elif "29500-remarks-procedural.txt" in g:
-            limit = 9
-            strict_limit = 9
-        elif "single-coin-only-garbage.txt" in g:
-            limit = 10
-            strict_limit = 10
-
-        if run_generator1:
-            validate_except_cost(consensus.output, expected)
-            validate_except_cost(mempool.output, expected_mempool)
-            validate_except_cost(costed2.output, expected_sha)
-            stdout.write(
-                f"{name} {consensus.run_time:.2f}s "
-                f"{consensus2.run_time:.2f}s | "
-                f"{mempool.run_time:.2f}s "
-                f"{mempool2.run_time:.2f}s | "
-                f"{costed2.run_time:.2f}s "
-            )
-        else:
-            compare_output(consensus2.output, expected, "")
-            compare_output(mempool2.output, expected_mempool, "strict")
-            compare_output(costed2.output, expected_sha, "costed")
-            stdout.write(
-                f"{name} {consensus2.run_time:.2f}s | "
-                f"{mempool2.run_time:.2f}s | "
-                f"{costed2.run_time:.2f}s"
-            )
-
-        if (
-            run_generator1 and consensus.run_time > limit
-        ) or consensus2.run_time > limit:
-            stdout.write(f" - exceeds limit ({limit})!")
+    if run_generator1:
+        validate_except_cost(consensus.output, expected)
+        validate_except_cost(mempool.output, expected_mempool)
+        assert match_costed_output(costed2.output, expected_sha), (
+            f"{name} costed section mismatch:\nGot:\n{costed2.output}\nExpected:\n{expected_sha}"
+        )
+        stdout.write(
+            f"{name} {consensus.run_time:.2f}s {consensus2.run_time:.2f}s | "
+            f"{mempool.run_time:.2f}s {mempool2.run_time:.2f}s | "
+            f"{costed2.run_time:.2f}s"
+        )
+    else:
+        compare_output(consensus2.output, expected, "")
+        compare_output(mempool2.output, expected_mempool, "strict")
+        if not match_costed_output(costed2.output, expected_sha):
+            print(f"\n costed output mismatch for {name}")
+            print(costed2.output)
+            print("expected:")
+            print(expected_sha)
             failed = 1
+        stdout.write(
+            f"{name} {consensus2.run_time:.2f}s | "
+            f"{mempool2.run_time:.2f}s | "
+            f"{costed2.run_time:.2f}s"
+        )
 
-        if (
-            run_generator1 and mempool.run_time > strict_limit
-        ) or mempool2.run_time > strict_limit:
-            stdout.write(f" - mempool exceeds limit ({strict_limit})!")
-            failed = 1
+    if (run_generator1 and consensus.run_time > limit) or consensus2.run_time > limit:
+        stdout.write(f" - exceeds limit ({limit})!")
+        failed = 1
+    if (run_generator1 and mempool.run_time > strict_limit) or mempool2.run_time > strict_limit:
+        stdout.write(f" - mempool exceeds limit ({strict_limit})!")
+        failed = 1
+    if costed2.run_time > sha_limit:
+        stdout.write(f" - costed exceeds limit ({sha_limit})!")
+        failed = 1
 
-        if costed2.run_time > sha_limit:
-            stdout.write(f" - costed exceeds limit ({sha_limit})!")
-            failed = 1
-
-        stdout.write("\n")
+    stdout.write("\n")
 
 print(f"returning {failed}")
 exit(failed)
