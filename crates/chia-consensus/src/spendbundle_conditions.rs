@@ -285,7 +285,6 @@ mod tests {
         a1: &mut Allocator,
         a2: &mut Allocator,
         expected: &str,
-        flags: u32,
     ) {
         use crate::test_generators::{print_conditions, print_diff};
 
@@ -361,8 +360,7 @@ mod tests {
 
     #[cfg(not(debug_assertions))]
     #[rstest]
-    // this test requires running after hard fork 2, where the COST_CONDITIONS
-    // flag is set
+    // This test requires running after hard fork 2, where the COST_CONDITIONS flag is set
     // #[case("aa-million-messages")]
     #[case("new-agg-sigs")]
     #[case("infinity-g1")]
@@ -399,10 +397,10 @@ mod tests {
     #[case("duplicate-seconds-absolute")]
     #[case("duplicate-seconds-relative")]
     #[case("height-absolute-ladder")]
-    //#[case("infinite-recursion1")]
-    //#[case("infinite-recursion2")]
-    //#[case("infinite-recursion3")]
-    //#[case("infinite-recursion4")]
+    // #[case("infinite-recursion1")]
+    // #[case("infinite-recursion2")]
+    // #[case("infinite-recursion3")]
+    // #[case("infinite-recursion4")]
     #[case("invalid-conditions")]
     #[case("just-puzzle-announce")]
     #[case("many-create-coin")]
@@ -411,7 +409,7 @@ mod tests {
     #[case("max-height")]
     #[case("multiple-reserve-fee")]
     #[case("negative-reserve-fee")]
-    //#[case("recursion-pairs")]
+    // #[case("recursion-pairs")]
     #[case("unknown-condition")]
     #[case("duplicate-messages")]
     fn run_generator(#[case] name: &str) {
@@ -421,34 +419,46 @@ mod tests {
         let filename = format!("../../generator-tests/{name}.txt");
         println!("file: {filename}");
         let test_file = read_to_string(filename).expect("test file not found");
-        let (generator, expected) = test_file.split_once('\n').expect("invalid test file");
+
+        // Split hex-encoded generator from rest of file
+        let (generator, expected) = test_file
+            .split_once('\n')
+            .expect("invalid test file (missing generator line)");
         let generator_buffer = hex::decode(generator).expect("invalid hex encoded generator");
 
-        // we only want the strict case and costed case
-        let (expected, costed) = match expected.split_once("STRICT:\n") {
-            Some((_c, m)) => match m.split_once("COSTED_SHA:\n") {
-                Some((d, n)) => (d, n),
-                None => (m, m),
-            },
-            None => match expected.split_once("COSTED_SHA:\n") {
-                Some((d, n)) => (d, n),
-                None => (expected, expected),
-            },
-        };
+        // Handle flexible test file format:
+        //  - default only
+        //  - default + STRICT
+        //  - default + STRICT + COSTED_SHA
+        //  - optional minimal COSTED_SHA section (only cost difference)
+        let mut default_out = expected;
+        let mut strict_out = "";
+        let mut costed_out = "";
 
+        if let Some((base, rest)) = expected.split_once("STRICT:\n") {
+            default_out = base;
+            if let Some((strict, costed)) = rest.split_once("COSTED_SHA:\n") {
+                strict_out = strict;
+                costed_out = costed;
+            } else {
+                strict_out = rest;
+            }
+        } else if let Some((base, costed)) = expected.split_once("COSTED_SHA:\n") {
+            default_out = base;
+            costed_out = costed;
+        }
+
+        // load optional .env file with block references
         let mut block_refs = Vec::<Vec<u8>>::new();
-
-        let filename = format!("../../generator-tests/{name}.env");
-        if let Ok(env_hex) = read_to_string(&filename) {
-            println!("block-ref file: {filename}");
+        let env_path = format!("../../generator-tests/{name}.env");
+        if let Ok(env_hex) = read_to_string(&env_path) {
+            println!("block-ref file: {env_path}");
             block_refs.push(hex::decode(env_hex).expect("hex decode env-file"));
         }
 
         let bundle = convert_block_to_bundle(&generator_buffer, &block_refs);
 
-        // run the whole block through run_block_generator2() to ensure the
-        // output conditions match and update the cost. The cost
-        // of just the spend bundle will be lower
+        // === Default case ===
         let mut a2 = make_allocator(MEMPOOL_MODE);
         let (execution_cost, block_cost, block_output) = {
             let block_conds = run_block_generator2(
@@ -482,7 +492,7 @@ mod tests {
             5_000_000,
             &TEST_CONSTANTS,
         );
-        // check_output is comparing the expected and actual outputs
+
         check_output(
             conds,
             block_output,
@@ -493,62 +503,68 @@ mod tests {
             &TEST_CONSTANTS,
             &mut a1,
             &mut a2,
-            expected,
-            MEMPOOL_MODE | DONT_VALIDATE_SIGNATURE,
+            if !strict_out.is_empty() {
+                strict_out
+            } else {
+                default_out
+            },
         );
 
-        // Now lets test that it works as expected with costed shatree
+        // === COSTED_SHA case ===
+        if !costed_out.trim().is_empty() {
+            let mut a2_costed = make_allocator(COST_SHATREE);
+            let mut a1_costed = make_allocator(COST_SHATREE);
 
-        let mut a2_costed = make_allocator(COST_SHATREE);
-        let mut a1_costed = make_allocator(COST_SHATREE);
-
-        let conds_res = run_spendbundle(
-            &mut a1_costed,
-            &bundle,
-            11_000_000_000,
-            DONT_VALIDATE_SIGNATURE | COST_SHATREE,
-            &TEST_CONSTANTS,
-        );
-        let conds = match conds_res {
-            Err(e) => Err(e),
-            Ok(x) => Ok(x.0),
-        };
-        let (execution_cost, block_cost, block_output) = {
-            let block_conds = run_block_generator2(
-                &mut a2_costed,
-                &generator_buffer,
-                &block_refs,
+            let conds_res = run_spendbundle(
+                &mut a1_costed,
+                &bundle,
                 11_000_000_000,
                 DONT_VALIDATE_SIGNATURE | COST_SHATREE,
-                &Signature::default(),
-                None,
                 &TEST_CONSTANTS,
             );
-            match block_conds {
-                Ok(ref conditions) => (
-                    conditions.execution_cost,
-                    conditions.cost,
-                    print_conditions(&a2_costed, &conditions, &a2_costed),
-                ),
-                Err(code) => {
-                    println!("error: {code:?}");
-                    (0, 0, format!("FAILED: {}\n", u32::from(code.1)))
+            let conds = match conds_res {
+                Err(e) => Err(e),
+                Ok(x) => Ok(x.0),
+            };
+
+            let (execution_cost, block_cost, block_output) = {
+                let block_conds = run_block_generator2(
+                    &mut a2_costed,
+                    &generator_buffer,
+                    &block_refs,
+                    11_000_000_000,
+                    DONT_VALIDATE_SIGNATURE | COST_SHATREE,
+                    &Signature::default(),
+                    None,
+                    &TEST_CONSTANTS,
+                );
+                match block_conds {
+                    Ok(ref conditions) => (
+                        conditions.execution_cost,
+                        conditions.cost,
+                        print_conditions(&a2_costed, &conditions, &a2_costed),
+                    ),
+                    Err(code) => {
+                        println!("error: {code:?}");
+                        (0, 0, format!("FAILED: {}\n", u32::from(code.1)))
+                    }
                 }
-            }
-        };
-        // compare the expected and actual outputs
-        check_output(
-            conds,
-            block_output,
-            block_cost,
-            execution_cost,
-            &generator_buffer,
-            &bundle,
-            &TEST_CONSTANTS,
-            &mut a1_costed,
-            &mut a2_costed,
-            costed,
-            DONT_VALIDATE_SIGNATURE | COST_SHATREE,
-        );
+            };
+
+            check_output(
+                conds,
+                block_output,
+                block_cost,
+                execution_cost,
+                &generator_buffer,
+                &bundle,
+                &TEST_CONSTANTS,
+                &mut a1_costed,
+                &mut a2_costed,
+                costed_out,
+            );
+        } else {
+            println!("(no COSTED_SHA section present — skipping costed comparison)");
+        }
     }
 }

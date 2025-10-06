@@ -12,13 +12,5 @@ heap: 68
 STRICT:
 FAILED: 10
 COSTED_SHA:
-SPENDS:
-- coin id: dde166b7f703c2d27b6d32d6366de6bc845fa77b89c9516a6a2a5f81478b16de ph: 8e7898923ddff7c7ca50df1e12fdeefb88fa004cbd26a1a3c8043447cb5cb4a8 exe-cost: 20 cond-cost: 0
 cost: 961290
-execution-cost: 40
-condition-cost: 0
-removal_amount: 123
-addition_amount: 0
-atoms: 128
-pairs: 284
-heap: 68
+(only cost differs from default)

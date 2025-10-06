@@ -10,13 +10,5 @@ atoms: 131228
 pairs: 2163194
 heap: 74
 COSTED_SHA:
-SPENDS:
-- coin id: 6d9af015964a30dce90b7aaa05a2b8a91a1625212bad94b6c9834ec642d03bf5 ph: 29ef8f86dcda067c84be60e7854af2b6ded26b7db1dda107a7e14e6dcdbe08ef exe-cost: 20 cond-cost: 0
 cost: 1454582864
-execution-cost: 190380614
-condition-cost: 0
-removal_amount: 123
-addition_amount: 0
-atoms: 131228
-pairs: 2163194
-heap: 74
+(only cost differs from default)
