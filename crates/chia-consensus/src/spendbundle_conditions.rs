@@ -78,12 +78,14 @@ pub fn run_spendbundle(
         subtract_cost(a, &mut cost_left, clvm_cost)?;
 
         cache.visit_tree(a, puz);
+        let cost_before = cost_left.clone();
         let buf = if flags & COST_SHATREE != 0 {
             tree_hash_cached_costed(a, puz, &mut cache, &mut cost_left)
                 .ok_or_else(|| ValidationErr(a.nil(), ErrorCode::CostExceeded))?
         } else {
             tree_hash_cached(a, puz, &mut cache)
         };
+        ret.shatree_cost += cost_before - cost_left;
         if coin_spend.coin.puzzle_hash != buf.into() {
             return Err(ValidationErr(puz, ErrorCode::WrongPuzzleHash));
         }
