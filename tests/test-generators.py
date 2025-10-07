@@ -57,6 +57,7 @@ def validate_except_cost(output1: str, output2: str) -> None:
     lines2 = output2.split("\n")
     assert len(lines1) == len(lines2)
     for l1, l2 in zip(lines1, lines2):
+        # these are supposed to differ, don't compare them
         if l1.startswith("cost:") and l2.startswith("cost: "):
             continue
         if l1.startswith("atoms: ") and l2.startswith("atoms: "):
