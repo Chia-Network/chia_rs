@@ -268,49 +268,6 @@ pub fn tree_hash(a: &Allocator, node: NodePtr) -> TreeHash {
     hashes[0]
 }
 
-pub fn tree_hash_costed(a: &Allocator, node: NodePtr, cost_left: &mut Cost) -> Option<TreeHash> {
-    let mut hashes = Vec::new();
-    let mut ops = vec![TreeOp::SExp(node)];
-
-    while let Some(op) = ops.pop() {
-        subtract_cost(cost_left, SHATREE_RECURSE_COST).ok()?;
-
-        match op {
-            TreeOp::SExp(node) => match a.node(node) {
-                NodeVisitor::Buffer(bytes) => {
-                    subtract_cost(cost_left, SHATREE_COST_PER_BYTE * bytes.len() as u64).ok()?;
-                    let hash = tree_hash_atom(bytes);
-                    hashes.push(hash);
-                }
-                NodeVisitor::U32(val) => {
-                    subtract_cost(cost_left, SHATREE_COST_PER_BYTE * a.atom_len(node) as u64)
-                        .ok()?;
-                    if (val as usize) < PRECOMPUTED_HASHES.len() {
-                        hashes.push(PRECOMPUTED_HASHES[val as usize]);
-                    } else {
-                        hashes.push(tree_hash_atom(a.atom(node).as_ref()));
-                    }
-                }
-                NodeVisitor::Pair(left, right) => {
-                    subtract_cost(cost_left, SHATREE_COST_PER_BYTE * 65_u64).ok()?;
-                    ops.push(TreeOp::Cons);
-                    ops.push(TreeOp::SExp(left));
-                    ops.push(TreeOp::SExp(right));
-                }
-            },
-            TreeOp::Cons => {
-                let first = hashes.pop().unwrap();
-                let rest = hashes.pop().unwrap();
-                hashes.push(tree_hash_pair(first, rest));
-            }
-            TreeOp::ConsAddCache(_) | TreeOp::ConsAddCacheCost(_, _) => unreachable!(),
-        }
-    }
-
-    assert!(hashes.len() == 1);
-    Some(hashes[0])
-}
-
 pub fn tree_hash_cached(a: &Allocator, node: NodePtr, cache: &mut TreeCache) -> TreeHash {
     cache.visit_tree(a, node);
 
@@ -464,6 +421,50 @@ pub fn tree_hash_from_bytes(buf: &[u8]) -> Result<TreeHash, EvalErr> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn tree_hash_costed(a: &Allocator, node: NodePtr, cost_left: &mut Cost) -> Option<TreeHash> {
+        let mut hashes = Vec::new();
+        let mut ops = vec![TreeOp::SExp(node)];
+
+        while let Some(op) = ops.pop() {
+            subtract_cost(cost_left, SHATREE_RECURSE_COST).ok()?;
+
+            match op {
+                TreeOp::SExp(node) => match a.node(node) {
+                    NodeVisitor::Buffer(bytes) => {
+                        subtract_cost(cost_left, SHATREE_COST_PER_BYTE * bytes.len() as u64)
+                            .ok()?;
+                        let hash = tree_hash_atom(bytes);
+                        hashes.push(hash);
+                    }
+                    NodeVisitor::U32(val) => {
+                        subtract_cost(cost_left, SHATREE_COST_PER_BYTE * a.atom_len(node) as u64)
+                            .ok()?;
+                        if (val as usize) < PRECOMPUTED_HASHES.len() {
+                            hashes.push(PRECOMPUTED_HASHES[val as usize]);
+                        } else {
+                            hashes.push(tree_hash_atom(a.atom(node).as_ref()));
+                        }
+                    }
+                    NodeVisitor::Pair(left, right) => {
+                        subtract_cost(cost_left, SHATREE_COST_PER_BYTE * 65_u64).ok()?;
+                        ops.push(TreeOp::Cons);
+                        ops.push(TreeOp::SExp(left));
+                        ops.push(TreeOp::SExp(right));
+                    }
+                },
+                TreeOp::Cons => {
+                    let first = hashes.pop().unwrap();
+                    let rest = hashes.pop().unwrap();
+                    hashes.push(tree_hash_pair(first, rest));
+                }
+                TreeOp::ConsAddCache(_) | TreeOp::ConsAddCacheCost(_, _) => unreachable!(),
+            }
+        }
+
+        assert!(hashes.len() == 1);
+        Some(hashes[0])
+    }
 
     #[test]
     fn test_tree_hash() {
