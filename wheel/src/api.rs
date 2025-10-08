@@ -67,6 +67,7 @@ use pyo3::types::PyList;
 use pyo3::types::PyTuple;
 use pyo3::types::{PyBytes, PyDict};
 use pyo3::wrap_pyfunction;
+use std::path::Path;
 
 use std::iter::zip;
 
@@ -586,6 +587,154 @@ pub fn py_is_canonical_serialization(buf: &[u8]) -> bool {
     is_canonical_serialization(buf)
 }
 
+#[pyo3::pyfunction]
+pub fn create_v2_plot(
+    filename: &str,
+    k: u8,
+    strength: u8,
+    plot_id: Bytes32,
+    memo: &[u8],
+) -> PyResult<()> {
+    if memo.len() != 32 + 48 + 32 {
+        return Err(PyValueError::new_err(format!(
+            "memo must be 112 bytes, got {}",
+            memo.len()
+        )));
+    }
+    Ok(chia_pos2::create_v2_plot(
+        Path::new(filename),
+        k,
+        strength,
+        &plot_id.to_bytes(),
+        memo.try_into().unwrap(),
+    )?)
+}
+
+#[pyclass]
+pub struct Prover(chia_pos2::Prover);
+
+#[pymethods]
+impl Prover {
+    #[new]
+    pub fn new(plot_path: &str) -> PyResult<Self> {
+        Ok(Self(chia_pos2::Prover::new(Path::new(plot_path))?))
+    }
+
+    pub fn get_qualities_for_challenge(
+        &self,
+        challenge: Bytes32,
+        proof_fragment_filter: u8,
+    ) -> PyResult<Vec<QualityProof>> {
+        let qualities = self
+            .0
+            .get_qualities_for_challenge(&challenge.to_bytes(), proof_fragment_filter)?;
+        Ok(qualities.into_iter().map(&QualityProof).collect())
+    }
+
+    pub fn get_partial_proof(&self, quality: &QualityProof) -> PyResult<(Vec<u64>, u8)> {
+        let chia_pos2::PartialProof {
+            proof_fragments,
+            strength,
+        } = self.0.get_partial_proof(&quality.0)?;
+        Ok((proof_fragments.to_vec(), strength))
+    }
+
+    pub fn size(&self) -> u8 {
+        self.0.size()
+    }
+
+    pub fn plot_id(&self) -> Bytes32 {
+        self.0.plot_id().into()
+    }
+
+    pub fn get_strength(&self) -> u8 {
+        self.0.get_strength()
+    }
+
+    pub fn get_filename(&self) -> String {
+        self.0.get_filename()
+    }
+
+    pub fn get_memo(&self) -> Vec<u8> {
+        let (ph, fpk, lsk) = self.0.get_memo();
+        let mut ret = vec![];
+        ret.extend_from_slice(&ph);
+        ret.extend_from_slice(&fpk);
+        ret.extend_from_slice(&lsk);
+        ret
+    }
+
+    pub fn to_bytes(&self) -> PyResult<Vec<u8>> {
+        bincode::serialize(&self.0)
+            .map_err(|m| PyRuntimeError::new_err(format!("failed to serialize Prover {m:?}")))
+    }
+
+    #[staticmethod]
+    pub fn from_bytes(b: &[u8]) -> PyResult<Self> {
+        Ok(Self(bincode::deserialize::<chia_pos2::Prover>(b).map_err(
+            |m| PyRuntimeError::new_err(format!("failed to deserialize Prover {m:?}")),
+        )?))
+    }
+}
+
+#[pyclass]
+#[derive(Clone)]
+pub struct QualityProof(chia_pos2::QualityChain);
+
+#[pymethods]
+impl QualityProof {
+    pub fn serialize(&self) -> Vec<u8> {
+        self.0.serialize().to_vec()
+    }
+}
+
+#[pyo3::pyfunction]
+pub fn validate_proof_v2(
+    plot_id: Bytes32,
+    size: u8,
+    challenge: Bytes32,
+    required_plot_strength: u8,
+    proof_fragment_scan_filter: u8,
+    proof: &[u8],
+) -> Option<Vec<u8>> {
+    chia_pos2::validate_proof_v2(
+        &plot_id.to_bytes(),
+        size,
+        &challenge.to_bytes(),
+        required_plot_strength,
+        proof_fragment_scan_filter,
+        proof,
+    )
+    .map(|quality| quality.to_vec())
+}
+
+#[pyo3::pyfunction]
+pub fn solve_proof(
+    fragments: Vec<u64>,
+    plot_id: Bytes32,
+    strength: u8,
+    k: u8,
+) -> PyResult<Vec<u8>> {
+    let num_fragments = fragments.len();
+    let partial_proof = match fragments.try_into() {
+        Err(_) => {
+            return Err(PyRuntimeError::new_err(format!(
+                "wrong number of proof fragments {num_fragments} expected 64"
+            )));
+        }
+        Ok(proof_fragments) => chia_pos2::PartialProof {
+            proof_fragments,
+            strength,
+        },
+    };
+
+    Ok(chia_pos2::solve_proof(
+        &partial_proof,
+        &plot_id.to_bytes(),
+        k,
+    ))
+}
+
 #[pymodule]
 pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // generator functions
@@ -614,6 +763,13 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_calculate_ip_iters, m)?)?;
     m.add_function(wrap_pyfunction!(py_is_overflow_block, m)?)?;
     m.add_function(wrap_pyfunction!(py_expected_plot_size, m)?)?;
+
+    // pos2 functions
+    m.add_function(wrap_pyfunction!(create_v2_plot, m)?)?;
+    m.add_function(wrap_pyfunction!(validate_proof_v2, m)?)?;
+    m.add_function(wrap_pyfunction!(solve_proof, m)?)?;
+    m.add_class::<Prover>()?;
+    m.add_class::<QualityProof>()?;
 
     // check time lock
     m.add_function(wrap_pyfunction!(py_check_time_locks, m)?)?;
