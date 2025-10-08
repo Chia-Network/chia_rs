@@ -397,7 +397,7 @@ fn run_generator(#[case] name: &str) {
             };
             if output != output_pre_hard_fork {
                 print_diff(&output, &output_pre_hard_fork);
-                if !UPDATE_TESTS && flags & COST_SHATREE == 0 {
+                if !UPDATE_TESTS {
                     panic!("run_block_generator 1 and 2 produced a different result!");
                 }
             }

@@ -485,7 +485,6 @@ mod tests {
 
         let bundle = convert_block_to_bundle(&generator_buffer, &block_refs);
 
-        // === Default case ===
         let mut a2 = make_allocator(MEMPOOL_MODE);
         let (execution_cost, block_cost, block_output) = {
             let block_conds = run_block_generator2(
@@ -512,11 +511,11 @@ mod tests {
         };
 
         let mut a1 = make_allocator(MEMPOOL_MODE);
-        let conds = get_conditions_from_spendbundle(
+        let conds = run_spendbundle(
             &mut a1,
             &bundle,
             11_000_000_000,
-            5_000_000,
+            DONT_VALIDATE_SIGNATURE,
             &TEST_CONSTANTS,
         );
 
@@ -537,7 +536,7 @@ mod tests {
             },
         );
 
-        // === COSTED_SHA case ===
+
         if !costed_out.trim().is_empty() {
             let mut a2_costed = make_allocator(COST_SHATREE);
             let mut a1_costed = make_allocator(COST_SHATREE);
