@@ -342,28 +342,28 @@ mod tests {
             }
         };
 
-        let expected_trimmed = expected.trim();
-        let output_trimmed = output.trim();
+        let expected = expected.trim();
+        let output = output.trim();
 
-        if expected_trimmed.starts_with("FAILED:") {
+        if expected.starts_with("FAILED:") {
             assert!(
-                output_trimmed.starts_with("FAILED:"),
+                output.starts_with("FAILED:"),
                 "expected failure but got success"
             );
             println!("(expected failure matched)");
             return;
         }
 
-        if expected_trimmed.starts_with("cost:") {
+        if expected.starts_with("cost:") {
             // Extract numeric cost from both
-            let expected_cost = expected_trimmed
+            let expected_cost = expected
                 .lines()
                 .find(|l| l.starts_with("cost:"))
                 .and_then(|l| l.split_whitespace().nth(1))
                 .and_then(|s| s.parse::<u64>().ok())
                 .unwrap_or_default();
 
-            let actual_cost = output_trimmed
+            let actual_cost = output
                 .lines()
                 .find(|l| l.starts_with("cost:"))
                 .and_then(|l| l.split_whitespace().nth(1))
@@ -379,7 +379,7 @@ mod tests {
             return;
         }
 
-        if output_trimmed != expected_trimmed {
+        if output != expected {
             print_diff(&output, expected);
             panic!("mismatching condition output");
         }
