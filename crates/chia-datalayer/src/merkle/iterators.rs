@@ -87,7 +87,7 @@ impl Iterator for LeftChildFirstIterator<'_> {
                                 return Some(Err(Error::ReferenceToUnknownParent()))
                             }
                             Err(e) => return Some(Err(e)),
-                        };
+                        }
                     } else if !self.already_queued.contains(&index) {
                         return Some(Err(Error::ReferenceToUnknownParent()));
                     }
@@ -109,7 +109,7 @@ impl Iterator for LeftChildFirstIterator<'_> {
                 Node::Internal(ref node) => {
                     if item.visited {
                         return Some(Ok((item.index, block)));
-                    };
+                    }
 
                     if node.left == node.right
                         || self.already_queued.contains(&node.left)
