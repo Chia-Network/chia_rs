@@ -108,10 +108,10 @@ impl BlockStatusCache {
             if let Node::Leaf(leaf) = block.node {
                 if key_to_index.insert(leaf.key, index).is_some() {
                     return Err(Error::KeyAlreadyPresent());
-                };
+                }
                 if leaf_hash_to_index.insert(leaf.hash, index).is_some() {
                     return Err(Error::HashAlreadyPresent());
-                };
+                }
             }
         }
 
@@ -212,11 +212,11 @@ impl BlockStatusCache {
         // TODO: not checking it is within bounds of the present blob
         if self.free_indexes.contains(&source) {
             return Err(Error::MoveSourceIndexNotInUse(source));
-        };
+        }
         // TODO: not checking it is within bounds of the present blob
         if self.free_indexes.contains(&destination) {
             return Err(Error::MoveDestinationIndexNotInUse(destination));
-        };
+        }
 
         self.free_indexes.insert(source);
 
@@ -389,7 +389,7 @@ impl MerkleBlob {
             InsertLocation::AsRoot {} => {
                 if !self.block_status_cache.no_keys() {
                     return Err(Error::UnableToInsertAsRootOfNonEmptyTree());
-                };
+                }
                 self.insert_first(key, value, hash)
             }
             InsertLocation::Leaf { index, side } => {
@@ -562,7 +562,7 @@ impl MerkleBlob {
             }
         } else {
             panic!("expected internal node but found leaf");
-        };
+        }
 
         self.insert_entry_to_blob(old_parent_index, &old_parent_block)?;
 
@@ -655,7 +655,7 @@ impl MerkleBlob {
             // OPT: can we avoid this extra min height leaf traversal?
             let min_height_leaf = self.get_min_height_leaf()?;
             self.insert_subtree_at_key(min_height_leaf.key, indexes[0], Side::Left)?;
-        };
+        }
 
         Ok(())
     }
@@ -760,7 +760,7 @@ impl MerkleBlob {
                 for child_index in [node.left, node.right] {
                     self.update_parent(child_index, Some(destination))?;
                 }
-            };
+            }
 
             self.insert_entry_to_blob(destination, &sibling_block)?;
             self.block_status_cache
@@ -808,7 +808,7 @@ impl MerkleBlob {
 
         if let Some(parent) = block.node.parent().0 {
             self.mark_lineage_as_dirty(parent)?;
-        };
+        }
 
         Ok(())
     }
@@ -852,7 +852,7 @@ impl MerkleBlob {
                             index,
                             *cached_index,
                         ));
-                    };
+                    }
                     assert!(
                         !self.block_status_cache.is_index_free(index),
                         "{}",
@@ -880,7 +880,7 @@ impl MerkleBlob {
         let extend_index = self.extend_index();
         if total_count != extend_index.0 as usize {
             return Err(Error::IntegrityTotalNodeCount(extend_index, total_count));
-        };
+        }
         if !child_to_parent.is_empty() {
             return Err(Error::IntegrityUnmatchedChildParentRelationships(
                 child_to_parent.len(),
