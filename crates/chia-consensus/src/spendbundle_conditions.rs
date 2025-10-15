@@ -285,7 +285,7 @@ mod tests {
         a1: &mut Allocator,
         a2: &mut Allocator,
         expected: &str,
-        flags: u32,
+        _flags: u32,
     ) {
         use crate::test_generators::{print_conditions, print_diff};
 
