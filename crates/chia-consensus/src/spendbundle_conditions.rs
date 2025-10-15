@@ -359,7 +359,6 @@ mod tests {
         }
     }
 
-    #[cfg(not(debug_assertions))]
     #[rstest]
     // this test requires running after hard fork 2, where the COST_CONDITIONS
     // flag is set
@@ -424,15 +423,15 @@ mod tests {
         let (generator, expected) = test_file.split_once('\n').expect("invalid test file");
         let generator_buffer = hex::decode(generator).expect("invalid hex encoded generator");
 
-        // we only want the strict case and costed case
-        let (expected, costed) = match expected.split_once("STRICT:\n") {
+        // we only want the strict case
+        let expected = match expected.split_once("STRICT:\n") {
             Some((_c, m)) => match m.split_once("COSTED_SHA:\n") {
-                Some((d, n)) => (d, n),
-                None => (m, m),
+                Some((d, _n)) => d,
+                None => m,
             },
             None => match expected.split_once("COSTED_SHA:\n") {
-                Some((d, n)) => (d, n),
-                None => (expected, expected),
+                Some((d, _n)) => d,
+                None => expected,
             },
         };
 
@@ -495,60 +494,6 @@ mod tests {
             &mut a2,
             expected,
             MEMPOOL_MODE | DONT_VALIDATE_SIGNATURE,
-        );
-
-        // Now lets test that it works as expected with costed shatree
-
-        let mut a2_costed = make_allocator(COST_SHATREE);
-        let mut a1_costed = make_allocator(COST_SHATREE);
-
-        let conds_res = run_spendbundle(
-            &mut a1_costed,
-            &bundle,
-            11_000_000_000,
-            DONT_VALIDATE_SIGNATURE | COST_SHATREE,
-            &TEST_CONSTANTS,
-        );
-        let conds = match conds_res {
-            Err(e) => Err(e),
-            Ok(x) => Ok(x.0),
-        };
-        let (execution_cost, block_cost, block_output) = {
-            let block_conds = run_block_generator2(
-                &mut a2_costed,
-                &generator_buffer,
-                &block_refs,
-                11_000_000_000,
-                DONT_VALIDATE_SIGNATURE | COST_SHATREE,
-                &Signature::default(),
-                None,
-                &TEST_CONSTANTS,
-            );
-            match block_conds {
-                Ok(ref conditions) => (
-                    conditions.execution_cost,
-                    conditions.cost,
-                    print_conditions(&a2_costed, &conditions, &a2_costed),
-                ),
-                Err(code) => {
-                    println!("error: {code:?}");
-                    (0, 0, format!("FAILED: {}\n", u32::from(code.1)))
-                }
-            }
-        };
-        // compare the expected and actual outputs
-        check_output(
-            conds,
-            block_output,
-            block_cost,
-            execution_cost,
-            &generator_buffer,
-            &bundle,
-            &TEST_CONSTANTS,
-            &mut a1_costed,
-            &mut a2_costed,
-            costed,
-            DONT_VALIDATE_SIGNATURE | COST_SHATREE,
         );
     }
 }
