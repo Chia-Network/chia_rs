@@ -124,6 +124,7 @@ pub(crate) fn print_conditions(a: &Allocator, c: &SpendBundleConditions, a2: &Al
     ret += &format!("atoms: {}\n", a2.atom_count() + a2.small_atom_count());
     ret += &format!("pairs: {}\n", a2.pair_count());
     ret += &format!("heap: {}\n", a2.heap_size());
+    ret += &format!("shatree_cost: {}\n", c.shatree_cost);
     ret
 }
 
@@ -254,14 +255,21 @@ fn run_generator(#[case] name: &str) {
     let (generator, expected) = test_file.split_once('\n').expect("invalid test file");
     let generator = hex::decode(generator).expect("invalid hex encoded generator");
 
+    let mut costed_sha_cost: String = format!("");
     let expected = match expected.split_once("STRICT:\n") {
         Some((c, m)) => match m.split_once("COSTED_SHA:\n") {
-            Some((d, n)) => [c, d, n],
-            None => [c, m, c],
+            Some((d, n)) => {
+                costed_sha_cost = n.to_string();
+                [c, d]
+            }
+            None => [c, m],
         },
         None => match expected.split_once("COSTED_SHA:\n") {
-            Some((d, n)) => [d, d, n],
-            None => [expected, expected, expected],
+            Some((d, n)) => {
+                costed_sha_cost = n.to_string();
+                [d, d]
+            }
+            None => [expected, expected],
         },
     };
 
@@ -276,7 +284,7 @@ fn run_generator(#[case] name: &str) {
     let mut write_back = format!("{}\n", hex::encode(&generator));
     let mut last_output = String::new();
 
-    for (flags, expected) in zip(&[0, MEMPOOL_MODE, COST_SHATREE], expected) {
+    for (flags, expected) in zip(&[0, MEMPOOL_MODE], expected) {
         let mut flags = *flags;
         if name == "aa-million-messages" || name == "aa-million-message-spends" {
             // this test requires running after hard fork 2, where the COST_CONDITIONS
@@ -310,19 +318,17 @@ fn run_generator(#[case] name: &str) {
             Err(code) => (0, format!("FAILED: {}\n", u32::from(code.1))),
         };
 
+        if flags == 0 {
+            // store this regardless of UPDATE_TESTS for costed_sha comparison
+            last_output = output.clone();
+        }
+
         if UPDATE_TESTS {
-            if (flags & COST_SHATREE) != 0 {
+            if (flags & MEMPOOL_MODE) != 0 {
                 if output != last_output {
-                    last_output = output.clone();
-                    write_back.push_str(&format!("COSTED_SHA:\n{output}"));
-                }
-            } else if (flags & MEMPOOL_MODE) != 0 {
-                if output != last_output {
-                    last_output = output.clone();
                     write_back.push_str(&format!("STRICT:\n{output}"));
                 }
             } else {
-                last_output = output.clone();
                 write_back.push_str(&format!("{output}"));
             }
         }
@@ -449,6 +455,82 @@ fn run_generator(#[case] name: &str) {
                     assert_eq!(spend.coin_amount, coinspends2[i].0.coin.amount);
                 }
             }
+        }
+    }
+
+    // compare costed_sha with default and expected file
+    let mut a2 = make_allocator(COST_SHATREE | DONT_VALIDATE_SIGNATURE);
+    let conds_sha = run_block_generator2(
+        &mut a2,
+        &generator,
+        &block_refs,
+        11_000_000_000,
+        COST_SHATREE | DONT_VALIDATE_SIGNATURE,
+        &Signature::default(),
+        None,
+        &TEST_CONSTANTS,
+    );
+
+    let (_expected_cost, sha_output) = match conds_sha {
+        Ok(ref conditions) => {
+            let cond_cost: u64 = conditions.spends.iter().map(|v| v.condition_cost).sum();
+            assert_eq!(cond_cost, conditions.condition_cost);
+            let exe_cost: u64 = conditions.spends.iter().map(|v| v.execution_cost).sum();
+            // the generator itself has execution cost. At least the cost of
+            // a quote
+            assert!(exe_cost <= conditions.execution_cost);
+            (conditions.cost, print_conditions(&a2, &conditions, &a2))
+        }
+        Err(code) => (0, format!("FAILED: {}\n", u32::from(code.1))),
+    };
+
+    // new costing failure
+    if sha_output == "FAILED: 23\n" {
+        assert_eq!(costed_sha_cost, sha_output);
+        write_back.push_str(&format!("COSTED_SHA:\n{sha_output}"));
+    } else if !conds_sha.is_ok() {
+        // otherwise check failures match
+        assert_eq!(sha_output, last_output);
+    } else {
+        // otherwise check
+        let unwrapped = conds_sha.unwrap();
+        let Some((most, _trailing)) = last_output.rsplit_once('\n') else {
+            panic!("bad test file")
+        };
+        let Some((most, _cost)) = most.rsplit_once('\n') else {
+            panic!("bad test file")
+        };
+        // amend shatree_cost with new info
+        last_output = most.to_owned() + &format!("\nshatree_cost: {}\n", unwrapped.shatree_cost);
+        write_back.push_str(&format!(
+            "COSTED_SHA:\nshatree_cost: {}\n",
+            unwrapped.shatree_cost
+        ));
+        // amend total cost with new info
+        last_output = last_output
+            .lines()
+            .map(|line| {
+                if let Some(v) = line.strip_prefix("cost:") {
+                    format!(
+                        "cost: {}",
+                        v.trim().parse::<u64>().unwrap_or(0) + unwrapped.shatree_cost
+                    )
+                } else {
+                    line.to_string()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        last_output += "\n";
+        assert_eq!(sha_output, last_output);
+        if !UPDATE_TESTS {
+            let extracted_cost = costed_sha_cost
+                .split_once(':')
+                .and_then(|(_, num_str)| num_str.trim().parse::<u64>().ok());
+            assert_eq!(
+                unwrapped.shatree_cost,
+                extracted_cost.expect("bad test file")
+            );
         }
     }
 
