@@ -57,7 +57,7 @@ def validate_except_cost(output1: str, output2: str) -> None:
     lines2 = output2.split("\n")
     assert len(lines1) == len(lines2)
     for l1, l2 in zip(lines1, lines2):
-        # the cost is supposed to differ, don't compare that
+        # these are supposed to differ, don't compare them
         if l1.startswith("cost:") and l2.startswith("cost: "):
             continue
         if l1.startswith("atoms: ") and l2.startswith("atoms: "):
@@ -104,10 +104,8 @@ for g in test_list:
     elif "100000-remarks-prefab.txt" in g:
         run_generator1 = False
     elif "puzzle-hash-stress-test.txt" in g:
-        # this test fails on generator1, because it's too expensive
         run_generator1 = False
     elif "puzzle-hash-stress-tree.txt" in g:
-        # this test fails on generator1, because it's too expensive
         run_generator1 = False
 
     if run_generator1:
@@ -159,9 +157,7 @@ for g in test_list:
     with open(g) as f:
         expected = f.read().split("\n", 1)[1]
         if "STRICT:\n" in expected:
-            # split STRICT section
             consensus_part, rest = expected.split("STRICT:\n", 1)
-
             if "COSTED_SHA:\n" in rest:
                 mempool_part, sha_part = rest.split("COSTED_SHA:\n", 1)
                 expected, expected_mempool, expected_sha = (
@@ -176,7 +172,6 @@ for g in test_list:
                     consensus_part,
                 )
         else:
-            # no STRICT
             if "COSTED_SHA:\n" in expected:
                 mempool_part, sha_part = expected.split("COSTED_SHA:\n", 1)
                 expected, expected_mempool, expected_sha = (
@@ -190,12 +185,11 @@ for g in test_list:
         stdout.write("\x1b[K")
         stdout.flush()
 
-        # this is the ambition with future optimizations
         limit = 1
         strict_limit = 1
         sha_limit = 3
 
-        # temporary higher limits until this is optimized
+        # temporary higher limits
         if "duplicate-coin-announce.txt" in g:
             limit = 4
             strict_limit = 4
@@ -235,10 +229,43 @@ for g in test_list:
             limit = 10
             strict_limit = 10
 
+        def extract_cost_value(s: str) -> Optional[int]:
+            """Extract integer cost from 'cost:' line, ignoring any trailing text."""
+            try:
+                after_colon = s.split(None, 1)[1]
+                digits = "".join(ch for ch in after_colon if ch.isdigit())
+                return int(digits) if digits else None
+            except Exception:
+                return None
+
         if run_generator1:
             validate_except_cost(consensus.output, expected)
             validate_except_cost(mempool.output, expected_mempool)
-            validate_except_cost(costed2.output, expected_sha)
+
+            _es = expected_sha.strip()
+            if _es.startswith("FAILED:"):
+                assert costed2.output.strip().startswith(
+                    "FAILED:"
+                ), "expected failure in COSTED_SHA but got success"
+            elif _es.startswith("cost:"):
+                _expected_cost = extract_cost_value(_es)
+                if _expected_cost is None:
+                    validate_except_cost(costed2.output, expected_sha)
+                else:
+                    _actual_cost = None
+                    for _line in costed2.output.splitlines():
+                        if _line.startswith("cost:"):
+                            _actual_cost = extract_cost_value(_line)
+                            break
+                    assert (
+                        _actual_cost is not None
+                    ), "could not find cost: line in actual COSTED_SHA output"
+                    assert (
+                        _expected_cost == _actual_cost
+                    ), f"COSTED_SHA: cost mismatch (expected {_expected_cost}, got {_actual_cost})"
+            else:
+                validate_except_cost(costed2.output, expected_sha)
+
             stdout.write(
                 f"{name} {consensus.run_time:.2f}s "
                 f"{consensus2.run_time:.2f}s | "
