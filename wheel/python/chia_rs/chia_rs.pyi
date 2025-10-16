@@ -429,6 +429,7 @@ class SpendBundleConditions:
     num_atoms: int
     num_pairs: int
     heap_size: int
+    shatree_cost: int
     def __new__(
         cls,
         spends: Sequence[SpendConditions],
@@ -446,7 +447,8 @@ class SpendBundleConditions:
         condition_cost: int,
         num_atoms: int,
         num_pairs: int,
-        heap_size: int
+        heap_size: int,
+        shatree_cost: int
     ) -> SpendBundleConditions: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -480,7 +482,8 @@ class SpendBundleConditions:
         condition_cost: Union[ int, _Unspec] = _Unspec(),
         num_atoms: Union[ int, _Unspec] = _Unspec(),
         num_pairs: Union[ int, _Unspec] = _Unspec(),
-        heap_size: Union[ int, _Unspec] = _Unspec()) -> SpendBundleConditions: ...
+        heap_size: Union[ int, _Unspec] = _Unspec(),
+        shatree_cost: Union[ int, _Unspec] = _Unspec()) -> SpendBundleConditions: ...
 
 @final
 class BlockRecord:

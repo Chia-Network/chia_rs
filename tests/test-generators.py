@@ -68,6 +68,8 @@ def validate_except_cost(output1: str, output2: str) -> None:
             continue
         if l1.startswith("execution-cost:") and l2.startswith("execution-cost: "):
             continue
+        if l1.startswith("shatree_cost:") and l2.startswith("shatree_cost:"):
+            continue
         if " exe-cost: 0 " in l1 and " exe-cost: " in l2:
             columns = l2.split(" ")
             idx = columns.index("exe-cost:")

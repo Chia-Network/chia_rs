@@ -594,6 +594,7 @@ class PlotSize:
             "num_atoms: int",
             "num_pairs: int",
             "heap_size: int",
+            "shatree_cost: int",
         ],
     )
 
