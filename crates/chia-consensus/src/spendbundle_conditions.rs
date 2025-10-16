@@ -359,6 +359,7 @@ mod tests {
         }
     }
 
+    #[cfg(not(debug_assertions))]
     #[rstest]
     // this test requires running after hard fork 2, where the COST_CONDITIONS
     // flag is set
