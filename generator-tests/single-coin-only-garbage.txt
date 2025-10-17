@@ -9,3 +9,5 @@ addition_amount: 0
 atoms: 3300207
 pairs: 57200878
 heap: 33000130
+COSTED_SHA:
+FAILED: 23

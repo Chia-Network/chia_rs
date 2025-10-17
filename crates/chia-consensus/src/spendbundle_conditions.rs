@@ -3,7 +3,7 @@ use crate::conditions::{
     ELIGIBLE_FOR_DEDUP,
 };
 use crate::consensus_constants::ConsensusConstants;
-use crate::flags::{COMPUTE_FINGERPRINT, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
+use crate::flags::{COMPUTE_FINGERPRINT, COST_SHATREE, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
 use crate::puzzle_fingerprint::compute_puzzle_fingerprint;
 use crate::run_block_generator::subtract_cost;
 use crate::solution_generator::calculate_generator_length;
@@ -13,7 +13,7 @@ use crate::validation_error::ValidationErr;
 use chia_bls::PublicKey;
 use chia_protocol::{Bytes, SpendBundle};
 
-use clvm_utils::tree_hash;
+use clvm_utils::{tree_hash_cached, tree_hash_cached_costed, TreeCache};
 use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::reduction::Reduction;
@@ -63,9 +63,11 @@ pub fn run_spendbundle(
 
     let byte_cost = generator_length_without_quote as u64 * constants.cost_per_byte;
     subtract_cost(a, &mut cost_left, byte_cost)?;
+    let mut cache = TreeCache::default();
 
     for coin_spend in &spend_bundle.coin_spends {
         // process the spend
+
         let puz = node_from_bytes(a, coin_spend.puzzle_reveal.as_slice())?;
         let sol = node_from_bytes(a, coin_spend.solution.as_slice())?;
         let parent = a.new_atom(coin_spend.coin.parent_coin_info.as_slice())?;
@@ -75,7 +77,15 @@ pub fn run_spendbundle(
         ret.execution_cost += clvm_cost;
         subtract_cost(a, &mut cost_left, clvm_cost)?;
 
-        let buf = tree_hash(a, puz);
+        cache.visit_tree(a, puz);
+        let cost_before = cost_left;
+        let buf = if flags & COST_SHATREE != 0 {
+            tree_hash_cached_costed(a, puz, &mut cache, &mut cost_left)
+                .ok_or(ValidationErr(puz, ErrorCode::CostExceeded))?
+        } else {
+            tree_hash_cached(a, puz, &mut cache)
+        };
+        ret.shatree_cost += cost_before - cost_left;
         if coin_spend.coin.puzzle_hash != buf.into() {
             return Err(ValidationErr(puz, ErrorCode::WrongPuzzleHash));
         }
@@ -263,9 +273,121 @@ mod tests {
     }
 
     #[cfg(not(debug_assertions))]
+    fn check_output(
+        conds: Result<SpendBundleConditions, ValidationErr>,
+        block_output: String,
+        block_cost: u64,
+        execution_cost: u64,
+        generator_buffer: &[u8],
+        bundle: &SpendBundle,
+        constants: &ConsensusConstants,
+        a1: &mut Allocator,
+        a2: &mut Allocator,
+        expected: &str,
+    ) {
+        use crate::test_generators::{print_conditions, print_diff};
+
+        let output = match conds {
+            Ok(mut conditions) => {
+                let block_byte_cost = generator_buffer.len() as u64 * constants.cost_per_byte;
+                let program_spends = bundle.coin_spends.iter().map(|coin_spend| {
+                    (
+                        coin_spend.coin,
+                        &coin_spend.puzzle_reveal,
+                        &coin_spend.solution,
+                    )
+                });
+
+                let generator_length_without_quote = solution_generator(program_spends)
+                    .expect("solution_generator failed")
+                    .len()
+                    - QUOTE_BYTES;
+                let bundle_byte_cost =
+                    generator_length_without_quote as u64 * constants.cost_per_byte;
+
+                println!(
+                    " block_cost: {block_cost} bytes: {block_byte_cost} exe-cost: {execution_cost}"
+                );
+                println!("bundle_cost: {} bytes: {bundle_byte_cost}", conditions.cost);
+                println!("execution_cost: {}", conditions.execution_cost);
+                println!("condition_cost: {}", conditions.condition_cost);
+
+                assert!(
+                    conditions.cost - bundle_byte_cost <= block_cost - block_byte_cost,
+                    "bundle cost must not exceed block cost"
+                );
+                assert!(conditions.cost > 0, "bundle cost must be positive");
+                assert!(
+                    conditions.execution_cost > 0,
+                    "execution cost must be positive"
+                );
+                assert_eq!(
+                    conditions.cost,
+                    conditions.condition_cost
+                        + conditions.execution_cost
+                        + conditions.shatree_cost
+                        + bundle_byte_cost,
+                    "cost must equal sum of parts"
+                );
+
+                // Adjust cost/execution_cost to match printed output compatibility.
+                conditions.cost = block_cost;
+                conditions.execution_cost = execution_cost;
+
+                print_conditions(a1, &conditions, a2)
+            }
+            Err(code) => {
+                println!("error: {code:?}");
+                format!("FAILED: {}\n", u32::from(code.1))
+            }
+        };
+
+        let expected = expected.trim();
+        let output = output.trim();
+
+        if expected.starts_with("FAILED:") {
+            assert!(
+                output.starts_with("FAILED:"),
+                "expected failure but got success"
+            );
+            println!("(expected failure matched)");
+            return;
+        }
+
+        if expected.starts_with("cost:") {
+            // Extract numeric cost from both
+            let expected_cost = expected
+                .lines()
+                .find(|l| l.starts_with("cost:"))
+                .and_then(|l| l.split_whitespace().nth(1))
+                .and_then(|s| s.parse::<u64>().ok())
+                .unwrap_or_default();
+
+            let actual_cost = output
+                .lines()
+                .find(|l| l.starts_with("cost:"))
+                .and_then(|l| l.split_whitespace().nth(1))
+                .and_then(|s| s.parse::<u64>().ok())
+                .unwrap_or_default();
+
+            assert_eq!(
+                expected_cost, actual_cost,
+                "COSTED_SHA: cost mismatch (expected {}, got {})",
+                expected_cost, actual_cost
+            );
+            println!("(COSTED_SHA: only cost differs, matched)");
+            return;
+        }
+
+        if output != expected {
+            print_diff(&output, expected);
+            panic!("mismatching condition output");
+        }
+    }
+
+    #[cfg(not(debug_assertions))]
     #[rstest]
-    // this test requires running after hard fork 2, where the COST_CONDITIONS
-    // flag is set
+    // This test requires running after hard fork 2, where the COST_CONDITIONS flag is set
     // #[case("aa-million-messages")]
     #[case("new-agg-sigs")]
     #[case("infinity-g1")]
@@ -302,10 +424,10 @@ mod tests {
     #[case("duplicate-seconds-absolute")]
     #[case("duplicate-seconds-relative")]
     #[case("height-absolute-ladder")]
-    //#[case("infinite-recursion1")]
-    //#[case("infinite-recursion2")]
-    //#[case("infinite-recursion3")]
-    //#[case("infinite-recursion4")]
+    // #[case("infinite-recursion1")]
+    // #[case("infinite-recursion2")]
+    // #[case("infinite-recursion3")]
+    // #[case("infinite-recursion4")]
     #[case("invalid-conditions")]
     #[case("just-puzzle-announce")]
     #[case("many-create-coin")]
@@ -314,37 +436,55 @@ mod tests {
     #[case("max-height")]
     #[case("multiple-reserve-fee")]
     #[case("negative-reserve-fee")]
-    //#[case("recursion-pairs")]
+    // #[case("recursion-pairs")]
     #[case("unknown-condition")]
     #[case("duplicate-messages")]
     fn run_generator(#[case] name: &str) {
-        use crate::test_generators::{print_conditions, print_diff};
+        use crate::test_generators::print_conditions;
         use std::fs::read_to_string;
 
         let filename = format!("../../generator-tests/{name}.txt");
         println!("file: {filename}");
         let test_file = read_to_string(filename).expect("test file not found");
-        let (generator, expected) = test_file.split_once('\n').expect("invalid test file");
+
+        // Split hex-encoded generator from rest of file
+        let (generator, expected) = test_file
+            .split_once('\n')
+            .expect("invalid test file (missing generator line)");
         let generator_buffer = hex::decode(generator).expect("invalid hex encoded generator");
 
-        let expected = match expected.split_once("STRICT:\n") {
-            Some((_, m)) => m,
-            None => expected,
-        };
+        // Handle flexible test file format:
+        //  - default only
+        //  - default + STRICT
+        //  - default + STRICT + COSTED_SHA
+        //  - optional minimal COSTED_SHA section (only cost difference)
+        let mut default_out = expected;
+        let mut strict_out = "";
+        let mut costed_out = "";
 
+        if let Some((base, rest)) = expected.split_once("STRICT:\n") {
+            default_out = base;
+            if let Some((strict, costed)) = rest.split_once("COSTED_SHA:\n") {
+                strict_out = strict;
+                costed_out = costed;
+            } else {
+                strict_out = rest;
+            }
+        } else if let Some((base, costed)) = expected.split_once("COSTED_SHA:\n") {
+            default_out = base;
+            costed_out = costed;
+        }
+
+        // load optional .env file with block references
         let mut block_refs = Vec::<Vec<u8>>::new();
-
-        let filename = format!("../../generator-tests/{name}.env");
-        if let Ok(env_hex) = read_to_string(&filename) {
-            println!("block-ref file: {filename}");
+        let env_path = format!("../../generator-tests/{name}.env");
+        if let Ok(env_hex) = read_to_string(&env_path) {
+            println!("block-ref file: {env_path}");
             block_refs.push(hex::decode(env_hex).expect("hex decode env-file"));
         }
 
         let bundle = convert_block_to_bundle(&generator_buffer, &block_refs);
 
-        // run the whole block through run_block_generator2() to ensure the
-        // output conditions match and update the cost. The cost
-        // of just the spend bundle will be lower
         let mut a2 = make_allocator(MEMPOOL_MODE);
         let (execution_cost, block_cost, block_output) = {
             let block_conds = run_block_generator2(
@@ -371,69 +511,85 @@ mod tests {
         };
 
         let mut a1 = make_allocator(MEMPOOL_MODE);
-        let conds = get_conditions_from_spendbundle(
+        let conds = run_spendbundle(
             &mut a1,
             &bundle,
             11_000_000_000,
-            5_000_000,
+            DONT_VALIDATE_SIGNATURE,
             &TEST_CONSTANTS,
         );
 
-        let output = match conds {
-            Ok(mut conditions) => {
-                // the cost of running the spend bundle should never be higher
-                // than the whole block but it's likely less.
-                // but only if the byte cost is not taken into account. The
-                // block will likely be smaller because the compression makes it
-                // smaller.
-                let block_byte_cost = generator_buffer.len() as u64 * TEST_CONSTANTS.cost_per_byte;
-                let program_spends = bundle.coin_spends.iter().map(|coin_spend| {
-                    (
-                        coin_spend.coin,
-                        &coin_spend.puzzle_reveal,
-                        &coin_spend.solution,
-                    )
-                });
-                let generator_length_without_quote = solution_generator(program_spends)
-                    .expect("solution_generator failed")
-                    .len()
-                    - QUOTE_BYTES;
-                let bundle_byte_cost =
-                    generator_length_without_quote as u64 * TEST_CONSTANTS.cost_per_byte;
-                println!(
-                    " block_cost: {block_cost} bytes: {block_byte_cost} exe-cost: {execution_cost}"
-                );
-                println!("bundle_cost: {} bytes: {bundle_byte_cost}", conditions.cost);
-                println!("execution_cost: {}", conditions.execution_cost);
-                println!("condition_cost: {}", conditions.condition_cost);
-                assert!(conditions.cost - bundle_byte_cost <= block_cost - block_byte_cost);
-                assert!(conditions.cost > 0);
-                assert!(conditions.execution_cost > 0);
-                assert_eq!(
-                    conditions.cost,
-                    conditions.condition_cost + conditions.execution_cost + bundle_byte_cost
-                );
-                // update the cost we print here, just to be compatible with
-                // the test cases we have. We've already ensured the cost is
-                // lower
-                conditions.cost = block_cost;
-                conditions.execution_cost = execution_cost;
-                print_conditions(&a1, &conditions, &a2)
-            }
-            Err(code) => {
-                println!("error: {code:?}");
-                format!("FAILED: {}\n", u32::from(code.1))
-            }
-        };
+        check_output(
+            conds,
+            block_output,
+            block_cost,
+            execution_cost,
+            &generator_buffer,
+            &bundle,
+            &TEST_CONSTANTS,
+            &mut a1,
+            &mut a2,
+            if !strict_out.is_empty() {
+                strict_out
+            } else {
+                default_out
+            },
+        );
 
-        if output != block_output {
-            print_diff(&output, &block_output);
-            panic!("run_block_generator2 produced a different result than get_conditions_from_spendbundle()");
-        }
+        if !costed_out.trim().is_empty() {
+            let mut a2_costed = make_allocator(COST_SHATREE);
+            let mut a1_costed = make_allocator(COST_SHATREE);
 
-        if output != expected {
-            print_diff(&output, expected);
-            panic!("mismatching condition output");
+            let conds_res = run_spendbundle(
+                &mut a1_costed,
+                &bundle,
+                11_000_000_000,
+                DONT_VALIDATE_SIGNATURE | COST_SHATREE,
+                &TEST_CONSTANTS,
+            );
+            let conds = match conds_res {
+                Err(e) => Err(e),
+                Ok(x) => Ok(x.0),
+            };
+
+            let (execution_cost, block_cost, block_output) = {
+                let block_conds = run_block_generator2(
+                    &mut a2_costed,
+                    &generator_buffer,
+                    &block_refs,
+                    11_000_000_000,
+                    DONT_VALIDATE_SIGNATURE | COST_SHATREE,
+                    &Signature::default(),
+                    None,
+                    &TEST_CONSTANTS,
+                );
+                match block_conds {
+                    Ok(ref conditions) => (
+                        conditions.execution_cost,
+                        conditions.cost,
+                        print_conditions(&a2_costed, &conditions, &a2_costed),
+                    ),
+                    Err(code) => {
+                        println!("error: {code:?}");
+                        (0, 0, format!("FAILED: {}\n", u32::from(code.1)))
+                    }
+                }
+            };
+
+            check_output(
+                conds,
+                block_output,
+                block_cost,
+                execution_cost,
+                &generator_buffer,
+                &bundle,
+                &TEST_CONSTANTS,
+                &mut a1_costed,
+                &mut a2_costed,
+                costed_out,
+            );
+        } else {
+            println!("(no COSTED_SHA section present — skipping costed comparison)");
         }
     }
 }

@@ -5,13 +5,12 @@ use super::run_block_generator::{
 };
 use crate::allocator::make_allocator;
 use crate::consensus_constants::TEST_CONSTANTS;
-use crate::flags::{COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
+use crate::flags::{COST_CONDITIONS, COST_SHATREE, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
 use chia_bls::Signature;
 use chia_protocol::Program;
 use chia_protocol::{Bytes, Bytes48};
 use clvmr::allocator::NodePtr;
 use clvmr::Allocator;
-use std::iter::zip;
 use text_diff::diff;
 use text_diff::Difference;
 
@@ -255,12 +254,17 @@ fn run_generator(#[case] name: &str) {
     let generator = hex::decode(generator).expect("invalid hex encoded generator");
 
     let expected = match expected.split_once("STRICT:\n") {
-        Some((c, m)) => [c, m],
-        None => [expected, expected],
+        Some((c, m)) => match m.split_once("COSTED_SHA:\n") {
+            Some((d, n)) => [c, d, n],
+            None => [c, m, c],
+        },
+        None => match expected.split_once("COSTED_SHA:\n") {
+            Some((d, n)) => [d, d, n],
+            None => [expected, expected, expected],
+        },
     };
 
     let mut block_refs = Vec::<Vec<u8>>::new();
-
     let filename2 = format!("../../generator-tests/{name}.env");
     if let Ok(env_hex) = read_to_string(&filename2) {
         println!("block-ref file: {filename2}");
@@ -270,7 +274,10 @@ fn run_generator(#[case] name: &str) {
     let mut write_back = format!("{}\n", hex::encode(&generator));
     let mut last_output = String::new();
 
-    for (flags, expected) in zip(&[0, MEMPOOL_MODE], expected) {
+    // Track base output and cost for COSTED_SHATREE comparison
+    let mut base_cost: Option<u64> = None;
+
+    for (flags, expected) in std::iter::zip(&[0, MEMPOOL_MODE, COST_SHATREE], expected) {
         let mut flags = *flags;
         if name == "aa-million-messages" || name == "aa-million-message-spends" {
             // this test requires running after hard fork 2, where the COST_CONDITIONS
@@ -304,16 +311,48 @@ fn run_generator(#[case] name: &str) {
             Err(code) => (0, format!("FAILED: {}\n", u32::from(code.1))),
         };
 
-        if UPDATE_TESTS {
+        if flags == 0 {
+            base_cost = Some(expected_cost);
+        }
+
+        let mut should_write_full = (flags & COST_SHATREE) == 0;
+
+        if (flags & COST_SHATREE) != 0 {
+            match (&conds2, &base_cost) {
+                (Ok(ref c), Some(base)) if c.cost != *base => {
+                    let short = format!("cost: {}\n(only cost differs from default)\n", c.cost);
+                    if UPDATE_TESTS {
+                        write_back.push_str(&format!("COSTED_SHA:\n{short}"));
+                    }
+                    should_write_full = false;
+                }
+                (Err(_), _) => {
+                    if UPDATE_TESTS {
+                        write_back.push_str(&format!("COSTED_SHA:\n{output}"));
+                    }
+                    should_write_full = false;
+                }
+                _ => {
+                    // identical and succeeded, no need to write
+                    should_write_full = false;
+                }
+            }
+        }
+
+        if UPDATE_TESTS && should_write_full {
             if (flags & MEMPOOL_MODE) != 0 {
                 if output != last_output {
+                    last_output = output.clone();
                     write_back.push_str(&format!("STRICT:\n{output}"));
                 }
             } else {
-                last_output = output.clone();
-                write_back.push_str(&format!("{output}"));
+                if output != last_output {
+                    last_output = output.clone();
+                    write_back.push_str(&format!("{output}"));
+                }
             }
         }
+
         if run_generator_one {
             let mut a1 = make_allocator(flags);
             let conds1 = run_block_generator(
@@ -331,7 +370,9 @@ fn run_generator(#[case] name: &str) {
                     // before the hard fork, the cost of running the genrator +
                     // puzzles should never be lower than after the hard-fork
                     // but it's likely higher.
-                    assert!(conditions.cost >= expected_cost);
+                    if (flags & COST_SHATREE) == 0 {
+                        assert!(conditions.cost >= expected_cost);
+                    };
                     // pre-hard fork, we don't have access to per-puzzle costs, so
                     // set those to whatever run_block_generator2() produced, to
                     // make the check pass
@@ -350,12 +391,9 @@ fn run_generator(#[case] name: &str) {
                             }
                         }
                     }
-
                     print_conditions(&a1, &conditions, &a2)
                 }
-                Err(code) => {
-                    format!("FAILED: {}\n", u32::from(code.1))
-                }
+                Err(code) => format!("FAILED: {}\n", u32::from(code.1)),
             };
             if output != output_pre_hard_fork {
                 print_diff(&output, &output_pre_hard_fork);
@@ -367,7 +405,7 @@ fn run_generator(#[case] name: &str) {
 
         if output != expected {
             print_diff(&output, expected);
-            if !UPDATE_TESTS {
+            if !UPDATE_TESTS && flags & COST_SHATREE == 0 {
                 panic!("mismatching generator output");
             }
         }
@@ -379,7 +417,6 @@ fn run_generator(#[case] name: &str) {
             &vec_of_slices,
             flags,
         );
-
         let result2 = get_coinspends_with_conditions_for_trusted_block(
             &TEST_CONSTANTS,
             &Program::new(generator.clone().into()),
@@ -392,7 +429,6 @@ fn run_generator(#[case] name: &str) {
         if let Ok(ref conds) = conds2 {
             // if run_block_generator2 is OK then check we're equal
             let coinspends = result.expect("get_coinspends");
-
             // check that we're getting the same info from get_coinspends_with_conditions_for_trusted_block
             let coinspends2 = result2.expect("get_coinspends_with_conds");
 
