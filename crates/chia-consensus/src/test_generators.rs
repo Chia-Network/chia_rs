@@ -325,8 +325,11 @@ fn run_generator(#[case] name: &str) {
                 }
             } else {
                 write_back.push_str(&format!("{output}"));
-                last_output = output.clone();
             }
+        }
+
+        if flags == 0 {
+            last_output = output.clone();
         }
 
         if run_generator_one {
@@ -490,7 +493,7 @@ fn run_generator(#[case] name: &str) {
         // assert_eq!(sha_output, last_output);
     } else {
         // otherwise check
-        let unwrapped = conds_sha.unwrap();
+        let unwrapped = conds_sha.expect("we already matched for not ok");
         let Some((most, _trailing)) = last_output.rsplit_once('\n') else {
             panic!("bad test file")
         };
@@ -526,7 +529,9 @@ fn run_generator(#[case] name: &str) {
                 .and_then(|(_, num_str)| num_str.trim().parse::<u64>().ok());
             assert_eq!(
                 unwrapped.shatree_cost,
-                extracted_cost.expect("bad test file")
+                extracted_cost
+                    .expect(format!("unable to find cost in {}", costed_sha_cost).as_str()),
+                "wrong shatree_cost vs expected"
             );
         }
     }
