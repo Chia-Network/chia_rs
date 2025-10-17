@@ -235,7 +235,7 @@ fn run_generator(#[case] name: &str) {
     // When making changes to print_conditions() enabling this will update the
     // test cases to match. Make sure to carefully review the diff before
     // landing an automatic update of the test case.
-    const UPDATE_TESTS: bool = false;
+    const UPDATE_TESTS: bool = true;
 
     let run_generator_one: bool = ![
         "single-coin-only-garbage",
@@ -243,6 +243,7 @@ fn run_generator(#[case] name: &str) {
         "puzzle-hash-stress-test",
         "puzzle-hash-stress-tree",
         "aa-million-message-spends",
+        "aa-million-messages",
         "29500-remarks-procedural",
         "100000-remarks-prefab",
         "3000000-conditions-single-coin",
@@ -283,6 +284,7 @@ fn run_generator(#[case] name: &str) {
 
     let mut write_back = format!("{}\n", hex::encode(&generator));
     let mut last_output = String::new();
+    let mut default_output = String::new();
 
     for (flags, expected) in zip(&[0, MEMPOOL_MODE], expected) {
         let mut flags = *flags;
@@ -325,11 +327,12 @@ fn run_generator(#[case] name: &str) {
                 }
             } else {
                 write_back.push_str(&format!("{output}"));
+                last_output = output.clone();
             }
         }
 
         if flags == 0 {
-            last_output = output.clone();
+            default_output = output.clone();
         }
 
         if run_generator_one {
@@ -494,20 +497,20 @@ fn run_generator(#[case] name: &str) {
     } else {
         // otherwise check
         let unwrapped = conds_sha.expect("we already matched for not ok");
-        let Some((most, _trailing)) = last_output.rsplit_once('\n') else {
+        let Some((most, _trailing)) = default_output.rsplit_once('\n') else {
             panic!("bad test file")
         };
         let Some((most, _cost)) = most.rsplit_once('\n') else {
             panic!("bad test file")
         };
         // amend shatree_cost with new info
-        last_output = most.to_owned() + &format!("\nshatree_cost: {}\n", unwrapped.shatree_cost);
+        default_output = most.to_owned() + &format!("\nshatree_cost: {}\n", unwrapped.shatree_cost);
         write_back.push_str(&format!(
             "COSTED_SHA:\nshatree_cost: {}\n",
             unwrapped.shatree_cost
         ));
         // amend total cost with new info
-        last_output = last_output
+        default_output = default_output
             .lines()
             .map(|line| {
                 if let Some(v) = line.strip_prefix("cost:") {
@@ -521,8 +524,8 @@ fn run_generator(#[case] name: &str) {
             })
             .collect::<Vec<_>>()
             .join("\n");
-        last_output += "\n";
-        assert_eq!(sha_output, last_output);
+        default_output += "\n";
+        assert_eq!(sha_output, default_output);
         if !UPDATE_TESTS {
             let extracted_cost = costed_sha_cost
                 .split_once(':')
