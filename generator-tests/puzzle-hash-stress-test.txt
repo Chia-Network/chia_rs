@@ -9,3 +9,6 @@ addition_amount: 0
 atoms: 3300151
 pairs: 59400473
 heap: 68
+shatree_cost: 0
+COSTED_SHA:
+FAILED: 23
