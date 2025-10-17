@@ -328,7 +328,7 @@ fn run_generator(#[case] name: &str) {
                 last_output = output.clone();
             }
         }
-        
+
         if run_generator_one {
             let mut a1 = make_allocator(flags);
             let conds1 = run_block_generator(
