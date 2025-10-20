@@ -78,6 +78,24 @@ def validate_except_cost(output1: str, output2: str) -> None:
         assert l1 == l2
 
 
+def recreate_expected_sha_output(
+    expected_default: str, expected_sha: str, shatree_cost: int
+) -> str:
+    lines = expected_default.splitlines()
+    updated_lines = []
+    for line in lines:
+        if line.startswith("cost:"):
+            value = line[len("cost:") :].strip()
+            new_value = int(value) + shatree_cost
+            updated_lines.append(f"cost: {new_value}")
+        elif line.startswith("shatree_cost:"):
+            updated_lines.append(expected_sha.splitlines()[0])
+        else:
+            updated_lines.append(line)
+
+    return "\n".join(updated_lines) + "\n"
+
+
 print(f"{'test name':43s}   consensus | mempool | costed")
 base_dir = os.path.dirname(os.path.abspath(__file__))
 test_list = sorted(glob.glob(os.path.join(base_dir, "../generator-tests/*.txt")))
@@ -171,6 +189,10 @@ for g in test_list:
                     mempool_part,
                     sha_part,
                 )
+                if expected_sha.startswith("shatree_cost:"):
+                    expected_sha = recreate_expected_sha_output(
+                        expected, expected_sha, costed2.result.shatree_cost
+                    )
             else:
                 expected, expected_mempool, expected_sha = (
                     consensus_part,
@@ -186,6 +208,10 @@ for g in test_list:
                     mempool_part,
                     sha_part,
                 )
+                if expected_sha.startswith("shatree_cost:"):
+                    expected_sha = recreate_expected_sha_output(
+                        expected, expected_sha, costed2.result.shatree_cost
+                    )
             else:
                 expected, expected_mempool, expected_sha = expected, expected, expected
 
@@ -240,7 +266,7 @@ for g in test_list:
         if run_generator1:
             validate_except_cost(consensus.output, expected)
             validate_except_cost(mempool.output, expected_mempool)
-            # validate_except_cost(costed2.output, expected_sha)
+            validate_except_cost(costed2.output, expected_sha)
             stdout.write(
                 f"{name} {consensus.run_time:.2f}s "
                 f"{consensus2.run_time:.2f}s | "
@@ -252,7 +278,7 @@ for g in test_list:
             compare_output(consensus2.output, expected, "")
             compare_output(mempool2.output, expected_mempool, "strict")
             # don't check the output for costed, just check the time
-            # compare_output(costed2.output, expected_sha, "costed")
+            compare_output(costed2.output, expected_sha, "costed")
             stdout.write(
                 f"{name} {consensus2.run_time:.2f}s | "
                 f"{mempool2.run_time:.2f}s | "
