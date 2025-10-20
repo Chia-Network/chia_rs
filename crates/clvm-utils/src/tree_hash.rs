@@ -583,8 +583,7 @@ mod tests {
 
         let hash1 = tree_hash(&a, node);
         let mut cost = u64::MAX;
-        let hash2 = tree_hash_cached(&a, node, &mut cache, &mut cost)
-            .expect("cost should be ok");
+        let hash2 = tree_hash_cached(&a, node, &mut cache, &mut cost).expect("cost should be ok");
         // for (key, value) in cache.iter() {
         //     println!("  {key:?}: {}", hex::encode(value));
         // }
@@ -753,8 +752,7 @@ mod tests {
 
         // if we re-run with cache, cost_left should still match the baseline
         let mut cost_left_cached2 = 1_000_000;
-        let cached2 =
-            tree_hash_cached(&a, root, &mut cache, &mut cost_left_cached2).unwrap();
+        let cached2 = tree_hash_cached(&a, root, &mut cache, &mut cost_left_cached2).unwrap();
 
         assert_eq!(cached2, cached, "cached hash mismatch on second run");
         assert_eq!(
@@ -800,8 +798,7 @@ mod tests {
 
         // run again with same cache — should still match cost and hash
         let mut cost_left_cached2 = 10_000_000;
-        let cached2 =
-            tree_hash_cached(&a, root, &mut cache, &mut cost_left_cached2).unwrap();
+        let cached2 = tree_hash_cached(&a, root, &mut cache, &mut cost_left_cached2).unwrap();
 
         assert_eq!(cached2, cached, "hash mismatch after cache rerun");
         assert_eq!(
