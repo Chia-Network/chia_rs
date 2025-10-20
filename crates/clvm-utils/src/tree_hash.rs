@@ -402,6 +402,7 @@ pub fn tree_hash_from_bytes(buf: &[u8]) -> Result<TreeHash, EvalErr> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
 
     #[test]
     fn test_tree_hash() {
@@ -493,10 +494,6 @@ mod tests {
         assert_eq!(hash1, hash3);
     }
 
-    #[cfg(test)]
-    use rstest::rstest;
-
-    #[cfg(test)]
     #[rstest]
     #[case(
         "block-1ee588dc",
@@ -591,7 +588,6 @@ mod tests {
         assert_eq!(hash1.as_ref(), hex::decode(expect).unwrap().as_slice());
     }
 
-    #[cfg(test)]
     fn test_sha256_atom(buf: &[u8]) {
         let hash = tree_hash_atom(buf);
 
