@@ -190,6 +190,7 @@ for g in test_list:
                     sha_part,
                 )
                 if expected_sha.startswith("shatree_cost:"):
+                    assert costed2.result.shatree_cost is not None
                     expected_sha = recreate_expected_sha_output(
                         expected, expected_sha, costed2.result.shatree_cost
                     )
@@ -209,6 +210,7 @@ for g in test_list:
                     sha_part,
                 )
                 if expected_sha.startswith("shatree_cost:"):
+                    assert costed2.result.shatree_cost is not None
                     expected_sha = recreate_expected_sha_output(
                         expected, expected_sha, costed2.result.shatree_cost
                     )
