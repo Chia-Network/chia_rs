@@ -353,7 +353,7 @@ pub fn tree_hash_from_bytes(buf: &[u8]) -> Result<TreeHash, EvalErr> {
     let node = node_from_bytes_backrefs(&mut a, buf)?;
     let mut cache = TreeCache::default();
     let mut cost = u64::MAX;
-    tree_hash_cached(&a, node, &mut cache, &mut cost).unwrap()
+    Ok(tree_hash_cached(&a, node, &mut cache, &mut cost).unwrap())
 }
 
 #[cfg(test)]
