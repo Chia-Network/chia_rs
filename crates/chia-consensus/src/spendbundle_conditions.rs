@@ -273,7 +273,8 @@ mod tests {
         SpendBundle::new(spends, Signature::default())
     }
 
-    // this function compares the expected and actual outputs
+    // this function compares the actual outputs with the expected string from the test file
+    // it shares functionality with the tests in test_generators.rs
     #[cfg(not(debug_assertions))]
     fn check_output(
         conds: Result<SpendBundleConditions, ValidationErr>,
