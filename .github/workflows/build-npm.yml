@@ -14,6 +14,11 @@ concurrency:
   group: ${{ github.event_name == 'pull_request' && format('{0}-{1}', github.workflow_ref, github.event.pull_request.number) || github.run_id }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  actions: write
+  id-token: write
+
 jobs:
   build_npm:
     name: Build npm
@@ -41,7 +46,7 @@ jobs:
 
       - name: Publish (npmjs.com)
         if: startsWith(github.event.ref, 'refs/tags')
-        uses: JS-DevTools/npm-publish@v3
+        uses: JS-DevTools/npm-publish@v4
         with:
-          token: ${{ secrets.node_auth_token }}
+          provenance: true
           package: wasm/pkg/package.json
