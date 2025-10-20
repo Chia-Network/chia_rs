@@ -355,7 +355,7 @@ mod tests {
 
         if output != expected {
             print_diff(&output, expected);
-            panic!("mismatching condition output");
+            panic!("run_blockgenerator2 produced a different result than expected in the test file");
         }
     }
 
