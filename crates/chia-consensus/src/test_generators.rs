@@ -235,7 +235,7 @@ fn run_generator(#[case] name: &str) {
     // When making changes to print_conditions() enabling this will update the
     // test cases to match. Make sure to carefully review the diff before
     // landing an automatic update of the test case.
-    const UPDATE_TESTS: bool = true;
+    const UPDATE_TESTS: bool = false;
 
     let run_generator_one: bool = ![
         "single-coin-only-garbage",
@@ -331,7 +331,7 @@ fn run_generator(#[case] name: &str) {
             }
         }
 
-        if flags == 0 {
+        if flags == 0 || flags == COST_CONDITIONS {
             default_output = output.clone();
         }
 
@@ -352,9 +352,9 @@ fn run_generator(#[case] name: &str) {
                     // before the hard fork, the cost of running the genrator +
                     // puzzles should never be lower than after the hard-fork
                     // but it's likely higher.
-                    if (flags & COST_SHATREE) == 0 {
-                        assert!(conditions.cost >= expected_cost);
-                    };
+
+                    assert!(conditions.cost >= expected_cost);
+
                     // pre-hard fork, we don't have access to per-puzzle costs, so
                     // set those to whatever run_block_generator2() produced, to
                     // make the check pass
@@ -462,13 +462,20 @@ fn run_generator(#[case] name: &str) {
     }
 
     // compare costed_sha with default and expected file
+    let mut flags = COST_SHATREE | DONT_VALIDATE_SIGNATURE;
+    if name == "aa-million-messages" || name == "aa-million-message-spends" {
+        // this test requires running after hard fork 2, where the COST_CONDITIONS
+        // flag is set
+        flags |= COST_CONDITIONS;
+    }
+
     let mut a2 = make_allocator(COST_SHATREE | DONT_VALIDATE_SIGNATURE);
     let conds_sha = run_block_generator2(
         &mut a2,
         &generator,
         &block_refs,
         11_000_000_000,
-        COST_SHATREE | DONT_VALIDATE_SIGNATURE,
+        flags,
         &Signature::default(),
         None,
         &TEST_CONSTANTS,
@@ -493,22 +500,29 @@ fn run_generator(#[case] name: &str) {
         write_back.push_str(&format!("COSTED_SHA:\n{sha_output}"));
     } else if !conds_sha.is_ok() {
         // otherwise check failures match
-        // assert_eq!(sha_output, last_output);
+        assert_eq!(sha_output, default_output);
     } else {
         // otherwise check
         let unwrapped = conds_sha.expect("we already matched for not ok");
-        let Some((most, _trailing)) = default_output.rsplit_once('\n') else {
-            panic!("bad test file")
-        };
-        let Some((most, _cost)) = most.rsplit_once('\n') else {
-            panic!("bad test file")
-        };
-        // amend shatree_cost with new info
-        default_output = most.to_owned() + &format!("\nshatree_cost: {}\n", unwrapped.shatree_cost);
         write_back.push_str(&format!(
             "COSTED_SHA:\nshatree_cost: {}\n",
             unwrapped.shatree_cost
         ));
+        let Some((most, _trailing)) = default_output.rsplit_once('\n') else {
+            if UPDATE_TESTS {
+                write(&filename, write_back.into_bytes()).expect("write file");
+            }
+            panic!("bad test file")
+        };
+        let Some((most, _cost)) = most.rsplit_once('\n') else {
+            if UPDATE_TESTS {
+                write(&filename, write_back.into_bytes()).expect("write file");
+            }
+            panic!("bad test file")
+        };
+        // amend shatree_cost with new info
+        default_output = most.to_owned() + &format!("\nshatree_cost: {}\n", unwrapped.shatree_cost);
+
         // amend total cost with new info
         default_output = default_output
             .lines()
