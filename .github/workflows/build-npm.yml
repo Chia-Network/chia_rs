@@ -44,6 +44,12 @@ jobs:
           name: npm-pkg
           path: ./wasm/pkg/*-*.tgz
 
+      - name: Ensure we have a new enough npm version for trusted publishing
+        if: startsWith(github.event.ref, 'refs/tags')
+        run: |
+          npm install -g npm
+          npm --version
+
       - name: Publish (npmjs.com)
         if: startsWith(github.event.ref, 'refs/tags')
         uses: JS-DevTools/npm-publish@v4
