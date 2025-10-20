@@ -171,7 +171,6 @@ impl TreeCache {
 enum TreeOp {
     SExp(NodePtr),
     Cons,
-    ConsAddCache(NodePtr),
     /// Used by the costed walker to record the cost-left value before
     /// traversing the pair, so we can compute how much cost was consumed
     /// while computing that subtree.
@@ -260,7 +259,7 @@ pub fn tree_hash(a: &Allocator, node: NodePtr) -> TreeHash {
                 let rest = hashes.pop().unwrap();
                 hashes.push(tree_hash_pair(first, rest));
             }
-            TreeOp::ConsAddCache(_) | TreeOp::ConsAddCacheCost(_, _) => unreachable!(),
+            TreeOp::ConsAddCacheCost(_, _) => unreachable!(),
         }
     }
 
@@ -303,67 +302,12 @@ pub fn tree_hash_costed(a: &Allocator, node: NodePtr, cost_left: &mut Cost) -> O
                 let rest = hashes.pop().unwrap();
                 hashes.push(tree_hash_pair(first, rest));
             }
-            TreeOp::ConsAddCache(_) | TreeOp::ConsAddCacheCost(_, _) => unreachable!(),
-        }
-    }
-
-    assert!(hashes.len() == 1);
-    Some(hashes[0])
-}
-
-pub fn tree_hash_cached(a: &Allocator, node: NodePtr, cache: &mut TreeCache) -> TreeHash {
-    cache.visit_tree(a, node);
-
-    let mut hashes = Vec::new();
-    let mut ops = vec![TreeOp::SExp(node)];
-
-    while let Some(op) = ops.pop() {
-        match op {
-            TreeOp::SExp(node) => match a.node(node) {
-                NodeVisitor::Buffer(bytes) => {
-                    let hash = tree_hash_atom(bytes);
-                    hashes.push(hash);
-                }
-                NodeVisitor::U32(val) => {
-                    if (val as usize) < PRECOMPUTED_HASHES.len() {
-                        hashes.push(PRECOMPUTED_HASHES[val as usize]);
-                    } else {
-                        hashes.push(tree_hash_atom(a.atom(node).as_ref()));
-                    }
-                }
-                NodeVisitor::Pair(left, right) => {
-                    if let Some((hash, _cost)) = cache.get(node) {
-                        hashes.push(*hash);
-                    } else {
-                        if cache.should_memoize(node) {
-                            ops.push(TreeOp::ConsAddCache(node));
-                        } else {
-                            ops.push(TreeOp::Cons);
-                        }
-                        ops.push(TreeOp::SExp(left));
-                        ops.push(TreeOp::SExp(right));
-                    }
-                }
-            },
-            TreeOp::Cons => {
-                let first = hashes.pop().unwrap();
-                let rest = hashes.pop().unwrap();
-                hashes.push(tree_hash_pair(first, rest));
-            }
-            TreeOp::ConsAddCache(original_node) => {
-                let first = hashes.pop().unwrap();
-                let rest = hashes.pop().unwrap();
-                let hash = tree_hash_pair(first, rest);
-                hashes.push(hash);
-                // non-costed path: store zero cost for this cached entry
-                cache.insert(original_node, &hash, 0);
-            }
             TreeOp::ConsAddCacheCost(_, _) => unreachable!(),
         }
     }
 
     assert!(hashes.len() == 1);
-    hashes[0]
+    Some(hashes[0])
 }
 
 fn subtract_cost(cost_left: &mut Cost, subtract: Cost) -> Result<(), ()> {
@@ -375,7 +319,7 @@ fn subtract_cost(cost_left: &mut Cost, subtract: Cost) -> Result<(), ()> {
     }
 }
 
-pub fn tree_hash_cached_costed(
+pub fn tree_hash_cached(
     a: &Allocator,
     node: NodePtr,
     cache: &mut TreeCache,
@@ -429,13 +373,6 @@ pub fn tree_hash_cached_costed(
                 let rest = hashes.pop().unwrap();
                 hashes.push(tree_hash_pair(first, rest));
             }
-            TreeOp::ConsAddCache(original_node) => {
-                let first = hashes.pop().unwrap();
-                let rest = hashes.pop().unwrap();
-                let hash = tree_hash_pair(first, rest);
-                hashes.push(hash);
-                cache.insert(original_node, &hash, 0);
-            }
             TreeOp::ConsAddCacheCost(original_node, cost_before) => {
                 let first = hashes.pop().unwrap();
                 let rest = hashes.pop().unwrap();
@@ -458,7 +395,8 @@ pub fn tree_hash_from_bytes(buf: &[u8]) -> Result<TreeHash, EvalErr> {
     let mut a = Allocator::new();
     let node = node_from_bytes_backrefs(&mut a, buf)?;
     let mut cache = TreeCache::default();
-    Ok(tree_hash_cached(&a, node, &mut cache))
+    let mut cost = u64::MAX;
+    tree_hash_cached(&a, node, &mut cache, &mut cost).ok_or(EvalErr::CostExceeded)
 }
 
 #[cfg(test)]
@@ -644,7 +582,9 @@ mod tests {
         let node = node_from_bytes_backrefs(&mut a, &generator).expect("node_from_bytes_backrefs");
 
         let hash1 = tree_hash(&a, node);
-        let hash2 = tree_hash_cached(&a, node, &mut cache);
+        let mut cost = u64::MAX;
+        let hash2 = tree_hash_cached(&a, node, &mut cache, &mut cost)
+            .expect("cost should be ok");
         // for (key, value) in cache.iter() {
         //     println!("  {key:?}: {}", hex::encode(value));
         // }
@@ -793,7 +733,7 @@ mod tests {
         let mut cache = TreeCache::default();
         cache.visit_tree(&a, root);
 
-        let cached = tree_hash_cached_costed(&a, root, &mut cache, &mut cost_left_cached).unwrap();
+        let cached = tree_hash_cached(&a, root, &mut cache, &mut cost_left_cached).unwrap();
 
         assert!(
             !cache.hashes.is_empty(),
@@ -814,7 +754,7 @@ mod tests {
         // if we re-run with cache, cost_left should still match the baseline
         let mut cost_left_cached2 = 1_000_000;
         let cached2 =
-            tree_hash_cached_costed(&a, root, &mut cache, &mut cost_left_cached2).unwrap();
+            tree_hash_cached(&a, root, &mut cache, &mut cost_left_cached2).unwrap();
 
         assert_eq!(cached2, cached, "cached hash mismatch on second run");
         assert_eq!(
@@ -845,7 +785,7 @@ mod tests {
         let mut cache = TreeCache::default();
         cache.visit_tree(&a, root);
 
-        let cached = tree_hash_cached_costed(&a, root, &mut cache, &mut cost_left_cached).unwrap();
+        let cached = tree_hash_cached(&a, root, &mut cache, &mut cost_left_cached).unwrap();
 
         assert!(
             !cache.hashes.is_empty(),
@@ -861,7 +801,7 @@ mod tests {
         // run again with same cache — should still match cost and hash
         let mut cost_left_cached2 = 10_000_000;
         let cached2 =
-            tree_hash_cached_costed(&a, root, &mut cache, &mut cost_left_cached2).unwrap();
+            tree_hash_cached(&a, root, &mut cache, &mut cost_left_cached2).unwrap();
 
         assert_eq!(cached2, cached, "hash mismatch after cache rerun");
         assert_eq!(

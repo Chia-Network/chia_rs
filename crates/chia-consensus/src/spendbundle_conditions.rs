@@ -13,7 +13,7 @@ use crate::validation_error::ValidationErr;
 use chia_bls::PublicKey;
 use chia_protocol::{Bytes, SpendBundle};
 
-use clvm_utils::{tree_hash_cached, tree_hash_cached_costed, TreeCache};
+use clvm_utils::{tree_hash_cached, TreeCache};
 use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::reduction::Reduction;
@@ -80,11 +80,12 @@ pub fn run_spendbundle(
         cache.visit_tree(a, puz);
         let cost_before = cost_left;
         let buf = if flags & COST_SHATREE != 0 {
-            tree_hash_cached_costed(a, puz, &mut cache, &mut cost_left)
-                .ok_or_else(|| ValidationErr(a.nil(), ErrorCode::CostExceeded))?
+            tree_hash_cached(a, puz, &mut cache, &mut cost_left)
         } else {
-            tree_hash_cached(a, puz, &mut cache)
-        };
+            let mut cost = u64::MAX;
+            tree_hash_cached(a, puz, &mut cache, &mut cost)
+        }
+        .ok_or_else(|| ValidationErr(a.nil(), ErrorCode::CostExceeded))?;
         ret.shatree_cost += cost_before - cost_left;
         if coin_spend.coin.puzzle_hash != buf.into() {
             return Err(ValidationErr(puz, ErrorCode::WrongPuzzleHash));
