@@ -277,7 +277,6 @@ for g in test_list:
         else:
             compare_output(consensus2.output, expected, "")
             compare_output(mempool2.output, expected_mempool, "strict")
-            # don't check the output for costed, just check the time
             compare_output(costed2.output, expected_sha, "costed")
             stdout.write(
                 f"{name} {consensus2.run_time:.2f}s | "
