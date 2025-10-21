@@ -661,6 +661,7 @@ dependencies = [
  "chia-datalayer",
  "chia-pos2",
  "chia-protocol",
+ "chia-sha2 0.31.0",
  "chia-ssl",
  "chia-traits 0.31.0",
  "clvm-utils",
