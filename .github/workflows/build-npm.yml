@@ -44,6 +44,11 @@ jobs:
           name: npm-pkg
           path: ./wasm/pkg/*-*.tgz
 
+      # To update to the latest npm without permission issues, we need to not use the system npm
+      - uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+
       - name: Ensure we have a new enough npm version for trusted publishing
         if: startsWith(github.event.ref, 'refs/tags')
         run: |
