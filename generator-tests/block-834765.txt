@@ -123,4 +123,4 @@ pairs: 85239
 heap: 116150
 shatree_cost: 0
 COSTED_SHA:
-shatree_cost: 173969750
+shatree_cost: 44109510

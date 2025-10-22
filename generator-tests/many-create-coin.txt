@@ -6105,4 +6105,4 @@ pairs: 475895
 heap: 100
 shatree_cost: 0
 COSTED_SHA:
-FAILED: 23
+shatree_cost: 420810

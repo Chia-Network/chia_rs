@@ -10,8 +10,8 @@ use std::ops::Deref;
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TreeHash([u8; 32]);
 
-const SHATREE_RECURSE_COST: u64 = 500;
-const SHATREE_COST_PER_BYTE: u64 = 250;
+const SHATREE_RECURSE_COST: u64 = 1300;
+const SHATREE_COST_PER_BYTE: u64 = 10;
 
 impl TreeHash {
     pub const fn new(hash: [u8; 32]) -> Self {
