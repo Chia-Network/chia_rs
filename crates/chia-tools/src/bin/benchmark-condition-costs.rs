@@ -4,12 +4,11 @@ use chia_consensus::make_aggsig_final_message::u64_to_bytes;
 use chia_sha2::Sha256;
 use linreg::linear_regression_of;
 use std::time::Instant;
-// use chia_consensus::gen::conditions::parse_conditions;
 use chia_consensus::conditions::{
     process_single_spend,
     validate_conditions,
     validate_signature,
-    ParseState, // SpendConditions,
+    ParseState,
 };
 use chia_consensus::conditions::{MempoolVisitor, SpendBundleConditions};
 use chia_consensus::opcodes;
