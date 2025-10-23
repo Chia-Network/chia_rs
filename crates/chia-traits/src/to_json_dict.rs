@@ -67,3 +67,13 @@ impl<T: ToJsonDict, U: ToJsonDict, W: ToJsonDict> ToJsonDict for (T, U, W) {
         Ok(list.into())
     }
 }
+
+impl<T: ToJsonDict, const N: usize> ToJsonDict for [T; N] {
+    fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let list = PyList::empty(py);
+        for v in self {
+            list.append(v.to_json_dict(py)?)?;
+        }
+        Ok(list.into())
+    }
+}

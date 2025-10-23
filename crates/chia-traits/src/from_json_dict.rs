@@ -97,3 +97,23 @@ where
         ))
     }
 }
+
+impl<T, const N: usize> FromJsonDict for [T; N]
+where
+    T: FromJsonDict + std::marker::Copy + Default,
+{
+    fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self> {
+        if o.len()? != N {
+            return Err(PyValueError::new_err(format!(
+                "expected {N} elements, got {}",
+                o.len()?
+            )));
+        }
+
+        let mut ret = [<T as Default>::default(); N];
+        for (i, v) in &mut ret.iter_mut().enumerate() {
+            *v = <T as FromJsonDict>::from_json_dict(&o.get_item(i)?)?;
+        }
+        Ok(ret)
+    }
+}

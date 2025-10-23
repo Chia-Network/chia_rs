@@ -25,7 +25,7 @@ use chia_consensus::spendbundle_validation::{
 };
 use chia_protocol::{
     calculate_ip_iters, calculate_sp_interval_iters, calculate_sp_iters, is_overflow_block,
-    py_expected_plot_size,
+    py_expected_plot_size, PartialProof,
 };
 use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
@@ -632,12 +632,12 @@ impl Prover {
         Ok(qualities.into_iter().map(&QualityProof).collect())
     }
 
-    pub fn get_partial_proof(&self, quality: &QualityProof) -> PyResult<(Vec<u64>, u8)> {
+    pub fn get_partial_proof(&self, quality: &QualityProof) -> PyResult<(PartialProof, u8)> {
         let chia_pos2::PartialProof {
             proof_fragments,
             strength,
         } = self.0.get_partial_proof(&quality.0)?;
-        Ok((proof_fragments.to_vec(), strength))
+        Ok((PartialProof { proof_fragments }, strength))
     }
 
     pub fn size(&self) -> u8 {
@@ -716,30 +716,13 @@ pub fn validate_proof_v2(
 }
 
 #[pyo3::pyfunction]
-pub fn solve_proof(
-    fragments: Vec<u64>,
-    plot_id: Bytes32,
-    strength: u8,
-    k: u8,
-) -> PyResult<Vec<u8>> {
-    let num_fragments = fragments.len();
-    let partial_proof = match fragments.try_into() {
-        Err(_) => {
-            return Err(PyRuntimeError::new_err(format!(
-                "wrong number of proof fragments {num_fragments} expected 64"
-            )));
-        }
-        Ok(proof_fragments) => chia_pos2::PartialProof {
-            proof_fragments,
-            strength,
-        },
+pub fn solve_proof(fragments: &PartialProof, plot_id: Bytes32, strength: u8, k: u8) -> Vec<u8> {
+    let partial_proof = chia_pos2::PartialProof {
+        proof_fragments: fragments.proof_fragments,
+        strength,
     };
 
-    Ok(chia_pos2::solve_proof(
-        &partial_proof,
-        &plot_id.to_bytes(),
-        k,
-    ))
+    chia_pos2::solve_proof(&partial_proof, &plot_id.to_bytes(), k)
 }
 
 #[pymodule]
@@ -777,6 +760,7 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(solve_proof, m)?)?;
     m.add_class::<Prover>()?;
     m.add_class::<QualityProof>()?;
+    m.add_class::<PartialProof>()?;
 
     // check time lock
     m.add_function(wrap_pyfunction!(py_check_time_locks, m)?)?;
