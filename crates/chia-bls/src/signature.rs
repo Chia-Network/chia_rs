@@ -514,7 +514,7 @@ impl Signature {
 
     #[classmethod]
     #[pyo3(name = "from_parent")]
-    pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: &Self) -> PyResult<PyObject> {
+    pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: &Self) -> PyResult<Py<PyAny>> {
         Err(PyNotImplementedError::new_err(
             "Signature does not support from_parent().",
         ))
@@ -554,7 +554,7 @@ mod pybindings {
     use chia_traits::{FromJsonDict, ToJsonDict};
 
     impl ToJsonDict for Signature {
-        fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
+        fn to_json_dict(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
             let bytes = self.to_bytes();
             Ok(("0x".to_string() + &hex::encode(bytes))
                 .into_pyobject(py)?
@@ -1284,7 +1284,7 @@ mod pytests {
 
     #[test]
     fn test_json_dict_roundtrip() {
-        pyo3::prepare_freethreaded_python();
+        Python::initialize();
         let mut rng = StdRng::seed_from_u64(1337);
         let mut data = [0u8; 32];
         let mut msg = [0u8; 10];
@@ -1293,7 +1293,7 @@ mod pytests {
             rng.fill(msg.as_mut_slice());
             let sk = SecretKey::from_seed(&data);
             let sig = sign(&sk, msg);
-            Python::with_gil(|py| {
+            Python::attach(|py| {
                 let string = sig.to_json_dict(py).expect("to_json_dict");
                 let py_class = py.get_type::<Signature>();
                 let sig2 = Signature::from_json_dict(&py_class, py, string.bind(py))
@@ -1312,8 +1312,8 @@ mod pytests {
     #[case("000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0ff000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f00", "Signature, invalid length 97 expected 96")]
     #[case("00r102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0ff000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f", "invalid hex")]
     fn test_json_dict(#[case] input: &str, #[case] msg: &str) {
-        pyo3::prepare_freethreaded_python();
-        Python::with_gil(|py| {
+        Python::initialize();
+        Python::attach(|py| {
             let py_class = py.get_type::<Signature>();
             let err = Signature::from_json_dict(
                 &py_class,

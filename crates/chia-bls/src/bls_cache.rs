@@ -4,7 +4,6 @@ use std::num::NonZeroUsize;
 use chia_sha2::Sha256;
 use linked_hash_map::LinkedHashMap;
 use std::sync::Mutex;
-
 use crate::{aggregate_verify_gt, hash_to_g2};
 use crate::{GTElement, PublicKey, Signature};
 
@@ -133,7 +132,7 @@ use pyo3::{
     exceptions::PyValueError,
     pybacked::PyBackedBytes,
     types::{PyAnyMethods, PyList, PySequence},
-    Bound, PyObject, PyResult,
+    Bound, PyResult,
 };
 
 #[cfg(feature = "py-bindings")]
@@ -181,7 +180,7 @@ impl BlsCache {
     }
 
     #[pyo3(name = "items")]
-    pub fn py_items(&self, py: pyo3::Python<'_>) -> PyResult<PyObject> {
+    pub fn py_items(&self, py: pyo3::Python<'_>) -> PyResult<Py<PyAny>> {
         use pyo3::prelude::*;
         use pyo3::types::PyBytes;
         let ret = PyList::empty(py);
