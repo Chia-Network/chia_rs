@@ -115,6 +115,7 @@ primitives = {
     "bool": "bool",
 }
 
+
 def rust_type_to_python(t: str) -> str:
     t = t.strip()
 
@@ -144,6 +145,7 @@ def rust_type_to_python(t: str) -> str:
         return f"list[{rust_type_to_python(m.group(1))}]"
 
     return t
+
 
 def parse_rust_source(filename: str, upper_case: bool) -> list[tuple[str, list[str]]]:
     ret: list[tuple[str, list[str]]] = []
