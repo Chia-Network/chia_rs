@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Optional, TextIO
 from glob import glob
+import re
 
 output_file = Path(__file__).parent.resolve() / "python" / "chia_rs" / "chia_rs.pyi"
 crates_dir = Path(__file__).parent.parent.resolve() / "crates"
@@ -96,31 +97,54 @@ class {name}:{"".join(map(add_indent, members))}
         )
 
 
+primitives = {
+    "Bytes32": "bytes32",
+    "Bytes100": "bytes100",
+    "Bytes": "bytes",
+    "String": "str",
+    "u8": "uint8",
+    "u16": "uint16",
+    "u32": "uint32",
+    "u64": "uint64",
+    "u128": "uint128",
+    "i8": "int8",
+    "i16": "int16",
+    "i32": "int32",
+    "i64": "int64",
+    "i128": "int128",
+    "bool": "bool",
+}
+
+
 def rust_type_to_python(t: str) -> str:
-    ret = (
-        t.replace("<", "[")
-        .replace(">", "]")
-        .replace("(", "tuple[")
-        .replace(")", "]")
-        .replace("Vec", "list")
-        .replace("Option", "Optional")
-        .replace("Bytes", "bytes")
-        .replace("String", "str")
-        .replace("u8", "uint8")
-        .replace("u16", "uint16")
-        .replace("u32", "uint32")
-        .replace("u64", "uint64")
-        .replace("u128", "uint128")
-        .replace("i8", "int8")
-        .replace("i16", "int16")
-        .replace("i32", "int32")
-        .replace("i64", "int64")
-        .replace("i128", "int128")
-        .strip()
-    )
-    if ret in enums:
-        ret = "int"
-    return ret
+    t = t.strip()
+
+    if t in enums:
+        return "int"
+
+    r = primitives.get(t)
+    if r is not None:
+        return r
+
+    m = re.fullmatch("Vec<(.+)>", t)
+    if m is not None:
+        return f"list[{rust_type_to_python(m.group(1))}]"
+
+    m = re.fullmatch("Option<(.+)>", t)
+    if m is not None:
+        return f"Optional[{rust_type_to_python(m.group(1))}]"
+
+    m = re.fullmatch("\\((.+)\\)", t)
+    if m is not None:
+        inner_list = m.group(1).split(",")
+        inner = ", ".join(map(lambda se: rust_type_to_python(se), inner_list))
+        return f"tuple[{inner}]"
+
+    m = re.fullmatch("\\[(.+); [0-9]+\\]", t)
+    if m is not None:
+        return f"list[{rust_type_to_python(m.group(1))}]"
+
+    return t
 
 
 def parse_rust_source(filename: str, upper_case: bool) -> list[tuple[str, list[str]]]:
@@ -486,7 +510,7 @@ class QualityProof:
 class Prover:
     def __new__(cls, plot_path: str) -> Prover: ...
     def get_qualities_for_challenge(self, challenge: bytes32, proof_fragment_filter: int) -> list[QualityProof]: ...
-    def get_partial_proof(self, quality: QualityProof) -> tuple[list[uint64], int]: ...
+    def get_partial_proof(self, quality: QualityProof) -> tuple[PartialProof, int]: ...
     def size(self) -> int: ...
     def plot_id(self) -> bytes32: ...
     def get_strength(self) -> int: ...
@@ -505,7 +529,7 @@ def create_v2_plot(filename: str,
 
 def validate_proof_v2(plot_id: bytes32, size: int, challenge: bytes32, required_plot_strength: int, proof_fragment_scan_filter: int, proof: bytes) -> Optional[bytes32]: ...
 
-def solve_proof(fragments: list[uint64], plot_id: bytes32, strength: int, k: int) -> bytes: ...
+def solve_proof(fragments: PartialProof, plot_id: bytes32, strength: int, k: int) -> bytes: ...
 
 """
     )

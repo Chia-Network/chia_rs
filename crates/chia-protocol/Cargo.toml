@@ -14,7 +14,10 @@ workspace = true
 [features]
 py-bindings = ["dep:pyo3", "dep:chia_py_streamable_macro", "chia-traits/py-bindings", "chia-bls/py-bindings"]
 arbitrary = ["dep:arbitrary", "chia-bls/arbitrary"]
-serde = ["dep:serde", "dep:chia-serde", "chia-bls/serde"]
+serde = ["dep:serde", "dep:chia-serde", "chia-bls/serde", "dep:serde_arrays"]
+
+[package.metadata.cargo-machete]
+ignored = "seder_arrays"
 
 [dependencies]
 pyo3 = { workspace = true, features = ["multiple-pymethods", "num-bigint"], optional = true }
@@ -30,6 +33,7 @@ chia-bls = { workspace = true }
 arbitrary = { workspace = true, features = ["derive"], optional = true }
 serde = { workspace = true, optional = true, features = ["derive"] }
 chia-serde = { workspace = true, optional = true }
+serde_arrays = { workspace = true, optional = true }
 
 [dev-dependencies]
 rstest = { workspace = true }

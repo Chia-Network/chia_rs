@@ -79,3 +79,13 @@ impl<T: ChiaToPython, U: ChiaToPython, V: ChiaToPython> ChiaToPython for (T, U, 
         .into_any())
     }
 }
+
+impl<T: ChiaToPython, const N: usize> ChiaToPython for [T; N] {
+    fn to_python<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
+        let ret = PyList::empty(py);
+        for v in self {
+            ret.append(v.to_python(py)?)?;
+        }
+        Ok(ret.into_any())
+    }
+}
