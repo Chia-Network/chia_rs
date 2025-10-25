@@ -1,5 +1,6 @@
 use chia_sha2::Sha256;
 use clvmr::allocator::{Allocator, NodePtr, NodeVisitor, ObjectType, SExp};
+use clvmr::cost::Cost;
 use clvmr::error::EvalErr;
 use clvmr::serde::node_from_bytes_backrefs;
 use hex_literal::hex;
@@ -8,6 +9,9 @@ use std::ops::Deref;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TreeHash([u8; 32]);
+
+const SHATREE_RECURSE_COST: u64 = 1300;
+const SHATREE_COST_PER_BYTE: u64 = 10;
 
 impl TreeHash {
     pub const fn new(hash: [u8; 32]) -> Self {
@@ -64,7 +68,9 @@ impl Deref for TreeHash {
 #[derive(Default)]
 pub struct TreeCache {
     hashes: Vec<TreeHash>,
-    // each entry is an index into hashes, or one of 3 special values:
+    // parallel vector holding the cost used to compute the corresponding hash
+    costs: Vec<Cost>,
+    // each entry is an index into hashes and costs, or one of 3 special values:
     // u16::MAX if the pair has not been visited
     // u16::MAX - 1 if the pair has been seen once
     // u16::MAX - 2 if the pair has been seen at least twice (this makes it a
@@ -77,7 +83,8 @@ const SEEN_ONCE: u16 = u16::MAX - 1;
 const SEEN_MULTIPLE: u16 = u16::MAX - 2;
 
 impl TreeCache {
-    pub fn get(&self, n: NodePtr) -> Option<&TreeHash> {
+    /// Get cached hash and its associated cost (if present).
+    pub fn get(&self, n: NodePtr) -> Option<(&TreeHash, Cost)> {
         // We only cache pairs (for now)
         if !matches!(n.object_type(), ObjectType::Pair) {
             return None;
@@ -88,10 +95,12 @@ impl TreeCache {
         if slot >= SEEN_MULTIPLE {
             return None;
         }
-        Some(&self.hashes[slot as usize])
+        Some((&self.hashes[slot as usize], self.costs[slot as usize]))
     }
 
-    pub fn insert(&mut self, n: NodePtr, hash: &TreeHash) {
+    /// Insert a cached hash with its associated cost. If the cache is full we
+    /// ignore the insertion.
+    pub fn insert(&mut self, n: NodePtr, hash: &TreeHash, cost: Cost) {
         // If we've reached the max size, just ignore new cache items
         if self.hashes.len() == SEEN_MULTIPLE as usize {
             return;
@@ -108,6 +117,7 @@ impl TreeCache {
 
         let slot = self.hashes.len();
         self.hashes.push(*hash);
+        self.costs.push(cost);
         self.pairs[idx] = slot as u16;
     }
 
@@ -161,7 +171,10 @@ impl TreeCache {
 enum TreeOp {
     SExp(NodePtr),
     Cons,
-    ConsAddCache(NodePtr),
+    /// Used by the costed walker to record the cost-left value before
+    /// traversing the pair, so we can compute how much cost was consumed
+    /// while computing that subtree.
+    ConsAddCacheCost(NodePtr, Cost),
 }
 
 // contains SHA256(1 .. x), where x is the index into the array and .. is
@@ -246,7 +259,7 @@ pub fn tree_hash(a: &Allocator, node: NodePtr) -> TreeHash {
                 let rest = hashes.pop().unwrap();
                 hashes.push(tree_hash_pair(first, rest));
             }
-            TreeOp::ConsAddCache(_) => unreachable!(),
+            TreeOp::ConsAddCacheCost(_, _) => unreachable!(),
         }
     }
 
@@ -254,20 +267,39 @@ pub fn tree_hash(a: &Allocator, node: NodePtr) -> TreeHash {
     hashes[0]
 }
 
-pub fn tree_hash_cached(a: &Allocator, node: NodePtr, cache: &mut TreeCache) -> TreeHash {
+fn subtract_cost(cost_left: &mut Cost, subtract: Cost) -> Result<(), ()> {
+    if subtract > *cost_left {
+        Err(())
+    } else {
+        *cost_left -= subtract;
+        Ok(())
+    }
+}
+
+pub fn tree_hash_cached(
+    a: &Allocator,
+    node: NodePtr,
+    cache: &mut TreeCache,
+    cost_left: &mut Cost,
+) -> Option<TreeHash> {
     cache.visit_tree(a, node);
 
     let mut hashes = Vec::new();
     let mut ops = vec![TreeOp::SExp(node)];
 
     while let Some(op) = ops.pop() {
+        // charge a call cost for processing this op
+        subtract_cost(cost_left, SHATREE_RECURSE_COST).ok()?;
         match op {
             TreeOp::SExp(node) => match a.node(node) {
                 NodeVisitor::Buffer(bytes) => {
+                    subtract_cost(cost_left, SHATREE_COST_PER_BYTE * bytes.len() as u64).ok()?;
                     let hash = tree_hash_atom(bytes);
                     hashes.push(hash);
                 }
                 NodeVisitor::U32(val) => {
+                    subtract_cost(cost_left, SHATREE_COST_PER_BYTE * a.atom_len(node) as u64)
+                        .ok()?;
                     if (val as usize) < PRECOMPUTED_HASHES.len() {
                         hashes.push(PRECOMPUTED_HASHES[val as usize]);
                     } else {
@@ -275,11 +307,16 @@ pub fn tree_hash_cached(a: &Allocator, node: NodePtr, cache: &mut TreeCache) -> 
                     }
                 }
                 NodeVisitor::Pair(left, right) => {
-                    if let Some(hash) = cache.get(node) {
+                    // pair cost (65 bytes as before)
+                    subtract_cost(cost_left, SHATREE_COST_PER_BYTE * 65_u64).ok()?;
+                    if let Some((hash, cached_cost)) = cache.get(node) {
+                        // when reusing a cached subtree, charge its cached cost
+                        subtract_cost(cost_left, cached_cost).ok()?;
                         hashes.push(*hash);
                     } else {
                         if cache.should_memoize(node) {
-                            ops.push(TreeOp::ConsAddCache(node));
+                            // record the cost_left before traversing this subtree
+                            ops.push(TreeOp::ConsAddCacheCost(node, *cost_left));
                         } else {
                             ops.push(TreeOp::Cons);
                         }
@@ -293,319 +330,477 @@ pub fn tree_hash_cached(a: &Allocator, node: NodePtr, cache: &mut TreeCache) -> 
                 let rest = hashes.pop().unwrap();
                 hashes.push(tree_hash_pair(first, rest));
             }
-            TreeOp::ConsAddCache(original_node) => {
+            TreeOp::ConsAddCacheCost(original_node, cost_before) => {
                 let first = hashes.pop().unwrap();
                 let rest = hashes.pop().unwrap();
                 let hash = tree_hash_pair(first, rest);
                 hashes.push(hash);
-                cache.insert(original_node, &hash);
+                // cost_before is the remaining cost before we computed this subtree
+                // cost_left is the remaining after computing it
+                // the cost of this subtree = before - after
+                let used = cost_before - *cost_left;
+                cache.insert(original_node, &hash, used);
             }
         }
     }
 
     assert!(hashes.len() == 1);
-    hashes[0]
+    Some(hashes[0])
 }
 
 pub fn tree_hash_from_bytes(buf: &[u8]) -> Result<TreeHash, EvalErr> {
     let mut a = Allocator::new();
     let node = node_from_bytes_backrefs(&mut a, buf)?;
     let mut cache = TreeCache::default();
-    Ok(tree_hash_cached(&a, node, &mut cache))
+    let mut cost = u64::MAX;
+    Ok(tree_hash_cached(&a, node, &mut cache, &mut cost).unwrap())
 }
 
-#[test]
-fn test_tree_hash() {
-    let mut a = Allocator::new();
-    let atom1 = a.new_atom(&[1, 2, 3]).unwrap();
-    let atom2 = a.new_atom(&[4, 5, 6]).unwrap();
-    let root = a.new_pair(atom1, atom2).unwrap();
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::rstest;
 
-    // test atom1 hash
-    let atom1_hash = {
-        let mut sha256 = Sha256::new();
-        sha256.update([1_u8]);
-        sha256.update([1, 2, 3]);
-        let atom1_hash = sha256.finalize();
+    fn tree_hash_costed(a: &Allocator, node: NodePtr, cost_left: &mut Cost) -> Option<TreeHash> {
+        let mut hashes = Vec::new();
+        let mut ops = vec![TreeOp::SExp(node)];
 
-        assert_eq!(tree_hash(&a, atom1).as_ref(), atom1_hash.as_slice());
-        atom1_hash
-    };
+        while let Some(op) = ops.pop() {
+            subtract_cost(cost_left, SHATREE_RECURSE_COST).ok()?;
 
-    // test atom2 hash
-    let atom2_hash = {
-        let mut sha256 = Sha256::new();
-        sha256.update([1_u8]);
-        sha256.update([4, 5, 6]);
-        let atom2_hash = sha256.finalize();
+            match op {
+                TreeOp::SExp(node) => match a.node(node) {
+                    NodeVisitor::Buffer(bytes) => {
+                        subtract_cost(cost_left, SHATREE_COST_PER_BYTE * bytes.len() as u64)
+                            .ok()?;
+                        let hash = tree_hash_atom(bytes);
+                        hashes.push(hash);
+                    }
+                    NodeVisitor::U32(val) => {
+                        subtract_cost(cost_left, SHATREE_COST_PER_BYTE * a.atom_len(node) as u64)
+                            .ok()?;
+                        if (val as usize) < PRECOMPUTED_HASHES.len() {
+                            hashes.push(PRECOMPUTED_HASHES[val as usize]);
+                        } else {
+                            hashes.push(tree_hash_atom(a.atom(node).as_ref()));
+                        }
+                    }
+                    NodeVisitor::Pair(left, right) => {
+                        subtract_cost(cost_left, SHATREE_COST_PER_BYTE * 65_u64).ok()?;
+                        ops.push(TreeOp::Cons);
+                        ops.push(TreeOp::SExp(left));
+                        ops.push(TreeOp::SExp(right));
+                    }
+                },
+                TreeOp::Cons => {
+                    let first = hashes.pop().unwrap();
+                    let rest = hashes.pop().unwrap();
+                    hashes.push(tree_hash_pair(first, rest));
+                }
+                TreeOp::ConsAddCacheCost(_, _) => unreachable!(),
+            }
+        }
 
-        assert_eq!(tree_hash(&a, atom2).as_ref(), atom2_hash.as_slice());
-        atom2_hash
-    };
-
-    // test tree hash
-    let root_hash = {
-        let mut sha256 = Sha256::new();
-        sha256.update([2_u8]);
-        sha256.update(atom1_hash.as_slice());
-        sha256.update(atom2_hash.as_slice());
-        let root_hash = sha256.finalize();
-
-        assert_eq!(tree_hash(&a, root).as_ref(), root_hash.as_slice());
-        root_hash
-    };
-
-    let atom3 = a.new_atom(&[7, 8, 9]).unwrap();
-    let root2 = a.new_pair(root, atom3).unwrap();
-
-    let atom3_hash = {
-        let mut sha256 = Sha256::new();
-        sha256.update([1_u8]);
-        sha256.update([7, 8, 9]);
-        sha256.finalize()
-    };
-
-    // test deeper tree hash
-    {
-        let mut sha256 = Sha256::new();
-        sha256.update([2_u8]);
-        sha256.update(root_hash.as_slice());
-        sha256.update(atom3_hash.as_slice());
-
-        assert_eq!(tree_hash(&a, root2).as_ref(), sha256.finalize().as_slice());
+        assert!(hashes.len() == 1);
+        Some(hashes[0])
     }
-}
 
-#[test]
-fn test_tree_hash_from_bytes() {
-    use clvmr::serde::{node_to_bytes, node_to_bytes_backrefs};
-
-    let mut a = Allocator::new();
-    let atom1 = a.new_atom(&[1, 2, 3]).unwrap();
-    let atom2 = a.new_atom(&[4, 5, 6]).unwrap();
-    let node1 = a.new_pair(atom1, atom2).unwrap();
-    let node2 = a.new_pair(atom2, atom1).unwrap();
-
-    let node1 = a.new_pair(node1, node1).unwrap();
-    let node2 = a.new_pair(node2, node2).unwrap();
-
-    let root = a.new_pair(node1, node2).unwrap();
-
-    let serialized_clvm = node_to_bytes(&a, root).expect("node_to_bytes");
-    let serialized_clvm_backrefs =
-        node_to_bytes_backrefs(&a, root).expect("node_to_bytes_backrefs");
-
-    let hash1 = tree_hash_from_bytes(&serialized_clvm).expect("tree_hash_from_bytes");
-    let hash2 = tree_hash_from_bytes(&serialized_clvm_backrefs).expect("tree_hash_from_bytes");
-    let hash3 = tree_hash(&a, root);
-
-    assert!(serialized_clvm.len() > serialized_clvm_backrefs.len());
-    assert_eq!(hash1, hash2);
-    assert_eq!(hash1, hash3);
-}
-
-#[cfg(test)]
-use rstest::rstest;
-
-#[cfg(test)]
-#[rstest]
-#[case(
-    "block-1ee588dc",
-    "1cba0b22b84b597d265d77fbabb57fada01d963f75dc3956a6166a2385997ef2"
-)]
-#[case(
-    "block-6fe59b24",
-    "540c5afac7c26728ed6b7891d8ce2f5b26009c4b0090d7035403c2425dc54e1d"
-)]
-#[case(
-    "block-b45268ac",
-    "7cc321f5554126c9f430afbc7dd9c804f5d34a248e3192f275f5d585ecf8e873"
-)]
-#[case(
-    "block-c2a8df0d",
-    "2e25efa524e420111006fee77f50fb8fbd725920a5312d5480af239d81ab5e7e"
-)]
-#[case(
-    "block-e5002df2",
-    "c179ece232dceef984ba000f7e5b67ee3092582668bf6178969df10845eb8b18"
-)]
-#[case(
-    "block-4671894",
-    "3750f0e1bde9fcb407135f974aa276a4580e1e76a47e6d8d9bb2911d0fe91db1"
-)]
-#[case(
-    "block-225758",
-    "880df94c3c9e0f7c26c42ae99723e683a4cd37e73f74c6322d1dfabaa1d64d93"
-)]
-#[case(
-    "block-834752",
-    "be755b8ef03d917b8bd37ae152792a7daa7de81bbb0eaa21c530571c2105c130"
-)]
-#[case(
-    "block-834752-compressed",
-    "be755b8ef03d917b8bd37ae152792a7daa7de81bbb0eaa21c530571c2105c130"
-)]
-#[case(
-    "block-834760",
-    "77558768f74c5f863b36232a1390843a63a397fc22da1321fea3a05eab67be2c"
-)]
-#[case(
-    "block-834761",
-    "4bac8b299c6545a37a825883c863b79ce850e7f6c8f1d2abeec2865f5450f1c5"
-)]
-#[case(
-    "block-834765",
-    "b915ec5f9f8ea723e0a99b035df206673369b802766dd76b6c8f4c15ab7bca2c"
-)]
-#[case(
-    "block-834766",
-    "409559c3395fb18a6c3390ccccd55e82162b1e68b867490a90ccbddf78147c9d"
-)]
-#[case(
-    "block-834768",
-    "905441945a9a56558337c8b7a536a6b9606ad63e11a265a938f301747ccfb7af"
-)]
-fn test_tree_hash_cached(
-    #[case] name: &str,
-    #[case] expect: &str,
-    #[values(true, false)] compressed: bool,
-) {
-    use clvmr::serde::{node_from_bytes_backrefs, node_to_bytes_backrefs};
-    use std::fs::read_to_string;
-
-    let filename = format!("../../generator-tests/{name}.txt");
-    println!("file: {filename}",);
-    let test_file = read_to_string(filename).expect("test file not found");
-    let generator = test_file.lines().next().expect("invalid test file");
-    let generator = hex::decode(generator).expect("invalid hex encoded generator");
-
-    let generator = if compressed {
+    #[test]
+    fn test_tree_hash() {
         let mut a = Allocator::new();
-        let node = node_from_bytes_backrefs(&mut a, &generator).expect("node_from_bytes_backrefs");
-        node_to_bytes_backrefs(&a, node).expect("node_to_bytes_backrefs")
-    } else {
-        generator
-    };
+        let atom1 = a.new_atom(&[1, 2, 3]).unwrap();
+        let atom2 = a.new_atom(&[4, 5, 6]).unwrap();
+        let root = a.new_pair(atom1, atom2).unwrap();
 
-    let mut a = Allocator::new();
-    let mut cache = TreeCache::default();
-    let node = node_from_bytes_backrefs(&mut a, &generator).expect("node_from_bytes_backrefs");
+        // test atom1 hash
+        let atom1_hash = {
+            let mut sha256 = Sha256::new();
+            sha256.update([1_u8]);
+            sha256.update([1, 2, 3]);
+            let atom1_hash = sha256.finalize();
 
-    let hash1 = tree_hash(&a, node);
-    let hash2 = tree_hash_cached(&a, node, &mut cache);
-    // for (key, value) in cache.iter() {
-    //     println!("  {key:?}: {}", hex::encode(value));
-    // }
-    assert_eq!(hash1, hash2);
-    assert_eq!(hash1.as_ref(), hex::decode(expect).unwrap().as_slice());
-}
+            assert_eq!(tree_hash(&a, atom1).as_ref(), atom1_hash.as_slice());
+            atom1_hash
+        };
 
-#[cfg(test)]
-fn test_sha256_atom(buf: &[u8]) {
-    let hash = tree_hash_atom(buf);
+        // test atom2 hash
+        let atom2_hash = {
+            let mut sha256 = Sha256::new();
+            sha256.update([1_u8]);
+            sha256.update([4, 5, 6]);
+            let atom2_hash = sha256.finalize();
 
-    let mut hasher = Sha256::new();
-    hasher.update([1_u8]);
-    if !buf.is_empty() {
-        hasher.update(buf);
-    }
+            assert_eq!(tree_hash(&a, atom2).as_ref(), atom2_hash.as_slice());
+            atom2_hash
+        };
 
-    assert_eq!(hash.as_ref(), hasher.finalize().as_slice());
-}
+        // test tree hash
+        let root_hash = {
+            let mut sha256 = Sha256::new();
+            sha256.update([2_u8]);
+            sha256.update(atom1_hash.as_slice());
+            sha256.update(atom2_hash.as_slice());
+            let root_hash = sha256.finalize();
 
-#[test]
-fn test_tree_hash_atom() {
-    test_sha256_atom(&[]);
-    for val in 0..=255 {
-        test_sha256_atom(&[val]);
-    }
+            assert_eq!(tree_hash(&a, root).as_ref(), root_hash.as_slice());
+            root_hash
+        };
 
-    for val in 0..=255 {
-        test_sha256_atom(&[0, val]);
-    }
+        let atom3 = a.new_atom(&[7, 8, 9]).unwrap();
+        let root2 = a.new_pair(root, atom3).unwrap();
 
-    for val in 0..=255 {
-        test_sha256_atom(&[0xff, val]);
-    }
-}
+        let atom3_hash = {
+            let mut sha256 = Sha256::new();
+            sha256.update([1_u8]);
+            sha256.update([7, 8, 9]);
+            sha256.finalize()
+        };
 
-#[test]
-fn test_precomputed_atoms() {
-    assert_eq!(tree_hash_atom(&[]), PRECOMPUTED_HASHES[0]);
-    for val in 1..(PRECOMPUTED_HASHES.len() as u8) {
-        assert_eq!(tree_hash_atom(&[val]), PRECOMPUTED_HASHES[val as usize]);
-    }
-}
+        // test deeper tree hash
+        {
+            let mut sha256 = Sha256::new();
+            sha256.update([2_u8]);
+            sha256.update(root_hash.as_slice());
+            sha256.update(atom3_hash.as_slice());
 
-#[test]
-fn test_tree_cache_get() {
-    let mut allocator = Allocator::new();
-    let mut cache = TreeCache::default();
-
-    let a = allocator.nil();
-    let b = allocator.one();
-    let c = allocator.new_pair(a, b).expect("new_pair");
-
-    assert_eq!(cache.get(a), None);
-    assert_eq!(cache.get(b), None);
-    assert_eq!(cache.get(c), None);
-
-    // We don't cache atoms
-    cache.insert(a, &tree_hash(&allocator, a));
-    assert_eq!(cache.get(a), None);
-
-    cache.insert(b, &tree_hash(&allocator, b));
-    assert_eq!(cache.get(b), None);
-
-    // but pair is OK
-    cache.insert(c, &tree_hash(&allocator, c));
-    assert_eq!(cache.get(c), Some(&tree_hash(&allocator, c)));
-}
-
-#[test]
-fn test_tree_cache_size_limit() {
-    let mut allocator = Allocator::new();
-    let mut cache = TreeCache::default();
-
-    let mut list = allocator.nil();
-    let mut hash = tree_hash(&allocator, list);
-    cache.insert(list, &hash);
-
-    // we only fit 65k items in the cache
-    for i in 0..65540 {
-        let b = allocator.one();
-        list = allocator.new_pair(b, list).expect("new_pair");
-        hash = tree_hash_pair(tree_hash_atom(b"\x01"), hash);
-        cache.insert(list, &hash);
-
-        println!("{i}");
-        if i < 65533 {
-            assert_eq!(cache.get(list), Some(&hash));
-        } else {
-            assert_eq!(cache.get(list), None);
+            assert_eq!(tree_hash(&a, root2).as_ref(), sha256.finalize().as_slice());
         }
     }
-    assert_eq!(cache.get(list), None);
-}
 
-#[test]
-fn test_tree_cache_should_memoize() {
-    let mut allocator = Allocator::new();
-    let mut cache = TreeCache::default();
+    #[test]
+    fn test_tree_hash_from_bytes() {
+        use clvmr::serde::{node_to_bytes, node_to_bytes_backrefs};
 
-    let a = allocator.nil();
-    let b = allocator.one();
-    let c = allocator.new_pair(a, b).expect("new_pair");
+        let mut a = Allocator::new();
+        let atom1 = a.new_atom(&[1, 2, 3]).unwrap();
+        let atom2 = a.new_atom(&[4, 5, 6]).unwrap();
+        let node1 = a.new_pair(atom1, atom2).unwrap();
+        let node2 = a.new_pair(atom2, atom1).unwrap();
 
-    assert!(!cache.should_memoize(a));
-    assert!(!cache.should_memoize(b));
-    assert!(!cache.should_memoize(c));
+        let node1 = a.new_pair(node1, node1).unwrap();
+        let node2 = a.new_pair(node2, node2).unwrap();
 
-    // we need to visit a node at least twice for it to be considered a
-    // candidate for memoization
-    assert!(cache.visit(c));
-    assert!(!cache.should_memoize(c));
-    assert!(!cache.visit(c));
+        let root = a.new_pair(node1, node2).unwrap();
 
-    assert!(cache.should_memoize(c));
+        let serialized_clvm = node_to_bytes(&a, root).expect("node_to_bytes");
+        let serialized_clvm_backrefs =
+            node_to_bytes_backrefs(&a, root).expect("node_to_bytes_backrefs");
+
+        let hash1 = tree_hash_from_bytes(&serialized_clvm).expect("tree_hash_from_bytes");
+        let hash2 = tree_hash_from_bytes(&serialized_clvm_backrefs).expect("tree_hash_from_bytes");
+        let hash3 = tree_hash(&a, root);
+
+        assert!(serialized_clvm.len() > serialized_clvm_backrefs.len());
+        assert_eq!(hash1, hash2);
+        assert_eq!(hash1, hash3);
+    }
+
+    #[rstest]
+    #[case(
+        "block-1ee588dc",
+        "1cba0b22b84b597d265d77fbabb57fada01d963f75dc3956a6166a2385997ef2"
+    )]
+    #[case(
+        "block-6fe59b24",
+        "540c5afac7c26728ed6b7891d8ce2f5b26009c4b0090d7035403c2425dc54e1d"
+    )]
+    #[case(
+        "block-b45268ac",
+        "7cc321f5554126c9f430afbc7dd9c804f5d34a248e3192f275f5d585ecf8e873"
+    )]
+    #[case(
+        "block-c2a8df0d",
+        "2e25efa524e420111006fee77f50fb8fbd725920a5312d5480af239d81ab5e7e"
+    )]
+    #[case(
+        "block-e5002df2",
+        "c179ece232dceef984ba000f7e5b67ee3092582668bf6178969df10845eb8b18"
+    )]
+    #[case(
+        "block-4671894",
+        "3750f0e1bde9fcb407135f974aa276a4580e1e76a47e6d8d9bb2911d0fe91db1"
+    )]
+    #[case(
+        "block-225758",
+        "880df94c3c9e0f7c26c42ae99723e683a4cd37e73f74c6322d1dfabaa1d64d93"
+    )]
+    #[case(
+        "block-834752",
+        "be755b8ef03d917b8bd37ae152792a7daa7de81bbb0eaa21c530571c2105c130"
+    )]
+    #[case(
+        "block-834752-compressed",
+        "be755b8ef03d917b8bd37ae152792a7daa7de81bbb0eaa21c530571c2105c130"
+    )]
+    #[case(
+        "block-834760",
+        "77558768f74c5f863b36232a1390843a63a397fc22da1321fea3a05eab67be2c"
+    )]
+    #[case(
+        "block-834761",
+        "4bac8b299c6545a37a825883c863b79ce850e7f6c8f1d2abeec2865f5450f1c5"
+    )]
+    #[case(
+        "block-834765",
+        "b915ec5f9f8ea723e0a99b035df206673369b802766dd76b6c8f4c15ab7bca2c"
+    )]
+    #[case(
+        "block-834766",
+        "409559c3395fb18a6c3390ccccd55e82162b1e68b867490a90ccbddf78147c9d"
+    )]
+    #[case(
+        "block-834768",
+        "905441945a9a56558337c8b7a536a6b9606ad63e11a265a938f301747ccfb7af"
+    )]
+    fn test_tree_hash_cached(
+        #[case] name: &str,
+        #[case] expect: &str,
+        #[values(true, false)] compressed: bool,
+    ) {
+        use clvmr::serde::{node_from_bytes_backrefs, node_to_bytes_backrefs};
+        use std::fs::read_to_string;
+
+        let filename = format!("../../generator-tests/{name}.txt");
+        println!("file: {filename}",);
+        let test_file = read_to_string(filename).expect("test file not found");
+        let generator = test_file.lines().next().expect("invalid test file");
+        let generator = hex::decode(generator).expect("invalid hex encoded generator");
+
+        let generator = if compressed {
+            let mut a = Allocator::new();
+            let node =
+                node_from_bytes_backrefs(&mut a, &generator).expect("node_from_bytes_backrefs");
+            node_to_bytes_backrefs(&a, node).expect("node_to_bytes_backrefs")
+        } else {
+            generator
+        };
+
+        let mut a = Allocator::new();
+        let mut cache = TreeCache::default();
+        let node = node_from_bytes_backrefs(&mut a, &generator).expect("node_from_bytes_backrefs");
+
+        let hash1 = tree_hash(&a, node);
+        let mut cost = u64::MAX;
+        let hash2 = tree_hash_cached(&a, node, &mut cache, &mut cost).expect("cost should be ok");
+        // for (key, value) in cache.iter() {
+        //     println!("  {key:?}: {}", hex::encode(value));
+        // }
+        assert_eq!(hash1, hash2);
+        assert_eq!(hash1.as_ref(), hex::decode(expect).unwrap().as_slice());
+    }
+
+    fn test_sha256_atom(buf: &[u8]) {
+        let hash = tree_hash_atom(buf);
+
+        let mut hasher = Sha256::new();
+        hasher.update([1_u8]);
+        if !buf.is_empty() {
+            hasher.update(buf);
+        }
+
+        assert_eq!(hash.as_ref(), hasher.finalize().as_slice());
+    }
+
+    #[test]
+    fn test_tree_hash_atom() {
+        test_sha256_atom(&[]);
+        for val in 0..=255 {
+            test_sha256_atom(&[val]);
+        }
+
+        for val in 0..=255 {
+            test_sha256_atom(&[0, val]);
+        }
+
+        for val in 0..=255 {
+            test_sha256_atom(&[0xff, val]);
+        }
+    }
+
+    #[test]
+    fn test_precomputed_atoms() {
+        assert_eq!(tree_hash_atom(&[]), PRECOMPUTED_HASHES[0]);
+        for val in 1..(PRECOMPUTED_HASHES.len() as u8) {
+            assert_eq!(tree_hash_atom(&[val]), PRECOMPUTED_HASHES[val as usize]);
+        }
+    }
+
+    #[test]
+    fn test_tree_cache_get() {
+        let mut allocator = Allocator::new();
+        let mut cache = TreeCache::default();
+
+        let a = allocator.nil();
+        let b = allocator.one();
+        let c = allocator.new_pair(a, b).expect("new_pair");
+
+        assert_eq!(cache.get(a), None);
+        assert_eq!(cache.get(b), None);
+        assert_eq!(cache.get(c), None);
+
+        // We don't cache atoms
+        cache.insert(a, &tree_hash(&allocator, a), 0);
+        assert_eq!(cache.get(a), None);
+
+        cache.insert(b, &tree_hash(&allocator, b), 0);
+        assert_eq!(cache.get(b), None);
+
+        // but pair is OK
+        cache.insert(c, &tree_hash(&allocator, c), 0);
+        let (h, _c) = cache.get(c).expect("expected cached pair");
+        assert_eq!(h, &tree_hash(&allocator, c));
+    }
+
+    #[test]
+    fn test_tree_cache_size_limit() {
+        let mut allocator = Allocator::new();
+        let mut cache = TreeCache::default();
+
+        let mut list = allocator.nil();
+        let mut hash = tree_hash(&allocator, list);
+        cache.insert(list, &hash, 0);
+
+        // we only fit 65k items in the cache
+        for i in 0..65540 {
+            let b = allocator.one();
+            list = allocator.new_pair(b, list).expect("new_pair");
+            hash = tree_hash_pair(tree_hash_atom(b"\x01"), hash);
+            cache.insert(list, &hash, 0);
+
+            println!("{i}");
+            if i < 65533 {
+                let (h, _c) = cache.get(list).expect("expected cached");
+                assert_eq!(h, &hash);
+            } else {
+                assert_eq!(cache.get(list), None);
+            }
+        }
+        assert_eq!(cache.get(list), None);
+    }
+
+    #[test]
+    fn test_tree_cache_should_memoize() {
+        let mut allocator = Allocator::new();
+        let mut cache = TreeCache::default();
+
+        let a = allocator.nil();
+        let b = allocator.one();
+        let c = allocator.new_pair(a, b).expect("new_pair");
+
+        assert!(!cache.should_memoize(a));
+        assert!(!cache.should_memoize(b));
+        assert!(!cache.should_memoize(c));
+
+        // we need to visit a node at least twice for it to be considered a
+        // candidate for memoization
+        assert!(cache.visit(c));
+        assert!(!cache.should_memoize(c));
+        assert!(!cache.visit(c));
+
+        assert!(cache.should_memoize(c));
+    }
+
+    #[test]
+    fn test_tree_hash_costed_equivalence_no_repeats() {
+        let mut a = Allocator::new();
+
+        // Build a nested tree:
+        // ((a . b) . ((x . y) . (z . w)))
+        let a_atom = a.new_atom(b"a").unwrap();
+        let b_atom = a.new_atom(b"b").unwrap();
+        let x_atom = a.new_atom(b"x").unwrap();
+        let y_atom = a.new_atom(b"y").unwrap();
+        let z_atom = a.new_atom(b"z").unwrap();
+        let w_atom = a.new_atom(b"w").unwrap();
+
+        let ab_pair = a.new_pair(a_atom, b_atom).unwrap();
+        let xy_pair = a.new_pair(x_atom, y_atom).unwrap();
+        let zw_pair = a.new_pair(z_atom, w_atom).unwrap();
+        let right_pair = a.new_pair(xy_pair, zw_pair).unwrap();
+        let root = a.new_pair(ab_pair, right_pair).unwrap();
+
+        let mut cost_left_baseline = 1_000_000;
+        let mut cost_left_cached = 1_000_000;
+
+        // baseline: costed but no caching
+        let baseline = tree_hash_costed(&a, root, &mut cost_left_baseline).unwrap();
+
+        // cached version
+        let mut cache = TreeCache::default();
+        cache.visit_tree(&a, root);
+
+        let cached = tree_hash_cached(&a, root, &mut cache, &mut cost_left_cached).unwrap();
+
+        assert!(
+            !cache.hashes.is_empty(),
+            "cache should contain memoized subtrees"
+        );
+
+        assert_eq!(baseline, cached, "hash mismatch between costed and cached");
+
+        // cost_left should match too
+        assert_eq!(
+            cost_left_baseline, cost_left_cached,
+            "cost mismatch between costed and cached"
+        );
+
+        // the number of cached hashes and costs must match
+        assert_eq!(cache.hashes.len(), cache.costs.len());
+
+        // if we re-run with cache, cost_left should still match the baseline
+        let mut cost_left_cached2 = 1_000_000;
+        let cached2 = tree_hash_cached(&a, root, &mut cache, &mut cost_left_cached2).unwrap();
+
+        assert_eq!(cached2, cached, "cached hash mismatch on second run");
+        assert_eq!(
+            cost_left_cached2, cost_left_baseline,
+            "cached cost mismatch on second run (should match costed baseline)"
+        );
+    }
+
+    #[test]
+    fn test_tree_hash_cost_equivalence_with_repeats() {
+        let mut a = Allocator::new();
+        let x_atom = a.new_atom(b"x").unwrap();
+        let y_atom = a.new_atom(b"y").unwrap();
+        let r = a.new_pair(x_atom, y_atom).unwrap();
+
+        let left = a.new_pair(r, r).unwrap();
+        let right = a.new_pair(r, r).unwrap();
+        let root = a.new_pair(left, right).unwrap();
+
+        // Nest it one level deeper:
+        let root = a.new_pair(root, root).unwrap();
+
+        let mut cost_left_baseline = 10_000_000;
+        let mut cost_left_cached = 10_000_000;
+
+        let baseline = tree_hash_costed(&a, root, &mut cost_left_baseline).unwrap();
+
+        let mut cache = TreeCache::default();
+        cache.visit_tree(&a, root);
+
+        let cached = tree_hash_cached(&a, root, &mut cache, &mut cost_left_cached).unwrap();
+
+        assert!(
+            !cache.hashes.is_empty(),
+            "cache should contain memoized subtrees"
+        );
+
+        assert_eq!(baseline, cached, "hash mismatch between costed and cached");
+        assert_eq!(
+            cost_left_baseline, cost_left_cached,
+            "cost mismatch after first run"
+        );
+
+        // run again with same cache — should still match cost and hash
+        let mut cost_left_cached2 = 10_000_000;
+        let cached2 = tree_hash_cached(&a, root, &mut cache, &mut cost_left_cached2).unwrap();
+
+        assert_eq!(cached2, cached, "hash mismatch after cache rerun");
+        assert_eq!(
+            cost_left_cached2, cost_left_baseline,
+            "cost mismatch after cache hits"
+        );
+    }
 }

@@ -81,6 +81,7 @@ pub struct OwnedSpendBundleConditions {
     pub num_atoms: u32,
     pub num_pairs: u32,
     pub heap_size: u32,
+    pub shatree_cost: u64,
 }
 
 impl OwnedSpendConditions {
@@ -169,6 +170,7 @@ impl OwnedSpendBundleConditions {
             num_atoms: (a.atom_count() + a.small_atom_count()) as u32,
             num_pairs: a.pair_count() as u32,
             heap_size: a.heap_size() as u32,
+            shatree_cost: sb.shatree_cost,
         }
     }
 }

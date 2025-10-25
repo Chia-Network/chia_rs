@@ -6,6 +6,9 @@ execution-cost: 4801223308
 condition-cost: 2974950000
 removal_amount: 123
 addition_amount: 0
-atoms: 2654
-pairs: 23457
-heap: 29388
+atoms: 2975153
+pairs: 62475440
+heap: 142
+shatree_cost: 0
+COSTED_SHA:
+shatree_cost: 248070

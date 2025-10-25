@@ -10,3 +10,6 @@ addition_amount: 0
 atoms: 163
 pairs: 677
 heap: 68
+shatree_cost: 0
+COSTED_SHA:
+shatree_cost: 238250

@@ -9,5 +9,8 @@ addition_amount: 0
 atoms: 128
 pairs: 284
 heap: 68
+shatree_cost: 0
 STRICT:
 FAILED: 10
+COSTED_SHA:
+shatree_cost: 28690

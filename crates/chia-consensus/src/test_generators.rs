@@ -5,7 +5,7 @@ use super::run_block_generator::{
 };
 use crate::allocator::make_allocator;
 use crate::consensus_constants::TEST_CONSTANTS;
-use crate::flags::{COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
+use crate::flags::{COST_CONDITIONS, COST_SHATREE, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
 use chia_bls::Signature;
 use chia_protocol::Program;
 use chia_protocol::{Bytes, Bytes48};
@@ -124,6 +124,7 @@ pub(crate) fn print_conditions(a: &Allocator, c: &SpendBundleConditions, a2: &Al
     ret += &format!("atoms: {}\n", a2.atom_count() + a2.small_atom_count());
     ret += &format!("pairs: {}\n", a2.pair_count());
     ret += &format!("heap: {}\n", a2.heap_size());
+    ret += &format!("shatree_cost: {}\n", c.shatree_cost);
     ret
 }
 
@@ -169,7 +170,7 @@ pub(crate) fn print_diff(output: &str, expected: &str) {
 #[rstest]
 // in CI we run with the clvmr/debug-allocator feature enabled, which makes this
 // test use too much RAM (about 6.8 GB)
-//#[case("aa-million-messages")]
+#[case("aa-million-messages")]
 #[case("single-coin-only-garbage")]
 #[case("many-coins-announcement-cap")]
 #[case("3000000-conditions-single-coin")]
@@ -242,6 +243,7 @@ fn run_generator(#[case] name: &str) {
         "puzzle-hash-stress-test",
         "puzzle-hash-stress-tree",
         "aa-million-message-spends",
+        "aa-million-messages",
         "29500-remarks-procedural",
         "100000-remarks-prefab",
         "3000000-conditions-single-coin",
@@ -254,9 +256,22 @@ fn run_generator(#[case] name: &str) {
     let (generator, expected) = test_file.split_once('\n').expect("invalid test file");
     let generator = hex::decode(generator).expect("invalid hex encoded generator");
 
+    let mut costed_sha_cost: String = format!("");
     let expected = match expected.split_once("STRICT:\n") {
-        Some((c, m)) => [c, m],
-        None => [expected, expected],
+        Some((c, m)) => match m.split_once("COSTED_SHA:\n") {
+            Some((d, n)) => {
+                costed_sha_cost = n.to_string();
+                [c, d]
+            }
+            None => [c, m],
+        },
+        None => match expected.split_once("COSTED_SHA:\n") {
+            Some((d, n)) => {
+                costed_sha_cost = n.to_string();
+                [d, d]
+            }
+            None => [expected, expected],
+        },
     };
 
     let mut block_refs = Vec::<Vec<u8>>::new();
@@ -269,6 +284,7 @@ fn run_generator(#[case] name: &str) {
 
     let mut write_back = format!("{}\n", hex::encode(&generator));
     let mut last_output = String::new();
+    let mut default_output = String::new();
 
     for (flags, expected) in zip(&[0, MEMPOOL_MODE], expected) {
         let mut flags = *flags;
@@ -310,10 +326,15 @@ fn run_generator(#[case] name: &str) {
                     write_back.push_str(&format!("STRICT:\n{output}"));
                 }
             } else {
-                last_output = output.clone();
                 write_back.push_str(&format!("{output}"));
+                last_output = output.clone();
             }
         }
+
+        if flags == 0 || flags == COST_CONDITIONS {
+            default_output = output.clone();
+        }
+
         if run_generator_one {
             let mut a1 = make_allocator(flags);
             let conds1 = run_block_generator(
@@ -331,7 +352,9 @@ fn run_generator(#[case] name: &str) {
                     // before the hard fork, the cost of running the genrator +
                     // puzzles should never be lower than after the hard-fork
                     // but it's likely higher.
+
                     assert!(conditions.cost >= expected_cost);
+
                     // pre-hard fork, we don't have access to per-puzzle costs, so
                     // set those to whatever run_block_generator2() produced, to
                     // make the check pass
@@ -435,6 +458,98 @@ fn run_generator(#[case] name: &str) {
                     assert_eq!(spend.coin_amount, coinspends2[i].0.coin.amount);
                 }
             }
+        }
+    }
+
+    // compare costed_sha with default and expected file
+    let mut flags = COST_SHATREE | DONT_VALIDATE_SIGNATURE;
+    if name == "aa-million-messages" || name == "aa-million-message-spends" {
+        // this test requires running after hard fork 2, where the COST_CONDITIONS
+        // flag is set
+        flags |= COST_CONDITIONS;
+    }
+
+    let mut a2 = make_allocator(COST_SHATREE | DONT_VALIDATE_SIGNATURE);
+    let conds_sha = run_block_generator2(
+        &mut a2,
+        &generator,
+        &block_refs,
+        11_000_000_000,
+        flags,
+        &Signature::default(),
+        None,
+        &TEST_CONSTANTS,
+    );
+
+    let (_expected_cost, sha_output) = match conds_sha {
+        Ok(ref conditions) => {
+            let cond_cost: u64 = conditions.spends.iter().map(|v| v.condition_cost).sum();
+            assert_eq!(cond_cost, conditions.condition_cost);
+            let exe_cost: u64 = conditions.spends.iter().map(|v| v.execution_cost).sum();
+            // the generator itself has execution cost. At least the cost of
+            // a quote
+            assert!(exe_cost <= conditions.execution_cost);
+            (conditions.cost, print_conditions(&a2, &conditions, &a2))
+        }
+        Err(code) => (0, format!("FAILED: {}\n", u32::from(code.1))),
+    };
+
+    // new costing failure
+    if sha_output == "FAILED: 23\n" {
+        assert_eq!(costed_sha_cost, sha_output);
+        write_back.push_str(&format!("COSTED_SHA:\n{sha_output}"));
+    } else if !conds_sha.is_ok() {
+        // otherwise check failures match
+        assert_eq!(sha_output, default_output);
+    } else {
+        // otherwise check
+        let unwrapped = conds_sha.expect("we already matched for not ok");
+        write_back.push_str(&format!(
+            "COSTED_SHA:\nshatree_cost: {}\n",
+            unwrapped.shatree_cost
+        ));
+        let Some((most, _trailing)) = default_output.rsplit_once('\n') else {
+            if UPDATE_TESTS {
+                write(&filename, write_back.into_bytes()).expect("write file");
+            }
+            panic!("bad test file")
+        };
+        let Some((most, _cost)) = most.rsplit_once('\n') else {
+            if UPDATE_TESTS {
+                write(&filename, write_back.into_bytes()).expect("write file");
+            }
+            panic!("bad test file")
+        };
+        // amend shatree_cost with new info
+        default_output = most.to_owned() + &format!("\nshatree_cost: {}\n", unwrapped.shatree_cost);
+
+        // amend total cost with new info
+        default_output = default_output
+            .lines()
+            .map(|line| {
+                if let Some(v) = line.strip_prefix("cost:") {
+                    format!(
+                        "cost: {}",
+                        v.trim().parse::<u64>().unwrap_or(0) + unwrapped.shatree_cost
+                    )
+                } else {
+                    line.to_string()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        default_output += "\n";
+        assert_eq!(sha_output, default_output);
+        if !UPDATE_TESTS {
+            let extracted_cost = costed_sha_cost
+                .split_once(':')
+                .and_then(|(_, num_str)| num_str.trim().parse::<u64>().ok());
+            assert_eq!(
+                unwrapped.shatree_cost,
+                extracted_cost
+                    .expect(format!("unable to find cost in {}", costed_sha_cost).as_str()),
+                "wrong shatree_cost vs expected"
+            );
         }
     }
 

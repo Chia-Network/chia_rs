@@ -5,7 +5,7 @@ use crate::conditions::{
     ParseState, SpendBundleConditions,
 };
 use crate::consensus_constants::ConsensusConstants;
-use crate::flags::DONT_VALIDATE_SIGNATURE;
+use crate::flags::{COST_SHATREE, DONT_VALIDATE_SIGNATURE};
 use crate::validation_error::{first, ErrorCode, ValidationErr};
 use chia_bls::{BlsCache, Signature};
 use chia_protocol::{BytesImpl, Coin, CoinSpend, Program};
@@ -223,7 +223,15 @@ where
         subtract_cost(a, &mut cost_left, clvm_cost)?;
         ret.execution_cost += clvm_cost;
 
-        let buf = tree_hash_cached(a, puzzle, &mut cache);
+        let cost_before = cost_left;
+        let buf = if flags & COST_SHATREE != 0 {
+            tree_hash_cached(a, puzzle, &mut cache, &mut cost_left)
+        } else {
+            let mut cost = u64::MAX;
+            tree_hash_cached(a, puzzle, &mut cache, &mut cost)
+        }
+        .ok_or_else(|| ValidationErr(a.nil(), ErrorCode::CostExceeded))?;
+        ret.shatree_cost += cost_before - cost_left;
         let puzzle_hash = a.new_atom(&buf)?;
 
         process_single_spend::<EmptyVisitor>(
@@ -298,7 +306,9 @@ where
         else {
             continue; // if we fail at this step then maybe the generator was malicious - try other spends
         };
-        let puzhash = tree_hash_cached(&a, puzzle, &mut cache);
+        let mut cost = u64::MAX;
+        let puzhash = tree_hash_cached(&a, puzzle, &mut cache, &mut cost)
+            .ok_or(ValidationErr(puzzle, ErrorCode::CostExceeded))?;
         let parent_id = BytesImpl::<32>::from_clvm(&a, parent_id)
             .map_err(|_| ValidationErr(first, ErrorCode::InvalidParentId))?;
         let coin = Coin::new(
@@ -371,7 +381,9 @@ where
         else {
             continue; // if we fail at this step then maybe the generator was malicious - try other spends
         };
-        let puzhash = tree_hash_cached(&a, puzzle, &mut cache);
+        let mut cost = u64::MAX;
+        let puzhash = tree_hash_cached(&a, puzzle, &mut cache, &mut cost)
+            .ok_or(ValidationErr(puzzle, ErrorCode::CostExceeded))?;
         let parent_id = BytesImpl::<32>::from_clvm(&a, parent_id)
             .map_err(|_| ValidationErr(first, ErrorCode::InvalidParentId))?;
         let coin = Coin::new(
