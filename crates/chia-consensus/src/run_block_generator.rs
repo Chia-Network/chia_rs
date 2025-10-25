@@ -5,13 +5,13 @@ use crate::conditions::{
     ParseState, SpendBundleConditions,
 };
 use crate::consensus_constants::ConsensusConstants;
-use crate::flags::DONT_VALIDATE_SIGNATURE;
+use crate::flags::{COST_SHATREE, DONT_VALIDATE_SIGNATURE};
 use crate::validation_error::{first, ErrorCode, ValidationErr};
 use chia_bls::{BlsCache, Signature};
 use chia_protocol::{BytesImpl, Coin, CoinSpend, Program};
 use chia_puzzles::{CHIALISP_DESERIALISATION, ROM_BOOTSTRAP_GENERATOR};
 use clvm_traits::FromClvm;
-use clvm_utils::{tree_hash_cached, TreeCache};
+use clvm_utils::{tree_hash_cached, tree_hash_cached_costed, TreeCache};
 use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;
@@ -223,7 +223,14 @@ where
         subtract_cost(a, &mut cost_left, clvm_cost)?;
         ret.execution_cost += clvm_cost;
 
-        let buf = tree_hash_cached(a, puzzle, &mut cache);
+        let cost_before = cost_left;
+        let buf = if flags & COST_SHATREE != 0 {
+            tree_hash_cached_costed(a, puzzle, &mut cache, &mut cost_left)
+                .ok_or(ValidationErr(puzzle, ErrorCode::CostExceeded))?
+        } else {
+            tree_hash_cached(a, puzzle, &mut cache)
+        };
+        ret.shatree_cost += cost_before - cost_left;
         let puzzle_hash = a.new_atom(&buf)?;
 
         process_single_spend::<EmptyVisitor>(

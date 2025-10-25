@@ -11,3 +11,6 @@ pairs: 6441273
 heap: 536870979
 STRICT:
 FAILED: 117
+COSTED_SHA:
+cost: 7502624988
+(only cost differs from default)

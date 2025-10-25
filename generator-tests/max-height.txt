@@ -13,3 +13,6 @@ addition_amount: 0
 atoms: 146
 pairs: 368
 heap: 68
+COSTED_SHA:
+cost: 2061790
+(only cost differs from default)
