@@ -16,10 +16,11 @@ pub struct ProofOfSpace {
     proof: Bytes,
 }
 
+/// The k-size for v1 PoS, or strength if it's a v2 PoS
 #[derive(Debug, PartialEq)]
 pub enum PlotSize {
     V1(u8),
-    V2(u8),
+    Strength(u8),
 }
 
 impl ProofOfSpace {
@@ -27,7 +28,7 @@ impl ProofOfSpace {
         if (self.version_and_size & 0x80) == 0 {
             PlotSize::V1(self.version_and_size)
         } else {
-            PlotSize::V2(self.version_and_size & 0x7f)
+            PlotSize::Strength(self.version_and_size & 0x7f)
         }
     }
 }
@@ -43,7 +44,7 @@ pub struct PyPlotSize {
     #[pyo3(get)]
     pub size_v1: Option<u8>,
     #[pyo3(get)]
-    pub size_v2: Option<u8>,
+    pub strength_v2: Option<u8>,
 }
 
 #[cfg(feature = "py-bindings")]
@@ -53,7 +54,7 @@ impl PyPlotSize {
     fn make_v1(s: u8) -> Self {
         Self {
             size_v1: Some(s),
-            size_v2: None,
+            strength_v2: None,
         }
     }
 
@@ -61,7 +62,7 @@ impl PyPlotSize {
     fn make_v2(s: u8) -> Self {
         Self {
             size_v1: None,
-            size_v2: Some(s),
+            strength_v2: Some(s),
         }
     }
 }
@@ -74,11 +75,11 @@ impl ProofOfSpace {
         match self.size() {
             PlotSize::V1(s) => PyPlotSize {
                 size_v1: Some(s),
-                size_v2: None,
+                strength_v2: None,
             },
-            PlotSize::V2(s) => PyPlotSize {
+            PlotSize::Strength(s) => PyPlotSize {
                 size_v1: None,
-                size_v2: Some(s),
+                strength_v2: Some(s),
             },
         }
     }
@@ -138,12 +139,12 @@ mod tests {
     #[case(0x01, PlotSize::V1(1))]
     #[case(0x08, PlotSize::V1(8))]
     #[case(0x7f, PlotSize::V1(0x7f))]
-    #[case(0x80, PlotSize::V2(0))]
-    #[case(0x81, PlotSize::V2(1))]
-    #[case(0x80 + 28, PlotSize::V2(28))]
-    #[case(0x80 + 30, PlotSize::V2(30))]
-    #[case(0x80 + 32, PlotSize::V2(32))]
-    #[case(0xff, PlotSize::V2(0x7f))]
+    #[case(0x80, PlotSize::Strength(0))]
+    #[case(0x81, PlotSize::Strength(1))]
+    #[case(0x80 + 28, PlotSize::Strength(28))]
+    #[case(0x80 + 30, PlotSize::Strength(30))]
+    #[case(0x80 + 32, PlotSize::Strength(32))]
+    #[case(0xff, PlotSize::Strength(0x7f))]
     fn proof_of_space_size(#[case] size_field: u8, #[case] expect: PlotSize) {
         let pos = ProofOfSpace::new(
             Bytes32::from(b"abababababababababababababababab"),

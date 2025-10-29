@@ -197,7 +197,7 @@ class PlotSize:
     def make_v2(s: int) -> PlotSize: ...
 
     size_v1: Optional[uint8]
-    size_v2: Optional[uint8]
+    strength_v2: Optional[uint8]
 
 # Proof-of-space 2
 @final
