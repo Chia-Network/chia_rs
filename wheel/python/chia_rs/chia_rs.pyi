@@ -197,7 +197,7 @@ class PlotSize:
     def make_v2(s: int) -> PlotSize: ...
 
     size_v1: Optional[uint8]
-    size_v2: Optional[uint8]
+    strength_v2: Optional[uint8]
 
 # Proof-of-space 2
 @final
@@ -4484,8 +4484,7 @@ class ConsensusConstants:
     NUMBER_ZERO_BITS_PLOT_FILTER_V2: uint8
     MIN_PLOT_SIZE_V1: uint8
     MAX_PLOT_SIZE_V1: uint8
-    MIN_PLOT_SIZE_V2: uint8
-    MAX_PLOT_SIZE_V2: uint8
+    PLOT_SIZE_V2: uint8
     SUB_SLOT_TIME_TARGET: uint16
     NUM_SP_INTERVALS_EXTRA: uint8
     MAX_FUTURE_TIME2: uint32
@@ -4540,8 +4539,7 @@ class ConsensusConstants:
         NUMBER_ZERO_BITS_PLOT_FILTER_V2: uint8,
         MIN_PLOT_SIZE_V1: uint8,
         MAX_PLOT_SIZE_V1: uint8,
-        MIN_PLOT_SIZE_V2: uint8,
-        MAX_PLOT_SIZE_V2: uint8,
+        PLOT_SIZE_V2: uint8,
         SUB_SLOT_TIME_TARGET: uint16,
         NUM_SP_INTERVALS_EXTRA: uint8,
         MAX_FUTURE_TIME2: uint32,
@@ -4612,8 +4610,7 @@ class ConsensusConstants:
         NUMBER_ZERO_BITS_PLOT_FILTER_V2: Union[ uint8, _Unspec] = _Unspec(),
         MIN_PLOT_SIZE_V1: Union[ uint8, _Unspec] = _Unspec(),
         MAX_PLOT_SIZE_V1: Union[ uint8, _Unspec] = _Unspec(),
-        MIN_PLOT_SIZE_V2: Union[ uint8, _Unspec] = _Unspec(),
-        MAX_PLOT_SIZE_V2: Union[ uint8, _Unspec] = _Unspec(),
+        PLOT_SIZE_V2: Union[ uint8, _Unspec] = _Unspec(),
         SUB_SLOT_TIME_TARGET: Union[ uint16, _Unspec] = _Unspec(),
         NUM_SP_INTERVALS_EXTRA: Union[ uint8, _Unspec] = _Unspec(),
         MAX_FUTURE_TIME2: Union[ uint32, _Unspec] = _Unspec(),

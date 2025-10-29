@@ -66,12 +66,8 @@ pub struct ConsensusConstants {
     min_plot_size_v1: u8,
     max_plot_size_v1: u8,
 
-    /// The smallest and largest allowed plot size for the the new plot
-    /// format, v2. These are the K-values for the plots. In addition to these
-    /// constraints, v2 plot sizes must be even numbers. The new plot format
-    /// was introduced in Chia-3.0.
-    min_plot_size_v2: u8,
-    max_plot_size_v2: u8,
+    /// v2 plots only support a single k-value, specified by this constant.
+    plot_size_v2: u8,
 
     /// The target number of seconds per sub-slot.
     sub_slot_time_target: u16,
@@ -185,8 +181,7 @@ pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
     number_zero_bits_plot_filter_v2: 5,
     min_plot_size_v1: 32,
     max_plot_size_v1: 50,
-    min_plot_size_v2: 28,
-    max_plot_size_v2: 32,
+    plot_size_v2: 28,
     sub_slot_time_target: 600,
     num_sp_intervals_extra: 3,
     max_future_time2: 2 * 60,
