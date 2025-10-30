@@ -7,7 +7,7 @@ output_file = Path(__file__).parent.resolve() / "python" / "chia_rs" / "chia_rs.
 crates_dir = Path(__file__).parent.parent.resolve() / "crates"
 input_dir = crates_dir / "chia-protocol" / "src"
 
-ignore_structs = ["PyPlotSize"]
+ignore_structs = ["PyPlotParam"]
 
 # enums are exposed to python as int
 enums = set(
@@ -276,7 +276,7 @@ extra_members = {
         "def sp_total_iters(self, constants: ConsensusConstants) -> uint128: ...",
     ],
     "ProofOfSpace": [
-        "def size(self) -> PlotSize: ...",
+        "def param(self) -> PlotParam: ...",
     ],
     "CoinRecord": [
         "@property\n    def spent(self) -> bool: ...",
@@ -492,11 +492,11 @@ class MerkleSet:
     ) -> MerkleSet: ...
 
 @final
-class PlotSize:
+class PlotParam:
     @staticmethod
-    def make_v1(s: int) -> PlotSize: ...
+    def make_v1(s: int) -> PlotParam: ...
     @staticmethod
-    def make_v2(s: int) -> PlotSize: ...
+    def make_v2(s: int) -> PlotParam: ...
 
     size_v1: Optional[uint8]
     strength_v2: Optional[uint8]

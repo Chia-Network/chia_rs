@@ -190,11 +190,11 @@ class MerkleSet:
     ) -> MerkleSet: ...
 
 @final
-class PlotSize:
+class PlotParam:
     @staticmethod
-    def make_v1(s: int) -> PlotSize: ...
+    def make_v1(s: int) -> PlotParam: ...
     @staticmethod
-    def make_v2(s: int) -> PlotSize: ...
+    def make_v2(s: int) -> PlotParam: ...
 
     size_v1: Optional[uint8]
     strength_v2: Optional[uint8]
@@ -2212,7 +2212,7 @@ class ProofOfSpace:
     plot_public_key: G1Element
     version_and_size: uint8
     proof: bytes
-    def size(self) -> PlotSize: ...
+    def param(self) -> PlotParam: ...
     def __new__(
         cls,
         challenge: bytes,
