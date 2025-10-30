@@ -1213,7 +1213,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
                 // if this spend already has a birth_seconds assertion, it's an
                 // error if it's different from the new birth assertion. One of
                 // them must be false
-                if spend.birth_seconds.map(|v| v == s) == Some(false) {
+                if spend.birth_seconds.is_some_and(|v| v != s) {
                     return Err(ValidationErr(c, ErrorCode::AssertMyBirthSecondsFailed));
                 }
                 spend.birth_seconds = Some(s);
@@ -1223,7 +1223,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
                 // if this spend already has a birth_height assertion, it's an
                 // error if it's different from the new birth assertion. One of
                 // them must be false
-                if spend.birth_height.map(|v| v == h) == Some(false) {
+                if spend.birth_height.is_some_and(|v| v != h) {
                     return Err(ValidationErr(c, ErrorCode::AssertMyBirthHeightFailed));
                 }
                 spend.birth_height = Some(h);

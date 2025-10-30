@@ -124,7 +124,7 @@ impl SecretKey {
             return Ok(Self(pk));
         }
 
-        if unsafe { !blst_sk_check(&pk) } {
+        if unsafe { !blst_sk_check(&raw const pk) } {
             return Err(Error::SecretKeyGroupOrder);
         }
 
@@ -134,7 +134,7 @@ impl SecretKey {
     pub fn to_bytes(&self) -> [u8; 32] {
         unsafe {
             let mut bytes = MaybeUninit::<[u8; 32]>::uninit();
-            blst_bendian_from_scalar(bytes.as_mut_ptr().cast::<u8>(), &self.0);
+            blst_bendian_from_scalar(bytes.as_mut_ptr().cast::<u8>(), &raw const self.0);
             bytes.assume_init()
         }
     }
@@ -142,7 +142,7 @@ impl SecretKey {
     pub fn public_key(&self) -> PublicKey {
         let p1 = unsafe {
             let mut p1 = MaybeUninit::<blst_p1>::uninit();
-            blst_sk_to_pk_in_g1(p1.as_mut_ptr(), &self.0);
+            blst_sk_to_pk_in_g1(p1.as_mut_ptr(), &raw const self.0);
             p1.assume_init()
         };
         PublicKey(p1)
@@ -186,7 +186,7 @@ impl Add<&SecretKey> for &SecretKey {
     fn add(self, rhs: &SecretKey) -> SecretKey {
         let scalar = unsafe {
             let mut ret = MaybeUninit::<blst_scalar>::uninit();
-            blst_sk_add_n_check(ret.as_mut_ptr(), &self.0, &rhs.0);
+            blst_sk_add_n_check(ret.as_mut_ptr(), &raw const self.0, &raw const rhs.0);
             ret.assume_init()
         };
         SecretKey(scalar)
@@ -197,7 +197,7 @@ impl Add<&SecretKey> for SecretKey {
     type Output = SecretKey;
     fn add(mut self, rhs: &SecretKey) -> SecretKey {
         unsafe {
-            blst_sk_add_n_check(&mut self.0, &self.0, &rhs.0);
+            blst_sk_add_n_check(&raw mut self.0, &raw const self.0, &raw const rhs.0);
             self
         }
     }
@@ -206,7 +206,7 @@ impl Add<&SecretKey> for SecretKey {
 impl AddAssign<&SecretKey> for SecretKey {
     fn add_assign(&mut self, rhs: &SecretKey) {
         unsafe {
-            blst_sk_add_n_check(&mut self.0, &self.0, &rhs.0);
+            blst_sk_add_n_check(&raw mut self.0, &raw const self.0, &raw const rhs.0);
         }
     }
 }
@@ -234,7 +234,8 @@ impl DerivableKey for SecretKey {
             let success =
                 blst_scalar_from_be_bytes(scalar.as_mut_ptr(), digest.as_ptr(), digest.len());
             assert!(success);
-            let success = blst_sk_add_n_check(scalar.as_mut_ptr(), scalar.as_ptr(), &self.0);
+            let success =
+                blst_sk_add_n_check(scalar.as_mut_ptr(), scalar.as_ptr(), &raw const self.0);
             assert!(success);
             scalar.assume_init()
         };

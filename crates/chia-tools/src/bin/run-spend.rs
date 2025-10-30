@@ -303,12 +303,9 @@ fn main() {
     while let Some((mut c, next)) = a.next(iter) {
         iter = next;
         let op_ptr = first(&a, c).expect("parsing conditions");
-        let op = match parse_opcode(&a, op_ptr, 0) {
-            None => {
-                println!("  UNKNOWN CONDITION [{}]", &hex::encode(a.atom(op_ptr)));
-                continue;
-            }
-            Some(v) => v,
+        let Some(op) = parse_opcode(&a, op_ptr, 0) else {
+            println!("  UNKNOWN CONDITION [{}]", &hex::encode(a.atom(op_ptr)));
+            continue;
         };
 
         c = rest(&a, c).expect("parsing conditions");
