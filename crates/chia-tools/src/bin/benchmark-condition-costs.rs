@@ -1,25 +1,22 @@
 use chia_bls::{sign, SecretKey, Signature};
-use chia_consensus::consensus_constants::TEST_CONSTANTS;
-use chia_consensus::make_aggsig_final_message::u64_to_bytes;
-use chia_sha2::Sha256;
-use linreg::linear_regression_of;
-use std::time::Instant;
 use chia_consensus::conditions::{
-    process_single_spend,
-    validate_conditions,
-    validate_signature,
-    ParseState,
+    process_single_spend, validate_conditions, validate_signature, ParseState,
 };
 use chia_consensus::conditions::{MempoolVisitor, SpendBundleConditions};
+use chia_consensus::consensus_constants::TEST_CONSTANTS;
+use chia_consensus::make_aggsig_final_message::u64_to_bytes;
 use chia_consensus::opcodes;
 use chia_consensus::opcodes::ConditionOpcode;
 use chia_consensus::spend_visitor::SpendVisitor;
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
+use chia_sha2::Sha256;
 use clvmr::{
     allocator::{Allocator, NodePtr},
     error::EvalErr,
 };
+use linreg::linear_regression_of;
+use std::time::Instant;
 struct ConditionTest<'a> {
     opcode: ConditionOpcode,
     args: &'a [NodePtr],
