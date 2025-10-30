@@ -1,6 +1,7 @@
 use crate::bytes::{Bytes, Bytes32};
 use chia_bls::G1Element;
 use chia_streamable_macro::streamable;
+use chia_traits::chia_error;
 
 #[streamable(no_json)]
 pub struct ProofOfSpace {
@@ -8,9 +9,14 @@ pub struct ProofOfSpace {
     pool_public_key: Option<G1Element>,
     pool_contract_puzzle_hash: Option<Bytes32>,
     plot_public_key: G1Element,
-    // this field was renamed when adding support for v2 plots since the top
-    // bit now means whether it's v1 or v2. To stay backwards compabible with
-    // JSON serialization, we still serialize this as its original name
+    /// The 2 top bits determine the type of proof:
+    /// 00 = v1 plot, the field store k-size
+    /// 10 = v2 plot, the field store strength
+    /// 01 = reserved
+    /// 11 = reserved
+    /// this field was renamed when adding support for v2 plots since the top
+    /// bit now means whether it's v1 or v2. To stay backwards compabible with
+    /// JSON serialization, we still serialize this as its original name
     #[cfg_attr(feature = "serde", serde(rename = "size", alias = "version_and_size"))]
     version_and_size: u8,
     proof: Bytes,
@@ -24,11 +30,13 @@ pub enum PlotSize {
 }
 
 impl ProofOfSpace {
-    pub fn size(&self) -> PlotSize {
-        if (self.version_and_size & 0x80) == 0 {
-            PlotSize::V1(self.version_and_size)
-        } else {
-            PlotSize::Strength(self.version_and_size & 0x7f)
+    pub fn size(&self) -> chia_error::Result<PlotSize> {
+        match self.version_and_size & 0b1100_0000 {
+            // valid v1 plot sizes are 32-50 (mainnet) and 18-50 (testnet)
+            0b0000_0000 => Ok(PlotSize::V1(self.version_and_size)),
+            // valid v2 plot strength are 2-63
+            0b1000_0000 => Ok(PlotSize::Strength(self.version_and_size & 0x3f)),
+            _ => Err(chia_error::Error::InvalidPoSVersion),
         }
     }
 }
@@ -52,6 +60,7 @@ pub struct PyPlotSize {
 impl PyPlotSize {
     #[staticmethod]
     fn make_v1(s: u8) -> Self {
+        assert!(s < 64);
         Self {
             size_v1: Some(s),
             strength_v2: None,
@@ -60,6 +69,7 @@ impl PyPlotSize {
 
     #[staticmethod]
     fn make_v2(s: u8) -> Self {
+        assert!(s < 64);
         Self {
             size_v1: None,
             strength_v2: Some(s),
@@ -71,16 +81,16 @@ impl PyPlotSize {
 #[pymethods]
 impl ProofOfSpace {
     #[pyo3(name = "size")]
-    fn py_size(&self) -> PyPlotSize {
-        match self.size() {
-            PlotSize::V1(s) => PyPlotSize {
+    fn py_size(&self) -> PyResult<PyPlotSize> {
+        match self.size()? {
+            PlotSize::V1(s) => Ok(PyPlotSize {
                 size_v1: Some(s),
                 strength_v2: None,
-            },
-            PlotSize::Strength(s) => PyPlotSize {
+            }),
+            PlotSize::Strength(s) => Ok(PyPlotSize {
                 size_v1: None,
                 strength_v2: Some(s),
-            },
+            }),
         }
     }
 }
@@ -135,17 +145,18 @@ mod tests {
     use rstest::rstest;
 
     #[rstest]
-    #[case(0x00, PlotSize::V1(0))]
-    #[case(0x01, PlotSize::V1(1))]
-    #[case(0x08, PlotSize::V1(8))]
-    #[case(0x7f, PlotSize::V1(0x7f))]
-    #[case(0x80, PlotSize::Strength(0))]
-    #[case(0x81, PlotSize::Strength(1))]
-    #[case(0x80 + 28, PlotSize::Strength(28))]
-    #[case(0x80 + 30, PlotSize::Strength(30))]
-    #[case(0x80 + 32, PlotSize::Strength(32))]
-    #[case(0xff, PlotSize::Strength(0x7f))]
-    fn proof_of_space_size(#[case] size_field: u8, #[case] expect: PlotSize) {
+    #[case(0x00, Ok(PlotSize::V1(0)))]
+    #[case(0x01, Ok(PlotSize::V1(1)))]
+    #[case(0x08, Ok(PlotSize::V1(8)))]
+    #[case(0x3f, Ok(PlotSize::V1(0x3f)))]
+    #[case(0x80, Ok(PlotSize::Strength(0)))]
+    #[case(0x81, Ok(PlotSize::Strength(1)))]
+    #[case(0x80 + 28, Ok(PlotSize::Strength(28)))]
+    #[case(0x80 + 30, Ok(PlotSize::Strength(30)))]
+    #[case(0x80 + 32, Ok(PlotSize::Strength(32)))]
+    #[case(0xff, Err(chia_error::Error::InvalidPoSVersion))]
+    #[case(0x7f, Err(chia_error::Error::InvalidPoSVersion))]
+    fn proof_of_space_size(#[case] size_field: u8, #[case] expect: chia_traits::Result<PlotSize>) {
         let pos = ProofOfSpace::new(
             Bytes32::from(b"abababababababababababababababab"),
             None,

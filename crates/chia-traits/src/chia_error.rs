@@ -20,6 +20,8 @@ pub enum Error {
     InvalidClvm,
     #[error("invalid pot iteration")]
     InvalidPotIteration,
+    #[error("Invalid ProofOfSpace version")]
+    InvalidPoSVersion,
     #[error("{0}")]
     Custom(String),
 }
