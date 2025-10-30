@@ -75,7 +75,7 @@ impl Signature {
     pub fn to_bytes(&self) -> [u8; 96] {
         unsafe {
             let mut bytes = MaybeUninit::<[u8; 96]>::uninit();
-            blst_p2_compress(bytes.as_mut_ptr().cast::<u8>(), &self.0);
+            blst_p2_compress(bytes.as_mut_ptr().cast::<u8>(), &raw const self.0);
             bytes.assume_init()
         }
     }
@@ -86,19 +86,19 @@ impl Signature {
 
     pub fn aggregate(&mut self, sig: &Signature) {
         unsafe {
-            blst_p2_add_or_double(&mut self.0, &self.0, &sig.0);
+            blst_p2_add_or_double(&raw mut self.0, &raw const self.0, &raw const sig.0);
         }
     }
 
     pub fn is_valid(&self) -> bool {
         // Infinity was considered a valid G2Element in older Relic versions
         // For historical compatibililty this behavior is maintained.
-        unsafe { blst_p2_is_inf(&self.0) || blst_p2_in_g2(&self.0) }
+        unsafe { blst_p2_is_inf(&raw const self.0) || blst_p2_in_g2(&raw const self.0) }
     }
 
     pub fn negate(&mut self) {
         unsafe {
-            blst_p2_cneg(&mut self.0, true);
+            blst_p2_cneg(&raw mut self.0, true);
         }
     }
 
@@ -106,7 +106,12 @@ impl Signature {
         unsafe {
             let mut scalar = MaybeUninit::<blst_scalar>::uninit();
             blst_scalar_from_be_bytes(scalar.as_mut_ptr(), int_bytes.as_ptr(), int_bytes.len());
-            blst_p2_mult(&mut self.0, &self.0, scalar.as_ptr().cast::<u8>(), 256);
+            blst_p2_mult(
+                &raw mut self.0,
+                &raw const self.0,
+                scalar.as_ptr().cast::<u8>(),
+                256,
+            );
         }
     }
 
@@ -116,8 +121,8 @@ impl Signature {
             let mut aff1 = MaybeUninit::<blst_p1_affine>::uninit();
             let mut aff2 = MaybeUninit::<blst_p2_affine>::uninit();
 
-            blst_p1_to_affine(aff1.as_mut_ptr(), &other.0);
-            blst_p2_to_affine(aff2.as_mut_ptr(), &self.0);
+            blst_p1_to_affine(aff1.as_mut_ptr(), &raw const other.0);
+            blst_p2_to_affine(aff2.as_mut_ptr(), &raw const self.0);
 
             blst_miller_loop(ans.as_mut_ptr(), &aff2.assume_init(), &aff1.assume_init());
             blst_final_exp(ans.as_mut_ptr(), ans.as_ptr());
@@ -151,7 +156,7 @@ impl Streamable for Signature {
 
 impl PartialEq for Signature {
     fn eq(&self, other: &Self) -> bool {
-        unsafe { blst_p2_is_equal(&self.0, &other.0) }
+        unsafe { blst_p2_is_equal(&raw const self.0, &raw const other.0) }
     }
 }
 impl Eq for Signature {}
@@ -174,7 +179,7 @@ impl fmt::Debug for Signature {
 impl AddAssign<&Signature> for Signature {
     fn add_assign(&mut self, rhs: &Signature) {
         unsafe {
-            blst_p2_add_or_double(&mut self.0, &self.0, &rhs.0);
+            blst_p2_add_or_double(&raw mut self.0, &raw const self.0, &raw const rhs.0);
         }
     }
 }
@@ -200,8 +205,8 @@ impl SubAssign<&Signature> for Signature {
     fn sub_assign(&mut self, rhs: &Signature) {
         unsafe {
             let mut neg = rhs.clone();
-            blst_p2_cneg(&mut neg.0, true);
-            blst_p2_add_or_double(&mut self.0, &self.0, &neg.0);
+            blst_p2_cneg(&raw mut neg.0, true);
+            blst_p2_add_or_double(&raw mut self.0, &raw const self.0, &raw const neg.0);
         }
     }
 }
@@ -210,7 +215,7 @@ impl Add<&Signature> for Signature {
     type Output = Signature;
     fn add(mut self, rhs: &Signature) -> Signature {
         unsafe {
-            blst_p2_add_or_double(&mut self.0, &self.0, &rhs.0);
+            blst_p2_add_or_double(&raw mut self.0, &raw const self.0, &raw const rhs.0);
             self
         }
     }
@@ -221,7 +226,7 @@ impl Add<&Signature> for &Signature {
     fn add(self, rhs: &Signature) -> Signature {
         let p1 = unsafe {
             let mut ret = MaybeUninit::<blst_p2>::uninit();
-            blst_p2_add_or_double(ret.as_mut_ptr(), &self.0, &rhs.0);
+            blst_p2_add_or_double(ret.as_mut_ptr(), &raw const self.0, &raw const rhs.0);
             ret.assume_init()
         };
         Signature(p1)
@@ -284,18 +289,18 @@ where
 
         let g1_affine = unsafe {
             let mut g1_affine = MaybeUninit::<blst_p1_affine>::uninit();
-            blst_p1_to_affine(g1_affine.as_mut_ptr(), &g1.borrow().0);
+            blst_p1_to_affine(g1_affine.as_mut_ptr(), &raw const g1.borrow().0);
             g1_affine.assume_init()
         };
 
         let g2_affine = unsafe {
             let mut g2_affine = MaybeUninit::<blst_p2_affine>::uninit();
-            blst_p2_to_affine(g2_affine.as_mut_ptr(), &g2.borrow().0);
+            blst_p2_to_affine(g2_affine.as_mut_ptr(), &raw const g2.borrow().0);
             g2_affine.assume_init()
         };
 
         unsafe {
-            blst_pairing_raw_aggregate(ctx, &g2_affine, &g1_affine);
+            blst_pairing_raw_aggregate(ctx, &raw const g2_affine, &raw const g1_affine);
         }
     }
 
@@ -347,8 +352,8 @@ pub fn verify<Msg: AsRef<[u8]>>(sig: &Signature, key: &PublicKey, msg: Msg) -> b
         let mut pubkey_affine = MaybeUninit::<blst_p1_affine>::uninit();
         let mut sig_affine = MaybeUninit::<blst_p2_affine>::uninit();
 
-        blst_p1_to_affine(pubkey_affine.as_mut_ptr(), &key.0);
-        blst_p2_to_affine(sig_affine.as_mut_ptr(), &sig.0);
+        blst_p1_to_affine(pubkey_affine.as_mut_ptr(), &raw const key.0);
+        blst_p2_to_affine(sig_affine.as_mut_ptr(), &raw const sig.0);
 
         let mut augmented_msg = key.to_bytes().to_vec();
         augmented_msg.extend_from_slice(msg.as_ref());
@@ -391,7 +396,7 @@ where
     let sig_gt = unsafe {
         let mut sig_affine = MaybeUninit::<blst_p2_affine>::uninit();
         let mut sig_gt = MaybeUninit::<blst_fp12>::uninit();
-        blst_p2_to_affine(sig_affine.as_mut_ptr(), &sig.0);
+        blst_p2_to_affine(sig_affine.as_mut_ptr(), &raw const sig.0);
         blst_aggregated_in_g2(sig_gt.as_mut_ptr(), sig_affine.as_ptr());
         sig_gt.assume_init()
     };
@@ -416,7 +421,7 @@ where
 
         let pk_affine = unsafe {
             let mut pk_affine = MaybeUninit::<blst_p1_affine>::uninit();
-            blst_p1_to_affine(pk_affine.as_mut_ptr(), &pk.borrow().0);
+            blst_p1_to_affine(pk_affine.as_mut_ptr(), &raw const pk.borrow().0);
             pk_affine.assume_init()
         };
 
@@ -427,7 +432,7 @@ where
         let err = unsafe {
             blst_pairing_aggregate_pk_in_g1(
                 ctx,
-                &pk_affine,
+                &raw const pk_affine,
                 std::ptr::null(),
                 aug_msg.as_ptr(),
                 aug_msg.len(),
@@ -443,7 +448,7 @@ where
 
     unsafe {
         blst_pairing_commit(ctx);
-        blst_pairing_finalverify(ctx, &sig_gt)
+        blst_pairing_finalverify(ctx, &raw const sig_gt)
     }
 }
 
@@ -487,7 +492,7 @@ pub fn sign_raw<Msg: AsRef<[u8]>>(sk: &SecretKey, msg: Msg) -> Signature {
             std::ptr::null(),
             0,
         );
-        blst_sign_pk_in_g1(p2.as_mut_ptr(), p2.as_ptr(), &sk.0);
+        blst_sign_pk_in_g1(p2.as_mut_ptr(), p2.as_ptr(), &raw const sk.0);
         p2.assume_init()
     };
     Signature(p2)

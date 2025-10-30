@@ -10,11 +10,8 @@ pub fn parse_hex_string(o: &Bound<'_, PyAny>, len: usize, name: &str) -> PyResul
         } else {
             &s[..]
         };
-        let buf = match hex::decode(s) {
-            Err(_) => {
-                return Err(PyValueError::new_err("invalid hex"));
-            }
-            Ok(v) => v,
+        let Ok(buf) = hex::decode(s) else {
+            return Err(PyValueError::new_err("invalid hex"));
         };
         if buf.len() == len {
             Ok(buf)

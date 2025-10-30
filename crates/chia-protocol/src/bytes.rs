@@ -127,11 +127,8 @@ impl FromJsonDict for Bytes {
             ));
         }
         let s = &s[2..];
-        let buf = match Vec::from_hex(s) {
-            Err(_) => {
-                return Err(PyValueError::new_err("invalid hex"));
-            }
-            Ok(v) => v,
+        let Ok(buf) = Vec::from_hex(s) else {
+            return Err(PyValueError::new_err("invalid hex"));
         };
         Ok(buf.into())
     }
@@ -287,11 +284,8 @@ impl<const N: usize> FromJsonDict for BytesImpl<N> {
             ));
         }
         let s = &s[2..];
-        let buf = match Vec::from_hex(s) {
-            Err(_) => {
-                return Err(PyValueError::new_err("invalid hex"));
-            }
-            Ok(v) => v,
+        let Ok(buf) = Vec::from_hex(s) else {
+            return Err(PyValueError::new_err("invalid hex"));
         };
         if buf.len() != N {
             return Err(PyValueError::new_err(format!(
