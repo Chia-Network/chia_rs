@@ -128,7 +128,7 @@ chia-serde = { path = "./crates/chia-serde", version = "0.32.0" }
 clvm-traits = { path = "./crates/clvm-traits", version = "0.32.0" }
 clvm-utils = { path = "./crates/clvm-utils", version = "0.32.0" }
 clvm-derive = { path = "./crates/clvm-derive", version = "0.32.0" }
-chia-pos2 = "0.1.2"
+chia-pos2 = "0.1.3"
 chia-consensus-fuzz = { path = "./crates/chia-consensus/fuzz", version = "0.32.0" }
 chia-bls-fuzz = { path = "./crates/chia-bls/fuzz", version = "0.32.0" }
 chia-datalayer-fuzz = { path = "./crates/chia-datalayer/fuzz", version = "0.32.0" }
