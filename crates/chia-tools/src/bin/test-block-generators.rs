@@ -268,8 +268,8 @@ fn main() {
                     )
                     .expect("failed to run block generator");
 
-                    recompressed_conditions.spends.sort_by_key(|s| *s.coin_id);
-                    conditions.spends.sort_by_key(|s| *s.coin_id);
+                    recompressed_conditions.spends.sort_by_key(|s| s.coin_id);
+                    conditions.spends.sort_by_key(|s| s.coin_id);
 
                     // in order for the comparison below the hold, we need to
                     // patch up the cost of the rust generator to look like the
@@ -328,8 +328,8 @@ fn main() {
                     .expect("run_block_generator()");
                     assert_eq!(baseline.cost, ti.cost);
 
-                    baseline.spends.sort_by_key(|s| *s.coin_id);
-                    conditions.spends.sort_by_key(|s| *s.coin_id);
+                    baseline.spends.sort_by_key(|s| s.coin_id);
+                    conditions.spends.sort_by_key(|s| s.coin_id);
 
                     // now ensure the outputs are the same
                     compare(&a, &baseline, &conditions);

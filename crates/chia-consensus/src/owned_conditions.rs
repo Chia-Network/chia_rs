@@ -106,7 +106,7 @@ impl OwnedSpendConditions {
         };
 
         Self {
-            coin_id: *spend.coin_id,
+            coin_id: spend.coin_id,
             parent_id: a
                 .atom(spend.parent_id)
                 .as_ref()

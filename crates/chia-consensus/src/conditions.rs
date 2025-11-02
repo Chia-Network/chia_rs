@@ -1,4 +1,3 @@
-use super::coin_id::compute_coin_id;
 use super::condition_sanitizers::{
     parse_amount, sanitize_announce_msg, sanitize_hash, sanitize_message_mode,
 };
@@ -30,7 +29,6 @@ use clvmr::cost::Cost;
 use std::cmp::{max, min};
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
-use std::sync::Arc;
 
 // spend flags
 
@@ -223,12 +221,7 @@ impl SpendVisitor for MempoolVisitor {
             // (i.e. any output is ephemeral), if so there is effectively a
             // committment to its coin ID and it cannot be fast forwarded.
             for cc in &s.create_coin {
-                let new_coin = Coin {
-                    parent_coin_info: *s.coin_id,
-                    puzzle_hash: cc.puzzle_hash,
-                    amount: cc.amount,
-                }
-                .coin_id();
+                let new_coin = Coin::new(s.coin_id, cc.puzzle_hash, cc.amount).coin_id();
 
                 if state.spent_coins.contains_key(&new_coin) {
                     s.flags &= !ELIGIBLE_FOR_FF;
@@ -717,7 +710,7 @@ pub struct SpendConditions {
     pub puzzle_hash: NodePtr,
     // the coin ID of the coin being spent. This is computed from parent_id,
     // coin_amount and puzzle_hash
-    pub coin_id: Arc<Bytes32>,
+    pub coin_id: Bytes32,
     // conditions
     // all these integers are initialized to None, which also means "no
     // constraint". A 0 may impose a constraint (post 1.8.0 soft-fork).
@@ -766,7 +759,7 @@ impl SpendConditions {
         parent_id: NodePtr,
         coin_amount: u64,
         puzzle_hash: NodePtr,
-        coin_id: Arc<Bytes32>,
+        coin_id: Bytes32,
         clvm_cost: Cost,
     ) -> SpendConditions {
         SpendConditions {
@@ -846,7 +839,7 @@ pub struct SpendBundleConditions {
 pub struct ParseState {
     // hashing of the announcements is deferred until parsing is complete. This
     // means less work up-front, in case parsing/validation fails
-    announce_coin: HashSet<(Arc<Bytes32>, NodePtr)>,
+    announce_coin: HashSet<(Bytes32, NodePtr)>,
     announce_puzzle: HashSet<(NodePtr, NodePtr)>,
 
     // the assert announcements are checked once everything has been parsed and
@@ -871,7 +864,7 @@ pub struct ParseState {
     // compute the coin ID, and stick it in this map. It's reference counted
     // since it may also be referenced by announcements. The value mapped to is
     // the index of the spend in SpendBundleConditions::spends
-    spent_coins: HashMap<Arc<Bytes32>, usize>,
+    spent_coins: HashMap<Bytes32, usize>,
 
     // for every coin spent, we also store all the puzzle hashes that were
     // spent. Note that these are just the node pointers into the allocator, so
@@ -938,18 +931,17 @@ pub fn process_single_spend<'a, V: SpendVisitor>(
     let parent_id = sanitize_hash(a, parent_id, 32, ErrorCode::InvalidParentId)?;
     let puzzle_hash = sanitize_hash(a, puzzle_hash, 32, ErrorCode::InvalidPuzzleHash)?;
     let my_amount = parse_amount(a, amount, ErrorCode::InvalidCoinAmount)?;
-    let amount_buf = a.atom(amount);
 
-    let coin_id = Arc::new(compute_coin_id(
-        a,
-        parent_id,
-        puzzle_hash,
-        amount_buf.as_ref(),
-    ));
+    let coin_id = Coin::new(
+        a.atom(parent_id).as_ref().try_into().unwrap(),
+        a.atom(puzzle_hash).as_ref().try_into().unwrap(),
+        my_amount,
+    )
+    .coin_id();
 
     if state
         .spent_coins
-        .insert(coin_id.clone(), ret.spends.len())
+        .insert(coin_id, ret.spends.len())
         .is_some()
     {
         // if this coin ID has already been added to this set, it's a double
@@ -1200,7 +1192,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
                 }
             }
             Condition::AssertMyCoinId(id) => {
-                if a.atom(id).as_ref() != (*spend.coin_id).as_ref() {
+                if a.atom(id).as_ref() != (spend.coin_id).as_ref() {
                     return Err(ValidationErr(c, ErrorCode::AssertMyCoinIdFailed));
                 }
             }
@@ -1246,7 +1238,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
                 if (flags & COST_CONDITIONS) == 0 {
                     decrement(&mut announce_countdown, msg)?;
                 }
-                state.announce_coin.insert((spend.coin_id.clone(), msg));
+                state.announce_coin.insert((spend.coin_id, msg));
             }
             Condition::CreatePuzzleAnnouncement(msg) => {
                 if flags & COST_CONDITIONS == 0 {
@@ -1282,8 +1274,8 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
                 spend.agg_sig_me.push((to_key(a, pk)?, msg));
                 if (flags & DONT_VALIDATE_SIGNATURE) == 0 {
                     let mut msg = a.atom(msg).as_ref().to_vec();
-                    msg.extend((*spend.coin_id).as_slice());
-                    msg.extend(constants.agg_sig_me_additional_data.as_slice());
+                    msg.extend_from_slice(&spend.coin_id);
+                    msg.extend_from_slice(&constants.agg_sig_me_additional_data);
                     state.pkm_pairs.push((to_key(a, pk)?, msg.into()));
                 }
             }
@@ -1372,7 +1364,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
                     spend.parent_id,
                     spend.puzzle_hash,
                     spend.coin_amount,
-                    &spend.coin_id,
+                    spend.coin_id,
                 )?;
                 state.messages.push(Message {
                     src,
@@ -1390,7 +1382,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
                     spend.parent_id,
                     spend.puzzle_hash,
                     spend.coin_amount,
-                    &spend.coin_id,
+                    spend.coin_id,
                 )?;
                 state.messages.push(Message {
                     src,
@@ -1415,7 +1407,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
 fn is_ephemeral(
     a: &Allocator,
     spend_idx: usize,
-    spent_ids: &HashMap<Arc<Bytes32>, usize>,
+    spent_ids: &HashMap<Bytes32, usize>,
     spends: &[SpendConditions],
 ) -> bool {
     let spend = &spends[spend_idx];
@@ -1568,10 +1560,10 @@ pub fn validate_conditions(
     if !state.assert_coin.is_empty() {
         let mut announcements = HashSet::<Bytes32>::with_capacity(state.announce_coin.len());
 
-        for (coin_id, announce) in &state.announce_coin {
+        for &(coin_id, announce) in &state.announce_coin {
             let mut hasher = Sha256::new();
-            hasher.update(**coin_id);
-            hasher.update(a.atom(*announce));
+            hasher.update(coin_id);
+            hasher.update(a.atom(announce));
             let announcement_id: [u8; 32] = hasher.finalize();
             announcements.insert(announcement_id.into());
         }
@@ -2013,7 +2005,7 @@ fn test_invalid_condition_args_terminator() {
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.flags, HAS_RELATIVE_CONDITION);
 
@@ -2040,7 +2032,7 @@ fn test_invalid_condition_list_terminator() {
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.flags, HAS_RELATIVE_CONDITION);
 
@@ -2276,7 +2268,7 @@ fn test_extra_arg(
     assert_eq!(conds.cost, expected_cost);
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert!((spend.flags & ELIGIBLE_FOR_DEDUP) == 0);
 
@@ -2324,7 +2316,7 @@ fn test_single_condition(
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert!((spend.flags & ELIGIBLE_FOR_DEDUP) == 0);
 
@@ -2467,7 +2459,7 @@ fn test_multiple_conditions(
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 1234));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 1234));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert!((spend.flags & ELIGIBLE_FOR_DEDUP) == 0);
 
@@ -2524,7 +2516,7 @@ fn test_single_height_relative_zero() {
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.flags, HAS_RELATIVE_CONDITION);
 
@@ -2582,7 +2574,7 @@ fn test_coin_announces_consume() {
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.flags, 0);
 }
@@ -2597,9 +2589,9 @@ fn test_cross_coin_announces_consume() {
 
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 2);
-    assert_eq!(*conds.spends[0].coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(conds.spends[0].coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(conds.spends[0].puzzle_hash).as_ref(), H2);
-    assert_eq!(*conds.spends[1].coin_id, test_coin_id(H2, H2, 123));
+    assert_eq!(conds.spends[1].coin_id, test_coin_id(H2, H2, 123));
     assert_eq!(a.atom(conds.spends[1].puzzle_hash).as_ref(), H2);
 }
 
@@ -2635,7 +2627,7 @@ fn test_puzzle_announces_consume() {
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.flags, 0);
 }
@@ -2650,9 +2642,9 @@ fn test_cross_coin_puzzle_announces_consume() {
 
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 2);
-    assert_eq!(*conds.spends[0].coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(conds.spends[0].coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(conds.spends[0].puzzle_hash).as_ref(), H2);
-    assert_eq!(*conds.spends[1].coin_id, test_coin_id(H2, H2, 123));
+    assert_eq!(conds.spends[1].coin_id, test_coin_id(H2, H2, 123));
     assert_eq!(a.atom(conds.spends[1].puzzle_hash).as_ref(), H2);
 }
 
@@ -2722,7 +2714,7 @@ fn test_multiple_assert_my_amount() {
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.flags, 0);
 }
@@ -2770,7 +2762,7 @@ fn test_multiple_assert_my_coin_id() {
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.flags, 0);
 }
@@ -2807,7 +2799,7 @@ fn test_multiple_assert_my_parent_coin_id() {
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.flags, 0);
 }
@@ -2845,7 +2837,7 @@ fn test_multiple_assert_my_puzzle_hash() {
     assert_eq!(conds.removal_amount, 123);
     assert_eq!(conds.addition_amount, 0);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.flags, 0);
 }
@@ -2883,7 +2875,7 @@ fn test_single_create_coin() {
     assert_eq!(conds.removal_amount, 123);
     assert_eq!(conds.addition_amount, 42);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
@@ -2906,7 +2898,7 @@ fn test_create_coin_max_amount() {
     assert_eq!(conds.removal_amount, 0xffff_ffff_ffff_ffff);
     assert_eq!(conds.addition_amount, 0xffff_ffff_ffff_ffff);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 0xffff_ffff_ffff_ffff));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 0xffff_ffff_ffff_ffff));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
@@ -2972,7 +2964,7 @@ fn test_create_coin_with_hint() {
     assert_eq!(conds.removal_amount, 123);
     assert_eq!(conds.addition_amount, 42);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
@@ -2995,7 +2987,7 @@ fn test_create_coin_extra_arg() {
     assert_eq!(conds.removal_amount, 123);
     assert_eq!(conds.addition_amount, 42);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
@@ -3016,7 +3008,7 @@ fn test_create_coin_with_multiple_hints() {
     assert_eq!(conds.removal_amount, 123);
     assert_eq!(conds.addition_amount, 42);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
@@ -3038,7 +3030,7 @@ fn test_create_coin_with_hint_as_atom() {
     assert_eq!(conds.removal_amount, 123);
     assert_eq!(conds.addition_amount, 42);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
@@ -3059,7 +3051,7 @@ fn test_create_coin_with_invalid_hint_as_terminator() {
     assert_eq!(conds.removal_amount, 123);
     assert_eq!(conds.addition_amount, 42);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
@@ -3092,7 +3084,7 @@ fn test_create_coin_with_short_hint() {
     assert_eq!(conds.removal_amount, 123);
     assert_eq!(conds.addition_amount, 42);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.create_coin.len(), 1);
 
@@ -3114,7 +3106,7 @@ fn test_create_coin_with_long_hint() {
     assert_eq!(conds.removal_amount, 123);
     assert_eq!(conds.addition_amount, 42);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.create_coin.len(), 1);
 
@@ -3137,7 +3129,7 @@ fn test_create_coin_with_pair_hint() {
     assert_eq!(conds.removal_amount, 123);
     assert_eq!(conds.addition_amount, 42);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.create_coin.len(), 1);
 
@@ -3160,7 +3152,7 @@ fn test_create_coin_with_cons_hint() {
     assert_eq!(conds.removal_amount, 123);
     assert_eq!(conds.addition_amount, 42);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
@@ -3182,7 +3174,7 @@ fn test_multiple_create_coin() {
     assert_eq!(conds.removal_amount, 123);
     assert_eq!(conds.addition_amount, 42 + 43);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.create_coin.len(), 2);
 
@@ -3295,7 +3287,7 @@ fn test_single_agg_sig_me(
     assert_eq!(conds.removal_amount, 123);
     assert_eq!(conds.addition_amount, 0);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
 
     let agg_sigs = agg_sig_vec(condition, spend);
@@ -3332,7 +3324,7 @@ fn test_duplicate_agg_sig(
     assert_eq!(conds.removal_amount, 123);
     assert_eq!(conds.addition_amount, 0);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
 
     let agg_sigs = agg_sig_vec(condition, spend);
@@ -3483,7 +3475,7 @@ fn test_single_agg_sig_unsafe() {
     assert_eq!(conds.removal_amount, 123);
     assert_eq!(conds.addition_amount, 0);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(conds.agg_sig_unsafe.len(), 1);
     for (pk, msg) in &conds.agg_sig_unsafe {
@@ -3517,7 +3509,7 @@ fn test_agg_sig_extra_arg(#[case] condition: ConditionOpcode) {
     assert_eq!(conds.cost, 1_200_000);
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert!((spend.flags & ELIGIBLE_FOR_DEDUP) == 0);
 
@@ -3559,7 +3551,7 @@ fn test_agg_sig_unsafe_invalid_terminator() {
     assert_eq!(conds.removal_amount, 123);
     assert_eq!(conds.addition_amount, 0);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(conds.agg_sig_unsafe.len(), 1);
     for (pk, msg) in &conds.agg_sig_unsafe {
@@ -3588,7 +3580,7 @@ fn test_agg_sig_me_invalid_terminator() {
     assert_eq!(conds.removal_amount, 123);
     assert_eq!(conds.addition_amount, 0);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.agg_sig_me.len(), 1);
     for (pk, msg) in &conds.agg_sig_unsafe {
@@ -3617,7 +3609,7 @@ fn test_duplicate_agg_sig_unsafe() {
     assert_eq!(conds.removal_amount, 123);
     assert_eq!(conds.addition_amount, 0);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(conds.agg_sig_unsafe.len(), 2);
     for (pk, msg) in &conds.agg_sig_unsafe {
@@ -3670,7 +3662,7 @@ fn final_message(
         a.new_atom(parent.as_slice()).expect("should pass"),
         amount,
         a.new_atom(puzzle.as_slice()).expect("test should pass"),
-        Arc::new(Bytes32::try_from(coin.coin_id()).expect("test should pass")),
+        coin.coin_id(),
         0, // clvm_cost
     );
 
@@ -3839,7 +3831,7 @@ fn test_remark() {
     // there is one spend
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.agg_sig_me.len(), 0);
     assert_eq!(spend.flags, 0);
@@ -3863,7 +3855,7 @@ fn test_remark_with_arg() {
     // there is one spend
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.agg_sig_me.len(), 0);
     assert_eq!(spend.flags, 0);
@@ -3911,13 +3903,13 @@ fn test_concurrent_spend() {
         // there are two spends
         assert_eq!(conds.spends.len(), 2);
         let spend = &conds.spends[0];
-        assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+        assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
         assert_eq!(spend.agg_sig_me.len(), 0);
         assert_eq!(spend.flags, 0);
 
         let spend = &conds.spends[1];
-        assert_eq!(*spend.coin_id, test_coin_id(H2, H2, 123));
+        assert_eq!(spend.coin_id, test_coin_id(H2, H2, 123));
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
         assert_eq!(spend.agg_sig_me.len(), 0);
         assert_eq!(spend.flags, 0);
@@ -3990,7 +3982,7 @@ fn test_assert_concurrent_spend_self() {
     // there are two spends
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.agg_sig_me.len(), 0);
     assert_eq!(spend.flags, 0);
@@ -4038,13 +4030,13 @@ fn test_concurrent_puzzle() {
         // there are two spends
         assert_eq!(conds.spends.len(), 2);
         let spend = &conds.spends[0];
-        assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
+        assert_eq!(spend.coin_id, test_coin_id(H1, H1, 123));
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
         assert_eq!(spend.agg_sig_me.len(), 0);
         assert_eq!(spend.flags, 0);
 
         let spend = &conds.spends[1];
-        assert_eq!(*spend.coin_id, test_coin_id(H2, H2, 123));
+        assert_eq!(spend.coin_id, test_coin_id(H2, H2, 123));
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
         assert_eq!(spend.agg_sig_me.len(), 0);
         assert_eq!(spend.flags, 0);
@@ -4116,7 +4108,7 @@ fn test_assert_concurrent_puzzle_self() {
     // there are two spends
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.agg_sig_me.len(), 0);
     assert_eq!(spend.flags, 0);
@@ -4348,7 +4340,7 @@ fn test_impossible_constraints_single_spend(
 
         assert_eq!(conds.spends.len(), 1);
         let spend = &conds.spends[0];
-        assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
+        assert_eq!(spend.coin_id, test_coin_id(H1, H1, 123));
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
         assert_eq!(spend.agg_sig_me.len(), 0);
         assert!((spend.flags & ELIGIBLE_FOR_DEDUP) == 0);
@@ -4445,13 +4437,13 @@ fn test_impossible_constraints_separate_spends(
 
         assert_eq!(conds.spends.len(), 2);
         let spend = &conds.spends[0];
-        assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
+        assert_eq!(spend.coin_id, test_coin_id(H1, H1, 123));
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
         assert_eq!(spend.agg_sig_me.len(), 0);
         assert!((spend.flags & ELIGIBLE_FOR_DEDUP) == 0);
 
         let spend = &conds.spends[1];
-        assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+        assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
         assert_eq!(spend.agg_sig_me.len(), 0);
         assert!((spend.flags & ELIGIBLE_FOR_DEDUP) == 0);
@@ -4494,7 +4486,7 @@ fn test_multiple_my_birth_assertions(
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 1234));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H2, 1234));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert!((spend.flags & ELIGIBLE_FOR_DEDUP) == 0);
 
@@ -4534,15 +4526,15 @@ fn test_ephemeral_non_ff_spend() {
 
     assert_eq!(conds.spends.len(), 2);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H1, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
     assert_eq!(spend.agg_sig_me.len(), 0);
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
 
     let spend = &conds.spends[1];
     assert_eq!(
-        *spend.coin_id,
-        test_coin_id((&(*conds.spends[0].coin_id)).into(), H1, 123)
+        spend.coin_id,
+        test_coin_id((&conds.spends[0].coin_id).into(), H1, 123)
     );
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
     assert_eq!(spend.agg_sig_me.len(), 0);
@@ -4578,15 +4570,15 @@ fn test_assert_ephemeral() {
 
     assert_eq!(conds.spends.len(), 2);
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H1, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
     assert_eq!(spend.agg_sig_me.len(), 0);
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP); // not ELIGIBLE_FOR_FF
 
     let spend = &conds.spends[1];
     assert_eq!(
-        *spend.coin_id,
-        test_coin_id((&(*conds.spends[0].coin_id)).into(), H2, 123)
+        spend.coin_id,
+        test_coin_id(&conds.spends[0].coin_id.to_bytes(), H2, 123)
     );
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.agg_sig_me.len(), 0);
@@ -4616,7 +4608,7 @@ fn test_assert_ephemeral_no_ff() {
     let (a, conds) = cond_test(test).unwrap();
 
     let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
+    assert_eq!(spend.coin_id, test_coin_id(H1, H1, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
     assert_eq!(spend.agg_sig_me.len(), 0);
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP); // not ELIGIBLE_FOR_FF
@@ -4624,8 +4616,8 @@ fn test_assert_ephemeral_no_ff() {
 
     let spend = &conds.spends[1];
     assert_eq!(
-        *spend.coin_id,
-        test_coin_id((&(*conds.spends[0].coin_id)).into(), H2, 123)
+        spend.coin_id,
+        test_coin_id(&conds.spends[0].coin_id.to_bytes(), H2, 123)
     );
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.agg_sig_me.len(), 0);
@@ -4762,15 +4754,15 @@ fn test_relative_condition_on_ephemeral(
 
         assert_eq!(conds.spends.len(), 2);
         let spend = &conds.spends[0];
-        assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
+        assert_eq!(spend.coin_id, test_coin_id(H1, H1, 123));
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
         assert_eq!(spend.agg_sig_me.len(), 0);
         assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP);
 
         let spend = &conds.spends[1];
         assert_eq!(
-            *spend.coin_id,
-            test_coin_id((&(*conds.spends[0].coin_id)).into(), H2, 123)
+            spend.coin_id,
+            test_coin_id(&conds.spends[0].coin_id.to_bytes(), H2, 123)
         );
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
         assert_eq!(spend.agg_sig_me.len(), 0);
@@ -5419,7 +5411,7 @@ fn test_message_conditions_single_spend(#[case] test_case: &str, #[case] expect:
         assert_eq!(conds.cost, 0);
         assert_eq!(conds.spends.len(), 1);
         let spend = &conds.spends[0];
-        assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+        assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
         assert_eq!(spend.flags, 0);
     } else if expect_pass {
@@ -5838,12 +5830,12 @@ fn test_message_conditions_two_spends(
         assert_eq!(conds.spends.len(), 2);
 
         let spend = &conds.spends[0];
-        assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+        assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
         assert_eq!(spend.flags, 0);
 
         let spend = &conds.spends[1];
-        assert_eq!(*spend.coin_id, test_coin_id(H2, H1, 123));
+        assert_eq!(spend.coin_id, test_coin_id(H2, H1, 123));
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
         assert_eq!(spend.flags, 0);
     } else if expect_pass {
@@ -5903,12 +5895,12 @@ fn test_all_message_conditions() {
         assert_eq!(conds.spends.len(), 2);
 
         let spend = &conds.spends[0];
-        assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
+        assert_eq!(spend.coin_id, test_coin_id(H1, H2, 123));
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
         assert_eq!(spend.flags, 0);
 
         let spend = &conds.spends[1];
-        assert_eq!(*spend.coin_id, test_coin_id(H2, H1, 456));
+        assert_eq!(spend.coin_id, test_coin_id(H2, H1, 456));
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
         assert_eq!(spend.flags, 0);
     }

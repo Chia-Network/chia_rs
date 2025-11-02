@@ -77,7 +77,9 @@ pub fn u64_to_bytes(val: u64) -> Vec<u8> {
 mod tests {
     use super::*;
     use crate::allocator::make_allocator;
+    use crate::conditions::SpendConditions;
     use crate::consensus_constants::TEST_CONSTANTS;
+    use chia_protocol::Bytes32;
     use clvmr::chia_dialect::LIMIT_HEAP;
     use clvmr::Allocator;
     use hex_literal::hex;
@@ -105,12 +107,6 @@ mod tests {
     #[case(AGG_SIG_PARENT_PUZZLE, 10_061_997)]
     #[case(AGG_SIG_ME, 1303)]
     fn test_make_aggsig_final_message(#[case] opcode: ConditionOpcode, #[case] coin_amount: u64) {
-        use std::sync::Arc;
-
-        use chia_protocol::Bytes32;
-
-        use crate::conditions::SpendConditions;
-
         let parent_id: Vec<u8> =
             hex!("4444444444444444444444444444444444444444444444444444444444444444").into();
         let puzzle_hash: Vec<u8> =
@@ -178,7 +174,7 @@ mod tests {
             coin_amount,
             a.new_atom(puzzle_hash.as_slice())
                 .expect("test should pass"),
-            Arc::new(Bytes32::try_from(coin.coin_id()).expect("test should pass")),
+            coin.coin_id(),
             0,
         );
 

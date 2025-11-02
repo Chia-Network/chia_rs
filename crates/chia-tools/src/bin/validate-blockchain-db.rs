@@ -317,7 +317,7 @@ features that are validated:
                 }
 
                 for spend in &conditions.spends {
-                    let coin_name = *spend.coin_id;
+                    let coin_name = spend.coin_id;
                     if !removals.remove(coin_name.as_slice()) {
                         println!("at height {height} could not find coin {coin_name} in coin_record table, which is being spent at height {height}");
                         cnt.fetch_add(1, Ordering::Relaxed);
