@@ -299,7 +299,7 @@ mod tests {
             if conds
                 .spends
                 .iter()
-                .any(|s| seen_spends.contains(&*s.coin_id))
+                .any(|s| seen_spends.contains(&s.coin_id))
             {
                 // We can't have conflicting spend bundles, since we combine
                 // them randomly. In this case two spend bundles spend the same
@@ -311,7 +311,7 @@ mod tests {
             }
             if conds.spends.iter().any(|s| {
                 s.create_coin.iter().any(|c| {
-                    seen_spends.contains(&Coin::new(*s.coin_id, c.puzzle_hash, c.amount).coin_id())
+                    seen_spends.contains(&Coin::new(s.coin_id, c.puzzle_hash, c.amount).coin_id())
                 })
             }) {
                 // We can't have conflicting spend bundles, since we combine
@@ -327,10 +327,10 @@ mod tests {
                 );
             }
             for spend in &conds.spends {
-                seen_spends.insert(*spend.coin_id);
+                seen_spends.insert(spend.coin_id);
                 for coin in &spend.create_coin {
                     seen_spends
-                        .insert(Coin::new(*spend.coin_id, coin.puzzle_hash, coin.amount).coin_id());
+                        .insert(Coin::new(spend.coin_id, coin.puzzle_hash, coin.amount).coin_id());
                 }
             }
 

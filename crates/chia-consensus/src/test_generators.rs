@@ -50,11 +50,11 @@ pub(crate) fn print_conditions(a: &Allocator, c: &SpendBundleConditions, a2: &Al
     ret += "SPENDS:\n";
 
     let mut spends: Vec<SpendConditions> = c.spends.clone();
-    spends.sort_by_key(|s| *s.coin_id);
+    spends.sort_by_key(|s| s.coin_id);
     for s in spends {
         ret += &format!(
             "- coin id: {} ph: {} exe-cost: {} cond-cost: {}\n",
-            hex::encode(*s.coin_id),
+            hex::encode(s.coin_id),
             hex::encode(a.atom(s.puzzle_hash)),
             s.execution_cost,
             s.condition_cost,
@@ -299,7 +299,7 @@ fn run_generator(#[case] name: &str) {
                 // the generator itself has execution cost. At least the cost of
                 // a quote
                 assert!(exe_cost <= conditions.execution_cost);
-                (conditions.cost, print_conditions(&a2, &conditions, &a2))
+                (conditions.cost, print_conditions(&a2, conditions, &a2))
             }
             Err(code) => (0, format!("FAILED: {}\n", u32::from(code.1))),
         };
@@ -311,7 +311,7 @@ fn run_generator(#[case] name: &str) {
                 }
             } else {
                 last_output = output.clone();
-                write_back.push_str(&format!("{output}"));
+                write_back.push_str(&output);
             }
         }
         if run_generator_one {
@@ -342,7 +342,7 @@ fn run_generator(#[case] name: &str) {
                         conditions.cost = conds2.cost;
                         conditions.execution_cost = conds2.execution_cost;
                         for s in &conds2.spends {
-                            for ms in conditions.spends.iter_mut() {
+                            for ms in &mut conditions.spends {
                                 if ms.coin_id == s.coin_id {
                                     ms.execution_cost = s.execution_cost;
                                     break;
