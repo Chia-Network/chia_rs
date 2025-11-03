@@ -5,7 +5,9 @@ use super::run_block_generator::{
 };
 use crate::allocator::make_allocator;
 use crate::consensus_constants::TEST_CONSTANTS;
-use crate::flags::{COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
+use crate::flags::{COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE, SIMPLIFY_GENERATOR};
+use crate::validation_error::ErrorCode;
+use crate::validation_error::ValidationErr;
 use chia_bls::Signature;
 use chia_protocol::Program;
 use chia_protocol::{Bytes, Bytes48};
@@ -286,7 +288,15 @@ fn run_generator(#[case] name: &str) {
             "aa-million-message-spends",
             "aa-million-messages",
             "29500-remarks-procedural",
+            "100000-remarks-prefab",
             "3000000-conditions-single-coin",
+            "block-4671894",
+            "block-225758",
+            "infinite-recursion1",
+            "infinite-recursion2",
+            "infinite-recursion3",
+            "infinite-recursion4",
+            "recursion-pairs",
         ]
         .contains(&name)
         {
@@ -294,8 +304,9 @@ fn run_generator(#[case] name: &str) {
             flags |= SIMPLIFY_GENERATOR;
         } else {
             // lets test that the procedural generators are filtered with the flag
+            let mut a = make_allocator(flags);
             let test_conds = run_block_generator2(
-                &mut a2,
+                &mut a,
                 &generator,
                 &block_refs,
                 11_000_000_000,
@@ -304,9 +315,10 @@ fn run_generator(#[case] name: &str) {
                 None,
                 &TEST_CONSTANTS,
             );
+            assert!(test_conds.is_err());
             assert_eq!(
-                test_conds,
-                Err(ValidationErr(a.nil(), ErrorCode::ComplexGeneratorReceived))
+                test_conds.unwrap_err(),
+                ValidationErr(a.nil(), ErrorCode::ComplexGeneratorReceived)
             )
         }
 
