@@ -71,6 +71,7 @@ use pyo3::wrap_pyfunction;
 use std::path::Path;
 
 use std::iter::zip;
+use std::time::Instant;
 
 use crate::run_program::{run_chia_program, serialized_length, serialized_length_trusted};
 
@@ -429,8 +430,10 @@ pub fn py_validate_clvm_and_signature(
     constants: &ConsensusConstants,
     flags: u32,
 ) -> PyResult<(OwnedSpendBundleConditions, Vec<([u8; 32], GTElement)>, f32)> {
-    let (owned_conditions, additions, duration) =
+    let start_time = Instant::now();
+    let (owned_conditions, additions) =
         py.allow_threads(|| validate_clvm_and_signature(new_spend, max_cost, constants, flags))?;
+    let duration = start_time.elapsed();
     Ok((owned_conditions, additions, duration.as_secs_f32()))
 }
 

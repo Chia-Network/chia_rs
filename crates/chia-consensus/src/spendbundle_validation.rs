@@ -10,7 +10,6 @@ use chia_protocol::SpendBundle;
 use chia_sha2::Sha256;
 use clvmr::chia_dialect::ENABLE_KECCAK_OPS_OUTSIDE_GUARD;
 use clvmr::{NodePtr, LIMIT_HEAP};
-use std::time::{Duration, Instant};
 
 // type definition makes clippy happy
 pub type ValidationPair = ([u8; 32], GTElement);
@@ -23,9 +22,7 @@ pub fn validate_clvm_and_signature(
     max_cost: u64,
     constants: &ConsensusConstants,
     flags: u32,
-) -> Result<(OwnedSpendBundleConditions, Vec<ValidationPair>, Duration), ValidationErr> {
-    let start_time = Instant::now();
-
+) -> Result<(OwnedSpendBundleConditions, Vec<ValidationPair>), ValidationErr> {
     let mut a = make_allocator(LIMIT_HEAP);
     let (sbc, pkm_pairs) = run_spendbundle(&mut a, spend_bundle, max_cost, flags, constants)?;
     let conditions = OwnedSpendBundleConditions::from(&a, sbc);
@@ -59,7 +56,7 @@ pub fn validate_clvm_and_signature(
     }
 
     // Collect results
-    Ok((conditions, pairs, start_time.elapsed()))
+    Ok((conditions, pairs))
 }
 
 pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusConstants) -> u32 {
@@ -287,7 +284,7 @@ ff843B9ACA00\
             coin_spends: vec![spend],
             aggregated_signature: Signature::default(),
         };
-        let (conds, _pks, _timing) = validate_clvm_and_signature(
+        let (conds, _pks) = validate_clvm_and_signature(
             &spend_bundle,
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
@@ -316,7 +313,7 @@ ff843B9ACA00\
         };
         let expected_cost = 5_527_116_044;
         let max_cost = expected_cost;
-        let (conds, _, _) =
+        let (conds, _) =
             validate_clvm_and_signature(&spend_bundle, max_cost, &TEST_CONSTANTS, MEMPOOL_MODE)
                 .expect("validate_clvm_and_signature failed");
         assert_eq!(conds.cost, expected_cost);
