@@ -7,7 +7,7 @@ output_file = Path(__file__).parent.resolve() / "python" / "chia_rs" / "chia_rs.
 crates_dir = Path(__file__).parent.parent.resolve() / "crates"
 input_dir = crates_dir / "chia-protocol" / "src"
 
-ignore_structs = ["PyPlotParam"]
+ignore_structs = ["PyPlotParam", "TwoOption<T, U>"]
 
 # enums are exposed to python as int
 enums = set(
@@ -169,7 +169,8 @@ def parse_rust_source(filename: str, upper_case: bool) -> list[tuple[str, list[s
                     for idx, rust_type in enumerate(rust_args.split(",")):
                         py_type = rust_type_to_python(rust_type)
                         args.append(f"a{idx}: {py_type}")
-                    ret.append((name, args))
+                    if name not in ignore_structs:
+                        ret.append((name, args))
                     continue
                 else:
                     continue
@@ -182,6 +183,9 @@ def parse_rust_source(filename: str, upper_case: bool) -> list[tuple[str, list[s
             # a field
             if ":" in line and "///" not in line:
                 name, rust_type = line.split("//")[0].strip().split(":")
+                if "TwoOption" in rust_type:
+                    # This is an implementation detail, don't expose to python
+                    continue
                 # members are separated by , in rust. Strip that off
                 try:
                     rust_type, line = rust_type.rsplit(",", 1)
@@ -206,6 +210,14 @@ def parse_rust_source(filename: str, upper_case: bool) -> list[tuple[str, list[s
 extra_members = {
     "Coin": [
         "def name(self) -> bytes32: ...",
+    ],
+    "SubEpochSummary": [
+        "@property\n    def new_sub_slot_iters(self) -> Optional[uint64]: ...",
+        "@property\n    def merkle_root(self) -> Optional[bytes32]: ...",
+    ],
+    "RewardChainBlock": [
+        "@property\n    def infused_challenge_chain_ip_vdf(self) -> Optional[VDFInfo]: ...",
+        "@property\n    def merkle_root(self) -> Optional[bytes32]: ...",
     ],
     "ClassgroupElement": [
         "@staticmethod\n    def create(bytes) -> ClassgroupElement: ...",
