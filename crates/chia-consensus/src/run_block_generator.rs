@@ -5,7 +5,7 @@ use crate::conditions::{
     ParseState, SpendBundleConditions,
 };
 use crate::consensus_constants::ConsensusConstants;
-use crate::flags::DONT_VALIDATE_SIGNATURE;
+use crate::flags::{DONT_VALIDATE_SIGNATURE, SIMPLIFY_GENERATOR};
 use crate::validation_error::{first, ErrorCode, ValidationErr};
 use chia_bls::{BlsCache, Signature};
 use chia_protocol::{BytesImpl, Coin, CoinSpend, Program};
@@ -86,6 +86,9 @@ pub fn run_block_generator<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
+    if !check_generator_quote(program, flags) {
+        return Err(ValidationErr(a.nil(), ErrorCode::ComplexGeneratorReceived));
+    };
     let mut cost_left = max_cost;
     let byte_cost = program.len() as u64 * constants.cost_per_byte;
 
@@ -154,6 +157,13 @@ fn extract_n<const N: usize>(
     Ok(ret)
 }
 
+// this function checks if the generator start with a quote
+// this is required after the SIMPLIFY_GENERATOR fork is active
+#[inline]
+pub fn check_generator_quote(program: &[u8], flags: u32) -> bool {
+    flags & SIMPLIFY_GENERATOR == 0 || program.starts_with(&[0xff, 0x01])
+}
+
 /// This has the same behavior as run_block_generator() but implements the
 /// generator ROM in rust instead of using the CLVM implementation.
 /// it is not backwards compatible in the CLVM cost computation (in this version
@@ -174,6 +184,9 @@ pub fn run_block_generator2<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
+    if !check_generator_quote(program, flags) {
+        return Err(ValidationErr(a.nil(), ErrorCode::ComplexGeneratorReceived));
+    };
     let byte_cost = program.len() as u64 * constants.cost_per_byte;
 
     let mut cost_left = max_cost;
@@ -264,6 +277,9 @@ where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
     let mut a = make_allocator(flags);
+    if !check_generator_quote(generator.as_ref(), flags) {
+        return Err(ValidationErr(a.nil(), ErrorCode::ComplexGeneratorReceived));
+    };
     let mut output = Vec::<CoinSpend>::new();
 
     let program = node_from_bytes_backrefs(&mut a, generator)?;
@@ -337,6 +353,9 @@ where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
     let mut a = make_allocator(flags);
+    if !check_generator_quote(generator.as_ref(), flags) {
+        return Err(ValidationErr(a.nil(), ErrorCode::ComplexGeneratorReceived));
+    };
     let mut output = Vec::<(CoinSpend, Vec<(u32, Vec<Vec<u8>>)>)>::new();
 
     let program = node_from_bytes_backrefs(&mut a, generator)?;
