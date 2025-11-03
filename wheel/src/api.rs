@@ -8,7 +8,7 @@ use chia_consensus::check_time_locks::py_check_time_locks;
 use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::flags::{
     COMPUTE_FINGERPRINT, COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE, NO_UNKNOWN_CONDS,
-    STRICT_ARGS_COUNT, SIMPLIFY_GENERATOR,
+    SIMPLIFY_GENERATOR, STRICT_ARGS_COUNT,
 };
 use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
