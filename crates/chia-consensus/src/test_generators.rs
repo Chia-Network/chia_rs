@@ -278,6 +278,38 @@ fn run_generator(#[case] name: &str) {
             flags |= COST_CONDITIONS;
         }
 
+        if ![
+            "single-coin-only-garbage",
+            "many-coins-announcement-cap",
+            "puzzle-hash-stress-test",
+            "puzzle-hash-stress-tree",
+            "aa-million-message-spends",
+            "aa-million-messages",
+            "29500-remarks-procedural",
+            "3000000-conditions-single-coin",
+        ]
+        .contains(&name)
+        {
+            // test that we allow quoted generators with the flag
+            flags |= SIMPLIFY_GENERATOR;
+        } else {
+            // lets test that the procedural generators are filtered with the flag
+            let test_conds = run_block_generator2(
+                &mut a2,
+                &generator,
+                &block_refs,
+                11_000_000_000,
+                flags | DONT_VALIDATE_SIGNATURE | SIMPLIFY_GENERATOR,
+                &Signature::default(),
+                None,
+                &TEST_CONSTANTS,
+            );
+            assert_eq!(
+                test_conds,
+                Err(ValidationErr(a.nil(), ErrorCode::ComplexGeneratorReceived))
+            )
+        }
+
         println!("flags: {flags:x}");
         let mut a2 = make_allocator(flags);
         let conds2 = run_block_generator2(
