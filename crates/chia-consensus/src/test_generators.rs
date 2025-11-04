@@ -5,7 +5,7 @@ use super::run_block_generator::{
 };
 use crate::allocator::make_allocator;
 use crate::consensus_constants::TEST_CONSTANTS;
-use crate::flags::{COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE, SIMPLIFY_GENERATOR};
+use crate::flags::{COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE, SIMPLE_GENERATOR};
 use crate::run_block_generator::check_generator_node;
 use crate::validation_error::ErrorCode;
 use chia_bls::Signature;
@@ -304,7 +304,7 @@ fn run_generator(#[case] name: &str) {
         .contains(&name)
         {
             // test that we allow quoted generators with the flag
-            flags |= SIMPLIFY_GENERATOR;
+            flags |= SIMPLE_GENERATOR;
         } else {
             // lets test that the procedural generators are filtered with the flag
             let mut a = make_allocator(flags);
@@ -313,7 +313,7 @@ fn run_generator(#[case] name: &str) {
                 &generator,
                 &block_refs,
                 11_000_000_000,
-                flags | DONT_VALIDATE_SIGNATURE | SIMPLIFY_GENERATOR,
+                flags | DONT_VALIDATE_SIGNATURE | SIMPLE_GENERATOR,
                 &Signature::default(),
                 None,
                 &TEST_CONSTANTS,
@@ -326,7 +326,7 @@ fn run_generator(#[case] name: &str) {
             // now lets specifically check the node generator check
             let program =
                 node_from_bytes_backrefs(&mut a, generator.as_ref()).expect("should be ok");
-            let res = check_generator_node(&a, program, flags | SIMPLIFY_GENERATOR);
+            let res = check_generator_node(&a, program, flags | SIMPLE_GENERATOR);
             assert!(res.is_err());
             assert_eq!(res.unwrap_err().1, ErrorCode::ComplexGeneratorReceived);
         }

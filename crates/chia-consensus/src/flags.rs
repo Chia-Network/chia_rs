@@ -31,4 +31,4 @@ pub const COST_CONDITIONS: u32 = 0x80_0000;
 pub const MEMPOOL_MODE: u32 = CLVM_MEMPOOL_MODE | NO_UNKNOWN_CONDS | STRICT_ARGS_COUNT;
 
 // This flag sets the generator to use the simpler generator rules
-pub const SIMPLIFY_GENERATOR: u32 = 0x1600_0000;
+pub const SIMPLE_GENERATOR: u32 = 0x1600_0000;

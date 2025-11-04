@@ -5,7 +5,7 @@ use crate::conditions::{
     ParseState, SpendBundleConditions,
 };
 use crate::consensus_constants::ConsensusConstants;
-use crate::flags::{DONT_VALIDATE_SIGNATURE, SIMPLIFY_GENERATOR};
+use crate::flags::{DONT_VALIDATE_SIGNATURE, SIMPLE_GENERATOR};
 use crate::validation_error::{first, ErrorCode, ValidationErr};
 use chia_bls::{BlsCache, Signature};
 use chia_protocol::{BytesImpl, Coin, CoinSpend, Program};
@@ -158,14 +158,14 @@ fn extract_n<const N: usize>(
 }
 
 // this function checks if the generator start with a quote
-// this is required after the SIMPLIFY_GENERATOR fork is active
+// this is required after the SIMPLE_GENERATOR fork is active
 #[inline]
 pub fn check_generator_quote(
     a: &Allocator,
     program: &[u8],
     flags: u32,
 ) -> Result<(), ValidationErr> {
-    if flags & SIMPLIFY_GENERATOR == 0 || program.starts_with(&[0xff, 0x01]) {
+    if flags & SIMPLE_GENERATOR == 0 || program.starts_with(&[0xff, 0x01]) {
         Ok(())
     } else {
         Err(ValidationErr(a.nil(), ErrorCode::ComplexGeneratorReceived))
@@ -180,7 +180,7 @@ pub fn check_generator_node(
     program: NodePtr,
     flags: u32,
 ) -> Result<(), ValidationErr> {
-    if flags & SIMPLIFY_GENERATOR == 0 {
+    if flags & SIMPLE_GENERATOR == 0 {
         return Ok(());
     }
     // this expects an atom with a single byte value of 1 as the first value in the list

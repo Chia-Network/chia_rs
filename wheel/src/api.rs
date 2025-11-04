@@ -8,7 +8,7 @@ use chia_consensus::check_time_locks::py_check_time_locks;
 use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::flags::{
     COMPUTE_FINGERPRINT, COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE, NO_UNKNOWN_CONDS,
-    SIMPLIFY_GENERATOR, STRICT_ARGS_COUNT,
+    SIMPLE_GENERATOR, STRICT_ARGS_COUNT,
 };
 use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
@@ -795,7 +795,7 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("DONT_VALIDATE_SIGNATURE", DONT_VALIDATE_SIGNATURE)?;
     m.add("COMPUTE_FINGERPRINT", COMPUTE_FINGERPRINT)?;
     m.add("COST_CONDITIONS", COST_CONDITIONS)?;
-    m.add("SIMPLIFY_GENERATOR", SIMPLIFY_GENERATOR)?;
+    m.add("SIMPLE_GENERATOR", SIMPLE_GENERATOR)?;
 
     m.add_class::<PyPlotParam>()?;
 
