@@ -86,9 +86,7 @@ pub fn run_block_generator<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
-    if !check_generator_quote(program, flags) {
-        return Err(ValidationErr(a.nil(), ErrorCode::ComplexGeneratorReceived));
-    };
+    check_generator_quote(a, program, flags)?;
     let mut cost_left = max_cost;
     let byte_cost = program.len() as u64 * constants.cost_per_byte;
 
@@ -160,8 +158,16 @@ fn extract_n<const N: usize>(
 // this function checks if the generator start with a quote
 // this is required after the SIMPLIFY_GENERATOR fork is active
 #[inline]
-pub fn check_generator_quote(program: &[u8], flags: u32) -> bool {
-    flags & SIMPLIFY_GENERATOR == 0 || program.starts_with(&[0xff, 0x01])
+pub fn check_generator_quote(
+    a: &Allocator,
+    program: &[u8],
+    flags: u32,
+) -> Result<(), ValidationErr> {
+    if flags & SIMPLIFY_GENERATOR == 0 || program.starts_with(&[0xff, 0x01]) {
+        Ok(())
+    } else {
+        Err(ValidationErr(a.nil(), ErrorCode::ComplexGeneratorReceived))
+    }
 }
 
 /// This has the same behavior as run_block_generator() but implements the
@@ -184,9 +190,7 @@ pub fn run_block_generator2<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
-    if !check_generator_quote(program, flags) {
-        return Err(ValidationErr(a.nil(), ErrorCode::ComplexGeneratorReceived));
-    };
+    check_generator_quote(a, program, flags)?;
     let byte_cost = program.len() as u64 * constants.cost_per_byte;
 
     let mut cost_left = max_cost;
@@ -277,9 +281,7 @@ where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
     let mut a = make_allocator(flags);
-    if !check_generator_quote(generator.as_ref(), flags) {
-        return Err(ValidationErr(a.nil(), ErrorCode::ComplexGeneratorReceived));
-    };
+    check_generator_quote(&a, generator.as_ref(), flags)?;
     let mut output = Vec::<CoinSpend>::new();
 
     let program = node_from_bytes_backrefs(&mut a, generator)?;
@@ -353,9 +355,7 @@ where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
     let mut a = make_allocator(flags);
-    if !check_generator_quote(generator.as_ref(), flags) {
-        return Err(ValidationErr(a.nil(), ErrorCode::ComplexGeneratorReceived));
-    };
+    check_generator_quote(&a, generator.as_ref(), flags)?;
     let mut output = Vec::<(CoinSpend, Vec<(u32, Vec<Vec<u8>>)>)>::new();
 
     let program = node_from_bytes_backrefs(&mut a, generator)?;
