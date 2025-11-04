@@ -298,6 +298,7 @@ fn run_generator(#[case] name: &str) {
             "infinite-recursion3",
             "infinite-recursion4",
             "recursion-pairs",
+            "non-quote-0001-start", // this will fail the generator format check before it fails at runtime
         ]
         .contains(&name)
         {
