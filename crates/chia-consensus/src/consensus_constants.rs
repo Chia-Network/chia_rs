@@ -138,8 +138,10 @@ pub struct ConsensusConstants {
     hard_fork2_height: u32,
 
     /// Once hard fork 2 activates, we'll start phasing out v1 plots. This is
-    /// the number blocks they will be phased-out over
-    plot_v1_phase_out: u32,
+    /// the log2 of the number of epochs they will be phased-out over. i.e. the
+    /// number of epochs is (1 << plot_v1_phase_out_epoch_bits).
+    /// This is not allowed to be > 8.
+    plot_v1_phase_out_epoch_bits: u8,
 
     /// The 128 plot filter adjustment height.
     /// This affects the plot filter for original plots
@@ -153,8 +155,10 @@ pub struct ConsensusConstants {
     /// This affects the plot filter for original plots
     plot_filter_32_height: u32,
 
-    /// initial minimum plot strength for v2 plots
-    plot_strength_initial: u8,
+    /// minimum and maximum plot strength for v2 plots. Proofs using strength
+    /// outside of these limits are not considered valid.
+    min_plot_strength: u8,
+    max_plot_strength: u8,
 
     /// The quality proof scan filter for v2 plots
     quality_proof_scan_filter: u8,
@@ -229,12 +233,13 @@ pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
     pool_sub_slot_iters: 37_600_000_000,
     hard_fork_height: 5_496_000,
     hard_fork2_height: 0xffff_ffff, // placeholder
-    plot_v1_phase_out: 920_000,
+    plot_v1_phase_out_epoch_bits: 8,
     plot_filter_128_height: 10_542_000,
     plot_filter_64_height: 15_592_000,
     plot_filter_32_height: 20_643_000,
 
-    plot_strength_initial: 2,
+    min_plot_strength: 2,
+    max_plot_strength: 32,
 
     quality_proof_scan_filter: 5,
 
