@@ -7,7 +7,6 @@ use crate::allocator::make_allocator;
 use crate::consensus_constants::TEST_CONSTANTS;
 use crate::flags::{COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE, SIMPLIFY_GENERATOR};
 use crate::validation_error::ErrorCode;
-use crate::validation_error::ValidationErr;
 use chia_bls::Signature;
 use chia_protocol::Program;
 use chia_protocol::{Bytes, Bytes48};
@@ -319,8 +318,8 @@ fn run_generator(#[case] name: &str) {
             );
             assert!(test_conds.is_err());
             assert_eq!(
-                test_conds.unwrap_err(),
-                ValidationErr(a.nil(), ErrorCode::ComplexGeneratorReceived)
+                test_conds.unwrap_err().1,
+                ErrorCode::ComplexGeneratorReceived
             )
         }
 

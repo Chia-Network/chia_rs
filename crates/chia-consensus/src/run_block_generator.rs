@@ -86,7 +86,6 @@ pub fn run_block_generator<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
-    check_generator_quote(a, program, flags)?;
     let mut cost_left = max_cost;
     let byte_cost = program.len() as u64 * constants.cost_per_byte;
 
@@ -94,6 +93,7 @@ where
 
     let rom_generator = node_from_bytes(a, &ROM_BOOTSTRAP_GENERATOR)?;
     let program = node_from_bytes_backrefs(a, program)?;
+    check_generator_node(a, program, flags)?;
 
     // this is setting up the arguments to be passed to the generator ROM,
     // not the actual generator (the ROM does that).
@@ -170,6 +170,23 @@ pub fn check_generator_quote(
     }
 }
 
+#[inline]
+pub fn check_generator_node(
+    a: &Allocator,
+    program: NodePtr,
+    flags: u32,
+) -> Result<(), ValidationErr> {
+    if flags & SIMPLIFY_GENERATOR == 0 {
+        return Ok(());
+    }
+    match a.next(program) {
+        Some((first, _)) if parse_amount(a, first, ErrorCode::ComplexGeneratorReceived)? == 1 => {
+            Ok(())
+        }
+        _ => Err(ValidationErr(a.nil(), ErrorCode::ComplexGeneratorReceived)),
+    }
+}
+
 /// This has the same behavior as run_block_generator() but implements the
 /// generator ROM in rust instead of using the CLVM implementation.
 /// it is not backwards compatible in the CLVM cost computation (in this version
@@ -197,6 +214,7 @@ where
     subtract_cost(a, &mut cost_left, byte_cost)?;
 
     let program = node_from_bytes_backrefs(a, program)?;
+    check_generator_node(a, program, flags)?;
 
     let args = setup_generator_args(a, block_refs)?;
     let dialect = ChiaDialect::new(flags);
@@ -285,6 +303,7 @@ where
     let mut output = Vec::<CoinSpend>::new();
 
     let program = node_from_bytes_backrefs(&mut a, generator)?;
+    check_generator_node(&a, program, flags)?;
     let args = setup_generator_args(&mut a, refs)?;
     let dialect = ChiaDialect::new(flags);
 
@@ -359,6 +378,7 @@ where
     let mut output = Vec::<(CoinSpend, Vec<(u32, Vec<Vec<u8>>)>)>::new();
 
     let program = node_from_bytes_backrefs(&mut a, generator)?;
+    check_generator_node(&a, program, flags)?;
     let args = setup_generator_args(&mut a, refs)?;
     let dialect = ChiaDialect::new(flags);
 
