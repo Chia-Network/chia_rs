@@ -230,6 +230,7 @@ pub(crate) fn print_diff(output: &str, expected: &str) {
 #[case("recursion-pairs")]
 #[case("unknown-condition")]
 #[case("duplicate-messages")]
+#[case("non-quote-0001-start")]
 fn run_generator(#[case] name: &str) {
     use std::fs::{read_to_string, write};
 
