@@ -86,6 +86,7 @@ pub fn run_block_generator<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
+    check_generator_quote(a, program, flags)?;
     let mut cost_left = max_cost;
     let byte_cost = program.len() as u64 * constants.cost_per_byte;
 
@@ -170,6 +171,8 @@ pub fn check_generator_quote(
     }
 }
 
+// this function is mostly the same as above but is a double check in case of
+// discrepancies in serialized vs deserialized forms
 #[inline]
 pub fn check_generator_node(
     a: &Allocator,
