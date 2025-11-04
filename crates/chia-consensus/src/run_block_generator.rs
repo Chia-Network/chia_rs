@@ -11,6 +11,7 @@ use chia_bls::{BlsCache, Signature};
 use chia_protocol::{BytesImpl, Coin, CoinSpend, Program};
 use chia_puzzles::{CHIALISP_DESERIALISATION, ROM_BOOTSTRAP_GENERATOR};
 use clvm_traits::FromClvm;
+use clvm_traits::MatchByte;
 use clvm_utils::{tree_hash_cached, TreeCache};
 use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::chia_dialect::ChiaDialect;
@@ -182,11 +183,10 @@ pub fn check_generator_node(
     if flags & SIMPLIFY_GENERATOR == 0 {
         return Ok(());
     }
-    match a.next(program) {
-        Some((first, _)) if parse_amount(a, first, ErrorCode::ComplexGeneratorReceived)? == 1 => {
-            Ok(())
-        }
-        _ => Err(ValidationErr(a.nil(), ErrorCode::ComplexGeneratorReceived)),
+    // this expects an atom with a single byte value of 1 as the first value in the list
+    match <(MatchByte<1>, NodePtr)>::from_clvm(a, program) {
+        Err(..) => Err(ValidationErr(a.nil(), ErrorCode::ComplexGeneratorReceived)),
+        _ => Ok(()),
     }
 }
 
