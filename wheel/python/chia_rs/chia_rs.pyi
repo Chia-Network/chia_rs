@@ -4512,11 +4512,12 @@ class ConsensusConstants:
     POOL_SUB_SLOT_ITERS: uint64
     HARD_FORK_HEIGHT: uint32
     HARD_FORK2_HEIGHT: uint32
-    PLOT_V1_PHASE_OUT: uint32
+    PLOT_V1_PHASE_OUT_EPOCH_BITS: uint8
     PLOT_FILTER_128_HEIGHT: uint32
     PLOT_FILTER_64_HEIGHT: uint32
     PLOT_FILTER_32_HEIGHT: uint32
-    PLOT_STRENGTH_INITIAL: uint8
+    MIN_PLOT_STRENGTH: uint8
+    MAX_PLOT_STRENGTH: uint8
     QUALITY_PROOF_SCAN_FILTER: uint8
     PLOT_FILTER_V2_FIRST_ADJUSTMENT_HEIGHT: uint32
     PLOT_FILTER_V2_SECOND_ADJUSTMENT_HEIGHT: uint32
@@ -4567,11 +4568,12 @@ class ConsensusConstants:
         POOL_SUB_SLOT_ITERS: uint64,
         HARD_FORK_HEIGHT: uint32,
         HARD_FORK2_HEIGHT: uint32,
-        PLOT_V1_PHASE_OUT: uint32,
+        PLOT_V1_PHASE_OUT_EPOCH_BITS: uint8,
         PLOT_FILTER_128_HEIGHT: uint32,
         PLOT_FILTER_64_HEIGHT: uint32,
         PLOT_FILTER_32_HEIGHT: uint32,
-        PLOT_STRENGTH_INITIAL: uint8,
+        MIN_PLOT_STRENGTH: uint8,
+        MAX_PLOT_STRENGTH: uint8,
         QUALITY_PROOF_SCAN_FILTER: uint8,
         PLOT_FILTER_V2_FIRST_ADJUSTMENT_HEIGHT: uint32,
         PLOT_FILTER_V2_SECOND_ADJUSTMENT_HEIGHT: uint32,
@@ -4638,11 +4640,12 @@ class ConsensusConstants:
         POOL_SUB_SLOT_ITERS: Union[ uint64, _Unspec] = _Unspec(),
         HARD_FORK_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         HARD_FORK2_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
-        PLOT_V1_PHASE_OUT: Union[ uint32, _Unspec] = _Unspec(),
+        PLOT_V1_PHASE_OUT_EPOCH_BITS: Union[ uint8, _Unspec] = _Unspec(),
         PLOT_FILTER_128_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_FILTER_64_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_FILTER_32_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
-        PLOT_STRENGTH_INITIAL: Union[ uint8, _Unspec] = _Unspec(),
+        MIN_PLOT_STRENGTH: Union[ uint8, _Unspec] = _Unspec(),
+        MAX_PLOT_STRENGTH: Union[ uint8, _Unspec] = _Unspec(),
         QUALITY_PROOF_SCAN_FILTER: Union[ uint8, _Unspec] = _Unspec(),
         PLOT_FILTER_V2_FIRST_ADJUSTMENT_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_FILTER_V2_SECOND_ADJUSTMENT_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
