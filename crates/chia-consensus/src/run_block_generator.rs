@@ -5,12 +5,13 @@ use crate::conditions::{
     ParseState, SpendBundleConditions,
 };
 use crate::consensus_constants::ConsensusConstants;
-use crate::flags::DONT_VALIDATE_SIGNATURE;
+use crate::flags::{DONT_VALIDATE_SIGNATURE, SIMPLE_GENERATOR};
 use crate::validation_error::{first, ErrorCode, ValidationErr};
 use chia_bls::{BlsCache, Signature};
 use chia_protocol::{BytesImpl, Coin, CoinSpend, Program};
 use chia_puzzles::{CHIALISP_DESERIALISATION, ROM_BOOTSTRAP_GENERATOR};
 use clvm_traits::FromClvm;
+use clvm_traits::MatchByte;
 use clvm_utils::{tree_hash_cached, TreeCache};
 use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::chia_dialect::ChiaDialect;
@@ -86,6 +87,7 @@ pub fn run_block_generator<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
+    check_generator_quote(a, program, flags)?;
     let mut cost_left = max_cost;
     let byte_cost = program.len() as u64 * constants.cost_per_byte;
 
@@ -93,6 +95,7 @@ where
 
     let rom_generator = node_from_bytes(a, &ROM_BOOTSTRAP_GENERATOR)?;
     let program = node_from_bytes_backrefs(a, program)?;
+    check_generator_node(a, program, flags)?;
 
     // this is setting up the arguments to be passed to the generator ROM,
     // not the actual generator (the ROM does that).
@@ -154,6 +157,39 @@ fn extract_n<const N: usize>(
     Ok(ret)
 }
 
+// this function checks if the generator start with a quote
+// this is required after the SIMPLE_GENERATOR fork is active
+#[inline]
+pub fn check_generator_quote(
+    a: &Allocator,
+    program: &[u8],
+    flags: u32,
+) -> Result<(), ValidationErr> {
+    if flags & SIMPLE_GENERATOR == 0 || program.starts_with(&[0xff, 0x01]) {
+        Ok(())
+    } else {
+        Err(ValidationErr(a.nil(), ErrorCode::ComplexGeneratorReceived))
+    }
+}
+
+// this function is mostly the same as above but is a double check in case of
+// discrepancies in serialized vs deserialized forms
+#[inline]
+pub fn check_generator_node(
+    a: &Allocator,
+    program: NodePtr,
+    flags: u32,
+) -> Result<(), ValidationErr> {
+    if flags & SIMPLE_GENERATOR == 0 {
+        return Ok(());
+    }
+    // this expects an atom with a single byte value of 1 as the first value in the list
+    match <(MatchByte<1>, NodePtr)>::from_clvm(a, program) {
+        Err(..) => Err(ValidationErr(a.nil(), ErrorCode::ComplexGeneratorReceived)),
+        _ => Ok(()),
+    }
+}
+
 /// This has the same behavior as run_block_generator() but implements the
 /// generator ROM in rust instead of using the CLVM implementation.
 /// it is not backwards compatible in the CLVM cost computation (in this version
@@ -174,12 +210,14 @@ pub fn run_block_generator2<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
+    check_generator_quote(a, program, flags)?;
     let byte_cost = program.len() as u64 * constants.cost_per_byte;
 
     let mut cost_left = max_cost;
     subtract_cost(a, &mut cost_left, byte_cost)?;
 
     let program = node_from_bytes_backrefs(a, program)?;
+    check_generator_node(a, program, flags)?;
 
     let args = setup_generator_args(a, block_refs)?;
     let dialect = ChiaDialect::new(flags);
@@ -264,9 +302,11 @@ where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
     let mut a = make_allocator(flags);
+    check_generator_quote(&a, generator.as_ref(), flags)?;
     let mut output = Vec::<CoinSpend>::new();
 
     let program = node_from_bytes_backrefs(&mut a, generator)?;
+    check_generator_node(&a, program, flags)?;
     let args = setup_generator_args(&mut a, refs)?;
     let dialect = ChiaDialect::new(flags);
 
@@ -337,9 +377,11 @@ where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
     let mut a = make_allocator(flags);
+    check_generator_quote(&a, generator.as_ref(), flags)?;
     let mut output = Vec::<(CoinSpend, Vec<(u32, Vec<Vec<u8>>)>)>::new();
 
     let program = node_from_bytes_backrefs(&mut a, generator)?;
+    check_generator_node(&a, program, flags)?;
     let args = setup_generator_args(&mut a, refs)?;
     let dialect = ChiaDialect::new(flags);
 

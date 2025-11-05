@@ -5,11 +5,14 @@ use super::run_block_generator::{
 };
 use crate::allocator::make_allocator;
 use crate::consensus_constants::TEST_CONSTANTS;
-use crate::flags::{COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
+use crate::flags::{COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE, SIMPLE_GENERATOR};
+use crate::run_block_generator::check_generator_node;
+use crate::validation_error::ErrorCode;
 use chia_bls::Signature;
 use chia_protocol::Program;
 use chia_protocol::{Bytes, Bytes48};
 use clvmr::allocator::NodePtr;
+use clvmr::serde::node_from_bytes_backrefs;
 use clvmr::Allocator;
 use std::iter::zip;
 use text_diff::diff;
@@ -228,6 +231,7 @@ pub(crate) fn print_diff(output: &str, expected: &str) {
 #[case("recursion-pairs")]
 #[case("unknown-condition")]
 #[case("duplicate-messages")]
+#[case("non-quote-0001-start")]
 fn run_generator(#[case] name: &str) {
     use std::fs::{read_to_string, write};
 
@@ -276,6 +280,55 @@ fn run_generator(#[case] name: &str) {
             // this test requires running after hard fork 2, where the COST_CONDITIONS
             // flag is set
             flags |= COST_CONDITIONS;
+        }
+
+        if ![
+            "single-coin-only-garbage",
+            "many-coins-announcement-cap",
+            "puzzle-hash-stress-test",
+            "puzzle-hash-stress-tree",
+            "aa-million-message-spends",
+            "aa-million-messages",
+            "29500-remarks-procedural",
+            "100000-remarks-prefab",
+            "3000000-conditions-single-coin",
+            "block-4671894",
+            "block-225758",
+            "infinite-recursion1",
+            "infinite-recursion2",
+            "infinite-recursion3",
+            "infinite-recursion4",
+            "recursion-pairs",
+            "non-quote-0001-start", // this will fail the generator format check before it fails at runtime
+        ]
+        .contains(&name)
+        {
+            // test that we allow quoted generators with the flag
+            flags |= SIMPLE_GENERATOR;
+        } else {
+            // lets test that the procedural generators are filtered with the flag
+            let mut a = make_allocator(flags);
+            let test_conds = run_block_generator2(
+                &mut a,
+                &generator,
+                &block_refs,
+                11_000_000_000,
+                flags | DONT_VALIDATE_SIGNATURE | SIMPLE_GENERATOR,
+                &Signature::default(),
+                None,
+                &TEST_CONSTANTS,
+            );
+            assert!(test_conds.is_err());
+            assert_eq!(
+                test_conds.unwrap_err().1,
+                ErrorCode::ComplexGeneratorReceived
+            );
+            // now lets specifically check the node generator check
+            let program =
+                node_from_bytes_backrefs(&mut a, generator.as_ref()).expect("should be ok");
+            let res = check_generator_node(&a, program, flags | SIMPLE_GENERATOR);
+            assert!(res.is_err());
+            assert_eq!(res.unwrap_err().1, ErrorCode::ComplexGeneratorReceived);
         }
 
         println!("flags: {flags:x}");
