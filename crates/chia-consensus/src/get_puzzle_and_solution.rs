@@ -44,7 +44,9 @@ pub fn get_puzzle_and_solution_for_coin(
             continue;
         }
 
-        let puzzle_hash = tree_hash_cached(a, puzzle, &mut cache);
+        let mut cost = u64::MAX;
+        let puzzle_hash = tree_hash_cached(a, puzzle, &mut cache, &mut cost)
+            .ok_or(ValidationErr(puzzle, ErrorCode::CostExceeded))?;
         if puzzle_hash != find_coin.puzzle_hash.into() {
             continue;
         }

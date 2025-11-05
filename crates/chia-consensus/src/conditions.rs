@@ -832,6 +832,9 @@ pub struct SpendBundleConditions {
     // the cost of the conditions
     pub condition_cost: u64,
 
+    // the cost of shatree-ing the puzzle reveals
+    pub shatree_cost: u64,
+
     // the sum of all values of all spent coins
     pub removal_amount: u128,
 

@@ -1,3 +1,4 @@
+use crate::flags::COST_SHATREE;
 use crate::run_block_generator::setup_generator_args;
 use crate::run_block_generator::subtract_cost;
 use chia_protocol::Coin;
@@ -74,7 +75,13 @@ where
 
         subtract_cost(&a, &mut cost_left, clvm_cost)?;
 
-        let puzzle_hash = tree_hash_cached(&a, puzzle, &mut cache);
+        let puzzle_hash = if flags & COST_SHATREE != 0 {
+            tree_hash_cached(&a, puzzle, &mut cache, &mut cost_left)
+        } else {
+            let mut cost = u64::MAX;
+            tree_hash_cached(&a, puzzle, &mut cache, &mut cost)
+        }
+        .ok_or(ValidationErr(puzzle, ErrorCode::CostExceeded))?;
 
         let coin = Coin {
             parent_coin_info: parent_id,

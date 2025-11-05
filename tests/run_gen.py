@@ -187,6 +187,7 @@ def print_spend_bundle_conditions(result: SpendBundleConditions) -> str:
     ret += f"atoms: {result.num_atoms}\n"
     ret += f"pairs: {result.num_pairs}\n"
     ret += f"heap: {result.heap_size}\n"
+    ret += f"shatree_cost: {result.shatree_cost}\n"
     return ret
 
 

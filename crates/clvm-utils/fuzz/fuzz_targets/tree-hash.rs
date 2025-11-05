@@ -11,8 +11,9 @@ fn test_hash(a: &Allocator, node: NodePtr) {
     let hash1 = tree_hash(a, node);
 
     let mut cache = TreeCache::default();
-    let hash2 = tree_hash_cached(a, node, &mut cache);
-    assert_eq!(hash1, hash2);
+    let mut cost = u64::MAX;
+    let hash2 = tree_hash_cached(a, node, &mut cache, &mut cost);
+    assert_eq!(hash1, hash2.expect("under cost"));
 }
 
 fuzz_target!(|data: &[u8]| {
