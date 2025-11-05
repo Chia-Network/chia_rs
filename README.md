@@ -48,7 +48,9 @@ Activate the virtual env:
 ```bash
 . ./venv/bin/activate
 ```
+
 or on Windows:
+
 ```
 . ./venv/Scripts/activate
 ```
