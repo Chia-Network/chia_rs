@@ -1,6 +1,6 @@
 [package]
 name = "chia-datalayer-macro"
-version = "0.32.0"
+version = "0.33.0"
 edition = "2021"
 license = "Apache-2.0"
 description = "Macros for DataLayer modules"

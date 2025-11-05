@@ -1,6 +1,6 @@
 [package]
 name = "chia-ssl"
-version = "0.32.0"
+version = "0.33.0"
 edition = "2021"
 license = "Apache-2.0"
 description = "Chia SSL X.509 certificate generator"
