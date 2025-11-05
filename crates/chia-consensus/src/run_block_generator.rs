@@ -39,10 +39,19 @@ pub fn subtract_cost(
 pub fn setup_generator_args<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
     a: &mut Allocator,
     block_refs: I,
+    flags: u32,
 ) -> Result<NodePtr, ValidationErr>
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
+    // once we have soft-forked in requiring simple generators, we no longer
+    // need to pass in the deserialization program
+    if (flags & SIMPLE_GENERATOR) != 0 {
+        if block_refs.into_iter().next().is_some() {
+            return Err(ValidationErr(a.nil(), ErrorCode::TooManyGeneratorRefs));
+        }
+        return Ok(a.nil());
+    }
     let clvm_deserializer = node_from_bytes(a, &CHIALISP_DESERIALISATION)?;
 
     // iterate in reverse order since we're building a linked list from
@@ -219,7 +228,7 @@ where
     let program = node_from_bytes_backrefs(a, program)?;
     check_generator_node(a, program, flags)?;
 
-    let args = setup_generator_args(a, block_refs)?;
+    let args = setup_generator_args(a, block_refs, flags)?;
     let dialect = ChiaDialect::new(flags);
 
     let Reduction(clvm_cost, all_spends) = run_program(a, &dialect, program, args, cost_left)?;
@@ -307,7 +316,7 @@ where
 
     let program = node_from_bytes_backrefs(&mut a, generator)?;
     check_generator_node(&a, program, flags)?;
-    let args = setup_generator_args(&mut a, refs)?;
+    let args = setup_generator_args(&mut a, refs, flags)?;
     let dialect = ChiaDialect::new(flags);
 
     let Reduction(_clvm_cost, res) = run_program(
@@ -382,7 +391,7 @@ where
 
     let program = node_from_bytes_backrefs(&mut a, generator)?;
     check_generator_node(&a, program, flags)?;
-    let args = setup_generator_args(&mut a, refs)?;
+    let args = setup_generator_args(&mut a, refs, flags)?;
     let dialect = ChiaDialect::new(flags);
 
     let Reduction(_clvm_cost, res) = run_program(

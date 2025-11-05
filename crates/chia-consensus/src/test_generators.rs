@@ -282,7 +282,9 @@ fn run_generator(#[case] name: &str) {
             flags |= COST_CONDITIONS;
         }
 
-        if ![
+        // These are generators that are programs, not a simple list of spends
+        // when the SIMPLE_GENERATOR flag is set, these should fail
+        if [
             "single-coin-only-garbage",
             "many-coins-announcement-cap",
             "puzzle-hash-stress-test",
@@ -303,32 +305,49 @@ fn run_generator(#[case] name: &str) {
         ]
         .contains(&name)
         {
-            // test that we allow quoted generators with the flag
-            flags |= SIMPLE_GENERATOR;
-        } else {
             // lets test that the procedural generators are filtered with the flag
             let mut a = make_allocator(flags);
             let test_conds = run_block_generator2(
                 &mut a,
                 &generator,
-                &block_refs,
+                &block_refs, // we're not allowed to pass in block references when SIMPLE_GENERATOR is set
                 11_000_000_000,
                 flags | DONT_VALIDATE_SIGNATURE | SIMPLE_GENERATOR,
                 &Signature::default(),
                 None,
                 &TEST_CONSTANTS,
             );
-            assert!(test_conds.is_err());
             assert_eq!(
                 test_conds.unwrap_err().1,
                 ErrorCode::ComplexGeneratorReceived
             );
+
             // now lets specifically check the node generator check
-            let program =
-                node_from_bytes_backrefs(&mut a, generator.as_ref()).expect("should be ok");
+            let program = node_from_bytes_backrefs(&mut a, generator.as_ref())
+                .expect("node_from_bytes_backref");
             let res = check_generator_node(&a, program, flags | SIMPLE_GENERATOR);
-            assert!(res.is_err());
             assert_eq!(res.unwrap_err().1, ErrorCode::ComplexGeneratorReceived);
+        } else {
+            // ensure SIMPLE_GENERATOR fails if there are any block references
+            // passed in. We pass in a dummy block reference
+            let mut a = make_allocator(flags);
+            let test_conds = run_block_generator2(
+                &mut a,
+                &generator,
+                &[&[0_u8, 1, 2, 3]],
+                11_000_000_000,
+                flags | DONT_VALIDATE_SIGNATURE | SIMPLE_GENERATOR,
+                &Signature::default(),
+                None,
+                &TEST_CONSTANTS,
+            );
+            assert_eq!(test_conds.unwrap_err().1, ErrorCode::TooManyGeneratorRefs);
+
+            // now lets specifically check the node generator check
+            let program = node_from_bytes_backrefs(&mut a, generator.as_ref())
+                .expect("node_from_bytes_backref");
+            let res = check_generator_node(&a, program, flags | SIMPLE_GENERATOR);
+            assert!(res.is_ok());
         }
 
         println!("flags: {flags:x}");
