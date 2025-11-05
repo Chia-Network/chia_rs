@@ -11,8 +11,9 @@ use crate::validation_error::ErrorCode;
 use chia_bls::Signature;
 use chia_protocol::Program;
 use chia_protocol::{Bytes, Bytes48};
+use chia_puzzles::CHIALISP_DESERIALISATION;
 use clvmr::allocator::NodePtr;
-use clvmr::serde::node_from_bytes_backrefs;
+use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs};
 use clvmr::Allocator;
 use std::iter::zip;
 use text_diff::diff;
@@ -328,6 +329,7 @@ fn run_generator(#[case] name: &str) {
             let res = check_generator_node(&a, program, flags | SIMPLE_GENERATOR);
             assert_eq!(res.unwrap_err().1, ErrorCode::ComplexGeneratorReceived);
         } else {
+            flags |= SIMPLE_GENERATOR;
             // ensure SIMPLE_GENERATOR fails if there are any block references
             // passed in. We pass in a dummy block reference
             let mut a = make_allocator(flags);
@@ -336,7 +338,7 @@ fn run_generator(#[case] name: &str) {
                 &generator,
                 &[&[0_u8, 1, 2, 3]],
                 11_000_000_000,
-                flags | DONT_VALIDATE_SIGNATURE | SIMPLE_GENERATOR,
+                flags | DONT_VALIDATE_SIGNATURE,
                 &Signature::default(),
                 None,
                 &TEST_CONSTANTS,
@@ -371,6 +373,20 @@ fn run_generator(#[case] name: &str) {
                 // the generator itself has execution cost. At least the cost of
                 // a quote
                 assert!(exe_cost <= conditions.execution_cost);
+
+                if (flags & SIMPLE_GENERATOR) != 0 {
+                    // when running generators with the SIMPLE_GENERATOR flag
+                    // set, we don't pass in the CLVM deserializer program. This
+                    // causes the atoms and pairs counters to be lower than
+                    // before (when the test cases were created). In order to
+                    // match the test cases, we increment those counters in
+                    // order to print compatible output.
+                    // these are the atoms and pairs that would have been
+                    // allocated by the deserializer program
+                    let _ =
+                        node_from_bytes(&mut a2, &CHIALISP_DESERIALISATION).expect("deserializer");
+                    a2.add_ghost_pair(2).expect("add_ghost_pair");
+                }
                 (conditions.cost, print_conditions(&a2, &conditions, &a2))
             }
             Err(code) => (0, format!("FAILED: {}\n", u32::from(code.1))),
