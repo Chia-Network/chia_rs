@@ -251,7 +251,7 @@ mod tests {
                     .expect("parsing CLVM");
             spends.push(CoinSpend::new(
                 Coin::new(
-                    parent_id.try_into().expect("parent_id"),
+                    parent_id,
                     tree_hash_from_bytes(puzzle.as_ref()).expect("hash").into(),
                     amount,
                 ),
@@ -361,7 +361,7 @@ mod tests {
                 Ok(ref conditions) => (
                     conditions.execution_cost,
                     conditions.cost,
-                    print_conditions(&a2, &conditions, &a2),
+                    print_conditions(&a2, conditions, &a2),
                 ),
                 Err(code) => {
                     println!("error: {code:?}");

@@ -22,7 +22,6 @@ use std::io::Cursor;
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
-use std::sync::Arc;
 
 fuzz_target!(|data: &[u8]| {
     let Ok(spend) = CoinSpend::parse::<false>(&mut Cursor::new(data)) else {
@@ -95,14 +94,7 @@ fn run_puzzle(
     let mut state = ParseState::default();
 
     let puzzle_hash = tree_hash(a, puzzle);
-    let coin_id = Arc::<Bytes32>::new(
-        Coin {
-            parent_coin_info: parent_id.try_into().unwrap(),
-            puzzle_hash: puzzle_hash.into(),
-            amount,
-        }
-        .coin_id(),
-    );
+    let coin_id = Coin::new(parent_id.try_into().unwrap(), puzzle_hash.into(), amount).coin_id();
 
     let mut spend = SpendConditions::new(
         a.new_atom(parent_id)?,

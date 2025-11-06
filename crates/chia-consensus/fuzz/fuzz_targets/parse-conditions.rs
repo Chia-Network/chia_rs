@@ -12,7 +12,6 @@ use clvm_fuzzing::make_list;
 use clvm_utils::tree_hash;
 use clvmr::{Allocator, NodePtr};
 use std::collections::HashSet;
-use std::sync::Arc;
 
 use chia_consensus::flags::{NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
 
@@ -28,14 +27,7 @@ fuzz_target!(|data: &[u8]| {
     let amount = 1337_u64;
     let parent_id: Bytes32 = b"12345678901234567890123456789012".into();
     let puzzle_hash = tree_hash(&a, input);
-    let coin_id = Arc::<Bytes32>::new(
-        Coin {
-            parent_coin_info: parent_id,
-            puzzle_hash: puzzle_hash.into(),
-            amount,
-        }
-        .coin_id(),
-    );
+    let coin_id = Coin::new(parent_id, puzzle_hash.into(), amount).coin_id();
     let parent_id = a.new_atom(&parent_id).expect("atom failed");
     let puzzle_hash = a.new_atom(&puzzle_hash).expect("atom failed");
 
@@ -46,7 +38,7 @@ fuzz_target!(|data: &[u8]| {
             parent_id,
             coin_amount: amount,
             puzzle_hash,
-            coin_id: coin_id.clone(),
+            coin_id,
             height_relative: None,
             seconds_relative: None,
             before_height_relative: None,

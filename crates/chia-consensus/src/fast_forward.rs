@@ -171,7 +171,6 @@ mod tests {
     use hex_literal::hex;
     use rstest::rstest;
     use std::fs;
-    use std::sync::Arc;
 
     pub fn run_puzzle(
         a: &mut Allocator,
@@ -195,14 +194,8 @@ mod tests {
         let mut state = ParseState::default();
 
         let puzzle_hash = tree_hash(a, puzzle);
-        let coin_id = Arc::<Bytes32>::new(
-            Coin {
-                parent_coin_info: parent_id.try_into().unwrap(),
-                puzzle_hash: puzzle_hash.into(),
-                amount,
-            }
-            .coin_id(),
-        );
+        let coin_id =
+            Coin::new(parent_id.try_into().unwrap(), puzzle_hash.into(), amount).coin_id();
 
         let mut spend = SpendConditions::new(
             a.new_atom(parent_id)?,

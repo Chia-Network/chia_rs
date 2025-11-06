@@ -3,7 +3,6 @@ use crate::sanitize_int::{sanitize_uint, SanitizedUint};
 use crate::validation_error::{first, rest, ErrorCode, ValidationErr};
 use chia_protocol::Bytes32;
 use clvmr::{Allocator, NodePtr};
-use std::sync::Arc;
 
 // these are mode flags used as the first argument to SEND_MESSAGE and
 // RECEIVE_MESSAGE. They indicate which properties of the sender and receiver we
@@ -18,7 +17,7 @@ pub const COINID: u8 = 0b111;
 
 #[derive(Debug)]
 pub enum SpendId {
-    OwnedCoinId(Arc<Bytes32>),
+    OwnedCoinId(Bytes32),
     CoinId(NodePtr),
     Parent(NodePtr),
     Puzzle(NodePtr),
@@ -91,10 +90,10 @@ impl SpendId {
         parent: NodePtr,
         puzzle: NodePtr,
         amount: u64,
-        coin_id: &Arc<Bytes32>,
+        coin_id: Bytes32,
     ) -> Result<SpendId, ValidationErr> {
         if mode == COINID {
-            return Ok(Self::OwnedCoinId(coin_id.clone()));
+            return Ok(Self::OwnedCoinId(coin_id));
         }
 
         match mode {
@@ -208,8 +207,8 @@ mod tests {
         let mut a = Allocator::new();
         let parent = a.new_atom(&BUF0).unwrap();
         let puzzle = a.new_atom(&BUF1).unwrap();
-        let coin_id = Arc::<Bytes32>::new(Bytes32::new(BUF2));
-        let src = SpendId::from_self(mode, parent, puzzle, 1337, &coin_id).unwrap();
+        let coin_id = Bytes32::new(BUF2);
+        let src = SpendId::from_self(mode, parent, puzzle, 1337, coin_id).unwrap();
 
         let mut key = Vec::<u8>::new();
         src.make_key(&mut key, &a);
