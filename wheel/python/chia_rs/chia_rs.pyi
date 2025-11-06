@@ -2309,6 +2309,7 @@ class RewardChainBlock:
     reward_chain_sp_signature: G2Element
     reward_chain_ip_vdf: VDFInfo
     infused_challenge_chain_ip_vdf: Optional[VDFInfo]
+    header_mmr_root: Optional[bytes32]
     is_transaction_block: bool
     def get_unfinished(self) -> RewardChainBlockUnfinished: ...
     def __new__(
@@ -2326,6 +2327,7 @@ class RewardChainBlock:
         reward_chain_sp_signature: G2Element,
         reward_chain_ip_vdf: VDFInfo,
         infused_challenge_chain_ip_vdf: Optional[VDFInfo],
+        header_mmr_root: Optional[bytes32],
         is_transaction_block: bool
     ) -> RewardChainBlock: ...
     def __hash__(self) -> int: ...
@@ -2358,6 +2360,7 @@ class RewardChainBlock:
         reward_chain_sp_signature: Union[ G2Element, _Unspec] = _Unspec(),
         reward_chain_ip_vdf: Union[ VDFInfo, _Unspec] = _Unspec(),
         infused_challenge_chain_ip_vdf: Union[ Optional[VDFInfo], _Unspec] = _Unspec(),
+        header_mmr_root: Union[ Optional[bytes32], _Unspec] = _Unspec(),
         is_transaction_block: Union[ bool, _Unspec] = _Unspec()) -> RewardChainBlock: ...
 
 @final
@@ -2567,13 +2570,15 @@ class SubEpochSummary:
     num_blocks_overflow: uint8
     new_difficulty: Optional[uint64]
     new_sub_slot_iters: Optional[uint64]
+    challenge_merkle_root: Optional[bytes32]
     def __new__(
         cls,
         prev_subepoch_summary_hash: bytes,
         reward_chain_hash: bytes,
         num_blocks_overflow: uint8,
         new_difficulty: Optional[uint64],
-        new_sub_slot_iters: Optional[uint64]
+        new_sub_slot_iters: Optional[uint64],
+        challenge_merkle_root: Optional[bytes32]
     ) -> SubEpochSummary: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -2596,7 +2601,8 @@ class SubEpochSummary:
         reward_chain_hash: Union[ bytes32, _Unspec] = _Unspec(),
         num_blocks_overflow: Union[ uint8, _Unspec] = _Unspec(),
         new_difficulty: Union[ Optional[uint64], _Unspec] = _Unspec(),
-        new_sub_slot_iters: Union[ Optional[uint64], _Unspec] = _Unspec()) -> SubEpochSummary: ...
+        new_sub_slot_iters: Union[ Optional[uint64], _Unspec] = _Unspec(),
+        challenge_merkle_root: Union[ Optional[bytes32], _Unspec] = _Unspec()) -> SubEpochSummary: ...
 
 @final
 class UnfinishedBlock:
