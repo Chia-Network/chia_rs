@@ -31,6 +31,7 @@ mod spend_bundle;
 mod sub_epoch_summary;
 mod unfinished_block;
 mod unfinished_header_block;
+mod utils;
 mod vdf;
 mod wallet_protocol;
 mod weight_proof;
