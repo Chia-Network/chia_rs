@@ -252,7 +252,7 @@ mod test {
                 .collect();
 
             let dialect = &ChiaDialect::new(MEMPOOL_MODE);
-            let args = setup_generator_args(&mut a2, blocks).expect("setup_generator_args");
+            let args = setup_generator_args(&mut a2, blocks, 0).expect("setup_generator_args");
             let Reduction(_, result) =
                 run_program(&mut a2, dialect, generator_node, args, MAX_COST)
                     .expect("run_program (generator)");

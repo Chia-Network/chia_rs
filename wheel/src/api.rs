@@ -215,7 +215,7 @@ pub fn get_puzzle_and_solution_for_coin2<'a>(
 
     let generator = node_from_bytes_backrefs(&mut allocator, generator.as_ref())
         .map_err(|e| map_pyerr_w_ptr(&e, &allocator))?;
-    let args = setup_generator_args(&mut allocator, refs)?;
+    let args = setup_generator_args(&mut allocator, refs, flags)?;
     let dialect = &ChiaDialect::new(flags);
 
     let (puzzle, solution) = py

@@ -231,7 +231,7 @@ mod tests {
         let mut a = make_allocator(MEMPOOL_MODE);
 
         let generator = node_from_bytes_backrefs(&mut a, generator).expect("node_from_bytes");
-        let args = setup_generator_args(&mut a, block_refs).expect("setup_generator_args");
+        let args = setup_generator_args(&mut a, block_refs, 0).expect("setup_generator_args");
         let dialect = ChiaDialect::new(MEMPOOL_MODE);
         let Reduction(_, mut all_spends) =
             run_program(&mut a, &dialect, generator, args, 11_000_000_000).expect("run_program");

@@ -36,7 +36,7 @@ where
 
     let program = node_from_bytes_backrefs(&mut a, program)?;
 
-    let args = setup_generator_args(&mut a, block_refs)?;
+    let args = setup_generator_args(&mut a, block_refs, flags)?;
     let dialect = ChiaDialect::new(flags);
 
     let Reduction(clvm_cost, all_spends) = run_program(&mut a, &dialect, program, args, cost_left)?;
