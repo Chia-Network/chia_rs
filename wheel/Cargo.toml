@@ -1,6 +1,6 @@
 [package]
 name = "chia_rs"
-version = "0.33.0"
+version = "0.34.0"
 authors = ["Richard Kiss <him@richardkiss.com>"]
 edition = "2021"
 license = "Apache-2.0"
