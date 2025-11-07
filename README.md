@@ -49,6 +49,12 @@ Activate the virtual env:
 . ./venv/bin/activate
 ```
 
+or on Windows:
+
+```
+. ./venv/Scripts/activate
+```
+
 ### Python Tests
 
 The `wheel` crate is a single Python wheel that exports bindings to various functionality in the repository, mostly from `chia-consensus` and `chia-protocol`.
