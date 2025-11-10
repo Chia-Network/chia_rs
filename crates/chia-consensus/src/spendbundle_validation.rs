@@ -59,9 +59,10 @@ pub fn validate_clvm_and_signature(
     Ok((conditions, pairs))
 }
 
-/// The prev_tx_height is the height of the most recent transaction block prior
-/// to the signage point index of the current block. (i.e. not necessarily the
-/// transaction block preceeding the current one).
+/// The prev_tx_height is the previous transaction block height of the most
+/// recent transaction block prior / to the signage point index of the current
+/// block. (i.e. not necessarily the / transaction block preceeding the current
+/// one).
 pub fn get_flags_for_height_and_constants(
     prev_tx_height: u32,
     constants: &ConsensusConstants,
@@ -207,9 +208,9 @@ mod tests {
     #[case(0, 0)]
     #[case(TEST_CONSTANTS.hard_fork_height, 0)]
     #[case(5_716_000, 0)]
-    fn test_get_flags(#[case] height: u32, #[case] expected_value: u32) {
+    fn test_get_flags(#[case] prev_tx_height: u32, #[case] expected_value: u32) {
         assert_eq!(
-            get_flags_for_height_and_constants(height, &TEST_CONSTANTS),
+            get_flags_for_height_and_constants(prev_tx_height, &TEST_CONSTANTS),
             expected_value
         );
     }

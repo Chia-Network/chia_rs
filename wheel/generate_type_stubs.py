@@ -367,7 +367,7 @@ def get_conditions_from_spendbundle(
     spend_bundle: SpendBundle,
     max_cost: int,
     constants: ConsensusConstants,
-    height: int,
+    prev_tx_height: int,
 ) -> SpendBundleConditions: ...
 
 def get_spends_for_trusted_block(

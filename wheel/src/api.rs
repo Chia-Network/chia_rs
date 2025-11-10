@@ -443,13 +443,13 @@ pub fn py_get_conditions_from_spendbundle(
     spend_bundle: &SpendBundle,
     max_cost: u64,
     constants: &ConsensusConstants,
-    height: u32,
+    prev_tx_height: u32,
 ) -> PyResult<OwnedSpendBundleConditions> {
     use chia_consensus::allocator::make_allocator;
     use chia_consensus::owned_conditions::OwnedSpendBundleConditions;
     let mut a = make_allocator(LIMIT_HEAP);
     let conditions =
-        get_conditions_from_spendbundle(&mut a, spend_bundle, max_cost, height, constants)?;
+        get_conditions_from_spendbundle(&mut a, spend_bundle, max_cost, prev_tx_height, constants)?;
     Ok(OwnedSpendBundleConditions::from(&a, conditions))
 }
 
