@@ -83,7 +83,7 @@ def get_spends_for_trusted_block_with_conditions(
 ) -> list[dict[str, Any]]: ...
 
 def get_flags_for_height_and_constants(
-    height: int,
+    prev_tx_height: int,
     constants: ConsensusConstants
 ) -> int: ...
 
