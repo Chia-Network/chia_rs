@@ -455,8 +455,11 @@ pub fn py_get_conditions_from_spendbundle(
 
 #[pyfunction]
 #[pyo3(name = "get_flags_for_height_and_constants")]
-pub fn py_get_flags_for_height_and_constants(height: u32, constants: &ConsensusConstants) -> u32 {
-    get_flags_for_height_and_constants(height, constants)
+pub fn py_get_flags_for_height_and_constants(
+    prev_tx_height: u32,
+    constants: &ConsensusConstants,
+) -> u32 {
+    get_flags_for_height_and_constants(prev_tx_height, constants)
 }
 
 #[pyo3::pyfunction]

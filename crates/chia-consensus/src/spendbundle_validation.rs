@@ -59,7 +59,13 @@ pub fn validate_clvm_and_signature(
     Ok((conditions, pairs))
 }
 
-pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusConstants) -> u32 {
+/// The prev_tx_height is the height of the most recent transaction block prior
+/// to the signage point index of the current block. (i.e. not necessarily the
+/// transaction block preceeding the current one).
+pub fn get_flags_for_height_and_constants(
+    prev_tx_height: u32,
+    constants: &ConsensusConstants,
+) -> u32 {
     //  the hard-fork initiated with 2.0. To activate June 2024
     //  * costs are ascribed to some unknown condition codes, to allow for
     // soft-forking in new conditions with cost
@@ -81,7 +87,7 @@ pub fn get_flags_for_height_and_constants(height: u32, constants: &ConsensusCons
 
     // In hard fork 2, we enable the keccak operator outside the softfork guard
     let mut flags: u32 = 0;
-    if height >= constants.hard_fork2_height {
+    if prev_tx_height >= constants.hard_fork2_height {
         flags |= ENABLE_KECCAK_OPS_OUTSIDE_GUARD | COST_CONDITIONS | SIMPLE_GENERATOR;
     }
     flags
