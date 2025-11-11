@@ -1,6 +1,6 @@
 [package]
 name = "chia-tools"
-version = "0.32.0"
+version = "0.34.0"
 edition = "2021"
 license = "Apache-2.0"
 description = "Utility functions and types used by the Chia blockchain full node"

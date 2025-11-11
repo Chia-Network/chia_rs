@@ -8,7 +8,7 @@ use chia_consensus::check_time_locks::py_check_time_locks;
 use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::flags::{
     COMPUTE_FINGERPRINT, COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE, NO_UNKNOWN_CONDS,
-    STRICT_ARGS_COUNT,
+    SIMPLE_GENERATOR, STRICT_ARGS_COUNT,
 };
 use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
@@ -34,7 +34,7 @@ use chia_protocol::{
     FullBlock, Handshake, HeaderBlock, InfusedChallengeChainSubSlot, LazyNode, MempoolItemsAdded,
     MempoolItemsRemoved, Message, NewCompactVDF, NewPeak, NewPeakWallet,
     NewSignagePointOrEndOfSubSlot, NewTransaction, NewUnfinishedBlock, NewUnfinishedBlock2,
-    PoolTarget, Program, ProofBlockHeader, ProofOfSpace, PuzzleSolutionResponse, PyPlotSize,
+    PoolTarget, Program, ProofBlockHeader, ProofOfSpace, PuzzleSolutionResponse, PyPlotParam,
     RecentChainData, RegisterForCoinUpdates, RegisterForPhUpdates, RejectAdditionsRequest,
     RejectBlock, RejectBlockHeaders, RejectBlocks, RejectCoinState, RejectHeaderBlocks,
     RejectHeaderRequest, RejectPuzzleSolution, RejectPuzzleState, RejectRemovalsRequest,
@@ -71,6 +71,7 @@ use pyo3::wrap_pyfunction;
 use std::path::Path;
 
 use std::iter::zip;
+use std::time::Instant;
 
 use crate::run_program::{run_chia_program, serialized_length, serialized_length_trusted};
 
@@ -214,7 +215,7 @@ pub fn get_puzzle_and_solution_for_coin2<'a>(
 
     let generator = node_from_bytes_backrefs(&mut allocator, generator.as_ref())
         .map_err(|e| map_pyerr_w_ptr(&e, &allocator))?;
-    let args = setup_generator_args(&mut allocator, refs)?;
+    let args = setup_generator_args(&mut allocator, refs, flags)?;
     let dialect = &ChiaDialect::new(flags);
 
     let (puzzle, solution) = py
@@ -429,8 +430,10 @@ pub fn py_validate_clvm_and_signature(
     constants: &ConsensusConstants,
     flags: u32,
 ) -> PyResult<(OwnedSpendBundleConditions, Vec<([u8; 32], GTElement)>, f32)> {
-    let (owned_conditions, additions, duration) =
+    let start_time = Instant::now();
+    let (owned_conditions, additions) =
         py.detach(|| validate_clvm_and_signature(new_spend, max_cost, constants, flags))?;
+    let duration = start_time.elapsed();
     Ok((owned_conditions, additions, duration.as_secs_f32()))
 }
 
@@ -440,20 +443,23 @@ pub fn py_get_conditions_from_spendbundle(
     spend_bundle: &SpendBundle,
     max_cost: u64,
     constants: &ConsensusConstants,
-    height: u32,
+    prev_tx_height: u32,
 ) -> PyResult<OwnedSpendBundleConditions> {
     use chia_consensus::allocator::make_allocator;
     use chia_consensus::owned_conditions::OwnedSpendBundleConditions;
     let mut a = make_allocator(LIMIT_HEAP);
     let conditions =
-        get_conditions_from_spendbundle(&mut a, spend_bundle, max_cost, height, constants)?;
+        get_conditions_from_spendbundle(&mut a, spend_bundle, max_cost, prev_tx_height, constants)?;
     Ok(OwnedSpendBundleConditions::from(&a, conditions))
 }
 
 #[pyfunction]
 #[pyo3(name = "get_flags_for_height_and_constants")]
-pub fn py_get_flags_for_height_and_constants(height: u32, constants: &ConsensusConstants) -> u32 {
-    get_flags_for_height_and_constants(height, constants)
+pub fn py_get_flags_for_height_and_constants(
+    prev_tx_height: u32,
+    constants: &ConsensusConstants,
+) -> u32 {
+    get_flags_for_height_and_constants(prev_tx_height, constants)
 }
 
 #[pyo3::pyfunction]
@@ -795,8 +801,9 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("DONT_VALIDATE_SIGNATURE", DONT_VALIDATE_SIGNATURE)?;
     m.add("COMPUTE_FINGERPRINT", COMPUTE_FINGERPRINT)?;
     m.add("COST_CONDITIONS", COST_CONDITIONS)?;
+    m.add("SIMPLE_GENERATOR", SIMPLE_GENERATOR)?;
 
-    m.add_class::<PyPlotSize>()?;
+    m.add_class::<PyPlotParam>()?;
 
     // Chia classes
     m.add_class::<Coin>()?;

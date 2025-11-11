@@ -7,7 +7,7 @@ output_file = Path(__file__).parent.resolve() / "python" / "chia_rs" / "chia_rs.
 crates_dir = Path(__file__).parent.parent.resolve() / "crates"
 input_dir = crates_dir / "chia-protocol" / "src"
 
-ignore_structs = ["PyPlotSize"]
+ignore_structs = ["PyPlotParam"]
 
 # enums are exposed to python as int
 enums = set(
@@ -276,7 +276,7 @@ extra_members = {
         "def sp_total_iters(self, constants: ConsensusConstants) -> uint128: ...",
     ],
     "ProofOfSpace": [
-        "def size(self) -> PlotSize: ...",
+        "def param(self) -> PlotParam: ...",
     ],
     "CoinRecord": [
         "@property\n    def spent(self) -> bool: ...",
@@ -367,7 +367,7 @@ def get_conditions_from_spendbundle(
     spend_bundle: SpendBundle,
     max_cost: int,
     constants: ConsensusConstants,
-    height: int,
+    prev_tx_height: int,
 ) -> SpendBundleConditions: ...
 
 def get_spends_for_trusted_block(
@@ -385,7 +385,7 @@ def get_spends_for_trusted_block_with_conditions(
 ) -> list[dict[str, Any]]: ...
 
 def get_flags_for_height_and_constants(
-    height: int,
+    prev_tx_height: int,
     constants: ConsensusConstants
 ) -> int: ...
 
@@ -425,6 +425,7 @@ MEMPOOL_MODE: int = ...
 DONT_VALIDATE_SIGNATURE: int = ...
 COMPUTE_FINGERPRINT: int = ...
 COST_CONDITIONS: int = ...
+SIMPLE_GENERATOR: int = ...
 
 ELIGIBLE_FOR_DEDUP: int = ...
 ELIGIBLE_FOR_FF: int = ...
@@ -492,14 +493,14 @@ class MerkleSet:
     ) -> MerkleSet: ...
 
 @final
-class PlotSize:
+class PlotParam:
     @staticmethod
-    def make_v1(s: int) -> PlotSize: ...
+    def make_v1(s: int) -> PlotParam: ...
     @staticmethod
-    def make_v2(s: int) -> PlotSize: ...
+    def make_v2(s: int) -> PlotParam: ...
 
     size_v1: Optional[uint8]
-    size_v2: Optional[uint8]
+    strength_v2: Optional[uint8]
 
 # Proof-of-space 2
 @final

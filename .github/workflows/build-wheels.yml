@@ -30,7 +30,7 @@ jobs:
             matrix: macos
             runs-on:
               arm: [macos-14]
-              intel: [macos-13]
+              intel: [macos-15-intel]
           - name: Ubuntu
             matrix: ubuntu
             runs-on:
@@ -385,6 +385,9 @@ jobs:
         with:
           fetch-depth: 1
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Chia-Network/actions/setup-python@main
+        with:
+          python-version: "3.9"
       - name: Prepare for coverage
         if: matrix.os.coverage
         run: |

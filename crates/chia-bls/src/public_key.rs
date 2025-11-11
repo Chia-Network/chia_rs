@@ -117,7 +117,7 @@ impl PublicKey {
     pub fn to_bytes(&self) -> [u8; 48] {
         unsafe {
             let mut bytes = MaybeUninit::<[u8; 48]>::uninit();
-            blst_p1_compress(bytes.as_mut_ptr().cast::<u8>(), &self.0);
+            blst_p1_compress(bytes.as_mut_ptr().cast::<u8>(), &raw const self.0);
             bytes.assume_init()
         }
     }
@@ -125,16 +125,16 @@ impl PublicKey {
     pub fn is_valid(&self) -> bool {
         // Infinity was considered a valid G1Element in older Relic versions
         // For historical compatibililty this behavior is maintained.
-        unsafe { blst_p1_is_inf(&self.0) || blst_p1_in_g1(&self.0) }
+        unsafe { blst_p1_is_inf(&raw const self.0) || blst_p1_in_g1(&raw const self.0) }
     }
 
     pub fn is_inf(&self) -> bool {
-        unsafe { blst_p1_is_inf(&self.0) }
+        unsafe { blst_p1_is_inf(&raw const self.0) }
     }
 
     pub fn negate(&mut self) {
         unsafe {
-            blst_p1_cneg(&mut self.0, true);
+            blst_p1_cneg(&raw mut self.0, true);
         }
     }
 
@@ -142,7 +142,12 @@ impl PublicKey {
         unsafe {
             let mut scalar = MaybeUninit::<blst_scalar>::uninit();
             blst_scalar_from_be_bytes(scalar.as_mut_ptr(), int_bytes.as_ptr(), int_bytes.len());
-            blst_p1_mult(&mut self.0, &self.0, scalar.as_ptr().cast::<u8>(), 256);
+            blst_p1_mult(
+                &raw mut self.0,
+                &raw const self.0,
+                scalar.as_ptr().cast::<u8>(),
+                256,
+            );
         }
     }
 
@@ -156,7 +161,7 @@ impl PublicKey {
 
 impl PartialEq for PublicKey {
     fn eq(&self, other: &Self) -> bool {
-        unsafe { blst_p1_is_equal(&self.0, &other.0) }
+        unsafe { blst_p1_is_equal(&raw const self.0, &raw const other.0) }
     }
 }
 impl Eq for PublicKey {}
@@ -227,7 +232,7 @@ impl Neg for &PublicKey {
 impl AddAssign<&PublicKey> for PublicKey {
     fn add_assign(&mut self, rhs: &PublicKey) {
         unsafe {
-            blst_p1_add_or_double(&mut self.0, &self.0, &rhs.0);
+            blst_p1_add_or_double(&raw mut self.0, &raw const self.0, &raw const rhs.0);
         }
     }
 }
@@ -236,8 +241,8 @@ impl SubAssign<&PublicKey> for PublicKey {
     fn sub_assign(&mut self, rhs: &PublicKey) {
         unsafe {
             let mut neg = *rhs;
-            blst_p1_cneg(&mut neg.0, true);
-            blst_p1_add_or_double(&mut self.0, &self.0, &neg.0);
+            blst_p1_cneg(&raw mut neg.0, true);
+            blst_p1_add_or_double(&raw mut self.0, &raw const self.0, &raw const neg.0);
         }
     }
 }
@@ -247,7 +252,7 @@ impl Add<&PublicKey> for &PublicKey {
     fn add(self, rhs: &PublicKey) -> PublicKey {
         let p1 = unsafe {
             let mut ret = MaybeUninit::<blst_p1>::uninit();
-            blst_p1_add_or_double(ret.as_mut_ptr(), &self.0, &rhs.0);
+            blst_p1_add_or_double(ret.as_mut_ptr(), &raw const self.0, &raw const rhs.0);
             ret.assume_init()
         };
         PublicKey(p1)
@@ -258,7 +263,7 @@ impl Add<&PublicKey> for PublicKey {
     type Output = PublicKey;
     fn add(mut self, rhs: &PublicKey) -> PublicKey {
         unsafe {
-            blst_p1_add_or_double(&mut self.0, &self.0, &rhs.0);
+            blst_p1_add_or_double(&raw mut self.0, &raw const self.0, &raw const rhs.0);
             self
         }
     }
@@ -292,7 +297,7 @@ impl DerivableKey for PublicKey {
                 bte.as_ptr().cast::<u8>(),
                 256,
             );
-            blst_p1_add(p1.as_mut_ptr(), p1.as_mut_ptr(), &self.0);
+            blst_p1_add(p1.as_mut_ptr(), p1.as_mut_ptr(), &raw const self.0);
             p1.assume_init()
         };
         PublicKey(p1)

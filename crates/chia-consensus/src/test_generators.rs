@@ -5,11 +5,15 @@ use super::run_block_generator::{
 };
 use crate::allocator::make_allocator;
 use crate::consensus_constants::TEST_CONSTANTS;
-use crate::flags::{COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
+use crate::flags::{COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE, SIMPLE_GENERATOR};
+use crate::run_block_generator::check_generator_node;
+use crate::validation_error::ErrorCode;
 use chia_bls::Signature;
 use chia_protocol::Program;
 use chia_protocol::{Bytes, Bytes48};
+use chia_puzzles::CHIALISP_DESERIALISATION;
 use clvmr::allocator::NodePtr;
+use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs};
 use clvmr::Allocator;
 use std::iter::zip;
 use text_diff::diff;
@@ -228,6 +232,7 @@ pub(crate) fn print_diff(output: &str, expected: &str) {
 #[case("recursion-pairs")]
 #[case("unknown-condition")]
 #[case("duplicate-messages")]
+#[case("non-quote-0001-start")]
 fn run_generator(#[case] name: &str) {
     use std::fs::{read_to_string, write};
 
@@ -278,6 +283,75 @@ fn run_generator(#[case] name: &str) {
             flags |= COST_CONDITIONS;
         }
 
+        // These are generators that are programs, not a simple list of spends
+        // when the SIMPLE_GENERATOR flag is set, these should fail
+        if [
+            "single-coin-only-garbage",
+            "many-coins-announcement-cap",
+            "puzzle-hash-stress-test",
+            "puzzle-hash-stress-tree",
+            "aa-million-message-spends",
+            "aa-million-messages",
+            "29500-remarks-procedural",
+            "100000-remarks-prefab",
+            "3000000-conditions-single-coin",
+            "block-4671894",
+            "block-225758",
+            "infinite-recursion1",
+            "infinite-recursion2",
+            "infinite-recursion3",
+            "infinite-recursion4",
+            "recursion-pairs",
+            "non-quote-0001-start", // this will fail the generator format check before it fails at runtime
+        ]
+        .contains(&name)
+        {
+            // lets test that the procedural generators are filtered with the flag
+            let mut a = make_allocator(flags);
+            let test_conds = run_block_generator2(
+                &mut a,
+                &generator,
+                &block_refs, // we're not allowed to pass in block references when SIMPLE_GENERATOR is set
+                11_000_000_000,
+                flags | DONT_VALIDATE_SIGNATURE | SIMPLE_GENERATOR,
+                &Signature::default(),
+                None,
+                &TEST_CONSTANTS,
+            );
+            assert_eq!(
+                test_conds.unwrap_err().1,
+                ErrorCode::ComplexGeneratorReceived
+            );
+
+            // now lets specifically check the node generator check
+            let program = node_from_bytes_backrefs(&mut a, generator.as_ref())
+                .expect("node_from_bytes_backref");
+            let res = check_generator_node(&a, program, flags | SIMPLE_GENERATOR);
+            assert_eq!(res.unwrap_err().1, ErrorCode::ComplexGeneratorReceived);
+        } else {
+            flags |= SIMPLE_GENERATOR;
+            // ensure SIMPLE_GENERATOR fails if there are any block references
+            // passed in. We pass in a dummy block reference
+            let mut a = make_allocator(flags);
+            let test_conds = run_block_generator2(
+                &mut a,
+                &generator,
+                &[&[0_u8, 1, 2, 3]],
+                11_000_000_000,
+                flags | DONT_VALIDATE_SIGNATURE,
+                &Signature::default(),
+                None,
+                &TEST_CONSTANTS,
+            );
+            assert_eq!(test_conds.unwrap_err().1, ErrorCode::TooManyGeneratorRefs);
+
+            // now lets specifically check the node generator check
+            let program = node_from_bytes_backrefs(&mut a, generator.as_ref())
+                .expect("node_from_bytes_backref");
+            let res = check_generator_node(&a, program, flags | SIMPLE_GENERATOR);
+            assert!(res.is_ok());
+        }
+
         println!("flags: {flags:x}");
         let mut a2 = make_allocator(flags);
         let conds2 = run_block_generator2(
@@ -299,6 +373,20 @@ fn run_generator(#[case] name: &str) {
                 // the generator itself has execution cost. At least the cost of
                 // a quote
                 assert!(exe_cost <= conditions.execution_cost);
+
+                if (flags & SIMPLE_GENERATOR) != 0 {
+                    // when running generators with the SIMPLE_GENERATOR flag
+                    // set, we don't pass in the CLVM deserializer program. This
+                    // causes the atoms and pairs counters to be lower than
+                    // before (when the test cases were created). In order to
+                    // match the test cases, we increment those counters in
+                    // order to print compatible output.
+                    // these are the atoms and pairs that would have been
+                    // allocated by the deserializer program
+                    let _ =
+                        node_from_bytes(&mut a2, &CHIALISP_DESERIALISATION).expect("deserializer");
+                    a2.add_ghost_pair(2).expect("add_ghost_pair");
+                }
                 (conditions.cost, print_conditions(&a2, &conditions, &a2))
             }
             Err(code) => (0, format!("FAILED: {}\n", u32::from(code.1))),

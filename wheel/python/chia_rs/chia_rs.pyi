@@ -65,7 +65,7 @@ def get_conditions_from_spendbundle(
     spend_bundle: SpendBundle,
     max_cost: int,
     constants: ConsensusConstants,
-    height: int,
+    prev_tx_height: int,
 ) -> SpendBundleConditions: ...
 
 def get_spends_for_trusted_block(
@@ -83,7 +83,7 @@ def get_spends_for_trusted_block_with_conditions(
 ) -> list[dict[str, Any]]: ...
 
 def get_flags_for_height_and_constants(
-    height: int,
+    prev_tx_height: int,
     constants: ConsensusConstants
 ) -> int: ...
 
@@ -123,6 +123,7 @@ MEMPOOL_MODE: int = ...
 DONT_VALIDATE_SIGNATURE: int = ...
 COMPUTE_FINGERPRINT: int = ...
 COST_CONDITIONS: int = ...
+SIMPLE_GENERATOR: int = ...
 
 ELIGIBLE_FOR_DEDUP: int = ...
 ELIGIBLE_FOR_FF: int = ...
@@ -190,14 +191,14 @@ class MerkleSet:
     ) -> MerkleSet: ...
 
 @final
-class PlotSize:
+class PlotParam:
     @staticmethod
-    def make_v1(s: int) -> PlotSize: ...
+    def make_v1(s: int) -> PlotParam: ...
     @staticmethod
-    def make_v2(s: int) -> PlotSize: ...
+    def make_v2(s: int) -> PlotParam: ...
 
     size_v1: Optional[uint8]
-    size_v2: Optional[uint8]
+    strength_v2: Optional[uint8]
 
 # Proof-of-space 2
 @final
@@ -2212,7 +2213,7 @@ class ProofOfSpace:
     plot_public_key: G1Element
     version_and_size: uint8
     proof: bytes
-    def size(self) -> PlotSize: ...
+    def param(self) -> PlotParam: ...
     def __new__(
         cls,
         challenge: bytes,
@@ -4484,8 +4485,7 @@ class ConsensusConstants:
     NUMBER_ZERO_BITS_PLOT_FILTER_V2: uint8
     MIN_PLOT_SIZE_V1: uint8
     MAX_PLOT_SIZE_V1: uint8
-    MIN_PLOT_SIZE_V2: uint8
-    MAX_PLOT_SIZE_V2: uint8
+    PLOT_SIZE_V2: uint8
     SUB_SLOT_TIME_TARGET: uint16
     NUM_SP_INTERVALS_EXTRA: uint8
     MAX_FUTURE_TIME2: uint32
@@ -4513,11 +4513,12 @@ class ConsensusConstants:
     POOL_SUB_SLOT_ITERS: uint64
     HARD_FORK_HEIGHT: uint32
     HARD_FORK2_HEIGHT: uint32
-    PLOT_V1_PHASE_OUT: uint32
+    PLOT_V1_PHASE_OUT_EPOCH_BITS: uint8
     PLOT_FILTER_128_HEIGHT: uint32
     PLOT_FILTER_64_HEIGHT: uint32
     PLOT_FILTER_32_HEIGHT: uint32
-    PLOT_STRENGTH_INITIAL: uint8
+    MIN_PLOT_STRENGTH: uint8
+    MAX_PLOT_STRENGTH: uint8
     QUALITY_PROOF_SCAN_FILTER: uint8
     PLOT_FILTER_V2_FIRST_ADJUSTMENT_HEIGHT: uint32
     PLOT_FILTER_V2_SECOND_ADJUSTMENT_HEIGHT: uint32
@@ -4540,8 +4541,7 @@ class ConsensusConstants:
         NUMBER_ZERO_BITS_PLOT_FILTER_V2: uint8,
         MIN_PLOT_SIZE_V1: uint8,
         MAX_PLOT_SIZE_V1: uint8,
-        MIN_PLOT_SIZE_V2: uint8,
-        MAX_PLOT_SIZE_V2: uint8,
+        PLOT_SIZE_V2: uint8,
         SUB_SLOT_TIME_TARGET: uint16,
         NUM_SP_INTERVALS_EXTRA: uint8,
         MAX_FUTURE_TIME2: uint32,
@@ -4569,11 +4569,12 @@ class ConsensusConstants:
         POOL_SUB_SLOT_ITERS: uint64,
         HARD_FORK_HEIGHT: uint32,
         HARD_FORK2_HEIGHT: uint32,
-        PLOT_V1_PHASE_OUT: uint32,
+        PLOT_V1_PHASE_OUT_EPOCH_BITS: uint8,
         PLOT_FILTER_128_HEIGHT: uint32,
         PLOT_FILTER_64_HEIGHT: uint32,
         PLOT_FILTER_32_HEIGHT: uint32,
-        PLOT_STRENGTH_INITIAL: uint8,
+        MIN_PLOT_STRENGTH: uint8,
+        MAX_PLOT_STRENGTH: uint8,
         QUALITY_PROOF_SCAN_FILTER: uint8,
         PLOT_FILTER_V2_FIRST_ADJUSTMENT_HEIGHT: uint32,
         PLOT_FILTER_V2_SECOND_ADJUSTMENT_HEIGHT: uint32,
@@ -4612,8 +4613,7 @@ class ConsensusConstants:
         NUMBER_ZERO_BITS_PLOT_FILTER_V2: Union[ uint8, _Unspec] = _Unspec(),
         MIN_PLOT_SIZE_V1: Union[ uint8, _Unspec] = _Unspec(),
         MAX_PLOT_SIZE_V1: Union[ uint8, _Unspec] = _Unspec(),
-        MIN_PLOT_SIZE_V2: Union[ uint8, _Unspec] = _Unspec(),
-        MAX_PLOT_SIZE_V2: Union[ uint8, _Unspec] = _Unspec(),
+        PLOT_SIZE_V2: Union[ uint8, _Unspec] = _Unspec(),
         SUB_SLOT_TIME_TARGET: Union[ uint16, _Unspec] = _Unspec(),
         NUM_SP_INTERVALS_EXTRA: Union[ uint8, _Unspec] = _Unspec(),
         MAX_FUTURE_TIME2: Union[ uint32, _Unspec] = _Unspec(),
@@ -4641,11 +4641,12 @@ class ConsensusConstants:
         POOL_SUB_SLOT_ITERS: Union[ uint64, _Unspec] = _Unspec(),
         HARD_FORK_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         HARD_FORK2_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
-        PLOT_V1_PHASE_OUT: Union[ uint32, _Unspec] = _Unspec(),
+        PLOT_V1_PHASE_OUT_EPOCH_BITS: Union[ uint8, _Unspec] = _Unspec(),
         PLOT_FILTER_128_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_FILTER_64_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_FILTER_32_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
-        PLOT_STRENGTH_INITIAL: Union[ uint8, _Unspec] = _Unspec(),
+        MIN_PLOT_STRENGTH: Union[ uint8, _Unspec] = _Unspec(),
+        MAX_PLOT_STRENGTH: Union[ uint8, _Unspec] = _Unspec(),
         QUALITY_PROOF_SCAN_FILTER: Union[ uint8, _Unspec] = _Unspec(),
         PLOT_FILTER_V2_FIRST_ADJUSTMENT_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_FILTER_V2_SECOND_ADJUSTMENT_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),

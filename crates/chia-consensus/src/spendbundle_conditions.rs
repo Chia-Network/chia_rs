@@ -26,10 +26,10 @@ pub fn get_conditions_from_spendbundle(
     a: &mut Allocator,
     spend_bundle: &SpendBundle,
     max_cost: u64,
-    height: u32,
+    prev_tx_height: u32,
     constants: &ConsensusConstants,
 ) -> Result<SpendBundleConditions, ValidationErr> {
-    let flags = get_flags_for_height_and_constants(height, constants);
+    let flags = get_flags_for_height_and_constants(prev_tx_height, constants);
     Ok(run_spendbundle(
         a,
         spend_bundle,
@@ -132,7 +132,7 @@ mod tests {
         #[case] filename: &str,
         #[case] spends: usize,
         #[case] additions: usize,
-        #[values(0, 1, 1_000_000, 5_000_000)] height: u32,
+        #[values(0, 1, 1_000_000, 5_000_000)] prev_tx_height: u32,
         #[case] cost: u64,
     ) {
         let bundle = SpendBundle::from_bytes(
@@ -142,7 +142,7 @@ mod tests {
 
         let mut a = make_allocator(LIMIT_HEAP);
         let conditions =
-            get_conditions_from_spendbundle(&mut a, &bundle, cost, height, &TEST_CONSTANTS)
+            get_conditions_from_spendbundle(&mut a, &bundle, cost, prev_tx_height, &TEST_CONSTANTS)
                 .expect("get_conditions_from_spendbundle");
 
         assert_eq!(conditions.spends.len(), spends);
@@ -192,7 +192,7 @@ mod tests {
     #[case("e3c0")]
     fn test_get_conditions_from_spendbundle_fast_forward(
         #[case] filename: &str,
-        #[values(0, 1, 1_000_000, 5_000_000)] height: u32,
+        #[values(0, 1, 1_000_000, 5_000_000)] prev_tx_height: u32,
     ) {
         let cost = 77_341_866;
         let spend = CoinSpend::from_bytes(
@@ -204,7 +204,7 @@ mod tests {
 
         let mut a = make_allocator(LIMIT_HEAP);
         let conditions =
-            get_conditions_from_spendbundle(&mut a, &bundle, cost, height, &TEST_CONSTANTS)
+            get_conditions_from_spendbundle(&mut a, &bundle, cost, prev_tx_height, &TEST_CONSTANTS)
                 .expect("get_conditions_from_spendbundle");
 
         assert_eq!(conditions.spends.len(), 1);
@@ -231,7 +231,7 @@ mod tests {
         let mut a = make_allocator(MEMPOOL_MODE);
 
         let generator = node_from_bytes_backrefs(&mut a, generator).expect("node_from_bytes");
-        let args = setup_generator_args(&mut a, block_refs).expect("setup_generator_args");
+        let args = setup_generator_args(&mut a, block_refs, 0).expect("setup_generator_args");
         let dialect = ChiaDialect::new(MEMPOOL_MODE);
         let Reduction(_, mut all_spends) =
             run_program(&mut a, &dialect, generator, args, 11_000_000_000).expect("run_program");
