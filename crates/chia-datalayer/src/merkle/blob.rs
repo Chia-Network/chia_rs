@@ -5,7 +5,7 @@ use pyo3::{
     buffer::PyBuffer,
     pyclass, pymethods,
     types::{PyDict, PyDictMethods, PyListMethods, PyType},
-    Bound, IntoPyObject, PyResult, Python,
+    Bound, IntoPyObject, PyAny, PyResult, Python,
 };
 
 use crate::merkle::iterators::{BreadthFirstIterator, LeftChildFirstIterator, ParentFirstIterator};
@@ -1434,26 +1434,26 @@ impl MerkleBlob {
     }
 
     #[pyo3(name = "get_lineage_with_indexes")]
-    pub fn py_get_lineage_with_indexes(
+    pub fn py_get_lineage_with_indexes<'py>(
         &self,
         index: TreeIndex,
-        py: Python<'_>,
-    ) -> PyResult<pyo3::PyObject> {
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
         let list = pyo3::types::PyList::empty(py);
 
         for (index, node) in self.get_lineage_with_indexes(index)? {
             list.append((index.into_pyobject(py)?, node.into_pyobject(py)?))?;
         }
 
-        Ok(list.into())
+        Ok(list.into_any())
     }
 
     #[pyo3(name = "get_nodes_with_indexes", signature = (index=None))]
-    pub fn py_get_nodes_with_indexes(
+    pub fn py_get_nodes_with_indexes<'py>(
         &self,
         index: Option<TreeIndex>,
-        py: Python<'_>,
-    ) -> PyResult<pyo3::PyObject> {
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
         let list = pyo3::types::PyList::empty(py);
 
         for item in ParentFirstIterator::new(&self.blob, index) {
@@ -1461,7 +1461,7 @@ impl MerkleBlob {
             list.append((index.into_pyobject(py)?, block.node.into_pyobject(py)?))?;
         }
 
-        Ok(list.into())
+        Ok(list.into_any())
     }
 
     #[pyo3(name = "empty")]
@@ -1503,14 +1503,14 @@ impl MerkleBlob {
     }
 
     #[pyo3(name = "get_keys_values")]
-    pub fn py_get_keys_values(&self, py: Python<'_>) -> PyResult<pyo3::PyObject> {
+    pub fn py_get_keys_values<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let map = self.get_keys_values()?;
         let dict = PyDict::new(py);
         for (key, value) in map {
             dict.set_item(key, value)?;
         }
 
-        Ok(dict.into())
+        Ok(dict.into_any())
     }
 
     #[pyo3(name = "get_key_index")]

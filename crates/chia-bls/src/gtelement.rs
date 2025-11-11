@@ -120,7 +120,7 @@ impl GTElement {
 
     #[classmethod]
     #[pyo3(name = "from_parent")]
-    pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: &Self) -> PyResult<Py<PyAny>> {
+    pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: &Self) -> PyResult<Py<pyo3::PyAny>> {
         Err(PyNotImplementedError::new_err(
             "GTElement does not support from_parent().",
         ))
@@ -146,7 +146,7 @@ mod pybindings {
     use chia_traits::{FromJsonDict, ToJsonDict};
 
     impl ToJsonDict for GTElement {
-        fn to_json_dict(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        fn to_json_dict(&self, py: Python<'_>) -> PyResult<Py<pyo3::PyAny>> {
             let bytes = self.to_bytes();
             Ok(("0x".to_string() + &hex::encode(bytes))
                 .into_pyobject(py)?

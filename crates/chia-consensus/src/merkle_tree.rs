@@ -366,9 +366,9 @@ impl MerkleSet {
         &self,
         py: Python<'_>,
         included_leaf: [u8; 32],
-    ) -> PyResult<(bool, PyObject)> {
+    ) -> PyResult<(bool, Py<PyAny>)> {
         match self.generate_proof(&included_leaf) {
-            Ok((included, proof)) => Ok((included, PyBytes::new(py, &proof).into())),
+            Ok((included, proof)) => Ok((included, PyBytes::new(py, &proof).into_any().unbind())),
             Err(_) => Err(PyValueError::new_err("invalid proof")),
         }
     }

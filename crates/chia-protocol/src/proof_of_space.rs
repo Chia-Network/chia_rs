@@ -86,7 +86,7 @@ impl ProofOfSpace {
 
 #[cfg(feature = "py-bindings")]
 impl ToJsonDict for ProofOfSpace {
-    fn to_json_dict(&self, py: pyo3::Python<'_>) -> pyo3::PyResult<pyo3::PyObject> {
+    fn to_json_dict(&self, py: pyo3::Python<'_>) -> pyo3::PyResult<pyo3::Py<pyo3::PyAny>> {
         use pyo3::prelude::PyDictMethods;
         let ret = pyo3::types::PyDict::new(py);
 
@@ -102,7 +102,7 @@ impl ToJsonDict for ProofOfSpace {
         ret.set_item("size", self.version_and_size.to_json_dict(py)?)?;
         ret.set_item("proof", self.proof.to_json_dict(py)?)?;
 
-        Ok(ret.into())
+        Ok(ret.into_any().unbind())
     }
 }
 

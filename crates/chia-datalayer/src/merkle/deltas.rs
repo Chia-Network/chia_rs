@@ -250,9 +250,7 @@ impl DeltaReader {
             extracted_jobs.push((hash, path));
         }
 
-        Ok(py.allow_threads(|| {
-            self.collect_and_return_from_merkle_blobs(&extracted_jobs, &hashes)
-        })?)
+        Ok(py.detach(|| self.collect_and_return_from_merkle_blobs(&extracted_jobs, &hashes))?)
     }
 
     #[allow(clippy::needless_pass_by_value)]
@@ -266,8 +264,8 @@ impl DeltaReader {
         for (path, indexes) in jobs {
             pathed_jobs.push((path, indexes));
         }
-        py.allow_threads(|| self.collect_from_merkle_blobs(&pathed_jobs))?;
-
+        py.detach(|| self.collect_from_merkle_blobs(&pathed_jobs))?;
+        
         Ok(())
     }
 
