@@ -1,11 +1,11 @@
 use std::borrow::Borrow;
 use std::num::NonZeroUsize;
 
+use crate::{aggregate_verify_gt, hash_to_g2};
+use crate::{GTElement, PublicKey, Signature};
 use chia_sha2::Sha256;
 use linked_hash_map::LinkedHashMap;
 use std::sync::Mutex;
-use crate::{aggregate_verify_gt, hash_to_g2};
-use crate::{GTElement, PublicKey, Signature};
 
 /// This is a cache of pairings of public keys and their corresponding message.
 /// It accelerates aggregate verification when some public keys have already
