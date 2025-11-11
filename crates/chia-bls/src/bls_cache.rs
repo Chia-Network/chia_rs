@@ -132,7 +132,7 @@ use pyo3::{
     exceptions::PyValueError,
     pybacked::PyBackedBytes,
     types::{PyAnyMethods, PyList, PySequence},
-    Bound, PyResult,
+    Bound, Py, PyResult,
 };
 
 #[cfg(feature = "py-bindings")]
@@ -163,12 +163,12 @@ impl BlsCache {
     ) -> PyResult<bool> {
         let pks = pks
             .try_iter()?
-            .map(|item| item?.extract())
+            .map(|item| Ok(item?.extract()?))
             .collect::<PyResult<Vec<PublicKey>>>()?;
 
         let msgs = msgs
             .try_iter()?
-            .map(|item| item?.extract())
+            .map(|item| Ok(item?.extract()?))
             .collect::<PyResult<Vec<PyBackedBytes>>>()?;
 
         Ok(self.aggregate_verify(pks.into_iter().zip(msgs), sig))
@@ -180,7 +180,7 @@ impl BlsCache {
     }
 
     #[pyo3(name = "items")]
-    pub fn py_items(&self, py: pyo3::Python<'_>) -> PyResult<Py<PyAny>> {
+    pub fn py_items(&self, py: pyo3::Python<'_>) -> PyResult<Py<pyo3::PyAny>> {
         use pyo3::prelude::*;
         use pyo3::types::PyBytes;
         let ret = PyList::empty(py);
@@ -191,7 +191,7 @@ impl BlsCache {
                 value.clone().into_pyobject(py)?.into_any(),
             ))?;
         }
-        Ok(ret.into())
+        Ok(ret.into_any().unbind())
     }
 
     #[pyo3(name = "update")]
@@ -212,11 +212,11 @@ impl BlsCache {
     pub fn py_evict(&self, pks: &Bound<'_, PyList>, msgs: &Bound<'_, PyList>) -> PyResult<()> {
         let pks = pks
             .try_iter()?
-            .map(|item| item?.extract())
+            .map(|item| Ok(item?.extract()?))
             .collect::<PyResult<Vec<PublicKey>>>()?;
         let msgs = msgs
             .try_iter()?
-            .map(|item| item?.extract())
+            .map(|item| Ok(item?.extract()?))
             .collect::<PyResult<Vec<PyBackedBytes>>>()?;
         self.evict(pks.into_iter().zip(msgs));
         Ok(())

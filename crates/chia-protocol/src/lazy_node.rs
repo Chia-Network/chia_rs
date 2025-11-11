@@ -13,22 +13,26 @@ pub struct LazyNode {
 #[pymethods]
 impl LazyNode {
     #[getter(pair)]
-    pub fn pair(&self, py: Python<'_>) -> PyResult<Option<PyObject>> {
+    pub fn pair(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
         match &self.allocator.sexp(self.node) {
             SExp::Pair(p1, p2) => {
                 let r1 = Self::new(self.allocator.clone(), *p1);
                 let r2 = Self::new(self.allocator.clone(), *p2);
                 let v = (r1, r2).into_pyobject(py)?;
-                Ok(Some(v.into()))
+                Ok(Some(v.into_any().unbind()))
             }
             SExp::Atom => Ok(None),
         }
     }
 
     #[getter(atom)]
-    pub fn atom(&self, py: Python<'_>) -> Option<PyObject> {
+    pub fn atom(&self, py: Python<'_>) -> Option<Py<PyAny>> {
         match &self.allocator.sexp(self.node) {
-            SExp::Atom => Some(PyBytes::new(py, self.allocator.atom(self.node).as_ref()).into()),
+            SExp::Atom => Some(
+                PyBytes::new(py, self.allocator.atom(self.node).as_ref())
+                    .into_any()
+                    .unbind(),
+            ),
             SExp::Pair(..) => None,
         }
     }

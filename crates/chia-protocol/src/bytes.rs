@@ -105,7 +105,7 @@ impl Streamable for Bytes {
 
 #[cfg(feature = "py-bindings")]
 impl ToJsonDict for Bytes {
-    fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
+    fn to_json_dict(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let prefix = if self.0.is_empty() { "" } else { "0x" };
         Ok(format!("{prefix}{self}")
             .into_pyobject(py)?
@@ -269,7 +269,7 @@ impl<const N: usize> Streamable for BytesImpl<N> {
 
 #[cfg(feature = "py-bindings")]
 impl<const N: usize> ToJsonDict for BytesImpl<N> {
-    fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
+    fn to_json_dict(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         Ok(format!("0x{self}").into_pyobject(py)?.into_any().unbind())
     }
 }
@@ -459,9 +459,11 @@ impl<const N: usize> ChiaToPython for BytesImpl<N> {
 }
 
 #[cfg(feature = "py-bindings")]
-impl<'py, const N: usize> FromPyObject<'py> for BytesImpl<N> {
-    fn extract_bound(obj: &Bound<'py, PyAny>) -> PyResult<Self> {
-        let b = obj.downcast::<PyBytes>()?;
+impl<'a, 'py, const N: usize> FromPyObject<'a, 'py> for BytesImpl<N> {
+    type Error = PyErr;
+
+    fn extract(obj: pyo3::Borrowed<'a, 'py, PyAny>) -> PyResult<Self> {
+        let b = obj.cast::<PyBytes>()?;
         let slice: &[u8] = b.as_bytes();
         let buf: [u8; N] = slice.try_into()?;
         Ok(BytesImpl::<N>(buf))
@@ -487,9 +489,11 @@ impl ChiaToPython for Bytes {
 }
 
 #[cfg(feature = "py-bindings")]
-impl<'py> FromPyObject<'py> for Bytes {
-    fn extract_bound(obj: &Bound<'py, PyAny>) -> PyResult<Self> {
-        let b = obj.downcast::<PyBytes>()?;
+impl<'a, 'py> FromPyObject<'a, 'py> for Bytes {
+    type Error = PyErr;
+
+    fn extract(obj: pyo3::Borrowed<'a, 'py, PyAny>) -> PyResult<Self> {
+        let b = obj.cast::<PyBytes>().map_err(pyo3::PyErr::from)?;
         Ok(Bytes(b.as_bytes().to_vec()))
     }
 }

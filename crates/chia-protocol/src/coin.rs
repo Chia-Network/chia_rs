@@ -64,7 +64,7 @@ impl Coin {
 impl Coin {
     #[classmethod]
     #[pyo3(name = "from_parent")]
-    pub fn from_parent(_cls: &Bound<'_, PyType>, _coin: Self) -> PyResult<PyObject> {
+    pub fn from_parent(_cls: &Bound<'_, PyType>, _coin: Self) -> PyResult<Py<PyAny>> {
         Err(PyNotImplementedError::new_err(
             "Coin does not support from_parent().",
         ))
