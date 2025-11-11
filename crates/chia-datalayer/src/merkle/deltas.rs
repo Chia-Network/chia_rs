@@ -265,7 +265,7 @@ impl DeltaReader {
             pathed_jobs.push((path, indexes));
         }
         py.detach(|| self.collect_from_merkle_blobs(&pathed_jobs))?;
-        
+
         Ok(())
     }
 

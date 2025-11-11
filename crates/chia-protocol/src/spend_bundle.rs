@@ -110,15 +110,13 @@ impl SpendBundle {
         } else {
             let aggregated_py = aggregated.into_any().unbind();
             let instance = cls.call_method1("from_parent", (Py::clone_ref(&aggregated_py, py),))?;
-            Ok(instance.into_any().unbind())        }
+            Ok(instance.into_any().unbind())
+        }
     }
 
     #[classmethod]
     #[pyo3(name = "from_parent")]
-    pub fn from_parent(
-        cls: &Bound<'_, PyType>,
-        spend_bundle: Self,
-    ) -> PyResult<Py<PyAny>> {
+    pub fn from_parent(cls: &Bound<'_, PyType>, spend_bundle: Self) -> PyResult<Py<PyAny>> {
         // Convert result into potential child class
         let instance = cls.call(
             (spend_bundle.coin_spends, spend_bundle.aggregated_signature),
