@@ -348,7 +348,6 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
 
     if py_pickle {
         let pickle = quote! {
-            #[allow(clippy::needless_question_mark)]
             #[pyo3::pymethods]
             impl #ident {
                 pub fn __setstate__(
@@ -373,7 +372,7 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 pub fn __getnewargs__<'py>(&self, py: pyo3::Python<'py>) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyTuple>> {
                     let mut args = Vec::new();
                     #( args.push(#crate_name::ChiaToPython::to_python(&self.#fnames, py)?); )*
-                    Ok(pyo3::types::PyTuple::new(py, args)?)
+                    pyo3::types::PyTuple::new(py, args)
                 }
             }
         };
