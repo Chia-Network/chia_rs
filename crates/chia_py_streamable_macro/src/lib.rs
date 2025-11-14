@@ -46,10 +46,12 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
         syn::Data::Struct(s) => s.fields,
         syn::Data::Enum(_) => {
             return quote! {
-                impl<'a> pyo3::conversion::FromPyObject<'a> for #ident {
-                    fn extract_bound(ob: &pyo3::Bound<'a, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+                impl<'a, 'py> pyo3::conversion::FromPyObject<'a, 'py> for #ident {
+                    type Error = pyo3::PyErr;
+
+                    fn extract(obj: pyo3::Borrowed<'a, 'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
                         use pyo3::types::PyAnyMethods;
-                        let v: u8 = ob.extract()?;
+                        let v: u8 = obj.extract()?;
                         <Self as #crate_name::Streamable>::parse::<false>(&mut std::io::Cursor::<&[u8]>::new(&[v])).map_err(|e| e.into())
                     }
                 }
@@ -76,13 +78,14 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
     let mut py_protocol = quote! {
         #[pyo3::pymethods]
         impl #ident {
-            fn __richcmp__(&self, other: pyo3::PyRef<Self>, op: pyo3::class::basic::CompareOp) -> pyo3::Py<pyo3::PyAny> {
+            fn __richcmp__(&self, other: pyo3::PyRef<Self>, op: pyo3::class::basic::CompareOp) -> pyo3::PyResult<pyo3::Py<pyo3::PyAny>> {
                 use pyo3::class::basic::CompareOp;
+                use pyo3::IntoPyObjectExt;
                 let py = other.py();
                 match op {
-                    CompareOp::Eq => pyo3::conversion::IntoPy::into_py(self == &*other, py),
-                    CompareOp::Ne => pyo3::conversion::IntoPy::into_py(self != &*other, py),
-                    _ => py.NotImplemented(),
+                    CompareOp::Eq => (self == &*other).into_py_any(py),
+                    CompareOp::Ne => (self != &*other).into_py_any(py),
+                    _ => Ok(py.NotImplemented()),
                 }
             }
 
@@ -95,7 +98,7 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
 
         impl #crate_name::ChiaToPython for #ident {
             fn to_python<'a>(&self, py: pyo3::Python<'a>) -> pyo3::PyResult<pyo3::Bound<'a, pyo3::PyAny>> {
-                Ok(pyo3::IntoPy::into_py(self.clone(), py).into_bound(py))
+                Ok(pyo3::Py::new(py, self.clone())?.into_bound(py).into_any())
             }
         }
     };
@@ -191,26 +194,24 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
         impl #ident {
             #[classmethod]
             #[pyo3(signature=(json_dict))]
-            pub fn from_json_dict(cls: &pyo3::Bound<'_, pyo3::types::PyType>, py: pyo3::Python<'_>, json_dict: &pyo3::Bound<pyo3::PyAny>) -> pyo3::PyResult<pyo3::PyObject> {
+            pub fn from_json_dict(cls: &pyo3::Bound<'_, pyo3::types::PyType>, py: pyo3::Python<'_>, json_dict: &pyo3::Bound<pyo3::PyAny>) -> pyo3::PyResult<pyo3::Py<pyo3::PyAny>> {
                 use pyo3::prelude::PyAnyMethods;
-                use pyo3::IntoPy;
+                use pyo3::IntoPyObjectExt;
                 use pyo3::Bound;
                 use pyo3::type_object::PyTypeInfo;
                 use std::borrow::Borrow;
                 let rust_obj = Bound::new(py, <Self as #crate_name::from_json_dict::FromJsonDict>::from_json_dict(json_dict)?)?;
 
-                // Check if python class is different from rust class (in case of child classes)
-                // if so call the python class's conversion code
-
                 if rust_obj.is_exact_instance(&cls) {
-                    Ok(rust_obj.into_py(py))
+                    rust_obj.into_py_any(py)
                 } else {
-                    let instance = cls.call_method1("from_parent", (rust_obj.into_py(py),))?;
-                    Ok(instance.into_py(py))
+                    let rust_py = rust_obj.into_py_any(py)?;
+                    let instance = cls.call_method1("from_parent", (rust_py.clone_ref(py),))?;
+                    Ok(instance.into_any().unbind())
                 }
             }
 
-            pub fn to_json_dict(&self, py: pyo3::Python) -> pyo3::PyResult<pyo3::PyObject> {
+            pub fn to_json_dict(&self, py: pyo3::Python) -> pyo3::PyResult<pyo3::Py<pyo3::PyAny>> {
                 #crate_name::to_json_dict::ToJsonDict::to_json_dict(self, py)
             }
         }
@@ -221,9 +222,9 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
         impl #ident {
             #[classmethod]
             #[pyo3(name = "from_bytes")]
-            pub fn py_from_bytes(cls: &pyo3::Bound<'_, pyo3::types::PyType>, py: pyo3::Python<'_>, blob: pyo3::buffer::PyBuffer<u8>) -> pyo3::PyResult<pyo3::PyObject> {
+            pub fn py_from_bytes(cls: &pyo3::Bound<'_, pyo3::types::PyType>, py: pyo3::Python<'_>, blob: pyo3::buffer::PyBuffer<u8>) -> pyo3::PyResult<pyo3::Py<pyo3::PyAny>> {
                 use pyo3::prelude::PyAnyMethods;
-                use pyo3::IntoPy;
+                use pyo3::IntoPyObjectExt;
                 use pyo3::Bound;
                 use pyo3::type_object::PyTypeInfo;
                 use std::borrow::Borrow;
@@ -236,22 +237,20 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 };
                 let rust_obj = Bound::new(py, <Self as #crate_name::Streamable>::from_bytes(slice)?)?;
 
-                // Check if python class is different from rust class (in case of child classes)
-                // if so call the python class's conversion code
-
                 if rust_obj.is_exact_instance(&cls) {
-                    Ok(rust_obj.into_py(py))
+                    rust_obj.into_py_any(py)
                 } else {
-                    let instance = cls.call_method1("from_parent", (rust_obj.into_py(py),))?;
-                    Ok(instance.into_py(py))
+                    let rust_py = rust_obj.into_py_any(py)?;
+                    let instance = cls.call_method1("from_parent", (rust_py.clone_ref(py),))?;
+                    Ok(instance.into_any().unbind())
                 }
             }
 
             #[classmethod]
             #[pyo3(name = "from_bytes_unchecked")]
-            pub fn py_from_bytes_unchecked(cls: &pyo3::Bound<'_, pyo3::types::PyType>, py: pyo3::Python<'_>, blob: pyo3::buffer::PyBuffer<u8>) -> pyo3::PyResult<pyo3::PyObject> {
+            pub fn py_from_bytes_unchecked(cls: &pyo3::Bound<'_, pyo3::types::PyType>, py: pyo3::Python<'_>, blob: pyo3::buffer::PyBuffer<u8>) -> pyo3::PyResult<pyo3::Py<pyo3::PyAny>> {
                 use pyo3::prelude::PyAnyMethods;
-                use pyo3::IntoPy;
+                use pyo3::IntoPyObjectExt;
                 use pyo3::Bound;
                 use pyo3::type_object::PyTypeInfo;
                 use std::borrow::Borrow;
@@ -263,23 +262,21 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 };
                 let rust_obj = Bound::new(py, <Self as #crate_name::Streamable>::from_bytes_unchecked(slice).map_err(|e| <#crate_name::chia_error::Error as Into<pyo3::PyErr>>::into(e))?)?;
 
-                // Check if python class is different from rust class (in case of child classes)
-                // if so call the python class's conversion code
-
                 if rust_obj.is_exact_instance(&cls) {
-                    Ok(rust_obj.into_py(py))
+                    rust_obj.into_py_any(py)
                 } else {
-                    let instance = cls.call_method1("from_parent", (rust_obj.into_py(py),))?;
-                    Ok(instance.into_py(py))
+                    let rust_py = rust_obj.into_py_any(py)?;
+                    let instance = cls.call_method1("from_parent", (rust_py.clone_ref(py),))?;
+                    Ok(instance.into_any().unbind())
                 }
             }
 
             // returns the type as well as the number of bytes read from the buffer
             #[classmethod]
             #[pyo3(signature= (blob, trusted=false))]
-            pub fn parse_rust<'p>(cls: &pyo3::Bound<'_, pyo3::types::PyType>, py: pyo3::Python<'_>, blob: pyo3::buffer::PyBuffer<u8>, trusted: bool) -> pyo3::PyResult<(pyo3::PyObject, u32)> {
+            pub fn parse_rust<'p>(cls: &pyo3::Bound<'_, pyo3::types::PyType>, py: pyo3::Python<'_>, blob: pyo3::buffer::PyBuffer<u8>, trusted: bool) -> pyo3::PyResult<(pyo3::Py<pyo3::PyAny>, u32)> {
                 use pyo3::prelude::PyAnyMethods;
-                use pyo3::IntoPy;
+                use pyo3::IntoPyObjectExt;
                 use pyo3::Bound;
                 use pyo3::type_object::PyTypeInfo;
                 use std::borrow::Borrow;
@@ -299,31 +296,35 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 // Check if python class is different from rust class (in case of child classes)
                 // if so call the python class's conversion code
 
-                let rust_obj = (Bound::new(py, rust_obj.0)?, rust_obj.1);
+                let rust_value = rust_obj.0;
+                let position = rust_obj.1;
+                let rust_bound = Bound::new(py, rust_value)?;
 
-                if rust_obj.0.is_exact_instance(&cls) {
-                    Ok((rust_obj.0.into_py(py), rust_obj.1))
+                if rust_bound.is_exact_instance(&cls) {
+                    Ok((rust_bound.into_py_any(py)?, position))
                 } else {
-                    let instance = cls.call_method1("from_parent", (rust_obj.0.into_py(py),))?;
-                    Ok((instance.into_py(py), rust_obj.1))
+                    let rust_py = rust_bound.into_py_any(py)?;
+                    let instance = cls.call_method1("from_parent", (rust_py.clone_ref(py),))?;
+                    Ok((instance.into_any().unbind(), position))
                 }
             }
 
             pub fn get_hash<'p>(&self, py: pyo3::Python<'p>) -> pyo3::PyResult<pyo3::Bound<'p, pyo3::types::PyAny>> {
-                use pyo3::IntoPy;
+                use pyo3::IntoPyObjectExt;
                 use pyo3::types::PyModule;
                 use pyo3::prelude::PyAnyMethods;
                 let mut ctx = chia_sha2::Sha256::new();
                 #crate_name::Streamable::update_digest(self, &mut ctx);
-                let bytes_module = PyModule::import_bound(py, "chia_rs.sized_bytes")?;
+                let bytes_module = PyModule::import(py, "chia_rs.sized_bytes")?;
                 let ty = bytes_module.getattr("bytes32")?;
-                ty.call1((&ctx.finalize().into_py(py),))
+                let digest = ctx.finalize().into_py_any(py)?;
+                ty.call1((digest,))
             }
             #[pyo3(name = "to_bytes")]
             pub fn py_to_bytes<'p>(&self, py: pyo3::Python<'p>) -> pyo3::PyResult<pyo3::Bound<'p, pyo3::types::PyBytes>> {
                 let mut writer = Vec::<u8>::new();
                 #crate_name::Streamable::stream(self, &mut writer).map_err(|e| <#crate_name::chia_error::Error as Into<pyo3::PyErr>>::into(e))?;
-                Ok(pyo3::types::PyBytes::new_bound(py, &writer))
+                Ok(pyo3::types::PyBytes::new(py, &writer))
             }
 
             pub fn stream_to_bytes<'p>(&self, py: pyo3::Python<'p>) -> pyo3::PyResult<pyo3::Bound<'p, pyo3::types::PyBytes>> {
@@ -371,7 +372,7 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 pub fn __getnewargs__<'py>(&self, py: pyo3::Python<'py>) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyTuple>> {
                     let mut args = Vec::new();
                     #( args.push(#crate_name::ChiaToPython::to_python(&self.#fnames, py)?); )*
-                    Ok(pyo3::types::PyTuple::new_bound(py, args))
+                    pyo3::types::PyTuple::new(py, args)
                 }
             }
         };
@@ -409,7 +410,7 @@ pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenSt
         syn::Data::Enum(_) => {
             return quote! {
                 impl #crate_name::to_json_dict::ToJsonDict for #ident {
-                    fn to_json_dict(&self, py: pyo3::Python) -> pyo3::PyResult<pyo3::PyObject> {
+                    fn to_json_dict(&self, py: pyo3::Python) -> pyo3::PyResult<pyo3::Py<pyo3::PyAny>> {
                         <u8 as #crate_name::to_json_dict::ToJsonDict>::to_json_dict(&(*self as u8), py)
                     }
                 }
@@ -444,11 +445,11 @@ pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenSt
             py_protocol.extend( quote! {
 
                 impl #crate_name::to_json_dict::ToJsonDict for #ident {
-                    fn to_json_dict(&self, py: pyo3::Python) -> pyo3::PyResult<pyo3::PyObject> {
+                    fn to_json_dict(&self, py: pyo3::Python) -> pyo3::PyResult<pyo3::Py<pyo3::PyAny>> {
                         use pyo3::prelude::PyDictMethods;
-                        let ret = pyo3::types::PyDict::new_bound(py);
+                        let ret = pyo3::types::PyDict::new(py);
                         #(ret.set_item(stringify!(#fnames_maybe_upper), self.#fnames.to_json_dict(py)?)?);*;
-                        Ok(ret.into())
+                        Ok(ret.into_any().unbind())
                     }
                 }
 
@@ -472,8 +473,8 @@ pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenSt
             py_protocol.extend( quote! {
 
                 impl #crate_name::to_json_dict::ToJsonDict for #ident {
-                    fn to_json_dict(&self, py: pyo3::Python) -> pyo3::PyResult<pyo3::PyObject> {
-                        Ok(self.0.to_json_dict(py)?.into())
+                    fn to_json_dict(&self, py: pyo3::Python) -> pyo3::PyResult<pyo3::Py<pyo3::PyAny>> {
+                        self.0.to_json_dict(py)
                     }
                 }
 

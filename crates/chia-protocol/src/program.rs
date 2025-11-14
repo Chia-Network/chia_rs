@@ -19,7 +19,7 @@ use clvmr::{Allocator, ChiaDialect};
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
 #[cfg(feature = "py-bindings")]
-use pyo3::types::PyType;
+use pyo3::types::{PyList, PyTuple, PyType};
 use std::io::Cursor;
 use std::ops::Deref;
 #[cfg(feature = "py-bindings")]
@@ -164,9 +164,6 @@ use chia_traits::{FromJsonDict, ToJsonDict};
 use chia_py_streamable_macro::PyStreamable;
 
 #[cfg(feature = "py-bindings")]
-use pyo3::types::{PyList, PyTuple};
-
-#[cfg(feature = "py-bindings")]
 use pyo3::exceptions::*;
 
 #[cfg(feature = "py-bindings")]
@@ -200,7 +197,7 @@ fn clvm_convert(a: &mut Allocator, o: &Bound<'_, PyAny>) -> PyResult<NodePtr> {
         a.new_number(val)
             .map_err(|e| PyMemoryError::new_err(e.to_string()))
     // Tuple (SExp-like)
-    } else if let Ok(pair) = o.downcast::<PyTuple>() {
+    } else if let Ok(pair) = o.cast::<PyTuple>() {
         if pair.len() == 2 {
             let left = clvm_convert(a, &pair.get_item(0)?)?;
             let right = clvm_convert(a, &pair.get_item(1)?)?;
@@ -213,7 +210,7 @@ fn clvm_convert(a: &mut Allocator, o: &Bound<'_, PyAny>) -> PyResult<NodePtr> {
             )))
         }
     // List
-    } else if let Ok(list) = o.downcast::<PyList>() {
+    } else if let Ok(list) = o.cast::<PyList>() {
         let mut rev = Vec::new();
         for py_item in list.iter() {
             rev.push(py_item);
@@ -232,7 +229,7 @@ fn clvm_convert(a: &mut Allocator, o: &Bound<'_, PyAny>) -> PyResult<NodePtr> {
             if pair.is_none() {
                 Err(PyTypeError::new_err(format!("invalid SExp item {o}")))
             } else {
-                let pair = pair.downcast::<PyTuple>()?;
+                let pair = pair.cast::<PyTuple>()?;
                 let left = clvm_convert(a, &pair.get_item(0)?)?;
                 let right = clvm_convert(a, &pair.get_item(1)?)?;
                 a.new_pair(left, right)
@@ -286,7 +283,7 @@ fn clvm_serialize(a: &mut Allocator, o: &Bound<'_, PyAny>) -> PyResult<NodePtr> 
     */
 
     // List
-    if let Ok(list) = o.downcast::<PyList>() {
+    if let Ok(list) = o.cast::<PyList>() {
         let mut rev = Vec::new();
         for py_item in list.iter() {
             rev.push(py_item);
@@ -367,7 +364,7 @@ impl Program {
             let program = node_from_bytes_backrefs(&mut a, self.0.as_ref()).map_err(map_pyerr)?;
             let dialect = ChiaDialect::new(flags);
 
-            Ok(py.allow_threads(|| run_program(&mut a, &dialect, program, clvm_args, max_cost)))
+            Ok(py.detach(|| run_program(&mut a, &dialect, program, clvm_args, max_cost)))
         })()?;
         match r {
             Ok(reduction) => {
@@ -449,7 +446,7 @@ impl Streamable for Program {
 
 #[cfg(feature = "py-bindings")]
 impl ToJsonDict for Program {
-    fn to_json_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
+    fn to_json_dict(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         self.0.to_json_dict(py)
     }
 }
@@ -459,7 +456,7 @@ impl ToJsonDict for Program {
 impl Program {
     #[classmethod]
     #[pyo3(name = "from_parent")]
-    pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: &Self) -> PyResult<PyObject> {
+    pub fn from_parent(_cls: &Bound<'_, PyType>, _instance: &Self) -> PyResult<Py<PyAny>> {
         Err(PyNotImplementedError::new_err(
             "This class does not support from_parent().",
         ))

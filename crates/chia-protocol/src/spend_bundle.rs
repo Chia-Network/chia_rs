@@ -103,30 +103,27 @@ impl SpendBundle {
         cls: &Bound<'_, PyType>,
         py: Python<'_>,
         spend_bundles: Vec<Self>,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         let aggregated = Bound::new(py, Self::aggregate(&spend_bundles))?;
         if aggregated.is_exact_instance(cls) {
-            Ok(aggregated.into_pyobject(py)?.unbind().into_any())
+            Ok(aggregated.into_any().unbind())
         } else {
-            let instance = cls.call_method1("from_parent", (aggregated.into_pyobject(py)?,))?;
-            Ok(instance.into_pyobject(py)?.unbind().into_any())
+            let aggregated_py = aggregated.into_any().unbind();
+            let instance = cls.call_method1("from_parent", (Py::clone_ref(&aggregated_py, py),))?;
+            Ok(instance.into_any().unbind())
         }
     }
 
     #[classmethod]
     #[pyo3(name = "from_parent")]
-    pub fn from_parent(
-        cls: &Bound<'_, PyType>,
-        py: Python<'_>,
-        spend_bundle: Self,
-    ) -> PyResult<PyObject> {
+    pub fn from_parent(cls: &Bound<'_, PyType>, spend_bundle: Self) -> PyResult<Py<PyAny>> {
         // Convert result into potential child class
         let instance = cls.call(
             (spend_bundle.coin_spends, spend_bundle.aggregated_signature),
             None,
         )?;
 
-        Ok(instance.into_pyobject(py)?.unbind())
+        Ok(instance.into_any().unbind())
     }
 
     #[pyo3(name = "name")]

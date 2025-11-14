@@ -41,18 +41,6 @@ jobs:
             runs-on:
               intel: [windows-latest]
         python:
-          - major-dot-minor: "3.9"
-            cibw-build: "cp39-*"
-            by-arch:
-              arm:
-                manylinux-version: 2_28
-                docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-aarch64
-                rustup-target: aarch64-unknown-linux-musl
-              intel:
-                manylinux-version: 2_28
-                docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-x86_64
-                rustup-target: x86_64-unknown-linux-musl
-            matrix: "3.9"
           - major-dot-minor: "3.10"
             cibw-build: "cp310-*"
             by-arch:
@@ -101,6 +89,18 @@ jobs:
                 docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-x86_64
                 rustup-target: x86_64-unknown-linux-musl
             matrix: "3.13"
+          - major-dot-minor: "3.14"
+            cibw-build: "cp314-*"
+            by-arch:
+              arm:
+                manylinux-version: 2_28
+                docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-aarch64
+                rustup-target: aarch64-unknown-linux-musl
+              intel:
+                manylinux-version: 2_28
+                docker-url: ghcr.io/chia-network/build-images/centos-pypa-rust-x86_64
+                rustup-target: x86_64-unknown-linux-musl
+            matrix: "3.14"
 
         arch:
           - name: ARM
@@ -240,8 +240,8 @@ jobs:
               arm: [Linux, ARM64]
               intel: [ubuntu-latest]
         python:
-          - major-dot-minor: "3.9"
-            matrix: "3.9"
+          - major-dot-minor: "3.12"
+            matrix: "3.12"
         arch:
           - name: Intel
             matrix: intel
@@ -387,7 +387,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Chia-Network/actions/setup-python@main
         with:
-          python-version: "3.9"
+          python-version: "3.12"
       - name: Prepare for coverage
         if: matrix.os.coverage
         run: |
@@ -458,8 +458,8 @@ jobs:
               arm: [Linux, ARM64]
               intel: [ubuntu-latest]
         python:
-          - major-dot-minor: "3.9"
-            matrix: "3.9"
+          - major-dot-minor: "3.12"
+            matrix: "3.12"
         arch:
           - name: Intel
             matrix: intel

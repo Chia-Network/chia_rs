@@ -160,7 +160,7 @@ pub fn get_puzzle_and_solution_for_coin<'a>(
     let dialect = &ChiaDialect::new(flags);
 
     let (puzzle, solution) = py
-        .allow_threads(|| -> Result<(NodePtr, NodePtr), EvalErr> {
+        .detach(|| -> Result<(NodePtr, NodePtr), EvalErr> {
             let Reduction(_cost, result) =
                 run_program(&mut allocator, dialect, program, args, max_cost)?;
             match parse_puzzle_solution(
@@ -219,7 +219,7 @@ pub fn get_puzzle_and_solution_for_coin2<'a>(
     let dialect = &ChiaDialect::new(flags);
 
     let (puzzle, solution) = py
-        .allow_threads(|| -> Result<(NodePtr, NodePtr), EvalErr> {
+        .detach(|| -> Result<(NodePtr, NodePtr), EvalErr> {
             let Reduction(_cost, result) =
                 run_program(&mut allocator, dialect, generator, args, max_cost)?;
             match parse_puzzle_solution(&allocator, result, find_coin) {
@@ -250,7 +250,7 @@ fn convert_list_of_tuples(spends: &Bound<'_, PyAny>) -> PyResult<Vec<CoinSpendRe
     let mut native_spends = Vec::<CoinSpendRef>::new();
     for s in spends.try_iter()? {
         let s = s?;
-        let tuple = s.downcast::<PyTuple>()?;
+        let tuple = s.cast::<PyTuple>()?;
         let coin = tuple.get_item(0)?.extract::<Coin>()?;
         let puzzle = tuple.get_item(1)?.extract::<PyBackedBytes>()?;
         let solution = tuple.get_item(2)?.extract::<PyBackedBytes>()?;
@@ -309,7 +309,7 @@ impl AugSchemeMPL {
 
     #[staticmethod]
     pub fn verify(py: Python<'_>, pk: &PublicKey, msg: &[u8], sig: &Signature) -> bool {
-        py.allow_threads(|| chia_bls::verify(sig, pk, msg))
+        py.detach(|| chia_bls::verify(sig, pk, msg))
     }
 
     #[staticmethod]
@@ -331,7 +331,7 @@ impl AugSchemeMPL {
             data.push((pk, msg));
         }
 
-        py.allow_threads(|| Ok(chia_bls::aggregate_verify(sig, data)))
+        py.detach(|| Ok(chia_bls::aggregate_verify(sig, data)))
     }
 
     #[staticmethod]
@@ -432,7 +432,7 @@ pub fn py_validate_clvm_and_signature(
 ) -> PyResult<(OwnedSpendBundleConditions, Vec<([u8; 32], GTElement)>, f32)> {
     let start_time = Instant::now();
     let (owned_conditions, additions) =
-        py.allow_threads(|| validate_clvm_and_signature(new_spend, max_cost, constants, flags))?;
+        py.detach(|| validate_clvm_and_signature(new_spend, max_cost, constants, flags))?;
     let duration = start_time.elapsed();
     Ok((owned_conditions, additions, duration.as_secs_f32()))
 }
@@ -525,7 +525,7 @@ pub fn get_spends_for_trusted_block<'a>(
     generator: Program,
     block_refs: &Bound<'_, PyList>,
     flags: u32,
-) -> pyo3::PyResult<PyObject> {
+) -> pyo3::PyResult<Py<PyAny>> {
     let refs = block_refs
         .into_iter()
         .map(|b| {
@@ -537,11 +537,11 @@ pub fn get_spends_for_trusted_block<'a>(
         .collect::<Vec<&'a [u8]>>();
 
     let output =
-        py.allow_threads(|| get_coinspends_for_trusted_block(constants, &generator, &refs, flags))?;
+        py.detach(|| get_coinspends_for_trusted_block(constants, &generator, &refs, flags))?;
 
     let dict = PyDict::new(py);
     dict.set_item("block_spends", output)?;
-    Ok(dict.into())
+    Ok(dict.into_any().unbind())
 }
 
 #[pyo3::pyfunction]
@@ -551,7 +551,7 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
     generator: Program,
     block_refs: &Bound<'a, PyList>,
     flags: u32,
-) -> pyo3::PyResult<PyObject> {
+) -> pyo3::PyResult<Py<PyAny>> {
     let refs = block_refs
         .into_iter()
         .map(|b| {
@@ -562,7 +562,7 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
         })
         .collect::<Vec<&'a [u8]>>();
 
-    let output = py.allow_threads(|| {
+    let output = py.detach(|| {
         get_coinspends_with_conditions_for_trusted_block(constants, &generator, &refs, flags)
     })?;
 
@@ -585,7 +585,7 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
         dict.set_item("conditions", cond_list)?;
         pylist.append(dict)?;
     }
-    Ok(pylist.into())
+    Ok(pylist.into_any().unbind())
 }
 
 #[pyo3::pyfunction]
