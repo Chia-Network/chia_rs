@@ -27,6 +27,7 @@ pub fn streamable(attr: TokenStream, item: TokenStream) -> TokenStream {
     let is_subclass = &attr.to_string() == "subclass";
     let no_serde = &attr.to_string() == "no_serde";
     let no_json = &attr.to_string() == "no_json";
+    let no_streamable = &attr.to_string() == "no_streamable";
 
     let mut input: DeriveInput = parse_macro_input!(item);
     let name = input.ident.clone();
@@ -91,8 +92,14 @@ pub fn streamable(attr: TokenStream, item: TokenStream) -> TokenStream {
         panic!("only structs are supported");
     }
 
-    let main_derives = quote! {
-        #[derive(chia_streamable_macro::Streamable, Hash, Debug, Clone, Eq, PartialEq)]
+    let main_derives = if no_streamable {
+        quote! {
+            #[derive(Hash, Debug, Clone, Eq, PartialEq)]
+        }
+    } else {
+        quote! {
+            #[derive(chia_streamable_macro::Streamable, Hash, Debug, Clone, Eq, PartialEq)]
+        }
     };
 
     let class_attrs = if is_subclass {
