@@ -4235,12 +4235,14 @@ class SubEpochData:
     num_blocks_overflow: uint8
     new_sub_slot_iters: Optional[uint64]
     new_difficulty: Optional[uint64]
+    challenge_merkle_root: Optional[bytes32]
     def __new__(
         cls,
         reward_chain_hash: bytes,
         num_blocks_overflow: uint8,
         new_sub_slot_iters: Optional[uint64],
-        new_difficulty: Optional[uint64]
+        new_difficulty: Optional[uint64],
+        challenge_merkle_root: Optional[bytes32]
     ) -> SubEpochData: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -4262,7 +4264,8 @@ class SubEpochData:
     def replace(self, *, reward_chain_hash: Union[ bytes32, _Unspec] = _Unspec(),
         num_blocks_overflow: Union[ uint8, _Unspec] = _Unspec(),
         new_sub_slot_iters: Union[ Optional[uint64], _Unspec] = _Unspec(),
-        new_difficulty: Union[ Optional[uint64], _Unspec] = _Unspec()) -> SubEpochData: ...
+        new_difficulty: Union[ Optional[uint64], _Unspec] = _Unspec(),
+        challenge_merkle_root: Union[ Optional[bytes32], _Unspec] = _Unspec()) -> SubEpochData: ...
 
 @final
 class SubSlotData:
