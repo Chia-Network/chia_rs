@@ -627,23 +627,14 @@ impl Prover {
         Ok(Self(chia_pos2::Prover::new(Path::new(plot_path))?))
     }
 
-    pub fn get_qualities_for_challenge(
-        &self,
-        challenge: Bytes32,
-        proof_fragment_filter: u8,
-    ) -> PyResult<Vec<QualityProof>> {
-        let qualities = self
-            .0
-            .get_qualities_for_challenge(&challenge.to_bytes(), proof_fragment_filter)?;
-        Ok(qualities.into_iter().map(&QualityProof).collect())
-    }
-
-    pub fn get_partial_proof(&self, quality: &QualityProof) -> PyResult<(PartialProof, u8)> {
-        let chia_pos2::PartialProof {
-            proof_fragments,
-            strength,
-        } = self.0.get_partial_proof(&quality.0)?;
-        Ok((PartialProof { proof_fragments }, strength))
+    pub fn get_qualities_for_challenge(&self, challenge: Bytes32) -> PyResult<Vec<PartialProof>> {
+        let qualities = self.0.get_qualities_for_challenge(&challenge.to_bytes())?;
+        Ok(qualities
+            .into_iter()
+            .map(|q| PartialProof {
+                fragments: q.chain_links,
+            })
+            .collect())
     }
 
     pub fn size(&self) -> u8 {
@@ -684,51 +675,41 @@ impl Prover {
     }
 }
 
-#[pyclass]
-#[derive(Clone)]
-pub struct QualityProof(chia_pos2::QualityChain);
-
-#[pymethods]
-impl QualityProof {
-    pub fn serialize(&self) -> Bytes32 {
-        let mut sha256 = Sha256::new();
-        sha256.update(self.0.serialize());
-        sha256.finalize().into()
-    }
-}
-
 #[pyo3::pyfunction]
 pub fn validate_proof_v2(
     plot_id: Bytes32,
     size: u8,
     challenge: Bytes32,
-    required_plot_strength: u8,
-    proof_fragment_scan_filter: u8,
+    plot_strength: u8,
     proof: &[u8],
 ) -> Option<Bytes32> {
     chia_pos2::validate_proof_v2(
         &plot_id.to_bytes(),
         size,
         &challenge.to_bytes(),
-        required_plot_strength,
-        proof_fragment_scan_filter,
+        plot_strength,
         proof,
     )
     .map(|quality| -> Bytes32 {
         let mut sha256 = Sha256::new();
-        sha256.update(quality);
+        sha256.update(chia_pos2::serialize_quality(
+            &quality.chain_links,
+            plot_strength,
+        ));
         sha256.finalize().into()
     })
 }
 
 #[pyo3::pyfunction]
 pub fn solve_proof(fragments: &PartialProof, plot_id: Bytes32, strength: u8, k: u8) -> Vec<u8> {
-    let partial_proof = chia_pos2::PartialProof {
-        proof_fragments: fragments.proof_fragments,
+    chia_pos2::solve_proof(
+        &chia_pos2::QualityChain {
+            chain_links: fragments.fragments,
+        },
+        &plot_id.to_bytes(),
+        k,
         strength,
-    };
-
-    chia_pos2::solve_proof(&partial_proof, &plot_id.to_bytes(), k)
+    )
 }
 
 #[pymodule]
@@ -765,7 +746,6 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(validate_proof_v2, m)?)?;
     m.add_function(wrap_pyfunction!(solve_proof, m)?)?;
     m.add_class::<Prover>()?;
-    m.add_class::<QualityProof>()?;
     m.add_class::<PartialProof>()?;
 
     // check time lock

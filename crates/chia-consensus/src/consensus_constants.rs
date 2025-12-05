@@ -160,9 +160,6 @@ pub struct ConsensusConstants {
     min_plot_strength: u8,
     max_plot_strength: u8,
 
-    /// The quality proof scan filter for v2 plots
-    quality_proof_scan_filter: u8,
-
     plot_filter_v2_first_adjustment_height: u32,
     plot_filter_v2_second_adjustment_height: u32,
     plot_filter_v2_third_adjustment_height: u32,
@@ -240,8 +237,6 @@ pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
 
     min_plot_strength: 2,
     max_plot_strength: 32,
-
-    quality_proof_scan_filter: 5,
 
     plot_filter_v2_first_adjustment_height: 0xffff_ffff, // placeholder
     plot_filter_v2_second_adjustment_height: 0xffff_ffff, // placeholder
