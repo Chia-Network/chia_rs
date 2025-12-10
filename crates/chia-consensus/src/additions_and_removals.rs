@@ -4,7 +4,7 @@ use chia_protocol::Coin;
 
 use crate::allocator::make_allocator;
 use crate::consensus_constants::ConsensusConstants;
-use crate::validation_error::{atom, first, next, rest, ErrorCode, ValidationErr};
+use crate::validation_error::{atom, first, next, rest, ValidationErr};
 use chia_protocol::{Bytes, Bytes32};
 use clvm_traits::FromClvm;
 use clvm_utils::{tree_hash_cached, TreeCache};
@@ -57,7 +57,7 @@ where
         iter = rest;
         let (_parent_id, (puzzle, _rest)) =
             <(NodePtr, (NodePtr, NodePtr))>::from_clvm(&a, spend)
-                .map_err(|_| ValidationErr(spend, ErrorCode::InvalidCondition))?;
+                .map_err(|_| ValidationErr::InvalidCondition(spend))?;
         cache.visit_tree(&a, puzzle);
     }
 
@@ -67,7 +67,7 @@ where
         // process the spend
         let (parent_id, (puzzle, (amount, (solution, _spend_level_extra)))) =
             <(Bytes32, (NodePtr, (u64, (NodePtr, NodePtr))))>::from_clvm(&a, spend)
-                .map_err(|_| ValidationErr(spend, ErrorCode::InvalidCondition))?;
+                .map_err(|_| ValidationErr::InvalidCondition(spend))?;
 
         let Reduction(clvm_cost, mut iter) =
             run_program(&mut a, &dialect, puzzle, solution, cost_left)?;
@@ -88,7 +88,7 @@ where
         while let Some((mut c, next)) = next(&a, iter)? {
             iter = next;
             let op = first(&a, c)?;
-            let Ok(op) = atom(&a, op, ErrorCode::InvalidConditionOpcode) else {
+            let Ok(op) = atom(&a, op, ValidationErr::InvalidConditionOpcode) else {
                 // unknown opcodes (including pairs) are simply ingnored in
                 // consensus mode
                 continue;
@@ -100,7 +100,7 @@ where
             c = rest(&a, c)?;
 
             let (puzzle_hash, (amount, hint)) = <(Bytes32, (u64, NodePtr))>::from_clvm(&a, c)
-                .map_err(|_| ValidationErr(c, ErrorCode::InvalidCondition))?;
+                .map_err(|_| ValidationErr::InvalidCondition(c))?;
 
             let coin = Coin {
                 parent_coin_info: spend_id,

@@ -6,7 +6,7 @@ use thiserror::Error;
 use pyo3::PyErr;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum ErrorCode {
+pub enum ValidationErr {
     #[default]
     Unknown,
     InvalidBlockSolution,
@@ -17,22 +17,22 @@ pub enum ErrorCode {
     BadAggregateSignature,
     WrongPuzzleHash,
     BadFarmerCoinAmount,
-    InvalidCondition,
-    InvalidConditionOpcode,
-    InvalidParentId,
-    InvalidPuzzleHash,
-    InvalidPublicKey,
-    InvalidMessage,
-    InvalidCoinAmount,
-    InvalidCoinAnnouncement,
-    InvalidPuzzleAnnouncement,
-    AssertMyCoinIdFailed,
-    AssertPuzzleAnnouncementFailed,
-    AssertCoinAnnouncementFailed,
-    AssertHeightRelativeFailed,
-    AssertHeightAbsoluteFailed,
-    AssertSecondsAbsoluteFailed,
-    CoinAmountExceedsMaximum,
+    InvalidCondition(NodePtr),
+    InvalidConditionOpcode(NodePtr),
+    InvalidParentId(NodePtr),
+    InvalidPuzzleHash(NodePtr),
+    InvalidPublicKey(NodePtr),
+    InvalidMessage(NodePtr),
+    InvalidCoinAmount(NodePtr),
+    InvalidCoinAnnouncement(NodePtr),
+    InvalidPuzzleAnnouncement(NodePtr),
+    AssertMyCoinIdFailed(NodePtr),
+    AssertPuzzleAnnouncementFailed(NodePtr),
+    AssertCoinAnnouncementFailed(NodePtr),
+    AssertHeightRelativeFailed(NodePtr),
+    AssertHeightAbsoluteFailed(NodePtr),
+    AssertSecondsAbsoluteFailed(NodePtr),
+    CoinAmountExceedsMaximum(NodePtr),
     SexpError,
     InvalidFeeLowFee,
     MempoolConflict,
@@ -40,7 +40,7 @@ pub enum ErrorCode {
     ExtendsUnknownBlock,
     CoinbaseNotYetSpendable,
     /// Renamed from "BlockCostExceedsMax" since it's more generic than that.
-    CostExceeded,
+    CostExceeded(NodePtr),
     BadAdditionRoot,
     BadRemovalRoot,
     InvalidPospaceHash,
@@ -129,10 +129,10 @@ pub enum ErrorCode {
     PreSoftForkMaxGeneratorSize,
     InvalidRequiredIters,
     TooManyGeneratorRefs,
-    AssertMyParentIdFailed,
-    AssertMyPuzzleHashFailed,
-    AssertMyAmountFailed,
-    GeneratorRuntimeError,
+    AssertMyParentIdFailed(NodePtr),
+    AssertMyPuzzleHashFailed(NodePtr),
+    AssertMyAmountFailed(NodePtr),
+    GeneratorRuntimeError(NodePtr),
     InvalidCostResult,
     InvalidTransactionsGeneratorRefsRoot,
     FutureGeneratorRefs,
@@ -160,35 +160,31 @@ pub enum ErrorCode {
     InvalidSoftforkCondition,
     InvalidSoftforkCost,
     TooManyAnnouncements,
-    InvalidMessageMode,
+    InvalidMessageMode(NodePtr),
     InvalidCoinId,
     MessageNotSentOrReceived,
     ComplexGeneratorReceived,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
-#[error("validation error: {1:?}")]
-pub struct ValidationErr(pub NodePtr, pub ErrorCode);
-
 impl From<EvalErr> for ValidationErr {
     fn from(v: EvalErr) -> Self {
         match v {
-            EvalErr::CostExceeded => ValidationErr(v.node_ptr(), ErrorCode::CostExceeded),
-            _ => ValidationErr(v.node_ptr(), ErrorCode::GeneratorRuntimeError),
+            EvalErr::CostExceeded => ValidationErr::CostExceeded(v.node_ptr()),
+            _ => ValidationErr::GeneratorRuntimeError(v.node_ptr()),
         }
     }
 }
 
 impl From<std::io::Error> for ValidationErr {
     fn from(_: std::io::Error) -> Self {
-        ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError)
+        ValidationErr::GeneratorRuntimeError(NodePtr::NIL)
     }
 }
 
 #[cfg(feature = "py-bindings")]
 impl From<ValidationErr> for PyErr {
     fn from(err: ValidationErr) -> PyErr {
-        pyo3::exceptions::PyValueError::new_err(("ValidationError", u32::from(err.1)))
+        pyo3::exceptions::PyValueError::new_err(("ValidationError", u32::from(err)))
     }
 }
 
@@ -196,170 +192,169 @@ impl From<ValidationErr> for PyErr {
 pub fn first(a: &Allocator, n: NodePtr) -> Result<NodePtr, ValidationErr> {
     match a.sexp(n) {
         SExp::Pair(left, _) => Ok(left),
-        SExp::Atom => Err(ValidationErr(n, ErrorCode::InvalidCondition)),
+        SExp::Atom => Err(ValidationErr::InvalidCondition(n)),
     }
 }
 
 // from chia-blockchain/chia/util/errors.py
-impl From<ErrorCode> for u32 {
-    fn from(err: ErrorCode) -> u32 {
+impl From<ValidationErr> for u32 {
+    fn from(err: ValidationErr) -> u32 {
         match err {
-            ErrorCode::Unknown => 1,
-            ErrorCode::InvalidBlockSolution => 2,
-            ErrorCode::InvalidCoinSolution => 3,
-            ErrorCode::DuplicateOutput => 4,
-            ErrorCode::DoubleSpend => 5,
-            ErrorCode::UnknownUnspent => 6,
-            ErrorCode::BadAggregateSignature => 7,
-            ErrorCode::WrongPuzzleHash => 8,
-            ErrorCode::BadFarmerCoinAmount => 9,
-            ErrorCode::InvalidCondition
-            | ErrorCode::InvalidConditionOpcode
-            | ErrorCode::InvalidParentId
-            | ErrorCode::InvalidPuzzleHash
-            | ErrorCode::InvalidPublicKey
-            | ErrorCode::InvalidMessage
-            | ErrorCode::InvalidCoinAmount
-            | ErrorCode::InvalidCoinAnnouncement
-            | ErrorCode::InvalidPuzzleAnnouncement => 10,
-            ErrorCode::AssertMyCoinIdFailed => 11,
-            ErrorCode::AssertPuzzleAnnouncementFailed | ErrorCode::AssertCoinAnnouncementFailed => {
-                12
-            }
-            ErrorCode::AssertHeightRelativeFailed => 13,
-            ErrorCode::AssertHeightAbsoluteFailed => 14,
-            ErrorCode::AssertSecondsAbsoluteFailed => 15,
-            ErrorCode::CoinAmountExceedsMaximum => 16,
-            ErrorCode::SexpError => 17,
-            ErrorCode::InvalidFeeLowFee => 18,
-            ErrorCode::MempoolConflict => 19,
-            ErrorCode::MintingCoin => 20,
-            ErrorCode::ExtendsUnknownBlock => 21,
-            ErrorCode::CoinbaseNotYetSpendable => 22,
-            ErrorCode::CostExceeded => 23,
-            ErrorCode::BadAdditionRoot => 24,
-            ErrorCode::BadRemovalRoot => 25,
-            ErrorCode::InvalidPospaceHash => 26,
-            ErrorCode::InvalidCoinbaseSignature => 27,
-            ErrorCode::InvalidPlotSignature => 28,
-            ErrorCode::TimestampTooFarInPast => 29,
-            ErrorCode::TimestampTooFarInFuture => 30,
-            ErrorCode::InvalidTransactionsFilterHash => 31,
-            ErrorCode::InvalidPospaceChallenge => 32,
-            ErrorCode::InvalidPospace => 33,
-            ErrorCode::InvalidHeight => 34,
-            ErrorCode::InvalidCoinbaseAmount => 35,
-            ErrorCode::InvalidMerkleRoot => 36,
-            ErrorCode::InvalidBlockFeeAmount => 37,
-            ErrorCode::InvalidWeight => 38,
-            ErrorCode::InvalidTotalIters => 39,
-            ErrorCode::BlockIsNotFinished => 40,
-            ErrorCode::InvalidNumIterations => 41,
-            ErrorCode::InvalidPot => 42,
-            ErrorCode::InvalidPotChallenge => 43,
-            ErrorCode::InvalidTransactionsGeneratorHash => 44,
-            ErrorCode::InvalidPoolTarget => 45,
-            ErrorCode::InvalidCoinbaseParent => 46,
-            ErrorCode::InvalidFeesCoinParent => 47,
-            ErrorCode::ReserveFeeConditionFailed => 48,
-            ErrorCode::NotBlockButHasData => 49,
-            ErrorCode::IsTransactionBlockButNoData => 50,
-            ErrorCode::InvalidPrevBlockHash => 51,
-            ErrorCode::InvalidTransactionsInfoHash => 52,
-            ErrorCode::InvalidFoliageBlockHash => 53,
-            ErrorCode::InvalidRewardCoins => 54,
-            ErrorCode::InvalidBlockCost => 55,
-            ErrorCode::NoEndOfSlotInfo => 56,
-            ErrorCode::InvalidPrevChallengeSlotHash => 57,
-            ErrorCode::InvalidSubEpochSummaryHash => 58,
-            ErrorCode::NoSubEpochSummaryHash => 59,
-            ErrorCode::ShouldNotMakeChallengeBlock => 60,
-            ErrorCode::ShouldMakeChallengeBlock => 61,
-            ErrorCode::InvalidChallengeChainData => 62,
-            ErrorCode::InvalidCcEosVdf => 65,
-            ErrorCode::InvalidRcEosVdf => 66,
-            ErrorCode::InvalidChallengeSlotHashRc => 67,
-            ErrorCode::InvalidPriorPointRc => 68,
-            ErrorCode::InvalidDeficit => 69,
-            ErrorCode::InvalidSubEpochSummary => 70,
-            ErrorCode::InvalidPrevSubEpochSummaryHash => 71,
-            ErrorCode::InvalidRewardChainHash => 72,
-            ErrorCode::InvalidSubEpochOverflow => 73,
-            ErrorCode::InvalidNewDifficulty => 74,
-            ErrorCode::InvalidNewSubSlotIters => 75,
-            ErrorCode::InvalidCcSpVdf => 76,
-            ErrorCode::InvalidRcSpVdf => 77,
-            ErrorCode::InvalidCcSignature => 78,
-            ErrorCode::InvalidRcSignature => 79,
-            ErrorCode::CannotMakeCcBlock => 80,
-            ErrorCode::InvalidRcSpPrevIp => 81,
-            ErrorCode::InvalidRcIpPrevIp => 82,
-            ErrorCode::InvalidIsTransactionBlock => 83,
-            ErrorCode::InvalidUrsbHash => 84,
-            ErrorCode::OldPoolTarget => 85,
-            ErrorCode::InvalidPoolSignature => 86,
-            ErrorCode::InvalidFoliageBlockPresence => 87,
-            ErrorCode::InvalidCcIpVdf => 88,
-            ErrorCode::InvalidRcIpVdf => 89,
-            ErrorCode::IpShouldBeNone => 90,
-            ErrorCode::InvalidRewardBlockHash => 91,
-            ErrorCode::InvalidMadeNonOverflowInfusions => 92,
-            ErrorCode::NoOverflowsInFirstSubSlotNewEpoch => 93,
-            ErrorCode::MempoolNotInitialized => 94,
-            ErrorCode::ShouldNotHaveIcc => 95,
-            ErrorCode::ShouldHaveIcc => 96,
-            ErrorCode::InvalidIccVdf => 97,
-            ErrorCode::InvalidIccHashCc => 98,
-            ErrorCode::InvalidIccHashRc => 99,
-            ErrorCode::InvalidIccEosVdf => 100,
-            ErrorCode::InvalidSpIndex => 101,
-            ErrorCode::TooManyBlocks => 102,
-            ErrorCode::InvalidCcChallenge => 103,
-            ErrorCode::InvalidPrefarm => 104,
-            ErrorCode::AssertSecondsRelativeFailed => 105,
-            ErrorCode::BadCoinbaseSignature => 106,
-            // ErrorCode::InitialTransactionFreeze => 107 (removed in `chia-blockchain`` as well)
-            ErrorCode::NoTransactionsWhileSyncing => 108,
-            ErrorCode::AlreadyIncludingTransaction => 109,
-            ErrorCode::IncompatibleNetworkId => 110,
-            ErrorCode::PreSoftForkMaxGeneratorSize => 111,
-            ErrorCode::InvalidRequiredIters => 112,
-            ErrorCode::TooManyGeneratorRefs => 113,
-            ErrorCode::AssertMyParentIdFailed => 114,
-            ErrorCode::AssertMyPuzzleHashFailed => 115,
-            ErrorCode::AssertMyAmountFailed => 116,
-            ErrorCode::GeneratorRuntimeError => 117,
-            ErrorCode::InvalidCostResult => 118,
-            ErrorCode::InvalidTransactionsGeneratorRefsRoot => 119,
-            ErrorCode::FutureGeneratorRefs => 120,
-            ErrorCode::GeneratorRefHasNoGenerator => 121,
-            ErrorCode::DoubleSpendInFork => 122,
-            ErrorCode::InvalidFeeTooCloseToZero => 123,
-            ErrorCode::CoinAmountNegative => 124,
-            ErrorCode::InternalProtocolError => 125,
-            ErrorCode::InvalidSpendBundle => 126,
-            ErrorCode::FailedGettingGeneratorMultiprocessing => 127,
-            ErrorCode::AssertBeforeSecondsAbsoluteFailed => 128,
-            ErrorCode::AssertBeforeSecondsRelativeFailed => 129,
-            ErrorCode::AssertBeforeHeightAbsoluteFailed => 130,
-            ErrorCode::AssertBeforeHeightRelativeFailed => 131,
-            ErrorCode::AssertConcurrentSpendFailed => 132,
-            ErrorCode::AssertConcurrentPuzzleFailed => 133,
-            ErrorCode::ImpossibleSecondsRelativeConstraints => 134,
-            ErrorCode::ImpossibleSecondsAbsoluteConstraints => 135,
-            ErrorCode::ImpossibleHeightRelativeConstraints => 136,
-            ErrorCode::ImpossibleHeightAbsoluteConstraints => 137,
-            ErrorCode::AssertMyBirthSecondsFailed => 138,
-            ErrorCode::AssertMyBirthHeightFailed => 139,
-            ErrorCode::AssertEphemeralFailed => 140,
-            ErrorCode::EphemeralRelativeCondition => 141,
-            ErrorCode::InvalidSoftforkCondition => 142,
-            ErrorCode::InvalidSoftforkCost => 143,
-            ErrorCode::TooManyAnnouncements => 144,
-            ErrorCode::InvalidMessageMode => 145,
-            ErrorCode::InvalidCoinId => 146,
-            ErrorCode::MessageNotSentOrReceived => 147,
-            ErrorCode::ComplexGeneratorReceived => 148,
+            ValidationErr::Unknown => 1,
+            ValidationErr::InvalidBlockSolution => 2,
+            ValidationErr::InvalidCoinSolution => 3,
+            ValidationErr::DuplicateOutput => 4,
+            ValidationErr::DoubleSpend => 5,
+            ValidationErr::UnknownUnspent => 6,
+            ValidationErr::BadAggregateSignature => 7,
+            ValidationErr::WrongPuzzleHash => 8,
+            ValidationErr::BadFarmerCoinAmount => 9,
+            ValidationErr::InvalidCondition
+            | ValidationErr::InvalidConditionOpcode
+            | ValidationErr::InvalidParentId
+            | ValidationErr::InvalidPuzzleHash
+            | ValidationErr::InvalidPublicKey
+            | ValidationErr::InvalidMessage
+            | ValidationErr::InvalidCoinAmount
+            | ValidationErr::InvalidCoinAnnouncement
+            | ValidationErr::InvalidPuzzleAnnouncement => 10,
+            ValidationErr::AssertMyCoinIdFailed => 11,
+            ValidationErr::AssertPuzzleAnnouncementFailed
+            | ValidationErr::AssertCoinAnnouncementFailed => 12,
+            ValidationErr::AssertHeightRelativeFailed => 13,
+            ValidationErr::AssertHeightAbsoluteFailed => 14,
+            ValidationErr::AssertSecondsAbsoluteFailed => 15,
+            ValidationErr::CoinAmountExceedsMaximum => 16,
+            ValidationErr::SexpError => 17,
+            ValidationErr::InvalidFeeLowFee => 18,
+            ValidationErr::MempoolConflict => 19,
+            ValidationErr::MintingCoin => 20,
+            ValidationErr::ExtendsUnknownBlock => 21,
+            ValidationErr::CoinbaseNotYetSpendable => 22,
+            ValidationErr::CostExceeded => 23,
+            ValidationErr::BadAdditionRoot => 24,
+            ValidationErr::BadRemovalRoot => 25,
+            ValidationErr::InvalidPospaceHash => 26,
+            ValidationErr::InvalidCoinbaseSignature => 27,
+            ValidationErr::InvalidPlotSignature => 28,
+            ValidationErr::TimestampTooFarInPast => 29,
+            ValidationErr::TimestampTooFarInFuture => 30,
+            ValidationErr::InvalidTransactionsFilterHash => 31,
+            ValidationErr::InvalidPospaceChallenge => 32,
+            ValidationErr::InvalidPospace => 33,
+            ValidationErr::InvalidHeight => 34,
+            ValidationErr::InvalidCoinbaseAmount => 35,
+            ValidationErr::InvalidMerkleRoot => 36,
+            ValidationErr::InvalidBlockFeeAmount => 37,
+            ValidationErr::InvalidWeight => 38,
+            ValidationErr::InvalidTotalIters => 39,
+            ValidationErr::BlockIsNotFinished => 40,
+            ValidationErr::InvalidNumIterations => 41,
+            ValidationErr::InvalidPot => 42,
+            ValidationErr::InvalidPotChallenge => 43,
+            ValidationErr::InvalidTransactionsGeneratorHash => 44,
+            ValidationErr::InvalidPoolTarget => 45,
+            ValidationErr::InvalidCoinbaseParent => 46,
+            ValidationErr::InvalidFeesCoinParent => 47,
+            ValidationErr::ReserveFeeConditionFailed => 48,
+            ValidationErr::NotBlockButHasData => 49,
+            ValidationErr::IsTransactionBlockButNoData => 50,
+            ValidationErr::InvalidPrevBlockHash => 51,
+            ValidationErr::InvalidTransactionsInfoHash => 52,
+            ValidationErr::InvalidFoliageBlockHash => 53,
+            ValidationErr::InvalidRewardCoins => 54,
+            ValidationErr::InvalidBlockCost => 55,
+            ValidationErr::NoEndOfSlotInfo => 56,
+            ValidationErr::InvalidPrevChallengeSlotHash => 57,
+            ValidationErr::InvalidSubEpochSummaryHash => 58,
+            ValidationErr::NoSubEpochSummaryHash => 59,
+            ValidationErr::ShouldNotMakeChallengeBlock => 60,
+            ValidationErr::ShouldMakeChallengeBlock => 61,
+            ValidationErr::InvalidChallengeChainData => 62,
+            ValidationErr::InvalidCcEosVdf => 65,
+            ValidationErr::InvalidRcEosVdf => 66,
+            ValidationErr::InvalidChallengeSlotHashRc => 67,
+            ValidationErr::InvalidPriorPointRc => 68,
+            ValidationErr::InvalidDeficit => 69,
+            ValidationErr::InvalidSubEpochSummary => 70,
+            ValidationErr::InvalidPrevSubEpochSummaryHash => 71,
+            ValidationErr::InvalidRewardChainHash => 72,
+            ValidationErr::InvalidSubEpochOverflow => 73,
+            ValidationErr::InvalidNewDifficulty => 74,
+            ValidationErr::InvalidNewSubSlotIters => 75,
+            ValidationErr::InvalidCcSpVdf => 76,
+            ValidationErr::InvalidRcSpVdf => 77,
+            ValidationErr::InvalidCcSignature => 78,
+            ValidationErr::InvalidRcSignature => 79,
+            ValidationErr::CannotMakeCcBlock => 80,
+            ValidationErr::InvalidRcSpPrevIp => 81,
+            ValidationErr::InvalidRcIpPrevIp => 82,
+            ValidationErr::InvalidIsTransactionBlock => 83,
+            ValidationErr::InvalidUrsbHash => 84,
+            ValidationErr::OldPoolTarget => 85,
+            ValidationErr::InvalidPoolSignature => 86,
+            ValidationErr::InvalidFoliageBlockPresence => 87,
+            ValidationErr::InvalidCcIpVdf => 88,
+            ValidationErr::InvalidRcIpVdf => 89,
+            ValidationErr::IpShouldBeNone => 90,
+            ValidationErr::InvalidRewardBlockHash => 91,
+            ValidationErr::InvalidMadeNonOverflowInfusions => 92,
+            ValidationErr::NoOverflowsInFirstSubSlotNewEpoch => 93,
+            ValidationErr::MempoolNotInitialized => 94,
+            ValidationErr::ShouldNotHaveIcc => 95,
+            ValidationErr::ShouldHaveIcc => 96,
+            ValidationErr::InvalidIccVdf => 97,
+            ValidationErr::InvalidIccHashCc => 98,
+            ValidationErr::InvalidIccHashRc => 99,
+            ValidationErr::InvalidIccEosVdf => 100,
+            ValidationErr::InvalidSpIndex => 101,
+            ValidationErr::TooManyBlocks => 102,
+            ValidationErr::InvalidCcChallenge => 103,
+            ValidationErr::InvalidPrefarm => 104,
+            ValidationErr::AssertSecondsRelativeFailed => 105,
+            ValidationErr::BadCoinbaseSignature => 106,
+            // ValidationErr::InitialTransactionFreeze => 107 (removed in `chia-blockchain`` as well)
+            ValidationErr::NoTransactionsWhileSyncing => 108,
+            ValidationErr::AlreadyIncludingTransaction => 109,
+            ValidationErr::IncompatibleNetworkId => 110,
+            ValidationErr::PreSoftForkMaxGeneratorSize => 111,
+            ValidationErr::InvalidRequiredIters => 112,
+            ValidationErr::TooManyGeneratorRefs => 113,
+            ValidationErr::AssertMyParentIdFailed => 114,
+            ValidationErr::AssertMyPuzzleHashFailed => 115,
+            ValidationErr::AssertMyAmountFailed => 116,
+            ValidationErr::GeneratorRuntimeError => 117,
+            ValidationErr::InvalidCostResult => 118,
+            ValidationErr::InvalidTransactionsGeneratorRefsRoot => 119,
+            ValidationErr::FutureGeneratorRefs => 120,
+            ValidationErr::GeneratorRefHasNoGenerator => 121,
+            ValidationErr::DoubleSpendInFork => 122,
+            ValidationErr::InvalidFeeTooCloseToZero => 123,
+            ValidationErr::CoinAmountNegative => 124,
+            ValidationErr::InternalProtocolError => 125,
+            ValidationErr::InvalidSpendBundle => 126,
+            ValidationErr::FailedGettingGeneratorMultiprocessing => 127,
+            ValidationErr::AssertBeforeSecondsAbsoluteFailed => 128,
+            ValidationErr::AssertBeforeSecondsRelativeFailed => 129,
+            ValidationErr::AssertBeforeHeightAbsoluteFailed => 130,
+            ValidationErr::AssertBeforeHeightRelativeFailed => 131,
+            ValidationErr::AssertConcurrentSpendFailed => 132,
+            ValidationErr::AssertConcurrentPuzzleFailed => 133,
+            ValidationErr::ImpossibleSecondsRelativeConstraints => 134,
+            ValidationErr::ImpossibleSecondsAbsoluteConstraints => 135,
+            ValidationErr::ImpossibleHeightRelativeConstraints => 136,
+            ValidationErr::ImpossibleHeightAbsoluteConstraints => 137,
+            ValidationErr::AssertMyBirthSecondsFailed => 138,
+            ValidationErr::AssertMyBirthHeightFailed => 139,
+            ValidationErr::AssertEphemeralFailed => 140,
+            ValidationErr::EphemeralRelativeCondition => 141,
+            ValidationErr::InvalidSoftforkCondition => 142,
+            ValidationErr::InvalidSoftforkCost => 143,
+            ValidationErr::TooManyAnnouncements => 144,
+            ValidationErr::InvalidMessageMode => 145,
+            ValidationErr::InvalidCoinId => 146,
+            ValidationErr::MessageNotSentOrReceived => 147,
+            ValidationErr::ComplexGeneratorReceived => 148,
         }
     }
 }
@@ -367,7 +362,7 @@ impl From<ErrorCode> for u32 {
 pub fn rest(a: &Allocator, n: NodePtr) -> Result<NodePtr, ValidationErr> {
     match a.sexp(n) {
         SExp::Pair(_, right) => Ok(right),
-        SExp::Atom => Err(ValidationErr(n, ErrorCode::InvalidCondition)),
+        SExp::Atom => Err(ValidationErr::InvalidCondition(n)),
     }
 }
 
@@ -379,23 +374,27 @@ pub fn next(a: &Allocator, n: NodePtr) -> Result<Option<(NodePtr, NodePtr)>, Val
             if a.atom_len(n) == 0 {
                 Ok(None)
             } else {
-                Err(ValidationErr(n, ErrorCode::InvalidCondition))
+                Err(ValidationErr::InvalidCondition(n))
             }
         }
     }
 }
 
-pub fn atom(a: &Allocator, n: NodePtr, code: ErrorCode) -> Result<Atom<'_>, ValidationErr> {
+pub fn atom(a: &Allocator, n: NodePtr, code: ValidationErr) -> Result<Atom<'_>, ValidationErr> {
     match a.sexp(n) {
         SExp::Atom => Ok(a.atom(n)),
-        SExp::Pair(..) => Err(ValidationErr(n, code)),
+        SExp::Pair(..) => Err(code),
     }
 }
 
 pub fn check_nil(a: &Allocator, n: NodePtr) -> Result<(), ValidationErr> {
-    if atom(a, n, ErrorCode::InvalidCondition)?.as_ref().is_empty() {
+    if atom(a, n, ValidationErr::InvalidCondition)?
+        .as_ref()
+        .is_empty()
+    {
         Ok(())
     } else {
-        Err(ValidationErr(n, ErrorCode::InvalidCondition))
+        Err(ValidationErr::InvalidCondition(n))
     }
+    d
 }

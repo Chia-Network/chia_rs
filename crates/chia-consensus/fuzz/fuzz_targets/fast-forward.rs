@@ -6,7 +6,7 @@ use chia_consensus::conditions::{
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::fast_forward::fast_forward_singleton;
 use chia_consensus::spend_visitor::SpendVisitor;
-use chia_consensus::validation_error::{ErrorCode, ValidationErr};
+use chia_consensus::validation_error::ValidationErr;
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
 use chia_protocol::CoinSpend;
@@ -167,8 +167,8 @@ fn test_ff(
     // fast-forward. It's OK to fail in different ways before and after, as long
     // as it's one of these failures
     let discrepancy_errors = [
-        ErrorCode::AssertMyParentIdFailed,
-        ErrorCode::AssertMyCoinIdFailed,
+        ValidationErr::AssertMyParentIdFailed,
+        ValidationErr::AssertMyCoinIdFailed,
     ];
 
     match (conditions1, conditions2) {
