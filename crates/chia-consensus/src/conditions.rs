@@ -15,7 +15,7 @@ use super::opcodes::{
     GENERIC_CONDITION_COST, RECEIVE_MESSAGE, REMARK, RESERVE_FEE, SEND_MESSAGE, SOFTFORK,
 };
 use super::sanitize_int::{sanitize_uint, SanitizedUint};
-use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
+use super::validation_error::{first, next, rest, ValidationErr};
 use crate::consensus_constants::ConsensusConstants;
 use crate::flags::{COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
 use crate::make_aggsig_final_message::u64_to_bytes;
@@ -352,7 +352,7 @@ fn check_agg_sig_unsafe_message(
         constants.agg_sig_parent_puzzle_additional_data.as_ref(),
     ] {
         if buf.as_ref().ends_with(additional_data) {
-            return Err(ValidationErr(msg, ErrorCode::InvalidMessage));
+            return Err(ValidationErr::InvalidMessage(msg));
         }
     }
     Ok(())
@@ -384,9 +384,9 @@ pub fn parse_args(
         | AGG_SIG_AMOUNT
         | AGG_SIG_PARENT_PUZZLE
         | AGG_SIG_PARENT_AMOUNT => {
-            let pubkey = sanitize_hash(a, first(a, c)?, 48, ErrorCode::InvalidPublicKey)?;
+            let pubkey = sanitize_hash(a, first(a, c)?, 48, ValidationErr::InvalidPublicKey)?;
             c = rest(a, c)?;
-            let message = sanitize_announce_msg(a, first(a, c)?, ErrorCode::InvalidMessage)?;
+            let message = sanitize_announce_msg(a, first(a, c)?, ValidationErr::InvalidMessage)?;
             // AGG_SIG_* take two parameters
 
             if (flags & STRICT_ARGS_COUNT) != 0 {
@@ -407,15 +407,15 @@ pub fn parse_args(
             }
         }
         CREATE_COIN => {
-            let puzzle_hash = sanitize_hash(a, first(a, c)?, 32, ErrorCode::InvalidPuzzleHash)?;
+            let puzzle_hash = sanitize_hash(a, first(a, c)?, 32, ValidationErr::InvalidPuzzleHash)?;
             c = rest(a, c)?;
             let node = first(a, c)?;
-            let amount = match sanitize_uint(a, node, 8, ErrorCode::InvalidCoinAmount)? {
+            let amount = match sanitize_uint(a, node, 8, ValidationErr::InvalidCoinAmount)? {
                 SanitizedUint::PositiveOverflow => {
-                    return Err(ValidationErr(node, ErrorCode::CoinAmountExceedsMaximum));
+                    return Err(ValidationErr::CoinAmountExceedsMaximum(node));
                 }
                 SanitizedUint::NegativeOverflow => {
-                    return Err(ValidationErr(node, ErrorCode::CoinAmountNegative));
+                    return Err(ValidationErr::CoinAmountNegative(node));
                 }
                 SanitizedUint::Ok(amount) => amount,
             };
@@ -451,13 +451,13 @@ pub fn parse_args(
             if (flags & NO_UNKNOWN_CONDS) != 0 {
                 // We don't know of any new softforked-in conditions, so they
                 // are all unknown
-                Err(ValidationErr(c, ErrorCode::InvalidConditionOpcode))
+                Err(ValidationErr::InvalidConditionOpcode(c))
             } else {
-                match sanitize_uint(a, first(a, c)?, 4, ErrorCode::InvalidSoftforkCost)? {
+                match sanitize_uint(a, first(a, c)?, 4, ValidationErr::InvalidSoftforkCost)? {
                     // the first argument represents the cost of the condition.
                     // We scale it by 10000 to make the argument be a bit smaller
                     SanitizedUint::Ok(cost) => Ok(Condition::Softfork(cost * 10000)),
-                    _ => Err(ValidationErr(c, ErrorCode::InvalidSoftforkCost)),
+                    _ => Err(ValidationErr::InvalidSoftforkCost(c)),
                 }
             }
         }
@@ -465,29 +465,29 @@ pub fn parse_args(
             // All of these conditions are unknown
             // but they have costs
             if (flags & NO_UNKNOWN_CONDS) != 0 {
-                Err(ValidationErr(c, ErrorCode::InvalidConditionOpcode))
+                Err(ValidationErr::InvalidConditionOpcode(c))
             } else {
                 Ok(Condition::Softfork(compute_unknown_condition_cost(op)))
             }
         }
         RESERVE_FEE => {
             maybe_check_args_terminator(a, c, flags)?;
-            let fee = parse_amount(a, first(a, c)?, ErrorCode::ReserveFeeConditionFailed)?;
+            let fee = parse_amount(a, first(a, c)?, ValidationErr::ReserveFeeConditionFailed)?;
             Ok(Condition::ReserveFee(fee))
         }
         CREATE_COIN_ANNOUNCEMENT => {
             maybe_check_args_terminator(a, c, flags)?;
-            let msg = sanitize_announce_msg(a, first(a, c)?, ErrorCode::InvalidCoinAnnouncement)?;
+            let msg = sanitize_announce_msg(a, first(a, c)?, ValidationErr::InvalidCoinAnnouncement)?;
             Ok(Condition::CreateCoinAnnouncement(msg))
         }
         ASSERT_COIN_ANNOUNCEMENT => {
             maybe_check_args_terminator(a, c, flags)?;
-            let id = sanitize_hash(a, first(a, c)?, 32, ErrorCode::AssertCoinAnnouncementFailed)?;
+            let id = sanitize_hash(a, first(a, c)?, 32, ValidationErr::AssertCoinAnnouncementFailed)?;
             Ok(Condition::AssertCoinAnnouncement(id))
         }
         CREATE_PUZZLE_ANNOUNCEMENT => {
             maybe_check_args_terminator(a, c, flags)?;
-            let msg = sanitize_announce_msg(a, first(a, c)?, ErrorCode::InvalidPuzzleAnnouncement)?;
+            let msg = sanitize_announce_msg(a, first(a, c)?, ValidationErr::InvalidPuzzleAnnouncement)?;
             Ok(Condition::CreatePuzzleAnnouncement(msg))
         }
         ASSERT_PUZZLE_ANNOUNCEMENT => {
@@ -496,44 +496,44 @@ pub fn parse_args(
                 a,
                 first(a, c)?,
                 32,
-                ErrorCode::AssertPuzzleAnnouncementFailed,
+                ValidationErr::AssertPuzzleAnnouncementFailed,
             )?;
             Ok(Condition::AssertPuzzleAnnouncement(id))
         }
         ASSERT_CONCURRENT_SPEND => {
             maybe_check_args_terminator(a, c, flags)?;
-            let id = sanitize_hash(a, first(a, c)?, 32, ErrorCode::AssertConcurrentSpendFailed)?;
+            let id = sanitize_hash(a, first(a, c)?, 32, ValidationErr::AssertConcurrentSpendFailed)?;
             Ok(Condition::AssertConcurrentSpend(id))
         }
         ASSERT_CONCURRENT_PUZZLE => {
             maybe_check_args_terminator(a, c, flags)?;
-            let id = sanitize_hash(a, first(a, c)?, 32, ErrorCode::AssertConcurrentPuzzleFailed)?;
+            let id = sanitize_hash(a, first(a, c)?, 32, ValidationErr::AssertConcurrentPuzzleFailed)?;
             Ok(Condition::AssertConcurrentPuzzle(id))
         }
         ASSERT_MY_COIN_ID => {
             maybe_check_args_terminator(a, c, flags)?;
-            let id = sanitize_hash(a, first(a, c)?, 32, ErrorCode::AssertMyCoinIdFailed)?;
+            let id = sanitize_hash(a, first(a, c)?, 32, ValidationErr::AssertMyCoinIdFailed)?;
             Ok(Condition::AssertMyCoinId(id))
         }
         ASSERT_MY_PARENT_ID => {
             maybe_check_args_terminator(a, c, flags)?;
-            let id = sanitize_hash(a, first(a, c)?, 32, ErrorCode::AssertMyParentIdFailed)?;
+            let id = sanitize_hash(a, first(a, c)?, 32, ValidationErr::AssertMyParentIdFailed)?;
             Ok(Condition::AssertMyParentId(id))
         }
         ASSERT_MY_PUZZLEHASH => {
             maybe_check_args_terminator(a, c, flags)?;
-            let id = sanitize_hash(a, first(a, c)?, 32, ErrorCode::AssertMyPuzzleHashFailed)?;
+            let id = sanitize_hash(a, first(a, c)?, 32, ValidationErr::AssertMyPuzzleHashFailed)?;
             Ok(Condition::AssertMyPuzzlehash(id))
         }
         ASSERT_MY_AMOUNT => {
             maybe_check_args_terminator(a, c, flags)?;
-            let amount = parse_amount(a, first(a, c)?, ErrorCode::AssertMyAmountFailed)?;
+            let amount = parse_amount(a, first(a, c)?, ValidationErr::AssertMyAmountFailed)?;
             Ok(Condition::AssertMyAmount(amount))
         }
         ASSERT_MY_BIRTH_SECONDS => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertMyBirthSecondsFailed;
+            let code = ValidationErr::AssertMyBirthSecondsFailed;
             match sanitize_uint(a, node, 8, code)? {
                 SanitizedUint::PositiveOverflow | SanitizedUint::NegativeOverflow => {
                     Err(ValidationErr(node, code))
@@ -544,7 +544,7 @@ pub fn parse_args(
         ASSERT_MY_BIRTH_HEIGHT => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertMyBirthHeightFailed;
+            let code = ValidationErr::AssertMyBirthHeightFailed;
             match sanitize_uint(a, node, 4, code)? {
                 SanitizedUint::PositiveOverflow | SanitizedUint::NegativeOverflow => {
                     Err(ValidationErr(node, code))
@@ -562,7 +562,7 @@ pub fn parse_args(
         ASSERT_SECONDS_RELATIVE => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertSecondsRelativeFailed;
+            let code = ValidationErr::AssertSecondsRelativeFailed;
             match sanitize_uint(a, node, 8, code)? {
                 SanitizedUint::PositiveOverflow => Err(ValidationErr(node, code)),
                 SanitizedUint::NegativeOverflow => Ok(Condition::SkipRelativeCondition),
@@ -572,7 +572,7 @@ pub fn parse_args(
         ASSERT_SECONDS_ABSOLUTE => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertSecondsAbsoluteFailed;
+            let code = ValidationErr::AssertSecondsAbsoluteFailed;
             match sanitize_uint(a, node, 4, code)? {
                 SanitizedUint::PositiveOverflow => Err(ValidationErr(node, code)),
                 SanitizedUint::NegativeOverflow => Ok(Condition::Skip),
@@ -582,7 +582,7 @@ pub fn parse_args(
         ASSERT_HEIGHT_RELATIVE => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertHeightRelativeFailed;
+            let code = ValidationErr::AssertHeightRelativeFailed;
             match sanitize_uint(a, node, 4, code)? {
                 SanitizedUint::PositiveOverflow => Err(ValidationErr(node, code)),
                 SanitizedUint::NegativeOverflow => Ok(Condition::SkipRelativeCondition),
@@ -592,7 +592,7 @@ pub fn parse_args(
         ASSERT_HEIGHT_ABSOLUTE => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertHeightAbsoluteFailed;
+            let code = ValidationErr::AssertHeightAbsoluteFailed;
             match sanitize_uint(a, node, 4, code)? {
                 SanitizedUint::PositiveOverflow => Err(ValidationErr(node, code)),
                 SanitizedUint::NegativeOverflow => Ok(Condition::Skip),
@@ -602,7 +602,7 @@ pub fn parse_args(
         ASSERT_BEFORE_SECONDS_RELATIVE => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertBeforeSecondsRelativeFailed;
+            let code = ValidationErr::AssertBeforeSecondsRelativeFailed;
             match sanitize_uint(a, node, 8, code)? {
                 SanitizedUint::PositiveOverflow => Ok(Condition::SkipRelativeCondition),
                 SanitizedUint::NegativeOverflow => Err(ValidationErr(node, code)),
@@ -613,7 +613,7 @@ pub fn parse_args(
             maybe_check_args_terminator(a, c, flags)?;
 
             let node = first(a, c)?;
-            let code = ErrorCode::AssertBeforeSecondsAbsoluteFailed;
+            let code = ValidationErr::AssertBeforeSecondsAbsoluteFailed;
             match sanitize_uint(a, node, 8, code)? {
                 SanitizedUint::PositiveOverflow => Ok(Condition::Skip),
                 SanitizedUint::NegativeOverflow => Err(ValidationErr(node, code)),
@@ -623,7 +623,7 @@ pub fn parse_args(
         ASSERT_BEFORE_HEIGHT_RELATIVE => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertBeforeHeightRelativeFailed;
+            let code = ValidationErr::AssertBeforeHeightRelativeFailed;
             match sanitize_uint(a, node, 4, code)? {
                 SanitizedUint::PositiveOverflow => Ok(Condition::SkipRelativeCondition),
                 SanitizedUint::NegativeOverflow => Err(ValidationErr(node, code)),
@@ -633,7 +633,7 @@ pub fn parse_args(
         ASSERT_BEFORE_HEIGHT_ABSOLUTE => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertBeforeHeightAbsoluteFailed;
+            let code = ValidationErr::AssertBeforeHeightAbsoluteFailed;
             match sanitize_uint(a, node, 4, code)? {
                 SanitizedUint::PositiveOverflow => Ok(Condition::Skip),
                 SanitizedUint::NegativeOverflow => Err(ValidationErr(node, code)),
@@ -643,7 +643,7 @@ pub fn parse_args(
         SEND_MESSAGE => {
             let mode = sanitize_message_mode(a, first(a, c)?)?;
             c = rest(a, c)?;
-            let message = sanitize_announce_msg(a, first(a, c)?, ErrorCode::InvalidMessage)?;
+            let message = sanitize_announce_msg(a, first(a, c)?, ValidationErr::InvalidMessage)?;
             c = rest(a, c)?;
             let dst = SpendId::parse(a, &mut c, (mode & 0b111) as u8)?;
 
@@ -660,7 +660,7 @@ pub fn parse_args(
         RECEIVE_MESSAGE => {
             let mode = sanitize_message_mode(a, first(a, c)?)?;
             c = rest(a, c)?;
-            let message = sanitize_announce_msg(a, first(a, c)?, ErrorCode::InvalidMessage)?;
+            let message = sanitize_announce_msg(a, first(a, c)?, ValidationErr::InvalidMessage)?;
             c = rest(a, c)?;
             let src = SpendId::parse(a, &mut c, ((mode >> 3) & 0b111) as u8)?;
 
@@ -677,7 +677,7 @@ pub fn parse_args(
             // this condition is always true, we always ignore arguments
             Ok(Condition::Skip)
         }
-        _ => Err(ValidationErr(c, ErrorCode::InvalidConditionOpcode)),
+        _ => Err(ValidationErr::InvalidConditionOpcode(c)),
     }
 }
 
@@ -935,9 +935,9 @@ pub fn process_single_spend<'a, V: SpendVisitor>(
     clvm_cost: Cost,
     constants: &ConsensusConstants,
 ) -> Result<&'a mut SpendConditions, ValidationErr> {
-    let parent_id = sanitize_hash(a, parent_id, 32, ErrorCode::InvalidParentId)?;
-    let puzzle_hash = sanitize_hash(a, puzzle_hash, 32, ErrorCode::InvalidPuzzleHash)?;
-    let my_amount = parse_amount(a, amount, ErrorCode::InvalidCoinAmount)?;
+    let parent_id = sanitize_hash(a, parent_id, 32, ValidationErr::InvalidParentId)?;
+    let puzzle_hash = sanitize_hash(a, puzzle_hash, 32, ValidationErr::InvalidPuzzleHash)?;
+    let my_amount = parse_amount(a, amount, ValidationErr::InvalidCoinAmount)?;
     let amount_buf = a.atom(amount);
 
     let coin_id = Arc::new(compute_coin_id(
@@ -954,7 +954,7 @@ pub fn process_single_spend<'a, V: SpendVisitor>(
     {
         // if this coin ID has already been added to this set, it's a double
         // spend
-        return Err(ValidationErr(parent_id, ErrorCode::DoubleSpend));
+        return Err(ValidationErr::DoubleSpend(parent_id));
     }
 
     state.spent_puzzles.insert(puzzle_hash);
@@ -989,7 +989,7 @@ fn assert_not_ephemeral(spend_flags: &mut u32, state: &mut ParseState, idx: usiz
 
 fn decrement(cnt: &mut u32, n: NodePtr) -> Result<(), ValidationErr> {
     if *cnt == 0 {
-        Err(ValidationErr(n, ErrorCode::TooManyAnnouncements))
+        Err(ValidationErr::TooManyAnnouncements(n))
     } else {
         *cnt -= 1;
         Ok(())
@@ -998,9 +998,9 @@ fn decrement(cnt: &mut u32, n: NodePtr) -> Result<(), ValidationErr> {
 
 fn to_key(a: &Allocator, pk: NodePtr) -> Result<PublicKey, ValidationErr> {
     let key = PublicKey::from_bytes(a.atom(pk).as_ref().try_into().expect("internal error"))
-        .map_err(|_| ValidationErr(pk, ErrorCode::InvalidPublicKey))?;
+        .map_err(|_| ValidationErr::InvalidPublicKey(pk))?;
     if key.is_inf() {
-        Err(ValidationErr(pk, ErrorCode::InvalidPublicKey))
+        Err(ValidationErr::InvalidPublicKey(pk))
     } else {
         Ok(key)
     }
@@ -1027,7 +1027,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
         let Some(op) = parse_opcode(a, first(a, c)?, flags) else {
             // in strict mode we don't allow unknown conditions
             if (flags & NO_UNKNOWN_CONDS) != 0 {
-                return Err(ValidationErr(c, ErrorCode::InvalidConditionOpcode));
+                return Err(ValidationErr::InvalidConditionOpcode(c));
             }
             // in non-strict mode, we just ignore unknown conditions
             continue;
@@ -1038,7 +1038,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
         match op {
             CREATE_COIN => {
                 if *max_cost < CREATE_COIN_COST {
-                    return Err(ValidationErr(c, ErrorCode::CostExceeded));
+                    return Err(ValidationErr::CostExceeded(c));
                 }
                 *max_cost -= CREATE_COIN_COST;
                 ret.condition_cost += CREATE_COIN_COST;
@@ -1053,7 +1053,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
             | AGG_SIG_PARENT_PUZZLE
             | AGG_SIG_PARENT_AMOUNT => {
                 if *max_cost < AGG_SIG_COST {
-                    return Err(ValidationErr(c, ErrorCode::CostExceeded));
+                    return Err(ValidationErr::CostExceeded(c));
                 }
                 *max_cost -= AGG_SIG_COST;
                 ret.condition_cost += AGG_SIG_COST;
@@ -1064,7 +1064,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
         if (flags & COST_CONDITIONS) != 0 {
             if free_condition_countdown == 0 {
                 if *max_cost < GENERIC_CONDITION_COST {
-                    return Err(ValidationErr(c, ErrorCode::CostExceeded));
+                    return Err(ValidationErr::CostExceeded(c));
                 }
                 *max_cost -= GENERIC_CONDITION_COST;
                 ret.condition_cost += GENERIC_CONDITION_COST;
@@ -1082,7 +1082,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
                 ret.reserve_fee = ret
                     .reserve_fee
                     .checked_add(limit)
-                    .ok_or(ValidationErr(c, ErrorCode::ReserveFeeConditionFailed))?;
+                    .ok_or(ValidationErr::ReserveFeeConditionFailed(c))?;
             }
             Condition::CreateCoin(ph, amount, hint) => {
                 let new_coin = NewCoin {
@@ -1091,7 +1091,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
                     hint,
                 };
                 if !spend.create_coin.insert(new_coin) {
-                    return Err(ValidationErr(c, ErrorCode::DuplicateOutput));
+                    return Err(ValidationErr::DuplicateOutput(c));
                 }
                 ret.addition_amount += amount as u128;
             }
@@ -1107,10 +1107,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
                         // this spend bundle requres to be spent *before* a
                         // timestamp and also *after* a timestamp that's the
                         // same or later. that's impossible.
-                        return Err(ValidationErr(
-                            c,
-                            ErrorCode::ImpossibleSecondsRelativeConstraints,
-                        ));
+                        return Err(ValidationErr::ImpossibleSecondsRelativeConstraints(c));
                     }
                 }
                 assert_not_ephemeral(&mut spend.flags, state, ret.spends.len());
@@ -1131,10 +1128,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
                         // this spend bundle requres to be spent *before* a
                         // height and also *after* a height that's the
                         // same or later. that's impossible.
-                        return Err(ValidationErr(
-                            c,
-                            ErrorCode::ImpossibleHeightRelativeConstraints,
-                        ));
+                        return Err(ValidationErr::ImpossibleHeightRelativeConstraints(c));
                     }
                 }
                 assert_not_ephemeral(&mut spend.flags, state, ret.spends.len());
@@ -1155,10 +1149,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
                         // this spend bundle requres to be spent *before* a
                         // timestamp and also *after* a timestamp that's the
                         // same or later. that's impossible.
-                        return Err(ValidationErr(
-                            c,
-                            ErrorCode::ImpossibleSecondsRelativeConstraints,
-                        ));
+                        return Err(ValidationErr::ImpossibleSecondsRelativeConstraints(c));
                     }
                 }
                 assert_not_ephemeral(&mut spend.flags, state, ret.spends.len());
@@ -1183,10 +1174,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
                         // this spend bundle requres to be spent *before* a
                         // height and also *after* a height that's the
                         // same or later. that's impossible.
-                        return Err(ValidationErr(
-                            c,
-                            ErrorCode::ImpossibleHeightRelativeConstraints,
-                        ));
+                        return Err(ValidationErr::ImpossibleHeightRelativeConstraints(c));
                     }
                 }
                 assert_not_ephemeral(&mut spend.flags, state, ret.spends.len());
@@ -1201,12 +1189,12 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
             }
             Condition::AssertMyCoinId(id) => {
                 if a.atom(id).as_ref() != (*spend.coin_id).as_ref() {
-                    return Err(ValidationErr(c, ErrorCode::AssertMyCoinIdFailed));
+                    return Err(ValidationErr::AssertMyCoinIdFailed(c));
                 }
             }
             Condition::AssertMyAmount(amount) => {
                 if amount != spend.coin_amount {
-                    return Err(ValidationErr(c, ErrorCode::AssertMyAmountFailed));
+                    return Err(ValidationErr::AssertMyAmountFailed(c));
                 }
             }
             Condition::AssertMyBirthSeconds(s) => {
@@ -1214,7 +1202,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
                 // error if it's different from the new birth assertion. One of
                 // them must be false
                 if spend.birth_seconds.is_some_and(|v| v != s) {
-                    return Err(ValidationErr(c, ErrorCode::AssertMyBirthSecondsFailed));
+                    return Err(ValidationErr::AssertMyBirthSecondsFailed(c));
                 }
                 spend.birth_seconds = Some(s);
                 assert_not_ephemeral(&mut spend.flags, state, ret.spends.len());
@@ -1224,7 +1212,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
                 // error if it's different from the new birth assertion. One of
                 // them must be false
                 if spend.birth_height.is_some_and(|v| v != h) {
-                    return Err(ValidationErr(c, ErrorCode::AssertMyBirthHeightFailed));
+                    return Err(ValidationErr::AssertMyBirthHeightFailed(c));
                 }
                 spend.birth_height = Some(h);
                 assert_not_ephemeral(&mut spend.flags, state, ret.spends.len());
@@ -1234,12 +1222,12 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
             }
             Condition::AssertMyParentId(id) => {
                 if a.atom(id).as_ref() != a.atom(spend.parent_id).as_ref() {
-                    return Err(ValidationErr(c, ErrorCode::AssertMyParentIdFailed));
+                    return Err(ValidationErr::AssertMyParentIdFailed(c));
                 }
             }
             Condition::AssertMyPuzzlehash(hash) => {
                 if a.atom(hash).as_ref() != a.atom(spend.puzzle_hash).as_ref() {
-                    return Err(ValidationErr(c, ErrorCode::AssertMyPuzzleHashFailed));
+                    return Err(ValidationErr::AssertMyPuzzleHashFailed(c));
                 }
             }
             Condition::CreateCoinAnnouncement(msg) => {
@@ -1357,7 +1345,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
             }
             Condition::Softfork(cost) => {
                 if *max_cost < cost {
-                    return Err(ValidationErr(c, ErrorCode::CostExceeded));
+                    return Err(ValidationErr::CostExceeded(c));
                 }
                 *max_cost -= cost;
                 ret.condition_cost += cost;
@@ -1499,12 +1487,12 @@ pub fn validate_conditions(
     if ret.removal_amount < ret.addition_amount {
         // The sum of removal amounts must not be less than the sum of addition
         // amounts
-        return Err(ValidationErr(spends, ErrorCode::MintingCoin));
+        return Err(ValidationErr::MintingCoin(spends));
     }
 
     if ret.removal_amount - ret.addition_amount < ret.reserve_fee as u128 {
         // the actual fee is lower than the reserved fee
-        return Err(ValidationErr(spends, ErrorCode::ReserveFeeConditionFailed));
+        return Err(ValidationErr::ReserveFeeConditionFailed(spends));
     }
 
     if let Some(bh) = ret.before_height_absolute {
@@ -1512,10 +1500,7 @@ pub fn validate_conditions(
             // this spend bundle requres to be spent *before* a
             // height and also *after* a height that's the
             // same or later. that's impossible.
-            return Err(ValidationErr(
-                spends,
-                ErrorCode::ImpossibleHeightAbsoluteConstraints,
-            ));
+            return Err(ValidationErr::ImpossibleHeightAbsoluteConstraints(spends));
         }
     }
 
@@ -1524,10 +1509,7 @@ pub fn validate_conditions(
             // this spend bundle requres to be spent *before* a
             // timestamp and also *after* a timestamp that's the
             // same or later. that's impossible.
-            return Err(ValidationErr(
-                spends,
-                ErrorCode::ImpossibleSecondsAbsoluteConstraints,
-            ));
+            return Err(ValidationErr::ImpossibleSecondsAbsoluteConstraints(spends));
         }
     }
 
@@ -1537,10 +1519,7 @@ pub fn validate_conditions(
             .spent_coins
             .contains_key(&Bytes32::try_from(a.atom(*coin_id).as_ref()).unwrap())
         {
-            return Err(ValidationErr(
-                *coin_id,
-                ErrorCode::AssertConcurrentSpendFailed,
-            ));
+            return Err(ValidationErr::AssertConcurrentSpendFailed(*coin_id));
         }
     }
 
@@ -1555,10 +1534,7 @@ pub fn validate_conditions(
 
         for puzzle_assert in &state.assert_concurrent_puzzle {
             if !spent_phs.contains(&a.atom(*puzzle_assert).as_ref().try_into().unwrap()) {
-                return Err(ValidationErr(
-                    *puzzle_assert,
-                    ErrorCode::AssertConcurrentPuzzleFailed,
-                ));
+                return Err(ValidationErr::AssertConcurrentPuzzleFailed(*puzzle_assert));
             }
         }
     }
@@ -1578,10 +1554,7 @@ pub fn validate_conditions(
 
         for coin_assert in &state.assert_coin {
             if !announcements.contains(&a.atom(*coin_assert).as_ref().try_into().unwrap()) {
-                return Err(ValidationErr(
-                    *coin_assert,
-                    ErrorCode::AssertCoinAnnouncementFailed,
-                ));
+                return Err(ValidationErr::AssertCoinAnnouncementFailed(*coin_assert));
             }
         }
     }
@@ -1589,9 +1562,8 @@ pub fn validate_conditions(
     for spend_idx in &state.assert_ephemeral {
         // make sure this coin was created in this block
         if !is_ephemeral(a, *spend_idx, &state.spent_coins, &ret.spends) {
-            return Err(ValidationErr(
+            return Err(ValidationErr::AssertEphemeralFailed(
                 ret.spends[*spend_idx].parent_id,
-                ErrorCode::AssertEphemeralFailed,
             ));
         }
     }
@@ -1601,9 +1573,8 @@ pub fn validate_conditions(
         // because consensus rules do not allow relative conditions on
         // ephemeral spends
         if is_ephemeral(a, *spend_idx, &state.spent_coins, &ret.spends) {
-            return Err(ValidationErr(
+            return Err(ValidationErr::EphemeralRelativeCondition(
                 ret.spends[*spend_idx].parent_id,
-                ErrorCode::EphemeralRelativeCondition,
             ));
         }
     }
@@ -1621,10 +1592,7 @@ pub fn validate_conditions(
 
         for puzzle_assert in &state.assert_puzzle {
             if !announcements.contains(&a.atom(*puzzle_assert).as_ref().try_into().unwrap()) {
-                return Err(ValidationErr(
-                    *puzzle_assert,
-                    ErrorCode::AssertPuzzleAnnouncementFailed,
-                ));
+                return Err(ValidationErr::AssertPuzzleAnnouncementFailed(*puzzle_assert));
             }
         }
     }
@@ -1642,10 +1610,7 @@ pub fn validate_conditions(
 
         for count in messages.values() {
             if *count != 0 {
-                return Err(ValidationErr(
-                    NodePtr::NIL,
-                    ErrorCode::MessageNotSentOrReceived,
-                ));
+                return Err(ValidationErr::MessageNotSentOrReceived);
             }
         }
     }
@@ -1656,6 +1621,7 @@ pub fn validate_conditions(
 
     Ok(())
 }
+
 
 pub fn validate_signature(
     state: &ParseState,
@@ -1989,17 +1955,21 @@ fn cond_test_sig(
 
 #[test]
 fn test_invalid_condition_list1() {
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (8 )))").unwrap_err().1,
-        ErrorCode::InvalidCondition
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (8 )))").unwrap_err().1,
+            ValidationErr::InvalidCondition
+        )
     );
 }
 
 #[test]
 fn test_invalid_condition_list2() {
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 ((8 ))))").unwrap_err().1,
-        ErrorCode::InvalidCondition
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 ((8 ))))").unwrap_err().1,
+            ValidationErr::InvalidCondition
+        )
     );
 }
 
@@ -2024,11 +1994,12 @@ fn test_invalid_condition_args_terminator() {
 fn test_invalid_condition_args_terminator_mempool() {
     // ASSERT_SECONDS_RELATIVE
     // in mempool mode, the argument list must be properly terminated
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((80 (50 8 ))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::InvalidCondition
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((80 (50 8 ))))")
+            .unwrap_err(),
+            ValidationErr::InvalidCondition
+        )
     );
 }
 
@@ -2059,35 +2030,56 @@ fn test_invalid_condition_list_terminator_mempool() {
 }
 
 #[test]
+fn test_invalid_condition_list_terminator_mempool() {
+    // ASSERT_SECONDS_RELATIVE
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((80 (50 8 ))))")
+                .unwrap_err(),
+            ValidationErr::InvalidCondition
+        )
+    );
+}
+
+#[test]
 fn test_invalid_condition_short_list_terminator() {
     // ASSERT_SECONDS_RELATIVE
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((80 8 ))))").unwrap_err().1,
-        ErrorCode::InvalidCondition
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((80 8 ))))")
+                .unwrap_err(),
+            ValidationErr::InvalidCondition
+        )
     );
 }
 
 #[test]
 fn test_invalid_spend_list1() {
-    assert_eq!(
-        cond_test("(8 )").unwrap_err().1,
-        ErrorCode::InvalidCondition
+    assert!(
+        matches!(
+            cond_test("(8 )").unwrap_err(),
+            ValidationErr::InvalidCondition
+        )
     );
 }
 
 #[test]
 fn test_invalid_spend_list2() {
-    assert_eq!(
-        cond_test("((8 ))").unwrap_err().1,
-        ErrorCode::InvalidCondition
+    assert!(
+        matches!(
+            cond_test("((8 ))").unwrap_err(),
+            ValidationErr::InvalidCondition
+        )
     );
 }
 
 #[test]
 fn test_invalid_spend_list_terminator() {
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (()) 8 ))").unwrap_err().1,
-        ErrorCode::InvalidCondition
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (()) 8 ))").unwrap_err(),
+            ValidationErr::InvalidCondition
+        )
     );
 }
 
@@ -2139,17 +2131,26 @@ fn test_strict_args_count(
     if flags == 0 {
         // two of the cases won't pass, even when garbage at the end is allowed.
         if condition == ASSERT_COIN_ANNOUNCEMENT {
-            assert_eq!(ret.unwrap_err().1, ErrorCode::AssertCoinAnnouncementFailed,);
+            assert!(matches!(
+                ret.unwrap_err(), ValidationErr::AssertCoinAnnouncementFailed
+            )
+        );
         } else if condition == ASSERT_PUZZLE_ANNOUNCEMENT {
-            assert_eq!(
-                ret.unwrap_err().1,
-                ErrorCode::AssertPuzzleAnnouncementFailed,
+            assert!(
+                matches!(
+                    ret.unwrap_err(),
+                    ValidationErr::AssertPuzzleAnnouncementFailed,
+                )
             );
         } else {
             assert!(ret.is_ok());
         }
     } else {
-        assert_eq!(ret.unwrap_err().1, ErrorCode::InvalidCondition);
+        assert!(
+            matches!(
+                ret.unwrap_err(), ValidationErr::InvalidCondition
+            )
+        );
     }
 }
 
@@ -2184,7 +2185,11 @@ fn test_message_strict_args_count(
     if flags == 0 {
         ret.unwrap();
     } else {
-        assert_eq!(ret.unwrap_err().1, ErrorCode::InvalidCondition);
+        assert!(
+            matches!(
+                ret.unwrap_err(), ValidationErr::InvalidCondition
+            )
+        );
     }
 }
 
@@ -2235,19 +2240,20 @@ fn test_extra_arg(
 
     // extra args are ignored in consensus mode
     // and a failure in mempool mode
-    assert_eq!(
-        cond_test_sig(
-            &format!(
-                "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 ) {} ))))",
-                condition as u8, arg, extra_cond
-            ),
-            &signature,
-            None,
-            MEMPOOL_MODE,
-        )
-        .unwrap_err()
-        .1,
-        ErrorCode::InvalidCondition
+    assert!(
+        matches!(
+            cond_test_sig(
+                &format!(
+                    "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 ) {} ))))",
+                    condition as u8, arg, extra_cond
+                ),
+                &signature,
+                None,
+                MEMPOOL_MODE,
+            )
+            .unwrap_err(),
+            ValidationErr::InvalidCondition
+            )
     );
 
     let (a, conds) = cond_test_sig(
@@ -2364,69 +2370,69 @@ fn test_single_condition_no_op(#[case] condition: ConditionOpcode, #[case] value
 #[case(
     ASSERT_SECONDS_ABSOLUTE,
     "0x010000000000000000",
-    ErrorCode::AssertSecondsAbsoluteFailed
+    ValidationErr::AssertSecondsAbsoluteFailed
 )]
 #[case(
     ASSERT_SECONDS_RELATIVE,
     "0x010000000000000000",
-    ErrorCode::AssertSecondsRelativeFailed
+    ValidationErr::AssertSecondsRelativeFailed
 )]
 #[case(
     ASSERT_HEIGHT_ABSOLUTE,
     "0x0100000000",
-    ErrorCode::AssertHeightAbsoluteFailed
+    ValidationErr::AssertHeightAbsoluteFailed
 )]
 #[case(
     ASSERT_HEIGHT_RELATIVE,
     "0x0100000000",
-    ErrorCode::AssertHeightRelativeFailed
+    ValidationErr::AssertHeightRelativeFailed
 )]
 #[case(
     ASSERT_BEFORE_SECONDS_ABSOLUTE,
     "-1",
-    ErrorCode::AssertBeforeSecondsAbsoluteFailed
+    ValidationErr::AssertBeforeSecondsAbsoluteFailed
 )]
 #[case(
     ASSERT_BEFORE_SECONDS_ABSOLUTE,
     "0",
-    ErrorCode::ImpossibleSecondsAbsoluteConstraints
+    ValidationErr::ImpossibleSecondsAbsoluteConstraints
 )]
 #[case(
     ASSERT_BEFORE_SECONDS_RELATIVE,
     "-1",
-    ErrorCode::AssertBeforeSecondsRelativeFailed
+    ValidationErr::AssertBeforeSecondsRelativeFailed
 )]
 #[case(
     ASSERT_BEFORE_HEIGHT_ABSOLUTE,
     "-1",
-    ErrorCode::AssertBeforeHeightAbsoluteFailed
+    ValidationErr::AssertBeforeHeightAbsoluteFailed
 )]
 #[case(
     ASSERT_BEFORE_HEIGHT_ABSOLUTE,
     "0",
-    ErrorCode::ImpossibleHeightAbsoluteConstraints
+    ValidationErr::ImpossibleHeightAbsoluteConstraints
 )]
 #[case(
     ASSERT_BEFORE_HEIGHT_RELATIVE,
     "-1",
-    ErrorCode::AssertBeforeHeightRelativeFailed
+    ValidationErr::AssertBeforeHeightRelativeFailed
 )]
-#[case(ASSERT_MY_BIRTH_HEIGHT, "-1", ErrorCode::AssertMyBirthHeightFailed)]
+#[case(ASSERT_MY_BIRTH_HEIGHT, "-1", ValidationErr::AssertMyBirthHeightFailed)]
 #[case(
     ASSERT_MY_BIRTH_HEIGHT,
     "0x0100000000",
-    ErrorCode::AssertMyBirthHeightFailed
+    ValidationErr::AssertMyBirthHeightFailed
 )]
-#[case(ASSERT_MY_BIRTH_SECONDS, "-1", ErrorCode::AssertMyBirthSecondsFailed)]
+#[case(ASSERT_MY_BIRTH_SECONDS, "-1", ValidationErr::AssertMyBirthSecondsFailed)]
 #[case(
     ASSERT_MY_BIRTH_SECONDS,
     "0x010000000000000000",
-    ErrorCode::AssertMyBirthSecondsFailed
+    ValidationErr::AssertMyBirthSecondsFailed
 )]
 fn test_single_condition_failure(
     #[case] condition: ConditionOpcode,
     #[case] arg: &str,
-    #[case] expected_error: ErrorCode,
+    #[case] expected_error: ValidationErr,
 ) {
     let err = cond_test(&format!(
         "((({{h1}} ({{h2}} (123 ((({} ({} )))))",
@@ -2505,14 +2511,15 @@ fn test_multiple_conditions(
 #[case(ASSERT_CONCURRENT_PUZZLE)]
 fn test_missing_arg(#[case] condition: ConditionOpcode) {
     // extra args are disallowed in mempool mode
-    assert_eq!(
-        cond_test_flag(
+    assert!(
+        matches!(
+            cond_test_flag(
             &format!("((({{h1}} ({{h2}} (123 ((({} )))))", condition as u8),
             0
         )
-        .unwrap_err()
-        .1,
-        ErrorCode::InvalidCondition
+        .unwrap_err(),
+        ValidationErr::InvalidCondition
+        )
     );
 }
 
@@ -2538,11 +2545,13 @@ fn test_reserve_fee_exceed_max() {
     // allowed. Note that we need two coins to provide the removals to cover the
     // reserve fee
     // "((({h1} ({h2} (123 (((60 ({msg1} ))) (({h2} ({h2} (123 (((61 ({c11} )))))")
-    assert_eq!(
-        cond_test("((({h1} ({h2} (0x00ffffffffffffffff (((52 (0x00fffffffffffffff0 ))) (({h2} ({h1} (0x00ffffff (((52 (0x10 )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::ReserveFeeConditionFailed
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (0x00ffffffffffffffff (((52 (0x00fffffffffffffff0 ))) (({h2} ({h1} (0x00ffffff (((52 (0x10 )))))")
+                .unwrap_err(),
+            ValidationErr::ReserveFeeConditionFailed
+        )
+        
     );
 }
 
@@ -2550,11 +2559,12 @@ fn test_reserve_fee_exceed_max() {
 fn test_reserve_fee_insufficient_spends() {
     // RESERVE_FEE
     // We spend a coin with amount 123 but reserve fee 124
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((52 (124 ) ))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::ReserveFeeConditionFailed
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((52 (124 ) ))))")
+            .unwrap_err(),
+            ValidationErr::ReserveFeeConditionFailed
+        )
     );
 }
 
@@ -2564,10 +2574,11 @@ fn test_reserve_fee_insufficient_fee() {
     // We spend a coin with amount 123 and create a coin worth 24 and reserve fee
     // of 100 (which adds up to 124, i.e. not enough fee)
     assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((52 (100 ) ((51 ({h2} (24 )) )))")
-            .unwrap_err()
-            .1,
-        ErrorCode::ReserveFeeConditionFailed
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((52 (100 ) ((51 ({h2} (24 )) )))")
+                .unwrap_err(),
+            ValidationErr::ReserveFeeConditionFailed
+        )
     );
 }
 
@@ -2606,11 +2617,12 @@ fn test_cross_coin_announces_consume() {
 #[test]
 fn test_failing_coin_consume() {
     // ASSERT_COIN_ANNOUNCEMENT
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((61 ({c11} )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::AssertCoinAnnouncementFailed
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((61 ({c11} )))))")
+                .unwrap_err(),
+            ValidationErr::AssertCoinAnnouncementFailed
+        )
     );
 }
 
@@ -2618,11 +2630,12 @@ fn test_failing_coin_consume() {
 fn test_coin_announce_mismatch() {
     // CREATE_COIN_ANNOUNCEMENT
     // ASSERT_COIN_ANNOUNCEMENT
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((60 ({msg1} ) ((61 ({c12} )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::AssertCoinAnnouncementFailed
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((60 ({msg1} ) ((61 ({c12} )))))")
+                .unwrap_err(),
+            ValidationErr::AssertCoinAnnouncementFailed
+        )
     );
 }
 
@@ -2659,34 +2672,37 @@ fn test_cross_coin_puzzle_announces_consume() {
 #[test]
 fn test_failing_puzzle_consume() {
     // ASSERT_PUZZLE_ANNOUNCEMENT
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((63 ({p21} )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::AssertPuzzleAnnouncementFailed
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((63 ({p21} )))))")
+            .unwrap_err(),
+            ValidationErr::AssertPuzzleAnnouncementFailed
+        )
+        
     );
 }
-
 #[test]
 fn test_puzzle_announce_mismatch() {
     // CREATE_PUZZLE_ANNOUNCEMENT
     // ASSERT_PUZZLE_ANNOUNCEMENT
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((62 ({msg1} ) ((63 ({p11} )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::AssertPuzzleAnnouncementFailed
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((62 ({msg1} ) ((63 ({p11} )))))")
+                .unwrap_err(),
+            ValidationErr::AssertPuzzleAnnouncementFailed(_)
+        )
     );
 }
 
 #[test]
 fn test_single_assert_my_amount_exceed_max() {
     // ASSERT_MY_AMOUNT
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((73 (0x010000000000000000 )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::AssertMyAmountFailed
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((73 (0x010000000000000000 )))))")
+                .unwrap_err(),
+            ValidationErr::AssertMyAmountFailed(_)
+        )
     );
 }
 
@@ -2694,11 +2710,12 @@ fn test_single_assert_my_amount_exceed_max() {
 fn test_single_assert_my_amount_overlong() {
     // ASSERT_MY_AMOUNT
     // leading zeroes are disallowed
-    assert_eq!(
-        cond_test_flag("((({h1} ({h2} (123 (((73 (0x0000007b )))))", 0)
-            .unwrap_err()
-            .1,
-        ErrorCode::AssertMyAmountFailed
+    assert!(
+        matches!(
+            cond_test_flag("((({h1} ({h2} (123 (((73 (0x0000007b )))))", 0)
+                .unwrap_err(),
+            ValidationErr::AssertMyAmountFailed(_)
+        )
     );
 }
 
@@ -2706,11 +2723,12 @@ fn test_single_assert_my_amount_overlong() {
 fn test_single_assert_my_amount_overlong_mempool() {
     // ASSERT_MY_AMOUNT
     // leading zeroes are disallowed in mempool mode
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((73 (0x0000007b )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::AssertMyAmountFailed
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((73 (0x0000007b )))))")
+                .unwrap_err(),
+            ValidationErr::AssertMyAmountFailed(_)
+        )
     );
 }
 
@@ -2726,26 +2744,27 @@ fn test_multiple_assert_my_amount() {
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.flags, 0);
 }
-
 #[test]
 fn test_multiple_failing_assert_my_amount() {
     // ASSERT_MY_AMOUNT
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((73 (123 ) ((73 (122 ) ))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::AssertMyAmountFailed
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((73 (123 ) ((73 (122 ) ))))")
+                .unwrap_err(),
+            ValidationErr::AssertMyAmountFailed(_)
+        )
     );
 }
 
 #[test]
 fn test_single_failing_assert_my_amount() {
     // ASSERT_MY_AMOUNT
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((73 (124 ) ))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::AssertMyAmountFailed
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((73 (124 ) ))))")
+                .unwrap_err(),
+            ValidationErr::AssertMyAmountFailed(_)
+        )
     );
 }
 
@@ -2753,11 +2772,12 @@ fn test_single_failing_assert_my_amount() {
 fn test_single_assert_my_coin_id_overlong() {
     // ASSERT_MY_COIN_ID
     // leading zeros in the coin amount invalid
-    assert_eq!(
-        cond_test_flag("((({h1} ({h2} (0x0000007b (((70 ({coin12} )))))", 0)
-            .unwrap_err()
-            .1,
-        ErrorCode::InvalidCoinAmount
+    assert!(
+        matches!(
+            cond_test_flag("((({h1} ({h2} (0x0000007b (((70 ({coin12} )))))", 0)
+                .unwrap_err(),
+            ValidationErr::InvalidCoinAmount(_)
+        )
     );
 }
 
@@ -2778,11 +2798,12 @@ fn test_multiple_assert_my_coin_id() {
 #[test]
 fn test_single_assert_my_coin_id_mismatch() {
     // ASSERT_MY_COIN_ID
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((70 ({coin11} )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::AssertMyCoinIdFailed
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((70 ({coin11} )))))")
+                .unwrap_err(),
+            ValidationErr::AssertMyCoinIdFailed(_)
+        )
     );
 }
 
@@ -2791,11 +2812,12 @@ fn test_multiple_assert_my_coin_id_mismatch() {
     // ASSERT_MY_COIN_ID
     // ASSERT_MY_AMOUNT
     // the coin-ID check matches the *other* coin, not itself
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((60 (123 ))) (({h1} ({h1} (123 (((70 ({coin12} )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::AssertMyCoinIdFailed
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((60 (123 ))) (({h1} ({h1} (123 (((70 ({coin12} )))))")
+                .unwrap_err(),
+            ValidationErr::AssertMyCoinIdFailed(_)
+        )
     );
 }
 
@@ -2815,11 +2837,12 @@ fn test_multiple_assert_my_parent_coin_id() {
 #[test]
 fn test_single_assert_my_parent_coin_id_mismatch() {
     // ASSERT_MY_PARENT_ID
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((71 ({h2} )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::AssertMyParentIdFailed
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((71 ({h2} )))))")
+                .unwrap_err(),
+            ValidationErr::AssertMyParentIdFailed(_)
+        )
     );
 }
 
@@ -2827,11 +2850,12 @@ fn test_single_assert_my_parent_coin_id_mismatch() {
 fn test_single_invalid_assert_my_parent_coin_id() {
     // ASSERT_MY_PARENT_ID
     // the parent ID in the condition is 33 bytes long
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((71 ({long} )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::AssertMyParentIdFailed
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((71 ({long} )))))")
+                .unwrap_err(),
+            ValidationErr::AssertMyParentIdFailed(_)
+        )
     );
 }
 
@@ -2853,11 +2877,12 @@ fn test_multiple_assert_my_puzzle_hash() {
 #[test]
 fn test_single_assert_my_puzzle_hash_mismatch() {
     // ASSERT_MY_PUZZLEHASH
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((72 ({h1} )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::AssertMyPuzzleHashFailed
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((72 ({h1} )))))")
+                .unwrap_err(),
+            ValidationErr::AssertMyPuzzleHashFailed(_)
+        )
     );
 }
 
@@ -2865,13 +2890,15 @@ fn test_single_assert_my_puzzle_hash_mismatch() {
 fn test_single_invalid_assert_my_puzzle_hash() {
     // ASSERT_MY_PUZZLEHASH
     // the parent ID in the condition is 33 bytes long
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((72 ({long} )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::AssertMyPuzzleHashFailed
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((72 ({long} )))))")
+                .unwrap_err(),
+            ValidationErr::AssertMyPuzzleHashFailed(_)
+        )
     );
 }
+
 
 #[test]
 fn test_single_create_coin() {
@@ -2916,49 +2943,52 @@ fn test_create_coin_max_amount() {
     }
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP | ELIGIBLE_FOR_FF);
 }
-
 #[test]
 fn test_minting_coin() {
     // CREATE_COIN
     // we spend a coin with value 123 but create a coin with value 124
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((51 ({h2} (124 )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::MintingCoin
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((51 ({h2} (124 )))))")
+                .unwrap_err(),
+            ValidationErr::MintingCoin
+        )
     );
 }
 
 #[test]
 fn test_create_coin_amount_exceeds_max() {
     // CREATE_COIN
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((51 ({h2} (0x010000000000000000 )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::CoinAmountExceedsMaximum
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((51 ({h2} (0x010000000000000000 )))))")
+                .unwrap_err(),
+            ValidationErr::CoinAmountExceedsMaximum(_)
+        )
     );
 }
 
 #[test]
 fn test_create_coin_negative_amount() {
     // CREATE_COIN
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((51 ({h2} (-1 )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::CoinAmountNegative
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((51 ({h2} (-1 )))))")
+                .unwrap_err(),
+            ValidationErr::CoinAmountNegative
+        )
     );
 }
 
 #[test]
 fn test_create_coin_invalid_puzzlehash() {
     // CREATE_COIN
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((51 ({long} (42 )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::InvalidPuzzleHash
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((51 ({long} (42 )))))")
+                .unwrap_err(),
+            ValidationErr::InvalidPuzzleHash(_)
+        )
     );
 }
 
@@ -3074,11 +3104,12 @@ fn test_create_coin_with_invalid_hint_as_terminator() {
 fn test_create_coin_with_invalid_hint_as_terminator_mempool() {
     // CREATE_COIN
     // in mempool mode it's not OK to have an invalid terminator
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 {h1}))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::InvalidCondition
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 {h1}))))")
+                .unwrap_err(),
+            ValidationErr::InvalidCondition(_)
+        )
     );
 }
 
@@ -3198,57 +3229,59 @@ fn test_multiple_create_coin() {
     }));
     assert_eq!(spend.flags, 0);
 }
-
 #[test]
 fn test_create_coin_exceed_cost() {
     // CREATE_COIN
     // ensure that we terminate parsing conditions once they exceed the max cost
-    assert_eq!(
-        cond_test_cb(
-            "((({h1} ({h2} (123 ({} )))",
-            0,
-            Some(Box::new(|a: &mut Allocator| -> NodePtr {
-                let mut rest: NodePtr = a.nil();
+    assert!(
+        matches!(
+            cond_test_cb(
+                "((({h1} ({h2} (123 ({} )))",
+                0,
+                Some(Box::new(|a: &mut Allocator| -> NodePtr {
+                    let mut rest: NodePtr = a.nil();
 
-                for i in 0..6500 {
-                    // this builds one CREATE_COIN condition
-                    let coin = (CREATE_COIN, (Bytes32::from(H2), (i, 0)))
-                        .to_clvm(a)
-                        .unwrap();
+                    for i in 0..6500 {
+                        // this builds one CREATE_COIN condition
+                        let coin = (CREATE_COIN, (Bytes32::from(H2), (i, 0)))
+                            .to_clvm(a)
+                            .unwrap();
 
-                    // add the CREATE_COIN condition to the list (called rest)
-                    rest = a.new_pair(coin, rest).unwrap();
-                }
-                rest
-            })),
-            &Signature::default(),
-            None,
+                        // add the CREATE_COIN condition to the list (called rest)
+                        rest = a.new_pair(coin, rest).unwrap();
+                    }
+                    rest
+                })),
+                &Signature::default(),
+                None,
+            )
+            .unwrap_err(),
+            ValidationErr::CostExceeded(_)
         )
-        .unwrap_err()
-        .1,
-        ErrorCode::CostExceeded
     );
 }
 
 #[test]
 fn test_duplicate_create_coin() {
     // CREATE_COIN
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 ) ((51 ({h2} (42 ) ))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::DuplicateOutput
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 ) ((51 ({h2} (42 ) ))))")
+                .unwrap_err(),
+            ValidationErr::DuplicateOutput
+        )
     );
 }
 
 #[test]
 fn test_duplicate_create_coin_with_hint() {
     // CREATE_COIN
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 (({h1})) ((51 ({h2} (42 ) ))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::DuplicateOutput
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 (({h1})) ((51 ({h2} (42 ) ))))")
+                .unwrap_err(),
+            ValidationErr::DuplicateOutput
+        )
     );
 }
 
@@ -3343,7 +3376,6 @@ fn test_duplicate_agg_sig(
     }
     assert_eq!(spend.flags, 0);
 }
-
 #[cfg(test)]
 #[rstest]
 #[case(AGG_SIG_ME)]
@@ -3358,17 +3390,19 @@ fn test_agg_sig_invalid_pubkey(
     #[case] condition: ConditionOpcode,
     #[values(MEMPOOL_MODE, 0)] mempool: u32,
 ) {
-    assert_eq!(
-        cond_test_flag(
-            &format!(
-                "((({{h1}} ({{h2}} (123 ((({} ({{h2}} ({{msg1}} )))))",
-                condition as u8
-            ),
-            mempool | DONT_VALIDATE_SIGNATURE
+    // AGG_SIG_* invalid pubkey
+    assert!(
+        matches!(
+            cond_test_flag(
+                &format!(
+                    "((({{h1}} ({{h2}} (123 ((({} ({{h2}} ({{msg1}} )))))",
+                    condition as u8
+                ),
+                mempool | DONT_VALIDATE_SIGNATURE
+            )
+            .unwrap_err(),
+            ValidationErr::InvalidPublicKey(_)
         )
-        .unwrap_err()
-        .1,
-        ErrorCode::InvalidPublicKey
     );
 }
 
@@ -3386,15 +3420,20 @@ fn test_agg_sig_infinity_pubkey(
     #[case] condition: ConditionOpcode,
     #[values(MEMPOOL_MODE, 0)] mempool: u32,
 ) {
-    let ret = cond_test_flag(
-        &format!(
-            "((({{h1}} ({{h2}} (123 ((({} (0xc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 ({{msg1}} )))))",
-            condition as u8
-            ),
-            mempool
+    // AGG_SIG_* infinity pubkey
+    assert!(
+        matches!(
+            cond_test_flag(
+                &format!(
+                    "((({{h1}} ({{h2}} (123 ((({} (0xc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 ({{msg1}} )))))",
+                    condition as u8
+                ),
+                mempool
+            )
+            .unwrap_err(),
+            ValidationErr::InvalidPublicKey(_)
+        )
     );
-
-    assert_eq!(ret.unwrap_err().1, ErrorCode::InvalidPublicKey);
 }
 
 #[cfg(test)]
@@ -3410,17 +3449,19 @@ fn test_agg_sig_invalid_msg(
     #[case] condition: ConditionOpcode,
     #[values(MEMPOOL_MODE, 0)] mempool: u32,
 ) {
-    assert_eq!(
-        cond_test_flag(
-            &format!(
-                "((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{longmsg}} )))))",
-                condition as u8
-            ),
-            mempool
+    // AGG_SIG_* invalid message
+    assert!(
+        matches!(
+            cond_test_flag(
+                &format!(
+                    "((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{longmsg}} )))))",
+                    condition as u8
+                ),
+                mempool
+            )
+            .unwrap_err(),
+            ValidationErr::InvalidMessage(_)
         )
-        .unwrap_err()
-        .1,
-        ErrorCode::InvalidMessage
     );
 }
 
@@ -3435,62 +3476,59 @@ fn test_agg_sig_invalid_msg(
 #[case(AGG_SIG_PARENT_AMOUNT)]
 fn test_agg_sig_exceed_cost(#[case] condition: ConditionOpcode) {
     // ensure that we terminate parsing conditions once they exceed the max cost
-    assert_eq!(
-        cond_test_cb(
-            "((({h1} ({h2} (123 ({} )))",
-            0,
-            Some(Box::new(move |a: &mut Allocator| -> NodePtr {
-                let mut rest: NodePtr = a.nil();
+    assert!(
+        matches!(
+            cond_test_cb(
+                "((({h1} ({h2} (123 ({} )))",
+                0,
+                Some(Box::new(move |a: &mut Allocator| -> NodePtr {
+                    let mut rest: NodePtr = a.nil();
 
-                for _i in 0..9167 {
-                    // this builds one AGG_SIG_* condition
-                    let aggsig = (
-                        condition,
-                        (Bytes48::from(PUBKEY), (Bytes::from(MSG1.as_slice()), 0)),
-                    )
-                        .to_clvm(a)
-                        .unwrap();
+                    for _i in 0..9167 {
+                        // this builds one AGG_SIG_* condition
+                        let aggsig = (
+                            condition,
+                            (Bytes48::from(PUBKEY), (Bytes::from(MSG1.as_slice()), 0)),
+                        )
+                            .to_clvm(a)
+                            .unwrap();
 
-                    // add the condition to the list (called rest)
-                    rest = a.new_pair(aggsig, rest).unwrap();
-                }
-                rest
-            })),
-            &Signature::default(),
-            None,
+                        // add the condition to the list (called rest)
+                        rest = a.new_pair(aggsig, rest).unwrap();
+                    }
+                    rest
+                })),
+                &Signature::default(),
+                None,
+            )
+            .unwrap_err(),
+            ValidationErr::CostExceeded(_)
         )
-        .unwrap_err()
-        .1,
-        ErrorCode::CostExceeded
     );
 }
 
 #[test]
-fn test_single_agg_sig_unsafe() {
+fn test_agg_sig_unsafe_invalid_pubkey() {
     // AGG_SIG_UNSAFE
-    let signature = sign_tx(H1, H2, 123, 49, MSG1);
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((49 ({h2} ({msg1} )))))")
+                .unwrap_err(),
+            ValidationErr::InvalidPublicKey(_)
+        )
+    );
+}
 
-    let (a, conds) = cond_test_sig(
-        "((({h1} ({h2} (123 (((49 ({pubkey} ({msg1} )))))",
-        &signature,
-        None,
-        0,
-    )
-    .unwrap();
-
-    assert_eq!(conds.cost, AGG_SIG_COST);
-    assert_eq!(conds.spends.len(), 1);
-    assert_eq!(conds.removal_amount, 123);
-    assert_eq!(conds.addition_amount, 0);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert_eq!(conds.agg_sig_unsafe.len(), 1);
-    for (pk, msg) in &conds.agg_sig_unsafe {
-        assert_eq!(*pk, PublicKey::from_bytes(PUBKEY).unwrap());
-        assert_eq!(a.atom(*msg).as_ref(), MSG1);
-    }
-    assert_eq!(spend.flags, 0);
+#[test]
+fn test_agg_sig_unsafe_long_msg() {
+    // AGG_SIG_UNSAFE
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((49 ({pubkey} ({longmsg} )))))")
+                .unwrap_err(),
+            ValidationErr::InvalidMessage(_)
+        )
+    );
 }
 
 #[cfg(test)]
@@ -3527,127 +3565,21 @@ fn test_agg_sig_extra_arg(#[case] condition: ConditionOpcode) {
     }
 
     // but not in mempool mode
-    assert_eq!(
-        cond_test_flag(
-            &format!(
-                "((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{msg1}} ( 1337 ) ))))",
-                condition as u8
-            ),
-            MEMPOOL_MODE,
+    assert!(
+        matches!(
+            cond_test_flag(
+                &format!(
+                    "((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{msg1}} ( 1337 ) ))))",
+                    condition as u8
+                ),
+                MEMPOOL_MODE,
+            )
+            .unwrap_err(),
+            ValidationErr::InvalidCondition(_)
         )
-        .unwrap_err()
-        .1,
-        ErrorCode::InvalidCondition
     );
 }
 
-#[test]
-fn test_agg_sig_unsafe_invalid_terminator() {
-    // AGG_SIG_UNSAFE
-    // in non-mempool mode, even an invalid terminator is allowed
-    let signature = sign_tx(H1, H2, 123, 49, MSG1);
-    let (a, conds) = cond_test_sig(
-        "((({h1} ({h2} (123 (((49 ({pubkey} ({msg1} 456 ))))",
-        &signature,
-        None,
-        0,
-    )
-    .unwrap();
-
-    assert_eq!(conds.cost, AGG_SIG_COST);
-    assert_eq!(conds.spends.len(), 1);
-    assert_eq!(conds.removal_amount, 123);
-    assert_eq!(conds.addition_amount, 0);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert_eq!(conds.agg_sig_unsafe.len(), 1);
-    for (pk, msg) in &conds.agg_sig_unsafe {
-        assert_eq!(*pk, PublicKey::from_bytes(PUBKEY).unwrap());
-        assert_eq!(a.atom(*msg).as_ref(), MSG1);
-    }
-    assert_eq!(spend.flags, 0);
-}
-
-#[test]
-fn test_agg_sig_me_invalid_terminator() {
-    // AGG_SIG_ME
-    // this has an invalid list terminator of the argument list. This is OK
-    // according to the original consensus rules
-    let signature = sign_tx(H1, H2, 123, 50, MSG1);
-    let (a, conds) = cond_test_sig(
-        "((({h1} ({h2} (123 (((50 ({pubkey} ({msg1} 456 ))))",
-        &signature,
-        None,
-        0,
-    )
-    .unwrap();
-
-    assert_eq!(conds.cost, AGG_SIG_COST);
-    assert_eq!(conds.spends.len(), 1);
-    assert_eq!(conds.removal_amount, 123);
-    assert_eq!(conds.addition_amount, 0);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert_eq!(spend.agg_sig_me.len(), 1);
-    for (pk, msg) in &conds.agg_sig_unsafe {
-        assert_eq!(*pk, PublicKey::from_bytes(PUBKEY).unwrap());
-        assert_eq!(a.atom(*msg).as_ref(), MSG1);
-    }
-    assert_eq!(spend.flags, 0);
-}
-
-#[test]
-fn test_duplicate_agg_sig_unsafe() {
-    // AGG_SIG_UNSAFE
-    // these conditions may not be deduplicated
-    let mut signature = sign_tx(H1, H2, 123, 49, MSG1);
-    signature.aggregate(&sign_tx(H1, H2, 123, 49, MSG1));
-    let (a, conds) = cond_test_sig(
-        "((({h1} ({h2} (123 (((49 ({pubkey} ({msg1} ) ((49 ({pubkey} ({msg1} ) ))))",
-        &signature,
-        None,
-        0,
-    )
-    .unwrap();
-
-    assert_eq!(conds.cost, AGG_SIG_COST * 2);
-    assert_eq!(conds.spends.len(), 1);
-    assert_eq!(conds.removal_amount, 123);
-    assert_eq!(conds.addition_amount, 0);
-    let spend = &conds.spends[0];
-    assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
-    assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert_eq!(conds.agg_sig_unsafe.len(), 2);
-    for (pk, msg) in &conds.agg_sig_unsafe {
-        assert_eq!(*pk, PublicKey::from_bytes(PUBKEY).unwrap());
-        assert_eq!(a.atom(*msg).as_ref(), MSG1);
-    }
-    assert_eq!(spend.flags, 0);
-}
-
-#[test]
-fn test_agg_sig_unsafe_invalid_pubkey() {
-    // AGG_SIG_UNSAFE
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((49 ({h2} ({msg1} )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::InvalidPublicKey
-    );
-}
-
-#[test]
-fn test_agg_sig_unsafe_long_msg() {
-    // AGG_SIG_UNSAFE
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((49 ({pubkey} ({longmsg} )))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::InvalidMessage
-    );
-}
 
 #[cfg(test)]
 fn final_message(
@@ -3694,11 +3626,8 @@ fn sign_tx(
     let final_msg = final_message(parent, puzzle, amount, opcode, msg);
     sign(&SecretKey::from_bytes(SECRET_KEY).unwrap(), final_msg)
 }
-
 #[cfg(test)]
 #[rstest]
-// these are the suffixes used for AGG_SIG_* conditions (other than
-// AGG_SIG_UNSAFE)
 #[case("0xccd5bb71183532bff220ba46c268991a3ff07eb358e8255a65c30a2dce0e5fbb")]
 #[case("0xbaf5d69c647c91966170302d18521b0a85663433d161e72c826ed08677b53a74")]
 #[case("0x284fa2ef486c7a41cc29fc99c9d08376161e93dd37817edb8219f42dca7592c4")]
@@ -3706,7 +3635,6 @@ fn sign_tx(
 #[case("0x0f7d90dff0613e6901e24dae59f1e690f18b8f5fbdcf1bb192ac9deaf7de22ad")]
 #[case("0x585796bd90bb553c0430b87027ffee08d88aba0162c6e1abbbcc6b583f2ae7f9")]
 #[case("0x2ebfdae17b29d83bae476a25ea06f0c4bd57298faddbbc3ec5ad29b9b86ce5df")]
-// The same suffixes, but 1 byte prepended
 #[case("0x01ccd5bb71183532bff220ba46c268991a3ff07eb358e8255a65c30a2dce0e5fbb")]
 #[case("0x01baf5d69c647c91966170302d18521b0a85663433d161e72c826ed08677b53a74")]
 #[case("0x01284fa2ef486c7a41cc29fc99c9d08376161e93dd37817edb8219f42dca7592c4")]
@@ -3718,6 +3646,7 @@ fn test_agg_sig_unsafe_invalid_msg(
     #[case] msg: &str,
     #[values(43, 44, 45, 46, 47, 48, 49, 50)] opcode: u16,
 ) {
+    // AGG_SIG_* invalid message
     let signature = sign_tx(
         H1,
         H2,
@@ -3732,8 +3661,11 @@ fn test_agg_sig_unsafe_invalid_msg(
         None,
         0,
     );
+
     if opcode == AGG_SIG_UNSAFE {
-        assert_eq!(ret.unwrap_err().1, ErrorCode::InvalidMessage);
+        assert!(
+            matches!(ret.unwrap_err(), ValidationErr::InvalidMessage(_))
+        );
     } else {
         assert!(ret.is_ok());
     }
@@ -3742,83 +3674,85 @@ fn test_agg_sig_unsafe_invalid_msg(
 #[test]
 fn test_agg_sig_unsafe_exceed_cost() {
     // AGG_SIG_UNSAFE
-    // ensure that we terminate parsing conditions once they exceed the max cost
-    assert_eq!(
-        cond_test_cb(
-            "((({h1} ({h2} (123 ({} )))",
-            0,
-            Some(Box::new(|a: &mut Allocator| -> NodePtr {
-                let mut rest: NodePtr = a.nil();
-
-                for _i in 0..9167 {
-                    // this builds one AGG_SIG_UNSAFE condition
-                    let aggsig = (
-                        AGG_SIG_UNSAFE,
-                        (Bytes48::from(PUBKEY), (Bytes::from(MSG1.as_slice()), 0)),
-                    )
-                        .to_clvm(a)
-                        .unwrap();
-
-                    // add the AGG_SIG_UNSAFE condition to the list (called rest)
-                    rest = a.new_pair(aggsig, rest).unwrap();
-                }
-                rest
-            })),
-            &Signature::default(),
-            None,
+    assert!(
+        matches!(
+            cond_test_cb(
+                "((({h1} ({h2} (123 ({} )))",
+                0,
+                Some(Box::new(|a: &mut Allocator| -> NodePtr {
+                    let mut rest: NodePtr = a.nil();
+                    for _i in 0..9167 {
+                        let aggsig = (
+                            AGG_SIG_UNSAFE,
+                            (Bytes48::from(PUBKEY), (Bytes::from(MSG1.as_slice()), 0)),
+                        )
+                            .to_clvm(a)
+                            .unwrap();
+                        rest = a.new_pair(aggsig, rest).unwrap();
+                    }
+                    rest
+                })),
+                &Signature::default(),
+                None,
+            )
+            .unwrap_err(),
+            ValidationErr::CostExceeded(_)
         )
-        .unwrap_err()
-        .1,
-        ErrorCode::CostExceeded
     );
 }
 
 #[test]
 fn test_spend_amount_exceeds_max() {
-    // the coin we're trying to spend has an amount that exceeds maximum
-    assert_eq!(
-        cond_test("((({h1} ({h2} (0x010000000000000000 ())))")
-            .unwrap_err()
-            .1,
-        ErrorCode::InvalidCoinAmount
+    // spending coin exceeds maximum
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (0x010000000000000000 ())))").unwrap_err(),
+            ValidationErr::InvalidCoinAmount(_)
+        )
     );
 }
 
 #[test]
 fn test_single_spend_negative_amount() {
-    // the coin we're trying to spend has a negative amount (i.e. it's invalid)
-    assert_eq!(
-        cond_test("((({h1} ({h2} (-123 ())))").unwrap_err().1,
-        ErrorCode::InvalidCoinAmount
+    // spending coin has negative amount
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (-123 ())))").unwrap_err(),
+            ValidationErr::CoinAmountNegative(_)
+        )
     );
 }
 
 #[test]
 fn test_single_spend_invalid_puzle_hash() {
-    // the puzzle hash in the spend is 33 bytes
-    assert_eq!(
-        cond_test("((({h1} ({long} (123 ())))").unwrap_err().1,
-        ErrorCode::InvalidPuzzleHash
+    // puzzle hash is invalid (33 bytes)
+    assert!(
+        matches!(
+            cond_test("((({h1} ({long} (123 ())))").unwrap_err(),
+            ValidationErr::InvalidPuzzleHash(_)
+        )
     );
 }
 
 #[test]
 fn test_single_spend_invalid_parent_id() {
-    // the parent coin ID is 33 bytes long
-    assert_eq!(
-        cond_test("((({long} ({h2} (123 ())))").unwrap_err().1,
-        ErrorCode::InvalidParentId
+    // parent coin ID is invalid (33 bytes)
+    assert!(
+        matches!(
+            cond_test("((({long} ({h2} (123 ())))").unwrap_err(),
+            ValidationErr::InvalidParentId(_)
+        )
     );
 }
 
 #[test]
 fn test_double_spend() {
-    // we spend the same coin twice
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 ()) (({h1} ({h2} (123 ())))")
-            .unwrap_err()
-            .1,
-        ErrorCode::DoubleSpend
+    // double spend of the same coin
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 ()) (({h1} ({h2} (123 ())))").unwrap_err(),
+            ValidationErr::DoubleSpend
+        )
     );
 }
 
@@ -3959,9 +3893,11 @@ fn test_concurrent_spend_fail() {
     ];
 
     for test in test_cases {
-        assert_eq!(
-            cond_test(test).unwrap_err().1,
-            ErrorCode::AssertConcurrentSpendFailed
+        assert!(
+            matches!(
+                cond_test(test).unwrap_err(),
+                ValidationErr::AssertConcurrentSpendFailed(_)
+            )
         );
     }
 }
@@ -4085,9 +4021,11 @@ fn test_concurrent_puzzle_fail() {
     ];
 
     for test in test_cases {
-        assert_eq!(
-            cond_test(test).unwrap_err().1,
-            ErrorCode::AssertConcurrentPuzzleFailed
+        assert!(
+            matches!(
+                cond_test(test).unwrap_err(),
+                ValidationErr::AssertConcurrentPuzzleFailed
+            )
         );
     }
 }

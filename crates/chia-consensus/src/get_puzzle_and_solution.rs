@@ -1,4 +1,4 @@
-use crate::validation_error::{atom, check_nil, first, next, rest, ErrorCode, ValidationErr};
+use crate::validation_error::{atom, check_nil, first, next, rest, ValidationErr};
 use chia_protocol::Coin;
 use clvm_utils::{tree_hash_cached, TreeCache};
 use clvmr::allocator::{Allocator, Atom, NodePtr};
@@ -9,12 +9,12 @@ pub fn parse_coin_spend(
     a: &Allocator,
     coin_spend: NodePtr,
 ) -> Result<(Atom<'_>, u64, NodePtr, NodePtr), ValidationErr> {
-    let parent = atom(a, first(a, coin_spend)?, ErrorCode::InvalidParentId)?;
+    let parent = atom(a, first(a, coin_spend)?, ValidationErr::InvalidParentId)?;
     let coin_spend = rest(a, coin_spend)?;
     let puzzle = first(a, coin_spend)?;
     let coin_spend = rest(a, coin_spend)?;
     let amount =
-        u64_from_bytes(atom(a, first(a, coin_spend)?, ErrorCode::InvalidCoinAmount)?.as_ref());
+        u64_from_bytes(atom(a, first(a, coin_spend)?, ValidationErr::InvalidCoinAmount)?.as_ref());
     let coin_spend = rest(a, coin_spend)?;
     let solution = first(a, coin_spend)?;
     check_nil(a, rest(a, coin_spend)?)?;
@@ -52,7 +52,7 @@ pub fn get_puzzle_and_solution_for_coin(
         // we found the coin!
         return Ok((puzzle, solution));
     }
-    Err(ValidationErr(generator_result, ErrorCode::InvalidCondition))
+    Err(ValidationErr::InvalidCondition(generator_result))
 }
 
 #[cfg(test)]
@@ -140,39 +140,43 @@ mod test {
         );
 
         // wrong parent
-        assert_eq!(
-            get_puzzle_and_solution_for_coin(
-                &a,
-                generator_output,
-                &Coin::new(make_dummy_id(2), tree_hash(&a, puzzle1).into(), 1337),
+        assert!(
+            matches!(
+                get_puzzle_and_solution_for_coin(
+                    &a,
+                    generator_output,
+                    &Coin::new(make_dummy_id(2), tree_hash(&a, puzzle1).into(), 1337),
+                )
+                .unwrap_err(),
+                ValidationErr::InvalidCondition
             )
-            .unwrap_err()
-            .1,
-            ErrorCode::InvalidCondition
+            
         );
 
         // wrong amount
-        assert_eq!(
-            get_puzzle_and_solution_for_coin(
-                &a,
-                generator_output,
-                &Coin::new(parent, tree_hash(&a, puzzle1).into(), 42),
+        assert!(
+            matches!(
+                get_puzzle_and_solution_for_coin(
+                    &a,
+                    generator_output,
+                    &Coin::new(parent, tree_hash(&a, puzzle1).into(), 42),
+                )
+                .unwrap_err(),
+                ValidationErr::InvalidCondition
             )
-            .unwrap_err()
-            .1,
-            ErrorCode::InvalidCondition
         );
 
         // wrong puzzle hash
-        assert_eq!(
-            get_puzzle_and_solution_for_coin(
-                &a,
-                generator_output,
-                &Coin::new(parent, make_dummy_id(4), 1337),
+        assert!(
+            matches!(
+                get_puzzle_and_solution_for_coin(
+                    &a,
+                    generator_output,
+                    &Coin::new(parent, make_dummy_id(4), 1337),
+                )
+                .unwrap_err(),
+                ValidationErr::InvalidCondition
             )
-            .unwrap_err()
-            .1,
-            ErrorCode::InvalidCondition
         );
     }
 
@@ -194,16 +198,20 @@ mod test {
 
         // this is a spend where the parent is not an atom
         let spend2 = make_invalid_coin_spend(&mut a, puzzle2, amount_atom, puzzle1, solution1);
-        assert_eq!(
-            parse_coin_spend(&a, spend2).unwrap_err().1,
-            ErrorCode::InvalidParentId
+        assert!(
+            matches!(
+                parse_coin_spend(&a, spend2).unwrap_err(),
+                ValidationErr::InvalidParentId
+            )
         );
 
         // this is a spend where the amount is not an atom
         let spend3 = make_invalid_coin_spend(&mut a, parent_atom, puzzle2, puzzle1, solution1);
-        assert_eq!(
-            parse_coin_spend(&a, spend3).unwrap_err().1,
-            ErrorCode::InvalidCoinAmount
+        assert!(
+            matches!(
+                parse_coin_spend(&a, spend3).unwrap_err(),
+                ValidationErr::InvalidCoinAmount
+            )
         );
     }
 
