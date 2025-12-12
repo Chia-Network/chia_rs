@@ -58,16 +58,16 @@ impl SpendId {
         };
 
         let amount = if (mode & AMOUNT) != 0 {
-            let amount = match sanitize_uint(a, first(a, *args)?, 8, ValidationErr::InvalidCoinAmount)?
-            {
-                SanitizedUint::PositiveOverflow => {
-                    return Err(ValidationErr::CoinAmountExceedsMaximum(*args));
-                }
-                SanitizedUint::NegativeOverflow => {
-                    return Err(ValidationErr::CoinAmountNegative(*args));
-                }
-                SanitizedUint::Ok(amount) => amount,
-            };
+            let amount =
+                match sanitize_uint(a, first(a, *args)?, 8, ValidationErr::InvalidCoinAmount)? {
+                    SanitizedUint::PositiveOverflow => {
+                        return Err(ValidationErr::CoinAmountExceedsMaximum(*args));
+                    }
+                    SanitizedUint::NegativeOverflow => {
+                        return Err(ValidationErr::CoinAmountNegative(*args));
+                    }
+                    SanitizedUint::Ok(amount) => amount,
+                };
             *args = rest(a, *args)?;
             amount
         } else {

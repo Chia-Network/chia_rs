@@ -428,8 +428,7 @@ where
         let coin = Coin::new(
             parent_id,
             puzhash.into(),
-            u64::from_clvm(&a, amount)
-                .map_err(|_| ValidationErr::InvalidCoinAmount(first))?,
+            u64::from_clvm(&a, amount).map_err(|_| ValidationErr::InvalidCoinAmount(first))?,
         );
         let Ok(puzzle_program) = Program::from_clvm(&a, puzzle) else {
             continue;

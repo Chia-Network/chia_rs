@@ -55,9 +55,8 @@ where
     let mut iter = all_spends;
     while let Some((spend, rest)) = a.next(iter) {
         iter = rest;
-        let (_parent_id, (puzzle, _rest)) =
-            <(NodePtr, (NodePtr, NodePtr))>::from_clvm(&a, spend)
-                .map_err(|_| ValidationErr::InvalidCondition(spend))?;
+        let (_parent_id, (puzzle, _rest)) = <(NodePtr, (NodePtr, NodePtr))>::from_clvm(&a, spend)
+            .map_err(|_| ValidationErr::InvalidCondition(spend))?;
         cache.visit_tree(&a, puzzle);
     }
 

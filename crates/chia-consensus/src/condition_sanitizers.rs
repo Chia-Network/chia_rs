@@ -23,9 +23,7 @@ pub fn parse_amount(
     make_err: fn(NodePtr) -> ValidationErr,
 ) -> Result<u64, ValidationErr> {
     match sanitize_uint(a, n, 8, make_err)? {
-        SanitizedUint::NegativeOverflow | SanitizedUint::PositiveOverflow => {
-            Err(make_err(n))
-        }
+        SanitizedUint::NegativeOverflow | SanitizedUint::PositiveOverflow => Err(make_err(n)),
         SanitizedUint::Ok(r) => Ok(r),
     }
 }
@@ -85,7 +83,10 @@ fn test_sanitize_mode(#[case] value: i64, #[case] pass: bool) {
     if pass {
         assert_eq!(i64::from(ret.unwrap()), value);
     } else {
-        assert!(matches!(ret.unwrap_err().1, ValidationErr::InvalidMessageMode));
+        assert!(matches!(
+            ret.unwrap_err().1,
+            ValidationErr::InvalidMessageMode
+        ));
     }
 }
 
@@ -163,62 +164,46 @@ fn amount_tester(buf: &[u8]) -> Result<u64, ValidationErr> {
 #[test]
 fn test_sanitize_amount() {
     // negative amounts are not allowed
-    assert!(
-        matches!(
-            amount_tester(&[0x80]).unwrap_err().1,
-            ValidationErr::InvalidCoinAmount
-        )
-    );
-    assert!(
-        matches!(
-            amount_tester(&[0xff]).unwrap_err().1,
-            ValidationErr::InvalidCoinAmount
-        )
-    );
-    assert!(
-        matches!(
-            amount_tester(&[0xff, 0]).unwrap_err().1,
-            ValidationErr::InvalidCoinAmount
-        )
-    );
+    assert!(matches!(
+        amount_tester(&[0x80]).unwrap_err().1,
+        ValidationErr::InvalidCoinAmount
+    ));
+    assert!(matches!(
+        amount_tester(&[0xff]).unwrap_err().1,
+        ValidationErr::InvalidCoinAmount
+    ));
+    assert!(matches!(
+        amount_tester(&[0xff, 0]).unwrap_err().1,
+        ValidationErr::InvalidCoinAmount
+    ));
 
     // leading zeros are somtimes necessary to make values positive
     assert_eq!(amount_tester(&[0, 0xff]), Ok(0xff));
     // but are disallowed when they are redundant
-    assert!(
-        matches!(
-            amount_tester(&[0, 0, 0, 0xff]).unwrap_err().1,
-            ValidationErr::InvalidCoinAmount
-        )
-    );
-    assert!(
-        matches!(
-            amount_tester(&[0, 0, 0, 0x80]).unwrap_err().1,
-            ValidationErr::InvalidCoinAmount
-        )
-    );
-    assert!(
-        matches!(
-            amount_tester(&[0, 0, 0, 0x7f]).unwrap_err().1,
-            ValidationErr::InvalidCoinAmount
-        )
-    );
-    assert!(
-        matches!(
-            amount_tester(&[0, 0, 0]).unwrap_err().1,
-            ValidationErr::InvalidCoinAmount
-        )
-    );
+    assert!(matches!(
+        amount_tester(&[0, 0, 0, 0xff]).unwrap_err().1,
+        ValidationErr::InvalidCoinAmount
+    ));
+    assert!(matches!(
+        amount_tester(&[0, 0, 0, 0x80]).unwrap_err().1,
+        ValidationErr::InvalidCoinAmount
+    ));
+    assert!(matches!(
+        amount_tester(&[0, 0, 0, 0x7f]).unwrap_err().1,
+        ValidationErr::InvalidCoinAmount
+    ));
+    assert!(matches!(
+        amount_tester(&[0, 0, 0]).unwrap_err().1,
+        ValidationErr::InvalidCoinAmount
+    ));
 
     // amounts aren't allowed to be too big
-    assert!(
-        matches!(
-            amount_tester(&[0x7f, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    assert!(matches!(
+        amount_tester(&[0x7f, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
             .unwrap_err()
             .1,
-            ValidationErr::InvalidCoinAmount
-        )
-    );
+        ValidationErr::InvalidCoinAmount
+    ));
 
     // this is small enough though
     assert_eq!(

@@ -477,17 +477,24 @@ pub fn parse_args(
         }
         CREATE_COIN_ANNOUNCEMENT => {
             maybe_check_args_terminator(a, c, flags)?;
-            let msg = sanitize_announce_msg(a, first(a, c)?, ValidationErr::InvalidCoinAnnouncement)?;
+            let msg =
+                sanitize_announce_msg(a, first(a, c)?, ValidationErr::InvalidCoinAnnouncement)?;
             Ok(Condition::CreateCoinAnnouncement(msg))
         }
         ASSERT_COIN_ANNOUNCEMENT => {
             maybe_check_args_terminator(a, c, flags)?;
-            let id = sanitize_hash(a, first(a, c)?, 32, ValidationErr::AssertCoinAnnouncementFailed)?;
+            let id = sanitize_hash(
+                a,
+                first(a, c)?,
+                32,
+                ValidationErr::AssertCoinAnnouncementFailed,
+            )?;
             Ok(Condition::AssertCoinAnnouncement(id))
         }
         CREATE_PUZZLE_ANNOUNCEMENT => {
             maybe_check_args_terminator(a, c, flags)?;
-            let msg = sanitize_announce_msg(a, first(a, c)?, ValidationErr::InvalidPuzzleAnnouncement)?;
+            let msg =
+                sanitize_announce_msg(a, first(a, c)?, ValidationErr::InvalidPuzzleAnnouncement)?;
             Ok(Condition::CreatePuzzleAnnouncement(msg))
         }
         ASSERT_PUZZLE_ANNOUNCEMENT => {
@@ -502,12 +509,22 @@ pub fn parse_args(
         }
         ASSERT_CONCURRENT_SPEND => {
             maybe_check_args_terminator(a, c, flags)?;
-            let id = sanitize_hash(a, first(a, c)?, 32, ValidationErr::AssertConcurrentSpendFailed)?;
+            let id = sanitize_hash(
+                a,
+                first(a, c)?,
+                32,
+                ValidationErr::AssertConcurrentSpendFailed,
+            )?;
             Ok(Condition::AssertConcurrentSpend(id))
         }
         ASSERT_CONCURRENT_PUZZLE => {
             maybe_check_args_terminator(a, c, flags)?;
-            let id = sanitize_hash(a, first(a, c)?, 32, ValidationErr::AssertConcurrentPuzzleFailed)?;
+            let id = sanitize_hash(
+                a,
+                first(a, c)?,
+                32,
+                ValidationErr::AssertConcurrentPuzzleFailed,
+            )?;
             Ok(Condition::AssertConcurrentPuzzle(id))
         }
         ASSERT_MY_COIN_ID => {
@@ -1592,7 +1609,9 @@ pub fn validate_conditions(
 
         for puzzle_assert in &state.assert_puzzle {
             if !announcements.contains(&a.atom(*puzzle_assert).as_ref().try_into().unwrap()) {
-                return Err(ValidationErr::AssertPuzzleAnnouncementFailed(*puzzle_assert));
+                return Err(ValidationErr::AssertPuzzleAnnouncementFailed(
+                    *puzzle_assert,
+                ));
             }
         }
     }
@@ -1621,7 +1640,6 @@ pub fn validate_conditions(
 
     Ok(())
 }
-
 
 pub fn validate_signature(
     state: &ParseState,
@@ -1949,22 +1967,18 @@ fn cond_test_sig(
 
 #[test]
 fn test_invalid_condition_list1() {
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (8 )))").unwrap_err().1,
-            ValidationErr::InvalidCondition
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (8 )))").unwrap_err().1,
+        ValidationErr::InvalidCondition
+    ));
 }
 
 #[test]
 fn test_invalid_condition_list2() {
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 ((8 ))))").unwrap_err().1,
-            ValidationErr::InvalidCondition
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 ((8 ))))").unwrap_err().1,
+        ValidationErr::InvalidCondition
+    ));
 }
 
 #[test]
@@ -1988,13 +2002,10 @@ fn test_invalid_condition_args_terminator() {
 fn test_invalid_condition_args_terminator_mempool() {
     // ASSERT_SECONDS_RELATIVE
     // in mempool mode, the argument list must be properly terminated
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((80 (50 8 ))))")
-            .unwrap_err(),
-            ValidationErr::InvalidCondition
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((80 (50 8 ))))").unwrap_err(),
+        ValidationErr::InvalidCondition
+    ));
 }
 
 #[test]
@@ -2015,67 +2026,52 @@ fn test_invalid_condition_list_terminator() {
 #[test]
 fn test_invalid_condition_list_terminator_mempool() {
     // ASSERT_SECONDS_RELATIVE
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((80 (50 8 ))))")
-                .unwrap_err(),
-            ValidationErr::InvalidCondition
-    )    
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((80 (50 8 ))))").unwrap_err(),
+        ValidationErr::InvalidCondition
+    ));
 }
 
 #[test]
 fn test_invalid_condition_list_terminator_mempool() {
     // ASSERT_SECONDS_RELATIVE
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((80 (50 8 ))))")
-                .unwrap_err(),
-            ValidationErr::InvalidCondition
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((80 (50 8 ))))").unwrap_err(),
+        ValidationErr::InvalidCondition
+    ));
 }
 
 #[test]
 fn test_invalid_condition_short_list_terminator() {
     // ASSERT_SECONDS_RELATIVE
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((80 8 ))))")
-                .unwrap_err(),
-            ValidationErr::InvalidCondition
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((80 8 ))))").unwrap_err(),
+        ValidationErr::InvalidCondition
+    ));
 }
 
 #[test]
 fn test_invalid_spend_list1() {
-    assert!(
-        matches!(
-            cond_test("(8 )").unwrap_err(),
-            ValidationErr::InvalidCondition
-        )
-    );
+    assert!(matches!(
+        cond_test("(8 )").unwrap_err(),
+        ValidationErr::InvalidCondition
+    ));
 }
 
 #[test]
 fn test_invalid_spend_list2() {
-    assert!(
-        matches!(
-            cond_test("((8 ))").unwrap_err(),
-            ValidationErr::InvalidCondition
-        )
-    );
+    assert!(matches!(
+        cond_test("((8 ))").unwrap_err(),
+        ValidationErr::InvalidCondition
+    ));
 }
 
 #[test]
 fn test_invalid_spend_list_terminator() {
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (()) 8 ))").unwrap_err(),
-            ValidationErr::InvalidCondition
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (()) 8 ))").unwrap_err(),
+        ValidationErr::InvalidCondition
+    ));
 }
 
 #[cfg(test)]
@@ -2127,25 +2123,19 @@ fn test_strict_args_count(
         // two of the cases won't pass, even when garbage at the end is allowed.
         if condition == ASSERT_COIN_ANNOUNCEMENT {
             assert!(matches!(
-                ret.unwrap_err(), ValidationErr::AssertCoinAnnouncementFailed
-            )
-        );
+                ret.unwrap_err(),
+                ValidationErr::AssertCoinAnnouncementFailed
+            ));
         } else if condition == ASSERT_PUZZLE_ANNOUNCEMENT {
-            assert!(
-                matches!(
-                    ret.unwrap_err(),
-                    ValidationErr::AssertPuzzleAnnouncementFailed,
-                )
-            );
+            assert!(matches!(
+                ret.unwrap_err(),
+                ValidationErr::AssertPuzzleAnnouncementFailed,
+            ));
         } else {
             assert!(ret.is_ok());
         }
     } else {
-        assert!(
-            matches!(
-                ret.unwrap_err(), ValidationErr::InvalidCondition
-            )
-        );
+        assert!(matches!(ret.unwrap_err(), ValidationErr::InvalidCondition));
     }
 }
 
@@ -2180,11 +2170,7 @@ fn test_message_strict_args_count(
     if flags == 0 {
         ret.unwrap();
     } else {
-        assert!(
-            matches!(
-                ret.unwrap_err(), ValidationErr::InvalidCondition
-            )
-        );
+        assert!(matches!(ret.unwrap_err(), ValidationErr::InvalidCondition));
     }
 }
 
@@ -2235,21 +2221,19 @@ fn test_extra_arg(
 
     // extra args are ignored in consensus mode
     // and a failure in mempool mode
-    assert!(
-        matches!(
-            cond_test_sig(
-                &format!(
-                    "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 ) {} ))))",
-                    condition as u8, arg, extra_cond
-                ),
-                &signature,
-                None,
-                MEMPOOL_MODE,
-            )
-            .unwrap_err(),
-            ValidationErr::InvalidCondition
-            )
-    );
+    assert!(matches!(
+        cond_test_sig(
+            &format!(
+                "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 ) {} ))))",
+                condition as u8, arg, extra_cond
+            ),
+            &signature,
+            None,
+            MEMPOOL_MODE,
+        )
+        .unwrap_err(),
+        ValidationErr::InvalidCondition
+    ));
 
     let (a, conds) = cond_test_sig(
         &format!(
@@ -2418,7 +2402,11 @@ fn test_single_condition_no_op(#[case] condition: ConditionOpcode, #[case] value
     "0x0100000000",
     ValidationErr::AssertMyBirthHeightFailed
 )]
-#[case(ASSERT_MY_BIRTH_SECONDS, "-1", ValidationErr::AssertMyBirthSecondsFailed)]
+#[case(
+    ASSERT_MY_BIRTH_SECONDS,
+    "-1",
+    ValidationErr::AssertMyBirthSecondsFailed
+)]
 #[case(
     ASSERT_MY_BIRTH_SECONDS,
     "0x010000000000000000",
@@ -2506,16 +2494,14 @@ fn test_multiple_conditions(
 #[case(ASSERT_CONCURRENT_PUZZLE)]
 fn test_missing_arg(#[case] condition: ConditionOpcode) {
     // extra args are disallowed in mempool mode
-    assert!(
-        matches!(
-            cond_test_flag(
+    assert!(matches!(
+        cond_test_flag(
             &format!("((({{h1}} ({{h2}} (123 ((({} )))))", condition as u8),
             0
         )
         .unwrap_err(),
         ValidationErr::InvalidCondition
-        )
-    );
+    ));
 }
 
 #[test]
@@ -2546,7 +2532,6 @@ fn test_reserve_fee_exceed_max() {
                 .unwrap_err(),
             ValidationErr::ReserveFeeConditionFailed
         )
-        
     );
 }
 
@@ -2554,13 +2539,10 @@ fn test_reserve_fee_exceed_max() {
 fn test_reserve_fee_insufficient_spends() {
     // RESERVE_FEE
     // We spend a coin with amount 123 but reserve fee 124
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((52 (124 ) ))))")
-            .unwrap_err(),
-            ValidationErr::ReserveFeeConditionFailed
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((52 (124 ) ))))").unwrap_err(),
+        ValidationErr::ReserveFeeConditionFailed
+    ));
 }
 
 #[test]
@@ -2568,13 +2550,10 @@ fn test_reserve_fee_insufficient_fee() {
     // RESERVE_FEE
     // We spend a coin with amount 123 and create a coin worth 24 and reserve fee
     // of 100 (which adds up to 124, i.e. not enough fee)
-    assert_eq!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((52 (100 ) ((51 ({h2} (24 )) )))")
-                .unwrap_err(),
-            ValidationErr::ReserveFeeConditionFailed
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((52 (100 ) ((51 ({h2} (24 )) )))").unwrap_err(),
+        ValidationErr::ReserveFeeConditionFailed
+    ));
 }
 
 // TOOD: test announcement across coins
@@ -2612,26 +2591,20 @@ fn test_cross_coin_announces_consume() {
 #[test]
 fn test_failing_coin_consume() {
     // ASSERT_COIN_ANNOUNCEMENT
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((61 ({c11} )))))")
-                .unwrap_err(),
-            ValidationErr::AssertCoinAnnouncementFailed
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((61 ({c11} )))))").unwrap_err(),
+        ValidationErr::AssertCoinAnnouncementFailed
+    ));
 }
 
 #[test]
 fn test_coin_announce_mismatch() {
     // CREATE_COIN_ANNOUNCEMENT
     // ASSERT_COIN_ANNOUNCEMENT
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((60 ({msg1} ) ((61 ({c12} )))))")
-                .unwrap_err(),
-            ValidationErr::AssertCoinAnnouncementFailed
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((60 ({msg1} ) ((61 ({c12} )))))").unwrap_err(),
+        ValidationErr::AssertCoinAnnouncementFailed
+    ));
 }
 
 #[test]
@@ -2667,64 +2640,48 @@ fn test_cross_coin_puzzle_announces_consume() {
 #[test]
 fn test_failing_puzzle_consume() {
     // ASSERT_PUZZLE_ANNOUNCEMENT
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((63 ({p21} )))))")
-            .unwrap_err(),
-            ValidationErr::AssertPuzzleAnnouncementFailed
-        )
-        
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((63 ({p21} )))))").unwrap_err(),
+        ValidationErr::AssertPuzzleAnnouncementFailed
+    ));
 }
 #[test]
 fn test_puzzle_announce_mismatch() {
     // CREATE_PUZZLE_ANNOUNCEMENT
     // ASSERT_PUZZLE_ANNOUNCEMENT
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((62 ({msg1} ) ((63 ({p11} )))))")
-                .unwrap_err(),
-            ValidationErr::AssertPuzzleAnnouncementFailed(_)
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((62 ({msg1} ) ((63 ({p11} )))))").unwrap_err(),
+        ValidationErr::AssertPuzzleAnnouncementFailed(_)
+    ));
 }
 
 #[test]
 fn test_single_assert_my_amount_exceed_max() {
     // ASSERT_MY_AMOUNT
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((73 (0x010000000000000000 )))))")
-                .unwrap_err(),
-            ValidationErr::AssertMyAmountFailed(_)
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((73 (0x010000000000000000 )))))").unwrap_err(),
+        ValidationErr::AssertMyAmountFailed(_)
+    ));
 }
 
 #[test]
 fn test_single_assert_my_amount_overlong() {
     // ASSERT_MY_AMOUNT
     // leading zeroes are disallowed
-    assert!(
-        matches!(
-            cond_test_flag("((({h1} ({h2} (123 (((73 (0x0000007b )))))", 0)
-                .unwrap_err(),
-            ValidationErr::AssertMyAmountFailed(_)
-        )
-    );
+    assert!(matches!(
+        cond_test_flag("((({h1} ({h2} (123 (((73 (0x0000007b )))))", 0).unwrap_err(),
+        ValidationErr::AssertMyAmountFailed(_)
+    ));
 }
 
 #[test]
 fn test_single_assert_my_amount_overlong_mempool() {
     // ASSERT_MY_AMOUNT
     // leading zeroes are disallowed in mempool mode
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((73 (0x0000007b )))))")
-                .unwrap_err(),
-            ValidationErr::AssertMyAmountFailed(_)
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((73 (0x0000007b )))))").unwrap_err(),
+        ValidationErr::AssertMyAmountFailed(_)
+    ));
 }
 
 #[test]
@@ -2742,38 +2699,29 @@ fn test_multiple_assert_my_amount() {
 #[test]
 fn test_multiple_failing_assert_my_amount() {
     // ASSERT_MY_AMOUNT
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((73 (123 ) ((73 (122 ) ))))")
-                .unwrap_err(),
-            ValidationErr::AssertMyAmountFailed(_)
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((73 (123 ) ((73 (122 ) ))))").unwrap_err(),
+        ValidationErr::AssertMyAmountFailed(_)
+    ));
 }
 
 #[test]
 fn test_single_failing_assert_my_amount() {
     // ASSERT_MY_AMOUNT
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((73 (124 ) ))))")
-                .unwrap_err(),
-            ValidationErr::AssertMyAmountFailed(_)
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((73 (124 ) ))))").unwrap_err(),
+        ValidationErr::AssertMyAmountFailed(_)
+    ));
 }
 
 #[test]
 fn test_single_assert_my_coin_id_overlong() {
     // ASSERT_MY_COIN_ID
     // leading zeros in the coin amount invalid
-    assert!(
-        matches!(
-            cond_test_flag("((({h1} ({h2} (0x0000007b (((70 ({coin12} )))))", 0)
-                .unwrap_err(),
-            ValidationErr::InvalidCoinAmount(_)
-        )
-    );
+    assert!(matches!(
+        cond_test_flag("((({h1} ({h2} (0x0000007b (((70 ({coin12} )))))", 0).unwrap_err(),
+        ValidationErr::InvalidCoinAmount(_)
+    ));
 }
 
 #[test]
@@ -2793,13 +2741,10 @@ fn test_multiple_assert_my_coin_id() {
 #[test]
 fn test_single_assert_my_coin_id_mismatch() {
     // ASSERT_MY_COIN_ID
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((70 ({coin11} )))))")
-                .unwrap_err(),
-            ValidationErr::AssertMyCoinIdFailed(_)
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((70 ({coin11} )))))").unwrap_err(),
+        ValidationErr::AssertMyCoinIdFailed(_)
+    ));
 }
 
 #[test]
@@ -2807,13 +2752,11 @@ fn test_multiple_assert_my_coin_id_mismatch() {
     // ASSERT_MY_COIN_ID
     // ASSERT_MY_AMOUNT
     // the coin-ID check matches the *other* coin, not itself
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((60 (123 ))) (({h1} ({h1} (123 (((70 ({coin12} )))))")
-                .unwrap_err(),
-            ValidationErr::AssertMyCoinIdFailed(_)
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((60 (123 ))) (({h1} ({h1} (123 (((70 ({coin12} )))))")
+            .unwrap_err(),
+        ValidationErr::AssertMyCoinIdFailed(_)
+    ));
 }
 
 #[test]
@@ -2832,26 +2775,20 @@ fn test_multiple_assert_my_parent_coin_id() {
 #[test]
 fn test_single_assert_my_parent_coin_id_mismatch() {
     // ASSERT_MY_PARENT_ID
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((71 ({h2} )))))")
-                .unwrap_err(),
-            ValidationErr::AssertMyParentIdFailed(_)
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((71 ({h2} )))))").unwrap_err(),
+        ValidationErr::AssertMyParentIdFailed(_)
+    ));
 }
 
 #[test]
 fn test_single_invalid_assert_my_parent_coin_id() {
     // ASSERT_MY_PARENT_ID
     // the parent ID in the condition is 33 bytes long
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((71 ({long} )))))")
-                .unwrap_err(),
-            ValidationErr::AssertMyParentIdFailed(_)
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((71 ({long} )))))").unwrap_err(),
+        ValidationErr::AssertMyParentIdFailed(_)
+    ));
 }
 
 #[test]
@@ -2872,28 +2809,21 @@ fn test_multiple_assert_my_puzzle_hash() {
 #[test]
 fn test_single_assert_my_puzzle_hash_mismatch() {
     // ASSERT_MY_PUZZLEHASH
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((72 ({h1} )))))")
-                .unwrap_err(),
-            ValidationErr::AssertMyPuzzleHashFailed(_)
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((72 ({h1} )))))").unwrap_err(),
+        ValidationErr::AssertMyPuzzleHashFailed(_)
+    ));
 }
 
 #[test]
 fn test_single_invalid_assert_my_puzzle_hash() {
     // ASSERT_MY_PUZZLEHASH
     // the parent ID in the condition is 33 bytes long
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((72 ({long} )))))")
-                .unwrap_err(),
-            ValidationErr::AssertMyPuzzleHashFailed(_)
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((72 ({long} )))))").unwrap_err(),
+        ValidationErr::AssertMyPuzzleHashFailed(_)
+    ));
 }
-
 
 #[test]
 fn test_single_create_coin() {
@@ -2942,49 +2872,37 @@ fn test_create_coin_max_amount() {
 fn test_minting_coin() {
     // CREATE_COIN
     // we spend a coin with value 123 but create a coin with value 124
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((51 ({h2} (124 )))))")
-                .unwrap_err(),
-            ValidationErr::MintingCoin
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((51 ({h2} (124 )))))").unwrap_err(),
+        ValidationErr::MintingCoin
+    ));
 }
 
 #[test]
 fn test_create_coin_amount_exceeds_max() {
     // CREATE_COIN
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((51 ({h2} (0x010000000000000000 )))))")
-                .unwrap_err(),
-            ValidationErr::CoinAmountExceedsMaximum(_)
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((51 ({h2} (0x010000000000000000 )))))").unwrap_err(),
+        ValidationErr::CoinAmountExceedsMaximum(_)
+    ));
 }
 
 #[test]
 fn test_create_coin_negative_amount() {
     // CREATE_COIN
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((51 ({h2} (-1 )))))")
-                .unwrap_err(),
-            ValidationErr::CoinAmountNegative
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((51 ({h2} (-1 )))))").unwrap_err(),
+        ValidationErr::CoinAmountNegative
+    ));
 }
 
 #[test]
 fn test_create_coin_invalid_puzzlehash() {
     // CREATE_COIN
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((51 ({long} (42 )))))")
-                .unwrap_err(),
-            ValidationErr::InvalidPuzzleHash(_)
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((51 ({long} (42 )))))").unwrap_err(),
+        ValidationErr::InvalidPuzzleHash(_)
+    ));
 }
 
 #[test]
@@ -3099,13 +3017,10 @@ fn test_create_coin_with_invalid_hint_as_terminator() {
 fn test_create_coin_with_invalid_hint_as_terminator_mempool() {
     // CREATE_COIN
     // in mempool mode it's not OK to have an invalid terminator
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 {h1}))))")
-                .unwrap_err(),
-            ValidationErr::InvalidCondition(_)
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 {h1}))))").unwrap_err(),
+        ValidationErr::InvalidCondition(_)
+    ));
 }
 
 #[test]
@@ -3228,56 +3143,48 @@ fn test_multiple_create_coin() {
 fn test_create_coin_exceed_cost() {
     // CREATE_COIN
     // ensure that we terminate parsing conditions once they exceed the max cost
-    assert!(
-        matches!(
-            cond_test_cb(
-                "((({h1} ({h2} (123 ({} )))",
-                0,
-                Some(Box::new(|a: &mut Allocator| -> NodePtr {
-                    let mut rest: NodePtr = a.nil();
+    assert!(matches!(
+        cond_test_cb(
+            "((({h1} ({h2} (123 ({} )))",
+            0,
+            Some(Box::new(|a: &mut Allocator| -> NodePtr {
+                let mut rest: NodePtr = a.nil();
 
-                    for i in 0..6500 {
-                        // this builds one CREATE_COIN condition
-                        let coin = (CREATE_COIN, (Bytes32::from(H2), (i, 0)))
-                            .to_clvm(a)
-                            .unwrap();
+                for i in 0..6500 {
+                    // this builds one CREATE_COIN condition
+                    let coin = (CREATE_COIN, (Bytes32::from(H2), (i, 0)))
+                        .to_clvm(a)
+                        .unwrap();
 
-                        // add the CREATE_COIN condition to the list (called rest)
-                        rest = a.new_pair(coin, rest).unwrap();
-                    }
-                    rest
-                })),
-                &Signature::default(),
-                None,
-            )
-            .unwrap_err(),
-            ValidationErr::CostExceeded(_)
+                    // add the CREATE_COIN condition to the list (called rest)
+                    rest = a.new_pair(coin, rest).unwrap();
+                }
+                rest
+            })),
+            &Signature::default(),
+            None,
         )
-    );
+        .unwrap_err(),
+        ValidationErr::CostExceeded(_)
+    ));
 }
 
 #[test]
 fn test_duplicate_create_coin() {
     // CREATE_COIN
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 ) ((51 ({h2} (42 ) ))))")
-                .unwrap_err(),
-            ValidationErr::DuplicateOutput
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 ) ((51 ({h2} (42 ) ))))").unwrap_err(),
+        ValidationErr::DuplicateOutput
+    ));
 }
 
 #[test]
 fn test_duplicate_create_coin_with_hint() {
     // CREATE_COIN
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 (({h1})) ((51 ({h2} (42 ) ))))")
-                .unwrap_err(),
-            ValidationErr::DuplicateOutput
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((51 ({h2} (42 (({h1})) ((51 ({h2} (42 ) ))))").unwrap_err(),
+        ValidationErr::DuplicateOutput
+    ));
 }
 
 #[cfg(test)]
@@ -3386,19 +3293,17 @@ fn test_agg_sig_invalid_pubkey(
     #[values(MEMPOOL_MODE, 0)] mempool: u32,
 ) {
     // AGG_SIG_* invalid pubkey
-    assert!(
-        matches!(
-            cond_test_flag(
-                &format!(
-                    "((({{h1}} ({{h2}} (123 ((({} ({{h2}} ({{msg1}} )))))",
-                    condition as u8
-                ),
-                mempool | DONT_VALIDATE_SIGNATURE
-            )
-            .unwrap_err(),
-            ValidationErr::InvalidPublicKey(_)
+    assert!(matches!(
+        cond_test_flag(
+            &format!(
+                "((({{h1}} ({{h2}} (123 ((({} ({{h2}} ({{msg1}} )))))",
+                condition as u8
+            ),
+            mempool | DONT_VALIDATE_SIGNATURE
         )
-    );
+        .unwrap_err(),
+        ValidationErr::InvalidPublicKey(_)
+    ));
 }
 
 #[cfg(test)]
@@ -3445,19 +3350,17 @@ fn test_agg_sig_invalid_msg(
     #[values(MEMPOOL_MODE, 0)] mempool: u32,
 ) {
     // AGG_SIG_* invalid message
-    assert!(
-        matches!(
-            cond_test_flag(
-                &format!(
-                    "((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{longmsg}} )))))",
-                    condition as u8
-                ),
-                mempool
-            )
-            .unwrap_err(),
-            ValidationErr::InvalidMessage(_)
+    assert!(matches!(
+        cond_test_flag(
+            &format!(
+                "((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{longmsg}} )))))",
+                condition as u8
+            ),
+            mempool
         )
-    );
+        .unwrap_err(),
+        ValidationErr::InvalidMessage(_)
+    ));
 }
 
 #[cfg(test)]
@@ -3471,59 +3374,51 @@ fn test_agg_sig_invalid_msg(
 #[case(AGG_SIG_PARENT_AMOUNT)]
 fn test_agg_sig_exceed_cost(#[case] condition: ConditionOpcode) {
     // ensure that we terminate parsing conditions once they exceed the max cost
-    assert!(
-        matches!(
-            cond_test_cb(
-                "((({h1} ({h2} (123 ({} )))",
-                0,
-                Some(Box::new(move |a: &mut Allocator| -> NodePtr {
-                    let mut rest: NodePtr = a.nil();
+    assert!(matches!(
+        cond_test_cb(
+            "((({h1} ({h2} (123 ({} )))",
+            0,
+            Some(Box::new(move |a: &mut Allocator| -> NodePtr {
+                let mut rest: NodePtr = a.nil();
 
-                    for _i in 0..9167 {
-                        // this builds one AGG_SIG_* condition
-                        let aggsig = (
-                            condition,
-                            (Bytes48::from(PUBKEY), (Bytes::from(MSG1.as_slice()), 0)),
-                        )
-                            .to_clvm(a)
-                            .unwrap();
+                for _i in 0..9167 {
+                    // this builds one AGG_SIG_* condition
+                    let aggsig = (
+                        condition,
+                        (Bytes48::from(PUBKEY), (Bytes::from(MSG1.as_slice()), 0)),
+                    )
+                        .to_clvm(a)
+                        .unwrap();
 
-                        // add the condition to the list (called rest)
-                        rest = a.new_pair(aggsig, rest).unwrap();
-                    }
-                    rest
-                })),
-                &Signature::default(),
-                None,
-            )
-            .unwrap_err(),
-            ValidationErr::CostExceeded(_)
+                    // add the condition to the list (called rest)
+                    rest = a.new_pair(aggsig, rest).unwrap();
+                }
+                rest
+            })),
+            &Signature::default(),
+            None,
         )
-    );
+        .unwrap_err(),
+        ValidationErr::CostExceeded(_)
+    ));
 }
 
 #[test]
 fn test_agg_sig_unsafe_invalid_pubkey() {
     // AGG_SIG_UNSAFE
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((49 ({h2} ({msg1} )))))")
-                .unwrap_err(),
-            ValidationErr::InvalidPublicKey(_)
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((49 ({h2} ({msg1} )))))").unwrap_err(),
+        ValidationErr::InvalidPublicKey(_)
+    ));
 }
 
 #[test]
 fn test_agg_sig_unsafe_long_msg() {
     // AGG_SIG_UNSAFE
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 (((49 ({pubkey} ({longmsg} )))))")
-                .unwrap_err(),
-            ValidationErr::InvalidMessage(_)
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 (((49 ({pubkey} ({longmsg} )))))").unwrap_err(),
+        ValidationErr::InvalidMessage(_)
+    ));
 }
 
 #[cfg(test)]
@@ -3560,21 +3455,18 @@ fn test_agg_sig_extra_arg(#[case] condition: ConditionOpcode) {
     }
 
     // but not in mempool mode
-    assert!(
-        matches!(
-            cond_test_flag(
-                &format!(
-                    "((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{msg1}} ( 1337 ) ))))",
-                    condition as u8
-                ),
-                MEMPOOL_MODE,
-            )
-            .unwrap_err(),
-            ValidationErr::InvalidCondition(_)
+    assert!(matches!(
+        cond_test_flag(
+            &format!(
+                "((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{msg1}} ( 1337 ) ))))",
+                condition as u8
+            ),
+            MEMPOOL_MODE,
         )
-    );
+        .unwrap_err(),
+        ValidationErr::InvalidCondition(_)
+    ));
 }
-
 
 #[cfg(test)]
 fn final_message(
@@ -3658,9 +3550,7 @@ fn test_agg_sig_unsafe_invalid_msg(
     );
 
     if opcode == AGG_SIG_UNSAFE {
-        assert!(
-            matches!(ret.unwrap_err(), ValidationErr::InvalidMessage(_))
-        );
+        assert!(matches!(ret.unwrap_err(), ValidationErr::InvalidMessage(_)));
     } else {
         assert!(ret.is_ok());
     }
@@ -3669,86 +3559,74 @@ fn test_agg_sig_unsafe_invalid_msg(
 #[test]
 fn test_agg_sig_unsafe_exceed_cost() {
     // AGG_SIG_UNSAFE
-    assert!(
-        matches!(
-            cond_test_cb(
-                "((({h1} ({h2} (123 ({} )))",
-                0,
-                Some(Box::new(|a: &mut Allocator| -> NodePtr {
-                    let mut rest: NodePtr = a.nil();
-                    for _i in 0..9167 {
-                        let aggsig = (
-                            AGG_SIG_UNSAFE,
-                            (Bytes48::from(PUBKEY), (Bytes::from(MSG1.as_slice()), 0)),
-                        )
-                            .to_clvm(a)
-                            .unwrap();
-                        rest = a.new_pair(aggsig, rest).unwrap();
-                    }
-                    rest
-                })),
-                &Signature::default(),
-                None,
-            )
-            .unwrap_err(),
-            ValidationErr::CostExceeded(_)
+    assert!(matches!(
+        cond_test_cb(
+            "((({h1} ({h2} (123 ({} )))",
+            0,
+            Some(Box::new(|a: &mut Allocator| -> NodePtr {
+                let mut rest: NodePtr = a.nil();
+                for _i in 0..9167 {
+                    let aggsig = (
+                        AGG_SIG_UNSAFE,
+                        (Bytes48::from(PUBKEY), (Bytes::from(MSG1.as_slice()), 0)),
+                    )
+                        .to_clvm(a)
+                        .unwrap();
+                    rest = a.new_pair(aggsig, rest).unwrap();
+                }
+                rest
+            })),
+            &Signature::default(),
+            None,
         )
-    );
+        .unwrap_err(),
+        ValidationErr::CostExceeded(_)
+    ));
 }
 
 #[test]
 fn test_spend_amount_exceeds_max() {
     // spending coin exceeds maximum
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (0x010000000000000000 ())))").unwrap_err(),
-            ValidationErr::InvalidCoinAmount(_)
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (0x010000000000000000 ())))").unwrap_err(),
+        ValidationErr::InvalidCoinAmount(_)
+    ));
 }
 
 #[test]
 fn test_single_spend_negative_amount() {
     // spending coin has negative amount
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (-123 ())))").unwrap_err(),
-            ValidationErr::CoinAmountNegative(_)
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (-123 ())))").unwrap_err(),
+        ValidationErr::CoinAmountNegative(_)
+    ));
 }
 
 #[test]
 fn test_single_spend_invalid_puzle_hash() {
     // puzzle hash is invalid (33 bytes)
-    assert!(
-        matches!(
-            cond_test("((({h1} ({long} (123 ())))").unwrap_err(),
-            ValidationErr::InvalidPuzzleHash(_)
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({long} (123 ())))").unwrap_err(),
+        ValidationErr::InvalidPuzzleHash(_)
+    ));
 }
 
 #[test]
 fn test_single_spend_invalid_parent_id() {
     // parent coin ID is invalid (33 bytes)
-    assert!(
-        matches!(
-            cond_test("((({long} ({h2} (123 ())))").unwrap_err(),
-            ValidationErr::InvalidParentId(_)
-        )
-    );
+    assert!(matches!(
+        cond_test("((({long} ({h2} (123 ())))").unwrap_err(),
+        ValidationErr::InvalidParentId(_)
+    ));
 }
 
 #[test]
 fn test_double_spend() {
     // double spend of the same coin
-    assert!(
-        matches!(
-            cond_test("((({h1} ({h2} (123 ()) (({h1} ({h2} (123 ())))").unwrap_err(),
-            ValidationErr::DoubleSpend
-        )
-    );
+    assert!(matches!(
+        cond_test("((({h1} ({h2} (123 ()) (({h1} ({h2} (123 ())))").unwrap_err(),
+        ValidationErr::DoubleSpend
+    ));
 }
 
 #[test]
@@ -3888,12 +3766,10 @@ fn test_concurrent_spend_fail() {
     ];
 
     for test in test_cases {
-        assert!(
-            matches!(
-                cond_test(test).unwrap_err(),
-                ValidationErr::AssertConcurrentSpendFailed(_)
-            )
-        );
+        assert!(matches!(
+            cond_test(test).unwrap_err(),
+            ValidationErr::AssertConcurrentSpendFailed(_)
+        ));
     }
 }
 
@@ -4016,12 +3892,10 @@ fn test_concurrent_puzzle_fail() {
     ];
 
     for test in test_cases {
-        assert!(
-            matches!(
-                cond_test(test).unwrap_err(),
-                ValidationErr::AssertConcurrentPuzzleFailed
-            )
-        );
+        assert!(matches!(
+            cond_test(test).unwrap_err(),
+            ValidationErr::AssertConcurrentPuzzleFailed
+        ));
     }
 }
 
@@ -4584,12 +4458,10 @@ fn test_assert_ephemeral_wrong_ph() {
        ))";
 
     // this is an invalid ASSERT_EPHEMERAL
-    assert!(
-        matches!(
-            cond_test(test).unwrap_err(),
-            ValidationErr::AssertEphemeralFailed
-        )
-    );
+    assert!(matches!(
+        cond_test(test).unwrap_err(),
+        ValidationErr::AssertEphemeralFailed
+    ));
 }
 
 #[test]
@@ -4610,12 +4482,10 @@ fn test_assert_ephemeral_wrong_amount() {
        ))";
 
     // this is an invalid ASSERT_EPHEMERAL
-    assert!(
-        matches!(
-            cond_test(test).unwrap_err(),
-            ValidationErr::AssertEphemeralFailed
-        )
-    );
+    assert!(matches!(
+        cond_test(test).unwrap_err(),
+        ValidationErr::AssertEphemeralFailed
+    ));
 }
 
 #[test]
@@ -4636,12 +4506,10 @@ fn test_assert_ephemeral_wrong_parent() {
        ))";
 
     // this is an invalid ASSERT_EPHEMERAL
-    assert!(
-        matches!(
-            cond_test(test).unwrap_err(),
-            ValidationErr::AssertEphemeralFailed
-        )
-    );
+    assert!(matches!(
+        cond_test(test).unwrap_err(),
+        ValidationErr::AssertEphemeralFailed
+    ));
 }
 
 #[cfg(test)]
@@ -4649,11 +4517,23 @@ fn test_assert_ephemeral_wrong_parent() {
 // the default expected errors are post soft-fork, when both new rules are
 // activated
 #[case(ASSERT_HEIGHT_ABSOLUTE, None)]
-#[case(ASSERT_HEIGHT_RELATIVE, Some(ValidationErr::EphemeralRelativeCondition))]
+#[case(
+    ASSERT_HEIGHT_RELATIVE,
+    Some(ValidationErr::EphemeralRelativeCondition)
+)]
 #[case(ASSERT_SECONDS_ABSOLUTE, None)]
-#[case(ASSERT_SECONDS_RELATIVE, Some(ValidationErr::EphemeralRelativeCondition))]
-#[case(ASSERT_MY_BIRTH_HEIGHT, Some(ValidationErr::EphemeralRelativeCondition))]
-#[case(ASSERT_MY_BIRTH_SECONDS, Some(ValidationErr::EphemeralRelativeCondition))]
+#[case(
+    ASSERT_SECONDS_RELATIVE,
+    Some(ValidationErr::EphemeralRelativeCondition)
+)]
+#[case(
+    ASSERT_MY_BIRTH_HEIGHT,
+    Some(ValidationErr::EphemeralRelativeCondition)
+)]
+#[case(
+    ASSERT_MY_BIRTH_SECONDS,
+    Some(ValidationErr::EphemeralRelativeCondition)
+)]
 #[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, None)]
 #[case(
     ASSERT_BEFORE_HEIGHT_RELATIVE,
@@ -5366,7 +5246,10 @@ fn test_message_conditions_single_spend(#[case] test_case: &str, #[case] expect:
     } else {
         let actual_err = ret.unwrap_err();
         println!("Error: {actual_err:?}");
-        assert!(matches!(ValidationErr::MessageNotSentOrReceived, actual_err));
+        assert!(matches!(
+            ValidationErr::MessageNotSentOrReceived,
+            actual_err
+        ));
     }
 }
 

@@ -236,18 +236,16 @@ ff01\
             coin_spends: vec![spend],
             aggregated_signature: Signature::default(),
         };
-        assert!(
-            matches!(
-                validate_clvm_and_signature(
-                    &spend_bundle,
-                    TEST_CONSTANTS.max_block_cost_clvm,
-                    &TEST_CONSTANTS,
-                    MEMPOOL_MODE,
-                )
-                .unwrap_err(),
-                ValidationErr::WrongPuzzleHash
+        assert!(matches!(
+            validate_clvm_and_signature(
+                &spend_bundle,
+                TEST_CONSTANTS.max_block_cost_clvm,
+                &TEST_CONSTANTS,
+                MEMPOOL_MODE,
             )
-        );
+            .unwrap_err(),
+            ValidationErr::WrongPuzzleHash
+        ));
     }
 
     #[test]
@@ -324,10 +322,7 @@ ff843B9ACA00\
         assert_eq!(conds.cost, expected_cost);
         let result =
             validate_clvm_and_signature(&spend_bundle, max_cost - 1, &TEST_CONSTANTS, MEMPOOL_MODE);
-        assert!(matches!(
-            result,
-            Err(ValidationErr::CostExceeded)
-        ));
+        assert!(matches!(result, Err(ValidationErr::CostExceeded)));
     }
 
     #[rstest]
@@ -409,9 +404,6 @@ ff843B9ACA00\
             &TEST_CONSTANTS,
             MEMPOOL_MODE,
         );
-        assert!(matches!(
-            result,
-            Err(ValidationErr::BadAggregateSignature)
-        ));
+        assert!(matches!(result, Err(ValidationErr::BadAggregateSignature)));
     }
 }

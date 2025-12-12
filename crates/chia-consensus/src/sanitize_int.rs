@@ -30,7 +30,7 @@ pub fn sanitize_uint(
     }
 
     if buf == [0_u8] || (buf.len() > 1 && buf[0] == 0 && (buf[1] & 0x80) == 0) {
-        return Err(make_err(n));       // changed
+        return Err(make_err(n)); // changed
     }
 
     let size_limit = if buf[0] == 0 { max_size + 1 } else { max_size };
@@ -68,42 +68,33 @@ fn test_sanitize_uint() {
 
     let just_zeros = a.new_substr(atom, 10, 70).unwrap();
     // a zero value must be represented by an empty atom
-    assert!(
-        matches!(
-            sanitize_uint(&a, just_zeros, 8, e).unwrap_err(),
-            ValidationErr::InvalidCoinAmount)
-        )
-    );
+    assert!(matches!(
+        sanitize_uint(&a, just_zeros, 8, e).unwrap_err(),
+        ValidationErr::InvalidCoinAmount
+    ));
 
     let a1 = a.new_substr(atom, 1, 101).unwrap();
-    assert!(
-        matches!(
-            sanitize_uint(&a, a1, 8, e).unwrap_err(),
-            ValidationErr::InvalidCoinAmount)
-        )
-    );
+    assert!(matches!(
+        sanitize_uint(&a, a1, 8, e).unwrap_err(),
+        ValidationErr::InvalidCoinAmount
+    ));
 
     let a1 = a.new_substr(atom, 1, 101).unwrap();
-    assert!(
-        matches!(
-            sanitize_uint(&a, a1, 8, e).unwrap_err(),
-            ValidationErr::InvalidCoinAmount)
-        )
-    );
+    assert!(matches!(
+        sanitize_uint(&a, a1, 8, e).unwrap_err(),
+        ValidationErr::InvalidCoinAmount
+    ));
 
     // a new all-zeros range
     let a1 = a.new_substr(atom, 1000, 1024).unwrap();
-    assert!(
-        matches!(
-            sanitize_uint(&a, a1, 8, e).unwrap_err(),
-            ValidationErr::InvalidCoinAmount)
-        )
-    );
+    assert!(matches!(
+        sanitize_uint(&a, a1, 8, e).unwrap_err(),
+        ValidationErr::InvalidCoinAmount
+    ));
 
     let exceed_maximum = a.new_substr(atom, 100, 110).unwrap();
     assert_eq!(
         sanitize_uint(&a, exceed_maximum, 8, e),
         Ok(SanitizedUint::PositiveOverflow)
     );
-
 }

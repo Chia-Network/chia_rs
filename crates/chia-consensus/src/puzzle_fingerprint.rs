@@ -215,12 +215,10 @@ mod tests {
         let mut ctx1 = Sha256::new();
 
         // we expect 2 elements, but there's only 1
-        assert!(
-            matches!(
-                hash_atom_list(&mut ctx1, &a, list, 2).unwrap_err(),
-                ValidationErr::InvalidCondition
-            )
-        );
+        assert!(matches!(
+            hash_atom_list(&mut ctx1, &a, list, 2).unwrap_err(),
+            ValidationErr::InvalidCondition
+        ));
     }
 
     #[test]
@@ -232,12 +230,10 @@ mod tests {
         let mut ctx1 = Sha256::new();
 
         // we expect all elements to be atoms, but we encountered a pair
-        assert!(
-            matches!(
-                hash_atom_list(&mut ctx1, &a, list, 1).unwrap_err(),
-                ValidationErr::InvalidCondition
-            )
-        );
+        assert!(matches!(
+            hash_atom_list(&mut ctx1, &a, list, 1).unwrap_err(),
+            ValidationErr::InvalidCondition
+        ));
     }
 
     #[rstest]

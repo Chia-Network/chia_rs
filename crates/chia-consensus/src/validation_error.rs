@@ -380,10 +380,14 @@ pub fn next(a: &Allocator, n: NodePtr) -> Result<Option<(NodePtr, NodePtr)>, Val
     }
 }
 
-pub fn atom(a: &Allocator, n: NodePtr, code: ValidationErr) -> Result<Atom<'_>, ValidationErr> {
+pub fn atom(
+    a: &Allocator,
+    n: NodePtr,
+    make_err: fn(NodePtr) -> ValidationErr,
+) -> Result<Atom<'_>, ValidationErr> {
     match a.sexp(n) {
         SExp::Atom => Ok(a.atom(n)),
-        SExp::Pair(..) => Err(code),
+        SExp::Pair(..) => Err(make_err(n)),
     }
 }
 
@@ -396,5 +400,4 @@ pub fn check_nil(a: &Allocator, n: NodePtr) -> Result<(), ValidationErr> {
     } else {
         Err(ValidationErr::InvalidCondition(n))
     }
-    d
 }
