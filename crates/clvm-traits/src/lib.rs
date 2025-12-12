@@ -39,7 +39,7 @@ mod derive_tests {
 
     use std::fmt::Debug;
 
-    use clvmr::{serde::node_to_bytes, Allocator};
+    use clvmr::{Allocator, serde::node_to_bytes};
 
     fn check<T>(value: &T, expected: &str)
     where

@@ -1,6 +1,6 @@
 use chia_bls::PublicKey;
 use chia_puzzles::P2_DELEGATED_PUZZLE_OR_HIDDEN_PUZZLE_HASH;
-use clvm_traits::{clvm_quote, FromClvm, ToClvm};
+use clvm_traits::{FromClvm, ToClvm, clvm_quote};
 use clvm_utils::{CurriedProgram, ToTreeHash, TreeHash};
 use hex_literal::hex;
 
@@ -60,7 +60,7 @@ mod tests {
     use chia_puzzles::P2_DELEGATED_PUZZLE_OR_HIDDEN_PUZZLE;
     use clvm_traits::ToClvm;
     use clvm_utils::tree_hash;
-    use clvmr::{serde::node_from_bytes, Allocator};
+    use clvmr::{Allocator, serde::node_from_bytes};
 
     use super::*;
 

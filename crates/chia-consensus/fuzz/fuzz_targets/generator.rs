@@ -7,8 +7,8 @@ use chia_consensus::{
 use chia_protocol::{CoinSpend, Program, SpendBundle};
 use chia_traits::Streamable;
 use clvmr::{
-    serde::{node_from_bytes, node_to_bytes},
     Allocator,
+    serde::{node_from_bytes, node_to_bytes},
 };
 use libfuzzer_sys::fuzz_target;
 use std::io::Cursor;

@@ -1,6 +1,6 @@
 use clvm_traits::{
-    clvm_list, clvm_quote, destructure_list, destructure_quote, match_list, match_quote,
-    ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError, MatchByte, ToClvm, ToClvmError,
+    ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError, MatchByte, ToClvm, ToClvmError, clvm_list,
+    clvm_quote, destructure_list, destructure_quote, match_list, match_quote,
 };
 
 #[derive(Debug, Clone)]
@@ -36,7 +36,7 @@ mod tests {
     use std::fmt::Debug;
 
     use clvm_traits::clvm_curried_args;
-    use clvmr::{serde::node_to_bytes, Allocator};
+    use clvmr::{Allocator, serde::node_to_bytes};
 
     use super::*;
 

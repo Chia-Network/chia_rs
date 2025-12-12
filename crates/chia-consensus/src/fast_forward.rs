@@ -1,8 +1,8 @@
 use crate::error::{Error, Result};
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
-use chia_puzzle_types::singleton::{SingletonArgs, SingletonSolution, SingletonStruct};
 use chia_puzzle_types::Proof;
+use chia_puzzle_types::singleton::{SingletonArgs, SingletonSolution, SingletonStruct};
 use chia_puzzles::SINGLETON_TOP_LAYER_V1_1_HASH;
 use clvm_traits::{FromClvm, ToClvm};
 use clvm_utils::CurriedProgram;
@@ -153,7 +153,7 @@ pub fn fast_forward_singleton(
 mod tests {
     use super::*;
     use crate::conditions::MempoolVisitor;
-    use crate::conditions::{parse_conditions, ParseState, SpendBundleConditions, SpendConditions};
+    use crate::conditions::{ParseState, SpendBundleConditions, SpendConditions, parse_conditions};
     use crate::consensus_constants::TEST_CONSTANTS;
     use crate::spend_visitor::SpendVisitor;
     use crate::validation_error::ValidationErr;

@@ -3,26 +3,27 @@ use super::condition_sanitizers::{
     parse_amount, sanitize_announce_msg, sanitize_hash, sanitize_message_mode,
 };
 use super::opcodes::{
-    compute_unknown_condition_cost, parse_opcode, ConditionOpcode, AGG_SIG_AMOUNT, AGG_SIG_COST,
-    AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT, AGG_SIG_PARENT_PUZZLE, AGG_SIG_PUZZLE,
-    AGG_SIG_PUZZLE_AMOUNT, AGG_SIG_UNSAFE, ASSERT_BEFORE_HEIGHT_ABSOLUTE,
-    ASSERT_BEFORE_HEIGHT_RELATIVE, ASSERT_BEFORE_SECONDS_ABSOLUTE, ASSERT_BEFORE_SECONDS_RELATIVE,
-    ASSERT_COIN_ANNOUNCEMENT, ASSERT_CONCURRENT_PUZZLE, ASSERT_CONCURRENT_SPEND, ASSERT_EPHEMERAL,
-    ASSERT_HEIGHT_ABSOLUTE, ASSERT_HEIGHT_RELATIVE, ASSERT_MY_AMOUNT, ASSERT_MY_BIRTH_HEIGHT,
-    ASSERT_MY_BIRTH_SECONDS, ASSERT_MY_COIN_ID, ASSERT_MY_PARENT_ID, ASSERT_MY_PUZZLEHASH,
-    ASSERT_PUZZLE_ANNOUNCEMENT, ASSERT_SECONDS_ABSOLUTE, ASSERT_SECONDS_RELATIVE, CREATE_COIN,
-    CREATE_COIN_ANNOUNCEMENT, CREATE_COIN_COST, CREATE_PUZZLE_ANNOUNCEMENT, FREE_CONDITIONS,
-    GENERIC_CONDITION_COST, RECEIVE_MESSAGE, REMARK, RESERVE_FEE, SEND_MESSAGE, SOFTFORK,
+    AGG_SIG_AMOUNT, AGG_SIG_COST, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT,
+    AGG_SIG_PARENT_PUZZLE, AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT, AGG_SIG_UNSAFE,
+    ASSERT_BEFORE_HEIGHT_ABSOLUTE, ASSERT_BEFORE_HEIGHT_RELATIVE, ASSERT_BEFORE_SECONDS_ABSOLUTE,
+    ASSERT_BEFORE_SECONDS_RELATIVE, ASSERT_COIN_ANNOUNCEMENT, ASSERT_CONCURRENT_PUZZLE,
+    ASSERT_CONCURRENT_SPEND, ASSERT_EPHEMERAL, ASSERT_HEIGHT_ABSOLUTE, ASSERT_HEIGHT_RELATIVE,
+    ASSERT_MY_AMOUNT, ASSERT_MY_BIRTH_HEIGHT, ASSERT_MY_BIRTH_SECONDS, ASSERT_MY_COIN_ID,
+    ASSERT_MY_PARENT_ID, ASSERT_MY_PUZZLEHASH, ASSERT_PUZZLE_ANNOUNCEMENT, ASSERT_SECONDS_ABSOLUTE,
+    ASSERT_SECONDS_RELATIVE, CREATE_COIN, CREATE_COIN_ANNOUNCEMENT, CREATE_COIN_COST,
+    CREATE_PUZZLE_ANNOUNCEMENT, ConditionOpcode, FREE_CONDITIONS, GENERIC_CONDITION_COST,
+    RECEIVE_MESSAGE, REMARK, RESERVE_FEE, SEND_MESSAGE, SOFTFORK, compute_unknown_condition_cost,
+    parse_opcode,
 };
-use super::sanitize_int::{sanitize_uint, SanitizedUint};
-use super::validation_error::{first, next, rest, ErrorCode, ValidationErr};
+use super::sanitize_int::{SanitizedUint, sanitize_uint};
+use super::validation_error::{ErrorCode, ValidationErr, first, next, rest};
 use crate::consensus_constants::ConsensusConstants;
 use crate::flags::{COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
 use crate::make_aggsig_final_message::u64_to_bytes;
 use crate::messages::{Message, SpendId};
 use crate::spend_visitor::SpendVisitor;
 use crate::validation_error::check_nil;
-use chia_bls::{aggregate_verify, BlsCache, PublicKey, Signature};
+use chia_bls::{BlsCache, PublicKey, Signature, aggregate_verify};
 use chia_protocol::{Bytes, Bytes32, Coin};
 use chia_sha2::Sha256;
 use clvmr::allocator::{Allocator, NodePtr, SExp};
@@ -1722,7 +1723,9 @@ const LONG_VEC: &[u8; 33] = &[
 ];
 
 #[cfg(test)]
-const PUBKEY: &[u8; 48] = &hex!("aefe1789d6476f60439e1168f588ea16652dc321279f05a805fbc63933e88ae9c175d6c6ab182e54af562e1a0dce41bb");
+const PUBKEY: &[u8; 48] = &hex!(
+    "aefe1789d6476f60439e1168f588ea16652dc321279f05a805fbc63933e88ae9c175d6c6ab182e54af562e1a0dce41bb"
+);
 #[cfg(test)]
 const SECRET_KEY: &[u8; 32] =
     &hex!("6fc9d9a2b05fd1f0e51bc91041a03be8657081f272ec281aff731624f0d1c220");
@@ -3390,8 +3393,8 @@ fn test_agg_sig_infinity_pubkey(
         &format!(
             "((({{h1}} ({{h2}} (123 ((({} (0xc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 ({{msg1}} )))))",
             condition as u8
-            ),
-            mempool
+        ),
+        mempool,
     );
 
     assert_eq!(ret.unwrap_err().1, ErrorCode::InvalidPublicKey);
@@ -3689,7 +3692,7 @@ fn sign_tx(
     opcode: u16,
     msg: &[u8],
 ) -> Signature {
-    use chia_bls::{sign, SecretKey};
+    use chia_bls::{SecretKey, sign};
 
     let final_msg = final_message(parent, puzzle, amount, opcode, msg);
     sign(&SecretKey::from_bytes(SECRET_KEY).unwrap(), final_msg)
@@ -4208,7 +4211,7 @@ fn test_cost_create_coins_conds_after_free(#[case] count: usize) {
 #[case(5001)]
 #[case(99)]
 fn test_cost_aggsig_conds_after_free(#[case] count: usize) {
-    use chia_bls::{sign, SecretKey};
+    use chia_bls::{SecretKey, sign};
 
     let sk = SecretKey::from_bytes(SECRET_KEY).expect("secret key");
     let pk = sk.public_key();
@@ -5190,7 +5193,7 @@ fn test_agg_sig(
     #[values(true, false)] expect_pass: bool,
     #[values(true, false)] with_cache: bool,
 ) {
-    use chia_bls::{sign, SecretKey};
+    use chia_bls::{SecretKey, sign};
     let mut signature = Signature::default();
     let bls_cache = BlsCache::default();
     let cache: Option<&BlsCache> = if with_cache {

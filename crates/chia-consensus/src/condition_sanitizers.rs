@@ -1,5 +1,5 @@
-use super::sanitize_int::{sanitize_uint, SanitizedUint};
-use super::validation_error::{atom, ErrorCode, ValidationErr};
+use super::sanitize_int::{SanitizedUint, sanitize_uint};
+use super::validation_error::{ErrorCode, ValidationErr, atom};
 use clvmr::allocator::{Allocator, NodePtr};
 
 pub fn sanitize_hash(

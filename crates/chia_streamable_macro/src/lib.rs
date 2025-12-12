@@ -1,13 +1,13 @@
 #![allow(clippy::missing_panics_doc)]
 
 use proc_macro::TokenStream;
+use proc_macro_crate::{FoundCrate, crate_name};
 use proc_macro2::{Ident, Span, TokenStream as TokenStream2};
-use proc_macro_crate::{crate_name, FoundCrate};
 use quote::quote;
 use syn::token::Pub;
 use syn::{
-    parse_macro_input, Data, DeriveInput, Expr, Fields, FieldsNamed, FieldsUnnamed, Index, Lit,
-    Type, Visibility,
+    Data, DeriveInput, Expr, Fields, FieldsNamed, FieldsUnnamed, Index, Lit, Type, Visibility,
+    parse_macro_input,
 };
 
 #[proc_macro_attribute]

@@ -3,7 +3,7 @@ use crate::{DerivableKey, Error, Result};
 
 use blst::*;
 use chia_sha2::Sha256;
-use chia_traits::{read_bytes, Streamable};
+use chia_traits::{Streamable, read_bytes};
 #[cfg(feature = "py-bindings")]
 use pyo3::exceptions::PyNotImplementedError;
 #[cfg(feature = "py-bindings")]
@@ -450,11 +450,13 @@ mod tests {
             // just any random bytes are not a valid key and should fail
             match PublicKey::from_bytes(&data) {
                 Err(Error::InvalidPublicKey(err)) => {
-                    assert!([
-                        BLST_ERROR::BLST_BAD_ENCODING,
-                        BLST_ERROR::BLST_POINT_NOT_ON_CURVE
-                    ]
-                    .contains(&err));
+                    assert!(
+                        [
+                            BLST_ERROR::BLST_BAD_ENCODING,
+                            BLST_ERROR::BLST_POINT_NOT_ON_CURVE
+                        ]
+                        .contains(&err)
+                    );
                 }
                 Err(e) => {
                     panic!("unexpected error from_bytes(): {e}");
@@ -467,13 +469,34 @@ mod tests {
     }
 
     #[rstest]
-    #[case("c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001", Error::G1NotCanonical)]
-    #[case("c08000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", Error::G1NotCanonical)]
-    #[case("c80000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", Error::G1NotCanonical)]
-    #[case("e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", Error::G1NotCanonical)]
-    #[case("d00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", Error::G1NotCanonical)]
-    #[case("800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", Error::G1InfinityNotZero)]
-    #[case("400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", Error::G1InfinityInvalidBits)]
+    #[case(
+        "c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001",
+        Error::G1NotCanonical
+    )]
+    #[case(
+        "c08000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        Error::G1NotCanonical
+    )]
+    #[case(
+        "c80000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        Error::G1NotCanonical
+    )]
+    #[case(
+        "e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        Error::G1NotCanonical
+    )]
+    #[case(
+        "d00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        Error::G1NotCanonical
+    )]
+    #[case(
+        "800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        Error::G1InfinityNotZero
+    )]
+    #[case(
+        "400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        Error::G1InfinityInvalidBits
+    )]
     fn test_from_bytes_failures(#[case] input: &str, #[case()] error: Error) {
         let bytes: [u8; 48] = hex::decode(input).unwrap().try_into().unwrap();
         assert_eq!(PublicKey::from_bytes(&bytes).unwrap_err(), error);
@@ -644,10 +667,22 @@ mod tests {
 
     // test cases from zksnark test in chia_rs
     #[rstest]
-    #[case("06f6ba2972ab1c83718d747b2d55cca96d08729b1ea5a3ab3479b8efe2d455885abf65f58d1507d7f260cd2a4687db821171c9d8dc5c0f5c3c4fd64b26cf93ff28b2e683c409fb374c4e26cc548c6f7cef891e60b55e6115bb38bbe97822e4d4", "a6f6ba2972ab1c83718d747b2d55cca96d08729b1ea5a3ab3479b8efe2d455885abf65f58d1507d7f260cd2a4687db82")]
-    #[case("127271e81a1cb5c08a68694fcd5bd52f475d545edd4fbd49b9f6ec402ee1973f9f4102bf3bfccdcbf1b2f862af89a1340d40795c1c09d1e10b1acfa0f3a97a71bf29c11665743fa8d30e57e450b8762959571d6f6d253b236931b93cf634e7cf", "b27271e81a1cb5c08a68694fcd5bd52f475d545edd4fbd49b9f6ec402ee1973f9f4102bf3bfccdcbf1b2f862af89a134")]
-    #[case("0fe94ac2d68d39d9207ea0cae4bb2177f7352bd754173ed27bd13b4c156f77f8885458886ee9fbd212719f27a96397c110fa7b4f898b1c45c2e82c5d46b52bdad95cae8299d4fd4556ae02baf20a5ec989fc62f28c8b6b3df6dc696f2afb6e20", "afe94ac2d68d39d9207ea0cae4bb2177f7352bd754173ed27bd13b4c156f77f8885458886ee9fbd212719f27a96397c1")]
-    #[case("13aedc305adfdbc854aa105c41085618484858e6baa276b176fd89415021f7a0c75ff4f9ec39f482f142f1b54c11144815e519df6f71b1db46c83b1d2bdf381fc974059f3ccd87ed5259221dc37c50c3be407b58990d14b6d5bb79dad9ab8c42", "b3aedc305adfdbc854aa105c41085618484858e6baa276b176fd89415021f7a0c75ff4f9ec39f482f142f1b54c111448")]
+    #[case(
+        "06f6ba2972ab1c83718d747b2d55cca96d08729b1ea5a3ab3479b8efe2d455885abf65f58d1507d7f260cd2a4687db821171c9d8dc5c0f5c3c4fd64b26cf93ff28b2e683c409fb374c4e26cc548c6f7cef891e60b55e6115bb38bbe97822e4d4",
+        "a6f6ba2972ab1c83718d747b2d55cca96d08729b1ea5a3ab3479b8efe2d455885abf65f58d1507d7f260cd2a4687db82"
+    )]
+    #[case(
+        "127271e81a1cb5c08a68694fcd5bd52f475d545edd4fbd49b9f6ec402ee1973f9f4102bf3bfccdcbf1b2f862af89a1340d40795c1c09d1e10b1acfa0f3a97a71bf29c11665743fa8d30e57e450b8762959571d6f6d253b236931b93cf634e7cf",
+        "b27271e81a1cb5c08a68694fcd5bd52f475d545edd4fbd49b9f6ec402ee1973f9f4102bf3bfccdcbf1b2f862af89a134"
+    )]
+    #[case(
+        "0fe94ac2d68d39d9207ea0cae4bb2177f7352bd754173ed27bd13b4c156f77f8885458886ee9fbd212719f27a96397c110fa7b4f898b1c45c2e82c5d46b52bdad95cae8299d4fd4556ae02baf20a5ec989fc62f28c8b6b3df6dc696f2afb6e20",
+        "afe94ac2d68d39d9207ea0cae4bb2177f7352bd754173ed27bd13b4c156f77f8885458886ee9fbd212719f27a96397c1"
+    )]
+    #[case(
+        "13aedc305adfdbc854aa105c41085618484858e6baa276b176fd89415021f7a0c75ff4f9ec39f482f142f1b54c11144815e519df6f71b1db46c83b1d2bdf381fc974059f3ccd87ed5259221dc37c50c3be407b58990d14b6d5bb79dad9ab8c42",
+        "b3aedc305adfdbc854aa105c41085618484858e6baa276b176fd89415021f7a0c75ff4f9ec39f482f142f1b54c111448"
+    )]
     fn test_from_uncompressed(#[case] input: &str, #[case] expect: &str) {
         let input = hex::decode(input).unwrap();
         let g1 = PublicKey::from_uncompressed(input.as_slice().try_into().unwrap()).unwrap();
@@ -741,7 +776,10 @@ mod tests {
 
     // test cases from clvm_rs
     #[rstest]
-    #[case("abcdef0123456789", "88e7302bf1fa8fcdecfb96f6b81475c3564d3bcaf552ccb338b1c48b9ba18ab7195c5067fe94fb216478188c0a3bef4a")]
+    #[case(
+        "abcdef0123456789",
+        "88e7302bf1fa8fcdecfb96f6b81475c3564d3bcaf552ccb338b1c48b9ba18ab7195c5067fe94fb216478188c0a3bef4a"
+    )]
     fn test_hash_to_g1(#[case] input: &str, #[case] expect: &str) {
         let g1 = hash_to_g1(input.as_bytes());
         assert_eq!(hex::encode(g1.to_bytes()), expect);
@@ -749,8 +787,16 @@ mod tests {
 
     // test cases from clvm_rs
     #[rstest]
-    #[case("abcdef0123456789", "BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_", "8dd8e3a9197ddefdc25dde980d219004d6aa130d1af9b1808f8b2b004ae94484ac62a08a739ec7843388019a79c437b0")]
-    #[case("abcdef0123456789", "BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_AUG_", "88e7302bf1fa8fcdecfb96f6b81475c3564d3bcaf552ccb338b1c48b9ba18ab7195c5067fe94fb216478188c0a3bef4a")]
+    #[case(
+        "abcdef0123456789",
+        "BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_",
+        "8dd8e3a9197ddefdc25dde980d219004d6aa130d1af9b1808f8b2b004ae94484ac62a08a739ec7843388019a79c437b0"
+    )]
+    #[case(
+        "abcdef0123456789",
+        "BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_AUG_",
+        "88e7302bf1fa8fcdecfb96f6b81475c3564d3bcaf552ccb338b1c48b9ba18ab7195c5067fe94fb216478188c0a3bef4a"
+    )]
     fn test_hash_to_g1_with_dst(#[case] input: &str, #[case] dst: &str, #[case] expect: &str) {
         let g1 = hash_to_g1_with_dst(input.as_bytes(), dst.as_bytes());
         assert_eq!(hex::encode(g1.to_bytes()), expect);
@@ -789,11 +835,26 @@ mod pytests {
     }
 
     #[rstest]
-    #[case("0x000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e", "PublicKey, invalid length 47 expected 48")]
-    #[case("0x000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f00", "PublicKey, invalid length 49 expected 48")]
-    #[case("000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e", "PublicKey, invalid length 47 expected 48")]
-    #[case("000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f00", "PublicKey, invalid length 49 expected 48")]
-    #[case("0x00r102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f", "invalid hex")]
+    #[case(
+        "0x000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e",
+        "PublicKey, invalid length 47 expected 48"
+    )]
+    #[case(
+        "0x000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f00",
+        "PublicKey, invalid length 49 expected 48"
+    )]
+    #[case(
+        "000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e",
+        "PublicKey, invalid length 47 expected 48"
+    )]
+    #[case(
+        "000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f00",
+        "PublicKey, invalid length 49 expected 48"
+    )]
+    #[case(
+        "0x00r102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f",
+        "invalid hex"
+    )]
     fn test_json_dict(#[case] input: &str, #[case] msg: &str) {
         Python::initialize();
         Python::attach(|py| {

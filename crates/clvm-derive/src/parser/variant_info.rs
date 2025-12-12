@@ -1,6 +1,6 @@
 use syn::{Expr, Fields, Ident, Variant};
 
-use super::{parse_named_fields, parse_unnamed_fields, ClvmOptions, FieldInfo, Repr};
+use super::{ClvmOptions, FieldInfo, Repr, parse_named_fields, parse_unnamed_fields};
 
 pub struct VariantInfo {
     pub kind: VariantKind,

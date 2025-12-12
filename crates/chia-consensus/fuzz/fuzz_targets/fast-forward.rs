@@ -1,7 +1,7 @@
 #![no_main]
 use chia_consensus::conditions::{
-    parse_conditions, MempoolVisitor, ParseState, SpendBundleConditions, SpendConditions,
-    ELIGIBLE_FOR_FF,
+    ELIGIBLE_FOR_FF, MempoolVisitor, ParseState, SpendBundleConditions, SpendConditions,
+    parse_conditions,
 };
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::fast_forward::fast_forward_singleton;

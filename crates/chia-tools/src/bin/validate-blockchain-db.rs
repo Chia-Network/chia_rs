@@ -11,9 +11,9 @@ use rusqlite::Connection;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::io::Write;
+use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
-use std::sync::Arc;
 use std::thread::available_parallelism;
 use std::time::{Duration, Instant};
 
@@ -169,7 +169,8 @@ features that are validated:
         }
 
         if block.prev_header_hash() != prev_hash {
-            println!("at height {height} the previous header hash mismatches. {} expected {} from height {}",
+            println!(
+                "at height {height} the previous header hash mismatches. {} expected {} from height {}",
                 block.prev_header_hash(),
                 prev_hash,
                 prev_height,
@@ -184,14 +185,19 @@ features that are validated:
             error_count.fetch_add(1, Ordering::Relaxed);
         }
         if height != (prev_height + 1) as u32 {
-            println!("at height {height} the the block height did not increment by 1, from previous block (at height {prev_height})");
+            println!(
+                "at height {height} the the block height did not increment by 1, from previous block (at height {prev_height})"
+            );
             error_count.fetch_add(1, Ordering::Relaxed);
         }
         prev_hash = block.header_hash();
         prev_height = height as i64;
         if let Some(hth) = &height_to_hash {
             if hth.len() > height as usize && hth[height as usize] != prev_hash {
-                println!("at height {height} the block hash ({prev_hash}) does not match the height-to-hash file ({})", hth[height as usize]);
+                println!(
+                    "at height {height} the block hash ({prev_hash}) does not match the height-to-hash file ({})",
+                    hth[height as usize]
+                );
                 error_count.fetch_add(1, Ordering::Relaxed);
             }
         }
@@ -227,13 +233,16 @@ features that are validated:
             let new_coin_id = add.coin_id();
             let Some((ph, _parent, amount, coin_base)) = additions.get(new_coin_id.as_slice())
             else {
-                println!("at height {height} the block created a reward coin {new_coin_id} that's not in the coin_record table");
+                println!(
+                    "at height {height} the block created a reward coin {new_coin_id} that's not in the coin_record table"
+                );
                 error_count.fetch_add(1, Ordering::Relaxed);
                 continue;
             };
             // TODO: ensure the parent coin ID is set correctly
             if ph != add.puzzle_hash.as_slice() {
-                println!("at height {height} the reward coin {new_coin_id} has an incorrect puzzle hash in the coin_record table {} expected {}",
+                println!(
+                    "at height {height} the reward coin {new_coin_id} has an incorrect puzzle hash in the coin_record table {} expected {}",
                     hex::encode(ph),
                     add.puzzle_hash
                 );
@@ -241,12 +250,17 @@ features that are validated:
             }
             // ensure the parent hash has the expected look
             if *amount != add.amount {
-                println!("at height {height} reward coin {new_coin_id} has amount {} in coin_record table, but the block has amount {}", amount, add.amount);
+                println!(
+                    "at height {height} reward coin {new_coin_id} has amount {} in coin_record table, but the block has amount {}",
+                    amount, add.amount
+                );
                 error_count.fetch_add(1, Ordering::Relaxed);
             }
             // this is a reward coin
             if !coin_base {
-                println!("at height {height} the reward coin {new_coin_id} is not marked as coin-base in the database");
+                println!(
+                    "at height {height} the reward coin {new_coin_id} is not marked as coin-base in the database"
+                );
                 error_count.fetch_add(1, Ordering::Relaxed);
             }
             additions.remove(new_coin_id.as_slice());
@@ -255,7 +269,9 @@ features that are validated:
             // this is not a transaction block
             // there should be no coins in the coin table spent at this height.
             if !removals.is_empty() {
-                println!("block at height {height} is not a transaction block, but the coin_record table has coins spent at this block height");
+                println!(
+                    "block at height {height} is not a transaction block, but the coin_record table has coins spent at this block height"
+                );
                 for coin_id in removals {
                     println!("  id: {}", hex::encode(coin_id));
                 }
@@ -263,7 +279,9 @@ features that are validated:
             }
             // there should not be any non-reward coins created in this block
             if !additions.is_empty() {
-                println!("block at height {height} is not a transaction block, but the coin_record table has coins created at this block height");
+                println!(
+                    "block at height {height} is not a transaction block, but the coin_record table has coins created at this block height"
+                );
                 for (coin_id, (ph, parent, amount, reward)) in additions {
                     println!(
                         "  id: {} - {} {} {amount} {}",

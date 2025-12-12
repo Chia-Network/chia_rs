@@ -1,9 +1,9 @@
 #![allow(clippy::missing_panics_doc)]
 
+use proc_macro_crate::{FoundCrate, crate_name};
 use proc_macro2::{Ident, Span};
-use proc_macro_crate::{crate_name, FoundCrate};
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, FieldsNamed, FieldsUnnamed};
+use syn::{DeriveInput, FieldsNamed, FieldsUnnamed, parse_macro_input};
 
 fn maybe_upper_fields(py_uppercase: bool, fnames: Vec<Ident>) -> Vec<Ident> {
     if py_uppercase {

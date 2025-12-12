@@ -9,10 +9,10 @@ use chia_consensus::run_block_generator::{
 };
 use chia_protocol::Program;
 use chia_tools::iterate_blocks;
+use clvmr::Allocator;
 use clvmr::allocator::NodePtr;
 use clvmr::serde::Serializer;
 use clvmr::serde::{is_canonical_serialization, node_from_bytes_backrefs};
-use clvmr::Allocator;
 use std::collections::HashSet;
 use std::io::Write;
 use std::thread::available_parallelism;
@@ -232,10 +232,10 @@ fn main() {
                         // this is a temporary (local) allocator, just for the
                         // purposes of re-serializing the block
                         let mut a = Allocator::new();
-                        let gen = node_from_bytes_backrefs(&mut a, generator)
+                        let generator_ptr = node_from_bytes_backrefs(&mut a, generator)
                             .expect("deserialize generator");
                         let mut ser = Serializer::new(None);
-                        let (done, _) = ser.add(&a, gen).expect("serialize");
+                        let (done, _) = ser.add(&a, generator_ptr).expect("serialize");
                         assert!(done);
                         let new_gen = ser.into_inner();
                         if new_gen.len() > generator.len() + 4 {

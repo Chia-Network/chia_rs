@@ -74,11 +74,11 @@ impl ProofOfInclusion {
 #[cfg(test)]
 mod tests {
     use crate::merkle::test_util::{
-        generate_hash, generate_kvid, open_dot, traversal_blob, HASH_ONE,
+        HASH_ONE, generate_hash, generate_kvid, open_dot, traversal_blob,
     };
     use crate::{Hash, KeyId, MerkleBlob, ValueId};
-    use rand::prelude::{SliceRandom, StdRng};
     use rand::SeedableRng;
+    use rand::prelude::{SliceRandom, StdRng};
     use rstest::rstest;
     use std::collections::HashMap;
     use std::iter::zip;

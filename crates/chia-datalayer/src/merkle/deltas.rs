@@ -4,7 +4,7 @@ use crate::{
     NodeHashToIndex, ParentFirstIterator, TreeIndex, ValueId,
 };
 #[cfg(feature = "py-bindings")]
-use pyo3::{pyclass, pymethods, PyResult, Python};
+use pyo3::{PyResult, Python, pyclass, pymethods};
 use rayon::iter::{IntoParallelIterator, ParallelExtend, ParallelIterator};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -320,7 +320,7 @@ impl DeltaFileCache {
 mod tests {
     use super::*;
     use crate::merkle::test_util::traversal_blob;
-    use crate::merkle::test_util::{generate_hash, generate_kvid, HASH_ONE, HASH_TWO, HASH_ZERO};
+    use crate::merkle::test_util::{HASH_ONE, HASH_TWO, HASH_ZERO, generate_hash, generate_kvid};
     use crate::{InsertLocation, InternalNodesMap, LeafNodesMap};
     use expect_test::expect;
     use rstest::rstest;

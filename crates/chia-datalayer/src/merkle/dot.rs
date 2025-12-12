@@ -1,7 +1,7 @@
-use crate::merkle::error::Error;
 use crate::LeftChildFirstIterator;
+use crate::merkle::error::Error;
 use crate::{InternalNode, LeafNode, MerkleBlob, Node, TreeIndex};
-use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
+use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
 use url::Url;
 
 pub struct DotLines {
@@ -82,25 +82,23 @@ impl Node {
         };
 
         match self {
-            Node::Internal ( InternalNode {left, right, ..}) => DotLines{
-                nodes: vec![
-                    format!("node_{index} [label=\"{index}\"]"),
-                ],
+            Node::Internal(InternalNode { left, right, .. }) => DotLines {
+                nodes: vec![format!("node_{index} [label=\"{index}\"]")],
                 connections: vec![
                     format!("node_{index} -> node_{left};"),
                     format!("node_{index} -> node_{right};"),
                     node_to_parent,
                 ],
-                pair_boxes: vec![
-                    format!("subgraph cluster_node_{index}_children {{ style=invis; {{rank = same; node_{left}->node_{right}[style=invis]; rankdir = LR}} }}"),
-                ],
+                pair_boxes: vec![format!(
+                    "subgraph cluster_node_{index}_children {{ style=invis; {{rank = same; node_{left}->node_{right}[style=invis]; rankdir = LR}} }}"
+                )],
                 note: String::new(),
                 ..Default::default()
             },
-            Node::Leaf (LeafNode{key, value, ..}) => DotLines{
-                nodes: vec![
-                    format!("node_{index} [shape=box, label=\"{index}\\nkey: {key}\\nvalue: {value}\"];"),
-                ],
+            Node::Leaf(LeafNode { key, value, .. }) => DotLines {
+                nodes: vec![format!(
+                    "node_{index} [shape=box, label=\"{index}\\nkey: {key}\\nvalue: {value}\"];"
+                )],
                 connections: vec![node_to_parent],
                 note: String::new(),
                 ..Default::default()

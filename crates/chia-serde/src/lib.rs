@@ -1,8 +1,8 @@
 use std::fmt;
 
 use serde::{
-    de::{self, Visitor},
     Deserializer, Serializer,
+    de::{self, Visitor},
 };
 
 pub fn ser_bytes<S>(value: &[u8], serializer: S, include_0x: bool) -> Result<S::Ok, S::Error>

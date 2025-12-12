@@ -1,9 +1,9 @@
 use chia_consensus::conditions::Condition;
+use chia_puzzle_types::Proof;
 use chia_puzzle_types::cat::{CatArgs, CatSolution};
 use chia_puzzle_types::did::{DidArgs, DidSolution};
 use chia_puzzle_types::singleton::{SingletonArgs, SingletonSolution};
 use chia_puzzle_types::standard::{StandardArgs, StandardSolution};
-use chia_puzzle_types::Proof;
 use chia_puzzles::CAT_PUZZLE_HASH;
 use chia_puzzles::DID_INNERPUZ_HASH;
 use chia_puzzles::P2_DELEGATED_PUZZLE_OR_HIDDEN_PUZZLE_HASH;
@@ -11,9 +11,9 @@ use chia_puzzles::SINGLETON_TOP_LAYER_V1_1_HASH;
 use chia_traits::Streamable;
 use clap::Parser;
 use clvm_traits::{FromClvm, ToClvm};
-use clvm_utils::tree_hash;
 use clvm_utils::CurriedProgram;
-use clvmr::{allocator::NodePtr, Allocator};
+use clvm_utils::tree_hash;
+use clvmr::{Allocator, allocator::NodePtr};
 
 /// Run a puzzle given a solution and print the resulting conditions
 #[derive(Parser, Debug)]
@@ -267,7 +267,7 @@ fn main() {
     use chia_consensus::validation_error::{first, rest};
     use chia_protocol::CoinSpend;
     use clvmr::reduction::Reduction;
-    use clvmr::{run_program, ChiaDialect};
+    use clvmr::{ChiaDialect, run_program};
     use std::fs::read;
 
     let args = Args::parse();

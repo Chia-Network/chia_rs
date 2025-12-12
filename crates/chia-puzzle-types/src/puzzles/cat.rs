@@ -102,7 +102,7 @@ mod tests {
     };
     use clvm_traits::ToClvm;
     use clvm_utils::tree_hash;
-    use clvmr::{serde::node_from_bytes, Allocator};
+    use clvmr::{Allocator, serde::node_from_bytes};
 
     use super::*;
 

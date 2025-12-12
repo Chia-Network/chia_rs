@@ -2,8 +2,8 @@
 use libfuzzer_sys::fuzz_target;
 
 use chia_consensus::puzzle_fingerprint::compute_puzzle_fingerprint;
-use clvmr::serde::node_from_bytes;
 use clvmr::Allocator;
+use clvmr::serde::node_from_bytes;
 
 fuzz_target!(|data: &[u8]| {
     let mut a = Allocator::new();

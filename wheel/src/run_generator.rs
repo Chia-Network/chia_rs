@@ -10,10 +10,10 @@ use chia_protocol::{Bytes, Bytes32, Coin};
 
 use clvmr::cost::Cost;
 
+use pyo3::PyResult;
 use pyo3::buffer::PyBuffer;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
-use pyo3::PyResult;
 
 pub fn py_to_slice<'a>(buf: PyBuffer<u8>) -> &'a [u8] {
     assert!(buf.is_c_contiguous(), "buffer must be contiguous");

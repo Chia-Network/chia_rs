@@ -1,4 +1,4 @@
-use super::validation_error::{atom, ErrorCode, ValidationErr};
+use super::validation_error::{ErrorCode, ValidationErr, atom};
 use clvmr::allocator::{Allocator, NodePtr};
 
 use clvmr::op_utils::u64_from_bytes;

@@ -1,8 +1,8 @@
 use std::borrow::Borrow;
 use std::num::NonZeroUsize;
 
-use crate::{aggregate_verify_gt, hash_to_g2};
 use crate::{GTElement, PublicKey, Signature};
+use crate::{aggregate_verify_gt, hash_to_g2};
 use chia_sha2::Sha256;
 use linked_hash_map::LinkedHashMap;
 use std::sync::Mutex;
@@ -129,10 +129,10 @@ impl BlsCache {
 
 #[cfg(feature = "py-bindings")]
 use pyo3::{
+    Bound, Py, PyResult,
     exceptions::PyValueError,
     pybacked::PyBackedBytes,
     types::{PyAnyMethods, PyList, PySequence},
-    Bound, Py, PyResult,
 };
 
 #[cfg(feature = "py-bindings")]
@@ -227,8 +227,8 @@ impl BlsCache {
 pub mod tests {
     use super::*;
 
-    use crate::sign;
     use crate::SecretKey;
+    use crate::sign;
 
     #[test]
     fn test_aggregate_verify() {
@@ -326,12 +326,14 @@ pub mod tests {
             let mut hasher = Sha256::new();
             hasher.update(aug_msg);
             let hash: [u8; 32] = hasher.finalize();
-            assert!(!bls_cache
-                .cache
-                .lock()
-                .expect("cache")
-                .items
-                .contains_key(&hash));
+            assert!(
+                !bls_cache
+                    .cache
+                    .lock()
+                    .expect("cache")
+                    .items
+                    .contains_key(&hash)
+            );
         }
     }
 
@@ -369,12 +371,14 @@ pub mod tests {
             let mut hasher = Sha256::new();
             hasher.update(aug_msg);
             let hash: [u8; 32] = hasher.finalize();
-            assert!(!bls_cache
-                .cache
-                .lock()
-                .expect("cache")
-                .items
-                .contains_key(&hash));
+            assert!(
+                !bls_cache
+                    .cache
+                    .lock()
+                    .expect("cache")
+                    .items
+                    .contains_key(&hash)
+            );
         }
         // Check that the remaining entries are still in the cache.
         for (pk, msg) in &[pks_msgs[1], pks_msgs[3], pks_msgs[4]] {
@@ -382,12 +386,14 @@ pub mod tests {
             let mut hasher = Sha256::new();
             hasher.update(aug_msg);
             let hash: [u8; 32] = hasher.finalize();
-            assert!(bls_cache
-                .cache
-                .lock()
-                .expect("cache")
-                .items
-                .contains_key(&hash));
+            assert!(
+                bls_cache
+                    .cache
+                    .lock()
+                    .expect("cache")
+                    .items
+                    .contains_key(&hash)
+            );
         }
     }
 }

@@ -1,7 +1,7 @@
 use blst::*;
 use chia_sha2::Sha256;
 use chia_traits::chia_error::Result;
-use chia_traits::{read_bytes, Streamable};
+use chia_traits::{Streamable, read_bytes};
 #[cfg(feature = "py-bindings")]
 use pyo3::exceptions::PyNotImplementedError;
 #[cfg(feature = "py-bindings")]

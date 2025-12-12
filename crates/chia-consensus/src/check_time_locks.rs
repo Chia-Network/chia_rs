@@ -5,9 +5,9 @@ use crate::validation_error::ErrorCode;
 use chia_protocol::Bytes32;
 use chia_protocol::CoinRecord;
 #[cfg(feature = "py-bindings")]
-use pyo3::pyfunction;
-#[cfg(feature = "py-bindings")]
 use pyo3::PyResult;
+#[cfg(feature = "py-bindings")]
+use pyo3::pyfunction;
 
 pub fn check_time_locks(
     removal_coin_records: &HashMap<Bytes32, CoinRecord>,

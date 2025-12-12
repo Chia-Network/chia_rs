@@ -11,7 +11,7 @@ use chia_consensus::flags::{
     SIMPLE_GENERATOR, STRICT_ARGS_COUNT,
 };
 use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
-use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
+use chia_consensus::merkle_tree::{MerkleSet, validate_merkle_proof};
 use chia_consensus::owned_conditions::{OwnedSpendBundleConditions, OwnedSpendConditions};
 use chia_consensus::run_block_generator::setup_generator_args;
 use chia_consensus::run_block_generator::{
@@ -22,10 +22,6 @@ use chia_consensus::solution_generator::solution_generator_backrefs as native_so
 use chia_consensus::spendbundle_conditions::get_conditions_from_spendbundle;
 use chia_consensus::spendbundle_validation::{
     get_flags_for_height_and_constants, validate_clvm_and_signature,
-};
-use chia_protocol::{
-    calculate_ip_iters, calculate_sp_interval_iters, calculate_sp_iters, is_overflow_block,
-    py_expected_plot_size, PartialProof,
 };
 use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,
@@ -55,6 +51,10 @@ use chia_protocol::{
     SubEpochSummary, SubSlotData, SubSlotProofs, TimestampedPeerInfo, TransactionAck,
     TransactionsInfo, UnfinishedBlock, UnfinishedHeaderBlock, VDFInfo, VDFProof, WeightProof,
 };
+use chia_protocol::{
+    PartialProof, calculate_ip_iters, calculate_sp_interval_iters, calculate_sp_iters,
+    is_overflow_block, py_expected_plot_size,
+};
 use chia_sha2::Sha256;
 use chia_traits::ChiaToPython;
 use clvm_utils::tree_hash_from_bytes;
@@ -78,6 +78,7 @@ use crate::run_program::{run_chia_program, serialized_length, serialized_length_
 use chia_consensus::fast_forward::fast_forward_singleton as native_ff;
 use chia_consensus::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
 use chia_consensus::validation_error::ValidationErr;
+use clvmr::ChiaDialect;
 use clvmr::allocator::NodePtr;
 use clvmr::cost::Cost;
 use clvmr::error::EvalErr;
@@ -85,11 +86,10 @@ use clvmr::reduction::Reduction;
 use clvmr::run_program;
 use clvmr::serde::is_canonical_serialization;
 use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs, node_to_bytes};
-use clvmr::ChiaDialect;
 
 use chia_bls::{
-    hash_to_g2 as native_hash_to_g2, BlsCache, DerivableKey, GTElement, PublicKey, SecretKey,
-    Signature,
+    BlsCache, DerivableKey, GTElement, PublicKey, SecretKey, Signature,
+    hash_to_g2 as native_hash_to_g2,
 };
 #[pyfunction]
 pub fn compute_merkle_set_root<'p>(

@@ -3,8 +3,8 @@ use chia_consensus::solution_generator::{calculate_generator_length, solution_ge
 use chia_protocol::{Coin, CoinSpend};
 use chia_traits::Streamable;
 use clvmr::{
-    serde::{node_from_bytes_backrefs, node_to_bytes},
     Allocator,
+    serde::{node_from_bytes_backrefs, node_to_bytes},
 };
 use libfuzzer_sys::fuzz_target;
 use std::io::Cursor;

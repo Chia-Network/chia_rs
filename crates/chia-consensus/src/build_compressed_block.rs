@@ -3,7 +3,7 @@ use crate::error::Result;
 use chia_bls::Signature;
 use chia_protocol::SpendBundle;
 use clvmr::allocator::{Allocator, NodePtr};
-use clvmr::serde::{node_from_bytes_backrefs, Serializer};
+use clvmr::serde::{Serializer, node_from_bytes_backrefs};
 use std::borrow::Borrow;
 
 #[cfg(feature = "py-bindings")]
@@ -269,7 +269,7 @@ mod tests {
     use chia_protocol::{Bytes, Coin};
     use chia_traits::Streamable;
     use rand::rngs::StdRng;
-    use rand::{prelude::SliceRandom, SeedableRng};
+    use rand::{SeedableRng, prelude::SliceRandom};
     use std::collections::HashSet;
     use std::fs;
     use std::time::Instant;
@@ -436,11 +436,11 @@ mod tests {
                 assert_eq!(conds.spends.len(), spends.len());
                 conds.spends.sort_by_key(|s| s.coin_id);
                 spends.sort_by_key(|s| s.coin_id);
-                for (mut gen, tx) in conds.spends.into_iter().zip(spends) {
-                    gen.create_coin.sort();
-                    gen.flags = 0;
-                    gen.fingerprint = Bytes::default();
-                    assert_eq!(&gen, tx);
+                for (mut generator, tx) in conds.spends.into_iter().zip(spends) {
+                    generator.create_coin.sort();
+                    generator.flags = 0;
+                    generator.fingerprint = Bytes::default();
+                    assert_eq!(&generator, tx);
                 }
             });
             assert_eq!(pool.panic_count(), 0);

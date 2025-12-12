@@ -5,13 +5,13 @@ use chia_protocol::*;
 use chia_traits::Streamable;
 use futures_util::stream::SplitSink;
 use futures_util::{SinkExt, StreamExt};
-use tokio::sync::{broadcast, oneshot, Mutex};
+use tokio::sync::{Mutex, broadcast, oneshot};
 use tokio::{net::TcpStream, task::JoinHandle};
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 use tungstenite::Message as WsMessage;
 
-use crate::utils::stream;
 use crate::Error;
+use crate::utils::stream;
 
 type WebSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 type Requests = Arc<Mutex<HashMap<u16, oneshot::Sender<Message>>>>;

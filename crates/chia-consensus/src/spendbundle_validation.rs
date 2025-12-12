@@ -9,7 +9,7 @@ use chia_bls::{aggregate_verify_gt, hash_to_g2};
 use chia_protocol::SpendBundle;
 use chia_sha2::Sha256;
 use clvmr::chia_dialect::ENABLE_KECCAK_OPS_OUTSIDE_GUARD;
-use clvmr::{NodePtr, LIMIT_HEAP};
+use clvmr::{LIMIT_HEAP, NodePtr};
 
 // type definition makes clippy happy
 pub type ValidationPair = ([u8; 32], GTElement);
@@ -102,10 +102,10 @@ mod tests {
     use crate::flags::{COMPUTE_FINGERPRINT, MEMPOOL_MODE};
     use crate::make_aggsig_final_message::u64_to_bytes;
     use crate::opcodes::{
-        ConditionOpcode, AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT,
-        AGG_SIG_PARENT_PUZZLE, AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT, AGG_SIG_UNSAFE,
+        AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT, AGG_SIG_PARENT_PUZZLE,
+        AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT, AGG_SIG_UNSAFE, ConditionOpcode,
     };
-    use chia_bls::{sign, G2Element, PublicKey, SecretKey, Signature};
+    use chia_bls::{G2Element, PublicKey, SecretKey, Signature, sign};
     use chia_protocol::{Bytes, Coin, CoinSpend, Program};
     use clvm_utils::tree_hash_atom;
     use hex::FromHex;

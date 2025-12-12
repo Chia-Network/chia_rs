@@ -1,6 +1,6 @@
 #![no_main]
 use chia_consensus::conditions::{
-    process_single_spend, MempoolVisitor, ParseState, SpendBundleConditions,
+    MempoolVisitor, ParseState, SpendBundleConditions, process_single_spend,
 };
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::flags::{NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};

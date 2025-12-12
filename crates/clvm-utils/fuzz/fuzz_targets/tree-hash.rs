@@ -1,7 +1,7 @@
 #![no_main]
 use libfuzzer_sys::{arbitrary, fuzz_target};
 
-use clvm_utils::{tree_hash, tree_hash_cached, TreeCache};
+use clvm_utils::{TreeCache, tree_hash, tree_hash_cached};
 use clvmr::{Allocator, NodePtr};
 
 use clvm_fuzzing::make_tree;

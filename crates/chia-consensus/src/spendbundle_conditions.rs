@@ -1,6 +1,6 @@
 use crate::conditions::{
-    process_single_spend, validate_conditions, MempoolVisitor, ParseState, SpendBundleConditions,
-    ELIGIBLE_FOR_DEDUP,
+    ELIGIBLE_FOR_DEDUP, MempoolVisitor, ParseState, SpendBundleConditions, process_single_spend,
+    validate_conditions,
 };
 use crate::consensus_constants::ConsensusConstants;
 use crate::flags::{COMPUTE_FINGERPRINT, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
@@ -222,11 +222,11 @@ mod tests {
         use chia_protocol::Bytes32;
         use chia_protocol::Coin;
         use chia_protocol::Program;
-        use clvm_traits::{destructure_tuple, match_tuple, FromClvm};
+        use clvm_traits::{FromClvm, destructure_tuple, match_tuple};
         use clvm_utils::tree_hash_from_bytes;
+        use clvmr::NodePtr;
         use clvmr::op_utils::first;
         use clvmr::serde::node_from_bytes_backrefs;
-        use clvmr::NodePtr;
 
         let mut a = make_allocator(MEMPOOL_MODE);
 
@@ -428,7 +428,9 @@ mod tests {
 
         if output != block_output {
             print_diff(&output, &block_output);
-            panic!("run_block_generator2 produced a different result than get_conditions_from_spendbundle()");
+            panic!(
+                "run_block_generator2 produced a different result than get_conditions_from_spendbundle()"
+            );
         }
 
         if output != expected {
