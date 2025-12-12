@@ -1638,19 +1638,13 @@ pub fn validate_signature(
             state.pkm_pairs.iter().map(|(pk, msg)| (pk, msg.as_slice())),
             signature,
         ) {
-            return Err(ValidationErr(
-                NodePtr::NIL,
-                ErrorCode::BadAggregateSignature,
-            ));
+            return Err(ValidationErr::BadAggregateSignature);
         }
     } else if !aggregate_verify(
         signature,
         state.pkm_pairs.iter().map(|(pk, msg)| (pk, msg.as_slice())),
     ) {
-        return Err(ValidationErr(
-            NodePtr::NIL,
-            ErrorCode::BadAggregateSignature,
-        ));
+        return Err(ValidationErr::BadAggregateSignature);
     }
     Ok(())
 }
@@ -2021,11 +2015,12 @@ fn test_invalid_condition_list_terminator() {
 #[test]
 fn test_invalid_condition_list_terminator_mempool() {
     // ASSERT_SECONDS_RELATIVE
-    assert_eq!(
-        cond_test("((({h1} ({h2} (123 (((80 (50 8 ))))")
-            .unwrap_err()
-            .1,
-        ErrorCode::InvalidCondition
+    assert!(
+        matches!(
+            cond_test("((({h1} ({h2} (123 (((80 (50 8 ))))")
+                .unwrap_err(),
+            ValidationErr::InvalidCondition
+    )    
     );
 }
 
@@ -4196,7 +4191,7 @@ fn test_cost_aggsig_conds_after_free(#[case] count: usize) {
     100,
     ASSERT_BEFORE_SECONDS_ABSOLUTE,
     100,
-    Some(ErrorCode::ImpossibleSecondsAbsoluteConstraints)
+    Some(ValidationErr::ImpossibleSecondsAbsoluteConstraints)
 )]
 #[case(ASSERT_SECONDS_ABSOLUTE, 99, ASSERT_BEFORE_SECONDS_ABSOLUTE, 100, None)]
 #[case(
@@ -4204,7 +4199,7 @@ fn test_cost_aggsig_conds_after_free(#[case] count: usize) {
     100,
     ASSERT_BEFORE_HEIGHT_ABSOLUTE,
     100,
-    Some(ErrorCode::ImpossibleHeightAbsoluteConstraints)
+    Some(ValidationErr::ImpossibleHeightAbsoluteConstraints)
 )]
 #[case(ASSERT_HEIGHT_ABSOLUTE, 99, ASSERT_BEFORE_HEIGHT_ABSOLUTE, 100, None)]
 #[case(
@@ -4212,7 +4207,7 @@ fn test_cost_aggsig_conds_after_free(#[case] count: usize) {
     100,
     ASSERT_BEFORE_SECONDS_RELATIVE,
     100,
-    Some(ErrorCode::ImpossibleSecondsRelativeConstraints)
+    Some(ValidationErr::ImpossibleSecondsRelativeConstraints)
 )]
 #[case(ASSERT_SECONDS_RELATIVE, 99, ASSERT_BEFORE_SECONDS_RELATIVE, 100, None)]
 #[case(
@@ -4220,7 +4215,7 @@ fn test_cost_aggsig_conds_after_free(#[case] count: usize) {
     100,
     ASSERT_BEFORE_HEIGHT_RELATIVE,
     100,
-    Some(ErrorCode::ImpossibleHeightRelativeConstraints)
+    Some(ValidationErr::ImpossibleHeightRelativeConstraints)
 )]
 #[case(ASSERT_HEIGHT_RELATIVE, 99, ASSERT_BEFORE_HEIGHT_RELATIVE, 100, None)]
 // order shouldn't matter
@@ -4229,7 +4224,7 @@ fn test_cost_aggsig_conds_after_free(#[case] count: usize) {
     100,
     ASSERT_SECONDS_ABSOLUTE,
     100,
-    Some(ErrorCode::ImpossibleSecondsAbsoluteConstraints)
+    Some(ValidationErr::ImpossibleSecondsAbsoluteConstraints)
 )]
 #[case(ASSERT_BEFORE_SECONDS_ABSOLUTE, 100, ASSERT_SECONDS_ABSOLUTE, 99, None)]
 #[case(
@@ -4237,7 +4232,7 @@ fn test_cost_aggsig_conds_after_free(#[case] count: usize) {
     100,
     ASSERT_HEIGHT_ABSOLUTE,
     100,
-    Some(ErrorCode::ImpossibleHeightAbsoluteConstraints)
+    Some(ValidationErr::ImpossibleHeightAbsoluteConstraints)
 )]
 #[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, 100, ASSERT_HEIGHT_ABSOLUTE, 99, None)]
 #[case(
@@ -4245,7 +4240,7 @@ fn test_cost_aggsig_conds_after_free(#[case] count: usize) {
     100,
     ASSERT_SECONDS_RELATIVE,
     100,
-    Some(ErrorCode::ImpossibleSecondsRelativeConstraints)
+    Some(ValidationErr::ImpossibleSecondsRelativeConstraints)
 )]
 #[case(ASSERT_BEFORE_SECONDS_RELATIVE, 100, ASSERT_SECONDS_RELATIVE, 99, None)]
 #[case(
@@ -4253,7 +4248,7 @@ fn test_cost_aggsig_conds_after_free(#[case] count: usize) {
     100,
     ASSERT_HEIGHT_RELATIVE,
     100,
-    Some(ErrorCode::ImpossibleHeightRelativeConstraints)
+    Some(ValidationErr::ImpossibleHeightRelativeConstraints)
 )]
 #[case(ASSERT_BEFORE_HEIGHT_RELATIVE, 100, ASSERT_HEIGHT_RELATIVE, 99, None)]
 fn test_impossible_constraints_single_spend(
@@ -4261,7 +4256,7 @@ fn test_impossible_constraints_single_spend(
     #[case] value1: u64,
     #[case] cond2: ConditionOpcode,
     #[case] value2: u64,
-    #[case] expected_err: Option<ErrorCode>,
+    #[case] expected_err: Option<ValidationErr>,
 ) {
     let test: &str = &format!(
         "(\
@@ -4303,7 +4298,7 @@ fn test_impossible_constraints_single_spend(
     100,
     ASSERT_BEFORE_SECONDS_ABSOLUTE,
     100,
-    Some(ErrorCode::ImpossibleSecondsAbsoluteConstraints)
+    Some(ValidationErr::ImpossibleSecondsAbsoluteConstraints)
 )]
 #[case(ASSERT_SECONDS_ABSOLUTE, 99, ASSERT_BEFORE_SECONDS_ABSOLUTE, 100, None)]
 #[case(
@@ -4311,7 +4306,7 @@ fn test_impossible_constraints_single_spend(
     100,
     ASSERT_BEFORE_HEIGHT_ABSOLUTE,
     100,
-    Some(ErrorCode::ImpossibleHeightAbsoluteConstraints)
+    Some(ValidationErr::ImpossibleHeightAbsoluteConstraints)
 )]
 #[case(ASSERT_HEIGHT_ABSOLUTE, 99, ASSERT_BEFORE_HEIGHT_ABSOLUTE, 100, None)]
 #[case(
@@ -4330,7 +4325,7 @@ fn test_impossible_constraints_single_spend(
     100,
     ASSERT_SECONDS_ABSOLUTE,
     100,
-    Some(ErrorCode::ImpossibleSecondsAbsoluteConstraints)
+    Some(ValidationErr::ImpossibleSecondsAbsoluteConstraints)
 )]
 #[case(ASSERT_BEFORE_SECONDS_ABSOLUTE, 100, ASSERT_SECONDS_ABSOLUTE, 99, None)]
 #[case(
@@ -4338,7 +4333,7 @@ fn test_impossible_constraints_single_spend(
     100,
     ASSERT_HEIGHT_ABSOLUTE,
     100,
-    Some(ErrorCode::ImpossibleHeightAbsoluteConstraints)
+    Some(ValidationErr::ImpossibleHeightAbsoluteConstraints)
 )]
 #[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, 100, ASSERT_HEIGHT_ABSOLUTE, 99, None)]
 #[case(
@@ -4356,7 +4351,7 @@ fn test_impossible_constraints_separate_spends(
     #[case] value1: u64,
     #[case] cond2: ConditionOpcode,
     #[case] value2: u64,
-    #[case] expected_err: Option<ErrorCode>,
+    #[case] expected_err: Option<ValidationErr>,
 ) {
     let test: &str = &format!(
         "(\
@@ -4398,11 +4393,11 @@ fn test_impossible_constraints_separate_spends(
 
 #[cfg(test)]
 #[rstest]
-#[case(ASSERT_MY_BIRTH_HEIGHT, ErrorCode::AssertMyBirthHeightFailed)]
-#[case(ASSERT_MY_BIRTH_SECONDS, ErrorCode::AssertMyBirthSecondsFailed)]
+#[case(ASSERT_MY_BIRTH_HEIGHT, ValidationErr::AssertMyBirthHeightFailed)]
+#[case(ASSERT_MY_BIRTH_SECONDS, ValidationErr::AssertMyBirthSecondsFailed)]
 fn test_conflicting_my_birth_assertions(
     #[case] condition: ConditionOpcode,
-    #[case] expected: ErrorCode,
+    #[case] expected: ValidationErr,
 ) {
     let val = condition as u8;
     assert_eq!(
@@ -4589,9 +4584,11 @@ fn test_assert_ephemeral_wrong_ph() {
        ))";
 
     // this is an invalid ASSERT_EPHEMERAL
-    assert_eq!(
-        cond_test(test).unwrap_err().1,
-        ErrorCode::AssertEphemeralFailed
+    assert!(
+        matches!(
+            cond_test(test).unwrap_err(),
+            ValidationErr::AssertEphemeralFailed
+        )
     );
 }
 
@@ -4613,9 +4610,11 @@ fn test_assert_ephemeral_wrong_amount() {
        ))";
 
     // this is an invalid ASSERT_EPHEMERAL
-    assert_eq!(
-        cond_test(test).unwrap_err().1,
-        ErrorCode::AssertEphemeralFailed
+    assert!(
+        matches!(
+            cond_test(test).unwrap_err(),
+            ValidationErr::AssertEphemeralFailed
+        )
     );
 }
 
@@ -4637,9 +4636,11 @@ fn test_assert_ephemeral_wrong_parent() {
        ))";
 
     // this is an invalid ASSERT_EPHEMERAL
-    assert_eq!(
-        cond_test(test).unwrap_err().1,
-        ErrorCode::AssertEphemeralFailed
+    assert!(
+        matches!(
+            cond_test(test).unwrap_err(),
+            ValidationErr::AssertEphemeralFailed
+        )
     );
 }
 
@@ -4648,24 +4649,24 @@ fn test_assert_ephemeral_wrong_parent() {
 // the default expected errors are post soft-fork, when both new rules are
 // activated
 #[case(ASSERT_HEIGHT_ABSOLUTE, None)]
-#[case(ASSERT_HEIGHT_RELATIVE, Some(ErrorCode::EphemeralRelativeCondition))]
+#[case(ASSERT_HEIGHT_RELATIVE, Some(ValidationErr::EphemeralRelativeCondition))]
 #[case(ASSERT_SECONDS_ABSOLUTE, None)]
-#[case(ASSERT_SECONDS_RELATIVE, Some(ErrorCode::EphemeralRelativeCondition))]
-#[case(ASSERT_MY_BIRTH_HEIGHT, Some(ErrorCode::EphemeralRelativeCondition))]
-#[case(ASSERT_MY_BIRTH_SECONDS, Some(ErrorCode::EphemeralRelativeCondition))]
+#[case(ASSERT_SECONDS_RELATIVE, Some(ValidationErr::EphemeralRelativeCondition))]
+#[case(ASSERT_MY_BIRTH_HEIGHT, Some(ValidationErr::EphemeralRelativeCondition))]
+#[case(ASSERT_MY_BIRTH_SECONDS, Some(ValidationErr::EphemeralRelativeCondition))]
 #[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, None)]
 #[case(
     ASSERT_BEFORE_HEIGHT_RELATIVE,
-    Some(ErrorCode::EphemeralRelativeCondition)
+    Some(ValidationErr::EphemeralRelativeCondition)
 )]
 #[case(ASSERT_BEFORE_SECONDS_ABSOLUTE, None)]
 #[case(
     ASSERT_BEFORE_SECONDS_RELATIVE,
-    Some(ErrorCode::EphemeralRelativeCondition)
+    Some(ValidationErr::EphemeralRelativeCondition)
 )]
 fn test_relative_condition_on_ephemeral(
     #[case] condition: ConditionOpcode,
-    #[case] expect_error: Option<ErrorCode>,
+    #[case] expect_error: Option<ValidationErr>,
 ) {
     // this test ensures that we disallow relative conditions (including
     // assert-my-birth conditions) on ephemeral coin spends.
@@ -4764,13 +4765,13 @@ fn test_softfork_condition(#[case] conditions: &str, #[case] expected_cost: Cost
 #[cfg(test)]
 #[rstest]
 // the cost argument must be positive
-#[case("((90 (-1 )", ErrorCode::InvalidSoftforkCost)]
+#[case("((90 (-1 )", ValidationErr::InvalidSoftforkCost)]
 // the cost argument may not exceed 2^32-1
-#[case("((90 (0x0100000000 )", ErrorCode::InvalidSoftforkCost)]
+#[case("((90 (0x0100000000 )", ValidationErr::InvalidSoftforkCost)]
 // the test has a cost limit of 11000000000
-#[case("((90 (0x00ffffffff )", ErrorCode::CostExceeded)]
-#[case("((90 )", ErrorCode::InvalidCondition)]
-fn test_softfork_condition_failures(#[case] conditions: &str, #[case] expected_err: ErrorCode) {
+#[case("((90 (0x00ffffffff )", ValidationErr::CostExceeded)]
+#[case("((90 )", ValidationErr::InvalidCondition)]
+fn test_softfork_condition_failures(#[case] conditions: &str, #[case] expected_err: ValidationErr) {
     // SOFTFORK (90)
     assert_eq!(
         cond_test_flag(&format!("((({{h1}} ({{h2}} (1234 ({conditions}))))"), 0)
@@ -4787,62 +4788,62 @@ fn test_softfork_condition_failures(#[case] conditions: &str, #[case] expected_e
     CREATE_PUZZLE_ANNOUNCEMENT,
     1025,
     0,
-    Some(ErrorCode::TooManyAnnouncements)
+    Some(ValidationErr::TooManyAnnouncements)
 )]
 #[case(
     ASSERT_PUZZLE_ANNOUNCEMENT,
     1024,
     0,
-    Some(ErrorCode::AssertPuzzleAnnouncementFailed)
+    Some(ValidationErr::AssertPuzzleAnnouncementFailed)
 )]
 #[case(
     ASSERT_PUZZLE_ANNOUNCEMENT,
     1025,
     0,
-    Some(ErrorCode::TooManyAnnouncements)
+    Some(ValidationErr::TooManyAnnouncements)
 )]
 #[case(CREATE_COIN_ANNOUNCEMENT, 1000, 0, None)]
 #[case(
     CREATE_COIN_ANNOUNCEMENT,
     1025,
     0,
-    Some(ErrorCode::TooManyAnnouncements)
+    Some(ValidationErr::TooManyAnnouncements)
 )]
 #[case(
     ASSERT_COIN_ANNOUNCEMENT,
     1024,
     0,
-    Some(ErrorCode::AssertCoinAnnouncementFailed)
+    Some(ValidationErr::AssertCoinAnnouncementFailed)
 )]
 #[case(
     ASSERT_COIN_ANNOUNCEMENT,
     1025,
     0,
-    Some(ErrorCode::TooManyAnnouncements)
+    Some(ValidationErr::TooManyAnnouncements)
 )]
 #[case(
     ASSERT_CONCURRENT_SPEND,
     1024,
     0,
-    Some(ErrorCode::AssertConcurrentSpendFailed)
+    Some(ValidationErr::AssertConcurrentSpendFailed)
 )]
 #[case(
     ASSERT_CONCURRENT_SPEND,
     1025,
     0,
-    Some(ErrorCode::TooManyAnnouncements)
+    Some(ValidationErr::TooManyAnnouncements)
 )]
 #[case(
     ASSERT_CONCURRENT_PUZZLE,
     1024,
     0,
-    Some(ErrorCode::AssertConcurrentPuzzleFailed)
+    Some(ValidationErr::AssertConcurrentPuzzleFailed)
 )]
 #[case(
     ASSERT_CONCURRENT_PUZZLE,
     1025,
     0,
-    Some(ErrorCode::TooManyAnnouncements)
+    Some(ValidationErr::TooManyAnnouncements)
 )]
 // new flag tests
 #[case(CREATE_PUZZLE_ANNOUNCEMENT, 1025, COST_CONDITIONS, None)]
@@ -4850,32 +4851,32 @@ fn test_softfork_condition_failures(#[case] conditions: &str, #[case] expected_e
     ASSERT_PUZZLE_ANNOUNCEMENT,
     1025,
     COST_CONDITIONS,
-    Some(ErrorCode::AssertPuzzleAnnouncementFailed)
+    Some(ValidationErr::AssertPuzzleAnnouncementFailed)
 )]
 #[case(CREATE_COIN_ANNOUNCEMENT, 1025, COST_CONDITIONS, None)]
 #[case(
     ASSERT_COIN_ANNOUNCEMENT,
     1025,
     COST_CONDITIONS,
-    Some(ErrorCode::AssertCoinAnnouncementFailed)
+    Some(ValidationErr::AssertCoinAnnouncementFailed)
 )]
 #[case(
     ASSERT_CONCURRENT_SPEND,
     1025,
     COST_CONDITIONS,
-    Some(ErrorCode::AssertConcurrentSpendFailed)
+    Some(ValidationErr::AssertConcurrentSpendFailed)
 )]
 #[case(
     ASSERT_CONCURRENT_PUZZLE,
     1025,
     COST_CONDITIONS,
-    Some(ErrorCode::AssertConcurrentPuzzleFailed)
+    Some(ValidationErr::AssertConcurrentPuzzleFailed)
 )]
 fn test_limit_announcements(
     #[case] cond: ConditionOpcode,
     #[case] count: i32,
     #[case] flag: u32,
-    #[case] expect_err: Option<ErrorCode>,
+    #[case] expect_err: Option<ValidationErr>,
 ) {
     let r = cond_test_cb(
         "((({h1} ({h1} (123 ({} )))",
@@ -5361,23 +5362,23 @@ fn test_message_conditions_single_spend(#[case] test_case: &str, #[case] expect:
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
         assert_eq!(spend.flags, 0);
     } else if expect_pass {
-        panic!("failed: {:?}", ret.unwrap_err().1);
+        panic!("failed: {:?}", ret.unwrap_err());
     } else {
-        let actual_err = ret.unwrap_err().1;
+        let actual_err = ret.unwrap_err();
         println!("Error: {actual_err:?}");
-        assert_eq!(ErrorCode::MessageNotSentOrReceived, actual_err);
+        assert!(matches!(ValidationErr::MessageNotSentOrReceived, actual_err));
     }
 }
 
 #[cfg(test)]
 #[rstest]
 #[case(512, 0, None)]
-#[case(513, 0, Some(ErrorCode::TooManyAnnouncements))]
+#[case(513, 0, Some(ValidationErr::TooManyAnnouncements))]
 #[case(513, COST_CONDITIONS, None)]
 fn test_limit_messages(
     #[case] count: i32,
     #[case] flags: u32,
-    #[case] expect_err: Option<ErrorCode>,
+    #[case] expect_err: Option<ValidationErr>,
 ) {
     let r = cond_test_cb(
         "((({h1} ({h1} (123 ({} )))",
@@ -5428,114 +5429,114 @@ fn test_limit_messages(
 
 #[cfg(test)]
 #[rstest]
-#[case("(66 (0x38 ({longmsg} )", ErrorCode::InvalidMessage)]
-#[case("(66 (0x3c ({long} ({msg1} )", ErrorCode::InvalidParentId)]
-#[case("(66 (0x3c ({msg2} ({msg1} )", ErrorCode::InvalidParentId)]
-#[case("(66 (0x3a ({long} ({msg1} )", ErrorCode::InvalidPuzzleHash)]
-#[case("(66 (0x3a ({msg2} ({msg1} )", ErrorCode::InvalidPuzzleHash)]
-#[case("(66 (0x3f ({long} ({msg1} )", ErrorCode::InvalidCoinId)]
-#[case("(66 (0x3f ({msg2} ({msg1} )", ErrorCode::InvalidCoinId)]
+#[case("(66 (0x38 ({longmsg} )", ValidationErr::InvalidMessage)]
+#[case("(66 (0x3c ({long} ({msg1} )", ValidationErr::InvalidParentId)]
+#[case("(66 (0x3c ({msg2} ({msg1} )", ValidationErr::InvalidParentId)]
+#[case("(66 (0x3a ({long} ({msg1} )", ValidationErr::InvalidPuzzleHash)]
+#[case("(66 (0x3a ({msg2} ({msg1} )", ValidationErr::InvalidPuzzleHash)]
+#[case("(66 (0x3f ({long} ({msg1} )", ValidationErr::InvalidCoinId)]
+#[case("(66 (0x3f ({msg2} ({msg1} )", ValidationErr::InvalidCoinId)]
 #[case(
     "(66 (0x08 ({msg1} ) ((67 (0x08 ({msg1} (-1 )",
-    ErrorCode::CoinAmountNegative
+    ValidationErr::CoinAmountNegative
 )]
 #[case(
     "(66 (0x08 ({msg1} ) ((67 (0x08 ({msg1} )",
-    ErrorCode::InvalidCondition
+    ValidationErr::InvalidCondition
 )]
 #[case(
     "(66 (0x01 ({msg1} (-1 ) ((67 (0x01 ({msg1} )",
-    ErrorCode::CoinAmountNegative
+    ValidationErr::CoinAmountNegative
 )]
 #[case(
     "(66 (0x01 ({msg1} ) ((67 (0x01 ({msg1} )",
-    ErrorCode::InvalidCondition
+    ValidationErr::InvalidCondition
 )]
 #[case(
     "(66 (0x02 ({msg1} ({msg2} ) ((67 (0x02 ({msg1} )",
-    ErrorCode::InvalidPuzzleHash
+    ValidationErr::InvalidPuzzleHash
 )]
 #[case(
     "(66 (0x02 ({msg1} ) ((67 (0x02 ({msg1} )",
-    ErrorCode::InvalidCondition
+    ValidationErr::InvalidCondition
 )]
 #[case(
     "(66 (0x10 ({msg1} ) ((67 (0x10 ({msg1} ({msg2} )",
-    ErrorCode::InvalidPuzzleHash
+    ValidationErr::InvalidPuzzleHash
 )]
 #[case(
     "(66 (0x10 ({msg1} ) ((67 (0x10 ({msg1} )",
-    ErrorCode::InvalidCondition
+    ValidationErr::InvalidCondition
 )]
 #[case(
     "(66 (0x04 ({msg1} ({msg2} ) ((67 (0x04 ({msg1} )",
-    ErrorCode::InvalidParentId
+    ValidationErr::InvalidParentId
 )]
 #[case(
     "(66 (0x04 ({msg1} ) ((67 (0x04 ({msg1} )",
-    ErrorCode::InvalidCondition
+    ValidationErr::InvalidCondition
 )]
 #[case(
     "(66 (0x20 ({msg1} ) ((67 (0x20 ({msg1} ({msg2} )",
-    ErrorCode::InvalidParentId
+    ValidationErr::InvalidParentId
 )]
 #[case(
     "(66 (0x20 ({msg1} ) ((67 (0x20 ({msg1} )",
-    ErrorCode::InvalidCondition
+    ValidationErr::InvalidCondition
 )]
 #[case(
     "(66 (0x07 ({msg1} ({msg2} ) ((67 (0x07 ({msg1} )",
-    ErrorCode::InvalidCoinId
+    ValidationErr::InvalidCoinId
 )]
 #[case(
     "(66 (0x07 ({msg1} ) ((67 (0x07 ({msg1} )",
-    ErrorCode::InvalidCondition
+    ValidationErr::InvalidCondition
 )]
 #[case(
     "(66 (0x38 ({msg1} ) ((67 (0x38 ({msg1} ({msg2} )",
-    ErrorCode::InvalidCoinId
+    ValidationErr::InvalidCoinId
 )]
 #[case(
     "(66 (0x38 ({msg1} ) ((67 (0x38 ({msg1} )",
-    ErrorCode::InvalidCondition
+    ValidationErr::InvalidCondition
 )]
 // message mode must be specified in canonical mode
 #[case(
     "(66 (0x00 ({msg1} ) ((67 (0x00 ({msg1} )",
-    ErrorCode::InvalidMessageMode
+    ValidationErr::InvalidMessageMode
 )]
 #[case(
     "(66 (0x01 ({msg1} (123 ) ((67 (0x00 ({msg1} )",
-    ErrorCode::InvalidMessageMode
+    ValidationErr::InvalidMessageMode
 )]
 // negative messages modes are not allowed
 #[case(
     "(66 (-1 ({msg1} (123 ) ((67 (0x01 ({msg1} )",
-    ErrorCode::InvalidMessageMode
+    ValidationErr::InvalidMessageMode
 )]
 #[case(
     "(66 (0x01 ({msg1} (123 ) ((67 (-1 ({msg1} )",
-    ErrorCode::InvalidMessageMode
+    ValidationErr::InvalidMessageMode
 )]
 // amounts must be specified in canonical mode
 #[case(
     "(66 (0x01 ({msg1} (0x0040 ) ((67 (0x01 ({msg1} (123 )",
-    ErrorCode::InvalidCoinAmount
+    ValidationErr::InvalidCoinAmount
 )]
 #[case(
     "(66 (0x01 ({msg1} (0x00 ) ((67 (0x01 ({msg1} (123 )",
-    ErrorCode::InvalidCoinAmount
+    ValidationErr::InvalidCoinAmount
 )]
 // coin amounts can't be negative
 #[case(
     "(66 (0x01 ({msg1} (-1 ) ((67 (0x01 ({msg1} (123 )",
-    ErrorCode::CoinAmountNegative
+    ValidationErr::CoinAmountNegative
 )]
 #[case(
     "(66 (0x01 ({msg1} (-1 ) ((67 (0x01 ({msg1} (123 )",
-    ErrorCode::CoinAmountNegative
+    ValidationErr::CoinAmountNegative
 )]
-fn test_message_conditions_failures(#[case] test_case: &str, #[case] expect: ErrorCode) {
+fn test_message_conditions_failures(#[case] test_case: &str, #[case] expect: ValidationErr) {
     let flags = MEMPOOL_MODE;
     let ret = cond_test_flag(&format!("((({{h1}} ({{h2}} (123 (({test_case}))))"), flags);
 
@@ -5789,7 +5790,7 @@ fn test_message_conditions_two_spends(
     } else {
         let actual_err = ret.unwrap_err().1;
         println!("Error: {actual_err:?}");
-        assert_eq!(ErrorCode::MessageNotSentOrReceived, actual_err);
+        assert_eq!(ValidationErr::MessageNotSentOrReceived, actual_err);
     }
 }
 
