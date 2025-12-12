@@ -1,4 +1,4 @@
-use super::validation_error::{atom, ErrorCode, ValidationErr};
+use super::validation_error::{atom, ValidationErr};
 use clvmr::allocator::{Allocator, NodePtr};
 
 use clvmr::op_utils::u64_from_bytes;
@@ -61,35 +61,43 @@ fn test_sanitize_uint() {
     }
     .unwrap();
 
-    let e = ErrorCode::InvalidCoinAmount;
+    let e = ValidationErr::InvalidCoinAmount;
     let no_leading_zero = a.new_substr(atom, 0, 8).unwrap();
     // this is a negative number, not allowed
     assert!(sanitize_uint(&a, no_leading_zero, 8, e) == Ok(SanitizedUint::NegativeOverflow));
 
     let just_zeros = a.new_substr(atom, 10, 70).unwrap();
     // a zero value must be represented by an empty atom
-    assert_eq!(
-        sanitize_uint(&a, just_zeros, 8, e).unwrap_err().1,
-        ErrorCode::InvalidCoinAmount
+    assert!(
+        matches!(
+            sanitize_uint(&a, just_zeros, 8, e).unwrap_err(),
+            ValidationErr::InvalidCoinAmount)
+        )
     );
 
     let a1 = a.new_substr(atom, 1, 101).unwrap();
-    assert_eq!(
-        sanitize_uint(&a, a1, 8, e).unwrap_err().1,
-        ErrorCode::InvalidCoinAmount
+    assert!(
+        matches!(
+            sanitize_uint(&a, a1, 8, e).unwrap_err(),
+            ValidationErr::InvalidCoinAmount)
+        )
     );
 
     let a1 = a.new_substr(atom, 1, 101).unwrap();
-    assert_eq!(
-        sanitize_uint(&a, a1, 8, e).unwrap_err().1,
-        ErrorCode::InvalidCoinAmount
+    assert!(
+        matches!(
+            sanitize_uint(&a, a1, 8, e).unwrap_err(),
+            ValidationErr::InvalidCoinAmount)
+        )
     );
 
     // a new all-zeros range
     let a1 = a.new_substr(atom, 1000, 1024).unwrap();
-    assert_eq!(
-        sanitize_uint(&a, a1, 8, e).unwrap_err().1,
-        ErrorCode::InvalidCoinAmount
+    assert!(
+        matches!(
+            sanitize_uint(&a, a1, 8, e).unwrap_err(),
+            ValidationErr::InvalidCoinAmount)
+        )
     );
 
     let exceed_maximum = a.new_substr(atom, 100, 110).unwrap();
@@ -97,4 +105,5 @@ fn test_sanitize_uint() {
         sanitize_uint(&a, exceed_maximum, 8, e),
         Ok(SanitizedUint::PositiveOverflow)
     );
+
 }

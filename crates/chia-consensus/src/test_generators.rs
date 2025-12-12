@@ -7,7 +7,7 @@ use crate::allocator::make_allocator;
 use crate::consensus_constants::TEST_CONSTANTS;
 use crate::flags::{COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE, SIMPLE_GENERATOR};
 use crate::run_block_generator::check_generator_node;
-use crate::validation_error::ErrorCode;
+use crate::validation_error::ValidationErr;
 use chia_bls::Signature;
 use chia_protocol::Program;
 use chia_protocol::{Bytes, Bytes48};
@@ -319,15 +319,15 @@ fn run_generator(#[case] name: &str) {
                 &TEST_CONSTANTS,
             );
             assert_eq!(
-                test_conds.unwrap_err().1,
-                ErrorCode::ComplexGeneratorReceived
+                test_conds.unwrap_err(),
+                ValidationErr::ComplexGeneratorReceived
             );
 
             // now lets specifically check the node generator check
             let program = node_from_bytes_backrefs(&mut a, generator.as_ref())
                 .expect("node_from_bytes_backref");
             let res = check_generator_node(&a, program, flags | SIMPLE_GENERATOR);
-            assert_eq!(res.unwrap_err().1, ErrorCode::ComplexGeneratorReceived);
+            assert_eq!(res.unwrap_err(), ValidationErr::ComplexGeneratorReceived);
         } else {
             flags |= SIMPLE_GENERATOR;
             // ensure SIMPLE_GENERATOR fails if there are any block references
@@ -343,7 +343,7 @@ fn run_generator(#[case] name: &str) {
                 None,
                 &TEST_CONSTANTS,
             );
-            assert_eq!(test_conds.unwrap_err().1, ErrorCode::TooManyGeneratorRefs);
+            assert_eq!(test_conds.unwrap_err(), ValidationErr::TooManyGeneratorRefs);
 
             // now lets specifically check the node generator check
             let program = node_from_bytes_backrefs(&mut a, generator.as_ref())

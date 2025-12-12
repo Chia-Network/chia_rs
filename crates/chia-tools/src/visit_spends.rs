@@ -1,4 +1,4 @@
-use chia_consensus::validation_error::{first, ErrorCode, ValidationErr};
+use chia_consensus::validation_error::{first, ValidationErr};
 use chia_protocol::Bytes32;
 use chia_protocol::FullBlock;
 use chia_puzzles::CHIALISP_DESERIALISATION;
@@ -128,7 +128,7 @@ pub fn visit_spends<
         // process the spend
         let destructure_list!(parent_id, puzzle, amount, solution, _spend_level_extra) =
             <match_list!(Bytes32, NodePtr, u64, NodePtr, NodePtr)>::from_clvm(a, spend)
-                .map_err(|_| ValidationErr(spend, ErrorCode::InvalidCondition))?;
+                .map_err(|_| ValidationErr::InvalidCondition(spend))?;
         callback(a, parent_id, amount, puzzle, solution);
     }
     Ok(())
