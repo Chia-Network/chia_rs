@@ -1,6 +1,6 @@
 use crate::condition_sanitizers::sanitize_hash;
 use crate::sanitize_int::{sanitize_uint, SanitizedUint};
-use crate::validation_error::{first, rest, ErrorCode, ValidationErr};
+use crate::validation_error::{first, rest, ValidationErr};
 use chia_protocol::Bytes32;
 use clvmr::{Allocator, NodePtr};
 use std::sync::Arc;
@@ -36,13 +36,13 @@ impl SpendId {
         // we're committing to parent, puzzle and amount. In this case you just
         // specify the coin ID
         if mode == COINID {
-            let coinid = sanitize_hash(a, first(a, *args)?, 32, ErrorCode::InvalidCoinId)?;
+            let coinid = sanitize_hash(a, first(a, *args)?, 32, ValidationErr::InvalidCoinId)?;
             *args = rest(a, *args)?;
             return Ok(Self::CoinId(coinid));
         }
 
         let parent = if (mode & PARENT) != 0 {
-            let parent = sanitize_hash(a, first(a, *args)?, 32, ErrorCode::InvalidParentId)?;
+            let parent = sanitize_hash(a, first(a, *args)?, 32, ValidationErr::InvalidParentId)?;
             *args = rest(a, *args)?;
             parent
         } else {
@@ -50,7 +50,7 @@ impl SpendId {
         };
 
         let puzzle = if (mode & PUZZLE) != 0 {
-            let puzzle = sanitize_hash(a, first(a, *args)?, 32, ErrorCode::InvalidPuzzleHash)?;
+            let puzzle = sanitize_hash(a, first(a, *args)?, 32, ValidationErr::InvalidPuzzleHash)?;
             *args = rest(a, *args)?;
             puzzle
         } else {
@@ -58,13 +58,13 @@ impl SpendId {
         };
 
         let amount = if (mode & AMOUNT) != 0 {
-            let amount = match sanitize_uint(a, first(a, *args)?, 8, ErrorCode::InvalidCoinAmount)?
+            let amount = match sanitize_uint(a, first(a, *args)?, 8, ValidationErr::InvalidCoinAmount)?
             {
                 SanitizedUint::PositiveOverflow => {
-                    return Err(ValidationErr(*args, ErrorCode::CoinAmountExceedsMaximum));
+                    return Err(ValidationErr::CoinAmountExceedsMaximum(*args));
                 }
                 SanitizedUint::NegativeOverflow => {
-                    return Err(ValidationErr(*args, ErrorCode::CoinAmountNegative));
+                    return Err(ValidationErr::CoinAmountNegative(*args));
                 }
                 SanitizedUint::Ok(amount) => amount,
             };
@@ -82,7 +82,7 @@ impl SpendId {
             PARENTAMOUNT => Ok(Self::ParentAmount(parent, amount)),
             PUZZLEAMOUNT => Ok(Self::PuzzleAmount(puzzle, amount)),
             0 => Ok(Self::None),
-            _ => Err(ValidationErr(*args, ErrorCode::InvalidMessageMode)),
+            _ => Err(ValidationErr::InvalidMessageMode(*args)),
         }
     }
 
@@ -105,7 +105,7 @@ impl SpendId {
             PARENTAMOUNT => Ok(Self::ParentAmount(parent, amount)),
             PUZZLEAMOUNT => Ok(Self::PuzzleAmount(puzzle, amount)),
             0 => Ok(Self::None),
-            _ => Err(ValidationErr(NodePtr::NIL, ErrorCode::InvalidMessageMode)),
+            _ => Err(ValidationErr::InvalidMessageMode),
         }
     }
 
