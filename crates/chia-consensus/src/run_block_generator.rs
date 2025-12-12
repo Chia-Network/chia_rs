@@ -6,7 +6,7 @@ use crate::conditions::{
 };
 use crate::consensus_constants::ConsensusConstants;
 use crate::flags::{DONT_VALIDATE_SIGNATURE, SIMPLE_GENERATOR};
-use crate::validation_error::{first, ErrorCode, ValidationErr};
+use crate::validation_error::{first, ValidationErr};
 use chia_bls::{BlsCache, Signature};
 use chia_protocol::{BytesImpl, Coin, CoinSpend, Program};
 use chia_puzzles::{CHIALISP_DESERIALISATION, ROM_BOOTSTRAP_GENERATOR};
@@ -27,7 +27,7 @@ pub fn subtract_cost(
     subtract: Cost,
 ) -> Result<(), ValidationErr> {
     if subtract > *cost_left {
-        Err(ValidationErr(a.nil(), ErrorCode::CostExceeded))
+        Err(ValidationErr::CostExceeded)
     } else {
         *cost_left -= subtract;
         Ok(())
@@ -48,7 +48,7 @@ where
     // need to pass in the deserialization program
     if (flags & SIMPLE_GENERATOR) != 0 {
         if block_refs.into_iter().next().is_some() {
-            return Err(ValidationErr(a.nil(), ErrorCode::TooManyGeneratorRefs));
+            return Err(ValidationErr::TooManyGeneratorRefs);
         }
         return Ok(a.nil());
     }
@@ -146,7 +146,7 @@ where
 fn extract_n<const N: usize>(
     a: &Allocator,
     mut n: NodePtr,
-    e: ErrorCode,
+    e: ValidationErr,
 ) -> Result<[NodePtr; N], ValidationErr> {
     let mut ret: [NodePtr; N] = [NodePtr::NIL; N];
     let mut counter = 0;
@@ -160,7 +160,7 @@ fn extract_n<const N: usize>(
         counter += 1;
     }
     if counter != N - 1 {
-        return Err(ValidationErr(n, e));
+        return Err(e);
     }
     ret[counter] = n;
     Ok(ret)
@@ -177,7 +177,7 @@ pub fn check_generator_quote(
     if flags & SIMPLE_GENERATOR == 0 || program.starts_with(&[0xff, 0x01]) {
         Ok(())
     } else {
-        Err(ValidationErr(a.nil(), ErrorCode::ComplexGeneratorReceived))
+        Err(ValidationErr::ComplexGeneratorReceived)
     }
 }
 
@@ -194,7 +194,7 @@ pub fn check_generator_node(
     }
     // this expects an atom with a single byte value of 1 as the first value in the list
     match <(MatchByte<1>, NodePtr)>::from_clvm(a, program) {
-        Err(..) => Err(ValidationErr(a.nil(), ErrorCode::ComplexGeneratorReceived)),
+        Err(..) => Err(ValidationErr::ComplexGeneratorReceived),
         _ => Ok(()),
     }
 }
@@ -253,7 +253,7 @@ where
     let mut iter = all_spends;
     while let Some((spend, rest)) = a.next(iter) {
         iter = rest;
-        let [_, puzzle, _] = extract_n::<3>(a, spend, ErrorCode::InvalidCondition)?;
+        let [_, puzzle, _] = extract_n::<3>(a, spend, ValidationErr::InvalidCondition)?;
         cache.visit_tree(a, puzzle);
     }
 
@@ -262,7 +262,7 @@ where
         iter = rest;
         // process the spend
         let [parent_id, puzzle, amount, solution, _spend_level_extra] =
-            extract_n::<5>(a, spend, ErrorCode::InvalidCondition)?;
+            extract_n::<5>(a, spend, ValidationErr::InvalidCondition)?;
 
         let Reduction(clvm_cost, conditions) =
             run_program(a, &dialect, puzzle, solution, cost_left)?;
@@ -288,7 +288,7 @@ where
         )?;
     }
     if a.atom_len(iter) != 0 {
-        return Err(ValidationErr(iter, ErrorCode::GeneratorRuntimeError));
+        return Err(ValidationErr::GeneratorRuntimeError(iter));
     }
 
     validate_conditions(a, &ret, &state, a.nil(), flags)?;
@@ -329,12 +329,12 @@ where
 
     let (first, _rest) = a
         .next(res)
-        .ok_or(ValidationErr(res, ErrorCode::GeneratorRuntimeError))?;
+        .ok_or(ValidationErr::GeneratorRuntimeError(res))?;
     let mut cache = TreeCache::default();
     let mut iter = first;
     while let Some((spend, rest)) = a.next(iter) {
         iter = rest;
-        let Ok([_, puzzle, _]) = extract_n::<3>(&a, spend, ErrorCode::InvalidCondition) else {
+        let Ok([_, puzzle, _]) = extract_n::<3>(&a, spend, ValidationErr::InvalidCondition) else {
             continue;
         };
         cache.visit_tree(&a, puzzle);
@@ -343,17 +343,17 @@ where
     while let Some((spend, rest)) = a.next(iter) {
         iter = rest;
         let Ok([parent_id, puzzle, amount, solution, _spend_level_extra]) =
-            extract_n::<5>(&a, spend, ErrorCode::InvalidCondition)
+            extract_n::<5>(&a, spend, ValidationErr::InvalidCondition)
         else {
             continue; // if we fail at this step then maybe the generator was malicious - try other spends
         };
         let puzhash = tree_hash_cached(&a, puzzle, &mut cache);
         let parent_id = BytesImpl::<32>::from_clvm(&a, parent_id)
-            .map_err(|_| ValidationErr(first, ErrorCode::InvalidParentId))?;
+            .map_err(|_| ValidationErr::InvalidParentId(first))?;
         let coin = Coin::new(
             parent_id,
             puzhash.into(),
-            parse_amount(&a, amount, ErrorCode::InvalidCoinAmount)?,
+            parse_amount(&a, amount, ValidationErr::InvalidCoinAmount)?,
         );
         let Ok(puzzle_program) = Program::from_clvm(&a, puzzle) else {
             continue;
@@ -401,16 +401,16 @@ where
         args,
         constants.max_block_cost_clvm,
     )
-    .map_err(|_| ValidationErr(program, ErrorCode::GeneratorRuntimeError))?;
+    .map_err(|_| ValidationErr::GeneratorRuntimeError(program))?;
 
     let (first, _rest) = a
         .next(res)
-        .ok_or(ValidationErr(res, ErrorCode::GeneratorRuntimeError))?;
+        .ok_or(ValidationErr::GeneratorRuntimeError(res))?;
     let mut cache = TreeCache::default();
     let mut iter = first;
     while let Some((spend, rest)) = a.next(iter) {
         iter = rest;
-        let [_, puzzle, _] = extract_n::<3>(&a, spend, ErrorCode::InvalidCondition)?;
+        let [_, puzzle, _] = extract_n::<3>(&a, spend, ValidationErr::InvalidCondition)?;
         cache.visit_tree(&a, puzzle);
     }
     iter = first;
@@ -418,18 +418,18 @@ where
         iter = rest;
         let mut cond_output = Vec::<(u32, Vec<Vec<u8>>)>::new();
         let Ok([parent_id, puzzle, amount, solution, _spend_level_extra]) =
-            extract_n::<5>(&a, spend, ErrorCode::InvalidCondition)
+            extract_n::<5>(&a, spend, ValidationErr::InvalidCondition)
         else {
             continue; // if we fail at this step then maybe the generator was malicious - try other spends
         };
         let puzhash = tree_hash_cached(&a, puzzle, &mut cache);
         let parent_id = BytesImpl::<32>::from_clvm(&a, parent_id)
-            .map_err(|_| ValidationErr(first, ErrorCode::InvalidParentId))?;
+            .map_err(|_| ValidationErr::InvalidParentId(first))?;
         let coin = Coin::new(
             parent_id,
             puzhash.into(),
             u64::from_clvm(&a, amount)
-                .map_err(|_| ValidationErr(first, ErrorCode::InvalidCoinAmount))?,
+                .map_err(|_| ValidationErr::InvalidCoinAmount(first))?,
         );
         let Ok(puzzle_program) = Program::from_clvm(&a, puzzle) else {
             continue;
@@ -445,7 +445,7 @@ where
             solution,
             constants.max_block_cost_clvm,
         )
-        .map_err(|_| ValidationErr(program, ErrorCode::GeneratorRuntimeError))?;
+        .map_err(|_| ValidationErr::GeneratorRuntimeError(program))?;
         // conditions_list is the full returned output of puzzle ran with solution
         // ((51 0xcafef00d 100) (51 0x1234 200) ...)
 

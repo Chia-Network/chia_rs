@@ -8,7 +8,7 @@ use super::opcodes::{
     CREATE_PUZZLE_ANNOUNCEMENT, REMARK, RESERVE_FEE,
 };
 use crate::flags::MEMPOOL_MODE;
-use crate::validation_error::{first, ErrorCode, ValidationErr};
+use crate::validation_error::{first, ValidationErr};
 use chia_sha2::Sha256;
 use clvmr::chia_dialect::ENABLE_KECCAK_OPS_OUTSIDE_GUARD;
 use clvmr::{Allocator, NodePtr, SExp};
@@ -24,12 +24,12 @@ fn hash_atom_list(
 ) -> Result<NodePtr, ValidationErr> {
     while count > 0 {
         let Some((arg, next)) = a.next(args) else {
-            return Err(ValidationErr(args, ErrorCode::InvalidCondition));
+            return Err(ValidationErr::InvalidCondition(args));
         };
         args = next;
         count -= 1;
         if !matches!(a.sexp(arg), SExp::Atom) {
-            return Err(ValidationErr(arg, ErrorCode::InvalidCondition));
+            return Err(ValidationErr::InvalidCondition(arg));
         }
         let buf = a.atom(arg);
 
@@ -136,7 +136,7 @@ pub fn compute_puzzle_fingerprint(
                 hash_atom_list(&mut fingerprint, a, c, 1)?;
             }
             _ => {
-                return Err(ValidationErr(c, ErrorCode::InvalidConditionOpcode));
+                return Err(ValidationErr::InvalidConditionOpcode(c));
             }
         }
     }
@@ -215,9 +215,11 @@ mod tests {
         let mut ctx1 = Sha256::new();
 
         // we expect 2 elements, but there's only 1
-        assert_eq!(
-            hash_atom_list(&mut ctx1, &a, list, 2).unwrap_err().1,
-            ErrorCode::InvalidCondition
+        assert!(
+            matches!(
+                hash_atom_list(&mut ctx1, &a, list, 2).unwrap_err(),
+                ValidationErr::InvalidCondition
+            )
         );
     }
 
@@ -230,9 +232,11 @@ mod tests {
         let mut ctx1 = Sha256::new();
 
         // we expect all elements to be atoms, but we encountered a pair
-        assert_eq!(
-            hash_atom_list(&mut ctx1, &a, list, 1).unwrap_err().1,
-            ErrorCode::InvalidCondition
+        assert!(
+            matches!(
+                hash_atom_list(&mut ctx1, &a, list, 1).unwrap_err(),
+                ValidationErr::InvalidCondition
+            )
         );
     }
 
