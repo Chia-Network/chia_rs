@@ -1,5 +1,5 @@
 use crate::merkle::error::Error;
-use crate::{try_get_block, Block, Node, TreeIndex, BLOCK_SIZE};
+use crate::{BLOCK_SIZE, Block, Node, TreeIndex, try_get_block};
 use std::collections::{HashSet, VecDeque};
 
 struct LeftChildFirstIteratorItem {
@@ -84,7 +84,7 @@ impl Iterator for LeftChildFirstIterator<'_> {
                                 return Some(Err(Error::LeafCannotBeParent()));
                             }
                             Err(Error::BlockIndexOutOfBounds(_)) => {
-                                return Some(Err(Error::ReferenceToUnknownParent()))
+                                return Some(Err(Error::ReferenceToUnknownParent()));
                             }
                             Err(e) => return Some(Err(e)),
                         }
@@ -247,7 +247,7 @@ mod tests {
     use crate::merkle::test_util::open_dot;
     use crate::merkle::test_util::traversal_blob;
     use crate::{Hash, MerkleBlob, NodeType};
-    use expect_test::{expect, Expect};
+    use expect_test::{Expect, expect};
     use rstest::rstest;
 
     fn iterator_test_reference(index: TreeIndex, block: &Block) -> (u32, NodeType, i64, i64, Hash) {

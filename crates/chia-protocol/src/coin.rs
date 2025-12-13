@@ -2,8 +2,8 @@ use crate::{Bytes32, BytesImpl};
 use chia_sha2::Sha256;
 use chia_streamable_macro::streamable;
 use clvm_traits::{
-    clvm_list, destructure_list, match_list, ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError,
-    ToClvm, ToClvmError,
+    ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError, ToClvm, ToClvmError, clvm_list,
+    destructure_list, match_list,
 };
 
 #[cfg(feature = "py-bindings")]
@@ -93,8 +93,8 @@ impl<N, D: ClvmDecoder<Node = N>> FromClvm<D> for Coin {
 mod tests {
     use super::*;
     use clvmr::{
-        serde::{node_from_bytes, node_to_bytes},
         Allocator,
+        serde::{node_from_bytes, node_to_bytes},
     };
     use rstest::rstest;
 

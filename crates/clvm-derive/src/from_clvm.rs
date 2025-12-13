@@ -1,11 +1,11 @@
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, ToTokens};
-use syn::{parse_quote, DeriveInput, GenericParam, Ident};
+use quote::{ToTokens, quote};
+use syn::{DeriveInput, GenericParam, Ident, parse_quote};
 
 use crate::{
     crate_name,
-    helpers::{add_trait_bounds, variant_discriminants, DiscriminantInfo},
-    parser::{parse, EnumInfo, FieldInfo, ParsedInfo, Repr, StructInfo, StructKind, VariantKind},
+    helpers::{DiscriminantInfo, add_trait_bounds, variant_discriminants},
+    parser::{EnumInfo, FieldInfo, ParsedInfo, Repr, StructInfo, StructKind, VariantKind, parse},
 };
 
 pub fn from_clvm(ast: DeriveInput) -> TokenStream {

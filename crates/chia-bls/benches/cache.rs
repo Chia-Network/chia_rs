@@ -1,8 +1,8 @@
 use chia_bls::aggregate_verify;
-use chia_bls::{sign, BlsCache, SecretKey, Signature};
-use criterion::{criterion_group, criterion_main, Criterion};
+use chia_bls::{BlsCache, SecretKey, Signature, sign};
+use criterion::{Criterion, criterion_group, criterion_main};
 use rand::rngs::StdRng;
-use rand::{seq::SliceRandom, Rng, SeedableRng};
+use rand::{Rng, SeedableRng, seq::SliceRandom};
 
 fn cache_benchmark(c: &mut Criterion) {
     let mut rng = StdRng::seed_from_u64(1337);

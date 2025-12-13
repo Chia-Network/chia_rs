@@ -1,7 +1,7 @@
 use crate::consensus_constants::ConsensusConstants;
 use crate::opcodes::{
-    ConditionOpcode, AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT,
-    AGG_SIG_PARENT_PUZZLE, AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT,
+    AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT, AGG_SIG_PARENT_PUZZLE,
+    AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT, ConditionOpcode,
 };
 use crate::owned_conditions::OwnedSpendConditions;
 use chia_protocol::Coin;
@@ -78,8 +78,8 @@ mod tests {
     use super::*;
     use crate::allocator::make_allocator;
     use crate::consensus_constants::TEST_CONSTANTS;
-    use clvmr::chia_dialect::LIMIT_HEAP;
     use clvmr::Allocator;
+    use clvmr::chia_dialect::LIMIT_HEAP;
     use hex_literal::hex;
     use rstest::rstest;
 

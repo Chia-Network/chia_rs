@@ -3,7 +3,7 @@
 use clvm_traits::{ClvmEncoder, ToClvm, ToClvmError};
 use clvmr::Atom;
 
-use crate::{tree_hash_atom, tree_hash_pair, TreeHash};
+use crate::{TreeHash, tree_hash_atom, tree_hash_pair};
 
 pub trait ToTreeHash {
     fn tree_hash(&self) -> TreeHash;
@@ -49,7 +49,7 @@ mod tests {
 
     use clvm_traits::ToClvm;
 
-    use crate::{curry_tree_hash, CurriedProgram};
+    use crate::{CurriedProgram, curry_tree_hash};
 
     #[test]
     fn test_tree_hash() {

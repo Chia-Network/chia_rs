@@ -4,7 +4,7 @@ use chia_puzzles::DID_INNERPUZ_HASH;
 use clvm_traits::{FromClvm, ToClvm};
 use clvm_utils::{CurriedProgram, ToTreeHash, TreeHash};
 
-use crate::{singleton::SingletonStruct, CoinProof};
+use crate::{CoinProof, singleton::SingletonStruct};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ToClvm, FromClvm)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -82,9 +82,8 @@ mod tests {
     use chia_puzzles::DID_INNERPUZ;
     use clvm_traits::{clvm_list, match_list};
     use clvmr::{
-        run_program,
+        Allocator, ChiaDialect, run_program,
         serde::{node_from_bytes, node_to_bytes},
-        Allocator, ChiaDialect,
     };
 
     use super::*;

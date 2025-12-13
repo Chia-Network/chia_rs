@@ -55,7 +55,7 @@ impl Payment {
 #[cfg(test)]
 mod tests {
     use clvm_utils::tree_hash;
-    use clvmr::{serde::node_from_bytes, Allocator};
+    use clvmr::{Allocator, serde::node_from_bytes};
     use hex_literal::hex;
 
     use super::*;

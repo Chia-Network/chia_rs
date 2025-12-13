@@ -1,17 +1,17 @@
-use chia_bls::{sign, SecretKey, Signature};
+use chia_bls::{SecretKey, Signature, sign};
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::make_aggsig_final_message::u64_to_bytes;
 use chia_sha2::Sha256;
 use linreg::linear_regression_of;
 use std::time::Instant;
 // use chia_consensus::gen::conditions::parse_conditions;
+use chia_consensus::conditions::{MempoolVisitor, SpendBundleConditions};
 use chia_consensus::conditions::{
+    ParseState, // SpendConditions,
     process_single_spend,
     validate_conditions,
     validate_signature,
-    ParseState, // SpendConditions,
 };
-use chia_consensus::conditions::{MempoolVisitor, SpendBundleConditions};
 use chia_consensus::opcodes;
 use chia_consensus::opcodes::ConditionOpcode;
 use chia_consensus::spend_visitor::SpendVisitor;

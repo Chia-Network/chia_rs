@@ -1,5 +1,5 @@
 use chia_sha2::Sha256;
-use chia_traits::{chia_error, read_bytes, Streamable};
+use chia_traits::{Streamable, chia_error, read_bytes};
 use clvm_traits::{ClvmDecoder, ClvmEncoder, FromClvm, FromClvmError, ToClvm, ToClvmError};
 use clvm_utils::TreeHash;
 use clvmr::Atom;
@@ -504,8 +504,8 @@ mod tests {
     use super::*;
 
     use clvmr::{
-        serde::{node_from_bytes, node_to_bytes},
         Allocator,
+        serde::{node_from_bytes, node_to_bytes},
     };
     use rstest::rstest;
 

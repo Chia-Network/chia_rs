@@ -1,8 +1,8 @@
-use pyo3::exceptions::PyValueError;
-use pyo3::types::PyAnyMethods;
 use pyo3::Bound;
 use pyo3::PyAny;
 use pyo3::PyResult;
+use pyo3::exceptions::PyValueError;
+use pyo3::types::PyAnyMethods;
 
 pub trait FromJsonDict {
     fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self>

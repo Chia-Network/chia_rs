@@ -1,4 +1,4 @@
-use clvmr::{allocator::NodePtr, allocator::SExp, Allocator};
+use clvmr::{Allocator, allocator::NodePtr, allocator::SExp};
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use std::rc::Rc;

@@ -1,12 +1,12 @@
 use crate::merkle::error::Error;
-use crate::{block_range, internal_hash, Side};
+use crate::{Side, block_range, internal_hash};
 use chia_protocol::Bytes32;
 #[cfg(feature = "py-bindings")]
 use chia_py_streamable_macro::{PyJsonDict, PyStreamable};
 use chia_streamable_macro::Streamable;
 use chia_traits::Streamable;
 #[cfg(feature = "py-bindings")]
-use pyo3::{pyclass, pymethods, Bound, FromPyObject, IntoPyObject, PyAny, PyErr, Python};
+use pyo3::{Bound, FromPyObject, IntoPyObject, PyAny, PyErr, Python, pyclass, pymethods};
 use std::ops::Range;
 
 pub type TreeIndexType = u32;
@@ -244,8 +244,8 @@ impl Node {
 
     pub fn set_hash(&mut self, hash: Hash) {
         match self {
-            Node::Internal(ref mut node) => node.hash = hash,
-            Node::Leaf(ref mut node) => node.hash = hash,
+            Node::Internal(node) => node.hash = hash,
+            Node::Leaf(node) => node.hash = hash,
         }
     }
 

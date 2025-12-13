@@ -1,7 +1,7 @@
-use chia_bls::sign;
 use chia_bls::Signature;
+use chia_bls::sign;
 use chia_bls::{PublicKey, SecretKey};
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 

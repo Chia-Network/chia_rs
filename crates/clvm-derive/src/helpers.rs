@@ -1,6 +1,6 @@
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
-use syn::{parse_quote, Expr, GenericParam, Generics, Ident, TypeParamBound};
+use syn::{Expr, GenericParam, Generics, Ident, TypeParamBound, parse_quote};
 
 use crate::parser::EnumInfo;
 

@@ -1,8 +1,8 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
-use chia_bls::{sign, verify};
 use chia_bls::{DerivableKey, PublicKey, SecretKey};
+use chia_bls::{sign, verify};
 
 fuzz_target!(|data: &[u8]| {
     if data.len() < 32 {

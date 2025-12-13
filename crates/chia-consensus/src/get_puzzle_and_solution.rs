@@ -1,6 +1,6 @@
-use crate::validation_error::{atom, check_nil, first, next, rest, ErrorCode, ValidationErr};
+use crate::validation_error::{ErrorCode, ValidationErr, atom, check_nil, first, next, rest};
 use chia_protocol::Coin;
-use clvm_utils::{tree_hash_cached, TreeCache};
+use clvm_utils::{TreeCache, tree_hash_cached};
 use clvmr::allocator::{Allocator, Atom, NodePtr};
 use clvmr::op_utils::u64_from_bytes;
 
@@ -69,7 +69,7 @@ mod test {
     use clvm_utils::tree_hash;
     use clvmr::reduction::Reduction;
     use clvmr::serde::node_from_bytes_backrefs;
-    use clvmr::{run_program, ChiaDialect};
+    use clvmr::{ChiaDialect, run_program};
     use rstest::rstest;
     use std::collections::HashSet;
     use std::fs;

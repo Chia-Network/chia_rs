@@ -1,6 +1,6 @@
 use syn::{DataEnum, Ident};
 
-use super::{parse_clvm_options, parse_variant, ClvmOptions, Repr, VariantInfo};
+use super::{ClvmOptions, Repr, VariantInfo, parse_clvm_options, parse_variant};
 
 pub struct EnumInfo {
     pub variants: Vec<VariantInfo>,

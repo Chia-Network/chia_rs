@@ -1,8 +1,8 @@
 use chia_bls::{
-    aggregate_verify, aggregate_verify_gt, hash_to_g2, sign, GTElement, PublicKey, SecretKey,
-    Signature,
+    GTElement, PublicKey, SecretKey, Signature, aggregate_verify, aggregate_verify_gt, hash_to_g2,
+    sign,
 };
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 

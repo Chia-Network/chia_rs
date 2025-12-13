@@ -1,4 +1,4 @@
-use chia_streamable_macro::{streamable, Streamable};
+use chia_streamable_macro::{Streamable, streamable};
 
 use crate::Coin;
 use crate::CoinState;

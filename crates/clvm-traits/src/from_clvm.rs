@@ -2,7 +2,7 @@ use std::{rc::Rc, sync::Arc};
 
 use num_bigint::BigInt;
 
-use crate::{decode_number, ClvmDecoder, FromClvmError};
+use crate::{ClvmDecoder, FromClvmError, decode_number};
 
 pub trait FromClvm<D>: Sized
 where
@@ -294,7 +294,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use clvmr::{serde::node_from_bytes, Allocator};
+    use clvmr::{Allocator, serde::node_from_bytes};
 
     use super::*;
 
@@ -406,7 +406,10 @@ mod tests {
         );
 
         assert_eq!(
-            decode(a, "b0b8f7dd239557ff8c49d338f89ac1a258a863fa52cd0a502e3aaae4b6738ba39ac8d982215aa3fa16bc5f8cb7e44b954d"),
+            decode(
+                a,
+                "b0b8f7dd239557ff8c49d338f89ac1a258a863fa52cd0a502e3aaae4b6738ba39ac8d982215aa3fa16bc5f8cb7e44b954d"
+            ),
             Ok(PublicKey::from_bytes(&bytes).unwrap())
         );
         assert_eq!(
@@ -434,7 +437,10 @@ mod tests {
             "
         );
         assert_eq!(
-            decode(a, "c060a3994dc9c0ef41a903d3335f0afe42ba16c88e7881706798492da4a1653cd10c69c841eeb56f44ae005e2bad27fb7ebb16ce8bbfbd708ea91dd4ff24f030497b50e694a8270eccd07dbc206b8ffe0c34a9ea81291785299fae8206a1e1bbc1d1"),
+            decode(
+                a,
+                "c060a3994dc9c0ef41a903d3335f0afe42ba16c88e7881706798492da4a1653cd10c69c841eeb56f44ae005e2bad27fb7ebb16ce8bbfbd708ea91dd4ff24f030497b50e694a8270eccd07dbc206b8ffe0c34a9ea81291785299fae8206a1e1bbc1d1"
+            ),
             Ok(Signature::from_bytes(&bytes).unwrap())
         );
         assert_eq!(
@@ -505,7 +511,10 @@ mod tests {
         );
 
         assert_eq!(
-            decode(a, "c0406f07897d1d28b8698af5dec5ca06907b1304b227dc9f740b8c4065cf04d5e8653ae66aa17063e7120ee7f22fae54373b35230e259244b90400b65cf00d86c591"),
+            decode(
+                a,
+                "c0406f07897d1d28b8698af5dec5ca06907b1304b227dc9f740b8c4065cf04d5e8653ae66aa17063e7120ee7f22fae54373b35230e259244b90400b65cf00d86c591"
+            ),
             Ok(K1Signature::from_bytes(&bytes).unwrap())
         );
         assert_eq!(
@@ -524,7 +533,10 @@ mod tests {
         );
 
         assert_eq!(
-            decode(a, "c040550e83da8cf9b2d407ed093ae213869ebd7ceaea603920f87d535690e52b40537915d8fe3d5a96c87e700c56dc638c32f7a2954f2ba409367d1a132000cc2228"),
+            decode(
+                a,
+                "c040550e83da8cf9b2d407ed093ae213869ebd7ceaea603920f87d535690e52b40537915d8fe3d5a96c87e700c56dc638c32f7a2954f2ba409367d1a132000cc2228"
+            ),
             Ok(K1Signature::from_bytes(&bytes).unwrap())
         );
         assert_eq!(

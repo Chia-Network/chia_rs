@@ -15,7 +15,7 @@ mod tests {
     fn test_secp256k1_key() -> anyhow::Result<()> {
         let mut rng = ChaCha8Rng::seed_from_u64(1337);
 
-        let sk = K1SecretKey::from_bytes(&rng.gen())?;
+        let sk = K1SecretKey::from_bytes(&rng.r#gen())?;
         assert_eq!(
             hex::encode(sk.to_bytes()),
             "ae491886341a539a1ccfaffcc9c78650ad1adc6270620c882b8d29bf6b9bc4cd"
@@ -36,7 +36,7 @@ mod tests {
             "02827cdbbed87e45683d448be2ea15fb72ba3732247bda18474868cf5456123fb4"
         );
 
-        let message_hash: [u8; 32] = rng.gen();
+        let message_hash: [u8; 32] = rng.r#gen();
         let sig = sk.sign_prehashed(&message_hash)?;
         assert_eq!(
             hex::encode(sig.to_bytes()),
@@ -60,7 +60,7 @@ mod tests {
     fn test_secp256r1_key() -> anyhow::Result<()> {
         let mut rng = ChaCha8Rng::seed_from_u64(1337);
 
-        let sk = R1SecretKey::from_bytes(&rng.gen())?;
+        let sk = R1SecretKey::from_bytes(&rng.r#gen())?;
         assert_eq!(
             hex::encode(sk.to_bytes()),
             "ae491886341a539a1ccfaffcc9c78650ad1adc6270620c882b8d29bf6b9bc4cd"
@@ -81,7 +81,7 @@ mod tests {
             "037dc85102f5eb7867b9580fea8b242c774173e1a47db320c798242d3a7a7579e4"
         );
 
-        let message_hash: [u8; 32] = rng.gen();
+        let message_hash: [u8; 32] = rng.r#gen();
         let sig = sk.sign_prehashed(&message_hash)?;
         assert_eq!(
             hex::encode(sig.to_bytes()),

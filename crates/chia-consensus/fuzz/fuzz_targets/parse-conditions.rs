@@ -2,7 +2,7 @@
 use libfuzzer_sys::{arbitrary, fuzz_target};
 
 use chia_consensus::conditions::{
-    parse_conditions, MempoolVisitor, ParseState, SpendBundleConditions, SpendConditions,
+    MempoolVisitor, ParseState, SpendBundleConditions, SpendConditions, parse_conditions,
 };
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::spend_visitor::SpendVisitor;

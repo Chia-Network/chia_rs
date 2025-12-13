@@ -2,8 +2,8 @@ use std::str::FromStr;
 
 use rcgen::{CertificateParams, DistinguishedName, DnType, Ia5String, KeyPair, SanType};
 use rsa::{
-    pkcs8::{EncodePrivateKey, LineEnding},
     RsaPrivateKey,
+    pkcs8::{EncodePrivateKey, LineEnding},
 };
 use time::{Date, Duration, Month, OffsetDateTime, PrimitiveDateTime, Time};
 

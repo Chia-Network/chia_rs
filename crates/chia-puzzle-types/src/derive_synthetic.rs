@@ -60,7 +60,7 @@ fn synthetic_offset(public_key: &PublicKey, hidden_puzzle_hash: &[u8; 32]) -> Se
 mod tests {
     use super::*;
 
-    use chia_bls::{master_to_wallet_unhardened_intermediate, DerivableKey};
+    use chia_bls::{DerivableKey, master_to_wallet_unhardened_intermediate};
     use hex::ToHex;
     use hex_literal::hex;
 
@@ -82,7 +82,7 @@ mod tests {
             "b27b87ea6b1e9653b54d2377e95708444f886ca0fc1728889bf3afee2f8cbe4c618b7127e9f38a189e6d56dd7933cfff",
             "b46d152384d888737aebe52bb9127314f678733c45948b00075575db79b732a2bbfa47dab0886863ade7f5fbdc4a14fa",
             "ada6da1ce6464d22dcbc1fe4396a0d1aa8a486fc7094f89a5d11a81cf75a1209eca7bae3b1d943dcff6e39c163d29fb5",
-            "b3b4ceea11bbc6fafb5800caa593385644a3262245357e5013be5c1cf622bf7cb0b667e586269c346459c3b5faf0eaef"
+            "b3b4ceea11bbc6fafb5800caa593385644a3262245357e5013be5c1cf622bf7cb0b667e586269c346459c3b5faf0eaef",
         ];
 
         let sk = SecretKey::from_bytes(&hex!(

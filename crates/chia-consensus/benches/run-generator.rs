@@ -3,9 +3,9 @@ use chia_consensus::additions_and_removals::additions_and_removals;
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::flags::DONT_VALIDATE_SIGNATURE;
 use chia_consensus::run_block_generator::{run_block_generator, run_block_generator2};
-use clvmr::serde::{node_from_bytes, node_to_bytes_backrefs};
 use clvmr::Allocator;
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use clvmr::serde::{node_from_bytes, node_to_bytes_backrefs};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use std::fs;
 use std::time::Instant;
 
@@ -46,7 +46,7 @@ fn run(c: &mut Criterion) {
             node_to_bytes_backrefs(&a, input).expect("failed to compress generator")
         };
 
-        for (gen, name_suffix) in &[(generator, ""), (compressed_generator, "-compressed")] {
+        for (generator, name_suffix) in &[(generator, ""), (compressed_generator, "-compressed")] {
             group.bench_function(format!("run_block_generator {name}{name_suffix}"), |b| {
                 b.iter(|| {
                     let mut a = Allocator::new();
@@ -54,7 +54,7 @@ fn run(c: &mut Criterion) {
 
                     let conds = run_block_generator(
                         &mut a,
-                        gen,
+                        generator,
                         &block_refs,
                         11_000_000_000,
                         DONT_VALIDATE_SIGNATURE,
@@ -74,7 +74,7 @@ fn run(c: &mut Criterion) {
 
                     let conds = run_block_generator2(
                         &mut a,
-                        gen,
+                        generator,
                         &block_refs,
                         11_000_000_000,
                         DONT_VALIDATE_SIGNATURE,
@@ -90,7 +90,8 @@ fn run(c: &mut Criterion) {
             group.bench_function(format!("additions_and_removals {name}{name_suffix}"), |b| {
                 b.iter(|| {
                     let start = Instant::now();
-                    let results = additions_and_removals(gen, &block_refs, 0, &TEST_CONSTANTS);
+                    let results =
+                        additions_and_removals(generator, &block_refs, 0, &TEST_CONSTANTS);
                     let _ = black_box(results);
                     start.elapsed()
                 });

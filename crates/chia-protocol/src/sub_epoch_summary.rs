@@ -3,8 +3,8 @@ use chia_streamable_macro::streamable;
 use chia_traits::{Result, Streamable};
 use std::io::Cursor;
 
-use crate::utils::{parse, stream, update_digest};
 use crate::Bytes32;
+use crate::utils::{parse, stream, update_digest};
 
 #[streamable(no_streamable)]
 pub struct SubEpochSummary {

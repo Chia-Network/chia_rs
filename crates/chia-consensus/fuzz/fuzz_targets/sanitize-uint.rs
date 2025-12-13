@@ -1,7 +1,7 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
-use chia_consensus::sanitize_int::{sanitize_uint, SanitizedUint};
+use chia_consensus::sanitize_int::{SanitizedUint, sanitize_uint};
 use chia_consensus::validation_error::{ErrorCode, ValidationErr};
 use clvmr::allocator::Allocator;
 

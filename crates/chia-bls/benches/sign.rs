@@ -1,5 +1,5 @@
-use chia_bls::{sign, SecretKey};
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use chia_bls::{SecretKey, sign};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 

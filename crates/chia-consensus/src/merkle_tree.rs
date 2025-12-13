@@ -1,6 +1,6 @@
 // This file contains the code used to create a full MerkleSet and is heavily reliant on the code in merkle_set.rs.
 
-use crate::merkle_set::{hash, NodeType, BLANK};
+use crate::merkle_set::{BLANK, NodeType, hash};
 use hex_literal::hex;
 
 #[cfg(feature = "py-bindings")]
@@ -747,19 +747,28 @@ mod tests {
         let (true, proof) = tree.generate_proof(&b).unwrap() else {
             panic!("failed to generate proof");
         };
-        assert_eq!(hex::encode(proof), "0200020002020201c00000000000000000000000000000000000000000000000000000000000000001c8000000000000000000000000000000000000000000000000000000000000000000");
+        assert_eq!(
+            hex::encode(proof),
+            "0200020002020201c00000000000000000000000000000000000000000000000000000000000000001c8000000000000000000000000000000000000000000000000000000000000000000"
+        );
 
         // in fact, the proof for a looks the same, since a and b are siblings
         let (true, proof) = tree.generate_proof(&b).unwrap() else {
             panic!("failed to generate proof");
         };
-        assert_eq!(hex::encode(proof), "0200020002020201c00000000000000000000000000000000000000000000000000000000000000001c8000000000000000000000000000000000000000000000000000000000000000000");
+        assert_eq!(
+            hex::encode(proof),
+            "0200020002020201c00000000000000000000000000000000000000000000000000000000000000001c8000000000000000000000000000000000000000000000000000000000000000000"
+        );
 
         // proofs of exclusion must also be complete
         let (false, proof) = tree.generate_proof(&c).unwrap() else {
             panic!("failed to generate proof");
         };
-        assert_eq!(hex::encode(proof), "0200020002020201c00000000000000000000000000000000000000000000000000000000000000001c8000000000000000000000000000000000000000000000000000000000000000000");
+        assert_eq!(
+            hex::encode(proof),
+            "0200020002020201c00000000000000000000000000000000000000000000000000000000000000001c8000000000000000000000000000000000000000000000000000000000000000000"
+        );
     }
 
     #[test]

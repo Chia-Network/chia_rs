@@ -1,5 +1,5 @@
 #![no_main]
-use chia_consensus::merkle_tree::{validate_merkle_proof, MerkleSet};
+use chia_consensus::merkle_tree::{MerkleSet, validate_merkle_proof};
 use hex_literal::hex;
 use libfuzzer_sys::fuzz_target;
 

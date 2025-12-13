@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use chia_puzzle_types::{nft::NftMetadata, Proof};
+use chia_puzzle_types::{Proof, nft::NftMetadata};
 use clvm_traits::{FromClvm, ToClvm};
 use clvmr::Allocator;
 use libfuzzer_sys::arbitrary::{Arbitrary, Unstructured};

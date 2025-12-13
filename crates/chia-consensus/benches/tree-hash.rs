@@ -1,6 +1,6 @@
-use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs, node_to_bytes_backrefs};
 use clvmr::Allocator;
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs, node_to_bytes_backrefs};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use std::fs::read_to_string;
 use std::time::Instant;
 
@@ -28,24 +28,26 @@ fn run(c: &mut Criterion) {
             node_to_bytes_backrefs(&a, input).expect("failed to compress generator")
         };
 
-        for (gen, name_suffix) in &[(&generator, ""), (&compressed_generator, "-compressed")] {
+        for (generator, name_suffix) in &[(&generator, ""), (&compressed_generator, "-compressed")]
+        {
             let mut a = Allocator::new();
-            let gen = node_from_bytes_backrefs(&mut a, gen).expect("parse generator");
+            let generator = node_from_bytes_backrefs(&mut a, generator).expect("parse generator");
 
             group.bench_function(format!("tree-hash {name}{name_suffix}"), |b| {
                 b.iter(|| {
                     let start = Instant::now();
-                    let _ = black_box(clvm_utils::tree_hash(&a, gen));
+                    let _ = black_box(clvm_utils::tree_hash(&a, generator));
                     start.elapsed()
                 });
             });
         }
 
-        for (gen, name_suffix) in &[(&generator, ""), (&compressed_generator, "-compressed")] {
+        for (generator, name_suffix) in &[(&generator, ""), (&compressed_generator, "-compressed")]
+        {
             group.bench_function(format!("tree-hash-from-stream {name}{name_suffix}"), |b| {
                 b.iter(|| {
                     let start = Instant::now();
-                    let _ = black_box(clvm_utils::tree_hash_from_bytes(gen));
+                    let _ = black_box(clvm_utils::tree_hash_from_bytes(generator));
                     start.elapsed()
                 });
             });

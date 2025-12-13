@@ -1,9 +1,9 @@
 use std::fmt;
 
 use syn::{
+    Attribute, Expr, Ident, Token,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
-    Attribute, Expr, Ident, Token,
 };
 
 /// The representation of fields when converted to and from CLVM.

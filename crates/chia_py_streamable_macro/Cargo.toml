@@ -1,7 +1,7 @@
 [package]
 name = "chia_py_streamable_macro"
 version = "0.35.0"
-edition = "2021"
+edition = "2024"
 license = "Apache-2.0"
 description = "Derive macro to create python bindings for Chia types"
 authors = ["Arvid Norberg <arvid@libtorrent.org>"]

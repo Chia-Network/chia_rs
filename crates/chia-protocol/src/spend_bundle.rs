@@ -1,15 +1,15 @@
-use crate::coin_spend::CoinSpend;
 use crate::Bytes32;
 use crate::Coin;
+use crate::coin_spend::CoinSpend;
 use chia_bls::G2Element;
 use chia_streamable_macro::streamable;
 use chia_traits::Streamable;
 use clvm_traits::FromClvm;
+use clvmr::Allocator;
 use clvmr::allocator::{NodePtr, SExp};
 use clvmr::cost::Cost;
 use clvmr::error::EvalErr;
 use clvmr::op_utils::{first, rest};
-use clvmr::Allocator;
 
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
@@ -65,7 +65,7 @@ impl SpendBundle {
                 let buf = match a.sexp(op) {
                     SExp::Atom => a.atom(op),
                     SExp::Pair(..) => {
-                        return Err(EvalErr::InvalidOpArg(op, "invalid condition".to_string()))
+                        return Err(EvalErr::InvalidOpArg(op, "invalid condition".to_string()));
                     }
                 };
                 let buf = buf.as_ref();

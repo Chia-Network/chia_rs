@@ -3,7 +3,7 @@ use std::{rc::Rc, sync::Arc};
 use clvmr::Atom;
 use num_bigint::BigInt;
 
-use crate::{encode_number, ClvmEncoder, ToClvmError};
+use crate::{ClvmEncoder, ToClvmError, encode_number};
 
 pub trait ToClvm<E>
 where
@@ -215,7 +215,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use clvmr::{serde::node_to_bytes, Allocator};
+    use clvmr::{Allocator, serde::node_to_bytes};
     use hex::ToHex;
 
     use super::*;

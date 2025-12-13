@@ -1,11 +1,11 @@
 use chia_streamable_macro::streamable;
 
-use crate::unfinished_header_block::UnfinishedHeaderBlock;
 use crate::Bytes;
 use crate::Bytes32;
 use crate::EndOfSubSlotBundle;
 use crate::RewardChainBlock;
 use crate::VDFProof;
+use crate::unfinished_header_block::UnfinishedHeaderBlock;
 use crate::{Foliage, FoliageTransactionBlock, TransactionsInfo};
 use chia_traits::Streamable;
 

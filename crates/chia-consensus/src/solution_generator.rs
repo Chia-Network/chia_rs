@@ -111,7 +111,7 @@ mod tests {
     use super::*;
     use chia_protocol::Program;
     use chia_traits::Streamable;
-    use clvmr::{run_program, ChiaDialect};
+    use clvmr::{ChiaDialect, run_program};
     use hex_literal::hex;
     use rstest::rstest;
 

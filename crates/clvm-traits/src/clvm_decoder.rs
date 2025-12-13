@@ -1,9 +1,9 @@
-use clvmr::{allocator::SExp, Allocator, Atom, NodePtr};
+use clvmr::{Allocator, Atom, NodePtr, allocator::SExp};
 use num_bigint::BigInt;
 
 use crate::{
-    destructure_list, destructure_quote, match_list, match_quote, FromClvm, FromClvmError,
-    MatchByte,
+    FromClvm, FromClvmError, MatchByte, destructure_list, destructure_quote, match_list,
+    match_quote,
 };
 
 pub trait ClvmDecoder: Sized {

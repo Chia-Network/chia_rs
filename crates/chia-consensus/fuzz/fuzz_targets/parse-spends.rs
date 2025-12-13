@@ -2,7 +2,7 @@
 use libfuzzer_sys::{arbitrary, fuzz_target};
 
 use chia_bls::Signature;
-use chia_consensus::conditions::{parse_spends, MempoolVisitor};
+use chia_consensus::conditions::{MempoolVisitor, parse_spends};
 use clvmr::{Allocator, NodePtr};
 
 use chia_consensus::consensus_constants::TEST_CONSTANTS;

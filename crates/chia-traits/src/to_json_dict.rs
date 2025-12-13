@@ -1,6 +1,6 @@
+use pyo3::BoundObject;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
-use pyo3::BoundObject;
 
 pub trait ToJsonDict {
     fn to_json_dict(&self, py: Python<'_>) -> PyResult<Py<PyAny>>;

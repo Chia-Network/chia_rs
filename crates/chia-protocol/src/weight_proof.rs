@@ -3,12 +3,12 @@ use chia_streamable_macro::streamable;
 use chia_traits::{Result, Streamable};
 use std::io::Cursor;
 
-use crate::utils::{parse, stream, update_digest};
 use crate::Bytes32;
 use crate::EndOfSubSlotBundle;
 use crate::HeaderBlock;
 use crate::ProofOfSpace;
 use crate::RewardChainBlock;
+use crate::utils::{parse, stream, update_digest};
 use crate::{VDFInfo, VDFProof};
 
 #[streamable(no_streamable)]
