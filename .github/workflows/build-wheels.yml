@@ -126,7 +126,7 @@ jobs:
         uses: Chia-Network/actions/clean-workspace@main
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -216,7 +216,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -251,7 +251,7 @@ jobs:
         uses: Chia-Network/actions/clean-workspace@main
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -283,7 +283,7 @@ jobs:
     runs-on: ubuntu-latest
     name: cargo fmt
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 1
 
@@ -301,7 +301,7 @@ jobs:
   clippy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@1.92.0
         with:
           components: clippy
@@ -315,7 +315,7 @@ jobs:
     permissions:
       contents: none
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: actionlint
         run: |
@@ -381,7 +381,7 @@ jobs:
         run: |
           git config --global core.autocrlf false
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 1
       - uses: dtolnay/rust-toolchain@stable
@@ -469,7 +469,7 @@ jobs:
         uses: Chia-Network/actions/clean-workspace@main
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
