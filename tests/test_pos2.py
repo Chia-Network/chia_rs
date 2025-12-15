@@ -1,5 +1,6 @@
 from chia_rs import create_v2_plot, Prover, validate_proof_v2, solve_proof
 from chia_rs.sized_bytes import bytes32
+from chia_rs.sized_ints import uint8
 import random
 
 
@@ -10,7 +11,6 @@ def test_plot_roundtrip() -> None:
     )
     k = 18
     strength = 2
-    proof_fragment_scan_filter = 4
 
     create_v2_plot("k-18-test.plot", k, strength, plot_id, b" " * (64 + 48))
 
@@ -36,24 +36,18 @@ def test_plot_roundtrip() -> None:
         challenge = bytes32.random(rng)
         num_challenges += 1
 
-        quality_proofs = prover.get_qualities_for_challenge(
-            challenge, proof_fragment_scan_filter
-        )
-        if quality_proofs == []:
+        partial_proofs = prover.get_qualities_for_challenge(challenge)
+        if partial_proofs == []:
             continue
-        for qp in quality_proofs:
-            proof_fragments, s = prover.get_partial_proof(qp)
-            assert s == strength
-            full_proof = solve_proof(proof_fragments, plot_id, strength, k)
+        for pp in partial_proofs:
+            full_proof = solve_proof(pp, plot_id, strength, k)
 
             num_proofs += 1
-            quality = validate_proof_v2(
-                plot_id, k, challenge, strength, proof_fragment_scan_filter, full_proof
-            )
+            quality = validate_proof_v2(plot_id, k, challenge, strength, full_proof)
             assert quality is not None
-            assert quality == qp.serialize()
+            assert quality == pp.get_string(uint8(strength))
 
     print(f"challenges: {num_challenges}")
     print(f"proofs: {num_proofs}")
     assert num_challenges == 100
-    assert num_proofs == 50
+    assert num_proofs == 3
