@@ -209,29 +209,30 @@ impl From<ValidationErr> for u32 {
             ValidationErr::BadAggregateSignature => 7,
             ValidationErr::WrongPuzzleHash => 8,
             ValidationErr::BadFarmerCoinAmount => 9,
-            ValidationErr::InvalidCondition
-            | ValidationErr::InvalidConditionOpcode
-            | ValidationErr::InvalidParentId
-            | ValidationErr::InvalidPuzzleHash
-            | ValidationErr::InvalidPublicKey
-            | ValidationErr::InvalidMessage
-            | ValidationErr::InvalidCoinAmount
-            | ValidationErr::InvalidCoinAnnouncement
-            | ValidationErr::InvalidPuzzleAnnouncement => 10,
-            ValidationErr::AssertMyCoinIdFailed => 11,
-            ValidationErr::AssertPuzzleAnnouncementFailed
-            | ValidationErr::AssertCoinAnnouncementFailed => 12,
-            ValidationErr::AssertHeightRelativeFailed => 13,
-            ValidationErr::AssertHeightAbsoluteFailed => 14,
-            ValidationErr::AssertSecondsAbsoluteFailed => 15,
-            ValidationErr::CoinAmountExceedsMaximum => 16,
+            ValidationErr::InvalidCondition(_)
+            | ValidationErr::InvalidConditionOpcode(_)
+            | ValidationErr::InvalidParentId(_)
+            | ValidationErr::InvalidPuzzleHash(_)
+            | ValidationErr::InvalidPublicKey(_)
+            | ValidationErr::InvalidMessage(_)
+            | ValidationErr::InvalidCoinAmount(_)
+            | ValidationErr::InvalidCoinAnnouncement(_)
+            | ValidationErr::InvalidPuzzleAnnouncement(_) => 10,
+            ValidationErr::AssertMyCoinIdFailed(_) => 11,
+            ValidationErr::AssertPuzzleAnnouncementFailed(_) 
+            | ValidationErr::AssertCoinAnnouncementFailed(_) => 12,
+            ValidationErr::AssertHeightRelativeFailed(_) => 13,
+            ValidationErr::AssertHeightAbsoluteFailed(_) => 14,
+            ValidationErr::AssertSecondsAbsoluteFailed(_) => 15,
+            ValidationErr::CoinAmountExceedsMaximum(_) => 16,
             ValidationErr::SexpError => 17,
             ValidationErr::InvalidFeeLowFee => 18,
             ValidationErr::MempoolConflict => 19,
             ValidationErr::MintingCoin => 20,
             ValidationErr::ExtendsUnknownBlock => 21,
             ValidationErr::CoinbaseNotYetSpendable => 22,
-            ValidationErr::CostExceeded => 23,
+            /// Renamed from "BlockCostExceedsMax" since it's more generic than that.
+            ValidationErr::CostExceeded(_) => 23,
             ValidationErr::BadAdditionRoot => 24,
             ValidationErr::BadRemovalRoot => 25,
             ValidationErr::InvalidPospaceHash => 26,
@@ -313,17 +314,17 @@ impl From<ValidationErr> for u32 {
             ValidationErr::InvalidPrefarm => 104,
             ValidationErr::AssertSecondsRelativeFailed => 105,
             ValidationErr::BadCoinbaseSignature => 106,
-            // ValidationErr::InitialTransactionFreeze => 107 (removed in `chia-blockchain`` as well)
+            // ValidationErr::InitialTransactionFreeze => 107 (removed in `chia-blockchain` as well)
             ValidationErr::NoTransactionsWhileSyncing => 108,
             ValidationErr::AlreadyIncludingTransaction => 109,
             ValidationErr::IncompatibleNetworkId => 110,
             ValidationErr::PreSoftForkMaxGeneratorSize => 111,
             ValidationErr::InvalidRequiredIters => 112,
             ValidationErr::TooManyGeneratorRefs => 113,
-            ValidationErr::AssertMyParentIdFailed => 114,
-            ValidationErr::AssertMyPuzzleHashFailed => 115,
-            ValidationErr::AssertMyAmountFailed => 116,
-            ValidationErr::GeneratorRuntimeError => 117,
+            ValidationErr::AssertMyParentIdFailed(_) => 114,
+            ValidationErr::AssertMyPuzzleHashFailed(_) => 115,
+            ValidationErr::AssertMyAmountFailed(_) => 116,
+            ValidationErr::GeneratorRuntimeError(_) => 117,
             ValidationErr::InvalidCostResult => 118,
             ValidationErr::InvalidTransactionsGeneratorRefsRoot => 119,
             ValidationErr::FutureGeneratorRefs => 120,
@@ -351,13 +352,14 @@ impl From<ValidationErr> for u32 {
             ValidationErr::InvalidSoftforkCondition => 142,
             ValidationErr::InvalidSoftforkCost => 143,
             ValidationErr::TooManyAnnouncements => 144,
-            ValidationErr::InvalidMessageMode => 145,
+            ValidationErr::InvalidMessageMode(_) => 145,
             ValidationErr::InvalidCoinId => 146,
             ValidationErr::MessageNotSentOrReceived => 147,
             ValidationErr::ComplexGeneratorReceived => 148,
         }
     }
 }
+
 
 pub fn rest(a: &Allocator, n: NodePtr) -> Result<NodePtr, ValidationErr> {
     match a.sexp(n) {
