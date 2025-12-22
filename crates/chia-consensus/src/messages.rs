@@ -82,7 +82,7 @@ impl SpendId {
             PARENTAMOUNT => Ok(Self::ParentAmount(parent, amount)),
             PUZZLEAMOUNT => Ok(Self::PuzzleAmount(puzzle, amount)),
             0 => Ok(Self::None),
-            _ => Err(ValidationErr::InvalidMessageMode(*args)),
+            _ => Err(ValidationErr::InvalidMessageMode),
         }
     }
 

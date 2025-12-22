@@ -27,7 +27,7 @@ pub fn subtract_cost(
     subtract: Cost,
 ) -> Result<(), ValidationErr> {
     if subtract > *cost_left {
-        Err(ValidationErr::CostExceeded)
+        Err(ValidationErr::CostExceeded(a.nil()))
     } else {
         *cost_left -= subtract;
         Ok(())
@@ -146,7 +146,7 @@ where
 fn extract_n<const N: usize>(
     a: &Allocator,
     mut n: NodePtr,
-    e: ValidationErr,
+    make_err: fn(NodePtr) -> ValidationErr,
 ) -> Result<[NodePtr; N], ValidationErr> {
     let mut ret: [NodePtr; N] = [NodePtr::NIL; N];
     let mut counter = 0;
@@ -160,7 +160,7 @@ fn extract_n<const N: usize>(
         counter += 1;
     }
     if counter != N - 1 {
-        return Err(e);
+        return Err(make_err(n));
     }
     ret[counter] = n;
     Ok(ret)
