@@ -131,7 +131,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Set up rust
-        uses: dtolnay/rust-toolchain@1.85.0
+        uses: dtolnay/rust-toolchain@1.92.0
 
       - uses: chia-network/actions/create-venv@main
         id: create-venv
@@ -175,7 +175,7 @@ jobs:
           fetch-depth: 1
 
       - name: Set up rust
-        uses: dtolnay/rust-toolchain@1.85.0
+        uses: dtolnay/rust-toolchain@1.92.0
 
       - name: cargo bench
         run: |
