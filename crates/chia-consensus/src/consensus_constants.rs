@@ -137,6 +137,9 @@ pub struct ConsensusConstants {
     /// is valid
     hard_fork2_height: u32,
 
+    /// 2.5.8 softfork
+    soft_fork8_height: u32,
+
     /// Once hard fork 2 activates, we'll start phasing out v1 plots. This is
     /// the log2 of the number of epochs they will be phased-out over. i.e. the
     /// number of epochs is (1 << plot_v1_phase_out_epoch_bits).
@@ -233,6 +236,7 @@ pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
     pool_sub_slot_iters: 37_600_000_000,
     hard_fork_height: 5_496_000,
     hard_fork2_height: 0xffff_ffff, // placeholder
+    soft_fork8_height: 8_655_000,
     plot_v1_phase_out_epoch_bits: 8,
     plot_filter_128_height: 10_542_000,
     plot_filter_64_height: 15_592_000,
