@@ -1,6 +1,6 @@
 [package]
 name = "chia"
-version = "0.35.0"
+version = "0.35.1"
 edition = "2021"
 license = "Apache-2.0"
 description = "A meta-crate that exports all of the Chia crates in the workspace."
