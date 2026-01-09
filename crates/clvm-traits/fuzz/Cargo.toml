@@ -1,6 +1,6 @@
 [package]
 name = "clvm-traits-fuzz"
-version = "0.35.0"
+version = "0.35.1"
 publish = false
 edition = "2021"
 
