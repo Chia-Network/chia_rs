@@ -30,5 +30,6 @@ pub const COST_CONDITIONS: u32 = 0x80_0000;
 /// A combination of flags suitable for mempool-mode, with stricter checking
 pub const MEMPOOL_MODE: u32 = CLVM_MEMPOOL_MODE | NO_UNKNOWN_CONDS | STRICT_ARGS_COUNT;
 
-// This flag sets the generator to use the simpler generator rules
-pub const SIMPLE_GENERATOR: u32 = 0x1600_0000;
+/// This flag sets the generator to use the simpler generator rules. This
+/// behavior is a hard fork
+pub const SIMPLE_GENERATOR: u32 = 0x100_0000;
