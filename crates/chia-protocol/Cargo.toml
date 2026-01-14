@@ -1,6 +1,6 @@
 [package]
 name = "chia-protocol"
-version = "0.36.0"
+version = "0.36.1"
 edition = "2024"
 license = "Apache-2.0"
 description = "Chia network protocol message types"
