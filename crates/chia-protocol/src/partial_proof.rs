@@ -1,5 +1,3 @@
-use crate::Bytes32;
-use chia_sha2::Sha256;
 use chia_streamable_macro::streamable;
 
 #[cfg(feature = "py-bindings")]
@@ -7,6 +5,12 @@ use pyo3::pymethods;
 
 #[cfg(feature = "py-bindings")]
 use chia_pos2::serialize_quality;
+
+#[cfg(feature = "py-bindings")]
+use chia_sha2::Sha256;
+
+#[cfg(feature = "py-bindings")]
+use crate::Bytes32;
 
 #[streamable]
 pub struct PartialProof {
