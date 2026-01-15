@@ -68,11 +68,15 @@ jobs:
         if: startsWith(github.event.ref, 'refs/tags')
         id: auth
 
+      - name: Clean untracked files
+        run: git clean -f
+
       - name: Publish (crates.io)
         if: startsWith(github.event.ref, 'refs/tags')
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
-        run: cargo ws publish --publish-as-is
+        # We need to use --allow-dirty because the Cargo.lock is updated by cargo-workspaces to remove cyclic dev dependencies
+        run: cargo ws publish --publish-as-is --allow-dirty
 
   fuzz_tests:
     name: Fuzz (${{ matrix.package.name }})
