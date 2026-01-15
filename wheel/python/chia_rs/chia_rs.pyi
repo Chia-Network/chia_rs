@@ -217,6 +217,8 @@ def create_v2_plot(filename: str,
     k: int,
     strength: int,
     plot_id: bytes32,
+    plot_index: uint16,
+    meta_group: uint8,
     memo: bytes,
 ) -> None: ...
 

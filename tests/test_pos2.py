@@ -1,6 +1,6 @@
 from chia_rs import create_v2_plot, Prover, validate_proof_v2, solve_proof
 from chia_rs.sized_bytes import bytes32
-from chia_rs.sized_ints import uint8
+from chia_rs.sized_ints import uint8, uint16
 import random
 
 
@@ -11,8 +11,12 @@ def test_plot_roundtrip() -> None:
     )
     k = 18
     strength = 2
+    index = uint16(0)
+    meta_group = uint8(0)
 
-    create_v2_plot("k-18-test.plot", k, strength, plot_id, b" " * (64 + 48))
+    create_v2_plot(
+        "k-18-test.plot", k, strength, plot_id, index, meta_group, b" " * (64 + 48)
+    )
 
     prover = Prover("k-18-test.plot")
 
@@ -50,4 +54,4 @@ def test_plot_roundtrip() -> None:
     print(f"challenges: {num_challenges}")
     print(f"proofs: {num_proofs}")
     assert num_challenges == 100
-    assert num_proofs == 3
+    assert num_proofs == 4

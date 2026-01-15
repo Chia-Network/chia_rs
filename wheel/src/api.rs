@@ -600,20 +600,18 @@ pub fn create_v2_plot(
     k: u8,
     strength: u8,
     plot_id: Bytes32,
+    plot_index: u16,
+    meta_group: u8,
     memo: &[u8],
 ) -> PyResult<()> {
-    if memo.len() != 32 + 48 + 32 {
-        return Err(PyValueError::new_err(format!(
-            "memo must be 112 bytes, got {}",
-            memo.len()
-        )));
-    }
     Ok(chia_pos2::create_v2_plot(
         Path::new(filename),
         k,
         strength,
         &plot_id.to_bytes(),
-        memo.try_into().unwrap(),
+        plot_index,
+        meta_group,
+        memo,
     )?)
 }
 
@@ -654,12 +652,7 @@ impl Prover {
     }
 
     pub fn get_memo(&self) -> Vec<u8> {
-        let (ph, fpk, lsk) = self.0.get_memo();
-        let mut ret = vec![];
-        ret.extend_from_slice(&ph);
-        ret.extend_from_slice(&fpk);
-        ret.extend_from_slice(&lsk);
-        ret
+        self.0.get_memo().to_vec()
     }
 
     pub fn to_bytes(&self) -> PyResult<Vec<u8>> {
