@@ -58,8 +58,8 @@ use chia_protocol::{
 use chia_sha2::Sha256;
 use chia_traits::ChiaToPython;
 use clvm_utils::tree_hash_from_bytes;
-use clvmr::chia_dialect::ENABLE_KECCAK_OPS_OUTSIDE_GUARD;
-use clvmr::{LIMIT_HEAP, NO_UNKNOWN_OPS};
+use clvmr::chia_dialect::DISABLE_OP;
+use clvmr::{ENABLE_KECCAK_OPS_OUTSIDE_GUARD, LIMIT_HEAP, NO_UNKNOWN_OPS};
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
@@ -775,6 +775,7 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("COMPUTE_FINGERPRINT", COMPUTE_FINGERPRINT)?;
     m.add("COST_CONDITIONS", COST_CONDITIONS)?;
     m.add("SIMPLE_GENERATOR", SIMPLE_GENERATOR)?;
+    m.add("DISABLE_OP", DISABLE_OP)?;
 
     m.add_class::<PyPlotParam>()?;
 
