@@ -1,6 +1,6 @@
 [package]
 name = "chia-bls"
-version = "0.36.1"
+version = "0.37.0"
 edition = "2024"
 license = "Apache-2.0"
 description = "BLS signature, verification and aggregation functions for the Chia blockchain"
