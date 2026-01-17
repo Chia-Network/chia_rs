@@ -208,14 +208,37 @@ impl<N, D: ClvmDecoder<Node = N>> FromClvm<D> for NftMetadata {
 
         for (key, value_ptr) in items {
             match key.as_str() {
-                "sn" => metadata.edition_number = FromClvm::from_clvm(decoder, value_ptr.0)?,
-                "st" => metadata.edition_total = FromClvm::from_clvm(decoder, value_ptr.0)?,
-                "u" => metadata.data_uris = FromClvm::from_clvm(decoder, value_ptr.0)?,
-                "h" => metadata.data_hash = FromClvm::from_clvm(decoder, value_ptr.0)?,
-                "mu" => metadata.metadata_uris = FromClvm::from_clvm(decoder, value_ptr.0)?,
-                "mh" => metadata.metadata_hash = FromClvm::from_clvm(decoder, value_ptr.0)?,
-                "lu" => metadata.license_uris = FromClvm::from_clvm(decoder, value_ptr.0)?,
-                "lh" => metadata.license_hash = FromClvm::from_clvm(decoder, value_ptr.0)?,
+                "sn" => {
+                    metadata.edition_number =
+                        FromClvm::from_clvm(decoder, value_ptr.0).unwrap_or(1);
+                }
+                "st" => {
+                    metadata.edition_total = FromClvm::from_clvm(decoder, value_ptr.0).unwrap_or(1);
+                }
+                "u" => {
+                    metadata.data_uris =
+                        FromClvm::from_clvm(decoder, value_ptr.0).unwrap_or_default();
+                }
+                "h" => {
+                    metadata.data_hash =
+                        FromClvm::from_clvm(decoder, value_ptr.0).unwrap_or_default();
+                }
+                "mu" => {
+                    metadata.metadata_uris =
+                        FromClvm::from_clvm(decoder, value_ptr.0).unwrap_or_default();
+                }
+                "mh" => {
+                    metadata.metadata_hash =
+                        FromClvm::from_clvm(decoder, value_ptr.0).unwrap_or_default();
+                }
+                "lu" => {
+                    metadata.license_uris =
+                        FromClvm::from_clvm(decoder, value_ptr.0).unwrap_or_default();
+                }
+                "lh" => {
+                    metadata.license_hash =
+                        FromClvm::from_clvm(decoder, value_ptr.0).unwrap_or_default();
+                }
                 _ => (),
             }
         }
@@ -258,5 +281,53 @@ impl<N, E: ClvmEncoder<Node = N>> ToClvm<E> for NftMetadata {
         ]);
 
         items.to_clvm(encoder)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use clvm_traits::clvm_list;
+    use clvmr::Allocator;
+
+    use super::*;
+
+    #[test]
+    fn test_nft_metadata_roundtrip() {
+        let mut allocator = Allocator::new();
+
+        let metadata = NftMetadata {
+            edition_number: 1,
+            edition_total: 1,
+            data_uris: vec!["https://example.com/data.json".to_string()],
+            data_hash: Some(Bytes32::default()),
+            metadata_uris: vec!["https://example.com/metadata.json".to_string()],
+            metadata_hash: Some(Bytes32::default()),
+            license_uris: vec!["https://example.com/license.txt".to_string()],
+            license_hash: Some(Bytes32::default()),
+        };
+
+        let encoded = metadata.to_clvm(&mut allocator).unwrap();
+        let decoded = NftMetadata::from_clvm(&allocator, encoded).unwrap();
+        assert_eq!(metadata, decoded);
+    }
+
+    #[test]
+    fn test_malformed_nft_metadata() {
+        let mut allocator = Allocator::new();
+
+        let metadata = clvm_list!(
+            ("sn", (1, 2)),
+            ("st", (1, 2)),
+            ("u", 1),
+            ("h", 2),
+            ("mu", 3),
+            ("mh", 4),
+            ("lu", 5),
+            ("lh", 6),
+        );
+
+        let encoded = metadata.to_clvm(&mut allocator).unwrap();
+        let decoded = NftMetadata::from_clvm(&allocator, encoded).unwrap();
+        assert_eq!(NftMetadata::default(), decoded);
     }
 }
