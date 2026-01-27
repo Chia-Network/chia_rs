@@ -92,7 +92,7 @@ jobs:
           - name: clvm-traits
           - name: chia-datalayer
         toolchain:
-          - nightly-2025-01-12
+          - nightly-2026-01-12
         max_total_time:
           - 20
     env:
