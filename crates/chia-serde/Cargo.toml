@@ -1,6 +1,6 @@
 [package]
 name = "chia-serde"
-version = "0.35.1"
+version = "0.35.2"
 edition = "2021"
 license = "Apache-2.0"
 description = "Serialization and deserialization helpers for Chia types"
