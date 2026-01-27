@@ -1,6 +1,6 @@
 [package]
 name = "chia_streamable_macro"
-version = "0.35.1"
+version = "0.35.2"
 edition = "2021"
 license = "Apache-2.0"
 description = "Streamable derive macro for serializing/deserializing types in Chia protocol format"
