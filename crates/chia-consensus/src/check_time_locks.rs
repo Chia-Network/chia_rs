@@ -202,124 +202,68 @@ mod tests {
         assert_eq!(result, expected);
     }
 
+    type Osc = OwnedSpendConditions;
+
     #[rstest]
-    // the following cases are created with height 50, and time 1000
+    // in the following cases, the coin is created at height 100, and time 1000
+    // and the time of check is height 200 and time 2000.
     #[case::height_relative_under(
-        OwnedSpendConditions {
-            height_relative: Some(100),
-            ..Default::default()
-        },
-        149, // initial height 50 + 99
-        2000,
+        Osc { height_relative: Some(101), ..Default::default() },
         Err(ErrorCode::AssertHeightRelativeFailed)
     )]
     #[case::height_relative_exact(
-        OwnedSpendConditions {
-            height_relative: Some(100),
-            ..Default::default()
-        },
-        150,  // initial height 50 + 100
-        2000,
+        Osc { height_relative: Some(100), ..Default::default() },
         Ok(())
     )]
     #[case::height_relative_over(
-        OwnedSpendConditions {
-            height_relative: Some(100),
-            ..Default::default()
-        },
-        151,  // initial height 50 + 101
-        2000,
+        Osc { height_relative: Some(99), ..Default::default() },
         Ok(())
     )]
     #[case::seconds_relative_under(
-        OwnedSpendConditions {
-            seconds_relative: Some(1000),
-            ..Default::default()
-        },
-        200,
-        1999, // 1000 + 999
+        Osc { seconds_relative: Some(1001), ..Default::default() },
         Err(ErrorCode::AssertSecondsRelativeFailed)
     )]
     #[case::seconds_relative_exact(
-        OwnedSpendConditions {
-            seconds_relative: Some(1000),
-            ..Default::default()
-        },
-        200,
-        2000,  // initial 1000 + 1000
+        Osc { seconds_relative: Some(1000), ..Default::default() },
         Ok(())
     )]
     #[case::seconds_relative_over(
-        OwnedSpendConditions {
-            seconds_relative: Some(1000),
-            ..Default::default()
-        },
-        200,
-        2001, // initial 1000 + 1001
+        Osc { seconds_relative: Some(999), ..Default::default() },
         Ok(())
     )]
     #[case::before_height_relative_under(
-        OwnedSpendConditions {
-            before_height_relative: Some(10),
-            ..Default::default()
-        },
-        59,  // initial height 50 + 9
-        1000,
+        Osc { before_height_relative: Some(101), ..Default::default() },
         Ok(())
     )]
     #[case::before_height_relative_exact(
-        OwnedSpendConditions {
-            before_height_relative: Some(10),
-            ..Default::default()
-        },
-        60,  // initial height 50 + 10
-        1000,
+        Osc { before_height_relative: Some(100), ..Default::default() },
         Err(ErrorCode::AssertBeforeHeightRelativeFailed)
     )]
     #[case::before_height_relative_over(
-        OwnedSpendConditions {
-            before_height_relative: Some(10),
-            ..Default::default()
-        },
-        61,  // initial height 50 + 11
-        1000,
+        Osc { before_height_relative: Some(99), ..Default::default() },
         Err(ErrorCode::AssertBeforeHeightRelativeFailed)
     )]
     #[case::before_seconds_relative_under(
-        OwnedSpendConditions {
-            before_seconds_relative: Some(1000),
-            ..Default::default()
-        },
-        100,
-        1999,  // initial time 1000 + 999
+        Osc { before_seconds_relative: Some(1001), ..Default::default() },
         Ok(())
     )]
     #[case::before_seconds_relative_exact(
-        OwnedSpendConditions {
-            before_seconds_relative: Some(1000),
-            ..Default::default()
-        },
-        100,
-        2000,  // initial time 1000 + 1000
+        Osc { before_seconds_relative: Some(1000), ..Default::default() },
         Err(ErrorCode::AssertBeforeSecondsRelativeFailed)
     )]
     #[case::before_seconds_relative_over(
-        OwnedSpendConditions {
-            before_seconds_relative: Some(1000),
-            ..Default::default()
-        },
-        100,
-        2001,  // initial time 1000 + 2001
+        Osc { before_seconds_relative: Some(999), ..Default::default() },
         Err(ErrorCode::AssertBeforeSecondsRelativeFailed)
     )]
-    fn test_relative_constraints_failures(
+    fn test_relative_constraints(
         #[case] spend: OwnedSpendConditions,
-        #[case] now_height: u32,
-        #[case] now_timestamp: u64,
         #[case] expected: Result<(), ErrorCode>,
     ) {
+        let now_height = 200_u32;
+        let now_timestamp = 2000_u64;
+
         let coin_id = Bytes32::from([3u8; 32]);
-        let coin_record = dummy_coin_record(50, 1000);
+        let coin_record = dummy_coin_record(100, 1000);
 
         let mut spend = spend;
         spend.coin_id = coin_id;
