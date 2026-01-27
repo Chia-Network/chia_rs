@@ -211,10 +211,12 @@ class TestCheckTimeLocks:
             ),
         ],
     )
+    @pytest.mark.parametrize("nowrap", [True, False])
     def test_conditions(
         self,
         conds: SpendBundleConditions,
         expected: Optional[int],
+        nowrap: bool,
     ) -> None:
         assert (
             check_time_locks(
@@ -222,6 +224,7 @@ class TestCheckTimeLocks:
                 conds,
                 self.PREV_BLOCK_HEIGHT,
                 self.PREV_BLOCK_TIMESTAMP,
+                nowrap,
             )
             == expected
         )
