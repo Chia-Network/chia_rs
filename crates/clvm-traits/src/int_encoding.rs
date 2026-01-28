@@ -28,18 +28,23 @@ pub fn encode_number(slice: &[u8], negative: bool) -> Vec<u8> {
 }
 
 pub fn decode_number<const LEN: usize>(mut slice: &[u8], signed: bool) -> Option<[u8; LEN]> {
-    let negative = signed && !slice.is_empty() && slice[0] & 0x80 != 0;
-    let padding_byte = if negative { 0xFF } else { 0x00 };
-
-    if slice.len() > LEN && slice[0] == padding_byte {
-        slice = &slice[slice.len() - LEN..];
-    }
-
-    if slice.len() > LEN {
+    // Reject negative numbers for unsigned types
+    if !signed && !slice.is_empty() && slice[0] == 0xFF {
         return None;
     }
 
-    assert!(slice.len() <= LEN);
+    let was_negative = signed && !slice.is_empty() && slice[0] & 0x80 != 0;
+    let padding_byte = if was_negative { 0xFF } else { 0x00 };
+
+    while slice.len() > LEN && slice[0] == padding_byte {
+        slice = &slice[1..];
+    }
+
+    let is_negative = signed && !slice.is_empty() && slice[0] & 0x80 != 0;
+
+    if slice.len() > LEN || (is_negative != was_negative) {
+        return None;
+    }
 
     let mut result = [padding_byte; LEN];
     let start = LEN - slice.len();
@@ -64,11 +69,11 @@ mod tests {
 
             #[allow(unused_comparisons)]
             let encoded = encode_number(&$num.to_be_bytes(), $num < 0);
-            assert_eq!(expected, encoded);
+            assert_eq!(encoded, expected);
 
             let expected = $num.to_be_bytes();
             let decoded = decode_number(&encoded, $signed).unwrap();
-            assert_eq!(expected, decoded);
+            assert_eq!(decoded, expected);
         };
     }
 
@@ -98,14 +103,7 @@ mod tests {
 
     #[test]
     fn test_edge_cases() {
-        assert_eq!(
-            decode_number::<4>(&[0xFF], false),
-            Some([0x00, 0x00, 0x00, 0xFF])
-        );
-
-        assert_eq!(
-            decode_number::<2>(&[0x00, 0x01, 0x00, 0x00], false),
-            Some([0x00, 0x00])
-        );
+        assert_eq!(decode_number::<4>(&[0xFF], false), None);
+        assert_eq!(decode_number::<2>(&[0x00, 0x01, 0x00, 0x00], false), None);
     }
 }
