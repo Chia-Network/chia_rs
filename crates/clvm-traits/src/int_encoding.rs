@@ -29,7 +29,7 @@ pub fn encode_number(slice: &[u8], negative: bool) -> Vec<u8> {
 
 pub fn decode_number<const LEN: usize>(mut slice: &[u8], signed: bool) -> Option<[u8; LEN]> {
     // Reject negative numbers for unsigned types
-    if !signed && !slice.is_empty() && slice[0] == 0xFF {
+    if !signed && !slice.is_empty() && slice[0] & 0x80 != 0 {
         return None;
     }
 
