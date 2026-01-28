@@ -95,4 +95,17 @@ mod tests {
         test_roundtrip!(255u32, false);
         test_roundtrip!(u32::MAX, false);
     }
+
+    #[test]
+    fn test_edge_cases() {
+        assert_eq!(
+            decode_number::<4>(&[0xFF], false),
+            Some([0x00, 0x00, 0x00, 0xFF])
+        );
+
+        assert_eq!(
+            decode_number::<2>(&[0x00, 0x01, 0x00, 0x00], false),
+            Some([0x00, 0x00])
+        );
+    }
 }
