@@ -78,23 +78,31 @@ jobs:
         # We need to use --allow-dirty because the Cargo.lock is updated by cargo-workspaces to remove cyclic dev dependencies
         run: cargo ws publish --publish-as-is --allow-dirty
 
-  fuzz_tests:
-    name: Fuzz (${{ matrix.package.name }})
+  generate_fuzz_list:
+    name: Generate fuzz crate list
     runs-on: ubuntu-latest
+    outputs:
+      fuzz_crates: ${{ steps.get_fuzz_crates.outputs.fuzz_crates }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@1.85.0
+
+      - name: Get fuzz crates
+        id: get_fuzz_crates
+        run: |
+          fuzz_crates=$(cargo metadata --format-version 1 | jq -c '[.packages[] | select(.metadata."cargo-fuzz" == true) | select(.source == null) | .name | sub("-fuzz$"; "")]')
+          echo "fuzz_crates=$fuzz_crates" >> "$GITHUB_OUTPUT"
+
+  fuzz_tests:
+    name: Fuzz (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    needs: generate_fuzz_list
     strategy:
       fail-fast: false
       matrix:
-        package:
-          - name: chia-consensus
-            env:
-              # EXAMPLE_ as an example and to appease actionlint
-              EXAMPLE_LSAN_OPTIONS: detect_leaks=0
-          - name: chia-bls
-          - name: clvm-utils
-          - name: chia-protocol
-          - name: chia-puzzle-types
-          - name: clvm-traits
-          - name: chia-datalayer
+        package: ${{ fromJson(needs.generate_fuzz_list.outputs.fuzz_crates) }}
         toolchain:
           - nightly-2026-01-12
         max_total_time:
@@ -112,7 +120,6 @@ jobs:
         run: cargo +"${{ matrix.toolchain }}" install cargo-fuzz
 
       - name: Fuzz
-        env: ${{ matrix.package.env || fromJSON('{}') }}
         run: |
-          cd crates/"${{ matrix.package.name }}"
+          cd crates/"${{ matrix.package }}"
           cargo fuzz list | xargs -I "%" sh -c "cargo +'${{ matrix.toolchain }}' fuzz run % -- -max_total_time=${{ matrix.max_total_time}} || exit 255"
