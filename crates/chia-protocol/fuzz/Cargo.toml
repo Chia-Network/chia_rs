@@ -22,41 +22,6 @@ arbitrary = { workspace = true }
 hex = { workspace = true }
 
 [[bin]]
-name = "parse-full-block"
-path = "fuzz_targets/parse-full-block.rs"
-test = false
-doc = false
-bench = false
-
-[[bin]]
-name = "parse-header-block"
-path = "fuzz_targets/parse-header-block.rs"
-test = false
-doc = false
-bench = false
-
-[[bin]]
-name = "parse-foliage"
-path = "fuzz_targets/parse-foliage.rs"
-test = false
-doc = false
-bench = false
-
-[[bin]]
-name = "parse-tx-info"
-path = "fuzz_targets/parse-tx-info.rs"
-test = false
-doc = false
-bench = false
-
-[[bin]]
-name = "parse-program"
-path = "fuzz_targets/parse-program.rs"
-test = false
-doc = false
-bench = false
-
-[[bin]]
 name = "streamable"
 path = "fuzz_targets/streamable.rs"
 test = false
