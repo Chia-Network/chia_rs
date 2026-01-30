@@ -10,40 +10,32 @@ use chia_consensus::validation_error::{ErrorCode, ValidationErr};
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
 use chia_protocol::CoinSpend;
-use chia_traits::streamable::Streamable;
 use clvm_traits::ToClvm;
 use clvm_utils::tree_hash;
 use clvmr::serde::{node_from_bytes, node_to_bytes};
 use clvmr::{Allocator, NodePtr};
-use hex_literal::hex;
-use libfuzzer_sys::fuzz_target;
-use std::io::Cursor;
+use libfuzzer_sys::{Corpus, fuzz_target};
 
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
 use std::sync::Arc;
 
-fuzz_target!(|data: &[u8]| {
-    let Ok(spend) = CoinSpend::parse::<false>(&mut Cursor::new(data)) else {
-        return;
-    };
-    let new_parents_parent =
-        hex!("abababababababababababababababababababababababababababababababab");
-
+fuzz_target!(|args: (CoinSpend, Bytes32)| -> Corpus {
+    let (spend, new_parents_parent) = args;
     let mut a = Allocator::new_limited(500_000_000);
     let Ok(puzzle) = spend.puzzle_reveal.to_clvm(&mut a) else {
-        return;
+        return Corpus::Reject;
     };
     let Ok(solution) = spend.solution.to_clvm(&mut a) else {
-        return;
+        return Corpus::Reject;
     };
     let puzzle_hash = Bytes32::from(tree_hash(&a, puzzle));
 
     for new_amount in [0, 2, 3] {
         for new_parent_amount in [0, 2, 3] {
             let new_parent_coin = Coin {
-                parent_coin_info: new_parents_parent.into(),
+                parent_coin_info: new_parents_parent,
                 puzzle_hash,
                 amount: if new_parent_amount == 0 {
                     spend.coin.amount
@@ -72,6 +64,7 @@ fuzz_target!(|data: &[u8]| {
             );
         }
     }
+    Corpus::Keep
 });
 
 fn run_puzzle(

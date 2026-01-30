@@ -1,16 +1,14 @@
 #![no_main]
 use chia_consensus::merkle_tree::{MerkleSet, validate_merkle_proof};
 use chia_sha2::Sha256;
-use libfuzzer_sys::fuzz_target;
+use libfuzzer_sys::{Corpus, fuzz_target};
 
-fuzz_target!(|data: &[u8]| {
-    let mut input = data;
-    let num_leafs = input.len() / 32;
-    let mut leafs = Vec::<[u8; 32]>::with_capacity(num_leafs);
-    for _ in 0..num_leafs {
-        leafs.push(input[..32].try_into().unwrap());
-        input = &input[32..];
+fuzz_target!(|leafs_: Vec::<[u8; 32]>| -> Corpus {
+    let num_leafs = leafs_.len();
+    if num_leafs == 0 {
+        return Corpus::Reject;
     }
+    let mut leafs = leafs_.clone();
 
     let tree = MerkleSet::from_leafs(&mut leafs);
     let root = tree.get_root();
@@ -18,7 +16,9 @@ fuzz_target!(|data: &[u8]| {
     // this is a leaf that's *not* in the tree, to also cover
     // proofs-of-exclusion
     let mut hasher = Sha256::new();
-    hasher.update(data);
+    for leaf in &leafs {
+        hasher.update(leaf);
+    }
     leafs.push(hasher.finalize());
 
     for (idx, item) in leafs.iter().enumerate() {
@@ -35,4 +35,5 @@ fuzz_target!(|data: &[u8]| {
             validate_merkle_proof(&proof, item, &root).expect("proof failed") == expect_included
         );
     }
+    Corpus::Keep
 });

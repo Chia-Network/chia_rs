@@ -1,23 +1,14 @@
 #![no_main]
 
-use libfuzzer_sys::{
-    arbitrary::{Arbitrary, Unstructured},
-    fuzz_target,
-};
-
 use chia_datalayer::{Error, Hash, InsertLocation, KeyId, MerkleBlob, ValueId};
+use libfuzzer_sys::fuzz_target;
 
-fuzz_target!(|data: &[u8]| {
-    let mut blob = MerkleBlob::new(Vec::new()).unwrap();
+fuzz_target!(|args: Vec<(KeyId, ValueId, Hash)>| {
+    let mut blob = MerkleBlob::new(Vec::new()).expect("construct MerkleBlob");
     blob.check_integrity_on_drop = false;
 
-    let mut unstructured = Unstructured::new(data);
-    while !unstructured.is_empty() {
-        let key = KeyId::arbitrary(&mut unstructured).unwrap();
-        let value = ValueId::arbitrary(&mut unstructured).unwrap();
-        let hash = Hash::arbitrary(&mut unstructured).unwrap();
-
-        match blob.insert(key, value, &hash, InsertLocation::Auto {}) {
+    for (key, value, hash) in &args {
+        match blob.insert(*key, *value, hash, InsertLocation::Auto {}) {
             Ok(_) => {}
             // should remain valid through these errors
             Err(Error::KeyAlreadyPresent()) => continue,
@@ -27,5 +18,5 @@ fuzz_target!(|data: &[u8]| {
         };
     }
 
-    blob.check_integrity().unwrap();
+    blob.check_integrity().expect("check integrity");
 });

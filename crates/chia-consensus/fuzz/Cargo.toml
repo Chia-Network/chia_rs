@@ -16,7 +16,7 @@ libfuzzer-sys = { workspace = true }
 clvmr = { workspace = true }
 clvm-utils = { workspace = true }
 clvm-traits = { workspace = true }
-chia-protocol = { workspace = true }
+chia-protocol = { workspace = true, features = ["arbitrary"] }
 chia-sha2 = { workspace = true }
 chia-traits = { workspace = true }
 chia-consensus = { workspace = true }

@@ -13,7 +13,7 @@ workspace = true
 
 [dependencies]
 libfuzzer-sys = { workspace = true }
-chia-bls = { workspace = true }
+chia-bls = { workspace = true, features = ["arbitrary"] }
 
 [[bin]]
 name = "derive"
