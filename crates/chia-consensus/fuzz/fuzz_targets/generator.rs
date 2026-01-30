@@ -5,23 +5,16 @@ use chia_consensus::{
     run_block_generator::get_coinspends_for_trusted_block,
 };
 use chia_protocol::{CoinSpend, Program, SpendBundle};
-use chia_traits::Streamable;
 use clvmr::{
     Allocator,
     serde::{node_from_bytes_backrefs, node_to_bytes},
 };
 use libfuzzer_sys::{Corpus, fuzz_target};
-use std::io::Cursor;
 
-fuzz_target!(|data: &[u8]| -> Corpus {
-    let mut spends = Vec::<CoinSpend>::new();
-    let mut data = Cursor::new(data);
+fuzz_target!(|spends: Vec<CoinSpend>| -> Corpus {
     let mut a = Allocator::new();
     let mut blockbuilder = BlockBuilder::new().expect("default");
 
-    while let Ok(spend) = CoinSpend::parse::<false>(&mut data) {
-        spends.push(spend.clone());
-    }
     if spends.is_empty() {
         return Corpus::Reject;
     }
