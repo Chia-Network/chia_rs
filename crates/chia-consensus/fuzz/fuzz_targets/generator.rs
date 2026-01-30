@@ -10,10 +10,10 @@ use clvmr::{
     Allocator,
     serde::{node_from_bytes_backrefs, node_to_bytes},
 };
-use libfuzzer_sys::fuzz_target;
+use libfuzzer_sys::{Corpus, fuzz_target};
 use std::io::Cursor;
 
-fuzz_target!(|data: &[u8]| {
+fuzz_target!(|data: &[u8]| -> Corpus {
     let mut spends = Vec::<CoinSpend>::new();
     let mut data = Cursor::new(data);
     let mut a = Allocator::new();
@@ -23,7 +23,7 @@ fuzz_target!(|data: &[u8]| {
         spends.push(spend.clone());
     }
     if spends.is_empty() {
-        return;
+        return Corpus::Reject;
     }
     let spend_bundle = SpendBundle {
         coin_spends: spends.clone(),
@@ -33,9 +33,9 @@ fuzz_target!(|data: &[u8]| {
         .add_spend_bundles([spend_bundle], 0, &TEST_CONSTANTS)
         .expect("add spend");
     let Ok((generator, _sig, _cost)) = blockbuilder.finalize(&TEST_CONSTANTS) else {
-        return;
+        return Corpus::Reject;
     };
-    let gen_prog = &Program::new(generator.clone().into());
+    let gen_prog = &Program::new(generator.into());
     let mut result = get_coinspends_for_trusted_block(&TEST_CONSTANTS, gen_prog, &vec![&[]], 0)
         .expect("get_coinspends_for_trusted_block");
 
@@ -72,4 +72,5 @@ fuzz_target!(|data: &[u8]| {
             assert_eq!(res.solution, prog);
         }
     }
+    Corpus::Keep
 });
