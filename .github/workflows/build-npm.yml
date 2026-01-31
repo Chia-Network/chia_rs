@@ -39,7 +39,7 @@ jobs:
           wasm-pack pack
 
       - name: Upload NPM pkg artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: npm-pkg
           path: ./wasm/pkg/*-*.tgz
