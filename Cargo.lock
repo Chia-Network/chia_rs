@@ -95,15 +95,15 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.97"
+version = "1.0.100"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcfed56ad506cb2c684a14971b8861fdc3baaaae314b9e5f9bb532cbe3ba7a4f"
+checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
 
 [[package]]
 name = "arbitrary"
-version = "1.4.1"
+version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dde20b3d026af13f561bdd0f15edf01fc734f0dafcedbaf42bba506a9517f223"
+checksum = "c3d036a3c4ab069c7b410a2ce876bd74808d2d0888a82667669f8e783a898bf1"
 dependencies = [
  "derive_arbitrary",
 ]
@@ -787,13 +787,13 @@ dependencies = [
 
 [[package]]
 name = "clvm-fuzzing"
-version = "0.16.1"
+version = "0.16.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa5a3c108dd1ef2ecc5a747cd62e533d27ebeb6bbd766cd5557951e504fbf372"
+checksum = "8398b5f4de5ef770392cacd104be700ca8a5cb4d0b648f793726065780432f1e"
 dependencies = [
  "anyhow",
  "arbitrary",
- "chia-sha2 0.28.1",
+ "chia-sha2 0.34.0",
  "clvmr",
 ]
 
@@ -846,9 +846,9 @@ dependencies = [
 
 [[package]]
 name = "clvmr"
-version = "0.16.4"
+version = "0.16.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2174ea916c818da7aa500ec9dfeb891b2510b160efb20deec292710df24844b"
+checksum = "38e8c8c0529b627891e9f007f30af2b931260a7eee6a6e1a8f55ba7a4ad6105a"
 dependencies = [
  "bitvec",
  "bumpalo",
