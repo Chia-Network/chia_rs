@@ -11,8 +11,8 @@ do
     echo "Targets: " $targets
     for t in $targets;
     do
-        cargo +nightly fuzz run --jobs $cores $t -- -max_total_time=1800 -timeout=10
-        cargo +nightly fuzz cmin $t
+        nice cargo +nightly fuzz run --jobs $cores $t -- -max_total_time=1800 -timeout=10
+        nice cargo +nightly fuzz cmin $t
     done
     popd
 done
