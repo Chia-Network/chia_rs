@@ -481,6 +481,7 @@ dependencies = [
  "clvm-utils",
  "clvmr",
  "hex",
+ "hex-literal",
  "indoc",
  "pyo3",
  "rstest",

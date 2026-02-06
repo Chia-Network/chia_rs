@@ -40,6 +40,7 @@ rstest = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
 indoc = { workspace = true }
+hex-literal = { workspace = true }
 
 [lib]
 crate-type = ["rlib"]

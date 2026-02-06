@@ -75,6 +75,82 @@ impl PyPlotParam {
     }
 }
 
+pub fn compute_plot_id_v1(
+    plot_pk: &G1Element,
+    pool_pk: Option<&G1Element>,
+    pool_contract: Option<&Bytes32>,
+) -> Bytes32 {
+    let mut ctx = Sha256::new();
+    // plot_id = sha256( ( pool_pk | contract_ph) + plot_pk)
+    if let Some(pool_pk) = pool_pk {
+        pool_pk.update_digest(&mut ctx);
+    } else if let Some(contract_ph) = pool_contract {
+        contract_ph.update_digest(&mut ctx);
+    } else {
+        panic!("invalid proof of space. Neither pool pk nor contract puzzle hash set");
+    }
+    plot_pk.update_digest(&mut ctx);
+    ctx.finalize().into()
+}
+
+pub fn compute_plot_id_v2(
+    strength: u8,
+    plot_pk: &G1Element,
+    pool_pk: Option<&G1Element>,
+    pool_contract: Option<&Bytes32>,
+    plot_index: u16,
+    meta_group: u8,
+) -> Bytes32 {
+    let mut ctx = Sha256::new();
+    // plot_group_id = sha256( 2 + strength + plot_pk + (pool_pk | contract_ph) )
+    // plot_id = sha256( plot_group_id + plot_index + meta_group)
+    let version = 2_u8;
+    let mut group_ctx = Sha256::new();
+    version.update_digest(&mut group_ctx);
+    strength.update_digest(&mut group_ctx);
+    plot_pk.update_digest(&mut group_ctx);
+    if let Some(pool_pk) = pool_pk {
+        pool_pk.update_digest(&mut group_ctx);
+    } else if let Some(contract_ph) = pool_contract {
+        contract_ph.update_digest(&mut group_ctx);
+    } else {
+        panic!(
+            "failed precondition of compute_plot_id_2(). Either pool-public-key or pool-contract-hash must be specified"
+        );
+    }
+    let plot_group_id: Bytes32 = group_ctx.finalize().into();
+
+    plot_group_id.update_digest(&mut ctx);
+    plot_index.update_digest(&mut ctx);
+    meta_group.update_digest(&mut ctx);
+    ctx.finalize().into()
+}
+
+impl ProofOfSpace {
+    pub fn compute_plot_id(&self) -> Bytes32 {
+        if self.version == 0 {
+            // v1 proofs
+            compute_plot_id_v1(
+                &self.plot_public_key,
+                self.pool_public_key.as_ref(),
+                self.pool_contract_puzzle_hash.as_ref(),
+            )
+        } else if self.version == 1 {
+            // v2 proofs
+            compute_plot_id_v2(
+                self.strength,
+                &self.plot_public_key,
+                self.pool_public_key.as_ref(),
+                self.pool_contract_puzzle_hash.as_ref(),
+                self.plot_index,
+                self.meta_group,
+            )
+        } else {
+            panic!("unknown proof version: {}", self.version);
+        }
+    }
+}
+
 #[cfg(feature = "py-bindings")]
 #[pymethods]
 impl ProofOfSpace {
@@ -97,6 +173,11 @@ impl ProofOfSpace {
                 panic!("invalid proof-of-space version {}", self.version);
             }
         }
+    }
+
+    #[pyo3(name = "compute_plot_id")]
+    pub fn py_compute_plot_id(&self) -> Bytes32 {
+        self.compute_plot_id()
     }
 }
 
@@ -221,7 +302,64 @@ impl Streamable for ProofOfSpace {
 #[allow(clippy::needless_pass_by_value)]
 mod tests {
     use super::*;
+    use hex_literal::hex;
     use rstest::rstest;
+
+    fn plot_pk() -> G1Element {
+        const PLOT_PK_BYTES: [u8; 48] = hex!(
+            "96b35c22adf93068c9536e016e88251ad715a591d8deabb60917d9c495f45a220ca56b906793c27778d5f7f71fb50b94"
+        );
+        G1Element::from_bytes(&PLOT_PK_BYTES).expect("PLOT_PK_BYTES is valid")
+    }
+
+    fn pool_pk() -> G1Element {
+        const POOL_PK_BYTES: [u8; 48] = hex!(
+            "ac6e995e0f9c307853fa5c79e571de5ec2f2d45e5c2641c0847fef8041916e4d07d5a9200d5aa92ceac3b1bf41ce93b2"
+        );
+        G1Element::from_bytes(&POOL_PK_BYTES).expect("POOL_PK_BYTES is valid")
+    }
+
+    // these are regression tests and test vectors for plot ID computations
+    #[rstest]
+    #[case("pool_pk", hex!("e185d4ec721ec060eb5833ec07d802fc69a43ed45dd59d7f20c58494421e0270"))]
+    #[case("contract_ph", hex!("4e196e2fb1fc4c85fc48b30c1e585dc0bee08451895909b0ae2db63e2788ab82"))]
+    fn test_compute_plot_id_v1(#[case] variant: &str, #[case] expected: [u8; 32]) {
+        let (pool_pk, pool_contract) = match variant {
+            "pool_pk" => (Some(pool_pk()), None),
+            "contract_ph" => (None, Some(Bytes32::new([1u8; 32]))),
+            _ => panic!("unknown v1 variant: {variant}"),
+        };
+        let result = compute_plot_id_v1(&plot_pk(), pool_pk.as_ref(), pool_contract.as_ref());
+        assert_eq!(result, Bytes32::new(expected));
+    }
+
+    #[rstest]
+    #[case(0, 0, 0, "pool_pk", hex!("d2d7c5e9e2955b33cf99058fc8ac0706b284d81768ce19e789bbbdd42eb9f6a1"))]
+    #[case(10, 256, 7, "pool_pk", hex!("b9fa5318770889a8ab4af143e9dac806b98e1033a128d3f50d18579c6cb78e9f"))]
+    #[case(0, 0, 0, "contract_ph", hex!("7390a21f1793f0920d698662194a1c5311c8ae2dd96c89778f86d88bbeb069e1"))]
+    #[case(5, 100, 3, "contract_ph", hex!("fa5462dd1c20194027119600d5eae77de1283cff97efb49522f563fa2f5608ec"))]
+    fn test_compute_plot_id_v2(
+        #[case] strength: u8,
+        #[case] plot_index: u16,
+        #[case] meta_group: u8,
+        #[case] variant: &str,
+        #[case] expected: [u8; 32],
+    ) {
+        let (pool_pk, pool_contract) = match variant {
+            "pool_pk" => (Some(pool_pk()), None),
+            "contract_ph" => (None, Some(Bytes32::new([1u8; 32]))),
+            _ => panic!("unknown v2 variant: {variant}"),
+        };
+        let result = compute_plot_id_v2(
+            strength,
+            &plot_pk(),
+            pool_pk.as_ref(),
+            pool_contract.as_ref(),
+            plot_index,
+            meta_group,
+        );
+        assert_eq!(result, Bytes32::new(expected));
+    }
 
     #[rstest]
     #[case(0, 18, Ok(18))]
