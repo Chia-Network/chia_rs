@@ -6,7 +6,7 @@ use chia_consensus::conditions::{
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::fast_forward::fast_forward_singleton;
 use chia_consensus::spend_visitor::SpendVisitor;
-use chia_consensus::validation_error::{ErrorCode, ValidationErr};
+use chia_consensus::error_code::ErrorCode;
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
 use chia_protocol::CoinSpend;
@@ -73,7 +73,7 @@ fn run_puzzle(
     solution: &[u8],
     parent_id: &[u8],
     amount: u64,
-) -> core::result::Result<SpendBundleConditions, ValidationErr> {
+) -> core::result::Result<SpendBundleConditions, ErrorCode> {
     let puzzle = node_from_bytes(a, puzzle)?;
     let solution = node_from_bytes(a, solution)?;
 
@@ -160,14 +160,16 @@ fn test_ff(
     // fast-forward. It's OK to fail in different ways before and after, as long
     // as it's one of these failures
     let discrepancy_errors = [
-        ErrorCode::AssertMyParentIdFailed,
-        ErrorCode::AssertMyCoinIdFailed,
+        u32::from(ErrorCode::AssertMyParentIdFailed(NodePtr::NIL)),
+        u32::from(ErrorCode::AssertMyCoinIdFailed(NodePtr::NIL)),
     ];
 
     match (conditions1, conditions2) {
-        (Err(ValidationErr(n1, msg1)), Err(ValidationErr(n2, msg2))) => {
-            if msg1 != msg2 || node_to_bytes(a, n1).unwrap() != node_to_bytes(a, n2).unwrap() {
-                assert!(discrepancy_errors.contains(&msg1) || discrepancy_errors.contains(&msg2));
+        (Err(msg1), Err(msg2)) => {
+            let code1 = u32::from(msg1);
+            let code2 = u32::from(msg2);
+            if code1 != code2 {
+                assert!(discrepancy_errors.contains(&code1) || discrepancy_errors.contains(&code2));
             }
         }
         (Ok(conditions1), Ok(conditions2)) => {
@@ -204,21 +206,21 @@ fn test_ff(
             assert_eq!(spend1.create_coin, spend2.create_coin);
             assert_eq!(spend1.flags, spend2.flags);
         }
-        (Ok(conditions1), Err(ValidationErr(_n2, msg2))) => {
+        (Ok(conditions1), Err(msg2)) => {
             // if the spend is valid and becomes invalid when
             // rebased/fast-forwarded, it should at least not be considered
             // eligible.
             assert!((conditions1.spends[0].flags & ELIGIBLE_FOR_FF) == 0);
-            assert!(discrepancy_errors.contains(&msg2));
+            assert!(discrepancy_errors.contains(&u32::from(msg2)));
         }
-        (Err(ValidationErr(_n1, msg1)), Ok(conditions2)) => {
+        (Err(msg1), Ok(conditions2)) => {
             // if the spend is invalid and becomes valid when
             // rebased/fast-forwarded, it should not be considered
             // eligible. This is a bit of a far-fetched scenario, but could
             // happen if there's an ASSERT_MY_COINID that's only valid after the
             // fast-forward
             assert!((conditions2.spends[0].flags & ELIGIBLE_FOR_FF) == 0);
-            assert!(discrepancy_errors.contains(&msg1));
+            assert!(discrepancy_errors.contains(&u32::from(msg1)));
         }
     }
 }

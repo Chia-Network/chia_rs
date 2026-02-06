@@ -1,4 +1,4 @@
-use crate::validation_error::{ErrorCode, ValidationErr, atom, check_nil, first, next, rest};
+use crate::error_code::{ErrorCode, atom, check_nil, first, next, rest};
 use chia_protocol::Coin;
 use clvm_utils::{TreeCache, tree_hash_cached};
 use clvmr::allocator::{Allocator, Atom, NodePtr};
@@ -8,7 +8,7 @@ use clvmr::op_utils::u64_from_bytes;
 pub fn parse_coin_spend(
     a: &Allocator,
     coin_spend: NodePtr,
-) -> Result<(Atom<'_>, u64, NodePtr, NodePtr), ValidationErr> {
+) -> Result<(Atom<'_>, u64, NodePtr, NodePtr), ErrorCode> {
     let parent = atom(a, first(a, coin_spend)?, ErrorCode::InvalidParentId)?;
     let coin_spend = rest(a, coin_spend)?;
     let puzzle = first(a, coin_spend)?;
@@ -25,7 +25,7 @@ pub fn get_puzzle_and_solution_for_coin(
     a: &Allocator,
     generator_result: NodePtr,
     find_coin: &Coin,
-) -> Result<(NodePtr, NodePtr), ValidationErr> {
+) -> Result<(NodePtr, NodePtr), ErrorCode> {
     // the output from the block generator is a list of CoinSpends
     // with (parent-coin-id puzzle-reveal amount solution)
     // this function is given the generator output and a parent_coin_id, amount
@@ -52,7 +52,7 @@ pub fn get_puzzle_and_solution_for_coin(
         // we found the coin!
         return Ok((puzzle, solution));
     }
-    Err(ValidationErr(generator_result, ErrorCode::InvalidCondition))
+    Err(ErrorCode::InvalidCondition(generator_result))
 }
 
 #[cfg(test)]
@@ -140,40 +140,37 @@ mod test {
         );
 
         // wrong parent
-        assert_eq!(
+        assert!(matches!(
             get_puzzle_and_solution_for_coin(
                 &a,
                 generator_output,
                 &Coin::new(make_dummy_id(2), tree_hash(&a, puzzle1).into(), 1337),
             )
-            .unwrap_err()
-            .1,
-            ErrorCode::InvalidCondition
-        );
+            .unwrap_err(),
+            ErrorCode::InvalidCondition(_)
+        ));
 
         // wrong amount
-        assert_eq!(
+        assert!(matches!(
             get_puzzle_and_solution_for_coin(
                 &a,
                 generator_output,
                 &Coin::new(parent, tree_hash(&a, puzzle1).into(), 42),
             )
-            .unwrap_err()
-            .1,
-            ErrorCode::InvalidCondition
-        );
+            .unwrap_err(),
+            ErrorCode::InvalidCondition(_)
+        ));
 
         // wrong puzzle hash
-        assert_eq!(
+        assert!(matches!(
             get_puzzle_and_solution_for_coin(
                 &a,
                 generator_output,
                 &Coin::new(parent, make_dummy_id(4), 1337),
             )
-            .unwrap_err()
-            .1,
-            ErrorCode::InvalidCondition
-        );
+            .unwrap_err(),
+            ErrorCode::InvalidCondition(_)
+        ));
     }
 
     #[test]
@@ -194,17 +191,17 @@ mod test {
 
         // this is a spend where the parent is not an atom
         let spend2 = make_invalid_coin_spend(&mut a, puzzle2, amount_atom, puzzle1, solution1);
-        assert_eq!(
-            parse_coin_spend(&a, spend2).unwrap_err().1,
-            ErrorCode::InvalidParentId
-        );
+        assert!(matches!(
+            parse_coin_spend(&a, spend2).unwrap_err(),
+            ErrorCode::InvalidParentId(_)
+        ));
 
         // this is a spend where the amount is not an atom
         let spend3 = make_invalid_coin_spend(&mut a, parent_atom, puzzle2, puzzle1, solution1);
-        assert_eq!(
-            parse_coin_spend(&a, spend3).unwrap_err().1,
-            ErrorCode::InvalidCoinAmount
-        );
+        assert!(matches!(
+            parse_coin_spend(&a, spend3).unwrap_err(),
+            ErrorCode::InvalidCoinAmount(_)
+        ));
     }
 
     #[rstest]

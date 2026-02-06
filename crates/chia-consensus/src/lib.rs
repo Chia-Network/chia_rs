@@ -26,7 +26,7 @@ pub mod solution_generator;
 pub mod spend_visitor;
 pub mod spendbundle_conditions;
 pub mod spendbundle_validation;
-pub mod validation_error;
+pub mod error_code;
 
 // these tests are large and expensive. They take a long time to run in
 // unoptimized builds. Only run these with --release

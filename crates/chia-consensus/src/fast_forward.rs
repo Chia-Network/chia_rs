@@ -156,7 +156,7 @@ mod tests {
     use crate::conditions::{ParseState, SpendBundleConditions, SpendConditions, parse_conditions};
     use crate::consensus_constants::TEST_CONSTANTS;
     use crate::spend_visitor::SpendVisitor;
-    use crate::validation_error::ValidationErr;
+    use crate::error_code::ErrorCode;
     use chia_protocol::Bytes32;
     use chia_protocol::Coin;
     use chia_protocol::CoinSpend;
@@ -179,7 +179,7 @@ mod tests {
         solution: &[u8],
         parent_id: &[u8],
         amount: u64,
-    ) -> core::result::Result<SpendBundleConditions, ValidationErr> {
+    ) -> core::result::Result<SpendBundleConditions, ErrorCode> {
         let puzzle = node_from_bytes(a, puzzle)?;
         let solution = node_from_bytes(a, solution)?;
 

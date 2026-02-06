@@ -1,5 +1,5 @@
 use crate::conditions::{Condition, ParseState, SpendBundleConditions, SpendConditions};
-use crate::validation_error::ValidationErr;
+use crate::error_code::ErrorCode;
 use clvmr::allocator::Allocator;
 
 /// These are customization points for the condition parsing and validation. The
@@ -14,5 +14,5 @@ pub trait SpendVisitor {
         a: &Allocator,
         state: &ParseState,
         bundle: &mut SpendBundleConditions,
-    ) -> Result<(), ValidationErr>;
+    ) -> Result<(), ErrorCode>;
 }

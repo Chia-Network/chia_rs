@@ -1,4 +1,4 @@
-use crate::validation_error::ValidationErr;
+use crate::error_code::ErrorCode;
 use clvm_traits::{FromClvmError, ToClvmError};
 use clvmr::error::EvalErr;
 use thiserror::Error;
@@ -17,8 +17,8 @@ pub enum Error {
     #[error("Eval {0}")]
     Eval(#[from] EvalErr),
 
-    #[error("Validation {0}")]
-    Validation(#[from] ValidationErr),
+    #[error("Validation {0:?}")]
+    Validation(ErrorCode),
 
     #[error("BLS {0}")]
     Bls(#[from] chia_bls::Error),
@@ -59,3 +59,9 @@ impl From<Error> for PyErr {
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
+
+impl From<ErrorCode> for Error {
+    fn from(err: ErrorCode) -> Self {
+        Error::Validation(err)
+    }
+}

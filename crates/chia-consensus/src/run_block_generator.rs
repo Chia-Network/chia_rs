@@ -6,7 +6,7 @@ use crate::conditions::{
 };
 use crate::consensus_constants::ConsensusConstants;
 use crate::flags::{DONT_VALIDATE_SIGNATURE, SIMPLE_GENERATOR};
-use crate::validation_error::{ErrorCode, ValidationErr, first};
+use crate::error_code::{ErrorCode, first};
 use chia_bls::{BlsCache, Signature};
 use chia_protocol::{BytesImpl, Coin, CoinSpend, Program};
 use chia_puzzles::{CHIALISP_DESERIALISATION, ROM_BOOTSTRAP_GENERATOR};
@@ -22,12 +22,12 @@ use clvmr::run_program::run_program;
 use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs};
 
 pub fn subtract_cost(
-    a: &Allocator,
+    _a: &Allocator,
     cost_left: &mut Cost,
     subtract: Cost,
-) -> Result<(), ValidationErr> {
+) -> Result<(), ErrorCode> {
     if subtract > *cost_left {
-        Err(ValidationErr(a.nil(), ErrorCode::CostExceeded))
+        Err(ErrorCode::CostExceeded(None))
     } else {
         *cost_left -= subtract;
         Ok(())
@@ -40,7 +40,7 @@ pub fn setup_generator_args<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>
     a: &mut Allocator,
     block_refs: I,
     flags: u32,
-) -> Result<NodePtr, ValidationErr>
+) -> Result<NodePtr, ErrorCode>
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
@@ -48,7 +48,7 @@ where
     // need to pass in the deserialization program
     if (flags & SIMPLE_GENERATOR) != 0 {
         if block_refs.into_iter().next().is_some() {
-            return Err(ValidationErr(a.nil(), ErrorCode::TooManyGeneratorRefs));
+            return Err(ErrorCode::TooManyGeneratorRefs);
         }
         return Ok(a.nil());
     }
@@ -92,7 +92,7 @@ pub fn run_block_generator<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
     signature: &Signature,
     bls_cache: Option<&BlsCache>,
     constants: &ConsensusConstants,
-) -> Result<SpendBundleConditions, ValidationErr>
+) -> Result<SpendBundleConditions, ErrorCode>
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
@@ -146,8 +146,8 @@ where
 fn extract_n<const N: usize>(
     a: &Allocator,
     mut n: NodePtr,
-    e: ErrorCode,
-) -> Result<[NodePtr; N], ValidationErr> {
+    e: impl Fn(NodePtr) -> ErrorCode + Copy,
+) -> Result<[NodePtr; N], ErrorCode> {
     let mut ret: [NodePtr; N] = [NodePtr::NIL; N];
     let mut counter = 0;
     assert!(N > 0);
@@ -160,7 +160,7 @@ fn extract_n<const N: usize>(
         counter += 1;
     }
     if counter != N - 1 {
-        return Err(ValidationErr(n, e));
+        return Err(e(n));
     }
     ret[counter] = n;
     Ok(ret)
@@ -170,14 +170,14 @@ fn extract_n<const N: usize>(
 // this is required after the SIMPLE_GENERATOR fork is active
 #[inline]
 pub fn check_generator_quote(
-    a: &Allocator,
+    _a: &Allocator,
     program: &[u8],
     flags: u32,
-) -> Result<(), ValidationErr> {
+) -> Result<(), ErrorCode> {
     if flags & SIMPLE_GENERATOR == 0 || program.starts_with(&[0xff, 0x01]) {
         Ok(())
     } else {
-        Err(ValidationErr(a.nil(), ErrorCode::ComplexGeneratorReceived))
+        Err(ErrorCode::ComplexGeneratorReceived)
     }
 }
 
@@ -188,13 +188,13 @@ pub fn check_generator_node(
     a: &Allocator,
     program: NodePtr,
     flags: u32,
-) -> Result<(), ValidationErr> {
+) -> Result<(), ErrorCode> {
     if flags & SIMPLE_GENERATOR == 0 {
         return Ok(());
     }
     // this expects an atom with a single byte value of 1 as the first value in the list
     match <(MatchByte<1>, NodePtr)>::from_clvm(a, program) {
-        Err(..) => Err(ValidationErr(a.nil(), ErrorCode::ComplexGeneratorReceived)),
+        Err(..) => Err(ErrorCode::ComplexGeneratorReceived),
         _ => Ok(()),
     }
 }
@@ -215,7 +215,7 @@ pub fn run_block_generator2<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>
     signature: &Signature,
     bls_cache: Option<&BlsCache>,
     constants: &ConsensusConstants,
-) -> Result<SpendBundleConditions, ValidationErr>
+) -> Result<SpendBundleConditions, ErrorCode>
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
@@ -288,7 +288,7 @@ where
         )?;
     }
     if a.atom_len(iter) != 0 {
-        return Err(ValidationErr(iter, ErrorCode::GeneratorRuntimeError));
+        return Err(ErrorCode::GeneratorRuntimeError(Some(iter)));
     }
 
     validate_conditions(a, &ret, &state, a.nil(), flags)?;
@@ -306,7 +306,7 @@ pub fn get_coinspends_for_trusted_block<GenBuf: AsRef<[u8]>, I: IntoIterator<Ite
     generator: &Program,
     refs: I,
     flags: u32,
-) -> Result<Vec<CoinSpend>, ValidationErr>
+) -> Result<Vec<CoinSpend>, ErrorCode>
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
@@ -329,7 +329,7 @@ where
 
     let (first, _rest) = a
         .next(res)
-        .ok_or(ValidationErr(res, ErrorCode::GeneratorRuntimeError))?;
+        .ok_or(ErrorCode::GeneratorRuntimeError(Some(res)))?;
     let mut cache = TreeCache::default();
     let mut iter = first;
     while let Some((spend, rest)) = a.next(iter) {
@@ -349,7 +349,7 @@ where
         };
         let puzhash = tree_hash_cached(&a, puzzle, &mut cache);
         let parent_id = BytesImpl::<32>::from_clvm(&a, parent_id)
-            .map_err(|_| ValidationErr(first, ErrorCode::InvalidParentId))?;
+            .map_err(|_| ErrorCode::InvalidParentId(first))?;
         let coin = Coin::new(
             parent_id,
             puzhash.into(),
@@ -381,7 +381,7 @@ pub fn get_coinspends_with_conditions_for_trusted_block<
     generator: &Program,
     refs: I,
     flags: u32,
-) -> Result<Vec<(CoinSpend, Vec<(u32, Vec<Vec<u8>>)>)>, ValidationErr>
+) -> Result<Vec<(CoinSpend, Vec<(u32, Vec<Vec<u8>>)>)>, ErrorCode>
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
@@ -401,11 +401,11 @@ where
         args,
         constants.max_block_cost_clvm,
     )
-    .map_err(|_| ValidationErr(program, ErrorCode::GeneratorRuntimeError))?;
+    .map_err(|_| ErrorCode::GeneratorRuntimeError(Some(program)))?;
 
     let (first, _rest) = a
         .next(res)
-        .ok_or(ValidationErr(res, ErrorCode::GeneratorRuntimeError))?;
+        .ok_or(ErrorCode::GeneratorRuntimeError(Some(res)))?;
     let mut cache = TreeCache::default();
     let mut iter = first;
     while let Some((spend, rest)) = a.next(iter) {
@@ -424,12 +424,12 @@ where
         };
         let puzhash = tree_hash_cached(&a, puzzle, &mut cache);
         let parent_id = BytesImpl::<32>::from_clvm(&a, parent_id)
-            .map_err(|_| ValidationErr(first, ErrorCode::InvalidParentId))?;
+            .map_err(|_| ErrorCode::InvalidParentId(first))?;
         let coin = Coin::new(
             parent_id,
             puzhash.into(),
             u64::from_clvm(&a, amount)
-                .map_err(|_| ValidationErr(first, ErrorCode::InvalidCoinAmount))?,
+                .map_err(|_| ErrorCode::InvalidCoinAmount(first))?,
         );
         let puzzle_program = Program::from_clvm(&a, puzzle).unwrap_or_default();
         let solution_program = Program::from_clvm(&a, solution).unwrap_or_default();
@@ -441,7 +441,7 @@ where
             solution,
             constants.max_block_cost_clvm,
         )
-        .map_err(|_| ValidationErr(program, ErrorCode::GeneratorRuntimeError))?;
+    .map_err(|_| ErrorCode::GeneratorRuntimeError(Some(program)))?;
         // conditions_list is the full returned output of puzzle ran with solution
         // ((51 0xcafef00d 100) (51 0x1234 200) ...)
 

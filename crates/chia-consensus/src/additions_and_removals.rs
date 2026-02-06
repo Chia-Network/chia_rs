@@ -4,7 +4,7 @@ use chia_protocol::Coin;
 
 use crate::allocator::make_allocator;
 use crate::consensus_constants::ConsensusConstants;
-use crate::validation_error::{ErrorCode, ValidationErr, atom, first, next, rest};
+use crate::error_code::{ErrorCode, atom, first, next, rest};
 use chia_protocol::{Bytes, Bytes32};
 use clvm_traits::FromClvm;
 use clvm_utils::{TreeCache, tree_hash_cached};
@@ -24,7 +24,7 @@ pub fn additions_and_removals<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf
     block_refs: I,
     flags: u32,
     constants: &ConsensusConstants,
-) -> Result<(Vec<(Coin, Option<Bytes>)>, Vec<(Bytes32, Coin)>), ValidationErr>
+) -> Result<(Vec<(Coin, Option<Bytes>)>, Vec<(Bytes32, Coin)>), ErrorCode>
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
@@ -57,7 +57,7 @@ where
         iter = rest;
         let (_parent_id, (puzzle, _rest)) =
             <(NodePtr, (NodePtr, NodePtr))>::from_clvm(&a, spend)
-                .map_err(|_| ValidationErr(spend, ErrorCode::InvalidCondition))?;
+                .map_err(|_| ErrorCode::InvalidCondition(spend))?;
         cache.visit_tree(&a, puzzle);
     }
 
@@ -67,7 +67,7 @@ where
         // process the spend
         let (parent_id, (puzzle, (amount, (solution, _spend_level_extra)))) =
             <(Bytes32, (NodePtr, (u64, (NodePtr, NodePtr))))>::from_clvm(&a, spend)
-                .map_err(|_| ValidationErr(spend, ErrorCode::InvalidCondition))?;
+                .map_err(|_| ErrorCode::InvalidCondition(spend))?;
 
         let Reduction(clvm_cost, mut iter) =
             run_program(&mut a, &dialect, puzzle, solution, cost_left)?;
@@ -100,7 +100,7 @@ where
             c = rest(&a, c)?;
 
             let (puzzle_hash, (amount, hint)) = <(Bytes32, (u64, NodePtr))>::from_clvm(&a, c)
-                .map_err(|_| ValidationErr(c, ErrorCode::InvalidCondition))?;
+                .map_err(|_| ErrorCode::InvalidCondition(c))?;
 
             let coin = Coin {
                 parent_coin_info: spend_id,
