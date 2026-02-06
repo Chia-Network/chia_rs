@@ -2,7 +2,7 @@
 use libfuzzer_sys::fuzz_target;
 
 use chia_consensus::sanitize_int::{SanitizedUint, sanitize_uint};
-use chia_consensus::validation_error::{ErrorCode, ValidationErr};
+use chia_consensus::error_code::ErrorCode;
 use clvmr::allocator::Allocator;
 
 fuzz_target!(|data: &[u8]| {
@@ -21,9 +21,8 @@ fuzz_target!(|data: &[u8]| {
         Ok(SanitizedUint::PositiveOverflow) => {
             assert!(data.len() > 8);
         }
-        Err(ValidationErr(n, c)) => {
+        Err(ErrorCode::InvalidCoinAmount(n)) => {
             assert!(n == atom);
-            assert!(c == ErrorCode::InvalidCoinAmount);
         }
     }
 
@@ -40,9 +39,8 @@ fuzz_target!(|data: &[u8]| {
         Ok(SanitizedUint::PositiveOverflow) => {
             assert!(data.len() > 4);
         }
-        Err(ValidationErr(n, c)) => {
+        Err(ErrorCode::InvalidCoinAmount(n)) => {
             assert!(n == atom);
-            assert!(c == ErrorCode::InvalidCoinAmount);
         }
     }
 });

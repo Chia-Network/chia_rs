@@ -8,8 +8,7 @@ use crate::puzzle_fingerprint::compute_puzzle_fingerprint;
 use crate::run_block_generator::subtract_cost;
 use crate::solution_generator::calculate_generator_length;
 use crate::spendbundle_validation::get_flags_for_height_and_constants;
-use crate::validation_error::ErrorCode;
-use crate::validation_error::ValidationErr;
+use crate::error_code::ErrorCode;
 use chia_bls::PublicKey;
 use chia_protocol::{Bytes, SpendBundle};
 
@@ -28,7 +27,7 @@ pub fn get_conditions_from_spendbundle(
     max_cost: u64,
     prev_tx_height: u32,
     constants: &ConsensusConstants,
-) -> Result<SpendBundleConditions, ValidationErr> {
+) -> Result<SpendBundleConditions, ErrorCode> {
     let flags = get_flags_for_height_and_constants(prev_tx_height, constants);
     Ok(run_spendbundle(
         a,
@@ -49,7 +48,7 @@ pub fn run_spendbundle(
     max_cost: u64,
     flags: u32,
     constants: &ConsensusConstants,
-) -> Result<(SpendBundleConditions, Vec<(PublicKey, Bytes)>), ValidationErr> {
+) -> Result<(SpendBundleConditions, Vec<(PublicKey, Bytes)>), ErrorCode> {
     // below is an adapted version of the code from run_block_generators::run_block_generator2()
     // it assumes no block references are passed in
     let mut cost_left = max_cost;
@@ -77,7 +76,7 @@ pub fn run_spendbundle(
 
         let buf = tree_hash(a, puz);
         if coin_spend.coin.puzzle_hash != buf.into() {
-            return Err(ValidationErr(puz, ErrorCode::WrongPuzzleHash));
+            return Err(ErrorCode::WrongPuzzleHash(puz));
         }
         let puzzle_hash = a.new_atom(&buf)?;
         let spend = process_single_spend::<MempoolVisitor>(

@@ -1,6 +1,6 @@
 use crate::condition_sanitizers::sanitize_hash;
 use crate::sanitize_int::{SanitizedUint, sanitize_uint};
-use crate::validation_error::{ErrorCode, ValidationErr, first, rest};
+use crate::error_code::{ErrorCode, first, rest};
 use chia_protocol::Bytes32;
 use clvmr::{Allocator, NodePtr};
 use std::sync::Arc;
@@ -31,7 +31,7 @@ pub enum SpendId {
 
 impl SpendId {
     // args is an in-out parameter. It's updated to point to then next argument
-    pub fn parse(a: &Allocator, args: &mut NodePtr, mode: u8) -> Result<SpendId, ValidationErr> {
+    pub fn parse(a: &Allocator, args: &mut NodePtr, mode: u8) -> Result<SpendId, ErrorCode> {
         // we have a special case for when all three mode flags are set. That means
         // we're committing to parent, puzzle and amount. In this case you just
         // specify the coin ID
@@ -61,10 +61,10 @@ impl SpendId {
             let amount = match sanitize_uint(a, first(a, *args)?, 8, ErrorCode::InvalidCoinAmount)?
             {
                 SanitizedUint::PositiveOverflow => {
-                    return Err(ValidationErr(*args, ErrorCode::CoinAmountExceedsMaximum));
+                    return Err(ErrorCode::CoinAmountExceedsMaximum(*args));
                 }
                 SanitizedUint::NegativeOverflow => {
-                    return Err(ValidationErr(*args, ErrorCode::CoinAmountNegative));
+                    return Err(ErrorCode::CoinAmountNegative(*args));
                 }
                 SanitizedUint::Ok(amount) => amount,
             };
@@ -82,7 +82,7 @@ impl SpendId {
             PARENTAMOUNT => Ok(Self::ParentAmount(parent, amount)),
             PUZZLEAMOUNT => Ok(Self::PuzzleAmount(puzzle, amount)),
             0 => Ok(Self::None),
-            _ => Err(ValidationErr(*args, ErrorCode::InvalidMessageMode)),
+            _ => Err(ErrorCode::InvalidMessageMode(Some(*args))),
         }
     }
 
@@ -92,7 +92,7 @@ impl SpendId {
         puzzle: NodePtr,
         amount: u64,
         coin_id: &Arc<Bytes32>,
-    ) -> Result<SpendId, ValidationErr> {
+    ) -> Result<SpendId, ErrorCode> {
         if mode == COINID {
             return Ok(Self::OwnedCoinId(coin_id.clone()));
         }
@@ -105,7 +105,7 @@ impl SpendId {
             PARENTAMOUNT => Ok(Self::ParentAmount(parent, amount)),
             PUZZLEAMOUNT => Ok(Self::PuzzleAmount(puzzle, amount)),
             0 => Ok(Self::None),
-            _ => Err(ValidationErr(NodePtr::NIL, ErrorCode::InvalidMessageMode)),
+            _ => Err(ErrorCode::InvalidMessageMode(None)),
         }
     }
 

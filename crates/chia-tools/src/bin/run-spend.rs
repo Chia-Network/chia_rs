@@ -264,7 +264,7 @@ fn print_puzzle_info(a: &Allocator, puzzle: NodePtr, solution: NodePtr) {
 fn main() {
     use chia_consensus::conditions::parse_args;
     use chia_consensus::opcodes::parse_opcode;
-    use chia_consensus::validation_error::{first, rest};
+    use chia_consensus::error_code::{first, rest};
     use chia_protocol::CoinSpend;
     use clvmr::reduction::Reduction;
     use clvmr::{ChiaDialect, run_program};

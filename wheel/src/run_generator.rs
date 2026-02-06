@@ -5,7 +5,6 @@ use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::owned_conditions::OwnedSpendBundleConditions;
 use chia_consensus::run_block_generator::run_block_generator as native_run_block_generator;
 use chia_consensus::run_block_generator::run_block_generator2 as native_run_block_generator2;
-use chia_consensus::validation_error::ValidationErr;
 use chia_protocol::{Bytes, Bytes32, Coin};
 
 use clvmr::cost::Cost;
@@ -64,9 +63,9 @@ pub fn run_block_generator<'a>(
                     spend_bundle_conds,
                 )),
             ),
-            Err(ValidationErr(_, error_code)) => {
+            Err(error_code) => {
                 // a validation error occurred
-                (Some(error_code.into()), None)
+                (Some(u32::from(error_code)), None)
             }
         }
     })
@@ -117,9 +116,9 @@ pub fn run_block_generator2<'a>(
                     spend_bundle_conds,
                 )),
             ),
-            Err(ValidationErr(_, error_code)) => {
+            Err(error_code) => {
                 // a validation error occurred
-                (Some(error_code.into()), None)
+                (Some(u32::from(error_code)), None)
             }
         }
     })
@@ -151,7 +150,7 @@ pub fn additions_and_removals<'a>(
             // a validation error occurred
             pyo3::exceptions::PyValueError::new_err(format!(
                 "additions_and_removals() failed: {}",
-                e.1 as u16
+                u32::from(e) as u16
             ))
         })
     })

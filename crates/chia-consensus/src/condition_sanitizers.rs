@@ -1,27 +1,31 @@
 use super::sanitize_int::{SanitizedUint, sanitize_uint};
-use super::validation_error::{ErrorCode, ValidationErr, atom};
+use super::error_code::{ErrorCode, atom};
 use clvmr::allocator::{Allocator, NodePtr};
 
 pub fn sanitize_hash(
     a: &Allocator,
     n: NodePtr,
     size: usize,
-    code: ErrorCode,
-) -> Result<NodePtr, ValidationErr> {
+    code: impl Fn(NodePtr) -> ErrorCode + Copy,
+) -> Result<NodePtr, ErrorCode> {
     let buf = atom(a, n, code)?;
 
     if buf.as_ref().len() == size {
         Ok(n)
     } else {
-        Err(ValidationErr(n, code))
+        Err(code(n))
     }
 }
 
-pub fn parse_amount(a: &Allocator, n: NodePtr, code: ErrorCode) -> Result<u64, ValidationErr> {
+pub fn parse_amount(
+    a: &Allocator,
+    n: NodePtr,
+    code: impl Fn(NodePtr) -> ErrorCode + Copy,
+) -> Result<u64, ErrorCode> {
     // amounts are not allowed to exceed 2^64. i.e. 8 bytes
     match sanitize_uint(a, n, 8, code)? {
         SanitizedUint::NegativeOverflow | SanitizedUint::PositiveOverflow => {
-            Err(ValidationErr(n, code))
+            Err(code(n))
         }
         SanitizedUint::Ok(r) => Ok(r),
     }
@@ -30,24 +34,24 @@ pub fn parse_amount(a: &Allocator, n: NodePtr, code: ErrorCode) -> Result<u64, V
 pub fn sanitize_announce_msg(
     a: &Allocator,
     n: NodePtr,
-    code: ErrorCode,
-) -> Result<NodePtr, ValidationErr> {
+    code: impl Fn(NodePtr) -> ErrorCode + Copy,
+) -> Result<NodePtr, ErrorCode> {
     let buf = atom(a, n, code)?;
 
     if buf.as_ref().len() > 1024 {
-        Err(ValidationErr(n, code))
+        Err(code(n))
     } else {
         Ok(n)
     }
 }
 
-pub fn sanitize_message_mode(a: &Allocator, node: NodePtr) -> Result<u32, ValidationErr> {
+pub fn sanitize_message_mode(a: &Allocator, node: NodePtr) -> Result<u32, ErrorCode> {
     let Some(mode) = a.small_number(node) else {
-        return Err(ValidationErr(node, ErrorCode::InvalidMessageMode));
+        return Err(ErrorCode::InvalidMessageMode(Some(node)));
     };
     // only 6 bits are allowed to be set
     if (mode & !0b11_1111) != 0 {
-        return Err(ValidationErr(node, ErrorCode::InvalidMessageMode));
+        return Err(ErrorCode::InvalidMessageMode(Some(node)));
     }
     Ok(mode)
 }
@@ -82,7 +86,10 @@ fn test_sanitize_mode(#[case] value: i64, #[case] pass: bool) {
     if pass {
         assert_eq!(i64::from(ret.unwrap()), value);
     } else {
-        assert_eq!(ret.unwrap_err().1, ErrorCode::InvalidMessageMode);
+        assert!(matches!(
+            ret.unwrap_err(),
+            ErrorCode::InvalidMessageMode(Some(_))
+        ));
     }
 }
 
@@ -105,7 +112,7 @@ fn test_sanitize_hash() {
     let short_n = a.new_atom(&short).unwrap();
     assert_eq!(
         sanitize_hash(&a, short_n, 32, ErrorCode::InvalidCondition),
-        Err(ValidationErr(short_n, ErrorCode::InvalidCondition))
+        Err(ErrorCode::InvalidCondition(short_n))
     );
     let valid_n = a.new_atom(&valid).unwrap();
     assert_eq!(
@@ -115,13 +122,13 @@ fn test_sanitize_hash() {
     let long_n = a.new_atom(&long).unwrap();
     assert_eq!(
         sanitize_hash(&a, long_n, 32, ErrorCode::InvalidCondition),
-        Err(ValidationErr(long_n, ErrorCode::InvalidCondition))
+        Err(ErrorCode::InvalidCondition(long_n))
     );
 
     let pair = a.new_pair(short_n, long_n).unwrap();
     assert_eq!(
         sanitize_hash(&a, pair, 32, ErrorCode::InvalidCondition),
-        Err(ValidationErr(pair, ErrorCode::InvalidCondition))
+        Err(ErrorCode::InvalidCondition(pair))
     );
 }
 
@@ -139,18 +146,18 @@ fn test_sanitize_announce_msg() {
     let long_n = a.new_atom(&long).unwrap();
     assert_eq!(
         sanitize_announce_msg(&a, long_n, ErrorCode::InvalidCondition),
-        Err(ValidationErr(long_n, ErrorCode::InvalidCondition))
+        Err(ErrorCode::InvalidCondition(long_n))
     );
 
     let pair = a.new_pair(valid_n, long_n).unwrap();
     assert_eq!(
         sanitize_announce_msg(&a, pair, ErrorCode::InvalidCondition),
-        Err(ValidationErr(pair, ErrorCode::InvalidCondition))
+        Err(ErrorCode::InvalidCondition(pair))
     );
 }
 
 #[cfg(test)]
-fn amount_tester(buf: &[u8]) -> Result<u64, ValidationErr> {
+fn amount_tester(buf: &[u8]) -> Result<u64, ErrorCode> {
     let mut a = Allocator::new();
     let n = a.new_atom(buf).unwrap();
 
@@ -160,46 +167,44 @@ fn amount_tester(buf: &[u8]) -> Result<u64, ValidationErr> {
 #[test]
 fn test_sanitize_amount() {
     // negative amounts are not allowed
-    assert_eq!(
-        amount_tester(&[0x80]).unwrap_err().1,
-        ErrorCode::InvalidCoinAmount
-    );
-    assert_eq!(
-        amount_tester(&[0xff]).unwrap_err().1,
-        ErrorCode::InvalidCoinAmount
-    );
-    assert_eq!(
-        amount_tester(&[0xff, 0]).unwrap_err().1,
-        ErrorCode::InvalidCoinAmount
-    );
+    assert!(matches!(
+        amount_tester(&[0x80]).unwrap_err(),
+        ErrorCode::InvalidCoinAmount(_)
+    ));
+    assert!(matches!(
+        amount_tester(&[0xff]).unwrap_err(),
+        ErrorCode::InvalidCoinAmount(_)
+    ));
+    assert!(matches!(
+        amount_tester(&[0xff, 0]).unwrap_err(),
+        ErrorCode::InvalidCoinAmount(_)
+    ));
 
     // leading zeros are somtimes necessary to make values positive
     assert_eq!(amount_tester(&[0, 0xff]), Ok(0xff));
     // but are disallowed when they are redundant
-    assert_eq!(
-        amount_tester(&[0, 0, 0, 0xff]).unwrap_err().1,
-        ErrorCode::InvalidCoinAmount
-    );
-    assert_eq!(
-        amount_tester(&[0, 0, 0, 0x80]).unwrap_err().1,
-        ErrorCode::InvalidCoinAmount
-    );
-    assert_eq!(
-        amount_tester(&[0, 0, 0, 0x7f]).unwrap_err().1,
-        ErrorCode::InvalidCoinAmount
-    );
-    assert_eq!(
-        amount_tester(&[0, 0, 0]).unwrap_err().1,
-        ErrorCode::InvalidCoinAmount
-    );
+    assert!(matches!(
+        amount_tester(&[0, 0, 0, 0xff]).unwrap_err(),
+        ErrorCode::InvalidCoinAmount(_)
+    ));
+    assert!(matches!(
+        amount_tester(&[0, 0, 0, 0x80]).unwrap_err(),
+        ErrorCode::InvalidCoinAmount(_)
+    ));
+    assert!(matches!(
+        amount_tester(&[0, 0, 0, 0x7f]).unwrap_err(),
+        ErrorCode::InvalidCoinAmount(_)
+    ));
+    assert!(matches!(
+        amount_tester(&[0, 0, 0]).unwrap_err(),
+        ErrorCode::InvalidCoinAmount(_)
+    ));
 
     // amounts aren't allowed to be too big
-    assert_eq!(
-        amount_tester(&[0x7f, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-            .unwrap_err()
-            .1,
-        ErrorCode::InvalidCoinAmount
-    );
+    assert!(matches!(
+        amount_tester(&[0x7f, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).unwrap_err(),
+        ErrorCode::InvalidCoinAmount(_)
+    ));
 
     // this is small enough though
     assert_eq!(

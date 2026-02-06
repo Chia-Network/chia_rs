@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 
 use crate::owned_conditions::OwnedSpendBundleConditions;
-use crate::validation_error::ErrorCode;
+use crate::error_code::ErrorCode;
 use chia_protocol::Bytes32;
 use chia_protocol::CoinRecord;
+use clvmr::allocator::NodePtr;
 #[cfg(feature = "py-bindings")]
 use pyo3::PyResult;
 #[cfg(feature = "py-bindings")]
@@ -16,57 +17,57 @@ pub fn check_time_locks(
     timestamp: u64,
 ) -> Result<(), ErrorCode> {
     if prev_transaction_block_height < bundle_conds.height_absolute {
-        return Err(ErrorCode::AssertHeightAbsoluteFailed);
+        return Err(ErrorCode::AssertHeightAbsoluteFailed(NodePtr::NIL));
     }
     if timestamp < bundle_conds.seconds_absolute {
-        return Err(ErrorCode::AssertSecondsAbsoluteFailed);
+        return Err(ErrorCode::AssertSecondsAbsoluteFailed(NodePtr::NIL));
     }
     if let Some(before_height_absolute) = bundle_conds.before_height_absolute {
         if prev_transaction_block_height >= before_height_absolute {
-            return Err(ErrorCode::AssertBeforeHeightAbsoluteFailed);
+            return Err(ErrorCode::AssertBeforeHeightAbsoluteFailed(NodePtr::NIL));
         }
     }
     if let Some(before_seconds_absolute) = bundle_conds.before_seconds_absolute {
         if timestamp >= before_seconds_absolute {
-            return Err(ErrorCode::AssertBeforeSecondsAbsoluteFailed);
+            return Err(ErrorCode::AssertBeforeSecondsAbsoluteFailed(NodePtr::NIL));
         }
     }
 
     for spend in &bundle_conds.spends {
         let Some(unspent) = removal_coin_records.get(&Bytes32::from(spend.coin_id)) else {
-            return Err(ErrorCode::InvalidCoinId);
+            return Err(ErrorCode::InvalidCoinId(NodePtr::NIL));
         };
 
         if let Some(birth_height) = spend.birth_height {
             if birth_height != unspent.confirmed_block_index {
-                return Err(ErrorCode::AssertMyBirthHeightFailed);
+                return Err(ErrorCode::AssertMyBirthHeightFailed(NodePtr::NIL));
             }
         }
         if let Some(birth_seconds) = spend.birth_seconds {
             if birth_seconds != unspent.timestamp {
-                return Err(ErrorCode::AssertMyBirthSecondsFailed);
+                return Err(ErrorCode::AssertMyBirthSecondsFailed(NodePtr::NIL));
             }
         }
         if let Some(height_relative) = spend.height_relative {
             if prev_transaction_block_height < unspent.confirmed_block_index + height_relative {
-                return Err(ErrorCode::AssertHeightRelativeFailed);
+                return Err(ErrorCode::AssertHeightRelativeFailed(NodePtr::NIL));
             }
         }
         if let Some(seconds_relative) = spend.seconds_relative {
             if timestamp < unspent.timestamp + seconds_relative {
-                return Err(ErrorCode::AssertSecondsRelativeFailed);
+                return Err(ErrorCode::AssertSecondsRelativeFailed(NodePtr::NIL));
             }
         }
         if let Some(before_height_relative) = spend.before_height_relative {
             if prev_transaction_block_height
                 >= unspent.confirmed_block_index + before_height_relative
             {
-                return Err(ErrorCode::AssertBeforeHeightRelativeFailed);
+                return Err(ErrorCode::AssertBeforeHeightRelativeFailed(NodePtr::NIL));
             }
         }
         if let Some(before_seconds_relative) = spend.before_seconds_relative {
             if timestamp >= unspent.timestamp + before_seconds_relative {
-                return Err(ErrorCode::AssertBeforeSecondsRelativeFailed);
+                return Err(ErrorCode::AssertBeforeSecondsRelativeFailed(NodePtr::NIL));
             }
         }
     }
@@ -124,7 +125,7 @@ mod tests {
         OwnedSpendBundleConditions { height_absolute: 11, ..Default::default() },
         10,
         0,
-        Err(ErrorCode::AssertHeightAbsoluteFailed)
+        Err(ErrorCode::AssertHeightAbsoluteFailed(NodePtr::NIL))
     )]
     #[case::height_absolute_exact(
         OwnedSpendBundleConditions { height_absolute: 10, ..Default::default() },
@@ -142,7 +143,7 @@ mod tests {
         OwnedSpendBundleConditions { seconds_absolute: 1001, ..Default::default() },
         0,
         1000,
-        Err(ErrorCode::AssertSecondsAbsoluteFailed)
+        Err(ErrorCode::AssertSecondsAbsoluteFailed(NodePtr::NIL))
     )]
     #[case::seconds_absolute_exact(
         OwnedSpendBundleConditions { seconds_absolute: 1000, ..Default::default() },
@@ -166,13 +167,13 @@ mod tests {
         OwnedSpendBundleConditions { before_height_absolute: Some(10), ..Default::default() },
         10,
         0,
-        Err(ErrorCode::AssertBeforeHeightAbsoluteFailed)
+        Err(ErrorCode::AssertBeforeHeightAbsoluteFailed(NodePtr::NIL))
     )]
     #[case::before_height_absolute_over(
         OwnedSpendBundleConditions { before_height_absolute: Some(10), ..Default::default() },
         11,
         0,
-        Err(ErrorCode::AssertBeforeHeightAbsoluteFailed)
+        Err(ErrorCode::AssertBeforeHeightAbsoluteFailed(NodePtr::NIL))
     )]
     #[case::before_seconds_absolute_under(
         OwnedSpendBundleConditions { before_seconds_absolute: Some(1000), ..Default::default() },
@@ -184,13 +185,13 @@ mod tests {
         OwnedSpendBundleConditions { before_seconds_absolute: Some(1000), ..Default::default() },
         0,
         1000,
-        Err(ErrorCode::AssertBeforeSecondsAbsoluteFailed)
+        Err(ErrorCode::AssertBeforeSecondsAbsoluteFailed(NodePtr::NIL))
     )]
     #[case::before_seconds_absolute_over(
         OwnedSpendBundleConditions { before_seconds_absolute: Some(1000), ..Default::default() },
         0,
         1001,
-        Err(ErrorCode::AssertBeforeSecondsAbsoluteFailed)
+        Err(ErrorCode::AssertBeforeSecondsAbsoluteFailed(NodePtr::NIL))
     )]
     fn test_absolute_constraints(
         #[case] bundle: OwnedSpendBundleConditions,
@@ -211,7 +212,7 @@ mod tests {
         },
         149, // initial height 50 + 99
         2000,
-        Err(ErrorCode::AssertHeightRelativeFailed)
+        Err(ErrorCode::AssertHeightRelativeFailed(NodePtr::NIL))
     )]
     #[case::height_relative_exact(
         OwnedSpendConditions {
@@ -238,7 +239,7 @@ mod tests {
         },
         200,
         1999, // 1000 + 999
-        Err(ErrorCode::AssertSecondsRelativeFailed)
+        Err(ErrorCode::AssertSecondsRelativeFailed(NodePtr::NIL))
     )]
     #[case::seconds_relative_exact(
         OwnedSpendConditions {
@@ -274,7 +275,7 @@ mod tests {
         },
         60,  // initial height 50 + 10
         1000,
-        Err(ErrorCode::AssertBeforeHeightRelativeFailed)
+        Err(ErrorCode::AssertBeforeHeightRelativeFailed(NodePtr::NIL))
     )]
     #[case::before_height_relative_over(
         OwnedSpendConditions {
@@ -283,7 +284,7 @@ mod tests {
         },
         61,  // initial height 50 + 11
         1000,
-        Err(ErrorCode::AssertBeforeHeightRelativeFailed)
+        Err(ErrorCode::AssertBeforeHeightRelativeFailed(NodePtr::NIL))
     )]
     #[case::before_seconds_relative_under(
         OwnedSpendConditions {
@@ -301,7 +302,7 @@ mod tests {
         },
         100,
         2000,  // initial time 1000 + 1000
-        Err(ErrorCode::AssertBeforeSecondsRelativeFailed)
+        Err(ErrorCode::AssertBeforeSecondsRelativeFailed(NodePtr::NIL))
     )]
     #[case::before_seconds_relative_over(
         OwnedSpendConditions {
@@ -310,7 +311,7 @@ mod tests {
         },
         100,
         2001,  // initial time 1000 + 2001
-        Err(ErrorCode::AssertBeforeSecondsRelativeFailed)
+        Err(ErrorCode::AssertBeforeSecondsRelativeFailed(NodePtr::NIL))
     )]
     fn test_relative_constraints_failures(
         #[case] spend: OwnedSpendConditions,
@@ -349,7 +350,7 @@ mod tests {
             ..Default::default()
         };
         let result = check_time_locks(&HashMap::new(), &bundle, 0, 0);
-        assert_eq!(result, Err(ErrorCode::InvalidCoinId));
+        assert_eq!(result, Err(ErrorCode::InvalidCoinId(NodePtr::NIL)));
     }
 
     #[rstest]
@@ -403,7 +404,10 @@ mod tests {
         };
 
         let result = check_time_locks(&map, &bundle, 100, 1000);
-        assert_eq!(result, Err(ErrorCode::AssertMyBirthHeightFailed));
+        assert_eq!(
+            result,
+            Err(ErrorCode::AssertMyBirthHeightFailed(NodePtr::NIL))
+        );
     }
 
     #[rstest]
@@ -427,7 +431,10 @@ mod tests {
         };
 
         let result = check_time_locks(&map, &bundle, 100, 1000);
-        assert_eq!(result, Err(ErrorCode::AssertMyBirthSecondsFailed));
+        assert_eq!(
+            result,
+            Err(ErrorCode::AssertMyBirthSecondsFailed(NodePtr::NIL))
+        );
     }
 
     #[test]
@@ -478,7 +485,10 @@ mod tests {
 
         // spend_relative_fail should fail first as 59 is below required 61 height
         let result = check_time_locks(&map, &bundle, 59, 600);
-        assert_eq!(result, Err(ErrorCode::AssertHeightRelativeFailed));
+        assert_eq!(
+            result,
+            Err(ErrorCode::AssertHeightRelativeFailed(NodePtr::NIL))
+        );
 
         let mut map = HashMap::new();
         map.insert(coin_id_1, coin_record_1);
@@ -491,6 +501,9 @@ mod tests {
 
         // spend_birth_dail should now fail
         let result = check_time_locks(&map, &bundle, 59, 600);
-        assert_eq!(result, Err(ErrorCode::AssertMyBirthHeightFailed));
+        assert_eq!(
+            result,
+            Err(ErrorCode::AssertMyBirthHeightFailed(NodePtr::NIL))
+        );
     }
 }

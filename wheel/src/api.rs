@@ -77,7 +77,7 @@ use crate::run_program::{run_chia_program, serialized_length, serialized_length_
 
 use chia_consensus::fast_forward::fast_forward_singleton as native_ff;
 use chia_consensus::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
-use chia_consensus::validation_error::ValidationErr;
+use chia_consensus::error_code::ErrorCode;
 use clvmr::ChiaDialect;
 use clvmr::allocator::NodePtr;
 use clvmr::cost::Cost;
@@ -91,6 +91,18 @@ use chia_bls::{
     BlsCache, DerivableKey, GTElement, PublicKey, SecretKey, Signature,
     hash_to_g2 as native_hash_to_g2,
 };
+
+fn error_node(err: ErrorCode) -> NodePtr {
+    match err {
+        ErrorCode::InvalidCondition(n)
+        | ErrorCode::InvalidParentId(n)
+        | ErrorCode::InvalidCoinAmount(n) => n,
+        ErrorCode::CostExceeded(Some(n))
+        | ErrorCode::GeneratorRuntimeError(Some(n))
+        | ErrorCode::InvalidMessageMode(Some(n)) => n,
+        _ => NodePtr::NIL,
+    }
+}
 #[pyfunction]
 pub fn compute_merkle_set_root<'p>(
     py: Python<'p>,
@@ -168,9 +180,10 @@ pub fn get_puzzle_and_solution_for_coin<'a>(
                 result,
                 &Coin::new(find_parent, find_ph, find_amount),
             ) {
-                Err(ValidationErr(n, _)) => {
-                    Err(EvalErr::InvalidOpArg(n, "coin not found".to_string()))
-                }
+                Err(err) => Err(EvalErr::InvalidOpArg(
+                    error_node(err),
+                    "coin not found".to_string(),
+                )),
                 Ok(pair) => Ok(pair),
             }
         })
@@ -223,9 +236,10 @@ pub fn get_puzzle_and_solution_for_coin2<'a>(
             let Reduction(_cost, result) =
                 run_program(&mut allocator, dialect, generator, args, max_cost)?;
             match parse_puzzle_solution(&allocator, result, find_coin) {
-                Err(ValidationErr(n, _)) => {
-                    Err(EvalErr::InvalidOpArg(n, "coin not found".to_string()))
-                }
+                Err(err) => Err(EvalErr::InvalidOpArg(
+                    error_node(err),
+                    "coin not found".to_string(),
+                )),
                 Ok(pair) => Ok(pair),
             }
         })

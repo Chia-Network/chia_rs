@@ -3,13 +3,13 @@ use crate::consensus_constants::ConsensusConstants;
 use crate::flags::{COST_CONDITIONS, SIMPLE_GENERATOR};
 use crate::owned_conditions::OwnedSpendBundleConditions;
 use crate::spendbundle_conditions::run_spendbundle;
-use crate::validation_error::{ErrorCode, ValidationErr};
+use crate::error_code::ErrorCode;
 use chia_bls::GTElement;
 use chia_bls::{aggregate_verify_gt, hash_to_g2};
 use chia_protocol::SpendBundle;
 use chia_sha2::Sha256;
 use clvmr::chia_dialect::{DISABLE_OP, ENABLE_KECCAK_OPS_OUTSIDE_GUARD};
-use clvmr::{LIMIT_HEAP, NodePtr};
+use clvmr::LIMIT_HEAP;
 
 // type definition makes clippy happy
 pub type ValidationPair = ([u8; 32], GTElement);
@@ -22,7 +22,7 @@ pub fn validate_clvm_and_signature(
     max_cost: u64,
     constants: &ConsensusConstants,
     flags: u32,
-) -> Result<(OwnedSpendBundleConditions, Vec<ValidationPair>), ValidationErr> {
+) -> Result<(OwnedSpendBundleConditions, Vec<ValidationPair>), ErrorCode> {
     let mut a = make_allocator(LIMIT_HEAP);
     let (sbc, pkm_pairs) = run_spendbundle(&mut a, spend_bundle, max_cost, flags, constants)?;
     let conditions = OwnedSpendBundleConditions::from(&a, sbc);
@@ -49,10 +49,7 @@ pub fn validate_clvm_and_signature(
         pairs.iter().map(|tuple| &tuple.1),
     );
     if !result {
-        return Err(ValidationErr(
-            NodePtr::NIL,
-            ErrorCode::BadAggregateSignature,
-        ));
+        return Err(ErrorCode::BadAggregateSignature);
     }
 
     // Collect results
@@ -243,17 +240,16 @@ ff01\
             coin_spends: vec![spend],
             aggregated_signature: Signature::default(),
         };
-        assert_eq!(
+        assert!(matches!(
             validate_clvm_and_signature(
                 &spend_bundle,
                 TEST_CONSTANTS.max_block_cost_clvm,
                 &TEST_CONSTANTS,
                 MEMPOOL_MODE,
             )
-            .unwrap_err()
-            .1,
-            ErrorCode::WrongPuzzleHash
-        );
+            .unwrap_err(),
+            ErrorCode::WrongPuzzleHash(_)
+        ));
     }
 
     #[test]
@@ -332,7 +328,7 @@ ff843B9ACA00\
             validate_clvm_and_signature(&spend_bundle, max_cost - 1, &TEST_CONSTANTS, MEMPOOL_MODE);
         assert!(matches!(
             result,
-            Err(ValidationErr(_, ErrorCode::CostExceeded))
+            Err(ErrorCode::CostExceeded(_))
         ));
     }
 
@@ -417,7 +413,7 @@ ff843B9ACA00\
         );
         assert!(matches!(
             result,
-            Err(ValidationErr(_, ErrorCode::BadAggregateSignature))
+            Err(ErrorCode::BadAggregateSignature)
         ));
     }
 }
