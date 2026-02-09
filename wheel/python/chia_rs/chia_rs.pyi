@@ -198,10 +198,12 @@ class PlotParam:
     @staticmethod
     def make_v1(s: int) -> PlotParam: ...
     @staticmethod
-    def make_v2(s: int) -> PlotParam: ...
+    def make_v2(plot_index: int, meta_group: int, strength: int) -> PlotParam: ...
 
     size_v1: Optional[uint8]
     strength_v2: Optional[uint8]
+    plot_index: uint16
+    meta_group: uint8
 
 @final
 class Prover:
@@ -2211,7 +2213,11 @@ class ProofOfSpace:
     pool_public_key: Optional[G1Element]
     pool_contract_puzzle_hash: Optional[bytes32]
     plot_public_key: G1Element
-    version_and_size: uint8
+    version: uint8
+    plot_index: uint16
+    meta_group: uint8
+    strength: uint8
+    size: uint8
     proof: bytes
     def param(self) -> PlotParam: ...
     def __new__(
@@ -2220,7 +2226,11 @@ class ProofOfSpace:
         pool_public_key: Optional[G1Element],
         pool_contract_puzzle_hash: Optional[bytes32],
         plot_public_key: G1Element,
-        version_and_size: uint8,
+        version: uint8,
+        plot_index: uint16,
+        meta_group: uint8,
+        strength: uint8,
+        size: uint8,
         proof: bytes
     ) -> Self: ...
     def __hash__(self) -> int: ...
@@ -2244,7 +2254,11 @@ class ProofOfSpace:
         pool_public_key: Union[ Optional[G1Element], _Unspec] = _Unspec(),
         pool_contract_puzzle_hash: Union[ Optional[bytes32], _Unspec] = _Unspec(),
         plot_public_key: Union[ G1Element, _Unspec] = _Unspec(),
-        version_and_size: Union[ uint8, _Unspec] = _Unspec(),
+        version: Union[ uint8, _Unspec] = _Unspec(),
+        plot_index: Union[ uint16, _Unspec] = _Unspec(),
+        meta_group: Union[ uint8, _Unspec] = _Unspec(),
+        strength: Union[ uint8, _Unspec] = _Unspec(),
+        size: Union[ uint8, _Unspec] = _Unspec(),
         proof: Union[ bytes, _Unspec] = _Unspec()) -> ProofOfSpace: ...
 
 @final

@@ -1,34 +1,59 @@
 import pytest
-from chia_rs.sized_ints import uint8
+from chia_rs.sized_ints import uint8, uint16
 
 from chia_rs import (
     G1Element,
     ProofOfSpace,
-    PlotParam,
 )
 
 
 def test_proof_of_space() -> None:
     challenge = b"abababababababababababababababab"
 
+    # version 1
     pos = ProofOfSpace(
-        challenge, None, None, G1Element(), uint8(5), bytes.fromhex("80")
+        challenge,
+        None,
+        None,
+        G1Element(),
+        uint8(0),
+        uint16(1),
+        uint8(2),
+        uint8(3),
+        uint8(4),
+        bytes.fromhex("80"),
     )
 
-    assert pos.param().size_v1 == 5
-    assert pos.param().strength_v2 is None
+    buffer = bytes(pos)
+    pos2, consumed = ProofOfSpace.parse_rust(buffer)
 
+    assert pos2.version == 0
+
+    assert pos2.plot_index == 0
+    assert pos2.meta_group == 0
+    assert pos2.strength == 0
+
+    assert pos2.size == 4
+
+    # version 2
     pos = ProofOfSpace(
-        challenge, None, None, G1Element(), uint8(0x85), bytes.fromhex("80")
+        challenge,
+        None,
+        None,
+        G1Element(),
+        uint8(1),
+        uint16(1),
+        uint8(2),
+        uint8(3),
+        uint8(4),
+        bytes.fromhex("80"),
     )
 
-    assert pos.param().size_v1 is None
-    assert pos.param().strength_v2 == 5
+    buffer = bytes(pos)
+    pos2, consumed = ProofOfSpace.parse_rust(buffer)
 
-    size = PlotParam.make_v1(5)
-    assert size.size_v1 == 5
-    assert size.strength_v2 is None
+    assert pos2.plot_index == 1
+    assert pos2.meta_group == 2
+    assert pos2.strength == 3
 
-    size = PlotParam.make_v2(5)
-    assert size.size_v1 is None
-    assert size.strength_v2 == 5
+    assert pos2.size == 0

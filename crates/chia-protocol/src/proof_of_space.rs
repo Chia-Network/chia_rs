@@ -1,48 +1,38 @@
 use crate::bytes::{Bytes, Bytes32};
 use chia_bls::G1Element;
+use chia_sha2::Sha256;
 use chia_streamable_macro::streamable;
-use chia_traits::chia_error;
+use chia_traits::{Error, Result, Streamable};
+use std::io::Cursor;
 
-#[streamable(no_json)]
+// This structure was updated for v2 proof-of-space, in a backwards compatible
+// way. The Option types are serialized as 1 byte to indicate whether the value
+// is set or not. Only 1 bit out of 8 are used. The byte prefix for
+// pool_contract_puzzle_hash is used to indicate whether this is a v1 or v2
+// proof.
+#[streamable(no_streamable)]
 pub struct ProofOfSpace {
     challenge: Bytes32,
     pool_public_key: Option<G1Element>,
     pool_contract_puzzle_hash: Option<Bytes32>,
     plot_public_key: G1Element,
-    /// The 2 top bits determine the type of proof:
-    /// 00 = v1 plot, the field store k-size
-    /// 10 = v2 plot, the field store strength
-    /// 01 = reserved
-    /// 11 = reserved
-    /// this field was renamed when adding support for v2 plots since the top
-    /// bit now means whether it's v1 or v2. To stay backwards compabible with
-    /// JSON serialization, we still serialize this as its original name
-    #[cfg_attr(feature = "serde", serde(rename = "size", alias = "version_and_size"))]
-    version_and_size: u8,
+
+    // this is 0 for v1 proof-of-space and 1 for v2. The version is encoded as
+    // part of the 8 bits prefix, indicating whether pool_contract_puzzle_hash
+    // is set or not
+    version: u8,
+
+    // These are set for v2 proofs and all zero for v1 proofs
+    plot_index: u16,
+    meta_group: u8,
+    strength: u8,
+
+    // this is set for v1 proofs, and zero for v2 proofs
+    size: u8,
+
     proof: Bytes,
 }
 
-/// The k-size for v1 PoS, or strength if it's a v2 PoS
-#[derive(Debug, PartialEq)]
-pub enum PlotParam {
-    KSize(u8),
-    Strength(u8),
-}
-
-impl ProofOfSpace {
-    pub fn param(&self) -> chia_error::Result<PlotParam> {
-        match self.version_and_size & 0b1100_0000 {
-            // valid v1 plot sizes are 32-50 (mainnet) and 18-50 (testnet)
-            0b0000_0000 => Ok(PlotParam::KSize(self.version_and_size)),
-            // valid v2 plot strength are 2-63
-            0b1000_0000 => Ok(PlotParam::Strength(self.version_and_size & 0x3f)),
-            _ => Err(chia_error::Error::InvalidPoSVersion),
-        }
-    }
-}
-
-#[cfg(feature = "py-bindings")]
-use chia_traits::{FromJsonDict, ToJsonDict};
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
 
@@ -53,6 +43,10 @@ pub struct PyPlotParam {
     pub size_v1: Option<u8>,
     #[pyo3(get)]
     pub strength_v2: Option<u8>,
+    #[pyo3(get)]
+    pub plot_index: u16,
+    #[pyo3(get)]
+    pub meta_group: u8,
 }
 
 #[cfg(feature = "py-bindings")]
@@ -64,15 +58,19 @@ impl PyPlotParam {
         Self {
             size_v1: Some(s),
             strength_v2: None,
+            plot_index: 0,
+            meta_group: 0,
         }
     }
 
     #[staticmethod]
-    fn make_v2(s: u8) -> Self {
-        assert!(s < 64);
+    fn make_v2(plot_index: u16, meta_group: u8, strength: u8) -> Self {
+        assert!(strength < 64);
         Self {
             size_v1: None,
-            strength_v2: Some(s),
+            strength_v2: Some(strength),
+            plot_index,
+            meta_group,
         }
     }
 }
@@ -81,60 +79,141 @@ impl PyPlotParam {
 #[pymethods]
 impl ProofOfSpace {
     #[pyo3(name = "param")]
-    fn py_param(&self) -> PyResult<PyPlotParam> {
-        match self.param()? {
-            PlotParam::KSize(s) => Ok(PyPlotParam {
-                size_v1: Some(s),
+    fn py_param(&self) -> PyPlotParam {
+        match self.version {
+            0 => PyPlotParam {
+                size_v1: Some(self.size),
                 strength_v2: None,
-            }),
-            PlotParam::Strength(s) => Ok(PyPlotParam {
+                plot_index: 0,
+                meta_group: 0,
+            },
+            1 => PyPlotParam {
                 size_v1: None,
-                strength_v2: Some(s),
-            }),
+                strength_v2: Some(self.strength),
+                plot_index: self.plot_index,
+                meta_group: self.meta_group,
+            },
+            _ => {
+                panic!("invalid proof-of-space version {}", self.version);
+            }
         }
     }
 }
 
-#[cfg(feature = "py-bindings")]
-impl ToJsonDict for ProofOfSpace {
-    fn to_json_dict(&self, py: pyo3::Python<'_>) -> pyo3::PyResult<pyo3::Py<pyo3::PyAny>> {
-        use pyo3::prelude::PyDictMethods;
-        let ret = pyo3::types::PyDict::new(py);
+// ProofOfSpace was updated in Chia 3.0 to support v2 proofs. In order to stay
+// backwards compatible with the network protocol and the block hashes of
+// previous versions, for v1 proofs, some care has to be taken.
+// Optional fields are serialized with a 1-byte prefix indicating whether the
+// field is set or not. This byte is either 0 or 1. This leaves 7 unused bits.
+// We use bit 2 in the byte prefix for the pool_contract_puzzle_hash field to
+// indicate whether this is a v2 proof or not. v1 proofs leave this bit as 0,
+// and thus remain backwards compatible. V2 proofs set it to 1, which alters
+// which fields are serialized. e.g. we no longer include size (k) of the plot
+// since v2 plots have a fixed size.
+impl Streamable for ProofOfSpace {
+    fn update_digest(&self, digest: &mut Sha256) {
+        self.challenge.update_digest(digest);
+        self.pool_public_key.update_digest(digest);
 
-        ret.set_item("challenge", self.challenge.to_json_dict(py)?)?;
-        ret.set_item("pool_public_key", self.pool_public_key.to_json_dict(py)?)?;
-        ret.set_item(
-            "pool_contract_puzzle_hash",
-            self.pool_contract_puzzle_hash.to_json_dict(py)?,
-        )?;
-        ret.set_item("plot_public_key", self.plot_public_key.to_json_dict(py)?)?;
+        if self.version == 0 {
+            self.pool_contract_puzzle_hash.update_digest(digest);
+            self.plot_public_key.update_digest(digest);
+            self.size.update_digest(digest);
+        } else if self.version == 1 {
+            if let Some(pool_contract) = self.pool_contract_puzzle_hash {
+                0b11_u8.update_digest(digest);
+                pool_contract.update_digest(digest);
+            } else {
+                0b10_u8.update_digest(digest);
+            }
 
-        // "size" was the original name of this field. We keep it to remain backwards compatible
-        ret.set_item("size", self.version_and_size.to_json_dict(py)?)?;
-        ret.set_item("proof", self.proof.to_json_dict(py)?)?;
+            self.plot_public_key.update_digest(digest);
+            self.plot_index.update_digest(digest);
+            self.meta_group.update_digest(digest);
+            self.strength.update_digest(digest);
+        } else {
+            panic!("version field must be 0 or 1, but it's {}", self.version);
+        }
 
-        Ok(ret.into_any().unbind())
+        self.proof.update_digest(digest);
     }
-}
 
-#[cfg(feature = "py-bindings")]
-impl FromJsonDict for ProofOfSpace {
-    fn from_json_dict(o: &pyo3::Bound<'_, pyo3::PyAny>) -> pyo3::PyResult<Self> {
-        use pyo3::prelude::PyAnyMethods;
-        Ok(Self {
-            challenge: <Bytes32 as FromJsonDict>::from_json_dict(&o.get_item("challenge")?)?,
-            pool_public_key: <Option<G1Element> as FromJsonDict>::from_json_dict(
-                &o.get_item("pool_public_key")?,
-            )?,
-            pool_contract_puzzle_hash: <Option<Bytes32> as FromJsonDict>::from_json_dict(
-                &o.get_item("pool_contract_puzzle_hash")?,
-            )?,
-            plot_public_key: <G1Element as FromJsonDict>::from_json_dict(
-                &o.get_item("plot_public_key")?,
-            )?,
-            version_and_size: <u8 as FromJsonDict>::from_json_dict(&o.get_item("size")?)?,
-            proof: <Bytes as FromJsonDict>::from_json_dict(&o.get_item("proof")?)?,
-        })
+    fn stream(&self, out: &mut Vec<u8>) -> Result<()> {
+        self.challenge.stream(out)?;
+        self.pool_public_key.stream(out)?;
+
+        if self.version == 0 {
+            self.pool_contract_puzzle_hash.stream(out)?;
+            self.plot_public_key.stream(out)?;
+            self.size.stream(out)?;
+        } else if self.version == 1 {
+            if let Some(pool_contract) = self.pool_contract_puzzle_hash {
+                0b11_u8.stream(out)?;
+                pool_contract.stream(out)?;
+            } else {
+                0b10_u8.stream(out)?;
+            }
+
+            self.plot_public_key.stream(out)?;
+            self.plot_index.stream(out)?;
+            self.meta_group.stream(out)?;
+            self.strength.stream(out)?;
+        } else {
+            return Err(Error::InvalidPoSVersion);
+        }
+
+        self.proof.stream(out)
+    }
+
+    fn parse<const TRUSTED: bool>(input: &mut Cursor<&[u8]>) -> Result<Self> {
+        let challenge = <Bytes32 as Streamable>::parse::<TRUSTED>(input)?;
+        let pool_public_key = <Option<G1Element> as Streamable>::parse::<TRUSTED>(input)?;
+
+        let prefix = <u8 as Streamable>::parse::<TRUSTED>(input)?;
+        let version = u8::from((prefix & 0b10) != 0);
+        let pool_contract_puzzle_hash = if (prefix & 1) != 0 {
+            Some(<Bytes32 as Streamable>::parse::<TRUSTED>(input)?)
+        } else {
+            None
+        };
+
+        let plot_public_key = <G1Element as Streamable>::parse::<TRUSTED>(input)?;
+
+        if version == 0 {
+            let size = <u8 as Streamable>::parse::<TRUSTED>(input)?;
+            let proof = <Bytes as Streamable>::parse::<TRUSTED>(input)?;
+
+            Ok(ProofOfSpace {
+                challenge,
+                pool_public_key,
+                pool_contract_puzzle_hash,
+                plot_public_key,
+                version,
+                plot_index: 0,
+                meta_group: 0,
+                strength: 0,
+                size,
+                proof,
+            })
+        } else {
+            let plot_index = <u16 as Streamable>::parse::<TRUSTED>(input)?;
+            let meta_group = <u8 as Streamable>::parse::<TRUSTED>(input)?;
+            let strength = <u8 as Streamable>::parse::<TRUSTED>(input)?;
+            let proof = <Bytes as Streamable>::parse::<TRUSTED>(input)?;
+
+            Ok(ProofOfSpace {
+                challenge,
+                pool_public_key,
+                pool_contract_puzzle_hash,
+                plot_public_key,
+                version,
+                plot_index,
+                meta_group,
+                strength,
+                size: 0,
+                proof,
+            })
+        }
     }
 }
 
@@ -145,27 +224,36 @@ mod tests {
     use rstest::rstest;
 
     #[rstest]
-    #[case(0x00, Ok(PlotParam::KSize(0)))]
-    #[case(0x01, Ok(PlotParam::KSize(1)))]
-    #[case(0x08, Ok(PlotParam::KSize(8)))]
-    #[case(0x3f, Ok(PlotParam::KSize(0x3f)))]
-    #[case(0x80, Ok(PlotParam::Strength(0)))]
-    #[case(0x81, Ok(PlotParam::Strength(1)))]
-    #[case(0x80 + 28, Ok(PlotParam::Strength(28)))]
-    #[case(0x80 + 30, Ok(PlotParam::Strength(30)))]
-    #[case(0x80 + 32, Ok(PlotParam::Strength(32)))]
-    #[case(0xff, Err(chia_error::Error::InvalidPoSVersion))]
-    #[case(0x7f, Err(chia_error::Error::InvalidPoSVersion))]
-    fn proof_of_space_size(#[case] size_field: u8, #[case] expect: chia_traits::Result<PlotParam>) {
+    #[case(0, 18, Ok(18))]
+    #[case(0, 28, Ok(28))]
+    #[case(0, 38, Ok(38))]
+    #[case(1, 18, Ok(0))]
+    #[case(1, 28, Ok(0))]
+    #[case(1, 38, Ok(0))]
+    #[case(2, 18, Err(Error::InvalidPoSVersion))]
+    fn proof_of_space_size(#[case] version: u8, #[case] size: u8, #[case] expect: Result<u8>) {
         let pos = ProofOfSpace::new(
             Bytes32::from(b"abababababababababababababababab"),
             None,
             None,
             G1Element::default(),
-            size_field,
+            version,
+            0,
+            0,
+            0,
+            size,
             Bytes::from(vec![]),
         );
 
-        assert_eq!(pos.param(), expect);
+        match pos.to_bytes() {
+            Ok(buf) => {
+                let new_pos =
+                    ProofOfSpace::parse::<false>(&mut Cursor::<&[u8]>::new(&buf)).expect("parse()");
+                assert_eq!(new_pos.size, expect.unwrap());
+            }
+            Err(e) => {
+                assert_eq!(e, expect.unwrap_err());
+            }
+        }
     }
 }

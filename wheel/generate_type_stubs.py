@@ -500,10 +500,12 @@ class PlotParam:
     @staticmethod
     def make_v1(s: int) -> PlotParam: ...
     @staticmethod
-    def make_v2(s: int) -> PlotParam: ...
+    def make_v2(plot_index: int, meta_group: int, strength: int) -> PlotParam: ...
 
     size_v1: Optional[uint8]
     strength_v2: Optional[uint8]
+    plot_index: uint16
+    meta_group: uint8
 
 @final
 class Prover:
