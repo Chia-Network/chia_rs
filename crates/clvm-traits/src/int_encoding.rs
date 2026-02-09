@@ -29,7 +29,12 @@ pub fn encode_number(slice: &[u8], negative: bool) -> Vec<u8> {
     result
 }
 
+/// # Panics
+///
+/// Panics if `LEN` is zero.
 pub fn decode_number<const LEN: usize>(mut slice: &[u8], signed: bool) -> Option<[u8; LEN]> {
+    assert!(LEN > 0, "Array length must be greater than zero");
+
     // Empty atoms are zero
     if slice.is_empty() {
         return Some([0; LEN]);
@@ -126,7 +131,7 @@ mod tests {
     #[rstest]
     fn test_u32(
         #[values(
-            0, 1, 10, 100, 1000, u8::MAX as u32, u8::MAX as u32, i16::MAX as u32, u16::MAX as u32, i32::MAX as u32, u32::MAX
+            0, 1, 10, 100, 1000, i8::MAX as u32, u8::MAX as u32, i16::MAX as u32, u16::MAX as u32, i32::MAX as u32, u32::MAX
         )]
         number: u32,
     ) {
@@ -136,7 +141,7 @@ mod tests {
     #[rstest]
     fn test_i32(
         #[values(
-            0, 1, 10, 100, 1000, u8::MAX as i32, u8::MAX as i32, i16::MAX as i32, u16::MAX as i32, i32::MAX
+            0, 1, 10, 100, 1000, i8::MAX as i32, u8::MAX as i32, i16::MAX as i32, u16::MAX as i32, i32::MAX
         )]
         number: i32,
     ) {
