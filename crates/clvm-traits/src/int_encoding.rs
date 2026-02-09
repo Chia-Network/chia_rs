@@ -147,6 +147,14 @@ mod tests {
     // Empty atoms are zero, regardless of sign
     #[case(&[], false, Some([0x00, 0x00]))]
     #[case(&[], true, Some([0x00, 0x00]))]
+    // Single byte atoms are sign extended to fit the array
+    #[case(&[0xFF], true, Some([0xFF, 0xFF]))]
+    #[case(&[0xFE], true, Some([0xFF, 0xFE]))]
+    #[case(&[0x80], true, Some([0xFF, 0x80]))]
+    #[case(&[0x81], true, Some([0xFF, 0x81]))]
+    #[case(&[0x7F], true, Some([0x00, 0x7F]))]
+    #[case(&[0x01], true, Some([0x00, 0x01]))]
+    #[case(&[0x00], true, Some([0x00, 0x00]))]
     // Leading zeros are padding bytes for positive numbers
     #[case(&[0x00], false, Some([0x00, 0x00]))]
     #[case(&[0x00], true, Some([0x00, 0x00]))]

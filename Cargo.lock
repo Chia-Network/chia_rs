@@ -810,7 +810,7 @@ dependencies = [
  "num-bigint",
  "pyo3",
  "rstest",
- "thiserror",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
