@@ -355,12 +355,12 @@ where
             puzhash.into(),
             parse_amount(&a, amount, ErrorCode::InvalidCoinAmount)?,
         );
-        let Ok(puzzle_program) = Program::from_clvm(&a, puzzle) else {
-            continue;
-        };
-        let Ok(solution_program) = Program::from_clvm(&a, solution) else {
-            continue;
-        };
+        // This may fail for malicious generators, where the puzzle reveal or
+        // solution reuses CLVM subtrees such that a plain serialization becomes
+        // very large. from_clvm() fails if the resulting buffer is greater than
+        // 2 MB
+        let puzzle_program = Program::from_clvm(&a, puzzle).unwrap_or_default();
+        let solution_program = Program::from_clvm(&a, solution).unwrap_or_default();
         let coinspend = CoinSpend::new(coin, puzzle_program, solution_program);
         output.push(coinspend);
     }
@@ -431,12 +431,8 @@ where
             u64::from_clvm(&a, amount)
                 .map_err(|_| ValidationErr(first, ErrorCode::InvalidCoinAmount))?,
         );
-        let Ok(puzzle_program) = Program::from_clvm(&a, puzzle) else {
-            continue;
-        };
-        let Ok(solution_program) = Program::from_clvm(&a, solution) else {
-            continue;
-        };
+        let puzzle_program = Program::from_clvm(&a, puzzle).unwrap_or_default();
+        let solution_program = Program::from_clvm(&a, solution).unwrap_or_default();
 
         let Reduction(_clvm_cost, res) = run_program(
             &mut a,
@@ -480,11 +476,11 @@ where
                 }
             }
 
-            // we have a valid condition
+            // we have a reasonable condition
             cond_output.push((opcode, bytes_vec));
         }
         output.push((
-            CoinSpend::new(coin, puzzle_program.clone(), solution_program.clone()),
+            CoinSpend::new(coin, puzzle_program, solution_program),
             cond_output,
         ));
     }

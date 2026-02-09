@@ -28,9 +28,10 @@ pub struct Signature(pub(crate) blst_p2);
 
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for Signature {
-    fn arbitrary(_u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        // placeholder
-        Ok(Self::default())
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        use crate::SecretKey;
+        let sk = SecretKey::arbitrary(u)?;
+        Ok(sign(&sk, b"foobar"))
     }
 }
 

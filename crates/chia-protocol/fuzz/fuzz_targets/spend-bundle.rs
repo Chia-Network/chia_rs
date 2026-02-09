@@ -2,19 +2,15 @@
 
 use chia_protocol::Coin;
 use chia_protocol::{Bytes32, SpendBundle};
-use chia_traits::Streamable;
 use clvm_traits::FromClvm;
 use clvmr::op_utils::{first, rest};
 use clvmr::{Allocator, NodePtr};
-use libfuzzer_sys::fuzz_target;
+use libfuzzer_sys::{Corpus, fuzz_target};
 use std::collections::HashSet;
 
-fuzz_target!(|data: &[u8]| {
-    let Ok(bundle) = SpendBundle::from_bytes(data) else {
-        return;
-    };
+fuzz_target!(|bundle: SpendBundle| -> Corpus {
     let Ok(additions) = bundle.additions() else {
-        return;
+        return Corpus::Reject;
     };
 
     let additions = additions.iter().copied().collect::<HashSet<_>>();
@@ -56,4 +52,5 @@ fuzz_target!(|data: &[u8]| {
     assert!(total_cost <= 11_000_000_000);
 
     assert_eq!(additions, expected);
+    Corpus::Keep
 });

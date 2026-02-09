@@ -39,6 +39,9 @@ fn test<'a, T: Arbitrary<'a> + Streamable + std::fmt::Debug + PartialEq>(data: &
     let mut u = Unstructured::new(data);
     let obj = <T as Arbitrary<'a>>::arbitrary(&mut u).unwrap();
     test_streamable(&obj);
+
+    // ensure parsing from garbage bytes doesn't crash or panic
+    let _ = Foliage::from_bytes(data);
 }
 
 fuzz_target!(|data: &[u8]| {
