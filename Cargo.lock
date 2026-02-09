@@ -809,6 +809,7 @@ dependencies = [
  "hex-literal",
  "num-bigint",
  "pyo3",
+ "rstest",
  "thiserror",
 ]
 
@@ -819,6 +820,7 @@ dependencies = [
  "clvm-traits",
  "clvmr",
  "libfuzzer-sys",
+ "num-bigint",
 ]
 
 [[package]]

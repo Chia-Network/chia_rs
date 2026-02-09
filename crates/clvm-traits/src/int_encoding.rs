@@ -1,3 +1,5 @@
+const MAX_PADDING_BYTES: usize = 64;
+
 pub fn encode_number(slice: &[u8], negative: bool) -> Vec<u8> {
     let mut start = 0;
     let pad_byte = if negative { 0xFF } else { 0x00 };
@@ -28,19 +30,30 @@ pub fn encode_number(slice: &[u8], negative: bool) -> Vec<u8> {
 }
 
 pub fn decode_number<const LEN: usize>(mut slice: &[u8], signed: bool) -> Option<[u8; LEN]> {
+    // Empty atoms are zero
+    if slice.is_empty() {
+        return Some([0; LEN]);
+    }
+
     // Reject negative numbers for unsigned types
-    if !signed && !slice.is_empty() && slice[0] & 0x80 != 0 {
+    if !signed && slice[0] & 0x80 != 0 {
         return None;
     }
 
-    let was_negative = signed && !slice.is_empty() && slice[0] & 0x80 != 0;
+    let was_negative = signed && slice[0] & 0x80 != 0;
     let padding_byte = if was_negative { 0xFF } else { 0x00 };
+    let mut padding_bytes = 0;
 
     while slice.len() > LEN && slice[0] == padding_byte {
+        if padding_bytes == MAX_PADDING_BYTES {
+            return None;
+        }
+
         slice = &slice[1..];
+        padding_bytes += 1;
     }
 
-    let is_negative = signed && !slice.is_empty() && slice[0] & 0x80 != 0;
+    let is_negative = signed && slice[0] & 0x80 != 0;
 
     if slice.len() > LEN || (is_negative != was_negative) {
         return None;
@@ -59,6 +72,7 @@ mod tests {
     use super::*;
 
     use clvmr::Allocator;
+    use rstest::rstest;
 
     macro_rules! test_roundtrip {
         ( $num:expr, $signed:expr ) => {
@@ -78,32 +92,91 @@ mod tests {
     }
 
     #[test]
-    fn test_signed_encoding() {
-        test_roundtrip!(0i32, true);
-        test_roundtrip!(1i32, true);
-        test_roundtrip!(2i32, true);
-        test_roundtrip!(3i32, true);
-        test_roundtrip!(255i32, true);
-        test_roundtrip!(4716i32, true);
-        test_roundtrip!(-255i32, true);
-        test_roundtrip!(-10i32, true);
-        test_roundtrip!(i32::MIN, true);
-        test_roundtrip!(i32::MAX, true);
+    fn test_u8() {
+        // We can test all combinations of u8 since there are only 256 possible values.
+        for number in u8::MIN..=u8::MAX {
+            test_roundtrip!(number, false);
+        }
     }
 
     #[test]
-    fn test_unsigned_encoding() {
-        test_roundtrip!(0u32, false);
-        test_roundtrip!(1u32, false);
-        test_roundtrip!(2u32, false);
-        test_roundtrip!(3u32, false);
-        test_roundtrip!(255u32, false);
-        test_roundtrip!(u32::MAX, false);
+    fn test_i8() {
+        // We can test all combinations of i8 since there are only 256 possible values.
+        for number in i8::MIN..=i8::MAX {
+            test_roundtrip!(number, true);
+        }
     }
 
     #[test]
-    fn test_edge_cases() {
-        assert_eq!(decode_number::<4>(&[0xFF], false), None);
-        assert_eq!(decode_number::<2>(&[0x00, 0x01, 0x00, 0x00], false), None);
+    fn test_u16() {
+        // We can test all combinations of u16 since there are only 65536 possible values.
+        for number in u16::MIN..=u16::MAX {
+            test_roundtrip!(number, false);
+        }
+    }
+
+    #[test]
+    fn test_i16() {
+        // We can test all combinations of i16 since there are only 65536 possible values.
+        for number in i16::MIN..=i16::MAX {
+            test_roundtrip!(number, true);
+        }
+    }
+
+    #[rstest]
+    fn test_u32(
+        #[values(
+            0, 1, 10, 100, 1000, u8::MAX as u32, u8::MAX as u32, i16::MAX as u32, u16::MAX as u32, i32::MAX as u32, u32::MAX
+        )]
+        number: u32,
+    ) {
+        test_roundtrip!(number, false);
+    }
+
+    #[rstest]
+    fn test_i32(
+        #[values(
+            0, 1, 10, 100, 1000, u8::MAX as i32, u8::MAX as i32, i16::MAX as i32, u16::MAX as i32, i32::MAX
+        )]
+        number: i32,
+    ) {
+        test_roundtrip!(number, true);
+    }
+
+    #[rstest]
+    // Empty atoms are zero, regardless of sign
+    #[case(&[], false, Some([0x00, 0x00]))]
+    #[case(&[], true, Some([0x00, 0x00]))]
+    // Leading zeros are padding bytes for positive numbers
+    #[case(&[0x00], false, Some([0x00, 0x00]))]
+    #[case(&[0x00], true, Some([0x00, 0x00]))]
+    #[case(&[0x00, 0x00], false, Some([0x00, 0x00]))]
+    #[case(&[0x00, 0x00], true, Some([0x00, 0x00]))]
+    #[case(&[0x00, 0x00, 0x00], false, Some([0x00, 0x00]))]
+    #[case(&[0x00, 0x00, 0x00], true, Some([0x00, 0x00]))]
+    // You can have too many padding bytes
+    #[case(&[0x00; MAX_PADDING_BYTES + 2], false, Some([0x00, 0x00]))]
+    #[case(&[0x00; MAX_PADDING_BYTES + 2], true, Some([0x00, 0x00]))]
+    #[case(&[0x00; MAX_PADDING_BYTES + 3], false, None)]
+    #[case(&[0x00; MAX_PADDING_BYTES + 3], true, None)]
+    #[case(&[0xFF; MAX_PADDING_BYTES + 2], true, Some([0xFF, 0xFF]))]
+    #[case(&[0xFF; MAX_PADDING_BYTES + 3], true, None)]
+    // If there's a non-padding byte that would result in exceeding the length, it's invalid
+    #[case(&[0x01, 0x00, 0x00], false, None)]
+    #[case(&[0x01, 0x00, 0x00], true, None)]
+    // If the number after the padding bytes doesn't have the same sign as the original number, it's invalid
+    #[case(&[0xFF, 0xFF, 0xFF, 0x00, 0x00], true, None)]
+    #[case(&[0xFF, 0xFF, 0xFF, 0xFF, 0xFF], true, Some([0xFF, 0xFF]))]
+    // Negative numbers aren't permitted for unsigned types
+    #[case(&[0xFF], false, None)]
+    #[case(&[0xFF, 0xFF], false, None)]
+    // The padding byte makes this number positive
+    #[case(&[0x00, 0xFF, 0xFF], false, Some([0xFF, 0xFF]))]
+    fn test_decode(#[case] input: &[u8], #[case] signed: bool, #[case] expected: Option<[u8; 2]>) {
+        assert_eq!(
+            decode_number::<2>(input, signed),
+            expected,
+            "input: {input:?}, signed: {signed}, expected: {expected:?}",
+        );
     }
 }
