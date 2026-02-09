@@ -8,7 +8,7 @@ use chia_bls::GTElement;
 use chia_bls::{aggregate_verify_gt, hash_to_g2};
 use chia_protocol::SpendBundle;
 use chia_sha2::Sha256;
-use clvmr::chia_dialect::{DISABLE_OP, ENABLE_KECCAK_OPS_OUTSIDE_GUARD};
+use clvmr::chia_dialect::{CANONICAL_INTS, DISABLE_OP, ENABLE_KECCAK_OPS_OUTSIDE_GUARD};
 use clvmr::{LIMIT_HEAP, NodePtr};
 
 // type definition makes clippy happy
@@ -89,7 +89,8 @@ pub fn get_flags_for_height_and_constants(
     // In hard fork 2, we enable the keccak operator outside the softfork guard
     let mut flags: u32 = 0;
     if prev_tx_height >= constants.hard_fork2_height {
-        flags |= ENABLE_KECCAK_OPS_OUTSIDE_GUARD | COST_CONDITIONS | SIMPLE_GENERATOR;
+        flags |=
+            ENABLE_KECCAK_OPS_OUTSIDE_GUARD | COST_CONDITIONS | SIMPLE_GENERATOR | CANONICAL_INTS;
     }
 
     if prev_tx_height >= constants.soft_fork8_height {

@@ -58,7 +58,7 @@ use chia_protocol::{
 use chia_sha2::Sha256;
 use chia_traits::ChiaToPython;
 use clvm_utils::tree_hash_from_bytes;
-use clvmr::chia_dialect::DISABLE_OP;
+use clvmr::chia_dialect::{CANONICAL_INTS, DISABLE_OP};
 use clvmr::{ENABLE_KECCAK_OPS_OUTSIDE_GUARD, ENABLE_SHA256_TREE, LIMIT_HEAP, NO_UNKNOWN_OPS};
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
@@ -776,6 +776,7 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("COST_CONDITIONS", COST_CONDITIONS)?;
     m.add("SIMPLE_GENERATOR", SIMPLE_GENERATOR)?;
     m.add("DISABLE_OP", DISABLE_OP)?;
+    m.add("CANONICAL_INTS", CANONICAL_INTS)?;
 
     m.add_class::<PyPlotParam>()?;
 
