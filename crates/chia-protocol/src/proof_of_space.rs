@@ -149,6 +149,32 @@ impl ProofOfSpace {
             panic!("unknown proof version: {}", self.version);
         }
     }
+
+    /// returns the quality string of the v2 proof of space.
+    /// returns None if this is a v1 proof or if the proof is invalid.
+    pub fn quality_string(&self) -> Option<Bytes32> {
+        if self.version != 1 {
+            return None;
+        }
+
+        let k_size = (self.proof.len() * 8 / 128) as u8;
+        let plot_id = self.compute_plot_id().to_bytes();
+        chia_pos2::validate_proof_v2(
+            &plot_id,
+            k_size,
+            &self.challenge.to_bytes(),
+            self.strength,
+            self.proof.as_slice(),
+        )
+        .map(|quality| {
+            let mut sha256 = Sha256::new();
+            sha256.update(chia_pos2::serialize_quality(
+                &quality.chain_links,
+                self.strength,
+            ));
+            sha256.finalize().into()
+        })
+    }
 }
 
 #[cfg(feature = "py-bindings")]
@@ -178,6 +204,11 @@ impl ProofOfSpace {
     #[pyo3(name = "compute_plot_id")]
     pub fn py_compute_plot_id(&self) -> Bytes32 {
         self.compute_plot_id()
+    }
+
+    #[pyo3(name = "quality_string")]
+    pub fn py_quality_string(&self) -> Option<Bytes32> {
+        self.quality_string()
     }
 }
 

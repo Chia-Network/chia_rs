@@ -472,6 +472,7 @@ dependencies = [
  "anyhow",
  "arbitrary",
  "chia-bls 0.37.0",
+ "chia-pos2",
  "chia-serde",
  "chia-sha2 0.37.0",
  "chia-traits 0.37.0",

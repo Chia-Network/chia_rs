@@ -282,6 +282,7 @@ extra_members = {
     "ProofOfSpace": [
         "def param(self) -> PlotParam: ...",
         "def compute_plot_id(self) -> bytes32: ...",
+        "def quality_string(self) -> Optional[bytes32]: ...",
     ],
     "CoinRecord": [
         "@property\n    def spent(self) -> bool: ...",
