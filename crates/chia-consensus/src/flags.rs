@@ -27,6 +27,11 @@ pub const COMPUTE_FINGERPRINT: u32 = 0x4_0000;
 /// processing them in in chia_rs. It is set to activate after hard fork 2.
 pub const COST_CONDITIONS: u32 = 0x80_0000;
 
+/// After the generator-identity hard fork, generators must be validated from
+/// the INTERNED (canonical) tree so atom/pair limits and cost apply to the same
+/// structure independent of serialization.
+pub const INTERNED_GENERATOR: u32 = 0x0800_0000;
+
 /// A combination of flags suitable for mempool-mode, with stricter checking
 pub const MEMPOOL_MODE: u32 = CLVM_MEMPOOL_MODE | NO_UNKNOWN_CONDS | STRICT_ARGS_COUNT;
 

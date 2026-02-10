@@ -5,7 +5,9 @@ use crate::conditions::{
     validate_conditions, validate_signature,
 };
 use crate::consensus_constants::ConsensusConstants;
-use crate::flags::{DONT_VALIDATE_SIGNATURE, SIMPLE_GENERATOR};
+use crate::flags::{DONT_VALIDATE_SIGNATURE, INTERNED_GENERATOR, SIMPLE_GENERATOR};
+use crate::generator_cost::total_cost_from_tree;
+use clvmr::serde::intern;
 use crate::validation_error::{ErrorCode, ValidationErr, first};
 use chia_bls::{BlsCache, Signature};
 use chia_protocol::{BytesImpl, Coin, CoinSpend, Program};
@@ -143,6 +145,112 @@ where
     Ok(result)
 }
 
+/// This is the same as run_block_generator2() but uses the interned (canonical)
+/// generator tree and the new cost formula. Used after the generator-identity
+/// hard fork to ensure atom/pair limits and cost apply to the canonical structure.
+#[allow(clippy::too_many_arguments)]
+pub fn run_block_generator3<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
+    program: &[u8],
+    block_refs: I,
+    max_cost: u64,
+    flags: u32,
+    signature: &Signature,
+    bls_cache: Option<&BlsCache>,
+    constants: &ConsensusConstants,
+) -> Result<SpendBundleConditions, ValidationErr>
+where
+    <I as IntoIterator>::IntoIter: DoubleEndedIterator,
+{
+    let tmp = Allocator::new();
+    check_generator_quote(&tmp, program, flags)?;
+
+    // Intern the generator to get canonical tree and cost
+    let mut decode_allocator = Allocator::new();
+    let program_node = node_from_bytes_backrefs(&mut decode_allocator, program)
+        .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
+    let interned = intern(&decode_allocator, program_node)
+        .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
+    let base_cost = total_cost_from_tree(&interned);
+    let mut allocator = interned.allocator;
+    let program_interned = interned.root;
+
+    let mut cost_left = max_cost;
+    subtract_cost(&allocator, &mut cost_left, base_cost)?;
+
+    check_generator_node(&allocator, program_interned, flags)?;
+
+    let args = setup_generator_args(&mut allocator, block_refs, flags)?;
+    let dialect = ChiaDialect::new(flags);
+
+    let Reduction(clvm_cost, all_spends) =
+        run_program(&mut allocator, &dialect, program_interned, args, cost_left)?;
+
+    subtract_cost(&allocator, &mut cost_left, clvm_cost)?;
+
+    let mut ret = SpendBundleConditions::default();
+
+    let all_spends = first(&allocator, all_spends)?;
+    ret.execution_cost += clvm_cost;
+
+    // at this point all_spends is a list of:
+    // (parent-coin-id puzzle-reveal amount solution . extra)
+    // where extra may be nil, or additional extension data
+
+    let mut state = ParseState::default();
+    let mut cache = TreeCache::default();
+
+    // first iterate over all puzzle reveals to find duplicate nodes, to know
+    // what to memoize during tree hash computations. This is managed by
+    // TreeCache
+    let mut iter = all_spends;
+    while let Some((spend, rest)) = allocator.next(iter) {
+        iter = rest;
+        let [_, puzzle, _] = extract_n::<3>(&allocator, spend, ErrorCode::InvalidCondition)?;
+        cache.visit_tree(&allocator, puzzle);
+    }
+
+    let mut iter = all_spends;
+    while let Some((spend, rest)) = allocator.next(iter) {
+        iter = rest;
+        // process the spend
+        let [parent_id, puzzle, amount, solution, _spend_level_extra] =
+            extract_n::<5>(&allocator, spend, ErrorCode::InvalidCondition)?;
+
+        let Reduction(clvm_cost, conditions) =
+            run_program(&mut allocator, &dialect, puzzle, solution, cost_left)?;
+
+        subtract_cost(&allocator, &mut cost_left, clvm_cost)?;
+        ret.execution_cost += clvm_cost;
+
+        let buf = tree_hash_cached(&allocator, puzzle, &mut cache);
+        let puzzle_hash = allocator.new_atom(&buf)?;
+
+        process_single_spend::<EmptyVisitor>(
+            &allocator,
+            &mut ret,
+            &mut state,
+            parent_id,
+            puzzle_hash,
+            amount,
+            conditions,
+            flags,
+            &mut cost_left,
+            clvm_cost,
+            constants,
+        )?;
+    }
+    if allocator.atom_len(iter) != 0 {
+        return Err(ValidationErr(iter, ErrorCode::GeneratorRuntimeError));
+    }
+
+    validate_conditions(&allocator, &ret, &state, allocator.nil(), flags)?;
+    validate_signature(&state, signature, flags, bls_cache)?;
+    ret.validated_signature = (flags & DONT_VALIDATE_SIGNATURE) == 0;
+
+    ret.cost = max_cost - cost_left;
+    Ok(ret)
+}
+
 fn extract_n<const N: usize>(
     a: &Allocator,
     mut n: NodePtr,
@@ -219,6 +327,12 @@ pub fn run_block_generator2<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
+    if (flags & INTERNED_GENERATOR) != 0 {
+        return run_block_generator3(
+            program, block_refs, max_cost, flags, signature, bls_cache, constants,
+        );
+    }
+
     check_generator_quote(a, program, flags)?;
     let byte_cost = program.len() as u64 * constants.cost_per_byte;
 
