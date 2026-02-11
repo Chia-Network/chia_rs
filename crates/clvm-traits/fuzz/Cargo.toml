@@ -11,6 +11,7 @@ cargo-fuzz = true
 libfuzzer-sys = { workspace = true }
 clvmr = { workspace = true }
 clvm-traits = { workspace = true }
+num-bigint = { workspace = true }
 
 [[bin]]
 name = "int_encoding"

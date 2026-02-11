@@ -32,3 +32,4 @@ thiserror = { workspace = true }
 [dev-dependencies]
 hex = { workspace = true }
 hex-literal = { workspace = true }
+rstest = { workspace = true }
