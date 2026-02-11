@@ -392,6 +392,77 @@ mod tests {
         assert_eq!(result, Bytes32::new(expected));
     }
 
+    // Regression tests for quality_string(). Vectors in quality-string-tests/*.txt:
+    // 7 lines (challenge hex, strength, plot_index, meta_group, pool hex, proof hex, expect_quality hex).
+    #[rstest]
+    #[case("pool-2-0-0")]
+    #[case("contract-2-0-0")]
+    #[case("contract-3-0-0")]
+    #[case("pool-3-0-0")]
+    #[case("pool-2-1-0")]
+    #[case("pool-2-0-1")]
+    #[case("pool-2-1000-7")]
+    fn test_quality_string(#[case] name: &str) {
+        let plot_pk = G1Element::from_bytes(&hex!(
+            "a9c96f979d895b9ded08907ecd775abf889d51219bb7776dd73fdbac6b0dcc063c72c9e10d96776f486bbd1416b54533"
+        ))
+        .unwrap();
+
+        let path = format!("quality-string-tests/{name}.txt");
+        let contents =
+            std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {path}: {e}"));
+        let l: Vec<&str> = contents
+            .lines()
+            .map(|line| line.split('#').next().unwrap_or(line).trim())
+            .filter(|s| !s.is_empty())
+            .collect();
+        assert_eq!(l.len(), 7, "expected 7 lines");
+
+        let challenge: [u8; 32] = hex::decode(l[0])
+            .expect("challenge hex")
+            .try_into()
+            .unwrap();
+        let strength: u8 = l[1].parse().expect("strength");
+        let plot_index: u16 = l[2].parse().expect("plot_index");
+        let meta_group: u8 = l[3].parse().expect("meta_group");
+        let (pool_pk, pool_contract) = if l[4].len() == 96 {
+            let b = hex::decode(l[4]).expect("pool_pk hex");
+            (
+                Some(G1Element::from_bytes(b.as_slice().try_into().unwrap()).expect("pool_pk")),
+                None,
+            )
+        } else {
+            let ph: [u8; 32] = hex::decode(l[4])
+                .expect("pool_contract hex")
+                .try_into()
+                .unwrap();
+            (None, Some(Bytes32::new(ph)))
+        };
+        let proof = hex::decode(l[5]).expect("proof hex");
+        let expect_quality: [u8; 32] = hex::decode(l[6])
+            .expect("expect_quality hex")
+            .try_into()
+            .unwrap();
+
+        let pos = ProofOfSpace::new(
+            Bytes32::new(challenge),
+            pool_pk,
+            pool_contract,
+            plot_pk,
+            1,
+            plot_index,
+            meta_group,
+            strength,
+            22,
+            Bytes::from(proof),
+        );
+
+        let quality = pos
+            .quality_string()
+            .expect("quality_string should return Some");
+        assert_eq!(quality, Bytes32::new(expect_quality));
+    }
+
     #[rstest]
     #[case(0, 18, Ok(18))]
     #[case(0, 28, Ok(28))]
