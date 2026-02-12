@@ -231,6 +231,7 @@ impl Streamable for ProofOfSpace {
             self.pool_contract_puzzle_hash.update_digest(digest);
             self.plot_public_key.update_digest(digest);
             self.size.update_digest(digest);
+            self.proof.update_digest(digest);
         } else if self.version == 1 {
             if let Some(pool_contract) = self.pool_contract_puzzle_hash {
                 0b11_u8.update_digest(digest);
@@ -243,11 +244,15 @@ impl Streamable for ProofOfSpace {
             self.plot_index.update_digest(digest);
             self.meta_group.update_digest(digest);
             self.strength.update_digest(digest);
+
+            // for v2 proofs, we don't hash the full proof directly. The full
+            // proof is the witness to this quality string commitment.
+            self.quality_string()
+                .expect("internal error. Can't compute hash of invalid ProofOfSpace")
+                .update_digest(digest);
         } else {
             panic!("version field must be 0 or 1, but it's {}", self.version);
         }
-
-        self.proof.update_digest(digest);
     }
 
     fn stream(&self, out: &mut Vec<u8>) -> Result<()> {
