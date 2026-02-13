@@ -6,6 +6,10 @@ use crate::conditions::{
 };
 use crate::consensus_constants::ConsensusConstants;
 use crate::flags::{DONT_VALIDATE_SIGNATURE, SIMPLE_GENERATOR};
+use crate::opcodes::{
+    AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT, AGG_SIG_PARENT_PUZZLE,
+    AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT, AGG_SIG_UNSAFE, CREATE_COIN,
+};
 use crate::validation_error::{ErrorCode, ValidationErr, first};
 use chia_bls::{BlsCache, Signature};
 use chia_protocol::{BytesImpl, Coin, CoinSpend, Program};
@@ -367,11 +371,35 @@ where
     Ok(output)
 }
 
-// this function is less capable of handling problematic generators as they are
-// returning serialized puzzles, which may not be possible. They will simply ignore many of the bad cases.
+/// Maximum number of conditions per spend before we start dropping conditions
+/// to keep JSON and other serialized output bounded. Only AGG_SIG_* and
+/// CREATE_COIN conditions are added after this limit is reached.
+const MAX_CONDITIONS_PER_SPEND: usize = 1024;
+
+/// Returns true for condition opcodes that are safe to include even after
+/// exceeding the soft limit. These conditions have cost associated with them, so
+/// are already restricted.
+fn is_high_priority_condition(op: u32) -> bool {
+    u16::try_from(op).is_ok()
+        && matches!(
+            op as u16,
+            AGG_SIG_PARENT
+                | AGG_SIG_PUZZLE
+                | AGG_SIG_AMOUNT
+                | AGG_SIG_PUZZLE_AMOUNT
+                | AGG_SIG_PARENT_AMOUNT
+                | AGG_SIG_PARENT_PUZZLE
+                | AGG_SIG_UNSAFE
+                | AGG_SIG_ME
+                | CREATE_COIN
+        )
+}
 
 // this function returns a list of tuples (coinspend, conditions)
 // conditions are formatted as a vec of tuples of (condition_opcode, args)
+// this function is less capable of handling problematic generators as they are
+// returning serialized puzzles, which may not be possible. They will simply
+// ignore many of the bad cases.
 #[allow(clippy::type_complexity)]
 pub fn get_coinspends_with_conditions_for_trusted_block<
     GenBuf: AsRef<[u8]>,
@@ -476,7 +504,12 @@ where
                 }
             }
 
-            // we have a reasonable condition
+            // When over the per-spend limit, drop low-priority conditions first (REMARK,
+            // announcements, SOFTFORK, SEND_MESSAGE, RECEIVE_MESSAGE) to keep output bounded.
+            if cond_output.len() >= MAX_CONDITIONS_PER_SPEND && !is_high_priority_condition(opcode)
+            {
+                continue 'outer;
+            }
             cond_output.push((opcode, bytes_vec));
         }
         output.push((
