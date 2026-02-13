@@ -24,7 +24,7 @@ def test_recursion_depth() -> None:
         str(spend["coin_spend"])
         == "CoinSpend { coin: Coin { parent_coin_info: 0101010101010101010101010101010101010101010101010101010101010101, puzzle_hash: 6c04a09251046f8dd47efe681af7e47f6e61e68fb2f9ad47c5031ec3e36c5564, amount: 123 }, puzzle_reveal: Program(80), solution: Program(ff80ffff018080) }"
     )
-    assert len(spend["conditions"]) == 2000000
+    assert len(spend["conditions"]) == 1024
 
     expected_condition = [
         "(66, [b'$', b'hello', b'\\x01\\x01\\x01\\x01\\x01\\x01\\x01\\x01\\x01\\x01\\x01\\x01\\x01\\x01\\x01\\x01\\x01\\x01\\x01\\x01\\x01\\x01\\x01\\x01\\x01\\x01\\x01\\x01\\x01\\x01\\x01\\x01'])",
