@@ -177,6 +177,9 @@ def parse_rust_source(filename: str, upper_case: bool) -> list[tuple[str, list[s
             if line.strip().startswith("#"):
                 continue
 
+            if line.strip().startswith("//"):
+                continue
+
             # a field
             if ":" in line and "///" not in line:
                 name, rust_type = line.split("//")[0].strip().split(":")
@@ -278,6 +281,8 @@ extra_members = {
     ],
     "ProofOfSpace": [
         "def param(self) -> PlotParam: ...",
+        "def compute_plot_id(self) -> bytes32: ...",
+        "def quality_string(self) -> Optional[bytes32]: ...",
     ],
     "CoinRecord": [
         "@property\n    def spent(self) -> bool: ...",
@@ -415,6 +420,9 @@ def is_overflow_block(
 def expected_plot_size(
     k: int
 ) -> int: ...
+
+def compute_plot_id_v1(plot_pk: G1Element, pool_pk: G1Element | None, pool_contract: bytes32 | None) -> bytes32: ...
+def compute_plot_id_v2(strength: uint8, plot_pk: G1Element, pool_pk: G1Element | None, pool_contract: bytes32 | None, plot_index: uint16, meta_group: uint8) -> bytes32: ...
 
 
 NO_UNKNOWN_CONDS: int = ...

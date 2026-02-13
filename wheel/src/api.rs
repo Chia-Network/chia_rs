@@ -88,7 +88,7 @@ use clvmr::serde::is_canonical_serialization;
 use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs, node_to_bytes};
 
 use chia_bls::{
-    BlsCache, DerivableKey, GTElement, PublicKey, SecretKey, Signature,
+    BlsCache, DerivableKey, G1Element, GTElement, PublicKey, SecretKey, Signature,
     hash_to_g2 as native_hash_to_g2,
 };
 #[pyfunction]
@@ -131,6 +131,34 @@ pub fn tree_hash<'a>(py: Python<'a>, blob: PyBuffer<u8>) -> PyResult<Bound<'a, P
     ChiaToPython::to_python(
         &Bytes32::from(&tree_hash_from_bytes(slice).map_err(map_pyerr)?.into()),
         py,
+    )
+}
+
+#[pyfunction]
+fn compute_plot_id_v1(
+    plot_pk: G1Element,
+    pool_pk: Option<G1Element>,
+    pool_contract: Option<Bytes32>,
+) -> Bytes32 {
+    chia_protocol::compute_plot_id_v1(&plot_pk, pool_pk.as_ref(), pool_contract.as_ref())
+}
+
+#[pyfunction]
+fn compute_plot_id_v2(
+    strength: u8,
+    plot_pk: G1Element,
+    pool_pk: Option<G1Element>,
+    pool_contract: Option<Bytes32>,
+    plot_index: u16,
+    meta_group: u8,
+) -> Bytes32 {
+    chia_protocol::compute_plot_id_v2(
+        strength,
+        &plot_pk,
+        pool_pk.as_ref(),
+        pool_contract.as_ref(),
+        plot_index,
+        meta_group,
     )
 }
 
@@ -766,6 +794,9 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
         get_spends_for_trusted_block_with_conditions,
         m
     )?)?;
+
+    m.add_function(wrap_pyfunction!(compute_plot_id_v1, m)?)?;
+    m.add_function(wrap_pyfunction!(compute_plot_id_v2, m)?)?;
 
     // clvm functions
     m.add("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;
