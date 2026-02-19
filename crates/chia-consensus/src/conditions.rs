@@ -11,9 +11,8 @@ use super::opcodes::{
     ASSERT_MY_AMOUNT, ASSERT_MY_BIRTH_HEIGHT, ASSERT_MY_BIRTH_SECONDS, ASSERT_MY_COIN_ID,
     ASSERT_MY_PARENT_ID, ASSERT_MY_PUZZLEHASH, ASSERT_PUZZLE_ANNOUNCEMENT, ASSERT_SECONDS_ABSOLUTE,
     ASSERT_SECONDS_RELATIVE, CREATE_COIN, CREATE_COIN_ANNOUNCEMENT, CREATE_COIN_COST,
-    CREATE_PUZZLE_ANNOUNCEMENT, ConditionOpcode, FREE_CONDITIONS, GENERIC_CONDITION_COST,
-    RECEIVE_MESSAGE, REMARK, RESERVE_FEE, SEND_MESSAGE, SOFTFORK, compute_unknown_condition_cost,
-    parse_opcode,
+    CREATE_PUZZLE_ANNOUNCEMENT, ConditionOpcode, GENERIC_CONDITION_COST, RECEIVE_MESSAGE, REMARK,
+    RESERVE_FEE, SEND_MESSAGE, SOFTFORK, compute_unknown_condition_cost, parse_opcode,
 };
 use super::sanitize_int::{SanitizedUint, sanitize_uint};
 use super::validation_error::{ErrorCode, ValidationErr, first, next, rest};
@@ -1020,7 +1019,6 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
     visitor: &mut V,
 ) -> Result<&'a mut SpendConditions, ValidationErr> {
     let mut announce_countdown: u32 = 1024;
-    let mut free_condition_countdown: usize = FREE_CONDITIONS;
 
     while let Some((mut c, next)) = next(a, iter)? {
         iter = next;
@@ -1063,16 +1061,12 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
             _ => {}
         }
         if (flags & COST_CONDITIONS) != 0 {
-            if free_condition_countdown == 0 {
-                if *max_cost < GENERIC_CONDITION_COST {
-                    return Err(ValidationErr(c, ErrorCode::CostExceeded));
-                }
-                *max_cost -= GENERIC_CONDITION_COST;
-                ret.condition_cost += GENERIC_CONDITION_COST;
-                spend.condition_cost += GENERIC_CONDITION_COST;
-            } else {
-                free_condition_countdown -= 1;
+            if *max_cost < GENERIC_CONDITION_COST {
+                return Err(ValidationErr(c, ErrorCode::CostExceeded));
             }
+            *max_cost -= GENERIC_CONDITION_COST;
+            ret.condition_cost += GENERIC_CONDITION_COST;
+            spend.condition_cost += GENERIC_CONDITION_COST;
         }
         c = rest(a, c)?;
         let cva = parse_args(a, c, op, flags)?;
@@ -4137,7 +4131,7 @@ fn test_assert_concurrent_puzzle_self() {
 #[case(1001)]
 #[case(5001)]
 #[case(99)]
-fn test_cost_all_conds_after_free(#[case] count: usize) {
+fn test_cost_all_conds(#[case] count: usize) {
     let r = cond_test_cb(
         "((({h1} ({h2} (123 ({} )))",
         COST_CONDITIONS,
@@ -4162,11 +4156,7 @@ fn test_cost_all_conds_after_free(#[case] count: usize) {
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap().1.condition_cost,
-        if count > FREE_CONDITIONS {
-            (count as u64 - FREE_CONDITIONS as u64) * GENERIC_CONDITION_COST
-        } else {
-            0
-        }
+        count as u64 * GENERIC_CONDITION_COST
     );
 }
 
@@ -4176,7 +4166,7 @@ fn test_cost_all_conds_after_free(#[case] count: usize) {
 #[case(1001)]
 #[case(5001)]
 #[case(99)]
-fn test_cost_create_coins_conds_after_free(#[case] count: usize) {
+fn test_cost_create_coins_conds(#[case] count: usize) {
     let r = cond_test_cb(
         "((({h1} ({h2} (1230000000000 ({} )))",
         COST_CONDITIONS,
@@ -4201,12 +4191,7 @@ fn test_cost_create_coins_conds_after_free(#[case] count: usize) {
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap().1.condition_cost,
-        if count > FREE_CONDITIONS {
-            ((count as u64 - FREE_CONDITIONS as u64) * GENERIC_CONDITION_COST)
-                + (CREATE_COIN_COST * count as u64)
-        } else {
-            CREATE_COIN_COST * count as u64
-        }
+        (count as u64 * GENERIC_CONDITION_COST) + (CREATE_COIN_COST * count as u64)
     );
 }
 
@@ -4216,7 +4201,7 @@ fn test_cost_create_coins_conds_after_free(#[case] count: usize) {
 #[case(1001)]
 #[case(5001)]
 #[case(99)]
-fn test_cost_aggsig_conds_after_free(#[case] count: usize) {
+fn test_cost_aggsig_conds(#[case] count: usize) {
     use chia_bls::{SecretKey, sign};
 
     let sk = SecretKey::from_bytes(SECRET_KEY).expect("secret key");
@@ -4250,12 +4235,7 @@ fn test_cost_aggsig_conds_after_free(#[case] count: usize) {
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap().1.condition_cost,
-        if count > FREE_CONDITIONS {
-            ((count as u64 - FREE_CONDITIONS as u64) * GENERIC_CONDITION_COST)
-                + (AGG_SIG_COST * count as u64)
-        } else {
-            AGG_SIG_COST * count as u64
-        }
+        (count as u64 * GENERIC_CONDITION_COST) + (AGG_SIG_COST * count as u64)
     );
 }
 
