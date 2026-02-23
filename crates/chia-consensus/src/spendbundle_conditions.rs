@@ -163,8 +163,8 @@ mod tests {
         });
         let program = solution_generator(program_spends).expect("solution_generator failed");
         let blocks: &[&[u8]] = &[];
-        let block_conds = run_block_generator2(
-            &mut a,
+        let (block_conds, _) = run_block_generator2(
+            || make_allocator(ConsensusFlags::LIMIT_HEAP),
             program.as_slice(),
             blocks,
             11_000_000_000,
@@ -347,10 +347,9 @@ mod tests {
         // run the whole block through run_block_generator2() to ensure the
         // output conditions match and update the cost. The cost
         // of just the spend bundle will be lower
-        let mut a2 = make_allocator(MEMPOOL_MODE);
         let (execution_cost, block_cost, block_output) = {
             let block_conds = run_block_generator2(
-                &mut a2,
+                || make_allocator(MEMPOOL_MODE),
                 &generator_buffer,
                 &block_refs,
                 11_000_000_000,
@@ -360,10 +359,10 @@ mod tests {
                 &TEST_CONSTANTS,
             );
             match block_conds {
-                Ok(ref conditions) => (
+                Ok((ref conditions, ref a2)) => (
                     conditions.execution_cost,
                     conditions.cost,
-                    print_conditions(&a2, &conditions, &a2),
+                    print_conditions(a2, conditions, a2),
                 ),
                 Err(code) => {
                     println!("error: {code:?}");

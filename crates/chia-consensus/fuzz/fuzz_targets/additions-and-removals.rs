@@ -15,9 +15,8 @@ fuzz_target!(|data: &[u8]| {
     let results =
         additions_and_removals::<&[u8], _>(data, [], ConsensusFlags::empty(), &TEST_CONSTANTS);
 
-    let mut a1 = make_allocator(ConsensusFlags::empty());
-    let Ok(r1) = run_block_generator2::<&[u8], _>(
-        &mut a1,
+    let Ok((r1, a1)) = run_block_generator2::<&[u8], _, _>(
+        || make_allocator(ConsensusFlags::empty()),
         data,
         [],
         110_000_000,

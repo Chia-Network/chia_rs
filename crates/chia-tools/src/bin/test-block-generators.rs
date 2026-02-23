@@ -68,35 +68,46 @@ struct Args {
     start_height: u32,
 }
 
-fn compare_new_coin(a: &Allocator, lhs: &NewCoin, rhs: &NewCoin) {
+fn compare_new_coin(a_lhs: &Allocator, lhs: &NewCoin, a_rhs: &Allocator, rhs: &NewCoin) {
     assert_eq!(lhs.puzzle_hash, rhs.puzzle_hash);
     assert_eq!(lhs.amount, rhs.amount);
-    assert_eq!(a.atom(lhs.hint), a.atom(rhs.hint));
+    assert_eq!(a_lhs.atom(lhs.hint), a_rhs.atom(rhs.hint));
 }
 
-fn compare_new_coins(a: &Allocator, lhs: &HashSet<NewCoin>, rhs: &HashSet<NewCoin>) {
+fn compare_new_coins(
+    a_lhs: &Allocator,
+    lhs: &HashSet<NewCoin>,
+    a_rhs: &Allocator,
+    rhs: &HashSet<NewCoin>,
+) {
     assert_eq!(lhs.len(), rhs.len());
 
     for c in lhs {
-        compare_new_coin(a, c, rhs.get(c).unwrap());
+        compare_new_coin(a_lhs, c, a_rhs, rhs.get(c).unwrap());
     }
 }
 
 fn compare_agg_sig(
-    a: &Allocator,
+    a_lhs: &Allocator,
     lhs: &Vec<(PublicKey, NodePtr)>,
+    a_rhs: &Allocator,
     rhs: &Vec<(PublicKey, NodePtr)>,
 ) {
     assert_eq!(lhs.len(), rhs.len());
 
     for (l, r) in std::iter::zip(lhs, rhs) {
         assert_eq!(l.0, r.0);
-        assert_eq!(a.atom(l.1), a.atom(r.1));
+        assert_eq!(a_lhs.atom(l.1), a_rhs.atom(r.1));
     }
 }
 
-fn compare_spend(a: &Allocator, lhs: &SpendConditions, rhs: &SpendConditions) {
-    assert_eq!(a.atom(lhs.parent_id), a.atom(rhs.parent_id));
+fn compare_spend(
+    a_lhs: &Allocator,
+    lhs: &SpendConditions,
+    a_rhs: &Allocator,
+    rhs: &SpendConditions,
+) {
+    assert_eq!(a_lhs.atom(lhs.parent_id), a_rhs.atom(rhs.parent_id));
     assert_eq!(lhs.coin_amount, rhs.coin_amount);
     assert_eq!(*lhs.coin_id, *rhs.coin_id);
     assert_eq!(lhs.height_relative, rhs.height_relative);
@@ -105,32 +116,57 @@ fn compare_spend(a: &Allocator, lhs: &SpendConditions, rhs: &SpendConditions) {
     assert_eq!(lhs.before_seconds_relative, rhs.before_seconds_relative);
     assert_eq!(lhs.birth_height, rhs.birth_height);
     assert_eq!(lhs.birth_seconds, rhs.birth_seconds);
-    compare_new_coins(a, &lhs.create_coin, &rhs.create_coin);
-    compare_agg_sig(a, &lhs.agg_sig_me, &rhs.agg_sig_me);
-    compare_agg_sig(a, &lhs.agg_sig_parent, &rhs.agg_sig_parent);
-    compare_agg_sig(a, &lhs.agg_sig_puzzle, &rhs.agg_sig_puzzle);
-    compare_agg_sig(a, &lhs.agg_sig_amount, &rhs.agg_sig_amount);
-    compare_agg_sig(a, &lhs.agg_sig_puzzle_amount, &rhs.agg_sig_puzzle_amount);
-    compare_agg_sig(a, &lhs.agg_sig_parent_amount, &rhs.agg_sig_parent_amount);
-    compare_agg_sig(a, &lhs.agg_sig_parent_puzzle, &rhs.agg_sig_parent_puzzle);
+    compare_new_coins(a_lhs, &lhs.create_coin, a_rhs, &rhs.create_coin);
+    compare_agg_sig(a_lhs, &lhs.agg_sig_me, a_rhs, &rhs.agg_sig_me);
+    compare_agg_sig(a_lhs, &lhs.agg_sig_parent, a_rhs, &rhs.agg_sig_parent);
+    compare_agg_sig(a_lhs, &lhs.agg_sig_puzzle, a_rhs, &rhs.agg_sig_puzzle);
+    compare_agg_sig(a_lhs, &lhs.agg_sig_amount, a_rhs, &rhs.agg_sig_amount);
+    compare_agg_sig(
+        a_lhs,
+        &lhs.agg_sig_puzzle_amount,
+        a_rhs,
+        &rhs.agg_sig_puzzle_amount,
+    );
+    compare_agg_sig(
+        a_lhs,
+        &lhs.agg_sig_parent_amount,
+        a_rhs,
+        &rhs.agg_sig_parent_amount,
+    );
+    compare_agg_sig(
+        a_lhs,
+        &lhs.agg_sig_parent_puzzle,
+        a_rhs,
+        &rhs.agg_sig_parent_puzzle,
+    );
     assert_eq!(lhs.flags, rhs.flags);
-    assert_eq!(a.atom(lhs.puzzle_hash), a.atom(rhs.puzzle_hash));
+    assert_eq!(a_lhs.atom(lhs.puzzle_hash), a_rhs.atom(rhs.puzzle_hash));
 }
 
-fn compare_spends(a: &Allocator, lhs: &Vec<SpendConditions>, rhs: &Vec<SpendConditions>) {
+fn compare_spends(
+    a_lhs: &Allocator,
+    lhs: &Vec<SpendConditions>,
+    a_rhs: &Allocator,
+    rhs: &Vec<SpendConditions>,
+) {
     assert_eq!(lhs.len(), rhs.len());
 
     for (l, r) in std::iter::zip(lhs, rhs) {
-        compare_spend(a, l, r);
+        compare_spend(a_lhs, l, a_rhs, r);
     }
 }
 
-fn compare(a: &Allocator, lhs: &SpendBundleConditions, rhs: &SpendBundleConditions) {
-    compare_spends(a, &lhs.spends, &rhs.spends);
+fn compare(
+    a_lhs: &Allocator,
+    lhs: &SpendBundleConditions,
+    a_rhs: &Allocator,
+    rhs: &SpendBundleConditions,
+) {
+    compare_spends(a_lhs, &lhs.spends, a_rhs, &rhs.spends);
     assert_eq!(lhs.reserve_fee, rhs.reserve_fee);
     assert_eq!(lhs.height_absolute, rhs.height_absolute);
     assert_eq!(lhs.seconds_absolute, rhs.seconds_absolute);
-    compare_agg_sig(a, &lhs.agg_sig_unsafe, &rhs.agg_sig_unsafe);
+    compare_agg_sig(a_lhs, &lhs.agg_sig_unsafe, a_rhs, &rhs.agg_sig_unsafe);
     assert_eq!(lhs.before_height_absolute, rhs.before_height_absolute);
     assert_eq!(lhs.before_seconds_absolute, rhs.before_seconds_absolute);
     assert_eq!(lhs.cost, rhs.cost);
@@ -191,8 +227,6 @@ fn main() {
                 return;
             }
             pool.execute(move || {
-                let mut a = Allocator::new_limited(500_000_000);
-
                 let ti = block.transactions_info.as_ref().expect("transactions_info");
                 let generator = block
                     .transactions_generator
@@ -219,8 +253,8 @@ fn main() {
                     } else {
                         ConsensusFlags::empty()
                     };
-                let mut conditions = block_runner(
-                    &mut a,
+                let (mut conditions, a) = block_runner(
+                    || Allocator::new_limited(500_000_000),
                     generator,
                     &block_refs,
                     ti.cost,
@@ -260,8 +294,8 @@ fn main() {
                     // since we just compressed the block, we have to run it
                     // with the new run_block_generator
                     let prog = &Program::new(new_gen.into());
-                    let mut recompressed_conditions = run_block_generator2(
-                        &mut a,
+                    let (mut recompressed_conditions, a_recomp) = run_block_generator2(
+                        || Allocator::new_limited(500_000_000),
                         prog,
                         &block_refs,
                         new_cost,
@@ -281,7 +315,7 @@ fn main() {
                     recompressed_conditions.cost = ti.cost;
 
                     // now ensure the outputs are the same
-                    compare(&a, &recompressed_conditions, &conditions);
+                    compare(&a_recomp, &recompressed_conditions, &a, &conditions);
 
                     // now lets check get_coinspends_for_trusted_block
                     let vec_of_slices: Vec<&[u8]> =
@@ -291,12 +325,12 @@ fn main() {
                         get_coinspends_for_trusted_block(constants, prog, &vec_of_slices, flags)
                             .expect("get_coinspends");
                     for (i, spend) in recompressed_conditions.spends.into_iter().enumerate() {
-                        let parent_id = a.atom(spend.parent_id);
+                        let parent_id = a_recomp.atom(spend.parent_id);
                         assert_eq!(
                             parent_id.as_ref(),
                             coinspends[i].coin.parent_coin_info.as_slice()
                         );
-                        let puzhash = a.atom(spend.puzzle_hash);
+                        let puzhash = a_recomp.atom(spend.puzzle_hash);
                         assert_eq!(puzhash.as_ref(), coinspends[i].coin.puzzle_hash.as_slice());
                         assert_eq!(spend.coin_amount, coinspends[i].coin.amount);
                     }
@@ -319,8 +353,8 @@ fn main() {
                 }
 
                 if args.original_generator {
-                    let mut baseline = run_block_generator(
-                        &mut a,
+                    let (mut baseline, a_baseline) = run_block_generator(
+                        || Allocator::new_limited(500_000_000),
                         generator.as_ref(),
                         &block_refs,
                         ti.cost,
@@ -336,7 +370,7 @@ fn main() {
                     conditions.spends.sort_by_key(|s| *s.coin_id);
 
                     // now ensure the outputs are the same
-                    compare(&a, &baseline, &conditions);
+                    compare(&a_baseline, &baseline, &a, &conditions);
                 }
             });
 

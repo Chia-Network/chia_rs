@@ -425,9 +425,8 @@ mod tests {
                 //fs::write(format!("../../{seed}.generator"), generator.as_slice())
                 //    .expect("write generator");
 
-                let mut a = Allocator::new();
-                let conds = run_block_generator2::<&[u8], _>(
-                    &mut a,
+                let (conds, a) = run_block_generator2::<&[u8], _, _>(
+                    Allocator::new,
                     generator.as_slice(),
                     [],
                     TEST_CONSTANTS.max_block_cost_clvm,

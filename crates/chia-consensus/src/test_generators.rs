@@ -309,7 +309,7 @@ fn run_generator(#[case] name: &str) {
             // lets test that the procedural generators are filtered with the flag
             let mut a = make_allocator(flags);
             let test_conds = run_block_generator2(
-                &mut a,
+                || make_allocator(flags),
                 &generator,
                 &block_refs, // we're not allowed to pass in block references when SIMPLE_GENERATOR is set
                 11_000_000_000,
@@ -334,7 +334,7 @@ fn run_generator(#[case] name: &str) {
             // passed in. We pass in a dummy block reference
             let mut a = make_allocator(flags);
             let test_conds = run_block_generator2(
-                &mut a,
+                || make_allocator(flags),
                 &generator,
                 &[&[0_u8, 1, 2, 3]],
                 11_000_000_000,
@@ -353,9 +353,8 @@ fn run_generator(#[case] name: &str) {
         }
 
         println!("flags: {:?}", flags);
-        let mut a2 = make_allocator(flags);
         let conds2 = run_block_generator2(
-            &mut a2,
+            || make_allocator(flags),
             &generator,
             &block_refs,
             11_000_000_000,
@@ -366,7 +365,7 @@ fn run_generator(#[case] name: &str) {
         );
 
         let (expected_cost, output) = match conds2 {
-            Ok(ref conditions) => {
+            Ok((ref conditions, ref mut a2)) => {
                 let cond_cost: u64 = conditions.spends.iter().map(|v| v.condition_cost).sum();
                 assert_eq!(cond_cost, conditions.condition_cost);
                 let exe_cost: u64 = conditions.spends.iter().map(|v| v.execution_cost).sum();
@@ -383,11 +382,10 @@ fn run_generator(#[case] name: &str) {
                     // order to print compatible output.
                     // these are the atoms and pairs that would have been
                     // allocated by the deserializer program
-                    let _ =
-                        node_from_bytes(&mut a2, &CHIALISP_DESERIALISATION).expect("deserializer");
+                    let _ = node_from_bytes(a2, &CHIALISP_DESERIALISATION).expect("deserializer");
                     a2.add_ghost_pair(2).expect("add_ghost_pair");
                 }
-                (conditions.cost, print_conditions(&a2, &conditions, &a2))
+                (conditions.cost, print_conditions(a2, conditions, a2))
             }
             Err(code) => (0, format!("FAILED: {}\n", u32::from(code.1))),
         };
@@ -403,9 +401,8 @@ fn run_generator(#[case] name: &str) {
             }
         }
         if run_generator_one {
-            let mut a1 = make_allocator(flags);
             let conds1 = run_block_generator(
-                &mut a1,
+                || make_allocator(flags),
                 &generator,
                 &block_refs,
                 11_000_000_000,
@@ -415,7 +412,7 @@ fn run_generator(#[case] name: &str) {
                 &TEST_CONSTANTS,
             );
             let output_pre_hard_fork = match conds1 {
-                Ok(mut conditions) => {
+                Ok((mut conditions, a1)) => {
                     // before the hard fork, the cost of running the genrator +
                     // puzzles should never be lower than after the hard-fork
                     // but it's likely higher.
@@ -423,13 +420,13 @@ fn run_generator(#[case] name: &str) {
                     // pre-hard fork, we don't have access to per-puzzle costs, so
                     // set those to whatever run_block_generator2() produced, to
                     // make the check pass
-                    if let Ok(ref conds2) = conds2 {
+                    let count_alloc = if let Ok((ref conds2_conditions, ref a2)) = conds2 {
                         // update the cost we print here, just to be compatible with
                         // the test cases we have. We've already ensured the cost is
                         // lower
-                        conditions.cost = conds2.cost;
-                        conditions.execution_cost = conds2.execution_cost;
-                        for s in &conds2.spends {
+                        conditions.cost = conds2_conditions.cost;
+                        conditions.execution_cost = conds2_conditions.execution_cost;
+                        for s in &conds2_conditions.spends {
                             for ms in conditions.spends.iter_mut() {
                                 if ms.coin_id == s.coin_id {
                                     ms.execution_cost = s.execution_cost;
@@ -437,9 +434,12 @@ fn run_generator(#[case] name: &str) {
                                 }
                             }
                         }
-                    }
+                        a2
+                    } else {
+                        &a1
+                    };
 
-                    print_conditions(&a1, &conditions, &a2)
+                    print_conditions(&a1, &conditions, count_alloc)
                 }
                 Err(code) => {
                     format!("FAILED: {}\n", u32::from(code.1))

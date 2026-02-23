@@ -94,11 +94,9 @@ fn main() {
                     .foliage_transaction_block
                     .expect("foliage_transaction_block");
 
-                let mut a = Allocator::new_limited(500_000_000);
-
                 let start_run_block = Instant::now();
-                let conditions = block_runner(
-                    &mut a,
+                let (conditions, a) = block_runner(
+                    || Allocator::new_limited(500_000_000),
                     generator,
                     &block_refs,
                     ti.cost,

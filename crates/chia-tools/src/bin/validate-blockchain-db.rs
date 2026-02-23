@@ -297,8 +297,6 @@ features that are validated:
         }
         let cnt = error_count.clone();
         pool.execute(move || {
-                let mut a = Allocator::new_limited(500_000_000);
-
                 let ti = block.transactions_info.as_ref().expect("transactions_info");
                 let generator = block
                     .transactions_generator
@@ -317,8 +315,8 @@ features that are validated:
                     } else {
                         ConsensusFlags::empty()
                     };
-                let conditions = block_runner(
-                    &mut a,
+                let (conditions, _) = block_runner(
+                    || Allocator::new_limited(500_000_000),
                     generator,
                     &block_refs,
                     ti.cost,

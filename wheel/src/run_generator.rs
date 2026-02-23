@@ -34,8 +34,6 @@ pub fn run_block_generator<'a>(
     bls_cache: Option<&BlsCache>,
     constants: &ConsensusConstants,
 ) -> (Option<u32>, Option<OwnedSpendBundleConditions>) {
-    let mut allocator = make_allocator(flags);
-
     let refs = block_refs
         .into_iter()
         .map(|b| {
@@ -49,7 +47,7 @@ pub fn run_block_generator<'a>(
 
     py.detach(|| {
         match native_run_block_generator(
-            &mut allocator,
+            || make_allocator(flags),
             program,
             refs,
             max_cost,
@@ -58,7 +56,7 @@ pub fn run_block_generator<'a>(
             bls_cache,
             constants,
         ) {
-            Ok(spend_bundle_conds) => (
+            Ok((spend_bundle_conds, allocator)) => (
                 None,
                 Some(OwnedSpendBundleConditions::from(
                     &allocator,
@@ -86,8 +84,6 @@ pub fn run_block_generator2<'a>(
     bls_cache: Option<&BlsCache>,
     constants: &ConsensusConstants,
 ) -> (Option<u32>, Option<OwnedSpendBundleConditions>) {
-    let mut allocator = make_allocator(flags);
-
     let refs = block_refs
         .into_iter()
         .map(|b| {
@@ -102,7 +98,7 @@ pub fn run_block_generator2<'a>(
 
     py.detach(|| {
         match native_run_block_generator2(
-            &mut allocator,
+            || make_allocator(flags),
             program,
             refs,
             max_cost,
@@ -111,7 +107,7 @@ pub fn run_block_generator2<'a>(
             bls_cache,
             constants,
         ) {
-            Ok(spend_bundle_conds) => (
+            Ok((spend_bundle_conds, allocator)) => (
                 None,
                 Some(OwnedSpendBundleConditions::from(
                     &allocator,
