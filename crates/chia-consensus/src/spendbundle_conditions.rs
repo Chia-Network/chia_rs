@@ -163,8 +163,7 @@ mod tests {
         });
         let program = solution_generator(program_spends).expect("solution_generator failed");
         let blocks: &[&[u8]] = &[];
-        let block_conds = run_block_generator2(
-            &mut a,
+        let (block_conds, _) = run_block_generator2(
             program.as_slice(),
             blocks,
             11_000_000_000,
@@ -347,28 +346,24 @@ mod tests {
         // run the whole block through run_block_generator2() to ensure the
         // output conditions match and update the cost. The cost
         // of just the spend bundle will be lower
-        let mut a2 = make_allocator(MEMPOOL_MODE);
-        let (execution_cost, block_cost, block_output) = {
-            let block_conds = run_block_generator2(
-                &mut a2,
-                &generator_buffer,
-                &block_refs,
-                11_000_000_000,
-                MEMPOOL_MODE | ConsensusFlags::DONT_VALIDATE_SIGNATURE,
-                &Signature::default(),
-                None,
-                &TEST_CONSTANTS,
-            );
-            match block_conds {
-                Ok(ref conditions) => (
-                    conditions.execution_cost,
-                    conditions.cost,
-                    print_conditions(&a2, &conditions, &a2),
-                ),
-                Err(code) => {
-                    println!("error: {code:?}");
-                    (0, 0, format!("FAILED: {}\n", u32::from(code.1)))
-                }
+        let block_conds = run_block_generator2(
+            &generator_buffer,
+            &block_refs,
+            11_000_000_000,
+            MEMPOOL_MODE | ConsensusFlags::DONT_VALIDATE_SIGNATURE,
+            &Signature::default(),
+            None,
+            &TEST_CONSTANTS,
+        );
+        let (execution_cost, block_cost, block_output) = match &block_conds {
+            Ok((conditions, a2)) => (
+                conditions.execution_cost,
+                conditions.cost,
+                print_conditions(a2, conditions, a2),
+            ),
+            Err(code) => {
+                println!("error: {code:?}");
+                (0, 0, format!("FAILED: {}\n", u32::from(code.1)))
             }
         };
 
@@ -420,7 +415,8 @@ mod tests {
                 // lower
                 conditions.cost = block_cost;
                 conditions.execution_cost = execution_cost;
-                print_conditions(&a1, &conditions, &a2)
+                let count_alloc = if let Ok((_, ref a2)) = block_conds { a2 } else { &a1 };
+                print_conditions(&a1, &conditions, count_alloc)
             }
             Err(code) => {
                 println!("error: {code:?}");

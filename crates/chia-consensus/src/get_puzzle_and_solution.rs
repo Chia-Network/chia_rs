@@ -227,10 +227,8 @@ mod test {
         let generator = test_file.split_once('\n').expect("invalid test file").0;
         let generator = hex::decode(generator).expect("invalid hex encoded generator");
 
-        let mut a = Allocator::new();
         let blocks: &[&[u8]] = &[];
-        let conds = run_block_generator2(
-            &mut a,
+        let (conds, a) = run_block_generator2(
             &generator,
             blocks,
             MAX_COST,

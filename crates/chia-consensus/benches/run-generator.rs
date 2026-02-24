@@ -49,11 +49,9 @@ fn run(c: &mut Criterion) {
         for (generator, name_suffix) in &[(generator, ""), (compressed_generator, "-compressed")] {
             group.bench_function(format!("run_block_generator {name}{name_suffix}"), |b| {
                 b.iter(|| {
-                    let mut a = Allocator::new();
                     let start = Instant::now();
 
                     let conds = run_block_generator(
-                        &mut a,
                         generator,
                         &block_refs,
                         11_000_000_000,
@@ -69,11 +67,9 @@ fn run(c: &mut Criterion) {
 
             group.bench_function(format!("run_block_generator2 {name}{name_suffix}"), |b| {
                 b.iter(|| {
-                    let mut a = Allocator::new();
                     let start = Instant::now();
 
                     let conds = run_block_generator2(
-                        &mut a,
                         generator,
                         &block_refs,
                         11_000_000_000,

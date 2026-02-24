@@ -9,7 +9,6 @@ use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::flags::{ConsensusFlags, MEMPOOL_MODE};
 use chia_consensus::run_block_generator::{run_block_generator, run_block_generator2};
 use chia_tools::iterate_blocks;
-use clvmr::Allocator;
 
 /// Analyze the blocks in a chia blockchain database
 #[derive(Parser, Debug)]
@@ -43,7 +42,7 @@ fn main() {
         MEMPOOL_MODE
     } else {
         ConsensusFlags::empty()
-    } | ConsensusFlags::DONT_VALIDATE_SIGNATURE;
+    } | ConsensusFlags::DONT_VALIDATE_SIGNATURE | ConsensusFlags::LIMIT_HEAP;
 
     let num_cores = args
         .num_jobs
@@ -75,14 +74,6 @@ fn main() {
             }
             let output = output.clone();
             pool.execute(move || {
-                // after the hard fork, we run blocks without paying for the
-                // CLVM generator ROM
-                let block_runner = if height >= TEST_CONSTANTS.hard_fork_height {
-                    run_block_generator2
-                } else {
-                    run_block_generator
-                };
-
                 let generator = block
                     .transactions_generator
                     .as_ref()
@@ -94,19 +85,29 @@ fn main() {
                     .foliage_transaction_block
                     .expect("foliage_transaction_block");
 
-                let mut a = Allocator::new_limited(500_000_000);
-
                 let start_run_block = Instant::now();
-                let conditions = block_runner(
-                    &mut a,
-                    generator,
-                    &block_refs,
-                    ti.cost,
-                    flags,
-                    &ti.aggregated_signature,
-                    None,
-                    &TEST_CONSTANTS,
-                )
+                // after the hard fork, we run blocks without paying for the CLVM generator ROM
+                let (conditions, a) = if height >= TEST_CONSTANTS.hard_fork_height {
+                    run_block_generator2(
+                        generator,
+                        &block_refs,
+                        ti.cost,
+                        flags,
+                        &ti.aggregated_signature,
+                        None,
+                        &TEST_CONSTANTS,
+                    )
+                } else {
+                    run_block_generator(
+                        generator,
+                        &block_refs,
+                        ti.cost,
+                        flags,
+                        &ti.aggregated_signature,
+                        None,
+                        &TEST_CONSTANTS,
+                    )
+                }
                 .expect("failed to run block generator");
 
                 let execute_timing = start_run_block.elapsed();

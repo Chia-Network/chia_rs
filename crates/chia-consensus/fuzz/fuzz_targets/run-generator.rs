@@ -1,6 +1,5 @@
 #![no_main]
 use chia_bls::Signature;
-use chia_consensus::allocator::make_allocator;
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::flags::ConsensusFlags;
 use chia_consensus::run_block_generator::{run_block_generator, run_block_generator2};
@@ -8,31 +7,25 @@ use chia_consensus::validation_error::{ErrorCode, ValidationErr};
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
-    let mut a1 = make_allocator(ConsensusFlags::LIMIT_HEAP);
     let r1 = run_block_generator::<&[u8], _>(
-        &mut a1,
         data,
         [],
         110_000_000,
-        ConsensusFlags::empty(),
+        ConsensusFlags::LIMIT_HEAP,
         &Signature::default(),
         None,
         &TEST_CONSTANTS,
     );
-    drop(a1);
 
-    let mut a2 = make_allocator(ConsensusFlags::LIMIT_HEAP);
     let r2 = run_block_generator2::<&[u8], _>(
-        &mut a2,
         data,
         [],
         110_000_000,
-        ConsensusFlags::empty(),
+        ConsensusFlags::LIMIT_HEAP,
         &Signature::default(),
         None,
         &TEST_CONSTANTS,
     );
-    drop(a2);
 
     #[allow(clippy::match_same_arms)]
     match (r1, r2) {
@@ -46,7 +39,7 @@ fuzz_target!(|data: &[u8]| {
             // run_block_generator2() parses conditions after each spend
             // instead of after running all spends
         }
-        (Ok(a), Ok(b)) => {
+        (Ok((a, _)), Ok((b, _))) => {
             assert!(a.cost >= b.cost);
             assert!(a.execution_cost > b.execution_cost);
             assert_eq!(a.condition_cost, b.condition_cost);

@@ -6,7 +6,6 @@ use chia_consensus::flags::ConsensusFlags;
 use chia_consensus::run_block_generator::{run_block_generator, run_block_generator2};
 use chia_protocol::{Bytes32, Coin};
 use chia_tools::iterate_blocks;
-use clvmr::Allocator;
 use rusqlite::Connection;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -297,36 +296,39 @@ features that are validated:
         }
         let cnt = error_count.clone();
         pool.execute(move || {
-                let mut a = Allocator::new_limited(500_000_000);
-
                 let ti = block.transactions_info.as_ref().expect("transactions_info");
                 let generator = block
                     .transactions_generator
                     .as_ref()
                     .expect("transactions_generator");
 
-                // after the hard fork, we run blocks without paying for the
-                // CLVM generator ROM
-                let block_runner = if height >= constants.hard_fork_height {
-                    run_block_generator2
-                } else {
-                    run_block_generator
-                };
-                let flags = if args.skip_signature_validation {
+                let flags = (if args.skip_signature_validation {
                         ConsensusFlags::DONT_VALIDATE_SIGNATURE
                     } else {
                         ConsensusFlags::empty()
-                    };
-                let conditions = block_runner(
-                    &mut a,
-                    generator,
-                    &block_refs,
-                    ti.cost,
-                    flags,
-                    &ti.aggregated_signature,
-                    None,
-                    constants,
-                )
+                    }) | ConsensusFlags::LIMIT_HEAP;
+                // after the hard fork, we run blocks without paying for the CLVM generator ROM
+                let (conditions, _a) = if height >= constants.hard_fork_height {
+                    run_block_generator2(
+                        generator,
+                        &block_refs,
+                        ti.cost,
+                        flags,
+                        &ti.aggregated_signature,
+                        None,
+                        constants,
+                    )
+                } else {
+                    run_block_generator(
+                        generator,
+                        &block_refs,
+                        ti.cost,
+                        flags,
+                        &ti.aggregated_signature,
+                        None,
+                        constants,
+                    )
+                }
                 .expect("failed to run block generator");
 
                 if conditions.cost != ti.cost {
