@@ -42,7 +42,8 @@ fn main() {
         MEMPOOL_MODE
     } else {
         ConsensusFlags::empty()
-    } | ConsensusFlags::DONT_VALIDATE_SIGNATURE | ConsensusFlags::LIMIT_HEAP;
+    } | ConsensusFlags::DONT_VALIDATE_SIGNATURE
+        | ConsensusFlags::LIMIT_HEAP;
 
     let num_cores = args
         .num_jobs
@@ -87,7 +88,7 @@ fn main() {
 
                 let start_run_block = Instant::now();
                 // after the hard fork, we run blocks without paying for the CLVM generator ROM
-                let (conditions, a) = if height >= TEST_CONSTANTS.hard_fork_height {
+                let (a, conditions) = if height >= TEST_CONSTANTS.hard_fork_height {
                     run_block_generator2(
                         generator,
                         &block_refs,

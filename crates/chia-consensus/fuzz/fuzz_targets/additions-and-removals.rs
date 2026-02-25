@@ -14,7 +14,7 @@ fuzz_target!(|data: &[u8]| {
     let results =
         additions_and_removals::<&[u8], _>(data, [], ConsensusFlags::empty(), &TEST_CONSTANTS);
 
-    let Ok((r1, a1)) = run_block_generator2::<&[u8], _>(
+    let Ok((a1, r1)) = run_block_generator2::<&[u8], _>(
         data,
         [],
         110_000_000,

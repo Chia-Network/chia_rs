@@ -84,8 +84,8 @@ where
 /// cause the function to return an error.
 ///
 /// Creates an allocator internally based on the consensus flags (using
-/// `make_allocator(flags)`). Returns both the conditions and the allocator
-/// since the conditions contain NodePtr references into the allocator.
+/// `make_allocator(flags)`). Returns `(Allocator, SpendBundleConditions)` since
+/// the conditions contain NodePtr references into the allocator.
 #[allow(clippy::too_many_arguments)]
 pub fn run_block_generator<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
     program: &[u8],
@@ -95,12 +95,12 @@ pub fn run_block_generator<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
     signature: &Signature,
     bls_cache: Option<&BlsCache>,
     constants: &ConsensusConstants,
-) -> Result<(SpendBundleConditions, Allocator), ValidationErr>
+) -> Result<(Allocator, SpendBundleConditions), ValidationErr>
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
+    check_generator_quote(program, flags)?;
     let mut a = make_allocator(flags);
-    check_generator_quote(&a, program, flags)?;
     let mut cost_left = max_cost;
     let byte_cost = program.len() as u64 * constants.cost_per_byte;
 
@@ -144,7 +144,7 @@ where
     )?;
     result.cost += max_cost - cost_left;
     result.execution_cost = clvm_cost;
-    Ok((result, a))
+    Ok((a, result))
 }
 
 fn extract_n<const N: usize>(
@@ -173,15 +173,14 @@ fn extract_n<const N: usize>(
 // this function checks if the generator start with a quote
 // this is required after the SIMPLE_GENERATOR fork is active
 #[inline]
-pub fn check_generator_quote(
-    a: &Allocator,
-    program: &[u8],
-    flags: ConsensusFlags,
-) -> Result<(), ValidationErr> {
+pub fn check_generator_quote(program: &[u8], flags: ConsensusFlags) -> Result<(), ValidationErr> {
     if !flags.contains(ConsensusFlags::SIMPLE_GENERATOR) || program.starts_with(&[0xff, 0x01]) {
         Ok(())
     } else {
-        Err(ValidationErr(a.nil(), ErrorCode::ComplexGeneratorReceived))
+        Err(ValidationErr(
+            NodePtr::NIL,
+            ErrorCode::ComplexGeneratorReceived,
+        ))
     }
 }
 
@@ -198,7 +197,10 @@ pub fn check_generator_node(
     }
     // this expects an atom with a single byte value of 1 as the first value in the list
     match <(MatchByte<1>, NodePtr)>::from_clvm(a, program) {
-        Err(..) => Err(ValidationErr(a.nil(), ErrorCode::ComplexGeneratorReceived)),
+        Err(..) => Err(ValidationErr(
+            NodePtr::NIL,
+            ErrorCode::ComplexGeneratorReceived,
+        )),
         _ => Ok(()),
     }
 }
@@ -211,8 +213,8 @@ pub fn check_generator_node(
 /// as each puzzle run in its own environment.
 ///
 /// Creates an allocator internally based on the consensus flags (using
-/// `make_allocator(flags)`). Returns both the conditions and the allocator
-/// since the conditions contain NodePtr references into the allocator.
+/// `make_allocator(flags)`). Returns `(Allocator, SpendBundleConditions)` since
+/// the conditions contain NodePtr references into the allocator.
 #[allow(clippy::too_many_arguments)]
 pub fn run_block_generator2<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
     program: &[u8],
@@ -222,12 +224,12 @@ pub fn run_block_generator2<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>
     signature: &Signature,
     bls_cache: Option<&BlsCache>,
     constants: &ConsensusConstants,
-) -> Result<(SpendBundleConditions, Allocator), ValidationErr>
+) -> Result<(Allocator, SpendBundleConditions), ValidationErr>
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
+    check_generator_quote(program, flags)?;
     let mut a = make_allocator(flags);
-    check_generator_quote(&a, program, flags)?;
     let byte_cost = program.len() as u64 * constants.cost_per_byte;
 
     let mut cost_left = max_cost;
@@ -304,7 +306,7 @@ where
     ret.validated_signature = !flags.contains(ConsensusFlags::DONT_VALIDATE_SIGNATURE);
 
     ret.cost = max_cost - cost_left;
-    Ok((ret, a))
+    Ok((a, ret))
 }
 
 // this function is less capable of handling problematic generators as they are
@@ -318,8 +320,8 @@ pub fn get_coinspends_for_trusted_block<GenBuf: AsRef<[u8]>, I: IntoIterator<Ite
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
+    check_generator_quote(generator.as_ref(), flags)?;
     let mut a = make_allocator(flags);
-    check_generator_quote(&a, generator.as_ref(), flags)?;
     let mut output = Vec::<CoinSpend>::new();
 
     let program = node_from_bytes_backrefs(&mut a, generator)?;
@@ -417,8 +419,8 @@ pub fn get_coinspends_with_conditions_for_trusted_block<
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
+    check_generator_quote(generator.as_ref(), flags)?;
     let mut a = make_allocator(flags);
-    check_generator_quote(&a, generator.as_ref(), flags)?;
     let mut output = Vec::<(CoinSpend, Vec<(u32, Vec<Vec<u8>>)>)>::new();
 
     let program = node_from_bytes_backrefs(&mut a, generator)?;

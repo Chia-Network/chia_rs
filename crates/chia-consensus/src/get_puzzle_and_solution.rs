@@ -228,7 +228,7 @@ mod test {
         let generator = hex::decode(generator).expect("invalid hex encoded generator");
 
         let blocks: &[&[u8]] = &[];
-        let (conds, a) = run_block_generator2(
+        let (a, conds) = run_block_generator2(
             &generator,
             blocks,
             MAX_COST,

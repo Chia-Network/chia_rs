@@ -163,7 +163,7 @@ mod tests {
         });
         let program = solution_generator(program_spends).expect("solution_generator failed");
         let blocks: &[&[u8]] = &[];
-        let (block_conds, _) = run_block_generator2(
+        let (_, block_conds) = run_block_generator2(
             program.as_slice(),
             blocks,
             11_000_000_000,
@@ -356,7 +356,7 @@ mod tests {
             &TEST_CONSTANTS,
         );
         let (execution_cost, block_cost, block_output) = match &block_conds {
-            Ok((conditions, a2)) => (
+            Ok((a2, conditions)) => (
                 conditions.execution_cost,
                 conditions.cost,
                 print_conditions(a2, conditions, a2),
@@ -415,7 +415,11 @@ mod tests {
                 // lower
                 conditions.cost = block_cost;
                 conditions.execution_cost = execution_cost;
-                let count_alloc = if let Ok((_, ref a2)) = block_conds { a2 } else { &a1 };
+                let count_alloc = if let Ok((ref a2, _)) = block_conds {
+                    a2
+                } else {
+                    &a1
+                };
                 print_conditions(&a1, &conditions, count_alloc)
             }
             Err(code) => {

@@ -364,7 +364,7 @@ fn run_generator(#[case] name: &str) {
         );
 
         let (expected_cost, output) = match &mut conds2 {
-            Ok((conditions, a2)) => {
+            Ok((a2, conditions)) => {
                 let cond_cost: u64 = conditions.spends.iter().map(|v| v.condition_cost).sum();
                 assert_eq!(cond_cost, conditions.condition_cost);
                 let exe_cost: u64 = conditions.spends.iter().map(|v| v.execution_cost).sum();
@@ -381,8 +381,7 @@ fn run_generator(#[case] name: &str) {
                     // order to print compatible output.
                     // these are the atoms and pairs that would have been
                     // allocated by the deserializer program
-                    let _ =
-                        node_from_bytes(a2, &CHIALISP_DESERIALISATION).expect("deserializer");
+                    let _ = node_from_bytes(a2, &CHIALISP_DESERIALISATION).expect("deserializer");
                     a2.add_ghost_pair(2).expect("add_ghost_pair");
                 }
                 (conditions.cost, print_conditions(a2, conditions, a2))
@@ -411,7 +410,7 @@ fn run_generator(#[case] name: &str) {
                 &TEST_CONSTANTS,
             );
             let output_pre_hard_fork = match conds1 {
-                Ok((mut conditions, a1)) => {
+                Ok((a1, mut conditions)) => {
                     // before the hard fork, the cost of running the genrator +
                     // puzzles should never be lower than after the hard-fork
                     // but it's likely higher.
@@ -419,7 +418,7 @@ fn run_generator(#[case] name: &str) {
                     // pre-hard fork, we don't have access to per-puzzle costs, so
                     // set those to whatever run_block_generator2() produced, to
                     // make the check pass
-                    let count_alloc = if let Ok((ref conds2_conditions, ref a2)) = conds2 {
+                    let count_alloc = if let Ok((ref a2, ref conds2_conditions)) = conds2 {
                         // update the cost we print here, just to be compatible with
                         // the test cases we have. We've already ensured the cost is
                         // lower
@@ -476,7 +475,7 @@ fn run_generator(#[case] name: &str) {
 
         // now lets check get_coinspends_for_trusted_block
         // but only if we trust it not to do shenanigans
-        if let Ok((ref conds, ref a2)) = conds2 {
+        if let Ok((ref a2, ref conds)) = conds2 {
             // if run_block_generator2 is OK then check we're equal
             let coinspends = result.expect("get_coinspends");
 

@@ -183,7 +183,7 @@ mod test {
         // and removals we *expect* to see
         // additions_and_removals only work on trusted blocks, so if
         // run_block_generator2() fails, we can call additions_and_removals() on it.
-        let (conds, a) = run_block_generator2(
+        let (a, conds) = run_block_generator2(
             &generator,
             &block_refs,
             11_000_000_000,

@@ -39,7 +39,7 @@ fuzz_target!(|data: &[u8]| {
             // run_block_generator2() parses conditions after each spend
             // instead of after running all spends
         }
-        (Ok((a, _)), Ok((b, _))) => {
+        (Ok((_, a)), Ok((_, b))) => {
             assert!(a.cost >= b.cost);
             assert!(a.execution_cost > b.execution_cost);
             assert_eq!(a.condition_cost, b.condition_cost);

@@ -46,15 +46,9 @@ pub fn run_block_generator<'a>(
 
     py.detach(|| {
         match native_run_block_generator(
-            program,
-            refs,
-            max_cost,
-            flags,
-            signature,
-            bls_cache,
-            constants,
+            program, refs, max_cost, flags, signature, bls_cache, constants,
         ) {
-            Ok((spend_bundle_conds, allocator)) => (
+            Ok((allocator, spend_bundle_conds)) => (
                 None,
                 Some(OwnedSpendBundleConditions::from(
                     &allocator,
@@ -96,15 +90,9 @@ pub fn run_block_generator2<'a>(
 
     py.detach(|| {
         match native_run_block_generator2(
-            program,
-            refs,
-            max_cost,
-            flags,
-            signature,
-            bls_cache,
-            constants,
+            program, refs, max_cost, flags, signature, bls_cache, constants,
         ) {
-            Ok((spend_bundle_conds, allocator)) => (
+            Ok((allocator, spend_bundle_conds)) => (
                 None,
                 Some(OwnedSpendBundleConditions::from(
                     &allocator,

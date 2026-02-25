@@ -247,30 +247,29 @@ fn main() {
                         ConsensusFlags::empty()
                     };
                 // after the hard fork, we run blocks without paying for the CLVM generator ROM
-                let (mut conditions, a) = if args.original_generator
-                    || height >= args.hard_fork_height
-                {
-                    run_block_generator2(
-                        generator,
-                        &block_refs,
-                        ti.cost,
-                        flags,
-                        &ti.aggregated_signature,
-                        None,
-                        constants,
-                    )
-                } else {
-                    run_block_generator(
-                        generator,
-                        &block_refs,
-                        ti.cost,
-                        flags,
-                        &ti.aggregated_signature,
-                        None,
-                        constants,
-                    )
-                }
-                .expect("failed to run block generator");
+                let (a, mut conditions) =
+                    if args.original_generator || height >= args.hard_fork_height {
+                        run_block_generator2(
+                            generator,
+                            &block_refs,
+                            ti.cost,
+                            flags,
+                            &ti.aggregated_signature,
+                            None,
+                            constants,
+                        )
+                    } else {
+                        run_block_generator(
+                            generator,
+                            &block_refs,
+                            ti.cost,
+                            flags,
+                            &ti.aggregated_signature,
+                            None,
+                            constants,
+                        )
+                    }
+                    .expect("failed to run block generator");
 
                 if args.test_serializer {
                     let new_gen = {
@@ -301,7 +300,7 @@ fn main() {
                     // since we just compressed the block, we have to run it
                     // with the new run_block_generator
                     let prog = &Program::new(new_gen.into());
-                    let (mut recompressed_conditions, a_recomp) = run_block_generator2(
+                    let (a_recomp, mut recompressed_conditions) = run_block_generator2(
                         prog,
                         &block_refs,
                         new_cost,
@@ -359,7 +358,7 @@ fn main() {
                 }
 
                 if args.original_generator {
-                    let (mut baseline, a_baseline) = run_block_generator(
+                    let (a_baseline, mut baseline) = run_block_generator(
                         generator.as_ref(),
                         &block_refs,
                         ti.cost,
