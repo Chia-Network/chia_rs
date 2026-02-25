@@ -115,5 +115,9 @@ fn cache_benchmark(c: &mut Criterion) {
     });
 }
 
-criterion_group!(cache, cache_benchmark);
+criterion_group! {
+    name = cache;
+    config = Criterion::default().sample_size(10);
+    targets = cache_benchmark
+}
 criterion_main!(cache);

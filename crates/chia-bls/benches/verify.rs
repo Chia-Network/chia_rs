@@ -60,5 +60,9 @@ fn verify_benchmark(c: &mut Criterion) {
     });
 }
 
-criterion_group!(verify, verify_benchmark);
+criterion_group! {
+    name = verify;
+    config = Criterion::default().sample_size(10);
+    targets = verify_benchmark
+}
 criterion_main!(verify);
