@@ -308,27 +308,20 @@ features that are validated:
                         ConsensusFlags::empty()
                     }) | ConsensusFlags::LIMIT_HEAP;
                 // after the hard fork, we run blocks without paying for the CLVM generator ROM
-                let (_a, conditions) = if height >= constants.hard_fork_height {
-                    run_block_generator2(
-                        generator,
-                        &block_refs,
-                        ti.cost,
-                        flags,
-                        &ti.aggregated_signature,
-                        None,
-                        constants,
-                    )
+                let block_runner = if height >= constants.hard_fork_height {
+                    run_block_generator2
                 } else {
-                    run_block_generator(
-                        generator,
-                        &block_refs,
-                        ti.cost,
-                        flags,
-                        &ti.aggregated_signature,
-                        None,
-                        constants,
-                    )
-                }
+                    run_block_generator
+                };
+                let (_a, conditions) = block_runner(
+                    generator,
+                    &block_refs,
+                    ti.cost,
+                    flags,
+                    &ti.aggregated_signature,
+                    None,
+                    constants,
+                )
                 .expect("failed to run block generator");
 
                 if conditions.cost != ti.cost {

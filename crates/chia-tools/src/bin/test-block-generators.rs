@@ -192,8 +192,8 @@ fn main() {
     let flags = if args.mempool {
         MEMPOOL_MODE
     } else {
-        ConsensusFlags::empty()
-    } | ConsensusFlags::LIMIT_HEAP;
+        ConsensusFlags::LIMIT_HEAP
+    };
 
     // Blocks created after the hard fork are not expected to work with the
     // original generator ROM. The cost will exceed the block cost. So when
@@ -247,29 +247,21 @@ fn main() {
                         ConsensusFlags::empty()
                     };
                 // after the hard fork, we run blocks without paying for the CLVM generator ROM
-                let (a, mut conditions) =
-                    if args.original_generator || height >= args.hard_fork_height {
-                        run_block_generator2(
-                            generator,
-                            &block_refs,
-                            ti.cost,
-                            flags,
-                            &ti.aggregated_signature,
-                            None,
-                            constants,
-                        )
-                    } else {
-                        run_block_generator(
-                            generator,
-                            &block_refs,
-                            ti.cost,
-                            flags,
-                            &ti.aggregated_signature,
-                            None,
-                            constants,
-                        )
-                    }
-                    .expect("failed to run block generator");
+                let block_runner = if args.original_generator || height >= args.hard_fork_height {
+                    run_block_generator2
+                } else {
+                    run_block_generator
+                };
+                let (a, mut conditions) = block_runner(
+                    generator,
+                    &block_refs,
+                    ti.cost,
+                    flags,
+                    &ti.aggregated_signature,
+                    None,
+                    constants,
+                )
+                .expect("failed to run block generator");
 
                 if args.test_serializer {
                     let new_gen = {
