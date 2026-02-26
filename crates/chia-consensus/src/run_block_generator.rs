@@ -6,6 +6,7 @@ use crate::conditions::{
 };
 use crate::consensus_constants::ConsensusConstants;
 use crate::flags::ConsensusFlags;
+use crate::generator_cost::total_cost_from_tree;
 use crate::opcodes::{
     AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT, AGG_SIG_PARENT_PUZZLE,
     AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT, AGG_SIG_UNSAFE, CREATE_COIN,
@@ -23,7 +24,7 @@ use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
-use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs};
+use clvmr::serde::{intern, node_from_bytes, node_from_bytes_backrefs};
 
 pub fn subtract_cost(
     a: &Allocator,
@@ -205,6 +206,102 @@ pub fn check_generator_node(
     }
 }
 
+// Interned-generator path for run_block_generator2: interns the program to get
+// the canonical tree, computes cost from that structure, then executes as normal.
+#[allow(clippy::too_many_arguments)]
+fn run_block_generator_interned<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
+    program: &[u8],
+    block_refs: I,
+    max_cost: u64,
+    flags: ConsensusFlags,
+    signature: &Signature,
+    bls_cache: Option<&BlsCache>,
+    constants: &ConsensusConstants,
+) -> Result<(Allocator, SpendBundleConditions), ValidationErr>
+where
+    <I as IntoIterator>::IntoIter: DoubleEndedIterator,
+{
+    let mut decode_allocator = Allocator::new();
+    let program_node = node_from_bytes_backrefs(&mut decode_allocator, program)
+        .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
+    let interned = intern(&decode_allocator, program_node)
+        .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
+    let base_cost = total_cost_from_tree(&interned);
+    let mut a = interned.allocator;
+    let program = interned.root;
+
+    let mut cost_left = max_cost;
+    subtract_cost(&a, &mut cost_left, base_cost)?;
+
+    check_generator_node(&a, program, flags)?;
+
+    let args = setup_generator_args(&mut a, block_refs, flags)?;
+    let dialect = ChiaDialect::new(flags.to_clvm_flags());
+
+    let Reduction(clvm_cost, all_spends) = run_program(&mut a, &dialect, program, args, cost_left)?;
+
+    subtract_cost(&a, &mut cost_left, clvm_cost)?;
+
+    let mut ret = SpendBundleConditions::default();
+
+    let all_spends = first(&a, all_spends)?;
+    ret.execution_cost += clvm_cost;
+
+    // at this point all_spends is a list of:
+    // (parent-coin-id puzzle-reveal amount solution . extra)
+    // where extra may be nil, or additional extension data
+
+    let mut state = ParseState::default();
+    let mut cache = TreeCache::default();
+
+    let mut iter = all_spends;
+    while let Some((spend, rest)) = a.next(iter) {
+        iter = rest;
+        let [_, puzzle, _] = extract_n::<3>(&a, spend, ErrorCode::InvalidCondition)?;
+        cache.visit_tree(&a, puzzle);
+    }
+
+    let mut iter = all_spends;
+    while let Some((spend, rest)) = a.next(iter) {
+        iter = rest;
+        let [parent_id, puzzle, amount, solution, _spend_level_extra] =
+            extract_n::<5>(&a, spend, ErrorCode::InvalidCondition)?;
+
+        let Reduction(clvm_cost, conditions) =
+            run_program(&mut a, &dialect, puzzle, solution, cost_left)?;
+
+        subtract_cost(&a, &mut cost_left, clvm_cost)?;
+        ret.execution_cost += clvm_cost;
+
+        let buf = tree_hash_cached(&a, puzzle, &mut cache);
+        let puzzle_hash = a.new_atom(&buf)?;
+
+        process_single_spend::<EmptyVisitor>(
+            &a,
+            &mut ret,
+            &mut state,
+            parent_id,
+            puzzle_hash,
+            amount,
+            conditions,
+            flags,
+            &mut cost_left,
+            clvm_cost,
+            constants,
+        )?;
+    }
+    if a.atom_len(iter) != 0 {
+        return Err(ValidationErr(iter, ErrorCode::GeneratorRuntimeError));
+    }
+
+    validate_conditions(&a, &ret, &state, a.nil(), flags)?;
+    validate_signature(&state, signature, flags, bls_cache)?;
+    ret.validated_signature = !flags.contains(ConsensusFlags::DONT_VALIDATE_SIGNATURE);
+
+    ret.cost = max_cost - cost_left;
+    Ok((a, ret))
+}
+
 /// This has the same behavior as run_block_generator() but implements the
 /// generator ROM in rust instead of using the CLVM implementation.
 /// it is not backwards compatible in the CLVM cost computation (in this version
@@ -229,6 +326,11 @@ where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
     check_generator_quote(program, flags)?;
+    if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
+        return run_block_generator_interned(
+            program, block_refs, max_cost, flags, signature, bls_cache, constants,
+        );
+    }
     let mut a = make_allocator(flags);
     let byte_cost = program.len() as u64 * constants.cost_per_byte;
 
