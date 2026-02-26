@@ -320,8 +320,8 @@ pub fn get_coinspends_for_trusted_block<GenBuf: AsRef<[u8]>, I: IntoIterator<Ite
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
-    check_generator_quote(generator.as_ref(), flags)?;
     let mut a = make_allocator(flags);
+    check_generator_quote(generator.as_ref(), flags)?;
     let mut output = Vec::<CoinSpend>::new();
 
     let program = node_from_bytes_backrefs(&mut a, generator)?;
@@ -419,8 +419,8 @@ pub fn get_coinspends_with_conditions_for_trusted_block<
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
-    check_generator_quote(generator.as_ref(), flags)?;
     let mut a = make_allocator(flags);
+    check_generator_quote(generator.as_ref(), flags)?;
     let mut output = Vec::<(CoinSpend, Vec<(u32, Vec<Vec<u8>>)>)>::new();
 
     let program = node_from_bytes_backrefs(&mut a, generator)?;
