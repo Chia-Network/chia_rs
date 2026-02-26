@@ -7,9 +7,10 @@ use chia_consensus::build_compressed_block::BlockBuilder;
 use chia_consensus::check_time_locks::py_check_time_locks;
 use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::flags::{
-    COMPUTE_FINGERPRINT, COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE, NO_UNKNOWN_CONDS,
-    SIMPLE_GENERATOR, STRICT_ARGS_COUNT,
+    COMPUTE_FINGERPRINT, COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, INTERNED_GENERATOR, MEMPOOL_MODE,
+    NO_UNKNOWN_CONDS, SIMPLE_GENERATOR, STRICT_ARGS_COUNT,
 };
+use chia_consensus::generator_cost::cost_and_tree_hash_for_bytes;
 use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_consensus::merkle_tree::{MerkleSet, validate_merkle_proof};
 use chia_consensus::owned_conditions::{OwnedSpendBundleConditions, OwnedSpendConditions};
@@ -712,6 +713,23 @@ pub fn solve_proof(fragments: &PartialProof, plot_id: Bytes32, strength: u8, k: 
     )
 }
 
+#[pyfunction]
+pub fn generator_tree_hash<'a>(py: Python<'a>, program: &[u8]) -> PyResult<Bound<'a, PyBytes>> {
+    let (_cost, hash) =
+        cost_and_tree_hash_for_bytes(program).map_err(|e| PyValueError::new_err(e.to_string()))?;
+    Ok(PyBytes::new(py, &hash))
+}
+
+#[pyfunction]
+pub fn generator_cost_and_hash<'a>(
+    py: Python<'a>,
+    program: &[u8],
+) -> PyResult<(u64, Bound<'a, PyBytes>)> {
+    let (cost, hash) =
+        cost_and_tree_hash_for_bytes(program).map_err(|e| PyValueError::new_err(e.to_string()))?;
+    Ok((cost, PyBytes::new(py, &hash)))
+}
+
 #[pymodule]
 pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // generator functions
@@ -782,6 +800,11 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("COMPUTE_FINGERPRINT", COMPUTE_FINGERPRINT)?;
     m.add("COST_CONDITIONS", COST_CONDITIONS)?;
     m.add("SIMPLE_GENERATOR", SIMPLE_GENERATOR)?;
+    m.add("INTERNED_GENERATOR", INTERNED_GENERATOR)?;
+
+    // generator identity hard fork functions
+    m.add_function(wrap_pyfunction!(generator_tree_hash, m)?)?;
+    m.add_function(wrap_pyfunction!(generator_cost_and_hash, m)?)?;
 
     m.add_class::<PyPlotParam>()?;
 

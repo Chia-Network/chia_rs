@@ -163,6 +163,11 @@ pub struct ConsensusConstants {
     plot_filter_v2_first_adjustment_height: u32,
     plot_filter_v2_second_adjustment_height: u32,
     plot_filter_v2_third_adjustment_height: u32,
+
+    /// The block height at which the generator-identity hard fork activates.
+    /// From this point, generator cost and tree-hash are computed over the
+    /// interned (canonical) tree representation.
+    hard_fork_tree_generator_height: u32,
 }
 
 pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
@@ -241,4 +246,5 @@ pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
     plot_filter_v2_first_adjustment_height: 0xffff_ffff, // placeholder
     plot_filter_v2_second_adjustment_height: 0xffff_ffff, // placeholder
     plot_filter_v2_third_adjustment_height: 0xffff_ffff, // placeholder
+    hard_fork_tree_generator_height: 0xffff_ffff, // placeholder
 };
