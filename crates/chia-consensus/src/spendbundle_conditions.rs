@@ -346,25 +346,26 @@ mod tests {
         // run the whole block through run_block_generator2() to ensure the
         // output conditions match and update the cost. The cost
         // of just the spend bundle will be lower
-        let block_conds = run_block_generator2(
-            &generator_buffer,
-            &block_refs,
-            11_000_000_000,
-            MEMPOOL_MODE | ConsensusFlags::DONT_VALIDATE_SIGNATURE,
-            &Signature::default(),
-            None,
-            &TEST_CONSTANTS,
-        );
-        let (execution_cost, block_cost, block_output) = {
+        let (execution_cost, block_cost, block_output, block_conds) = {
+            let block_conds = run_block_generator2(
+                &generator_buffer,
+                &block_refs,
+                11_000_000_000,
+                MEMPOOL_MODE | ConsensusFlags::DONT_VALIDATE_SIGNATURE,
+                &Signature::default(),
+                None,
+                &TEST_CONSTANTS,
+            );
             match &block_conds {
                 Ok((a2, conditions)) => (
                     conditions.execution_cost,
                     conditions.cost,
                     print_conditions(a2, conditions, a2),
+                    block_conds,
                 ),
                 Err(code) => {
                     println!("error: {code:?}");
-                    (0, 0, format!("FAILED: {}\n", u32::from(code.1)))
+                    (0, 0, format!("FAILED: {}\n", u32::from(code.1)), block_conds)
                 }
             }
         };
@@ -417,15 +418,8 @@ mod tests {
                 // lower
                 conditions.cost = block_cost;
                 conditions.execution_cost = execution_cost;
-                // Use the block generator's allocator for atom/pair/heap counts if
-                // available, otherwise fall back to the spendbundle allocator. This
-                // ensures we print consistent allocator stats when comparing outputs.
-                let count_alloc = if let Ok((ref a2, _)) = block_conds {
-                    a2
-                } else {
-                    &a1
-                };
-                print_conditions(&a1, &conditions, count_alloc)
+                let (a2, _) = block_conds.as_ref().unwrap();
+                print_conditions(&a1, &conditions, a2)
             }
             Err(code) => {
                 println!("error: {code:?}");

@@ -321,8 +321,7 @@ fn run_generator(#[case] name: &str) {
                 ErrorCode::ComplexGeneratorReceived
             );
 
-            // now lets specifically check the node generator check (uses a
-            // fresh allocator since the call above failed and returned nothing)
+            // now lets specifically check the node generator check
             let mut a = make_allocator(flags);
             let program = node_from_bytes_backrefs(&mut a, generator.as_ref())
                 .expect("node_from_bytes_backref");
@@ -343,8 +342,7 @@ fn run_generator(#[case] name: &str) {
             );
             assert_eq!(test_conds.unwrap_err().1, ErrorCode::TooManyGeneratorRefs);
 
-            // now lets specifically check the node generator check (uses a
-            // fresh allocator since the call above failed and returned nothing)
+            // now lets specifically check the node generator check
             let mut a = make_allocator(flags);
             let program = node_from_bytes_backrefs(&mut a, generator.as_ref())
                 .expect("node_from_bytes_backref");
@@ -418,7 +416,7 @@ fn run_generator(#[case] name: &str) {
                     // pre-hard fork, we don't have access to per-puzzle costs, so
                     // set those to whatever run_block_generator2() produced, to
                     // make the check pass
-                    let count_alloc = if let Ok((ref a2, ref conds2_conditions)) = conds2 {
+                    if let Ok((_, ref conds2_conditions)) = conds2 {
                         // update the cost we print here, just to be compatible with
                         // the test cases we have. We've already ensured the cost is
                         // lower
@@ -432,12 +430,11 @@ fn run_generator(#[case] name: &str) {
                                 }
                             }
                         }
-                        a2
-                    } else {
-                        &a1
-                    };
+                    }
 
-                    print_conditions(&a1, &conditions, count_alloc)
+                    // Extract a2 from conds2 for print_conditions, or use a1 as fallback
+                    let a2 = if let Ok((ref a2, _)) = conds2 { a2 } else { &a1 };
+                    print_conditions(&a1, &conditions, a2)
                 }
                 Err(code) => {
                     format!("FAILED: {}\n", u32::from(code.1))
