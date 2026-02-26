@@ -81,6 +81,7 @@ pub struct DidRecoverySolution {
 mod tests {
     use chia_puzzles::DID_INNERPUZ;
     use clvm_traits::{clvm_list, match_list};
+    use clvmr::chia_dialect::ClvmFlags;
     use clvmr::{
         Allocator, ChiaDialect, run_program,
         serde::{node_from_bytes, node_to_bytes},
@@ -107,8 +108,14 @@ mod tests {
         .to_clvm(a)
         .unwrap();
 
-        let output = run_program(a, &ChiaDialect::new(0), curried, ptr, u64::MAX)
-            .expect("could not run did puzzle and solution");
+        let output = run_program(
+            a,
+            &ChiaDialect::new(ClvmFlags::empty()),
+            curried,
+            ptr,
+            u64::MAX,
+        )
+        .expect("could not run did puzzle and solution");
         assert_eq!(
             hex::encode(node_to_bytes(a, output.1).unwrap()),
             "ff2aff847465737480"

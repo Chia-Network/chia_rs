@@ -3,7 +3,7 @@ use crate::conditions::{
     validate_conditions,
 };
 use crate::consensus_constants::ConsensusConstants;
-use crate::flags::{COMPUTE_FINGERPRINT, DONT_VALIDATE_SIGNATURE, INTERNED_GENERATOR, MEMPOOL_MODE};
+use crate::flags::{ConsensusFlags, MEMPOOL_MODE};
 use crate::generator_cost::total_cost_from_tree;
 use crate::puzzle_fingerprint::compute_puzzle_fingerprint;
 use crate::run_block_generator::subtract_cost;
@@ -38,7 +38,7 @@ pub fn get_conditions_from_spendbundle(
         a,
         spend_bundle,
         max_cost,
-        flags | MEMPOOL_MODE | DONT_VALIDATE_SIGNATURE,
+        flags | MEMPOOL_MODE | ConsensusFlags::DONT_VALIDATE_SIGNATURE,
         constants,
     )?
     .0)
@@ -51,13 +51,13 @@ pub fn run_spendbundle(
     a: &mut Allocator,
     spend_bundle: &SpendBundle,
     max_cost: u64,
-    flags: u32,
+    flags: ConsensusFlags,
     constants: &ConsensusConstants,
 ) -> Result<(SpendBundleConditions, Vec<(PublicKey, Bytes)>), ValidationErr> {
     // below is an adapted version of the code from run_block_generators::run_block_generator2()
     // it assumes no block references are passed in
     let mut cost_left = max_cost;
-    let dialect = ChiaDialect::new(flags);
+    let dialect = ChiaDialect::new(flags.to_clvm_flags());
     let mut ret = SpendBundleConditions::default();
     let mut state = ParseState::default();
     // We don't pay the size cost (nor execution cost) of being wrapped by a
@@ -65,7 +65,7 @@ pub fn run_spendbundle(
     let generator_length_without_quote =
         calculate_generator_length(&spend_bundle.coin_spends) - QUOTE_BYTES;
 
-    let base_cost = if (flags & INTERNED_GENERATOR) != 0 {
+    let base_cost = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
         let generator = solution_generator_backrefs(
             spend_bundle
                 .coin_spends
@@ -116,7 +116,9 @@ pub fn run_spendbundle(
             constants,
         )?;
 
-        if (spend.flags & ELIGIBLE_FOR_DEDUP) != 0 && (flags & COMPUTE_FINGERPRINT) != 0 {
+        if (spend.flags & ELIGIBLE_FOR_DEDUP) != 0
+            && flags.contains(ConsensusFlags::COMPUTE_FINGERPRINT)
+        {
             spend.fingerprint = compute_puzzle_fingerprint(a, conditions)?;
         }
     }
@@ -140,7 +142,6 @@ mod tests {
     use chia_bls::Signature;
     use chia_protocol::CoinSpend;
     use chia_traits::Streamable;
-    use clvmr::chia_dialect::LIMIT_HEAP;
     use rstest::rstest;
     use std::fs::read;
 
@@ -162,7 +163,7 @@ mod tests {
         )
         .expect("parse bundle");
 
-        let mut a = make_allocator(LIMIT_HEAP);
+        let mut a = make_allocator(ConsensusFlags::LIMIT_HEAP);
         let conditions =
             get_conditions_from_spendbundle(&mut a, &bundle, cost, prev_tx_height, &TEST_CONSTANTS)
                 .expect("get_conditions_from_spendbundle");
@@ -189,7 +190,7 @@ mod tests {
             program.as_slice(),
             blocks,
             11_000_000_000,
-            MEMPOOL_MODE | DONT_VALIDATE_SIGNATURE,
+            MEMPOOL_MODE | ConsensusFlags::DONT_VALIDATE_SIGNATURE,
             &Signature::default(),
             None,
             &TEST_CONSTANTS,
@@ -224,7 +225,7 @@ mod tests {
 
         let bundle = SpendBundle::new(vec![spend], Signature::default());
 
-        let mut a = make_allocator(LIMIT_HEAP);
+        let mut a = make_allocator(ConsensusFlags::LIMIT_HEAP);
         let conditions =
             get_conditions_from_spendbundle(&mut a, &bundle, cost, prev_tx_height, &TEST_CONSTANTS)
                 .expect("get_conditions_from_spendbundle");
@@ -253,8 +254,9 @@ mod tests {
         let mut a = make_allocator(MEMPOOL_MODE);
 
         let generator = node_from_bytes_backrefs(&mut a, generator).expect("node_from_bytes");
-        let args = setup_generator_args(&mut a, block_refs, 0).expect("setup_generator_args");
-        let dialect = ChiaDialect::new(MEMPOOL_MODE);
+        let args = setup_generator_args(&mut a, block_refs, ConsensusFlags::empty())
+            .expect("setup_generator_args");
+        let dialect = ChiaDialect::new(MEMPOOL_MODE.to_clvm_flags());
         let Reduction(_, mut all_spends) =
             run_program(&mut a, &dialect, generator, args, 11_000_000_000).expect("run_program");
 
@@ -374,7 +376,7 @@ mod tests {
                 &generator_buffer,
                 &block_refs,
                 11_000_000_000,
-                MEMPOOL_MODE | DONT_VALIDATE_SIGNATURE,
+                MEMPOOL_MODE | ConsensusFlags::DONT_VALIDATE_SIGNATURE,
                 &Signature::default(),
                 None,
                 &TEST_CONSTANTS,

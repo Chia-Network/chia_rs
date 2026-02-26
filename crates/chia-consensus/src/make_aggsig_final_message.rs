@@ -78,14 +78,14 @@ mod tests {
     use super::*;
     use crate::allocator::make_allocator;
     use crate::consensus_constants::TEST_CONSTANTS;
+    use crate::flags::ConsensusFlags;
     use clvmr::Allocator;
-    use clvmr::chia_dialect::LIMIT_HEAP;
     use hex_literal::hex;
     use rstest::rstest;
 
     #[test]
     fn test_validate_u64() {
-        let mut a: Allocator = make_allocator(LIMIT_HEAP);
+        let mut a: Allocator = make_allocator(ConsensusFlags::LIMIT_HEAP);
         for v in 0..10000 {
             let ptr = a.new_small_number(v).expect("valid u64");
             assert_eq!(a.atom(ptr).as_ref(), u64_to_bytes(v as u64).as_slice());
@@ -172,7 +172,7 @@ mod tests {
             }
             _ => {}
         }
-        let mut a: Allocator = make_allocator(LIMIT_HEAP);
+        let mut a: Allocator = make_allocator(ConsensusFlags::LIMIT_HEAP);
         let spend = SpendConditions::new(
             a.new_atom(parent_id.as_slice()).expect("should pass"),
             coin_amount,

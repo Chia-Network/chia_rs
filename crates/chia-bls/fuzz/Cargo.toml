@@ -1,6 +1,6 @@
 [package]
 name = "chia-bls-fuzz"
-version = "0.36.0"
+version = "0.38.1"
 authors = ["Automatically generated"]
 publish = false
 edition = "2024"
@@ -13,7 +13,7 @@ workspace = true
 
 [dependencies]
 libfuzzer-sys = { workspace = true }
-chia-bls = { workspace = true }
+chia-bls = { workspace = true, features = ["arbitrary"] }
 
 [[bin]]
 name = "derive"

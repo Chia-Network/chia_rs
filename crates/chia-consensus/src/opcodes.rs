@@ -107,7 +107,11 @@ pub fn compute_unknown_condition_cost(op: ConditionOpcode) -> Cost {
     }
 }
 
-pub fn parse_opcode(a: &Allocator, op: NodePtr, _flags: u32) -> Option<ConditionOpcode> {
+pub fn parse_opcode(
+    a: &Allocator,
+    op: NodePtr,
+    _flags: crate::flags::ConsensusFlags,
+) -> Option<ConditionOpcode> {
     let buf = match a.sexp(op) {
         SExp::Atom => a.atom(op),
         SExp::Pair(..) => return None,
@@ -167,7 +171,11 @@ pub fn parse_opcode(a: &Allocator, op: NodePtr, _flags: u32) -> Option<Condition
 }
 
 #[cfg(test)]
-fn opcode_tester(a: &mut Allocator, val: &[u8], flags: u32) -> Option<ConditionOpcode> {
+fn opcode_tester(
+    a: &mut Allocator,
+    val: &[u8],
+    flags: crate::flags::ConsensusFlags,
+) -> Option<ConditionOpcode> {
     let v = a.new_atom(val).unwrap();
     parse_opcode(a, v, flags)
 }
@@ -219,7 +227,10 @@ use rstest::rstest;
 #[case(&[RECEIVE_MESSAGE as u8], Some(RECEIVE_MESSAGE))]
 fn test_parse_opcode(#[case] input: &[u8], #[case] expected: Option<ConditionOpcode>) {
     let mut a = Allocator::new();
-    assert_eq!(opcode_tester(&mut a, input, 0), expected);
+    assert_eq!(
+        opcode_tester(&mut a, input, crate::flags::ConsensusFlags::empty()),
+        expected
+    );
 }
 
 #[test]
@@ -229,5 +240,8 @@ fn test_parse_invalid_opcode() {
     let v1 = a.new_atom(&[0]).unwrap();
     let v2 = a.new_atom(&[0]).unwrap();
     let p = a.new_pair(v1, v2).unwrap();
-    assert_eq!(parse_opcode(&a, p, 0), None);
+    assert_eq!(
+        parse_opcode(&a, p, crate::flags::ConsensusFlags::empty()),
+        None
+    );
 }

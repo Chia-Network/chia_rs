@@ -6,10 +6,7 @@ use chia_consensus::allocator::make_allocator;
 use chia_consensus::build_compressed_block::BlockBuilder;
 use chia_consensus::check_time_locks::py_check_time_locks;
 use chia_consensus::consensus_constants::ConsensusConstants;
-use chia_consensus::flags::{
-    COMPUTE_FINGERPRINT, COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, INTERNED_GENERATOR, MEMPOOL_MODE,
-    NO_UNKNOWN_CONDS, SIMPLE_GENERATOR, STRICT_ARGS_COUNT,
-};
+use chia_consensus::flags::{ConsensusFlags, MEMPOOL_MODE};
 use chia_consensus::generator_cost::cost_and_tree_hash_for_bytes;
 use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_impl;
 use chia_consensus::merkle_tree::{MerkleSet, validate_merkle_proof};
@@ -59,8 +56,6 @@ use chia_protocol::{
 use chia_sha2::Sha256;
 use chia_traits::ChiaToPython;
 use clvm_utils::tree_hash_from_bytes;
-use clvmr::chia_dialect::ENABLE_KECCAK_OPS_OUTSIDE_GUARD;
-use clvmr::{LIMIT_HEAP, NO_UNKNOWN_OPS};
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
@@ -89,7 +84,7 @@ use clvmr::serde::is_canonical_serialization;
 use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs, node_to_bytes};
 
 use chia_bls::{
-    BlsCache, DerivableKey, GTElement, PublicKey, SecretKey, Signature,
+    BlsCache, DerivableKey, G1Element, GTElement, PublicKey, SecretKey, Signature,
     hash_to_g2 as native_hash_to_g2,
 };
 #[pyfunction]
@@ -135,6 +130,34 @@ pub fn tree_hash<'a>(py: Python<'a>, blob: PyBuffer<u8>) -> PyResult<Bound<'a, P
     )
 }
 
+#[pyfunction]
+fn compute_plot_id_v1(
+    plot_pk: G1Element,
+    pool_pk: Option<G1Element>,
+    pool_contract: Option<Bytes32>,
+) -> Bytes32 {
+    chia_protocol::compute_plot_id_v1(&plot_pk, pool_pk.as_ref(), pool_contract.as_ref())
+}
+
+#[pyfunction]
+fn compute_plot_id_v2(
+    strength: u8,
+    plot_pk: G1Element,
+    pool_pk: Option<G1Element>,
+    pool_contract: Option<Bytes32>,
+    plot_index: u16,
+    meta_group: u8,
+) -> Bytes32 {
+    chia_protocol::compute_plot_id_v2(
+        strength,
+        &plot_pk,
+        pool_pk.as_ref(),
+        pool_contract.as_ref(),
+        plot_index,
+        meta_group,
+    )
+}
+
 // there is an updated version of this function that doesn't require serializing
 // and deserializing the generator and arguments.
 #[allow(clippy::too_many_arguments)]
@@ -147,9 +170,9 @@ pub fn get_puzzle_and_solution_for_coin<'a>(
     find_parent: Bytes32,
     find_amount: u64,
     find_ph: Bytes32,
-    flags: u32,
+    flags: ConsensusFlags,
 ) -> PyResult<(Bound<'a, PyBytes>, Bound<'a, PyBytes>)> {
-    let mut allocator = make_allocator(LIMIT_HEAP);
+    let mut allocator = make_allocator(ConsensusFlags::LIMIT_HEAP);
 
     let program = py_to_slice::<'a>(program);
     let args = py_to_slice::<'a>(args);
@@ -158,7 +181,7 @@ pub fn get_puzzle_and_solution_for_coin<'a>(
         .map_err(|e| map_pyerr_w_ptr(&e, &allocator))?;
     let args = node_from_bytes_backrefs(&mut allocator, args)
         .map_err(|e| map_pyerr_w_ptr(&e, &allocator))?;
-    let dialect = &ChiaDialect::new(flags);
+    let dialect = &ChiaDialect::new(flags.to_clvm_flags());
 
     let (puzzle, solution) = py
         .detach(|| -> Result<(NodePtr, NodePtr), EvalErr> {
@@ -203,9 +226,9 @@ pub fn get_puzzle_and_solution_for_coin2<'a>(
     block_refs: &Bound<'a, PyList>,
     max_cost: Cost,
     find_coin: &Coin,
-    flags: u32,
+    flags: ConsensusFlags,
 ) -> PyResult<(Program, Program)> {
-    let mut allocator = make_allocator(LIMIT_HEAP);
+    let mut allocator = make_allocator(ConsensusFlags::LIMIT_HEAP);
 
     let refs = block_refs.into_iter().map(|b| {
         let buf = b
@@ -217,7 +240,7 @@ pub fn get_puzzle_and_solution_for_coin2<'a>(
     let generator = node_from_bytes_backrefs(&mut allocator, generator.as_ref())
         .map_err(|e| map_pyerr_w_ptr(&e, &allocator))?;
     let args = setup_generator_args(&mut allocator, refs, flags)?;
-    let dialect = &ChiaDialect::new(flags);
+    let dialect = &ChiaDialect::new(flags.to_clvm_flags());
 
     let (puzzle, solution) = py
         .detach(|| -> Result<(NodePtr, NodePtr), EvalErr> {
@@ -380,7 +403,7 @@ fn supports_fast_forward(spend: &CoinSpend) -> bool {
         amount: spend.coin.amount,
     };
 
-    let mut a = make_allocator(LIMIT_HEAP);
+    let mut a = make_allocator(ConsensusFlags::LIMIT_HEAP);
     let Ok(puzzle) = node_from_bytes(&mut a, spend.puzzle_reveal.as_slice()) else {
         return false;
     };
@@ -406,7 +429,7 @@ fn fast_forward_singleton<'p>(
     new_coin: &Coin,
     new_parent: &Coin,
 ) -> PyResult<Bound<'p, PyBytes>> {
-    let mut a = make_allocator(LIMIT_HEAP);
+    let mut a = make_allocator(ConsensusFlags::LIMIT_HEAP);
     let puzzle = node_from_bytes(&mut a, spend.puzzle_reveal.as_slice())
         .map_err(|e| map_pyerr_w_ptr(&e, &a))?;
     let solution =
@@ -429,7 +452,7 @@ pub fn py_validate_clvm_and_signature(
     new_spend: &SpendBundle,
     max_cost: u64,
     constants: &ConsensusConstants,
-    flags: u32,
+    flags: ConsensusFlags,
 ) -> PyResult<(OwnedSpendBundleConditions, Vec<([u8; 32], GTElement)>, f32)> {
     let start_time = Instant::now();
     let (owned_conditions, additions) =
@@ -448,7 +471,7 @@ pub fn py_get_conditions_from_spendbundle(
 ) -> PyResult<OwnedSpendBundleConditions> {
     use chia_consensus::allocator::make_allocator;
     use chia_consensus::owned_conditions::OwnedSpendBundleConditions;
-    let mut a = make_allocator(LIMIT_HEAP);
+    let mut a = make_allocator(ConsensusFlags::LIMIT_HEAP);
     let conditions =
         get_conditions_from_spendbundle(&mut a, spend_bundle, max_cost, prev_tx_height, constants)?;
     Ok(OwnedSpendBundleConditions::from(&a, conditions))
@@ -460,7 +483,7 @@ pub fn py_get_flags_for_height_and_constants(
     prev_tx_height: u32,
     constants: &ConsensusConstants,
 ) -> u32 {
-    get_flags_for_height_and_constants(prev_tx_height, constants)
+    get_flags_for_height_and_constants(prev_tx_height, constants).bits()
 }
 
 #[pyo3::pyfunction]
@@ -525,7 +548,7 @@ pub fn get_spends_for_trusted_block<'a>(
     constants: &ConsensusConstants,
     generator: Program,
     block_refs: &Bound<'_, PyList>,
-    flags: u32,
+    flags: ConsensusFlags,
 ) -> pyo3::PyResult<Py<PyAny>> {
     let refs = block_refs
         .into_iter()
@@ -551,7 +574,7 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
     constants: &ConsensusConstants,
     generator: Program,
     block_refs: &Bound<'a, PyList>,
-    flags: u32,
+    flags: ConsensusFlags,
 ) -> pyo3::PyResult<Py<PyAny>> {
     let refs = block_refs
         .into_iter()
@@ -601,20 +624,18 @@ pub fn create_v2_plot(
     k: u8,
     strength: u8,
     plot_id: Bytes32,
+    plot_index: u16,
+    meta_group: u8,
     memo: &[u8],
 ) -> PyResult<()> {
-    if memo.len() != 32 + 48 + 32 {
-        return Err(PyValueError::new_err(format!(
-            "memo must be 112 bytes, got {}",
-            memo.len()
-        )));
-    }
     Ok(chia_pos2::create_v2_plot(
         Path::new(filename),
         k,
         strength,
         &plot_id.to_bytes(),
-        memo.try_into().unwrap(),
+        plot_index,
+        meta_group,
+        memo,
     )?)
 }
 
@@ -655,12 +676,7 @@ impl Prover {
     }
 
     pub fn get_memo(&self) -> Vec<u8> {
-        let (ph, fpk, lsk) = self.0.get_memo();
-        let mut ret = vec![];
-        ret.extend_from_slice(&ph);
-        ret.extend_from_slice(&fpk);
-        ret.extend_from_slice(&lsk);
-        ret
+        self.0.get_memo().to_vec()
     }
 
     pub fn to_bytes(&self) -> PyResult<Vec<u8>> {
@@ -710,6 +726,27 @@ pub fn solve_proof(fragments: &PartialProof, plot_id: Bytes32, strength: u8, k: 
         &plot_id.to_bytes(),
         k,
         strength,
+    )
+}
+
+/// Converts full proof bytes to quality string (does not validate the proof).
+/// Returns the serialized quality string, or None if proof format is invalid.
+#[pyo3::pyfunction]
+pub fn quality_string_from_proof(
+    plot_id: Bytes32,
+    size: u8,
+    plot_strength: u8,
+    proof: &[u8],
+) -> Option<Bytes32> {
+    chia_pos2::quality_string_from_proof(&plot_id.to_bytes(), size, plot_strength, proof).map(
+        |quality| -> Bytes32 {
+            let mut sha256 = Sha256::new();
+            sha256.update(chia_pos2::serialize_quality(
+                &quality.chain_links,
+                plot_strength,
+            ));
+            sha256.finalize().into()
+        },
     )
 }
 
@@ -763,6 +800,9 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(create_v2_plot, m)?)?;
     m.add_function(wrap_pyfunction!(validate_proof_v2, m)?)?;
     m.add_function(wrap_pyfunction!(solve_proof, m)?)?;
+    m.add_function(wrap_pyfunction!(quality_string_from_proof, m)?)?;
+    m.add_function(wrap_pyfunction!(compute_plot_id_v1, m)?)?;
+    m.add_function(wrap_pyfunction!(compute_plot_id_v2, m)?)?;
     m.add_class::<Prover>()?;
     m.add_class::<PartialProof>()?;
 
@@ -792,19 +832,48 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
         m
     )?)?;
 
-    // clvm functions
-    m.add("NO_UNKNOWN_CONDS", NO_UNKNOWN_CONDS)?;
-    m.add("STRICT_ARGS_COUNT", STRICT_ARGS_COUNT)?;
-    m.add("MEMPOOL_MODE", MEMPOOL_MODE)?;
-    m.add("DONT_VALIDATE_SIGNATURE", DONT_VALIDATE_SIGNATURE)?;
-    m.add("COMPUTE_FINGERPRINT", COMPUTE_FINGERPRINT)?;
-    m.add("COST_CONDITIONS", COST_CONDITIONS)?;
-    m.add("SIMPLE_GENERATOR", SIMPLE_GENERATOR)?;
-    m.add("INTERNED_GENERATOR", INTERNED_GENERATOR)?;
+    // flags affecting consensus
+    m.add("NO_UNKNOWN_CONDS", ConsensusFlags::NO_UNKNOWN_CONDS.bits())?;
+    m.add(
+        "STRICT_ARGS_COUNT",
+        ConsensusFlags::STRICT_ARGS_COUNT.bits(),
+    )?;
+    m.add("MEMPOOL_MODE", MEMPOOL_MODE.bits())?;
+    m.add(
+        "DONT_VALIDATE_SIGNATURE",
+        ConsensusFlags::DONT_VALIDATE_SIGNATURE.bits(),
+    )?;
+    m.add(
+        "COMPUTE_FINGERPRINT",
+        ConsensusFlags::COMPUTE_FINGERPRINT.bits(),
+    )?;
+    m.add("COST_CONDITIONS", ConsensusFlags::COST_CONDITIONS.bits())?;
+    m.add("SIMPLE_GENERATOR", ConsensusFlags::SIMPLE_GENERATOR.bits())?;
+    m.add(
+        "INTERNED_GENERATOR",
+        ConsensusFlags::INTERNED_GENERATOR.bits(),
+    )?;
 
     // generator identity hard fork functions
     m.add_function(wrap_pyfunction!(generator_tree_hash, m)?)?;
     m.add_function(wrap_pyfunction!(generator_cost_and_hash, m)?)?;
+
+    // flags from clvm_rs, affecting execution
+    m.add_function(wrap_pyfunction!(run_chia_program, m)?)?;
+    m.add("CANONICAL_INTS", ConsensusFlags::CANONICAL_INTS.bits())?;
+    m.add("NO_UNKNOWN_OPS", ConsensusFlags::NO_UNKNOWN_OPS.bits())?;
+    m.add("LIMIT_HEAP", ConsensusFlags::LIMIT_HEAP.bits())?;
+    m.add("RELAXED_BLS", ConsensusFlags::RELAXED_BLS.bits())?;
+    m.add(
+        "ENABLE_KECCAK_OPS_OUTSIDE_GUARD",
+        ConsensusFlags::ENABLE_KECCAK_OPS_OUTSIDE_GUARD.bits(),
+    )?;
+    m.add("DISABLE_OP", ConsensusFlags::DISABLE_OP.bits())?;
+    m.add(
+        "ENABLE_SHA256_TREE",
+        ConsensusFlags::ENABLE_SHA256_TREE.bits(),
+    )?;
+    m.add("ENABLE_SECP_OPS", ConsensusFlags::ENABLE_SECP_OPS.bits())?;
 
     m.add_class::<PyPlotParam>()?;
 
@@ -932,16 +1001,6 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<FeeRate>()?;
     m.add_class::<LazyNode>()?;
     m.add_class::<Message>()?;
-
-    // facilities from clvm_rs
-
-    m.add_function(wrap_pyfunction!(run_chia_program, m)?)?;
-    m.add("NO_UNKNOWN_OPS", NO_UNKNOWN_OPS)?;
-    m.add("LIMIT_HEAP", LIMIT_HEAP)?;
-    m.add(
-        "ENABLE_KECCAK_OPS_OUTSIDE_GUARD",
-        ENABLE_KECCAK_OPS_OUTSIDE_GUARD,
-    )?;
 
     m.add_function(wrap_pyfunction!(serialized_length, m)?)?;
     m.add_function(wrap_pyfunction!(serialized_length_trusted, m)?)?;

@@ -1,6 +1,6 @@
 [package]
 name = "chia"
-version = "0.36.0"
+version = "0.38.1"
 edition = "2024"
 license = "Apache-2.0"
 description = "A meta-crate that exports all of the Chia crates in the workspace."
@@ -114,33 +114,33 @@ lto = "thin"
 bench = false
 
 [workspace.dependencies]
-chia_py_streamable_macro = { path = "./crates/chia_py_streamable_macro", version = "0.36.0" }
-chia_streamable_macro = { path = "./crates/chia_streamable_macro", version = "0.36.0" }
-chia-bls = { path = "./crates/chia-bls", version = "0.36.0" }
-chia-client = { path = "./crates/chia-client", version = "0.36.0" }
-chia-consensus = { path = "./crates/chia-consensus", version = "0.36.0" }
-chia-datalayer = { path = "./crates/chia-datalayer", version = "0.36.0" }
-chia-datalayer-macro = { path = "./crates/chia-datalayer/macro", version = "0.36.0" }
-chia-protocol = { path = "./crates/chia-protocol", version = "0.36.0" }
-chia-secp = { path = "./crates/chia-secp", version = "0.36.0" }
-chia-ssl = { path = "./crates/chia-ssl", version = "0.36.0" }
-chia-traits = { path = "./crates/chia-traits", version = "0.36.0" }
-chia-puzzle-types = { path = "./crates/chia-puzzle-types", version = "0.36.0" }
-chia-sha2 = { path = "./crates/chia-sha2", version = "0.36.0" }
-chia-serde = { path = "./crates/chia-serde", version = "0.36.0" }
-clvm-traits = { path = "./crates/clvm-traits", version = "0.36.0" }
-clvm-utils = { path = "./crates/clvm-utils", version = "0.36.0" }
-clvm-derive = { path = "./crates/clvm-derive", version = "0.36.0" }
-chia-pos2 = "0.1.6"
-chia-consensus-fuzz = { path = "./crates/chia-consensus/fuzz", version = "0.36.0" }
-chia-bls-fuzz = { path = "./crates/chia-bls/fuzz", version = "0.36.0" }
-chia-datalayer-fuzz = { path = "./crates/chia-datalayer/fuzz", version = "0.36.0" }
-chia-protocol-fuzz = { path = "./crates/chia-protocol/fuzz", version = "0.36.0" }
-chia-puzzle-types-fuzz = { path = "./crates/chia-puzzle-types/fuzz", version = "0.36.0" }
-clvm-traits-fuzz = { path = "./crates/clvm-traits/fuzz", version = "0.36.0" }
-clvm-utils-fuzz = { path = "./crates/clvm-utils/fuzz", version = "0.36.0" }
+chia_py_streamable_macro = { path = "./crates/chia_py_streamable_macro", version = "0.38.0" }
+chia_streamable_macro = { path = "./crates/chia_streamable_macro", version = "0.38.0" }
+chia-bls = { path = "./crates/chia-bls", version = "0.38.0" }
+chia-client = { path = "./crates/chia-client", version = "0.38.0" }
+chia-consensus = { path = "./crates/chia-consensus", version = "0.38.0" }
+chia-datalayer = { path = "./crates/chia-datalayer", version = "0.38.0" }
+chia-datalayer-macro = { path = "./crates/chia-datalayer/macro", version = "0.38.0" }
+chia-protocol = { path = "./crates/chia-protocol", version = "0.38.0" }
+chia-secp = { path = "./crates/chia-secp", version = "0.38.0" }
+chia-ssl = { path = "./crates/chia-ssl", version = "0.38.0" }
+chia-traits = { path = "./crates/chia-traits", version = "0.38.0" }
+chia-puzzle-types = { path = "./crates/chia-puzzle-types", version = "0.38.0" }
+chia-sha2 = { path = "./crates/chia-sha2", version = "0.38.0" }
+chia-serde = { path = "./crates/chia-serde", version = "0.38.0" }
+clvm-traits = { path = "./crates/clvm-traits", version = "0.38.0" }
+clvm-utils = { path = "./crates/clvm-utils", version = "0.38.0" }
+clvm-derive = { path = "./crates/clvm-derive", version = "0.38.0" }
+chia-pos2 = "0.4.0"
+chia-consensus-fuzz = { path = "./crates/chia-consensus/fuzz", version = "0.38.0" }
+chia-bls-fuzz = { path = "./crates/chia-bls/fuzz", version = "0.38.0" }
+chia-datalayer-fuzz = { path = "./crates/chia-datalayer/fuzz", version = "0.38.0" }
+chia-protocol-fuzz = { path = "./crates/chia-protocol/fuzz", version = "0.38.0" }
+chia-puzzle-types-fuzz = { path = "./crates/chia-puzzle-types/fuzz", version = "0.38.0" }
+clvm-traits-fuzz = { path = "./crates/clvm-traits/fuzz", version = "0.38.0" }
+clvm-utils-fuzz = { path = "./crates/clvm-utils/fuzz", version = "0.38.0" }
 blst = { version = "0.3.16", features = ["portable"] }
-clvmr = "0.17.0"
+clvmr = "0.17.1"
 clvm-fuzzing = "0.17.0"
 syn = "2.0.101"
 quote = "1.0.40"
@@ -158,9 +158,9 @@ criterion = "0.5.1"
 rstest = "0.22.0"
 expect-test = "1.5.0"
 tokio = "1.45.0"
-tokio-tungstenite = "0.24.0"
+tokio-tungstenite = "0.28.0"
 futures-util = "0.3.31"
-tungstenite = "0.24.0"
+tungstenite = "0.28.0"
 hex-literal = "0.4.1"
 num-traits = "0.2.15"
 num-bigint = "0.4.5"
@@ -168,11 +168,12 @@ text-diff = "0.4.0"
 lazy_static = "1.4.0"
 rcgen = "0.13.2"
 rsa = "0.9.7"
-time = "0.3.41"
+time = "0.3.47"
 rusqlite = "0.31.0"
 clap = "4.5.38"
 zstd = "0.13.3"
 blocking-threadpool = "1.0.1"
+bitflags = "2.6"
 libfuzzer-sys = "0.4"
 wasm-bindgen = "0.2.100"
 openssl = "0.10.71"

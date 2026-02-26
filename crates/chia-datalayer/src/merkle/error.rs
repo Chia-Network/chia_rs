@@ -46,6 +46,8 @@ pub enum Error {
     IndexIsNotAChild(TreeIndex),
     #[error("cycle found")]
     CycleFound(),
+    #[error("recursion depth exceeded while building merkle blob (max=64)")]
+    RecursionDepthExceeded(),
     #[error("block index out of bounds: {0}")]
     BlockIndexOutOfBounds(TreeIndex),
     #[error("leaf hash not found: {0:?}")]

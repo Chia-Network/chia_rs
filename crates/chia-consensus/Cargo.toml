@@ -1,6 +1,6 @@
 [package]
 name = "chia-consensus"
-version = "0.36.0"
+version = "0.38.1"
 edition = "2024"
 license = "Apache-2.0"
 description = "Utility functions and types used by the Chia blockchain full node"
@@ -20,6 +20,7 @@ py-bindings = [
 ]
 
 [dependencies]
+bitflags = { workspace = true }
 clvmr = { workspace = true }
 hex = { workspace = true }
 pyo3 = { workspace = true, optional = true }

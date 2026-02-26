@@ -27,7 +27,7 @@ pub struct SecretKey(pub(crate) blst_scalar);
 impl<'a> arbitrary::Arbitrary<'a> for SecretKey {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let mut seed = [0_u8; 32];
-        let _ = u.fill_buffer(seed.as_mut_slice());
+        u.fill_buffer(seed.as_mut_slice())?;
         Ok(Self::from_seed(&seed))
     }
 }

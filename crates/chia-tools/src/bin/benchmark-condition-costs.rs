@@ -12,6 +12,7 @@ use chia_consensus::conditions::{
     validate_conditions,
     validate_signature,
 };
+use chia_consensus::flags::ConsensusFlags;
 use chia_consensus::opcodes;
 use chia_consensus::opcodes::ConditionOpcode;
 use chia_consensus::spend_visitor::SpendVisitor;
@@ -21,6 +22,7 @@ use clvmr::{
     allocator::{Allocator, NodePtr},
     error::EvalErr,
 };
+
 struct ConditionTest<'a> {
     opcode: ConditionOpcode,
     args: &'a [NodePtr],
@@ -424,7 +426,7 @@ pub fn main() {
                 puz_hash_node_ptr,
                 hundred,
                 conditions,
-                0,
+                ConsensusFlags::empty(),
                 &mut cost,
                 0, // clvm_cost
                 &TEST_CONSTANTS,
@@ -432,8 +434,10 @@ pub fn main() {
             .expect("process_single_spend");
 
             MempoolVisitor::post_process(&allocator, &state, &mut ret).expect("post_process");
-            validate_conditions(&allocator, &ret, &state, spends, 0).expect("validate_conditions");
-            validate_signature(&state, &signature, 0, None).expect("validate_signature");
+            validate_conditions(&allocator, &ret, &state, spends, ConsensusFlags::empty())
+                .expect("validate_conditions");
+            validate_signature(&state, &signature, ConsensusFlags::empty(), None)
+                .expect("validate_signature");
 
             let elapsed = start.elapsed();
             // the first run is a warmup

@@ -375,12 +375,6 @@ jobs:
             test-runner:
               matrix: pytest
     steps:
-      # the test files are read verbatim, making it problematic if git is
-      # allowed to insert \r when checking out files
-      - name: disable git autocrlf
-        run: |
-          git config --global core.autocrlf false
-
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
@@ -420,12 +414,14 @@ jobs:
       - name: Upload to Coveralls
         uses: coverallsapp/github-action@v2
         if: matrix.os.coverage
+        continue-on-error: true
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         with:
           flag-name: ${{ join(matrix.*.name, ' ') }}
           parallel: true
           path-to-lcov: "./lcov.info"
+          fail-on-error: false
 
   unit_tests_done:
     name: Unit Tests - Done
@@ -434,10 +430,12 @@ jobs:
     steps:
       - name: Upload to Coveralls
         uses: coverallsapp/github-action@v2
+        continue-on-error: true
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         with:
           parallel-finished: true
+          fail-on-error: false
 
   upload:
     name: Upload to PyPI - ${{ matrix.os.name }} ${{ matrix.python.major-dot-minor }} ${{ matrix.arch.name }}

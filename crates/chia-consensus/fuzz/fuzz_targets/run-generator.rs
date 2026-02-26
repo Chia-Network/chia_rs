@@ -2,32 +2,32 @@
 use chia_bls::Signature;
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
+use chia_consensus::flags::ConsensusFlags;
 use chia_consensus::run_block_generator::{run_block_generator, run_block_generator2};
 use chia_consensus::validation_error::{ErrorCode, ValidationErr};
-use clvmr::chia_dialect::LIMIT_HEAP;
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
-    let mut a1 = make_allocator(LIMIT_HEAP);
+    let mut a1 = make_allocator(ConsensusFlags::LIMIT_HEAP);
     let r1 = run_block_generator::<&[u8], _>(
         &mut a1,
         data,
         [],
         110_000_000,
-        0,
+        ConsensusFlags::empty(),
         &Signature::default(),
         None,
         &TEST_CONSTANTS,
     );
     drop(a1);
 
-    let mut a2 = make_allocator(LIMIT_HEAP);
+    let mut a2 = make_allocator(ConsensusFlags::LIMIT_HEAP);
     let r2 = run_block_generator2::<&[u8], _>(
         &mut a2,
         data,
         [],
         110_000_000,
-        0,
+        ConsensusFlags::empty(),
         &Signature::default(),
         None,
         &TEST_CONSTANTS,

@@ -5,7 +5,7 @@ use super::run_block_generator::{
 };
 use crate::allocator::make_allocator;
 use crate::consensus_constants::TEST_CONSTANTS;
-use crate::flags::{COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE, SIMPLE_GENERATOR};
+use crate::flags::{ConsensusFlags, MEMPOOL_MODE};
 use crate::run_block_generator::check_generator_node;
 use crate::validation_error::ErrorCode;
 use chia_bls::Signature;
@@ -125,7 +125,7 @@ pub(crate) fn print_conditions(a: &Allocator, c: &SpendBundleConditions, a2: &Al
     ret += &format!("condition-cost: {}\n", c.condition_cost);
     ret += &format!("removal_amount: {}\n", c.removal_amount);
     ret += &format!("addition_amount: {}\n", c.addition_amount);
-    ret += &format!("atoms: {}\n", a2.atom_count() + a2.small_atom_count());
+    ret += &format!("atoms: {}\n", a2.atom_count());
     ret += &format!("pairs: {}\n", a2.pair_count());
     ret += &format!("heap: {}\n", a2.heap_size());
     ret
@@ -275,12 +275,12 @@ fn run_generator(#[case] name: &str) {
     let mut write_back = format!("{}\n", hex::encode(&generator));
     let mut last_output = String::new();
 
-    for (flags, expected) in zip(&[0, MEMPOOL_MODE], expected) {
+    for (flags, expected) in zip(&[ConsensusFlags::empty(), MEMPOOL_MODE], expected) {
         let mut flags = *flags;
         if name == "aa-million-messages" || name == "aa-million-message-spends" {
             // this test requires running after hard fork 2, where the COST_CONDITIONS
             // flag is set
-            flags |= COST_CONDITIONS;
+            flags |= ConsensusFlags::COST_CONDITIONS;
         }
 
         // These are generators that are programs, not a simple list of spends
@@ -313,7 +313,7 @@ fn run_generator(#[case] name: &str) {
                 &generator,
                 &block_refs, // we're not allowed to pass in block references when SIMPLE_GENERATOR is set
                 11_000_000_000,
-                flags | DONT_VALIDATE_SIGNATURE | SIMPLE_GENERATOR,
+                flags | ConsensusFlags::DONT_VALIDATE_SIGNATURE | ConsensusFlags::SIMPLE_GENERATOR,
                 &Signature::default(),
                 None,
                 &TEST_CONSTANTS,
@@ -326,10 +326,10 @@ fn run_generator(#[case] name: &str) {
             // now lets specifically check the node generator check
             let program = node_from_bytes_backrefs(&mut a, generator.as_ref())
                 .expect("node_from_bytes_backref");
-            let res = check_generator_node(&a, program, flags | SIMPLE_GENERATOR);
+            let res = check_generator_node(&a, program, flags | ConsensusFlags::SIMPLE_GENERATOR);
             assert_eq!(res.unwrap_err().1, ErrorCode::ComplexGeneratorReceived);
         } else {
-            flags |= SIMPLE_GENERATOR;
+            flags |= ConsensusFlags::SIMPLE_GENERATOR;
             // ensure SIMPLE_GENERATOR fails if there are any block references
             // passed in. We pass in a dummy block reference
             let mut a = make_allocator(flags);
@@ -338,7 +338,7 @@ fn run_generator(#[case] name: &str) {
                 &generator,
                 &[&[0_u8, 1, 2, 3]],
                 11_000_000_000,
-                flags | DONT_VALIDATE_SIGNATURE,
+                flags | ConsensusFlags::DONT_VALIDATE_SIGNATURE,
                 &Signature::default(),
                 None,
                 &TEST_CONSTANTS,
@@ -348,18 +348,18 @@ fn run_generator(#[case] name: &str) {
             // now lets specifically check the node generator check
             let program = node_from_bytes_backrefs(&mut a, generator.as_ref())
                 .expect("node_from_bytes_backref");
-            let res = check_generator_node(&a, program, flags | SIMPLE_GENERATOR);
+            let res = check_generator_node(&a, program, flags | ConsensusFlags::SIMPLE_GENERATOR);
             assert!(res.is_ok());
         }
 
-        println!("flags: {flags:x}");
+        println!("flags: {:?}", flags);
         let mut a2 = make_allocator(flags);
         let conds2 = run_block_generator2(
             &mut a2,
             &generator,
             &block_refs,
             11_000_000_000,
-            flags | DONT_VALIDATE_SIGNATURE,
+            flags | ConsensusFlags::DONT_VALIDATE_SIGNATURE,
             &Signature::default(),
             None,
             &TEST_CONSTANTS,
@@ -374,7 +374,7 @@ fn run_generator(#[case] name: &str) {
                 // a quote
                 assert!(exe_cost <= conditions.execution_cost);
 
-                if (flags & SIMPLE_GENERATOR) != 0 {
+                if flags.contains(ConsensusFlags::SIMPLE_GENERATOR) {
                     // when running generators with the SIMPLE_GENERATOR flag
                     // set, we don't pass in the CLVM deserializer program. This
                     // causes the atoms and pairs counters to be lower than
@@ -393,7 +393,7 @@ fn run_generator(#[case] name: &str) {
         };
 
         if UPDATE_TESTS {
-            if (flags & MEMPOOL_MODE) != 0 {
+            if flags.contains(MEMPOOL_MODE) {
                 if output != last_output {
                     write_back.push_str(&format!("STRICT:\n{output}"));
                 }
@@ -409,7 +409,7 @@ fn run_generator(#[case] name: &str) {
                 &generator,
                 &block_refs,
                 11_000_000_000,
-                flags | DONT_VALIDATE_SIGNATURE,
+                flags | ConsensusFlags::DONT_VALIDATE_SIGNATURE,
                 &Signature::default(),
                 None,
                 &TEST_CONSTANTS,
@@ -495,7 +495,7 @@ fn run_generator(#[case] name: &str) {
                             .puzzle_reveal
                             .run(
                                 &mut a,
-                                flags,
+                                flags.to_clvm_flags(),
                                 TEST_CONSTANTS.max_block_cost_clvm,
                                 &coinspends[i].solution,
                             )

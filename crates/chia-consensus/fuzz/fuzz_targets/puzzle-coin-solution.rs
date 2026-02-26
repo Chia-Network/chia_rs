@@ -1,20 +1,16 @@
 #![no_main]
-use libfuzzer_sys::{arbitrary, fuzz_target};
+use libfuzzer_sys::fuzz_target;
 
 use chia_consensus::get_puzzle_and_solution::get_puzzle_and_solution_for_coin;
 use chia_protocol::Coin;
-use clvm_fuzzing::make_tree;
-use clvmr::allocator::Allocator;
+use clvm_fuzzing::ArbitraryClvmTree;
 
-const HASH: [u8; 32] = [
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-];
+const HASH: [u8; 32] = [0_u8; 32];
 
-fuzz_target!(|data: &[u8]| {
-    let mut a = Allocator::new();
-    let mut unstructured = arbitrary::Unstructured::new(data);
-    let (input, _) = make_tree(&mut a, &mut unstructured);
-
-    let _ret =
-        get_puzzle_and_solution_for_coin(&a, input, &Coin::new(HASH.into(), HASH.into(), 1337));
+fuzz_target!(|input: ArbitraryClvmTree| {
+    let _ret = get_puzzle_and_solution_for_coin(
+        &input.allocator,
+        input.tree,
+        &Coin::new(HASH.into(), HASH.into(), 1337),
+    );
 });

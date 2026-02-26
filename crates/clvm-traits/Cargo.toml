@@ -1,6 +1,6 @@
 [package]
 name = "clvm-traits"
-version = "0.36.0"
+version = "0.38.1"
 edition = "2024"
 license = "Apache-2.0"
 description = "Traits for encoding and decoding CLVM objects."
@@ -32,3 +32,4 @@ thiserror = { workspace = true }
 [dev-dependencies]
 hex = { workspace = true }
 hex-literal = { workspace = true }
+rstest = { workspace = true }

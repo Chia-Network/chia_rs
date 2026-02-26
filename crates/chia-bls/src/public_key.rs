@@ -26,9 +26,9 @@ pub struct PublicKey(pub(crate) blst_p1);
 
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for PublicKey {
-    fn arbitrary(_u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        // placeholder
-        Ok(Self::default())
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        use crate::SecretKey;
+        Ok(SecretKey::arbitrary(u)?.public_key())
     }
 }
 

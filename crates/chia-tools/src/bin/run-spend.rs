@@ -1,4 +1,5 @@
 use chia_consensus::conditions::Condition;
+use chia_consensus::flags::ConsensusFlags;
 use chia_puzzle_types::Proof;
 use chia_puzzle_types::cat::{CatArgs, CatSolution};
 use chia_puzzle_types::did::{DidArgs, DidSolution};
@@ -266,6 +267,7 @@ fn main() {
     use chia_consensus::opcodes::parse_opcode;
     use chia_consensus::validation_error::{first, rest};
     use chia_protocol::CoinSpend;
+    use clvmr::chia_dialect::ClvmFlags;
     use clvmr::reduction::Reduction;
     use clvmr::{ChiaDialect, run_program};
     use std::fs::read;
@@ -287,7 +289,7 @@ fn main() {
 
     println!("Spending {:?}", &spend.coin);
     println!("   coin-id: {}\n", hex::encode(spend.coin.coin_id()));
-    let dialect = ChiaDialect::new(0);
+    let dialect = ChiaDialect::new(ClvmFlags::empty());
     let Reduction(_clvm_cost, conditions) =
         match run_program(&mut a, &dialect, puzzle, solution, 11_000_000_000) {
             Ok(r) => r,
@@ -303,14 +305,15 @@ fn main() {
     while let Some((mut c, next)) = a.next(iter) {
         iter = next;
         let op_ptr = first(&a, c).expect("parsing conditions");
-        let Some(op) = parse_opcode(&a, op_ptr, 0) else {
+        let Some(op) = parse_opcode(&a, op_ptr, ConsensusFlags::empty()) else {
             println!("  UNKNOWN CONDITION [{}]", &hex::encode(a.atom(op_ptr)));
             continue;
         };
 
         c = rest(&a, c).expect("parsing conditions");
 
-        let condition = parse_args(&a, c, op, 0).expect("parse condition args");
+        let condition =
+            parse_args(&a, c, op, ConsensusFlags::empty()).expect("parse condition args");
         println!("  [{op:?}] {}", condition.debug_print(&a));
     }
 

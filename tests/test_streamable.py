@@ -6,8 +6,10 @@ from chia_rs import (
     G2Element,
     Program,
     AugSchemeMPL,
+    ProofOfSpace,
 )
-from chia_rs.sized_ints import uint64
+from typing import Iterator, Optional
+from chia_rs.sized_ints import uint64, uint8, uint16
 from chia_rs.sized_bytes import bytes32
 import pytest
 import copy
@@ -763,3 +765,60 @@ def test_program() -> None:
     # garbage at the end of the serialization
     with pytest.raises(ValueError, match="invalid CLVM serialization"):
         Program.from_json_dict("0xff808080")
+
+
+def get_pool_target() -> Iterator[tuple[Optional[G1Element], Optional[bytes32]]]:
+    yield (pk, None)
+    yield (None, bytes32.random())
+
+
+def get_proof_of_space() -> Iterator[ProofOfSpace]:
+    challenge = bytes32.random()
+    proof1 = random.randbytes(128)
+    proof2 = random.randbytes(512)
+    plot_public_key = pk
+
+    for pool_public_key, pool_contract_puzzle_hash in get_pool_target():
+        # version 0 (v1-plots)
+        for size in [18, 32]:
+            yield ProofOfSpace(
+                challenge,
+                pool_public_key,
+                pool_contract_puzzle_hash,
+                plot_public_key,
+                uint8(0),
+                uint16(0),
+                uint8(0),
+                uint8(0),
+                uint8(size),
+                proof1,
+            )
+        # version 1 (v2-plots)
+        for plot_index in [0, 1, 250, 16000]:
+            for meta_group in [0, 1, 255]:
+                for strength in [2, 3, 4]:
+                    yield ProofOfSpace(
+                        challenge,
+                        pool_public_key,
+                        pool_contract_puzzle_hash,
+                        plot_public_key,
+                        uint8(1),
+                        uint16(plot_index),
+                        uint8(meta_group),
+                        uint8(strength),
+                        uint8(0),
+                        proof2,
+                    )
+
+
+def test_pos_stremable() -> None:
+    # ProofOfSpace is either v1 and contains the plot size (k) or v2 and
+    # contains plot_index, meta_group and strength, but not size. The size is
+    # fixed for v2 plots.
+
+    for pos in get_proof_of_space():
+        pos_bytes = pos.stream_to_bytes()
+        pos2 = ProofOfSpace.from_bytes(pos_bytes)
+        assert pos == pos2
+        pos2_bytes = pos2.stream_to_bytes()
+        assert pos_bytes == pos2_bytes

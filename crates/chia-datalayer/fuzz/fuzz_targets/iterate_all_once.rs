@@ -1,9 +1,6 @@
 #![no_main]
 
-use libfuzzer_sys::{
-    arbitrary::{Arbitrary, Unstructured},
-    fuzz_target,
-};
+use libfuzzer_sys::fuzz_target;
 use std::collections::HashMap;
 
 use chia_datalayer::{
@@ -11,19 +8,14 @@ use chia_datalayer::{
     MerkleBlob, NodeType, ParentFirstIterator, TreeIndex, ValueId,
 };
 
-fuzz_target!(|data: &[u8]| {
-    let mut blob = MerkleBlob::new(Vec::new()).unwrap();
+fuzz_target!(|args: Vec<(KeyId, ValueId, Hash)>| {
+    let mut blob = MerkleBlob::new(Vec::new()).expect("construct MerkleBlob");
     blob.check_integrity_on_drop = false;
 
     let mut leaf_count: usize = 0;
 
-    let mut unstructured = Unstructured::new(data);
-    while !unstructured.is_empty() {
-        let key = KeyId::arbitrary(&mut unstructured).unwrap();
-        let value = ValueId::arbitrary(&mut unstructured).unwrap();
-        let hash = Hash::arbitrary(&mut unstructured).unwrap();
-
-        match blob.insert(key, value, &hash, InsertLocation::Auto {}) {
+    for (key, value, hash) in &args {
+        match blob.insert(*key, *value, hash, InsertLocation::Auto {}) {
             Ok(_) => {
                 leaf_count += 1;
             }
@@ -35,19 +27,19 @@ fuzz_target!(|data: &[u8]| {
         };
     }
 
-    blob.check_integrity().unwrap();
+    blob.check_integrity().expect("check integrity");
 
     let raw_blob = blob.read_blob();
 
     let nodes_a = LeftChildFirstIterator::new(raw_blob, None)
         .collect::<Result<HashMap<TreeIndex, Block>, Error>>()
-        .unwrap();
+        .expect("left child first iterator");
     let nodes_b = ParentFirstIterator::new(raw_blob, None)
         .collect::<Result<HashMap<TreeIndex, Block>, Error>>()
-        .unwrap();
+        .expect("parent first iterator");
     let nodes_c = BreadthFirstIterator::new(raw_blob, None)
         .collect::<Result<HashMap<TreeIndex, Block>, Error>>()
-        .unwrap();
+        .expect("breadth first iterator");
 
     assert_eq!(nodes_c.len(), leaf_count);
 

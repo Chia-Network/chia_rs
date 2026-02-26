@@ -18,7 +18,7 @@ use super::opcodes::{
 use super::sanitize_int::{SanitizedUint, sanitize_uint};
 use super::validation_error::{ErrorCode, ValidationErr, first, next, rest};
 use crate::consensus_constants::ConsensusConstants;
-use crate::flags::{COST_CONDITIONS, DONT_VALIDATE_SIGNATURE, NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
+use crate::flags::ConsensusFlags;
 use crate::make_aggsig_final_message::u64_to_bytes;
 use crate::messages::{Message, SpendId};
 use crate::spend_visitor::SpendVisitor;
@@ -362,9 +362,9 @@ fn check_agg_sig_unsafe_message(
 fn maybe_check_args_terminator(
     a: &Allocator,
     arg: NodePtr,
-    flags: u32,
+    flags: ConsensusFlags,
 ) -> Result<(), ValidationErr> {
-    if (flags & STRICT_ARGS_COUNT) != 0 {
+    if flags.contains(ConsensusFlags::STRICT_ARGS_COUNT) {
         check_nil(a, rest(a, arg)?)?;
     }
     Ok(())
@@ -374,7 +374,7 @@ pub fn parse_args(
     a: &Allocator,
     mut c: NodePtr,
     op: ConditionOpcode,
-    flags: u32,
+    flags: ConsensusFlags,
 ) -> Result<Condition, ValidationErr> {
     match op {
         AGG_SIG_UNSAFE
@@ -390,7 +390,7 @@ pub fn parse_args(
             let message = sanitize_announce_msg(a, first(a, c)?, ErrorCode::InvalidMessage)?;
             // AGG_SIG_* take two parameters
 
-            if (flags & STRICT_ARGS_COUNT) != 0 {
+            if flags.contains(ConsensusFlags::STRICT_ARGS_COUNT) {
                 check_nil(a, rest(a, c)?)?;
             }
             match op {
@@ -443,13 +443,13 @@ pub fn parse_args(
                         }
                     }
                 }
-            } else if (flags & STRICT_ARGS_COUNT) != 0 {
+            } else if flags.contains(ConsensusFlags::STRICT_ARGS_COUNT) {
                 check_nil(a, c)?;
             }
             Ok(Condition::CreateCoin(puzzle_hash, amount, a.nil()))
         }
         SOFTFORK => {
-            if (flags & NO_UNKNOWN_CONDS) != 0 {
+            if flags.contains(ConsensusFlags::NO_UNKNOWN_CONDS) {
                 // We don't know of any new softforked-in conditions, so they
                 // are all unknown
                 Err(ValidationErr(c, ErrorCode::InvalidConditionOpcode))
@@ -465,7 +465,7 @@ pub fn parse_args(
         256..=65535 => {
             // All of these conditions are unknown
             // but they have costs
-            if (flags & NO_UNKNOWN_CONDS) != 0 {
+            if flags.contains(ConsensusFlags::NO_UNKNOWN_CONDS) {
                 Err(ValidationErr(c, ErrorCode::InvalidConditionOpcode))
             } else {
                 Ok(Condition::Softfork(compute_unknown_condition_cost(op)))
@@ -555,7 +555,7 @@ pub fn parse_args(
         }
         ASSERT_EPHEMERAL => {
             // this condition does not take any parameters
-            if (flags & STRICT_ARGS_COUNT) != 0 {
+            if flags.contains(ConsensusFlags::STRICT_ARGS_COUNT) {
                 check_nil(a, c)?;
             }
             Ok(Condition::AssertEphemeral)
@@ -574,7 +574,7 @@ pub fn parse_args(
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
             let code = ErrorCode::AssertSecondsAbsoluteFailed;
-            match sanitize_uint(a, node, 4, code)? {
+            match sanitize_uint(a, node, 8, code)? {
                 SanitizedUint::PositiveOverflow => Err(ValidationErr(node, code)),
                 SanitizedUint::NegativeOverflow => Ok(Condition::Skip),
                 SanitizedUint::Ok(r) => Ok(Condition::AssertSecondsAbsolute(r)),
@@ -648,7 +648,7 @@ pub fn parse_args(
             c = rest(a, c)?;
             let dst = SpendId::parse(a, &mut c, (mode & 0b111) as u8)?;
 
-            if (flags & STRICT_ARGS_COUNT) != 0 {
+            if flags.contains(ConsensusFlags::STRICT_ARGS_COUNT) {
                 check_nil(a, c)?;
             }
 
@@ -665,7 +665,7 @@ pub fn parse_args(
             c = rest(a, c)?;
             let src = SpendId::parse(a, &mut c, ((mode >> 3) & 0b111) as u8)?;
 
-            if (flags & STRICT_ARGS_COUNT) != 0 {
+            if flags.contains(ConsensusFlags::STRICT_ARGS_COUNT) {
                 check_nil(a, c)?;
             }
             Ok(Condition::ReceiveMessage(
@@ -931,7 +931,7 @@ pub fn process_single_spend<'a, V: SpendVisitor>(
     puzzle_hash: NodePtr,
     amount: NodePtr,
     conditions: NodePtr,
-    flags: u32,
+    flags: ConsensusFlags,
     max_cost: &mut Cost,
     clvm_cost: Cost,
     constants: &ConsensusConstants,
@@ -1014,7 +1014,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
     state: &mut ParseState,
     mut spend: SpendConditions,
     mut iter: NodePtr,
-    flags: u32,
+    flags: ConsensusFlags,
     max_cost: &mut Cost,
     constants: &ConsensusConstants,
     visitor: &mut V,
@@ -1027,7 +1027,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
 
         let Some(op) = parse_opcode(a, first(a, c)?, flags) else {
             // in strict mode we don't allow unknown conditions
-            if (flags & NO_UNKNOWN_CONDS) != 0 {
+            if flags.contains(ConsensusFlags::NO_UNKNOWN_CONDS) {
                 return Err(ValidationErr(c, ErrorCode::InvalidConditionOpcode));
             }
             // in non-strict mode, we just ignore unknown conditions
@@ -1062,7 +1062,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
             }
             _ => {}
         }
-        if (flags & COST_CONDITIONS) != 0 {
+        if flags.contains(ConsensusFlags::COST_CONDITIONS) {
             if free_condition_countdown == 0 {
                 if *max_cost < GENERIC_CONDITION_COST {
                     return Err(ValidationErr(c, ErrorCode::CostExceeded));
@@ -1244,44 +1244,44 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
                 }
             }
             Condition::CreateCoinAnnouncement(msg) => {
-                if (flags & COST_CONDITIONS) == 0 {
+                if !flags.contains(ConsensusFlags::COST_CONDITIONS) {
                     decrement(&mut announce_countdown, msg)?;
                 }
                 state.announce_coin.insert((spend.coin_id.clone(), msg));
             }
             Condition::CreatePuzzleAnnouncement(msg) => {
-                if flags & COST_CONDITIONS == 0 {
+                if !flags.contains(ConsensusFlags::COST_CONDITIONS) {
                     decrement(&mut announce_countdown, msg)?;
                 }
                 state.announce_puzzle.insert((spend.puzzle_hash, msg));
             }
             Condition::AssertCoinAnnouncement(msg) => {
-                if flags & COST_CONDITIONS == 0 {
+                if !flags.contains(ConsensusFlags::COST_CONDITIONS) {
                     decrement(&mut announce_countdown, msg)?;
                 }
                 state.assert_coin.insert(msg);
             }
             Condition::AssertPuzzleAnnouncement(msg) => {
-                if flags & COST_CONDITIONS == 0 {
+                if !flags.contains(ConsensusFlags::COST_CONDITIONS) {
                     decrement(&mut announce_countdown, msg)?;
                 }
                 state.assert_puzzle.insert(msg);
             }
             Condition::AssertConcurrentSpend(id) => {
-                if flags & COST_CONDITIONS == 0 {
+                if !flags.contains(ConsensusFlags::COST_CONDITIONS) {
                     decrement(&mut announce_countdown, id)?;
                 }
                 state.assert_concurrent_spend.insert(id);
             }
             Condition::AssertConcurrentPuzzle(id) => {
-                if flags & COST_CONDITIONS == 0 {
+                if !flags.contains(ConsensusFlags::COST_CONDITIONS) {
                     decrement(&mut announce_countdown, id)?;
                 }
                 state.assert_concurrent_puzzle.insert(id);
             }
             Condition::AggSigMe(pk, msg) => {
                 spend.agg_sig_me.push((to_key(a, pk)?, msg));
-                if (flags & DONT_VALIDATE_SIGNATURE) == 0 {
+                if !flags.contains(ConsensusFlags::DONT_VALIDATE_SIGNATURE) {
                     let mut msg = a.atom(msg).as_ref().to_vec();
                     msg.extend((*spend.coin_id).as_slice());
                     msg.extend(constants.agg_sig_me_additional_data.as_slice());
@@ -1290,7 +1290,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
             }
             Condition::AggSigParent(pk, msg) => {
                 spend.agg_sig_parent.push((to_key(a, pk)?, msg));
-                if (flags & DONT_VALIDATE_SIGNATURE) == 0 {
+                if !flags.contains(ConsensusFlags::DONT_VALIDATE_SIGNATURE) {
                     let mut msg = a.atom(msg).as_ref().to_vec();
                     msg.extend(a.atom(spend.parent_id).as_ref());
                     msg.extend(constants.agg_sig_parent_additional_data.as_slice());
@@ -1299,7 +1299,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
             }
             Condition::AggSigPuzzle(pk, msg) => {
                 spend.agg_sig_puzzle.push((to_key(a, pk)?, msg));
-                if (flags & DONT_VALIDATE_SIGNATURE) == 0 {
+                if !flags.contains(ConsensusFlags::DONT_VALIDATE_SIGNATURE) {
                     let mut msg = a.atom(msg).as_ref().to_vec();
                     msg.extend(a.atom(spend.puzzle_hash).as_ref());
                     msg.extend(constants.agg_sig_puzzle_additional_data.as_slice());
@@ -1308,7 +1308,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
             }
             Condition::AggSigAmount(pk, msg) => {
                 spend.agg_sig_amount.push((to_key(a, pk)?, msg));
-                if (flags & DONT_VALIDATE_SIGNATURE) == 0 {
+                if !flags.contains(ConsensusFlags::DONT_VALIDATE_SIGNATURE) {
                     let mut msg = a.atom(msg).as_ref().to_vec();
                     msg.extend(u64_to_bytes(spend.coin_amount).as_slice());
                     msg.extend(constants.agg_sig_amount_additional_data.as_slice());
@@ -1317,7 +1317,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
             }
             Condition::AggSigPuzzleAmount(pk, msg) => {
                 spend.agg_sig_puzzle_amount.push((to_key(a, pk)?, msg));
-                if (flags & DONT_VALIDATE_SIGNATURE) == 0 {
+                if !flags.contains(ConsensusFlags::DONT_VALIDATE_SIGNATURE) {
                     let mut msg = a.atom(msg).as_ref().to_vec();
                     msg.extend(a.atom(spend.puzzle_hash).as_ref());
                     msg.extend(u64_to_bytes(spend.coin_amount).as_slice());
@@ -1327,7 +1327,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
             }
             Condition::AggSigParentAmount(pk, msg) => {
                 spend.agg_sig_parent_amount.push((to_key(a, pk)?, msg));
-                if (flags & DONT_VALIDATE_SIGNATURE) == 0 {
+                if !flags.contains(ConsensusFlags::DONT_VALIDATE_SIGNATURE) {
                     let mut msg = a.atom(msg).as_ref().to_vec();
                     msg.extend(a.atom(spend.parent_id).as_ref());
                     msg.extend(u64_to_bytes(spend.coin_amount).as_slice());
@@ -1337,7 +1337,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
             }
             Condition::AggSigParentPuzzle(pk, msg) => {
                 spend.agg_sig_parent_puzzle.push((to_key(a, pk)?, msg));
-                if (flags & DONT_VALIDATE_SIGNATURE) == 0 {
+                if !flags.contains(ConsensusFlags::DONT_VALIDATE_SIGNATURE) {
                     let mut msg = a.atom(msg).as_ref().to_vec();
                     msg.extend(a.atom(spend.parent_id).as_ref());
                     msg.extend(a.atom(spend.puzzle_hash).as_ref());
@@ -1350,7 +1350,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
                 // suffix added to other AGG_SIG_* conditions
                 check_agg_sig_unsafe_message(a, msg, constants)?;
                 ret.agg_sig_unsafe.push((to_key(a, pk)?, msg));
-                if (flags & DONT_VALIDATE_SIGNATURE) == 0 {
+                if !flags.contains(ConsensusFlags::DONT_VALIDATE_SIGNATURE) {
                     state
                         .pkm_pairs
                         .push((to_key(a, pk)?, a.atom(msg).as_ref().to_vec().into()));
@@ -1365,7 +1365,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
                 spend.condition_cost += cost;
             }
             Condition::SendMessage(src_mode, dst, msg) => {
-                if flags & COST_CONDITIONS == 0 {
+                if !flags.contains(ConsensusFlags::COST_CONDITIONS) {
                     decrement(&mut announce_countdown, msg)?;
                 }
                 let src = SpendId::from_self(
@@ -1383,7 +1383,7 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
                 });
             }
             Condition::ReceiveMessage(src, dst_mode, msg) => {
-                if flags & COST_CONDITIONS == 0 {
+                if !flags.contains(ConsensusFlags::COST_CONDITIONS) {
                     decrement(&mut announce_countdown, msg)?;
                 }
                 let dst = SpendId::from_self(
@@ -1446,7 +1446,7 @@ pub fn parse_spends<V: SpendVisitor>(
     spends: NodePtr,
     max_cost: Cost,
     clvm_cost: Cost,
-    flags: u32,
+    flags: ConsensusFlags,
     aggregate_signature: &Signature,
     bls_cache: Option<&BlsCache>,
     constants: &ConsensusConstants,
@@ -1484,7 +1484,7 @@ pub fn parse_spends<V: SpendVisitor>(
     V::post_process(a, &state, &mut ret)?;
     validate_conditions(a, &ret, &state, spends, flags)?;
     validate_signature(&state, aggregate_signature, flags, bls_cache)?;
-    ret.validated_signature = (flags & DONT_VALIDATE_SIGNATURE) == 0;
+    ret.validated_signature = !flags.contains(ConsensusFlags::DONT_VALIDATE_SIGNATURE);
 
     ret.cost = max_cost - cost_left;
     Ok(ret)
@@ -1495,7 +1495,7 @@ pub fn validate_conditions(
     ret: &SpendBundleConditions,
     state: &ParseState,
     spends: NodePtr,
-    _flags: u32,
+    _flags: ConsensusFlags,
 ) -> Result<(), ValidationErr> {
     if ret.removal_amount < ret.addition_amount {
         // The sum of removal amounts must not be less than the sum of addition
@@ -1661,10 +1661,10 @@ pub fn validate_conditions(
 pub fn validate_signature(
     state: &ParseState,
     signature: &Signature,
-    flags: u32,
+    flags: ConsensusFlags,
     bls_cache: Option<&BlsCache>,
 ) -> Result<(), ValidationErr> {
-    if (flags & DONT_VALIDATE_SIGNATURE) != 0 {
+    if flags.contains(ConsensusFlags::DONT_VALIDATE_SIGNATURE) {
         return Ok(());
     }
 
@@ -1692,6 +1692,8 @@ pub fn validate_signature(
 
 #[cfg(test)]
 use crate::consensus_constants::TEST_CONSTANTS;
+#[cfg(test)]
+use crate::flags::MEMPOOL_MODE;
 #[cfg(test)]
 use chia_protocol::Bytes48;
 #[cfg(test)]
@@ -1926,7 +1928,7 @@ fn parse_list(a: &mut Allocator, input: &str, callback: &Callback) -> NodePtr {
 #[allow(clippy::needless_pass_by_value)]
 fn cond_test_cb(
     input: &str,
-    flags: u32,
+    flags: ConsensusFlags,
     callback: Callback,
     signature: &Signature,
     bls_cache: Option<&BlsCache>,
@@ -1961,9 +1963,6 @@ fn cond_test_cb(
 }
 
 #[cfg(test)]
-use crate::flags::MEMPOOL_MODE;
-
-#[cfg(test)]
 use clvm_traits::ToClvm;
 
 #[cfg(test)]
@@ -1975,7 +1974,7 @@ fn cond_test(input: &str) -> Result<(Allocator, SpendBundleConditions), Validati
 #[cfg(test)]
 fn cond_test_flag(
     input: &str,
-    flags: u32,
+    flags: ConsensusFlags,
 ) -> Result<(Allocator, SpendBundleConditions), ValidationErr> {
     cond_test_cb(input, flags, None, &Signature::default(), None)
 }
@@ -1985,7 +1984,7 @@ fn cond_test_sig(
     input: &str,
     signature: &Signature,
     bls_cache: Option<&BlsCache>,
-    flags: u32,
+    flags: ConsensusFlags,
 ) -> Result<(Allocator, SpendBundleConditions), ValidationErr> {
     cond_test_cb(input, flags, None, signature, bls_cache)
 }
@@ -2011,7 +2010,11 @@ fn test_invalid_condition_args_terminator() {
     // we only look at the condition arguments the condition expects, any
     // additional arguments are ignored, including the terminator
     // ASSERT_SECONDS_RELATIVE
-    let (a, conds) = cond_test_flag("((({h1} ({h2} (123 (((80 (50 8 ))))", 0).unwrap();
+    let (a, conds) = cond_test_flag(
+        "((({h1} ({h2} (123 (((80 (50 8 ))))",
+        ConsensusFlags::empty(),
+    )
+    .unwrap();
 
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
@@ -2038,7 +2041,11 @@ fn test_invalid_condition_args_terminator_mempool() {
 #[test]
 fn test_invalid_condition_list_terminator() {
     // ASSERT_SECONDS_RELATIVE
-    let (a, conds) = cond_test_flag("((({h1} ({h2} (123 (((80 (50 8 ))))", 0).unwrap();
+    let (a, conds) = cond_test_flag(
+        "((({h1} ({h2} (123 (((80 (50 8 ))))",
+        ConsensusFlags::empty(),
+    )
+    .unwrap();
 
     assert_eq!(conds.cost, 0);
     assert_eq!(conds.spends.len(), 1);
@@ -2129,7 +2136,7 @@ fn test_invalid_spend_list_terminator() {
 fn test_strict_args_count(
     #[case] condition: ConditionOpcode,
     #[case] arg: &str,
-    #[values(STRICT_ARGS_COUNT, 0)] flags: u32,
+    #[values(ConsensusFlags::STRICT_ARGS_COUNT, ConsensusFlags::empty())] flags: ConsensusFlags,
 ) {
     // extra args are disallowed when STRICT_ARGS_COUNT is set
     let ret = cond_test_flag(
@@ -2137,9 +2144,9 @@ fn test_strict_args_count(
             "((({{h1}} ({{h2}} (123 ((({} ({} ( 1337 )))))",
             condition as u8, arg
         ),
-        flags | DONT_VALIDATE_SIGNATURE,
+        flags | ConsensusFlags::DONT_VALIDATE_SIGNATURE,
     );
-    if flags == 0 {
+    if flags.is_empty() {
         // two of the cases won't pass, even when garbage at the end is allowed.
         if condition == ASSERT_COIN_ANNOUNCEMENT {
             assert_eq!(ret.unwrap_err().1, ErrorCode::AssertCoinAnnouncementFailed,);
@@ -2171,7 +2178,7 @@ fn test_message_strict_args_count(
     #[case] mode: u8,
     #[case] msg: &str,
     #[case] arg: &str,
-    #[values(STRICT_ARGS_COUNT, 0)] flags: u32,
+    #[values(ConsensusFlags::STRICT_ARGS_COUNT, ConsensusFlags::empty())] flags: ConsensusFlags,
 ) {
     // extra args are disallowed when STRICT_ARG_COUNT is set
     // pad determines whether the extra (unknown) argument is added to the
@@ -2182,9 +2189,9 @@ fn test_message_strict_args_count(
         &format!(
             "((({{h1}} ({{h2}} (123 (((66 ({mode} ({msg} {arg} {extra1} ) ((67 ({mode} ({msg} {extra2} ) ))))"
         ),
-        flags | DONT_VALIDATE_SIGNATURE,
+        flags | ConsensusFlags::DONT_VALIDATE_SIGNATURE,
     );
-    if flags == 0 {
+    if flags.is_empty() {
         ret.unwrap();
     } else {
         assert_eq!(ret.unwrap_err().1, ErrorCode::InvalidCondition);
@@ -2260,7 +2267,7 @@ fn test_extra_arg(
         ),
         &signature,
         None,
-        0,
+        ConsensusFlags::empty(),
     )
     .unwrap();
 
@@ -2289,21 +2296,27 @@ fn test_extra_arg(
 #[cfg(test)]
 #[rstest]
 #[case(ASSERT_SECONDS_ABSOLUTE, "104", |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.seconds_absolute, 104))]
+#[case(ASSERT_SECONDS_ABSOLUTE, "0x008000000000000000", |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.seconds_absolute, 0x8000_0000_0000_0000))]
 #[case(ASSERT_SECONDS_ABSOLUTE, "0", |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.seconds_absolute, 0))]
 #[case(ASSERT_SECONDS_ABSOLUTE, "-1", |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.seconds_absolute, 0))]
 #[case(ASSERT_SECONDS_RELATIVE, "101", |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.seconds_relative, Some(101)))]
+#[case(ASSERT_SECONDS_RELATIVE, "0x008000000000000000", |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.seconds_relative, Some(0x8000_0000_0000_0000)))]
 #[case(ASSERT_SECONDS_RELATIVE, "0", |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.seconds_relative, Some(0)))]
 #[case(ASSERT_SECONDS_RELATIVE, "-1", |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.seconds_relative, None))]
 #[case(ASSERT_HEIGHT_RELATIVE, "101", |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.height_relative, Some(101)))]
+#[case(ASSERT_HEIGHT_RELATIVE, "0x0080000000", |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.height_relative, Some(0x8000_0000)))]
 #[case(ASSERT_HEIGHT_RELATIVE, "0", |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.height_relative, Some(0)))]
 #[case(ASSERT_HEIGHT_RELATIVE, "-1", |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.height_relative, None))]
 #[case(ASSERT_HEIGHT_ABSOLUTE, "100", |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.height_absolute, 100))]
+#[case(ASSERT_HEIGHT_ABSOLUTE, "0x0080000000", |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.height_absolute, 0x8000_0000))]
 #[case(ASSERT_HEIGHT_ABSOLUTE, "-1", |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.height_absolute, 0))]
+#[case(ASSERT_BEFORE_SECONDS_ABSOLUTE, "0x008000000000000000", |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.before_seconds_absolute, Some(0x8000_0000_0000_0000)))]
 #[case(ASSERT_BEFORE_SECONDS_ABSOLUTE, "104", |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.before_seconds_absolute, Some(104)))]
 #[case(ASSERT_BEFORE_SECONDS_RELATIVE, "101", |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.before_seconds_relative, Some(101)))]
 #[case(ASSERT_BEFORE_SECONDS_RELATIVE, "0", |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.before_seconds_relative, Some(0)))]
 #[case(ASSERT_BEFORE_HEIGHT_RELATIVE, "101", |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.before_height_relative, Some(101)))]
 #[case(ASSERT_BEFORE_HEIGHT_RELATIVE, "0", |_: &SpendBundleConditions, s: &SpendConditions| assert_eq!(s.before_height_relative, Some(0)))]
+#[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, "0x0080000000", |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.before_height_absolute, Some(0x8000_0000)))]
 #[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, "100", |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.before_height_absolute, Some(100)))]
 #[case(RESERVE_FEE, "100", |c: &SpendBundleConditions, _: &SpendConditions| assert_eq!(c.reserve_fee, 100))]
 #[case(ASSERT_MY_AMOUNT, "123", |_: &SpendBundleConditions, _: &SpendConditions| {})]
@@ -2511,7 +2524,7 @@ fn test_missing_arg(#[case] condition: ConditionOpcode) {
     assert_eq!(
         cond_test_flag(
             &format!("((({{h1}} ({{h2}} (123 ((({} )))))", condition as u8),
-            0
+            ConsensusFlags::empty()
         )
         .unwrap_err()
         .1,
@@ -2698,9 +2711,12 @@ fn test_single_assert_my_amount_overlong() {
     // ASSERT_MY_AMOUNT
     // leading zeroes are disallowed
     assert_eq!(
-        cond_test_flag("((({h1} ({h2} (123 (((73 (0x0000007b )))))", 0)
-            .unwrap_err()
-            .1,
+        cond_test_flag(
+            "((({h1} ({h2} (123 (((73 (0x0000007b )))))",
+            ConsensusFlags::empty()
+        )
+        .unwrap_err()
+        .1,
         ErrorCode::AssertMyAmountFailed
     );
 }
@@ -2757,9 +2773,12 @@ fn test_single_assert_my_coin_id_overlong() {
     // ASSERT_MY_COIN_ID
     // leading zeros in the coin amount invalid
     assert_eq!(
-        cond_test_flag("((({h1} ({h2} (0x0000007b (((70 ({coin12} )))))", 0)
-            .unwrap_err()
-            .1,
+        cond_test_flag(
+            "((({h1} ({h2} (0x0000007b (((70 ({coin12} )))))",
+            ConsensusFlags::empty()
+        )
+        .unwrap_err()
+        .1,
         ErrorCode::InvalidCoinAmount
     );
 }
@@ -2990,8 +3009,11 @@ fn test_create_coin_with_hint() {
 fn test_create_coin_extra_arg() {
     // CREATE_COIN
     // extra args are allowed in non-mempool mode
-    let (a, conds) =
-        cond_test_flag("((({h1} ({h2} (123 (((51 ({h2} (42 (({h1}) (1337 )))))", 0).unwrap();
+    let (a, conds) = cond_test_flag(
+        "((({h1} ({h2} (123 (((51 ({h2} (42 (({h1}) (1337 )))))",
+        ConsensusFlags::empty(),
+    )
+    .unwrap();
 
     assert_eq!(conds.cost, CREATE_COIN_COST);
     assert_eq!(conds.spends.len(), 1);
@@ -3055,7 +3077,11 @@ fn test_create_coin_with_hint_as_atom() {
 #[test]
 fn test_create_coin_with_invalid_hint_as_terminator() {
     // CREATE_COIN
-    let (a, conds) = cond_test_flag("((({h1} ({h2} (123 (((51 ({h2} (42 {h1}))))", 0).unwrap();
+    let (a, conds) = cond_test_flag(
+        "((({h1} ({h2} (123 (((51 ({h2} (42 {h1}))))",
+        ConsensusFlags::empty(),
+    )
+    .unwrap();
 
     assert_eq!(conds.cost, CREATE_COIN_COST);
     assert_eq!(conds.spends.len(), 1);
@@ -3209,7 +3235,7 @@ fn test_create_coin_exceed_cost() {
     assert_eq!(
         cond_test_cb(
             "((({h1} ({h2} (123 ({} )))",
-            0,
+            ConsensusFlags::empty(),
             Some(Box::new(|a: &mut Allocator| -> NodePtr {
                 let mut rest: NodePtr = a.nil();
 
@@ -3282,7 +3308,7 @@ fn agg_sig_vec(c: ConditionOpcode, s: &SpendConditions) -> &[(PublicKey, NodePtr
 #[case(AGG_SIG_PARENT_AMOUNT)]
 fn test_single_agg_sig_me(
     #[case] condition: ConditionOpcode,
-    #[values(MEMPOOL_MODE, 0)] mempool: u32,
+    #[values(MEMPOOL_MODE, ConsensusFlags::empty())] mempool: ConsensusFlags,
 ) {
     let signature = sign_tx(H1, H2, 123, condition, MSG1);
     let (a, conds) = cond_test_sig(
@@ -3321,13 +3347,13 @@ fn test_single_agg_sig_me(
 #[case(AGG_SIG_PARENT_AMOUNT)]
 fn test_duplicate_agg_sig(
     #[case] condition: ConditionOpcode,
-    #[values(MEMPOOL_MODE, 0)] mempool: u32,
+    #[values(MEMPOOL_MODE, ConsensusFlags::empty())] mempool: ConsensusFlags,
 ) {
     // we cannot deduplicate AGG_SIG conditions. Their signatures will be
     // aggregated, and so must all copies of the public keys
     let (a, conds) =
         cond_test_flag(&format!("((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{msg1}} ) (({} ({{pubkey}} ({{msg1}} ) ))))", condition as u8, condition as u8),
-            mempool | DONT_VALIDATE_SIGNATURE)
+            mempool | ConsensusFlags::DONT_VALIDATE_SIGNATURE)
             .unwrap();
 
     assert_eq!(conds.cost, AGG_SIG_COST * 2);
@@ -3359,7 +3385,7 @@ fn test_duplicate_agg_sig(
 #[case(AGG_SIG_UNSAFE)]
 fn test_agg_sig_invalid_pubkey(
     #[case] condition: ConditionOpcode,
-    #[values(MEMPOOL_MODE, 0)] mempool: u32,
+    #[values(MEMPOOL_MODE, ConsensusFlags::empty())] mempool: ConsensusFlags,
 ) {
     assert_eq!(
         cond_test_flag(
@@ -3367,7 +3393,7 @@ fn test_agg_sig_invalid_pubkey(
                 "((({{h1}} ({{h2}} (123 ((({} ({{h2}} ({{msg1}} )))))",
                 condition as u8
             ),
-            mempool | DONT_VALIDATE_SIGNATURE
+            mempool | ConsensusFlags::DONT_VALIDATE_SIGNATURE
         )
         .unwrap_err()
         .1,
@@ -3387,7 +3413,7 @@ fn test_agg_sig_invalid_pubkey(
 #[case(AGG_SIG_UNSAFE)]
 fn test_agg_sig_infinity_pubkey(
     #[case] condition: ConditionOpcode,
-    #[values(MEMPOOL_MODE, 0)] mempool: u32,
+    #[values(MEMPOOL_MODE, ConsensusFlags::empty())] mempool: ConsensusFlags,
 ) {
     let ret = cond_test_flag(
         &format!(
@@ -3411,7 +3437,7 @@ fn test_agg_sig_infinity_pubkey(
 #[case(AGG_SIG_PARENT_AMOUNT)]
 fn test_agg_sig_invalid_msg(
     #[case] condition: ConditionOpcode,
-    #[values(MEMPOOL_MODE, 0)] mempool: u32,
+    #[values(MEMPOOL_MODE, ConsensusFlags::empty())] mempool: ConsensusFlags,
 ) {
     assert_eq!(
         cond_test_flag(
@@ -3441,7 +3467,7 @@ fn test_agg_sig_exceed_cost(#[case] condition: ConditionOpcode) {
     assert_eq!(
         cond_test_cb(
             "((({h1} ({h2} (123 ({} )))",
-            0,
+            ConsensusFlags::empty(),
             Some(Box::new(move |a: &mut Allocator| -> NodePtr {
                 let mut rest: NodePtr = a.nil();
 
@@ -3477,7 +3503,7 @@ fn test_single_agg_sig_unsafe() {
         "((({h1} ({h2} (123 (((49 ({pubkey} ({msg1} )))))",
         &signature,
         None,
-        0,
+        ConsensusFlags::empty(),
     )
     .unwrap();
 
@@ -3513,7 +3539,7 @@ fn test_agg_sig_extra_arg(#[case] condition: ConditionOpcode) {
             "((({{h1}} ({{h2}} (123 ((({} ({{pubkey}} ({{msg1}} ( 1337 ) ))))",
             condition as u8
         ),
-        DONT_VALIDATE_SIGNATURE,
+        ConsensusFlags::DONT_VALIDATE_SIGNATURE,
     )
     .unwrap();
 
@@ -3553,7 +3579,7 @@ fn test_agg_sig_unsafe_invalid_terminator() {
         "((({h1} ({h2} (123 (((49 ({pubkey} ({msg1} 456 ))))",
         &signature,
         None,
-        0,
+        ConsensusFlags::empty(),
     )
     .unwrap();
 
@@ -3582,7 +3608,7 @@ fn test_agg_sig_me_invalid_terminator() {
         "((({h1} ({h2} (123 (((50 ({pubkey} ({msg1} 456 ))))",
         &signature,
         None,
-        0,
+        ConsensusFlags::empty(),
     )
     .unwrap();
 
@@ -3611,7 +3637,7 @@ fn test_duplicate_agg_sig_unsafe() {
         "((({h1} ({h2} (123 (((49 ({pubkey} ({msg1} ) ((49 ({pubkey} ({msg1} ) ))))",
         &signature,
         None,
-        0,
+        ConsensusFlags::empty(),
     )
     .unwrap();
 
@@ -3664,11 +3690,10 @@ fn final_message(
     use crate::make_aggsig_final_message::make_aggsig_final_message;
     use crate::owned_conditions::OwnedSpendConditions;
     use chia_protocol::Coin;
-    use clvmr::LIMIT_HEAP;
 
     let coin = Coin::new(Bytes32::from(parent), Bytes32::from(puzzle), amount);
 
-    let mut a: Allocator = make_allocator(LIMIT_HEAP);
+    let mut a: Allocator = make_allocator(ConsensusFlags::LIMIT_HEAP);
     let spend = SpendConditions::new(
         a.new_atom(parent.as_slice()).expect("should pass"),
         amount,
@@ -3733,7 +3758,7 @@ fn test_agg_sig_unsafe_invalid_msg(
         format!("((({{h1}} ({{h2}} (123 ((({opcode} ({{pubkey}} ({msg} )))))").as_str(),
         &signature,
         None,
-        0,
+        ConsensusFlags::empty(),
     );
     if opcode == AGG_SIG_UNSAFE {
         assert_eq!(ret.unwrap_err().1, ErrorCode::InvalidMessage);
@@ -3749,7 +3774,7 @@ fn test_agg_sig_unsafe_exceed_cost() {
     assert_eq!(
         cond_test_cb(
             "((({h1} ({h2} (123 ({} )))",
-            0,
+            ConsensusFlags::empty(),
             Some(Box::new(|a: &mut Allocator| -> NodePtr {
                 let mut rest: NodePtr = a.nil();
 
@@ -4134,7 +4159,7 @@ fn test_assert_concurrent_puzzle_self() {
 fn test_cost_all_conds_after_free(#[case] count: usize) {
     let r = cond_test_cb(
         "((({h1} ({h2} (123 ({} )))",
-        COST_CONDITIONS,
+        ConsensusFlags::COST_CONDITIONS,
         Some(Box::new(move |a: &mut Allocator| -> NodePtr {
             let mut rest: NodePtr = a.nil();
 
@@ -4173,7 +4198,7 @@ fn test_cost_all_conds_after_free(#[case] count: usize) {
 fn test_cost_create_coins_conds_after_free(#[case] count: usize) {
     let r = cond_test_cb(
         "((({h1} ({h2} (1230000000000 ({} )))",
-        COST_CONDITIONS,
+        ConsensusFlags::COST_CONDITIONS,
         Some(Box::new(move |a: &mut Allocator| -> NodePtr {
             let mut rest: NodePtr = a.nil();
 
@@ -4222,7 +4247,7 @@ fn test_cost_aggsig_conds_after_free(#[case] count: usize) {
     }
     let r = cond_test_cb(
         "((({h1} ({h2} (1230000000000 ({} )))",
-        COST_CONDITIONS,
+        ConsensusFlags::COST_CONDITIONS,
         Some(Box::new(move |a: &mut Allocator| -> NodePtr {
             let mut rest: NodePtr = a.nil();
 
@@ -4821,8 +4846,11 @@ fn test_relative_condition_on_ephemeral(
 #[case("((0xff01 )", 106)]
 fn test_softfork_condition(#[case] conditions: &str, #[case] expected_cost: Cost) {
     // SOFTFORK (90)
-    let (_, spends) =
-        cond_test_flag(&format!("((({{h1}} ({{h2}} (1234 ({conditions}))))"), 0).unwrap();
+    let (_, spends) = cond_test_flag(
+        &format!("((({{h1}} ({{h2}} (1234 ({conditions}))))"),
+        ConsensusFlags::empty(),
+    )
+    .unwrap();
     assert_eq!(spends.cost, expected_cost);
 }
 
@@ -4838,108 +4866,116 @@ fn test_softfork_condition(#[case] conditions: &str, #[case] expected_cost: Cost
 fn test_softfork_condition_failures(#[case] conditions: &str, #[case] expected_err: ErrorCode) {
     // SOFTFORK (90)
     assert_eq!(
-        cond_test_flag(&format!("((({{h1}} ({{h2}} (1234 ({conditions}))))"), 0)
-            .unwrap_err()
-            .1,
+        cond_test_flag(
+            &format!("((({{h1}} ({{h2}} (1234 ({conditions}))))"),
+            ConsensusFlags::empty()
+        )
+        .unwrap_err()
+        .1,
         expected_err
     );
 }
 
 #[cfg(test)]
 #[rstest]
-#[case(CREATE_PUZZLE_ANNOUNCEMENT, 1000, 0, None)]
+#[case(CREATE_PUZZLE_ANNOUNCEMENT, 1000, ConsensusFlags::empty(), None)]
 #[case(
     CREATE_PUZZLE_ANNOUNCEMENT,
     1025,
-    0,
+    ConsensusFlags::empty(),
     Some(ErrorCode::TooManyAnnouncements)
 )]
 #[case(
     ASSERT_PUZZLE_ANNOUNCEMENT,
     1024,
-    0,
+    ConsensusFlags::empty(),
     Some(ErrorCode::AssertPuzzleAnnouncementFailed)
 )]
 #[case(
     ASSERT_PUZZLE_ANNOUNCEMENT,
     1025,
-    0,
+    ConsensusFlags::empty(),
     Some(ErrorCode::TooManyAnnouncements)
 )]
-#[case(CREATE_COIN_ANNOUNCEMENT, 1000, 0, None)]
+#[case(CREATE_COIN_ANNOUNCEMENT, 1000, ConsensusFlags::empty(), None)]
 #[case(
     CREATE_COIN_ANNOUNCEMENT,
     1025,
-    0,
+    ConsensusFlags::empty(),
     Some(ErrorCode::TooManyAnnouncements)
 )]
 #[case(
     ASSERT_COIN_ANNOUNCEMENT,
     1024,
-    0,
+    ConsensusFlags::empty(),
     Some(ErrorCode::AssertCoinAnnouncementFailed)
 )]
 #[case(
     ASSERT_COIN_ANNOUNCEMENT,
     1025,
-    0,
+    ConsensusFlags::empty(),
     Some(ErrorCode::TooManyAnnouncements)
 )]
 #[case(
     ASSERT_CONCURRENT_SPEND,
     1024,
-    0,
+    ConsensusFlags::empty(),
     Some(ErrorCode::AssertConcurrentSpendFailed)
 )]
 #[case(
     ASSERT_CONCURRENT_SPEND,
     1025,
-    0,
+    ConsensusFlags::empty(),
     Some(ErrorCode::TooManyAnnouncements)
 )]
 #[case(
     ASSERT_CONCURRENT_PUZZLE,
     1024,
-    0,
+    ConsensusFlags::empty(),
     Some(ErrorCode::AssertConcurrentPuzzleFailed)
 )]
 #[case(
     ASSERT_CONCURRENT_PUZZLE,
     1025,
-    0,
+    ConsensusFlags::empty(),
     Some(ErrorCode::TooManyAnnouncements)
 )]
 // new flag tests
-#[case(CREATE_PUZZLE_ANNOUNCEMENT, 1025, COST_CONDITIONS, None)]
+#[case(
+    CREATE_PUZZLE_ANNOUNCEMENT,
+    1025,
+    ConsensusFlags::COST_CONDITIONS,
+    None
+)]
 #[case(
     ASSERT_PUZZLE_ANNOUNCEMENT,
     1025,
-    COST_CONDITIONS,
+    ConsensusFlags::COST_CONDITIONS,
     Some(ErrorCode::AssertPuzzleAnnouncementFailed)
 )]
-#[case(CREATE_COIN_ANNOUNCEMENT, 1025, COST_CONDITIONS, None)]
+#[case(CREATE_COIN_ANNOUNCEMENT, 1025, ConsensusFlags::COST_CONDITIONS, None)]
 #[case(
     ASSERT_COIN_ANNOUNCEMENT,
     1025,
-    COST_CONDITIONS,
+    ConsensusFlags::COST_CONDITIONS,
     Some(ErrorCode::AssertCoinAnnouncementFailed)
 )]
 #[case(
     ASSERT_CONCURRENT_SPEND,
     1025,
-    COST_CONDITIONS,
+    ConsensusFlags::COST_CONDITIONS,
     Some(ErrorCode::AssertConcurrentSpendFailed)
 )]
 #[case(
     ASSERT_CONCURRENT_PUZZLE,
     1025,
-    COST_CONDITIONS,
+    ConsensusFlags::COST_CONDITIONS,
     Some(ErrorCode::AssertConcurrentPuzzleFailed)
 )]
 fn test_limit_announcements(
     #[case] cond: ConditionOpcode,
     #[case] count: i32,
-    #[case] flag: u32,
+    #[case] flag: ConsensusFlags,
     #[case] expect_err: Option<ErrorCode>,
 ) {
     let r = cond_test_cb(
@@ -4985,7 +5021,8 @@ fn test_eligible_for_ff_assert_parent() {
            ))\
        ))";
 
-    let (_a, cond) = cond_test_flag(test, DONT_VALIDATE_SIGNATURE).expect("cond_test");
+    let (_a, cond) =
+        cond_test_flag(test, ConsensusFlags::DONT_VALIDATE_SIGNATURE).expect("cond_test");
     assert!(cond.spends.len() == 1);
     assert!((cond.spends[0].flags & ELIGIBLE_FOR_FF) != 0);
 }
@@ -5116,7 +5153,8 @@ fn test_eligible_for_ff_timelocks(
        ))"
     );
 
-    let (_a, cond) = cond_test_flag(test, DONT_VALIDATE_SIGNATURE).expect("cond_test");
+    let (_a, cond) =
+        cond_test_flag(test, ConsensusFlags::DONT_VALIDATE_SIGNATURE).expect("cond_test");
     assert!(cond.spends.len() == 1);
     assert!(if eligible {
         (cond.spends[0].flags & ELIGIBLE_FOR_FF) != 0
@@ -5151,7 +5189,8 @@ fn test_eligible_for_ff_invalid_agg_sig_me(
        ))"
     );
 
-    let (_a, cond) = cond_test_sig(test, &signature, None, 0).expect("cond_test");
+    let (_a, cond) =
+        cond_test_sig(test, &signature, None, ConsensusFlags::empty()).expect("cond_test");
     assert!(cond.spends.len() == 1);
     let flags = cond.spends[0].flags;
     if eligible {
@@ -5237,7 +5276,7 @@ fn test_agg_sig(
     }
     assert_eq!(
         expect_pass,
-        cond_test_sig(puzzle.as_str(), &signature, cache, 0).is_ok()
+        cond_test_sig(puzzle.as_str(), &signature, cache, ConsensusFlags::empty()).is_ok()
     );
 }
 
@@ -5436,12 +5475,12 @@ fn test_message_conditions_single_spend(#[case] test_case: &str, #[case] expect:
 
 #[cfg(test)]
 #[rstest]
-#[case(512, 0, None)]
-#[case(513, 0, Some(ErrorCode::TooManyAnnouncements))]
-#[case(513, COST_CONDITIONS, None)]
+#[case(512, ConsensusFlags::empty(), None)]
+#[case(513, ConsensusFlags::empty(), Some(ErrorCode::TooManyAnnouncements))]
+#[case(513, ConsensusFlags::COST_CONDITIONS, None)]
 fn test_limit_messages(
     #[case] count: i32,
-    #[case] flags: u32,
+    #[case] flags: ConsensusFlags,
     #[case] expect_err: Option<ErrorCode>,
 ) {
     let r = cond_test_cb(
@@ -5900,7 +5939,8 @@ fn test_all_message_conditions() {
             ))\
         ))"
         );
-        let (a, conds) = cond_test_flag(&test, 0).expect("condition expected to pass");
+        let (a, conds) =
+            cond_test_flag(&test, ConsensusFlags::empty()).expect("condition expected to pass");
 
         assert_eq!(conds.cost, 0);
         assert_eq!(conds.spends.len(), 2);
@@ -5971,7 +6011,7 @@ fn test_message_eligible_for_ff() {
        ))"
         );
 
-        let (_a, cond) = cond_test_flag(&test, 0).expect("cond_test");
+        let (_a, cond) = cond_test_flag(&test, ConsensusFlags::empty()).expect("cond_test");
         assert!(cond.spends.len() == 2);
         assert_eq!(
             (cond.spends[0].flags & ELIGIBLE_FOR_FF) != 0,
@@ -5995,7 +6035,7 @@ fn test_message_eligible_for_ff() {
        ))"
         );
 
-        let (_a, cond) = cond_test_flag(&test, 0).expect("cond_test");
+        let (_a, cond) = cond_test_flag(&test, ConsensusFlags::empty()).expect("cond_test");
         assert!(cond.spends.len() == 2);
         assert_eq!(
             (cond.spends[0].flags & ELIGIBLE_FOR_FF) != 0,
@@ -6026,7 +6066,7 @@ fn test_assert_concurrent_spend_ff(#[values(true, false)] is_dedup_id: bool) {
         if is_dedup_id { "{coin12}" } else { "{coin21}" }
     );
 
-    let (_a, cond) = cond_test_flag(&test, 0).expect("cond_test");
+    let (_a, cond) = cond_test_flag(&test, ConsensusFlags::empty()).expect("cond_test");
     assert!(cond.spends.len() == 2);
 
     // If the spend is referenced by ASSERT_CONCURRENT_SPEND, it's not eligible for FF
@@ -6044,7 +6084,7 @@ fn test_dedup_excess_amount() {
            ))\
        ))";
 
-    let (_a, cond) = cond_test_flag(test, 0).expect("cond_test");
+    let (_a, cond) = cond_test_flag(test, ConsensusFlags::empty()).expect("cond_test");
     assert!(cond.spends.len() == 1);
 
     // Not eligible for dedup because the output is less than the input
@@ -6060,7 +6100,7 @@ fn test_dedup_same_amount() {
            ))\
        ))";
 
-    let (_a, cond) = cond_test_flag(test, 0).expect("cond_test");
+    let (_a, cond) = cond_test_flag(test, ConsensusFlags::empty()).expect("cond_test");
     assert!(cond.spends.len() == 1);
 
     // Eligible for dedup because the output is equal to the input
@@ -6077,7 +6117,7 @@ fn test_dedup_absorb_amount() {
            ))\
        ))";
 
-    let (_a, cond) = cond_test_flag(test, 0).expect("cond_test");
+    let (_a, cond) = cond_test_flag(test, ConsensusFlags::empty()).expect("cond_test");
     assert!(cond.spends.len() == 2);
 
     // Eligible for dedup because the output is greater than the input
@@ -6098,7 +6138,7 @@ fn test_dedup_reserve_and_pay_fee() {
            ))\
        ))";
 
-    let (_a, cond) = cond_test_flag(test, 0).expect("cond_test");
+    let (_a, cond) = cond_test_flag(test, ConsensusFlags::empty()).expect("cond_test");
     assert!(cond.spends.len() == 2);
 
     // Not eligible for dedup because the output is less than the input
@@ -6120,7 +6160,7 @@ fn test_dedup_reserve_fee_without_paying() {
            ))\
        ))";
 
-    let (_a, cond) = cond_test_flag(test, 0).expect("cond_test");
+    let (_a, cond) = cond_test_flag(test, ConsensusFlags::empty()).expect("cond_test");
     assert!(cond.spends.len() == 2);
 
     // Eligible for dedup because the output is equal to the input

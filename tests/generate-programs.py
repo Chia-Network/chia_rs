@@ -6,8 +6,7 @@ from clvm.operators import KEYWORD_TO_ATOM
 
 def recursive_cons(filename: str, num: int) -> None:
     with open(filename, "w+") as f:
-        f.write(
-            """
+        f.write("""
 ;(mod (N)
 ;    (defun prepend (V N)
 ;        (if N (c V (prepend V (- N 1) V)) ())
@@ -16,8 +15,7 @@ def recursive_cons(filename: str, num: int) -> None:
 ;)
 
 (a (q 2 2 (c 2 (c (q . 1337) (c 5 ())))) (c (q 2 (i 11 (q 4 5 (a 2 (c 2 (c 5 (c (- 11 (q . 1)) (c 5 ())))))) ()) 1) 1))
-"""
-        )
+""")
 
     with open(filename[:-4] + "env", "w+") as f:
         f.write("(%d)" % num)
@@ -25,8 +23,7 @@ def recursive_cons(filename: str, num: int) -> None:
 
 def many_args(filename: str, op: str, num: int) -> None:
     with open(filename + "-precompiled", "w+") as f:
-        f.write(
-            """
+        f.write("""
 ;(mod (n)
 ;    (defun large-atom (n)
 ;        (if n (lsh (large-atom (- n 1)) 65535) 0x80)
@@ -36,9 +33,7 @@ def many_args(filename: str, op: str, num: int) -> None:
 ;    )
 ;    (raise (large-atom n))
 ;)
-"""
-            % op
-        )
+""" % op)
 
         f.write(
             "(a (q 2 6 (c 2 (c (a 4 (c 2 (c 5 (q)))) (q)))) (c (q (a (i 5 (q 23 (a 4 (c 2 (c (- 5 (q . 1)) (q)))) (q . 0x00ffff)) (q 1 . -128)) 1) %s"
@@ -71,16 +66,13 @@ def many_args(filename: str, op: str, num: int) -> None:
 
 def many_args_point(filename: str, op: str, num: int) -> None:
     with open(filename, "w+") as f:
-        f.write(
-            """;(mod (n)
+        f.write(""";(mod (n)
 ;    (defun raise (atom)
 ;        (%s atom atom atom atom atom atom atom atom atom atom atom atom atom atom)
 ;    )
 ;    (raise (logxor n 0xb3b8ac537f4fd6bde9b26221d49b54b17a506be147347dae5d081c0a6572b611d8484e338f3432971a9823976c6a232b))
 ;)
-"""
-            % op
-        )
+""" % op)
         f.write(
             "(a (q 2 2 (c 2 (c (logxor 5 (q . 0xb3b8ac537f4fd6bde9b26221d49b54b17a506be147347dae5d081c0a6572b611d8484e338f3432971a9823976c6a232b)) (q)))) (c (q %s"
             % op
@@ -95,8 +87,7 @@ def many_args_point(filename: str, op: str, num: int) -> None:
 def softfork_wrap(filename: str, val: str) -> None:
 
     with open(filename, "w+") as f:
-        f.write(
-            """;(mod (n)
+        f.write(""";(mod (n)
 ;    (defun recurse (count)
 ;        (if (= 0 count) 42 (recurse (+ (- count 1) (softfork %s))))
 ;    )
@@ -104,9 +95,7 @@ def softfork_wrap(filename: str, val: str) -> None:
 ;)
 
 (a (q 2 2 (c 2 (c 5 (q)))) (c (q 2 (i (= (q) 5) (q 1 . 42) (q 2 2 (c 2 (c (+ (- 5 (q . 1)) (softfork (q . %s))) (q))))) 1) 1))
-"""
-            % (val, val)
-        )
+""" % (val, val))
 
     with open(filename[:-4] + "env", "w+") as f:
         f.write("(0xffffffff)")
@@ -115,18 +104,14 @@ def softfork_wrap(filename: str, val: str) -> None:
 def binary_recurse(filename: str, op: str, val: str, count: int) -> None:
 
     with open(filename, "w+") as f:
-        f.write(
-            """; (mod (N)
+        f.write("""; (mod (N)
 ;   (defun iter (V N)
 ;     (if (= N 0) V (iter ({op} V V) (- N 1)))
 ;   )
 ;   (iter {val} N)
 ; )
 (a (q 2 2 (c 2 (c (q . {val}) (c 5 ())))) (c (q 2 (i (= 11 ()) (q . 5) (q 2 2 (c 2 (c ({op} 5 5) (c (- 11 (q . 1)) ()))))) 1) 1))
-""".format(
-                op=op, val=val
-            )
-        )
+""".format(op=op, val=val))
 
     with open(filename[:-4] + "env", "w+") as f:
         f.write(f"({count})")
@@ -140,8 +125,7 @@ def unary_recurse(filename: str, op: str, second: str, count: int) -> None:
         quoted_second = ""
 
     with open(filename, "w+") as f:
-        f.write(
-            """; (mod (N)
+        f.write("""; (mod (N)
 ;   (defun large-atom (n)
 ;       (if n (lsh (large-atom (- n 1)) 65535) 0x80)
 ;   )
@@ -151,10 +135,7 @@ def unary_recurse(filename: str, op: str, second: str, count: int) -> None:
 ;   (iter (large-atom 6) N)
 ; )
 (a (q 2 4 (c 2 (c (a 6 (c 2 (q 6))) (c 5 ())))) (c (q (a (i (= 11 ()) (q . 5) (q 2 4 (c 2 (c ({op} 5 {quoted_second}) (c (- 11 (q . 1)) ()))))) 1) 2 (i 5 (q 23 (a 6 (c 2 (c (- 5 (q . 1)) ()))) (q . 0x00ffff)) (q 1 . -128)) 1) 1))
-""".format(
-                op=op, second=second, quoted_second=quoted_second
-            )
-        )
+""".format(op=op, second=second, quoted_second=quoted_second))
 
     with open(filename[:-4] + "env", "w+") as f:
         f.write(f"({count})")

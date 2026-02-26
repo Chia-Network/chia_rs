@@ -4,6 +4,7 @@ use chia_protocol::Coin;
 
 use crate::allocator::make_allocator;
 use crate::consensus_constants::ConsensusConstants;
+use crate::flags::ConsensusFlags;
 use crate::validation_error::{ErrorCode, ValidationErr, atom, first, next, rest};
 use chia_protocol::{Bytes, Bytes32};
 use clvm_traits::FromClvm;
@@ -22,7 +23,7 @@ use clvmr::serde::node_from_bytes_backrefs;
 pub fn additions_and_removals<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
     program: &[u8],
     block_refs: I,
-    flags: u32,
+    flags: ConsensusFlags,
     constants: &ConsensusConstants,
 ) -> Result<(Vec<(Coin, Option<Bytes>)>, Vec<(Bytes32, Coin)>), ValidationErr>
 where
@@ -37,7 +38,7 @@ where
     let program = node_from_bytes_backrefs(&mut a, program)?;
 
     let args = setup_generator_args(&mut a, block_refs, flags)?;
-    let dialect = ChiaDialect::new(flags);
+    let dialect = ChiaDialect::new(flags.to_clvm_flags());
 
     let Reduction(clvm_cost, all_spends) = run_program(&mut a, &dialect, program, args, cost_left)?;
 
@@ -129,7 +130,7 @@ where
 mod test {
     use super::*;
     use crate::consensus_constants::TEST_CONSTANTS;
-    use crate::flags::DONT_VALIDATE_SIGNATURE;
+    use crate::flags::ConsensusFlags;
     use crate::run_block_generator::run_block_generator2;
     use chia_bls::Signature;
     use rstest::rstest;
@@ -182,13 +183,13 @@ mod test {
         // and removals we *expect* to see
         // additions_and_removals only work on trusted blocks, so if
         // run_block_generator2() fails, we can call additions_and_removals() on it.
-        let mut a = make_allocator(0);
+        let mut a = make_allocator(ConsensusFlags::empty());
         let conds = run_block_generator2(
             &mut a,
             &generator,
             &block_refs,
             11_000_000_000,
-            DONT_VALIDATE_SIGNATURE,
+            ConsensusFlags::DONT_VALIDATE_SIGNATURE,
             &Signature::default(),
             None,
             &TEST_CONSTANTS,
@@ -223,9 +224,13 @@ mod test {
         }
 
         // now run the function under test
-        let (additions, removals) =
-            additions_and_removals(&generator, &block_refs, 0, &TEST_CONSTANTS)
-                .expect("additions_and_removals()");
+        let (additions, removals) = additions_and_removals(
+            &generator,
+            &block_refs,
+            ConsensusFlags::empty(),
+            &TEST_CONSTANTS,
+        )
+        .expect("additions_and_removals()");
 
         assert_eq!(expect_additions.len(), additions.len());
         assert_eq!(expect_removals.len(), removals.len());

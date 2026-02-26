@@ -102,6 +102,7 @@ jobs:
           exit ${FAILURE}
 
       - name: python black
+        if: matrix.python.major-dot-minor != 3.9
         run: |
           black --check tests
           black --check wheel/generate_type_stubs.py

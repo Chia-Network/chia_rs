@@ -14,7 +14,7 @@ use clvmr::{Allocator, NodePtr};
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use chia_consensus::flags::{NO_UNKNOWN_CONDS, STRICT_ARGS_COUNT};
+use chia_consensus::flags::ConsensusFlags;
 
 fuzz_target!(|data: &[u8]| {
     let mut a = Allocator::new();
@@ -41,7 +41,11 @@ fuzz_target!(|data: &[u8]| {
 
     let mut state = ParseState::default();
 
-    for flags in &[0, STRICT_ARGS_COUNT, NO_UNKNOWN_CONDS] {
+    for flags in &[
+        ConsensusFlags::empty(),
+        ConsensusFlags::STRICT_ARGS_COUNT,
+        ConsensusFlags::NO_UNKNOWN_CONDS,
+    ] {
         let mut coin_spend = SpendConditions {
             parent_id,
             coin_amount: amount,

@@ -4,7 +4,7 @@ use libfuzzer_sys::{arbitrary, fuzz_target};
 use chia_consensus::conditions::parse_args;
 use clvmr::allocator::Allocator;
 
-use chia_consensus::flags::STRICT_ARGS_COUNT;
+use chia_consensus::flags::ConsensusFlags;
 
 use chia_consensus::opcodes::{
     AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT, AGG_SIG_PARENT_PUZZLE,
@@ -21,7 +21,7 @@ fuzz_target!(|data: &[u8]| {
     let mut unstructured = arbitrary::Unstructured::new(data);
     let input = make_list(&mut a, &mut unstructured);
 
-    for flags in &[0, STRICT_ARGS_COUNT] {
+    for flags in &[ConsensusFlags::empty(), ConsensusFlags::STRICT_ARGS_COUNT] {
         for op in &[
             AGG_SIG_ME,
             AGG_SIG_UNSAFE,

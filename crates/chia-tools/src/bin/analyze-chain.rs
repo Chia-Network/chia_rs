@@ -6,7 +6,7 @@ use std::thread::available_parallelism;
 use std::time::Instant;
 
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
-use chia_consensus::flags::{DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
+use chia_consensus::flags::{ConsensusFlags, MEMPOOL_MODE};
 use chia_consensus::run_block_generator::{run_block_generator, run_block_generator2};
 use chia_tools::iterate_blocks;
 use clvmr::Allocator;
@@ -39,7 +39,11 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    let flags = if args.mempool_mode { MEMPOOL_MODE } else { 0 } | DONT_VALIDATE_SIGNATURE;
+    let flags = if args.mempool_mode {
+        MEMPOOL_MODE
+    } else {
+        ConsensusFlags::empty()
+    } | ConsensusFlags::DONT_VALIDATE_SIGNATURE;
 
     let num_cores = args
         .num_jobs
@@ -114,16 +118,18 @@ fn main() {
                     .write_fmt(format_args!(
                         "{height} \
                     atoms: {} \
-                    small_atoms: {} \
+                    allocated_atoms: {} \
                     pairs: {} \
+                    allocated_pairs: {} \
                     heap: {} \
                     block_cost: {} \
                     execute_time: {} \
                     timestamp: {} \
                     \n",
                         a.atom_count(),
-                        a.small_atom_count(),
+                        a.allocated_atom_count(),
                         a.pair_count(),
+                        a.allocated_pair_count(),
                         a.heap_size(),
                         ti.cost,
                         execute_timing.as_micros(),

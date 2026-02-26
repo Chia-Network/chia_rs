@@ -2,8 +2,9 @@
 all_counters: dict[str, list[int]] = {}
 
 keys = ["atoms:",
-     "small_atoms:",
+     "allocated_atoms:",
      "pairs:",
+     "allocated_pairs:",
      "heap:",
      "block_cost:",
      "execute_time:",

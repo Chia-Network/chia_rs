@@ -59,7 +59,7 @@ pub fn get_puzzle_and_solution_for_coin(
 mod test {
     use super::*;
     use crate::consensus_constants::TEST_CONSTANTS;
-    use crate::flags::{DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
+    use crate::flags::{ConsensusFlags, MEMPOOL_MODE};
     use crate::make_aggsig_final_message::u64_to_bytes;
     use crate::run_block_generator::{run_block_generator2, setup_generator_args};
     use chia_bls::Signature;
@@ -234,7 +234,7 @@ mod test {
             &generator,
             blocks,
             MAX_COST,
-            MEMPOOL_MODE | DONT_VALIDATE_SIGNATURE,
+            MEMPOOL_MODE | ConsensusFlags::DONT_VALIDATE_SIGNATURE,
             &Signature::default(),
             None,
             &TEST_CONSTANTS,
@@ -251,8 +251,9 @@ mod test {
                 .map(|c| (c.puzzle_hash, c.amount))
                 .collect();
 
-            let dialect = &ChiaDialect::new(MEMPOOL_MODE);
-            let args = setup_generator_args(&mut a2, blocks, 0).expect("setup_generator_args");
+            let dialect = &ChiaDialect::new(MEMPOOL_MODE.to_clvm_flags());
+            let args = setup_generator_args(&mut a2, blocks, ConsensusFlags::empty())
+                .expect("setup_generator_args");
             let Reduction(_, result) =
                 run_program(&mut a2, dialect, generator_node, args, MAX_COST)
                     .expect("run_program (generator)");

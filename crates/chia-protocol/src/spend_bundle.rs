@@ -5,11 +5,10 @@ use chia_bls::G2Element;
 use chia_streamable_macro::streamable;
 use chia_traits::Streamable;
 use clvm_traits::FromClvm;
-use clvmr::Allocator;
-use clvmr::allocator::{NodePtr, SExp};
 use clvmr::cost::Cost;
 use clvmr::error::EvalErr;
 use clvmr::op_utils::{first, rest};
+use clvmr::{Allocator, ClvmFlags, NodePtr, SExp};
 
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
@@ -51,7 +50,9 @@ impl SpendBundle {
 
         for cs in &self.coin_spends {
             a.restore_checkpoint(&checkpoint);
-            let (cost, mut conds) = cs.puzzle_reveal.run(&mut a, 0, cost_left, &cs.solution)?;
+            let (cost, mut conds) =
+                cs.puzzle_reveal
+                    .run(&mut a, ClvmFlags::empty(), cost_left, &cs.solution)?;
             if cost > cost_left {
                 return Err(EvalErr::CostExceeded);
             }

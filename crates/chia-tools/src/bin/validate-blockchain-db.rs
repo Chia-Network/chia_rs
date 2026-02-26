@@ -2,7 +2,7 @@ use clap::Parser;
 
 use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
-use chia_consensus::flags::DONT_VALIDATE_SIGNATURE;
+use chia_consensus::flags::ConsensusFlags;
 use chia_consensus::run_block_generator::{run_block_generator, run_block_generator2};
 use chia_protocol::{Bytes32, Coin};
 use chia_tools::iterate_blocks;
@@ -313,9 +313,9 @@ features that are validated:
                     run_block_generator
                 };
                 let flags = if args.skip_signature_validation {
-                        DONT_VALIDATE_SIGNATURE
+                        ConsensusFlags::DONT_VALIDATE_SIGNATURE
                     } else {
-                        0
+                        ConsensusFlags::empty()
                     };
                 let conditions = block_runner(
                     &mut a,

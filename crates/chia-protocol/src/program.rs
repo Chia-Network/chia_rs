@@ -7,7 +7,6 @@ use chia_traits::chia_error::{Error, Result};
 use clvm_traits::{FromClvm, FromClvmError, ToClvm, ToClvmError};
 #[cfg(feature = "py-bindings")]
 use clvmr::SExp;
-use clvmr::allocator::NodePtr;
 use clvmr::cost::Cost;
 use clvmr::error::EvalErr;
 use clvmr::run_program;
@@ -15,7 +14,7 @@ use clvmr::serde::{
     node_from_bytes, node_from_bytes_backrefs, node_to_bytes, serialized_length_from_bytes,
     serialized_length_from_bytes_trusted,
 };
-use clvmr::{Allocator, ChiaDialect};
+use clvmr::{Allocator, ChiaDialect, ClvmFlags, NodePtr};
 #[cfg(feature = "py-bindings")]
 use pyo3::prelude::*;
 #[cfg(feature = "py-bindings")]
@@ -71,7 +70,7 @@ impl Program {
     pub fn run<A: ToClvm<Allocator>>(
         &self,
         a: &mut Allocator,
-        flags: u32,
+        flags: ClvmFlags,
         max_cost: Cost,
         arg: &A,
     ) -> std::result::Result<(Cost, NodePtr), EvalErr> {
@@ -339,6 +338,13 @@ impl Program {
         Self::from_bytes(hex::decode(s).map_err(|_| Error::InvalidString)?.as_slice())
     }
 
+    // This function takes ClvmFlags, not ConsensusFlags. chia-consensus depends
+    // on chia-protocol, so chia-protocol can't depend on chia-consensus. The
+    // ideal solution to this would probably be to remove the *member funtion*
+    // run(), and replace it with a free function run_chia_program().
+    // Since python programs only have access to ConsensusFlags, this call
+    // relies on the shared flags having the same bits. This is a smell we
+    // should work towards fixing.
     fn run_rust(
         &self,
         py: Python<'_>,
@@ -362,7 +368,7 @@ impl Program {
 
         let r: Response = (|| -> PyResult<Response> {
             let program = node_from_bytes_backrefs(&mut a, self.0.as_ref()).map_err(map_pyerr)?;
-            let dialect = ChiaDialect::new(flags);
+            let dialect = ChiaDialect::new(ClvmFlags::from_bits_truncate(flags));
 
             Ok(py.detach(|| run_program(&mut a, &dialect, program, clvm_args, max_cost)))
         })()?;
@@ -519,7 +525,9 @@ mod tests {
         // (+ 2 5)
         let prg = Program::from_bytes(&hex::decode("ff10ff02ff0580").expect("hex::decode"))
             .expect("from_bytes");
-        let (cost, result) = prg.run(a, 0, 1000, &[1300, 37]).expect("run");
+        let (cost, result) = prg
+            .run(a, ClvmFlags::empty(), 1000, &[1300, 37])
+            .expect("run");
         assert_eq!(cost, 869);
         assert_eq!(a.number(result), 1337.into());
     }

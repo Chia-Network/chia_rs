@@ -3,7 +3,7 @@ use clap::Parser;
 use chia_bls::PublicKey;
 use chia_consensus::conditions::{NewCoin, SpendBundleConditions, SpendConditions};
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
-use chia_consensus::flags::{DONT_VALIDATE_SIGNATURE, MEMPOOL_MODE};
+use chia_consensus::flags::{ConsensusFlags, MEMPOOL_MODE};
 use chia_consensus::run_block_generator::{
     get_coinspends_for_trusted_block, run_block_generator, run_block_generator2,
 };
@@ -153,7 +153,11 @@ fn main() {
         .queue_len(num_cores + 5)
         .build();
 
-    let flags = if args.mempool { MEMPOOL_MODE } else { 0 };
+    let flags = if args.mempool {
+        MEMPOOL_MODE
+    } else {
+        ConsensusFlags::empty()
+    };
 
     // Blocks created after the hard fork are not expected to work with the
     // original generator ROM. The cost will exceed the block cost. So when
@@ -211,9 +215,9 @@ fn main() {
                 };
                 let flags = flags
                     | if args.skip_signature_validation {
-                        DONT_VALIDATE_SIGNATURE
+                        ConsensusFlags::DONT_VALIDATE_SIGNATURE
                     } else {
-                        0
+                        ConsensusFlags::empty()
                     };
                 let mut conditions = block_runner(
                     &mut a,

@@ -1253,6 +1253,7 @@ impl MerkleBlob {
         all_used_hashes: &mut HashSet<Hash>,
     ) -> Result<Self, Error> {
         let mut hashes_and_indexes: Vec<(Hash, TreeIndex)> = Vec::new();
+        let mut visited: HashSet<Hash> = HashSet::new();
         let mut merkle_blob = Self::new(Vec::new())?;
         merkle_blob.inner_build_blob_from_node_list(
             nodes,
@@ -1260,11 +1261,14 @@ impl MerkleBlob {
             interested_hashes,
             &mut hashes_and_indexes,
             all_used_hashes,
+            &mut visited,
+            0,
         )?;
 
         Ok(merkle_blob)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn inner_build_blob_from_node_list(
         &mut self,
         nodes: &NodeHashToDeltaReaderNode,
@@ -1272,10 +1276,24 @@ impl MerkleBlob {
         interested_hashes: &HashSet<Hash>,
         hashes_and_indexes: &mut Vec<(Hash, TreeIndex)>,
         all_used_hashes: &mut HashSet<Hash>,
+        visited: &mut HashSet<Hash>,
+        depth: usize,
     ) -> Result<TreeIndex, Error> {
-        match nodes.get(&node_hash) {
-            None => Err(Error::NodeHashNotInNodeMaps(node_hash)),
-            Some(deltas::DeltaReaderNode::Leaf { key, value }) => {
+        const MAX_RECURSION_DEPTH: usize = 64;
+        if depth > MAX_RECURSION_DEPTH {
+            return Err(Error::RecursionDepthExceeded());
+        }
+
+        let node = nodes
+            .get(&node_hash)
+            .ok_or(Error::NodeHashNotInNodeMaps(node_hash))?;
+
+        if !visited.insert(node_hash) {
+            return Err(Error::CycleFound());
+        }
+
+        match node {
+            deltas::DeltaReaderNode::Leaf { key, value } => {
                 let index = self.get_new_index();
                 self.insert_entry_to_blob(
                     index,
@@ -1300,7 +1318,7 @@ impl MerkleBlob {
 
                 Ok(index)
             }
-            Some(deltas::DeltaReaderNode::Internal { left, right }) => {
+            deltas::DeltaReaderNode::Internal { left, right } => {
                 let index = self.get_new_index();
 
                 let left_index = self.inner_build_blob_from_node_list(
@@ -1309,6 +1327,8 @@ impl MerkleBlob {
                     interested_hashes,
                     hashes_and_indexes,
                     all_used_hashes,
+                    visited,
+                    depth + 1,
                 )?;
                 let right_index = self.inner_build_blob_from_node_list(
                     nodes,
@@ -1316,6 +1336,8 @@ impl MerkleBlob {
                     interested_hashes,
                     hashes_and_indexes,
                     all_used_hashes,
+                    visited,
+                    depth + 1,
                 )?;
 
                 for child_index in [left_index, right_index] {
@@ -1662,6 +1684,108 @@ mod tests {
                 node_type,
             );
         }
+    }
+
+    #[test]
+    fn test_inner_build_blob_from_node_list_depth_limit() {
+        let mut nodes = NodeHashToDeltaReaderNode::new();
+        let internal_hashes: Vec<Hash> = (0..=65).map(generate_hash).collect();
+
+        for d in 0..=64usize {
+            let right_leaf_hash = generate_hash(10_000 + d as i32);
+            nodes.insert(
+                right_leaf_hash,
+                deltas::DeltaReaderNode::Leaf {
+                    key: KeyId(d as i64),
+                    value: ValueId(d as i64),
+                },
+            );
+            nodes.insert(
+                internal_hashes[d],
+                deltas::DeltaReaderNode::Internal {
+                    left: internal_hashes[d + 1],
+                    right: right_leaf_hash,
+                },
+            );
+        }
+
+        let mut blob = MerkleBlob::new(Vec::new()).unwrap();
+        blob.check_integrity_on_drop = false;
+        let mut hashes_and_indexes: Vec<(Hash, TreeIndex)> = Vec::new();
+        let mut all_used_hashes: HashSet<Hash> = HashSet::new();
+        let mut visited: HashSet<Hash> = HashSet::new();
+
+        let err = blob
+            .inner_build_blob_from_node_list(
+                &nodes,
+                internal_hashes[0],
+                &HashSet::new(),
+                &mut hashes_and_indexes,
+                &mut all_used_hashes,
+                &mut visited,
+                0,
+            )
+            .unwrap_err();
+
+        assert!(matches!(err, Error::RecursionDepthExceeded()));
+    }
+
+    #[test]
+    fn test_inner_build_blob_from_node_list_revisit_node_hash() {
+        let a = generate_hash(42);
+        let b = generate_hash(43);
+        let leaf1 = generate_hash(44);
+        let leaf2 = generate_hash(45);
+
+        let mut nodes = NodeHashToDeltaReaderNode::new();
+        nodes.insert(
+            leaf1,
+            deltas::DeltaReaderNode::Leaf {
+                key: KeyId(1),
+                value: ValueId(1),
+            },
+        );
+        nodes.insert(
+            leaf2,
+            deltas::DeltaReaderNode::Leaf {
+                key: KeyId(2),
+                value: ValueId(2),
+            },
+        );
+        nodes.insert(
+            a,
+            deltas::DeltaReaderNode::Internal {
+                left: b,
+                right: leaf1,
+            },
+        );
+        nodes.insert(
+            b,
+            deltas::DeltaReaderNode::Internal {
+                left: a,
+                right: leaf2,
+            },
+        );
+
+        let mut blob = MerkleBlob::new(Vec::new()).unwrap();
+        blob.check_integrity_on_drop = false;
+        let mut hashes_and_indexes: Vec<(Hash, TreeIndex)> = Vec::new();
+        let mut all_used_hashes: HashSet<Hash> = HashSet::new();
+        let mut visited: HashSet<Hash> = HashSet::new();
+
+        let err = blob
+            .inner_build_blob_from_node_list(
+                &nodes,
+                a,
+                &HashSet::new(),
+                &mut hashes_and_indexes,
+                &mut all_used_hashes,
+                &mut visited,
+                0,
+            )
+            .unwrap_err();
+
+        assert!(matches!(err, Error::CycleFound()));
     }
 
     #[test]

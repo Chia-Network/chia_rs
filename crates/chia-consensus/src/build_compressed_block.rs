@@ -261,6 +261,7 @@ impl BlockBuilder {
 mod tests {
     use super::*;
     use crate::consensus_constants::TEST_CONSTANTS;
+    use crate::flags::ConsensusFlags;
     use crate::flags::MEMPOOL_MODE;
     use crate::owned_conditions::OwnedSpendBundleConditions;
     use crate::run_block_generator::run_block_generator2;
@@ -292,9 +293,15 @@ mod tests {
             let bundle = SpendBundle::from_bytes(buf.as_slice()).expect("parsing SpendBundle");
 
             let mut a = Allocator::new();
-            let conds = run_spendbundle(&mut a, &bundle, 11_000_000_000, 0, &TEST_CONSTANTS)
-                .expect("run_spendbundle")
-                .0;
+            let conds = run_spendbundle(
+                &mut a,
+                &bundle,
+                11_000_000_000,
+                ConsensusFlags::empty(),
+                &TEST_CONSTANTS,
+            )
+            .expect("run_spendbundle")
+            .0;
 
             if conds
                 .spends

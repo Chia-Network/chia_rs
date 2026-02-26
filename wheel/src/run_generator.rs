@@ -2,6 +2,7 @@ use chia_bls::{BlsCache, Signature};
 use chia_consensus::additions_and_removals::additions_and_removals as native_additions_and_removals;
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::consensus_constants::ConsensusConstants;
+use chia_consensus::flags::ConsensusFlags;
 use chia_consensus::owned_conditions::OwnedSpendBundleConditions;
 use chia_consensus::run_block_generator::run_block_generator as native_run_block_generator;
 use chia_consensus::run_block_generator::run_block_generator2 as native_run_block_generator2;
@@ -28,7 +29,7 @@ pub fn run_block_generator<'a>(
     program: PyBuffer<u8>,
     block_refs: &Bound<'_, PyList>,
     max_cost: Cost,
-    flags: u32,
+    flags: ConsensusFlags,
     signature: &Signature,
     bls_cache: Option<&BlsCache>,
     constants: &ConsensusConstants,
@@ -80,7 +81,7 @@ pub fn run_block_generator2<'a>(
     program: PyBuffer<u8>,
     block_refs: &Bound<'_, PyList>,
     max_cost: Cost,
-    flags: u32,
+    flags: ConsensusFlags,
     signature: &Signature,
     bls_cache: Option<&BlsCache>,
     constants: &ConsensusConstants,
@@ -131,7 +132,7 @@ pub fn additions_and_removals<'a>(
     py: Python<'a>,
     program: PyBuffer<u8>,
     block_refs: &Bound<'_, PyList>,
-    flags: u32,
+    flags: ConsensusFlags,
     constants: &ConsensusConstants,
 ) -> PyResult<(Vec<(Coin, Option<Bytes>)>, Vec<(Bytes32, Coin)>)> {
     let refs = block_refs

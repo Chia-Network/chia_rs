@@ -4,12 +4,7 @@ use libfuzzer_sys::fuzz_target;
 use chia_bls::{DerivableKey, PublicKey, SecretKey};
 use chia_bls::{sign, verify};
 
-fuzz_target!(|data: &[u8]| {
-    if data.len() < 32 {
-        return;
-    }
-
-    let sk = SecretKey::from_seed(data);
+fuzz_target!(|sk: SecretKey| {
     let pk = sk.public_key();
 
     // round-trip SecretKey

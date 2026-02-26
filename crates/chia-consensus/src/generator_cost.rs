@@ -6,7 +6,6 @@ use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::error::EvalErr;
 use clvmr::serde::{intern, InternedTree};
 use clvmr::serde::node_from_bytes_backrefs;
-use clvmr::serde::Bytes32;
 
 type Result<T> = std::result::Result<T, EvalErr>;
 
@@ -48,7 +47,7 @@ pub fn total_cost_from_tree(tree: &InternedTree) -> u64 {
 #[derive(Debug)]
 pub struct GeneratorInfo {
     pub tree: InternedTree,
-    pub tree_hash: Bytes32,
+    pub tree_hash: [u8; 32],
     pub cost: u64,
 }
 
@@ -79,13 +78,13 @@ pub fn intern_cost(allocator: &Allocator, node: NodePtr) -> Result<u64> {
 }
 
 /// Returns (total_cost, tree_hash).
-pub fn generator_cost_and_hash(allocator: &Allocator, node: NodePtr) -> Result<(u64, Bytes32)> {
+pub fn generator_cost_and_hash(allocator: &Allocator, node: NodePtr) -> Result<(u64, [u8; 32])> {
     let info = process_generator(allocator, node)?;
     Ok((info.cost, info.tree_hash))
 }
 
 /// From serialized bytes: (cost, tree_hash).
-pub fn cost_and_tree_hash_for_bytes(blob: &[u8]) -> Result<(u64, Bytes32)> {
+pub fn cost_and_tree_hash_for_bytes(blob: &[u8]) -> Result<(u64, [u8; 32])> {
     let mut allocator = Allocator::new();
     let node = node_from_bytes_backrefs(&mut allocator, blob)?;
     generator_cost_and_hash(&allocator, node)
