@@ -240,18 +240,19 @@ fn main() {
                     return;
                 }
 
+                // after the hard fork, we run blocks without paying for the
+                // CLVM generator ROM
+                let block_runner = if args.original_generator || height >= args.hard_fork_height {
+                    run_block_generator2
+                } else {
+                    run_block_generator
+                };
                 let flags = flags
                     | if args.skip_signature_validation {
                         ConsensusFlags::DONT_VALIDATE_SIGNATURE
                     } else {
                         ConsensusFlags::empty()
                     };
-                // after the hard fork, we run blocks without paying for the CLVM generator ROM
-                let block_runner = if args.original_generator || height >= args.hard_fork_height {
-                    run_block_generator2
-                } else {
-                    run_block_generator
-                };
                 let (a, mut conditions) = block_runner(
                     generator,
                     &block_refs,

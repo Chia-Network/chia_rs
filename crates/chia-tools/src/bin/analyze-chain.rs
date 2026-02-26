@@ -74,6 +74,14 @@ fn main() {
             }
             let output = output.clone();
             pool.execute(move || {
+                // after the hard fork, we run blocks without paying for the
+                // CLVM generator ROM
+                let block_runner = if height >= TEST_CONSTANTS.hard_fork_height {
+                    run_block_generator2
+                } else {
+                    run_block_generator
+                };
+
                 let generator = block
                     .transactions_generator
                     .as_ref()
@@ -86,12 +94,6 @@ fn main() {
                     .expect("foliage_transaction_block");
 
                 let start_run_block = Instant::now();
-                // after the hard fork, we run blocks without paying for the CLVM generator ROM
-                let block_runner = if height >= TEST_CONSTANTS.hard_fork_height {
-                    run_block_generator2
-                } else {
-                    run_block_generator
-                };
                 let (a, conditions) = block_runner(
                     generator,
                     &block_refs,

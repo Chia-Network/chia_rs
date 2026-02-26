@@ -355,15 +355,17 @@ mod tests {
             None,
             &TEST_CONSTANTS,
         );
-        let (execution_cost, block_cost, block_output) = match &block_conds {
-            Ok((a2, conditions)) => (
-                conditions.execution_cost,
-                conditions.cost,
-                print_conditions(a2, conditions, a2),
-            ),
-            Err(code) => {
-                println!("error: {code:?}");
-                (0, 0, format!("FAILED: {}\n", u32::from(code.1)))
+        let (execution_cost, block_cost, block_output) = {
+            match &block_conds {
+                Ok((a2, conditions)) => (
+                    conditions.execution_cost,
+                    conditions.cost,
+                    print_conditions(a2, conditions, a2),
+                ),
+                Err(code) => {
+                    println!("error: {code:?}");
+                    (0, 0, format!("FAILED: {}\n", u32::from(code.1)))
+                }
             }
         };
 
@@ -415,6 +417,9 @@ mod tests {
                 // lower
                 conditions.cost = block_cost;
                 conditions.execution_cost = execution_cost;
+                // Use the block generator's allocator for atom/pair/heap counts if
+                // available, otherwise fall back to the spendbundle allocator. This
+                // ensures we print consistent allocator stats when comparing outputs.
                 let count_alloc = if let Ok((ref a2, _)) = block_conds {
                     a2
                 } else {

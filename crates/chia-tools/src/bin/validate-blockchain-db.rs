@@ -302,17 +302,18 @@ features that are validated:
                     .as_ref()
                     .expect("transactions_generator");
 
-                let flags = (if args.skip_signature_validation {
-                        ConsensusFlags::DONT_VALIDATE_SIGNATURE
-                    } else {
-                        ConsensusFlags::empty()
-                    }) | ConsensusFlags::LIMIT_HEAP;
-                // after the hard fork, we run blocks without paying for the CLVM generator ROM
+                // after the hard fork, we run blocks without paying for the
+                // CLVM generator ROM
                 let block_runner = if height >= constants.hard_fork_height {
                     run_block_generator2
                 } else {
                     run_block_generator
                 };
+                let flags = (if args.skip_signature_validation {
+                        ConsensusFlags::DONT_VALIDATE_SIGNATURE
+                    } else {
+                        ConsensusFlags::empty()
+                    }) | ConsensusFlags::LIMIT_HEAP;
                 let (_a, conditions) = block_runner(
                     generator,
                     &block_refs,
