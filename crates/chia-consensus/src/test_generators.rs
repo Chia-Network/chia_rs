@@ -433,7 +433,11 @@ fn run_generator(#[case] name: &str) {
                     }
 
                     // Extract a2 from conds2 for print_conditions, or use a1 as fallback
-                    let a2 = if let Ok((ref a2, _)) = conds2 { a2 } else { &a1 };
+                    let a2 = if let Ok((ref a2, _)) = conds2 {
+                        a2
+                    } else {
+                        &a1
+                    };
                     print_conditions(&a1, &conditions, a2)
                 }
                 Err(code) => {
