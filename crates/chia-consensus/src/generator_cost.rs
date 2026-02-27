@@ -16,7 +16,7 @@ type Result<T> = std::result::Result<T, EvalErr>;
 // Chia-consensus cost formula constants.
 const COEF_B: u64 = 1;
 const COEF_A: u64 = 2;
-const COEF_P: u64 = 2;
+const COEF_P: u64 = 3;  // Changed from 2 to 3 to ensure size_component ≥ serde_2026_bytes
 const COEF_S: u64 = 1;
 const COEF_I: u64 = 8;
 const SIZE_COST_PER_BYTE: u64 = 6000;
@@ -152,7 +152,7 @@ mod tests {
 
         let info = process_generator(&allocator, node).unwrap();
 
-        assert_eq!(info.cost, 198_000);
+        assert_eq!(info.cost, 204_000);
     }
 
     #[test]
@@ -163,7 +163,7 @@ mod tests {
 
         let info = process_generator(&allocator, node).unwrap();
 
-        assert_eq!(info.cost, 115_500);
+        assert_eq!(info.cost, 121_500);
     }
 
     #[test]
@@ -174,7 +174,7 @@ mod tests {
 
         let cost = intern_cost(&allocator, node).unwrap();
 
-        assert_eq!(cost, 192_000);
+        assert_eq!(cost, 198_000);
     }
 
     #[test]
@@ -184,7 +184,7 @@ mod tests {
 
         let (cost, hash) = cost_and_tree_hash_for_bytes(&blob).unwrap();
 
-        assert_eq!(cost, 180_000);
+        assert_eq!(cost, 186_000);
 
         let mut allocator = Allocator::new();
         let node = node_from_bytes(&mut allocator, &blob).unwrap();
