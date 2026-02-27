@@ -434,7 +434,9 @@ fn run_generator(#[case] name: &str) {
 
                     // Extract a2 from conds2 for print_conditions
                     // If conds2 failed, this test will fail anyway, so unwrap is fine
-                    let (a2, _) = conds2.as_ref().expect("conds2 must succeed if conds1 succeeded");
+                    let (a2, _) = conds2
+                        .as_ref()
+                        .expect("conds2 must succeed if conds1 succeeded");
                     print_conditions(&a1, &conditions, a2)
                 }
                 Err(code) => {
