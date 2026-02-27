@@ -16,7 +16,7 @@ type Result<T> = std::result::Result<T, EvalErr>;
 // Chia-consensus cost formula constants.
 const COEF_B: u64 = 1;
 const COEF_A: u64 = 2;
-const COEF_P: u64 = 3;  // Changed from 2 to 3 to ensure size_component ≥ serde_2026_bytes
+const COEF_P: u64 = 3; // Changed from 2 to 3 to ensure size_component ≥ serde_2026_bytes
 const COEF_S: u64 = 1;
 const COEF_I: u64 = 8;
 const SIZE_COST_PER_BYTE: u64 = 6000;
