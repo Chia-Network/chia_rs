@@ -43,5 +43,9 @@ fn parse_benchmark(c: &mut Criterion) {
     });
 }
 
-criterion_group!(parse, parse_benchmark);
+criterion_group! {
+    name = parse;
+    config = Criterion::default().sample_size(10);
+    targets = parse_benchmark
+}
 criterion_main!(parse);

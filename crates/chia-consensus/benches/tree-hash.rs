@@ -6,6 +6,7 @@ use std::time::Instant;
 
 fn run(c: &mut Criterion) {
     let mut group = c.benchmark_group("tree-hash");
+    group.sample_size(10);
 
     for name in &[
         "block-4671894",

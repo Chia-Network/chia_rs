@@ -9,6 +9,7 @@ const NUM_LEAFS: usize = 1000;
 
 fn run(c: &mut Criterion) {
     let mut group = c.benchmark_group("merkle-set");
+    group.sample_size(10);
 
     let mut rng = SmallRng::seed_from_u64(1337);
 

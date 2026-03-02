@@ -41,5 +41,9 @@ fn key_derivation_benchmark(c: &mut Criterion) {
     });
 }
 
-criterion_group!(key_derivation, key_derivation_benchmark);
+criterion_group! {
+    name = key_derivation;
+    config = Criterion::default().sample_size(10);
+    targets = key_derivation_benchmark
+}
 criterion_main!(key_derivation);

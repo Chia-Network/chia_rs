@@ -24,5 +24,9 @@ fn sign_benchmark(c: &mut Criterion) {
     });
 }
 
-criterion_group!(signing, sign_benchmark);
+criterion_group! {
+    name = signing;
+    config = Criterion::default().sample_size(10);
+    targets = sign_benchmark
+}
 criterion_main!(signing);
