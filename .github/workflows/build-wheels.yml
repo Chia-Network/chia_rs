@@ -313,7 +313,7 @@ jobs:
   actionlint:
     runs-on: ubuntu-latest
     permissions:
-      contents: none
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
