@@ -1,6 +1,6 @@
 [package]
 name = "clvm-traits-fuzz"
-version = "0.38.1"
+version.workspace = true
 publish = false
 edition = "2024"
 

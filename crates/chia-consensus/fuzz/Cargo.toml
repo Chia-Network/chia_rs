@@ -1,6 +1,6 @@
 [package]
 name = "chia-consensus-fuzz"
-version = "0.38.1"
+version.workspace = true
 authors = ["Automatically generated"]
 publish = false
 edition = "2024"
