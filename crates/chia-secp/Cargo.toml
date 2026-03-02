@@ -1,6 +1,6 @@
 [package]
 name = "chia-secp"
-version = "0.38.1"
+version.workspace = true
 edition = "2024"
 license = "Apache-2.0"
 description = "Secp256k1 and secp256r1 types for Chia"
