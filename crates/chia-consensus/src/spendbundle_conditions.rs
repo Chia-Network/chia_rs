@@ -4,9 +4,10 @@ use crate::conditions::{
 };
 use crate::consensus_constants::ConsensusConstants;
 use crate::flags::{ConsensusFlags, MEMPOOL_MODE};
+use crate::generator_cost::total_cost_from_tree;
 use crate::puzzle_fingerprint::compute_puzzle_fingerprint;
 use crate::run_block_generator::subtract_cost;
-use crate::solution_generator::calculate_generator_length;
+use crate::solution_generator::{calculate_generator_length, solution_generator_backrefs};
 use crate::spendbundle_validation::get_flags_for_height_and_constants;
 use crate::validation_error::ErrorCode;
 use crate::validation_error::ValidationErr;
@@ -14,11 +15,14 @@ use chia_bls::PublicKey;
 use chia_protocol::{Bytes, SpendBundle};
 
 use clvm_utils::tree_hash;
+use clvmr::NodePtr;
 use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
+use clvmr::serde::intern;
 use clvmr::serde::node_from_bytes;
+use clvmr::serde::node_from_bytes_backrefs;
 
 const QUOTE_BYTES: usize = 2;
 
@@ -61,8 +65,25 @@ pub fn run_spendbundle(
     let generator_length_without_quote =
         calculate_generator_length(&spend_bundle.coin_spends) - QUOTE_BYTES;
 
-    let byte_cost = generator_length_without_quote as u64 * constants.cost_per_byte;
-    subtract_cost(a, &mut cost_left, byte_cost)?;
+    let base_cost = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
+        let generator = solution_generator_backrefs(
+            spend_bundle
+                .coin_spends
+                .iter()
+                .map(|cs| (cs.coin, cs.puzzle_reveal.as_slice(), cs.solution.as_slice())),
+        )
+        .map_err(|_| ValidationErr(a.nil(), ErrorCode::GeneratorRuntimeError))?;
+
+        let mut decode_allocator = Allocator::new();
+        let program_node = node_from_bytes_backrefs(&mut decode_allocator, &generator)
+            .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
+        let interned = intern(&decode_allocator, program_node)
+            .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
+        total_cost_from_tree(&interned)
+    } else {
+        generator_length_without_quote as u64 * constants.cost_per_byte
+    };
+    subtract_cost(a, &mut cost_left, base_cost)?;
 
     for coin_spend in &spend_bundle.coin_spends {
         // process the spend
