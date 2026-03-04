@@ -1,36 +1,30 @@
 //! Chia-specific generator cost calculation.
+//!
+//! Pure storage model: cost = (atom_bytes + 2*atoms + 3*pairs) * COST_PER_BYTE.
+//! SHA tree-hash cost is not charged separately — it is structurally bounded
+//! by the size component (worst-case ratio <= 3.33, ~37ms SHA CPU on a 2012
+//! Celeron). See PR #1371 for the alternative split model (6000/4500).
 
 use clvmr::serde::InternedTree;
 
-// Chia-consensus cost formula constants.
-const COEF_B: u64 = 1;
-const COEF_A: u64 = 2;
-const COEF_P: u64 = 3; // ensures size_cost >= serialized byte count
-const COEF_S: u64 = 1;
-const COEF_I: u64 = 8;
-const SIZE_COST_PER_BYTE: u64 = 6000;
-const SHA_COST_PER_UNIT: u64 = 4500;
+const COST_PER_BYTE: u64 = 12000;
 
-/// Compute total generator cost from an interned tree in one pass.
+/// Compute total generator cost from an interned tree.
+///
+/// The size formula `atom_bytes + 2*atom_count + 3*pair_count` is proven to
+/// be an upper bound on the serialized byte count (P=3 accounts for pair
+/// opcodes and back-reference overhead).
 #[inline]
 pub fn total_cost_from_tree(tree: &InternedTree) -> u64 {
     let atom_count = tree.atoms.len() as u64;
     let pair_count = tree.pairs.len() as u64;
 
     let mut atom_bytes: u64 = 0;
-    let mut sha_atom_blocks: u64 = 0;
     for &atom in &tree.atoms {
-        let len = tree.allocator.atom_len(atom) as u64;
-        atom_bytes += len;
-        sha_atom_blocks += (len + 73) / 64;
+        atom_bytes += tree.allocator.atom_len(atom) as u64;
     }
 
-    let size_cost = COEF_B * atom_bytes + COEF_A * atom_count + COEF_P * pair_count;
-    let sha_blocks = sha_atom_blocks + 2 * pair_count;
-    let sha_invocations = atom_count + pair_count;
-    let sha_cost = COEF_S * sha_blocks + COEF_I * sha_invocations;
-
-    size_cost * SIZE_COST_PER_BYTE + sha_cost * SHA_COST_PER_UNIT
+    (atom_bytes + 2 * atom_count + 3 * pair_count) * COST_PER_BYTE
 }
 
 #[cfg(test)]
@@ -44,7 +38,7 @@ mod tests {
         let allocator = Allocator::new();
         let node = allocator.nil();
         let tree = intern(&allocator, node).unwrap();
-        assert_eq!(total_cost_from_tree(&tree), 52_500);
+        assert_eq!(total_cost_from_tree(&tree), 24_000);
     }
 
     #[test]
@@ -54,7 +48,7 @@ mod tests {
         let right = allocator.new_atom(&[4, 5, 6]).unwrap();
         let node = allocator.new_pair(left, right).unwrap();
         let tree = intern(&allocator, node).unwrap();
-        assert_eq!(total_cost_from_tree(&tree), 204_000);
+        assert_eq!(total_cost_from_tree(&tree), 156_000);
     }
 
     #[test]
@@ -63,7 +57,7 @@ mod tests {
         let atom = allocator.new_atom(&[42]).unwrap();
         let node = allocator.new_pair(atom, atom).unwrap();
         let tree = intern(&allocator, node).unwrap();
-        assert_eq!(total_cost_from_tree(&tree), 121_500);
+        assert_eq!(total_cost_from_tree(&tree), 72_000);
     }
 
     #[test]
@@ -72,6 +66,6 @@ mod tests {
         let atom = allocator.new_atom(&[1, 2, 3, 4, 5]).unwrap();
         let node = allocator.new_pair(atom, allocator.nil()).unwrap();
         let tree = intern(&allocator, node).unwrap();
-        assert_eq!(total_cost_from_tree(&tree), 198_000);
+        assert_eq!(total_cost_from_tree(&tree), 144_000);
     }
 }
