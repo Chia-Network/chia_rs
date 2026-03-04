@@ -1,0 +1,22 @@
+[package]
+name = "chia-vdf"
+version.workspace = true
+edition = "2024"
+license = "Apache-2.0"
+description = "Pure Rust VDF (verifiable delay function) implementation."
+authors = [
+    "Richard Kiss <him@richardkiss.com>",
+    "Arvid Norberg <arvid@chia.net>",
+    "Brandon Haggstrom <b.haggstrom@chia.net>"
+]
+homepage = "https://github.com/Chia-Network/chia_rs"
+repository = "https://github.com/Chia-Network/chia_rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+num-bigint = { workspace = true }
+num-traits = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
