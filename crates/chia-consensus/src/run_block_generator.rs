@@ -301,20 +301,26 @@ fn run_block_generator_interned<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenB
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
-    let mut decode_allocator = Allocator::new();
+    let mut decode_allocator = make_allocator(flags);
     let program_node = node_from_bytes_backrefs(&mut decode_allocator, program)
         .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
     let interned = intern(&decode_allocator, program_node)
         .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
     let base_cost = total_cost_from_tree(&interned);
-    let a = interned.allocator;
-    let program = interned.root;
 
     let mut cost_left = max_cost;
-    subtract_cost(&a, &mut cost_left, base_cost)?;
+    subtract_cost(&decode_allocator, &mut cost_left, base_cost)?;
 
     run_block_generator_inner(
-        a, program, block_refs, max_cost, cost_left, flags, signature, bls_cache, constants,
+        decode_allocator,
+        program_node,
+        block_refs,
+        max_cost,
+        cost_left,
+        flags,
+        signature,
+        bls_cache,
+        constants,
     )
 }
 
