@@ -26,7 +26,6 @@ pub fn validate_clvm_and_signature(
     let (sbc, pkm_pairs) = run_spendbundle(&mut a, spend_bundle, max_cost, flags, constants)?;
     let conditions = OwnedSpendBundleConditions::from(&a, sbc);
 
-    // Collect all pairs in a single vector to avoid multiple iterations
     let mut pairs = Vec::new();
 
     let mut aug_msg = Vec::<u8>::new();
@@ -42,7 +41,6 @@ pub fn validate_clvm_and_signature(
         key.update(&aug_msg);
         pairs.push((key.finalize(), pairing));
     }
-    // Verify aggregated signature
     let result = aggregate_verify_gt(
         &spend_bundle.aggregated_signature,
         pairs.iter().map(|tuple| &tuple.1),
@@ -54,7 +52,6 @@ pub fn validate_clvm_and_signature(
         ));
     }
 
-    // Collect results
     Ok((conditions, pairs))
 }
 
@@ -93,6 +90,7 @@ pub fn get_flags_for_height_and_constants(
             | ConsensusFlags::SIMPLE_GENERATOR
             | ConsensusFlags::CANONICAL_INTS
             | ConsensusFlags::ENABLE_SECP_OPS
+            | ConsensusFlags::RELAXED_BLS
             | ConsensusFlags::INTERNED_GENERATOR;
     }
 
