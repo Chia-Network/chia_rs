@@ -1,3 +1,4 @@
+use crate::condition_sanitizers::parse_amount;
 use crate::run_block_generator::setup_generator_args;
 use crate::run_block_generator::subtract_cost;
 use chia_protocol::Coin;
@@ -67,8 +68,9 @@ where
         iter = tail;
         // process the spend
         let (parent_id, (puzzle, (amount, (solution, _spend_level_extra)))) =
-            <(Bytes32, (NodePtr, (u64, (NodePtr, NodePtr))))>::from_clvm(&a, spend)
+            <(Bytes32, (NodePtr, (NodePtr, (NodePtr, NodePtr))))>::from_clvm(&a, spend)
                 .map_err(|_| ValidationErr(spend, ErrorCode::InvalidCondition))?;
+        let amount = parse_amount(&a, amount, ErrorCode::InvalidCoinAmount)?;
 
         let Reduction(clvm_cost, mut iter) =
             run_program(&mut a, &dialect, puzzle, solution, cost_left)?;
@@ -100,8 +102,10 @@ where
             }
             c = rest(&a, c)?;
 
-            let (puzzle_hash, (amount, hint)) = <(Bytes32, (u64, NodePtr))>::from_clvm(&a, c)
-                .map_err(|_| ValidationErr(c, ErrorCode::InvalidCondition))?;
+            let (puzzle_hash, (amount, hint)) =
+                <(Bytes32, (NodePtr, NodePtr))>::from_clvm(&a, c)
+                    .map_err(|_| ValidationErr(c, ErrorCode::InvalidCondition))?;
+            let amount = parse_amount(&a, amount, ErrorCode::InvalidCoinAmount)?;
 
             let coin = Coin {
                 parent_coin_info: spend_id,
