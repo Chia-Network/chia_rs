@@ -452,12 +452,12 @@ pub fn py_validate_clvm_and_signature(
     max_cost: u64,
     constants: &ConsensusConstants,
     flags: ConsensusFlags,
-) -> PyResult<(OwnedSpendBundleConditions, Vec<([u8; 32], GTElement)>, f32)> {
+) -> PyResult<(OwnedSpendBundleConditions, Vec<([u8; 32], GTElement)>, f64)> {
     let start_time = Instant::now();
     let (owned_conditions, additions) =
         py.detach(|| validate_clvm_and_signature(new_spend, max_cost, constants, flags))?;
     let duration = start_time.elapsed();
-    Ok((owned_conditions, additions, duration.as_secs_f32()))
+    Ok((owned_conditions, additions, duration.as_secs_f64()))
 }
 
 #[pyfunction]
