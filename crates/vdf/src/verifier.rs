@@ -605,7 +605,9 @@ pub fn verify_n_wesolowski(
             Err(()) => return false,
         };
         let mut xnew = Form::identity(&d);
-        if verify_weso_segment(&d, &x_current, &proof, &b, segment_iters, &mut xnew) {
+        let seg_invalid = verify_weso_segment(&d, &x_current, &proof, &b, segment_iters, &mut xnew);
+        eprintln!("verify_weso_segment result: {} (true = segment invalid)", seg_invalid);
+        if seg_invalid {
             return false;
         }
         x_current = xnew;
@@ -624,5 +626,80 @@ pub fn verify_n_wesolowski(
         Ok(f) => f,
         Err(()) => return false,
     };
-    verify_wesolowski_proof(&d, &x_current, &y, &proof, iterations)
+    let final_ok = verify_wesolowski_proof(&d, &x_current, &y, &proof, iterations);
+    eprintln!("verify_wesolowski_proof result: {}", final_ok);
+    final_ok
+}
+
+#[cfg(test)]
+mod tests {
+    use super::verify_n_wesolowski;
+    use crate::pure::discriminant::create_discriminant;
+    use std::path::Path;
+
+    /// vdf.txt format per record (6 lines): challenge (hex), discriminant_size, input_el (hex),
+    /// output (hex), number_of_iterations, witness_type (recursion depth).
+    #[test]
+    fn test_verify_from_vdf_txt() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src").join("vdf.txt");
+        let content = match std::fs::read_to_string(&path) {
+            Ok(c) => c,
+            Err(_) => {
+                eprintln!("skip test_verify_from_vdf_txt: vdf.txt not found");
+                return;
+            }
+        };
+        let lines: Vec<&str> = content.lines().map(str::trim).filter(|s| !s.is_empty()).collect();
+        assert!(
+            lines.len() % 6 == 0,
+            "vdf.txt must have 6 lines per record, got {} lines",
+            lines.len()
+        );
+
+        let mut passed = 0;
+        for chunk in lines.chunks_exact(6) {
+            let challenge_hex = chunk[0];
+            let discriminant_size: u32 = chunk[1].parse().expect("discriminant_size");
+            let input_el_hex = chunk[2];
+            let output_hex = chunk[3];
+            let number_of_iterations: u64 = chunk[4].parse().expect("number_of_iterations");
+            let witness_type: u64 = chunk[5].parse().expect("witness_type");
+
+            let challenge = hex::decode(challenge_hex).expect("challenge hex");
+            let input_el = hex::decode(input_el_hex).expect("input_el hex");
+            let output = hex::decode(output_hex).expect("output hex");
+
+            eprintln!("challenge: {}", challenge_hex);
+            eprintln!("discriminant_size: {}", discriminant_size);
+
+            let disc_bytes = (discriminant_size / 8) as usize;
+            let mut discriminant = vec![0u8; disc_bytes];
+            assert!(
+                create_discriminant(&challenge, discriminant_size, &mut discriminant),
+                "create_discriminant failed"
+            );
+            eprintln!("discriminant: {} ({} bytes)", hex::encode(&discriminant), discriminant.len());
+
+            eprintln!("input_el: {} ({} bytes)", input_el_hex, input_el.len());
+            eprintln!("output: {} ({} bytes)", output_hex, output.len());
+            eprintln!("number_of_iterations: {}", number_of_iterations);
+            eprintln!("witness_type: {}", witness_type);
+
+            let ok = verify_n_wesolowski(
+                &discriminant,
+                &input_el,
+                &output,
+                number_of_iterations,
+                witness_type,
+            );
+            eprintln!("verify_n_wesolowski result: {}", ok);
+            assert!(
+                ok,
+                "verify_n_wesolowski failed for challenge={} iterations={} witness_type={}",
+                challenge_hex, number_of_iterations, witness_type
+            );
+            passed += 1;
+        }
+        assert!(passed > 0, "no records in vdf.txt");
+    }
 }
