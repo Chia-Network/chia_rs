@@ -116,6 +116,8 @@ impl Signature {
         }
     }
 
+    /// Single pairing e(sig, pk) in GT. When the `vroom` feature is enabled,
+    /// uses VROOM's pairing implementation (AVX512 RNS optimizations).
     pub fn pair(&self, other: &PublicKey) -> GTElement {
         let ans = unsafe {
             let mut ans = MaybeUninit::<blst_fp12>::uninit();
@@ -125,6 +127,7 @@ impl Signature {
             blst_p1_to_affine(aff1.as_mut_ptr(), &raw const other.0);
             blst_p2_to_affine(aff2.as_mut_ptr(), &raw const self.0);
 
+            // With feature "vroom", blst is built from vroom/blst/pairing.c so these are VROOM
             blst_miller_loop(ans.as_mut_ptr(), &aff2.assume_init(), &aff1.assume_init());
             blst_final_exp(ans.as_mut_ptr(), ans.as_ptr());
             ans.assume_init()
