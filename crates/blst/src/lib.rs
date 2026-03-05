@@ -1777,104 +1777,109 @@ macro_rules! sig_variant_impl {
 
             #[test]
             fn test_sign_n_verify() {
-                let ikm: [u8; 32] = [
-                    0x93, 0xad, 0x7e, 0x65, 0xde, 0xad, 0x05, 0x2a, 0x08, 0x3a,
-                    0x91, 0x0c, 0x8b, 0x72, 0x85, 0x91, 0x46, 0x4c, 0xca, 0x56,
-                    0x60, 0x5b, 0xb0, 0x56, 0xed, 0xfe, 0x2b, 0x60, 0xa6, 0x3c,
-                    0x48, 0x99,
-                ];
+                for _ in 0..100 {
+                    let ikm: [u8; 32] = [
+                        0x93, 0xad, 0x7e, 0x65, 0xde, 0xad, 0x05, 0x2a, 0x08, 0x3a,
+                        0x91, 0x0c, 0x8b, 0x72, 0x85, 0x91, 0x46, 0x4c, 0xca, 0x56,
+                        0x60, 0x5b, 0xb0, 0x56, 0xed, 0xfe, 0x2b, 0x60, 0xa6, 0x3c,
+                        0x48, 0x99,
+                    ];
 
-                let sk = SecretKey::key_gen(&ikm, &[]).unwrap();
-                let pk = sk.sk_to_pk();
+                    let sk = SecretKey::key_gen(&ikm, &[]).unwrap();
+                    let pk = sk.sk_to_pk();
 
-                let dst = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_";
-                let msg = b"hello foo";
-                let sig = sk.sign(msg, dst, &[]);
+                    let dst = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_";
+                    let msg = b"hello foo";
+                    let sig = sk.sign(msg, dst, &[]);
 
-                let err = sig.verify(true, msg, dst, &[], &pk, true);
-                assert_eq!(err, BLST_ERROR::BLST_SUCCESS);
+                    let err = sig.verify(true, msg, dst, &[], &pk, true);
+                    assert_eq!(err, BLST_ERROR::BLST_SUCCESS);
+                }
             }
 
             #[test]
             fn test_aggregate() {
-                let num_msgs = 10;
-                let dst = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_";
+                for _ in 0..100 {
+                    let num_msgs = 10;
+                    let dst = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_";
 
-                let seed = [0u8; 32];
-                let mut rng = ChaCha20Rng::from_seed(seed);
+                    let seed = [0u8; 32];
+                    let mut rng = ChaCha20Rng::from_seed(seed);
 
-                let sks: Vec<_> =
-                    (0..num_msgs).map(|_| gen_random_key(&mut rng)).collect();
-                let pks =
-                    sks.iter().map(|sk| sk.sk_to_pk()).collect::<Vec<_>>();
-                let pks_refs: Vec<&PublicKey> =
-                    pks.iter().map(|pk| pk).collect();
-                let pks_rev: Vec<&PublicKey> =
-                    pks.iter().rev().map(|pk| pk).collect();
+                    let sks: Vec<_> =
+                        (0..num_msgs).map(|_| gen_random_key(&mut rng)).collect();
+                    let pks =
+                        sks.iter().map(|sk| sk.sk_to_pk()).collect::<Vec<_>>();
+                    let pks_refs: Vec<&PublicKey> =
+                        pks.iter().map(|pk| pk).collect();
+                    let pks_rev: Vec<&PublicKey> =
+                        pks.iter().rev().map(|pk| pk).collect();
 
-                let pk_comp = pks[0].compress();
-                let pk_uncomp = PublicKey::uncompress(&pk_comp);
-                assert_eq!(pk_uncomp.is_ok(), true);
+                    let pk_comp = pks[0].compress();
+                    let pk_uncomp = PublicKey::uncompress(&pk_comp);
+                    assert_eq!(pk_uncomp.is_ok(), true);
 
-                let mut msgs: Vec<Vec<u8>> = vec![vec![]; num_msgs];
-                for i in 0..num_msgs {
-                    let msg_len = (rng.next_u64() & 0x3F) + 1;
-                    msgs[i] = vec![0u8; msg_len as usize];
-                    rng.fill_bytes(&mut msgs[i]);
+                    let mut msgs: Vec<Vec<u8>> = vec![vec![]; num_msgs];
+                    for i in 0..num_msgs {
+                        let msg_len = (rng.next_u64() & 0x3F) + 1;
+                        msgs[i] = vec![0u8; msg_len as usize];
+                        rng.fill_bytes(&mut msgs[i]);
+                    }
+
+                    let msgs_refs: Vec<&[u8]> =
+                        msgs.iter().map(|m| m.as_slice()).collect();
+
+                    let sigs = sks
+                        .iter()
+                        .zip(msgs.iter())
+                        .map(|(sk, m)| (sk.sign(m, dst, &[])))
+                        .collect::<Vec<Signature>>();
+
+                    let mut errs = sigs
+                        .iter()
+                        .zip(msgs.iter())
+                        .zip(pks.iter())
+                        .map(|((s, m), pk)| (s.verify(true, m, dst, &[], pk, true)))
+                        .collect::<Vec<BLST_ERROR>>();
+                    assert_eq!(errs, vec![BLST_ERROR::BLST_SUCCESS; num_msgs]);
+
+                    // Swap message/public key pairs to create bad signature
+                    errs = sigs
+                        .iter()
+                        .zip(msgs.iter())
+                        .zip(pks.iter().rev())
+                        .map(|((s, m), pk)| (s.verify(true, m, dst, &[], pk, true)))
+                        .collect::<Vec<BLST_ERROR>>();
+                    assert_ne!(errs, vec![BLST_ERROR::BLST_SUCCESS; num_msgs]);
+
+                    let sig_refs =
+                        sigs.iter().map(|s| s).collect::<Vec<&Signature>>();
+                    let agg = match AggregateSignature::aggregate(&sig_refs, true) {
+                        Ok(agg) => agg,
+                        Err(err) => panic!("aggregate failure: {:?}", err),
+                    };
+
+                    let agg_sig = agg.to_signature();
+                    let mut result = agg_sig
+                        .aggregate_verify(false, &msgs_refs, dst, &pks_refs, false);
+                    assert_eq!(result, BLST_ERROR::BLST_SUCCESS);
+
+                    // Swap message/public key pairs to create bad signature
+                    result = agg_sig
+                        .aggregate_verify(false, &msgs_refs, dst, &pks_rev, false);
+                    assert_ne!(result, BLST_ERROR::BLST_SUCCESS);
                 }
-
-                let msgs_refs: Vec<&[u8]> =
-                    msgs.iter().map(|m| m.as_slice()).collect();
-
-                let sigs = sks
-                    .iter()
-                    .zip(msgs.iter())
-                    .map(|(sk, m)| (sk.sign(m, dst, &[])))
-                    .collect::<Vec<Signature>>();
-
-                let mut errs = sigs
-                    .iter()
-                    .zip(msgs.iter())
-                    .zip(pks.iter())
-                    .map(|((s, m), pk)| (s.verify(true, m, dst, &[], pk, true)))
-                    .collect::<Vec<BLST_ERROR>>();
-                assert_eq!(errs, vec![BLST_ERROR::BLST_SUCCESS; num_msgs]);
-
-                // Swap message/public key pairs to create bad signature
-                errs = sigs
-                    .iter()
-                    .zip(msgs.iter())
-                    .zip(pks.iter().rev())
-                    .map(|((s, m), pk)| (s.verify(true, m, dst, &[], pk, true)))
-                    .collect::<Vec<BLST_ERROR>>();
-                assert_ne!(errs, vec![BLST_ERROR::BLST_SUCCESS; num_msgs]);
-
-                let sig_refs =
-                    sigs.iter().map(|s| s).collect::<Vec<&Signature>>();
-                let agg = match AggregateSignature::aggregate(&sig_refs, true) {
-                    Ok(agg) => agg,
-                    Err(err) => panic!("aggregate failure: {:?}", err),
-                };
-
-                let agg_sig = agg.to_signature();
-                let mut result = agg_sig
-                    .aggregate_verify(false, &msgs_refs, dst, &pks_refs, false);
-                assert_eq!(result, BLST_ERROR::BLST_SUCCESS);
-
-                // Swap message/public key pairs to create bad signature
-                result = agg_sig
-                    .aggregate_verify(false, &msgs_refs, dst, &pks_rev, false);
-                assert_ne!(result, BLST_ERROR::BLST_SUCCESS);
             }
 
             #[test]
             fn test_multiple_agg_sigs() {
-                let dst = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_";
-                let num_pks_per_sig = 10;
-                let num_sigs = 10;
+                for _ in 0..100 {
+                    let dst = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_";
+                    let num_pks_per_sig = 10;
+                    let num_sigs = 10;
 
-                let seed = [0u8; 32];
-                let mut rng = ChaCha20Rng::from_seed(seed);
+                    let seed = [0u8; 32];
+                    let mut rng = ChaCha20Rng::from_seed(seed);
 
                 let mut msgs: Vec<Vec<u8>> = vec![vec![]; num_sigs];
                 let mut sigs: Vec<Signature> = Vec::with_capacity(num_sigs);
@@ -2027,6 +2032,7 @@ macro_rules! sig_variant_impl {
                     64,
                 );
                 assert_ne!(result, BLST_ERROR::BLST_SUCCESS);
+                }
             }
 
             #[test]
@@ -2120,74 +2126,76 @@ macro_rules! sig_variant_impl {
 
             #[test]
             fn test_multi_point() {
-                let dst = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_";
-                let num_pks = 13;
+                for _ in 0..100 {
+                    let dst = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_";
+                    let num_pks = 13;
 
-                let seed = [0u8; 32];
-                let mut rng = ChaCha20Rng::from_seed(seed);
+                    let seed = [0u8; 32];
+                    let mut rng = ChaCha20Rng::from_seed(seed);
 
-                // Create public keys
-                let sks: Vec<_> =
-                    (0..num_pks).map(|_| gen_random_key(&mut rng)).collect();
+                    // Create public keys
+                    let sks: Vec<_> =
+                        (0..num_pks).map(|_| gen_random_key(&mut rng)).collect();
 
-                let pks =
-                    sks.iter().map(|sk| sk.sk_to_pk()).collect::<Vec<_>>();
-                let pks_refs: Vec<&PublicKey> =
-                    pks.iter().map(|pk| pk).collect();
+                    let pks =
+                        sks.iter().map(|sk| sk.sk_to_pk()).collect::<Vec<_>>();
+                    let pks_refs: Vec<&PublicKey> =
+                        pks.iter().map(|pk| pk).collect();
 
-                // Create random message for pks to all sign
-                let msg_len = (rng.next_u64() & 0x3F) + 1;
-                let mut msg = vec![0u8; msg_len as usize];
-                rng.fill_bytes(&mut msg);
+                    // Create random message for pks to all sign
+                    let msg_len = (rng.next_u64() & 0x3F) + 1;
+                    let mut msg = vec![0u8; msg_len as usize];
+                    rng.fill_bytes(&mut msg);
 
-                // Generate signature for each key pair
-                let sigs = sks
-                    .iter()
-                    .map(|sk| sk.sign(&msg, dst, &[]))
-                    .collect::<Vec<Signature>>();
-                let sigs_refs: Vec<&Signature> =
-                    sigs.iter().map(|s| s).collect();
+                    // Generate signature for each key pair
+                    let sigs = sks
+                        .iter()
+                        .map(|sk| sk.sign(&msg, dst, &[]))
+                        .collect::<Vec<Signature>>();
+                    let sigs_refs: Vec<&Signature> =
+                        sigs.iter().map(|s| s).collect();
 
-                // create random values
-                let mut rands: Vec<u8> = Vec::with_capacity(8 * num_pks);
-                for _ in 0..num_pks {
-                    let mut r = rng.next_u64();
-                    while r == 0 {
-                        // Reject zero as it is used for multiplication.
-                        r = rng.next_u64();
+                    // create random values
+                    let mut rands: Vec<u8> = Vec::with_capacity(8 * num_pks);
+                    for _ in 0..num_pks {
+                        let mut r = rng.next_u64();
+                        while r == 0 {
+                            // Reject zero as it is used for multiplication.
+                            r = rng.next_u64();
+                        }
+                        rands.extend_from_slice(&r.to_le_bytes());
                     }
-                    rands.extend_from_slice(&r.to_le_bytes());
+
+                    // Sanity test each current single signature
+                    let errs = sigs
+                        .iter()
+                        .zip(pks.iter())
+                        .map(|(s, pk)| (s.verify(true, &msg, dst, &[], pk, true)))
+                        .collect::<Vec<BLST_ERROR>>();
+                    assert_eq!(errs, vec![BLST_ERROR::BLST_SUCCESS; num_pks]);
+
+                    // sanity test aggregated signature
+                    let agg_pk = AggregatePublicKey::aggregate(&pks_refs, false)
+                        .unwrap()
+                        .to_public_key();
+                    let agg_sig = AggregateSignature::aggregate(&sigs_refs, false)
+                        .unwrap()
+                        .to_signature();
+                    let err = agg_sig.verify(true, &msg, dst, &[], &agg_pk, true);
+                    assert_eq!(err, BLST_ERROR::BLST_SUCCESS);
+
+                    // test multi-point aggregation using add
+                    let agg_pk = pks.add().to_public_key();
+                    let agg_sig = sigs.add().to_signature();
+                    let err = agg_sig.verify(true, &msg, dst, &[], &agg_pk, true);
+                    assert_eq!(err, BLST_ERROR::BLST_SUCCESS);
+
+                    // test multi-point aggregation using mult
+                    let agg_pk = pks.mult(&rands, 64).to_public_key();
+                    let agg_sig = sigs.mult(&rands, 64).to_signature();
+                    let err = agg_sig.verify(true, &msg, dst, &[], &agg_pk, true);
+                    assert_eq!(err, BLST_ERROR::BLST_SUCCESS);
                 }
-
-                // Sanity test each current single signature
-                let errs = sigs
-                    .iter()
-                    .zip(pks.iter())
-                    .map(|(s, pk)| (s.verify(true, &msg, dst, &[], pk, true)))
-                    .collect::<Vec<BLST_ERROR>>();
-                assert_eq!(errs, vec![BLST_ERROR::BLST_SUCCESS; num_pks]);
-
-                // sanity test aggregated signature
-                let agg_pk = AggregatePublicKey::aggregate(&pks_refs, false)
-                    .unwrap()
-                    .to_public_key();
-                let agg_sig = AggregateSignature::aggregate(&sigs_refs, false)
-                    .unwrap()
-                    .to_signature();
-                let err = agg_sig.verify(true, &msg, dst, &[], &agg_pk, true);
-                assert_eq!(err, BLST_ERROR::BLST_SUCCESS);
-
-                // test multi-point aggregation using add
-                let agg_pk = pks.add().to_public_key();
-                let agg_sig = sigs.add().to_signature();
-                let err = agg_sig.verify(true, &msg, dst, &[], &agg_pk, true);
-                assert_eq!(err, BLST_ERROR::BLST_SUCCESS);
-
-                // test multi-point aggregation using mult
-                let agg_pk = pks.mult(&rands, 64).to_public_key();
-                let agg_sig = sigs.mult(&rands, 64).to_signature();
-                let err = agg_sig.verify(true, &msg, dst, &[], &agg_pk, true);
-                assert_eq!(err, BLST_ERROR::BLST_SUCCESS);
             }
         }
     };
@@ -2311,44 +2319,46 @@ mod fp12_test {
         const nbits: usize = 64;
         const nbytes: usize = (nbits + 7) / 8;
 
-        let mut scalars = Box::new([0u8; nbytes * npoints]);
-        ChaCha20Rng::from_entropy().fill_bytes(scalars.as_mut());
+        for _ in 0..100 {
+            let mut scalars = Box::new([0u8; nbytes * npoints]);
+            ChaCha20Rng::from_entropy().fill_bytes(scalars.as_mut());
 
-        let mut p1s: Vec<blst_p1> = Vec::with_capacity(npoints);
-        let mut p2s: Vec<blst_p2> = Vec::with_capacity(npoints);
+            let mut p1s: Vec<blst_p1> = Vec::with_capacity(npoints);
+            let mut p2s: Vec<blst_p2> = Vec::with_capacity(npoints);
 
-        unsafe {
-            p1s.set_len(npoints);
-            p2s.set_len(npoints);
+            unsafe {
+                p1s.set_len(npoints);
+                p2s.set_len(npoints);
 
-            for i in 0..npoints {
-                blst_p1_mult(
-                    &mut p1s[i],
-                    blst_p1_generator(),
-                    &scalars[i * nbytes],
-                    32,
-                );
-                blst_p2_mult(
-                    &mut p2s[i],
-                    blst_p2_generator(),
-                    &scalars[i * nbytes + 4],
-                    32,
-                );
+                for i in 0..npoints {
+                    blst_p1_mult(
+                        &mut p1s[i],
+                        blst_p1_generator(),
+                        &scalars[i * nbytes],
+                        32,
+                    );
+                    blst_p2_mult(
+                        &mut p2s[i],
+                        blst_p2_generator(),
+                        &scalars[i * nbytes + 4],
+                        32,
+                    );
+                }
             }
+
+            let ps = p1_affines::from(&p1s);
+            let qs = p2_affines::from(&p2s);
+
+            let mut naive = blst_fp12::default();
+            for i in 0..npoints {
+                naive *= blst_fp12::miller_loop(&qs[i], &ps[i]);
+            }
+
+            assert_eq!(
+                naive,
+                blst_fp12::miller_loop_n(qs.as_slice(), ps.as_slice())
+            );
         }
-
-        let ps = p1_affines::from(&p1s);
-        let qs = p2_affines::from(&p2s);
-
-        let mut naive = blst_fp12::default();
-        for i in 0..npoints {
-            naive *= blst_fp12::miller_loop(&qs[i], &ps[i]);
-        }
-
-        assert_eq!(
-            naive,
-            blst_fp12::miller_loop_n(qs.as_slice(), ps.as_slice())
-        );
     }
 }
 
