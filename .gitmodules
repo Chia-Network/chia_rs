@@ -1,0 +1,6 @@
+[submodule "vroom"]
+	path = vroom
+	url = https://github.com/SimonLangowski/VROOM.git
+[submodule "blst-src"]
+	path = blst-src
+	url = https://github.com/supranational/blst.git
