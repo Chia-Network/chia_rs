@@ -93,7 +93,8 @@ pub fn get_flags_for_height_and_constants(
             | ConsensusFlags::SIMPLE_GENERATOR
             | ConsensusFlags::CANONICAL_INTS
             | ConsensusFlags::ENABLE_SECP_OPS
-            | ConsensusFlags::RELAXED_BLS;
+            | ConsensusFlags::RELAXED_BLS
+            | ConsensusFlags::INTERNED_GENERATOR;
     }
 
     if prev_tx_height >= constants.soft_fork8_height {

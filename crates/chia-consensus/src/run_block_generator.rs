@@ -6,6 +6,7 @@ use crate::conditions::{
 };
 use crate::consensus_constants::ConsensusConstants;
 use crate::flags::ConsensusFlags;
+use crate::generator_cost::total_cost_from_tree;
 use crate::opcodes::{
     AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT, AGG_SIG_PARENT_PUZZLE,
     AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT, AGG_SIG_UNSAFE, CREATE_COIN,
@@ -23,7 +24,7 @@ use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
-use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs};
+use clvmr::serde::{intern, node_from_bytes, node_from_bytes_backrefs};
 
 pub fn subtract_cost(
     a: &Allocator,
@@ -229,6 +230,11 @@ where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
     check_generator_quote(program, flags)?;
+    if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
+        return run_block_generator_interned(
+            program, block_refs, max_cost, flags, signature, bls_cache, constants,
+        );
+    }
     let mut a = make_allocator(flags);
     let byte_cost = program.len() as u64 * constants.cost_per_byte;
 
@@ -236,6 +242,31 @@ where
     subtract_cost(&a, &mut cost_left, byte_cost)?;
 
     let program = node_from_bytes_backrefs(&mut a, program)?;
+
+    run_block_generator_inner(
+        a, program, block_refs, max_cost, cost_left, flags, signature, bls_cache, constants,
+    )
+}
+
+/// Shared inner implementation for run_block_generator2 and run_block_generator_interned.
+/// Takes an already-deserialized program and an already-computed cost_left (after
+/// subtracting the generator's base cost). Runs the generator ROM, executes each
+/// puzzle, and returns the accumulated SpendBundleConditions.
+#[allow(clippy::too_many_arguments)]
+fn run_block_generator_inner<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
+    mut a: Allocator,
+    program: NodePtr,
+    block_refs: I,
+    max_cost: u64,
+    mut cost_left: u64,
+    flags: ConsensusFlags,
+    signature: &Signature,
+    bls_cache: Option<&BlsCache>,
+    constants: &ConsensusConstants,
+) -> Result<(Allocator, SpendBundleConditions), ValidationErr>
+where
+    <I as IntoIterator>::IntoIter: DoubleEndedIterator,
+{
     check_generator_node(&a, program, flags)?;
 
     let args = setup_generator_args(&mut a, block_refs, flags)?;
@@ -307,6 +338,36 @@ where
 
     ret.cost = max_cost - cost_left;
     Ok((a, ret))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_block_generator_interned<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
+    program: &[u8],
+    block_refs: I,
+    max_cost: u64,
+    flags: ConsensusFlags,
+    signature: &Signature,
+    bls_cache: Option<&BlsCache>,
+    constants: &ConsensusConstants,
+) -> Result<(Allocator, SpendBundleConditions), ValidationErr>
+where
+    <I as IntoIterator>::IntoIter: DoubleEndedIterator,
+{
+    let mut decode_allocator = Allocator::new();
+    let program_node = node_from_bytes_backrefs(&mut decode_allocator, program)
+        .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
+    let interned = intern(&decode_allocator, program_node)
+        .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
+    let base_cost = total_cost_from_tree(&interned);
+    let a = interned.allocator;
+    let program = interned.root;
+
+    let mut cost_left = max_cost;
+    subtract_cost(&a, &mut cost_left, base_cost)?;
+
+    run_block_generator_inner(
+        a, program, block_refs, max_cost, cost_left, flags, signature, bls_cache, constants,
+    )
 }
 
 // this function is less capable of handling problematic generators as they are
