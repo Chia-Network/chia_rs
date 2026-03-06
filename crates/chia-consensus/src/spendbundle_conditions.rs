@@ -44,6 +44,40 @@ pub fn get_conditions_from_spendbundle(
     .0)
 }
 
+/// Computes the base cost of a spend bundle's generator before any puzzles run.
+/// For INTERNED_GENERATOR, builds a backrefs-encoded generator, interns the tree,
+/// and charges based on the interned structure. Otherwise charges cost_per_byte
+/// on the raw generator length (excluding the quote wrapper).
+fn calculate_base_cost(
+    a: &mut Allocator,
+    spend_bundle: &SpendBundle,
+    flags: ConsensusFlags,
+    constants: &ConsensusConstants,
+) -> Result<u64, ValidationErr> {
+    if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
+        let generator = solution_generator_backrefs(
+            spend_bundle
+                .coin_spends
+                .iter()
+                .map(|cs| (cs.coin, cs.puzzle_reveal.as_slice(), cs.solution.as_slice())),
+        )
+        .map_err(|_| ValidationErr(a.nil(), ErrorCode::GeneratorRuntimeError))?;
+
+        let mut decode_allocator = Allocator::new();
+        let program_node = node_from_bytes_backrefs(&mut decode_allocator, &generator)
+            .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
+        let interned = intern(&decode_allocator, program_node)
+            .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
+        Ok(total_cost_from_tree(&interned))
+    } else {
+        // We don't pay the size cost (nor execution cost) of being wrapped by a
+        // quote (in solution_generator).
+        let generator_length_without_quote =
+            calculate_generator_length(&spend_bundle.coin_spends) - QUOTE_BYTES;
+        Ok(generator_length_without_quote as u64 * constants.cost_per_byte)
+    }
+}
+
 // returns the conditions for the spendbundle, along with the (public key,
 // message) pairs emitted by the spends (for validating the aggregate signature)
 #[allow(clippy::type_complexity)]
@@ -60,29 +94,7 @@ pub fn run_spendbundle(
     let dialect = ChiaDialect::new(flags.to_clvm_flags());
     let mut ret = SpendBundleConditions::default();
     let mut state = ParseState::default();
-    // We don't pay the size cost (nor execution cost) of being wrapped by a
-    // quote (in solution_generator).
-    let generator_length_without_quote =
-        calculate_generator_length(&spend_bundle.coin_spends) - QUOTE_BYTES;
-
-    let base_cost = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
-        let generator = solution_generator_backrefs(
-            spend_bundle
-                .coin_spends
-                .iter()
-                .map(|cs| (cs.coin, cs.puzzle_reveal.as_slice(), cs.solution.as_slice())),
-        )
-        .map_err(|_| ValidationErr(a.nil(), ErrorCode::GeneratorRuntimeError))?;
-
-        let mut decode_allocator = Allocator::new();
-        let program_node = node_from_bytes_backrefs(&mut decode_allocator, &generator)
-            .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
-        let interned = intern(&decode_allocator, program_node)
-            .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
-        total_cost_from_tree(&interned)
-    } else {
-        generator_length_without_quote as u64 * constants.cost_per_byte
-    };
+    let base_cost = calculate_base_cost(a, spend_bundle, flags, constants)?;
     subtract_cost(a, &mut cost_left, base_cost)?;
 
     for coin_spend in &spend_bundle.coin_spends {
