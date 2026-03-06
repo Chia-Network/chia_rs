@@ -142,3 +142,10 @@ path = "fuzz_targets/puzzle-fingerprint.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "merkle-tree"
+path = "fuzz_targets/merkle-tree.rs"
+test = false
+doc = false
+bench = false
