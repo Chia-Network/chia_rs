@@ -44,6 +44,11 @@ bitflags! {
 
         /// Simpler generator rules (hard fork behavior).
         const SIMPLE_GENERATOR = 0x100_0000;
+
+        /// After the generator-identity hard fork, generators must be validated from
+        /// the INTERNED (canonical) tree so atom/pair limits and cost apply to the same
+        /// structure independent of serialization.
+        const INTERNED_GENERATOR = 0x0800_0000;
     }
 }
 
