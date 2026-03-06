@@ -206,6 +206,52 @@ pub fn check_generator_node(
     }
 }
 
+/// This has the same behavior as run_block_generator() but implements the
+/// generator ROM in rust instead of using the CLVM implementation.
+/// it is not backwards compatible in the CLVM cost computation (in this version
+/// you only pay cost for the generator, the puzzles and the conditions).
+/// it also does not apply the stack depth or object allocation limits the same,
+/// as each puzzle run in its own environment.
+///
+/// Creates an allocator internally based on the consensus flags (using
+/// `make_allocator(flags)`). Returns `(Allocator, SpendBundleConditions)` since
+/// the conditions contain NodePtr references into the allocator.
+#[allow(clippy::too_many_arguments)]
+pub fn run_block_generator2<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
+    program: &[u8],
+    block_refs: I,
+    max_cost: u64,
+    flags: ConsensusFlags,
+    signature: &Signature,
+    bls_cache: Option<&BlsCache>,
+    constants: &ConsensusConstants,
+) -> Result<(Allocator, SpendBundleConditions), ValidationErr>
+where
+    <I as IntoIterator>::IntoIter: DoubleEndedIterator,
+{
+    check_generator_quote(program, flags)?;
+    if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
+        return run_block_generator_interned(
+            program, block_refs, max_cost, flags, signature, bls_cache, constants,
+        );
+    }
+    let mut a = make_allocator(flags);
+    let byte_cost = program.len() as u64 * constants.cost_per_byte;
+
+    let mut cost_left = max_cost;
+    subtract_cost(&a, &mut cost_left, byte_cost)?;
+
+    let program = node_from_bytes_backrefs(&mut a, program)?;
+
+    run_block_generator_inner(
+        a, program, block_refs, max_cost, cost_left, flags, signature, bls_cache, constants,
+    )
+}
+
+/// Shared inner implementation for run_block_generator2 and run_block_generator_interned.
+/// Takes an already-deserialized program and an already-computed cost_left (after
+/// subtracting the generator's base cost). Runs the generator ROM, executes each
+/// puzzle, and returns the accumulated SpendBundleConditions.
 #[allow(clippy::too_many_arguments)]
 fn run_block_generator_inner<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
     mut a: Allocator,
@@ -255,6 +301,7 @@ where
     let mut iter = all_spends;
     while let Some((spend, rest)) = a.next(iter) {
         iter = rest;
+        // process the spend
         let [parent_id, puzzle, amount, solution, _spend_level_extra] =
             extract_n::<5>(&a, spend, ErrorCode::InvalidCondition)?;
 
@@ -317,48 +364,6 @@ where
 
     let mut cost_left = max_cost;
     subtract_cost(&a, &mut cost_left, base_cost)?;
-
-    run_block_generator_inner(
-        a, program, block_refs, max_cost, cost_left, flags, signature, bls_cache, constants,
-    )
-}
-
-/// This has the same behavior as run_block_generator() but implements the
-/// generator ROM in rust instead of using the CLVM implementation.
-/// it is not backwards compatible in the CLVM cost computation (in this version
-/// you only pay cost for the generator, the puzzles and the conditions).
-/// it also does not apply the stack depth or object allocation limits the same,
-/// as each puzzle run in its own environment.
-///
-/// Creates an allocator internally based on the consensus flags (using
-/// `make_allocator(flags)`). Returns `(Allocator, SpendBundleConditions)` since
-/// the conditions contain NodePtr references into the allocator.
-#[allow(clippy::too_many_arguments)]
-pub fn run_block_generator2<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
-    program: &[u8],
-    block_refs: I,
-    max_cost: u64,
-    flags: ConsensusFlags,
-    signature: &Signature,
-    bls_cache: Option<&BlsCache>,
-    constants: &ConsensusConstants,
-) -> Result<(Allocator, SpendBundleConditions), ValidationErr>
-where
-    <I as IntoIterator>::IntoIter: DoubleEndedIterator,
-{
-    check_generator_quote(program, flags)?;
-    if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
-        return run_block_generator_interned(
-            program, block_refs, max_cost, flags, signature, bls_cache, constants,
-        );
-    }
-    let mut a = make_allocator(flags);
-    let byte_cost = program.len() as u64 * constants.cost_per_byte;
-
-    let mut cost_left = max_cost;
-    subtract_cost(&a, &mut cost_left, byte_cost)?;
-
-    let program = node_from_bytes_backrefs(&mut a, program)?;
 
     run_block_generator_inner(
         a, program, block_refs, max_cost, cost_left, flags, signature, bls_cache, constants,
