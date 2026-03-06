@@ -206,10 +206,6 @@ pub fn check_generator_node(
     }
 }
 
-/// Shared inner implementation for run_block_generator2 and run_block_generator_interned.
-/// Takes an already-deserialized program and an already-computed cost_left (after
-/// subtracting the generator's base cost). Runs the generator ROM, executes each
-/// puzzle, and returns the accumulated SpendBundleConditions.
 #[allow(clippy::too_many_arguments)]
 fn run_block_generator_inner<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
     mut a: Allocator,
@@ -259,7 +255,6 @@ where
     let mut iter = all_spends;
     while let Some((spend, rest)) = a.next(iter) {
         iter = rest;
-        // process the spend
         let [parent_id, puzzle, amount, solution, _spend_level_extra] =
             extract_n::<5>(&a, spend, ErrorCode::InvalidCondition)?;
 
