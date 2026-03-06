@@ -1,8 +1,8 @@
+use crate::condition_sanitizers::parse_amount;
 use crate::validation_error::{ErrorCode, ValidationErr, atom, check_nil, first, next, rest};
 use chia_protocol::Coin;
 use clvm_utils::{TreeCache, tree_hash_cached};
 use clvmr::allocator::{Allocator, Atom, NodePtr};
-use clvmr::op_utils::u64_from_bytes;
 
 /// returns parent-coin ID, amount, puzzle-reveal and solution
 pub fn parse_coin_spend(
@@ -13,8 +13,7 @@ pub fn parse_coin_spend(
     let coin_spend = rest(a, coin_spend)?;
     let puzzle = first(a, coin_spend)?;
     let coin_spend = rest(a, coin_spend)?;
-    let amount =
-        u64_from_bytes(atom(a, first(a, coin_spend)?, ErrorCode::InvalidCoinAmount)?.as_ref());
+    let amount = parse_amount(a, first(a, coin_spend)?, ErrorCode::InvalidCoinAmount)?;
     let coin_spend = rest(a, coin_spend)?;
     let solution = first(a, coin_spend)?;
     check_nil(a, rest(a, coin_spend)?)?;
