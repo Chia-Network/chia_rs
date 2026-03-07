@@ -66,7 +66,7 @@ def check_tree(leafs: list[bytes32]) -> None:
         )
 
     for i in range(256):
-        item = bytes32([i] + [2] * 31)
+        item = bytes32.fill(bytes([i]), fill=b"\x02", align="<")
         py_included, py_proof = py_tree.is_included_already_hashed(item)
         assert not py_included
         ru_included, ru_proof = ru_tree.is_included_already_hashed(item)
