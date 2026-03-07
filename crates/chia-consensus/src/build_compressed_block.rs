@@ -212,27 +212,18 @@ impl BlockBuilder {
     /// the first bool indicates whether the bundles was added.
     /// the second bool indicates whether we're done
     #[pyo3(name = "add_spend_bundles")]
-    pub fn py_add_spend_bundle(
+    pub fn py_add_spend_bundles(
         &mut self,
+        py: Python<'_>,
         bundles: &Bound<'_, PyList>,
         cost: u64,
         constants: &ConsensusConstants,
     ) -> PyResult<(bool, bool)> {
-        let (added, result) = self.add_spend_bundles(
-            bundles.iter().map(|item| {
-                // ideally, the failures in here would be reported back as python
-                // exceptions, but map() is infallible, so it's not so easy to
-                // propagate errors back
-                // TODO: It would be nice to not have to clone the SpendBundle
-                // here
-                item.extract::<Bound<'_, SpendBundle>>()
-                    .expect("spend bundle")
-                    .get()
-                    .clone()
-            }),
-            cost,
-            constants,
-        )?;
+        let sbs: Vec<SpendBundle> = bundles
+            .iter()
+            .map(|sb| Ok(sb.extract()?))
+            .collect::<PyResult<_>>()?;
+        let (added, result) = py.detach(|| self.add_spend_bundles(sbs, cost, constants))?;
         let done = matches!(result, BuildBlockResult::Done);
         Ok((added, done))
     }
