@@ -15,6 +15,10 @@ repository = "https://github.com/Chia-Network/chia_rs"
 [workspace]
 members = ["crates/*", "crates/*/fuzz", "wasm", "wheel"]
 
+[patch.crates-io]
+# Use local blst (with optional VROOM pairing) so only one native lib is linked
+blst = { path = "./crates/blst" }
+
 [workspace.package]
 version = "0.38.1"
 
@@ -142,7 +146,9 @@ chia-protocol-fuzz = { path = "./crates/chia-protocol/fuzz", version = "0.38.1" 
 chia-puzzle-types-fuzz = { path = "./crates/chia-puzzle-types/fuzz", version = "0.38.1" }
 clvm-traits-fuzz = { path = "./crates/clvm-traits/fuzz", version = "0.38.1" }
 clvm-utils-fuzz = { path = "./crates/clvm-utils/fuzz", version = "0.38.1" }
-blst = { version = "0.3.16", features = ["portable"] }
+# BLS backend. When feature "vroom" is enabled (e.g. via chia-bls), pairing uses
+# VROOM's implementation (vroom/ submodule). Otherwise standard blst from blst-src.
+blst = { path = "./crates/blst", default-features = false, features = ["portable"] }
 clvmr = "0.17.1"
 clvm-fuzzing = "0.17.0"
 syn = "2.0.101"

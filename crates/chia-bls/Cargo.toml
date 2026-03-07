@@ -15,6 +15,8 @@ workspace = true
 py-bindings = ["dep:pyo3", "dep:chia_py_streamable_macro", "chia-traits/py-bindings"]
 arbitrary = ["dep:arbitrary"]
 serde = ["dep:serde", "dep:chia-serde"]
+# Use VROOM for pairing (AVX512 RNS) where supported; fall back to standard blst otherwise
+vroom = ["blst/vroom"]
 
 [dependencies]
 chia-traits = { workspace = true }
@@ -22,7 +24,7 @@ chia-sha2 = { workspace = true }
 chia_py_streamable_macro = { workspace = true, optional = true }
 sha2 = { workspace = true }
 hkdf = { workspace = true }
-blst = { workspace = true }
+blst = { workspace = true, features = ["portable"] }
 hex = { workspace = true }
 thiserror = { workspace = true }
 pyo3 = { workspace = true, features = ["multiple-pymethods"], optional = true }
