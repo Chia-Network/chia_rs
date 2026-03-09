@@ -849,6 +849,7 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
         ConsensusFlags::ENABLE_SHA256_TREE.bits(),
     )?;
     m.add("ENABLE_SECP_OPS", ConsensusFlags::ENABLE_SECP_OPS.bits())?;
+    m.add("MALACHITE", ConsensusFlags::MALACHITE.bits())?;
 
     m.add_class::<PyPlotParam>()?;
 
