@@ -200,4 +200,4 @@ indexmap = "2.10.0"
 serde_arrays = "0.2.0"
 
 [patch.crates-io]
-clvmr = { git = "https://github.com/Chia-Network/clvm_rs", rev = "763f93d" }
+clvmr = { git = "https://github.com/Chia-Network/clvm_rs", rev = "bf6b8b3" }
