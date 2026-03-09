@@ -1,3 +1,4 @@
+use crate::allocator::make_allocator;
 use crate::conditions::{
     ELIGIBLE_FOR_DEDUP, MempoolVisitor, ParseState, SpendBundleConditions, process_single_spend,
     validate_conditions,
@@ -21,7 +22,7 @@ use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
-use clvmr::serde::intern;
+use clvmr::serde::intern_tree_with_factory;
 use clvmr::serde::node_from_bytes;
 use clvmr::serde::node_from_bytes_backrefs;
 
@@ -67,7 +68,7 @@ fn calculate_base_cost(
         let mut decode_allocator = Allocator::new();
         let program_node = node_from_bytes_backrefs(&mut decode_allocator, &generator)
             .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
-        let interned = intern(&decode_allocator, program_node)
+        let interned = intern_tree_with_factory(&decode_allocator, program_node, || make_allocator(flags))
             .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
         Ok(total_cost_from_tree(&interned))
     } else {

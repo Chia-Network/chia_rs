@@ -37,13 +37,13 @@ pub fn total_cost_from_tree(tree: &InternedTree) -> u64 {
 mod tests {
     use super::*;
     use clvmr::allocator::Allocator;
-    use clvmr::serde::intern;
+    use clvmr::serde::intern_tree;
 
     #[test]
     fn test_empty_atom() {
         let allocator = Allocator::new();
         let node = allocator.nil();
-        let tree = intern(&allocator, node).unwrap();
+        let tree = intern_tree(&allocator, node).unwrap();
         assert_eq!(total_cost_from_tree(&tree), 52_500);
     }
 
@@ -53,7 +53,7 @@ mod tests {
         let left = allocator.new_atom(&[1, 2, 3]).unwrap();
         let right = allocator.new_atom(&[4, 5, 6]).unwrap();
         let node = allocator.new_pair(left, right).unwrap();
-        let tree = intern(&allocator, node).unwrap();
+        let tree = intern_tree(&allocator, node).unwrap();
         assert_eq!(total_cost_from_tree(&tree), 204_000);
     }
 
@@ -62,7 +62,7 @@ mod tests {
         let mut allocator = Allocator::new();
         let atom = allocator.new_atom(&[42]).unwrap();
         let node = allocator.new_pair(atom, atom).unwrap();
-        let tree = intern(&allocator, node).unwrap();
+        let tree = intern_tree(&allocator, node).unwrap();
         assert_eq!(total_cost_from_tree(&tree), 121_500);
     }
 
@@ -71,7 +71,7 @@ mod tests {
         let mut allocator = Allocator::new();
         let atom = allocator.new_atom(&[1, 2, 3, 4, 5]).unwrap();
         let node = allocator.new_pair(atom, allocator.nil()).unwrap();
-        let tree = intern(&allocator, node).unwrap();
+        let tree = intern_tree(&allocator, node).unwrap();
         assert_eq!(total_cost_from_tree(&tree), 198_000);
     }
 }
