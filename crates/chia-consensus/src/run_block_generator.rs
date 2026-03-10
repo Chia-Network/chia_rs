@@ -1,4 +1,4 @@
-use crate::allocator::make_allocator;
+use crate::allocator::{make_allocator, heap_limit_for_flags};
 use crate::condition_sanitizers::parse_amount;
 use crate::conditions::{
     EmptyVisitor, ParseState, SpendBundleConditions, parse_spends, process_single_spend,
@@ -24,7 +24,7 @@ use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
-use clvmr::serde::{intern_tree_with_factory, node_from_bytes, node_from_bytes_backrefs};
+use clvmr::serde::{intern_tree_limited, node_from_bytes, node_from_bytes_backrefs};
 
 pub fn subtract_cost(
     a: &Allocator,
@@ -356,7 +356,7 @@ where
     let mut decode_allocator = Allocator::new();
     let program_node = node_from_bytes_backrefs(&mut decode_allocator, program)
         .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
-    let interned = intern_tree_with_factory(&decode_allocator, program_node, || make_allocator(flags))
+    let interned = intern_tree_limited(&decode_allocator, program_node, heap_limit_for_flags(flags))
         .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
     let base_cost = total_cost_from_tree(&interned);
     let a = interned.allocator;
