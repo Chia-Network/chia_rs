@@ -128,6 +128,81 @@ mod tests {
     const QUOTE_EXECUTION_COST: u64 = 20;
     const QUOTE_BYTES_COST: u64 = QUOTE_BYTES as u64 * TEST_CONSTANTS.cost_per_byte;
 
+    fn assert_run_spendbundle_matches_parse_spends(spend_bundle: &SpendBundle) {
+        use crate::conditions::parse_spends;
+
+        let flags = MEMPOOL_MODE | ConsensusFlags::DONT_VALIDATE_SIGNATURE;
+
+        let mut a1 = make_allocator(ConsensusFlags::LIMIT_HEAP);
+        let (sb_conds, _) = run_spendbundle(
+            &mut a1,
+            spend_bundle,
+            11_000_000_000,
+            flags,
+            &TEST_CONSTANTS,
+        )
+        .expect("run_spendbundle");
+
+        let mut a2 = make_allocator(ConsensusFlags::LIMIT_HEAP);
+        let dialect = ChiaDialect::new(flags.to_clvm_flags());
+
+        let mut spend_list = a2.nil();
+        for coin_spend in spend_bundle.coin_spends.iter().rev() {
+            let puz = node_from_bytes(&mut a2, coin_spend.puzzle_reveal.as_slice()).unwrap();
+            let sol = node_from_bytes(&mut a2, coin_spend.solution.as_slice()).unwrap();
+            let Reduction(_, conditions) =
+                run_program(&mut a2, &dialect, puz, sol, 11_000_000_000).unwrap();
+
+            let parent = a2
+                .new_atom(coin_spend.coin.parent_coin_info.as_slice())
+                .unwrap();
+            let ph_bytes = tree_hash(&a2, puz);
+            let puzzle_hash = a2.new_atom(&ph_bytes).unwrap();
+            let amount = a2.new_number(coin_spend.coin.amount.into()).unwrap();
+
+            let nil = a2.nil();
+            let tuple = a2.new_pair(conditions, nil).unwrap();
+            let tuple = a2.new_pair(amount, tuple).unwrap();
+            let tuple = a2.new_pair(puzzle_hash, tuple).unwrap();
+            let tuple = a2.new_pair(parent, tuple).unwrap();
+
+            spend_list = a2.new_pair(tuple, spend_list).unwrap();
+        }
+
+        let nil = a2.nil();
+        let spends_node = a2.new_pair(spend_list, nil).unwrap();
+
+        let ps_conds = parse_spends::<MempoolVisitor>(
+            &a2,
+            spends_node,
+            11_000_000_000,
+            0,
+            flags,
+            &Signature::default(),
+            None,
+            &TEST_CONSTANTS,
+        )
+        .expect("parse_spends");
+
+        assert_eq!(
+            sb_conds.spends.len(),
+            ps_conds.spends.len(),
+            "number of spends differ"
+        );
+        for (i, (s1, s2)) in sb_conds
+            .spends
+            .iter()
+            .zip(ps_conds.spends.iter())
+            .enumerate()
+        {
+            assert_eq!(
+                s1.flags, s2.flags,
+                "spend {i} flags differ: run_spendbundle={:#x}, parse_spends={:#x}",
+                s1.flags, s2.flags
+            );
+        }
+    }
+
     #[rstest]
     #[case("3000253", 8, 2, 51_216_870)]
     #[case("1000101", 34, 15, 250_083_677)]
@@ -187,6 +262,8 @@ mod tests {
             block_conds.execution_cost - QUOTE_EXECUTION_COST
         );
         assert_eq!(conditions.condition_cost, block_conds.condition_cost);
+
+        assert_run_spendbundle_matches_parse_spends(&bundle);
     }
 
     #[rstest]
@@ -213,6 +290,160 @@ mod tests {
         let spend = &conditions.spends[0];
         assert_eq!(spend.flags, ELIGIBLE_FOR_FF | ELIGIBLE_FOR_DEDUP);
         assert_eq!(conditions.cost, cost);
+
+        assert_run_spendbundle_matches_parse_spends(&bundle);
+    }
+
+    fn make_list(a: &mut Allocator, items: &[clvmr::NodePtr]) -> clvmr::NodePtr {
+        let mut result = a.nil();
+        for &item in items.iter().rev() {
+            result = a.new_pair(item, result).unwrap();
+        }
+        result
+    }
+
+    fn condition_node(
+        a: &mut Allocator,
+        opcode: crate::opcodes::ConditionOpcode,
+        args: &[clvmr::NodePtr],
+    ) -> clvmr::NodePtr {
+        let op = a.new_number(opcode.into()).unwrap();
+        let mut items = vec![op];
+        items.extend_from_slice(args);
+        make_list(a, &items)
+    }
+
+    // The identity puzzle (CLVM atom 1): returns its solution as output.
+    const IDENTITY_PUZZLE: &[u8] = &[1];
+
+    fn identity_puzzle_hash() -> [u8; 32] {
+        use clvm_utils::tree_hash_atom;
+        tree_hash_atom(&[1]).to_bytes()
+    }
+
+    fn make_coin_spend(parent: [u8; 32], amount: u64, extra_conditions: &[&[u8]]) -> CoinSpend {
+        use crate::opcodes::{ASSERT_MY_AMOUNT, CREATE_COIN};
+        use chia_protocol::{Coin, Program};
+        use clvmr::serde::{node_from_bytes, node_to_bytes};
+
+        let mut a = Allocator::new();
+        let puzzle_hash = identity_puzzle_hash();
+
+        let ph_node = a.new_atom(&puzzle_hash).unwrap();
+        let amt_node = a.new_number(amount.into()).unwrap();
+        let create_coin = condition_node(&mut a, CREATE_COIN, &[ph_node, amt_node]);
+
+        let amt_node2 = a.new_number(amount.into()).unwrap();
+        let assert_my_amount = condition_node(&mut a, ASSERT_MY_AMOUNT, &[amt_node2]);
+
+        let mut all = vec![create_coin, assert_my_amount];
+        for extra in extra_conditions {
+            all.push(node_from_bytes(&mut a, extra).unwrap());
+        }
+        let conditions = make_list(&mut a, &all);
+        let solution = node_to_bytes(&a, conditions).unwrap();
+
+        CoinSpend::new(
+            Coin::new(parent.into(), puzzle_hash.into(), amount),
+            Program::from(IDENTITY_PUZZLE.to_vec()),
+            Program::from(solution),
+        )
+    }
+
+    fn serialize_condition(
+        opcode: crate::opcodes::ConditionOpcode,
+        args: &[clvmr::NodePtr],
+        a: &Allocator,
+    ) -> Vec<u8> {
+        use clvmr::serde::node_to_bytes;
+        let mut a2 = Allocator::new();
+        let op = a2.new_number(opcode.into()).unwrap();
+        let mut items = vec![op];
+        for &arg in args {
+            let bytes = node_to_bytes(a, arg).unwrap();
+            items.push(node_from_bytes(&mut a2, &bytes).unwrap());
+        }
+        let list = make_list(&mut a2, &items);
+        node_to_bytes(&a2, list).unwrap()
+    }
+
+    #[test]
+    fn test_post_process_single_ff_eligible_spend() {
+        let spend_a = make_coin_spend([1u8; 32], 123, &[]);
+
+        let bundle = SpendBundle::new(vec![spend_a], Signature::default());
+        let mut alloc = make_allocator(ConsensusFlags::LIMIT_HEAP);
+        let flags = MEMPOOL_MODE | ConsensusFlags::DONT_VALIDATE_SIGNATURE;
+        let (conds, _) =
+            run_spendbundle(&mut alloc, &bundle, 11_000_000_000, flags, &TEST_CONSTANTS)
+                .expect("run_spendbundle");
+
+        assert_eq!(conds.spends.len(), 1);
+        assert_ne!(conds.spends[0].flags & ELIGIBLE_FOR_FF, 0);
+        assert_ne!(conds.spends[0].flags & ELIGIBLE_FOR_DEDUP, 0);
+
+        assert_run_spendbundle_matches_parse_spends(&bundle);
+    }
+
+    #[test]
+    fn test_post_process_assert_concurrent_spend_clears_ff() {
+        use chia_protocol::Coin;
+
+        let puzzle_hash = identity_puzzle_hash();
+        let spend_a = make_coin_spend([1u8; 32], 123, &[]);
+        let coin_a_id = Coin::new([1u8; 32].into(), puzzle_hash.into(), 123).coin_id();
+
+        let mut a = Allocator::new();
+        let coin_id_node = a.new_atom(coin_a_id.as_slice()).unwrap();
+        let assert_concurrent =
+            serialize_condition(crate::opcodes::ASSERT_CONCURRENT_SPEND, &[coin_id_node], &a);
+        let spend_b = make_coin_spend([2u8; 32], 123, &[&assert_concurrent]);
+
+        let bundle = SpendBundle::new(vec![spend_a, spend_b], Signature::default());
+        let mut alloc = make_allocator(ConsensusFlags::LIMIT_HEAP);
+        let flags = MEMPOOL_MODE | ConsensusFlags::DONT_VALIDATE_SIGNATURE;
+        let (conds, _) =
+            run_spendbundle(&mut alloc, &bundle, 11_000_000_000, flags, &TEST_CONSTANTS)
+                .expect("run_spendbundle");
+
+        assert_eq!(conds.spends.len(), 2);
+        assert_eq!(conds.spends[0].flags & ELIGIBLE_FOR_FF, 0);
+        assert_ne!(conds.spends[0].flags & ELIGIBLE_FOR_DEDUP, 0);
+
+        assert_run_spendbundle_matches_parse_spends(&bundle);
+    }
+
+    #[test]
+    fn test_post_process_ephemeral_output_clears_ff() {
+        use chia_protocol::{Coin, Program};
+
+        let puzzle_hash = identity_puzzle_hash();
+        let spend_a = make_coin_spend([1u8; 32], 123, &[]);
+
+        let coin_a_id = Coin::new([1u8; 32].into(), puzzle_hash.into(), 123).coin_id();
+        let ephemeral_coin = Coin::new(coin_a_id, puzzle_hash.into(), 123);
+
+        let a = Allocator::new();
+        let nil = a.nil();
+        let empty_solution = clvmr::serde::node_to_bytes(&a, nil).unwrap();
+
+        let spend_b = CoinSpend::new(
+            ephemeral_coin,
+            Program::from(IDENTITY_PUZZLE.to_vec()),
+            Program::from(empty_solution),
+        );
+
+        let bundle = SpendBundle::new(vec![spend_a, spend_b], Signature::default());
+        let mut alloc = make_allocator(ConsensusFlags::LIMIT_HEAP);
+        let flags = MEMPOOL_MODE | ConsensusFlags::DONT_VALIDATE_SIGNATURE;
+        let (conds, _) =
+            run_spendbundle(&mut alloc, &bundle, 11_000_000_000, flags, &TEST_CONSTANTS)
+                .expect("run_spendbundle");
+
+        assert_eq!(conds.spends.len(), 2);
+        assert_eq!(conds.spends[0].flags & ELIGIBLE_FOR_FF, 0);
+
+        assert_run_spendbundle_matches_parse_spends(&bundle);
     }
 
     // given a block generator and block-refs, convert run the generator to
