@@ -1,6 +1,6 @@
 [package]
 name = "chia-datalayer"
-version = "0.38.1"
+version = "0.38.2"
 edition = "2024"
 license = "Apache-2.0"
 description = "DataLayer modules for Chia blockchain"
