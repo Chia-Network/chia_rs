@@ -19,6 +19,20 @@ A collection of Rust crates for working with the Chia blockchain. There are also
 - [Python](https://www.python.org/downloads/) 3.9 or higher installed.
 - The [Rust toolchain](https://rustup.rs/) must be installed.
 
+After cloning, initialize submodules (required for the optional **vroom** BLS backend):
+
+```bash
+git submodule update --init --recursive
+```
+
+### Optional: VROOM backend for pairing
+
+To use [VROOM](https://github.com/SimonLangowski/VROOM)’s pairing implementation (AVX512 RNS optimizations) where supported, build with the `vroom` feature. All other BLS operations (keygen, sign, verify, aggregation) use the standard blst implementation; only pairing uses VROOM when this feature is enabled.
+
+```bash
+cargo build --features vroom   # or add vroom to default features in your crate
+```
+
 ## Unit Tests
 
 To run the unit tests for the whole workspace:

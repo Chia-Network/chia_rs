@@ -1,0 +1,36 @@
+[package]
+name = "blst"
+version = "0.3.16"
+authors = ["sean-sn <sean@supranational.net>"]
+edition = "2018"
+license = "Apache-2.0"
+description = "Bindings for blst BLS12-381 library (with optional VROOM pairing)"
+repository = "https://github.com/supranational/blst"
+categories = ["cryptography"]
+keywords = ["crypto", "bls", "signature", "asm", "wasm"]
+links = "blst"
+
+[features]
+default = []
+portable = []
+force-adx = []
+no-threads = []
+serde-secret = ["serde"]
+# Use VROOM's pairing implementation where supported (AVX512 RNS optimizations)
+vroom = []
+
+[build-dependencies]
+cc = "1.0"
+[target.'cfg(target_env = "msvc")'.build-dependencies]
+glob = "0.3"
+
+[dependencies]
+zeroize = { version = "^1.1", features = ["zeroize_derive"] }
+serde = { version = "1.0.152", optional = true }
+
+[target.'cfg(not(any(target_arch="wasm32", target_os="none", target_os="unknown", target_os="uefi")))'.dependencies]
+threadpool = "^1.8.1"
+
+[dev-dependencies]
+rand = "0.8"
+rand_chacha = "0.3"
