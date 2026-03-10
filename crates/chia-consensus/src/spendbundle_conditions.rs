@@ -7,6 +7,7 @@ use crate::flags::{ConsensusFlags, MEMPOOL_MODE};
 use crate::puzzle_fingerprint::compute_puzzle_fingerprint;
 use crate::run_block_generator::subtract_cost;
 use crate::solution_generator::calculate_generator_length;
+use crate::spend_visitor::SpendVisitor;
 use crate::spendbundle_validation::get_flags_for_height_and_constants;
 use crate::validation_error::ErrorCode;
 use crate::validation_error::ValidationErr;
@@ -101,6 +102,7 @@ pub fn run_spendbundle(
         }
     }
 
+    MempoolVisitor::post_process(a, &state, &mut ret)?;
     validate_conditions(a, &ret, &state, a.nil(), flags)?;
 
     assert!(max_cost >= cost_left);
