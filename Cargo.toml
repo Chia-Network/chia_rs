@@ -127,6 +127,7 @@ chia-datalayer-macro = { path = "./crates/chia-datalayer/macro", version = "0.38
 chia-protocol = { path = "./crates/chia-protocol", version = "0.38.1" }
 chia-secp = { path = "./crates/chia-secp", version = "0.38.1" }
 chia-ssl = { path = "./crates/chia-ssl", version = "0.38.1" }
+chia-vdf-verify = { path = "./crates/chia-vdf-verify", version = "0.38.1" }
 chia-traits = { path = "./crates/chia-traits", version = "0.38.1" }
 chia-puzzle-types = { path = "./crates/chia-puzzle-types", version = "0.38.1" }
 chia-sha2 = { path = "./crates/chia-sha2", version = "0.38.1" }
