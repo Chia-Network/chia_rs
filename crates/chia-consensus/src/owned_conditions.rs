@@ -168,7 +168,7 @@ impl OwnedSpendBundleConditions {
             condition_cost: sb.condition_cost,
             num_atoms: a.atom_count() as u32,
             num_pairs: a.pair_count() as u32,
-            heap_size: a.heap_size() as u32,
+            heap_size: a.allocated_heap_size() as u32,
         }
     }
 }

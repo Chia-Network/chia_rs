@@ -25,6 +25,7 @@ bitflags! {
         const DISABLE_OP = 0x0200;
         const ENABLE_SHA256_TREE = 0x0400;
         const ENABLE_SECP_OPS = 0x0800;
+        const MALACHITE = 0x1000;
 
         // Consensus flags
         /// Skip validating AGG_SIG / condition signatures.
@@ -78,6 +79,9 @@ impl ConsensusFlags {
         if clvm.contains(ClvmFlags::ENABLE_SECP_OPS) {
             out = out.union(ConsensusFlags::ENABLE_SECP_OPS);
         }
+        if clvm.contains(ClvmFlags::MALACHITE) {
+            out = out.union(ConsensusFlags::MALACHITE);
+        }
         out
     }
 
@@ -109,6 +113,9 @@ impl ConsensusFlags {
         }
         if self.contains(ConsensusFlags::ENABLE_SECP_OPS) {
             out.insert(ClvmFlags::ENABLE_SECP_OPS);
+        }
+        if self.contains(ConsensusFlags::MALACHITE) {
+            out.insert(ClvmFlags::MALACHITE);
         }
         out
     }

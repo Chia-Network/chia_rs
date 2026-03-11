@@ -118,6 +118,7 @@ fn main() {
                     pairs: {} \
                     allocated_pairs: {} \
                     heap: {} \
+                    allocated_heap: {} \
                     block_cost: {} \
                     execute_time: {} \
                     timestamp: {} \
@@ -127,6 +128,7 @@ fn main() {
                         a.pair_count(),
                         a.allocated_pair_count(),
                         a.heap_size(),
+                        a.allocated_heap_size(),
                         ti.cost,
                         execute_timing.as_micros(),
                         ftb.timestamp,
