@@ -288,7 +288,7 @@ fn run_generator(#[case] name: &str) {
     let mut last_output = String::new();
 
     for (flags, expected) in zip(&[ConsensusFlags::empty(), MEMPOOL_MODE], expected) {
-        let mut flags = *flags;
+        let mut flags = *flags - ConsensusFlags::LIMIT_HEAP;
         if name == "aa-million-messages" || name == "aa-million-message-spends" {
             // this test requires running after hard fork 2, where the COST_CONDITIONS
             // flag is set

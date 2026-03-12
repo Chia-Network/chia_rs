@@ -428,7 +428,7 @@ mod tests {
                     generator.as_slice(),
                     [],
                     TEST_CONSTANTS.max_block_cost_clvm,
-                    MEMPOOL_MODE,
+                    MEMPOOL_MODE - ConsensusFlags::LIMIT_HEAP,
                     &signature,
                     None,
                     &TEST_CONSTANTS,

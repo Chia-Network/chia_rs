@@ -21,7 +21,7 @@ fuzz_target!(|data: &[u8]| {
         data,
         [],
         110_000_000,
-        ConsensusFlags::LIMIT_HEAP,
+        ConsensusFlags::empty(),
         &Signature::default(),
         None,
         &TEST_CONSTANTS,

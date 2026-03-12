@@ -244,7 +244,8 @@ mod tests {
             program.as_slice(),
             blocks,
             11_000_000_000,
-            MEMPOOL_MODE | ConsensusFlags::DONT_VALIDATE_SIGNATURE,
+            (MEMPOOL_MODE | ConsensusFlags::DONT_VALIDATE_SIGNATURE)
+                - ConsensusFlags::LIMIT_HEAP,
             &Signature::default(),
             None,
             &TEST_CONSTANTS,
@@ -583,7 +584,8 @@ mod tests {
                 &generator_buffer,
                 &block_refs,
                 11_000_000_000,
-                MEMPOOL_MODE | ConsensusFlags::DONT_VALIDATE_SIGNATURE,
+                (MEMPOOL_MODE | ConsensusFlags::DONT_VALIDATE_SIGNATURE)
+                    - ConsensusFlags::LIMIT_HEAP,
                 &Signature::default(),
                 None,
                 &TEST_CONSTANTS,

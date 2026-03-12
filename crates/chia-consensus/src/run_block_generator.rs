@@ -228,6 +228,12 @@ pub fn run_block_generator2<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
+    if flags.contains(ConsensusFlags::LIMIT_HEAP) {
+        return Err(ValidationErr(
+            NodePtr::NIL,
+            ErrorCode::GeneratorRuntimeError,
+        ));
+    }
     check_generator_quote(program, flags)?;
     let mut a = make_allocator(flags);
     let byte_cost = program.len() as u64 * constants.cost_per_byte;
