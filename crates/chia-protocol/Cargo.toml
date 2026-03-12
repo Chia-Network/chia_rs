@@ -17,7 +17,7 @@ arbitrary = ["dep:arbitrary", "chia-bls/arbitrary"]
 serde = ["dep:serde", "dep:chia-serde", "chia-bls/serde", "dep:serde_arrays"]
 
 [package.metadata.cargo-machete]
-ignored = "seder_arrays"
+ignored = "serde_arrays"
 
 [dependencies]
 pyo3 = { workspace = true, features = ["multiple-pymethods", "num-bigint"], optional = true }
