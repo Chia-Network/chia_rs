@@ -28,8 +28,5 @@ pub mod spendbundle_conditions;
 pub mod spendbundle_validation;
 pub mod validation_error;
 
-// these tests are large and expensive. They take a long time to run in
-// unoptimized builds. Only run these with --release
-#[cfg(not(debug_assertions))]
 #[cfg(test)]
 pub(crate) mod test_generators;

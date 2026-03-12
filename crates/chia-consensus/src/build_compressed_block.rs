@@ -255,8 +255,6 @@ impl BlockBuilder {
     }
 }
 
-// this test is expensive and takes forever in debug builds
-#[cfg(not(debug_assertions))]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -275,6 +273,7 @@ mod tests {
     use std::fs;
     use std::time::Instant;
 
+    #[ignore = "expensive test, only run in release mode (--include-ignored)"]
     #[test]
     fn test_build_block() {
         let mut all_bundles = vec![];
