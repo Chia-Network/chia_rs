@@ -231,8 +231,7 @@ mod test {
             &generator,
             blocks,
             MAX_COST,
-            (MEMPOOL_MODE | ConsensusFlags::DONT_VALIDATE_SIGNATURE)
-                - ConsensusFlags::LIMIT_HEAP,
+            (MEMPOOL_MODE | ConsensusFlags::DONT_VALIDATE_SIGNATURE) - ConsensusFlags::LIMIT_HEAP,
             &Signature::default(),
             None,
             &TEST_CONSTANTS,
