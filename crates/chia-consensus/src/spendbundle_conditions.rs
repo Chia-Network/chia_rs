@@ -484,7 +484,7 @@ mod tests {
                     .expect("parsing CLVM");
             spends.push(CoinSpend::new(
                 Coin::new(
-                    parent_id.try_into().expect("parent_id"),
+                    parent_id,
                     tree_hash_from_bytes(puzzle.as_ref()).expect("hash").into(),
                     amount,
                 ),

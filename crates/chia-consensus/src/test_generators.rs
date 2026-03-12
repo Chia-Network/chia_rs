@@ -15,6 +15,7 @@ use chia_puzzles::CHIALISP_DESERIALISATION;
 use clvmr::Allocator;
 use clvmr::allocator::NodePtr;
 use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs};
+use std::fmt::Write;
 use std::iter::zip;
 use text_diff::Difference;
 use text_diff::diff;
@@ -24,20 +25,20 @@ use rstest::rstest;
 pub(crate) fn print_conditions(a: &Allocator, c: &SpendBundleConditions, a2: &Allocator) -> String {
     let mut ret = String::new();
     if c.reserve_fee > 0 {
-        ret += &format!("RESERVE_FEE: {}\n", c.reserve_fee);
+        writeln!(ret, "RESERVE_FEE: {}", c.reserve_fee).unwrap();
     }
 
     if c.height_absolute > 0 {
-        ret += &format!("ASSERT_HEIGHT_ABSOLUTE {}\n", c.height_absolute);
+        writeln!(ret, "ASSERT_HEIGHT_ABSOLUTE {}", c.height_absolute).unwrap();
     }
     if c.seconds_absolute > 0 {
-        ret += &format!("ASSERT_SECONDS_ABSOLUTE {}\n", c.seconds_absolute);
+        writeln!(ret, "ASSERT_SECONDS_ABSOLUTE {}", c.seconds_absolute).unwrap();
     }
     if let Some(val) = c.before_seconds_absolute {
-        ret += &format!("ASSERT_BEFORE_SECONDS_ABSOLUTE {val}\n");
+        writeln!(ret, "ASSERT_BEFORE_SECONDS_ABSOLUTE {val}").unwrap();
     }
     if let Some(val) = c.before_height_absolute {
-        ret += &format!("ASSERT_BEFORE_HEIGHT_ABSOLUTE {val}\n");
+        writeln!(ret, "ASSERT_BEFORE_HEIGHT_ABSOLUTE {val}").unwrap();
     }
     let mut agg_sigs = Vec::<(Bytes48, Bytes)>::new();
     for (pk, msg) in &c.agg_sig_unsafe {
@@ -45,53 +46,61 @@ pub(crate) fn print_conditions(a: &Allocator, c: &SpendBundleConditions, a2: &Al
     }
     agg_sigs.sort();
     for (pk, msg) in agg_sigs {
-        ret += &format!(
-            "AGG_SIG_UNSAFE pk: {} msg: {}\n",
+        writeln!(
+            ret,
+            "AGG_SIG_UNSAFE pk: {} msg: {}",
             hex::encode(pk),
             hex::encode(msg)
-        );
+        )
+        .unwrap();
     }
-    ret += "SPENDS:\n";
+    writeln!(ret, "SPENDS:").unwrap();
 
     let mut spends: Vec<SpendConditions> = c.spends.clone();
     spends.sort_by_key(|s| *s.coin_id);
     for s in spends {
-        ret += &format!(
-            "- coin id: {} ph: {} exe-cost: {} cond-cost: {}\n",
+        writeln!(
+            ret,
+            "- coin id: {} ph: {} exe-cost: {} cond-cost: {}",
             hex::encode(*s.coin_id),
             hex::encode(a.atom(s.puzzle_hash)),
             s.execution_cost,
             s.condition_cost,
-        );
+        )
+        .unwrap();
 
         if let Some(val) = s.height_relative {
-            ret += &format!("  ASSERT_HEIGHT_RELATIVE {val}\n");
+            writeln!(ret, "  ASSERT_HEIGHT_RELATIVE {val}").unwrap();
         }
         if let Some(val) = s.seconds_relative {
-            ret += &format!("  ASSERT_SECONDS_RELATIVE {val}\n");
+            writeln!(ret, "  ASSERT_SECONDS_RELATIVE {val}").unwrap();
         }
         if let Some(val) = s.before_height_relative {
-            ret += &format!("  ASSERT_BEFORE_HEIGHT_RELATIVE {val}\n");
+            writeln!(ret, "  ASSERT_BEFORE_HEIGHT_RELATIVE {val}").unwrap();
         }
         if let Some(val) = s.before_seconds_relative {
-            ret += &format!("  ASSERT_BEFORE_SECONDS_RELATIVE {val}\n");
+            writeln!(ret, "  ASSERT_BEFORE_SECONDS_RELATIVE {val}").unwrap();
         }
         let mut create_coin: Vec<&NewCoin> = s.create_coin.iter().collect();
         create_coin.sort_by_key(|cc| (cc.puzzle_hash, cc.amount));
         for cc in create_coin {
             if cc.hint == NodePtr::NIL {
-                ret += &format!(
-                    "  CREATE_COIN: ph: {} amount: {}\n",
+                writeln!(
+                    ret,
+                    "  CREATE_COIN: ph: {} amount: {}",
                     hex::encode(cc.puzzle_hash),
                     cc.amount
-                );
+                )
+                .unwrap();
             } else {
-                ret += &format!(
-                    "  CREATE_COIN: ph: {} amount: {} hint: {}\n",
+                writeln!(
+                    ret,
+                    "  CREATE_COIN: ph: {} amount: {} hint: {}",
                     hex::encode(cc.puzzle_hash),
                     cc.amount,
                     hex::encode(a.atom(cc.hint))
-                );
+                )
+                .unwrap();
             }
         }
 
@@ -110,24 +119,26 @@ pub(crate) fn print_conditions(a: &Allocator, c: &SpendBundleConditions, a2: &Al
             }
             agg_sigs.sort();
             for (pk, msg) in &agg_sigs {
-                ret += &format!(
-                    "  {} pk: {} msg: {}\n",
+                writeln!(
+                    ret,
+                    "  {} pk: {} msg: {}",
                     sig_conds.1,
                     hex::encode(pk),
                     hex::encode(msg)
-                );
+                )
+                .unwrap();
             }
         }
     }
 
-    ret += &format!("cost: {}\n", c.cost);
-    ret += &format!("execution-cost: {}\n", c.execution_cost);
-    ret += &format!("condition-cost: {}\n", c.condition_cost);
-    ret += &format!("removal_amount: {}\n", c.removal_amount);
-    ret += &format!("addition_amount: {}\n", c.addition_amount);
-    ret += &format!("atoms: {}\n", a2.atom_count());
-    ret += &format!("pairs: {}\n", a2.pair_count());
-    ret += &format!("heap: {}\n", a2.allocated_heap_size());
+    writeln!(ret, "cost: {}", c.cost).unwrap();
+    writeln!(ret, "execution-cost: {}", c.execution_cost).unwrap();
+    writeln!(ret, "condition-cost: {}", c.condition_cost).unwrap();
+    writeln!(ret, "removal_amount: {}", c.removal_amount).unwrap();
+    writeln!(ret, "addition_amount: {}", c.addition_amount).unwrap();
+    writeln!(ret, "atoms: {}", a2.atom_count()).unwrap();
+    writeln!(ret, "pairs: {}", a2.pair_count()).unwrap();
+    writeln!(ret, "heap: {}", a2.allocated_heap_size()).unwrap();
     ret
 }
 
@@ -351,7 +362,7 @@ fn run_generator(#[case] name: &str) {
             assert!(res.is_ok());
         }
 
-        println!("flags: {:?}", flags);
+        println!("flags: {flags:?}");
         let mut conds2 = run_block_generator2(
             &generator,
             &block_refs,
@@ -391,11 +402,11 @@ fn run_generator(#[case] name: &str) {
         if UPDATE_TESTS {
             if flags.contains(MEMPOOL_MODE) {
                 if output != last_output {
-                    write_back.push_str(&format!("STRICT:\n{output}"));
+                    write!(write_back, "STRICT:\n{output}").unwrap();
                 }
             } else {
                 last_output = output.clone();
-                write_back.push_str(&format!("{output}"));
+                write_back.push_str(&output.clone());
             }
         }
         if run_generator_one {
@@ -424,7 +435,7 @@ fn run_generator(#[case] name: &str) {
                         conditions.cost = conds2_conditions.cost;
                         conditions.execution_cost = conds2_conditions.execution_cost;
                         for s in &conds2_conditions.spends {
-                            for ms in conditions.spends.iter_mut() {
+                            for ms in &mut conditions.spends {
                                 if ms.coin_id == s.coin_id {
                                     ms.execution_cost = s.execution_cost;
                                     break;
@@ -446,6 +457,7 @@ fn run_generator(#[case] name: &str) {
             };
             if output != output_pre_hard_fork {
                 print_diff(&output, &output_pre_hard_fork);
+                #[allow(clippy::manual_assert)]
                 if !UPDATE_TESTS {
                     panic!("run_block_generator 1 and 2 produced a different result!");
                 }
@@ -454,6 +466,7 @@ fn run_generator(#[case] name: &str) {
 
         if output != expected {
             print_diff(&output, expected);
+            #[allow(clippy::manual_assert)]
             if !UPDATE_TESTS {
                 panic!("mismatching generator output");
             }
