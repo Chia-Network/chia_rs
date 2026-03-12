@@ -608,14 +608,22 @@ mod tests {
             }
         };
 
-        let mut a1 = make_allocator(MEMPOOL_MODE);
-        let conds = get_conditions_from_spendbundle(
+        // Use run_spendbundle directly without LIMIT_HEAP so both paths use the
+        // same heap configuration. get_conditions_from_spendbundle hardcodes
+        // MEMPOOL_MODE (which includes LIMIT_HEAP); large test generators can
+        // exhaust the 500 MB limit there, giving a different error than
+        // run_block_generator2 which now runs without any heap cap.
+        let sb_flags = get_flags_for_height_and_constants(5_000_000, &TEST_CONSTANTS);
+        let mut a1 = make_allocator(ConsensusFlags::empty());
+        let conds = run_spendbundle(
             &mut a1,
             &bundle,
             11_000_000_000,
-            5_000_000,
+            (sb_flags | MEMPOOL_MODE | ConsensusFlags::DONT_VALIDATE_SIGNATURE)
+                - ConsensusFlags::LIMIT_HEAP,
             &TEST_CONSTANTS,
-        );
+        )
+        .map(|(c, _)| c);
 
         let output = match conds {
             Ok(mut conditions) => {
