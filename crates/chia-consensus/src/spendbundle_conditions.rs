@@ -449,7 +449,6 @@ mod tests {
     // given a block generator and block-refs, convert run the generator to
     // produce the SpendBundle for the block without runningi, or validating,
     // the puzzles.
-    #[cfg(not(debug_assertions))]
     fn convert_block_to_bundle(generator: &[u8], block_refs: &[Vec<u8>]) -> SpendBundle {
         use crate::run_block_generator::setup_generator_args;
         use chia_protocol::Bytes32;
@@ -496,7 +495,7 @@ mod tests {
         SpendBundle::new(spends, Signature::default())
     }
 
-    #[cfg(not(debug_assertions))]
+    #[ignore = "expensive test, only run in release mode (--include-ignored)"]
     #[rstest]
     // this test requires running after hard fork 2, where the COST_CONDITIONS
     // flag is set

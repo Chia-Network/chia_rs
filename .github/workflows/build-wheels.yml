@@ -353,9 +353,11 @@ jobs:
           - name: dev
             matrix: dev
             cargo-test-options: ""
+            test-binary-options: ""
           - name: release
             matrix: release
             cargo-test-options: --release
+            test-binary-options: --include-ignored
         test-runner:
           - name: Cargo
             matrix: cargo
@@ -393,7 +395,7 @@ jobs:
           } >> "$GITHUB_ENV"
       - name: cargo test (${{ matrix.mode.name }})
         if: matrix.test-runner.matrix == 'cargo'
-        run: cargo test --workspace ${{ matrix.os.cargo-test-options }} ${{ matrix.mode.cargo-test-options }}
+        run: cargo test --workspace ${{ matrix.os.cargo-test-options }} ${{ matrix.mode.cargo-test-options }} -- ${{ matrix.mode.test-binary-options }}
       - name: python test with coverage
         if: matrix.os.coverage && matrix.test-runner.matrix == 'pytest'
         run: |

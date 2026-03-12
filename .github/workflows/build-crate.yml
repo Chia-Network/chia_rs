@@ -50,7 +50,7 @@ jobs:
         env:
           CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS: true
           CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS: true
-        run: cargo test --workspace --all-features --release --features=clvmr/allocator-debug
+        run: cargo test --workspace --all-features --release --features=clvmr/allocator-debug -- --include-ignored
 
       - name: Build (release)
         run: cargo build --workspace --all-features --release

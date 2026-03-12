@@ -170,6 +170,7 @@ pub(crate) fn print_diff(output: &str, expected: &str) {
     }
 }
 
+#[ignore = "expensive test, only run in release mode (--include-ignored)"]
 #[rstest]
 // in CI we run with the clvmr/debug-allocator feature enabled, which makes this
 // test use too much RAM (about 6.8 GB)
