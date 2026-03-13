@@ -11,6 +11,9 @@ repository = "https://github.com/Chia-Network/chia_rs"
 [lints]
 workspace = true
 
+[features]
+openssl = ["clvmr/openssl", "chia-sha2/openssl"]
+
 [dependencies]
 chia-protocol = { workspace = true }
 chia-traits = { workspace = true }
@@ -18,6 +21,7 @@ chia-puzzles = { workspace = true }
 clvm-utils = { workspace = true }
 clvm-traits = { workspace = true }
 chia-puzzle-types = { workspace = true }
+bitflags = { workspace = true }
 chia-bls = { workspace = true }
 chia-consensus = { workspace = true }
 clvmr = { workspace = true, features = ["counters"] }
@@ -87,5 +91,10 @@ bench = false
 
 [[bin]]
 name = "puzzle-hash"
+test = false
+bench = false
+
+[[bin]]
+name = "run-generator"
 test = false
 bench = false
