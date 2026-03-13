@@ -65,16 +65,16 @@ impl Deref for TreeHash {
 pub struct TreeCache {
     hashes: Vec<TreeHash>,
     // each entry is an index into hashes, or one of 3 special values:
-    // u16::MAX if the pair has not been visited
-    // u16::MAX - 1 if the pair has been seen once
-    // u16::MAX - 2 if the pair has been seen at least twice (this makes it a
+    // u32::MAX if the pair has not been visited
+    // u32::MAX - 1 if the pair has been seen once
+    // u32::MAX - 2 if the pair has been seen at least twice (this makes it a
     // candidate for memoization)
-    pairs: Vec<u16>,
+    pairs: Vec<u32>,
 }
 
-const NOT_VISITED: u16 = u16::MAX;
-const SEEN_ONCE: u16 = u16::MAX - 1;
-const SEEN_MULTIPLE: u16 = u16::MAX - 2;
+const NOT_VISITED: u32 = u32::MAX;
+const SEEN_ONCE: u32 = u32::MAX - 1;
+const SEEN_MULTIPLE: u32 = u32::MAX - 2;
 
 impl TreeCache {
     pub fn get(&self, n: NodePtr) -> Option<&TreeHash> {
@@ -108,7 +108,7 @@ impl TreeCache {
 
         let slot = self.hashes.len();
         self.hashes.push(*hash);
-        self.pairs[idx] = slot as u16;
+        self.pairs[idx] = slot as u32;
     }
 
     /// mark the node as being visited. Returns true if we need to
@@ -571,21 +571,16 @@ fn test_tree_cache_size_limit() {
     let mut hash = tree_hash(&allocator, list);
     cache.insert(list, &hash);
 
-    // we only fit 65k items in the cache
-    for i in 0..65540 {
+    // with u32, we can fit ~4 billion items in the cache,
+    // so just verify items within a reasonable range are cached
+    for _i in 0..65540 {
         let b = allocator.one();
         list = allocator.new_pair(b, list).expect("new_pair");
         hash = tree_hash_pair(tree_hash_atom(b"\x01"), hash);
         cache.insert(list, &hash);
 
-        println!("{i}");
-        if i < 65533 {
-            assert_eq!(cache.get(list), Some(&hash));
-        } else {
-            assert_eq!(cache.get(list), None);
-        }
+        assert_eq!(cache.get(list), Some(&hash));
     }
-    assert_eq!(cache.get(list), None);
 }
 
 #[test]
