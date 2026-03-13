@@ -4547,6 +4547,7 @@ class ConsensusConstants:
     HARD_FORK_HEIGHT: uint32
     HARD_FORK2_HEIGHT: uint32
     SOFT_FORK8_HEIGHT: uint32
+    SOFT_FORK9_HEIGHT: uint32
     PLOT_V1_PHASE_OUT_EPOCH_BITS: uint8
     PLOT_FILTER_128_HEIGHT: uint32
     PLOT_FILTER_64_HEIGHT: uint32
@@ -4603,6 +4604,7 @@ class ConsensusConstants:
         HARD_FORK_HEIGHT: uint32,
         HARD_FORK2_HEIGHT: uint32,
         SOFT_FORK8_HEIGHT: uint32,
+        SOFT_FORK9_HEIGHT: uint32,
         PLOT_V1_PHASE_OUT_EPOCH_BITS: uint8,
         PLOT_FILTER_128_HEIGHT: uint32,
         PLOT_FILTER_64_HEIGHT: uint32,
@@ -4675,6 +4677,7 @@ class ConsensusConstants:
         HARD_FORK_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         HARD_FORK2_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         SOFT_FORK8_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
+        SOFT_FORK9_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_V1_PHASE_OUT_EPOCH_BITS: Union[ uint8, _Unspec] = _Unspec(),
         PLOT_FILTER_128_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_FILTER_64_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
