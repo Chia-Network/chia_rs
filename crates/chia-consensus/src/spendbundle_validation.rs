@@ -90,14 +90,16 @@ pub fn get_flags_for_height_and_constants(
     if prev_tx_height >= constants.hard_fork2_height {
         flags |= ConsensusFlags::ENABLE_KECCAK_OPS_OUTSIDE_GUARD
             | ConsensusFlags::COST_CONDITIONS
-            | ConsensusFlags::SIMPLE_GENERATOR
-            | ConsensusFlags::CANONICAL_INTS
             | ConsensusFlags::ENABLE_SECP_OPS
             | ConsensusFlags::RELAXED_BLS;
     }
 
     if prev_tx_height >= constants.soft_fork8_height {
         flags |= ConsensusFlags::DISABLE_OP;
+    }
+
+    if prev_tx_height >= constants.soft_fork9_height {
+        flags |= ConsensusFlags::SIMPLE_GENERATOR | ConsensusFlags::CANONICAL_INTS;
     }
     flags
 }
