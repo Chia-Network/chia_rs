@@ -495,7 +495,6 @@ mod tests {
         SpendBundle::new(spends, Signature::default())
     }
 
-    #[ignore = "expensive test, only run in release mode (--include-ignored)"]
     #[rstest]
     // this test requires running after hard fork 2, where the COST_CONDITIONS
     // flag is set
@@ -550,6 +549,7 @@ mod tests {
     //#[case("recursion-pairs")]
     #[case("unknown-condition")]
     #[case("duplicate-messages")]
+    #[ignore = "expensive test, only run in release mode (--include-ignored)"]
     fn run_generator(#[case] name: &str) {
         use crate::test_generators::{print_conditions, print_diff};
         use std::fs::read_to_string;
