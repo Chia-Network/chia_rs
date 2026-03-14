@@ -360,8 +360,12 @@ where
         intern_tree_limited(&decode_allocator, program_node, heap_limit_for_flags(flags))
             .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
     let base_cost = total_cost_from_tree(&interned);
-    let a = interned.allocator;
-    let program = interned.root;
+    let clvmr::serde::InternedTree {
+        allocator: a,
+        root: program,
+        ..
+    } = interned;
+    drop(decode_allocator);
 
     let mut cost_left = max_cost;
     subtract_cost(&a, &mut cost_left, base_cost)?;
