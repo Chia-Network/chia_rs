@@ -122,9 +122,12 @@ impl ConsensusFlags {
 }
 
 /// Mempool-mode: clvmr MEMPOOL_MODE plus consensus stricter checking.
+/// LIMIT_HEAP is excluded here; callers that actually want heap limiting
+/// (e.g. spendbundle_validation) must add it explicitly.
 pub const MEMPOOL_MODE: ConsensusFlags = ConsensusFlags::from_clvm_flags(CLVM_MEMPOOL_MODE)
     .union(ConsensusFlags::NO_UNKNOWN_CONDS)
-    .union(ConsensusFlags::STRICT_ARGS_COUNT);
+    .union(ConsensusFlags::STRICT_ARGS_COUNT)
+    .difference(ConsensusFlags::LIMIT_HEAP);
 
 impl Default for ConsensusFlags {
     fn default() -> Self {
