@@ -40,7 +40,7 @@ pub fn run_chia_program(
     max_cost: Cost,
     flags: ConsensusFlags,
 ) -> PyResult<(Cost, LazyNode)> {
-    let mut allocator = make_allocator(flags);
+    let mut allocator = make_allocator();
     let flags = flags.to_clvm_flags();
 
     let reduction = (|| -> PyResult<Response> {

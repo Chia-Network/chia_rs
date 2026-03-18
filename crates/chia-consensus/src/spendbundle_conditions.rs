@@ -133,7 +133,7 @@ mod tests {
 
         let flags = MEMPOOL_MODE | ConsensusFlags::DONT_VALIDATE_SIGNATURE;
 
-        let mut a1 = make_allocator(ConsensusFlags::LIMIT_HEAP);
+        let mut a1 = make_allocator();
         let (sb_conds, _) = run_spendbundle(
             &mut a1,
             spend_bundle,
@@ -143,7 +143,7 @@ mod tests {
         )
         .expect("run_spendbundle");
 
-        let mut a2 = make_allocator(ConsensusFlags::LIMIT_HEAP);
+        let mut a2 = make_allocator();
         let dialect = ChiaDialect::new(flags.to_clvm_flags());
 
         let mut spend_list = a2.nil();
@@ -218,7 +218,7 @@ mod tests {
         )
         .expect("parse bundle");
 
-        let mut a = make_allocator(ConsensusFlags::LIMIT_HEAP);
+        let mut a = make_allocator();
         let conditions =
             get_conditions_from_spendbundle(&mut a, &bundle, cost, prev_tx_height, &TEST_CONSTANTS)
                 .expect("get_conditions_from_spendbundle");
@@ -281,7 +281,7 @@ mod tests {
 
         let bundle = SpendBundle::new(vec![spend], Signature::default());
 
-        let mut a = make_allocator(ConsensusFlags::LIMIT_HEAP);
+        let mut a = make_allocator();
         let conditions =
             get_conditions_from_spendbundle(&mut a, &bundle, cost, prev_tx_height, &TEST_CONSTANTS)
                 .expect("get_conditions_from_spendbundle");
@@ -372,7 +372,7 @@ mod tests {
         let spend_a = make_coin_spend([1u8; 32], 123, &[]);
 
         let bundle = SpendBundle::new(vec![spend_a], Signature::default());
-        let mut alloc = make_allocator(ConsensusFlags::LIMIT_HEAP);
+        let mut alloc = make_allocator();
         let flags = MEMPOOL_MODE | ConsensusFlags::DONT_VALIDATE_SIGNATURE;
         let (conds, _) =
             run_spendbundle(&mut alloc, &bundle, 11_000_000_000, flags, &TEST_CONSTANTS)
@@ -400,7 +400,7 @@ mod tests {
         let spend_b = make_coin_spend([2u8; 32], 123, &[&assert_concurrent]);
 
         let bundle = SpendBundle::new(vec![spend_a, spend_b], Signature::default());
-        let mut alloc = make_allocator(ConsensusFlags::LIMIT_HEAP);
+        let mut alloc = make_allocator();
         let flags = MEMPOOL_MODE | ConsensusFlags::DONT_VALIDATE_SIGNATURE;
         let (conds, _) =
             run_spendbundle(&mut alloc, &bundle, 11_000_000_000, flags, &TEST_CONSTANTS)
@@ -434,7 +434,7 @@ mod tests {
         );
 
         let bundle = SpendBundle::new(vec![spend_a, spend_b], Signature::default());
-        let mut alloc = make_allocator(ConsensusFlags::LIMIT_HEAP);
+        let mut alloc = make_allocator();
         let flags = MEMPOOL_MODE | ConsensusFlags::DONT_VALIDATE_SIGNATURE;
         let (conds, _) =
             run_spendbundle(&mut alloc, &bundle, 11_000_000_000, flags, &TEST_CONSTANTS)
@@ -460,7 +460,7 @@ mod tests {
         use clvmr::op_utils::first;
         use clvmr::serde::node_from_bytes_backrefs;
 
-        let mut a = make_allocator(MEMPOOL_MODE);
+        let mut a = make_allocator();
 
         let generator = node_from_bytes_backrefs(&mut a, generator).expect("node_from_bytes");
         let args = setup_generator_args(&mut a, block_refs, ConsensusFlags::empty())
@@ -607,7 +607,7 @@ mod tests {
             }
         };
 
-        let mut a1 = make_allocator(MEMPOOL_MODE);
+        let mut a1 = make_allocator();
         let conds = get_conditions_from_spendbundle(
             &mut a1,
             &bundle,

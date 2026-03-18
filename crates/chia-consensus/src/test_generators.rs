@@ -334,7 +334,7 @@ fn run_generator(#[case] name: &str) {
             );
 
             // now lets specifically check the node generator check
-            let mut a = make_allocator(flags);
+            let mut a = make_allocator();
             let program = node_from_bytes_backrefs(&mut a, generator.as_ref())
                 .expect("node_from_bytes_backref");
             let res = check_generator_node(&a, program, flags | ConsensusFlags::SIMPLE_GENERATOR);
@@ -355,7 +355,7 @@ fn run_generator(#[case] name: &str) {
             assert_eq!(test_conds.unwrap_err().1, ErrorCode::TooManyGeneratorRefs);
 
             // now lets specifically check the node generator check
-            let mut a = make_allocator(flags);
+            let mut a = make_allocator();
             let program = node_from_bytes_backrefs(&mut a, generator.as_ref())
                 .expect("node_from_bytes_backref");
             let res = check_generator_node(&a, program, flags | ConsensusFlags::SIMPLE_GENERATOR);
@@ -502,7 +502,7 @@ fn run_generator(#[case] name: &str) {
             if coinspends.len() == conds.spends.len() {
                 for (i, spend) in conds.spends.iter().enumerate() {
                     let runnable = {
-                        let mut a = make_allocator(flags);
+                        let mut a = make_allocator();
                         coinspends[i]
                             .puzzle_reveal
                             .run(

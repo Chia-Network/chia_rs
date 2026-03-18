@@ -5,7 +5,6 @@ from chia_rs import (
     run_block_generator,
     run_block_generator2,
     MEMPOOL_MODE,
-    LIMIT_HEAP,
 )
 from chia_rs.sized_ints import uint64
 from run_gen import DEFAULT_CONSTANTS
@@ -72,7 +71,7 @@ def test_block_builder() -> None:
             generator,
             [],
             11000000000,
-            MEMPOOL_MODE & ~LIMIT_HEAP,
+            MEMPOOL_MODE,
             signature,
             None,
             DEFAULT_CONSTANTS,

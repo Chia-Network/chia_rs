@@ -19,6 +19,9 @@ bitflags! {
         // via the python binding, which "launders" the type of the flags
         const CANONICAL_INTS = 0x0001;
         const NO_UNKNOWN_OPS = 0x0002;
+        /// Retained for clvmr bit-parity; has no effect in chia-consensus.
+        /// Heap limiting is handled directly by `make_allocator()` on all
+        /// spend-bundle paths without needing a flag.
         const LIMIT_HEAP = 0x0004;
         const RELAXED_BLS = 0x0008;
         const ENABLE_KECCAK_OPS_OUTSIDE_GUARD = 0x0100;
@@ -121,9 +124,10 @@ impl ConsensusFlags {
     }
 }
 
-/// Mempool-mode: clvmr MEMPOOL_MODE plus consensus stricter checking.
-/// LIMIT_HEAP is excluded here; callers that actually want heap limiting
-/// (e.g. spendbundle_validation) must add it explicitly.
+/// Mempool-mode flags: clvmr MEMPOOL_MODE plus consensus stricter checking.
+/// LIMIT_HEAP is explicitly excluded so that block-validation callers that pass
+/// MEMPOOL_MODE to run_block_generator2 do not accidentally enable the clvmr
+/// heap-limit enforcement at the CLVM execution level.
 pub const MEMPOOL_MODE: ConsensusFlags = ConsensusFlags::from_clvm_flags(CLVM_MEMPOOL_MODE)
     .union(ConsensusFlags::NO_UNKNOWN_CONDS)
     .union(ConsensusFlags::STRICT_ARGS_COUNT)

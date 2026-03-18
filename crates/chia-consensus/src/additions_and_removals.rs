@@ -3,14 +3,13 @@ use crate::run_block_generator::setup_generator_args;
 use crate::run_block_generator::subtract_cost;
 use chia_protocol::Coin;
 
-use crate::allocator::make_allocator;
 use crate::consensus_constants::ConsensusConstants;
 use crate::flags::ConsensusFlags;
 use crate::validation_error::{ErrorCode, ValidationErr, atom, first, next, rest};
 use chia_protocol::{Bytes, Bytes32};
 use clvm_traits::FromClvm;
 use clvm_utils::{TreeCache, tree_hash_cached};
-use clvmr::allocator::NodePtr;
+use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
@@ -30,7 +29,7 @@ pub fn additions_and_removals<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
-    let mut a = make_allocator(flags);
+    let mut a = Allocator::new_limited(u32::MAX as usize);
     let mut additions = Vec::<(Coin, Option<Bytes>)>::new();
     let mut removals = Vec::<(Bytes32, Coin)>::new();
 
