@@ -502,7 +502,7 @@ fn run_generator(#[case] name: &str) {
             if coinspends.len() == conds.spends.len() {
                 for (i, spend) in conds.spends.iter().enumerate() {
                     let runnable = {
-                        let mut a = make_allocator();
+                        let mut a = Allocator::new_limited(u32::MAX as usize);
                         coinspends[i]
                             .puzzle_reveal
                             .run(

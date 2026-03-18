@@ -460,7 +460,7 @@ mod tests {
         use clvmr::op_utils::first;
         use clvmr::serde::node_from_bytes_backrefs;
 
-        let mut a = make_allocator();
+        let mut a = Allocator::new_limited(u32::MAX as usize);
 
         let generator = node_from_bytes_backrefs(&mut a, generator).expect("node_from_bytes");
         let args = setup_generator_args(&mut a, block_refs, ConsensusFlags::empty())
@@ -607,7 +607,7 @@ mod tests {
             }
         };
 
-        let mut a1 = make_allocator();
+        let mut a1 = Allocator::new_limited(u32::MAX as usize);
         let conds = get_conditions_from_spendbundle(
             &mut a1,
             &bundle,
