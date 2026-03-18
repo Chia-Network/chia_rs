@@ -21,6 +21,7 @@ bitflags! {
         const NO_UNKNOWN_OPS = 0x0002;
         const LIMIT_HEAP = 0x0004;
         const RELAXED_BLS = 0x0008;
+        const LIMITS = 0x0010;
         const ENABLE_KECCAK_OPS_OUTSIDE_GUARD = 0x0100;
         const DISABLE_OP = 0x0200;
         const ENABLE_SHA256_TREE = 0x0400;
@@ -67,6 +68,9 @@ impl ConsensusFlags {
         if clvm.contains(ClvmFlags::RELAXED_BLS) {
             out = out.union(ConsensusFlags::RELAXED_BLS);
         }
+        if clvm.contains(ClvmFlags::LIMITS) {
+            out = out.union(ConsensusFlags::LIMITS);
+        }
         if clvm.contains(ClvmFlags::ENABLE_KECCAK_OPS_OUTSIDE_GUARD) {
             out = out.union(ConsensusFlags::ENABLE_KECCAK_OPS_OUTSIDE_GUARD);
         }
@@ -101,6 +105,9 @@ impl ConsensusFlags {
         }
         if self.contains(ConsensusFlags::RELAXED_BLS) {
             out.insert(ClvmFlags::RELAXED_BLS);
+        }
+        if self.contains(ConsensusFlags::LIMITS) {
+            out.insert(ClvmFlags::LIMITS);
         }
         if self.contains(ConsensusFlags::ENABLE_KECCAK_OPS_OUTSIDE_GUARD) {
             out.insert(ClvmFlags::ENABLE_KECCAK_OPS_OUTSIDE_GUARD);

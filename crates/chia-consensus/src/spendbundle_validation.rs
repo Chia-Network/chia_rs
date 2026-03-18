@@ -99,7 +99,9 @@ pub fn get_flags_for_height_and_constants(
     }
 
     if prev_tx_height >= constants.soft_fork9_height {
-        flags |= ConsensusFlags::SIMPLE_GENERATOR | ConsensusFlags::CANONICAL_INTS;
+        flags |= ConsensusFlags::SIMPLE_GENERATOR
+            | ConsensusFlags::CANONICAL_INTS
+            | ConsensusFlags::LIMITS;
     }
     flags
 }
