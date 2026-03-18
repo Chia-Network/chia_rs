@@ -361,6 +361,7 @@ where
     let base_cost = total_cost_from_tree(&interned);
     let a = interned.allocator;
     let program = interned.root;
+    drop(decode_allocator);
 
     let mut cost_left = max_cost;
     subtract_cost(&a, &mut cost_left, base_cost)?;
