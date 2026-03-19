@@ -4,9 +4,10 @@ use crate::conditions::{
 };
 use crate::consensus_constants::ConsensusConstants;
 use crate::flags::{ConsensusFlags, MEMPOOL_MODE};
+use crate::generator_cost::total_cost_from_tree;
 use crate::puzzle_fingerprint::compute_puzzle_fingerprint;
 use crate::run_block_generator::subtract_cost;
-use crate::solution_generator::calculate_generator_length;
+use crate::solution_generator::{calculate_generator_length, solution_generator_backrefs};
 use crate::spend_visitor::SpendVisitor;
 use crate::spendbundle_validation::get_flags_for_height_and_constants;
 use crate::validation_error::ErrorCode;
@@ -15,11 +16,14 @@ use chia_bls::PublicKey;
 use chia_protocol::{Bytes, SpendBundle};
 
 use clvm_utils::tree_hash;
+use clvmr::NodePtr;
 use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
+use clvmr::serde::intern_tree_limited;
 use clvmr::serde::node_from_bytes;
+use clvmr::serde::node_from_bytes_backrefs;
 
 const QUOTE_BYTES: usize = 2;
 
@@ -41,6 +45,41 @@ pub fn get_conditions_from_spendbundle(
     .0)
 }
 
+/// Computes the base cost of a spend bundle's generator before any puzzles run.
+/// For INTERNED_GENERATOR, builds a backrefs-encoded generator, interns the tree,
+/// and charges based on the interned structure. Otherwise charges cost_per_byte
+/// on the raw generator length (excluding the quote wrapper).
+fn calculate_base_cost(
+    a: &mut Allocator,
+    spend_bundle: &SpendBundle,
+    flags: ConsensusFlags,
+    constants: &ConsensusConstants,
+) -> Result<u64, ValidationErr> {
+    if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
+        let generator = solution_generator_backrefs(
+            spend_bundle
+                .coin_spends
+                .iter()
+                .map(|cs| (cs.coin, cs.puzzle_reveal.as_slice(), cs.solution.as_slice())),
+        )
+        .map_err(|_| ValidationErr(a.nil(), ErrorCode::GeneratorRuntimeError))?;
+
+        let mut decode_allocator = Allocator::new();
+        let program_node = node_from_bytes_backrefs(&mut decode_allocator, &generator)
+            .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
+        let interned =
+            intern_tree_limited(&decode_allocator, program_node, u32::MAX as usize)
+                .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
+        Ok(total_cost_from_tree(&interned))
+    } else {
+        // We don't pay the size cost (nor execution cost) of being wrapped by a
+        // quote (in solution_generator).
+        let generator_length_without_quote =
+            calculate_generator_length(&spend_bundle.coin_spends) - QUOTE_BYTES;
+        Ok(generator_length_without_quote as u64 * constants.cost_per_byte)
+    }
+}
+
 // returns the conditions for the spendbundle, along with the (public key,
 // message) pairs emitted by the spends (for validating the aggregate signature)
 #[allow(clippy::type_complexity)]
@@ -57,13 +96,8 @@ pub fn run_spendbundle(
     let dialect = ChiaDialect::new(flags.to_clvm_flags());
     let mut ret = SpendBundleConditions::default();
     let mut state = ParseState::default();
-    // We don't pay the size cost (nor execution cost) of being wrapped by a
-    // quote (in solution_generator).
-    let generator_length_without_quote =
-        calculate_generator_length(&spend_bundle.coin_spends) - QUOTE_BYTES;
-
-    let byte_cost = generator_length_without_quote as u64 * constants.cost_per_byte;
-    subtract_cost(a, &mut cost_left, byte_cost)?;
+    let base_cost = calculate_base_cost(a, spend_bundle, flags, constants)?;
+    subtract_cost(a, &mut cost_left, base_cost)?;
 
     for coin_spend in &spend_bundle.coin_spends {
         // process the spend
