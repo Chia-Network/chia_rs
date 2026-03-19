@@ -832,6 +832,7 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
     m.add("COST_CONDITIONS", ConsensusFlags::COST_CONDITIONS.bits())?;
     m.add("SIMPLE_GENERATOR", ConsensusFlags::SIMPLE_GENERATOR.bits())?;
+    m.add("LIMIT_SPENDS", ConsensusFlags::LIMIT_SPENDS.bits())?;
 
     // flags from clvm_rs, affecting execution
     m.add_function(wrap_pyfunction!(run_chia_program, m)?)?;

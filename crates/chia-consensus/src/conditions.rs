@@ -61,6 +61,8 @@ pub const HAS_RELATIVE_CONDITION: u32 = 2;
 // 8. The coin does not issue an CREATE_COIN_ANNOUNCEMENT condition
 pub const ELIGIBLE_FOR_FF: u32 = 4;
 
+pub const MAX_SPENDS_PER_BLOCK: usize = 6000;
+
 pub struct EmptyVisitor {}
 
 impl SpendVisitor for EmptyVisitor {
@@ -1478,9 +1480,19 @@ pub fn parse_spends<V: SpendVisitor>(
 
     let mut cost_left = max_cost;
 
+    let mut spends_left: usize = if flags.contains(ConsensusFlags::LIMIT_SPENDS) {
+        MAX_SPENDS_PER_BLOCK
+    } else {
+        usize::MAX
+    };
+
     let mut iter = first(a, spends)?;
     while let Some((spend, next)) = next(a, iter)? {
         iter = next;
+        if spends_left == 0 {
+            return Err(ValidationErr(spend, ErrorCode::TooManySpends));
+        }
+        spends_left -= 1;
         // cost_left is passed in as a mutable reference and decremented by the
         // cost of the condition (if it has a cost). This let us fail as early
         // as possible if cost is exceeded
@@ -6171,4 +6183,62 @@ fn test_dedup_reserve_fee_without_paying() {
 
     // Not eligible for dedup because the output is less than the input
     assert_eq!(cond.spends[1].flags & ELIGIBLE_FOR_DEDUP, 0);
+}
+
+#[cfg(test)]
+fn build_spend_list(a: &mut Allocator, num_spends: usize) -> NodePtr {
+    let mut spend_list = a.nil();
+    for i in (0..num_spends).rev() {
+        let mut parent = [0u8; 32];
+        parent[0..4].copy_from_slice(&(i as u32).to_be_bytes());
+        let parent_id = a.new_atom(&parent).unwrap();
+        let puzzle_hash = a.new_atom(H2).unwrap();
+        let amount = a.new_number(1.into()).unwrap();
+        let conditions = a.nil();
+
+        let nil = a.nil();
+        let spend = a.new_pair(conditions, nil).unwrap();
+        let spend = a.new_pair(amount, spend).unwrap();
+        let spend = a.new_pair(puzzle_hash, spend).unwrap();
+        let spend = a.new_pair(parent_id, spend).unwrap();
+
+        spend_list = a.new_pair(spend, spend_list).unwrap();
+    }
+    let nil = a.nil();
+    a.new_pair(spend_list, nil).unwrap()
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(MAX_SPENDS_PER_BLOCK, ConsensusFlags::LIMIT_SPENDS, None)]
+#[case(MAX_SPENDS_PER_BLOCK + 1, ConsensusFlags::LIMIT_SPENDS, Some(ErrorCode::TooManySpends))]
+#[case(MAX_SPENDS_PER_BLOCK + 1, ConsensusFlags::empty(), None)]
+fn test_limit_spends_parse_spends(
+    #[case] num_spends: usize,
+    #[case] flags: ConsensusFlags,
+    #[case] expected_err: Option<ErrorCode>,
+) {
+    let mut a = Allocator::new();
+    let spends = build_spend_list(&mut a, num_spends);
+    let result = parse_spends::<MempoolVisitor>(
+        &a,
+        spends,
+        11_000_000_000,
+        0,
+        flags | ConsensusFlags::DONT_VALIDATE_SIGNATURE,
+        &Signature::default(),
+        None,
+        &TEST_CONSTANTS,
+    );
+    match (expected_err, result) {
+        (Some(err), Err(e)) => {
+            assert_eq!(e.1, err);
+        }
+        (None, Ok(conds)) => {
+            assert_eq!(conds.spends.len(), num_spends);
+        }
+        _ => {
+            panic!("mismatch");
+        }
+    }
 }
