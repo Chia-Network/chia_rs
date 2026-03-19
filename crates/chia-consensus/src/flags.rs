@@ -46,6 +46,9 @@ bitflags! {
 
         /// Simpler generator rules (hard fork behavior).
         const SIMPLE_GENERATOR = 0x100_0000;
+
+        /// Limit the number of spends per block.
+        const LIMIT_SPENDS = 0x200_0000;
     }
 }
 
@@ -131,7 +134,8 @@ impl ConsensusFlags {
 /// Mempool-mode: clvmr MEMPOOL_MODE plus consensus stricter checking.
 pub const MEMPOOL_MODE: ConsensusFlags = ConsensusFlags::from_clvm_flags(CLVM_MEMPOOL_MODE)
     .union(ConsensusFlags::NO_UNKNOWN_CONDS)
-    .union(ConsensusFlags::STRICT_ARGS_COUNT);
+    .union(ConsensusFlags::STRICT_ARGS_COUNT)
+    .union(ConsensusFlags::LIMIT_SPENDS);
 
 impl Default for ConsensusFlags {
     fn default() -> Self {

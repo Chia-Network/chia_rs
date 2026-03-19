@@ -1,6 +1,6 @@
 use crate::conditions::{
-    ELIGIBLE_FOR_DEDUP, MempoolVisitor, ParseState, SpendBundleConditions, process_single_spend,
-    validate_conditions,
+    ELIGIBLE_FOR_DEDUP, MAX_SPENDS_PER_BLOCK, MempoolVisitor, ParseState, SpendBundleConditions,
+    process_single_spend, validate_conditions,
 };
 use crate::consensus_constants::ConsensusConstants;
 use crate::flags::{ConsensusFlags, MEMPOOL_MODE};
@@ -64,6 +64,12 @@ pub fn run_spendbundle(
 
     let byte_cost = generator_length_without_quote as u64 * constants.cost_per_byte;
     subtract_cost(a, &mut cost_left, byte_cost)?;
+
+    if flags.contains(ConsensusFlags::LIMIT_SPENDS)
+        && spend_bundle.coin_spends.len() > MAX_SPENDS_PER_BLOCK
+    {
+        return Err(ValidationErr(a.nil(), ErrorCode::TooManySpends));
+    }
 
     for coin_spend in &spend_bundle.coin_spends {
         // process the spend
@@ -674,6 +680,54 @@ mod tests {
         if output != expected {
             print_diff(&output, expected);
             panic!("mismatching condition output");
+        }
+    }
+
+    fn make_bare_coin_spend(parent: [u8; 32], amount: u64) -> CoinSpend {
+        use chia_protocol::{Coin, Program};
+
+        let puzzle_hash = identity_puzzle_hash();
+        let a = Allocator::new();
+        let nil = a.nil();
+        let solution = clvmr::serde::node_to_bytes(&a, nil).unwrap();
+
+        CoinSpend::new(
+            Coin::new(parent.into(), puzzle_hash.into(), amount),
+            Program::from(IDENTITY_PUZZLE.to_vec()),
+            Program::from(solution),
+        )
+    }
+
+    #[rstest]
+    #[case(MAX_SPENDS_PER_BLOCK, ConsensusFlags::LIMIT_SPENDS, None)]
+    #[case(MAX_SPENDS_PER_BLOCK + 1, ConsensusFlags::LIMIT_SPENDS, Some(ErrorCode::TooManySpends))]
+    #[case(MAX_SPENDS_PER_BLOCK + 1, ConsensusFlags::empty(), None)]
+    fn test_limit_spends_run_spendbundle(
+        #[case] num_spends: usize,
+        #[case] extra_flags: ConsensusFlags,
+        #[case] expected_err: Option<ErrorCode>,
+    ) {
+        let coin_spends: Vec<CoinSpend> = (0..num_spends)
+            .map(|i| {
+                let mut parent = [0u8; 32];
+                parent[0..4].copy_from_slice(&(i as u32).to_be_bytes());
+                make_bare_coin_spend(parent, 0)
+            })
+            .collect();
+        let bundle = SpendBundle::new(coin_spends, Signature::default());
+        let mut alloc = make_allocator(ConsensusFlags::LIMIT_HEAP);
+        let flags = ConsensusFlags::DONT_VALIDATE_SIGNATURE | extra_flags;
+        let result = run_spendbundle(&mut alloc, &bundle, u64::MAX, flags, &TEST_CONSTANTS);
+        match (expected_err, result) {
+            (Some(err), Err(e)) => {
+                assert_eq!(e.1, err);
+            }
+            (None, Ok((conds, _))) => {
+                assert_eq!(conds.spends.len(), num_spends);
+            }
+            _ => {
+                panic!("mismatch");
+            }
         }
     }
 }

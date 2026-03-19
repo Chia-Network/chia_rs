@@ -164,6 +164,7 @@ pub enum ErrorCode {
     InvalidCoinId,
     MessageNotSentOrReceived,
     ComplexGeneratorReceived,
+    TooManySpends,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
@@ -360,6 +361,7 @@ impl From<ErrorCode> for u32 {
             ErrorCode::InvalidCoinId => 146,
             ErrorCode::MessageNotSentOrReceived => 147,
             ErrorCode::ComplexGeneratorReceived => 148,
+            ErrorCode::TooManySpends => 149,
         }
     }
 }

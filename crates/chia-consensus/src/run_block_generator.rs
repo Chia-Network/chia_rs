@@ -1,8 +1,8 @@
 use crate::allocator::make_allocator;
 use crate::condition_sanitizers::parse_amount;
 use crate::conditions::{
-    EmptyVisitor, ParseState, SpendBundleConditions, parse_spends, process_single_spend,
-    validate_conditions, validate_signature,
+    EmptyVisitor, MAX_SPENDS_PER_BLOCK, ParseState, SpendBundleConditions, parse_spends,
+    process_single_spend, validate_conditions, validate_signature,
 };
 use crate::consensus_constants::ConsensusConstants;
 use crate::flags::ConsensusFlags;
@@ -267,9 +267,19 @@ where
         cache.visit_tree(&a, puzzle);
     }
 
+    let mut spends_left: usize = if flags.contains(ConsensusFlags::LIMIT_SPENDS) {
+        MAX_SPENDS_PER_BLOCK
+    } else {
+        usize::MAX
+    };
+
     let mut iter = all_spends;
     while let Some((spend, rest)) = a.next(iter) {
         iter = rest;
+        if spends_left == 0 {
+            return Err(ValidationErr(spend, ErrorCode::TooManySpends));
+        }
+        spends_left -= 1;
         // process the spend
         let [parent_id, puzzle, amount, solution, _spend_level_extra] =
             extract_n::<5>(&a, spend, ErrorCode::InvalidCondition)?;
@@ -523,4 +533,67 @@ where
         ));
     }
     Ok(output)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::conditions::MAX_SPENDS_PER_BLOCK;
+    use crate::consensus_constants::TEST_CONSTANTS;
+    use crate::solution_generator::solution_generator;
+    use clvm_utils::tree_hash_atom;
+    use rstest::rstest;
+
+    const IDENTITY_PUZZLE: &[u8] = &[1];
+
+    fn make_generator(num_spends: usize) -> Vec<u8> {
+        let puzzle_hash = tree_hash_atom(&[1]).to_bytes();
+        let empty_solution: &[u8] = &[0x80]; // serialized nil
+
+        let spends = (0..num_spends).map(|i| {
+            let mut parent = [0u8; 32];
+            parent[0..4].copy_from_slice(&(i as u32).to_be_bytes());
+            (
+                Coin::new(parent.into(), puzzle_hash.into(), 0),
+                IDENTITY_PUZZLE,
+                empty_solution,
+            )
+        });
+
+        solution_generator(spends).expect("solution_generator")
+    }
+
+    #[rstest]
+    #[case(MAX_SPENDS_PER_BLOCK, ConsensusFlags::LIMIT_SPENDS, None)]
+    #[case(MAX_SPENDS_PER_BLOCK + 1, ConsensusFlags::LIMIT_SPENDS, Some(ErrorCode::TooManySpends))]
+    #[case(MAX_SPENDS_PER_BLOCK + 1, ConsensusFlags::empty(), None)]
+    fn test_limit_spends_run_block_generator2(
+        #[case] num_spends: usize,
+        #[case] extra_flags: ConsensusFlags,
+        #[case] expected_err: Option<ErrorCode>,
+    ) {
+        let program = make_generator(num_spends);
+        let flags = extra_flags | ConsensusFlags::DONT_VALIDATE_SIGNATURE;
+        let blocks: &[&[u8]] = &[];
+        let result = run_block_generator2(
+            &program,
+            blocks,
+            u64::MAX,
+            flags,
+            &Signature::default(),
+            None,
+            &TEST_CONSTANTS,
+        );
+        match (expected_err, result) {
+            (Some(err), Err(e)) => {
+                assert_eq!(e.1, err);
+            }
+            (None, Ok(conds)) => {
+                assert_eq!(conds.1.spends.len(), num_spends);
+            }
+            _ => {
+                panic!("mismatch");
+            }
+        }
+    }
 }
