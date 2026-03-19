@@ -173,6 +173,7 @@ for g in test_list:
             strict_limit = 4
         elif "negative-reserve-fee.txt" in g:
             limit = 4
+            strict_limit = 4
         elif "infinite-recursion4" in g:
             limit = 2
             strict_limit = 2

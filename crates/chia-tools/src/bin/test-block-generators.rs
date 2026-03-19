@@ -192,7 +192,7 @@ fn main() {
     let flags = if args.mempool {
         MEMPOOL_MODE
     } else {
-        ConsensusFlags::LIMIT_HEAP
+        ConsensusFlags::empty()
     };
 
     // Blocks created after the hard fork are not expected to work with the

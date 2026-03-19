@@ -308,11 +308,11 @@ features that are validated:
                 } else {
                     run_block_generator
                 };
-                let flags = (if args.skip_signature_validation {
-                        ConsensusFlags::DONT_VALIDATE_SIGNATURE
-                    } else {
-                        ConsensusFlags::empty()
-                    }) | ConsensusFlags::LIMIT_HEAP;
+                let flags = if args.skip_signature_validation {
+                    ConsensusFlags::DONT_VALIDATE_SIGNATURE
+                } else {
+                    ConsensusFlags::empty()
+                };
                 let (_a, conditions) = block_runner(
                     generator,
                     &block_refs,

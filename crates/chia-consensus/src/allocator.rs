@@ -1,12 +1,8 @@
 use clvmr::allocator::Allocator;
 
-use crate::flags::ConsensusFlags;
-
-/// Construct an Allocator with a heap-size limit or not, depending on the flags.
-pub fn make_allocator(flags: ConsensusFlags) -> Allocator {
-    if flags.contains(ConsensusFlags::LIMIT_HEAP) {
-        Allocator::new_limited(500_000_000)
-    } else {
-        Allocator::new_limited(u32::MAX as usize)
-    }
+/// Construct an Allocator with the mempool heap limit (500 MB).
+/// This is the standard allocator for all spend-bundle / mempool paths.
+/// Block-validation paths create their own allocator without a low cap.
+pub fn make_allocator() -> Allocator {
+    Allocator::new_limited(500_000_000)
 }

@@ -1,4 +1,3 @@
-use crate::allocator::make_allocator;
 use crate::condition_sanitizers::parse_amount;
 use crate::conditions::{
     EmptyVisitor, ParseState, SpendBundleConditions, parse_spends, process_single_spend,
@@ -83,9 +82,9 @@ where
 /// SpendBundleConditions. Some conditions are validated, and if invalid may
 /// cause the function to return an error.
 ///
-/// Creates an allocator internally based on the consensus flags (using
-/// `make_allocator(flags)`). Returns `(Allocator, SpendBundleConditions)` since
-/// the conditions contain NodePtr references into the allocator.
+/// Creates an unlimited allocator for block validation.
+/// Returns `(Allocator, SpendBundleConditions)` since the conditions contain
+/// NodePtr references into the allocator.
 #[allow(clippy::too_many_arguments)]
 pub fn run_block_generator<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
     program: &[u8],
@@ -100,7 +99,7 @@ where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
     check_generator_quote(program, flags)?;
-    let mut a = make_allocator(flags);
+    let mut a = Allocator::new_limited(u32::MAX as usize);
     let mut cost_left = max_cost;
     let byte_cost = program.len() as u64 * constants.cost_per_byte;
 
@@ -212,9 +211,9 @@ pub fn check_generator_node(
 /// it also does not apply the stack depth or object allocation limits the same,
 /// as each puzzle run in its own environment.
 ///
-/// Creates an allocator internally based on the consensus flags (using
-/// `make_allocator(flags)`). Returns `(Allocator, SpendBundleConditions)` since
-/// the conditions contain NodePtr references into the allocator.
+/// Creates an unlimited allocator for block validation.
+/// Returns `(Allocator, SpendBundleConditions)` since the conditions contain
+/// NodePtr references into the allocator.
 #[allow(clippy::too_many_arguments)]
 pub fn run_block_generator2<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
     program: &[u8],
@@ -229,7 +228,7 @@ where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
     check_generator_quote(program, flags)?;
-    let mut a = make_allocator(flags);
+    let mut a = Allocator::new_limited(u32::MAX as usize);
     let byte_cost = program.len() as u64 * constants.cost_per_byte;
 
     let mut cost_left = max_cost;
@@ -320,7 +319,7 @@ pub fn get_coinspends_for_trusted_block<GenBuf: AsRef<[u8]>, I: IntoIterator<Ite
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
-    let mut a = make_allocator(flags);
+    let mut a = Allocator::new_limited(u32::MAX as usize);
     check_generator_quote(generator.as_ref(), flags)?;
     let mut output = Vec::<CoinSpend>::new();
 
@@ -419,7 +418,7 @@ pub fn get_coinspends_with_conditions_for_trusted_block<
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
-    let mut a = make_allocator(flags);
+    let mut a = Allocator::new_limited(u32::MAX as usize);
     check_generator_quote(generator.as_ref(), flags)?;
     let mut output = Vec::<(CoinSpend, Vec<(u32, Vec<Vec<u8>>)>)>::new();
 

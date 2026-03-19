@@ -22,7 +22,7 @@ pub fn validate_clvm_and_signature(
     constants: &ConsensusConstants,
     flags: ConsensusFlags,
 ) -> Result<(OwnedSpendBundleConditions, Vec<ValidationPair>), ValidationErr> {
-    let mut a = make_allocator(ConsensusFlags::LIMIT_HEAP);
+    let mut a = make_allocator();
     let (sbc, pkm_pairs) = run_spendbundle(&mut a, spend_bundle, max_cost, flags, constants)?;
     let conditions = OwnedSpendBundleConditions::from(&a, sbc);
 

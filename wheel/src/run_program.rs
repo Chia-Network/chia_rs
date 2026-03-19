@@ -1,7 +1,7 @@
 use crate::error::{map_pyerr, map_pyerr_w_ptr};
-use chia_consensus::allocator::make_allocator;
 use chia_consensus::flags::ConsensusFlags;
 use chia_protocol::LazyNode;
+use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;
 use clvmr::reduction::Response;
@@ -40,7 +40,7 @@ pub fn run_chia_program(
     max_cost: Cost,
     flags: ConsensusFlags,
 ) -> PyResult<(Cost, LazyNode)> {
-    let mut allocator = make_allocator(flags);
+    let mut allocator = Allocator::new_limited(u32::MAX as usize);
     let flags = flags.to_clvm_flags();
 
     let reduction = (|| -> PyResult<Response> {

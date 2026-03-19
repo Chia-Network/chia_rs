@@ -68,7 +68,13 @@ def test_block_builder() -> None:
 
         start = time.monotonic()
         err, conds2 = run_block_generator2(
-            generator, [], 11000000000, MEMPOOL_MODE, signature, None, DEFAULT_CONSTANTS
+            generator,
+            [],
+            11000000000,
+            MEMPOOL_MODE,
+            signature,
+            None,
+            DEFAULT_CONSTANTS,
         )
         end = time.monotonic()
         run_time = end - start

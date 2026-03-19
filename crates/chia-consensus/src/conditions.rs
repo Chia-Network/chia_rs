@@ -3715,7 +3715,7 @@ fn final_message(
 
     let coin = Coin::new(Bytes32::from(parent), Bytes32::from(puzzle), amount);
 
-    let mut a: Allocator = make_allocator(ConsensusFlags::LIMIT_HEAP);
+    let mut a: Allocator = make_allocator();
     let spend = SpendConditions::new(
         a.new_atom(parent.as_slice()).expect("should pass"),
         amount,

@@ -41,7 +41,7 @@ fn main() {
     let flags = if args.mempool_mode {
         MEMPOOL_MODE
     } else {
-        ConsensusFlags::LIMIT_HEAP
+        ConsensusFlags::empty()
     } | ConsensusFlags::DONT_VALIDATE_SIGNATURE;
 
     let num_cores = args
