@@ -68,8 +68,9 @@ fn calculate_base_cost(
         let mut decode_allocator = Allocator::new();
         let program_node = node_from_bytes_backrefs(&mut decode_allocator, &generator)
             .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
-        let interned = intern_tree_limited(&decode_allocator, program_node, heap_limit_for_flags(flags))
-            .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
+        let interned =
+            intern_tree_limited(&decode_allocator, program_node, heap_limit_for_flags(flags))
+                .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
         Ok(total_cost_from_tree(&interned))
     } else {
         // We don't pay the size cost (nor execution cost) of being wrapped by a
