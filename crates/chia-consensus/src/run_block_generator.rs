@@ -1,4 +1,4 @@
-use crate::allocator::{heap_limit_for_flags, make_allocator};
+use crate::allocator::make_allocator;
 use crate::condition_sanitizers::parse_amount;
 use crate::conditions::{
     EmptyVisitor, ParseState, SpendBundleConditions, parse_spends, process_single_spend,
@@ -357,7 +357,7 @@ where
     let program_node = node_from_bytes_backrefs(&mut decode_allocator, program)
         .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
     let interned =
-        intern_tree_limited(&decode_allocator, program_node, heap_limit_for_flags(flags))
+        intern_tree_limited(&decode_allocator, program_node, u32::MAX as usize)
             .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
     let base_cost = total_cost_from_tree(&interned);
     let a = interned.allocator;

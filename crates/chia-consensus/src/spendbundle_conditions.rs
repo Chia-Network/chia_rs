@@ -1,4 +1,3 @@
-use crate::allocator::heap_limit_for_flags;
 use crate::conditions::{
     ELIGIBLE_FOR_DEDUP, MempoolVisitor, ParseState, SpendBundleConditions, process_single_spend,
     validate_conditions,
@@ -69,7 +68,7 @@ fn calculate_base_cost(
         let program_node = node_from_bytes_backrefs(&mut decode_allocator, &generator)
             .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
         let interned =
-            intern_tree_limited(&decode_allocator, program_node, heap_limit_for_flags(flags))
+            intern_tree_limited(&decode_allocator, program_node, u32::MAX as usize)
                 .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
         Ok(total_cost_from_tree(&interned))
     } else {
