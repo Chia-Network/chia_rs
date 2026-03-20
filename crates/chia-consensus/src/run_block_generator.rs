@@ -356,9 +356,8 @@ where
     let mut decode_allocator = Allocator::new();
     let program_node = node_from_bytes_backrefs(&mut decode_allocator, program)
         .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
-    let interned =
-        intern_tree_limited(&decode_allocator, program_node, u32::MAX as usize)
-            .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
+    let interned = intern_tree_limited(&decode_allocator, program_node, u32::MAX as usize)
+        .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
     let base_cost = total_cost_from_tree(&interned);
     let a = interned.allocator;
     let program = interned.root;
