@@ -404,7 +404,11 @@ fn build_message_spends(a: &mut Allocator, mode: u8) -> (NodePtr, usize) {
     (spends, NUM_CONDITIONS * 2)
 }
 
-fn run_benchmark(allocator: &Allocator, spends: NodePtr, num_total: usize) -> (f64, f64, u64) {
+fn run_benchmark(
+    allocator: &Allocator,
+    spends: NodePtr,
+    num_total: usize,
+) -> (Vec<f64>, f64, f64, u64) {
     // warmup
     let result = parse_spends::<EmptyVisitor>(
         allocator,
@@ -438,37 +442,22 @@ fn run_benchmark(allocator: &Allocator, spends: NodePtr, num_total: usize) -> (f
     }
 
     let avg = samples.iter().sum::<f64>() / samples.len() as f64;
-    samples.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    let median = if samples.len() % 2 == 0 {
-        (samples[samples.len() / 2 - 1] + samples[samples.len() / 2]) / 2.0
+    let mut sorted_samples = samples.clone();
+    sorted_samples.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let median = if sorted_samples.len() % 2 == 0 {
+        (sorted_samples[sorted_samples.len() / 2 - 1] + sorted_samples[sorted_samples.len() / 2])
+            / 2.0
     } else {
-        samples[samples.len() / 2]
+        sorted_samples[sorted_samples.len() / 2]
     };
 
-    (avg, median, condition_cost)
+    (samples, avg, median, condition_cost)
 }
 
-fn write_samples(allocator: &Allocator, spends: NodePtr, num_total: usize, path: &str) {
-    let mut samples = Vec::<f64>::new();
-    for _ in 0..TIMING_REPS {
-        let start = Instant::now();
-        parse_spends::<EmptyVisitor>(
-            allocator,
-            spends,
-            11_000_000_000,
-            0,
-            FLAGS,
-            &Signature::default(),
-            None,
-            &TEST_CONSTANTS,
-        )
-        .expect("parse_spends");
-        let elapsed = start.elapsed();
-        samples.push(elapsed.as_nanos() as f64 / num_total as f64);
-    }
+fn write_samples(samples: &[f64], path: &str) {
     let mut file = fs::File::create(path).expect("create data file");
     writeln!(file, "# nanos_per_condition").unwrap();
-    for ns in &samples {
+    for ns in samples {
         writeln!(file, "{ns:.3}").unwrap();
     }
 }
@@ -637,7 +626,7 @@ pub fn main() {
         let spends_list = allocator.new_pair(spend, nil).unwrap();
         let spends = allocator.new_pair(spends_list, nil).unwrap();
 
-        let (avg, median, condition_cost) = run_benchmark(&allocator, spends, num_total);
+        let (samples, avg, median, condition_cost) = run_benchmark(&allocator, spends, num_total);
         let label = opcode_name(cond.opcode);
         if condition_cost > 0 {
             let ns_per_cost = median * num_total as f64 / condition_cost as f64;
@@ -649,7 +638,7 @@ pub fn main() {
         }
 
         let path = format!("data/{label}.dat");
-        write_samples(&allocator, spends, num_total, &path);
+        write_samples(&samples, &path);
 
         allocator.restore_checkpoint(&cp);
     }
@@ -672,7 +661,7 @@ pub fn main() {
 
         let (spends, num_total) = builder(&mut allocator);
 
-        let (avg, median, condition_cost) = run_benchmark(&allocator, spends, num_total);
+        let (samples, avg, median, condition_cost) = run_benchmark(&allocator, spends, num_total);
         let label = opcode_name(opcode);
         if condition_cost > 0 {
             let ns_per_cost = median * num_total as f64 / condition_cost as f64;
@@ -684,7 +673,7 @@ pub fn main() {
         }
 
         let path = format!("data/{label}.dat");
-        write_samples(&allocator, spends, num_total, &path);
+        write_samples(&samples, &path);
 
         allocator.restore_checkpoint(&cp);
     }
@@ -698,7 +687,7 @@ pub fn main() {
         let (spends, num_total) = build_message_spends(&mut allocator, mode);
 
         let name = mode_name(mode);
-        let (avg, median, condition_cost) = run_benchmark(&allocator, spends, num_total);
+        let (samples, avg, median, condition_cost) = run_benchmark(&allocator, spends, num_total);
         if condition_cost > 0 {
             let ns_per_cost = median * num_total as f64 / condition_cost as f64;
             println!(
@@ -709,7 +698,7 @@ pub fn main() {
         }
 
         let path = format!("data/SendMessage_0x{mode:02x}.dat");
-        write_samples(&allocator, spends, num_total, &path);
+        write_samples(&samples, &path);
 
         allocator.restore_checkpoint(&cp);
     }
