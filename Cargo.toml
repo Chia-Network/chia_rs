@@ -16,7 +16,7 @@ repository = "https://github.com/Chia-Network/chia_rs"
 members = ["crates/*", "crates/*/fuzz", "wasm", "wheel"]
 
 [workspace.package]
-version = "0.41.0"
+version = "0.41.1"
 
 [workspace.lints.rust]
 rust_2018_idioms = { level = "deny", priority = -1 }
