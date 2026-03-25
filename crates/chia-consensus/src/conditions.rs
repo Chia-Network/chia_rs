@@ -117,17 +117,16 @@ impl SpendVisitor for MempoolVisitor {
                 // for these reasons the associated conditions are not eligible for FF
                 spend.flags &= !ELIGIBLE_FOR_FF;
             }
-            Condition::AssertMyParentId(_) => {
+            Condition::AssertMyParentId(_)
                 // the singleton_top_layer_v1_1.clsp will only emit two
                 // conditions, ASSERT_MY_AMOUNT and ASSERT_MY_PARENT_ID (in that
                 // order). So we expect this conditon as the second in the list.
                 // Any other conditions of this kind have to have been produced
                 // by the inner puzzle, which we don't have control over. So in
                 // that case this spend is not eligible for fast-forward.
-                if self.condition_counter != 1 {
+                if self.condition_counter != 1 => {
                     spend.flags &= !ELIGIBLE_FOR_FF;
                 }
-            }
             Condition::AggSigMe(_, _)
             | Condition::AggSigParent(_, _)
             | Condition::AggSigParentAmount(_, _)

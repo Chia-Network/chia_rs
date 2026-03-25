@@ -241,11 +241,7 @@ pub fn collect_and_return_from_merkle_blob(
     let mut in_subtree: HashSet<Hash> = HashSet::new();
     let mut index_stack: Vec<(TreeIndex, bool)> = Vec::new();
     index_stack.push((TreeIndex(0), false));
-    loop {
-        let Some((index, visited)) = index_stack.pop() else {
-            break;
-        };
-
+    while let Some((index, visited)) = index_stack.pop() {
         let block = format::try_get_block(&blob, index)?;
 
         let node_hash = block.node.hash();
