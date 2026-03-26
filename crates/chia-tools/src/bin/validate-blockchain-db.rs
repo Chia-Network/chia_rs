@@ -89,6 +89,8 @@ const TESTNET11_CONSTANTS: ConsensusConstants = ConsensusConstants {
     sub_slot_iters_starting: 67_108_864,
     // forks activated from the beginning on testnet11
     hard_fork_height: 0,
+    soft_fork8_height: 3_755_000,
+    soft_fork9_height: 3_924_000,
     plot_filter_128_height: 6_029_568,
     plot_filter_64_height: 11_075_328,
     plot_filter_32_height: 16_121_088,
