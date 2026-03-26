@@ -7,7 +7,7 @@ use crate::flags::{ConsensusFlags, MEMPOOL_MODE};
 use crate::generator_cost::total_cost_from_tree;
 use crate::puzzle_fingerprint::compute_puzzle_fingerprint;
 use crate::run_block_generator::subtract_cost;
-use crate::solution_generator::{calculate_generator_length, solution_generator_backrefs};
+use crate::solution_generator::{build_generator, calculate_generator_length};
 use crate::spend_visitor::SpendVisitor;
 use crate::spendbundle_validation::get_flags_for_height_and_constants;
 use crate::validation_error::ErrorCode;
@@ -23,7 +23,6 @@ use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
 use clvmr::serde::intern_tree_limited;
 use clvmr::serde::node_from_bytes;
-use clvmr::serde::node_from_bytes_backrefs;
 
 const QUOTE_BYTES: usize = 2;
 
@@ -46,9 +45,9 @@ pub fn get_conditions_from_spendbundle(
 }
 
 /// Computes the base cost of a spend bundle's generator before any puzzles run.
-/// For INTERNED_GENERATOR, builds a backrefs-encoded generator, interns the tree,
-/// and charges based on the interned structure. Otherwise charges cost_per_byte
-/// on the raw generator length (excluding the quote wrapper).
+/// For INTERNED_GENERATOR, builds the generator tree, interns it, and charges
+/// based on the interned structure. Otherwise charges cost_per_byte on the raw
+/// generator length (excluding the quote wrapper).
 fn calculate_base_cost(
     a: &mut Allocator,
     spend_bundle: &SpendBundle,
@@ -56,18 +55,16 @@ fn calculate_base_cost(
     constants: &ConsensusConstants,
 ) -> Result<u64, ValidationErr> {
     if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
-        let generator = solution_generator_backrefs(
+        let mut gen_allocator = Allocator::new();
+        let generator = build_generator(
+            &mut gen_allocator,
             spend_bundle
                 .coin_spends
                 .iter()
                 .map(|cs| (cs.coin, cs.puzzle_reveal.as_slice(), cs.solution.as_slice())),
         )
         .map_err(|_| ValidationErr(a.nil(), ErrorCode::GeneratorRuntimeError))?;
-
-        let mut decode_allocator = Allocator::new();
-        let program_node = node_from_bytes_backrefs(&mut decode_allocator, &generator)
-            .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
-        let interned = intern_tree_limited(&decode_allocator, program_node, u32::MAX as usize)
+        let interned = intern_tree_limited(&gen_allocator, generator, u32::MAX as usize)
             .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
         Ok(total_cost_from_tree(&interned))
     } else {
