@@ -12,8 +12,8 @@ use super::opcodes::{
     ASSERT_MY_PARENT_ID, ASSERT_MY_PUZZLEHASH, ASSERT_PUZZLE_ANNOUNCEMENT, ASSERT_SECONDS_ABSOLUTE,
     ASSERT_SECONDS_RELATIVE, CREATE_COIN, CREATE_COIN_ANNOUNCEMENT, CREATE_COIN_COST,
     CREATE_PUZZLE_ANNOUNCEMENT, ConditionOpcode, GENERIC_CONDITION_COST, MESSAGE_CONDITION_COST,
-    RECEIVE_MESSAGE, REMARK, RESERVE_FEE, SEND_MESSAGE, SOFTFORK, compute_unknown_condition_cost,
-    parse_opcode,
+    NEW_CREATE_COIN_COST, RECEIVE_MESSAGE, REMARK, RESERVE_FEE, SEND_MESSAGE, SOFTFORK, SPEND_COST,
+    compute_unknown_condition_cost, parse_opcode,
 };
 use super::sanitize_int::{SanitizedUint, sanitize_uint};
 use super::validation_error::{ErrorCode, ValidationErr, first, next, rest};
@@ -966,6 +966,15 @@ pub fn process_single_spend<'a, V: SpendVisitor>(
 
     let mut spend = SpendConditions::new(parent_id, my_amount, puzzle_hash, coin_id, clvm_cost);
 
+    if flags.contains(ConsensusFlags::COST_CONDITIONS) {
+        if *max_cost < SPEND_COST {
+            return Err(ValidationErr(parent_id, ErrorCode::CostExceeded));
+        }
+        *max_cost -= SPEND_COST;
+        ret.condition_cost += SPEND_COST;
+        spend.condition_cost += SPEND_COST;
+    }
+
     let mut visitor = V::new_spend(&mut spend);
 
     parse_conditions(
@@ -1048,12 +1057,17 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
         // in case we exceed the limit, we want to fail as early as possible
         match op {
             CREATE_COIN => {
-                if *max_cost < CREATE_COIN_COST {
+                let cost = if flags.contains(ConsensusFlags::COST_CONDITIONS) {
+                    NEW_CREATE_COIN_COST
+                } else {
+                    CREATE_COIN_COST
+                };
+                if *max_cost < cost {
                     return Err(ValidationErr(c, ErrorCode::CostExceeded));
                 }
-                *max_cost -= CREATE_COIN_COST;
-                ret.condition_cost += CREATE_COIN_COST;
-                spend.condition_cost += CREATE_COIN_COST;
+                *max_cost -= cost;
+                ret.condition_cost += cost;
+                spend.condition_cost += cost;
             }
             AGG_SIG_UNSAFE
             | AGG_SIG_ME
@@ -4215,7 +4229,7 @@ fn test_cost_all_conds(#[case] count: usize) {
     assert!(r.is_ok());
     assert_eq!(
         r.unwrap().1.condition_cost,
-        count as u64 * GENERIC_CONDITION_COST
+        SPEND_COST + count as u64 * GENERIC_CONDITION_COST
     );
 }
 
@@ -4248,7 +4262,10 @@ fn test_cost_create_coins_conds(#[case] count: usize) {
         None,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap().1.condition_cost, CREATE_COIN_COST * count as u64);
+    assert_eq!(
+        r.unwrap().1.condition_cost,
+        SPEND_COST + NEW_CREATE_COIN_COST * count as u64
+    );
 }
 
 #[cfg(test)]
@@ -4289,7 +4306,10 @@ fn test_cost_aggsig_conds(#[case] count: usize) {
         None,
     );
     assert!(r.is_ok());
-    assert_eq!(r.unwrap().1.condition_cost, AGG_SIG_COST * count as u64);
+    assert_eq!(
+        r.unwrap().1.condition_cost,
+        SPEND_COST + AGG_SIG_COST * count as u64
+    );
 }
 
 // the relative constraints clash because they are on the same coin spend

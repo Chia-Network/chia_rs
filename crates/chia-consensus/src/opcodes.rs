@@ -65,6 +65,11 @@ pub const SOFTFORK: ConditionOpcode = 90;
 pub const CREATE_COIN_COST: Cost = 1_800_000;
 pub const AGG_SIG_COST: Cost = 1_200_000;
 
+// When COST_CONDITIONS is set, each spend is charged SPEND_COST and
+// CREATE_COIN uses NEW_CREATE_COIN_COST instead of CREATE_COIN_COST.
+pub const SPEND_COST: Cost = CREATE_COIN_COST / 4;
+pub const NEW_CREATE_COIN_COST: Cost = CREATE_COIN_COST - SPEND_COST;
+
 pub const MESSAGE_CONDITION_COST: Cost = 700;
 pub const GENERIC_CONDITION_COST: Cost = 200;
 
