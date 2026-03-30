@@ -585,7 +585,7 @@ mod tests {
             let mut parent = [0u8; 32];
             parent[0..4].copy_from_slice(&(i as u32).to_be_bytes());
             (
-                Coin::new(parent.into(), puzzle_hash.into(), total_amount),
+                Coin::new(parent.into(), puzzle_hash, total_amount),
                 IDENTITY_PUZZLE,
                 solution_bytes.as_slice(),
             )

@@ -399,7 +399,7 @@ mod tests {
                     let (bundle, cost, conds) = entry.as_ref();
                     let start_call = Instant::now();
                     let (added, result) = builder
-                        .add_spend_bundles([bundle].into_iter(), *cost, &TEST_CONSTANTS)
+                        .add_spend_bundles([bundle], *cost, &TEST_CONSTANTS)
                         .expect("add_spend_bundle");
 
                     max_call_time = f32::max(max_call_time, start_call.elapsed().as_secs_f32());
