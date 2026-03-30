@@ -63,6 +63,8 @@ def test_plot_roundtrip(
     assert prover.get_strength() == strength
     assert prover.size() == k
     assert prover.plot_id() == plot_id
+    assert prover.get_meta_group() == meta_group
+    assert prover.get_plot_index() == plot_index
 
     # Test serialization/deserialization
     serialized = prover.to_bytes()
@@ -71,6 +73,8 @@ def test_plot_roundtrip(
     assert prover2.get_strength() == strength
     assert prover2.size() == k
     assert prover2.plot_id() == plot_id
+    assert prover2.get_meta_group() == meta_group
+    assert prover2.get_plot_index() == plot_index
 
     num_challenges = 0
     num_proofs = 0
