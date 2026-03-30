@@ -540,8 +540,12 @@ mod tests {
     use super::*;
     use crate::conditions::MAX_SPENDS_PER_BLOCK;
     use crate::consensus_constants::TEST_CONSTANTS;
+    use crate::opcodes::{CREATE_COIN, CREATE_COIN_COST, NEW_CREATE_COIN_COST, SPEND_COST};
     use crate::solution_generator::solution_generator;
+    use chia_protocol::Bytes32;
+    use clvm_traits::ToClvm;
     use clvm_utils::tree_hash_atom;
+    use clvmr::serde::node_to_bytes;
     use rstest::rstest;
 
     const IDENTITY_PUZZLE: &[u8] = &[1];
@@ -557,6 +561,33 @@ mod tests {
                 Coin::new(parent.into(), puzzle_hash.into(), 0),
                 IDENTITY_PUZZLE,
                 empty_solution,
+            )
+        });
+
+        solution_generator(spends).expect("solution_generator")
+    }
+
+    fn make_generator_with_create_coins(num_spends: usize, coins_per_spend: usize) -> Vec<u8> {
+        let puzzle_hash = Bytes32::from(tree_hash_atom(&[1]).to_bytes());
+
+        let mut a = Allocator::new();
+        let mut conds = a.nil();
+        for i in 0..coins_per_spend {
+            let cond = (CREATE_COIN, (puzzle_hash, (i as u64, 0)))
+                .to_clvm(&mut a)
+                .unwrap();
+            conds = a.new_pair(cond, conds).unwrap();
+        }
+        let solution_bytes = node_to_bytes(&a, conds).unwrap();
+
+        let total_amount: u64 = (0..coins_per_spend as u64).sum();
+        let spends = (0..num_spends).map(|i| {
+            let mut parent = [0u8; 32];
+            parent[0..4].copy_from_slice(&(i as u32).to_be_bytes());
+            (
+                Coin::new(parent.into(), puzzle_hash, total_amount),
+                IDENTITY_PUZZLE,
+                solution_bytes.as_slice(),
             )
         });
 
@@ -595,5 +626,52 @@ mod tests {
                 panic!("mismatch");
             }
         }
+    }
+
+    #[rstest]
+    #[case(1, 1)]
+    #[case(3, 1)]
+    #[case(1, 3)]
+    #[case(5, 5)]
+    fn test_cost_conditions_with_create_coin(
+        #[case] num_spends: usize,
+        #[case] coins_per_spend: usize,
+    ) {
+        let program = make_generator_with_create_coins(num_spends, coins_per_spend);
+        let blocks: &[&[u8]] = &[];
+        let num_coins = (num_spends * coins_per_spend) as u64;
+
+        let (_, without) = run_block_generator2(
+            &program,
+            blocks,
+            u64::MAX,
+            ConsensusFlags::DONT_VALIDATE_SIGNATURE,
+            &Signature::default(),
+            None,
+            &TEST_CONSTANTS,
+        )
+        .expect("without COST_CONDITIONS");
+
+        let (_, with) = run_block_generator2(
+            &program,
+            blocks,
+            u64::MAX,
+            ConsensusFlags::DONT_VALIDATE_SIGNATURE | ConsensusFlags::COST_CONDITIONS,
+            &Signature::default(),
+            None,
+            &TEST_CONSTANTS,
+        )
+        .expect("with COST_CONDITIONS");
+
+        assert_eq!(without.spends.len(), num_spends);
+        assert_eq!(with.spends.len(), num_spends);
+
+        assert_eq!(without.condition_cost, CREATE_COIN_COST * num_coins);
+        assert_eq!(
+            with.condition_cost,
+            SPEND_COST * num_spends as u64 + NEW_CREATE_COIN_COST * num_coins
+        );
+
+        assert_eq!(without.execution_cost, with.execution_cost);
     }
 }

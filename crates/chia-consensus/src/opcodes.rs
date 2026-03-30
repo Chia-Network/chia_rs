@@ -62,8 +62,16 @@ pub const REMARK: ConditionOpcode = 1;
 // the cost is specified in increments of 10000, to keep the values smaller
 pub const SOFTFORK: ConditionOpcode = 90;
 
+// This create coin cost applies before the 3.0 hard fork activates
 pub const CREATE_COIN_COST: Cost = 1_800_000;
 pub const AGG_SIG_COST: Cost = 1_200_000;
+
+// Spend cost and the new create coin cost applies after the 3.0 hard fork
+// activates
+// When COST_CONDITIONS is set, each spend is charged SPEND_COST and
+// CREATE_COIN uses NEW_CREATE_COIN_COST instead of CREATE_COIN_COST.
+pub const SPEND_COST: Cost = CREATE_COIN_COST / 4;
+pub const NEW_CREATE_COIN_COST: Cost = CREATE_COIN_COST - SPEND_COST;
 
 pub const MESSAGE_CONDITION_COST: Cost = 700;
 pub const GENERIC_CONDITION_COST: Cost = 200;

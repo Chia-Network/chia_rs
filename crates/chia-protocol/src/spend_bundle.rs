@@ -39,8 +39,18 @@ impl SpendBundle {
         self.hash().into()
     }
 
+    /// Returns the coins created by this spend bundle. This is a convenience
+    /// method that does not perform full consensus validation -- it only runs
+    /// each puzzle and scans for CREATE_COIN conditions. The cost budget is
+    /// approximate and intentionally more conservative than consensus rules.
     pub fn additions(&self) -> Result<Vec<Coin>, EvalErr> {
-        const CREATE_COIN_COST: Cost = 1_800_000;
+        // This must match NEW_CREATE_COIN_COST (the post-hard-fork value,
+        // 3/4 of the original 1,800,000). Using the old higher value would
+        // cause false positives for valid blocks after the hard fork. Using
+        // the lower value pre-hard-fork is fine: it only makes the safety
+        // bound slightly more lenient, which is harmless for a non-consensus
+        // helper.
+        const CREATE_COIN_COST: Cost = 1_350_000;
         const CREATE_COIN: u8 = 51;
 
         let mut ret = Vec::<Coin>::new();
