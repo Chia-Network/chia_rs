@@ -26,13 +26,13 @@ CONTRACT_PH = bytes32.fromhex("01" * 32)
 @pytest.mark.parametrize(
     "strength, pool_pk, contract_ph, plot_index, meta_group, expected_proofs",
     [
-        (2, POOL_PK, None, uint16(0), uint8(0), 8),
-        (2, POOL_PK, None, uint16(0), uint8(1), 6),
-        (2, POOL_PK, None, uint16(1), uint8(0), 8),
-        (2, None, CONTRACT_PH, uint16(0), uint8(0), 8),
-        (2, None, CONTRACT_PH, uint16(1000), uint8(7), 10),
-        (3, POOL_PK, None, uint16(0), uint8(0), 9),
-        (3, None, CONTRACT_PH, uint16(0), uint8(0), 13),
+        (2, POOL_PK, None, uint16(0), uint8(0), 446),
+        (2, POOL_PK, None, uint16(0), uint8(1), 322),
+        (2, POOL_PK, None, uint16(1), uint8(0), 378),
+        (2, None, CONTRACT_PH, uint16(0), uint8(0), 362),
+        (2, None, CONTRACT_PH, uint16(1000), uint8(7), 383),
+        (3, POOL_PK, None, uint16(0), uint8(0), 412),
+        (3, None, CONTRACT_PH, uint16(0), uint8(0), 379),
     ],
     ids=["0", "1", "2", "3", "4", "5", "6"],
 )
