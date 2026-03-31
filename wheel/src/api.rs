@@ -678,6 +678,14 @@ impl Prover {
         self.0.get_memo().to_vec()
     }
 
+    pub fn get_meta_group(&self) -> u8 {
+        self.0.get_meta_group()
+    }
+
+    pub fn get_plot_index(&self) -> u16 {
+        self.0.get_plot_index()
+    }
+
     pub fn to_bytes(&self) -> PyResult<Vec<u8>> {
         bincode::serialize(&self.0)
             .map_err(|m| PyRuntimeError::new_err(format!("failed to serialize Prover {m:?}")))
