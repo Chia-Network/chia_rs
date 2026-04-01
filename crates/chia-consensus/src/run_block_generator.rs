@@ -24,7 +24,10 @@ use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
-use clvmr::serde::{InternedTree, intern_tree_limited, node_from_bytes, node_from_bytes_backrefs};
+use clvmr::serde::{
+    InternedTree, deserialize_2026, node_from_bytes, node_from_bytes_backrefs,
+    intern_tree_limited, SERDE_2026_MAGIC_PREFIX,
+};
 
 pub fn subtract_cost(cost_left: &mut Cost, subtract: Cost) -> Result<(), ValidationErr> {
     if subtract > *cost_left {
@@ -223,7 +226,12 @@ where
 
     let (mut a, base_cost, program) = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
         let mut decode_allocator = Allocator::new();
-        let program_node = node_from_bytes_backrefs(&mut decode_allocator, program)?;
+        let program_node = if program.starts_with(&SERDE_2026_MAGIC_PREFIX) {
+            deserialize_2026(&mut decode_allocator, program, usize::MAX, true)
+                .map_err(|_| ValidationErr(ErrorCode::GeneratorRuntimeError))?
+        } else {
+            node_from_bytes_backrefs(&mut decode_allocator, program)?
+        };
         let interned = intern_tree_limited(&decode_allocator, program_node, u32::MAX as usize)
             .map_err(|_| ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
         let cost = interned_vbytes(&interned) * constants.cost_per_byte;

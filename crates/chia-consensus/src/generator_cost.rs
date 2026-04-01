@@ -33,7 +33,7 @@ pub fn interned_vbytes(tree: &InternedTree) -> u64 {
 mod tests {
     use super::*;
     use clvmr::allocator::Allocator;
-    use clvmr::serde::intern_tree;
+    use clvmr::serde::intern;
 
     #[test]
     fn test_interned_vbytes_nil() {

@@ -95,9 +95,6 @@ impl ConsensusFlags {
         if clvm.contains(ClvmFlags::ENABLE_SECP_OPS) {
             out = out.union(ConsensusFlags::ENABLE_SECP_OPS);
         }
-        if clvm.contains(ClvmFlags::MALACHITE) {
-            out = out.union(ConsensusFlags::MALACHITE);
-        }
         out
     }
 
@@ -135,9 +132,6 @@ impl ConsensusFlags {
         }
         if self.contains(ConsensusFlags::ENABLE_SECP_OPS) {
             out.insert(ClvmFlags::ENABLE_SECP_OPS);
-        }
-        if self.contains(ConsensusFlags::MALACHITE) {
-            out.insert(ClvmFlags::MALACHITE);
         }
         out
     }
