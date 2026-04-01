@@ -111,7 +111,7 @@ clvm-utils = ["dep:clvm-utils"]
 openssl = ["chia-sha2/openssl", "clvmr/openssl"]
 
 [patch.crates-io]
-clvmr = { git = "https://github.com/Chia-Network/clvm_rs", branch = "serde_2026" }
+clvmr = { git = "https://github.com/Chia-Network/clvm_rs", rev = "315a693a89c22fd9dc170c923c80e9aca5ab708b" }
 
 [profile.release]
 lto = "thin"
