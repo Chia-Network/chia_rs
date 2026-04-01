@@ -85,15 +85,19 @@ jobs:
         shell: bash
         run: |
           FAILURE=0
+          EXTRA_ARGS=()
+          if [[ "${{ matrix.python.major-dot-minor }}" == "3.9" ]]; then
+            EXTRA_ARGS=(--allowlist wheel/stubtest.allowlist.3-9)
+          fi
           echo "::group::concise"
-          if ! stubtest ${{ matrix.python.stubtest-args }} --allowlist wheel/stubtest.allowlist --concise chia_rs
+          if ! stubtest ${{ matrix.python.stubtest-args }} "${EXTRA_ARGS[@]}" --allowlist wheel/stubtest.allowlist --concise chia_rs
           then
             FAILURE=1
           fi
           echo "::endgroup::"
 
           echo "::group::complete"
-          if ! stubtest ${{ matrix.python.stubtest-args }} --allowlist wheel/stubtest.allowlist chia_rs
+          if ! stubtest ${{ matrix.python.stubtest-args }} "${EXTRA_ARGS[@]}" --allowlist wheel/stubtest.allowlist chia_rs
           then
             FAILURE=1
           fi

@@ -1,0 +1,25 @@
+# Python 3.9 specific suppressions (not needed on 3.10+)
+
+chia_rs\.ReadableBuffer
+
+chia_rs\.sized_byte_class\.Iterable
+chia_rs\.sized_byte_class\.BinaryIO\.write
+chia_rs\.struct_stream\.BinaryIO\.write
+
+# from_parent methods
+chia_rs\.G1Element\.from_parent
+chia_rs\.G2Element\.from_parent
+chia_rs\.GTElement\.from_parent
+chia_rs\.PrivateKey\.from_parent
+chia_rs\.Program\.from_parent
+chia_rs\.Spend\.from_parent
+chia_rs\.SpendBundleConditions\.from_parent
+chia_rs\.SpendConditions\.from_parent
+chia_rs\.spend\.SpendConditions\.from_parent
+chia_rs\.Coin\.from_parent
+chia_rs\.CoinSpend\.from_parent
+chia_rs\.SpendBundle\.from_parent
+
+# disjoint base (3.9 only)
+chia_rs\.sized_bytes\.SizedBytes
+chia_rs\.sized_ints\.StructStream
