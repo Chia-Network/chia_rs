@@ -76,9 +76,6 @@ impl ConsensusFlags {
         if clvm.contains(ClvmFlags::RELAXED_BLS) {
             out = out.union(ConsensusFlags::RELAXED_BLS);
         }
-        if clvm.contains(ClvmFlags::LIMITS) {
-            out = out.union(ConsensusFlags::LIMITS);
-        }
         if clvm.contains(ClvmFlags::ENABLE_KECCAK_OPS_OUTSIDE_GUARD) {
             out = out.union(ConsensusFlags::ENABLE_KECCAK_OPS_OUTSIDE_GUARD);
         }
@@ -90,9 +87,6 @@ impl ConsensusFlags {
         }
         if clvm.contains(ClvmFlags::ENABLE_SECP_OPS) {
             out = out.union(ConsensusFlags::ENABLE_SECP_OPS);
-        }
-        if clvm.contains(ClvmFlags::MALACHITE) {
-            out = out.union(ConsensusFlags::MALACHITE);
         }
         out
     }
@@ -114,9 +108,6 @@ impl ConsensusFlags {
         if self.contains(ConsensusFlags::RELAXED_BLS) {
             out.insert(ClvmFlags::RELAXED_BLS);
         }
-        if self.contains(ConsensusFlags::LIMITS) {
-            out.insert(ClvmFlags::LIMITS);
-        }
         if self.contains(ConsensusFlags::ENABLE_KECCAK_OPS_OUTSIDE_GUARD) {
             out.insert(ClvmFlags::ENABLE_KECCAK_OPS_OUTSIDE_GUARD);
         }
@@ -128,9 +119,6 @@ impl ConsensusFlags {
         }
         if self.contains(ConsensusFlags::ENABLE_SECP_OPS) {
             out.insert(ClvmFlags::ENABLE_SECP_OPS);
-        }
-        if self.contains(ConsensusFlags::MALACHITE) {
-            out.insert(ClvmFlags::MALACHITE);
         }
         out
     }

@@ -110,6 +110,9 @@ clvm-utils = ["dep:clvm-utils"]
 
 openssl = ["chia-sha2/openssl", "clvmr/openssl"]
 
+[patch.crates-io]
+clvmr = { git = "https://github.com/Chia-Network/clvm_rs", branch = "serde_2026" }
+
 [profile.release]
 lto = "thin"
 
@@ -143,7 +146,7 @@ chia-puzzle-types-fuzz = { path = "./crates/chia-puzzle-types/fuzz", version = "
 clvm-traits-fuzz = { path = "./crates/clvm-traits/fuzz", version = "0.42.0" }
 clvm-utils-fuzz = { path = "./crates/clvm-utils/fuzz", version = "0.42.0" }
 blst = { version = "0.3.16", features = ["portable"] }
-clvmr = "0.17.4"
+clvmr = { version = "0.17", features = ["ser-2026"] }
 clvm-fuzzing = "0.17.0"
 syn = "2.0.101"
 quote = "1.0.40"

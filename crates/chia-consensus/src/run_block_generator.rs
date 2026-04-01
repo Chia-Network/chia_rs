@@ -24,7 +24,9 @@ use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
-use clvmr::serde::{InternedTree, intern_tree_limited, node_from_bytes, node_from_bytes_backrefs};
+use clvmr::serde::{
+    InternedTree, intern, node_from_bytes, node_from_bytes_auto, node_from_bytes_backrefs,
+};
 
 pub fn subtract_cost(
     a: &Allocator,
@@ -233,8 +235,9 @@ where
 
     let (mut a, base_cost, program) = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
         let mut decode_allocator = Allocator::new();
-        let program_node = node_from_bytes_backrefs(&mut decode_allocator, program)?;
-        let interned = intern_tree_limited(&decode_allocator, program_node, u32::MAX as usize)
+        let program_node = node_from_bytes_auto(&mut decode_allocator, program)
+            .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
+        let interned = intern(&decode_allocator, program_node)
             .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
         let cost = total_cost_from_tree(&interned);
         let InternedTree {
