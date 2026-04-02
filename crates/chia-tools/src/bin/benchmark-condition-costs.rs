@@ -1,109 +1,478 @@
-use chia_bls::{SecretKey, Signature, sign};
+use chia_bls::{SecretKey, Signature};
+use chia_consensus::conditions::{EmptyVisitor, parse_spends};
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
-use chia_consensus::make_aggsig_final_message::u64_to_bytes;
-use chia_sha2::Sha256;
-use linreg::linear_regression_of;
-use std::time::Instant;
-// use chia_consensus::gen::conditions::parse_conditions;
-use chia_consensus::conditions::{MempoolVisitor, SpendBundleConditions};
-use chia_consensus::conditions::{
-    ParseState, // SpendConditions,
-    process_single_spend,
-    validate_conditions,
-    validate_signature,
-};
 use chia_consensus::flags::ConsensusFlags;
 use chia_consensus::opcodes;
 use chia_consensus::opcodes::ConditionOpcode;
-use chia_consensus::spend_visitor::SpendVisitor;
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
-use clvmr::{
-    allocator::{Allocator, NodePtr},
-    error::EvalErr,
-};
+use chia_sha2::Sha256;
+use clvmr::allocator::{Allocator, NodePtr};
+use hex_literal::hex;
+use std::fs;
+use std::io::Write;
+use std::time::Instant;
+
+fn opcode_name(op: ConditionOpcode) -> &'static str {
+    match op {
+        opcodes::AGG_SIG_UNSAFE => "AggSigUnsafe",
+        opcodes::AGG_SIG_ME => "AggSigMe",
+        opcodes::AGG_SIG_PARENT => "AggSigParent",
+        opcodes::AGG_SIG_PUZZLE => "AggSigPuzzle",
+        opcodes::AGG_SIG_AMOUNT => "AggSigAmount",
+        opcodes::AGG_SIG_PARENT_AMOUNT => "AggSigParentAmount",
+        opcodes::AGG_SIG_PARENT_PUZZLE => "AggSigParentPuzzle",
+        opcodes::AGG_SIG_PUZZLE_AMOUNT => "AggSigPuzzleAmount",
+        opcodes::REMARK => "Remark",
+        opcodes::ASSERT_MY_COIN_ID => "AssertMyCoinId",
+        opcodes::ASSERT_MY_PARENT_ID => "AssertMyParentId",
+        opcodes::ASSERT_MY_PUZZLEHASH => "AssertMyPuzzlehash",
+        opcodes::ASSERT_MY_AMOUNT => "AssertMyAmount",
+        opcodes::ASSERT_MY_BIRTH_HEIGHT => "AssertMyBirthHeight",
+        opcodes::ASSERT_MY_BIRTH_SECONDS => "AssertMyBirthSeconds",
+        opcodes::ASSERT_SECONDS_RELATIVE => "AssertSecondsRelative",
+        opcodes::ASSERT_SECONDS_ABSOLUTE => "AssertSecondsAbsolute",
+        opcodes::ASSERT_HEIGHT_RELATIVE => "AssertHeightRelative",
+        opcodes::ASSERT_HEIGHT_ABSOLUTE => "AssertHeightAbsolute",
+        opcodes::ASSERT_BEFORE_SECONDS_RELATIVE => "AssertBeforeSecondsRelative",
+        opcodes::ASSERT_BEFORE_SECONDS_ABSOLUTE => "AssertBeforeSecondsAbsolute",
+        opcodes::ASSERT_BEFORE_HEIGHT_RELATIVE => "AssertBeforeHeightRelative",
+        opcodes::ASSERT_BEFORE_HEIGHT_ABSOLUTE => "AssertBeforeHeightAbsolute",
+        opcodes::SOFTFORK => "Softfork",
+        opcodes::ASSERT_CONCURRENT_SPEND => "AssertConcurrentSpend",
+        opcodes::ASSERT_CONCURRENT_PUZZLE => "AssertConcurrentPuzzle",
+        opcodes::ASSERT_EPHEMERAL => "AssertEphemeral",
+        opcodes::CREATE_COIN_ANNOUNCEMENT => "CreateCoinAnnouncement",
+        opcodes::ASSERT_COIN_ANNOUNCEMENT => "AssertCoinAnnouncement",
+        opcodes::CREATE_PUZZLE_ANNOUNCEMENT => "CreatePuzzleAnnouncement",
+        opcodes::ASSERT_PUZZLE_ANNOUNCEMENT => "AssertPuzzleAnnouncement",
+        _ => panic!("unknown opcode: {op}"),
+    }
+}
 
 struct ConditionTest<'a> {
     opcode: ConditionOpcode,
     args: &'a [NodePtr],
-    aggregate_signature: Signature,
-    // 0 means we want to estimate a reasonable cost
-    cost: u64,
 }
-use hex_literal::hex;
 
-const H1: &[u8; 32] = &[
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-];
+const H1: &[u8; 32] = &[1; 32];
+const H2: &[u8; 32] = &[2; 32];
+const AMOUNT: u64 = 100;
 
 const SECRET_KEY: &[u8; 32] =
     &hex!("6fc9d9a2b05fd1f0e51bc91041a03be8657081f272ec281aff731624f0d1c220");
 
-const MSG1: &[u8; 13] = &[3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
+const FLAGS: ConsensusFlags =
+    ConsensusFlags::DONT_VALIDATE_SIGNATURE.union(ConsensusFlags::COST_CONDITIONS);
+const NUM_CONDITIONS: usize = 500;
+const TIMING_REPS: usize = 300;
 
-// this function takes a NodePtr of (q . ((CONDITION ARG ARG)...))
-// and add another (CONDITION ARG ARG) to the list
-fn cons_condition(allocator: &mut Allocator, current_ptr: NodePtr) -> Result<NodePtr, EvalErr> {
-    let Some((cond, _rest)) = allocator.next(current_ptr) else {
-        return Err(EvalErr::InvalidOpArg(current_ptr, "not a pair".into()));
-    };
-    allocator.new_pair(cond, current_ptr)
-}
-
-fn cons_two_conditions(
-    allocator: &mut Allocator,
-    current_ptr: NodePtr,
-) -> Result<NodePtr, EvalErr> {
-    let Some((cond_one, rest)) = allocator.next(current_ptr) else {
-        return Err(EvalErr::InvalidOpArg(current_ptr, "not a pair".into()));
-    };
-    let Some((cond_two, _rest)) = allocator.next(rest) else {
-        return Err(EvalErr::InvalidOpArg(current_ptr, "not a pair".into()));
-    };
-    let temp = allocator.new_pair(cond_one, current_ptr)?;
-    allocator.new_pair(cond_two, temp)
-}
-
-// this function generates (q . ((CONDITION ARG ARG)))
-fn create_conditions(
-    allocator: &mut Allocator,
-    condition: &ConditionTest<'_>,
-) -> Result<NodePtr, EvalErr> {
-    let mut rest = allocator.nil();
-    for arg in condition.args.iter().rev() {
-        rest = allocator.new_pair(*arg, rest)?;
+fn make_list(a: &mut Allocator, items: &[NodePtr]) -> NodePtr {
+    let mut list = a.nil();
+    for item in items.iter().rev() {
+        list = a.new_pair(*item, list).unwrap();
     }
-    let opcode = allocator.new_small_number(condition.opcode as u32)?;
-    let cond_list = allocator.new_pair(opcode, rest)?;
-    allocator.new_pair(cond_list, allocator.nil())
+    list
 }
 
-fn create_two_conditions(
-    allocator: &mut Allocator,
-    cond_one: &ConditionTest<'_>,
-    cond_two: &ConditionTest<'_>,
-) -> Result<NodePtr, EvalErr> {
-    let temp = create_conditions(allocator, cond_one).expect("create_conditions");
-    let mut rest = allocator.nil();
-    for arg in cond_two.args.iter().rev() {
-        rest = allocator.new_pair(*arg, rest).expect("create_conditions");
+fn hash_two(a: &[u8], b: &[u8]) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(a);
+    hasher.update(b);
+    hasher.finalize()
+}
+
+fn compute_coin_id(parent: &[u8], puzzle: &[u8], amount_bytes: &[u8]) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(parent);
+    hasher.update(puzzle);
+    hasher.update(amount_bytes);
+    hasher.finalize()
+}
+
+fn clone_atom(a: &mut Allocator, arg: NodePtr) -> NodePtr {
+    let bytes = a.atom(arg).as_ref().to_vec();
+    a.new_atom(&bytes).unwrap()
+}
+
+fn make_condition(a: &mut Allocator, opcode: ConditionOpcode, args: &[NodePtr]) -> NodePtr {
+    let opcode_node = a.new_small_number(opcode as u32).unwrap();
+    let rest = make_list(a, args);
+    a.new_pair(opcode_node, rest).unwrap()
+}
+
+/// Return the SpendId argument nodes for a 3-bit mode describing a target coin.
+fn spend_id_fields(
+    a: &mut Allocator,
+    mode_bits: u8,
+    parent: &[u8],
+    puzzle: &[u8],
+    amount_bytes: &[u8],
+) -> Vec<NodePtr> {
+    if mode_bits == 0b111 {
+        let cid = compute_coin_id(parent, puzzle, amount_bytes);
+        vec![a.new_atom(&cid).unwrap()]
+    } else {
+        let mut fields = Vec::new();
+        if (mode_bits & 0b100) != 0 {
+            fields.push(a.new_atom(parent).unwrap());
+        }
+        if (mode_bits & 0b010) != 0 {
+            fields.push(a.new_atom(puzzle).unwrap());
+        }
+        if (mode_bits & 0b001) != 0 {
+            fields.push(a.new_atom(amount_bytes).unwrap());
+        }
+        fields
     }
-    let opcode = allocator
-        .new_small_number(cond_two.opcode as u32)
-        .expect("create_conditions");
-    let cond_list = allocator.new_pair(opcode, rest).expect("create_conditions");
-    allocator.new_pair(cond_list, temp)
+}
+
+fn field_name(bits: u8) -> &'static str {
+    match bits {
+        0 => "00",
+        1 => "am",
+        2 => "pu",
+        3 => "pa",
+        4 => "PA",
+        5 => "Pa",
+        6 => "Pp",
+        7 => "id",
+        _ => unreachable!(),
+    }
+}
+
+fn mode_name(mode: u8) -> String {
+    let dst = mode & 0b111;
+    let src = (mode >> 3) & 0b111;
+    format!("{}->{}", field_name(dst), field_name(src))
+}
+
+/// Build NUM_CONDITIONS instances of a simple (non-paired) condition,
+/// each with freshly allocated argument nodes.
+fn build_simple_conditions(a: &mut Allocator, cond: &ConditionTest<'_>) -> (NodePtr, usize) {
+    let mut conditions = a.nil();
+    for _ in 0..NUM_CONDITIONS {
+        let fresh_args: Vec<NodePtr> = cond.args.iter().map(|&arg| clone_atom(a, arg)).collect();
+        let node = make_condition(a, cond.opcode, &fresh_args);
+        conditions = a.new_pair(node, conditions).unwrap();
+    }
+    (conditions, NUM_CONDITIONS)
+}
+
+/// Build NUM_CONDITIONS CREATE_COIN_ANNOUNCEMENT with unique messages,
+/// plus a single ASSERT matching the first one to force all announcements
+/// to be hashed.
+fn build_create_coin_announcements(
+    a: &mut Allocator,
+    coin_id_bytes: &[u8; 32],
+) -> (NodePtr, usize) {
+    let mut conditions = a.nil();
+    let first_msg = [0u8; 32];
+    let announcement_id = hash_two(coin_id_bytes, &first_msg);
+    let id_node = a.new_atom(&announcement_id).unwrap();
+    let assert = make_condition(a, opcodes::ASSERT_COIN_ANNOUNCEMENT, &[id_node]);
+    conditions = a.new_pair(assert, conditions).unwrap();
+
+    for i in (0..NUM_CONDITIONS).rev() {
+        let mut msg_buf = [0u8; 32];
+        msg_buf[24..32].copy_from_slice(&(i as u64).to_be_bytes());
+        let msg_node = a.new_atom(&msg_buf).unwrap();
+        let create = make_condition(a, opcodes::CREATE_COIN_ANNOUNCEMENT, &[msg_node]);
+        conditions = a.new_pair(create, conditions).unwrap();
+    }
+    (conditions, NUM_CONDITIONS + 1)
+}
+
+/// Build NUM_CONDITIONS CREATE_COIN_ANNOUNCEMENT + ASSERT_COIN_ANNOUNCEMENT pairs,
+/// each with a unique message and matching announcement hash.
+fn build_assert_coin_announcements(
+    a: &mut Allocator,
+    coin_id_bytes: &[u8; 32],
+) -> (NodePtr, usize) {
+    let mut conditions = a.nil();
+    for i in (0..NUM_CONDITIONS).rev() {
+        let mut msg_buf = [0u8; 32];
+        msg_buf[24..32].copy_from_slice(&(i as u64).to_be_bytes());
+        let announcement_id = hash_two(coin_id_bytes, &msg_buf);
+
+        let msg_node = a.new_atom(&msg_buf).unwrap();
+        let create = make_condition(a, opcodes::CREATE_COIN_ANNOUNCEMENT, &[msg_node]);
+
+        let id_node = a.new_atom(&announcement_id).unwrap();
+        let assert = make_condition(a, opcodes::ASSERT_COIN_ANNOUNCEMENT, &[id_node]);
+
+        conditions = a.new_pair(assert, conditions).unwrap();
+        conditions = a.new_pair(create, conditions).unwrap();
+    }
+    (conditions, NUM_CONDITIONS * 2)
+}
+
+/// Build NUM_CONDITIONS CREATE_PUZZLE_ANNOUNCEMENT with unique messages,
+/// plus a single ASSERT matching the first one to force all announcements
+/// to be hashed.
+fn build_create_puzzle_announcements(a: &mut Allocator, puzzle_hash: &[u8]) -> (NodePtr, usize) {
+    let mut conditions = a.nil();
+    let first_msg = [0u8; 32];
+    let announcement_id = hash_two(puzzle_hash, &first_msg);
+    let id_node = a.new_atom(&announcement_id).unwrap();
+    let assert = make_condition(a, opcodes::ASSERT_PUZZLE_ANNOUNCEMENT, &[id_node]);
+    conditions = a.new_pair(assert, conditions).unwrap();
+
+    for i in (0..NUM_CONDITIONS).rev() {
+        let mut msg_buf = [0u8; 32];
+        msg_buf[24..32].copy_from_slice(&(i as u64).to_be_bytes());
+        let msg_node = a.new_atom(&msg_buf).unwrap();
+        let create = make_condition(a, opcodes::CREATE_PUZZLE_ANNOUNCEMENT, &[msg_node]);
+        conditions = a.new_pair(create, conditions).unwrap();
+    }
+    (conditions, NUM_CONDITIONS + 1)
+}
+
+/// Build NUM_CONDITIONS CREATE_PUZZLE_ANNOUNCEMENT + ASSERT_PUZZLE_ANNOUNCEMENT pairs,
+/// each with a unique message and matching announcement hash.
+fn build_assert_puzzle_announcements(a: &mut Allocator, puzzle_hash: &[u8]) -> (NodePtr, usize) {
+    let mut conditions = a.nil();
+    for i in (0..NUM_CONDITIONS).rev() {
+        let mut msg_buf = [0u8; 32];
+        msg_buf[24..32].copy_from_slice(&(i as u64).to_be_bytes());
+        let announcement_id = hash_two(puzzle_hash, &msg_buf);
+
+        let msg_node = a.new_atom(&msg_buf).unwrap();
+        let create = make_condition(a, opcodes::CREATE_PUZZLE_ANNOUNCEMENT, &[msg_node]);
+
+        let id_node = a.new_atom(&announcement_id).unwrap();
+        let assert = make_condition(a, opcodes::ASSERT_PUZZLE_ANNOUNCEMENT, &[id_node]);
+
+        conditions = a.new_pair(assert, conditions).unwrap();
+        conditions = a.new_pair(create, conditions).unwrap();
+    }
+    (conditions, NUM_CONDITIONS * 2)
+}
+
+/// Build two spends where spend 1 has NUM_CONDITIONS ASSERT_CONCURRENT_SPEND
+/// referencing spend 2's coin ID.
+fn build_assert_concurrent_spend(a: &mut Allocator) -> (NodePtr, usize) {
+    let amount_node = a.new_small_number(AMOUNT as u32).unwrap();
+    let coin2_id = compute_coin_id(H2, H1, a.atom(amount_node).as_ref());
+
+    let parent1 = a.new_atom(H1).unwrap();
+    let puzzle1 = a.new_atom(H2).unwrap();
+    let parent2 = a.new_atom(H2).unwrap();
+    let puzzle2 = a.new_atom(H1).unwrap();
+
+    let mut conditions1 = a.nil();
+    for _ in 0..NUM_CONDITIONS {
+        let id_node = a.new_atom(&coin2_id).unwrap();
+        let cond = make_condition(a, opcodes::ASSERT_CONCURRENT_SPEND, &[id_node]);
+        conditions1 = a.new_pair(cond, conditions1).unwrap();
+    }
+
+    let remark = make_condition(a, opcodes::REMARK, &[]);
+    let conditions2 = a.new_pair(remark, a.nil()).unwrap();
+
+    let spend1 = make_list(a, &[parent1, puzzle1, amount_node, conditions1]);
+    let spend2 = make_list(a, &[parent2, puzzle2, amount_node, conditions2]);
+
+    let nil = a.nil();
+    let list = a.new_pair(spend2, nil).unwrap();
+    let list = a.new_pair(spend1, list).unwrap();
+    let spends = a.new_pair(list, nil).unwrap();
+    (spends, NUM_CONDITIONS)
+}
+
+/// Build two spends where spend 1 has NUM_CONDITIONS ASSERT_CONCURRENT_PUZZLE
+/// referencing spend 2's puzzle hash.
+fn build_assert_concurrent_puzzle(a: &mut Allocator) -> (NodePtr, usize) {
+    let amount_node = a.new_small_number(AMOUNT as u32).unwrap();
+
+    let parent1 = a.new_atom(H1).unwrap();
+    let puzzle1 = a.new_atom(H2).unwrap();
+    let parent2 = a.new_atom(H2).unwrap();
+    let puzzle2 = a.new_atom(H1).unwrap();
+
+    let mut conditions1 = a.nil();
+    for _ in 0..NUM_CONDITIONS {
+        let ph_node = a.new_atom(H1).unwrap();
+        let cond = make_condition(a, opcodes::ASSERT_CONCURRENT_PUZZLE, &[ph_node]);
+        conditions1 = a.new_pair(cond, conditions1).unwrap();
+    }
+
+    let remark = make_condition(a, opcodes::REMARK, &[]);
+    let conditions2 = a.new_pair(remark, a.nil()).unwrap();
+
+    let spend1 = make_list(a, &[parent1, puzzle1, amount_node, conditions1]);
+    let spend2 = make_list(a, &[parent2, puzzle2, amount_node, conditions2]);
+
+    let nil = a.nil();
+    let list = a.new_pair(spend2, nil).unwrap();
+    let list = a.new_pair(spend1, list).unwrap();
+    let spends = a.new_pair(list, nil).unwrap();
+    (spends, NUM_CONDITIONS)
+}
+
+/// Build two spends where spend 1 creates a coin (via CREATE_COIN) and
+/// spend 2 is that ephemeral coin with NUM_CONDITIONS ASSERT_EPHEMERAL.
+fn build_assert_ephemeral(a: &mut Allocator) -> (NodePtr, usize) {
+    let amount_node = a.new_small_number(AMOUNT as u32).unwrap();
+
+    let parent1 = a.new_atom(H1).unwrap();
+    let puzzle1 = a.new_atom(H2).unwrap();
+
+    // Spend 1 creates coin 2 via CREATE_COIN with puzzle H1 and amount AMOUNT
+    let create_ph = a.new_atom(H1).unwrap();
+    let create_amt = a.new_small_number(AMOUNT as u32).unwrap();
+    let create_coin = make_condition(a, opcodes::CREATE_COIN, &[create_ph, create_amt]);
+    let conditions1 = a.new_pair(create_coin, a.nil()).unwrap();
+
+    // Coin 2 is ephemeral: parent is coin 1's ID, puzzle is H1, amount is AMOUNT
+    let amount_bytes = a.atom(amount_node).as_ref().to_vec();
+    let coin1_id = compute_coin_id(H1, H2, &amount_bytes);
+    let parent2 = a.new_atom(&coin1_id).unwrap();
+    let puzzle2 = a.new_atom(H1).unwrap();
+
+    let mut conditions2 = a.nil();
+    for _ in 0..NUM_CONDITIONS {
+        let cond = make_condition(a, opcodes::ASSERT_EPHEMERAL, &[]);
+        conditions2 = a.new_pair(cond, conditions2).unwrap();
+    }
+
+    let spend1 = make_list(a, &[parent1, puzzle1, amount_node, conditions1]);
+    let spend2 = make_list(a, &[parent2, puzzle2, amount_node, conditions2]);
+
+    let nil = a.nil();
+    let list = a.new_pair(spend2, nil).unwrap();
+    let list = a.new_pair(spend1, list).unwrap();
+    let spends = a.new_pair(list, nil).unwrap();
+    (spends, NUM_CONDITIONS)
+}
+
+/// Build a two-spend structure with NUM_CONDITIONS SEND/RECEIVE pairs.
+/// Coin 1 (H1/H2) sends, coin 2 (H2/H1) receives.
+fn build_message_spends(a: &mut Allocator, mode: u8) -> (NodePtr, usize) {
+    let send_dst_mode = mode & 0b111;
+    let recv_src_mode = (mode >> 3) & 0b111;
+
+    let amount_node = a.new_small_number(AMOUNT as u32).unwrap();
+    let amount_bytes: Vec<u8> = a.atom(amount_node).as_ref().to_vec();
+
+    let parent1_node = a.new_atom(H1).unwrap();
+    let puzzle1_node = a.new_atom(H2).unwrap();
+    let parent2_node = a.new_atom(H2).unwrap();
+    let puzzle2_node = a.new_atom(H1).unwrap();
+
+    let mut send_conditions = a.nil();
+    let mut recv_conditions = a.nil();
+
+    for i in (0..NUM_CONDITIONS).rev() {
+        let mut msg_buf = [0u8; 32];
+        msg_buf[24..32].copy_from_slice(&(i as u64).to_be_bytes());
+
+        // SEND on coin 1, destination fields describe coin 2
+        let s_mode = a.new_small_number(mode as u32).unwrap();
+        let s_msg = a.new_atom(&msg_buf).unwrap();
+        let dst_fields = spend_id_fields(a, send_dst_mode, H2, H1, &amount_bytes);
+        let mut send_args = vec![s_mode, s_msg];
+        send_args.extend(dst_fields);
+        let send = make_condition(a, opcodes::SEND_MESSAGE, &send_args);
+
+        // RECEIVE on coin 2, source fields describe coin 1
+        let r_mode = a.new_small_number(mode as u32).unwrap();
+        let r_msg = a.new_atom(&msg_buf).unwrap();
+        let src_fields = spend_id_fields(a, recv_src_mode, H1, H2, &amount_bytes);
+        let mut recv_args = vec![r_mode, r_msg];
+        recv_args.extend(src_fields);
+        let recv = make_condition(a, opcodes::RECEIVE_MESSAGE, &recv_args);
+
+        send_conditions = a.new_pair(send, send_conditions).unwrap();
+        recv_conditions = a.new_pair(recv, recv_conditions).unwrap();
+    }
+
+    let spend1 = make_list(
+        a,
+        &[parent1_node, puzzle1_node, amount_node, send_conditions],
+    );
+    let spend2 = make_list(
+        a,
+        &[parent2_node, puzzle2_node, amount_node, recv_conditions],
+    );
+
+    let nil = a.nil();
+    let spends_list = a.new_pair(spend2, nil).unwrap();
+    let spends_list = a.new_pair(spend1, spends_list).unwrap();
+    let spends = a.new_pair(spends_list, nil).unwrap();
+
+    (spends, NUM_CONDITIONS * 2)
+}
+
+struct BenchmarkResult {
+    samples: Vec<f64>,
+    avg: f64,
+    median: f64,
+    condition_cost: u64,
+}
+
+fn run_benchmark(allocator: &Allocator, spends: NodePtr, num_total: usize) -> BenchmarkResult {
+    // warmup
+    let result = parse_spends::<EmptyVisitor>(
+        allocator,
+        spends,
+        11_000_000_000,
+        0,
+        FLAGS,
+        &Signature::default(),
+        None,
+        &TEST_CONSTANTS,
+    )
+    .expect("parse_spends");
+    let condition_cost = result.condition_cost;
+
+    let mut samples = Vec::<f64>::new();
+    for _ in 0..TIMING_REPS {
+        let start = Instant::now();
+        parse_spends::<EmptyVisitor>(
+            allocator,
+            spends,
+            11_000_000_000,
+            0,
+            FLAGS,
+            &Signature::default(),
+            None,
+            &TEST_CONSTANTS,
+        )
+        .expect("parse_spends");
+        let elapsed = start.elapsed();
+        samples.push(elapsed.as_nanos() as f64 / num_total as f64);
+    }
+
+    let avg = samples.iter().sum::<f64>() / samples.len() as f64;
+    let mut sorted = samples.clone();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let median = if sorted.len().is_multiple_of(2) {
+        f64::midpoint(sorted[sorted.len() / 2 - 1], sorted[sorted.len() / 2])
+    } else {
+        sorted[sorted.len() / 2]
+    };
+
+    BenchmarkResult {
+        samples,
+        avg,
+        median,
+        condition_cost,
+    }
+}
+
+fn write_samples(result: &BenchmarkResult, path: &str) {
+    let mut file = fs::File::create(path).expect("create data file");
+    writeln!(file, "# nanos_per_condition").unwrap();
+    for ns in &result.samples {
+        writeln!(file, "{ns:.3}").unwrap();
+    }
 }
 
 pub fn main() {
-    use gnuplot::{AxesCommon, Figure, PlotOption};
-
-    const REPS: u32 = 500;
-
     let mut allocator = Allocator::new();
     let one = allocator.new_small_number(1).expect("number");
-    let hundred = allocator.new_small_number(100).expect("number");
-    let sixty_three = allocator.new_small_number(63).expect("number");
+    let hundred = allocator.new_small_number(AMOUNT as u32).expect("number");
     let sk = SecretKey::from_bytes(SECRET_KEY).expect("secret key");
     let pk = sk.public_key();
     let parent_id = allocator.new_atom(H1).expect("atom");
@@ -112,385 +481,245 @@ pub fn main() {
     let coin = Coin {
         parent_coin_info: H1.into(),
         puzzle_hash,
-        amount: 100,
+        amount: AMOUNT,
     };
     let coin_id = allocator.new_atom(coin.coin_id().as_slice()).expect("atom");
+    let coin_id_bytes: [u8; 32] = coin.coin_id().into();
     let h1_pointer = allocator.new_atom(H1).expect("atom");
     let pk_ptr = allocator.new_atom(&pk.to_bytes()).expect("pubkey");
-    let msg_ptr = allocator.new_atom(MSG1).expect("msg");
+    let msg_ptr = allocator.new_atom(&[3u8; 13]).expect("msg");
 
-    let mut hasher = Sha256::new();
-    hasher.update([coin.coin_id().as_slice(), MSG1].concat());
-    let coin_announce_msg: [u8; 32] = hasher.finalize();
-    hasher = Sha256::new();
-    hasher.update([puzzle_hash.as_slice(), MSG1].concat());
-    let puzzle_announce_msg: [u8; 32] = hasher.finalize();
-
-    // this is the list of conditions to test
     let cond_tests = [
         ConditionTest {
             opcode: opcodes::AGG_SIG_UNSAFE,
             args: &[pk_ptr, msg_ptr],
-            aggregate_signature: sign(&sk, MSG1),
-            cost: 1_200_000,
         },
         ConditionTest {
             opcode: opcodes::AGG_SIG_ME,
             args: &[pk_ptr, msg_ptr],
-            aggregate_signature: sign(
-                &sk,
-                [
-                    MSG1,
-                    coin.coin_id().as_slice(),
-                    TEST_CONSTANTS.agg_sig_me_additional_data.as_slice(),
-                ]
-                .concat(),
-            ),
-            cost: 1_200_000,
         },
         ConditionTest {
             opcode: opcodes::AGG_SIG_PARENT,
             args: &[pk_ptr, msg_ptr],
-            aggregate_signature: sign(
-                &sk,
-                [
-                    MSG1,
-                    H1.as_slice(),
-                    TEST_CONSTANTS.agg_sig_parent_additional_data.as_slice(),
-                ]
-                .concat(),
-            ),
-            cost: 1_200_000,
         },
         ConditionTest {
             opcode: opcodes::AGG_SIG_PUZZLE,
             args: &[pk_ptr, msg_ptr],
-            aggregate_signature: sign(
-                &sk,
-                [
-                    MSG1,
-                    puzzle_hash.as_slice(),
-                    TEST_CONSTANTS.agg_sig_puzzle_additional_data.as_slice(),
-                ]
-                .concat(),
-            ),
-            cost: 1_200_000,
         },
         ConditionTest {
             opcode: opcodes::AGG_SIG_AMOUNT,
             args: &[pk_ptr, msg_ptr],
-            aggregate_signature: sign(
-                &sk,
-                [
-                    MSG1,
-                    u64_to_bytes(100_u64).as_slice(),
-                    TEST_CONSTANTS.agg_sig_amount_additional_data.as_slice(),
-                ]
-                .concat(),
-            ),
-            cost: 1_200_000,
         },
         ConditionTest {
             opcode: opcodes::AGG_SIG_PARENT_AMOUNT,
             args: &[pk_ptr, msg_ptr],
-            aggregate_signature: sign(
-                &sk,
-                [
-                    MSG1,
-                    H1.as_slice(),
-                    u64_to_bytes(100_u64).as_slice(),
-                    TEST_CONSTANTS
-                        .agg_sig_parent_amount_additional_data
-                        .as_slice(),
-                ]
-                .concat(),
-            ),
-            cost: 1_200_000,
         },
         ConditionTest {
             opcode: opcodes::AGG_SIG_PARENT_PUZZLE,
             args: &[pk_ptr, msg_ptr],
-            aggregate_signature: sign(
-                &sk,
-                [
-                    MSG1,
-                    H1.as_slice(),
-                    puzzle_hash.as_slice(),
-                    TEST_CONSTANTS
-                        .agg_sig_parent_puzzle_additional_data
-                        .as_slice(),
-                ]
-                .concat(),
-            ),
-            cost: 1_200_000,
         },
         ConditionTest {
             opcode: opcodes::AGG_SIG_PUZZLE_AMOUNT,
             args: &[pk_ptr, msg_ptr],
-            aggregate_signature: sign(
-                &sk,
-                [
-                    MSG1,
-                    puzzle_hash.as_slice(),
-                    u64_to_bytes(100_u64).as_slice(),
-                    TEST_CONSTANTS
-                        .agg_sig_puzzle_amount_additional_data
-                        .as_slice(),
-                ]
-                .concat(),
-            ),
-            cost: 1_200_000,
         },
         ConditionTest {
             opcode: opcodes::REMARK,
             args: &[h1_pointer],
-            aggregate_signature: Signature::default(),
-            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::ASSERT_MY_COIN_ID,
             args: &[coin_id],
-            aggregate_signature: Signature::default(),
-            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::ASSERT_MY_PARENT_ID,
             args: &[h1_pointer],
-            aggregate_signature: Signature::default(),
-            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::ASSERT_MY_PUZZLEHASH,
             args: &[puz_hash_node_ptr],
-            aggregate_signature: Signature::default(),
-            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::ASSERT_MY_AMOUNT,
             args: &[hundred],
-            aggregate_signature: Signature::default(),
-            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::ASSERT_MY_BIRTH_HEIGHT,
             args: &[hundred],
-            aggregate_signature: Signature::default(),
-            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::ASSERT_MY_BIRTH_SECONDS,
             args: &[hundred],
-            aggregate_signature: Signature::default(),
-            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::ASSERT_SECONDS_RELATIVE,
             args: &[one],
-            aggregate_signature: Signature::default(),
-            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::ASSERT_SECONDS_ABSOLUTE,
             args: &[one],
-            aggregate_signature: Signature::default(),
-            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::ASSERT_HEIGHT_RELATIVE,
             args: &[one],
-            aggregate_signature: Signature::default(),
-            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::ASSERT_HEIGHT_ABSOLUTE,
             args: &[one],
-            aggregate_signature: Signature::default(),
-            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::ASSERT_BEFORE_SECONDS_RELATIVE,
             args: &[one],
-            aggregate_signature: Signature::default(),
-            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::ASSERT_BEFORE_SECONDS_ABSOLUTE,
             args: &[one],
-            aggregate_signature: Signature::default(),
-            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::ASSERT_BEFORE_HEIGHT_RELATIVE,
             args: &[one],
-            aggregate_signature: Signature::default(),
-            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::ASSERT_BEFORE_HEIGHT_ABSOLUTE,
             args: &[one],
-            aggregate_signature: Signature::default(),
-            cost: 0,
         },
         ConditionTest {
             opcode: opcodes::SOFTFORK,
             args: &[hundred, h1_pointer],
-            aggregate_signature: Signature::default(),
-            cost: 0,
         },
         ConditionTest {
-            opcode: opcodes::SEND_MESSAGE,
-            args: &[sixty_three, h1_pointer, coin_id],
-            aggregate_signature: Signature::default(),
-            cost: 0,
+            opcode: opcodes::CREATE_COIN_ANNOUNCEMENT,
+            args: &[],
         },
         ConditionTest {
             opcode: opcodes::ASSERT_COIN_ANNOUNCEMENT,
-            args: &[allocator.new_atom(&coin_announce_msg).expect("msg")],
-            aggregate_signature: Signature::default(),
-            cost: 0,
+            args: &[],
+        },
+        ConditionTest {
+            opcode: opcodes::CREATE_PUZZLE_ANNOUNCEMENT,
+            args: &[],
         },
         ConditionTest {
             opcode: opcodes::ASSERT_PUZZLE_ANNOUNCEMENT,
-            args: &[allocator.new_atom(&puzzle_announce_msg).expect("msg")],
-            aggregate_signature: Signature::default(),
-            cost: 0,
+            args: &[],
         },
     ];
 
-    let receive_message = ConditionTest {
-        opcode: opcodes::RECEIVE_MESSAGE,
-        args: &[sixty_three, h1_pointer, coin_id],
-        aggregate_signature: Signature::default(),
-        cost: 0,
-    };
+    fs::create_dir_all("data").expect("create data directory");
 
-    let coin_announcement = ConditionTest {
-        opcode: opcodes::CREATE_COIN_ANNOUNCEMENT,
-        args: &[msg_ptr],
-        aggregate_signature: Signature::default(),
-        cost: 0,
-    };
-    let puzzle_announcement = ConditionTest {
-        opcode: opcodes::CREATE_PUZZLE_ANNOUNCEMENT,
-        args: &[msg_ptr],
-        aggregate_signature: Signature::default(),
-        cost: 0,
-    };
-
-    let mut cost_factors = Vec::<f64>::new();
     for cond in cond_tests {
-        let mut cost = u64::MAX;
-        let mut samples = Vec::<(f64, f64)>::new();
-        let mut signature = Signature::default();
         let cp = allocator.checkpoint();
-        // Parse the conditions and then make the list longer
 
-        let (mut conditions, multiplier) = match cond.opcode {
-            opcodes::SEND_MESSAGE => (
-                create_two_conditions(&mut allocator, &cond, &receive_message).expect("two set"),
-                2,
-            ),
-            opcodes::ASSERT_PUZZLE_ANNOUNCEMENT => (
-                create_two_conditions(&mut allocator, &cond, &puzzle_announcement)
-                    .expect("two set"),
-                2,
-            ),
-            opcodes::ASSERT_COIN_ANNOUNCEMENT => (
-                create_two_conditions(&mut allocator, &cond, &coin_announcement).expect("two set"),
-                2,
-            ),
-            _ => (
-                create_conditions(&mut allocator, &cond).expect("create_conditions"),
-                1,
-            ),
+        let (conditions, num_total) = match cond.opcode {
+            opcodes::CREATE_COIN_ANNOUNCEMENT => {
+                build_create_coin_announcements(&mut allocator, &coin_id_bytes)
+            }
+            opcodes::ASSERT_COIN_ANNOUNCEMENT => {
+                build_assert_coin_announcements(&mut allocator, &coin_id_bytes)
+            }
+            opcodes::CREATE_PUZZLE_ANNOUNCEMENT => {
+                build_create_puzzle_announcements(&mut allocator, puzzle_hash.as_slice())
+            }
+            opcodes::ASSERT_PUZZLE_ANNOUNCEMENT => {
+                build_assert_puzzle_announcements(&mut allocator, puzzle_hash.as_slice())
+            }
+            _ => build_simple_conditions(&mut allocator, &cond),
         };
 
-        for i in 1..REPS {
-            signature += &cond.aggregate_signature;
-            let mut spends = allocator.nil();
-            // a "spend" is the following list (parent puzhash amount conditions)
-            let spend_list = [parent_id, puz_hash_node_ptr, hundred, conditions];
-            for arg in spend_list.iter().rev() {
-                spends = allocator.new_pair(*arg, spends).expect("new_pair");
-            }
-            // need to reset state or we get a double spend
-            let mut ret = SpendBundleConditions::default();
-            let mut state = ParseState::default();
+        let spend = make_list(
+            &mut allocator,
+            &[parent_id, puz_hash_node_ptr, hundred, conditions],
+        );
+        let nil = allocator.nil();
+        let spends_list = allocator.new_pair(spend, nil).unwrap();
+        let spends = allocator.new_pair(spends_list, nil).unwrap();
 
-            let start = Instant::now();
-            process_single_spend::<MempoolVisitor>(
-                &allocator,
-                &mut ret,
-                &mut state,
-                parent_id,
-                puz_hash_node_ptr,
-                hundred,
-                conditions,
-                ConsensusFlags::empty(),
-                &mut cost,
-                0, // clvm_cost
-                &TEST_CONSTANTS,
-            )
-            .expect("process_single_spend");
-
-            MempoolVisitor::post_process(&allocator, &state, &mut ret).expect("post_process");
-            validate_conditions(&allocator, &ret, &state, spends, ConsensusFlags::empty())
-                .expect("validate_conditions");
-            validate_signature(&state, &signature, ConsensusFlags::empty(), None)
-                .expect("validate_signature");
-
-            let elapsed = start.elapsed();
-            // the first run is a warmup
-            if i > 1 {
-                samples.push(((i * multiplier) as f64, elapsed.as_nanos() as f64));
-            }
-
-            // make the conditions list longer
-            conditions = if matches!(
-                cond.opcode,
-                opcodes::SEND_MESSAGE
-                    | opcodes::ASSERT_PUZZLE_ANNOUNCEMENT
-                    | opcodes::ASSERT_COIN_ANNOUNCEMENT
-            ) {
-                cons_two_conditions(&mut allocator, conditions).expect("cons_condition")
-            } else {
-                cons_condition(&mut allocator, conditions).expect("cons_condition")
-            };
-        }
-        // reset allocator before next condition test
-        let (slope, offset): (f64, f64) = linear_regression_of(&samples).expect("linreg failed");
-        if cond.cost > 0 {
-            let cost_per_ns = cond.cost as f64 / slope;
-            cost_factors.push(cost_per_ns);
+        let result = run_benchmark(&allocator, spends, num_total);
+        let label = opcode_name(cond.opcode);
+        if result.condition_cost > 0 {
+            let ns_per_cost = result.median * num_total as f64 / result.condition_cost as f64;
             println!(
-                "condition: {:2} nano-per-cond: {slope:6.3} cost-per-nanosecond: {cost_per_ns:0.3}",
-                cond.opcode
+                "{label:<33} avg: {:8.0} ns  median: {:8.0} ns  ns/cost: {ns_per_cost:.3}",
+                result.avg, result.median,
             );
         } else {
-            let cost_per_ns = cost_factors.iter().sum::<f64>() / cost_factors.len() as f64;
             println!(
-                "condition: {:2} nano-per-cond: {slope:6.3} computed-cost: {:0.2}",
-                cond.opcode,
-                slope * cost_per_ns
+                "{label:<33} avg: {:8.0} ns  median: {:8.0} ns",
+                result.avg, result.median
             );
         }
-        let mut plot = Figure::new();
-        plot.axes2d()
-            .set_x_label("number of conditions", &[])
-            .set_y_label("nanoseconds", &[])
-            .points(
-                samples.iter().map(|v| v.0),
-                samples.iter().map(|v| v.1),
-                &[PlotOption::PointSymbol('o')],
-            )
-            .lines(
-                [0, REPS * multiplier],
-                [offset, offset + slope * ((REPS * multiplier) as f64)],
-                &[],
+
+        let path = format!("data/{label}.dat");
+        write_samples(&result, &path);
+
+        allocator.restore_checkpoint(&cp);
+    }
+
+    // Benchmark conditions that require two spends.
+    #[allow(clippy::type_complexity)]
+    let two_spend_tests: &[(ConditionOpcode, fn(&mut Allocator) -> (NodePtr, usize))] = &[
+        (
+            opcodes::ASSERT_CONCURRENT_SPEND,
+            build_assert_concurrent_spend,
+        ),
+        (
+            opcodes::ASSERT_CONCURRENT_PUZZLE,
+            build_assert_concurrent_puzzle,
+        ),
+        (opcodes::ASSERT_EPHEMERAL, build_assert_ephemeral),
+    ];
+
+    for &(opcode, builder) in two_spend_tests {
+        let cp = allocator.checkpoint();
+
+        let (spends, num_total) = builder(&mut allocator);
+
+        let result = run_benchmark(&allocator, spends, num_total);
+        let label = opcode_name(opcode);
+        if result.condition_cost > 0 {
+            let ns_per_cost = result.median * num_total as f64 / result.condition_cost as f64;
+            println!(
+                "{label:<33} avg: {:8.0} ns  median: {:8.0} ns  ns/cost: {ns_per_cost:.3}",
+                result.avg, result.median,
             );
-        plot.save_to_png(format!("condition-{}.png", cond.opcode), 1024, 768)
-            .expect("save svg");
-        plot.close();
+        } else {
+            println!(
+                "{label:<33} avg: {:8.0} ns  median: {:8.0} ns",
+                result.avg, result.median
+            );
+        }
+
+        let path = format!("data/{label}.dat");
+        write_samples(&result, &path);
+
+        allocator.restore_checkpoint(&cp);
+    }
+
+    // Benchmark every SEND_MESSAGE/RECEIVE_MESSAGE mode combination.
+    // Mode is 6 bits: lower 3 = destination id, upper 3 = source id.
+    // Uses two spends: coin 1 (H1/H2) sends, coin 2 (H2/H1) receives.
+    for mode in 0u8..=63 {
+        let cp = allocator.checkpoint();
+
+        let (spends, num_total) = build_message_spends(&mut allocator, mode);
+
+        let name = mode_name(mode);
+        let result = run_benchmark(&allocator, spends, num_total);
+        if result.condition_cost > 0 {
+            let ns_per_cost = result.median * num_total as f64 / result.condition_cost as f64;
+            println!(
+                "Message 0x{mode:02x} {name:20} avg: {:8.0} ns  median: {:8.0} ns  ns/cost: {ns_per_cost:.3}",
+                result.avg, result.median,
+            );
+        } else {
+            println!(
+                "Message 0x{mode:02x} {name:20} avg: {:8.0} ns  median: {:8.0} ns",
+                result.avg, result.median
+            );
+        }
+
+        let path = format!("data/SendMessage_0x{mode:02x}.dat");
+        write_samples(&result, &path);
+
         allocator.restore_checkpoint(&cp);
     }
 }
