@@ -6,6 +6,7 @@ use crate::conditions::{
 };
 use crate::consensus_constants::ConsensusConstants;
 use crate::flags::ConsensusFlags;
+use crate::generator_cost::total_cost_from_tree;
 use crate::opcodes::{
     AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT, AGG_SIG_PARENT_PUZZLE,
     AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT, AGG_SIG_UNSAFE, CREATE_COIN,
@@ -23,7 +24,7 @@ use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
-use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs};
+use clvmr::serde::{InternedTree, intern_tree_limited, node_from_bytes, node_from_bytes_backrefs};
 
 pub fn subtract_cost(
     a: &Allocator,
@@ -229,13 +230,28 @@ where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
     check_generator_quote(program, flags)?;
-    let mut a = make_allocator(flags);
-    let byte_cost = program.len() as u64 * constants.cost_per_byte;
+
+    let (mut a, base_cost, program) = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
+        let mut decode_allocator = Allocator::new();
+        let program_node = node_from_bytes_backrefs(&mut decode_allocator, program)?;
+        let interned = intern_tree_limited(&decode_allocator, program_node, u32::MAX as usize)
+            .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
+        let cost = total_cost_from_tree(&interned);
+        let InternedTree {
+            allocator, root, ..
+        } = interned;
+        drop(decode_allocator);
+        (allocator, cost, root)
+    } else {
+        let mut a = make_allocator(flags);
+        let byte_cost = program.len() as u64 * constants.cost_per_byte;
+        let program = node_from_bytes_backrefs(&mut a, program)?;
+        (a, byte_cost, program)
+    };
 
     let mut cost_left = max_cost;
-    subtract_cost(&a, &mut cost_left, byte_cost)?;
+    subtract_cost(&a, &mut cost_left, base_cost)?;
 
-    let program = node_from_bytes_backrefs(&mut a, program)?;
     check_generator_node(&a, program, flags)?;
 
     let args = setup_generator_args(&mut a, block_refs, flags)?;
