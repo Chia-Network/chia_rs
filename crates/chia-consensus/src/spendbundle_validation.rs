@@ -91,8 +91,7 @@ pub fn get_flags_for_height_and_constants(
         flags |= ConsensusFlags::ENABLE_KECCAK_OPS_OUTSIDE_GUARD
             | ConsensusFlags::COST_CONDITIONS
             | ConsensusFlags::ENABLE_SECP_OPS
-            | ConsensusFlags::RELAXED_BLS
-            | ConsensusFlags::INTERNED_GENERATOR;
+            | ConsensusFlags::RELAXED_BLS;
     }
 
     if prev_tx_height >= constants.soft_fork8_height {
