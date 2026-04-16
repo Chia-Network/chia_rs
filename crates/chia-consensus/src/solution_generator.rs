@@ -5,7 +5,7 @@ use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::serde::{node_from_bytes_backrefs, node_to_bytes, node_to_bytes_backrefs};
 
 /// the tuple has the Coin, puzzle-reveal and solution
-fn build_generator<BufRef, I>(a: &mut Allocator, spends: I) -> Result<NodePtr>
+pub(crate) fn build_generator<BufRef, I>(a: &mut Allocator, spends: I) -> Result<NodePtr>
 where
     BufRef: AsRef<[u8]>,
     I: IntoIterator<Item = (Coin, BufRef, BufRef)>,
