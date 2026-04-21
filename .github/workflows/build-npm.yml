@@ -45,7 +45,7 @@ jobs:
           path: ./wasm/pkg/*-*.tgz
 
       # To update to the latest npm without permission issues, we need to not use the system npm
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v6.3.0
         with:
           node-version: lts/*
 
