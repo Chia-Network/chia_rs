@@ -11,7 +11,7 @@ use chia_protocol::{Bytes, Bytes32, Coin};
 
 use clvmr::allocator::Allocator;
 use clvmr::cost::Cost;
-use clvmr::serde::{intern_tree_limited, node_from_bytes_backrefs};
+use clvmr::serde::{intern, node_from_bytes_backrefs};
 
 use pyo3::PyResult;
 use pyo3::buffer::PyBuffer;
@@ -153,7 +153,7 @@ pub fn generator_interned_weight(program: PyBuffer<u8>) -> PyResult<u64> {
     let mut a = Allocator::new();
     let node = node_from_bytes_backrefs(&mut a, program)
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("bad generator: {e}")))?;
-    let tree = intern_tree_limited(&a, node, u32::MAX as usize)
+    let tree = intern(&a, node)
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("intern failed: {e}")))?;
     Ok(interned_weight(&tree))
 }
