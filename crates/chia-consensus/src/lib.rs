@@ -3,6 +3,7 @@
 
 pub mod additions_and_removals;
 pub mod allocator;
+pub mod build_block_2026;
 pub mod build_compressed_block;
 pub mod build_interned_block;
 pub mod check_time_locks;
@@ -22,6 +23,7 @@ pub mod messages;
 pub mod opcodes;
 pub mod owned_conditions;
 pub mod puzzle_fingerprint;
+pub mod program_bytes;
 pub mod run_block_generator;
 pub mod sanitize_int;
 pub mod solution_generator;

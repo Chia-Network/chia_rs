@@ -10,7 +10,8 @@ use chia_protocol::{Bytes, Bytes32, Coin};
 
 use clvmr::allocator::Allocator;
 use clvmr::cost::Cost;
-use clvmr::serde::{intern_tree_limited, node_from_bytes_backrefs};
+use chia_consensus::program_bytes::node_from_bytes_auto;
+use clvmr::serde::intern_tree_limited;
 
 use pyo3::PyResult;
 use pyo3::buffer::PyBuffer;
