@@ -1,5 +1,5 @@
 use crate::allocator::make_allocator;
-use crate::condition_sanitizers::parse_amount;
+use crate::program_bytes::node_from_bytes_auto;
 use crate::conditions::{
     EmptyVisitor, MAX_SPENDS_PER_BLOCK, ParseState, SpendBundleConditions, parse_spends,
     process_single_spend, validate_conditions, validate_signature,
@@ -25,8 +25,7 @@ use clvmr::cost::Cost;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
 use clvmr::serde::{
-    InternedTree, deserialize_2026, node_from_bytes, node_from_bytes_backrefs,
-    intern_tree_limited, SERDE_2026_MAGIC_PREFIX,
+    InternedTree, node_from_bytes, node_from_bytes_backrefs, intern_tree_limited,
 };
 
 pub fn subtract_cost(cost_left: &mut Cost, subtract: Cost) -> Result<(), ValidationErr> {
@@ -226,12 +225,8 @@ where
 
     let (mut a, base_cost, program) = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
         let mut decode_allocator = Allocator::new();
-        let program_node = if program.starts_with(&SERDE_2026_MAGIC_PREFIX) {
-            deserialize_2026(&mut decode_allocator, program, usize::MAX, true)
-                .map_err(|_| ValidationErr(ErrorCode::GeneratorRuntimeError))?
-        } else {
-            node_from_bytes_backrefs(&mut decode_allocator, program)?
-        };
+        let program_node = node_from_bytes_auto(&mut decode_allocator, program)
+            .map_err(|_| ValidationErr(ErrorCode::GeneratorRuntimeError))?;
         let interned = intern_tree_limited(&decode_allocator, program_node, u32::MAX as usize)
             .map_err(|_| ValidationErr(ErrorCode::GeneratorRuntimeError))?;
         let cost = total_cost_from_tree(&interned);
@@ -348,7 +343,7 @@ where
     check_generator_quote(generator.as_ref(), flags)?;
     let mut output = Vec::<CoinSpend>::new();
 
-    let program = node_from_bytes_backrefs(&mut a, generator)?;
+    let program = node_from_bytes_auto(&mut a, generator)?;
     check_generator_node(&a, program, flags)?;
     let args = setup_generator_args(&mut a, refs, flags)?;
     let dialect = ChiaDialect::new(flags.to_clvm_flags());
@@ -447,7 +442,7 @@ where
     check_generator_quote(generator.as_ref(), flags)?;
     let mut output = Vec::<(CoinSpend, Vec<(u32, Vec<Vec<u8>>)>)>::new();
 
-    let program = node_from_bytes_backrefs(&mut a, generator)?;
+    let program = node_from_bytes_auto(&mut a, generator)?;
     check_generator_node(&a, program, flags)?;
     let args = setup_generator_args(&mut a, refs, flags)?;
     let dialect = ChiaDialect::new(flags.to_clvm_flags());
