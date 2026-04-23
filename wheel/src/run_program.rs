@@ -7,7 +7,7 @@ use clvmr::cost::Cost;
 use clvmr::reduction::Response;
 use clvmr::run_program::run_program;
 use clvmr::serde::{
-    node_from_bytes_backrefs, serialized_length_from_bytes, serialized_length_from_bytes_trusted,
+    node_from_bytes_auto, serialized_length_from_bytes, serialized_length_from_bytes_trusted,
 };
 use pyo3::buffer::PyBuffer;
 use pyo3::prelude::*;
@@ -44,9 +44,9 @@ pub fn run_chia_program(
     let flags = flags.to_clvm_flags();
 
     let reduction = (|| -> PyResult<Response> {
-        let program = node_from_bytes_backrefs(&mut allocator, program)
+        let program = node_from_bytes_auto(&mut allocator, program)
             .map_err(|e| map_pyerr_w_ptr(&e, &allocator))?;
-        let args = node_from_bytes_backrefs(&mut allocator, args)
+        let args = node_from_bytes_auto(&mut allocator, args)
             .map_err(|e| map_pyerr_w_ptr(&e, &allocator))?;
         let dialect = ChiaDialect::new(flags);
 

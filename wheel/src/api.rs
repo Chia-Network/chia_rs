@@ -4,6 +4,7 @@ use crate::run_generator::{
     run_block_generator2,
 };
 use chia_consensus::allocator::make_allocator;
+use chia_consensus::build_block_2026::Block2026Builder;
 use chia_consensus::build_compressed_block::BlockBuilder;
 use chia_consensus::check_time_locks::py_check_time_locks;
 use chia_consensus::consensus_constants::ConsensusConstants;
@@ -82,7 +83,7 @@ use clvmr::error::EvalErr;
 use clvmr::reduction::Reduction;
 use clvmr::run_program;
 use clvmr::serde::is_canonical_serialization;
-use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs, node_to_bytes};
+use clvmr::serde::{node_from_bytes, node_from_bytes_auto, node_to_bytes};
 
 use chia_bls::{
     BlsCache, DerivableKey, G1Element, GTElement, PublicKey, SecretKey, Signature,
@@ -178,9 +179,9 @@ pub fn get_puzzle_and_solution_for_coin<'a>(
     let program = py_to_slice::<'a>(program);
     let args = py_to_slice::<'a>(args);
 
-    let program = node_from_bytes_backrefs(&mut allocator, program)
+    let program = node_from_bytes_auto(&mut allocator, program)
         .map_err(|e| map_pyerr_w_ptr(&e, &allocator))?;
-    let args = node_from_bytes_backrefs(&mut allocator, args)
+    let args = node_from_bytes_auto(&mut allocator, args)
         .map_err(|e| map_pyerr_w_ptr(&e, &allocator))?;
     let dialect = &ChiaDialect::new(flags.to_clvm_flags());
 
@@ -238,7 +239,7 @@ pub fn get_puzzle_and_solution_for_coin2<'a>(
         py_to_slice::<'a>(buf)
     });
 
-    let generator = node_from_bytes_backrefs(&mut allocator, generator.as_ref())
+    let generator = node_from_bytes_auto(&mut allocator, generator.as_ref())
         .map_err(|e| map_pyerr_w_ptr(&e, &allocator))?;
     let args = setup_generator_args(&mut allocator, refs, flags)?;
     let dialect = &ChiaDialect::new(flags.to_clvm_flags());
@@ -782,6 +783,7 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(fast_forward_singleton, m)?)?;
     m.add_class::<OwnedSpendBundleConditions>()?;
     m.add_class::<BlockBuilder>()?;
+    m.add_class::<Block2026Builder>()?;
     m.add(
         "ELIGIBLE_FOR_DEDUP",
         chia_consensus::conditions::ELIGIBLE_FOR_DEDUP,
