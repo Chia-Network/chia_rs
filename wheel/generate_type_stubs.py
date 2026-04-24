@@ -259,6 +259,7 @@ extra_members = {
         "def get_tree_hash(self) -> bytes32: ...",
         "@staticmethod\n    def default() -> Program: ...",
         "@staticmethod\n    def fromhex(h: str) -> Program: ...",
+        "@staticmethod\n    def from_program_bytes(blob: bytes) -> Program: ...",
         "@staticmethod\n    def to(o: object) -> Program: ...",
         "def run_rust(self, max_cost: int, flags: int, args: object) -> tuple[int, LazyNode]: ...",
         "def uncurry_rust(self) -> tuple[LazyNode, LazyNode]: ...",
