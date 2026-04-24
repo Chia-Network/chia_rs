@@ -467,6 +467,14 @@ impl Program {
             "This class does not support from_parent().",
         ))
     }
+
+    /// Wrap raw bytes as a Program without CLVM structure validation.
+    /// Use for non-standard serializations (e.g. serde_2026) that will be
+    /// validated at execution time by run_block_generator / node_from_bytes_auto.
+    #[staticmethod]
+    fn from_program_bytes(blob: &[u8]) -> Self {
+        Self(blob.into())
+    }
 }
 
 #[cfg(feature = "py-bindings")]
