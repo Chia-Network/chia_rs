@@ -480,16 +480,18 @@ impl Program {
 #[cfg(feature = "py-bindings")]
 impl FromJsonDict for Program {
     fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self> {
+        use clvmr::serde::node_from_bytes_auto;
         let bytes = Bytes::from_json_dict(o)?;
-        let len =
-            serialized_length_from_bytes(bytes.as_slice()).map_err(|_e| Error::EndOfBuffer)?;
-        if len as usize != bytes.len() {
-            // If the bytes in the JSON string is not a valid CLVM
-            // serialization, or if it has garbage at the end of the string,
-            // reject it
-            return Err(Error::InvalidClvm)?;
+        match serialized_length_from_bytes(bytes.as_slice()) {
+            Ok(len) if len as usize == bytes.len() => Ok(Self(bytes)),
+            _ => {
+                // Fall back to auto-detection for backrefs / serde_2026
+                let mut a = Allocator::new();
+                node_from_bytes_auto(&mut a, bytes.as_slice())
+                    .map_err(|_e| <Error as Into<pyo3::PyErr>>::into(Error::EndOfBuffer))?;
+                Ok(Self(bytes))
+            }
         }
-        Ok(Self(bytes))
     }
 }
 
