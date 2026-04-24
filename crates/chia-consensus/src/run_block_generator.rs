@@ -699,4 +699,58 @@ mod tests {
 
         assert_eq!(without.execution_cost, with.execution_cost);
     }
+
+    #[test]
+    fn test_check_generator_quote_simple_only_rejects_non_quote() {
+        let flags = ConsensusFlags::SIMPLE_GENERATOR;
+        // Non-quote generator: starts with 0x80 (nil atom), not [0xff, 0x01]
+        assert_eq!(
+            check_generator_quote(&[0x80], flags).unwrap_err().1,
+            ErrorCode::ComplexGeneratorReceived,
+        );
+        // Valid quote generator: starts with [0xff, 0x01]
+        assert!(check_generator_quote(&[0xff, 0x01, 0x80], flags).is_ok());
+    }
+
+    #[test]
+    fn test_check_generator_quote_interned_bypasses_check() {
+        let flags = ConsensusFlags::SIMPLE_GENERATOR | ConsensusFlags::INTERNED_GENERATOR;
+        // With INTERNED_GENERATOR, even non-quote bytes are accepted
+        assert!(check_generator_quote(&[0x80], flags).is_ok());
+        assert!(check_generator_quote(&[0x00, 0x42], flags).is_ok());
+    }
+
+    #[test]
+    fn test_check_generator_quote_pre_simple_always_passes() {
+        let flags = ConsensusFlags::empty();
+        // Before SIMPLE_GENERATOR, anything is accepted
+        assert!(check_generator_quote(&[0x80], flags).is_ok());
+        assert!(check_generator_quote(&[0xff, 0x01, 0x80], flags).is_ok());
+    }
+
+    #[test]
+    fn test_check_generator_node_simple_only_rejects_non_quote() {
+        let flags = ConsensusFlags::SIMPLE_GENERATOR;
+        let mut a = Allocator::new();
+        // Build a non-quote tree: just an atom (not (1 . rest))
+        let atom = a.new_atom(&[42]).unwrap();
+        assert_eq!(
+            check_generator_node(&a, atom, flags).unwrap_err().1,
+            ErrorCode::ComplexGeneratorReceived,
+        );
+        // Build a valid (1 . nil) tree
+        let one = a.new_atom(&[1]).unwrap();
+        let nil = a.nil();
+        let pair = a.new_pair(one, nil).unwrap();
+        assert!(check_generator_node(&a, pair, flags).is_ok());
+    }
+
+    #[test]
+    fn test_check_generator_node_interned_bypasses_check() {
+        let flags = ConsensusFlags::SIMPLE_GENERATOR | ConsensusFlags::INTERNED_GENERATOR;
+        let mut a = Allocator::new();
+        let atom = a.new_atom(&[42]).unwrap();
+        // INTERNED_GENERATOR bypasses the node check even for non-quote trees
+        assert!(check_generator_node(&a, atom, flags).is_ok());
+    }
 }
