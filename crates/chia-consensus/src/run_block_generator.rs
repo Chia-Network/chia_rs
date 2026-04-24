@@ -177,6 +177,10 @@ fn extract_n<const N: usize>(
 // this is required after the SIMPLE_GENERATOR fork is active
 #[inline]
 pub fn check_generator_quote(program: &[u8], flags: ConsensusFlags) -> Result<(), ValidationErr> {
+    if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
+        // serde_2026 blocks have a different serialization header
+        return Ok(());
+    }
     if !flags.contains(ConsensusFlags::SIMPLE_GENERATOR) || program.starts_with(&[0xff, 0x01]) {
         Ok(())
     } else {
@@ -195,7 +199,9 @@ pub fn check_generator_node(
     program: NodePtr,
     flags: ConsensusFlags,
 ) -> Result<(), ValidationErr> {
-    if !flags.contains(ConsensusFlags::SIMPLE_GENERATOR) {
+    if !flags.contains(ConsensusFlags::SIMPLE_GENERATOR)
+        || flags.contains(ConsensusFlags::INTERNED_GENERATOR)
+    {
         return Ok(());
     }
     // this expects an atom with a single byte value of 1 as the first value in the list
