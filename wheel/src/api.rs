@@ -133,6 +133,16 @@ pub fn tree_hash<'a>(py: Python<'a>, blob: PyBuffer<u8>) -> PyResult<Bound<'a, P
 }
 
 #[pyfunction]
+pub fn tree_hash_auto<'a>(py: Python<'a>, blob: PyBuffer<u8>) -> PyResult<Bound<'a, PyAny>> {
+    use clvmr::serde::node_from_bytes_auto;
+    let slice = py_to_slice::<'a>(blob);
+    let mut a = clvmr::Allocator::new();
+    let node = node_from_bytes_auto(&mut a, slice).map_err(map_pyerr)?;
+    let hash = clvm_utils::tree_hash(&a, node);
+    ChiaToPython::to_python(&Bytes32::from(&hash.into()), py)
+}
+
+#[pyfunction]
 fn compute_plot_id_v1(
     plot_pk: G1Element,
     pool_pk: Option<G1Element>,
@@ -1006,6 +1016,7 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(serialized_length_trusted, m)?)?;
     m.add_function(wrap_pyfunction!(compute_merkle_set_root, m)?)?;
     m.add_function(wrap_pyfunction!(tree_hash, m)?)?;
+    m.add_function(wrap_pyfunction!(tree_hash_auto, m)?)?;
     m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin, m)?)?;
     m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin2, m)?)?;
 
