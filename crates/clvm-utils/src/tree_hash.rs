@@ -404,6 +404,45 @@ fn test_tree_hash_from_bytes() {
     assert_eq!(hash1, hash3);
 }
 
+#[test]
+fn test_tree_hash_auto_matches_tree_hash_for_all_formats() {
+    use clvmr::serde::{
+        DeserializeLimits, node_from_bytes_auto, node_to_bytes, node_to_bytes_backrefs,
+        node_to_bytes_serde_2026,
+    };
+
+    let mut a = Allocator::new();
+    let atom1 = a.new_atom(&[1, 2, 3]).unwrap();
+    let atom2 = a.new_atom(&[4, 5, 6]).unwrap();
+    let node1 = a.new_pair(atom1, atom2).unwrap();
+    let node2 = a.new_pair(atom2, atom1).unwrap();
+    let node1 = a.new_pair(node1, node1).unwrap();
+    let node2 = a.new_pair(node2, node2).unwrap();
+    let root = a.new_pair(node1, node2).unwrap();
+
+    let canonical_hash = tree_hash(&a, root);
+
+    let standard = node_to_bytes(&a, root).unwrap();
+    let backrefs = node_to_bytes_backrefs(&a, root).unwrap();
+    let serde_2026 = node_to_bytes_serde_2026(&a, root).unwrap();
+
+    // tree_hash_from_bytes only handles standard + backrefs
+    assert_eq!(tree_hash_from_bytes(&standard).unwrap(), canonical_hash);
+    assert_eq!(tree_hash_from_bytes(&backrefs).unwrap(), canonical_hash);
+    // tree_hash_from_bytes rejects serde_2026
+    assert!(tree_hash_from_bytes(&serde_2026).is_err());
+
+    // node_from_bytes_auto + tree_hash works for ALL formats (the
+    // approach used by tree_hash_auto in the Python binding)
+    for (label, bytes) in [("standard", &standard), ("backrefs", &backrefs), ("serde_2026", &serde_2026)] {
+        let mut a2 = Allocator::new();
+        let node = node_from_bytes_auto(&mut a2, bytes, DeserializeLimits::default())
+            .unwrap_or_else(|e| panic!("{label}: node_from_bytes_auto failed: {e}"));
+        let hash = tree_hash(&a2, node);
+        assert_eq!(hash, canonical_hash, "{label}: tree_hash mismatch");
+    }
+}
+
 #[cfg(test)]
 use rstest::rstest;
 

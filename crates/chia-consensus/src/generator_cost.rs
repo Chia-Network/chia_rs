@@ -1,6 +1,11 @@
 //! Chia-specific generator cost calculation.
 //!
-//! Pure storage model: cost = (atom_bytes + 2*atoms + 3*pairs) * COST_PER_BYTE.
+//! Pure storage model: cost = interned_weight(tree) * COST_PER_BYTE.
+//! The weight `atom_bytes + 2*atoms + 3*pairs` is an upper bound on the
+//! serialized byte count.  COST_PER_BYTE (12000) comes from the consensus
+//! constants, so `total_cost_from_tree` hardcodes it only for internal use;
+//! callers who need the pre-multiplied weight can use `interned_weight`.
+//!
 //! SHA tree-hash cost is not charged separately — it is structurally bounded
 //! by the size component (worst-case ratio <= 3.33, ~37ms SHA CPU on a 2012
 //! Celeron). See PR #1371 for the alternative split model (6000/4500).
@@ -9,13 +14,14 @@ use clvmr::serde::InternedTree;
 
 const COST_PER_BYTE: u64 = 12000;
 
-/// Compute total generator cost from an interned tree.
+/// Return the byte-weight-equivalent of an interned tree:
+/// `atom_bytes + 2*atom_count + 3*pair_count`.
 ///
-/// The size formula `atom_bytes + 2*atom_count + 3*pair_count` is proven to
-/// be an upper bound on the serialized byte count (P=3 accounts for pair
-/// opcodes and back-reference overhead).
+/// Multiply by `COST_PER_BYTE` (consensus constant, currently 12000) to get
+/// the full generator size cost.  This is deliberately separated so Python
+/// callers can reuse the consensus constant instead of hardcoding a multiplier.
 #[inline]
-pub fn total_cost_from_tree(tree: &InternedTree) -> u64 {
+pub fn interned_weight(tree: &InternedTree) -> u64 {
     let atom_count = tree.atoms.len() as u64;
     let pair_count = tree.pairs.len() as u64;
 
@@ -24,7 +30,15 @@ pub fn total_cost_from_tree(tree: &InternedTree) -> u64 {
         atom_bytes += tree.allocator.atom_len(atom) as u64;
     }
 
-    (atom_bytes + 2 * atom_count + 3 * pair_count) * COST_PER_BYTE
+    atom_bytes + 2 * atom_count + 3 * pair_count
+}
+
+/// Compute total generator cost from an interned tree.
+///
+/// Equivalent to `interned_weight(tree) * COST_PER_BYTE`.
+#[inline]
+pub fn total_cost_from_tree(tree: &InternedTree) -> u64 {
+    interned_weight(tree) * COST_PER_BYTE
 }
 
 #[cfg(test)]

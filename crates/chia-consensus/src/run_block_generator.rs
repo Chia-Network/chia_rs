@@ -24,7 +24,10 @@ use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
-use clvmr::serde::{InternedTree, intern_tree_limited, node_from_bytes, node_from_bytes_backrefs};
+use clvmr::serde::{
+    DeserializeLimits, InternedTree, intern_tree, node_from_bytes, node_from_bytes_auto,
+    node_from_bytes_backrefs,
+};
 
 pub fn subtract_cost(
     a: &Allocator,
@@ -175,6 +178,10 @@ fn extract_n<const N: usize>(
 // this is required after the SIMPLE_GENERATOR fork is active
 #[inline]
 pub fn check_generator_quote(program: &[u8], flags: ConsensusFlags) -> Result<(), ValidationErr> {
+    if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
+        // serde_2026 blocks have a different serialization header
+        return Ok(());
+    }
     if !flags.contains(ConsensusFlags::SIMPLE_GENERATOR) || program.starts_with(&[0xff, 0x01]) {
         Ok(())
     } else {
@@ -193,7 +200,9 @@ pub fn check_generator_node(
     program: NodePtr,
     flags: ConsensusFlags,
 ) -> Result<(), ValidationErr> {
-    if !flags.contains(ConsensusFlags::SIMPLE_GENERATOR) {
+    if !flags.contains(ConsensusFlags::SIMPLE_GENERATOR)
+        || flags.contains(ConsensusFlags::INTERNED_GENERATOR)
+    {
         return Ok(());
     }
     // this expects an atom with a single byte value of 1 as the first value in the list
@@ -233,8 +242,10 @@ where
 
     let (mut a, base_cost, program) = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
         let mut decode_allocator = Allocator::new();
-        let program_node = node_from_bytes_backrefs(&mut decode_allocator, program)?;
-        let interned = intern_tree_limited(&decode_allocator, program_node, u32::MAX as usize)
+        let program_node =
+            node_from_bytes_auto(&mut decode_allocator, program, DeserializeLimits::default())
+                .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
+        let interned = intern_tree(&decode_allocator, program_node)
             .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
         let cost = total_cost_from_tree(&interned);
         let InternedTree {
@@ -350,7 +361,7 @@ where
     check_generator_quote(generator.as_ref(), flags)?;
     let mut output = Vec::<CoinSpend>::new();
 
-    let program = node_from_bytes_backrefs(&mut a, generator)?;
+    let program = node_from_bytes_auto(&mut a, generator, DeserializeLimits::default())?;
     check_generator_node(&a, program, flags)?;
     let args = setup_generator_args(&mut a, refs, flags)?;
     let dialect = ChiaDialect::new(flags.to_clvm_flags());
@@ -449,7 +460,7 @@ where
     check_generator_quote(generator.as_ref(), flags)?;
     let mut output = Vec::<(CoinSpend, Vec<(u32, Vec<Vec<u8>>)>)>::new();
 
-    let program = node_from_bytes_backrefs(&mut a, generator)?;
+    let program = node_from_bytes_auto(&mut a, generator, DeserializeLimits::default())?;
     check_generator_node(&a, program, flags)?;
     let args = setup_generator_args(&mut a, refs, flags)?;
     let dialect = ChiaDialect::new(flags.to_clvm_flags());
@@ -689,5 +700,59 @@ mod tests {
         );
 
         assert_eq!(without.execution_cost, with.execution_cost);
+    }
+
+    #[test]
+    fn test_check_generator_quote_simple_only_rejects_non_quote() {
+        let flags = ConsensusFlags::SIMPLE_GENERATOR;
+        // Non-quote generator: starts with 0x80 (nil atom), not [0xff, 0x01]
+        assert_eq!(
+            check_generator_quote(&[0x80], flags).unwrap_err().1,
+            ErrorCode::ComplexGeneratorReceived,
+        );
+        // Valid quote generator: starts with [0xff, 0x01]
+        assert!(check_generator_quote(&[0xff, 0x01, 0x80], flags).is_ok());
+    }
+
+    #[test]
+    fn test_check_generator_quote_interned_bypasses_check() {
+        let flags = ConsensusFlags::SIMPLE_GENERATOR | ConsensusFlags::INTERNED_GENERATOR;
+        // With INTERNED_GENERATOR, even non-quote bytes are accepted
+        assert!(check_generator_quote(&[0x80], flags).is_ok());
+        assert!(check_generator_quote(&[0x00, 0x42], flags).is_ok());
+    }
+
+    #[test]
+    fn test_check_generator_quote_pre_simple_always_passes() {
+        let flags = ConsensusFlags::empty();
+        // Before SIMPLE_GENERATOR, anything is accepted
+        assert!(check_generator_quote(&[0x80], flags).is_ok());
+        assert!(check_generator_quote(&[0xff, 0x01, 0x80], flags).is_ok());
+    }
+
+    #[test]
+    fn test_check_generator_node_simple_only_rejects_non_quote() {
+        let flags = ConsensusFlags::SIMPLE_GENERATOR;
+        let mut a = Allocator::new();
+        // Build a non-quote tree: just an atom (not (1 . rest))
+        let atom = a.new_atom(&[42]).unwrap();
+        assert_eq!(
+            check_generator_node(&a, atom, flags).unwrap_err().1,
+            ErrorCode::ComplexGeneratorReceived,
+        );
+        // Build a valid (1 . nil) tree
+        let one = a.new_atom(&[1]).unwrap();
+        let nil = a.nil();
+        let pair = a.new_pair(one, nil).unwrap();
+        assert!(check_generator_node(&a, pair, flags).is_ok());
+    }
+
+    #[test]
+    fn test_check_generator_node_interned_bypasses_check() {
+        let flags = ConsensusFlags::SIMPLE_GENERATOR | ConsensusFlags::INTERNED_GENERATOR;
+        let mut a = Allocator::new();
+        let atom = a.new_atom(&[42]).unwrap();
+        // INTERNED_GENERATOR bypasses the node check even for non-quote trees
+        assert!(check_generator_node(&a, atom, flags).is_ok());
     }
 }

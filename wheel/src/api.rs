@@ -1,8 +1,10 @@
 use crate::error::{map_pyerr, map_pyerr_w_ptr};
 use crate::run_generator::{
-    additions_and_removals, py_to_slice, run_block_generator, run_block_generator2,
+    additions_and_removals, generator_interned_weight, py_to_slice, run_block_generator,
+    run_block_generator2,
 };
 use chia_consensus::allocator::make_allocator;
+use chia_consensus::build_block_2026::Block2026Builder;
 use chia_consensus::build_compressed_block::BlockBuilder;
 use chia_consensus::check_time_locks::py_check_time_locks;
 use chia_consensus::consensus_constants::ConsensusConstants;
@@ -15,6 +17,7 @@ use chia_consensus::run_block_generator::{
     get_coinspends_for_trusted_block, get_coinspends_with_conditions_for_trusted_block,
 };
 use chia_consensus::solution_generator::solution_generator as native_solution_generator;
+use chia_consensus::solution_generator::solution_generator_2026 as native_solution_generator_2026;
 use chia_consensus::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
 use chia_consensus::spendbundle_conditions::get_conditions_from_spendbundle;
 use chia_consensus::spendbundle_validation::{
@@ -80,7 +83,7 @@ use clvmr::error::EvalErr;
 use clvmr::reduction::Reduction;
 use clvmr::run_program;
 use clvmr::serde::is_canonical_serialization;
-use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs, node_to_bytes};
+use clvmr::serde::{DeserializeLimits, node_from_bytes, node_from_bytes_auto, node_to_bytes};
 
 use chia_bls::{
     BlsCache, DerivableKey, G1Element, GTElement, PublicKey, SecretKey, Signature,
@@ -130,6 +133,17 @@ pub fn tree_hash<'a>(py: Python<'a>, blob: PyBuffer<u8>) -> PyResult<Bound<'a, P
 }
 
 #[pyfunction]
+pub fn tree_hash_auto<'a>(py: Python<'a>, blob: PyBuffer<u8>) -> PyResult<Bound<'a, PyAny>> {
+    use clvmr::serde::{DeserializeLimits, node_from_bytes_auto};
+    let slice = py_to_slice::<'a>(blob);
+    let mut a = clvmr::Allocator::new();
+    let node =
+        node_from_bytes_auto(&mut a, slice, DeserializeLimits::default()).map_err(map_pyerr)?;
+    let hash = clvm_utils::tree_hash(&a, node);
+    ChiaToPython::to_python(&Bytes32::from(&hash.into()), py)
+}
+
+#[pyfunction]
 fn compute_plot_id_v1(
     plot_pk: G1Element,
     pool_pk: Option<G1Element>,
@@ -176,9 +190,10 @@ pub fn get_puzzle_and_solution_for_coin<'a>(
     let program = py_to_slice::<'a>(program);
     let args = py_to_slice::<'a>(args);
 
-    let program = node_from_bytes_backrefs(&mut allocator, program)
-        .map_err(|e| map_pyerr_w_ptr(&e, &allocator))?;
-    let args = node_from_bytes_backrefs(&mut allocator, args)
+    let program =
+        node_from_bytes_auto(&mut allocator, program, DeserializeLimits::default())
+            .map_err(|e| map_pyerr_w_ptr(&e, &allocator))?;
+    let args = node_from_bytes_auto(&mut allocator, args, DeserializeLimits::default())
         .map_err(|e| map_pyerr_w_ptr(&e, &allocator))?;
     let dialect = &ChiaDialect::new(flags.to_clvm_flags());
 
@@ -236,8 +251,9 @@ pub fn get_puzzle_and_solution_for_coin2<'a>(
         py_to_slice::<'a>(buf)
     });
 
-    let generator = node_from_bytes_backrefs(&mut allocator, generator.as_ref())
-        .map_err(|e| map_pyerr_w_ptr(&e, &allocator))?;
+    let generator =
+        node_from_bytes_auto(&mut allocator, generator.as_ref(), DeserializeLimits::default())
+            .map_err(|e| map_pyerr_w_ptr(&e, &allocator))?;
     let args = setup_generator_args(&mut allocator, refs, flags)?;
     let dialect = &ChiaDialect::new(flags.to_clvm_flags());
 
@@ -301,6 +317,15 @@ fn solution_generator_backrefs<'p>(
         py,
         &native_solution_generator_backrefs(spends)?,
     ))
+}
+
+#[pyfunction]
+fn solution_generator_2026<'p>(
+    py: Python<'p>,
+    spends: &Bound<'_, PyAny>,
+) -> PyResult<Bound<'p, PyBytes>> {
+    let spends = convert_list_of_tuples(spends)?;
+    Ok(PyBytes::new(py, &native_solution_generator_2026(spends)?))
 }
 
 #[pyclass]
@@ -762,13 +787,16 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // generator functions
     m.add_function(wrap_pyfunction!(run_block_generator, m)?)?;
     m.add_function(wrap_pyfunction!(run_block_generator2, m)?)?;
+    m.add_function(wrap_pyfunction!(generator_interned_weight, m)?)?;
     m.add_function(wrap_pyfunction!(additions_and_removals, m)?)?;
     m.add_function(wrap_pyfunction!(solution_generator, m)?)?;
     m.add_function(wrap_pyfunction!(solution_generator_backrefs, m)?)?;
+    m.add_function(wrap_pyfunction!(solution_generator_2026, m)?)?;
     m.add_function(wrap_pyfunction!(supports_fast_forward, m)?)?;
     m.add_function(wrap_pyfunction!(fast_forward_singleton, m)?)?;
     m.add_class::<OwnedSpendBundleConditions>()?;
     m.add_class::<BlockBuilder>()?;
+    m.add_class::<Block2026Builder>()?;
     m.add(
         "ELIGIBLE_FOR_DEDUP",
         chia_consensus::conditions::ELIGIBLE_FOR_DEDUP,
@@ -991,6 +1019,7 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(serialized_length_trusted, m)?)?;
     m.add_function(wrap_pyfunction!(compute_merkle_set_root, m)?)?;
     m.add_function(wrap_pyfunction!(tree_hash, m)?)?;
+    m.add_function(wrap_pyfunction!(tree_hash_auto, m)?)?;
     m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin, m)?)?;
     m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin2, m)?)?;
 

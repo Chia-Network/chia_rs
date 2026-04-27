@@ -21,7 +21,7 @@ use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
-use clvmr::serde::intern_tree_limited;
+use clvmr::serde::intern_tree;
 use clvmr::serde::node_from_bytes;
 
 const QUOTE_BYTES: usize = 2;
@@ -64,7 +64,7 @@ fn calculate_base_cost(
                 .map(|cs| (cs.coin, cs.puzzle_reveal.as_slice(), cs.solution.as_slice())),
         )
         .map_err(|_| ValidationErr(a.nil(), ErrorCode::GeneratorRuntimeError))?;
-        let interned = intern_tree_limited(&gen_allocator, generator, u32::MAX as usize)
+        let interned = intern_tree(&gen_allocator, generator)
             .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
         Ok(total_cost_from_tree(&interned))
     } else {
