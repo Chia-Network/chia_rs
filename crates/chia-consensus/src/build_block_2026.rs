@@ -50,7 +50,7 @@ use crate::solution_generator::build_generator;
 use chia_bls::Signature;
 use chia_protocol::SpendBundle;
 use clvmr::allocator::Allocator;
-use clvmr::serde::{intern, node_to_bytes_serde_2026};
+use clvmr::serde::{intern_tree, node_to_bytes_serde_2026};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
@@ -132,7 +132,7 @@ fn compute_spend_weight(bundle: &SpendBundle) -> Result<u64> {
         .map(|cs| (cs.coin, cs.puzzle_reveal.as_ref(), cs.solution.as_ref()))
         .collect();
     let generator = build_generator(&mut a, spends)?;
-    let interned = intern(&a, generator)?;
+    let interned = intern_tree(&a, generator)?;
     let total = interned_weight(&interned);
     Ok(total.saturating_sub(WRAPPER_WEIGHT))
 }
@@ -244,7 +244,7 @@ impl BuilderInner {
         }
 
         let generator = build_generator(&mut a, spend_tuples)?;
-        let interned = intern(&a, generator)?;
+        let interned = intern_tree(&a, generator)?;
         let exact_weight = interned_weight(&interned);
         let generator_cost = exact_weight * self.cost_per_byte;
         let total_cost = self.included_irreducible + generator_cost;

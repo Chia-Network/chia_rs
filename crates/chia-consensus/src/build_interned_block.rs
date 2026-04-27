@@ -4,7 +4,7 @@ use crate::generator_cost::total_cost_from_tree;
 use chia_bls::Signature;
 use chia_protocol::SpendBundle;
 use clvmr::allocator::{Allocator, NodePtr};
-use clvmr::serde::{intern, node_from_bytes_backrefs, node_to_bytes_backrefs};
+use clvmr::serde::{intern_tree, node_from_bytes_backrefs, node_to_bytes_backrefs};
 use std::borrow::Borrow;
 
 #[cfg(feature = "py-bindings")]
@@ -62,7 +62,7 @@ impl InternedBlockBuilder {
         // Build (q . ((spend_list)))
         let inner = allocator.new_pair(spend_list, allocator.nil())?;
         let outer = allocator.new_pair(allocator.one(), inner)?;
-        let interned = intern(allocator, outer)?;
+        let interned = intern_tree(allocator, outer)?;
         Ok(total_cost_from_tree(&interned))
     }
 

@@ -14,7 +14,7 @@ use clvmr::allocator::NodePtr;
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
-use clvmr::serde::node_from_bytes_auto;
+use clvmr::serde::{DeserializeLimits, node_from_bytes_auto};
 
 /// Run a *trusted* block generator and return its additions and removals. This
 /// function does not validate the block, it is assumed to be valid.
@@ -36,7 +36,7 @@ where
 
     let mut cost_left = constants.max_block_cost_clvm;
 
-    let program = node_from_bytes_auto(&mut a, program)?;
+    let program = node_from_bytes_auto(&mut a, program, DeserializeLimits::default())?;
 
     let args = setup_generator_args(&mut a, block_refs, flags)?;
     let dialect = ChiaDialect::new(flags.to_clvm_flags());
