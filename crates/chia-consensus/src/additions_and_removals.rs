@@ -36,7 +36,7 @@ where
 
     let mut cost_left = constants.max_block_cost_clvm;
 
-    let program = node_from_bytes_auto(&mut a, program)?;
+    let program = node_from_bytes_auto(&mut a, program, DeserializeOptions::default())?;
 
     let args = setup_generator_args(&mut a, block_refs, flags)?;
     let dialect = ChiaDialect::new(flags.to_clvm_flags());

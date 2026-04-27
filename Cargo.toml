@@ -113,7 +113,7 @@ openssl = ["chia-sha2/openssl", "clvmr/openssl"]
 [patch.crates-io]
 # Pin clvmr to clvm_rs PR #708 (serde_2026) until the format ships in a
 # crates.io release. Bump this rev in lockstep with that branch.
-clvmr = { git = "https://github.com/Chia-Network/clvm_rs", rev = "2104989d4a9fc6e21e1789c71bf8cb4599ab31cf" }
+clvmr = { git = "https://github.com/Chia-Network/clvm_rs", rev = "b95f8bed118f509ec44a9ddabf1ed549192c336f" }
 
 [profile.release]
 lto = "thin"

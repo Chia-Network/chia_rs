@@ -25,7 +25,7 @@ use clvmr::cost::Cost;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
 use clvmr::serde::{
-    InternedTree, node_from_bytes, node_from_bytes_backrefs, intern_tree_limited,
+    InternedTree, intern_tree_limited, node_from_bytes, node_from_bytes_backrefs,
 };
 
 pub fn subtract_cost(cost_left: &mut Cost, subtract: Cost) -> Result<(), ValidationErr> {
@@ -349,7 +349,7 @@ where
     check_generator_quote(generator.as_ref(), flags)?;
     let mut output = Vec::<CoinSpend>::new();
 
-    let program = node_from_bytes_auto(&mut a, generator)?;
+    let program = node_from_bytes_auto(&mut a, generator, DeserializeOptions::default())?;
     check_generator_node(&a, program, flags)?;
     let args = setup_generator_args(&mut a, refs, flags)?;
     let dialect = ChiaDialect::new(flags.to_clvm_flags());
@@ -448,7 +448,7 @@ where
     check_generator_quote(generator.as_ref(), flags)?;
     let mut output = Vec::<(CoinSpend, Vec<(u32, Vec<Vec<u8>>)>)>::new();
 
-    let program = node_from_bytes_auto(&mut a, generator)?;
+    let program = node_from_bytes_auto(&mut a, generator, DeserializeOptions::default())?;
     check_generator_node(&a, program, flags)?;
     let args = setup_generator_args(&mut a, refs, flags)?;
     let dialect = ChiaDialect::new(flags.to_clvm_flags());

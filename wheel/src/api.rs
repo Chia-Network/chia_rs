@@ -135,7 +135,6 @@ pub fn tree_hash<'a>(py: Python<'a>, blob: PyBuffer<u8>) -> PyResult<Bound<'a, P
 
 #[pyfunction]
 pub fn tree_hash_auto<'a>(py: Python<'a>, blob: PyBuffer<u8>) -> PyResult<Bound<'a, PyAny>> {
-    use clvmr::serde::node_from_bytes_auto;
     let slice = py_to_slice::<'a>(blob);
     let mut a = clvmr::Allocator::new();
     let node = node_from_bytes_auto(&mut a, slice).map_err(map_pyerr)?;
