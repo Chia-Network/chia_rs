@@ -124,18 +124,7 @@ impl<T: Streamable> Streamable for Vec<T> {
     }
 
     fn parse<const TRUSTED: bool>(input: &mut Cursor<&[u8]>) -> Result<Self> {
-        let len = u32::parse::<TRUSTED>(input)?;
-
-        let mut ret = if mem::size_of::<T>() == 0 {
-            Vec::<T>::new()
-        } else {
-            let limit = 2 * 1024 * 1024 / mem::size_of::<T>();
-            Vec::<T>::with_capacity(std::cmp::min(limit, len as usize))
-        };
-        for _ in 0..len {
-            ret.push(T::parse::<TRUSTED>(input)?);
-        }
-        Ok(ret)
+        parse_vec_with_max_length::<T, TRUSTED>(input, u32::MAX as usize)
     }
 }
 
