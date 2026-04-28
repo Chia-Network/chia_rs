@@ -228,3 +228,72 @@ class TestCheckTimeLocks:
             )
             == expected
         )
+
+    @pytest.mark.parametrize(
+        "conds,expected_nowrap,expected_wrap",
+        [
+            # --- height_relative wrapping ---
+            # confirmed_height=10, prev_height=15
+            # 10 + (2^32 - 11) = u32::MAX, no overflow, 15 < u32::MAX -> Err both
+            (make_test_conds(height_relative=0xFFFF_FFF5), 13, 13),
+            # 10 + (2^32 - 10) overflows to 0, wrapping: 15 < 0 -> Ok
+            # saturating: clamps to u32::MAX, 15 < u32::MAX -> Err
+            (make_test_conds(height_relative=0xFFFF_FFF6), 13, None),
+            # 10 + u32::MAX overflows to 9, wrapping: 15 < 9 -> Ok
+            (make_test_conds(height_relative=0xFFFF_FFFF), 13, None),
+            # --- seconds_relative wrapping ---
+            # coin_timestamp=10000, prev_timestamp=10150
+            # 10000 + (u64::MAX - 10000) = u64::MAX, no overflow -> Err both
+            (make_test_conds(seconds_relative=0xFFFF_FFFF_FFFF_D8EF), 105, 105),
+            # 10000 + (u64::MAX - 9999) overflows to 0, wrapping: 10150 < 0 -> Ok
+            (make_test_conds(seconds_relative=0xFFFF_FFFF_FFFF_D8F0), 105, None),
+            # 10000 + u64::MAX overflows to 9999, wrapping: 10150 < 9999 -> Ok
+            (make_test_conds(seconds_relative=0xFFFF_FFFF_FFFF_FFFF), 105, None),
+            # --- before_height_relative wrapping ---
+            # check is >=, so wrapping to a small value causes failure
+            # 10 + (2^32 - 11) = u32::MAX, no overflow, 15 >= u32::MAX -> Ok both
+            (make_test_conds(before_height_relative=0xFFFF_FFF5), None, None),
+            # 10 + (2^32 - 10) overflows to 0, wrapping: 15 >= 0 -> Err
+            # saturating: 15 >= u32::MAX -> Ok
+            (make_test_conds(before_height_relative=0xFFFF_FFF6), None, 131),
+            # 10 + u32::MAX overflows to 9, wrapping: 15 >= 9 -> Err
+            (make_test_conds(before_height_relative=0xFFFF_FFFF), None, 131),
+            # --- before_seconds_relative wrapping ---
+            # 10000 + (u64::MAX - 10000) = u64::MAX, no overflow, 10150 >= u64::MAX -> Ok both
+            (
+                make_test_conds(before_seconds_relative=0xFFFF_FFFF_FFFF_D8EF),
+                None,
+                None,
+            ),
+            # 10000 + (u64::MAX - 9999) overflows to 0, wrapping: 10150 >= 0 -> Err
+            (make_test_conds(before_seconds_relative=0xFFFF_FFFF_FFFF_D8F0), None, 129),
+            # 10000 + u64::MAX overflows to 9999, wrapping: 10150 >= 9999 -> Err
+            (make_test_conds(before_seconds_relative=0xFFFF_FFFF_FFFF_FFFF), None, 129),
+        ],
+    )
+    def test_wrapping_conditions(
+        self,
+        conds: SpendBundleConditions,
+        expected_nowrap: Optional[int],
+        expected_wrap: Optional[int],
+    ) -> None:
+        assert (
+            check_time_locks(
+                dict(self.REMOVALS),
+                conds,
+                self.PREV_BLOCK_HEIGHT,
+                self.PREV_BLOCK_TIMESTAMP,
+                True,
+            )
+            == expected_nowrap
+        )
+        assert (
+            check_time_locks(
+                dict(self.REMOVALS),
+                conds,
+                self.PREV_BLOCK_HEIGHT,
+                self.PREV_BLOCK_TIMESTAMP,
+                False,
+            )
+            == expected_wrap
+        )
