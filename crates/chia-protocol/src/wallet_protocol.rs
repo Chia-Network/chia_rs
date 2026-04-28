@@ -120,7 +120,7 @@ pub struct RejectAdditionsRequest {
 pub struct RespondBlockHeaders {
     start_height: u32,
     end_height: u32,
-    #[chia(max_length = 64)]
+    #[chia(max_length = 128)]
     header_blocks: Vec<HeaderBlock>,
 }
 
@@ -169,7 +169,7 @@ pub struct RespondToPhUpdates {
     #[chia(max_length = 1600000)]
     puzzle_hashes: Vec<Bytes32>,
     min_height: u32,
-    #[chia(max_length = 1600000)]
+    #[chia(max_length = 500000)]
     coin_states: Vec<CoinState>,
 }
 
@@ -185,7 +185,7 @@ pub struct RespondToCoinUpdates {
     #[chia(max_length = 1600000)]
     coin_ids: Vec<Bytes32>,
     min_height: u32,
-    #[chia(max_length = 1600000)]
+    #[chia(max_length = 500000)]
     coin_states: Vec<CoinState>,
 }
 
@@ -265,7 +265,7 @@ pub struct CoinStateFilters {
 
 #[streamable(message)]
 pub struct RequestPuzzleState {
-    #[chia(max_length = 32700)]
+    #[chia(max_length = 35000)]
     puzzle_hashes: Vec<Bytes32>,
     previous_height: Option<u32>,
     header_hash: Bytes32,
@@ -275,12 +275,12 @@ pub struct RequestPuzzleState {
 
 #[streamable(message)]
 pub struct RespondPuzzleState {
-    #[chia(max_length = 32700)]
+    #[chia(max_length = 33000)]
     puzzle_hashes: Vec<Bytes32>,
     height: u32,
     header_hash: Bytes32,
     is_finished: bool,
-    #[chia(max_length = 32700)]
+    #[chia(max_length = 500000)]
     coin_states: Vec<CoinState>,
 }
 
@@ -291,7 +291,7 @@ pub struct RejectPuzzleState {
 
 #[streamable(message)]
 pub struct RequestCoinState {
-    #[chia(max_length = 32700)]
+    #[chia(max_length = 500000)]
     coin_ids: Vec<Bytes32>,
     previous_height: Option<u32>,
     header_hash: Bytes32,
@@ -300,9 +300,9 @@ pub struct RequestCoinState {
 
 #[streamable(message)]
 pub struct RespondCoinState {
-    #[chia(max_length = 32700)]
+    #[chia(max_length = 500000)]
     coin_ids: Vec<Bytes32>,
-    #[chia(max_length = 32700)]
+    #[chia(max_length = 500000)]
     coin_states: Vec<CoinState>,
 }
 
