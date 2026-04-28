@@ -14,6 +14,7 @@ pub fn check_time_locks(
     bundle_conds: &OwnedSpendBundleConditions,
     prev_transaction_block_height: u32,
     timestamp: u64,
+    nowrap: bool,
 ) -> Result<(), ErrorCode> {
     if prev_transaction_block_height < bundle_conds.height_absolute {
         return Err(ErrorCode::AssertHeightAbsoluteFailed);
@@ -48,24 +49,52 @@ pub fn check_time_locks(
             }
         }
         if let Some(height_relative) = spend.height_relative {
-            if prev_transaction_block_height < unspent.confirmed_block_index + height_relative {
+            if nowrap {
+                if prev_transaction_block_height
+                    < unspent
+                        .confirmed_block_index
+                        .saturating_add(height_relative)
+                {
+                    return Err(ErrorCode::AssertHeightRelativeFailed);
+                }
+            } else if prev_transaction_block_height
+                < unspent.confirmed_block_index.wrapping_add(height_relative)
+            {
                 return Err(ErrorCode::AssertHeightRelativeFailed);
             }
         }
         if let Some(seconds_relative) = spend.seconds_relative {
-            if timestamp < unspent.timestamp + seconds_relative {
+            if nowrap {
+                if timestamp < unspent.timestamp.saturating_add(seconds_relative) {
+                    return Err(ErrorCode::AssertSecondsRelativeFailed);
+                }
+            } else if timestamp < unspent.timestamp.wrapping_add(seconds_relative) {
                 return Err(ErrorCode::AssertSecondsRelativeFailed);
             }
         }
         if let Some(before_height_relative) = spend.before_height_relative {
-            if prev_transaction_block_height
-                >= unspent.confirmed_block_index + before_height_relative
+            if nowrap {
+                if prev_transaction_block_height
+                    >= unspent
+                        .confirmed_block_index
+                        .saturating_add(before_height_relative)
+                {
+                    return Err(ErrorCode::AssertBeforeHeightRelativeFailed);
+                }
+            } else if prev_transaction_block_height
+                >= unspent
+                    .confirmed_block_index
+                    .wrapping_add(before_height_relative)
             {
                 return Err(ErrorCode::AssertBeforeHeightRelativeFailed);
             }
         }
         if let Some(before_seconds_relative) = spend.before_seconds_relative {
-            if timestamp >= unspent.timestamp + before_seconds_relative {
+            if nowrap {
+                if timestamp >= unspent.timestamp.saturating_add(before_seconds_relative) {
+                    return Err(ErrorCode::AssertBeforeSecondsRelativeFailed);
+                }
+            } else if timestamp >= unspent.timestamp.wrapping_add(before_seconds_relative) {
                 return Err(ErrorCode::AssertBeforeSecondsRelativeFailed);
             }
         }
@@ -83,12 +112,14 @@ pub fn py_check_time_locks(
     bundle_conds: &OwnedSpendBundleConditions,
     prev_transaction_block_height: u32,
     timestamp: u64,
+    nowrap: bool,
 ) -> PyResult<Option<u32>> {
     let res = check_time_locks(
         &removal_coin_records,
         bundle_conds,
         prev_transaction_block_height,
         timestamp,
+        nowrap,
     );
 
     match res {
@@ -197,129 +228,135 @@ mod tests {
         #[case] prev_height: u32,
         #[case] timestamp: u64,
         #[case] expected: Result<(), ErrorCode>,
+        #[values(true, false)] nowrap: bool,
     ) {
-        let result = check_time_locks(&HashMap::new(), &bundle, prev_height, timestamp);
+        let result = check_time_locks(&HashMap::new(), &bundle, prev_height, timestamp, nowrap);
         assert_eq!(result, expected);
     }
 
+    type Osc = OwnedSpendConditions;
+
     #[rstest]
-    // the following cases are created with height 50, and time 1000
+    // Coin confirmed at height 100, timestamp 1000.
+    // Checked at height 200, timestamp 2000.
+    // Each case: (spend, expected_nowrap, expected_no_nowrap)
+    //
+    // height_relative check: prev_height < confirmed + height_relative -> Err
+    // 200 < 100 + 101 = 201 -> Err (both agree, no overflow)
     #[case::height_relative_under(
-        OwnedSpendConditions {
-            height_relative: Some(100),
-            ..Default::default()
-        },
-        149, // initial height 50 + 99
-        2000,
-        Err(ErrorCode::AssertHeightRelativeFailed)
+        Osc { height_relative: Some(101), ..Default::default() },
+        Err(ErrorCode::AssertHeightRelativeFailed),
+        Err(ErrorCode::AssertHeightRelativeFailed),
     )]
+    // 200 < 100 + 100 = 200 -> Ok (both agree, no overflow)
     #[case::height_relative_exact(
-        OwnedSpendConditions {
-            height_relative: Some(100),
-            ..Default::default()
-        },
-        150,  // initial height 50 + 100
-        2000,
-        Ok(())
+        Osc { height_relative: Some(100), ..Default::default() },
+        Ok(()),
+        Ok(()),
     )]
+    // 200 < 100 + 99 = 199 -> Ok (both agree, no overflow)
     #[case::height_relative_over(
-        OwnedSpendConditions {
-            height_relative: Some(100),
-            ..Default::default()
-        },
-        151,  // initial height 50 + 101
-        2000,
-        Ok(())
+        Osc { height_relative: Some(99), ..Default::default() },
+        Ok(()),
+        Ok(()),
     )]
+    // 200 < 100 + u32::MAX -> Err with nowrap (saturates), Ok without (wraps)
+    #[case::height_relative_wrap(
+        Osc { height_relative: Some(0xffff_ffff), ..Default::default() },
+        Err(ErrorCode::AssertHeightRelativeFailed),
+        Ok(()),
+    )]
+    // seconds_relative check: timestamp < coin_time + seconds_relative -> Err
+    // 2000 < 1000 + 1001 = 2001 -> Err (both agree, no overflow)
     #[case::seconds_relative_under(
-        OwnedSpendConditions {
-            seconds_relative: Some(1000),
-            ..Default::default()
-        },
-        200,
-        1999, // 1000 + 999
-        Err(ErrorCode::AssertSecondsRelativeFailed)
+        Osc { seconds_relative: Some(1001), ..Default::default() },
+        Err(ErrorCode::AssertSecondsRelativeFailed),
+        Err(ErrorCode::AssertSecondsRelativeFailed),
     )]
+    // 2000 < 1000 + 1000 = 2000 -> Ok (both agree, no overflow)
     #[case::seconds_relative_exact(
-        OwnedSpendConditions {
-            seconds_relative: Some(1000),
-            ..Default::default()
-        },
-        200,
-        2000,  // initial 1000 + 1000
-        Ok(())
+        Osc { seconds_relative: Some(1000), ..Default::default() },
+        Ok(()),
+        Ok(()),
     )]
+    // 2000 < 1000 + 999 = 1999 -> Ok (both agree, no overflow)
     #[case::seconds_relative_over(
-        OwnedSpendConditions {
-            seconds_relative: Some(1000),
-            ..Default::default()
-        },
-        200,
-        2001, // initial 1000 + 1001
-        Ok(())
+        Osc { seconds_relative: Some(999), ..Default::default() },
+        Ok(()),
+        Ok(()),
     )]
+    // 2000 < 1000 + u64::MAX -> Err with nowrap (saturates), Ok without (wraps)
+    #[case::seconds_relative_wrap(
+        Osc { seconds_relative: Some(0xffff_ffff_ffff_ffff), ..Default::default() },
+        Err(ErrorCode::AssertSecondsRelativeFailed),
+        Ok(()),
+    )]
+    // before_height_relative check: prev_height >= confirmed + before_height_relative -> Err
+    // 200 >= 100 + 101 = 201 -> Ok (both agree, no overflow)
     #[case::before_height_relative_under(
-        OwnedSpendConditions {
-            before_height_relative: Some(10),
-            ..Default::default()
-        },
-        59,  // initial height 50 + 9
-        1000,
-        Ok(())
+        Osc { before_height_relative: Some(101), ..Default::default() },
+        Ok(()),
+        Ok(()),
     )]
+    // 200 >= 100 + 100 = 200 -> Err (both agree, no overflow)
     #[case::before_height_relative_exact(
-        OwnedSpendConditions {
-            before_height_relative: Some(10),
-            ..Default::default()
-        },
-        60,  // initial height 50 + 10
-        1000,
-        Err(ErrorCode::AssertBeforeHeightRelativeFailed)
+        Osc { before_height_relative: Some(100), ..Default::default() },
+        Err(ErrorCode::AssertBeforeHeightRelativeFailed),
+        Err(ErrorCode::AssertBeforeHeightRelativeFailed),
     )]
+    // 200 >= 100 + 99 = 199 -> Err (both agree, no overflow)
     #[case::before_height_relative_over(
-        OwnedSpendConditions {
-            before_height_relative: Some(10),
-            ..Default::default()
-        },
-        61,  // initial height 50 + 11
-        1000,
-        Err(ErrorCode::AssertBeforeHeightRelativeFailed)
+        Osc { before_height_relative: Some(99), ..Default::default() },
+        Err(ErrorCode::AssertBeforeHeightRelativeFailed),
+        Err(ErrorCode::AssertBeforeHeightRelativeFailed),
     )]
+    // 200 >= 100 + 0xffff_ffff -> Ok with nowrap (saturates), Err without (wraps)
+    #[case::before_height_relative_wrap(
+        Osc { before_height_relative: Some(0xffff_ffff), ..Default::default() },
+        Ok(()),
+        Err(ErrorCode::AssertBeforeHeightRelativeFailed),
+    )]
+    // before_seconds_relative check: timestamp >= coin_time + before_seconds_relative -> Err
+    // 2000 >= 1000 + 1001 = 2001 -> Ok (both agree, no overflow)
     #[case::before_seconds_relative_under(
-        OwnedSpendConditions {
-            before_seconds_relative: Some(1000),
-            ..Default::default()
-        },
-        100,
-        1999,  // initial time 1000 + 999
-        Ok(())
+        Osc { before_seconds_relative: Some(1001), ..Default::default() },
+        Ok(()),
+        Ok(()),
     )]
+    // 2000 >= 1000 + 1000 = 2000 -> Err (both agree, no overflow)
     #[case::before_seconds_relative_exact(
-        OwnedSpendConditions {
-            before_seconds_relative: Some(1000),
-            ..Default::default()
-        },
-        100,
-        2000,  // initial time 1000 + 1000
-        Err(ErrorCode::AssertBeforeSecondsRelativeFailed)
+        Osc { before_seconds_relative: Some(1000), ..Default::default() },
+        Err(ErrorCode::AssertBeforeSecondsRelativeFailed),
+        Err(ErrorCode::AssertBeforeSecondsRelativeFailed),
     )]
+    // 2000 >= 1000 + 999 = 1999 -> Err (both agree, no overflow)
     #[case::before_seconds_relative_over(
-        OwnedSpendConditions {
-            before_seconds_relative: Some(1000),
-            ..Default::default()
-        },
-        100,
-        2001,  // initial time 1000 + 2001
-        Err(ErrorCode::AssertBeforeSecondsRelativeFailed)
+        Osc { before_seconds_relative: Some(999), ..Default::default() },
+        Err(ErrorCode::AssertBeforeSecondsRelativeFailed),
+        Err(ErrorCode::AssertBeforeSecondsRelativeFailed),
     )]
-    fn test_relative_constraints_failures(
+    // 2000 >= 1000 + u64::MAX -> Ok with nowrap (saturates), Err without (wraps)
+    #[case::before_seconds_relative_wrap(
+        Osc { before_seconds_relative: Some(0xffff_ffff_ffff_ffff), ..Default::default() },
+        Ok(()),
+        Err(ErrorCode::AssertBeforeSecondsRelativeFailed),
+    )]
+    fn test_relative_constraints(
         #[case] spend: OwnedSpendConditions,
-        #[case] now_height: u32,
-        #[case] now_timestamp: u64,
-        #[case] expected: Result<(), ErrorCode>,
+        #[case] expected_nowrap: Result<(), ErrorCode>,
+        #[case] expected_no_nowrap: Result<(), ErrorCode>,
+        #[values(true, false)] nowrap: bool,
     ) {
+        let expected = if nowrap {
+            expected_nowrap
+        } else {
+            expected_no_nowrap
+        };
+        let now_height = 200_u32;
+        let now_timestamp = 2000_u64;
+
         let coin_id = Bytes32::from([3u8; 32]);
-        let coin_record = dummy_coin_record(50, 1000);
+        let coin_record = dummy_coin_record(100, 1000);
 
         let mut spend = spend;
         spend.coin_id = coin_id;
@@ -333,12 +370,12 @@ mod tests {
         };
 
         let result: Result<(), ErrorCode> =
-            check_time_locks(&map, &bundle, now_height, now_timestamp);
+            check_time_locks(&map, &bundle, now_height, now_timestamp, nowrap);
         assert_eq!(result, expected);
     }
 
-    #[test]
-    fn test_invalid_coin_id() {
+    #[rstest]
+    fn test_invalid_coin_id(#[values(true, false)] nowrap: bool) {
         let coin_id = Bytes32::from([1u8; 32]);
         let spend = OwnedSpendConditions {
             coin_id,
@@ -348,12 +385,12 @@ mod tests {
             spends: vec![spend],
             ..Default::default()
         };
-        let result = check_time_locks(&HashMap::new(), &bundle, 0, 0);
+        let result = check_time_locks(&HashMap::new(), &bundle, 0, 0, nowrap);
         assert_eq!(result, Err(ErrorCode::InvalidCoinId));
     }
 
     #[rstest]
-    fn test_all_checks_pass() {
+    fn test_all_checks_pass(#[values(true, false)] nowrap: bool) {
         let coin_id = Bytes32::from([2u8; 32]);
         let coin_record = dummy_coin_record(10, 500);
 
@@ -378,12 +415,12 @@ mod tests {
             ..Default::default()
         };
 
-        let result = check_time_locks(&map, &bundle, 20, 700);
+        let result = check_time_locks(&map, &bundle, 20, 700, nowrap);
         assert!(result.is_ok());
     }
 
     #[rstest]
-    fn test_birth_height_and_seconds_mismatch() {
+    fn test_birth_height_and_seconds_mismatch(#[values(true, false)] nowrap: bool) {
         let coin_id = Bytes32::from([4u8; 32]);
         let coin_record = dummy_coin_record(10, 500);
 
@@ -402,12 +439,12 @@ mod tests {
             ..Default::default()
         };
 
-        let result = check_time_locks(&map, &bundle, 100, 1000);
+        let result = check_time_locks(&map, &bundle, 100, 1000, nowrap);
         assert_eq!(result, Err(ErrorCode::AssertMyBirthHeightFailed));
     }
 
     #[rstest]
-    fn test_birth_seconds_mismatch() {
+    fn test_birth_seconds_mismatch(#[values(true, false)] nowrap: bool) {
         let coin_id = Bytes32::from([5u8; 32]);
         let coin_record = dummy_coin_record(10, 500);
 
@@ -426,12 +463,12 @@ mod tests {
             ..Default::default()
         };
 
-        let result = check_time_locks(&map, &bundle, 100, 1000);
+        let result = check_time_locks(&map, &bundle, 100, 1000, nowrap);
         assert_eq!(result, Err(ErrorCode::AssertMyBirthSecondsFailed));
     }
 
-    #[test]
-    fn test_multiple_spends_in_bundle() {
+    #[rstest]
+    fn test_multiple_spends_in_bundle(#[values(true, false)] nowrap: bool) {
         let coin_id_1 = Bytes32::from([1u8; 32]);
         let coin_id_2 = Bytes32::from([2u8; 32]);
         let coin_id_3 = Bytes32::from([3u8; 32]);
@@ -477,7 +514,7 @@ mod tests {
         };
 
         // spend_relative_fail should fail first as 59 is below required 61 height
-        let result = check_time_locks(&map, &bundle, 59, 600);
+        let result = check_time_locks(&map, &bundle, 59, 600, nowrap);
         assert_eq!(result, Err(ErrorCode::AssertHeightRelativeFailed));
 
         let mut map = HashMap::new();
@@ -489,8 +526,8 @@ mod tests {
             ..Default::default()
         };
 
-        // spend_birth_dail should now fail
-        let result = check_time_locks(&map, &bundle, 59, 600);
+        // spend_birth_fail should now fail
+        let result = check_time_locks(&map, &bundle, 59, 600, nowrap);
         assert_eq!(result, Err(ErrorCode::AssertMyBirthHeightFailed));
     }
 }
