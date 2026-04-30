@@ -641,7 +641,7 @@ mod tests {
     fn test_random_bytes() {
         let mut rng = SmallRng::seed_from_u64(1337);
         for _n in 0..TEST_ITERS {
-            let vec_length: usize = rng.gen_range(0..=500);
+            let vec_length: usize = rng.random_range(0..=500);
             let mut random_data: Vec<[u8; 32]> = Vec::with_capacity(vec_length);
             for _ in 0..vec_length {
                 let mut array: [u8; 32] = [0; 32];
@@ -658,7 +658,7 @@ mod tests {
         let mut rng = SmallRng::seed_from_u64(1337);
         for _ in 0..TEST_ITERS {
             // Generate a random length for the Vec
-            let vec_length: usize = rng.gen_range(1..=500);
+            let vec_length: usize = rng.random_range(1..=500);
 
             // Generate a Vec of random [u8; 32] arrays
             let mut random_data: Vec<[u8; 32]> = Vec::with_capacity(vec_length);
@@ -671,7 +671,7 @@ mod tests {
             let tree = MerkleSet::from_leafs(&mut random_data);
             let root = tree.get_root();
             assert_eq!(root, compute_merkle_set_root(&mut random_data));
-            let index = rng.gen_range(0..random_data.len());
+            let index = rng.random_range(0..random_data.len());
             let Ok((true, proof)) = tree.generate_proof(&random_data[index]) else {
                 panic!("failed to generate proof");
             };
@@ -685,7 +685,7 @@ mod tests {
         // Create a random number generator
         let mut rng = SmallRng::seed_from_u64(1337);
         // Generate a random length for the Vec
-        let vec_length: usize = rng.gen_range(5..=500);
+        let vec_length: usize = rng.random_range(5..=500);
 
         // Generate a Vec of random [u8; 32] arrays
         let mut random_data: Vec<[u8; 32]> = Vec::with_capacity(vec_length);

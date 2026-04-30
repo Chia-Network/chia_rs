@@ -848,6 +848,7 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("NO_UNKNOWN_OPS", ConsensusFlags::NO_UNKNOWN_OPS.bits())?;
     m.add("LIMIT_HEAP", ConsensusFlags::LIMIT_HEAP.bits())?;
     m.add("RELAXED_BLS", ConsensusFlags::RELAXED_BLS.bits())?;
+    m.add("ENABLE_GC", ConsensusFlags::ENABLE_GC.bits())?;
     m.add(
         "ENABLE_KECCAK_OPS_OUTSIDE_GUARD",
         ConsensusFlags::ENABLE_KECCAK_OPS_OUTSIDE_GUARD.bits(),

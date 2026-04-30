@@ -39,7 +39,7 @@ impl K1PublicKey {
     pub const SIZE: usize = 33;
 
     pub fn to_bytes(&self) -> [u8; Self::SIZE] {
-        self.0.to_encoded_point(true).as_ref().try_into().unwrap()
+        self.0.to_sec1_point(true).as_ref().try_into().unwrap()
     }
 
     pub fn from_bytes(bytes: &[u8; Self::SIZE]) -> Result<Self, Error> {
