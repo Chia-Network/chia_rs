@@ -4,6 +4,7 @@ use rcgen::{CertificateParams, DistinguishedName, DnType, Ia5String, KeyPair, Sa
 use rsa::{
     RsaPrivateKey,
     pkcs8::{EncodePrivateKey, LineEnding},
+    rand_core::UnwrapErr,
 };
 use time::{Date, Duration, Month, OffsetDateTime, PrimitiveDateTime, Time};
 
@@ -21,9 +22,7 @@ pub struct ChiaCertificate {
 
 impl ChiaCertificate {
     pub fn generate() -> Result<ChiaCertificate> {
-        let mut rng = rand::thread_rng();
-
-        let key = RsaPrivateKey::new(&mut rng, 2048)?;
+        let key = RsaPrivateKey::new(&mut UnwrapErr(getrandom::SysRng), 2048)?;
         let key_pem = key.to_pkcs8_pem(LineEnding::default())?.to_string();
 
         let mut params = CertificateParams::default();
