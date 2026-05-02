@@ -2,3 +2,6 @@
 # or .__disjoint_base__ is not present in stub when adding the decorator
 chia_rs\.sized_byte_class\.SizedBytes
 chia_rs\.struct_stream\.StructStream
+
+# 3.9 stubtest rejects @final + @disjoint_base together; we keep both for 3.10+
+chia_rs\.Block2026Builder
