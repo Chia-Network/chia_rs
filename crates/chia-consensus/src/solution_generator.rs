@@ -116,7 +116,11 @@ where
 {
     let mut a = Allocator::new();
     let generator = build_generator(&mut a, spends)?;
-    Ok(node_to_bytes_serde_2026(&a, generator, Compression::default())?)
+    Ok(node_to_bytes_serde_2026(
+        &a,
+        generator,
+        Compression::default(),
+    )?)
 }
 
 #[cfg(test)]
