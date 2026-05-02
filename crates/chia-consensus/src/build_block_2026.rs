@@ -94,7 +94,6 @@ impl BestBlock {
             included_indices: Vec::new(),
         }
     }
-
 }
 
 struct SharedState {
@@ -235,11 +234,7 @@ impl BuilderInner {
         for c in &self.candidates[..self.included_count] {
             signature.aggregate(&c.bundle.aggregated_signature);
             for cs in &c.bundle.coin_spends {
-                spend_tuples.push((
-                    cs.coin,
-                    cs.puzzle_reveal.as_ref(),
-                    cs.solution.as_ref(),
-                ));
+                spend_tuples.push((cs.coin, cs.puzzle_reveal.as_ref(), cs.solution.as_ref()));
             }
         }
 
@@ -361,11 +356,7 @@ impl Block2026Builder {
 
     /// Add a candidate spend bundle.  Must be called before [`start`].
     /// Candidates should be in priority order (highest fee-per-cost first).
-    pub fn add_candidate(
-        &mut self,
-        bundle: SpendBundle,
-        irreducible_cost: u64,
-    ) -> Result<()> {
+    pub fn add_candidate(&mut self, bundle: SpendBundle, irreducible_cost: u64) -> Result<()> {
         self.inner
             .as_mut()
             .expect("add_candidate called after start()")
@@ -470,11 +461,7 @@ impl Block2026Builder {
     }
 
     #[pyo3(name = "add_candidate")]
-    pub fn py_add_candidate(
-        &mut self,
-        bundle: SpendBundle,
-        irreducible_cost: u64,
-    ) -> PyResult<()> {
+    pub fn py_add_candidate(&mut self, bundle: SpendBundle, irreducible_cost: u64) -> PyResult<()> {
         Ok(self.add_candidate(bundle, irreducible_cost)?)
     }
 
@@ -659,7 +646,7 @@ mod tests {
             QUOTE_COST + 3 * exec_cost + (WRAPPER_WEIGHT + 3 * (solo_w + LIST_CONS_WEIGHT)) * cpb;
         let ub4 =
             QUOTE_COST + 4 * exec_cost + (WRAPPER_WEIGHT + 4 * (solo_w + LIST_CONS_WEIGHT)) * cpb;
-        constants.max_block_cost_clvm = (ub3 + ub4) / 2;
+        constants.max_block_cost_clvm = u64::midpoint(ub3, ub4);
 
         let mut builder = Block2026Builder::new(&constants);
         for i in 0..6u64 {
@@ -696,7 +683,7 @@ mod tests {
             QUOTE_COST + 3 * exec_cost + (WRAPPER_WEIGHT + 3 * (solo_w + LIST_CONS_WEIGHT)) * cpb;
         let ub4 =
             QUOTE_COST + 4 * exec_cost + (WRAPPER_WEIGHT + 4 * (solo_w + LIST_CONS_WEIGHT)) * cpb;
-        constants.max_block_cost_clvm = (ub3 + ub4) / 2;
+        constants.max_block_cost_clvm = u64::midpoint(ub3, ub4);
 
         let mut builder = Block2026Builder::new(&constants);
         for i in 0..6u64 {

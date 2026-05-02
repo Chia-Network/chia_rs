@@ -11,8 +11,9 @@ use clvmr::cost::Cost;
 use clvmr::error::EvalErr;
 use clvmr::run_program;
 use clvmr::serde::{
-    node_from_bytes, node_from_bytes_backrefs, node_to_bytes, serialized_length_from_bytes,
-    serialized_length_from_bytes_trusted, serialized_length_serde_2026, SERDE_2026_MAGIC_PREFIX,
+    SERDE_2026_MAGIC_PREFIX, node_from_bytes, node_from_bytes_backrefs, node_to_bytes,
+    serialized_length_from_bytes, serialized_length_from_bytes_trusted,
+    serialized_length_serde_2026,
 };
 use clvmr::{Allocator, ChiaDialect, ClvmFlags, NodePtr};
 #[cfg(feature = "py-bindings")]
@@ -482,18 +483,17 @@ impl Program {
 #[cfg(feature = "py-bindings")]
 impl FromJsonDict for Program {
     fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self> {
-        use clvmr::serde::{DeserializeOptions, node_from_bytes_auto};
         let bytes = Bytes::from_json_dict(o)?;
-        match serialized_length_from_bytes(bytes.as_slice()) {
-            Ok(len) if len as usize == bytes.len() => Ok(Self(bytes)),
-            _ => {
-                // Fall back to auto-detection for backrefs / serde_2026
-                let mut a = Allocator::new();
-                node_from_bytes_auto(&mut a, bytes.as_slice(), DeserializeOptions::default())
-                    .map_err(|_e| <Error as Into<pyo3::PyErr>>::into(Error::EndOfBuffer))?;
-                Ok(Self(bytes))
-            }
+        let buf = bytes.as_slice();
+        let len = if buf.starts_with(&SERDE_2026_MAGIC_PREFIX) {
+            serialized_length_serde_2026(buf).map_err(|_e| Error::EndOfBuffer)?
+        } else {
+            serialized_length_from_bytes(buf).map_err(|_e| Error::EndOfBuffer)?
+        };
+        if len as usize != buf.len() {
+            return Err(Error::InvalidClvm)?;
         }
+        Ok(Self(bytes))
     }
 }
 
