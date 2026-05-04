@@ -407,8 +407,8 @@ fn test_tree_hash_from_bytes() {
 #[test]
 fn test_tree_hash_auto_matches_tree_hash_for_all_formats() {
     use clvmr::serde::{
-        Compression, DeserializeOptions, node_from_bytes_auto, node_to_bytes,
-        node_to_bytes_backrefs, node_to_bytes_serde_2026,
+        DeserializeOptions, node_from_bytes_auto, node_to_bytes, node_to_bytes_backrefs,
+        node_to_bytes_serde_2026,
     };
 
     let mut a = Allocator::new();
@@ -424,7 +424,7 @@ fn test_tree_hash_auto_matches_tree_hash_for_all_formats() {
 
     let standard = node_to_bytes(&a, root).unwrap();
     let backrefs = node_to_bytes_backrefs(&a, root).unwrap();
-    let serde_2026 = node_to_bytes_serde_2026(&a, root, Compression::default()).unwrap();
+    let serde_2026 = node_to_bytes_serde_2026(&a, root).unwrap();
 
     // tree_hash_from_bytes only handles standard + backrefs
     assert_eq!(tree_hash_from_bytes(&standard).unwrap(), canonical_hash);
