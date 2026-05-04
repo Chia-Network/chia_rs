@@ -438,7 +438,11 @@ impl Streamable for Program {
         let pos = input.position();
         let buf: &[u8] = &input.get_ref()[pos as usize..];
         let len = if buf.starts_with(&SERDE_2026_MAGIC_PREFIX) {
-            serialized_length_serde_2026(buf).map_err(|_e| Error::EndOfBuffer)?
+            // Framing-only walk: chia-protocol just needs to find the byte
+            // boundary. Consensus caps (max_atom_len) are enforced later, at
+            // run_block_generator time, so accept anything that's structurally
+            // walkable here.
+            serialized_length_serde_2026(buf, usize::MAX, false).map_err(|_e| Error::EndOfBuffer)?
         } else if TRUSTED {
             serialized_length_from_bytes_trusted(buf).map_err(|_e| Error::EndOfBuffer)?
         } else {
@@ -486,7 +490,8 @@ impl FromJsonDict for Program {
         let bytes = Bytes::from_json_dict(o)?;
         let buf = bytes.as_slice();
         let len = if buf.starts_with(&SERDE_2026_MAGIC_PREFIX) {
-            serialized_length_serde_2026(buf).map_err(|_e| Error::EndOfBuffer)?
+            // Framing-only walk; see Streamable::parse for rationale.
+            serialized_length_serde_2026(buf, usize::MAX, false).map_err(|_e| Error::EndOfBuffer)?
         } else {
             serialized_length_from_bytes(buf).map_err(|_e| Error::EndOfBuffer)?
         };
