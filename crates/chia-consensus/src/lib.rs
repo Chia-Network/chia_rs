@@ -26,6 +26,7 @@ pub mod puzzle_fingerprint;
 pub mod program_bytes;
 pub mod run_block_generator;
 pub mod sanitize_int;
+pub mod serde_2026;
 pub mod solution_generator;
 pub mod spend_visitor;
 pub mod spendbundle_conditions;
