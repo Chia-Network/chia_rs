@@ -8,9 +8,9 @@ use chia_consensus::run_block_generator::run_block_generator as native_run_block
 use chia_consensus::run_block_generator::run_block_generator2 as native_run_block_generator2;
 use chia_protocol::{Bytes, Bytes32, Coin};
 
+use chia_consensus::program_bytes::node_from_bytes_auto;
 use clvmr::allocator::Allocator;
 use clvmr::cost::Cost;
-use chia_consensus::program_bytes::node_from_bytes_auto;
 use clvmr::serde::intern_tree_limited;
 
 use pyo3::PyResult;
