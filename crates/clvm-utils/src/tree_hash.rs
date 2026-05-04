@@ -407,15 +407,15 @@ fn test_tree_hash_from_bytes() {
 #[test]
 fn test_tree_hash_auto_matches_tree_hash_for_all_formats() {
     use clvmr::serde::{
-        SERDE_2026_MAGIC_PREFIX, deserialize_2026, node_from_bytes_backrefs, node_to_bytes,
-        node_to_bytes_backrefs, node_to_bytes_serde_2026,
+        SERDE_2026_MAGIC_PREFIX, node_from_bytes_backrefs, node_from_bytes_serde_2026,
+        node_to_bytes, node_to_bytes_backrefs, node_to_bytes_serde_2026,
     };
 
     // 1 MiB matches the legacy clvm_rs default; this test isn't consensus.
     const TEST_MAX_ATOM_LEN: usize = 1 << 20;
     let auto = |a: &mut Allocator, bytes: &[u8]| {
-        if let Some(body) = bytes.strip_prefix(SERDE_2026_MAGIC_PREFIX.as_slice()) {
-            deserialize_2026(a, body, TEST_MAX_ATOM_LEN, false)
+        if bytes.starts_with(&SERDE_2026_MAGIC_PREFIX) {
+            node_from_bytes_serde_2026(a, bytes, TEST_MAX_ATOM_LEN, false)
         } else {
             node_from_bytes_backrefs(a, bytes)
         }
