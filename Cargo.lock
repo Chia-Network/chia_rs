@@ -693,7 +693,6 @@ dependencies = [
  "chia-traits 0.42.1",
  "clvm-utils",
  "clvmr",
- "hex",
  "pyo3",
 ]
 

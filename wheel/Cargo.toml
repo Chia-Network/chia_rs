@@ -30,7 +30,6 @@ openssl = ["clvmr/openssl"]
 
 [dependencies]
 clvmr = { workspace = true }
-hex = { workspace = true }
 pyo3 = { workspace = true, features = ["multiple-pymethods"] }
 bincode = { workspace = true }
 chia-consensus = { workspace = true, features = ["py-bindings"] }

@@ -1,4 +1,4 @@
-use crate::error::{map_pyerr, map_pyerr_w_ptr};
+use crate::error::map_pyerr;
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::flags::ConsensusFlags;
 use chia_protocol::LazyNode;
@@ -44,15 +44,13 @@ pub fn run_chia_program(
     let flags = flags.to_clvm_flags();
 
     let reduction = (|| -> PyResult<Response> {
-        let program = node_from_bytes_backrefs(&mut allocator, program)
-            .map_err(|e| map_pyerr_w_ptr(&e, &allocator))?;
-        let args = node_from_bytes_backrefs(&mut allocator, args)
-            .map_err(|e| map_pyerr_w_ptr(&e, &allocator))?;
+        let program = node_from_bytes_backrefs(&mut allocator, program).map_err(map_pyerr)?;
+        let args = node_from_bytes_backrefs(&mut allocator, args).map_err(map_pyerr)?;
         let dialect = ChiaDialect::new(flags);
 
         Ok(py.detach(|| run_program(&mut allocator, &dialect, program, args, max_cost)))
     })()?
-    .map_err(|e| map_pyerr_w_ptr(&e, &allocator))?;
+    .map_err(map_pyerr)?;
     let val = LazyNode::new(Rc::new(allocator), reduction.1);
     Ok((reduction.0, val))
 }
