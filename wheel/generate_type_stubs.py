@@ -332,11 +332,11 @@ def fast_forward_singleton(spend: CoinSpend, new_coin: Coin, new_parent: Coin) -
 
 def run_block_generator(
     program: ReadableBuffer, block_refs: list[ReadableBuffer], max_cost: int, flags: int, signature: G2Element, bls_cache: Optional[BLSCache], constants: ConsensusConstants
-) -> tuple[Optional[int], Optional[SpendBundleConditions]]: ...
+) -> tuple[Optional[int], Optional[str], Optional[SpendBundleConditions]]: ...
 
 def run_block_generator2(
     program: ReadableBuffer, block_refs: list[ReadableBuffer], max_cost: int, flags: int, signature: G2Element, bls_cache: Optional[BLSCache], constants: ConsensusConstants
-) -> tuple[Optional[int], Optional[SpendBundleConditions]]: ...
+) -> tuple[Optional[int], Optional[str], Optional[SpendBundleConditions]]: ...
 
 def additions_and_removals(
     program: ReadableBuffer, block_refs: list[ReadableBuffer], flags: int, constants: ConsensusConstants

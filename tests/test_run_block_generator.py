@@ -25,7 +25,7 @@ def test_run_block_generator_cost() -> None:
 
     byte_cost = len(generator) * 12000
 
-    err, conds = run_block_generator(
+    err, err_msg, conds = run_block_generator(
         generator,
         [],
         original_consensus_cost,
@@ -35,12 +35,13 @@ def test_run_block_generator_cost() -> None:
         DEFAULT_CONSTANTS,
     )
     assert err is None
+    assert err_msg is None
     assert conds is not None
     assert conds.cost == original_consensus_cost
     assert conds.execution_cost + condition_cost + byte_cost == original_consensus_cost
     assert conds.condition_cost == condition_cost
 
-    err2, conds2 = run_block_generator2(
+    err2, err_msg2, conds2 = run_block_generator2(
         generator,
         [],
         hard_fork_consensus_cost,
@@ -50,6 +51,7 @@ def test_run_block_generator_cost() -> None:
         DEFAULT_CONSTANTS,
     )
     assert err2 is None
+    assert err_msg2 is None
     assert conds2 is not None
     assert conds2.cost == hard_fork_consensus_cost
     assert conds2.condition_cost == condition_cost
@@ -72,7 +74,7 @@ def test_run_block_generator_cost() -> None:
         assert l1 == l2
 
     # we exceed the cost limit by 1
-    err, conds = run_block_generator(
+    err, err_msg, conds = run_block_generator(
         generator,
         [],
         original_consensus_cost - 1,
@@ -83,9 +85,10 @@ def test_run_block_generator_cost() -> None:
     )
     # BLOCK_COST_EXCEEDS_MAX = 23
     assert err == 23
+    assert err_msg == "CostExceeded"
     assert conds is None
 
-    err, conds = run_block_generator2(
+    err, err_msg, conds = run_block_generator2(
         generator,
         [],
         hard_fork_consensus_cost - 1,
@@ -96,10 +99,11 @@ def test_run_block_generator_cost() -> None:
     )
     # BLOCK_COST_EXCEEDS_MAX = 23
     assert err == 23
+    assert err_msg == "CostExceeded"
     assert conds is None
 
     # the byte cost alone exceeds the limit by 1
-    err, conds = run_block_generator(
+    err, err_msg, conds = run_block_generator(
         generator,
         [],
         byte_cost - 1,
@@ -110,10 +114,11 @@ def test_run_block_generator_cost() -> None:
     )
     # BLOCK_COST_EXCEEDS_MAX = 23
     assert err == 23
+    assert err_msg == "CostExceeded"
     assert conds is None
 
     # the byte cost alone exceeds the limit by 1
-    err, conds = run_block_generator2(
+    err, err_msg, conds = run_block_generator2(
         generator,
         [],
         byte_cost - 1,
@@ -124,4 +129,5 @@ def test_run_block_generator_cost() -> None:
     )
     # BLOCK_COST_EXCEEDS_MAX = 23
     assert err == 23
+    assert err_msg == "CostExceeded"
     assert conds is None
