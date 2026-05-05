@@ -1,4 +1,4 @@
-use crate::error::{map_pyerr, map_pyerr_w_ptr};
+use crate::error::map_pyerr;
 use crate::run_generator::{
     additions_and_removals, py_to_slice, run_block_generator, run_block_generator2,
 };
@@ -176,10 +176,8 @@ pub fn get_puzzle_and_solution_for_coin<'a>(
     let program = py_to_slice::<'a>(program);
     let args = py_to_slice::<'a>(args);
 
-    let program = node_from_bytes_backrefs(&mut allocator, program)
-        .map_err(|e| map_pyerr_w_ptr(&e, &allocator))?;
-    let args = node_from_bytes_backrefs(&mut allocator, args)
-        .map_err(|e| map_pyerr_w_ptr(&e, &allocator))?;
+    let program = node_from_bytes_backrefs(&mut allocator, program).map_err(map_pyerr)?;
+    let args = node_from_bytes_backrefs(&mut allocator, args).map_err(map_pyerr)?;
     let dialect = &ChiaDialect::new(flags.to_clvm_flags());
 
     let (puzzle, solution) = py
@@ -197,19 +195,13 @@ pub fn get_puzzle_and_solution_for_coin<'a>(
                 Ok(pair) => Ok(pair),
             }
         })
-        .map_err(|e| map_pyerr_w_ptr(&e, &allocator))?;
+        .map_err(map_pyerr)?;
 
     // keep serializing normally, until wallets support backrefs
     let serialize = node_to_bytes;
     Ok((
-        PyBytes::new(
-            py,
-            &serialize(&allocator, puzzle).map_err(|e| map_pyerr_w_ptr(&e, &allocator))?,
-        ),
-        PyBytes::new(
-            py,
-            &serialize(&allocator, solution).map_err(|e| map_pyerr_w_ptr(&e, &allocator))?,
-        ),
+        PyBytes::new(py, &serialize(&allocator, puzzle).map_err(map_pyerr)?),
+        PyBytes::new(py, &serialize(&allocator, solution).map_err(map_pyerr)?),
     ))
 }
 
@@ -236,8 +228,8 @@ pub fn get_puzzle_and_solution_for_coin2<'a>(
         py_to_slice::<'a>(buf)
     });
 
-    let generator = node_from_bytes_backrefs(&mut allocator, generator.as_ref())
-        .map_err(|e| map_pyerr_w_ptr(&e, &allocator))?;
+    let generator =
+        node_from_bytes_backrefs(&mut allocator, generator.as_ref()).map_err(map_pyerr)?;
     let args = setup_generator_args(&mut allocator, refs, flags)?;
     let dialect = &ChiaDialect::new(flags.to_clvm_flags());
 
@@ -252,15 +244,13 @@ pub fn get_puzzle_and_solution_for_coin2<'a>(
                 Ok(pair) => Ok(pair),
             }
         })
-        .map_err(|e| map_pyerr_w_ptr(&e, &allocator))?;
+        .map_err(map_pyerr)?;
 
     // keep serializing normally, until wallets support backrefs
     Ok((
-        node_to_bytes(&allocator, puzzle)
-            .map_err(|e| map_pyerr_w_ptr(&e, &allocator))?
-            .into(),
+        node_to_bytes(&allocator, puzzle).map_err(map_pyerr)?.into(),
         node_to_bytes(&allocator, solution)
-            .map_err(|e| map_pyerr_w_ptr(&e, &allocator))?
+            .map_err(map_pyerr)?
             .into(),
     ))
 }
@@ -429,16 +419,14 @@ fn fast_forward_singleton<'p>(
     new_parent: &Coin,
 ) -> PyResult<Bound<'p, PyBytes>> {
     let mut a = make_allocator(ConsensusFlags::LIMIT_HEAP);
-    let puzzle = node_from_bytes(&mut a, spend.puzzle_reveal.as_slice())
-        .map_err(|e| map_pyerr_w_ptr(&e, &a))?;
-    let solution =
-        node_from_bytes(&mut a, spend.solution.as_slice()).map_err(|e| map_pyerr_w_ptr(&e, &a))?;
+    let puzzle = node_from_bytes(&mut a, spend.puzzle_reveal.as_slice()).map_err(map_pyerr)?;
+    let solution = node_from_bytes(&mut a, spend.solution.as_slice()).map_err(map_pyerr)?;
 
     let new_solution = native_ff(&mut a, puzzle, solution, &spend.coin, new_coin, new_parent)?;
     Ok(PyBytes::new(
         py,
         node_to_bytes(&a, new_solution)
-            .map_err(|e| map_pyerr_w_ptr(&e, &a))?
+            .map_err(map_pyerr)?
             .as_slice(),
     ))
 }
