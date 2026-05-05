@@ -85,7 +85,7 @@ use clvmr::reduction::Reduction;
 use clvmr::run_program;
 use clvmr::serde::is_canonical_serialization;
 use chia_consensus::program_bytes::node_from_bytes_auto;
-use clvmr::serde::{node_from_bytes, node_to_bytes};
+use clvmr::serde::{SERDE_2026_MAGIC_PREFIX, node_from_bytes, node_to_bytes};
 
 use chia_bls::{
     BlsCache, DerivableKey, G1Element, GTElement, PublicKey, SecretKey, Signature,
@@ -809,6 +809,10 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
         chia_consensus::conditions::ELIGIBLE_FOR_FF,
     )?;
     m.add_class::<OwnedSpendConditions>()?;
+    m.add(
+        "SERDE_2026_MAGIC_PREFIX",
+        PyBytes::new(py, &SERDE_2026_MAGIC_PREFIX),
+    )?;
 
     // pot functions
     m.add_function(wrap_pyfunction!(py_calculate_sp_interval_iters, m)?)?;
