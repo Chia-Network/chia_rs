@@ -32,7 +32,7 @@ def parse_output(
     error_msg: Optional[str],
 ) -> str:
     if error_code is not None:
-        return f"FAILED: {error_code}\n"
+        return f"FAILED: {error_msg} ({error_code})\n"
     else:
         assert result is not None
         return print_spend_bundle_conditions(result)
