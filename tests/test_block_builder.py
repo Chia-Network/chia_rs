@@ -67,7 +67,7 @@ def test_block_builder() -> None:
         gen_time = end - start
 
         start = time.monotonic()
-        err, conds2 = run_block_generator2(
+        err, err_msg, conds2 = run_block_generator2(
             generator, [], 11000000000, MEMPOOL_MODE, signature, None, DEFAULT_CONSTANTS
         )
         end = time.monotonic()
@@ -78,5 +78,6 @@ def test_block_builder() -> None:
         )
 
         assert err is None
+        assert err_msg is None
         assert conds2 is not None
         assert conds2.cost == generator_cost

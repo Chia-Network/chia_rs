@@ -189,7 +189,11 @@ impl From<std::io::Error> for ValidationErr {
 #[cfg(feature = "py-bindings")]
 impl From<ValidationErr> for PyErr {
     fn from(err: ValidationErr) -> PyErr {
-        pyo3::exceptions::PyValueError::new_err(("ValidationError", u32::from(err.1)))
+        pyo3::exceptions::PyValueError::new_err((
+            "ValidationError",
+            u32::from(err.1),
+            format!("{:?}", err.1),
+        ))
     }
 }
 

@@ -43,7 +43,7 @@ def test_get_puzzle_and_solution_for_coin(input_file: str) -> None:
     )
 
     # first, run the block generator just to list all the spends
-    err, conds = run_block_generator2(
+    err, err_msg, conds = run_block_generator2(
         block,
         [],
         MAX_COST,
@@ -53,6 +53,7 @@ def test_get_puzzle_and_solution_for_coin(input_file: str) -> None:
         DEFAULT_CONSTANTS,
     )
     assert err is None
+    assert err_msg is None
     assert conds is not None
 
     args = b"\xff" + DESERIALIZE_MOD + b"\xff\x80\x80"

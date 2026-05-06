@@ -27,10 +27,12 @@ def compare_output(output: str, expected: str, title: str) -> None:
 
 
 def parse_output(
-    result: Optional[SpendBundleConditions], error_code: Optional[int]
+    result: Optional[SpendBundleConditions],
+    error_code: Optional[int],
+    error_msg: Optional[str],
 ) -> str:
     if error_code is not None:
-        return f"FAILED: {error_code}\n"
+        return f"FAILED: {error_msg} ({error_code})\n"
     else:
         assert result is not None
         return print_spend_bundle_conditions(result)
@@ -44,10 +46,10 @@ class Results:
 
 
 def run_generator(file: str, flags: int, version: int) -> Results:
-    error_code, result, run_time = run_gen(
+    error_code, error_msg, result, run_time = run_gen(
         file, flags, file.replace(".txt", ".env"), version
     )
-    output = parse_output(result, error_code)
+    output = parse_output(result, error_code, error_msg)
     return Results(output, result, run_time)
 
 
@@ -72,6 +74,9 @@ def validate_except_cost(output1: str, output2: str) -> None:
             idx = columns.index("exe-cost:")
             columns[idx + 1] = "0"
             l2 = " ".join(columns)
+        if l1 != l2:
+            print(l1)
+            print(l2)
         assert l1 == l2
 
 

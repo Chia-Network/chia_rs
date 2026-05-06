@@ -636,7 +636,7 @@ mod tests {
                     (
                         0,
                         0,
-                        format!("FAILED: {}\n", u32::from(code.1)),
+                        format!("FAILED: {:?} ({})\n", code.1, u32::from(code.1)),
                         block_conds,
                     )
                 }
@@ -696,7 +696,7 @@ mod tests {
             }
             Err(code) => {
                 println!("error: {code:?}");
-                format!("FAILED: {}\n", u32::from(code.1))
+                format!("FAILED: {:?} ({})\n", code.1, u32::from(code.1))
             }
         };
 

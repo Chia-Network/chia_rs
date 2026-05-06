@@ -32,7 +32,11 @@ pub fn run_block_generator<'a>(
     signature: &Signature,
     bls_cache: Option<&BlsCache>,
     constants: &ConsensusConstants,
-) -> (Option<u32>, Option<OwnedSpendBundleConditions>) {
+) -> (
+    Option<u32>,
+    Option<String>,
+    Option<OwnedSpendBundleConditions>,
+) {
     let refs = block_refs
         .into_iter()
         .map(|b| {
@@ -50,15 +54,17 @@ pub fn run_block_generator<'a>(
         ) {
             Ok((allocator, spend_bundle_conds)) => (
                 None,
+                None,
                 Some(OwnedSpendBundleConditions::from(
                     &allocator,
                     spend_bundle_conds,
                 )),
             ),
-            Err(ValidationErr(_, error_code)) => {
-                // a validation error occurred
-                (Some(error_code.into()), None)
-            }
+            Err(ValidationErr(_, error_code)) => (
+                Some(error_code.into()),
+                Some(format!("{error_code:?}")),
+                None,
+            ),
         }
     })
 }
@@ -75,7 +81,11 @@ pub fn run_block_generator2<'a>(
     signature: &Signature,
     bls_cache: Option<&BlsCache>,
     constants: &ConsensusConstants,
-) -> (Option<u32>, Option<OwnedSpendBundleConditions>) {
+) -> (
+    Option<u32>,
+    Option<String>,
+    Option<OwnedSpendBundleConditions>,
+) {
     let refs = block_refs
         .into_iter()
         .map(|b| {
@@ -94,15 +104,17 @@ pub fn run_block_generator2<'a>(
         ) {
             Ok((allocator, spend_bundle_conds)) => (
                 None,
+                None,
                 Some(OwnedSpendBundleConditions::from(
                     &allocator,
                     spend_bundle_conds,
                 )),
             ),
-            Err(ValidationErr(_, error_code)) => {
-                // a validation error occurred
-                (Some(error_code.into()), None)
-            }
+            Err(ValidationErr(_, error_code)) => (
+                Some(error_code.into()),
+                Some(format!("{error_code:?}")),
+                None,
+            ),
         }
     })
 }
@@ -129,12 +141,7 @@ pub fn additions_and_removals<'a>(
     let program = py_to_slice::<'a>(program);
 
     py.detach(|| {
-        native_additions_and_removals(program, refs, flags, constants).map_err(|e| {
-            // a validation error occurred
-            pyo3::exceptions::PyValueError::new_err(format!(
-                "additions_and_removals() failed: {}",
-                e.1 as u16
-            ))
-        })
+        native_additions_and_removals(program, refs, flags, constants)
+            .map_err(|e| -> pyo3::PyErr { e.into() })
     })
 }
