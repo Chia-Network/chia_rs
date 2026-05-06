@@ -396,7 +396,7 @@ fn run_generator(#[case] name: &str) {
                 }
                 (conditions.cost, print_conditions(a2, conditions, a2))
             }
-            Err(code) => (0, format!("FAILED: {}\n", u32::from(code.1))),
+            Err(code) => (0, format!("FAILED: {:?} ({})\n", code.1, u32::from(code.1))),
         };
 
         if UPDATE_TESTS {
@@ -452,7 +452,7 @@ fn run_generator(#[case] name: &str) {
                     print_conditions(&a1, &conditions, a2)
                 }
                 Err(code) => {
-                    format!("FAILED: {}\n", u32::from(code.1))
+                    format!("FAILED: {:?} ({})\n", code.1, u32::from(code.1))
                 }
             };
             if output != output_pre_hard_fork {

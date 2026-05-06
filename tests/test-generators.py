@@ -74,6 +74,9 @@ def validate_except_cost(output1: str, output2: str) -> None:
             idx = columns.index("exe-cost:")
             columns[idx + 1] = "0"
             l2 = " ".join(columns)
+        if l1 != l2:
+            print(l1)
+            print(l2)
         assert l1 == l2
 
 
