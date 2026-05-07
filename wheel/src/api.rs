@@ -59,9 +59,9 @@ use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::pybacked::PyBackedBytes;
-use pyo3::types::PyList;
 use pyo3::types::PyTuple;
 use pyo3::types::{PyBytes, PyDict};
+use pyo3::types::{PyList, PySequence, PySequenceMethods};
 use pyo3::wrap_pyfunction;
 use std::path::Path;
 
@@ -214,17 +214,17 @@ pub fn get_puzzle_and_solution_for_coin<'a>(
 pub fn get_puzzle_and_solution_for_coin2<'a>(
     py: Python<'a>,
     generator: &Program,
-    block_refs: &Bound<'a, PyList>,
+    block_refs: &Bound<'a, PySequence>,
     max_cost: Cost,
     find_coin: &Coin,
     flags: ConsensusFlags,
 ) -> PyResult<(Program, Program)> {
     let mut allocator = make_allocator(ConsensusFlags::LIMIT_HEAP);
 
-    let refs = block_refs.into_iter().map(|b| {
+    let refs = block_refs.to_list()?.into_iter().map(|b| {
         let buf = b
             .extract::<PyBuffer<u8>>()
-            .expect("block_refs should be a list of buffers");
+            .expect("block_refs should be a sequence of buffers");
         py_to_slice::<'a>(buf)
     });
 
@@ -534,15 +534,16 @@ pub fn get_spends_for_trusted_block<'a>(
     py: Python<'a>,
     constants: &ConsensusConstants,
     generator: Program,
-    block_refs: &Bound<'_, PyList>,
+    block_refs: &Bound<'_, PySequence>,
     flags: ConsensusFlags,
 ) -> pyo3::PyResult<Py<PyAny>> {
     let refs = block_refs
+        .to_list()?
         .into_iter()
         .map(|b| {
             let buf = b
                 .extract::<PyBuffer<u8>>()
-                .expect("block_refs must be list of buffers");
+                .expect("block_refs must be sequence of buffers");
             py_to_slice::<'a>(buf)
         })
         .collect::<Vec<&'a [u8]>>();
@@ -560,15 +561,16 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
     py: Python<'a>,
     constants: &ConsensusConstants,
     generator: Program,
-    block_refs: &Bound<'a, PyList>,
+    block_refs: &Bound<'a, PySequence>,
     flags: ConsensusFlags,
 ) -> pyo3::PyResult<Py<PyAny>> {
     let refs = block_refs
+        .to_list()?
         .into_iter()
         .map(|b| {
             let buf = b
                 .extract::<PyBuffer<u8>>()
-                .expect("block_refs must be list of buffers");
+                .expect("block_refs must be sequence of buffers");
             py_to_slice::<'a>(buf)
         })
         .collect::<Vec<&'a [u8]>>();

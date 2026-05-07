@@ -13,7 +13,7 @@ use clvmr::cost::Cost;
 use pyo3::PyResult;
 use pyo3::buffer::PyBuffer;
 use pyo3::prelude::*;
-use pyo3::types::PyList;
+use pyo3::types::{PySequence, PySequenceMethods};
 
 pub fn py_to_slice<'a>(buf: PyBuffer<u8>) -> &'a [u8] {
     assert!(buf.is_c_contiguous(), "buffer must be contiguous");
@@ -26,7 +26,7 @@ pub fn py_to_slice<'a>(buf: PyBuffer<u8>) -> &'a [u8] {
 pub fn run_block_generator<'a>(
     py: Python<'a>,
     program: PyBuffer<u8>,
-    block_refs: &Bound<'_, PyList>,
+    block_refs: &Bound<'_, PySequence>,
     max_cost: Cost,
     flags: ConsensusFlags,
     signature: &Signature,
@@ -38,11 +38,13 @@ pub fn run_block_generator<'a>(
     Option<OwnedSpendBundleConditions>,
 ) {
     let refs = block_refs
+        .to_list()
+        .expect("block_refs should be a sequence")
         .into_iter()
         .map(|b| {
             let buf = b
                 .extract::<PyBuffer<u8>>()
-                .expect("block_refs should be a list of buffers");
+                .expect("block_refs should be a sequence of buffers");
             py_to_slice::<'a>(buf)
         })
         .collect::<Vec<&'a [u8]>>();
@@ -75,7 +77,7 @@ pub fn run_block_generator<'a>(
 pub fn run_block_generator2<'a>(
     py: Python<'a>,
     program: PyBuffer<u8>,
-    block_refs: &Bound<'_, PyList>,
+    block_refs: &Bound<'_, PySequence>,
     max_cost: Cost,
     flags: ConsensusFlags,
     signature: &Signature,
@@ -87,11 +89,13 @@ pub fn run_block_generator2<'a>(
     Option<OwnedSpendBundleConditions>,
 ) {
     let refs = block_refs
+        .to_list()
+        .expect("block_refs should be a sequence")
         .into_iter()
         .map(|b| {
             let buf = b
                 .extract::<PyBuffer<u8>>()
-                .expect("block_refs must be list of buffers");
+                .expect("block_refs must be sequence of buffers");
             py_to_slice::<'a>(buf)
         })
         .collect::<Vec<&'a [u8]>>();
@@ -124,16 +128,17 @@ pub fn run_block_generator2<'a>(
 pub fn additions_and_removals<'a>(
     py: Python<'a>,
     program: PyBuffer<u8>,
-    block_refs: &Bound<'_, PyList>,
+    block_refs: &Bound<'_, PySequence>,
     flags: ConsensusFlags,
     constants: &ConsensusConstants,
 ) -> PyResult<(Vec<(Coin, Option<Bytes>)>, Vec<(Bytes32, Coin)>)> {
     let refs = block_refs
+        .to_list()?
         .into_iter()
         .map(|b| {
             let buf = b
                 .extract::<PyBuffer<u8>>()
-                .expect("block_refs must be list of buffers");
+                .expect("block_refs must be sequence of buffers");
             py_to_slice::<'a>(buf)
         })
         .collect::<Vec<&'a [u8]>>();
