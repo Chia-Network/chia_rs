@@ -168,21 +168,21 @@ pub enum ErrorCode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
-#[error("validation error: {1:?}")]
-pub struct ValidationErr(pub NodePtr, pub ErrorCode);
+#[error("validation error: {0:?}")]
+pub struct ValidationErr(pub ErrorCode);
 
 impl From<EvalErr> for ValidationErr {
     fn from(v: EvalErr) -> Self {
         match v {
-            EvalErr::CostExceeded => ValidationErr(v.node_ptr(), ErrorCode::CostExceeded),
-            _ => ValidationErr(v.node_ptr(), ErrorCode::GeneratorRuntimeError),
+            EvalErr::CostExceeded => ValidationErr(ErrorCode::CostExceeded),
+            _ => ValidationErr(ErrorCode::GeneratorRuntimeError),
         }
     }
 }
 
 impl From<std::io::Error> for ValidationErr {
     fn from(_: std::io::Error) -> Self {
-        ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError)
+        ValidationErr(ErrorCode::GeneratorRuntimeError)
     }
 }
 
@@ -191,8 +191,8 @@ impl From<ValidationErr> for PyErr {
     fn from(err: ValidationErr) -> PyErr {
         pyo3::exceptions::PyValueError::new_err((
             "ValidationError",
-            u32::from(err.1),
-            format!("{:?}", err.1),
+            u32::from(err.0),
+            format!("{:?}", err.0),
         ))
     }
 }
@@ -201,7 +201,7 @@ impl From<ValidationErr> for PyErr {
 pub fn first(a: &Allocator, n: NodePtr) -> Result<NodePtr, ValidationErr> {
     match a.sexp(n) {
         SExp::Pair(left, _) => Ok(left),
-        SExp::Atom => Err(ValidationErr(n, ErrorCode::InvalidCondition)),
+        SExp::Atom => Err(ValidationErr(ErrorCode::InvalidCondition)),
     }
 }
 
@@ -373,7 +373,7 @@ impl From<ErrorCode> for u32 {
 pub fn rest(a: &Allocator, n: NodePtr) -> Result<NodePtr, ValidationErr> {
     match a.sexp(n) {
         SExp::Pair(_, right) => Ok(right),
-        SExp::Atom => Err(ValidationErr(n, ErrorCode::InvalidCondition)),
+        SExp::Atom => Err(ValidationErr(ErrorCode::InvalidCondition)),
     }
 }
 
@@ -385,7 +385,7 @@ pub fn next(a: &Allocator, n: NodePtr) -> Result<Option<(NodePtr, NodePtr)>, Val
             if a.atom_len(n) == 0 {
                 Ok(None)
             } else {
-                Err(ValidationErr(n, ErrorCode::InvalidCondition))
+                Err(ValidationErr(ErrorCode::InvalidCondition))
             }
         }
     }
@@ -394,7 +394,7 @@ pub fn next(a: &Allocator, n: NodePtr) -> Result<Option<(NodePtr, NodePtr)>, Val
 pub fn atom(a: &Allocator, n: NodePtr, code: ErrorCode) -> Result<Atom<'_>, ValidationErr> {
     match a.sexp(n) {
         SExp::Atom => Ok(a.atom(n)),
-        SExp::Pair(..) => Err(ValidationErr(n, code)),
+        SExp::Pair(..) => Err(ValidationErr(code)),
     }
 }
 
@@ -402,6 +402,6 @@ pub fn check_nil(a: &Allocator, n: NodePtr) -> Result<(), ValidationErr> {
     if atom(a, n, ErrorCode::InvalidCondition)?.as_ref().is_empty() {
         Ok(())
     } else {
-        Err(ValidationErr(n, ErrorCode::InvalidCondition))
+        Err(ValidationErr(ErrorCode::InvalidCondition))
     }
 }

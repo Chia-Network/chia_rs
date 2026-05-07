@@ -34,7 +34,7 @@ pub fn sanitize_uint(
     // be interpreted as a negative integer. i.e. if the next top bit is set
     // all other leading zeros are invalid
     if buf == [0_u8] || (buf.len() > 1 && buf[0] == 0 && (buf[1] & 0x80) == 0) {
-        return Err(ValidationErr(n, code));
+        return Err(ValidationErr(code));
     }
 
     // strip the leading zero byte if there is one
@@ -75,26 +75,26 @@ fn test_sanitize_uint() {
     let just_zeros = a.new_substr(atom, 10, 70).unwrap();
     // a zero value must be represented by an empty atom
     assert_eq!(
-        sanitize_uint(&a, just_zeros, 8, e).unwrap_err().1,
+        sanitize_uint(&a, just_zeros, 8, e).unwrap_err().0,
         ErrorCode::InvalidCoinAmount
     );
 
     let a1 = a.new_substr(atom, 1, 101).unwrap();
     assert_eq!(
-        sanitize_uint(&a, a1, 8, e).unwrap_err().1,
+        sanitize_uint(&a, a1, 8, e).unwrap_err().0,
         ErrorCode::InvalidCoinAmount
     );
 
     let a1 = a.new_substr(atom, 1, 101).unwrap();
     assert_eq!(
-        sanitize_uint(&a, a1, 8, e).unwrap_err().1,
+        sanitize_uint(&a, a1, 8, e).unwrap_err().0,
         ErrorCode::InvalidCoinAmount
     );
 
     // a new all-zeros range
     let a1 = a.new_substr(atom, 1000, 1024).unwrap();
     assert_eq!(
-        sanitize_uint(&a, a1, 8, e).unwrap_err().1,
+        sanitize_uint(&a, a1, 8, e).unwrap_err().0,
         ErrorCode::InvalidCoinAmount
     );
 

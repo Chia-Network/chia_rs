@@ -329,7 +329,7 @@ fn run_generator(#[case] name: &str) {
                 &TEST_CONSTANTS,
             );
             assert_eq!(
-                test_conds.unwrap_err().1,
+                test_conds.unwrap_err().0,
                 ErrorCode::ComplexGeneratorReceived
             );
 
@@ -338,7 +338,7 @@ fn run_generator(#[case] name: &str) {
             let program = node_from_bytes_backrefs(&mut a, generator.as_ref())
                 .expect("node_from_bytes_backref");
             let res = check_generator_node(&a, program, flags | ConsensusFlags::SIMPLE_GENERATOR);
-            assert_eq!(res.unwrap_err().1, ErrorCode::ComplexGeneratorReceived);
+            assert_eq!(res.unwrap_err().0, ErrorCode::ComplexGeneratorReceived);
         } else {
             flags |= ConsensusFlags::SIMPLE_GENERATOR;
             // ensure SIMPLE_GENERATOR fails if there are any block references
@@ -352,7 +352,7 @@ fn run_generator(#[case] name: &str) {
                 None,
                 &TEST_CONSTANTS,
             );
-            assert_eq!(test_conds.unwrap_err().1, ErrorCode::TooManyGeneratorRefs);
+            assert_eq!(test_conds.unwrap_err().0, ErrorCode::TooManyGeneratorRefs);
 
             // now lets specifically check the node generator check
             let mut a = make_allocator(flags);
@@ -396,7 +396,7 @@ fn run_generator(#[case] name: &str) {
                 }
                 (conditions.cost, print_conditions(a2, conditions, a2))
             }
-            Err(code) => (0, format!("FAILED: {:?} ({})\n", code.1, u32::from(code.1))),
+            Err(code) => (0, format!("FAILED: {:?} ({})\n", code.0, u32::from(code.0))),
         };
 
         if UPDATE_TESTS {
@@ -452,7 +452,7 @@ fn run_generator(#[case] name: &str) {
                     print_conditions(&a1, &conditions, a2)
                 }
                 Err(code) => {
-                    format!("FAILED: {:?} ({})\n", code.1, u32::from(code.1))
+                    format!("FAILED: {:?} ({})\n", code.0, u32::from(code.0))
                 }
             };
             if output != output_pre_hard_fork {

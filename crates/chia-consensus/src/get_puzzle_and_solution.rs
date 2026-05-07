@@ -51,7 +51,7 @@ pub fn get_puzzle_and_solution_for_coin(
         // we found the coin!
         return Ok((puzzle, solution));
     }
-    Err(ValidationErr(generator_result, ErrorCode::InvalidCondition))
+    Err(ValidationErr(ErrorCode::InvalidCondition))
 }
 
 #[cfg(test)]
@@ -146,7 +146,7 @@ mod test {
                 &Coin::new(make_dummy_id(2), tree_hash(&a, puzzle1).into(), 1337),
             )
             .unwrap_err()
-            .1,
+            .0,
             ErrorCode::InvalidCondition
         );
 
@@ -158,7 +158,7 @@ mod test {
                 &Coin::new(parent, tree_hash(&a, puzzle1).into(), 42),
             )
             .unwrap_err()
-            .1,
+            .0,
             ErrorCode::InvalidCondition
         );
 
@@ -170,7 +170,7 @@ mod test {
                 &Coin::new(parent, make_dummy_id(4), 1337),
             )
             .unwrap_err()
-            .1,
+            .0,
             ErrorCode::InvalidCondition
         );
     }
@@ -194,14 +194,14 @@ mod test {
         // this is a spend where the parent is not an atom
         let spend2 = make_invalid_coin_spend(&mut a, puzzle2, amount_atom, puzzle1, solution1);
         assert_eq!(
-            parse_coin_spend(&a, spend2).unwrap_err().1,
+            parse_coin_spend(&a, spend2).unwrap_err().0,
             ErrorCode::InvalidParentId
         );
 
         // this is a spend where the amount is not an atom
         let spend3 = make_invalid_coin_spend(&mut a, parent_atom, puzzle2, puzzle1, solution1);
         assert_eq!(
-            parse_coin_spend(&a, spend3).unwrap_err().1,
+            parse_coin_spend(&a, spend3).unwrap_err().0,
             ErrorCode::InvalidCoinAmount
         );
     }

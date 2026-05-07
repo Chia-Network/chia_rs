@@ -62,7 +62,7 @@ pub fn run_block_generator<'a>(
                     spend_bundle_conds,
                 )),
             ),
-            Err(ValidationErr(_, error_code)) => (
+            Err(ValidationErr(error_code)) => (
                 Some(error_code.into()),
                 Some(format!("{error_code:?}")),
                 None,
@@ -114,7 +114,7 @@ pub fn run_block_generator2<'a>(
                     spend_bundle_conds,
                 )),
             ),
-            Err(ValidationErr(_, error_code)) => (
+            Err(ValidationErr(error_code)) => (
                 Some(error_code.into()),
                 Some(format!("{error_code:?}")),
                 None,
