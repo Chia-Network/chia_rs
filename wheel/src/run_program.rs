@@ -2,7 +2,6 @@ use crate::error::map_pyerr;
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::flags::ConsensusFlags;
 use chia_consensus::program_bytes::node_from_bytes_auto;
-use chia_consensus::serde_2026::node_from_bytes_auto;
 use chia_protocol::LazyNode;
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;
