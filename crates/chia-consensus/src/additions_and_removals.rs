@@ -15,7 +15,6 @@ use clvmr::allocator::NodePtr;
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
-use crate::program_bytes::node_from_bytes_auto;
 
 /// Run a *trusted* block generator and return its additions and removals. This
 /// function does not validate the block, it is assumed to be valid.

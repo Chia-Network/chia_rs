@@ -1,4 +1,5 @@
 use crate::allocator::make_allocator;
+use crate::condition_sanitizers::parse_amount;
 use crate::program_bytes::node_from_bytes_auto;
 use crate::conditions::{
     EmptyVisitor, MAX_SPENDS_PER_BLOCK, ParseState, SpendBundleConditions, parse_spends,
@@ -27,8 +28,6 @@ use clvmr::run_program::run_program;
 use clvmr::serde::{
     InternedTree, intern_tree_limited, node_from_bytes, node_from_bytes_backrefs,
 };
-use crate::serde_2026::node_from_bytes_auto;
->>>>>>> 17af0417 (serde_2026: track upstream API drop of DeserializeOptions)
 
 pub fn subtract_cost(cost_left: &mut Cost, subtract: Cost) -> Result<(), ValidationErr> {
     if subtract > *cost_left {
@@ -697,7 +696,7 @@ mod tests {
         let flags = ConsensusFlags::SIMPLE_GENERATOR;
         // Non-quote generator: starts with 0x80 (nil atom), not [0xff, 0x01]
         assert_eq!(
-            check_generator_quote(&[0x80], flags).unwrap_err().1,
+            check_generator_quote(&[0x80], flags).unwrap_err().0,
             ErrorCode::ComplexGeneratorReceived,
         );
         // Valid quote generator: starts with [0xff, 0x01]
@@ -727,7 +726,7 @@ mod tests {
         // Build a non-quote tree: just an atom (not (1 . rest))
         let atom = a.new_atom(&[42]).unwrap();
         assert_eq!(
-            check_generator_node(&a, atom, flags).unwrap_err().1,
+            check_generator_node(&a, atom, flags).unwrap_err().0,
             ErrorCode::ComplexGeneratorReceived,
         );
         // Build a valid (1 . nil) tree
