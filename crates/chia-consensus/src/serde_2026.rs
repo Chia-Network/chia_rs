@@ -8,7 +8,7 @@
 
 use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::error::Result;
-use clvmr::serde::{SERDE_2026_MAGIC_PREFIX, node_from_bytes_backrefs, deserialize_2026};
+use clvmr::serde::{SERDE_2026_MAGIC_PREFIX, deserialize_2026, node_from_bytes_backrefs};
 
 /// Per-atom byte cap used by chia consensus when deserializing CLVM blobs.
 ///
