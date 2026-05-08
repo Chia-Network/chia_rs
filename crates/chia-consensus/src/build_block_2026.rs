@@ -50,7 +50,7 @@ use crate::solution_generator::build_generator;
 use chia_bls::Signature;
 use chia_protocol::SpendBundle;
 use clvmr::allocator::Allocator;
-use clvmr::serde::{intern_tree, node_to_bytes_serde_2026};
+use clvmr::serde::{intern_tree, serialize_2026};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
@@ -250,7 +250,7 @@ impl BuilderInner {
             ));
         }
 
-        let serialized = node_to_bytes_serde_2026(&a, generator)?;
+        let serialized = serialize_2026(&a, generator, 0)?;
 
         let included_indices = self.candidates[..self.included_count]
             .iter()

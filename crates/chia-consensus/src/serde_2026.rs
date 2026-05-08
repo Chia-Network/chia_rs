@@ -8,7 +8,7 @@
 
 use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::error::Result;
-use clvmr::serde::{SERDE_2026_MAGIC_PREFIX, node_from_bytes_backrefs, node_from_bytes_serde_2026};
+use clvmr::serde::{SERDE_2026_MAGIC_PREFIX, node_from_bytes_backrefs, deserialize_2026};
 
 /// Per-atom byte cap used by chia consensus when deserializing CLVM blobs.
 ///
@@ -25,7 +25,7 @@ pub const CONSENSUS_MAX_ATOM_LEN: usize = 1 << 20;
 /// plain classic).
 pub fn node_from_bytes_auto(allocator: &mut Allocator, bytes: &[u8]) -> Result<NodePtr> {
     if bytes.starts_with(&SERDE_2026_MAGIC_PREFIX) {
-        node_from_bytes_serde_2026(allocator, bytes, CONSENSUS_MAX_ATOM_LEN, false)
+        deserialize_2026(allocator, bytes, CONSENSUS_MAX_ATOM_LEN, false)
     } else {
         node_from_bytes_backrefs(allocator, bytes)
     }

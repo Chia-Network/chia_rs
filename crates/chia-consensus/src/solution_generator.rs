@@ -3,7 +3,7 @@ use chia_protocol::Coin;
 use chia_protocol::CoinSpend;
 use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::serde::{
-    node_from_bytes_backrefs, node_to_bytes, node_to_bytes_backrefs, node_to_bytes_serde_2026,
+    node_from_bytes_backrefs, node_to_bytes, node_to_bytes_backrefs, serialize_2026,
 };
 
 /// the tuple has the Coin, puzzle-reveal and solution
@@ -115,7 +115,7 @@ where
 {
     let mut a = Allocator::new();
     let generator = build_generator(&mut a, spends)?;
-    Ok(node_to_bytes_serde_2026(&a, generator)?)
+    Ok(serialize_2026(&a, generator, 0)?)
 }
 
 #[cfg(test)]
