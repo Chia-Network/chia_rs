@@ -76,7 +76,6 @@ use crate::run_program::{run_chia_program, serialized_length, serialized_length_
 use chia_consensus::fast_forward::fast_forward_singleton as native_ff;
 use chia_consensus::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
 use chia_consensus::program_bytes::node_from_bytes_auto;
-use chia_consensus::serde_2026::node_from_bytes_auto;
 use chia_consensus::validation_error::ValidationErr;
 use clvmr::ChiaDialect;
 use clvmr::allocator::NodePtr;
