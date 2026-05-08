@@ -166,8 +166,8 @@ fn test_ff(
     ];
 
     match (conditions1, conditions2) {
-        (Err(ValidationErr(n1, msg1)), Err(ValidationErr(n2, msg2))) => {
-            if msg1 != msg2 || node_to_bytes(a, n1).unwrap() != node_to_bytes(a, n2).unwrap() {
+        (Err(ValidationErr(msg1)), Err(ValidationErr(msg2))) => {
+            if msg1 != msg2 {
                 assert!(discrepancy_errors.contains(&msg1) || discrepancy_errors.contains(&msg2));
             }
         }
@@ -205,14 +205,14 @@ fn test_ff(
             assert_eq!(spend1.create_coin, spend2.create_coin);
             assert_eq!(spend1.flags, spend2.flags);
         }
-        (Ok(conditions1), Err(ValidationErr(_n2, msg2))) => {
+        (Ok(conditions1), Err(ValidationErr(msg2))) => {
             // if the spend is valid and becomes invalid when
             // rebased/fast-forwarded, it should at least not be considered
             // eligible.
             assert!((conditions1.spends[0].flags & ELIGIBLE_FOR_FF) == 0);
             assert!(discrepancy_errors.contains(&msg2));
         }
-        (Err(ValidationErr(_n1, msg1)), Ok(conditions2)) => {
+        (Err(ValidationErr(msg1)), Ok(conditions2)) => {
             // if the spend is invalid and becomes valid when
             // rebased/fast-forwarded, it should not be considered
             // eligible. This is a bit of a far-fetched scenario, but could

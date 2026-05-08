@@ -43,7 +43,7 @@ where
 
     let Reduction(clvm_cost, all_spends) = run_program(&mut a, &dialect, program, args, cost_left)?;
 
-    subtract_cost(&a, &mut cost_left, clvm_cost)?;
+    subtract_cost(&mut cost_left, clvm_cost)?;
     let all_spends = first(&a, all_spends)?;
 
     let mut cache = TreeCache::default();
@@ -59,7 +59,7 @@ where
         iter = rest;
         let (_parent_id, (puzzle, _rest)) =
             <(NodePtr, (NodePtr, NodePtr))>::from_clvm(&a, spend)
-                .map_err(|_| ValidationErr(spend, ErrorCode::InvalidCondition))?;
+                .map_err(|_| ValidationErr(ErrorCode::InvalidCondition))?;
         cache.visit_tree(&a, puzzle);
     }
 
@@ -69,13 +69,13 @@ where
         // process the spend
         let (parent_id, (puzzle, (amount, (solution, _spend_level_extra)))) =
             <(Bytes32, (NodePtr, (NodePtr, (NodePtr, NodePtr))))>::from_clvm(&a, spend)
-                .map_err(|_| ValidationErr(spend, ErrorCode::InvalidCondition))?;
+                .map_err(|_| ValidationErr(ErrorCode::InvalidCondition))?;
         let amount = parse_amount(&a, amount, ErrorCode::InvalidCoinAmount)?;
 
         let Reduction(clvm_cost, mut iter) =
             run_program(&mut a, &dialect, puzzle, solution, cost_left)?;
 
-        subtract_cost(&a, &mut cost_left, clvm_cost)?;
+        subtract_cost(&mut cost_left, clvm_cost)?;
 
         let puzzle_hash = tree_hash_cached(&a, puzzle, &mut cache);
 
@@ -104,7 +104,7 @@ where
 
             let (puzzle_hash, (amount, hint)) =
                 <(Bytes32, (NodePtr, NodePtr))>::from_clvm(&a, c)
-                    .map_err(|_| ValidationErr(c, ErrorCode::InvalidCondition))?;
+                    .map_err(|_| ValidationErr(ErrorCode::InvalidCondition))?;
             let amount = parse_amount(&a, amount, ErrorCode::InvalidCoinAmount)?;
 
             let coin = Coin {

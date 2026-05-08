@@ -16,7 +16,6 @@ use chia_bls::PublicKey;
 use chia_protocol::{Bytes, SpendBundle};
 
 use clvm_utils::tree_hash;
-use clvmr::NodePtr;
 use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::reduction::Reduction;
@@ -49,7 +48,6 @@ pub fn get_conditions_from_spendbundle(
 /// based on the interned structure. Otherwise charges cost_per_byte on the raw
 /// generator length (excluding the quote wrapper).
 fn calculate_base_cost(
-    a: &mut Allocator,
     spend_bundle: &SpendBundle,
     flags: ConsensusFlags,
     constants: &ConsensusConstants,
@@ -63,9 +61,9 @@ fn calculate_base_cost(
                 .iter()
                 .map(|cs| (cs.coin, cs.puzzle_reveal.as_slice(), cs.solution.as_slice())),
         )
-        .map_err(|_| ValidationErr(a.nil(), ErrorCode::GeneratorRuntimeError))?;
+        .map_err(|_| ValidationErr(ErrorCode::GeneratorRuntimeError))?;
         let interned = intern_tree_limited(&gen_allocator, generator, u32::MAX as usize)
-            .map_err(|_| ValidationErr(NodePtr::NIL, ErrorCode::GeneratorRuntimeError))?;
+            .map_err(|_| ValidationErr(ErrorCode::GeneratorRuntimeError))?;
         Ok(total_cost_from_tree(&interned))
     } else {
         // We don't pay the size cost (nor execution cost) of being wrapped by a
@@ -92,13 +90,13 @@ pub fn run_spendbundle(
     let dialect = ChiaDialect::new(flags.to_clvm_flags());
     let mut ret = SpendBundleConditions::default();
     let mut state = ParseState::default();
-    let base_cost = calculate_base_cost(a, spend_bundle, flags, constants)?;
-    subtract_cost(a, &mut cost_left, base_cost)?;
+    let base_cost = calculate_base_cost(spend_bundle, flags, constants)?;
+    subtract_cost(&mut cost_left, base_cost)?;
 
     if flags.contains(ConsensusFlags::LIMIT_SPENDS)
         && spend_bundle.coin_spends.len() > MAX_SPENDS_PER_BLOCK
     {
-        return Err(ValidationErr(a.nil(), ErrorCode::TooManySpends));
+        return Err(ValidationErr(ErrorCode::TooManySpends));
     }
 
     for coin_spend in &spend_bundle.coin_spends {
@@ -110,11 +108,11 @@ pub fn run_spendbundle(
         let Reduction(clvm_cost, conditions) = run_program(a, &dialect, puz, sol, cost_left)?;
 
         ret.execution_cost += clvm_cost;
-        subtract_cost(a, &mut cost_left, clvm_cost)?;
+        subtract_cost(&mut cost_left, clvm_cost)?;
 
         let buf = tree_hash(a, puz);
         if coin_spend.coin.puzzle_hash != buf.into() {
-            return Err(ValidationErr(puz, ErrorCode::WrongPuzzleHash));
+            return Err(ValidationErr(ErrorCode::WrongPuzzleHash));
         }
         let puzzle_hash = a.new_atom(&buf)?;
         let spend = process_single_spend::<MempoolVisitor>(
@@ -139,7 +137,7 @@ pub fn run_spendbundle(
     }
 
     MempoolVisitor::post_process(a, &state, &mut ret)?;
-    validate_conditions(a, &ret, &state, a.nil(), flags)?;
+    validate_conditions(a, &ret, &state, flags)?;
 
     assert!(max_cost >= cost_left);
     ret.cost = max_cost - cost_left;
@@ -636,7 +634,7 @@ mod tests {
                     (
                         0,
                         0,
-                        format!("FAILED: {:?} ({})\n", code.1, u32::from(code.1)),
+                        format!("FAILED: {:?} ({})\n", code.0, u32::from(code.0)),
                         block_conds,
                     )
                 }
@@ -696,7 +694,7 @@ mod tests {
             }
             Err(code) => {
                 println!("error: {code:?}");
-                format!("FAILED: {:?} ({})\n", code.1, u32::from(code.1))
+                format!("FAILED: {:?} ({})\n", code.0, u32::from(code.0))
             }
         };
 
@@ -750,7 +748,7 @@ mod tests {
         let result = run_spendbundle(&mut alloc, &bundle, u64::MAX, flags, &TEST_CONSTANTS);
         match (expected_err, result) {
             (Some(err), Err(e)) => {
-                assert_eq!(e.1, err);
+                assert_eq!(e.0, err);
             }
             (None, Ok((conds, _))) => {
                 assert_eq!(conds.spends.len(), num_spends);

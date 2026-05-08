@@ -8,7 +8,6 @@ use chia_bls::GTElement;
 use chia_bls::{aggregate_verify_gt, hash_to_g2};
 use chia_protocol::SpendBundle;
 use chia_sha2::Sha256;
-use clvmr::NodePtr;
 
 // type definition makes clippy happy
 pub type ValidationPair = ([u8; 32], GTElement);
@@ -48,10 +47,7 @@ pub fn validate_clvm_and_signature(
         pairs.iter().map(|tuple| &tuple.1),
     );
     if !result {
-        return Err(ValidationErr(
-            NodePtr::NIL,
-            ErrorCode::BadAggregateSignature,
-        ));
+        return Err(ValidationErr(ErrorCode::BadAggregateSignature));
     }
 
     // Collect results
@@ -260,7 +256,7 @@ ff01\
                 MEMPOOL_MODE,
             )
             .unwrap_err()
-            .1,
+            .0,
             ErrorCode::WrongPuzzleHash
         );
     }
@@ -341,7 +337,7 @@ ff843B9ACA00\
             validate_clvm_and_signature(&spend_bundle, max_cost - 1, &TEST_CONSTANTS, MEMPOOL_MODE);
         assert!(matches!(
             result,
-            Err(ValidationErr(_, ErrorCode::CostExceeded))
+            Err(ValidationErr(ErrorCode::CostExceeded))
         ));
     }
 
@@ -426,7 +422,7 @@ ff843B9ACA00\
         );
         assert!(matches!(
             result,
-            Err(ValidationErr(_, ErrorCode::BadAggregateSignature))
+            Err(ValidationErr(ErrorCode::BadAggregateSignature))
         ));
     }
 }
