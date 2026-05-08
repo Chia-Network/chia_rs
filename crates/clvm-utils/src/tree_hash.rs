@@ -407,15 +407,15 @@ fn test_tree_hash_from_bytes() {
 #[test]
 fn test_tree_hash_auto_matches_tree_hash_for_all_formats() {
     use clvmr::serde::{
-        SERDE_2026_MAGIC_PREFIX, node_from_bytes_backrefs, node_from_bytes_serde_2026,
-        node_to_bytes, node_to_bytes_backrefs, node_to_bytes_serde_2026,
+        SERDE_2026_MAGIC_PREFIX, deserialize_2026, node_from_bytes_backrefs, node_to_bytes,
+        node_to_bytes_backrefs, serialize_2026,
     };
 
     // 1 MiB matches the legacy clvm_rs default; this test isn't consensus.
     const TEST_MAX_ATOM_LEN: usize = 1 << 20;
     let auto = |a: &mut Allocator, bytes: &[u8]| {
         if bytes.starts_with(&SERDE_2026_MAGIC_PREFIX) {
-            node_from_bytes_serde_2026(a, bytes, TEST_MAX_ATOM_LEN, false)
+            deserialize_2026(a, bytes, TEST_MAX_ATOM_LEN, false)
         } else {
             node_from_bytes_backrefs(a, bytes)
         }
@@ -434,7 +434,7 @@ fn test_tree_hash_auto_matches_tree_hash_for_all_formats() {
 
     let standard = node_to_bytes(&a, root).unwrap();
     let backrefs = node_to_bytes_backrefs(&a, root).unwrap();
-    let serde_2026 = node_to_bytes_serde_2026(&a, root).unwrap();
+    let serde_2026 = serialize_2026(&a, root, 0).unwrap();
 
     // tree_hash_from_bytes only handles standard + backrefs
     assert_eq!(tree_hash_from_bytes(&standard).unwrap(), canonical_hash);
