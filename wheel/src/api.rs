@@ -5,6 +5,7 @@ use crate::run_generator::{
 };
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::build_compressed_block::BlockBuilder;
+use chia_consensus::build_interned_block::InternedBlockBuilder;
 use chia_consensus::check_time_locks::py_check_time_locks;
 use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::flags::{ConsensusFlags, MEMPOOL_MODE};
@@ -763,6 +764,7 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(fast_forward_singleton, m)?)?;
     m.add_class::<OwnedSpendBundleConditions>()?;
     m.add_class::<BlockBuilder>()?;
+    m.add_class::<InternedBlockBuilder>()?;
     m.add(
         "ELIGIBLE_FOR_DEDUP",
         chia_consensus::conditions::ELIGIBLE_FOR_DEDUP,
