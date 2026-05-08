@@ -303,7 +303,7 @@ class MerkleBlob:
 
     def __new__(
         cls,
-        blob: bytes,
+        blob: ReadableBuffer,
     ) -> MerkleBlob: ...
 
     @classmethod

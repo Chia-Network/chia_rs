@@ -24,15 +24,15 @@ def supports_fast_forward(spend: CoinSpend) -> bool : ...
 def fast_forward_singleton(spend: CoinSpend, new_coin: Coin, new_parent: Coin) -> bytes: ...
 
 def run_block_generator(
-    program: ReadableBuffer, block_refs: list[ReadableBuffer], max_cost: int, flags: int, signature: G2Element, bls_cache: Optional[BLSCache], constants: ConsensusConstants
+    program: ReadableBuffer, block_refs: Sequence[ReadableBuffer], max_cost: int, flags: int, signature: G2Element, bls_cache: Optional[BLSCache], constants: ConsensusConstants
 ) -> tuple[Optional[int], Optional[str], Optional[SpendBundleConditions]]: ...
 
 def run_block_generator2(
-    program: ReadableBuffer, block_refs: list[ReadableBuffer], max_cost: int, flags: int, signature: G2Element, bls_cache: Optional[BLSCache], constants: ConsensusConstants
+    program: ReadableBuffer, block_refs: Sequence[ReadableBuffer], max_cost: int, flags: int, signature: G2Element, bls_cache: Optional[BLSCache], constants: ConsensusConstants
 ) -> tuple[Optional[int], Optional[str], Optional[SpendBundleConditions]]: ...
 
 def additions_and_removals(
-    program: ReadableBuffer, block_refs: list[ReadableBuffer], flags: int, constants: ConsensusConstants
+    program: ReadableBuffer, block_refs: Sequence[ReadableBuffer], flags: int, constants: ConsensusConstants
 ) -> tuple[list[tuple[Coin, Optional[bytes]]], list[tuple[bytes32, Coin]]]: ...
 
 def check_time_locks(
@@ -72,14 +72,14 @@ def get_conditions_from_spendbundle(
 def get_spends_for_trusted_block(
     constants: ConsensusConstants,
     generator: Program,
-    block_refs: list[ReadableBuffer],
+    block_refs: Sequence[ReadableBuffer],
     flags: int,
 ) -> dict[str, Any]: ...
 
 def get_spends_for_trusted_block_with_conditions(
     constants: ConsensusConstants,
     generator: Program,
-    block_refs: list[ReadableBuffer],
+    block_refs: Sequence[ReadableBuffer],
     flags: int,
 ) -> list[dict[str, Any]]: ...
 
@@ -155,7 +155,7 @@ def serialized_length(program: ReadableBuffer) -> int: ...
 def serialized_length_trusted(program: ReadableBuffer) -> int: ...
 def tree_hash(blob: ReadableBuffer) -> bytes32: ...
 def get_puzzle_and_solution_for_coin(program: ReadableBuffer, args: ReadableBuffer, max_cost: int, find_parent: bytes32, find_amount: int, find_ph: bytes32, flags: int) -> tuple[bytes, bytes]: ...
-def get_puzzle_and_solution_for_coin2(generator: Program, block_refs: list[ReadableBuffer], max_cost: int, find_coin: Coin, flags: int) -> tuple[Program, Program]: ...
+def get_puzzle_and_solution_for_coin2(generator: Program, block_refs: Sequence[ReadableBuffer], max_cost: int, find_coin: Coin, flags: int) -> tuple[Program, Program]: ...
 
 @final
 class BLSCache:
