@@ -160,17 +160,12 @@ def test_generator_interned_weight_dedup_pair() -> None:
 
 def test_generator_interned_weight_real_block() -> None:
     generator = bytes.fromhex(
-        open("generator-tests/block-834768.txt").read().split("\n")[0]
+        open("generator-tests/block-834768.txt", "r").read().split("\n")[0]
     )
     weight = generator_interned_weight(generator)
-    assert weight > 0
-    # Interned weight * COST_PER_BYTE is the INTERNED_GENERATOR cost model cost.
-    # For reference, the flat byte cost of this generator is len * 12000.
-    COST_PER_BYTE = 12000
-    interned_cost = weight * COST_PER_BYTE
-    byte_cost = len(generator) * COST_PER_BYTE
-    # Deduplication in a real block generator should reduce cost vs. flat bytes.
-    assert interned_cost < byte_cost
+    # Pinned value for block-834768 (39090 bytes serialized, 13465 unique weight).
+    # Interning deduplicates shared subtrees: 13465 << 39090.
+    assert weight == 13465
 
 
 def test_generator_interned_weight_bad_input() -> None:

@@ -4,7 +4,8 @@
 //! The weight `atom_bytes + 2*atoms + 3*pairs` is an upper bound on the
 //! serialized byte count.  COST_PER_BYTE (12000) comes from the consensus
 //! constants, so `total_cost_from_tree` hardcodes it only for internal use;
-//! callers who need the pre-multiplied weight can use `interned_weight`.
+//! callers who need the raw weight (before multiplying by COST_PER_BYTE) can
+//! use `interned_weight`.
 //!
 //! SHA tree-hash cost is not charged separately — it is structurally bounded
 //! by the size component (worst-case ratio <= 3.33, ~37ms SHA CPU on a 2012
@@ -48,10 +49,12 @@ mod tests {
     use clvmr::serde::intern_tree;
 
     #[test]
-    fn test_empty_atom() {
+    fn test_interned_weight_nil() {
+        // nil atom: 0 atom bytes, 1 atom, 0 pairs → 0 + 2*1 + 3*0 = 2
         let allocator = Allocator::new();
         let node = allocator.nil();
         let tree = intern_tree(&allocator, node).unwrap();
+        assert_eq!(interned_weight(&tree), 2);
         assert_eq!(total_cost_from_tree(&tree), 24_000);
     }
 

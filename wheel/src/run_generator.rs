@@ -157,12 +157,14 @@ pub fn additions_and_removals<'a>(
 /// `atom_bytes + 2*atom_count + 3*pair_count`.  Multiply by
 /// `COST_PER_BYTE` to get the full generator size cost.
 #[pyfunction]
-pub fn generator_interned_weight(program: PyBuffer<u8>) -> PyResult<u64> {
+pub fn generator_interned_weight(py: Python<'_>, program: PyBuffer<u8>) -> PyResult<u64> {
     let program = py_to_slice(program);
-    let mut a = Allocator::new();
-    let node = node_from_bytes_backrefs(&mut a, program)
-        .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("bad generator: {e}")))?;
-    let tree = intern_tree_limited(&a, node, u32::MAX as usize)
-        .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("intern failed: {e}")))?;
-    Ok(interned_weight(&tree))
+    py.detach(|| {
+        let mut a = Allocator::new();
+        let node = node_from_bytes_backrefs(&mut a, program)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("bad generator: {e}")))?;
+        let tree = intern_tree_limited(&a, node, u32::MAX as usize)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("intern failed: {e}")))?;
+        Ok(interned_weight(&tree))
+    })
 }
