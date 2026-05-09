@@ -6,6 +6,7 @@ use chia_protocol::Coin;
 use crate::allocator::make_allocator;
 use crate::consensus_constants::ConsensusConstants;
 use crate::flags::ConsensusFlags;
+use crate::serde_2026::node_from_bytes_auto;
 use crate::validation_error::{ErrorCode, ValidationErr, atom, first, next, rest};
 use chia_protocol::{Bytes, Bytes32};
 use clvm_traits::FromClvm;
@@ -14,7 +15,6 @@ use clvmr::allocator::NodePtr;
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
-use clvmr::serde::node_from_bytes_backrefs;
 
 /// Run a *trusted* block generator and return its additions and removals. This
 /// function does not validate the block, it is assumed to be valid.
@@ -36,7 +36,7 @@ where
 
     let mut cost_left = constants.max_block_cost_clvm;
 
-    let program = node_from_bytes_backrefs(&mut a, program)?;
+    let program = node_from_bytes_auto(&mut a, program)?;
 
     let args = setup_generator_args(&mut a, block_refs, flags)?;
     let dialect = ChiaDialect::new(flags.to_clvm_flags());

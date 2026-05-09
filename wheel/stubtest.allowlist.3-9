@@ -23,3 +23,6 @@ chia_rs\.SpendBundle\.from_parent
 # disjoint base (3.9 only)
 chia_rs\.sized_bytes\.SizedBytes
 chia_rs\.sized_ints\.StructStream
+
+# 3.9 stubtest rejects @final + @disjoint_base together; we keep both for 3.10+
+chia_rs\.Block2026Builder
