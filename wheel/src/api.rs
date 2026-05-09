@@ -17,6 +17,7 @@ use chia_consensus::run_block_generator::{
     get_coinspends_for_trusted_block, get_coinspends_with_conditions_for_trusted_block,
 };
 use chia_consensus::solution_generator::solution_generator as native_solution_generator;
+use chia_consensus::solution_generator::solution_generator_2026 as native_solution_generator_2026;
 use chia_consensus::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
 use chia_consensus::spendbundle_conditions::get_conditions_from_spendbundle;
 use chia_consensus::spendbundle_validation::{
@@ -82,7 +83,7 @@ use clvmr::error::EvalErr;
 use clvmr::reduction::Reduction;
 use clvmr::run_program;
 use clvmr::serde::is_canonical_serialization;
-use clvmr::serde::{node_from_bytes, node_from_bytes_backrefs, node_to_bytes};
+use clvmr::serde::{SERDE_2026_MAGIC_PREFIX, node_from_bytes, node_from_bytes_backrefs, node_to_bytes};
 
 use chia_bls::{
     BlsCache, DerivableKey, G1Element, GTElement, PublicKey, SecretKey, Signature,
@@ -295,6 +296,15 @@ fn solution_generator_backrefs<'p>(
         py,
         &native_solution_generator_backrefs(spends)?,
     ))
+}
+
+#[pyfunction]
+fn solution_generator_2026<'p>(
+    py: Python<'p>,
+    spends: &Bound<'_, PyAny>,
+) -> PyResult<Bound<'p, PyBytes>> {
+    let spends = convert_list_of_tuples(spends)?;
+    Ok(PyBytes::new(py, &native_solution_generator_2026(spends)?))
 }
 
 #[pyclass]
@@ -760,6 +770,7 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(additions_and_removals, m)?)?;
     m.add_function(wrap_pyfunction!(solution_generator, m)?)?;
     m.add_function(wrap_pyfunction!(solution_generator_backrefs, m)?)?;
+    m.add_function(wrap_pyfunction!(solution_generator_2026, m)?)?;
     m.add_function(wrap_pyfunction!(supports_fast_forward, m)?)?;
     m.add_function(wrap_pyfunction!(fast_forward_singleton, m)?)?;
     m.add_class::<OwnedSpendBundleConditions>()?;
@@ -837,6 +848,10 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("COST_CONDITIONS", ConsensusFlags::COST_CONDITIONS.bits())?;
     m.add("SIMPLE_GENERATOR", ConsensusFlags::SIMPLE_GENERATOR.bits())?;
     m.add("LIMIT_SPENDS", ConsensusFlags::LIMIT_SPENDS.bits())?;
+    m.add(
+        "SERDE_2026_MAGIC_PREFIX",
+        PyBytes::new(py, &SERDE_2026_MAGIC_PREFIX),
+    )?;
 
     // flags from clvm_rs, affecting execution
     m.add_function(wrap_pyfunction!(run_chia_program, m)?)?;

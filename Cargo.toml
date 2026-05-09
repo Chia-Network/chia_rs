@@ -143,7 +143,7 @@ chia-puzzle-types-fuzz = { path = "./crates/chia-puzzle-types/fuzz", version = "
 clvm-traits-fuzz = { path = "./crates/clvm-traits/fuzz", version = "0.42.0" }
 clvm-utils-fuzz = { path = "./crates/clvm-utils/fuzz", version = "0.42.0" }
 blst = { version = "0.3.16", features = ["portable"] }
-clvmr = "0.17.7"
+clvmr = "0.17"
 clvm-fuzzing = "0.17.0"
 syn = "2.0.101"
 quote = "1.0.40"
@@ -199,3 +199,8 @@ tempfile = "3.19.1"
 bitvec = "1.0.1"
 indexmap = "2.10.0"
 serde_arrays = "0.2.0"
+
+[patch.crates-io]
+# Pin clvmr to clvm_rs PR #708 (serde_2026) until the format ships in a
+# crates.io release. Bump this rev in lockstep with that branch.
+clvmr = { git = "https://github.com/Chia-Network/clvm_rs", rev = "b95f8bed118f509ec44a9ddabf1ed549192c336f" }
