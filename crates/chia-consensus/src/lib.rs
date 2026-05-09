@@ -3,6 +3,7 @@
 
 pub mod additions_and_removals;
 pub mod allocator;
+pub mod build_block_2026;
 pub mod build_compressed_block;
 pub mod build_interned_block;
 pub mod check_time_locks;
