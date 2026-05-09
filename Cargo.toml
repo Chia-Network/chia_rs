@@ -143,7 +143,7 @@ chia-puzzle-types-fuzz = { path = "./crates/chia-puzzle-types/fuzz", version = "
 clvm-traits-fuzz = { path = "./crates/clvm-traits/fuzz", version = "0.45.0" }
 clvm-utils-fuzz = { path = "./crates/clvm-utils/fuzz", version = "0.45.0" }
 blst = { version = "0.3.16", features = ["portable"] }
-clvmr = "0.17.7"
+clvmr = "0.17"
 clvm-fuzzing = "0.17.0"
 syn = "2.0.101"
 quote = "1.0.40"
@@ -199,3 +199,15 @@ tempfile = "3.19.1"
 bitvec = "1.0.1"
 indexmap = "2.10.0"
 serde_arrays = "0.2.0"
+
+[patch.crates-io]
+# Pin clvmr to the exact clvm_rs main commit where serde_2026 was squash-merged
+# (PR #708, commit 12b59aa) until the format ships in a crates.io release.
+# Deliberately NOT later main commits: main subsequently (a) bumped to 0.18.0,
+# which falls outside the semver range clvm-fuzzing (a separately-published
+# crate) requires for its own clvmr dependency, giving fuzz targets two
+# incompatible clvmr crate instances, and (b) renamed `ClvmFlags::LIMITS` to
+# `LIMIT_SOFTFORK` (PR #803), which chia-consensus's flags.rs (written against
+# the crates.io release) does not expect. Bump this rev only in lockstep with
+# a corresponding update to chia_rs's own use of the clvmr API.
+clvmr = { git = "https://github.com/Chia-Network/clvm_rs", rev = "12b59aa8007489738457afbf78dc9d771f0b2b7d" }
