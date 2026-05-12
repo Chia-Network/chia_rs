@@ -3,7 +3,7 @@ use chia_bls::Signature;
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::flags::ConsensusFlags;
 use chia_consensus::run_block_generator::{run_block_generator, run_block_generator2};
-use chia_consensus::validation_error::{ErrorCode, ValidationErr};
+use chia_consensus::validation_error::ErrorCode;
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
@@ -29,7 +29,7 @@ fuzz_target!(|data: &[u8]| {
 
     #[allow(clippy::match_same_arms)]
     match (r1, r2) {
-        (Err(ValidationErr(ErrorCode::CostExceeded)), Ok(_)) => {
+        (Err(e), Ok(_)) if e.error_code() == ErrorCode::CostExceeded => {
             // Since run_block_generator2 cost less, it's not a problem if the
             // original generator runs out of cost while the rust implementation
             // succeeds. This is part of its features.

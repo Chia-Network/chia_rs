@@ -47,7 +47,7 @@ pub fn validate_clvm_and_signature(
         pairs.iter().map(|tuple| &tuple.1),
     );
     if !result {
-        return Err(ValidationErr(ErrorCode::BadAggregateSignature));
+        return Err(ValidationErr::Err(ErrorCode::BadAggregateSignature));
     }
 
     // Collect results
@@ -256,7 +256,7 @@ ff01\
                 MEMPOOL_MODE,
             )
             .unwrap_err()
-            .0,
+            .error_code(),
             ErrorCode::WrongPuzzleHash
         );
     }
@@ -337,7 +337,7 @@ ff843B9ACA00\
             validate_clvm_and_signature(&spend_bundle, max_cost - 1, &TEST_CONSTANTS, MEMPOOL_MODE);
         assert!(matches!(
             result,
-            Err(ValidationErr(ErrorCode::CostExceeded))
+            Err(ValidationErr::Err(ErrorCode::CostExceeded))
         ));
     }
 
@@ -422,7 +422,7 @@ ff843B9ACA00\
         );
         assert!(matches!(
             result,
-            Err(ValidationErr(ErrorCode::BadAggregateSignature))
+            Err(ValidationErr::Err(ErrorCode::BadAggregateSignature))
         ));
     }
 }

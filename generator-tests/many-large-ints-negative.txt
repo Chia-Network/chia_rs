@@ -10,4 +10,4 @@ atoms: 280235
 pairs: 6441273
 heap: 536870979
 STRICT:
-FAILED: GeneratorRuntimeError (117)
+FAILED: eval error: Out of Memory (117)

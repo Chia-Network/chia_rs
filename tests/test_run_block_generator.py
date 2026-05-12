@@ -85,7 +85,7 @@ def test_run_block_generator_cost() -> None:
     )
     # BLOCK_COST_EXCEEDS_MAX = 23
     assert err == 23
-    assert err_msg == "CostExceeded"
+    assert err_msg == "validation error: CostExceeded"
     assert conds is None
 
     err, err_msg, conds = run_block_generator2(
@@ -99,7 +99,7 @@ def test_run_block_generator_cost() -> None:
     )
     # BLOCK_COST_EXCEEDS_MAX = 23
     assert err == 23
-    assert err_msg == "CostExceeded"
+    assert err_msg == "validation error: CostExceeded"
     assert conds is None
 
     # the byte cost alone exceeds the limit by 1
@@ -114,7 +114,7 @@ def test_run_block_generator_cost() -> None:
     )
     # BLOCK_COST_EXCEEDS_MAX = 23
     assert err == 23
-    assert err_msg == "CostExceeded"
+    assert err_msg == "validation error: CostExceeded"
     assert conds is None
 
     # the byte cost alone exceeds the limit by 1
@@ -129,5 +129,5 @@ def test_run_block_generator_cost() -> None:
     )
     # BLOCK_COST_EXCEEDS_MAX = 23
     assert err == 23
-    assert err_msg == "CostExceeded"
+    assert err_msg == "validation error: CostExceeded"
     assert conds is None

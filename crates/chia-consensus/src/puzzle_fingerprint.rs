@@ -23,12 +23,12 @@ fn hash_atom_list(
 ) -> Result<NodePtr, ValidationErr> {
     while count > 0 {
         let Some((arg, next)) = a.next(args) else {
-            return Err(ValidationErr(ErrorCode::InvalidCondition));
+            return Err(ValidationErr::Err(ErrorCode::InvalidCondition));
         };
         args = next;
         count -= 1;
         if !matches!(a.sexp(arg), SExp::Atom) {
-            return Err(ValidationErr(ErrorCode::InvalidCondition));
+            return Err(ValidationErr::Err(ErrorCode::InvalidCondition));
         }
         let buf = a.atom(arg);
 
@@ -135,7 +135,7 @@ pub fn compute_puzzle_fingerprint(
                 hash_atom_list(&mut fingerprint, a, c, 1)?;
             }
             _ => {
-                return Err(ValidationErr(ErrorCode::InvalidConditionOpcode));
+                return Err(ValidationErr::Err(ErrorCode::InvalidConditionOpcode));
             }
         }
     }
@@ -215,7 +215,9 @@ mod tests {
 
         // we expect 2 elements, but there's only 1
         assert_eq!(
-            hash_atom_list(&mut ctx1, &a, list, 2).unwrap_err().0,
+            hash_atom_list(&mut ctx1, &a, list, 2)
+                .unwrap_err()
+                .error_code(),
             ErrorCode::InvalidCondition
         );
     }
@@ -230,7 +232,9 @@ mod tests {
 
         // we expect all elements to be atoms, but we encountered a pair
         assert_eq!(
-            hash_atom_list(&mut ctx1, &a, list, 1).unwrap_err().0,
+            hash_atom_list(&mut ctx1, &a, list, 1)
+                .unwrap_err()
+                .error_code(),
             ErrorCode::InvalidCondition
         );
     }

@@ -21,8 +21,11 @@ fuzz_target!(|data: &[u8]| {
         Ok(SanitizedUint::PositiveOverflow) => {
             assert!(data.len() > 8);
         }
-        Err(ValidationErr(c)) => {
+        Err(ValidationErr::Err(c)) => {
             assert!(c == ErrorCode::InvalidCoinAmount);
+        }
+        _ => {
+            panic!("invalid state");
         }
     }
 
@@ -39,8 +42,11 @@ fuzz_target!(|data: &[u8]| {
         Ok(SanitizedUint::PositiveOverflow) => {
             assert!(data.len() > 4);
         }
-        Err(ValidationErr(c)) => {
+        Err(ValidationErr::Err(c)) => {
             assert!(c == ErrorCode::InvalidCoinAmount);
+        }
+        _ => {
+            panic!("invalid state");
         }
     }
 });
