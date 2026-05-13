@@ -52,13 +52,19 @@ pub fn iterate_blocks(
         let block =
             FullBlock::from_bytes_unchecked(&block_buffer).expect("failed to parse FullBlock");
 
-        if block.transactions_generator.is_none() {
+        let generator = block
+            .transactions_generator()
+            .expect("failed to parse transactions_generator");
+        if generator.is_none() {
             callback(height, block, vec![]);
             continue;
         }
 
         let mut block_refs = Vec::<Vec<u8>>::new();
-        for height in &block.transactions_generator_ref_list {
+        let ref_list = block
+            .transactions_generator_ref_list()
+            .expect("failed to parse transactions_generator_ref_list");
+        for height in &ref_list {
             let mut rows = block_ref_lookup
                 .query(rusqlite::params![height])
                 .expect("failed to look up ref-block");
@@ -78,7 +84,8 @@ pub fn iterate_blocks(
             let ref_block =
                 FullBlock::from_bytes_unchecked(&ref_block).expect("failed to parse ref-block");
             let ref_gen = ref_block
-                .transactions_generator
+                .transactions_generator()
+                .expect("failed to parse ref-block transactions_generator")
                 .expect("block ref has no generator");
             block_refs.push(ref_gen.as_ref().into());
         }

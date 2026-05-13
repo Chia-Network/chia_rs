@@ -223,15 +223,15 @@ fn main() {
         args.start_height,
         max_height,
         |height, block, block_refs| {
-            if block.transactions_generator.is_none() {
+            let generator = block
+                .transactions_generator()
+                .expect("failed to parse transactions_generator");
+            if generator.is_none() {
                 return;
             }
             pool.execute(move || {
                 let ti = block.transactions_info.as_ref().expect("transactions_info");
-                let generator = block
-                    .transactions_generator
-                    .as_ref()
-                    .expect("transactions_generator");
+                let generator = generator.as_ref().expect("transactions_generator");
 
                 if args.test_canonical_encoding {
                     if !is_canonical_serialization(generator) {

@@ -636,6 +636,7 @@ dependencies = [
  "chia-puzzles",
  "chia-sha2 0.42.1",
  "chia-traits 0.42.1",
+ "chia_streamable_macro 0.42.1",
  "clap",
  "clvm-traits",
  "clvm-utils",

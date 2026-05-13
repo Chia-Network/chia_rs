@@ -266,7 +266,10 @@ features that are validated:
             }
             additions.remove(new_coin_id.as_slice());
         }
-        if block.transactions_generator.is_none() {
+        let generator = block
+            .transactions_generator()
+            .expect("failed to parse transactions_generator");
+        if generator.is_none() {
             // this is not a transaction block
             // there should be no coins in the coin table spent at this height.
             if !removals.is_empty() {
@@ -299,10 +302,7 @@ features that are validated:
         let cnt = error_count.clone();
         pool.execute(move || {
                 let ti = block.transactions_info.as_ref().expect("transactions_info");
-                let generator = block
-                    .transactions_generator
-                    .as_ref()
-                    .expect("transactions_generator");
+                let generator = generator.as_ref().expect("transactions_generator");
 
                 // after the hard fork, we run blocks without paying for the CLVM generator ROM
                 let block_runner = if height >= constants.hard_fork_height {

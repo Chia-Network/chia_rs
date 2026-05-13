@@ -37,7 +37,8 @@ fn main() {
         let block = FullBlock::from_bytes_unchecked(&block).expect("failed to parse FullBlock");
 
         let program = block
-            .transactions_generator
+            .transactions_generator()
+            .expect("failed to parse transactions_generator")
             .expect("not a transaction block");
 
         println!("{}\n", hex::encode(program.as_ref()));

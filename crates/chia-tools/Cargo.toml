@@ -17,6 +17,7 @@ openssl = ["clvmr/openssl", "chia-sha2/openssl"]
 [dependencies]
 chia-protocol = { workspace = true }
 chia-traits = { workspace = true }
+chia_streamable_macro = { workspace = true }
 chia-puzzles = { workspace = true }
 clvm-utils = { workspace = true }
 clvm-traits = { workspace = true }
@@ -79,6 +80,11 @@ bench = false
 
 [[bin]]
 name = "validate-blockchain-db"
+test = false
+bench = false
+
+[[bin]]
+name = "fullblock-deferred-equivalence"
 test = false
 bench = false
 

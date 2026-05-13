@@ -69,7 +69,10 @@ fn main() {
                 print!("  {height}\r");
                 io::stdout().flush().unwrap();
             }
-            if block.transactions_generator.is_none() {
+            let generator = block
+                .transactions_generator()
+                .expect("failed to parse transactions_generator");
+            if generator.is_none() {
                 return;
             }
             let output = output.clone();
@@ -81,10 +84,7 @@ fn main() {
                     run_block_generator
                 };
 
-                let generator = block
-                    .transactions_generator
-                    .as_ref()
-                    .expect("transactions_generator");
+                let generator = generator.as_ref().expect("transactions_generator");
 
                 let ti = block.transactions_info.as_ref().expect("transactions_info");
 

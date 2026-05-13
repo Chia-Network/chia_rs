@@ -83,12 +83,15 @@ fn main() {
         args.start_height,
         args.max_height,
         |height, block, block_refs| {
-            if block.transactions_generator.is_none() {
+            let prg = block
+                .transactions_generator()
+                .expect("failed to parse transactions_generator");
+            if prg.is_none() {
                 return;
             }
             // this is called for each transaction block
             let max_cost = block.transactions_info.unwrap().cost;
-            let prg = block.transactions_generator.unwrap();
+            let prg = prg.unwrap();
 
             let seen_puzzles = seen_puzzles.clone();
             let seen_singletons = seen_singletons.clone();
