@@ -76,8 +76,8 @@ impl LegacyFullBlock {
             && self.challenge_chain_ip_proof.normalized_to_identity
     }
 
-    pub fn transactions_generator(&self) -> &Option<Program> {
-        &self.transactions_generator
+    pub fn transactions_generator(&self) -> Option<&Program> {
+        self.transactions_generator.as_ref()
     }
 
     pub fn transactions_generator_ref_list(&self) -> &Vec<u32> {

@@ -18,6 +18,7 @@ use std::io::Cursor;
 /// The old eager `FullBlock` layout lives only in the proving tool that checks
 /// this representation against mainnet blocks.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GeneratorInfo(Bytes);
 
@@ -98,9 +99,15 @@ mod tests {
         Program::from(&gen_bytes[..])
     }
 
-    fn generator_info_blob(generator: Option<Program>, ref_list: &[u32]) -> Vec<u8> {
+    fn generator_info_blob(generator: Option<&Program>, ref_list: &[u32]) -> Vec<u8> {
         let mut blob = Vec::new();
-        generator.stream(&mut blob).unwrap();
+        match generator {
+            Some(generator) => {
+                blob.push(1);
+                generator.stream(&mut blob).unwrap();
+            }
+            None => blob.push(0),
+        }
         ref_list.to_vec().stream(&mut blob).unwrap();
         blob
     }
@@ -112,7 +119,7 @@ mod tests {
         let ref_list = vec![100u32, 200u32];
 
         // Serialize to blob format
-        let blob = generator_info_blob(Some(generator.clone()), &ref_list);
+        let blob = generator_info_blob(Some(&generator), &ref_list);
 
         // Create GeneratorInfo from blob
         let gen_info = GeneratorInfo::from_bytes(Bytes::from(blob.clone()));
@@ -147,7 +154,7 @@ mod tests {
     #[test]
     fn test_generator_info_present_generator_empty_ref_list() {
         let generator = test_program();
-        let blob = generator_info_blob(Some(generator.clone()), &[]);
+        let blob = generator_info_blob(Some(&generator), &[]);
         let gen_info = GeneratorInfo::from_bytes(Bytes::from(blob));
 
         let (parsed_gen, parsed_ref_list) = gen_info.parse_generator_info().unwrap();
@@ -159,7 +166,7 @@ mod tests {
     #[test]
     fn test_generator_info_rejects_trailing_bytes() {
         let generator = test_program();
-        let mut blob = generator_info_blob(Some(generator), &[42]);
+        let mut blob = generator_info_blob(Some(&generator), &[42]);
         blob.push(0xff);
         let gen_info = GeneratorInfo::from_bytes(Bytes::from(blob));
 

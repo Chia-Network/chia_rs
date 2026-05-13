@@ -7,7 +7,7 @@ output_file = Path(__file__).parent.resolve() / "python" / "chia_rs" / "chia_rs.
 crates_dir = Path(__file__).parent.parent.resolve() / "crates"
 input_dir = crates_dir / "chia-protocol" / "src"
 
-ignore_structs = ["PyPlotParam"]
+ignore_structs = ["PyPlotParam", "GeneratorInfo"]
 
 # enums are exposed to python as int
 enums = set(
@@ -162,6 +162,8 @@ def parse_rust_source(filename: str, upper_case: bool) -> list[tuple[str, list[s
                     in_struct = in_struct.strip()
                 elif line.startswith("pub struct ") and "(" in line and ");" in line:
                     name = line.split("pub struct ")[1].split("(")[0].strip()
+                    if name in ignore_structs:
+                        continue
                     rust_args = line.split("(")[1].split(");")[0]
                     args = []
                     for idx, rust_type in enumerate(rust_args.split(",")):
@@ -183,12 +185,18 @@ def parse_rust_source(filename: str, upper_case: bool) -> list[tuple[str, list[s
             # a field
             if ":" in line and "///" not in line:
                 name, rust_type = line.split("//")[0].strip().split(":")
+                if name.startswith("pub "):
+                    name = name.removeprefix("pub ").strip()
                 # members are separated by , in rust. Strip that off
                 try:
                     rust_type, line = rust_type.rsplit(",", 1)
                 except:
                     rust_type, line = rust_type.rsplit("}", 1)
                     line = "}" + line
+                if in_struct == "FullBlock" and name == "generator_info":
+                    members.append("transactions_generator: Optional[Program]")
+                    members.append("transactions_generator_ref_list: list[uint32]")
+                    continue
                 py_type = rust_type_to_python(rust_type)
                 members.append(f"{name.upper() if upper_case else name}: {py_type}")
 

@@ -23,7 +23,7 @@ fn test_fullblock_deferred_api_compiles() {
 
 /// Load and compare multiple blocks from test data if available
 #[test]
-#[ignore] // Only run when test data is available
+#[ignore = "only run when test data is available"]
 fn test_parse_real_blockchain_blocks() {
     use std::fs;
     use std::path::Path;
@@ -62,6 +62,6 @@ fn test_parse_real_blockchain_blocks() {
         tested_count += 1;
     }
 
-    println!("Successfully parsed {} blocks", tested_count);
+    println!("Successfully parsed {tested_count} blocks");
     assert!(tested_count > 0, "No blocks were tested");
 }

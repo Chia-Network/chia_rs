@@ -47,8 +47,8 @@ fn record_mismatch(height: u32, category: &str, detail: impl std::fmt::Display) 
 fn compare_value<T: PartialEq + std::fmt::Debug>(
     height: u32,
     category: &str,
-    eager: T,
-    deferred: T,
+    eager: &T,
+    deferred: &T,
 ) -> bool {
     if eager == deferred {
         true
@@ -62,7 +62,7 @@ fn compare_value<T: PartialEq + std::fmt::Debug>(
     }
 }
 
-fn compare_generator(height: u32, eager: &Option<Program>, deferred: &Option<Program>) -> bool {
+fn compare_generator(height: u32, eager: Option<&Program>, deferred: Option<&Program>) -> bool {
     match (eager, deferred) {
         (None, None) => true,
         (Some(eager), Some(deferred)) if eager.as_slice() == deferred.as_slice() => true,
@@ -171,37 +171,37 @@ fn compare_blocks(height: u32, block_bytes: &[u8]) -> bool {
     };
 
     let mut ok = true;
-    ok &= compare_value(height, "height", eager.height(), deferred.height());
-    ok &= compare_value(height, "weight", eager.weight(), deferred.weight());
+    ok &= compare_value(height, "height", &eager.height(), &deferred.height());
+    ok &= compare_value(height, "weight", &eager.weight(), &deferred.weight());
     ok &= compare_value(
         height,
         "total_iters",
-        eager.total_iters(),
-        deferred.total_iters(),
+        &eager.total_iters(),
+        &deferred.total_iters(),
     );
     ok &= compare_value(
         height,
         "prev_header_hash",
-        eager.prev_header_hash(),
-        deferred.prev_header_hash(),
+        &eager.prev_header_hash(),
+        &deferred.prev_header_hash(),
     );
     ok &= compare_value(
         height,
         "header_hash",
-        eager.header_hash(),
-        deferred.header_hash(),
+        &eager.header_hash(),
+        &deferred.header_hash(),
     );
     ok &= compare_value(
         height,
         "is_transaction_block",
-        eager.is_transaction_block(),
-        deferred.is_transaction_block(),
+        &eager.is_transaction_block(),
+        &deferred.is_transaction_block(),
     );
     ok &= compare_value(
         height,
         "is_fully_compactified",
-        eager.is_fully_compactified(),
-        deferred.is_fully_compactified(),
+        &eager.is_fully_compactified(),
+        &deferred.is_fully_compactified(),
     );
 
     let deferred_generator = match deferred.transactions_generator() {
@@ -211,7 +211,11 @@ fn compare_blocks(height: u32, block_bytes: &[u8]) -> bool {
             return false;
         }
     };
-    ok &= compare_generator(height, eager.transactions_generator(), &deferred_generator);
+    ok &= compare_generator(
+        height,
+        eager.transactions_generator(),
+        deferred_generator.as_ref(),
+    );
 
     let deferred_ref_list = match deferred.transactions_generator_ref_list() {
         Ok(ref_list) => ref_list,
@@ -223,8 +227,8 @@ fn compare_blocks(height: u32, block_bytes: &[u8]) -> bool {
     ok &= compare_value(
         height,
         "transactions_generator_ref_list",
-        eager.transactions_generator_ref_list().clone(),
-        deferred_ref_list,
+        eager.transactions_generator_ref_list(),
+        &deferred_ref_list,
     );
 
     let eager_bytes = match eager.to_bytes() {

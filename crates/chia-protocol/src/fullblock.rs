@@ -13,6 +13,7 @@ use std::io::Cursor;
 /// stored as a single opaque tail blob. Accessors parse that tail lazily.
 #[derive(Hash, Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "py-bindings", pyo3::pyclass(frozen))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FullBlock {
     pub finished_sub_slots: Vec<EndOfSubSlotBundle>,
@@ -31,7 +32,7 @@ pub struct FullBlock {
 }
 
 impl FullBlock {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::needless_pass_by_value, clippy::too_many_arguments)]
     pub fn new(
         finished_sub_slots: Vec<EndOfSubSlotBundle>,
         reward_chain_block: RewardChainBlock,
@@ -246,17 +247,18 @@ impl FullBlock {
         )
     }
 
-    fn __repr__(&self) -> PyResult<String> {
-        Ok(format!("{self:?}"))
+    fn __repr__(&self) -> String {
+        format!("{self:?}")
     }
 
-    fn __hash__(&self) -> PyResult<isize> {
+    fn __hash__(&self) -> isize {
         use std::hash::{Hash, Hasher};
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         Hash::hash(self, &mut hasher);
-        Ok(hasher.finish() as isize)
+        hasher.finish() as isize
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     fn __richcmp__(
         &self,
         other: PyRef<'_, Self>,
@@ -486,14 +488,14 @@ impl FullBlock {
                     "reward_chain_sp_proof" => reward_chain_sp_proof = value.extract()?,
                     "reward_chain_ip_proof" => reward_chain_ip_proof = value.extract()?,
                     "infused_challenge_chain_ip_proof" => {
-                        infused_challenge_chain_ip_proof = value.extract()?
+                        infused_challenge_chain_ip_proof = value.extract()?;
                     }
                     "foliage" => foliage = value.extract()?,
                     "foliage_transaction_block" => foliage_transaction_block = value.extract()?,
                     "transactions_info" => transactions_info = value.extract()?,
                     "transactions_generator" => transactions_generator = value.extract()?,
                     "transactions_generator_ref_list" => {
-                        transactions_generator_ref_list = value.extract()?
+                        transactions_generator_ref_list = value.extract()?;
                     }
                     _ => {
                         return Err(pyo3::exceptions::PyKeyError::new_err(format!(
@@ -547,12 +549,12 @@ impl FullBlock {
         self.py_to_bytes(py)
     }
 
-    fn __deepcopy__(&self, _memo: &Bound<'_, PyAny>) -> PyResult<Self> {
-        Ok(self.clone())
+    fn __deepcopy__(&self, _memo: &Bound<'_, PyAny>) -> Self {
+        self.clone()
     }
 
-    fn __copy__(&self) -> PyResult<Self> {
-        Ok(self.clone())
+    fn __copy__(&self) -> Self {
+        self.clone()
     }
 
     fn to_json_dict(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
